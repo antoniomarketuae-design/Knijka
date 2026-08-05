@@ -1,0 +1,529 @@
+{
+ "version": 1,
+ "retrievedAt": "2026-08-04",
+ "claims": [
+  {
+   "id": "med-cpr-depth",
+   "topicBg": "Дълбочина на гръдните компресии при възрастен",
+   "conceptIds": [
+    "c-cpr-basics"
+   ],
+   "questionIds": [
+    "q-ptp-036"
+   ],
+   "figureBg": "5–6 см",
+   "figureQuote": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "Effectiveness depends on hand position, depth of chest compressions, and the rate at which they are done. The ERC Guidelines are clear that the most effective rate is 100 to 120 chest compressions per minute. Equally important to effective compressions is the force or depth of each push: each compression must push the chest down 5 to 6 cm. The hands should be positioned on the centre of the chest.\r",
+    "lineNo": 446
+   },
+   "naredba24TopicBg": "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+   "authoritative": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "Effectiveness depends on hand position, depth of chest compressions, and the rate at which they are done. The ERC Guidelines are clear that the most effective rate is 100 to 120 chest compressions per minute. Equally important to effective compressions is the force or depth of each push: each compression must push the chest down 5 to 6 cm. The hands should be positioned on the centre of the chest.\r",
+    "lineNo": 446
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "Compress to a depth of at least 5 cm, but not more than 6 cm.",
+     "lineNo": 119
+    },
+    {
+     "sourceId": "src-bchk-first-help-bls",
+     "quoteBg": "6. Уверете се, че раменете ви са разположени точно над гърдите на пострадалия. Натискайте най-малко 5 см (макс. 6 cм) надолу върху гръдната кост с изпънати ръце.",
+     "lineNo": 89
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "И трите източника — включително БЧК — казват 5–6 см. Тезата, че БЧК още учи 4–5 см, не се потвърждава от текста на страницата към 2026-08-04."
+  },
+  {
+   "id": "med-cpr-rate",
+   "topicBg": "Честота на гръдните компресии при възрастен",
+   "conceptIds": [
+    "c-cpr-basics"
+   ],
+   "questionIds": [
+    "q-ptp-016"
+   ],
+   "figureBg": "100–120 в минута",
+   "figureQuote": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "Effectiveness depends on hand position, depth of chest compressions, and the rate at which they are done. The ERC Guidelines are clear that the most effective rate is 100 to 120 chest compressions per minute. Equally important to effective compressions is the force or depth of each push: each compression must push the chest down 5 to 6 cm. The hands should be positioned on the centre of the chest.\r",
+    "lineNo": 446
+   },
+   "naredba24TopicBg": "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+   "authoritative": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "Effectiveness depends on hand position, depth of chest compressions, and the rate at which they are done. The ERC Guidelines are clear that the most effective rate is 100 to 120 chest compressions per minute. Equally important to effective compressions is the force or depth of each push: each compression must push the chest down 5 to 6 cm. The hands should be positioned on the centre of the chest.\r",
+    "lineNo": 446
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "Compress the chest at a rate of 100-120 min-1.",
+     "lineNo": 118
+    }
+   ],
+   "conflicts": [
+    {
+     "sourceId": "src-bchk-first-help-bls",
+     "quoteBg": "9. Направете 30 извънгръдни притискания, както е описано, с честота 100 притискания в минута (може да се правят по-бързо, но не повече от 120 в минута).",
+     "lineNo": 92,
+     "natureBg": "БЧК дава 100/мин като цел и 120 като таван („може да се правят по-бързо, но не повече от 120“). ERC/RCUK 2025 дават 100–120 като диапазон. Формулировката на БЧК е от ерата „поне 100“ (насоки 2010 г.)."
+    }
+   ],
+   "statusBg": "grounded-contested",
+   "noteBg": "Числата съвпадат; рамката не. Нашият верен отговор „около 100–120“ следва ERC 2025."
+  },
+  {
+   "id": "med-cpr-ratio",
+   "topicBg": "Съотношение компресии : обдишвания при обучен спасител",
+   "conceptIds": [
+    "c-cpr-basics"
+   ],
+   "questionIds": [
+    "q-ptp-017",
+    "q-ptp-060"
+   ],
+   "figureBg": "30 : 2",
+   "figureQuote": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "When bystanders are able and willing to provide rescue breaths, the recommendation is that they should perform CPR at a rate of 30 compressions followed by 2 breaths, repeated until EMS are on scene and able to take over. This will ensure the best chance for\r",
+    "lineNo": 449
+   },
+   "naredba24TopicBg": "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+   "authoritative": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "When bystanders are able and willing to provide rescue breaths, the recommendation is that they should perform CPR at a rate of 30 compressions followed by 2 breaths, repeated until EMS are on scene and able to take over. This will ensure the best chance for\r",
+    "lineNo": 449
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "If you have been trained to provide rescue breaths, alternate 30 chest compressions with 2 rescue breaths.",
+     "lineNo": 196
+    },
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "If you are not trained to provide rescue breaths, perform continuous chest compressions without interruptions.",
+     "lineNo": 199
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "Вторият цитат от RCUK е основанието за q-ptp-060: необучен спасител прави само натискания — това е насока, а не отстъпка."
+  },
+  {
+   "id": "med-hand-position",
+   "topicBg": "Къде се поставят ръцете при гръдни компресии",
+   "conceptIds": [
+    "c-cpr-basics"
+   ],
+   "questionIds": [
+    "q-ptp-016"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-bls",
+    "quoteBg": "Place the heel of one hand on the lower half of the sternum (“in the centre of the chest”).",
+    "lineNo": 184
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "Effectiveness depends on hand position, depth of chest compressions, and the rate at which they are done. The ERC Guidelines are clear that the most effective rate is 100 to 120 chest compressions per minute. Equally important to effective compressions is the force or depth of each push: each compression must push the chest down 5 to 6 cm. The hands should be positioned on the centre of the chest.\r",
+     "lineNo": 446
+    }
+   ],
+   "conflicts": [
+    {
+     "sourceId": "src-bchk-first-help-bls",
+     "quoteBg": "5. Повдигнете пръстите си нагоре, за да се избегне оказването на натиск върху ребрата. Натискайте върху горната част на корема или долната част на гръдната кост.",
+     "lineNo": 88,
+     "natureBg": "ФАКТИЧЕСКА ГРЕШКА в БЧК. ERC/RCUK: долната половина на гръдната кост. Натиск върху горната част на корема е точно това, което насоките забраняват. Прилича на изгубено отрицание при превода от изданието на Червения кръст Белгия-Фландрия. Не се цитира и не се преразказва."
+    }
+   ],
+   "statusBg": "grounded-contested",
+   "noteBg": "Дистракторът „върху корема“ в q-ptp-016 е верен като ГРЕШЕН отговор — и е точно това, което БЧК страницата казва."
+  },
+  {
+   "id": "med-breathing-check",
+   "topicBg": "Проверката за дишане и редът спрямо обаждането на 112",
+   "conceptIds": [
+    "c-cpr-basics",
+    "c-first-aid-priorities"
+   ],
+   "questionIds": [
+    "q-ptp-013",
+    "q-ptp-017",
+    "q-ptp-037"
+   ],
+   "figureBg": "не повече от 10 секунди",
+   "figureQuote": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "for a maximum of 10 seconds.\r",
+    "lineNo": 792
+   },
+   "naredba24TopicBg": "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-bls",
+    "quoteBg": "Suspect cardiac arrest in any person who is unresponsive.",
+    "lineNo": 157
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "Assess their breathing while you wait for the call to be answered.",
+     "lineNo": 159
+    },
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "Slow, laboured breathing, as well as other abnormal patterns such as agonal gasping or panting, must be recognised as signs of cardiac arrest.",
+     "lineNo": 160
+    },
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "If any person is unresponsive with abnormal breathing, cardiac arrest should be assumed.",
+     "lineNo": 162
+    },
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "for a maximum of 10 seconds.\r",
+     "lineNo": 792
+    },
+    {
+     "sourceId": "src-bchk-first-help-bls",
+     "quoteBg": "Когато проверявате дишането на пострадал: погледнете, чуйте, опитайте се да усетите дишане в продължение на не повече от 10 секунди.",
+     "lineNo": 43
+    }
+   ],
+   "conflicts": [
+    {
+     "sourceId": "src-rcuk-2025-bls",
+     "quoteBg": "Call 999 for any unresponsive person. Rescuers no longer need to confirm abnormal breathing before calling. Initiate the call first, then assess breathing while waiting for the call to be answered. The ambulance service call handler will be able to assist you in identifying abnormal breathing, if needed.",
+     "lineNo": 130,
+     "natureBg": "ПРОМЯНА 2021 → 2025, заявена от самия RCUK. По ERC 2021 се проверяваше дишането и после се звънеше; по 2025 се звъни при всеки, който не реагира, а дишането се оценява ДОКАТО чакаш да вдигнат. Всеки въпрос, който подрежда „провери дишането → звънни“, е граден по остарялата редакция."
+    }
+   ],
+   "statusBg": "grounded-superseded-order",
+   "noteBg": "10-секундният прозорец оцелява в главата First Aid на ERC 2025 (ABCDE) и у БЧК, но вече НЕ се появява в текста на RCUK Adult BLS 2025. Пази прозореца като „не се бави повече от 10 секунди“, не като задължителна процедура преди обаждането."
+  },
+  {
+   "id": "med-bleeding-direct-pressure",
+   "topicBg": "Първо действие при животозастрашаващо кървене",
+   "conceptIds": [
+    "c-bleeding-control"
+   ],
+   "questionIds": [
+    "q-ptp-018",
+    "q-ptp-039",
+    "q-ptp-040",
+    "q-ptp-062"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 5 — спиране на кръвотечение, обработка на рани, превръзки",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-first-aid",
+    "quoteBg": "Apply firm, direct manual pressure to any bleeding injury site.",
+    "lineNo": 237
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Life-threatening bleeding: an escalating approach with manual direct pressure and, thereafter, haemostatic dressing and/or tourniquets.",
+     "lineNo": 113
+    },
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "check for serious injuries. Is there life-threatening bleeding? If yes, apply direct pressure. Prepare to deliver chest compressions and rescue breaths.\r",
+     "lineNo": 763
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "„Escalating approach“ е редът: директен натиск → хемостатична превръзка → турникет. Нищо в ERC/RCUK 2025 не подкрепя промиване на кървяща рана преди спиране на кървенето."
+  },
+  {
+   "id": "med-tourniquet",
+   "topicBg": "Кога и как се поставя турникет",
+   "conceptIds": [
+    "c-bleeding-control"
+   ],
+   "questionIds": [
+    "q-ptp-018",
+    "q-ptp-038"
+   ],
+   "figureBg": "5–7 см над раната",
+   "figureQuote": {
+    "sourceId": "src-rcuk-2025-first-aid",
+    "quoteBg": "Place the tourniquet around the traumatised limb 5-7cm above the injury, but not over a joint.",
+    "lineNo": 241
+   },
+   "naredba24TopicBg": "чл. 9, т. 5 — спиране на кръвотечение, обработка на рани, превръзки",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-first-aid",
+    "quoteBg": "Apply a tourniquet as soon as possible for life-threatening extremity bleeding that is not controlled by direct manual pressure:",
+    "lineNo": 240
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Place the tourniquet around the traumatised limb 5-7cm above the injury, but not over a joint.",
+     "lineNo": 241
+    },
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Write the time the tourniquet was applied.",
+     "lineNo": 243
+    },
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Do not release the tourniquet. It should only be released by a healthcare professional.",
+     "lineNo": 244
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "И трите верни твърдения в q-ptp-038 се покриват дума по дума. Дистракторът „турникет високо на рамото при всяко кървене“ е грешен на две основания едновременно: не при всяко кървене, и не където и да е — 5–7 см над раната и не върху става."
+  },
+  {
+   "id": "med-recovery-position",
+   "topicBg": "Стабилно странично положение — и кога е ПРОТИВОПОКАЗАНО",
+   "conceptIds": [
+    "c-victim-handling",
+    "c-cpr-basics"
+   ],
+   "questionIds": [
+    "q-ptp-022",
+    "q-ptp-037"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 2 — съзнание и неговите нарушения при черепно-мозъчна травма",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-first-aid",
+    "quoteBg": "Place adults and children with a decreased level of responsiveness who do NOT meet the criteria for CPR into a lateral (side-lying) recovery position.",
+    "lineNo": 148
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "In cases of not normal breathing or trauma, do NOT move the person into the recovery position. If they are in cardiac arrest position them lying flat on their back for CPR.\r",
+     "lineNo": 768
+    }
+   ],
+   "conflicts": [
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "In cases of agonal breathing or trauma, do NOT move the person into the recovery position.",
+     "lineNo": 149,
+     "natureBg": "ПРЯКО ПРОТИВОРЕЧИ на нашето съдържание. Пострадал при ПТП по дефиниция е травма. ERC/RCUK 2025 казват при травма ДА НЕ се поставя в странично положение; q-ptp-022 и q-ptp-037 инструктират точно това. Това е най-тежката находка по тези 29 въпроса."
+    },
+    {
+     "sourceId": "src-bchk-first-help-bls",
+     "quoteBg": "1. Поставете пострадалия в стабилно странично положение. Виж „Техника – стабилно странично положение“.",
+     "lineNo": 52,
+     "natureBg": "БЧК учи страничното положение за всеки в безсъзнание, който диша, без изключение за травма — т.е. българското учебно съдържание е на страната на нашия текущ отговор, а международният консенсус от 2025 г. е срещу него."
+    }
+   ],
+   "statusBg": "contested-content-affected",
+   "noteBg": "Не се решава от вълна по източници. Изисква решение на основателя: да следваме ли ERC 2025 (и да преформулираме въпросите), или да следваме това, което БЧК изпитва. Виж README, раздел „Отвореният конфликт“."
+  },
+  {
+   "id": "med-spinal-handling",
+   "topicBg": "Съмнение за травма на шийния отдел на гръбнака",
+   "conceptIds": [
+    "c-victim-handling"
+   ],
+   "questionIds": [
+    "q-ptp-020",
+    "q-ptp-042",
+    "q-ptp-064"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 6 — поведение при травми на гръбначния стълб и опорно-двигателния апарат",
+   "authoritative": {
+    "sourceId": "src-rcuk-2025-first-aid",
+    "quoteBg": "Suspect a cervical spine injury in a person who fell or dived from a height, was crushed by machinery or a heavy object or was involved in a road traffic or a sporting accident.",
+    "lineNo": 228
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Minimise movement of the neck. If the person is awake and alert, encourage them to self-maintain their neck in a comfortable, stable position.",
+     "lineNo": 229
+    },
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Never force an uncooperative person into any position, as this may exacerbate an injury.",
+     "lineNo": 230
+    },
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "n \u0007Do not move the person unless they are in an unsafe situation.\r",
+     "lineNo": 787
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "Покрива q-ptp-042 (седни и не мърдай) и q-ptp-064 (глава-врат-гръб в една линия). НЕ покрива каската от q-ptp-020: нито ERC 2025, нито RCUK 2025 казват дума за сваляне на мотоциклетна каска — виж med-helmet-removal."
+  },
+  {
+   "id": "med-move-only-if-unsafe",
+   "topicBg": "Кога изобщо се мести пострадал — и горящият автомобил",
+   "conceptIds": [
+    "c-victim-handling",
+    "c-first-aid-priorities"
+   ],
+   "questionIds": [
+    "q-ptp-013",
+    "q-ptp-021",
+    "q-ptp-041",
+    "q-ptp-063"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 8 — извличане и транспортиране на пострадали при ПТП",
+   "authoritative": {
+    "sourceId": "src-erc-2025-layperson",
+    "quoteBg": "n \u0007Do not move the person unless they are in an unsafe situation.\r",
+    "lineNo": 787
+   },
+   "corroborating": [
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "assessment of the situation. Is the person at risk of further injury? (Road traffic? Spilled chemicals? Live wires? Violent persons?) Is it safe for you to approach them? Can you move them to safety?\r",
+     "lineNo": 750
+    },
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Check for scene safety.",
+     "lineNo": 127
+    },
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "Това може да стане само когато той се намира в пряка, неконтролируема, опасност, ако не може да се осигури необходимата безопасност и ако можете да предприемете действия, без да се излагате на риск. Ако е необходимо, преместете го до най-близкото безопасно място.",
+     "lineNo": 38
+    },
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "Когато наближите пътно-транспортно произшествие, намалете скоростта, без да спирате твърде внезапно. Паркирайте колата си на сигурно място, до ръба на твърдия банкет, или встрани от пътя. Поставете флуоресцентно яке и застанете зад мантинелата, ако сте на магистрала. Използвайте знаци за опасност (например триъгълник или аварийните светлини), за да сигнализирате другите водачи, че е станал инцидент. Уверете се, че не пречите на пристигането на службите за спешна помощ.",
+     "lineNo": 27
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "Решаващото ПРАВИЛО е покрито и от трите източника: местиш само при непосредствена опасност. Верните отговори на q-ptp-021 (гори / лежи на активна лента) стоят. ТЕХНИКАТА в q-ptp-063 не е насока — покрита е само от учебното помагало на БЧК; виж med-extrication-technique."
+  },
+  {
+   "id": "med-extrication-technique",
+   "topicBg": "Техника за извличане от горящ автомобил (хват на Раутек)",
+   "conceptIds": [
+    "c-victim-handling"
+   ],
+   "questionIds": [
+    "q-ptp-063"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 8 — извличане и транспортиране на пострадали при ПТП",
+   "authoritative": null,
+   "corroborating": [
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "Ако пострадалият е в съзнание,обяснете му какво възнамерявате да направите, и го помолете да Ви сътрудничи. При възможност придържайте шията на пострадалия по време на евакуационната процедура.Завъртайте главата, шията или тялото на пострадалия колкото е възможно по-малко. Съществуват няколко техники за евакуация на пострадал, като влачене /със и без одеяло/, повдигане и др.",
+     "lineNo": 39
+    },
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "2. Коленичете зад главата му. Плъзнете едната си ръка под шията му, а другата между лопатките му.Внимателно повдигнете главата и раменете му, и се приближете по-близо до него.",
+     "lineNo": 44
+    },
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "4. Сложете двете си ръце под мишниците и хванете едната му предмишница. Захванете китката му с едната си ръка, а предмишницата му с другата си ръка.",
+     "lineNo": 46
+    },
+    {
+     "sourceId": "src-bchk-first-help-steps",
+     "quoteBg": "6. Със силата на гръбначната си мускулатура станете и повдигнете пострадалия нагоре. Ходете гърбом, влачейки пострадалия с вас. Наблюдавайте за препятствия зад вас.",
+     "lineNo": 47
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "ungrounded-teaching-material-only",
+   "noteBg": "ПРАЗНИНАТА СЕ СВИ, НО НЕ Е ЗАТВОРЕНА — и предишният запис („ungrounded-no-reachable-source“, нула цитата) вече беше неверен спрямо самия q-ptp-063, който обяснява хвата и цитира БЧК дословно. Какво е вярно на 2026-08-04: БЧК, „Основните стъпки в първата помощ“, раздел „Спешно извеждане на пострадал“, ОПИСВА и хвата, и ограничението — коленичиш зад главата, двете ръце под мишниците, хващаш предмишницата, изправяш се и ходиш гърбом, влачейки пострадалия, като „завъртайте главата, шията или тялото на пострадалия колкото е възможно по-малко“ (bchk_page5.txt:39, 44, 46, 47). Това е точно движението в верния отговор на q-ptp-063. ТРИ ОГРАДИ ОБАЧЕ ОСТАВАТ: (1) БЧК е учебно помагало, не основание — authority: not-a-grounding-source; (2) разделът е ОБЩ (спешно извеждане), не за изваждане от автомобил — освобождаването на колана и автомобилният контекст ги няма никъде в текста; (3) ERC 2025 и RCUK 2025 продължават изобщо да не разглеждат извличане от автомобил, а учебната програма по Наредба № 24, чл. 8, ал. 1 НЕ Е ПУБЛИКУВАНА (търсено в ДАБДП, МЗ, strategy.bg и redcross.bg). Тоест техниката вече е проследима до назован български източник на ред, но НЕ е насока — точно както q-ptp-063 казва на ученика. Придобиването на учебната програма от БЧК остава начинът това да стане grounded."
+  },
+  {
+   "id": "med-helmet-removal",
+   "topicBg": "Каска на мотоциклетист в безсъзнание",
+   "conceptIds": [
+    "c-victim-handling"
+   ],
+   "questionIds": [
+    "q-ptp-020"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": "чл. 9, т. 6 — поведение при травми на гръбначния стълб и опорно-двигателния апарат",
+   "authoritative": null,
+   "corroborating": [
+    {
+     "sourceId": "src-rcuk-2025-first-aid",
+     "quoteBg": "Minimise movement of the neck. If the person is awake and alert, encourage them to self-maintain their neck in a comfortable, stable position.",
+     "lineNo": 229
+    },
+    {
+     "sourceId": "src-erc-2025-layperson",
+     "quoteBg": "n \u0007Do not move the person unless they are in an unsafe situation.\r",
+     "lineNo": 787
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "ungrounded-inferred-only",
+   "noteBg": "ПРАЗНИНА. Нито ERC 2025, нито RCUK 2025 споменават сваляне на каска. Нашият верен отговор („не я сваляш, ако диша“) е СЪВМЕСТИМ с „минимизирай движението на врата“, но това е извод, а не цитат. Не го обяснявай на ученика като насока — обясни правилото за врата, от което следва."
+  },
+  {
+   "id": "med-legal-duty",
+   "topicBg": "Правното задължение на мястото на ПТП",
+   "conceptIds": [
+    "c-first-aid-priorities"
+   ],
+   "questionIds": [
+    "q-ptp-013",
+    "q-ptp-014",
+    "q-ptp-015",
+    "q-ptp-033",
+    "q-ptp-034",
+    "q-ptp-035"
+   ],
+   "figureBg": null,
+   "naredba24TopicBg": null,
+   "authoritative": {
+    "sourceId": "law:zdvp",
+    "quoteBg": "б) (изм. - ДВ, бр. 53 от 2014 г.) да остане на мястото на произшествието и да изчака пристигането на компетентните органи на Министерството на вътрешните работи;",
+    "lineNo": null
+   },
+   "corroborating": [
+    {
+     "sourceId": "law:zdvp",
+     "quoteBg": "в) (изм. - ДВ, бр. 43 от 2002 г., бр. 53 от 2014 г.) до пристигането на органите по буква \"б\", съобразно необходимостта, да вземе мерки за безопасността на движението и да окаже помощ на пострадалите, ако това не представлява опасност за него;",
+     "lineNo": null
+    },
+    {
+     "sourceId": "law:zdvp",
+     "quoteBg": "1. (изм. - ДВ, бр. 43 от 2002 г.) да вземе мерки за осигуряване безопасността на движението и да окаже помощ на пострадалите, ако това не представлява опасност за него;",
+     "lineNo": null
+    },
+    {
+     "sourceId": "law:zdvp",
+     "quoteBg": "40. (Нова - ДВ, бр. 43 от 2002 г., изм., бр. 71 от 2020 г., в сила от 11.08.2020 г.) \"Първа долекарска помощ\" е прилагането на подходящи животоподдържащи действия и мероприятия за предотвратяване на усложненията, получени при травми, свързани с пътнотранспортни произшествия, на място или в близост до него, от водачи на моторни превозни средства и други участници в движението до идването на екип от Център за спешна медицинска помощ.",
+     "lineNo": null
+    }
+   ],
+   "conflicts": [],
+   "statusBg": "grounded-agreed",
+   "noteBg": "ТОВА и само това може да носи цитат „ЗДвП чл. 123“. Чл. 123 урежда СПИРАНЕТО, ОСТАВАНЕТО и ИЗВИКВАНЕТО — не съдържа нито дълбочина, нито честота, нито проверка за дишане. Чл. 124 е за водача, който НЕ е участник (нашият случай в q-ptp-013). § 6, т. 40 дава легалната дефиниция на „първа долекарска помощ“."
+  }
+ ]
+}

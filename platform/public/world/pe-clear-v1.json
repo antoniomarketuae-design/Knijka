@@ -7,7 +7,7 @@
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
    "minX": -46,
-   "minY": -14.125,
+   "minY": -18.125,
    "maxX": 48,
    "maxY": 332
   },
@@ -25,11 +25,11 @@
   "zonesVersion": 1,
   "stats": {
    "roadKm": 0.28,
-   "nodes": 3,
-   "edges": 2,
+   "nodes": 4,
+   "edges": 3,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 7,
+   "buildings": 10,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -46,12 +46,37 @@
    "roadscapeNoteBg": "Събирателна улица: ясна крайна линия, осеви прекъснати линии и редица улични стълбове — единствената осветена отсечка в групата. Пред търговската тераса стои В27 „Забранено е спирането“, за да не се паркира точно пред витрините.",
    "terminus": "opens-to-collector",
    "terminusNoteBg": "Улицата не свършва в нищото: пред теб тя се влива в четирилентова събирателна улица — по-широко платно, крайни линии и улично осветление. Затова точно тук се гледа напред, а не само в пътеката.",
+   "nearfield": "arcade-canyon-low",
+   "nearfieldNoteBg": "Още от потеглянето си между витрините: двуетажна търговска аркада опира и от двете страни в тротоара. Улицата е тясна и ниска, небето започва точно над покривите — затова тук се кара бавно и се гледа в тротоара, а не в далечината.",
+   "nearfieldSignature": "both|low|12.6",
+   "nearfieldFirstM": -12,
    "terminusLegs": 1,
    "terminusRoadM": 125,
    "roadClass": "tertiary",
    "parkingBandM": 0,
    "bareVerge": null,
    "curbToCurbM": 16.25,
+   "carriageway": "bays-from-the-seat",
+   "carriagewayNoteBg": "Единствената отсечка, по която потегляш върху широко платно и то остава широко: 46 м по 24,25 м с паркинг джобове пред витрините и коли, спрели непосредствено вдясно от теб. Стеснението е чак на тридесет и един метра.",
+   "carriagewaySegments": [
+    {
+     "id": "pe-e-street-s1",
+     "fromY": 0,
+     "toY": 46,
+     "curbToCurbM": 24.25
+    },
+    {
+     "id": "pe-e-street",
+     "fromY": 46,
+     "toY": 150,
+     "curbToCurbM": 16.25
+    }
+   ],
+   "spawnCurbToCurbM": 24.25,
+   "widthChangesAtM": [
+    31
+   ],
+   "bayedRoadM": 46,
    "oneway": false,
    "banSignRef": "В27",
    "primaryCrossingId": "pe-x-1",
@@ -74,6 +99,11 @@
     "y": 275
    },
    {
+    "id": "pe-n-cw1",
+    "x": 0,
+    "y": 46
+   },
+   {
     "id": "pe-n-end",
     "x": 0,
     "y": 150
@@ -87,7 +117,7 @@
   "edges": [
    {
     "id": "pe-e-street",
-    "from": "pe-n-start",
+    "from": "pe-n-cw1",
     "to": "pe-n-end",
     "class": "tertiary",
     "name": "Улица с пешеходна пътека",
@@ -97,11 +127,11 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
-    "length": 150,
+    "length": 104,
     "geometry": [
      [
       0,
-      0
+      46
      ],
      [
       0,
@@ -109,6 +139,31 @@
      ]
     ],
     "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s1",
+    "from": "pe-n-start",
+    "to": "pe-n-cw1",
+    "class": "tertiary",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 46,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      46
+     ]
+    ],
+    "parkingBand": true
    },
    {
     "id": "pe-e-collector",
@@ -153,7 +208,7 @@
   {
    "id": "pe-b-shop",
    "height": 4.5,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -26,
@@ -176,7 +231,7 @@
   {
    "id": "pe-b-terrace-w",
    "height": 11,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -30,
@@ -199,7 +254,7 @@
   {
    "id": "pe-b-kiosk-e",
    "height": 3,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      13,
@@ -222,7 +277,7 @@
   {
    "id": "pe-b-arcade-e",
    "height": 8,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      13,
@@ -245,7 +300,7 @@
   {
    "id": "pe-b-far-w",
    "height": 15,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -46,
@@ -268,7 +323,7 @@
   {
    "id": "pe-b-far-e",
    "height": 15,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      22,
@@ -291,7 +346,7 @@
   {
    "id": "pe-b-vista",
    "height": 22,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -44,
@@ -310,6 +365,75 @@
      332
     ]
    ]
+  },
+  {
+   "id": "pe-b-nf-arcade-w",
+   "height": 6.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     -34,
+     3
+    ],
+    [
+     -16.6,
+     3
+    ],
+    [
+     -16.6,
+     34
+    ],
+    [
+     -34,
+     34
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-arcade-e",
+   "height": 6.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     16.6,
+     3
+    ],
+    [
+     33,
+     3
+    ],
+    [
+     33,
+     30
+    ],
+    [
+     16.6,
+     30
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-arcade-e2",
+   "height": 6.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     16.6,
+     36
+    ],
+    [
+     30,
+     36
+    ],
+    [
+     30,
+     52
+    ],
+    [
+     16.6,
+     52
+    ]
+   ]
   }
  ],
  "spawnPoints": [
@@ -318,7 +442,7 @@
    "x": 4.06,
    "y": 15,
    "heading": 0,
-   "edgeId": "pe-e-street",
+   "edgeId": "pe-e-street-s1",
    "name": "Подход към пешеходната пътека"
   },
   {
@@ -335,8 +459,8 @@
    "id": "pe-z-nostopping",
    "kind": "noStopping",
    "edgeId": "pe-e-street",
-   "fromM": 67.5,
-   "toM": 108,
+   "fromM": 21.5,
+   "toM": 62,
    "signRef": "В27"
   }
  ]

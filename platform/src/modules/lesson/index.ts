@@ -25,9 +25,14 @@
  *
  * THE FOUR THINGS TO KNOW BEFORE CHANGING ANYTHING HERE:
  *
- *  1. `say` is a REFERENCE, never a sentence (types.ts). There is nowhere in a
- *     beat to put an unreviewed claim, which is how ADR-002 is satisfied on
- *     the whole playback path without a single runtime check.
+ *  1. `say` is a REFERENCE, never a sentence (types.ts) — AND A REFERENCE IS
+ *     NOT A GATE. This line used to end „…which is how ADR-002 is satisfied on
+ *     the whole playback path without a single runtime check", and that
+ *     sentence is why nobody looked for four years' worth of first-aid
+ *     instruction being read aloud unreviewed. A beat cannot HOLD an unchecked
+ *     claim; it could happily POINT at one, and `concepts.json` has no status
+ *     field to point at. clearance.ts is the runtime check that belief stood in
+ *     for. Every string leaves through it.
  *  2. The board is TRACES, not video (resolve.ts). ~0.7 MB per lesson instead
  *     of ~5.3 MB, and it is the only version that fits on Bulgarian mobile
  *     data for all 54 lessons. Nothing here prefetches; a beat's media is
@@ -50,6 +55,63 @@ export {
 
 // ---- Resolution: ids → the stored strings, one beat at a time --------------
 export { resolveBeat, resolveBoard, resolveOutline } from "./resolve";
+
+// ---- THE GATE --------------------------------------------------------------
+// Nothing this module says to a student leaves without passing clearance.ts.
+// `courseClearance()` is the instrument: it answers „which lessons has the gate
+// silenced, and do they still teach anything?" from the real resolver, and
+// `recentWithheldSources()` names every source that was refused and why. Read
+// them; a gate whose refusals nobody can see is a gate that will be removed by
+// the next person who cannot explain why a lesson went quiet.
+//
+// `lessonsInPreparation()` is the half that was missing until now: the census
+// existed and NOTHING OUTSIDE THIS MODULE CALLED IT, so a lesson the gate had
+// reduced to four identical „под преглед" bubbles was still offered in the hub
+// behind an ordinary link. Both surfaces that can open a lesson — the index and
+// `/classroom/[lessonId]` — go through it.
+export { courseClearance, lessonClearance, lessonsInPreparation } from "./resolve";
+export type { LessonClearance, LessonOffer } from "./resolve";
+export {
+  CLAIM_FREE_CLASSES,
+  GATED_CLASSES,
+  SAY_CLASS,
+  citationFingerprint,
+  citationLine,
+  conceptClearance,
+  questionClearance,
+  recentWithheldSources,
+  resetWithheldSources,
+  setWithheldSink,
+  signClearance,
+  summaryFingerprint,
+} from "./clearance";
+export type { Clearance, SayClass, WithheldReason, WithheldSource } from "./clearance";
+// Two authorities, and the difference between them is the point:
+// `CARRIED_CONCEPT_SUMMARIES` is a dated policy freeze that describes exactly
+// the bytes of `CARRY_FROZEN_BLOB`, and `CLEARED_SINCE_FREEZE` is a person
+// having read one sentence. Only the second can cover text written after the
+// freeze — which is why the first must never be regenerated from the live file.
+export {
+  CARRIED_CONCEPT_SUMMARIES,
+  CARRY_CEILING,
+  CARRY_FROZEN_AT,
+  CARRY_FROZEN_BLOB,
+  CLEARED_SINCE_FREEZE,
+  MACHINE_SIGNERS,
+} from "./clearanceCarry";
+export type { CarrySignature } from "./clearanceCarry";
+// The citation half of the same utterance — what the room prints beside the
+// sentence. Pinned separately because it is proved differently: the carry is
+// signed by a person, this is re-proved against content/law on every test run.
+export { CARRIED_CONCEPT_CITATIONS, CITATIONS_FROZEN_AT } from "./clearanceCitations";
+// The same claim, made about the QUESTION bank — the door `status` was assumed
+// to cover and never did. A question's `status` says a person approved the row;
+// it says nothing about the article number printed beside it, and that number
+// reaches a screen on five surfaces that never enter this module.
+export {
+  CARRIED_QUESTION_CITATIONS,
+  QUESTION_CITATIONS_FROZEN_AT,
+} from "./clearanceQuestionCitations";
 
 // ---- The authored-lecture socket (docs/ai/85, content/lessons/*.json) ------
 // The written lecture and the composed lesson are ONE engine with two sources

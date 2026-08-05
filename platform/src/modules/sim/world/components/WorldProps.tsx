@@ -126,6 +126,9 @@ const SIGN_GLB: Record<SignKind, string> = {
   // so the sim never hard-fails on a partially shipped kit.
   noOvertaking: "sign_no_overtaking",
   noStopping: "sign_no_stopping",
+  // В28 rides the В27 body — byte-identical plate circle in the source art, one
+  // diagonal instead of two (see signFaces.ts). No new GLB.
+  noParking: "sign_no_stopping", // В28 — v28.svg face
   slippery: "sign_slippery",
   curve: "sign_warning_bend", // А1 — the shipped v1 asset serves curveAdvisory
   railGuarded: "sign_rail_guarded",
@@ -175,6 +178,7 @@ const SIGN_FACE_OVERRIDE: Partial<Record<SignKind, { art: SignFaceArt; numeral?:
   mandatoryRight: { art: "g2" },
   mandatoryLeft: { art: "g3" },
   children: { art: "a19" },
+  noParking: { art: "v28" },
 };
 /** В33 numerals are per-placement, so its faces are built on demand (below). */
 const LIMIT_END_ART: SignFaceArt = "v33";

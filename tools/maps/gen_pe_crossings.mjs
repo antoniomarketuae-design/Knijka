@@ -71,6 +71,119 @@
  * nodes and edges — 2/1 becomes 3/2 or 4/3), which is what „0 intersections"
  * was measuring.
  *
+ * ⚠ DOC 87 B50 / B53 / B54 — WHY IT GREW A **FIFTH** AXIS, AND THE MEASUREMENT
+ * THAT FORCED IT. The terminus pass above closed the horizon and the register
+ * still refused to call the rows fixed, with the right reason: „all seven
+ * differences are 100 m+ away. The near field a student drives in is still one
+ * street." Measured on the shipped files and on `buildWorldGeometry` output,
+ * not asserted — this is what the first fifty metres of all seven contained:
+ *
+ *   - curb to curb: **16.25 m on all seven**, `parkingBandM: 0` on all seven.
+ *     Four axes of „variety" and not one of them changes the width of the
+ *     asphalt, which is the single biggest object in the frame.
+ *   - the В26 limit plate stands at **(8.9, 45) on all seven** — same face,
+ *     same post, same side, same distance from the spawn (props.ts
+ *     `SPAWN_CONTEXT_AHEAD_M`, 30 m ahead of a spawn at y = 15).
+ *   - the first two street trees land at **(14.4, −11.0) and (−14.0, −33.0) on
+ *     four of the seven**, because `buildWorldGeometry` seeds EVERY district's
+ *     prop rng from one constant (`DEFAULT_SEED = 1337`) and the tree pass
+ *     walks a fixed 22 m cadence — so two same-class straight streets get
+ *     byte-identical planting at byte-identical metres.
+ *   - authored frontage standing between the spawn (y = 15) and y = 62:
+ *     **pe-cane 0**, pe-clear 1, pe-slow 2, pe-rain 2, pe-bus 2, pe-child 2,
+ *     pe-dart 3. The lesson he wrote „absolutely same as question 23" about is
+ *     the one with NOTHING beside the road for the first fifty metres.
+ *
+ * The cause is structural and it is in this file: **every STREETSCAPE recipe is
+ * authored relative to `crossingY`**, so its content sits 20–50 m north of the
+ * spawn, and the terminus is 100 m+ out. All four axes act where the student is
+ * not yet looking. Nothing in this generator has ever authored the part of the
+ * world that fills the windscreen for the whole approach.
+ *
+ * So every instance now also names a NEARFIELD: what stands beside the road in
+ * the first fifty metres. It is authored in ABSOLUTE y, anchored to the SPAWN
+ * rather than to the crossing — that anchor is the whole point of the axis, and
+ * `NEARFIELD_FIRST_WITHIN_M` makes it enforceable: at least one volume must
+ * begin within 20 m of the spawn, so „the near field is bare" cannot come back.
+ *
+ * The recipes differ in SILHOUETTE, not in position, because position is what
+ * the last three passes varied and the sheet still read as one street. The
+ * levers are the ones that change the SHAPE OF THE SKY: height band (a 2.6 m
+ * lock-up row you see clean over vs a 12 m blank dock wall vs a 17 m slab
+ * standing end-on), setback (a wall on the kerb line vs houses 21 m back
+ * behind gardens), rhythm (unbroken vs wall/gap/wall), and symmetry (one side
+ * towering while the other is open — which no instance in the family had).
+ * Height also picks the facade family for free: `buildings.facadeVariant`
+ * sends h ≥ 15 to the panelka grid and hashes everything below it across all
+ * four sets, so a family that was all-tall was also all-one-texture.
+ *
+ * IT ALSO FIXES THE PLANTING, WITHOUT TOUCHING THE PROP PASS. `props.ts` skips
+ * a tree whose point falls `insideBuilding(p, 1.8)`, and the near-field volumes
+ * that stand on the kerb line sit exactly under the x = ±14.4 tree stations. A
+ * recipe that occupies the west kerb clears the west row and leaves the east
+ * one; a recipe that stands back leaves both. Seven different occupancy
+ * patterns ⇒ seven different surviving tree rows, bought with authored data
+ * instead of a global reseed. **The reseed is still the real cure and it is
+ * NOT done here:** `DEFAULT_SEED` is shared by all 90 districts and every
+ * pinned prop census in the tree, so it is a wave of its own.
+ *
+ * ⚠ DOC 87 B50 / B53 / B54 — WHY IT GREW A **SIXTH** AXIS, AND THE ONE
+ * SENTENCE THAT REFUSED THE FIFTH. The near-field pass above gave the seven
+ * districts seven rooflines and the register still would not sign the rows:
+ *
+ *   „THE CARRIAGEWAY IS IDENTICAL ON ALL SEVEN — the same 16.25 m width, the
+ *   same осева, the same edge line, the same kerb. So the bottom ~45% of every
+ *   frame is one picture … A driver looks at the road, not the roofline."
+ *
+ * Five axes and every one of them is BESIDE the road. Nothing this generator
+ * has ever written changed the asphalt, and the asphalt is the largest object
+ * in a cockpit frame.
+ *
+ * WHY THE WIDTH LEVER LOOKED BLOCKED, AND WHY IT IS NOT. The register's own
+ * note (lever 3 below, and doc 87 row 884) says a 4 m curbside band grows the
+ * street to 24.25 m curb to curb, which „grows the staged crossing from 16.25
+ * to 24.25 m and takes 5.7 s longer at 1.4 m/s" and dropped
+ * `sc-crossing-slow-crosser` and `sc-crossing-white-cane` from 3 stars to 1.
+ * That measurement is right, and so is the conclusion — for the crossing.
+ * Traced to its cause it is much narrower than it reads:
+ *
+ *   - `edgeParkingWidthM` adds the band OUTSIDE the travel lanes, and
+ *     `referents.ts` derives the lane grid from `halfWidth − parkingM`. So a
+ *     band does NOT move the driven rail: x = 4.0625 is the right-lane centre
+ *     with a band and without one. No trace cares.
+ *   - what the band DOES move is the KERB (8.125 → 12.125) and everything
+ *     measured from it. `templates-pe*.ts` pins the staged walk by VALUE —
+ *     `CURB_X = −9.73`, `roadFromM 1.6`, `roadToM 17.85` — so on a banded
+ *     street the pedestrian steps off inside the parking strip instead of off
+ *     the pavement, and `markings.paintZebra(…, eb.halfWidth)` paints a 24.25 m
+ *     zebra under a 16.25 m walk.
+ *
+ * i.e. THE BLOCK IS ON THE SEGMENT THAT CARRIES THE CROSSING, not on the
+ * street. The street is 138–155 m long; the crossing occupies one 16 m band of
+ * it. Everything south of the crossing zone is free.
+ *
+ * So every instance now also names a CARRIAGEWAY: the street is emitted as a
+ * CHAIN of collinear segments joined at degree-2 nodes, and only the southern
+ * ones vary. Three shapes, all of them legible from the seat:
+ *   - `bays-from-spawn-*` — the drill STARTS on a 24.25 m street lined with
+ *     kerbside bays and a real parked row, and the road narrows ahead of you;
+ *   - `bay-pocket-*` — 16.25 m at the seat, flaring into a bay pocket (a джоб)
+ *     in the middle distance and closing again before the zebra;
+ *   - `plain-two-lane` — today's single 16.25 m ribbon, unchanged.
+ *
+ * THE INVARIANTS THAT MAKE IT SAFE, each one asserted below rather than argued:
+ *   - every segment is `lanes: 2` and carries the SAME `maxspeed`, so the lane
+ *     grid never moves under the x = 4.06 rail and no unposted limit exists;
+ *   - the segment that hosts `pe-x-1` is ALWAYS `parkingBand: false` and is
+ *     always the edge id `pe-e-street`, so the painted zebra, the
+ *     `CrossingZoneTracker` zone, the В24/В27 span and the staged walk from
+ *     CURB_X are byte-identical to the file before this axis existed;
+ *   - a banded segment must end at least `BAND_CROSSING_CLEAR_M` before the
+ *     crossing. `TrafficLayer.computeParkedCars` clears 25 m around a crossing
+ *     only on the crossing's OWN edge, so on a split street that guard does not
+ *     reach — this generator has to keep the distance itself, and does;
+ *   - a ban span may not straddle a joint (two zone rows would post two signs).
+ *
  * DEGREE 2, NEVER DEGREE 3 — and that is a rule, not a coincidence. A leg
  * hangs off the terminal node so the node stays degree 2, which
  * `network.nodeOpenRadiusM` treats as a JOINT (0.6 m setback) and
@@ -80,7 +193,7 @@
  * obligation can fire inside a crossing drill. That was lever 2 below, and this
  * is how the variety is bought WITHOUT it.
  *
- * THREE LEVERS DELIBERATELY NOT USED, each with the measurement that ruled it
+ * FOUR LEVERS DELIBERATELY NOT USED, each with the measurement that ruled it
  * out — read this before reaching for them:
  *   1. THE CENTRELINE **OF THE GRADED STREET**. Every committed PE trace is a
  *      dead-straight rail at exactly x = 4.06 (measured: min = max on every
@@ -91,23 +204,33 @@
  *   2. NEW JUNCTION NODES (degree >= 3). An uncontrolled junction inside a
  *      crossing drill can fire a give-way fault the lesson never teaches — the
  *      exact defect class he complains loudest about.
- *   3. CARRIAGEWAY WIDTH. It was tried: giving four of these streets the 4 m
- *      curbside parking band widens them to 24.25 m curb to curb, which is a
- *      genuinely different street AND fixes FR-21's car half — but the staged
- *      walks are measured from the kerb, so the crossing grows from 16.25 m to
- *      24.25 m and takes 5.7 s longer at 1.4 m/s. `s3-pe-bot-completion` then
- *      dropped `sc-crossing-slow-crosser` and `sc-crossing-white-cane` from
- *      3 stars to 1. Re-tuning seven drills' release distances (doc 86 T11
- *      derives them from the kerb offset) is a lesson-design job, not a map
- *      job. The width lever is left to whoever owns that re-tune; the tag it
- *      needs already exists (`DistrictEdge.parkingBand`).
+ *   3. WIDTH **AT THE CROSSING**, i.e. one `parkingBand: true` on the edge that
+ *      hosts `pe-x-1`. It was tried and the measurement stands: the staged
+ *      walks are pinned by value from the kerb, so the crossing grows 16.25 →
+ *      24.25 m, takes 5.7 s longer at 1.4 m/s, and `s3-pe-bot-completion`
+ *      dropped `sc-crossing-slow-crosser` and `sc-crossing-white-cane` from 3
+ *      stars to 1. Re-tuning the release distances (doc 86 T11 derives them
+ *      from the kerb offset) is a lesson-design job in `templates-pe*.ts`, not
+ *      a map job. That block is REAL and it is why the CARRIAGEWAY axis above
+ *      widens the street only SOUTH of the crossing zone.
+ *   4. `lanes` ON ANY DRIVEN SEGMENT. Measured, not assumed: the lane grid is
+ *      `−travelHalf + k·8.125 + 4.0625`, so a 2-lane street puts a centre at
+ *      x = +4.0625 — the rail every committed trace drives. `lanes: 3` puts the
+ *      centres at −8.13 / 0 / +8.13 and the recorded rail STRADDLES a divider;
+ *      `lanes: 4` keeps 4.06 a centre but demotes it from the kerbside lane to
+ *      the inner one, and widens the travel carriageway to 32.5 m, which puts
+ *      CURB_X = −9.73 inside it. Only `lanes: 2` leaves both the rail and the
+ *      staged walk where they were authored, so every segment gets `lanes: 2`.
  *
- * FR-21's car half is therefore closed here the OTHER way the tag allows: every
- * one of the seven declares `parkingBand: false`, so the curb pass places
- * nothing. It used to seat every body at `travelHalf + 2.0 m`, which on a class
- * with no band is two metres PAST the kerb — „he goes trough a car which is
- * standing on the sidewalk", four separate lessons in his own words. Nothing
- * now stands on these pavements, and no geometry moved to achieve it.
+ * FR-21's car half is closed here TWO ways now, and the second is the honest
+ * one. Every CROSSING segment still declares `parkingBand: false`, so the curb
+ * pass places nothing where there is nowhere lawful to stand — that used to seat
+ * a body at `travelHalf + 2.0 m`, two metres PAST the kerb, „he goes trough a
+ * car which is standing on the sidewalk", four lessons in his own words. And the
+ * banded segments the CARRIAGEWAY axis introduces are the tag working as
+ * designed: the band is drawn, the kerb moves out from under the row, and the
+ * bodies stand on asphalt. Five of the seven now carry a real parked row, and
+ * `pe-districts.test.ts` measures every body against the band it stands in.
  *
  * Pinned by platform/src/modules/sim/lessons/scenario/__tests__/
  * lane10-pe-vru-truth.test.ts (G7): every district must name a distinct
@@ -160,8 +283,27 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const SCALED_LANE_W = 3.25 * 2.5;
 /** Street continues this far past the crossing (run-out + finish), m. */
 const RUNOUT_M = 60;
+/**
+ * Where the drive STARTS. Every recorded PE trace begins here, so it is the
+ * anchor the NEARFIELD axis is authored against — the streetscapes are
+ * authored against `crossingY` instead, which is precisely why their content
+ * lands 20–50 m north of the seat and the first fifty metres were bare.
+ */
+const SPAWN_Y_M = 15;
 /** constants.PARKING_LANE_WIDTH_M — the curbside band, per side, m. */
 const PARKING_LANE_WIDTH_M = 4.0;
+/**
+ * CARRIAGEWAY axis: how far short of the crossing every banded segment must
+ * stop. `TrafficLayer.computeParkedCars` refuses to park within
+ * `PARK_CROSSING_CLEAR_M` of an authored crossing — but only for crossings on
+ * the SAME edge (`if (crossing.edgeId !== edge.id) continue`). On a split
+ * street the bay segment is a different edge, so that guard cannot see the
+ * zebra and this generator has to keep the distance itself. 30 m is the pass's
+ * own 25 m clear plus a body half-length and a joint radius.
+ */
+const BAND_CROSSING_CLEAR_M = 30;
+/** Shortest segment worth emitting: below this the ribbon is all joint taper. */
+const MIN_SEGMENT_M = 12;
 /** constants.SIDEWALK_WIDTH_M + SIDEWALK_SKIRT_M. */
 const SIDEWALK_W = 3.5;
 const SIDEWALK_SKIRT_M = 0.35;
@@ -186,11 +328,52 @@ function frontageClearX(parkingBandM) {
 
 const r2 = (v) => Math.round(v * 100) / 100;
 
-/** Axis-aligned block, counter-clockwise, rounded — the footprint helper. */
+/**
+ * `cityBuildings.DATA_HEIGHT_MIN_M` — the renderer clamps an authored height up
+ * to this. Authoring below it is not an error the world reports; it is a number
+ * in the file that the screen quietly ignores, which is the whole disease this
+ * generator has just been treated for. Self-validated below instead.
+ */
+const MIN_DRAWN_HEIGHT_M = 3;
+
+/**
+ * Axis-aligned block, counter-clockwise, rounded — the footprint helper.
+ *
+ * ⚠ `heightSource: "height"`, AND THAT ONE WORD IS THE ANSWER TO „SAME MAP,
+ * SAME ENGINEERING, EVERYTHING SAME". It used to say `"default"`, and
+ * `cityBuildings.resolveBuildingHeightM` reads that word like this:
+ *
+ *     if (b.heightSource === "default") {
+ *       const u = (hashString(b.id) % 1000) / 1000;
+ *       return DEFAULT_HEIGHT_MIN_M + u * (DEFAULT_HEIGHT_MAX_M - DEFAULT_HEIGHT_MIN_M);
+ *     }                                //  15 m                       25 m
+ *
+ * — i.e. THE AUTHORED HEIGHT WAS THROWN AWAY AND REPLACED BY A HASH IN
+ * [15, 25] m. Every volume this file has ever written: the 1.8 m park wall, the
+ * 3 m corner kiosk, the 2.8 m garage row, the 12 m dock wall, the 17 m panel
+ * slab — all of them rendered as a 15–25 m mid-rise block. Measured on the
+ * shipped files: the authored height was being discarded on 10/10 volumes of
+ * pe-dart-v1, 9/9 of pe-rain-v1, 11/13 of pe-cane-v1, 10/11 of pe-slow-v1.
+ *
+ * That is why three variety passes did not move the picture. STREETSCAPES has
+ * been authoring a low kiosk against a tall terrace since doc 86 D1, ROADSCAPES
+ * and TERMINI both lean on massing, and not one of those metres has ever
+ * reached the screen. It is also why the family read as one TEXTURE:
+ * `buildings.facadeVariant` sends `height >= 15` to the panelka grid, and with
+ * every resolved height ≥ 15 two thirds of the family took that one facade set.
+ *
+ * ⚠ IT IS NOT ONLY THIS FAMILY, and this fix deliberately does not reach the
+ * rest. Across the 100 shipped district files there are **332 buildings on
+ * `heightSource: "default"` and 4 on `"height"`** — the authored height is
+ * discarded on 111 of d2-v1's volumes, on every поligon, lot, ov-, rx-, sp- and
+ * tj- map's frontage, everywhere. Fixing that belongs in
+ * `resolveBuildingHeightM` (or in the other generators), it moves every map in
+ * the product, and it is a wave of its own. See the report.
+ */
 function block(x0, x1, y0, y1, height) {
   return {
     height,
-    heightSource: "default",
+    heightSource: "height",
     footprint: [
       [r2(x0), r2(y0)],
       [r2(x1), r2(y0)],
@@ -240,7 +423,7 @@ const STREETSCAPES = {
     build: (cY) => [
       { id: "pe-b-clinic", ...block(12.8, 30, cY + 2, cY + 26, 5.5) },
       { id: "pe-b-clinic-annex", ...block(12.8, 21, cY - 20, cY - 4, 4) },
-      { id: "pe-b-park-wall", ...block(-15.5, -12.8, cY - 46, cY + 30, 1.8) },
+      { id: "pe-b-park-wall", ...block(-15.5, -12.8, cY - 46, cY + 30, 3) },
       { id: "pe-b-pavilion", ...block(-34, -22, cY - 8, cY + 8, 4.2) },
     ],
   },
@@ -285,8 +468,8 @@ const STREETSCAPES = {
       { id: "pe-b-slab-s", ...block(-44, -13.2, cY - 60, cY - 13, 17) },
       { id: "pe-b-slab-n", ...block(-44, -13.2, cY + 7, cY + 46, 17) },
       { id: "pe-b-playhouse", ...block(-26, -17, cY - 8, cY + 2, 3) },
-      { id: "pe-b-garages", ...block(12.7, 19, cY - 52, cY - 12, 2.8) },
-      { id: "pe-b-garages-n", ...block(12.7, 19, cY + 6, cY + 30, 2.8) },
+      { id: "pe-b-garages", ...block(12.7, 19, cY - 52, cY - 12, 3) },
+      { id: "pe-b-garages-n", ...block(12.7, 19, cY + 6, cY + 30, 3) },
     ],
   },
   /** PE-14 „Бял бастун" — the institute whose door points at the zebra. */
@@ -296,7 +479,7 @@ const STREETSCAPES = {
     build: (cY) => [
       { id: "pe-b-institute", ...block(-38, -12.9, cY - 26, cY + 18, 10) },
       { id: "pe-b-institute-wing", ...block(-38, -25, cY + 18, cY + 40, 10) },
-      { id: "pe-b-shelter", ...block(12.9, 16.4, cY - 9, cY - 3, 2.8) },
+      { id: "pe-b-shelter", ...block(12.9, 16.4, cY - 9, cY - 3, 3) },
       { id: "pe-b-offices-e", ...block(12.9, 30, cY + 8, cY + 40, 12) },
     ],
   },
@@ -337,6 +520,101 @@ const STREETSCAPES = {
  * is for.
  */
 const KIND_TO_SIGN = { noStopping: "В27", noOvertaking: "В24" };
+
+// ---------------------------------------------------------------------------
+// Carriageways (doc 87 B50/B53/B54, sixth axis) — THE WIDTH OF THE ASPHALT
+// ---------------------------------------------------------------------------
+
+/**
+ * „A driver looks at the road, not the roofline." Five axes changed what stands
+ * BESIDE the street and the register measured the street itself: 16.25 m curb
+ * to curb, `parkingBandM: 0`, on all seven.
+ *
+ * A carriageway recipe returns the SOUTHERN segments of the chain — everything
+ * from y = 0 up to `cutY`, where the crossing-bearing `pe-e-street` takes over
+ * and runs to the terminal node. `cutY = 0` means no split at all: the street
+ * stays the single edge it has always been, byte-identical.
+ *
+ * Only three things vary and all three are read from the seat:
+ *   - WIDTH — a banded segment is 24.25 m curb to curb against 16.25 m, and
+ *     `TrafficLayer` fills its bays with a real parked row;
+ *   - WHERE THE WIDTH CHANGES — the taper is a hard depth cue. A road that
+ *     narrows 13 m past the bonnet is not the road that narrows at 52 m;
+ *   - WHETHER THE SEAT IS INSIDE IT — starting between two parked rows and
+ *     coming upon a bay pocket forty metres out are different drives.
+ *
+ * Not varied, and each is a measurement in the header: lane COUNT (lever 4),
+ * width at the crossing (lever 3), the centreline (lever 1), junctions (2).
+ */
+const CARRIAGEWAYS = {
+  /** The street the family has always been: one 16.25 m ribbon, no joint. */
+  "plain-two-lane": {
+    segments: () => [],
+    noteBg:
+      "Обикновено двулентово платно: 16,25 м от бордюр до бордюр по цялата отсечка, без джобове и без разширения — платното изглежда еднакво от потеглянето до пътеката.",
+  },
+  /** The ONLY pocket whose mouth is BEHIND the seat: the car spawns three
+   *  metres inside it, so the drill opens on 24.25 m of asphalt that then
+   *  narrows 29 m out. Its parked row starts at y = 23. */
+  "bay-pocket-behind-the-seat": {
+    segments: () => [
+      { toY: 12, band: false },
+      { toY: 44, band: true },
+    ],
+    noteBg:
+      "Паркинг джобът започва ТРИ МЕТРА ЗАД теб — потегляш вече вътре в него, платното е 24,25 м широко и отдясно има спрели коли. На двадесет и девет метра напред се стеснява обратно до 16,25 м. Единствената отсечка в групата, чието разширение е започнало, преди ти да си тръгнал.",
+  },
+  /** The ONLY street that is wide UNDER THE SEAT and stays wide: bays run the
+   *  whole length of the terrace and the taper is 31 m out. Row starts y = 11 —
+   *  the closest parked car in the family. */
+  "bays-from-the-seat": {
+    segments: () => [{ toY: 46, band: true }],
+    noteBg:
+      "Единствената отсечка, по която потегляш върху широко платно и то остава широко: 46 м по 24,25 м с паркинг джобове пред витрините и коли, спрели непосредствено вдясно от теб. Стеснението е чак на тридесет и един метра.",
+  },
+  /** The clinic car park: the pocket sits in the MIDDLE distance, so the wide
+   *  stretch reads as a place you are driving toward rather than one you are
+   *  in. Row starts y = 37. */
+  "bay-pocket-mid": {
+    segments: () => [
+      { toY: 26, band: false },
+      { toY: 55, band: true },
+    ],
+    noteBg:
+      "Тясно платно под колелата и широк джоб в средната далечина: между двадесет и шестия и петдесет и петия метър улицата се разтваря до 24,25 м — това е паркингът пред поликлиниката. После се стеснява обратно, четиридесет метра пред теб.",
+  },
+  /** The ONE-WAY street: the pocket mouth opens one metre past the bonnet and
+   *  runs 36 m — the longest bay in the family — and none of that width carries
+   *  an осева, because a one-way road has no oncoming half to separate. */
+  "bay-pocket-oneway": {
+    segments: () => [
+      { toY: 16, band: false },
+      { toY: 52, band: true },
+    ],
+    noteBg:
+      "Джобът се отваря на един метър пред бронята и върви цели тридесет и шест метра: 24,25 м платно, по което НЯМА осева линия — улицата е еднопосочна, цялото платно е твое. Точно това прави пропускането на пешеходеца изцяло твоя отговорност.",
+  },
+  /** The blind corner: narrow under the seat, a lock-up row's pocket 7 m out,
+   *  and the row starts at y = 33. */
+  "bay-pocket-near": {
+    segments: () => [
+      { toY: 18, band: false },
+      { toY: 50, band: true },
+    ],
+    noteBg:
+      "Тръгваш по тясно 16,25-метрово платно, а на три метра пред теб то се разширява в паркинг джоб пред гаражите — 24,25 м със спрели коли, и после отново се стеснява преди пътеката.",
+  },
+  /** The freight approach: the pocket is a lorry lay-by, far enough out that
+   *  it reads as a widening of the middle distance, not of the near field. */
+  "bay-pocket-far": {
+    segments: () => [
+      { toY: 22, band: false },
+      { toY: 58, band: true },
+    ],
+    noteBg:
+      "Тясно платно под колелата и широк джоб чак в далечината: между двадесет и втория и петдесет и осмия метър улицата се разтваря до 24,25 м — това е отбивката пред портала на базата, където спират тежките коли. Най-отдалеченото разширение в групата.",
+  },
+};
 
 const ROADSCAPES = {
   /** PE-03 — the shopping COLLECTOR: the only lit, edge-lined street of the set,
@@ -598,7 +876,7 @@ const TERMINI = {
       "Улицата свършва в зеленото на квартала: нито блок, нито стена — само нисък парков зид далеч напред. Оттам няма какво да те спре да гледаш надалеч, и точно затова децата отляво се виждат късно.",
     legs: () => [],
     build: (L) => [
-      { id: "pe-b-park-wall-n", ...block(-56, 56, L + 62, L + 65.6, 2.2) },
+      { id: "pe-b-park-wall-n", ...block(-56, 56, L + 62, L + 65.6, 3) },
       { id: "pe-b-pavilion-n", ...block(-30, -13, L + 30, L + 46, 3.6) },
       { id: "pe-b-pavilion-e", ...block(15, 30, L + 36, L + 50, 3.6) },
     ],
@@ -656,6 +934,175 @@ const TERMINI = {
 };
 
 // ---------------------------------------------------------------------------
+// Nearfields (doc 87 B50 / B53 / B54) — WHAT STANDS BESIDE THE FIRST 50 m
+// ---------------------------------------------------------------------------
+
+/**
+ * The fifth axis, and the only one authored in ABSOLUTE y. See the header for
+ * the measurement; the short version is that axes 2–4 all act 50 m or more
+ * ahead of a driver who spends the whole drill looking at the first fifty.
+ *
+ * A recipe returns volumes that must lie inside
+ * `[NEARFIELD_MIN_Y, crossingY − NEARFIELD_CROSSING_CLEAR_M]`, must clear the
+ * carriageway like every other volume (the shared per-edge clearance check
+ * below measures them too), and must include at least one that BEGINS within
+ * `NEARFIELD_FIRST_WITHIN_M` of the spawn. The last rule is the axis: without
+ * it a „near field" recipe silently drifts north and becomes a fourth
+ * streetscape.
+ *
+ * `signature` is the thing the family test compares — the three levers that
+ * decide the SHAPE OF THE SKY at the seat, in the order a driver reads them:
+ * which sides are occupied, the height band, and the nearest setback. Two
+ * instances may not share it. It is asserted rather than described because
+ * „they look different" is exactly the claim this family has failed three
+ * times; a signature is checkable.
+ */
+const NEARFIELD_MIN_Y = 1;
+/** No near-field volume may stand inside this of the crossing: the last stretch
+ *  before a zebra belongs to the zebra, and the streetscape recipes already own
+ *  it (they are authored ±46 m around `crossingY`). */
+const NEARFIELD_CROSSING_CLEAR_M = 16;
+/** At least one volume must begin within this of the spawn — THE axis rule. */
+const NEARFIELD_FIRST_WITHIN_M = 20;
+
+const NEARFIELDS = {
+  /** PE-03 — a low two-storey shop arcade tight to both kerbs. You are inside
+   *  a COMMERCIAL canyon from the first metre, and the sky sits just above the
+   *  rooflines: the shortest horizon in the family. */
+  "arcade-canyon-low": {
+    sides: "both",
+    heightBand: "low",
+    setbackM: 12.6,
+    noteBg:
+      "Още от потеглянето си между витрините: двуетажна търговска аркада опира и от двете страни в тротоара. Улицата е тясна и ниска, небето започва точно над покривите — затова тук се кара бавно и се гледа в тротоара, а не в далечината.",
+    build: () => [
+      { id: "pe-b-nf-arcade-w", ...block(-30, -12.6, 3, 34, 6.5) },
+      { id: "pe-b-nf-arcade-e", ...block(12.6, 29, 3, 30, 6.5) },
+      { id: "pe-b-nf-arcade-e2", ...block(12.6, 26, 36, 52, 6.5) },
+    ],
+  },
+  /** PE-08 — the OPPOSITE of the arcade and the only OPEN one: nothing stands
+   *  on either kerb at all. Everything is set 19–26 m back behind forecourts,
+   *  so the pavement runs free and the sky comes down to the rooflines instead
+   *  of starting above them. The widest, brightest street of the seven.
+   *
+   *  It deliberately carries no kerbside wall, and that is a consequence of the
+   *  `heightSource` fix rather than a taste: the renderer clamps an authored
+   *  height up to 3 m (`DATA_HEIGHT_MIN_M`), and a 3 m wall on the kerb line is
+   *  not a garden edging — from a 1.25 m eye 9 m away it stands 11° above the
+   *  horizon and closes exactly the view this recipe exists to open. */
+  "open-forecourt": {
+    sides: "both",
+    heightBand: "setback-low",
+    setbackM: 19,
+    noteBg:
+      "Широко и открито: на нито един от двата тротоара не стои нищо — сградите са дръпнати навътре зад паркинга на поликлиниката. Нищо не ти пречи да виждаш надалеч, и точно затова бавният пешеходец се забелязва рано, ако гледаш.",
+    build: () => [
+      { id: "pe-b-nf-villa-w", ...block(-40, -26, 8, 30, 7) },
+      { id: "pe-b-nf-annex-w", ...block(-38, -25, 36, 56, 5.5) },
+      { id: "pe-b-nf-pavilion-e", ...block(19, 31, 10, 24, 4.5) },
+      { id: "pe-b-nf-clinic-park-e", ...block(22, 34, 30, 52, 5.5) },
+    ],
+  },
+  /** PE-16 — total enclosure from metre one: the dock walls run south to the
+   *  start of the street, so the canyon has no mouth. Nights here are the
+   *  headlights and nothing else. */
+  "dock-wall-tight": {
+    sides: "both",
+    heightBand: "tall",
+    setbackM: 12.6,
+    noteBg:
+      "Коридорът започва още от потеглянето: глухите стени на рампите вървят до самото начало на отсечката. Няма отвор, няма пролука, няма къде да падне светлина — от първия метър караш в тъмен тунел.",
+    build: () => [
+      { id: "pe-b-nf-dock-w", ...block(-42, -12.6, 2, 23, 12) },
+      { id: "pe-b-nf-dock-e", ...block(12.6, 44, 2, 31, 12) },
+    ],
+  },
+  /** PE-02 — a lock-up garage row whose roofline sits barely above the eye for
+   *  thirty metres with open sky over it, and then the 9 m corner block rears
+   *  up at y = 50, three times its height. The silhouette CHANGES during the
+   *  approach, and that change is the lesson. (3 m, not the 2.6 m first
+   *  authored: `MIN_DRAWN_HEIGHT_M` is the floor the renderer actually draws,
+   *  so anything lower is a number the screen ignores.) */
+  "lockup-garages": {
+    sides: "both",
+    heightBand: "low-row",
+    setbackM: 12.6,
+    noteBg:
+      "Първите тридесет метра покрай теб минава ниска редица гаражи — покривите им са едва над очите ти и над тях остава чисто небе. И точно затова деветметровата ъглова сграда, която изниква след тях, изглежда толкова внезапна: улицата ти е показала ниска линия, и после я вдига.",
+    // The east row is BROKEN AT THE BAY MOUTH, and that is the CARRIAGEWAY axis
+    // showing through the frontage rather than a taste: a lock-up forecourt
+    // cannot occupy the metres the parking pocket occupies, so the row stops at
+    // y = 17 (still on the 16.25 m lead-in, still hard against the kerb at
+    // x = 12.6) and picks up again at y = 20 standing 4 m further back, which is
+    // where the widened kerb puts it. It is also what keeps the east tree
+    // station at (14.0, 11) suppressed here — without it that station survives
+    // on this district AND on pe-slow-v1, and the family's „no two plant the
+    // same tree in the same metre" gate fails on that pair. It caught it.
+    build: () => [
+      { id: "pe-b-nf-lockup-w", ...block(-26, -12.6, 4, 17, 3) },
+      { id: "pe-b-nf-lockup-w2", ...block(-26, -12.6, 24, 37, 3) },
+      { id: "pe-b-nf-lockup-e", ...block(12.6, 25, 4, 17, 3) },
+      { id: "pe-b-nf-lockup-e2", ...block(12.6, 25, 20, 31, 3) },
+    ],
+  },
+  /** PE-10 — the only ASYMMETRIC one in the family: a 21 m residential slab
+   *  standing over the west kerb while the east side is a 2.4 m yard wall.
+   *  One side of the windscreen is full and the other is sky. */
+  "yard-wall-asym": {
+    sides: "asym-west-tall",
+    heightBand: "slab",
+    setbackM: 12.6,
+    noteBg:
+      "Улицата е несиметрична: отляво жилищен блок опира в тротоара и закрива половината стъкло, а отдясно е само ниският зид на базата. Каквото излиза насреща, излиза отдясно — и ти няма как да го видиш отляво.",
+    build: () => [
+      { id: "pe-b-nf-slab-w", ...block(-34, -13, 6, 44, 21) },
+      { id: "pe-b-nf-yardwall-e", ...block(12.6, 13.8, 2, 27, 3) },
+      { id: "pe-b-nf-weighhut-e", ...block(16, 26, 6, 17, 3.6) },
+    ],
+  },
+  /** PE-04 — the only LAYERED frontage in the family: a 2.8 m garage row on the
+   *  kerb with a 17 m panel slab standing right behind it, so the east side has
+   *  two depths and a roofline that steps. The west is the slab the streetscape
+   *  already puts on the kerb — one flat wall, one stepped one. */
+  "garage-and-backslab": {
+    sides: "asym-east-layered",
+    heightBand: "stepped",
+    setbackM: 12.7,
+    noteBg:
+      "Отдясно улицата е на два етажа дълбочина: първо ниска редица гаражи до самия тротоар, а веднага зад тях се извисява панелен блок. Отляво е глухият калкан на другия блок. Между гаражите има процепи — и точно оттам излиза дете, което ти виждаш едва в последния момент.",
+    build: () => [
+      // The bin store is not dressing: without something on this kerb before
+      // y = 17 the east tree station at y = 11 survives here AND on pe-slow-v1,
+      // and the family test „no two districts plant the same tree in the same
+      // metre" fails on that one pair. It caught it; this is the fix.
+      { id: "pe-b-nf-binstore-e", ...block(12.7, 18, 6, 14, 3) },
+      { id: "pe-b-nf-trafo-e", ...block(12.7, 20, 17, 25, 3.6) },
+      { id: "pe-b-nf-backslab-e", ...block(19.5, 40, 26, 52, 17) },
+    ],
+  },
+  /** PE-14 — the DOMESTIC one, and the only family of separate volumes: a
+   *  continuous three-storey terrace hard on the east kerb, and on the west
+   *  three DETACHED houses standing 21 m back behind open front gardens with
+   *  real gaps between them. Every other instance is walls; this one is
+   *  objects, and the gaps are where a person steps out. */
+  "villa-row-setback": {
+    sides: "asym-east-tight",
+    heightBand: "house",
+    setbackM: 12.9,
+    noteBg:
+      "Ниска домашна улица: отдясно плътен ред стари къщи опира в тротоара, а отляво къщите са дръпнати навътре зад предни градини и стоят разделени една от друга. Между тях зеят пролуки — и точно от такава пролука се излиза направо на платното, без да те е видял никой.",
+    build: () => [
+      { id: "pe-b-nf-house-w1", ...block(-32, -21, 6, 17, 8.5) },
+      { id: "pe-b-nf-house-w2", ...block(-32, -21, 23, 34, 8.5) },
+      { id: "pe-b-nf-house-w3", ...block(-32, -21, 40, 51, 8.5) },
+      { id: "pe-b-nf-terrace-e", ...block(12.9, 24, 4, 26, 9.5) },
+      { id: "pe-b-nf-terrace-e2", ...block(12.9, 24, 32, 54, 9.5) },
+    ],
+  },
+};
+
+// ---------------------------------------------------------------------------
 // The generator (single crossing — the S3 PE micro-map)
 // ---------------------------------------------------------------------------
 
@@ -668,11 +1115,23 @@ const TERMINI = {
  *   streetscape: string,     // doc 86 D1 — the frontage recipe (STREETSCAPES)
  *   roadscape: string,       // doc 87 FR-41 — the cross-section (ROADSCAPES)
  *   terminus: string,        // doc 87 B50 — what the street runs into (TERMINI)
+ *   nearfield: string,       // doc 87 B53 — what stands beside the first 50 m
+ *   carriageway: string,     // doc 87 B50 — the width of the asphalt (CARRIAGEWAYS)
  * }} params
  */
 export function buildPeCrossingStreet(params) {
   const errors = [];
-  const { districtId, label, approachM, maxspeedKmh, streetscape, roadscape, terminus } = params;
+  const {
+    districtId,
+    label,
+    approachM,
+    maxspeedKmh,
+    streetscape,
+    roadscape,
+    terminus,
+    nearfield,
+    carriageway,
+  } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
   if (!/^[a-z0-9-]+$/.test(districtId ?? "")) errors.push(`districtId "${districtId}" must be kebab-case`);
@@ -698,37 +1157,117 @@ export function buildPeCrossingStreet(params) {
         `HORIZON, which is the half the roadscape pass left alone and the re-look photographed)`,
     );
   }
+  if (!NEARFIELDS[nearfield]) {
+    errors.push(
+      `nearfield "${nearfield}" unknown — pick one of ${Object.keys(NEARFIELDS).join(", ")} ` +
+        `(doc 87 B50/B53/B54: an instance without its own near field is another copy of the ` +
+        `FIRST FIFTY METRES, which is the only part of the street the student looks at for the ` +
+        `whole drill and the one part the other four axes never touch)`,
+    );
+  }
+  if (!CARRIAGEWAYS[carriageway]) {
+    errors.push(
+      `carriageway "${carriageway}" unknown — pick one of ${Object.keys(CARRIAGEWAYS).join(", ")} ` +
+        `(doc 87 B50/B53/B54: an instance without its own carriageway is another copy of the ` +
+        `SAME 16.25 m ribbon, which is the bottom ~45% of every cockpit frame and the half ` +
+        `the near-field pass was refused for)`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_pe_crossings params invalid:\n  - ${errors.join("\n  - ")}`);
 
   const road = ROADSCAPES[roadscape];
   const end = TERMINI[terminus];
+  const near = NEARFIELDS[nearfield];
+  const cw = CARRIAGEWAYS[carriageway];
   /** Arterial classes carry the band by class; an explicit tag overrides it. */
   const bandByClass = ["primary", "secondary", "tertiary"].includes(road.roadClass);
   const hasBand = road.parkingBand === null ? bandByClass : road.parkingBand === true;
+  /** The band ON THE CROSSING SEGMENT — lever 3 keeps this 0 on all seven. */
   const parkingBandM = hasBand ? PARKING_LANE_WIDTH_M : 0;
   const clearX = frontageClearX(parkingBandM);
-  /** How far the authored frontage moves out to clear THIS cross-section. */
-  const shiftOut = clearX - FRONTAGE_CLEAR_X;
 
   const crossingY = approachM;
   const lengthM = crossingY + RUNOUT_M;
   const halfRoadM = SCALED_LANE_W; // 2 lanes total → half-width = one drawn lane
   const laneCenterM = r2(SCALED_LANE_W / 2); // right-lane center offset from x=0
 
-  // -- Nodes / edge (one straight street; a zebra needs no junctions).
-  const NODES = {
-    "pe-n-start": [0, 0],
-    "pe-n-end": [0, lengthM],
-  };
-  const geometry = [
-    [0, 0],
-    [0, lengthM],
-  ];
-  const EDGES = [
-    {
+  // -- CARRIAGEWAY (doc 87 B50/B53/B54, sixth axis): the street as a CHAIN of
+  // collinear segments joined at degree-2 nodes. The recipe owns everything
+  // SOUTH of `cutY`; `pe-e-street` runs from there to the terminal node and
+  // carries the crossing, the ban zone, the finish spawn and — always —
+  // `parkingBand: false`, so nothing the axis does can reach the graded
+  // geometry (see lever 3 in the header for the measurement that forces it).
+  const southSpec = cw.segments(lengthM, crossingY);
+  /** [fromY, toY, bandM] per segment, south → north, INCLUDING pe-e-street. */
+  const SEGMENTS = [];
+  {
+    let y0 = 0;
+    southSpec.forEach((s, i) => {
+      SEGMENTS.push({
+        id: `pe-e-street-s${i + 1}`,
+        fromNode: i === 0 ? "pe-n-start" : `pe-n-cw${i}`,
+        toNode: `pe-n-cw${i + 1}`,
+        fromY: y0,
+        toY: s.toY,
+        bandM: s.band ? PARKING_LANE_WIDTH_M : 0,
+      });
+      y0 = s.toY;
+    });
+    SEGMENTS.push({
       id: "pe-e-street",
-      from: "pe-n-start",
-      to: "pe-n-end",
+      fromNode: southSpec.length === 0 ? "pe-n-start" : `pe-n-cw${southSpec.length}`,
+      toNode: "pe-n-end",
+      fromY: y0,
+      toY: lengthM,
+      bandM: parkingBandM,
+    });
+  }
+  const crossSeg = SEGMENTS[SEGMENTS.length - 1];
+  /** The curbside band in force at district y — drives the frontage stand-back. */
+  const bandAtY = (y) => {
+    for (const s of SEGMENTS) if (y >= s.fromY - 1e-9 && y <= s.toY + 1e-9) return s.bandM;
+    return 0; // north of the terminal node: terminus legs, never banded
+  };
+  /**
+   * How far a volume spanning [y0, y1] must move out. The WIDEST band its own
+   * y-range touches, so a wall beside a bay pocket stands back from the bay's
+   * kerb and the same recipe's wall beside the plain section does not — the
+   * frontage steps where the road does, which is what a real джоб looks like.
+   */
+  const shiftForSpan = (y0, y1) => {
+    let widest = 0;
+    for (const s of SEGMENTS) {
+      if (y1 < s.fromY - 1e-9 || y0 > s.toY + 1e-9) continue;
+      widest = Math.max(widest, s.bandM);
+    }
+    return widest;
+  };
+  const shiftBlock = (bl) => {
+    const ys = bl.footprint.map(([, y]) => y);
+    const out = shiftForSpan(Math.min(...ys), Math.max(...ys));
+    return out === 0
+      ? bl
+      : { ...bl, footprint: bl.footprint.map(([x, y]) => [r2(x + Math.sign(x) * out), y]) };
+  };
+  /** Legacy alias kept for the meta signature: the CROSSING segment's shift. */
+  const shiftOut = clearX - FRONTAGE_CLEAR_X;
+
+  // -- Nodes / edges. Every segment is `lanes: 2` on the same posted limit, so
+  // the lane grid (and the x = 4.06 rail every committed trace drives) is the
+  // same on all of them; only the kerb moves.
+  const NODES = { "pe-n-start": [0, 0], "pe-n-end": [0, lengthM] };
+  for (const s of SEGMENTS) {
+    if (!NODES[s.toNode]) NODES[s.toNode] = [0, r2(s.toY)];
+  }
+  const segEdge = (s) => {
+    const geo = [
+      [0, r2(s.fromY)],
+      [0, r2(s.toY)],
+    ];
+    return {
+      id: s.id,
+      from: s.fromNode,
+      to: s.toNode,
       class: road.roadClass,
       name: "Улица с пешеходна пътека",
       oneway: road.oneway,
@@ -737,20 +1276,28 @@ export function buildPeCrossingStreet(params) {
       lanesSource: "tag",
       maxspeed: maxspeedKmh,
       maxspeedSource: "tag",
-      length: polylineLength(geometry),
-      geometry,
-      // FR-21 (car half) + FR-41: only written when the roadscape has an
-      // OPINION about the curbside band, so an arterial-class street stays
-      // byte-identical to a file written before the tag existed.
-      // `true`  ⇒ draw the 4 m band; the parked row lands on asphalt.
-      // `false` ⇒ no band and no procedural parked row on this street at all.
-      ...(road.parkingBand === null ? {} : { parkingBand: road.parkingBand }),
+      length: polylineLength(geo),
+      geometry: geo,
+      // FR-21 (car half) + FR-41: only written when there is an OPINION about
+      // the curbside band, so a street written before the tag existed is
+      // byte-identical. `true` ⇒ draw the 4 m band and let the parked row land
+      // on asphalt; `false` ⇒ no band and no procedural parked row at all.
+      // The CROSSING segment inherits the roadscape's opinion; a CARRIAGEWAY
+      // segment states its own, because the band is what the axis IS.
+      ...(s.id === "pe-e-street"
+        ? road.parkingBand === null
+          ? {}
+          : { parkingBand: road.parkingBand }
+        : { parkingBand: s.bandM > 0 }),
       // FR-41: a side with NO pavement at all (network.edgeBareVerge) — the
       // industrial canyon's loading wall stands on the kerb, so that side has
       // no footway, no lamp column, no tree and no bus shelter.
       ...(road.bareVerge ? { bareVerge: road.bareVerge } : {}),
-    },
-  ];
+    };
+  };
+  // `pe-e-street` stays EDGES[0] — pe-districts.test.ts reads the graded street
+  // there, and so does every census that has ever been taken of this family.
+  const EDGES = [segEdge(crossSeg), ...SEGMENTS.slice(0, -1).map(segEdge)];
 
   // -- TERMINUS (doc 87 B50/B53/B54): the road NORTH of pe-n-end. Every leg
   // hangs off the previous one in a chain, so every node it introduces has
@@ -792,14 +1339,30 @@ export function buildPeCrossingStreet(params) {
 
   // -- Ban zone (ADR-006 stage 2a): the В24/В27 the roadscape posts, spanned
   // as a fraction of the street so it rides any approach length.
-  const ZONES = road.ban
+  //
+  // The span is authored in ABSOLUTE y and then re-based onto the crossing
+  // segment's own arclength, because `DistrictZone.fromM/toM` are measured
+  // along ONE edge. A span that straddled a joint would have to be emitted as
+  // two zone rows and `zoneSigns` posts a face at each row's start — two В24
+  // posts eight metres apart is a falsehood a student can see, so instead the
+  // span is CLAMPED to start just inside the crossing segment. On the two
+  // instances where that moves it (pe-dart 42 → 48 m, pe-bus 29.6 → 58 m) the
+  // ban still covers the whole crossing approach, which is what the roadscape
+  // recipe's note says it is for. Asserted below, never assumed.
+  const banAbs = road.ban
+    ? {
+        fromY: Math.max(r2(lengthM * road.ban.fromFrac), r2(crossSeg.fromY + 2)),
+        toY: r2(lengthM * road.ban.toFrac),
+      }
+    : null;
+  const ZONES = banAbs
     ? [
         {
           id: `pe-z-${road.ban.kind.toLowerCase()}`,
           kind: road.ban.kind,
           edgeId: "pe-e-street",
-          fromM: r2(lengthM * road.ban.fromFrac),
-          toM: r2(lengthM * road.ban.toFrac),
+          fromM: r2(banAbs.fromY - crossSeg.fromY),
+          toM: r2(banAbs.toY - crossSeg.fromY),
           signRef: KIND_TO_SIGN[road.ban.kind],
         },
       ]
@@ -822,13 +1385,16 @@ export function buildPeCrossingStreet(params) {
   const ROUNDABOUTS = [];
 
   // -- Spawns: approach start (right-lane center) + a finish reference point.
+  // The approach spawn keeps its coordinates to the metre (every recorded trace
+  // starts there) but names whichever segment now contains y = 15.
+  const segAtY = (y) => SEGMENTS.find((s) => y >= s.fromY - 1e-9 && y <= s.toY + 1e-9) ?? crossSeg;
   const SPAWN_POINTS = [
     {
       id: "pe-spawn-approach",
       x: laneCenterM,
       y: 15,
       heading: 0,
-      edgeId: "pe-e-street",
+      edgeId: segAtY(SPAWN_Y_M).id,
       name: "Подход към пешеходната пътека",
     },
     {
@@ -845,19 +1411,23 @@ export function buildPeCrossingStreet(params) {
   // happens here and that occludes the approach. Every volume stands clear of
   // the carriageway + kerb + sidewalk (post-validated below).
   const recipe = STREETSCAPES[streetscape];
-  // Authored against FRONTAGE_CLEAR_X; a road that carries a parking band
-  // pushes the whole frontage OUT by the band width, so the recipe keeps its
-  // authored stand-back from the kerb on every cross-section (no volume
-  // straddles x = 0, so the sign of x is the side).
+  // Authored against FRONTAGE_CLEAR_X; a stretch of road that carries a parking
+  // band pushes the frontage BESIDE IT out by the band width, so the recipe
+  // keeps its authored stand-back from the kerb on every cross-section and
+  // never has to know which one it is riding (no volume straddles x = 0, so the
+  // sign of x is the side). `shiftForSpan` is per-VOLUME rather than
+  // per-district since the CARRIAGEWAY axis: a wall beside a bay pocket stands
+  // 4 m further back than the same recipe's wall beside the plain section.
   const BUILDINGS = [
-    ...recipe.build(crossingY).map((bl) => ({
-      ...bl,
-      footprint: bl.footprint.map(([x, y]) => [r2(x + Math.sign(x) * shiftOut), y]),
-    })),
+    ...recipe.build(crossingY).map(shiftBlock),
     // The TERMINUS vista: what fills the sky at the end of the street. Authored
     // in absolute coordinates (it is past the terminal node, so the parking
     // band never shifts it) and validated against EVERY edge below.
     ...end.build(lengthM),
+    // The NEARFIELD: what stands beside the FIRST FIFTY METRES. Authored in
+    // absolute y against the SPAWN, and shifted out by the band like the
+    // streetscape is. Validated below against the spawn anchor and the crossing.
+    ...near.build().map(shiftBlock),
   ];
 
   // -- Bounds + stats.
@@ -944,14 +1514,51 @@ export function buildPeCrossingStreet(params) {
          *  windscreen the cross-section pass never filled. */
         terminus,
         terminusNoteBg: end.noteBg,
+        /** doc 87 B50/B53/B54 — WHAT STANDS BESIDE THE FIRST FIFTY METRES,
+         *  i.e. the only part of the world the student looks at for the whole
+         *  drill, and the one the other four axes are all authored past. */
+        nearfield,
+        nearfieldNoteBg: near.noteBg,
+        /** The signature the family battery compares: sides occupied × height
+         *  band × nearest setback. Two instances may not share it. */
+        nearfieldSignature: `${near.sides}|${near.heightBand}|${r2(near.setbackM + shiftOut)}`,
+        /** Distance from the SPAWN to the first near-field volume, m. This is
+         *  the number that was effectively infinite on pe-cane-v1 and 41+ m on
+         *  most of the rest; `NEARFIELD_FIRST_WITHIN_M` now caps it. */
+        nearfieldFirstM: r2(
+          Math.min(...near.build().map((bl) => Math.min(...bl.footprint.map(([, y]) => y)))) -
+            SPAWN_Y_M,
+        ),
         /** Extra road the terminus adds past the terminal node (0 = the street
          *  simply ends and the vista is frontage only). */
         terminusLegs: LEGS.length,
-        terminusRoadM: r2(EDGES.slice(1).reduce((s, e) => s + e.length, 0)),
+        // LEG length only — the CARRIAGEWAY axis also puts edges after index 0,
+        // and counting those here would have quietly reported bay pockets as
+        // terminus road.
+        terminusRoadM: r2(LEGS.reduce((s, l) => s + polylineLength(l.edge.geometry), 0)),
         roadClass: road.roadClass,
         parkingBandM,
         bareVerge: road.bareVerge,
         curbToCurbM: r2(2 * (halfRoadM + parkingBandM)),
+        /** doc 87 B50/B53/B54 — THE WIDTH OF THE ASPHALT, per segment. The one
+         *  axis that changes the bottom ~45 % of a cockpit frame. */
+        carriageway,
+        carriagewayNoteBg: cw.noteBg,
+        carriagewaySegments: SEGMENTS.map((s) => ({
+          id: s.id,
+          fromY: r2(s.fromY),
+          toY: r2(s.toY),
+          curbToCurbM: r2(2 * (halfRoadM + s.bandM)),
+        })),
+        /** Curb to curb AT THE SEAT (district y = 15). This is the number the
+         *  founder's frame is actually of; `curbToCurbM` above is the crossing's
+         *  and is frozen at 16.25 by lever 3. */
+        spawnCurbToCurbM: r2(2 * (halfRoadM + bandAtY(SPAWN_Y_M))),
+        /** Where the width changes, north of the spawn — the taper is a depth
+         *  cue and no two instances may put it in the same place. */
+        widthChangesAtM: SEGMENTS.slice(0, -1).map((s) => r2(s.toY - SPAWN_Y_M)),
+        /** Metres of 24.25 m carriageway on the drive. 0 = today's street. */
+        bayedRoadM: r2(SEGMENTS.reduce((s, g) => s + (g.bandM > 0 ? g.toY - g.fromY : 0), 0)),
         oneway: road.oneway,
         banSignRef: road.ban ? KIND_TO_SIGN[road.ban.kind] : null,
         primaryCrossingId: "pe-x-1",
@@ -989,9 +1596,77 @@ export function buildPeCrossingStreet(params) {
     if (e.length <= 0) post.push(`${e.id}: zero length`);
   }
   const distToStreet = (x, y) => Math.abs(x) + (y < 0 ? -y : y > lengthM ? y - lengthM : 0);
+  const segIds = new Set(SEGMENTS.map((s) => s.id));
   for (const s of SPAWN_POINTS) {
-    if (s.edgeId !== "pe-e-street") post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
+    if (!segIds.has(s.edgeId)) post.push(`${s.id}: unknown edgeId ${s.edgeId}`);
+    if (s.edgeId !== segAtY(s.y).id) post.push(`${s.id}: edgeId ${s.edgeId} does not contain y=${s.y}`);
     if (distToStreet(s.x, s.y) > halfRoadM) post.push(`${s.id}: not on the carriageway`);
+  }
+  // -- CARRIAGEWAY invariants (doc 87 B50/B53/B54, the sixth axis). Every one of
+  // these is what keeps a width change from reaching the graded geometry, and
+  // every one is the reason a previous attempt at the width lever was reverted.
+  {
+    let prevY = 0;
+    for (const s of SEGMENTS) {
+      if (Math.abs(s.fromY - prevY) > 1e-9) {
+        post.push(`carriageway ${carriageway}: segment ${s.id} starts at ${s.fromY}, gap from ${prevY}`);
+      }
+      if (s.toY - s.fromY < MIN_SEGMENT_M) {
+        post.push(
+          `carriageway ${carriageway}: segment ${s.id} is ${r2(s.toY - s.fromY)} m — below the ` +
+            `${MIN_SEGMENT_M} m floor, so it would be all joint taper and no ribbon`,
+        );
+      }
+      prevY = s.toY;
+    }
+    if (Math.abs(prevY - lengthM) > 1e-9) {
+      post.push(`carriageway ${carriageway}: the chain ends at ${prevY}, not at the terminal node ${lengthM}`);
+    }
+    // Lever 3: the segment the zebra is painted on, the CrossingZone arms from
+    // and the staged walk steps onto must be the 16.25 m one it was authored
+    // against. `markings.paintZebra` takes `eb.halfWidth`, so a band here paints
+    // a 24.25 m zebra under a walk pinned at CURB_X = −9.73.
+    if (crossSeg.bandM !== 0) {
+      post.push(
+        `carriageway ${carriageway}: the crossing segment carries a ${crossSeg.bandM} m band — ` +
+          `that widens the painted zebra and the kerb the staged walk is pinned to ` +
+          `(templates-pe*.ts CURB_X = −9.73), which is the change that dropped ` +
+          `sc-crossing-slow-crosser and sc-crossing-white-cane from 3 stars to 1`,
+      );
+    }
+    // Lever 4: one lane grid on the whole chain, or the recorded rail moves.
+    for (const e of EDGES) {
+      if (!segIds.has(e.id)) continue;
+      if (e.lanes !== 2) post.push(`${e.id}: ${e.lanes} lanes — only 2 keeps x = ${laneCenterM} a kerbside lane centre`);
+      if (e.maxspeed !== maxspeedKmh) post.push(`${e.id}: ${e.maxspeed} km/h — a joint has no arm to post В26 on`);
+      if (e.class !== road.roadClass) post.push(`${e.id}: class ${e.class} != the roadscape's ${road.roadClass}`);
+      if (e.oneway !== road.oneway) post.push(`${e.id}: oneway ${e.oneway} != the roadscape's ${road.oneway}`);
+    }
+    // The parked row `TrafficLayer` seats in a bay must stay clear of the zebra.
+    // Its own 25 m crossing guard only looks at the crossing's OWN edge
+    // (`if (crossing.edgeId !== edge.id) continue`), so on a split street this
+    // distance is nobody's job but this generator's.
+    for (const s of SEGMENTS) {
+      if (s.bandM === 0) continue;
+      if (crossingY - s.toY < BAND_CROSSING_CLEAR_M) {
+        post.push(
+          `carriageway ${carriageway}: banded segment ${s.id} ends at y=${s.toY}, only ` +
+            `${r2(crossingY - s.toY)} m before the crossing at ${crossingY} — computeParkedCars ` +
+            `cannot see a crossing on another edge, so a body would stand inside the approach ` +
+            `(need >= ${BAND_CROSSING_CLEAR_M} m)`,
+        );
+      }
+    }
+    // A ban span may not straddle a joint: `zoneSigns` posts one face per zone
+    // row, so a split span posts two signs metres apart.
+    if (banAbs) {
+      if (banAbs.fromY < crossSeg.fromY - 1e-9 || banAbs.toY > lengthM + 1e-9) {
+        post.push(
+          `roadscape ${roadscape}: ban span [${banAbs.fromY}, ${banAbs.toY}] straddles the joint at ` +
+            `y=${crossSeg.fromY} — it would need two zone rows and would post two ${KIND_TO_SIGN[road.ban.kind]} faces`,
+        );
+      }
+    }
   }
   // The crossing must sit ON the street centerline with real approach room
   // before it (the ~35 m zone must arm on the road, not at spawn).
@@ -1017,6 +1692,18 @@ export function buildPeCrossingStreet(params) {
     const band = e.parkingBand === true ? PARKING_LANE_WIDTH_M : 0;
     return travelHalf + band + SIDEWALK_SKIRT_M + SIDEWALK_W + FRONTAGE_STANDBACK_M;
   };
+  /** The whole graded street as one collinear polyline — see the chain test. */
+  const CHAIN_GEO = [
+    [0, 0],
+    [0, lengthM],
+  ];
+  /** Clearance the chain demands at district y, band-aware. */
+  const chainClearanceAt = (y) =>
+    halfRoadM +
+    bandAtY(Math.min(Math.max(y, 0), lengthM)) +
+    SIDEWALK_SKIRT_M +
+    SIDEWALK_W +
+    FRONTAGE_STANDBACK_M;
   /** Distance from a point to a polyline, ENDS INCLUDED (so a volume past the
    *  terminal node is measured from the terminal node, not waved through). */
   const missToPolyline = (geo, px, py) => {
@@ -1040,8 +1727,38 @@ export function buildPeCrossingStreet(params) {
     if (seenBuildingIds.has(bl.id)) post.push(`duplicate building id ${bl.id}`);
     seenBuildingIds.add(bl.id);
     if (!(bl.height > 0)) post.push(`${bl.id}: non-positive height`);
+    // Since `block()` emits `heightSource: "height"`, the authored metres are
+    // what gets drawn — EXCEPT below this floor, where the renderer clamps and
+    // says nothing. A file that states 1.8 and draws 3.0 is a smaller version
+    // of the bug that produced „same map, same engineering": a number in the
+    // data that the screen does not obey.
+    if (bl.height < MIN_DRAWN_HEIGHT_M) {
+      post.push(
+        `${bl.id}: height ${bl.height} m is below the renderer's ${MIN_DRAWN_HEIGHT_M} m floor ` +
+          `(cityBuildings.DATA_HEIGHT_MIN_M clamps it up and reports nothing) — author ` +
+          `${MIN_DRAWN_HEIGHT_M} m, or use a volume that is genuinely taller`,
+      );
+    }
     for (const [x, y] of bl.footprint) {
+      // The CHAIN is one straight collinear street, so its clearance is measured
+      // against the whole [0, lengthM] ribbon with the band IN FORCE AT THIS y —
+      // never segment by segment. Per-segment `missToPolyline` measures to a
+      // segment's END POINT, so a wall standing 4 m north of a bay pocket's
+      // joint failed a 16.48 m lateral test on a hypotenuse of 13.2 m: a
+      // geometry error, not a frontage error.
+      {
+        const need = chainClearanceAt(y);
+        const got = missToPolyline(CHAIN_GEO, x, y);
+        if (got < need - 1e-9) {
+          post.push(
+            `${bl.id}: footprint (${x}, ${y}) is ${r2(got)} m from the street, inside its ` +
+              `${r2(need)} m kerb+sidewalk clearance (${road.roadClass}, 2 lanes, ` +
+              `${r2(bandAtY(Math.min(Math.max(y, 0), lengthM)))} m band here)`,
+          );
+        }
+      }
       for (const e of EDGES) {
+        if (segIds.has(e.id)) continue; // handled by the chain test above
         const need = clearanceOf(e);
         const got = missToPolyline(e.geometry, x, y);
         if (got < need - 1e-9) {
@@ -1058,10 +1775,38 @@ export function buildPeCrossingStreet(params) {
   // crossing zone. This is the invariant that keeps the 21 recorded ghost traces
   // valid without re-measuring them.
   for (const e of EDGES) {
-    if (e.id === "pe-e-street") continue;
+    if (segIds.has(e.id)) continue; // a CARRIAGEWAY segment, not a terminus leg
     for (const [, y] of e.geometry) {
       if (y < lengthM - 1e-9) post.push(`${e.id}: terminus geometry reaches y=${y}, south of the terminal node (${lengthM})`);
     }
+  }
+  // The NEARFIELD must actually BE a near field. Three rules, and the first is
+  // the axis itself: a recipe whose nearest volume drifts north is a fourth
+  // streetscape wearing this axis's name, which is exactly how the first fifty
+  // metres ended up bare on all seven while four axes reported „variety".
+  {
+    const nfY = near.build().flatMap((bl) => bl.footprint.map(([, y]) => y));
+    const first = Math.min(...nfY);
+    const last = Math.max(...nfY);
+    if (first > SPAWN_Y_M + NEARFIELD_FIRST_WITHIN_M) {
+      post.push(
+        `nearfield ${nearfield}: nearest volume begins at y=${first}, ` +
+          `${r2(first - SPAWN_Y_M)} m from the spawn — the axis requires something standing ` +
+          `within ${NEARFIELD_FIRST_WITHIN_M} m of it (doc 87 B53: the streetscapes are ` +
+          `authored against the CROSSING and that is why they all land past the seat)`,
+      );
+    }
+    if (first < NEARFIELD_MIN_Y) {
+      post.push(`nearfield ${nearfield}: volume at y=${first} is south of the street start`);
+    }
+    if (last > crossingY - NEARFIELD_CROSSING_CLEAR_M) {
+      post.push(
+        `nearfield ${nearfield}: volume reaches y=${last}, inside the ` +
+          `${NEARFIELD_CROSSING_CLEAR_M} m the crossing at y=${crossingY} keeps clear ` +
+          `(the streetscape recipe owns that stretch)`,
+      );
+    }
+    if (near.build().length < 2) post.push(`nearfield ${nearfield}: needs >= 2 volumes to read as a street edge`);
   }
   if (BUILDINGS.length < 3) post.push(`streetscape ${streetscape}: needs >= 3 volumes to read as a street`);
   if (!Number.isFinite(bounds.minX) || bounds.maxX <= bounds.minX || bounds.maxY <= bounds.minY) {
@@ -1074,21 +1819,33 @@ export function buildPeCrossingStreet(params) {
   if (road.bareVerge !== null && !["left", "right", "both"].includes(road.bareVerge)) {
     post.push(`roadscape ${roadscape}: bareVerge must be null | "left" | "right" | "both"`);
   }
-  // FR-21: a street that draws no parking band must not be left carrying a
-  // procedurally parked row, because the pass would stand it on the pavement.
-  if (parkingBandM === 0 && road.parkingBand !== false) {
-    post.push(
-      `roadscape ${roadscape}: no parking band is drawn, so it must say ` +
-        `parkingBand: false — otherwise TrafficLayer.computeParkedCars seats a ` +
-        `row 2 m past the kerb, on the footway (founder item FR-21)`,
-    );
+  // FR-21: every drivable edge in the file must state an OPINION about the
+  // band, and the opinion must match the width actually drawn. Absent, the class
+  // decides — and on a `residential` street the class says "no band" while
+  // `TrafficLayer.PARK_CLASSES` says "park here", which is the two-set
+  // disagreement that put 2605 bodies on 83 districts' pavements.
+  for (const e of EDGES) {
+    if (typeof e.parkingBand !== "boolean") {
+      post.push(`${e.id}: no parkingBand opinion — the class decides, and PARK_CLASSES ⊋ PARKING_LANE_CLASSES (FR-21)`);
+      continue;
+    }
+    const seg = SEGMENTS.find((s) => s.id === e.id);
+    if (seg && e.parkingBand !== seg.bandM > 0) {
+      post.push(`${e.id}: parkingBand ${e.parkingBand} contradicts its ${seg.bandM} m band`);
+    }
   }
   for (const z of ZONES) {
     if (KIND_TO_SIGN[z.kind] !== z.signRef) post.push(`${z.id}: signRef ${z.signRef} does not post ${z.kind}`);
-    if (!(z.fromM >= 0 && z.toM <= lengthM && z.toM - z.fromM >= 20)) {
-      post.push(`${z.id}: span [${z.fromM}, ${z.toM}] is not a readable stretch of the ${lengthM} m street`);
+    const host = SEGMENTS.find((s) => s.id === z.edgeId);
+    if (!host) {
+      post.push(`${z.id}: unknown edgeId ${z.edgeId}`);
+    } else if (!(z.fromM >= 0 && z.toM <= host.toY - host.fromY + 1e-9 && z.toM - z.fromM >= 20)) {
+      post.push(
+        `${z.id}: span [${z.fromM}, ${z.toM}] is not a readable stretch of the ` +
+          `${r2(host.toY - host.fromY)} m ${host.id} segment`,
+      );
     }
-    if (z.edgeId !== "pe-e-street") post.push(`${z.id}: unknown edgeId ${z.edgeId}`);
+    if (z.edgeId !== "pe-e-street") post.push(`${z.id}: a ban belongs on the crossing segment, not on ${z.edgeId}`);
   }
   if (post.length > 0) {
     throw new Error(`gen_pe_crossings self-validation FAILED:\n  - ${post.join("\n  - ")}`);
@@ -1104,33 +1861,69 @@ export function buildPeCrossingStreet(params) {
 // He played catalog 24–30 back to back. Every column below has to differ from
 // its neighbours for the SEQUENCE to stop being the defect (doc 87 B53):
 //
-//   district      approach  limit  class         curb-to-curb  parked row  sign
-//   pe-clear-v1     90 m    50     tertiary        24.25 m      broken@В27  В27
-//   pe-slow-v1      85 m    40     residential*    24.25 m      broken@В27  В27
-//   pe-rain-v1      95 m    50     unclassified    16.25 m      NONE         —
-//   pe-dart-v1      80 m    50     residential     16.25 m      NONE        В27
-//   pe-bus-v1       88 m    50     tertiary        24.25 m      on asphalt  В24
-//   pe-child-v1     78 m    40     residential     16.25 m      NONE        В24
-//   pe-cane-v1      92 m    50     residential* ONE-WAY 24.25 m on asphalt  Д4
+//   district      appr limit class        sign  near field           first m
+//   pe-clear-v1   90 m  50   tertiary     В27   arcade-canyon-low     −12
+//   pe-slow-v1    85 m  40   residential  В27   open-forecourt        −11
+//   pe-rain-v1    95 m  50   unclassified  —    dock-wall-tight       −13
+//   pe-dart-v1    80 m  50   residential  В24   lockup-garages        −11
+//   pe-bus-v1     88 m  50   tertiary     В24   yard-wall-asym        −13
+//   pe-child-v1   78 m  40   residential   —    garage-and-backslab    +2
+//   pe-cane-v1    92 m  50   residential  Д4    villa-row-setback     −12
+//                             (ONE-WAY)
 //
-//   (* residential + an explicit `parkingBand: true` — see ROADSCAPES.)
+// „first m" is `nearfieldFirstM`: how far from the SPAWN the nearest authored
+// volume begins. Negative means it is already beside you when the drill starts.
+// Before this axis existed the same column read +41, +24, +10, +19, +15, +3 and
+// — on pe-cane-v1, the lesson he wrote „absolutely same as question 23" about —
+// nothing at all for the first fifty metres.
 //
-// FR-21 is closed on all seven, two different ways: four streets grew the band
-// their row was already standing in the middle of (the bodies did not move —
-// the KERB did), and three declare `parkingBand: false`, so nothing is placed
-// where there is nowhere to stand. The three narrow ones are narrow on purpose:
-// pe-dart-v1 and pe-child-v1 carry darts whose release distances are DERIVED
-// from the kerb offset (doc 86 T11), so widening them would silently re-time
-// two drills, and pe-rain-v1 is a wall-to-wall industrial canyon that would not
-// have kerbside parking anyway.
+// ⚠ THE CROSS-SECTION COLUMN THIS TABLE USED TO CARRY WAS FALSE ONCE, was
+// deleted, and is now TRUE — worth the whole history, because a future author
+// would have trusted the false version. It once claimed 24.25 m curb-to-curb
+// for four of the seven while every shipped file was 16.25 m with
+// `parkingBandM: 0`; the comment had survived a revert. What follows is
+// measured on the emitted JSON by `pe-districts.test.ts`, not asserted here:
 //
-// No two rows agree on the whole tuple, and world/__tests__/pe-districts
-// „no two districts share a CROSS-SECTION signature" is what keeps it that way.
-// The two arterial-class streets also gain edge lines, lane dashes and a lamp
-// column row that the residential ones do not have, so „lamps = 0 on all seven"
-// is no longer true of the family either. And a В27 span is a real hole in the
-// parked row — `TrafficLayer.computeParkedCars` honours the ban zone, so the
-// sign and the street agree.
+//   district      carriageway                  seat      width changes   1st car
+//   pe-clear-v1   bays-from-the-seat           24.25 m   +31             y=11
+//   pe-slow-v1    bay-pocket-mid               16.25 m   +11, +40        y=37
+//   pe-rain-v1    plain-two-lane               16.25 m   —               none
+//   pe-dart-v1    bay-pocket-near              16.25 m    +3, +35        y=29
+//   pe-bus-v1     bay-pocket-far               16.25 m    +7, +43        y=33
+//   pe-child-v1   bay-pocket-behind-the-seat   24.25 m    −3, +29        y=23
+//   pe-cane-v1    bay-pocket-oneway            16.25 m    +1, +37        y=27
+//                 (ONE-WAY: 24.25 m of asphalt with no осева on it at all)
+//
+// „seat" is curb-to-curb at district y = 15, where every recorded drive begins.
+// „width changes" is metres AHEAD of that seat. All seven were 16.25 m / never.
+//
+// ⚠ THE „1st car" COLUMN IS WHY THE BAY STARTS ARE STAGGERED, and it is worth
+// the sentence because the first attempt got it wrong and the sheet showed it.
+// `TrafficLayer.computeParkedCars` seats the row at `PARK_END_MARGIN_M` = 11 m
+// from the SEGMENT START and every `PARK_SPACING_M` = 6.6 m after it, on the
+// RIGHT of travel only. Three districts were first given a bay starting at
+// y = 0; all three then had their nearest parked car at exactly y = 11, on the
+// same side, at the same three metres — a fresh instance of the very defect
+// this axis exists to fix, and the cockpit sheet made it obvious at a glance.
+// Six distinct bay starts buy six distinct rows. The one-sidedness is NOT
+// fixable from here: the row's side is `TrafficLayer`'s right-hand normal.
+//
+// FR-21 is now closed both ways the tag allows. The CROSSING segment of every
+// one of the seven still declares `parkingBand: false`, so nothing is placed
+// where there is nowhere lawful to stand; the five bay segments declare `true`,
+// so the band is drawn, the kerb moves out from under the row and the bodies
+// stand on asphalt. That is the tag doing its job rather than being avoided.
+//
+// No two rows agree on the whole tuple, and world/__tests__/pe-districts holds
+// it: „no two districts share a CROSS-SECTION signature", „no two share a
+// TERMINUS", „no two share a NEAR-FIELD signature", and now „no two share a
+// CARRIAGEWAY signature" — the last one being the only assertion in the battery
+// about the part of the world the cockpit camera actually points at. The two
+// arterial-class streets also gain edge lines, lane dashes and a lamp column
+// row that the residential ones do not have, so „lamps = 0 on all seven" is no
+// longer true of the family either. And a В27 span is a real hole in the parked
+// row — `TrafficLayer.computeParkedCars` honours the ban zone, so the sign and
+// the street agree.
 
 const INSTANCES = [
   {
@@ -1141,6 +1934,8 @@ const INSTANCES = [
     streetscape: "corner-shop-terrace",
     roadscape: "collector-shopping",
     terminus: "opens-to-collector",
+    nearfield: "arcade-canyon-low",
+    carriageway: "bays-from-the-seat",
   },
   {
     districtId: "pe-slow-v1",
@@ -1150,6 +1945,8 @@ const INSTANCES = [
     streetscape: "clinic-and-park",
     roadscape: "residential-clinic",
     terminus: "closed-by-block",
+    nearfield: "open-forecourt",
+    carriageway: "bay-pocket-mid",
   },
   {
     districtId: "pe-rain-v1",
@@ -1159,6 +1956,8 @@ const INSTANCES = [
     streetscape: "unlit-warehouse-canyon",
     roadscape: "industrial-canyon",
     terminus: "bends-away-left",
+    nearfield: "dock-wall-tight",
+    carriageway: "plain-two-lane",
   },
   {
     districtId: "pe-dart-v1",
@@ -1168,6 +1967,8 @@ const INSTANCES = [
     streetscape: "blind-corner-kiosk",
     roadscape: "residential-blind-corner",
     terminus: "necks-to-service",
+    nearfield: "lockup-garages",
+    carriageway: "bay-pocket-near",
   },
   {
     districtId: "pe-bus-v1",
@@ -1177,6 +1978,8 @@ const INSTANCES = [
     streetscape: "depot-gate",
     roadscape: "freight-collector",
     terminus: "bends-away-right",
+    nearfield: "yard-wall-asym",
+    carriageway: "bay-pocket-far",
   },
   {
     districtId: "pe-child-v1",
@@ -1186,6 +1989,8 @@ const INSTANCES = [
     streetscape: "courtyard-blocks",
     roadscape: "courtyard-street",
     terminus: "opens-to-green",
+    nearfield: "garage-and-backslab",
+    carriageway: "bay-pocket-behind-the-seat",
   },
   {
     districtId: "pe-cane-v1",
@@ -1195,6 +2000,8 @@ const INSTANCES = [
     streetscape: "institute-and-transit",
     roadscape: "oneway-institute",
     terminus: "jogs-and-continues",
+    nearfield: "villa-row-setback",
+    carriageway: "bay-pocket-oneway",
   },
 ];
 
@@ -1214,8 +2021,18 @@ for (const params of INSTANCES) {
 
   const sc = district.meta.scenario;
   console.log(`=== pe-crossings build: ${params.districtId} ===`);
-  line("approach / street length", `${params.approachM} m / ${district.roads.edges[0].length} m`);
+  line("approach / street length", `${params.approachM} m / ${sc.params.approachM + 60} m`);
   line("limit", `${params.maxspeedKmh} km/h`);
+  line(
+    "carriageway",
+    `${params.carriageway} — ${sc.spawnCurbToCurbM} m at the seat, ` +
+      `${sc.carriagewaySegments.map((s) => `${s.fromY}–${s.toY}:${s.curbToCurbM}`).join(" | ")}` +
+      `${
+        sc.widthChangesAtM.length
+          ? `, width changes at ${sc.widthChangesAtM.map((m) => `${m >= 0 ? "+" : ""}${m} m`).join(", ")} from the seat`
+          : ", no width change"
+      }`,
+  );
   line("streetscape", `${params.streetscape} (${district.buildings.length} volumes)`);
   line(
     "roadscape",

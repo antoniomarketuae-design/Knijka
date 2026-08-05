@@ -70,10 +70,63 @@ const RIBBON_HALF_W = 0.7;
 /** Ahead-fade window (m): full → gone. Keeps attention on the near field. */
 const FADE_START_M = 90;
 const FADE_END_M = 120;
-/** How much of the ribbon's opacity survives PAST the active waypoint. The
- *  look-ahead leg has to be readable (it is the turn announcement) without
- *  competing with the task the student is actually on. */
-const BEYOND_GOAL_OPACITY = 0.42;
+/**
+ * How much of the ribbon's opacity survives PAST the active waypoint. The
+ * look-ahead leg has to be readable (it is the turn announcement) without
+ * competing with the task the student is actually on.
+ *
+ * REGISTER B24 — founder: *„the moment I cross the marking after the stop line
+ * the green line changes to right."* 0.42 was the whole of it, and it is the
+ * same defect class as B18/B25: the ribbon's turn announcement was anchored to
+ * the WRONG MOMENT. The geometry was already right — `deriveGuidanceRoute`
+ * chains look-ahead legs until the turn is on the ribbon — but the leg was
+ * drawn at 0.42 × the ribbon's own 0.42 uOpacity ⇒ **~18 % effective, under
+ * additive blending, on daylit asphalt, 60 m out.** Invisible. Then
+ * `sc-jstop-line` completes — and that objective is a `passSignal`, so it
+ * completes on the exact frame the nose crosses the paint — the route is
+ * re-derived and that same stretch snaps to 100 %.
+ *
+ * So the turn announced itself by GETTING BRIGHT AT THE STOP LINE: the one
+ * frame where instruction 4 («Огледай се: наляво, надясно и пак наляво») wants
+ * his eyes out of the windscreen and on the junction. He read it exactly
+ * right — the line changed to right at the moment he crossed the marking.
+ *
+ * 0.80 makes the continuation legible from the approach (it clears the 90–120 m
+ * ahead-fade about 62 m before the stop line, ~7 s at the 30 km/h this drill
+ * caps), so nothing perceptible happens at the crossing. The leg is still
+ * visibly quieter than the active one, and „which task is now" was never
+ * carried by the ribbon anyway — the marker carries it (gate bar across the
+ * lane + «спри тук» label + ground pool), and all three are far louder than a
+ * 20 % brightness step.
+ *
+ * DRIVEN AND PHOTOGRAPHED 2026-08-04, which is the half this row was missing.
+ * `sc-junction-stop` L1 in /dev/drive-rig, HUD hidden so the frame is the glass
+ * and nothing else, stopped lawfully and then crept across the paint in 0.6 m
+ * hops. The objective flips at **y = −27.72**, the graded line to the
+ * centimetre. The pair that straddles it is 0.76 m apart:
+ *
+ *   before  `laneSL/strip/B24S-s05-y-28.44-x4.06-obj1-v4.png`
+ *   after   `laneSL/strip/B24S-s07-y-27.68-x4.06-obj2-v3.png`
+ *
+ * and the green ribbon is the same band, same reach, same brightness in both.
+ * A second, independent run put the flip at the same y to the centimetre and
+ * closed the pair to **9 cm** —
+ *
+ *   before  `laneSL/verify/B24V-s06-y-27.75-x4.06-obj1-v3.png`
+ *   after   `laneSL/verify/B24V-CARD-y-27.66-obj2.png`
+ *
+ * — and at that resolution, across the very frame, nothing on the glass
+ * changes. It had already bent right 24.8 m earlier
+ * (`B24S-s01-y-52.48-…`, where the gate bar and «Спри на стоп-линията» stand
+ * across the lane and the ribbon continues past them into the east arm) and at
+ * the lawful stop 3.2 m short of the paint (`B24c-A-stopline-y-30.9-obj1.png`).
+ *
+ * This constant is therefore load-bearing for a founder row, and it is one
+ * number in a shader string that no geometry test can see — so it is exported
+ * and pinned by `routeGuidanceAnnouncement.test.ts` rather than left as a
+ * comment somebody can quietly tune back to 0.42.
+ */
+export const BEYOND_GOAL_OPACITY = 0.8;
 
 const ARROW_Y = 2.6;
 /** Arrow sits this far before the junction node (2.5×-scaled mouths — a safe
@@ -306,23 +359,90 @@ const POOL_VERT = /* glsl */ `
 // Label chip — the marker states its own contract, in Bulgarian
 // ---------------------------------------------------------------------------
 
-/** Second line of the chip: the objective's hidden speed contract, spelled
- *  out. A gate that silently demands ≤5 km/h is the whole of doc 86 T8. */
-function capLineBg(goal: GuidancePointGoal): string {
-  if (goal.maxSpeedKmh === undefined) return "";
-  return goal.affordance === "halt"
-    ? `спри — под ${Math.round(goal.maxSpeedKmh)} км/ч`
-    : `не по-бързо от ${Math.round(goal.maxSpeedKmh)} км/ч`;
+/**
+ * THE POSTED LIMIT AT A POINT — nearest carriageway edge, district metres.
+ *
+ * Row B58. This chip is not a debug read-out: it is a bar drawn across the lane
+ * carrying an instruction in the instructor's voice, and on «Превишаване над
+ * +10» it read **«не по-бързо от 57 км/ч» on a street posted 50**, inside the
+ * one drill whose whole subject is that 51–60 in a 50 zone is a scored fault.
+ * The founder's words for the class: „a student who obeys the number the world
+ * shows him commits the mistake the world is grading."
+ *
+ * The generator half of that number is fixed at source (`scenario/params.ts`
+ * widenSpeedCap — the ladder's grace is now bounded by the posted limit). This
+ * is the second half, and it is the one that closes the class rather than the
+ * instance: **32 gates in the catalog are AUTHORED above their own street's
+ * limit** (55 on a 50, 92 on a 90, 33 on a 30). Those authored numbers are
+ * grading slack — a beginner's speedometer, the rule engine's own
+ * `speedingGraceMaxKmh` — and re-authoring them would move 32 graded gates and
+ * their committed traces, which is a decision, not a bug fix. What is NOT
+ * defensible is PRINTING them. So the gate keeps grading exactly what it
+ * graded, and the sentence on the glass is clamped to the sign: the label may
+ * be stricter than the gate, never more permissive than the law.
+ *
+ * `maxspeed` is optional on the structural edge type, so a district that omits
+ * it (or a test double) leaves the label exactly as authored.
+ */
+export function postedLimitAt(
+  district: RouteDistrictLike,
+  x: number,
+  y: number,
+): number | undefined {
+  let best: number | undefined;
+  let bestD2 = Infinity;
+  for (const e of district.roads.edges) {
+    const limit = (e as { maxspeed?: unknown }).maxspeed;
+    if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) continue;
+    const g = e.geometry;
+    for (let i = 1; i < g.length; i += 1) {
+      const ax = g[i - 1]![0];
+      const ay = g[i - 1]![1];
+      const bx = g[i]![0];
+      const by = g[i]![1];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const len2 = dx * dx + dy * dy;
+      const t = len2 <= 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2));
+      const px = ax + t * dx;
+      const py = ay + t * dy;
+      const d2 = (x - px) * (x - px) + (y - py) * (y - py);
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = limit;
+      }
+    }
+  }
+  return best;
 }
 
-function makeLabelTexture(goal: GuidancePointGoal | null): THREE.CanvasTexture | null {
+/** Second line of the chip: the objective's hidden speed contract, spelled
+ *  out. A gate that silently demands ≤5 km/h is the whole of doc 86 T8.
+ *  `postedKmh` is the street's own limit at the marker — see postedLimitAt. */
+export function capLineBg(goal: GuidancePointGoal, postedKmh?: number): string {
+  if (goal.maxSpeedKmh === undefined) return "";
+  // A HALT demand is never clamped: «спри — под 5 км/ч» is already far below
+  // any posted limit, and min() there would silently turn a stop into a limit.
+  const shown =
+    goal.affordance === "halt" || postedKmh === undefined
+      ? goal.maxSpeedKmh
+      : Math.min(goal.maxSpeedKmh, postedKmh);
+  return goal.affordance === "halt"
+    ? `спри — под ${Math.round(shown)} км/ч`
+    : `не по-бързо от ${Math.round(shown)} км/ч`;
+}
+
+function makeLabelTexture(
+  goal: GuidancePointGoal | null,
+  postedKmh?: number,
+): THREE.CanvasTexture | null {
   if (!goal || !goal.marker || typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
   canvas.width = LABEL_PX_W;
   canvas.height = LABEL_PX_H;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  const cap = capLineBg(goal);
+  const cap = capLineBg(goal, postedKmh);
   ctx.clearRect(0, 0, LABEL_PX_W, LABEL_PX_H);
   ctx.fillStyle = "rgba(6, 18, 22, 0.72)";
   const r = 26;
@@ -440,7 +560,16 @@ export function RouteGuidance({
   );
   const gateShape =
     pointGoal && pointGoal.marker && pointGoal.shape.kind === "gate" ? pointGoal.shape : null;
-  const labelTexture = useMemo(() => makeLabelTexture(pointGoal), [pointGoal]);
+  // B58 — the street's own limit AT THE MARKER (not the map's headline number),
+  // so a 50→30 transition district clamps each gate to the zone it stands in.
+  const postedAtGoal = useMemo(
+    () => (pointGoal ? postedLimitAt(district, pointGoal.x, pointGoal.y) : undefined),
+    [district, pointGoal],
+  );
+  const labelTexture = useMemo(
+    () => makeLabelTexture(pointGoal, postedAtGoal),
+    [pointGoal, postedAtGoal],
+  );
   useEffect(() => () => labelTexture?.dispose(), [labelTexture]);
 
   // --- Ribbon: preallocated triangle strip (2 verts per route sample),

@@ -194,7 +194,8 @@ for iOS's collapsing toolbar (Playwright cannot hide a real one).
 | `ovlp` / `occl` | "overlapping components" | interactive pairs whose hit areas intersect; and `elementFromPoint` at a control's own centre returning something else |
 | `open` / `close` | "elements moving when popups appear" | max positional shift of everything outside the overlay |
 | `bar` / `clip` | "the left and right sides are not stabalized" | shift after the toolbar takes 90px and gives it back; pinned controls cut off |
-| `settle` | "elements shifting position" | ms for the layout to stop moving after each state change |
+| `app ms` | "elements shifting position" | **app** ms for the layout to stop moving after each state change — timestamped inside the page |
+| `instr%` | — | the probe's own share of the sample it took. Not inside `app ms`; past 25% the row prints `INSTRUMENT-BOUND` |
 
 Two accounting rules it took a wrong answer to learn, both documented at their
 call site:
@@ -226,6 +227,65 @@ call site:
   that took** (`settle`), because raising the sleep would have hidden the one
   number worth having. `tools/mobile/toolbar-trace.mjs` is the diagnostic that
   established the mechanism.
+
+* **Never let the instrument inside the number.** That polling loop then lived in
+  Node, so every `page.evaluate` round trip — each one scheduled onto a main
+  thread the 3D shell is already using — was charged to the app as settling
+  time. Re-derived from the last recorded sweep: the `base` phase of
+  simulator-drive / iphone16-portrait reported **32,144 ms of which 31,881 ms
+  (99.2%) was the probe**, on a page that by construction was doing nothing,
+  while the layout had been still since 1,477 ms. One crossing in that sample
+  took ~30.5 s. On a quiet box the same arithmetic passes anything by 10 ms —
+  including a black canvas. The loop now runs **inside the page**
+  (`lib/settle.mjs`), timestamps itself with `performance.now()`, and crosses
+  the bridge exactly once; the crossing is outside the metric by construction
+  and its cost is printed beside it, never subtracted from it silently.
+  `settle.test.mjs` drives that loop against a fake document and a page whose
+  round trip is deliberately slow, so the property is pinned rather than
+  asserted in a comment.
+
+* **`base` is not a settling time.** Nothing changes state before it: the route
+  has loaded, the popups are dismissed, the world has rendered and a 1.2–6 s
+  sleep has elapsed. It is the FLOOR of this instrument on this box — worth
+  having, and the right thing to compare the other phases against — but it was
+  scored against the 1,200 ms budget like any other phase, and in the sweep
+  above it was the **worst** one. A budget decided by the phase in which the app
+  is idle is not a budget. It is now labelled `base(idle)` everywhere it is
+  printed.
+
+* **A readiness gate at the top of a row is half a gate.** Two overlay toggles
+  and two viewport resizes happen between it and the capture, and each rebuilds
+  the WebGL drawing buffer. The canvas is therefore asked again at every
+  checkpoint and once more in the frame the screenshot comes from; a row that
+  ends on a blank canvas is REFUSED and its capture is named `ENDED-BLANK__…`.
+  Measured 2026-08-05 on simulator-drive / iphone16-portrait: the gate opened on
+  a real street (287 colours, dark 0.083) and the same canvas measured 44
+  colours by the end of the row. Every geometry number in between described a
+  screen no student sees.
+
+---
+
+## Motion is a run parameter, and the report says which one
+
+`reducedMotion: "reduce"` used to be hard-coded into `contextOptions` for
+**every** device profile, with nothing printing it. That is a defensible default
+for a layout sweep — an entry transition caught mid-flight makes two captures of
+the same screen differ — but it means any animation claim ever made through this
+harness compared a reduced-motion frame against a reduced-motion frame. It could
+not have failed.
+
+`contextOptions(device, { motion })` now **requires** the mode, and every report
+prints it in its first three lines:
+
+```bash
+node tools/mobile/stability-probe.mjs -r simulator-drive --motion reduce   # default
+node tools/mobile/stability-probe.mjs -r simulator-drive --motion allow    # what a student sees
+```
+
+| mode | Playwright | what it means for a claim |
+| --- | --- | --- |
+| `reduce` | `reduce` | geometry is deterministic; **no animation claim can be made from the run** |
+| `allow` | `no-preference` | the app animates as it does on a phone; expect frames in flight to differ |
 
 ---
 

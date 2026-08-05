@@ -21,7 +21,8 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { actIdForActName, normaliseForMatch, normaliseUnitRef, resolveLawRef } from "@/lib/content/law";
-import type { Question } from "@/lib/content/types";
+import { describeConflict, resolveSourceRef } from "@/lib/content/sources";
+import type { Question, SourceRef } from "@/lib/content/types";
 import { stripReviewPrefix } from "./logic";
 import type {
   FieldChange,
@@ -30,6 +31,7 @@ import type {
   QuestionDiff,
   QuotedClaim,
   ReviewRisk,
+  SourceRefEvidence,
 } from "./types";
 
 if (typeof window !== "undefined") {
@@ -117,6 +119,76 @@ export function lawEvidenceFor(lawRefs: readonly { act: string; ref: string }[])
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Retrieved non-statutory sources
+// ---------------------------------------------------------------------------
+
+const SOURCE_MISS_REASON_BG: Record<string, string> = {
+  "source-not-in-registers":
+    "Този източник не е в никой регистър (content/medical, content/sources) — текстът не може да бъде показан, значи и не може да бъде проверен тук.",
+  "claim-not-found":
+    "Регистърът съдържа източника, но не и това твърдение — или claimId е сгрешен, или твърдението не цитира точно този източник.",
+};
+
+/**
+ * The same retrieval, for citations that are not law.
+ *
+ * WHY IT EXISTS AT ALL. `sourceRefs` without a resolver would print an honest
+ * MISS on every row that uses it — which is exactly the unreviewable state the
+ * shape was added to end (docs/education/90 §14 item N). A citation shape and
+ * the thing that resolves it ship together.
+ *
+ * Never restates a figure: everything on screen is read out of the register,
+ * including the conflicts, which are shown because a reviewer deciding between
+ * ERC 2025 and what БЧК actually teaches needs to see BOTH before signing.
+ */
+export function sourceEvidenceFor(sourceRefs: readonly SourceRef[]): SourceRefEvidence[] {
+  return sourceRefs.map((ref) => {
+    const lookup = resolveSourceRef(ref);
+    if (!lookup.found) {
+      return {
+        sourceId: ref.sourceId,
+        ref: ref.ref,
+        found: false,
+        citationBg: null,
+        authorityBg: null,
+        quoteBg: null,
+        figureBg: null,
+        figureQuoteBg: null,
+        claimStatusBg: null,
+        conflictsBg: [],
+        missReasonBg: SOURCE_MISS_REASON_BG[lookup.reason] ?? "Неуспешно извличане.",
+        sourceUrl: null,
+        sourceVersionBg: null,
+      };
+    }
+    const { source, claim } = lookup;
+    // The quote must come from the source THIS ref names; showing a sibling
+    // source's sentence would be the decorative citation all over again.
+    const quote =
+      claim === null
+        ? null
+        : claim.authoritative?.sourceId === source.id
+          ? claim.authoritative.quoteBg
+          : (claim.corroborating.find((q) => q.sourceId === source.id)?.quoteBg ?? null);
+    return {
+      sourceId: source.id,
+      ref: ref.ref,
+      found: true,
+      citationBg: lookup.citationBg,
+      authorityBg: source.authority,
+      quoteBg: quote,
+      figureBg: claim?.figureBg ?? null,
+      figureQuoteBg: claim?.figureQuote?.quoteBg ?? null,
+      claimStatusBg: claim?.statusBg ?? null,
+      conflictsBg: (claim?.conflicts ?? []).map(describeConflict),
+      missReasonBg: null,
+      sourceUrl: source.url,
+      sourceVersionBg: source.editionBg || null,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
 // 2. Quoted claims
 // ---------------------------------------------------------------------------
 
@@ -142,10 +214,19 @@ export function quotedSpans(text: string): string[] {
 export function checkQuotedClaims(
   explanationBg: string,
   evidence: readonly LawRefEvidence[],
+  sourceEvidence: readonly SourceRefEvidence[] = [],
 ): QuotedClaim[] {
-  const haystacks = evidence
-    .filter((e) => e.found && e.textBg !== null)
-    .map((e) => ({ ref: e.ref, text: normaliseForMatch(e.textBg as string) }));
+  const haystacks = [
+    ...evidence
+      .filter((e) => e.found && e.textBg !== null)
+      .map((e) => ({ ref: e.ref, text: normaliseForMatch(e.textBg as string) })),
+    // A first-aid explanation quoting ERC 2025 must be checkable the same way,
+    // or every one of those rows shows a false alarm and the check gets ignored
+    // — which is worse than not having it.
+    ...sourceEvidence
+      .filter((e) => e.found && e.quoteBg !== null)
+      .map((e) => ({ ref: e.ref, text: normaliseForMatch(e.quoteBg as string) })),
+  ];
 
   return quotedSpans(explanationBg).map((quote) => {
     const needle = normaliseForMatch(quote);
@@ -330,6 +411,11 @@ function renderLawRefs(row: RawQuestion): string {
   return refs.map((l) => `${String(l.act ?? "")} ${String(l.ref ?? "")}`).join(" · ");
 }
 
+function renderSourceRefs(row: RawQuestion): string {
+  const refs = Array.isArray(row.sourceRefs) ? (row.sourceRefs as RawQuestion[]) : [];
+  return refs.map((s) => `${String(s.sourceId ?? "")} ${String(s.ref ?? "")}`).join(" · ");
+}
+
 /**
  * The explanation MINUS any leading `[REVIEW: …]`, on both sides of the diff.
  *
@@ -348,6 +434,7 @@ const FIELDS: { field: string; labelBg: string; render: (row: RawQuestion) => st
   { field: "options", labelBg: "Отговори и ключ", render: renderOptions },
   { field: "explanationBg", labelBg: "Обяснение", render: renderExplanation },
   { field: "lawRefs", labelBg: "Правни основания", render: renderLawRefs },
+  { field: "sourceRefs", labelBg: "Извънправни източници", render: renderSourceRefs },
   { field: "type", labelBg: "Тип", render: (r) => String(r.type ?? "") },
   { field: "points", labelBg: "Точки", render: (r) => String(r.points ?? "") },
 ];
@@ -414,7 +501,7 @@ function classifyRisk(changes: readonly FieldChange[], keyChange: KeyChange | nu
   if (touched.has("options") || touched.has("type") || touched.has("points")) return "answer-text";
   if (touched.has("textBg")) return "stem";
   if (touched.has("explanationBg")) return "explanation";
-  if (touched.has("lawRefs")) return "citation";
+  if (touched.has("lawRefs") || touched.has("sourceRefs")) return "citation";
   return "untouched";
 }
 

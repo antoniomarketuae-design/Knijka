@@ -38,7 +38,12 @@ import {
   type SignalClusterMode,
   type SignalControllerSchedule,
 } from "./signals";
-import { buildStopLines, type StopLine, type StopLineSet } from "./stoplines";
+import {
+  buildStopLines,
+  roundaboutGiveWayReachM,
+  type StopLine,
+  type StopLineSet,
+} from "./stoplines";
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
 import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
@@ -340,8 +345,19 @@ const YIELD_CONVICT_SUSTAIN_SEC = 0.9;
 /** Azimuth sweep around the roundabout centre that marks the vehicle as
  * circulating (ring priority) — entry grading stands down after this (C1). */
 const RB_ON_RING_DEG = 35;
-/** How far beyond a roundabout's ring the entry-yield decision zone reaches,
- * meters (entry mouths widened with the perceptual road scale). */
+/**
+ * How far beyond a roundabout's ring a driver counts as COMMITTED to entering,
+ * meters (entry mouths widened with the perceptual road scale).
+ *
+ * This is the CONVICTION geometry and nothing else: inside it a barge can be
+ * billed and the sustain clock may start; outside it the tracker watches and
+ * says nothing. It is deliberately still bolted to the ring rather than to the
+ * paint — the observation zone moved out to the give-way marking (see
+ * `roundaboutGiveWayReachM`) and widening the place a driver can be CONVICTED
+ * along with it would have manufactured exactly the fault that fix repairs: a
+ * driver still braking toward the line, forty metres out, convicted because the
+ * clock had been running since before he could see the ring.
+ */
 const ROUNDABOUT_ENTRY_MARGIN_M = 12;
 /** Extra reach beyond the ring for the circulating-traffic band, meters —
  * circulating NPCs now ride lane centers ~4 m off the ring centerline. */
@@ -562,6 +578,17 @@ export interface DistrictWorldRuntime extends WorldRuntime {
   debugSignalClusters(): readonly SignalClusterInfo[];
   /** Uncontrolled (right-hand-rule) junction nodes with positions — devtools/tests. */
   debugUncontrolledJunctions(): ReadonlyArray<{ id: string; x: number; y: number }>;
+  /**
+   * Per-roundabout entry radii, metres — the OBSERVATION reach (out at the
+   * give-way paint) and the COMMIT reach (where a violation may fire). Exposed
+   * so a test can assert that the instrument is armed where the road is
+   * painted, instead of asserting a constant back at itself (doc 87 B15).
+   */
+  debugRoundaboutZones(): ReadonlyArray<{
+    id: string;
+    watchReachM: number;
+    commitReachM: number;
+  }>;
 }
 
 export function createWorldRuntime(districtJson: District | unknown): DistrictWorldRuntime {
@@ -703,11 +730,52 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   // are neither signalized nor guarded by any stop/give-way line → equal
   // junctions where you give way to the right.
   const guardedNodeIds = new Set(stopLines.all.map((l) => l.junctionNodeId));
+  /**
+   * The nodes a roundabout's ring edges touch — every ring MOUTH (doc 87 B15).
+   *
+   * These stay in `uncontrolledJunctions` above: on a two-lane ring the
+   * right-hand-rule tracker is what bills a driver who leaves the INNER lane
+   * straight across an occupied outer lane (sc-rb-lane-choice's чл. 25, ал. 2
+   * demo grades FAILED_TO_YIELD from it by design). What must never happen is
+   * that it speaks to a driver still on an ARM, approaching the mouth — see
+   * the gate at §4b.
+   */
+  const roundaboutNodeIds = new Set<string>();
+  for (const e of district.roads.edges) {
+    if (!e.roundabout) continue;
+    roundaboutNodeIds.add(e.from);
+    roundaboutNodeIds.add(e.to);
+  }
   const uncontrolledJunctions = district.intersections
     .filter((it) => !it.signalized && it.degree >= 3 && !guardedNodeIds.has(it.id))
     .map((it) => ({ id: it.id, x: it.x, y: it.y }));
   const uncontrolledIds = new Set(uncontrolledJunctions.map((j) => j.id));
-  const roundabouts = district.roundabouts;
+  /**
+   * Roundabouts, each carrying its TWO entry radii (doc 87 B15, second half):
+   *
+   *  - `watchReach2` — where the give-way instrument OPENS ITS EYES. Derived
+   *    from the М7/М18 paint at this ring's own mouths, so wherever the road
+   *    says „wait", the grader is live. Floored at the legacy ring-relative
+   *    reach: no roundabout's zone shrinks, on any map, ever.
+   *  - `commitReach2` — where a driver counts as ENTERING, and therefore the
+   *    only place a violation may fire or its sustain clock may start.
+   *    Unchanged, so this whole change is additive on the conviction side: no
+   *    drive that was innocent yesterday can be billed today.
+   *
+   * Both are squared — the per-frame proximity scan stays sqrt-free.
+   */
+  const roundabouts = district.roundabouts.map((rb) => {
+    const commitReach = rb.radius + ROUNDABOUT_ENTRY_MARGIN_M;
+    const watchReach = Math.max(commitReach, roundaboutGiveWayReachM(district, index, rb));
+    return {
+      id: rb.id,
+      x: rb.x,
+      y: rb.y,
+      radius: rb.radius,
+      watchReach2: watchReach * watchReach,
+      commitReach2: commitReach * commitReach,
+    };
+  });
 
   // Junctions that behave as UNCONTROLLED right now (doc 72 JU-09/JU-20): the
   // structurally uncontrolled nodes above, PLUS any signalized junction whose
@@ -735,6 +803,23 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   let rbFired = false;
   let rbConflictSeen = false; // circulating traffic observed this approach
   let rbSlowed = false; // driver slowed to yield speed while it was circulating
+  /**
+   * The entry-yield COMMENDATION is awarded when the driver leaves the COMMIT
+   * radius having been inside it — not when he leaves the (now much wider)
+   * observation zone. Two reasons, and the first is the honest one:
+   *
+   *  - the award means „this entry is finished and it was done right", and the
+   *    entry finishes at the ring, not thirty metres back down the exit arm;
+   *  - it keeps the award WHERE IT ALREADY WAS. The staged roundabout runner
+   *    resolves its own encounter „clear" at ringRadius + 30 m and listens for
+   *    this event to say „yielded" instead. Moving the award out with the
+   *    observation zone lost that race on rb-2lane-v1 (award at 60.25 m, runner
+   *    already resolved at 56) and turned a shadow drive that demonstrates a
+   *    yield into one that demonstrates an empty ring. Widening the grader's
+   *    EYES must not move its VERDICTS, in either direction.
+   */
+  let rbCommittedSeen = false; // has been inside the commit radius this visit
+  let rbYieldAwarded = false; // the commendation already fired this visit
   // C1 revision — yield-adjudication tolerance bands (A12 discipline):
   //  - Braking response: a driver DECELERATING hard toward the conflict is
   //    yielding, not barging — staged conflicts can materialise inside the
@@ -1251,7 +1336,40 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // vehicle approaches from the right = failing to give way (once per
       // visit). Slowing for that same conflict and NOT barging in earns a
       // positive commendation, awarded on leaving the junction.
-      if (nearestIx !== null && isUncontrolledJunction(nearestIx.id)) {
+      // B15 — THE RIGHT-HAND RULE DOES NOT REACH UP A ROUNDABOUT'S ARM.
+      //
+      // A ring mouth is degree 3, unsignalized, and `buildStopLines` skips
+      // roundabout nodes on purpose, so every mouth lands in
+      // `uncontrolledJunctions` — „equal junction, give way to the RIGHT".
+      // For a driver ALREADY ON THE RING that is load-bearing (it is what
+      // bills the чл. 25, ал. 2 cut across an occupied outer lane in
+      // sc-rb-lane-choice). For a driver still on an ARM it is simply the
+      // wrong law: Наредба № РД-02-21-1/23.11.2023 чл. 61, ал. 5 forbids Б3 at
+      // a ring entry, so ал. 2 posts Б1/Б2 there, and ЗДвП чл. 50, ал. 1 makes
+      // the duty „пропусни движещите се по пътя с предимство" — the ring,
+      // which on a CCW roundabout is on your LEFT. §4c adjudicates exactly
+      // that, and it is the only tracker an approaching driver should meet.
+      //
+      // The founder's row, measured: he stops on the М8 paint at
+      // (4.06, −36.92) on rb-mini-v1 — 18.9 m out, on `rbm-e-arm-s` — waits
+      // 4 s, 8 s, 40 s, sixty, then pulls away, and is billed ОПАСНА
+      // «Непропускане» 0.800 s after the wheels turn, at y = −35.50: the FIRST
+      // tick inside RHR_CORE_RADIUS_M. The same 0.800 s at every wait length,
+      // because it is not a reaction window, it is the time to roll 1.4 m. The
+      // vehicle he is convicted for is the circulator that has already crossed
+      // in front of him and is LEAVING up the east arc — on his right, and so
+      // under чл. 47 his to yield to. The card even printed the wrong law back
+      // at him: „На кръстовище без светофар пропускаш идващите отдясно."
+      // Eight mouths of the real Лозенец district (d2-v1) carried it too.
+      //
+      // „On the ring" is read off the lane fix, not guessed from geometry: the
+      // ring edges are the ones flagged `roundabout` in the district, which is
+      // the same fact `buildStopLines` keys on.
+      const onRoundaboutEdge =
+        fix.edgeIdx >= 0 && index.edgeRt(fix.edgeIdx).edge.roundabout;
+      const approachingRingMouth =
+        nearestIx !== null && roundaboutNodeIds.has(nearestIx.id) && !onRoundaboutEdge;
+      if (nearestIx !== null && !approachingRingMouth && isUncontrolledJunction(nearestIx.id)) {
         if (rhrNode !== nearestIx.id) {
           rhrNode = nearestIx.id;
           rhrFired = false;
@@ -1269,7 +1387,25 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         );
         if (rightConflict) {
           rhrConflictSeen = true;
-          if (rhrCondSince === null) rhrCondSince = tSec; // conflict became visible
+          // B15's staleness, in the tracker it was NOT fixed in. The identical
+          // repair shipped one block below for `rbCondSince` (see §4c) and its
+          // twin was left here, where the same driver meets the same sentence
+          // at every ordinary crossroads: the stamp is taken the first tick the
+          // conflict is visible and cleared only when the conflict is GONE, so
+          // a driver who does the lawful thing and STANDS STILL banks the whole
+          // wait. After sixty seconds the 0.9 s reaction window and the 3.0 s
+          // braking-response band are fifty-nine seconds expired, the only live
+          // gate left is `speedKmh > RHR_MOVING_KMH`, and he is billed on the
+          // tick the wheels turn — with waiting LONGER making it worse.
+          // Measured on rb-mini-v1 before the fix: conviction 0.800 s after the
+          // wheels turned after a 4 s wait, and 0.800 s after a 60 s wait —
+          // the same 1.4 m of rolling, not a window.
+          //
+          // RHR_MOVING_KMH is the right floor and not a new one: it is the same
+          // threshold the conviction test itself uses, so the clock can never
+          // bank time the verdict would refuse to act on.
+          if (v.speedKmh <= RHR_MOVING_KMH) rhrCondSince = null;
+          else if (rhrCondSince === null) rhrCondSince = tSec; // conflict became visible
           if (v.speedKmh <= RHR_YIELD_KMH) rhrSlowed = true;
         } else {
           rhrCondSince = null;
@@ -1325,13 +1461,21 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         const dx = rb.x - v.position.x;
         const dy = rb.y - v.position.y;
         const d2 = dx * dx + dy * dy;
-        const reach = rb.radius + ROUNDABOUT_ENTRY_MARGIN_M;
-        if (d2 <= reach * reach && d2 < nearRbDist2) {
+        // The OBSERVATION zone — out at the give-way paint, not at a constant
+        // bolted to the ring (roundaboutGiveWayReachM). Where the road says
+        // wait, the instrument is awake.
+        if (d2 <= rb.watchReach2 && d2 < nearRbDist2) {
           nearRb = rb;
           nearRbDist2 = d2;
         }
       }
       if (nearRb !== null) {
+        // COMMITTED = inside the ring-relative entry radius. Everything that
+        // can cost the student points is gated on this and only this; the band
+        // between it and the paint is for WATCHING (his stop, his wait, the
+        // circulator he let past), which is exactly the evidence the old
+        // 30-metre keyhole threw away.
+        const committed = nearRbDist2 <= nearRb.commitReach2;
         if (rbNode !== nearRb.id) {
           rbNode = nearRb.id;
           rbFired = false;
@@ -1340,12 +1484,35 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rbAzPrevDeg = null;
           rbAzAccumDeg = 0;
           rbCondSince = null;
+          rbCommittedSeen = false;
+          rbYieldAwarded = false;
+        }
+        // The entry is FINISHED the moment he leaves the commit radius having
+        // been inside it — that is where the commendation belongs and where it
+        // has always fired (see the rbCommittedSeen note above).
+        if (committed) rbCommittedSeen = true;
+        else if (rbCommittedSeen && !rbYieldAwarded && rbConflictSeen && rbSlowed && !rbFired) {
+          events.push({
+            kind: "prioritySituation",
+            situation: "roundabout",
+            violated: false,
+            yielded: true,
+          });
+          rbYieldAwarded = true;
         }
         // Azimuth sweep this visit — ≥ RB_ON_RING_DEG means the vehicle is
-        // CIRCULATING (holds ring priority); see the C1 note above.
+        // CIRCULATING (holds ring priority); see the C1 note above. Measured
+        // only inside the commit radius, so the latch means the same number of
+        // degrees it always did: an arm that does not point at the centre
+        // sweeps a few degrees of its own on the long approach, and a sweep
+        // budget spent out there would stand entry grading down for a driver
+        // who has not entered anything.
+        if (!committed) rbAzPrevDeg = null; // re-seed on the next committed frame
         const azDeg = bearingDeg(v.position.x - nearRb.x, v.position.y - nearRb.y);
-        if (rbAzPrevDeg !== null) rbAzAccumDeg += signedDeltaDeg(rbAzPrevDeg, azDeg);
-        rbAzPrevDeg = azDeg;
+        if (committed) {
+          if (rbAzPrevDeg !== null) rbAzAccumDeg += signedDeltaDeg(rbAzPrevDeg, azDeg);
+          rbAzPrevDeg = azDeg;
+        }
         const onRing = Math.abs(rbAzAccumDeg) >= RB_ON_RING_DEG;
         const band = nearRb.radius + ROUNDABOUT_BAND_EXTRA_M;
         const circulating = circulatingQuery(
@@ -1383,8 +1550,16 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           // itself uses, so the clock can never accumulate time the verdict
           // would refuse to act on (a 2 km/h creep must not bank a window it
           // then spends on one jab of throttle).
+          //
+          // …and the clock only STARTS once he is committed. The observation
+          // zone now reaches the give-way paint, tens of metres further out
+          // than the ring-relative entry radius; a stamp out there would hand
+          // the conviction gates a window that had already expired by the time
+          // he arrived, which is the same wrongful conviction this block exists
+          // to prevent, wearing a longer approach. Clearing is unconditional on
+          // purpose — mercy applies wherever the tracker can see.
           if (v.speedKmh <= RHR_MOVING_KMH) rbCondSince = null;
-          else if (rbCondSince === null) rbCondSince = tSec; // conflict became visible
+          else if (rbCondSince === null && committed) rbCondSince = tSec; // conflict became visible
           if (v.speedKmh <= RHR_YIELD_KMH) rbSlowed = true;
         } else {
           rbCondSince = null;
@@ -1401,6 +1576,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         // braking immunity expires after YIELD_BRAKE_RESPONSE_MAX_SEC.
         if (
           !rbFired &&
+          committed &&
           circulating &&
           inward >= ROUNDABOUT_INWARD_MIN &&
           v.speedKmh > RHR_MOVING_KMH &&
@@ -1413,8 +1589,25 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
           rbFired = true;
         }
       } else {
-        // Left the roundabout vicinity: reward a correctly-yielded entry.
-        if (rbNode !== null && rbConflictSeen && rbSlowed && !rbFired) {
+        // Left the roundabout vicinity entirely. The award normally landed at
+        // the commit radius on the way out; this is the backstop for a visit
+        // that ended without ever crossing back out of it — a teleport, a
+        // respawn, or a drive that ends on the ring.
+        //
+        // `rbCommittedSeen` is the guard the wider observation zone makes
+        // necessary: the zone now reaches tens of metres up every arm, so a
+        // driver merely crawling PAST a roundabout in traffic could satisfy
+        // "saw a circulator" and "was under the yield speed" without ever
+        // approaching the thing. Praise for a yield he never made is a smaller
+        // lie than a conviction he never earned, but it is the same lie.
+        if (
+          rbNode !== null &&
+          rbCommittedSeen &&
+          !rbYieldAwarded &&
+          rbConflictSeen &&
+          rbSlowed &&
+          !rbFired
+        ) {
           events.push({
             kind: "prioritySituation",
             situation: "roundabout",
@@ -1429,6 +1622,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         rbAzPrevDeg = null;
         rbAzAccumDeg = 0;
         rbCondSince = null;
+        rbCommittedSeen = false;
+        rbYieldAwarded = false;
       }
 
       // 5. Pedestrian-crossing zones.
@@ -2034,6 +2229,14 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
 
     debugSignalClusters(): readonly SignalClusterInfo[] {
       return signals.clusters;
+    },
+
+    debugRoundaboutZones() {
+      return roundabouts.map((rb) => ({
+        id: rb.id,
+        watchReachM: Math.sqrt(rb.watchReach2),
+        commitReachM: Math.sqrt(rb.commitReach2),
+      }));
     },
   };
 

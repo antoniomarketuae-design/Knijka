@@ -111,7 +111,12 @@ interface Sample {
  * to `slowMps` for 15 s — the taught corrective action — and report the
  * centre-to-centre gap at each checkpoint.
  */
-function driveEaseOff(s: BrakingLeadCarSpec, fastMps: number, slowMps: number): Sample {
+function driveEaseOff(
+  s: BrakingLeadCarSpec,
+  fastMps: number,
+  slowMps: number,
+  cruiseSec = 30,
+): Sample {
   const tr: TrafficSystem = createTrafficSystem(district(), {
     seed: 3,
     vehicleCount: 0,
@@ -147,7 +152,7 @@ function driveEaseOff(s: BrakingLeadCarSpec, fastMps: number, slowMps: number): 
     runner.step(tr, inp, out);
   };
 
-  for (let i = 0; i < 30 * 30; i++) step(fastMps);
+  for (let i = 0; i < cruiseSec * 30; i++) step(fastMps);
   gapAfterCruiseM = tr.staged("lead")!.y - py;
   for (let i = 0; i < 15 * 30; i++) step(slowMps);
   return { gapAfterCruiseM, gapAfterEaseM: tr.staged("lead")!.y - py };
@@ -155,7 +160,15 @@ function driveEaseOff(s: BrakingLeadCarSpec, fastMps: number, slowMps: number): 
 
 describe("T17 · matchPlayer is a rubber band — easing off does NOT open the gap", () => {
   it("the metres return to the authored constant no matter what the student does", () => {
-    const r = driveEaseOff(spec(), FAST_MPS, SLOW_MPS);
+    // 60 s of cruise, not 30 — B79 (uncommitted in `runners.ts` when this was
+    // measured, 2026-08-04) made the COMMANDED station start at the gap the
+    // actor actually has and walk in at LEAD_STATION_CLOSE_MPS = 1.5 m/s. This
+    // rig seeds the player 80 m back on purpose ("earned by closing"), so the
+    // band now needs (80 − 20)/1.5 = 40 s to reach its fixed point and a 30 s
+    // phase measured it mid-convergence at ~35 m. The SUBJECT of the test is
+    // the fixed point, not the approach — so the phase is long enough to reach
+    // it. Nothing about the rubber band's law changed.
+    const r = driveEaseOff(spec(), FAST_MPS, SLOW_MPS, 60);
     // Settled on the authored gap while cruising…
     expect(r.gapAfterCruiseM).toBeCloseTo(FOLLOW_GAP_M, 0);
     // …and 15 seconds of backing off by 7 m/s bought essentially nothing:
@@ -270,5 +283,165 @@ describe("T17 · scheduledCruise — the taught corrective action finally works"
     }
     // He met it: the lead sat at its hold until he closed to the release band.
     expect(minGap).toBeLessThanOrEqual(FOLLOW_GAP_M + 12);
+  });
+});
+
+/* =========================================================================== *
+ * B72 / FR-53 — `paceProfile`: the lead that DOES something
+ *
+ * T17 (above) killed the rubber band and, in the founder's own words, produced
+ * his other complaint in a purer form: one `paceSpeedMps` is a metronome, and a
+ * metronome is a gap you set once and then stop thinking about. He asked for a
+ * lead that «slows a bit, speeds a bit».
+ *
+ * The field shipped with the seam proven and its OWN behaviour unmeasured —
+ * these are the measurements. They are written against the LEAD's speed and the
+ * gap a CONSTANT-SPEED student sees, because that is the whole claim: the
+ * reason the distance changes is the truck's business, never the speedometer.
+ * ========================================================================== */
+
+/** Sampled at 2 Hz through a constant-speed drive. */
+interface PaceSample {
+  tSec: number;
+  arcS: number;
+  leadMps: number;
+  gapM: number;
+}
+
+/**
+ * Drive at ONE speed for `seconds` and report what the lead did. The player
+ * starts inside the scheduled-cruise release band (followGap + 12) so the
+ * handover is on the first tick and every later metre is the profile's doing.
+ */
+function driveConstant(s: BrakingLeadCarSpec, playerMps: number, seconds: number): PaceSample[] {
+  const tr: TrafficSystem = createTrafficSystem(district(), {
+    seed: 3,
+    vehicleCount: 0,
+    pedestrianCount: 0,
+  });
+  const runner = new BrakingLeadCarRunner(s);
+  runner.stage(tr, () => 0.5, true);
+  let py = HOLD_M - 30; // 30 m back — inside the 20 + 12 release band
+  let t = 0;
+  const out: SimTickEvent[] = [];
+  const samples: PaceSample[] = [];
+  for (let i = 0; i < seconds * 30; i++) {
+    t += DT;
+    py += playerMps * DT;
+    const kmh = playerMps * 3.6;
+    tr.update(DT, {
+      signalPhase: () => "green",
+      playerPos: { x: LANE_X, y: py },
+      playerSpeedKmh: kmh,
+      playerHeadingDeg: 0,
+    });
+    runner.step(
+      tr,
+      { tSec: t, dtSec: DT, x: LANE_X, y: py, speedKmh: kmh, headingDeg: 0, brakePedal: 0, tickEvents: [] },
+      out,
+    );
+    if (i % 15 === 0) {
+      const lead = tr.staged("lead")!;
+      samples.push({ tSec: t, arcS: lead.s, leadMps: lead.speedMps, gapM: lead.y - py });
+    }
+  }
+  return samples;
+}
+
+/** An ease at arc 120 and a resume at arc 150 — the fo-* shape, in miniature. */
+function profiled(): BrakingLeadCarSpec {
+  return {
+    ...spec("scheduledCruise"),
+    paceProfile: [
+      { atS: 120, speedMps: 7 },
+      { atS: 150, speedMps: 11 },
+    ],
+  };
+}
+
+describe("B72 · paceProfile — the lead varies its speed, and the student's gap moves with it", () => {
+  it("the lead really slows and really picks back up, at the AUTHORED arcs", () => {
+    const r = driveConstant(profiled(), CRUISE_MPS, 30);
+    // tSec ≥ 4 skips the release ramp: the actor spins up from rest at
+    // accelMps2 8 and is still at 5.2 m/s at t = 2. Measured: it reaches the
+    // base 9.00 at t = 3.5 and holds it to arc 120.
+    const before = r.filter((s) => s.arcS < 118 && s.tSec >= 4);
+    const eased = r.filter((s) => s.arcS >= 128 && s.arcS < 148);
+    const resumed = r.filter((s) => s.arcS >= 162);
+    expect(before.length).toBeGreaterThan(2);
+    expect(eased.length).toBeGreaterThan(2);
+    expect(resumed.length).toBeGreaterThan(2);
+    // Base leg — the authored `paceSpeedMps`, untouched before the first `atS`.
+    for (const s of before) expect(s.leadMps).toBeCloseTo(CRUISE_MPS, 1);
+    // …the ease…
+    for (const s of eased) expect(s.leadMps).toBeCloseTo(7, 1);
+    // …and the resume, which is FASTER than the base: the gap the student
+    // re-opened is handed back rather than banked.
+    for (const s of resumed) expect(s.leadMps).toBeCloseTo(11, 1);
+  });
+
+  it("a student holding ONE speed sees the gap close and then open again", () => {
+    const r = driveConstant(profiled(), CRUISE_MPS, 30);
+    const settled = r.filter((s) => s.tSec > 2);
+    // Where the gap bottoms out, and what it does afterwards.
+    let minIdx = 0;
+    for (let i = 1; i < settled.length; i++) if (settled[i].gapM < settled[minIdx].gapM) minIdx = i;
+    const start = settled[0].gapM;
+    const trough = settled[minIdx].gapM;
+    const after = Math.max(...settled.slice(minIdx).map((s) => s.gapM));
+    expect(start - trough).toBeGreaterThan(3); // it really closed on him…
+    expect(after - trough).toBeGreaterThan(3); // …and really opened again
+    // He never touched the pedals: every metre of that is the lead's doing.
+    expect(minIdx).toBeGreaterThan(0);
+    expect(minIdx).toBeLessThan(settled.length - 1);
+  });
+
+  it("WITHOUT a profile the same drive is the metronome the founder measured", () => {
+    // The control. sd 0.2 km/h over 341 samples was his «very boring»; with a
+    // constant-speed student the gap is a flat line, i.e. nothing to read.
+    const r = driveConstant(spec("scheduledCruise"), CRUISE_MPS, 30).filter((s) => s.tSec >= 4);
+    for (const s of r) expect(s.leadMps).toBeCloseTo(CRUISE_MPS, 2);
+    const gaps = r.map((s) => s.gapM);
+    expect(Math.max(...gaps) - Math.min(...gaps)).toBeLessThan(0.5);
+  });
+
+  it("OPT-IN: a profile authored under matchPlayer changes NOTHING (FR-56 precedent)", () => {
+    // `brakingLeadCar` is the most borrowed staged kind in the catalogue and
+    // most of its users are not following drills. A field that leaked into the
+    // band would re-time all of them — which is the exact mistake FR-56
+    // documented. The runner's guard is `paceMode !== "scheduledCruise"`.
+    const banded: BrakingLeadCarSpec = {
+      ...spec(),
+      paceProfile: [
+        { atS: 120, speedMps: 7 },
+        { atS: 150, speedMps: 11 },
+      ],
+    };
+    const withProfile = driveConstant(banded, CRUISE_MPS, 30);
+    const without = driveConstant(spec(), CRUISE_MPS, 30);
+    expect(withProfile.length).toBe(without.length);
+    for (let i = 0; i < withProfile.length; i++) {
+      expect(withProfile[i].gapM).toBeCloseTo(without[i].gapM, 9);
+      expect(withProfile[i].leadMps).toBeCloseTo(without[i].leadMps, 9);
+    }
+  });
+
+  it("the legs are read in order — an out-of-order profile would silently mis-select", () => {
+    // `paceLegAt` stops scanning at the first unreached leg (the profile is
+    // documented ASCENDING), so this is a real trap for an author. Pinning the
+    // symptom here is what makes the data-truth guard below meaningful rather
+    // than decorative.
+    const scrambled: BrakingLeadCarSpec = {
+      ...spec("scheduledCruise"),
+      paceProfile: [
+        { atS: 150, speedMps: 11 },
+        { atS: 120, speedMps: 7 },
+      ],
+    };
+    const r = driveConstant(scrambled, CRUISE_MPS, 30).filter((s) => s.arcS >= 128 && s.arcS < 148);
+    expect(r.length).toBeGreaterThan(2);
+    // It latches the FIRST leg (arc 150) at arc 120 and never eases: the drill
+    // an author thought they wrote does not happen.
+    for (const s of r) expect(s.leadMps).not.toBeCloseTo(7, 1);
   });
 });

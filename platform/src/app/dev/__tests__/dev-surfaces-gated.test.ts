@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { type Dirent, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -33,18 +33,25 @@ const APP = path.resolve(__dirname, "../..");
 const DEV_PAGES = path.join(APP, "dev");
 const DEV_API = path.join(APP, "api", "dev");
 
+/**
+ * `withFileTypes` on purpose: the directory entry already carries the kind, so
+ * this asks the filesystem once per DIRECTORY instead of once per FILE. The
+ * KNIJKA_DIST_DIR sweep below walks src/app + src/modules + src/lib — thousands
+ * of entries — and the repo lives on a 7200 rpm spinning disk, where a per-entry
+ * `statSync` is a per-entry seek.
+ */
 function collect(dir: string, filename: RegExp): string[] {
-  let entries: string[];
+  let entries: Dirent[];
   try {
-    entries = readdirSync(dir);
+    entries = readdirSync(dir, { withFileTypes: true });
   } catch {
     return [];
   }
   const out: string[] = [];
   for (const e of entries) {
-    const p = path.join(dir, e);
-    if (statSync(p).isDirectory()) out.push(...collect(p, filename));
-    else if (filename.test(e)) out.push(p);
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...collect(p, filename));
+    else if (filename.test(e.name)) out.push(p);
   }
   return out;
 }
@@ -93,6 +100,16 @@ describe("dev surfaces are unreachable in a production build", () => {
    * server's. It selects a BUILD DIRECTORY and must never grow into a way to
    * change what is served. If someone ever reaches for it to unlock a surface,
    * this fails.
+   *
+   * THE TIMEOUT IS DECLARED, NOT DECORATIVE. This case reads every .ts/.tsx
+   * under src/app, src/modules and src/lib. Warm, that is ~0.8 s and it looks
+   * like a fast test; COLD, on this repo's 7200 rpm disk and with several agents
+   * sharing a 16 GB box, three consecutive solo runs took 22.2 s, 26.8 s and
+   * 39.5 s — every one of them a failure against vitest's 5 s default, and every
+   * one of them written off as a flake because the next warm run passed. It is
+   * not a flake: it is an I/O-bound sweep whose cost depends on the page cache.
+   * `collect` above no longer stats per file, and this says out loud what the
+   * sweep may cost, so a cold run reports the truth instead of a phantom.
    */
   it("KNIJKA_DIST_DIR never reaches application code", () => {
     const appSources = [
@@ -106,5 +123,8 @@ describe("dev surfaces are unreachable in a production build", () => {
       .filter((f) => readFileSync(f, "utf8").includes("KNIJKA_DIST_DIR"))
       .map(rel);
     expect(offenders).toEqual([]);
-  });
+    // The sweep must actually have swept — an empty list proves nothing if the
+    // walk silently found no files (a moved directory would do exactly that).
+    expect(appSources.length).toBeGreaterThan(200);
+  }, 120_000);
 });

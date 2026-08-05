@@ -8,6 +8,7 @@ import {
   allLessons,
   courseCompletion,
   getLessonProgressStore,
+  lessonsInPreparation,
   resolveBeat,
   resumePoint,
 } from "@/modules/lesson";
@@ -46,6 +47,23 @@ import {
  * The resume card prefers the most recently touched UNFINISHED lesson over
  * course order — a student who jumped to the roundabout lesson because that is
  * what scares them wants that one back, not lesson 1 (see `resumePoint`).
+ *
+ * WHY THIS PAGE ASKS THE CLEARANCE GATE A QUESTION. `@/modules/lesson` has
+ * always been able to say how much a lesson can still teach; until now nothing
+ * asked. `l-accidents-first-aid` was in this list, numbered, with a progress
+ * bar and an ordinary link, and it opens on one greeting followed by four
+ * consecutive identical „Тази част още се проверява от преподавател" bubbles
+ * and no questions at all — because its four concept summaries taught the
+ * pre-2025 first aid and the gate is holding them back on purpose. Each of
+ * those bubbles is the right thing for a BEAT to say. Fifty-four numbered
+ * lessons with one of them hollow is the wrong thing for a COURSE to do.
+ *
+ * So a lesson the census marks „in-preparation" is still SHOWN — hiding it
+ * would make the course silently 53 long and lose the promise that first aid is
+ * coming — but it is not a link, it is not what „Продължи" opens, and it says
+ * why. The threshold and its measured blast radius live in
+ * `resolve.ts › offerFor`; this page renders the verdict and does not
+ * second-guess it.
  */
 
 export const metadata: Metadata = {
@@ -72,19 +90,25 @@ export default async function ClassroomIndexPage() {
   const repo = getContentRepo();
   const topics = [...repo.topics()].sort((a, b) => a.order - b.order);
 
+  // The gate's verdict, once for the whole page rather than once per row.
+  const inPreparation = lessonsInPreparation();
+  const openable = lessons.filter((l) => !inPreparation.has(l.id));
+
   // „Продължи оттам" — from the student's own position rows, not from a
   // mastery heuristic. One indexed read (userId), 54 ids compared in memory.
+  //
+  // OPENABLE IDS ONLY. `resumePoint` answers „what next" from course order when
+  // there is no history, and course order starts at lesson 1 — so a hollow
+  // lesson early in the course would become the one big button on the page, for
+  // every brand-new student. Completion is counted over the same set: a lesson
+  // nobody can open must not sit permanently in the denominator of doc 84's
+  // gate U3, which would make the course impossible to finish.
   const progressRows = await getLessonProgressStore().listForUser(user.id);
   const byLesson = new Map(progressRows.map((r) => [r.lessonId, r]));
-  const resume = resumePoint(
-    lessons.map((l) => l.id),
-    progressRows,
-  );
-  const done = courseCompletion(
-    lessons.map((l) => l.id),
-    progressRows,
-  );
-  const next = lessons.find((l) => l.id === resume?.lessonId) ?? lessons[0];
+  const openableIds = openable.map((l) => l.id);
+  const resume = resumePoint(openableIds, progressRows);
+  const done = courseCompletion(openableIds, progressRows);
+  const next = openable.find((l) => l.id === resume?.lessonId) ?? openable[0];
 
   /**
    * Boards per lesson, counted the way the ROOM counts them.
@@ -141,6 +165,14 @@ export default async function ClassroomIndexPage() {
         Дъска с правилно и грешно има в {boardLessons} от {lessons.length} урока. В темите без
         записи (алкохол, документи, санкции) учителят обяснява с текст от закона и с въпроси —
         манёвра няма какво да се покаже там.
+        {inPreparation.size > 0 && (
+          <>
+            {" "}
+            {inPreparation.size === 1 ? "Един урок е" : `${inPreparation.size} урока са`} в
+            подготовка: материалът им се проверява от преподавател и няма да ти го покажем, докато
+            не е потвърден.
+          </>
+        )}
       </p>
 
       <div className="flex flex-col gap-4">
@@ -159,6 +191,36 @@ export default async function ClassroomIndexPage() {
                   const mastery = Math.round((overview?.avgMastery ?? 0) * 100);
                   const boards = boardsByLesson.get(lesson.id) ?? 0;
                   const row = byLesson.get(lesson.id);
+
+                  // NOT A LINK, and it says why in the same breath. The
+                  // alternative — hiding the row — teaches a student that the
+                  // course is 53 lessons and that first aid is not coming,
+                  // which is a bare verdict delivered by absence (THEO-4). It
+                  // keeps its number and its place in the topic.
+                  if (inPreparation.has(lesson.id)) {
+                    return (
+                      <li key={lesson.id}>
+                        <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-surface-2/20 p-2.5">
+                          <span className="metric grid size-8 shrink-0 place-items-center rounded-lg bg-surface text-xs font-bold text-muted">
+                            {lesson.order}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-semibold leading-snug text-muted">
+                              {lesson.titleBg}
+                            </span>
+                            <span className="mt-0.5 block text-[11px] leading-snug text-muted">
+                              Материалът за този урок се проверява от преподавател. Ще го отворим,
+                              щом е потвърден — предпочитаме да ти кажем това, отколкото да ти
+                              разкажем нещо непроверено.
+                            </span>
+                          </span>
+                          <span className="hud-label hidden shrink-0 rounded-full border border-hair px-2 py-0.5 text-[10px] sm:inline-flex">
+                            в подготовка
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  }
                   // Watched vs. known — the two bars mean different things and
                   // the row says which is which rather than blending them.
                   const watchedBg =

@@ -17,6 +17,7 @@ import {
   loadDiffBaseline,
   quotedSpans,
   repoRootFor,
+  sourceEvidenceFor,
 } from "./evidence";
 import type { LawRefEvidence } from "./types";
 
@@ -141,7 +142,12 @@ describe("lawEvidenceFor", () => {
  * rows nothing actually changed. So the parser is checked against content the
  * test can verify independently.
  */
-describe("loadDiffBaseline", () => {
+// TIMEOUT, and why it is not a hang. This suite shells out to git and reads
+// the whole question bank off disk. On a cold FS cache on the 7200rpm E: drive
+// the FIRST test alone measured 23s of import + read, so the default 5s turned
+// a correct suite red — and a guard that goes red on a cold box gets deleted as
+// flaky, which is how the hole this module exists to close gets reopened.
+describe("loadDiffBaseline", { timeout: 120_000 }, () => {
   const contentDir = [
     path.join(process.cwd(), "content"),
     path.resolve(process.cwd(), "..", "content"),
@@ -187,5 +193,148 @@ describe("loadDiffBaseline", () => {
     // The real topic still came through — a `missing` frame in the middle of
     // the batch must not desynchronise the ones after it.
     expect(baseline.rows.size).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The non-statutory half. These assertions are the reason `sourceRefs` is a
+ * usable citation shape rather than a second way to write an unresolvable one:
+ * the reviewer must SEE the sentence, and must see it only when it really came
+ * from the source the row names.
+ */
+describe("sourceEvidenceFor — the citations that are not law", () => {
+  it("puts the verbatim source sentence on screen for the row that cites it", () => {
+    const [ev] = sourceEvidenceFor([
+      {
+        sourceId: "src-nsi-ptp-2023",
+        ref: "Методологични бележки",
+        claimId: "stat-road-death-30-days",
+      },
+    ]);
+    expect(ev.found).toBe(true);
+    expect(ev.quoteBg).toContain("Загинал при ПТП");
+    expect(ev.figureBg).toBe("30 дни");
+    expect(ev.figureQuoteBg).toContain("30 дни");
+    expect(ev.sourceUrl).toMatch(/^https:\/\//);
+    expect(ev.authorityBg).toBe("official-methodology");
+  });
+
+  it("shows the recorded conflicts, because a source register can disagree with itself", () => {
+    const [ev] = sourceEvidenceFor([
+      {
+        sourceId: "src-nsi-ptp-2023",
+        ref: "Методологични бележки",
+        claimId: "stat-road-death-30-days",
+      },
+    ]);
+    expect(ev.conflictsBg.length).toBeGreaterThan(0);
+    expect(ev.conflictsBg.join(" ")).toContain("30 дни");
+  });
+
+  it("reports a MISS with a plain-Bulgarian reason instead of guessing", () => {
+    const [ev] = sourceEvidenceFor([{ sourceId: "src-nope", ref: "никъде" }]);
+    expect(ev.found).toBe(false);
+    expect(ev.quoteBg).toBeNull();
+    expect(ev.missReasonBg).toContain("регистър");
+  });
+
+  /**
+   * The check that makes the whole evidence layer worth reading: a quote we put
+   * in an explanation is tested against the SOURCE text too, not only against
+   * the statute — otherwise every grounded first-aid row would show a false
+   * alarm and the check would be ignored.
+   */
+  it("checkQuotedClaims resolves a span quoted from a non-statutory source", () => {
+    const src = sourceEvidenceFor([
+      {
+        sourceId: "src-nsi-ptp-2023",
+        ref: "Методологични бележки",
+        claimId: "stat-road-death-30-days",
+      },
+    ]);
+    const claims = checkQuotedClaims(
+      "НСИ брои за загинал „всеки човек, който в резултат на произшествието е убит на място“ и това е важно.",
+      [],
+      src,
+    );
+    expect(claims).toHaveLength(1);
+    expect(claims[0].foundInRef).not.toBeNull();
+  });
+});
+
+/**
+ * The statute, in the statute's own words — against the real content file.
+ *
+ * q-ptp-013 shipped ЗДвП чл. 124, т. 1 inside quotation marks as „да вземеш …
+ * да окажеш … за него“: the verbs rewritten into the second person so the
+ * sentence would read to a student, while „за него“ stayed in the third. The
+ * result was a sentence that exists in no text — a hybrid of the statute and
+ * an editor — and it was written INSIDE the wave whose whole purpose was
+ * ending decorative and unearned citation. Paraphrase belongs outside the
+ * marks; what is inside them has to be retrievable.
+ *
+ * So the rule gets a standing test rather than a memo. For the first-aid rows
+ * that rest on Bulgarian statute, EVERY Cyrillic span in quotation marks must
+ * be found, verbatim, in an article the row itself cites. (Latin spans are the
+ * ERC/RCUK 2025 quotes; those are checked against `content/medical` by
+ * `verify-claims.mjs`, and here they simply have no statute to match.)
+ *
+ * Timed out generously for the same reason `loadDiffBaseline` is: this reads
+ * the question bank off the 7200rpm E: drive and loads the law corpus, which
+ * costs seconds on a cold FS cache and nothing at all on a warm one.
+ */
+describe("first-aid rows quote Bulgarian statute verbatim", { timeout: 120_000 }, () => {
+  const contentDir = [
+    path.join(process.cwd(), "content"),
+    path.resolve(process.cwd(), "..", "content"),
+  ].find((dir) => fs.existsSync(path.join(dir, "topics.json")));
+
+  interface Row {
+    id: string;
+    explanationBg: string;
+    lawRefs: { act: string; ref: string }[];
+  }
+
+  function firstAidRows(): Row[] {
+    expect(contentDir, "content dir not found").toBeTruthy();
+    return JSON.parse(
+      fs.readFileSync(
+        path.join(contentDir as string, "questions", "ptp-i-parva-pomosht.json"),
+        "utf8",
+      ),
+    ) as Row[];
+  }
+
+  /** The rows whose explanation quotes ЗДвП rather than only naming it. */
+  const QUOTES_STATUTE = ["q-ptp-013", "q-ptp-017"];
+
+  it.each(QUOTES_STATUTE)("%s quotes only what the cited article actually says", (id) => {
+    const row = firstAidRows().find((r) => r.id === id);
+    expect(row, `${id} missing from ptp-i-parva-pomosht.json`).toBeTruthy();
+    const claims = checkQuotedClaims(
+      (row as Row).explanationBg,
+      lawEvidenceFor((row as Row).lawRefs),
+    );
+    const cyrillic = claims.filter((c) => /[А-Яа-я]/.test(c.quote));
+    // A row in this list must actually be quoting the statute; an empty list
+    // would make the assertion below pass by saying nothing.
+    expect(cyrillic.length, `${id} quotes no statute at all`).toBeGreaterThan(0);
+    expect(
+      cyrillic.filter((c) => c.foundInRef === null).map((c) => c.quote),
+      `${id}: quoted as statute but in none of its cited articles`,
+    ).toEqual([]);
+  });
+
+  /**
+   * The exact defect, pinned. Second-person verbs are how a statute gets
+   * "helpfully" rewritten inside quotation marks, and чл. 124 is the article
+   * every non-participant row leans on.
+   */
+  it("never rewrites чл. 124, т. 1 into the second person", () => {
+    const raw = firstAidRows()
+      .map((r) => r.explanationBg)
+      .join("\n");
+    expect(raw).not.toContain("да вземеш мерки");
+    expect(raw).not.toContain("да окажеш помощ");
   });
 });

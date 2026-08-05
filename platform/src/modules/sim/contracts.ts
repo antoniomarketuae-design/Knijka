@@ -187,6 +187,24 @@ export interface LessonSpec {
    */
   world?: { districtId: string };
   /**
+   * THE STREET'S OWN POSTED LIMIT, km/h — carried so no channel that SPEAKS to
+   * the student can print a number above the sign (doc 87 B58).
+   *
+   * The founder's finding was an in-world gate bar reading «не по-бързо от 57
+   * км/ч» on a street posted 50, inside the drill that grades speeding. Two of
+   * the three channels that print a cap are fixed elsewhere — the ladder that
+   * generated the 57 (`scenario/params.ts` widenSpeedCap) and the world label
+   * (`RouteGuidance.postedLimitAt`, which reads the district edge under the
+   * marker and so handles a 50→30 transition per gate). The third is the
+   * ADVISOR card, which is a pure derivation over the session and has no
+   * district in hand — hence this field, set by `compileScenario` from the
+   * template's own map recipe.
+   *
+   * Absent (curriculum + exam-bank lessons, any test double) ⇒ every channel
+   * behaves exactly as before.
+   */
+  postedLimitKmh?: number;
+  /**
    * B-multi-map (doc 74 §5.5): per-lesson ambient traffic sizing. Absent
    * fields fall back to DEFAULT_LESSON_TRAFFIC (the city values). The полигон
    * runs ~2 vehicles / 2 pedestrians — an учебна площадка is not a highway.
@@ -577,6 +595,44 @@ export interface StagedActorPathSpec {
     | "cyclist"
     | "childCyclist"
     | "animal";
+  /**
+   * RESTING TURN INDICATOR — the blinker the actor shows from the moment it is
+   * staged, before any runner has commanded anything.
+   *
+   * WHY IT EXISTS (2026-08-04, `clips/whyPanelPairing.MISSING_DRILLS` #1). The
+   * ЗАОБИКАЛЯНЕ drill that ЗДвП чл. 43б (new in ДВ бр. 64/2025) needs opens on
+   * «спрял на осевата с ляв мигач автомобил, който чака да завие наляво» — a
+   * car STANDING STILL with its left indicator on. That blinker is not
+   * decoration: § 6 т. 80 ДР defines заобикаляне as passing a STATIONARY
+   * participant, which чл. 41 ал. 2's „движещото се" excludes, so the whole
+   * reason this is a different manoeuvre from изпреварване is that the car
+   * ahead is stopped and has ANNOUNCED why. Take the blinker away and the
+   * student sees an abandoned car.
+   *
+   * The channel already exists end to end — `setIndicator` (ledger L6, founder
+   * items 43/44) publishes `TrafficVehicleState.indicator` and the fleet
+   * renders it. What did not exist was any way for a TEMPLATE to ask for it:
+   * `setIndicator` is a runner-issued command, and a scenario spec cannot
+   * reach the traffic port. So a stationary announced car — the defining image
+   * of three withheld questions (q-krastovishta-051, q-manevri-024,
+   * q-manevri-060) — was unauthorable, and that is why the drill is on the
+   * missing list rather than merely unbuilt.
+   *
+   * OPT-IN, on the FR-56 `rollingStart` / B72 `paceProfile` precedent: absent =
+   * the runner never issues a command and every one of the catalogue's staged
+   * actors is byte-identical. It is a RESTING state, not a script — a runner
+   * that drives its own indicator (the cut-in's announced shift, the
+   * lane-shift pass) overwrites it on its own schedule and owns it from then
+   * on, which is correct: the announcement stops being true once the car moves.
+   *
+   * NO HAZARD OPTION, deliberately. `traffic/types.VehicleIndicator` is
+   * `"left" | "right" | "off"` and nothing renders both lamps at once, so
+   * offering „аварийни светлини" here would be a field that types-checks and
+   * shows a LEFT blinker — the broken-down-car image (чл. 41 ал. 2's other
+   * seat) needs a new VehicleIndicator member and a renderer that blinks both
+   * sides, which is a real change in the presentation layer, not a spec field.
+   */
+  indicator?: "left" | "right";
 }
 
 export type StagedEventKind =
@@ -732,8 +788,20 @@ export interface PriorityFromRightSpec extends StagedEventBase {
    * obeying «приближи бавно» reached an empty junction). Author it only to
    * TIGHTEN or LOOSEN those numbers; there is no way to ask for an
    * unwitnessed release, because there is no lesson in one.
+   *
+   * `stoppedNearM` — HOW FAR BACK A STANDSTILL STILL COUNTS AS WITNESSING,
+   * m; absent = the runner's `WITNESS_STOPPED_NEAR_M` (14), so every spec
+   * that does not author it is byte-identical. Author it when THIS lesson
+   * grades a yield from further back than 14 m: the drill must not credit a
+   * stop at a pose where its own conflict is then re-pinned and never
+   * crosses. Measured case, doc 87 B30 — `sc-jx-giveway-b1` grades the yield
+   * over y ∈ [90, 122.275] while its Б1 line is 27.725 m out, so a stop at
+   * the graded circle's own centre sits 13.97 m from the line and one 30 cm
+   * further back sits 14.27 m: the first sees the car cross, the second is
+   * marooned watching an empty boulevard. A 30 cm cliff deciding whether the
+   * lesson happens is not a design.
    */
-  witnessArm?: { etaSec: number; nearLineM: number };
+  witnessArm?: { etaSec: number; nearLineM: number; stoppedNearM?: number };
 }
 
 /** A lead car matches the player's speed at a fixed gap, then brake-slams at
@@ -782,6 +850,50 @@ export interface BrakingLeadCarSpec extends StagedEventBase {
   /** Scheduled-cruise speed, m/s. Default `actor.cruiseSpeedMps`. Ignored
    *  under "matchPlayer". */
   paceSpeedMps?: number;
+  /**
+   * B72 / FR-53 — an authored SPEED PROFILE for a `scheduledCruise` lead: the
+   * ease-and-resume the founder asked for, keyed to the ROAD instead of to him.
+   *
+   * WHY IT EXISTS. T17 killed the rubber band, and the measurement says it
+   * stayed dead — driven with a deliberate 24→8→34→10→26 km/h program the
+   * player's speed had sd 8.2 km/h against the truck's sd 0.2, r = −0.026. But
+   * the cure produced the founder's OTHER complaint in a purer form: with only
+   * one `paceSpeedMps` the lead is a metronome at a dead-constant 20.2 km/h for
+   * the whole 360 m («very boring»), and a metronome is a gap you set once and
+   * then stop thinking about. What he asked for is a lead that DOES something —
+   * «slows a bit, speeds a bit» — so following it is a task rather than a
+   * cruise-control setting. B72's close-out named this field exactly: „give the
+   * truck an authored speed profile instead of a single `paceSpeedMps` — a
+   * scheduled ease-and-resume (e.g. 5.6 → 3.5 → 5.6 m/s at authored y)".
+   *
+   * SHAPE. A piecewise-constant schedule, sorted by `atS` ascending: the target
+   * is the LAST leg whose `atS` the lead's own arc position has reached; before
+   * the first leg the base `paceSpeedMps ?? actor.cruiseSpeedMps` applies. `atS`
+   * is arc metres along the actor's OWN resolved path (the same
+   * `StagedActorView.s` the runners already read). On the straight fo-* streets
+   * the path starts at the district origin and runs +y, so an arc metre IS a
+   * district y — which is why the authored profiles read as the "authored y
+   * positions" the review asked for. The lead ramps between legs through the
+   * staged actor's ordinary accel/decel, so an ease is a real ease and not a
+   * teleport of the speedometer.
+   *
+   * WHY IT IS OPT-IN AND NOT A CHANGED DEFAULT — the FR-56 `rollingStart`
+   * precedent verbatim. `brakingLeadCar` is the most borrowed staged kind in
+   * the catalogue (ledger T17 counts 16 lead actors across 16 scenarios) and
+   * most of them are not following drills at all: pace cars pinned abeam for a
+   * blind-spot check, inert queue tails, brake-slam stimuli whose choreography
+   * is timed off a constant approach. Re-timing all of them to give two drills
+   * a personality is precisely the mistake FR-56 documented, where one
+   * unconditional line broke four assertions in three files. ABSENT = the
+   * runner never enters this code path and the drive is byte-identical.
+   *
+   * DETERMINISM. The active leg is a pure function of the actor's own arc
+   * position, itself a pure function of (spec, command stream, dt sequence) —
+   * no player term, no RNG, no wall clock. Ignored under "matchPlayer": a band
+   * and a schedule are two different commands, and authoring both is a template
+   * bug the scenario-data battery rejects.
+   */
+  paceProfile?: ReadonlyArray<{ atS: number; speedMps: number }>;
 }
 
 /** A slow "cyclist" (narrow scripted vehicle-agent — honest v1 actor-model

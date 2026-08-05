@@ -10,15 +10,18 @@
 import type { ParkingBaySpec } from "../../contracts";
 import type { District, DistrictZone } from "../types";
 import {
-  ARTERIAL_CLASSES,
   BUS_LANE_SEAM_WIDTH_M,
   CENTER_LINE_WIDTH_M,
   DASH_GAP_M,
   DASH_LENGTH_M,
   DASH_WIDTH_M,
+  EDGE_LINE_CLASSES,
   EDGE_LINE_INSET_M,
   EDGE_LINE_WIDTH_M,
   EMERGENCY_LANE_SEAM_WIDTH_M,
+  GIVE_WAY_TRIANGLE_BASE_M,
+  GIVE_WAY_TRIANGLE_LENGTH_M,
+  GIVE_WAY_TRIANGLE_SETBACK_M,
   MARKED_CLASSES,
   MARKING_Y,
   paintsZebra,
@@ -64,6 +67,9 @@ export interface MarkingBuildResult {
   /** Painted zone-speed numeral quads („30"/„20" road glyphs — founder R3
    *  #33/#34; 0 on every map without a qualifying zone edge). */
   speedGlyphQuads: number;
+  /** М18 „триъгълник" symbols painted before an М7 линия за изчакване
+   *  (Наредба № 2/2001 чл. 23 ал. 3). 0 on every map with no Б1 approach. */
+  giveWayTriangles: number;
 }
 
 /** Flat quad centered at `p`, extending ±alongHalf along `dir`, ±acrossHalf sideways. */
@@ -240,12 +246,16 @@ function authoredSolidBoundaries(
       if (lanesPerDir < 2) continue; // no boundary between laneId 0 and 1 to seam
       // An emergency lane needs BOTH of its edges painted or it reads as one
       // more travel lane: the wide inner line AND the carriageway edge line on
-      // its curb side. Only on hosts that paint no edge line of their own —
-      // mw-v1 is `motorway`, deliberately outside ARTERIAL_CLASSES (no street
-      // furniture on a motorway), so it had literally nothing on the outside.
-      // On the `primary` motorway maps (mw-entry/mw-exit) the arterial pass
-      // already draws that line, and a second one would just double it.
-      const outerW = emergency && !ARTERIAL_CLASSES.has(eb.edge.class) ? EDGE_LINE_WIDTH_M : 0;
+      // its curb side. Only on hosts that paint no edge line of their own.
+      //
+      // This used to ask ARTERIAL_CLASSES and was the loudest symptom of B81's
+      // cause: `motorway` is outside that set because a motorway carries no
+      // street FURNITURE, so mw-v1 „had literally nothing on the outside" and
+      // this branch was written to hand it one. Now that the edge line asks
+      // EDGE_LINE_CLASSES — a set about paint — a motorway paints its own,
+      // continuous over the whole ribbon instead of only over the zone span,
+      // and this branch correctly falls to 0 rather than doubling it.
+      const outerW = emergency && !EDGE_LINE_CLASSES.has(eb.edge.class) ? EDGE_LINE_WIDTH_M : 0;
       // …and it sits INSET from the carriageway edge, on the arterial pass's own
       // terms (`travelHalf - EDGE_LINE_INSET_M` below, „so paint never underlaps
       // it"): a 0.3 m strip centred exactly on travelHalf hangs half its width
@@ -373,6 +383,74 @@ function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): voi
     const half = (to - from) / 2;
     paintQuad(acc, add(base, mul(lineDir, -mid)), lineDir, half, STOP_LINE_WIDTH_M / 2);
   }
+}
+
+/**
+ * М18 „триъгълник" — the give-way symbol on the carriageway just BEFORE the М7
+ * линия за изчакване (Наредба № 2/2001, чл. 23, ал. 3; see constants.ts for the
+ * verbatim text and for why this exists at all).
+ *
+ * Geometry is derived from the SAME approach frame `paintStopLine` uses, so the
+ * symbol and the line it belongs to can never drift apart:
+ *   - `away` points out of the junction, so the driver who must give way travels
+ *     `-away` and „before the line" is at a LARGER +away offset;
+ *   - the apex therefore points along `+away`, i.e. straight back at that
+ *     driver. That orientation IS the legal content of ал. 3 — the same
+ *     triangle drawn the other way up is a different marking;
+ *   - across the road it is centred on each INCOMING travel lane (the half the
+ *     М7 line already spans), never on the parking band and never on the
+ *     oncoming half.
+ *
+ * Returns the number of triangles painted (one per incoming lane).
+ */
+function paintGiveWayTriangles(acc: MeshAccumulator, ap: Approach): number {
+  const away = ap.cutTangentAway;
+  const lineDir = perpRight(away);
+  const travelHalf = ap.halfWidth - ap.parkingM;
+  if (travelHalf <= 0.5) return 0;
+
+  // The М7 line's own span, restated from paintStopLine so the two agree.
+  const inner = 0.15;
+  const outer = travelHalf - 0.2;
+  const from = ap.edge.oneway ? -outer : inner;
+  const to = outer;
+  const span = to - from;
+  if (span <= 0.5) return 0;
+
+  // The symbol's BASE sits `SETBACK` before the line; the apex is a further
+  // LENGTH out, pointing at the driver.
+  const lineBase = add(ap.cut, mul(away, STOP_LINE_BEYOND_CUT_M));
+  const baseS = GIVE_WAY_TRIANGLE_SETBACK_M;
+  const apexS = baseS + GIVE_WAY_TRIANGLE_LENGTH_M;
+
+  // One symbol per incoming travel lane, on that lane's centre. `span` is the
+  // incoming half (or the whole carriageway on a one-way arm), so dividing it
+  // by the lane count places the symbol where the wheel tracks are, whatever
+  // the arm's width and lane count.
+  const lanes = Math.max(1, ap.edge.oneway ? ap.edge.lanes : Math.floor(ap.edge.lanes / 2));
+  const half = GIVE_WAY_TRIANGLE_BASE_M / 2;
+  let painted = 0;
+  for (let i = 0; i < lanes; i++) {
+    const t = from + (span * (i + 0.5)) / lanes;
+    // Symbol must fit inside the carriageway, not hang over the curb.
+    if (t - half < Math.min(from, to) - 1e-6 || t + half > to + 1e-6) continue;
+    const centre = add(lineBase, mul(lineDir, -t));
+    const baseL = add(add(centre, mul(away, baseS)), mul(lineDir, -half));
+    const baseR = add(add(centre, mul(away, baseS)), mul(lineDir, half));
+    const apex = add(centre, mul(away, apexS));
+    // District-space CCW → front-facing up after toWorld (mesh.ts).
+    const ia = acc.vertex(toWorld(baseL[0], baseL[1], MARKING_Y), UP, [0, 0]);
+    const ib = acc.vertex(toWorld(baseR[0], baseR[1], MARKING_Y), UP, [1, 0]);
+    const ic = acc.vertex(toWorld(apex[0], apex[1], MARKING_Y), UP, [0.5, 1]);
+    // Wind by measured signed area rather than by assuming which way `lineDir`
+    // ran: `away` flips per approach, and a back-faced symbol is invisible.
+    const area =
+      (baseR[0] - baseL[0]) * (apex[1] - baseL[1]) - (apex[0] - baseL[0]) * (baseR[1] - baseL[1]);
+    if (area >= 0) acc.tri(ia, ib, ic);
+    else acc.tri(ia, ic, ib);
+    painted++;
+  }
+  return painted;
 }
 
 /** Parking-bay stroke width — reads as bay paint next to the 0.25 m dashes. */
@@ -718,6 +796,7 @@ export function buildMarkings(
   let markingQuads = 0;
   let stopLines = 0;
   let zebraCrossings = 0;
+  let giveWayTriangles = 0;
 
   // -- lane lines ------------------------------------------------------------
   const zones = district.zones ?? [];
@@ -761,7 +840,7 @@ export function buildMarkings(
         ? paintDashedLineExcluding(acc, offLine, width, ex)
         : paintDashedLine(acc, offLine, width);
     }
-    if (ARTERIAL_CLASSES.has(eb.edge.class)) {
+    if (EDGE_LINE_CLASSES.has(eb.edge.class)) {
       // With a parking band the edge line sits ON the travel/parking boundary;
       // without one it stays inset from the curb so paint never underlaps it.
       const edgeOff = eb.parkingM > 0 ? travelHalf : travelHalf - EDGE_LINE_INSET_M;
@@ -785,6 +864,12 @@ export function buildMarkings(
         paintStopLine(acc, ap, true);
         stopLines++;
         markingQuads++;
+        // …and the М18 symbol the М7 line is allowed to carry. Painted here,
+        // next to the line it belongs to, so the pair can never be placed by
+        // two different derivations.
+        const tris = paintGiveWayTriangles(acc, ap);
+        giveWayTriangles += tris;
+        markingQuads += tris;
       }
     }
   }
@@ -830,5 +915,6 @@ export function buildMarkings(
     parkingBays: parkingBays.length,
     laneArrowQuads,
     speedGlyphQuads,
+    giveWayTriangles,
   };
 }

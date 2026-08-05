@@ -54,15 +54,21 @@ export default defineConfig({
     // public/ size ceiling is enforced by tools/assets/publicBudget.test.mjs,
     // and it has to run in the gate everything else runs in, or it is not a
     // ceiling — it is a suggestion nobody executes.
-    // The third glob reaches out of platform/ for the same reason the second
+    // The third entry reaches out of platform/ for the same reason the second
     // one does: tools/mobile/budget.test.mjs is the mobile SCREEN BUDGET, and a
-    // budget nobody's build enforces is a suggestion. It is listed explicitly
-    // rather than as `../tools/**` because most tools/ tests are node:test
-    // files (scripts/tools-tests.mjs owns those) and vitest cannot run them.
+    // budget nobody's build enforces is a suggestion. It names ONE FILE because
+    // most tools/ tests are node:test files (scripts/tools-tests.mjs owns
+    // those) and vitest cannot run them.
+    //
+    // It used to say `../tools/mobile/**/*.test.mjs`, which contradicted that
+    // sentence: the moment the probe rewrite added navigation.test.mjs and
+    // ready.test.mjs — both node:test, both green under `node --test` — vitest
+    // globbed them and reported "No test suite found" as two hard failures in
+    // every gate. The comment was right and the glob was wrong.
     include: [
       "src/**/*.test.{ts,tsx}",
       "../tools/assets/**/*.test.mjs",
-      "../tools/mobile/**/*.test.mjs",
+      "../tools/mobile/budget.test.mjs",
     ],
     environment: "node",
     coverage: {

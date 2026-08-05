@@ -59,8 +59,11 @@ interface Quad {
   maxX: number;
 }
 
-/** Reconstruct quads from the 6-index groups (every marking primitive is a
- *  MeshAccumulator.quad — arrow heads are degenerate quads, same shape).
+/** Reconstruct quads from the 6-index groups. Valid HERE because every build in
+ *  this file passes EMPTY stop/give-way sets, and the one marking primitive that
+ *  is NOT a MeshAccumulator.quad — the М18 „триъгълник" (3 indices, painted only
+ *  beside an М7 линия за изчакване) — cannot be emitted without a give-way
+ *  approach. Arrow heads are degenerate quads, same 6-index shape.
  *  World (x, MARKING_Y, -y) → district (x, y): districtY = -z. */
 function quads(mesh: MeshData, fromIndex = 0): Quad[] {
   const p = mesh.positions;
@@ -178,7 +181,7 @@ describe("rb-2lane-v1 — laneArrows paints every arm's approach glyphs, rotated
     expect(arrows).toHaveLength(28);
   });
 
-  it("the arms now carry lane lines UNDER the arrows — RE-BASELINED (doc 86 T1)", () => {
+  it("the arms now carry lane lines AND edge lines UNDER the arrows — RE-BASELINED", () => {
     // Was `expect(base.markingQuads).toBe(0)` under the title "the arrows are
     // the ONLY paint on this map (unclassified arms draw no lane lines)". Doc
     // 86 quotes that assertion as the tree's own pinned proof of T1: rb-2lane's
@@ -190,9 +193,16 @@ describe("rb-2lane-v1 — laneArrows paints every arm's approach glyphs, rotated
     // each bank. The property the assertion actually protected — the arrow pass
     // APPENDS and changes nothing before it — is the byte-identical-prefix test
     // above, which still holds exactly.
-    expect(base.markingQuads).toBe(60);
+    //
+    // RE-BASELINED AGAIN 60 → 68 (founder item B81, „there are no marking on the
+    // roads … has to be GLOBALLY FIXED"). The solid carriageway EDGE LINE used
+    // to be gated on ARTERIAL_CLASSES — a street-FURNITURE set — so every
+    // `unclassified`/`residential`/motorway carriageway in the world had none.
+    // It is now gated on EDGE_LINE_CLASSES, a set about paint, and these four
+    // straight arms each add one 2-point solid per side: 4 arms × 2 = 8 quads.
+    expect(base.markingQuads).toBe(68);
     expect(base.laneArrowQuads).toBe(0);
-    expect(builtMesh.indices.length).toBe((60 + 28) * 6);
+    expect(builtMesh.indices.length).toBe((68 + 28) * 6);
   });
 
   it("…and the осева of every arm is the widest line on it (T16)", () => {

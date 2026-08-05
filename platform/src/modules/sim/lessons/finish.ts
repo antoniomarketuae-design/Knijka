@@ -77,7 +77,13 @@
  */
 
 import type { SimTick } from "../rules";
-import type { FinishGateState, ObjectiveParams, RouteFinishZone } from "./types";
+import type {
+  FinishGateState,
+  ObjectiveParams,
+  RouteFinishZone,
+  YieldReason,
+  YieldWaitState,
+} from "./types";
 
 /**
  * Arrival radius for a bay finish, meters — before the clamp below. A bay is a
@@ -144,6 +150,14 @@ export const FINISH_LANE_FLOOR_M = 9;
  * up for the exam bay, a beginner pauses mid-shuffle to work out the wheel, a
  * student stops to read the banner. Twelve seconds motionless at the end of
  * the route, with the task still not done, is not any of those.
+ *
+ * B15 CORRECTION (2026-08-04). The original of this comment ended „…and a
+ * red-light wait ends by itself", and that sentence carried the whole weight
+ * of the distinction. It is false at a GIVE-WAY line: nothing ends a wait for
+ * a gap in circulating traffic except a gap, and the founder waited forty
+ * seconds for one. A standstill is therefore no longer sufficient evidence of
+ * being stuck by itself — see `stepYieldWait` below, which withholds the
+ * evidence entirely while the standstill is the lawful thing to be doing.
  */
 export const FINISH_STANDSTILL_KMH = 1;
 export const FINISH_STUCK_S = 12;
@@ -178,6 +192,59 @@ export const FINISH_LEAVE_S = 20;
  * Shuffling at the corner of the box must never read as leaving it.
  */
 export const FINISH_CORRIDOR_MARGIN_M = 8;
+
+// ---------------------------------------------------------------------------
+// FR-B5-JAM (doc 87, 2026-08-05) — THE CRASH PIN
+// ---------------------------------------------------------------------------
+//
+// Both gates above are ANCHORED AT THE END OF THE ROUTE, because that is where
+// the three stranded-student reports of July came from. A fourth way to be
+// stranded was found by driving on 2026-08-05 and it is nowhere near the end:
+// `sc-jx-giveway-b1@L1`, driven correctly — stop at the Б1 line, wait, then
+// „щом пътят е чист, потегляш" — ended in a 10-point COLLISION with a car
+// standing in the second junction's mouth at y = 146.00, and after it the car
+// was **held at full throttle for 40 s** with the third objective 32 m ahead
+// and unreachable. The obstacle itself is fixed elsewhere (templates-junctions
+// + the traffic clamps). This is the other half, and it is the more dangerous
+// one, because it does not need THAT obstacle: pin a car against ANY solid
+// thing anywhere on a route and the same nothing happens forever.
+//
+// The evidence has to separate „pinned" from every legitimate standstill, and
+// a standstill alone cannot do it — B15 taught that lesson at a give-way line.
+// So the pin needs all three of:
+//
+//   1. a graded COLLISION has happened (the catalog's `terminateSession` flag —
+//      the only code that carries it). Nothing else arms this;
+//   2. the car has not left the place it hit (within CRASH_PIN_RADIUS_M of the
+//      collision pose). Drive away and the arm is dropped — a student who
+//      reverses out and carries on is not stuck, and must never be closed down;
+//   3. it has then stood completely still for CRASH_PIN_STUCK_S, with the
+//      lawful-wait freeze applying exactly as it does to the other two gates.
+//
+// Nothing here grades. Like every other finish gate it decides WHEN the drive
+// stops, never WHAT counts as a fault: the collision keeps its 10 points, the
+// unreached objectives stay honestly unreached, and `buildLessonResult` reports
+// finished-and-not-passed. The alternative — teleporting the car free — was
+// rejected: it would invent a driving outcome the student did not drive, and
+// the debrief is the thing he actually needs after a crash he cannot undo.
+
+/** How far from the impact pose still counts as „pinned against it", m. A car
+ *  length and a half: enough that a shunt or a shuffle does not disarm the
+ *  rescue, small enough that anyone who has genuinely driven away has. */
+export const CRASH_PIN_RADIUS_M = 6;
+
+/**
+ * Seconds motionless against what you hit before the drive is closed for you.
+ *
+ * Shorter than FINISH_STUCK_S (12) on purpose: at the end of a route a
+ * standstill is ambiguous (lining up, thinking, reading the banner), and after
+ * an impact it is not — the student has already been given the fault card and
+ * has either reversed out or cannot. Ten seconds is longer than any recovery
+ * shunt and a quarter of the forty the founder's drive spent going nowhere.
+ * NOTE the pause aid: at L1/L2 a graded fault freezes physics behind a teach
+ * card and sim time does not advance, so the card can never spend this clock.
+ */
+export const CRASH_PIN_STUCK_S = 10;
 
 interface Point {
   x: number;
@@ -413,6 +480,245 @@ export function terminalRescueZone(
   if (anchor.mode === "outside") return normalizeOutside(anchor);
 
   return { ...anchor, radiusM: Math.max(anchor.radiusM, FINISH_LANE_FLOOR_M) };
+}
+
+// ---------------------------------------------------------------------------
+// THE LAWFUL WAIT — B15 (founder, „Кръгово движение"): «the roundabout convicts
+// me the instant the wheels turn after I have waited properly at the give-way
+// line. I waited about 40 seconds.»
+//
+// THAT ROW WAS UNPHOTOGRAPHABLE, and this file is why. Three separate runs
+// tried to hold the frame: at roughly twenty seconds of standing still the
+// session handed itself a result screen («0 наказателни точки · НЕИЗДЪРЖАН ·
+// Ориентировъчно време 20 с») and the keyboard stopped mattering. Twenty
+// seconds is FINISH_LEAVE_S, and the gate that spends it is the one directly
+// above — leave-the-work-site.
+//
+// THE GEOMETRY, measured on the shipped drill rather than argued
+// (b15-lawful-wait.test.ts pins every number):
+//   sc-roundabout-entry  ring (0,0) · enterRadiusM 24 · exitRadiusM 34
+//   the painted М8 give-way bars on the south arm:  (4.06, −35.725)
+//   ⇒ a car stopped ON THE PAINT is 35.96 m out — 1.96 m INSIDE the region
+//     this gate calls „you have left the roundabout", which starts at 34 m.
+// The gate arms on one frame within 24 m. So every student who has been at the
+// ring and is then stationary where the lesson TELLS him to stand („спри на
+// линията и я пропусни", instruction 2) is inside an armed finish, counting
+// down, and at twenty seconds his lesson is over. Driven and confirmed live:
+// the arming flips at 22.1 m from the centre, and the raw gate latches
+// `reachedAtSec` exactly FINISH_LEAVE_S after the first frame on the paint.
+//
+// The gate fires because the ONLY thing it can read is „the car is not at the
+// ring and is not moving", which is equally true of a tab someone walked away
+// from and of a student doing the single most important thing a learner does
+// at a junction.
+//
+// THE GATES ARE NOT WRONG TO EXIST. An idle tab must not hold a lesson open
+// forever, and a car standing in the middle of nowhere with nothing pending is
+// genuinely finished with the route. What was missing is the DISTINCTION, and
+// it is not a longer timeout — a longer timeout only moves the number at which
+// the product fails him. It is: while the scenario is EXPECTING a yield, a
+// standstill is not evidence of anything except obedience, so it must not
+// count toward the idle finish at all.
+//
+// WHAT COUNTS AS „expecting a yield", and why each one is here:
+//  · a Б1 give-way line or a Б2 stop sign within reach ahead — the tick's own
+//    `nextStopLineControl`/`nextStopLineM` (worldRuntime publishes both);
+//  · a red / red-amber / amber light at that line — waiting it out is the law;
+//  · a pedestrian on a crossing whose approach zone the car is inside — the
+//    tick reports this as an EVENT, so it is latched (see YieldWaitState);
+//  · a ROUNDABOUT this route has not finished, with the car stopped within one
+//    approach of it. This one cannot be read off the stop line at all:
+//    `stoplines.ts` skips every junction touching a roundabout edge
+//    (`incident.some(roundabout) ⇒ continue`), so rb-mini-v1's give-way arm
+//    publishes NO stop-line context whatsoever — the М8 paint and its Б1 are
+//    drawn, the graded line is not. Confirmed on the live drive: the telemetry
+//    reads `nextStopLineControl = null` on every frame of the approach. His
+//    exact case therefore has to come from the ROUTE — a roundabout objective
+//    the sequential chain has not passed yet, and a car at a standstill within
+//    one approach of it.
+//
+// WHAT THIS DELIBERATELY DOES NOT DO. It does not grade — nothing here emits,
+// suppresses or reweights a ScorableEvent, exactly like the rest of this file.
+// It does not touch the objective chain: a wait completes no task. And it does
+// not hold a session open forever — YIELD_WAIT_MAX_S below is the point past
+// which even a lawful-looking standstill is an abandoned tab.
+// ---------------------------------------------------------------------------
+
+/**
+ * How close ahead a controlled line has to be for a standstill to read as
+ * waiting AT it, meters. The runtime watches 120 m of road (NEXT_LINE_WATCH_M)
+ * — far too generous here: a car stopped 80 m short of a give-way line is
+ * stopped in open road, not at the line. Twelve metres is the shipped
+ * junction-mouth setback (STOP_LINE_BEYOND_CUT_M band) plus a car length and
+ * change, so a driver stopped ON the paint, or one car back in a queue, is
+ * inside it and nothing further out is.
+ */
+export const YIELD_STOP_LINE_REACH_M = 12;
+
+/**
+ * How far SHORT of a ring the car may stand and still read as waiting to enter
+ * it, meters beyond the objective's own `enterRadiusM`.
+ *
+ * Measured against the shipped case rather than guessed: on `rb-mini-v1` the
+ * ring is r=18, the objective's enterRadiusM is 24, and the painted М8
+ * give-way bars sit 18.2 m out from the entry mouth — i.e. ~36 m from the ring
+ * centre, 12 m beyond the arming circle. Twenty metres covers that with room
+ * for the car behind him in a queue, and excludes the spawn (93 m out), which
+ * must keep ending the session when a tab is abandoned there.
+ */
+export const YIELD_ROUNDABOUT_APPROACH_M = 20;
+
+/**
+ * The ceiling. Past this many CONTINUOUS seconds of lawful-looking standstill
+ * the hold stops being honoured and the finish gates resume — because at some
+ * point „waiting for a gap" and „closed the laptop" become indistinguishable
+ * again, and the gate's legitimate purpose is the second one.
+ *
+ * Three minutes is deliberately far past any real wait. The founder's was 40 s;
+ * the roundabout drill's circulator comes round every ~40 s; the longest
+ * signalized red on the shipped maps is 26 s of a 50 s cycle. It is 4.5× his
+ * wait and 3× the sixty-second proof this row is closed with, and it still
+ * bounds an abandoned tab to three minutes.
+ */
+export const YIELD_WAIT_MAX_S = 180;
+
+/**
+ * Why this frame is a lawful wait — for the instructor's voice, tests and
+ * telemetry, never for grading. The union itself moved to `./types` when
+ * `YieldWaitState` started carrying one (B15-VOICE); re-exported here so every
+ * existing `from "./finish"` import is unchanged.
+ */
+export type { YieldReason };
+
+/** Fresh hold: not waiting, nothing latched. */
+export function createYieldWait(): YieldWaitState {
+  return { holding: false, sinceSec: null, reason: null, pedestrianCrossingIds: [] };
+}
+
+/** The route context the roundabout reason needs (engine-side session state). */
+export interface YieldWaitContext {
+  /** Every objective's params, in route order. */
+  params: readonly ObjectiveParams[];
+  /**
+   * Index of the ACTIVE objective; >= params.length ⇒ the chain is done.
+   * Objectives BEFORE it are complete by construction (the chain is strictly
+   * sequential), which is exactly how „a roundabout this route still has to
+   * do" is expressed below — no extra state, and it stays true across a
+   * voided traversal, which is when a student is most likely to be sitting at
+   * the line again.
+   */
+  currentIndex: number;
+}
+
+/** Fold this frame's crossing events into the latched pedestrian set. */
+function stepPedestrianCrossings(
+  prev: readonly string[],
+  tick: SimTick,
+): readonly string[] {
+  let next = prev;
+  const drop = (id: string): void => {
+    if (next.includes(id)) next = next.filter((x) => x !== id);
+  };
+  for (const e of tick.events) {
+    switch (e.kind) {
+      case "crossingZoneEntered":
+        // Re-emitted whenever the flag changes, so it both arms and disarms.
+        if (e.pedestrianOnCrossing) {
+          if (!next.includes(e.crossingId)) next = [...next, e.crossingId];
+        } else drop(e.crossingId);
+        break;
+      case "crossingPassed":
+      case "crossingZoneExited":
+        drop(e.crossingId);
+        break;
+      default:
+        break;
+    }
+  }
+  return next;
+}
+
+/**
+ * Is the scenario expecting a yield HERE? Null = no; a reason otherwise.
+ * Speed is NOT considered — the caller owns the standstill test, so this stays
+ * a pure statement about the world and the route.
+ */
+export function yieldReasonAt(
+  tick: SimTick,
+  ctx: YieldWaitContext,
+  pedestrianCrossingIds: readonly string[],
+): YieldReason | null {
+  // 1-3. A controlled line the runtime can see, within reach ahead.
+  const lineM = tick.nextStopLineM;
+  if (lineM !== undefined && lineM <= YIELD_STOP_LINE_REACH_M) {
+    if (tick.nextStopLineControl === "giveWay") return "giveWayLine";
+    if (tick.nextStopLineControl === "stopSign") return "stopSign";
+    if (
+      tick.nextStopLineControl === "trafficLight" &&
+      tick.nextStopLineState !== undefined &&
+      tick.nextStopLineState !== "green"
+    ) {
+      return "redLight";
+    }
+  }
+
+  // 4. A pedestrian on a crossing this car is in the approach zone of.
+  if (pedestrianCrossingIds.length > 0) return "pedestrian";
+
+  // 5. A ring this route has NOT finished yet, with the car stopped within one
+  // approach of it. The annulus is deliberately symmetric — it is not worth
+  // guessing from a heading whether a stationary car 30 m out is arriving or
+  // has just been told to come back (which is precisely what the voided-exit
+  // card says: „върни се в кръговото и излез с пуснат десен мигач"). Inside
+  // the ring is excluded by `d > enterRadiusM`, and the ring being BEHIND you
+  // is excluded by the objective being done, so what is left is a car that
+  // still has this roundabout to do and is not moving toward it.
+  for (let i = Math.max(0, ctx.currentIndex); i < ctx.params.length; i++) {
+    const p = ctx.params[i];
+    if (p.kind !== "completeManeuver" || p.maneuver !== "roundabout") continue;
+    const d = dist(tick.position, p);
+    if (d > p.enterRadiusM && d <= p.enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M) {
+      return "roundaboutEntry";
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Advance the lawful-wait hold by one frame.
+ *
+ * `holding` is true only while the car is at a FULL standstill
+ * (FINISH_STANDSTILL_KMH — the same bar the stuck-rescue uses, so the two
+ * cannot disagree about what „not moving" means) AND a reason above applies
+ * AND the hold has not run past YIELD_WAIT_MAX_S. The engine freezes both
+ * finish gates on exactly those frames.
+ */
+export function stepYieldWait(
+  prev: YieldWaitState | undefined,
+  tick: SimTick,
+  ctx: YieldWaitContext,
+): YieldWaitState {
+  const base = prev ?? createYieldWait();
+  const pedestrianCrossingIds = stepPedestrianCrossings(base.pedestrianCrossingIds, tick);
+
+  const stationary = Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH;
+  const reason = stationary ? yieldReasonAt(tick, ctx, pedestrianCrossingIds) : null;
+  if (reason === null) {
+    return { holding: false, sinceSec: null, reason: null, pedestrianCrossingIds };
+  }
+
+  const sinceSec = base.sinceSec ?? tick.t;
+  // Past the ceiling the hold is spent: the gates resume and an abandoned tab
+  // still ends. `sinceSec` is kept so the hold does not silently re-arm on the
+  // next frame — only moving away from the yield (above) clears it.
+  const holding = tick.t - sinceSec <= YIELD_WAIT_MAX_S;
+  // The reason is published on every qualifying frame, INCLUDING the ones past
+  // the ceiling: it states what the world is, and the world does not change
+  // because a timer expired. Only `holding` is the gate — so the instructor's
+  // voice, which reads `holding`, falls silent at exactly the moment the finish
+  // gates resume and the session is on its way to ending.
+  return { holding, sinceSec, reason, pedestrianCrossingIds };
 }
 
 /** Fresh gate: disarmed, outside, untripped. */

@@ -43,10 +43,12 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./lib/pw.mjs";
-import { contextOptions, resolveDevices } from "./lib/devices.mjs";
+import { contextOptions, resolveDevices, resolveMotion } from "./lib/devices.mjs";
 import { ROUTES } from "./lib/routes.mjs";
-import { gotoAuthenticated, signIn } from "./lib/auth.mjs";
+import { gotoAuthenticated, NAV_BUDGET_MS, signIn } from "./lib/auth.mjs";
 import { ensureHarnessUser } from "./lib/user.mjs";
+import { isWorldFrame, waitForWorld, worldVitals } from "./lib/ready.mjs";
+import { appMs, instrumentShare, settle } from "./lib/settle.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = join(HERE, ".out", "stability");
@@ -65,6 +67,37 @@ const TOOLBAR_PX = 90;
  * counts against the row.
  */
 const SETTLE_BUDGET_MS = 1200;
+/**
+ * When the probe owns more than this share of a sample, the SAMPLE is about the
+ * box and says so out loud — even though the metric itself (`atRestMs`, taken
+ * in-page) no longer contains it. A quarter, not a half: "most of it was the
+ * instrument" is far too late a place to start warning, and the number that
+ * started this whole round was 99.2%.
+ */
+const INSTRUMENT_SHARE_LIMIT = 0.25;
+/**
+ * THE PHASE THAT FOLLOWS NO STATE CHANGE. `base` is taken after the route has
+ * loaded, after `prepare`, after the world wait, and after a fixed
+ * `settleMs` sleep of 1.2-6 s — so by construction nothing is settling when it
+ * runs, and whatever it reports is the FLOOR of this instrument on this box,
+ * not a settling time. It was scored against the settle budget like any other
+ * phase, and in the last recorded sweep it was the WORST one (32,144 ms), which
+ * is how a budget came to be decided by the phase in which the app was idle.
+ * It is still measured and still printed — an app that is STILL MOVING 1.2 s
+ * after load is a real finding — but it is named for what it is.
+ */
+const IDLE_PHASE = "base";
+/**
+ * How long a route that declares `requiresWorld` may take to actually PAINT the
+ * 3D world before this probe gives up and records nothing.
+ *
+ * Generous on purpose: on this box a cold `next dev` compile of the driving
+ * route plus its GLB/KTX2 assets has been measured in minutes, and the honest
+ * answer to "the world was not up yet" is to wait, not to measure the loading
+ * screen and call it 1,190 ms. It is a REFUSAL budget, not a performance one —
+ * exceeding it fails the row, it never silently shortens the wait.
+ */
+const WORLD_TIMEOUT_MS = Number(process.env.KNIJKA_WORLD_TIMEOUT_MS || 180_000);
 
 // -----------------------------------------------------------------------------
 // The surfaces. ROUTES is the phase-0 list; /dashboard is added here because it
@@ -94,6 +127,23 @@ function parseArgs(argv) {
     // proven to still be detectable. See tools/mobile/regressions/ for the ones
     // used to verify this probe.
     else if (a === "--inject-css") out.injectCss = argv[++i];
+    // ONE RUN IS NOT A MEASUREMENT WHEN THE MARGIN IS THIN. `settle` is a
+    // wall-clock number on a box that is shared with every other lane, and this
+    // probe reported a 1,200 ms budget met by 2 ms once and by 10 ms once — from
+    // single runs, which cannot tell "the product got faster" from "the box was
+    // quieter". `--repeat N` re-measures the same surface N times in the same
+    // session and reports min / median / worst / spread per phase, so the
+    // verdict comes with the one fact that makes it readable: how far the number
+    // moves when nothing about the app changes.
+    else if (a === "--repeat") out.repeat = Math.max(1, Number(argv[++i]) || 1);
+    // MOTION IS A RUN PARAMETER AND IT IS PRINTED. `reducedMotion: "reduce"`
+    // was hard-coded on every device profile with nothing saying so, which made
+    // every animation claim ever made through this harness unfalsifiable: a
+    // reduced-motion frame was being compared against a reduced-motion frame.
+    // `--motion allow` runs the app the way a student's phone does; the default
+    // is still `reduce` because a LAYOUT sweep wants deterministic geometry —
+    // but now the report states which, in a line nobody can miss.
+    else if (a === "--motion") out.motion = argv[++i];
     else if (a === "--device" || a === "-d") out.devices.push(argv[++i]);
     else if (a === "--route" || a === "-r") out.routes.push(argv[++i]);
     else if (a.startsWith("--")) out.flags.add(a.slice(2));
@@ -668,38 +718,23 @@ function stabilityBody(config) {
 // longer sleep.
 // =============================================================================
 
-/** A cheap whole-page geometry hash. Two equal consecutive reads = at rest. */
-function geometryFingerprint() {
-  let acc = 0;
-  let n = 0;
-  for (const el of document.querySelectorAll("*")) {
-    const r = el.getBoundingClientRect();
-    if (r.width <= 0 && r.height <= 0) continue;
-    acc += r.left * 31 + r.top * 17 + r.width * 7 + r.height * 3;
-    n += 1;
-  }
-  return `${n}:${Math.round(acc * 10)}`;
-}
+// THE MEASUREMENT ITSELF NOW LIVES IN lib/settle.mjs, and it lives there so it
+// can be TESTED. `settleBody` is driven against a fake document in
+// settle.test.mjs — a document whose geometry stops changing at a known sample
+// and whose clock is under the test's control — which is the only way to prove
+// that the number this probe reports is the app's and not the probe's. Every
+// one of the four defects found in this instrument survived because the
+// instrument had no test that could see it from outside.
+//
+// `appMs` is THE metric. `s.ms` is still recorded and still printed, and
+// nothing scores against it.
 
-/**
- * Wait until the page's geometry stops changing.
- * @returns {Promise<{ms:number, settled:boolean, samples:number}>}
- */
-async function settle(page, { minMs = 150, pollMs = 100, timeoutMs = 6000 } = {}) {
-  const started = Date.now();
-  await page.waitForTimeout(minMs);
-  let previous = await page.evaluate(geometryFingerprint).catch(() => null);
-  let samples = 1;
-  while (Date.now() - started < timeoutMs) {
-    await page.waitForTimeout(pollMs);
-    const current = await page.evaluate(geometryFingerprint).catch(() => null);
-    samples += 1;
-    if (current !== null && current === previous) {
-      return { ms: Date.now() - started, settled: true, samples };
-    }
-    previous = current;
-  }
-  return { ms: Date.now() - started, settled: false, samples };
+/** Median of a numeric list. Empty list -> 0. */
+function median(values) {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
 }
 
 // =============================================================================
@@ -762,6 +797,8 @@ const devices = resolveDevices(
 );
 const surfaces =
   args.routes.length > 0 ? SURFACES.filter((s) => args.routes.includes(s.id)) : SURFACES;
+const REPEAT = args.repeat ?? 1;
+const MOTION = resolveMotion(args.motion ?? "reduce");
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -778,18 +815,91 @@ const credentials =
     ? { email: process.env.KNIJKA_MOBILE_EMAIL, password: process.env.KNIJKA_MOBILE_PASSWORD }
     : await ensureHarnessUser();
 
-/** Compile from NODE first: a fetch has no navigation timeout and no service
- *  worker in front of it. See lib/measure.mjs warmRoutes for the long version. */
+/**
+ * Compile from NODE first: a fetch has no navigation timeout and no service
+ * worker in front of it. See lib/measure.mjs warmRoutes for the long version.
+ *
+ * "NO NAVIGATION TIMEOUT" USED TO MEAN NO TIMEOUT AT ALL, AND THAT IS A WAY TO
+ * LOSE A WHOLE SWEEP IN SILENCE. Measured here on 2026-08-05: Turbopack began a
+ * `filesystem cache database compaction` that ran for 7.0 minutes, the dev
+ * server stopped answering, and this `fetch` sat on the open connection with no
+ * deadline and nothing printed. The run was killed at 15.5 minutes having
+ * produced zero output and zero CPU — indistinguishable, from outside, from a
+ * slow compile. A sweep that can hang forever without saying so is the same
+ * class of defect as a number that includes its own instrument: the failure is
+ * invisible from inside the thing it breaks.
+ *
+ * So: a deadline, generous enough for a genuine cold compile on a mechanical
+ * disk, and a line printed BEFORE the wait as well as after it.
+ *
+ * AND THE LADDER THIS SITS IN IS LONG, WHICH IS WORTH SAYING OUT LOUD RATHER
+ * THAN DISCOVERING. `gotoAuthenticated` retries three times and re-warms
+ * between attempts, so a single iteration against a sick dev server can spend
+ * 3x180 s of navigation plus 2x420 s of warming — about 20 minutes — before it
+ * gives up. Observed on 2026-08-05: one landscape iteration sat there for 18
+ * minutes. That is FINITE and, thanks to the heartbeat below, VISIBLE, which
+ * are the two properties it did not have before. It is not fast, and a sweep
+ * whose box is in that state should be re-run rather than believed.
+ */
+const WARM_TIMEOUT_MS = Number(process.env.KNIJKA_WARM_TIMEOUT_MS || 420_000);
 async function warm(target, cookie = "") {
   const t0 = Date.now();
+  console.log(`[stability] warming ${target} (up to ${Math.round(WARM_TIMEOUT_MS / 1000)}s)…`);
   try {
-    const res = await fetch(target, { headers: cookie ? { cookie } : {}, redirect: "manual" });
+    const res = await fetch(target, {
+      headers: cookie ? { cookie } : {},
+      redirect: "manual",
+      signal: AbortSignal.timeout(WARM_TIMEOUT_MS),
+    });
     await res.arrayBuffer();
     console.log(`[stability] warmed ${target} -> ${res.status} in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (e) {
-    console.log(`[stability] warm ${target} failed: ${e.message}`);
+    console.log(
+      `[stability] warm ${target} failed after ${((Date.now() - t0) / 1000).toFixed(1)}s: ${e.message}` +
+        (e?.name === "TimeoutError"
+          ? " — the dev server did not answer. It is probably compacting its Turbopack cache; that has" +
+            " been measured at 7 minutes on this box. The sweep continues; the navigation will retry."
+          : ""),
+    );
   }
 }
+
+/**
+ * SAY SOMETHING WHILE YOU WAIT. A row can legitimately take minutes, and the
+ * only thing worse than a slow probe is a slow probe that looks like a hung one
+ * — every stall in this harness's history was first diagnosed by killing a run
+ * that had printed nothing for a quarter of an hour.
+ */
+function heartbeat(label, everyMs = 30_000) {
+  const t0 = Date.now();
+  const timer = setInterval(() => {
+    console.log(`[stability] …still in ${label} after ${Math.round((Date.now() - t0) / 1000)}s`);
+  }, everyMs);
+  if (typeof timer.unref === "function") timer.unref();
+  return () => clearInterval(timer);
+}
+
+// -----------------------------------------------------------------------------
+// THE RUN, DECLARED BEFORE IT STARTS AND AGAIN WHEN IT ENDS.
+//
+// Every parameter that can change what a number means goes here, printed, in
+// one block. `motion` is on this list because it was NOT on any list: it was
+// hard-coded to "reduce" in lib/devices.mjs on every profile, and a reader of
+// the resulting table had no way to know that the app's animations had been
+// switched off before it was measured.
+// -----------------------------------------------------------------------------
+const runBanner = () =>
+  [
+    `RUN — ${engine.name} @ ${url}`,
+    `  motion=${MOTION.id}      ${MOTION.says}`,
+    `  repeat=${REPEAT}  devices=${devices.map((d) => d.id).join(",")}  routes=${surfaces.map((s) => s.id).join(",")}`,
+    `  settle budget ${SETTLE_BUDGET_MS} ms, measured as atRestMs IN-PAGE — the probe's own bridge`,
+    `  crossings are outside the metric, and their share of each sample is printed beside it.`,
+    `  patience: navigation ${Math.round(NAV_BUDGET_MS / 1000)}s TOTAL across every retry, world ` +
+      `${Math.round(WORLD_TIMEOUT_MS / 1000)}s, warm ${Math.round(WARM_TIMEOUT_MS / 1000)}s.`,
+    `  A run that exceeds its budget is LOST and says so; a slow one reports itself every 30s.`,
+  ].join("\n");
+console.log(`\n${runBanner()}\n`);
 
 await warm(new URL("/login", url).toString());
 
@@ -806,7 +916,7 @@ let storageState;
 try {
   for (const device of devices) {
     const context = await browser.newContext({
-      ...contextOptions(device),
+      ...contextOptions(device, { motion: MOTION.id }),
       ...(storageState ? { storageState } : {}),
     });
     const page = await context.newPage();
@@ -823,14 +933,79 @@ try {
       }
 
       for (const surface of surfaces) {
-        const row = { route: surface.id, device: device.id, ok: false };
+       const iterations = [];
+       for (let iteration = 1; iteration <= REPEAT; iteration += 1) {
+        const row = { route: surface.id, device: device.id, ok: false, iteration };
+        // Hoisted out of the try so the FAILURE path can name its frame too.
+        const suffix = REPEAT > 1 ? `__i${String(iteration).padStart(2, "0")}` : "";
+        const stopBeat = heartbeat(`${surface.id} · ${device.id} · run #${iteration}`);
         try {
           await gotoAuthenticated(page, url, surface);
           if (surface.waitFor) {
             await page.waitForSelector(surface.waitFor, { timeout: 180_000, state: "attached" });
           }
           if (injectedCss) await page.addStyleTag({ content: injectedCss });
+          // Dismiss whatever is already up, BEFORE the world wait. The driving
+          // shell opens with a full-screen `role="dialog"`, and this probe has
+          // no evidence that such a dialog leaves the canvas visible — waiting
+          // for a rendered street from behind an opaque modal would refuse
+          // every row forever, which is not honesty, it is just a probe that
+          // is switched off. So: clear it first, wait second, and clear again
+          // afterwards (below) for anything that mounted during the wait.
           if (surface.prepare) await surface.prepare(page);
+
+          // ---- THE WORLD HAS TO BE UP BEFORE ANYTHING IS RECORDED ---------
+          // `waitFor: "canvas"` is satisfied by an attached, empty, black
+          // rectangle, and `settleMs` is a guess. Together they are why every
+          // number this probe ever produced for the driving shell described a
+          // LOADING SCREEN: black canvas, „Зареждане на улицата със зебра…",
+          // a live „Compiling …" badge — and geometry that settles beautifully,
+          // because nothing was moving, because nothing was there.
+          //
+          // So the canvas is asked, in pixels (lib/ready.mjs). The wait is
+          // reported separately and is NEVER part of a settle number: settle
+          // measures what happens AFTER a state change on a live screen.
+          if (surface.requiresWorld) {
+            const world = await waitForWorld(page, {
+              timeoutMs: WORLD_TIMEOUT_MS,
+              onStep: (s) =>
+                process.stdout.write(
+                  `\r      [world] ${String(s.at).padStart(6)}ms ` +
+                    `${s.ok ? "RENDERED" : `waiting — ${s.reason}`}`.padEnd(96),
+                ),
+            });
+            process.stdout.write("\n");
+            row.world = {
+              ready: world.ready,
+              ms: world.ms,
+              reads: world.reads,
+              vitals: world.vitals,
+              timeline: world.timeline,
+            };
+            if (!world.ready) {
+              // REFUSING IS THE POINT. A row recorded here would be a row about
+              // a shell, and a shell's geometry is clean, symmetric and fast —
+              // it passes every budget this file owns while telling the founder
+              // nothing about the product.
+              throw new Error(
+                `the 3D world never rendered within ${Math.round(world.ms / 1000)}s ` +
+                  `(${world.reason}) — refusing to record a sample of the loading screen`,
+              );
+            }
+          }
+
+          // ---- AND AGAIN, FOR WHAT MOUNTED DURING THE WAIT ----------------
+          // `prepare` running ONLY before the wait was half a check: it cannot
+          // dismiss a dialog React has not mounted yet, so on a slow cold load
+          // it found nothing, returned happily, and the intro popup then
+          // appeared over the world and was measured as part of the road.
+          // Running it a second time closes that window. It is idempotent —
+          // it clicks until nothing is left to click — and its refusal ("a
+          // modal is still open, this is the intro state, not the road") now
+          // fires against a shell that has actually finished starting, which
+          // is the only time that refusal means anything.
+          if (surface.prepare) await surface.prepare(page);
+
           await page.waitForTimeout(surface.settleMs ?? 1200);
           row.settle = { base: await settle(page) };
 
@@ -852,6 +1027,29 @@ try {
                 `database at its connection cap; re-run this route.`,
             );
           }
+
+          // ---- WHICH STEP BLANKS THE CANVAS ------------------------------
+          // A row that ends on a black canvas is refused (below), but "it went
+          // out somewhere in the middle" is not an actionable finding. This
+          // asks the canvas after EVERY phase, so the refusal comes with the
+          // gesture that caused it. Deliberately outside every settle window —
+          // it is a screenshot, it costs a few hundred ms, and none of it may
+          // land in a number about the app.
+          row.worldPhases = [];
+          const worldCheck = async (label) => {
+            if (!surface.requiresWorld) return;
+            const v = await worldVitals(page);
+            const verdict = v.vitals ? isWorldFrame(v.vitals) : { ok: false, reason: v.reason };
+            row.worldPhases.push({
+              phase: label,
+              ok: verdict.ok,
+              reason: verdict.reason,
+              distinct: v.vitals?.distinct ?? null,
+              darkShare: v.vitals?.darkShare ?? null,
+              busyShare: v.vitals?.busyShare ?? null,
+            });
+          };
+          await worldCheck("after-base-settle");
 
           const base = await page.evaluate(stabilityBody, probeArgs(device, "base"));
           Object.assign(row, {
@@ -897,6 +1095,7 @@ try {
           }
           if (opened) {
             row.settle.overlayOpen = await settle(page);
+            await worldCheck("after-overlay-open");
             const open = await page.evaluate(stabilityBody, probeArgs(device, "overlay-open"));
             row.overlayEdge = open.edge;
             row.overlayEdgeBlocking = open.edgeBlocking;
@@ -909,8 +1108,79 @@ try {
             row.overlayUnreachable = open.unreachable;
             row.shiftOnOpen = diff(base.snapshot, open.snapshot);
 
-            await page.keyboard.press("Escape").catch(() => {});
+            // ---- THE CLOSE -------------------------------------------------
+            // ESCAPE IS NOT A DISMISS KEY ON THE DRIVING SHELL, and this phase
+            // is the one the whole settle budget is judged on.
+            //
+            // This used to be `page.keyboard.press("Escape")`. On
+            // simulator-drive that keystroke does not close the lesson menu:
+            // modules/sim/engine/input.ts:272 binds Escape to
+            // `onTogglePause()`, documented at line 14 as "Escape — pause
+            // menu". So the phase named `overlayClose` left the menu open and
+            // MOUNTED THE „Пауза" MODAL ON TOP OF IT — it was measuring a
+            // second overlay OPENING, and the number it produced (the worst
+            // phase, the one that decided a 1,200 ms verdict by 10 ms) was
+            // about a dialog appearing, not about a layout coming to rest
+            // after a dismissal. Three consecutive captures show it: the menu
+            // still open, „Пауза" over it, in the frame taken at the END of
+            // the row.
+            //
+            // So: close it the way a student does — toggle the control that
+            // opened it — and then PROVE the overlay count actually went down.
+            // A close phase that did not close anything is reported as such
+            // instead of being averaged into the budget.
+            const overlayCount = () =>
+              page
+                .evaluate(() => {
+                  let n = 0;
+                  for (const el of document.querySelectorAll(
+                    '[role="dialog"],[data-sim-overlay],[aria-modal="true"]',
+                  )) {
+                    const cs = getComputedStyle(el);
+                    if (cs.display === "none" || cs.visibility === "hidden") continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width > 0 && r.height > 0) n += 1;
+                  }
+                  return n;
+                })
+                .catch(() => -1);
+
+            const openCount = await overlayCount();
+            await trigger.click({ timeout: 20_000 }).catch(() => {});
             row.settle.overlayClose = await settle(page);
+            await worldCheck("after-overlay-close");
+            let closedCount = await overlayCount();
+
+            // The toggle is the honest first choice, but not every surface has
+            // one that closes. Fall back to the overlay's own dismiss control —
+            // and to NOTHING after that. There is deliberately no Escape
+            // fallback: on this route Escape OPENS the pause menu, so a
+            // "fallback" would re-create the exact defect this block exists to
+            // remove, and would do it only on the runs where the honest close
+            // had already failed — i.e. it would hide the finding. Which
+            // gesture was needed is recorded, because "the menu needs two
+            // different gestures to shut" is itself a finding about the screen.
+            // PAGE-WIDE, not scoped to the dialog: on the driving shell the
+            // control that opens the lesson menu RELABELS itself to „Затвори"
+            // while the menu is up, so it is neither the original trigger
+            // (its aria-label changed) nor a descendant of the panel.
+            if (closedCount >= openCount && closedCount !== -1) {
+              const dismiss = page
+                .locator('button[aria-label*="атвор" i], button:has-text("Затвори")')
+                .first();
+              if (await dismiss.isVisible().catch(() => false)) {
+                await dismiss.click({ timeout: 10_000 }).catch(() => {});
+                row.overlayClosedBy = "dismiss-button";
+                closedCount = await overlayCount();
+              }
+            }
+            if (closedCount >= openCount && closedCount !== -1) {
+              row.overlayCloseFailed = true;
+              row.overlayCloseCounts = { open: openCount, afterClose: closedCount };
+            } else {
+              row.overlayClosedBy = row.overlayClosedBy ?? "trigger-toggle";
+            }
+
             const closed = await page.evaluate(stabilityBody, probeArgs(device, "overlay-closed"));
             row.shiftOnClose = diff(base.snapshot, closed.snapshot);
             row.overlayTested = true;
@@ -924,6 +1194,7 @@ try {
           const vp = page.viewportSize();
           await page.setViewportSize({ width: vp.width, height: Math.max(240, vp.height - TOOLBAR_PX) });
           row.settle.toolbarShown = await settle(page);
+          await worldCheck("after-viewport-shrink");
           const shrunk = await page.evaluate(stabilityBody, probeArgs(device, "toolbar-shown"));
           // WHAT COUNTS AS "CLIPPED BY THE TOOLBAR". Content that runs past the
           // fold on a scrolling page is not clipped, it is below the fold — the
@@ -942,19 +1213,64 @@ try {
           };
           await page.setViewportSize(vp);
           row.settle.toolbarHidden = await settle(page);
+          await worldCheck("after-viewport-restore");
           const restored = await page.evaluate(stabilityBody, probeArgs(device, "toolbar-hidden"));
           row.shiftOnToolbar = diff(base.snapshot, restored.snapshot);
 
-          await page.screenshot({ path: join(OUT_DIR, `${surface.id}__${device.id}.png`) });
+          // ---- AND WAS THE WORLD STILL THERE AT THE END? -------------------
+          // THE GATE AT THE TOP OF THE ROW IS HALF A GATE. Everything that
+          // decides this row happens AFTER it: two overlay toggles and two
+          // viewport resizes, each of which tears down and rebuilds the WebGL
+          // drawing buffer. A canvas that rendered a street at second 40 and
+          // has been black ever since would still be reported as a measurement
+          // of the road, and the capture written at the bottom of this block —
+          // the one artefact a human ever opens — would show the black.
+          //
+          // That is exactly how row C8's frames came to exist. So the canvas is
+          // asked a SECOND time, in the same pixels, at the moment the capture
+          // is taken; the row is refused if the answer changed. This is the
+          // „open a capture and see a street" check, mechanised, so that it
+          // stops depending on somebody remembering to look.
+          if (surface.requiresWorld) {
+            const end = await worldVitals(page);
+            const verdict = end.vitals ? isWorldFrame(end.vitals) : { ok: false, reason: end.reason };
+            row.worldAtEnd = { ok: verdict.ok, reason: verdict.reason, vitals: end.vitals };
+            await page
+              .screenshot({
+                path: join(
+                  OUT_DIR,
+                  `${verdict.ok ? "" : "ENDED-BLANK__"}${surface.id}__${device.id}${suffix}.png`,
+                ),
+              })
+              .catch(() => {});
+            if (!verdict.ok) {
+              throw new Error(
+                `the world was up when this row started and is NOT up in the frame the row ends on ` +
+                  `(${verdict.reason}) — every geometry number above describes a screen the student ` +
+                  `never sees. Capture: ENDED-BLANK__${surface.id}__${device.id}${suffix}.png`,
+              );
+            }
+          } else {
+            await page.screenshot({ path: join(OUT_DIR, `${surface.id}__${device.id}${suffix}.png`) });
+          }
           row.ok = true;
         } catch (error) {
           row.error = String(error?.message || error).split("\n")[0];
-          await page.screenshot({ path: join(OUT_DIR, `FAILED__${surface.id}__${device.id}.png`) }).catch(() => {});
+          // THE SUFFIX MATTERS. Without it every failed iteration wrote to the
+          // same path, so a 4-run sweep that lost run #04 kept ONE image — and
+          // if two runs failed, only the last one's evidence survived. The run
+          // that has to be explained is precisely the one that was overwritten.
+          await page
+            .screenshot({ path: join(OUT_DIR, `FAILED__${surface.id}__${device.id}${suffix}.png`) })
+            .catch(() => {});
+        } finally {
+          stopBeat();
         }
-        rows.push(row);
+        iterations.push(row);
+        const tag = REPEAT > 1 ? `#${String(iteration).padStart(2, "0")} ` : "";
         console.log(
           row.ok
-            ? `  ${row.route.padEnd(18)} ${row.device.padEnd(20)} ` +
+            ? `  ${tag}${row.route.padEnd(18)} ${row.device.padEnd(20)} ` +
               `edge=${row.edgeBlocking.length}/${row.edge.length} ` +
               `+overlay=${row.overlayEdgeBlocking ? row.overlayEdgeBlocking.length : "-"} ` +
               `margins=${row.margins.minLeftPx}/${row.margins.minRightPx} ` +
@@ -962,9 +1278,49 @@ try {
               `overlap=${row.overlaps.length} occl=${row.occluded.length} ` +
               `shift(open)=${row.shiftOnOpen ? row.shiftOnOpen.worstPx : "-"} ` +
               `shift(close)=${row.shiftOnClose ? row.shiftOnClose.worstPx : "-"} ` +
-              `shift(toolbar)=${row.shiftOnToolbar.worstPx} clip=${row.toolbar.clippedPinned}/${row.toolbar.clippedFlow}`
-            : `  ${row.route.padEnd(18)} ${row.device.padEnd(20)} ERROR ${row.error}`,
+              `shift(toolbar)=${row.shiftOnToolbar.worstPx} clip=${row.toolbar.clippedPinned}/${row.toolbar.clippedFlow}` +
+              (REPEAT > 1
+                ? `  settle(app)=${Object.values(row.settle).map((s) => appMs(s) ?? "NONE").join("/")}`
+                : "")
+            : `  ${tag}${row.route.padEnd(18)} ${row.device.padEnd(20)} ERROR ${row.error}`,
         );
+       }
+       // ONE ROW PER SURFACE STILL, so every existing reader of this report
+       // keeps working. The reported row is the LAST successful iteration — but
+       // the settle verdict below is taken over ALL of them, because a budget
+       // that only has to be met on the run you happened to keep is not a
+       // budget. `settleRuns` carries every sample so the spread is auditable.
+       const ok = iterations.filter((r) => r.ok);
+       const chosen = ok.length > 0 ? ok[ok.length - 1] : iterations[0];
+       chosen.iterations = iterations.length;
+       chosen.iterationsOk = ok.length;
+       // ONLY the runs that were accepted may be SCORED. That is the whole
+       // point of the refusal, and widening it here would undo it.
+       chosen.settleRuns = ok.map((r) => r.settle);
+       // …but a refused run still took measurements, and throwing them away
+       // makes a refusal unreadable ("something went wrong somewhere"). They are
+       // kept under a name nothing scores, paired with what the canvas was doing
+       // at each checkpoint, and printed in a section that says REFUSED on every
+       // line. Diagnosis, never data.
+       chosen.refused = iterations
+         .filter((r) => !r.ok)
+         .map((r) => ({
+           iteration: r.iteration,
+           error: r.error,
+           settle: r.settle ?? {},
+           worldPhases: r.worldPhases ?? [],
+         }));
+       // EVERY iteration's world wait, failed ones included — that is where the
+       // evidence lives when a run is lost. `chosen.world` alone would describe
+       // only the run that happened to survive.
+       chosen.worldRuns = iterations
+         .filter((r) => r.world)
+         .map((r) => ({ iteration: r.iteration, ready: r.world.ready, ms: r.world.ms, reads: r.world.reads }));
+       // ALWAYS, not `if (iterations.length > 1)`. A single run that was lost is
+       // 100% of the sample gone, and the old guard meant the ONE case where
+       // the loss is total was the one case that recorded no reason for it.
+       chosen.iterationErrors = iterations.filter((r) => !r.ok).map((r) => `#${r.iteration} ${r.error}`);
+       rows.push(chosen);
       }
     } finally {
       await context.close();
@@ -1010,6 +1366,19 @@ const report = {
   baseUrl: url,
   at: new Date().toISOString(),
   injectedCss: args.injectCss ?? null,
+  // THE RUN'S OWN PARAMETERS, IN THE ARTEFACT. A JSON that does not say whether
+  // animations were playing cannot be re-read six weeks later, and this one
+  // could not: `reducedMotion` was a constant in another file.
+  run: {
+    motion: MOTION.id,
+    motionMeans: MOTION.says,
+    colorScheme: "dark",
+    repeat: REPEAT,
+    settleBudgetMs: SETTLE_BUDGET_MS,
+    settleMetric: "atRestMs — measured in-page; the probe's bridge crossings are outside it",
+    instrumentShareLimit: INSTRUMENT_SHARE_LIMIT,
+    idlePhase: IDLE_PHASE,
+  },
   rows,
   orientation,
 };
@@ -1019,19 +1388,49 @@ const reportName = args.injectCss
 writeFileSync(join(OUT_DIR, reportName), JSON.stringify(report, null, 2));
 
 // ----------------------------------------------------------------- the table
-console.log(`\nSTABILITY — ${engine.name} @ ${url}\n`);
-const H = ["route", "device", "edge!", "+ovl!", "margins L/R", "unreach", "ovlp", "occl", "open", "close", "bar", "clip", "settle"];
+console.log(`\nSTABILITY — ${runBanner().split("\n").slice(1).join("\n")}\n`);
+const H = ["route", "device", "edge!", "+ovl!", "margins L/R", "unreach", "ovlp", "occl", "open", "close", "bar", "clip", "app ms", "instr%"];
 console.log(
   `  ${H[0].padEnd(18)}${H[1].padEnd(20)}${H[2].padEnd(7)}${H[3].padEnd(7)}${H[4].padEnd(14)}` +
-  `${H[5].padEnd(9)}${H[6].padEnd(6)}${H[7].padEnd(6)}${H[8].padEnd(7)}${H[9].padEnd(7)}${H[10].padEnd(6)}${H[11].padEnd(6)}${H[12]}`,
+  `${H[5].padEnd(9)}${H[6].padEnd(6)}${H[7].padEnd(6)}${H[8].padEnd(7)}${H[9].padEnd(7)}${H[10].padEnd(6)}${H[11].padEnd(6)}` +
+  `${H[12].padEnd(9)}${H[13]}`,
 );
 let failed = false;
 for (const r of rows) {
+  // A ROW THAT LOST RUNS IS NOT A CLEAN ROW, AND THAT INCLUDES A ROW THAT LOST
+  // ALL OF THEM. The --repeat 4 sweep that produced the last C8 number dropped
+  // run #04 in BOTH passes and still printed a table with no mark on it: 25% of
+  // the sample gone, and the one surviving artefact was a quieter number.
+  // Losing a sample is a finding about the measurement, so it fails the row the
+  // same way an overlap does — and it is printed BEFORE the `!r.ok` bail-out,
+  // which used to `continue` past it whenever every run of a row was lost.
+  if (r.iterations && r.iterationsOk < r.iterations) {
+    failed = true;
+    console.log(
+      `  ${r.route.padEnd(18)}${r.device.padEnd(20)}` +
+        `LOST ${r.iterations - r.iterationsOk}/${r.iterations} RUNS — ${(r.iterationErrors ?? []).join(" | ")}`,
+    );
+  }
   if (!r.ok) { failed = true; console.log(`  ${r.route.padEnd(18)}${r.device.padEnd(20)}ERROR ${r.error}`); continue; }
   const overlayEdge = r.overlayEdgeBlocking ? r.overlayEdgeBlocking.length : 0;
   const unreach = r.unreachable.length + (r.overlayUnreachable?.length ?? 0);
-  const settles = Object.values(r.settle ?? {});
-  const worstSettle = settles.reduce((m, s) => Math.max(m, s.ms), 0);
+  // ACROSS EVERY ITERATION, not just the one whose geometry is reported. With
+  // --repeat 1 these are identical; with --repeat N a budget that is met on
+  // four runs out of five has not been met.
+  const settles = (r.settleRuns?.length ? r.settleRuns : [r.settle ?? {}]).flatMap((s) =>
+    Object.values(s),
+  );
+  // THE METRIC IS THE APP NUMBER. `s.ms` — total wall clock, the thing the
+  // budget used to be stated against — is still recorded, still printed in the
+  // detail, and no longer decides anything: it contained the probe's own bridge
+  // crossings, up to 99.2% of a sample. `appMs` is `atRestMs`, timestamped
+  // inside the page, which is when the layout was demonstrably no longer
+  // moving. A phase that produced no app number at all is NOT a zero.
+  const apps = settles.map(appMs);
+  const noSample = apps.some((v) => v === null);
+  const worstApp = apps.reduce((m, v) => (v === null ? m : Math.max(m, v)), 0);
+  const worstShare = settles.reduce((m, s) => Math.max(m, instrumentShare(s)), 0);
+  const instrumentBound = worstShare > INSTRUMENT_SHARE_LIMIT;
   const neverSettled = settles.some((s) => !s.settled);
   const bad =
     r.edgeBlocking.length > 0 || overlayEdge > 0 ||
@@ -1039,9 +1438,11 @@ for (const r of rows) {
     (r.shiftOnOpen?.worstPx ?? 0) > 0 || (r.shiftOnClose?.worstPx ?? 0) > 0 ||
     r.shiftOnToolbar.worstPx > 0 || r.toolbar.clippedPinned > 0 ||
     (r.margins.deltaPx ?? 0) > 2 ||
-    neverSettled || worstSettle > SETTLE_BUDGET_MS;
+    neverSettled || noSample || worstApp > SETTLE_BUDGET_MS;
   if (bad) failed = true;
-  r.worstSettleMs = worstSettle;
+  r.worstAppSettleMs = noSample ? null : worstApp;
+  r.worstSettleMs = settles.reduce((m, s) => Math.max(m, s.ms ?? 0), 0);
+  r.instrumentShare = Math.round(worstShare * 1000) / 1000;
   r.neverSettled = neverSettled;
   console.log(
     `  ${r.route.padEnd(18)}${r.device.padEnd(20)}` +
@@ -1053,7 +1454,9 @@ for (const r of rows) {
     `${String(r.shiftOnOpen ? r.shiftOnOpen.worstPx : "-").padEnd(7)}` +
     `${String(r.shiftOnClose ? r.shiftOnClose.worstPx : "-").padEnd(7)}` +
     `${String(r.shiftOnToolbar.worstPx).padEnd(6)}${String(r.toolbar.clippedPinned).padEnd(6)}` +
-    `${worstSettle}${neverSettled ? "!" : ""}` +
+    `${`${noSample ? "NO SAMPLE" : worstApp}${neverSettled ? "!" : ""}`.padEnd(9)}` +
+    `${(worstShare * 100).toFixed(0)}%` +
+    (instrumentBound ? "  INSTRUMENT-BOUND" : "") +
     (bad ? "   <--" : ""),
   );
 }
@@ -1061,17 +1464,307 @@ console.log("\n  edge!   = BLOCKING safe-area findings (nothing in the CSS pays 
 console.log("  +ovl!   = the same, measured with the popup open. Advisory findings are below.");
 console.log("  unreach = controls outside the viewport with NOTHING that scrolls (resting / popup open).");
 console.log(
-  `  settle  = worst ms for the layout to STOP MOVING after a state change ` +
-    `(budget ${SETTLE_BUDGET_MS}ms; "!" = never settled). Every shift above is measured AFTER this.`,
+  `  app ms  = worst APP settle across every phase and every run: in-page ms from a state change\n` +
+    `            to the layout demonstrably no longer moving (budget ${SETTLE_BUDGET_MS} ms; "!" = a phase\n` +
+    `            never came to rest; "NO SAMPLE" = a phase produced no number and this row has no\n` +
+    `            verdict in it). This is NOT the old \`settle\` column: that was wall clock and it\n` +
+    `            included the probe's own page.evaluate round trips.\n` +
+    `  instr%  = the probe's share of the sample it took — bridge crossings plus the cost of its own\n` +
+    `            DOM walk inside the page. It is NOT inside "app ms" any more, but past\n` +
+    `            ${(INSTRUMENT_SHARE_LIMIT * 100).toFixed(0)}% the row is marked INSTRUMENT-BOUND: the box, not the product, set the pace.`,
 );
 
-console.log("\nSETTLE DETAIL (ms to come to rest, per phase)");
+// ------------------------------------------------------------ WORLD READINESS
+// THE EVIDENCE THAT THIS ROW IS ABOUT THE PRODUCT. Without these numbers the
+// table below is indistinguishable from the one this probe printed while it was
+// measuring a black canvas — and that table looked excellent.
+const worldRows = rows.filter((r) => r.world);
+if (worldRows.length > 0) {
+  console.log("\nWORLD READINESS — the canvas was asked, in pixels, before anything was recorded");
+  console.log(
+    `  ${"route".padEnd(18)}${"device".padEnd(20)}${"up?".padEnd(6)}${"wait".padEnd(9)}` +
+      `${"reads".padEnd(7)}${"colours".padEnd(9)}${"busy".padEnd(8)}${"dark".padEnd(8)}${"std".padEnd(7)}${"still up at end?"}`,
+  );
+  for (const r of worldRows) {
+    const v = r.world.vitals ?? {};
+    const end = r.worldAtEnd;
+    console.log(
+      `  ${r.route.padEnd(18)}${r.device.padEnd(20)}` +
+        `${(r.world.ready ? "yes" : "NO").padEnd(6)}${`${r.world.ms}ms`.padEnd(9)}` +
+        `${String(r.world.reads).padEnd(7)}${String(v.distinct ?? "-").padEnd(9)}` +
+        `${String(v.busyShare ?? "-").padEnd(8)}${String(v.darkShare ?? "-").padEnd(8)}${String(v.stdLuma ?? "-").padEnd(7)}` +
+        `${end ? (end.ok ? `yes (${end.vitals?.distinct ?? "-"} colours)` : `NO — ${end.reason}`) : "not checked"}`,
+    );
+    // EVERY iteration, failed ones included. The row above describes the run
+    // that was kept; a run that never rendered produced no sample at all, and
+    // that is the single most important thing this section can say.
+    for (const w of r.worldRuns ?? []) {
+      if (!w.ready) {
+        console.log(`      #${String(w.iteration).padStart(2, "0")} NEVER RENDERED after ${w.ms} ms / ${w.reads} reads`);
+      }
+    }
+    // WHICH GESTURE PUT IT OUT. Printed whenever the canvas was not a rendered
+    // scene at every checkpoint, so the finding names the step instead of
+    // saying "somewhere between the gate and the capture".
+    const phases = r.worldPhases ?? [];
+    if (phases.some((p) => !p.ok)) {
+      console.log(`      THE CANVAS WENT OUT DURING THIS ROW — checkpoint by checkpoint:`);
+      for (const p of phases) {
+        console.log(
+          `        ${p.phase.padEnd(24)}${p.ok ? "world" : "BLANK"}  ` +
+            `${String(p.distinct ?? "-").padStart(4)} colours  dark ${p.darkShare ?? "-"}` +
+            (p.ok ? "" : `   <-- ${p.reason}`),
+        );
+      }
+    }
+    const rendered = (r.worldRuns ?? []).filter((w) => w.ready).map((w) => w.ms);
+    if (rendered.length > 1) {
+      console.log(
+        `      ${rendered.length} runs rendered: ${Math.min(...rendered)}..${Math.max(...rendered)} ms ` +
+          `(median ${median(rendered)} ms) of waiting before any measurement began`,
+      );
+    }
+  }
+  console.log(
+    "\n  wait    = time from the page load to two consecutive frames that are a rendered scene.\n" +
+      "            Popups are dismissed both BEFORE this (so a modal cannot hide the canvas) and\n" +
+      "            AFTER it (so one that mounts during the wait is not measured as road). NOT part\n" +
+      "            of any settle number below, and NOT a performance figure — it is a dev server\n" +
+      "            compiling on a mechanical disk.\n" +
+      "  colours = distinct colours in the centre band of the canvas (a cleared buffer has ~35, the\n" +
+      "            same buffer with the lesson menu over it ~110, a rendered street ~450).\n" +
+      "  busy    = fraction of the band that varies between neighbouring pixels — the statistic a\n" +
+      "            dialog cannot fake. See lib/ready.mjs for the measured table these lines come from.\n" +
+      "  still up at end? = THE SAME QUESTION, ASKED AGAIN IN THE FRAME THE CAPTURE IS TAKEN FROM.\n" +
+      "            Two overlay toggles and two viewport resizes happen between the gate at the top of\n" +
+      "            a row and the screenshot at the bottom, and every one of them rebuilds the WebGL\n" +
+      "            drawing buffer. A row that says yes here is a row whose capture shows a street —\n" +
+      "            which is the check that had to be done by eye, and therefore was not done.",
+  );
+}
+
+console.log("\nSETTLE DETAIL — app ms to come to rest, per phase (wall clock and instrument share beside it)");
 for (const r of rows) {
   if (!r.ok || !r.settle) continue;
-  const parts = Object.entries(r.settle).map(
-    ([phase, s]) => `${phase} ${s.ms}${s.settled ? "" : "!"}`,
-  );
+  const parts = Object.entries(r.settle).map(([phase, s]) => {
+    const app = appMs(s);
+    return (
+      `${phase}${phase === IDLE_PHASE ? "(idle)" : ""} ` +
+      `${app === null ? "NO-SAMPLE" : app}${s.settled ? "" : "!"}` +
+      `[wall ${s.ms}, ${(instrumentShare(s) * 100).toFixed(0)}% probe]`
+    );
+  });
   console.log(`  ${r.route.padEnd(18)}${r.device.padEnd(20)}${parts.join("  ")}`);
+}
+console.log(
+  `\n  "${IDLE_PHASE}(idle)" IS NOT A SETTLING TIME. Nothing changes state before it: the route has\n` +
+    `  loaded, the popups are dismissed, the world (where required) has rendered, and a fixed\n` +
+    `  settleMs sleep of 1.2-6 s has already elapsed. So it measures the FLOOR of this instrument on\n` +
+    `  this box — useful, and the right thing to compare the other phases against, but it can only\n` +
+    `  fail if the app is STILL MOVING seconds after load. It was scored against the settle budget\n` +
+    `  like every other phase, and in the last recorded sweep it was the WORST one at 32,144 ms of\n` +
+    `  which 31,881 ms was the probe: a budget decided by the phase in which the app did nothing.`,
+);
+
+// ---------------------------------------------------------- SETTLE STABILITY
+// THE NUMBER ABOUT THE NUMBER.
+//
+// The two times this budget has been reported met it was by 2 ms and by 10 ms,
+// from single runs. A single run cannot distinguish "the product got faster"
+// from "the box was quieter", and a margin thinner than the run-to-run spread is
+// not a margin at all. So when the probe is asked to repeat, it says how far the
+// number moves while the app does not, and how coarse the instrument's own steps
+// are — an app number can only land on floor + k*step, so a 10 ms margin inside
+// a 100 ms step is a rounding accident.
+//
+// EVERY FIGURE IN THIS BLOCK IS THE APP NUMBER (`atRestMs`, timestamped in-page
+// by lib/settle.mjs). The old wall-clock number is printed beside it under
+// `wall(med)` and scores nothing, because it contained the probe's own bridge
+// crossings — 99.2% of one recorded sample — and therefore moved with the box.
+if (REPEAT > 1) {
+  console.log(
+    `\nSETTLE STABILITY — ${REPEAT} runs of the same measurement, same app, same box.` +
+      `\n  Every number in this block is the APP number (atRestMs, in-page). "wall" is the old` +
+      `\n  metric — total round-trip time — printed beside it so the two can never be confused again.`,
+  );
+  console.log(
+    `  ${"route".padEnd(18)}${"device".padEnd(20)}${"phase".padEnd(15)}` +
+      `${"n".padEnd(4)}${"min".padEnd(7)}${"median".padEnd(8)}${"worst".padEnd(7)}${"spread".padEnd(8)}` +
+      `${"wall(med)".padEnd(11)}${"instr%".padEnd(8)}${"step".padEnd(6)}over`,
+  );
+  for (const r of rows) {
+    if (!r.ok || !r.settleRuns?.length) continue;
+    const phases = [...new Set(r.settleRuns.flatMap((s) => Object.keys(s)))];
+    for (const phase of phases) {
+      const samples = r.settleRuns.map((s) => s[phase]).filter(Boolean);
+      if (samples.length === 0) continue;
+      const app = samples.map(appMs).filter((v) => v !== null);
+      const missing = samples.length - app.length;
+      const lo = app.length ? Math.min(...app) : null;
+      const hi = app.length ? Math.max(...app) : null;
+      const over = app.filter((v) => v > SETTLE_BUDGET_MS).length;
+      const share = median(samples.map((s) => Math.round(instrumentShare(s) * 100)));
+      console.log(
+        `  ${r.route.padEnd(18)}${r.device.padEnd(20)}${`${phase}${phase === IDLE_PHASE ? "(idle)" : ""}`.padEnd(15)}` +
+          `${String(app.length).padEnd(4)}${String(lo ?? "-").padEnd(7)}${String(app.length ? median(app) : "-").padEnd(8)}` +
+          `${String(hi ?? "-").padEnd(7)}${String(hi === null ? "-" : hi - lo).padEnd(8)}` +
+          `${String(median(samples.map((s) => s.ms ?? 0))).padEnd(11)}` +
+          `${`${share}%`.padEnd(8)}` +
+          `${String(Math.max(...samples.map((s) => s.stepMs ?? 0))).padEnd(6)}` +
+          `${over}/${app.length}${over > 0 ? "  <-- OVER BUDGET" : ""}` +
+          (missing > 0 ? `  ${missing} RUN(S) PRODUCED NO SAMPLE` : ""),
+      );
+    }
+  }
+  console.log(
+    `\n  min/median/worst/spread are APP ms across the ${REPEAT} runs. wall(med) = the whole round trip\n` +
+      `  including the probe's own bridge crossings — informational only, nothing scores against it.\n` +
+      `  step = the widest gap between two consecutive in-page reads, i.e. the RESOLUTION: an app\n` +
+      `  number can only land on ~150 + k*step, so a budget margin thinner than one step is a\n` +
+      `  rounding accident and is called one below.`,
+  );
+
+  // AND THE VERDICT ON THE VERDICT, stated in one line so nobody has to do the
+  // arithmetic and nobody can quietly not do it.
+  for (const r of rows) {
+    if (!r.ok || !r.settleRuns?.length) continue;
+    // WORST APP PHASE PER RUN. A run in which any phase produced no sample has
+    // no worst, and is counted as lost rather than as a fast run.
+    const perRun = r.settleRuns.map((s) => {
+      const values = Object.values(s).map(appMs);
+      return values.some((v) => v === null) ? null : Math.max(...values);
+    });
+    const worstPerRun = perRun.filter((v) => v !== null);
+    const noSampleRuns = perRun.length - worstPerRun.length;
+    if (worstPerRun.length === 0) {
+      console.log(
+        `\n  ${r.route} · ${r.device}: NO APP NUMBER AT ALL — every one of the ${perRun.length} runs had a phase\n` +
+          `  that never came to rest. There is no verdict here, and a blank is not a pass.`,
+      );
+      failed = true;
+      continue;
+    }
+    const hi = Math.max(...worstPerRun);
+    const lo = Math.min(...worstPerRun);
+    const mid = median(worstPerRun);
+    const spread = hi - lo;
+    const margin = SETTLE_BUDGET_MS - hi;
+    const step = Math.max(
+      ...r.settleRuns.flatMap((s) => Object.values(s).map((x) => x.stepMs ?? 0)),
+    );
+    const failures = worstPerRun.filter((v) => v > SETTLE_BUDGET_MS).length;
+    const noise = spread > Math.abs(margin) || step > Math.abs(margin);
+
+    // THE INSTRUMENT IS INSIDE THE MEASUREMENT, and on a loaded box it IS the
+    // measurement. `settle.ms` is wall clock around a polling loop whose every
+    // read is a `page.evaluate` round trip, and those round trips are charged
+    // to the app. The worst sample in the last recorded sweep was 32,144 ms of
+    // which 31,881 ms was `evalMs` — the layout had come to rest at 1,477 ms
+    // (`atRestMs`) and the other 30 seconds were the probe waiting for its own
+    // question to be answered. That cuts both ways, which is why it belongs in
+    // the verdict rather than a footnote: on a busy box it fails the app for
+    // the box's sins, and on a quiet one it passes anything, including a black
+    // canvas. When the instrument owns most of the number, the number is about
+    // the box.
+    const evals = r.settleRuns.flatMap((s) => Object.values(s).map((x) => x.evalMs ?? 0));
+    const totals = r.settleRuns.flatMap((s) => Object.values(s).map((x) => x.ms));
+    const evalTotal = evals.reduce((a, b) => a + b, 0);
+    const msTotal = totals.reduce((a, b) => a + b, 0);
+    const evalShare = msTotal > 0 ? evalTotal / msTotal : 0;
+    const wallHi = Math.max(...totals);
+    const instrumentBound = evalShare > INSTRUMENT_SHARE_LIMIT;
+    const asked = r.iterations ?? perRun.length;
+    const lost = asked - worstPerRun.length;
+    console.log(
+      `\n  ${r.route} · ${r.device}: worst APP phase per run — min ${lo} / median ${mid} / worst ${hi} ms ` +
+        `against a ${SETTLE_BUDGET_MS} ms budget.\n` +
+        `  ${worstPerRun.length} of ${asked} runs produced a full sample` +
+        (lost > 0
+          ? ` — ${lost} WERE LOST: ${[...(r.iterationErrors ?? []), ...(noSampleRuns > 0 ? [`${noSampleRuns} run(s) had a phase that never came to rest`] : [])].join(" | ")}`
+          : "") +
+        `.\n  ${failures} of ${worstPerRun.length} runs were over budget. ` +
+        `Spread ${spread} ms; instrument resolution ${step} ms; margin at worst ${margin} ms.\n` +
+        `  Wall clock for the same samples peaked at ${wallHi} ms, of which ${(evalShare * 100).toFixed(0)}% was this probe —\n` +
+        `  NONE of that is inside the app numbers above; it is timed inside the page.\n` +
+        (failures > 0
+          ? `  VERDICT: OVER BUDGET on ${failures} of ${worstPerRun.length} runs — the budget is not met.`
+          : noise
+            ? `  VERDICT: NOT REPRODUCIBLE. The margin is smaller than the run-to-run spread and/or the\n` +
+              `  instrument's own step, so this pass/fail is a property of the box, not of the product.`
+            : `  VERDICT: reproducible — the margin is wider than both the spread and the instrument step.`) +
+        (instrumentBound
+          ? `\n  INSTRUMENT-BOUND SAMPLE: ${(evalShare * 100).toFixed(0)}% of the wall clock around these measurements was the\n` +
+            `  probe (bridge crossings plus its own DOM walk), over the ${(INSTRUMENT_SHARE_LIMIT * 100).toFixed(0)}% line. The APP numbers survive\n` +
+            `  that — they are timestamped in-page — but anything that reads the wall column, and every\n` +
+            `  number this probe published before this change, is about the box.`
+          : "") +
+        (lost > 0
+          ? `\n  AND IT IS NOT A FULL SAMPLE: ${lost} of ${asked} runs never reported. Read every number\n` +
+            `  above as the best ${worstPerRun.length} of ${asked}.`
+          : ""),
+    );
+  }
+}
+
+// ------------------------------------------------------------- REFUSED DETAIL
+// WHAT A REFUSED ROW HAD MEASURED WHEN IT WAS REFUSED, AND WHAT THE CANVAS WAS
+// DOING AT THE TIME. None of this is scored and none of it appears in the table
+// — a refusal that silently deletes its own evidence is only half a refusal,
+// and "the row failed" with no numbers is exactly the report that makes the
+// next person re-run by hand and read a capture with their eyes.
+const refusedRows = rows.filter((r) => (r.refused ?? []).length > 0);
+if (refusedRows.length > 0) {
+  console.log("\nREFUSED — measured, then thrown out. DIAGNOSIS ONLY; nothing here is a verdict.");
+  for (const r of refusedRows) {
+    for (const run of r.refused) {
+      console.log(`  ${r.route} · ${r.device} · run #${String(run.iteration).padStart(2, "0")}`);
+      console.log(`      REFUSED: ${run.error}`);
+      const phases = Object.entries(run.settle);
+      if (phases.length > 0) {
+        console.log(
+          `      phases measured before the refusal: ` +
+            phases
+              .map(([name, s]) => `${name} ${appMs(s) ?? "NO-SAMPLE"}${s.settled ? "" : "!"}`)
+              .join("  "),
+        );
+      }
+      for (const p of run.worldPhases) {
+        console.log(
+          `      canvas ${p.ok ? "world" : "BLANK"} at ${p.phase} — ` +
+            `${p.distinct ?? "-"} colours, dark ${p.darkShare ?? "-"}`,
+        );
+      }
+      console.log(
+        `      A phase measured while the canvas was BLANK is a measurement of a loading screen.\n` +
+          `      Read only the phases above the first BLANK line, and read them as diagnosis.`,
+      );
+    }
+  }
+}
+
+// ------------------------------------------------------------ SAMPLE INTEGRITY
+// LAST, LOUD, AND UNCONDITIONAL. The report is long; the run that produced C8
+// printed its lost iteration into the middle of it and nobody saw. If anything
+// was asked for and not delivered, it is repeated here, at the bottom, where the
+// exit code is.
+const asked = rows.reduce((n, r) => n + (r.iterations ?? 1), 0);
+const produced = rows.reduce((n, r) => n + (r.iterationsOk ?? (r.ok ? 1 : 0)), 0);
+console.log(`\nSAMPLE INTEGRITY — ${produced} of ${asked} requested runs produced a row`);
+if (produced < asked) {
+  failed = true;
+  for (const r of rows) {
+    const want = r.iterations ?? 1;
+    const got = r.iterationsOk ?? (r.ok ? 1 : 0);
+    if (got >= want) continue;
+    console.log(`  LOST ${want - got}/${want}  ${r.route} · ${r.device}`);
+    for (const e of r.iterationErrors ?? []) console.log(`      ${e}`);
+  }
+  console.log(
+    `  A missing run is a finding about the MEASUREMENT and fails this sweep. Do not read the\n` +
+      `  numbers above as "the app": read them as the best ${produced} of ${asked}.`,
+  );
+} else {
+  console.log("  every requested run produced a row.");
 }
 
 console.log("\nUNREACHABLE DETAIL — a control off-screen that no gesture brings back");
@@ -1140,6 +1833,14 @@ for (const o of orientation) {
     `ctrls ${o.interactive.padEnd(10)}edge ${o.edge.padEnd(8)}margins ${o.margins}`,
   );
 }
+
+// THE ARTEFACT HAS TO MATCH THE VERDICT THAT WAS PRINTED. `stability.json` was
+// written before any of the analysis above ran, so the per-row conclusions the
+// table draws — the worst APP settle, the instrument share, whether a phase ever
+// came to rest — existed only in the terminal and were absent from the file
+// anything downstream reads. Written once early (so a crash still leaves the raw
+// rows) and once here, complete.
+writeFileSync(join(OUT_DIR, reportName), JSON.stringify({ ...report, failed }, null, 2));
 
 console.log(`\n  captures + json: ${join(OUT_DIR, reportName)}`);
 process.exit(failed ? 1 : 0);

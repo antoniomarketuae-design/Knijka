@@ -330,8 +330,12 @@ const PARK_CAP = 150;
 //
 // The residual is a tracked, shrinking budget: `__tests__/parked-on-footway`.
 
-/** A district edge that has opted out of the procedural curb row entirely. */
-function parkingOptedOut(edge: DistrictEdge): boolean {
+/** A district edge that has opted out of the procedural curb row entirely.
+ *  Exported because a walk line can only be „inside the parked row" on a street
+ *  that HAS one: `__tests__/ped-through-parked` asks this before it compares a
+ *  pavement offset against `travelHalf + PARK_BAND_CENTER_M`, so the witness and
+ *  the pass that seats the bodies cannot drift apart. */
+export function parkingOptedOut(edge: DistrictEdge): boolean {
   return (edge as { parkingBand?: unknown }).parkingBand === false;
 }
 

@@ -11,10 +11,14 @@ import {
 } from "react";
 import { IconCheck, IconLock, IconShield, IconX } from "@/components/icons";
 import { CheckControl } from "@/components/ui/CheckControl";
+// Pure module (no node:fs, no zod) — safe in a client component, and the whole
+// point: the tab strip and the server page from the same routing table.
+import { QUEUE_META, REVIEW_QUEUES } from "@/modules/content-admin/queues";
 import type {
   FlaggedListResult,
   FlaggedQuestionDto,
   LawRefEvidence,
+  SourceRefEvidence,
   QuestionPatch,
   QuotedClaim,
   ReviewRisk,
@@ -226,22 +230,25 @@ export function ReviewClient({ result }: { result: FlaggedListResult }) {
 
       <Census census={census} signedThisSession={signedThisSession} risk={risk} />
 
-      {/* Queue switch */}
+      {/*
+        Queue switch — rendered FROM the routing table, never hand-written.
+        Two hand-written tabs is what hid twelve first-aid rows: `machine-checked`
+        matched neither, so the rows existed, validated, and were reachable from
+        no screen at all. Mapping REVIEW_QUEUES makes a queue that exists on the
+        server exist here too, and the count comes from `census.queueTotals`, so
+        a tab can no longer disagree with the page it opens.
+      */}
       <nav aria-label="Опашки" className="flex flex-wrap gap-2">
-        <QueueTab
-          href={href("needs-review", 1)}
-          active={queue === "needs-review"}
-          label="За поправка"
-          count={census.needsReview + census.staleSignatures}
-          hintBg="Одиторът или вълната поправки е намерила нещо конкретно."
-        />
-        <QueueTab
-          href={href("unsigned", 1)}
-          active={queue === "unsigned"}
-          label="Неподписани"
-          count={census.unsignedApproved}
-          hintBg="Пише „approved“, но никой човек не го е задавал. Стигат до ученик още днес."
-        />
+        {REVIEW_QUEUES.map((name) => (
+          <QueueTab
+            key={name}
+            href={href(name, 1)}
+            active={queue === name}
+            label={QUEUE_META[name].labelBg}
+            count={census.queueTotals[name]}
+            hintBg={QUEUE_META[name].hintBg}
+          />
+        ))}
       </nav>
 
       {error !== null ? (
@@ -728,6 +735,7 @@ const QuestionCard = function QuestionCard({
 
           <QuoteCheck claims={q.quotedClaims} />
           <LawEvidence evidence={q.lawEvidence} />
+          <SourceEvidence evidence={q.sourceEvidence} />
 
           {/* STICKY, and that is the point. A card runs 2,000–3,500px because
               the statute is on it (ADR-002) — measured 3,480px for the first
@@ -1046,6 +1054,104 @@ function LawEvidence({ evidence }: { evidence: LawRefEvidence[] }) {
   );
 }
 
+/**
+ * The same evidence, for a citation that is NOT a statute (`sourceRefs`).
+ *
+ * Two things are on screen here that the law panel has no need for. The
+ * AUTHORITY badge, because „current-consensus“ and „not-a-grounding-source“ are
+ * not the same claim and a reviewer must not have to remember which is which.
+ * And the CONFLICTS, because a statute does not contradict itself while ERC
+ * 2025, RCUK 2025 and БЧК demonstrably do — a row is not reviewable until the
+ * disagreement is visible next to it.
+ */
+function SourceEvidence({ evidence }: { evidence: SourceRefEvidence[] }) {
+  if (evidence.length === 0) return null;
+  return (
+    <section aria-label="Извънправни източници, дословно" className="mt-3 flex flex-col gap-2">
+      <p className="text-[11px] font-bold uppercase tracking-wide text-muted">
+        Извънправен източник, дословно
+      </p>
+      {evidence.map((src, i) => (
+        <article
+          key={`${src.sourceId}-${i}`}
+          className={`rounded-xl border p-3 ${
+            src.found ? "border-border bg-surface-2/40" : "border-warning/50 bg-warning/10"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+            <span className="text-foreground">{src.ref}</span>
+            {src.authorityBg !== null ? (
+              <span className="rounded-full bg-surface px-2 py-0.5 text-muted">
+                {src.authorityBg}
+              </span>
+            ) : null}
+            {src.claimStatusBg !== null ? (
+              <span
+                className={`rounded-full px-2 py-0.5 ${
+                  src.claimStatusBg.startsWith("grounded")
+                    ? "bg-surface text-muted"
+                    : "bg-warning/20 text-warning"
+                }`}
+              >
+                {src.claimStatusBg}
+              </span>
+            ) : null}
+          </div>
+
+          {src.found ? (
+            <>
+              {src.figureBg !== null && src.figureQuoteBg !== null ? (
+                <p className="mt-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs leading-relaxed text-foreground">
+                  <span className="font-bold">{src.figureBg}</span>
+                  {" — "}
+                  <span className="font-serif">{src.figureQuoteBg}</span>
+                </p>
+              ) : null}
+              {src.quoteBg !== null ? (
+                <p className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-surface px-3 py-2 font-serif text-xs leading-relaxed text-foreground">
+                  {src.quoteBg}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs leading-relaxed text-muted">
+                  Редът сочи източника, но не и конкретно твърдение (няма claimId) — няма какво да
+                  се покаже дословно.
+                </p>
+              )}
+              {src.conflictsBg.length > 0 ? (
+                <ul className="mt-2 flex flex-col gap-1.5 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2">
+                  {src.conflictsBg.map((conflict, k) => (
+                    <li key={k} className="text-[11px] leading-relaxed text-foreground">
+                      {conflict}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              <p className="mt-1.5 text-[11px] text-muted">
+                {src.citationBg}
+                {src.sourceUrl !== null ? (
+                  <>
+                    {" · "}
+                    <a
+                      href={src.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline hover:text-foreground"
+                    >
+                      източник
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-xs leading-relaxed text-foreground">{src.missReasonBg}</p>
+          )}
+        </article>
+      ))}
+    </section>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Inline edit form
 // ---------------------------------------------------------------------------
@@ -1117,8 +1223,13 @@ function EditForm({
   const setLawRef = (index: number, key: "act" | "ref", value: string) =>
     setLawRefs((prev) => prev.map((l, i) => (i === index ? { ...l, [key]: value } : l)));
 
+  // A row grounded on a registered non-statutory source may legitimately end
+  // up with zero lawRefs — the last one is only undeletable when it is the only
+  // citation the row has.
+  const minLawRefs = q.sourceRefs.length > 0 ? 0 : 1;
+
   const removeLawRef = (index: number) =>
-    setLawRefs((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : prev));
+    setLawRefs((prev) => (prev.length > minLawRefs ? prev.filter((_, i) => i !== index) : prev));
 
   const addLawRef = () => setLawRefs((prev) => [...prev, { act: "ЗДвП", ref: "" }]);
 
@@ -1130,7 +1241,13 @@ function EditForm({
     if (type === "single" && correct !== 1) return "Въпрос с един верен трябва да има точно 1 верен отговор.";
     if (type === "multi" && correct < 2) return "Въпрос с няколко верни трябва да има поне 2 верни отговора.";
     if (explanationBg.trim().length === 0) return "Обяснението е задължително.";
-    if (lawRefs.length < 1) return "Нужно е поне едно правно основание.";
+    // A row must cite SOMETHING — but not necessarily a statute. Demanding a
+    // lawRef here is the console's copy of the schema rule that dressed 29
+    // first-aid questions in „ЗДвП чл. 123"; a row grounded on a registered
+    // non-statutory source (read-only, see mergePatch) already clears the bar.
+    if (lawRefs.length < 1 && q.sourceRefs.length < 1) {
+      return "Нужно е поне едно основание — правно или извънправен източник.";
+    }
     if (lawRefs.some((l) => l.act.trim().length === 0 || l.ref.trim().length === 0)) {
       return "Всяко правно основание трябва да има акт и член.";
     }
@@ -1178,6 +1295,7 @@ function EditForm({
       {/* The statute stays on screen while editing — the point of the edit is
           usually to make the text match what the article actually says. */}
       <LawEvidence evidence={q.lawEvidence} />
+      <SourceEvidence evidence={q.sourceEvidence} />
 
       {/* Question text */}
       <label className="flex flex-col gap-1">
@@ -1282,7 +1400,7 @@ function EditForm({
             <button
               type="button"
               onClick={() => removeLawRef(i)}
-              disabled={lawRefs.length <= 1}
+              disabled={lawRefs.length <= minLawRefs}
               aria-label="Премахни основанието"
               className="shrink-0 rounded-lg border border-border p-2 text-muted transition hover:border-danger/50 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
             >

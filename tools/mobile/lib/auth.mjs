@@ -20,6 +20,26 @@
 export const LOGIN_NAV_TIMEOUT_MS = 180_000;
 
 /**
+ * THE TOTAL A SINGLE NAVIGATION MAY SPEND, ACROSS EVERY RETRY.
+ *
+ * WITHOUT THIS THE RETRY LADDER MULTIPLIES OUT TO HOURS, and it did. Counted
+ * from the code rather than guessed: `gotoQuiesced` makes 3 attempts of up to
+ * 180 s and re-warms (up to 420 s) between them — 24.5 minutes — and the
+ * offline-page check below then repeats that whole ladder up to 4 times, each
+ * with another warm in front of it. Worst case is over two hours for ONE
+ * iteration of ONE row. Observed on 2026-08-05: a landscape iteration sat in
+ * this ladder for 31 minutes and was still going when the sweep was killed.
+ *
+ * Every individual timeout in there was defensible; nobody had multiplied them
+ * together. That is the same shape as the other defects in this harness — each
+ * piece correct, the composition never looked at — so the fix is a budget on
+ * the COMPOSITION, stated once, in the currency that matters: how long a row is
+ * allowed to spend before it is declared lost. Losing a run is loud now
+ * (stability-probe's SAMPLE INTEGRITY block); losing an afternoon is not.
+ */
+export const NAV_BUDGET_MS = Number(process.env.KNIJKA_NAV_BUDGET_MS || 600_000);
+
+/**
  * @param {import("playwright").Page} page
  * @param {{email:string,password:string}} credentials
  * @param {string} baseUrl
@@ -121,12 +141,87 @@ export async function signIn(page, credentials, baseUrl) {
     .catch(() => {});
 }
 
-/** Compile a route server-side with the page's own session cookies. */
-async function warmFromNode(page, target) {
+/**
+ * NAVIGATE FROM A STOPPED PAGE, AND RETRY THE TWO FAILURES THAT ARE THE BOX.
+ *
+ * A `--repeat 4` sweep lost run #04 in BOTH of its passes — once to
+ * „interrupted by another navigation", once to „Timeout was reached" — and a
+ * quarter of the sample silently vanishing is fatal to a verdict decided by
+ * 10 ms. Neither error was about the app:
+ *
+ *   INTERRUPTED — the driving shell is a client-routed React app that is still
+ *     doing things when the next iteration starts: a `router.replace` settling
+ *     the deep link, a server action returning, a prefetch. Starting a fresh
+ *     `page.goto` while the previous page's router is mid-push aborts one of
+ *     the two, and Playwright reports whichever it was as a hard failure. The
+ *     fix is to STOP being on that page first: `about:blank` tears the old
+ *     document down, cancels its pending navigations, and costs milliseconds.
+ *   TIMEOUT — the same cold-compile problem the rest of this file is about,
+ *     hit on a route the previous iteration had already warmed, i.e. the box
+ *     under load rather than the route being uncompiled. Re-warm from node
+ *     (no navigation timeout, no service worker) and try again.
+ *
+ * Three attempts, and the failure carries all of them so a genuine breakage
+ * cannot hide behind a retry.
+ */
+async function gotoQuiesced(page, target, attempts = 3, deadline = Infinity) {
+  const failures = [];
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const left = deadline - Date.now();
+    if (left <= 0) {
+      throw new Error(
+        `[mobile-harness] ${target} ran out of its total navigation budget after ${attempt - 1} ` +
+          `attempt(s): ${failures.join(" | ") || "no error yet — the budget simply expired"}`,
+      );
+    }
+    try {
+      await page.goto("about:blank", { waitUntil: "domcontentloaded", timeout: 30_000 });
+    } catch {
+      /* a page too busy to tear down is not itself a failure — the goto below decides */
+    }
+    try {
+      await page.goto(target, {
+        waitUntil: "domcontentloaded",
+        timeout: Math.max(1_000, Math.min(180_000, deadline - Date.now())),
+      });
+      if (attempt > 1) {
+        console.log(`[mobile-harness] ${target} needed ${attempt} navigation attempts: ${failures.join(" | ")}`);
+      }
+      return;
+    } catch (error) {
+      failures.push(`#${attempt} ${String(error?.message || error).split("\n")[0]}`);
+      if (attempt === attempts) {
+        throw new Error(
+          `[mobile-harness] ${target} would not load in ${attempts} attempts: ${failures.join(" | ")}`,
+        );
+      }
+      await warmFromNode(page, target, deadline);
+    }
+  }
+}
+
+/**
+ * Compile a route server-side with the page's own session cookies.
+ *
+ * WITH A DEADLINE. "A plain fetch has no navigation timeout" was the point of
+ * this helper and it was also, unnoticed, a way for the whole sweep to stop
+ * dead: a dev server that stops answering mid-request (Turbopack's filesystem
+ * cache compaction has been measured at 7 minutes on this box) leaves this
+ * `await` with nothing to wake it, and a probe that hangs in silence looks
+ * exactly like a probe doing slow work. Generous — a genuinely cold route on a
+ * mechanical disk is minutes — but finite.
+ */
+export const WARM_TIMEOUT_MS = Number(process.env.KNIJKA_WARM_TIMEOUT_MS || 420_000);
+async function warmFromNode(page, target, deadline = Infinity) {
   try {
     const cookies = await page.context().cookies();
     const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
-    const res = await fetch(target, { headers: { cookie }, redirect: "manual" });
+    const budget = Math.max(1_000, Math.min(WARM_TIMEOUT_MS, deadline - Date.now()));
+    const res = await fetch(target, {
+      headers: { cookie },
+      redirect: "manual",
+      signal: AbortSignal.timeout(budget),
+    });
     await res.arrayBuffer();
   } catch {
     /* the retry will surface the problem with a better message */
@@ -166,9 +261,10 @@ async function fillCredentials(page, credentials, attempts = 10) {
  * loading card filling the screen — that would score 0% road and be a lie in
  * the opposite direction.
  */
-export async function gotoAuthenticated(page, baseUrl, route) {
+export async function gotoAuthenticated(page, baseUrl, route, { budgetMs = NAV_BUDGET_MS } = {}) {
   const target = new URL(route.path, baseUrl).toString();
-  await page.goto(target, { waitUntil: "domcontentloaded", timeout: 180_000 });
+  const deadline = Date.now() + budgetMs;
+  await gotoQuiesced(page, target, 3, deadline);
 
   // THE SERVICE WORKER CAN HAND YOU A DIFFERENT PAGE AND STILL SAY 200.
   // public/sw.js answers a navigation whose fetch THREW with /offline.html.
@@ -193,8 +289,8 @@ export async function gotoAuthenticated(page, baseUrl, route) {
     // worker in front of it, so it waits for the real response however long the
     // compile takes, and the next navigation finds a warm route. Retrying the
     // navigation alone just re-triggers the same abort.
-    await warmFromNode(page, target);
-    await page.goto(target, { waitUntil: "domcontentloaded", timeout: 180_000 });
+    await warmFromNode(page, target, deadline);
+    await gotoQuiesced(page, target, 3, deadline);
   }
 
   const landed = new URL(page.url());

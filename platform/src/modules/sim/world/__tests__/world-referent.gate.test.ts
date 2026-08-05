@@ -347,10 +347,17 @@ describe("scenario-world-referent gate", () => {
     expect(missing).toEqual([]);
     expect(both).toEqual([]);
     expect(checked.size + NO_WORLD_REFERENT.size).toBe(all.length);
-    // Doc 86 §10's arithmetic, pinned.
-    expect(checked.size).toBe(45);
+    // Doc 86 §10's arithmetic, pinned — and the pin MOVES ONLY WITH A REASON
+    // written here, which is the point of pinning it at all.
+    //
+    // 45 → 46 / 58 → 59 (2026-08-05, doc 87 item 7): CLOSING_ON_LEAD_TOO_FAST,
+    // the FO-08 closing-rate code. It is CHECKED (a `stagedActorRule` on
+    // brakingLeadCar | cutInLeadCar — the same referent its two siblings in the
+    // following family carry), not exempted: a lesson with no lead vehicle
+    // cannot arm it and the gate must keep saying so.
+    expect(checked.size).toBe(46);
     expect(NO_WORLD_REFERENT.size).toBe(13);
-    expect(all.length).toBe(58);
+    expect(all.length).toBe(59);
   });
 
   it("never exceeds doc 86 on the four classes §10 counts to ±0 (T1 90 · T2 31 · T3 9 · T4 83)", () => {

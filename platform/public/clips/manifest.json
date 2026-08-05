@@ -252,6 +252,58 @@
       "quality": "high"
     },
     {
+      "id": "sc-jx-giveway-b1__m0",
+      "templateId": "sc-jx-giveway-b1",
+      "mistakeIndex": 0,
+      "tracePath": "content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json",
+      "src": "/clips/sc-jx-giveway-b1__m0.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-08-04T20:52:48.500Z",
+      "titleBg": "Навлизане пред колата по главния",
+      "keyframes": [
+        "/clips/sc-jx-giveway-b1__m0.k0.webp",
+        "/clips/sc-jx-giveway-b1__m0.k1.webp",
+        "/clips/sc-jx-giveway-b1__m0.k2.webp",
+        "/clips/sc-jx-giveway-b1__m0.k3.webp",
+        "/clips/sc-jx-giveway-b1__m0.k4.webp"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил отдясно с предимство",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
+      "id": "sc-jx-giveway-b1__m1",
+      "templateId": "sc-jx-giveway-b1",
+      "mistakeIndex": 1,
+      "tracePath": "content/traces/sc-jx-giveway-b1/mistake-no-scan.trace.json",
+      "src": "/clips/sc-jx-giveway-b1__m1.webm",
+      "durationSec": 12,
+      "recordedAt": "2026-08-04T20:55:28.238Z",
+      "titleBg": "Излизане без пълен оглед в двете посоки",
+      "keyframes": [
+        "/clips/sc-jx-giveway-b1__m1.k0.webp",
+        "/clips/sc-jx-giveway-b1__m1.k1.webp",
+        "/clips/sc-jx-giveway-b1__m1.k2.webp",
+        "/clips/sc-jx-giveway-b1__m1.k3.webp",
+        "/clips/sc-jx-giveway-b1__m1.k4.webp"
+      ],
+      "actors": [
+        {
+          "kind": "vehicle",
+          "label": "Автомобил отдясно с предимство",
+          "present": true
+        }
+      ],
+      "view": "exterior",
+      "quality": "high"
+    },
+    {
       "id": "sc-jx-priority-confidence__m0",
       "templateId": "sc-jx-priority-confidence",
       "mistakeIndex": 0,

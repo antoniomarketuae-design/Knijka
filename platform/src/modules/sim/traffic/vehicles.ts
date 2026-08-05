@@ -41,6 +41,18 @@ export interface VehicleAgent {
   committedSignalNode: string | null;
   /** Unsignalized intersection node currently reserved by this agent. */
   heldNode: string | null;
+  /**
+   * Sim time this agent stopped making progress toward `heldNode` while still
+   * SHORT of it, or null while it is moving (or has no slot). Drives the
+   * forfeit below — see RESERVATION_STALL_GRACE_SEC.
+   */
+  heldStalledSinceSec: number | null;
+  /**
+   * Sim time until which this agent may not TAKE a junction slot while it is
+   * still stalled — set when it forfeits one, so the slot it just gave back
+   * cannot be re-grabbed by the same stalled agent on its very next frame.
+   */
+  reserveCooldownUntilSec: number;
 }
 
 /** Time-slot reservation for one unsignalized intersection node. */
@@ -87,6 +99,37 @@ export interface VehicleEnv {
 /** Braking headroom kept between the reservation attempt and the stop point. */
 const RESERVE_AHEAD_M = 12;
 const RESERVATION_STALE_SEC = 0.8;
+/**
+ * FR-B5-DEADLOCK (doc 87, 2026-08-05) — A SLOT A CAR CANNOT USE IS A SLOT IT
+ * MUST GIVE BACK.
+ *
+ * The stale-reclaim above only reclaims a slot nobody is RENEWING, and the
+ * lifecycle below renewed unconditionally for as long as the holder's current
+ * lane still pointed at the node. So an agent that took the slot on approach
+ * and was then stopped by something else — the commonest something else being
+ * THE PLAYER, halted at a give-way line because the lesson told him to — kept
+ * the junction reserved forever without ever entering it. Every other agent
+ * was denied, stopped, and stayed stopped.
+ *
+ * Measured on `jxg-giveway-v1` with the junction family's ambient baseline
+ * (4 cars) and the player parked at the mouth-2 Б1 line: agent 3 takes
+ * `jxg-n-j2` and halts at (4.06, 111.70) at t = 31.6 s; the reservation reads
+ * `holder 3, renewed 240.0` at the end of a 240 s run; ALL SIX bodies (4
+ * ambient + both staged) are motionless by t = 71.7 s and none of them ever
+ * moves again. That is the frozen queue with the brake bars lit that the
+ * founder photographed, and it is a stationary obstacle wherever it happens to
+ * freeze — including the lane the student is about to drive up.
+ *
+ * The rule: an agent still SHORT of the box forfeits the slot after this many
+ * continuous seconds without progress. Two seconds is longer than any
+ * stop-and-go dip a moving queue produces and far shorter than a wait behind a
+ * stopped player. An agent already INSIDE the box (`fromNode === heldNode`)
+ * never forfeits — a car standing in a junction must keep the box to itself,
+ * which is the safe direction and the whole point of the slot.
+ */
+const RESERVATION_STALL_GRACE_SEC = 2;
+/** Below this the agent counts as making no progress toward its slot, m/s. */
+const RESERVATION_PROGRESS_MPS = 0.3;
 /** Minimum arc past the node before a reservation releases (floor — raised
  *  to the junction radius so the box is actually clear before release). */
 const HOLD_PAST_MIN_M = 8;
@@ -144,6 +187,8 @@ export function createVehicleAgent(
     desiredFactor,
     committedSignalNode: null,
     heldNode: null,
+    heldStalledSinceSec: null,
+    reserveCooldownUntilSec: -Infinity,
   };
 }
 
@@ -300,8 +345,29 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
   }
   // …and from ANY angle, not just along the lane: a staged actor crossing the
   // junction box is lateral to this agent until the last metre, so the
-  // corridor test above cannot catch it. Refusing the arc advance is always
-  // safe — the pre-move pose was clear by induction.
+  // corridor test above cannot catch it.
+  //
+  // FR-B5-FREEZE (doc 87, 2026-08-05) — ONLY REFUSE A STEP THAT CLOSES.
+  //
+  // This test used to be "is anything within `sep` of my NEXT pose", measured
+  // from any angle — which includes a body BEHIND me. Two cars 3 m apart
+  // therefore froze each other permanently: the leader would not advance
+  // because its follower was inside the radius, and the follower would not
+  // advance because the leader was. Measured on `jxg-giveway-v1` at L3:
+  // ambient id0 stopped ON the node jxg-n-j2 at (−0.10, 154.06) and the staged
+  // priority car pinned 2.98 m behind it at (2.88, 154.06), BOTH motionless
+  // from t = 41 s to the end of a 140 s run — 1.18 m off the student's lane
+  // centre, in the mouth he is told to drive through. That pair IS the founder's
+  // „stationary box van standing in the student's own lane"
+  // (`newdef/ZOOM-b5gw-junction-t58.png`) and the 10-point COLLISION at
+  // y = 146.00 on a correctly-driven run.
+  //
+  // The repair is one clause and it strictly WEAKENS the clamp in the only
+  // direction that is safe: a step is refused only when it would leave the two
+  // bodies CLOSER than they already are. A step that increases the separation
+  // can never create an overlap the previous pose did not already have, so the
+  // „never clip" guarantee is untouched — and a car with something parked
+  // behind it can drive away, which is what breaks the lock.
   if (env.staged.length > 0 && agent.s > sBefore) {
     const step = agent.s - sBefore;
     const nx = agent.state.x + agent.state.dirX * step;
@@ -310,11 +376,13 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       const st = env.staged[j];
       if (st === agent.state) continue;
       const sep = HALF_LEN + vehicleHalfLengthM(st.profile) + 0.5;
-      if (Math.hypot(st.x - nx, st.y - ny) < sep) {
-        agent.s = sBefore;
-        agent.speed = 0;
-        break;
-      }
+      const dAfter = Math.hypot(st.x - nx, st.y - ny);
+      if (dAfter >= sep) continue;
+      const dBefore = Math.hypot(st.x - agent.state.x, st.y - agent.state.y);
+      if (dAfter >= dBefore) continue; // moving away — never a reason to freeze
+      agent.s = sBefore;
+      agent.speed = 0;
+      break;
     }
   }
   // Same guarantee vs the leader agent (leader treated at its pre-move pose).
@@ -340,7 +408,8 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
     curLane = lane(env, agent, 0);
   }
 
-  // Reservation lifecycle: renew while relevant, release once passed.
+  // Reservation lifecycle: renew while relevant, release once passed — and
+  // FORFEIT while held without progress (see RESERVATION_STALL_GRACE_SEC).
   if (agent.heldNode) {
     const r = env.reservations.get(agent.heldNode);
     const holdPastM = Math.max(
@@ -348,12 +417,32 @@ export function updateVehicle(agent: VehicleAgent, dt: number, env: VehicleEnv):
       (env.graph.junctionRadiusM.get(agent.heldNode) ?? 0) + STOP_LINE_BEYOND_CUT_M,
     );
     if (curLane.toNode === agent.heldNode) {
-      if (r) r.renewedAt = env.timeSec; // still approaching / traversing
+      // Still APPROACHING the box. Renew only while actually closing on it;
+      // a holder that has been standing still for the grace gives the slot
+      // back so the junction can serve somebody who can use it.
+      if (agent.speed > RESERVATION_PROGRESS_MPS) {
+        agent.heldStalledSinceSec = null;
+        if (r) r.renewedAt = env.timeSec;
+      } else {
+        if (agent.heldStalledSinceSec === null) agent.heldStalledSinceSec = env.timeSec;
+        if (env.timeSec - agent.heldStalledSinceSec < RESERVATION_STALL_GRACE_SEC) {
+          if (r) r.renewedAt = env.timeSec;
+        } else {
+          if (r && r.holder === agent.state.id) r.holder = -1;
+          agent.heldNode = null;
+          agent.heldStalledSinceSec = null;
+          agent.reserveCooldownUntilSec = env.timeSec + RESERVATION_STALL_GRACE_SEC;
+        }
+      }
     } else if (curLane.fromNode === agent.heldNode && agent.s <= holdPastM) {
-      if (r) r.renewedAt = env.timeSec; // clearing the (scaled) junction box
+      // INSIDE / clearing the (scaled) junction box — never forfeited, at any
+      // speed: a car standing in the box owns the box until it is out of it.
+      agent.heldStalledSinceSec = null;
+      if (r) r.renewedAt = env.timeSec;
     } else {
       if (r && r.holder === agent.state.id) r.holder = -1;
       agent.heldNode = null;
+      agent.heldStalledSinceSec = null;
     }
   }
 
@@ -485,7 +574,20 @@ function stopPointTerm(
         const r = env.reservations.get(lk.toNode);
         if (r) {
           const stale = env.timeSec - r.renewedAt > RESERVATION_STALE_SEC;
-          if (r.holder === -1 || r.holder === agent.state.id || stale) {
+          // A stalled agent that JUST forfeited this slot may not take it
+          // straight back — otherwise the forfeit frees the junction for
+          // exactly one frame and the deadlock re-forms. An agent that has
+          // started moving again is never held off (the cooldown is ANDed
+          // with "still not making progress").
+          const cooling =
+            v <= RESERVATION_PROGRESS_MPS && env.timeSec < agent.reserveCooldownUntilSec;
+          if (cooling) {
+            if (stopAt > 0.3) {
+              const t = idmTerm(cfg, v, stopAt, 0);
+              if (t > term) term = t;
+            }
+            blocked = true;
+          } else if (r.holder === -1 || r.holder === agent.state.id || stale) {
             r.holder = agent.state.id;
             r.renewedAt = env.timeSec;
             agent.heldNode = lk.toNode;

@@ -29,8 +29,11 @@
  *    codeRefs (over-limit / too-fast-for-conditions) → exterior+dashboard —
  *    a speeding fault is unreadable without the speed readout (pilot v2
  *    cause 5).
- *  - camera (R1): "rearAware" when a staged actor approaches from BEHIND
- *    (emergencyApproach/rearTailgater) — the chase camera can never show it.
+ *  - camera (R1): "rearAware" when the actor the card REQUIRES approaches from
+ *    BEHIND (emergencyApproach, a negative-gap brakingLeadCar), or when a rear
+ *    spec is the only thing staged — the chase camera can never show those. A
+ *    rear presence the card does NOT require (the FO-07 лепка) leaves the lens
+ *    on `chase`, so a required FORWARD actor stays in frame (doc 87 B29/B30).
  *  - laneHighlight: positional lane faults (NOT_KEEPING_RIGHT) emit the
  *    REQUIRED lane's center so the rig can tint it green for ~2 s at the
  *    fault (visual explanation, not decoration — doc 66 spirit).
@@ -347,17 +350,21 @@ function kindEngagedBy(kind: string, codes: ReadonlySet<string>): boolean {
   return false;
 }
 
-function deriveActors(
+/**
+ * The staged specs this mistake's card actually REQUIRES an actor from —
+ * `deriveActors`' own selection, isolated so the camera can be derived from it
+ * instead of from "which kinds happen to be staged" (see `deriveCamera`).
+ */
+function requiredStagedSpecs(
   staged: readonly StagedLike[],
-  district: DistrictDoc,
   codes: ReadonlySet<string>,
   notes: string[],
-): ClipRequiredActor[] {
-  const derived: { kind: string; actor: ClipRequiredActor }[] = [];
+): StagedLike[] {
+  const derived: { spec: StagedLike; actor: ClipRequiredActor }[] = [];
   for (const spec of staged) {
     const actor = actorForStaged(spec);
     if (actor !== null) {
-      derived.push({ kind: spec.kind, actor });
+      derived.push({ spec, actor });
     } else if (!NON_ACTOR_KINDS.has(spec.kind)) {
       notes.push(`Непознат staged вид „${spec.kind}“ — участникът не е изведен`);
     }
@@ -369,10 +376,19 @@ function deriveActors(
   // engages; the other is correctly handled in the demo and is not in the fault
   // frame. Single-conflict templates are NEVER filtered, so a demo whose fault
   // is unrelated to its lone staged actor keeps its honest (if unmet) R1 row.
-  const conflictCount = derived.filter((d) => KIND_CONFLICT_CODES[d.kind] !== undefined).length;
+  const conflictCount = derived.filter((d) => KIND_CONFLICT_CODES[d.spec.kind] !== undefined).length;
   const kept =
-    conflictCount > 1 ? derived.filter((d) => kindEngagedBy(d.kind, codes)) : derived;
-  const actors = kept.map((d) => d.actor);
+    conflictCount > 1 ? derived.filter((d) => kindEngagedBy(d.spec.kind, codes)) : derived;
+  return kept.map((d) => d.spec);
+}
+
+function deriveActors(
+  requiredSpecs: readonly StagedLike[],
+  district: DistrictDoc,
+): ClipRequiredActor[] {
+  const actors = requiredSpecs
+    .map((spec) => actorForStaged(spec))
+    .filter((a): a is ClipRequiredActor => a !== null);
   // Occupied bays = the parked cars a lot demo collides with / threads.
   const bays = district.meta?.scenario?.bays;
   if (Array.isArray(bays) && bays.some((b) => (b as { occupied?: boolean }).occupied === true)) {
@@ -682,9 +698,44 @@ const TURN_ACROSS_CLIPS: ReadonlySet<string> = new Set([
   "sc-vu-cyclist-hook__m2",
 ]);
 
+/** Does this staged spec put its actor BEHIND the ghost at the fault beat? */
+function approachesFromRear(spec: StagedLike): boolean {
+  return REAR_APPROACH_KINDS.has(spec.kind) || pacesBehind(spec);
+}
+
+/**
+ * B29/B30 (doc 87) — THE CAMERA FRAMES THE ACTOR THE CARD REQUIRES, and a rear
+ * presence the card does NOT require may never turn the lens away from one it
+ * does.
+ *
+ * What was wrong, measured rather than argued. This chose `rearAware` as soon
+ * as ANY staged spec was a rear approach. `sc-jx-giveway-b1` stages the JU-02
+ * priority car (ahead-right, the whole lesson) AND an FO-07 `rearTailgater`
+ * лепка — pressure scenery that `NON_ACTOR_KINDS` already declares is not an
+ * R1 actor. Both of its clips were therefore planned with a lens standing
+ * REAR_CAM_AHEAD_M = 9.5 m in front of the ghost looking BACK past it, while
+ * the required actor on both cards is „Автомобил отдясно с предимство", which
+ * is on бул. „Втори" north of that lens. Running `actorInRearAwareFrame` at
+ * m0's fault pose (ghost 4.0625, 122.333, heading 0) for the priority car at
+ * every x from −40 to +95 returns a NEGATIVE depth every time: it is behind
+ * the camera at all of them, so no `hold.offsetM` could ever put it in that
+ * frame. Both entries died on the rig's R1 gate with „липсва vehicle" and
+ * `readPresence()` `{vehicles: 2, obstacleVehicles: 0, framedKinds: []}` — the
+ * two mistake clips this lesson teaches with were unproducible, for a reason
+ * that had nothing to do with where the actor stood.
+ *
+ * The rule now reads off `requiredSpecs` (what `deriveActors` kept):
+ *  - a REQUIRED actor that approaches from behind  → rearAware (sc-vu-emergency's
+ *    ambulance, sc-lane-change's blind-spot car at `followGapM: -24`);
+ *  - no required actor at all, but a rear spec staged → rearAware, unchanged
+ *    (sc-merge-accel-lane's mainline car is the only thing in the picture);
+ *  - a required actor that does NOT come from behind → chase, even when a
+ *    лепка is also staged. That is the fix.
+ */
 function deriveCamera(
   clipId: string,
   staged: readonly StagedLike[],
+  requiredSpecs: readonly StagedLike[],
   notes: string[],
 ): "chase" | "rearAware" {
   if (TURN_ACROSS_CLIPS.has(clipId)) {
@@ -694,13 +745,19 @@ function deriveCamera(
     );
     return "rearAware";
   }
-  if (staged.some((s) => REAR_APPROACH_KINDS.has(s.kind) || pacesBehind(s))) {
+  if (!staged.some(approachesFromRear)) return "chase";
+  const rearIsRequired = requiredSpecs.some(approachesFromRear);
+  if (rearIsRequired || requiredSpecs.length === 0) {
     notes.push(
       "Ключовият участник идва ОТЗАД — страничен три-четвърти кадър (rearAware), " +
         "който държи и призрака, и приближаващия отзад в рамката",
     );
     return "rearAware";
   }
+  notes.push(
+    "Отзад има само сценичен натиск (лепка), а изискваният участник е ОТПРЕД — " +
+      "преследваща камера (chase), за да остане изискваният участник в кадър",
+  );
   return "chase";
 }
 
@@ -810,7 +867,8 @@ export function buildClipPlan(
     // --- R1/R2/R4 cards ------------------------------------------------------
     const notes: string[] = [];
     const staged = (spec.staged ?? []) as StagedLike[];
-    const requiredActors = deriveActors(staged, district, codes, notes);
+    const requiredSpecs = requiredStagedSpecs(staged, codes, notes);
+    const requiredActors = deriveActors(requiredSpecs, district);
     const posts = renderedSignPosts(spec.map.districtId, district);
     const governingControl = deriveControl(
       codes,
@@ -824,7 +882,7 @@ export function buildClipPlan(
     );
     const hasTelltaleStimulus = staged.some((s) => s.kind === "telltaleStimulus");
     const view = deriveView(codes, hasTelltaleStimulus, notes);
-    const camera = deriveCamera(pilot.id, staged, notes);
+    const camera = deriveCamera(pilot.id, staged, requiredSpecs, notes);
     const laneHighlight = deriveLaneHighlight(codes, district, faultPos, notes);
 
     entries.push({

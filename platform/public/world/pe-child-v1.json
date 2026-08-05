@@ -24,11 +24,11 @@
   },
   "stats": {
    "roadKm": 0.14,
-   "nodes": 2,
-   "edges": 1,
+   "nodes": 4,
+   "edges": 3,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 8,
+   "buildings": 11,
    "spawnPoints": 2,
    "zones": 0
   },
@@ -45,12 +45,44 @@
    "roadscapeNoteBg": "Междублокова улица: нито знак, нито стълб, нито крайна линия — само осевата прекъсната. Най-голата отсечка в групата, и точно затова нищо не ти подсказва, че оттук изскачат деца.",
    "terminus": "opens-to-green",
    "terminusNoteBg": "Улицата свършва в зеленото на квартала: нито блок, нито стена — само нисък парков зид далеч напред. Оттам няма какво да те спре да гледаш надалеч, и точно затова децата отляво се виждат късно.",
+   "nearfield": "garage-and-backslab",
+   "nearfieldNoteBg": "Отдясно улицата е на два етажа дълбочина: първо ниска редица гаражи до самия тротоар, а веднага зад тях се извисява панелен блок. Отляво е глухият калкан на другия блок. Между гаражите има процепи — и точно оттам излиза дете, което ти виждаш едва в последния момент.",
+   "nearfieldSignature": "asym-east-layered|stepped|12.7",
+   "nearfieldFirstM": -9,
    "terminusLegs": 0,
    "terminusRoadM": 0,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
    "curbToCurbM": 16.25,
+   "carriageway": "bay-pocket-behind-the-seat",
+   "carriagewayNoteBg": "Паркинг джобът започва ТРИ МЕТРА ЗАД теб — потегляш вече вътре в него, платното е 24,25 м широко и отдясно има спрели коли. На двадесет и девет метра напред се стеснява обратно до 16,25 м. Единствената отсечка в групата, чието разширение е започнало, преди ти да си тръгнал.",
+   "carriagewaySegments": [
+    {
+     "id": "pe-e-street-s1",
+     "fromY": 0,
+     "toY": 12,
+     "curbToCurbM": 16.25
+    },
+    {
+     "id": "pe-e-street-s2",
+     "fromY": 12,
+     "toY": 44,
+     "curbToCurbM": 24.25
+    },
+    {
+     "id": "pe-e-street",
+     "fromY": 44,
+     "toY": 138,
+     "curbToCurbM": 16.25
+    }
+   ],
+   "spawnCurbToCurbM": 24.25,
+   "widthChangesAtM": [
+    -3,
+    29
+   ],
+   "bayedRoadM": 32,
    "oneway": false,
    "banSignRef": null,
    "primaryCrossingId": "pe-x-1",
@@ -68,6 +100,16 @@
  "roads": {
   "nodes": [
    {
+    "id": "pe-n-cw1",
+    "x": 0,
+    "y": 12
+   },
+   {
+    "id": "pe-n-cw2",
+    "x": 0,
+    "y": 44
+   },
+   {
     "id": "pe-n-end",
     "x": 0,
     "y": 138
@@ -81,7 +123,7 @@
   "edges": [
    {
     "id": "pe-e-street",
-    "from": "pe-n-start",
+    "from": "pe-n-cw2",
     "to": "pe-n-end",
     "class": "residential",
     "name": "Улица с пешеходна пътека",
@@ -91,11 +133,11 @@
     "lanesSource": "tag",
     "maxspeed": 40,
     "maxspeedSource": "tag",
-    "length": 138,
+    "length": 94,
     "geometry": [
      [
       0,
-      0
+      44
      ],
      [
       0,
@@ -103,6 +145,56 @@
      ]
     ],
     "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s1",
+    "from": "pe-n-start",
+    "to": "pe-n-cw1",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 12,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      12
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s2",
+    "from": "pe-n-cw1",
+    "to": "pe-n-cw2",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 32,
+    "geometry": [
+     [
+      0,
+      12
+     ],
+     [
+      0,
+      44
+     ]
+    ],
+    "parkingBand": true
    }
   ]
  },
@@ -122,22 +214,22 @@
   {
    "id": "pe-b-slab-s",
    "height": 17,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
-     -44,
+     -48,
      18
     ],
     [
-     -13.2,
+     -17.2,
      18
     ],
     [
-     -13.2,
+     -17.2,
      65
     ],
     [
-     -44,
+     -48,
      65
     ]
    ]
@@ -145,7 +237,7 @@
   {
    "id": "pe-b-slab-n",
    "height": 17,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -44,
@@ -168,7 +260,7 @@
   {
    "id": "pe-b-playhouse",
    "height": 3,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -26,
@@ -190,31 +282,31 @@
   },
   {
    "id": "pe-b-garages",
-   "height": 2.8,
-   "heightSource": "default",
+   "height": 3,
+   "heightSource": "height",
    "footprint": [
     [
-     12.7,
+     16.7,
      26
     ],
     [
-     19,
+     23,
      26
     ],
     [
-     19,
+     23,
      66
     ],
     [
-     12.7,
+     16.7,
      66
     ]
    ]
   },
   {
    "id": "pe-b-garages-n",
-   "height": 2.8,
-   "heightSource": "default",
+   "height": 3,
+   "heightSource": "height",
    "footprint": [
     [
      12.7,
@@ -236,8 +328,8 @@
   },
   {
    "id": "pe-b-park-wall-n",
-   "height": 2.2,
-   "heightSource": "default",
+   "height": 3,
+   "heightSource": "height",
    "footprint": [
     [
      -56,
@@ -260,7 +352,7 @@
   {
    "id": "pe-b-pavilion-n",
    "height": 3.6,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -30,
@@ -283,7 +375,7 @@
   {
    "id": "pe-b-pavilion-e",
    "height": 3.6,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      15,
@@ -302,6 +394,75 @@
      188
     ]
    ]
+  },
+  {
+   "id": "pe-b-nf-binstore-e",
+   "height": 3,
+   "heightSource": "height",
+   "footprint": [
+    [
+     16.7,
+     6
+    ],
+    [
+     22,
+     6
+    ],
+    [
+     22,
+     14
+    ],
+    [
+     16.7,
+     14
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-trafo-e",
+   "height": 3.6,
+   "heightSource": "height",
+   "footprint": [
+    [
+     16.7,
+     17
+    ],
+    [
+     24,
+     17
+    ],
+    [
+     24,
+     25
+    ],
+    [
+     16.7,
+     25
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-backslab-e",
+   "height": 17,
+   "heightSource": "height",
+   "footprint": [
+    [
+     23.5,
+     26
+    ],
+    [
+     44,
+     26
+    ],
+    [
+     44,
+     52
+    ],
+    [
+     23.5,
+     52
+    ]
+   ]
   }
  ],
  "spawnPoints": [
@@ -310,7 +471,7 @@
    "x": 4.06,
    "y": 15,
    "heading": 0,
-   "edgeId": "pe-e-street",
+   "edgeId": "pe-e-street-s2",
    "name": "Подход към пешеходната пътека"
   },
   {

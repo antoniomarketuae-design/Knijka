@@ -49,8 +49,15 @@ const FACE_PX = 512;
  *  (`points="100,22 186,170 14,170"`, `stroke-width="16"`, `#c1121f`), so only
  *  the pictogram inside it differs. Founder items 60/61 (the school zone with
  *  no school and no children) — a школска зона must carry the sign that names
- *  the reason for its limit. */
-export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19";
+ *  the reason for its limit.
+ *
+ *  `v28` (В28 „Забранено е паркирането") rides the В27 „Забранени са престоят и
+ *  паркирането" GLB on the same argument, and here the proof is a byte match:
+ *  both source SVGs open with
+ *  `<circle cx="100" cy="100" r="88" fill="#0057a8" stroke="#c1121f"
+ *  stroke-width="20" data-plate="true"/>` and differ only in the face — В27
+ *  carries two diagonals (the X), В28 one. */
+export type SignFaceArt = "v26" | "v33" | "d4" | "g2" | "g3" | "a19" | "v28";
 
 const svgSource = new Map<SignFaceArt, Promise<string | null>>();
 

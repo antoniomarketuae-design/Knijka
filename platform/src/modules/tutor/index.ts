@@ -42,6 +42,23 @@ export {
 } from "./retrieval";
 export type { RetrievedItem } from "./retrieval";
 
+// THE GATE ON RETRIEVAL (the third door). Retrieval filters the content bank
+// through the SAME `conceptClearance` / `questionClearance` / `signClearance`
+// the classroom uses, so nothing unreviewed becomes grounding for a model —
+// which is ADR-002's requirement stated the other way round: retrieval that
+// hands the model unreviewed law is free recall with an extra step.
+//
+// These three are the instrument. A gate whose refusals nobody can see is a
+// gate the next person removes because they cannot explain why the tutor went
+// quiet on first aid — so read `recentWithheldMaterials()` before concluding
+// the retriever is broken.
+export {
+  recentWithheldMaterials,
+  resetWithheldMaterials,
+  setWithheldMaterialSink,
+} from "./retrieval";
+export type { WithheldMaterial } from "./retrieval";
+
 // Global daily spend ceiling on the Anthropic key (audit H-8). Exported so an
 // ops/admin surface can show today's burn, and so the message the student sees
 // when it trips is testable from outside the module.

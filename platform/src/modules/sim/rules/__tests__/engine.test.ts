@@ -295,7 +295,10 @@ describe("turn indicator detector", () => {
   it("indicator too long ago (beyond lookback) counts as missing", () => {
     const { events } = drive([
       tick(0, { speedKmh: 20, indicator: "left" }),
-      tick(4, { speedKmh: 15, events: [turn("left")] }), // 4 s > 3 s lookback
+      // 6 s > the 5 s indicatorLookbackSec. Register B21 widened it from 3 to
+      // 5 because the stalk auto-cancels itself on a beginner's wobble — see
+      // rules/types.ts and lane-change-beginner-window.test.ts.
+      tick(6, { speedKmh: 15, events: [turn("left")] }),
     ]);
     expect(codes(events)).toEqual(["TURN_WITHOUT_INDICATOR"]);
   });
@@ -308,7 +311,7 @@ describe("turn indicator detector", () => {
   });
 });
 
-describe("lane change detectors (indicator + mirror within 5 s)", () => {
+describe("lane change detectors (indicator within 5 s, mirror within 8 s)", () => {
   it("indicator + correct-side mirror glance => commendation, no violations", () => {
     const { events } = drive([
       tick(0, { speedKmh: 40, indicator: "left", events: [glance("left")] }),
@@ -345,20 +348,23 @@ describe("lane change detectors (indicator + mirror within 5 s)", () => {
     ]);
   });
 
-  it("glance exactly 5 s before the change still counts (boundary inclusive)", () => {
+  // Register B21 moved this boundary from 5 s to 8 s: the window has to cover
+  // the serial keyboard beats AND the lateral traverse of a lane drawn at
+  // PERCEPTUAL_ROAD_SCALE (4.06 m, not 1.63 m). See rules/types.ts.
+  it("glance exactly 8 s before the change still counts (boundary inclusive)", () => {
     const { events } = drive([
       tick(0, { speedKmh: 40, events: [glance("left")] }),
-      ...cruise(1, 4, { speedKmh: 40 }),
-      tick(5, { speedKmh: 40, indicator: "left", laneId: 1 }),
+      ...cruise(1, 7, { speedKmh: 40 }),
+      tick(8, { speedKmh: 40, indicator: "left", laneId: 1 }),
     ]);
     expect(codes(events)).toEqual(["SAFE_LANE_CHANGE"]);
   });
 
-  it("glance 6 s before the change is too old", () => {
+  it("glance 9 s before the change is too old", () => {
     const { events } = drive([
       tick(0, { speedKmh: 40, events: [glance("left")] }),
-      ...cruise(1, 5, { speedKmh: 40 }),
-      tick(6, { speedKmh: 40, indicator: "left", laneId: 1 }),
+      ...cruise(1, 8, { speedKmh: 40 }),
+      tick(9, { speedKmh: 40, indicator: "left", laneId: 1 }),
     ]);
     expect(codes(events)).toEqual(["LANE_CHANGE_WITHOUT_MIRROR_CHECK"]);
   });

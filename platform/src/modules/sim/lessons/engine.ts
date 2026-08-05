@@ -50,12 +50,17 @@ import {
   stepObjective,
   type ObjectiveContext,
 } from "./objectives";
+import { stepYieldVoice } from "./advisor";
 import { applyEscalations, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
 import {
+  CRASH_PIN_RADIUS_M,
+  CRASH_PIN_STUCK_S,
+  FINISH_STANDSTILL_KMH,
   createFinishGate,
   routeFinishZone,
   stepFinishGate,
+  stepYieldWait,
   terminalRescueZone,
 } from "./finish";
 import type {
@@ -187,7 +192,14 @@ function withFollowingGapDetail(
   tick: SimTick,
   cfg: RuleEngineConfig,
 ): string {
-  if (e.code !== "FOLLOWING_TOO_CLOSE" && e.code !== "FOLLOWING_TOO_CLOSE_FOR_RAIN") {
+  if (
+    e.code !== "FOLLOWING_TOO_CLOSE" &&
+    e.code !== "FOLLOWING_TOO_CLOSE_FOR_RAIN" &&
+    // FO-08: the closing code is the same duty measured while it collapses —
+    // it needs the number MORE than the other two, because „намали с нея" is
+    // meaningless without knowing how much room is left.
+    e.code !== "CLOSING_ON_LEAD_TOO_FAST"
+  ) {
     return e.explanationBg;
   }
   const gapM = tick.leadGapM;
@@ -694,6 +706,68 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // CANNOT END. Nothing about a route can be behind you before the first
   // frame that describes where you are. It costs a real drive exactly one
   // frame — every gate below arms and trips from the first honest pose.
+
+  // ---------------------------------------------------------------------
+  // B15 — THE LAWFUL WAIT (founder: „I waited about 40 seconds" at the
+  // give-way line, and the session ended itself at 20). Folded BEFORE the
+  // gates and on every driving frame, because two of its inputs are stateful:
+  // the pedestrian latch rides discrete events, and the hold's own clock has
+  // to survive frames on which no gate is consulted at all. See finish.ts
+  // `stepYieldWait` for what counts as a yield and why each case is there.
+  //
+  // The pose guard applies here for the same reason it applies to the gates: a
+  // drive that has not begun is not waiting for anything.
+  let yieldWait = prev.yieldWait;
+  let yieldWaitSec = prev.yieldWaitSec;
+  if (prev.phase === "driving" && posedAtSec !== undefined) {
+    yieldWait = stepYieldWait(prev.yieldWait, tick, {
+      params: objectives.map((o) => o.params),
+      currentIndex,
+    });
+    if (yieldWait.holding) {
+      // Sim-seconds since the previous frame, clamped: a backgrounded tab can
+      // hand this engine a multi-second jump, and inflating the measured wait
+      // with time nobody spent waiting would corrupt the par-time line below.
+      const dt = Math.min(Math.max(tick.t - prev.lastT, 0), 1);
+      yieldWaitSec = (yieldWaitSec ?? 0) + dt;
+    }
+  }
+
+  // B15-VOICE (2026-08-05) — REQUIREMENT ZERO AT THE GIVE-WAY LINE.
+  //
+  // The fold above made the lawful wait SURVIVABLE. It is still SILENT: for
+  // the whole minute the student waits correctly, nothing is said on the rule
+  // surface, on the card or here on the teach channel, and the first thing the
+  // product ever says to him about the priority car is „−10". Doc 64 THEO-4,
+  // ratified by the founder, forbids exactly that — every feature must act as
+  // a virtual instructor that EXPLAINS EVERY DECISION, and a bare verdict
+  // delivered by silence is still a bare verdict. It is also backwards as
+  // teaching: the minute he is doing the right thing is the minute an
+  // instructor talks.
+  //
+  // The voice rides the SAME channel the B4/B5/B6 objective notices ride —
+  // `lesson` HUD events, the coach's line for what is taught and never billed.
+  // Nothing here emits, suppresses or reweights a ScorableEvent; the graded
+  // codes are read (to mute a congratulation the same screen is penalising)
+  // and never written. And it is folded from the ALREADY-GRADED `ruleEvents`
+  // of this very tick, so the mute can never lag the fault it answers to.
+  //
+  // EXAM SESSIONS ARE EXCLUDED, on the advisor's own distinction rather than a
+  // new one: `advisorPromptForSession` opens with the same unconditional
+  // `examMode` gate, and for the same reason — telling a candidate who has
+  // priority mid-assessment is telling him the answer.
+  let yieldVoice = prev.yieldVoice;
+  if (!examMode && prev.phase === "driving" && posedAtSec !== undefined && yieldWait !== undefined) {
+    const voice = stepYieldVoice(prev.yieldVoice, {
+      t: tick.t,
+      speedKmh: tick.speedKmh,
+      wait: yieldWait,
+      violations: scoredEvents.filter((e) => e.kind === "violation").map((e) => e.code),
+    });
+    yieldVoice = voice.state;
+    for (const n of voice.notices) hudEvents.push(n);
+  }
+
   let finishGate = prev.finishGate;
   let finishRescueGate = prev.finishRescueGate;
   let stoppedStuck = false;
@@ -707,26 +781,43 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     const params = objectives.map((o) => o.params);
     const onTerminal = currentIndex === objectives.length - 1;
 
-    // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
-    // presence-based and generous, and it must stay off the terminal
-    // objective, where every correct final approach would satisfy it.
-    if (!onTerminal) {
-      const zone = routeFinishZone(params);
-      if (zone !== null) {
-        finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
+    if (yieldWait?.holding === true) {
+      // B15 — THE FREEZE. This frame is a student standing still because the
+      // road told him to, so it is evidence of nothing and neither gate may
+      // spend it. Arming is left alone (it is pure geometry and cannot end a
+      // session on its own); the partial dwell is DROPPED, so the seconds he
+      // spends waiting can never be credited to a gate the moment the wait
+      // ends — the dwell restarts from the first frame he is free to move
+      // again. Without that drop, freezing would merely defer the same 20 s
+      // verdict to the instant the gap appeared.
+      if (finishGate?.insideSinceSec != null) {
+        finishGate = { ...finishGate, insideSinceSec: null };
       }
-    }
-    // Gate 2 — simply stuck. Runs on EVERY frame regardless of which objective
-    // is active, because the state it detects does not care: a car standing
-    // completely motionless at the end of the route, for twelve seconds at a
-    // waypoint or twenty-five beside a bay, with the route unfinished, is not
-    // going anywhere on its own. Gate 1 cannot cover it — on a compact route
-    // (a lot where the pull-up pose is 10 m from the bay) its half-distance
-    // clamp shrinks the zone below one lane, so a car parked three metres off
-    // the end satisfied neither gate and had no way out at all.
-    const rescue = terminalRescueZone(params);
-    if (rescue !== null) {
-      finishRescueGate = stepFinishGate(finishRescueGate ?? createFinishGate(), rescue, tick);
+      if (finishRescueGate?.insideSinceSec != null) {
+        finishRescueGate = { ...finishRescueGate, insideSinceSec: null };
+      }
+    } else {
+      // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
+      // presence-based and generous, and it must stay off the terminal
+      // objective, where every correct final approach would satisfy it.
+      if (!onTerminal) {
+        const zone = routeFinishZone(params);
+        if (zone !== null) {
+          finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);
+        }
+      }
+      // Gate 2 — simply stuck. Runs on EVERY frame regardless of which objective
+      // is active, because the state it detects does not care: a car standing
+      // completely motionless at the end of the route, for twelve seconds at a
+      // waypoint or twenty-five beside a bay, with the route unfinished, is not
+      // going anywhere on its own. Gate 1 cannot cover it — on a compact route
+      // (a lot where the pull-up pose is 10 m from the bay) its half-distance
+      // clamp shrinks the zone below one lane, so a car parked three metres off
+      // the end satisfied neither gate and had no way out at all.
+      const rescue = terminalRescueZone(params);
+      if (rescue !== null) {
+        finishRescueGate = stepFinishGate(finishRescueGate ?? createFinishGate(), rescue, tick);
+      }
     }
 
     stoppedStuck =
@@ -754,6 +845,60 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
       });
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // FR-B5-JAM — THE CRASH PIN (finish.ts, see its block for the measurement)
+  //
+  // A car pressed against what it just hit is stuck in a way NEITHER gate
+  // above can see: both are anchored at the END of the route, and the founder's
+  // drive was pinned 32 m short of it — throttle held, nothing moving, forty
+  // seconds, lesson unfinishable. This is the third gate, anchored on the
+  // impact instead of on the route: collision → did not leave the spot → stood
+  // completely still for CRASH_PIN_STUCK_S. It grades nothing; the collision
+  // keeps its ten points and every unreached objective stays unreached.
+  // ---------------------------------------------------------------------
+  let crashPin = prev.crashPin;
+  {
+    const crashed = scoredEvents.some(
+      (e) => e.kind === "violation" && e.terminateSession === true,
+    );
+    if (crashed) {
+      // Re-arm on every impact: the pose that matters is the LAST one.
+      crashPin = { atSec: tick.t, x: tick.position.x, y: tick.position.y, stillSinceSec: null };
+    } else if (crashPin !== undefined) {
+      const awayM = Math.hypot(tick.position.x - crashPin.x, tick.position.y - crashPin.y);
+      if (awayM > CRASH_PIN_RADIUS_M) {
+        crashPin = undefined; // drove away — not stuck, and never closed down
+      } else if (yieldWait?.holding === true || tick.speedKmh > FINISH_STANDSTILL_KMH) {
+        // Moving, or lawfully waiting (B15's freeze applies here for the same
+        // reason it applies to the other two gates: that second is evidence of
+        // nothing). Drop the partial dwell rather than bank it.
+        if (crashPin.stillSinceSec !== null) crashPin = { ...crashPin, stillSinceSec: null };
+      } else if (crashPin.stillSinceSec === null) {
+        crashPin = { ...crashPin, stillSinceSec: tick.t };
+      }
+    }
+  }
+  if (
+    phase === "driving" &&
+    prev.phase === "driving" &&
+    posedAtSec !== undefined &&
+    crashPin?.stillSinceSec != null &&
+    tick.t - crashPin.stillSinceSec >= CRASH_PIN_STUCK_S
+  ) {
+    phase = "completed";
+    endedAtSec = tick.t;
+    // THEO-4: never a bare verdict. Name what happened, say why the drive is
+    // being closed rather than left running, and hand him to the debrief —
+    // where the collision's own explanation and corrective already live.
+    hudEvents.push({
+      kind: "lesson",
+      titleBg: examMode ? "Край на изпита след удара" : "Край на упражнението след удара",
+      explanationBg: examMode
+        ? "След удара колата остана притисната на място и маршрутът не може да продължи, затова изпитът приключва тук. Разборът показва удара, всяка останала задача и какво трябваше да се направи преди него."
+        : "След удара колата остана притисната на място и не може да продължи по маршрута — затова урокът приключва тук, вместо да те държи блокиран. Разборът показва как се стига до такъв удар и какво го предотвратява: по-ранно намаляване и достатъчна дистанция до всичко неподвижно напред.",
+    });
   }
 
   // A13: exam sessions TERMINATE the moment the official limits are crossed
@@ -810,6 +955,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ...(examTermination !== undefined ? { examTermination } : {}),
       ...(finishGate !== undefined ? { finishGate } : {}),
       ...(finishRescueGate !== undefined ? { finishRescueGate } : {}),
+      ...(yieldWait !== undefined ? { yieldWait } : {}),
+      ...(yieldWaitSec !== undefined ? { yieldWaitSec } : {}),
+      ...(yieldVoice !== undefined ? { yieldVoice } : {}),
+      // FR-B5-JAM: the one field that must be able to go BACK to absent (the
+      // student reversed out and drove away), which the additive spread above
+      // cannot express over `...prev` — so it is written unconditionally.
+      crashPin,
       ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,
@@ -928,6 +1080,10 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     effectiveScore: effectiveTotalPoints,
     escalations: escalated,
     durationSec: state.endedAtSec ?? state.lastT,
+    // B15: of that duration, the seconds spent lawfully stationary at a yield.
+    // Carried so the rubric's par-time line can stop calling a correct wait
+    // slowness; it never reaches a point, a star or the verdict.
+    ...(state.yieldWaitSec !== undefined ? { yieldWaitSec: state.yieldWaitSec } : {}),
     // A15: the mistake-map channels ride into the result untouched.
     ...(state.eventPositions !== undefined ? { eventPositions: state.eventPositions } : {}),
     ...(state.nearMisses !== undefined ? { nearMisses: state.nearMisses } : {}),

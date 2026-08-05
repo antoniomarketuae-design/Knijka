@@ -68,6 +68,17 @@ const FRAME_LINES: Record<FrameLineId, string> = {
   "refuse-boundary": "Това не е в материала за този урок.",
   "refuse-nearby": "Тук говорим за „{{slot}}“.",
   "refuse-offer": "Да го изкараме на тренировка — там въпросите са точно по темата.",
+
+  // --- material under review (clearance.ts) --------------------------------
+  // What the teacher says when a beat's own material has not cleared the gate.
+  // It is a stage direction like every other line here: it states no rule, no
+  // number, no article and no consequence — it says only that WE are not sure,
+  // which is the one thing we are sure of. Going quiet instead would be a bare
+  // verdict (THEO-4) delivered by absence, and an empty bubble would tell the
+  // student the classroom has nothing to say about first aid, which is a
+  // different and worse lie than „не съм проверил това".
+  withheld:
+    "Тази част още се проверява от преподавател и няма да ти я разказвам, докато не е потвърдена. По-добре да ти кажа „не знам сигурно“, отколкото да те науча на грешното. Ще се върнем на нея.",
 };
 
 /** The `{{slot}}` marker, exported so tests can assert a line has one. */

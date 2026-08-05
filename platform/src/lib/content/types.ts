@@ -26,6 +26,39 @@ export interface LawRef {
   ref: string; // e.g. "чл. 47" ("?" suffix = unverified)
 }
 
+/**
+ * A citation to something that is NOT a statute, and the answer to the schema
+ * defect that produced the decorative citation (docs/education/90 §12 item 8,
+ * §14 item N).
+ *
+ * WHY THIS EXISTS. `lawRefs` used to be `.min(1)` on every question, so a row
+ * was COMPELLED to name an act even when no act governs what it asks. Twenty-
+ * nine first-aid questions duly cited „ЗДвП чл. 123" — the duty to stop and
+ * assist — under claims about compression depth and tourniquets. The citation
+ * was not sloppy; it was the only thing the schema would accept. A compression
+ * depth is settled by a clinical guideline, and the number of casualties in a
+ * statistic is settled by a statistical methodology; neither has an article
+ * number, and pretending otherwise is how a student is pointed at a text that
+ * cannot answer the question they just got wrong.
+ *
+ * `sourceId` resolves in the non-statutory source registers
+ * (content/medical/, content/sources/ — see lib/content/sources), each of which
+ * pins its sources by URL, byte count and sha256 exactly as content/law does.
+ * A row may carry `lawRefs`, `sourceRefs`, or both; it must carry at least one
+ * citation of SOME kind, which is the part of the old rule worth keeping.
+ */
+export interface SourceRef {
+  /** Register id of the source, e.g. "src-erc-2025-layperson". Must resolve. */
+  sourceId: string;
+  /** Where inside that source, in the source's own terms — no article numbers
+   *  are invented: "Adult BLS — Chest compressions", "Методологични бележки". */
+  ref: string;
+  /** Optional claim id in the register's claims.json — the machine-checked
+   *  verbatim quote that grounds this row. Lets the review console show the
+   *  sentence rather than only the source's name. */
+  claimId?: string;
+}
+
 export interface Topic {
   id: string; // "t-" prefix
   order: number;
@@ -158,6 +191,14 @@ export interface Question {
   options: QuestionOption[];
   explanationBg: string;
   lawRefs: LawRef[];
+  /**
+   * Non-statutory grounding (clinical guideline, statistical methodology, …).
+   * OPTIONAL and additive: every row that existed before this field validates
+   * unchanged, and a re-serialisation never introduces the key. The rule the
+   * schema now enforces is `lawRefs.length + sourceRefs.length >= 1` — cite
+   * something, but only cite a statute when a statute is what settles it.
+   */
+  sourceRefs?: SourceRef[];
   media: QuestionMedia | null;
   status: ContentStatus;
 }

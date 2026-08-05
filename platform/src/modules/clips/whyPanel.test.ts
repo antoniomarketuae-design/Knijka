@@ -247,6 +247,24 @@ describe("resolveWhyPanel — every resolvable drill ref is playable", () => {
     // depicts — so the ev-overtake allowance was SCOPED to exclude them. All
     // four are in whyPanelPairing.ts MISSING_DRILLS with the brief for the
     // demo that would serve them.
-    expect(shipped).toBe(528);
+    //
+    // 528 → 522 on 2026-08-05, and this six is a DIFFERENT kind of loss from
+    // the four above — nothing about these pairings was found to be wrong. The
+    // question-bank citation wave dropped the article number from every
+    // citation naming an act content/law does not hold, and ППЗДвП is one:
+    // q-signali-i-markirovka-013, -014, -018, -030, -053 and -058 all used to
+    // law-match sc-ov-solid-line on „ППЗДвП чл. 63" and now read „ППЗДвП
+    // надлъжна пътна маркировка", so the guard can no longer PROVE the drill
+    // argues from the question's rule and falls back to text.
+    //
+    // The drill's own teach.lawRef is still „ППЗДвП чл. 63" — a number the
+    // catalogue asserts and this repo equally cannot check. The clean fix is
+    // to INGEST ППЗДвП (content/law/sources.json already pins the URL,
+    // HEAD 200, 1,263,430 bytes), which restores all six as real law-matches.
+    // The cheap fix is a scoped LAWREF_MISMATCH_ALLOW for
+    // „ev-*→sc-ov-solid-line" naming those six ids — deliberately NOT taken
+    // here, because an allowance is a reviewer's written judgement and keeping
+    // a count green is not a reason to mint one.
+    expect(shipped).toBe(522);
   });
 });

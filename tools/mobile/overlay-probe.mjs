@@ -451,7 +451,7 @@ let storageState;
 try {
   for (const device of devices) {
     const context = await browser.newContext({
-      ...contextOptions(device),
+      ...contextOptions(device, { motion: "reduce" }),
       ...(storageState ? { storageState } : {}),
     });
     const page = await context.newPage();

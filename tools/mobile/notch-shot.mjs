@@ -109,7 +109,7 @@ const summary = {};
 for (const id of ["iphone16-landscape", "iphone16-portrait"]) {
   const device = resolveDevices([id])[0];
   const ctx = await browser.newContext({
-    ...contextOptions(device),
+    ...contextOptions(device, { motion: "reduce" }),
     ...(storageState ? { storageState } : {}),
   });
   const page = await ctx.newPage();

@@ -15,6 +15,11 @@
  *
  *   1. It is structurally impossible for a lesson file to contain an
  *      unreviewed claim about Bulgarian law — there is nowhere to put one.
+ *      IT IS NOT IMPOSSIBLE FOR A BEAT TO SPEAK ONE. A reference is a promise
+ *      about where the words come from, not about whether anybody read them,
+ *      and `concepts.json` carries no `status` at all (content/SCHEMA.md). The
+ *      corpus is checked at resolution time by modules/lesson/clearance.ts;
+ *      read that file before assuming this list is a safety argument.
  *   2. A content fix in concepts.json propagates to every lesson that cites
  *      it, with no lesson edit and no re-render.
  *   3. ADR-002 is satisfied by construction on the whole playback path: no
@@ -62,7 +67,8 @@ export type FrameLineId =
   | "opinion-turnback"
   | "refuse-boundary"
   | "refuse-nearby"
-  | "refuse-offer";
+  | "refuse-offer"
+  | "withheld";
 
 /** Where a frame line's single `{{slot}}` gets its (stored) text. */
 export interface FrameSlot {

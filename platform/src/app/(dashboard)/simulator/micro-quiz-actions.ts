@@ -14,12 +14,44 @@
  *    learning.submitAnswer(context:"micro") — the SAME readiness signal as
  *    theory. Correct options + explanation + law refs only come back AFTER the
  *    student answers.
+ *
+ * THE TWO THINGS THIS FILE GOT WRONG, and they were independent.
+ *
+ * 1. THE DEAL HAD NO STATUS FILTER. It walked `questionsByConcept` and took
+ *    what it found. Measured over every quizzable lesson on 2026-08-04: 98
+ *    distinct rows dealt, 23 of them `needs-review`. A student mid-drive was
+ *    being shown unreviewed questions and then their unreviewed explanations —
+ *    on a surface where the drive is PAUSED and the card's whole job is to be
+ *    read. Every other student-facing surface in this product already gates on
+ *    `approved`: narration.ts:87, lesson/clearance.ts, lesson/quiz.ts:43,
+ *    exam/builder.ts:120, tutor/retrieval.ts. This one did not, and nobody
+ *    noticed because all of its neighbours did.
+ *
+ * 2. THE SUBMIT HALF DID NOT BIND THE QUESTION TO A DEAL. It validated the
+ *    id's type and length, then handed the id to submitAnswer, which answered
+ *    with `correctOptionIds`, `explanationBg` and `lawRefs` — for ANY of the
+ *    1,089 rows in the bank. Verified by running it: `q-ptp-009`
+ *    (`needs-review`, hit-and-run, cites НК чл. 140) came back keyed, explained
+ *    and cited, from a user who had never been dealt it, with no ticket of any
+ *    kind. That is audit M-10's answer-key oracle exactly, one door along: it
+ *    was written up as a practice defect, practice was fixed by wiring
+ *    issuePracticeTicket, and this neighbour kept the shape.
+ *
+ *    Worse than the cheating, and the same sentence practice/actions.ts already
+ *    carries: every forged answer wrote a QuestionAttempt and moved mastery
+ *    (measured: 0 → 0.35 on c-hit-and-run, reps 1, dueAt +1d), so the readiness
+ *    score — the one dataset that could ever show this product makes safer
+ *    drivers — was client-writable through here.
+ *
+ * Both are closed the way the neighbours close them: the deal filters on
+ * `status === "approved"`, and it signs the bank it dealt (issuePracticeTicket)
+ * so the submit half only honours a question this student was actually offered.
  */
 
 import "@/lib/content/loader";
 import { getContentRepo } from "@/lib/content/repo";
 import { getSessionUser } from "@/modules/auth";
-import { submitAnswer } from "@/modules/learning";
+import { issuePracticeTicket, submitAnswer } from "@/modules/learning";
 import {
   isQuizMediaRenderable,
   lessonById,
@@ -35,16 +67,40 @@ const MAX_SELECTED_OPTIONS = 12;
 /** Keep the bank small: a session shows at most ~4 quizzes (quiz-trigger cap). */
 const MAX_PER_CONCEPT = 3;
 const MAX_BANK = 16;
+/** Comfortably above a real ticket (16 ids, a signature), far below a DoS. */
+const MAX_TICKET_LENGTH = 4096;
+
+/**
+ * What a lesson start gets: the sanitized bank AND the capability to answer it.
+ *
+ * The ticket is signed over exactly these ids, for this user, for one sitting.
+ * It is a capability, not a secret — it says "these questions, this user, until
+ * then" and nothing else — so shipping it to the browser costs nothing, which
+ * is the same reasoning the practice page's own `ticket` prop carries.
+ *
+ * It rides alongside the questions rather than on each `MicroQuizQuestion`
+ * because that type belongs to modules/sim/lessons (the pure trigger's input),
+ * and a session capability is not a property of a question.
+ *
+ * An empty bank ships an empty ticket: no questions dealt, no capability
+ * granted. A "" ticket verifies as MISSING, never as valid.
+ */
+export interface MicroQuizBank {
+  questions: MicroQuizQuestion[];
+  ticket: string;
+}
+
+const EMPTY_BANK: MicroQuizBank = { questions: [], ticket: "" };
 
 /**
  * Concept-linked question bank for a lesson's contextual quizzes. Concepts =
  * the lesson's own conceptIds ∪ the trigger's target concepts, so whatever the
  * road throws (crossing, stop line, turn, priority) has a question ready.
- * Returns [] on any failure — the trigger degrades to no quizzes.
+ * Returns an empty bank on any failure — the trigger degrades to no quizzes.
  */
 export async function loadMicroQuizBank(
   lessonId: string,
-): Promise<MicroQuizQuestion[]> {
+): Promise<MicroQuizBank> {
   // getSessionUser + [] rather than requireUser(), for the reason proxy.ts
   // states about /api routes: a LOAD must never answer with a navigation.
   // requireUser() calls redirect(), and Next turns a redirect thrown inside a
@@ -59,18 +115,18 @@ export async function loadMicroQuizBank(
   // The mutation half (submitMicroQuizAnswer) refuses by THROWING, which is
   // also not a navigation — see its own note.
   const user = await getSessionUser();
-  if (user === null) return [];
+  if (user === null) return EMPTY_BANK;
 
   // C-3: the micro-quiz is part of the drive, so it rides the simulator
   // entitlement. Degrades to an empty bank rather than throwing — the same
   // graceful "no quizzes this session" path every other failure takes.
-  if (!(await canDriveSimulator(user))) return [];
+  if (!(await canDriveSimulator(user))) return EMPTY_BANK;
 
   if (typeof lessonId !== "string" || lessonId.length === 0 || lessonId.length > MAX_ID_LENGTH) {
-    return [];
+    return EMPTY_BANK;
   }
   const lesson = lessonById(lessonId);
-  if (lesson === undefined) return [];
+  if (lesson === undefined) return EMPTY_BANK;
 
   try {
     const repo = getContentRepo();
@@ -84,6 +140,22 @@ export async function loadMicroQuizBank(
         if (bank.length >= MAX_BANK) break;
         if (takenForConcept >= MAX_PER_CONCEPT) break;
         if (seen.has(q.id)) continue;
+        // STATUS GATE — before `seen`/`taken`, for the same reason the L1 media
+        // guard below is: refusing an item costs the concept nothing, it simply
+        // takes the next question instead.
+        //
+        // This is `narration.ts:87`, `lesson/clearance.ts:242`,
+        // `lesson/quiz.ts:43` and `exam/builder.ts:120` — the check every other
+        // student-facing surface already makes, and the one this file did not.
+        // Without it the deal handed a driver 23 `needs-review` rows across the
+        // quizzable lessons, question AND explanation, mid-drive.
+        //
+        // `draft` is refused too, not just `needs-review`. Practice
+        // deliberately deals `draft` (session.ts) because practice is where
+        // unreviewed material earns its review; a paused drive is not — the
+        // student is here to drive, the quiz interrupts them, and an interrupt
+        // has to be worth the interruption.
+        if (q.status !== "approved") continue;
         // L1 GUARD — before `seen`/`taken`, so refusing an undrawable item
         // costs the concept nothing: it simply takes the next question instead.
         //
@@ -116,10 +188,18 @@ export async function loadMicroQuizBank(
       }
       if (bank.length >= MAX_BANK) break;
     }
-    return bank;
+    // AUDIT M-10, on this door. Signed over EXACTLY the ids this call dealt, to
+    // THIS user, for one sitting. submitAnswer refuses any question that is not
+    // on it, so the 45 ids in the DOM of a mock exam in another tab — or any of
+    // the 1,089 rows typed into a fetch by hand — buy nothing here: they were
+    // never dealt. An empty bank grants nothing (see MicroQuizBank).
+    return {
+      questions: bank,
+      ticket: bank.length === 0 ? "" : issuePracticeTicket(user.id, bank.map((q) => q.id)),
+    };
   } catch {
     // Content repo unavailable — no quizzes this session (graceful).
-    return [];
+    return EMPTY_BANK;
   }
 }
 
@@ -132,10 +212,18 @@ export async function loadMicroQuizBank(
  * gate below is here: without it this endpoint would be an unmetered way for a
  * free account to answer graded questions and move mastery, i.e. a hole
  * straight through the 20/day theory cap.
+ *
+ * `ticket` is the capability loadMicroQuizBank issued for this drive. It is
+ * passed to the learning module UNVALIDATED beyond a length bound, on purpose:
+ * verification belongs to practiceTicket.ts, which owns the signing key and
+ * throws BEFORE anything is read, graded or written — so a submission we are
+ * not going to honour never touches mastery and, above all, is never answered
+ * with the key.
  */
 export async function submitMicroQuizAnswer(
   questionId: string,
   selectedOptionIds: string[],
+  ticket: string,
 ): Promise<MicroQuizAnswerResult> {
   // THROW, never redirect. The note on loadMicroQuizBank above explains the
   // mechanism; what makes this one worse is WHEN it fires — mid-drive, while
@@ -168,12 +256,17 @@ export async function submitMicroQuizAnswer(
   ) {
     throw new Error("submitMicroQuizAnswer: invalid selectedOptionIds");
   }
+  if (typeof ticket !== "string" || ticket.length > MAX_TICKET_LENGTH) {
+    throw new Error("submitMicroQuizAnswer: invalid ticket");
+  }
 
   const result = await submitAnswer(
     user.id,
     questionId,
     [...new Set(selectedOptionIds)],
     "micro",
+    new Date(),
+    { ticket },
   );
 
   return {

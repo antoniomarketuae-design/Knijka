@@ -19,15 +19,22 @@
  * part of the car (unlike the status dashboard, which stays up on exams).
  */
 
-import type { LessonSpec } from "../contracts";
+import type { HudEvent, LessonSpec } from "../contracts";
 import {
   PRE_DRIVE_STEP_CONTROLS,
   PRE_DRIVE_STEP_ORDER,
   type PreDriveStepId,
 } from "../procedures";
-import type { SimTick } from "../rules";
+import { VIOLATIONS, type SimTick, type ViolationCode } from "../rules";
 import { parseScenarioLessonId } from "./scenario";
-import type { LessonSessionState, ObjectiveEvalState, ObjectiveParams } from "./types";
+import type {
+  LessonSessionState,
+  ObjectiveEvalState,
+  ObjectiveParams,
+  YieldReason,
+  YieldVoiceState,
+  YieldWaitState,
+} from "./types";
 
 // ---------------------------------------------------------------------------
 // Setting (persisted client-side; parsing kept pure and testable here)
@@ -109,20 +116,56 @@ export function advisorPromptForPreDriveStep(stepId: PreDriveStepId): AdvisorPro
 }
 
 /**
+ * REACH-ZONE HALT BAND, km/h — a cap at or below this is „come to rest here",
+ * never a speed limit. Mirrors REACH_ZONE_HALT_CAP_KMH in objectives.ts; kept
+ * as a local literal so this pure module stays free of the evaluator.
+ */
+const ADVISOR_HALT_CAP_KMH = 8;
+
+/**
+ * The number this card may print, given the street's own limit (doc 87 B58).
+ *
+ * The gate keeps grading exactly what the template authored — re-authoring the
+ * 32 catalog gates that sit above their own street's limit would move graded
+ * gates and their committed traces, which is a decision, not a bug fix. What is
+ * not defensible is SAYING those numbers to a student in the instructor's
+ * voice. On «Превишаване над +10» the card read, in one sentence: «Задръж под
+ * 50, докато потокът те подминава — дръж под 52 км/ч» — a title and a suffix
+ * that contradict each other, in the drill whose whole subject is that going
+ * over 50 is the fault. So the printed number is clamped to the sign: the card
+ * may be stricter than the gate, never more permissive than the law.
+ *
+ * A HALT demand is never clamped — «спри — под 5 км/ч» is already far below any
+ * posted limit, and a min() there would silently turn a stop into a limit.
+ */
+function shownCapKmh(capKmh: number, postedLimitKmh?: number): number {
+  if (capKmh <= ADVISOR_HALT_CAP_KMH) return capKmh;
+  if (postedLimitKmh === undefined || !Number.isFinite(postedLimitKmh) || postedLimitKmh <= 0) {
+    return capKmh;
+  }
+  return Math.min(capKmh, postedLimitKmh);
+}
+
+/**
  * Prompt for the ACTIVE driving objective. `evalState` (when the caller has
  * it) sharpens phase-dependent maneuvers — currently the roundabout, whose
  * exit-indicator hint only makes sense once the ring has been entered.
+ * `postedLimitKmh` is the street's own limit — see shownCapKmh (B58).
  */
 export function advisorPromptForObjective(
   titleBg: string,
   params: ObjectiveParams,
   evalState?: ObjectiveEvalState,
+  postedLimitKmh?: number,
 ): AdvisorPrompt {
   switch (params.kind) {
     case "reachZone":
       // Speed-capped zones: the cap is the coachable part (approach discipline).
       return params.maxSpeedKmh !== undefined
-        ? { textBg: `${titleBg} — дръж под ${params.maxSpeedKmh} км/ч`, keys: [] }
+        ? {
+            textBg: `${titleBg} — дръж под ${shownCapKmh(params.maxSpeedKmh, postedLimitKmh)} км/ч`,
+            keys: [],
+          }
         : { textBg: titleBg, keys: [] };
 
     case "passSignal":
@@ -191,13 +234,436 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
   }
 
   if (s.phase !== "driving") return null;
+
+  // B15-VOICE: a live yield OUTRANKS the objective. While the student is
+  // lawfully standing still, „what am I supposed to be doing" has a different
+  // and more urgent answer than the waypoint at the far end of the route — he
+  // is already doing it, and the card's job is to say so and name what he is
+  // waiting for. The objective prompt returns the frame he moves off.
+  const waiting = s.yieldWait;
+  if (waiting !== undefined && waiting.holding && waiting.reason !== null) {
+    return yieldWaitAdvisorPrompt(waiting.reason);
+  }
+
   if (s.currentObjectiveIndex >= s.objectives.length) return null;
   const active = s.objectives[s.currentObjectiveIndex];
   return advisorPromptForObjective(
     active.spec.titleBg,
     active.params,
     s.evalStates[s.currentObjectiveIndex],
+    s.lesson.postedLimitKmh,
   );
+}
+
+// ---------------------------------------------------------------------------
+// THE VOICE FOR THE WAITING — B15-VOICE (2026-08-05), requirement zero.
+//
+// THE DEFECT, measured at the give-way line of „Кръгово движение". For the
+// entire minute a student waits CORRECTLY nothing was said on the rule
+// surface, on the card or on the teach channel; the first thing the product
+// ever said to him about the priority car was „−10". That is a bare verdict
+// delivered by silence, and doc 64 THEO-4 — the founder's own ratified
+// requirement zero — forbids exactly that: every theory feature must act as a
+// virtual driving instructor that EXPLAINS EVERY DECISION, no bare
+// correct/wrong verdicts anywhere, ever.
+//
+// It is also backwards as teaching. The minute he is doing the right thing is
+// the minute a real instructor is talking: naming what has priority, saying
+// what gap to look for, and — the part beginners never hear — confirming that
+// WAITING IS THE MANOEUVRE, not a stall. B15 already made the wait survivable
+// (finish.ts froze the idle gates on it) and the rubric already stopped
+// billing it as slow. Neither of those is audible. This is.
+//
+// FOUR RULES THIS OBEYS.
+//
+//  1. IT MUST NOT NAG. A line that repeats every two seconds is worse than
+//     silence. So the voice is STAGED and each stage speaks at most ONCE per
+//     wait: the naming at YIELD_VOICE_NAME_S, the reassurance at
+//     YIELD_VOICE_SETTLE_S, the gap verdict after he goes. A two-minute wait
+//     produces three sentences, not sixty. The advisor CARD is deliberately
+//     constant for the whole wait — its text is the key the shell's
+//     announce/dismiss logic is built on (LessonPlayShell `advisorDismissed`,
+//     `useFreshKey`), so a card that counted seconds would re-announce itself
+//     on every frame, which is the nag wearing a different hat.
+//
+//  2. IT MUST NOT LEAK THE ANSWER ON THE EXAM. The existing advisor's own
+//     distinction is a single unconditional gate — `advisorPromptForSession`
+//     opens with `if (s.lesson.examMode === true) return null`, and
+//     `defaultAdvisorEnabled`/`glancePingsEligible` repeat it — because a
+//     training aid is not part of the car. Telling a candidate mid-assessment
+//     who has priority is telling him the answer. Same gate, same place: the
+//     engine never folds this on an exam session (engine.ts), and the card
+//     never renders one.
+//
+//  3. IT MUST NOT INVENT LAW. ADR-002: retrieval and citation only, never
+//     free recall. Three of the five citations below are read straight off the
+//     rule catalog at module load, so the sentence spoken while he waits cites
+//     byte-identically what the graded card would cite for failing the same
+//     duty. The two that no code grades (Б1, and a roundabout entry) are
+//     authored against the retrieved text of ЗДвП чл. 47 / чл. 50, ал. 1 and
+//     carry the same citation the scenario's own authored `teach.lawRef`
+//     carries. In particular the roundabout does NOT cite „чл. 50а": a content
+//     audit retracted that citation across the bank on 2026-08-03 (чл. 50а is
+//     the BLOCKED-junction rule and says nothing about roundabouts) — the
+//     priority comes from the sign at the mouth, and Б3 „Път с предимство"
+//     cannot be placed at a roundabout entry, which is why the entering driver
+//     is always on the road without priority.
+//
+//  4. IT MUST NOT GRADE, AND MUST NOT CONTRADICT WHAT DOES. Everything here
+//     emits `lesson` HUD events — the coach's channel for what is taught and
+//     not billed, the same one the B4/B5/B6 objective notices ride. It reads
+//     the graded stream but never writes to it. And the gap verdict MUTES
+//     itself the moment a yield-family fault is graded inside its window: a
+//     screen that says „good gap" beside a 10-point опасна is a worse failure
+//     than the silence this replaces.
+// ---------------------------------------------------------------------------
+
+/**
+ * Continuous seconds of lawful standstill before the instructor names the
+ * duty. Not zero on purpose: at a Б1 „Пропусни движението" a clear mouth is
+ * legal AT A ROLL (no full stop is demanded — see rules/types.ts on the
+ * give-way control), so a driver who dips to walking pace and carries on has
+ * not waited for anything and must not be lectured about it. Just over a
+ * second is the point at which the car has genuinely settled.
+ */
+export const YIELD_VOICE_NAME_S = 1.2;
+
+/**
+ * Continuous seconds before the SECOND line — the one that says the waiting is
+ * itself correct. This is the „am I broken?" mark: the founder's own wait was
+ * ~40 s, the roundabout drill's circulator laps in ~39 s, and the longest
+ * signalized red on the shipped maps is 26 s of a 50 s cycle. Ten seconds is
+ * inside all three, so the reassurance lands while the doubt is fresh and
+ * still leaves the rest of a long wait completely quiet.
+ */
+export const YIELD_VOICE_SETTLE_S = 10;
+
+/**
+ * Seconds after the wheels turn before the gap verdict speaks.
+ *
+ * It is a WINDOW rather than an instant because the honest evidence is what
+ * the rule engine does next, not what can be seen at the moment of departure.
+ * A barged entry convicts once the barge condition has held
+ * YIELD_CONVICT_SUSTAIN_SEC (0.9 s) and is immune only inside
+ * YIELD_BRAKE_RESPONSE_MAX_SEC (3.0 s) — both in worldRuntime.ts. Four seconds
+ * clears both, so „nothing was graded" means the adjudication has actually
+ * run and come back clean, not that it has not run yet.
+ */
+export const YIELD_VOICE_VERDICT_S = 4;
+
+/**
+ * How long a finished wait keeps waiting for the wheels to turn, seconds. A
+ * red goes green while the car is still standing — the wait has ended but the
+ * departure has not happened, and the verdict is about the departure. Past
+ * this the wait is disconnected from whatever he does next and is dropped
+ * unjudged.
+ */
+export const YIELD_VOICE_DEPART_GRACE_S = 10;
+
+/**
+ * A wait that ended less than this long ago is the SAME episode when it
+ * resumes, seconds. Two things produce a resume: creeping one car length up a
+ * queue at the line, and speed noise around the standstill bar. Neither is a
+ * new junction and neither may re-open the lecture. Twelve seconds is ~40 m at
+ * drill speeds — anything further apart than that is genuinely the next
+ * junction, and being told again there is right.
+ */
+export const YIELD_VOICE_EPISODE_GAP_S = 12;
+
+/**
+ * Graded codes that MUTE the gap verdict for the wait they land on. Every one
+ * of them means the departure was judged and judged badly, by the channel that
+ * is allowed to judge — the verdict would either contradict it or, worse,
+ * congratulate the student on the same frame the toast bills him ten points.
+ */
+export const YIELD_VOICE_MUTE_CODES: readonly ViolationCode[] = [
+  "FAILED_TO_YIELD",
+  "EMERGENCY_NOT_YIELDED",
+  "PEDESTRIAN_NOT_YIELDED",
+  "PEDESTRIAN_CROSSING_TOO_FAST",
+  "RED_LIGHT_CROSSED",
+  "STOP_SIGN_NO_FULL_STOP",
+  "CONTROLLER_SIGNAL_VIOLATED",
+  "COLLISION",
+];
+
+/**
+ * The Б1 / roundabout citation, authored against the RETRIEVED text of the
+ * two articles that actually carry the duty (content/law/acts/zdvp.json):
+ *
+ *   чл. 47 — „Водач на пътно превозно средство, приближаващо се към
+ *   кръстовище, трябва да се движи с такава скорост, че при необходимост да
+ *   може да спре и да пропусне участниците в движението, които имат
+ *   предимство."
+ *   чл. 50, ал. 1 — „На кръстовище, на което единият от пътищата е
+ *   сигнализиран като път с предимство, водачите на пътни превозни средства от
+ *   другите пътища са длъжни да пропуснат пътните превозни средства, които се
+ *   движат по пътя с предимство."
+ */
+const LAW_GIVE_WAY = "ЗДвП чл. 47; чл. 50, ал. 1";
+
+/**
+ * The roundabout citation — the yield half of `SC_ROUNDABOUT_ENTRY.teach
+ * .lawRef` (templates-flow.ts), in the form that file now uses. There is no
+ * „article for roundabouts" in ЗДвП; the priority comes from the sign at the
+ * mouth, and Б3 „Път с предимство" cannot stand there.
+ *
+ * NUMBERLESS ON THE НАРЕДБА, and that is a rule rather than a style choice.
+ * `modules/lesson/clearanceCitations.ts` names „Наредба № РД-02-21-1/23.11.2023
+ * чл. 61, ал. 5" — for this exact Б3 claim — as one of the two worst citations
+ * in the classroom, because that act is not in `content/law/acts` at all and
+ * the number therefore cannot be checked by anyone, least of all the student.
+ * A pinned citation may only be RESOLVABLE or NUMBERLESS. ЗДвП чл. 50, ал. 1 is
+ * resolvable and its text is quoted above; the Наредба is named for what it
+ * holds and carries no number.
+ */
+const LAW_ROUNDABOUT = "ЗДвП чл. 50, ал. 1; Наредба № РД-02-21-1/2023 правила за поставяне на знак Б3";
+
+/**
+ * The green-light citation. ППЗДвП чл. 31 is the catalog's own for the red
+ * (RED_LIGHT_CROSSED, retrieved below); ЗДвП чл. 50а is retrieved verbatim and
+ * is what makes „look before you go on green" a duty rather than advice:
+ * „Забранено е навлизането в кръстовище дори и при разрешаващ сигнал на
+ * светофара, ако обстановката в кръстовището ще принуди водача да спре в
+ * кръстовището или да възпрепятства напречното движение."
+ */
+const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50а`;
+
+interface YieldVoiceCopy {
+  /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
+  cardBg: string;
+  namedTitleBg: string;
+  namedBg: string;
+  settledTitleBg: string;
+  /** `sec` = whole seconds waited so far, so the reassurance is measured. */
+  settledBg: (sec: number) => string;
+  verdictTitleBg: string;
+  verdictBg: (sec: number) => string;
+  lawRef: string;
+}
+
+/**
+ * WHAT THE INSTRUCTOR SAYS, per reason. Authored copy — the advisor never
+ * free-forms guidance (ADR-002, the rule this file opens with) — with every
+ * legal claim traceable to the retrieved article in `lawRef` or to the rule
+ * catalog's own authored `correctiveBg` for the matching fault.
+ */
+const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
+  roundaboutEntry: {
+    cardBg:
+      "Чакаш правилно — в кръга имат предимство. Гледай НАЛЯВО и тръгвай, когато можеш да влезеш, без някой в кръга да намалява заради теб.",
+    namedTitleBg: "Защо чакаш: в кръга имат предимство",
+    namedBg:
+      "Спрял си правилно. На входа на кръгово кръстовище не може да стои знак „Път с предимство“ — там винаги е Б1 или Б2, тоест ти си на пътя без предимство и пропускаш движещите се в кръга. Гледай НАЛЯВО. Интервалът, който чакаш, е такъв, че да влезеш и да набереш скоростта на кръга, без движещият се в него да намалява заради теб.",
+    settledTitleBg: "Чакането Е маневрата",
+    settledBg: (sec) =>
+      `Стоиш вече ${sec} секунди и това е правилно — на кръгово се чака точно толкова, колкото поиска кръгът. Тези секунди не ти струват нито точка и се изваждат от ориентировъчното време на урока, така че не бързай. И не гледай надясно за „ред“: редът на пристигане не е правило за предимство — гледай наляво и тръгвай на първия истински интервал.`,
+    verdictTitleBg: "Интервалът беше добър",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и влезе — и при влизането не беше отчетено нарушение на предимството. Точно това е проверката, която ще правиш цял живот на всяко кръгово: тръгваш само когато можеш да влезеш и да набереш скорост, без движещият се в кръга да намалява заради теб. Оттук нататък излизането е отклонение надясно и се обявява с десен мигач.`,
+    lawRef: LAW_ROUNDABOUT,
+  },
+  giveWayLine: {
+    cardBg:
+      "Чакаш правилно — знак Б1: пропускаш движещите се по пътя с предимство. Огледай ляво–дясно–ляво и тръгвай в реален интервал.",
+    namedTitleBg: "Защо чакаш: знак Б1 „Пропусни движението“",
+    namedBg:
+      "Спрял си правилно. Знакът Б1 те поставя на пътя БЕЗ предимство: на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него. Пълно спиране Б1 не изисква — задължението е да пропуснеш. Огледай ляво–дясно–ляво и чакай интервал, в който пресичаш, без някой по главния път да намалява заради теб.",
+    settledTitleBg: "Чакането Е маневрата",
+    settledBg: (sec) =>
+      `${sec} секунди на линията са правилни, не бавни. Времето, което стоиш заради предимство, се изважда от ориентировъчното време на урока и не ти струва точки — законът иска да приближаваш кръстовището с такава скорост, че при необходимост да спреш и да пропуснеш, тоест да можеш да чакаш толкова, колкото поиска главният път. Ако видимостта е лоша, изнеси се напред бавно, докато видиш, и пак спри.`,
+    verdictTitleBg: "Пропусна и тръгна в истински интервал",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и премина — без отчетено нарушение на предимството. Запомни мярката вместо секундите: интервалът е достатъчен, когато пресичаш и се подреждаш в потока, без някой по главния път да вдига крак от газта заради теб.`,
+    lawRef: LAW_GIVE_WAY,
+  },
+  stopSign: {
+    cardBg:
+      "Знак Б2: пълното спиране е задължително — и е направено. Сега пропусни движещите се по пътя с предимство.",
+    namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
+    namedBg:
+      "Спрял си правилно, и точно тук пълното спиране е задължително — на Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен. Колелата неподвижни, брой наум до три, огледай ляво–дясно–ляво. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
+    settledTitleBg: "Чакането Е маневрата",
+    settledBg: (sec) =>
+      `${sec} секунди на стоп-линията са правилни. Пълното спиране е изпълнено — това, което тече сега, е втората половина на задължението: пропускането. Тези секунди не се броят в ориентировъчното време на урока, така че изчакай спокойно да мине всичко, което има предимство.`,
+    verdictTitleBg: "Спря докрай и пропусна",
+    verdictBg: (sec) =>
+      `Спря напълно, изчака ${sec} с и потегли — без отчетено нарушение на предимството. На истинския изпит двете половини се проверяват поотделно: първо колелата неподвижни на линията, после пропускането. Ти направи и двете.`,
+    lawRef: VIOLATIONS.STOP_SIGN_NO_FULL_STOP.lawRef,
+  },
+  redLight: {
+    cardBg:
+      "Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че кръстовището е свободно.",
+    namedTitleBg: "Защо чакаш: червен сигнал",
+    namedBg:
+      "Спрял си пред стоп-линията и това е единственото правилно нещо тук. На червено се спира напълно ПРЕД линията — без изключения — и се потегля чак на зелено. Дръж крак на спирачката и гледай светофара за ТВОЯТА посока. Когато светне зелено, преди да тръгнеш погледни самото кръстовище: навлизане е забранено дори при разрешаващ сигнал, ако обстановката вътре ще те принуди да спреш в кръстовището и да пречиш на напречното движение.",
+    settledTitleBg: "Чакането Е маневрата",
+    settledBg: (sec) =>
+      `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги: виж кой стои насреща, кой ще завива и къде са пешеходците, за да тръгнеш на зелено с готова картина вместо да я събираш в движение.`,
+    verdictTitleBg: "Изчака сигнала и тръгна чисто",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и премина — без отчетено нарушение на сигнала. Зеленото е разрешение да минеш, не задължение да тръгнеш веднага: проверката, която току-що направи — свободно ли е кръстовището отсреща — е тази, която пази от засядане в средата му.`,
+    lawRef: LAW_RED_LIGHT,
+  },
+  pedestrian: {
+    cardBg:
+      "Чакаш правилно — пешеходецът на пътеката минава пръв. Изчакай да освободи платното; не минавай зад гърба му.",
+    namedTitleBg: "Защо чакаш: пешеходец на пътеката",
+    namedBg:
+      "Спрял си правилно. При приближаване към пешеходна пътека си длъжен да пропуснеш стъпилите на нея или преминаващите по нея пешеходци, като намалиш скоростта или спреш. Изчакай човекът да освободи платното — не го заобикаляй и не минавай зад гърба му, дори да изглежда, че има място. Погледни и встрани от пътеката: който сигнализира, че ще пресича, също се пропуска.",
+    settledTitleBg: "Чакането Е маневрата",
+    settledBg: (sec) =>
+      `${sec} секунди пред пътеката са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Пешеходецът може да е бавен, да се върне или да поведе дете: не тръгвай на предположение, тръгни, когато го видиш от другата страна.`,
+    verdictTitleBg: "Пропусна пешеходеца",
+    verdictBg: (sec) =>
+      `Изчака ${sec} с и потегли — без отчетено нарушение спрямо пешеходец. Това е грешката с най-тежка цена в целия списък, и ти я избегна по правилния начин: спиране, изчакване докрай, чак после газ.`,
+    lawRef: VIOLATIONS.PEDESTRIAN_NOT_YIELDED.lawRef,
+  },
+};
+
+/** The card line for a live wait — constant per reason, by design (rule 1). */
+export function yieldWaitAdvisorPrompt(reason: YieldReason): AdvisorPrompt {
+  // No key chips: the correct action is to keep the car still, and the honesty
+  // rule of this file is that a chip must name a control that PERFORMS the
+  // step. There is no key for „carry on doing nothing".
+  return { textBg: YIELD_VOICE_COPY[reason].cardBg, keys: [] };
+}
+
+/** Fresh voice: nothing said, nothing pending. */
+export function createYieldVoice(): YieldVoiceState {
+  return { reason: null, sinceSec: 0, endedAtSec: null, spoken: 0, pending: null };
+}
+
+/** One frame of evidence for `stepYieldVoice` — no clock, no world access. */
+export interface YieldVoiceInput {
+  /** Session time, seconds. */
+  t: number;
+  /** Speed this frame, km/h (sign ignored — a reverse creep is still moving). */
+  speedKmh: number;
+  /** The lawful-wait hold for this frame (finish.ts `stepYieldWait`). */
+  wait: YieldWaitState;
+  /** Codes GRADED on this frame — the engine's own rule output, read only. */
+  violations: readonly ViolationCode[];
+}
+
+/** What the voice produced this frame. `notices` is empty on almost all of them. */
+export interface YieldVoiceStep {
+  state: YieldVoiceState;
+  notices: readonly HudEvent[];
+}
+
+/** The standstill bar, mirroring finish.ts FINISH_STANDSTILL_KMH — kept as a
+ *  local literal so this pure copy module stays free of the gate machinery. */
+const YIELD_VOICE_STANDSTILL_KMH = 1;
+
+function say(copy: YieldVoiceCopy, titleBg: string, explanationBg: string): HudEvent {
+  return { kind: "lesson", titleBg, explanationBg, lawRef: copy.lawRef };
+}
+
+/**
+ * Advance the instructor's voice by one frame. Pure: same state + same input
+ * ⇒ same output, like every other fold in this subsystem.
+ *
+ * THE SHAPE, in one sentence per stage:
+ *  · the wait begins → after YIELD_VOICE_NAME_S, name what has priority, why,
+ *    and what gap he is looking for, with the article;
+ *  · the wait lasts  → after YIELD_VOICE_SETTLE_S, say once that the waiting
+ *    itself is the manoeuvre and is costing him nothing;
+ *  · the wait ends and the wheels turn → after YIELD_VOICE_VERDICT_S, say
+ *    whether the gap was right — unless the graded channel already said it was
+ *    not, in which case say nothing at all.
+ *
+ * Everything else is bookkeeping that keeps each of those to exactly once.
+ */
+export function stepYieldVoice(
+  prev: YieldVoiceState | undefined,
+  input: YieldVoiceInput,
+): YieldVoiceStep {
+  const { t, wait, violations } = input;
+  const base = prev ?? createYieldVoice();
+  const notices: HudEvent[] = [];
+  const moving = Math.abs(input.speedKmh) > YIELD_VOICE_STANDSTILL_KMH;
+
+
+  let reason = base.reason;
+  let sinceSec = base.sinceSec;
+  let endedAtSec = base.endedAtSec;
+  let spoken = base.spoken;
+  let pending = base.pending;
+
+  // --- 1. The verdict window, first: it can be muted by this very frame. ----
+  if (pending !== null) {
+    if (violations.some((c) => YIELD_VOICE_MUTE_CODES.includes(c))) {
+      // The graded channel owns this departure. Drop it silently — this is the
+      // one branch that must never speak, and it is why the verdict waits.
+      pending = null;
+    } else if (wait.holding) {
+      // He did not actually go: a creep of one car length in a queue, and he is
+      // standing at the same line again. Nothing has been judged, so nothing
+      // is said; the episode below simply resumes.
+      pending = null;
+    } else if (pending.wentAtSec === null) {
+      if (moving) pending = { ...pending, wentAtSec: t };
+      else if (t - (endedAtSec ?? t) > YIELD_VOICE_DEPART_GRACE_S) pending = null;
+    } else if (t - pending.wentAtSec >= YIELD_VOICE_VERDICT_S) {
+      const copy = YIELD_VOICE_COPY[pending.reason];
+      notices.push(
+        say(copy, copy.verdictTitleBg, copy.verdictBg(Math.max(1, Math.round(pending.waitedSec)))),
+      );
+      pending = null;
+    }
+  }
+
+  // --- 2. The live wait. ---------------------------------------------------
+  if (wait.holding && wait.reason !== null) {
+    // The episode CONTINUES while the duty is the same and the hold either
+    // never broke (`endedAtSec === null`) or broke only briefly — a creep of
+    // one car length up a queue, or speed noise around the standstill bar.
+    const continuing =
+      reason === wait.reason &&
+      (endedAtSec === null || t - endedAtSec <= YIELD_VOICE_EPISODE_GAP_S);
+    if (!continuing) {
+      // Nothing to resume — a first wait, a different duty, or the same one far
+      // enough later to be the NEXT junction. All three are a new episode, and
+      // a new episode is allowed to be explained from the top.
+      sinceSec = wait.sinceSec ?? t;
+      spoken = 0;
+    }
+    reason = wait.reason; // identical when continuing; the live duty otherwise
+    endedAtSec = null;
+
+    const heldSec = t - sinceSec;
+    const copy = YIELD_VOICE_COPY[wait.reason];
+    if (spoken < 1 && heldSec >= YIELD_VOICE_NAME_S) {
+      notices.push(say(copy, copy.namedTitleBg, copy.namedBg));
+      spoken = 1;
+    }
+    if (spoken < 2 && heldSec >= YIELD_VOICE_SETTLE_S) {
+      notices.push(say(copy, copy.settledTitleBg, copy.settledBg(Math.round(heldSec))));
+      spoken = 2;
+    }
+    return { state: { reason, sinceSec, endedAtSec, spoken, pending }, notices };
+  }
+
+  // --- 3. The wait just ended. --------------------------------------------
+  if (reason !== null && endedAtSec === null) {
+    endedAtSec = t;
+    // Only a wait the student was actually TOLD about gets a verdict. A
+    // sub-YIELD_VOICE_NAME_S dip was never narrated and judging it would be a
+    // bare verdict of exactly the kind this file exists to abolish.
+    if (spoken >= 1 && pending === null) {
+      pending = { reason, waitedSec: Math.max(0, t - sinceSec), wentAtSec: moving ? t : null };
+    }
+  }
+
+  // The episode is forgotten only once it can no longer resume, so that a
+  // creep-and-restop within the gap does not re-open the lecture.
+  if (reason !== null && endedAtSec !== null && t - endedAtSec > YIELD_VOICE_EPISODE_GAP_S) {
+    reason = null;
+    spoken = 0;
+  }
+
+  return { state: { reason, sinceSec, endedAtSec, spoken, pending }, notices };
 }
 
 // ---------------------------------------------------------------------------

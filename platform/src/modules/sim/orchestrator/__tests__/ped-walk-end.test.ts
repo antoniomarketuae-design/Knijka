@@ -22,6 +22,7 @@
 import { describe, expect, it } from "vitest";
 import type { PedestrianDartOutSpec } from "../../contracts";
 import { SCENARIO_TEMPLATES } from "@/modules/sim/lessons";
+import { PED_SHOULDER_HALF_M } from "../../traffic/pedestrians";
 import { createTrafficSystem } from "../../traffic/system";
 import type { TrafficDistrict } from "../../traffic/types";
 import { PedestrianDartOutRunner, PED_REST_PAST_ROAD_M } from "../runners";
@@ -30,6 +31,10 @@ import { PedestrianDartOutRunner, PED_REST_PAST_ROAD_M } from "../runners";
 const SIDEWALK_WIDTH_M = 3.5;
 /** PARK_BAND_CENTER_M (traffic/TrafficLayer) — where a kerbside body sits. */
 const PARK_BAND_CENTER_M = 2.0;
+/** PARKED_HALF_W_M (traffic/TrafficLayer) — and a body is 1.9 m WIDE. */
+const PARKED_HALF_W_M = 0.95;
+/** SIDEWALK_SKIRT_M (world/builders/constants) — the kerb face she steps up. */
+const SIDEWALK_SKIRT_M = 0.35;
 
 function straightDistrict(): TrafficDistrict {
   return {
@@ -73,12 +78,33 @@ function pedSpecs(): PedestrianDartOutSpec[] {
 
 describe("staged pedestrian walk end (L9 second-order)", () => {
   it("rests on the pavement, clear of both the carriageway and the parked row", () => {
-    // One pace past the kerb: past the carriageway, inside a 3.5 m pavement,
-    // and short of the 2.0 m parking-band centre so she can never finish
-    // inside a parked body even where no clear zone was authored.
-    expect(PED_REST_PAST_ROAD_M).toBeGreaterThan(0.5);
-    expect(PED_REST_PAST_ROAD_M).toBeLessThan(PARK_BAND_CENTER_M);
+    // 2026-08-04 — this test used to say `< PARK_BAND_CENTER_M`, and that is
+    // how a clamp of 1.8 m was certified as "can never finish inside a parked
+    // body". It compared her against the body's CENTRE. A parked body is 1.9 m
+    // wide, so it spans 1.05 … 2.95 m past the kerb and 1.8 m is 0.75 m INSIDE
+    // its near flank. Register B46 photographed exactly that: rest x 9.94
+    // against a body spanning 9.21 … 11.09.
+    //
+    // The assertion is now against her SHOULDER and the body's FLANK, which is
+    // the thing his sentence is about, and it is bounded on both sides — the
+    // constant has 0.20 m of legal room in total.
+    const nearFlank = PARK_BAND_CENTER_M - PARKED_HALF_W_M; // 1.05 m past the kerb
+    expect(PED_REST_PAST_ROAD_M + PED_SHOULDER_HALF_M).toBeLessThanOrEqual(nearFlank);
+    // …and far enough out to be standing ON the pavement, not on the kerb face.
+    expect(PED_REST_PAST_ROAD_M - PED_SHOULDER_HALF_M).toBeGreaterThanOrEqual(SIDEWALK_SKIRT_M);
     expect(PED_REST_PAST_ROAD_M).toBeLessThan(SIDEWALK_WIDTH_M);
+  });
+
+  it("zb-v1 — the district of the lesson he was looking at — puts her nowhere near a body", () => {
+    // The concrete instance, in world coordinates, so a future reader does not
+    // have to re-derive it. `zb-e-street` is 2-lane residential with no parking
+    // band: kerb at 8.125, procedural row on the FOOTWAY at 9.175 … 11.075.
+    const KERB_X = 8.125;
+    const restX = KERB_X + PED_REST_PAST_ROAD_M;
+    const bodyNear = KERB_X + PARK_BAND_CENTER_M - PARKED_HALF_W_M;
+    expect(restX + PED_SHOULDER_HALF_M).toBeLessThanOrEqual(bodyNear);
+    // The old 1.8 m clamp rested her at 9.925 — inside 9.175 … 11.075.
+    expect(KERB_X + 1.8).toBeGreaterThan(bodyNear);
   });
 
   it("the census this was measured against is still the census", () => {
@@ -122,16 +148,40 @@ describe("staged pedestrian walk end (L9 second-order)", () => {
     const long = traffic.staged("long")!;
     expect(long.pathLengthM).toBeCloseTo(17.85 + PED_REST_PAST_ROAD_M, 5);
 
-    // Already short (the reversing-bay aisle walker's +1.2 m): untouched.
+    // Already short (sc-hzac-bystander stops AT the kerb, +0.0 m): untouched.
     const shortSpec = {
       ...base,
       id: "short",
-      travelM: 8.4,
+      travelM: 7.2,
       roadFromM: 1.2,
       roadToM: 7.2,
     } as unknown as PedestrianDartOutSpec;
     new PedestrianDartOutRunner(shortSpec).stage(traffic, () => 0.5, true);
-    expect(traffic.staged("short")!.pathLengthM).toBeCloseTo(8.4, 5);
+    expect(traffic.staged("short")!.pathLengthM).toBeCloseTo(7.2, 5);
+  });
+
+  it("the three specs the tighter clamp newly shortens all end clear of the row", () => {
+    // Tightening 1.8 → 0.8 moves three authored walks that the old clamp left
+    // alone: pbe-aisle-walker (+1.20), sc-hzes-child (+1.38) and
+    // sc-rts-passenger (+1.67). Every one of those rest points was inside the
+    // parked row's 1.05 … 2.95 m band, so all three are moved OUT of a car,
+    // and none of them is moved back onto the carriageway.
+    const nearFlank = PARK_BAND_CENTER_M - PARKED_HALF_W_M;
+    const newlyClamped = pedSpecs().filter(
+      (s) => !s.ambient && s.travelM - s.roadToM > PED_REST_PAST_ROAD_M && s.travelM - s.roadToM <= 1.8,
+    );
+    expect(newlyClamped.map((s) => s.id).sort()).toEqual([
+      "pbe-aisle-walker",
+      "sc-hzes-child",
+      "sc-rts-passenger",
+    ]);
+    for (const s of newlyClamped) {
+      expect(s.travelM - s.roadToM + PED_SHOULDER_HALF_M, s.id).toBeGreaterThan(nearFlank);
+      expect(
+        Math.min(s.travelM, s.roadToM + PED_REST_PAST_ROAD_M) - s.roadToM,
+        s.id,
+      ).toBeCloseTo(PED_REST_PAST_ROAD_M, 6);
+    }
   });
 
   it("still reaches every arc the encounter grades against", () => {

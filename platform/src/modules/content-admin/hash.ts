@@ -24,6 +24,13 @@ export interface CanonicalQuestionContent {
   options: { id: string; textBg: string; correct: boolean; media: unknown }[];
   explanationBg: string;
   lawRefs: { act: string; ref: string }[];
+  /**
+   * Present ONLY when the row carries non-statutory citations. Omitting the key
+   * on the 1,089 rows that do not is not cosmetic: a key that is always emitted
+   * would change every existing content hash, and the reviewer's signature is
+   * supposed to change when the CONTENT changes, not when the schema grows.
+   */
+  sourceRefs?: { sourceId: string; ref: string; claimId?: string }[];
   media: unknown;
 }
 
@@ -49,6 +56,18 @@ export function canonicalQuestionContent(q: Question): CanonicalQuestionContent 
     })),
     explanationBg: q.explanationBg,
     lawRefs: q.lawRefs.map((l) => ({ act: l.act, ref: l.ref })),
+    // A first-aid row's grounding IS what the reviewer is signing off on, so it
+    // has to be inside the hash — otherwise the ERC citation could be swapped
+    // after approval and the signature would still match. `undefined` makes
+    // JSON.stringify drop the key entirely for every row without sourceRefs.
+    sourceRefs:
+      q.sourceRefs && q.sourceRefs.length > 0
+        ? q.sourceRefs.map((s) =>
+            s.claimId === undefined
+              ? { sourceId: s.sourceId, ref: s.ref }
+              : { sourceId: s.sourceId, ref: s.ref, claimId: s.claimId },
+          )
+        : undefined,
     media: q.media ?? null,
   };
 }

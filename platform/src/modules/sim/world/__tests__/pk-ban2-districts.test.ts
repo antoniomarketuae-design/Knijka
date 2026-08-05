@@ -393,23 +393,36 @@ describe(`${ID} — В27 vs В28 adjudication through the real reducer`, () => {
 // Known render gap — the plate the drill most needs a learner to SEE
 // ---------------------------------------------------------------------------
 
-describe(`${ID} — plate furniture (KNOWN GAP, pinned)`, () => {
-  it("posts the В27 face and NOTHING for В28 — exactly backwards from what the drill wants shown", () => {
-    // builders/zoneSigns.ts maps noStopping → the В27 SignKind and leaves
-    // noParking in the marking-only bucket (no В28 asset exists), so the half
-    // of this street whose plate carries the LESSON renders bare. Render-only:
-    // grading reads the spans, never the posts.
-    // FIX: a В28 SignKind asset + `noParking: "noParking"` in ZONE_SIGN_KIND
-    // (shared files — not taken here); then this expects 1 and 1.
+describe(`${ID} — plate furniture (GAP CLOSED)`, () => {
+  it("posts BOTH plates — one В28 over the parking ban, one В27 over the stopping ban", () => {
+    // WAS „posts the В27 face and NOTHING for В28 — exactly backwards from what
+    // the drill wants shown", pinned as a KNOWN GAP because a В28 SignKind
+    // touches shared files. It has been taken: `noParking` is a SignKind, it
+    // rides the В27 GLB (the two source SVGs open with a byte-identical plate
+    // circle and differ only in the face — one diagonal instead of the X), and
+    // `ZONE_SIGN_KIND.noParking` posts it. This map's own data was already
+    // asking for it: the zone carries `signRef: "В28"` and a spawn point is
+    // literally named „Място за престой — под В28".
+    // Render-only, exactly as before: grading reads the spans, never the posts.
     const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
     expect(world.stats.signs.noStopping).toBe(1);
-    expect(zoneSignsPlaceNoParking()).toBe(false);
+    expect(world.stats.signs.noParking).toBe(1);
+    expect(zoneSignsPlaceNoParking()).toBe(true);
+  });
+
+  it("…and each plate stands at the first metre of the span it governs", () => {
+    const world = buildWorldGeometry(assertDistrict(loadRaw(ID)), { seed: 7 });
+    // World space is (x, y, −districtY), so the district metre is −z.
+    const at = (kind: "noParking" | "noStopping") =>
+      world.signs.filter((s) => s.kind === kind).map((s) => -s.position[2]);
+    expect(at("noParking")).toEqual([PARK_FROM_Y]);
+    expect(at("noStopping")).toEqual([SEAM_Y]);
   });
 });
 
-/** Documentation-as-assertion: the sign builder's kind table has no noParking
- *  entry, so no authored В28 span can post a plate today. Kept as a function so
- *  the claim above is checkable, not folklore. */
+/** Documentation-as-assertion: the sign builder's kind table maps the noParking
+ *  zone to a post. Kept as a function so the claim above is checkable, not
+ *  folklore. */
 function zoneSignsPlaceNoParking(): boolean {
   const src = fs.readFileSync(path.resolve(__dirname, "..", "builders", "zoneSigns.ts"), "utf8");
   return /ZONE_SIGN_KIND[\s\S]*?noParking\s*:/.test(src.slice(src.indexOf("ZONE_SIGN_KIND"), src.indexOf("};", src.indexOf("ZONE_SIGN_KIND"))));

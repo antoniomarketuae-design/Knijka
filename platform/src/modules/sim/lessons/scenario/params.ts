@@ -75,11 +75,44 @@ function widenRadius(radiusM: number, toleranceScale: number, maxRadiusWidenM: n
  * «спри напълно» accept a rolling car and strip the very capsule that makes
  * stopping a metre short count. So the 42 halt gates in the catalog read the
  * same at L1 as at L4 — «спри» means спри on every rung.
+ *
+ * THE POSTED-LIMIT CEILING (doc 87 B58, and B56 before it). The compiled cap
+ * is not a private number: `RouteGuidance` prints it in the world, on the gate
+ * bar across the lane, as «не по-бързо от N км/ч» — an INSTRUCTION the student
+ * reads and obeys. On `sc-speed-dangerous` — the drill whose entire subject is
+ * that 51–60 км/ч in a 50 zone is a scored fault — the L1 ladder turned an
+ * authored 52 into a bar reading **57 on a street posted 50**, so the world
+ * instructed the exact offence it was about to bill. The founder's B58 words
+ * for the class: „a student who obeys the number the world shows him commits
+ * the mistake the world is grading."
+ *
+ * The census that made this a class rather than an anecdote: **126** compiled
+ * reachZone gates across the catalog carried a cap above their district's
+ * posted limit, and **94 of them were the ladder's doing** (authored ≤ posted,
+ * compiled above it) — every aided rung of every speed, overtaking and
+ * lane-discipline drill, plus the motorway (authored 140 = posted 140 → an L1
+ * bar reading 145). Grace is forgiveness for a beginner's speedometer; it was
+ * never a licence to post a higher number than the sign.
+ *
+ * So the grace is bounded by the posted limit, and by `maxSpeedKmh` itself so
+ * the WIDEN-ONLY rule above still holds exactly: a template that authored a
+ * cap ABOVE its own posted limit keeps that authored cap (tightening it is an
+ * authoring decision, not the ladder's, and would move 32 graded gates), it
+ * simply stops being inflated further. `postedLimitKmh` absent ⇒ behaviour is
+ * bit-identical to before, which is what keeps the 446 gates on maps that
+ * declare no limit unchanged.
  */
-function widenSpeedCap(maxSpeedKmh: number, toleranceScale: number): number {
+function widenSpeedCap(
+  maxSpeedKmh: number,
+  toleranceScale: number,
+  postedLimitKmh?: number,
+): number {
   if (maxSpeedKmh <= REACH_ZONE_HALT_CAP_KMH) return maxSpeedKmh;
   const grace = SPEED_CAP_GRACE_KMH_PER_TOLERANCE * Math.max(0, toleranceScale - 1);
-  return grace > 0 ? r1(maxSpeedKmh + grace) : maxSpeedKmh;
+  if (grace <= 0) return maxSpeedKmh;
+  const widened = r1(maxSpeedKmh + grace);
+  if (postedLimitKmh === undefined || !Number.isFinite(postedLimitKmh)) return widened;
+  return Math.min(widened, Math.max(maxSpeedKmh, postedLimitKmh));
 }
 
 /**
@@ -90,11 +123,18 @@ function widenSpeedCap(maxSpeedKmh: number, toleranceScale: number): number {
  * `maxRadiusWidenM` is the chain-derived ceiling described on widenRadius;
  * it defaults to the standing REACH_ZONE_GRACE_M ceiling so a caller that
  * only has one objective in hand (validate.ts's round-trip) still behaves.
+ *
+ * `postedLimitKmh` is the street's own limit (`spec.map.params.maxspeedKmh`,
+ * mirrored in the district's `meta.scenario.params`). Optional for the same
+ * reason: a caller round-tripping a single objective has no map in hand, and
+ * absent it the ladder behaves exactly as it always did. See widenSpeedCap —
+ * the gate's number is printed in the world, so it may not exceed the sign.
  */
 export function serializeObjectiveParams(
   p: ObjectiveParams,
   toleranceScale = 1,
   maxRadiusWidenM = REACH_ZONE_GRACE_M,
+  postedLimitKmh?: number,
 ): { kind: LessonObjective["kind"]; params: Record<string, unknown> } {
   switch (p.kind) {
     case "reachZone": {
@@ -104,7 +144,7 @@ export function serializeObjectiveParams(
         radiusM: widenRadius(p.radiusM, toleranceScale, maxRadiusWidenM),
       };
       if (p.maxSpeedKmh !== undefined) {
-        params.maxSpeedKmh = widenSpeedCap(p.maxSpeedKmh, toleranceScale);
+        params.maxSpeedKmh = widenSpeedCap(p.maxSpeedKmh, toleranceScale, postedLimitKmh);
       }
       // B18/FR-24 — carried through untouched by the ladder, and that IS the
       // point: the widening above stretches the acceptance backwards down the

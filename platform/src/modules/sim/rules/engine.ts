@@ -230,6 +230,9 @@ export interface RuleEngineState {
   // -- B1a Wave-3 detector pack (doc 72 capability 1) — config-gated drills --
   /** Following under the WET-prudent gap while it rains (FO-04; config-gated). */
   followingRain: EpisodeState;
+  /** Gap to the lead COLLAPSING and already under the taught time-gap — the
+   *  approach to a slowing / stopped queue (FO-08; config-gated). */
+  leadClosing: EpisodeState;
   // -- ZONE-BAN data layer (ADR-006 stage 2a) --------------------------------
   /** Casual rest inside an authored В27 no-stopping zone (PK-06). */
   banZoneStop: EpisodeState;
@@ -288,6 +291,42 @@ const IDLE_EPISODE: EpisodeState = {
   lastEmitAt: null,
 };
 
+/**
+ * JU-23 per-CONTROL copy for JUNCTION_SCAN_INCOMPLETE (doc 87, item 5 of the
+ * 2026-08-05 gate's open list).
+ *
+ * The code is armed at BOTH kinds of priority line — a Б1 give-way line and a
+ * Б2 stop line — because the fresh ляво-дясно scan is owed at both (see the
+ * `stopLineCrossed` branch). The catalogue carries one string per code, so it
+ * used to name Б2 for both, and the founder photographed the consequence: a
+ * fault card reading «Премина стоп-линията на знак Б2» under the title bar of
+ * the lesson «Б1 не значи спри винаги» (`newdef/b5gw-card-t24.4.png`).
+ *
+ * The catalogue text is now control-neutral and these two overrides put the
+ * sign the student actually crossed on the card. They ride `makeViolation`'s
+ * existing `titleBg`/`explanationBg` override channel — no new event field, no
+ * new code, no severity or points change. `correctiveBg` has no per-event
+ * channel (it is read from the catalogue BY CODE at display time), which is
+ * why the catalogue's corrective was rewritten to be true of both controls
+ * rather than split here.
+ *
+ * The Б1 half must also not smuggle back the myth this lesson exists to kill:
+ * Б1 does not demand a stop (ЗДвП чл. 50), it demands that you give way — so
+ * its copy says „намали и огледай", never „спри".
+ */
+const JUNCTION_SCAN_COPY = {
+  giveWay: {
+    titleBg: "Непълно оглеждане при знак Б1",
+    explanationBg:
+      "Премина линията на знак Б1 „Пропусни движението“, без да огледаш и наляво, и надясно. Б1 не иска да спреш винаги — иска да пропуснеш, а пропускаш само това, което си видял. „Един поглед не стига“: най-честата причина за удар на кръстовище е „гледах, но не видях“.",
+  },
+  stop: {
+    titleBg: "Непълно оглеждане при знак Б2",
+    explanationBg:
+      "Премина стоп-линията на знак Б2 „Спри!“, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за удар на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
+  },
+} as const;
+
 export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngineState {
   return {
     config: { ...DEFAULT_RULE_CONFIG, ...config },
@@ -333,6 +372,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     standstillGap: { ...IDLE_EPISODE },
     highBeamDip: { ...IDLE_EPISODE },
     followingRain: { ...IDLE_EPISODE },
+    leadClosing: { ...IDLE_EPISODE },
     banZoneStop: { ...IDLE_EPISODE },
     solidCross: { ...IDLE_EPISODE },
     busLane: { ...IDLE_EPISODE },
@@ -377,6 +417,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     standstillGap: { ...s.standstillGap },
     highBeamDip: { ...s.highBeamDip },
     followingRain: { ...s.followingRain },
+    leadClosing: { ...s.leadClosing },
     banZoneStop: { ...s.banZoneStop },
     solidCross: { ...s.solidCross },
     busLane: { ...s.busLane },
@@ -1100,6 +1141,48 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("FOLLOWING_TOO_CLOSE", t));
   }
 
+  // FO-08 — CLOSING ON THE LEAD (config-gated per-lesson drill; see the
+  // RuleEngineConfig block for the measurement that produced it).
+  //
+  // The detector above is muted below `followMinSpeedKmh` so a queue rolling in
+  // formation is not spammed, and „Дистанция при спиране в колона" is driven
+  // entirely inside that mute: at its own nominal 19.9 km/h the recorded run
+  // eats 27.5 m of gap down to zero and grades NOTHING. This is the missing
+  // half, and it swaps the SPEED gate for the discriminator the speed gate was
+  // standing in for:
+  //
+  //   the gap is genuinely COLLAPSING (≥ leadClosingMinRateMps) — a queue in
+  //   formation holds its gap and a faster car ahead opens it, so neither can
+  //   ever arm this — AND it has already fallen under the FULL taught time-gap.
+  //
+  // No grace ratio here, deliberately: `followFireRatio` exists so a steady
+  // 1.3 s of urban flow is not billed as tailgating, and a gap that is steady
+  // is exactly the case this code excludes. What is left is „you are under the
+  // taught distance AND still eating it", which needs no further tolerance —
+  // and it fires while the student can still stop, which a 0.7 × line would
+  // not.
+  //
+  // NO DOUBLE BILL, structurally: this code is armed ONLY BELOW
+  // `followMinSpeedKmh`, i.e. in exactly the band the base основна is muted in.
+  // Above the floor the same act is already FOLLOWING_TOO_CLOSE and this stays
+  // silent — measured: a 25 km/h run used to collect BOTH (closing at t=14.3,
+  // then tailgating at t=16.6 — six points for one act) and now collects only
+  // the base code, unchanged from before this detector existed.
+  const leadClosingMps = -gapOpeningMps;
+  const closingOnLead =
+    cfg.leadClosingEnabled &&
+    moving &&
+    forwardGear &&
+    speed < cfg.followMinSpeedKmh &&
+    leadGapM !== null &&
+    leadClosingMps >= cfg.leadClosingMinRateMps &&
+    leadGapM < safeGapM;
+  if (
+    stepEpisode(s.leadClosing, closingOnLead, !closingOnLead, t, cfg.leadClosingSustainSec)
+  ) {
+    events.push(makeViolation("CLOSING_ON_LEAD_TOO_FAST", t));
+  }
+
   // Rain-aware following (FO-04 — „дистанция в дъжд"; config-gated per-lesson
   // drill). In rain the braking distance grows ~1.5×, so the prudent gap does
   // too. This fires ONLY in the band that is fine for DRY (the base основна
@@ -1599,6 +1682,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.standstillGap,
     s.highBeamDip,
     s.followingRain,
+    s.leadClosing,
     s.banZoneStop,
     s.solidCross,
     s.busLane,
@@ -1694,8 +1778,12 @@ function handleTickEvent(
         return !scanned;
       };
       if (e.control === "giveWay") {
-        // Б1: no full-stop grade; the scan-observation fault still applies.
-        if (scanIncomplete()) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
+        // Б1: no full-stop grade; the scan-observation fault still applies —
+        // and it names Б1, not Б2. The catalogue string is control-neutral (see
+        // its comment); this is the branch that puts the right sign on the card.
+        if (scanIncomplete()) {
+          out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.giveWay));
+        }
         break;
       }
       // Б2 stop sign: a qualifying full stop must have ended recently. The scan
@@ -1708,7 +1796,9 @@ function handleTickEvent(
           ? makeCommendation("FULL_STOP_AT_STOP_SIGN", t)
           : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
       );
-      if (scanIncomplete()) out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t));
+      if (scanIncomplete()) {
+        out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.stop));
+      }
       break;
     }
 

@@ -105,6 +105,7 @@ const CONFIG_GATED: ReadonlyArray<readonly [FaultCode, keyof RuleEngineConfig]> 
   ["JUNCTION_SCAN_INCOMPLETE", "junctionScanObservationEnabled"],
   ["TURN_WITHOUT_OBSERVATION", "turnObservationEnabled"],
   ["FOLLOWING_TOO_CLOSE_FOR_RAIN", "followRainAwareEnabled"],
+  ["CLOSING_ON_LEAD_TOO_FAST", "leadClosingEnabled"],
   ["ILLEGAL_STOP_IN_BAN_ZONE", "banZoneStopEnabled"],
   ["DRIVING_TOO_SLOW_FOR_MOTORWAY", "motorwayMinSpeedEnabled"],
 ];
@@ -1478,6 +1479,10 @@ export const REFERENT_RULES: Readonly<Partial<Record<FaultCode, ReferentRule>>> 
   FOLLOWING_TOO_CLOSE_FOR_RAIN: stagedActorRule(
     ["brakingLeadCar", "cutInLeadCar"],
     "a lead vehicle to follow",
+  ),
+  CLOSING_ON_LEAD_TOO_FAST: stagedActorRule(
+    ["brakingLeadCar", "cutInLeadCar"],
+    "a lead vehicle to close on",
   ),
   STANDSTILL_GAP_TOO_CLOSE: stagedActorRule(
     ["brakingLeadCar", "cutInLeadCar"],

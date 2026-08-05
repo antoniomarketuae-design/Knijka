@@ -177,6 +177,61 @@ Section mastery is simply the aggregate of its concepts. Rules:
 }]                                   // generators stop at machine-checked — see "status"
 ```
 
+### `sourceRefs` — citing something that is not a statute
+
+**Optional, additive.** Every row written before this field existed validates
+unchanged, and a re-serialisation never introduces the key.
+
+```json
+{
+  "lawRefs":    [{ "act": "ЗДвП", "ref": "§ 6, т. 30 ДР" }],
+  "sourceRefs": [{
+    "sourceId": "src-nsi-ptp-2023",                       // must resolve in a register
+    "ref": "Методологични бележки — „загинал при ПТП“",   // the source's OWN terms
+    "claimId": "stat-road-death-30-days"                  // optional: the checked quote
+  }]
+}
+```
+
+**Why it exists.** `lawRefs` used to be `min 1` on every question, so a row was
+*compelled* to name an act even where no act governs the answer. Twenty-nine
+first-aid questions duly cited **ЗДвП чл. 123** — the duty to stop and assist —
+under claims about compression depth and tourniquets. That was not carelessness;
+it was the only thing the schema would accept (docs/education/90 §12 item 8,
+§14 item N).
+
+**The rule now.** `lawRefs.length + sourceRefs.length >= 1`. Cite something —
+but only cite a statute when a statute is what settles it. `lawRefs` on its own
+still covers ~all rows and nothing about them changed.
+
+**Registers.** `sourceId` must exist in one of:
+
+| Register | File | Holds |
+| --- | --- | --- |
+| medical | `medical/sources.json` | clinical guidelines (ERC 2025, RCUK 2025, БЧК) |
+| general | `sources/sources.json` | other non-statutory sources (statistical methodology today) |
+
+Ids are globally unique across registers, so a row names only the id. An
+unresolvable `sourceId` **fails the load and `validate:content`**, exactly like
+an unknown `signRef` — a citation nobody can open is the defect, not the fix.
+`claimId` points at a claim in the same register's `claims.json`, whose quote
+was *cut from the fetched source text by a builder that throws when the locator
+stops matching*; that is what the review console shows and what
+`tools/verify.mjs` re-checks.
+
+**Lockstep** (all five must agree — CLAUDE.md):
+`platform/src/lib/content/types.ts` · `schemas.ts` · `loader.ts` ·
+`platform/scripts/validate-content.mjs` · this file · and the review console's
+resolver `platform/src/lib/content/sources` +
+`platform/src/modules/content-admin/evidence.ts`. `sourceRefs` is also inside
+the signed content hash (`tools/theory/question_hash.mjs` and its TS mirror) —
+the key is emitted **only when the row has one**, so existing hashes are
+untouched while a swapped citation still breaks a signature.
+
+**Not editable at `/review`.** The console renders `sourceRefs` and their
+quotes but will not let anyone retype them: a non-statutory citation means
+something only because a machine can re-verify it.
+
 ### Question media (THEO-1) — data-driven kinds only
 
 No binary assets: every kind renders client-side from data this repo owns.
@@ -408,7 +463,14 @@ two systems at once: контролни точки are taken only `въз осн
    `"needs-review"`. Approval happens at `/review` and lands in
    `review/approvals.json`.
 1. **ORIGINAL questions only.** Never copy or closely paraphrase official listovki items (copyright risk R5). Same concepts, fresh wording and scenarios.
-2. **Every question and concept cites its legal basis** (`lawRefs`). If unsure of the exact article → `"status": "needs-review"` and an honest ref guess with `"?"` suffix.
+2. **Every question and concept cites its basis.** For a rule that a statute
+   settles, that is `lawRefs`; if unsure of the exact article → `"status":
+   "needs-review"` and an honest ref guess with `"?"` suffix. **When no statute
+   governs the answer — a clinical figure, a statistical threshold — do NOT
+   reach for the nearest plausible article. Use `sourceRefs` (above) and cite
+   what actually settles it.** Citing ЗДвП чл. 123 for a compression depth is
+   how 29 questions came to point students at an article that cannot answer
+   them.
 3. Valid UTF-8 JSON, no trailing commas, ids unique across the whole repo, every `conceptIds`/`dependsOn`/`topicId` must resolve.
 4. Bulgarian text natural and modern (17-year-old reader), not bureaucratic prose.
 5. Distribution guidance per topic file: ~60% single / 40% multi; points mix ≈ 40% ×1, 40% ×2, 20% ×3.

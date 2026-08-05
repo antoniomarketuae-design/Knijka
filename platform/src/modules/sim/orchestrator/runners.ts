@@ -195,16 +195,50 @@ export const DART_CREEP_RELEASE_M = 8;
  *
  * So the walk now stops ONE PACE onto the pavement, measured from the same
  * `roadToM` the drill already grades the crossing against: clear of the
- * carriageway, comfortably inside a 3.5 m pavement, and short of the parking
- * band centre so a walker can never finish inside a parked body even where no
- * clear zone was authored. It is a MINIMUM — a spec that already ends sooner
- * (the reversing-bay aisle walker at +1.2 m, the tram-door passenger at +1.67)
- * is untouched, byte for byte.
+ * carriageway, comfortably inside a 3.5 m pavement. It is a MINIMUM — a spec
+ * that already ends sooner (the reversing-bay aisle walker at +1.2 m, the
+ * tram-door passenger at +1.67) is untouched, byte for byte.
  *
  * It cannot change grading: `onRoad` is `roadFromM..roadToM` and the encounter
  * resolves at `roadToM + 0.5`, both of which the clamped walk still reaches.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-04 — THE CLAMP WAS 1.8 AND 1.8 PARKS HER INSIDE THE CAR.
+ *
+ * The reasoning above ("short of the parking band centre so a walker can never
+ * finish inside a parked body") compared a rest point against the body's
+ * CENTRE. A parked body is 1.9 m wide. It spans
+ * `PARK_BAND_CENTER_M ± PARKED_HALF_W_M` = **1.05 … 2.95 m past the kerb**, so
+ * 1.8 m past the kerb is not short of the car — it is 0.75 m inside its near
+ * flank, near enough its centre line.
+ *
+ * Measured on zb-v1, the district of the lesson he was looking at (catalog 5,
+ * `sc-zebra-approach`): the street is `residential` with no parking band, so
+ * the kerb is at x 8.125 and the row stands ON the footway at 9.175 … 11.075.
+ * `ZEBRA_PED` starts at x −9.73 with `roadToM` 17.85, and the old clamp rested
+ * her at **x = 9.925 — 0.75 m inside a parked body, 0.2 m off its centre.**
+ * Register row B46 measured the same thing from the pixels and wrote it down
+ * as a residual: rest x 9.94/10.19 against a body spanning 9.21 … 11.09.
+ *
+ * The previous pass moved her off the grass verge and straight into the parked
+ * row. She only ever LOOKED clear at zb-x-1 because ЗДвП чл. 98's crossing
+ * clear band (`PARK_CROSSING_CLEAR_M`, 10.25 m) happens to empty the kerb
+ * either side of that one crossing — which is why "the nearest body is 13.4 m
+ * away" was measured and believed. Move the crossing, or play any of the other
+ * 21 specs that share the geometry, and she is standing in a car again.
+ *
+ * 0.8 m is the whole of the room there is, and both bounds are hard:
+ *   ≥ SIDEWALK_SKIRT_M 0.35 + a walker's 0.25 m shoulder = 0.60 — any less and
+ *     she rests on the kerb face rather than on the footway;
+ *   ≤ (PARK_BAND_CENTER_M 2.0 − PARKED_HALF_W_M 0.95) − 0.25 = 0.80 — any more
+ *     and her shoulder is inside the nearest body.
+ * It is still one pace (0.8 m), it is still unambiguously on the pavement, and
+ * it is now the pace that a photograph can survive. Same lateral rule as the
+ * AMBIENT walkers (`traffic/pedestrians.PED_KERB_WALK_M` = 0.7): every
+ * pedestrian in the product now walks between the kerb and the parked row
+ * rather than through it.
  */
-export const PED_REST_PAST_ROAD_M = 1.8;
+export const PED_REST_PAST_ROAD_M = 0.8;
 
 export class PedestrianDartOutRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -400,7 +434,10 @@ const WITNESS_MIN_SPEED_MPS = 0.5;
  * are the ones `templates-junctions2.ts:74` already ships, verbatim; an
  * authored `witnessArm` still wins.
  */
-export const DEFAULT_WITNESS_ARM = { etaSec: 8, nearLineM: 6 } as const;
+export const DEFAULT_WITNESS_ARM: NonNullable<PriorityFromRightSpec["witnessArm"]> = {
+  etaSec: 8,
+  nearLineM: 6,
+};
 /** A player at/under this counts as standing still at the mouth, km/h. */
 const WITNESS_STOPPED_KMH = 2.5;
 /**
@@ -461,6 +498,72 @@ function stagedTransitSec(distM: number, cruiseMps: number, accelMps2: number): 
   return d <= rampM ? Math.sqrt((2 * d) / a) : v / a + (d - rampM) / v;
 }
 
+/**
+ * The same transit, for a car ALREADY ROLLING at `nowMps` — the number the
+ * re-hold below needs, because by then the actor is mid-approach and
+ * `stagedTransitSec`'s from-rest ramp would over-state its remaining time.
+ */
+function stagedTransitFromSec(
+  distM: number,
+  nowMps: number,
+  cruiseMps: number,
+  accelMps2: number,
+): number {
+  const c = Math.max(cruiseMps, 0.5);
+  const a = Math.max(accelMps2, 0.5);
+  const d = Math.max(distM, 0);
+  const v = Math.min(Math.max(nowMps, 0), c);
+  const rampM = (c * c - v * v) / (2 * a);
+  if (d <= rampM) return (Math.sqrt(v * v + 2 * a * d) - v) / a;
+  return (c - v) / a + (d - rampM) / c;
+}
+
+/**
+ * ═══ B33 — THE RELEASE IS A LIVE DECISION, NOT A ONE-SHOT PREDICTION ═══
+ *
+ * The founder, playing lesson 15 «Ограничена видимост»: *„if I drive under 22
+ * as it states, the traffic car passes long before I reach the crossroad"*.
+ * OBEYING THE INSTRUCTION DELETED THE ENCOUNTER. That is worse than a bug —
+ * it teaches that following instructions is pointless.
+ *
+ * MEASURED on the real sc-junction-blind@L1 through the live wiring, driving
+ * the pace its own objective authorises (`maxSpeedKmh 22`) and its own
+ * instruction 3 demands («приближи почти до спиране и изпълзи внимателно»):
+ *
+ *   t=17.0  player 17.3 m from his line at 10 km/h → raw ETA 6.2 s.
+ *           The car needs 6.1 s for its remaining 48.7 m. THE GATE FIRES.
+ *   t=23.4  the car crosses the node — the player is 24.4 m short of it,
+ *           still creeping at 5 km/h.
+ *   t=39.7  the player finally reaches the junction mouth. The car is
+ *           **145.7 m away and parked at the end of its path forever.**
+ *
+ * The prediction said 6.2 s. The truth was 22.7 s. **Nothing re-checked it.**
+ * The witness gate (L7/S2) reads the player's INSTANTANEOUS speed once, and a
+ * student who is still slowing down — which is what every junction lesson in
+ * this catalogue instructs — has his arrival over-estimated at exactly the
+ * frame the decision is latched. The staged actor is a one-shot: once it has
+ * crossed, that junction is dead for the rest of the drive.
+ *
+ * So the release is now re-validated while the car is still short of the box.
+ * If the player's LIVE ETA has grown past what the car's own remaining transit
+ * can honour, the car is pinned again and the runner returns to `armed`, where
+ * every existing release path (nearLineM, the stopped-witness rule, a recovered
+ * ETA) is still waiting for it. The car cannot deadlock: a player at the mouth
+ * releases it on distance, a player standing near it releases it on the
+ * stopped-witness rule, and a player who simply drives on releases it on ETA.
+ *
+ * WHAT DOES NOT MOVE: a constant-pace approach never re-holds, because its ETA
+ * only ever falls — so `witness-arm.test.ts`'s "commits on EXACTLY the legacy
+ * frame" and every committed trace's choreography are untouched.
+ */
+const WITNESS_REHOLD_SLACK_SEC = 2.5;
+/**
+ * …and only while the car is still this far short of the node, m. A crossing
+ * already under way is never taken back: a car that stops dead in the junction
+ * mouth is a worse lie than one that arrives late.
+ */
+const WITNESS_REHOLD_MIN_CAR_DIST_M = 14;
+
 export class PriorityFromRightRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -471,6 +574,10 @@ export class PriorityFromRightRunner implements EventRunner {
   /** Continuous seconds the player has been stationary inside the commit
    *  distance — the stopped-witness release (see WITNESS_STOPPED_HOLD_SEC). */
   private stoppedForSec = 0;
+  /** The release came from the stopped-witness rule (T7). It is never taken
+   *  back: a standing driver's ETA is infinite by construction, so re-holding
+   *  on it would restore the exact deadlock that rule exists to end. */
+  private stoppedRelease = false;
 
   constructor(readonly spec: PriorityFromRightSpec) {}
 
@@ -501,6 +608,7 @@ export class PriorityFromRightRunner implements EventRunner {
     this.outcome = null;
     this.sawYield = false;
     this.stoppedForSec = 0;
+    this.stoppedRelease = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -536,7 +644,14 @@ export class PriorityFromRightRunner implements EventRunner {
         const w = s.witnessArm ?? DEFAULT_WITNESS_ARM;
         const rawEtaSec =
           playerLineDist / Math.max(input.speedKmh * KMH_TO_MPS, WITNESS_MIN_SPEED_MPS);
-        if (input.speedKmh <= WITNESS_STOPPED_KMH && playerLineDist <= WITNESS_STOPPED_NEAR_M) {
+        // How far back a standstill still counts as witnessing. The constant is
+        // the floor and stays the default for all 13 specs; a lesson that
+        // GRADES a yield from further back than 14 m authors its own, because
+        // otherwise its graded pose and its conflict release disagree and the
+        // student is marooned. See contracts.ts `witnessArm.stoppedNearM` for
+        // the sc-jx-giveway-b1 measurement (doc 87 B30).
+        const stoppedNearM = w.stoppedNearM ?? WITNESS_STOPPED_NEAR_M;
+        if (input.speedKmh <= WITNESS_STOPPED_KMH && playerLineDist <= stoppedNearM) {
           this.stoppedForSec += input.dtSec;
         } else {
           this.stoppedForSec = 0;
@@ -554,6 +669,7 @@ export class PriorityFromRightRunner implements EventRunner {
         if (playerLineDist <= w.nearLineM || rawEtaSec <= etaGateSec || stoppedWitness) {
           traffic.stagedCommand(s.id, { type: "cruise" }); // through the box
           this.phase = "triggered";
+          if (stoppedWitness) this.stoppedRelease = true;
           return null;
         }
         // Not committed: fall through — the hold/sync branches below keep
@@ -579,6 +695,33 @@ export class PriorityFromRightRunner implements EventRunner {
     }
 
     // triggered — the car is committed through the junction.
+    //
+    // …unless the commitment has since become a lie. B33: re-measure while the
+    // car is still meaningfully short of the box, and take the release back if
+    // the player's live ETA has outgrown what the car can honour. See
+    // WITNESS_REHOLD_SLACK_SEC for the measurement this repairs.
+    if (!this.stoppedRelease && -carArc >= WITNESS_REHOLD_MIN_CAR_DIST_M) {
+      const w = s.witnessArm ?? DEFAULT_WITNESS_ARM;
+      if (playerLineDist > w.nearLineM) {
+        const rawEtaSec =
+          playerLineDist / Math.max(input.speedKmh * KMH_TO_MPS, WITNESS_MIN_SPEED_MPS);
+        const carEtaSec = stagedTransitFromSec(
+          -carArc,
+          actor.speedMps,
+          s.actor.cruiseSpeedMps,
+          s.actor.accelMps2 ?? DEFAULT_STAGED_ACCEL_MPS2,
+        );
+        if (rawEtaSec > carEtaSec + WITNESS_ENTRY_MARGIN_SEC + WITNESS_REHOLD_SLACK_SEC) {
+          // Pin it short of the box and go back to waiting for him. The armed
+          // branch's hold/sync keeps it there and every release path still
+          // applies, so this can defer the crossing but never delete it.
+          traffic.stagedCommand(s.id, { type: "cruise", speedMps: 0 });
+          this.phase = "armed";
+          this.stoppedForSec = 0;
+          return null;
+        }
+      }
+    }
     if (carArc > 6) {
       // Past the node: sprint out of the 26 m conflict radius so a correctly
       // yielding player can never cross into a stale "conflict".
@@ -669,12 +812,88 @@ const LEAD_CAR_LENGTH_M = 4.3;
  */
 const SCHEDULED_RELEASE_SLACK_M = 12;
 
+/**
+ * B79 — how fast the commanded STATION may walk in toward the authored follow
+ * gap, m/s. See `bandGapM` below for what it repairs.
+ *
+ * 1.5 m/s closes the catalog's worst surplus (sc-ln-decisive-change: a 55 m
+ * hold against a 22 m station on a spawn the player shares) in the first
+ * seconds of the drive, and it is well under the gain-limited closing rate the
+ * band itself would command there (0.55 x 33 = 18 m/s), so the station is the
+ * binding constraint exactly while the transient exists and never after.
+ */
+const LEAD_STATION_CLOSE_MPS = 1.5;
+
 export class BrakingLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
 
   private followGapM = 0;
+  /**
+   * B79 — THE STATION THE BAND IS ACTUALLY COMMANDED WITH, m of centres.
+   * `null` until the first paced frame; `followGapM` for every actor that has
+   * nothing to converge (see commandPace).
+   *
+   * MEASURED, on the shipped `sc-ov-crossing-overtake` L1 through the live
+   * stack (compileScenario -> worldRuntime -> traffic.leadGapMeters ->
+   * reduceTick, i.e. the numbers the student is graded on), constant-speed
+   * player, right lane, no overtake:
+   *
+   *   t 0.0  lead STANDING at 30 m of centres (its staged hold), player 0 km/h
+   *   t 4.5  17.9 m — already through the authored 20 m station
+   *   t 6.0  16.0 m — the bottom (11.9 m of bumpers)
+   *   t 6.50 FOLLOWING_TOO_CLOSE at 12.08 m / 1.04 s, y = 64
+   *   t 7.5+ 12.4 -> 13.9 -> 15.9 -> 18.1 m: opening, monotonically, for the
+   *          next twenty seconds, and it never closes again.
+   *
+   * `matchPlayer` is a P-controller — `target = playerSpeed + 0.55 x (gapM -
+   * gap)` (traffic/staged.ts MATCH_GAIN). Commanded with the AUTHORED station
+   * while the actor is still parked at its staged hold — which every
+   * spawn-corridor lead in the catalog authors FARTHER out than the station —
+   * the error term is negative from frame one, so the lead is ordered to be up
+   * to 5.5 m/s SLOWER than the player while it is also still at REST. It then
+   * cannot arrest the closure it was told to create: a 2.6 m/s^2 actor needs
+   * ~2 s to null a 5.5 m/s deficit and loses ~5.8 m doing it. The station is
+   * overshot by 4.0 m (20%), and the overshoot lasts longer than the rule
+   * engine's own `followSustainSec` of 2 s. So the fault fires.
+   *
+   * THE THRESHOLD IS NOT WRONG AND THE MEASUREMENT IS NOT WRONG. 12.08 m at
+   * 42 km/h really is 1.04 s of headway and really is tailgating. What is
+   * wrong is that the band was asked to converge THROUGH a gap the drill never
+   * authored it to visit — and the bill lands 100 m before this lesson's own
+   * graded zone, in a drill whose subject is ZDvP чл. 119. That is the
+   * founder's B79 verbatim: «I recieved an error I have been tailing him too
+   * close and In fact I wasnt that close.» He was not: one second later the
+   * gap opened and stayed open.
+   *
+   * So the station starts at the gap the actor ACTUALLY has and walks in to
+   * the authored one at LEAD_STATION_CLOSE_MPS. The approach becomes monotone
+   * — the gap trails the moving station by gain-lag (1.5/0.55 = 2.7 m) from
+   * ABOVE and settles on it — and:
+   *
+   *  - steady state is byte-identical. Once the station reaches `followGapM`
+   *    it latches there and the command is the command it always was.
+   *  - the detector is NOT silenced. This can only ever ADD gap, only during
+   *    the first seconds, and only while the actor is still farther out than
+   *    its authored station. A genuine tailgate is a gap the student HOLDS
+   *    under threshold — reached after the latch, and untouched here.
+   *  - an actor with nothing to converge is skipped outright, so
+   *    `sc-lc-blindspot` (station -24 m: it belongs BEHIND the player) and
+   *    `sc-follow-tailgater` / `sc-speed-dangerous` (stations of 150 / 400 m,
+   *    already nearer than authored at the spawn) never enter this path.
+   */
+  private bandGapM: number | null = null;
+  /**
+   * B72 / FR-53 — the `paceProfile` leg currently commanded (index into
+   * `spec.paceProfile`, −1 = the base speed), so the `cruise` command is
+   * re-issued ONLY on a leg change. `stagedCommand` overwrites the active
+   * command wholesale, so re-issuing an unchanged target every frame would be
+   * harmless but would also make the command stream noise in every recorder
+   * and fake-port assertion that counts commands. A leg boundary is crossed
+   * once, so the stream carries one command per authored leg.
+   */
+  private paceLeg = -1;
   private approachSpeedKmh = 0;
   private resolvedAtSec: number | null = null;
   private resumed = false;
@@ -688,21 +907,79 @@ export class BrakingLeadCarRunner implements EventRunner {
 
   constructor(readonly spec: BrakingLeadCarSpec) {}
 
+  /**
+   * B72 / FR-53 — the scheduled-cruise target for an arc position: the LAST
+   * authored leg the lead has reached, else the base speed. Piecewise
+   * constant; `atS` is arc metres along the actor's own path.
+   */
+  private paceLegAt(arcS: number): { index: number; speedMps: number } {
+    const s = this.spec;
+    const base = s.paceSpeedMps ?? s.actor.cruiseSpeedMps;
+    const profile = s.paceProfile;
+    if (profile === undefined || profile.length === 0) return { index: -1, speedMps: base };
+    let index = -1;
+    for (let i = 0; i < profile.length; i++) {
+      if (arcS >= profile[i].atS) index = i;
+      else break; // authored ascending — the first unreached leg ends the scan
+    }
+    return { index, speedMps: index < 0 ? base : profile[index].speedMps };
+  }
+
+  /**
+   * B72 / FR-53 — re-issue the cruise target when the lead crosses into a new
+   * authored leg. Called once per frame while the lead is pacing (never after
+   * the slam: a braking lead must not have its brake overwritten by a cruise).
+   */
+  private stepPaceProfile(traffic: StagedTrafficPort): void {
+    const s = this.spec;
+    if (s.paceMode !== "scheduledCruise" || s.paceProfile === undefined) return;
+    const actor = traffic.staged(s.id);
+    if (!actor) return;
+    const leg = this.paceLegAt(actor.s);
+    if (leg.index === this.paceLeg) return;
+    this.paceLeg = leg.index;
+    traffic.stagedCommand(s.id, { type: "cruise", speedMps: leg.speedMps });
+  }
+
   /** The pacing command — the rubber band, or T17's scheduled cruise. */
-  private commandPace(traffic: StagedTrafficPort): void {
+  private commandPace(traffic: StagedTrafficPort, input?: DirectorInput): void {
     const s = this.spec;
     if (s.paceMode === "scheduledCruise") {
-      traffic.stagedCommand(s.id, {
-        type: "cruise",
-        speedMps: s.paceSpeedMps ?? s.actor.cruiseSpeedMps,
-      });
+      // B72: the profile's leg for wherever the lead is being released from —
+      // absent a profile this is exactly `paceSpeedMps ?? cruiseSpeedMps`.
+      const actor = s.paceProfile === undefined ? null : traffic.staged(s.id);
+      const leg = this.paceLegAt(actor ? actor.s : -Infinity);
+      this.paceLeg = leg.index;
+      traffic.stagedCommand(s.id, { type: "cruise", speedMps: leg.speedMps });
       return;
     }
     traffic.stagedCommand(s.id, {
       type: "matchPlayer",
-      gapM: this.followGapM,
+      gapM: this.stationGapM(traffic, input),
       maxSpeedMps: s.maxMatchSpeedMps,
     });
+  }
+
+  /**
+   * B79 — the commanded station for THIS frame (see `bandGapM`).
+   *
+   * First paced frame: seed at the gap the actor actually has, but only when
+   * there is a convergence to make (a POSITIVE authored station the actor is
+   * currently FARTHER out than). Everything else seeds straight at the
+   * authored value, which makes this a no-op for it forever.
+   */
+  private stationGapM(traffic: StagedTrafficPort, input?: DirectorInput): number {
+    const target = this.followGapM;
+    if (this.bandGapM === null) {
+      const actor = input ? traffic.staged(this.spec.id) : null;
+      const actualM = actor ? dist(input!.x, input!.y, actor.x, actor.y) : target;
+      this.bandGapM = target > 0 && actualM > target ? actualM : target;
+    }
+    if (this.bandGapM > target) {
+      const dt = input?.dtSec ?? 0;
+      this.bandGapM = Math.max(target, this.bandGapM - LEAD_STATION_CLOSE_MPS * dt);
+    }
+    return this.bandGapM;
   }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
@@ -730,7 +1007,16 @@ export class BrakingLeadCarRunner implements EventRunner {
     } else {
       traffic.stagedCommand(s.id, { type: "reset" });
     }
+    // The authored RESTING indicator (contracts.ts `StagedActorPathSpec.
+    // indicator`) — re-issued on a re-stage too, because `reset` clears the
+    // published state along with the pose. Absent = not issued at all, so the
+    // command stream of every existing spec is unchanged.
+    if (s.actor.indicator !== undefined) {
+      traffic.stagedCommand(s.id, { type: "setIndicator", indicator: s.actor.indicator });
+    }
     this.followGapM = s.followGapM + (rng() * 2 - 1) * 2;
+    this.bandGapM = null; // B79 — re-seeded on the first paced frame
+    this.paceLeg = -1; // B72 — the profile restarts with the actor's pose
     this.phase = "armed";
     this.outcome = null;
     this.hazardActive = false;
@@ -782,11 +1068,24 @@ export class BrakingLeadCarRunner implements EventRunner {
       const nearLead =
         releaseDistM === undefined || dist(input.x, input.y, actor.x, actor.y) <= releaseDistM;
       if (nearLead && input.speedKmh > 4) {
-        this.commandPace(traffic);
+        this.commandPace(traffic, input);
         this.phase = "triggered"; // following — the encounter is now live
       }
       return null;
     }
+
+    // B79 — walk the commanded station in to the authored one (see bandGapM).
+    // `matchPlayer` is issued once and then persists, so the convergence has to
+    // be re-commanded while it is still running; the moment the station latches
+    // at `followGapM` this stops re-issuing and the actor is left holding the
+    // exact command it held before this repair existed.
+    if (this.approachSpeedKmh === 0 && this.bandGapM !== null && this.bandGapM > this.followGapM) {
+      this.commandPace(traffic, input);
+    }
+
+    // B72 / FR-53 — the authored ease-and-resume. Only while still pacing: once
+    // the lead has slammed, `brake` owns the longitudinal channel.
+    if (this.approachSpeedKmh === 0) this.stepPaceProfile(traffic);
 
     // triggered: following until the staged slam point, then adjudicating.
     if (dist(actor.x, actor.y, s.slamAt.x, s.slamAt.y) <= s.slamRadiusM) {

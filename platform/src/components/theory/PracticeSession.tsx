@@ -16,11 +16,13 @@ import { CheckControl } from "@/components/ui/CheckControl";
 import { Gauge } from "@/components/hud/Gauge";
 import type { PracticeQuestionDto, PracticeSubmitResult } from "./types";
 import {
+  ARTWORK_MIN_PX,
   hasSignOptions,
   QuestionArtwork,
   SignFace,
   useArtworkBudget,
 } from "./QuestionMedia";
+import { useIsShort, useQuestionBudget } from "./questionBudget";
 import { WhyPanel, WhyPanelIdle } from "./WhyPanel";
 import { buildWhyPanelModel } from "@/modules/clips/view";
 
@@ -209,6 +211,9 @@ export function PracticeSession({
   // the in-card mobile section — so MistakeReplay never fetches twice. Safe
   // for hydration: `result` is always null at SSR, so nothing renders early.
   const isDesktop = useSyncExternalStore(subscribeDesktop, readDesktop, () => false);
+  // Row C5: a phone held sideways. Server-rendered as false, so nothing moves
+  // before hydration and the markup the crawler sees is the ordinary one.
+  const isShort = useIsShort();
 
   // Phase 5: the artwork gives back whatever this card is over the fold by.
   const cardRef = useRef<HTMLElement>(null);
@@ -216,6 +221,24 @@ export function PracticeSession({
     cardRef,
     current?.id ?? "",
     current?.media != null && result === null,
+  );
+  // ROW C5 — AND THEN, ONLY THEN, THE WORDS.
+  //
+  // On a phone held sideways the picture bottoming out at 44px is not enough
+  // on the heaviest items: the answers still landed 4–79px under the pinned
+  // „Провери" strip on 13 of the bank's 18 worst questions, which is the one
+  // thing the founder actually cannot work around — you cannot choose an
+  // answer you cannot see. So the ANSWERS stop moving and the QUESTION gives:
+  // it keeps whatever height is left and scrolls inside its own box for the
+  // rest. `enabled` is false until the artwork budget has bottomed out, so the
+  // words are never clipped while a diagram still has room to shrink.
+  const questionBoxRef = useRef<HTMLSpanElement>(null);
+  const questionMaxPx = useQuestionBudget(
+    cardRef,
+    questionBoxRef,
+    current?.id ?? "",
+    result === null &&
+      (current?.media == null || artworkPx <= ARTWORK_MIN_PX),
   );
   const panelModel = useMemo(
     () =>
@@ -242,20 +265,39 @@ export function PracticeSession({
   // Any sign-face option switches the whole list to the picture grid.
   const signGrid = hasSignOptions(current.options);
 
-  // THREE columns once there are more than four options, on a phone held
-  // sideways only. Measured on the worst six-option item in the bank
-  // (q-vehicle-063) at 852x393: three 264px columns give two rows of 109px =
-  // 224px, against 240px for three rows of two. A real but MODEST win, not the
-  // halving the row count suggests, because a narrower column wraps each option
-  // to more lines — recorded because the obvious reading overstates it 5x.
+  // TWO columns on a phone held sideways — ALWAYS, and the „three once there
+  // are more than four options" rule that used to be here was measured on the
+  // wrong phone and is now falsified.
   //
-  // Hoisted out of the JSX deliberately: inline, the ternary defeated BOTH
-  // source scanners that guard this file (checkControl.test.ts mis-parsed the
-  // element's props and mobileFold.test.ts read the closing brace as a
-  // concatenation seam). A class string a scanner cannot read is a class string
-  // Tailwind might not emit, which is the failure those tests exist to catch.
-  const shortOptionColumns =
-    current.options.length > 4 ? "short:sm:grid-cols-3" : "short:sm:grid-cols-2";
+  // That rule was derived at 852x393, where a third column is a modest win. On
+  // the 780x360 Android floor it is a LOSS, and a large one, because the option
+  // text column is what decides how many lines an answer wraps to. Re-derived
+  // on this tree, WebKit, 780x360, q-vehicle-058 (five options, the worst item
+  // in the bank on this viewport):
+  //
+  //   three columns  text column 240px  rows h[64,109,132,132,86]  269px tall
+  //   two columns    text column 363px  rows h[64, 64, 86, 86,64]  225px tall
+  //
+  // A grid row is as tall as its TALLEST cell, so the 132px option inflated the
+  // whole row and the two-line option beside it was drawn into a five-line box
+  // — visible in the capture as a half-empty tile next to an answer cut off by
+  // the „Провери" strip. Widening the column removes the wrapping that made the
+  // tall cell tall, and that is worth more than the extra column ever was: 45px
+  // of overhang to none.
+  //
+  // It costs nothing where it loses. The one shape two columns is worse for is
+  // six SHORT options (q-vehicle-005: three rows of 44px instead of two), and
+  // that item finishes 162px clear of the fold on the iPhone and 90px clear on
+  // the Android floor. Measured on both phones, both orientations, before the
+  // rule changed — and CSS cannot know an option's height, so the rule has to
+  // be the one that is safe on the worst case rather than optimal on the best.
+  //
+  // Hoisted out of the JSX deliberately, and it stays hoisted now that it is a
+  // constant: inline, the ternary defeated BOTH source scanners that guard this
+  // file (checkControl.test.ts mis-parsed the element's props and
+  // mobileFold.test.ts read the closing brace as a concatenation seam). A class
+  // string a scanner cannot read is a class string Tailwind might not emit.
+  const shortOptionColumns = "short:sm:grid-cols-2";
 
   // THE COMPARISON GRID, AND WHY IT IS 2x2 AND NOT 3+1.
   //
@@ -278,6 +320,16 @@ export function PracticeSession({
   // stays for a future six-sign item that does not exist yet.
   const signGridColumns =
     current.options.length > 4 ? "sm:grid-cols-3" : "sm:grid-cols-2";
+
+  // Row C5: the artwork strip belongs in the action bar exactly when it has
+  // stopped being a picture — landscape phone, budget on the floor, question
+  // not yet answered (after answering the why-panel owns the teaching and the
+  // card is free to grow again).
+  const artworkInBar =
+    isShort &&
+    current.media !== null &&
+    result === null &&
+    artworkPx <= ARTWORK_MIN_PX;
 
   return (
     // `max-sm:-mb-6` cancels <main>'s bottom padding on phones. That padding
@@ -320,7 +372,11 @@ export function PracticeSession({
       // bleeding off one edge with a 32px gutter on the other. Captured, seen,
       // fixed. Width auto lets the flex cross-axis stretch do the work, which
       // is container + both margins = the full screen.
-      className="card flex w-full min-w-0 flex-col gap-2.5 p-3 max-sm:-mx-4 max-sm:w-auto max-sm:flex-1 max-sm:rounded-none max-sm:border-x-0 max-sm:px-4 short:-mx-4 short:w-auto short:flex-1 short:gap-2.5 short:rounded-none short:border-x-0 short:p-3 short:px-4 sm:gap-6 sm:p-7 lg:max-w-2xl"
+      // `short:pt-2 narrow-tall:pt-2` — the card's top padding, 12px -> 8px on
+      // a phone. The BOTTOM stays 12px on purpose: the action bar's `-mb-3`
+      // cancels exactly that much, so trimming both ends would leave the bar
+      // 4px short of the card's edge and put a hairline of backdrop under it.
+      className="card flex w-full min-w-0 flex-col gap-2.5 p-3 max-sm:-mx-4 max-sm:w-auto max-sm:flex-1 max-sm:rounded-none max-sm:border-x-0 max-sm:px-4 narrow-tall:pt-2 short:-mx-4 short:w-auto short:flex-1 short:gap-2.5 short:rounded-none short:border-x-0 short:p-3 short:px-4 short:pt-2 sm:gap-6 sm:p-7 lg:max-w-2xl"
     >
       {/* Progress — `sm` and up.
           MOBILE FOLD (founder review): every row of chrome here is 393x852
@@ -402,8 +458,17 @@ export function PracticeSession({
           is what is left here once the progress strip, a two-line question,
           four answers and the action bar have taken theirs; the viewer then
           gives 361px, three times what the inline block ever showed. From
-          `sm` up this is the same component at the same size as before. */}
-      {current.media !== null ? (
+          `sm` up this is the same component at the same size as before.
+
+          AND ON A PHONE HELD SIDEWAYS IT CAN LEAVE THE CARD ENTIRELY. Once the
+          budget has bottomed out the block is no longer a picture — it is a
+          44px „Виж схемата ⤢" strip, i.e. a CONTROL — and a control belongs in
+          the bar the thumb is already on. Measured at 852x393: the strip plus
+          its gap is 54px of the ~258 the whole question has, and moving it took
+          all six of the bank's heaviest artwork items from 12–35px under the
+          action bar to clear. While the picture still fits it stays here, where
+          it can be looked at without a tap. */}
+      {current.media !== null && !artworkInBar ? (
         <QuestionArtwork media={current.media} heightPx={artworkPx} />
       ) : null}
 
@@ -412,12 +477,59 @@ export function PracticeSession({
         {/* `short:` holds the phone sizes on a landscape phone: 20px glyphs on
             1.625 leading are a desktop's, and this screen has 393px of height.
             The GLYPHS are not shrunk below the phone size — `text-lg` is the
-            same 18px a portrait phone gets. */}
-        <legend className="max-w-[62ch] text-lg font-bold leading-snug text-foreground short:text-lg short:leading-snug sm:text-xl sm:leading-relaxed">
-          {current.textBg}
+            same 18px a portrait phone gets.
+
+            `short:max-w-none` — the 62ch reading cap is right for a desktop
+            column and wrong for a phone held sideways. Measured at 852x393: the
+            legend was 670px inside an 804px card, so 134px of the widest screen
+            the product runs on was doing nothing while the question below it
+            wrapped to five lines. The cap stays everywhere it is a cap.
+
+            THE FADE IS THE AFFORDANCE, and it is only drawn when the box is
+            actually clamped. A question cut off mid-line with nothing to say so
+            reads as a rendering fault, not as „there is more" — the same
+            argument that took the rounded corner off the card's physical edge.
+            It washes the box's 12px tail padding, not a line of type, so
+            scrolling to the end still shows the last line clean. */}
+        {/* `narrow-tall:relative` is the portrait twin of `short:relative`: it
+            is what the „there is more" fade is positioned against. Without it
+            the fade would be absolute against the card and wash the wrong
+            box — which is why the twins are added as a set, never one at a
+            time (questionBudget.ts PHONE_FOLD_QUERY says the same in JS). */}
+        <legend className="max-w-[62ch] text-lg font-bold leading-snug text-foreground narrow-tall:relative short:relative short:max-w-none short:text-lg short:leading-snug sm:text-xl sm:leading-relaxed">
+          <span
+            ref={questionBoxRef}
+            data-question-box
+            // `overscroll-contain`: a flick that runs out of question text must
+            // not then scroll the page out from under the answers.
+            //
+            // THE TAIL PADDING IS CONDITIONAL, and the first cut of this was
+            // not. `short:pb-3` on every question spends 12px of a 393px screen
+            // on 1 013 four-option items that never needed it — measured, it
+            // put 2–4px of scroll back onto five questions that had just been
+            // cleared. It is only there to give the fade something to wash that
+            // is not a line of type, so it only exists when the fade does.
+            className={`block narrow-tall:overflow-y-auto narrow-tall:overscroll-contain short:overflow-y-auto short:overscroll-contain ${
+              questionMaxPx === null ? "" : "narrow-tall:pb-3 short:pb-3"
+            }`}
+            style={questionMaxPx === null ? undefined : { maxHeight: questionMaxPx }}
+          >
+            {current.textBg}
+          </span>
+          {questionMaxPx === null ? null : (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-3 bg-gradient-to-t from-surface to-transparent narrow-tall:block short:block"
+            />
+          )}
         </legend>
+        {/* `short:hidden` — on a landscape phone this line moves into the action
+            bar as a pill, next to the readouts that already live there. It is
+            22px of the ~59 the six-option worst case is short by, and it is the
+            same move the exam runner already made with its own „Всички верни".
+            Exactly one of the two is in the accessibility tree at any viewport. */}
         {current.type === "multi" ? (
-          <p className="mt-1.5 text-xs font-bold text-accent sm:mt-2">
+          <p className="mt-1.5 text-xs font-bold text-accent short:hidden sm:mt-2">
             Избери всички верни отговори.
           </p>
         ) : null}
@@ -429,11 +541,16 @@ export function PracticeSession({
             answers being on the screen and being under it. There is room for it
             horizontally: the card is ~820px wide in landscape and an option
             row's text column was measured at 285px on a portrait phone. */}
+        {/* `short:mt-1 narrow-tall:mt-1` — 4px, and on the Android floor 4px is
+            the difference between a nudge and clean. This is the gap between
+            the question and the first answer on a screen where the question,
+            the answers and the action bar are the ONLY three things; 8px of it
+            was a desktop measure inherited by a phone. */}
         <ul
           className={
             signGrid
-              ? `mt-2 grid grid-cols-2 gap-1.5 short:mt-2 short:gap-1.5 sm:mt-4 sm:gap-2.5 ${signGridColumns}`
-              : `mt-2 flex flex-col gap-1.5 short:mt-2 short:gap-1.5 short:sm:grid sm:mt-4 sm:gap-2.5 ${shortOptionColumns}`
+              ? `mt-2 grid grid-cols-2 gap-1.5 short:mt-1 short:gap-1.5 narrow-tall:mt-1 sm:mt-4 sm:gap-2.5 ${signGridColumns}`
+              : `mt-2 flex flex-col gap-1.5 short:mt-1 short:gap-1.5 narrow-tall:mt-1 short:sm:grid sm:mt-4 sm:gap-2.5 ${shortOptionColumns}`
           }
         >
           {current.options.map((option, optionIndex) => {
@@ -536,9 +653,21 @@ export function PracticeSession({
 
                     `min-h-11` (44px) replaces py-3 as the guarantee that the
                     row is thumb-sized — it is the property that actually
-                    matters, stated directly instead of inferred from padding. */}
+                    matters, stated directly instead of inferred from padding.
+
+                    AND IT IS WHAT MAKES THE PHONE PADDINGS SPENDABLE. On the
+                    360-wide Android the row padding is the only furniture that
+                    repeats once per answer, so it is the only one worth more
+                    than a rounding error: `short:py-1.5` and `narrow-tall:py-2`
+                    take 4px off each row, which is 24px on a six-option item in
+                    portrait and 12px on a three-row landscape grid. Nothing
+                    shrinks below the thumb guarantee — `min-h-11` still floors
+                    every row at 44px, and the sweep re-checks every control on
+                    every row (row C6's „0 controls under 44px"): the smallest
+                    row this produces on any of the four profiles is exactly 44.
+                    The 14px the seventeen-year-old is reading is untouched. */}
                 <label
-                  className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none short:gap-2.5 short:px-3 short:py-2 sm:gap-3 sm:px-4 sm:py-3.5 ${stateClasses} ${
+                  className={`flex min-h-11 items-start gap-2.5 rounded-xl border px-3 py-2.5 text-sm transition duration-200 ease-out focus-within:ring-2 focus-within:ring-accent/50 motion-reduce:transition-none motion-reduce:transform-none short:gap-2.5 short:px-3 short:py-1.5 narrow-tall:py-2 sm:gap-3 sm:px-4 sm:py-3.5 ${stateClasses} ${
                     result === null ? "cursor-pointer" : "cursor-default"
                   }`}
                 >
@@ -586,7 +715,25 @@ export function PracticeSession({
       {/* Feedback — the live region stays mounted so the update is announced.
           Verdict + mastery stay in-card; the why-panel teaches beside (lg)
           or right below (mobile — the honest bottom section, not a sheet). */}
-      <div aria-live="polite">
+      {/* `-my-2.5` WHILE EMPTY — a 20px bug, and the first cut of it fixed HALF.
+          This live region must stay MOUNTED before the first answer or the
+          verdict is never announced, but an empty flex child still takes a
+          `gap-2.5` on BOTH sides: 20px spent on a zero-height box, every
+          question, in the orientation with the least room. `short:-mt-2.5`
+          cancelled exactly one of the two, on the reasoning that the bar's
+          `mt-auto` eats the other — which is true only while there is SLACK
+          above the bar. On the questions this row is about there is none, and
+          the surviving 10px was the entire overhang on q-vehicle-063 and
+          q-vehicle-056 at 780x360 (11px of document scroll, nothing hidden) and
+          half of q-krastovishta-062's at 360x780. Cancelling both takes those
+          to zero.
+          `narrow-tall:` because the bug was never landscape-only — portrait
+          simply had a phone wide enough to absorb it. `display:none` would have
+          been simpler and would have silenced the announcement. */}
+      <div
+        aria-live="polite"
+        className={result === null ? "short:-my-2.5 narrow-tall:-my-2.5" : ""}
+      >
         {result !== null ? (
           <div className="flex flex-col gap-3">
             <VerdictStrip result={result} conceptTitleBg={current.conceptTitleBg} />
@@ -616,7 +763,13 @@ export function PracticeSession({
 
           The `short:` copies of the pin are the same bar on a phone held
           sideways, where 393px of height makes it matter more, not less. */}
-      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:mt-auto max-sm:rounded-b-none max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-2 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))] short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:mt-auto short:rounded-b-none short:border-t short:border-hair short:bg-surface/95 short:px-4 short:py-2 short:backdrop-blur short:[padding-bottom:calc(0.5rem+env(safe-area-inset-bottom))]">
+      {/* `py-1.5` rather than `py-2` on a phone: 4px, and the FOLD IS THE TOP OF
+          THIS BAR, so every pixel taken off its padding is a pixel handed back
+          to the answers above it — the only furniture in this file that pays
+          twice. „Провери" is 45px on its own, so the bar is 57px and the
+          control is still over the 44px floor; the safe-area calc keeps the
+          same 6px above the home indicator that the padding now is. */}
+      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:mt-auto max-sm:rounded-b-none max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-1.5 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))] short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:mt-auto short:rounded-b-none short:border-t short:border-hair short:bg-surface/95 short:px-4 short:py-1.5 short:backdrop-blur short:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))]">
         {/* The phone instrument strip: the session's progress as a 2px rule
             along the bar's lit top edge, and the readouts beside the button. */}
         <div
@@ -647,6 +800,19 @@ export function PracticeSession({
         >
           ← Теми
         </Link>
+        {/* The diagram/sign opener, on a phone held sideways, once it has
+            stopped being a picture. Same component and the same full-screen
+            viewer — only the mount point moves, so there is exactly one dialog
+            and one `open` state. `w-auto shrink-0` REPLACES the block's
+            `block w-full`; appending would leave two `w-*` utilities fighting
+            over stylesheet order. */}
+        {artworkInBar ? (
+          <QuestionArtwork
+            media={current.media}
+            heightPx={artworkPx}
+            buttonClassName="inline-block w-auto shrink-0"
+          />
+        ) : null}
         {result === null ? (
           <button
             type="button"
@@ -666,6 +832,15 @@ export function PracticeSession({
           <p role="alert" className="text-sm font-semibold text-danger">
             {error}
           </p>
+        ) : null}
+
+        {/* The multi-answer warning, on a phone held sideways. Its in-card
+            twin is `short:hidden`; this one is `short:inline-flex`, so the
+            student is told exactly once and the card gets its 22px back. */}
+        {current.type === "multi" ? (
+          <span className="hidden shrink-0 items-center rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-bold text-accent short:inline-flex">
+            Всички верни
+          </span>
         ) : null}
 
         {/* Phone readouts, right of the button: which question, how many right,

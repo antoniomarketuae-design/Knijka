@@ -231,6 +231,8 @@ describe("the touch audit", () => {
  */
 describe("the stability probe's negative controls", () => {
   const PROBE = readFileSync(new URL("./stability-probe.mjs", import.meta.url), "utf8");
+  /** The settle loop lives here now — inside the page, one bridge crossing. */
+  const SETTLE_LIB = readFileSync(new URL("./lib/settle.mjs", import.meta.url), "utf8");
 
   it("still accepts --inject-css and applies it to every measured page", () => {
     expect(PROBE).toContain('a === "--inject-css"');
@@ -269,7 +271,15 @@ describe("the stability probe's negative controls", () => {
    * shift of the driving cluster on alternate runs.
    */
   it("waits for the layout to come to rest instead of sleeping", () => {
-    expect(PROBE).toContain("function geometryFingerprint()");
+    // The fingerprint moved into lib/settle.mjs when the polling loop was moved
+    // INSIDE THE PAGE — the whole loop used to run in Node, so every
+    // `page.evaluate` round trip was charged to the app as settling time (one
+    // recorded sample: 32,144 ms of which 31,881 ms was the probe). This test
+    // still asserts the same property — no fixed sleep at a state change — but
+    // it has to look where the loop now lives, and it also pins the thing that
+    // made the old number wrong: `settle` is imported, not re-implemented here.
+    expect(SETTLE_LIB).toContain("const fingerprint = () => {");
+    expect(PROBE).toMatch(/import \{[^}]*\bsettle\b[^}]*\} from "\.\/lib\/settle\.mjs";/);
     for (const phase of ["toolbarShown", "toolbarHidden", "overlayOpen", "overlayClose"]) {
       expect(PROBE).toContain(`row.settle.${phase} = await settle(page)`);
     }

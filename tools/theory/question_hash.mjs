@@ -49,6 +49,19 @@ export function canonicalQuestionContent(q) {
       act: l.act,
       ref: l.ref,
     })),
+    // Non-statutory grounding (`sourceRefs`) is covered too — a first-aid row's
+    // ERC citation is exactly what a reviewer is signing off on, so swapping it
+    // after approval must break the signature. The key is EMITTED ONLY when the
+    // row has one: always emitting it would rewrite all 1,089 existing hashes
+    // for a schema change that touched none of their content.
+    sourceRefs:
+      Array.isArray(q.sourceRefs) && q.sourceRefs.length > 0
+        ? q.sourceRefs.map((s) =>
+            s.claimId === undefined
+              ? { sourceId: s.sourceId, ref: s.ref }
+              : { sourceId: s.sourceId, ref: s.ref, claimId: s.claimId },
+          )
+        : undefined,
     media: q.media ?? null,
   };
 }

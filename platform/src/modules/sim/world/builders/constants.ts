@@ -220,6 +220,35 @@ export const CENTER_LINE_WIDTH_M = DASH_WIDTH_M * 1.5;
 export const EDGE_LINE_WIDTH_M = 0.3;
 export const EDGE_LINE_INSET_M = 0.5;
 export const STOP_LINE_WIDTH_M = 0.8;
+
+/**
+ * М18 „ТРИЪГЪЛНИК" — the give-way symbol painted on the carriageway BEFORE the
+ * М7 линия за изчакване (Наредба № 2/2001, чл. 23, ал. 3, verified verbatim by
+ * docs/education/90_THEORY_VS_LAW_AUDIT.md §„Markings"):
+ *
+ *   „Преди линията за изчакване върху платното за движение може да бъде
+ *    очертан символът М18 „триъгълник", предупреждаващ за приближаване към път
+ *    с предимство. Върхът на триъгълника е насочен срещу водачите, които
+ *    трябва да пропуснат…"
+ *
+ * The theory bank TEACHES it — `q-krastovishta-062` („голям бял триъгълник с
+ * връх, насочен към теб") is a live, law-cited exam question — and until now
+ * the simulator could not draw it, so a student met the symbol in the exam and
+ * never once on the road. Its natural twin, the М7 line itself, has been
+ * painted since v1 (`paintStopLine(…, dashed: true)`).
+ *
+ * Sized against the 2.5× perceptual carriageway (LANE_WIDTH_M 8.125), not
+ * against a real 3.25 m lane: ~44% of the lane wide, so it reads as a symbol
+ * from the seat rather than as a scuff. The apex points AT the approaching
+ * driver, which is the whole legal content of ал. 3 — a triangle drawn the
+ * other way up is a different marking.
+ */
+export const GIVE_WAY_TRIANGLE_BASE_M = 3.6;
+export const GIVE_WAY_TRIANGLE_LENGTH_M = 5.4;
+/** Clear gap between the М7 line and the triangle's BASE (its junction-side
+ *  edge) — „няколко метра преди нея" at road scale. */
+export const GIVE_WAY_TRIANGLE_SETBACK_M = 3.0;
+
 export const ZEBRA_STRIPE_ACROSS_M = 0.8; // stripe width across the road
 export const ZEBRA_GAP_M = 0.6;
 export const ZEBRA_LENGTH_M = 6.0; // extent along the road axis
@@ -458,7 +487,9 @@ export const SIDEWALK_CLASSES: ReadonlySet<string> = new Set([
   "living_street",
 ]);
 
-/** Arterial classes: streetlights + solid edge lines. */
+/** Arterial classes: STREET FURNITURE (streetlights, street trees, the parking
+ *  band's siblings in props.ts). It used to decide the painted carriageway edge
+ *  line as well — see EDGE_LINE_CLASSES below for why that was wrong. */
 export const ARTERIAL_CLASSES: ReadonlySet<string> = new Set([
   "primary",
   "primary_link",
@@ -467,6 +498,55 @@ export const ARTERIAL_CLASSES: ReadonlySet<string> = new Set([
   "tertiary",
   "tertiary_link",
 ]);
+
+/**
+ * Classes whose carriageway gets the SOLID EDGE LINE (М1 „очертаваща края на
+ * платното за движение").
+ *
+ * WHY THIS IS ITS OWN SET AND NOT `ARTERIAL_CLASSES` (founder item B81, „there
+ * are no marking on the roads … has to be GLOBALLY FIXED"). The edge line is
+ * PAINT; `ARTERIAL_CLASSES` is FURNITURE — its own docstring is „streetlights",
+ * and props.ts uses it to decide street trees and lamp posts. markings.ts
+ * borrowed it, and a borrowed predicate is wrong at both ends:
+ *
+ *  - a MOTORWAY carriageway got no edge line at all, because a motorway carries
+ *    no street furniture. `authoredSolidBoundaries` even grew a special case to
+ *    hand mw-v1's emergency lane an outer line, precisely because the class it
+ *    had to ask was answering a different question;
+ *  - and 444 of the world's 698 marked edges — 63.6%, across 83 of 100 built
+ *    districts — are `residential`/`unclassified`, so on the streets the drills
+ *    actually run on the ENTIRE painted vocabulary of a mid-block ribbon was one
+ *    dashed осева across a 16.25 m carriageway. That is the frame he called „a
+ *    very basic Minecraft server with a car".
+ *
+ * `living_street` is deliberately OUT and is not an oversight: a жилищна зона is
+ * a shared surface where the carriageway edge is the point that is NOT defined,
+ * and painting one there would teach the opposite of what the zone means.
+ * `service` is out for the reason it is out of MARKED_CLASSES — a car-park aisle
+ * carries bay paint, not carriageway lines.
+ */
+export const EDGE_LINE_CLASSES: ReadonlySet<string> = new Set([
+  "motorway",
+  "trunk",
+  "primary",
+  "primary_link",
+  "secondary",
+  "secondary_link",
+  "tertiary",
+  "tertiary_link",
+  "unclassified",
+  "residential",
+]);
+
+/**
+ * Does the painter draw a solid carriageway edge line on this edge? The
+ * painter's OWN arithmetic, exported for the same reason `paintsCentreLine` is
+ * (doc 86 T1): the runtime and the tests ask the question instead of restating
+ * the class set.
+ */
+export function paintsEdgeLine(edge: { class: string }): boolean {
+  return MARKED_CLASSES.has(edge.class) && EDGE_LINE_CLASSES.has(edge.class);
+}
 
 /** Priority rank per class for stop/give-way sign placement. */
 export const CLASS_RANK: Readonly<Record<string, number>> = {

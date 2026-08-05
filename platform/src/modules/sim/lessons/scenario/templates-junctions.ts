@@ -830,17 +830,38 @@ export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
      *    is screened no matter where the student stops, so „stop further back
      *    for a better sightline" was never available to him either.
      *
-     * −34 m: clear of the row by 16 m of crossing distance (x ≈ 20.6), still
-     * OUTSIDE the junction patch (`nodeOpenRadiusM` 27.125, so the car stands
-     * on its own carriageway and not in the box), 43.6 m from the line and
-     * ~43° off the forward axis — inside the right-glance cone, at a size a
-     * student can read. At `cruiseSpeedMps` 8 it is a ~4 s conflict: the car
-     * you must actually wait for, which is the whole lesson (ЗДвП чл. 50).
-     * The runner then walks it to its `PRIORITY_COMMIT_CAR_M + 3` pin at 28 m
-     * and releases it as the student reaches the mouth — unchanged behaviour,
-     * now performed where he can see it happen.
+     * −34 m WAS NOT ENOUGH, AND THE „~43°" ABOVE WAS MEASURED FROM THE WRONG
+     * POSE. 43.6 m / 43° is the geometry at the Б1 PAINT (4.06, 122.275). The
+     * pose this drill actually grades is `sc-jxgb-yield`, 13.8 m further back,
+     * and the rig stops there: at (4.06, 108.11) a car at x = 34 is 33.1° off
+     * the forward axis, and the cockpit's right glance is centred on
+     * `CameraRig.GLANCE_OFFSETS.right` = 0.93 rad = **53.3°**. So the held
+     * glance points twenty degrees PAST it, into the parked row, and the car
+     * lives in the windscreen instead. Photographed 2026-08-04: twelve held
+     * right-glance frames across 25 s at the graded pose, panels closed, and
+     * the staged car crossing the box at t = 45.3 s (orchestrator replay of the
+     * measured trajectory: hold 34.0 → walk to 27.2 → 20.3 → release → x = 2.9
+     * at the node) — NOT ONE frame contains it. His „I looked but I didnt see
+     * it at all" reproduced exactly, for a reason neither of us had named.
+     *
+     * −45 m puts the car where the glance is aimed. From the graded band's own
+     * centre (4.06, 108.5) that is 41.9°; from the Б1 paint 53.2° — the glance
+     * axis to within a degree. It is still INSIDE `scenery-sightline` T6's
+     * min(45, cruise × 6) = 45 m sample window, so the gate keeps testing the
+     * whole of it; still OUTSIDE the junction patch (`nodeOpenRadiusM` 27.125),
+     * so the car stands on its own carriageway and not in the box; and the
+     * runner's own hold/sync branch then walks it in to the
+     * `PRIORITY_COMMIT_CAR_M + 3` pin at 28 m, which is now 17 m of visible
+     * approach sweeping 42° → 28° instead of 14 m sitting at 33°. The behaviour
+     * is unchanged; the place it is performed is the place he is told to look.
+     *
+     * The other half of the same repair is in the MAP: бул. „Втори" declares
+     * `parkingBand: false` on both arms (tools/maps/gen_jx_giveway.mjs holds the
+     * measurement), because a hold at −45 clears the old row by 8.69 m but
+     * anything beyond x ≈ 50 was screened by 0.09–1.5 m — and the five
+     * FAMILY-BASELINE ambient cars sharing this arm were screened with it.
      */
-    hold: { nodeIndex: 1, offsetM: -34 },
+    hold: { nodeIndex: 1, offsetM: -45 },
     cruiseSpeedMps: 8,
   },
   junctionNodeIndex: 1,
@@ -853,7 +874,29 @@ export const SC_JX_GIVEWAY_CONFLICT: PriorityFromRightSpec = {
   // L7 (ledger §4): authored rather than inherited from the runner default —
   // this drill's own instruction 4 demands a full stop at the Б1 line, and on a
   // pure distance gate the car it tells you to wait for has already gone.
-  witnessArm: { etaSec: 8, nearLineM: 6 },
+  //
+  // `stoppedNearM` — B30, and it is a THIRTY-CENTIMETRE cliff, measured on the
+  // seat rather than argued. This drill's Б1 line is 27.725 m from the node, so
+  // a student stopped at `sc-jxgb-yield`'s own centre (4.06, 108.5) is
+  // playerLineDist 13.97 m from it — 3 cm inside the runner's default
+  // `WITNESS_STOPPED_NEAR_M` 14. Stop where the rig actually stops, y 108.21,
+  // and it is 14.27 m: the stopped-witness never fires, the B33 re-hold pins
+  // the car (a standing player's raw ETA floors to 28.5 s, which no car can
+  // honour), and the loop closes — «cruise 0» forever. Photographed: twenty
+  // seconds of held right glance at y 108.21 with an empty boulevard
+  // (`B108-HELD-05…17`), against the same drive stopped 3.5 m further on at
+  // y 111.71, where the car crosses the windscreen and the engine commends
+  // YIELDED_TO_PRIORITY (`AB112-*-FORWARD`, t=48.50). His sentence for that
+  // first case is „I looked but I didnt see it at all", and he was right.
+  //
+  // 33 m is the rear edge of what this lesson GRADES: `sc-jxgb-yield` credits
+  // the yield from y 90 at L1 (centre 108.5, r 13.5 + the aid ladder's 5), and
+  // y 90 is playerLineDist 32.4. So the rule is „a stop anywhere this drill
+  // calls a yield releases the car it told you to yield to" — the graded pose
+  // and the conflict release stop disagreeing. Every other spec keeps the 14 m
+  // default byte-for-byte; the field exists so this one does not have to move
+  // a constant that R3 deliberately bounded.
+  witnessArm: { etaSec: 8, nearLineM: 6, stoppedNearM: 33 },
 };
 
 /** Learn-only rear pressure (доп. натиск): a car glued behind the player, so
@@ -881,7 +924,32 @@ export const SC_JX_GIVEWAY_TAILGATER: RearTailgaterSpec = {
   id: "sc-jxgb-tailgater",
   kind: "rearTailgater",
   actor: {
-    pathNodes: ["jxg-n-s", "jxg-n-j1", "jxg-n-j2"],
+    /**
+     * FR-B5-VAN (doc 87, 2026-08-05) — THE PATH ENDED IN THE JUNCTION THE
+     * STUDENT IS ABOUT TO DRIVE INTO, AND THE ACTOR PARKED THERE FOR GOOD.
+     *
+     * It used to be `["jxg-n-s", "jxg-n-j1", "jxg-n-j2"]`. A staged vehicle
+     * that runs out of path stops on the last metre of it and never moves
+     * again (staged.ts `finished`), and the last metre of that path is the
+     * CENTRE OF MOUTH 2 — the node at (0, 150), i.e. the box the drill's own
+     * instruction 5 sends the student through („щом пътят е чист, потегляш").
+     * Measured before the fix, five wait lengths (0/5/9/15/20 s) at the Б1
+     * line, ambient traffic off: the лепка comes to rest at (−4.06, 150.00) at
+     * t ≈ 27 s in EVERY one of them and is still standing there at t = 200 s.
+     * With the family's ambient baseline on it freezes even earlier, at
+     * (−4.06, −8.46) — inside mouth 1. Either way it is a stationary car
+     * standing in a junction, which is what the founder photographed as a box
+     * van „squarely on the blue path" (`newdef/ZOOM-b5gw-junction-t58.png`) and
+     * drove into: a 10-point COLLISION at y = 146.00 on a correctly-driven run.
+     *
+     * `jxg-n-n` (0, 240) is the north arm's far end — 90 m past mouth 2 and
+     * 62 m past this drill's last objective (`sc-jxgb-exit`, y = 178). Adding
+     * it lets the pass finish where a real overtaker's pass finishes: up the
+     * road and out of the lesson. Nothing else about the encounter moves — the
+     * hold, the release gap, the pressure and the pass are all upstream of
+     * mouth 1 and unchanged.
+     */
+    pathNodes: ["jxg-n-s", "jxg-n-j1", "jxg-n-j2", "jxg-n-n"],
     hold: { nodeIndex: 0, offsetM: 6 },
     cruiseSpeedMps: 9,
     extraRightOffsetM: 0,
@@ -984,42 +1052,56 @@ export const SC_JX_GIVEWAY_B1: ScenarioSpec = {
        * advisor was congratulating him on the junction behind him. A task that
        * is still current after you have driven past it teaches nothing.
        *
-       * WIDENING WAS WRITTEN, MEASURED, AND DELIBERATELY NOT SHIPPED.
-       * `y 108.5 r 13.5` → y ∈ [95, 122] (with `acceptBeforeMarkM` re-derived
-       * to −13.775 so the paint cut still holds) passes the family's own B5
-       * gate — that one checks the RAW disc, so the centre only has to move
-       * back with the radius, and 108.5 + 13.5 = 122.0 is short of 122.275.
-       * `traffic/scenery-sightline` T6 („the graded yield pose can SEE the
-       * staged conflict actor") then FAILED it at 1.37 m against a 2 m floor:
+       * THE WIDENING WAS REFUSED ONCE, BY A GATE THAT WAS RIGHT, AND THE GATE
+       * IS NOW SATISFIED INSTEAD OF ARGUED WITH. The previous attempt at
+       * `y 108.5 r 13.5` passed the family's own B5 gate (that one checks the
+       * RAW disc: 108.5 + 13.5 = 122.0, short of the 122.275 paint) and was
+       * then failed by `traffic/scenery-sightline` T6 — „the graded yield pose
+       * can SEE the staged conflict actor" — at 1.37 m against a 2 m floor:
        *   «sc-jxgb-yield (4.06, 108.50) → actor (44.0, 154.1)
        *    blocked by (10.1, 110.0)»
-       * That blocker is a parked body on the student's OWN kerb —
-       * `TrafficLayer.computeParkedCars` on the tertiary `jxg-e-m`, seated at
-       * travelHalf 8.125 + PARK_BAND_CENTER 2.0 = x 10.125, last lawful slot
-       * y 110. Solving the same clearance by hand along the band: a pose at
-       * y 110 clears by 2.37 m, y 109.5 by 2.05 m, and y 98 — the rear edge of
-       * the widened band — is blocked outright. So this band cannot be widened
-       * backwards on this map: behind ≈ y 110 the student's own kerbside row
-       * stands in the give-way sightline, and crediting a pose there would be
-       * certifying a yield made from where he cannot see. One measured lie
-       * traded for another is not a fix.
+       * and the agent reverted rather than ship a measured lie. That was the
+       * right call: T6 exists to make „a lesson grades a look its own scenery
+       * makes impossible" unauthorable, which IS B29's complaint written as a
+       * test, and widening past it would have been certifying a yield made
+       * from where the student cannot see.
        *
-       * The values below are therefore the shipped ones, UNCHANGED, and B31's
-       * second half stays open with a named owner: the kerbside row, not this
-       * objective. `computeParkedCars` already honours a per-edge
-       * `parkingBand: false` (FR-21), which `tools/maps/gen_jx_giveway.mjs` can
-       * declare on `jxg-e-m` — and on `jxg-e-e2`, whose row is what screens the
-       * boulevard itself. Once that row is gone the widening above is a
-       * two-number change and this comment is its recipe. What the actor fix
-       * above does close is the reason he was stopping 30 m short at all.
+       * WHAT THE GATE WAS PROTECTING, AND WHY IT NO LONGER BITES. The blocker
+       * was a single parked body on the student's OWN kerb — the last lawful
+       * slot of `computeParkedCars`' row on the tertiary `jxg-e-m`, at
+       * (10.125, 110), on the east side because that edge's polyline points
+       * north and the pass walks the right-hand normal. `jxg-e-m` now declares
+       * `parkingBand: false` (FR-21; the recipe this comment used to end with,
+       * see tools/maps/gen_jx_giveway.mjs for the measurement), so that row is
+       * gone and the sightline from the whole approach is clear. Swept along
+       * x 4.06 against every actor sample inside the 45 m window, worst
+       * clearance to any remaining body:
+       *
+       *   pose y   |  86    95    99.5   104    108.5   113    122
+       *   before   | 0.00  0.00   0.00   0.00   1.08   4.19   8.91
+       *   after    | 4.76  5.55   5.98   6.50   7.03   7.62   8.91
+       *
+       * Read the BEFORE row again: the SHIPPED band already reached y 99.5 at
+       * L1 (r 9 widened to 13.5), so this drill was crediting a yield from
+       * poses with 0.00 m of sightline — the exact defect T6 forbids, invisible
+       * to T6 because it samples the authored CENTRE and not the band. Removing
+       * the row fixes a live falsehood, not merely a hypothetical one.
+       *
+       * SO THE BAND MOVES: `y 108.5 r 13.5`, `acceptBeforeMarkM` re-derived to
+       * −13.775 so the acceptance still ends ON the paint. Effective band
+       * y ∈ [95, 122.275] at L3+, and y ∈ [90, 122.275] at L1 once the aid
+       * ladder widens 13.5 → 18.5 (capped by REACH_ZONE_GRACE_M) — against
+       * y ∈ [104, 122.275] and y ∈ [99.5, 122.275] before. Every metre of it
+       * clears the scenery by ≥ 4.76 m. The ≤ 6 km/h crawl gate is untouched:
+       * the SPEED cap is the drill and it stays.
        */
       params: {
         kind: "reachZone",
         x: 4.06,
-        y: 113,
-        radiusM: 9,
+        y: 108.5,
+        radiusM: 13.5,
         maxSpeedKmh: 6,
-        acceptBeforeMarkM: -9.275,
+        acceptBeforeMarkM: -13.775,
       },
     },
     {

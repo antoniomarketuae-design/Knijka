@@ -7,11 +7,24 @@
  * founder is about to make a launch decision on. A review screen that throws on
  * open, or quietly reports the wrong number of unsigned rows, is worse than no
  * review screen — it is the same class of defect as the flag it replaces.
+ *
+ * TIMEOUT, and why it is not a hang. Every test here walks the real 1,089-row
+ * bank, retrieves statute text, and shells out to git for the diff baseline. On
+ * a cold FS cache on the 7200rpm E: drive that measured 23s of import before the
+ * first assertion ran, so vitest's default 5s failed a suite that is correct
+ * (warm, the same files pass in 5s total). The explicit budget below is the
+ * difference between a guard the gate trusts and one someone deletes as flaky —
+ * and this is the guard that keeps twelve first-aid rows on screen.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Question } from "@/lib/content/types";
+import { approvalStateOf, indexLedger, readLedger } from "./approvals";
 import { listFlaggedQuestions } from "./io";
+import { REVIEW_QUEUES, dispositionOf } from "./queues";
 
-describe("listFlaggedQuestions — against the real bank", () => {
+describe("listFlaggedQuestions — against the real bank", { timeout: 120_000 }, () => {
   it("opens without throwing and reports a whole-bank census", async () => {
     const result = await listFlaggedQuestions();
     expect(result.census.total).toBeGreaterThan(1000);
@@ -92,7 +105,102 @@ describe("listFlaggedQuestions — against the real bank", () => {
   });
 });
 
-describe("the queue is ordered by what a wrong decision costs a student", () => {
+// ---------------------------------------------------------------------------
+// Reachability — the property that was missing when twelve rows disappeared
+// ---------------------------------------------------------------------------
+
+/** The real /content dir, probed the way io.ts probes it (cwd is platform/ under vitest). */
+function contentDir(): string {
+  for (const dir of [path.join(process.cwd(), "content"), path.resolve(process.cwd(), "..", "content")]) {
+    if (fs.existsSync(path.join(dir, "topics.json"))) return dir;
+  }
+  throw new Error(`content dir not found from ${process.cwd()}`);
+}
+
+function readQuestions(slug: string): Question[] {
+  return JSON.parse(
+    fs.readFileSync(path.join(contentDir(), "questions", `${slug}.json`), "utf8"),
+  ) as Question[];
+}
+
+describe("every row in the bank is reachable from some queue", { timeout: 120_000 }, () => {
+  it("accounts for the WHOLE bank: every row is queued or human-approved", async () => {
+    // THE ALARM. Promoting rows to `machine-checked` used to remove them from
+    // both queues — no error, no warning, just a shorter screen. This identity
+    // is what makes that loud: a status that routes nowhere leaves the sum
+    // short of the bank, and the message below names the shortfall.
+    const { census } = await listFlaggedQuestions();
+    const queued = REVIEW_QUEUES.reduce((sum, queue) => sum + census.queueTotals[queue], 0);
+    expect(
+      queued + census.humanApproved,
+      `${census.total - queued - census.humanApproved} row(s) are in no queue and unsigned — ` +
+        `queueTotals ${JSON.stringify(census.queueTotals)}, humanApproved ${census.humanApproved}`,
+    ).toBe(census.total);
+  });
+
+  it("pages each queue at exactly the size its tab advertises", async () => {
+    // The tab count comes from `census.queueTotals`, the page from the queue
+    // walk. If those two ever disagree the founder is told "12" and shown none.
+    for (const queue of REVIEW_QUEUES) {
+      const result = await listFlaggedQuestions({ queue, pageSize: 1 });
+      expect(result.queue, `?queue=${queue} was not honoured`).toBe(queue);
+      expect(result.total, `${queue}: tab says ${result.census.queueTotals[queue]}`).toBe(
+        result.census.queueTotals[queue],
+      );
+      if (result.total > 0) expect(result.flagged.length).toBe(1);
+    }
+  });
+
+  it("keeps every unsigned first-aid row on a screen the founder can open", async () => {
+    // docs/development/91 §4.17 names 29 rows by id and tells the founder to
+    // open /review and approve them. Twelve — q-ptp-018, 019, 020, 021, 038,
+    // 039, 040, 041, 042, 061, 063, 064 — reached no queue at all, and
+    // c-bleeding-control and c-victim-handling were down to 1 visible row of 7
+    // each: the two most dangerous topics in the product had effectively left
+    // the queue. This walks the REAL queues (the per-topic summaries are built
+    // over the whole backlog, not the page) and asserts reachability, NOT a
+    // particular status — a later wave may legitimately promote a row, it may
+    // not make one disappear.
+    const SLUG = "ptp-i-parva-pomosht";
+    const signatures = indexLedger(readLedger(contentDir()));
+    const rows = readQuestions(SLUG);
+    const expected = rows.filter(
+      (q) => dispositionOf(q.status, approvalStateOf(q, signatures.get(q.id))) !== "human-approved",
+    ).length;
+
+    let onScreen = 0;
+    for (const queue of REVIEW_QUEUES) {
+      const { topics } = await listFlaggedQuestions({ queue, pageSize: 1 });
+      onScreen += topics.find((t) => t.slug === SLUG)?.needsReviewCount ?? 0;
+    }
+    expect(
+      onScreen,
+      `${expected - onScreen} unsigned row(s) of ${SLUG} appear in no queue`,
+    ).toBe(expected);
+  });
+
+  it("shows the whole of the two most dangerous concepts, not one row of seven", async () => {
+    const CONCEPTS = ["c-bleeding-control", "c-victim-handling", "c-cpr-basics", "c-first-aid-priorities"];
+    const signatures = indexLedger(readLedger(contentDir()));
+    const rows = readQuestions("ptp-i-parva-pomosht");
+    // The 29 medical rows §4.17 rules on, by concept.
+    expect(rows.filter((q) => q.conceptIds.some((id) => CONCEPTS.includes(id))).length).toBe(29);
+
+    for (const concept of CONCEPTS) {
+      const inConcept = rows.filter((q) => q.conceptIds.includes(concept));
+      const stranded = inConcept
+        .map((q) => ({ q, where: dispositionOf(q.status, approvalStateOf(q, signatures.get(q.id))) }))
+        .filter(({ where }) => where !== "human-approved" && !REVIEW_QUEUES.includes(where))
+        .map(({ q, where }) => `${q.id} (${q.status} → ${where})`);
+      expect(
+        stranded,
+        `${concept}: ${stranded.length} of ${inConcept.length} rows reach no queue — ${stranded.join(", ")}`,
+      ).toEqual([]);
+    }
+  });
+});
+
+describe("the queue is ordered by what a wrong decision costs a student", { timeout: 120_000 }, () => {
   const RANK = ["key-flip", "answer-text", "stem", "explanation", "citation", "untouched"];
 
   it("ranks the WHOLE backlog, not just the page that is on screen", async () => {

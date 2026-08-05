@@ -6,9 +6,9 @@
   "mapKind": "scenario-street",
   "generator": "tools/maps/gen_pe_crossings.mjs",
   "boundsLocalMeters": {
-   "minX": -28,
+   "minX": -32,
    "minY": -14.125,
-   "maxX": 27,
+   "maxX": 30,
    "maxY": 258
   },
   "attribution": {
@@ -25,11 +25,11 @@
   "zonesVersion": 1,
   "stats": {
    "roadKm": 0.21,
-   "nodes": 3,
-   "edges": 2,
+   "nodes": 5,
+   "edges": 4,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 7,
+   "buildings": 11,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -46,12 +46,44 @@
    "roadscapeNoteBg": "Тясна квартална улица преди закрит ъгъл: В24 „Забранено е изпреварването“ важи точно там, където видимостта свършва — не се излиза в насрещното покрай ъгъла, зад който излиза пешеходецът.",
    "terminus": "necks-to-service",
    "terminusNoteBg": "След закрития ъгъл платното се стеснява наполовина — нататък е служебна алея с една лента между гаражите. Стеснението се вижда отдалеч и е причината да си свалил скоростта ПРЕДИ пътеката, а не след нея.",
+   "nearfield": "lockup-garages",
+   "nearfieldNoteBg": "Първите тридесет метра покрай теб минава ниска редица гаражи — покривите им са едва над очите ти и над тях остава чисто небе. И точно затова деветметровата ъглова сграда, която изниква след тях, изглежда толкова внезапна: улицата ти е показала ниска линия, и после я вдига.",
+   "nearfieldSignature": "both|low-row|12.6",
+   "nearfieldFirstM": -11,
    "terminusLegs": 1,
    "terminusRoadM": 70,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
    "curbToCurbM": 16.25,
+   "carriageway": "bay-pocket-near",
+   "carriagewayNoteBg": "Тръгваш по тясно 16,25-метрово платно, а на три метра пред теб то се разширява в паркинг джоб пред гаражите — 24,25 м със спрели коли, и после отново се стеснява преди пътеката.",
+   "carriagewaySegments": [
+    {
+     "id": "pe-e-street-s1",
+     "fromY": 0,
+     "toY": 18,
+     "curbToCurbM": 16.25
+    },
+    {
+     "id": "pe-e-street-s2",
+     "fromY": 18,
+     "toY": 50,
+     "curbToCurbM": 24.25
+    },
+    {
+     "id": "pe-e-street",
+     "fromY": 50,
+     "toY": 140,
+     "curbToCurbM": 16.25
+    }
+   ],
+   "spawnCurbToCurbM": 16.25,
+   "widthChangesAtM": [
+    3,
+    35
+   ],
+   "bayedRoadM": 32,
    "oneway": false,
    "banSignRef": "В24",
    "primaryCrossingId": "pe-x-1",
@@ -74,6 +106,16 @@
     "y": 210
    },
    {
+    "id": "pe-n-cw1",
+    "x": 0,
+    "y": 18
+   },
+   {
+    "id": "pe-n-cw2",
+    "x": 0,
+    "y": 50
+   },
+   {
     "id": "pe-n-end",
     "x": 0,
     "y": 140
@@ -87,7 +129,7 @@
   "edges": [
    {
     "id": "pe-e-street",
-    "from": "pe-n-start",
+    "from": "pe-n-cw2",
     "to": "pe-n-end",
     "class": "residential",
     "name": "Улица с пешеходна пътека",
@@ -97,11 +139,11 @@
     "lanesSource": "tag",
     "maxspeed": 50,
     "maxspeedSource": "tag",
-    "length": 140,
+    "length": 90,
     "geometry": [
      [
       0,
-      0
+      50
      ],
      [
       0,
@@ -109,6 +151,56 @@
      ]
     ],
     "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s1",
+    "from": "pe-n-start",
+    "to": "pe-n-cw1",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 18,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      18
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s2",
+    "from": "pe-n-cw1",
+    "to": "pe-n-cw2",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 32,
+    "geometry": [
+     [
+      0,
+      18
+     ],
+     [
+      0,
+      50
+     ]
+    ],
+    "parkingBand": true
    },
    {
     "id": "pe-e-alley",
@@ -153,22 +245,22 @@
   {
    "id": "pe-b-corner",
    "height": 9,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
-     -28,
+     -32,
      50
     ],
     [
-     -12.6,
+     -16.6,
      50
     ],
     [
-     -12.6,
+     -16.6,
      78.5
     ],
     [
-     -28,
+     -32,
      78.5
     ]
    ]
@@ -176,22 +268,22 @@
   {
    "id": "pe-b-kiosk",
    "height": 3,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
-     -16.5,
+     -20.5,
      40
     ],
     [
-     -12.6,
+     -16.6,
      40
     ],
     [
-     -12.6,
+     -16.6,
      47
     ],
     [
-     -16.5,
+     -20.5,
      47
     ]
    ]
@@ -199,22 +291,22 @@
   {
    "id": "pe-b-east-row",
    "height": 7,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
-     12.6,
+     16.6,
      34
     ],
     [
-     26,
+     30,
      34
     ],
     [
-     26,
+     30,
      70
     ],
     [
-     12.6,
+     16.6,
      70
     ]
    ]
@@ -222,7 +314,7 @@
   {
    "id": "pe-b-east-row2",
    "height": 7,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      12.6,
@@ -245,7 +337,7 @@
   {
    "id": "pe-b-garagerow-w",
    "height": 3.2,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -25,
@@ -268,7 +360,7 @@
   {
    "id": "pe-b-garagerow-e",
    "height": 3.2,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      9.2,
@@ -291,7 +383,7 @@
   {
    "id": "pe-b-alley-end",
    "height": 12,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -21,
@@ -312,25 +404,117 @@
    ]
   },
   {
-   "id": "sw-pe-e-street-l2",
-   "height": 17,
+   "id": "pe-b-nf-lockup-w",
+   "height": 3,
+   "heightSource": "height",
+   "footprint": [
+    [
+     -26,
+     4
+    ],
+    [
+     -12.6,
+     4
+    ],
+    [
+     -12.6,
+     17
+    ],
+    [
+     -26,
+     17
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-lockup-w2",
+   "height": 3,
+   "heightSource": "height",
+   "footprint": [
+    [
+     -30,
+     24
+    ],
+    [
+     -16.6,
+     24
+    ],
+    [
+     -16.6,
+     37
+    ],
+    [
+     -30,
+     37
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-lockup-e",
+   "height": 3,
+   "heightSource": "height",
+   "footprint": [
+    [
+     12.6,
+     4
+    ],
+    [
+     25,
+     4
+    ],
+    [
+     25,
+     17
+    ],
+    [
+     12.6,
+     17
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-lockup-e2",
+   "height": 3,
+   "heightSource": "height",
+   "footprint": [
+    [
+     16.6,
+     20
+    ],
+    [
+     29,
+     20
+    ],
+    [
+     29,
+     31
+    ],
+    [
+     16.6,
+     31
+    ]
+   ]
+  },
+  {
+   "id": "sw-pe-e-street-l1",
+   "height": 13.6,
    "heightSource": "levels",
    "footprint": [
     [
-     -17.32,
-     91.05
+     -18.31,
+     99.17
     ],
     [
-     -17.32,
-     120.95
+     -18.31,
+     126.83
     ],
     [
-     -35.89,
-     120.95
+     -42.24,
+     126.83
     ],
     [
-     -35.89,
-     91.05
+     -42.24,
+     99.17
     ]
    ]
   }
@@ -341,7 +525,7 @@
    "x": 4.06,
    "y": 15,
    "heading": 0,
-   "edgeId": "pe-e-street",
+   "edgeId": "pe-e-street-s1",
    "name": "Подход към пешеходната пътека"
   },
   {
@@ -358,8 +542,8 @@
    "id": "pe-z-noovertaking",
    "kind": "noOvertaking",
    "edgeId": "pe-e-street",
-   "fromM": 42,
-   "toM": 100.8,
+   "fromM": 2,
+   "toM": 50.8,
    "signRef": "В24"
   }
  ]

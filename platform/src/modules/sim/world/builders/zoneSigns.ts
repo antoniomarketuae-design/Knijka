@@ -117,6 +117,11 @@ const CURVE_PLATE_MIN_ROOM_M = HAZARD_WARNING_AHEAD_M + 3;
 const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
   noOvertaking: "noOvertaking",
   noStopping: "noStopping",
+  // В28 „Забранено е паркирането". This row was MISSING, not marking-only: the
+  // zone kind has existed since the ban slice („В24/В27/В28 bans" in its own
+  // docstring) and pk-ban2-v1 authors one, so the map had a graded parking ban
+  // whose sign was never posted — while the parking lessons name В28 34 times.
+  noParking: "noParking",
   waterPatch: "slippery",
   icePatch: "slippery",
   curveAdvisory: "curve",

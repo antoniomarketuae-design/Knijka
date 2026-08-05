@@ -45,6 +45,11 @@ tools/clips/headless/cluster/
 # harness's own durable artefact is tools/mobile/baseline.json, which IS
 # tracked, because later phases are measured against it.
 tools/mobile/.out/
+# …and the engineering-progress frames, which are the same thing under another
+# name. 17 of them (9.5 MB) were committed before this line existed and are
+# still tracked — ignoring a path does not untrack what is already in it, so
+# those need an explicit `git rm --cached tools/mobile/.engprog` to leave.
+tools/mobile/.engprog/
 
 # agent rig output (screenshots + row dumps) — never committed
 .fold-rig/

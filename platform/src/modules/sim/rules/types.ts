@@ -481,8 +481,9 @@ export type ViolationCode =
   | "HIGH_BEAM_NOT_DIPPED" // второстепенна: long beam left on behind a lead vehicle at night (AC-04)
   | "OVERTAKING_AT_CROSSING" // опасна: overtaking (lane change past a lead) in a pedestrian-crossing zone (OV-07)
   // B1a Wave-3 detector pack (doc 72 capability 1 — config-gated per-lesson drills on EXISTING telemetry)
-  | "JUNCTION_SCAN_INCOMPLETE" // основна: crossed a Б2 stop line without a fresh left-AND-right scan (JU-23; config-gated)
+  | "JUNCTION_SCAN_INCOMPLETE" // основна: crossed a priority line (Б1 or Б2) without a fresh left-AND-right scan (JU-23; config-gated)
   | "FOLLOWING_TOO_CLOSE_FOR_RAIN" // второстепенна: dry-appropriate gap held in rain — under the wet 3-second gap (FO-04; config-gated)
+  | "CLOSING_ON_LEAD_TOO_FAST" // основна: the gap to the car in front is COLLAPSING and has fallen under the taught time-gap — the approach to a slowing/stopped queue (FO-08; config-gated)
   // ZONE-BAN data layer (ADR-006 stage 2a — authored В24/В27 district zones)
   | "ILLEGAL_STOP_IN_BAN_ZONE" // основна: casual rest inside a В27 no-stopping zone (PK-06; queue/signal stops structurally innocent)
   | "OVERTAKING_IN_BAN_ZONE" // основна: lane change past a lead inside a В24 no-overtaking zone (OV-06; the OV-07 corridor discipline)
@@ -625,9 +626,20 @@ export interface RuleEngineConfig {
   handbrakeSustainSec: number;
   headlightsSustainSec: number;
 
-  /** Indicator must have been on (in the right direction) within this window before a turn/lane change. */
+  /**
+   * Indicator must have been on (in the right direction) within this window
+   * before a turn/lane change. The tracker is refreshed EVERY TICK the stalk
+   * is on (engine.ts §1), so this is not "signal early enough" — it is "how
+   * long an EXTINGUISHED signal still counts", and the thing that extinguishes
+   * it is usually not the student. See the default for the beginner case.
+   */
   indicatorLookbackSec: number;
-  /** Mirror glance (side of the maneuver) required within this window before a lane change. Doc requirement: 5 s. */
+  /**
+   * Mirror glance (side of the maneuver) required within this window before a
+   * lane change. Measured from the glance to the frame `tick.laneId` flips —
+   * i.e. it has to cover the human beats AND the whole lateral traverse of a
+   * lane drawn at PERCEPTUAL_ROAD_SCALE. See the default.
+   */
   mirrorLookbackSec: number;
   /** Lane-id changes below this speed are ignored (parking shuffles, not lane changes). */
   laneChangeMinSpeedKmh: number;
@@ -725,6 +737,53 @@ export interface RuleEngineConfig {
   followRecoveryRateMps: number;
   /** Seconds under the fire threshold before FOLLOWING_TOO_CLOSE fires. */
   followSustainSec: number;
+
+  // -- CLOSING_ON_LEAD_TOO_FAST (FO-08; doc 87 item 7 — his item 40) ---------
+  //
+  // WHY THIS EXISTS, measured before it was written. `sc-follow-standstill`
+  // („Дистанция при спиране в колона") is a drill about approaching a STOPPED
+  // queue, and its nominal pace is the staged lead's own 20.2 km/h cruise.
+  // Driven at exactly that pace down the lane with no lift, the recorded run
+  // reads: lead gap 27.5 m at t = 13 s → 8.6 m at t = 41 → 2.7 m at t = 43 →
+  // 0.0 m at t = 45, and the ENTIRE rule-event log for the run is
+  // `+CLEAN_DRIVING@46.5` and `STANDSTILL_GAP_TOO_CLOSE@54.2`. Not one distance
+  // fault, at any point, on a drive that ends in the queue. The founder's
+  // result screen for the live version of that drive is «20 наказателни точки ·
+  // НЕИЗДЪРЖАН · Опасни 2 · Основни 0 · Второстепенни 0» — he failed and was
+  // told nothing, which is a requirement-zero (doc 64 THEO-4) violation as much
+  // as a tuning one.
+  //
+  // The mechanism is one number: `followMinSpeedKmh` is 20 and the drill is
+  // driven at 19.9. Below the floor `FOLLOWING_TOO_CLOSE` is silent — for good
+  // reason, since a queue rolling in formation at 15–20 km/h with one-second
+  // gaps is normal traffic and grading it is the genre's classic trust-killer.
+  //
+  // The floor is therefore NOT lowered. What is added is the discriminator the
+  // floor was standing in for: a queue in formation holds its gap, and a driver
+  // running into the back of one does not. So this code judges the gap below
+  // the floor ONLY while the gap is genuinely COLLAPSING — closing at
+  // `leadClosingMinRateMps` or more. A steady queue can never arm it (closing
+  // ≈ 0); a car ahead that is faster than you can never arm it (the gap opens).
+  //
+  // SHIPPED OFF, like every other per-lesson detector: the exam bots and 149
+  // other templates keep the pre-change grading byte-for-byte.
+
+  /** Master switch — enabled per lesson (`ruleConfig`), never by default. */
+  leadClosingEnabled: boolean;
+  /**
+   * Closing rate (m/s) the gap must be shrinking at before this code can fire.
+   * Above the frame-to-frame noise of the gap channel, and well under the
+   * ~1.2–1.6 m/s a non-lifting driver develops against a queue that is coming
+   * to rest (measured on the drill above).
+   */
+  leadClosingMinRateMps: number;
+  /**
+   * Seconds the collapsing-and-under-gap state must hold before it fires.
+   * SHORTER than `followSustainSec` on purpose: a gap that is closing is its
+   * own confirmation, and the whole value of this code is that it speaks while
+   * the student still has room to stop.
+   */
+  leadClosingSustainSec: number;
 
   /** Seconds against a one-way's flow before WRONG_WAY fires. */
   wrongWaySustainSec: number;
@@ -1150,8 +1209,50 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   handbrakeSustainSec: 1.5,
   headlightsSustainSec: 2,
 
-  indicatorLookbackSec: 3,
-  mirrorLookbackSec: 5,
+  // REGISTER B21 — founder: „he must press almost at the same time few buttons
+  // … just a second." Both windows are widened, and the reason is the same in
+  // both: they were set at REAL-WORLD numbers and then applied to a manoeuvre
+  // this simulator makes structurally longer than the real one.
+  //
+  // indicator 3 → 5. The tracker refreshes every tick the stalk is on, so 3 s
+  // never meant „signal 3 s early" — it meant „an extinguished signal is
+  // forgotten after 3 s". And the stalk extinguishes ITSELF: scene/cabin.ts
+  // auto-cancels like a real car (AUTOCANCEL_ARM_RAD 0.22 → RELEASE 0.05). A
+  // beginner wobbles — eases left, straightens to re-check the mirror, eases
+  // left again — and that first straighten clicks the stalk off while he is
+  // still in the old lane, seconds before the wheels cross. He is then
+  // convicted of LANE_CHANGE_WITHOUT_INDICATOR for a signal he DID give and
+  // the CAR cancelled. 5 s covers one whole wobble-and-recover. It is also the
+  // only value consistent with the drill's own contract: sc-lane-change
+  // examinerBg demands «навременен мигач (2–3 секунди преди преместването)», so
+  // 3 s was exactly the LOWER bound of the lesson's own ask with zero margin
+  // left for the crossing itself.
+  //
+  // mirror 5 → 8. This one is measured from the glance to the frame
+  // `tick.laneId` flips, so it has to pay for BOTH halves of the manoeuvre:
+  //   · the human half is strictly SERIAL and cannot be overlapped — KeyQ pins
+  //     the camera to the mirror (CameraRig GLANCE_OFFSETS), so a student
+  //     physically cannot steer while looking. Release → re-orient → find the
+  //     steer key is 1.5–2.5 s for a 17-year-old on their first drive;
+  //   · the lateral half is 4.06 m, not the legal 1.63 m, because the lane is
+  //     drawn at PERCEPTUAL_ROAD_SCALE (2.5 × 3.25 m = 8.125 m). A gentle
+  //     beginner diagonal runs ~0.8–1.2 m/s of lateral speed ⇒ 3.4–5.1 s.
+  // 5–7.6 s total, and it got WORSE the slower and more carefully he drove —
+  // the grading was upside down for exactly the audience this product has.
+  // Same reasoning as laneKeepMaxOffsetM below: the car stays real-size, so the
+  // tolerance must track the DRAWN lane, not the law.
+  //
+  // 8 and not more: the blind-spot actor this drill stages sits 24 m behind at
+  // matched speed, and a car closing at a 15 km/h differential covers 33 m in
+  // 8 s — the honest edge of „your glance is still true". Past ~10 s the
+  // observation IS stale and crediting it would teach a lie.
+  //
+  // NEITHER widening can absolve a mistake demo: „Престрояване без мигач" and
+  // „Престрояване без огледало" never arm their channel at all, so the
+  // timestamp is `null` and no window width reaches them (pinned by
+  // lane-change-beginner-window.test.ts).
+  indicatorLookbackSec: 5,
+  mirrorLookbackSec: 8,
   laneChangeMinSpeedKmh: 10,
   laneChangeJointGraceSec: 1.5, // C1 — see the interface comment
 
@@ -1194,6 +1295,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // from a cut-in; do not count those frames (FP case: "cut-in recovery").
   followRecoveryRateMps: 0.5,
   followSustainSec: 2,
+
+  // FO-08 closing-rate pack — OFF, opted into per lesson (see the block above).
+  leadClosingEnabled: false,
+  leadClosingMinRateMps: 0.8,
+  leadClosingSustainSec: 1,
 
   wrongWaySustainSec: 1.5,
   // A12: was 8 — a real overtake of a slower vehicle runs 10-15 s in the left

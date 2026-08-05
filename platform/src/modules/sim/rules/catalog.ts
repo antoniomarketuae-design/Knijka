@@ -495,16 +495,44 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Непълно оглеждане на кръстовището",
+    // CONTROL-NEUTRAL BY CONSTRUCTION (doc 87, 2026-08-05). This entry used to
+    // say „стоп-линията на знак Б2" unconditionally — and engine.ts arms the
+    // code at a Б1 give-way line too, deliberately and correctly (the fresh
+    // ляво-дясно scan is the crux of the Б1 lesson). The result was a card
+    // reading «Премина стоп-линията на знак Б2» printed directly under the
+    // title bar «Б1 не значи спри винаги», photographed at
+    // `newdef/b5gw-card-t24.4.png`: the lesson and the fault named opposite
+    // signs on the same screen. The catalogue text may therefore name NO sign
+    // — it is the one string both controls have to be true of. The sign is
+    // supplied per event by the engine's control-aware branch
+    // (junctionScanCopy in engine.ts), which knows which line was crossed;
+    // `correctiveBg` is looked up by CODE at display time (SessionEndScreen,
+    // attemptReel, tutor/retrieval) and has no per-event channel, so it must
+    // stay true of both — hence „преди да навлезеш" rather than „спри".
     explanationBg:
-      "Премина стоп-линията на знак Б2, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за катастрофа на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
+      "Премина линията на кръстовището, без да огледаш и наляво, и надясно. „Един поглед не стига“ — най-честата причина за катастрофа на кръстовище е „гледах, но не видях“: погледнал си веднъж отдалеч и си потеглил в това, което се е променило.",
     correctiveBg:
-      "На знак Б2 спри напълно и огледай по реда ляво-дясно-ляво — вторият поглед наляво е точно за колата, която е приближила, докато си гледал надясно. Потегляш чак след пълното оглеждане.",
+      "Преди да навлезеш в кръстовището, огледай по реда ляво-дясно-ляво — вторият поглед наляво е точно за колата, която е приближила, докато си гледал надясно. Тръгваш чак след пълното оглеждане.",
     // чл. 47 carries the SCAN-before-you-enter duty: „Водач…, приближаващо се
     // към кръстовище, трябва да се движи с такава скорост, че при необходимост да
     // може да спре и да пропусне участниците в движението, които имат предимство."
     // чл. 48 / чл. 50, ал. 1 say who that is.
     lawRef: "ЗДвП чл. 47; чл. 48; чл. 50, ал. 1",
     conceptId: "c-give-way-stop-behavior",
+  },
+  CLOSING_ON_LEAD_TOO_FAST: {
+    // The dynamic half of the чл. 23 distance duty, so it carries the same
+    // class as FOLLOWING_TOO_CLOSE: not keeping enough room to the vehicle in
+    // front is основна whether the gap was always short or is being eaten.
+    severityClass: "osnovna",
+    points: SEVERITY_POINTS.osnovna,
+    titleBg: "Настигаш колата отпред",
+    explanationBg:
+      "Колата пред теб намалява, а ти не намаляваш с нея — разстоянието се топи и вече е под дистанцията, която трябва да държиш. Точно така се стига до удар в спряла колона: не защото си карал бързо, а защото си влязъл в чужда спирачка със своята скорост.",
+    correctiveBg:
+      "Щом видиш, че предният намалява — отпусни газта веднага и спирай плавно с него, а не в последния момент. Гледай през и над него към спрялата колона напред: спирачните светлини пред НЕГО са твоят сигнал, не неговите.",
+    lawRef: "ЗДвП чл. 23; чл. 20, ал. 2",
+    conceptId: "c-following-distance",
   },
   FOLLOWING_TOO_CLOSE_FOR_RAIN: {
     severityClass: "vtorostepenna",

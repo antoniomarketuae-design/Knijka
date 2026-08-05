@@ -97,6 +97,40 @@ export interface LawRefEvidence {
 }
 
 /**
+ * The same three-piece evidence, for a citation that is NOT a statute.
+ *
+ * A guideline has no article to print, so what stands in for „the verbatim
+ * source line" is the CLAIM QUOTE — the sentence a builder cut out of the
+ * fetched text by a locator that throws when it stops matching. And a statute
+ * never disagrees with itself, so `conflictsBg` has no counterpart on
+ * LawRefEvidence: where ERC 2025, RCUK 2025 and БЧК teach different things, the
+ * reviewer has to see that before deciding, not after.
+ */
+export interface SourceRefEvidence {
+  sourceId: string;
+  ref: string;
+  found: boolean;
+  /** "НСИ — Пътнотранспортни произшествия … (издание 2024 г.)" */
+  citationBg: string | null;
+  /** How far up the hierarchy this source sits — `binding-bg`, `superseded`, … */
+  authorityBg: string | null;
+  /** The claim's verbatim quote from THIS source, when the ref named a claim. */
+  quoteBg: string | null;
+  /** The figure the claim carries ("5–6 см"), and the sentence that states it —
+   *  which is usually NOT the sentence that states the rule. For a medical row
+   *  this is the single most important thing on the card. */
+  figureBg: string | null;
+  figureQuoteBg: string | null;
+  /** The claim's own status: grounded-agreed, ungrounded-inferred-only, … */
+  claimStatusBg: string | null;
+  /** Recorded disagreements between sources. Empty is a real answer, not a gap. */
+  conflictsBg: string[];
+  missReasonBg: string | null;
+  sourceUrl: string | null;
+  sourceVersionBg: string | null;
+}
+
+/**
  * A „…" span inside the explanation, checked against the retrieved text of the
  * articles this question cites. This is the ten-second check: does the sentence
  * we put in a student's head actually appear in the law we point them at?
@@ -173,6 +207,8 @@ export interface FlaggedQuestionDto {
   /** The auditor's note text (inside [REVIEW: …]), or null if there is none. */
   reviewNote: string | null;
   lawRefs: { act: string; ref: string }[];
+  /** Non-statutory citations, as stored. Empty for almost every row. */
+  sourceRefs: { sourceId: string; ref: string; claimId?: string }[];
 
   /** The row's own lifecycle flag, as stored. */
   status: Question["status"];
@@ -180,6 +216,8 @@ export interface FlaggedQuestionDto {
   approval: ApprovalState;
   /** Retrieved statute text for every lawRef. */
   lawEvidence: LawRefEvidence[];
+  /** Retrieved quote + recorded conflicts for every sourceRef. */
+  sourceEvidence: SourceRefEvidence[];
   /** Quoted spans in the explanation, checked against the retrieved text. */
   quotedClaims: QuotedClaim[];
   /** What changed since the baseline commit. */
@@ -188,8 +226,15 @@ export interface FlaggedQuestionDto {
   contentHash: string;
 }
 
-/** Which backlog the reviewer is working through. */
-export type ReviewQueue = "needs-review" | "unsigned";
+/**
+ * Which backlog the reviewer is working through.
+ *
+ * There is one per pipeline stage, and that is not decoration: while there were
+ * only two, `machine-checked` matched neither and twelve first-aid rows vanished
+ * from the only screen that can approve them. The routing rule that keeps this
+ * union total lives in `./queues` — read the header there before adding a member.
+ */
+export type ReviewQueue = "needs-review" | "machine-checked" | "unsigned" | "draft";
 
 export interface ReviewTopicSummary {
   slug: string;
@@ -215,6 +260,16 @@ export interface ReviewCensus {
   /** Signed once, edited since — the signature no longer covers the row. */
   staleSignatures: number;
   unsignedApprovedBaseline: number;
+  /**
+   * How many rows sit in each queue — the number on each tab, and the proof
+   * that no row is stranded.
+   *
+   * Every question is routed to exactly one queue or is human-approved, so
+   * `sum(queueTotals) + humanApproved === total` over the whole bank. That
+   * identity is the alarm: a status that reaches no queue makes the sum fall
+   * short instead of quietly shrinking a screen (queue.test.ts).
+   */
+  queueTotals: Record<ReviewQueue, number>;
 }
 
 /** How many rows of each risk band this queue holds, before paging. */

@@ -235,25 +235,56 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
 
 /**
  * The staged LEAD CAR on fo-brake-v1: paces the player's own lane at a SAFE
- * ~22 m ahead (positive followGapM, matchPlayer), then BRAKE-SLAMS when it
+ * ~27 m ahead (positive followGapM, matchPlayer), then BRAKE-SLAMS when it
  * reaches y = 230 with the player still at cruise (minSlamSpeedKmh 25 — the
  * ~40 km/h approach clears it). The safe pace means the pre-slam gap never
  * trips FOLLOWING_TOO_CLOSE, so the collision demos grade ONLY COLLISION. The
- * shadow reacts and stops within the 22 m; the two mistakes react late / not
+ * shadow reacts and stops within the gap; the two mistakes react late / not
  * at all and rear-end the stopped lead.
+ *
+ * WHY 27 AND NOT 22 (doc 87 B69 — the drill taught the opposite of what it
+ * graded). Instruction 1 of this lesson says, in one sentence: «Движи се
+ * спокойно зад предната кола, около 40 км/ч, и дръж поне 2 секунди дистанция.»
+ * At `followGapM: 22` the staged lead held **23.1 m of centres = 19.0 m of
+ * bumpers invariantly**, which at the 40 км/ч the same sentence asks for is
+ * **1.74–1.79 s — 12% UNDER the two seconds it demands**. And the student could
+ * not obey both halves: `followGapM` is a DISTANCE and the lead `matchPlayer`s
+ * it, re-establishing the same 23 m whatever he did, so the only way to reach
+ * 2 s was to drop to ≤34 км/ч — i.e. to disobey «около 40 км/ч» in the same
+ * instruction. It was innocent by the detector (`followSafeSeconds 1.8 ×
+ * followFireRatio 0.7 = 1.26 s`), which is exactly why nobody had seen it: the
+ * demonstration showed a sub-two-second gap and called it the correct approach.
+ *
+ * The arithmetic: 2 s at 40 км/ч (11.11 m/s) = 22.2 m of BUMPERS; the hero is
+ * 4.1 m long, so 26.3 m of CENTRES. 27 would have been enough for ONE drive and
+ * not for the lesson: `BrakingLeadCarRunner.arm` seeds the station as
+ * `s.followGapM + (rng()·2 − 1)·2`, i.e. **±2 m of per-session jitter**, so a
+ * 27 authored against the mean still demonstrates 1.88 s on an unlucky seed and
+ * the row would have reopened on somebody else's drive. **29** is the smallest
+ * value whose WORST seed clears two seconds: 29 − 2 = 27 m of centres = 22.9 m
+ * of bumpers = **2.06 s**, and the luckiest seed gives 2.42 s. The hold moves
+ * with it (40 → 45 m along the path = ~30 m ahead of the spawn) so the gap is
+ * right from frame zero instead of being converged into over the first seconds
+ * — a DEMONSTRATION is judged by what it shows, including at the start.
+ *
+ * The slam point (y = 230) is the LEAD's own position and is untouched, so the
+ * two pinned COLLISION demos still rear-end the stopped lead: they drive to
+ * fixed absolute y (238 / 244) past a lead that stops in the same place it
+ * always did. Re-checked against `fo-follow-brake-traces.test.ts` and both
+ * committed traces.
  */
 const FB_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-fb-lead",
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 40 }, // dormant ~25 m ahead of the spawn
+    hold: { nodeIndex: 0, offsetM: 45 }, // dormant ~30 m ahead of the spawn (B69)
     cruiseSpeedMps: 11,
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
   },
-  followGapM: 22, // pace ~22 m AHEAD — a SAFE gap at the ~40 km/h approach
-  maxMatchSpeedMps: 13, // 47 km/h — holds 22 m at the ~40 km/h cruise
+  followGapM: 29, // pace ~29 m AHEAD — ≥2 s at the ~40 km/h approach on EVERY seed (B69)
+  maxMatchSpeedMps: 13, // 47 km/h — holds the gap at the ~40 km/h cruise
   slamAt: { x: 4.06, y: 230 }, // the staged brake-slam point, mid-street
   slamRadiusM: 3,
   slamDecelMps2: 6.5, // a hard emergency slam
@@ -350,33 +381,69 @@ export const SC_FOLLOW_BRAKE: ScenarioSpec = {
 // ---------------------------------------------------------------------------
 
 /**
- * The staged LEAD CAR for sc-follow-standstill: a STATIONARY queue-tail vehicle
- * held at y = 290 in the player's own lane (a car stopped at the red light / at
- * the back of a column). It NEVER arms — armDistM 3 m means it would only begin
- * to pace if the player's CENTER came within 3 m (i.e. a bumper contact), which
- * never happens — so its position is fully deterministic and the encounter is a
- * pure pull-up-behind-a-stopped-car. That determinism is what lets the drives
- * pin the standstill gap exactly (leadGapM = 290 − playerY − 4.1 m). The slam
- * fields are inert (the lead never triggers) but kept well-formed.
+ * The staged LEAD CAR for sc-follow-standstill — the car that ARRIVES at the
+ * back of the column, which the student has been following the whole way.
+ *
+ * B70 / FR-51 (founder item 40, doc 87). His sentence has two halves and only
+ * one of them was answered. „the column is waiting at the end of the road" was
+ * met by staging a real column (FS_QUEUE_AHEAD below). The other half —
+ * **„the user just drives and nothing much happens until the very end"** —
+ * was left open, and the register kept it open in its own words: *„nothing was
+ * authored between spawn and the queue"*. It was not a matter of taste.
+ * Measured on the shipped shadow: the drill's first THIRTY SECONDS are 266 m
+ * of empty tarmac with the lead gap running 270.9 → 37.7 m and no other object
+ * in the world. Thirty seconds of nothing, then one judgement, then the end.
+ *
+ * So the queue tail is no longer a prop parked at y = 290 with `armDistM: 3`
+ * (a value chosen precisely so it could never move). It starts 33 m ahead of
+ * the spawn, is released by the player's own first movement, drives its own
+ * arc under T17's scheduled cruise with the B72 `paceProfile` varying it, eases
+ * as the standing column comes into view, rolls up to the back of it and stops
+ * — AT y = 290, the same metre it used to be parked at.
+ *
+ * WHY THE FINAL METRE IS THE DESIGN CONSTRAINT. Everything this drill grades
+ * hangs off that number: the standstill gap is `290 − playerY − 4.1`, the
+ * credited rest zone is y = 281 and the two mistake demos convict at y = 284.7.
+ * The last two legs exist to land it there deterministically — 2.2 m/s from
+ * arc 250 (a queue-speed roll, ~8 km/h) and 0 from arc 289.5, whose 4.5 m/s²
+ * ramp costs 2.2²/(2×4.5) = 0.54 m of overshoot. Measured rest: y = 290.0.
+ * The lesson's subject is unchanged; what changed is that the student now
+ * spends the approach doing чл. 23 instead of waiting.
+ *
+ * The slam fields stay inert (`minSlamSpeedKmh 250`, `slamAt` past the road
+ * end): this is deterministic moving traffic that comes to rest, not a braking
+ * drill — the brake-slam belongs to sc-follow-brake and grading it here would
+ * import a second subject.
  */
 const FS_LEAD_CAR: BrakingLeadCarSpec = {
   id: "sc-fs-lead",
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: 290 }, // stationary queue tail at y = 290
-    cruiseSpeedMps: 8,
+    hold: { nodeIndex: 0, offsetM: 48 }, // (4.06, 48) — 33 m of centres ahead of the spawn
+    cruiseSpeedMps: 5.6, // 20.2 km/h — a calm urban pace under the posted 50
     extraRightOffsetM: 0, // the player's OWN lane (northbound, x = 4.06)
     colorIndex: 2,
   },
-  followGapM: 14,
-  maxMatchSpeedMps: 12,
-  slamAt: { x: 4.06, y: 520 }, // far past the road — inert (the lead never arms)
+  paceMode: "scheduledCruise", // T17 — the lead drives its own arc, not the player's
+  paceSpeedMps: 5.6,
+  // B72 / FR-53 — the ease-and-resume that makes the 250 m before the queue a
+  // following exercise, then the two legs that park it at the back of the
+  // column. Arc metres are district y on this street.
+  paceProfile: [
+    { atS: 110, speedMps: 4.0 }, // 14.4 km/h — eases; the gap you were holding shrinks
+    { atS: 150, speedMps: 6.0 }, // 21.6 km/h — and opens again, on its own business
+    { atS: 215, speedMps: 4.4 }, // 15.8 km/h — the standing column is in view now
+    { atS: 250, speedMps: 2.2 }, //  7.9 km/h — rolling up to the back of it
+    { atS: 289.5, speedMps: 0 }, // the queue tail comes to rest at y = 290.0
+  ],
+  followGapM: 26, // scheduledCruise: the RELEASE distance is this + 12 = 38 m ≥ the 33 m handover
+  maxMatchSpeedMps: 12, // unused under scheduledCruise
+  slamAt: { x: 4.06, y: 520 }, // far past the road — the slam tier is inert
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250,
   proximityFallbackM: 0.3,
-  armDistM: 3, // never arms — the lead stays a stationary queue tail at y = 290
   triggersHazard: false,
   resumeAfterSec: 3,
 };
@@ -390,19 +457,43 @@ const FS_LEAD_CAR: BrakingLeadCarSpec = {
  * parked car.
  *
  * Two more standing vehicles ahead of the tail, at the 7 m centres a real
- * stopped queue keeps (≈ 3 m of clear tarmac between bumpers). They are inert
- * by exactly the mechanism the tail uses — armDistM 3 m means they would only
- * begin to pace on bumper contact — so the graded standstill gap is still
- * measured against the y = 290 tail and stays fully deterministic.
+ * stopped queue keeps (≈ 3 m of clear tarmac between bumpers). `armDistM: 3`
+ * means they would only begin to pace on bumper contact, i.e. never — so the
+ * column the tail rolls up to is a fixed, fully deterministic backdrop and the
+ * graded standstill gap is still measured against the tail's y = 290 rest pose.
  *
- * Mounted through `LevelSpec.stagedAdd`, never `ScenarioSpec.staged`: the
- * recorder reads `spec.staged` (traces/scFollowStandstill.ts), so the three
- * committed recordings and their §5/§9 gate are byte-identical.
+ * FR-51 note, because this comment used to say the opposite: these two are
+ * mounted through `LevelSpec.stagedAdd` and are STILL invisible to the trace
+ * recorder (it reads `spec.staged`), but the three committed recordings are no
+ * longer byte-identical to their old selves — `spec.staged`'s own member, the
+ * tail, is the thing that changed, so all three were re-recorded with the
+ * approach they now depict.
  */
 const FS_QUEUE_AHEAD: BrakingLeadCarSpec[] = [297, 304].map((y, i) => ({
-  ...FS_LEAD_CAR,
   id: `sc-fs-queue-${i + 1}`,
-  actor: { ...FS_LEAD_CAR.actor, hold: { nodeIndex: 0, offsetM: y }, colorIndex: 3 + i },
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["fo-n-start", "fo-n-end"],
+    hold: { nodeIndex: 0, offsetM: y },
+    cruiseSpeedMps: 8,
+    extraRightOffsetM: 0,
+    colorIndex: 3 + i,
+  },
+  followGapM: 14,
+  maxMatchSpeedMps: 12,
+  slamAt: { x: 4.06, y: 520 },
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250,
+  proximityFallbackM: 0.3,
+  // FR-51: these two are STILL PROPS and are written out in full rather than
+  // spread from FS_LEAD_CAR, because the tail is no longer inert and spreading
+  // it would hand the standing column the arriving car's scheduled cruise —
+  // the whole column would drive off up the street. `armDistM: 3` means they
+  // would only arm on bumper contact, i.e. never.
+  armDistM: 3,
+  triggersHazard: false,
+  resumeAfterSec: 3,
 }));
 
 /** FO-08 — дистанция при пълно спиране в колона (ЗДвП чл. 23: дори при спиране
@@ -427,13 +518,14 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // B70: say what is actually on the road. The column is ALREADY standing —
-    // it does not stop in front of you — and pretending otherwise made the
-    // student watch for a braking car that never brakes.
-    { n: 1, textBg: "Потегли по правата улица. Напред в твоята лента вече стои спряла колона — виждаш я отдалеч." },
-    { n: 2, textBg: "Намали плавно още отдалеч и спри зад последната кола, без да залепваш за бронята ѝ." },
-    { n: 3, textBg: "Остави разумно разстояние: колкото да виждаш къде задните гуми на предната кола опират в асфалта — около два метра." },
-    { n: 4, textBg: "Това разстояние ти дава място да заобиколиш при нужда и резерв, ако предният се върне назад по наклон." },
+    // B70 / FR-51: say what is actually on the road — and there is now
+    // something on it from the first metre. The column ahead IS already
+    // standing (two parked-up cars at y = 297/304); the car in FRONT of the
+    // student is the one that arrives and joins it, so both halves are named.
+    { n: 1, textBg: "Потегли след колата пред теб и я следвай на съобразена дистанция — тя ще те заведе до колоната." },
+    { n: 2, textBg: "Тя ще намалява и ще ускорява по своя си работа, а не заради теб. Намалявай с нея веднага и връщай дистанцията плавно, не с газ." },
+    { n: 3, textBg: "Напред в лентата вече стои спряла колона — виждаш я отдалеч. Колата пред теб ще се нареди последна в нея." },
+    { n: 4, textBg: "Спри зад нея на разумно разстояние: колкото да виждаш къде задните ѝ гуми опират в асфалта — около два метра. Толкова ти дава място да заобиколиш при нужда и резерв, ако предният се върне назад по наклон." },
     { n: 5, textBg: "Изчакай спокойно зад него на тази дистанция до края на упражнението." },
   ],
   success: [
@@ -450,7 +542,9 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
       params: { kind: "reachZone", x: LANE_X, y: 281, radiusM: 8, maxSpeedKmh: 6 },
     },
   ],
-  rubric: { parTimeSec: 80 },
+  // FR-51: the approach is a following exercise now, not 235 m at 30 km/h down
+  // an empty street — the shadow takes 71.7 s where it used to take 42.5.
+  rubric: { parTimeSec: 100 },
   shadow: { path: "content/traces/sc-follow-standstill/shadow-correct.trace.json" },
   mistakes: [
     {
@@ -490,6 +584,52 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     l5Wet(),
   ],
   staged: [FS_LEAD_CAR],
+  /**
+   * FR-B5-QUEUE (doc 87 item 7 — his item 40). THE DRILL WAS UNSURVIVABLE AT
+   * ITS OWN NOMINAL SPEED, AND SILENT WHILE IT KILLED YOU.
+   *
+   * Measured on this template before anything was changed, by driving the lane
+   * at the staged lead's own cruise (20 km/h) without lifting:
+   *
+   *   t=13 lead 27.5 m · t=35 15.4 · t=39 10.8 · t=41 8.6 · t=43 2.7 · t=45 0.0
+   *   rule events for the whole run: `+CLEAN_DRIVING@46.5`,
+   *                                  `STANDSTILL_GAP_TOO_CLOSE@54.2`
+   *
+   * Not one distance fault, at any point, on a drive that ends inside the
+   * queue — and a COMMENDATION on the way in. The founder's live version of the
+   * same drive is the result screen «20 наказателни точки · НЕИЗДЪРЖАН ·
+   * Опасни 2 · Основни 0 · Второстепенни 0»: he failed, twice, and was never
+   * told what he did wrong. Under doc 64 THEO-4 that is the graver half.
+   *
+   * THE CHOICE, MADE AND WRITTEN DOWN. The register offered two: a gentler
+   * final leg, or a closing-rate detector. This is the detector, for three
+   * reasons and in that order.
+   *
+   *  1. A gentler leg makes this drill easier; it does not make it TEACH. The
+   *     screenshot's defect is «Основни 0 · Второстепенни 0», and softening
+   *     `paceProfile` leaves that exactly in place for the next student who
+   *     closes one metre per second faster. The instrument is the fix; the
+   *     tuning is a workaround for the missing instrument.
+   *  2. The 20 km/h `followMinSpeedKmh` floor is RIGHT and stays. The register
+   *     said so and the measurement agrees: this drill's subject is a queue at
+   *     8 km/h, and grading a formation-rolling queue on distance is the
+   *     genre's classic trust-killer. A closing-rate test is orthogonal to the
+   *     floor — it asks whether the gap is COLLAPSING, which a formation queue's
+   *     never is, so nothing that was innocent becomes guilty.
+   *  3. The leg cannot be re-timed from this lane anyway. `FS_LEAD_CAR`'s final
+   *     metre (rest at y = 290.0) is the constant every graded number here
+   *     hangs off, and all three committed recordings under `content/traces/`
+   *     depict it. Moving it means re-recording content this lane does not own,
+   *     which is how a "curriculum call" becomes a cross-lane content change at
+   *     two in the morning. The detector needs no trace to move.
+   *
+   * The drill is passable by someone driving it correctly BECAUSE the fire line
+   * is the taught gap itself and only while it is shrinking: the shadow — which
+   * slows with the lead, as instruction 2 says — never reaches it (the trace
+   * gate re-asserts that), and the non-lifting drive is now told, with the
+   * measured seconds in the card, while it still has room to stop.
+   */
+  ruleConfig: { leadClosingEnabled: true },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };
@@ -695,6 +835,27 @@ const FT_LEAD_TRUCK: BrakingLeadCarSpec = {
   },
   paceMode: "scheduledCruise", // T17 — the truck drives its own arc, not the player's
   paceSpeedMps: 5.6,
+  // B72 / FR-53 — THE EASE AND RESUME. T17's single `paceSpeedMps` cured the
+  // rubber band and, in the founder's own terms, made the drill worse: driven
+  // and measured on 2026-08-03 the truck held 20.1–20.2 km/h over 341 samples
+  // (sd 0.2) for the whole 360 m — «very boring», a metronome. The gap the
+  // shadow keeps drifted 22.4 → 25.8 m across FIFTY-FIVE SECONDS at a constant
+  // 19.9 km/h: nothing to read, nothing to do, a distance you set once.
+  //
+  // These four legs are the „slows a bit, speeds a bit" he asked for, keyed to
+  // the ROAD (arc metres = district y here) and never to him — which is the
+  // whole point: the reason the gap changes is visibly the truck's business,
+  // so the student learns to read the box instead of the speedometer. The
+  // first ease is the deep one (5.6 → 3.6 m/s = 20.2 → 13.0 km/h) because the
+  // lesson is that you cannot see WHY a truck brakes; the second is softer.
+  // Both resumes overshoot the base slightly so the gap the student re-opened
+  // is handed back rather than banked.
+  paceProfile: [
+    { atS: 120, speedMps: 3.6 }, // 13.0 km/h — eases for something you cannot see past it
+    { atS: 160, speedMps: 5.9 }, // 21.2 km/h — and picks back up, without warning either
+    { atS: 235, speedMps: 4.3 }, // 15.5 km/h — a second, softer ease
+    { atS: 275, speedMps: 6.1 }, // 22.0 km/h — pulls away over the closing stretch
+  ],
   followGapM: 26, // scheduledCruise: the RELEASE distance is this + 12 = 38 m ≥ the 30 m handover
   maxMatchSpeedMps: 15, // unused under scheduledCruise; kept for the demo clones
   slamAt: { x: 4.06, y: 520 }, // far past the 360 m road — never reached
@@ -798,6 +959,36 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     },
   ],
   rubric: { parTimeSec: 95 },
+  /**
+   * THE DRILL COULD NOT GRADE ITS OWN SUBJECT — measured 2026-08-04, drive-rig,
+   * sc-follow-truck@L1, a closed-loop steady 20 km/h for 58 s.
+   *
+   * `followMinSpeedKmh` defaults to 20 (rules/types.ts) and exists for a good
+   * reason: queue traffic legitimately rolls at 15–20 km/h with one-second gaps,
+   * and grading that spams the genre's classic false positive (A12). But THIS
+   * drill authors a lead that cruises at `paceSpeedMps` 5.6 m/s = **20.16 km/h**
+   * and instructs the student to follow it. A student who obeys sits at
+   * 19.6–20.2 km/h — ON the floor — and B72's first ease takes the truck to
+   * 3.6 m/s = **12.96 km/h**, dragging the obedient student 7 km/h UNDER it.
+   *
+   * So `FOLLOWING_TOO_CLOSE` — this lesson's entire subject, the code both of
+   * its mistake demos cite — was structurally unable to fire in the student's
+   * own drive. Measured on that drive: the bumper gap fell 21.5 → **1.09 m
+   * (0.20 s of headway)** at t = 27.7 s and stayed under 1.2 s of headway for
+   * 16 s, INCLUDING the whole of the graded zone at y = 175, and the engine
+   * said nothing. The first and only feedback the student got was a COLLISION
+   * at t = 47.3 s. Meanwhile the mistake demo teaches the fault at 48 km/h,
+   * where the floor is not in the way — the lesson demonstrates a fault it
+   * cannot detect in the drive it then asks you to make.
+   *
+   * 10 km/h is chosen, not defaulted: it keeps genuine stop-and-go (a queue
+   * roll, the standstill drill's own subject) exempt while covering the entire
+   * band this lead is ever authored to drive — its slowest leg is 12.96 km/h.
+   * Opt-in per the ruleConfig discipline: no other lesson's floor moves, and
+   * `sc-follow-standstill` deliberately keeps the default, because a queue at
+   * 8 km/h with a short gap is what THAT drill is about.
+   */
+  ruleConfig: { followMinSpeedKmh: 10 },
   shadow: { path: "content/traces/sc-follow-truck/shadow-correct.trace.json" },
   mistakes: [
     {

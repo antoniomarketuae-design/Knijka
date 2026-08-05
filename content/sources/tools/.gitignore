@@ -1,0 +1,6 @@
+# The fetched originals are NOT committed — sources.json pins each one by URL,
+# byte count and sha256, exactly as content/law and content/medical do. Run
+# fetch.sh to get them back, then verify.mjs to prove nothing drifted.
+*.pdf
+*.txt
+*.html

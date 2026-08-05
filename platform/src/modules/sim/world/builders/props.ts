@@ -208,23 +208,83 @@ const ENTRY_POST_END_CLEAR_M = 25;
  *  edge already states the limit ahead of him. */
 const SPAWN_CONTEXT_AHEAD_M = 30;
 
-/** В26 restate cadence through a long limited stretch — the same discipline
- *  zoneSigns applies to В24, at the pitch markings.ts paints the road glyph, so
- *  post and paint say the number together instead of the paint saying it alone. */
+/**
+ * В26 restate cadence through a long limited stretch.
+ *
+ * **AUTHORED, NOT STATUTORY — and it has to be said out loud.** Наредба № РД-02-21-1
+ * от 23.11.2023 („за сигнализация на пътищата с пътни знаци") is the act that
+ * governs where a sign stands and when it is repeated, and this repo does NOT hold
+ * its text: `content/law/sources.json` catalogues it as `coverage: "index-only"`
+ * (`src-sars-naredba-rd-02-21-1-ot-23`), so no article of it can be quoted here
+ * under ADR-002. No metre figure for В26 repetition is therefore citable, and per
+ * the founder's standing ruling an honest blank beats a guessed number: 120 m is
+ * OUR cadence, chosen to match the pitch markings.ts paints its tarmac numeral at
+ * (SPEED_GLYPH_PITCH_M) so post and paint restate the limit together instead of
+ * the paint carrying it alone. If the ordinance is ever ingested and names a
+ * distance, this constant is the one line to change.
+ *
+ * The junction rule below it is a different matter — that one IS law-shaped.
+ */
 const LIMIT_REPEAT_M = 120;
-/** …but never inside this of the segment end: a plate at the mouth reads as the
- *  NEXT road's limit, which is the exact lie the numeral rules exist to stop. */
+/** …but never inside this of the segment end WHEN A JUNCTION IS THE END: a plate
+ *  at the mouth reads as the NEXT road's limit, which is the exact lie the
+ *  numeral rules exist to stop. */
 const LIMIT_REPEAT_END_CLEAR_M = 40;
 /**
- * …and ONLY on a reduced-speed stretch. This is deliberately the same threshold
- * markings.ts paints its tarmac numeral at (SPEED_GLYPH_MAX_KMH), because the
- * complaint being answered is precisely „30 is written on the road and nowhere
- * else": wherever the paint states the limit alone, a post now states it too.
- * Above it, repeating would be wrong signing rather than missing signing — a
- * 140 motorway is signed at its entry and after its junctions, and studding a
- * kilometre of it with plates every 120 m teaches a street that does not exist.
+ * At a DEAD END there is no next road to mistake the plate for, so the full
+ * clearance only buys 40 m of silence at the end of every arm. Founder row B34
+ * measured exactly that silence: turning west off the Б2 onto tj-emerge-v1's
+ * priority road gives 160 m of arm ending at the district boundary, and a 40 m
+ * blanket there deletes the only mid-block repeat the stretch has room for.
  */
-const LIMIT_REPEAT_MAX_KMH = 30;
+const LIMIT_REPEAT_DEAD_END_CLEAR_M = 12;
+/**
+ * …and ONLY BELOW the built-up-area limit. A В26 exists to state a number the
+ * driver cannot otherwise infer, and 50 in a town is exactly the number he CAN:
+ * it is ЗДвП чл. 21's general built-up-area limit, announced by the населено
+ * място sign, not re-posted every block. 30 and 40 are not inferable — they are
+ * reductions, and a driver who joined mid-block has no way to know one is in
+ * force unless the street keeps telling him.
+ *
+ * It was 30 (markings.ts's SPEED_GLYPH_MAX_KMH, so „30 is written on the road and
+ * nowhere else" got its post). 40 stretches — every scenario stem and side street
+ * — fell through the same hole and are now covered.
+ *
+ * Row B34 („the priority road never repeats its limit", a 50 boulevard) is NOT
+ * fixed by moving this number, and it was measured before it was believed:
+ * widening the cadence to 50 adds nothing at all to tj-emerge-v1/tj-stop-v1 —
+ * their arms are shorter than one cadence past their own entry plates — while it
+ * studs sp-creep2-v1's junction-less 400 m residential approach with 5 extra
+ * plates it has no reason to carry. What fixes B34 is the JUNCTION rule below.
+ */
+const LIMIT_REPEAT_MAX_KMH = 40;
+/**
+ * How far PAST a junction the В26 that restates the limit stands, measured from
+ * the edge of the junction patch (so it is never inside the mouth).
+ *
+ * **This pass is law-shaped rather than authored.** A prohibition introduced by a
+ * group-В sign has a зона на действие that ENDS at the next junction unless the
+ * sign is repeated after it — the corpus states it three times over, in approved
+ * items: q-signs-011 („Забраната от знак действа до следващото кръстовище, ако
+ * знакът не е повторен след него"), q-signs-012 and q-signs-021, all citing
+ * Наредба № РД-02-21-1/2023 „зона на действие на пътните знаци" + ЗДвП чл. 21.
+ * So past an unrepeated junction the number the reducer still grades is a number
+ * the law has already let lapse. Repeating it is what makes the graded limit true.
+ *
+ * It is the В26 twin of the rule the ordinance states for Б3 — чл. 61, ал. 1, as
+ * recorded verbatim in the audit note on q-signs-023: „В населени места пътен
+ * знак Б3 „Път с предимство" се поставя пред всяко кръстовище на път с предимство."
+ * Б3 repeats BEFORE the junction because the junction is its subject; В26 repeats
+ * AFTER it because that is where its scope restarts. (That quote reaches us
+ * through a content audit, not through the pinned corpus — see the note on
+ * LIMIT_REPEAT_M — and q-signs-023 is still `needs-review`, so it is cited here as
+ * corroboration of a rule the approved зона-на-действие items already carry, never
+ * as the load-bearing source.)
+ */
+const JUNCTION_LIMIT_REPEAT_CLEAR_M = 8;
+/** An arm shorter than this past the mouth gets nothing: a plate crammed against
+ *  the far junction is the „reads as the NEXT road's limit" failure again. */
+const JUNCTION_LIMIT_REPEAT_MIN_ROOM_M = 24;
 
 /** A В26 at a mid-route limit change stands just past the transition node, so
  *  the first metre it governs is the first metre it is visible on. */
@@ -405,15 +465,15 @@ export function buildProps(
   // -- traffic lights at signalized junctions ---------------------------------
   // Two heads per incoming approach (doc 62 S1/#19 — „green appeared once and
   // never again"): the NEAR head stands right of the driver at the stop line
-  // (the shipped pose), and a FAR-SIDE companion mirrors it through the node —
-  // the far-left corner across the junction, the head a driver WAITING AT THE
-  // LINE actually has in view (the near pole is abeam of the A-pillar there,
-  // invisible from both cockpit and chase cameras). Both carry the approach's
-  // own travel bearing so the render callback lights the arm's graded
-  // axis-group (WorldRuntime.signalLampState), never the node's single group.
-  // The companion is skipped when its mirrored point lands inside another
-  // arm's corridor (organic OSM junctions are not orthogonal) — deterministic
-  // geometry, no RNG.
+  // (the shipped pose), and a FAR-SIDE companion stands across the junction on
+  // THE SAME KERB — the head a driver rolling up to, and waiting at, the line
+  // actually has in his windscreen (the near pole is abeam of the A-pillar
+  // there, invisible from both cockpit and chase cameras). Both carry the
+  // approach's own travel bearing so the render callback lights the arm's
+  // graded axis-group (WorldRuntime.signalLampState), never the node's single
+  // group. The companion is skipped when its mirrored point lands inside
+  // another arm's corridor (organic OSM junctions are not orthogonal) —
+  // deterministic geometry, no RNG.
   for (const node of network.nodes.values()) {
     if (!node.signalized || node.degree < 3) continue;
     let approachesLit = 0;
@@ -435,11 +495,33 @@ export function buildProps(
         // offsets were built for exactly this and were never wired.
         ...signalSized,
       });
-      // Far-side companion: the mirror of the near head through the node.
-      // Clearance check: must sit outside every arm's carriageway corridor
-      // (projected in FRONT of the node toward that arm, lateral > halfWidth
-      // + margin) — a pole may stand on a verge, never on asphalt.
-      const m: Vec2 = [2 * node.pos[0] - p[0], 2 * node.pos[1] - p[1]];
+      // Far-side companion — MIRRORED ALONG THE DRIVER'S OWN AXIS, not through
+      // the node.
+      //
+      // Doc 87 B37/B39/B55, and the reason his sentence „there is no traffic
+      // light at all" was true of a scene that contains eight of them. A point
+      // reflection through the node flips BOTH axes, so the companion for the
+      // southern approach landed at the far-LEFT corner. Measured on sx-v1
+      // (the map lessons 18/19 run on, and the one he drove): from the south
+      // stop line at y = −27.7 the near head is 9 m to his RIGHT at azimuth
+      // 90° — straight out the passenger window — and the only head left in
+      // the windscreen was that far-left one, 59 m away at −17°, half behind a
+      // street tree. Nothing signal-shaped was ever ahead of him. Reflecting
+      // in the line THROUGH the node PERPENDICULAR to his travel keeps the
+      // lateral side, so the companion lands on the far kerb of his own side:
+      // azimuth +7° at the approach, +9° at the line, +13° in the box —
+      // dead ahead, growing, for the whole decision window. It is also what a
+      // Bulgarian signalised crossroads actually looks like (repeater at the
+      // line, primary head across the junction on the right-hand kerb), and it
+      // ends a second defect nobody had named: the point mirror put the
+      // companion exactly on the OPPOSITE approach's near head, so eight heads
+      // stood on four coincident poles, z-fighting in pairs.
+      //
+      // Clearance check (unchanged): must sit outside every arm's carriageway
+      // corridor (projected in FRONT of the node toward that arm, lateral >
+      // halfWidth + margin) — a pole may stand on a verge, never on asphalt.
+      const alongToNode = (node.pos[0] - p[0]) * travel[0] + (node.pos[1] - p[1]) * travel[1];
+      const m: Vec2 = [p[0] + 2 * alongToNode * travel[0], p[1] + 2 * alongToNode * travel[1]];
       let clear = true;
       for (const other of node.approaches) {
         const dir = other.cutTangentAway;
@@ -941,6 +1023,66 @@ export function buildProps(
     }
   }
 
+  // -- В26 REPEATED PAST EVERY JUNCTION (founder row B34) -----------------------
+  // „nothing is there on the Map … no actual street signs anywhere" — and the
+  // measurement behind it: tj-emerge-v1's priority road is 320 m of boulevard
+  // carrying two В26 «50», at x = -115 and x = +115. Each one is the ENTRY plate
+  // of its own arm, posted 30 m ahead of that arm's spawn and facing inward. The
+  // B34 drill starts on the stem, stops at the Б2 and turns LEFT — so the student
+  // JOINS the priority road at the junction, downstream of both plates, and drives
+  // 160 m graded against a 50 he was never once shown. tj-stop-v1 is the same
+  // shape at x = ±105. Real roads do not do this: a limit is re-posted after a
+  // junction precisely so the driver who joined mid-block knows it.
+  //
+  // The law is not decorative here (see JUNCTION_LIMIT_REPEAT_CLEAR_M): a group-В
+  // prohibition's зона на действие ENDS at the next junction unless repeated after
+  // it, so an unrepeated limit past a junction is one the reducer grades and the
+  // ordinance has already released. This pass is what keeps those two in step.
+  //
+  // Truthful by construction, so the T4 rule holds without review: the plate
+  // states `ap.edge.maxspeed` — the tag of the very edge it stands on, which is
+  // the number `tick.maxSpeedKmh` grades there — and a limit the face set cannot
+  // state truthfully places NOTHING. It can only ever restate a road's own tag; it
+  // can never invent one.
+  //
+  // Scenario micro-maps only, on the identical reasoning to the transition pass
+  // above: our own authored tags are the lesson, while an OSM city district's tag
+  // boundaries are way-splitting artefacts whose real signage the source never
+  // recorded. So every city/exam/полигон map stays byte-identical.
+  if (lessonScale !== undefined) {
+    for (const [nodeId, info] of [...network.nodes.entries()].sort((a, b) =>
+      a[0] < b[0] ? -1 : 1,
+    )) {
+      if (info.degree < 3) continue; // a junction, not a bend or a stub
+      if (info.approaches.some((ap) => ap.edge.roundabout)) continue; // Б1/Д11 territory
+      for (const ap of info.approaches) {
+        if (!ap.outgoing) continue; // nobody may drive away this way
+        const eb = network.edgeById.get(ap.edgeId);
+        if (!eb) continue;
+        const plate = speedPlate(ap.edge.maxspeed);
+        if (!plate) continue; // no truthful face for this limit — post nothing
+        const g = ap.edge.geometry as Vec2[];
+        const len = polylineLength(g);
+        const forward = ap.edge.from === nodeId; // travel runs with the geometry
+        // Clear of the junction PATCH, not merely of the node: `setback` is the
+        // trim the world builder itself uses for the mouth, so the post can never
+        // land on the open area a turning car drives across.
+        const sFromNode =
+          Math.max(ap.setback, info.radius, eb.halfWidth) + JUNCTION_LIMIT_REPEAT_CLEAR_M;
+        if (sFromNode > len - JUNCTION_LIMIT_REPEAT_MIN_ROOM_M) continue; // arm too short
+        const geomS = forward ? sFromNode : len - sFromNode;
+        const { point, tangent } = pointAlong(g, geomS);
+        const travel = forward ? tangent : mul(tangent, -1);
+        const p = add(point, mul(perpRight(travel), eb.halfWidth + 0.8));
+        if (
+          pushSignAt(p, yawFromFacing(mul(travel, -1)), plate.kind, { speedKmh: plate.speedKmh })
+        ) {
+          recordPlate(ap.edgeId, geomS, forward ? 1 : -1, plate.speedKmh);
+        }
+      }
+    }
+  }
+
   // -- В26 repeated ahead of a spawn that starts inside a limited segment -------
   // Doc 86 T4/T5 stated as a POSITIVE invariant: a driver must be able to read
   // the limit he is graded on. A rung that spawns 20 m inside a зона-30 (
@@ -983,7 +1125,7 @@ export function buildProps(
     }
   }
 
-  // -- В26 RESTATED through a long limited stretch (founder items 31/33/34) ------
+  // -- В26 RESTATED through a long limited stretch (founder items 31/33/34, B34) --
   // Every pass above states the limit at an EVENT — a district entry, a
   // transition node, a spawn. None of them states it again, so a long graded
   // segment goes quiet: measured on sp-creep2-v1, the 280 m зона-30 carries
@@ -997,7 +1139,14 @@ export function buildProps(
   // 66 R2: „the governing control must be IN FRAME at the fault, not only at the
   // kerb entry"). The cadence here matches the painted road glyph's own pitch
   // (markings SPEED_GLYPH_PITCH_M), so post and paint restate the limit together
-  // instead of the paint carrying it alone.
+  // instead of the paint carrying it alone. That pitch is OURS, not the
+  // ordinance's — LIMIT_REPEAT_M says so at length, and says why no article can
+  // be cited for it.
+  //
+  // Row B34 widened the gate from 30 to 40 km/h (LIMIT_REPEAT_MAX_KMH — every
+  // scenario stem and side street) and made the end clearance dead-end-aware. It
+  // stops BELOW 50 on purpose, and the constant's docstring says why, with the
+  // measurement that settled it.
   //
   // It can only ever RESTATE: a direction with no plate already posted gets
   // nothing, and the numeral is copied from the plate being repeated. So this
@@ -1016,9 +1165,15 @@ export function buildProps(
           .sort((a, b) => a.sAlongTravel - b.sAlongTravel);
         const last = posted[posted.length - 1];
         if (!last) continue; // never announced here — that is another pass's call
+        // Where this direction of travel ENDS decides how much silence to leave:
+        // a junction can steal the plate's meaning, a dead end cannot.
+        const farNodeId = dirSign === 1 ? eb.edge.to : eb.edge.from;
+        const endClear = network.deadEnds.has(farNodeId)
+          ? LIMIT_REPEAT_DEAD_END_CLEAR_M
+          : LIMIT_REPEAT_END_CLEAR_M;
         for (
           let s = last.sAlongTravel + LIMIT_REPEAT_M;
-          s <= len - LIMIT_REPEAT_END_CLEAR_M;
+          s <= len - endClear;
           s += LIMIT_REPEAT_M
         ) {
           const geomS = dirSign === 1 ? s : len - s;

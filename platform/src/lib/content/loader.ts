@@ -56,6 +56,17 @@ export interface RawContent {
    * fixtures need not provide it; absent = every district is unknown.
    */
   districtExists?: (districtId: string) => boolean;
+  /**
+   * True if `sourceId` is in one of the non-statutory source registers
+   * (content/medical/sources.json, content/sources/sources.json — see
+   * lib/content/sources). A `sourceRef` pointing at a source nobody registered
+   * is an unresolvable citation, which is precisely the defect `sourceRefs`
+   * was added to end, so it fails the load exactly like an unknown `signRef`.
+   *
+   * Optional and same convention as `districtExists`: absent = no source is
+   * known, so a fixture that uses `sourceRefs` must supply this.
+   */
+  sourceExists?: (sourceId: string) => boolean;
 }
 
 function duplicates(values: readonly string[]): string[] {
@@ -252,9 +263,19 @@ export function buildContentRepo(raw: RawContent): ContentRepo {
   // signs/signs.json; every sceneStill district must be a committed world map.
   const signCodes = new Set(signs.map((s) => s.code));
   const districtExists = raw.districtExists ?? (() => false);
+  const sourceExists = raw.sourceExists ?? (() => false);
   for (const [slug, questions] of questionFiles) {
     for (const question of questions) {
       const at = `questions/${slug}.json: question "${question.id}"`;
+      // Non-statutory citations must resolve, for the same reason a signRef
+      // must: a citation nobody can open is the defect, not the fix.
+      for (const sourceRef of question.sourceRefs ?? []) {
+        if (!sourceExists(sourceRef.sourceId)) {
+          errors.push(
+            `${at} sourceRefs references unknown sourceId "${sourceRef.sourceId}" (no such id in any register — see lib/content/sources REGISTERS)`,
+          );
+        }
+      }
       const media = question.media;
       if (media !== null && "kind" in media) {
         if (media.kind === "sign" && !signCodes.has(media.signRef)) {
@@ -418,7 +439,38 @@ function loadRawContentFromDisk(): RawContent {
     signs: readJson(path.join(contentDir, "signs", "signs.json")),
     svgExists: (svgFile) => fs.existsSync(path.join(contentDir, svgFile)),
     districtExists: (districtId) => fs.existsSync(path.join(worldDir, `${districtId}.json`)),
+    sourceExists: (sourceId) => registeredSourceIds(contentDir).has(sourceId),
   };
+}
+
+/**
+ * The ids in every non-statutory register, read once.
+ *
+ * Deliberately NOT `getSourceRegistry()` from lib/content/sources: this module
+ * is imported at module-evaluation time by everything that touches content, and
+ * pulling in the registry's full Zod validation here would make a malformed
+ * register file take down the whole content load rather than fail the one row
+ * that cites it. The registry does the real validation where it is used; this
+ * only needs to answer "is that id registered at all?".
+ */
+let registeredIds: Set<string> | null = null;
+function registeredSourceIds(contentDir: string): Set<string> {
+  if (registeredIds) return registeredIds;
+  const ids = new Set<string>();
+  for (const dir of ["medical", "sources"]) {
+    const file = path.join(contentDir, dir, "sources.json");
+    if (!fs.existsSync(file)) continue;
+    try {
+      const parsed = readJson(file) as { sources?: { id?: unknown }[] };
+      for (const row of parsed.sources ?? []) {
+        if (typeof row?.id === "string") ids.add(row.id);
+      }
+    } catch {
+      /* a malformed register is simply an empty one here — see above */
+    }
+  }
+  registeredIds = ids;
+  return ids;
 }
 
 /** The validated, frozen repo over the real /content files. */

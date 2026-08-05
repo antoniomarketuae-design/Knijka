@@ -21,6 +21,7 @@ import type {
   Section,
   Sign,
   SignMediaRef,
+  SourceRef,
   Topic,
 } from "./types";
 
@@ -47,6 +48,26 @@ export const ContentStatusSchema = z.enum([
 export const LawRefSchema = z.strictObject({
   act: z.string().min(1, "lawRef.act must not be empty"),
   ref: z.string().min(1, "lawRef.ref must not be empty"),
+});
+
+/**
+ * A citation to something that is not a statute — see the SourceRef doc comment
+ * in types.ts for why the schema needed this at all.
+ *
+ * `sourceId` is checked for SHAPE here and for EXISTENCE at load
+ * (loader.ts resolves it against the registers, the same way a `signRef` is
+ * resolved against signs.json). A dangling source id is authoring garbage: it
+ * renders as an unresolvable citation, which is the failure this replaces.
+ */
+export const SourceRefSchema = z.strictObject({
+  sourceId: z
+    .string()
+    .regex(/^src-[a-z0-9-]+$/, 'sourceRef.sourceId must be kebab-case with "src-" prefix'),
+  ref: z.string().min(1, "sourceRef.ref must not be empty"),
+  claimId: z
+    .string()
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "sourceRef.claimId must be kebab-case")
+    .optional(),
 });
 
 const KEBAB_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -191,12 +212,28 @@ export const QuestionSchema = z
     textBg: z.string().min(1),
     options: z.array(QuestionOptionSchema).min(2, "question must offer at least 2 options"),
     explanationBg: z.string().min(1),
-    lawRefs: z.array(LawRefSchema).min(1, "every question must cite at least one lawRef"),
+    // NOT .min(1) any more, and that is the point. The old floor forced a
+    // statute onto every row, which is what dressed 29 first-aid questions in
+    // „ЗДвП чл. 123" (docs/education/90 §14 item N). The floor moved to the
+    // cross-field check below: cite SOMETHING, but only cite law when law is
+    // what settles it.
+    lawRefs: z.array(LawRefSchema),
+    sourceRefs: z.array(SourceRefSchema).optional(),
     media: QuestionMediaSchema.nullable(),
     status: ContentStatusSchema,
   })
   .check((ctx) => {
     const q = ctx.value;
+
+    if (q.lawRefs.length + (q.sourceRefs?.length ?? 0) < 1) {
+      ctx.issues.push({
+        code: "custom",
+        message:
+          "every question must cite at least one source — a statute in lawRefs, or a non-statutory source in sourceRefs",
+        input: q,
+        path: ["lawRefs"],
+      });
+    }
 
     const correctCount = q.options.filter((o) => o.correct).length;
     if (q.type === "single" && correctCount !== 1) {
@@ -293,6 +330,7 @@ type Assert<T extends true> = T;
 export type SchemasMirrorTypes = [
   Assert<Equals<z.infer<typeof ContentStatusSchema>, ContentStatus>>,
   Assert<Equals<z.infer<typeof LawRefSchema>, LawRef>>,
+  Assert<Equals<z.infer<typeof SourceRefSchema>, SourceRef>>,
   Assert<Equals<z.infer<typeof TopicSchema>, Topic>>,
   Assert<Equals<z.infer<typeof ConceptSchema>, Concept>>,
   Assert<Equals<z.infer<typeof SignMediaRefSchema>, SignMediaRef>>,

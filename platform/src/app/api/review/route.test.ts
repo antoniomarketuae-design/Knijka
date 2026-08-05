@@ -40,7 +40,18 @@ const parseReviewRequest = vi.fn((body: unknown) => {
   const id = (body as { questionId?: unknown })?.questionId;
   return typeof id === "string" ? { questionId: id, decision: { action: "approve" } } : null;
 });
-vi.mock("@/modules/content-admin", () => ({
+// parseQueue is narrowed from the REAL module, not stubbed. It is a pure
+// string->queue narrowing with no I/O and no guard duty, so a hand-written
+// double would only be a second copy of REVIEW_QUEUES that can drift from the
+// first — which is exactly what happened on the first attempt at this: a stub
+// that did not know `approved` maps to the `unsigned` queue turned a passing
+// test red for a reason that had nothing to do with the route.
+//
+// It is listed at all only because a vi.mock factory REPLACES the module:
+// anything route.ts imports and this object omits arrives as undefined, which is
+// how three tests went red the moment the review-queue fix added this import.
+vi.mock("@/modules/content-admin", async (importOriginal) => ({
+  parseQueue: (await importOriginal<typeof import("@/modules/content-admin")>()).parseQueue,
   listFlaggedQuestions: (options?: unknown) => listFlaggedQuestions(options),
   applyReviewDecision: (questionId: string, decision: unknown, reviewer: string) =>
     applyReviewDecision(questionId, decision, reviewer),

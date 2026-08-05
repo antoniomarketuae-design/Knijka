@@ -336,6 +336,17 @@ export type SignKind =
   //    District.zones spans, never these placements; builders/zoneSigns.ts).
   | "noOvertaking" // В24 (zones kind noOvertaking)
   | "noStopping" // В27 (zones kind noStopping)
+  // -- В28 „Забранено е паркирането". `DistrictZoneKind` has carried
+  //    `noParking` since the ban slice landed (its own docstring reads „В24/
+  //    В27/В28 bans") and `pk-ban2-v1` authors one — but `ZONE_SIGN_KIND` had
+  //    no entry for it, because there was no SignKind to map it to. So the one
+  //    В28 span in the world posted NOTHING, while the parking-family lesson
+  //    copy names В28 thirty-four times. Rides the В27 plate: the two source
+  //    SVGs open with a byte-identical
+  //    `<circle cx="100" cy="100" r="88" fill="#0057a8" stroke="#c1121f"
+  //    stroke-width="20" data-plate="true"/>` and differ only in the face
+  //    (В27's X vs В28's single bar) — the Г2/Г3-on-the-Г12-plate precedent.
+  | "noParking" // В28 (zones kind noParking)
   | "slippery" // А15 (zones kinds waterPatch + icePatch)
   | "curve" // А1 (zones kind curveAdvisory — reuses sign_warning_bend.glb)
   | "railGuarded" // А32-style guarded rail warning (railCrossing + guarded)
@@ -399,6 +410,7 @@ export const SIGN_KINDS: readonly SignKind[] = [
   "limitEnd",
   "noOvertaking",
   "noStopping",
+  "noParking",
   "slippery",
   "curve",
   "railGuarded",

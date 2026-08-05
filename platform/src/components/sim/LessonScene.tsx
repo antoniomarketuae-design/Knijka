@@ -27,11 +27,11 @@ import { Environment } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { Euler, type Group } from "three";
 import {
-  applyReversePedalRemap,
   createTelemetry,
   hasTouchScreen,
   isTouchOnlyDevice,
   ReverseAssist,
+  ReversePedalMapper,
   shouldRemapReversePedals,
   SimInput,
   TouchInputSource,
@@ -272,6 +272,13 @@ class GatedSimInput extends SimInput {
    *  A2 observer, the scenario director and the recorder all see the
    *  FUNCTIONAL pedals. */
   reversePedalRemap = false;
+  /** LAW 2 (engine/reverseAssist.ts): the swap above is applied THROUGH this
+   *  mapper, never raw, so a pedal held across the flip keeps braking instead
+   *  of becoming the reverse accelerator. It is the input path — not the
+   *  assist's trigger — that guarantees a held brake can never mean throttle,
+   *  which is why the [ / ] keys, the touch gear sheet and the cockpit lever
+   *  are covered by it too. */
+  private readonly reverseMapper = new ReversePedalMapper();
   /** Raw (pre-gate) pedal values from the last read — the A2 procedure
    *  observer edge-detects these: a real brake press performs "press-brake",
    *  a throttle press on a ready driveline performs "move-off". */
@@ -281,7 +288,7 @@ class GatedSimInput extends SimInput {
 
   override read(): VehicleInput {
     const out = super.read();
-    if (this.reversePedalRemap) applyReversePedalRemap(out);
+    this.reverseMapper.apply(out, this.reversePedalRemap);
     this.rawThrottle = out.throttle;
     this.rawBrake = out.brake;
     if (this.driveLocked) {
@@ -1242,6 +1249,47 @@ function ReadyScene({
               // grading flips (render-only; inert without a posted controller).
               controllerFigure={runtime}
             />
+            {/* THE CAMERA LIVES INSIDE <Physics>, AND THAT IS THE FIX FOR THE
+                BACK-SEAT POV (doc 87 B67 — „no instrument cluster in frame at
+                all" above ~68 km/h).
+
+                CameraRig places the cockpit eye by reading the interpolated
+                chassis group's world pose in a useFrame. R3F runs equal-priority
+                useFrame subscribers in SUBSCRIPTION order, and rapier's own
+                stepper — the thing that writes that pose — is the first child of
+                <Physics>. So the camera is only guaranteed to read a FRESH pose
+                if it subscribes after the stepper. As a SIBLING of the
+                <Suspense> above it did the opposite: the whole Physics subtree
+                suspends on the district/GLB load, so CameraRig committed (and
+                subscribed) FIRST, and every frame it aimed the eye at where the
+                car had been on the PREVIOUS frame. The camera then rendered one
+                frame of travel behind the car it is supposed to be sitting in —
+                0.20 m at 44 км/ч (invisible), 0.30 m at 69 (the eye is level
+                with the seat back and the whole dash goes black), 0.57 m at 128
+                (the driver's headrest fills the lower-left quadrant and there is
+                no cluster and no steering wheel in frame at all). Speed-
+                proportional, surviving a throttle-shut coast and surviving a
+                C×3 view cycle — which is exactly the founder-reported symptom,
+                and exactly why the previous fix, a feed-forward INSIDE the lerp,
+                could not touch it: the lerp was already converged. Measured at
+                138.7 км/ч with the dev camera probe: the camera sat at
+                car-local (0.240, 0.710, −0.255) against a COCKPIT_EYE of
+                (0.24, 0.71, −0.255) — a residual of 8·10⁻¹⁴ m. The camera was
+                never in the wrong place relative to what it read. It was
+                reading last frame's car.
+
+                Mounted last, so it subscribes after the stepper AND after
+                VehicleRig, in the same Suspense boundary, on every mount. */}
+            <CameraRig
+              chassisGroupRef={chassisGroupRef}
+              simRef={simRef}
+              cameraModeRef={cameraModeRef}
+              cabinRef={cabinRef}
+              telemetryRef={telemetryRef}
+              topdownAllowed={topdownInCycle}
+              enterTopdown={enterTopdown}
+              driveLocked={driveLocked}
+            />
           </Physics>
         </Suspense>
         {/* A7 in-world route guidance: ghost route ribbon + turn chevron +
@@ -1284,16 +1332,6 @@ function ReadyScene({
             onChange={setFollowHintOn}
           />
         ) : null}
-        <CameraRig
-          chassisGroupRef={chassisGroupRef}
-          simRef={simRef}
-          cameraModeRef={cameraModeRef}
-          cabinRef={cabinRef}
-          telemetryRef={telemetryRef}
-          topdownAllowed={topdownInCycle}
-          enterTopdown={enterTopdown}
-          driveLocked={driveLocked}
-        />
         {cockpit && rain ? <WindshieldDroplets wiperRef={wiperVisualRef} /> : null}
       </Canvas>
 
@@ -1512,8 +1550,13 @@ function ReadyScene({
           <p className="max-w-2xl text-sm font-bold leading-snug [@media(orientation:portrait)]:hidden">
             Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.
           </p>
+          {/* The sentence used to read „задръж надолу" — hold down. That was
+              the instruction that made a Б2 stop select reverse, so it is now
+              what it always should have been: STOP first, LIFT the thumb, then
+              press down again. Two acts of the foot, exactly like selecting R
+              with the lever in a real automatic. */}
           <p className="max-w-2xl text-sm font-bold leading-snug text-accent-2 [@media(orientation:portrait)]:hidden">
-            Задръж надолу, докато колата стои — минава на заден ход.
+            Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.
           </p>
           <button
             type="button"
@@ -1932,16 +1975,23 @@ function RuntimeDriver({
     tRef.current += dt;
     const sample = sampleRef.current;
 
-    // Auto-reverse assist (founder 2026-07-17): hold the brake at a
+    // Auto-reverse assist (founder 2026-07-17): press the brake at a
     // standstill in D → the assist works the SAME selector gate as the
     // [ / ] keys (two gearDown steps, D→N→R); in R the pedals are already
     // remapped by GatedSimInput (S/↓ = reverse throttle, W/↑ = brake), so
-    // holding the remapped brake at a standstill walks the gate back up
+    // pressing the remapped brake at a standstill walks the gate back up
     // (R→N→D). Interlocks, DrivelineEvents, HUD telltales and the recorder
     // all see canonical transitions. Hard gates: never on examMode lessons
     // (prop), never during the pre-drive procedure (a held brake there IS a
     // step), automatic box only (the manual tier keeps the real gearbox),
     // engine running only.
+    //
+    // The word is PRESS, not hold, and it is load-bearing: since 2026-08-05
+    // the assist only reads a press that begins after the car is stopped and
+    // the pedal has been lifted (reverseAssist.ts LAW 1). A brake carried in
+    // from motion and held — the Б2 stop line, a red light, a give-way wait —
+    // shifts nothing, because that pedal drove the car backwards into traffic
+    // for as long as this assist has existed.
     if (reverseAssistEnabled && !driveLocked && cabin) {
       const dl = cabin.driveline;
       if (dl.transmission === "automatic" && dl.engineOn) {
@@ -2148,7 +2198,9 @@ function ControlsHelp({
     { keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
     { keys: "I", what: "двигател: старт / стоп", essential: true },
     { keys: "[ ]", what: "скорости: към P / към D", essential: true },
-    { keys: "S / ↓", what: "задръж на място → задна / напред" },
+    // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
+    // you ask for reverse — see the two laws in engine/reverseAssist.ts.
+    { keys: "S / ↓", what: "на място: пусни и натисни пак → задна / напред" },
     { keys: "Space", what: "ръчна спирачка", essential: true },
     { keys: "Z", what: "съединител — задръж („Напреднал“)" },
     { keys: "B", what: "предпазен колан", essential: true },

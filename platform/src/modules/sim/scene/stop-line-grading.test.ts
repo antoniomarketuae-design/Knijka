@@ -109,9 +109,25 @@ function routeDirAt(route: DerivedRoute, idx: number): [number, number] {
   return len > 1e-6 ? [dx / len, dy / len] : [0, 1];
 }
 
-function routeCrosses(route: DerivedRoute, line: GuidanceStopLine): boolean {
+/**
+ * Does the objective’s own guidance route drive across this line?
+ *
+ * `windowM` — doc 87 B31. The default 12 m is a ROUTE-proximity window, and the
+ * route ENDS at the objective’s marker, so an objective whose marker sits more
+ * than 12 m short of the paint fell out of the sweep entirely — even when its
+ * own acceptance still reached past that paint.
+ * `sc-jx-giveway-b1#sc-jxgb-yield`
+ * walked straight through the hole when its band moved back onto the approach
+ * (y 113 r 9 → y 108.5 r 13.5): the marker is 14.36 m short of the Б1 line at
+ * (0, 122.275) while the L1 aid ladder widens the disc to r 18.5, i.e. credit
+ * reaching y 127 — 4.7 m PAST the paint — and the sweep stopped looking. The
+ * caller now passes max(12, the objective’s own radius), so the window is at
+ * least as long as the reach being policed. No new offender surfaced: the
+ * undeclared list stayed empty and the declared floor went back to 11.
+ */
+function routeCrosses(route: DerivedRoute, line: GuidanceStopLine, windowM = ROUTE_TOUCHES_LINE_M): boolean {
   let bestIdx = -1;
-  let bestD2 = ROUTE_TOUCHES_LINE_M * ROUTE_TOUCHES_LINE_M;
+  let bestD2 = windowM * windowM;
   for (let i = 0; i < route.count; i += 1) {
     const dx = route.pts[i * 2]! - line.x;
     const dy = route.pts[i * 2 + 1]! - line.y;
@@ -194,7 +210,7 @@ beforeAll(() => {
             const near = Math.max(params.radiusM, MIN_GOVERNING_NEAR_M);
             for (const line of world.stopLines) {
               if (Math.hypot(params.x - line.x, params.y - line.y) > near) continue;
-              if (!routeCrosses(route, line)) continue;
+              if (!routeCrosses(route, line, Math.max(ROUTE_TOUCHES_LINE_M, params.radiusM))) continue;
               // Signed distance of the AUTHORED mark along the line's own
               // travel direction. + = the mark is already inside the junction.
               const pastM = (params.x - line.x) * line.dirX + (params.y - line.y) * line.dirY;

@@ -130,7 +130,9 @@ export async function sweep(options = {}) {
   try {
     for (const device of devices) {
       const context = await browser.newContext({
-        ...contextOptions(device),
+        // Motion is stated at the call site and printed in the report — see
+        // lib/devices.mjs. A coverage sweep wants deterministic geometry.
+        ...contextOptions(device, { motion: "reduce" }),
         ...(storageState ? { storageState } : {}),
       });
       const page = await context.newPage();

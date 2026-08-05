@@ -626,6 +626,9 @@ export function CameraRig({
     dmEye: new Vector3(),
     dmPitch: new Quaternion(),
     dmQuad: new Vector3(),
+    // B67 probe scratch — the camera's offset expressed in the CAR's frame.
+    probeLocal: new Vector3(),
+    probeInv: new Quaternion(),
   });
   const prevPosValid = useRef(false);
 
@@ -902,6 +905,44 @@ export function CameraRig({
         glanceEuler.set(headPitch, headYaw, 0, "YXZ");
         glanceQuat.setFromEuler(glanceEuler);
         cam.quaternion.multiply(glanceQuat);
+      }
+
+      // --- B67 PROBE (dev builds only; never on the founder's build) ---------
+      // Register B67's verification clause is explicit: "verify the fix with a
+      // POSITIONAL assertion (camera-to-COCKPIT_EYE under 0.15 m while holding
+      // 145 km/h), not by eye — the previous fix passed by eye at 76 km/h and
+      // fails at 145." There was no way to read that number from outside the
+      // canvas, so the back-seat POV could only ever be argued about. This
+      // publishes the camera's offset IN THE CAR'S OWN FRAME, which is exactly
+      // the quantity COCKPIT_EYE names, plus the chassis pose it was measured
+      // against so a harness can tell a mis-CONVERGED camera (offset wrong)
+      // from a STALE-READ one (offset right, car drawn somewhere else).
+      if (process.env.NODE_ENV !== "production") {
+        const { probeLocal, probeInv } = scratchRef.current;
+        probeLocal.copy(cam.position).sub(pos).applyQuaternion(probeInv.copy(quat).invert());
+        (window as unknown as { __camProbe?: unknown }).__camProbe = {
+          speedKmh: sim?.speedKmh ?? 0,
+          delta,
+          // Camera position expressed car-local (+X car-left, +Y up, +Z fwd).
+          localX: probeLocal.x,
+          localY: probeLocal.y,
+          localZ: probeLocal.z,
+          // Signed error against the authored eye — negative Z is REARWARD.
+          errX: probeLocal.x - COCKPIT_EYE.x,
+          errY: probeLocal.y - COCKPIT_EYE.y,
+          errZ: probeLocal.z - COCKPIT_EYE.z,
+          errM: Math.hypot(
+            probeLocal.x - COCKPIT_EYE.x,
+            probeLocal.y - COCKPIT_EYE.y,
+            probeLocal.z - COCKPIT_EYE.z,
+          ),
+          chassisX: pos.x,
+          chassisY: pos.y,
+          chassisZ: pos.z,
+          camX: cam.position.x,
+          camY: cam.position.y,
+          camZ: cam.position.z,
+        };
       }
     }
 

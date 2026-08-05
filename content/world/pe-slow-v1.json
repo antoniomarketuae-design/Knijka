@@ -25,11 +25,11 @@
   "zonesVersion": 1,
   "stats": {
    "roadKm": 0.14,
-   "nodes": 2,
-   "edges": 1,
+   "nodes": 4,
+   "edges": 3,
    "intersections": 0,
    "crossings": 1,
-   "buildings": 7,
+   "buildings": 11,
    "spawnPoints": 2,
    "zones": 1
   },
@@ -46,12 +46,44 @@
    "roadscapeNoteBg": "Квартална улица пред поликлиника: без улично осветление и без крайни линии, само осева прекъсната линия — а пред самия вход В27 „Забранено е спирането“, за да остане достъп за линейка.",
    "terminus": "closed-by-block",
    "terminusNoteBg": "Улицата е ЗАТВОРЕНА: на петнадесет метра след края ѝ стои жилищен блок напряко. Хоризонт няма — това, което виждаш в горната част на стъклото, е стена, и точно затова окото пада на пътеката.",
+   "nearfield": "open-forecourt",
+   "nearfieldNoteBg": "Широко и открито: на нито един от двата тротоара не стои нищо — сградите са дръпнати навътре зад паркинга на поликлиниката. Нищо не ти пречи да виждаш надалеч, и точно затова бавният пешеходец се забелязва рано, ако гледаш.",
+   "nearfieldSignature": "both|setback-low|19",
+   "nearfieldFirstM": -7,
    "terminusLegs": 0,
    "terminusRoadM": 0,
    "roadClass": "residential",
    "parkingBandM": 0,
    "bareVerge": null,
    "curbToCurbM": 16.25,
+   "carriageway": "bay-pocket-mid",
+   "carriagewayNoteBg": "Тясно платно под колелата и широк джоб в средната далечина: между двадесет и шестия и петдесет и петия метър улицата се разтваря до 24,25 м — това е паркингът пред поликлиниката. После се стеснява обратно, четиридесет метра пред теб.",
+   "carriagewaySegments": [
+    {
+     "id": "pe-e-street-s1",
+     "fromY": 0,
+     "toY": 26,
+     "curbToCurbM": 16.25
+    },
+    {
+     "id": "pe-e-street-s2",
+     "fromY": 26,
+     "toY": 55,
+     "curbToCurbM": 24.25
+    },
+    {
+     "id": "pe-e-street",
+     "fromY": 55,
+     "toY": 145,
+     "curbToCurbM": 16.25
+    }
+   ],
+   "spawnCurbToCurbM": 16.25,
+   "widthChangesAtM": [
+    11,
+    40
+   ],
+   "bayedRoadM": 29,
    "oneway": false,
    "banSignRef": "В27",
    "primaryCrossingId": "pe-x-1",
@@ -69,6 +101,16 @@
  "roads": {
   "nodes": [
    {
+    "id": "pe-n-cw1",
+    "x": 0,
+    "y": 26
+   },
+   {
+    "id": "pe-n-cw2",
+    "x": 0,
+    "y": 55
+   },
+   {
     "id": "pe-n-end",
     "x": 0,
     "y": 145
@@ -82,7 +124,7 @@
   "edges": [
    {
     "id": "pe-e-street",
-    "from": "pe-n-start",
+    "from": "pe-n-cw2",
     "to": "pe-n-end",
     "class": "residential",
     "name": "Улица с пешеходна пътека",
@@ -92,11 +134,11 @@
     "lanesSource": "tag",
     "maxspeed": 40,
     "maxspeedSource": "tag",
-    "length": 145,
+    "length": 90,
     "geometry": [
      [
       0,
-      0
+      55
      ],
      [
       0,
@@ -104,6 +146,56 @@
      ]
     ],
     "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s1",
+    "from": "pe-n-start",
+    "to": "pe-n-cw1",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 26,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      26
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "pe-e-street-s2",
+    "from": "pe-n-cw1",
+    "to": "pe-n-cw2",
+    "class": "residential",
+    "name": "Улица с пешеходна пътека",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 29,
+    "geometry": [
+     [
+      0,
+      26
+     ],
+     [
+      0,
+      55
+     ]
+    ],
+    "parkingBand": true
    }
   ]
  },
@@ -123,7 +215,7 @@
   {
    "id": "pe-b-clinic",
    "height": 5.5,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      12.8,
@@ -146,7 +238,7 @@
   {
    "id": "pe-b-clinic-annex",
    "height": 4,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      12.8,
@@ -168,23 +260,23 @@
   },
   {
    "id": "pe-b-park-wall",
-   "height": 1.8,
-   "heightSource": "default",
+   "height": 3,
+   "heightSource": "height",
    "footprint": [
     [
-     -15.5,
+     -19.5,
      39
     ],
     [
-     -12.8,
+     -16.8,
      39
     ],
     [
-     -12.8,
+     -16.8,
      115
     ],
     [
-     -15.5,
+     -19.5,
      115
     ]
    ]
@@ -192,7 +284,7 @@
   {
    "id": "pe-b-pavilion",
    "height": 4.2,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -34,
@@ -215,7 +307,7 @@
   {
    "id": "pe-b-end-slab",
    "height": 19,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -38,
@@ -238,7 +330,7 @@
   {
    "id": "pe-b-end-wing-w",
    "height": 14,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      -52,
@@ -261,7 +353,7 @@
   {
    "id": "pe-b-end-wing-e",
    "height": 14,
-   "heightSource": "default",
+   "heightSource": "height",
    "footprint": [
     [
      30,
@@ -280,6 +372,98 @@
      160
     ]
    ]
+  },
+  {
+   "id": "pe-b-nf-villa-w",
+   "height": 7,
+   "heightSource": "height",
+   "footprint": [
+    [
+     -44,
+     8
+    ],
+    [
+     -30,
+     8
+    ],
+    [
+     -30,
+     30
+    ],
+    [
+     -44,
+     30
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-annex-w",
+   "height": 5.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     -42,
+     36
+    ],
+    [
+     -29,
+     36
+    ],
+    [
+     -29,
+     56
+    ],
+    [
+     -42,
+     56
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-pavilion-e",
+   "height": 4.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     19,
+     10
+    ],
+    [
+     31,
+     10
+    ],
+    [
+     31,
+     24
+    ],
+    [
+     19,
+     24
+    ]
+   ]
+  },
+  {
+   "id": "pe-b-nf-clinic-park-e",
+   "height": 5.5,
+   "heightSource": "height",
+   "footprint": [
+    [
+     26,
+     30
+    ],
+    [
+     38,
+     30
+    ],
+    [
+     38,
+     52
+    ],
+    [
+     26,
+     52
+    ]
+   ]
   }
  ],
  "spawnPoints": [
@@ -288,7 +472,7 @@
    "x": 4.06,
    "y": 15,
    "heading": 0,
-   "edgeId": "pe-e-street",
+   "edgeId": "pe-e-street-s1",
    "name": "Подход към пешеходната пътека"
   },
   {
@@ -305,8 +489,8 @@
    "id": "pe-z-nostopping",
    "kind": "noStopping",
    "edgeId": "pe-e-street",
-   "fromM": 58,
-   "toM": 104.4,
+   "fromM": 3,
+   "toM": 49.4,
    "signRef": "В27"
   }
  ]

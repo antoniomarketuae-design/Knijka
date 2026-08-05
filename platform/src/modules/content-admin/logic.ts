@@ -82,6 +82,12 @@ function mergePatch(question: Question, patch: QuestionPatch): unknown {
   if (patch.lawRefs !== undefined) {
     next.lawRefs = patch.lawRefs.map((l) => ({ act: l.act, ref: l.ref }));
   }
+  // `sourceRefs` is deliberately NOT editable from the console and is carried
+  // through untouched by the spread above. A non-statutory citation only means
+  // anything because a builder cut its quote out of fetched bytes and a
+  // verifier can re-check it; a free-text box in a review screen would let
+  // someone type a source id that resolves to nothing, which is the exact
+  // defect the field was added to end.
   return next;
 }
 
@@ -189,6 +195,22 @@ function renderLawRefs(
   return `[\n${objs.map((o) => inner + o).join(",\n")}\n${indent}]`;
 }
 
+/**
+ * `sourceRefs` one object per line, and only when the row has any — the key
+ * must not appear on the 1,089 rows that do not, or a review of one first-aid
+ * question would rewrite every file it touches.
+ */
+function renderSourceRefs(sourceRefs: NonNullable<Question["sourceRefs"]>, indent: string): string {
+  const inner = `${indent}  `;
+  const objs = sourceRefs.map(
+    (s) =>
+      `${inner}{ "sourceId": ${j(s.sourceId)}, "ref": ${j(s.ref)}${
+        s.claimId !== undefined ? `, "claimId": ${j(s.claimId)}` : ""
+      } }`,
+  );
+  return `[\n${objs.join(",\n")}\n${indent}]`;
+}
+
 function renderScalarArray(values: string[]): string {
   return `[${values.map(j).join(", ")}]`;
 }
@@ -217,6 +239,9 @@ function renderQuestion(q: Question, indent: string, style: LawRefsStyle): strin
     `${f}"options": ${renderOptions(q.options, f)}`,
     `${f}"explanationBg": ${j(q.explanationBg)}`,
     `${f}"lawRefs": ${renderLawRefs(q.lawRefs, f, style)}`,
+    ...(q.sourceRefs && q.sourceRefs.length > 0
+      ? [`${f}"sourceRefs": ${renderSourceRefs(q.sourceRefs, f)}`]
+      : []),
     `${f}"media": ${j(q.media)}`,
     `${f}"status": ${j(q.status)}`,
   ];

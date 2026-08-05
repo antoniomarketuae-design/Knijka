@@ -45,6 +45,7 @@
  *   mustFit: string[],
  *   waitFor?: string,
  *   settleMs?: number,
+ *   requiresWorld?: boolean,
  *   prepare?: (page: import("playwright").Page) => Promise<void>,
  *   budget: {
  *     contentMin: number,
@@ -197,6 +198,15 @@ export const ROUTES = [
     waitFor: "canvas",
     settleMs: 6000,
     prepare: dismissOverlays,
+    // `waitFor: "canvas"` IS NOT A READINESS SIGNAL AND NEVER WAS. React mounts
+    // the canvas before the world data is built and long before the GLB/KTX2
+    // assets land, so `state: "attached"` is satisfied by an empty black
+    // rectangle. Every capture behind row C8 is that rectangle. A probe that
+    // measures this route must therefore ask the CANVAS whether it has drawn
+    // anything — lib/ready.mjs, `waitForWorld` — and refuse to record a sample
+    // if it has not. Declared here so the requirement travels with the route
+    // rather than living in one probe.
+    requiresWorld: true,
     budget: { contentMin: 0.85, foldMustPass: true, touchMustPass: true },
     note: "This is the route the founder's 85% is about — measured with the intro popups dismissed.",
   },

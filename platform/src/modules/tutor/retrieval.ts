@@ -12,10 +12,62 @@
  *  1. the ContentRepo — concepts, exam questions, road signs;
  *  2. the sim rule catalog — the 52 authored violation specs the rule engine
  *     grades with (see the second section below).
+ *
+ * THE THIRD DOOR — and why this file has a gate now.
+ *
+ * `modules/lesson/clearance.ts` is the classroom's gate: a concept summary is
+ * spoken only if the exact sentence is pinned in the carry, a question or a
+ * sign only if its own `status` is `approved`. Two doors had already been found
+ * and closed there — narration.ts gated its authored text; resolve.ts did not,
+ * and spoke a first-aid instruction ERC 2025 now reverses. This file was the
+ * third, and it was found the same way: by RUNNING it, not by reading it.
+ *
+ * MEASURED, against the real bank, before the filter below existed:
+ *
+ *   „Как се мести пострадал в безсъзнание след катастрофа?"
+ *      → q-ptp-063 (10.70, needs-review), c-victim-handling (10.00, NOT
+ *        carried), q-ptp-037, q-ptp-022, q-ptp-061, q-ptp-034 — six materials,
+ *        six ungated. `c-victim-handling` is the exact concept the classroom
+ *        now refuses to speak, because its summary taught the reversal.
+ *   „Как се спира силно кръвотечение?" → c-bleeding-control (8.10, not carried)
+ *   „Кога се прави сърдечен масаж?"    → c-cpr-basics (6.00, not carried)
+ *
+ * AND IT LEAKED BACK INTO THE CLASSROOM. `interrupt.ts beatMaterials` gates
+ * Tier 1 properly; `service.ts lessonGrounding` then WIDENED with
+ * `retrieveMaterialsInTopic`, which did not. Measured over the six beats of
+ * `l-accidents-first-aid`: tier1 = 0 on every one of them (correctly withheld),
+ * room = 6, tier2 = 6 — so the classroom refused to say it out loud and handed
+ * the same rows to the model as grounding. Gating the candidate list closes
+ * both paths at once, because both paths build their candidates here.
+ *
+ * IT WAS INERT ONLY BECAUSE `isTutorEnabled()` RETURNS FALSE WITHOUT AN API
+ * KEY. A config flag standing in for a gate is precisely the shape of the
+ * original defect, and it stops standing in the moment a key is pasted.
+ *
+ * WHY THE SAME THREE FUNCTIONS AND NOT A COPY. A second implementation of
+ * „may this be spoken" is how the neighbouring door gets missed again: the two
+ * drift, and nothing in the tree tells you which one you are looking at. They
+ * come through `@/modules/lesson`'s public barrel (docs/architecture/05) — the
+ * lesson module already imports this one for `ruleMaterial`, so the two names
+ * each other's public API and neither reaches into the other's internals.
+ *
+ * WHAT THE GATE COSTS, measured (retrieval.test.ts prints it): the whole
+ * first-aid corpus goes dark for the tutor, and so does every road sign (0 of
+ * 77 are `approved` today). That is the correct trade and it is the one the
+ * classroom already made — the student gets a refusal that names the boundary
+ * instead of a confident paragraph with a law citation stapled to unreviewed
+ * clinical instruction.
  */
 
 import type { ContentRepo } from "@/lib/content/repo";
 import type { LawRef } from "@/lib/content/types";
+import {
+  conceptClearance,
+  questionClearance,
+  signClearance,
+  type Clearance,
+  type WithheldReason,
+} from "@/modules/lesson";
 import { VIOLATIONS, type SeverityClass } from "@/modules/sim/rules";
 
 export interface RetrievedItem {
@@ -32,6 +84,55 @@ export interface RetrievedItem {
 /** How many materials are injected into the prompt at most. */
 export const MAX_RETRIEVED_ITEMS = 6;
 
+/**
+ * ADMISSION FLOOR: what fraction of the student's content words a material must
+ * actually contain before it may be called grounding. Ranking is a separate
+ * question — this decides whether an item is in the room at all.
+ *
+ * WHY IT EXISTS, and it is a consequence of the clearance filter above rather
+ * than an independent idea. Before the filter, the score floor was one fuzzy
+ * prefix hit (0.7), and it survived only because the on-topic rows crowded the
+ * junk out of six slots. Withhold the on-topic rows and the junk is all that is
+ * left. MEASURED, immediately after the gate went in:
+ *
+ *   „Как се спира силно кръвотечение?" → c-stopping-standing-rules („Как се
+ *   спира и престоява правилно"), q-vehicle-011 (brakes), q-speed-034, two
+ *   motorway rows — six approved materials, every one about stopping a CAR,
+ *   under a question about arterial bleeding.
+ *   „Кога се прави сърдечен масаж?" → six rows about overtaking, ambulances
+ *   and left turns.
+ *
+ * That is worse than the refusal it replaced, and it is worse in the ADR-002
+ * direction specifically: the model is handed six REVIEWED rows carrying real
+ * lawRefs, and rule 3 of the system prompt tells it to cite what it uses. A
+ * confident citation of чл. 98 under a first-aid question is a fabrication with
+ * a whitelist-approved chip on it — the citation validator cannot catch it,
+ * because the reference really was injected.
+ *
+ * WHY A FRACTION AND NOT A HIGHER SCORE. The score is a SUM, so it grows with
+ * question length: a floor that silences „Кога мога да изпреварвам?" (1 content
+ * token) lets a six-word question through on two stray matches. The fraction
+ * asks the question that actually matters — „how much of what the student asked
+ * is in this material" — and it is length-invariant.
+ *
+ * WHY 0.5, measured over 12 questions the bank genuinely covers and 6 it does
+ * not (the sweep is reproduced in retrieval.test.ts):
+ *
+ *   floor   answerable questions left with nothing   uncovered questions still grounded
+ *   0.00    0 / 12                                   5 / 6
+ *   0.34    0 / 12                                   2 / 6
+ *   0.50    0 / 12                                   1 / 6   ← and that one is a TRUE hit
+ *   0.60    2 / 12                                   1 / 6
+ *   0.67    5 / 12                                   1 / 6
+ *
+ * 0.5 is the knee: it costs nothing the bank can answer and removes almost
+ * everything it cannot. (The survivor at 0.5 is „Как се сменя гума?", which
+ * lands on q-vehicle-046 „Сменяш спукана гума…" at 0.85 — the question set was
+ * wrong about that one, not the floor.) Above the knee the cost is immediate
+ * and real: at 0.6 „Кога трябва да пропусна пешеходец?" goes dark.
+ */
+export const MIN_QUESTION_COVERAGE = 0.5;
+
 /** Weight multiplier for matches in the item's title vs. its body. */
 const TITLE_WEIGHT = 3;
 const EXACT_MATCH = 1;
@@ -42,6 +143,20 @@ const PREFIX_MIN_LENGTH = 4;
 /**
  * Function words + question scaffolding that carry no retrieval signal.
  * Deliberately small — over-aggressive stopwording hurts short questions.
+ *
+ * THE SECOND GROUP is imperative scaffolding, and it was added when
+ * MIN_QUESTION_COVERAGE made the DENOMINATOR matter. Before the coverage floor
+ * a junk token was merely harmless — it scored nothing and the sum ignored it.
+ * Now it dilutes: „Обясни ми предимството" is two tokens, only one of which any
+ * material can contain, so a perfect hit on „предимство" scores coverage 0.35
+ * and the tutor refuses the single most natural thing a student types at a
+ * teacher. „Обясни" and „кажи" are how a 17-year-old addresses a person; they
+ * are not what they are asking about.
+ *
+ * The bar for membership is the one this list already had: the word must be
+ * scaffolding in EVERY question, not merely common. That is why „пешеходец",
+ * „знак" and „спира" are absent however often they appear — each of them is
+ * the subject of some question.
  */
 const STOPWORDS_BG = new Set([
   "а", "аз", "ако", "але", "би", "бих", "ва", "вие", "във", "в", "го", "да",
@@ -51,6 +166,9 @@ const STOPWORDS_BG = new Set([
   "на", "не", "него", "ни", "ние", "но", "нея", "от", "по", "при", "с", "са",
   "се", "си", "сме", "сте", "съм", "така", "тази", "те", "тези", "ти", "то",
   "това", "този", "той", "трябва", "тя", "че", "ще", "що", "я",
+  // Imperative scaffolding — „ask the teacher" verbs, not subjects.
+  "гледам", "искам", "казва", "кажеш", "кажи", "може", "нещо", "обясни",
+  "обясниш", "означава", "питам", "прави", "правя", "разкажи", "става",
 ]);
 
 /**
@@ -106,18 +224,113 @@ interface Candidate {
   lawRefs: LawRef[];
 }
 
-function scoreCandidate(queryTokens: string[], c: Candidate): number {
-  return (
-    TITLE_WEIGHT * scoreTokens(queryTokens, tokenizeBg(c.titleBg)) +
-    scoreTokens(queryTokens, tokenizeBg(c.bodyBg))
-  );
+// ---------------------------------------------------------------------------
+// The withheld log — the part that makes a refusal visible to US
+// ---------------------------------------------------------------------------
+
+/**
+ * One content row retrieval refused to hand a model.
+ *
+ * SEPARATE FROM THE CLASSROOM'S RING (lesson/clearance.ts `WithheldSource`) on
+ * purpose, and the difference is the whole reason it is worth having: that one
+ * records „lesson L, beat B would not say row R", which is a fact about a
+ * lesson. This one records „row R is not available to the tutor at all", which
+ * is a fact about the CORPUS. A retrieval refusal has no beat to name — free
+ * chat has no beat — and reporting it under a fabricated one would make the
+ * gap look like a lesson defect somebody could fix by editing a lesson.
+ *
+ * PRIVACY (ADR-004, these are minors): a record names a CONTENT ROW and never
+ * a user, a thread or a question. What was asked is a content gap and
+ * `interrupt.ts` already logs those, also without a user id.
+ */
+export interface WithheldMaterial {
+  kind: "concept" | "question" | "sign";
+  id: string;
+  reason: WithheldReason;
+  ts: number;
+}
+
+const WITHHELD_RING_SIZE = 200;
+const withheldRing: WithheldMaterial[] = [];
+let withheldSink: ((record: WithheldMaterial) => void) | null = null;
+
+/** Seam for a persistent sink (logging, an admin page). Never given a user id. */
+export function setWithheldMaterialSink(
+  next: ((record: WithheldMaterial) => void) | null,
+): void {
+  withheldSink = next;
+}
+
+export function recentWithheldMaterials(): readonly WithheldMaterial[] {
+  return withheldRing;
+}
+
+export function resetWithheldMaterials(): void {
+  withheldRing.length = 0;
 }
 
 /**
- * Rank the whole content bank against the student's question and return the
- * top materials. Draft/needs-review items are included on purpose — the v1
- * bank is founder-authored and the tutor's grounding contract is "our
- * content only", not "approved content only".
+ * Deduplicated on (kind, id): a scan of the whole bank refuses the same 361
+ * rows on every single question, so counting presses would bury the artifact
+ * within one conversation. WHICH rows are dark is the artifact; how often a
+ * scorer walked past them is noise.
+ */
+function noteWithheldFromRetrieval(record: Omit<WithheldMaterial, "ts">): void {
+  const key = `${record.kind}|${record.id}`;
+  if (withheldRing.some((r) => `${r.kind}|${r.id}` === key)) return;
+  const full: WithheldMaterial = { ...record, ts: Date.now() };
+  withheldRing.push(full);
+  if (withheldRing.length > WITHHELD_RING_SIZE) withheldRing.shift();
+  if (withheldSink !== null) {
+    try {
+      withheldSink(full);
+    } catch {
+      // A logging failure must never take the tutor down with it.
+    }
+  }
+}
+
+/**
+ * How well a material answers this question, on two independent axes.
+ *
+ * `score` RANKS (title-weighted, unbounded, the v1 scorer unchanged).
+ * `coverage` ADMITS: the fraction of the student's content words that appear
+ * anywhere in the material, in [0, 1]. Title and body are pooled for coverage
+ * because a word the student used is evidence wherever it sits; the title boost
+ * is a ranking opinion and has no business in an admission test.
+ *
+ * Both come from ONE tokenization of each field, so the extra pass costs a
+ * third `scoreTokens` walk and no re-tokenization.
+ */
+function judgeCandidate(
+  queryTokens: string[],
+  c: Candidate,
+  bodyForSearch: string = c.bodyBg,
+): { score: number; coverage: number } {
+  const titleTokens = tokenizeBg(c.titleBg);
+  const bodyTokens = tokenizeBg(bodyForSearch);
+  return {
+    score:
+      TITLE_WEIGHT * scoreTokens(queryTokens, titleTokens) +
+      scoreTokens(queryTokens, bodyTokens),
+    coverage:
+      scoreTokens(queryTokens, [...titleTokens, ...bodyTokens]) /
+      queryTokens.length,
+  };
+}
+
+/**
+ * Rank the CLEARED part of the content bank against the student's question and
+ * return the top materials.
+ *
+ * This doc comment used to read „Draft/needs-review items are included on
+ * purpose — the tutor's grounding contract is «our content only», not
+ * «approved content only»". That sentence was the charter for the defect: the
+ * bank is not one corpus with one trust level. 290 of its 1,089 questions are
+ * `needs-review`, 71 of 77 signs are `draft`, and 29 first-aid rows were
+ * regrounded on ERC 2025 / RCUK 2025 with several answers REVERSED. „Our
+ * content" and „content a person has checked" stopped being the same claim on
+ * the day the second one started to matter.
  */
 export function retrieveMaterials(
   repo: ContentRepo,
@@ -158,15 +371,24 @@ export function retrieveMaterialsInTopic(
   return rankMaterials(repo, question, limit, topicId);
 }
 
-function rankMaterials(
+/**
+ * THE GATE, and the only place a content-bank row becomes a candidate.
+ *
+ * Both ranked paths — free chat and the classroom's Tier 2 — go through this
+ * one function, so there is exactly one line to read to know what the model may
+ * see. `withheld` is called for every refusal, which is what makes a silent
+ * corpus visible to US rather than only to the student who got a refusal.
+ *
+ * A withheld row is DROPPED, not substituted and not summarised. There is
+ * nothing honest to substitute with: a sentence about first aid that we wrote
+ * to fill the gap is the very thing this gate exists to prevent, and a title
+ * without its body is a heading over an answer the model would then supply
+ * from memory — ADR-002's exact failure.
+ */
+function clearedCandidates(
   repo: ContentRepo,
-  question: string,
-  limit: number,
   topicId: string | null,
-): RetrievedItem[] {
-  const queryTokens = tokenizeBg(question);
-  if (queryTokens.length === 0) return [];
-
+): Candidate[] {
   const inTopic = new Set<string>(
     topicId === null
       ? []
@@ -176,41 +398,74 @@ function rankMaterials(
           .map((c) => c.id),
   );
 
-  const candidates: Candidate[] = [
-    ...repo
-      .concepts()
-      .filter((c) => topicId === null || c.topicId === topicId)
-      .map((c) => ({
-        kind: "concept" as const,
-        id: c.id,
-        titleBg: c.titleBg,
-        bodyBg: c.summaryBg,
-        lawRefs: c.lawRefs,
-      })),
-    ...repo
-      .questions()
-      .filter((q) => topicId === null || q.conceptIds.some((id) => inTopic.has(id)))
-      .map((q) => ({
-        kind: "question" as const,
-        id: q.id,
-        titleBg: q.textBg,
-        bodyBg: q.explanationBg,
-        lawRefs: q.lawRefs,
-      })),
-    ...(topicId === null
-      ? repo.signs().map((s) => ({
-          kind: "sign" as const,
-          id: s.id,
-          titleBg: `Знак ${s.code} „${s.nameBg}“`,
-          bodyBg: s.meaningBg,
-          lawRefs: s.lawRefs,
-        }))
-      : []),
-  ];
+  const candidates: Candidate[] = [];
 
-  return candidates
-    .map((c) => ({ ...c, score: scoreCandidate(queryTokens, c) }))
-    .filter((c) => c.score >= PREFIX_MATCH)
+  for (const c of repo.concepts()) {
+    if (topicId !== null && c.topicId !== topicId) continue;
+    if (!cleared("concept", c.id, conceptClearance(c))) continue;
+    candidates.push({
+      kind: "concept",
+      id: c.id,
+      titleBg: c.titleBg,
+      bodyBg: c.summaryBg,
+      lawRefs: c.lawRefs,
+    });
+  }
+
+  for (const q of repo.questions()) {
+    if (topicId !== null && !q.conceptIds.some((id) => inTopic.has(id))) continue;
+    if (!cleared("question", q.id, questionClearance(q))) continue;
+    candidates.push({
+      kind: "question",
+      id: q.id,
+      titleBg: q.textBg,
+      bodyBg: q.explanationBg,
+      lawRefs: q.lawRefs,
+    });
+  }
+
+  // Signs are topic-less in the bank, so a topic-scoped retrieval excludes them
+  // rather than guessing (see retrieveMaterialsInTopic). A sign that matters to
+  // a lesson is already named in the beat's Tier-1 `signIds`, where
+  // `beatMaterials` applies this same check.
+  if (topicId === null) {
+    for (const s of repo.signs()) {
+      if (!cleared("sign", s.id, signClearance(s))) continue;
+      candidates.push({
+        kind: "sign",
+        id: s.id,
+        titleBg: `Знак ${s.code} „${s.nameBg}“`,
+        bodyBg: s.meaningBg,
+        lawRefs: s.lawRefs,
+      });
+    }
+  }
+
+  return candidates;
+}
+
+function cleared(
+  kind: "concept" | "question" | "sign",
+  id: string,
+  clearance: Clearance,
+): boolean {
+  if (clearance.cleared) return true;
+  noteWithheldFromRetrieval({ kind, id, reason: clearance.reason });
+  return false;
+}
+
+function rankMaterials(
+  repo: ContentRepo,
+  question: string,
+  limit: number,
+  topicId: string | null,
+): RetrievedItem[] {
+  const queryTokens = tokenizeBg(question);
+  if (queryTokens.length === 0) return [];
+
+  return clearedCandidates(repo, topicId)
+    .map((c) => ({ ...c, ...judgeCandidate(queryTokens, c) }))
+    .filter((c) => c.coverage >= MIN_QUESTION_COVERAGE && c.score >= PREFIX_MATCH)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ kind, id, titleBg, bodyBg, lawRefs, score }) => ({
@@ -250,6 +505,14 @@ export const MAX_RETRIEVED_RULES = 2;
  * a small, broad-brush corpus — 52 violation entries covering the whole of
  * driving — so a weak match on one inflected word would let almost any
  * question drag in a rule. One full token's worth of overlap is the floor.
+ *
+ * IT WAS NOT ENOUGH ON ITS OWN, and the same measurement that produced
+ * MIN_QUESTION_COVERAGE showed it: „Кога се прави сърдечен масаж?" dragged in
+ * RAIL_CROSSING_VIOLATION (2.80) and „Как се мести пострадал…" dragged in
+ * STOP_LINE_OVERSHOOT (3.00) — because one absolute token of overlap is easy
+ * to reach and says nothing about whether the entry is ABOUT the question. The
+ * coverage floor below is the same admission test the content bank now gets,
+ * and it is the one that removes those two.
  */
 const RULE_MIN_SCORE = EXACT_MATCH;
 
@@ -347,9 +610,11 @@ export function retrieveRuleMaterials(
 
   return RULE_CANDIDATES.map((c) => ({
     ...c,
-    score: scoreCandidate(queryTokens, { ...c, bodyBg: c.searchBodyBg }),
+    ...judgeCandidate(queryTokens, c, c.searchBodyBg),
   }))
-    .filter((c) => c.score >= RULE_MIN_SCORE)
+    .filter(
+      (c) => c.coverage >= MIN_QUESTION_COVERAGE && c.score >= RULE_MIN_SCORE,
+    )
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map(({ kind, id, titleBg, bodyBg, lawRefs, score }) => ({

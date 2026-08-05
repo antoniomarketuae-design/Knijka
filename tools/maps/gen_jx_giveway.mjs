@@ -132,7 +132,7 @@ export function buildGiveWayDistrict(params) {
     "jxg-n-e2": [ewArmM, y2],
   };
 
-  const edge = (id, from, to, cls, maxspeed, name) => {
+  const edge = (id, from, to, cls, maxspeed, name, extra = {}) => {
     const geometry = [
       [r2(NODES[from][0]), r2(NODES[from][1])],
       [r2(NODES[to][0]), r2(NODES[to][1])],
@@ -151,20 +151,102 @@ export function buildGiveWayDistrict(params) {
       maxspeedSource: "tag",
       length: polylineLength(geometry),
       geometry,
+      ...extra,
     };
   };
 
   // Tertiary NS street (the player's route: s → j1 → j2 → n, geometry pointing
   // NORTH so a northbound approach crosses each giveWay line with dirSign +1).
+  //
+  // `jxg-e-m` — WHY THIS ONE BLOCK PARKS NOBODY (FR-21; doc 87 B29/B30/B31).
+  // His sentence: „I cant see the car coming on the right because of the cars
+  // that have stopped on the side walk". Measured on this map rather than
+  // argued, with `computeParkedCars` + the T6 sightline arithmetic:
+  //
+  //   · the procedural curb pass walks the RIGHT-hand normal of the edge's own
+  //     travel direction, and this edge points NORTH — so its row stands on the
+  //     EAST kerb at x = travelHalf 8.125 + PARK_BAND_CENTER_M 2.0 = 10.125,
+  //     which is the side the mouth-2 priority car comes from. Five lawful
+  //     slots: y 44 / 50.6 / 77 / 96.8 / 110;
+  //   · the LAST of them, at (10.125, 110), stands squarely in the give-way
+  //     sightline. From the graded yield band's own rear half the ray to the
+  //     conflict actor clears it by 0.00 m at y 92-106, 0.50 m at 107, 1.08 m
+  //     at 108 and 1.67 m at 109, against the doc 86 §9 floor of 2.00 m. The
+  //     SHIPPED band (`sc-jxgb-yield` y 113 r 9, widened to r 13.5 at L1) admits
+  //     y from 99.5, so the lesson already credited a yield made from a pose the
+  //     scenery blinds — the exact defect `traffic/__tests__/scenery-sightline`
+  //     exists to make unauthorable, hiding from that test because the test
+  //     samples the authored CENTRE and not the band;
+  //   · the row could not be moved instead: `computeParkedCars` derives the side
+  //     from the polyline's normal, so flipping it is a global change to all
+  //     3723 committed bodies, and a В27/В28 ban span would have been worse
+  //     still — it would post „no stopping" across the metres where this very
+  //     drill orders a stop.
+  //
+  // So the map declares what this street really carries. FR-21's `parkingBand`
+  // is exactly that declaration and `computeParkedCars` already honours it; the
+  // district keeps its other 55 bodies (the south approach, both boulevards, the
+  // north exit), so the world does not read as empty — the ONE row that stands
+  // inside a graded sightline is gone.
+  //
+  // ---------------------------------------------------------------------------
+  // AND THE ROW THAT WAS STILL THERE WHEN HE LOOKED: бул. „Втори" ITSELF.
+  // ---------------------------------------------------------------------------
+  // The block above closed the row on the STUDENT'S OWN kerb and the T6 gate
+  // went green — and his sentence was still true from the seat. Photographed
+  // 2026-08-04 under a HELD right glance at the graded stop pose (4.06, 108.11,
+  // v = 0, ЗАДАЧА 2/3 credited, every dismissible panel closed): the centre of
+  // the frame is a nose-to-tail row of parked bodies and no road surface behind
+  // them. Because the row that fills a RIGHT GLANCE from this pose is not on
+  // his street at all — it is бул. „Втори"'s own kerb row, at
+  // y = 150 − (travelHalf 8.125 + PARK_BAND_CENTER_M 2.0) = 139.875, nine
+  // bodies from x 44 to x 103.4, at bearings 51.5° to 72.3° right of forward
+  // while the cockpit's right glance is centred on GLANCE_OFFSETS.right =
+  // 0.93 rad = 53.3°. The parked row IS the right glance.
+  //
+  // Sightline clearance from the graded pose (4.06, 108.11) to a car in the
+  // westbound lane (y 154.06), measured against those nine bodies — the doc 86
+  // §9 floor is 2.00 m:
+  //
+  //   car at x   |  10     20     28     34     45     60     95
+  //   clearance  | 33.34  27.32  20.74  16.12   8.69   0.81   1.41
+  //
+  // So everything on that boulevard beyond x ≈ 50 is behind a wall of parked
+  // bodies, from every pose on the approach — the staged car's whole run down
+  // from its spawn at x 105, and the five FAMILY-BASELINE ambient cars
+  // (`SCENARIO_FAMILY_TRAFFIC_BASELINE.junction`) that share the arm with it.
+  // `traffic/__tests__/scenery-sightline` T6 never saw it: its window is
+  // min(45, cruise × 6) = 45 m, and the row starts at 44.
+  //
+  // A drill whose whole content is „огледай се надясно и виж дали идва кола"
+  // may not be authored on a priority road whose approach is screened for its
+  // last 60 m. So бул. „Втори" — the boulevard THIS lesson grades a look down,
+  // both arms so the ribbon does not step across the junction — declares no
+  // kerbside parking. 18 bodies go; the district keeps 37 (the south approach,
+  // the north exit and бул. „Първи"), so the world still reads as a street.
+  // The kerb math is unaffected elsewhere: `nodeOpenRadiusM` takes the MAX
+  // half-width over a node's incident edges and jxg-e-n / jxg-e-w1 / jxg-e-e1
+  // still carry their 4 m band, so both mouths keep radius 12.125 + corner and
+  // BOTH graded give-way lines stay exactly where they were (jxg-e-s@102.3,
+  // jxg-e-m@122.3 — locked by world/__tests__/jxg-districts).
+  //
+  // HONESTY DEBT, measured here and NOT fixed here: бул. „Първи" has the same
+  // row at y = −10.125 (x 37.4…103.4 and −36.4…−109), and instruction 2 of the
+  // same lesson orders a look down it („Пътят с предимство е чист"). From the
+  // mouth-1 line (4.06, −27.725) the ray to a car in the eastbound lane crosses
+  // y = −10.125 at x = 4.06 + 0.7437·(X − 4.06), i.e. INSIDE that row for any
+  // X ≳ 50. Mouth 1 stages no conflict car, so no gate fails and nothing the
+  // founder photographed is about it — but the ambient five drive that arm too.
+  // Owner: whoever takes the mouth-1 row of the register.
   const EDGES = [
     edge("jxg-e-s", "jxg-n-s", "jxg-n-j1", minorClass, minorMaxKmh, "ул. Второстепенна — подход"),
-    edge("jxg-e-m", "jxg-n-j1", "jxg-n-j2", minorClass, minorMaxKmh, "ул. Второстепенна — между кръстовищата"),
+    edge("jxg-e-m", "jxg-n-j1", "jxg-n-j2", minorClass, minorMaxKmh, "ул. Второстепенна — между кръстовищата", { parkingBand: false }),
     edge("jxg-e-n", "jxg-n-j2", "jxg-n-n", minorClass, minorMaxKmh, "ул. Второстепенна — изход"),
     // Secondary EW boulevards (priority roads).
     edge("jxg-e-w1", "jxg-n-w1", "jxg-n-j1", priorityClass, priorityMaxKmh, "бул. Първи — запад"),
     edge("jxg-e-e1", "jxg-n-j1", "jxg-n-e1", priorityClass, priorityMaxKmh, "бул. Първи — изток"),
-    edge("jxg-e-w2", "jxg-n-w2", "jxg-n-j2", priorityClass, priorityMaxKmh, "бул. Втори — запад"),
-    edge("jxg-e-e2", "jxg-n-j2", "jxg-n-e2", priorityClass, priorityMaxKmh, "бул. Втори — изток"),
+    edge("jxg-e-w2", "jxg-n-w2", "jxg-n-j2", priorityClass, priorityMaxKmh, "бул. Втори — запад", { parkingBand: false }),
+    edge("jxg-e-e2", "jxg-n-j2", "jxg-n-e2", priorityClass, priorityMaxKmh, "бул. Втори — изток", { parkingBand: false }),
   ];
 
   const INTERSECTIONS = [

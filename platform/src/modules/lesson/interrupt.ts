@@ -53,6 +53,7 @@ import {
   type RetrievedItem,
   type TutorLessonContext,
 } from "@/modules/tutor";
+import { conceptClearance, questionClearance, signClearance } from "./clearance";
 import { lessonById } from "./compose";
 import { frameLine } from "./frames";
 import { MAX_INTERRUPTION_LENGTH, MAX_MODEL_ASKS_PER_BEAT } from "./types";
@@ -69,6 +70,15 @@ import type { AskChip, Beat, ChipIntent, InterruptionAnswer, Lesson } from "./ty
  * beat is the best-specified context this product will ever have — an author
  * decided these belong together — and when the materials are already exact,
  * the grounding is stronger AND the prompt is smaller AND the call is cheaper.
+ *
+ * THE GATE APPLIES HERE TOO, and this is the door that was easiest to miss.
+ * These materials are not just what the model reads: with no API key — the
+ * state this repo is in today — `bestMaterialFor` serves one of them to the
+ * student VERBATIM. A withheld concept summary reaching a student because they
+ * typed a question instead of pressing play is the same failure through a
+ * different door. Worse, in the model path an unreviewed summary becomes the
+ * grounding a confident paragraph is built on, and a confident wrong answer
+ * with a citation attached is the artifact ADR-002 exists to prevent.
  */
 export function beatMaterials(beat: Beat): RetrievedItem[] {
   const repo = getContentRepo();
@@ -77,6 +87,7 @@ export function beatMaterials(beat: Beat): RetrievedItem[] {
   for (const id of beat.conceptIds) {
     const concept = repo.conceptById(id);
     if (concept === undefined) continue;
+    if (!conceptClearance(concept).cleared) continue;
     materials.push({
       kind: "concept",
       id: concept.id,
@@ -89,6 +100,7 @@ export function beatMaterials(beat: Beat): RetrievedItem[] {
   for (const id of beat.questionIds) {
     const question = repo.questionById(id);
     if (question === undefined) continue;
+    if (!questionClearance(question).cleared) continue;
     materials.push({
       kind: "question",
       id: question.id,
@@ -105,6 +117,7 @@ export function beatMaterials(beat: Beat): RetrievedItem[] {
   for (const code of beat.signIds) {
     const sign = repo.signs().find((s) => s.code === code);
     if (sign === undefined) continue;
+    if (!signClearance(sign).cleared) continue;
     materials.push({
       kind: "sign",
       id: sign.id,
@@ -145,13 +158,22 @@ function firstRule(beat: Beat): { code: string; spec: (typeof VIOLATIONS)[keyof 
   return null;
 }
 
+/**
+ * The summary that answers „Защо е така?".
+ *
+ * Gated: a beat whose concepts are all withheld returns null here and the
+ * caller falls through to the rule catalogue, then to the constructive
+ * refusal. That is the correct ladder — a refusal the student can act on beats
+ * a paragraph nobody has checked, and `resolveBeat` no longer offers the chip
+ * at all in that case, so almost nobody reaches this branch by pressing.
+ */
 function firstConceptSummary(beat: Beat): { textBg: string; lawRefs: LawRef[] } | null {
   const repo = getContentRepo();
   for (const id of beat.conceptIds) {
     const concept = repo.conceptById(id);
-    if (concept !== undefined && concept.summaryBg.trim().length > 0) {
-      return { textBg: concept.summaryBg, lawRefs: [...concept.lawRefs] };
-    }
+    if (concept === undefined || concept.summaryBg.trim().length === 0) continue;
+    if (!conceptClearance(concept).cleared) continue;
+    return { textBg: concept.summaryBg, lawRefs: [...concept.lawRefs] };
   }
   return null;
 }

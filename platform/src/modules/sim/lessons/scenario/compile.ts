@@ -1011,8 +1011,21 @@ export function compileScenario(
   // it; maneuver tolerances scale both ways (params.ts).
   const toleranceScale = rung.toleranceScale ?? DEFAULT_LEVEL_TOLERANCE[level];
   const widenBudget = radiusWidenBudget(spec);
+  // B58 — the street's own posted limit, so the ladder's speed grace can never
+  // print a gate label ABOVE the sign. The template's map recipe is the single
+  // authored source (it is mirrored byte-for-byte into the district's
+  // meta.scenario.params by the generators, and the world tests assert that),
+  // so no district load is needed at compile time. Non-numeric / absent ⇒
+  // undefined ⇒ params.ts behaves exactly as before.
+  const postedRaw = spec.map.params["maxspeedKmh"];
+  const postedLimitKmh = typeof postedRaw === "number" && Number.isFinite(postedRaw) ? postedRaw : undefined;
   const objectives: LessonObjective[] = spec.success.map((o, i) => {
-    const { kind, params } = serializeObjectiveParams(o.params, toleranceScale, widenBudget[i]);
+    const { kind, params } = serializeObjectiveParams(
+      o.params,
+      toleranceScale,
+      widenBudget[i],
+      postedLimitKmh,
+    );
     return { id: o.id, titleBg: o.titleBg, kind, params };
   });
 
@@ -1086,6 +1099,10 @@ export function compileScenario(
     ).map((s, i) => ({ n: i + 1, textBg: s.textBg })),
     conceptIds: [...spec.conceptIds],
     world: { districtId: spec.map.districtId },
+    // B58 — carried so the advisor card cannot print a cap above the sign; see
+    // LessonSpec.postedLimitKmh. Same single authored source as the gate clamp
+    // above, so the two can never disagree.
+    ...(postedLimitKmh !== undefined ? { postedLimitKmh } : {}),
     traffic,
     spawn: spec.start.spawnPointId
       ? { pointId: spec.start.spawnPointId }

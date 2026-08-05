@@ -259,11 +259,21 @@ export function QuestionArtwork({
   media,
   heightPx,
   labelBg = "Уголеми изображението",
+  buttonClassName,
 }: {
   media: QuestionMedia | null;
   /** Phone height budget for the artwork itself (not the frame). */
   heightPx: number;
   labelBg?: string;
+  /**
+   * Replaces the phone button's own box classes (NOT appended to them: two
+   * competing `w-*` utilities in one string are decided by stylesheet order,
+   * which is a coin flip). The practice runner passes this when the artwork has
+   * bottomed out on a landscape phone and the „Виж схемата ⤢" strip moves into
+   * the action bar — where it is one control among several rather than a
+   * full-width block.
+   */
+  buttonClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -298,7 +308,9 @@ export function QuestionArtwork({
            rig can read it out of the DOM instead of inferring it from a box
            height — see src/app/dev/fold-rig. */
         data-artwork-px={heightPx}
-        className="relative block w-full rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent wide-tall:hidden"
+        className={`relative rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent wide-tall:hidden ${
+          buttonClassName ?? "block w-full"
+        }`}
       >
         {asStrip ? (
           <span className="flex h-11 items-center gap-2 rounded-xl border border-border bg-surface-2/40 px-3 text-xs font-bold text-muted">

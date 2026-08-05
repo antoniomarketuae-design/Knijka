@@ -81,11 +81,28 @@ export const DEVICES = {
   },
 };
 
-/** The sweep every baseline and every budget run uses unless told otherwise. */
+/**
+ * The sweep every baseline and every budget run uses unless told otherwise.
+ *
+ * `small-landscape` IS IN THIS LIST, and it was not. The profile has existed
+ * since the ladder was written, but nothing ran it by default — so the only
+ * numbers anyone ever had for 780x360 came from probes that named it by hand,
+ * and the last one recorded 1 of 18 and was never re-run. A profile that is
+ * defined but not in the default ladder is a profile nobody notices has gone
+ * stale, which is the same „it looked right on the one device we checked"
+ * failure this file's header is about, one level down.
+ *
+ * It is also the HARDEST viewport in the set, not a rounding error: 360px of
+ * height minus a 48px topbar and a 61px pinned action bar leaves ~251px for a
+ * question and its answers — 33px less than the founder's phone gets sideways.
+ * The Android fleet Bulgarian 17-year-olds actually carry is the 360-wide
+ * class, and they rotate it.
+ */
 export const DEFAULT_DEVICE_IDS = [
   "iphone16-portrait",
   "iphone16-landscape",
   "small-portrait",
+  "small-landscape",
 ];
 
 export function resolveDevices(ids) {
@@ -101,8 +118,75 @@ export function resolveDevices(ids) {
   });
 }
 
-/** Playwright context options for a profile. */
-export function contextOptions(device) {
+// -----------------------------------------------------------------------------
+// MOTION IS A RUN PARAMETER, NOT A CONSTANT — AND IT NEVER WAS ONE.
+//
+// `reducedMotion: "reduce"` was hard-coded into this function, on EVERY profile,
+// with no way to say otherwise and nothing that printed it. That is defensible
+// as a default for a LAYOUT sweep — an entry transition caught mid-flight makes
+// two captures of the same screen differ, and geometry that is still animating
+// is not geometry — but it has a consequence nobody had written down: under
+// `prefers-reduced-motion: reduce` the app's animations DO NOT PLAY. So any
+// claim about an animation made through this harness compared a reduced-motion
+// frame against a reduced-motion frame. It could not have failed. It was not a
+// check; it was a shape.
+//
+// So the mode is now a REQUIRED argument. Not a default with an override — a
+// caller that says nothing gets an error, because the failure mode being closed
+// here is precisely "nobody stated it and nobody noticed". Every probe passes it
+// explicitly, every report prints it, and `MOTION_MODES` names what the two
+// values mean so the next reader does not have to infer it from Playwright.
+// -----------------------------------------------------------------------------
+
+/** @type {Record<string,{playwright:"reduce"|"no-preference", says:string}>} */
+export const MOTION_MODES = {
+  /** `prefers-reduced-motion: reduce` — the app's animations are SUPPRESSED. */
+  reduce: {
+    playwright: "reduce",
+    says:
+      "animations SUPPRESSED (prefers-reduced-motion: reduce) — geometry is deterministic, " +
+      "and NO CLAIM ABOUT AN ANIMATION CAN BE MADE FROM THIS RUN",
+  },
+  /** No preference — the app animates exactly as it does on a student's phone. */
+  allow: {
+    playwright: "no-preference",
+    says:
+      "animations ENABLED (no prefers-reduced-motion) — this is what a student sees; " +
+      "expect frame-to-frame geometry to differ while a transition is in flight",
+  },
+};
+
+export const MOTION_MODE_IDS = Object.keys(MOTION_MODES);
+
+/** Resolve and validate a mode id. Throws rather than guessing. */
+export function resolveMotion(mode) {
+  const found = MOTION_MODES[mode];
+  if (!found) {
+    throw new Error(
+      `[mobile-harness] motion mode must be one of ${MOTION_MODE_IDS.join(", ")} — got ${JSON.stringify(mode)}. ` +
+        `It is required, not optional: a sweep that does not state whether animations were playing ` +
+        `cannot be read, and every animation claim ever made through this harness was made with ` +
+        `reducedMotion silently forced to "reduce".`,
+    );
+  }
+  return { id: mode, ...found };
+}
+
+/**
+ * Playwright context options for a profile.
+ *
+ * @param {DeviceProfile} device
+ * @param {{motion: "reduce"|"allow", colorScheme?: "dark"|"light"}} options
+ *        `motion` is REQUIRED — see MOTION_MODES above.
+ */
+export function contextOptions(device, options) {
+  if (!options || typeof options.motion !== "string") {
+    throw new Error(
+      "[mobile-harness] contextOptions(device, { motion }) — `motion` is required. " +
+        `Pass one of ${MOTION_MODE_IDS.join(", ")} and PRINT it in the report.`,
+    );
+  }
+  const motion = resolveMotion(options.motion);
   return {
     viewport: { width: device.width, height: device.height },
     deviceScaleFactor: device.dpr,
@@ -111,10 +195,8 @@ export function contextOptions(device) {
     userAgent: device.ua,
     locale: "bg-BG",
     timezoneId: "Europe/Sofia",
-    // ADR-004: users are minors. Nothing here collects or transmits anything;
-    // reduced motion also keeps entry animations from being screenshotted
-    // mid-flight, which made earlier captures unreproducible.
-    reducedMotion: "reduce",
-    colorScheme: "dark",
+    // ADR-004: users are minors. Nothing here collects or transmits anything.
+    reducedMotion: motion.playwright,
+    colorScheme: options.colorScheme ?? "dark",
   };
 }

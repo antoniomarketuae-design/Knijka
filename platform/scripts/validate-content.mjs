@@ -146,6 +146,63 @@ function checkLawRefs(c, value, { min = 0 } = {}) {
   });
 }
 
+/**
+ * Non-statutory citations (`sourceRefs`) — plain-JS mirror of SourceRefSchema.
+ *
+ * The shape exists because `lawRefs` used to be `.min(1)` on every row, which
+ * COMPELLED a statute even where none governs the answer — and that compulsion
+ * is what put „ЗДвП чл. 123" under a claim about compression depth
+ * (docs/education/90 §14 item N). `known` is the set of ids registered in
+ * content/medical/sources.json + content/sources/sources.json; an unresolvable
+ * source id is the very defect this replaces, so it is an error, not a warning.
+ */
+function checkSourceRefs(c, value, known) {
+  if (value === undefined) return;
+  if (!c.require(Array.isArray(value), "sourceRefs must be an array when present")) return;
+  value.forEach((ref, i) => {
+    if (!isPlainObject(ref)) return c.fail(`sourceRefs[${i}] must be an object`);
+    for (const key of Object.keys(ref)) {
+      if (!["sourceId", "ref", "claimId"].includes(key)) {
+        c.fail(`sourceRefs[${i}]: unrecognized key "${key}"`);
+      }
+    }
+    const idOk = c.require(
+      isNonEmptyString(ref.sourceId) && /^src-[a-z0-9-]+$/.test(ref.sourceId),
+      `sourceRefs[${i}].sourceId must be kebab-case with "src-" prefix`,
+    );
+    c.require(isNonEmptyString(ref.ref), `sourceRefs[${i}].ref must be a non-empty string`);
+    if (ref.claimId !== undefined) {
+      c.require(
+        isNonEmptyString(ref.claimId) && KEBAB_SLUG.test(ref.claimId),
+        `sourceRefs[${i}].claimId must be kebab-case when present`,
+      );
+    }
+    if (idOk && !known.has(ref.sourceId)) {
+      c.fail(
+        `sourceRefs[${i}] references unknown sourceId "${ref.sourceId}" — not in content/medical/sources.json or content/sources/sources.json`,
+      );
+    }
+  });
+}
+
+/** Ids in every non-statutory source register (see lib/content/sources). */
+function loadRegisteredSourceIds() {
+  const ids = new Set();
+  for (const dir of ["medical", "sources"]) {
+    const file = path.join(contentDir, dir, "sources.json");
+    if (!fs.existsSync(file)) continue;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      for (const row of parsed.sources ?? []) if (isNonEmptyString(row?.id)) ids.add(row.id);
+    } catch (err) {
+      errors.push(`${dir}/sources.json: invalid JSON (${err.message})`);
+    }
+  }
+  return ids;
+}
+
+const registeredSourceIds = loadRegisteredSourceIds();
+
 function checkTopic(item, index) {
   const c = checker("topics.json", index, item);
   if (!c.require(isPlainObject(item), "topic must be an object")) return;
@@ -311,7 +368,7 @@ function checkQuestion(item, index, relFile) {
   if (!c.require(isPlainObject(item), "question must be an object")) return;
   c.noUnknownKeys([
     "id", "conceptIds", "type", "points", "textBg", "options",
-    "explanationBg", "lawRefs", "media", "status",
+    "explanationBg", "lawRefs", "sourceRefs", "media", "status",
   ]);
   c.require(isNonEmptyString(item.id), "id must be a non-empty string");
   if (c.require(
@@ -329,7 +386,18 @@ function checkQuestion(item, index, relFile) {
   c.require([1, 2, 3].includes(item.points), "points must be 1, 2 or 3");
   c.require(isNonEmptyString(item.textBg), "textBg must be a non-empty string");
   c.require(isNonEmptyString(item.explanationBg), "explanationBg must be a non-empty string");
-  checkLawRefs(c, item.lawRefs, { min: 1 });
+  // NOT min 1 any more — the floor moved to "at least one citation of SOME
+  // kind" below, so a row governed by no statute is no longer forced to invent
+  // one. Mirror of QuestionSchema in src/lib/content/schemas.ts.
+  checkLawRefs(c, item.lawRefs);
+  checkSourceRefs(c, item.sourceRefs, registeredSourceIds);
+  const lawCount = Array.isArray(item.lawRefs) ? item.lawRefs.length : 0;
+  const sourceCount = Array.isArray(item.sourceRefs) ? item.sourceRefs.length : 0;
+  if (lawCount + sourceCount < 1) {
+    c.fail(
+      "every question must cite at least one source — a statute in lawRefs, or a non-statutory source in sourceRefs",
+    );
+  }
   if (item.media !== null) checkQuestionMedia(c, item.media);
   c.require(STATUSES.includes(item.status), `status must be one of: ${STATUSES.join(", ")}`);
 

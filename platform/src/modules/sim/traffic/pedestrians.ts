@@ -19,6 +19,7 @@
  */
 
 import type { SignalPhase } from "../contracts";
+import { edgeParkingWidthM } from "../world/builders/network";
 import { offsetPolyline, projectOntoPolyline, sampleLane, type LaneGraph } from "./graph";
 import { rngRange, type Rng } from "./rng";
 import type { VehicleAgent } from "./vehicles";
@@ -72,7 +73,96 @@ export interface PedestrianEnv {
   playerSpeedKmh: number;
 }
 
-const SIDEWALK_MARGIN_M = 1.2;
+// ---------------------------------------------------------------------------
+// Where a pedestrian walks, laterally — founder item B14/B46/B49, the CAUSE.
+//
+// HIS SENTENCE, three lessons running: „the Pedestrian at the end when he
+// leaves the Zebra, he goes trough a car", „he passes like a ghost trough some
+// car", „ghost crossing trough stopped car".
+//
+// It was never a rendering or a collision bug. It is two constants that were
+// written years apart and have overlapped by construction ever since:
+//
+//   • this file put the sidewalk at `travelHalf + 0.4 + 1.2 = travelHalf + 1.6`,
+//     a number from before the 4 m curbside parking band and before the
+//     procedural parked row existed;
+//   • `TrafficLayer` seats every parked body at `travelHalf + PARK_BAND_CENTER_M`
+//     (2.0) with a half-width of 0.95, i.e. spanning
+//     `travelHalf + 1.05 … travelHalf + 2.95`.
+//
+// travelHalf + 1.6 is 0.55 m INSIDE the near flank of every parked car in the
+// district. Not sometimes — always, on every street the pass parks. Measured
+// over the 100 committed districts before this change: **19 of 121 pedestrian
+// walk loops on 11 districts pass through a parked body, up to 1.25 m deep**
+// (zb-v1 — the lesson he was looking at — 2 of 2; rb-ped-v1 3 of 3;
+// pe-school-v1, pe-zone-v1, ov-crossing-v1, pk-banx-v1, rx-tram-stop-v1,
+// rx-tram-island-v1 all 1 of 1).
+//
+// The SECOND half of the same mistake, and the one FR-21's fix created: the
+// offset was measured from the TRAVEL lanes, not from the kerb. Where a street
+// declares `parkingBand` the world moves its kerb out 4 m — and the walk did
+// not move with it, so the pedestrian was left walking down the middle of the
+// parking lane, on the carriageway. Measured: **50 crossing-edges on 5
+// districts had their walk line inside the kerb.**
+//
+// So the offset is now derived from the same geometry the world draws the kerb
+// with and the parking pass seats bodies in:
+//
+//   • no procedural row on the footway (a declared band puts the row inside
+//     the carriageway, or the street parks nobody) — walk `PED_STAND_BACK_M`
+//     past the KERB, mid-pavement, exactly as before but from the right datum;
+//   • row standing ON the footway (the FR-21 budget: a class the pass parks but
+//     the world draws no band for) — walk `PED_KERB_WALK_M` past the kerb, i.e.
+//     BETWEEN the kerb and the cars. It is tight, because a 1.9 m car parked in
+//     the middle of a 3.5 m pavement genuinely leaves 1.05 m at the kerb and
+//     0.55 m at the wall. Kerbside and not wallside on purpose: a walker behind
+//     the row is hidden from the driver, and the whole lesson is about seeing
+//     her.
+// ---------------------------------------------------------------------------
+
+/** Walker half-width (shoulders), m — what must clear a parked body's flank. */
+export const PED_SHOULDER_HALF_M = 0.25;
+/** Stand-back from the kerb on a clear pavement, m (the historic 1.6 measured
+ *  from the travel lanes, now measured from the kerb). */
+export const PED_STAND_BACK_M = 1.6;
+/** Stand-back where the procedural parked row stands on the footway, m.
+ *  Bounded on both sides and there is no slack in it:
+ *    ≥ SIDEWALK_SKIRT_M 0.35 + shoulders 0.25 = 0.60 (fully off the kerb face)
+ *    ≤ (PARK_BAND_CENTER_M 2.0 − PARKED_HALF_W_M 0.95) − 0.25 = 0.80 (clear of
+ *      the nearest body's flank). */
+export const PED_KERB_WALK_M = 0.7;
+/** Lead-in each side of the carriageway that still counts as "on the crossing"
+ *  for `crossingCounts` / the rule engine — a pedestrian who has stepped off
+ *  the kerb is already «стъпил на пътеката» (ЗДвП чл. 119).
+ *
+ *  1.1 m is not a new number: it is what today's geometry implied (a 1.6 m
+ *  stand-back with a 0.5 m margin), reproduced exactly so that moving the WALK
+ *  LINE can never shrink a graded window. Where the walk is pulled in to the
+ *  kerb the margin clamps at 0 and the window only grows. */
+const CROSSING_LEAD_IN_M = 1.1;
+
+/**
+ * Lateral offset of the sidewalk this edge's walkers use, measured from the
+ * road centre line. `laneWidthM` is the runtime's lane width (the world's
+ * LANE_WIDTH_M); the parking band comes from the same `edgeParkingWidthM` the
+ * kerb, the ribbon, the colliders and the FR-21 footway ledger all use, so the
+ * walk and the kerb can never disagree again.
+ */
+export function pedSidewalkOffsetM(edge: DistrictEdge, laneWidthM: number): number {
+  const travelHalf = (Math.max(1, edge.lanes) * laneWidthM) / 2;
+  const bandM = edgeParkingWidthM(edge);
+  const kerb = travelHalf + bandM;
+  // A row on the FOOTWAY is exactly the case `parked-on-footway.test.ts`
+  // budgets: the pass parks this class, and the world draws it no band. An
+  // explicit `parkingBand: false` says the street parks nobody at all.
+  const rowOnFootway = bandM === 0 && (edge as { parkingBand?: unknown }).parkingBand !== false;
+  return kerb + (rowOnFootway ? PED_KERB_WALK_M : PED_STAND_BACK_M);
+}
+
+/** Carriageway half width (kerb line) — the span a crossing walk grades over. */
+export function pedCarriagewayHalfM(edge: DistrictEdge, laneWidthM: number): number {
+  return (Math.max(1, edge.lanes) * laneWidthM) / 2 + edgeParkingWidthM(edge);
+}
 
 const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
 
@@ -145,8 +235,9 @@ export function buildPedRoute(
   const proj = projectOntoPolyline(center.px, center.py, center.cum, crossing.x, crossing.y);
   const sC = Math.min(Math.max(proj.s, 1), center.length - 1);
 
-  const halfRoad = (edge.lanes * laneWidthM) / 2 + 0.4;
-  const sideOff = halfRoad + SIDEWALK_MARGIN_M;
+  // B14 — kerb line and walking line from the same geometry the world uses.
+  const halfRoad = pedCarriagewayHalfM(edge, laneWidthM);
+  const sideOff = pedSidewalkOffsetM(edge, laneWidthM);
   const back = Math.min(rngRange(rng, 25, 60), sC);
   const fwd = Math.min(rngRange(rng, 25, 60), center.length - sC);
 
@@ -167,8 +258,10 @@ export function buildPedRoute(
   const bStart: number[] = [sideB.px[0], sideB.py[0]];
   const crossLen = Math.hypot(bStart[0] - aEnd[0], bStart[1] - aEnd[1]);
   if (crossLen < 2) return null;
-  // Roadway span within the cross segment (with a step margin each side).
-  const margin = Math.max(0.3, (crossLen - 2 * halfRoad) / 2 - 0.7);
+  // Roadway span within the cross segment: the carriageway itself, opened by
+  // CROSSING_LEAD_IN_M each side so a walker who has stepped off the kerb
+  // already counts as on the crossing.
+  const margin = Math.max(0, (crossLen - 2 * halfRoad) / 2 - CROSSING_LEAD_IN_M);
   const roadFrom = margin;
   const roadTo = crossLen - margin;
 

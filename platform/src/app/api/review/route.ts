@@ -18,6 +18,7 @@ import { getSessionUser } from "@/modules/auth";
 import {
   applyReviewDecision,
   listFlaggedQuestions,
+  parseQueue,
   parseReviewRequest,
   type ReviewQueue,
 } from "@/modules/content-admin";
@@ -41,7 +42,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const params = new URL(request.url).searchParams;
-  const queue: ReviewQueue = params.get("queue") === "unsigned" ? "unsigned" : "needs-review";
+  const queue: ReviewQueue = parseQueue(params.get("queue"));
   const pageParam = Number.parseInt(params.get("page") ?? "1", 10);
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
 

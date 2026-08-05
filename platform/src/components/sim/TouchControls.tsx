@@ -46,13 +46,20 @@
  * REVERSE, WITH NO GEAR CHANGE IN IT. „Very hard to switch to reverse" was
  * true: it took a pedal AND a selector — two hands of input for one intention.
  * Down on this axis is the brake; ReverseAssist (engine/reverseAssist.ts, which
- * has existed and been unit-tested since 2026-07-17) watches for a brake held
- * at a standstill and steps the REAL selector D→N→R through the same
- * DrivelineState API the [ / ] keys use, after which `applyReversePedalRemap`
- * swaps the two channels — so down keeps meaning "backwards" and up becomes the
- * brake. One axis, one thumb, and the rule engine, the A2 procedure observer
- * and the trace recorder see the identical canonical events they always did.
- * Nothing about grading, scenario timing or recording was touched to get here.
+ * has existed and been unit-tested since 2026-07-17) watches for a brake
+ * PRESSED at a standstill and steps the REAL selector D→N→R through the same
+ * DrivelineState API the [ / ] keys use, after which the pedal mapper swaps the
+ * two channels — so down keeps meaning "backwards" and up becomes the brake.
+ * One axis, one thumb, and the rule engine, the A2 procedure observer and the
+ * trace recorder see the identical canonical events they always did. Nothing
+ * about grading, scenario timing or recording was touched to get here.
+ *
+ * PRESSED, NOT HELD (2026-08-05). It used to be a HOLD, and a thumb planted at
+ * the bottom of this axis is how a learner stops — so stopping at a Б2 sign
+ * selected R and the swap then read the same planted thumb as a floored reverse
+ * accelerator. The thumb must now come back to centre and go down again, and
+ * even then a thumb that was already down when R engaged goes on braking until
+ * it lifts. See the two laws at the top of engine/reverseAssist.ts.
  *
  * WHY A THUMB PAD AND NOT A WHEEL, A TILT SENSOR OR THE OLD LONG SLIDER:
  *  - a wheel wants two thumbs and a fixed pivot the hand has to find; the
@@ -583,14 +590,14 @@ export function TouchControls({
       </div>
 
       {/* ══ BOTTOM-RIGHT ═ ONE drivetrain axis ═══════════════════════════════
-          Up = forward · centre = neutral · down = brake, then reverse (the
-          standstill hold hands over to ReverseAssist — see the header). */}
+          Up = forward · centre = neutral · down = brake, then reverse (centre
+          the thumb, then press down again — see the header). */}
       <div
         role="slider"
         aria-label={
           inReverse
             ? "Ход — назад: надолу назад, нагоре спирачка"
-            : "Ход — нагоре напред, в средата спиране, задръж надолу за назад"
+            : "Ход — нагоре напред, в средата спиране, надолу спирачка; спряла кола: пусни и натисни пак надолу за назад"
         }
         aria-valuemin={-100}
         aria-valuemax={100}

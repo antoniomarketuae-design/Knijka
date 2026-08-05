@@ -62,7 +62,7 @@ const read = () =>
   });
 
 const browser = await engine.launcher.launch();
-const context = await browser.newContext(contextOptions(device));
+const context = await browser.newContext(contextOptions(device, { motion: "reduce" }));
 const page = await context.newPage();
 page.setDefaultTimeout(180_000);
 page.setDefaultNavigationTimeout(180_000);

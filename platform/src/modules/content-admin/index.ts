@@ -6,7 +6,10 @@
  * Consumers (the /review page, the /api/review route handlers) import ONLY
  * from here. Client components must import types from `./types` with
  * `import type` — never a value from this index, which pulls in the
- * server-only filesystem layer.
+ * server-only filesystem layer. `./queues` is the one other module a client
+ * component may import directly, and by value: it is pure (no `node:fs`, no
+ * zod) and it is what makes the tab strip render itself from the same routing
+ * table the server pages by, so a queue cannot exist on one side only.
  */
 
 // Pure logic (safe on the server; also unit-tested in logic.test.ts).
@@ -37,12 +40,26 @@ export {
   writeLedgerAtomic,
 } from "./approvals";
 export { CONTENT_HASH_RE, canonicalQuestionContent, hashQuestionContent } from "./hash";
+
+// The routing table: which backlog a row belongs to. Total by construction —
+// every row reaches exactly one queue or is human-approved, so no status can
+// drop off the review console the way `machine-checked` did.
+export {
+  DEFAULT_QUEUE,
+  QUEUE_META,
+  REVIEW_QUEUES,
+  dispositionOf,
+  emptyQueueTotals,
+  parseQueue,
+} from "./queues";
+export type { QueueMeta, RowDisposition } from "./queues";
 export {
   RISK_LABEL_BG,
   checkQuotedClaims,
   compareRisk,
   lawEvidenceFor,
   quotedSpans,
+  sourceEvidenceFor,
 } from "./evidence";
 
 // Server-only filesystem orchestration.
@@ -78,4 +95,5 @@ export type {
   ReviewTopicSummary,
   ReviewVerdict,
   RiskTally,
+  SourceRefEvidence,
 } from "./types";

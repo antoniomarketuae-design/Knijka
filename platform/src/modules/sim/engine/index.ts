@@ -20,10 +20,12 @@ export type { SimInputCallbacks } from "./input";
 
 export {
   ReverseAssist,
+  ReversePedalMapper,
   applyReversePedalRemap,
   shouldRemapReversePedals,
   REVERSE_ASSIST_STANDSTILL_KMH,
   REVERSE_ASSIST_HOLD_S,
+  REVERSE_ASSIST_LIFT_S,
   REVERSE_ASSIST_SUPPRESS_S,
   REVERSE_ASSIST_PEDAL_ON,
 } from "./reverseAssist";

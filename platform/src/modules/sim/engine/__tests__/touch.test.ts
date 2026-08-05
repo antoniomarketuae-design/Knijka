@@ -11,6 +11,7 @@ import { SimInput } from "../input";
 import {
   applyReversePedalRemap,
   ReverseAssist,
+  ReversePedalMapper,
   shouldRemapReversePedals,
   type ReverseAssistCommand,
 } from "../reverseAssist";
@@ -247,30 +248,60 @@ describe("ONE THUMB, ONE AXIS, AND REVERSE — the founder's sentence, end to en
     }
   }
 
-  it("holding the thumb DOWN at a standstill puts the car in R, with no gear input", () => {
+  /** Step the assist for `sec` on the pedals the thumb is currently making,
+   *  the way the scene does — one frame at 60 Hz, RAW pedals. */
+  function driveAssist(
+    assist: ReverseAssist,
+    input: SimInput,
+    sec: number,
+    speedKmh: number,
+    selector: "D" | "R" = "D",
+  ): ReverseAssistCommand | null {
+    let command: ReverseAssistCommand | null = null;
+    for (let t = 0; t < sec; t += 1 / 60) {
+      const pedals = input.read();
+      command =
+        assist.update({
+          speedKmh,
+          selector,
+          brakePedal: pedals.brake,
+          throttlePedal: pedals.throttle,
+          dtSec: 1 / 60,
+        }) ?? command;
+    }
+    return command;
+  }
+
+  it("a thumb held down THROUGH the stop keeps the car in D — that is a stop, not a request to reverse", () => {
+    // The defect this file's second half now guards: on touch the natural way
+    // to stop is to plant the thumb at the bottom and leave it there, which is
+    // exactly how a Б2 stop looked to the old hold-based trigger.
     const h = harness();
     const src = new TouchInputSource();
     h.input.attachTouch(src);
     const assist = new ReverseAssist();
+
+    thumb(src, RANGE); // full down = full brake, planted while still rolling
+    expect(driveAssist(assist, h.input, 0.6, 9)).toBe(null); // braking to a halt
+    expect(driveAssist(assist, h.input, 30, 0)).toBe(null); // …then 30 s stopped
+    h.input.dispose();
+  });
+
+  it("thumb to centre, then DOWN again at a standstill puts the car in R, with no gear input", () => {
+    const h = harness();
+    const src = new TouchInputSource();
+    h.input.attachTouch(src);
+    const assist = new ReverseAssist();
+
+    thumb(src, 0); // spring-centred: the thumb comes off the pedal
+    expect(driveAssist(assist, h.input, 0.4, 0)).toBe(null);
 
     thumb(src, RANGE); // full down = full brake
     const held = h.input.read();
     expect(held.brake).toBe(1);
     expect(held.throttle).toBe(0);
 
-    // The scene steps the assist once per frame with the RAW pedals.
-    let command: ReverseAssistCommand | null = null;
-    for (let t = 0; t < 0.5; t += 1 / 60) {
-      command =
-        assist.update({
-          speedKmh: 0,
-          selector: "D",
-          brakePedal: held.brake,
-          throttlePedal: held.throttle,
-          dtSec: 1 / 60,
-        }) ?? command;
-    }
-    expect(command).toBe("shiftToR");
+    expect(driveAssist(assist, h.input, 0.5, 0)).toBe("shiftToR");
     h.input.dispose();
   });
 
@@ -291,6 +322,38 @@ describe("ONE THUMB, ONE AXIS, AND REVERSE — the founder's sentence, end to en
     applyReversePedalRemap(up);
     expect(up.brake).toBe(1); // …is now the brake
     expect(up.throttle).toBe(0);
+  });
+
+  it("…but a thumb that was ALREADY down when R engaged goes on braking", () => {
+    // Same chain, through the mapper the scene actually uses (LAW 2). The
+    // thumb never moved; only the selector did. A pedal that meant stop must
+    // not become the reverse accelerator under a stationary thumb.
+    const src = new TouchInputSource();
+    const mapper = new ReversePedalMapper();
+
+    thumb(src, RANGE); // thumb planted at the bottom = full brake, in D
+    const inD = baseInput();
+    src.mergeInto(inD);
+    mapper.apply(inD, false);
+    expect(inD.brake).toBe(1);
+
+    const inR = baseInput(); // …selector goes to R, thumb unmoved
+    src.mergeInto(inR);
+    mapper.apply(inR, true);
+    expect(inR.throttle).toBe(0);
+    expect(inR.brake).toBe(1);
+
+    thumb(src, 0); // thumb lifts to centre
+    const centre = baseInput();
+    src.mergeInto(centre);
+    mapper.apply(centre, true);
+
+    thumb(src, RANGE); // and presses again — NOW it reverses
+    const again = baseInput();
+    src.mergeInto(again);
+    mapper.apply(again, true);
+    expect(again.throttle).toBe(1);
+    expect(again.brake).toBe(0);
   });
 
   it("letting go returns to neutral — a spring-centred axis holds nothing", () => {

@@ -11,6 +11,7 @@ import { tutorAllowanceSpentReplyBg } from "./allowance";
 import { sofiaDayKey } from "./budget";
 import { computeCostMicroUsd } from "./cost";
 import {
+  CONCEPT_PRIORITY,
   FakeTutorModel,
   FakeTutorStore,
   makeTutorFixtureRepo,
@@ -127,7 +128,12 @@ describe("askTutor — happy path", () => {
     // Model got the grounded system prompt + the student's question.
     expect(model.completeCalls).toHaveLength(1);
     const call = model.completeCalls[0];
-    expect(call.system).toContain("Предимство на кръстовище"); // material
+    // A CLEARED material. This assertion used to name the fixture's concept
+    // summary; retrieval now filters candidates through the classroom's
+    // clearance gate, and `concepts.json` has no status field, so no concept
+    // summary reaches a prompt unless its exact bytes are pinned.
+    expect(call.system).toContain("Кой има предимство на нерегулирано кръстовище?");
+    expect(call.system).not.toContain(CONCEPT_PRIORITY.summaryBg); // withheld
     expect(call.system).toContain("[ЗДвП чл. 47]"); // its lawRef marker
     expect(call.messages.at(-1)).toEqual({
       role: "user",
@@ -229,7 +235,7 @@ describe("askTutor — follow-up grounding (doc 81 D2)", () => {
 
     const system = model.completeCalls[0].system;
     expect(system).not.toContain("(няма намерени материали по този въпрос)");
-    expect(system).toContain("Предимство на кръстовище");
+    expect(system).toContain("Кой има предимство на нерегулирано кръстовище?");
     expect(result.limited).toBe(false);
   });
 

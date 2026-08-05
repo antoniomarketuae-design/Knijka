@@ -179,14 +179,33 @@ export function scoreRubric(
   }
 
   // -- Par time: informational line only (doc 76 §6).
+  //
+  // B15 (2026-08-04): the comparison runs on DRIVING time, not clock time.
+  // `parTimeSec` never touched a star and still does not — but the line it
+  // prints is read, and telling a student who waited forty seconds for a real
+  // gap at a give-way line that he was over the guideline is telling him the
+  // correct thing was the slow thing. Waiting is not the drill's clock running;
+  // it IS the drill. `yieldWaitSec` is the engine's measure of the seconds he
+  // spent lawfully stationary at a yield (finish.ts `stepYieldWait`) and it
+  // comes out of the comparison. Absent (server-rebuilt results, curriculum
+  // lessons, any drive with no wait) ⇒ 0 ⇒ byte-identical to what shipped.
   if (rubric.parTimeSec !== undefined) {
-    const over = result.durationSec > rubric.parTimeSec;
+    const waitSec = Math.max(0, Math.min(result.yieldWaitSec ?? 0, result.durationSec));
+    const drivingSec = result.durationSec - waitSec;
+    const waitRounded = Math.round(waitSec);
+    const over = drivingSec > rubric.parTimeSec;
+    // Only spoken when it actually moved the reading — a 1 s twitch at a red
+    // does not need a sentence, and THEO-4 asks for explanation, not noise.
+    const waitNote =
+      waitRounded > 0
+        ? ` (${waitRounded} с чакане на предимство не се броят — изчакването е част от задачата)`
+        : "";
     breakdownBg.push({
       id: "parTime",
       labelBg: "Ориентировъчно време",
       detailBg: over
-        ? `${Math.round(result.durationSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с — спокойно, точността е преди скоростта.`
-        : `${Math.round(result.durationSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с.`,
+        ? `${Math.round(drivingSec)} с при ориентир ${Math.round(rubric.parTimeSec)} с${waitNote} — спокойно, точността е преди скоростта.`
+        : `${Math.round(drivingSec)} с — в ориентира от ${Math.round(rubric.parTimeSec)} с${waitNote}.`,
       points: null,
       measured: true,
     });

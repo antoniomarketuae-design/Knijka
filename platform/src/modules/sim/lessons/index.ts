@@ -71,15 +71,25 @@ export {
 } from "./engine";
 
 // Route finish gate (founder 2026-07-28 — the end of the route ends the drive)
+// + the lawful-wait hold that suspends it (B15 — waiting at a give-way line is
+// not idling).
 export {
   createFinishGate,
+  createYieldWait,
   routeFinishZone,
   stepFinishGate,
+  stepYieldWait,
+  yieldReasonAt,
   FINISH_BAY_RADIUS_M,
   FINISH_DWELL_S,
   FINISH_MIN_RADIUS_M,
   FINISH_REST_KMH,
   FINISH_REST_S,
+  YIELD_ROUNDABOUT_APPROACH_M,
+  YIELD_STOP_LINE_REACH_M,
+  YIELD_WAIT_MAX_S,
+  type YieldReason,
+  type YieldWaitContext,
 } from "./finish";
 
 // Repeat-penalty escalation (A9 — pure, shared by client fold + server grading)
@@ -125,6 +135,24 @@ export {
   type AdvisorPrompt,
   type GlancePingPhase,
   type GlancePingsState,
+} from "./advisor";
+
+// B15-VOICE — the instructor's voice for a lawful wait (requirement zero, doc
+// 64 THEO-4): the minute the student waits correctly is the minute the product
+// used to say nothing at all. Pure copy + a staged fold; the engine emits it
+// on the `lesson` teach channel, and never on an exam session.
+export {
+  createYieldVoice,
+  stepYieldVoice,
+  yieldWaitAdvisorPrompt,
+  YIELD_VOICE_DEPART_GRACE_S,
+  YIELD_VOICE_EPISODE_GAP_S,
+  YIELD_VOICE_MUTE_CODES,
+  YIELD_VOICE_NAME_S,
+  YIELD_VOICE_SETTLE_S,
+  YIELD_VOICE_VERDICT_S,
+  type YieldVoiceInput,
+  type YieldVoiceStep,
 } from "./advisor";
 
 // Debrief (template v1 — AI tutor seam documented in debrief.ts)
@@ -288,4 +316,6 @@ export type {
   SessionNearMiss,
   SimLessonGamificationEvent,
   TeachMoment,
+  YieldVoiceState,
+  YieldWaitState,
 } from "./types";

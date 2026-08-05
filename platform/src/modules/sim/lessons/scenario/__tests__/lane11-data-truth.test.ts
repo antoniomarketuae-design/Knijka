@@ -283,7 +283,15 @@ describe("T17 — the FOLLOWING drills' leads drive their own arc", () => {
     // this assertion pins the COUNT so a new matchPlayer gap drill cannot be
     // added silently.
     for (const id of Object.keys(BAND_BY_DESIGN)) expect(banded, id).toContain(id);
-    expect(banded.length).toBe(20);
+    // 20 → 19 (B70 / FR-51): `sc-fs-lead`, sc-follow-standstill's queue tail,
+    // left the band. It used to be a PROP — `armDistM: 3`, i.e. a car that
+    // could only ever arm on bumper contact — parked at y = 290 while the
+    // student drove 266 m of empty street to reach it. It is now the car that
+    // ARRIVES at the back of the column under `scheduledCruise` + a
+    // `paceProfile`, so the approach is a following exercise and the count of
+    // banded leads falls by exactly one. This number may only go DOWN for a
+    // reason written next to it.
+    expect(banded.length).toBe(19);
   });
 });
 

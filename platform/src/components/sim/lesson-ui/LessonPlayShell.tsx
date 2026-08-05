@@ -78,6 +78,7 @@ import {
   type LessonResult,
   type LessonSessionState,
   type LessonSpec,
+  type LessonStepResult,
   type MicroQuizQuestion,
   type MistakeDemo,
   type NearMissEvent,
@@ -121,6 +122,7 @@ import { recordSelfPredictionAction } from "@/app/(dashboard)/simulator/calibrat
 import { isResultScreenHeld } from "@/modules/learning/calibration";
 import { AdvisorCard } from "./AdvisorCard";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
+import { HudCloseButton } from "./HudCloseButton";
 import {
   exitFullscreen,
   FULLSCREEN_CHANGE_EVENTS,
@@ -589,7 +591,7 @@ function QuizFrequencySelector({
  * founder named it by name («the instructions too»). `max-w-md` is gone: the
  * card is `w-full` of the column, which is where its width now comes from.
  */
-function BriefingCard({
+export function BriefingCard({
   steps,
   onClose,
 }: {
@@ -611,14 +613,13 @@ function BriefingCard({
     >
       <div className="flex items-center gap-2">
         <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Скрий инструкциите"
-          className="ml-auto rounded-lg px-1.5 text-xs font-bold text-muted hover:text-foreground"
-        >
-          ✕
-        </button>
+        {/* A6, 2026-08-04. This control existed — it just could not be hit. It
+            was `px-1.5 text-xs` with no height of its own: a ~24 × 18 px target
+            on the screen row C2 was closed on the rule that nothing may be
+            under 44 px. It is now the column's ONE close control
+            (HudCloseButton), which paints an 18 px ring and carries a 44 px hit
+            rect it does not paint. */}
+        <HudCloseButton onClick={onClose} labelBg="Скрий инструкциите" />
       </div>
       {/* Capped and scrollable: a five-step briefing on a 390 px-tall landscape
           window is tall enough to reach the instrument band, and a card that
@@ -776,6 +777,7 @@ export function LessonPlayShell({
   onExitToSelect,
   onStartLesson,
   onStartScenario,
+  onDevTelemetry,
 }: {
   lesson: LessonSpec;
   quality: QualityPreset;
@@ -789,6 +791,22 @@ export function LessonPlayShell({
    * the owner compiles and remounts. Absent on curriculum sessions ⇒ no CTA.
    */
   onStartScenario?: (templateId: string, level: ScenarioLevel) => void;
+  /**
+   * DEV DRIVE RIG ONLY (/dev/drive-rig — 404s in production). Read-only tap on
+   * the tick path: the SAME tick the rules saw, plus the step result they
+   * produced, handed to the rig so it can publish per-frame telemetry ALONGSIDE
+   * the fault cards this shell renders.
+   *
+   * WHY IT EXISTS. /dev/gw-shell mounts this shell and shows the cards but
+   * publishes no position and no speed; /dev/ghost-demo publishes telemetry but
+   * mounts a bare LessonScene with no cards. So „was that conviction correct?"
+   * had no answer — you could photograph the CARD or read the car's STATE,
+   * never both (register rows B15, B29). The rule events, the objective chain
+   * and the HUD cards only exist in THIS component, so the tap has to be here.
+   *
+   * Never passed by /simulator: absent ⇒ the tick path is byte-identical.
+   */
+  onDevTelemetry?: (tick: SimTick, step: LessonStepResult) => void;
 }) {
   // Engine state: ref-resident, frame-rate mutations, zero re-renders.
   const [initialSession] = useState(() => createLessonSession(lesson));
@@ -1037,6 +1055,22 @@ export function LessonPlayShell({
   const [briefingOpen, setBriefingOpen] = useState(true);
   const closeBriefing = useCallback(() => setBriefingOpen(false), []);
 
+  // -- A6: DISMISSING THE ADVISOR PROMPT ---------------------------------------
+  //
+  // Founder: „those pop ups … need to be able to be removed when clicked with
+  // the mouse". The advisor card had no control at all — the nearest thing was
+  // „Съветник: изкл." in the ⚙ sheet, which is a different intention (stop
+  // advising me AT ALL) wearing this one's clothes.
+  //
+  // Dismiss is therefore scoped to the PROMPT, not to the mode: the text that
+  // was on screen when he clicked is remembered, and the card returns the
+  // moment the engine has something DIFFERENT to say. That is what makes it
+  // safe against requirement zero — the advisor is a teaching surface, and a
+  // click meaning „I have read this one" must not silently become „never
+  // explain anything to me again". Cleared on every retry with the rest of the
+  // per-run state (`sceneEpoch`), so a fresh run always starts advised.
+  const [advisorDismissed, setAdvisorDismissed] = useState<string | null>(null);
+
   // Armed cabin faults, sampled at the status bar's own cadence. Only the
   // ARMED SET matters, so the key comparison keeps this from re-rendering the
   // shell every 150 ms (the TelltaleEdgePings precedent).
@@ -1169,6 +1203,12 @@ export function LessonPlayShell({
   const [quizFreq, setQuizFreq] = useQuizFrequency();
   const quizFreqRef = useRef<QuizFrequency>(quizFreq);
   const quizBankRef = useRef<MicroQuizQuestion[]>([]);
+  // The capability that came with the bank (audit M-10, closed on this door
+  // 2026-08-04). It is a session token, not an answer — nothing about which
+  // option is correct is in it — so holding it client-side is exactly what the
+  // theory practice page already does with its own. "" until a bank arrives;
+  // the server refuses a submission it does not cover.
+  const quizTicketRef = useRef<string>("");
   const quizTriggerRef = useRef<QuizTriggerState | null>(null);
   const quizStatsRef = useRef<{ total: number; correct: number }>({ total: 0, correct: 0 });
   const [activeQuiz, setActiveQuiz] = useState<TriggeredQuiz | null>(null);
@@ -1183,10 +1223,11 @@ export function LessonPlayShell({
     if (examMode || lesson.mistakeExperience !== undefined) return;
     let cancelled = false;
     void loadMicroQuizBank(lesson.id).then(
-      (bank) => {
+      ({ questions, ticket }) => {
         if (cancelled) return;
-        quizBankRef.current = bank;
-        quizTriggerRef.current = createQuizTriggerState(quizFreqRef.current, bank);
+        quizBankRef.current = questions;
+        quizTicketRef.current = ticket;
+        quizTriggerRef.current = createQuizTriggerState(quizFreqRef.current, questions);
       },
       () => {
         /* bank load failed — leave the trigger null */
@@ -1204,6 +1245,15 @@ export function LessonPlayShell({
       quizTriggerRef.current = { ...quizTriggerRef.current, frequency: quizFreq };
     }
   }, [quizFreq]);
+
+  // The overlay knows nothing about tickets — it asks a question and reports an
+  // answer. This closure carries the drive's capability so the server can bind
+  // the submission to the bank it actually dealt.
+  const handleQuizSubmit = useCallback(
+    (questionId: string, selectedOptionIds: string[]) =>
+      submitMicroQuizAnswer(questionId, selectedOptionIds, quizTicketRef.current),
+    [],
+  );
 
   const handleQuizDone = useCallback((correct: boolean) => {
     quizStatsRef.current = {
@@ -1339,9 +1389,12 @@ export function LessonPlayShell({
     (tick: SimTick) => {
       const prev = sessionRef.current;
       if (prev.phase === "completed" || prev.phase === "aborted") return;
-      const { state, hudEvents, teachMoments, mistakeMoment } = applyTick(prev, tick);
+      const step = applyTick(prev, tick);
+      const { state, hudEvents, teachMoments, mistakeMoment } = step;
       sessionRef.current = state;
       lastTickRef.current = tick;
+      // Dev drive rig: read-only, undefined everywhere but /dev/drive-rig.
+      onDevTelemetry?.(tick, step);
 
       // THEO-3: the targeted wrong action fired — pause into the consequence
       // overlay (one-shot; the functional update keeps an already-open card).
@@ -1397,7 +1450,7 @@ export function LessonPlayShell({
       // finished on this very frame → grade and persist (finalize is guarded).
       if (state.phase === "completed") finalize(state);
     },
-    [push, finalize, activeQuiz, teachQueue, mistakeMode],
+    [push, finalize, activeQuiz, teachQueue, mistakeMode, onDevTelemetry],
   );
 
   // A8/A15 measurement channels — ref-resident like the tick path (no
@@ -1529,6 +1582,10 @@ export function LessonPlayShell({
     // result, and the persisted setting is the only thing allowed to outlive a
     // run.
     setEndSkipped(false);
+    // A6: „скрий съвета" was about ONE prompt in ONE run. A fresh run starts
+    // advised — otherwise the first thing a student loses on a retry is the
+    // coaching they retried in order to get right.
+    setAdvisorDismissed(null);
     // I1: a fresh attempt is a fresh prediction — the gate asks again.
     setCalibrationDone(false);
     setTraceUploaded(false);
@@ -2396,8 +2453,14 @@ export function LessonPlayShell({
           !ended &&
           activeQuiz === null &&
           teachQueue.length === 0 &&
-          snap.advisorPrompt !== null ? (
-            <AdvisorCard prompt={snap.advisorPrompt} />
+          snap.advisorPrompt !== null &&
+          snap.advisorPrompt.textBg !== advisorDismissed ? (
+            <AdvisorCard
+              prompt={snap.advisorPrompt}
+              // A6: the mouse-sized ✕. Scoped to this prompt — see
+              // `advisorDismissed`.
+              onDismiss={() => setAdvisorDismissed(snap.advisorPrompt?.textBg ?? null)}
+            />
           ) : null}
           {/* THE BRIEFING — the authored numbered steps, finally on the glass.
               Roomy only; compact feeds the same list through the queue below,
@@ -2697,7 +2760,7 @@ export function LessonPlayShell({
           <div data-hud-keep="">
             <MicroQuizOverlay
               quiz={activeQuiz}
-              onSubmit={submitMicroQuizAnswer}
+              onSubmit={handleQuizSubmit}
               onDone={handleQuizDone}
             />
           </div>
@@ -2776,6 +2839,14 @@ export function LessonPlayShell({
           // the drive HUD's ghost register would make it unreadable. See the
           // micro-quiz above.
           <div
+            // A2: the handle PlayAreaStyles' hit-area rule needs. The skip
+            // control and the „не показвай автоматично" pill live inside
+            // SessionEndScreen (modules/sim) and measured 28 px and 19 px tall
+            // — both under the 44 px minimum row C2 was closed on. The rule
+            // that grows them is CSS, so it can be written from this lane
+            // against a name this lane owns; naming the element here is the
+            // whole of what that costs.
+            data-hud="end-screen"
             data-hud-keep=""
             className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
           >

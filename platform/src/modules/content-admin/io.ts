@@ -35,6 +35,7 @@ import {
   lawEvidenceFor,
   loadDiffBaseline,
   repoRootFor,
+  sourceEvidenceFor,
   type DiffBaseline,
 } from "./evidence";
 import { hashQuestionContent } from "./hash";
@@ -46,6 +47,7 @@ import {
   stripReviewPrefix,
   validateQuestionsFile,
 } from "./logic";
+import { dispositionOf, emptyQueueTotals, parseQueue } from "./queues";
 import type {
   ApprovalEntry,
   DecisionOutcome,
@@ -130,6 +132,7 @@ function toDto(
 ): FlaggedQuestionDto {
   const explanationClean = stripReviewPrefix(q.explanationBg);
   const lawEvidence = lawEvidenceFor(q.lawRefs);
+  const sourceEvidence = sourceEvidenceFor(q.sourceRefs ?? []);
   return {
     id: q.id,
     topicSlug: topic.slug,
@@ -143,10 +146,16 @@ function toDto(
     explanationClean,
     reviewNote: extractReviewNote(q.explanationBg),
     lawRefs: q.lawRefs.map((l) => ({ act: l.act, ref: l.ref })),
+    sourceRefs: (q.sourceRefs ?? []).map((s) =>
+      s.claimId === undefined
+        ? { sourceId: s.sourceId, ref: s.ref }
+        : { sourceId: s.sourceId, ref: s.ref, claimId: s.claimId },
+    ),
     status: q.status,
     approval: approvalStateOf(q, signature),
     lawEvidence,
-    quotedClaims: checkQuotedClaims(explanationClean, lawEvidence),
+    sourceEvidence,
+    quotedClaims: checkQuotedClaims(explanationClean, lawEvidence, sourceEvidence),
     diff: diffAgainstBaseline(q, baseline),
     contentHash: hashQuestionContent(q),
   };
@@ -158,13 +167,19 @@ interface QueuedRow {
 }
 
 /**
- * The two backlogs, and why there are two.
+ * Walk the whole bank once: count it honestly, and collect the rows of ONE
+ * queue.
  *
- *  - `needs-review` — a person or an audit named a specific problem. Also holds
- *    rows whose signature went STALE (signed once, edited since): the row is
- *    quietly unapproved and has to be re-signed, which the reviewer must see.
- *  - `unsigned` — the 800-odd rows that say `approved` because a generator
- *    wrote it. They are the ones reaching students today on nobody's authority.
+ * The routing is not decided here — `dispositionOf` (./queues) owns it, and it
+ * is total: every row lands in exactly one queue or is human-approved. That
+ * matters because the previous version decided membership inline with a
+ * two-branch expression, and a row whose status matched neither branch was
+ * simply dropped. Twelve `machine-checked` first-aid rows were dropped that
+ * way, silently, from the only screen that can approve them.
+ *
+ * `queueTotals` is filled for EVERY queue on every call, not just the one being
+ * paged, so each tab can state its own size and the sum can be checked against
+ * the bank.
  */
 function collectQueue(
   dir: string,
@@ -184,6 +199,7 @@ function collectQueue(
     unsignedApproved: 0,
     staleSignatures: 0,
     unsignedApprovedBaseline: 0,
+    queueTotals: emptyQueueTotals(),
   };
 
   for (const topic of topics) {
@@ -200,11 +216,10 @@ function collectQueue(
       if (state.kind === "unsigned-claim") census.unsignedApproved += 1;
       if (state.kind === "signature-stale") census.staleSignatures += 1;
 
-      const belongs =
-        queue === "needs-review"
-          ? q.status === "needs-review" || state.kind === "signature-stale"
-          : state.kind === "unsigned-claim";
-      if (!belongs) continue;
+      const disposition = dispositionOf(q.status, state);
+      if (disposition === "human-approved") continue;
+      census.queueTotals[disposition] += 1;
+      if (disposition !== queue) continue;
       rows.push({ question: q, topic });
       inQueue += 1;
     }
@@ -256,7 +271,7 @@ export async function listFlaggedQuestions(
   const topics = readTopics(dir);
   const ledger = readLedger(dir);
   const signatures = indexLedger(ledger);
-  const queue: ReviewQueue = options.queue === "unsigned" ? "unsigned" : "needs-review";
+  const queue: ReviewQueue = parseQueue(options.queue);
   const pageSize = Math.max(1, options.pageSize ?? REVIEW_PAGE_SIZE);
 
   const { rows, census, summaries } = collectQueue(dir, topics, signatures, queue);

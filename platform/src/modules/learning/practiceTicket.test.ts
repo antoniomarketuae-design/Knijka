@@ -184,10 +184,66 @@ describe("submitAnswer — practice session binding", () => {
     warn.mockRestore();
   });
 
-  it("does not gate micro-quiz answers — the sim picks those, not the client", async () => {
-    const result = await submitAnswer(USER, "q-road-1", ["q-road-1-a"], "micro", NOW);
-    expect(result.correct).toBe(true);
+  /**
+   * THIS TEST USED TO ASSERT THE OPPOSITE, and its title said why:
+   * „does not gate micro-quiz answers — the sim picks those, not the client".
+   * Both clauses were false. The sim does not pick: `loadMicroQuizBank` ships
+   * up to 16 questions to the browser and a PURE client-side trigger chooses
+   * among them, so the ids are in the client by design. And ungated meant the
+   * id was checked for TYPE and LENGTH and nothing else, while submitAnswer
+   * returned `correctOptionIds`, the explanation and the citations — for any of
+   * the 1,089 rows in the bank. Same payload as practice, same oracle, one door
+   * along. The belief in this title is the reason nobody looked.
+   */
+  it("gates micro-quiz answers exactly as it gates practice", async () => {
+    vi.stubEnv("PRACTICE_TICKET_REQUIRED", "1");
+
+    await expect(
+      submitAnswer(USER, "q-road-1", ["q-road-1-a"], "micro", NOW),
+    ).rejects.toMatchObject({ reason: "MISSING" });
+
+    const theirTicket = issuePracticeTicket("someone-else", DEALT, NOW);
+    await expect(
+      submitAnswer(USER, "q-road-1", ["q-road-1-a"], "micro", NOW, { ticket: theirTicket }),
+    ).rejects.toMatchObject({ reason: "WRONG_USER" });
+
+    // The oracle itself: an id that was never dealt to this drive.
+    const ticket = issuePracticeTicket(USER, DEALT, NOW);
+    await expect(
+      submitAnswer(USER, "q-sprio-1", ["q-sprio-1-a"], "micro", NOW, { ticket }),
+    ).rejects.toMatchObject({ reason: "QUESTION_NOT_IN_SESSION" });
+
+    expect(store.recordAnswerCalls).toHaveLength(0);
+
+    // …and a question this drive WAS dealt still grades normally.
+    const ok = await submitAnswer(USER, "q-road-1", ["q-road-1-a"], "micro", NOW, { ticket });
+    expect(ok.correct).toBe(true);
     expect(store.recordAnswerCalls).toHaveLength(1);
+  });
+
+  /**
+   * The half the ticket cannot do. Ticket policy is permissive outside
+   * production by design (see isPracticeTicketRequired) — so if the ONLY micro
+   * guard were the ticket, an unsigned first-aid row would still be spoken in
+   * dev, in a script, and on any box whose .env says `0`. Status is a content
+   * question, not a session one, and it refuses everywhere.
+   */
+  it("refuses an unapproved question through micro even WITH a valid ticket", async () => {
+    vi.stubEnv("PRACTICE_TICKET_REQUIRED", "0");
+    // q-prio-2 is `needs-review` in the fixture bank; deal it explicitly.
+    const ticket = issuePracticeTicket(USER, ["q-prio-2"], NOW);
+
+    await expect(
+      submitAnswer(USER, "q-prio-2", ["q-prio-2-a"], "micro", NOW, { ticket }),
+    ).rejects.toThrow(/not approved/i);
+    expect(store.recordAnswerCalls).toHaveLength(0);
+
+    // Practice is unchanged: it deals unreviewed material on purpose.
+    const practiceTicket = issuePracticeTicket(USER, ["q-prio-2"], NOW);
+    const graded = await submitAnswer(USER, "q-prio-2", ["q-prio-2-a"], "practice", NOW, {
+      ticket: practiceTicket,
+    });
+    expect(graded.correctOptionIds.length).toBeGreaterThan(0);
   });
 });
 

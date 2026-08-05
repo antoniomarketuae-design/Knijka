@@ -20,6 +20,7 @@ import {
   IconX,
 } from "@/components/icons";
 import { isSoon, statusBadge } from "@/lib/routeStatus";
+import { TOPBAR_SLIDE_MS, useAutoHideTopbar } from "./autoHideTopbar";
 
 interface NavItem {
   href: string;
@@ -166,6 +167,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const openButtonRef = useRef<HTMLButtonElement>(null);
+  const pathname = usePathname();
+  const topbar = useAutoHideTopbar(pathname);
 
   // Escape closes the drawer; focus moves into it on open, back on close.
   // (Navigation closes it too — every drawer link calls onNavigate.)
@@ -238,10 +241,54 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           /simulator and the founder's 85% (measured 83.7%). `short:h-12`
           spends 48px there instead of 64, which is still 4px of clearance
           around a 44px control, and hands 4.1% of the screen back to the
-          product on every landscape route at once. */}
+          product on every landscape route at once.
+
+          AND ON A QUESTION IT STANDS DOWN ENTIRELY — the second half of row C5.
+          48px was not enough: portrait passes 18 of 18, landscape 14, and all
+          four misses are UNDER 48px, i.e. this bar is the whole remaining gap.
+          The founder ruled on the fix rather than on the number: hide it while
+          a question is up, bring it back on a scroll up or a tap near the top
+          edge. autoHideTopbar.ts holds the conditions, the machine and the
+          reasons; what is here is the two things the DOM has to say.
+
+          FIRST: `fixed` INSTEAD OF `sticky`, WHICH IS WHERE THE 48px COMES
+          FROM. A sticky bar is still an in-flow flex item — translating it
+          would slide a picture of the bar away and hand the page nothing. Out
+          of flow, the content column below starts at y=0 and the question gets
+          the 48px for real. The swap happens in the SAME commit that hides it,
+          once, at arm time; only `transform` is ever animated, so no frame of
+          this has the page reflowing under a moving element.
+
+          SECOND: A FIXED BAR PAYS ITS OWN SAFE-AREA INSETS. `position: fixed`
+          resolves against the viewport, not against <body>'s padded box
+          (globals.css says so in as many words) — the same trap that put the
+          nav drawer's rows 43px inside a landscape notch. So while it is fixed,
+          and only then, the horizontal padding carries the inset itself. */}
       <header
         data-app-topbar
-        className="console console-bottom sticky top-0 z-40 flex h-16 items-center justify-between px-4 backdrop-blur short:h-12 lg:hidden"
+        data-topbar-armed={topbar.armed ? "on" : undefined}
+        data-topbar-hidden={topbar.hidden ? "on" : undefined}
+        // Focus entering the bar brings it back, so a keyboard or switch user
+        // tabbing out of the skip link never lands on a control that is
+        // painted off the top of the screen. Capture, so it fires for the
+        // logo and the hamburger alike without either knowing about it.
+        onFocusCapture={topbar.reveal}
+        style={
+          topbar.armed
+            ? {
+                paddingLeft: "calc(1rem + env(safe-area-inset-left, 0px))",
+                paddingRight: "calc(1rem + env(safe-area-inset-right, 0px))",
+                transitionDuration: `${TOPBAR_SLIDE_MS}ms`,
+              }
+            : undefined
+        }
+        className={`console console-bottom z-40 flex h-16 items-center justify-between px-4 backdrop-blur short:h-12 lg:hidden ${
+          topbar.armed
+            ? `fixed inset-x-0 top-0 transition-transform ease-out motion-reduce:transition-none ${
+                topbar.hidden ? "-translate-y-full" : "translate-y-0"
+              }`
+            : "sticky top-0"
+        }`}
       >
         <Logo />
         <button
@@ -255,12 +302,51 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           // sizes — the smallest violation the harness found anywhere in the
           // app and the one control every screen carries. `min-h-11 min-w-11`
           // states the 44px directly instead of hoping padding adds up to it.
+          //
+          // IT DID NOT SHRINK TO BUY THE 48px EITHER. That was the other option
+          // on the table for row C5 and the founder rejected it by name: this
+          // is the control row C6 was closed on („0 controls under 44px on any
+          // dashboard route"), so the space came from moving the bar, not from
+          // making the one thing on it smaller.
           className="btn-ghost min-h-11 min-w-11 rounded-xl p-2"
         >
           <IconMenu className="h-5 w-5" />
           <span className="visually-hidden">Отвори менюто</span>
         </button>
       </header>
+
+      {/* THE WAY BACK, MADE VISIBLE — „a student who does not know it exists
+          must not feel trapped".
+
+          A lit 3px hairline with a short bright grabber at the top edge, drawn
+          only while the bar is away. It is what a landscape phone shows instead
+          of the bar's own lit bottom lip, and it says „there is chrome up here"
+          without a shrunken control saying it.
+
+          IT IS NOT A BUTTON, AND THAT IS THE POINT. A 3px <button> would be a
+          control under 44px on a dashboard route — the exact row C6 finding the
+          founder refused to pay for space — and a 44px one would be an
+          invisible slab sitting on top of the question. So the affordance is
+          decorative (`aria-hidden`, `pointer-events-none`) and the GESTURE is a
+          passive pointer test over the top 44px, in autoHideTopbar.ts, that
+          neither swallows the tap nor preventDefaults it. Keyboard users do not
+          need it at all: focus entering the bar reveals it.
+
+          AND IT COSTS THE QUESTION NOTHING. <main> carries `short:py-1` — 4px
+          of top padding — so these 3px are drawn inside a gutter that already
+          existed. Zero of the reclaimed 48px goes back, and no element on the
+          page is overlapped by it. */}
+      {topbar.armed && topbar.hidden ? (
+        <div
+          aria-hidden
+          data-topbar-handle
+          className="pointer-events-none fixed inset-x-0 top-0 z-40 h-[3px] bg-gradient-to-b from-hair to-transparent lg:hidden"
+        >
+          {/* 64px of lit telemetry cyan, centred. Measured on the render: at
+              `w-10` it read as a stray pixel on an 852px-wide screen. */}
+          <span className="mx-auto block h-full w-16 rounded-b-full bg-accent-2 shadow-glow-2" />
+        </div>
+      ) : null}
 
       {/* Mobile slide-over.
 

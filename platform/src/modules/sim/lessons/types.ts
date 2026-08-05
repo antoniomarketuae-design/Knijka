@@ -316,6 +316,109 @@ export interface RouteFinishZone {
   terminalRescue?: boolean;
 }
 
+/**
+ * B15 (2026-08-04) — per-session memory of the LAWFUL-WAIT hold that suspends
+ * the finish gates (finish.ts `stepYieldWait`).
+ *
+ * The gates below end a session nobody is driving any more. They could not
+ * tell that apart from a session someone is driving CORRECTLY: waiting at a
+ * give-way line for a gap looks, to a gate that only reads position and speed,
+ * exactly like an abandoned tab. It is the opposite — it is the single most
+ * important thing a learner does at a junction, and the founder was failed for
+ * doing it well after a 40-second wait.
+ */
+export interface YieldWaitState {
+  /** Was the LAST tick a lawful stationary wait? (The gates are frozen on it.) */
+  holding: boolean;
+  /** Session time the current continuous hold began; null when not holding. */
+  sinceSec: number | null;
+  /**
+   * WHY this frame is a lawful wait (finish.ts `yieldReasonAt`), or null when
+   * it is not one. Never graded — the same "measurement channel, not a
+   * verdict" contract `yieldWaitSec` rides.
+   *
+   * REQUIREMENT ZERO (doc 64 THEO-4) is why it is remembered rather than
+   * recomputed at the caller. The hold used to publish only the BOOLEAN, so
+   * every surface downstream — the advisor card, the teach channel — knew that
+   * the student was waiting and could not say what for. The result was the
+   * defect this field exists to close: for the whole minute he waited
+   * correctly at the give-way line the product said nothing at all, and the
+   * first thing it ever said about the priority car was a penalty. A virtual
+   * instructor that explains every decision cannot narrate a duty it cannot
+   * name.
+   */
+  reason: YieldReason | null;
+  /**
+   * Crossings the vehicle is inside the approach zone of WITH a pedestrian on
+   * them (latched from `crossingZoneEntered`, released by `crossingPassed` /
+   * `crossingZoneExited` / a re-entry event that clears the flag). Stopping for
+   * a pedestrian is a yield the tick reports only as an event, so it has to be
+   * remembered across frames like every other zone state in this module.
+   */
+  pedestrianCrossingIds: readonly string[];
+}
+
+/**
+ * Why a frame is a lawful wait — for the instructor's voice, the tests and
+ * telemetry, NEVER for grading. Declared here rather than in finish.ts (which
+ * still re-exports it, so every existing import keeps working) because
+ * `YieldWaitState` above now carries one and types.ts is the leaf of this
+ * folder's import graph.
+ */
+export type YieldReason =
+  | "giveWayLine"
+  | "stopSign"
+  | "redLight"
+  | "pedestrian"
+  | "roundaboutEntry";
+
+/**
+ * B15-VOICE (2026-08-05) — per-session memory of what the instructor has
+ * ALREADY said about the wait in progress, so that saying it is not the same
+ * as saying it again. See advisor.ts `stepYieldVoice`.
+ *
+ * The whole point of this state is the second half of the founder's
+ * constraint: the fix for silence is not a line on every frame. A prompt that
+ * repeats every two seconds is worse than saying nothing, so the voice is
+ * STAGED — one line when the wait begins, one when it has lasted long enough
+ * that the student starts doubting himself, one when he goes — and this is the
+ * memory that keeps each of them to exactly once per wait.
+ */
+export interface YieldVoiceState {
+  /** The wait being narrated; null = no wait is in progress. */
+  reason: YieldReason | null;
+  /** Session time that wait began (matches YieldWaitState.sinceSec). */
+  sinceSec: number;
+  /**
+   * Session time the wait ended; null while it is still running. An episode
+   * that ended only moments ago is still the SAME episode — a creep of one car
+   * length in a queue, or speed noise around the standstill bar, must not
+   * re-open the lecture.
+   */
+  endedAtSec: number | null;
+  /** Staged lines already spoken for THIS episode: 0, 1 (named) or 2 (settled). */
+  spoken: number;
+  /**
+   * A finished wait whose GAP has not been judged yet. The verdict is withheld
+   * for `YIELD_VOICE_VERDICT_S` after the wheels turn, because the honest
+   * evidence is what the rule engine does NEXT: a barged entry convicts within
+   * ~1–3 s of moving into a visible conflict (worldRuntime's
+   * YIELD_CONVICT_SUSTAIN_SEC 0.9 s + YIELD_BRAKE_RESPONSE_MAX_SEC 3.0 s).
+   *
+   * A yield-family fault graded inside the window DROPS this outright: the
+   * graded card owns the moment, and this channel stays quiet rather than
+   * congratulating a student the same screen is penalising.
+   */
+  pending: {
+    reason: YieldReason;
+    /** Seconds he actually stood there. */
+    waitedSec: number;
+    /** When the wheels turned; null = the wait ended but he has not moved yet
+     *  (a light went green and he is still gathering himself). */
+    wentAtSec: number | null;
+  } | null;
+}
+
 /** Per-session memory of the route-finish gate (finish.ts `stepFinishGate`). */
 export interface FinishGateState {
   /** The vehicle has been observed OUTSIDE the zone at least once — you
@@ -753,6 +856,50 @@ export interface LessonSessionState {
    * no way out at all.
    */
   finishRescueGate?: FinishGateState;
+  /**
+   * B15 (additive) — the lawful-wait hold that FREEZES both gates above. See
+   * YieldWaitState and finish.ts `stepYieldWait`. Absent until the first tick
+   * that consults it.
+   */
+  yieldWait?: YieldWaitState;
+  /**
+   * B15 (additive) — total session seconds spent lawfully stationary at a
+   * yield (give-way line, stop sign, red light, pedestrian on a crossing, or
+   * short of a roundabout the route still has to enter).
+   *
+   * Two consumers, and NEITHER of them grades: the finish gates read the live
+   * `yieldWait` above, and the scenario rubric subtracts this total before it
+   * compares the drive against `parTimeSec`, so a student who waits forty
+   * seconds for a real gap is not told he was slow for doing the one thing the
+   * lesson asked of him. Points, pass/fail and stars never see it.
+   */
+  yieldWaitSec?: number;
+  /**
+   * B15-VOICE (additive) — what the instructor has already said about the wait
+   * in progress (advisor.ts `stepYieldVoice`). Absent until the first tick
+   * that consults it; inert on exam sessions, where the advisor is silent by
+   * design and coaching a live yield would be feeding the candidate the
+   * answer.
+   */
+  yieldVoice?: YieldVoiceState;
+  /**
+   * FR-B5-JAM (additive) — the CRASH PIN (finish.ts CRASH_PIN_STUCK_S).
+   *
+   * Armed by a graded COLLISION with the pose it happened at; disarmed the
+   * moment the car leaves CRASH_PIN_RADIUS_M of that pose (it drove away, so
+   * it is not stuck). `stillSinceSec` is the session time the car last came to
+   * a complete standstill inside that radius, or null while it is moving —
+   * frozen, like both finish gates, while the lawful-wait hold is on.
+   *
+   * Absent on every session until the first collision, so no existing drive
+   * can reach it.
+   */
+  crashPin?: {
+    atSec: number;
+    x: number;
+    y: number;
+    stillSinceSec: number | null;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -816,6 +963,14 @@ export interface LessonResult {
   /** The repeat mistakes that graded harder — debrief shows „повторна ×1.5". */
   escalations: EscalatedMistake[];
   durationSec: number;
+  /**
+   * B15 (additive): of `durationSec`, how many seconds were spent lawfully
+   * STATIONARY at a yield — see LessonSessionState.yieldWaitSec. Read by the
+   * scenario rubric's informational par-time line and by nothing else; absent
+   * on server-rebuilt results (wire.ts times the drive by wall clock), which
+   * leaves that line exactly as it shipped.
+   */
+  yieldWaitSec?: number;
   /**
    * A15 (additive): positions of the scored events for the end-screen mistake
    * map, paired to summary.mistakes/commendations by (kind, code, t). Absent

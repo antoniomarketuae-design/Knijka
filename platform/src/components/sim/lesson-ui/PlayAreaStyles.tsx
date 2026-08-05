@@ -321,6 +321,89 @@ export function PlayAreaStyles() {
       }
 
       /* ------------------------------------------------------------------
+         ROW A6 — EVERY CLOSE CONTROL IS 44 px, AND NONE OF THEM IS 44 px WIDE.
+
+         Founder, verbatim: „those pop ups … need to be able to be removed when
+         clicked with the mouse … complete rework". A control he cannot hit is
+         the same defect as a control that is not there, and the register closed
+         row C2 on 44 px as the number.
+
+         WHY IT CANNOT SIMPLY BE «h-11 w-11». The notification column is
+         «min(15rem, 36vw)» (notifyColumn.ts). On the founder's 393 px portrait
+         phone that is **141 px** — a 44 px painted button would be 31 % of the
+         column's whole width, on the screen whose review thread is „half of it
+         is furniture". So this is row C2's own answer, generalised: the ring
+         stays 18 px and an unpainted ::before carries the hit rect.
+
+         CENTRED, not inset. C2's rule stretches «left: 0; right: 0» because it
+         grows wide-but-short pills. These are 18 px SQUARES, so both axes are
+         short, and a rect centred on the glyph is the only shape that is 44 px
+         in both without depending on the glyph's own box.
+
+         BOTH GRAMMARS, unlike C2. C2 is «[data-sim-compact="on"]» because a
+         thumb is what 44 px is about. This row is not about a thumb — it is a
+         MOUSE user's sentence — and the mouse case is the roomy one, so the
+         rule is unscoped. Nothing is painted either way, so the desktop pays
+         nothing for it.
+
+         ORDERING IS LOAD-BEARING. «z-index» lifts the hit rect above the
+         SIBLING card that follows it in the column (cards are 6 px apart and
+         the rects are 44 px tall, so consecutive controls DO overlap). Without
+         it the later card's rect wins in the overlap and the founder's click
+         lands on the wrong ✕ — the „I clicked it and the wrong one closed" bug,
+         which is worse than no control at all. Verified by measurement, not by
+         reasoning: «popup-close.test.ts» + the rendered click captures.
+         ------------------------------------------------------------------ */
+      [data-hud-close] {
+        position: relative;
+        z-index: 1;
+      }
+      [data-hud-close]::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 2.75rem;
+        height: 2.75rem;
+        transform: translate(-50%, -50%);
+      }
+
+      /* …AND THE SAME ON THE END-OF-LESSON SCREEN — ROW A2.
+
+         His item 2 asks for three things: Space skips the debrief, the screen
+         SAYS so, and a control turns the popup off for good. All three are
+         built (SessionEndScreen, doc 86 L15) — and two of the three were the
+         smallest controls in the product: «Пропусни разбора» measured 28 px
+         tall and the «Не показвай автоматично» pill 19 px. „It is on the
+         screen" is not the same claim as „he can press it", and A2 is a row
+         about a man trying to get rid of a popup.
+
+         Named by their own SEMANTICS and not by their position in the tree:
+         «aria-keyshortcuts="Space"» is the skip button (it is the attribute
+         that promises the shortcut) and «aria-pressed» is the auto-open pill
+         (it is the attribute that makes it a toggle). A «:nth-child» chain
+         would have been a private detail of a file this lane must not edit —
+         and it would silently stop matching the day a wrapper moves, which is
+         the failure mode where a fix reports green and the founder still
+         cannot press the button. These two attributes are load-bearing to what
+         the controls ARE. The debrief's own CTAs are full-size already and are
+         deliberately not matched. Nothing painted here either. */
+      [data-hud="end-screen"] button[aria-keyshortcuts="Space"],
+      [data-hud="end-screen"] button[aria-pressed] {
+        position: relative;
+      }
+      [data-hud="end-screen"] button[aria-keyshortcuts="Space"]::before,
+      [data-hud="end-screen"] button[aria-pressed]::before {
+        content: "";
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 2.75rem;
+        transform: translateY(-50%);
+      }
+
+      /* ------------------------------------------------------------------
          ROW C1 — ONE surface in the top band, not four painted on each other.
 
          The founder's landing frame (doc 87:237) is three surfaces stacked in

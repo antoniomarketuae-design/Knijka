@@ -557,6 +557,16 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //     remaining clips. The arc advance is simply refused when it would put
   //     two bodies inside each other: the previous pose was clear by
   //     induction, so rolling back to it is always safe.
+  //
+  //     FR-B5-FREEZE (doc 87, 2026-08-05): …but ONLY when the step CLOSES on
+  //     that body. Measured from any angle this also caught a car BEHIND the
+  //     actor, and the ambient side of the same clamp (vehicles.ts) caught the
+  //     actor behind IT — so two bodies 3 m apart froze each other for good.
+  //     On `jxg-giveway-v1` that pair came to rest ON the second junction's
+  //     node, in the student's own lane, and the correctly-driven drill ended
+  //     in a 10-point collision with it. Refusing only a CLOSING step keeps the
+  //     „never clip" guarantee exactly (a step that grows the separation cannot
+  //     create an overlap) and lets a boxed-in actor drive out.
   if (env.ambient.length > 0 && agent.s > sBefore) {
     const step = agent.s - sBefore;
     const nx = agent.state.x + agent.state.dirX * step;
@@ -565,11 +575,13 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
       const a = env.ambient[i];
       if (a === agent.state) continue;
       const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
-      if (Math.hypot(a.x - nx, a.y - ny) < sep) {
-        agent.s = sBefore;
-        agent.speed = 0;
-        break;
-      }
+      const dAfter = Math.hypot(a.x - nx, a.y - ny);
+      if (dAfter >= sep) continue;
+      const dBefore = Math.hypot(a.x - agent.state.x, a.y - agent.state.y);
+      if (dAfter >= dBefore) continue; // moving away — never a reason to freeze
+      agent.s = sBefore;
+      agent.speed = 0;
+      break;
     }
   }
 

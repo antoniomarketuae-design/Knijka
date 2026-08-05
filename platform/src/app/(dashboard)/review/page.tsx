@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { listFlaggedQuestions, type ReviewQueue } from "@/modules/content-admin";
+import { listFlaggedQuestions, parseQueue, type ReviewQueue } from "@/modules/content-admin";
 import { requireUser } from "@/modules/auth";
 import { ReviewClient } from "./ReviewClient";
 
@@ -38,7 +38,7 @@ export default async function ReviewPage({
   await requireUser();
 
   const params = await searchParams;
-  const queue: ReviewQueue = params.queue === "unsigned" ? "unsigned" : "needs-review";
+  const queue: ReviewQueue = parseQueue(params.queue);
   const parsedPage = Number.parseInt(params.page ?? "1", 10);
   const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 

@@ -155,7 +155,15 @@ describe("the guard: no question is shown a drill that argues from another law",
     // 53 → 57 on 2026-08-03, all four from the citation wave (see
     // MISSING_DRILLS): q-signs-054 (Т13, ЗДвП чл. 50, ал. 2) and the three
     // заобикаляне questions the scoped ev-overtake allowance now excludes.
-    expect(refused).toBe(57);
+    //
+    // 57 → 63 on 2026-08-05: six markings questions
+    // (q-signali-i-markirovka-013, -014, -018, -030, -053, -058) that used to
+    // law-match sc-ov-solid-line on „ППЗДвП чл. 63". Nothing was found wrong
+    // with those pairings — the question bank's citation pin dropped the
+    // article number from every ref naming an act content/law does not hold,
+    // and ППЗДвП is one, so the shared key is gone. See the long note on the
+    // same count in whyPanel.test.ts: ingesting ППЗДвП restores all six.
+    expect(refused).toBe(63);
   });
 
   it("CANARY: the original defective pairing is caught by the guard, not just by the correction", () => {

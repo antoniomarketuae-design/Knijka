@@ -5,9 +5,10 @@
  * OWN staged lead truck (brakingLeadCar sc-ft-lead, `profile: "truck"` — the
  * large-vehicle actor profile; single truth, imported from the template). The
  * trace gate replays exactly these through the production stack:
- *   - shadow: ZERO violations + CLEAN_DRIVING (a calm ~20 km/h follow behind
- *     the pinned ~17 m gap — about 3 seconds at that speed, the increased
- *     blocked-vision distance the lesson teaches);
+ *   - shadow: ZERO violations + CLEAN_DRIVING — a follow that now VARIES with
+ *     the truck (20 → 13 → 21 → 15 → 20 km/h), because since B72 the truck
+ *     varies too; the headway never drops under the 2.5 s floor
+ *     `lane11-data-truth` pins, against the copy's «поне 3 секунди»;
  *   - „Залепен зад камиона": steady ~48 km/h behind the SAME 17 m grades
  *     EXACTLY FOLLOWING_TOO_CLOSE (~1 s at that speed — with zero forward
  *     vision);
@@ -18,10 +19,14 @@
  * Geometry pinned to content/world/fo-follow-v1.json: a 1+1 straight street on
  * x = 0, right-lane center x = 4.06, spawn fo-spawn-approach (4.06, 15) heading
  * north, 360 m long, limit 50 km/h. The truck paces AHEAD in the SAME lane
- * (matchPlayer, gap pinned); its slam tier is authored out of reach in the
+ * under T17's `scheduledCruise` with B72's `paceProfile` — its own arc, its own
+ * schedule, no player term at all; its slam tier is authored out of reach in the
  * template — deterministic moving traffic whose whole hazard is the sight line
- * it takes away, not a braking drill. The profile is visual+data only: the
- * leadGap detector stays point-based (doc 72 FO-06 "zero grading change").
+ * it takes away, not a braking drill. The two MISTAKE tapes keep pinned clones
+ * of the historical matchPlayer rig (`scFollowTruckStaged`) because a recorded
+ * input tape needs a lead that holds station; only the shadow drives the live
+ * template. The `profile: "truck"` field is visual+data only: the leadGap
+ * detector stays point-based (doc 72 FO-06 "zero grading change").
  */
 
 import type { StagedEventSpec } from "../contracts";
@@ -42,18 +47,45 @@ const X_LANE = 4.06;
 // The correct demonstration (shadow)
 // ---------------------------------------------------------------------------
 
+/**
+ * B72 / FR-53 — THE SHADOW NOW FOLLOWS A TRUCK THAT DOES SOMETHING.
+ *
+ * The old script was three legs of a flat 20 km/h, and it was correct against
+ * the drill as it then stood: the truck held a dead-constant 20.2 km/h for the
+ * whole 360 m, so „following" it was one throttle setting held for 55 seconds
+ * and the gap drifted 22.4 → 25.8 m in all that time. Measured, that is the
+ * founder's «very boring» — and a correct demonstration of a lesson with
+ * nothing in it demonstrates nothing.
+ *
+ * `FT_LEAD_TRUCK.paceProfile` now eases at arc 120 (5.6 → 3.6 m/s) and again
+ * at 235 (5.9 → 4.3), resuming after each, so this script mirrors it ONE
+ * REACTION LATE — which is the whole skill the lesson claims to teach and the
+ * only way a student can drive it, because behind a box truck the ease itself
+ * is the first and only warning. The leg boundaries are the player positions
+ * at which the truck's change becomes visible, not the truck's own arcs.
+ */
 export function scFollowTruckShadowScript(): DriveScript {
   return {
     steps: [
       { kind: "annotation", textBg: "Пред теб се движи камион — той закрива целия обзор напред. Изостани на поне 3 секунди." },
       { kind: "glance", mirror: "rear" },
-      // ~20 km/h behind the pinned ~17 m lead: ~3 s of gap — the increased
-      // blocked-vision distance.
-      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 110]], targetKmh: 20, stopAtEnd: false },
-      { kind: "annotation", textBg: "Виждаш само задната врата на камиона — тези 3 секунди са времето ти за реакция на невидимото." },
-      { kind: "drive", points: [[X_LANE, 110], [X_LANE, 230]], targetKmh: 20, stopAtEnd: false },
+      // Calm ~20 km/h behind the truck's own 20.2 — the handover gap held.
+      { kind: "drive", points: [[X_LANE, 15], [X_LANE, 90]], targetKmh: 20, stopAtEnd: false },
+      { kind: "annotation", textBg: "Стоповете на камиона светнаха — не знаеш защо и няма как да знаеш. Вдигни крака от газта веднага." },
+      // The truck's deep ease (13 km/h at arc 120–160): read it and ease too.
+      { kind: "drive", points: [[X_LANE, 90], [X_LANE, 130]], targetKmh: 13, stopAtEnd: false },
+      { kind: "annotation", textBg: "Тръгна пак — но дистанцията се връща бавно, не с газ. Ти не виждаш пътя, ти виждаш само вратата му." },
+      { kind: "drive", points: [[X_LANE, 130], [X_LANE, 205]], targetKmh: 21, stopAtEnd: false },
+      { kind: "annotation", textBg: "Пак намалява. Всеки път разбираш последен — затова разстоянието се държи предварително, а не се навакса после." },
+      // The second, softer ease (15.5 km/h at arc 235–275).
+      { kind: "drive", points: [[X_LANE, 205], [X_LANE, 245]], targetKmh: 15, stopAtEnd: false },
       { kind: "annotation", textBg: "Не се доближавай, „за да виждаш“ — по-близо значи по-малко видимост и по-малко време." },
-      { kind: "drive", points: [[X_LANE, 230], [X_LANE, 345]], targetKmh: 20 },
+      // Ends at 336, not 345: the truck runs out of carriageway at y = 360 and
+      // stops there, so the last metres of the old script were a run-up onto a
+      // stationary box that pushed the shadow's MINIMUM headway to 2.43 s —
+      // under `lane11-data-truth`'s 2.5 s floor, and under this drill's own
+      // «поне 3 секунди». y = 336 is inside the finish zone (330 ± 12).
+      { kind: "drive", points: [[X_LANE, 245], [X_LANE, 336]], targetKmh: 20 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "Готово: целият участък зад камиона — на дистанция, която връща изгубената видимост." },
     ],

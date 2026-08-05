@@ -1,0 +1,8 @@
+# The fetched originals are pinned in ../sources.json by URL + bytes + sha256,
+# so they are re-fetchable and do not belong in the repo (~18 MB, mostly the
+# ERC layperson PDF). Same rule as content/law/tools/.gitignore.
+*.pdf
+*.html
+*.txt
+*.docx
+!README*

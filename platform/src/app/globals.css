@@ -1,6 +1,40 @@
 @import "tailwindcss";
 
 /* ============================================================
+   @source — THE PIN THAT MAKES THIS FILE COMPILABLE ON THIS BOX.
+
+   Measured 2026-08-04, three runs of the real @tailwindcss/postcss pass over
+   this exact file, same machine, box otherwise idle:
+
+     cwd = platform/                       7.5 s   159,392 B
+     cwd = repo root, NO @source         324.3 s   160,393 B   ← 43x
+     cwd = repo root, @source "../"        8.6 s   160,393 B   ← this line
+
+   Tailwind v4 auto-detects its source set by walking up to the project root.
+   The .git directory is at `E:\AI driver`, not at `platform/`, so with nothing
+   pinned the scan can resolve to the WHOLE REPO — docs/, content/, tools/,
+   spike/, every scratch dir — on a 7200 rpm mechanical disk. 324 s is far past
+   the deadline Turbopack gives its PostCSS loader child, so the child never
+   replies and the endpoint dies with:
+
+     Failed to write app endpoint /dev/<any-route>/page
+     Caused by: [project]/src/app/globals.css [app-client] (css)
+                timeout while receiving message from process
+                deadline has elapsed
+
+   Every app route imports this file through the root layout, so that panic
+   took out EVERY route on the box, on every server — the shared clip rig on
+   :3200 included. Two fix waves lost their „look before you ship" evidence to
+   it and read it as „the route never compiles".
+
+   The pin costs NOTHING in coverage, and that is measured rather than argued:
+   the emitted CSS is byte-identical to the unpinned whole-repo scan (160,393 B
+   both), i.e. nothing outside platform/src was contributing a single utility.
+   Relative to this file, so it is portable to the VPS.
+   ============================================================ */
+@source "../";
+
+/* ============================================================
    `short:` — THE VARIANT THIS APP WAS MISSING, AND THE BUG IT FIXES.
 
    Every breakpoint in Tailwind is a WIDTH. On a phone held sideways that is
