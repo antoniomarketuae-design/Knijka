@@ -74,6 +74,22 @@ export interface DistrictEdge {
    * ⇒ the class decides, i.e. every map written before the tag is unchanged.
    */
   parkingBand?: boolean;
+  /**
+   * WHICH KERB the procedural parked row stands on (doc 87 B50/B53/B54).
+   *
+   * The band itself is symmetric by construction — `builders/roads`
+   * `ribbonCrossSection` mirrors it about the centreline — but the curb pass
+   * that fills it took the right-hand normal and nothing else, so the bay was
+   * DRAWN on both sides and FILLED on one, on every district in the product.
+   * Measured on the PE family: all 16 bodies of the six bayed districts stood
+   * at x = +10.13 and the left band was empty tarmac six streets deep.
+   *
+   * Absent ⇒ `"right"` (byte-identical to every map written before the tag).
+   * Consumed by `traffic/TrafficLayer.parkedSideOf`; the world builder does
+   * not read it — the band's WIDTH is unchanged either way, so no kerb, kerb
+   * collider, pavement, frontage or lane centre moves.
+   */
+  parkingSide?: "left" | "right" | "both";
 }
 
 export interface DistrictIntersection {
@@ -86,6 +102,35 @@ export interface DistrictIntersection {
 
 export type CrossingKind = "signals" | "marked" | "unmarked" | "unknown";
 
+/**
+ * CENTRAL REFUGE ISLAND / MEDIAN NOSE at a crossing (doc 87 B50/B53/B54 — the
+ * остров).
+ *
+ * WHY IT IS A SCHEMA FIELD AND NOT A BUILDING. It was tried as an authored
+ * volume and it cannot work: `builders/cityBuildings.DATA_HEIGHT_MIN_M` is 3 m
+ * and clamps EVERY footprint up to it, so a 0.3 m island renders as a three
+ * metre wall across the road. Nothing else in district-v1 could express a
+ * median, a refuge, a raised table, a staggered or an angled crossing either —
+ * `DistrictCrossing` was `{id,x,y,kind,signalized,edgeId}` — which is why half
+ * the variety brief was undeliverable from the map generators.
+ *
+ * The island is built into the SIDEWALK mesh (`builders/markings`
+ * `buildCrossingFurniture`), which is also the kerb collider, so a car cannot
+ * mount it — the same construction the roundabout central island already uses.
+ * It is centred on the edge's CENTRELINE and it never widens the carriageway,
+ * so no lane centre, kerb, pavement or frontage moves: on a two-lane
+ * perceptual street the lane centres stay at ±4.06 m and a 2.4 m island
+ * (±1.2 m) leaves 2.86 m of clearance to the driven rail.
+ */
+export interface DistrictCrossingIsland {
+  /** Full width across the road, m — centred on the edge centreline. */
+  widthM: number;
+  /** How far the nose reaches BACK along the edge toward the approach, m. */
+  approachM: number;
+  /** How far it reaches PAST the crossing, m. */
+  departM: number;
+}
+
 export interface DistrictCrossing {
   id: string;
   x: number;
@@ -93,6 +138,34 @@ export interface DistrictCrossing {
   kind: CrossingKind;
   signalized: boolean;
   edgeId: string | null;
+  // -- doc 87 B50/B53/B54: the crossing's own FURNITURE. Every field is
+  //    optional and absent ⇒ byte-identical paint, so the 90 committed
+  //    districts are untouched. None of them moves the crossing POINT
+  //    (`x`/`y`), which is the only thing the rule engine's CrossingZoneTracker
+  //    derives its zone from — the graded geometry is invariant by
+  //    construction, not by argument.
+  /** Central refuge island / median nose the crossing is split by. */
+  island?: DistrictCrossingIsland;
+  /**
+   * RAISED TABLE (повдигната пешеходна пътека): the painted ramp band on each
+   * approach, m. PAINT ONLY, and named so on purpose — the road surface is not
+   * displaced vertically, because the ribbon mesh and the ground collider are
+   * built from the same vertices and lifting one without the other is how a car
+   * ends up driving through tarmac. What the student sees is what a Bulgarian
+   * raised crossing actually shows first: the chevron/triangle ramp bands
+   * across both approaches and the plateau's edge lines.
+   */
+  tableRampM?: number;
+  /**
+   * STAGGERED crossing: the far half of the zebra is offset this far ALONG the
+   * edge (signed, m). Left at 0 on every PE district today — a staged walk is
+   * pinned by value in `lessons/scenario/templates-pe*.ts`, so a staggered
+   * paint with an unstaggered walk would put the pedestrian beside her own
+   * zebra. The field exists so the map can express it once the walk can.
+   */
+  staggerM?: number;
+  /** ANGLED crossing: the bars are skewed this far from perpendicular, deg. */
+  skewDeg?: number;
 }
 
 export interface DistrictRoundabout {
@@ -579,6 +652,11 @@ export interface WorldStats {
    *  builders/roundabout.ts on why a token disc over a live carriageway is a
    *  worse answer than none. */
   roundaboutIslands: number;
+  /** Kerbed pedestrian refuge islands / median noses built at crossings
+   *  (doc 87 B50/B53/B54). 0 on every district written before the field. */
+  crossingIslands: number;
+  /** Raised-table ramp bands painted — 2 per table, one per approach. */
+  crossingTableRamps: number;
   /** Registered roundabouts on this district, drawn or refused. */
   roundabouts: number;
   /** Dashes of the circular ring lane divider (0 on single-lane rings — there

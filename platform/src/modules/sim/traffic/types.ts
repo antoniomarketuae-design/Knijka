@@ -37,6 +37,15 @@ export interface DistrictEdge {
   length: number;
   /** Polyline [x, y][] from `from` to `to`, endpoints matching the nodes. */
   geometry: number[][];
+  /**
+   * Which kerb the procedural parked row stands on (doc 87 B50/B53/B54).
+   * Absent ⇒ `"right"`, the pre-tag walk. See `TrafficLayer.parkedSideOf` for
+   * the measurement that made it necessary. `parkingBand: false` still wins.
+   */
+  parkingSide?: "left" | "right" | "both";
+  /** Curbside parking-band opt-in, mirrored from world/types (the curb pass
+   *  reads it through `parkingOptedOut`). */
+  parkingBand?: boolean;
 }
 
 export interface DistrictIntersection {

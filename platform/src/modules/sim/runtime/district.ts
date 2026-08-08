@@ -61,6 +61,11 @@ export interface DistrictEdge {
    * map) = not a motorway — the detectors stay structurally silent.
    */
   motorway?: boolean;
+  /** Curbside parking-band opt-in (doc 87 FR-21) — world/traffic read it. */
+  parkingBand?: boolean;
+  /** Which kerb the procedural parked row stands on; absent ⇒ `"right"`
+   *  (doc 87 B50/B53/B54 — `traffic/TrafficLayer.parkedSideOf`). */
+  parkingSide?: "left" | "right" | "both";
 }
 
 export interface DistrictIntersection {
@@ -73,6 +78,16 @@ export interface DistrictIntersection {
 
 export type CrossingKind = "signals" | "marked" | "unmarked" | "unknown";
 
+/** Central refuge island / median nose at a crossing — mirrors
+ *  world/types.DistrictCrossingIsland. The runtime does not consume it (the
+ *  CrossingZoneTracker derives its zone from `x`/`y` alone); it is typed here
+ *  so the parser passes it through instead of silently dropping it. */
+export interface DistrictCrossingIsland {
+  widthM: number;
+  approachM: number;
+  departM: number;
+}
+
 export interface DistrictCrossing {
   id: string;
   x: number;
@@ -81,6 +96,13 @@ export interface DistrictCrossing {
   signalized: boolean;
   /** Host drivable edge, or null when the crossing sits on an excluded way. */
   edgeId: string | null;
+  // -- doc 87 B50/B53/B54 crossing FURNITURE (mirrors world/types). All
+  //    optional, none of them read by any detector: the graded crossing zone
+  //    is derived from `x`/`y`, which none of these fields touches.
+  island?: DistrictCrossingIsland;
+  tableRampM?: number;
+  staggerM?: number;
+  skewDeg?: number;
 }
 
 export interface DistrictRoundabout {

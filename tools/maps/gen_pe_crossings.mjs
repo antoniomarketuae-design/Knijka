@@ -546,6 +546,116 @@ const KIND_TO_SIGN = { noStopping: "В27", noOvertaking: "В24" };
  * Not varied, and each is a measurement in the header: lane COUNT (lever 4),
  * width at the crossing (lever 3), the centreline (lever 1), junctions (2).
  */
+// ---------------------------------------------------------------------------
+// SEVENTH AXIS — THE CROSSING KIT (doc 87 B50 / B53 / B54)
+//
+// Six axes and the sheet still read as one street. The re-look named two causes
+// and both are measurable, not aesthetic:
+//
+//  1. THE PARKED ROW STOOD ON ONE KERB, ON EVERY STREET IN THE PRODUCT.
+//     `TrafficLayer.computeParkedCars` took the right-hand normal and nothing
+//     else (`const nx = dy; const ny = -dx`), while
+//     `builders/roads.ribbonCrossSection` mirrors the parking band about the
+//     centreline. So the bay was DRAWN on both sides and FILLED on one:
+//     measured on the shipped files, ALL SIXTEEN bodies across the six bayed
+//     PE districts stood at x = +10.13, and the west band was empty tarmac six
+//     streets deep. `parkingSide` (world/types + traffic/TrafficLayer
+//     `parkedSideOf`) is that missing alternation; absent still means "right",
+//     so the other 84 districts are byte-identical.
+//
+//  2. NO MEDIAN, REFUGE ISLAND, RAISED TABLE, STAGGERED OR ANGLED CROSSING WAS
+//     EXPRESSIBLE AT ALL. `DistrictCrossing` was
+//     `{id, x, y, kind, signalized, edgeId}` and `CrossingKind` is
+//     signals|marked|unmarked|unknown — so half the variety brief could not be
+//     authored from here even in principle. And it could NOT be faked with a
+//     building: `cityBuildings.DATA_HEIGHT_MIN_M` clamps every authored volume
+//     up to 3 m, so a 0.3 m island renders as a WALL ACROSS THE ROAD.
+//     `island` / `tableRampM` / `staggerM` / `skewDeg` close that, and
+//     `markings.buildCrossingFurniture` builds them — the kerb into the
+//     SIDEWALK mesh, which is also the collider, so a car cannot mount it.
+//
+// WHY THIS AXIS IS ALLOWED WHERE LEVERS 1-4 WERE NOT. It never touches the
+// graded geometry: the crossing POINT (`x`,`y`) is unmoved, which is the only
+// thing `runtime/zones.CrossingZoneTracker` derives the graded zone from; no
+// edge changes width, class, lane count or centreline, so the driven rail
+// stays at x = 4.0625 and every committed trace still drives it; and the
+// island is centred on the centreline, 1.2 m of half-width at the widest,
+// leaving 2.86 m of clearance to that rail.
+//
+// TWO KITS DELIBERATELY NOT AUTHORED, each with the reason measured on the
+// lesson data rather than argued:
+//   - AN ISLAND ON pe-child-v1. Its hazard is a `ballDartOut` that rolls from
+//     x = −9.73 across the whole carriageway (`templates-pe.CHILD_BALL_PED`,
+//     travelM 20.5). A ball rolling THROUGH a kerbed island is a falsehood the
+//     founder catches on the first play, so pe-child gets the raised table,
+//     which nothing rolls through.
+//   - `staggerM` ON ANY OF THE SEVEN. Every staged walk in this family is
+//     pinned by VALUE in `templates-pe*.ts` (`CURB_X = −9.73`, roadFromM 1.6,
+//     roadToM 17.85). Staggering the PAINT without staggering the WALK puts
+//     the pedestrian beside her own zebra. The field exists so the map can say
+//     it the day the walk can follow; the value stays 0 here, on purpose.
+// ---------------------------------------------------------------------------
+
+/** A crossing island wider than this would reach the driven rail's clearance. */
+const ISLAND_MAX_WIDTH_M = 2.6;
+
+const CROSSING_KITS = {
+  /** No furniture — a plain painted zebra, the family's pre-axis crossing. */
+  bare: {
+    furniture: () => ({}),
+    noteBg: "Пътеката е обикновена, без остров и без повдигане.",
+  },
+  /** ПОВДИГНАТА ПЕШЕХОДНА ПЪТЕКА — the plateau's edge lines plus a band of
+   *  chevron teeth on both approaches. Paint, not displacement (see
+   *  markings.buildCrossingFurniture on why the ribbon is not lifted). */
+  "raised-table": {
+    furniture: () => ({ tableRampM: 3.0 }),
+    noteBg:
+      "Повдигната пешеходна пътека: платното носи маркировка на рампа от двете страни на пътеката — зъбци и напречна линия на площадката.",
+  },
+  /** A shorter, sharper table — a courtyard calming measure. */
+  "raised-table-short": {
+    furniture: () => ({ tableRampM: 2.2 }),
+    noteBg:
+      "Къса повдигната пътека: рампата е стегната, зъбците стоят близо до пътеката, площадката е тясна.",
+  },
+  /** ОСТРОВ — a long central median nose reaching back down the approach.
+   *  This is the kit that puts a kerbed object in the middle of the road for
+   *  tens of metres before the crossing, which is what „the near field is one
+   *  street" was asking for. */
+  "refuge-long-median": {
+    furniture: () => ({ island: { widthM: 2.4, approachM: 34, departM: 8 } }),
+    noteBg:
+      "Осров за пешеходци с дълъг разделителен нос: бордюриран остров разделя платното десетки метри преди пътеката.",
+  },
+  /** ОСТРОВ — a compact refuge, symmetric about the crossing. */
+  "refuge-compact": {
+    furniture: () => ({ island: { widthM: 2.0, approachM: 9, departM: 9 } }),
+    noteBg:
+      "Компактен остров за пешеходци точно на пътеката: пешеходецът може да спре по средата на платното.",
+  },
+  /** ОСТРОВ with a medium nose, on the one-way street. */
+  "refuge-tactile": {
+    furniture: () => ({ island: { widthM: 2.2, approachM: 20, departM: 6 } }),
+    noteBg:
+      "Тактилен остров за пешеходци: бордюриран остров с нос по средата на еднопосочното платно.",
+  },
+  /** ЪГЛОВА ПЪТЕКА — the bars run diagonally across the carriageway. */
+  angled: {
+    furniture: () => ({ skewDeg: 18 }),
+    noteBg: "Пътеката пресича платното под ъгъл — лентите не са перпендикулярни на оста.",
+  },
+  /** An angled crossing ON a short raised table — the two levers together. */
+  "angled-table": {
+    furniture: () => ({ skewDeg: -12, tableRampM: 2.2 }),
+    noteBg:
+      "Повдигната пътека, положена под ъгъл спрямо оста на платното: рампа и наклонени ленти едновременно.",
+  },
+};
+
+/** Kerbside rows: which kerb a banded segment's parked row stands on. */
+const PARKED_SIDES = ["left", "right", "both"];
+
 const CARRIAGEWAYS = {
   /** The street the family has always been: one 16.25 m ribbon, no joint. */
   "plain-two-lane": {
@@ -1117,6 +1227,8 @@ const NEARFIELDS = {
  *   terminus: string,        // doc 87 B50 — what the street runs into (TERMINI)
  *   nearfield: string,       // doc 87 B53 — what stands beside the first 50 m
  *   carriageway: string,     // doc 87 B50 — the width of the asphalt (CARRIAGEWAYS)
+ *   crossingKit: string,     // doc 87 B50/B53/B54 — the crossing FURNITURE (CROSSING_KITS)
+ *   parkedSide: string,      // doc 87 B50/B53/B54 — which kerb the parked row stands on
  * }} params
  */
 export function buildPeCrossingStreet(params) {
@@ -1131,6 +1243,8 @@ export function buildPeCrossingStreet(params) {
     terminus,
     nearfield,
     carriageway,
+    crossingKit,
+    parkedSide,
   } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
@@ -1173,12 +1287,38 @@ export function buildPeCrossingStreet(params) {
         `the near-field pass was refused for)`,
     );
   }
+  if (!CROSSING_KITS[crossingKit]) {
+    errors.push(
+      `crossingKit "${crossingKit}" unknown — pick one of ${Object.keys(CROSSING_KITS).join(", ")} ` +
+        `(doc 87 B50/B53/B54: without its own crossing furniture an instance is another copy ` +
+        `of the SAME PAINTED ZEBRA — the one object all seven of these lessons are actually ` +
+        `about, and the one no earlier axis could reach, because the fields did not exist)`,
+    );
+  }
+  if (!PARKED_SIDES.includes(parkedSide)) {
+    errors.push(
+      `parkedSide "${parkedSide}" unknown — pick one of ${PARKED_SIDES.join(", ")} ` +
+        `(doc 87 B50/B53/B54: the curb pass filled the RIGHT band on every street in the ` +
+        `product — all 16 bodies of this family measured at x = +10.13 — so an instance ` +
+        `without its own side is another copy of the same one-sided street)`,
+    );
+  }
+  const kitIsland = CROSSING_KITS[crossingKit] ? CROSSING_KITS[crossingKit].furniture().island : null;
+  if (kitIsland && kitIsland.widthM > ISLAND_MAX_WIDTH_M) {
+    errors.push(
+      `crossingKit "${crossingKit}" island is ${kitIsland.widthM} m wide — max ` +
+        `${ISLAND_MAX_WIDTH_M} m. Wider and the kerb eats into the clearance of the driven ` +
+        `rail at x = 4.0625, which 21 committed traces sit on. Not a styling choice.`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_pe_crossings params invalid:\n  - ${errors.join("\n  - ")}`);
 
   const road = ROADSCAPES[roadscape];
   const end = TERMINI[terminus];
   const near = NEARFIELDS[nearfield];
   const cw = CARRIAGEWAYS[carriageway];
+  const kit = CROSSING_KITS[crossingKit];
+  const furniture = kit.furniture();
   /** Arterial classes carry the band by class; an explicit tag overrides it. */
   const bandByClass = ["primary", "secondary", "tertiary"].includes(road.roadClass);
   const hasBand = road.parkingBand === null ? bandByClass : road.parkingBand === true;
@@ -1289,6 +1429,11 @@ export function buildPeCrossingStreet(params) {
           ? {}
           : { parkingBand: road.parkingBand }
         : { parkingBand: s.bandM > 0 }),
+      // doc 87 B50/B53/B54 — WHICH KERB the row stands on. Written only on a
+      // segment that actually HAS a band: `parkingSide` on a bandless edge
+      // would be a tag about a row that does not exist. Absent still means
+      // "right" in `TrafficLayer.parkedSideOf`, so this is purely additive.
+      ...(s.id !== "pe-e-street" && s.bandM > 0 ? { parkingSide: parkedSide } : {}),
       // FR-41: a side with NO pavement at all (network.edgeBareVerge) — the
       // industrial canyon's loading wall stands on the kerb, so that side has
       // no footway, no lamp column, no tree and no bus shelter.
@@ -1378,6 +1523,10 @@ export function buildPeCrossingStreet(params) {
       kind: "marked",
       signalized: false,
       edgeId: "pe-e-street",
+      // doc 87 B50/B53/B54 — the CROSSING KIT. Spread last and only when the
+      // kit authors something, so a `bare` crossing serialises byte-identically
+      // to every pe-*.json written before this axis existed.
+      ...furniture,
     },
   ];
 
@@ -1544,6 +1693,16 @@ export function buildPeCrossingStreet(params) {
          *  axis that changes the bottom ~45 % of a cockpit frame. */
         carriageway,
         carriagewayNoteBg: cw.noteBg,
+        /** doc 87 B50/B53/B54 — THE CROSSING ITSELF: refuge island / median
+         *  nose, raised table, angle. The only axis that changes the object
+         *  all seven lessons are actually about, and the one that needed a
+         *  district-v1 schema change before it could exist at all. */
+        crossingKit,
+        crossingKitNoteBg: kit.noteBg,
+        /** WHICH KERB the procedural parked row stands on. Before this the
+         *  answer was `right` on every street in the product: all 16 bodies
+         *  of this family measured at x = +10.13, west band empty. */
+        parkedSide,
         carriagewaySegments: SEGMENTS.map((s) => ({
           id: s.id,
           fromY: r2(s.fromY),
@@ -1936,6 +2095,8 @@ const INSTANCES = [
     terminus: "opens-to-collector",
     nearfield: "arcade-canyon-low",
     carriageway: "bays-from-the-seat",
+    crossingKit: "raised-table",
+    parkedSide: "both",
   },
   {
     districtId: "pe-slow-v1",
@@ -1947,6 +2108,8 @@ const INSTANCES = [
     terminus: "closed-by-block",
     nearfield: "open-forecourt",
     carriageway: "bay-pocket-mid",
+    crossingKit: "refuge-long-median",
+    parkedSide: "left",
   },
   {
     districtId: "pe-rain-v1",
@@ -1958,6 +2121,8 @@ const INSTANCES = [
     terminus: "bends-away-left",
     nearfield: "dock-wall-tight",
     carriageway: "plain-two-lane",
+    crossingKit: "angled",
+    parkedSide: "right",
   },
   {
     districtId: "pe-dart-v1",
@@ -1969,6 +2134,8 @@ const INSTANCES = [
     terminus: "necks-to-service",
     nearfield: "lockup-garages",
     carriageway: "bay-pocket-near",
+    crossingKit: "angled-table",
+    parkedSide: "left",
   },
   {
     districtId: "pe-bus-v1",
@@ -1980,6 +2147,8 @@ const INSTANCES = [
     terminus: "bends-away-right",
     nearfield: "yard-wall-asym",
     carriageway: "bay-pocket-far",
+    crossingKit: "refuge-compact",
+    parkedSide: "both",
   },
   {
     districtId: "pe-child-v1",
@@ -1991,6 +2160,8 @@ const INSTANCES = [
     terminus: "opens-to-green",
     nearfield: "garage-and-backslab",
     carriageway: "bay-pocket-behind-the-seat",
+    crossingKit: "raised-table-short",
+    parkedSide: "right",
   },
   {
     districtId: "pe-cane-v1",
@@ -2002,6 +2173,8 @@ const INSTANCES = [
     terminus: "jogs-and-continues",
     nearfield: "villa-row-setback",
     carriageway: "bay-pocket-oneway",
+    crossingKit: "refuge-tactile",
+    parkedSide: "right",
   },
 ];
 

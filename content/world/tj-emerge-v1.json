@@ -455,29 +455,6 @@
    ]
   },
   {
-   "id": "sw-tj-e-s-r0",
-   "height": 17,
-   "heightSource": "levels",
-   "footprint": [
-    [
-     16.04,
-     -91.44
-    ],
-    [
-     16.04,
-     -70.56
-    ],
-    [
-     37.13,
-     -70.56
-    ],
-    [
-     37.13,
-     -91.44
-    ]
-   ]
-  },
-  {
    "id": "sw-tj-e-s-l0",
    "height": 20.4,
    "heightSource": "levels",

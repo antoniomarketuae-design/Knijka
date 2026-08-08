@@ -57,6 +57,9 @@
    "curbToCurbM": 16.25,
    "carriageway": "bay-pocket-oneway",
    "carriagewayNoteBg": "Джобът се отваря на един метър пред бронята и върви цели тридесет и шест метра: 24,25 м платно, по което НЯМА осева линия — улицата е еднопосочна, цялото платно е твое. Точно това прави пропускането на пешеходеца изцяло твоя отговорност.",
+   "crossingKit": "refuge-tactile",
+   "crossingKitNoteBg": "Тактилен остров за пешеходци: бордюриран остров с нос по средата на еднопосочното платно.",
+   "parkedSide": "right",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -204,7 +207,8 @@
       52
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "right"
    },
    {
     "id": "pe-e-jog",
@@ -270,7 +274,12 @@
    "y": 92,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "island": {
+    "widthM": 2.2,
+    "approachM": 20,
+    "departM": 6
+   }
   }
  ],
  "roundabouts": [],

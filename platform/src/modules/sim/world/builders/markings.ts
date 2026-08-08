@@ -12,6 +12,8 @@ import type { District, DistrictZone } from "../types";
 import {
   BUS_LANE_SEAM_WIDTH_M,
   CENTER_LINE_WIDTH_M,
+  CURB_CHAMFER_M,
+  CURB_FOOT_TINT,
   DASH_GAP_M,
   DASH_LENGTH_M,
   DASH_WIDTH_M,
@@ -25,6 +27,8 @@ import {
   MARKED_CLASSES,
   MARKING_Y,
   paintsZebra,
+  ROAD_Y,
+  SIDEWALK_TOP_Y,
   SOLID_CENTER_LINE_WIDTH_M,
   SOLID_LANE_DIVIDER_WIDTH_M,
   SPEED_GLYPH_DIGIT_GAP_M,
@@ -44,6 +48,7 @@ import {
 import {
   add,
   mul,
+  norm,
   offsetPolyline,
   perpRight,
   pointAlong,
@@ -480,23 +485,63 @@ function paintParkingBay(acc: MeshAccumulator, bay: ParkingBaySpec): number {
   return 3;
 }
 
-/** Zebra crossing: longitudinal bars across the full road width. */
+/** Rotate a unit direction by `deg` (positive = toward the road's right). */
+function rotate(d: Vec2, deg: number): Vec2 {
+  if (deg === 0) return d;
+  const a = (deg * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return [d[0] * c - d[1] * s, d[0] * s + d[1] * c];
+}
+
+/**
+ * Zebra crossing: longitudinal bars across the full road width.
+ *
+ * doc 87 B50/B53/B54 — the bars now answer to the crossing's FURNITURE:
+ *  - `islandHalfW` opens the gap a central refuge stands in (bars that would
+ *    be painted ON the island are refused, not drawn under a kerb);
+ *  - `skewDeg` rotates the whole crossing off perpendicular (an ANGLED
+ *    crossing), layout axis and bar axis together, with the span widened by
+ *    1/cos so the paint still reaches both kerbs;
+ *  - `staggerM` offsets the far half along the road (a STAGGERED crossing).
+ * All three default to 0/undefined, and at those values every emitted vertex
+ * is byte-identical to the pre-furniture painter.
+ */
 function paintZebra(
   acc: MeshAccumulator,
   at: Vec2,
   roadDir: Vec2,
   halfWidth: number,
+  furniture: { islandHalfW?: number; skewDeg?: number; staggerM?: number } = {},
 ): number {
-  const r = perpRight(roadDir);
+  const skew = furniture.skewDeg ?? 0;
+  const islandHalfW = furniture.islandHalfW ?? 0;
+  const stagger = furniture.staggerM ?? 0;
+  const barDir = rotate(roadDir, skew);
+  const r = perpRight(barDir);
   const step = ZEBRA_STRIPE_ACROSS_M + ZEBRA_GAP_M;
-  const span = halfWidth * 2 - 0.5;
+  const span = (halfWidth * 2 - 0.5) / Math.cos((skew * Math.PI) / 180);
   const count = Math.max(2, Math.floor(span / step));
   const start = -((count - 1) * step) / 2;
+  let painted = 0;
   for (let i = 0; i < count; i++) {
     const off = start + i * step;
-    paintQuad(acc, add(at, mul(r, off)), roadDir, ZEBRA_LENGTH_M / 2, ZEBRA_STRIPE_ACROSS_M / 2);
+    // The refuge island: no bar may be painted on the kerbed nose.
+    if (islandHalfW > 0 && Math.abs(off) < islandHalfW + ZEBRA_STRIPE_ACROSS_M / 2) continue;
+    // A STAGGERED crossing walks its far half further along the street; the
+    // near half (right of the centreline, where the pedestrian starts on a
+    // right-hand-drive street) stays where the crossing point is.
+    const along = stagger !== 0 && off < 0 ? mul(roadDir, stagger) : ([0, 0] as Vec2);
+    paintQuad(
+      acc,
+      add(add(at, mul(r, off)), along),
+      barDir,
+      ZEBRA_LENGTH_M / 2,
+      ZEBRA_STRIPE_ACROSS_M / 2,
+    );
+    painted++;
   }
-  return count;
+  return painted;
 }
 
 // ---------------------------------------------------------------------------
@@ -884,7 +929,11 @@ export function buildMarkings(
     if (!eb) continue;
     const proj = projectOntoPolyline(eb.edge.geometry as Vec2[], [crossing.x, crossing.y]);
     if (proj.distance > 25) continue; // data glitch guard
-    markingQuads += paintZebra(acc, proj.point, proj.tangent, eb.halfWidth);
+    markingQuads += paintZebra(acc, proj.point, proj.tangent, eb.halfWidth, {
+      islandHalfW: crossing.island ? crossing.island.widthM / 2 : 0,
+      skewDeg: crossing.skewDeg ?? 0,
+      staggerM: crossing.staggerM ?? 0,
+    });
     zebraCrossings++;
   }
 
@@ -917,4 +966,233 @@ export function buildMarkings(
     speedGlyphQuads,
     giveWayTriangles,
   };
+}
+
+// ---------------------------------------------------------------------------
+// CROSSING FURNITURE — doc 87 B50 / B53 / B54.
+//
+// The register's refusal, in his own words about six consecutive pedestrian
+// lessons: „same map, same engineering, everything same … already 5-6
+// different questions". Six axes of variety had already been authored into
+// tools/maps/gen_pe_crossings.mjs — streetscape, roadscape, terminus,
+// nearfield, carriageway, class — and the sheet still read as one street,
+// because every one of them acts BESIDE the road or PAST the end of the drive.
+//
+// The one thing none of them could touch is THE CROSSING ITSELF, and the
+// reason was structural, not aesthetic: `DistrictCrossing` was
+// `{id, x, y, kind, signalized, edgeId}`. A median, a refuge island, a raised
+// table, a staggered or an angled crossing was not expressible in district-v1
+// AT ALL. Nor could one be faked with a building —
+// `cityBuildings.DATA_HEIGHT_MIN_M` clamps every authored volume up to 3 m, so
+// a 0.3 m island renders as a WALL ACROSS THE ROAD.
+//
+// This pass builds what the new fields describe:
+//   - the REFUGE ISLAND / median nose, as a kerbed prism into the SIDEWALK
+//     mesh — which is also the kerb collider, so a car cannot mount it (the
+//     construction the roundabout central island already uses) — plus the
+//     М-hatch band painted around its foot;
+//   - the RAISED TABLE ramp bands (chevron teeth on both approaches and the
+//     plateau edge lines).
+//
+// WHAT IT DELIBERATELY DOES NOT DO, and why the graded geometry is safe:
+//   - it never moves `crossing.x`/`y`, which is the ONLY thing
+//     `runtime/zones.CrossingZoneTracker` derives the graded zone from;
+//   - it never changes any edge width, lane count or centreline, so every lane
+//     centre (x = ±4.06 on a two-lane perceptual street) is where it was and
+//     every committed trace still drives its own rail. A 2.4 m island (±1.2 m)
+//     leaves 2.86 m between its kerb and the driven rail;
+//   - the table is PAINT, not displacement: the ribbon mesh and the ground
+//     collider come from the same vertices, and lifting one without the other
+//     is how a car drives through tarmac.
+// ---------------------------------------------------------------------------
+
+/** Island kerb chamfer — the sidewalk profile own value. */
+const ISLAND_CHAMFER_M = CURB_CHAMFER_M;
+/** Length of the island tapered nose at each end, m. */
+const ISLAND_NOSE_M = 1.6;
+/** White hatch band painted around the island foot. */
+const ISLAND_HATCH_W_M = 0.35;
+/** Ramp-band chevron tooth: base across the road, length along it. */
+const TABLE_TOOTH_BASE_M = 0.55;
+const TABLE_TOOTH_LEN_M = 0.8;
+/** Gap between ramp-band teeth, m. */
+const TABLE_TOOTH_GAP_M = 0.55;
+
+export interface CrossingFurnitureResult {
+  /** Kerbed refuge islands built into the sidewalk mesh (and its collider). */
+  islands: number;
+  /** Raised-table ramp bands painted (2 per table — one per approach). */
+  tableRamps: number;
+  /** Quads added to the SIDEWALK mesh by the island prisms. */
+  islandQuads: number;
+  /** Quads added to the MARKINGS mesh (hatch + ramp teeth + plateau lines). */
+  furnitureQuads: number;
+}
+
+/** One island footprint ring, district space, CCW: a rectangle tapered at both
+ *  ends so the nose reads as a nose and not as a kerbed box. `s` runs along the
+ *  road (toward the departure side), `t` across it (to the right). */
+function islandRing(at: Vec2, roadDir: Vec2, halfW: number, backM: number, fwdM: number): Vec2[] {
+  const r = perpRight(roadDir);
+  const nose = Math.min(ISLAND_NOSE_M, backM * 0.6, fwdM * 0.6);
+  const p = (s: number, t: number): Vec2 => add(add(at, mul(roadDir, s)), mul(r, t));
+  return [
+    p(-backM, 0),
+    p(-backM + nose, halfW),
+    p(fwdM - nose, halfW),
+    p(fwdM, 0),
+    p(fwdM - nose, -halfW),
+    p(-backM + nose, -halfW),
+  ];
+}
+
+/** Kerbed prism from `ring`: vertical face ROAD_Y→top, 45° chamfer, flat top.
+ *  Emitted into the SIDEWALK accumulator, which is also the kerb collider. */
+function buildIslandPrism(acc: MeshAccumulator, ring: Vec2[]): number {
+  const n = ring.length;
+  const topY = SIDEWALK_TOP_Y;
+  const chamferY = topY - ISLAND_CHAMFER_M;
+  let cx = 0;
+  let cy = 0;
+  for (const p of ring) {
+    cx += p[0];
+    cy += p[1];
+  }
+  cx /= n;
+  cy /= n;
+  let quads = 0;
+  const footIdx: number[] = [];
+  const midIdx: number[] = [];
+  const topIdx: number[] = [];
+  const topFan: number[] = [];
+  const foot: [number, number, number] = [CURB_FOOT_TINT, CURB_FOOT_TINT, CURB_FOOT_TINT];
+  for (let i = 0; i < n; i++) {
+    const p = ring[i] as Vec2;
+    const outward = norm([p[0] - cx, p[1] - cy]);
+    const nOut: [number, number, number] = [outward[0], 0, -outward[1]];
+    const inset: Vec2 = [
+      p[0] - outward[0] * ISLAND_CHAMFER_M,
+      p[1] - outward[1] * ISLAND_CHAMFER_M,
+    ];
+    footIdx.push(acc.vertex(toWorld(p[0], p[1], ROAD_Y), nOut, [0, 0], foot));
+    midIdx.push(acc.vertex(toWorld(p[0], p[1], chamferY), nOut, [0.07, 0]));
+    topIdx.push(acc.vertex(toWorld(inset[0], inset[1], topY), UP, [0.1, 0]));
+    topFan.push(acc.vertex(toWorld(inset[0], inset[1], topY), UP, [inset[0] * 0.2, inset[1] * 0.2]));
+  }
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    acc.quad(footIdx[i]!, footIdx[j]!, midIdx[j]!, midIdx[i]!);
+    acc.quad(midIdx[i]!, midIdx[j]!, topIdx[j]!, topIdx[i]!);
+    quads += 2;
+  }
+  // Flat top as a fan from vertex 0 — the ring is convex by construction.
+  for (let i = 1; i < n - 1; i++) acc.tri(topFan[0]!, topFan[i]!, topFan[i + 1]!);
+  quads += n - 2;
+  return quads;
+}
+
+/** White hatch band hugging the island foot — what a driver reads as „solid
+ *  object ahead" long before the kerb itself resolves. */
+function paintIslandHatch(acc: MeshAccumulator, ring: Vec2[]): number {
+  let quads = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i] as Vec2;
+    const b = ring[(i + 1) % ring.length] as Vec2;
+    const d: Vec2 = [b[0] - a[0], b[1] - a[1]];
+    const l = Math.hypot(d[0], d[1]);
+    if (l < 1e-3) continue;
+    const dir: Vec2 = [d[0] / l, d[1] / l];
+    const mid: Vec2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    // Painted OUTSIDE the kerb line: a quad under an opaque prism is a quad
+    // nobody ever sees.
+    const c = add(mid, mul(perpRight(dir), -ISLAND_HATCH_W_M / 2));
+    paintQuad(acc, c, dir, l / 2, ISLAND_HATCH_W_M / 2);
+    quads++;
+  }
+  return quads;
+}
+
+/** One ramp band of a raised table: the plateau transverse edge line plus a row
+ *  of triangle teeth across the road. `sign` = +1 departure, −1 approach. */
+function paintTableRamp(
+  acc: MeshAccumulator,
+  at: Vec2,
+  roadDir: Vec2,
+  halfWidth: number,
+  rampM: number,
+  sign: 1 | -1,
+): number {
+  const r = perpRight(roadDir);
+  const edge = add(at, mul(roadDir, sign * (ZEBRA_LENGTH_M / 2 + 0.4)));
+  paintQuad(acc, edge, roadDir, STOP_LINE_WIDTH_M / 2, halfWidth - 0.25);
+  let quads = 1;
+  const step = TABLE_TOOTH_BASE_M + TABLE_TOOTH_GAP_M;
+  const span = halfWidth * 2 - 0.5;
+  const count = Math.max(2, Math.floor(span / step));
+  const start = -((count - 1) * step) / 2;
+  const toothLen = Math.min(TABLE_TOOTH_LEN_M, Math.max(0.4, rampM * 0.6));
+  const base = add(edge, mul(roadDir, sign * (rampM - toothLen / 2)));
+  for (let i = 0; i < count; i++) {
+    const c = add(base, mul(r, start + i * step));
+    const tip = add(c, mul(roadDir, -sign * toothLen));
+    const l = add(c, mul(r, -TABLE_TOOTH_BASE_M / 2));
+    const rr = add(c, mul(r, TABLE_TOOTH_BASE_M / 2));
+    const ia = acc.vertex(toWorld(l[0], l[1], MARKING_Y), UP, [0, 0]);
+    const ib = acc.vertex(toWorld(rr[0], rr[1], MARKING_Y), UP, [1, 0]);
+    const ic = acc.vertex(toWorld(tip[0], tip[1], MARKING_Y), UP, [0.5, 1]);
+    // District-CCW winding (mesh.ts) — flipped for the far-side band.
+    if (sign === 1) acc.tri(ia, ib, ic);
+    else acc.tri(ia, ic, ib);
+    quads++;
+  }
+  return quads;
+}
+
+/**
+ * Build every crossing furniture item the district authors. Runs AFTER
+ * buildMarkings and BEFORE the decal pass, so road wear keeps out from under
+ * the new paint exactly as it does for every other marking (decals.ts
+ * MarkingKeepOut reads the markings mesh, which this pass has already grown).
+ *
+ * A district whose crossings carry no furniture fields adds ZERO vertices to
+ * either mesh — the additive contract every builder pass here holds.
+ */
+export function buildCrossingFurniture(
+  district: District,
+  network: RoadNetwork,
+  meshes: { sidewalks: MeshAccumulator; markings: MeshAccumulator },
+): CrossingFurnitureResult {
+  let islands = 0;
+  let tableRamps = 0;
+  let islandQuads = 0;
+  let furnitureQuads = 0;
+  for (const crossing of district.crossings) {
+    if (!crossing.edgeId) continue;
+    const eb = network.edgeById.get(crossing.edgeId);
+    if (!eb) continue;
+    const island = crossing.island;
+    const rampM = crossing.tableRampM ?? 0;
+    if ((!island || island.widthM <= 0) && rampM <= 0) continue;
+    const proj = projectOntoPolyline(eb.edge.geometry as Vec2[], [crossing.x, crossing.y]);
+    if (proj.distance > 25) continue; // same data-glitch guard as the zebra
+    if (island && island.widthM > 0) {
+      const ring = islandRing(
+        proj.point,
+        proj.tangent,
+        island.widthM / 2,
+        Math.max(1, island.approachM),
+        Math.max(1, island.departM),
+      );
+      furnitureQuads += paintIslandHatch(meshes.markings, ring);
+      islandQuads += buildIslandPrism(meshes.sidewalks, ring);
+      islands++;
+    }
+    if (rampM > 0) {
+      const { point, tangent } = proj;
+      furnitureQuads += paintTableRamp(meshes.markings, point, tangent, eb.halfWidth, rampM, -1);
+      furnitureQuads += paintTableRamp(meshes.markings, point, tangent, eb.halfWidth, rampM, 1);
+      tableRamps += 2;
+    }
+  }
+  return { islands, tableRamps, islandQuads, furnitureQuads };
 }

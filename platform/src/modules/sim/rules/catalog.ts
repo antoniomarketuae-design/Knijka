@@ -15,6 +15,27 @@
  * corrective). Like every other string here it is authored, never generated:
  * this map is the grounding input for the post-Alpha LLM debrief (ADR-002 —
  * the LLM may rephrase, never invent).
+ *
+ * `lawRef` AND THE ACTS WE DO NOT HOLD (2026-08-05). Six entries here used to
+ * name an article of ППЗДвП or Наредба № РД-02-21-1 — acts `content/law` holds
+ * not one byte of, so the number was unverifiable BY CONSTRUCTION and no
+ * resolver could ever confirm or deny it. They now name the act and the
+ * SUBJECT, byte-identical to the phrasing the question bank froze for the same
+ * rule („ППЗДвП светлинни сигнали за регулиране на движението"). The ruling is
+ * content/law/README.md's: the rule and the act with no article number beat a
+ * number nobody can check. `modules/sim/__tests__/law-citations.test.ts` runs
+ * the real resolver over every `lawRef` in this module and fails on a relapse.
+ *
+ * ONE KNOWN CONSEQUENCE, recorded so it is not rediscovered as a bug: both
+ * `hazard/feedback.ts:parseHazardLawRef` and `tutor/retrieval.ts:parseCatalogLawRef`
+ * split a citation at the first чл./ал./т./§/№ token, so a subject-only ref
+ * yields `null` — those five entries (RED_LIGHT_CROSSED, STOP_LINE_OVERSHOOT,
+ * YELLOW_LIGHT_NOT_STOPPED, RED_YELLOW_CROSSED, CROSSED_SOLID_LINE) carry no
+ * citation chip on a hazard reveal and no `lawRefs` on a tutor rule candidate.
+ * Nothing ships that way today — 0 of the 8 items in content/hazard/items.json
+ * use those codes — and the fix, when a reveal needs one, is for both twins to
+ * fall back to splitting after a recognised act name, which is exactly the
+ * `{ act: "ППЗДвП", ref: "надлъжна пътна маркировка" }` shape the bank stores.
  */
 
 import {
@@ -81,7 +102,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Пресече стоп-линията на червено. Червеният сигнал означава пълно спиране преди линията — без изключения. Това е една от най-честите причини за тежки катастрофи на кръстовища.",
     correctiveBg:
       "При жълто, което не можеш да минеш безопасно, започни да спираш; на червено спри напълно ПРЕДИ стоп-линията и потегли чак на зелено.",
-    lawRef: "ППЗДвП чл. 31",
+    lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     conceptId: "c-traffic-light-signals",
   },
   STOP_SIGN_NO_FULL_STOP: {
@@ -97,7 +118,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // движещите се по пътя с предимство!" се поставя преди кръстовище на път
     // без предимство." ЗДвП чл. 6, т. 1 makes the sign binding („съобразяват
     // своето поведение… с пътните знаци"), and чл. 50, ал. 1 is the yield half.
-    lawRef: "ЗДвП чл. 6, т. 1; чл. 50, ал. 1; Наредба № РД-02-21-1/23.11.2023 чл. 60, ал. 1",
+    lawRef: "ЗДвП чл. 6, т. 1; чл. 50, ал. 1; Наредба № РД-02-21-1/23.11.2023 правила за поставяне на знак Б2",
     conceptId: "c-give-way-stop-behavior",
   },
   TURN_WITHOUT_INDICATOR: {
@@ -378,7 +399,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Спря на червено с предницата отвъд стоп-линията — върху пешеходната пътека или в устието на кръстовището. Линията показва докъде е твоето място: отвъд нея пречиш на пешеходците и на завиващите.",
     correctiveBg:
       "Започвай спирането по-рано и целѝ спиране на 1–2 метра ПРЕДИ линията — така виждаш и линията, и светофара, без да навлизаш в пътеката.",
-    lawRef: "ППЗДвП чл. 31",
+    lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     conceptId: "c-traffic-light-signals",
   },
   CENTER_LINE_TOUCHED: {
@@ -424,7 +445,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Пресече стоп-линията на жълто, макар че имаше достатъчно разстояние да спреш спокойно. Жълтото не е „по-бледо зелено“ — то забранява навлизането, освен когато безопасното спиране вече е невъзможно.",
     correctiveBg:
       "Щом видиш жълто, решавай веднага: можеш ли да спреш плавно преди линията — спираш. Продължаваш само ако спирането би било рязко и опасно за движещите се зад теб.",
-    lawRef: "ППЗДвП чл. 31",
+    lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     conceptId: "c-traffic-light-signals",
   },
   CONTROLLER_SIGNAL_VIOLATED: {
@@ -446,7 +467,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Навлезе в кръстовището на комбинацията червено + жълто. Тя означава „приготви се“ — зеленото едва предстои, а напречното движение може още да изчиства кръстовището.",
     correctiveBg:
       "На червено + жълто: включи предавка и бъди готов, но потегляй чак когато светне чисто зелено — и след бърз поглед наляво и надясно.",
-    lawRef: "ППЗДвП чл. 31",
+    lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     conceptId: "c-traffic-light-signals",
   },
   // -- B1a Wave-2 detector pack (doc 72 capability 1) -----------------------
@@ -591,7 +612,7 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
       "Пресече изцяло непрекъснатата осева линия и навлезе в насрещната половина на платното. Единичната непрекъсната линия (М1) не се застъпва и не се пресича — тя стои точно там, където насрещното движение или видимостта правят навлизането отсреща опасно.",
     correctiveBg:
       "Плътна линия = стена: остани в своята лента, дори предният да пълзи. Изпреварвай или заобикаляй чак където линията стане прекъсната — а дотогава дръж средата на лентата и дистанция за спокойно следване.",
-    lawRef: "ППЗДвП чл. 63 (М1 — единична непрекъсната линия)",
+    lawRef: "ППЗДвП надлъжна пътна маркировка (М1 — единична непрекъсната линия)",
     conceptId: "c-longitudinal-markings",
   },
   DRIVING_IN_BUS_LANE: {

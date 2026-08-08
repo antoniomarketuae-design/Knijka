@@ -339,6 +339,43 @@ export function parkingOptedOut(edge: DistrictEdge): boolean {
   return (edge as { parkingBand?: unknown }).parkingBand === false;
 }
 
+/**
+ * WHICH KERB THE ROW STANDS ON (doc 87 B50/B53/B54 — the sign error).
+ *
+ * MEASURED, not argued. Until this tag existed the walk below took the
+ * right-hand normal (`nx = dy; ny = -dx`) and nothing else, so EVERY body in
+ * the world stood on the right kerb. On the seven-district PE family that is
+ * literally one number: all 16 bodies of the six bayed districts sat at
+ * **x = +10.13**, six streets deep — while `network.ribbonCrossSection`
+ * mirrors the parking band about the centreline, i.e. the bay is DRAWN on both
+ * sides and FILLED on one. The left band is tarmac nobody ever parks on, in
+ * every district in the product, and it is a large part of why the founder
+ * read six consecutive crossing lessons as one street.
+ *
+ * The tag mirrors `network.BareVergeSide` exactly — same vocabulary, same
+ * per-SIDE-of-one-carriageway meaning, same "absent ⇒ unchanged" contract.
+ * ABSENT ⇒ `"right"`, i.e. every one of the 90 committed districts keeps
+ * byte-identical placement and every pinned census still holds; a map that
+ * wants the other kerb, or both, says so.
+ *
+ * `parkingBand: false` still wins outright (`parkingOptedOut` above): a street
+ * with no lawful band parks nobody on either side.
+ */
+export type ParkedSide = "left" | "right" | "both";
+
+/** Read the per-edge parked-row side. Absent/garbage ⇒ `"right"` (today). */
+export function parkedSideOf(edge: DistrictEdge): ParkedSide {
+  const v = (edge as { parkingSide?: unknown }).parkingSide;
+  return v === "left" || v === "both" ? v : "right";
+}
+
+/** The normal multipliers `parkedSideOf` resolves to. +1 = right of travel. */
+const SIDE_SIGNS: Readonly<Record<ParkedSide, readonly (1 | -1)[]>> = {
+  right: [1],
+  left: [-1],
+  both: [1, -1],
+};
+
 /** `District.zones` kinds that forbid leaving a car at the kerb (ЗДвП чл. 98:
  *  В27 „забранено е спирането" forbids stopping, and therefore parking too).
  *  A body inside one of these spans is a sign the world contradicts. */
@@ -604,6 +641,11 @@ export function computeParkedCars(
     }
 
     const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;
+    // The kerb(s) this street parks on. `right` alone is the pre-tag walk, and
+    // the ORDER matters: the right side is emitted first at every station, so a
+    // `both` street's right-hand row is byte-identical to the same street
+    // tagged `right` (only extra bodies are appended, never re-ordered).
+    const sides = SIDE_SIGNS[parkedSideOf(edge)];
     const stop = total - PARK_END_MARGIN_M;
     let nextAt = PARK_END_MARGIN_M;
     let arc = 0;
@@ -622,24 +664,36 @@ export function computeParkedCars(
       while (nextAt < arc + segLen && nextAt <= stop) {
         const t = nextAt - arc;
         // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick model.
-        const h = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
+        const h0 = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
         const lawful =
           nextAt >= lawfulFrom &&
           nextAt <= lawfulTo &&
           !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M) &&
           !banSpans.some(([a, b]) => nextAt >= a && nextAt <= b);
-        if (h % 5 !== 0 && lawful) {
-          const px = ax + dx * t + nx * offset;
-          const py = ay + dy * t + ny * offset;
-          if (
-            !junctionRadii.keepOut.some((j) => Math.hypot(px - j.x, py - j.y) < j.r) &&
-            !onAnyCarriageway(edges, px, py) &&
-            !clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)
-          ) {
+        if (lawful) {
+          for (const side of sides) {
+            // The left kerb gets its OWN hash, so its gaps, models and paint
+            // are not a mirror image of the right row — a mirrored row reads
+            // as one row seen twice, which is the defect this tag exists for.
+            const h = side === 1 ? h0 : (h0 ^ 0x9e3779b9) >>> 0;
+            if (h % 5 === 0) continue;
+            const px = ax + dx * t + nx * side * offset;
+            const py = ay + dy * t + ny * side * offset;
+            if (
+              junctionRadii.keepOut.some((j) => Math.hypot(px - j.x, py - j.y) < j.r) ||
+              onAnyCarriageway(edges, px, py) ||
+              clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)
+            ) {
+              continue;
+            }
+            // A car at the LEFT kerb of a two-way street is parked against the
+            // oncoming lane's direction of travel, i.e. nose the other way.
+            // On a one-way street both kerbs face the single travel direction.
+            const yaw = Math.atan2(dx, -dy);
             out.push({
               x: px,
               y: py,
-              yaw: Math.atan2(dx, -dy),
+              yaw: side === 1 || edge.oneway ? yaw : yaw + Math.PI,
               model: assignCivilianModel(h),
               seed: h,
             });

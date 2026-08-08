@@ -58,6 +58,9 @@
    "curbToCurbM": 16.25,
    "carriageway": "bay-pocket-far",
    "carriagewayNoteBg": "Тясно платно под колелата и широк джоб чак в далечината: между двадесет и втория и петдесет и осмия метър улицата се разтваря до 24,25 м — това е отбивката пред портала на базата, където спират тежките коли. Най-отдалеченото разширение в групата.",
+   "crossingKit": "refuge-compact",
+   "crossingKitNoteBg": "Компактен остров за пешеходци точно на пътеката: пешеходецът може да спре по средата на платното.",
+   "parkedSide": "both",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -200,7 +203,8 @@
       58
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "both"
    },
    {
     "id": "pe-e-yard",
@@ -245,7 +249,12 @@
    "y": 88,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "island": {
+    "widthM": 2,
+    "approachM": 9,
+    "departM": 9
+   }
   }
  ],
  "roundabouts": [],

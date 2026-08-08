@@ -57,6 +57,9 @@
    "curbToCurbM": 16.25,
    "carriageway": "plain-two-lane",
    "carriagewayNoteBg": "Обикновено двулентово платно: 16,25 м от бордюр до бордюр по цялата отсечка, без джобове и без разширения — платното изглежда еднакво от потеглянето до пътеката.",
+   "crossingKit": "angled",
+   "crossingKitNoteBg": "Пътеката пресича платното под ъгъл — лентите не са перпендикулярни на оста.",
+   "parkedSide": "right",
    "carriagewaySegments": [
     {
      "id": "pe-e-street",
@@ -170,7 +173,8 @@
    "y": 95,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "skewDeg": 18
   }
  ],
  "roundabouts": [],

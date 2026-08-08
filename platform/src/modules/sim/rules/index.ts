@@ -39,6 +39,29 @@ export {
   type ViolationSpec,
 } from "./catalog";
 
+/**
+ * The Наредба № 38 grounding: which clause of приложение № 5, т. 10 each code
+ * is charged under, and — for the ten-point ones — what its detector actually
+ * establishes before it convicts. Exported so the tutor/debrief surfaces can
+ * cite the clause a student was charged under instead of only the number
+ * (THEO-4: never a bare verdict).
+ */
+export {
+  N38_ACT_ID,
+  N38_BASIS,
+  N38_CLAUSE_CLASS,
+  N38_OPASNA_CASES,
+  N38_OPASNA_HEADER,
+  N38_OSNOVNA_DEF,
+  N38_PASS_RULE,
+  N38_REF,
+  N38_UNIT_REF,
+  N38_VTOROSTEPENNA_DEF,
+  type ConflictEvidence,
+  type N38Basis,
+  type N38OpasnaCase,
+} from "./n38";
+
 export { createRuleEngine, reduceTick, type ReduceResult, type RuleEngineState } from "./engine";
 
 export {

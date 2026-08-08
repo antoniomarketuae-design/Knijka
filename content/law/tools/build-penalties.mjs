@@ -61,6 +61,43 @@ const AKT = src(
   "Актовете, с които се установяват нарушенията по този закон, се съставят от длъжностните лица на службите за контрол",
   { paragraphRef: "ал. 1" },
 );
+/**
+ * CORRECTED 2026-08-05. Three of the six entries called for an акт on the
+ * inference „контролни точки се отнемат само с наказателно постановление, значи
+ * по акт". ДВ, бр. 64 от 2025 г. (в сила от 7.09.2025 г.) killed it inside
+ * чл. 186, ал. 1 itself: the same amendment that rewrote the алинея added the
+ * КОНТРОЛНИ ТОЧКИ to the list of data a ФИШ must carry. A фиш therefore takes
+ * points, and чл. 186, ал. 8 closes the loop — an unpaid фиш „се смята за
+ * влязло в сила наказателно постановление", which is exactly what Наредба
+ * № Iз-2539 чл. 3, ал. 1 requires.
+ *
+ * So the фиш/акт test is the one чл. 186, ал. 1 actually states and nothing
+ * else: is лишаване от право provided for THIS offence? Checked against the
+ * corpus, not from memory — чл. 179 contains the word „лишаване" zero times,
+ * and in чл. 183 it appears only in ал. 6 (повторно нарушение по ал. 5, т. 1
+ * или 2), ал. 7 and ал. 8, never in ал. 5 itself.
+ */
+/**
+ * TRIPWIRES. `penalties.json` has no field for these two quotes — they are the
+ * REASONING behind the фиш/акт call, not a figure — so they are cut here purely
+ * so the build fails if the ground moves. `src()` runs `quote()` eagerly and
+ * throws when a locator stops matching, which is the whole contract of this
+ * file. Restore `instrument: "акт"` on the three entries below only if one of
+ * these two throws.
+ */
+const TRIPWIRES = [
+  // The фиш carries контролни точки (added by ДВ, бр. 64 от 2025 г.).
+  src("zdvp", "чл. 186", "за броя контролни точки, които се отнемат.", { paragraphRef: "ал. 1" }),
+  // ...and лишаване enters чл. 183 only at повторно нарушение, i.e. never on a
+  // first offence under ал. 5, т. 1/2 — the two entries corrected below.
+  src(
+    "zdvp",
+    "чл. 183",
+    "Когато нарушението по ал. 5, т. 1 или 2 е повторно, водачът се наказва с глоба в размер 300 лв. и лишаване от право да управлява моторно превозно средство за срок един месец.",
+    { paragraphRef: "ал. 6" },
+  ),
+];
+if (TRIPWIRES.length !== 2) throw new Error("tripwire count changed");
 const CP_LIST = src(
   "naredba-iz-2539",
   "чл. 6",
@@ -120,15 +157,15 @@ const penalties = [
       system: "fine",
       status: "grounded",
       amountBgn: 200,
-      instrument: "акт",
-      instrumentSource: AKT,
+      instrument: "фиш",
+      instrumentSource: FISH,
       source: src("zdvp", "чл. 179", "Наказва се с глоба в размер 200 лв.:", {
         paragraphRef: "ал. 1",
         pointRef: "т. 5",
         contextNeedle: "който не спазва предписанието на пътните знаци, пътната маркировка",
       }),
       noteBg:
-        "Глобата 200 лв. е размерът по чл. 179, ал. 1 (уводното изречение). Отнемането на контролни точки става само с влязло в сила наказателно постановление, т.е. по акт, не с фиш.",
+        "Глобата 200 лв. е размерът по чл. 179, ал. 1 (уводното изречение). Чл. 179 не предвижда лишаване от право да управлява, затова по чл. 186, ал. 1 глобата МОЖЕ да се наложи с фиш. Контролните точки не налагат акт: същият чл. 186, ал. 1 (изм. ДВ, бр. 64 от 2025 г.) изисква фишът да съдържа „за броя контролни точки, които се отнемат“, а неплатеният фиш се смята за влязло в сила наказателно постановление (чл. 186, ал. 8). Акт се съставя, когато нарушителят оспори нарушението или откаже да подпише фиша (чл. 186, ал. 2).",
     },
     controlPoints: {
       system: "controlPoints",
@@ -161,14 +198,15 @@ const penalties = [
       system: "fine",
       status: "grounded",
       amountBgn: 150,
-      instrument: "акт",
-      instrumentSource: AKT,
+      instrument: "фиш",
+      instrumentSource: FISH,
       source: src("zdvp", "чл. 183", "Наказва се с глоба 150 лв. водач, който:", {
         paragraphRef: "ал. 5",
         pointRef: "т. 1",
         contextNeedle: "преминава при сигнал на светофара, който не разрешава преминаването",
       }),
-      noteBg: "Глобата 150 лв. е размерът по чл. 183, ал. 5 (уводното изречение).",
+      noteBg:
+        "Глобата 150 лв. е размерът по чл. 183, ал. 5 (уводното изречение). За нарушението по ал. 5, т. 1 не е предвидено лишаване от право да управлява, затова по чл. 186, ал. 1 глобата може да се наложи с фиш — и фишът носи контролните точки (чл. 186, ал. 1, изм. ДВ, бр. 64 от 2025 г.). Лишаване се появява едва при ПОВТОРНО нарушение (чл. 183, ал. 6: глоба 300 лв. и един месец), а тогава фиш вече е изключен.",
     },
     controlPoints: {
       system: "controlPoints",

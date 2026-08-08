@@ -55,7 +55,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: ти и цялата твоя посока",
     stopBg: "Спира: напречното направление",
     accent: "#3ddc84",
-    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
+    lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "chestOrBack",
@@ -64,7 +64,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: напречното направление",
     stopBg: "Спираш: ти, преди стоп-линията",
     accent: "#ff6a5a",
-    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
+    lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "armRaised",
@@ -73,7 +73,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: никой — това не е „тръгвай“",
     stopBg: "Спират: всички посоки — сменя фазите",
     accent: "#ffb020",
-    lawRef: "ППЗДвП чл. 29, ал. 3",
+    lawRef: "ППЗДвП сигнали на регулировчика",
   },
 ];
 
