@@ -247,7 +247,18 @@ export function buildSpSpeedStreet(params) {
       {
         // The canopy: low and wide, right on the frontage, so it reads from far
         // back as a place rather than as another block.
+        //
+        // B64 (doc 87). „Reads as a place" was the intent and it was not what
+        // shipped: standing at the graded stop point, this and its two
+        // neighbours are three grey extruded boxes, because a `building` is a
+        // footprint plus a height and nothing else. `kind: "busStop"` is the
+        // one word that turns it into the thing the drill's own card asks the
+        // student to imagine — `world/builders/props.ts` parks the shelter kit
+        // (with its lit face) on the pavement in front of this frontage, at the
+        // same pose the derived big-street rule uses. The volume stays: it is
+        // the building the stop belongs to.
         id: "sp-b-stop-canopy",
+        kind: "busStop",
         height: 3.4,
         heightSource: "default",
         footprint: [

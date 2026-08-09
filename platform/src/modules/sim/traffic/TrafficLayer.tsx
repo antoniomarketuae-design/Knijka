@@ -104,6 +104,7 @@ import {
   buildTrafficFleet,
   disposeTrafficFleet,
   DRACO_DECODER_PATH,
+  FLEET,
   FLEET_URLS,
   updateEmergencyStrobe,
 } from "./vehicleFleet";
@@ -339,6 +340,142 @@ export function parkingOptedOut(edge: DistrictEdge): boolean {
   return (edge as { parkingBand?: unknown }).parkingBand === false;
 }
 
+/**
+ * WHICH KERB THE ROW STANDS ON (doc 87 B50/B53/B54 — the sign error).
+ *
+ * MEASURED, not argued. Until this tag existed the walk below took the
+ * right-hand normal (`nx = dy; ny = -dx`) and nothing else, so EVERY body in
+ * the world stood on the right kerb. On the seven-district PE family that is
+ * literally one number: all 16 bodies of the six bayed districts sat at
+ * **x = +10.13**, six streets deep — while `network.ribbonCrossSection`
+ * mirrors the parking band about the centreline, i.e. the bay is DRAWN on both
+ * sides and FILLED on one. The left band is tarmac nobody ever parks on, in
+ * every district in the product, and it is a large part of why the founder
+ * read six consecutive crossing lessons as one street.
+ *
+ * The tag mirrors `network.BareVergeSide` exactly — same vocabulary, same
+ * per-SIDE-of-one-carriageway meaning, same "absent ⇒ unchanged" contract.
+ * ABSENT ⇒ `"right"`, i.e. every one of the 90 committed districts keeps
+ * byte-identical placement and every pinned census still holds; a map that
+ * wants the other kerb, or both, says so.
+ *
+ * `parkingBand: false` still wins outright (`parkingOptedOut` above): a street
+ * with no lawful band parks nobody on either side.
+ */
+export type ParkedSide = "left" | "right" | "both";
+
+/** Read the per-edge parked-row side. Absent/garbage ⇒ `"right"` (today). */
+export function parkedSideOf(edge: DistrictEdge): ParkedSide {
+  const v = (edge as { parkingSide?: unknown }).parkingSide;
+  return v === "left" || v === "both" ? v : "right";
+}
+
+/** The normal multipliers `parkedSideOf` resolves to. +1 = right of travel. */
+const SIDE_SIGNS: Readonly<Record<ParkedSide, readonly (1 | -1)[]>> = {
+  right: [1],
+  left: [-1],
+  both: [1, -1],
+};
+
+/**
+ * THE SAME THREE CARS, IN THE SAME ORDER, ON STREET AFTER STREET
+ * (doc 87 B50/B53/B54 — measured from the driving seat, not reasoned about).
+ *
+ * The placement hash below is `(e * 73856093) ^ (slot * 19349663)`: the EDGE
+ * INDEX inside the district and the SLOT INDEX along it. Nothing in it names
+ * the district. So two maps whose parked segment happens to be the same edge
+ * index — which, on a family of generated streets, is *every* map — get the
+ * same hash, therefore the same `assignCivilianModel` pick and the same paint
+ * seed, in the same order.
+ *
+ * Measured on the shipped PE family before this salt existed, right kerb:
+ *
+ *   pe-cane   m=1 s=654 | m=1 s=35 | m=4 s=133
+ *   pe-bus    m=1 s=654 | m=1 s=35 | m=4 s=133
+ *   pe-child  m=1 s=654 | m=1 s=35
+ *
+ * — and the left kerb was `m=3 s=398 | m=4 s=421` on pe-dart, pe-slow AND
+ * pe-bus. Three consecutive lessons, a red car then a white one then a dark
+ * one, at the same kerb, in the same order. Photographed:
+ * `base__28-pe-cane__y15.png` beside `base__29-pe-bus__y15.png`.
+ *
+ * THE SALT IS ON THE APPEARANCE ONLY, AND THAT IS THE WHOLE POINT. `h` still
+ * decides the 1-in-5 gap skip and therefore WHERE every body stands, so every
+ * committed district keeps byte-identical coordinates, count, yaw and every
+ * pinned census; only which car is standing there changes.
+ * `__tests__/parked-appearance.test.ts` asserts exactly that split — over all
+ * 90 shipped districts, by running the pass twice with the salt present and
+ * absent — rather than asking anyone to trust this comment.
+ */
+function districtParkedSalt(district: TrafficDistrict): number {
+  const id = (district as { meta?: { district?: unknown } }).meta?.district;
+  if (typeof id !== "string" || id.length === 0) return 0;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h = Math.imul(h ^ id.charCodeAt(i), 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/** Avalanche the placement hash with the district salt — appearance only. */
+function parkedLookHash(placementHash: number, salt: number): number {
+  let x = (placementHash ^ salt) >>> 0;
+  x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+  return (x ^ (x >>> 16)) >>> 0;
+}
+
+/**
+ * WHAT KIND OF VEHICLE STANDS AT THIS KERB (doc 87 B50/B53/B54).
+ *
+ * The salt above makes the row a DIFFERENT row on every street. It cannot make
+ * it a different KIND of row: `assignCivilianModel` draws from one pool with
+ * one set of weights, so a freight collector outside a depot gate and a
+ * между-блоково courtyard both get the same mix of hatchbacks and saloons, and
+ * from the driving seat a kerb of hatchbacks looks like a kerb of hatchbacks
+ * wherever it stands.
+ *
+ * A mix is an ALLOWED SET, not new weights, and it is chosen off the same look
+ * hash — so no body moves, none is added or removed, and a street that names no
+ * mix (every district in the product except the PE family) is byte-identical.
+ * The names are the ones a Bulgarian street explains itself with.
+ */
+const PARKED_MIXES: Readonly<Record<string, readonly string[]>> = {
+  /**
+   * Товарна улица пред портал на база — панелен бус, пикап, боксав джип.
+   *
+   * ORDER IS NOT DECORATION HERE. The pick is `look % set.length`, so the
+   * position a model occupies decides which slot gets it — and the slot that
+   * matters is the one nearest the seat. Measured on pe-bus at three
+   * orderings: `[kargo_v, tarpan, kolos]` seated a 4x4 first, and
+   * `[kargo_v, tarpan, kolos, kargo_v]` seated three identical vans, which is
+   * the very defect this whole axis is about. This ordering puts the PANEL VAN
+   * at 18 m — the body whose roofline you cannot mistake for a hatchback — and
+   * the pickups behind it.
+   */
+  freight: ["kolos", "tarpan", "kargo_v"],
+  /** Междублоково / еднопосочна градска — малки градски коли. */
+  compact: ["vela_h3", "pino"],
+  /** Стара улица — комби и седани от предишното поколение, пикап. */
+  veteran: ["dret_90", "corva_sw", "tarpan"],
+};
+
+/** FLEET indices per mix, resolved once (FLEET is a frozen const tuple). */
+const PARKED_MIX_INDICES: Readonly<Record<string, readonly number[]>> = Object.fromEntries(
+  Object.entries(PARKED_MIXES).map(([k, names]) => [
+    k,
+    names.map((n) => (FLEET as readonly string[]).indexOf(n)).filter((i) => i >= 0),
+  ]),
+);
+
+/** Read the per-edge kerb mix. Absent/unknown ⇒ the unbiased parked pool. */
+function parkedMixOf(edge: DistrictEdge): readonly number[] | null {
+  const v = (edge as { parkingMix?: unknown }).parkingMix;
+  if (typeof v !== "string") return null;
+  const idx = PARKED_MIX_INDICES[v];
+  return idx && idx.length > 0 ? idx : null;
+}
+
 /** `District.zones` kinds that forbid leaving a car at the kerb (ЗДвП чл. 98:
  *  В27 „забранено е спирането" forbids stopping, and therefore parking too).
  *  A body inside one of these spans is a sign the world contradicts. */
@@ -555,6 +692,9 @@ export function computeParkedCars(
   const out: ParkedCar[] = [];
   const edges = district.roads?.edges ?? [];
   const junctionRadii = junctionRadiiOf(district);
+  // Appearance only — see districtParkedSalt. Placement is deliberately not
+  // salted, so no committed body moves.
+  const salt = districtParkedSalt(district);
   for (let e = 0; e < edges.length; e++) {
     const edge = edges[e];
     if (edge.roundabout) continue;
@@ -604,52 +744,79 @@ export function computeParkedCars(
     }
 
     const offset = laneWidthM * Math.max(1, edge.lanes) * 0.5 + PARK_BAND_CENTER_M;
+    // The kerb(s) this street parks on. The RIGHT side is walked first and at
+    // phase 0, so a `right` street (and every district written before the tag,
+    // which resolves to `right`) emits the same bodies in the same order with
+    // the same coordinates, models and seeds as the pre-tag pass.
+    const sides = SIDE_SIGNS[parkedSideOf(edge)];
+    const mix = parkedMixOf(edge);
     const stop = total - PARK_END_MARGIN_M;
-    let nextAt = PARK_END_MARGIN_M;
-    let arc = 0;
-    let slot = 0;
-    for (let s = 0; s < geo.length - 1 && nextAt <= stop; s++) {
-      const ax = geo[s][0];
-      const ay = geo[s][1];
-      let dx = geo[s + 1][0] - ax;
-      let dy = geo[s + 1][1] - ay;
-      const segLen = Math.hypot(dx, dy);
-      if (segLen < 1e-3) continue;
-      dx /= segLen;
-      dy /= segLen;
-      const nx = dy; // right-hand normal of the travel direction
-      const ny = -dx;
-      while (nextAt < arc + segLen && nextAt <= stop) {
-        const t = nextAt - arc;
-        // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick model.
-        const h = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
-        const lawful =
-          nextAt >= lawfulFrom &&
-          nextAt <= lawfulTo &&
-          !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M) &&
-          !banSpans.some(([a, b]) => nextAt >= a && nextAt <= b);
-        if (h % 5 !== 0 && lawful) {
-          const px = ax + dx * t + nx * offset;
-          const py = ay + dy * t + ny * offset;
-          if (
-            !junctionRadii.keepOut.some((j) => Math.hypot(px - j.x, py - j.y) < j.r) &&
-            !onAnyCarriageway(edges, px, py) &&
-            !clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)
-          ) {
-            out.push({
-              x: px,
-              y: py,
-              yaw: Math.atan2(dx, -dy),
-              model: assignCivilianModel(h),
-              seed: h,
-            });
-            if (out.length >= PARK_CAP) return out;
+    for (const side of sides) {
+      // A HALF-SLOT PHASE on the left kerb, and it is not a nicety. Sharing the
+      // station list put a left car exactly abreast of a right car at every
+      // station: measured on the first build of this tag, `pe-clear` came out
+      // as four exact facing PAIRS (R11/L11, R18/L18, R24/L24, R31/L31) and
+      // `pe-bus` as two — a corridor of gates, which is a fresh copy of the
+      // "one row seen twice" this tag exists to end. Phased, the two rows
+      // interleave the way a real street's kerbs do.
+      const phase = side === 1 ? 0 : PARK_SPACING_M / 2;
+      let nextAt = PARK_END_MARGIN_M + phase;
+      let arc = 0;
+      let slot = 0;
+      for (let s = 0; s < geo.length - 1 && nextAt <= stop; s++) {
+        const ax = geo[s][0];
+        const ay = geo[s][1];
+        let dx = geo[s + 1][0] - ax;
+        let dy = geo[s + 1][1] - ay;
+        const segLen = Math.hypot(dx, dy);
+        if (segLen < 1e-3) continue;
+        dx /= segLen;
+        dy /= segLen;
+        const nx = dy; // right-hand normal of the travel direction
+        const ny = -dx;
+        while (nextAt < arc + segLen && nextAt <= stop) {
+          const t = nextAt - arc;
+          // Deterministic hash: skip ~1 in 5 slots for natural gaps + pick
+          // model. The left kerb salts it, so its gaps and models are not the
+          // right row's read back at an offset.
+          const h0 = ((e * 73856093) ^ (slot * 19349663)) >>> 0;
+          const h = side === 1 ? h0 : (h0 ^ 0x9e3779b9) >>> 0;
+          const lawful =
+            nextAt >= lawfulFrom &&
+            nextAt <= lawfulTo &&
+            !crossingArcs.some((cs) => Math.abs(nextAt - cs) < PARK_CROSSING_CLEAR_M) &&
+            !banSpans.some(([a, b]) => nextAt >= a && nextAt <= b);
+          if (lawful && h % 5 !== 0) {
+            const px = ax + dx * t + nx * side * offset;
+            const py = ay + dy * t + ny * side * offset;
+            if (
+              !junctionRadii.keepOut.some((j) => Math.hypot(px - j.x, py - j.y) < j.r) &&
+              !onAnyCarriageway(edges, px, py) &&
+              !clearZones.some((z) => Math.hypot(px - z.x, py - z.y) < z.radiusM)
+            ) {
+              // A car at the LEFT kerb of a two-way street is parked against
+              // the oncoming lane's direction of travel, i.e. nose the other
+              // way. On a one-way street both kerbs face the one direction.
+              const yaw = Math.atan2(dx, -dy);
+              // WHICH car stands here — salted with the district's own name so
+              // two maps that share an edge index do not share a row. `h`
+              // (position, gaps, count) is untouched: see districtParkedSalt.
+              const look = parkedLookHash(h, salt);
+              out.push({
+                x: px,
+                y: py,
+                yaw: side === 1 || edge.oneway ? yaw : yaw + Math.PI,
+                model: mix ? mix[look % mix.length] : assignCivilianModel(look),
+                seed: look,
+              });
+              if (out.length >= PARK_CAP) return out;
+            }
           }
+          nextAt += PARK_SPACING_M;
+          slot++;
         }
-        nextAt += PARK_SPACING_M;
-        slot++;
+        arc += segLen;
       }
-      arc += segLen;
     }
   }
   return out;
@@ -692,8 +859,8 @@ function makeBlobTexture(): CanvasTexture {
 // ---------------------------------------------------------------------------
 const BUBBLE_W_M = 3.6;
 const BUBBLE_H_M = 1.9;
-const BUBBLE_TEX_W = 1024;
-const BUBBLE_TEX_H = 540;
+export const BUBBLE_TEX_W = 1024;
+export const BUBBLE_TEX_H = 540;
 /** Bubble base sits this far above the figure's head. */
 const BUBBLE_GAP_M = 0.42;
 /** Distance at which the bubble is drawn at 1:1 world size, m. */
@@ -707,9 +874,61 @@ const BUBBLE_MAX_SCALE = 3.4;
 const BUBBLE_ANFAS_ENTER = 0.55;
 const BUBBLE_ANFAS_EXIT = 0.45;
 
+/** Left+right ink margin inside the card, px of the 1024 px canvas. The
+ *  border stroke is 7 px and the corner radius 34, so 44 keeps a centred line
+ *  clear of the rounded accent frame rather than merely inside the bitmap. */
+export const BUBBLE_PAD_X = 44;
+
+/**
+ * Paint one centred line, SHRUNK TO FIT (doc 87 B41).
+ *
+ * Every line here was a bare `fillText` — centred, no wrap, no measurement —
+ * so a string longer than the card simply ran off both sides. It was not
+ * hypothetical: on 2026-08-09 the law line grew from „ППЗДвП чл. 29, ал. 3;
+ * ЗДвП чл. 7" (32 chars) to „ППЗДвП сигнали на регулировчика; ЗДвП чл. 7"
+ * (43) when the article numbers came off the two acts the corpus does not
+ * hold, and nothing re-rendered the bubble to see it. `controller-bubble.test`
+ * guards the STRINGS with a character budget and says in its own comment that
+ * the honest fix is a `measureText` clamp in the painter. This is it.
+ *
+ * Shrink, never ellipsize: this is the one place in the product where a law
+ * reference is read FROM THE DRIVING SEAT (ADR-002 — retrieved and cited,
+ * never recalled), and „ППЗДвП сигнали на регул…" is a worse failure than a
+ * couple of points of type. The floor is 0.62 of the authored size, below
+ * which the line would stop being legible at BUBBLE_REF_DIST_M and the copy
+ * — not the painter — is what needs fixing; at the floor it clamps with
+ * canvas' own `maxWidth` squeeze so the ink can never leave the card.
+ */
+export const BUBBLE_MIN_FONT_SCALE = 0.62;
+
+function bubbleLine(
+  g: CanvasRenderingContext2D,
+  text: string,
+  weight: number,
+  sizePx: number,
+  y: number,
+  W: number,
+): void {
+  const FONT = '"Segoe UI", system-ui, "Noto Sans", sans-serif';
+  const maxW = W - 2 * BUBBLE_PAD_X;
+  g.font = `${weight} ${sizePx}px ${FONT}`;
+  const measured = g.measureText(text).width;
+  if (measured > maxW) {
+    const scaled = Math.max(BUBBLE_MIN_FONT_SCALE, maxW / measured);
+    g.font = `${weight} ${Math.floor(sizePx * scaled)}px ${FONT}`;
+  }
+  // `maxWidth` is the belt to the shrink's braces — at the floor, or if a
+  // font substitution measures differently from what it rasterises, the
+  // browser squeezes the glyphs instead of letting them overhang.
+  g.fillText(text, W / 2, y, maxW);
+}
+
 /** Paint one posture's caption into the bubble canvas (called only when the
- *  posture actually changes — never per frame). */
-function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbleCopy): void {
+ *  posture actually changes — never per frame). Exported for
+ *  `__tests__/controller-bubble.test.ts`, which drives it against a recording
+ *  2D context — the painter is the thing that can overflow, so the painter is
+ *  the thing the gate has to hold. */
+export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbleCopy): void {
   const g = c.getContext("2d");
   if (!g) return;
   const W = c.width;
@@ -741,23 +960,18 @@ function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbleCopy):
   g.strokeStyle = copy.accent;
   g.stroke();
 
-  const FONT = '"Segoe UI", system-ui, "Noto Sans", sans-serif';
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
   g.fillStyle = copy.accent;
-  g.font = `700 116px ${FONT}`;
-  g.fillText(copy.headlineBg, W / 2, 122);
+  bubbleLine(g, copy.headlineBg, 700, 116, 122, W);
   g.fillStyle = "#dbe5f2";
-  g.font = `600 44px ${FONT}`;
-  g.fillText(copy.poseBg, W / 2, 190);
+  bubbleLine(g, copy.poseBg, 600, 44, 190, W);
   g.fillStyle = "#9ff0c4";
-  g.font = `500 46px ${FONT}`;
-  g.fillText(copy.goBg, W / 2, 268);
+  bubbleLine(g, copy.goBg, 500, 46, 268, W);
   g.fillStyle = "#ffc9c2";
-  g.fillText(copy.stopBg, W / 2, 334);
+  bubbleLine(g, copy.stopBg, 500, 46, 334, W);
   g.fillStyle = "#8ea3bd";
-  g.font = `500 38px ${FONT}`;
-  g.fillText(copy.lawRef, W / 2, 404);
+  bubbleLine(g, copy.lawRef, 500, 38, 404, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the

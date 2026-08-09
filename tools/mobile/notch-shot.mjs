@@ -25,7 +25,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./lib/pw.mjs";
-import { contextOptions, resolveDevices } from "./lib/devices.mjs";
+import { resolveDevices } from "./lib/devices.mjs";
+import { newDeviceContext } from "./lib/insets.mjs";
 import { gotoAuthenticated, signIn } from "./lib/auth.mjs";
 import { ensureHarnessUser } from "./lib/user.mjs";
 
@@ -108,8 +109,11 @@ const summary = {};
 
 for (const id of ["iphone16-landscape", "iphone16-portrait"]) {
   const device = resolveDevices([id])[0];
-  const ctx = await browser.newContext({
-    ...contextOptions(device, { motion: "reduce" }),
+  // Real insets by default — lib/insets.mjs. This probe photographs the notch
+  // band, so measuring it at env(safe-area-inset-*) = 0 was the least
+  // defensible instance of the whole defect.
+  const { context: ctx } = await newDeviceContext(browser, device, {
+    motion: "reduce",
     ...(storageState ? { storageState } : {}),
   });
   const page = await ctx.newPage();

@@ -39,7 +39,7 @@ describe("CONTROLLER_SIGNAL_VIOLATED — the guilty side", () => {
     if (v.kind === "violation") {
       expect(v.severityClass).toBe("opasna");
       expect(v.points).toBe(10);
-      expect(v.lawRef).toBe("ЗДвП чл. 7");
+      expect(v.lawRef).toBe("ЗДвП чл. 6, т. 2; чл. 7, ал. 1");
       expect(v.conceptId).toBe("c-signal-hierarchy");
     }
   });
@@ -105,7 +105,7 @@ describe("catalog entry", () => {
     expect(spec.titleBg).toMatch(/[Ѐ-ӿ]/);
     expect(spec.explanationBg).toMatch(/регулировчик/i);
     expect(spec.correctiveBg).toMatch(/[Ѐ-ӿ]/);
-    expect(spec.lawRef).toBe("ЗДвП чл. 7");
+    expect(spec.lawRef).toBe("ЗДвП чл. 6, т. 2; чл. 7, ал. 1");
     expect(spec.conceptId).toBe("c-signal-hierarchy");
   });
 });

@@ -7,7 +7,12 @@
  * Query params:
  *   ?state=column   the right-edge notification column with all four panels up
  *   ?state=end      the end-of-lesson debrief (A2: Space / the note / the
- *                   „не показвай автоматично" setting)
+ *                   „не показвай автоматично" setting), WITH the manoeuvre
+ *                   rubric mounted — the fourth scale, on the same screen as
+ *                   the наказателни точки headline
+ *   ?state=scales   every OTHER surface that prints a scored number, in one
+ *                   scrollable column, so „which points?" can be photographed
+ *                   instead of argued about (see the block below)
  *   ?compact=on     force the compact (phone) grammar without a coarse pointer
  */
 
@@ -16,6 +21,12 @@ import { useSearchParams } from "next/navigation";
 import { PlayAreaStyles } from "@/components/sim/lesson-ui/PlayAreaStyles";
 import { BriefingCard } from "@/components/sim/lesson-ui/LessonPlayShell";
 import { AdvisorCard } from "@/components/sim/lesson-ui/AdvisorCard";
+import { CalibrationGate } from "@/components/sim/lesson-ui/CalibrationGate";
+import { ExamBriefingCard } from "@/components/sim/lesson-ui/ExamBriefingCard";
+import { ExamModeCard } from "@/components/sim/lesson-ui/ExamModeCard";
+import { LessonCard } from "@/components/sim/lesson-ui/LessonCard";
+import { TeachMomentOverlay } from "@/components/sim/lesson-ui/TeachMomentOverlay";
+import type { LessonEntryView } from "@/components/sim/lesson-ui/types";
 import {
   HudStyles,
   HudToasts,
@@ -32,8 +43,8 @@ import {
   serializeFlag,
   type HudToast,
 } from "@/modules/sim/hud";
-import { buildSessionSummary, makeViolation } from "@/modules/sim/rules";
-import type { LessonResult } from "@/modules/sim/lessons";
+import { buildSessionSummary, makeViolation, pointsBg } from "@/modules/sim/rules";
+import type { LessonResult, LessonSpec, RubricScore, TeachMoment } from "@/modules/sim/lessons";
 
 import { ROOMY_HUD_FLOOR_PX } from "@/components/sim/lesson-ui/immersive";
 
@@ -62,6 +73,172 @@ function seededResult(): LessonResult {
     escalations: [],
     durationSec: 184,
   };
+}
+
+// ---------------------------------------------------------------------------
+// ?state=scales — WHICH POINTS? Every surface that prints a scored number.
+//
+// The founder drove the simulator, met „−10 т." and read it as his DRIVING
+// LICENCE being docked. The result screen was repaired first; the same bare
+// unit was still live on thirteen other surfaces, and the worst of them is the
+// one he meets MINUTES EARLIER in the same drive. His complaint came from
+// looking at a screen, so it has to close on screens: this column mounts the
+// real components with realistic props, in one frame, so the four scales can be
+// read side by side and checked for the OTHER failure — labelling them all
+// „изпитни точки", which is exactly as wrong as labelling none of them.
+// ---------------------------------------------------------------------------
+
+/** His own drive: over the limit in town, first encounter, t = 22 s. */
+const TEACH_SPEEDING: TeachMoment = {
+  code: "SPEEDING_DANGEROUS",
+  scenarioId: null,
+  titleBg: "Превишена скорост",
+  explanationBg:
+    "Превиши разрешената скорост с повече от 10 km/h. Спирачният път расте с квадрата на скоростта — при 68 km/h вместо 50 km/h спираш около 15 метра по-късно.",
+  lawRef: "ЗДвП чл. 21, ал. 1",
+  severity: "opasna",
+  points: 10,
+  t: 22,
+};
+
+/** The manoeuvre rubric — the fourth scale, 0..2 and EARNED. */
+const RIG_RUBRIC: RubricScore = {
+  stars: 2,
+  breakdownBg: [
+    {
+      id: "placement",
+      labelBg: "Точност на паркирането",
+      detailBg: "Приемливо: 0,34 м от центъра, 4° отклонение от линията на мястото.",
+      points: 1,
+      measured: true,
+    },
+    {
+      id: "economy",
+      labelBg: "Икономия на движения",
+      detailBg: "Едно влизане, без корекции.",
+      points: 2,
+      measured: true,
+    },
+    {
+      id: "observation",
+      labelBg: "Наблюдение",
+      detailBg: "Няма записани погледи за тази маневра.",
+      points: null,
+      measured: false,
+    },
+  ],
+};
+
+function rigEntry(over: Partial<LessonEntryView> = {}): LessonEntryView {
+  return {
+    lesson: {
+      id: "rig-exam",
+      order: 7,
+      titleBg: "Изпитен маршрут — градски",
+      descriptionBg: "Официалният формат: 2–4 км, без насочваща линия, без подсказки.",
+      conceptIds: ["c-priority", "c-speed"],
+      objectives: [{}, {}, {}],
+    } as unknown as LessonSpec,
+    unlocked: true,
+    passed: false,
+    attempts: 3,
+    bestScore: 12,
+    ...over,
+  };
+}
+
+function RigSection({ titleBg, children }: { titleBg: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-xl border border-border bg-background/80 p-3">
+      <h2 className="text-[10px] font-black uppercase tracking-widest text-accent">{titleBg}</h2>
+      {children}
+    </section>
+  );
+}
+
+function ScalesGallery({ compact }: { compact: boolean }) {
+  return (
+    <div className="absolute inset-0 z-40 overflow-y-auto bg-background/95 p-3">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-3">
+        <p className="rounded-xl border border-accent/50 bg-accent/10 p-3 text-xs leading-relaxed">
+          <strong>Коя точка?</strong> Четири различни броячи се показват в този
+          продукт: наказателни (изпитни) точки по Наредба № 38, контролни точки по
+          книжката, точки за изпълнение на маневрата (не са закон) и точки от
+          теоретичния изпит. Всяко число тук трябва да носи името на своята скала.
+        </p>
+
+        <RigSection titleBg="1 · Учебен момент — екранът, който вижда пръв (t=22)">
+          {/* Tall enough for the WHOLE card. At 26rem the frame cut the
+              „оценка: Наредба № 38…" chip off the bottom — i.e. the rig hid the
+              exact thing it was built to photograph. */}
+          <div className="relative h-[46rem] overflow-hidden rounded-lg border border-border">
+            <TeachMomentOverlay
+              moment={TEACH_SPEEDING}
+              remaining={0}
+              onAcknowledge={() => undefined}
+            />
+          </div>
+        </RigSection>
+
+        <RigSection titleBg="2 · Учебен момент — компактният лист (телефон), разгънат">
+          <div
+            className="relative h-64 overflow-hidden rounded-lg border border-border"
+            style={{ ["--sim-vh" as string]: "24rem" }}
+          >
+            <TeachMomentOverlay
+              moment={TEACH_SPEEDING}
+              remaining={2}
+              onAcknowledge={() => undefined}
+              compact
+            />
+          </div>
+        </RigSection>
+
+        <RigSection titleBg="3 · Изпитният брифинг — скалата, преди първото число">
+          <ExamBriefingCard
+            variantId="EX-7K2M"
+            variantDescriptionBg="Градски маршрут · дневна светлина · умерен трафик"
+            onStart={() => undefined}
+            onBack={() => undefined}
+          />
+        </RigSection>
+
+        <RigSection titleBg="4 · Входните карти — изпитен режим и урок">
+          <ExamModeCard entry={rigEntry()} prerequisiteTitleBg={null} onOpen={() => undefined} />
+          <LessonCard
+            entry={rigEntry({ bestScore: 4, attempts: 2 })}
+            onStart={() => undefined}
+          />
+        </RigSection>
+
+        <RigSection titleBg="5 · „Позна ли се?“ — двете плочки пред резултата">
+          <CalibrationGate
+            lessonTitleBg="Изпитен маршрут — градски"
+            onSubmit={async () => ({
+              predictedPoints: 6,
+              predictedPass: true,
+              actualPoints: 20,
+              actualPass: false,
+              errorPoints: -14,
+              verdict: "overconfident",
+              verdictAgreed: false,
+              titleBg: "Подценил си грешките си",
+              bodyBg:
+                "Мислеше, че си направил 6, а протоколът записа 20. На пътя това е разликата между „мина ми“ и катастрофа — инструкторът на изпита вижда всичко, което ти пропусна.",
+            })}
+            onResolved={() => undefined}
+          />
+        </RigSection>
+
+        {compact ? null : (
+          <p className="pb-6 text-[10px] text-muted">
+            Резултатният екран и рубриката на маневрата са на ?state=end; тостът в
+            движение е на ?state=column.
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function PopupRigClient() {
@@ -227,6 +404,10 @@ export function PopupRigClient() {
                 onExit={() => undefined}
                 nextLessonTitleBg={null}
                 onNextLesson={null}
+                // THE FOURTH SCALE, ON THE SAME SCREEN AS THE HEADLINE. „1 / 2 т."
+                // sits under „наказателни точки" and is neither — it is the
+                // product's own quality grade, and it runs the other way.
+                rubric={RIG_RUBRIC}
                 onSkip={compact ? null : () => setSkipped(true)}
                 autoOpen={autoOpen}
                 onAutoOpenChange={compact ? null : setAutoOpenPersisted}
@@ -234,6 +415,8 @@ export function PopupRigClient() {
             </div>
           </div>
         ) : null}
+
+        {state === "scales" ? <ScalesGallery compact={compact} /> : null}
 
         {state === "end" && skipped ? (
           <div
@@ -247,7 +430,9 @@ export function PopupRigClient() {
             >
               <span className="text-sm font-black text-warning">Неиздържан</span>
               <span className="text-xs font-bold tabular-nums text-muted">
-                {result.score} нак. точки
+                {/* Same vocabulary as the product; a rig that prints a different
+                    string than the shell is a rig that lies about the shell. */}
+                {pointsBg("exam", result.score)}
               </span>
               <button
                 type="button"

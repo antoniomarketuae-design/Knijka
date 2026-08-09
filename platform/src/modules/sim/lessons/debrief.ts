@@ -25,7 +25,21 @@
  */
 
 import type { LessonSpec } from "../contracts";
-import { VIOLATIONS, type ViolationCode, type ViolationEvent } from "../rules";
+import {
+  EXAM_VS_CONTROL_POINTS_BG,
+  VIOLATIONS,
+  deriveSpeedingBand,
+  examMarkFor,
+  examPointsWordBg,
+  formatEur,
+  instrumentLabelBg,
+  parseSpeedMeasurement,
+  pointsLabelBg,
+  roadConsequenceFor,
+  withEurBg,
+  type ViolationCode,
+  type ViolationEvent,
+} from "../rules";
 import type { LessonResult } from "./types";
 
 export interface DebriefOutput {
@@ -67,6 +81,14 @@ interface MistakeGroup {
   points: number;
   count: number;
   totalPoints: number;
+  /**
+   * The speeding measurement of the WORST event in the group, when the code
+   * carries one (`rules/consequences.ts encodeSpeedMeasurement`). Grouping
+   * collapses „×3" into one line, so the line has to pick a speed — and the
+   * only defensible pick is the fastest, because that is the rung the student
+   * would actually have been charged on. Absent for every other code.
+   */
+  worstSpeedDetail: string | undefined;
 }
 
 const SEVERITY_LABEL: Record<ViolationEvent["severityClass"], string> = {
@@ -100,7 +122,7 @@ export function buildDebrief(
     );
   } else if (result.passed) {
     lines.push(
-      `Урокът „${lesson.titleBg}“ е издържан: ${summary.score.totalPoints} наказателни точки при допустими 9. Точно това иска да види изпитващият.`,
+      `Урокът „${lesson.titleBg}“ е издържан: ${examPointsWordBg(summary.score.totalPoints)} от изпитния лист при допустими 9. Точно това иска да види изпитващият.`,
     );
   } else if (!result.completedAll) {
     lines.push(
@@ -109,8 +131,14 @@ export function buildDebrief(
   } else {
     const reasons: string[] = [];
     if (summary.score.hasDangerous) reasons.push("допусната е опасна грешка");
-    if (summary.score.totalPoints > 9) reasons.push(`${summary.score.totalPoints} т. общо (допустими 9)`);
-    if (summary.score.osnovniPoints > 6) reasons.push(`${summary.score.osnovniPoints} т. от основни грешки (допустими 6)`);
+    // „10 т. общо" was the exact string the founder read as his licence. The
+    // unit rides on the number now, everywhere it is printed.
+    if (summary.score.totalPoints > 9) {
+      reasons.push(`${examPointsWordBg(summary.score.totalPoints)} от изпитния лист (допустими 9)`);
+    }
+    if (summary.score.osnovniPoints > 6) {
+      reasons.push(`${examPointsWordBg(summary.score.osnovniPoints)} от основни грешки (допустими 6)`);
+    }
     lines.push(
       `Урокът „${lesson.titleBg}“ не е издържан по официалните критерии: ${reasons.join("; ")}.`,
     );
@@ -163,12 +191,22 @@ export function buildDebrief(
   if (groups.length > 0) {
     lines.push("");
     lines.push("Най-важните грешки (подредени по тежест):");
+    // Said once, before the first number: which of the three point systems
+    // these points belong to. „10 т." with no unit reads as контролни точки.
+    lines.push(EXAM_VS_CONTROL_POINTS_BG);
+    let anyBlank = false;
     for (const g of groups.slice(0, MAX_MISTAKE_LINES)) {
       const times = g.count > 1 ? ` ×${g.count}` : "";
       const escMult = maxEscalationByCode.get(g.code);
       const escNote = escMult !== undefined ? ` — повторна грешка ×${fmtPoints(escMult)}` : "";
+      // The citation on this line is now the clause the POINTS come from
+      // (Наредба № 38, приложение № 5, т. 10), with the rule that was broken
+      // beside it. They used to be one chip, which is how a limits table ended
+      // up looking like the source of a ten-point exam mark.
+      const mark = codeIsKnown(g.code) ? examMarkFor(g.code as ViolationCode) : null;
+      const basis = mark === null ? g.lawRef : `${mark.citationBg}; правилото: ${g.lawRef}`;
       lines.push(
-        `• ${g.titleBg}${times} — ${g.severityLabel}, ${g.totalPoints} т. (${g.lawRef})${escNote}`,
+        `• ${g.titleBg}${times} — ${g.severityLabel}, ${pts(g.totalPoints)} по изпитния лист (${basis})${escNote}`,
       );
       // A15: the authored corrective — WHAT the right action was, from the
       // violation catalog (ADR-002: authored copy, never generated). Part of
@@ -176,13 +214,24 @@ export function buildDebrief(
       // rephrase this line but must not invent corrective advice.
       const corrective = correctiveFor(g.code);
       if (corrective !== null) lines.push(`  → Правилното действие: ${corrective}`);
+      // THE OTHER HALF. A real instructor says both: „this fails your exam,
+      // and on the street a camera sends you a фиш for X." Retrieved, never
+      // recalled — and silent rather than invented where we hold nothing.
+      const road = codeIsKnown(g.code) ? roadLines(g.code as ViolationCode, g.worstSpeedDetail) : [];
+      if (road.length === 0) anyBlank = true;
+      for (const line of road) lines.push(`  → ${line}`);
+    }
+    if (anyBlank) {
+      lines.push(
+        "  → За останалите от изброените нарушения санкцията на пътя още не е извлечена дословно от закона, затова тук няма сума. По-добре празно, отколкото сгрешено число.",
+      );
     }
     if (groups.length > MAX_MISTAKE_LINES) {
       lines.push(`• …и още ${groups.length - MAX_MISTAKE_LINES} вида нарушения — виж пълния списък в резултата.`);
     }
     if (result.effectiveScore > result.score) {
       lines.push(
-        `• Тренировъчен резултат: ${fmtPoints(result.effectiveScore)} т. — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${result.score} т.`,
+        `• Тренировъчен резултат: ${pts(result.effectiveScore)} — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${pts(result.score)}`,
       );
     }
   }
@@ -236,6 +285,18 @@ function fmtPoints(n: number): string {
 }
 
 /**
+ * „1 наказателна т." / „4.5 наказателни т." — the unit, agreeing.
+ *
+ * Every point figure this file prints goes through here. That is the whole
+ * wave in one function: a bare „т." reads as КОНТРОЛНИ точки to a Bulgarian
+ * driver, and the founder read his lesson score as his licence because of it.
+ * Escalated half-points come through as 4.5, which is plural.
+ */
+function pts(n: number): string {
+  return pointsLabelBg(Number(fmtPoints(n)), "наказателна", "наказателни");
+}
+
+/**
  * A15: authored corrective action for a violation code (catalog correctiveBg).
  * Guarded lookup — MistakeGroup.code is a plain string (pre-drive machine and
  * future codes flow through here), so an unknown code degrades to no line.
@@ -243,6 +304,88 @@ function fmtPoints(n: number): string {
 function correctiveFor(code: string): string | null {
   if (!(code in VIOLATIONS)) return null;
   return VIOLATIONS[code as ViolationCode].correctiveBg;
+}
+
+/** MistakeGroup.code is a plain string; only catalogued codes have a basis. */
+function codeIsKnown(code: string): boolean {
+  return code in VIOLATIONS;
+}
+
+/**
+ * THE REAL-WORLD HALF, as coaching lines.
+ *
+ * Returns EMPTY when nothing has been retrieved for the code — the caller then
+ * prints one honest sentence for the whole list instead of four identical
+ * apologies. Every number below comes out of `rules/consequences.ts`, whose
+ * quotes are re-cut from `content/law/acts` by its own test; this function
+ * composes sentences around them and introduces no figure of its own.
+ */
+function roadLines(code: ViolationCode, speedDetail?: string): string[] {
+  const road = roadConsequenceFor(code);
+  if (road.kind === "unknown") return [];
+
+  if (road.kind === "authored") {
+    const refs = road.refsBg.length > 0 ? ` (${road.refsBg.join("; ")})` : "";
+    // `withEurBg` and not the raw prose: the structured branch below quotes the
+    // fine in euro, and the same debrief printing лв. in one paragraph and € in
+    // the next is the two-currency defect in text form. Anything inside „…“ is
+    // left exactly as the act wrote it.
+    return [`На пътя (не влиза в оценката на урока): ${withEurBg(road.textBg)}${refs}`];
+  }
+
+  if (road.kind === "single") {
+    const cp =
+      road.controlPoints.status === "grounded" && road.controlPoints.points !== null
+        ? `${road.controlPoints.points} контролни точки от книжката`
+        : road.controlPoints.status === "not-listed"
+          ? "0 контролни точки — нарушението не е в изчерпателния списък"
+          : "контролни точки: не е установено";
+    return [
+      `На пътя (не влиза в оценката на урока): глоба ${formatEur(road.fine.eurCents)} ` +
+        `(${road.fine.amountBgn} лв. по текста на закона) и ${cp}. Пристига като ` +
+        `${instrumentLabelBg(road.fine.instruments)}. ` +
+        `(${road.fine.source.citationBg}; ${road.controlPoints.source.citationBg})`,
+    ];
+  }
+
+  // A ladder: one exam fault, several road penalties. THE STUDENT'S OWN RUNG
+  // COMES FIRST when the reducer carried his speed and the limit through on the
+  // event — that is the whole point of `deriveSpeedingBand`, and „here is the
+  // table, find yourself" was the defect. The act's rungs still follow it,
+  // because the ladder is the teaching; and ал. 2's answer is given alongside
+  // whenever it differs, since the engine does not know whether the lesson was
+  // in a населено място and inventing that would be inventing the penalty.
+  const measured = parseSpeedMeasurement(speedDetail);
+  const derived: string[] = [];
+  if (measured !== null) {
+    const here = deriveSpeedingBand({ ...measured, scope: "urban" });
+    const outside = deriveSpeedingBand({ ...measured, scope: "outsideUrban" });
+    derived.push(`Твоят случай: ${here.arithmeticBg} ${here.verdictBg}`);
+    if (here.escalation !== null) derived.push(here.escalation.noteBg);
+    if (outside.totalBgn !== here.totalBgn || outside.tier?.fine.banBg !== here.tier?.fine.banBg) {
+      derived.push(`Ако беше извън населено място: ${outside.verdictBg}`);
+    }
+    derived.push(here.toleranceBg);
+  }
+  const rungs = road.tiers
+    .map((t) => {
+      const ban = t.fine.banBg === null ? "" : ` + ${t.fine.banBg}`;
+      const cp =
+        t.controlPoints.status === "grounded" && t.controlPoints.points !== null
+          ? ` и ${t.controlPoints.points} контролни точки`
+          : "";
+      return `${t.bandBg} — ${formatEur(t.fine.eurCents)}${ban}${cp}`;
+    })
+    .join("; ");
+  const low = road.tiers[0];
+  const high = road.tiers[road.tiers.length - 1];
+  return [
+    ...derived,
+    `На пътя (не влиза в оценката на урока) глобата зависи от превишението — ${road.scopeBg}: ${rungs}.`,
+    road.appliesBg,
+    `Долните стъпала пристигат като ${instrumentLabelBg(low.fine.instruments)}; горните — като ` +
+      `${instrumentLabelBg(high.fine.instruments)}. ${road.footnoteBg}`,
+  ];
 }
 
 /**
@@ -257,14 +400,16 @@ function improvementLine(
   if (result.aborted || priorBestScore === null || priorBestScore === undefined) {
     return null;
   }
+  // Same unit discipline as everywhere else in this file: „т." on its own
+  // reads as контролни точки, so the first number in each sentence carries it.
   const now = result.score;
   if (now < priorBestScore) {
-    return `Личен напредък: ${now} т. срещу най-добрите ти ${priorBestScore} т. досега за този урок — свали резултата, продължавай така.`;
+    return `Личен напредък: ${pts(now)} по изпитния лист срещу най-добрите ти ${priorBestScore} досега за този урок — свали резултата, продължавай така.`;
   }
   if (now === priorBestScore) {
-    return `Изравни най-добрия си резултат за този урок (${priorBestScore} т.). Следващата цел е да го подобриш.`;
+    return `Изравни най-добрия си резултат за този урок (${pts(priorBestScore)} по изпитния лист). Следващата цел е да го подобриш.`;
   }
-  return `Най-добрият ти резултат за този урок остава ${priorBestScore} т.; този път допусна повече (${now} т.). Спокойно — повтори го и ще го стигнеш.`;
+  return `Най-добрият ти резултат за този урок остава ${pts(priorBestScore)} по изпитния лист; този път допусна повече (${now}). Спокойно — повтори го и ще го стигнеш.`;
 }
 
 function commendationLines(result: LessonResult): string[] {
@@ -277,6 +422,12 @@ function commendationLines(result: LessonResult): string[] {
     .map(([title, count]) => `• ${title}${count > 1 ? ` ×${count}` : ""}`);
 }
 
+/** Excess over the limit, for picking the worst event in a speeding group. */
+function excessOf(detail: string | undefined): number | null {
+  const m = parseSpeedMeasurement(detail);
+  return m === null ? null : m.measuredKmh - m.limitKmh;
+}
+
 function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] {
   const byCode = new Map<string, MistakeGroup>();
   for (const m of mistakes) {
@@ -284,6 +435,9 @@ function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] 
     if (g) {
       g.count += 1;
       g.totalPoints += m.points;
+      const here = excessOf(m.detail);
+      const best = excessOf(g.worstSpeedDetail);
+      if (here !== null && (best === null || here > best)) g.worstSpeedDetail = m.detail;
     } else {
       byCode.set(m.code, {
         code: m.code,
@@ -295,6 +449,7 @@ function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] 
         points: m.points,
         count: 1,
         totalPoints: m.points,
+        worstSpeedDetail: excessOf(m.detail) === null ? undefined : m.detail,
       });
     }
   }

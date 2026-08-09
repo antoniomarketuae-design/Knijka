@@ -346,6 +346,11 @@ const PARKED_HALF_DIAG_M = Math.hypot(2.25, 0.95);
 const WALK_CLEAR_RADIUS_M = WALKER_HALF_W_M + PARKED_HALF_DIAG_M;
 /** Circle pitch along the walk — ≤ radius, so the union has no gaps. */
 const WALK_CLEAR_PITCH_M = WALK_CLEAR_RADIUS_M;
+/** Kerb kept clear either side of an authored bus stop, m past the frontage's
+ *  own half-diagonal. ЗДвП чл. 98 bans stopping AT the spirka; the extra
+ *  metres are the bay a bus needs to pull in and out of, which is exactly the
+ *  span that has to be empty for the shelter to be visible from the road. */
+const BUS_STOP_NO_PARK_MARGIN_M = 6;
 
 /** Circles covering the segment (ax,ay)→(bx,by) at WALK_CLEAR_RADIUS_M. */
 function corridorZones(
@@ -377,13 +382,54 @@ const walkZoneCache = new Map<string, readonly ParkedClearZone[]>();
  * recipe). Purely visual: the curb pass has no colliders and feeds no
  * proximity query, so removing a body changes zero grading.
  */
-export function parkedClearZonesFor(lessonId: string): readonly ParkedClearZone[] {
+export function parkedClearZonesFor(
+  lessonId: string,
+  districtRaw?: unknown,
+): readonly ParkedClearZone[] {
   const parsed = parseScenarioLessonId(lessonId);
   if (!parsed) return [];
-  const cached = walkZoneCache.get(parsed.templateId);
+  // The district is an OPTIONAL second input (the bus-stop rule below), so the
+  // cache must not serve a district-less answer to a district-ful caller.
+  const cacheKey = `${parsed.templateId}|${districtRaw === undefined ? 0 : 1}`;
+  const cached = walkZoneCache.get(cacheKey);
   if (cached) return cached;
   const spec = scenarioById(parsed.templateId);
   const zones: ParkedClearZone[] = [];
+  // ── RULE 2 (doc 87 B64): NOBODY PARKS AT A BUS STOP. ─────────────────────
+  //
+  // ЗДвП чл. 98, ал. 1, т. 4 — спиране и престой на спирка на превозно средство
+  // от редовните линии е забранено. The curb pass did not know that, so on
+  // `sp-creep-v1` the decorative row ran unbroken straight past the frontage
+  // the drill points at, and the shelter that now stands there was behind a
+  // parked car from the driving seat: „I stopped at my bus stop" with the bus
+  // stop hidden by the thing that may not be there.
+  //
+  // Derived from the same authored key that places the shelter, so there is no
+  // list to keep in sync — a map that names a stop clears its own kerb, and
+  // the 90 districts that name none are byte-identical. Radius covers the
+  // frontage plus the ban's own margin rather than a guessed number.
+  if (districtRaw !== null && typeof districtRaw === "object") {
+    const buildings = (districtRaw as { buildings?: unknown }).buildings;
+    if (Array.isArray(buildings)) {
+      for (const b of buildings as Array<{
+        kind?: string;
+        footprint?: Array<[number, number]>;
+      }>) {
+        if (b.kind !== "busStop" || !Array.isArray(b.footprint) || b.footprint.length < 3) continue;
+        let cx = 0;
+        let cy = 0;
+        let half = 0;
+        for (const [px, py] of b.footprint) {
+          cx += px;
+          cy += py;
+        }
+        cx /= b.footprint.length;
+        cy /= b.footprint.length;
+        for (const [px, py] of b.footprint) half = Math.max(half, Math.hypot(px - cx, py - cy));
+        zones.push({ x: cx, y: cy, radiusM: half + BUS_STOP_NO_PARK_MARGIN_M });
+      }
+    }
+  }
   if (spec) {
     const staged = [
       ...(spec.staged ?? []),
@@ -402,7 +448,7 @@ export function parkedClearZonesFor(lessonId: string): readonly ParkedClearZone[
     }
   }
   const frozen: readonly ParkedClearZone[] = zones;
-  walkZoneCache.set(parsed.templateId, frozen);
+  walkZoneCache.set(cacheKey, frozen);
   return frozen;
 }
 

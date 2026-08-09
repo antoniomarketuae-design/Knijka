@@ -51,7 +51,13 @@ const SW = "sw-";
  * un-populating the world a student drives through.
  */
 const POPULATED: ReadonlyArray<readonly [string, number]> = [
-  ["d2-v1", 380],
+  // 380 → 378 and (below) tj-emerge 14 → 13, 2026-08-09. NOT a config change:
+  // these two districts' `spawnPoints` had been edited by a later pass and the
+  // wall was never re-stamped, so five shipped plots were standing inside a
+  // spawn keep-out (14.51–15.80 m where CITY wants 18; 11.98 m where JUNCTION
+  // wants 12). `tools/maps/streetwall.test.mjs` now holds the repo to being
+  // the pass's fixed point, so this table can only go stale deliberately.
+  ["d2-v1", 378],
   ["sx-v1", 16],
   ["ln-v1", 20],
   ["fo-follow-v1", 18],
@@ -62,7 +68,7 @@ const POPULATED: ReadonlyArray<readonly [string, number]> = [
   ["tj-stop-v1", 16],
   ["ov-narrow-v1", 9],
   ["tj-rhr-v1", 16],
-  ["tj-emerge-v1", 14],
+  ["tj-emerge-v1", 13],
   ["wb-boulevard-v1", 7],
   ["vu-pass-v1", 19],
   ["sp-rain-v1", 18],
@@ -224,7 +230,10 @@ describe("street wall — the populate pass is pinned", () => {
     // pe-child-v1 with 9 authored, lesson-bearing volumes (see the table).
     // 651 → 649: the same trade once more, on sp-zone30-v1 — two generated
     // blocks give way to the AUTHORED school (founder item 61).
-    expect(total).toBe(649);
+    // 649 → 646: d2-v1 -2 and tj-emerge-v1 -1, the five plots that had come to
+    // sit inside a moved spawn keep-out (see the table's head note). Those are
+    // NOT a trade for authored volumes — they are stale plots removed.
+    expect(total).toBe(646);
   });
 
   it("leaves the maps whose buildings ARE the lesson completely alone", () => {

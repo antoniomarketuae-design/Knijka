@@ -5,6 +5,12 @@
  */
 
 import {
+  POINT_SCALES,
+  THEORY_EXAM_SCORE_NOTE_BG,
+  pointsOutOfBg,
+  pointsScaleLabelBg,
+} from "@/lib/content/pointScales";
+import {
   formatClock,
   type ResultSummary,
   type ReviewQuestion,
@@ -39,6 +45,13 @@ export function ScoreSummaryCard({
         Резултат от пробния изпит
       </h2>
 
+      {/*
+        WAS „78" + „/ 97 точки". Unqualified „точки" is the founder's exact
+        misreading with the abbreviation spelled out — in Bulgarian it means
+        КОНТРОЛНИ точки, the licence budget. The fraction keeps the numbers (a
+        second „97" inside the caption would print the ceiling twice) and the
+        caption directly beneath it names the scale in the наредба's own words.
+      */}
       <p className="flex items-baseline gap-2">
         <span
           className={`text-6xl font-black tabular-nums ${
@@ -47,7 +60,10 @@ export function ScoreSummaryCard({
         >
           {score}
         </span>
-        <span className="text-xl font-bold text-muted">/ {maxScore} точки</span>
+        <span className="text-xl font-bold text-muted">/ {maxScore}</span>
+      </p>
+      <p className="-mt-3 text-center text-sm font-semibold text-muted">
+        {POINT_SCALES.theory.nameBg}
       </p>
 
       <p
@@ -66,9 +82,12 @@ export function ScoreSummaryCard({
       ) : null}
 
       <dl className="mt-2 grid w-full grid-cols-1 gap-2 text-center sm:grid-cols-3">
-        <SummaryStat label="Праг за успех" value={`≥ ${passPoints} точки`} />
         <SummaryStat
-          label="Загубени точки"
+          label={`Праг — ${pointsScaleLabelBg("theory")}`}
+          value={`≥ ${passPoints}`}
+        />
+        <SummaryStat
+          label={`Загубени ${pointsScaleLabelBg("theory")}`}
           value={String(Math.max(0, maxScore - score))}
         />
         <SummaryStat
@@ -76,6 +95,16 @@ export function ScoreSummaryCard({
           value={timeUsedSec !== undefined ? formatClock(timeUsedSec) : "—"}
         />
       </dl>
+
+      {/*
+        B58, theory half. This card is rendered in TWO places — the server
+        attempt page and, seconds after submit, inside the client runner — so
+        the note has to live on the card and not on either host, or one of the
+        two paths ships the verdict without the scale.
+      */}
+      <p className="w-full rounded-xl border border-hair bg-surface-2 p-3 text-left text-xs leading-relaxed text-muted">
+        {THEORY_EXAM_SCORE_NOTE_BG}
+      </p>
     </section>
   );
 }
@@ -124,18 +153,40 @@ function ReviewCard({
             Без отговор
           </span>
         ) : null}
+        {/* WAS „2 от 3 т." — 45 of these per review, the densest bare „т." on
+            the theory side. `title` carries the scale's own sentence, exactly
+            as the sim's micro-quiz chip does. */}
         <span
+          title={POINT_SCALES.theory.noteBg}
           className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-black tabular-nums ${
             q.correct
               ? "bg-success/15 text-success"
               : "bg-danger/15 text-danger"
           }`}
         >
-          {q.pointsAwarded} от {q.maxPoints} т.
+          {pointsOutOfBg("theory", q.pointsAwarded, q.maxPoints)}
         </span>
       </header>
 
       <h3 className="text-base font-bold leading-snug">{q.textBg}</h3>
+
+      {/*
+        DOOR 6 (docs/education/92 §10.3). A verdict frozen at grading, printed
+        beside text read today, used to say nothing about the gap between the
+        two. When the bank no longer backs this row the server has already
+        stripped the key, the explanation and the citations; all that is left to
+        do here is SAY SO, in the classroom's register — a refusal a student
+        cannot see is a refusal that gets deleted by the next person who cannot
+        explain why a card went quiet. The points chip above is untouched.
+      */}
+      {q.noticeBg ? (
+        <p
+          role="note"
+          className="rounded-xl border border-border bg-surface-2 p-3 text-sm leading-relaxed text-muted"
+        >
+          {q.noticeBg}
+        </p>
+      ) : null}
 
       <ul className="flex flex-col gap-2">
         {q.options.map((o) => (

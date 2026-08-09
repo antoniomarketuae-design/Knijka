@@ -6,6 +6,7 @@
  * quick-start accent treatment ("Свободно каране").
  */
 
+import { pointsBg } from "@/modules/sim/rules";
 import type { LessonEntryView } from "./types";
 
 export function LessonCard({
@@ -77,7 +78,8 @@ export function LessonCard({
           <div className="flex items-baseline gap-1">
             <dt className="font-semibold">Най-добър:</dt>
             <dd className="font-black tabular-nums text-foreground">
-              {bestScore} т. наказание
+              {/* „т. наказание" said the direction and still not the scale. */}
+              {bestScore === null ? "—" : pointsBg("exam", bestScore)}
             </dd>
           </div>
         ) : null}

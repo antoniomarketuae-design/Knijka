@@ -93,6 +93,61 @@ export const SC_JUNCTION_RHR_CONFLICT: PriorityFromRightSpec = {
   witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
+/**
+ * THE SECOND CAR (doc 87 B23) — his sentence, verbatim: *„the traffic car is
+ * quite quick and its only 1 so by the time I reach the crossroad it already
+ * has passed — should there be at least 1 more that we have to wait"*.
+ *
+ * Two waves answered the first half of that (the witness gate, the ambient
+ * family baseline) and neither answered the second: the STAGED conflict was
+ * exactly one car, so „пропусни идващия отдясно" was a single event with
+ * nothing behind it. Every real junction a learner will ever stop at has a
+ * second car in it, and the mistake that kills people there is not missing the
+ * first one — it is pulling out the instant the first one clears.
+ *
+ * WHY IT LIVES ON THE RUNGS (`stagedAdd`) AND NOT IN `staged`. The three
+ * committed recordings for this template — shadow, barge, no-look — are
+ * recorded from `SC_JUNCTION_RHR.staged` (traces/scJunctions.ts), and their
+ * whole value is that they are byte-stable demonstrations of ONE adjudicated
+ * conflict each. Putting the follower in the base array would re-cut all three
+ * and re-open three graded gates for a car that is not what any of them
+ * demonstrates. `stagedAdd` reaches every LIVE rung — which is where he was
+ * when he wrote the sentence — and leaves the demos alone. Precedent:
+ * `SC_JX_EQUAL_ONCOMING_EARLY` (templates-junctions3.ts).
+ *
+ * THE DIALS, and why these numbers:
+ *  - hold −150 m puts it AT `tj-n-e`, the far end of the east arm (the path
+ *    start — a deeper hold would be clamped there anyway and silently collapse
+ *    onto the leader). 55 m behind the lead car's own hold.
+ *  - `leadSec −13` is the sequencing. It is what the runner's approach sync
+ *    aims at: this car wants the node ~13 s after the player's projected
+ *    crossing, against the lead car's 3.5 — so it is still coming when the
+ *    lead has gone, which is precisely the moment the drill is now about.
+ *  - `cruiseSpeedMps 7` under the lead's 8 keeps it from closing on the leader
+ *    while both are released (they share one lane and staged actors do not
+ *    queue behind each other).
+ *  - `colorIndex 2` so the two are told apart in a frame and in a replay.
+ */
+export const SC_JUNCTION_RHR_CONFLICT_2: PriorityFromRightSpec = {
+  id: "sc-jrhr-conflict-2",
+  kind: "priorityFromRight",
+  libraryEventId: "JU-01",
+  junction: { nodeId: "tj-n-c", x: 0, y: 0 },
+  junctionControl: "uncontrolled",
+  actor: {
+    pathNodes: ["tj-n-e", "tj-n-c", "tj-n-w"],
+    hold: { nodeIndex: 1, offsetM: -150 },
+    cruiseSpeedMps: 7,
+    colorIndex: 2,
+  },
+  junctionNodeIndex: 1,
+  armDistM: 70,
+  leadSec: -13,
+  lineDistM: 18,
+  clearSpeedMps: 11.5,
+  witnessArm: { etaSec: 8, nearLineM: 6 },
+};
+
 export const SC_JUNCTION_RHR: ScenarioSpec = {
   id: "sc-junction-rhr",
   family: "junction",
@@ -128,7 +183,12 @@ export const SC_JUNCTION_RHR: ScenarioSpec = {
         "Преди устието се огледай: първо наляво, после НАДЯСНО. Кола отдясно има предимство — това е правилото на дясното.",
     },
     { n: 4, textBg: "Идва ли кола отдясно — спри преди кръстовището и я изчакай да премине изцяло." },
-    { n: 5, textBg: "Щом пътят е чист, завий наляво и продължи на запад." },
+    {
+      n: 5,
+      textBg:
+        "НЕ тръгвай в мига, в който първата кола отмине: погледни пак надясно — зад нея идва втора. Изчакването свършва не с първата кола, а когато пътят е чист.",
+    },
+    { n: 6, textBg: "Щом пътят е чист, завий наляво и продължи на запад." },
   ],
   success: [
     {
@@ -173,11 +233,20 @@ export const SC_JUNCTION_RHR: ScenarioSpec = {
       "Изпитващият гледа три неща: осезаемо намаляване преди равнозначно кръстовище, завъртане на главата наляво и надясно и реално пропускане на идващия отдясно — без колебание, но и без нахлуване.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
-      { level: 5, traffic: { vehicleCount: 8 } }, // L5: живо движение около кръстовището
+    // B23 — the follower rides EVERY rung, including the aided ones. „Look
+    // again before you go" is not an advanced skill you unlock at L4; it is
+    // the skill this lesson is for, and a rung that deletes it teaches the
+    // opposite habit. (The ladder still differentiates: aids, tolerance and
+    // the ambient street all move with the rung.)
+    { level: 1, stagedAdd: [SC_JUNCTION_RHR_CONFLICT_2] },
+    { level: 2, stagedAdd: [SC_JUNCTION_RHR_CONFLICT_2] },
+    { level: 3, stagedAdd: [SC_JUNCTION_RHR_CONFLICT_2] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [SC_JUNCTION_RHR_CONFLICT_2] },
+    {
+      level: 5,
+      traffic: { vehicleCount: 8 }, // L5: живо движение около кръстовището
+      stagedAdd: [SC_JUNCTION_RHR_CONFLICT_2],
+    },
   ],
   staged: [SC_JUNCTION_RHR_CONFLICT],
   conditions: { weather: "dry" },
@@ -405,7 +474,7 @@ export const SC_SIGNAL_RESPONSE: ScenarioSpec = {
       "На всяко светофарно кръстовище, много пъти на ден. Решението за спиране се взима при появата на жълтото — не при червеното.",
     whyBg:
       "Пресичането на червено е сред най-смъртоносните грешки в града, а навикът се гради на жълтото: който гони жълтия сигнал, рано или късно влиза на червено. Плавното, ранно спиране пази и теб, и движещия се зад теб.",
-    lawRef: "ППЗДвП чл. 31",
+    lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     examinerBg:
       "Изпитващият гледа: ранно забелязване на сигнала, плавно спиране 1–2 метра преди линията, търпение на червено и червено-жълто и потегляне до 2–3 секунди на зелено. Спиране върху линията или пътеката е грешка.",
   },

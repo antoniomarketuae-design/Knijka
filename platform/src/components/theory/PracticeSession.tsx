@@ -767,9 +767,27 @@ export function PracticeSession({
           THIS BAR, so every pixel taken off its padding is a pixel handed back
           to the answers above it — the only furniture in this file that pays
           twice. „Провери" is 45px on its own, so the bar is 57px and the
-          control is still over the 44px floor; the safe-area calc keeps the
-          same 6px above the home indicator that the padding now is. */}
-      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:mt-auto max-sm:rounded-b-none max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-1.5 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))] short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:mt-auto short:rounded-b-none short:border-t short:border-hair short:bg-surface/95 short:px-4 short:py-1.5 short:backdrop-blur short:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))]">
+          control is still over the 44px floor.
+
+          THE HOME INDICATOR IS PAID FOR ONCE, BY <body>, AND THIS BAR USED TO
+          PAY FOR IT AGAIN. It carried
+          `[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))]`, which
+          is correct for a `fixed` surface — those resolve against the viewport
+          — but this bar is `sticky` inside the card, inside <main>, inside
+          <body>, and globals.css already pads <body> by exactly that inset.
+          Charged twice it is not safety, it is 34px of dead glass in portrait
+          and 21px in landscape, taken off the answers directly above it.
+
+          MEASURED, WebKit, iPhone 16 with the real insets emulated
+          (tools/mobile/lib/insets.mjs), before and after on the same page: the
+          lowest control in this bar sat 41px above the top of the home-indicator
+          band in portrait and 28px in landscape; it now sits 7px above it,
+          which is the 6px of `py-1.5` this comment always claimed. The bar's
+          bottom edge lands on <body>'s padding, so the band itself is still
+          nobody's to paint on. Worth 34px / 21px back to the answers on every
+          question, and it took `q-vehicle-058` in the landscape exam from 18px
+          of document scroll to zero. */}
+      <div className="relative flex flex-wrap items-center gap-3 max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:mt-auto max-sm:rounded-b-none max-sm:border-t max-sm:border-hair max-sm:bg-surface/95 max-sm:px-4 max-sm:py-1.5 max-sm:backdrop-blur short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:mt-auto short:rounded-b-none short:border-t short:border-hair short:bg-surface/95 short:px-4 short:py-1.5 short:backdrop-blur">
         {/* The phone instrument strip: the session's progress as a 2px rule
             along the bar's lit top edge, and the readouts beside the button. */}
         <div

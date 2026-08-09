@@ -9,8 +9,26 @@
  * on a phone does.
  */
 
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { setContentRepo } from "../../../lib/content/repo";
+
+/**
+ * THE DOOR-6 GATE IS STUBBED HERE, AND ONLY HERE. `review.ts` asks
+ * `questionClearance` whether a row may still be read (docs/education/92
+ * §10.3), and that function checks the citation-freeze table built from the
+ * REAL 1,089-row bank. Every question below is synthetic, so none of them can
+ * be in it and every card would come back withheld — these tests would go green
+ * while proving nothing about what they exist for (the review surviving the
+ * device it was taken on, audit M-1).
+ *
+ * The gate is proved against the real bank, with the real table, in
+ * `review-integrity.test.ts` — including the case this stub hides: a
+ * `needs-review` row is refused. A stub in the file that tests something else
+ * is fine; a stub in the file that tests the gate would not be.
+ */
+vi.mock("@/modules/lesson", () => ({
+  questionClearance: () => ({ cleared: true }),
+}));
 import {
   getExamReview,
   InMemoryExamStore,

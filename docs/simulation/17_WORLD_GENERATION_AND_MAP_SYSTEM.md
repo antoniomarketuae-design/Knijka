@@ -106,6 +106,26 @@ junction itself).
 `edgeId` = the drivable edge the crossing sits on (null when it's on an
 excluded way).
 
+> **Additive tags the generators write and this section does not derive from
+> OSM.** All optional; absent ⇒ the behaviour described above, so every map
+> written before a tag is byte-identical. Owned by the TypeScript contract in
+> `sim/world/types.ts`, which carries the measurement behind each one.
+>
+> - on an **edge**: `zone`, `noOvertake`, `noUTurn`, `motorway`,
+>   `parkingBand` (draw the 4 m curbside band), `parkingSide`
+>   (`left|right|both` — which kerb the procedural row FILLS; the band is
+>   drawn on both either way), `parkingMix` (what KIND of vehicle stands
+>   there — `freight|compact|veteran`).
+> - on a **crossing**: `island` (`{widthM, approachM, departM}` — a kerbed
+>   central refuge / median nose, built into the sidewalk mesh so it is also a
+>   collider), `tableRampM` (raised-table ramp band, paint only), `staggerM`,
+>   `skewDeg`. None of them moves the crossing POINT, which is the only thing
+>   `runtime/zones.CrossingZoneTracker` derives the graded zone from.
+>
+> `approachM` is a schema field, not a thing a student can see: a 9 m nose at
+> 64 m from the spawn does not appear in a cockpit frame at all. Photograph a
+> kit from the seat before crediting a map for it (doc 87 B50/B53/B54).
+
 **`roundabouts`** — clustered `junction=roundabout` edges:
 `{ id: "rb-1", x, y, radius, edgeIds }`. The sim treats members as
 oneway-circular with priority-inside (BG rule: знак Б1 on entries — verified

@@ -16,6 +16,7 @@
  */
 
 import { useState } from "react";
+import { minusPointsBg, pointsBg } from "@/modules/sim/rules";
 
 export interface SessionHistoryMistake {
   titleBg: string;
@@ -107,14 +108,20 @@ export function SessionHistorySection({ entries }: { entries: SessionHistoryEntr
                 </span>
                 {e.score !== null ? (
                   <span className="text-xs font-black tabular-nums">
-                    {e.score} т.
+                    {/* Same scale as the result screen, said the same way — this
+                        row is the founder's own history of it, one page from the
+                        drive, and it read „12 т." with nothing naming the unit. */}
+                    {pointsBg("exam", e.score)}
                     {e.effectiveScore !== null && e.effectiveScore > e.score ? (
                       <span
                         className="ml-1 font-semibold text-muted"
                         title="Тренировъчен резултат — повторените грешки тежат повече (×1.5/×2.0); официалният резултат е отляво."
                       >
-                        (трен. {Number.isInteger(e.effectiveScore) ? e.effectiveScore : e.effectiveScore.toFixed(1)}{" "}
-                        т.)
+                        (трен.{" "}
+                        {Number.isInteger(e.effectiveScore)
+                          ? e.effectiveScore
+                          : e.effectiveScore.toFixed(1)}
+                        )
                       </span>
                     ) : null}
                   </span>
@@ -152,8 +159,14 @@ export function SessionHistorySection({ entries }: { entries: SessionHistoryEntr
                               {m.titleBg}
                               {m.count > 1 ? ` ×${m.count}` : ""}
                             </span>
-                            <span className="text-xs font-black tabular-nums" style={{ color: SEVERITY_TONE[m.severityClass] }}>
-                              −{m.points * m.count} т.
+                            {/* The expanded history row is a FaultCard in
+                                miniature and had the same bare unit the card
+                                itself was repaired of. */}
+                            <span
+                              className="whitespace-nowrap text-xs font-black tabular-nums"
+                              style={{ color: SEVERITY_TONE[m.severityClass] }}
+                            >
+                              {minusPointsBg("exam", m.points * m.count)}
                             </span>
                             <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
                               {m.lawRef}

@@ -87,7 +87,7 @@ describe("lesson lifecycle without pre-drive", () => {
       kind: "violation",
       severity: "opasna",
       points: 10,
-      lawRef: "ППЗДвП чл. 31",
+      lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     });
     // QW7: the violation toast must carry the catalog's authored WHY — the
     // law-cited explanation is the teaching moment, not just the title.

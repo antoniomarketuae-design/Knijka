@@ -343,8 +343,26 @@ export const CALIBRATION_PENDING_TITLE_BG = "Изчисляваме проток
 export const CALIBRATION_PENDING_BODY_BG =
   "Само секунда — преди да ти покажем резултата, искаме първо ти да кажеш какъв мислиш, че е.";
 
-/** „−3 т." / „+2 т." / „0 т." — signed, because the sign is the message. */
+/**
+ * „−3 изпитни т." / „+2 изпитни т." — signed, because the sign is the message,
+ * and NAMED, because „т." on its own means контролни точки to a Bulgarian.
+ *
+ * Found by photographing the surface rather than by the source scanner: the
+ * scanner in `modules/sim/rules/__tests__/point-scales.test.ts` reads the sim
+ * HUD and the lesson shell, and this string is composed HERE and only rendered
+ * there — so the gate over those two directories was clean while the screen
+ * still showed „−14 т." under two tiles that had just been repaired. A scanner
+ * can only see the file it is pointed at; the frame sees everything.
+ *
+ * The qualifier is hard-coded rather than imported from `modules/sim/rules`
+ * (`pointsBg("exam", n)`) because this is the learning module and the sim's
+ * public API is not on its import path — the difference between a licence
+ * point and an exam point matters more than the duplication, and
+ * `calibration.test.ts` pins the wording on both sides.
+ */
 export function formatCalibrationError(error: number): string {
   const rounded = Math.round(error * 10) / 10;
-  return `${rounded > 0 ? "+" : ""}${rounded} т.`;
+  const abs = Math.abs(rounded);
+  const unit = abs === 1 ? "изпитна т." : "изпитни т.";
+  return `${rounded > 0 ? "+" : ""}${rounded} ${unit}`;
 }

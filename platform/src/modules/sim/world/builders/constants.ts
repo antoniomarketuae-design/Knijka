@@ -193,6 +193,53 @@ export const JUNCTION_DECAL_AREA_M2 = 120;
  *  junction with quads. 4 × 4 approaches = 16 decals in the worst case. */
 export const JUNCTION_DECAL_MAX_PER_APPROACH = 4;
 
+// --- Tyre / skid marks (founder register B65 — „no tyre marks") -------------
+//
+// A SKID IS NOT A BLOB, WHICH IS WHY THE FIRST ART LANE REFUSED TO FAKE ONE.
+// The register records that refusal and it was the right call: every other
+// atlas cell is a roughly-square patch of grime dropped at a random angle
+// somewhere in the travel band, and a skid drawn that way is a smear lying
+// diagonally across the road. A real скид is (a) LONG and THIN, (b) aligned
+// with TRAVEL to within a couple of degrees, (c) laid in PAIRS one axle track
+// apart, and (d) placed where cars actually brake hard. None of those four can
+// be expressed by weight + minSize + maxSize + aspect, so the cell needs its
+// own placement rule — the honest note said exactly that. These are its
+// parameters.
+//
+/** Rear-axle track of the fictional hero saloon: how far apart the two streaks
+ *  of one pair are laid, centre to centre, m. (ADR-001 — a track width is a
+ *  dimension, not a brand; nothing here names a real vehicle.) */
+export const SKID_TRACK_M = 1.62;
+/** Nominal centreline spacing between skid EVENTS along a ribbon, m. Rarer than
+ *  general wear (ROAD_DECAL_SPACING_M) on purpose: a street where every 30 m
+ *  carries a panic stop is a street nobody survives. */
+export const SKID_SPACING_M = 110;
+/**
+ * A ribbon shorter than this carries no rubber at all.
+ *
+ * Not a tuning knob — a rule with a reason and a test consequence. Rubber is
+ * laid by a car that got up to a speed worth braking off, and a 60 m stub
+ * between two junction mouths is not that road; laying a skid there would put
+ * an 11 m streak on a ribbon whose whole usable band is 40 m. It is also what
+ * keeps `decals.test.ts`'s 120 m isolated-ribbon fixture — which asserts an
+ * EXACT quad count of 12 slots per seed over 200 seeds — measuring the pass it
+ * was written for instead of silently absorbing this one.
+ */
+export const SKID_MIN_RIBBON_M = 200;
+/** Longest run of rubber a single streak is drawn at, m — a 50 km/h emergency
+ *  stop lays roughly 12–15 m on dry asphalt, and the quad is the DARKEST part
+ *  of that, not the whole braking distance. */
+export const SKID_MAX_LENGTH_M = 11;
+export const SKID_MIN_LENGTH_M = 5.5;
+/** Width of one streak, m — a tyre contact patch, near enough. */
+export const SKID_WIDTH_M = 0.22;
+/** How far a streak may wander off its lane centre, m (a locked wheel drifts;
+ *  it does not teleport into the next lane). */
+export const SKID_LANE_WOBBLE_M = 0.9;
+/** Maximum yaw of a streak away from the travel axis, rad (~4.6°). A skid that
+ *  is visibly crooked to the road reads as a bug, not as rubber. */
+export const SKID_ALIGN_JITTER_RAD = 0.08;
+
 /** Marking paint dimensions (М-series, stylized). Scaled with the road —
  * textbook paint on an 8 m lane reads like thread (perceptual road scale). */
 export const DASH_LENGTH_M = 5.0;
@@ -583,6 +630,102 @@ export const STREETLIGHT_SPACING_M = 28;
 export const STREET_TREE_SPACING_M = 22;
 export const PARK_TREE_GRID_M = 18;
 
+// --- Street furniture on the streets the drills actually run on (B65) -------
+//
+// THE MEASUREMENT THAT FORCED THIS. The founder drove `sp-creep-v1` — 360 m of
+// two-way street — and wrote „I see many issue with the Map its very Raw,
+// boring". Re-rendered twice; nothing changed. Counted on the built world, not
+// inherited from the register (which said „one lamp post in 360 m"):
+//
+//     sp-creep-v1   streetlights 0   billboards 0   busStops 0   parkingKits 0
+//     sp-zone30-v1  streetlights 0   ...            (the SCHOOL street)
+//
+// ZERO, not one. And zero lamps means zero of everything downstream, because
+// WorldProps.furniturePlacements derives every bench, bin, planter and bollard
+// in the product FROM THE LAMP RUN. One predicate — `ARTERIAL_CLASSES.has(
+// edge.class)`, whose own docstring says „streetlights" — is why a scenario
+// micro-map has no street furniture of any kind: every one of them is authored
+// `residential`, and `residential` is not an arterial.
+//
+// The set below is the furniture predicate widened to the classes a Bulgarian
+// city actually lights. It is applied ONLY on scenario micro-maps, and that
+// gate is not timidity — it is the same discipline props.ts already applies to
+// В1/Д4/Б3/В26: our authored micro-maps are ours to dress, while an OSM city
+// district's real column positions were never recorded, d2-v1 and district-v1
+// already carry 280 columns from their arterials, and widening the predicate
+// there would add ~1,000 lamp instances to the two heaviest maps in the
+// product for no teaching gain. Every city/exam/полигон map therefore stays
+// BYTE-IDENTICAL, which also means the tier-low draw/triangle budget
+// (environment/perfBudget.ts) is unchanged where it is tightest.
+export const SCENARIO_LIT_CLASSES: ReadonlySet<string> = new Set([
+  ...ARTERIAL_CLASSES,
+  "residential",
+  "unclassified",
+  "living_street",
+]);
+/** Column pitch on a scenario side street — wider than the arterial 28 m,
+ *  because a жилищна улица is lit more sparsely than a boulevard. */
+export const SCENARIO_STREETLIGHT_SPACING_M = 32;
+
+/**
+ * OVERHEAD DISTRIBUTION LINE — the „no wires, no poles" half of B65.
+ *
+ * Sofia's residential streets are strung, not buried: a concrete or wooden
+ * column every ~35–40 m on one verge, a short crossarm, and 3–4 catenary
+ * spans between neighbours. It is the single most characteristic thing in a
+ * photograph of a Bulgarian side street and the world had none of it.
+ *
+ * Poles alternate to the verge OPPOSITE the lamp column run so the two rows do
+ * not merge into one silhouette (the same reasoning as ROUNDABOUT_SIGN_OUT_M).
+ */
+export const UTILITY_POLE_SPACING_M = 37;
+/** Column height above the pavement, m. */
+export const UTILITY_POLE_HEIGHT_M = 8.6;
+/** Half-span of the crossarm, m — the wires hang from its two tips + the top. */
+export const UTILITY_ARM_HALF_M = 0.62;
+/** Sag of a span at mid-point, m. A dead-straight wire reads as a wire-frame
+ *  artefact; the sag is what makes it read as a cable. */
+export const UTILITY_WIRE_SAG_M = 0.55;
+
+/**
+ * PAVEMENT PARAPET (парапет) — the „no fences, no barriers" half of B65.
+ *
+ * `public/sim/streetscape-v2/railing_run_6m.glb` has shipped since the v2 kit
+ * landed and NO CODE PATH COULD EVER PLACE IT: 2.4 KB, one primitive, one
+ * `steel_black` material, span 6.055 m, height 1.10 m. It is the same class of
+ * defect as sign_priority_road.glb (doc 86 D5) — a finished asset with no
+ * placement pass — and it is exactly the object he says is missing. Placing it
+ * costs no new bytes in public/ (so the size ceiling behind
+ * tools/assets/publicBudget.test.mjs cannot move) and carries no brand.
+ */
+export const RAILING_RUN_M = 6.055;
+/** A parapet shorter than this is street clutter, not a guard rail: runs below
+ *  it are dropped whole rather than drawn as one lonely panel. */
+export const RAILING_MIN_RUN_M = 30;
+/** Standing distance from the kerb line, m — at the back of the walking width,
+ *  never over the carriageway. */
+export const RAILING_FROM_KERB_M = 0.55;
+/**
+ * Panels per unbroken run, then the gap before the next one, in panels.
+ *
+ * MEASURED, THEN CORRECTED. The first cut placed a continuous centred run and
+ * put 58 panels — 351 m of unbroken fence — down one side of a 360 m street.
+ * That is not street furniture, it is a wall: it hides the very frontage this
+ * row is about and it is not what a Bulgarian street looks like either. A
+ * парапет runs in STRETCHES, with the gaps where the doorways and the parked
+ * cars need them. 5 on / 4 off = 30 m of rail then 24 m of open kerb.
+ */
+export const RAILING_PANELS_PER_RUN = 5;
+export const RAILING_GAP_PANELS = 4;
+/**
+ * NO PARAPET WITHIN THIS OF A CROSSING, m — a correctness rule, not a taste
+ * one. A guard rail is precisely the object that stops a pedestrian stepping
+ * off the kerb, so a panel standing across a zebra's approach fences off the
+ * crossing the lesson grades and contradicts the paint. Every authored
+ * crossing on the edge clears its own gap.
+ */
+export const RAILING_CROSSING_CLEAR_M = 11;
+
 // --- streetscape v2 dressing (doc 70 REF 1 + REF 3) --------------------------
 
 /** Leafy-tree row spacing along arterial streets (REF 3's tree-lined roads). */
@@ -602,5 +745,9 @@ export const BILLBOARD_END_INSET_M = 20;
 export const BUS_STOP_FROM_MOUTH_M = 28;
 /** Minimum separation between two placed shelters. */
 export const BUS_STOP_MIN_SEPARATION_M = 150;
+/** Shelter depth, m — how far the kit is parked IN from the back edge of the
+ *  sidewalk so its roof does not overhang the kerb. Named because the authored
+ *  B64 placement and the derived one must agree on it. */
+export const BUS_STOP_SHELTER_DEPTH_M = 1.35;
 /** Deterministic shelter count cap (target 4–8 district-wide). */
 export const BUS_STOP_MAX_COUNT = 6;

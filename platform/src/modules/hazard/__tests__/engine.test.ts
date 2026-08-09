@@ -62,7 +62,7 @@ describe("hazardEngine.judge", () => {
     expect(judgement.hazardBg.length).toBeGreaterThan(0);
     expect(judgement.developingBg.length).toBeGreaterThan(0);
     expect(judgement.correctiveBg.length).toBeGreaterThan(0);
-    expect(judgement.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119" }]);
+    expect(judgement.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119, ал. 1" }]);
   });
 
   it("teaches a zero exactly as hard as a five", async () => {

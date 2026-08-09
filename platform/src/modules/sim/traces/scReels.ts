@@ -327,16 +327,39 @@ function animalMistake(): DriveScript {
 }
 
 function animalMistakeCrossLine(): DriveScript {
+  // THE CROSSING MOVED 100→118 ⇒ 132→158 ON 2026-08-09, AND THE OLD COMMENT
+  // HERE ("the oncoming stream is far north, so no head-on this time") WAS
+  // MEASURABLY FALSE.
+  // ---------------------------------------------------------------------
+  // This demo's entire lesson is „Насрещното беше чисто — и пак е забранено":
+  // М1 is unconditional. Nothing could check the premise, because the
+  // overtake corridor was disarmed inside М1 spans (worldRuntime's
+  // `solidCenterLine !== true` clause, removed the same day). The first run
+  // with the corridor armed measured, on this exact recording:
+  //
+  //   crossing at y=100→118  →  a real oncoming car at gapSec 2.39 (t 12.20)
+  //   crossing at y=110→128  →  an emergent COLLISION at t 13.40
+  //   crossing at y=132→158  →  corridor SILENT, CROSSED_SOLID_LINE alone
+  //   crossing at y≥126 … 205 →  corridor silent throughout
+  //
+  // So the shipped demo told the student the road was clear while driving
+  // within 2.4 s — and ten metres of authoring — of a head-on. The repair is
+  // to make the WORLD match the copy rather than the copy match the world:
+  // the crossing now happens AT the animal (y 132→158 — the same beat and the
+  // same geometry as the m0 swerve, which is the pedagogy: the two demos are
+  // one decision apart), in the window the recording is genuinely empty. The
+  // graded codeRef is unchanged (`CROSSED_SOLID_LINE` alone) — it is now true
+  // because the road is clear, not because nothing was watching.
   return {
     steps: [
       { kind: "annotation", textBg: "Грешка (без удар): водачът пак пресича непрекъснатата осева линия, за да заобиколи животното." },
-      { kind: "drive", points: [[LANE, 15], [LANE, 100]], targetKmh: 42, stopAtEnd: false },
-      // Cross x=0 inside the solid span (y∈[90,230]) → CROSSED_SOLID_LINE; the
-      // oncoming stream is far north, so no head-on this time.
-      { kind: "drive", points: [[LANE, 100], [-4, 118]], targetKmh: 30, stopAtEnd: false },
-      { kind: "drive", points: [[-4, 118], [LANE, 150]], targetKmh: 30, stopAtEnd: false },
+      { kind: "drive", points: [[LANE, 15], [LANE, 132]], targetKmh: 42, stopAtEnd: false },
+      // Cross x=0 inside the solid span (y∈[90,230]) → CROSSED_SOLID_LINE, at
+      // the animal beat and in the MEASURED clear window (see above).
+      { kind: "drive", points: [[LANE, 132], [-4, 158]], targetKmh: 30, stopAtEnd: false },
+      { kind: "drive", points: [[-4, 158], [LANE, 190]], targetKmh: 30, stopAtEnd: false },
       { kind: "annotation", textBg: "Насрещното беше чисто — но пресичането на М1 е забранено при всякакви условия." },
-      { kind: "drive", points: [[LANE, 150], [LANE, 325]], targetKmh: 40 },
+      { kind: "drive", points: [[LANE, 190], [LANE, 325]], targetKmh: 40 },
       { kind: "pause", sec: 1, brake: true },
     ],
   };

@@ -24,7 +24,12 @@ import type {
   HazardLawRef,
   HazardVerdict,
 } from "@/components/hazard/types";
-import { VIOLATIONS, type SeverityClass, type ViolationCode } from "@/modules/sim/rules";
+import {
+  VIOLATIONS,
+  parseRuleLawRef,
+  type SeverityClass,
+  type ViolationCode,
+} from "@/modules/sim/rules";
 import type { HazardItem, HazardItemScore } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -58,32 +63,23 @@ export function hazardRuleCitation(item: HazardItem): HazardRuleCitation {
 }
 
 /**
- * Split "ЗДвП чл. 119" into the {act, ref} pair the citation chip renders, at
- * the first reference token (чл./ал./т./§/№). A trailing parenthetical gloss is
- * the rule engine's note to itself and is dropped.
+ * Split "ЗДвП чл. 119" into the {act, ref} pair the citation chip renders.
  *
- * A string with no reference token yields null and the reveal simply carries no
- * chip: a bare act name is not a citable reference, and manufacturing one is
- * precisely what ADR-002 forbids.
+ * NO LONGER A TWIN (2026-08-09). This used to be a hand-copy of
+ * `modules/tutor/retrieval.ts parseCatalogLawRef`, and its own header said „if
+ * a third consumer appears, promote it to the sim/rules barrel that owns the
+ * strings". Both copies split at the first reference token (чл./ал./т./§/№),
+ * which is a rule about the REF and broke on the ACT: „Наредба № РД-02-21-1…"
+ * split inside the act's own designation, and a subject-level citation with no
+ * number at all („ППЗДвП надлъжна пътна маркировка", the shape every ППЗДвП
+ * entry now has) yielded nothing. The split now happens on the ACT NAME, in
+ * `@/modules/sim/rules parseRuleLawRef` — one implementation, imported by both.
  *
- * TWIN: modules/tutor/retrieval.ts parseCatalogLawRef does the same split for
- * the tutor's grounding whitelist. It is duplicated rather than imported
- * because it is another module's internal (docs/architecture/05); if a third
- * consumer appears, promote it to the sim/rules barrel that owns the strings.
+ * Still fails closed: an unrecognised act yields null and the reveal simply
+ * carries no chip. Manufacturing a citation is what ADR-002 forbids.
  */
-const REF_TOKEN_RE = /\s(?=(?:чл\.|ал\.|т\.|§|№))/;
-
 export function parseHazardLawRef(raw: string): HazardLawRef | null {
-  const cleaned = raw
-    .replace(/\s*\([^)]*\)\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const at = REF_TOKEN_RE.exec(cleaned);
-  if (!at || at.index <= 0) return null;
-  const act = cleaned.slice(0, at.index).trim();
-  const ref = cleaned.slice(at.index + at[0].length).trim();
-  if (act.length === 0 || ref.length === 0) return null;
-  return { act, ref };
+  return parseRuleLawRef(raw);
 }
 
 // ---------------------------------------------------------------------------

@@ -21,6 +21,35 @@
 // iPhone 16 (6.1", Dynamic Island) insets, in CSS px:
 //   portrait  top 59, bottom 34, sides 0
 //   landscape top 0,  bottom 21, sides 59
+//
+// AND SINCE 2026-08-09 THEY ARE ALSO SUBSTITUTED INTO THE PAGE. Carrying the
+// numbers here was only half the job: the APP still laid out at env() = 0, so
+// „the notch band is unsafe" was checked against a document that had never
+// heard of the notch. `lib/insets.mjs` rewrites the app's own
+// env(safe-area-inset-*) declarations to these values before the first layout,
+// and `newDeviceContext` is now the only way this harness opens a context.
+// Everything measured before that date — every fold column, every screen-share
+// percentage — describes a phone with no cutout and no home indicator.
+//
+// WHY `top: 59` IS CARRIED BUT COSTS THIS APP NOTHING. It is the DEVICE's
+// inset. What a PAGE sees on top depends on the presentation: in a Safari tab
+// the browser chrome already owns that strip, and this app ships
+// `appleWebApp.statusBarStyle: "black"` (opaque, app/layout.tsx), so a
+// standalone launch is positioned below the status bar too — both report 0.
+// globals.css therefore pays back left/right/bottom on <body> and deliberately
+// not top. Emulating 59 here is still the right conservative choice: it is what
+// a `black-translucent` switch would hand the page, and the only places the app
+// reads the top inset are the skip link and the nav drawer, which are `fixed`
+// and must survive it.
+//
+// THE TWO ANDROID PROFILES ARE THE DELIBERATE ZERO-INSET CONTROL, and that is
+// a statement, not an omission. Chrome reports a non-zero bottom inset only for
+// an edge-to-edge page on Android 15+ with gesture navigation (~24dp), and this
+// project has never measured one of those phones. Guessing a number here would
+// put a fabricated 24px into every Android column; leaving them at 0 keeps one
+// device in the ladder where env() genuinely is 0, which is also the control
+// that proves the emulation is doing something on the other two. If a real
+// Android measurement ever arrives, it belongs here and nowhere else.
 // -----------------------------------------------------------------------------
 
 const IOS_UA =

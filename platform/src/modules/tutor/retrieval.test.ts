@@ -393,7 +393,7 @@ describe("retrieveRuleMaterials", () => {
     expect(yielded).toBeDefined();
     expect(yielded?.kind).toBe("rule");
     // The whole point of the corpus: the citation rides along with it.
-    expect(yielded?.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119" }]);
+    expect(yielded?.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119, ал. 1" }]);
   });
 
   it("carries the official severity, points and corrective into the body", () => {

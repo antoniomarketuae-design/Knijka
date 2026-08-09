@@ -152,7 +152,7 @@ describe("d2-v1 is a structurally valid district-v1 document (ADR-007 contract)"
     // build_district_d2.mjs alone drops both, and these two pins catch it).
     // The AUTHORED count is still zero: every footprint on d2 is generated,
     // and stripping the `sw-` prefix must return the file to the ADR-007 state.
-    expect(district.buildings.length).toBe(380);
+    expect(district.buildings.length).toBe(378);
     expect(district.buildings.filter((b) => !b.id.startsWith("sw-")).length).toBe(0);
     // The M-15 zone layer (tools/maps/gen_exam_district_zones.mjs) — a POST-PASS
     // over this build, so re-running build_district_d2.mjs alone drops it and
@@ -285,10 +285,10 @@ describe("d2-v1 through the world builder", () => {
   it("derives city furniture from the data alone: lights, zebras, signs", () => {
     expect(world.trafficLights.length).toBeGreaterThan(0);
     expect(world.stats.zebraCrossings).toBeGreaterThan(0);
-    expect(world.stats.buildings).toBe(380);
+    expect(world.stats.buildings).toBe(378);
   });
 
-  it("the street wall costs FOUR draw calls, not 380 (doc 82 V7 / §2.2)", () => {
+  it("the street wall costs FOUR draw calls, not 378 (doc 82 V7 / §2.2)", () => {
     // The whole reason V7 could be a data-only pass: buildings.ts merges every
     // prism into ONE mesh per facade palette variant, so the draw cost of a
     // populated district is the same four meshes an empty one would have paid
@@ -300,7 +300,7 @@ describe("d2-v1 through the world builder", () => {
     expect(world.buildingWalls.length).toBe(4);
     expect(world.buildingWalls.some((m) => m.positions.length > 0)).toBe(true);
     expect(world.stats.buildingInstances).toBe(0);
-    // 380 four-sided prisms ≈ 6.8 k triangles of wall + roof against the §2.2
+    // 378 four-sided prisms ≈ 6.8 k triangles of wall + roof against the §2.2
     // phone budget of 250 k/frame — the street wall is ~3 % of it.
     const prismTris =
       world.buildingWalls.reduce((n, m) => n + m.indices.length / 3, 0) +

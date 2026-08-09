@@ -68,7 +68,7 @@ import {
   type Clearance,
   type WithheldReason,
 } from "@/modules/lesson";
-import { VIOLATIONS, type SeverityClass } from "@/modules/sim/rules";
+import { VIOLATIONS, parseRuleLawRef, type SeverityClass } from "@/modules/sim/rules";
 
 export interface RetrievedItem {
   kind: "concept" | "question" | "sign" | "rule";
@@ -524,31 +524,29 @@ const SEVERITY_LABEL_BG: Record<SeverityClass, string> = {
 
 /**
  * Split "ЗДвП чл. 21" into the {act, ref} shape the citation whitelist works
- * on, at the first reference token (чл./ал./т./§/№).
+ * on.
  *
- * A trailing gloss in parentheses is dropped: "ППЗДвП чл. 63 (М1 — единична
- * непрекъсната линия)" is the rule engine's note to itself, not part of the
- * legal reference. Left in, it would turn a citation chip into a sentence and
- * make two entries citing the same наредба render as two different sources.
+ * A trailing gloss in parentheses is dropped: "ППЗДвП надлъжна пътна
+ * маркировка (М1 — единична непрекъсната линия)" is the rule engine's note to
+ * itself, not part of the legal reference. Left in, it would turn a citation
+ * chip into a sentence and make two entries citing the same наредба render as
+ * two different sources.
  *
- * A string with no reference token yields null — a bare act name is not a
- * citable reference, and manufacturing one is precisely what ADR-002 forbids.
- * The entry still grounds the answer; it just contributes no citation.
+ * THE SPLIT MOVED FROM THE REF TO THE ACT (2026-08-09) and lives in
+ * `@/modules/sim/rules parseRuleLawRef`, which is also what
+ * `modules/hazard/feedback.ts` now calls — the two were hand-copies, and both
+ * copies split at the first reference token, so „Наредба № РД-02-21-1…" split
+ * inside the act's own designation and a subject-level citation with no number
+ * („ППЗДвП светлинни сигнали за регулиране на движението", the shape every
+ * ППЗДвП entry now has after the article numbers came off acts the repo does
+ * not hold) produced no citation at all.
+ *
+ * Still returns null for an unrecognised act — a bare act name is not a citable
+ * reference, and manufacturing one is precisely what ADR-002 forbids. The entry
+ * still grounds the answer; it just contributes no citation.
  */
-const REF_TOKEN_RE = /\s(?=(?:чл\.|ал\.|т\.|§|№))/;
-
 export function parseCatalogLawRef(raw: string): LawRef | null {
-  const cleaned = raw
-    .replace(/\s*\([^)]*\)\s*$/, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const at = REF_TOKEN_RE.exec(cleaned);
-  if (!at || at.index <= 0) return null;
-
-  const act = cleaned.slice(0, at.index).trim();
-  const ref = cleaned.slice(at.index + at[0].length).trim();
-  if (act.length === 0 || ref.length === 0) return null;
-  return { act, ref };
+  return parseRuleLawRef(raw);
 }
 
 interface RuleCandidate extends Candidate {

@@ -1090,12 +1090,17 @@ describe("wave-6 bot completion — sc-mv-uturn-ban at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the turn at the tempting spot is SCORED 10 and reaches NO gate", () => {
-    // CROSSED_SOLID_LINE is опасна, so it is SCORED with a non-blocking toast
-    // rather than pausing into a teach card — a dangerous code must never pop a
-    // modal mid-drive, least of all while the student is still sideways across
-    // the road. So it lands on session.events and the A9 teach channel stays
-    // empty. The §9 exact-code assert lives on the trace gate.
+  it("counter-proof: the turn at the tempting spot TEACHES основна and reaches NO gate", () => {
+    // RE-BASELINED 2026-08-09 (Наредба № 38 grounding pass). This used to read
+    // „SCORED 10". CROSSED_SOLID_LINE charged опасна under б. „в", a CLOSED
+    // enumeration of six cases none of which covers it — see
+    // `rules/n38.ts` → N38_BASIS.CROSSED_SOLID_LINE. It is основна (3) now, so
+    // the first encounter TEACHES with a card instead of docking.
+    //
+    // For THIS drill the change costs nothing at all, and the assertions below
+    // are why: the U-turn at the tempting spot completes NOTHING, so the sheet
+    // reads НЕИЗДЪРЖАН and 1★ on the objectives alone. The points were never
+    // what taught this lesson.
     let s = createLessonSession(compileScenario(SC_MV_UTURN_BAN, 3));
     const taught: string[] = [];
     recordScMvUturnBanDrive(loadDistrict("mv-uturn-v1"), "mistake-cross-solid", {
@@ -1106,11 +1111,12 @@ describe("wave-6 bot completion — sc-mv-uturn-ban at L3", () => {
       },
     });
     const r = buildLessonResult(s);
-    expect(taught).toEqual([]);
-    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
-      "CROSSED_SOLID_LINE",
-    ]);
-    expect(r.score).toBe(10);
+    // Taught, not docked. A TAUGHT violation stays off `session.events` (the
+    // card carries the teaching instead of the sheet) — the shipped A12 shape
+    // for основни, which this code now joins.
+    expect(taught).toEqual(["CROSSED_SOLID_LINE"]);
+    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(r.score).toBe(0);
     expect(r.passed).toBe(false);
     // …and the objectives say the same thing the code does, independently: this
     // driver turned at y = 130 and never came within 6 m of the gate at y = 250,

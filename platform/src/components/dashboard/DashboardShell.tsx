@@ -202,7 +202,31 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     // that was broken.
     //
     // At `lg` the display becomes grid and the flex direction is inert.
-    <div className="flex min-h-dvh flex-col lg:grid lg:grid-cols-[16rem_1fr]">
+    // THE ROOT IS 100dvh MINUS THE HOME INDICATOR, AND THE SUBTRACTION IS THE
+    // WHOLE POINT. It was a bare `min-h-dvh`, and on the founder's phone that
+    // one token made every page of this app taller than the screen it is on.
+    //
+    // The chain: app/layout ships `viewportFit: "cover"`, so the page owns the
+    // whole display and env(safe-area-inset-*) is non-zero; globals.css pays the
+    // inset back on <body> (`padding-bottom: env(safe-area-inset-bottom, 0px)`), so
+    // <body>'s CONTENT box is 100dvh − 34px in portrait and 100dvh − 21px in
+    // landscape. Asking for a full 100dvh inside that box overflows it by
+    // exactly the inset — the document scrolls by 34/21px on every screen in the
+    // product, forever, and the 34px it scrolls into is bare padding.
+    //
+    // That is not cosmetic. `useQuestionBudget` reads `scrollHeight − vh` as
+    // „the question must give this back", and against a min-height FLOOR that
+    // number never reaches zero — so the stem was cut by 34px on every
+    // ResizeObserver tick until it hit its 62px floor. Measured on this tree,
+    // WebKit, iPhone 16 with the real insets emulated, 20 heaviest questions per
+    // surface: the stem was clamped to 62px on 20 of 20 portrait cases, hiding
+    // up to 173px of the question, on BOTH runners — 0 of 20 clean in both
+    // orientations. With this one calc: 40 of 40 portrait, and the stem is not
+    // clamped on a single case there.
+    //
+    // Inert everywhere else: env() falls back to 0px on any display without a
+    // cutout, and `calc(100dvh - 0px)` is `100dvh`.
+    <div className="flex min-h-[calc(100dvh-env(safe-area-inset-bottom,0px))] flex-col lg:grid lg:grid-cols-[16rem_1fr]">
       {/* Desktop sidebar — a console SLAB, not a column with a border on it:
           it catches the cabin light down the edge that faces the deck and drops
           a short shadow onto it (`.console` + `.console-right`, globals.css §9).

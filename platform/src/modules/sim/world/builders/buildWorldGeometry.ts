@@ -17,7 +17,7 @@ import { ROAD_Y, TERRAIN_MARGIN_M } from "./constants";
 import { buildBuildings } from "./buildings";
 import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
 import { buildRoadDecals } from "./decals";
-import { buildMarkings } from "./markings";
+import { buildCrossingFurniture, buildMarkings } from "./markings";
 import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
 import { buildRailTracks } from "./railTrack";
@@ -78,6 +78,15 @@ export function buildWorldGeometry(
   // (into the PAINT mesh). It runs after markings and before decals so the wear
   // pass keeps out from under the new paint, exactly as for every other marking.
   const roundabouts = buildRoundabouts(rings, {
+    sidewalks: roads.sidewalks,
+    markings: markings.markings,
+  });
+  // Crossing FURNITURE (doc 87 B50/B53/B54): the kerbed refuge island / median
+  // nose and the raised table's painted ramp bands. Same insertion point and
+  // the same two accumulators as the roundabout island above — after the paint,
+  // before the wear, so decals keep out from under it. Adds nothing at all to a
+  // district whose crossings carry no furniture fields.
+  const crossingFurniture = buildCrossingFurniture(district, network, {
     sidewalks: roads.sidewalks,
     markings: markings.markings,
   });
@@ -144,7 +153,8 @@ export function buildWorldGeometry(
     skippedRibbons: roads.skippedRibbonCount,
     junctionPatches: roads.junctionPatchCount,
     sidewalkStrips: roads.sidewalkStripCount,
-    markingQuads: markings.markingQuads + roundabouts.ringDividerQuads,
+    markingQuads:
+      markings.markingQuads + roundabouts.ringDividerQuads + crossingFurniture.furnitureQuads,
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
     parkingBays: markings.parkingBays,
@@ -154,6 +164,10 @@ export function buildWorldGeometry(
     waterDecals: water.count,
     railTrackQuads: rail.deckQuads + rail.railQuads,
     roundaboutIslands: roundabouts.islands,
+    /** doc 87 B50/B53/B54 — kerbed pedestrian refuge islands / median noses. */
+    crossingIslands: crossingFurniture.islands,
+    /** Raised-table ramp bands painted (2 per table, one per approach). */
+    crossingTableRamps: crossingFurniture.tableRamps,
     roundabouts: rings.length,
     ringDividerQuads: roundabouts.ringDividerQuads,
     /** FR-22, the outer half: mouth-free arcs of circular ring kerb swept. */
@@ -165,6 +179,11 @@ export function buildWorldGeometry(
     streetlights: props.streetlights.length,
     trees: props.trees.length,
     billboards: props.billboards.length,
+    /** B65 street furniture — see constants.SCENARIO_LIT_CLASSES. */
+    utilityPoles: props.utilityPoles.length,
+    utilityWireSpans: props.utilityPoles.filter((p) => p.spanM > 0).length,
+    railings: props.railings.length,
+    skidMarks: decals.skidCount,
     busStops: props.busStops.length,
     parkingKits: props.parkingKits.length,
     vertices,
@@ -177,6 +196,9 @@ export function buildWorldGeometry(
     // the water-sheet mesh (only on maps with live waterPatch spans) +
     // the rail deck + rails meshes (only on maps with a railCrossing zone) +
     // the roundabout planting mesh (only on maps with a drawn central island) +
+    // the B65 dressing (pole row, wire run, parapet — each ONE draw, and each
+    // mounted only when its list is non-empty, so a city/exam district's
+    // draw-call count is unchanged to the call) +
     // towers (chunked & frustum-culled at runtime; count ~model-order).
     drawCallEstimate:
       13 +
@@ -185,6 +207,8 @@ export function buildWorldGeometry(
       (water.count > 0 ? 1 : 0) +
       (rail.deckQuads > 0 ? 2 : 0) +
       (roundabouts.islands > 0 ? 1 : 0) +
+      (props.utilityPoles.length > 0 ? 2 : 0) +
+      (props.railings.length > 0 ? 1 : 0) +
       CITY_MODELS.length,
   };
 
@@ -208,6 +232,8 @@ export function buildWorldGeometry(
     streetlights: props.streetlights,
     trees: props.trees,
     billboards: props.billboards,
+    utilityPoles: props.utilityPoles,
+    railings: props.railings,
     busStops: props.busStops,
     parkingKits: props.parkingKits,
     schools,

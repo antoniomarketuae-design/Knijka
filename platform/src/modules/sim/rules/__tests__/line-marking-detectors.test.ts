@@ -2,7 +2,8 @@
  * LINE TYPES + BUS LANES detector pack (ADR-006 stage 2b — authored М1/BUS
  * district zones) — true-positive coverage + the STRUCTURAL innocent sides.
  * The taxonomy archetypes:
- *   CROSSED_SOLID_LINE   OV-04/SN-03 escalation  опасна (10)
+ *   CROSSED_SOLID_LINE   OV-04/SN-03 escalation  основна (3) — was опасна (10)
+ *                                                until the Н38 grounding pass
  *   DRIVING_IN_BUS_LANE  SN-05                   основна (3)
  *
  * The stage-2a discipline holds: both flags are authored data only
@@ -23,15 +24,24 @@ function violationsOf(events: RuleEvent[], code: string): ViolationEvent[] {
 }
 
 describe("CROSSED_SOLID_LINE (OV-04/SN-03 — пресичане на непрекъсната осева)", () => {
-  it("fully crossing the solid осева (opposing bank, in-span) grades опасна (10) once", () => {
+  it("fully crossing the solid осева (opposing bank, in-span) grades основна (3) once", () => {
+    // RE-BASELINED 2026-08-09 — the charge moved, the DETECTION did not. This
+    // code charged 10 under Наредба № 38 приложение № 5, т. 10, б. „в“, whose
+    // six cases it matched none of: case 2 is expressly one-way roads and
+    // junctions („път с еднопосочно движение“) while this detector requires
+    // `oneway: false`, and case 5 („създаде предпоставка за допускане на ПТП“)
+    // asks for a danger this detector never establishes — as the fixture below
+    // shows, it convicts with no other road user anywhere in the tick. See
+    // `rules/n38.ts` → N38_BASIS.CROSSED_SOLID_LINE for the full argument and
+    // `naredba-38-classification.test.ts` for the pin that now guards it.
     const { events } = drive([
       tick(0, { speedKmh: 30, oneway: false, solidCenterLine: true }),
       ...cruise(1, 5, { speedKmh: 30, oneway: false, solidCenterLine: true, opposingBank: true }),
     ]);
     const v = violationsOf(events, "CROSSED_SOLID_LINE");
     expect(v).toHaveLength(1);
-    expect(v[0].severityClass).toBe("opasna");
-    expect(v[0].points).toBe(10);
+    expect(v[0].severityClass).toBe("osnovna");
+    expect(v[0].points).toBe(3);
   });
 
   it("an indicator does NOT exempt — a signalled overtake across solid still convicts", () => {

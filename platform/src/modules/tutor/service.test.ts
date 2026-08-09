@@ -46,7 +46,7 @@ vi.mock("@/modules/learning", () => ({
 
 const USER = "user-1";
 const REPLY_WITH_CITATION =
-  "Пропускаш идващите по пътя с предимство [ЗДвП чл. 47]. Потренирай „Предимство“!";
+  "Пропускаш идващите по пътя с предимство [ЗДвП чл. 47; чл. 48; чл. 50, ал. 1]. Потренирай „Предимство“!";
 
 function userMsg(content: string, ts: number): TutorMessage {
   return { role: "user", content, ts };
@@ -122,7 +122,7 @@ describe("askTutor — happy path", () => {
 
     expect(result.limited).toBe(false);
     expect(result.reply).toBe(REPLY_WITH_CITATION);
-    expect(result.citations).toEqual([{ act: "ЗДвП", ref: "чл. 47" }]);
+    expect(result.citations).toEqual([{ act: "ЗДвП", ref: "чл. 47; чл. 48; чл. 50, ал. 1" }]);
     expect(result.threadId).toBe(store.threadFor(USER)?.id);
 
     // Model got the grounded system prompt + the student's question.
@@ -184,7 +184,7 @@ describe("askTutor — happy path", () => {
     // history silently demotes to plain text on the next page load.
     await askTutor(USER, "Кога имам предимство?");
     const saved = store.saveExchangeCalls[0].messages;
-    expect(saved[1].citations).toEqual([{ act: "ЗДвП", ref: "чл. 47" }]);
+    expect(saved[1].citations).toEqual([{ act: "ЗДвП", ref: "чл. 47; чл. 48; чл. 50, ал. 1" }]);
     // The student's own message is never a source of citations.
     expect(saved[0].citations).toBeUndefined();
   });
@@ -300,7 +300,7 @@ describe("askTutor — rule-catalog grounding (audit I-1)", () => {
 
   it("grounds a driving-behaviour question in the catalog and cites its lawRef", async () => {
     const ruleModel = new FakeTutorModel(
-      "Спираш пред пътеката и изчакваш [ЗДвП чл. 119].",
+      "Спираш пред пътеката и изчакваш [ЗДвП чл. 119, ал. 1].",
     );
     setTutorModel(ruleModel);
 
@@ -311,9 +311,9 @@ describe("askTutor — rule-catalog grounding (audit I-1)", () => {
     expect(system).toContain("Непропускане на пешеходец"); // catalog title
     expect(system).toContain("опасна грешка — 10 наказателни точки"); // official cost
     expect(system).toContain("Правилното действие:"); // the corrective
-    expect(system).toContain("[ЗДвП чл. 119]"); // citable marker
+    expect(system).toContain("[ЗДвП чл. 119, ал. 1]"); // citable marker
 
-    expect(result.citations).toEqual([{ act: "ЗДвП", ref: "чл. 119" }]);
+    expect(result.citations).toEqual([{ act: "ЗДвП", ref: "чл. 119, ал. 1" }]);
   });
 
   it("still drops a citation the model invented from the catalog corpus", async () => {
@@ -326,7 +326,7 @@ describe("askTutor — rule-catalog grounding (audit I-1)", () => {
 
     // The catalog IS grounding this answer (its real ref is in the prompt) —
     // and the whitelist still refuses the two markers the model made up.
-    expect(ruleModel.completeCalls[0].system).toContain("[ЗДвП чл. 119]");
+    expect(ruleModel.completeCalls[0].system).toContain("[ЗДвП чл. 119, ал. 1]");
     expect(result.citations).toEqual([]);
   });
 

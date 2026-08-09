@@ -11,6 +11,7 @@
  * session directly.
  */
 
+import { EXAM_POINTS_SHORT_NOTE_BG, pointsBg } from "@/modules/sim/rules";
 import type { LessonEntryView } from "./types";
 
 export function ExamModeCard({
@@ -69,7 +70,9 @@ export function ExamModeCard({
           </div>
           <div className="flex items-baseline gap-1">
             <dt className="font-semibold">Лимити:</dt>
-            <dd className="font-black text-foreground">9 т. общо · 6 т. основни · 0 опасни</dd>
+            <dd className="font-black text-foreground">
+              {pointsBg("exam", 9)} общо · 6 от основни · 0 опасни
+            </dd>
           </div>
           {attempts > 0 ? (
             <div className="flex items-baseline gap-1">
@@ -80,10 +83,17 @@ export function ExamModeCard({
           {bestScore !== null ? (
             <div className="flex items-baseline gap-1">
               <dt className="font-semibold">Най-добър:</dt>
-              <dd className="font-black tabular-nums text-foreground">{bestScore} т. наказание</dd>
+              <dd className="font-black tabular-nums text-foreground">
+                {pointsBg("exam", bestScore)}
+              </dd>
             </div>
           ) : null}
         </dl>
+
+        {/* THE ENTRY CARD IS WHERE THE SCALE IS SET. „9 т. общо" here and „−10 т."
+            three minutes later are the same unnamed unit, and the unnamed unit is
+            what the founder read as his licence. */}
+        <p className="text-[11px] leading-relaxed text-muted">{EXAM_POINTS_SHORT_NOTE_BG}</p>
 
         {unlocked ? (
           <button type="button" className="btn-accent w-full" onClick={onOpen}>

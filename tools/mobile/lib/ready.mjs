@@ -394,6 +394,163 @@ export async function worldVitals(page, { band = 0.5 } = {}) {
   return { box, clip, vitals: frameVitals(shot), reason: null };
 }
 
+// -----------------------------------------------------------------------------
+// INSTRUMENT DEFECT #10 — THE CAPTURE GOES BLIND, THE WORLD DOES NOT.
+//
+// Row C8 round 3 recorded that "the canvas dies at the layout-viewport resize
+// step, in 5 of 5 portrait runs and in landscape, and never comes back", and
+// refused every driving row on the strength of it. It is not the canvas. It is
+// this screenshot path.
+//
+// Measured on 2026-08-09, WebKit, iPhone 16 portrait, on a page with NONE of
+// this app in it — one <canvas>, one raw WebGL context, one rAF loop:
+//
+//   three screenshots, nothing touched     SHOT LIVE  (so it is not "the 2nd shot")
+//   canvas.width reassigned to the SAME    SHOT LIVE  (so it is not reallocation)
+//   CSS box resized, buffer PINNED         SHOT LIVE  (so it is not layout)
+//   BUFFER RESIZED TO A DIFFERENT SIZE     SHOT BLACK — 1 distinct colour, and
+//                                          permanently: restoring the exact
+//                                          original size, recycling the layer,
+//                                          promoting it with translateZ(0), an
+//                                          opacity nudge and an element-scoped
+//                                          screenshot are all still black,
+//   …while gl.readPixels() called in the same rAF tick returned a bright frame
+//   at every step (darkShare 0.000) with isContextLost() false and no
+//   webglcontextlost event. A FRESH PAGE captures normally.
+//
+// And the same experiment against the real driving shell:
+//
+//   before the resize   SHOT 313 colours, dark 0.086   GL alive, 770 draws/700ms
+//   after  -90 px       SHOT  54 colours, dark 0.995   GL alive, 790 draws/700ms
+//   after  restore      SHOT  36 colours, dark 0.997   GL alive, 768 draws/700ms
+//
+// So any probe that resizes the viewport of a route with a responsive WebGL
+// canvas — which `page.setViewportSize` always does, because R3F sizes the
+// drawing buffer from the CSS box — destroys its own ability to see that canvas
+// for the rest of the page's life, and then reads the black it caused as a
+// finding about the app.
+//
+// A pixel gate cannot tell those apart. This can: ask the page whether the
+// context is lost and whether draw calls are still being issued. It is the ONLY
+// thing allowed to reclassify a blank capture, it is never allowed to open the
+// gate at the top of a row (that one still has to see a street, before anything
+// has been resized), and it can fail — a genuinely lost context reports
+// `lost: true` and a stopped renderer reports `draws: 0`.
+// -----------------------------------------------------------------------------
+
+/**
+ * Init script: count WebGL draw calls and remember every context created.
+ * Must be added to the CONTEXT before the app boots (`addInitScript`), because
+ * it wraps the prototypes the app is about to use.
+ */
+export const GL_LIVENESS_SCRIPT = `(() => {
+  const state = { contexts: [], draws: 0 };
+  window.__knijkaGl = () => ({
+    draws: state.draws,
+    contexts: state.contexts.map((c) => {
+      let lost = "unknown";
+      let buf = "?";
+      let w = 0;
+      try { lost = c.ctx.isContextLost(); } catch { lost = "throw"; }
+      try {
+        w = c.ctx.drawingBufferWidth;
+        buf = c.ctx.drawingBufferWidth + "x" + c.ctx.drawingBufferHeight;
+      } catch { /* gone */ }
+      // ATTACHED, because R3F legitimately throws a context away and makes a
+      // new one, and the discarded one reports lost=true at 0x0 forever. A
+      // stale context is not evidence about the screen; the one hanging off a
+      // canvas that is still in the document is.
+      let attached = false;
+      try { attached = !!c.canvas && document.contains(c.canvas) && w > 0; } catch { attached = false; }
+      return { lost, buf, kind: c.kind, attached };
+    }),
+  });
+  const wrap = (proto, name) => {
+    const original = proto && proto[name];
+    if (typeof original !== "function") return;
+    proto[name] = function (...args) { state.draws += 1; return original.apply(this, args); };
+  };
+  for (const P of [window.WebGLRenderingContext, window.WebGL2RenderingContext]) {
+    if (!P) continue;
+    for (const m of ["drawArrays", "drawElements", "drawArraysInstanced", "drawElementsInstanced", "drawRangeElements"]) {
+      wrap(P.prototype, m);
+    }
+  }
+  const getContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+    const ctx = getContext.call(this, kind, ...rest);
+    if (ctx && /webgl/i.test(String(kind))) state.contexts.push({ ctx, canvas: this, kind: String(kind) });
+    return ctx;
+  };
+})();`;
+
+/**
+ * Is the renderer still alive and still drawing? Two reads `sampleMs` apart.
+ *
+ * `installed:false` means the init script was never added — which must never be
+ * read as "alive", so callers treat it as no evidence at all.
+ *
+ * @param {import("playwright").Page} page
+ * @returns {Promise<{installed:boolean, contexts:Array, anyLost:boolean,
+ *                    draws:number, drawsPerSecond:number, drawing:boolean}>}
+ */
+export async function glLiveness(page, { sampleMs = 600 } = {}) {
+  const read = () => page.evaluate(() => (window.__knijkaGl ? window.__knijkaGl() : null)).catch(() => null);
+  const before = await read();
+  if (!before) return { installed: false, contexts: [], anyLost: false, draws: 0, drawsPerSecond: 0, drawing: false };
+  await page.waitForTimeout(sampleMs);
+  const after = (await read()) ?? before;
+  const delta = Math.max(0, (after.draws ?? 0) - (before.draws ?? 0));
+  const contexts = after.contexts ?? [];
+  // THE LIVE ONES ONLY. Measured 2026-08-09 on the driving shell: after a
+  // viewport resize the page reported TWO contexts — `0x0 lost=true` (the one
+  // R3F threw away) and `393x852 lost=false` still drawing 267 calls/s. Judging
+  // "is the renderer down" from the first of those would refuse a row whose
+  // screen was, on the same read, a photographed street.
+  const live = contexts.filter((c) => c.attached);
+  return {
+    installed: true,
+    contexts,
+    live,
+    discarded: contexts.length - live.length,
+    anyLost: live.length === 0 || live.some((c) => c.lost === true || c.lost === "throw"),
+    draws: after.draws ?? 0,
+    drawsPerSecond: Math.round((delta / sampleMs) * 1000),
+    drawing: delta > 0,
+  };
+}
+
+/**
+ * Is a blank capture the instrument's fault rather than the app's?
+ *
+ * ONLY yes when there is positive evidence on the other side: the script is
+ * installed, at least one WebGL context exists, none of them is lost, and draw
+ * calls are still being issued. Anything else is "no idea", which callers must
+ * treat as the app's problem — the conservative direction.
+ *
+ * @param {Awaited<ReturnType<typeof glLiveness>>} liveness
+ */
+export function isCaptureBlind(liveness) {
+  if (!liveness?.installed) return { blind: false, why: "GL liveness was never installed — no evidence either way" };
+  if (liveness.contexts.length === 0) return { blind: false, why: "no WebGL context was ever created on this page" };
+  const live = liveness.live ?? [];
+  if (live.length === 0) {
+    return { blind: false, why: "no WebGL context is attached to a canvas in the document any more" };
+  }
+  if (live.some((c) => c.lost === true || c.lost === "throw")) {
+    return { blind: false, why: "the live WebGL context IS lost — the renderer really is down" };
+  }
+  if (!liveness.drawing) return { blind: false, why: "no draw calls in the sample window — the renderer has stopped" };
+  return {
+    blind: true,
+    why:
+      `the live context is up (${live.map((c) => c.buf).join(", ")}${
+        liveness.discarded ? `, plus ${liveness.discarded} discarded` : ""
+      }) and still issuing ${liveness.drawsPerSecond} draw calls/s — the renderer is running and this ` +
+      `engine's screenshot path is not`,
+  };
+}
+
 /**
  * Is the app admitting, in its own words, that the world is not up?
  * @param {import("playwright").Page} page

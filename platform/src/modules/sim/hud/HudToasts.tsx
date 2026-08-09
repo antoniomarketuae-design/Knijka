@@ -42,6 +42,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { HudEvent } from "../contracts";
+import { minusPointsBg } from "../rules";
 import {
   TOAST_CARD_WIDTH_CLASS,
   TOAST_MAX_VISIBLE,
@@ -205,8 +206,13 @@ function ToastCard({
             {meta.label}
           </span>
           <span className="flex items-center gap-1">
-            <span className="text-xs font-black tabular-nums" style={{ color: meta.color }}>
-              −{event.points} т.
+            {/* The unit rides ON the number. A bare „−10 т." on a toast is the
+                same misreading as on the result screen, three minutes earlier. */}
+            <span
+              className="whitespace-nowrap text-xs font-black tabular-nums"
+              style={{ color: meta.color }}
+            >
+              {minusPointsBg("exam", event.points)}
             </span>
             <DismissGlyph show={onDismiss !== null} />
           </span>

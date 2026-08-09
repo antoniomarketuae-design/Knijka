@@ -181,18 +181,85 @@ describe("overtake-corridor — THE ABORT IS SACRED (OV-08) + FP battery", () =>
     expect(overtakeOf(ticks)).toHaveLength(0);
   });
 
-  it("FP-5: inside an authored М1 span the corridor stands down (CROSSED_SOLID_LINE's act)", () => {
+  it("FP-5 (was: 'the corridor stands down inside an М1 span') — it now MEASURES there; presence is still not the trigger", () => {
+    // THE PIN WAS INVERTED 2026-08-09, deliberately. It used to assert
+    // silence, on the stage-2b reading that the М1 span "is
+    // CROSSED_SOLID_LINE's act". That was defensible only while
+    // CROSSED_SOLID_LINE billed опасна (10) and the geometry charge stood in
+    // for the danger; the Наредба № 38 review demoted it to основна (3), and
+    // silence here then meant a head-on gamble across a solid line — exactly
+    // where sight distance is worst — billed 3 unless it ended in a
+    // collision. The FP the battery actually needs to guard is the one BELOW:
+    // the corridor must still never convict on POSITION alone.
     const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
     rt.setOncomingQuery(() => TIGHT);
     // ov-solid-v1's span covers y ∈ [90, 230]: the excursion lives wholly inside.
     const ticks = run(rt, northRun(X_OPP, 130, 50, 55));
+    const events = overtakeOf(ticks);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ situation: "overtake-oncoming", violated: true, gapSec: 3 });
+  });
+
+  it("FP-5a: the SAME solid-span excursion with an EMPTY oncoming lane stays silent — geometry alone never convicts", () => {
+    // The false positive the demotion was about, restated as a test: crossing
+    // the paint on an empty road is CROSSED_SOLID_LINE's основна and nothing
+    // else. No 10-point charge may rest on position.
+    const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
+    // No query installed — the default answers "nobody anywhere".
+    const ticks = run(rt, northRun(X_OPP, 130, 50, 55));
     expect(overtakeOf(ticks)).toHaveLength(0);
   });
 
-  it("…and the SAME map's dashed stretch (outside the span) still grades — the gate is the span, not the map", () => {
+  it("FP-5b: a safe measured gap inside the span stays silent too — the band is the same band", () => {
+    const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
+    rt.setOncomingQuery(() => SAFE);
+    const ticks = run(rt, northRun(X_OPP, 130, 50, 55));
+    expect(overtakeOf(ticks)).toHaveLength(0);
+  });
+
+  it("FP-5c: the abort is sacred inside the span too — braking out of the shrinking window never convicts", () => {
+    const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
+    rt.setOncomingQuery(scriptedQuery((frame) => (frame < 20 ? SAFE : TIGHT)));
+    const out: Frame[] = [];
+    let y = 130;
+    for (let i = 0; i < 50; i++) {
+      const speed = i < 20 ? 60 : Math.max(18, 60 - (i - 20) * 1.0 * (3.6 * 0.05 * 5.6));
+      const x = i < 45 ? X_OPP : X_OWN;
+      y += (speed / 3.6) * 0.05;
+      out.push({ pose: { x, y, headingDeg: 0 }, speedKmh: speed });
+    }
+    const ticks = run(rt, [...out, ...northRun(X_OWN, y, 30, 25)]);
+    expect(overtakeOf(ticks)).toHaveLength(0);
+  });
+
+  it("…and the SAME map's dashed stretch (outside the span) still grades — the map is graded end to end", () => {
     const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
     rt.setOncomingQuery(() => TIGHT);
     const ticks = run(rt, northRun(X_OPP, 20, 50, 55)); // y 20..~58 < 90
+    expect(overtakeOf(ticks)).toHaveLength(1);
+  });
+
+  it("THE SEAM NO LONGER ACQUITS: one continuous excursion from dashed INTO the span bills once, not never", () => {
+    // The sharpest consequence of the old clause, and the reason it could not
+    // simply be left alone. The tight episode is accumulated on the dashed
+    // approach; the frame the car touched the paint, `ocArmed` went false, the
+    // else-branch cleared `ocTightSince`/`ocEmitted`, and the sustain restarted
+    // from nothing on the far side. Driving DEEPER into the dangerous half was
+    // an acquittal.
+    //
+    // The arithmetic, so the pin cannot rot into a tautology. 55 km/h at
+    // dt 0.05 is 0.764 m/frame; the run starts on the opposing bank at y = 60,
+    // so ov-solid-v1's span (y ≥ 90) begins at frame 39. The gap enters the
+    // convict band at frame 24 (y ≈ 78 — still dashed) and the sustain is
+    // YIELD_CONVICT_SUSTAIN_SEC = 0.9 s = 18 frames, so the bill is due at
+    // frame 42 — THREE FRAMES PAST THE PAINT. Under the old clause the
+    // else-branch fired at frame 39, cleared `ocTightSince`, and the car then
+    // spent the remaining 31 frames inside the span where nothing was armed:
+    // zero events. The episode has to survive the seam to bill at all.
+    const rt = createWorldRuntime(loadWorld("ov-solid-v1"));
+    rt.setOncomingQuery(scriptedQuery((frame) => (frame < 24 ? SAFE : TIGHT)));
+    const ticks = run(rt, northRun(X_OPP, 60, 70, 55));
+    // The excursion is ONE act: one bill, not two, and not zero.
     expect(overtakeOf(ticks)).toHaveLength(1);
   });
 

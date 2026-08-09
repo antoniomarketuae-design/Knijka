@@ -64,8 +64,17 @@ const OUT_FILE = path.resolve(
 );
 const check = process.argv.includes("--check");
 
-/** Acts we ship full text for — must mirror lib/content/law/corpus.ts ACT_IDS. */
-const ACT_IDS = ["zdvp", "naredba-iz-2539", "naredba-38"];
+/**
+ * Acts we ship full text for, LIFTED FROM corpus.ts — the same reason
+ * `actAliasesFromCorpus` below is lifted rather than retyped, and it has now
+ * bitten once. This was a hand copy carrying the comment "must mirror
+ * lib/content/law/corpus.ts ACT_IDS"; when three acts were wired in, the
+ * aliases (which ARE lifted) started resolving names this list had never
+ * loaded, and the script died on `acts.get(actId).units` with a TypeError
+ * instead of saying anything useful. Two lists that must agree should be one
+ * list.
+ */
+const ACT_IDS = actIdsFromCorpus();
 
 /** Numbered refs whose act is on disk but not yet wired into ACT_IDS. */
 const PENDING_CORPUS = new Set(["Наредба № 24"]);
@@ -104,11 +113,24 @@ for (const id of ACT_IDS) {
  * nothing, and this script would then „refuse" a citation the real resolver
  * accepts.
  */
-function actAliasesFromCorpus() {
-  const src = readFileSync(
+/** corpus.ts, read as text — it is TypeScript and server-only, so it cannot be imported here. */
+function corpusSource() {
+  return readFileSync(
     path.resolve(HERE, "..", "src", "lib", "content", "law", "corpus.ts"),
     "utf8",
   );
+}
+
+function actIdsFromCorpus() {
+  const block = /export const ACT_IDS[\s\S]*?\n\] as const;/.exec(corpusSource());
+  if (block === null) throw new Error("corpus.ts: could not find ACT_IDS");
+  const out = [...block[0].matchAll(/"([a-z0-9-]+)"/g)].map((m) => m[1]);
+  if (out.length === 0) throw new Error("corpus.ts: ACT_IDS parsed to nothing");
+  return out;
+}
+
+function actAliasesFromCorpus() {
+  const src = corpusSource();
   const block = /const ACT_ALIASES[\s\S]*?\n\];/.exec(src);
   if (block === null) throw new Error("corpus.ts: could not find ACT_ALIASES");
   const out = [];
@@ -133,7 +155,13 @@ function normaliseUnitRef(ref) {
   if (art) return `чл. ${art[1]}${art[2] ?? ""}`;
   const para = /^§\s*(\d+)([а-я]?)(?![а-яА-Я])/.exec(s);
   if (para) return `§ ${para[1]}${para[2] ?? ""}`;
-  const annex = /^(?:приложение|Приложение|ПРИЛОЖЕНИЕ)\s*№?\s*(\d+[а-я]?)(?![а-яА-Я])/.exec(s);
+  // „прил. № 2" IS an annex number. Recognising only the full word is what let
+  // 74 bank citations (40 distinct, 100% on Наредба № РД-02-21-1, an act
+  // content/law/acts does not hold) pass this script's NUMBERLESS branch — a
+  // branch written to catch exactly them. Kept in step with the real resolver,
+  // `lib/content/law/corpus.ts` ANNEX_RE.
+  const annex =
+    /^(?:приложение|Приложение|ПРИЛОЖЕНИЕ|прил|Прил|ПРИЛ)\.?\s*№?\s*(\d+[а-я]?)(?![а-яА-Я])/.exec(s);
   if (annex) return `приложение № ${annex[1]}`;
   return null;
 }
@@ -298,12 +326,18 @@ console.log(
   `INSIDE student-facing prose (${prose.filter((r) => r.status === "approved").length} approved) — ` +
   `no citation pin can see inside a sentence`,
 );
+// Was a warning line, is now a fact: the abbreviated form is INSIDE the rule.
+// `normaliseUnitRef` above recognises „прил. № N", so any survivor is refused
+// by `classify` and the script never reaches here. Printed anyway, because the
+// count going non-zero would mean the widening was reverted, not that new
+// citations slipped past.
 const annexLocators = rows.flatMap((r) =>
   (r.lawRefs ?? []).filter((l) => /^\s*прил\.\s*№?\s*\d/.test(l.ref)),
 );
 console.log(
-  `NOT COVERED BY THE „no number" RULE: ${annexLocators.length} refs use the abbreviated ` +
-  `„прил. № N" form, which names an annex we cannot open`,
+  `abbreviated „прил. № N" annex locators: ${annexLocators.length} ` +
+  `(the „no number" rule now covers them — a non-zero count here can only mean ` +
+  `normaliseUnitRef stopped seeing the abbreviation)`,
 );
 
 if (check) {

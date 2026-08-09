@@ -109,7 +109,15 @@ import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/ca
 /** How long the completed pre-drive checklist stays on screen after the
  *  thirteenth step rolls the car away — see the state that uses it. */
 const PRE_DRIVE_DONE_HOLD_MS = 7000;
-import { accumulateScore, VIOLATIONS, type SimTick } from "@/modules/sim/rules";
+import {
+  accumulateScore,
+  EXAM_POINTS_SHORT_NOTE_BG,
+  examMarkCitationBg,
+  minusPointsBg,
+  pointsBg,
+  VIOLATIONS,
+  type SimTick,
+} from "@/modules/sim/rules";
 import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
@@ -1809,7 +1817,7 @@ export function LessonPlayShell({
                   : result.passed
                     ? ("good" as const)
                     : ("warn" as const),
-              chipBg: resultHeld ? null : `${result.score} т.`,
+              chipBg: resultHeld ? null : pointsBg("exam", result.score),
               lineBg: resultHeld
                 ? "Сесията завърши — първо се самооцени"
                 : result.aborted
@@ -1833,7 +1841,11 @@ export function LessonPlayShell({
               tone: "teach" as const,
               chipBg: "Учебен момент",
               lineBg: teachQueue[0].titleBg,
-              detailBg: `${teachQueue[0].explanationBg}\n\nПърва среща — не се брои в резултата. При повторение: −${teachQueue[0].points} т., а повторните грешки тежат още повече (×1.5 / ×2.0).`,
+              // The SAME sentence the teach card carries, and it had the SAME
+              // bare „т.". Both now name the scale and the clause the number
+              // comes out of — а chip reading „ЗДвП чл. 21" beside a 10-point
+              // mark is what the founder read as his licence being docked.
+              detailBg: `${teachQueue[0].explanationBg}\n\nПърва среща — не се брои в резултата. При повторение: ${minusPointsBg("exam", teachQueue[0].points)} по ${examMarkCitationBg(teachQueue[0].severity)}, а повторните грешки тежат още повече (×1.5 / ×2.0).\n\n${EXAM_POINTS_SHORT_NOTE_BG}`,
               lawRef: teachQueue[0].lawRef ?? null,
               blocking: true,
               onAck: handleTeachAcknowledged,
@@ -1850,7 +1862,7 @@ export function LessonPlayShell({
                   id: `toast:${t.id}`,
                   kind: "violation",
                   tone: t.event.severity === "vtorostepenna" ? "warn" : "danger",
-                  chipBg: `−${t.event.points} т.`,
+                  chipBg: minusPointsBg("exam", t.event.points),
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
                   lawRef: t.event.lawRef ?? null,
@@ -2675,8 +2687,11 @@ export function LessonPlayShell({
               aria-label="Протокол — наказателни точки"
               className="hud-ghost rounded-xl border border-border px-3 py-2 text-xs"
             >
+              {/* „/ 9 т." named nothing. The tally IS the exam sheet, so the
+                  strip says which sheet — the founder read the same unit on the
+                  result screen as контролни точки off his licence. */}
               <p className="text-[10px] font-black uppercase tracking-wider text-muted">
-                Протокол
+                Протокол · Наредба № 38
               </p>
               <p className="mt-0.5 flex items-baseline gap-1 font-black tabular-nums">
                 <span
@@ -2686,7 +2701,7 @@ export function LessonPlayShell({
                 >
                   {snap.examTally.totalPoints}
                 </span>
-                <span className="font-semibold text-muted">/ 9 т.</span>
+                <span className="font-semibold text-muted">/ {pointsBg("exam", 9)}</span>
               </p>
               <p className="text-[10px] font-semibold tabular-nums text-muted">
                 основни {snap.examTally.osnovniPoints} / 6

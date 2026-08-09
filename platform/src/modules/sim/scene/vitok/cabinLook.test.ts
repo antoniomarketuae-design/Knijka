@@ -53,9 +53,11 @@ describe("cabin look · the projection is the SHIPPED cockpit camera", () => {
     const doorMirrorLeft = at([0.905, 0.455, 0.592]);
     expect(doorMirrorLeft.x).toBeCloseTo(0.001, 3);
     expect(doorMirrorLeft.y).toBeCloseTo(0.24, 3);
-    const interiorMirror = at([0, 0.803, 0.5]);
-    expect(interiorMirror.x).toBeCloseTo(0.708, 3);
-    expect(interiorMirror.y).toBeCloseTo(0.724, 3);
+    // B58 raised the mirror station 105 mm (the В26 «50» the speed lessons tell
+    // the student to read sat behind the glass); the landmark moved with it.
+    const interiorMirror = at([0, 0.908, 0.5]);
+    expect(interiorMirror.x).toBeCloseTo(0.71, 3);
+    expect(interiorMirror.y).toBeCloseTo(0.889, 3);
   });
 
   it("reports a point behind the lens as not-ahead instead of guessing", () => {

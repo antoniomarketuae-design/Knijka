@@ -2,7 +2,7 @@
 
 > **GENERATED FILE** — rebuild with `node tools/theory/verify_drafts.mjs --report`
 > after any content edit or approval batch. Manual edits will be overwritten.
-> Generated: 2026-08-03. Mechanical checks only — no machine ever
+> Generated: 2026-08-09. Mechanical checks only — no machine ever
 > judges content. **draft → approved is HUMAN-ONLY** (the founder).
 
 ## 1. Totals
@@ -12,8 +12,8 @@
 | draft (this queue) | 0 |
 | — CLEAN (passed every mechanical check) | 0 |
 | — FLAGGED (at least one precise issue) | 0 |
-| needs-review (separate pass — see §3) | 290 |
-| approved | 799 |
+| needs-review (separate pass — see §3) | 293 |
+| approved | 796 |
 
 Estimated total review time: **~1 min** (20s per clean, 120s per flagged), splittable per topic below.
 
@@ -37,7 +37,7 @@ Estimated total review time: **~1 min** (20s per clean, 120s per flagged), split
 
 ## 3. The ~290 flagged questions from PROGRESS §7 — cross-reference
 
-The list EXISTS AS DATA: it is exactly the 290 questions with
+The list EXISTS AS DATA: it is exactly the 293 questions with
 `status: "needs-review"`. 288 of them carry the machine-visible markers
 ('?'-suffixed lawRef or a `[REVIEW: …]` note); the adversarial audits'
 `flaggedLegal` tallies (`content/audits/*.audit.json`) account for 152 —
@@ -55,14 +55,14 @@ writes). Per-topic needs-review counts:
 | signali-i-markirovka | 10 |
 | predimstvo | 3 |
 | krastovishta | 38 |
-| skorost-i-distantsia | 15 |
+| skorost-i-distantsia | 17 |
 | manevri-i-izprevarvane | 29 |
 | uyazvimi-uchastnitsi | 18 |
 | magistrali-i-izvangradsko | 3 |
 | spirane-i-parkirane | 22 |
 | nosht-i-uslozhneni-uslovia | 3 |
 | alkohol-i-godnost | 21 |
-| dokumenti-i-sanktsii | 27 |
+| dokumenti-i-sanktsii | 28 |
 | ptp-i-parva-pomosht | 33 |
 | eko-i-zashtitno-shofirane | 6 |
 
@@ -163,9 +163,9 @@ statistics. Per-file numbers:
 | `nosht-i-uslozhneni-uslovia` | 41 | 11 / 10 / 10 / 10 | 10 (24.4%) | 23.2% |
 | `alkohol-i-godnost` | 39 | 10 / 10 / 10 / 9 | 9 (23.1%) | 22.4% |
 | `dokumenti-i-sanktsii` | 37 | 8 / 12 / 9 / 8 | 9 (24.3%) | 25.0% |
-| `ptp-i-parva-pomosht` | 40 | 10 / 10 / 10 / 10 | 9 (22.5%) | 24.4% |
+| `ptp-i-parva-pomosht` | 40 | 10 / 11 / 10 / 9 | 12 (30.0%) | 24.4% |
 | `eko-i-zashtitno-shofirane` | 39 | 10 / 10 / 10 / 9 | 7 (17.9%) | 21.2% |
-| **whole bank** | 698 | 175 / 180 / 177 / 166 | 165 (23.6%) | 22.5% |
+| **whole bank** | 698 | 175 / 181 / 177 / 165 | 168 (24.1%) | 22.5% |
 
 ## 6. Duplicates and near-duplicates (whole bank — pairs, no judgment)
 

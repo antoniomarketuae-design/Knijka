@@ -43,6 +43,12 @@ import {
   formatCalibrationError,
   type CalibrationVerdict,
 } from "@/modules/learning/calibration";
+import {
+  EXAM_POINTS_SHORT_NOTE_BG,
+  EXAM_SCALE_SOURCE_BG,
+  examPointsForClassBg,
+  pointsBg,
+} from "@/modules/sim/rules";
 
 /** What the owner gets back once the gate resolves — enough to render the
  *  reveal without re-deriving anything the server already decided. */
@@ -176,7 +182,7 @@ export function CalibrationGate({
               Ти каза
             </dt>
             <dd className="mt-1 text-2xl font-black tabular-nums">
-              {reveal.predictedPoints} т.
+              {pointsBg("exam", reveal.predictedPoints)}
               <span className="ml-2 align-middle text-xs font-bold text-muted">
                 {reveal.predictedPass ? "издържан" : "неиздържан"}
               </span>
@@ -187,13 +193,18 @@ export function CalibrationGate({
               Изпитът каза
             </dt>
             <dd className="mt-1 text-2xl font-black tabular-nums" style={{ color: tone }}>
-              {reveal.actualPoints} т.
+              {pointsBg("exam", reveal.actualPoints)}
               <span className="ml-2 align-middle text-xs font-bold text-muted">
                 {reveal.actualPass ? "издържан" : "неиздържан"}
               </span>
             </dd>
           </div>
         </dl>
+
+        {/* This gate stands in FRONT of the result screen, so it is the first
+            place a student meets their own number — and it showed it as a bare
+            „20 т." on both tiles. Same repair as the screen behind it. */}
+        <p className="text-[11px] leading-relaxed text-muted">{EXAM_POINTS_SHORT_NOTE_BG}</p>
 
         <p className="text-sm leading-relaxed">{reveal.bodyBg}</p>
 
@@ -253,8 +264,9 @@ export function CalibrationGate({
           className="w-32 rounded-xl border border-border bg-surface-2/50 px-3 py-2 font-mono text-lg font-black tabular-nums"
         />
         <span id="sim-calibration-hint" className="text-[11px] text-muted">
-          Цяло число от 0 до {MAX_PREDICTED_POINTS}. Опасна грешка = 10 т.,
-          основна = 3 т., второстепенна = 1 т.
+          Цяло число от 0 до {MAX_PREDICTED_POINTS}. Опасна грешка ={" "}
+          {examPointsForClassBg("opasna")}, основна = {examPointsForClassBg("osnovna")},
+          второстепенна = {examPointsForClassBg("vtorostepenna")} ({EXAM_SCALE_SOURCE_BG}).
         </span>
       </label>
 

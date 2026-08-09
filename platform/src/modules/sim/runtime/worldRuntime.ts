@@ -1792,14 +1792,46 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // above; the director appends after sample(), so event order holds).
       // Bands, disciplines and exemptions documented at
       // OVERTAKE_CONVICT_GAP_SEC; state doc at the oc* declarations.
-      const ocArmed =
+      //
+      // THE М1 SEAM, 2026-08-09 — the corridor now measures INSIDE solid spans.
+      // -----------------------------------------------------------------------
+      // This predicate used to carry `tick.solidCenterLine !== true`, on the
+      // stage-2b reading that an М1 span "is CROSSED_SOLID_LINE's act". While
+      // that code billed опасна (10) the omission was invisible: the geometry
+      // charge stood in for the danger. The 2026-08-09 Наредба № 38 review
+      // demoted CROSSED_SOLID_LINE to основна (3) — correctly, because the
+      // detector establishes no предпоставка — and that made the omission the
+      // whole exposure: nothing measured oncoming traffic exactly where sight
+      // distance is worst, so a head-on gamble across a solid line billed 3
+      // unless it ended in a collision. A single continuous overtake also
+      // LOST its accumulated tight-gap episode the frame it touched the paint
+      // (the else-branch below clears ocTightSince/ocEmitted), so driving
+      // deeper into the dangerous half actively acquitted the driver.
+      //
+      // Two acts, two laws, two lessons — the catalogue's own stage-2b ruling,
+      // and the SPEED_TOO_FAST_FOR_CURVE precedent: crossing the paint is
+      // Наредба № 2/2001 М1 (knowledge — б. „а"), gambling against a closing
+      // oncoming car is ЗДвП чл. 42, ал. 1 („свободен път на разстояние,
+      // достатъчно за маневрата"). Where both happen, both grade.
+      //
+      // WHAT IS DELIBERATELY *NOT* CHANGED: the OV-09 RETURN tracker below
+      // keeps the seam byte-for-byte (`orArmed`). Its adjudication fires on
+      // the frame the excursion ends as a committed return, and its own exit
+      // test already requires `solidCenterLine !== true`; sc-ov-solid-return's
+      // whole pedagogy is that an excursion which lands inside the span is
+      // CROSSED_SOLID_LINE's alone. Widening the corridor is a measurement;
+      // widening the return would be a second charge for the same landing.
+      const ocBase =
         tick.opposingBank === true &&
-        tick.solidCenterLine !== true && // М1 span = CROSSED_SOLID_LINE's act
         edgeRt !== null &&
         !edgeRt.edge.oneway &&
         edgeRt.edge.lanes >= 2 && // narrow two-way = the OV-14 runner's act
         nearestIx === null && // junction sweeps = the JU-10 tracker's act
         v.gear >= 0; // reverse maneuvering is exempt (A12)
+      /** Head-on measurement: armed on dashed AND solid осева alike. */
+      const ocArmed = ocBase;
+      /** OV-09 return adjudication: the М1 seam, exactly as shipped. */
+      const orArmed = ocBase && tick.solidCenterLine !== true;
       if (ocArmed) {
         ocExcursion = true;
         const committed = v.speedKmh > OVERTAKE_COMMIT_MIN_KMH;
@@ -1863,12 +1895,12 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         ocTightGapSec = undefined;
       }
       // 6a'. OVERTAKE-RETURN tracker (doc 72 OV-09) — rides the corridor's
-      // OWN armed context (ocArmed above): the pass phases are watched during
-      // the opposing-bank excursion, the single adjudication happens on the
-      // frame the excursion ends as a COMMITTED RETURN to the own bank.
-      // Bands + the reference-speed latch documented at
-      // OVERTAKE_RETURN_CONVICT_GAP_SEC.
-      if (ocArmed) {
+      // OWN armed context, MINUS the М1 span (`orArmed` above): the pass
+      // phases are watched during the opposing-bank excursion, the single
+      // adjudication happens on the frame the excursion ends as a COMMITTED
+      // RETURN to the own bank. Bands + the reference-speed latch documented
+      // at OVERTAKE_RETURN_CONVICT_GAP_SEC.
+      if (orArmed) {
         orExcursion = true;
         // One act, one code: the corridor billing this same excursion stands
         // the return adjudication down (read while still armed — the oc

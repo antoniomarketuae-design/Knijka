@@ -87,6 +87,13 @@ export interface PerQuestionResult {
   /** The question weight (1 | 2 | 3). */
   maxPoints: number;
   correctOptionIds: string[];
+  /**
+   * `review.ts teachingPin` of the question the grader actually read. Stamped
+   * HERE, by the code that read it, so the fingerprint persisted with the grade
+   * and the fingerprint rendered on the post-submit screen are the same value
+   * computed once — not two reads that happen to agree (door 6).
+   */
+  contentPin: string;
 }
 
 export interface GradeResult {
@@ -174,6 +181,24 @@ export interface ExamReviewOption {
  * the full option set with correct flags, the explanation and the citations.
  * Safe by construction — only reachable for an attempt that is already closed.
  */
+/**
+ * Whether the text beside a frozen verdict is still the text that earned it
+ * (docs/education/92 §10.3 — door 6). Decided at READ time by
+ * `review.ts reviewIntegrity`; four of the five states are visible to the
+ * student as `noticeBg`, and none of them changes a point.
+ *
+ *   verified   the graded fingerprint matches the bank today, and the row is
+ *              still cleared. The only state that says nothing.
+ *   unpinned   graded before fingerprints existed. Today's text is shown and
+ *              LABELLED as today's — an unknown, reported as an unknown.
+ *   moved      the row was edited after the exam. Withheld: the new key beside
+ *              the old verdict is the actual defect.
+ *   withdrawn  `questionClearance` refuses it now — rejected to `draft`, or its
+ *              citation pin moved.
+ *   gone       no longer in the bank at all.
+ */
+export type ReviewIntegrity = "verified" | "unpinned" | "moved" | "withdrawn" | "gone";
+
 export interface ExamReviewQuestion {
   questionId: string;
   textBg: string;
@@ -188,10 +213,18 @@ export interface ExamReviewQuestion {
   options: ExamReviewOption[];
   explanationBg: string;
   lawRefs: { act: string; ref: string }[];
+  /** Door 6: is this still the row that was graded? */
+  integrity: ReviewIntegrity;
+  /** Claim-free Bulgarian for a row that is not `verified`; "" when it is. */
+  noticeBg: string;
   /** Primary topic — null when the question has left the bank. */
   topicSlug: string | null;
   topicTitleBg: string | null;
 }
+
+/** A review row before the topic breakdown is attached — what both surfaces
+ *  build (see `review.ts buildReviewRow`). */
+export type ExamReviewRow = Omit<ExamReviewQuestion, "topicSlug" | "topicTitleBg">;
 
 /** How one topic went in this exam — the row a "practise this" link hangs off. */
 export interface ExamTopicResult {

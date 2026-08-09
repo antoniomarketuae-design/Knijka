@@ -76,7 +76,14 @@ export type {
   SupplyProblemCode,
 } from "./supply";
 export { setExamStore, InMemoryExamStore, type ExamStore } from "./store";
-export { parseGradedAnswers, rehydrateReview, type GradedAnswerRecord } from "./review";
+export {
+  buildReviewRow,
+  parseGradedAnswers,
+  rehydrateReview,
+  reviewIntegrity,
+  type GradedAnswerRecord,
+} from "./review";
+export { teachingPin } from "./pin";
 export {
   EXAM_QUESTION_COUNT,
   EXAM_MAX_POINTS,
@@ -100,8 +107,10 @@ export type {
   ExamReview,
   ExamReviewOption,
   ExamReviewQuestion,
+  ExamReviewRow,
   ExamTopicResult,
   InProgressExam,
+  ReviewIntegrity,
 } from "./types";
 
 // -- attempt payload (ExamAttempt.answers JSON) ------------------------------
@@ -352,9 +361,16 @@ export async function submitExam(
     score: grade.score,
     passed,
     // schema contract: answers Json =
-    //   [{questionId, optionIds, correct, points, maxPoints}]
+    //   [{questionId, optionIds, correct, points, maxPoints, contentPin}]
     // `maxPoints` is the weight AS GRADED: getExamReview must not let a later
     // content edit change what the candidate could have scored (audit M-1).
+    //
+    // `contentPin` closes the other half of that same thought (door 6,
+    // docs/education/92 §10.3). Freezing the NUMBER while leaving the TEXT live
+    // is what let `/review` put a re-edited answer key beside an old verdict.
+    // Storing the text would put back the ~39 KB per attempt M-1 removed, so
+    // what is stored is 16 hex of it — ~0.7 KB for a 45-question paper — and
+    // `review.ts` compares it at read time.
     answers: grade.perQuestion.map((p) => ({
       questionId: p.questionId,
       optionIds:
@@ -362,6 +378,7 @@ export async function submitExam(
       correct: p.correct,
       points: p.points,
       maxPoints: p.maxPoints,
+      contentPin: p.contentPin,
     })),
   });
 

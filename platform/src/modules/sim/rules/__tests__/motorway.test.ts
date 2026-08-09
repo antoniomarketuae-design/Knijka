@@ -181,6 +181,41 @@ describe("emergency-lane detector (EMERGENCY_LANE_DRIVING)", () => {
     expect(codes(drive(ticks).events)).not.toContain("EMERGENCY_LANE_DRIVING");
   });
 
+  it("an emergencyLane span OFF a motorway never convicts — чл. 58 opens „при движение по автомагистрала“", () => {
+    // Added 2026-08-09 with the Наредба № 38 re-grounding (rules/n38.ts). The
+    // 10 rests on the lane's legal purpose, and that purpose is a MOTORWAY
+    // fact; the cited article is expressly conditioned on motorway travel. The
+    // detector used to arm on the authored span alone, so a span authored on
+    // an urban street would have billed 10 points citing an article that does
+    // not reach it. All three shipped spans (mw-v1, mw-entry-v1, mw-exit-v1)
+    // sit on `motorway: true` edges, so nothing shipped moves — this pins the
+    // charge to the road its citation names.
+    const ticks = [0, 1, 2, 3, 4, 5].map((t) =>
+      tick(t, {
+        maxSpeedKmh: 50,
+        emergencyLaneRight: true,
+        laneId: 0,
+        laneCount: 3,
+        speedKmh: 45,
+      }),
+    );
+    expect(codes(drive(ticks).events)).not.toContain("EMERGENCY_LANE_DRIVING");
+  });
+
+  it("…and the SAME frames WITH the motorway tag do convict — the gate is the tag, not the fixture", () => {
+    const ticks = [0, 1, 2, 3, 4, 5].map((t) =>
+      tick(t, {
+        maxSpeedKmh: 50,
+        motorway: true,
+        emergencyLaneRight: true,
+        laneId: 0,
+        laneCount: 3,
+        speedKmh: 45,
+      }),
+    );
+    expect(codes(drive(ticks).events)).toContain("EMERGENCY_LANE_DRIVING");
+  });
+
   it("grades опасна (10 т.) on the verified чл. 58, т. 4 basis with the prohibitions concept", () => {
     const ticks = [0, 1, 2, 3, 4].map((t) => mw(t, { speedKmh: 100, laneId: 0 }));
     const ev = drive(ticks).events.find(

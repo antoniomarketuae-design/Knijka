@@ -5,9 +5,17 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-/** The fetched originals sit next to this script (see .gitignore). */
-const SCRATCH = path.dirname(new URL(import.meta.url).pathname.replace(/^\//, ""));
+/**
+ * The fetched originals sit next to this script (see .gitignore).
+ *
+ * `fileURLToPath`, not `new URL(...).pathname` — the pathname is percent-encoded
+ * and does not survive this repo's own checkout path: the space in "E:\AI driver"
+ * comes back as "%20" and every read fails with ENOENT on
+ * "E:\AI%20driver\content\law\tools\…". Matches build-speed-acts.mjs.
+ */
+const SCRATCH = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.argv[2];
 const RETRIEVED = "2026-08-03";
 

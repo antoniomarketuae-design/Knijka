@@ -182,8 +182,10 @@ describe("repeat-penalty escalation lands in effective points", () => {
     // Debrief names the repeat and keeps both scores visible.
     const debrief = buildDebrief(lesson, result).text;
     expect(debrief).toContain("повторна грешка ×2");
-    expect(debrief).toContain("Тренировъчен резултат: 4.5 т.");
-    expect(debrief).toContain("остава 3 т.");
+    // The unit is on both numbers now — a bare „т." reads as контролни точки
+    // (the licence) to a Bulgarian, which is the misreading this wave closes.
+    expect(debrief).toContain("Тренировъчен резултат: 4.5 наказателни т.");
+    expect(debrief).toContain("остава 3 наказателни т.");
   });
 
   it("always-grade (опасна) escalates from its second encounter", () => {

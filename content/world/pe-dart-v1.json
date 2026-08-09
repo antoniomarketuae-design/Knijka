@@ -58,6 +58,10 @@
    "curbToCurbM": 16.25,
    "carriageway": "bay-pocket-near",
    "carriagewayNoteBg": "Тръгваш по тясно 16,25-метрово платно, а на три метра пред теб то се разширява в паркинг джоб пред гаражите — 24,25 м със спрели коли, и после отново се стеснява преди пътеката.",
+   "crossingKit": "angled-table",
+   "crossingKitNoteBg": "Повдигната пътека, положена под ъгъл спрямо оста на платното: рампа и наклонени ленти едновременно.",
+   "parkedSide": "left",
+   "parkedMix": "veteran",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -200,7 +204,9 @@
       50
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "left",
+    "parkingMix": "veteran"
    },
    {
     "id": "pe-e-alley",
@@ -237,7 +243,9 @@
    "y": 80,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "skewDeg": -12,
+   "tableRampM": 2.2
   }
  ],
  "roundabouts": [],

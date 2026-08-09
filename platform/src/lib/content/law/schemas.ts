@@ -14,6 +14,7 @@
 import { z } from "zod";
 import type {
   ControlPointsPenalty,
+  DisqualificationPenalty,
   ExamPointsPenalty,
   FigureStatus,
   FineInstrument,
@@ -24,6 +25,7 @@ import type {
   LawUnit,
   PenaltyBank,
   PenaltyCitation,
+  PenaltyConduct,
   PenaltyEntry,
   SourceCoverage,
 } from "./types";
@@ -114,10 +116,59 @@ export const PenaltyCitationSchema = z.strictObject({
   pointRef: z.string().min(1).optional(),
   quoteBg: z.string().min(8, "a citation quote must be long enough to be checkable"),
   contextQuoteBg: z.string().min(8).optional(),
+  // Checked for real in corpus.ts, where the act text is available: it must
+  // occur in the cited unit AND inside the quotes. Here we only refuse a phrase
+  // too short to identify anything — „скорост" would match half the statute.
+  offencePhraseBg: z.string().min(12, "an offence phrase must be specific enough to identify one offence").optional(),
 });
 
+/**
+ * The row's declaration of what it prices. Everything with teeth is in
+ * corpus.ts, where the act text is available — the anchors must be findable in
+ * the act, the statement must satisfy them, and every offence phrase on the row
+ * must satisfy them too. Here we only refuse the shapes that would make that
+ * check vacuous:
+ *
+ *  - an EMPTY anchor set, which every phrase satisfies;
+ *  - a group of nothing but two-letter fragments. „Б2" is a legitimate
+ *    alternative — it identifies one sign — but a group in which NOTHING is
+ *    longer than three characters is a group that matches by accident, so at
+ *    least one alternative must be substantial.
+ */
+export const PenaltyConductSchema = z
+  .strictObject({
+    statementBg: z.string().min(20, "the conduct statement must be a sentence a reviewer can judge"),
+    anchorsBg: z
+      .array(z.array(z.string().min(2)).min(1, "an anchor group needs at least one alternative"))
+      .min(1, "a conduct with no anchors is satisfied by every sentence, including the wrong one"),
+  })
+  .check((ctx) => {
+    ctx.value.anchorsBg.forEach((group, i) => {
+      if (!group.some((a) => a.trim().length >= 4)) {
+        ctx.issues.push({
+          code: "custom",
+          message: `anchor group ${i} has no alternative longer than three characters — a group that short matches by accident`,
+          input: ctx.value,
+          path: ["anchorsBg", i],
+        });
+      }
+      const seen = new Set<string>();
+      for (const a of group) {
+        if (seen.has(a)) {
+          ctx.issues.push({
+            code: "custom",
+            message: `anchor group ${i} repeats "${a}"`,
+            input: ctx.value,
+            path: ["anchorsBg", i],
+          });
+        }
+        seen.add(a);
+      }
+    });
+  });
+
 export const FigureStatusSchema = z.enum(["grounded", "not-listed", "unknown"]);
-export const FineInstrumentSchema = z.enum(["фиш", "акт"]);
+export const FineInstrumentSchema = z.enum(["фиш", "електронен фиш", "акт"]);
 
 /**
  * status ⇄ value coupling, shared by all three systems. Pure: returns the
@@ -147,14 +198,64 @@ export const FinePenaltySchema = z
     system: z.literal("fine"),
     status: FigureStatusSchema,
     amountBgn: z.number().nonnegative().nullable(),
-    instrument: FineInstrumentSchema,
-    instrumentSource: PenaltyCitationSchema,
+    instrument: FineInstrumentSchema.nullable(),
+    instrumentSource: PenaltyCitationSchema.nullable(),
     source: PenaltyCitationSchema,
     noteBg: z.string().min(1).nullable(),
   })
   .check((ctx) => {
     for (const message of figureProblems(ctx.value.status, ctx.value.amountBgn, "amountBgn")) {
       ctx.issues.push({ code: "custom", message, input: ctx.value, path: ["amountBgn"] });
+    }
+    // An instrument is a claim about the law, so it needs the rule that permits
+    // it — and naming a rule while claiming no instrument is a dangling cite.
+    if ((ctx.value.instrument === null) !== (ctx.value.instrumentSource === null)) {
+      ctx.issues.push({
+        code: "custom",
+        message:
+          "instrument and instrumentSource must be null together — an instrument without the rule that permits it is an assertion from memory, which is the thing ADR-002 forbids",
+        input: ctx.value,
+        path: ["instrumentSource"],
+      });
+    }
+  });
+
+/**
+ * Лишаване от право. Same status⇄value coupling as the three figure systems,
+ * plus one of its own: a grounded ban must quote its duration in the act's own
+ * words, and `durationBg` must be a substring of the quote (checked at load in
+ * corpus.ts, where the act text is available).
+ */
+export const DisqualificationPenaltySchema = z
+  .strictObject({
+    system: z.literal("disqualification"),
+    status: FigureStatusSchema,
+    months: z.number().int().nonnegative().nullable(),
+    durationBg: z.string().min(1).nullable(),
+    source: PenaltyCitationSchema,
+    noteBg: z.string().min(1).nullable(),
+  })
+  .check((ctx) => {
+    const v = ctx.value;
+    for (const message of figureProblems(v.status, v.months, "months")) {
+      ctx.issues.push({ code: "custom", message, input: v, path: ["months"] });
+    }
+    if (v.status === "grounded" && v.durationBg === null) {
+      ctx.issues.push({
+        code: "custom",
+        message:
+          'a grounded лишаване must carry durationBg — the act\'s own words for the period ("6 месеца", "два месеца"), because rendering the number ourselves is paraphrase',
+        input: v,
+        path: ["durationBg"],
+      });
+    }
+    if (v.status !== "grounded" && v.durationBg !== null) {
+      ctx.issues.push({
+        code: "custom",
+        message: `status "${v.status}" claims no period is established, so durationBg must be null`,
+        input: v,
+        path: ["durationBg"],
+      });
     }
   });
 
@@ -187,16 +288,61 @@ export const ExamPointsPenaltySchema = z
     }
   });
 
-export const PenaltyEntrySchema = z.strictObject({
-  id: z.string().regex(/^pen-[a-z0-9-]+$/, 'penalty id must be kebab-case with "pen-" prefix'),
-  titleBg: z.string().min(1),
-  summaryBg: z.string().min(1),
-  fine: FinePenaltySchema,
-  controlPoints: ControlPointsPenaltySchema,
-  examPoints: ExamPointsPenaltySchema.nullable(),
-  lawRefs: z.array(LawRefSchema).min(1, "every penalty must cite at least one lawRef"),
-  status: ContentStatusSchema,
-});
+export const PenaltyEntrySchema = z
+  .strictObject({
+    id: z.string().regex(/^pen-[a-z0-9-]+$/, 'penalty id must be kebab-case with "pen-" prefix'),
+    titleBg: z.string().min(1),
+    summaryBg: z.string().min(1),
+    conduct: PenaltyConductSchema,
+    fine: FinePenaltySchema,
+    controlPoints: ControlPointsPenaltySchema,
+    disqualification: DisqualificationPenaltySchema,
+    examPoints: ExamPointsPenaltySchema.nullable(),
+    lawRefs: z.array(LawRefSchema).min(1, "every penalty must cite at least one lawRef"),
+    status: ContentStatusSchema,
+  })
+  .check((ctx) => {
+    /**
+     * THE INSTRUMENT IS DERIVED, NOT CHOSEN — and this is the whole reason
+     * `disqualification` exists as a field.
+     *
+     * Three of the first six entries carried `instrument: "акт"` on the
+     * inference „контролни точки се отнемат само с наказателно постановление,
+     * значи по акт". ДВ, бр. 64 от 2025 г. ended that inference: a фиш now
+     * carries контролни точки itself (чл. 186, ал. 1) and so does an електронен
+     * фиш (чл. 189, ал. 5, т. 8), and Наредба № Iз-2539 чл. 2, ал. 6 names all
+     * three as bases for deduction. The one test the statute actually states is
+     * whether ЛИШАВАНЕ ОТ ПРАВО is provided:
+     *
+     *   чл. 186, ал. 1 — „За административни нарушения, за които НЕ Е
+     *     ПРЕДВИДЕНО наказание лишаване от право да управлява моторно превозно
+     *     средство, може да бъде наложена с фиш глоба…"
+     *   чл. 189, ал. 4 — the identical condition for an електронен фиш.
+     *
+     * So the ban fixes the instrument, and an entry that has not established
+     * the ban may not name one. Nothing below is a style rule: each branch is a
+     * sentence in the act.
+     */
+    const { fine, disqualification: ban } = ctx.value;
+    const push = (message: string): void => {
+      ctx.issues.push({ code: "custom", message, input: ctx.value, path: ["fine", "instrument"] });
+    };
+    if (ban.status === "grounded" && fine.instrument !== "акт") {
+      push(
+        `лишаване от право is provided (${ban.durationBg ?? "?"}), so ЗДвП чл. 186, ал. 1 and чл. 189, ал. 4 both bar a фиш — instrument must be "акт", not "${fine.instrument}"`,
+      );
+    }
+    if (ban.status === "not-listed" && fine.instrument !== "фиш" && fine.instrument !== "електронен фиш") {
+      push(
+        `no лишаване is provided for this offence, so ЗДвП чл. 186, ал. 1 permits a фиш — instrument must be "фиш" or "електронен фиш", not "${fine.instrument}". (An акт is still drawn up if the driver disputes it, чл. 186, ал. 2 — that belongs in noteBg, not here: it is a fact about the driver, not about the offence.)`,
+      );
+    }
+    if (ban.status === "unknown" && fine.instrument !== null) {
+      push(
+        'whether лишаване is provided has not been established, so no instrument may be claimed — instrument must be null, the same ruling that forbids a guessed number',
+      );
+    }
+  });
 
 export const PenaltyBankSchema = z
   .strictObject({
@@ -232,10 +378,12 @@ export type LawSchemasMirrorTypes = [
   Assert<Equals<z.infer<typeof LawUnitSchema>, LawUnit>>,
   Assert<Equals<z.infer<typeof LawActSchema>, LawAct>>,
   Assert<Equals<z.infer<typeof PenaltyCitationSchema>, PenaltyCitation>>,
+  Assert<Equals<z.infer<typeof PenaltyConductSchema>, PenaltyConduct>>,
   Assert<Equals<z.infer<typeof FigureStatusSchema>, FigureStatus>>,
   Assert<Equals<z.infer<typeof FineInstrumentSchema>, FineInstrument>>,
   Assert<Equals<z.infer<typeof FinePenaltySchema>, FinePenalty>>,
   Assert<Equals<z.infer<typeof ControlPointsPenaltySchema>, ControlPointsPenalty>>,
+  Assert<Equals<z.infer<typeof DisqualificationPenaltySchema>, DisqualificationPenalty>>,
   Assert<Equals<z.infer<typeof ExamPointsPenaltySchema>, ExamPointsPenalty>>,
   Assert<Equals<z.infer<typeof PenaltyEntrySchema>, PenaltyEntry>>,
   Assert<Equals<z.infer<typeof PenaltyBankSchema>, PenaltyBank>>,

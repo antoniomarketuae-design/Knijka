@@ -56,7 +56,16 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckControl } from "@/components/ui/CheckControl";
-import { VIOLATIONS, type FailReason, type ViolationCode } from "../rules";
+import {
+  MANOEUVRE_MAX_PER_LINE,
+  POINT_SCALES,
+  SEVERITY_POINTS,
+  VIOLATIONS,
+  pointsEachBg,
+  pointsOutOfBg,
+  type FailReason,
+  type ViolationCode,
+} from "../rules";
 import {
   REACTION_BAND_LABELS_BG,
   type LessonResult,
@@ -64,6 +73,7 @@ import {
   type ParkAlignment,
   type RubricScore,
 } from "../lessons";
+import { FaultCard, ThreeSystemsNote } from "./FaultCard";
 import {
   MistakeMap,
   type MinimapPolyline,
@@ -83,10 +93,15 @@ export interface SessionEndConcept {
   href: string;
 }
 
+/**
+ * Every one of these counts НАКАЗАТЕЛНИ (изпитни) точки — Наредба № 38's exam
+ * sheet — and says so, because „точки" on its own reads as контролни точки to
+ * any Bulgarian driver. See FaultCard.tsx for the full ruling.
+ */
 const FAIL_REASON_TEXT: Record<FailReason, string> = {
   "dangerous-mistake": "допусната е опасна грешка — директно неиздържан",
-  "total-points-exceeded": "повече от 9 наказателни точки общо",
-  "osnovni-points-exceeded": "повече от 6 точки от основни грешки",
+  "total-points-exceeded": "повече от 9 наказателни точки от изпитния лист",
+  "osnovni-points-exceeded": "повече от 6 наказателни точки от основни грешки",
 };
 
 const PARK_ALIGNMENT_LABELS: Record<ParkAlignment, string> = {
@@ -373,10 +388,13 @@ export function SessionEndScreen({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [skipEnabled, skip]);
 
+  // The class legend. „(10 т.)" beside a headline about наказателни точки was
+  // the last bare unit left on the repaired result screen, and the tariff is
+  // read off the engine's own SEVERITY_POINTS rather than retyped here.
   const rows = [
-    { label: "Опасни грешки", per: "10 т.", count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
-    { label: "Основни грешки", per: "3 т.", count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
-    { label: "Второстепенни грешки", per: "1 т.", count: score.vtorostepenniCount, points: score.vtorostepenniPoints, tone: "var(--accent-soft)" },
+    { label: "Опасни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.opasna), count: score.opasniCount, points: score.opasniPoints, tone: "var(--danger)" },
+    { label: "Основни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.osnovna), count: score.osnovniCount, points: score.osnovniPoints, tone: "var(--warning)" },
+    { label: "Второстепенни грешки", per: pointsEachBg("exam", SEVERITY_POINTS.vtorostepenna), count: score.vtorostepenniCount, points: score.vtorostepenniPoints, tone: "var(--accent-soft)" },
   ];
 
   // I1: the gate holds the whole screen back. Nothing below this line renders
@@ -476,7 +494,14 @@ export function SessionEndScreen({
           >
             {result.score}
           </span>
-          <span className="text-xl font-bold text-muted">наказателни точки</span>
+          <span className="text-xl font-bold text-muted">
+            {result.score === 1 ? "наказателна точка" : "наказателни точки"}
+          </span>
+        </p>
+        {/* The unit, spelled out under the headline number. Without it „10 т."
+            reads as контролни точки — the licence — which is what happened. */}
+        <p className="-mt-2 text-center text-[11px] font-semibold text-muted">
+          от изпитния лист по Наредба № 38 · важат за този урок · не са контролни точки по книжката
         </p>
 
         <p
@@ -558,6 +583,9 @@ export function SessionEndScreen({
         <section aria-label="Оценка на маневрата" className="card flex flex-col gap-2 p-5">
           <div className="flex items-center gap-3">
             <h3 className="text-sm font-extrabold">Оценка на маневрата</h3>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-bold text-muted">
+              {POINT_SCALES.manoeuvre.sourceBg}
+            </span>
             <span
               aria-label={`${rubric.stars} от 3 звезди`}
               className="ml-auto text-lg tracking-wide"
@@ -573,13 +601,26 @@ export function SessionEndScreen({
               ))}
             </span>
           </div>
+          {/* THE FOURTH SCALE, AND THE ONE A FIND-AND-REPLACE WOULD HAVE GOT
+              WRONG. „1 / 2 т." sits a few centimetres under a headline reading
+              „20 наказателни точки", and it is NOT the exam sheet, NOT the
+              licence, and not law at all — it is this product's own quality
+              grade, and it runs the OTHER WAY: 2 is the good number. Labelling
+              it „изпитни точки" would have been as wrong as leaving it bare. */}
+          <p className="text-[11px] leading-relaxed text-muted">
+            {POINT_SCALES.manoeuvre.noteBg}
+          </p>
           <ul className="flex flex-col gap-1.5">
             {rubric.breakdownBg.map((line) => (
               <li key={line.id} className="flex flex-col gap-0.5 text-sm">
                 <div className="flex items-baseline gap-2">
                   <span className="font-semibold">{line.labelBg}</span>
                   <span className="ml-auto shrink-0 text-xs font-black tabular-nums text-muted">
-                    {line.points !== null ? `${line.points} / 2 т.` : line.measured ? "—" : "не се измерва"}
+                    {line.points !== null
+                      ? pointsOutOfBg("manoeuvre", line.points, MANOEUVRE_MAX_PER_LINE)
+                      : line.measured
+                        ? "—"
+                        : "не се измерва"}
                   </span>
                 </div>
                 <p className="text-xs leading-relaxed text-muted">{line.detailBg}</p>
@@ -672,47 +713,25 @@ export function SessionEndScreen({
       {summary.mistakes.length > 0 ? (
         <section aria-label="Грешки" className="card flex flex-col gap-2 p-5">
           <h3 className="text-sm font-extrabold">Грешки ({summary.mistakes.length})</h3>
+          {/* The founder's ruling, on the screen that caused it: изпитни точки,
+              контролни точки and глоба are three systems and must never be
+              conflated. Said once, above the list, rather than on every row. */}
+          <ThreeSystemsNote />
           <ul className="flex flex-col gap-2">
             {summary.mistakes.map((m, i) => {
               const key = `v:${i}`;
               const flash = rowFlash(key);
-              const corrective = correctiveFor(m.code);
               return (
                 <li
                   key={flash.key}
                   ref={registerRow(key)}
                   className={`flex flex-col gap-1 rounded-xl border border-border p-3 ${flash.className}`}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-sm font-bold">{m.titleBg}</span>
-                    <span
-                      className="shrink-0 text-xs font-black tabular-nums"
-                      style={{
-                        color:
-                          m.severityClass === "opasna"
-                            ? "var(--danger)"
-                            : m.severityClass === "osnovna"
-                              ? "var(--warning)"
-                              : "var(--accent-soft)",
-                      }}
-                    >
-                      −{m.points} т.
-                    </span>
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted">{m.explanationBg}</p>
-                  {/* A15: the authored corrective — WHAT the right action was. */}
-                  {corrective !== null ? (
-                    <p className="text-xs font-semibold leading-relaxed">
-                      <span className="text-success">✔ Правилното действие:</span>{" "}
-                      {corrective}
-                    </p>
-                  ) : null}
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
-                      {m.lawRef}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-muted">в {clock(m.t)}</span>
-                  </div>
+                  <FaultCard
+                    event={m}
+                    correctiveBg={correctiveFor(m.code)}
+                    atBg={clock(m.t)}
+                  />
                 </li>
               );
             })}

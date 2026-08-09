@@ -91,7 +91,17 @@ export function FoldRigClient({
       data-fold-rig-mode={mode}
       data-fold-rig-paper={mode === "exam" ? paper.length : 1}
       data-fold-rig-timelow={timeLow ? "1" : "0"}
-      className="isolate flex min-h-dvh flex-col bg-background text-foreground"
+      /* `flex-1`, NOT `min-h-dvh` — this element stands in for the (dashboard)
+         group layout's root, which is `isolate flex flex-1 flex-col
+         bg-background` inside <body class="min-h-full flex flex-col">. The rig
+         had its own `min-h-dvh` here, which is a DIFFERENT height rule from the
+         product's: once <body> pays the home-indicator inset the two disagree by
+         exactly that inset, so the rig would have gone on reporting 34px of
+         document scroll after the product stopped having any. A rig that is
+         34px wrong is worse than no rig (see the <main> class string below,
+         which drifted by 8px once and made every landscape number pessimistic).
+         `text-foreground` stays: the real group carries it as an inline style. */
+      className="isolate flex flex-1 flex-col bg-background text-foreground"
     >
       <DashboardShell>
         {/* BYTE-FOR-BYTE the (dashboard) layout's own <main> class string.

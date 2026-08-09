@@ -83,9 +83,9 @@ function runOvertake(
   frames: number,
   frameAt: (frame: number) => { x: number; speedKmh?: number },
   mate: MateSim,
-  opts: { gear?: number; playerY0?: number } = {},
+  opts: { gear?: number; playerY0?: number; districtId?: string } = {},
 ): SimTick[] {
-  const rt = createWorldRuntime(loadWorld("ov-oncoming-v1"));
+  const rt = createWorldRuntime(loadWorld(opts.districtId ?? "ov-oncoming-v1"));
   const live: CyclistConflict = { x: X_OWN, y: mate.y, dirX: 0, dirY: 1, speedMps: mate.speedMps };
   rt.setOvertakenQuery((px, py, _h, r) => {
     if (Math.hypot(live.x - px, live.y - py) > r) return null;
@@ -334,6 +334,35 @@ describe("overtake-return — FP battery (A12: err innocent)", () => {
       ),
     ).toHaveLength(1);
     // …so the return tracker stands down on the same excursion.
+    expect(returnsOf(ticks)).toHaveLength(0);
+  });
+
+  it("FP-9: THE М1 SEAM SURVIVES the 2026-08-09 corridor widening — a cut that LANDS inside a solid span is CROSSED_SOLID_LINE's act alone", () => {
+    // On 2026-08-09 the head-on corridor was widened to measure inside
+    // authored М1 spans (worldRuntime `ocBase`/`ocArmed`; see
+    // overtake-corridor.test.ts FP-5). The RETURN tracker was deliberately
+    // NOT widened — it keeps `orArmed = ocBase && solidCenterLine !== true`.
+    // This test is what that decision is worth: sc-ov-solid-return's whole
+    // pedagogy is that an excursion which lands inside the span grades the
+    // marking and nothing else („Връщане върху вече плътната линия"), and the
+    // template's own comment names this seam as the mechanism. The geometry
+    // below is the FIRST test's guilty ~0.6 s cut, verbatim, moved onto
+    // ov-solid-v1's span (y ∈ [90, 230]) — guilty on ov-oncoming-v1, silent
+    // here, and the difference is the paint.
+    const cutFrame = frameAtAlong(-(0.6 * MATE_MPS + OVERTAKE_RETURN_BODY_M));
+    const ticks = runOvertake(
+      cutFrame + 40,
+      (f) => ({ x: f < cutFrame ? X_OPP : X_OWN }),
+      { y: 110, speedMps: MATE_MPS },
+      { districtId: "ov-solid-v1", playerY0: 95 },
+    );
+    // NON-VACUITY, pinned rather than reasoned about. Silence proves the seam
+    // only if the run really was (a) inside the span throughout — a drift past
+    // y = 230 would pass for the wrong reason — and (b) genuinely out on the
+    // opposing bank, which is the other half of `orArmed`. Both are asserted,
+    // so the ONLY remaining explanation for the silence is `solidCenterLine`.
+    expect(ticks.every((t) => t.solidCenterLine === true)).toBe(true);
+    expect(ticks.some((t) => t.opposingBank === true)).toBe(true);
     expect(returnsOf(ticks)).toHaveLength(0);
   });
 

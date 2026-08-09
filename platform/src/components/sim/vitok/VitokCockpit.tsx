@@ -317,19 +317,98 @@ function asMesh(o: Object3D | undefined): Mesh | null {
 // are untouched, so the acceptance test stays green on its own terms.
 // ---------------------------------------------------------------------------
 
-/** Headliner underside, chassis-local metres — 7 mm above the tallest authored
- *  cabin geometry (y 0.893), i.e. as high as it can go and still be seen. */
-const ROOF_Y = 0.9;
+// ---------------------------------------------------------------------------
+// B58 — THE MIRROR STATION RAISE (2026-08-09). Read this before touching any
+// number in this block or in `scene/vitok/hotspots.ts`.
+//
+// The founder played „Превишаване над +10 км/ч" and the В26 «50» that the
+// lesson's own instruction 2 tells him to read („скоростта се чете от знака и
+// скоростомера") was never in the windscreen — it sat behind THIS cabin's
+// interior mirror at every distance on the approach. He was offered two fixes
+// and chose to move the mirror, on purpose: the cheap fix would have stopped
+// SCENARIO_SIGN_SCALE scaling the sign's MOUNTING height, which partly undoes
+// his own earlier ruling that the drills' signs must be big.
+//
+// So the WHOLE mirror station moved up by MIRROR_STATION_RAISE_M:
+//   · the asset half — the `hotspot_mirror_rear` node plus the 168
+//     `interior_shell` vertices that are the authored casing, dress and stalk —
+//     is applied by `tools/glb/raise_interior_mirror.mjs`, which carries the
+//     measurement and refuses to run twice. Moving the glass alone does
+//     nothing: the authored casing then becomes the occluder.
+//   · the code half is this block. Every number below is the number this file
+//     already shipped, plus the raise, so every relationship the POD comment
+//     documents (the pad buries the stalk root; the sleeve hugs the authored
+//     bar; the nose stops short of the glass) survives verbatim — the station
+//     translated, it was not redesigned.
+//
+// ROOF_Y HAD TO MOVE TOO, and it could not simply take the raise. At +105 mm
+// the assembly's top (the mirror hood, chassis y 0.9551) is 55 mm above the old
+// ceiling; a headliner left at 0.90 would be pierced by the mirror. But raising
+// the ceiling while leaving its FRONT EDGE at z 0.34 pushes that edge clean out
+// of frame (fy 1.06 at 16:9) and brings back R0 round 2's „the mirror hangs in
+// open sky". So the edge is re-solved instead: ROOF_FRONT_Z is the z at which a
+// panel at the new ROOF_Y projects to the SAME frame row the old one did.
+// Measured through the shipped camera, old (0.90, 0.34) → fy 0.95784, new
+// (0.945, 0.481) → fy 0.95779 — 0.03 px of an 799 px frame, and identical at
+// every aspect because it is the same ray. The headliner band, the window
+// fraction and the „does the authored overhead kit hide the ceiling" argument
+// below are therefore all UNCHANGED BY CONSTRUCTION; only the mirror moved.
+// ---------------------------------------------------------------------------
+
+/**
+ * How far the whole mirror station sits above where hero_interior v3 authored
+ * it, metres. THE ASSET CARRIES THIS TOO — see
+ * `tools/glb/raise_interior_mirror.mjs`, which is where the figure is derived
+ * and where a re-export of the interior has to re-apply it. If the two ever
+ * disagree the mount will float off the mirror, which is visible in one frame.
+ *
+ * 105 mm, not the 94 mm the register handed down: MirrorRig's 60 mm lift runs
+ * along the EYE RAY, and a raised node steepens that ray, so ~7 mm of every
+ * 100 is spent pulling the glass back down. The true threshold at which the
+ * plate stops being hidden anywhere on the approach is 92.8 mm at the lane
+ * centre — 94 clears it by 1.2 mm, which is not a margin — and it rises to
+ * 104.6 mm when the student drifts 0.75 m toward the kerb the sign is on.
+ */
+const MIRROR_STATION_RAISE_M = 0.105;
+
+/**
+ * Headliner underside, chassis-local metres. Was 0.90 („7 mm above the tallest
+ * authored cabin geometry, y 0.893"); it now clears the raised mirror instead,
+ * and deliberately sits BELOW the assembly's top (hood 0.9551, rear shell
+ * 0.9528) so those tops finish inside the 50 mm slab and body and ceiling read
+ * as one silhouette with no sky sliver between them — the same trick the POD
+ * pad already uses. The glass top (0.9086) and bezel top (0.9181) still hang
+ * clear below it, so the mirror is a mirror hanging from a ceiling, not a hole
+ * in one.
+ *
+ * HONEST NOTE, since somebody will measure it: this puts the headliner above
+ * the GT-E exterior roof skin (y 0.886 over the header, 0.907 peak). It was
+ * already at/over it at 0.90. This panel is not a structural surface — the A3
+ * cabin ships no roof at all and this slab exists only to close the top of the
+ * frame — and it lives inside the cockpit-only group, so no camera can ever see
+ * it against the body.
+ */
+const ROOF_Y = 0.945;
 /** Panel thickness — it is only ever seen from underneath; this just keeps the
  *  slab from reading as a zero-depth card at the frame edge. */
 const ROOF_THICKNESS = 0.05;
 /** Half-width: past the door cards (authored face x ±0.731) and the A-pillars,
  *  so the panel reaches the frame edges at every review aspect. */
 const ROOF_HALF_W = 0.88;
-/** Windscreen header line — the panel's front edge (see the fy table above). */
-const ROOF_FRONT_Z = 0.34;
-/** Where the header pad ends and the plain headliner begins. */
-const ROOF_PAD_BACK_Z = 0.1;
+/**
+ * Windscreen header line — the panel's front edge. SOLVED, not chosen: it is
+ * the z at which ROOF_Y projects to the frame row the old (0.90, 0.34) edge
+ * projected to (fy 0.95784 → 0.95779). Because it is the same ray from the eye,
+ * the fy table above still holds at every aspect, and so does the „authored
+ * overhead kit occludes anything higher" finding — a ray that grazed the kit at
+ * 0.8114 before still grazes it at 0.8114.
+ * It also stays inside the windscreen: the tint plane's line at this height is
+ * z 0.556, i.e. the edge sits 75 mm behind the glass.
+ */
+const ROOF_FRONT_Z = 0.481;
+/** Where the header pad ends and the plain headliner begins — the pad keeps its
+ *  authored 240 mm run, moved forward with the edge. */
+const ROOF_PAD_BACK_Z = 0.241;
 /** Rear edge — behind the B-pillars, out of frame in every pose. */
 const ROOF_BACK_Z = -1.35;
 
@@ -355,6 +434,12 @@ const ROOF_BACK_Z = -1.35;
 //   root ring    x ±0.0099   y 0.8551…0.8750   z 0.1487…0.1513
 //   mirror ring  x ±0.0099   y 0.8121…0.8319   z 0.4687…0.4713
 // → a 19.8 mm square bar on the axis (0, 0.86505, 0.150) → (0, 0.82200, 0.470).
+//
+// EVERY y IN THIS BLOCK IS THE AUTHORED ONE. B58 raised the whole station by
+// MIRROR_STATION_RAISE_M in the ASSET, so the shipped bar is those numbers plus
+// the raise — which is exactly how `STALK` below is written, and why nothing
+// else here needed re-solving: a rigid translation preserves every offset the
+// round-3/round-4 work measured.
 //
 // WHY A DIAGONAL AND NOT A VERTICAL STICK. Projecting that axis through the
 // shipped cockpit camera, the stalk runs from px(1293, −3) — off the top-right
@@ -422,10 +507,17 @@ const ROOF_BACK_Z = -1.35;
 // frame — see the block above HOUSING_HOOD.
 // ---------------------------------------------------------------------------
 
-/** Authored mirror stalk, chassis-local — see the vertex dump above. */
+/**
+ * Authored mirror stalk, chassis-local — see the vertex dump above, plus the
+ * B58 raise: `raise_interior_mirror.mjs` translated those same vertices in the
+ * asset, so the axis this mount is aligned to is the authored one shifted up by
+ * MIRROR_STATION_RAISE_M. Written as `authored + raise` rather than as new
+ * literals so the dump above stays the provenance and the two halves of the
+ * change cannot silently drift apart.
+ */
 const STALK = {
-  root: { y: 0.86505, z: 0.15 },
-  tip: { y: 0.822, z: 0.47 },
+  root: { y: 0.86505 + MIRROR_STATION_RAISE_M, z: 0.15 },
+  tip: { y: 0.822 + MIRROR_STATION_RAISE_M, z: 0.47 },
   /** Half-section of the authored bar (19.8 mm square). */
   half: 0.0099,
 } as const;
@@ -434,9 +526,14 @@ const STALK_SLOPE = (STALK.root.y - STALK.tip.y) / (STALK.tip.z - STALK.root.z);
 /** Rotation about X that points a box's local +Z down the stalk axis. */
 const POD_PITCH = Math.atan2(STALK.root.y - STALK.tip.y, STALK.tip.z - STALK.root.z);
 /**
- * Mount extent and section, all offsets measured from the stalk axis.
- *  - `zBack` buries every box in the authored overhead kit (its ribs run to
- *    z 0.06 at y 0.837–0.858) so the mount has no visible root;
+ * Mount extent and section, all offsets measured from the stalk axis. Offsets,
+ * not heights: B58 raised the axis, and every one of them came with it.
+ *  - `zBack` buried the boxes in the authored overhead kit (its ribs run to
+ *    z 0.06 at y 0.837–0.858) so the mount had no visible root. Since the
+ *    raise it does better than that: at z 0.06 the sleeve spans y 0.965–0.999,
+ *    entirely inside the headliner slab (0.945–0.995), and it first appears
+ *    below the ceiling at z 0.21 — a mount descending from the roof, which is
+ *    what it was always drawing;
  *  - `arm` is the sleeve: ±17 mm × ±17 mm around a ±9.9 mm bar = 7.1 mm of
  *    cover all round. It is aligned to the AUTHORED axis, so the bar is inside
  *    it by construction and can never reappear as a second stick (round 2's
@@ -447,10 +544,16 @@ const POD_PITCH = Math.atan2(STALK.root.y - STALK.tip.y, STALK.tip.z - STALK.roo
  *    ROOF_Y so mount and ceiling are one silhouette with no sliver, and it is
  *    entirely behind the headliner's front edge in screen, so it is free.
  *
- * THE FRONT STOPS ARE MEASURED, NOT CHOSEN. The authored stalk does not merely
- * approach the mirror, it INTERSECTS the lifted glass: the glass's top edge is
- * the constant-height line chassis y 0.8165 running (0.119, 0.470) →
- * (−0.083, 0.417). Anything in CHASSIS space that hugs the stalk past that
+ * THE FRONT STOPS ARE MEASURED, NOT CHOSEN, and B58 did not have to re-measure
+ * them — it made them safer. The stalk axis rose by the full 105 mm while the
+ * RIGGED glass rose 97.5 mm (MirrorRig lifts along the eye ray, which steepens
+ * as the node goes up), so every clearance below grew by 7.5 mm. The heights
+ * quoted are the pre-raise ones; the shipped glass top edge is at y 0.9086.
+ *
+ * The authored stalk does not merely approach the mirror, it INTERSECTS the
+ * lifted glass: the glass's top edge is the constant-height line chassis
+ * y 0.8165 running (0.119, 0.470) → (−0.083, 0.417). Anything in CHASSIS space
+ * that hugs the stalk past that
  * point lands on the reflection — measured in round 3, not assumed: a sleeve
  * front at z 0.505 moved the reflection's first bright row from 230 to 239
  * across columns 1010…1080 of the rendered frame. So:
@@ -586,7 +689,8 @@ function CabinRoof() {
           above this box's yLo 0.010) so the union has no seam and no step, and
           it never dips below the axis, so it cannot reach the reflection: its
           underside at its front face (z 0.44) is chassis y 0.836, 19 mm clear
-          of the glass's top edge line y 0.8165. */}
+          of the glass's top edge line y 0.8165 — pre-raise figures; B58 widened
+          that clearance to 27 mm (y 0.941 against a glass top of 0.9086). */}
       <group position={[0, POD_NOSE_RUN.y, POD_NOSE_RUN.z]} rotation={[POD_PITCH, 0, 0]}>
         <mesh position={[0, (POD.nose.yLo + POD.nose.yHi) / 2, 0]} onUpdate={setLayer}>
           <boxGeometry
@@ -605,8 +709,10 @@ function CabinRoof() {
 // The authored dress (hero_interior_v3.py `build_mirror_dress`) is four 3 mm
 // strips lying in the glass QUAD'S OWN PLANE plus a day/night tab, all merged
 // into interior_shell, and behind them a casing block measured (raycast) at
-// chassis x ±0.096 / y 0.759–0.850 / z 0.467–0.560. None of it can be moved or
-// deleted from here. With MirrorRig lifting the glass clear of that casing,
+// chassis x ±0.096 / y 0.759–0.850 / z 0.467–0.560 — y 0.864–0.955 since B58
+// moved those 168 vertices with the glass. None of it can be moved FROM HERE
+// (it is merged into one Draco mesh; moving it is an asset edit, which is what
+// `tools/glb/raise_interior_mirror.mjs` is). With MirrorRig lifting the glass clear of that casing,
 // the authored strips are always going to be at a different depth from the
 // glass, and in a rendered frame that read as a dark frame sitting low-left of
 // a reflection that overhung it, with the top strip's inner face showing as a

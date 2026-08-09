@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { makeCommendation, makeViolation, type ScorableEvent } from "../../rules";
+import {
+  VIOLATIONS,
+  makeCommendation,
+  makeViolation,
+  roadConsequenceFor,
+  type ScorableEvent,
+  type ViolationCode,
+} from "../../rules";
 import { buildDebrief } from "../debrief";
 import {
   abortSession,
@@ -62,7 +69,7 @@ describe("buildDebrief", () => {
     expect(red).toBeLessThan(indicator);
     expect(indicator).toBeLessThan(handbrake);
 
-    expect(d.text).toContain("ППЗДвП чл. 31");
+    expect(d.text).toContain("ППЗДвП светлинни сигнали за регулиране на движението");
     expect(d.text).toContain("Какво да упражниш");
     // Concept ids in order of first mistake occurrence.
     expect(d.conceptIds).toEqual([
@@ -79,7 +86,57 @@ describe("buildDebrief", () => {
     ]);
     const d = buildDebrief(l0, result);
     expect(d.text).toContain("Превишена скорост ×2");
-    expect(d.text).toContain("2 т.");
+    // WAS `toContain("2 т.")`. A bare „т." is the defect this wave exists to
+    // remove: in Bulgarian, unqualified „точки" means КОНТРОЛНИ точки — the
+    // licence — and the founder read his lesson score as exactly that. The
+    // unit now rides on the number wherever the debrief prints one.
+    expect(d.text).toContain("2 наказателни т. по изпитния лист");
+  });
+
+  it("never prints a bare „N т.“ — the unit rides on every number", () => {
+    const result = resultWithEvents([
+      makeViolation("SPEEDING_DANGEROUS", 4),
+      makeViolation("HANDBRAKE_LEFT_ON", 9),
+    ]);
+    // priorBestScore exercises the improvement line too — it printed „1 т.
+    // срещу най-добрите ти 4 т." and was the last bare pair in the file.
+    const d = buildDebrief(l0, result, { priorBestScore: 3 });
+    // „10 т." / „1 т." with nothing after it. „10 наказателни т." is fine.
+    const bare = d.text.match(/\d+(?:[.,]\d+)?\s+т\.(?!\s*по)/g) ?? [];
+    expect(bare, `bare point figures: ${bare.join(", ")}`).toEqual([]);
+    expect(d.text).toContain("НЕ са контролни точки");
+  });
+
+  it("says what happens on the street, not only what it costs on the exam", () => {
+    // THEO-4: a real instructor says both halves. The exam mark is Наредба
+    // № 38's; the глоба, the instrument and the контролни точки are the road's,
+    // and they are shown separately and cited separately.
+    const result = resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 7)]);
+    const d = buildDebrief(l0, result);
+    expect(d.text).toContain("10 наказателни т. по изпитния лист");
+    expect(d.text).toContain("Наредба № 38 приложение № 5, т. 10, б. „в“");
+    expect(d.text).toContain("На пътя");
+    expect(d.text).toContain("76,69 €"); // 150 лв. at the fixed 1.95583
+    expect(d.text).toContain("10 контролни точки");
+    expect(d.text).toContain("ЗДвП чл. 183, ал. 5, т. 1");
+    // With the edition named — the debrief chip and the fault-card chip are the
+    // same string, and it has to survive a student following it.
+    expect(d.text).toContain("Наредба № Iз-2539 (изм. ДВ, бр. 49 от 2026 г.), чл. 6, ал. 1, т. 20");
+  });
+
+  it("shows the rule and no number where nothing has been retrieved", () => {
+    // The founder's standing ruling, asserted: an honest blank beats a guess.
+    // The CODE is looked up rather than hard-coded — road penalties are being
+    // retrieved incrementally, so naming one here would make this test go red
+    // the day somebody grounds it, which is the opposite of what it guards.
+    const blank = (Object.keys(VIOLATIONS) as ViolationCode[]).find(
+      (c) => roadConsequenceFor(c).kind === "unknown",
+    );
+    if (blank === undefined) return; // every code grounded — nothing left to guard
+    const d = buildDebrief(l0, resultWithEvents([makeViolation(blank, 6)]));
+    expect(d.text).toContain("още не е извлечена дословно от закона");
+    expect(d.text).not.toMatch(/\d+\s*€/);
+    expect(d.text).not.toMatch(/\d+\s*лв\./);
   });
 
   it("mentions the collision termination explicitly", () => {
@@ -112,14 +169,14 @@ describe("buildDebrief", () => {
     const result = resultWithEvents([makeViolation("HANDBRAKE_LEFT_ON", 5)]); // 1 pt
     const d = buildDebrief(l0, result, { priorBestScore: 4 });
     expect(d.text).toContain("Личен напредък");
-    expect(d.text).toContain("1 т. срещу най-добрите ти 4 т.");
+    expect(d.text).toContain("1 наказателна т. по изпитния лист срещу най-добрите ти 4");
   });
 
   it("notes a matched or worse score encouragingly, and skips it on first attempt", () => {
     const worse = buildDebrief(l0, resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 5)]), {
       priorBestScore: 2,
     });
-    expect(worse.text).toContain("остава 2 т.");
+    expect(worse.text).toContain("остава 2 наказателни т. по изпитния лист");
 
     const first = buildDebrief(l0, resultWithEvents([]), { priorBestScore: null });
     expect(first.text).not.toContain("напредък");

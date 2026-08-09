@@ -37,6 +37,23 @@ export interface DistrictEdge {
   length: number;
   /** Polyline [x, y][] from `from` to `to`, endpoints matching the nodes. */
   geometry: number[][];
+  /**
+   * Which kerb the procedural parked row stands on (doc 87 B50/B53/B54).
+   * Absent ⇒ `"right"`, the pre-tag walk. See `TrafficLayer.parkedSideOf` for
+   * the measurement that made it necessary. `parkingBand: false` still wins.
+   */
+  parkingSide?: "left" | "right" | "both";
+  /**
+   * WHAT KIND of vehicle stands at this kerb (doc 87 B50/B53/B54) — one of
+   * `TrafficLayer.PARKED_MIXES` (`freight` | `compact` | `veteran`). Absent ⇒
+   * the unbiased parked pool, i.e. every district written before this tag is
+   * byte-identical. It selects among the SAME bodies at the SAME stations; it
+   * never adds, removes or moves one.
+   */
+  parkingMix?: string;
+  /** Curbside parking-band opt-in, mirrored from world/types (the curb pass
+   *  reads it through `parkingOptedOut`). */
+  parkingBand?: boolean;
 }
 
 export interface DistrictIntersection {
@@ -74,6 +91,15 @@ export interface TrafficDistrict {
   intersections: DistrictIntersection[];
   crossings: DistrictCrossing[];
   zones?: TrafficDistrictZone[];
+  /**
+   * The district's own name (`meta.district` in the shipped file). The ONLY
+   * thing the traffic layer reads it for is `TrafficLayer.districtParkedSalt`
+   * — the parked row's model and paint. Without it two maps whose parked
+   * segment lands on the same edge index get the same three cars in the same
+   * order, which is measurable and was photographed on the PE family. Optional
+   * so the small in-test fixtures stay valid; absent ⇒ the pre-salt look.
+   */
+  meta?: { district?: string };
 }
 
 // ---------------------------------------------------------------------------

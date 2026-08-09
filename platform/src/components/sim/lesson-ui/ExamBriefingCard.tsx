@@ -17,6 +17,12 @@
  */
 
 import { useState } from "react";
+import {
+  EXAM_PASS_RULE_BG,
+  EXAM_POINTS_SHORT_NOTE_BG,
+  EXAM_SCALE_SOURCE_BG,
+  examPointsForClassBg,
+} from "@/modules/sim/rules";
 
 export function ExamBriefingCard({
   variantId = null,
@@ -128,9 +134,17 @@ export function ExamBriefingCard({
             </h3>
             <p className="mt-1">
               По официалната система, от първата секунда: опасна грешка{" "}
-              <strong>10 т.</strong>, основна <strong>3 т.</strong>, второстепенна{" "}
-              <strong>1 т.</strong> Няма предупреждения, няма учебни паузи и няма
-              въпроси по време на карането — всяка грешка се пише веднага.
+              <strong>{examPointsForClassBg("opasna")}</strong>, основна{" "}
+              <strong>{examPointsForClassBg("osnovna")}</strong>, второстепенна{" "}
+              <strong>{examPointsForClassBg("vtorostepenna")}</strong> Няма
+              предупреждения, няма учебни паузи и няма въпроси по време на карането —
+              всяка грешка се пише веднага.
+            </p>
+            {/* THE SCALE, NAMED BEFORE HE EVER SEES A NUMBER. This card is the
+                briefing: if the unit is established here, the toast mid-drive and
+                the protocol at the end are reading off a scale he already knows. */}
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              {EXAM_POINTS_SHORT_NOTE_BG} Тарифата е по {EXAM_SCALE_SOURCE_BG}.
             </p>
           </div>
 
@@ -142,7 +156,7 @@ export function ExamBriefingCard({
               <li>опасна грешка — незабавно;</li>
               <li>пътнотранспортно произшествие — незабавно;</li>
               <li>повече от 9 наказателни точки общо;</li>
-              <li>повече от 6 точки от основни грешки.</li>
+              <li>повече от 6 наказателни точки от основни грешки.</li>
             </ul>
             <p className="mt-1.5 text-xs text-muted">
               Прекратен или прекъснат изпит не се продължава — започва се нов опит.
@@ -166,6 +180,11 @@ export function ExamBriefingCard({
           Изпитът е издържан при завършен маршрут с не повече от 9 наказателни точки,
           не повече от 6 от основни грешки и нито една опасна. След протокола получаваш
           пълния разбор — карта на грешките и какво да упражниш.
+        </p>
+        {/* The pass rule VERBATIM (ADR-002 — the paraphrase above is ours, this
+            sentence is the наредба's own), so the „9" has a source on screen. */}
+        <p className="text-[11px] leading-relaxed text-muted">
+          Наредба № 38, приложение № 5: „{EXAM_PASS_RULE_BG}“
         </p>
 
         <div className="flex flex-wrap items-center gap-3">

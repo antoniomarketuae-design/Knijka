@@ -614,12 +614,23 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: the solid return is SCORED 10 (опасна, never a modal) and reaches NO gate", () => {
-    // CROSSED_SOLID_LINE is опасна, so it is SCORED with a non-blocking toast
-    // rather than pausing into a teach card — a dangerous code must never pop a
-    // modal mid-drive, least of all while the student is still on the wrong side
-    // of the road. So it lands on session.events and the A9 teach channel stays
-    // empty. The §9 exact-code assert lives on the trace gate.
+  it("counter-proof: the solid return TEACHES основна — and still reaches NO gate", () => {
+    // RE-BASELINED 2026-08-09 with the Наредба № 38 grounding pass, and the
+    // re-baseline is the finding, so it is written out rather than trimmed.
+    //
+    // This assert used to read „SCORED 10 (опасна, never a modal)". The 10 had
+    // no basis: приложение № 5, т. 10, б. „в" is a CLOSED list of six cases,
+    // and full occupancy of the opposing bank on a TWO-WAY road is none of
+    // them — case 2 names „път с еднопосочно движение" and this detector
+    // requires `oneway === false`, while case 5 („предпоставка за допускане на
+    // ПТП") asks for a danger the detector never queries. CROSSED_SOLID_LINE is
+    // now основна (3), so it joins the A12 ladder every other основна is on:
+    // first encounter TEACHES with a card, the repeat grades. Exactly the shape
+    // the sibling counter-proof below already documents for чл. 42.
+    //
+    // WHAT DID NOT CHANGE, and it is the half that matters here: the rule
+    // engine still convicts on the identical frame, and the drive still fails —
+    // on the OBJECTIVES, which were always the honest half of this demo.
     let s = createLessonSession(compileScenario(SC_OV_SOLID_RETURN, 3));
     const taught: string[] = [];
     recordScOvSolidReturnDrive(loadDistrict("ov-solid2-v1"), "mistake-return-on-solid", {
@@ -630,12 +641,15 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
       },
     });
     const r = buildLessonResult(s);
-    expect(taught).toEqual([]);
-    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
-      "CROSSED_SOLID_LINE",
-    ]);
-    expect(r.score).toBe(10);
-    expect(r.passed).toBe(false);
+    // Taught, not docked — the first-encounter half of the основна ladder. Note
+    // what that costs, recorded because it is easy to miss: a TAUGHT violation
+    // never reaches `session.events`, so it is absent from the result sheet and
+    // from `summary.conceptIds` too. That is the shipped A12 design for every
+    // основна (the card teaches instead of the sheet), not something this
+    // downgrade invented — but this code now lives under it.
+    expect(taught).toEqual(["CROSSED_SOLID_LINE"]);
+    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    expect(r.score).toBe(0);
     // …and the objectives say the same thing the code does, independently: he
     // is never fully home in his own lane before the М1 span, so sc-ovsr-home
     // never arms and — objectives being SEQUENTIAL — neither does the finish.
@@ -649,10 +663,14 @@ describe("wave-5 bot completion — sc-ov-solid-return at L3", () => {
     // from which a whole pass still fits"), so this driver legitimately ticks it
     // and then fails the drill's real gate. The verdict is unchanged where it
     // matters and is asserted right here: home false, completedAll false,
-    // passed false, score 10.
+    // passed false.
     expect(r.objectives.find((o) => o.id === "sc-ovsr-home")!.done).toBe(false);
     expect(r.objectives.find((o) => o.id === "sc-ovsr-finish")!.done).toBe(false);
     expect(r.completedAll).toBe(false);
+    // The drill is still LOST, and now it is lost on the gate rather than on a
+    // charge the act does not authorise. This assertion is the one that keeps
+    // the downgrade honest: dropping 10 points did NOT hand him the lesson.
+    expect(r.passed).toBe(false);
   });
 
   it("counter-proof: the late cut TEACHES чл. 42 on the A9 channel — and fails the SAME gate", () => {

@@ -24,14 +24,14 @@ describe("priority-situation grading", () => {
   });
 
   // ADR-006 stage 1b (doc 72 VU-09): the RESERVED "emergency" situation routes
-  // to its own catalog code (special-regime duty, ЗДвП чл. 91) — every other
+  // to its own catalog code (special-regime duty, ЗДвП чл. 104, ал. 1) — every other
   // situation keeps grading FAILED_TO_YIELD byte-identically (asserted above).
-  it("routes the 'emergency' situation to EMERGENCY_NOT_YIELDED (опасна, чл. 91)", () => {
+  it("routes the 'emergency' situation to EMERGENCY_NOT_YIELDED (опасна, чл. 104, ал. 1)", () => {
     const { events } = drive([tick(1, { speedKmh: 45, events: [priority(true, "emergency")] })]);
     expect(codes(events)).toContain("EMERGENCY_NOT_YIELDED");
     expect(codes(events)).not.toContain("FAILED_TO_YIELD");
     const v = events.find((e) => e.kind === "violation" && e.code === "EMERGENCY_NOT_YIELDED");
-    expect(v).toMatchObject({ severityClass: "opasna", detail: "emergency", lawRef: "ЗДвП чл. 91" });
+    expect(v).toMatchObject({ severityClass: "opasna", detail: "emergency", lawRef: "ЗДвП чл. 104, ал. 1; чл. 91, ал. 1" });
   });
 
   it("commends an emergency approach the driver made way for", () => {

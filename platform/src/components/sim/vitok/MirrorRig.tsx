@@ -99,7 +99,15 @@ const INTERIOR_MOUNT_Y_OFFSET = 0.55;
  * the glass moves instead: 14 mm down is ~19 px at 1440×900, enough that the
  * arm meets the housing's top rim with clearance and the reflection is a clean
  * rectangle. The cockpit-camera contract asserts only that the mirror's fy
- * stays ≤ 0.97 (it is 0.745, so the drop is well inside the band).
+ * stays ≤ 0.97 (0.745 then, 0.889 after the B58 raise — still inside the band).
+ *
+ * B58 KEPT THIS UNCHANGED ON PURPOSE. The raise moved the authored stalk and
+ * the glass node by the same 105 mm, so the geometry this constant answers —
+ * the stalk's underside crossing the glass's top edge — is the same geometry it
+ * always was. (It is in fact 7.5 mm slacker now, because the eye-ray lift below
+ * eats part of a raised node's move; the drop is therefore, if anything,
+ * generous. Left alone: re-tuning a verified 14 mm to save 7 is how a fixed
+ * frame becomes an unfixed one.)
  */
 const MIRROR_DROP_M = 0.014;
 
@@ -164,8 +172,10 @@ interface MirrorDef {
 //     rectangle on med/high forever. mirrorPass.ts owns autoClear now.
 //
 // NOTE ON `rear.pos` (it is NOT the glass centre, on purpose): the GLB glass
-// sits at chassis (0, 0.803, 0.50) — the header-mounted housing of the
-// 2026-07-11 black-mass fix — but the rear RTT vantage stays at eye height
+// sits at chassis (0, 0.908, 0.50) — the header-mounted housing of the
+// 2026-07-11 black-mass fix, plus the 105 mm B58 mirror-station raise that
+// `tools/glb/raise_interior_mirror.mjs` applied to the asset — but the rear RTT
+// vantage stays at eye height
 // (0, 0.687, 0.575), which is the ruling pinned by
 // vehicle/cockpit-camera-contract.test.ts („sample point ≠ glass"): a rear
 // mirror reflects the DRIVER'S eye line, not the glass's own position, so the
@@ -201,7 +211,8 @@ interface MirrorDef {
 // REF 7 lift was applied along the glass's OWN NORMAL. Measured on the shipped
 // GLB, that normal — quaternion (−0.0346, −0.1391, −0.0049, 0.98966) applied
 // to +Z — is (−0.275, +0.070, +0.959) in GLB space, while the direction from
-// the glass centre (GLB (0, 1.353, −0.5)) to the cockpit eye (COCKPIT_EYE
+// the glass centre (GLB (0, 1.353, −0.5) then; (0, 1.458, −0.5) since the B58
+// raise) to the cockpit eye (COCKPIT_EYE
 // through the yaw-π / y−0.55 mount → GLB (−0.24, 1.26, 0.255)) is
 // (−0.301, −0.117, +0.947). Those differ by 10.8°, so a 50 mm normal-lift
 // slid the glass 9.4 mm SIDEWAYS across the driver's sightline, and being
@@ -218,6 +229,14 @@ interface MirrorDef {
 // contract's `interiorMirror` landmark is untouched), it is simply 60 mm
 // nearer than the casing that used to bury it. Head-sway parallax against the
 // fixed COCKPIT_EYE is ~1 mm of apparent shift and invisible.
+//
+// ONE CONSEQUENCE B58 HAD TO PAY FOR, recorded because it will surprise the
+// next person who moves this node: because the lift runs along the EYE RAY and
+// a raised node makes that ray point further DOWN, a node raise does not arrive
+// at the glass intact. 105 mm of node raise delivers 97.5 mm at the glass —
+// the missing 7.5 mm is the lift's own y-component growing. That is why the
+// mirror-station raise is 105 mm and not the 94 mm first estimated from the
+// node position alone.
 const MIRROR_DEFS: Record<MirrorKind, MirrorDef> = {
   rear: {
     width: 256,

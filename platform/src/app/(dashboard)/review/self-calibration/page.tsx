@@ -14,6 +14,7 @@ import {
 // the learning barrel, which client-reachable code imports for the pure copy.
 import { getCalibrationStore } from "@/modules/learning/calibrationStore";
 import { lessonById, parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
+import { pointsBg } from "@/modules/sim/rules";
 
 export const metadata: Metadata = {
   title: "Позна ли се? · Книжка.AI",
@@ -102,7 +103,9 @@ function SummaryCard({ summary }: { summary: CalibrationSummary }) {
         <Stat
           label="Средна грешка"
           value={
-            summary.meanAbsError === null ? "—" : `${summary.meanAbsError.toFixed(1)} т.`
+            summary.meanAbsError === null
+              ? "—"
+              : `${summary.meanAbsError.toFixed(1)} изпитни т.`
           }
         />
         <Stat
@@ -244,8 +247,15 @@ function HistoryTable({ points }: { points: CalibrationPoint[] }) {
                     {p.verdictAgreed ? "" : " · сгреши и присъдата"}
                   </span>
                 </th>
-                <td className="py-2 text-right font-mono tabular-nums">{p.predictedPoints} т.</td>
-                <td className="py-2 text-right font-mono tabular-nums">{p.actualPoints} т.</td>
+                {/* The same наказателни точки the gate asked him to predict —
+                    named here too, because a trend page is where a student
+                    stares at the number longest. */}
+                <td className="py-2 text-right font-mono tabular-nums">
+                  {pointsBg("exam", p.predictedPoints)}
+                </td>
+                <td className="py-2 text-right font-mono tabular-nums">
+                  {pointsBg("exam", p.actualPoints)}
+                </td>
                 <td
                   className={`py-2 text-right font-mono font-bold tabular-nums ${
                     p.error < 0 ? "text-danger" : "text-foreground"

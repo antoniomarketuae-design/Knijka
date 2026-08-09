@@ -43,11 +43,19 @@ import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./lib/pw.mjs";
-import { contextOptions, resolveDevices, resolveMotion } from "./lib/devices.mjs";
+import { resolveDevices, resolveMotion } from "./lib/devices.mjs";
+import { assertInsetsApplied, insetBanner, newDeviceContext } from "./lib/insets.mjs";
 import { ROUTES } from "./lib/routes.mjs";
 import { gotoAuthenticated, NAV_BUDGET_MS, signIn } from "./lib/auth.mjs";
 import { ensureHarnessUser } from "./lib/user.mjs";
-import { isWorldFrame, waitForWorld, worldVitals } from "./lib/ready.mjs";
+import {
+  GL_LIVENESS_SCRIPT,
+  glLiveness,
+  isCaptureBlind,
+  isWorldFrame,
+  waitForWorld,
+  worldVitals,
+} from "./lib/ready.mjs";
 import { appMs, instrumentShare, settle } from "./lib/settle.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -799,6 +807,10 @@ const surfaces =
   args.routes.length > 0 ? SURFACES.filter((s) => args.routes.includes(s.id)) : SURFACES;
 const REPEAT = args.repeat ?? 1;
 const MOTION = resolveMotion(args.motion ?? "reduce");
+// „real" is the default and „none" has to be asked for out loud: a profile that
+// omits the notch is not modelling the device (lib/insets.mjs).
+const INSETS = args.insets ?? "real";
+const ROTATION = args.rotation ?? "symmetric";
 
 mkdirSync(OUT_DIR, { recursive: true });
 
@@ -903,8 +915,14 @@ console.log(`\n${runBanner()}\n`);
 
 await warm(new URL("/login", url).toString());
 
+// The unsafe bands are the ones the page was laid out against (`activeInset`,
+// set per device below), never the raw profile — otherwise a single-sided
+// --rotation run reports the notch on the side it just moved it away from.
+let activeInset = null;
 const probeArgs = (device, phase) => ({
-  safeArea: device.safeArea,
+  safeArea: activeInset
+    ? { top: activeInset.top, right: activeInset.right, bottom: activeInset.bottom, left: activeInset.left }
+    : device.safeArea,
   margin: EDGE_MARGIN_PX,
   phase,
 });
@@ -915,10 +933,27 @@ let storageState;
 
 try {
   for (const device of devices) {
-    const context = await browser.newContext({
-      ...contextOptions(device, { motion: MOTION.id }),
+    // REAL INSETS BY DEFAULT — lib/insets.mjs. Every `edge!` verdict this probe
+    // has ever printed was read from the AUTHORED CSS precisely because
+    // env(safe-area-inset-*) resolved to 0 in this engine; with the emulation on
+    // it resolves to the phone's real numbers, so the pixel and the authoring
+    // finally agree and a regression shows up in both columns.
+    const { context, inset } = await newDeviceContext(browser, device, {
+      motion: MOTION.id,
+      insets: INSETS,
+      rotation: ROTATION,
       ...(storageState ? { storageState } : {}),
     });
+    activeInset = inset;
+    // INSTRUMENT DEFECT #10 (lib/ready.mjs). The toolbar phase resizes the
+    // viewport, R3F resizes the drawing buffer, and this engine's screenshot
+    // path then returns a flat fill for that canvas for the rest of the page's
+    // life — while the context stays alive and the render loop keeps running.
+    // Without a second, non-pixel witness the probe reads the black it caused
+    // as the world dying and refuses every driving row. Installed on the
+    // CONTEXT, before the app boots, because it wraps the prototypes the app is
+    // about to use.
+    await context.addInitScript(GL_LIVENESS_SCRIPT);
     const page = await context.newPage();
     page.setDefaultTimeout(180_000);
     page.setDefaultNavigationTimeout(180_000);
@@ -931,6 +966,15 @@ try {
         const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
         for (const s of surfaces) await warm(new URL(s.path, url).toString(), cookie);
       }
+      console.log(`[stability] ${insetBanner(device, inset)}`);
+      // The negative control for the emulation itself: refuse to publish a
+      // device column that quietly measured a phone with no notch. Needs a
+      // real document — later device columns reuse the storage state and so
+      // have not navigated anywhere yet.
+      if (page.url() === "about:blank") {
+        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180_000 });
+      }
+      await assertInsetsApplied(page, inset);
 
       for (const surface of surfaces) {
        const iterations = [];
@@ -1188,6 +1232,40 @@ try {
             row.overlayTested = false;
           }
 
+          // ---- THE CAPTURE THE ROW IS JUDGED ON, TAKEN WHILE IT IS STILL
+          //      WORTH TAKING ----------------------------------------------
+          // The next block resizes the viewport, and on this engine that ends
+          // this page's ability to photograph its own WebGL canvas for good
+          // (instrument defect #10 — the evidence is in lib/ready.mjs). So the
+          // frame a human opens, and the world verdict the row is refused on,
+          // are taken HERE: after every state change that can plausibly kill
+          // the world (both overlay toggles), and before the one gesture that
+          // can only kill the camera. Everything the old end-of-row check was
+          // for is still checked — a world that went out during the overlay
+          // phases is caught here and refused exactly as before.
+          if (surface.requiresWorld) {
+            const beforeResize = await worldVitals(page);
+            const v = beforeResize.vitals
+              ? isWorldFrame(beforeResize.vitals)
+              : { ok: false, reason: beforeResize.reason };
+            row.worldBeforeResize = { ok: v.ok, reason: v.reason, vitals: beforeResize.vitals };
+            await page
+              .screenshot({
+                path: join(
+                  OUT_DIR,
+                  `${v.ok ? "" : "ENDED-BLANK__"}${surface.id}__${device.id}${suffix}.png`,
+                ),
+              })
+              .catch(() => {});
+            if (!v.ok) {
+              throw new Error(
+                `the world was up when this row started and is NOT up after the overlay phases ` +
+                  `(${v.reason}) — every geometry number above describes a screen the student never ` +
+                  `sees. Capture: ENDED-BLANK__${surface.id}__${device.id}${suffix}.png`,
+              );
+            }
+          }
+
           // ---- THE TOOLBAR TEST -----------------------------------------
           // iOS grows the visual viewport when the toolbar collapses. Shrink
           // the layout viewport by the same amount, snapshot, restore.
@@ -1218,37 +1296,42 @@ try {
           row.shiftOnToolbar = diff(base.snapshot, restored.snapshot);
 
           // ---- AND WAS THE WORLD STILL THERE AT THE END? -------------------
-          // THE GATE AT THE TOP OF THE ROW IS HALF A GATE. Everything that
-          // decides this row happens AFTER it: two overlay toggles and two
-          // viewport resizes, each of which tears down and rebuilds the WebGL
-          // drawing buffer. A canvas that rendered a street at second 40 and
-          // has been black ever since would still be reported as a measurement
-          // of the road, and the capture written at the bottom of this block —
-          // the one artefact a human ever opens — would show the black.
+          // Still asked — a world that dies during the toolbar phase is a real
+          // finding and this is the only place that would see it. What changed
+          // is WHAT A BLANK MEANS HERE, because after a viewport resize this
+          // engine cannot photograph the canvas at all (defect #10):
           //
-          // That is exactly how row C8's frames came to exist. So the canvas is
-          // asked a SECOND time, in the same pixels, at the moment the capture
-          // is taken; the row is refused if the answer changed. This is the
-          // „open a capture and see a street" check, mechanised, so that it
-          // stops depending on somebody remembering to look.
+          //   blank + context alive + still drawing  -> CAPTURE-BLIND. The
+          //     instrument, not the app. Recorded, printed loudly, NOT refused
+          //     — refusing it is what left this row with no measurement for
+          //     three rounds while the app was rendering the whole time.
+          //   blank + context lost, or no draw calls  -> the renderer really
+          //     did stop. Refused, exactly as before.
+          //   no liveness evidence at all             -> refused, exactly as
+          //     before. Absence of evidence is not the instrument's alibi.
           if (surface.requiresWorld) {
             const end = await worldVitals(page);
             const verdict = end.vitals ? isWorldFrame(end.vitals) : { ok: false, reason: end.reason };
             row.worldAtEnd = { ok: verdict.ok, reason: verdict.reason, vitals: end.vitals };
-            await page
-              .screenshot({
-                path: join(
-                  OUT_DIR,
-                  `${verdict.ok ? "" : "ENDED-BLANK__"}${surface.id}__${device.id}${suffix}.png`,
-                ),
-              })
-              .catch(() => {});
             if (!verdict.ok) {
-              throw new Error(
-                `the world was up when this row started and is NOT up in the frame the row ends on ` +
-                  `(${verdict.reason}) — every geometry number above describes a screen the student ` +
-                  `never sees. Capture: ENDED-BLANK__${surface.id}__${device.id}${suffix}.png`,
-              );
+              const liveness = await glLiveness(page);
+              const blind = isCaptureBlind(liveness);
+              row.captureBlind = { ...blind, liveness };
+              await page
+                .screenshot({
+                  path: join(
+                    OUT_DIR,
+                    `${blind.blind ? "CAPTURE-BLIND__" : "ENDED-BLANK__"}${surface.id}__${device.id}${suffix}.png`,
+                  ),
+                })
+                .catch(() => {});
+              if (!blind.blind) {
+                throw new Error(
+                  `the world was up before the toolbar phase and is NOT up in the frame the row ends ` +
+                    `on (${verdict.reason}), and the page agrees: ${blind.why}. Capture: ` +
+                    `ENDED-BLANK__${surface.id}__${device.id}${suffix}.png`,
+                );
+              }
             }
           } else {
             await page.screenshot({ path: join(OUT_DIR, `${surface.id}__${device.id}${suffix}.png`) });
@@ -1382,10 +1465,22 @@ const report = {
   rows,
   orientation,
 };
+// …AND A FULL SWEEP MUST NOT BE ABLE TO POSE AS A NARROW ONE, OR VICE VERSA.
+// The guard above covers the injected fixtures and nothing else, so a two-run
+// check of `exams` silently destroyed the five-run `simulator-drive` sweep that
+// row C8 was evidenced by — a register citation that quietly stopped pointing at
+// anything. The name now carries the SCOPE that produced it; `stability.json`
+// stays as the "everything was measured" artefact, which is the only run for
+// which that unqualified name is true.
+const scoped =
+  surfaces.length === SURFACES.length && devices.length === 4
+    ? "stability.json"
+    : `stability-${surfaces.map((s) => s.id).join("+")}-${devices.map((d) => d.id).join("+")}.json`;
 const reportName = args.injectCss
   ? `stability-INJECTED-${basename(args.injectCss).replace(/\.css$/, "")}.json`
-  : "stability.json";
+  : scoped;
 writeFileSync(join(OUT_DIR, reportName), JSON.stringify(report, null, 2));
+console.log(`\n  raw: ${join(OUT_DIR, reportName)}`);
 
 // ----------------------------------------------------------------- the table
 console.log(`\nSTABILITY — ${runBanner().split("\n").slice(1).join("\n")}\n`);
@@ -1488,13 +1583,41 @@ if (worldRows.length > 0) {
   for (const r of worldRows) {
     const v = r.world.vitals ?? {};
     const end = r.worldAtEnd;
+    const pre = r.worldBeforeResize;
     console.log(
       `  ${r.route.padEnd(18)}${r.device.padEnd(20)}` +
         `${(r.world.ready ? "yes" : "NO").padEnd(6)}${`${r.world.ms}ms`.padEnd(9)}` +
         `${String(r.world.reads).padEnd(7)}${String(v.distinct ?? "-").padEnd(9)}` +
         `${String(v.busyShare ?? "-").padEnd(8)}${String(v.darkShare ?? "-").padEnd(8)}${String(v.stdLuma ?? "-").padEnd(7)}` +
-        `${end ? (end.ok ? `yes (${end.vitals?.distinct ?? "-"} colours)` : `NO — ${end.reason}`) : "not checked"}`,
+        `${
+          pre
+            ? pre.ok
+              ? `yes (${pre.vitals?.distinct ?? "-"} colours, judged pre-resize)`
+              : `NO — ${pre.reason}`
+            : end
+              ? end.ok
+                ? `yes (${end.vitals?.distinct ?? "-"} colours)`
+                : `NO — ${end.reason}`
+              : "not checked"
+        }`,
     );
+    // INSTRUMENT DEFECT #10, WHEN IT FIRES, SAYS SO IN FULL. A blank capture
+    // after the viewport resize is this engine losing sight of the canvas, not
+    // the world going out — but that claim only counts with the page's own
+    // answer printed beside it, so it is.
+    if (r.captureBlind?.blind) {
+      const l = r.captureBlind.liveness;
+      console.log(
+        `      CAPTURE-BLIND AFTER THE VIEWPORT RESIZE — the instrument, not the app.\n` +
+          `        the frame reads ${r.worldAtEnd?.vitals?.distinct ?? "-"} colours / dark ` +
+          `${r.worldAtEnd?.vitals?.darkShare ?? "-"}, and the page says: ${r.captureBlind.why}.\n` +
+          `        contexts: ${l.contexts.map((c) => `${c.kind} ${c.buf} lost=${c.lost}`).join(" | ")}\n` +
+          `        This row is NOT refused for it. Capture: CAPTURE-BLIND__${r.route}__${r.device}*.png\n` +
+          `        See lib/ready.mjs for the no-app control that isolates it to one variable.`,
+      );
+    } else if (r.captureBlind && !r.captureBlind.blind) {
+      console.log(`      the canvas really did go out: ${r.captureBlind.why}`);
+    }
     // EVERY iteration, failed ones included. The row above describes the run
     // that was kept; a run that never rendered produced no sample at all, and
     // that is the single most important thing this section can say.
@@ -1508,12 +1631,18 @@ if (worldRows.length > 0) {
     // saying "somewhere between the gate and the capture".
     const phases = r.worldPhases ?? [];
     if (phases.some((p) => !p.ok)) {
-      console.log(`      THE CANVAS WENT OUT DURING THIS ROW — checkpoint by checkpoint:`);
-      for (const p of phases) {
+      // AFTER `after-viewport-shrink` THE CAMERA IS BLIND, so a BLANK from
+      // there on is not a claim about the app. Marked rather than dropped: the
+      // checkpoints before it are the ones that mean something, and a reader
+      // must be able to see exactly where the evidence stops.
+      const blindFrom = phases.findIndex((p) => p.phase === "after-viewport-shrink");
+      console.log(`      CANVAS, CHECKPOINT BY CHECKPOINT:`);
+      for (const [i, p] of phases.entries()) {
+        const blind = blindFrom >= 0 && i >= blindFrom && r.captureBlind?.blind;
         console.log(
-          `        ${p.phase.padEnd(24)}${p.ok ? "world" : "BLANK"}  ` +
+          `        ${p.phase.padEnd(24)}${p.ok ? "world" : blind ? "blind" : "BLANK"}  ` +
             `${String(p.distinct ?? "-").padStart(4)} colours  dark ${p.darkShare ?? "-"}` +
-            (p.ok ? "" : `   <-- ${p.reason}`),
+            (p.ok ? "" : blind ? `   (capture-blind after the resize — not a finding about the app)` : `   <-- ${p.reason}`),
         );
       }
     }
@@ -1535,11 +1664,14 @@ if (worldRows.length > 0) {
       "            same buffer with the lesson menu over it ~110, a rendered street ~450).\n" +
       "  busy    = fraction of the band that varies between neighbouring pixels — the statistic a\n" +
       "            dialog cannot fake. See lib/ready.mjs for the measured table these lines come from.\n" +
-      "  still up at end? = THE SAME QUESTION, ASKED AGAIN IN THE FRAME THE CAPTURE IS TAKEN FROM.\n" +
-      "            Two overlay toggles and two viewport resizes happen between the gate at the top of\n" +
-      "            a row and the screenshot at the bottom, and every one of them rebuilds the WebGL\n" +
-      "            drawing buffer. A row that says yes here is a row whose capture shows a street —\n" +
-      "            which is the check that had to be done by eye, and therefore was not done.",
+      "  still up at end? = THE SAME QUESTION, ASKED AGAIN IN THE FRAME THE CAPTURE IS TAKEN FROM —\n" +
+      "            and taken BEFORE the toolbar phase, because after a viewport resize this engine\n" +
+      "            cannot photograph a WebGL canvas at all. Both overlay toggles are already behind\n" +
+      "            it, so a world that dies from a state change is still caught and still refuses the\n" +
+      "            row. The canvas is asked once more at the very end; a blank there is reported as\n" +
+      "            CAPTURE-BLIND only when the page itself says the context is alive and still\n" +
+      "            drawing, and is refused in every other case. lib/ready.mjs carries the control\n" +
+      "            that isolates the cause to one variable — the drawing buffer changing size.",
   );
 }
 

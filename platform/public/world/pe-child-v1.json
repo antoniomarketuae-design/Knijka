@@ -57,6 +57,10 @@
    "curbToCurbM": 16.25,
    "carriageway": "bay-pocket-behind-the-seat",
    "carriagewayNoteBg": "Паркинг джобът започва ТРИ МЕТРА ЗАД теб — потегляш вече вътре в него, платното е 24,25 м широко и отдясно има спрели коли. На двадесет и девет метра напред се стеснява обратно до 16,25 м. Единствената отсечка в групата, чието разширение е започнало, преди ти да си тръгнал.",
+   "crossingKit": "raised-table-short",
+   "crossingKitNoteBg": "Къса повдигната пътека: рампата е стегната, зъбците стоят близо до пътеката, площадката е тясна.",
+   "parkedSide": "right",
+   "parkedMix": "veteran",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -194,7 +198,9 @@
       44
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "right",
+    "parkingMix": "veteran"
    }
   ]
  },
@@ -206,7 +212,8 @@
    "y": 78,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "tableRampM": 2.2
   }
  ],
  "roundabouts": [],

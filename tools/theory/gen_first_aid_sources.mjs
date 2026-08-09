@@ -864,7 +864,121 @@ W("   `parseQueue` наистина се експортира (`index.ts:53`). �
 W("   нейния собствен гейт, защото той пускаше само `src/modules/content-admin`.");
 W();
 
-const dest = path.join(ROOT, "docs/education/92_FIRST_AID_SOURCES.md");
-fs.mkdirSync(path.dirname(dest), { recursive: true });
-fs.writeFileSync(dest, out, "utf8");
-console.log("WROTE " + dest + "  (" + out.length + " chars, " + out.split("\n").length + " lines)");
+// ---------------------------------------------------------------------------
+// THE WRITE — and why it is not `writeFileSync(dest, out)` any more
+// ---------------------------------------------------------------------------
+//
+// This generator emits §0 through §7.3. Doc 92 is 2,071 lines and §8, §9 and
+// §10 — the entire six-door history, ~955 lines of it, hand-written, and the
+// only record of how each of those doors was found and closed — sit BELOW that.
+// `writeFileSync(dest, out)` deleted all of it, silently, in the time it takes
+// to run `node tools/theory/gen_first_aid_sources.mjs`. The document itself
+// carried the warning („Преди да го пуснеш: запази опашката от §8 нататък"),
+// which is a note asking a human to be careful about a thing a machine can just
+// do — and notes like that are load-bearing exactly once.
+//
+// So the tool now SPLICES: it replaces the generated head and keeps the
+// hand-written tail byte for byte. And when it cannot find the seam it REFUSES
+// rather than guessing, because the failure mode of guessing here is the
+// deletion this exists to prevent.
+//
+// The seam is a sentinel this file emits. Runs before the sentinel existed have
+// no such line, so there is a fallback: the first heading numbered above the
+// last section this generator produces.
+
+const GENERATED_THROUGH_SECTION = 7;
+const SENTINEL =
+  "<!-- END GENERATED — everything below this line is hand-written and is preserved " +
+  "byte for byte by tools/theory/gen_first_aid_sources.mjs. Do not remove this marker. -->";
+
+/**
+ * Split an existing doc at the seam: `{ head, tail }`.
+ * Throws when the file exists and the seam cannot be located.
+ */
+function splitAtSeam(existing) {
+  const lines = existing.split("\n");
+
+  // Leading blank lines are stripped from the tail and one is re-added on
+  // write. Without that the file grows by exactly one line per run — measured,
+  // by running it twice.
+  const cut = (headEnd, tailStart) => ({
+    head: lines.slice(0, headEnd).join("\n"),
+    tail: lines.slice(tailStart).join("\n").replace(/^\n+/, ""),
+  });
+
+  const atSentinel = lines.findIndex((l) => l.trim() === SENTINEL);
+  if (atSentinel !== -1) return cut(atSentinel, atSentinel + 1);
+
+  // Pre-sentinel document: the first `## N.` heading past the generated range.
+  const atHeading = lines.findIndex((l) => {
+    const m = /^##\s+(\d+)\./.exec(l);
+    return m !== null && Number(m[1]) > GENERATED_THROUGH_SECTION;
+  });
+  if (atHeading !== -1) return cut(atHeading, atHeading);
+
+  // Neither. Either somebody renumbered the sections, or the tail is genuinely
+  // gone. Both are reasons to stop and let a person look.
+  throw new Error(
+    `refusing to write ${path.relative(ROOT, DEST)}: it exists (${lines.length} lines) but ` +
+      `neither the END GENERATED sentinel nor a hand-written section above ` +
+      `§${GENERATED_THROUGH_SECTION} was found. Overwriting would delete whatever is ` +
+      `there. Check the file, then either restore the sentinel line or move the ` +
+      `hand-written part under a heading numbered above ${GENERATED_THROUGH_SECTION}.`,
+  );
+}
+
+const DEST = path.join(ROOT, "docs/education/92_FIRST_AID_SOURCES.md");
+fs.mkdirSync(path.dirname(DEST), { recursive: true });
+
+const force = process.argv.includes("--force");
+const existed = fs.existsSync(DEST);
+const { head: existingHead, tail } = existed
+  ? splitAtSeam(fs.readFileSync(DEST, "utf8"))
+  : { head: null, tail: "" };
+
+/**
+ * AND THE HEAD IS HAND-EDITED TOO. Splicing the tail was written first and then
+ * TESTED, which is how this came out: regenerating §0–§7.3 over the committed
+ * file silently reverted three deliberate edits inside the generated range — a
+ * navigation blockquote pointing readers at §10, the „ЗАТВОРЕНО, ПРОВЕРЕНО ЧРЕЗ
+ * ИЗПЪЛНЕНИЕ" status banner on §7.1, and a repaired soft-hyphen in an ERC
+ * quote. A generator that quietly reverts a status from „closed" to „open" is
+ * the same defect as one that deletes §8, only smaller and harder to notice.
+ *
+ * So: if the head on disk is not the head this tool produces, it REFUSES and
+ * says how far apart they are. `--force` regenerates (and still keeps the
+ * tail). The default is the safe one, because the person who types this command
+ * six months from now will not know any of the above.
+ */
+if (existingHead !== null && existingHead.trimEnd() !== out.trimEnd() && !force) {
+  const a = existingHead.split("\n");
+  const b = out.split("\n");
+  const firstDiff = a.findIndex((l, i) => l !== b[i]);
+  const sample = [];
+  for (let i = firstDiff; i < Math.min(firstDiff + 3, Math.max(a.length, b.length)); i += 1) {
+    if (a[i] !== b[i]) {
+      sample.push(`      on disk:   ${JSON.stringify((a[i] ?? "").slice(0, 100))}`);
+      sample.push(`      generated: ${JSON.stringify((b[i] ?? "").slice(0, 100))}`);
+    }
+  }
+  console.error(
+    `REFUSING to write ${path.relative(ROOT, DEST)}.\n\n` +
+      `  The generated part (§0–§${GENERATED_THROUGH_SECTION}) has been hand-edited since it was\n` +
+      `  last generated: ${a.length} lines on disk vs ${b.length} generated, first difference at\n` +
+      `  line ${firstDiff + 1}.\n` +
+      `${sample.join("\n")}\n\n` +
+      `  Regenerating would revert those edits. The hand-written tail (§8 onward,\n` +
+      `  ${tail === "" ? 0 : tail.split("\n").length} lines) is preserved either way.\n\n` +
+      `  Read the differences, fold anything worth keeping back into this generator,\n` +
+      `  then re-run with --force.`,
+  );
+  process.exit(1);
+}
+
+const final = `${out}${SENTINEL}\n${tail === "" ? "" : `\n${tail}`}`;
+fs.writeFileSync(DEST, final, "utf8");
+const keptLines = tail === "" ? 0 : tail.split("\n").length;
+console.log(
+  `WROTE ${DEST}  (${final.length} chars, ${final.split("\n").length} lines; ` +
+    `${out.split("\n").length} generated, ${keptLines} hand-written lines preserved)`,
+);

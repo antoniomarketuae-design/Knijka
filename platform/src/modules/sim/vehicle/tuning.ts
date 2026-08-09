@@ -651,11 +651,17 @@ export function cockpitVFovForAspect(aspect: number): number {
  *      the shaved cowl still slopes away along the sightline)
  *   10 m road pt   (y −0.49, z 10):      fy 0.446 [0.466] (10–100 m band clear) ✓
  *   horizon:                             fy 0.580 [0.601] ✓ (band 0.55–0.62)
- *   int. mirror    (0.00, 0.803, 0.50): fx 0.708 fy 0.724 (upper-right, ABOVE
+ *   int. mirror    (0.00, 0.908, 0.50): fx 0.710 fy 0.889 (upper-right, ABOVE
  *      the horizon and clear of the graded road band — RAISED from the old
  *      eye-level (0, 0.687, 0.575) in the 2026-07-11 black-mass fix: that
  *      block dropped into the sightline under the v2 camera, so the mirror
- *      was rebuilt small on a header-mounted stalk, hero_interior_v2.py)
+ *      was rebuilt small on a header-mounted stalk, hero_interior_v2.py — and
+ *      raised a further 105 mm on 2026-08-09 by founder item B58, which
+ *      photographed the В26 «50» that the speed lessons tell the student to
+ *      read sitting behind the glass at every distance on the approach. That
+ *      move is an ASSET change (tools/glb/raise_interior_mirror.mjs) plus
+ *      VitokCockpit's ROOF_Y / STALK block; it took fy 0.724 → 0.889, still
+ *      under the ≤0.97 ceiling the acceptance test asserts)
  *   door mirror L  (0.905, 0.455, 0.592): fx 0.001 fy 0.240 (glass at the left
  *      frame edge — lane 12: "~37° left from the aft camera") ✓
  *   glass top/header (y 0.850, z 0.16):  fy 0.980 [1.003] → header still out

@@ -414,6 +414,9 @@ required citation whose `quoteBg` is re-verified against the act text at load.
 ```json
 {
   "id": "pen-b2-no-stop-danger",
+  "conduct":       { "statementBg": "Водачът не спазва предписанието на пътните знаци или правилата за предимство и от това е създадена непосредствена опасност за движението.",
+                     "anchorsBg": [["пътен знак", "пътните знаци"],
+                                   ["не спазва предписанието", "неспиране", "не спре"]] },
   "fine":          { "system": "fine",          "status": "grounded", "amountBgn": 200,
                      "instrument": "акт",       // фиш | акт
                      "instrumentSource": { "actId": "zdvp", "ref": "чл. 189", "quoteBg": "…" },
@@ -438,6 +441,17 @@ quote that never says "100 лв." is refused at load. The offence text rides alo
 as `contextQuoteBg` (a second excerpt from the same unit, verified the same way)
 because Bulgarian penalty articles put the amount in the alinea opening and the
 behaviour in a numbered point below it.
+
+`conduct` is required, and it is the only field in the row that a citation
+cannot write for itself. A grounded figure must also carry
+`source.offencePhraseBg` — the act's own words for the conduct — and the loader
+checks that phrase against `conduct.anchorsBg` (AND of groups, OR inside a
+group), not merely against the citation's own quotes. Without it a citation can
+be verbatim, state its figure, name an offence and price the WRONG one:
+measured, giving the 21–30 km/h speeding row the traffic-light case from Наредба
+№ 38 produced no complaint at all. The anchors are themselves checked against
+the act the row's `lawRefs` name, so the declaration cannot be moved to fit a
+wrong citation. See `content/law/README.md` rules 1d and 1e.
 
 `status` per figure — and this is the founder's ruling in code:
 

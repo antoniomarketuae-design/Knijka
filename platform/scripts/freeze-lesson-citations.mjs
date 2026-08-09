@@ -128,7 +128,11 @@ function normaliseUnitRef(ref) {
   if (art) return `чл. ${art[1]}${art[2] ?? ""}`;
   const para = /^§\s*(\d+)([а-я]?)(?![а-яА-Я])/.exec(s);
   if (para) return `§ ${para[1]}${para[2] ?? ""}`;
-  const annex = /^(?:приложение|Приложение|ПРИЛОЖЕНИЕ)\s*№?\s*(\d+[а-я]?)(?![а-яА-Я])/.exec(s);
+  // „прил. № 2" IS an annex number — see freeze-question-citations.mjs and
+  // `lib/content/law/corpus.ts` ANNEX_RE. Recognising only the full word made
+  // the abbreviation read as „numberless" to every check in the repo.
+  const annex =
+    /^(?:приложение|Приложение|ПРИЛОЖЕНИЕ|прил|Прил|ПРИЛ)\.?\s*№?\s*(\d+[а-я]?)(?![а-яА-Я])/.exec(s);
   if (annex) return `приложение № ${annex[1]}`;
   return null;
 }

@@ -34,7 +34,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./lib/pw.mjs";
-import { contextOptions, resolveDevices } from "./lib/devices.mjs";
+import { resolveDevices } from "./lib/devices.mjs";
+import { newDeviceContext } from "./lib/insets.mjs";
 import { resolveRoutes } from "./lib/routes.mjs";
 import { probeBody } from "./lib/probe.mjs";
 import { gotoAuthenticated, signIn } from "./lib/auth.mjs";
@@ -450,8 +451,9 @@ const rows = [];
 let storageState;
 try {
   for (const device of devices) {
-    const context = await browser.newContext({
-      ...contextOptions(device, { motion: "reduce" }),
+    // Real insets by default — lib/insets.mjs.
+    const { context } = await newDeviceContext(browser, device, {
+      motion: "reduce",
       ...(storageState ? { storageState } : {}),
     });
     const page = await context.newPage();

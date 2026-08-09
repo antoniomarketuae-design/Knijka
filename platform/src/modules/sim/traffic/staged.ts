@@ -33,6 +33,13 @@ const DEFAULT_ACCEL_MPS2 = 2.6;
 const DEFAULT_DECEL_MPS2 = 4.5;
 const DEFAULT_SLAM_DECEL_MPS2 = 7.5;
 const HOLD_DECEL_MPS2 = 8;
+/** A commanded target at/below this is „stand still", not „crawl" (B40 — the
+ *  standing-hold brake lamps at the bottom of `stepStagedVehicle`). */
+const HOLD_LIT_TARGET_MPS = 0.05;
+/** …and the actor counts as stopped at/below this. Matches the ambient
+ *  fleet's own `speed < 0.5` stopped bar in vehicles.ts, so the scripted and
+ *  the background car light up at the same moment. */
+const HOLD_LIT_SPEED_MPS = 0.5;
 /** Default laneShift glide duration, s (the FO-03 cut-in reads as one calm
  *  lane change at urban speed — ~8 m of lateral travel over 1.5 s). */
 const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
@@ -609,8 +616,32 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     if (agent.lat === agent.latTarget) agent.latRate = 0;
   }
 
-  // Brake lights: an active slam, or actively slowing toward a lower target.
-  agent.state.braking = cmd.type === "brake" || agent.speed > target + 0.3;
+  // Brake lights: an active slam, actively slowing toward a lower target —
+  // or STANDING STILL ON A COMMANDED HOLD.
+  //
+  // That last clause is doc 87 B40, and it is a legibility defect, not a
+  // cosmetic one. A staged actor asked to wait — the car pinned short of a
+  // junction box, the колона standing at the end of the street, the
+  // регулировчик drill's queue, and above all `sc-shes-sleeper`, the car
+  // asleep on green that the whole lesson «Спане на зелено» is about — sat
+  // there with UNLIT tail lamps, because `speed > target + 0.3` is false when
+  // both are zero. Measured from the seat at the pose the lesson's own card
+  // points at (y = −33.1, 57 m out), the sleeper was „a ~30 px dark shape
+  // among other stationary vehicles" and the student could not tell it was
+  // facing him, let alone that it was standing on a line.
+  //
+  // Two lit lamps is what a driver actually reads a stopped car by, and it is
+  // the truth: a car held at a stop line has its foot on the brake. The
+  // AMBIENT fleet already does exactly this (`vehicles.ts` — `term > 0.8 &&
+  // speed < 0.5`), so this also ends a split where the scripted car and the
+  // background car behaved differently while doing the same thing.
+  //
+  // `finished` is excluded on purpose: an actor that has run out of path is
+  // parked, not waiting, and a parked car with its brake lights on is a lie
+  // in the other direction.
+  const holding = target <= HOLD_LIT_TARGET_MPS && agent.speed <= HOLD_LIT_SPEED_MPS;
+  agent.state.braking =
+    cmd.type === "brake" || agent.speed > target + 0.3 || (holding && !agent.finished);
 
   publishVehicle(agent);
 }

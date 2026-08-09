@@ -49,6 +49,16 @@ export interface ValidateScenarioOptions {
 }
 
 const ID_RE = /^sc-[a-z0-9]+(-[a-z0-9]+)*$/;
+/**
+ * A FIRST-WORD check, and it is not the gate. „ЗДвП чл. 9999" passes this, and
+ * so did „ППЗДвП чл. 31" for as long as this was the only thing looking at the
+ * 250 citation strings under `modules/sim` — ППЗДвП being an act
+ * `content/law/acts` holds not one byte of, so that number was unverifiable by
+ * construction. This regex stays because it is the cheap authoring-time nudge
+ * that runs in the browser; the real check resolves every lawRef in the module
+ * against the corpus and lives in `modules/sim/__tests__/law-citations.test.ts`
+ * (the corpus loader is node-only, so it cannot run from here).
+ */
 const LAW_REF_RE = /^(ЗДвП|ППЗДвП|Наредба)/;
 const CYRILLIC_RE = /[Ѐ-ӿ]/;
 

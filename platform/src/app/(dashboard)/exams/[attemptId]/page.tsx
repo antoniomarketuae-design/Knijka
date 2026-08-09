@@ -2,6 +2,14 @@ import "@/lib/content/loader";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  POINT_SCALES,
+  THEORY_EXAM_SCORE_NOTE_BG,
+  pointsBg,
+  pointsOutOfBg,
+  pointsScaleLabelBg,
+  pointsWordsBg,
+} from "@/lib/content/pointScales";
 import { requireUser } from "@/modules/auth";
 import {
   EXAM_DURATION_SEC,
@@ -124,7 +132,11 @@ function CompletedAttemptView({
         <Celebration
           show
           title="Взе изпита!"
-          subtitle={`Издържа с ${score} от ${maxScore} точки — над прага ${passPoints}. Готов си за изпитния ден.`}
+          subtitle={`Издържа с ${pointsOutOfBg(
+            "theory",
+            score,
+            maxScore,
+          )} — над прага ${passPoints}. Готов си за изпитния ден.`}
         />
       ) : null}
 
@@ -173,7 +185,9 @@ function TopicBreakdown({ byTopic }: { byTopic: ExamTopicResult[] }) {
         </h2>
         <p className="mt-1 text-sm text-muted">
           {lostAnywhere
-            ? "Оттук започва следващата тренировка — темите, в които изгуби точки."
+            ? `Оттук започва следващата тренировка — темите, в които изгуби ${pointsScaleLabelBg(
+                "theory",
+              )}.`
             : "Чисто по всички теми. Точно така изглежда готовността."}
         </p>
       </div>
@@ -204,8 +218,10 @@ function TopicRow({ topic: t }: { topic: ExamTopicResult }) {
         <p className="truncate text-sm font-semibold" title={t.titleBg}>
           {t.titleBg}
         </p>
+        {/* WAS „2 от 3 т." — a bare „т." on the row a failing candidate reads
+            first, next to a „Тренирай темата" button. */}
         <p className="text-xs text-muted tabular-nums">
-          {t.points} от {t.maxPoints} т.
+          {pointsOutOfBg("theory", t.points, t.maxPoints)}
         </p>
       </div>
 
@@ -253,9 +269,11 @@ function ScoreReadout({
   const threshPct = maxScore > 0 ? Math.min(100, (passPoints / maxScore) * 100) : 0;
   const verdictColor = passed ? "var(--success)" : "var(--danger)";
   const margin = passed ? score - passPoints : passPoints - score;
+  // WAS „+9 т. над прага" / „12 т. до прага". The single most-read line on the
+  // screen after the verdict itself, and it named no scale at all.
   const marginLabel = passed
-    ? `+${margin} т. над прага`
-    : `${margin} т. до прага`;
+    ? `над прага с ${pointsBg("theory", margin)}`
+    : `до прага остават ${pointsBg("theory", margin)}`;
 
   return (
     <section
@@ -279,14 +297,24 @@ function ScoreReadout({
           size={216}
           color={verdictColor}
           unit={`/ ${maxScore}`}
-          ariaLabel={`Резултат: ${score} от ${maxScore} точки. ${
+          /* Spoken, so the WORD form, not the abbreviation: a screen reader
+             saying „т." says nothing, and „точки" alone says контролни точки. */
+          ariaLabel={`Резултат: ${score} от ${pointsWordsBg(
+            "theory",
+            maxScore,
+          )}. ${
             passed ? "Изпитът е издържан" : "Изпитът не е издържан"
-          }. Праг за успех ${passPoints} точки.`}
+          }. Праг за успех ${pointsWordsBg("theory", passPoints)}.`}
         />
 
         {/* Telemetry column */}
         <div className="flex w-full flex-1 flex-col items-center gap-4 sm:items-start">
-          <span className="hud-label">Пробен изпит · Резултат</span>
+          {/* The Gauge draws „74" over „/ 97" and can carry no unit of its own
+              — so the scale is named in the label directly beside it, and again
+              on the axis, the tiles and the note. */}
+          <span className="hud-label">
+            Пробен изпит · {POINT_SCALES.theory.nameBg}
+          </span>
 
           <div className="flex flex-col items-center gap-3 sm:items-start">
             <h2
@@ -324,10 +352,13 @@ function ScoreReadout({
                 style={{ left: `${threshPct}%` }}
               />
             </div>
+            {/* An axis, so the unit is written ONCE, at the end of it — „0 …
+                праг 87 … 97 т. по теорията" — rather than „0 т. … 97 т." with
+                neither one saying which т. this is. */}
             <div className="mt-2 flex justify-between hud-label">
-              <span>0 т.</span>
+              <span>0</span>
               <span className="text-accent">праг {passPoints}</span>
-              <span>{maxScore} т.</span>
+              <span>{pointsBg("theory", maxScore)}</span>
             </div>
           </div>
         </div>
@@ -336,13 +367,33 @@ function ScoreReadout({
       {/* Format telemetry tiles */}
       <dl className="relative mt-7 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <ReadoutTile label="Въпроси" value={String(EXAM_QUESTION_COUNT)} />
-        <ReadoutTile label="Праг за успех" value={`≥ ${passPoints}`} accent />
-        <ReadoutTile label="Загубени точки" value={String(Math.max(0, maxScore - score))} />
+        <ReadoutTile
+          label={`Праг — ${pointsScaleLabelBg("theory")}`}
+          value={`≥ ${passPoints}`}
+          accent
+        />
+        {/* WAS „Загубени точки" — the reading is „контролни точки". */}
+        <ReadoutTile
+          label={`Загубени ${pointsScaleLabelBg("theory")}`}
+          value={String(Math.max(0, maxScore - score))}
+        />
         <ReadoutTile
           label="Използвано време"
           value={timeUsedSec !== undefined ? formatClock(timeUsedSec) : "—"}
         />
       </dl>
+
+      {/*
+        THE SCALE, ON THE SCREEN THAT DELIVERS THE VERDICT.
+        This is the theory half of B58. The sim's result screen carries
+        `EXAM_VS_CONTROL_POINTS_BG`, which sets наказателни against контролни;
+        this screen counts a THIRD system, and a student who has driven a lesson
+        can now mistake it for either. The note names it, cites чл. 39, ал. 1
+        and rules out both.
+      */}
+      <p className="relative mt-4 rounded-xl border border-hair bg-surface-2/60 p-3 text-xs leading-relaxed text-muted">
+        {THEORY_EXAM_SCORE_NOTE_BG}
+      </p>
     </section>
   );
 }

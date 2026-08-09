@@ -15,7 +15,8 @@
 // itself is stale, the bug is in the measurement.
 // =============================================================================
 import { engineByName } from "./lib/pw.mjs";
-import { contextOptions, resolveDevices } from "./lib/devices.mjs";
+import { resolveDevices } from "./lib/devices.mjs";
+import { newDeviceContext } from "./lib/insets.mjs";
 import { ROUTES } from "./lib/routes.mjs";
 import { gotoAuthenticated, signIn } from "./lib/auth.mjs";
 import { ensureHarnessUser } from "./lib/user.mjs";
@@ -62,7 +63,8 @@ const read = () =>
   });
 
 const browser = await engine.launcher.launch();
-const context = await browser.newContext(contextOptions(device, { motion: "reduce" }));
+// Real insets by default — lib/insets.mjs.
+const { context } = await newDeviceContext(browser, device, { motion: "reduce" });
 const page = await context.newPage();
 page.setDefaultTimeout(180_000);
 page.setDefaultNavigationTimeout(180_000);

@@ -382,8 +382,12 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
     expect(bar).toContain("max-sm:border-t");
     // Above the option rows in paint order, or taps land on the option.
     expect(bar).toMatch(/max-sm:z-\d+/);
-    // iPhone home indicator.
-    expect(bar).toContain("env(safe-area-inset-bottom)");
+    // THE HOME INDICATOR IS PAID FOR ONCE — see PAYS_THE_INSET_ONCE below.
+    // This used to demand `env(safe-area-inset-bottom)` HERE, which is the
+    // second payment: <body> already pads by the inset (globals.css) and this
+    // bar is `sticky` inside it, so the calc bought nothing and cost 34px.
+    expect(bar).not.toContain("env(safe-area-inset-bottom)");
+    expect(bar).toContain("max-sm:py-1.5");
     // Desktop keeps the plain in-flow row — no unconditional `sticky`.
     expect(bar).not.toMatch(/(^|\s)sticky(\s|$)/);
     // The negative margins have to match the card's phone padding, or the bar
@@ -412,10 +416,12 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
       "short:mt-auto",
       "short:border-t",
       "short:bg-surface/95",
-      "env(safe-area-inset-bottom)",
+      // `short:py-1.5`, not a safe-area calc — PAYS_THE_INSET_ONCE below.
+      "short:py-1.5",
     ]) {
       expect(bar).toContain(utility);
     }
+    expect(bar).not.toContain("env(safe-area-inset-bottom)");
   });
 
   it("pins the EXAM bar on a phone held sideways too", () => {
@@ -443,10 +449,12 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
       "short:-mb-3",
       "short:rounded-b-none",
       "short:bg-surface/95",
-      "env(safe-area-inset-bottom)",
+      // `short:pb-1.5`, not a safe-area calc — PAYS_THE_INSET_ONCE below.
+      "short:pb-1.5",
     ]) {
       expect(bar).toContain(utility);
     }
+    expect(bar).not.toContain("env(safe-area-inset-bottom)");
     // The navigator is a sheet in landscape as well — 45 buttons in flow below
     // the card is ~300px of document on a 393px screen.
     expect(EXAM).toContain('className="card hidden h-fit p-4 wide-tall:block"');
@@ -472,7 +480,9 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
     expect(bar).toContain("max-sm:bottom-0");
     expect(bar).toMatch(/max-sm:bg-surface(\/\d+)?/);
     expect(bar).toMatch(/max-sm:z-\d+/);
-    expect(bar).toContain("env(safe-area-inset-bottom)");
+    // PAYS_THE_INSET_ONCE below.
+    expect(bar).not.toContain("env(safe-area-inset-bottom)");
+    expect(bar).toContain("max-sm:pb-1.5");
     expect(bar).not.toMatch(/(^|\s)sticky(\s|$)/);
     expect(bar).toContain("max-sm:-mx-4");
     expect(bar).toContain("max-sm:-mb-3");
@@ -489,6 +499,119 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
     for (const source of [PRACTICE, EXAM]) {
       expect(source).toContain("max-sm:-mb-6");
     }
+  });
+
+  /**
+   * THE ONE TOKEN THE WHOLE FOLD HANGS ON.
+   *
+   * The app shell's root asked for a full `min-h-dvh` inside a <body> that
+   * globals.css had already inset by the home indicator, so the document was
+   * permanently 34px (portrait) / 21px (landscape) taller than the screen — on
+   * every page of the product, forever. Nothing in the repo could see it,
+   * because Playwright's WebKit resolves env(safe-area-inset-*) to 0 and every
+   * mobile number ever taken here was taken on a phone with no cutout.
+   *
+   * Measured with the insets emulated (tools/mobile/lib/insets.mjs), 20 heaviest
+   * questions per surface, fold = top of the pinned bar, re-derived from raw:
+   *
+   *   surface   profile          BEFORE   AFTER
+   *   practice  iPhone 393x852    0/20    20/20
+   *   practice  iPhone 852x393    0/20    19/20
+   *   exam      iPhone 393x852    0/20    20/20
+   *   exam      iPhone 852x393    0/20    20/20
+   *
+   * A „simplification" back to `min-h-dvh` reinstates all four columns at 0.
+   */
+  it("the app shell's root height subtracts the home-indicator inset", () => {
+    const SHELL = read("components/dashboard/DashboardShell.tsx");
+    expect(SHELL).toContain("min-h-[calc(100dvh-env(safe-area-inset-bottom,0px))]");
+    expect(SHELL).not.toMatch(/className="flex min-h-dvh flex-col/);
+    // And the rig has to be the same product, or it measures a screen nobody
+    // gets. It stands in for the (dashboard) group's root, which is `flex-1`
+    // inside <body class="min-h-full flex flex-col"> — not a dvh rule of its own.
+    expect(FOLD_RIG).toContain('className="isolate flex flex-1 flex-col bg-background text-foreground"');
+    // …and no className in the rig may carry a dvh height rule of its own. The
+    // prose above that line names `min-h-dvh` to explain why it is gone, so
+    // this looks at class strings, not at the file.
+    for (const m of FOLD_RIG.matchAll(/className=(?:"([^"]*)"|\{`([^`]*)`)/g)) {
+      expect(m[1] ?? m[2] ?? "").not.toContain("min-h-dvh");
+    }
+  });
+
+  /**
+   * PAYS_THE_INSET_ONCE — the home indicator is charged for exactly once, and
+   * WHICH surface pays depends on how it is positioned.
+   *
+   * The rule, stated so the next reader does not have to rediscover it:
+   *   `fixed`            resolves against the VIEWPORT, so <body>'s padding
+   *                      never reaches it — it MUST pay the inset itself.
+   *   `sticky` / in-flow resolves inside <body>'s padded content box, which
+   *                      globals.css has ALREADY inset — so paying again is
+   *                      not safety, it is dead glass taken off the answers.
+   *
+   * Both runners' pinned bars are sticky and both were paying. Measured on the
+   * fold rig, WebKit, iPhone 16 with the real insets emulated
+   * (tools/mobile/lib/insets.mjs) — the numbers are only visible at all with
+   * that emulation on, which is why this stood for the life of the bars: the
+   * lowest control in the bar sat 41px above the home-indicator band in
+   * portrait and 28px in landscape, where the padding it is spelled with claims
+   * 6px. It is 7px now, in both. Worth 34px (portrait) / 21px (landscape) back
+   * to the answers on every question in the product.
+   *
+   * The exam's navigator sheet is the control that proves the rule is about
+   * positioning and not about taste: it IS `fixed`, and it keeps its calc.
+   */
+  it("the home indicator is paid for ONCE — by <body> for sticky bars, by the surface itself for fixed ones", () => {
+    const GLOBALS = read("app/globals.css");
+    // <body> pays it, for everything in flow. If this rule ever moves, the
+    // bars have to start paying again and this test is the reason to notice.
+    expect(GLOBALS.replace(/\s+/g, " ")).toContain(
+      "padding-bottom: env(safe-area-inset-bottom, 0px);",
+    );
+
+    for (const [name, source] of [["practice", PRACTICE], ["exam", EXAM]] as const) {
+      for (const variant of ["max-sm:sticky", "short:sticky"]) {
+        const bar = classListWith(source, variant);
+        expect(bar, `${name} ${variant}`).not.toBe("");
+        expect(bar, `${name} ${variant} pays the bottom inset twice`).not.toContain(
+          "env(safe-area-inset-bottom)",
+        );
+      }
+    }
+
+    // …and the one surface that legitimately pays it is still paying it.
+    const sheet = classListWith(EXAM, "max-h-[80dvh]");
+    expect(sheet).toContain("env(safe-area-inset-bottom)");
+    expect(EXAM).toContain('className="fixed inset-0 z-50 flex flex-col justify-end wide-tall:hidden"');
+  });
+
+  /**
+   * A CLAMP MUST PAY FOR ITSELF. `useQuestionBudget` hands the whole document
+   * overflow to the question to give back, which is only sound while that
+   * overflow is the question's to give. Against a min-height FLOOR it is not:
+   * `over` never moves, and the hook subtracts it again on every tick until the
+   * stem hits QUESTION_MIN_PX. That is what clamped the question to 62px on
+   * 20 of 20 portrait cases — up to 173px of the stem gone, three of five lines
+   * on q-predimstvo-042, with ~900 device px of empty card below the answers.
+   *
+   * The shell's height is fixed now, so this is the NET rather than the fix,
+   * and it is mechanism-blind on purpose: it asks only whether the last cut
+   * made the page shorter, and refunds every pixel that bought nothing.
+   */
+  it("the question budget stops cutting when cutting stops helping", () => {
+    // The ledger and the freeze exist…
+    expect(QUESTION_BUDGET).toContain("chaseRef");
+    expect(QUESTION_BUDGET).toContain("frozenAtRef");
+    // …the freeze condition is „the last cut gained nothing", not „gained less
+    // than it cost" — the strong form, which cannot misfire on a layout that is
+    // still settling…
+    expect(QUESTION_BUDGET).toMatch(/spent > 0 && gained <= 0/);
+    // …the refund hands back everything that bought nothing…
+    expect(QUESTION_BUDGET).toMatch(/chase\.overAtStart - over/);
+    // …and it re-asks when the viewport height changes, so a rotation or a
+    // collapsing toolbar is never answered from the other orientation's ledger.
+    expect(QUESTION_BUDGET).toMatch(/frozenAtRef\.current = vh/);
+    expect(QUESTION_BUDGET).toMatch(/Math\.abs\(frozenAtRef\.current - vh\) < 1/);
   });
 });
 
@@ -641,11 +764,21 @@ describe("the reclaimed chrome stays reclaimed", () => {
     // ...and the two pills it used to carry on phones are chips at the head of
     // the question text, where they cost no row: inside the question box, so
     // they are the first thing in the scroller rather than a block above it.
-    expect(EXAM).toMatch(/\{q\.points\} т\.\s*\n?\s*<\/span>/);
+    //
+    // THE WEIGHT CHIP IS NO LONGER A LITERAL, AND THIS LINE IS PART OF WHY IT
+    // TOOK SO LONG. It read „3 т." — a number naming none of this product's
+    // four point scales, which to a Bulgarian reads as КОНТРОЛНИ точки, the
+    // licence budget (B58). This assertion pinned that exact string, so the
+    // repair could not land without turning the fold sweep red. What this block
+    // is actually about is PLACEMENT, so that is all it pins now; the wording is
+    // `modules/sim/rules/__tests__/point-scales.test.ts`'s business and the chip
+    // is written by `lib/content/pointScales.ts`.
+    const WEIGHT_CHIP = '{pointsBg("theory", q.points)}';
+    expect(EXAM).toMatch(/\{pointsBg\("theory", q\.points\)\}\s*\n?\s*<\/span>/);
     expect(EXAM).toContain("Всички верни");
     const boxAt = EXAM.indexOf("data-question-box");
-    expect(EXAM.indexOf("{q.points} т.")).toBeGreaterThan(boxAt);
-    expect(EXAM.indexOf("{q.points} т.")).toBeLessThan(EXAM.indexOf("{q.textBg}"));
+    expect(EXAM.indexOf(WEIGHT_CHIP)).toBeGreaterThan(boxAt);
+    expect(EXAM.indexOf(WEIGHT_CHIP)).toBeLessThan(EXAM.indexOf("{q.textBg}"));
     // ...and the flag button exists twice: spelled out on desktop, a 44px icon
     // inside the sticky bar on a phone.
     const flags = [...EXAM.matchAll(/toggleFlag\(q\.id\)/g)];

@@ -531,6 +531,21 @@ const yardChild = (
   dir: { x: number; y: number },
   speedMps: number,
   travelM: number,
+  /**
+   * Release radius, m. The WALKERS keep 400 — the whole street — because a
+   * walker released at the first tick is still walking when he arrives.
+   *
+   * A RUNNER released at the first tick is not: doc 87 B60 asked for children
+   * playing, and a child at 2.6 m/s covers his whole 90 m of pavement in 35 s
+   * — before a lawful 27 km/h drive reaches the school at all. Measured on
+   * this drive: the scene clock is ~16 s old before the car leaves y = 15, so
+   * a first-tick runner is a STATUE by the time he is looked at, which is
+   * exactly the failure the row already records („they walk", and now „they
+   * stand"). Handing the runners a release radius instead ties their clock to
+   * HIS position rather than to the scene's, so the chase is under way in the
+   * window he is driving through, on any rung and at any approach speed.
+   */
+  triggerDistM = 400,
 ): PedestrianDartOutSpec => ({
   id,
   kind: "pedestrianDartOut",
@@ -552,16 +567,50 @@ const yardChild = (
   // instead it proves they can never reach the carriageway at any speed, which
   // the two lines above already guarantee by construction.
   ambient: true,
-  // Longer than the street: they are released on the first frame the car is
-  // pointed up the road, so nothing can cancel them as „not encountered".
-  triggerDistM: 400,
+  triggerDistM,
   minTriggerSpeedKmh: 0,
   variant: "child",
 });
 
-/** Two children walking the pavement in front of the school, passing each
- *  other — the ordinary picture outside a Bulgarian училище at going-home
- *  time, and the one the copy has always claimed. */
+/**
+ * Children in front of the school — and since doc 87 B60, children who are
+ * PLAYING rather than commuting.
+ *
+ * His sentence is „no kids are playing on the sidewalks and we should do that
+ * it will attract the user to watch closely." Four children existed, and the
+ * 2026-08-02 re-look answered him plainly: **they walk.** 0.85–1.15 m/s,
+ * single file, all four on their own errand. Nothing in that picture makes a
+ * seventeen-year-old lift off.
+ *
+ * WHAT CHANGED, AND WHAT DELIBERATELY DID NOT.
+ * Three of the six now RUN — 2.4–2.9 m/s, which is a child's jog, not a
+ * sprint — and their paths CONVERGE on the stretch the driver is looking at:
+ * two chase each other north up the pavement while a third runs south to meet
+ * them. Movement that crosses is what reads as a game from a moving car;
+ * everything else reads as a queue. The two walkers stay, because a schoolyard
+ * with nobody merely walking is a cartoon.
+ *
+ * TIMING IS THE WHOLE TRICK, and it is arithmetic, not taste — and the first
+ * cut of this got it wrong, which is worth writing down. Yard children were
+ * released at the FIRST TICK (`triggerDistM` 400). That is right for a walker
+ * and fatal for a runner: measured on the rendered drive, the scene clock is
+ * ~16 s old before the car leaves the spawn and the school is not reached
+ * until t ≈ 42 s, by which time a 2.6 m/s child has run out his whole path
+ * and is STANDING — „they walk" would simply have become „they stand".
+ * The three runners therefore release on a RADIUS (70 m) instead: their clock
+ * starts from HIS position, ~9–12 s before he is level with them, so the chase
+ * is always under way in the window he is driving through — at any approach
+ * speed, on any rung, with no dependence on how long the scene was warm.
+ *
+ * The safety construction is unchanged and is what lets these be `ambient`:
+ * every path is a straight line at constant x on the EAST pavement, the
+ * nearest point of any of them is 1.78 m from the carriageway edge (x =
+ * +8.125) against a `PEDESTRIAN_CONTACT_M` of 1.5, and `roadFromM`/`roadToM`
+ * still sit beyond the walk so `onRoad` is false on every frame. The
+ * encounter battery's ambient invariant — „never reaches the carriageway at
+ * ANY speed" — is satisfied by construction for the new three exactly as it
+ * was for the old four.
+ */
 const SCHOOL_YARD_CHILDREN: PedestrianDartOutSpec[] = [
   yardChild("sc-zn-kid-1", { x: SCHOOL_WALK_X, y: 198 }, { x: 0, y: 1 }, 1.0, 26),
   yardChild("sc-zn-kid-2", { x: SCHOOL_WALK_X + 1.2, y: 238 }, { x: 0, y: -1 }, 1.15, 30),
@@ -570,7 +619,15 @@ const SCHOOL_YARD_CHILDREN: PedestrianDartOutSpec[] = [
   // instruction text has always described. He walks west (toward the road) and
   // halts at x = 10.1, i.e. 2.0 m from the asphalt.
   yardChild("sc-zn-kid-3", { x: SCHOOL_GATE_X, y: 216 }, { x: -1, y: 0 }, 0.9, 6.5),
-  yardChild("sc-zn-kid-4", { x: SCHOOL_WALK_X, y: 246 }, { x: 0, y: -1 }, 0.85, 18),
+  // THE CHASE. kid-4 runs, kid-5 runs after him one pace of pavement over and
+  // six metres back, and they stay a stride apart the whole way — the two
+  // figures the driver sees moving fastest, on the kerb he is driving along.
+  yardChild("sc-zn-kid-4", { x: SCHOOL_WALK_X + 0.5, y: 176 }, { x: 0, y: 1 }, 2.6, 70, 70),
+  yardChild("sc-zn-kid-5", { x: SCHOOL_WALK_X + 1.4, y: 170 }, { x: 0, y: 1 }, 2.9, 74, 70),
+  // …and the one running the other way, so the paths CROSS in front of him
+  // instead of all drifting the same direction with the traffic. He is
+  // released at y ≈ 192 — i.e. running TOWARD the windscreen, not away from it.
+  yardChild("sc-zn-kid-6", { x: SCHOOL_WALK_X + 1.0, y: 262 }, { x: 0, y: -1 }, 2.4, 62, 70),
 ];
 
 export const SC_SPEED_ZONE: ScenarioSpec = {
@@ -595,7 +652,10 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
   instructionsBg: [
     { n: 1, textBg: "Влизаш в зона 30 — училище и жилищен квартал. Ограничението тук е 30 км/ч, не 50." },
     { n: 2, textBg: "Свали скоростта осезаемо още на знака А19 „Деца“ и установи спокойни около 26–28 км/ч." },
-    { n: 3, textBg: "Вдясно напред е УЧИЛИЩЕТО: пред оградата му по тротоара вървят деца, а едно излиза от портата към бордюра. Гледай ги, не километража — всеки момент някое може да стъпи на платното." },
+    // Doc 87 B60 — the world now shows children RUNNING and the copy has to
+    // say so: an instruction that describes a picture the student is not
+    // looking at is worse than no instruction.
+    { n: 3, textBg: "Вдясно напред е УЧИЛИЩЕТО: пред оградата му деца ТИЧАТ и се гонят по тротоара, а едно излиза от портата към бордюра. Гледай тях, не километража — тичащо дете не гледа пътя и всеки момент някое може да стъпи на платното." },
     { n: 4, textBg: "Не пренасяй „скоростта от булеварда“ в зоната: 50 км/ч тук е над +10 км/ч, тоест опасна грешка." },
     { n: 5, textBg: "Задръж под 30 км/ч до края на зоната." },
   ],
@@ -820,10 +880,18 @@ export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
   // on-screen zone marker, so the stop is motivated without inventing danger.
   instructionsBg: [
     { n: 1, textBg: "Потегли по правата улица и установи спокойна скорост около 45 км/ч. Улицата е празна — никаква опасност: спирането тук е ТВОЕ решение, не реакция." },
+    // B64. This line used to end „…представи си, че това е твоята спирка или
+    // адрес", and the founder answered „the question states stopping out of
+    // nowhere, but why?". It said IMAGINE because there was nothing to look at:
+    // the map authored a canopy, a shop and a neighbour block, and a building
+    // with no kind renders as a grey extruded box. `sp-b-stop-canopy` is now
+    // `kind: "busStop"` and the world builds the shelter on the pavement beside
+    // the graded zone (world/builders/props.ts), so the copy can stop asking him
+    // to imagine and start telling him where to look.
     {
       n: 2,
       textBg:
-        "Напред светещият маркер отбелязва контролната зона — представи си, че това е твоята спирка или адрес. Реши да спреш ОТРАНО, не в последния момент.",
+        "Напред ВДЯСНО, до тротоара, има автобусна спирка — навесът се вижда отдалеч. Това е твоята спирка: там слизаш. Светещият маркер на пътя показва точно къде да спреш. Реши да спреш ОТРАНО, не в последния момент.",
     },
     { n: 3, textBg: "Вдигни газта първо и остави колата да губи скорост, после спирай постепенно и равномерно до пълен покой в зоната." },
     { n: 4, textBg: "Силната спирачка е само за истинска опасност: на празна улица рязкото забиване изненадва движещите се зад теб — точно това се брои за грешка." },

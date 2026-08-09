@@ -9,7 +9,7 @@ const bank = makeBank([
   makeItemSource("hz-ped"),
   makeItemSource("hz-gap", {
     violationCode: "FOLLOWING_TOO_CLOSE",
-    lawRefEcho: "ЗДвП чл. 23",
+    lawRefEcho: "ЗДвП чл. 23, ал. 1",
   }),
 ]);
 

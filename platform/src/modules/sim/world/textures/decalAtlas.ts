@@ -161,6 +161,50 @@ function cellPainter(
       }
       break;
     }
+    case "skid": {
+      // ONE STREAK OF LAID RUBBER — and the cell is painted for the shape the
+      // quad actually is, which is what every other cell here can assume and
+      // this one cannot. The skid quad is ~11 m x 0.22 m, so the square cell
+      // is stretched ~50:1: `u` (cell x) is the length of the slide and `v`
+      // (cell y) is the 0.22 m width, compressed until any vertical detail
+      // averages out. So the art carries its structure ALONG u and keeps v
+      // near-uniform — a band painted with a vertical pattern would render as
+      // a flat grey smear and nothing else.
+      //
+      // Along u it tells the story of the stop, in the direction the wheel
+      // travelled: faint at the left where the tyre first breaks traction,
+      // darkening as the rubber heats, darkest just before it lifts. The two
+      // outer thirds of v are lightly feathered so the streak has an edge
+      // rather than a hard border.
+      const bandTop = y0 + cs * 0.24;
+      const bandH = cs * 0.52;
+      const steps = 64;
+      for (let i = 0; i < steps; i++) {
+        const u = i / (steps - 1);
+        // Heat ramp: 0.18 at the break-away end, ~0.8 at the lift-off end.
+        const ramp = 0.18 + 0.62 * Math.pow(u, 0.75);
+        // Judder: a locked tyre hops, so the rubber is laid unevenly.
+        const judder = 0.82 + 0.18 * Math.sin(u * 26 + 1.3) + (rng() - 0.5) * 0.16;
+        const alpha = Math.max(0, Math.min(0.86, ramp * judder));
+        ctx.fillStyle = `rgba(18,17,18,${alpha})`;
+        ctx.fillRect(x0 + u * cs, bandTop, cs / steps + 1, bandH);
+      }
+      // Feathered shoulders (kept faint — v is the compressed axis).
+      for (const side of [0, 1]) {
+        ctx.fillStyle = "rgba(22,21,22,0.22)";
+        ctx.fillRect(x0, side === 0 ? bandTop - cs * 0.09 : bandTop + bandH, cs, cs * 0.09);
+      }
+      // Two or three tread ribs running the length of the slide.
+      for (let r = 0; r < 3; r++) {
+        ctx.strokeStyle = `rgba(8,8,9,${0.14 + rng() * 0.1})`;
+        ctx.lineWidth = cs * 0.035;
+        ctx.beginPath();
+        ctx.moveTo(x0, bandTop + bandH * (0.2 + r * 0.3));
+        ctx.lineTo(x0 + cs, bandTop + bandH * (0.2 + r * 0.3));
+        ctx.stroke();
+      }
+      break;
+    }
   }
 }
 

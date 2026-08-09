@@ -78,10 +78,32 @@ import {
   type TrafficLightPlacement,
   type TreeKind,
   type TreePlacement,
+  type UtilityPolePlacement,
   type WorldGeometry,
 } from "../types";
+import {
+  UTILITY_ARM_HALF_M,
+  UTILITY_POLE_HEIGHT_M,
+  UTILITY_WIRE_SAG_M,
+} from "../builders/constants";
 import { createGltfLoader } from "./gltfLoader";
 import { makeSignFaceTexture, type SignFaceArt } from "./signFaces";
+import {
+  SIGNAL_HEAD_LABELS,
+  SIGNAL_LABEL_MAX_DIST_M,
+  signalLabelKindFor,
+  type SignalLabelKind,
+} from "./signalHeadLabels";
+import {
+  drawWorldLabel,
+  WORLD_LABEL_GAP_M,
+  WORLD_LABEL_H_M,
+  WORLD_LABEL_MAX_SCALE,
+  WORLD_LABEL_REF_DIST_M,
+  WORLD_LABEL_TEX_H,
+  WORLD_LABEL_TEX_W,
+  WORLD_LABEL_W_M,
+} from "./worldLabel";
 import {
   createInstancedMesh,
   createOffsetInstancedMesh,
@@ -343,6 +365,12 @@ interface PropAssets {
   pedSignalHousing: THREE.BufferGeometry;
   streetlightHousing: THREE.BufferGeometry;
   streetlightGlow: THREE.BufferGeometry;
+  /** Overhead-line column + crossarm (B65) — code geometry, no new asset. */
+  utilityPole: THREE.BufferGeometry;
+  /** Pavement parapet panel — the shipped, never-placed railing_run_6m.glb
+   *  (B65); null when the GLB is missing, which skips the pass entirely
+   *  rather than substituting a fake fence. */
+  railingPanel: THREE.BufferGeometry | null;
   trees: Record<TreeKind, THREE.BufferGeometry>;
   furniture: {
     bench: THREE.BufferGeometry;
@@ -380,6 +408,144 @@ interface PropAssets {
  */
 function bakeBoulevardLinden(scene: THREE.Object3D): THREE.BufferGeometry {
   return bakeVertexColored(scene, { centerXZ: true }).scale(0.76, 1.1, 0.76);
+}
+
+/**
+ * OVERHEAD-LINE COLUMN (founder register B65 — „no wires, no poles").
+ *
+ * Code geometry, deliberately: the kit has no pole asset, public/ has a size
+ * ceiling with a test behind it (tools/assets/publicBudget.test.mjs), and a
+ * tapered concrete column with a crossarm is four primitives. It costs zero
+ * bytes on the wire and it cannot carry a brand (ADR-001).
+ *
+ * Built in the streetlight's own local frame: +X runs ALONG the street, so the
+ * crossarm sits ACROSS it and the three insulator tips are where the spans
+ * hang from. 168 triangles at these segment counts — three of them fit inside
+ * one lamp column's budget.
+ */
+function buildUtilityPole(): THREE.BufferGeometry {
+  const h = UTILITY_POLE_HEIGHT_M;
+  const parts: THREE.BufferGeometry[] = [];
+  // Tapered column (a Bulgarian concrete СтБ column is visibly narrower up top).
+  const shaft = new THREE.CylinderGeometry(0.11, 0.17, h, 6, 1);
+  shaft.translate(0, h / 2, 0);
+  parts.push(shaft);
+  // Crossarm across the street (local Z), a little below the crown.
+  const arm = new THREE.BoxGeometry(0.09, 0.09, UTILITY_ARM_HALF_M * 2);
+  arm.translate(0, h - 0.7, 0);
+  parts.push(arm);
+  // Three insulators: the two arm tips + the crown.
+  for (const [ax, ay, az] of [
+    [0, h - 0.52, UTILITY_ARM_HALF_M],
+    [0, h - 0.52, -UTILITY_ARM_HALF_M],
+    [0, h + 0.14, 0],
+  ] as const) {
+    const ins = new THREE.CylinderGeometry(0.05, 0.06, 0.2, 5, 1);
+    ins.translate(ax, ay, az);
+    parts.push(ins);
+  }
+  const merged = mergeSafe(parts, false);
+  disposeAll(parts);
+  paintGeometry(merged, 0x9c9a95); // weathered concrete
+  merged.computeBoundingSphere();
+  return merged;
+}
+
+/**
+ * THE SPANS, as ONE merged mesh for the whole district = ONE draw call.
+ *
+ * They cannot be instanced: a span's length is the gap to the next column, and
+ * `StaticTransform` carries a single uniform scale, so instancing would either
+ * stretch the wire's THICKNESS with its length or force one instanced draw per
+ * distinct span. Merging is the cheaper answer and it is what markings.ts and
+ * decals.ts already do for the same reason.
+ *
+ * Each span is three catenaries — the two arm tips and the crown — drawn as
+ * thin triangle ribbons that always face up. The sag matters: a dead-straight
+ * line between two poles reads as a wireframe artefact, and UTILITY_WIRE_SAG_M
+ * is what makes it read as a cable.
+ */
+function buildUtilityWires(poles: readonly UtilityPolePlacement[]): THREE.BufferGeometry | null {
+  const spans = poles.filter((p) => p.spanM > 0);
+  if (spans.length === 0) return null;
+  const SEGMENTS = 8;
+  /**
+   * Half-width of the ribbon, m — and it is a CROSS, not a flat strip.
+   *
+   * MEASURED IN THE FIRST RENDER, not reasoned about afterwards: the first cut
+   * drew each wire as a single HORIZONTAL ribbon, and the frame came back with
+   * the poles plainly visible and the cables gone. Of course it did. A driver's
+   * eye is at 1.2 m and the wire hangs at 8.5 m, so over a 37 m span he looks
+   * at a horizontal ribbon from ~11° BELOW it — a 0.056 m strip projects to
+   * about a centimetre, i.e. nothing, and at 100 m to nothing at all.
+   *
+   * Two ribbons per conductor — one horizontal, one vertical — cost four extra
+   * triangles per span per wire and give a silhouette that survives any
+   * approach angle. The width is a legibility figure, not a conductor gauge: a
+   * real 10 mm cable is invisible in this engine and the road itself is drawn
+   * at 2.5× perceptual scale, so the wire is drawn at the scale it is read at.
+   */
+  const HALF_W = 0.05;
+  const h = UTILITY_POLE_HEIGHT_M;
+  const hangers: [number, number][] = [
+    [h - 0.42, UTILITY_ARM_HALF_M],
+    [h - 0.42, -UTILITY_ARM_HALF_M],
+    [h + 0.24, 0],
+  ];
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const colors: number[] = [];
+
+  for (const pole of spans) {
+    const yaw = pole.yaw;
+    // Local +X (along the street, toward the next column) and local +Z.
+    const ax = Math.cos(yaw);
+    const az = -Math.sin(yaw);
+    const zx = Math.sin(yaw);
+    const zz = Math.cos(yaw);
+    for (const [hy, hz] of hangers) {
+      // plane 0 = horizontal (offset across the run), plane 1 = vertical.
+      for (const plane of [0, 1] as const) {
+        const base = positions.length / 3;
+        for (let i = 0; i <= SEGMENTS; i++) {
+          const t = i / SEGMENTS;
+          // Parabolic sag — visually indistinguishable from a catenary at these
+          // spans and one multiply instead of a cosh.
+          const sag = UTILITY_WIRE_SAG_M * 4 * t * (1 - t);
+          const along = t * pole.spanM;
+          const px = pole.position[0] + ax * along + zx * hz;
+          const py = pole.position[1] + hy - sag;
+          const pz = pole.position[2] + az * along + zz * hz;
+          for (const side of [-1, 1] as const) {
+            const o = HALF_W * side;
+            positions.push(
+              px + (plane === 0 ? zx * o : 0),
+              py + (plane === 1 ? o : 0),
+              pz + (plane === 0 ? zz * o : 0),
+            );
+            normals.push(plane === 0 ? 0 : zx, plane === 0 ? 1 : 0, plane === 0 ? 0 : zz);
+            uvs.push(t, side < 0 ? 0 : 1);
+            colors.push(0.11, 0.11, 0.12);
+          }
+        }
+        for (let i = 0; i < SEGMENTS; i++) {
+          const a = base + i * 2;
+          indices.push(a, a + 1, a + 3, a, a + 3, a + 2);
+        }
+      }
+    }
+  }
+
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(positions), 3));
+  g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(normals), 3));
+  g.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(uvs), 2));
+  g.setAttribute("color", new THREE.BufferAttribute(new Float32Array(colors), 3));
+  g.setIndex(indices);
+  g.computeBoundingSphere();
+  return g;
 }
 
 // rail_barrier GLB frame (tools/blender/signs_v2.py build_rail_barrier): the
@@ -497,6 +663,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     barrierArm,
     bollardYb,
     wheelStop,
+    railingRun,
   ] = await Promise.all([
     load(SIGN_BASE, SIGN_GLB.stop),
     load(SIGN_BASE, SIGN_GLB.giveWay),
@@ -518,6 +685,10 @@ async function buildPropAssets(): Promise<PropAssets> {
     load(STREET_V2_BASE, "barrier_arm"),
     load(STREET_V2_BASE, "bollard_yb"),
     load(STREET_V2_BASE, "wheel_stop"),
+    // B65 — the parapet. Loaded TOLERANTLY (loadOptional) like the zone-sign
+    // kits: a missing GLB skips the pass, and a street with no fence is a
+    // smaller lie than a street with a fence made of something else.
+    loadOptional(STREET_V2_BASE, "railing_run_6m"),
   ]);
 
   const bakeSign = (gltf: GLTF): SignAsset => {
@@ -656,6 +827,13 @@ async function buildPropAssets(): Promise<PropAssets> {
     pedSignalHousing,
     streetlightHousing,
     streetlightGlow,
+    utilityPole: buildUtilityPole(),
+    // The GLB's run axis is already local X (bbox ±3.0275) and it stands on
+    // y = 0, so it bakes UNROTATED and UNNORMALISED: a normalising bake would
+    // rescale the panel and change the 6.055 m the builder spaces them at.
+    railingPanel: railingRun
+      ? bakeVertexColored(railingRun.scene, { normalize: false })
+      : null,
     trees: {
       linden: bakeBoulevardLinden(leafyB.scene),
       ornamental: bakeVertexColored(ornamental.scene, { centerXZ: true }),
@@ -702,6 +880,8 @@ function disposePropAssets(a: PropAssets): void {
     a.pedSignalHousing,
     a.streetlightHousing,
     a.streetlightGlow,
+    a.utilityPole,
+    a.railingPanel,
     ...Object.values(a.trees),
     a.furniture.bench,
     a.furniture.bollard,
@@ -789,14 +969,47 @@ const LAMP_OFFSETS: [number, number, number][] = [
 ];
 
 /**
+ * Top of the vehicle head's housing, m — the anchor the B35 caption hangs
+ * above. Derived from the lens the housing is built around rather than typed
+ * twice: the red lens centre is `LAMP_OFFSETS[0].y` with r 0.13, and the GLB's
+ * hood carries ~0.15 m of visor over it.
+ */
+const SIGNAL_HEAD_TOP_M = LAMP_OFFSETS[0]![1] + 0.13 + 0.15;
+
+/**
  * Pedestrian head (doc 86 L3): TWO lenses, red over green, on a shorter pole —
  * the silhouette that tells a driver at a glance that this lamp is not his.
  * Mounted lower than the vehicle head (lenses at 2.30 / 2.00 m vs 2.85–2.25) so
  * the two never read as one signal on the same kerb.
+ *
+ * WHY THE LENS SITS PROUD OF THE BOX (doc 87 B55, open half). The head faces
+ * ACROSS the carriageway — that is what a pedestrian head is for — so the
+ * driver never sees it square on: measured at 65–77° off-normal on `pe-jay-v1`.
+ * At the shipped geometry (r 0.105 at z 0.12 inside a housing whose front face
+ * is at z 0.19) only **0.035 m of sphere cleared the box**, and the whole of
+ * that sliver was silhouetted AGAINST THE DARK HOUSING. Projected width of the
+ * visible sliver at 77° off-normal, taken off the circle rather than guessed:
+ * **0.054 m** — 2 px at a 30 m approach, which is the „1–2 px sliver" the
+ * register photographed at 14×.
+ *
+ * The remedy is the one the VEHICLE head already had forced on it for the same
+ * complaint (r 0.085 → 0.13, founder R3 „no visible traffic light", doc 62 S1):
+ * a bigger lens carried further forward. At r 0.13 / z 0.20 the same
+ * measurement gives **0.169 m**, 3.1× wider — and 0.10 m of it now clears the
+ * BOX's own silhouette, so the lit lens reads against the sky instead of
+ * against black paint. The sphere's back is still at z 0.07, i.e. 0.12 m of it
+ * remains inside the 0.2 m-deep box: it seats like a lens in a hood, it does
+ * not float. Nothing else moves — the housing, the pole, the mounting heights
+ * and the phase source are untouched, so the „not your lamp" silhouette and
+ * `pedLampColors` are exactly as they were.
  */
+/** Lens centre, m in front of the housing origin (front face at z 0.19). */
+const PED_LENS_Z_M = 0.2;
+/** Lens radius, m — the vehicle head's value, for the vehicle head's reason. */
+const PED_LENS_R_M = 0.13;
 const PED_LAMP_OFFSETS: [number, number, number][] = [
-  [0, 2.3, 0.12],
-  [0, 2.0, 0.12],
+  [0, 2.3, PED_LENS_Z_M],
+  [0, 2.0, PED_LENS_Z_M],
 ];
 const PED_POLE_TOP_M = 2.5;
 const PED_HOUSING_MID_M = 2.15;
@@ -931,10 +1144,36 @@ function TrafficLights({
     lastPhases.current = new Array<SignalLampState | null>(lights.length).fill(null);
   }, [lights, lamps]);
 
-  useFrame(() => {
+  // B35 — the caption for a head whose lenses cannot be read (see below).
+  const labelRef = useRef<THREE.Mesh | null>(null);
+  const labelTex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = WORLD_LABEL_TEX_W;
+    c.height = WORLD_LABEL_TEX_H;
+    return new THREE.CanvasTexture(c);
+  }, []);
+  useEffect(() => () => labelTex.dispose(), [labelTex]);
+  /** Which caption is currently PAINTED into the canvas (null = never). */
+  const paintedLabel = useRef<SignalLabelKind | null>(null);
+
+  useFrame((frame) => {
     const mesh = lampsRef.current;
     if (!mesh) return;
     let dirty = false;
+    // --- B35 label selection, folded into the loop that already asks every
+    // head for its state: zero extra `getSignalPhase` calls, zero allocations.
+    const e = frame.camera.matrixWorld.elements;
+    // The camera's forward is -Z of its own basis, and its position is the
+    // translation column — read straight off the matrix so no Vector3 is
+    // allocated inside useFrame (the perf law this file already keeps).
+    const fwdX = -e[8]!;
+    const fwdZ = -e[10]!;
+    const camX = e[12]!;
+    const camZ = e[14]!;
+    let labelIndex = -1;
+    let labelDist = 0;
+    let labelScore = Infinity;
+    let labelKind: SignalLabelKind | null = null;
     for (let i = 0; i < lights.length; i++) {
       const light = lights[i]!;
       // B35 — THE FALLBACK WAS `?? "green"`, i.e. a head with no phase source
@@ -958,6 +1197,48 @@ function TrafficLights({
       // than a false instruction.
       const state: SignalLampState =
         getSignalPhase?.(light.nodeId, light.approachBearingDeg) ?? "dark";
+
+      // Caption candidate. `getSignalPhase` MUST be present: without a runtime
+      // every head falls back to "dark" above, and captioning those would put
+      // «ЗАГАСНАЛ СВЕТОФАР» over every head on /dev/scene-still — a statement
+      // about the LAW made from the absence of data. Unlit-because-unsimulated
+      // is not загаснал, and only a wired runtime can tell the two apart.
+      if (getSignalPhase) {
+        const kind = signalLabelKindFor(state);
+        if (kind !== null) {
+          const dx = light.position[0] - camX;
+          const dz = light.position[2] - camZ;
+          // Ahead of the driver only. A head he has already driven past is
+          // behind his head, and a caption there is a billboard in the mirror.
+          const along = dx * fwdX + dz * fwdZ;
+          if (along > 0) {
+            const d2 = dx * dx + dz * dz;
+            const d = Math.sqrt(d2);
+            // WHICH HEAD GETS THE CAPTION, and why it is not simply the
+            // nearest. A signalized X-junction carries EIGHT heads on one node
+            // (sx-v1, measured), and at the stop line the nearest of them is
+            // the near-side head 9 m away and 80° off the view axis — beside
+            // the driver's shoulder, where a caption is off the edge of the
+            // windscreen. The head he actually reads there is the far-side
+            // companion, 58 m away and 9° off axis.
+            //
+            // So the score is an effective distance that penalises being off
+            // the view axis: `d / cos²θ`, which is `d³ / along²`. It picks the
+            // far companion at the line and the near kerbside head on the
+            // approach, which is what a driver's eye does; and because it is
+            // still a distance, a dark junction 20 m ahead always beats one
+            // 70 m further up the same boulevard.
+            const score = (d * d2) / (along * along);
+            if (score < labelScore && d <= SIGNAL_LABEL_MAX_DIST_M) {
+              labelScore = score;
+              labelDist = d;
+              labelIndex = i;
+              labelKind = kind;
+            }
+          }
+        }
+      }
+
       if (lastPhases.current[i] === state) continue;
       lastPhases.current[i] = state;
       const colors = lampColorsFor(state);
@@ -967,12 +1248,86 @@ function TrafficLights({
       dirty = true;
     }
     if (dirty && mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+    // --- B35: place the caption on the nearest unreadable head ahead.
+    const label = labelRef.current;
+    if (label) {
+      if (labelIndex < 0 || labelKind === null) {
+        label.visible = false;
+      } else {
+        if (paintedLabel.current !== labelKind) {
+          paintedLabel.current = labelKind;
+          drawWorldLabel(labelTex.image as HTMLCanvasElement, SIGNAL_HEAD_LABELS[labelKind]);
+          labelTex.needsUpdate = true;
+        }
+        const light = lights[labelIndex]!;
+        // Constant apparent size past the reference distance — the caption has
+        // to be readable at the 45 m where the drill's own card says «намали
+        // отрано», not only at the line where the decision is already made.
+        const s = Math.min(
+          WORLD_LABEL_MAX_SCALE,
+          Math.max(1, labelDist / WORLD_LABEL_REF_DIST_M),
+        );
+        // THE HEAD'S OWN SCALE, and it is not a detail: every signal placement
+        // in the product is emitted at `scale 1.5` (sx-v1 and pe-jay-v1 both
+        // measured through `buildWorldGeometry`), so the housing crown stands
+        // at 1.5 × SIGNAL_HEAD_TOP_M. The first cut of this anchored at the
+        // unscaled height and the card rendered INSIDE the housing — present
+        // in the scene graph, invisible in the frame, and it took a measured
+        // placement dump rather than a second look to find.
+        const headTop = light.position[1] + SIGNAL_HEAD_TOP_M * (light.scale ?? 1);
+        label.position.set(
+          light.position[0],
+          // The card hangs clear above the crown and grows UPWARD, never
+          // downward into the junction he is trying to see.
+          headTop + WORLD_LABEL_GAP_M + (WORLD_LABEL_H_M * s) / 2,
+          light.position[2],
+        );
+        label.scale.set(s, s, 1);
+        label.quaternion.copy(frame.camera.quaternion); // billboard
+        label.visible = true;
+      }
+    }
   });
 
   return (
     <group name="traffic-lights">
       <primitive object={housing} />
       <primitive object={lamps.mesh} ref={lampsRef} />
+      {/* B35 — the „this one is off" affordance, world-anchored over the head.
+          Mounted always and hidden by one boolean per frame on the ~150
+          scenarios whose heads are all readable.
+
+          WHY IT DOES NOT DEPTH-TEST, which is the one place this departs from
+          the B42 bubble and is not a shortcut. Measured on this row's own
+          drive: the cockpit's INTERIOR REAR-VIEW MIRROR is camera-parked at an
+          identical 251 × 150 px rect — x 794–1045, y 200–350 on a 1280 × 720
+          canvas — in every frame of the approach (y −59, −37, −29.7 all
+          measured, `scratchpad/fourrows/b35c/rect-*.png`). In view angles that
+          is 7.6°–19.5° to the right of the axis, and a head on the RIGHT VERGE
+          sits at 8.5° at 60 m and 19° at 27 m. The mirror therefore covers the
+          right-verge sight line for the whole approach: with the caption
+          depth-tested, more than half of it was behind the mirror glass at
+          every pose. (That is the register's own row 7 / B58 finding, measured
+          a third time here — it is filed, not hidden.)
+
+          A bus hiding the officer is meaningful occlusion; the driver's own
+          cabin hiding the instruction is the cabin eating the message, and
+          this row has been refused twice for a caption a student cannot read.
+          depthWrite stays off so it carves no hole, the distance is capped at
+          SIGNAL_LABEL_MAX_DIST_M so it cannot float over a building three
+          blocks away, and it is drawn transparent — i.e. after the opaque
+          pass — so it lands on top of the cabin rather than under it. */}
+      <mesh ref={labelRef} visible={false} renderOrder={7} frustumCulled={false}>
+        <planeGeometry args={[WORLD_LABEL_W_M, WORLD_LABEL_H_M]} />
+        <meshBasicMaterial
+          map={labelTex}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
       {pedLights.length > 0 ? (
         <PedestrianSignals
           lights={pedLights}
@@ -1030,7 +1385,7 @@ function PedestrianSignals({
   useEffect(() => () => housing.dispose(), [housing]);
 
   const lamps = useMemo(() => {
-    const geometry = new THREE.SphereGeometry(0.105, 10, 8);
+    const geometry = new THREE.SphereGeometry(PED_LENS_R_M, 10, 8);
     const material = new THREE.MeshBasicMaterial({ toneMapped: false });
     const mesh = createOffsetInstancedMesh(geometry, material, lights, PED_LAMP_OFFSETS);
     mesh.name = "pedestrian-signal-lamps";
@@ -1390,6 +1745,66 @@ function Streetlights({
 // Trees (boulevard linden + ornamental + leafy_a/b, bucketed by builder kind)
 // ---------------------------------------------------------------------------
 
+/**
+ * FOUR MODELS WERE NOT FOUR TREES — founder register B65, „the trees are one
+ * repeated model".
+ *
+ * `TreePlacement.variant` (0|1|2) has existed since streetscape v2 and NOTHING
+ * EVER READ IT: the renderer bucketed by `kind` alone and handed every
+ * instance to `createInstancedMesh`, whose only per-instance freedoms are yaw
+ * and a UNIFORM scale. A uniform scale is the one transform that cannot change
+ * a silhouette — a big leafyA and a small leafyA are the same tree at two
+ * distances — so a residential street planted from three kinds still read as
+ * one model repeated down the verge, which is exactly what he said.
+ *
+ * The fix costs nothing: bucket by kind as before (still four instanced draws,
+ * still four geometries, no new asset and no new byte in public/) and apply
+ * the variant as a NON-UNIFORM scale in the instance matrix. Variant 0 is the
+ * authored proportions verbatim; 1 is a narrow, taller tree; 2 is a squat,
+ * broader one. Crowns therefore differ in outline, not merely in size — and
+ * because the builder already jitters `scale` and `yaw`, no two neighbours
+ * repeat.
+ *
+ * Widening only in xz would push a canopy over the kerb, so the broad variant
+ * is held to +12% while the narrow one takes most of the spread — the same
+ * caution `bakeBoulevardLinden` states for the linden avenue.
+ */
+const TREE_VARIANT_SCALE: readonly [number, number, number][] = [
+  [1.0, 1.0, 1.0],
+  [0.84, 1.22, 0.84],
+  [1.12, 0.86, 1.12],
+];
+
+function createTreeInstancedMesh(
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  placements: readonly TreePlacement[],
+  options: { castShadow?: boolean; name?: string },
+): THREE.InstancedMesh {
+  const mesh = new THREE.InstancedMesh(geometry, material, placements.length);
+  const pos = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const scl = new THREE.Vector3();
+  const mat = new THREE.Matrix4();
+  const yAxis = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < placements.length; i++) {
+    const t = placements[i]!;
+    const v = TREE_VARIANT_SCALE[t.variant] ?? TREE_VARIANT_SCALE[0]!;
+    const s = t.scale ?? 1;
+    pos.set(t.position[0], t.position[1], t.position[2]);
+    quat.setFromAxisAngle(yAxis, t.yaw);
+    scl.set(s * v[0], s * v[1], s * v[2]);
+    mat.compose(pos, quat, scl);
+    mesh.setMatrixAt(i, mat);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = options.castShadow ?? false;
+  mesh.matrixAutoUpdate = false;
+  mesh.frustumCulled = false; // see three-helpers.createInstancedMesh
+  if (options.name) mesh.name = options.name;
+  return mesh;
+}
+
 function Trees({
   world,
   assets,
@@ -1416,7 +1831,7 @@ function Trees({
     };
     for (const t of kept) buckets[t.kind].push(t);
     return TREE_KINDS.map((kind) =>
-      createInstancedMesh(assets.trees[kind], assets.materials.tree, buckets[kind], {
+      createTreeInstancedMesh(assets.trees[kind]!, assets.materials.tree, buckets[kind]!, {
         castShadow,
         name: `trees-${kind}`,
       }),
@@ -1501,6 +1916,92 @@ function Furniture({
   return (
     <group name="furniture">
       {meshes.map((m, i) => (
+        <primitive key={i} object={m} />
+      ))}
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// B65 street furniture — the overhead line and the pavement parapet
+// ---------------------------------------------------------------------------
+
+/**
+ * „no wires, no poles, no fences, no barriers" — the three named absences that
+ * no builder pass could produce, rendered in THREE draws total and mounted
+ * only when the district actually has them.
+ *
+ * The `length > 0` guards are load-bearing, not tidiness: every city, exam and
+ * полигон district returns empty lists (see constants.SCENARIO_LIT_CLASSES),
+ * and an InstancedMesh with count 0 still costs a draw call submission. This
+ * way the tier-low draw budget on the heaviest maps in the product is
+ * unchanged to the call, which is what `buildWorldGeometry.drawCallEstimate`
+ * now claims.
+ */
+function B65Furniture({
+  world,
+  assets,
+  preset,
+}: {
+  world: WorldGeometry;
+  assets: PropAssets;
+  preset: QualityPreset;
+}) {
+  const meshes = useMemo(() => {
+    const castShadow = preset.castShadows === "full";
+    const out: THREE.Object3D[] = [];
+    const disposables: { dispose(): void }[] = [];
+    if (world.utilityPoles.length > 0) {
+      out.push(
+        createInstancedMesh(assets.utilityPole, assets.materials.streetSteel, world.utilityPoles, {
+          castShadow,
+          name: "utility-poles",
+        }),
+      );
+      const wires = buildUtilityWires(world.utilityPoles);
+      if (wires) {
+        // Wires are unlit thin ribbons: a MeshStandard wire at 8.5 m reads as a
+        // flickering white thread when the sun catches it edge-on. Basic +
+        // vertex colour keeps it a constant dark cable at every heading.
+        // DoubleSide: the cross's vertical ribbon is back-facing from one side
+        // of the street, and a wire that disappears when you change lane is a
+        // worse artefact than the one it replaced.
+        const material = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(wires, material);
+        mesh.name = "utility-wires";
+        mesh.frustumCulled = false;
+        out.push(mesh);
+        disposables.push(wires, material);
+      }
+    }
+    if (world.railings.length > 0 && assets.railingPanel) {
+      out.push(
+        createInstancedMesh(assets.railingPanel, assets.materials.streetSteel, world.railings, {
+          castShadow,
+          name: "pavement-parapet",
+        }),
+      );
+    }
+    return { out, disposables };
+  }, [assets, world.utilityPoles, world.railings, preset.castShadows]);
+
+  useEffect(
+    () => () => {
+      for (const o of meshes.out) {
+        if ((o as THREE.InstancedMesh).isInstancedMesh) (o as THREE.InstancedMesh).dispose();
+      }
+      disposeAll(meshes.disposables);
+    },
+    [meshes],
+  );
+
+  if (meshes.out.length === 0) return null;
+  return (
+    <group name="b65-street-furniture">
+      {meshes.out.map((m, i) => (
         <primitive key={i} object={m} />
       ))}
     </group>
@@ -1654,6 +2155,7 @@ export function WorldPropsGroup({
           <Streetlights world={world} assets={assets} preset={preset} night={night} />
           <Trees world={world} assets={assets} preset={preset} />
           <Furniture world={world} assets={assets} preset={preset} />
+          <B65Furniture world={world} assets={assets} preset={preset} />
           <StreetscapeV2 world={world} assets={assets} preset={preset} night={night} />
         </>
       ) : null}

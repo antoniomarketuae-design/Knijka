@@ -19,6 +19,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { chromium } from "./lib/pw.mjs";
+import { DEVICES } from "./lib/devices.mjs";
+import { newDeviceContext } from "./lib/insets.mjs";
 import { signIn } from "./lib/auth.mjs";
 import { ensureHarnessUser } from "./lib/user.mjs";
 
@@ -72,11 +74,20 @@ async function main() {
   const { email, password } = await ensureHarnessUser();
   const browser = await chromium.launch({ args: GL });
   const mobile = CASE === "mobile";
-  const ctx = await browser.newContext(
-    mobile
-      ? { viewport: { width: 393, height: 852 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }
-      : { viewport: { width: 1440, height: 900 } },
-  );
+  // THE MOBILE CASE GOES THROUGH THE DOOR. It used to hand-roll 393x852 here,
+  // which is the whole defect lib/insets.mjs closes in one line: a viewport with
+  // no notch and no home indicator, photographed and called an iPhone. The
+  // desktop case is a desktop and is exempt below.
+  let ctx;
+  if (mobile) {
+    ({ context: ctx } = await newDeviceContext(browser, DEVICES["iphone16-portrait"], {
+      motion: "reduce",
+    }));
+  } else {
+    // insets-exempt: 1440x900 is a desktop browser window; there is no cutout
+    // to model and no device profile that describes it.
+    ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  }
   const page = await ctx.newPage();
   page.on("console", (m) => {
     if (m.type() === "error") log(`console.error ${m.text().slice(0, 160)}`);

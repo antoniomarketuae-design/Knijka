@@ -19,6 +19,7 @@ import { IconBook, IconCheck, IconX } from "@/components/icons";
 import { QuestionMediaView, SignFace, hasSignOptions } from "@/components/theory/QuestionMedia";
 import { CheckControl } from "@/components/ui/CheckControl";
 import type { TriggeredQuiz } from "@/modules/sim/lessons";
+import { POINT_SCALES, pointsBg } from "@/modules/sim/rules";
 import { COMPACT_MAX_HEIGHT_PX, isCompactViewport } from "./immersive";
 import type { MicroQuizAnswerResult } from "./types";
 
@@ -177,10 +178,34 @@ export function MicroQuizOverlay({
             </h2>
             <p className="text-xs text-muted">Пауза — светкавичен въпрос от пътната ситуация</p>
           </div>
-          <span className="ml-auto rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted">
-            {quiz.points} т.
+          {/* A DIFFERENT SCALE FROM EVERYTHING ELSE ON THIS DRIVE, and the chip
+              used to render it as a bare „2 т." three seconds after a violation
+              toast that also said „т.". This is the weight the question carries
+              on the THEORETICAL exam — earned, not deducted, and nothing to do
+              with the наказателни точки being tallied behind the overlay. */}
+          <span
+            title={POINT_SCALES.theory.noteBg}
+            className="ml-auto shrink-0 whitespace-nowrap rounded-full border border-border px-2.5 py-1 text-[11px] font-bold text-muted"
+          >
+            {pointsBg("theory", quiz.points)}
           </span>
         </div>
+        {/* THE NOTE COSTS HEIGHT, AND HEIGHT IS THE SCARCE THING HERE.
+            Photographed at 852×393 — the founder's actual hold — three lines of
+            explanation pushed sign tiles 3 and 4 below the fold, which is
+            verbatim the L1 defect this file's header exists to record: „a
+            picture question with half its pictures off screen". Trading the
+            points defect for that one is not a fix.
+
+            So the CHIP carries the scale on every viewport (that is the whole
+            requirement — no bare „т."), and the sentence explaining the scale
+            renders only where there is room for it. On the landscape phone the
+            same words live on the chip's `title`. */}
+        {short ? null : (
+          <p className="-mt-2 text-[11px] leading-snug text-muted">
+            {POINT_SCALES.theory.noteBg}
+          </p>
+        )}
 
         {/* The artwork the question is ABOUT — above the text, as in theory. */}
         <QuizArtwork quiz={quiz} compact={compact} short={short} />

@@ -44,6 +44,24 @@
 //    slightly, which is the safe direction for a budget.
 //  - Shadow DOM is not traversed (this app has none). If that changes, this
 //    function silently under-reports and must be extended.
+//
+// THE FOLD BLOCK, AND WHICH TOOL TO USE
+// ---------------------------------------------------------------------------
+// This probe's `fold` used to measure every `mustFit` element against the
+// VIEWPORT EDGE, which scores an answer painted under an opaque sticky bar as
+// fitting — 58 px of optimism on the exam runner. `tools/mobile/fold-sweep.mjs`
+// was written with the honest finder and documented this file as the one still
+// getting it wrong. As of 2026-08-09 the finder here IS that finder (same
+// two-anchor, three-state rule), and the row publishes `foldPx`, `barPinned`
+// and `barAnchor` so a verdict can be read against the line it was scored on.
+//
+// `fold-sweep.mjs` REMAINS THE INSTRUMENT FOR THE QUESTION RUNNERS. It does
+// three things this general-purpose probe does not and should not: it
+// substitutes the device's real `env(safe-area-inset-*)` before first layout
+// (Playwright's WebKit reports 0), it REFUSES a row where no pinned bar was
+// found instead of scoring it, and it verifies the rig mounted the surface that
+// was asked for. Use it for practice/exam fold work; use this probe for the
+// chrome-vs-content budget across the route list.
 // -----------------------------------------------------------------------------
 
 /**
@@ -495,11 +513,61 @@ export function probeBody(config) {
   }
 
   // ------------------------------------------------------------- fold test
+  //
+  // THE FOLD IS THE TOP OF THE PINNED BAR, NOT THE VIEWPORT EDGE.
+  //
+  // This block used to measure `r.bottom - VH`, which scores an answer painted
+  // UNDER an opaque sticky strip as „fits" — 58 px of optimism on the exam
+  // runner, and every fold column this harness ever published carried it.
+  // `fold-sweep.mjs` was written with the honest finder and said so in its own
+  // header („lib/probe.mjs still measures against the viewport edge"); leaving
+  // both tools in the tree meant the next person had a 50/50 chance of picking
+  // the flattering one. The finder below is the same one, ported, so there is
+  // no longer a wrong tool to pick up.
+  //
+  // TWO BOTTOM EDGES. `position: fixed` resolves against the viewport, so a
+  // fixed bar's bottom lands on `VH`. A `sticky` bar lives inside <body>'s
+  // padded content box, so once <body> pays the home-indicator inset its bottom
+  // lands on `VH − padding-bottom` — 35 px higher on an iPhone 16 in portrait.
+  // Testing only against `VH` found nothing and fell straight back to the
+  // viewport edge, i.e. the same defect through the other door.
+  //
+  // AND A THIRD STATE. When the page genuinely does not fit, the bar is carried
+  // BELOW the usable bottom. It is still the bar and still the fold, and those
+  // are the rows worth counting — so the test is „at or past the usable
+  // bottom", and `barAnchor` records which of the three it was.
+  //
+  // WHEN THERE IS NO BAR (a topic list, a settings page) the fold falls back to
+  // the usable bottom and `barPinned` says `false`. It is recorded, never
+  // silent: `fold-sweep.mjs` REFUSES such a row on the question runners, and a
+  // caller that cares can do the same rather than read a fallback as a bar.
   const scrollingEl = document.scrollingElement || document.documentElement;
   const docOverflowPx = Math.max(
     0,
     Math.round(scrollingEl.scrollHeight - scrollingEl.clientHeight),
   );
+  const bodyPadBottom = Math.round(parseFloat(getComputedStyle(document.body).paddingBottom)) || 0;
+  const usableBottom = VH - bodyPadBottom;
+  let foldPx = usableBottom;
+  let barEl = null;
+  let barAnchor = null;
+  for (const el of document.querySelectorAll("body *")) {
+    const cs = getComputedStyle(el);
+    if (cs.position !== "sticky" && cs.position !== "fixed") continue;
+    const r = el.getBoundingClientRect();
+    if (r.height < 4) continue;
+    if (r.bottom < usableBottom - 4) continue;
+    if (r.top < foldPx) {
+      foldPx = Math.round(r.top);
+      barEl = el;
+      barAnchor =
+        Math.abs(r.bottom - VH) <= 4
+          ? "viewport"
+          : Math.abs(r.bottom - usableBottom) <= 4
+            ? "safe-area"
+            : "overflowing";
+    }
+  }
   const foldItems = [];
   for (const raw of mustFit) {
     // "first:<selector>" checks only the first match. Without it, a selector
@@ -525,7 +593,9 @@ export function probeBody(config) {
     let scrollNeeded = 0;
     for (const el of matches) {
       const r = el.getBoundingClientRect();
-      const below = Math.max(0, Math.round(r.bottom - VH));
+      // `foldPx`, not `VH`: ink under the pinned bar is neither readable nor
+      // tappable, and calling it „on screen" is the whole defect.
+      const below = Math.max(0, Math.round(r.bottom - foldPx));
       const above = Math.max(0, Math.round(-r.top));
       const right = Math.max(0, Math.round(r.right - VW));
       const left = Math.max(0, Math.round(-r.left));
@@ -752,6 +822,16 @@ export function probeBody(config) {
       scrolls: docOverflowPx > 1,
       items: foldItems,
       pass: docOverflowPx <= 1 && foldItems.every((i) => i.fits),
+      // WHAT THE VERDICT WAS MEASURED AGAINST. Published so a green fold row
+      // can be read against the line it was scored on — `barPinned: false`
+      // means „no bottom bar was found, this was scored on the usable edge",
+      // which on a question runner is a REFUSAL in fold-sweep.mjs, not a pass.
+      foldPx,
+      viewportBottomPx: VH,
+      usableBottomPx: usableBottom,
+      barPinned: barEl !== null,
+      barAnchor,
+      bar: barEl ? `${barEl.tagName.toLowerCase()}.${String(barEl.className).slice(0, 46)}` : null,
     },
     touch: {
       minTouch,

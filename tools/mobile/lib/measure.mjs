@@ -18,7 +18,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { engineByName } from "./pw.mjs";
-import { contextOptions, resolveDevices } from "./devices.mjs";
+import { resolveDevices } from "./devices.mjs";
+import { assertInsetsApplied, insetBanner, newDeviceContext } from "./insets.mjs";
 import { probeBody } from "./probe.mjs";
 import { resolveRoutes } from "./routes.mjs";
 import { gotoAuthenticated, signIn } from "./auth.mjs";
@@ -129,10 +130,17 @@ export async function sweep(options = {}) {
 
   try {
     for (const device of devices) {
-      const context = await browser.newContext({
-        // Motion is stated at the call site and printed in the report — see
-        // lib/devices.mjs. A coverage sweep wants deterministic geometry.
-        ...contextOptions(device, { motion: "reduce" }),
+      // REAL INSETS, BY DEFAULT, THROUGH THE ONE DOOR. `newDeviceContext` is
+      // `browser.newContext` plus the profile's notch and home indicator
+      // substituted into the app's own env(safe-area-inset-*) declarations —
+      // see lib/insets.mjs for why a raw newContext here measured a phone that
+      // does not exist for the whole life of this harness.
+      // Motion is stated at the call site and printed in the report; a coverage
+      // sweep wants deterministic geometry.
+      const { context, inset } = await newDeviceContext(browser, device, {
+        motion: "reduce",
+        insets: options.insets ?? "real",
+        rotation: options.rotation,
         ...(storageState ? { storageState } : {}),
       });
       const page = await context.newPage();
@@ -145,6 +153,21 @@ export async function sweep(options = {}) {
           await warmRoutes(context, url, routes, options.quiet);
           warmed = true;
         }
+        // AND IT MUST BE ABLE TO FAIL. An emulation that rewrote nothing is
+        // indistinguishable from a phone with no notch, which is the exact
+        // defect this closes — so the first page of every device column is
+        // asked what actually landed, and the sweep stops rather than publish
+        // a column that silently measured the old, notchless phone.
+        const insetSeen = await assertInsetsApplied(page, inset);
+        if (!options.quiet) {
+          console.log(`  ${insetBanner(device, inset)}`);
+          console.log(
+            `  engine env() ${JSON.stringify(insetSeen.engine)} · <body> padding ` +
+              `${insetSeen.body.left}/${insetSeen.body.right}/${insetSeen.body.bottom} · ` +
+              `${insetSeen.agent?.declarations ?? 0} rules + ` +
+              `${insetSeen.agent?.inlineDeclarations ?? 0} inline styles rewritten`,
+          );
+        }
 
         for (const route of routes) {
           const result = {
@@ -154,6 +177,9 @@ export async function sweep(options = {}) {
             device: device.id,
             deviceLabel: device.label,
             engine: engine.name,
+            insets: inset.mode,
+            insetAsked: { top: inset.top, right: inset.right, bottom: inset.bottom, left: inset.left },
+            rotation: inset.rotation,
             ok: false,
           };
           try {
@@ -178,7 +204,11 @@ export async function sweep(options = {}) {
             const probe = await page.evaluate(probeBody, {
               contentSelectors: route.contentSelectors,
               mustFit: route.mustFit,
-              safeArea: device.safeArea,
+              // The bands the probe calls unsafe are the ones the page was
+              // actually laid out against — `inset`, not the raw profile —
+              // so a single-sided `--rotation` run cannot report the notch on
+              // the side it just moved the notch away from.
+              safeArea: { top: inset.top, right: inset.right, bottom: inset.bottom, left: inset.left },
               safeEdgeMargin: 8,
               minTouch: 44,
             });

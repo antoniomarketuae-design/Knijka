@@ -1,6 +1,12 @@
 /**
  * Exam grading — pure functions only (no repo, no store, no clock).
  *
+ * IT ALSO STAMPS THE FINGERPRINT (door 6, docs/education/92 §10.3). Grading is
+ * the moment the exact bytes of a question are read to decide a verdict, so it
+ * is the honest place to record WHICH bytes those were: `contentPin` on every
+ * `PerQuestionResult`. It is still pure — `teachingPin` is a hash of the object
+ * it was handed.
+ *
  * Official rules (docs/education/32):
  * - each question awards its full weight (1/2/3) or nothing;
  * - "multi" (select-all-correct) questions score ONLY on an exact set match:
@@ -12,6 +18,7 @@
  */
 
 import type { Question } from "../../lib/content/types";
+import { teachingPin } from "./pin";
 import {
   EXAM_PASS_POINTS,
   type ExamAnswer,
@@ -49,6 +56,7 @@ export function gradeExam(
       points: correct ? q.points : 0,
       maxPoints: q.points,
       correctOptionIds,
+      contentPin: teachingPin(q),
     };
   });
 

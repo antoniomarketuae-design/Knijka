@@ -19,13 +19,13 @@
 
 import "@/lib/content/loader";
 import { redirect } from "next/navigation";
-import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import {
   EXAM_DURATION_SEC,
   EXAM_GRACE_SEC,
   EXAM_PASS_POINTS,
   ExamError,
+  buildReviewRow,
   getOpenExamAttempt,
   startExam,
   submitExam,
@@ -198,50 +198,36 @@ function parseSubmitInput(value: unknown): SubmitExamInput | null {
  * Post-submit enrichment from the content repo: full option texts with
  * correct flags, explanationBg and lawRefs. Only reachable after submitExam
  * succeeded, i.e. the attempt is closed — nothing leaks during the exam.
+ *
+ * THIS IS NO LONGER ITS OWN MAP (door 6, docs/education/92 §10.3). It used to
+ * be a near-copy of `modules/exam/review.ts rehydrateReview`, and the two were
+ * the two ungated readers of the same rows — the /exams/[id] review and this
+ * screen. Two copies is how one gets fixed and the other does not, so both now
+ * come through `buildReviewRow`, which decides the row's integrity and withholds
+ * the teaching half when the bank no longer backs the verdict.
+ *
+ * On THIS surface the content cannot have drifted — the grade was computed
+ * milliseconds ago from the same read — and `contentPin` comes from the grader
+ * that read it, so a row here is `verified` unless `questionClearance` refuses
+ * it, which is the case worth catching: a `needs-review` row that reached a
+ * paper at all.
  */
 function buildReview(
   perQuestion: PerQuestionResult[],
   answers: SubmitExamInput["answers"],
 ): ReviewQuestion[] {
-  const repo = getContentRepo();
   const chosenByQuestion = new Map(
-    answers.map((a) => [a.questionId, new Set(a.optionIds)]),
+    answers.map((a) => [a.questionId, a.optionIds]),
   );
 
-  return perQuestion.map((p) => {
-    const chosen = chosenByQuestion.get(p.questionId) ?? new Set<string>();
-    const q = repo.questionById(p.questionId);
-    if (!q) {
-      // Content shifted between start and review — degrade gracefully.
-      return {
-        questionId: p.questionId,
-        textBg: "Този въпрос вече не е наличен в учебното съдържание.",
-        type: "single" as const,
-        answered: chosen.size > 0,
-        correct: p.correct,
-        pointsAwarded: p.points,
-        maxPoints: p.maxPoints,
-        options: [],
-        explanationBg: "",
-        lawRefs: [],
-      };
-    }
-    return {
-      questionId: q.id,
-      textBg: q.textBg,
-      type: q.type,
-      answered: chosen.size > 0,
+  return perQuestion.map((p) =>
+    buildReviewRow({
+      questionId: p.questionId,
+      optionIds: chosenByQuestion.get(p.questionId) ?? [],
       correct: p.correct,
-      pointsAwarded: p.points,
+      points: p.points,
       maxPoints: p.maxPoints,
-      options: q.options.map((o) => ({
-        id: o.id,
-        textBg: o.textBg,
-        correct: o.correct,
-        chosen: chosen.has(o.id),
-      })),
-      explanationBg: q.explanationBg,
-      lawRefs: q.lawRefs.map((l) => ({ act: l.act, ref: l.ref })),
-    };
-  });
+      contentPin: p.contentPin,
+    }),
+  );
 }

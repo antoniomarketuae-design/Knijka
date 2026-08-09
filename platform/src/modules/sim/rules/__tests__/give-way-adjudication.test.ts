@@ -59,7 +59,7 @@ describe("Б1 give-way adjudication (ЗДвП чл. 50 — yield, not full stop)
       detail: "give-way",
       severityClass: "opasna",
       points: 10,
-      lawRef: "ЗДвП чл. 47",
+      lawRef: "ЗДвП чл. 47; чл. 48; чл. 50, ал. 1",
     });
     // The rolling cross itself must NOT add a full-stop опасна on top.
     expect(codes(events)).not.toContain("STOP_SIGN_NO_FULL_STOP");

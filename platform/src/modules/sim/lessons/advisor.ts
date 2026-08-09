@@ -417,7 +417,7 @@ const LAW_GIVE_WAY = "ЗДвП чл. 47; чл. 50, ал. 1";
  * resolvable and its text is quoted above; the Наредба is named for what it
  * holds and carries no number.
  */
-const LAW_ROUNDABOUT = "ЗДвП чл. 50, ал. 1; Наредба № РД-02-21-1/2023 правила за поставяне на знак Б3";
+const LAW_ROUNDABOUT = "ЗДвП чл. 50, ал. 1; Наредба № РД-02-21-1/23.11.2023 правила за поставяне на знак Б3";
 
 /**
  * The green-light citation. ППЗДвП чл. 31 is the catalog's own for the red

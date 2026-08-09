@@ -61,6 +61,23 @@
  * „Повече" adds: the remainder of the explanation and the repeat-cost stake.
  * The card never degrades to a verdict — it degrades to a shorter explanation
  * with the rest one thumb away.
+ *
+ * ---------------------------------------------------------------------------
+ * WHICH POINTS (founder, photographed at t=22 of his own drive).
+ *
+ * This card said „При повторение: −10 т." beside a chip reading only „ЗДвП
+ * чл. 21, ал. 1", and he read it as his DRIVING LICENCE being docked ten
+ * контролни точки. Unqualified „точки" means exactly that to a Bulgarian, and
+ * the chip made it worse rather than better: чл. 21 sets the SPEED LIMIT — the
+ * rule he broke — and says nothing at all about a ten-point mark. That comes
+ * from Наредба № 38, приложение № 5, т. 10, б. „в“.
+ *
+ * So the number now carries its scale (`minusPointsBg("exam", …)`, the one
+ * formatter in `modules/sim/rules/scales.ts`), the clause it comes out of is
+ * named next to it, the citation chip is labelled „правило" so it stops
+ * impersonating the source of the mark, and one sentence says what these points
+ * are not. The result screen was repaired first; this is the same repair on the
+ * screen he actually meets first.
  */
 
 import { useEffect, useState } from "react";
@@ -73,6 +90,11 @@ import {
   IconWheel,
 } from "@/components/icons";
 import type { TeachMoment } from "@/modules/sim/lessons";
+import {
+  EXAM_POINTS_SHORT_NOTE_BG,
+  examMarkCitationBg,
+  minusPointsBg,
+} from "@/modules/sim/rules";
 
 /** No Space bar, no hover: the card shows a big tap target instead of a key. */
 function isTouchDevice(): boolean {
@@ -227,19 +249,32 @@ export function TeachMomentOverlay({
               {moment.explanationBg}
             </p>
             {expanded ? (
-              <p className="mt-1.5 text-[11px] leading-snug text-muted">
-                Първа среща — <strong className="text-foreground">не се брои в резултата</strong>.
-                При повторение: <strong className="text-foreground">−{moment.points} т.</strong>, а
-                повторните грешки тежат още повече (×1.5 / ×2.0).
-              </p>
+              <>
+                <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                  Първа среща — <strong className="text-foreground">не се брои в резултата</strong>.
+                  При повторение:{" "}
+                  <strong className="text-foreground">{minusPointsBg("exam", moment.points)}</strong>{" "}
+                  ({SEVERITY_LABEL[moment.severity]}) по {examMarkCitationBg(moment.severity)}, а
+                  повторните грешки тежат още повече (×1.5 / ×2.0).
+                </p>
+                {/* THE SENTENCE THAT ANSWERS THE MISREADING. He met „−10 т." here,
+                    minutes before the result screen, and read it as his licence. */}
+                <p className="mt-1 text-[10px] leading-snug text-muted">
+                  {EXAM_POINTS_SHORT_NOTE_BG}
+                </p>
+              </>
             ) : null}
           </div>
 
           {/* Law ref + the expander + the thumb-sized acknowledge. */}
           <div className="flex shrink-0 items-center gap-2">
+            {/* THE CHIP HE PHOTOGRAPHED read „ЗДвП чл. 21, ал. 1" next to a
+                10-point mark, and чл. 21 is the SPEED LIMIT — not the source of
+                the mark. Labelled „правило", because that is what it is; the
+                clause the number comes out of is named with the number itself. */}
             {moment.lawRef ? (
               <span className="shrink-0 rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-bold text-muted">
-                {moment.lawRef}
+                правило: {moment.lawRef}
               </span>
             ) : null}
             <button
@@ -311,19 +346,33 @@ export function TeachMomentOverlay({
         <div className="min-w-0">
           <h3 className="text-base font-extrabold leading-snug">{moment.titleBg}</h3>
           <p className="mt-2 text-sm leading-relaxed text-foreground">{moment.explanationBg}</p>
-          {moment.lawRef ? (
-            <span className="mt-3 inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
-              {moment.lawRef}
+          {/* TWO CHIPS, NOT ONE — and this is the founder's photographed defect.
+              He saw „−10 т." beside a single chip reading „ЗДвП чл. 21, ал. 1".
+              чл. 21 sets the SPEED LIMIT: it is the rule he broke, and it is not
+              where the ten comes from. The ten comes from приложение № 5 of
+              Наредба № 38, which nothing on this card had ever said. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {moment.lawRef ? (
+              <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                правило: {moment.lawRef}
+              </span>
+            ) : null}
+            <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+              оценка: {examMarkCitationBg(moment.severity)}
             </span>
-          ) : null}
+          </div>
         </div>
 
         {/* The teach-first promise + the stake on repeat */}
         <div className="rounded-xl border border-accent-2/40 bg-accent-2/10 p-4">
           <p className="text-sm leading-relaxed">
             Първа среща — <strong>не се брои в резултата</strong>. При повторение:{" "}
-            <strong>−{moment.points} т.</strong> ({SEVERITY_LABEL[moment.severity]}), а
-            повторните грешки тежат още повече (×1.5 / ×2.0).
+            <strong>{minusPointsBg("exam", moment.points)}</strong> (
+            {SEVERITY_LABEL[moment.severity]}), а повторните грешки тежат още повече
+            (×1.5 / ×2.0).
+          </p>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            {EXAM_POINTS_SHORT_NOTE_BG}
           </p>
         </div>
 

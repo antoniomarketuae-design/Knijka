@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useRef,
   useState,
   useSyncExternalStore,
   type RefObject,
@@ -137,6 +138,50 @@ export function useQuestionBudget(
   const [px, setPx] = useState<number | null>(null);
   const [seenKey, setSeenKey] = useState(resetKey);
 
+  /**
+   * A CLAMP MUST PAY FOR ITSELF — the guard, and the defect it closes.
+   *
+   * `measure()` reads „how far past the bottom of the screen does this document
+   * go" and hands the whole number to the question to give back. That is only
+   * sound while the number is the question's to give. It was not, on the
+   * founder's phone, for the life of this hook:
+   *
+   *   app/layout ships `viewportFit: "cover"`, globals.css pays the inset back
+   *   as `body { padding-bottom: env(safe-area-inset-bottom) }`, and the shell
+   *   asked for a full `min-h-dvh` inside that padded box — so the document was
+   *   permanently 34px (portrait) / 21px (landscape) taller than the viewport.
+   *   Against a min-height FLOOR, shrinking the question shrinks NOTHING.
+   *   `over` stayed at 34 on every ResizeObserver tick and this hook subtracted
+   *   it again, and again, until the stem hit QUESTION_MIN_PX.
+   *
+   * Measured on the tree before the fix, WebKit, iPhone 16 with the real insets
+   * emulated (tools/mobile/lib/insets.mjs), 20 heaviest questions per surface:
+   * the stem was clamped to 62px on 20 of 20 PORTRAIT cases on both runners,
+   * hiding 49–173px of the question — three of five lines gone on
+   * q-predimstvo-042 — while ~900 device px of the card sat empty below the
+   * answers. No sweep had ever seen it, because the desktop WebKit port
+   * resolves env(safe-area-inset-*) to 0 and every mobile number this project
+   * had produced was taken on a phone with no notch.
+   *
+   * The shell's height is fixed now (DashboardShell), so `over` reaches 0 the
+   * ordinary way. This is the NET, and it is deliberately mechanism-blind: it
+   * does not know about safe areas, min-heights or anything else. It asks one
+   * question — did the last cut make the page shorter? — and if the answer is
+   * no, it refunds every pixel that bought nothing and stops until the viewport
+   * changes. The residual is then left VISIBLE as document scroll, which is the
+   * rule the rest of this file already states: a budget that silently swallows
+   * its own failure is how „every option fits" gets reported for a screen with
+   * an option under the bar.
+   *
+   * `<= 0` (not „less than it cost") is chosen because it cannot misfire on a
+   * transient: a layout still settling always moves the number a little. A cut
+   * that moves it by NOTHING is not a slow cut, it is a wasted one.
+   */
+  const pxRef = useRef<number | null>(null);
+  const chaseRef = useRef<{ overAtStart: number; over: number; px: number } | null>(null);
+  /** The viewport height we gave up at; cleared when the viewport changes. */
+  const frozenAtRef = useRef<number | null>(null);
+
   // Reset DURING RENDER, not in an effect — React's documented way to adjust
   // state when a prop changes. In an effect it costs an extra commit and one
   // painted frame of the previous question's clamp, which is visible as a jump
@@ -147,6 +192,15 @@ export function useQuestionBudget(
   }
 
   useEffect(() => {
+    // The ledger belongs to one question at one viewport. `resetKey` and
+    // `enabled` are both in this effect's deps, so this runs before the first
+    // measure of a new question and before the first measure after the gate
+    // opens — which is also why the refs are cleared here rather than during
+    // render, where a discarded render would corrupt them.
+    pxRef.current = null;
+    chaseRef.current = null;
+    frozenAtRef.current = null;
+
     if (!enabled) {
       // A clamp must never outlive the condition that justified it: rotating
       // back to portrait, or answering (the why-panel needs the card to grow
@@ -158,6 +212,17 @@ export function useQuestionBudget(
     const box = boxRef.current;
     if (!card || !box) return;
 
+    // `pxRef` is the source of truth and `px` is its mirror for rendering. It
+    // used to be a functional `setPx(prev => …)`, which is the usual answer to
+    // a stale closure — but the guard below has to read the CURRENT clamp and
+    // write a ledger entry in the same breath, and a state updater is not a
+    // place to have side effects (React may call it twice).
+    const apply = (next: number | null): void => {
+      if (pxRef.current === next) return;
+      pxRef.current = next;
+      setPx(next);
+    };
+
     const measure = (): void => {
       // A PHONE IS THE ONLY VIEWPORT THIS TOUCHES, and the check is inside
       // `measure` rather than around the effect so a rotation re-evaluates the
@@ -165,7 +230,9 @@ export function useQuestionBudget(
       // height. (It was `SHORT_QUERY` — see PHONE_FOLD_QUERY for the 360px
       // Android portrait measurements that widened it.)
       if (!window.matchMedia(PHONE_FOLD_QUERY).matches) {
-        setPx((prev) => (prev === null ? prev : null));
+        chaseRef.current = null;
+        frozenAtRef.current = null;
+        apply(null);
         return;
       }
       const vh = window.visualViewport?.height ?? window.innerHeight;
@@ -180,23 +247,52 @@ export function useQuestionBudget(
           card.getBoundingClientRect().bottom - vh,
         ),
       );
-      if (over <= 0) return;
-      setPx((prev) => {
-        // `scrollHeight` is the UNCLAMPED text height, which is what the first
-        // pass has to subtract from; after that the previous clamp is the
-        // truth (scrollHeight would still report the full text).
-        const natural = box.scrollHeight;
-        const current = prev ?? natural;
-        const next = Math.max(QUESTION_MIN_PX, current - over);
-        // A CLAMP THAT DOES NOT CLAMP IS NOT FREE, and the first cut of this
-        // returned one. On a two-line question the floor is ABOVE the text's
-        // own height, so `next` bound nothing — but it was still a non-null
-        // value, so the caller drew the „there is more" fade over nothing and
-        // paid its 12px of tail padding. Measured at 852x393: 12px back on
-        // q-eco-062, q-vehicle-063, q-vehicle-058 and q-ptp-062, which is the
-        // whole of q-eco-062's overhang. Not binding means not there.
-        return next >= natural ? null : next;
-      });
+      if (over <= 0) {
+        chaseRef.current = null;
+        frozenAtRef.current = null;
+        return;
+      }
+      // Already established that these pixels are not this question's to give,
+      // at this viewport height. Rotating or a toolbar collapse re-asks.
+      if (frozenAtRef.current !== null && Math.abs(frozenAtRef.current - vh) < 1) return;
+
+      // `scrollHeight` is the UNCLAMPED text height even while clamped (the box
+      // keeps its overflow), so this is the height to subtract from and it stays
+      // correct across a reflow that rewraps the stem.
+      const natural = box.scrollHeight;
+      const current = pxRef.current ?? natural;
+      const chase = chaseRef.current;
+
+      if (chase !== null) {
+        const spent = chase.px - current; // px the words gave up on the last tick
+        const gained = chase.over - over; // px the page got shorter by
+        if (spent > 0 && gained <= 0) {
+          // THE REFUND. Everything this question has given up since the chase
+          // started bought `overAtStart - over` px of page, and not one pixel
+          // more is coming. Hand the rest back and stop.
+          const useful = Math.max(0, chase.overAtStart - over);
+          const keep = natural - useful;
+          apply(useful === 0 || keep >= natural ? null : Math.max(QUESTION_MIN_PX, keep));
+          frozenAtRef.current = vh;
+          return;
+        }
+      }
+
+      const next = Math.max(QUESTION_MIN_PX, current - over);
+      // A CLAMP THAT DOES NOT CLAMP IS NOT FREE, and the first cut of this
+      // returned one. On a two-line question the floor is ABOVE the text's
+      // own height, so `next` bound nothing — but it was still a non-null
+      // value, so the caller drew the „there is more" fade over nothing and
+      // paid its 12px of tail padding. Measured at 852x393: 12px back on
+      // q-eco-062, q-vehicle-063, q-vehicle-058 and q-ptp-062, which is the
+      // whole of q-eco-062's overhang. Not binding means not there.
+      const applied = next >= natural ? null : next;
+      chaseRef.current = {
+        overAtStart: chase?.overAtStart ?? over,
+        over,
+        px: applied ?? natural,
+      };
+      apply(applied);
     };
 
     // A ResizeObserver, not a one-shot: a scene still is a FETCH that swaps a

@@ -1,6 +1,14 @@
 import "@/lib/content/loader";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  POINT_SCALES,
+  THEORY_EXAM_SCORE_NOTE_BG,
+  THEORY_EXAM_SHORT_NOTE_BG,
+  THEORY_QUESTION_WEIGHT_NOTE_BG,
+  pointsOutOfBg,
+  pointsScaleLabelBg,
+} from "@/lib/content/pointScales";
 import { getContentRepo } from "@/lib/content/repo";
 import { requireUser } from "@/modules/auth";
 import {
@@ -17,7 +25,7 @@ import { startExamAction } from "./actions";
 export const metadata: Metadata = {
   title: "Пробни изпити · Книжка.AI",
   description:
-    "Пробен изпит 1:1 с официалния формат: 45 въпроса на опит от банка с над 1000 оригинални, 97 точки, праг 87, 40 минути.",
+    "Пробен изпит 1:1 с официалния формат: 45 въпроса на опит от банка с над 1000 оригинални, 97 точки от правилни отговори, праг 87, 40 минути.",
 };
 
 const MESSAGES: Record<string, string> = {
@@ -87,27 +95,65 @@ export default async function ExamsPage({
           <h2 id="exam-rules-title" className="font-display text-lg font-extrabold">
             Официалният формат, едно към едно
           </h2>
+          {/* WHICH POINTS. The strip used to read „45 · 97 · 87 · 40:00" —
+              four numbers off two different counters (questions and points)
+              with nothing naming either. `pointsScaleLabelBg` writes the scale
+              once for the whole row; the tiles below name it on each figure. */}
           <span className="hud-label">
-            {EXAM_QUESTION_COUNT} · {EXAM_MAX_POINTS} · {EXAM_PASS_POINTS} ·{" "}
+            {EXAM_QUESTION_COUNT} въпроса · {EXAM_MAX_POINTS}{" "}
+            {pointsScaleLabelBg("theory")} · праг {EXAM_PASS_POINTS} ·{" "}
             {formatClock(EXAM_DURATION_SEC)}
           </span>
         </div>
 
         <dl className="relative grid grid-cols-2 gap-3 sm:grid-cols-5">
           <RuleStat value={String(EXAM_QUESTION_COUNT)} label="въпроса на изпит" />
-          <RuleStat value={String(EXAM_MAX_POINTS)} label="точки максимум" />
-          <RuleStat value={`≥ ${EXAM_PASS_POINTS}`} label="точки за успех" accent />
+          {/* WAS „точки максимум" / „точки за успех". Unqualified „точки" is
+              КОНТРОЛНИ точки to a Bulgarian — the founder's own misreading,
+              spelled out instead of abbreviated. */}
+          <RuleStat
+            value={String(EXAM_MAX_POINTS)}
+            label={`${pointsScaleLabelBg("theory")} — максимум`}
+          />
+          <RuleStat
+            value={`≥ ${EXAM_PASS_POINTS}`}
+            label={`${pointsScaleLabelBg("theory")} — за успех`}
+            accent
+          />
           <RuleStat value={formatClock(EXAM_DURATION_SEC)} label="минути време" />
           <RuleStat value={bankLabel} label="въпроса в банката" />
         </dl>
 
+        {/* „въпроси с тежест 1, 2 и 3 точки" was the sentence. Bare „точки" is
+            the licence budget to a Bulgarian, and „тежест … точки по теорията"
+            reads as a machine talking — so the sentence is rebuilt around the
+            наредба's own noun instead of having a qualifier bolted onto it. */}
         <p className="mt-4 text-sm leading-relaxed text-muted">
           Пробният изпит повтаря официалния теоретичен изпит на ИААА (Наредба
-          № 38): въпроси с тежест 1, 2 и 3 точки, включително въпроси с повече
-          от един верен отговор. Всеки опит тегли нови {EXAM_QUESTION_COUNT}{" "}
-          въпроса от банка с {bankLabel} оригинални — два еднакви изпита
-          практически няма. По време на изпита няма подсказки и обратна
-          връзка — пълният преглед с обяснения идва след предаването.
+          № 38): всеки въпрос носи 1, 2 или 3{" "}
+          {POINT_SCALES.theory.wordPluralBg}, а някои имат повече от един верен
+          отговор. Всеки опит тегли нови {EXAM_QUESTION_COUNT} въпроса от банка
+          с {bankLabel} оригинални — два еднакви изпита практически няма. По
+          време на изпита няма подсказки и обратна връзка — пълният преглед с
+          обяснения идва след предаването.
+        </p>
+
+        {/*
+          THE SCALE, NAMED AND CITED, BEFORE THE STUDENT EVER SEES A NUMBER.
+          B58: the founder read „−10 т." in the simulator as his LICENCE being
+          docked, because unqualified „точки" in Bulgarian means контролни
+          точки. This screen counts a third thing again — точки от правилни
+          отговори on the THEORETICAL exam (Наредба № 38, чл. 39, ал. 1) — and
+          a student who has driven a lesson now has two wrong readings
+          available, not one. Both are ruled out by name.
+
+          ADR-002: the 1/2/3 weight is NOT in the наредба. чл. 38, ал. 1 gives
+          the ИААА director the power to approve the questions; the наредба
+          never enumerates a weight. So the second sentence names the article
+          and refuses to cite a clause for the number.
+        */}
+        <p className="mt-3 rounded-xl border border-hair bg-surface-2/60 p-3 text-xs leading-relaxed text-muted">
+          {THEORY_EXAM_SCORE_NOTE_BG} {THEORY_QUESTION_WEIGHT_NOTE_BG}
         </p>
 
         <form action={startExamAction} className="mt-5">
@@ -186,15 +232,19 @@ function HistoryRow({ entry }: { entry: ExamHistoryEntry }) {
         {dateFmt.format(entry.startedAt)}
       </span>
 
-      <span className="metric text-sm font-normal text-muted">
-        {entry.score !== null ? (
-          <>
-            <strong className="font-bold text-foreground">{entry.score}</strong>/
-            {entry.maxScore} т.
-          </>
-        ) : (
-          "— т."
-        )}
+      {/* WAS „78/97 т." and, for an unfinished attempt, „— т.".
+          „т." names none of this product's four point scales, and „— т." named
+          a scale for a number that does not exist. Now: the vocabulary writes
+          the score („78 / 97 т. по теорията"), and an attempt with no score
+          shows a dash and the badge beside it instead of a unit with nothing
+          in front of it. The scale's one-line note is on the row's title. */}
+      <span
+        className="metric text-sm font-semibold text-foreground"
+        title={THEORY_EXAM_SHORT_NOTE_BG}
+      >
+        {entry.score !== null
+          ? pointsOutOfBg("theory", entry.score, entry.maxScore)
+          : "—"}
       </span>
 
       <span className="ml-auto flex items-center gap-3">

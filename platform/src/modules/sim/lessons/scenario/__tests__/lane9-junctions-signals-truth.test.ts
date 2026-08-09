@@ -298,7 +298,7 @@ describe("L4 — the регулировчик stands on the approach he is talki
 });
 
 describe("L4 — every gesture says who goes, who stops and whose priority it is", () => {
-  it("covers the three ППЗДвП чл. 29, ал. 3 postures", () => {
+  it("covers the three регулировчик postures", () => {
     expect(CONTROLLER_GESTURES.map((g) => g.posture)).toEqual([
       "sideProfile",
       "chestOrBack",
@@ -323,7 +323,16 @@ describe("L4 — every gesture says who goes, who stops and whose priority it is
       // за сигнализиране" (направляващи стълбчета, конуси, бариери) — the
       // регулировчик's postures are ППЗДвП чл. 29, ал. 3. ЗДвП чл. 7 (the
       // controller outranks the lamp) stays valid alongside it.
-      expect(gesture.lawRef).toMatch(/ППЗДвП чл\. 29, ал\. 3/);
+      //
+      // 2026-08-09: the ARTICLE NUMBER came off. `content/law/acts` holds no
+      // byte of ППЗДвП, so „чл. 29, ал. 3" was unverifiable by construction —
+      // this assertion could only ever confirm that the string had not been
+      // retyped, never that the number was right. What is asserted now is the
+      // act and the SUBJECT, which is checkable in the sense that matters: a
+      // reader can find the регулировчик's postures in that act.
+      // `modules/sim/__tests__/law-citations.test.ts` runs the real resolver
+      // over every lawRef in the module and fails on a relapse.
+      expect(gesture.lawRef).toMatch(/ППЗДвП сигнали на регулировчика/);
     });
   }
 

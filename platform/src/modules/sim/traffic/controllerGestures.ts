@@ -25,6 +25,18 @@
  * `CONTROLLER_GESTURES` — stays where it is and is what the debrief and the
  * lesson copy use. These strings are its caption: the same three answers, cut
  * to what stays readable on a billboard 30–60 m away in a moving cockpit.
+ *
+ * THE FOURTH CATALOGUE (2026-08-09). Three surveys of „where does the simulator
+ * cite law" named the scenario templates and the 58-entry rule catalogue and
+ * missed this file — and this is the one whose `lawRef` is PAINTED ONTO A
+ * CANVAS in the 3D scene (`TrafficLayer.tsx`, `g.fillText(copy.lawRef, …)`),
+ * i.e. read from the driving seat rather than from a panel. All three entries
+ * cited „ППЗДвП чл. 29, ал. 3", an article of an act `content/law/acts` does
+ * not hold, so nobody could check the number. They now name the act and the
+ * subject — „ППЗДвП сигнали на регулировчика" — and the half that IS checkable
+ * stays exactly as it was: ЗДвП чл. 7, which is in the corpus and is the
+ * clause that actually says the officer outranks the lamp.
+ * `modules/sim/__tests__/law-citations.test.ts` scans this file by name.
  */
 
 /** A posture the officer can hold (ППЗДвП чл. 29, ал. 3). Mirrors the authored
@@ -55,7 +67,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: ти и цялата твоя посока",
     stopBg: "Спира: напречното направление",
     accent: "#3ddc84",
-    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
+    lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "chestOrBack",
@@ -64,7 +76,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: напречното направление",
     stopBg: "Спираш: ти, преди стоп-линията",
     accent: "#ff6a5a",
-    lawRef: "ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7",
+    lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
   {
     posture: "armRaised",
@@ -73,7 +85,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     goBg: "Минава: никой — това не е „тръгвай“",
     stopBg: "Спират: всички посоки — сменя фазите",
     accent: "#ffb020",
-    lawRef: "ППЗДвП чл. 29, ал. 3",
+    lawRef: "ППЗДвП сигнали на регулировчика",
   },
 ];
 

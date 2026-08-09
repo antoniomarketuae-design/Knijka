@@ -130,7 +130,10 @@ export function buildLessonWorldCore(lesson: LessonSpec, raw: unknown): LessonWo
     district,
     geometry,
     scenarioObstacles,
-    parkedClearZones: parkedClearZonesFor(lesson.id),
+    // `raw` is passed so the bus-stop kerb rule can see the district's
+    // authored `kind: "busStop"` frontages (doc 87 B64) — nobody parks at a
+    // spirka, and the shelter has to be visible from the road.
+    parkedClearZones: parkedClearZonesFor(lesson.id, raw),
     gripPatches,
     spawnPoints,
   };

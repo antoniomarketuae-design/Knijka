@@ -88,7 +88,7 @@ describe("buildHazardFeedback", () => {
       hazardBg: item.hazardBg,
       developingBg: item.developingBg,
     });
-    expect(feedback.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119" }]);
+    expect(feedback.lawRefs).toEqual([{ act: "ЗДвП", ref: "чл. 119, ал. 1" }]);
   });
 
   it("copies its prose — nothing on the payload is composed at request time", () => {

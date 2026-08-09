@@ -61,8 +61,16 @@ export function SimulatorPaywall({
             предимство, пешеходци, паркиране — карай ги, докато станат рефлекс.
           </li>
           <li>
+            {/* „колко точки струва на изпита" — the one unqualified „точки"
+                left in the guarded directories once the check learned to read
+                the word as well as the abbreviation. On a sales page, before
+                the student has driven anything, „точки" with no scale is the
+                founder's own misreading offered pre-emptively: it is the
+                PRACTICAL sheet's наказателни точки (Наредба № 38, приложение
+                № 5, т. 10), not the licence. */}
             <strong>Разбор след всяко каране</strong>: къде точно сгреши, колко
-            точки струва на изпита и какво да направиш следващия път.
+            наказателни точки струва на изпита и какво да направиш следващия
+            път.
           </li>
           <li>
             <strong>Връзка с теорията</strong>: сгрешен въпрос → същата

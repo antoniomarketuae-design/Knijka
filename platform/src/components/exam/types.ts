@@ -27,6 +27,17 @@ export interface ReviewLawRef {
   ref: string;
 }
 
+/**
+ * Whether the text on this card is still the text that earned the verdict on
+ * it (docs/education/92 §10.3 — door 6). Mirrors `@/modules/exam ReviewIntegrity`;
+ * declared here rather than imported because this file is the CLIENT contract
+ * and takes no runtime dependency on the exam module. Anything other than
+ * `verified` arrives with `noticeBg` filled in, and — except for `unpinned` —
+ * with the teaching half (option key, explanation, citations) already stripped
+ * SERVER-SIDE. The card must not try to reconstruct it.
+ */
+export type ReviewIntegrity = "verified" | "unpinned" | "moved" | "withdrawn" | "gone";
+
 export interface ReviewQuestion {
   questionId: string;
   textBg: string;
@@ -41,6 +52,9 @@ export interface ReviewQuestion {
   options: ReviewOption[];
   explanationBg: string;
   lawRefs: ReviewLawRef[];
+  integrity: ReviewIntegrity;
+  /** Claim-free Bulgarian shown on the card; "" when `integrity` is verified. */
+  noticeBg: string;
 }
 
 export interface ResultSummary {

@@ -50,6 +50,14 @@ import {
   ROAD_DECAL_END_INSET_M,
   ROAD_DECAL_SPACING_M,
   ROAD_DECAL_Y,
+  SKID_ALIGN_JITTER_RAD,
+  SKID_LANE_WOBBLE_M,
+  SKID_MAX_LENGTH_M,
+  SKID_MIN_LENGTH_M,
+  SKID_MIN_RIBBON_M,
+  SKID_SPACING_M,
+  SKID_TRACK_M,
+  SKID_WIDTH_M,
 } from "./constants";
 import {
   add,
@@ -70,7 +78,7 @@ import type { NodeInfo, RoadNetwork } from "./network";
 // Atlas manifest (4x4 grid; 6 cells used in v1)
 // ---------------------------------------------------------------------------
 
-export type DecalKind = "crackA" | "crackB" | "patch" | "oil" | "manhole" | "dirt";
+export type DecalKind = "crackA" | "crackB" | "patch" | "oil" | "manhole" | "dirt" | "skid";
 
 export interface DecalCell {
   kind: DecalKind;
@@ -104,7 +112,20 @@ export const DECAL_CELLS: readonly DecalCell[] = [
   { kind: "oil", cell: [3, 0], minSizeM: 1.3, maxSizeM: 2.3, aspect: 1, weight: 0.16, junctionWeight: 0.3 },
   { kind: "manhole", cell: [0, 1], minSizeM: 0.85, maxSizeM: 1.0, aspect: 1, weight: 0.16, junctionWeight: 0.22 },
   { kind: "dirt", cell: [1, 1], minSizeM: 1.6, maxSizeM: 3.0, aspect: 1, weight: 0.1, junctionWeight: 0.04 },
+  // TYRE MARKS (founder register B65 — „no tyre marks"). BOTH weights are 0
+  // and that is the whole design: a skid is NOT drawn by the weighted pickers
+  // above, because they place a roughly-square blob at a free angle somewhere
+  // in the travel band and a skid drawn that way lies diagonally across the
+  // road. `buildSkidPairs` below places this cell, and only it — see
+  // constants.SKID_TRACK_M for the four properties a real скид has that
+  // weight/size/aspect cannot express. An earlier art lane REFUSED to fake
+  // this rather than ship a smear, and the refusal was right; this is the
+  // placement rule that refusal asked for.
+  { kind: "skid", cell: [2, 1], minSizeM: 5.5, maxSizeM: 11, aspect: 0.02, weight: 0, junctionWeight: 0 },
 ];
+
+/** The skid cell, by identity — `buildSkidPairs` is the only placer. */
+const SKID_CELL: DecalCell = DECAL_CELLS.find((c) => c.kind === "skid")!;
 
 /** UV rect [u0, v0, u1, v1] of a cell (small inset guards filter bleed). */
 export function decalCellUvRect(cell: [number, number]): [number, number, number, number] {
@@ -272,10 +293,12 @@ export class MarkingKeepOut {
 
 export interface DecalBuildResult {
   decals: MeshAccumulator;
-  /** TOTAL quads in the batch (ribbon pass + junction pass). */
+  /** TOTAL quads in the batch (ribbon pass + junction pass + skid pass). */
   count: number;
   /** How many of `count` came from the junction pass (doc 82 V4). */
   junctionCount: number;
+  /** How many of `count` are tyre-mark streaks (B65). Two per braking pair. */
+  skidCount: number;
 }
 
 /** Rotate `p` by angle a (district space). */
@@ -438,6 +461,100 @@ function buildNodeDecals(
 }
 
 /**
+ * TYRE MARKS on one ribbon (founder register B65 — „no tyre marks").
+ *
+ * THIS IS THE RULE THE EARLIER REFUSAL ASKED FOR. The register records that an
+ * art lane was asked for skid marks and declined to fake them, noting that a
+ * real one needs a new DecalKind, an atlas cell and an along-ribbon placement
+ * rule. Declining was right: the weighted pickers above choose a size and a
+ * FREE rotation, and a skid drawn that way is a dark smear lying diagonally
+ * across the carriageway — worse than nothing, because a student reads it as a
+ * marking he does not recognise. Four properties make rubber read as rubber,
+ * and every one of them is a constraint the generic path cannot express:
+ *
+ *   1. IT IS LONG AND THIN — 5.5–11 m of streak, 0.22 m wide (a contact
+ *      patch), not a 3 m blob;
+ *   2. IT IS ALIGNED WITH TRAVEL, to within SKID_ALIGN_JITTER_RAD (~4.6°). A
+ *      locked wheel slides along the road, not across it;
+ *   3. IT COMES IN PAIRS, SKID_TRACK_M apart, because a car has two wheels on
+ *      an axle. A single streak reads as a paint scuff;
+ *   4. IT LIES IN A LANE. Both streaks of a pair sit inside the SAME lane,
+ *      wobbled a little off its centre, never straddling a lane line.
+ *
+ * Emitted into the SHARED accumulator on the SHARED atlas, so it stays ONE
+ * mesh and ONE draw call (doc 71 §4.4) — the cost of the whole feature is two
+ * quads per braking station. Paint still wins: both streaks are tested against
+ * the keep-out and the PAIR is dropped as a unit if either lands on a marking,
+ * because half a pair is a scuff.
+ *
+ * Its own rng stream, seeded per edge id from a rotated seed, so adding this
+ * pass leaves every crack, patch, oil stain, manhole and dirt pool in the
+ * product byte-identical.
+ */
+function buildSkidPairs(
+  acc: MeshAccumulator,
+  eb: RoadNetwork["edges"][number],
+  seed: number,
+  keepOut: MarkingKeepOut,
+): number {
+  const line = eb.line;
+  if (!line) return 0;
+  const length = polylineLength(line);
+  if (length < SKID_MIN_RIBBON_M) return 0;
+  const stations = Math.floor(length / SKID_SPACING_M);
+  if (stations < 1) return 0;
+
+  const rng = mulberry32((((seed ^ hashString(eb.edge.id)) >>> 0) ^ 0x5b1d5b1d) >>> 0);
+  const travelHalf = eb.halfWidth - eb.parkingM;
+  const lanes = Math.max(1, eb.edge.lanes);
+  const halfWidth = SKID_WIDTH_M / 2;
+  let count = 0;
+
+  for (let k = 0; k < stations; k++) {
+    for (let attempt = 0; attempt < DECAL_PLACEMENT_ATTEMPTS; attempt++) {
+      const len = SKID_MIN_LENGTH_M + rng() * (SKID_MAX_LENGTH_M - SKID_MIN_LENGTH_M);
+      const halfLen = len / 2;
+      // The end clearance is for the quad's EDGE, exactly as the ribbon pass
+      // computes it (decals.test.ts asserts no corner reaches past the inset).
+      // A skid is aligned, so its along-ribbon reach is its own half-length.
+      const endClear = ROAD_DECAL_END_INSET_M + halfLen;
+      const band = length - 2 * endClear;
+      if (band <= 0) break; // ribbon too short for a streak this long
+      const slot = band / stations;
+      const s = endClear + slot * (k + 0.15 + rng() * 0.7);
+      const { point, tangent } = pointAlong(line, s);
+      const right = perpRight(tangent);
+
+      // One lane, both wheels. The pair's centre is the lane centre, wobbled.
+      const lane = Math.floor(rng() * lanes);
+      const laneCentre = -travelHalf + (lane + 0.5) * LANE_WIDTH_M;
+      const wobble = (rng() * 2 - 1) * SKID_LANE_WOBBLE_M;
+      const edgeReach = SKID_TRACK_M / 2 + halfWidth;
+      const centre = Math.max(
+        -travelHalf + edgeReach,
+        Math.min(travelHalf - edgeReach, laneCentre + wobble),
+      );
+
+      const roadAngle = Math.atan2(tangent[1], tangent[0]);
+      const angle = roadAngle + (rng() - 0.5) * 2 * SKID_ALIGN_JITTER_RAD;
+
+      // Both wheels first, THEN the verdict: half a pair is a scuff, so the
+      // keep-out vetoes the station rather than one streak of it.
+      const pair = [SKID_TRACK_M / 2, -SKID_TRACK_M / 2].map((offset) =>
+        decalCorners(add(point, mul(right, centre + offset)), halfLen, halfWidth, angle),
+      );
+      if (pair.some((corners) => keepOut.blocks(corners))) continue;
+      for (const corners of pair) {
+        emitDecalQuad(acc, SKID_CELL, corners, ROAD_DECAL_Y);
+        count++;
+      }
+      break;
+    }
+  }
+  return count;
+}
+
+/**
  * @param markings the markings mesh built for the SAME network — the paint
  *   every decal has to keep out of. buildWorldGeometry therefore paints before
  *   it wears; the parameter is required rather than optional so a new caller
@@ -532,5 +649,17 @@ export function buildRoadDecals(
     junctionCount += buildNodeDecals(acc, node, seed, keepOut);
   }
 
-  return { decals: acc, count: count + junctionCount, junctionCount };
+  // Tyre marks — same accumulator, same atlas, same draw call, its own rule
+  // and its own rng stream (see buildSkidPairs).
+  let skidCount = 0;
+  for (const eb of network.edges) {
+    skidCount += buildSkidPairs(acc, eb, seed, keepOut);
+  }
+
+  return {
+    decals: acc,
+    count: count + junctionCount + skidCount,
+    junctionCount,
+    skidCount,
+  };
 }

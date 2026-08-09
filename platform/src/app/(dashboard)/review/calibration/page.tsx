@@ -110,7 +110,7 @@ function CalibrationCard({ calibration: c }: { calibration: Calibration }) {
           <Stat label="Средна прогноза" value={percent(c.meanPredicted)} />
           <Stat
             label="Отклонение"
-            value={signedPercent(c.calibrationGap)}
+            value={signedPercentagePoints(c.calibrationGap)}
             tone={
               c.calibrationGap !== null && c.calibrationGap > 0.05
                 ? "danger"
@@ -220,8 +220,16 @@ function percent(value: number | null): string {
   return value === null ? "—" : `${Math.round(value * 100)}%`;
 }
 
-function signedPercent(value: number | null): string {
+/**
+ * PERCENTAGE POINTS, NOT „ТОЧКИ". `calibrationGap` is the difference between
+ * two probabilities, so ×100 makes it a spread in percentage points — and this
+ * function rendered it as „+7 т.", the same abbreviation the simulator uses for
+ * наказателни точки, on a card sitting between three plain percentages. It is
+ * the fifth thing in this product that counted in „т." and the only one that
+ * was never points at all. „п.п." is the standard Bulgarian abbreviation.
+ */
+function signedPercentagePoints(value: number | null): string {
   if (value === null) return "—";
   const rounded = Math.round(value * 100);
-  return `${rounded > 0 ? "+" : ""}${rounded} т.`;
+  return `${rounded > 0 ? "+" : ""}${rounded} п.п.`;
 }

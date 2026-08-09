@@ -128,6 +128,25 @@ const GROUPS: Record<PbrGroup, GroupConfig> = {
   },
 };
 
+/**
+ * The anisotropy a ground texture is actually bound at: what the tier asked
+ * for, clamped to what the DEVICE reports.
+ *
+ * Exported and pure because the clamp is where this went wrong before. It read
+ * `Math.min(8, Math.max(4, anisotropy))`, which quietly did two things nobody
+ * had measured: the floor made `QUALITY_PRESETS.low.anisotropy = 2` unreachable
+ * (low and med bound the ground at the identical 4, so the low preset's own
+ * number never left the file), and the ceiling of 8 capped the single lever
+ * that fixes the grazing-angle falloff at half of what every GPU this ships to
+ * supports. A clamp that silently overrides the tier is not a safety net; it is
+ * a place for a decision to go and die.
+ */
+export function groundAnisotropyFor(requested: number, deviceMax: number): number {
+  if (!Number.isFinite(requested) || requested < 1) return 1;
+  const cap = Number.isFinite(deviceMax) && deviceMax >= 1 ? deviceMax : 1;
+  return Math.max(1, Math.min(Math.floor(requested), Math.floor(cap)));
+}
+
 /** repeat = uvMetresPerUnit / textureRealWorldMetres (per axis). */
 function repeatOf(cfg: GroupConfig): [number, number] {
   return [
@@ -170,7 +189,10 @@ function configureTexture(
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearMipmapLinearFilter; // trilinear over the mip chain
   if (!compressed) tex.generateMipmaps = true; // KTX2 ships its own mips
-  tex.anisotropy = 4; // sensible default; usePbrSet() raises it per quality
+  // Load-time placeholder only: usePbrSet() sets the tier's groundAnisotropy
+  // (clamped to the device max) on the very next effect, before a frame with
+  // these textures bound can matter.
+  tex.anisotropy = 4;
   tex.needsUpdate = true;
   return tex;
 }
@@ -347,9 +369,12 @@ function release(group: PbrGroup, mode: GroundMapsMode): void {
  * it resolves / on the server. Callers should fall back to their procedural
  * texture while null. `mode` is the tier's download budget (TEXTURE_BUDGETS[
  * preset.level].groundMaps) — maps outside it are never fetched and come back
- * null on the set. `anisotropy` (from the quality preset) is applied to the
- * shared textures; the CC0 sets look best at 4-8. `gl` (from `useThree`) is
- * needed to detect the GPU's transcode-target formats for the KTX2 path.
+ * null on the set. `anisotropy` is `QUALITY_PRESETS[level].groundAnisotropy` —
+ * NOT the general `anisotropy`, which is the canvas/facade number: the ground
+ * is the one surface a cockpit camera meets at 4-10 degrees, and that is a
+ * different filtering problem (see quality.ts, and `groundAnisotropyFor` above
+ * for the clamp). `gl` (from `useThree`) is needed both to detect the GPU's
+ * KTX2 transcode targets and to read its anisotropy ceiling.
  */
 export function usePbrSet(
   group: PbrGroup,
@@ -383,14 +408,17 @@ export function usePbrSet(
 
   useEffect(() => {
     if (!set) return;
-    const a = Math.min(8, Math.max(4, anisotropy));
+    // The tier asks; the DEVICE decides the ceiling. See groundAnisotropyFor
+    // above for what the old clamp was doing, and `groundAnisotropy` in
+    // components/quality.ts for the measurement that set the number.
+    const a = groundAnisotropyFor(anisotropy, gl.capabilities.getMaxAnisotropy());
     for (const tex of texturesOf(set)) {
       if (tex.anisotropy !== a) {
         tex.anisotropy = a;
         tex.needsUpdate = true;
       }
     }
-  }, [set, anisotropy]);
+  }, [set, anisotropy, gl]);
 
   return set;
 }

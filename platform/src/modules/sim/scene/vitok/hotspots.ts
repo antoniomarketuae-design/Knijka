@@ -222,11 +222,16 @@ export const COCKPIT_HOTSPOTS: readonly CockpitHotspotSpec[] = [
     name: "hotspot_mirror_rear",
     // Raised to the header-mounted housing in the 2026-07-11 black-mass fix
     // (was [0, 0.687, 0.575]) so the glance click-target tracks the relocated
-    // glass (GLB hotspot_mirror_rear now at chassis (0, 0.803, 0.50)).
+    // glass, and raised again by B58's 105 mm mirror-station move (the В26 «50»
+    // the speed lessons tell the student to read was behind the mirror at every
+    // distance on the approach). The GLB node is the authority: chassis
+    // (0, 0.803 + 0.105, 0.50). If the asset is ever re-exported without
+    // `tools/glb/raise_interior_mirror.mjs`, this number moves back with it —
+    // a proxy left behind makes the mirror unclickable, not merely misplaced.
     labelBg: "Вътрешно огледало — задръж за поглед",
     keyHint: "F",
     shortBg: "Вътрешно огледало",
-    pos: [0, 0.803, 0.5],
+    pos: [0, 0.908, 0.5],
     size: [0.3, 0.13, 0.09],
     action: { type: "glance", mirror: "rear" },
   },

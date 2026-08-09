@@ -76,9 +76,12 @@ const LANDMARKS = {
   /** Interior rear-view mirror glass centre (GLB hotspot_mirror_rear) — RAISED
    *  to a small header-mounted housing in the 2026-07-11 black-mass fix (was
    *  (0, 0.687, 0.575), the eye-level block that the v2 camera dropped into the
-   *  sightline). Now (0, 0.803, 0.50): projects to the upper-right, out of the
-   *  road band. */
-  interiorMirror: { x: 0.0, y: 0.803, z: 0.5 },
+   *  sightline), then raised 105 mm again by B58 (the В26 «50» the speed
+   *  lessons tell the student to read sat behind it at every distance on the
+   *  approach). Now (0, 0.908, 0.50) — the authored GLB node position after
+   *  `tools/glb/raise_interior_mirror.mjs`. Still upper-right, out of the road
+   *  band, and still inside the ≤0.97 band asserted below. */
+  interiorMirror: { x: 0.0, y: 0.908, z: 0.5 },
   /** Left door-mirror glass centre (GLB hotspot_mirror_left). */
   doorMirrorLeft: { x: 0.905, y: 0.455, z: 0.592 },
   /** Road surface point ~10 m ahead of the driver. */
@@ -219,6 +222,12 @@ describe("frame composition bands at 16:9 (founder contract: world ≥65%)", () 
     // bands below are UNCHANGED (the raised position still satisfies them) —
     // the window-size assertions above are untouched. MirrorRig's rear-view
     // RTT vantage stays at (0,0.687,0.575) by design (sample point ≠ glass).
+    //
+    // 2026-08-09 B58: raised a further 105 mm to (0, 0.908, 0.50), because the
+    // В26 «50» that the speed lessons' instruction 2 tells the student to read
+    // was behind the mirror at every distance on the approach. fy 0.724 →
+    // 0.872: still under the 0.97 ceiling this test has always asserted, and
+    // the four bands below are the reason the raise had a ceiling at all.
     expect(f.interiorMirror.x).toBeGreaterThanOrEqual(0.6);
     expect(f.interiorMirror.x).toBeLessThanOrEqual(0.95);
     expect(f.interiorMirror.y).toBeGreaterThan(f.road10m.y);

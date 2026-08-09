@@ -146,7 +146,7 @@ describe("validateScenarioSpec", () => {
 
   it("teach.lawRef must cite ЗДвП / ППЗДвП / Наредба", () => {
     expect(errorsOf((s) => (s.teach.lawRef = "art. 40"))[0]).toContain("must cite ЗДвП");
-    expect(errorsOf((s) => (s.teach.lawRef = "ППЗДвП чл. 31"))).toEqual([]);
+    expect(errorsOf((s) => (s.teach.lawRef = "ППЗДвП светлинни сигнали за регулиране на движението"))).toEqual([]);
   });
 
   it("levels must be unique, ascending, 1..5, with sane deltas", () => {

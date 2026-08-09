@@ -58,6 +58,10 @@
    "curbToCurbM": 16.25,
    "carriageway": "bay-pocket-mid",
    "carriagewayNoteBg": "Тясно платно под колелата и широк джоб в средната далечина: между двадесет и шестия и петдесет и петия метър улицата се разтваря до 24,25 м — това е паркингът пред поликлиниката. После се стеснява обратно, четиридесет метра пред теб.",
+   "crossingKit": "refuge-long-median",
+   "crossingKitNoteBg": "Осров за пешеходци с дълъг разделителен нос: бордюриран остров разделя платното десетки метри преди пътеката.",
+   "parkedSide": "left",
+   "parkedMix": "mixed",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -195,7 +199,8 @@
       55
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "left"
    }
   ]
  },
@@ -207,7 +212,12 @@
    "y": 85,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "island": {
+    "widthM": 2.4,
+    "approachM": 34,
+    "departM": 8
+   }
   }
  ],
  "roundabouts": [],

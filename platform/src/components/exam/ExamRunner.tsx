@@ -15,6 +15,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  POINT_SCALES,
+  pointsBg,
+  pointsWordsBg,
+} from "@/lib/content/pointScales";
 import type { ExamQuestion } from "@/modules/exam";
 import { submitExamAction } from "@/app/(dashboard)/exams/actions";
 import {
@@ -599,8 +604,14 @@ export function ExamRunner({
               This used to be `short:hidden sm:flex`, which is the same set
               expressed as two variants racing on emission order. */}
           <div className="hidden flex-wrap items-center gap-2 wide-tall:flex">
-            <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-black tabular-nums text-muted">
-              {q.points} {q.points === 1 ? "точка" : "точки"}
+            {/* WAS „3 точки" — the desktop twin of the phone pill below, and
+                the same defect spelled out: bare „точки" reads as КОНТРОЛНИ
+                точки. There is room here for the word form. */}
+            <span
+              title={POINT_SCALES.theory.noteBg}
+              className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-black tabular-nums text-muted"
+            >
+              {pointsWordsBg("theory", q.points)}
             </span>
             {q.type === "multi" ? (
               <span className="rounded-full border border-warning/50 px-2.5 py-0.5 text-xs font-bold text-warning">
@@ -665,10 +676,23 @@ export function ExamRunner({
                     the box starts at the top, so they are what a student sees
                     first, and the alternative (outside the box, still in the
                     legend) is a block-level row again. */}
+                {/*
+                  WAS „3 т." — the last bare „т." on the theory side, and the
+                  one a candidate looks at for forty timed minutes.
+
+                  The ABBREVIATED form here, not the word form the desktop meta
+                  row uses: this pill sits inline at the head of the question
+                  text on a phone and the block above measures what a line
+                  costs. „3 т. по теорията" is the same phrase the student
+                  already met on the simulator's micro-quiz chip — one counter,
+                  one wording, both halves of the product — and the scale's
+                  full sentence rides on `title`, as it does there.
+                */}
                 <span
+                  title={POINT_SCALES.theory.noteBg}
                   className="mr-1.5 inline-block rounded-full bg-surface-2 px-2 py-0.5 align-[0.15em] text-[11px] font-black leading-normal tabular-nums text-muted wide-tall:hidden"
                 >
-                  {q.points} т.
+                  {pointsBg("theory", q.points)}
                 </span>
                 {q.type === "multi" ? (
                   <span className="mr-1.5 inline-block rounded-full border border-warning/50 px-2 py-0.5 align-[0.15em] text-[11px] font-bold leading-normal text-warning wide-tall:hidden">
@@ -763,7 +787,19 @@ export function ExamRunner({
               bar is `-mx-4` there or it stops reaching the card's edges and
               grows a 4px seam down both sides. `rounded-b-none` for the same
               reason the card lost its radius. */}
-          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:rounded-b-none max-sm:border-border max-sm:bg-surface/95 max-sm:px-4 max-sm:pt-1.5 max-sm:backdrop-blur max-sm:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))] short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:rounded-b-none short:border-border short:bg-surface/95 short:px-4 short:pt-1.5 short:backdrop-blur short:[padding-bottom:calc(0.375rem+env(safe-area-inset-bottom))] sm:pt-4">
+          {/* `pb-1.5`, NOT `calc(0.375rem + env(safe-area-inset-bottom))`. THE
+              HOME INDICATOR IS PAID FOR ONCE, BY <body>. That calc is right for
+              a `fixed` surface — the navigator sheet below is one and keeps it
+              — but this bar is `sticky` inside the card, inside <main>, inside
+              <body>, and globals.css already pads <body> by exactly the inset.
+              Paid twice it was 34px of dead glass in portrait and 21px in
+              landscape, taken straight off the answers above it, on the surface
+              that runs under a 40-minute clock. Measured before/after on the
+              same page (WebKit, iPhone 16, real insets emulated): the lowest
+              control moved from 41px above the indicator band to 7px above it —
+              the 6px this padding has always claimed — and `q-vehicle-058` in
+              the landscape exam went from 18px of document scroll to 0. */}
+          <div className="mt-auto flex items-center justify-between gap-2 border-t border-border max-sm:sticky max-sm:bottom-0 max-sm:z-20 max-sm:-mx-4 max-sm:-mb-3 max-sm:rounded-b-none max-sm:border-border max-sm:bg-surface/95 max-sm:px-4 max-sm:pb-1.5 max-sm:pt-1.5 max-sm:backdrop-blur short:sticky short:bottom-0 short:z-20 short:-mx-4 short:-mb-3 short:rounded-b-none short:border-border short:bg-surface/95 short:px-4 short:pb-1.5 short:pt-1.5 short:backdrop-blur sm:pt-4">
             {/* The diagram/sign opener once it has stopped being a picture —
                 see `artworkInBar`. `w-auto shrink-0` REPLACES the block's
                 `block w-full` rather than being appended to it: two `w-*`

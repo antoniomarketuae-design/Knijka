@@ -221,10 +221,25 @@ describe("summarizeCalibration", () => {
 
 describe("formatCalibrationError", () => {
   it("always carries the sign, because the sign is the message", () => {
-    expect(formatCalibrationError(-3)).toBe("-3 т.");
-    expect(formatCalibrationError(2)).toBe("+2 т.");
-    expect(formatCalibrationError(0)).toBe("0 т.");
-    expect(formatCalibrationError(-1.26)).toBe("-1.3 т.");
+    expect(formatCalibrationError(-3)).toBe("-3 изпитни т.");
+    expect(formatCalibrationError(2)).toBe("+2 изпитни т.");
+    expect(formatCalibrationError(0)).toBe("0 изпитни т.");
+    expect(formatCalibrationError(-1.26)).toBe("-1.3 изпитни т.");
+  });
+
+  /**
+   * …AND ALWAYS CARRIES THE SCALE. This string is rendered on the calibration
+   * gate directly under „6 изпитни т. / 20 изпитни т.", and it read „−14 т." —
+   * the same bare unit the founder took for контролни точки off his licence.
+   * It survived the sim-side source scan because it is composed in THIS module
+   * and only displayed over there; it was caught by photographing the screen.
+   */
+  it("names the scale — a bare „т.“ here reads as контролни точки", () => {
+    expect(formatCalibrationError(-14)).toContain("изпитни т.");
+    expect(formatCalibrationError(-14)).not.toMatch(/^-?\+?\d+([.,]\d+)? т\.$/);
+    // точка is feminine singular, and it stays feminine when abbreviated.
+    expect(formatCalibrationError(1)).toBe("+1 изпитна т.");
+    expect(formatCalibrationError(-1)).toBe("-1 изпитна т.");
   });
 });
 

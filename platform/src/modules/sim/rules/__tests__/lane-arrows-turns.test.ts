@@ -43,7 +43,7 @@ describe("M-17a — WRONG_LANE_FOR_DIRECTION (М10 lane arrows)", () => {
   it("turning left out of a „само направо“ lane grades the marking, not the signal", () => {
     const { events } = drive(approachAndTurn("through", "left"));
     expect(codes(events)).toEqual(["WRONG_LANE_FOR_DIRECTION"]);
-    expect(events[0]).toMatchObject({ severityClass: "osnovna", points: 3, lawRef: "ЗДвП чл. 6" });
+    expect(events[0]).toMatchObject({ severityClass: "osnovna", points: 3, lawRef: "ЗДвП чл. 6, т. 1" });
   });
 
   it("turning left out of the „само наляво“ lane grades nothing", () => {

@@ -33,6 +33,21 @@ bx=-cx, by=cz, bz=cy+0.55; mount yaw-pi / y-0.55 untouched):
       into the six LEGACY materials only - int_emissive / int_chrome stay out
       of the atlas per doc 73 SS6) and exports the INT collection.
 
+THE SHIPPED GLB IS NOT THIS SCRIPT'S OUTPUT VERBATIM — READ BEFORE RE-EXPORTING.
+Founder register B58 (2026-08-09) raised the WHOLE interior-mirror station by
+105 mm: the `hotspot_mirror_rear` node plus the 168 interior_shell vertices that
+are the mirror casing, the P1-16 dress and the stalk. The В26 «50» that the
+speed lessons' instruction 2 tells the student to read sat behind the mirror at
+every distance on the approach, and the founder chose to move the mirror rather
+than lower the drills' signs.
+
+That edit is applied POST-EXPORT by `tools/glb/raise_interior_mirror.mjs`, which
+carries the derivation and refuses to run twice. It is NOT in this script,
+because the mirror's base position comes from hero_interior_v2.py and this file
+only dresses it. So: after any re-export, run that tool, or the mirror drops
+back onto the sign and VitokCockpit's ROOF_Y / STALK block and
+scene/vitok/hotspots.ts will all be 105 mm out.
+
 MEASURED-TRUTH DEVIATIONS from doc-73 nominal coords (the black-slab lesson:
 the shipped asset outranks the spec's assumed surfaces; each was re-derived by
 raycast against the v2 shell at build time):

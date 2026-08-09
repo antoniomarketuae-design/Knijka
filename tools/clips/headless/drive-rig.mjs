@@ -58,6 +58,11 @@ const QUALITY = opt("quality", "medium");
 const PRE_KEYS = (opt("pre", "KeyB") || "").split(",").filter(Boolean);
 /** 0 disables the auto-acknowledge of teach/quiz cards (leave them on screen). */
 const ACK = opt("ack", "1") !== "0";
+/**
+ * `--fullscreen on|off` — the state the shell is FORCED into before anything
+ * is measured. Default `on`, which is what a student gets. See settleFullscreen.
+ */
+const FULLSCREEN = opt("fullscreen", "on");
 
 let SCRIPT = opt("script", null);
 if (SCRIPT && SCRIPT.startsWith("@")) SCRIPT = readFileSync(SCRIPT.slice(1), "utf8");
@@ -110,6 +115,78 @@ function table(dump, every) {
     );
   }
   return lines.join("\n");
+}
+
+/**
+ * FORCE THE FULLSCREEN STATE, THEN SAY WHAT THE CANVAS ACTUALLY IS.
+ *
+ * `LessonPlayShell` asks for fullscreen in a MOUNT EFFECT, and the Fullscreen
+ * API only grants that while the click that navigated here still counts as
+ * transient user activation. A headless run has no click. Chrome therefore
+ * grants it sometimes and rejects it other times, and the shell lays out
+ * differently either way — measured on identical invocations of this rig, the
+ * canvas came back 1264×620 on one run and 1028×577 on the next. EVERY frame
+ * and every pixel measurement this project publishes is taken through that,
+ * and nothing was pinning it.
+ *
+ * A synthetic `window.__driveRig.press("KeyX")` cannot fix it: a script-made
+ * KeyboardEvent is not trusted and carries no activation, so the request is
+ * refused. `page.keyboard.press` goes through CDP `Input.dispatchKeyEvent` and
+ * IS trusted — that is the whole reason this uses the real keyboard for one
+ * key while the drive itself uses the rig's injector.
+ *
+ * The state is then VERIFIED, not assumed, and the achieved geometry is logged
+ * beside every run so a frame can be read against the size it was taken at.
+ * Refusing to settle is a soft failure: an unpinned geometry is exactly the
+ * kind of quiet variance that makes two runs disagree and nobody able to say
+ * why.
+ */
+async function settleFullscreen(page, want, softFailures) {
+  const read = () =>
+    page.evaluate(() => {
+      const c = document.querySelector("canvas");
+      const r = c ? c.getBoundingClientRect() : null;
+      return {
+        fs: document.fullscreenElement !== null,
+        supported: typeof document.documentElement.requestFullscreen === "function",
+        w: r ? Math.round(r.width) : 0,
+        h: r ? Math.round(r.height) : 0,
+        dpr: window.devicePixelRatio,
+      };
+    });
+
+  const target = want !== "off";
+  let state = await read();
+  if (state.fs !== target) {
+    if (!state.supported && target) {
+      softFailures.push("fullscreen: the browser has no Element.requestFullscreen — geometry unpinned");
+      log(`  fullscreen UNAVAILABLE — canvas ${state.w}x${state.h} is not pinned`);
+      return state;
+    }
+    // A trusted key press. The shell binds KeyX -> toggleFullscreen.
+    await page.keyboard.press("KeyX");
+    try {
+      await page.waitForFunction(
+        (t) => (document.fullscreenElement !== null) === t,
+        target,
+        { timeout: 5000 },
+      );
+    } catch {
+      /* fall through to the verify below — it reports the real state */
+    }
+    state = await read();
+  }
+
+  if (state.fs !== target) {
+    softFailures.push(
+      `fullscreen: asked for ${target ? "ON" : "OFF"}, got ${state.fs ? "ON" : "OFF"} — ` +
+        `canvas geometry is NOT pinned for this run`,
+    );
+    log(`  fullscreen NOT SETTLED (wanted ${target ? "on" : "off"}) — canvas ${state.w}x${state.h}`);
+  } else {
+    log(`  fullscreen ${state.fs ? "ON" : "OFF"} (forced) — canvas ${state.w}x${state.h} @dpr ${state.dpr}`);
+  }
+  return state;
 }
 
 async function main() {
@@ -166,6 +243,9 @@ async function main() {
   // The scene keeps keyboard focus on the document; a stray focused element
   // would eat the synthetic glance keys.
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+
+  // Pin the geometry BEFORE the first frame is taken (see settleFullscreen).
+  const viewportState = await settleFullscreen(page, FULLSCREEN, softFailures);
 
   for (const code of PRE_KEYS) {
     await page.evaluate((c) => {
@@ -260,6 +340,10 @@ async function main() {
   shots += 1;
 
   const dump = await page.evaluate(() => window.__driveRig.dump());
+  // The geometry every frame in this run was measured through, stored WITH the
+  // telemetry — a PNG whose canvas size is not recorded cannot be compared to
+  // the next one.
+  dump.viewport = { requested: FULLSCREEN, ...viewportState };
   writeFileSync(join(OUT, `${TAG}-telemetry.json`), JSON.stringify(dump, null, 2));
 
   // INTEGRITY CHECK. The session clock is monotonic per SimTick's contract, so
@@ -278,7 +362,11 @@ async function main() {
     );
   }
 
-  console.log(`\n=== ${dump.meta.lessonId} — ${dump.meta.sampleCount} samples, ${dump.events.length} events, ${shots} frames ===\n`);
+  console.log(
+    `\n=== ${dump.meta.lessonId} — ${dump.meta.sampleCount} samples, ${dump.events.length} events, ` +
+      `${shots} frames @ canvas ${viewportState.w}x${viewportState.h} ` +
+      `(fullscreen ${viewportState.fs ? "on" : "off"}, asked ${FULLSCREEN}) ===\n`,
+  );
   console.log(table(dump, EVERY));
   console.log("\n--- step log ---");
   for (const l of dump.script.log) {

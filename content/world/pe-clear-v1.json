@@ -58,6 +58,10 @@
    "curbToCurbM": 16.25,
    "carriageway": "bays-from-the-seat",
    "carriagewayNoteBg": "Единствената отсечка, по която потегляш върху широко платно и то остава широко: 46 м по 24,25 м с паркинг джобове пред витрините и коли, спрели непосредствено вдясно от теб. Стеснението е чак на тридесет и един метра.",
+   "crossingKit": "raised-table",
+   "crossingKitNoteBg": "Повдигната пешеходна пътека: платното носи маркировка на рампа от двете страни на пътеката — зъбци и напречна линия на площадката.",
+   "parkedSide": "both",
+   "parkedMix": "mixed",
    "carriagewaySegments": [
     {
      "id": "pe-e-street-s1",
@@ -163,7 +167,8 @@
       46
      ]
     ],
-    "parkingBand": true
+    "parkingBand": true,
+    "parkingSide": "both"
    },
    {
     "id": "pe-e-collector",
@@ -200,7 +205,8 @@
    "y": 90,
    "kind": "marked",
    "signalized": false,
-   "edgeId": "pe-e-street"
+   "edgeId": "pe-e-street",
+   "tableRampM": 3
   }
  ],
  "roundabouts": [],

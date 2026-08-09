@@ -242,9 +242,9 @@ export function StaticWorld({
   // fetched at all, so normalMap/roughnessMap/aoMap come back null and the
   // authored material constants below take over.
   const budget = TEXTURE_BUDGETS[preset.level];
-  const asphalt = usePbrSet("road", budget.groundMaps, preset.anisotropy, gl);
-  const concrete = usePbrSet("sidewalk", budget.groundMaps, preset.anisotropy, gl);
-  const grass = usePbrSet("ground", budget.groundMaps, preset.anisotropy, gl);
+  const asphalt = usePbrSet("road", budget.groundMaps, preset.groundAnisotropy, gl);
+  const concrete = usePbrSet("sidewalk", budget.groundMaps, preset.groundAnisotropy, gl);
+  const grass = usePbrSet("ground", budget.groundMaps, preset.groundAnisotropy, gl);
   // Baked facade bay sets (facade_atlas.py) — shared with the instanced kit
   // towers (CityBuildings wires the same cache onto the GLB materials, and
   // MUST pass the same mode: one cache entry, one GPU copy).

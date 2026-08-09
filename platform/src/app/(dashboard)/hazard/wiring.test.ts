@@ -99,7 +99,7 @@ function itemSource(id: string): HazardItemSource {
     hazardBg: "Дете зад паркиран бус.",
     developingBg: "Топка излиза на платното преди детето.",
     violationCode: "PEDESTRIAN_CROSSING_TOO_FAST",
-    lawRefEcho: "ЗДвП чл. 119",
+    lawRefEcho: "ЗДвП чл. 119, ал. 1",
     notesBg: "",
   };
 }

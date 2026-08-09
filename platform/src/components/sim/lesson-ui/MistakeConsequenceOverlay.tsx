@@ -25,7 +25,14 @@ import { useEffect } from "react";
 import { IconArrowRight, IconShield } from "@/components/icons";
 import { traceUrlForRepoPath } from "@/modules/clips/view";
 import type { MistakeDemo, TeachMoment } from "@/modules/sim/lessons";
-import { VIOLATIONS, type SeverityClass, type ViolationSpec } from "@/modules/sim/rules";
+import {
+  EXAM_POINTS_SHORT_NOTE_BG,
+  VIOLATIONS,
+  examMarkCitationBg,
+  minusPointsBg,
+  type SeverityClass,
+  type ViolationSpec,
+} from "@/modules/sim/rules";
 
 const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
   ssr: false,
@@ -126,9 +133,12 @@ export function MistakeConsequenceOverlay({
               Преживей грешката — пауза. Нищо от това не се брои в резултат.
             </p>
           </div>
+          {/* THE STAKE, WITH ITS SCALE. This card is a rehearsal — nothing here
+              is scored — so the number is what a repeat in a GRADED drive would
+              cost on the изпитен лист, and it says which sheet that is. */}
           <span className="ml-auto shrink-0 rounded-full border border-danger/50 bg-danger/10 px-2.5 py-1 text-[11px] font-bold text-danger">
             {SEVERITY_LABEL_BG[severity]}
-            {points !== undefined ? ` · −${points} т.` : ""}
+            {points !== undefined ? ` · ${minusPointsBg("exam", points)}` : ""}
           </span>
         </div>
 
@@ -140,13 +150,27 @@ export function MistakeConsequenceOverlay({
             <p className="mt-2 text-sm leading-relaxed text-foreground">
               {demo.whatWentWrongBg}
             </p>
-            {lawRef ? (
-              <span className="mt-3 inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
-                {lawRef}
-              </span>
-            ) : null}
+            {/* The rule and the mark are two different citations. The chip used
+                to carry only the rule, next to a point figure it does not set. */}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {lawRef ? (
+                <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                  правило: {lawRef}
+                </span>
+              ) : null}
+              {points !== undefined ? (
+                <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                  оценка: {examMarkCitationBg(severity)}
+                </span>
+              ) : null}
+            </div>
             <div className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3">
               <p className="text-sm leading-relaxed">{CONSEQUENCE_FRAMING_BG[severity]}</p>
+              {points !== undefined ? (
+                <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                  {EXAM_POINTS_SHORT_NOTE_BG}
+                </p>
+              ) : null}
             </div>
           </div>
 

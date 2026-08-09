@@ -34,7 +34,7 @@ export function makeItemSource(
     hazardBg: "Опасността беше X.",
     developingBg: "Ето какво я издаваше.",
     violationCode: "PEDESTRIAN_CROSSING_TOO_FAST",
-    lawRefEcho: "ЗДвП чл. 119",
+    lawRefEcho: "ЗДвП чл. 119, ал. 1",
     notesBg: "",
     ...overrides,
   };

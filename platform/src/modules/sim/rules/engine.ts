@@ -41,6 +41,7 @@
  */
 
 import { makeCommendation, makeViolation } from "./catalog";
+import { encodeSpeedMeasurement } from "./consequences";
 import {
   DEFAULT_RULE_CONFIG,
   type LaneArrow,
@@ -876,6 +877,12 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const limit = tick.maxSpeedKmh;
   const bands = speedingBands(limit, cfg);
   const speedReset = speed <= limit;
+  // THE TWO NUMBERS THE CONVICTION USED TO THROW AWAY. Both speeding codes hold
+  // the speed and the limit at the instant they fire, and used to emit neither,
+  // so every downstream surface could say only „here is чл. 182's whole table".
+  // Carried as `detail` (see consequences.ts encodeSpeedMeasurement) so
+  // `deriveSpeedingBand` can name the student's own rung.
+  const speedDetail = encodeSpeedMeasurement(speed, limit);
   if (
     stepSustainedEpisode(
       s.speedingMinor,
@@ -887,7 +894,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.speedingRepeatSec,
     )
   ) {
-    events.push(makeViolation("SPEEDING_OVER_LIMIT", t));
+    events.push(makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }));
   }
   if (
     stepSustainedEpisode(
@@ -900,7 +907,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       cfg.speedingRepeatSec,
     )
   ) {
-    events.push(makeViolation("SPEEDING_DANGEROUS", t));
+    events.push(makeViolation("SPEEDING_DANGEROUS", t, { detail: speedDetail }));
   }
 
   const moving = speed > cfg.movingSpeedKmh;
@@ -1264,7 +1271,20 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    not this one (one act, one code);
   //  - reverse maneuvering and the standstill are exempt (stopping on a
   //    motorway is its own future story — descoped honestly).
-  const inEmergencyLane = tick.emergencyLaneRight === true && tick.laneId === 0;
+  // THE MOTORWAY GATE, added 2026-08-09 with the Наредба № 38 re-grounding of
+  // EMERGENCY_LANE_DRIVING (see rules/n38.ts). The cited article opens with its
+  // own condition — „Чл. 58. ПРИ ДВИЖЕНИЕ ПО АВТОМАГИСТРАЛА на водача е
+  // забранено: … 4. … да се движи … в лентата за принудително спиране" — and
+  // the detector armed on an authored `emergencyLane` span ALONE. All three
+  // spans that exist today (mw-v1, mw-entry-v1, mw-exit-v1) sit on
+  // `motorway: true` edges, so this is byte-identical on shipped content; what
+  // it forbids is the future case where the span is authored on an urban
+  // street and a 10-point charge fires citing a motorway-only article. The
+  // 10 rests on the lane's LEGAL PURPOSE (see n38.ts), and that purpose is a
+  // motorway fact — so the arming condition and the citation are now the same
+  // road, by construction rather than by authoring luck.
+  const inEmergencyLane =
+    tick.emergencyLaneRight === true && tick.laneId === 0 && tick.motorway === true;
   const motorwayCrawl =
     cfg.motorwayMinSpeedEnabled &&
     tick.motorway === true &&
@@ -1299,7 +1319,10 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    firm braking toward a stop pauses the clock, and the STOP itself never
   //    grades here (v ≤ movingSpeedKmh disarms — stopping is descoped);
   //  - a degenerate span on a single-lane road never convicts (laneCount > 1
-  //    — the busLane guard, mirrored), reverse maneuvering is exempt.
+  //    — the busLane guard, mirrored), reverse maneuvering is exempt;
+  //  - 2026-08-09: the span must ALSO be on an authored motorway edge — the
+  //    cited article is expressly conditioned on „при движение по
+  //    автомагистрала" (see `inEmergencyLane` above and rules/n38.ts).
   // Reset on leaving the lane or the span — one bill per excursion.
   const emergencyLaneDriving =
     inEmergencyLane &&

@@ -162,6 +162,61 @@ would be a lie, so each device profile carries the **real** device insets
 those as the unsafe bands, while still reporting what `env()` actually returned
 and whether the app's stylesheets reference `safe-area-inset` at all.
 
+---
+
+## The ninth instrument defect: the whole harness ran at inset 0
+
+Carrying the real numbers in `devices.mjs` was only half the job, and the half
+that was missing is the one that decides layout. The **app** still laid out at
+`env(safe-area-inset-*) = 0`, because that is what the engine returns — so
+"is this control inside the notch band" was asked of a document that had never
+heard of a notch, and every fold, screen-share and „20 of 20" number this
+project has produced describes a phone with no cutout and no home indicator.
+
+On the founder's iPhone 16 that is **34 px of height in portrait** and **118 px
+of width plus 21 px of height in landscape** that no measurement ever charged.
+Parity was won by roughly the margin the insets eat: with them present, both
+runners scored **0 of 20 in both orientations** — and not by 34 px of scroll,
+but because the question text was clamped to its 62 px floor on most items.
+
+`lib/insets.mjs` closes it. `env()` cannot be given a value from outside the
+engine, so instead **every place the authored CSS asks for
+`env(safe-area-inset-X)` is rewritten, in the page, to the profile's real
+number for X, before the document's first layout** — CSSOM declarations (all
+of them, including nested / `@media` / `@layer` / `adoptedStyleSheets`) and the
+`style=""` attributes React writes on the shell, re-applied whenever React puts
+them back.
+
+```bash
+node tools/mobile/cli.mjs                          # real insets — the default
+node tools/mobile/fold-sweep.mjs --insets none     # the OLD, notch-less run
+node tools/mobile/fold-sweep.mjs --rotation left   # cutout on ONE side only
+```
+
+Three properties make it a measurement rather than a hope:
+
+* **`newDeviceContext()` is the only door.** `insets.test.mjs` fails on any
+  `.newContext(` under `tools/mobile` that is not preceded by an
+  `// insets-exempt: <reason>` comment. The defect was never a wrong number; it
+  was that opening a context was a one-liner that said nothing about the notch,
+  so six probes independently did the same wrong thing. It caught a seventh
+  (`engprog-look.mjs` hand-rolling 393×852) the first time it ran.
+* **It must be able to fail.** `assertInsetsApplied()` refuses a page where the
+  agent rewrote zero declarations, or where `<body>`'s padding did not end up at
+  the asked-for inset — because "rewrote nothing" and "this phone has no notch"
+  are the same reading, and one of them is the defect.
+* **Both numbers are always printed.** The engine's own `env()` is still 0 and
+  every report says so next to the emulated values. This substitutes values; it
+  does not invent geometry, and a hard-coded pixel that happens to equal an
+  inset is untouched.
+
+**Landscape rotation is a real question with a stated answer.** Held sideways
+the cutout is on one physical side and which one depends on which way you
+turned the phone. iOS publishes both `left` and `right` as the inset (so a page
+lays out centred), which is also the harder case — 118 px gone instead of 59 —
+so `symmetric` is the default and the run prints which it used. `--rotation
+left|right` measures the single-sided version.
+
 **Screenshots** — one PNG per route × device, under `tools/mobile/.out/`, which
 is gitignored (capture directories have been committed by accident twice in this
 repo). Failures are captured too, named `FAILED__*`.

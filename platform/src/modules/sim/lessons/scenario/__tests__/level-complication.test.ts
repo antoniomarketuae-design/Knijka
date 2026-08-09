@@ -43,6 +43,16 @@ import type { RungAddition, ScenarioLevel, ScenarioSpec } from "../types";
 
 const LIGHTS_COPY = /светлин|фаров/i;
 
+/**
+ * The negative control for `validateScenarioSpec`'s citation check: a string
+ * that is deliberately NOT a citation. A NAMED CONSTANT rather than a literal
+ * at the `lawRef:` site, because `modules/sim/__tests__/law-citations.test.ts`
+ * scans the literals at those sites and resolves them against `content/law` —
+ * a specimen that exists here to be rejected would read there as a defect.
+ * One use, one name, and the name says what it is.
+ */
+const NOT_A_CITATION = "the highway code";
+
 /** Every rung of every template, paired with the authored rung BELOW it. */
 function rungPairs(spec: ScenarioSpec): Array<{ level: ScenarioLevel; below: ScenarioLevel }> {
   const out: Array<{ level: ScenarioLevel; below: ScenarioLevel }> = [];
@@ -369,7 +379,7 @@ describe("validateScenarioSpec refuses copy that could not teach", () => {
       adds: ["grip"],
       titleBg: "Мокър паваж",
       coachBg: "Тук описваме какво точно се променя и какво прави шофьорът с това.",
-      lawRef: "the highway code",
+      lawRef: NOT_A_CITATION,
     };
     expect(validateScenarioSpec(s).join("\n")).toMatch(/must cite ЗДвП/);
   });

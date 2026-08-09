@@ -4,6 +4,7 @@
  */
 export type {
   ControlPointsPenalty,
+  DisqualificationPenalty,
   ExamPointsPenalty,
   FigureStatus,
   FineInstrument,
@@ -16,6 +17,7 @@ export type {
   LawUnit,
   PenaltyBank,
   PenaltyCitation,
+  PenaltyConduct,
   PenaltyEntry,
   SourceCoverage,
 } from "./types";
@@ -23,7 +25,9 @@ export type {
 export {
   ACT_IDS,
   actIdForActName,
+  ANNEX_RE,
   describeControlPoints,
+  describeDisqualification,
   describeExamPoints,
   describeFine,
   formatCitation,
@@ -32,15 +36,37 @@ export {
   getLawCorpus,
   getPenalty,
   getSource,
+  isSupersededSnapshot,
   listPenalties,
   normaliseForMatch,
   normaliseUnitRef,
+  offencePhraseMatchesConduct,
   penaltiesForArticle,
   resetLawCorpus,
   resolveCitation,
   resolveLawRef,
+  SNAPSHOT_ACT_IDS,
   verifyCitations,
   type ActId,
   type FigureDisplay,
   type LawCorpus,
 } from "./corpus";
+
+/**
+ * The prose gate. The citation freeze pins a row's `lawRefs` and a figure's
+ * `quoteBg`; this checks the NUMBERS inside the sentences next to them, which
+ * nothing could see before — see `../proseFigures.ts` for the four ways a
+ * number is allowed to be accounted for.
+ */
+export {
+  BGN_PER_EUR_BG,
+  GROUNDING_LEDGER,
+  evidenceForCitation,
+  evidenceForLawRefs,
+  evidenceFromSentence,
+  penaltyProseRows,
+  runProseGate,
+  type NoteDeclarations,
+  type ProseGateResult,
+  type ProseGateRow,
+} from "./proseGate";

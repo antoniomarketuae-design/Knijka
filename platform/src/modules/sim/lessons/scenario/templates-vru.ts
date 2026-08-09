@@ -835,14 +835,52 @@ export const SC_VU_DOOR_ZONE: ScenarioSpec = {
   success: [
     {
       id: "sc-vud-row",
-      titleBg: "Премини покрай редицата с дистанция от вратите",
-      // Mid-row checkpoint on the discipline line, at calm pace.
-      params: { kind: "reachZone", x: VUD_CLEAR_X, y: 175, radiusM: 6, maxSpeedKmh: 40 },
+      titleBg: "Подмини вратата по своята линия — без да излизаш в насрещното",
+      /**
+       * THE GATE THAT MEASURES WHAT ITS TITLE PROMISES (doc 87, 2026-08-09).
+       *
+       * This was `(2.6, 175) r 6, ≤40` and it was titled „премини покрай
+       * редицата с дистанция от вратите". It measured neither half of that.
+       * A radius-6 disc on an 8.125 m lane accepts x ∈ [−3.4, 8.6]: the whole
+       * carriageway, the ONCOMING bank past the М1, and the door swing itself.
+       * And it sat at y = 175 — nineteen metres PAST the door at y = 156,
+       * which is the one place on this street where the student's line is the
+       * lesson.
+       *
+       * It was found by the Наредба № 38 re-baseline: `CROSSED_SOLID_LINE` was
+       * carrying an unlawful 10-point опасна charge, and when that came off,
+       * the „рязко избягване през непрекъснатата линия" mistake demo PASSED
+       * the drill — it dives to x = −1.2 across the осева, comes back, and
+       * ticks every gate the template authored. The severity had been doing
+       * the objectives' job; the drill never encoded „не пресичай осевата" at
+       * all. `s10-vru-pack-bot-completion.test.ts` pinned that hole on purpose
+       * so that closing it would go red here.
+       *
+       * Closed by moving the gate ONTO the door and shrinking it to the band
+       * the lesson actually teaches. At (2.6, 156) r 2.2 the acceptance is
+       * x ∈ [0.4, 4.8]:
+       *   left bound  — right of the М1 осева at x = 0: the swerve is out.
+       *   right bound — 1.05 m clear of the parked flank at x = 5.85: the hug
+       *                 line at 4.6 is still inside (it fails on the door it
+       *                 hits, which is ITS honest code), but a car any further
+       *                 over is in the swing.
+       * Measured against the three committed drives at y = 156: shadow 0.00 m
+       * off centre, hug 2.00, swerve 3.7+ — and the L1 ladder widens 2.2 to
+       * 3.3, still short of the swerve. No `maxSpeedKmh`: a cap would arm the
+       * evaluator's grace CAPSULE, and this gate is about lateral position, the
+       * one thing a capsule stretched down the approach must not forgive. The
+       * pace contract moved to the finish gate below, where it costs nothing.
+       */
+      params: { kind: "reachZone", x: VUD_CLEAR_X, y: 156, radiusM: 2.2 },
     },
     {
       id: "sc-vud-finish",
-      titleBg: "Продължи до края на улицата",
-      params: { kind: "reachZone", x: VUD_LANE_X, y: 270, radiusM: 9 },
+      titleBg: "Върни се плавно в средата на лентата и продължи до края",
+      // The row's pace contract lives here now (see sc-vud-row): past the row
+      // the street is straight and empty, so a cap is a pace check rather than
+      // a position trap, and the terminal gate is where the evaluator's grace
+      // capsule is designed to be forgiving.
+      params: { kind: "reachZone", x: VUD_LANE_X, y: 270, radiusM: 9, maxSpeedKmh: 40 },
     },
   ],
   rubric: { parTimeSec: 55 },

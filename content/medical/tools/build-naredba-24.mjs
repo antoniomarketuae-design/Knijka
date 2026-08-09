@@ -9,6 +9,31 @@
  * Source text: lex.bg consolidated through ДВ, бр. 114 от 24.12.2025 г.
  * NOT the ДАБДП PDF, which still serves the pre-2025 redaction.
  *
+ * WHERE THE ACT ENDS AND THE WEBSITE BEGINS (fixed 2026-08-09).
+ * `naredba24_lex.txt` is the whole lex.bg PAGE flattened to lines, not the act:
+ * the first 20 lines are the site's navigation and the last 48 are its sidebar
+ * — news headlines with datestamps, forum threads, a „Хумор" section, a
+ * newsletter box and the copyright line. The navigation never leaked, because
+ * it arrives before the first unit exists to append to. The SIDEBAR did, all
+ * 1,062 characters of it, straight into `приложение № 2 към чл. 12` — 10.8% of
+ * the emitted act — because that annex is REPEALED and therefore has no body of
+ * its own to stop the walk. Emitted, `getArticle("naredba-24", "приложение № 2")`
+ * would have handed a student a lex.bg forum post, and `LawActSchema` would not
+ * have blinked: it is a valid string.
+ *
+ * Two independent stops, because one is a guess and two is a rule:
+ *   1. A REPEALED UNIT IS COMPLETE at its „(Отм. - ДВ, …)" line. That is what
+ *      repealed means on lex.bg — a heading and that line, no body. Structural,
+ *      and it is what actually went wrong here.
+ *   2. THE PAGE FURNITURE ENDS THE DOCUMENT. Once the act has started, a line
+ *      that is exactly one of the sidebar's own headings is the website talking.
+ * And then a REFUSAL: the emitted units are scanned for furniture signatures
+ * and the build throws rather than write. Same discipline as the „чл. 9 did not
+ * parse" guard below — a silent trim is how this got in.
+ * `platform/src/lib/content/law/pageFurniture.test.ts` asserts the same
+ * property over EVERY act in `content/law/acts/`, loaded or not, so the next
+ * ingest cannot reintroduce the class.
+ *
  * Usage, from content/medical/tools/:
  *   node build-naredba-24.mjs ../../law
  */
@@ -36,8 +61,41 @@ const push = () => {
   }
 };
 
+/**
+ * The lex.bg sidebar's own section headings, as whole lines. The first one to
+ * appear after the act has begun is where the page stops being the act.
+ * („НОВИНИ"/„ФОРУМ"/„ХУМОР" in caps are the TOP navigation and appear before
+ * any unit exists, so they need no handling — they are listed for the reader.)
+ */
+const PAGE_FURNITURE_HEADINGS = new Set([
+  "Новини",
+  "Спектър",
+  "Форум",
+  "Хумор",
+  "Бюлетин",
+  "Посети форума",
+  "Виж всички",
+]);
+
+/** A repealed unit is a heading and this line. Nothing follows it. */
+const REPEALED_RE = /^\(Отм\.\s*[-–—]/;
+
 let context = null;
+let ended = false;
 for (const line of clean) {
+  if (ended) continue;
+  if (units.length > 0 && PAGE_FURNITURE_HEADINGS.has(line)) {
+    push();
+    ended = true;
+    continue;
+  }
+  if (current && REPEALED_RE.test(line)) {
+    // Close it HERE: whatever comes next belongs to the next unit or to the
+    // website, never to a repealed one.
+    current.lines.push(line);
+    push();
+    continue;
+  }
   if (/^(Заключителни разпоредби|КЪМ НАРЕДБА ЗА ИЗМЕНЕНИЕ)/.test(line)) {
     push();
     context = "Заключителни разпоредби";
@@ -89,5 +147,35 @@ const act = {
 };
 
 if (!act.units.some((u) => u.ref === "чл. 9")) throw new Error("чл. 9 (the syllabus) did not parse — refusing to emit");
+
+/**
+ * THE REFUSAL. Signatures of a web page rather than a statute. Each one was
+ * present in the 1,062 characters that shipped, and none of them can occur in
+ * the text of a наредба.
+ */
+const FURNITURE_SIGNATURES = [
+  [/\d{1,2}\.\d{1,2}\.\d{4}\s+\d{1,2}:\d{2}/, "a news datestamp (dd.mm.yyyy hh:mm)"],
+  [/^\d{4}-\d{2}-\d{2}$/m, "an ISO date on its own line"],
+  // NOT `\bмнения\b`: JavaScript's `\b` is ASCII-only, so it never fires on a
+  // Cyrillic word and this signature silently matched nothing. Caught by the
+  // negative control in pageFurniture.test.ts, which is what it is for.
+  [/(?<![А-Яа-яA-Za-z])мнения(?![А-Яа-яA-Za-z])/, "a forum thread's reply count"],
+  [/Посети форума|Виж всички|Отписване/, "a sidebar call to action"],
+  [/Lex\.bg|политика за поверителност|общи условия/, "the site footer"],
+  [/^Хумор$/m, "the „Хумор“ section"],
+  [/информационен e-mail бюлетин/, "the newsletter box"],
+];
+const dirty = [];
+for (const u of act.units) {
+  for (const [re, what] of FURNITURE_SIGNATURES) {
+    if (re.test(u.textBg)) dirty.push(`  ${u.ref}: ${what}`);
+  }
+}
+if (dirty.length > 0) {
+  throw new Error(
+    `page furniture in ${dirty.length} place(s) — refusing to emit an act that would ` +
+      `hand a student a lex.bg forum post:\n${dirty.join("\n")}`,
+  );
+}
 writeFileSync(path.join(OUT, "acts", "naredba-24.json"), JSON.stringify(act, null, 1) + "\n", "utf8");
 console.log(`acts/naredba-24.json: ${act.units.length} units — ${act.units.map((u) => u.ref).join(", ")}`);

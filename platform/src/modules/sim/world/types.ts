@@ -74,6 +74,34 @@ export interface DistrictEdge {
    * ⇒ the class decides, i.e. every map written before the tag is unchanged.
    */
   parkingBand?: boolean;
+  /**
+   * WHICH KERB the procedural parked row stands on (doc 87 B50/B53/B54).
+   *
+   * The band itself is symmetric by construction — `builders/roads`
+   * `ribbonCrossSection` mirrors it about the centreline — but the curb pass
+   * that fills it took the right-hand normal and nothing else, so the bay was
+   * DRAWN on both sides and FILLED on one, on every district in the product.
+   * Measured on the PE family: all 16 bodies of the six bayed districts stood
+   * at x = +10.13 and the left band was empty tarmac six streets deep.
+   *
+   * Absent ⇒ `"right"` (byte-identical to every map written before the tag).
+   * Consumed by `traffic/TrafficLayer.parkedSideOf`; the world builder does
+   * not read it — the band's WIDTH is unchanged either way, so no kerb, kerb
+   * collider, pavement, frontage or lane centre moves.
+   */
+  parkingSide?: "left" | "right" | "both";
+  /**
+   * WHAT KIND of vehicle stands at that kerb (doc 87 B50/B53/B54).
+   *
+   * `parkingSide` answers which kerb is empty; this answers what fills the one
+   * that is not. The curb pass draws from a single weighted pool, so the row
+   * outside a freight depot gate and the row in a между-блоково courtyard are
+   * the same mix of hatchbacks and saloons — and a kerb of hatchbacks looks
+   * like a kerb of hatchbacks from the driving seat, whatever the street is
+   * called. One of `traffic/TrafficLayer.PARKED_MIXES`; absent ⇒ the unbiased
+   * pool. Selection only: the SAME bodies stand at the SAME stations.
+   */
+  parkingMix?: string;
 }
 
 export interface DistrictIntersection {
@@ -86,6 +114,35 @@ export interface DistrictIntersection {
 
 export type CrossingKind = "signals" | "marked" | "unmarked" | "unknown";
 
+/**
+ * CENTRAL REFUGE ISLAND / MEDIAN NOSE at a crossing (doc 87 B50/B53/B54 — the
+ * остров).
+ *
+ * WHY IT IS A SCHEMA FIELD AND NOT A BUILDING. It was tried as an authored
+ * volume and it cannot work: `builders/cityBuildings.DATA_HEIGHT_MIN_M` is 3 m
+ * and clamps EVERY footprint up to it, so a 0.3 m island renders as a three
+ * metre wall across the road. Nothing else in district-v1 could express a
+ * median, a refuge, a raised table, a staggered or an angled crossing either —
+ * `DistrictCrossing` was `{id,x,y,kind,signalized,edgeId}` — which is why half
+ * the variety brief was undeliverable from the map generators.
+ *
+ * The island is built into the SIDEWALK mesh (`builders/markings`
+ * `buildCrossingFurniture`), which is also the kerb collider, so a car cannot
+ * mount it — the same construction the roundabout central island already uses.
+ * It is centred on the edge's CENTRELINE and it never widens the carriageway,
+ * so no lane centre, kerb, pavement or frontage moves: on a two-lane
+ * perceptual street the lane centres stay at ±4.06 m and a 2.4 m island
+ * (±1.2 m) leaves 2.86 m of clearance to the driven rail.
+ */
+export interface DistrictCrossingIsland {
+  /** Full width across the road, m — centred on the edge centreline. */
+  widthM: number;
+  /** How far the nose reaches BACK along the edge toward the approach, m. */
+  approachM: number;
+  /** How far it reaches PAST the crossing, m. */
+  departM: number;
+}
+
 export interface DistrictCrossing {
   id: string;
   x: number;
@@ -93,6 +150,34 @@ export interface DistrictCrossing {
   kind: CrossingKind;
   signalized: boolean;
   edgeId: string | null;
+  // -- doc 87 B50/B53/B54: the crossing's own FURNITURE. Every field is
+  //    optional and absent ⇒ byte-identical paint, so the 90 committed
+  //    districts are untouched. None of them moves the crossing POINT
+  //    (`x`/`y`), which is the only thing the rule engine's CrossingZoneTracker
+  //    derives its zone from — the graded geometry is invariant by
+  //    construction, not by argument.
+  /** Central refuge island / median nose the crossing is split by. */
+  island?: DistrictCrossingIsland;
+  /**
+   * RAISED TABLE (повдигната пешеходна пътека): the painted ramp band on each
+   * approach, m. PAINT ONLY, and named so on purpose — the road surface is not
+   * displaced vertically, because the ribbon mesh and the ground collider are
+   * built from the same vertices and lifting one without the other is how a car
+   * ends up driving through tarmac. What the student sees is what a Bulgarian
+   * raised crossing actually shows first: the chevron/triangle ramp bands
+   * across both approaches and the plateau's edge lines.
+   */
+  tableRampM?: number;
+  /**
+   * STAGGERED crossing: the far half of the zebra is offset this far ALONG the
+   * edge (signed, m). Left at 0 on every PE district today — a staged walk is
+   * pinned by value in `lessons/scenario/templates-pe*.ts`, so a staggered
+   * paint with an unstaggered walk would put the pedestrian beside her own
+   * zebra. The field exists so the map can express it once the walk can.
+   */
+  staggerM?: number;
+  /** ANGLED crossing: the bars are skewed this far from perpendicular, deg. */
+  skewDeg?: number;
 }
 
 export interface DistrictRoundabout {
@@ -123,11 +208,30 @@ export interface DistrictBuilding {
    * its street frontage (builders/schools.ts), and the sign pass posts the
    * А19 „Деца" warning triangle on both approaches (builders/props.ts).
    *
+   * `"busStop"` is doc 87 B64 and it is the same shape of ask, from the same
+   * reviewer: the drill «Рязко спиране» tells the student „представи си, че
+   * това е твоята спирка или адрес" and he answered *„the question states
+   * stopping out of nowhere, but why?"*. Standing at the graded stop point on
+   * `sp-creep-v1` the answer was three grey extruded boxes — the map already
+   * authored `sp-b-stop-canopy` / `-shop` / `-neighbour`, and a `building` is
+   * only a footprint plus a height, so a bus stop and a block of flats render
+   * identically. The reason to stop was in the prose and not in the world.
+   *
+   * The world already HAS the object: `WorldGeometry.busStops` and a shelter
+   * kit with a lit ad face, placed by a DERIVED rule in `builders/props.ts` —
+   * primary/secondary class, ≥ 28 m past a real junction mouth. Every scenario
+   * micro-street fails both halves of that rule (residential, two nodes, no
+   * junction), which is why `constants.ts` records „sp-creep-v1 … busStops 0".
+   * So the missing piece was never the model; it was that a map could not SAY
+   * „a bus stop belongs here". This key says it, and props.ts parks the same
+   * shelter on the pavement in front of the authored footprint.
+   *
    * It is NOT a grading input: the reduced limit still comes from the edge's
    * own `maxspeed` / `zone` tag, exactly as before. A building kind may dress
-   * the world; it may never decide a fault.
+   * the world; it may never decide a fault. (The В27/„спирка" stopping ban is
+   * a `zones` span and stays one — nothing here posts a sign or bans a stop.)
    */
-  kind?: "school";
+  kind?: "school" | "busStop";
 }
 
 export interface DistrictSpawnPoint {
@@ -492,6 +596,30 @@ export interface BillboardPlacement extends StaticTransform {
 }
 
 /**
+ * One column of the overhead distribution line (founder register B65 — „no
+ * wires, no poles"). Local +X runs ALONG the street toward the NEXT column, so
+ * the renderer can hang the span without re-deriving the road tangent.
+ *
+ * `spanM` is the distance to that next column, or 0 at the end of a run — the
+ * one piece of information a wire needs and a StaticTransform cannot carry.
+ * Wires are drawn from these poses only, so a pole list with every `spanM: 0`
+ * is a legal (wireless) district rather than a broken one.
+ */
+export interface UtilityPolePlacement extends StaticTransform {
+  spanM: number;
+}
+
+/**
+ * One 6 m panel of pavement parapet (B65 — „no fences, no barriers"), standing
+ * at the back of the kerb with its run axis along local +X.
+ *
+ * Placed as whole panels rather than a stretched run so the instanced draw
+ * uses the shipped `railing_run_6m.glb` verbatim: a stretched railing has
+ * stretched BALUSTERS, which is the tell that gives away a faked fence.
+ */
+export type RailingPlacement = StaticTransform;
+
+/**
  * One instanced glass-tower model. Non-uniform scale (unlike
  * StaticTransform's single scale) because footprints fit width/height/depth
  * independently. Base sits at world y=0.
@@ -579,6 +707,11 @@ export interface WorldStats {
    *  builders/roundabout.ts on why a token disc over a live carriageway is a
    *  worse answer than none. */
   roundaboutIslands: number;
+  /** Kerbed pedestrian refuge islands / median noses built at crossings
+   *  (doc 87 B50/B53/B54). 0 on every district written before the field. */
+  crossingIslands: number;
+  /** Raised-table ramp bands painted — 2 per table, one per approach. */
+  crossingTableRamps: number;
   /** Registered roundabouts on this district, drawn or refused. */
   roundabouts: number;
   /** Dashes of the circular ring lane divider (0 on single-lane rings — there
@@ -597,6 +730,15 @@ export interface WorldStats {
   trees: number;
   /** Roadside billboards on primary streets (streetscape v2). */
   billboards: number;
+  /** Overhead-line columns (B65). */
+  utilityPoles: number;
+  /** Catenary spans hung between them — poles minus one per run. */
+  utilityWireSpans: number;
+  /** Pavement parapet panels (B65). */
+  railings: number;
+  /** Tyre/skid-mark decals in the wear batch (B65 — a subset of `roadDecals`,
+   *  counted separately because their placement rule is its own). */
+  skidMarks: number;
   /** Bus-stop shelters on primary/secondary sidewalks (streetscape v2). */
   busStops: number;
   /** Surface-parking dressing clusters (kiosk + barrier + wheel stops). */
@@ -664,6 +806,13 @@ export interface WorldGeometry {
   trees: TreePlacement[];
   /** Roadside billboards along primary streets (streetscape v2, REF 3). */
   billboards: BillboardPlacement[];
+  /** Overhead-line columns + the span each one carries forward (B65). Empty on
+   *  every city/exam/полигон district — see constants.SCENARIO_LIT_CLASSES on
+   *  why the dressing passes are gated to the authored micro-maps. */
+  utilityPoles: UtilityPolePlacement[];
+  /** Pavement parapet panels (B65). Empty on the same maps, for the same
+   *  reason. */
+  railings: RailingPlacement[];
   /** Bus-stop shelters on primary/secondary sidewalks near junction mouths. */
   busStops: StaticTransform[];
   /** Name boards + railings of every `kind: "school"` building (schools.ts).

@@ -546,6 +546,164 @@ const KIND_TO_SIGN = { noStopping: "В27", noOvertaking: "В24" };
  * Not varied, and each is a measurement in the header: lane COUNT (lever 4),
  * width at the crossing (lever 3), the centreline (lever 1), junctions (2).
  */
+// ---------------------------------------------------------------------------
+// SEVENTH AXIS — THE CROSSING KIT (doc 87 B50 / B53 / B54)
+//
+// Six axes and the sheet still read as one street. The re-look named two causes
+// and both are measurable, not aesthetic:
+//
+//  1. THE PARKED ROW STOOD ON ONE KERB, ON EVERY STREET IN THE PRODUCT.
+//     `TrafficLayer.computeParkedCars` took the right-hand normal and nothing
+//     else (`const nx = dy; const ny = -dx`), while
+//     `builders/roads.ribbonCrossSection` mirrors the parking band about the
+//     centreline. So the bay was DRAWN on both sides and FILLED on one:
+//     measured on the shipped files, ALL SIXTEEN bodies across the six bayed
+//     PE districts stood at x = +10.13, and the west band was empty tarmac six
+//     streets deep. `parkingSide` (world/types + traffic/TrafficLayer
+//     `parkedSideOf`) is that missing alternation; absent still means "right",
+//     so the other 84 districts are byte-identical.
+//
+//  2. NO MEDIAN, REFUGE ISLAND, RAISED TABLE, STAGGERED OR ANGLED CROSSING WAS
+//     EXPRESSIBLE AT ALL. `DistrictCrossing` was
+//     `{id, x, y, kind, signalized, edgeId}` and `CrossingKind` is
+//     signals|marked|unmarked|unknown — so half the variety brief could not be
+//     authored from here even in principle. And it could NOT be faked with a
+//     building: `cityBuildings.DATA_HEIGHT_MIN_M` clamps every authored volume
+//     up to 3 m, so a 0.3 m island renders as a WALL ACROSS THE ROAD.
+//     `island` / `tableRampM` / `staggerM` / `skewDeg` close that, and
+//     `markings.buildCrossingFurniture` builds them — the kerb into the
+//     SIDEWALK mesh, which is also the collider, so a car cannot mount it.
+//
+// WHY THIS AXIS IS ALLOWED WHERE LEVERS 1-4 WERE NOT. It never touches the
+// graded geometry: the crossing POINT (`x`,`y`) is unmoved, which is the only
+// thing `runtime/zones.CrossingZoneTracker` derives the graded zone from; no
+// edge changes width, class, lane count or centreline, so the driven rail
+// stays at x = 4.0625 and every committed trace still drives it; and the
+// island is centred on the centreline, 1.2 m of half-width at the widest,
+// leaving 2.86 m of clearance to that rail.
+//
+// TWO KITS DELIBERATELY NOT AUTHORED, each with the reason measured on the
+// lesson data rather than argued:
+//   - AN ISLAND ON pe-child-v1. Its hazard is a `ballDartOut` that rolls from
+//     x = −9.73 across the whole carriageway (`templates-pe.CHILD_BALL_PED`,
+//     travelM 20.5). A ball rolling THROUGH a kerbed island is a falsehood the
+//     founder catches on the first play, so pe-child gets the raised table,
+//     which nothing rolls through.
+//   - `staggerM` ON ANY OF THE SEVEN. Every staged walk in this family is
+//     pinned by VALUE in `templates-pe*.ts` (`CURB_X = −9.73`, roadFromM 1.6,
+//     roadToM 17.85). Staggering the PAINT without staggering the WALK puts
+//     the pedestrian beside her own zebra. The field exists so the map can say
+//     it the day the walk can follow; the value stays 0 here, on purpose.
+// ---------------------------------------------------------------------------
+
+/** A crossing island wider than this would reach the driven rail's clearance. */
+const ISLAND_MAX_WIDTH_M = 2.6;
+
+const CROSSING_KITS = {
+  /** No furniture — a plain painted zebra, the family's pre-axis crossing. */
+  bare: {
+    furniture: () => ({}),
+    noteBg: "Пътеката е обикновена, без остров и без повдигане.",
+  },
+  /** ПОВДИГНАТА ПЕШЕХОДНА ПЪТЕКА — the plateau's edge lines plus a band of
+   *  chevron teeth on both approaches. Paint, not displacement (see
+   *  markings.buildCrossingFurniture on why the ribbon is not lifted). */
+  "raised-table": {
+    furniture: () => ({ tableRampM: 3.0 }),
+    noteBg:
+      "Повдигната пешеходна пътека: платното носи маркировка на рампа от двете страни на пътеката — зъбци и напречна линия на площадката.",
+  },
+  /** A shorter, sharper table — a courtyard calming measure. */
+  "raised-table-short": {
+    furniture: () => ({ tableRampM: 2.2 }),
+    noteBg:
+      "Къса повдигната пътека: рампата е стегната, зъбците стоят близо до пътеката, площадката е тясна.",
+  },
+  /** ОСТРОВ — a long central median nose reaching back down the approach.
+   *  This is the kit that puts a kerbed object in the middle of the road for
+   *  tens of metres before the crossing, which is what „the near field is one
+   *  street" was asking for. */
+  "refuge-long-median": {
+    furniture: () => ({ island: { widthM: 2.4, approachM: 34, departM: 8 } }),
+    noteBg:
+      "Осров за пешеходци с дълъг разделителен нос: бордюриран остров разделя платното десетки метри преди пътеката.",
+  },
+  /**
+   * ОСТРОВ — a compact refuge, symmetric about the crossing.
+   *
+   * ⚠ NOT USED BY ANY INSTANCE, AND THE REASON IS THE ONLY REASON THAT COUNTS:
+   * IT CANNOT BE SEEN. pe-bus carried it, its 9 m nose put the kerb at y = 79 —
+   * 64 m from a spawn at y = 15 — and at that range, 2 m wide and a kerb high,
+   * the zebra reads as unbroken white bars and there is no island in the frame
+   * (`scratchpad/sf/frames/ZOOM-bus-median.png`, opened). The kit stayed in the
+   * JSON and a test counted it, so the row was being credited for an object
+   * nobody could look at. Kept as a named recipe because a SHORT refuge is a
+   * real thing to author — on a street whose crossing the drive actually
+   * reaches — but the family uses the long-nose variants, which were
+   * photographed first (`refuge-long-median` on pe-slow resolves from the seat
+   * at 36 m: `ZOOM-slow-median.png`).
+   */
+  "refuge-compact": {
+    furniture: () => ({ island: { widthM: 2.0, approachM: 9, departM: 9 } }),
+    noteBg:
+      "Компактен остров за пешеходци точно на пътеката: пешеходецът може да спре по средата на платното.",
+  },
+  /** ОСТРОВ — the long central reservation of a freight collector: the kerbed
+   *  nose starts back at the segment joint, so the island is standing in the
+   *  middle of the road while the driver is still at the spawn. Measured
+   *  against pe-slow's 34 m nose, which resolves at 36 m from the seat. */
+  "refuge-nose-long": {
+    furniture: () => ({ island: { widthM: 2.0, approachM: 44, departM: 9 } }),
+    noteBg:
+      "Дълъг разделителен остров пред товарния портал: бордюриран нос тръгва от снаждането на платното и дели улицата чак до пътеката.",
+  },
+  /** ОСТРОВ with a medium nose, on the one-way street. */
+  "refuge-tactile": {
+    furniture: () => ({ island: { widthM: 2.2, approachM: 20, departM: 6 } }),
+    noteBg:
+      "Тактилен остров за пешеходци: бордюриран остров с нос по средата на еднопосочното платно.",
+  },
+  /** ЪГЛОВА ПЪТЕКА — the bars run diagonally across the carriageway. */
+  angled: {
+    furniture: () => ({ skewDeg: 18 }),
+    noteBg: "Пътеката пресича платното под ъгъл — лентите не са перпендикулярни на оста.",
+  },
+  /** An angled crossing ON a short raised table — the two levers together. */
+  "angled-table": {
+    furniture: () => ({ skewDeg: -12, tableRampM: 2.2 }),
+    noteBg:
+      "Повдигната пътека, положена под ъгъл спрямо оста на платното: рампа и наклонени ленти едновременно.",
+  },
+};
+
+/** Kerbside rows: which kerb a banded segment's parked row stands on. */
+const PARKED_SIDES = ["left", "right", "both"];
+
+/**
+ * WHAT KIND OF VEHICLE STANDS AT THE KERB — the eighth lever, and the one the
+ * contact sheet forced.
+ *
+ * `parkedSide` answers WHICH KERB IS EMPTY. It cannot answer what fills the one
+ * that is not, and that turned out to matter more than the side did. Measured
+ * off `computeParkedCars` on the shipped files, right kerb, before this:
+ *
+ *   pe-cane   arden_x · corva_sw · vela_h3
+ *   pe-bus    arden_x · corva_sw · pino
+ *   pe-child  vela_h3 · pino
+ *
+ * — and before the district salt landed it was worse than similar, it was
+ * IDENTICAL: `m=1 s=654 | m=1 s=35 | m=4 s=133` on all three, i.e. the same
+ * three cars in the same paint in the same order, on three consecutive
+ * lessons. A freight collector outside a depot gate and a между-блоково
+ * courtyard cannot both be lined with the same hatchbacks and read as
+ * different streets.
+ *
+ * `TrafficLayer.PARKED_MIXES` holds the sets; this is the vocabulary the
+ * instances pick from. Selection only — the same bodies stand at the same
+ * stations, so no trace, census or clear-zone moves.
+ */
+const PARKED_MIXES = ["mixed", "freight", "compact", "veteran"];
+
 const CARRIAGEWAYS = {
   /** The street the family has always been: one 16.25 m ribbon, no joint. */
   "plain-two-lane": {
@@ -1117,6 +1275,9 @@ const NEARFIELDS = {
  *   terminus: string,        // doc 87 B50 — what the street runs into (TERMINI)
  *   nearfield: string,       // doc 87 B53 — what stands beside the first 50 m
  *   carriageway: string,     // doc 87 B50 — the width of the asphalt (CARRIAGEWAYS)
+ *   crossingKit: string,     // doc 87 B50/B53/B54 — the crossing FURNITURE (CROSSING_KITS)
+ *   parkedSide: string,      // doc 87 B50/B53/B54 — which kerb the parked row stands on
+ *   parkedMix: string,       // doc 87 B50/B53/B54 — what KIND of vehicle stands at it
  * }} params
  */
 export function buildPeCrossingStreet(params) {
@@ -1131,6 +1292,9 @@ export function buildPeCrossingStreet(params) {
     terminus,
     nearfield,
     carriageway,
+    crossingKit,
+    parkedSide,
+    parkedMix,
   } = params;
 
   // -- Parameter validation (actionable — the assembly line runs unattended).
@@ -1173,12 +1337,47 @@ export function buildPeCrossingStreet(params) {
         `the near-field pass was refused for)`,
     );
   }
+  if (!CROSSING_KITS[crossingKit]) {
+    errors.push(
+      `crossingKit "${crossingKit}" unknown — pick one of ${Object.keys(CROSSING_KITS).join(", ")} ` +
+        `(doc 87 B50/B53/B54: without its own crossing furniture an instance is another copy ` +
+        `of the SAME PAINTED ZEBRA — the one object all seven of these lessons are actually ` +
+        `about, and the one no earlier axis could reach, because the fields did not exist)`,
+    );
+  }
+  if (!PARKED_SIDES.includes(parkedSide)) {
+    errors.push(
+      `parkedSide "${parkedSide}" unknown — pick one of ${PARKED_SIDES.join(", ")} ` +
+        `(doc 87 B50/B53/B54: the curb pass filled the RIGHT band on every street in the ` +
+        `product — all 16 bodies of this family measured at x = +10.13 — so an instance ` +
+        `without its own side is another copy of the same one-sided street)`,
+    );
+  }
+  if (!PARKED_MIXES.includes(parkedMix)) {
+    errors.push(
+      `parkedMix "${parkedMix}" unknown — pick one of ${PARKED_MIXES.join(", ")} ` +
+        `(doc 87 B50/B53/B54: the curb pass drew from ONE pool, so pe-cane, pe-bus and ` +
+        `pe-child were lined with the same three cars in the same paint in the same order — ` +
+        `measured, then photographed at the spawn. A freight kerb and a courtyard kerb ` +
+        `cannot be the same row of hatchbacks)`,
+    );
+  }
+  const kitIsland = CROSSING_KITS[crossingKit] ? CROSSING_KITS[crossingKit].furniture().island : null;
+  if (kitIsland && kitIsland.widthM > ISLAND_MAX_WIDTH_M) {
+    errors.push(
+      `crossingKit "${crossingKit}" island is ${kitIsland.widthM} m wide — max ` +
+        `${ISLAND_MAX_WIDTH_M} m. Wider and the kerb eats into the clearance of the driven ` +
+        `rail at x = 4.0625, which 21 committed traces sit on. Not a styling choice.`,
+    );
+  }
   if (errors.length > 0) throw new Error(`gen_pe_crossings params invalid:\n  - ${errors.join("\n  - ")}`);
 
   const road = ROADSCAPES[roadscape];
   const end = TERMINI[terminus];
   const near = NEARFIELDS[nearfield];
   const cw = CARRIAGEWAYS[carriageway];
+  const kit = CROSSING_KITS[crossingKit];
+  const furniture = kit.furniture();
   /** Arterial classes carry the band by class; an explicit tag overrides it. */
   const bandByClass = ["primary", "secondary", "tertiary"].includes(road.roadClass);
   const hasBand = road.parkingBand === null ? bandByClass : road.parkingBand === true;
@@ -1289,6 +1488,20 @@ export function buildPeCrossingStreet(params) {
           ? {}
           : { parkingBand: road.parkingBand }
         : { parkingBand: s.bandM > 0 }),
+      // doc 87 B50/B53/B54 — WHICH KERB the row stands on. Written only on a
+      // segment that actually HAS a band: `parkingSide` on a bandless edge
+      // would be a tag about a row that does not exist. Absent still means
+      // "right" in `TrafficLayer.parkedSideOf`, so this is purely additive.
+      ...(s.id !== "pe-e-street" && s.bandM > 0
+        ? {
+            parkingSide: parkedSide,
+            // …and WHAT stands there. `mixed` is the unbiased pool, so it is
+            // written as an absent tag rather than a string the reader has to
+            // look up — same "absent ⇒ unchanged" contract as every other
+            // field on this edge.
+            ...(parkedMix === "mixed" ? {} : { parkingMix: parkedMix }),
+          }
+        : {}),
       // FR-41: a side with NO pavement at all (network.edgeBareVerge) — the
       // industrial canyon's loading wall stands on the kerb, so that side has
       // no footway, no lamp column, no tree and no bus shelter.
@@ -1378,6 +1591,10 @@ export function buildPeCrossingStreet(params) {
       kind: "marked",
       signalized: false,
       edgeId: "pe-e-street",
+      // doc 87 B50/B53/B54 — the CROSSING KIT. Spread last and only when the
+      // kit authors something, so a `bare` crossing serialises byte-identically
+      // to every pe-*.json written before this axis existed.
+      ...furniture,
     },
   ];
 
@@ -1544,6 +1761,20 @@ export function buildPeCrossingStreet(params) {
          *  axis that changes the bottom ~45 % of a cockpit frame. */
         carriageway,
         carriagewayNoteBg: cw.noteBg,
+        /** doc 87 B50/B53/B54 — THE CROSSING ITSELF: refuge island / median
+         *  nose, raised table, angle. The only axis that changes the object
+         *  all seven lessons are actually about, and the one that needed a
+         *  district-v1 schema change before it could exist at all. */
+        crossingKit,
+        crossingKitNoteBg: kit.noteBg,
+        /** WHICH KERB the procedural parked row stands on. Before this the
+         *  answer was `right` on every street in the product: all 16 bodies
+         *  of this family measured at x = +10.13, west band empty. */
+        parkedSide,
+        /** …and WHAT stands at it. The kerb the eye reads is a shape, not a
+         *  side: before this every street's row was drawn from one pool and
+         *  three consecutive lessons came out with the same three cars. */
+        parkedMix,
         carriagewaySegments: SEGMENTS.map((s) => ({
           id: s.id,
           fromY: r2(s.fromY),
@@ -1936,6 +2167,12 @@ const INSTANCES = [
     terminus: "opens-to-collector",
     nearfield: "arcade-canyon-low",
     carriageway: "bays-from-the-seat",
+    crossingKit: "raised-table",
+    // BOTH kerbs, and the row starts level with the bonnet — the only street in
+    // the family whose left row faces YOU (two-way, so `computeParkedCars`
+    // turns it nose-about). A lined shopping street.
+    parkedSide: "both",
+    parkedMix: "mixed",
   },
   {
     districtId: "pe-slow-v1",
@@ -1947,6 +2184,11 @@ const INSTANCES = [
     terminus: "closed-by-block",
     nearfield: "open-forecourt",
     carriageway: "bay-pocket-mid",
+    crossingKit: "refuge-long-median",
+    // ONE car, far out, on the far kerb — the clinic forecourt keeps the near
+    // kerb clear. The sparsest street in the family that has a row at all.
+    parkedSide: "left",
+    parkedMix: "mixed",
   },
   {
     districtId: "pe-rain-v1",
@@ -1958,6 +2200,12 @@ const INSTANCES = [
     terminus: "bends-away-left",
     nearfield: "dock-wall-tight",
     carriageway: "plain-two-lane",
+    crossingKit: "angled",
+    // The one street with NO band at all (`plain-two-lane`), so the tag is
+    // inert here and both kerbs are bare tarmac. Kept explicit so the family
+    // table has no hole in it.
+    parkedSide: "right",
+    parkedMix: "mixed",
   },
   {
     districtId: "pe-dart-v1",
@@ -1969,6 +2217,12 @@ const INSTANCES = [
     terminus: "necks-to-service",
     nearfield: "lockup-garages",
     carriageway: "bay-pocket-near",
+    crossingKit: "angled-table",
+    // The ONLY street where the near kerb is the empty one and the far kerb is
+    // lined — the mirror image of the composition five of the seven used to
+    // share. Old estates and a pickup: a street that has not been resurfaced.
+    parkedSide: "left",
+    parkedMix: "veteran",
   },
   {
     districtId: "pe-bus-v1",
@@ -1980,6 +2234,17 @@ const INSTANCES = [
     terminus: "bends-away-right",
     nearfield: "yard-wall-asym",
     carriageway: "bay-pocket-far",
+    // `refuge-compact` → `refuge-nose-long`, and the reason is a photograph:
+    // the compact island's 9 m nose sat 64 m from the seat and did not appear
+    // in the frame at all (`ZOOM-bus-median.png`). The long nose starts at the
+    // segment joint, 43 m out, where pe-slow's 34 m nose is already legible.
+    crossingKit: "refuge-nose-long",
+    // RIGHT only — the depot's own vehicles stand on the depot side, and
+    // `freight` is what makes this kerb unmistakable: panel vans, a pickup and
+    // a boxy 4x4, i.e. a row with a completely different roofline from the
+    // hatchbacks every other street in the family parks.
+    parkedSide: "right",
+    parkedMix: "freight",
   },
   {
     districtId: "pe-child-v1",
@@ -1991,6 +2256,18 @@ const INSTANCES = [
     terminus: "opens-to-green",
     nearfield: "garage-and-backslab",
     carriageway: "bay-pocket-behind-the-seat",
+    crossingKit: "raised-table-short",
+    // RIGHT only, and the CLOSEST row in the family (8 m) on the WIDEST seat
+    // (24.25 m), with the whole left-hand bay standing empty beside the slab.
+    //
+    // `veteran`, not `compact`, and the reason is the contact sheet rather
+    // than taste: with both courtyard streets on `compact` this frame and
+    // pe-cane's were still cousins — light small cars on the right of a
+    // straight grey street, twice. A между-блоково space is where the old cars
+    // live anyway, so the honest mix is also the legible one, and the
+    // (mix, side) pair stays unique against pe-dart's veteran-on-the-left.
+    parkedSide: "right",
+    parkedMix: "veteran",
   },
   {
     districtId: "pe-cane-v1",
@@ -2002,6 +2279,13 @@ const INSTANCES = [
     terminus: "jogs-and-continues",
     nearfield: "villa-row-setback",
     carriageway: "bay-pocket-oneway",
+    crossingKit: "refuge-tactile",
+    // BOTH kerbs — and on a ONE-WAY street `computeParkedCars` does NOT turn
+    // the left row about, so every car on both sides is tail-on to the driver.
+    // That is the one-way tell you can read without finding the Д4 face, and
+    // no other street in the family can produce it.
+    parkedSide: "both",
+    parkedMix: "compact",
   },
 ];
 

@@ -26,12 +26,14 @@ import { speedLimitSignKind } from "../types";
 import type {
   BillboardPlacement,
   District,
+  RailingPlacement,
   SignKind,
   SignPlacement,
   StaticTransform,
   TrafficLightPlacement,
   TreeKind,
   TreePlacement,
+  UtilityPolePlacement,
 } from "../types";
 import {
   ARTERIAL_CLASSES,
@@ -41,14 +43,24 @@ import {
   BUS_STOP_FROM_MOUTH_M,
   BUS_STOP_MAX_COUNT,
   BUS_STOP_MIN_SEPARATION_M,
+  BUS_STOP_SHELTER_DEPTH_M,
   CLASS_RANK,
   LINDEN_BOULEVARD_COUNT,
   PARK_TREE_GRID_M,
+  RAILING_CROSSING_CLEAR_M,
+  RAILING_FROM_KERB_M,
+  RAILING_GAP_PANELS,
+  RAILING_MIN_RUN_M,
+  RAILING_PANELS_PER_RUN,
+  RAILING_RUN_M,
   ROAD_Y,
+  SCENARIO_LIT_CLASSES,
+  SCENARIO_STREETLIGHT_SPACING_M,
   SIDEWALK_TOP_Y,
   SIDEWALK_WIDTH_M,
   STREET_TREE_SPACING_M,
   STREETLIGHT_SPACING_M,
+  UTILITY_POLE_SPACING_M,
 } from "./constants";
 import {
   add,
@@ -88,6 +100,10 @@ export interface PropBuildResult {
   streetlights: StaticTransform[];
   trees: TreePlacement[];
   billboards: BillboardPlacement[];
+  /** Overhead-line columns, each carrying the span to its successor (B65). */
+  utilityPoles: UtilityPolePlacement[];
+  /** Pavement parapet panels (B65). */
+  railings: RailingPlacement[];
   busStops: StaticTransform[];
   parkingKits: StaticTransform[];
   /** "<nodeId>:<edgeId>" keys of approaches that got a stop sign. */
@@ -443,6 +459,8 @@ export function buildProps(
   const streetlights: StaticTransform[] = [];
   const trees: TreePlacement[] = [];
   const billboards: BillboardPlacement[] = [];
+  const utilityPoles: UtilityPolePlacement[] = [];
+  const railings: RailingPlacement[] = [];
   const busStops: StaticTransform[] = [];
   const parkingKits: StaticTransform[] = [];
   const stopSignApproaches = new Set<string>();
@@ -1360,8 +1378,39 @@ export function buildProps(
   }
 
   // -- streetlights along arterials --------------------------------------------
+  //
+  // …AND, on a scenario micro-map, along the residential streets too (founder
+  // register B65). MEASURED before it was believed: `buildProps` on
+  // sp-creep-v1 returned `streetlights: 0` — not the „one lamp post in 360 m"
+  // the register printed, ZERO — and the same on sp-zone30-v1, the street with
+  // the school on it. `ARTERIAL_CLASSES` is the furniture predicate and every
+  // authored micro-map in this catalogue is class `residential`, so the gate
+  // was never once satisfied on the maps the drills actually run on.
+  //
+  // The blast radius is larger than lamps. WorldProps.furniturePlacements
+  // derives EVERY bench, bin, planter and bollard in the product from this
+  // list, so „no lamp" silently meant „no street furniture of any kind" — the
+  // exact sentence in his review. Widening the predicate here lights the run
+  // AND fills the pavement, in the existing instanced draws, at no new
+  // draw-call cost.
+  //
+  // The scenario gate keeps every city/exam/полигон district byte-identical —
+  // see constants.SCENARIO_LIT_CLASSES for why that is the honest call and not
+  // merely the safe one.
+  const litClasses = lessonScale !== undefined ? SCENARIO_LIT_CLASSES : ARTERIAL_CLASSES;
+
+  // Bucketed footprint lookup, hoisted above the dressing passes so poles and
+  // parapets can ask the same question the tree passes ask. Bucketed, not
+  // scanned — see terrain.ts and AabbGrid's header: doc 82 V7's street wall
+  // turns every prop candidate's linear footprint scan into a 380-box one on
+  // the city map. The predicate itself is unchanged, so every tree lands
+  // exactly where it did.
+  const buildingGrid = new AabbGrid(24);
+  for (const box of buildingAabbs) buildingGrid.add(box);
+  const insideBuilding = (p: Vec2, pad: number) => buildingGrid.hits(p, pad);
+
   for (const eb of network.edges) {
-    if (!eb.line || !ARTERIAL_CLASSES.has(eb.edge.class)) continue;
+    if (!eb.line || !litClasses.has(eb.edge.class)) continue;
     // Lamp columns stand on the verge — so a BARE verge (network.ts
     // BareVergeSide) never gets one. On a divided street that verge is the
     // median, whose columns belong to the OTHER carriageway's row; a column
@@ -1374,7 +1423,12 @@ export function buildProps(
     const onlySide: 1 | -1 | null =
       eb.bareVerge === "left" ? 1 : eb.bareVerge === "right" ? -1 : null;
     let side: 1 | -1 = onlySide ?? 1;
-    for (let s = STREETLIGHT_SPACING_M / 2; s < total; s += STREETLIGHT_SPACING_M) {
+    // A жилищна улица is lit more sparsely than a boulevard; an arterial keeps
+    // the pitch it has always had, so no committed city map moves.
+    const pitch = ARTERIAL_CLASSES.has(eb.edge.class)
+      ? STREETLIGHT_SPACING_M
+      : SCENARIO_STREETLIGHT_SPACING_M;
+    for (let s = pitch / 2; s < total; s += pitch) {
       const { point, tangent } = pointAlong(eb.line, s);
       const r = perpRight(tangent);
       const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 0.4)));
@@ -1388,6 +1442,105 @@ export function buildProps(
     }
   }
 
+  // -- overhead distribution line: columns + the spans they carry (B65) --------
+  //
+  // „no wires, no poles" — and a Bulgarian side street without them does not
+  // read as a Bulgarian side street. One column every UTILITY_POLE_SPACING_M,
+  // on ONE verge for the whole edge (a real feeder does not zig-zag), and the
+  // verge chosen is the one the lamp row is NOT alternating onto first, so the
+  // two rows never collapse into a single silhouette on a straight approach.
+  //
+  // Each pole carries `spanM`: the distance forward to its successor, 0 at the
+  // end of the run. The renderer hangs the catenary from that and nothing
+  // else, so a wire can never exist without the two poles that hold it up.
+  //
+  // The stations are made EXACTLY EVEN (`span = total / n`) rather than laid
+  // at a fixed pitch with a ragged tail: an overhead line's spans are equal by
+  // construction, and equal spans also mean one wire geometry per edge instead
+  // of one per gap. Same scenario gate as the lamp row above.
+  if (lessonScale !== undefined) {
+    for (const eb of network.edges) {
+      if (!eb.line || eb.edge.roundabout || !SCENARIO_LIT_CLASSES.has(eb.edge.class)) continue;
+      if (eb.bareVerge === "both") continue; // nowhere to stand a column
+      const total = polylineLength(eb.line);
+      if (total < UTILITY_POLE_SPACING_M) continue; // no room for a span
+      // Opposite the lamp row's first side (which is +1 unless a verge is bare).
+      let side: 1 | -1 = eb.bareVerge === "right" ? -1 : eb.bareVerge === "left" ? 1 : -1;
+      if (isBareVergeSide(eb.bareVerge, side)) side = (-side) as 1 | -1;
+      if (isBareVergeSide(eb.bareVerge, side)) continue;
+      const gaps = Math.max(1, Math.round(total / UTILITY_POLE_SPACING_M));
+      const span = total / gaps;
+      for (let i = 0; i <= gaps; i++) {
+        const { point, tangent } = pointAlong(eb.line, Math.min(total, i * span));
+        const r = perpRight(tangent);
+        // Behind the pavement, a pace further out than the lamp column so the
+        // two never overlap even where the alternation brings them level.
+        const p = add(point, mul(r, side * (eb.halfWidth + SIDEWALK_WIDTH_M + 1.1)));
+        if (insideBuilding(p, 1.2)) continue;
+        utilityPoles.push({
+          position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
+          // Local +X runs along the street toward the NEXT column.
+          yaw: yawFromFacing(perpRight(tangent)),
+          spanM: i < gaps ? span : 0,
+        });
+      }
+    }
+  }
+
+  // -- pavement parapet (B65 — „no fences, no barriers") ------------------------
+  //
+  // `railing_run_6m.glb` shipped finished and unreachable (constants.
+  // RAILING_RUN_M says so with the numbers). It stands at the back of the kerb
+  // on the side the parked row is NOT on — a parapet in front of a parking bay
+  // would fence the bay off from the street it serves — and only where the run
+  // is long enough to be a guard rail rather than one stray panel.
+  //
+  // It never reaches the carriageway: the panel is 0.09 m deep and stands
+  // RAILING_FROM_KERB_M past the kerb line, i.e. inside the pavement, which is
+  // also the kerb collider. Nothing here is graded and nothing is an obstacle.
+  if (lessonScale !== undefined) {
+    for (const eb of network.edges) {
+      if (!eb.line || eb.edge.roundabout || !SCENARIO_LIT_CLASSES.has(eb.edge.class)) continue;
+      const total = polylineLength(eb.line);
+      if (total < RAILING_MIN_RUN_M) continue;
+      // WHICH KERB. `perpRight` is the RIGHT of the geometry direction, and
+      // that is exactly where TrafficLayer parks its procedural row (doc 87
+      // B50 — `parkingSide`, absent ⇒ "right"). A parapet there fences the bay
+      // off from the street it serves and, in the first render, put the whole
+      // run behind a wall of parked cars where nothing could see it. It takes
+      // the LEFT kerb, and falls back to the right only when the left verge is
+      // bare (a median / motorway връзка has no pavement to stand on).
+      let side: 1 | -1 = -1;
+      if (isBareVergeSide(eb.bareVerge, side)) side = 1;
+      if (isBareVergeSide(eb.bareVerge, side)) continue;
+      // Whole panels, centred on the street, so both ends finish square
+      // instead of a half panel poking into a junction mouth.
+      const slots = Math.floor((total - 8) / RAILING_RUN_M);
+      if (slots < Math.ceil(RAILING_MIN_RUN_M / RAILING_RUN_M)) continue;
+      const s0 = (total - slots * RAILING_RUN_M) / 2;
+      // Where the zebras are on THIS edge — the panels that would fence one
+      // off are skipped (constants.RAILING_CROSSING_CLEAR_M says why).
+      const crossingStations = district.crossings
+        .filter((c) => c.edgeId === eb.edge.id)
+        .map((c) => projectOntoPolyline(eb.edge.geometry as Vec2[], [c.x, c.y]).s);
+      const period = RAILING_PANELS_PER_RUN + RAILING_GAP_PANELS;
+      for (let i = 0; i < slots; i++) {
+        if (i % period >= RAILING_PANELS_PER_RUN) continue; // the open stretch
+        const s = s0 + (i + 0.5) * RAILING_RUN_M;
+        if (crossingStations.some((cs) => Math.abs(cs - s) < RAILING_CROSSING_CLEAR_M)) continue;
+        const { point, tangent } = pointAlong(eb.line, s);
+        const r = perpRight(tangent);
+        const p = add(point, mul(r, side * (eb.halfWidth + RAILING_FROM_KERB_M)));
+        if (insideBuilding(p, 0.6)) continue;
+        railings.push({
+          position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
+          // Run axis = local +X = the road tangent.
+          yaw: yawFromFacing(perpRight(tangent)),
+        });
+      }
+    }
+  }
+
   // -- trees (streetscape v2 mix, doc 70 REF 3) ---------------------------------
   // A gantry-hero micro-map (lc-gantry-v1) opts every roadside tree pass out so
   // no canopy occludes the overhead-signal shot; every other district keeps its
@@ -1395,14 +1548,6 @@ export function buildProps(
   const placeTrees = !suppressRoadsideTreesOf(district);
   const roadGrid = new SegmentGrid(24);
   for (const eb of network.edges) roadGrid.addPolyline(eb.edge.geometry as Vec2[]);
-
-  // Bucketed, not scanned — see terrain.ts and AabbGrid's header: doc 82 V7's
-  // street wall turns every prop candidate's linear footprint scan into a
-  // 380-box one on the city map. The predicate itself is unchanged, so every
-  // prop lands exactly where it did.
-  const buildingGrid = new AabbGrid(24);
-  for (const box of buildingAabbs) buildingGrid.add(box);
-  const insideBuilding = (p: Vec2, pad: number) => buildingGrid.hits(p, pad);
 
   const pushTree = (p: Vec2, kind: TreeKind) => {
     trees.push({
@@ -1528,6 +1673,52 @@ export function buildProps(
     }
   }
 
+  // -- AUTHORED bus stops (doc 87 B64) -------------------------------------------
+  // A `kind: "busStop"` building says „a bus stop belongs at this frontage".
+  // The derived rule below can never place one on a scenario micro-street
+  // (residential class, two nodes, no junction mouth ≥ 28 m back), which is
+  // exactly why the drill that asks the student to imagine a bus stop showed
+  // him a grey box. Authored placements bypass the class/junction filters and
+  // the district cap — a map that names a stop gets the stop — but they use
+  // the SAME shelter transform recipe as the derived pass: parked at the back
+  // of the sidewalk on the near side of the road, open side facing the
+  // roadway. That keeps one visual truth for the object at both sites.
+  //
+  // The footprint is not deleted: the building behind the shelter is the
+  // frontage the stop belongs to, and dropping it would trade one missing
+  // object for another. What changes is that the driver now has something at
+  // the kerb to read.
+  for (const b of district.buildings) {
+    if (b.kind !== "busStop" || b.footprint.length < 3) continue;
+    let cx = 0;
+    let cy = 0;
+    for (const [px, py] of b.footprint) {
+      cx += px;
+      cy += py;
+    }
+    cx /= b.footprint.length;
+    cy /= b.footprint.length;
+    // Nearest road, and where on it this frontage sits.
+    let best: { eb: (typeof network.edges)[number]; s: number; d: number } | null = null;
+    for (const eb of network.edges) {
+      if (!eb.line) continue;
+      const pr = projectOntoPolyline(eb.line, [cx, cy]);
+      if (best === null || pr.distance < best.d) best = { eb, s: pr.s, d: pr.distance };
+    }
+    if (best === null) continue;
+    const { point, tangent } = pointAlong(best.eb.line!, best.s);
+    // Which side of the road the frontage is on — the shelter goes on that
+    // one, or the building would look across the street at its own stop.
+    const r = perpRight(tangent);
+    const side = (cx - point[0]) * r[0] + (cy - point[1]) * r[1] >= 0 ? 1 : -1;
+    const lateral = best.eb.halfWidth + SIDEWALK_WIDTH_M - BUS_STOP_SHELTER_DEPTH_M;
+    const p = add(point, mul(r, side * lateral));
+    busStops.push({
+      position: toWorld(p[0], p[1], SIDEWALK_TOP_Y),
+      yaw: yawFromFacing(mul(r, -side)), // open side faces the roadway
+    });
+  }
+
   // -- bus-stop shelters (primary/secondary, past the junction mouth) ------------
   // Candidates sit BUS_STOP_FROM_MOUTH_M along the junction-trimmed ribbon
   // (the trim IS the mouth, so >= 25 m is guaranteed), on the right-of-travel
@@ -1558,7 +1749,7 @@ export function buildProps(
     const { point, tangent } = pointAlong(eb.line, s);
     const r = perpRight(tangent);
     // Shelter (1.7 m deep) parked at the back of the 3.5 m sidewalk.
-    const p = add(point, mul(r, eb.halfWidth + SIDEWALK_WIDTH_M - 1.35));
+    const p = add(point, mul(r, eb.halfWidth + SIDEWALK_WIDTH_M - BUS_STOP_SHELTER_DEPTH_M));
     if (insideBuilding(p, 1.2)) continue;
     busStopCandidates.push({
       order: hashString(eb.edge.id),
@@ -1609,6 +1800,8 @@ export function buildProps(
     streetlights,
     trees,
     billboards,
+    utilityPoles,
+    railings,
     busStops,
     parkingKits,
     stopSignApproaches,
