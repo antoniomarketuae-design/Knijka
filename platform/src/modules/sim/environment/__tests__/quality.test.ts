@@ -10,6 +10,7 @@ import {
   maxDprFor,
   medianFpsFromDeltas,
   TOUCH_MAX_DPR,
+  TOUCH_MED_MAX_DPR,
   TOUCH_HIGH_MAX_DPR,
   recommendQuality,
   seedQualityFromSignals,
@@ -367,16 +368,55 @@ describe("autoQualityCeiling", () => {
 });
 
 describe("maxDprFor", () => {
-  it("renders a handset 1:1 with its CSS pixels on the two tiers `auto` can reach", () => {
-    // The ceiling only bound `auto`. A device promoted to med by measurement,
-    // or a student choosing a tier by hand, still reached maxDpr 1.25 — a
-    // measured 1.56× backing store (492,195 px vs 315,172 px at the iPhone-16
-    // landscape viewport, production build, 2026-08-12). doc 82 §2.2's ruling
-    // is about the DEVICE, so the cap now is too.
-    for (const level of ["low", "med"] as const) {
-      expect(maxDprFor(level, iphone16())).toBe(TOUCH_MAX_DPR);
-      expect(maxDprFor(level, galaxyA16())).toBe(TOUCH_MAX_DPR);
+  it("renders a handset 1:1 with its CSS pixels at `low` — the rung nobody paid for", () => {
+    // `low` is the cold start of EVERY touch-only device, the tier an
+    // unmeasured GPU gets, and the tier a failed one is sent back to. It is the
+    // one rung on the automatic path where no frame time has ever been
+    // produced, so it is the one rung that may not spend fill.
+    expect(maxDprFor("low", iphone16())).toBe(TOUCH_MAX_DPR);
+    expect(maxDprFor("low", galaxyA16())).toBe(TOUCH_MAX_DPR);
+    expect(seedQualityFromSignals(iphone16())).toBe("low");
+    expect(seedQualityFromSignals(galaxyA16())).toBe("low");
+  });
+
+  it("gives a handset a sharper picture at `med` WITHOUT a press — the default path", () => {
+    // THE DEFECT THIS CLOSES. `TOUCH_HIGH_MAX_DPR` shipped and was verified
+    // 6/6, and his next sentence was still „resolution quality is brutally low
+    // ultra bad not like the pc". Both true: with nothing seeded and nothing
+    // pressed his phone renders `low` at dpr 1.0, because `high` costs a press
+    // he never made. `med` is the only rung `auto` reaches on its own, so it is
+    // the only place the default picture can improve.
+    expect(maxDprFor("med", iphone16())).toBe(TOUCH_MED_MAX_DPR);
+    expect(maxDprFor("med", galaxyA16({ dpr: 2.625 }))).toBe(TOUCH_MED_MAX_DPR);
+    // 4× the fragments of 1.0, not 9×: the evidence for this rung is ONE
+    // measurement taken at 1×, and it does not stretch to native.
+    expect(TOUCH_MED_MAX_DPR).toBe(2);
+    expect(TOUCH_MED_MAX_DPR).toBeLessThan(TOUCH_HIGH_MAX_DPR);
+  });
+
+  it("only ever hands `med` to a device that MEASURED its way there", () => {
+    // The whole defence of the rung above. If a phone could be SEEDED into
+    // `med`, this would be 4× the fill granted to a GPU that has never produced
+    // a frame time — the guess this file exists to refuse. It cannot: the seed
+    // returns `low` for every touch-only device without exception, and
+    // `levelFromLedger` with no ledger reduces to the seed.
+    for (const phone of [iphone16(), galaxyA16(), iphone16({ deviceMemoryGb: 8 })]) {
+      expect(seedQualityFromSignals(phone)).toBe("low");
+      expect(levelFromLedger("low", null, autoQualityCeiling(phone))).toBe("low");
     }
+    // The only route is a promotion, and a promotion needs BOTH a median at or
+    // above PROMOTE_FPS and the fuller sample window.
+    const earned = ledgerFromSample(null, { level: "low", fpsMedian: 60, samples: 120 }, "med");
+    expect(earned.earned).toBe("med");
+    // A handset meeting doc 82's own ~30 fps phone target never gets there.
+    const struggling = ledgerFromSample(null, { level: "low", fpsMedian: 30, samples: 120 }, "med");
+    expect(struggling.earned).toBe("low");
+    // …and one that drowns at `med` is sent back to 1.0 permanently, which is
+    // what makes being wrong here cost one session rather than every session.
+    const drowned = ledgerFromSample(null, { level: "med", fpsMedian: 26, samples: 120 }, "med");
+    expect(drowned.failedAt).toBe("med");
+    expect(levelFromLedger("low", drowned, "med")).toBe("low");
+    expect(maxDprFor(levelFromLedger("low", drowned, "med"), iphone16())).toBe(TOUCH_MAX_DPR);
   });
 
   it("gives a handset its OWN screen at `high` — the founder's ruling, twice given", () => {

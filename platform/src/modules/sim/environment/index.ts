@@ -69,6 +69,7 @@ export {
   MIN_PROBE_SAMPLES,
   maxDprFor,
   TOUCH_MAX_DPR,
+  TOUCH_MED_MAX_DPR,
   TOUCH_HIGH_MAX_DPR,
 } from "./quality";
 export type {

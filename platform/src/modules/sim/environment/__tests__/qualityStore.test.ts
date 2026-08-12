@@ -120,11 +120,19 @@ describe("seedQualityLevel / refreshSeededQuality", () => {
 });
 
 describe("canvasMaxDpr", () => {
-  it("clamps a handset to 1.0 on the tiers `auto` can reach, and hands it the panel at `high`", async () => {
+  it("walks a handset UP a resolution ladder whose rungs are each paid for", async () => {
     installBrowser(PHONE); // devicePixelRatio 3
     const { canvasMaxDpr } = await freshStore();
+    // `low` — the cold start of every touch-only device and the tier a failed
+    // one returns to. No frame time has ever been produced here, so no fill is
+    // spent here.
     expect(canvasMaxDpr("low")).toBe(1);
-    expect(canvasMaxDpr("med")).toBe(1);
+    // `med` — unreachable by guessing (the seed returns `low` for every phone),
+    // so a device on it has cleared 57 fps over 60+ clean frames. THIS is the
+    // rung the founder's default path actually lands on, and it is why „we
+    // shipped dpr 3" stopped being the same sentence as „his phone renders
+    // dpr 3": with nothing pressed, the deployed build gave him 393×852.
+    expect(canvasMaxDpr("med")).toBe(2);
     // §I26(c) / the founder's ruling: the top tier is only reachable by an
     // explicit press in the lesson menu, and when it is reached the phone
     // renders the pixels its screen actually has.

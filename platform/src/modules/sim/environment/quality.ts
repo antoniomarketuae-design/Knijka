@@ -356,24 +356,83 @@ export const TOUCH_MAX_DPR = 1.0;
 export const TOUCH_HIGH_MAX_DPR = 3.0;
 
 /**
+ * THE RESOLUTION A HANDSET MAY REACH ON THE TIER IT HAS *EARNED*.
+ *
+ * WHY THIS CONSTANT HAD TO EXIST AT ALL. `TOUCH_HIGH_MAX_DPR` shipped, was
+ * measured 6/6 (his own viewport allocates 1179×2556 at «Високо»), and the
+ * founder's next sentence was still *"resolution quality is brutally low ultra
+ * bad not like the pc"*. Both facts are true, because they are about different
+ * sentences: **"we shipped dpr 3" and "his phone renders dpr 3" are not the
+ * same claim, and the second one costs a press.** Measured on the deployed
+ * build with nothing seeded and nothing pressed — the state he actually opens
+ * the app in — his phone rendered `low`, dpr **1.0**, 393×852 on a 1179×2556
+ * panel. The control we shipped was real; it just was not on the path he walks.
+ *
+ * SO THE DEFAULT PATH HAS TO MOVE, AND THIS IS THE ONLY RUNG ON IT THAT MAY.
+ * `low` may not: it is the cold start of every touch-only device
+ * (`seedQualityFromSignals`), the tier an unmeasured GPU gets, and the tier a
+ * FAILED one is sent back to. Handing 4× the fill to a device that has never
+ * produced a frame time is exactly the guess this whole file exists to refuse.
+ *
+ * `med` IS DIFFERENT, AND THE DIFFERENCE IS EVIDENCE. On a phone `med` is
+ * unreachable by guessing: the seed returns `low` for every touch-only device
+ * without exception, so the ONLY route to `med` is `ledgerFromSample` promoting
+ * after a window whose median cleared `PROMOTE_FPS` (57) over at least
+ * `MIN_PROMOTION_SAMPLES` (60) clean frames. A device on `med` has *measured*
+ * headroom; it is the one rung on the automatic path that was paid for. A
+ * Mali-G57 handset meeting doc 82's own phone target (~30 fps) is nowhere near
+ * 57, never leaves `low`, and never sees this number.
+ *
+ * WHY 2.0 AND NOT 3.0 — and this is a budget, not a taste. 2.0 is 4× the
+ * fragments of 1.0; native on his panel is 9×. The evidence for granting
+ * anything here is ONE measurement taken at 1×, and a 4× extrapolation from it
+ * is a stretch a 9× extrapolation would not survive. It also keeps the top rung
+ * meaning what its own words say — «Високо» promises *"Пълна резолюция"*, and a
+ * tier that silently already gave you that has nothing left to sell. What it
+ * buys him, concretely: 786×1704 instead of 393×852, a 1.5× linear upsample to
+ * his panel instead of today's 3×, with no press and no menu.
+ *
+ * MEASURED COST, this box at his viewport, tier `med`, production build (a
+ * GTX 1060 through ANGLE/D3D11 — NOT an A18, and the milliseconds do not
+ * transfer; the SHAPE does): see the table in the wave report. If a device is
+ * wrong-footed by it the existing machinery corrects it without anyone being
+ * told: a window under `HOLD_FPS` demotes the tier AND latches `failedAt`, so
+ * the next cold start is `low` at 1.0, permanently.
+ */
+export const TOUCH_MED_MAX_DPR = 2.0;
+
+/**
  * The Canvas dpr cap for a tier on a given device.
  *
  * Pointing devices: the preset's own cap, exactly as authored — untouched.
- * Handsets: 1:1 with CSS pixels at `low` and `med` (the tiers `auto` can reach
- * on its own), and the screen's real pixels at `high` (the tier only an
- * explicit student choice reaches). Pure, so the ruling is unit-tested in Node;
- * `canvasMaxDpr()` in the store is the DOM half that reads the signals.
+ * Handsets, a ladder whose rungs are paid for in different currencies:
+ *   `low`  → 1:1 with CSS pixels. The cold start, the unmeasured device, and
+ *            the device that failed. Nothing is granted to a guess.
+ *   `med`  → the screen's own ratio, capped at `TOUCH_MED_MAX_DPR`. Reachable
+ *            only by a MEASURED promotion, so this rung is bought with a frame
+ *            time rather than with an assumption.
+ *   `high` → the screen's own ratio, capped at `TOUCH_HIGH_MAX_DPR`. Reachable
+ *            only by a deliberate press on a control that states the trade
+ *            first (`qualityTradeBg`, lesson-ui/qualityChoice.ts).
+ *
+ * In every case it is the PANEL's ratio and never the preset's supersample: on
+ * a desktop 1.25/1.5 means "more fragments than the screen has, bought for edge
+ * quality", and on a phone that same number is still a DOWNSCALE. A dpr-1
+ * tablet therefore gets 1.0 on all three rungs — a phone never pays for
+ * supersampling, only for its own glass.
+ *
+ * Pure, so the ruling is unit-tested in Node; `canvasMaxDpr()` in the store is
+ * the DOM half that reads the signals.
  */
 export function maxDprFor(level: QualityLevel, signals: DeviceSignals): number {
   const preset = QUALITY_PRESETS[level].maxDpr;
   if (!isTouchOnlyDevice(signals)) return preset;
-  if (level === "high") {
-    // A garbage `devicePixelRatio` (0, NaN, negative) must degrade to the old
-    // behaviour, never to a blank drawing buffer.
-    const native = Number.isFinite(signals.dpr) && signals.dpr > 0 ? signals.dpr : TOUCH_MAX_DPR;
-    return Math.min(Math.max(native, TOUCH_MAX_DPR), TOUCH_HIGH_MAX_DPR);
-  }
-  return Math.min(preset, TOUCH_MAX_DPR);
+  if (level === "low") return Math.min(preset, TOUCH_MAX_DPR);
+  // A garbage `devicePixelRatio` (0, NaN, negative) must degrade to the old
+  // behaviour, never to a blank drawing buffer.
+  const native = Number.isFinite(signals.dpr) && signals.dpr > 0 ? signals.dpr : TOUCH_MAX_DPR;
+  const ceiling = level === "high" ? TOUCH_HIGH_MAX_DPR : TOUCH_MED_MAX_DPR;
+  return Math.min(Math.max(native, TOUCH_MAX_DPR), ceiling);
 }
 
 /**
