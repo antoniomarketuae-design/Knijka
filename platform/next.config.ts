@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
@@ -165,8 +167,94 @@ const CACHE_MANIFEST = "public, max-age=300, stale-while-revalidate=3600";
  */
 const distDir = process.env.KNIJKA_DIST_DIR || ".next";
 
+/**
+ * PER-LANE tsconfig — the tracked `tsconfig.json` is never the write target.
+ *
+ * THE DEFECT THIS REMOVES (2026-08-11). `next dev` does not merely READ the
+ * tsconfig: `lib/typescript/writeConfigurationDefaults.js` appends
+ * `getTypeDefinitionGlobPatterns(distDir)` — `<distDir>/types/**` and
+ * `<distDir>/dev/types/**` — to `include` and writes the file back to disk.
+ * With `KNIJKA_DIST_DIR=.next-<lane>` those globs name a scratch dir, so every
+ * parallel agent's dev server silently edited a SHARED, TRACKED file at boot.
+ * `src/lib/tsconfigHygiene.test.ts` then goes red on a tree whose source is
+ * clean, and three lanes lost about an hour each to it in one week. AGENTS.md
+ * has documented the symptom since 2026-07-30 and all three read it first.
+ *
+ * Documentation was the wrong instrument: the failure needs no mistake to
+ * occur — booting a server correctly is enough. So the write is REDIRECTED
+ * rather than forbidden. `typescript.tsconfigPath` is resolved by Next as
+ * `path.join(projectDir, name)` (`lib/verify-typescript-setup.js`) and is what
+ * both the dev bundler and the build read, so pointing it at a per-lane file
+ * means the appended globs land there. The tracked file is not opened for
+ * writing at all — which survives SIGKILL, a closed terminal and an agent that
+ * never runs its cleanup, none of which a snapshot/restore wrapper survives.
+ *
+ * The lane file `extends` the tracked one, and that is doing a SECOND job:
+ * `writeConfigurationDefaults` opens with „Bail automatic setup when the user
+ * has extended or referenced another config" and returns before it reads
+ * anything, so the lane file is not rewritten either — it stays the two lines
+ * written below. `extends` also inherits the real `include`/`exclude` and
+ * `@/*` paths, resolved relative to the BASE file, so a lane's own build
+ * type-checks exactly the source the shared config names and never its own
+ * scratch dir. Nothing accumulates anywhere.
+ *
+ * `.next` (every normal `npm run dev`, `npm run build`, the VPS deploy) is
+ * unchanged: no `tsconfigPath` is set and Next writes `tsconfig.json` exactly
+ * as before — that file's six `include` entries are ALREADY correct for
+ * `.next`, so there is nothing for it to append.
+ *
+ * PROVEN 2026-08-11 WITH A NEGATIVE CONTROL, because „I checked and it was
+ * clean" is how this survives. Same server, same route, same request:
+ *   - fix ON  (`KNIJKA_DIST_DIR=.next-b67gap`): ready, `GET /` 200 in 49.8 s,
+ *     `git diff platform/tsconfig.json` EMPTY, include still 6.
+ *   - fix OFF (`KNIJKA_DIST_DIR=.next-b67ctl`, tsconfigPath suppressed): same
+ *     boot, `GET /` 200 in 46.8 s, include 6 → 8 with `.next-b67ctl/types/**`
+ *     and `.next-b67ctl/dev/types/**` appended to the TRACKED file.
+ * The trigger is the first page COMPILE, not boot — a check made between
+ * „Ready" and the first request sees a clean file and proves nothing.
+ *
+ * `exclude: [".next-*"]` in tsconfig.json stays and is a SEPARATE guard: it
+ * stops the project-wide recursive `include` glob type-checking a scratch dir
+ * that happens to exist on disk. This redirect stops the globs being WRITTEN;
+ * that exclude stops a dir being SWEPT without any glob at all.
+ *
+ * AND IT ANSWERS „why does include still win" — IT DOES NOT, measured
+ * 2026-08-11 in an isolated project. With `exclude: [".next-*"]` present, an
+ * explicit `.next-stale/dev/types` include glob aimed at a stale route
+ * validator type-checks CLEAN (tsc exit 0); delete only that exclude and the
+ * same tree fails TS2322 on the validator. `exclude` filters `include`, so the
+ * appended globs have been INERT to `tsc` since that guard landed. What they
+ * still cost is real but different: a dirty tracked file one `git add -A` from
+ * being committed, and a red `tsconfigHygiene` test. Anyone told „your tsc is
+ * broken by a scratch glob" was misdiagnosed.
+ */
+function laneTsconfigName(dist: string): string | undefined {
+  if (dist === ".next") return undefined;
+  const lane = dist.replace(/^[.\\/]+/, "").replace(/[^A-Za-z0-9._-]+/g, "-");
+  return `tsconfig.${lane || "lane"}.json`;
+}
+
+const laneTsconfig = laneTsconfigName(distDir);
+
+if (laneTsconfig) {
+  // Every launcher in tools/ spawns `next dev` with `cwd: PLATFORM`, so cwd is
+  // the project dir; the tsconfig.json probe confirms it before writing. If it
+  // is ever not, Next creates the lane file itself on first run — the tracked
+  // file is still not the target, which is the guarantee that matters.
+  const projectDir = process.cwd();
+  const target = path.join(projectDir, laneTsconfig);
+  if (fs.existsSync(path.join(projectDir, "tsconfig.json")) && !fs.existsSync(target)) {
+    fs.writeFileSync(
+      target,
+      `${JSON.stringify({ extends: "./tsconfig.json" }, null, 2)}\n`,
+      "utf8",
+    );
+  }
+}
+
 const nextConfig: NextConfig = {
   distDir,
+  ...(laneTsconfig ? { typescript: { tsconfigPath: laneTsconfig } } : {}),
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

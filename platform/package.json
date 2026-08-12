@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:tools": "node scripts/tools-tests.mjs",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/normalize-next-env.mjs && tsc --noEmit",
     "validate:content": "node scripts/validate-content.mjs",
     "payments:reconcile": "node scripts/payments-reconcile.mjs",
     "perf:report": "node scripts/perf-report.mjs",
@@ -21,7 +21,10 @@
     "assets:budget": "node ../tools/assets/check-asset-budget.mjs",
     "assets:prune": "node ../tools/assets/prune-public.mjs --public public",
     "mobile:sweep": "node ../tools/mobile/cli.mjs",
-    "mobile:budget": "vitest run ../tools/mobile/budget.test.mjs"
+    "mobile:budget": "vitest run ../tools/mobile/budget.test.mjs",
+    "mobile:wire": "node ../tools/mobile/wire-probe.mjs",
+    "deck:captions": "node ../tools/mobile/deck-captions.mjs",
+    "deck:captions:freeze": "node ../tools/mobile/deck-captions.mjs --prod --freeze"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

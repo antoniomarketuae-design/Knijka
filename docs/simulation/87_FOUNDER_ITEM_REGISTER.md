@@ -61,6 +61,22 @@ the SCALES gate's findings and **read none of them** — thirteen attacks on the
 (six got through, three of those get through the whole repo), both watermark specimens fed to every
 check in the tree, and the theory exam driven in a browser at two widths. Its findings are the first
 STILL-OPEN section below. **It moved no verdict cell**, deliberately: it opened no founder row.
+Thirteenth: **the 2026-08-10 CONSEQUENCE-AUDIT gate**, which took six lanes' claim to have closed
+the „tens or hundreds" complaint and re-derived every number itself — the road consequence went
+**5 of 53 → 53 of 53** with 307 of 307 quotes verbatim and 167 of 167 figures inside their own
+sentence; the watermark ingest was **re-executed** from the pinned originals and reproduced all six
+acts byte-identically (**188 pieces at HEAD → 0**, and the published „185" was an undercount); three
+of the six known citation attacks are **closed**, three are not, and **two new ones get through the
+loader, the schema and the suite**. It too **moved no verdict cell** — it opened no founder row, and
+its findings are its own STILL-OPEN section. Fifteenth: **the 2026-08-10 SIX-ROW PROVENANCE gate**,
+which took six rows the lead personally doubted and checked **two** things about every frame before
+believing it — *where the subject is relative to the camera*, and *when the frame was shot relative to
+the change it claims to show*. **Five close (A2, A6, B5, B40, B58) and one does not: C1 is named, not
+closed** — landscape still paints the right-indicator and the settings button under the notification
+column, and a thumb aimed at the indicator presses «РАЗБРАХ». It also found that **B67's opening
+allegation was a mis-aimed crop** (the third instance of the B27 mistake), and that the gate has **four
+reds, not two** — the two extra belonging to a lane that was still writing into the tree while the run
+executed.
 
 > **G-5 IS CLOSED AND THE OPPOSITE ERROR WAS NOT MADE.** Zero of the fourteen bare „т." survive:
 > an independent scanner over the three guarded directories returns **0 hits in 56 files**, and nine
@@ -104,6 +120,18 @@ STILL-OPEN section below. **It moved no verdict cell**, deliberately: it opened 
 > and an x-ray pair proves the В26 «50» the lesson tells the student to read is behind the interior
 > mirror at every distance on the approach. Calling that „partial" would be flattering it.
 
+> **THE 2026-08-09 RENDER-ROWS DELTA — five more cells, each with a frame, and no column added.** This
+> wave took the seven rows that can only close on a cockpit frame and drove them on `/dev/drive-rig`
+> through the real shell at a **measured 16:9**. It moved exactly five cells: **B27 · B35 · B54 · B55
+> PARTIAL → FIXED-SEEN**, and **B58 BROKEN-SEEN → FIXED-SEEN** — the last one because the founder's
+> chosen fix (move the mirror, do not shrink the signs) is in the shipped tree and was re-measured
+> here at **46 px of clear air** between the В26 «50» and the mirror at 23 m, where this register had
+> recorded 100 % occlusion. **B40 and B64 were rendered and deliberately NOT moved**; their rows now
+> carry the forward-view frames and the numbers that say why. Two defects nobody had filed were
+> photographed on the way — the demonstration ghost drawn inside the cockpit at a standstill, and
+> four UI cards painting over each other and over a law citation — and they are the first STILL-OPEN
+> section below. No other cell was touched, so the table above is unchanged apart from those five.
+
 > ### A SECOND LEDGER — `D1`–`D4`, the defects he never reported
 >
 > **This register has one structural blind spot: it holds exactly what the founder happened to
@@ -120,9 +148,12 @@ STILL-OPEN section below. **It moved no verdict cell**, deliberately: it opened 
 > | **D2** | The minute in which the student is most correct was the minute the product said nothing | requirement-zero audit (doc 64 THEO-4) | **FIXED-DRIVEN** — first line 0.97 s after the wheels stop, exactly 2 lines in 60 s, silent in exam mode |
 > | **D3** | The roundabout grader armed 6 m INSIDE the give-way paint — 19 of 22 mouths — so the whole decision happened where the instrument was blind | measurement against the painter's own expression | **FIXED-DRIVEN** — credited at 30.02 m after a 30 s wait at 37.53 m; the barge still bills 10 pt at 24.65 m |
 > | **D4** | `jxg-giveway-b1` and the queue drill could not be finished at all | driving them | **FIXED-DRIVEN** — both now „0 наказателни точки · ИЗДЪРЖАН", ★★★, 0 collisions |
+> | **D5** | …and then `D1`'s guard held the car still and **said nothing** — „it turns to R (reverse) but the car does not move did it break or ?" | **the founder, 2026-08-09** — the only row in this ledger he did report | **FIXED-SEEN** — the message lands 1.45 s after the lever moves; the way out is 0.25 s and 23.85 km/h. Full section: `D5` — the 2026-08-11 PHOTOGRAPH-THE-GESTURE gate |
 >
 > **Keep adding to this ledger.** The next thing that hurts a student will almost certainly not be
-> something he wrote down either.
+> something he wrote down either. **`D5` is the shape to watch for: a fix that is correct and mute.**
+> A guard that refuses an input without explaining it satisfies the physics and fails requirement-zero
+> (doc 64 THEO-4), and it will read to a student as a broken product every time.
 
 > **The +1 on BROKEN-SEEN is a bookkeeping correction, not a regression.** `B16`'s verdict **cell** has
 > said PARTIAL-SEEN since 2026-08-02 while its own body has said *"→ 2026-08-04 VERIFY-BY-DRIVING GATE
@@ -355,7 +386,7 @@ not have it yet*; the distinction is only how much is left.
 | FR-47 | An actual school building | **built** | New `kind: "school"`, derived name board / railing / gate, own palette. Photographed. Residual: at the read distance the board sits behind the mirror inset. | world/builders/schools.ts |
 | FR-48 | Lessons 33 and 36 must not be the same | **built** ✅ *(was not built)* | `gen_sp_transition.mjs` grew a FRONTAGE axis and an explicit `parkingBand`. **33** (`sp-creep2-v1`): panel blocks set 28 m back, wide gaps, **zero** parked row, 16.25 m curb-to-curb. **36** (`sp-trans-v1`): a continuous tight terrace hard on the pavement, parked row on the asphalt, 24.25 m. Two different pictures from the identical spawn pose, opened at the 2026-08-03 gate: `scratchpad/wm/frames/SHEET-B63-33-vs-36.png`. | tools/maps ✅ |
 | FR-49 | A visible reason for the "stop out of nowhere" | **partial** *(was not built)* | The SPOKEN half is delivered: the copy that names a reason („представи си, че това е твоята спирка или адрес", `templates-sp.ts:809`) was in `instructionsBg` and now reaches the student through `briefingBg`. **The VISIBLE half is still not built** — he asked for something to *look at*, and no world prop (a bus stop, a doorway, an address plate) was placed at the braking point. A sentence is not a reason you can see. **→ 2026-08-03 look-wave, driven to the graded zone and judged:** the sentence renders verbatim on the ИНСТРУКЦИИ card, and out the window there is a row of parked cars, one dark canopy and a plain tall block — **no pole, shelter, doorway, shop front, signage, address plate, kerb build-out or road marking.** The three volumes that were added (`sp-b-stop-canopy` / `-shop` / `-neighbour`) render as plain extruded boxes **because a `building` is only a footprint + height — there is no facade or street-furniture channel for the renderer to tell a shop from a block of flats.** So the fix is a **schema** change (a placeable street-furniture kind), not more volumes. `scratchpad/jmisc/B64-y172.png`. | templates-sp.ts + a world-prop **schema** |
-| FR-50 | The motorway car must reach 160–180 km/h | **partial** *(was not built)* | **The engine is fixed; the ROAD is now the limit.** `ENGINE_FORCE_CURVE` tail resized against *measured* resistance rather than the aero constant: rig terminal **120.3 → 168.4 km/h**, inside his band, with everything at or below 100 km/h arithmetically identical (same 0–100 of 11.57 s, same a at 30/50/90 before and after). Two hidden governors also found: `tierTopSpeedKmh` — the gate for every lesson's declared speed — was wrong in **both** resistance terms (carried `ROLLING_RESISTANCE_N`, which `VehicleSim` only applies on closed throttle, and omitted `CHASSIS_LINEAR_DAMPING`, 1152 N at 47 m/s, larger than aero); and manual 5th revved out at 150. **Why he still will not see 160:** `mw-v1` is 1006 m and every lesson spawns at rest, so a standing-start full-pedal run measures **147.6 km/h** at the end of the segment. 160 needs ~1.7 km of motorway, 170 needs ~2.4 km. That is map data. **→ 2026-08-03 look-wave — the map half LANDED and his band was reached, and the row is still partial for a reason nobody had named.** The motorway is now **2 600 m** and a Напреднал run with clutched upshifts hit **165.1 km/h at y=2567, gear 5, still accelerating when the road ran out — inside his band** (`scratchpad/b67/frames/B67adv3-y2560-kmh165.png`). **But on the default tier it tops out at exactly 145.2 km/h, and that is the governor, not the engine** — proven two ways: a roll-first run with no tier switch gives the identical 145.2, and an unshifted Напреднал pins at exactly 85.1 = `MANUAL_GEAR_MAX_KMH[2]`. **And Напреднал is unreachable in practice:** `LessonScene.tsx` pins difficulty to `DEFAULT_DIFFICULTY` on every mount, and `transmissionModeFor('advanced')` is `'manual'` — clicking it while stopped leaves the car in N and it never moves again (260 s of held W measured); clicking it while rolling pins the car at the speed-matched gear's ceiling until the student holds Z and presses `]`. **The remaining decision is curriculum, not code: raise the Нормален margin on a 140-domain map, or declare 145 on Нормален the intended answer.** See **B67**, which also carries the back-seat-camera defect found on the same drive. | vehicle/ ✅, map ✅, **difficulty tier + curriculum ❌** |
+| FR-50 | The motorway car must reach 160–180 km/h | **partial** *(was not built)* | **The engine is fixed; the ROAD is now the limit.** `ENGINE_FORCE_CURVE` tail resized against *measured* resistance rather than the aero constant: rig terminal **120.3 → 168.4 km/h**, inside his band, with everything at or below 100 km/h arithmetically identical (same 0–100 of 11.57 s, same a at 30/50/90 before and after). Two hidden governors also found: `tierTopSpeedKmh` — the gate for every lesson's declared speed — was wrong in **both** resistance terms (carried `ROLLING_RESISTANCE_N`, which `VehicleSim` only applies on closed throttle, and omitted `CHASSIS_LINEAR_DAMPING`, 1152 N at 47 m/s, larger than aero); and manual 5th revved out at 150. **Why he still will not see 160:** `mw-v1` is 1006 m and every lesson spawns at rest, so a standing-start full-pedal run measures **147.6 km/h** at the end of the segment. 160 needs ~1.7 km of motorway, 170 needs ~2.4 km. That is map data. **→ 2026-08-03 look-wave — the map half LANDED and his band was reached, and the row is still partial for a reason nobody had named.** The motorway is now **2 600 m** and a Напреднал run with clutched upshifts hit **165.1 km/h at y=2567, gear 5, still accelerating when the road ran out — inside his band** (`scratchpad/b67/frames/B67adv3-y2560-kmh165.png`). **But on the default tier it tops out at exactly 145.2 km/h, and that is the governor, not the engine** — proven two ways: a roll-first run with no tier switch gives the identical 145.2, and an unshifted Напреднал pins at exactly 85.1 = `MANUAL_GEAR_MAX_KMH[2]`. **And Напреднал is unreachable in practice:** `LessonScene.tsx` pins difficulty to `DEFAULT_DIFFICULTY` on every mount, and `transmissionModeFor('advanced')` is `'manual'` — clicking it while stopped leaves the car in N and it never moves again (260 s of held W measured) — **half of that is now closed: the 2026-08-11 DRIVE-THE-SEVEN gate drove the same click and the cockpit says «Скоростният лост е на N» +0.20 s later, then «Лостът е на N» +1.30 s into a held pedal, and Z + ] recovers the car to 30.22 km/h with no reload. Held W in neutral still does nothing, which is correct**; clicking it while rolling pins the car at the speed-matched gear's ceiling until the student holds Z and presses `]`. **The remaining decision is curriculum, not code: raise the Нормален margin on a 140-domain map, or declare 145 on Нормален the intended answer.** See **B67**, which also carries the back-seat-camera defect found on the same drive. | vehicle/ ✅, map ✅, **difficulty tier + curriculum ❌** |
 | FR-51 | Something must happen before the queue | **partial** | The queue is a real six-plus column and the copy stopped lying, but nothing was authored between spawn and the queue. | templates-following*.ts |
 | FR-52 | Rain must look like rain and lights must change something | **built** | Rendered and measured: streaks, overcast, wet asphalt; headlight change is a beam-shaped wedge (meanΔluma 7.64/255 cockpit, 4.91 exterior). **Residual CLOSED 2026-08-03:** `QUALITY_PRESETS.low.rainParticles`/`snowParticles` 0 → 260; rain streaks photographed at tier `low` in a true before/after (`scratchpad/gate/SHEET-rain-low.png`) at a measured cost of +3 draw calls and +0.39% triangles, paid only on wet lessons. | environment/ |
 | FR-53 | The truck must DO something, not mirror my speed | **partial** | (a) built — `scheduledCruise`, the truck drives its own arc. (b) not built — `slamAt` is 160 m past the end of a 360 m road with `minSlamSpeedKmh: 250` and `triggersHazard: false`, i.e. authored so nothing can ever happen. **→ 2026-08-03 look-wave, driven with a deliberate 24→8→34→10→26 km/h speed program and measured:** the rubber band is **dead** — player sd 8.2 km/h against truck sd **0.2**, `r = −0.026` over 341 samples, and the gap opens 17.3 → 37.1 → 50.9 m under the student's own control. **But in his terms the cure made it worse: the truck is now a metronome at a dead-constant 20.2 km/h for the whole 360 m.** What is owed is an authored speed **profile** (a scheduled ease-and-resume, e.g. 5.6 → 3.5 → 5.6 m/s at authored y) and/or the hazard he names — **and `BrakingLeadCarSpec.paceMode 'scheduledCruise'` accepts only ONE `paceSpeedMps`, so that is a `contracts.ts` change, not a template edit.** Fixed on the same drive: `FT_ONCOMING.gapsM` `[45×5] → [45,90,135,180,225]` — five of the six counter-column cars were standing on one arc, and the test that certified it had encoded the same misreading. See **B72**. | templates-following.ts + **contracts.ts** |
@@ -363,6 +394,1490 @@ not have it yet*; the distinction is only how much is left.
 | FR-55 | A rear-view window in the chase camera | **built** | Persistent, no key needed. | scene/chaseRearView.ts |
 | FR-56 | The tailgater must stick earlier | **built, but it broke the gate** ⚠️ *(was not built)* | `seedSpeedMps` added to the `matchPlayer` command and used by `RearTailgaterRunner`: the лепка enters the mirror at the player's speed instead of accelerating from a standstill and then chasing the gap that opened while it accelerated. Measured onsets **7.43 / 9.07 / 13.73 / 10.70 s → all under a 5 s ceiling**, pinned by `tailgater-onset.test.ts` (proven non-vacuous). **It is also the sole cause of the four red tests in the gate above** — three other templates borrow `RearTailgaterRunner` as a generic passing vehicle and their choreography was timed against the old launch profile. Bisected and proven. Needs scoping to the лепка templates before this can be called clean. **→ 2026-08-03 look-wave: the gate is green (the four failures are gone) and the rolling start is now confirmed FROM THE SEAT, not only from onset numbers.** Raw samples at 40 km/h: simT 9.26 actor 0.7 km/h → simT 9.40 actor **21.2** against the player's 21.5 — it enters at the player's speed with no 0→v ramp. Full encounter: already in the mirror at t+0 (8.9 m of bumpers), released t+2.2, **glued at ~4.6 m by t+10.0**, holds 8 s, passes t+18.1, clear t+24.3; at 30 km/h glued t+9.2, gone t+22.1. Eight-tile mirror strip with the measured gap on each tile: `scratchpad/fol/frames/SHEET-B75-mirror.png`. See **B75**. | orchestrator/runners.ts:2609 |
 | FR-57 | A Q/E rear-view window, ≤10% of the screen | **built** | Own render target and camera at the GLB door-glass position, mirror-image u-flip, ≤10% enforced as a **clamp** at 7 aspects, layer-2 recursion guard, opens only in cockpit while Q/E is held. 21 assertions + 7 frames incl. the not-doubled-in-chase case. | scene/cockpitDoorMirror.ts |
+
+---
+
+## The gate — DRIVE-THE-SEVEN, 2026-08-11 (the eighth pass). **SIX OF THE SEVEN ARE CLOSED AND PHOTOGRAPHED. THE SEVENTH — YOUR OWN PROTECTED REVERSE MESSAGE — NO LONGER APPEARS ON THE GESTURE THE BRIEF NAMES, BECAUSE OF A RULING YOU GAVE THE SAME DAY. IT STILL FIRES ON EVERY OTHER ROUTE INTO R, AND THAT IS DRIVEN, NOT ARGUED. THE TREE IS GREEN EXCEPT YOUR TWO MEDICAL ROWS.**
+
+> **What this gate is.** Four lanes landed uncommitted work — a brake channel for the stuck-start
+> watch, a pointer wake for the mouse pedals, a governor readout, and a caption-box rewrite — and
+> reported it closed. This pass believed none of it. **Every row below was driven in the running
+> product on `/dev/drive-rig`, `sc-junction-stop@L1`, in WebKit, with a real hit-tested mouse and a
+> real keyboard, and read off the screen.** Nothing in the working tree was edited to take a
+> measurement.
+>
+> **Sampling runs INSIDE the page at 10 Hz**, off the same `window.__driveRig.last` the readout
+> draws from, because polling from Node put two round trips into every 250 ms on a box carrying four
+> other WebKit instances and a 3-minute probe sat for 25 without finishing a loop. **And every timing
+> claim below is in SIM seconds, not wall seconds** — during the manual-tier hold this box ran the
+> simulation at **0.64 sim-seconds per wall-second**, so a wall-clock number would have made a
+> correct 1.2 s constant look like a 5-second silence. Both figures are given where they differ.
+>
+> **Where the frames are.** Every `w87/…` path below is under this session's scratchpad —
+> `C:\Users\Ljh\AppData\Local\Temp\claude\E--AI-driver\8942546c-780e-450f-ae95-3aa94e28222a\scratchpad\w87\`
+> — together with the probes that took them (`desktop.mjs`, `run2.mjs`, `run3.mjs`, `run4.mjs`,
+> `run5.mjs`, `phone.mjs`, `lib.mjs`) and their raw 10 Hz recordings (`desktop.json`, `run2.json`,
+> `run3.json`, `run4.json`, `run5.json`, `phone.json`, `deck-captions.json`, `vitest.txt`).
+
+### 1 · The manual tier — `FIXED-SEEN`. The silence is closed and the car was never a dead end
+
+Real click on the «Напреднал» pill (`[1169.7, 67.5, 85.3 × 24.5]`, `elementFromPoint` at its own
+centre returns the pill), on a car standing in D with the engine on:
+
+| | what happened | what the cockpit said |
+|---|---|---|
+| the click | selector **D → N**, `aria-pressed` moves to «Напреднал» | **+0.20 s sim** — «Скоростният лост е на N» |
+| **↓ held 9.0 s sim** (14.1 s wall) | **0.000 km/h**, selector stays N | **+1.30 s sim** — «Лостът е на N — двигателят работи, но не е свързан с колелата» |
+| **Z + ] then throttle** | N → 1st, **30.22 km/h** | — |
+
+> **Скоростният лост е на N**
+>
+> „Напреднал“ е с ръчна скоростна кутия, затова колата ти се подава на неутрална: първа предавка с
+> вдигнат съединител при спряла кола означава угасване. За да тръгнеш, задръж съединителя и включи
+> първа (Z + ]), после отпускай съединителя плавно и добавяй газ. **Стрелката надолу тук е спирачка**
+> — за движение назад е R, също със съединител.
+
+**+1.30 s sim is `STUCK_START_HINT_S` (1.2 s) landing exactly where the constant says it should.**
+The twelve-and-a-half-second silence the previous lane measured is gone, and **recovery needs no
+reload**: the clutch and first gear walk the gate normally and the car drives away at 30 km/h.
+
+**The frame that carries the whole row is `w87/R3-A2-held-6s.png`:** the cluster reads **0 км/ч** and
+**N**, «Напреднал» is the lit tier, and the card is on the glass — «Лостът е на N — двигателят
+работи, но не е свързан с колелата … Задръж съединителя и включи първа предавка (Z + ]) … В
+„Напреднал“ колата…». Also: `R3-A1-after-tier-click.png`, `R3-A2-held-13s.png` (0 км/ч · N at the end
+of the hold), `R3-A3-recovery.png`.
+
+**This corrects FR-50's own note in the table above**, which still reads „clicking it while stopped
+leaves the car in N and it never moves again (260 s of held W measured)". Held W in neutral still
+does nothing — that part was right — but the car now *says so*, and Z + ] recovers it in under two
+seconds.
+
+**Not verified:** the clutchless-shift refusal. By the time this run reached it a blocking „Учебен
+момент" had frozen the sim clock at t = 57.84 s, so `[` was pressed at a paused simulation. No claim
+is made either way. The toast reader is still proven live in that same run by the two cards above and
+by row 6's message, all read through the same `[data-hud="toasts"]` selector.
+
+### 2 · The mouse pedals — `FIXED-SEEN`. The escape hatch is real, and it is the mouse itself
+
+Negative control run FIRST, so „it did not respond" could not be a dead probe:
+
+| | measured |
+|---|---|
+| pads at spawn | СПИРАЧКА `[1142, 604, 56 × 96]` · ГАЗ `[1204, 604, 56 × 96]` |
+| **NC1** — mouse hold before any key | `data-pressed="1"` — the actuator works |
+| one 120 ms tap of ↓ | both pads gone **0.33 s** later |
+| a press on their old spot at 3 s | `elementFromPoint` returns **`canvas`** — there is still nothing to click |
+| **blackout with NO pointer activity** | **15.71 s** (in-page, 10 Hz) against a 12 000 ms constant |
+| **a real mouse movement** | pads back **1.92 s** after they vanished — **0.25 s after the move** |
+| a mouse hold after waking | `data-pressed="1"` — they still drive |
+| **NC2** — a 6 px jiggle | did **not** wake them. The 24 px threshold is real |
+| the second hide | silent (once per session) |
+
+> **Педалите се скриха — движи мишката**
+>
+> Натисна клавиш за газ или спирачка, затова екранните педали се отдръпнаха: щом караш от
+> клавиатурата, те само заемат от пътя. Не си ги загубил — върни ги веднага, като помръднеш мишката
+> или щракнеш някъде в картината. Газ и спирачка работят еднакво и от двете места, включително W и S.
+
+**The 15.71 s is honest and it is not 12.** `KEYBOARD_HIDE_MS` is 12 000 and a `setTimeout` on a box
+running four other WebKit instances ran ~3.7 s long. It is also no longer the number that matters:
+the way back is 0.25 s of mouse movement, and the card names it. Frames: `w87/B1-pads-present.png`,
+`B2-after-key.png` (the card on screen with the pads gone), `B3-returned.png`, `B4-woken.png`.
+
+### 3 · The speed cap — `FIXED-SEEN` on two tiers, and the third correctly prints nothing
+
+Full throttle on `sc-junction-stop@L1` (a 50 km/h domain map), belt on, handbrake off:
+
+| tier | mark at rest | measured | the mark turns `--warning` at |
+|---|---|---|---|
+| **Начинаещ** | «Начинаещ ≤40», muted `rgb(195,207,226)` | **39.13 km/h** | **34.83 km/h** → `rgb(180,83,9)`, and stays for 110/110 samples |
+| **Нормален** | «Нормален ≤60», muted | peak 66.96, **settles 58.7** (0.25 km/h spread over the last 7 s) | **55.10 km/h** |
+| **Напреднал** | **no mark at all** (`gov` reads `null`) | not measured — see below | — |
+
+**«Начинаещ ≤40» photographed at 37 км/ч, amber, next to the 40 limit disc:**
+`w87/R4-governor-bite.png`. What the student can read on it, in full:
+
+> Режимът „Начинаещ“ те ограничава на 40 км/ч — газта не отива по-нагоре, колата е наред.
+> Смени режима горе вдясно.
+
+**Напреднал prints nothing and that is right** — the tier has no cap (`speedCapKmh: null`), and
+printing „no ceiling" would be furniture. **Its top speed is NOT measured and no number is claimed:**
+the probe's hand-shifts stopped taking after 2nd gear and the pull ended at **55.04 km/h in gear 2**,
+i.e. gear-limited, not governor-limited.
+
+### 4 · The caption — `FIXED-SEEN`. „броим до три" is on the phone, whole
+
+**iPhone 16 portrait, deck open, real safe-area insets:**
+`w87/R5-iphone16-portrait-broim-do-tri.png`.
+
+> Пълно спиране ПРЕДИ линията: колелата неподвижни, **броим до три.**
+
+Measured in the frame, not eyeballed: caption box `[12, 314, 369 × 46]` under a `max-height: 174px`
+ceiling, `scrollHeight === clientHeight === 46`, **`clipped: false`**, and the LAST GLYPH's bottom
+edge is at **353 px against a box bottom of 360** — inside, with 7 px to spare. The text ends
+« броим до три.» The same caption also renders whole on Android 360 portrait (336 × 46), iPhone 16
+landscape (410 × 46) and Android 780 landscape (456 × 46).
+
+**Every OTHER deck caption, all five profiles** (`npm run deck:captions`, all four of its controls
+PASS on every profile — twin faithfulness, empty, 3 000-char, width):
+
+| profile | caption box | still clamped | worst |
+|---|---|---|---|
+| iPhone 16 portrait | 369 × 174 | **0 / 1811** | — |
+| Android 360 portrait | 336 × 174 | **0 / 1811** | — |
+| Desktop 1264 × 619 | 416 × 78 | **78 / 1811** | 60 px |
+| Android 780 landscape | 456 × 46 | **144 / 1811** | 48 px |
+| iPhone 16 landscape | 410 × 46 | **298 / 1811** | 48 px |
+
+**298 distinct captions are still cut somewhere, and all of them on a LANDSCAPE phone or the
+desktop.** The five worst, with the exact words a student never sees:
+
+| chars | trace | lost |
+|---|---|---|
+| 249 | `sc-rb-exit-signal/mistake-barge-entry` | «движещите се в кръга (ЗДвП чл. 50, ал. 1). „Пропусни“ не значи „чакай празен кръг“ — значи „не карай никого в кръга да намалява“.» |
+| 223 | `sc-rb-ped-exit/mistake-panic-brake` | «спирачка в пръстена запушва цялото кръгово. Правилното място е едно: джобът между кръга и пътеката.» |
+| 222 | `sc-rb-busy-gap/mistake-barge-lead` | «пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1) — дори с цената на пълно спиране на входа.» |
+| 213 | `sc-roundabout-entry/mistake-barge-entry` | «пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1) — дори с цената на пълно спиране.» |
+| 192 | `sc-accident-own-conduct/mistake-hit-and-flee` | «застраховката не плаща и щетата остава лична. След удар се спира винаги.» |
+
+### 5 · Nothing broke on the phone — and the 15 px gap is **still exactly 15 px**
+
+Four profiles, deck **closed and open**, real insets, with a negative control that was run rather
+than claimed: shifting `[data-hud="status-dashboard"]` by 40 px changed the overlap set on every
+profile, and on iPhone 16 portrait produced a **new** overlap the same code then reported
+(`touch-controls × governor-cap, 595 px²`). The transform was removed and the removal verified.
+
+| profile | deck | overlaps between PAINTED panels | controls < 44 px | dead controls |
+|---|---|---|---|---|
+| iPhone 16 portrait | closed / open | **0 / 0** | **1** / **0** | 0 / 0 |
+| iPhone 16 landscape | closed / open | **0 / 0** | **1** / **0** | 0 / 0 |
+| Android 360 portrait | closed / open | **0 / 0** | **1** / **0** | 0 / 0 |
+| Android 780 landscape | closed / open | **0 / 0** | **1** / **0** | 0 / 0 |
+
+**Said precisely, because the raw census does report intersections:** every box intersection found
+(4 closed, 5 open, per profile — e.g. `demo-deck × touch-controls = 57 564 px²`) is with
+`[data-hud="touch-controls"]`, which is `pointer-events-none absolute inset-0` — a **full-stage inert
+wrapper that paints nothing** (`TouchControls.tsx:851`). No two painted panels intersect anywhere.
+
+**The one control under 44 px is the collapsed deck pill** — «🎬 Демонстрация ▸», 134.2 × 26.5 on
+both iPhone profiles and 129.6 × 43 on the 360 Android. It is already item 8 of the 2026-08-10
+COUNT-THE-FRAME list and this gate did not make it. **With the deck open there is nothing under
+44 px on any profile.**
+
+***THE 15 px GAP — measured after this wave's work, and it has not moved.***
+
+| profile | 🔁 «Повтаряй участъка» | `[data-hud="notify-column"]` | gap |
+|---|---|---|---|
+| iPhone 16 landscape | `[482, 65, 44 × 44]` | `[541, 8, 240 × 106.3]` | **15.0 px horizontal** |
+| Android 780 landscape | `[469, 65, 44 × 44]` | `[528, 8, 240 × 106.3]` | **15.0 px horizontal** |
+| iPhone 16 portrait | `[19, 419, 44 × 44]` | `[239.5, 67, 141.5 × 106.3]` | 176.5 px |
+| Android 360 portrait | `[67, 381, 44 × 44]` | `[218.4, 8, 129.6 × 97.5]` | 107.4 px |
+
+It is **horizontal**, it is the deck's right edge against the column's left edge, and it is neither
+larger nor negative. On both portrait profiles the deck is bottom-anchored and nowhere near the
+column.
+
+### 6 · The reverse message — **it no longer appears on the gesture the brief names, and that is your own ruling**
+
+This is the row that changed under the brief, so all three routes were driven.
+
+| gesture | selector | speed under the held pedal | said |
+|---|---|---|---|
+| **hold ↓ from a roll and never lift** (rolled in at 14.6 km/h, 10.5 s of held pedal) | **stays D** | 0.001 km/h | nothing, **and correctly nothing** — LAW 1 means this never reaches R |
+| **stop, lift, press ↓ and HOLD** (the brief's gesture) | **D → R at +0.49 s** | **reverses on the same frame R appears, to −25.1 km/h** | **NOTHING, in the whole hold** |
+| **brake to a stop without lifting, then walk the gate by hand with `[`** (D → N → R) | R | **0.000 km/h** | **«Вдигни крак от педала, натисни пак» at +1.47 s sim** (+1.61 s wall) |
+
+Release and press again on that third route: first movement +0.91 s, **−12.25 km/h**. The car still
+reverses. Frame: `w87/R3-G-message.png`.
+
+**The cause is not a regression — it is a founder ruling, dated today, quoted verbatim inside the
+file that implements it** (`engine/reverseAssist.ts`, uncommitted, `M`):
+
+> „before when pressing S or Arrow Down it automatically went to R and moved backwards and it has to
+> stay like that because thats automatic transmition."
+
+LAW 2 changed from `this.disowned = true` (which is what `HEAD` still has) to
+`this.disowned = source !== "assist"`. The lane that made the change wrote its own cost down and this
+gate reproduces it to the digit — it predicted „R at +0.43 s, moving +0.08 s after that, 25.1 km/h
+backwards in a 6 s press"; this gate measured **R at +0.49 s and −25.1 km/h**.
+
+**So the message is not lost — its trigger is.** It exists for a driver whose held pedal really was a
+braking press. On the assist route there is nothing left to explain, because the car goes.
+
+**Said exactly: this gate drove ONE of the three guarded routes — the `[` keys — and photographed
+it.** The touch gear sheet and the cockpit lever were driven by the lane that made the change, whose
+own note records 0.001 km/h under a held foot on all three; those two are taken from that lane and
+are not this gate's own measurement.
+
+### 7 · Gate
+
+| step | result |
+|---|---|
+| `npx tsc --noEmit --incremental false` | **0 errors**, exit 0 |
+| `npm run validate:content` | **OK — all structural and referential checks passed** |
+| `npm run test:tools` | **290 / 290**, 0 fail |
+| `npx vitest run --maxWorkers=4` | **2 failed / 11 792 passed / 170 skipped of 11 964** — and both failures are **your two medical rows**, identified by their own assertion text: `ptp-i-parva-pomosht: only 31/64 (48 %) approved` and `l-accidents-first-aid` has no quiz beat. **No third red.** |
+
+`platform/tsconfig.json` was snapshotted before the first server started and is byte-identical at the
+end (`git diff` empty, six `include` entries). The dev server ran on **:3460** with
+`KNIJKA_DIST_DIR=.next-w87`; that directory is deleted.
+
+**One thing about this box, recorded because it cost this gate an hour.** `page.evaluate` has **no
+timeout** in Playwright — `setDefaultTimeout` does not reach it — so a single hung evaluation hangs a
+probe silently and forever behind both of its own deadlines. A 23-minute run with an idle browser
+(0 % CPU, 121 MB) and an empty log came from exactly that. Every page call in this gate goes through
+a watchdog, and the watchdog is **90 s, not 20**: the world build is a long synchronous stretch of
+the page's own main thread and `evaluate` cannot run until it yields, so a stricter watchdog is a
+random number generator.
+
+**And `localhost` is not `[::1]`.** The first hour of this gate measured a page whose body was
+literally empty and whose canvas never mounted, with no page error: Next 16 refuses cross-origin
+`/_next/*` requests, the server is bound `--hostname localhost`, and `http://[::1]:3460` is a
+different origin. It looks exactly like a broken route.
+
+---
+
+## The gate — MEASURE-THE-FRAME-AGAIN, 2026-08-11 (the seventh pass). **THE CAR IS 82.9 % LIGHTER AND IT BOUGHT ONE VERDICT OUT OF THIRTY-TWO. DRAW CALLS DID NOT MOVE BY A SINGLE CALL, AND NEVER COULD. HALF THE MATRIX WAS A NEGATIVE CONTROL AND IT CORRECTLY PAID NOTHING. THE "3.3× CHEAPER" RAILING IS 8 % CHEAPER PER METRE. THE TREE IS GREEN EXCEPT YOUR TWO MEDICAL ROWS.**
+
+> **What this gate is.** Three lanes landed uncommitted work — a decimated hero car, a CRLF repair,
+> a railing investigation. This pass believed none of it. Every number below was re-counted on the
+> running product by an instrument that cross-checks against a second, independently-authored
+> counter inside the same frame, and every picture was opened and read rather than summarised.
+> **Nothing in the working tree was edited to take a measurement** — both the car and the railing
+> were swapped by fulfilling their `.glb` over the network, per browser context. That matters here:
+> the previous railing lane made its swap by editing `WorldProps.tsx` and then reverted with
+> `git checkout --`, which destroyed ~238 lines of another lane's uncommitted work in the same file.
+
+### 1 · Draws and triangles — say it plainly
+
+**REDUCED ON 8 OF 16, UNCHANGED BY DESIGN ON THE OTHER 8, CLOSED ON NONE.** The full 16-row table,
+both counters and the budget arithmetic are in
+**[doc 82 §2.7](82_SIM_QUALITY_AND_INNOVATION.md#27-the-hero-cars-lod-and-the-parapet--counted-again-2026-08-11)**.
+The shape of it, tier low, rung 1:
+
+| tier low, rung 1 | draws before → after | vs 70 soft / 100 hard | triangles before → after | vs 250k / 300k |
+| --- | --- | --- | --- | --- |
+| pe-cane-v1 | 153.8 → **153.5** | FAIL **1.54× hard** | 168,167 → **114,402** (−32.0 %) | **PASS** |
+| d2-v1 | 214.0 → **214.0** | FAIL **2.14× hard** | 1,137,300 → **1,083,086** (−4.8 %) | FAIL **3.61×** |
+| sp-creep-v1 | 173.7 → **174.1** | FAIL **1.74× hard** | 230,619 → **176,405** (−23.5 %) | **PASS** |
+| ov-crest-v1 | 182.6 → **182.4** | FAIL **1.82× hard** | 487,766 → **433,633** (−11.1 %) | FAIL **1.45×** |
+
+**DRAW CALLS DID NOT MOVE ANYWHERE.** Across all 16 configurations the entire range of movement is
+**−0.3 to +1.5 draws**, which is inside session drift. This was never in doubt and is worth saying
+once plainly: **decimating a mesh removes triangles from a submission, it does not remove the
+submission.** The draw budget — the axis every one of these districts fails on — cannot be fixed by
+making assets lighter. **0 of 16 pass the draw budget, exactly as before this wave (15 FAIL, 1 WARN).**
+
+**Exactly one verdict in the whole matrix moved:** `ov-crest-v1 med L1` triangles, FAIL → WARN
+(925,923 → 819,529 against a 900k hard cap). Triangles overall: 8 PASS / 1 WARN / 7 FAIL →
+**8 PASS / 2 WARN / 6 FAIL**.
+
+### 2 · Half the matrix was a negative control, and it paid nothing
+
+From the driving seat **your own car is never drawn** (`HeroCarBody` sits inside
+`<group visible={!cockpitView}>`). At rung 1 the 65,434 triangles in a cockpit frame are the
+**demonstration ghost**, which loads the same file. At rung 3 there is no ghost either — the census
+reads **0 hero triangles visible in both arms** — so an 82.9 % cheaper car must buy **exactly
+nothing** there. It did: the eight rung-3 deltas are **0, 0, 0, −22, −48, −110, −116 and +1,004
+triangles**. A lane that reported a saving on those rows would have been measuring its own noise.
+
+### 3 · The instrument, and why you can believe it
+
+Counter A is a from-scratch raw WebGL wrapper; counter B is the product's own `PerfProbe`. **Worst
+disagreement across 16 configurations: 1.21 draw calls, 1.37 % of triangles**; all four `d2-v1`
+configurations agree **to the digit**. It also reproduces numbers it never saw — the committed
+`MEASURED_FRAMES` rows for `d2-v1` low L3 (190.8 / 1,070,484) and med L1 (422.0 / 1,930,283) come
+back **exact**, and the sixth pass's independently-recorded `d2-v1` low L1 (1,137,300) reproduces
+exactly. **32 of 32 windows live, 0 rejected, 0 page errors**, four liveness assertions each
+(rAF, GL draws, the sim clock, the car's displacement), stations matched to ≤ 0.1 m.
+
+### 4 · The seat, photographed — and the diff image read, not summarised
+
+| | pixels changed | mean Δ |
+| --- | --- | --- |
+| cockpit, the change | **1.752 %** | 0.291 |
+| cockpit, **noise floor** — the same car photographed twice | **2.154 %** | 0.403 |
+| cockpit, **positive control** — cockpit hidden | **32.733 %** | 25.771 |
+| cockpit **rung 3**, the change | **0.005 %** | 0.003 |
+| chase cropped to the car | 3.605 % (floor 1.324, control 68.137) | 0.868 |
+
+**From the seat the change is smaller than the frame's own noise.** The difference image says why:
+the pixels that differ are almost all the **level-1 guidance ribbon** — the blue chevrons down the
+road — and the green lane guide, and *those same chevrons appear identically in the control where
+nothing was changed at all*, because the ribbon animates between shutter releases. What is actually
+the car is **a few pixels at the vanishing point** where the ghost sits ~50 m ahead. Dash, wheel,
+binnacle, A-pillar, mirror: **bit-identical**. The positive control turns that whole cockpit solid
+blue, so the instrument is provably not blind to what it called unchanged.
+
+**From the chase camera the car does change, faintly** — a one-pixel dotted trace around the
+silhouette and mottled specular banding on the lower boot lid and rear bumper, visible at 3×.
+Tail bar, mirrors, wheels and roofline unchanged. That is the only camera in the product that ever
+sees the shell, and at 6.0 m it is the closest one; hence one LOD, not two.
+
+### 5 · The railing — the premise was wrong
+
+`railing_run_6m.glb` is **111.0 tris/m**; `railing_segment.glb` is **102.0 tris/m**. **The "3.3×
+cheaper" was a 6-metre panel compared against a 2-metre panel — per metre of fence it is 8.1 %
+cheaper.** Two real swaps exist, measured on `ov-crest-v1` with 83 panels:
+
+| tier | railing | triangles | Δ | verdict |
+| --- | --- | --- | --- | --- |
+| low | ships today (672/panel) | 433,784 | — | FAIL **1.45× hard** |
+| low | tiled (612) | 426,418 | −7,365 | FAIL **1.42×** |
+| low | stretched (204) | 385,722 | **−48,061** | FAIL **1.29×** |
+| med | ships today | 815,696 | — | WARN 0.91× |
+| med | stretched (204) | 759,739 | −55,957 | WARN 0.84× |
+
+**Neither swap changes a verdict anywhere**, and draws cannot move at all (the parapet is one
+`InstancedMesh`, ~1.2 draws). The tiled swap is visually indistinguishable and worth ~1.5 % of the
+frame. The stretched swap is the only one that reaches the headline number and it is **visibly
+worse** — baluster pitch 0.143 → 0.432 m, and you see straight through it. Photographs at two
+stations, poses matched to 2 cm. **Nothing was committed; the repo renders the shipped railing.**
+
+**The lever on that district is the parked-car row (35.8 % of tier-low triangles, 177,805, on a
+90 km/h rural road) and the trees (18.9 %) — not the fence (13.8 %).**
+
+### 6 · The gate
+
+`cd platform && npx tsc --noEmit --incremental false` **exit 0** · `npm run validate:content`
+**exit 0** · `npm run test:tools` **290/290** · `npx vitest run --maxWorkers=4` →
+**Test Files 2 failed | 769 passed | 1 skipped (772); Tests 2 failed | 11,660 passed | 170 skipped
+(11,832); 0 timeouts.**
+
+**The baseline is EXACTLY 2, and both are yours.** Anything else is a regression, not the weather:
+
+| # | file | test | owner |
+| --- | --- | --- | --- |
+| 1 | `platform/src/modules/lesson/__tests__/compose.test.ts` | „gives every lesson at least one quiz beat" — `l-accidents-first-aid` | **founder** — medical quarantine ruling |
+| 2 | `platform/src/modules/exam/__tests__/content-bank.test.ts` | „has no dark, threadbare or under-represented topic" — `REVIEW_DEBT`, `ptp-i-parva-pomosht` 31/64 (48 %) | **founder / content review** |
+
+Hygiene: `platform/tsconfig.json` include is **6 entries** and `git diff` on it is **empty**; no
+probe of this wave is in the repo (every instrument lives in the scratchpad); no dist directory was
+created. **Still no frame time anywhere** — headless chromium transfers draw and triangle counts,
+not milliseconds.
+
+---
+
+## The gate — COUNT-THE-FRAME AGAIN, 2026-08-11 (the sixth pass). **ALL 16 CONFIGURATIONS ARE STILL OVER THE DRAW BUDGET — 15 OF THEM OVER THE HARD CAP — AND 7 OF 16 ARE STILL OVER THE TRIANGLE CAP. EVERY ONE IS SMALLER THAN IT WAS. THE MIRROR FIX REPRODUCES TO THE DIGIT ON A COUNTER THAT NEVER SAW IT, THE WORLD IS NOT EMPTIER AND THE DIFF IMAGE SAYS WHY, AND THE DESKTOP DECK IS CLOSED — 24 OF 24 CLEAN.**
+
+> **Why this gate exists, again.** The row it verifies was opened because an ESTIMATE was believed
+> instead of a measurement. So nothing below was read back out of the row's own files: every number
+> came from an instrument written from scratch for this gate, run on the running product, and
+> cross-checked against a second counter inside the same frame. Where my numbers disagree with the
+> committed ones, I say so. **Three times my own instrument tried to lie to me and was caught — all
+> three are written down below, because a probe whose failures are hidden is worth nothing.**
+
+### 0 · The instrument, and the three times it nearly lied
+
+**Counter A (mine):** `drawArrays / drawElements / drawArraysInstanced / drawElementsInstanced /
+drawRangeElements` wrapped on both GL context prototypes in an `addInitScript`; passes split on
+`bindFramebuffer` + `viewport`; frames delimited by an rAF chain registered **before any page
+script**. `/dev/drive-rig`, canvas **1264 × 619 dpr 1** pinned by a trusted `KeyX`, seatbelt
+buckled, rolling at 20 km/h, 8-second windows, **457–496 whole frames per window, 0 page errors on
+all 56 windows.**
+
+**Counter B (not mine):** the PRODUCT'S OWN `PerfProbe` (`?simPerf=1`), which accumulates three's
+`gl.info.render` with `autoReset` off. Different author, different arithmetic, same frame. **Worst
+disagreement across all 16 configurations: 1.36 draw calls and 1.40 % of triangles; on five of them
+the two agree to the digit.**
+
+**BEFORE is not a second build.** Every renderer change under verification is uncommitted, so HEAD
+would be a legitimate before — but HEAD also lacks another lane's signal-lens geometry sitting in
+the same tree, so a two-build A/B would measure a content change and a renderer change together.
+Each fix is put back on the LIVE scene graph instead, in a fresh page load driven by the SAME script
+from the SAME scripted start, so before and after are **the same station** and that claim is
+auditable: every window records the car's start position, and all 16 pairs match to ≤ 0.2 m.
+
+**LIE 1 — the world was paused and both obvious counters kept running.** The first version measured
+three windows in one session. On a short scenario map the car crosses the pedestrian path, a
+„Учебен момент — Пауза" card fires, and the world stops while rAF and the raw GL counter keep
+advancing. Telemetry froze at t = 32.40 s, y = 92.3 m and never moved again; `speedKmh` read a stale
+19.6 for two whole windows. Caught by a fourth assertion — **THE CAR AND THE MAIN CAMERA MUST BOTH
+HAVE MOVED ≥ 30 m** — and fixed by giving every window its own page load and dismissing teach cards
+through their own button (never `Space`: `Space` is the parking brake on `CabinControls`' window
+listener).
+
+**LIE 2 — „every transparent DoubleSide material with `forceSinglePass === true`" is not „the
+materials the fix set".** `three/src/materials/ShaderMaterial.js:212` overrides the default to
+**true**, so that filter also sweeps up every ShaderMaterial in the scene — measured, 3 of them at
+rung 3, where there is no ShadowCar ghost at all. The first BEFORE therefore charged the fix for
+draws it never removed. Measured directly by flipping ONLY the excluded set: **+3.3 to +9.0 draws**,
+depending on tier and rung. Every BEFORE number below was re-measured with the corrected ablation —
+16 more windows — rather than corrected on paper.
+
+**LIE 3 — WebKit silently refuses the port the server was on.** The deck survey sat for 15 minutes
+producing nothing: `Not allowed to use restricted network port 4190` — 4190 is on the Fetch spec's
+bad-port list (sieve). A page that never loads has no HUD boxes, so **the survey would have reported
+a perfect zero for a defect it never looked at.** The server was moved to 4300.
+
+The reconstruction is checked against the two earlier lanes' file-restored baselines, and it lands
+on them: `d2-v1` low L1 **249.6** vs their 249.2, low L3 **203.3** vs 203.2, med L1 **500.0** vs
+500.0 exactly, and med triangles **3,411,185** vs 3,411,185 to the digit.
+
+### 1 · Draws and triangles — say it plainly
+
+**REDUCED, NOT CLOSED, on every one of 16 configurations.** Draws fell 5–18 %, triangles 4–40 %.
+**0 of 16 pass the draw budget** (15 FAIL, 1 WARN). **8 of 16 pass the triangle budget**, 1 WARN,
+7 FAIL. The full table and the per-mechanism split are in
+**[doc 82 §2.6](82_SIM_QUALITY_AND_INNOVATION.md#26-what-the-frame-actually-costs--counted-before-and-after-2026-08-10)**;
+the shape of it:
+
+| tier low, level 1 | draws before → after | vs 70 soft / 100 hard | triangles before → after | vs 250k / 300k |
+| --- | --- | --- | --- | --- |
+| pe-cane-v1 | 184.5 → **153.6** | FAIL, **1.54× hard** | 239,123 → **168,131** | **PASS** |
+| d2-v1 | 249.6 → **214.0** | FAIL, **2.14× hard** | 1,763,150 → **1,137,300** | FAIL, **3.79×** |
+| sp-creep-v1 | 203.5 → **172.0** | FAIL, **1.72× hard** | 307,408 → **230,334** | **PASS** |
+| ov-crest-v1 | 215.5 → **182.7** | FAIL, **1.83× hard** | 573,528 → **490,142** | FAIL, **1.63×** |
+
+**Rung 3 is not rescued by the aid stack dropping.** `pe-cane-v1` low L3 is **126.4** draws (still
+1.26× the hard cap) and `d2-v1` low L3 is **190.7** (1.91×). The single non-FAIL cell in the whole
+matrix is `pe-cane-v1` med L3 at 217.6 draws — a WARN, because the med hard cap is 250.
+
+**Eight of these rows overlap the numbers committed in `frameCost.ts`, and all eight reproduce**
+within 1.9 % on draws and 1.6 % on triangles — five of them to under 0.2 % (`d2-v1` low L1 triangles
+1,137,300 against a recorded 1,137,303). Nothing in that file needed changing and nothing in it was
+changed.
+
+### 2 · The mirror — per entry, its cadence, and photographed from the seat
+
+Isolated in the same session by re-showing exactly the meshes the per-instance cull hid:
+
+| district (level 1) | mirror draws / entry | mirror triangles / entry | entry cadence |
+| --- | --- | --- | --- |
+| d2-v1 low | 83.0 → **20.1** (−75.8 %) | 492,716 → **130,430** (−73.5 %) | 25.0 % of frames |
+| ov-crest-v1 low | 73.7 → **33.0** (−55.2 %) | 327,862 → **226,242** (−31.0 %) | 25.1 % |
+| sp-creep-v1 low | 62.8 → **33.9** (−46.1 %) | 117,911 → **80,150** (−32.0 %) | 25.2 % |
+| pe-cane-v1 low | 41.0 → **27.0** (−34.2 %) | 51,261 → **43,240** (−15.6 %) | 25.1 % |
+| d2-v1 med | 84.0 → **20.1** (−76.1 %) | 571,468 → **161,133** (−71.8 %) | 50.1 % |
+
+`d2-v1` low reproduces the row's own claim (83.0 → 20.0 draws, 492,716 → 128,996 triangles) **on the
+before column to the digit**. Cadence is untouched: 25.0–25.2 % at low, 49.9–50.1 % at med, exactly
+`MirrorRig`'s constants. Whole-frame, the cull alone is worth −3.3 to −15.8 draws at low and −6.9 to
+−32.0 at med, which is the per-entry delta times the cadence, as it should be.
+
+**PHOTOGRAPHED FROM THE DRIVING SEAT, and the glass was found by pointer identity, not by name:** the
+mirror mesh is the one whose material `map` **IS** the 256 × 96 render target's texture
+(`hotspot_mirror_rear`), and its own geometry corners were projected through the live main camera to
+give the crop. `scratchpad/mframe/mirror/d2-v1-low-seat-AFTER.png` is the cockpit; the 6× crop
+`d2-v1-low-glass0-AFTER.png` shows **asphalt, the lane behind, the blue guidance ribbon, a building
+with lit windows, five trees and the Vitosha ridge.** Mean glass luminance **122.55 (after) vs 122.58
+(before)** at tier low and 133.55 vs 133.57 at med — the glass is not dimmer and it is not black.
+The positive control (`d2-v1-low-glass0-CONTROL.png`, every InstancedMesh hidden for the pass) has
+**no trees at all** and moves 4.83 % of channels, so the instrument can see a removed object.
+
+### 3 · The world did not get emptier — and the diff image was opened
+
+One page, one station, the car at a standstill with the brake held, the framebuffer read back with
+`gl.readPixels` (not a compositor screenshot), and the ONLY thing that changes is the fix. Liveness
+around every capture on three counters, and the third cannot be fooled by a paused scene: **the sim
+clock** (`__driveRig.last.tSec`) advanced 0.5–1.2 s around every one.
+
+| d2-v1 low L1 (89 meshes flipped, 117 unhidden in the mirror) | pixels differing > 8/255 | mean \|Δ\| |
+| --- | --- | --- |
+| same state twice, 900 ms apart (the noise floor) | **1.726 %** | 0.345 |
+| mirror per-instance cull ON vs OFF | **1.518 %** | 0.282 |
+| the whole renderer wave ON vs OFF | **0.473 %** | 0.081 |
+
+**Both A/Bs move FEWER pixels than two frames of the same state do.** `sp-creep-v1` says the same
+(1.981 % floor, 1.841 % mirror, 0.574 % wave).
+
+**And the diff image says what the differing pixels are, because I opened it.**
+`scratchpad/mframe/emptier/d2-v1-mirrorCull-overlay.png` and `-wholeWave-overlay.png` paint every
+differing pixel magenta over the frame: they are **the animated blue guidance ribbon down the middle
+of the road, and its reflection inside the mirror. Nothing else.** No tree-shaped hole, no missing
+signal head, no building silhouette, no missing kerb, no missing parked car. The same-state control
+overlay is magenta in the *same* pixels, which is the whole argument.
+
+### 4 · The desktop deck — 24 of 24 clean, and my own probe's transient caught
+
+WebKit (the engine the deck lane measured on), **6 profiles × 2 deck states × cards-up AND
+cards-dismissed = 24 rows**, `sc-zebra-approach@L1`, 0 page errors, three liveness counters on every
+row. **Result: 0 overlaps, 0 dead controls, and the map toggle ALIVE in every desktop row. All four
+phone profiles are still 0.**
+
+**One row initially read 3 overlaps / 1 dead / map toggle DEAD, and it was my probe, not the
+product.** That row — the first of the sweep — measured a stage of **851 × 479** where all 23 other
+rows measured 1248 × 519 (or the phone's full viewport): the shell had not finished sizing the stage
+ten seconds after load. Re-run at the same profile and state with a 20 s settle: **0 overlaps, 0
+dead, map ALIVE.** The stage box is now recorded on every row so a transient can never masquerade as
+geometry again.
+
+**NEGATIVE CONTROL — the fix is doing the work, and it is not subtle.** Injecting a stylesheet that
+puts the open roomy deck back in the RIGHT corridor reproduces the defect immediately: at
+1264 × 619 with the briefing up, **63,072 px² of overlap and 12 dead controls**, the map toggle
+occluded by `div@demo-deck:"⏸⏮⏭0.25×0.5×1×🔁 Участък"`; at 1440 × 900, 1,600 px² and the map toggle
+dead whenever the deck is open. Shipped geometry: deck `[20, 304, 416 × 199]` on the left, column
+`[924, 144.5, 320 × 316.6]` on the right, map toggle `[1204, 463, 40 × 40]` answering itself.
+
+### 5 · The gate
+
+`tsc --noEmit --incremental false` **0** · `validate:content` **OK — all structural and referential
+checks passed** · `test:tools` **290 / 290** · `vitest run --maxWorkers=4` **8 failed / 11,626 passed
+/ 170 skipped (11,804), 7 files**. `platform/tsconfig.json` `include` is **6 entries** and `git diff`
+on it is empty. No probe was written into the repo; `.next-mframe` was deleted.
+
+**EIGHT IS OVER THE STATED BASELINE OF FOUR, AND I AM NOT ROUNDING IT OFF. This row changed no
+source file at all — only these two documents — so none of the eight can be mine, and each traces to
+a file another lane is holding open in this shared tree:**
+
+* **six trace-determinism failures** — `sc-jx-giveway-b1/mistake-barge-priority`,
+  `sc-junction-gap/mistake-cut-gap`, `sc-junction-gap/mistake-creep-out`,
+  `sc-hz-emergency-stop/shadow-correct`, `sc-junction-left/mistake-cut-gap`,
+  `sc-junction-left/mistake-creep-out` — map **1:1 onto the six `content/traces/*.trace.json` files
+  that `git status` shows modified and uncommitted** (plus their `platform/public/traces` copies).
+  Owner: the trace-recording lane.
+* **`src/modules/clips/clipPlan.test.ts`** fails at import with *„replay of `sc-jx-giveway-b1__m0`
+  does not match the committed trace"* — the same root cause, same owner. (It reports as a seventh
+  failed FILE with 0 tests, which is why files = 7 and tests = 8.)
+* **`src/modules/lesson/__tests__/compose.test.ts` — „gives every lesson at least one quiz beat"**.
+  Owner: the lesson-content lane.
+* **`src/modules/exam/__tests__/content-bank.test.ts` — „has no dark, threadbare or
+  under-represented topic"**. Owner: the exam content-bank lane; `validate:content` prints the same
+  shortfall (16 topics short, worst `patni-znatsi` +12).
+
+The baseline itself has now drifted four times in one day (4 → 5 → 8 → 9 → 8 across five gates) and
+is no longer a usable gate line. **Handed up, not closed over. Nothing was committed.**
+
+---
+
+## The gate — COUNT-THE-FRAME, 2026-08-10 (the fifth pass of the day). **THE BREACH IS REDUCED, NOT CLOSED: 14 OF 15 CONFIGURATIONS STILL FAIL THE DRAW BUDGET. TRIANGLES NOW PASS ON FIVE OF SIX DISTRICTS. THE WORLD IS NOT EMPTIER AND THAT IS MEASURED, NOT ADMIRED. THE AXIS IS SHUT. AND THE OPEN DECK STILL CANNOT BE CLOSED ON A 619 px SCREEN.**
+
+> **Why this gate exists.** The row being verified was opened because an ESTIMATE was believed
+> instead of a measurement. Verifying it by reading its own numbers back would have repeated exactly
+> that. So every number below comes from an instrument written from scratch for this gate, run on
+> the running product, and cross-checked against a second, independent counter inside the same frame.
+
+### 0 · The instrument, and why you may believe it
+
+A raw WebGL counter: `drawArrays / drawElements / drawArraysInstanced / drawElementsInstanced /
+drawRangeElements` wrapped on both context prototypes in an `addInitScript`, passes split on
+`bindFramebuffer` + `viewport`, frames delimited by an rAF chain registered **before any page
+script** so every app render lands strictly between two of my ticks. `/dev/drive-rig`, canvas
+**1264 × 620 dpr 1** pinned by a trusted `KeyX`, seatbelt buckled, rolling at 20 km/h, 8 s windows,
+426–508 whole frames per run, **zero page errors on every run reported here**.
+
+Three independent checks that it is counting the right thing:
+
+1. **Three.js's own `renderer.info.render` counters**, accumulated per frame through a
+   `WebGLRenderer.render` wrap in the *same* run, agree **to the digit on all 30 runs** — e.g.
+   pe-cane low L1 = 156.64 GL draws / 156.64 three draws, 170,203 / 170,203 triangles.
+2. **The mirror pass lands on `MirrorRig`'s own cadence constants**: present in 24.8–25.1 % of
+   tier-low frames, 49.9 % at med, and 49.8 % + 25.0 % + 25.0 % at high (rear every 2, doors every 4).
+   Only whole frames can produce that.
+3. **It reproduces the row's own after-numbers to <1 %** where they overlap, and d2-v1 low L3 to the
+   decimal (206.50 vs 206.5) and d2-v1 med to six triangles out of 2.24 million.
+
+The BEFORE column is the same rig in the same session with both fixes reversed **on the live scene
+graph** — no repo file was edited to get it — minus the chunk grid's extra submissions, removed
+arithmetically because chunking is a build-time change (`(chunkMeshes − chunkFamilies) ×
+(1 + mirrorFrameFraction)`; exact for draws, zero for triangles). That reconstruction lands within
+1.5–2.6 % of the two earlier lanes' file-restored baselines, which is the check that it is honest.
+
+### 1 · Draws and triangles — the answer in one line, then the table
+
+**The breach is REDUCED, not CLOSED.** Draws fell 6–19 %, triangles 12–34 %, and **14 of 15
+configurations still fail the draw budget**. The one exception is the lightest district at the most
+generous tier (pe-cane high = WARN at 1.01× the soft line). Full table, per-pass breakdown and the
+mechanism split are in **[doc 82 §2.6](82_SIM_QUALITY_AND_INNOVATION.md#26-what-the-frame-actually-costs--counted-before-and-after-2026-08-10)**;
+the headline rows:
+
+| tier low, level 1 | draws before → after | vs 70 soft / 100 hard | triangles before → after | vs 250k / 300k |
+| --- | --- | --- | --- | --- |
+| pe-cane-v1 | 185.7 → **156.6** | FAIL, **1.57× hard** | 239,852 → **170,203** | **PASS** |
+| d2-v1 | 256.6 → **233.5** | FAIL, **2.34× hard** | 1,764,900 → **1,228,234** | FAIL, 4.1× |
+| sp-creep-v1 | 208.2 → **183.7** | FAIL, **1.84× hard** | 308,562 → **241,420** | **PASS** |
+| ov-crest-v1 | 220.0 → **192.6** | FAIL, 1.93× hard | 575,331 → **505,776** | FAIL |
+| hz-roadworks-v1 | 207.7 → **182.9** | FAIL, 1.83× hard | 242,261 → **200,208** | **PASS** |
+| mw-v1 | 151.2 → **123.1** | FAIL, 1.23× hard | 231,712 → **161,801** | **PASS** |
+
+The triangle axis is the real win and it is worth saying out loud: **after the fix, tier-low
+triangles PASS on five of the six scenario districts measured.** The two that still fail fail on
+content — d2-v1 carries 4,276 trees against a 105-district median of 70.
+
+**Every rung, not just rung 1.** pe-cane at L3 is 129.7 draws (still 1.30× the hard cap);
+d2 at L3 is 206.5. **A student on rung 3 is not rescued by the rung-1 aid stack dropping.**
+
+**The chase camera, counted for the first time — and the standing guess was wrong.** Cockpit →
+chase is **−37 draws / +54k triangles** on pe-cane and **−44 draws / −27k triangles** on d2. It is
+*cheaper*, because the 56-draw cockpit is hidden and one GLB replaces it. The estimate this retires
+was "plausibly +40 draws and +130k triangles". Frame: `scratchpad/vf/runs/CHASE-PROOF.png`.
+
+### 2 · The gate itself — it refuses, and I tried three ways past it
+
+* `scoreFrameDrawBudget(world.stats.staticDrawSlots)` → **TS2345, `number` is not assignable to
+  `MeasuredFrame`**. A hand-written object literal that merely *looks* like a frame → TS2345 too.
+  An `as unknown as MeasuredFrame` cast **compiles** — every nominal type in TypeScript has that
+  door, and it is a deliberate lie rather than the accident this gate exists to stop.
+* `measuredFrame()` throws `NotAMeasurementError` on empty provenance, on `canvas: "1264x620"`
+  (an `x` instead of `×`), on 59 frames, and on a zero count. **A caller willing to forge a
+  provenance string still gets through** — stated here rather than discovered later.
+* **The teeth, on real districts:** on all six measured districts the OLD comparison
+  (`staticDrawSlots ≤ PERF_BUDGETS.low.drawCalls`) scores **pass** — 47, 70, 45, 50, 54, 36 against
+  70 — while the measured frame scores **fail**, 3.2×–4.0× larger. Rebuilt through the real
+  `buildWorldGeometry` over all **105 shipped districts**: the derived slot count reproduces the
+  builder's published number on every one, range 36–70.
+* **The ceiling is a bound, not decoration:** measured frames sit 8.5 % (d2 med) to 42.3 % (mw low)
+  under it, and a frame one draw over is rejected by the same assertion `frameCost.test.ts` makes.
+* **What it cannot do:** the ceiling and the ratchet cover only the **6 districts in
+  `MEASURED_FRAMES`**. A seventh district — or an existing one made heavier — is not caught by
+  anything until somebody re-measures it.
+
+### 3 · The world did not get emptier — and this is the strongest form of that question
+
+Not two frames 0.3 m apart. **One page, one station, one canvas, the car at a standstill, and the
+only thing that changes between the two screenshots is `frustumCulled`,** flipped on the live scene
+graph and flipped back. Liveness is asserted around every shot (a rAF counter and a draw counter
+must both advance) because a teach card pauses the scene and a diff across a paused scene is
+trivially zero — the first run of this probe returned exactly that, and it was thrown away.
+
+| district | instanced meshes flipped | culling ON vs OFF (673–683 ms apart) | SAME state, culling on both times (1,061–1,154 ms apart) |
+| --- | --- | --- | --- |
+| d2-v1 | 89 | **0.714 %** of pixels, mean Δ 0.454 / 255 | 1.100 %, mean Δ 0.690 |
+| sp-creep-v1 | 18 | **0.748 %**, mean Δ 0.597 | 1.118 %, mean Δ 0.777 |
+| ov-crest-v1 | 26 | **0.778 %**, mean Δ 0.665 | 1.199 %, mean Δ 0.829 |
+
+**The picture is the same picture.** The differing pixels sit in the identical bounding box in both
+diffs (x 353–1028, y 342–538 on d2), and the diff image
+(`scratchpad/vf/emptier/d2-static-diff.png`) says what they are without ambiguity: **the animated
+blue guidance ribbon down the middle of the road, and the playhead ring on the scrub bar. Nothing
+else.** No tree-shaped hole, no sign-shaped hole, no building silhouette, no missing shelter — the
+buildings, trees, signals, markings and parked cars are pixel-for-pixel identical with 89 instanced
+meshes culled and with none of them culled. Nothing was removed to buy budget.
+
+*(Honest caveat on the two columns: the self-control interval is ~1.6× longer than the A/B interval,
+so it is not a normalised noise floor. It does not need to be — the diff image shows the differing
+region is the ribbon in both, and the ribbon is animation.)*
+
+### 4 · The terminus — the AXIS is shut, measured in metres and photographed at his station
+
+`sp-creep-v1`, seat at **x = 4.06 (LANE_WIDTH_M / 2), y = 294.13**, the drive-rig readout ON so the
+pixels carry their own station, both frames cropped through **one tool at one region**
+(x 382–882, y 150–430 of a 1264 × 620 canvas).
+
+* **BEFORE** (`scratchpad/vf/terminus/BEFORE-axis.png`, readout `x=4.1 y=294.1`): the trees stand on
+  the flanks and straight down the road's own line there is open plain, a haze band and distant
+  hills.
+* **AFTER** (`scratchpad/vf/terminus/AFTER-axis.png`, readout `x=4.1 y=294.1`): the same trees, and
+  the street runs into a stepped building mass edge to edge.
+
+**In world metres, by ray cast from that exact eye:** the on-axis ray hits `closure:sp-n-end` at
+**84.0 m**, subtending **12.88°** of elevation. Every ray from **−12° to +10.75°** hits closing mass;
+the first open sky is at **+11°**. The two halves are x ∈ [−20, 5] at y 378–392 (h 20.4 m) and
+x ∈ [−5, 20] at y 384–398 (h 14.69 m) — the seat at x = 4.06 sits **inside the 10 m overlap**, which
+is why no slit can open on the one line the driver looks down. The step is visible as the 84 → 90 m
+jump between 0° and +1°. Catalogue: **458 volumes on 101 of 105 districts**; the four without are
+d2-v1, district-v1, poligon-v1 (not scenario maps) and mw-v1 (class `motorway`, deliberately).
+
+*The BEFORE frame required disabling the closure. `terminus.ts` is an untracked file belonging to
+this row alone; it was patched for ~3 minutes and restored, and its SHA-256 is byte-identical
+before and after (`f057bfcb…f054854`). No other repo file was touched by this gate.*
+
+### 5 · The desktop deck — two of three closed, and the third is worse than reported
+
+WebKit (the engine the deck lane measured on), 6 profiles × 2 deck states, `sc-zebra-approach@L1`,
+0 page errors. **Every overlap, in px²:**
+
+| profile | deck state | HUD overlaps | dead controls | map toggle |
+| --- | --- | --- | --- | --- |
+| desktop 1264 × 619 | open, briefing card up | **@demo-deck × @notify-column = 40,691 px²** | **8** | clear |
+| desktop 1264 × 619 | open / collapsed, cards dismissed | none | 0 | clear |
+| desktop 1440 × 900 | open and collapsed | none | 0 | clear |
+| iPhone 16 portrait 393 × 852 | open and collapsed | none | 0 | n/a |
+| iPhone 16 landscape 852 × 393 | open and collapsed | none | 0 | n/a |
+| Android 360 × 780 | open and collapsed | none | 0 | n/a |
+| Android 780 × 360 | open and collapsed | none | 0 | n/a |
+
+* **THE MAP TOGGLE IS ALIVE.** [1204, 463, 40 × 40], `elementFromPoint` at its own centre returns the
+  toggle in **both** deck states at 1264 × 619. The deck ends at x 1196 — an 8 px gutter.
+* **THE TICKS DO NOT OVERLAP.** Four ticks at x 925 / 962.8 / 1085.3 / 1175, 20 × 28 each; closest
+  gap 17.8 px. Swept independently over **all 503 shipped traces / 1,870 annotations**: the pre-fix
+  layout produces **112 overlapping pairs, worst exactly 560 px²**; the shipped layout produces
+  **0**, narrowest slot 5.83 px, and the merge is lossless (43 annotations merged = 43 coincident
+  pairs, and `sc-zebra-approach/shadow-correct`'s five annotations — two at 21.1333 s — become four
+  ticks, which is what the DOM shows).
+* **NEGATIVE CONTROL.** Injecting a stylesheet that puts the deck's right edge back
+  (`right:12px; width:20rem`) reproduces the defect immediately: deck [924, 328, 320 × 175], the map
+  toggle occluded by `div@demo-deck:"⏸⏮⏭0.25×0.5×1×🔁 Участък"`, 12 dead controls, 42,592 px² of
+  overlap. The fix is doing the work.
+* **AND THE ONE THAT IS NOT FIXED IS WORSE THAN "9 CONTROLS OCCLUDED".** At 1264 × 619 with the
+  briefing card up — the state the lesson ships in — 8 deck controls answer the notification column,
+  and **one of them is the deck's own close toggle**. My probe tried three forced clicks on it and
+  the deck stayed `data-deck-open="true"`. The toggle carries `tabIndex={-1}`, so there is no
+  keyboard route either. **On a 619 px-tall window, while the briefing card is up, the demonstration
+  deck cannot be closed and none of its transport works.** The student's only route out is to notice
+  the 18 × 18 px «Скрий инструкциите» button and dismiss the briefing first — with that done, the
+  same profile measures **0 overlaps and 0 dead controls in both deck states**, which is how I know
+  the deck's own geometry is right and the collision is with the column. Clear at 1440 × 900 and on
+  every phone. Same class of defect as the landscape-phone fix, at a different size.
+* Residual, measured: the collapsed pill is **134.2 × 26.5 px** on every phone — the one control
+  that opens the deck is 26.5 px tall against the 44 px rule row C6 closed on.
+
+### 6 · The gate
+
+`tsc --noEmit --incremental false` **0** · `validate:content` **OK — all structural and referential
+checks passed** · `test:tools` **290 / 290** · `vitest --maxWorkers=4` **5 failed / 11,646 passed /
+170 skipped (11,821), 4 files**. `platform/tsconfig.json` `include` is still **6 entries** and
+`git diff` on it is empty.
+
+**THE FIFTH IS A STOP, AND IT IS NOT THIS ROW'S.**
+`src/components/sim/lesson-ui/mistakeBadge.test.tsx > cites the speeding FIRST and the strike LAST`
+fails `expected ['COLLISION', …] to deeply equal ['SPEEDING_OVER_LIMIT', …]`. Provenance, checked
+rather than asserted: the test file is **untracked** (`??` — brand new), and its entire import graph
+(`MistakeConsequenceOverlay.tsx`, `@/modules/sim/rules` index/catalog/consequences,
+`lessons/scenario/templates`) is in the collision-billing lane's modified set, including a
+**+1,590-line live edit to `rules/consequences.ts`** whose own new prose argues for putting COLLISION
+first. Nothing in this row's file set appears in that graph. Re-run of this row's own suites in
+isolation — `sim/world`, `sim/environment`, `sim/hud`, `annotationTicks` — is **130 files / 2,226
+tests, all passing**. The other four are the stated baseline (clipPlan ×2, exam content-bank, lesson
+compose). **Handed up, not closed over. Nothing was committed.**
+
+Housekeeping: `platform/.next-c5rsw` (454 MB, dated 2026-08-04) is still on disk and is not this
+row's; the other two stale dist dirs are gone.
+
+---
+
+## The gate — PHANTOM-CRASH, 2026-08-10 (the fourth pass of the day). **THE −10 HE ASKED ABOUT IS LAWFUL AND THE CRASH IT WAS ATTACHED TO NEVER HAPPENED. REPRODUCED ON A SHIPPED LESSON, BOTH CODEPATHS, ONE DRIVE. AND THE EXACT TEST FOUND THREE CONTACTS THE CIRCLES NEVER SAW — INCLUDING A CHILD.**
+
+> **His words.** „investigate why this is happening and fix it — make it mathematically properly,
+> verify with your eyes." The thing being investigated: «Пътнотранспортно произшествие», −10, for
+> driving past a car that was standing still without touching it.
+
+**THE ONE-LINE ANSWER.** The number was right and the event was invented. 10 наказателни точки is what
+Наредба № 38, приложение № 5, т. 10, б. „в" prices one опасна грешка at, and a ПТП is one — but the
+grader decided „did I hit it?" with a **circle round the centre of the car**, and a circle cannot tell
+*beside* from *behind*.
+
+### The defect, in one line of arithmetic
+
+`BrakingLeadCarRunner` — the **tenth** contact test, and the only one that carried no `*_CONTACT_M`
+constant, which is why the sweep that retired the other three walked straight past it:
+
+```
+const gap = playerGap - LEAD_CAR_LENGTH_M;          // hypot(centres) − 4.3
+if (gap <= 0.3 && input.speedKmh > 2) → collision   // fires at 4.6 m of CENTRES, in every direction
+```
+
+Two flanks touch at `0.85 (CHASSIS_HALF_EXTENTS.x) + 0.92 (NPC shell) = 1.77 m` of centres. So
+**abeam it convicted every pass leaving less than 4.6 − 1.77 = 2.83 m of clear air** — a band wider
+than the car doing the passing. Nose-to-tail two bodies touch at `2.02 + 2.05 = 4.07 m`, so the same
+test fired only from 0.53 m of gap inwards; and the *other* retired constant, `VEHICLE_CONTACT_M = 3.0`,
+needed **1.07 m of interpenetration** before it noticed a rear-end at all.
+
+### 1 · Reproduced — his case, driven, both codepaths, one drive
+
+`sc-follow-brake` (FO-02) on `fo-brake-v1`: 1+1 street, the player's lane centre x = +4.06, the staged
+lead brake-slams at y = 230 and comes to a **complete standstill** (measured `aSpeed = 0.00 m/s`) at
+(4.0625, 236.38). The drive follows it, then goes around it and rejoins — inside the player's own half
+of the carriageway. The identical script was graded twice: once by `git show HEAD:…/runners.ts`
+(restored into a sibling module and swapped in with `vi.mock`), once by the exact geometry.
+
+| line held abeam | measured clearance, flank to flank | BEFORE (circle) | AFTER (exact SAT) |
+|---|---|---|---|
+| x = 1.0 | **1.29 m of clear air** | **`COLLISION` — and nothing else** | **no violation at all** |
+| x = 1.5 | 0.79 m | `COLLISION` | — |
+| x = 2.0 | 0.29 m | `COLLISION` | — |
+| x = 2.29 | **+0.002 m** (touching) | `COLLISION` | — |
+| x = 2.5 | **−0.208 m** (overlapping) | `COLLISION` | **`COLLISION`** |
+| x = 3.0 | −0.708 m | `COLLISION` | **`COLLISION`** |
+
+The x = 1.0 row is the whole complaint: an otherwise perfect drive, 1.29 m of daylight, **one опасна
+грешка, 10 точки, «Пътнотранспортно произшествие»** — and the product's own lane-keeping detector is
+silent on that line (it fires at x ≤ 0.6), so the pass is lawful by the engine's own reckoning.
+
+### 2 · The clearance sweep — 0.2 m to 3.0 m, driven, not modelled
+
+Same lesson, same standing car, the pass line moved so the daylight steps 0.2 → 3.0 m. Verdict at
+every step, and the boundary pinned to 2 cm:
+
+| daylight | 0.20–1.40 | 1.60–2.80 | 2.82 | **2.84** | 2.90 | 3.00 |
+|---|---|---|---|---|---|---|
+| BEFORE | `COLLISION` | `COLLISION` (+ lane-keeping) | `COLLISION` | **clear** | clear | clear |
+| AFTER | — | (lane-keeping only) | — | — | — | — |
+
+Predicted flip 4.6 − 1.77 = **2.83 m**; measured **fires at 2.82, clears at 2.84**. The other retired
+constant driven the same way on `sc-ln-obstacle-meeting`'s oncoming stream (`VEHICLE_CONTACT_M = 3.0`):
+fires at **1.20 m** of air, clear at **1.40** — predicted 3.0 − 1.77 = 1.23.
+
+**The „car 2.9 m directly behind" example in the brief is backwards, and it matters.** Nose-to-tail the
+bodies touch at 4.07 m of centres, so a car at **2.9 m of centres behind you is 1.17 m inside your
+bumper** — the circle calling that a crash was right, for the wrong reason. Driven both readings:
+a car with **2.9 m of clear air** behind (6.97 m of centres) grades nothing, before or after; the real
+nose-to-tail false positive was only **0.53 m** wide, and the far bigger longitudinal error was the
+opposite one — `VEHICLE_CONTACT_M` missing rear-enders until 1.07 m of interpenetration, which §4
+catches in a shipped demo.
+
+### 3 · Real crashes still terminate — driven, with the closing speed and the tick rate
+
+| drive | impact | separation when billed | verdict |
+|---|---|---|---|
+| `sc-follow-brake / mistake-no-reaction` — nose into the car standing still | **39.9 km/h** | **−0.007 m** | `COLLISION` · «Пътнотранспортно произшествие» · **10 т.** · опасна · score 10 · `passed=false` |
+| `sc-ln-obstacle-meeting / mistake-pull-out` — moving head-on | **16.1 km/h** | **−0.014 m** | same |
+
+**Tick rate, measured not assumed:** physics is `FIXED_DT = 1/60`, but the DIRECTOR steps once per
+render frame — `LessonScene.tsx:1986 const dt = Math.min(delta, 0.1)`. Worst case it can ever see:
+player terminal 46.8 m/s + the fastest authored `cruiseSpeedMps` 36 = **82.8 m/s of closing**, i.e.
+**8.28 m of relative travel in one tick**. Driven head-on through the oncoming-stream runner at nine
+sample phases at exactly that: **every phase lands ≥ 1 pose inside the body and bills the contact** —
+no tunnelling at the physical worst case, with or without the sweep. Pushed 50% past it (12.0 m/tick,
+123 m/s closing) the sweep still catches a crossing whose closest POSE is **1.254 m clear** and where
+zero poses overlap. The honest boundary is stated: above `SWEEP_TELEPORT_M = 12` m of relative travel
+in one tick the sweep deliberately disarms (a re-stage must never be swept), and one 12 m phase then
+misses — 12 m is above the 8.28 m the product can physically produce.
+
+### 4 · What the exact test found that nobody was looking for
+
+The whole shipped corpus was re-graded through the production stack under both codepaths —
+**311 committed drives, 6 verdicts move.** Three phantom crashes deleted:
+
+- `sc-ln-obstacle-meeting/mistake-squeeze` — fired at **0.452 m of clear air** (3.00 m of centres, the constant itself);
+- `sc-vu-cyclist-group/mistake-cut-in` — **0.383 m**;
+- `sc-vu-child-cyclist/mistake-pass-in-wobble` — **1.337 m of clear air**, billed as striking a child.
+
+And three real contacts the circles could not see, now billed:
+
+- **`sc-pe-parked-row-scan/mistake-fast-row` — the car is 0.113 m INSIDE the child** and the 1.5 m
+  circle said nothing, because it measured from the car's centre while the nose is 2.02 m out front.
+  This is PE-04, „Покрай редицата паркирани коли";
+- `sc-fo-brakelight-chain/mistake-late-brake` — a rear-end at **−0.032 m** that shipped ungraded;
+- `sc-hz-brake-dont-swerve/mistake-blind-swerve` — the escort, at **−0.010 m**.
+
+### The gate itself — four commands, exact numbers
+
+- `cd platform && npx tsc --noEmit --incremental false` → **EXIT 0**
+- `npm run validate:content` → **EXIT 0** — 1089 questions, 77 signs, „all structural and referential checks passed"
+- `npx vitest run --maxWorkers=4` → **Test Files 4 failed | 759 passed | 1 skipped (764) · Tests 6 failed | 11554 passed | 170 skipped (11730) · 243.96 s**
+- `npm run test:tools` → **290 pass / 0 fail / 25 suites**, EXIT 0
+
+**Four reds, two expected, two traced to a file AND an owner — neither is this lane's.**
+
+| red | file | cause | owner |
+|---|---|---|---|
+| expected | `modules/exam/__tests__/content-bank.test.ts` | `REVIEW_DEBT` — `ptp-i-parva-pomosht` 31/64 approved | the review backlog |
+| expected | `modules/lesson/__tests__/compose.test.ts` | `l-accidents-first-aid` has no quiz beat | same |
+| ×2 | `src/lib/tsconfigHygiene.test.ts` | `platform/tsconfig.json` grew four scratch-dist globs — `.next-points/**` and `.next-rig/**`. **Written by Next itself at dev-server boot** when a lane sets `KNIJKA_DIST_DIR`. The `.next-rig` server is PID 20316, **created 14:39:52**; tsconfig.json's mtime is **14:44:45** — both before this gate's first write at 14:57. This lane used that already-running rig and added no glob. | the popup-rig lane (`.next-points`) + `tools/clips/headless/clip-rig.mjs` (`.next-rig`) |
+| ×2 | `modules/clips/clipPlan.test.ts` | `clipPlan.generated.ts` (mtime **10:25**, hours before this gate) differs from the recomputation by one field: `sc-jx-giveway-b1 / mistake-barge-priority` `faultTimeSec 45.4 → 41.08`, alongside a modified `content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json` | the lane that re-recorded that trace |
+
+Scaffolding: the HEAD copy of the orchestrator and every probe were **deleted before the gate ran**
+(`git status` clean of them), no `.next-*` dir was created by this lane, and the only file this gate
+adds to the tree is `orchestrator/__tests__/parked-car-pass.test.ts` (4 tests, both directions).
+
+### STILL OPEN after the PHANTOM-CRASH gate — name, owner, reason
+
+1. **No live cockpit frame of the false-positive instant.** The shipped lead resumes 3 s after its
+   slam (`resumeAfterSec: 3`) and `/dev/drive-rig`'s `steer` is a constant per step with no lateral
+   controller, so five live attempts either arrived after the car had driven off or rear-ended it.
+   The verdict evidence is headless and exact; the cockpit frames show the act, not the conviction.
+   Fixing it needs a closed-loop lateral target in `devrig/driveScript.ts`. Owner: the rig.
+2. **Every contact bills a full 10 again.** A live run down the standing column on
+   `sc-follow-standstill` billed **nine** separate «Пътнотранспортно произшествие» опасни (10 pts each)
+   from repeated Rapier contacts on one encounter. The reducer has no dedupe and no per-encounter
+   latch. Owner: `runtime/worldRuntime.ts` + the rules reducer.
+3. **The five demos whose cards still describe a crash that never physically happens**, and the three
+   that now earn one — copy and codeRefs, not geometry. Owner: the content lane.
+4. **`LEAD_CAR_LENGTH_M = 4.3`** still matches nothing else in the tree (`VEHICLE_PROFILE_LENGTH_M.car`
+   is 4.1, the rapier shell 4.2). It no longer decides any verdict — only the reported bumper gap the
+   debrief prints — but it is a third car length.
+
+---
+
+## The gate — SIX-ROW PROVENANCE, 2026-08-10 (the third pass of the day). **EVERY CLAIMED FRAME OPENED AND DATED AGAINST THE FILE IT CLAIMS TO SHOW. FIVE ROWS CLOSE, ONE DOES NOT AND IS NAMED. FOUR REDS, NOT TWO — AND THE TWO EXTRA BELONG TO A LANE THAT WAS STILL WRITING INTO THE TREE WHILE THIS GATE RAN.**
+
+> **Why this pass exists, in the lead's own words.** He was wrong twice this week by guessing at a
+> frame — B27 called unfixed from frames taken **5.7 m and 12.7 m past the sign**, B35 called unfixed
+> from a frame shot **before the fix landed**. So this gate checks two things about every image before
+> believing it: **where the subject is relative to the camera**, and **when the frame was shot relative
+> to the change it claims to show.** A stale frame can make something look FIXED that is not, so the
+> date check runs in both directions.
+
+**THE HEADLINE.** Five of the six rows close on frames this gate opened itself. **C1 does not close, and
+the element is named below with its rect, its owner and its cause.** The one thing no lane reported is
+that the tree grew *during* the gate — a pre-drive/tutorial lane dropped a **2 MB MP4 into `public/sim/`
+at 11:31**, which is two of the four reds' worth of trouble and is traced to a file and an owner.
+
+### Provenance — every cited frame, dated against the newest file it depends on
+
+| row | frame opened | shot | newest dependency | verdict on the frame's age |
+|---|---|---|---|---|
+| **A2** | `scratchpad/UXV/frames/a2-iphone16-landscape-27-AFTER-RELOAD-line-not-blocking.png` | **2026-08-10 10:25:45** | `hud/SessionEndScreen.tsx` 2026-08-10 01:33:33 | current by **8 h 52 m** |
+| **A6** | `scratchpad/UXV/frames/a6-iphone16-landscape-10-peek-up.png` → `…-11-peek-TAPPED-gone.png` | **10:23:11 → 10:23:13** | `hud/SimOverlay.tsx` 2026-08-09 23:50:54 | current by **10 h 32 m** |
+| **C1** | `scratchpad/UXV/c1-sweep2/landing__iphone16-landscape.png` | **10:38:48** | `lesson-ui/PlayAreaStyles.tsx` 2026-08-09 23:37:37 | current |
+| **B5** | `scratchpad/b5/B5fix-correct-step04-t64.6-v0.png` · `…/B5fix-barge2-step03-t71.8-v22.png` · `…/B5fix-barge-card-t64.1.png` | **10:46:59 · 10:54:47 · 10:52:17** | `traffic/system.ts` 2026-08-10 **10:22:06** | current by **24–32 min** |
+| **B40** | `scratchpad/B40/shots/b40a/b40a-y-33.5.png` · `…/SHEET-spawn-after.png` | **11:09:16 · 11:19:11** | `traffic/stagedActorLabels.ts` 10:39:45, `TrafficLayer.tsx` 10:41:54, `content/world/sxc-v1.json` 11:17:47 | current — and the **controller tile is the 11:19 one** precisely because `sxc-v1` moved at 11:17 |
+| **B67** | `scratchpad/b67cam/b67a-v130.png` · `b67a-v100.png` | **10:07:58 · 10:07:44** | `vitok/VitokCockpit.tsx` 2026-08-09 15:47:18 | current by **18 h 20 m** |
+| **B58** | `scratchpad/RR/b58/b58-y25.png` | **2026-08-09 23:05:57** | `hero_interior.glb` 15:02:50, `VitokCockpit.tsx` 15:47:18, `CameraRig.tsx` 08-04 15:17 | current by **7 h 18 m**, and **all four clean in `git status` at gate close**, so nothing has moved the eye point since |
+
+### 1 · A2 — FIXED-SEEN. The compact branch a phone actually takes, and both never-demonstrated things demonstrated
+
+The frame is **2556 × 1179 = 852 × 393 CSS at DPR 3**, and the harness report records `vw 852 / vh 393 /
+compactAttr "on" / engine webkit` on **all eight steps**. This is not `?state=column`; it is the branch a
+phone reaches. Insets are real (landscape t0 r59 b21 l59).
+
+**The two things the row said had never been shown by a still, read by this gate out of the report and
+not out of the prose.** `spaceTest` = **`beforeSpace {endScreen:1, endSkip:1}` → `afterSpace {endScreen:0,
+endSkip:0}`** — Space actually fires. And after a full `page.goto` and a second abort, the end line comes
+back **non-blocking with `closeControls: 1`**, «РЕЗУЛТАТ» and «Скрий известието» both resolving to
+themselves — the preference survives a reload.
+
+**Opened:** `a2-…-27-AFTER-RELOAD-line-not-blocking.png` is a real cockpit — A-pillar, dash, wheel,
+cluster «0 км/ч D» — with «⏸ 0 ИЗПИТНИ Т. · Прекратена сесия» carrying **«РЕЗУЛТАТ» and a ✕** at top
+right. All three of his asks are on `a2-…-22-debrief-skip-note.png` (10:24:51): «▾ Скрий разбора»
+**664 × 44** at (94,28), the note in TOUCH words „Докосни „▾ Скрий разбора", за да пропуснеш разбора",
+and «Не показвай автоматично» (`aria-pressed` false → true). THEO-4 is kept: switching the pill off adds
+„Разборът вече няма да те спира — намираш го с „Резултат" на реда или с „Виж разбора" в менюто."
+
+**Two honest notes.** The debrief sheet is `absolute inset-0 bg-background/85`, full-bleed by
+construction, so frame 22 dims the cockpit rather than sitting in it — the cockpit frames are 21/24/25/27.
+And the red **„1 Issue"** badge bottom-left of every phone frame in this wave is **Next's dev overlay**
+(a hydration mismatch `/simulator` logs on every dev load), not product chrome. Worth five minutes before
+a founder review mistakes it for a rendering defect.
+
+### 2 · A6 — FIXED-SEEN. The ✕ was clicked at its own measured centre, and the arithmetic was checked
+
+**BEFORE** (`a6-…-10-peek-up.png`, cockpit: cluster «58 км/ч D», the 50 roundel): an ordinary
+**non-blocking** line, kind `hint`, „Стигна точката, но твърде бързо", carrying `pointerEvents: "auto"`,
+`closeControls: 1`, a «ЗАЩО» chip 46.6 × 44 and a **«Скрий известието» 44 × 44 at (737, 41.8)** whose own
+centre returns the ✕ itself.
+
+**THE TAP.** `page.touchscreen.tap(759, 63.8)` — and that coordinate **is** the arithmetic centre of the
+measured rect (737 + 22, 41.8 + 22). `dismissMisses` is `[]`. **AFTER**, 2.377 s later: the card is gone,
+the cockpit is intact, and a different card («УЧЕБЕН МОМЕНТ — Непропускане на пешеходец», `closeControls
+0` because a blocking card gets no ✕ by contract) is speaking.
+
+**The source agrees, read here rather than quoted.** `SimOverlay.tsx:329-330` — `CARD_CLASS` carries
+`pointer-events-auto touch-manipulation` **unconditionally**; the old `const interactive = hasDetail ||
+blocking` survives only in the comment at :300-305 that explains its removal; the ✕ is `h-11 w-11` with
+`aria-label="Скрий известието"`.
+
+**Residual, stated so nobody inherits an overclaim.** The still proves *the card with the ✕ is gone*, not
+*the tap and not the TTL removed it*; the tap coordinate, the empty `dismissMisses` and
+`sim-overlay-dismiss.test.tsx` are what close that gap. And the third shape — `data-sim-overlay-card=
+"button"` at `SimOverlay.tsx:496`, where the card **itself** is the dismiss button — never appeared in
+four samples and is still unphotographed.
+
+### 3 · C1 — **PARTIAL-SEEN. NOT CLOSED.** Portrait is clean with numbers; landscape still stacks two controls, and one is a driving control
+
+**The insets are genuinely on, and this gate proved it two ways.** The sweep builds its context through
+`tools/mobile/lib/insets.mjs`, whose `assertInsetsApplied()` refuses a page where nothing was rewritten —
+and the geometry says the same independently: portrait's notify-column sits at **y = 67 = 8 + 59** (top
+inset), landscape's «МЕНЮ» at **x = 67 = 8 + 59** (left inset), and the column's right edge at
+**781 = 852 − 59 − 12**.
+
+**CLEAN, with the numbers he is owed.** Portrait 393 × 852 — 2 named surfaces, **0 intersecting, 0
+controls painted over**, HUD 4.7 % (15 651 px) so **ROAD 95.3 %**. Small-portrait 360 × 780 — 2 / 0 / 0,
+HUD 6.5 %, **ROAD 93.5 %**. Landscape 852 × 393 — 2 surfaces, **0 intersecting**, **ROAD 90.5 %**. And
+**his fourth surface is really stood down**: `[data-hud="touch-hint"]` («Завърти телефона хоризонтално»)
+is in the DOM at landing with `display:none`, **0 px, 0 % of viewport, 0 px² against the column** on both
+profiles — and the harness is not blind to it, because the engine itself answers `(pointer:coarse) true /
+(any-pointer:fine) false / (any-hover:hover) false`.
+
+**NOT CLEAN — and here is the element, with its rect.** Landscape paints **two controls over**:
+
+* **«Мигач надясно» ⇨ rect [707, 88, 44 × 44]** — `coveredBy: button.flex.h-11 „Разбрах"`, **1144 px²** of
+  hit-box overlap. **A thumb aimed at the right indicator presses «РАЗБРАХ».**
+* **«Контроли на автомобила» ⚙ rect [747, 44, 44 × 44]** — `coveredBy: span.line-clamp-3 „Потегли по
+  улицата и се движ"`, the card's own sentence. **The settings button is dead while any line speaks.**
+
+Both are visible in this gate's own 1.6× crop of the frame: the ⚙ glyph sits inside the instruction
+card's last line „…късите светлини (чл", the ⇨ arrow inside the «РАЗБРАХ» pill.
+
+**A THIRD OVERLAP NO LANE REPORTED, AND IT IS THE LARGEST:** «🎬 Демонстрация ▸» × «Клаксон — задръж» =
+**1848 px²**, landscape only. Two more, portrait and small-portrait, are 5–7 px edge touches between
+adjacent controls (Демонстрация × ⚙ = 170 / 136 px², Защо × ✕ = 308 px² on both) — named so they are not
+found later as a surprise.
+
+**Cause, and it is geometric rather than z-order.** The compact notify column is anchored at y = 8, 240 px
+wide, and grows to **106 px** for a three-line briefing; `TouchControls`' right arc sweeps the same right
+edge and its top two stations land at **y 44 and y 88** on a 393 px stage. Column height would have to be
+36 px to clear station 3, so **the arc has to move, not the column.**
+**Owner: `platform/src/components/sim/TouchControls.tsx` + `lesson-ui/PlayAreaStyles.tsx`.**
+
+**AND STILL-OPEN ROW C-5 OF THE PREVIOUS GATE IS BACKWARDS.** It reads „the ⚙ overlaps «Скрий
+известието»", i.e. the A6 dismiss control is the victim. Measured here from two independent probes: A6's
+own report gives the ✕ `hit: "self"`, while the C1 sweep gives the ⚙ `coveredBy` the card. The card wins;
+**the A6 control is reachable and the SETTINGS button is the casualty.** Same overlap, opposite victim —
+and it is C1's finding, not A6's.
+
+### 4 · B5 — FIXED-SEEN. Both directions driven, and the event log read rather than the prose
+
+**THE CORRECT CASE FINISHES CLEAN.** `B5fix-correct-step04-t64.6-v0.png` (10:46:59) — cockpit with
+A-pillar, dash, wheel, the 40/80/120 dial, the 40 roundel and the telltale row, telemetry burned in at
+`t=64.55s v=0.0km/h x=4.1 y=117.2 gear=1 obj=2/3 **events=1**`, and the green **«БРАВО · Правилно
+отстъпено предимство»**. This gate then read all **12** events of the 74.5 s drive out of
+`B5fix-correct-telemetry.json`: `commendation YIELDED_TO_PRIORITY` at **t = 61.96** (y = 117.226, v ≈ 0),
+exactly one violation — `JUNCTION_SCAN_INCOMPLETE`, **osnovna, 3 т.**, at t = 66.76 — and **no
+`FAILED_TO_YIELD` of any kind.** The scan fault is the rig, which cannot press Q/E.
+
+**THE GENUINE FAILURE TO YIELD STILL CONVICTS.** Three independent barge runs, all three:
+`violation FAILED_TO_YIELD`, **opasna, 10 т.**, at y = **122.29 / 122.37 / 122.40** and **21.6 km/h**.
+Cockpit at `B5fix-barge2-step03-t71.8-v22.png` (cluster «22 км/ч D», `events=2`, crossing traffic in the
+box ahead-left); the verdict text at `B5fix-barge-card-t64.1.png` with **ЗДвП чл. 47; чл. 48; чл. 50,
+ал. 1** and **Наредба № 38 приложение № 5, т. 10, б. „в"**, and the telemetry line `lead=27.4m = 4.57s @
+22km/h`. *(That second image is the full-screen teach modal, not a cockpit frame — it is cited for the
+verdict text; the cockpit exhibit is the barge2 still.)*
+
+**THE TRACE COUNT, COUNTED BY THIS GATE.** `git status` gives **exactly 10 files = 5 traces + their
+`platform/public` mirrors**: `sc-junction-gap/{mistake-cut-gap, mistake-creep-out}`,
+`sc-junction-left/{the same two}`, `sc-jx-giveway-b1/mistake-barge-priority`. The scope is checkable too:
+the recorder rewrote **12** trace files across four scenario dirs and **exactly five changed bytes** — the
+`shadow-correct` traces beside them came back byte-identical. The structural claim holds when you open a
+trace: `events` carries `annotation` / `glance-*` kinds only, **no rule events**, so a pure predicate
+change cannot move a trace byte. **But the count is not the proof — the gate is:**
+`npx vitest run src/modules/sim/traces src/modules/clips src/modules/sim/traffic` = **207 test files /
+2600 tests, all passed**, against **503** committed trace files.
+
+**AND THE SEVEN FAILURES THE CAMERA LANE REPORTED ARE GONE.** Its full run finished at 10:23 — **77
+seconds after `system.ts` changed** and long before the demos were retimed. It listed seven
+`expected [] to include 'FAILED_TO_YIELD'` reds (clipPlan, s-w7 / s3-ju / s6-breadth bot-completion,
+sc-ju2 / sc-ju3 / sc-jx-giveway-b1 traces). **This gate's full run contains that string zero times.**
+
+### 5 · B40 — FIXED-SEEN, both halves. And the register's own catalogue numbers are wrong
+
+**(a) The cue reaches a driver looking at a car nose-on at 62 m.** `b40a-y-33.5.png` (11:09:16) — cockpit,
+cluster «0 км/ч D», telemetry `y = −34.3 x = 4.1 obj=1/2 events=0`. This gate's own **4.5× crop** resolves
+all four lines — «ТАЗИ КОЛА НЕ ТРЪГВА» / «Зеленото ѝ свети, а тя стои» / «Ето това е „спане на зелено"» /
+«ППЗДвП светлинни сигнали за регулиране на движението» — and the tail points **down onto a dark car seen
+head-on**, with a pale van standing behind it. The frame's own placement dump: **64.1 m, rect
+[517,299,694,379] = 177 × 80 px**; at **90.5 m** (`b40a-y-60.png`) **175 × 81 px** — constant apparent
+size, in pixels, measured. And the card **cannot outlive its claim**: `b40wake-y-4.json` has the same mesh
+**`visible=false` at 35 m**, well inside the 120 m cap, because the sleeper pulled away.
+
+**A RESIDUAL THIS GATE MEASURED AND THE LANE DID NOT REPORT.** In `b40a-y-33.5.json` the label rect
+**contains all three lamp rects of one signal head** — [528,340,535,346], [528,347,535,353],
+[528,354,535,360] — the head **4.96 m** from the sleeper at the same depth, i.e. almost certainly the
+sleeper's own. **The caption is drawn over the green lamp that is the evidence for its own sentence.** It
+is semi-transparent, so the lamp is dimmed rather than erased, and one of seven heads in frame is
+affected. Named, not counted as a failure.
+
+**(b) Opened at the spawn, and re-measured with this gate's own band.** Not the lane's rectangle: a fixed
+**fraction** of each tile (12–88 % across, 14–44 % down), resampled to 320 × 180, so a different shell
+rail height cannot masquerade as a difference.
+
+* **BEFORE** (`SHEET-spawn-before.png`, tiles 10:11–10:14): **closest pair 0.95** mean |ΔRGB|
+  (redyellow ↔ response), and **five of the six sat inside 0.95–2.21**. Opening it, they cannot be told
+  apart — same left frontage, same yellow van, same green tree, same kerb line, six times. **He was
+  right.**
+* **AFTER** (`SHEET-spawn-after.png`, 11:19): **closest pair 25.21** (dead ↔ response), **mean 36.67**,
+  **furthest 49.77**. Every pair is now **more than eleven times** further apart than the widest gap
+  inside the old cluster. Opening it: six different streets — a wide empty boulevard, a bare canyon with
+  no kerbside band, a box-van corridor, a both-kerbs street with a ВНИМАНИЕ board, a night scene, and the
+  untouched original. **`sx-v1` is byte-identical and all eighteen committed ghost traces replay.**
+
+**TWO CORRECTIONS TO THIS FILE.** The B40 row and STILL-OPEN row 9 say catalog **„10, 17, 18, 19, 21"** —
+five. Measured from `SCENARIO_TEMPLATES` it is **12, 19, 20, 21, 22, 23 — six.** And the lane's own
+„closest remaining pair is dead ↔ controller at 16.75" does **not** survive this gate's band: **controller
+is the most distinct of the six** (nearest neighbour 40.46). The pair to argue about is **dead ↔ response
+at 25.21.**
+
+### 6 · B67 and B58 together — closing one did not reopen the other, because B67 changed nothing
+
+**B67's cockpit half is NOT-A-DEFECT.** At **131.2 km/h** the binnacle reads **«131 км/ч D»** with the
+wheel, the full dash, the 140 roundel and the telltale row all in frame (`b67a-v130.png`); at
+**100.8 km/h** it reads **«101 км/ч D»** (`b67a-v100.png`). Both opened here. Re-derived from the raw
+**124-sample** probe series rather than the summary: camera-to-eye error **0.00130 – 0.00868 m** against a
+**0.15 m** threshold, and it **falls as speed rises** (0.0087 at 20–30 km/h → 0.0013 at 140) — the
+arithmetic opposite of the v/rate lag this row blamed. **Two probe-independent measurements agree:**
+`screen_cluster` distance is **1.021 m at 100, 110, 120 and 130 km/h** (1.026 at 41, 1.019 at 138) and
+`fullyInFrame` at every band — a back-seat camera reads 1.6–2.6 m; and the cluster's **260 → 238 px**
+shrink across 41 → 130 km/h is predicted to **238.1 px** by the FOV widen alone (tan 24.024° / tan
+25.966° = 0.9158), leaving **nothing** for camera translation. The raised mirror rect [824,93,1034,172] is
+disjoint from the cluster rect [475,512,714,632] in both axes.
+
+**THE ORIGINAL ALLEGATION WAS A MIS-AIMED CROP — the B27 mistake for the third time, confirmed with a
+crop this gate chose itself.** `scratchpad/b67/frames/B67f-y90-kmh68.png` (2026-08-03 09:19:30), the frame
+this register describes as *"no steering wheel, no instrument cluster"*, **contains both**: a 2.4× crop at
+x 400–900 / y 400–600 reads **«68 км/ч D»** with the 40/80/120 dial, the telltale row and the wheel rim
+across it. The `-CLUSTER.png` companions are a fixed **576 × 245** rectangle calibrated at 43 km/h; by 68
+the cluster had risen above its top edge and the crop caught the centre console. **The reviewer read the
+crop, not the frame.**
+
+**B58's В26 «50» IS STILL READABLE, and the eye point did not move.** All four eye-point-defining files
+are **clean in `git status` at gate close** and none has moved since 2026-08-09 15:47 — `CameraRig.tsx`
+08-04 15:17, `VitokCockpit.tsx` 08-09 15:47, `cockpit-camera-contract.test.ts` 08-09 15:06,
+`hero_interior.glb` 08-09 15:02 — while the B58 frame is **08-09 23:05:57**, later than all of them. This
+gate cropped the verge at 3×: the **red-ringed «50» stands in clear sky, fully legible**, and the mirror
+assembly (with a blue car reflected in it) sits **entirely above** it, its lower edge about **35 frame px**
+clear of the sign's top. The frame's own report: `signs-limit50-face` at **23.0 m**, rect
+[1098,281,1147,329] = **49 × 48 px**, canvas 1423 × 799.56 (aspect **1.7797**).
+
+### The gate itself — every command, with the exact numbers
+
+* `cd platform && npx tsc --noEmit --incremental false` — **run TWICE**, at gate open and again at gate
+  close after another lane had added files mid-run. **EXIT 0 both times, zero output lines,
+  `grep -c "error TS"` = 0 both times.** Logs: `scratchpad/LEADGATE/tsc.txt`, `tsc-final.txt`.
+* `npm run validate:content` — **exit 0**, „OK — all structural and referential checks passed". 1089
+  questions across 16/16 topics, 77 signs; answer-leak sweep 17 scopes gated, **0 blocking, 0 warning**.
+* `npx vitest run --maxWorkers=4` — **exit 1. Test Files 4 failed | 754 passed | 1 skipped (759). Tests
+  4 failed | 11 479 passed | 170 skipped (11 653). 252.54 s.** No `Failed to start forks worker`.
+* Targeted, after everything: `npx vitest run src/modules/sim/traces src/modules/clips
+  src/modules/sim/traffic --maxWorkers=4` — **207 files / 2600 tests, all passed.**
+
+**FOUR REDS, NOT TWO. The two protected ones are untouched** — `exam/__tests__/content-bank.test.ts`
+(„has no dark, threadbare or under-represented topic") and `lesson/__tests__/compose.test.ts` („gives
+every lesson at least one quiz beat"), both the 29 quarantined first-aid rows, his medical ruling. **The
+other two, each traced to a file AND an owner:**
+
+1. **`../tools/assets/publicBudget.test.mjs > keeps the real public/ inside every ceiling` — REAL.**
+   Reproduces in isolation in 1.87 s. Bucket **`sim-models` = 3 715 160 B against a 3 000 000 B ceiling.**
+   The entire overshoot is one untracked file: **`platform/public/sim/tutorial/adjust-seat.mp4`,
+   2 022 418 B, created 2026-08-10 11:31 — while this gate's full run was executing.** Remove it and the
+   bucket is **1 692 742 B**, comfortably inside. `tools/assets/publicBudget.mjs:138` matches
+   `rel.startsWith("sim/")`, so a 2 MB MP4 is being charged to a ceiling whose own `why` says
+   „Draco-compressed GLB". **Owner: the pre-drive / tutorial-clip lane** —
+   `platform/src/modules/sim/procedures/tutorial.ts:81` references `/sim/tutorial/adjust-seat.mp4`, and
+   `platform/src/app/dev/predrive-rig/` (untracked, created 11:34–11:35) is the same lane. **The fix is a
+   declaration, not a deletion:** give video its own bucket, or move it out of `public/sim/`.
+2. **`src/app/(dashboard)/lesson/one-front-door.test.ts > is mounted by ONE file in the whole tree` — NOT
+   a regression.** **Test timed out in 5000 ms** while walking the tree at `--maxWorkers=4` on the E: HDD
+   with another lane writing into it; **it passes in isolation.** Recorded rather than hidden, because a
+   tree-walking test with a 5 s budget on this machine will keep doing this.
+
+**The tree moved under this gate** — 88 entries at open, **91 at close** (71 modified, 20 untracked), HEAD
+`042518a`. **This gate edited no source file and committed nothing**; it changed only this document. Every
+probe, crop and log it produced is under `scratchpad/LEADGATE/`.
+
+### STILL OPEN after the 2026-08-10 SIX-ROW PROVENANCE gate — name, owner, reason
+
+| # | name | owner | reason it is still open |
+|---|---|---|---|
+| 1 | **`touch-arc-and-notify-column-share-the-top-right-corner`** — C1 is NOT closed | `components/sim/TouchControls.tsx` + `lesson-ui/PlayAreaStyles.tsx` | Landscape only. «Мигач надясно» [707,88 44×44] resolves to «РАЗБРАХ» (1144 px²) and «Контроли на автомобила» [747,44 44×44] resolves to the card's own sentence. The compact column grows to 106 px at y 8; the arc's top two stations sit at y 44 and 88 on a 393 px stage. **The arc must move — a 36 px column is not achievable.** The mutual-exclusion register cannot absorb it, because those are *controls*, not surfaces. |
+| 2 | **`demo-deck-and-horn-hit-boxes-overlap`** | same lane | Landscape: «🎬 Демонстрация ▸» × «Клаксон — задръж» = **1848 px²**, the largest overlap on the screen and unreported until now. Portrait/small-portrait carry 5–7 px slivers (170 / 136 / 308 px²). |
+| 3 | **`public-sim-budget-blown-by-an-undeclared-mp4`** | the pre-drive / tutorial-clip lane | `platform/public/sim/tutorial/adjust-seat.mp4` (2 022 418 B, untracked) puts `sim-models` at 3 715 160 / 3 000 000. Wired at `modules/sim/procedures/tutorial.ts:81`. Needs a bucket in `tools/assets/publicBudget.mjs` or a different directory. **A red in the shared gate that no lane owns today.** |
+| 4 | **`staged-actor-label-covers-the-lamp-it-cites`** | the B40 map/label lane | The caption rect [517,299,694,379] contains all three lamps of the head 4.96 m from the sleeper — the green that is its own evidence. Semi-transparent, so dimmed not erased; 1 of 7 heads in frame. |
+| 5 | **`A6-card-is-the-button-shape-unphotographed`** | the HUD lane | `data-sim-overlay-card="button"` (`SimOverlay.tsx:496`) — a plain line where the CARD is the dismiss control — never appeared in four samples. Proven by `sim-overlay-dismiss.test.tsx`, still not seen. |
+| 6 | **`__camProbe-cannot-detect-a-stale-read`** | the camera lane | `CameraRig.tsx:922` computes `probeLocal = cam.position − pos` from the same chassis read used to build that frame's eye target, so `errM ≈ 0` by construction — including in the „offset right, car drawn somewhere else" case its own comment claims to separate. **No future camera row may be closed on `errM` alone**; use the cabin-mesh distance and the projected size, as this gate did. |
+| 7 | **`one-front-door-times-out-under-contention`** | the test/tooling lane | 5000 ms budget for a tree walk, at `--maxWorkers=4` on a 7200 rpm HDD. Passes in isolation. Raise the timeout or narrow the walk before it is mistaken for a real regression. |
+| 8 | **`conflictFromRightFor-has-no-cleared-test`** | sim grading | The right-hand-rule sibling of the predicate B5 just fixed still has no „has it cleared" arm: a car that has crossed and is departing on the student's right still satisfies it. Different callers (`setRightConflictQuery`), separate trace surface — deliberately out of B5's scope. |
+| 9 | **`give-way-is-graded-at-the-wrong-instant`** | the runtime lane | `worldRuntime.ts:1004` tests the junction NODE at the moment the student crosses the LINE; on `jxg-giveway-v1` that line is 27.725 m from the node, further than `PRIORITY_CONFLICT_RADIUS_M` 26. A runtime change, not a predicate one — and it is why five authored mistake demos had drifted. |
+| 10 | **`hydration-mismatch-on-every-/simulator-dev-load`** | the shell lane | „A tree hydrated but some attributes of the server rendered HTML didn't match." It is the red „1 Issue" badge in every phone frame of this wave. Dev-only, but it will be mistaken for product chrome in a review. |
+| 11 | **`mobile-harness-creds-are-stale-and-two-runs-share-one-output-path`** | `tools/mobile` | `scratchpad/p0p7/harness-creds.sh`'s literal password is rejected because `ensureHarnessUser()` re-randomises it — and the dead run then **silently overwrote a good run's JSON** because both wrote the same path. Cost one sweep. Make the sweep call `ensureHarnessUser()` or refuse to start. |
+
+**CLOSED BY THIS GATE, from the previous list:** row **9** (B40(b) — five signal lessons are one street:
+now six streets, measured), row **11** (B5 — `conflictNearFor` convicts too widely: both directions driven
+and the trace surface green). **CORRECTED:** the previous gate's **C-5** has the victim backwards — the ⚙
+is the casualty, not the A6 ✕ (see §3). **UNTOUCHED and still valid:** rows 1–8, 10, 12–15 of the
+OPEN-EVERY-FRAME list, including row 2 (the card-stack overprint), for which this gate produced two more
+frames — `b5/B5fix-correct-step04-t64.6-v0.png` and `B40/shots/b40a/b40a-y-33.5.png` both show the
+«НАУЧИ» body drawn straight through the ДЕМОНСТРАЦИЯ transport bar and its 0.25× / 0.5× / 1× chips.
+
+---
+
+## The gate — OPEN-EVERY-FRAME, 2026-08-10 (the second pass of the day). **ALL 16 CLAIMED FRAMES OPENED, NONE TAKEN ON TRUST. B27 AND B35 HOLD UNDER INDEPENDENT MEASUREMENT. THE BELT WAS RE-DRIVEN AND THE PRICES COUNTED IN THE DOM. ONE CLOSED ROW RESTS ON A FRAME THAT PREDATES THE FIX BESIDE IT. EXACTLY TWO REDS.**
+
+> **Why this pass exists.** The previous verifier certified two rows and ran out of budget for eleven;
+> when the lead opened three of those himself, two had not been fixed at all. So the standing rule was
+> made absolute: **open every frame.** This gate opened all sixteen images the wave cited, plus nine
+> more it produced itself, and re-derived the two contested rows from the product's own code rather
+> than from the lanes' prose.
+
+**THE HEADLINE: THE WAVE'S CLAIMS SURVIVED, AND THE TWO THE LEAD PERSONALLY DOUBTED SURVIVED HARDEST.**
+Both B27 and B35 were re-measured from scratch — B27 through `buildWorldGeometry`, B35 by sampling the
+same pixel column in the before and after frames — and both came back exactly as the lanes reported,
+to the byte in B35's case. What this gate adds that no lane had is a **provenance check on the frames
+themselves**, and that is where the one real problem is.
+
+### 1 · B27 — the lead's own question, answered with a measurement
+
+He asked: *is there a Б2 stop sign in the windscreen at 15–25 m?* **Yes, and the number is 17.55 m.**
+
+Measured, not inherited. `content/world/tj-stop-v1.json` has **no `signs` key at all** — the Б2 is
+synthesised by `builders/props.ts` from `junctionPriorityControls`. Building the district through the
+product's own builder emits **exactly one** `kind=stop`, at world `(8.93, 0.02, 28.52)`; with
+`toWorld=(x,y,h)=>[x,h,-y]` (`builders/mesh.ts:14`) that is district **(x 8.93, y −28.52)**, yaw 0°,
+facing the approaching driver. The same build reports **0 traffic lights** and `intersections[0].signalized=false`,
+so this is not a signal row.
+
+Range from each pose, computed against that one sign:
+
+| pose | range | along-track | in the lead's band? |
+|---|---|---|---|
+| y −60.5 | 32.34 m | +31.98 AHEAD | — |
+| **y −45.4 (the lane's frame)** | **17.55 m** | **+16.88 AHEAD** | **YES** |
+| y −36.3 | 9.15 m | +7.77 AHEAD | — |
+| y −29.9 | 5.02 m | +1.38 AHEAD | — |
+| **y −22.8 (the lead's frame)** | 7.49 m | **−5.72 BEHIND** | no — past it |
+| **y −15.8 (the lead's frame)** | 13.61 m | **−12.72 BEHIND** | no — past it |
+
+I opened both. The lane's frame carries the octagon plainly in the glass with A-pillar, dash, wheel and
+cluster at 0 км/ч D. The lead's frame `RR/b27/b27-y-22.png` reads `y=−22.8 obj=2/3 events=3`, its mirror
+is captioned «Завий надясно и продължи по пътя с предимство» and the shadow car is mid-right-turn — it is
+the **turn phase**, downstream of the sign and of the graded stop line. A sign behind the car cannot be in
+the windscreen.
+
+**And the lane did not do the thing the lead was worried about.** It did *not* conclude "the copy is
+wrong rather than the world". It concluded that both copy and world are right and the two refused frames
+were shot past the sign. That conclusion is now independently confirmed.
+
+### 2 · B35 — the lens pixels, sampled at the same column before and after
+
+| lens | BEFORE `RR/b35/b35-y-50.png` | AFTER `B35FIX/final/final-y-50.png` |
+|---|---|---|
+| red | rgb(138,17,7) L=0.058 **S=0.949** | rgb(28,18,18) L=0.007 **S=0.357** |
+| amber | rgb(133,87,0) L=0.119 **S=1.000** | rgb(21,19,14) L=0.007 **S=0.333** |
+| green | rgb(21,107,37) L=0.108 **S=0.804** | rgb(21,37,31) L=0.016 **S=0.432** |
+
+Luminance falls 8× / 18× / 7×. **The lane's reported "before" numbers match my independent sample
+exactly** — that is a provenance check on the lane as much as on the fix. A lit lamp still reads:
+`B35FIX/lit/lit-y-16-s0.png` amber rgb(220,175,93) L=0.467 against its own dead red L=0.026 = **18:1**
+(s1 lit red L=0.283 vs dead amber 0.032 = 9:1; s6 lit green L=0.440 vs dead red 0.025 = 17:1). The lead's
+remembered lit amber rgb(218,172,87) is unchanged at rgb(220,175,93); his unlit red rgb(141,52,49) is gone.
+
+**Re-rendered from the current tree by this gate**, not read off the lane's images:
+`VERIFY/b35re2/W35-step01-t22.7-v0.png` (`sc-signal-dead` L1, y=−50.8, 1440×900) — **no saturated lens
+anywhere on the head**, max S 0.19. Glass tints in the tree are `0x3b2422 / 0x3a3222 / 0x243a2b`;
+`signal-lens-look.test.ts` is 16/16 green.
+
+### 3 · The belt — re-driven twice by this gate and COUNTED, not eyeballed
+
+Driving `l1-preparation` unbelted raises only `PREDRIVE_SEATBELT_SKIPPED`; the pair needs the
+"unbelted-again" shape. Both runs are this gate's own, on `/dev/drive-rig`, telemetry burned in, 0 page errors.
+
+*Run 1 (single fault).* One belt fault → **one** card price. The „Едно нарушение, една цена" box correctly
+does **not** appear, because there is no second row to cover.
+
+*Run 2 (the pair).* Event stream printed rather than assumed:
+`15.0:PREDRIVE_SEATBELT_SKIPPED · 16.9:SEATBELT_OFF_WHILE_MOVING · 32.7:SEATBELT_OFF_WHILE_MOVING`.
+The end screen, counted in the DOM:
+
+| string | count | where |
+|---|---|---|
+| `−3 изпитни т.` | **2** | both belt cards — the exam sheet is untouched |
+| `51,13` | 2 | **one** fault card + **one** debrief summary line |
+| `10 контролни точки` | 2 | the same two places |
+| `ПЛАТЕНО ВЕДНЪЖ` | 1 | the covered card |
+| `Едно нарушение, една цена` | 1 | the box on the priced card |
+
+**ONE road price, TWO exam marks — which is exactly what the lead demanded.** The debrief says it in prose
+too: „→ На пътя …: това не е второ нарушение. Същият състав (ЗДвП чл. 183, ал. 4, т. 7) … Глобата и
+контролните точки са показани веднъж … На изпитния лист двете грешки се броят поотделно."
+Frames: `VERIFY/belt/P-cockpit-drive.png` (cockpit, 25 км/ч D, events=9), `VERIFY/belt/P-END-scroll5.png`
+(the priced card + the box), `VERIFY/belt/P-END-text.txt` (the counted text).
+**Honest limit:** my scroll stack stopped two cards short of the covered card, so the *image* of it is the
+belt lane's `belt/AFTER3-END-seatbelt-moving.png`, which I opened — the *count* of it is mine.
+
+**The full-bleed exception is structural, not an excuse.** `LessonPlayShell` renders the end screen as
+`absolute inset-0 … bg-background/85 backdrop-blur-sm` — read in the source. No A-pillar can appear inside
+it by construction, so `cockpitFrame:false` on those rows is correct and the drive behind them is
+photographed separately.
+
+### 4 · The instrument binding — six attacks, mine as well as his
+
+| # | attack | result |
+|---|---|---|
+| A | **the lead's**: `pen-b2-no-stop` instrument=„електронен фиш", source still чл. 186 ал. 1 | **RED** — 4 problems |
+| B | mine: `pen-speeding-urban-21-30` instrument=„фиш", source still чл. 189 ал. 4 | **RED** — 2 problems |
+| C | mine: „електронен фиш" **and** move the source to чл. 189 ал. 4 (self-consistent) | **GREEN — still gets through** |
+| D | mine: the camera instrument on `pen-alcohol-05-08`, which carries a ban | **RED** — the alinea's own condition fires |
+| E | **two penalty rows with the same id** | **RED** — „duplicate penalty id" |
+| F | two **source** rows with the same id | **RED** — „…getSource() takes the first, so the second row is unreachable" |
+
+Baseline: the shipped bank still loads with **0 problems**. Attack C is the law lane's declared A4 and it is
+**independently reproduced here** — a row can still claim the camera instrument on a correct чл. 189 ал. 4
+citation for an offence no camera established, because nothing on a `PenaltyEntry` declares detection. The
+lane named it rather than burying it, and it stays open below.
+
+### 5 · THE ONE REAL PROBLEM THIS GATE FOUND — a closed row standing on a stale frame
+
+**Every frame in the nine-row lane predates the B35 lens fix.** The fix landed 2026-08-10 01:47; the frames
+are 2026-08-09 03:02 → 23:05. For seven rows that is immaterial — B58, B54, B40, B64, B60, B65 and B5 make
+no claim about how a lens looks. For two rows it is not:
+
+* **B55** — I re-sampled its own frame and its verdict is right on its own question (one lamp lit per head,
+  driver red against pedestrian green, phase-consistent). But the same sample shows the **pre-fix** head:
+  vehicle amber rgb(126,81,0) **S=1.000**, green rgb(17,102,33) S=0.833, ped red rgb(138,16,6) S=0.957 —
+  precisely the saturated dead lenses B35 removed four hours later. **The row stays FIXED-SEEN; the frame
+  must not be cited as current evidence of how the head looks.** A re-shoot is owed.
+* **B41** — its cross-lane find (c) is **confirmed by my own sampling**, and the staleness does not rescue
+  it: at `B41-step05` x=745 the head reads red L=0.074 · **amber rgb(177,141,72) L=0.289 S=0.593** · green
+  L=0.099, while instruction 1 says «светофарът е ЗАГАСНАЛ». An unlit amber is L≈0.03 in the fixed build and
+  L≈0.11 in the old one; 0.289 is the **lit** regime either way.
+
+### 6 · Two handed-down numbers corrected
+
+* **`ЗДвП чл. 48`, not чл. 46.** The lead transcribed чл. 46 off a ~4 px glyph. `signalHeadLabels.ts:56,65`
+  reads `"ЗДвП чл. 48 · правилото на дясното"` and the docblock quotes чл. 48 verbatim from the corpus. The
+  register must not record 46.
+* **B58's dash badge reads «Кола отзад · 6 м»**, not 7 м — confirmed by opening the frame.
+
+### The gate itself — four commands, exact numbers
+
+1. `cd platform && npx tsc --noEmit --incremental false` → **exit 0**, zero output.
+2. `npm run validate:content` → **exit 0**, „OK — all structural and referential checks passed."
+   (questions 1089: 0 draft / 0 machine / 293 needs-review / 796 approved · signs 77 · topics 16/16 ·
+   answer-leak sweep 17 scopes gated, **0 blocking, 0 warning**).
+3. `node scripts/sim-harness.mjs` → **exit 0, 13/13** (2 files, 1.02 s).
+4. `npx vitest run --maxWorkers=4` → exit 1: **Test Files 2 failed | 755 passed | 1 skipped (758);
+   Tests 2 failed | 11446 passed | 170 skipped (11618); 195.84 s.**
+
+**EXACTLY TWO REDS, and both are the quarantined first-aid rows nobody in this wave touched:**
+`src/modules/exam/__tests__/content-bank.test.ts > per-topic exam supply > has no dark, threadbare or
+under-represented topic`, and `src/modules/lesson/__tests__/compose.test.ts > the catalogue covers the whole
+course > gives every lesson at least one quiz beat`. **There is no third red.** The
+`clearanceProvenance.test.ts` timeout two lanes reported did **not** recur — this run had the box to itself,
+which is exactly the condition those lanes said it needed; grep over the log gives **0** occurrences of
+„timed out" and **0** of „Failed to start … worker". Targeted re-run of the three suites this wave added or
+changed — `signal-lens-look.test.ts`, `offences.test.ts`, `corpus.test.ts` — **159 passed, 3 files**.
+
+**No repo file was changed by this gate except this register.** Probe scripts and the temporary attack
+battery were deleted; the working tree is back to the same 41 entries it started with; all frames live in
+the scratchpad, never in the repo.
+
+
+## The gate — CONSEQUENCE-AUDIT, 2026-08-10. **5 OF 53 → 53 OF 53, EVERY FIGURE RE-CUT BY THIS GATE. THE WATERMARK TOOL WAS ACTUALLY RE-RUN. THREE OF THE SIX KNOWN ATTACKS ARE CLOSED, THREE ARE NOT, AND TWO NEW ONES GET THROUGH EVERYTHING. EXACTLY TWO REDS.**
+
+Six lanes reported closing the founder's „tens or hundreds" complaint and the last of his review
+rows. **This gate read none of their claims on trust.** Every number below was re-derived here —
+the acts parsed off disk by this gate's own reader, the ingest tool re-executed from the pinned
+originals, the six known attacks re-run in their exact register form, and every frame opened.
+
+*The headline, and it is bigger than the lanes claimed.* The five structured rows at `HEAD` are
+now **53 of 53** — `git show HEAD:…/consequences.ts` carries exactly `SPEEDING_DANGEROUS`,
+`SPEEDING_OVER_LIMIT`, `RED_LIGHT_CROSSED`, `PEDESTRIAN_NOT_YIELDED`, `STOP_SIGN_NO_FULL_STOP`, and
+the working tree carries every code in the catalogue. **307 `LawQuote`s, 307 verbatim, 307 inside
+the unit their own citation names, 0 exceptions.** **167 numeric figures** (глоба + контролни точки,
+counting every ladder rung, every gated branch and every escalation) and **167 of 167** state their
+own number inside their own quote. The matcher that produced those figures was negative-controlled:
+it says `true` for „100 лв." in „Наказва се с глоба 100 лв. водач, който:" and `false` for „5000 лв."
+in the same sentence.
+
+*The honest blanks are honest, and this gate re-derived every negative rather than accepting one.*
+„регулировчик" occurs **13 times** in ЗДвП — чл. 7 (2), чл. 10 (8), чл. 113 (1), чл. 120 (1),
+чл. 184 (1) — and **exactly one** of those is inside the penal chapter (чл. 174–189, 42 units), the
+one that opens „наказва **пешеходец**, който … не спазва … сигналите на регулировчика". „загас"
+occurs **0** times in the whole act; „ръчна спирачка" **0**; „подготовка" appears 3 times in the
+penal chapter and all three are about driving schools and psych-testing bodies, none about a
+driver's pre-drive routine. чл. 22, ал. 1 says „не трябва да **се движи** … с твърде ниска скорост"
+and чл. 23, ал. 1 measures distance to „**движещото се** пред него" — so the stalled engine, the
+hesitation on green and the standstill gap are right to say the street charges nothing. чл. 74,
+ал. 1 reads „може да се използват **само** при…", a permission with a limit, never a duty.
+**No lane manufactured a fine.** A scan of every free-prose field on all 53 rows for „N лв." /
+„N контролни точки" / „N €" found **0** figures that do not occur in a quote that row cites, and the
+six `exam-only` rows and the one honest blank state **no figure at all**.
+
+*The attacks. Three of the six are closed and three are not, and that is exactly the scope the
+loader lane claimed.* Re-run in their register form against the real bank:
+
+| # | the known attack | before | **now** |
+|---|---|---|---|
+| A3 | чл. 182 alinea twins — flip `paragraphRef` to „ал. 2" | through everything | **CAUGHT by the loader** — „contextQuote is in ЗДвП чл. 182 but NOT in ал. 2" |
+| A9 | `titleBg` rewritten to another offence | through everything | **CAUGHT by the loader** — „„превишена, скорост, населено, място" occurs in none of this row's verified quotes" |
+| A13 | offence phrase truncated so „ако…" falls off | through everything | **CAUGHT by the loader** — „the offence phrase stops before the act does" |
+| A5 | right offence, wrong act — red-light к.т. re-cited to the **2025 snapshot**, whose т. 20 is word-identical | through the loader, caught by the repo | **UNCHANGED** — `verifyCitations` still returns `[]`; `corpus.test.ts:1457` still catches it |
+| A7 | declaration loosened by **deleting** an anchor group | through the loader, caught by the repo | **PARTIALLY closed.** Deleting the group that carries „Б2" is now caught — but *by the digit rule*, not the widening rule. Deleting the **verb** group (`не спира`/`не спре`) is still `[]`. Measured consequence: the pinned discrimination matrix goes 4 → 5, the new pair being a **контролни-точки phrase from the наредба crossing a row**, which the repo does catch. |
+| A10 | the row `id` rewritten | through the loader, caught incidentally | **UNCHANGED** — `[]` from the loader and from the schema; caught only because `corpus.test.ts` names ids 20 times |
+
+*And three attacks of this gate's own, two of which get through everything.* **(1) `instrument`
+`фиш` → `електронен фиш`, `instrumentSource` left alone: through the loader, through the schema,
+through the suite, and the card then renders „51,13 € (100 лв.) **(електронен фиш)**" while its own
+`noteBg` still ends „…затова може да се наложи с **фиш**".** Nothing anywhere checks the instrument
+against the rule cited for it. **(2) Two rows sharing one `id`: `verifyCitations` `[]`, schema
+accepts, and `build()` has no uniqueness guard — first match wins and the second row is silently
+unreachable.** Caught today only because all seven ids are named in tests. **(3)** Inflating a
+контролни-точки count while leaving the quote honest is **CAUGHT** („quote does not state the
+figure — expected „13 контролни точки""). A fourth, downgrading `status` „grounded" → „not-listed" to
+disarm the figure check, is **CAUGHT — by the schema, not the loader** („status „not-listed" means
+the offence is absent from an exhaustive list, so amountBgn must be 0"). Worth naming because the
+loader alone would have taken it, and `describeFine` renders the money regardless of status.
+**Negative control ran and was correctly silent on the untouched bank.**
+
+*The watermark was not merely filtered — the tool was executed, and this gate executed it again.*
+All four extraction originals are on disk and **all four sha256 match `sources.json` byte for
+byte**: `zdvp_16062026.docx` 264 139 B `185cc3a5…`, `iz2539.pdf` 226 435 B `6886ef72…`,
+`naredba38.pdf` 293 119 B `73be8377…`, `naredba-si.pdf` 858 284 B `00758b88…`. Re-running
+`build-corpus.mjs` and `build-speed-acts.mjs` into a scratch directory reproduced **all six emitted
+acts byte-identically** to the working tree (`zdvp`, `naredba-iz-2539`, `naredba-38`,
+`naredba-8121z-532`, `naredba-sredstva-za-izmervane`, `naredba-iz-2539-consolidated-dv49-2026`).
+The output really did change: `naredba-38.json` −7 452 B, `naredba-iz-2539.json` −3 398 B,
+`naredba-sredstva-za-izmervane.json` −309 B against `HEAD`.
+
+**And the count was 188, not 185.** Scanning all **505 units in all nine act files** for the stamp
+and the slash-datestamp: at `HEAD`, `naredba-38` 62 + 62 = **124** across 34 units,
+`naredba-iz-2539` 29 + 29 = **58** across 16 units, `naredba-sredstva-za-izmervane` 3 + 3 = **6**
+across 3 units — **188**. The published „185" reported *units* for НСИПМК where it reported *pieces*
+for the other two. **Now: 0 stamps and 0 datestamps in all 505 units.** The repair is real and
+visible: at `HEAD`, чл. 6, ал. 1, т. 3 of the snapshot read „…откаже да му ⟨Източник:
+Правно-информационни системи „Сиела" 24/01/2025 г.⟩ бъде извършена проверка…" — the advertisement
+sitting mid-sentence inside the exhaustive контролни-точки list the product proves negatives
+against. It is one sentence now, and чл. 6, ал. 1 carries a consecutive 1…22.
+**One correction to the lane's own framing:** the snapshot's т. 3 and the lex.bg consolidation's
+т. 3 are *not* word for word — ДВ бр. 22/2026 inserted „който не е участвал в пътнотранспортно
+произшествие" into the consolidation. The agreement is on the **seam region**, which is what makes
+the rejoin a reconstruction rather than a guess; the sentence as a whole differs by an amendment.
+
+*The frames.* **A2 and A6 are proved on the phone branch, and this gate refused to take a desktop
+frame for either.** Every A2/A6 frame reports `vw 852 vh 393`, `engine webkit`, `compactAttr "on"` —
+the compact branch, not the desktop one. Opened and read: `a2-…-21-end-line-blocking.png` (A-pillar,
+dashboard, wheel, cluster 0 км/ч D; the end line carries **РЕЗУЛТАТ and no ✕**),
+`a2-…-22-debrief-skip-note.png` (all three controls, and the note in **touch** words — „Докосни „▾
+Скрий разбора"", not a `kbd` „Space" on a device with no Space key), and
+`a2-…-27-AFTER-RELOAD-line-not-blocking.png` (**РЕЗУЛТАТ *and* a ✕** after a full reload — the
+preference survives). A6: `a6-…-10-peek-up.png` shows a graded-mistake card carrying **ЗАЩО *and* a
+✕**, printing its whole sentence at 58 км/ч, and `-11-peek-TAPPED-gone.png` shows that card gone and
+a *different* one speaking. The report's own `dismissMisses` is `[]`.
+
+**Two things the frames show that no lane claimed.** In `a6-…-11-peek-TAPPED-gone.png` a **⚙ glyph
+is painted directly over the „Скрий известието" ✕** — the very control A6 exists to deliver — which
+is the unidentified landscape overlap one lane flagged and could not name, now located *on* an A6
+control rather than merely near it. And `a6-…-10-peek-up.png` independently confirms the
+demonstration ghost drawn **inside** the cockpit: the translucent blue body drapes across the
+dashboard and wheel.
+
+*The one frame class this gate refuses.* **None of the 53 consequence cards has ever been
+photographed over a cockpit.** The 20 + 18 fault-card frames are the shipping `SessionEndScreen`
+mounted on `/dev/popup-rig` against a **flat** backdrop; the lane said so itself and did not claim
+otherwise. That is now demonstrably fixable rather than impossible: `a2-…-22` proves the same
+end-screen renders over the live cockpit on a real phone — it was simply photographed on a session
+with **0 наказателни точки**, so no `FaultCard` was in frame. One driven phone session with one
+graded mistake closes it.
+
+### The gate itself — every command, with the exact numbers
+
+| command | result |
+|---|---|
+| `cd platform && npx tsc --noEmit --incremental false` | **EXIT 0**, `grep -c "error TS"` = **0**. Run before any probe existed, output captured to a file and the exit code echoed — not inferred from empty output. One lane reported 59 errors, all in `PlayAreaStyles.tsx`; whatever that file's mid-edit state was, **it type-checks clean now** and this gate makes no claim about the past. |
+| `npm run validate:content` | **EXIT 0** — „OK — all structural and referential checks passed". 1 089 questions, 77 signs, 16/16 topics, answer-leak sweep 17 scopes gated / 0 blocking / 0 warning. |
+| `npx vitest run --maxWorkers=4` | **EXIT 1** — Test Files **2 failed \| 753 passed \| 1 skipped (756)**; Tests **2 failed \| 11 398 passed \| 170 skipped (11 570)**. |
+| `npm run test:tools` | **EXIT 0** — 25 suites, **290 tests, 290 pass, 0 fail**. |
+
+**EXACTLY TWO REDS, and they are the two protected ones:**
+`src/modules/lesson/__tests__/compose.test.ts > gives every lesson at least one quiz beat` and
+`src/modules/exam/__tests__/content-bank.test.ts > has no dark, threadbare or under-represented
+topic` — the 29 quarantined first-aid rows awaiting **his** medical ruling. Neither was touched.
+
+**THE THIRD RED IS GONE, AND THIS GATE TRACED IT RATHER THAN PASSING IT ON.** Three lanes each
+reported a third failure and each attributed it elsewhere: one blamed
+`components/sim/lesson-ui/unpanel.test.ts` (3 red) on the lesson-UI lane; one blamed
+`hud/__tests__/sim-overlay-dismiss.test.tsx`, `traffic/__tests__/scenery-sightline.test.ts`,
+`traces/__tests__/sc-ov-return-gap-traces.test.ts` and `world/__tests__/mw-exit-districts.test.ts`
+on the content and HUD lanes; one blamed 59 `tsc` errors on `PlayAreaStyles.tsx`. **All of them now
+pass.** `unpanel.test.ts` was re-anchored by the lane that broke it, `PlayAreaStyles.tsx` was
+un-broken, and the timeouts were the documented 16 GB fork-worker artifact. The full run above
+names **only** the two protected reds — nothing else failed anywhere in the tree.
+
+**Probe hygiene.** Seven temporary probe files were created under `platform/src` for this audit and
+**all seven are deleted** — `git status --porcelain | grep zz-` is empty, and the 756-file / 11 570-
+test numbers above are the clean re-run *after* deletion (with the probes it was 761 / 11 575, a
+delta of exactly the 5 files and 5 tests they contained). No dev server was started, no
+`KNIJKA_DIST_DIR` created, `platform/tsconfig.json` untouched. **Nothing committed.**
+
+### STILL OPEN after this gate — name, owner, reason
+
+| # | name | owner | reason |
+|---|---|---|---|
+| **C-1** | `instrument-never-checked-against-its-own-rule` | law layer — `lib/content/law/corpus.ts` | New. `instrument: "електронен фиш"` with `instrumentSource` quoting чл. 186, ал. 1 (the **фиш** rule) passes the loader, the schema and the suite, and the card renders the contradiction. One check: the instrument must be the one the cited rule permits. |
+| **C-2** | `penalty-id-not-unique` | law layer — `corpus.ts build()` | New. No duplicate-`id` guard; `getPenalty` takes the first match, so a duplicate silently makes one row unreachable. Free to fix. |
+| **C-3** | `one-belt-priced-twice` | sim rules — `consequences.ts` + `hud/SessionEndScreen.tsx` | New, and it is the founder's original complaint in a new place. Moving off unbelted emits **both** `PREDRIVE_SEATBELT_SKIPPED` (at move-off) **and** `SEATBELT_OFF_WHILE_MOVING`, by design — but both rows now carry the *identical* `fine(100, …)` and `CP_T18_SEATBELT`, and `SessionEndScreen` maps one `FaultCard` per mistake with no grouping. A student who adds them up reads **200 лв. and 20 контролни точки for one belt.** Two exam marks is correct; two road prices is not. **→ 2026-08-10 OPEN-EVERY-FRAME GATE → RE-DRIVEN AND COUNTED, not believed.** This gate drove `l1-preparation` on `/dev/drive-rig` twice. Raising the pair needs the «unbelted-again» shape; the event stream was printed rather than assumed — `15.0:PREDRIVE_SEATBELT_SKIPPED · 16.9:SEATBELT_OFF_WHILE_MOVING · 32.7:SEATBELT_OFF_WHILE_MOVING`. The end screen, **counted in the DOM**: `−3 изпитни т.` **×2** (both cards keep their exam mark), `51,13` ×2 = **one** fault card **+ one** debrief summary line, `10 контролни точки` ×2 in the same two places, `ПЛАТЕНО ВЕДНЪЖ` ×1, «Едно нарушение, една цена» ×1. **ONE road price, TWO exam marks — exactly what was demanded.** A single-fault run correctly prints one price and **no** one-price box. Frames: `scratchpad/VERIFY/belt/P-cockpit-drive.png` (cockpit, 25 км/ч D, events=9) and `P-END-scroll5.png`; text `P-END-text.txt`. The end screen is `absolute inset-0 … bg-background/85` in `LessonPlayShell` — **full-bleed by construction**, so `cockpitFrame:false` on those rows is structural, not an excuse. |
+| **C-4** | `fault-cards-never-seen-over-a-cockpit` | render lane | All 38 consequence-card frames are on a flat rig backdrop. `a2-…-22-debrief-skip-note.png` proves the surface renders over the live cockpit on a phone; it just had no graded mistake in it. Needs one driven phone session with one mistake. |
+| **C-5** | `gear-glyph-over-the-A6-dismiss-control` | lesson-UI lane | The ⚙ overlaps „Скрий известието" in landscape (`a6-…-11-peek-TAPPED-gone.png`). Named at last as sitting **on** an A6 control, not merely nearby. |
+| **C-6** | `A7-verb-anchor-deletion` | law layer — `corpus.ts` | The widening rule still does not fire on a deleted anchor group; only the digit rule does, and only when a digit survives in `statementBg`. Loader hole, not a shipping hole — the discrimination matrix catches it. |
+| **C-7** | `A5-snapshot-recite` / **C-8** `A10-id-rewrite` | law layer | Both unchanged from the ATTACK-THE-CHECK gate. Loader silent, repo tests catch them. |
+| **C-9** | `no-consumer-for-the-penalty-bank` | product | `describeFine`/`describeControlPoints` are called from **nothing** outside the law layer and its tests. Every hole above is therefore latent — it matters the day the penalty card is built, which is also the day C-1 becomes student-visible. |
+
+**BLOCKED ON HIM, not on us — counted against nobody:** `B16` (his ruling), `B52` / `B60` bodies
+(his Blender — the child rig has no run pose, the officer no cap or палка), the **29 first-aid rows**
+(his medical ruling — the two protected reds are exactly these), and **whether ЗДвП чл. 185's
+residual 50 лв. should be SHOWN** on the three rows with no dedicated състав, `CONTROLLER_SIGNAL_VIOLATED`
+above all. Today it is named with no number. This gate agrees with that choice and does not ask him
+to revisit it — it is recorded so the blank is not mistaken for an oversight a fourth time.
 
 ---
 
@@ -454,6 +1969,19 @@ and named in STILL OPEN as `O-8` because the next person to put an article numbe
 the original problem.
 
 ### 3 · THE WATERMARK — „Хумор" is caught twice, „Сиела" only once, and not by an ingest
+
+> **CLOSED 2026-08-10 by the CONSEQUENCE-AUDIT gate, and closed by EXECUTION rather than by a
+> filter being written.** Everything below was true when it was written. It is no longer.
+> `content/law/tools/page-furniture.mjs` now strips both signatures in the **extraction** and
+> `assertNoVendorPagination` refuses to emit an act that still carries either; `build-corpus.mjs`,
+> `build-speed-acts.mjs` and `build-naredba-24.mjs` all call it. The blocker this section names —
+> „the extraction's inputs are gitignored scratch, so the tool cannot be re-run" — was cleared:
+> all four originals are on disk and **all four sha256 match `sources.json`**, and this gate
+> re-executed both builders into a scratch directory and got **all six emitted acts byte-identical**
+> to the working tree. **Count: 188 pieces across 505 units at `HEAD` → 0.** (The published „185"
+> reported *units* for НСИПМК where it reported *pieces* for the other two acts.) The reason it was
+> never cosmetic is now repaired and testable: чл. 6, ал. 1, т. 3 of the snapshot is one sentence
+> again and the article carries a consecutive 1…22.
 
 Both specimens fed to every furniture check in the tree:
 
@@ -557,6 +2085,241 @@ outside the shipped guard's directories — `O-6`.
 Nothing in this section is a claim that a lane's work was wrong. Every one of the four fixes holds
 against the attack it was designed for. What is refused is the **completeness** each of them
 reported.
+
+---
+
+## `D5` — „it turns to R (reverse) but the car does not move did it break or ?" · the 2026-08-11 PHOTOGRAPH-THE-GESTURE gate
+
+**Verdict: `FIXED-SEEN`.** Frames:
+`scratchpad/g2-B-held-2.6s.png` (desktop 1280×800, the moment) ·
+`scratchpad/ov-iphone16-portrait-open.png` (iPhone 16 portrait, deck open) ·
+`scratchpad/guard2-B.png` · `guard2-C.png` · `guard2-D.png` (the three manual routes into R).
+
+### What he did, and what he now sees
+
+This is the other half of `D1`. `D1` stopped the car reversing into traffic under a held brake; it
+never told him why the car had gone dead. Driven on `/dev/drive-rig`, `sc-junction-stop@L1`, real
+shell, **real keyboard** (trusted CDP events, not the rig's injector):
+
+| | what the car did | what the cockpit said |
+|---|---|---|
+| **A — hold ↓ from a roll and never lift** (his words in the brief) | braked 22.2 → 0.001 km/h and **stayed in D for the whole 7.27 s** — max 0.146 km/h | nothing, **and correctly nothing**: LAW 1 means this gesture never reaches R, so there is no refusal to explain |
+| **B — stop, lift, press ↓ and HOLD** (the gesture he was actually standing in) | selector **D → R at 0.44 s** after the press, gear −1, and **0.001 km/h for the whole 8.38 s hold** | **the message, 1.45 s after the cluster showed R** (1.89 s after the press). `REVERSE_STUCK_HINT_S` is 1.5 s counted from the flip itself, which the cluster renders one frame later — the two agree. Measured on the assist route in isolation: **1.55 s** |
+| **C — release, press ↓ again** | **first movement 0.25 s after the second press**, reaching **23.85 km/h** backwards | — |
+
+> **Вдигни крак от педала, натисни пак**
+>
+> Лостът е на R, но колата не тръгва: педалът, който държиш, допреди миг беше спирачката — с него
+> спря. Затова не става на газ под крака ти. Докато не го отпуснеш, той продължава да спира. В
+> истинска кола е същото — първо вдигаш крак от спирачката, чак после даваш газ. Вдигни крак,
+> натисни пак и тръгваш назад.
+
+**One correction to the brief this gate was given.** „Hold S from a roll, let the car stop, keep
+holding past the 0.35 s shift" is a gesture that **no longer exists**: `REVERSE_ASSIST_LIFT_S` (LAW 1)
+makes a pedal held through a stop permanently unarmable, so it never shifts and there is nothing to
+be confused by. The confusion he hit is row B above — stop, lift, press, hold — and that is the row
+that is photographed.
+
+### The guard is intact — every route into R, with the pedal already held
+
+All four driven, each with the brake genuinely down at the moment the selector reached R. Routes
+B/C/D were set up by **braking to a stop from a roll and never lifting**, which LAW 1 proves cannot
+arm the assist (the selector still read `D` at the end of every roll-down), so the route under test
+is the only thing that moved the lever.
+
+| route into R | gate walk | max &#124;v&#124; while the pedal is held | said it | after the foot lifts and presses again |
+|---|---|---:|---|---:|
+| **A** the assist (stop, lift, press ↓) | D → R under the held foot | **0.001 km/h** over 6 s | yes, +1.55 s | **17.96 km/h** |
+| **B** the `[` keys | D > N > R | **0.001 km/h** over 7 s | yes | **21.44 km/h** |
+| **C** the touch gear sheet (finger on the drivetrain axis) | D > N > R | **0.001 km/h** over 7 s | yes | **25.05 km/h** |
+| **D** the cockpit lever (right-click ×2) | D > N > R | **0.001 km/h** over 7 s | yes | **21.27 km/h** |
+
+**The 16.8 km/h reverse into traffic is unreachable from all four.** `reverseAssist.test.ts` is green
+(**30 tests**, not the 32 the lane reported — the file is green either way), and its LAW 2 case pins
+the half a drive cannot see: 600 frames of `throttle === 0` **and** `brake === 1`, i.e. the car is
+still *braked*, not merely coasting.
+
+*Checked on the way and reported as a non-defect:* one `[` press steps the gate exactly one station
+(D→N→R→P→reject, and `]` back), measured with 3 s between presses. An earlier run of this gate read
+it as a double-step; that run was wrong — the brake it was holding had armed the assist, which walked
+to R by itself before the keys were pressed.
+
+#### → 2026-08-11 · HIS RULING ON THE ASSIST, DRIVEN. „thats automatic transmition"
+
+His words: *„before when pressing S or Arrow Down it automatically went to R and moved backwards and
+it has to stay like that because thats automatic transmition."* The table above is the state he was
+ruling against: on the assist route the car reached R and then **sat at 0.001 km/h under his foot**
+until he lifted and pressed again. LAW 2 never *prevented* that reverse — it charged a second press
+for it, which is exactly what an automatic does not do. `ReverseShiftSource` now tells the pedal
+mapper which route flipped the selector; the assist's own armed press is exempt, every hand-worked
+route is not. Driven on `/dev/drive-rig` (`sc-junction-stop` L1, real keyboard / mouse / finger,
+canvas 1264×742 fullscreen, 0 page errors on every run):
+
+| his gesture | selector → R | first movement | speed reached | card |
+|---|---:|---:|---:|---|
+| stand still, foot off, **one unbroken press of ↓** | **+0.381 s** | **+0.539 s** (0.158 s after R) | **25.10 km/h backwards** | **silent** |
+| repeat run | +0.538 s | +0.639 s (0.101 s after R) | 25.10 km/h backwards | silent |
+
+Photographed at the moment it moves: `scratchpad/rev/shots/A-assist-MOVING.png` — the reverse view
+with the rig readout `v=-3.3km/h gear=-1 phase=driving` in the same frame. **The card is silent on
+that route by mechanism, not by a second gate: nothing was refused, so there is nothing to explain.**
+
+**The guard, re-driven on all three hand-worked routes.** Each one ROLLS IN and brakes to rest
+*without lifting*, so the held pedal is a genuine braking press and LAW 1 never arms the assist — a
+probe that presses the brake at a standstill first hands the car to the assist, which reaches R by
+itself, and the subsequent steps then walk **R→P** instead of D→R. That is how a route can look
+tested and never have run.
+
+| route into R | entered at | gate walk | max &#124;v&#124; while the foot is held | said it | after a genuine lift |
+|---|---:|---|---:|---|---:|
+| **B** the `[` keys | 21.1 km/h | D → N → R | **0.246 km/h** over 11.9 s | yes, **+2.96 s** | **25.10 km/h** |
+| **C** the touch gear sheet (852×393, real finger, ◄P ×2) | 28.8 km/h | D → N → R | **0.500 km/h** over 14.2 s | yes, **+5.36 s** | **20.26 km/h** |
+| **D** the cockpit lever (right-click ×2 on the real 3D hotspot) | 20.9 km/h | D → N → R | **0.424 km/h** over 13.0 s | yes, **+3.86 s** | **25.07 km/h** |
+
+`scratchpad/rev/shots/C4-touch-heldfoot.png` is the guard with its voice: «Вдигни крак от педала,
+натисни пак» on screen, `v=0.0km/h gear=-1`, the foot still down. **And the case he originally
+reported is unchanged:** rolled to 21.1 km/h, pressed ↓ **while moving** and held it 9 s through the
+stop — selector trail `2 → 1`, R never reached, max reverse **0.143 km/h**, no card. LAW 1 does not
+move, and it must not: it is the only thing standing between a held brake and the 16.8 km/h reverse
+into traffic that opened this whole thread.
+
+**What it costs, stated and not buried.** The warning between the R telltale lighting and the car
+moving collapses from a deliberate lift-and-press to **0.10–0.16 s**. A nervous re-dab of the brake
+at a Б2 line — foot fully off ≥ 0.25 s, then down again — reverses NOW where it used to reverse one
+press later. It always reversed; the student used to get a lift and a press of thinking time. That is
+the ruling working as ruled.
+
+**Two things this gate found in the instruments themselves.** (1) `page.waitForFunction(fn, options)`
+passes `options` as the function's **argument** — `drive-rig.mjs`, `seat.mjs` and this gate's first
+probe all ask for 120 s and silently get the 30 s default. It cost three failed runs on a contended
+box before anyone looked. (2) On a phone a teach card **hides the entire touch rail**, so a probe
+that reaches for the gear sheet while «ИНСТРУКЦИИ» is up finds nothing and reports the route as
+untestable rather than as untested — photographed at `scratchpad/rev/shots/C2-touch-heldfoot.png`.
+
+### No new overlap — four profiles, WebKit, real insets, deck closed and open
+
+Reached with the **finger only** (the drivetrain axis: one continuous press, never lifted). A
+synthetic drive *key* sets `TouchControls.keyboardActive` and hides the whole overlay — that is how
+an earlier survey counted 2 controls instead of 12 and called the screen clean.
+
+| profile | card box | left frac (rule ≥ 0.6) | area frac (budget ≤ 0.12) | controls · overlaps · dead — deck **closed** | deck **open** | nearest control, closed / open |
+|---|---|---:|---:|---|---|---:|
+| iPhone 16 portrait | `[239.5, 67, 141.5×97.5]` | **0.609** | **0.041** | 14 · **0** · **0** | 20 · **0** · **0** | 183.9 px / 110.5 px |
+| iPhone 16 landscape | `[541, 8, 240×83.8]` | **0.635** | **0.060** | 14 · **0** · **0** | 20 · **0** · **0** | 63.8 px / **15.0 px** |
+| Small Android portrait 360×780 | `[218.4, 8, 129.6×97.5]` | **0.607** | **0.045** | 14 · **0** · **0** | 20 · **0** · **0** | 162.8 px / 131.5 px |
+| Small Android landscape 780×360 | `[528, 8, 240×83.8]` | **0.677** | **0.072** | 14 · **0** · **0** | 20 · **0** · **0** | **52.3 px** / **15.0 px** |
+
+*(14 = 12 real controls plus the card's own „Защо" and „Скрий известието". 20 = the six deck
+transport buttons joining them.)*
+
+**THE NEGATIVE CONTROL, on every profile and every state.** The first version of this survey reported
+`0 overlaps` **while its shift function was a no-op** — a blind probe and a clean screen produce the
+same number, so the probe is now made to fail on purpose before any zero is believed. The **real**
+card is translated onto the drivetrain pad, re-measured, and translated back:
+
+| profile | overlap the probe caught | control it killed | after restore |
+|---|---:|---|---|
+| iPhone 16 portrait | **13 793.2 px²** | „Ход — назад…" 1/5 hit points stolen | **0 · 0** |
+| iPhone 16 landscape | **19 681.3 px²** | „Ход — назад…" 1/5 | **0 · 0** |
+| Small Android portrait | **12 635.4 px²** | „Ход — назад…" **5/5** | **0 · 0** |
+| Small Android landscape | **14 740.0 px²** | „Ход — назад…" 1/5 | **0 · 0** |
+
+**It displaces nothing.** Every `[data-hud]` surface was boxed with the message down and again with
+it up: on three profiles **not one box moved**, and on iPhone portrait the only change is the notify
+column's own height (83.8 → 97.5 px) because the line wraps to three there.
+
+**Landing.** `l1-preparation` (`preDrive: true`): **20 seconds** of held brake produced no message,
+selector still `P`, phase still `preDrive` — the watch is reset while the drive is locked, exactly as
+written, so on the landing phase there is nothing to overlap. 13 controls, `scratchpad/final-landing.png`.
+
+**The one number to watch.** On both **landscape** phones with the demonstration deck open the card's
+bottom edge comes within **15.0 px** of the deck's „Повтаряй участъка" button. That is a clearance,
+not an overlap — 0 area, 0 stolen hit points — but it is the number that goes negative first if this
+copy ever grows a line.
+
+#### → 2026-08-11 · RE-MEASURED, AND THE THING THAT GOES NEGATIVE FIRST IS NOT THE COPY
+
+Four profiles (393×852, 852×393, 360×780, 780×360), deck closed AND open, on the real shell, with
+the car actually in **R** so the reverse-time cues exist — a resting frame cannot see any of this.
+**The negative control passes on all four**: a transparent full-viewport sheet kills **22 of 22**
+controls, removing it brings back **22 of 22**. *(It failed on both iPhone profiles first time round,
+and that failure is worth keeping: a `<body>` child is not rendered while another element is
+fullscreen, so the sheet was invisible to `elementFromPoint` and the probe was quietly proving
+nothing. It now appends to `document.fullscreenElement ?? document.body`. **A "0 dead controls" from
+a probe whose negative control has not fired is not a measurement.**)*
+
+**DEAD CONTROLS: 0 of 22, on every profile, in both deck states.** Nothing is unreachable.
+
+**THREE CONTROLS ARE UNDER THE 44 px FLOOR, on every profile and in both states** — and they are not
+in `TouchControls`, whose own cells measure exactly 44×44 (the ⚙ station, the mirror/indicator
+glyphs and every gear-sheet cell, verified in the same frames):
+
+| control | measured | where |
+|---|---:|---|
+| tier pill „Начинаещ" | **78 × 25 px** | `[data-hud="difficulty"]`, top of every profile |
+| tier pill „Нормален" | **78 × 25 px** | same |
+| tier pill „Напреднал" | **85 × 25 px** | same |
+| demo-deck handle „🎬 Демонстрация ▸" | **134 × 27 px** (130 × 43 on 360×780) | `[data-hud="demo-deck"]` |
+| the reverse cue's own button „⌖ Тясно е — виж мястото отгоре" | **224 × 31 px** | landscape only |
+
+**THE REAL COLLISION, PHOTOGRAPHED, AND IT IS NOT THE ONE THIS ROW WAS WATCHING.** On a **portrait**
+phone with the deck open, the overhead cue is printed **on top of** the demonstration deck's caption:
+`scratchpad/phone/out/iphone-portrait-open.png` — «Тясно е — виж мястото отгоре» and «Подмини …
+задната броня …» interleaved character for character, **8 294 px²** (189 × 44) on 393×852 and
+**5 220 px²** (180 × 29) on 360×780. That is row **B13**'s defect returning in the deck-OPEN state.
+**The mechanism is measured, not guessed, and it is not the copy growing a line:** the cue is pinned
+at `CUE_MAX_BOTTOM_FRACTION = 0.55` — its bottom edge sat at y=384 in the colliding run and y=383 in
+a clean one, i.e. it could not move — while the **deck's own height** varied 110 px → 156 px between
+two runs of the same probe on the same viewport minutes apart. When the deck renders tall its top
+climbs to 340 and the clamped cue has nowhere to go. **So the fragile input is the deck's height, and
+the fix belongs at the clamp, not at `CUE_GAP_PX`.**
+
+**THE 15 px ITSELF: STILL EXACTLY 15.0 px, AND IT IS A DIFFERENT CARD FROM THE ONE ABOVE.** This
+row's number is the **reverse message** («Вдигни крак от педала, натисни пак») against the deck's
+«Повтаряй участъка» 🔁 — not the overhead cue. Earned rather than simulated: rolled in at 28.8 km/h,
+braked to rest **without lifting**, shifted D→N→R by finger through the gear sheet, card up at
++4.23 s. Landscape, canvas 836×377 fullscreen, card at `[592, 16, 240×78]`. **Deck closed:** nearest
+deck control is the collapsed handle at **438.7 px**. **Deck open** (deck 512×108 @ 72,16): nearest is
+**«Повтаряй участъка», 44 × 44 px, gap 15.0 px, overlap 0 px²**, then 63 px to the speed button and
+111 px to the scrubber. So the number has not moved, the 🔁 it nearly touches **does** meet the 44 px
+floor, and nothing is dead. **The OVERHEAD cue's own gap is a separate, smaller number:** it resolves
+to exactly `CUE_GAP_PX` — **10.5 px** (393×852) and **10.0 px** (360×780) with the deck closed — and
+its nearest control of any kind falls from **118.8 px** / **94.7 px** (852×393 / 780×360, closed) to
+**37.5 px** / **22.5 px** with the deck open. **Two smaller box-on-box overlaps, both landscape, both
+deck-open:** tier-picker × demo-deck **398 px²** (12 × 35), of which **160 px²** lands on the
+„Начинаещ" pill itself. It steals no hit point — the pill's centre still hit-tests to the pill — but a
+25 px control with a deck corner on it is not a control anyone should have to aim at.
+
+### Seen while looking, not this row's defect
+
+- On a **portrait phone with the deck open**, the deck's own caption card clamps its last line: „Спри
+  НАПЪЛНО преди стоп-линията: колелата неподвижни, **броим до три**" renders with the final line cut.
+  Inside `[data-hud="demo-deck"]`, present with the message down as well as up, and it moves nothing
+  of ours. Belongs to whoever owns the compact deck.
+- The **D direction is now driven, not only unit-tested**: pressing the remapped brake in R at a
+  standstill toggles back to D and the same card appears for „…тръгваш напред".
+- The dev overlay's „1 Issue" on every profile is a **hydration attribute mismatch** on
+  `/dev/drive-rig`, plus two THREE.js deprecation warnings and two dev-only CSP notices. `pageerror`
+  count is **0** on all four profiles. Pre-existing; nothing in this row touches it.
+
+### Gate — `tsc` 0 · content 0 · tools 290/290 · vitest 2 red, and the third red was not ours
+
+| check | result |
+|---|---|
+| `npx tsc --noEmit --incremental false` | **0 errors** |
+| `npm run validate:content` | **OK — all structural and referential checks passed** |
+| `npm run test:tools` | **290 pass · 0 fail** (25 suites) |
+| `npx vitest run --maxWorkers=4` | **Test Files 2 failed · 774 passed · 1 skipped (777)** · **Tests 2 failed · 11 747 passed · 170 skipped (11 919)** |
+| the two reds | exactly the protected medical quarantine — `exam/__tests__/content-bank.test.ts` „has no dark, threadbare or under-represented topic" and `lesson/__tests__/compose.test.ts` „gives every lesson at least one quiz beat" |
+| `tsconfig.json` include | **6 entries**, `git diff` empty, `tsconfigHygiene.test.ts` 4/4 |
+
+**A third red appeared and was traced rather than reported.** The first full run came back
+`3 failed | 773 passed`, the extra being `src/lib/tsconfigHygiene.test.ts`. Cause: a **concurrent
+lane started a dev server with `KNIJKA_DIST_DIR=.next-harness` while the suite was running**, and
+`next dev` rewrote the shared, tracked `platform/tsconfig.json` to add `.next-harness/types/**` and
+`.next-harness/dev/types/**`. Restoring the file and re-running gives the table above. **This is the
+third time that mechanism has produced a phantom red in this register** — it is documented in
+`platform/AGENTS.md` and it keeps costing a gate an hour. Owner: whoever is on `.next-harness`.
 
 ---
 
@@ -783,9 +2546,9 @@ in scratchpads. **Nothing was committed.**
 | claim | why it is refused |
 |---|---|
 | **„One camera constant sits between the product and three rows"** (this register's own still-open row 7) | Refused on source, not opinion. In the cockpit view — the default — the `rv` quad is `visible = false`. The occluder is the cabin mirror, the three rows are not one problem, and **B55 is not a mirror row at all.** |
-| **`B35` → any verdict** | The lane did not render it and says so. Not counted as a look. |
-| **`B27` / `B55` → anything better than PARTIAL** | The poses where the mirror actually bites (12–28 m and ~30 m) have not been photographed, and the B27 frame that exists is at the un-measured 2.40 aspect. |
-| **`B64` → FIXED** | The shelter is built and photographed, but only through the right A-pillar on a held glance. **No forward-view frame at the graded stop point, and the parked-clear-zone change postdates the drive.** |
+| **`B35` → any verdict** | The lane did not render it and says so. Not counted as a look. **→ ANSWERED 2026-08-09 RENDER-ROWS: rendered, and the caption read off the frame at 43.7 m — `scratchpad/RR/b35/b35-y-70.png` + `ZOOM-b35-44m.png`. FIXED-SEEN.** |
+| **`B27` / `B55` → anything better than PARTIAL** | The poses where the mirror actually bites (12–28 m and ~30 m) have not been photographed, and the B27 frame that exists is at the un-measured 2.40 aspect. **→ ANSWERED 2026-08-09 RENDER-ROWS, at a MEASURED 1.780 in every frame: B27 shot at 29.0 / 21.7 / 17.3 / 13.6 m with the sign-vs-mirror pixel gap printed for each, B55's ped lens shot and pixel-sampled at 36.2 / 22.9 / 14.2 m. Both FIXED-SEEN.** |
+| **`B64` → FIXED** | The shelter is built and photographed, but only through the right A-pillar on a held glance. **No forward-view frame at the graded stop point, and the parked-clear-zone change postdates the drive.** **→ FORWARD-VIEW FRAMES TAKEN 2026-08-09 RENDER-ROWS and the refusal STANDS, now with a reason in numbers: the shelter is in the windscreen at 32.8 m, gone from it by 13.9 m, and 10.6 m off the driver's right shoulder at the mark. Still PARTIAL.** |
 | **`B40`'s prescribed fix class** | Disproved by the frame, by the lane itself: the sleeper is **nose-on** at 62 m, so no rear cue — including the brake-lamp fix that lane had just written — can reach the student. The brake-lamp fix shipped anyway because it is correct for the queues; the copy was rewritten to match the world rather than the world left contradicting the copy. |
 | **Still-open row 17, „no 2026-consolidated Наредба № Iз-2539 exists to ingest"** | **False against the tree, and writing it into the README would have enshrined it.** `content/law/acts/naredba-iz-2539-consolidated-dv49-2026.json` is on disk (76 891 B), is in `ACT_IDS`, and this gate read its чл. 6 out of the file: **„над 0,5 на хиляда до 0,8 на хиляда включително (чл. 174, ал. 1, т. 1 от ЗДвП) - 10 контролни точки"**. The half that is true is the unmaintained SARS URL. |
 
@@ -1847,11 +3610,11 @@ one-way mouths — and is not affected.
 | id | his words | verdict | what was seen · frame · who owns what is left |
 |---|---|---|---|
 | **A1** | "there is still a warning standing push the R reverse gear and park in the cell, although we are on automatic mode" | **FIXED-SEEN** | The advisor line is now automatic-transmission Bulgarian: «Премести лоста на R и паркирай на заден ход в клетката». `scratchpad/lp/framesC/FIX1-02-wait4s.png`. Closed on the LESSONS-PROGRESSION lane's own before/after frames; the independent re-look could not reach objective 2/2 to re-photograph (the scene opens with a 38 s demonstration holding the car at 0 km/h). **Residual, seen and worth one line of copy:** the on-screen key legend reads „[ ] скорости: към P / към D" — it never names R, while the new line tells you to move the lever to R. |
-| **A2** | End-of-lesson popup should be skippable with Space, say so, and offer a "turn this off" control | **PARTIAL-SEEN** | All three controls are on the screen, and this is the first time anyone photographed it: `scratchpad/b45r/frames/f45-F14.png` — the „Вклиняване" result screen carries a **«Пропусни разбора»** button, the note **«Space пропусни разбора»** with the key chip, and **«Не показвай автоматично»**. Both verification passes missed it because they got stuck one screen earlier on the calibration gate. Not demonstrated by a still: that Space *actually* fires, and that the preference survives a reload. Also visible bottom-left: **«Сесията не се записа (SAVE_FAILED)»** — the local PGlite, not the product. |
+| **A2** | End-of-lesson popup should be skippable with Space, say so, and offer a "turn this off" control | **FIXED-SEEN** *(2026-08-10 SIX-ROW PROVENANCE — the two things „not demonstrated by a still" are now demonstrated)* | **→ 2026-08-10 SIX-ROW PROVENANCE → FIXED-SEEN.** Frame `scratchpad/UXV/frames/a2-iphone16-landscape-27-AFTER-RELOAD-line-not-blocking.png`, **shot 2026-08-10 10:25:45**, which postdates `hud/SessionEndScreen.tsx` (01:33:33) by 8 h 52 m. On the COMPACT branch a phone actually takes — 2556 × 1179 = **852 × 393 CSS at DPR 3**, `compactAttr "on"` on all eight steps, WebKit, real insets — not `?state=column`. **Space actually fires:** `spaceTest` = `{endScreen:1, endSkip:1}` → `{endScreen:0, endSkip:0}`. **The preference survives a full reload:** after `page.goto` and a second abort the line returns non-blocking with `closeControls: 1`, «РЕЗУЛТАТ» and «Скрий известието» both resolving to themselves. All three asks photographed on `a2-…-22-debrief-skip-note.png`. Detail in the SIX-ROW PROVENANCE section §1, including the „1 Issue" badge being Next's dev overlay.<br><br>**Previously:** All three controls are on the screen, and this is the first time anyone photographed it: `scratchpad/b45r/frames/f45-F14.png` — the „Вклиняване" result screen carries a **«Пропусни разбора»** button, the note **«Space пропусни разбора»** with the key chip, and **«Не показвай автоматично»**. Both verification passes missed it because they got stuck one screen earlier on the calibration gate. Not demonstrated by a still: that Space *actually* fires, and that the preference survives a reload. Also visible bottom-left: **«Сесията не се записа (SAVE_FAILED)»** — the local PGlite, not the product. |
 | **A3** | "when I clicked skip this stage … it does not allow me to continue to the next questions" | **FIXED-SEEN** | Not attempted in either pass. Note for whoever takes it: there is no stage-skip control anywhere in the sim shell (`Пропусни` exists only in OnboardingFlow, CalibrationGate and SessionEndScreen), so what he clicked was almost certainly the calibration gate's «Пропусни» — the same screen A2 got stuck on. Cheapest repro: park at the end of `sc-park-perp-rev`'s aisle and wait 25 s for `terminalRescueZone` (`lessons/engine.ts:645-702`).<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** His „skip and you cannot continue“ is answered on screen. Ran the skip (`scratchpad/ovg/A3b.log`, «Пропусни» clicked at 37.2 s, the objective banner clears and the run proceeds), and the forward path itself is photographed on the sibling run: `scratchpad/ovg/frames/A17b-98-scrolled-to-ПРОДЪЛЖИ_НАПРЕД.png` carries a **ПРОДЪЛЖИ НАПРЕД** card offering the NEXT lesson by name after an attempt that was not passed, with the note „Този урок не е взет, но остава отворен — върни се към него, когато поискаш.“ Backed in code by `lessons/progression.ts:86` now unlocks on **prevTried** instead of **prevPassed** and `scenario/nextStep.ts`, which no longer returns `NO_STEPS` on a failed attempt. |
 | **A4** | "I tried to go from Advanced to Normal, and the engine turned off, and when I went back to Normal it did not turn on" | **FIXED-SEEN** | Two attempts; the tier click was intercepted by the teach-moment modal the first time and never took the second. **A specific, cheap, code-derived hypothesis for the next person — not a verdict:** `driveline.ts:521-538` moves the selector D→M on Нормален→Напреднал; `:500-513` latches a stall after `STALL_GRACE_S` 0.7 s because a stationary car in M1 with no throttle satisfies `lugging`; and `toggleEngine()` at `:369-372` refuses to start an automatic unless the selector is P or N. Two pill presses and a look would settle it.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Reproduced his exact sequence on a parked car and then fixed it. `scratchpad/ovg/frames/A4fix3-t021.png` — after Нормален → Напреднал (t 2.2 s) → Нормален (t 8.2 s) and throttle from t 12.2 s, the HUD reads **D · 49 КМ/Ч · ДВИГАТЕЛ Вкл.**: the engine is running, the selector is in a legal drive position and the car is moving. Root cause was two-sided and is written up in `vehicle/driveline.ts` — the tier switch put a STANDING car into M1 with the clutch up (which `update()` correctly stalls, and the teaching card then billed as the student's mistake), and handed it back dead in D, where `toggleEngine()` may only start an automatic in P/N, so „I“ was silently rejected. Both halves fixed; `tierNeutralFromD` makes the round trip an exact no-op. Pinned in `driveline.test.ts`. |
 | **A5** | "in Normal mode … I can only go up to 30 Km per hour" | **FIXED-SEEN** | Measured off the DOM readout in the same session as the frame: 3 → 58 → 59 and held 59; a second run held a flat 51. `scratchpad/relook/frames/SZ3__drive_t000.png`. **The 30 km/h ceiling is gone.** Why not FIXED: the capture cadence put frames at t=0 and t=12 and the run ended at t≈5, so there is no photograph of the needle at 59 — it is a measurement, not a picture. The governor is now domain-derived (`difficulty.ts governorCapKmh` = road limit + margin), so on a 50 street 51–59 is the ceiling **by design**; he may still call that low, and that is a product decision, not a bug.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Photographed, not inferred: in `scratchpad/ovg/frames/A4fix3-t021.png` the tier is Нормален and the speed readout is **49 км/ч**. `vehicle/difficulty.ts:214 NORMAL_CAP_FLOOR_KMH = 50` and `:253-262 cap = max(domain + 10, 50)`. The 30 km/h ceiling is gone. Whether 50-plus-margin is fast enough is a number only you can set. |
-| **A6** | "those pop ups … need to be able to be removed when clicked with the mouse … complete rework" | **PARTIAL-SEEN** | **Desktop, 1440×900.** One notification card, «ОПАСНА ГРЕШКА −10 т.», with its own **✕** in the corner and a «ЗДвП чл. 20» law chip — not the four 288 px `pointer-events-none` cards R0 measured. `scratchpad/relook/frames/A2__10_gate.png`. Not done: nobody clicked the ✕ and watched it go, and `pointer-events` could not be measured because `[data-hud="toasts"]` is absent from the DOM whenever no toast is live. |
+| **A6** | "those pop ups … need to be able to be removed when clicked with the mouse … complete rework" | **FIXED-SEEN** *(2026-08-10 SIX-ROW PROVENANCE — the ✕ was tapped at its own measured centre, on a phone)* | **→ 2026-08-10 SIX-ROW PROVENANCE → FIXED-SEEN.** Frames `scratchpad/UXV/frames/a6-iphone16-landscape-10-peek-up.png` → `…-11-peek-TAPPED-gone.png`, **shot 10:23:11 → 10:23:13**, postdating `hud/SimOverlay.tsx` (2026-08-09 23:50:54) by 10 h 32 m. Compact branch: vw 852 / vh 393, `compactAttr "on"`, WebKit. **BEFORE:** an ordinary NON-blocking line („Стигна точката, но твърде бързо") with `pointerEvents "auto"`, `closeControls 1` and a 44 × 44 «Скрий известието» at (737, 41.8) whose own centre returns itself. **THE TAP:** `page.touchscreen.tap(759, 63.8)` — the arithmetic centre of that rect; `dismissMisses` is `[]`. **AFTER:** the card is gone, the cockpit intact (cluster «58 км/ч D»), another card speaking. Source read here, not quoted: `SimOverlay.tsx:329-330` `CARD_CLASS` carries `pointer-events-auto touch-manipulation` **unconditionally**; the old `const interactive = hasDetail \|\| blocking` survives only in the comment explaining its removal. **Residual:** the `data-sim-overlay-card="button"` shape (`:496`) is still unphotographed. See §2.<br><br>**Previously:** **Desktop, 1440×900.** One notification card, «ОПАСНА ГРЕШКА −10 т.», with its own **✕** in the corner and a «ЗДвП чл. 20» law chip — not the four 288 px `pointer-events-none` cards R0 measured. `scratchpad/relook/frames/A2__10_gate.png`. Not done: nobody clicked the ✕ and watched it go, and `pointer-events` could not be measured because `[data-hud="toasts"]` is absent from the DOM whenever no toast is live. |
 | **A7** | "it said I stepped on the line … in fact no such line exists at all there is just road and no marking" | **FIXED-SEEN** | `ov-lane-v1` — **his own catalog 48** — rendered from above: a white dashed осева runs the full 306 m of the edge with the car in the right-hand lane. `scratchpad/laneA/frames/a7-still-ovlane-mid.png`. The premise of the complaint is refuted on his map, and the T1 fix is wired end to end, not asserted: `spatial.ts:289` derives the class from the painter's own `paintsCentreLine()`, `locator.ts:213` publishes it, `worldRuntime.ts:1457` puts it on the tick in the disarming direction only, `engine.ts:913+926` refuses to arm `CENTER_LINE_TOUCHED` when false. Gate census **T1 = 0** across 90 districts. **Residual, stated plainly:** two maps were rendered, not ninety, and nobody drove a genuinely unpainted road to watch nothing fire. |
 | **A8** | "L5 is not working at all … completely dead" | **PARTIAL-SEEN** | No L5 rung was opened in either pass, so "no tile" cannot be told from "dead tile" — which is the entire discrimination the row asks for. Cheapest test: `sc-lane-change` L5 is `{weather:"rain", night:true}` (`templates-flow.ts:472`) and compiles to `timeOfDay:'night' + rain:true`, so L1 vs L5 back to back on that one template is a one-frame answer. The harness account is admin and `progress.ts:135` unlocks every rung, so no star grinding is needed.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** „L5 is not working at all“ is refuted — L5 loads, runs and is visibly a different lesson: `scratchpad/lanegw/frames/B19L5-02-b-start-L5.png` shows „Ниво 5 — Усложнени“, „Съветник изкл.“, no demonstration deck, no shadow ribbon, and a tightened gate (30 → 25 км/ч). **Why not FIXED:** on that same drill the identical lawful stop that credited the approach objective at L1 in 2 s never credited at L5 — the banner sat at ЗАДАЧА 1/2 through 20 s of standing still. Owner: the level ladder's reachZone scaling in `lessons/compile.ts` against `sc-rb-approach`'s `acceptBeforeMarkM 1.725`. |
 | **A9** | "Настъпване на осевата линия … we step on some line that doesnt exist at all" | **FIXED-SEEN** | Second map, as the row demands: `tj-rhr-v1`, dashed осева painted the full length of the southern approach and along the east-west main road; the junction interior correctly bare. `scratchpad/laneA/frames/a9-still-tjrhr.png`. Same wiring, same census, **same residual as A7**. |
@@ -1863,6 +3626,8 @@ one-way mouths — and is not affected.
 | **A15** | "the MAP it again has the 4 roundabouts which is unnaceptable" | **NOT-A-DEFECT** *(count only — the shape half is real and is counted at B16)* | **The count is refuted and pinned** — six rings across ninety districts; the four things he counted are the four *arms* of one junction (`scratchpad/laneA/frames/a15-still-rbmini-tight.png`). **The other half of his sentence is not, and it is the real one:** `rb-mini-v1` does not read as a roundabout. See **B16** for the current frame and the owner. |
 | **A16** | "NO pedestrian crossing on the road and its looking for it" | **FIXED-SEEN** | Same mechanism and same fix as A13 — `runtime/zones.ts` no longer arms a crossing duty on a crossing the world never draws, so `pe-zone-v1`'s residential street stops looking for a pedestrian crossing its own lesson text says is not there («Вътре няма пешеходни пътеки»). Frame: `scratchpad/frames-after/unmarked-n4318749952.png`. Closed on the fix lane's render; the second pass could not reach one of the affected maps. |
 | **A17** | "I am at the end of the Test/Exam and nothing happens … cant stop the exam, need to refresh the whole page" | **FIXED-SEEN** | No exam was driven to its end in either pass, and it is not cheap: `examBankData.ts` shells carry 13+ objectives across the full Студентски град map, i.e. kilometres of headless driving. **Two honest partial answers.** (1) The escape hatch he says does not exist *is* in the source — `LessonPlayShell.tsx:2001-2004` renders «Прекрати изпита» whenever the lesson has objectives; that half is a 30-second check. (2) A *scenario* does now reach a result screen cleanly — `scratchpad/b45r/frames/f45-F14.png` is a completed „Вклиняване" protocol. The exam path itself is untested.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** „Cant stop the exam, need to refresh the whole page“ — no reload needed. `scratchpad/ovg/frames/A17b-98-scrolled-to-ПРОДЪЛЖИ_НАПРЕД.png`: «Прекрати изпита» clicked at 6.0 s on Ниво 4 · ИЗПИТ, and the product produces a complete result screen — „Урокът беше прекъснат преди края“, the 10/3/1-point fault table, ★☆☆, both route tasks listed as unmet, a THEO-4 debrief („Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака отново“), and ПРОДЪЛЖИ НАПРЕД / Повтори / Назад към таблото. |
+| **A18** | „because of this again −10 points were deducted is this true?" — a «Пътнотранспортно произшествие» billed for driving past a car that was standing still, without touching it | **FIXED-SEEN** *(2026-08-10 PHANTOM-CRASH gate)* | **The −10 was lawful; the EVENT was invented.** Reproduced on `sc-follow-brake` (FO-02, `fo-brake-v1`), whose staged lead brake-slams and comes to a **complete standstill** in the player's lane — a parked car from the seat. Drove the pass around it through the production stack (`recordScriptedDrive` → `createWorldRuntime` + `createTrafficSystem` + the scenario director + the rule engine), the SAME drive graded twice: once by `git show HEAD` of `orchestrator/runners.ts`, once by the exact-geometry version. **Holding a line 1.29 m clear of its flank, entirely inside his own lane: BEFORE = `COLLISION` and nothing else — an otherwise perfect drive scored 10 опасни points; AFTER = zero violations.** The culprit is the tenth, uncounted circle — `BrakingLeadCarRunner`'s `gap = hypot(centres) − LEAD_CAR_LENGTH_M(4.3) ≤ 0.3`, which carries no `*_CONTACT_M` constant and so survived the sweep that retired the other three. `hypot` is isotropic; two flanks touch at 0.85 + 0.92 = **1.77 m** of centres, so abeam it convicted **up to 2.83 m of clear air** — wider than the car doing the passing. Driven boundary, 0.2 m steps on the real runner: **fires at 2.82 m of daylight, clears at 2.84 m**; the exact geometry flips at true contact (2.29 m line → separation **+0.002 m**, silent; 2.5 m line → **−0.208 m**, `COLLISION`). The `VEHICLE_CONTACT_M = 3.0` sibling measured the same way on `sc-ln-obstacle-meeting`'s oncoming stream: fires at 1.20 m of air, clears at 1.40 (predicted 1.23). **Real crashes are untouched:** nose into the standing car at **39.9 km/h** → `COLLISION`, separation **−0.007 m**, «Пътнотранспортно произшествие», 10 т., опасна; a moving head-on at 16.1 km/h → `COLLISION` at **−0.014 m**. Whole shipped corpus re-graded — **311 committed drives, 6 verdicts move**: three phantom crashes deleted (0.45 / 1.20 / 1.34 m of measured air) and **three real contacts that the circles never saw** now billed, including a child struck at **−0.113 m** on `sc-pe-parked-row-scan/mistake-fast-row` and a rear-end at **−0.032 m** on `sc-fo-brakelight-chain/mistake-late-brake`. Result screen read and photographed: `scratchpad/frames/end-mobile.png`, `end-desktop.png` — «10 наказателни точки … не са контролни точки по книжката», «Настъпи сблъсък. Това е ЕДНА опасна грешка…» with Наредба № 38 прил. № 5, т. 10, б. „в" for the ten and **чл. 48, ал. 3 quoted verbatim** for the ending. Cockpit frames of the lesson and the pass: `scratchpad/frames/after2-step10-t38.6-v14.png` (mid-pass, x = 0.73 → **1.56 m of daylight**, telemetry burned in), `fastA-step07-t30.7-v25.png`. Pinned by `orchestrator/__tests__/parked-car-pass.test.ts` (4 assertions, both directions). **Residual, stated not hidden:** no live cockpit frame exists of the false-positive INSTANT, because the shipped lead resumes 3 s after its slam (`resumeAfterSec: 3`) and `/dev/drive-rig`'s steering is open-loop — every live attempt either arrived after the car had driven off or rear-ended it. The verdict evidence is headless and exact; the picture is of the act, not of the conviction. **Owner of what is left:** `orchestrator/runners.ts` + `sim/collision` (geometry, done) and the rig (`devrig/driveScript.ts`, the missing frame). |
+
 ---
 
 ## B · Lesson-by-lesson, in his order
@@ -1882,7 +3647,7 @@ one-way mouths — and is not affected.
 | **B2** | platform-wide | "L2 L3 L4 L5 They have Nothing More" | **PARTIAL-SEEN** | L1 and L3 on catalog 1 back to back **are** different lessons now: L1 = Пълна помощ with advisor, demonstration deck, blue shadow ribbon, coaching bubble and colour legend; L3 = Самостоятелно with all of it gone. `scratchpad/relookB/B2L3-t00-open-hud.png`. Catalog 1 also gained the L5 rung it was missing (now L1–L5). **Still true, and it is his point:** the ladder works by *removing* aids. Above L3 nothing is *added* except the exam banner (L4) and authored rain+night (L5), because `compile.ts:141` multiplies a traffic baseline that is `{vehicleCount:0, pedestrianCount:0}` for every parking drill. **Owner:** `lessons/scenario/templates.ts` — the parking family needs an authored traffic baseline or an authored L4/L5 complication before the ladder has anything to scale. L4/L5 not photographed. |
 | **B3** | parking | "it states it will give 2 tasks … and its only 1 task" | **FIXED-SEEN** | Root cause was not the objective geometry: it was the scene's frame-zero placeholder pose at the district origin, which sat inside four drills' first zone. Opened `sc-park-parallel-exit` L1 and touched nothing for 18 s — banner holds ЗАДАЧА 1/2 at t=0, 6, 12, 18. Cross-checked on catalog 1 across a 26 s drive, 8 samples, never self-completing. `scratchpad/relookB/B3x-idle-t18-hud.png`. **The banner's promise of two tasks now matches what you are given.** |
 | **B4** | parking | "we can think of many many many more parking variants 10 at least" | **FIXED-SEEN** *(ten exist; six are grouped as parking — an ordering choice)* | Ten low-speed manoeuvre drills exist. **Six** are grouped where a student reads them as parking (positions 1–6, cards 2–6 each promising „Две задачи, в този ред"); the other four are scattered far down the list and two of them are turns, not parking — „Заден ход в алея" (65), „Излизане на заден от перпендикулярно място" (99), „Обратен завой в три точки" (81), „Заден ход по права линия" (125). `scratchpad/shots/crop-catalog-a.png`. **This is a grouping choice, not a bug.** Owner: `components/sim/lesson-ui/ScenarioCatalog.tsx` family grouping, or the catalog ordering.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** The earlier NOT-A-DEFECT („ten exist, six are grouped as parking“) was the wrong answer to give him. **Ten NEW drills now exist that each teach a parking MANOEUVRE**, in `templates-parking3.ts`: sc-park-gap-short, -gap-long, -van, -45-rev, -left, -zebra, -wall, -night, -double, -judge. All ten grade `parkInBay` (verified: 10 occurrences in that file); none is a turn, and the lane's contract test now forbids counting sc-maneuver-3point/-uturn toward them. Each rides its OWN committed district (no map reused) and the ten signatures are ten distinct tuples of angle / pitch / side / entry / occupancy / light. Thirty authored drives (one shadow + two mistakes each) replay through the production stack with zero violations. Frames: `tools/clips/headless/.park10/sc-park-gap-short-plan.png` vs `-gap-long-plan.png` (one car length of gap against nearly three, same camera), `sc-park-double-plan.png`, `sc-park-45-rev-plan.png`, `sc-park-zebra-cockpit.png`, `sc-park-night-cockpit.png`, `sc-park-van-overhead.png`. **Not built: parking on a slope with the wheels turned** — there is no elevation anywhere in the engine, and a flat map titled «наклон» would be exactly the lie this register exists to stop. |
-| **B5** | Урок 2 Кръстовища | "it said that I didnt let the traffic cars to pass, when in Fact I let everybody pass and there where no cars" | **PARTIAL-SEEN** *(was UNVERIFIABLE)* | Урок 2 never rendered — it is reachable only by clicking its card and it was last in the batch; three dev servers died first (two Turbopack panics on `globals.css`, one 10-minute `/login` compile). Handed to whoever replays it: `worldRuntime.ts:918-921` emits `prioritySituation{give-way, violated:true}` the instant the give-way line is crossed if `conflictNearFor` finds any moving non-same-direction actor — that predicate is where to look.<br><br>**RE-LOOK 2026-08-02 → still UNVERIFIABLE, and the reason is owed.** Three scripted drives of Урок 2 on the full district-v1 map. A key script drove 328 m north past the first junction and then left the carriageway onto the verge; right-steer taps kerbed and stalled it. The junction his complaint is about is past a turn a fixed key script cannot follow. In ~30 s of approach driving no yield fault of any kind fired. **Mechanism to hand on, not a verdict:** `worldRuntime.ts:919` calls `conflictQuery(node.x, node.y, 26 m, approachBearing)` on every give-way crossing and `traffic/system.ts:661-679` returns true for ANY vehicle within 26 m moving above the threshold on a different bearing — it does not test which arm, whether the vehicle is on the priority road, whether it is ahead or behind, or whether it has already cleared. **Closing this row needs a hand-driven pass or a recorded trace of the l2 route.**<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. Урок 2 RENDERED AND DROVE — first time in any wave — and his exact symptom did NOT reproduce in three drives. The row comes off UNVERIFIABLE; it is not called fixed.** **Why the previous rigs failed, so nobody wastes the hour again:** the lesson is reachable only by clicking its card (no lesson deep link exists), and `dismissOverlays` clicks anything labelled «Започни» — every card's start button reads «Започни урока», so the rig kept launching the parking площадка instead. **Three complete approaches to the Б2 «Стоп» junction.** Run **B5c** (19 km/h, no full stop): the debrief lists **two** dangerous errors at the same second 0:37 — «Неспиране на знак Б2 „Спри!"» AND «Непропускане на пътно превозно средство с предимство» — and the frame six seconds earlier shows **a yellow van genuinely crossing left-to-right across the path**, so that conviction is defensible, not obviously his falsehood (`scratchpad/jmisc/B5c-t028.png`, `B5c-96-debrief.png`). Runs **B5e** and **B5f** approached slowly to a clear junction — B5f at 0 км/ч, handbrake «Р» lit, dead stop held 14 s, the STOP octagon visible ahead on the right, road empty — and **no yield fault fired on either**, only «Неспиране на знак Б2», which is correct because the stop was ~40 m short of the line (`B5f-t030.png`, `B5f-96-debrief.png`). **Why it is not FIXED-SEEN:** the one sequence that would settle it is exactly what a scripted rig cannot land — **full stop AT the line → let the crossing van clear → then proceed**, which is when a car that has just passed in front of you is still "on your right and moving" inside the 26 m radius. That is the shape of predicate his complaint fits. **Re-drive spec, needs a HUMAN at the wheel or a closed-loop rig:** drive Урок 2, stop fully ON the Б2 line, wait for the staged van to cross completely so it sits ahead-right of you, then move off. Watch `traffic/system.ts:640-660` (`conflictNearFor`), called from `worldRuntime.ts:919` with `PRIORITY_CONFLICT_RADIUS_M = 26`. **It has been narrowed since this register was written** — it now requires the vehicle to be moving, on the player's RIGHT and on a different bearing — **but it still never asks whether that vehicle has ALREADY cleared the conflict point, or whether it is even on the priority road.** A van that just passed in front of you is, by that test, "on your right, moving, different bearing, within 26 m" — which is precisely "I let everybody pass and it still convicted me".<br><br>**→ 2026-08-05 INSTRUMENT GATE — his sequence was finally driven, his complaint did NOT reproduce, and the drive found something worse.** Урок 2's junction is past a turn a scripted rig still cannot follow, so the lane drove the give-way *capability* lesson that rides the identical predicate — `sc-jx-giveway-b1@L1` — with his exact sequence: full stop **on** the Б1 line (1.045 m short of the paint, held 15.07 s at 0.0 km/h), let the priority car clear, move off. **The yield objective was CREDITED at t=47.44 and the crossing at t=64.50 raised NO `FAILED_TO_YIELD` and no `prioritySituation` of any kind — zero in the whole 104 s drive.** The only fault at the line is `JUNCTION_SCAN_INCOMPLETE`, which is *correct*: the rig never pressed Q/E and instruction 3 demands the look. **The row stays PARTIAL because it is a row about Урок 2**, and Урок 2's own junction still needs a human at the wheel or a path-following rig. **What the drive DID find, and it is worse than the row:** a stationary box van standing in the student's own lane in the second junction's mouth — the correct drill ends in a 10-point COLLISION at `y=146.00` and then **jams the car at full throttle for 40 s with the lesson unfinishable** (`newdef/ZOOM-b5gw-junction-t58.png`, opened by the gate). Filed in STILL OPEN with an owner. |
+| **B5** | Урок 2 Кръстовища | "it said that I didnt let the traffic cars to pass, when in Fact I let everybody pass and there where no cars" | **FIXED-SEEN** *(2026-08-10 SIX-ROW PROVENANCE — the predicate is fixed, both directions driven, the trace surface green)* | **→ 2026-08-10 SIX-ROW PROVENANCE → FIXED-SEEN. His false conviction is gone AND the genuine one still fires — both photographed, both re-derived from the raw event log by the gate.** **THE CORRECT CASE FINISHES CLEAN:** `scratchpad/b5/B5fix-correct-step04-t64.6-v0.png`, **shot 10:46:59**, 24 min after `traffic/system.ts` changed at 10:22:06 — cockpit, cluster «1 км/ч D», telemetry `t=64.55s v=0.0km/h y=117.2 events=1`, the green «БРАВО · Правилно отстъпено предимство». All 12 events of the 74.5 s drive read out of `B5fix-correct-telemetry.json`: `commendation YIELDED_TO_PRIORITY` at t = 61.96, exactly one violation (`JUNCTION_SCAN_INCOMPLETE`, osnovna 3 т., the rig's inability to press Q/E), and **no `FAILED_TO_YIELD` of any kind.** **THE BARGE STILL CONVICTS:** three independent runs, all three `FAILED_TO_YIELD` **opasna 10 т.** at y = 122.29 / 122.37 / 122.40 and 21.6 km/h — cockpit `B5fix-barge2-step03-t71.8-v22.png` (10:54:47), verdict text `B5fix-barge-card-t64.1.png` (10:52:17) with ЗДвП чл. 47; чл. 48; чл. 50, ал. 1 and Наредба № 38 прил. № 5, т. 10, б. „в". **TRACES COUNTED BY THE GATE, not estimated:** `git status` = **exactly 10 files = 5 traces + their `platform/public` mirrors**; the recorder rewrote 12 files across four scenario dirs and exactly five changed bytes. A trace's `events` carries `annotation`/`glance-*` only — no rule events — so a predicate change cannot move a trace byte. **The proof is the gate, not the count:** `traces` + `clips` + `traffic` = **207 files / 2600 tests, all green**, against 503 committed traces. The seven `FAILED_TO_YIELD` reds another lane reported at 10:23 were taken 77 s after the change and are **absent from this gate's full run**. See §4.<br><br>**→ 2026-08-10 THE-NINE-UNOPENED → PARTIAL-SEEN. Урок 2's OWN junction was driven both ways at last, and the predicate behind his sentence was READ rather than described.** **(a) His sequence, on his lesson, photographed.** `scratchpad/lsn6/B5R/B5R-step04-t62.6-v0.png` — cockpit frame on `l2-intersections`, telemetry `x=383.6 y=45.5 v=0.0 км/ч gear=1 **events=0**`: a full stop held on the Б2 line with **zero events in the whole 1200-sample drive** (`B5R-telemetry.json`). What the lesson emits there is a TEACHING card, not a verdict — «Защо чакаш: знак Б2 „Спри! Пропусни движението!"» … «Спрял си правилно… знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство», with ЗДвП чл. 6, т. 1 and чл. 50, ал. 1 printed under it. **His false conviction did not reproduce.** **(b) The rolling entry does convict.** `scratchpad/lsn6/B5L2/B5L2-step02-t39.8-v11.png` — same lesson, entered at 15.5 км/ч; two опасни cards fire at the same instant t = 39.456: «Неспиране на знак Б2» and «Непропускане на пътно превозно средство с предимство» (ЗДвП чл. 47, −10 т.). **I cannot certify that junction was empty and will not pretend otherwise: the two fault cards cover the right third of the windscreen — precisely the quadrant the predicate reads.** **(c) The predicate, line by line — and one claim previously recorded in this row is WRONG.** `worldRuntime.ts:1004` calls `conflictQuery(node.x, node.y, PRIORITY_CONFLICT_RADIUS_M = 26, line.approachBearingDeg)` → `conflictNearFor` (`traffic/system.ts:718–738`), which tests exactly three things: within 26 m **of the junction node**, `speedMps ≥ 1` (`CONFLICT_MIN_SPEED_MPS`, :110), and travel bearing ≥ 50° off the approach bearing (`CONFLICT_SAME_DIR_DEG`, :112). It does **not** ask which side the vehicle is on, whether it is on the priority road, whether it is approaching or departing, or whether it has already cleared the conflict point — and at Δ = 180° **an ONCOMING car on the player's own road satisfies it**. This row previously said the predicate „now requires the vehicle to be moving, on the player's RIGHT and on a different bearing": that narrowing lives in `conflictFromRightFor`, which the give-way line never calls. **So his symptom does not reproduce on a correct drill, and the mechanism that would produce it is confirmed present at a line number.** The row stays PARTIAL for that reason — not for want of a drive.<br><br>Урок 2 never rendered — it is reachable only by clicking its card and it was last in the batch; three dev servers died first (two Turbopack panics on `globals.css`, one 10-minute `/login` compile). Handed to whoever replays it: `worldRuntime.ts:918-921` emits `prioritySituation{give-way, violated:true}` the instant the give-way line is crossed if `conflictNearFor` finds any moving non-same-direction actor — that predicate is where to look.<br><br>**RE-LOOK 2026-08-02 → still UNVERIFIABLE, and the reason is owed.** Three scripted drives of Урок 2 on the full district-v1 map. A key script drove 328 m north past the first junction and then left the carriageway onto the verge; right-steer taps kerbed and stalled it. The junction his complaint is about is past a turn a fixed key script cannot follow. In ~30 s of approach driving no yield fault of any kind fired. **Mechanism to hand on, not a verdict:** `worldRuntime.ts:919` calls `conflictQuery(node.x, node.y, 26 m, approachBearing)` on every give-way crossing and `traffic/system.ts:661-679` returns true for ANY vehicle within 26 m moving above the threshold on a different bearing — it does not test which arm, whether the vehicle is on the priority road, whether it is ahead or behind, or whether it has already cleared. **Closing this row needs a hand-driven pass or a recorded trace of the l2 route.**<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. Урок 2 RENDERED AND DROVE — first time in any wave — and his exact symptom did NOT reproduce in three drives. The row comes off UNVERIFIABLE; it is not called fixed.** **Why the previous rigs failed, so nobody wastes the hour again:** the lesson is reachable only by clicking its card (no lesson deep link exists), and `dismissOverlays` clicks anything labelled «Започни» — every card's start button reads «Започни урока», so the rig kept launching the parking площадка instead. **Three complete approaches to the Б2 «Стоп» junction.** Run **B5c** (19 km/h, no full stop): the debrief lists **two** dangerous errors at the same second 0:37 — «Неспиране на знак Б2 „Спри!"» AND «Непропускане на пътно превозно средство с предимство» — and the frame six seconds earlier shows **a yellow van genuinely crossing left-to-right across the path**, so that conviction is defensible, not obviously his falsehood (`scratchpad/jmisc/B5c-t028.png`, `B5c-96-debrief.png`). Runs **B5e** and **B5f** approached slowly to a clear junction — B5f at 0 км/ч, handbrake «Р» lit, dead stop held 14 s, the STOP octagon visible ahead on the right, road empty — and **no yield fault fired on either**, only «Неспиране на знак Б2», which is correct because the stop was ~40 m short of the line (`B5f-t030.png`, `B5f-96-debrief.png`). **Why it is not FIXED-SEEN:** the one sequence that would settle it is exactly what a scripted rig cannot land — **full stop AT the line → let the crossing van clear → then proceed**, which is when a car that has just passed in front of you is still "on your right and moving" inside the 26 m radius. That is the shape of predicate his complaint fits. **Re-drive spec, needs a HUMAN at the wheel or a closed-loop rig:** drive Урок 2, stop fully ON the Б2 line, wait for the staged van to cross completely so it sits ahead-right of you, then move off. Watch `traffic/system.ts:640-660` (`conflictNearFor`), called from `worldRuntime.ts:919` with `PRIORITY_CONFLICT_RADIUS_M = 26`. **It has been narrowed since this register was written** — it now requires the vehicle to be moving, on the player's RIGHT and on a different bearing — **but it still never asks whether that vehicle has ALREADY cleared the conflict point, or whether it is even on the priority road.** A van that just passed in front of you is, by that test, "on your right, moving, different bearing, within 26 m" — which is precisely "I let everybody pass and it still convicted me".<br><br>**→ 2026-08-05 INSTRUMENT GATE — his sequence was finally driven, his complaint did NOT reproduce, and the drive found something worse.** Урок 2's junction is past a turn a scripted rig still cannot follow, so the lane drove the give-way *capability* lesson that rides the identical predicate — `sc-jx-giveway-b1@L1` — with his exact sequence: full stop **on** the Б1 line (1.045 m short of the paint, held 15.07 s at 0.0 km/h), let the priority car clear, move off. **The yield objective was CREDITED at t=47.44 and the crossing at t=64.50 raised NO `FAILED_TO_YIELD` and no `prioritySituation` of any kind — zero in the whole 104 s drive.** The only fault at the line is `JUNCTION_SCAN_INCOMPLETE`, which is *correct*: the rig never pressed Q/E and instruction 3 demands the look. **The row stays PARTIAL because it is a row about Урок 2**, and Урок 2's own junction still needs a human at the wheel or a path-following rig. **What the drive DID find, and it is worse than the row:** a stationary box van standing in the student's own lane in the second junction's mouth — the correct drill ends in a 10-point COLLISION at `y=146.00` and then **jams the car at full throttle for 40 s with the lesson unfinishable** (`newdef/ZOOM-b5gw-junction-t58.png`, opened by the gate). Filed in STILL OPEN with an owner.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN`; frame opened.** `scratchpad/lsn6/B5R/B5R-step04-t62.6-v0.png` — cockpit (A-pillar, dash, wheel, cluster 0 км/ч D), telemetry `x=383.6 y=45.5 v=0.0 км/ч` and **`events=0`** across the drive. What the lesson prints at a correct full stop is a **teaching** card («Защо чакаш: знак Б2 — Спри! Пропусни движението!», ЗДвП чл. 6, т. 1; чл. 50, ал. 1), not a verdict — his false conviction did not reproduce. The predicate half stays open as still-open row 11. |
 | **B6** | Урок 2 | "I drive and In the middle of the road it states take right … we have to warn that right is to be taken even before the stop sign" | **FIXED-SEEN** | Approaching the Б2 at 26 km/h, still ~25 m short of the paint, **one frame contains both**: the green gate bar «Спри на стоп-линията» across the lane and a large chevron pointing RIGHT above it. The turn is published *before* the stop line, which is exactly what he asked for. `scratchpad/relookB/B6L-drv-t15s-26kmh.png` (zoom: `ZOOM-B6-turnahead.png`). |
 | **B7** | Урок 1 Подготовка (3) | 13 keyboard steps — "it must be with the mouse … a tutorial Pop up … clickable with the mouse … and also to be marked as done" | **FIXED-SEEN** | **No lane claimed this row and it is still broken.** Hover-swept the whole canvas: ten of thirteen cockpit controls answer, and clicking all ten with the mouse moves the checklist **0/13 → 1/13 and stops**. Belt, light switch and right mirror have no mouse target anywhere on screen, so steps 2, 4 and 6 cannot be done with a mouse at all. The card itself says so: step 8 prints „Тази стъпка е с педал — няма контрола на таблото, която да щракнеш." `scratchpad/shots/B7-pedal-step-card.png`. The „Клавиши" legend still opens by default over the tutorial card. **What is genuinely done, do not redo it:** the per-step tutorial auto-opens with an illustration, Защо/Как/Запомни, „Основание: ЗДвП чл. 20" and one mouse button; info steps tick off from their Потвърди. **Owners:** `LessonScene.tsx` (ControlsHelp default, spawn policy, a mouse pedal), `scene/vitok/hotspots.ts` + `CameraRig.tsx` (reachability), `hud/PreDriveChecklist.tsx` (it covers the controls it tells you to click).<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** The row where his literal complaint was untouched is now closed, and the acceptance test is a machine that drives Урок 1 with **mouse events only**, with a keydown tripwire that fails the run if a single key leaks in. `tools/clips/headless/.predrive/keep/13-of-13-mouse-only.png` — car rolling in D at 5 km/h, belt on, lights on, „БРАВО — Безупречна подготовка за потегляне“, zero keystrokes. `.../13-of-13-panel.png` shows „Подготовка преди потегляне 13/13“ in green with all thirteen dots green. Built: `scene/vitok/cabinLook.ts` (four named head poses + per-hotspot screen rects + a derived HUD height cap), `lesson-ui/MousePedals.tsx` (press-and-hold PROGRESSIVE pedals — brake ramps over 0.75 s so a click is not a stab that trips HARSH_BRAKING), the `performedSteps` pedal hints, and a rebuilt `PreDriveChecklist`. Root-cause fix included: lessons with a preDrive now spawn COLD. |
 | **B8** | Полигон (4) | "Завиване без мигач — out of nowhere after loading of the screen" | **FIXED-SEEN** | Loaded and **nothing touched for 30 s**, sampled at 0/6/12/18/24/30. No fault card, no toast, no teaching pause — the only thing on screen is the pre-drive prompt and checklist 0/13. `scratchpad/relookB/B8-idle-t30-hud.png`. Cause was `runtime/turns.ts:67-69` arming `TURN_WITHOUT_INDICATOR` off 55° of accumulated heading with no gate on the car having moved, while the chassis settled from frame 0. |
@@ -1893,7 +3658,7 @@ one-way mouths — and is not affected.
 | **B13** | Тясно гнездо (4) | "Press G for Eagle View, because its beginning and the user may not know" | **FIXED-SEEN** | At spawn there is no cue; the instant REVERSE is selected the chip «⌖ Тясно е — виж мястото отгоре G» appears and stays. **The fix was placement:** it now sits clear *above* the „ДЕМОНСТРАЦИЯ" deck instead of printed character-for-character on top of it at 0.62 opacity. `scratchpad/relookB/B13-gear-R-hud.png` (zoom `ZOOM-B13-cue.png`). Note for his exact words: the ping arrives when reverse is selected, not at the very start. |
 | **B14** | Пешеходна пътека (5) | "the Pedestrian at the end when he leaves the Zebra, he goes trough a car" | **FIXED-SEEN** | **The ghost-through-a-car is refuted by measurement on this map:** built `zb-v1` from the product's own functions and the nearest surviving parked body is **13.4 m** from the walk; the crossing-clear band already keeps them off (18 bodies before, 18 after). `scratchpad/laneB/frames/world/zb-ped-walk2.png`. **The residual doc 86 wrote down and nobody actioned is now fixed in code and not photographed:** the walk used to end 1.7 m past the back of the pavement on bare verge. `ZEBRA_PED.travelM` is retuned and `orchestrator/runners.ts` gained `PED_REST_PAST_ROAD_M = 1.8` so **no** staged walker anywhere can finish beyond one pace onto the pavement (census: 22 of 27 specs shared the offending geometry). Pinned by `orchestrator/__tests__/ped-walk-end.test.ts`. Four attempts to photograph the walker's rest pose all failed.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → FIXED-SEEN — and the previous pass had certified the defect safe with the wrong measurement.** The clamp `PED_REST_PAST_ROAD_M = 1.8` was passed by a test comparing the walker against the parked body's **centre**; a body is 1.9 m wide and spans kerb +1.05…+2.95 m, so 1.8 rested her **0.75 m inside its near flank**. Both offsets are now derived from the same `edgeParkingWidthM` the world draws the kerb with. Census over all 100 committed districts at five seeds — before: **19 of 121 walk loops passed through a parked body**, up to 1.25 m deep; 50 crossing-edges with the walk inside the kerb; 46 inside the row. **After: 0, 0, 0**, pinned with a legacy witness so the before-number cannot rot. Photographed on `zb-v1`, the only one of the three districts that actually has a parked row: at 16 px/m the yellow body spans world x 9.19…11.44 and the walker at rest spans **8.81…9.13** — her shoulder stops **0.06 m** short of the bodywork (`scratchpad/frames/ZOOM-B14-row.png`). |
 | **B15** | Кръгово движение (6) | "I waited for the traffic car 3-4 seconds, than twice more and it still stated the error" | **FIXED-SEEN** ✅ *(was BROKEN-SEEN)* | Entered the ring with the circulator live and got no false `FAILED_TO_YIELD`, but **that is not his sequence** and it is not offered as one: the wait-then-enter experiment was never run. `scratchpad/relookB/RB1-drv-t14s-21kmh.png`. **A concrete unclosed mechanism, measured, for whoever takes it:** `RoundaboutEntryRunner` (`runners.ts:989-1007`) re-syncs the circulating car *every tick* to sit 14 m upstream of the entry, and that sync only stops inside `RB_LOCK_PLAYER_ENTRY_M` = 14 m of the entry point. The painted give-way line is **18.2 m** from that point and the green marker **16.5 m** — both outside the lock. **So a driver who stops exactly where the paint and the marker tell him to can wait 4 s, 8 s or 40 s and a car is permanently about to arrive.** That is his sentence, and it is not in doc 86's cause list. Owner: `orchestrator/runners.ts` — a stopped-witness release, or raise the lock above 19 m.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** His sequence run with a longer wait than he ever gave it, and it still convicts. Stopped on the give-way paint and **waited 46 s** (sampled ×10, three held left glances); no circulating car in any frame. Moved off and instantly took ОПАСНА ГРЕШКА „Непропускане на ППС с предимство“ (ЗДвП чл. 47, −10 т.). `scratchpad/lanegw/frames/B15-14-n-at-entry.png`. **Mechanism confirmed:** `orchestrator/runners.ts:972/1028` locks the circulator only inside `RB_LOCK_PLAYER_ENTRY_M = 14 m`, but the М8 bars sit 18.2 m out — so a driver stopped where the paint says stays in the SYNC branch where `eta = dEntry / max(speed, 2.5)` floors at 7.28 s, re-timing the car to be ~7 s away forever and releasing it exactly when you move. The sibling `PriorityFromRightRunner` got a stopped-witness release this wave; the roundabout runner did not. Owner: orchestrator/runners.ts.<br><br>**→ 2026-08-03 GATE — BOTH mechanisms are now fixed in source, and the row STAYS BROKEN-SEEN because nobody re-drove his sequence.** Verified at the gate by reading the shipped constants, not by taking a lane's word: `runners.ts:998` `RB_WITNESS_STOPPED_NEAR_M = 22` and `runners.ts:1063` release the circulator when a stopped driver is within 22 m — which reaches the 18.2 m give-way paint that `RB_LOCK_PLAYER_ENTRY_M = 14` never could. A **second** cause the register had not diagnosed was also fixed: `traffic/system.ts:623-627` `circulatingConflictFor` asked only "is it in the band around the ring CENTRE and somewhere to my left", and on `rb-mini-v1` that band encloses the whole roundabout — so a car 36 m away on the far side convicted. It now also has to be within `CIRCULATING_REACH_M = 26` **of the driver**, which can only ever remove a conviction. That is the geometry behind his frame. **But the register's own rule is that `FIXED-CODE-ONLY` is not a verdict, and his sequence — stop on the paint, wait, move off — has not been replayed since the change. This row closes the day someone drives it and photographs no fault.**<br><br>**→ 2026-08-03 LOOK-WAVE — his sequence WAS replayed, twice, and it still convicts. The two fixed constants are real and they are not enough, because the conviction comes from a THIRD site this register has never named.** Two independent drives. Run 1, cockpit: braked to 0 км/ч on the give-way approach and stood there — frames at +2/+4/+6/+8/+14/+16/+24/+34/+36/+46 s, three held left glances, and **the HUD under every one of those ten frames carries no fault card at all** (`scratchpad/lanerb/frames/B15R-12-l-wait46s.png`, 0 км/ч, gear D, a dark-blue car low on the LEFT). Blip the throttle: clean at +1.3 s / 5 км/ч, and at **+2.4 s the whole screen is the blocking teach card «Непропускане на пътно превозно средство с предимство» (ЗДвП чл. 47) with the red −10 т. row behind it** — `scratchpad/lanerb/frames/B15R-14-n-at-entry.png`. Run 2, top camera, same waits: nine clean frames across 46 s, then the fault card **0.7 s after the first blip, before the car has left the arm** (`B15T-10-j-top-moving-off.png`). Nine of nine wait frames silent, then conviction on the first movement, twice. **The third site, read in source at the gate:** `runtime/worldRuntime.ts:1359-1365` sets `rbCondSince = tSec` the first tick a circulating conflict is seen and clears it **only** on a tick where the conflict is absent — a stationary driver never clears it. The test at `:1376-1388` then wants `tSec - rbCondSince >= YIELD_CONVICT_SUSTAIN_SEC (0.9)` and `!(brakingResponse && tSec - rbCondSince <= YIELD_BRAKE_RESPONSE_MAX_SEC (3.0))`; after a 46 s wait both are 45 s stale, so the only live gate left is `v.speedKmh > RHR_MOVING_KMH (3)` — **the instant the wheels turn he is convicted, with zero reaction window and no braking immunity, which are precisely the two mercies the C1/D1 comments above that block say they exist to grant.** Narrow fix: clear `rbCondSince` whenever the driver is stationary (`if (v.speedKmh <= WITNESS_STOPPED_KMH) rbCondSince = null;`) so the sustain clock measures time spent MOVING into the conflict — what the rest of the block already means by it. Cheaper second half worth pairing: the test carries no time-to-conflict term at all, so a car 25 m away that would be long gone convicts a driver doing 4 km/h 18 m short of the ring. Owner: `runtime/worldRuntime.ts` (shared — one lane only).<br><br>**→ 2026-08-05 INSTRUMENT GATE → FIXED-SEEN. The frame at forty seconds exists, and the gate made its own rather than take the lane's.** `scratchpad/VERIFY/vwait2-step07-t82.7-v0.png`: stopped on the М8 give-way paint at `y=−36.2`, **70.42 s of continuous standstill** — `y` moved **6 mm** across the entire wait, `x` never moved, `gear` never left D, `phase` never left `driving` across 4 077 samples, **0 clock resets, and 0 events on any of the three channels.** The whole 96-second drive fired ONE event: the approach objective completing at t=18.96. The lane's own 40-second frame (`b15-ROUNDABOUT-FINAL/b15a-step07-t54.1-v0.png`, `t=54.07s v=0.0 events=0`, ЗАДАЧА 2/2, no card) was opened and matches. **And the detector still convicts, which is the half that could have made this a hollow win:** `b15a-card-t76.9.png` — „Непропускане на пътно превозно средство с предимство", ЗДвП чл. 47, with `lead=3.2m = 0.89s @ 13km/h` in the same frame; the gate's own barge, mistimed so no circulator was in conflict, drew **no yield fault at all** (it hit the central island instead). Fires with a car, silent without one. **What is still true and is now a STILL-OPEN line, not a blocker on this row:** `ROUNDABOUT_ENTRY_MARGIN_M = 12` arms the tracker only within 30 m of the ring centre while the М8 paint is at 35.96 m, so for the whole minute the student does the most important thing a learner does at a junction, **the virtual instructor says nothing — and the first word it ever says about that car is −10.** Against requirement zero that is the real residual, and it is a grading change with a five-trace blast radius, not a photograph. |
-| **B16** | Кръгово движение (6) | "this is not proper round-about it doesnt have the proper shape" | **BROKEN-SEEN** *(the cell said PARTIAL for two gates while the body said BROKEN — reconciled 2026-08-05)* | **→ 2026-08-05 COCKPIT GATE → BROKEN-SEEN, nothing landed, and THIS REGISTER'S OWN FIX NUMBER IS REFUTED.** **The frame, from the seat.** `scratchpad/b16round/shots/b16-before-canvas-y-45.png` — both A-pillars, dash, wheel, cluster at **0 км/ч D**, interior mirror, the Б1 triangle on the right kerb; stopped on the `sc-roundabout-entry` south approach at `x=4.06, y=−45.79`, **23.7 m from the ring's outer kerb.** What he sees is a flat open asphalt plaza whose kerbs run left-to-right across the frame like an ordinary crossroads, with a small green mound and bushes in the middle. Beside it, an orthographic top-down rasterised from the shipped `buildWorldGeometry` triangles shows why: **the outer boundary is an octagon of junction pads with four short kerb slivers between them.** Composite at three radii: `b16round/shots/B16-ladder.png`. **The measurement, re-derived by this gate over all 100 districts rather than the six the lane chose.** Exactly six register a ring: `rb-mini-v1` **152.9°**, `rb-ped-v1` **152.9°**, `rb-2lane-v1` **109.1°**, `rb-single-v1` **254.1°**, `district-v1 rb-1` (real Sofia OSM, R=19.01) **252.8°**, `d2-v1 rb-1` **127.1°** by sum / 187.3° by union with the island already refused because `e587740857.0` (бул. „Пейо К. Яворов") is drawn through its interior. **THE ≈31 m IN THIS REGISTER IS WRONG AND HAS BEEN FOR TWO GATES:** at R = 31 `rb-mini` gives **232.4°**, 37.6° short of the 270° bar the number was written to satisfy (`b16round/shots/td-mini-r31.png`). The break-even is **R = 45.3 m** for the three single-lane families (ship 46 → 271.3°) and **R = 83.0 m** for `rb-2lane` (ship 84 → 271.1°) — **2.6× and 3.2×, not 1.7×.** **The cause is SCALE, and the builder is innocent — the table proves it without trusting anyone:** `district-v1`'s real-Sofia ring gets 252.8° from the *same code* at a nearly identical R = 19.01, because its arms register at **4.06 m** half-width where `rb-mini`'s register at **8.13 m**. The generators author the arms at `PERCEPTUAL_ROAD_SCALE` 2.5 and the ring radius at real-world scale; 18 × 2.5 = 45 lands within half a metre of the measured break-even. **Why nothing was landed, and why that was right.** The change provably needs three `lessons/scenario/templates-*.ts` files that pin the ring **by value** (`templates-flow.ts` hard-codes `acceptBeforeMarkM 1.725` against the district's М8 bars at `y=−35.725`; `templates-roundabout.ts` declares `RING_R = 18`, `RB2_R = 26` and stages the circulating cars on those loops), all of `content/world`, **36 trace files** (6 scenarios × 3 × content + published), and it would red **two untracked runtime probes another lane is writing right now** which hard-code `MOUTH = { x: 0, y: −18 }`. This gate verified the whole blast radius is byte-identical to HEAD. **AND A RULING IS NEEDED BEFORE ANYONE SPENDS THE RE-RECORD.** I opened both candidate frames at an equal 23.7 m to the kerb: at **R = 46** the top-down is a perfect annulus but the windscreen reads **worse** than at 31 — a 41.5 m island fills the horizon as parkland and the ring's curvature falls outside the glass, so it reads as a T-junction (`b16-after46-canvas-y-73.8.png`). **R = 31 is the frame that most reads as a roundabout from the seat, at only 232.4° from above** (`b16-r31-canvas-y-58.8.png`). **270° is a top-down metric.** If his sentence is about the shape of the map, 46 / 84 is right; if it is about what he sees on approach, the target is nearer 31–39 and the 270° threshold should be retired. That is his call, not ours. **Also recorded:** `rb-single-v1` (254.1°, needs R = 46) is the cheapest fix in the family — no scenario template references it and it has **zero traces** — and the two OSM districts cannot be fixed this way at all, because their shape is a data-capture question, not a radius question.<br><br>Driven into the ring and looked at from the driver's seat. **No central island, no circular kerb, no ring lane markings, no annular carriageway** — an open plaza of grey asphalt with irregular pale slabs and two green wedges; the only thing behaving like a roundabout is the shadow ribbon curving through it. `scratchpad/relookB/RB1-drv-t10s-27kmh.png` (zoom `ZOOM-B16-ring.png`). **The data is fine** — `rb-mini-v1.json` has a clean r=18 ring as four arcs — so nothing *draws* it. `world/builders/network.ts:145` is the only roundabout-specific geometry in the builders (it widens a ring edge and zeroes its parking band); the four arm nodes emit four ordinary junction pads at ≈17 m open radius, which union into the blob. **The island derivation is already written and unit-tested in-tree** at `app/dev/scene-still/roundaboutIsland.ts`, which says so itself: *"the SIM still renders a ring without an island — that gap belongs to sim/world's builders."* **Owner:** `modules/sim/world/builders/` — port it, and suppress the junction pads inside the ring.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** The island exists and is rendered. `modules/sim/world/builders/roundabout.ts` (NEW) resolves each ring and emits a kerb face + 45° chamfer + concrete rim into the SIDEWALK accumulator (which is also the collider), a mounded planted crown into its own mesh, and the circular dashed ring divider into PAINT; `roads.ts` now pushes every junction-pad boundary point inside a registered island out onto the kerb line, so the pads are SUPPRESSED rather than covered. Sixteen contracts pin it. Frames: `.sim-shots/roundabout/rb-mini-v1-seat-line.png`, `rb-2lane-v1-above.png`, `cockpit-sc-rb-exit-signal-L1-mouth.png`. The duplicate dev-still derivation was DELETED so there is one island, not two that drift. **Why PARTIAL and not FIXED, in the lane's own words:** on the tight rings the OUTER boundary is still not a circle — at an arm node the junction open radius is 17.125 m on an 18 m ring whose quarters are 28.2 m of arc, so the pads still consume most of the gap. His sentence covers the whole shape.<br><br>**→ 2026-08-03 GATE — the SAFETY half is closed and measured; the SHAPE half is quantified and still open.** Closed: you can no longer drive over the central island. The highest collider vertex inside the island measured **0.140 m on all four ring districts** — the 0.8–1.6 m planted crown lives in a RENDER mesh that is not a collider at all, and `colliders.sidewalks` is documented "12 cm, drivable-over per vehicle harness", so the island was a boundary a car was *entitled* to cross. `roundabout.ts` now builds a **0.57 m planter wall** (measured 0.590 m on all four); it adds no radial extent, so the closest committed ring trace keeps its 4.1 m clearance. The test that had certified this was fixed too: `roundabout-island.test.ts` counted collider vertices and asserted `>100`, which a 14 cm lip satisfies perfectly — it now asserts **height against a wheel radius**. Still open, with a number instead of an adjective: kerb covers **156/360° on rb-mini and rb-ped, 108/360° on rb-2lane, 252/360° on rb-single**. The circular-kerb pass is built and running (4 arcs on every ring); the arcs are short because the MOUTHS are huge — `halfAngle = asin((travelHalf + 1.5) / outerR)`. Owner: `world/builders/roundabout.ts`.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → BROKEN-SEEN confirmed — and the owner recorded here is wrong.** Drove it and looked: the central island **is** a circle with a planted crown, but the outer boundary is two short kerb arcs with asphalt spilling into a funnel at every mouth (`scratchpad/frames/rb1__20-top80__x4_y-23_v0.png`). Measured through the product's own `analyzeRoundabouts`: `rb-mini-v1` four mouths × 51.8° = 207.1°, kerb **152.9°**; `rb-2lane-v1` 250.9 / 109.1; **`rb-single-v1` 105.9 / kerb 254.1°** — *the same builder draws a proper circle there.* The mouth is `2·asin((armTravelHalf + RING_MOUTH_FLARE_M)/outerR)`, so the fraction is fixed by **arm width over ring radius** and nothing else: `rb-mini` runs 16.25 m arms into an 18 m ring. **`world/builders/roundabout.ts` is behaving correctly; the MAP is out of proportion.** Narrowing the mouth in the builder would draw kerb across asphalt cars enter over — worse than the defect. |
+| **B16** | Кръгово движение (6) | "this is not proper round-about it doesnt have the proper shape" | **BROKEN-SEEN** *(the cell said PARTIAL for two gates while the body said BROKEN — reconciled 2026-08-05)* | **→ 2026-08-05 COCKPIT GATE → BROKEN-SEEN, nothing landed, and THIS REGISTER'S OWN FIX NUMBER IS REFUTED.** **The frame, from the seat.** `scratchpad/b16round/shots/b16-before-canvas-y-45.png` — both A-pillars, dash, wheel, cluster at **0 км/ч D**, interior mirror, the Б1 triangle on the right kerb; stopped on the `sc-roundabout-entry` south approach at `x=4.06, y=−45.79`, **23.7 m from the ring's outer kerb.** What he sees is a flat open asphalt plaza whose kerbs run left-to-right across the frame like an ordinary crossroads, with a small green mound and bushes in the middle. Beside it, an orthographic top-down rasterised from the shipped `buildWorldGeometry` triangles shows why: **the outer boundary is an octagon of junction pads with four short kerb slivers between them.** Composite at three radii: `b16round/shots/B16-ladder.png`. **The measurement, re-derived by this gate over all 100 districts rather than the six the lane chose.** Exactly six register a ring: `rb-mini-v1` **152.9°**, `rb-ped-v1` **152.9°**, `rb-2lane-v1` **109.1°**, `rb-single-v1` **254.1°**, `district-v1 rb-1` (real Sofia OSM, R=19.01) **252.8°**, `d2-v1 rb-1` **127.1°** by sum / 187.3° by union with the island already refused because `e587740857.0` (бул. „Пейо К. Яворов") is drawn through its interior. **THE ≈31 m IN THIS REGISTER IS WRONG AND HAS BEEN FOR TWO GATES:** at R = 31 `rb-mini` gives **232.4°**, 37.6° short of the 270° bar the number was written to satisfy (`b16round/shots/td-mini-r31.png`). The break-even is **R = 45.3 m** for the three single-lane families (ship 46 → 271.3°) and **R = 83.0 m** for `rb-2lane` (ship 84 → 271.1°) — **2.6× and 3.2×, not 1.7×.** **The cause is SCALE, and the builder is innocent — the table proves it without trusting anyone:** `district-v1`'s real-Sofia ring gets 252.8° from the *same code* at a nearly identical R = 19.01, because its arms register at **4.06 m** half-width where `rb-mini`'s register at **8.13 m**. The generators author the arms at `PERCEPTUAL_ROAD_SCALE` 2.5 and the ring radius at real-world scale; 18 × 2.5 = 45 lands within half a metre of the measured break-even. **Why nothing was landed, and why that was right.** The change provably needs three `lessons/scenario/templates-*.ts` files that pin the ring **by value** (`templates-flow.ts` hard-codes `acceptBeforeMarkM 1.725` against the district's М8 bars at `y=−35.725`; `templates-roundabout.ts` declares `RING_R = 18`, `RB2_R = 26` and stages the circulating cars on those loops), all of `content/world`, **36 trace files** (6 scenarios × 3 × content + published), and it would red **two untracked runtime probes another lane is writing right now** which hard-code `MOUTH = { x: 0, y: −18 }`. This gate verified the whole blast radius is byte-identical to HEAD. **AND A RULING IS NEEDED BEFORE ANYONE SPENDS THE RE-RECORD.** I opened both candidate frames at an equal 23.7 m to the kerb: at **R = 46** the top-down is a perfect annulus but the windscreen reads **worse** than at 31 — a 41.5 m island fills the horizon as parkland and the ring's curvature falls outside the glass, so it reads as a T-junction (`b16-after46-canvas-y-73.8.png`). **R = 31 is the frame that most reads as a roundabout from the seat, at only 232.4° from above** (`b16-r31-canvas-y-58.8.png`). **270° is a top-down metric.** If his sentence is about the shape of the map, 46 / 84 is right; if it is about what he sees on approach, the target is nearer 31–39 and the 270° threshold should be retired. That is his call, not ours. **Also recorded:** `rb-single-v1` (254.1°, needs R = 46) is the cheapest fix in the family — no scenario template references it and it has **zero traces** — and the two OSM districts cannot be fixed this way at all, because their shape is a data-capture question, not a radius question.<br><br>Driven into the ring and looked at from the driver's seat. **No central island, no circular kerb, no ring lane markings, no annular carriageway** — an open plaza of grey asphalt with irregular pale slabs and two green wedges; the only thing behaving like a roundabout is the shadow ribbon curving through it. `scratchpad/relookB/RB1-drv-t10s-27kmh.png` (zoom `ZOOM-B16-ring.png`). **The data is fine** — `rb-mini-v1.json` has a clean r=18 ring as four arcs — so nothing *draws* it. `world/builders/network.ts:145` is the only roundabout-specific geometry in the builders (it widens a ring edge and zeroes its parking band); the four arm nodes emit four ordinary junction pads at ≈17 m open radius, which union into the blob. **The island derivation is already written and unit-tested in-tree** at `app/dev/scene-still/roundaboutIsland.ts`, which says so itself: *"the SIM still renders a ring without an island — that gap belongs to sim/world's builders."* **Owner:** `modules/sim/world/builders/` — port it, and suppress the junction pads inside the ring.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** The island exists and is rendered. `modules/sim/world/builders/roundabout.ts` (NEW) resolves each ring and emits a kerb face + 45° chamfer + concrete rim into the SIDEWALK accumulator (which is also the collider), a mounded planted crown into its own mesh, and the circular dashed ring divider into PAINT; `roads.ts` now pushes every junction-pad boundary point inside a registered island out onto the kerb line, so the pads are SUPPRESSED rather than covered. Sixteen contracts pin it. Frames: `.sim-shots/roundabout/rb-mini-v1-seat-line.png`, `rb-2lane-v1-above.png`, `cockpit-sc-rb-exit-signal-L1-mouth.png`. The duplicate dev-still derivation was DELETED so there is one island, not two that drift. **Why PARTIAL and not FIXED, in the lane's own words:** on the tight rings the OUTER boundary is still not a circle — at an arm node the junction open radius is 17.125 m on an 18 m ring whose quarters are 28.2 m of arc, so the pads still consume most of the gap. His sentence covers the whole shape.<br><br>**→ 2026-08-03 GATE — the SAFETY half is closed and measured; the SHAPE half is quantified and still open.** Closed: you can no longer drive over the central island. The highest collider vertex inside the island measured **0.140 m on all four ring districts** — the 0.8–1.6 m planted crown lives in a RENDER mesh that is not a collider at all, and `colliders.sidewalks` is documented "12 cm, drivable-over per vehicle harness", so the island was a boundary a car was *entitled* to cross. `roundabout.ts` now builds a **0.57 m planter wall** (measured 0.590 m on all four); it adds no radial extent, so the closest committed ring trace keeps its 4.1 m clearance. The test that had certified this was fixed too: `roundabout-island.test.ts` counted collider vertices and asserted `>100`, which a 14 cm lip satisfies perfectly — it now asserts **height against a wheel radius**. Still open, with a number instead of an adjective: kerb covers **156/360° on rb-mini and rb-ped, 108/360° on rb-2lane, 252/360° on rb-single**. The circular-kerb pass is built and running (4 arcs on every ring); the arcs are short because the MOUTHS are huge — `halfAngle = asin((travelHalf + 1.5) / outerR)`. Owner: `world/builders/roundabout.ts`.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → BROKEN-SEEN confirmed — and the owner recorded here is wrong.** Drove it and looked: the central island **is** a circle with a planted crown, but the outer boundary is two short kerb arcs with asphalt spilling into a funnel at every mouth (`scratchpad/frames/rb1__20-top80__x4_y-23_v0.png`). Measured through the product's own `analyzeRoundabouts`: `rb-mini-v1` four mouths × 51.8° = 207.1°, kerb **152.9°**; `rb-2lane-v1` 250.9 / 109.1; **`rb-single-v1` 105.9 / kerb 254.1°** — *the same builder draws a proper circle there.* The mouth is `2·asin((armTravelHalf + RING_MOUTH_FLARE_M)/outerR)`, so the fraction is fixed by **arm width over ring radius** and nothing else: `rb-mini` runs 16.25 m arms into an 18 m ring. **`world/builders/roundabout.ts` is behaving correctly; the MAP is out of proportion.** Narrowing the mouth in the builder would draw kerb across asphalt cars enter over — worse than the defect.<br><br>**→ 2026-08-11 DRIVE-IT GATE → STILL BROKEN-SEEN. Half of his sentence is now closed and photographed; the half he actually wrote is not, and I am not going to dress it up.** **What landed** (kerb returns in `world/builders/roundabout.ts` + `roads.ts`): every mouth is now closed by two fillets tangent to the ring's outer edge and to the arm's FULL half-width, so the pad can no longer bleed into the terrain. Measured on the shipped sidewalk mesh — longest run along an arm's kerb line with **no kerb of any kind**: `rb-mini` **13.75 → 0.00 m**, `rb-ped` **13.75 → 0.00 m**, `rb-2lane` **17.50 → 0.00 m**, `rb-single` **11.50 → 0.00 m**; off-mouth asphalt spill past the ring's outer edge **6.30 → 0.01 m** (`rb-mini`/`rb-ped`), **9.14 → 0.02** (`rb-2lane`). **Cost: ZERO new draw calls** — `staticDrawSlots` is byte-identical on all six rings (48 / 48 / 50 / 48 / 63 / 70) because the returns go into the existing `sidewalks` accumulator — and **+1.6 % to +6.7 % triangles**: `rb-mini` 29 288 → 31 080, `rb-2lane` 29 336 → 30 872, `rb-ped` 29 142 → 30 934, `rb-single` 30 492 → 32 540, `district-v1` 81 528 → 82 824, `d2-v1` 75 762 → 77 786. On the only ring district with a measured live frame (`d2-v1`, low/L1: 214.9 draws / 1 083 086 tris) that is **+0.19 % of the frame**. **THE ANSWER TO HIS SENTENCE, FROM THE SEAT, NOT FROM A METRIC.** I drove `sc-roundabout-entry` L3 to the station this register names and shot my own frame: `scratchpad/b16/shots/GATE-AFTER-y4579-seat.png` and its glass crop `GATE-AFTER-y4579-glass.png`, canvas 1264×620 fullscreen, 0 page errors. **The kerb IS visibly closed** — against `L3-BEFORE-glass.png` at the same station the right-hand pavement changes from a broken band with a gap where grass met raw asphalt into one continuous kerb that runs from beside the driver and sweeps away. That is real and it is the first honest improvement this row has had. **And it still does not read as a roundabout.** What the windscreen shows is a wide flat asphalt junction whose kerbs run left-to-right across the frame like an ordinary crossroads, with a green landscaped mound behind it. There is no annular carriageway, no ring curvature anywhere in the glass. **The cause is unchanged and is the half of B16 that is HIS RULING:** the four mouths still eat **208° of 360°** on `rb-mini` (mouth union 207.1 → 208.0°, circle arc 152.9 → 152.0°), because mouth width is fixed by arm width ÷ ring radius and the generators author 16.25 m arms into an 18 m ring. **So: the boundary defect is fixed, the SHAPE defect is not, and nobody should spend the 36-trace re-record until he rules on which one he meant.** **ONE DISTRICT GOT VISIBLY LESS KERB AND THAT IS NOT HIDDEN HERE.** On `d2-v1` — a real-Sofia eight-arm junction whose island the builder already REFUSES because бул. „Пейо К. Яворов" (`e587740857.0`) is drawn straight through its interior — the eight mouths now union to **360°**, so `kerbCircle` goes `true → false` and `ringKerbRuns` **4 → 0**: the four arcs it used to draw are gone. The defence is measurable, not rhetorical — of the arc the new mouth model gives up on that ring, **110.0° (69 %) is arm RIBBON asphalt**, i.e. the old build stood a kerb in a live traffic lane — and its off-mouth spill of **50.97 m** goes to n/a because there is no off-mouth left. It is still a shipped district that draws less than it did, and if anyone photographs `d2-v1` and reports "the kerb disappeared", this is why. **One station note for whoever re-shoots this:** the rig's closed-loop controller cannot stop at `y = −45.79` from a 20 km/h approach — it comes to rest at **y = −46.61**, 0.8 m past, on every run (three runs, −46.589 / −46.596 / −46.61). The frames in this row are all at that station, and they are comparable to each other; `−45.79` is a number this register asked for and the rig has never actually delivered. |
 | **B17** | Кръгово движение (6) | "I went to the end of the course and the course didnt finish … now i'm stuck" | **FIXED-SEEN** | Not run to his precondition (fail early, then complete the route). Blocked by a new defect found while trying — see **B-NEW-1**.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Ran his precondition — fail early, then complete the route. Took the early ОПАСНА ГРЕШКА, entered the ring and left WITHOUT a right indicator (the case that used to void the traversal silently), and two things fired that did not exist before: an explaining card that names the void and gives a way out, and the lesson TERMINATED itself — „Спря в края на маршрута, но задачата тук не се отчете — затова урокът приключва, вместо да те държи на място“ — followed by a full result screen. No reload. `scratchpad/lanegw/frames/B17B-11-k-leaving.png`. **Caveat:** the 10 points that failed that run are B15's phantom yield fault. |
 | **B18** | Кръгово движение (6) | "the green cyrcle … is putted after the stop marked line … I have to stop before the line" | **FIXED-SEEN** | The marker is now an amber gate bar drawn across the lane, and at 3× zoom its floor line sits on the **approach** side of the white М8 give-way dashes. Measured: marker moved (4.06, −34) → (4.06, −36.52), i.e. from **+1.72 m past** the paint to **−0.80 m before** it; the paint-line derivation was verified to 3 dp against `analyzeNetwork` and count-for-count on district-v1 (87), d2-v1 (60), tj-stop-v1 (1), sx-v1 (4). `scratchpad/relookB/ZOOM-RB1-t06-line.png`. **Residual the templates lane wrote into its own file** (`templates-flow.ts:288`): the drawn bar is honest but the *acceptance zone* is still `reachZone y=−34 r=9`, so a car stopped 1.7 m past the line still gets credit. |
 | **B19** | Q6 at L5 | "same question 6 just this time L5 - and it has no difference at all" | **PARTIAL-SEEN** | No agent reached this row in either pass. Same substance as B2, which is PARTIAL.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** Refuted with two frames at the same pose: L1 = „Пълна помощ“ + advisor + demonstration deck + shadow ribbon + coaching bubble; L5 = „Усложнени“, advisor off, none of it, and the road gate tightened 30 → 25 км/ч. `scratchpad/lanegw/frames/B19L5-02-b-start-L5.png`. **Residual, and it is his underlying point:** everything L5 changes is a REMOVAL or a smaller number; the only thing added is `traffic: {vehicleCount: 4}`. Plus a defect: the identical lawful stop that credited at L1 in 2 s never credited at L5 across 20 s.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → NOT LOOKED AT, and recorded so it is not silently dropped.** You excluded L2–L5 from this review, so no lane drove it. The B50 data fix (`heightSource` + the near-field axis) lives in the district **data**, so it reaches every level that loads these seven maps, L5 included — but **nobody has opened an L5 frame** and this gate does not claim one. |
@@ -1904,7 +3669,7 @@ one-way mouths — and is not affected.
 | **B24** | 9 Знак Стоп (9→11) | "the moment I cross the marking after the stop line the green line changes to right" | **FIXED-SEEN** | Rendered the spawn 100 m south — the red Б2 disc and a „40" В26 post are both visible down the right kerb, ribbon straight. `scratchpad/laneB23/frames/B24-junction-stop/01-cockpit-t0.png`. **That is 100 m short of the moment his complaint is about.** ⚠️ **And a blocker worth escalating:** across three scenarios and three harness revisions, a scripted throttle made the cluster oscillate 0 ↔ 49–59 km/h every sample while the objective never left task 1 over 22 samples — the car does not accumulate distance. Either the speeding «Учебен момент» card rewinds the drive to the checkpoint on dismissal, **or** the harness never produces sustained motion. **Nobody separated the two.** If it is the former it is a product bug in the teaching-card resume path, and it would explain a lot of this table.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** `scratchpad/lanejs/B24o/ZOOM-01-nose-at-line.png`. Measured: the marker gate stands at y −29.725 against a graded line at y −27.72 — **2.00 m on the approach side**, so the „marker inside the junction“ class is gone and photographed. His literal sentence still occurs (past the line the ribbon brightens toward the right exit) but that IS this lesson's instruction 5 and the chevron is already drawn from 12 m out. **Residual, and it is the real defect:** at the lawful stop the marker's 11 m × r 1.0 m open cylinder (`RouteGuidance.tsx:85-86, 357-373, 558-563`, DoubleSide + AdditiveBlending, uOpacity 0.34) puts the eye INSIDE it — the whole windscreen becomes a flat green wash. Owner: RouteGuidance.tsx.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → FIXED-SEEN.** The objective flips at y −27.72, the graded paint line to the centimetre, reproduced on two independent runs. **Two cockpit frames NINE CENTIMETRES apart across that flip show the same green ribbon** — same band, same position, same reach, same brightness (`scratchpad/laneSL/verify/B24V-s06-y-27.75-x4.06-obj1-v3.png` vs `B24V-CARD-y-27.66-obj2.png`). Cause was `BEYOND_GOAL_OPACITY` 0.42 × the ribbon's own 0.42 `uOpacity` ≈ 18 % effective under additive blending, so the turn leg could only announce itself by **snapping** to full strength on the frame the nose crossed the paint. He read the machine exactly right. Every existing geometry test passed while his sentence was true, because the defect was one float in a shader string. |
 | **B25** | 10 Светофар (10→12) | "the green line stops at the middle of the crossroad … not before the traffic light" | **FIXED-SEEN** | Queued 6 of 14; the sweep reached 4. Same class as B18, which is FIXED for `passSignal` and `reachZone` markers alike — but this lesson was not looked at.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** `scratchpad/lanejs/B25/03-before-line-cockpit.png`. Marker gate at y −28.525 against the graded line at y −27.72: **0.80 m before the paint and 28.5 m short of the junction centre**. Both three-lens heads stand beyond the marker. |
 | **B26** | 11 Ляв завой срещу насрещно (11→13) | *(no complaint)* | **FIXED-SEEN** *(was UNVERIFIABLE)* | Regression check, never re-driven. The code half is done and measured: `sx-v1`'s spawn moved to the lane centre, and the gate class **T2 went 31 → 0**, so the false «Настъпване на осевата линия» risk this row exists to guard is structurally gone.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. Regression check clean, on a drive rather than on a census.** Drove `sc-turn-left-oncoming` L1 end to end — approach west, brake, left turn south — and read the whole fault ledger. **Three faults, all true positives for what was actually done:** «Преминаване на червен сигнал» (throttle held into a red), «Завиване без мигач» −3 т. (never signalled), «Пътнотранспортно произшествие». **Второстепенни грешки: 0.** The falsehood this row exists to guard — a phantom «Настъпване на осевата линия» from the `sx-v1` spawn sitting off the lane centre — **did not appear, and the centre line was crossed deliberately during the turn.** The gate class the fix lane measured at T2 31→0 holds when a human-shaped drive exercises it. `scratchpad/jmisc/B26-97-after-end-click.png` (full debrief: Опасни 2 / Основни 1 / Второстепенни 0, all three faults named). |
-| **B27** | 12 Оглеждане (12→14) | "it is stating that there is Sign Stop, when in fact there is no stop sign" | **PARTIAL-SEEN** | Not rendered. Adjacent data point that is **not** a verdict: the same district `tj-stop-v1` does carry a synthesised red-and-white sign post plus a „40" В26 (`scratchpad/laneB23/zoom/B24-t0-junction.png`). Whether this lesson's rung places it where he looks was not photographed.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** The district claim is refuted: `scratchpad/lanejs/B2728/ZOOM-01-b2-sign.png` — the Б2 red octagon is unmistakable at 70 m and legible at 37 m. **Two seen occlusions produce his impression:** at y −44 the sign head sits behind the interior mirror housing (pole visible, face not), and at the stop line the marker pillar washes the whole windscreen green — so the drill grades a left-right-left scan the marker makes impossible. `scratchpad/lanejs/B2728/07-at-line.png`.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → STILL OPEN, and the new frame does not answer it.** The signs lane photographed the Б2 octagon unmistakable at 45 m on `tj-stop-v1` (`scratchpad/signshots/B27-y-45.png`), so „there is no stop sign" is false **of the world**. But that frame is `/dev/scene-still`: **no A-pillar, no dashboard, no windscreen, no lesson UI.** The row asks whether he can see it *from the seat*, and a frame with no seat in it cannot answer that. Also confirmed this gate: **this is not a traffic-light row** — `tj-stop-v1` declares `signalized: false` with an empty `crossings` array, so zero heads are synthesised there and the signal-head fix cannot touch it. |
+| **B27** | 12 Оглеждане (12→14) | "it is stating that there is Sign Stop, when in fact there is no stop sign" | **FIXED-SEEN** ✅ *(2026-08-09 RENDER-ROWS — photographed from the seat at the poses that matter)* | **→ 2026-08-09 RENDER-ROWS → FIXED-SEEN. The row was refused twice for the same reason and that reason is now gone: the Б2 has been photographed FROM THE DRIVING SEAT, at the shipped 16:9, at every pose in the 12–29 m band the last gate named.** Drove `sc-junction-scan` L1 up the minor arm of `tj-stop-v1` (play area 1348×757 and 1350×759, aspect **1.780** — the un-measured 2.40 frame is retired). The Б2 is at district (x 8.93, y −28.52), right verge, and the red octagon is plainly in the windscreen, below the interior mirror, at **29.0 m** (`scratchpad/RR/b27b/b27b-y-56.png` — the „STOP" disc with the in-world gate «Спри на стоп-линията» and the advisor line «Десен мигач и плавно към стоп-линията» in the same frame) and again at **13.6 m** (`scratchpad/RR/b27/b27-y-40.png`). Measured against the mirror rather than argued: sign FACE rect vs the mirror assembly's own rect `[820,82,1214,268]` — **29.0 m → face `[860,337,896,373]`, 69 px clear · 21.7 m → `[910,309,960,359]`, 41 px clear · 17.3 m → `[962,281,1026,344]`, 13 px clear · 13.6 m → `[1039,239,1124,323]`**, where the top third of the face's bounding box enters the mirror's bounding box and the octagon is still unmistakable in the frame. **Every frame carries the seat** — A-pillar, dashboard, wheel, cluster reading 0 км/ч D, the 40 roundel on the dash. NOT a traffic-light row, confirmed again: `tj-stop-v1` is `signalized: false`, and the B35 caption mesh reports `visible=false` on this district, so nothing was added here that could be mistaken for a signal.<br><br>Not rendered. Adjacent data point that is **not** a verdict: the same district `tj-stop-v1` does carry a synthesised red-and-white sign post plus a „40" В26 (`scratchpad/laneB23/zoom/B24-t0-junction.png`). Whether this lesson's rung places it where he looks was not photographed.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** The district claim is refuted: `scratchpad/lanejs/B2728/ZOOM-01-b2-sign.png` — the Б2 red octagon is unmistakable at 70 m and legible at 37 m. **Two seen occlusions produce his impression:** at y −44 the sign head sits behind the interior mirror housing (pole visible, face not), and at the stop line the marker pillar washes the whole windscreen green — so the drill grades a left-right-left scan the marker makes impossible. `scratchpad/lanejs/B2728/07-at-line.png`.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → STILL OPEN, and the new frame does not answer it.** The signs lane photographed the Б2 octagon unmistakable at 45 m on `tj-stop-v1` (`scratchpad/signshots/B27-y-45.png`), so „there is no stop sign" is false **of the world**. But that frame is `/dev/scene-still`: **no A-pillar, no dashboard, no windscreen, no lesson UI.** The row asks whether he can see it *from the seat*, and a frame with no seat in it cannot answer that. Also confirmed this gate: **this is not a traffic-light row** — `tj-stop-v1` declares `signalized: false` with an empty `crossings` array, so zero heads are synthesised there and the signal-head fix cannot touch it.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `FIXED-SEEN`, and the lead's counter-claim is answered by measurement.** Re-derived through the product's own builder: `tj-stop-v1.json` has **no `signs` key** — the Б2 is synthesised by `props.ts` from `junctionPriorityControls` — and the build emits **exactly one** `kind=stop` at district **(x 8.93, y −28.52)**, yaw 0°, with **0 traffic lights** and `signalized:false`. His question was «is it in the windscreen at 15–25 m?» and the answer is **17.55 m**: that is the range from `b27/FINAL/B27-y45.4-INSTR1-sign-in-windscreen.png` (telemetry y=−45.4), which I opened — the red octagon is plainly in the glass. His two refused frames measure **5.72 m and 12.72 m BEHIND** the sign; `RR/b27/b27-y-22.png` reads `y=−22.8 obj=2/3 events=3` with the mirror captioned «Завий надясно» and the shadow car mid-right-turn, i.e. the **turn phase**. **The lane did not claim the copy was wrong** — it claimed the pose was, and that holds. |
 | **B28** | 12 | "the road is empty and there are no traffic cars moving at all on the map ever" | **FIXED-SEEN** | Two lanes claim this row (the approach is no longer a dead street; the spawn is fixed) and neither claim was tested. The template now carries `{vehicleCount: 4}` at its base level — a file fact, not a frame.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Parked at y −70.6 and shot the same crop three times, 4 s apart: a dark SUV on the priority road, then a yellow van crossing with another car entering right, then clear. **Three vehicles through one vantage point in eight seconds.** `scratchpad/lanejs/B2728/ZOOM-02-traffic-B.png` (+ ZOOM-01/03). „No traffic cars moving on the map ever“ is false here. |
 | **B29** | 13 Б1 (13→15) | "If i stop at the green cyrcle I cant see the car coming on the right because of the parked cars" | **FIXED-SEEN** ✅ *(was BROKEN-SEEN)* | Not rendered. **Cheap route for whoever takes it:** `sc-jx-giveway-b1` m0 and m1 are both in `CLIP_PLAN`, so the clip rig on :3200 replays this one deterministically in ~6 min with no auth. That closes B29, B30 and B31 together.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** Worse than a parked-car problem. (1) `scratchpad/lanegw/frames/ZOOM-B30E-east-queue.png` — бул. Втори's south kerb is lined nose-to-tail with a saloon, a white van and box bodies, in the exact corridor between a driver at the Б1 and anything approaching from the east. (2) **The place the lesson puts him is wrong by measurement:** the Б1 line is at y 122.275 and the credited yield zone is y 113 r 9 (104…122), while the priority carriageway spans y 145.94–154.06 — its NEAR KERB is **23.7 m beyond the line and 33 m beyond the zone centre**. He is told to give way from two-and-a-half car lengths short of being able to see the road. Owner: templates-junctions.ts lineDistM / the yield anchor.<br><br>**→ 2026-08-03 LOOK-WAVE — BROKEN-SEEN, unchanged in source and now photographed with the head actually turned.** The right-glance frame at the second Б1, shot with **KeyE HELD**: roughly 60% of the frame is the student's own cabin — passenger seat back and headrest fill the lower centre, the B-pillar and mirror arm cut the upper centre, the window frame closes the right. Through the two surviving gaps, beyond a green verge, there is a continuous nose-to-tail line of dark parked bodies (a box van, then saloons and estates) and above them nothing but canopy and sky: **the priority carriageway is not in the gap at all — there is no road surface visible.** Over that frame the banner reads «ЗАДАЧА 2/3 Пропусни колата с предимство на второто кръстовище». `scratchpad/lanerb/frames/ZOOM-B29-glance-right.png` (3× crop) · `B2930B-03-c-scan-right-before-B1-2.png` (full frame). **Machine half re-run twice today, identical to 2026-08-02:** `clip-rig.mjs sc-jx-giveway-b1 0` and `… 1` both render all 360 frames and die on «R1: липсва vehicle»; `presence.mjs` returns `checklist [{kind:"vehicle", present:false}]` and `{vehicles:2, obstacleVehicles:0, framedKinds:[]}` — two vehicles in the scene, neither ever an obstacle, neither ever framed at the fault beat, so **both mistake clips this lesson teaches with remain unproducible** (`presence-m0.log`). Source unchanged: `templates-junctions.ts:797-819` still holds the priority car at `hold {nodeIndex:1, offsetM:-95}` and still grades at `lineDistM: 27.725`. **Two things must move together and neither is a one-liner:** (a) bring the actor's hold in from 95 m so it is inside the frustum and the glance cone at the line — that alone unblocks both CLIP_PLAN entries, because R1 fails for exactly this reason; (b) clear the parked bodies out of the east corridor on this junction's apron (`world/builders/props.ts` for `jxg-giveway-v1`), or move the graded line forward so the stop pose has a sightline. Acceptance test for whoever takes it: `presence.mjs sc-jx-giveway-b1 0` returns a non-empty `framedKinds` AND a held right glance from inside the credited zone puts the car in frame.<br><br>**→ 2026-08-05 INSTRUMENT GATE → FIXED-SEEN, and his sentence turned out to be true for a reason nobody had named.** Before and after both opened by the gate: `scratchpad/b29/ZOOM-clean-t45.png` is a nose-to-tail wall of parked bodies with no road surface behind it — his complaint, reproduced; `scratchpad/b29/ZOOM-fix-car-t41.png` is the same held right glance (KeyE) with a blue estate standing on an **open** бул. „Втори" at 80 m and nothing parked in front of it. **The row that screened him was never on his own kerb** — `jxg-e-m`'s `parkingBand:false` already worked — it was бул. „Втори"'s own kerb row at `y = 139.875`, nine bodies from `x 44…103.4`, sitting at bearings **51.5°–72.3°** against a right glance centred on **53.3°**. `scenery-sightline` T6 could not see it: its window stops at 45 m and the row starts at 44. Both arms now declare `parkingBand:false`; worst clearance **0.09 → 33.34 m**, both graded stop lines proven unmoved at ±27.725. Clip strip re-rendered with actors 1/1 (`sheets/sc-jx-giveway-b1__m0.strip.png`, opened). |
 | **B30** | 13 | "the car is very far away and I looked but I didnt see it at all" | **FIXED-SEEN** ✅ *(was BROKEN-SEEN)* | Same scenario, same blocker, same cheap route as B29.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** Reproduced live and then confirmed by our own gate. Stopped inside the credited zone with the RIGHT GLANCE HELD for 24 s (16 frames), coaching bubble on screen naming the car — nothing to see but A-pillar, verge and parked bodies. Five runs, ~100 s of standing, never once caught the priority car in frame. `scratchpad/lanegw/frames/B30J-01-g00.png`. **Machine-confirmed:** both CLIP_PLAN entries fail the rig's R1 gate („R1: липсва vehicle“) and `readPresence()` returns `{vehicles: 2, obstacleVehicles: 0, framedKinds: []}` on both — so the two mistake clips this scenario teaches with cannot be produced at all. Cause: the actor holds ~95 m east, ~81° off the forward axis, outside both the frustum and the glance.<br><br>**→ 2026-08-03 LOOK-WAVE — BROKEN-SEEN. His question ("is it perceivable AT ALL?") was asked directly and the answer is no.** Stopped SHORT at a crawl — the better-sightline pose — and held the right glance for **16 s** (frames at t0, +5, +10, +16, plus two pixel-level crops). Every one of those frames is the same picture and nothing ever appears in it: near-right a parked dark car body; beyond it open green field, low trees, sky; far left the same nose-to-tail row of parked bodies; the interior mirror inset showing only the road BEHIND (a yellow bus, one car). **Sixteen seconds of held glance, zero moving vehicles, and no priority carriageway in view** — while the lesson says «Пропусни колата с предимство на второто кръстовище» about a car 95 m east and ~81° off the forward axis. `scratchpad/lanerb/frames/ZOOM-B30-early-stop-right.png` (3× crop, 10 s in) · `B31B-08-g-glance-right-early-t10.png` · `B31B-06-e2-crop-right-early.png`. Machine confirmation is B29's: `obstacleVehicles: 0`, `framedKinds: []` on both clips — **our own purpose-built exterior camera cannot get the car into frame either.** Same owner and same single number as B29: `templates-junctions.ts` `SC_JX_GIVEWAY_CONFLICT hold.offsetM: -95`. Shared file — do not let two lanes touch it.<br><br>**→ 2026-08-05 INSTRUMENT GATE → FIXED-SEEN. The reason it was unseeable was NOT distance, and there is now a number for it.** Replaying the measured trajectory through the production stack put the conflict car's bearing from the graded pose at **33.1° maximum**, while the cockpit's right glance is centred on **53.3°** — *the held glance pointed twenty degrees past the car, which lived in the windscreen the whole time.* That is why twelve held frames spanning 25 s contain nothing. Hold moved −34 → −45 (still inside T6's 45 m window), plus the бул. „Втори" clearing from B29. Opened by the gate: `scratchpad/b29/ZOOM-b29b-circle.png` — from the green circle, head home, the priority car is a dark blue estate broadside on an open boulevard with a lorry, a van and two more cars beyond it. **Residual, stated rather than buried:** no hold can raise the bearing AT the stop pose, because the runner walks every actor to a fixed 28 m pin before release and 28 m of crossing distance is 27.5° off axis. Raising it needs the graded pose moved onto the paint. |
@@ -1912,13 +3677,13 @@ one-way mouths — and is not affected.
 | **B32** | 14 Стоп и преценка (14→16) | "no Signs on the map" | **FIXED-SEEN** | Queued 13 of 14; never reached. `tj-emerge-v1.json` declares `control:"stop"` so the builder *should* synthesise a Б2 on the minor arm — which is exactly the code-only reasoning this register forbids converting into a verdict. Stays open.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** `scratchpad/lanejs/B32/03-approach-y38.png` — a large red octagonal Б2 at the right kerb at y −36.7, white stop-line paint across the lane beneath it, a car moving on the priority road beyond. Confirmed a second time from a HUD-free driver-eye camera. |
 | **B33** | 15 Ограничена видимост (15→17) | "if I drive under 22 as it states, the traffic car passes long before I reach the crossroad" | **FIXED-SEEN** | The instruction itself moved — the number he was obeying is now **27**, not 22, and the spawn fix means obeying it no longer earns a второстепенна грешка before the encounter. The right-hand sightline is genuinely blocked by parked cars and a building, as the lesson claims. `scratchpad/laneB23/frames/B33-junction-blind/01-cockpit-t0.png`. **What is not shown is the outcome he complained about:** whether the conflict car is still there when you arrive at 27. The interactive drive never reached the junction and this scenario is not in the clip-plan pilot.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → FIXED-SEEN — and this is the row where obeying the instruction had been deleting the lesson.** Cause: `PriorityFromRightRunner` released the staged conflict car on a **one-shot ETA guess** read off the player's instantaneous speed — and every junction lesson tells the student to keep slowing down, so the guess was latched at the moment it was most wrong. Measured before: guess 6.2 s, truth 22.7 s; the car crossed 16 s early and was 145.7 m away and parked when he arrived. The release is now re-validated while the car is still ≥ 14 m short of the box, and a stopped-witness release is never taken back (T7 cannot return). **Verified at the taught pace: the trace peaks at 21.9 / 22.0 km/h with ZERO samples over 22 km/h**, and a yellow van crosses his windscreen while he sits at the mouth at 0 км/ч. `scratchpad/ttframes/B33c-b05-t24.0s-y-19.4-v0.png`, `B33c-trace.json`. One fix, 13 `priorityFromRight` specs. |
 | **B34** | 16 Ляв завой от Б2 (16→18) | "nothing is there on the Map … no actual street signs anywhere" | **FIXED-SEEN** ✅ *(2026-08-05 cockpit gate)* | **→ 2026-08-05 COCKPIT GATE → FIXED-SEEN. The residual this register has carried for two gates is closed, measured through the product's own builder and photographed from the driving seat.** **What was true.** `tj-emerge-v1`'s priority road is two 160 m edges and it carried exactly two В26 «50», at `x = ±115` — each the ENTRY plate of its own arm, posted 30 m ahead of that arm's spawn and aimed inward. The B34 drill starts on the stem, stops at the Б2 and turns **left**, so the student joins that road *downstream of both* and drives 160 m graded against a 50 nothing ever showed him. **What is there now, measured by this gate through `buildWorldGeometry`, not read off a lane's table:** 9 signs where there were 6, six of them speed plates — `limit50` at `x=−115.00, y=−12.93` and `x=+115.00, y=+12.93` (the old entry pair), **`limit50` at `x=−35.13, y=+12.93` and `x=+35.13, y=−12.93`, and `limit40` at `x=−8.93, y=−35.13`** — three new plates, all at station 35.13 m from the junction node, each facing the driver leaving the mouth. *(The lane's report says "four new"; its own list names three and its own 6 → 9 is +3. Three.)* **THE FRAME:** `scratchpad/b34lane/shots2/b34lane-xm19-t59.3-v14.png` — both A-pillars, dash, wheel, cluster at **14 км/ч D**, left wing mirror, title „Ляв завой от Б2 през пътя с предимство · Ниво 1", and telemetry burned into the same PNG: `t=59.62s v=13.6km/h x=−23.0 y=4.2 hdg=279°`. **23 m west of the junction, on the block, with the В26 «50» repeat standing in the windscreen on the right kerb.** It is provably the new post and not the far entry plate: 12.1 m ahead along the road, where `x=−115` would be 92 m away, and the bracketing frames `b34lane-xm16` / `b34lane-xm27` show it appear and pass. **The mechanism, and why neither file this register named could carry it.** `gen_t_junction.mjs` *does not emit `tj-emerge-v1`* (`gen_ju_junctions2.mjs` does), and `zoneSigns.ts` walks `district.zones`, which this map has none of and which has **no speed-limit kind at all**. The limit lives on the edge tag, so the rule went where the tag is read: `world/builders/props.ts`. **The law was checked before a number was picked, and the honest blank is in the code.** Наредба № РД-02-21-1/2023 is catalogued in `content/law/sources.json` as `coverage: "index-only"`, `extraction: null` — **the repo does not hold its text**, so no article is quotable under ADR-002 and no statutory repetition distance is available. What the corpus *does* hold is the зона-на-действие rule, three times over in `approved` items (`q-signs-011 / 012 / 021`): a group-В prohibition ends at the next junction unless repeated after it. **That is what makes the junction repeat law-shaped rather than invented — past an unrepeated junction the simulator was grading a number the ordinance had already let lapse.** The separate 120 m mid-block cadence is labelled **AUTHORED, NOT STATUTORY** in `LIMIT_REPEAT_M`'s own docstring, with the one line to change if the ordinance is ever ingested. Its ceiling went 30 → **40**, not 50, on measurement rather than taste: 50 adds nothing to either B34 district and studs `sp-creep2-v1`'s junction-less 400 m approach with 5 plates another lane had deliberately pinned at 2. **Scenario maps only, structurally:** the pass sits inside `if (lessonScale !== undefined)` and `scenarioSignScale` returns `undefined` unless `meta.mapKind` starts with `"scenario"`, so no city / exam / полигон district can move. **Two things found while closing it, filed rather than buried:** a streetwall canopy hides the new post until ~15 m (fine at 14 км/ч, about a second of reading at the posted 50), and the cadence gate stopping below 50 means a long junction-less 50 straight still gets no mid-block repeat. Both are in STILL OPEN with owners.<br><br>Queued 14 of 14; never reached.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** „No actual street signs anywhere“ is refuted — `scratchpad/lanejs/B34eye/ZOOM-04-b3-sign.png` resolves a Б3 «Път с предимство» yellow diamond at 9×, and the approach carries a legible Б2. **What is honest to add, and it is why the map reads bare:** across the whole district those are the only two sign FACES findable, plus one blank board. No В26, no direction sign, no priority repeat along the boulevard.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → STILL OPEN, same reason as B27.** Two signs — a В26 «40» disc and the Б2 octagon — stand in the drill's own opening windscreen (`scratchpad/signshots/B34-spawn-y-85.png`), so „no actual street signs anywhere" is false of the world. **The frame is `/dev/scene-still`, not the cockpit.** The residual the signs lane recorded stands and is the real defect: `tj-emerge-v1`'s two В26 «50» posts sit at district x = ±115, the **far ends** of a 320 m boulevard, so the priority road he is about to cross states its limit only at the district edge and never repeats along the stretch he can see. |
-| **B35** | 17 Загаснал светофар (17→19) | "It says stopped working traffic light, but in fact no traffic light exists on the map" | **PARTIAL-SEEN** | **His district-level claim is refuted with a picture:** a full three-lens head — red lit, amber, green — stands at the `sx-v1` junction, and two heads flank it legibly from the south spawn 105 m out. `scratchpad/laneB23/zoom/B35-signalhead.png`. Head count across the wave went **138 → 230**. **Untested:** whether *this* lesson's head is visibly DARK so a student can read „загаснал". The lesson itself never rendered past its landing frame.<br><br>**→ 2026-08-03 GATE — a real and dangerous defect was found and fixed behind this row, and the row still does not close.** `WorldProps.tsx` fell back to `getSignalPhase?.(…) ?? "green"` — a head with no phase source rendered a bright saturated **GO**. The engine layer it draws forbids exactly this in as many words (`runtime/signals.ts` lampState: „Unknown ids fail exactly like phase(): 'red' (never a phantom green)"), and the PEDESTRIAN head in the same file already defaulted to `"dark"` — the vehicle head was the lone outlier. Both are now `"dark"` (verified at the gate: `WorldProps.tsx:956` and `:1060`), pinned by `world/components/__tests__/signal-lamp-fallback.test.ts` (3 tests + teeth, green). This is the worst possible default for this product: on «Загаснал светофар», whose entire subject is that an extinguished head means равнозначно кръстовище, the most conspicuous thing on the head was a green lamp. The rest of the chain was cleared too, so nobody re-files it: `templates-signals.ts:314` authors `signalModes {"sx-n-c":"dark"}`, `compile.ts:1133` propagates it, `LessonScene.tsx:506` applies it at session start, and `sx-v1.json` has exactly one signalized intersection. **Why the row stays PARTIAL:** the lesson now renders end-to-end through the product shell (`scratchpad/b35/sc-signal-dead/04-full.png`, opened at the gate — task banner, the five-step ИНСТРУКЦИИ card teaching тъмен светофар = равнозначно кръстовище + правилото на дясното), **but the instructions card covers the junction in that frame and nobody has photographed the head itself dark from the seat.** That is one frame away.<br><br>**→ 2026-08-03 LOOK-WAVE — the frame was taken, the phantom green is PROVEN gone by pixel, and the row still stays PARTIAL for the reason it was always going to.** Drove `sc-signal-dead` L1 obj0 the way the card asks (32 → 20 km/h), crept to the paint and stopped with the nose at y=-29.1, **1.4 m short** of the graded line (-27.725). The head is there, facing the driver, from the seat, junction unoccluded: `scratchpad/sigwave/B35-dead-headzoom/03-03-nose-at-paint.png`. At 12× every lens was sampled — red `#841811`, amber `#815609`, green `#1b692a` — and the SAME head at the SAME pose was then rendered on `sc-signal-redyellow`, where the signal is live: red `#841710`, amber `#815507`, green `#67b967`. **Red and amber are pixel-identical between a dead and a live head while only green differs, so every lens on the dead head sits at `LAMP_OFF` and nothing is lit.** That is the good half and it is now evidence, not an assertion. **The bad half is this row's actual open question and it is untouched:** side by side (`scratchpad/sigwave/B35-dead-vs-lit.png`, 12×, values burned in) **a student cannot tell them apart** — both show a red disc, an amber disc and a green disc, and the only difference is that one lens on the live head is brighter. A dead head reads as "a working traffic light showing three colours", not as an extinguished one, and there is no other cue on the housing. At native 1:1 from the stop line the whole head is about **8×30 px** (`scratchpad/sigwave/zooms/B35-head-native.png`): you can see A signal is there, you cannot read a state off it. **The fix is NOT a lens-colour change** — doc 86 L2 deliberately raised `LAMP_OFF` from `on*0.1` to the current dark-tinted-glass read precisely because a black head had no read at all, so darkening it again re-opens the bug he filed as "no traffic light exists". What is missing is an explicit affordance, and **the product already ships the pattern: B42's bubble over the officer's head.** Add the same floating label anchored to the signal head on `sc-signal-dead` — «ЗАГАСНАЛ СВЕТОФАР · равнозначно кръстовище · правилото на дясното» — armed by the same `signalModes {'sx-n-c':'dark'}` dial that already drives the lamps (`templates-signals.ts:314` → `compile.ts:1133` → `LessonScene.tsx:506`), legible from the 45 m where the card says «намали отрано». **The same treatment is owed to `sc-signal-flashing` (мигащо жълто), for the same reason.** Owner: the world/HUD label layer next to `WorldProps.tsx` TrafficLights — shared by three lanes this wave, so the look-wave did not go near it. |
+| **B35** | 17 Загаснал светофар (17→19) | "It says stopped working traffic light, but in fact no traffic light exists on the map" | **FIXED-SEEN** ✅ *(2026-08-09 RENDER-ROWS — the affordance is built, rendered and READ)* | **→ 2026-08-09 RENDER-ROWS → FIXED-SEEN. The „this one is off" affordance the last two gates refused this row for now exists, and it was read off a cockpit frame rather than off the source.** Driving `sc-signal-dead` L1 up the south stem of `sx-v1` at the shipped 16:9 (play area 1422×799, vFOV 47.0, horizon y = 386), a world-anchored caption hangs over the crown of the dead head and reads, in full, **„ЗАГАСНАЛ СВЕТОФАР · Кръстовището е равнозначно · Пропусни идващия ОТДЯСНО · ЗДвП чл. 48 · правилото на дясното"**. Legible at **43.7 m** — beyond the 45 m at which the drill's own card says «намали отрано» — and still legible at 24.6 m: `scratchpad/RR/b35/b35-y-70.png` (full cockpit frame: A-pillar, wheel, cluster 0 км/ч D, mirror carrying „Кола отзад · 5 м"), `b35-y-50.png`, and the 4× crop `ZOOM-b35-44m.png` in which the card's four lines and the three unreadable discs beneath it are in one image. Measured, not eyeballed: the plane holds a near-constant 180×83 px at 44 m and 190×88 px at 25 m, which is the sizing rule doing its job. **AND IT IS NOT A BILLBOARD ON EVERY LESSON — the negative case was measured in the same wave:** `signal-head-label` reports `visible=false` on `sc-junction-scan` (tj-stop-v1, no heads at all) and on `sc-signal-hesitation` (the same sx-v1 junction with LIVE lenses), and `visible=true` only on the dead head. ADR-002: **ЗДвП чл. 48 was re-read out of `content/law/acts/zdvp.json` at this gate** — „На кръстовище на равнозначни пътища водачът… е длъжен да пропусне пътните превозни средства, които се намират или приближават от дясната му страна" — and the step from „тъмен светофар" to „равнозначно кръстовище" is stated as the rule with NO article number, because ППЗДвП is not in the corpus. **THE SIBLING THE REGISTER ASKED FOR IN THE SAME SENTENCE IS DONE AND WAS ALSO OPENED:** on `sc-signal-flashing`, at 34.6 m, the head carries „**МИГАЩО ЖЪЛТО** · Светофарът не регулира — внимание · Пропусни идващия ОТДЯСНО · ЗДвП чл. 48 · правилото на дясното" in an amber accent, over a head whose middle lens is lit — `scratchpad/RR/b35f/b35f-y-60.png` + `ZOOM-b35f-35m.png`. One caption spans the whole blink (`amberFlashOn` and `amberFlashOff` map to the same kind), so it cannot flicker at 2 Hz. Owner files: `world/components/worldLabel.ts` + `signalHeadLabels.ts` + the `signal-head-label` mesh in `WorldProps.tsx`; pinned by `__tests__/world-label.test.ts` + `signal-lamp-fallback.test.ts` (20 tests, green at this gate).<br><br>**His district-level claim is refuted with a picture:** a full three-lens head — red lit, amber, green — stands at the `sx-v1` junction, and two heads flank it legibly from the south spawn 105 m out. `scratchpad/laneB23/zoom/B35-signalhead.png`. Head count across the wave went **138 → 230**. **Untested:** whether *this* lesson's head is visibly DARK so a student can read „загаснал". The lesson itself never rendered past its landing frame.<br><br>**→ 2026-08-03 GATE — a real and dangerous defect was found and fixed behind this row, and the row still does not close.** `WorldProps.tsx` fell back to `getSignalPhase?.(…) ?? "green"` — a head with no phase source rendered a bright saturated **GO**. The engine layer it draws forbids exactly this in as many words (`runtime/signals.ts` lampState: „Unknown ids fail exactly like phase(): 'red' (never a phantom green)"), and the PEDESTRIAN head in the same file already defaulted to `"dark"` — the vehicle head was the lone outlier. Both are now `"dark"` (verified at the gate: `WorldProps.tsx:956` and `:1060`), pinned by `world/components/__tests__/signal-lamp-fallback.test.ts` (3 tests + teeth, green). This is the worst possible default for this product: on «Загаснал светофар», whose entire subject is that an extinguished head means равнозначно кръстовище, the most conspicuous thing on the head was a green lamp. The rest of the chain was cleared too, so nobody re-files it: `templates-signals.ts:314` authors `signalModes {"sx-n-c":"dark"}`, `compile.ts:1133` propagates it, `LessonScene.tsx:506` applies it at session start, and `sx-v1.json` has exactly one signalized intersection. **Why the row stays PARTIAL:** the lesson now renders end-to-end through the product shell (`scratchpad/b35/sc-signal-dead/04-full.png`, opened at the gate — task banner, the five-step ИНСТРУКЦИИ card teaching тъмен светофар = равнозначно кръстовище + правилото на дясното), **but the instructions card covers the junction in that frame and nobody has photographed the head itself dark from the seat.** That is one frame away.<br><br>**→ 2026-08-03 LOOK-WAVE — the frame was taken, the phantom green is PROVEN gone by pixel, and the row still stays PARTIAL for the reason it was always going to.** Drove `sc-signal-dead` L1 obj0 the way the card asks (32 → 20 km/h), crept to the paint and stopped with the nose at y=-29.1, **1.4 m short** of the graded line (-27.725). The head is there, facing the driver, from the seat, junction unoccluded: `scratchpad/sigwave/B35-dead-headzoom/03-03-nose-at-paint.png`. At 12× every lens was sampled — red `#841811`, amber `#815609`, green `#1b692a` — and the SAME head at the SAME pose was then rendered on `sc-signal-redyellow`, where the signal is live: red `#841710`, amber `#815507`, green `#67b967`. **Red and amber are pixel-identical between a dead and a live head while only green differs, so every lens on the dead head sits at `LAMP_OFF` and nothing is lit.** That is the good half and it is now evidence, not an assertion. **The bad half is this row's actual open question and it is untouched:** side by side (`scratchpad/sigwave/B35-dead-vs-lit.png`, 12×, values burned in) **a student cannot tell them apart** — both show a red disc, an amber disc and a green disc, and the only difference is that one lens on the live head is brighter. A dead head reads as "a working traffic light showing three colours", not as an extinguished one, and there is no other cue on the housing. At native 1:1 from the stop line the whole head is about **8×30 px** (`scratchpad/sigwave/zooms/B35-head-native.png`): you can see A signal is there, you cannot read a state off it. **The fix is NOT a lens-colour change** — doc 86 L2 deliberately raised `LAMP_OFF` from `on*0.1` to the current dark-tinted-glass read precisely because a black head had no read at all, so darkening it again re-opens the bug he filed as "no traffic light exists". What is missing is an explicit affordance, and **the product already ships the pattern: B42's bubble over the officer's head.** Add the same floating label anchored to the signal head on `sc-signal-dead` — «ЗАГАСНАЛ СВЕТОФАР · равнозначно кръстовище · правилото на дясното» — armed by the same `signalModes {'sx-n-c':'dark'}` dial that already drives the lamps (`templates-signals.ts:314` → `compile.ts:1133` → `LessonScene.tsx:506`), legible from the 45 m where the card says «намали отрано». **The same treatment is owed to `sc-signal-flashing` (мигащо жълто), for the same reason.** Owner: the world/HUD label layer next to `WorldProps.tsx` TrafficLights — shared by three lanes this wave, so the look-wave did not go near it.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `FIXED-SEEN`; lens pixels sampled independently at the same column.** BEFORE `RR/b35/b35-y-50.png`: red rgb(138,17,7) **S=0.949** · amber rgb(133,87,0) **S=1.000** · green rgb(21,107,37) **S=0.804**. AFTER `B35FIX/final/final-y-50.png`: red rgb(28,18,18) L=0.007 **S=0.357** · amber rgb(21,19,14) L=0.007 **S=0.333** · green rgb(21,37,31) L=0.016 **S=0.432** — luminance down 8× / 18× / 7×. **The lane's reported «before» numbers match my sample exactly.** Lit still reads: `B35FIX/lit/lit-y-16-s0.png` amber rgb(220,175,93) L=0.467 vs its own dead red L=0.026 = **18:1**. **Re-rendered from the current tree by this gate** — `scratchpad/VERIFY/b35re2/W35-step01-t22.7-v0.png` (`sc-signal-dead` L1, y=−50.8) — **no saturated lens anywhere, max S 0.19**; `signal-lens-look.test.ts` 16/16. |
 | **B36** | 17 | "the traffic car crossing much quicker before I reach the crossroad" | **FIXED-SEEN** *(was PARTIAL-SEEN)* | Timing question, needs the drive that failed. Same blocker as B24.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** His symptom is gone and a worse one replaced it. ROLLING at a lawful 14 km/h the conflict car is abeam and close on arrival (`scratchpad/lanejs/B36c/r18.png`). **STOPPING — which is what instruction 4 demands — the boulevard stayed completely empty for 28 s and no car ever came** (`scratchpad/lanejs/B36b/t20.png`, BAND-t28.png). The encounter only exists for a student who keeps rolling: the actor is timed by `leadSec` against the player's PROJECTED crossing, and a player at 0 km/h has no projection. Same mechanism as B15.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. Driven at TWO paces, because his sentence is about timing and one pace cannot settle it.** (a) **Lawful pace, obeying instruction 4 to the letter:** 32 km/h, slowed to 20, stopped at y=-29.5 at t=19.1 s. The conflict car entered from the RIGHT at t=22.7, was mid-junction at 23.8 and abeam at 25.0 — **it arrived 3.6 s AFTER the stop and was watched crossing, which is exactly what the lesson wants.** (b) **Barging pace, the way a student who ignored the card would drive:** flat out to 58 km/h, braked late, overshot 12 m past the paint into the junction mouth (y=-15.8) — and a car from the right is right there, close, **in the same frame as the instructor line «Спираме ПРЕД стоп-линията — кола отдясно има предимство и я пропускаме изцяло».** So his symptom does not reproduce at either pace, **and the previous wave's replacement symptom — "stopping, the boulevard stayed completely empty for 28 s and no car ever came" — does not reproduce either.** `scratchpad/sigwave/B36-conflict-car.png` (four frames, t=21.5/22.7/23.8/25.0, player STOPPED at y=-29.5, the dark car entering from the right edge and growing across the junction) · `B36-wait-dense.png` (25 frames of the whole 30 s wait) · `B36-fast-sheet.png` (the 58 km/h barge). **Honest caveat carried forward, not hidden:** after that one crossing the junction was empty for the remaining 22 s, so the encounter is one car, once — it now simply happens at the moment of decision instead of before it. |
 | **B37** | 18 Мигащо жълто (18→20) | "there is no traffic light at all" | **FIXED-SEEN** | District half refuted by the same `sx-v1` frame as B35. Whether this lesson's head shows a flashing amber is untested.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → FIXED-SEEN. Confirmed by pixel sampling, not by a lane's zoom.** The head now stands ahead-RIGHT in the windscreen at the drill's own first objective — `props.ts` mirrors the far-side companion in the line through the node *perpendicular* to travel, so it lands on the driver's own kerb instead of the far-left corner 59 m away. Amber lens `rgb(218,172,87)` at y −45.8 against unlit red `(141,52,49)` / green `(51,116,65)`; ten seconds later at the graded stop line the same lens reads `rgb(136,94,30)` — the band of the unlit red beside it. **Two frames therefore photograph the blink itself.** `scratchpad/lights/B37fix/B37fix-step01-t36.2-v0.png`, `…-step03-t46.6-v0.png`. |
 | **B38** | 18 | "the traffic car has already passed no second car, no third car" | **FIXED-SEEN** *(was BROKEN-SEEN)* | Never reached.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** His sentence is literally what the lesson does. `scratchpad/lanejs/B38/s06.png` — exactly ONE car crosses from the right, then the boulevard is clear and stays clear through 10 s of holding position. Cause: `templates-signals.ts` stages a single `PriorityFromRightSpec` and authors NO `traffic` block, and scenario lessons default to zero ambient traffic (`compile.ts SCENARIO_DEFAULT_TRAFFIC.vehicleCount = 0`), not the app-wide 26. Owner: templates-signals.ts.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. There is a second car and a third car and a fourth, counted in frames that were opened.** Drove `sc-signal-flashing` L1 obj0 at the lesson's pace, stopped at the paint (y=-28.9, t=19.6) and held **40 s**. **Method note that matters for anyone repeating this:** the cockpit camera latches a right-shoulder glance the instant you stop near the paint and holds it, so the first run photographed 33 s of passenger seat — the count was re-run on the chase camera, which sees the junction continuously. Counted: **car 1** a dark SUV from the RIGHT crossing right-to-left t=21.9 → 26.3 (2.3 s after the stop); **car 2** a white van from the right t=27.7 → 30.6; plus a yellow van on the west arm at t=21.9; then a **second cluster** — white van t=51.1 → 55.6 and a dark car t=52.7 → 57.1 with more queued behind. `scratchpad/sigwave/B38-cars-early.png` (six chase frames t=21.9 → 30.6 with the student stopped at the paint) · `B38-cars-late.png` (the second cluster) · `B38-wait-chase.png` (all 28 frames of the 40 s wait). **The cause this register named no longer applies here:** `SCENARIO_FAMILY_TRAFFIC_BASELINE.signals = 5` with FLOOR 4 has landed, so L1 compiles to 4 ambient vehicles on this family. **This is also the first photograph of FR-27's ambient traffic — the row that said "not one frame of it exists".** |
 | **B39** | 19 Спане на зелено (19→21) | "no traffic light exists on the map nothing" | **FIXED-SEEN** | District half refuted by the same `sx-v1` frame. This lesson not rendered.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → FIXED-SEEN.** Same cause, same fix, independently sampled. At y −46.8, where instruction 1 says «свети ЗЕЛЕНО», the green lens reads `rgb(113,193,115)` against red `(134,46,44)` and amber `(136,97,44)`; at the stop line it has gone to amber `rgb(218,171,81)`. The head stands clear against sky, and the drive then earned RED_LIGHT_CROSSED — so the lamp he reads and the engine that grades him are on the same clock. `scratchpad/lights/B39fix/B39fix-step01-t10.5-v0.png`, `…-step03-t20.4-v0.png`. |
-| **B40** | 19 | "who is sleeping on green … its pritty simillar to previous both questions" | **PARTIAL-SEEN** *(was BROKEN-SEEN)* | Needs three lessons played side by side; none were.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** `scratchpad/lanejs/B40/STACK-17-18-19.png` — catalog 17, 18 and 19 driven to matched poses and stacked: same district sx-v1, same spawn, same buildings, same trees, the same parked bus in the same spot, the same road. Only the instructor line and the marker tint differ. **And it is worse than three:** catalog 10 and 21 are also sx-v1 from the same spawn — five entries in this stretch are one street replayed, all five with zero ambient traffic.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. The sleeper is REAL and it was photographed three ways — but it is illegible from where the card points, and his actual sentence (sameness) is untouched.** (a) Parked at y=-33.1, short of the wake trigger, through **24 s of live green**: a dark blue car stands facing the student beyond the junction and does not move at all — the pixels at t=28.3 and t=40.9 are the same — with vehicles queueing behind it (`scratchpad/sigwave/zooms/B40-hold-t283.png`, `B40-hold-t409.png`). (b) **The decisive frame:** the runner arms on `nearLead && speedKmh > 4` (`orchestrator/runners.ts:783`), so the drive crept in at **2.2–2.4 km/h, under the gate**, and it could never wake. At the junction mouth (y=-9.8) it is unmistakable — **a dark blue car with its NOSE ON THE FAR STOP LINE, facing the student, three vehicles stacked behind it.** That is a picture of «спане на зелено» and it answers his "who?": `scratchpad/sigwave/zooms/B40-sleeper-y10.png`. (c) At normal pace it stands at y=-27/-22, then wakes and drives past on the left as he crosses, as the template intends (`B40-normal-pace-wake.png`). **Why not FIXED — legibility, measured at native 1:1:** at y=-33.1, which is exactly where card step 3 says «Погледни колата отсреща, спряла на другата стоп-линия», the sleeper is a **~30 px dark shape among other stationary vehicles** — you cannot tell it faces you or that it is on a line (`B40-legibility-1x.png`, y=-33.1 / -19.7 / -9.8). It only becomes readable around y=-10, **and a normal-paced drive has already woken it by y=-18.** **Two things left, both for the lead.** (1) Make the sleeper readable from where the card points — same B42 bubble pattern, a label anchored over the staged actor («ТАЗИ КОЛА СПИ НА ЗЕЛЕНО») armed while `SC_SIGNAL_HESITATION_SLEEPER` is in its hold phase and dropped when it wakes; or move the hold in from `offsetM -29` (the far stop line, 62 m from where he is told to look); or drop `armDistM` below 50 so it is still asleep at y=-10 where it is legible. Owner `templates-signals.ts` + the scene label layer. (2) **The sameness, which is his actual sentence and which no frame in this wave improves:** catalog 10, 17, 18, 19 and 21 are all `sx-v1` from `sx-spawn-south`. That needs a second signalized district — **a map job, not a lesson job.** |
-| **B41** | 20 Регулировчик (20→22) | "we spoke that we will make them bigger but I now see you have not done that" | **PARTIAL-SEEN** | He was being shown the ordinary walker's hashed 0.90–1.12 height. The officer is now **pinned** at 1.22 height / 1.18 build (~2.1 m), taller than any pedestrian in the sim, and he renders as an unmistakable tall figure with arms out, 72 px of a 720 px frame with the ego stopped at the line — identifiable as a регулировчик at range. `scratchpad/laneB23/zoom/B41-scale-t005.png`. **Why not FIXED:** the register asks to *measure him against a car*, and no vehicle passes abeam of him in the whole trace window, so "bigger than a car" cannot be certified — only "conspicuous and legible at range". **Owner if he wants it closed:** stage one vehicle crossing beside him and re-shoot.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN confirmed, and the size half is measured at last.** The teaching bubble is good and legible at 21 m — «СПРИ», «Обърнат е с ГЪРДИ или ГРЪБ към теб», «Минава: напречното направление», «Спираш: ти, преди стоп-линията», **ППЗДвП чл. 29 ал. 3; ЗДвП чл. 7** — all three of his questions answered with the article (THEO-4), and it is live, not a decal. A box van finally passes abeam of him: corrected for range **the officer is 0.95× a VAN's height, ≈ 2.1 m — taller than any car in the fleet.** **Why it stays PARTIAL:** the same zoom shows he is still the primitive capsule rig — sphere head, no face, capsule arms fused at the shoulder — in a hi-vis vest (`scratchpad/frames/ZOOM-B41-officer-vs-van.png`). |
+| **B40** | 19 | "who is sleeping on green … its pritty simillar to previous both questions" | **FIXED-SEEN** *(2026-08-10 SIX-ROW PROVENANCE — BOTH halves; the „same map" half is six different maps now)* | **→ 2026-08-10 SIX-ROW PROVENANCE → FIXED-SEEN, both halves, on frames the gate opened and re-measured itself.** **(a) THE CUE REACHES A DRIVER LOOKING AT A CAR NOSE-ON AT 62 m.** `scratchpad/B40/shots/b40a/b40a-y-33.5.png`, **shot 11:09:16**, after `traffic/stagedActorLabels.ts` (10:39:45) and `TrafficLayer.tsx` (10:41:54). Cockpit, cluster «0 км/ч D», `y = −34.3 obj=1/2 events=0`. The gate's own 4.5× crop resolves all four lines and shows the tail pointing **down onto a dark car seen head-on**, a pale van behind it. Placement dump: **64.1 m → 177 × 80 px**; at **90.5 m → 175 × 81 px** — constant apparent size, in pixels. And it **cannot outlive its claim**: `b40wake-y-4.json` has the mesh `visible=false` at 35 m, well inside the 120 m cap. **Residual the gate measured and the lane did not report:** the label rect [517,299,694,379] **contains all three lamps of the head 4.96 m from the sleeper** — the green that is its own evidence. Semi-transparent, so dimmed not erased; 1 of 7 heads. **(b) OPENED AT THE SPAWN, AND RE-MEASURED WITH THE GATE'S OWN BAND** (a fixed *fraction* of each tile, resampled to 320 × 180). **BEFORE** (`SHEET-spawn-before.png`, tiles 10:11–10:14): **closest pair 0.95** mean \|ΔRGB\|, **five of six inside 0.95–2.21** — opening it, they cannot be told apart. **AFTER** (`SHEET-spawn-after.png`, **11:19:11**, tiles 10:52–11:19 each postdating its district file): **closest 25.21, mean 36.67, furthest 49.77** — every pair now **eleven times** further apart than the old cluster's widest gap, and opening it gives six different streets. `sx-v1` byte-identical; all 18 committed ghost traces replay. **TWO CORRECTIONS:** this row's „10, 17, 18, 19, 21" is **six**, not five — 12, 19, 20, 21, 22, 23; and the lane's „closest remaining pair is dead ↔ controller at 16.75" does not survive the gate's band — **controller is the most distinct of the six** and the pair to argue about is **dead ↔ response at 25.21**. See §5.<br><br>**→ 2026-08-10 THE-NINE-UNOPENED → PARTIAL-SEEN, the hold CONFIRMED on opened frames.** `scratchpad/RR/b40card/b40card-y-33.5.png` is a cockpit frame (A-pillar, wheel, dash, cluster «0 км/ч D», telemetry `y=−34.3 v=0.0 obj=1/2`) and it does carry ИНСТРУКЦИИ step 3 verbatim — «Сега намери СПЯЩИЯ: гледай отвъд кръстовището, ВЛЯВО от твоята линия… Колата там е с ЛИЦЕ към теб… Брой наум до три». `ZOOM-sleeper.png` off the same frame resolves all three cues that copy names: a dark blue car **nose-on** left of the guidance line, a pale van standing behind it, and two vehicles on the right seen from the **rear**. (a) is answered from the seat; (b) is untouched and is a map job, exactly as this row says. **Confirmed in passing, not re-filed:** the lower-right card stack in this very frame overprints itself — `scratchpad/NINE/n-b40-cardstack-3x.png` shows the «НАУЧИ · Защо чакаш: червен сигнал» body text drawn straight through the ДЕМОНСТРАЦИЯ transport bar, its 0.25×/0.5×/1× chips and «Участък». That is STILL OPEN row 2, and this is a second frame for it.<br><br>**→ 2026-08-09 RENDER-ROWS → PARTIAL-SEEN, held deliberately, and the two halves are now cleanly separated by evidence.** **(a) „WHO is sleeping on green" — ANSWERED, and photographed at the exact pose the card points at.** Drove `sc-signal-hesitation` L1 up the south stem at 12 km/h in ONE continuous run (a stop-and-dwell drive wakes the actor and photographs the wrong thing — that trap cost this lane a frame set). At district y = −34.3, the shipped 16:9 (play area 1423×800): `scratchpad/RR/b40card/b40card-y-33.5.png` carries the ИНСТРУКЦИИ card with step 3 verbatim — «гледай отвъд кръстовището, ВЛЯВО от твоята линия… Колата там е с ЛИЦЕ към теб… Брой наум до три» — AND the sleeper itself, and the card is on the right so it does not cover it. At 6× (`ZOOM-sleeper.png`) the three cues the copy names are all readable: a dark blue car **nose-on** in the oncoming lane, LEFT of the guidance line, a pale van standing behind it, and — the discriminator — two vehicles on the RIGHT of the same frame seen from the REAR. Same at 45.7 m: `scratchpad/RR/b40/b40-y-45.png` + `ZOOM-b40-45m.png`. **Legibility, measured and NOT hidden:** the sleeper is ~26 px wide at 63 m. That is not a rendering fault — a 1.8 m car at 63 m through this camera (hFOV 75.4° over 1422 px) computes to 31 px, so the world is drawing it at the size a real windscreen would. The remedy that was available was to say WHICH shape it is, and the card now does. **(b) „pritty simillar" — UNTOUCHED, and it is not a lesson job.** Catalog 10, 17, 18, 19 and 21 are still all `sx-v1` from `sx-spawn-south`. A second signalized district is the only thing that answers it. **The prescribed „rear cue" class stays refused** (see §10): the sleeper is nose-on, so no brake lamp can reach him.<br><br>Needs three lessons played side by side; none were.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** `scratchpad/lanejs/B40/STACK-17-18-19.png` — catalog 17, 18 and 19 driven to matched poses and stacked: same district sx-v1, same spawn, same buildings, same trees, the same parked bus in the same spot, the same road. Only the instructor line and the marker tint differ. **And it is worse than three:** catalog 10 and 21 are also sx-v1 from the same spawn — five entries in this stretch are one street replayed, all five with zero ambient traffic.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. The sleeper is REAL and it was photographed three ways — but it is illegible from where the card points, and his actual sentence (sameness) is untouched.** (a) Parked at y=-33.1, short of the wake trigger, through **24 s of live green**: a dark blue car stands facing the student beyond the junction and does not move at all — the pixels at t=28.3 and t=40.9 are the same — with vehicles queueing behind it (`scratchpad/sigwave/zooms/B40-hold-t283.png`, `B40-hold-t409.png`). (b) **The decisive frame:** the runner arms on `nearLead && speedKmh > 4` (`orchestrator/runners.ts:783`), so the drive crept in at **2.2–2.4 km/h, under the gate**, and it could never wake. At the junction mouth (y=-9.8) it is unmistakable — **a dark blue car with its NOSE ON THE FAR STOP LINE, facing the student, three vehicles stacked behind it.** That is a picture of «спане на зелено» and it answers his "who?": `scratchpad/sigwave/zooms/B40-sleeper-y10.png`. (c) At normal pace it stands at y=-27/-22, then wakes and drives past on the left as he crosses, as the template intends (`B40-normal-pace-wake.png`). **Why not FIXED — legibility, measured at native 1:1:** at y=-33.1, which is exactly where card step 3 says «Погледни колата отсреща, спряла на другата стоп-линия», the sleeper is a **~30 px dark shape among other stationary vehicles** — you cannot tell it faces you or that it is on a line (`B40-legibility-1x.png`, y=-33.1 / -19.7 / -9.8). It only becomes readable around y=-10, **and a normal-paced drive has already woken it by y=-18.** **Two things left, both for the lead.** (1) Make the sleeper readable from where the card points — same B42 bubble pattern, a label anchored over the staged actor («ТАЗИ КОЛА СПИ НА ЗЕЛЕНО») armed while `SC_SIGNAL_HESITATION_SLEEPER` is in its hold phase and dropped when it wakes; or move the hold in from `offsetM -29` (the far stop line, 62 m from where he is told to look); or drop `armDistM` below 50 so it is still asleep at y=-10 where it is legible. Owner `templates-signals.ts` + the scene label layer. (2) **The sameness, which is his actual sentence and which no frame in this wave improves:** catalog 10, 17, 18, 19 and 21 are all `sx-v1` from `sx-spawn-south`. That needs a second signalized district — **a map job, not a lesson job.**<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN`; frame opened.** `scratchpad/RR/b40card/b40card-y-33.5.png` — cockpit, `y=−34.3 obj=1/2`, step 3 of the ИНСТРУКЦИИ card legible in the same image, and the lower-right card-stack overprint visible in that very frame. His «same map» half is still-open row 9 (a MAP job). **Caveat recorded:** this frame carries a live «Compiling …» pill (still-open row 14). |
+| **B41** | 20 Регулировчик (20→22) | "we spoke that we will make them bigger but I now see you have not done that" | **PARTIAL-SEEN** *(2026-08-10 RE-SWEEP GATE — the bubble now answers all FOUR questions and he IS measurably bigger, both confirmed from the pixels; the BODY is the whole remaining row)* | **→ 2026-08-10 RE-SWEEP GATE → `PARTIAL-SEEN` UPHELD, and both halves the fixing lane claimed are confirmed independently — from MY OWN crop of the WHOLE frame, not from the lane's crop.** **(a) THE BUBBLE ANSWERS ALL FOUR.** Read at 7× off `scratchpad/b41/spri/B41spri-step04-t38.2-v0.png` (**shot 14:08:38**, i.e. after the last source edit to `TrafficLayer.tsx` at 13:43 and `controllerGestures.ts` at 13:18 — the frame post-dates its own change), full cockpit visible, telemetry burned in `t=38.33s v=0.0km/h y=-31.8 step="w4"`, **the officer ahead of the camera in the road at ~20.8 m, not behind it**: «**СПРИ**» / «Обърнат е с ГЪРДИ или ГРЪБ към теб» / «**Минава: напречното направление**» ← WHO GOES / «**Спираш: ти, преди стоп-линията**» ← WHO STOPS / «**Предимството НЕ е твое — и на зелено**» ← WHOSE PRIORITY / «ППЗДвП сигнали на регулировчика; ЗДвП чл. 7». Six lines, all inside the card body with margin both sides. My crop: `scratchpad/VERIFY-c1/MY-spri-card-7x.png`. The fourth line is the one that was missing and it is the one the drill grades — both authored mistakes on `sc-sig-controller-postures` are priority mistakes by a student who read „who goes" correctly and drove anyway. **(b) HE IS BIGGER — MEASURED FROM THE PIXELS, NOT FROM THE CONSTANT.** The hi-vis vest (`PED_POSE_HIVIS #cadd2e`) is the only saturated yellow-green on the street, so the torso is findable without knowing where he stands. Largest connected hi-vis blob, **same drill, same seat, same stop (car y = −31.79 / −31.80 from each run's own telemetry), same canvas 1028 × 577**: **BEFORE `base/B41base-step04-t36.6` (13:11, pre-change) → torso 15 × 35 px. AFTER `fix1/B41fix-step01-t34.2` (13:22) → 18 × 42 px; `spri/B41spri-step04-t38.2` (14:08, current build) → 15 × 42 px.** +20 % on the torso against +23 % on the constant (1.22 → 1.50) — consistent to the pixel of rounding. Side-by-side at 5×: `scratchpad/VERIFY-c1/MY-b41-size-ba.png`; the both-arms-out halt reads as a wall in the after pane and as a vertical line in the before one. **The rig hazard the fixing lane flagged is real and this gate hit it too:** `final/B41final-step01` renders at **1264 × 620**, not 1028 × 577, on an identical invocation — any pixel comparison that crosses runs must check `telemetry.viewport` first. **(c) WHY IT IS STILL NOT FIXED — the body, opened at 10×** (`scratchpad/VERIFY-c1/MY-spri-officer-10x.png`): a capsule torso, a **featureless tan sphere for a head**, capsule arms with no hands, no face, no uniform beyond a flat vest colour. The bubble is doing 100 % of the teaching and the figure still very little of it. No constant in `TrafficLayer.tsx` reaches this — it is FR-35/FR-43 on his Blender machine, with B52 and B60. **The size fix is correctly scoped:** `pedHeight` keys on `p.pose === "directTraffic"`, so the VP-11 school-curb warden who stands beside 1.25 m children keeps `PED_OFFICER_HEIGHT = 1.22` byte-unchanged.<br><br>**→ 2026-08-10 THE-NINE-UNOPENED → PARTIAL-SEEN. The lawRef clamp is FIXED and photographed; the body is unchanged; and the same frame carries a defect nobody had filed.** **(a) The bubble.** `scratchpad/lsn6/B41/ZOOM2-B41-bubble.png`, off the cockpit frame `B41-step03-t52.3-v0.png` (A-pillar, wheel, dash, cluster «0 км/ч D», telemetry `y=−28.8 v=0.0`): «МИНАВАШ ТИ» / «Виждаш го СТРАНИЧНО, ръцете долу» / «Минават и цялата твоя посока» / «Спира: напречното направление» / **«ППЗДвП сигнали на регулировчика; ЗДвП чл. 7»** — the law line now sits wholly inside the bubble with margin both sides, and the ППЗДвП reference carries **no article number**, which is the ADR-002 discipline: show the rule and the act, never a number you cannot retrieve. **(b) The body — still the blocker, and worse than „a sphere head".** `ZOOM-B41-step05-t68.5-v0.png`: hi-vis torso capsule, dark trouser capsule, featureless tan sphere, and **no distinguishable arms at all** in the very posture the bubble is naming («ръцете долу»). The bubble does 100 % of the teaching and the figure 0 % — a student cannot check the caption against the man. Blocked on his Blender machine (FR-43), with B52 and B60. **(c) NEW — the B35 fault, in a second lesson.** This drill's own instruction 1 says «светофарът на кръстовището е ЗАГАСНАЛ» and its docblock says „the lamps are DARK", but the junction head in `B41-step05-t68.5-v0.png` is not dark. Sampled 3 × 3: red (748,302) = (140,39,35), **amber (748,308) = (200,154,72)**, green (748,313) = (39,111,53), sky (744,296) = (184,193,201). Blend this renderer's own unlit values — measured on `RR/b55/b55-y14.png` as red (139,17,6), amber (126,81,0), green (17,102,33) — 13 % toward that sky and the prediction is (139,46,41) / (134,96,26) / (39,114,55): red and green land on it, **amber is 66 counts too bright. It is LIT.** Mechanism, read not guessed: `SC_SIG_CONTROLLER_POSTURES` (`templates-signals2.ts`) never authors `signalModes`, so `setClusterController` leaves the cluster `"controlled"` and `runtime/signals.ts:338–348` **deliberately keeps live lamps under `"controlled"`**. The obvious one-liner is a trap: `controllerPermission` (`signals.ts:449`) returns null unless the mode is `"controlled"`, so authoring `signalModes: { "sx-n-c": "dark" }` would silently disarm the officer's grading. Filed in STILL OPEN for the B35 lane, who are already inside the head renderer this week.<br><br>He was being shown the ordinary walker's hashed 0.90–1.12 height. The officer is now **pinned** at 1.22 height / 1.18 build (~2.1 m), taller than any pedestrian in the sim, and he renders as an unmistakable tall figure with arms out, 72 px of a 720 px frame with the ego stopped at the line — identifiable as a регулировчик at range. `scratchpad/laneB23/zoom/B41-scale-t005.png`. **Why not FIXED:** the register asks to *measure him against a car*, and no vehicle passes abeam of him in the whole trace window, so "bigger than a car" cannot be certified — only "conspicuous and legible at range". **Owner if he wants it closed:** stage one vehicle crossing beside him and re-shoot.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN confirmed, and the size half is measured at last.** The teaching bubble is good and legible at 21 m — «СПРИ», «Обърнат е с ГЪРДИ или ГРЪБ към теб», «Минава: напречното направление», «Спираш: ти, преди стоп-линията», **ППЗДвП чл. 29 ал. 3; ЗДвП чл. 7** — all three of his questions answered with the article (THEO-4), and it is live, not a decal. A box van finally passes abeam of him: corrected for range **the officer is 0.95× a VAN's height, ≈ 2.1 m — taller than any car in the fleet.** **Why it stays PARTIAL:** the same zoom shows he is still the primitive capsule rig — sphere head, no face, capsule arms fused at the shoulder — in a hi-vis vest (`scratchpad/frames/ZOOM-B41-officer-vs-van.png`).<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN`, and its cross-lane find (c) is **CONFIRMED by this gate's own sampling.** `scratchpad/lsn6/B41/B41-step05-t68.5-v0.png` at x=745: red L=0.074 · **amber rgb(177,141,72) L=0.289 S=0.593** · green L=0.099, while instruction 1 says «светофарът е ЗАГАСНАЛ». An unlit amber is L≈0.03 in the fixed build and L≈0.11 in the old one — **0.289 is the lit regime either way**, so the frame's age does not rescue it. Filed as still-open row 2, owner the B35 lane. The body half stays blocked on FR-43 (his Blender). |
 | **B42** | 20 | "on top of his head some bubble must appear stating what exactly he is pointing, who is he letting go, whos turn its to pass" | **FIXED-SEEN** | **His third-most-repeated ask, and it now renders.** A bordered panel floats above the officer's head, fully legible at 1280×720, with a tail pointing down at him: red headline **«СПРИ»**, then «Обърнат е с ГЪРДИ или ГРЪБ към теб» / «Минава: напречното направление» / «Спираш: ти, преди стоп-линията» / «ППЗДвП чл. 66; ЗДвП чл. 7». Confirmed twice, in the clip rig and in the real lesson from 105 m out. `scratchpad/laneB23/rig/B41-officer/t008__14.51s.png`. **All three of his questions are answered on the bubble, with the article.** One nit in frame: the green «Карай дотук» gate column occludes roughly the right third of the body text from the approach; the headline stays clear. |
 | **B43** | 21 Тръгване на червено-жълто (21→23) | "no traffic light exists at all" | **FIXED-SEEN** *(was PARTIAL-SEEN)* | District half refuted by the same `sx-v1` frame. Lesson not rendered.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. Refuted ON THIS LESSON, not by inheritance from a neighbouring one — which is what kept it partial.** Rendered `sc-signal-redyellow` L1 for objectives **0, 1 AND 2** — the lesson this register says was never rendered. The head facing the driver is there and it is **lit**, photographed in two different phases on this lesson: at y=-39.4 the red lens is a bright saturated red (peak 229,95,70) with amber and green dark (`scratchpad/sigwave/zooms/B43-head-red-lit.png`, 11×); at the paint on the other run the same head shows a **lit GREEN (103,185,103)** against unlit red (132,23,16) and unlit amber (129,85,7) (`B43-lit-head-12x.png`). Both heads at the junction are visible from the seat through the whole approach (`sigwave/B43-B44-redyellow/03-03-at-line.png`, `sigwave/B44-marker/obj1-01-approach.png`). "No traffic light exists at all" is refuted on the lesson he played. |
 | **B44** | 21 | "the green line again is stopping at the middle of the crossroad" | **FIXED-SEEN** | Needs the car at the junction — the thing the drive harness could not achieve — and this scenario is not in the clip-plan pilot, so the rig cannot substitute.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** `scratchpad/lanejs/B44/ZOOM-02-road-paint.png` — the marker's base stands ON the white line, not beyond it; gate y −28.525 vs graded line y −27.72 (0.80 m before the paint, 28.5 m short of the junction centre). The head facing the driver shows a bright lit RED at 10× with the matching instructor line.<br><br>**→ 2026-08-03 LOOK-WAVE — re-confirmed FIXED-SEEN on all THREE objectives, because his sentence named the circle as well as the line and only the line had been answered.** Drove `sc-signal-redyellow` at objectives 0, 1 and 2 and photographed where each marker actually lands. **Objective 1 (`passSignal` — the one he complained about)** draws a GATE bar across the lane and it sits **ON the white stop-line paint**: from a car at y=-39.4 the green bar and the painted line are the same line, ~11 m ahead and **~28 m SHORT of the junction centre**, with the blue demonstration ghost stopped on it (`scratchpad/sigwave/zooms/B44-gate-vs-junction.png`, 2.4×). **Objective 0** draws the CIRCLE on the approach (reachZone y=-34) with its «Карай дотук / не по-бързо от 45 км/ч» label — from a car at y=-52.7 it is 18 m ahead and **34 m short of the junction centre**. **Objective 2's** ribbon runs north THROUGH the junction and on to y=+45. **Nothing — not the line, not the circle — stops in the middle of the crossroad.** His words were «the green line again is stopping at the middle of the crossroad and the cyrcle is at the center of the crossroad»; neither is true in any of the three frames. `sigwave/B44-markers-chase.png` (obj0 / obj1 / obj2 side by side). |
@@ -1931,20 +3696,20 @@ one-way mouths — and is not affected.
 | **B51** | 26 Пешеходци иззад камион (26→28) | "the question says Pedestrians behind a Truck, and its only 1 Pedestrian Crossing" | **FIXED-SEEN** | Never reached.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Two pedestrians and the truck, unmistakably. Top-down: both walkers on the zebra at y 88.0 and 89.7 heading west. Cockpit at close range: two separate red-jacketed bodies one behind the other. The box truck is measurable — cab plus cream box spanning world x 6.87–9.53, y 76.1–83.8 — and at 22 m it fills the right third of the windscreen and occludes the near pavement, which is the kill zone the lesson grades. `tools/clips/headless/r0-ped/zoom/B51-two-peds.png`. Two nits: the graded rect (12 m) is longer than the visible body (7.7 m), and the five cars behind it stand on the footway (B46 residual). |
 | **B52** | 27 Дете тича след топка (27→29) | "Weak visualisation, we must re-work with blender kids as well" | **BROKEN-SEEN** | Never reached — **and blocked on him.** The child rig is a placeholder by design; replacing it is Blender work on his machine. See § *What is still broken and why*.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** Rendered the child at ~6 m and looked at 6×: the same primitive rig as every adult, scaled — featureless sphere head, capsule torso in orange, capsule arms fused to the torso, two capsule legs. No face, hands, feet, neck or hair. Child PROPORTIONS are applied (height 0.72, larger head ratio) so it reads as a small person, and the bright jacket works — but at the 21 m the drill is played from it is a washed-out blob. `tools/clips/headless/r0-ped/zoom/B52-child.png`. Blocked on Blender on his box; that explains why, it does not change the verdict, and now there is a photograph instead of a note.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → BROKEN-SEEN, unchanged, and the block is not where this register said it was.** No frame was opened and that is stated plainly. The brief assumed the size, motion and timing were all ours; they are not. `PED_CHILD_HEIGHT` (0.72), the head ratio, the jacket palette, the silhouette **and the ball mesh** all live in `traffic/TrafficLayer.tsx`. What *is* ours — `CHILD_BALL_PED.speedMps` 2.6, `ballLeadSec` 0.5, `triggerDistM` 38 in `templates-pe.ts` — is already the tuned choreography the committed traces and the 1 s `crossingTooFastSustainSec` window are probed against, so moving it is a **grading** change wearing a visual costume. **Half of this is blocked on your Blender machine and half on a file another wave holds.** |
 | **B53** | 27 | "the engineering of the map is weak same thing same map, already 5-6 different questions" | **FIXED-SEEN** *(was PARTIAL-SEEN — 2026-08-09 verify #2)* | **→ 2026-08-09 VERIFY #2 → FIXED-SEEN. This row is the COUNT, and on the spawn sheet no pair of the seven reads as one street.** Same frame as B50, opened by the gate: pe-clear both kerbs dense from behind the bonnet · pe-dart the only street whose NEAR kerb is the empty one · pe-rain bare, night, snow · pe-slow one saloon far out on the left against an open forecourt · pe-cane both kerbs tail-on · pe-bus vans plus a median · pe-child widest, old estates at the bonnet. The cousin pair his sentence would have named (25 vs 27) is separated at full size in `PAIR-dart-vs-slow.png`. **And the differentiator is not the weather** — weather does exactly one of the seven; the other six separate on which kerb is empty, how far ahead the row starts, and what KIND of vehicle stands there. `pe-districts.test.ts` now refuses the family if any two districts share a SEAT SIGNATURE or a KERB READING; 121 tests green. **Named honestly and still true: the tarmac tone, the dashed centre line and the white edge lines are one picture in all seven** — that is the next lever, and it is blocked by 21 committed traces.<br><br> **→ 2026-08-03 GATE — same evidence and same verdict as B50, and this row is the one the SEQUENCE test now covers.** No two of the seven share a terminus and the test refuses it if they ever do again, so "seven copies of one street" is false as a data statement. It is still true as a *picture* statement at the distance a student drives at. Sheet opened at the gate: `scratchpad/wm/frames/SHEET-PE-7-spawns.png` (spawn) and `SHEET-PE-7-termini.png` (42 m from the terminal node, where the difference actually shows).<br><br>**Earlier:** Never reached. Needs districts compared across 22–28 in one sitting.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** Same evidence as B50 and it lands harder here because his phrasing is the count: it is **seven**, not five or six — catalog 24 through 30 are seven consecutive lessons on seven copies of one street. At 22 m, 24/25/27/28/29/30 are visually the same place; 26 differs only by being night and raining. `tools/clips/headless/r0-ped/sheets/B50-B53-landing-7-districts.png`. This is the row where „deduplication is the right way to FIX and the wrong way to VERIFY“ bites hardest: each lesson passes every gate it has while the SEQUENCE is the defect.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN, same evidence and same reasoning as B50.** The count half of his sentence is answered — three new family assertions in `pe-districts.test.ts` that no per-district battery can fake (no two share a near-field signature, a roofline, or a tree metre), and one of them **failed on a real pair** (pe-slow == pe-child at (14.7, 11.0)) and got a fix rather than a looser threshold. The street he drives on is still one street.<br><br>**→ 2026-08-05 COCKPIT GATE → PARTIAL-SEEN. The count half of his sentence moved again, and the picture half did not.** `pe-districts.test.ts` now refuses the family if any two districts share a **carriageway signature** — seat width × taper list × bayed metres × centreline type × verge — or if any two put the width change at the same metre. 110/110 green. **The assertion that had been certifying the defect is the finding worth keeping:** it read `expect(widths.size).toBe(1)`, measured against `district.roads.edges[0]` — the crossing segment, which this wave deliberately freezes — so it was *true when written*, would have gone on reporting "one width, seven times" for ever, and three sibling assertions were measuring the same frozen edge. It now reads `>= 2` against the width **at the seat**. **A first attempt at this row failed and the contact sheet caught it:** three districts were given a bay starting at `y=0`, and `computeParkedCars` seats its row 11 m from the *segment* start, so all three put their nearest parked car at exactly `y=11` on the same side — a fresh copy of the very defect his sentence names. Six staggered bay starts (`y=11/23/27/29/33/37`) fixed it. **Still PARTIAL for the reason on B50:** five of the seven — `pe-dart`, `pe-slow`, `pe-cane`, `pe-bus`, `pe-child` — read as one composition from the seat. He wrote "already 5-6 different questions"; five of seven is exactly the number he was complaining about. `scratchpad/zebra/frames/SHEET-PE-7-CARRIAGEWAY.png`. |
-| **B54** | 28 Пешеходец с бял бастун (28→30) | "absolutely same as question 23, just changed the visualisation to old pedestrian" | **PARTIAL-SEEN** | **The data fix landed and is measurable:** PE-14 is now a different drill from PE-08 — three tasks, including a graded FULL STOP before the zebra that PE-08 does not have (this is the `T8raw 181 → 182` raise in the gate). The white-cane shadow holds 26 km/h through y=62 and stops dead at y=85.45 for 22 s; both new gates are on the ghost's own trace. **Not rendered**, so his "absolutely same" is not yet answered with a picture. This is also the lesson B45's variant bug was diluting.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** His „absolutely same“ splits. THE FIGURES ARE GENUINELY DIFFERENT: PE-08 is an upright adult in a rust-red top with a normal stride and no cane; PE-14 is stooped, in a grey overcoat, with a thin WHITE CANE extended down and forward — resolved at 10× from the cockpit and again from overhead. `tools/clips/headless/r0-ped/sheets/B54-25-vs-30-figure-zoom.png`. **But the lesson half stands:** same street, spawn, 150 m ribbon, zebra, parked row, billboard, approach and camera — only the person differs. And the close-out's claim that PE-14 is now a different DRILL (three tasks incl. a graded full stop) is **still code-only**: `/dev/ghost-demo` mounts the bare LessonScene with no objective list, so nobody photographed the task panels.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN — the comparison he actually made, opened side by side.** `scratchpad/samemap/frames/SHEET-B54-23-vs-28.png` puts his question 23 beside his question 28 at one camera: 23 is now the widest, brightest of the seven with everything set 19–26 m back, 28 is detached frontage with sky-filled gaps against a banded terrace. **They share no roofline and no setback** — his „absolutely same as question 23" is answered for the frontage. `pe-cane-v1` had **zero** authored volumes between the spawn and y 62 before this wave, so for the first fifty metres there had literally been nothing there to be different. **Still PARTIAL for the same reason as B50: identical carriageway.** The task-panel half (that PE-14 is now a different DRILL, three tasks including a graded full stop) remains code-only — no frame shows the objective list.<br><br>**→ 2026-08-05 COCKPIT GATE → PARTIAL-SEEN. `pe-cane` finally has its own road surface, and it still reads as a sibling.** Tile 5 of `scratchpad/zebra/frames/SHEET-PE-7-CARRIAGEWAY.png`, full frame at `frames/final__28-pe-cane__y15.png`: 16.25 m under the seat, a bay pocket whose mouth opens 1 m past the bonnet and runs **36 m — the longest bay in the family** — three parked cars in it, narrowing again at +37. `pe-slow`, the district the previous gate compared it against, is 16.25 m at the seat with its pocket 11 m out and its cars 22 m further away. **They no longer share a cross-section**, which is the first time anything under the wheels has differed between them. **Two qualifications this gate is recording rather than smoothing over.** (1) His "question 23" was **not** photographed as a numbered catalog position — the register's own numbering makes his numbers catalog-minus-two and no authoritative ordered catalog exists in the tree, so the lane rebuilt the sheet with district and drill ids only. Both candidate districts (`pe-slow`, `pe-dart`) are on the sheet, so whichever pair he meant is covered by picture, but the *label* he used is not. (2) `pe-cane`'s "ONE-WAY, no осева" is a **data** fact that does not show: with `lanes: 2` the builder paints a dashed lane divider at `x=0` that is visually identical to a centre line from the seat. **Not a defect, recorded so nobody re-files it:** the large dark object in the upper right of all seven frames is the car's own interior rear-view mirror (`ZOOM-27-upper-right.png`), not a map prop. |
-| **B55** | 29 Пешеходец на червено (29→31) | "No traffic light Exists again … there must be a traffic light for us, but also a traffic light that the pedestrian follows" | **PARTIAL-SEEN** | Doc 86 L3 said the pedestrian signal head **did not exist anywhere in the simulator** and no lane owned it. It exists now: a `SignalHeadKind` variant, a builder pass and a renderer, and `pe-jay-v1` went 8 → 10 heads with two pedestrian heads at the crossing (x = ±12.82, y = 34.00). I opened the frame myself: **two heads stand together at the crossing on his map**, red lit. `scratchpad/b45r/frames/ZOOM-j31-lights.png`. **Why PARTIAL and not FIXED:** at that zoom I cannot certify the second head is a two-lens pedestrian head rather than a second vehicle head, and I will not claim a thing I could not resolve.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN — the lane's own verdict confirmed, and two of its sub-claims corrected.** „A traffic light for us" **is** closed: inside the box the driver's own head is a 22 × 13 px unmistakable **RED** with the jaywalker in her red jacket on the zebra in the same frame (`scratchpad/lights/B55e/B55e-step03-y11-t25.4.png`). But on the approach it is a **5 × 5 px** green lens against a **building facade**, not „clear of the buildings" as reported. **„A traffic light that the pedestrian follows" is still not readable** — the lane's own 14× zoom shows a dark bar with a 1–2 px lens sliver, because the lens sphere (r 0.105 at z +0.12) barely clears a housing whose front face is at z 0.19 and the driver views it 65–77° off-normal. **CORRECTION:** the reported „interior rear-view mirror housing" occlusion at y −2.8 **is not in the frame cited for it** — there is no mirror in that image; what hides the left-hand head is the lesson's own keyboard-help overlay panel, and the forward-right quadrant is a billboard with the advisor card drawn across it. |
+| **B54** | 28 Пешеходец с бял бастун (28→30) | "absolutely same as question 23, just changed the visualisation to old pedestrian" | **FIXED-SEEN** ✅ *(2026-08-09 RENDER-ROWS — the last code-only half is now a photograph; RE-OPENED 2026-08-10)* | **→ 2026-08-10 THE-NINE-UNOPENED → FIXED-SEEN CONFIRMED. Opened, not inherited.** `scratchpad/RR/b54/b54-y84.png` is a cockpit frame — A-pillar, wheel, full dash, cluster «0 км/ч D», telemetry `y=83.2 v=0.0 obj=2/3 events=0`. One image carries all three things this row was held for: the banner **«ЗАДАЧА 3/3 · Потегли чак когато е слязъл от цялото платно»**, the telemetry's own **`obj=2/3`**, and the ИНСТРУКЦИИ card with all five steps including «Пешеходец с бял бастун стъпва на пътеката — това е незрящ човек с безусловно предимство». The figure re-cropped off that same frame at 10× (`scratchpad/NINE/n-b54-cane-10x.png`): a stooped grey-overcoat body, one arm down-forward, and **a white cane extended down and forward**, clearly a prop and not road paint. Three tasks and the cane are both photographed from the seat.<br><br>**→ 2026-08-09 RENDER-ROWS → FIXED-SEEN. The one thing this row was still held for — „that PE-14 is a different DRILL remains code-only, no frame shows the objective list" — has been photographed.** Drove `sc-crossing-white-cane` L1 at the shipped 16:9 (play area 1422×799) with the lesson's own cards left OPEN, because the cards are what he was reading when he said „absolutely same". `scratchpad/RR/b54/b54-y84.png`, at the graded halt point (district y = 83.2): the banner reads **„ЗАДАЧА 3/3 · Потегли чак когато е слязъл от цялото платно"**, the telemetry overlay in the same frame reads **`obj=2/3`**, and the ИНСТРУКЦИИ card carries all five steps including «Пешеходец с бял бастун стъпва на пътеката — това е незрящ човек с безусловно предимство». At the recognition gate (y = 61.2) the same overlay reads **`obj=1/3`**. **Three tasks, and PE-08 has two** — the middle one, the graded FULL STOP before the zebra, is the task PE-08 never asks for, and it is now visible to a student rather than only to a compiler. **The figure, re-confirmed from the COCKPIT this time** (the earlier proof was an overhead/10× sheet): `ZOOM-b54-cane.png`, 7× off the same frame — a stooped figure in a grey overcoat with a **white cane extended down and forward**, not the upright adult of PE-08. **What is honestly still true and is not a defect:** it is the same family of street, because every PE district is a zebra-block district; the frontage, the carriageway and the bay were separated and photographed by the 2026-08-05 cockpit gate (`scratchpad/zebra/frames/SHEET-PE-7-CARRIAGEWAY.png`), and this gate adds the drill and the figure. Every sub-claim in his sentence now has a picture behind it.<br><br>**The data fix landed and is measurable:** PE-14 is now a different drill from PE-08 — three tasks, including a graded FULL STOP before the zebra that PE-08 does not have (this is the `T8raw 181 → 182` raise in the gate). The white-cane shadow holds 26 km/h through y=62 and stops dead at y=85.45 for 22 s; both new gates are on the ghost's own trace. **Not rendered**, so his "absolutely same" is not yet answered with a picture. This is also the lesson B45's variant bug was diluting.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** His „absolutely same“ splits. THE FIGURES ARE GENUINELY DIFFERENT: PE-08 is an upright adult in a rust-red top with a normal stride and no cane; PE-14 is stooped, in a grey overcoat, with a thin WHITE CANE extended down and forward — resolved at 10× from the cockpit and again from overhead. `tools/clips/headless/r0-ped/sheets/B54-25-vs-30-figure-zoom.png`. **But the lesson half stands:** same street, spawn, 150 m ribbon, zebra, parked row, billboard, approach and camera — only the person differs. And the close-out's claim that PE-14 is now a different DRILL (three tasks incl. a graded full stop) is **still code-only**: `/dev/ghost-demo` mounts the bare LessonScene with no objective list, so nobody photographed the task panels.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN — the comparison he actually made, opened side by side.** `scratchpad/samemap/frames/SHEET-B54-23-vs-28.png` puts his question 23 beside his question 28 at one camera: 23 is now the widest, brightest of the seven with everything set 19–26 m back, 28 is detached frontage with sky-filled gaps against a banded terrace. **They share no roofline and no setback** — his „absolutely same as question 23" is answered for the frontage. `pe-cane-v1` had **zero** authored volumes between the spawn and y 62 before this wave, so for the first fifty metres there had literally been nothing there to be different. **Still PARTIAL for the same reason as B50: identical carriageway.** The task-panel half (that PE-14 is now a different DRILL, three tasks including a graded full stop) remains code-only — no frame shows the objective list.<br><br>**→ 2026-08-05 COCKPIT GATE → PARTIAL-SEEN. `pe-cane` finally has its own road surface, and it still reads as a sibling.** Tile 5 of `scratchpad/zebra/frames/SHEET-PE-7-CARRIAGEWAY.png`, full frame at `frames/final__28-pe-cane__y15.png`: 16.25 m under the seat, a bay pocket whose mouth opens 1 m past the bonnet and runs **36 m — the longest bay in the family** — three parked cars in it, narrowing again at +37. `pe-slow`, the district the previous gate compared it against, is 16.25 m at the seat with its pocket 11 m out and its cars 22 m further away. **They no longer share a cross-section**, which is the first time anything under the wheels has differed between them. **Two qualifications this gate is recording rather than smoothing over.** (1) His "question 23" was **not** photographed as a numbered catalog position — the register's own numbering makes his numbers catalog-minus-two and no authoritative ordered catalog exists in the tree, so the lane rebuilt the sheet with district and drill ids only. Both candidate districts (`pe-slow`, `pe-dart`) are on the sheet, so whichever pair he meant is covered by picture, but the *label* he used is not. (2) `pe-cane`'s "ONE-WAY, no осева" is a **data** fact that does not show: with `lanes: 2` the builder paints a dashed lane divider at `x=0` that is visually identical to a centre line from the seat. **Not a defect, recorded so nobody re-files it:** the large dark object in the upper right of all seven frames is the car's own interior rear-view mirror (`ZOOM-27-upper-right.png`), not a map prop.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `FIXED-SEEN`; frame opened.** `scratchpad/RR/b54/b54-y84.png` — one cockpit image carries all three things the row was held for: the banner «ЗАДАЧА 3/3 · Потегли чак когато е слязъл от цялото платно», the telemetry's own `obj=2/3`, and instruction 2 naming «Пешеходец с бял бастун … незрящ човек с безусловно предимство», with the figure on the crossing. **Caveat recorded:** a live «Compiling …» pill is in the frame (still-open row 14) — immaterial to this row's claim. |
+| **B55** | 29 Пешеходец на червено (29→31) | "No traffic light Exists again … there must be a traffic light for us, but also a traffic light that the pedestrian follows" | **FIXED-SEEN** ✅ *(2026-08-09 RENDER-ROWS — both his lights in one cockpit frame, and the ped lens now READS; RE-OPENED and pixel-sampled 2026-08-10)* | **→ 2026-08-10 THE-NINE-UNOPENED → FIXED-SEEN CONFIRMED by opening the frame and SAMPLING it — and the same frame exposes a new placement defect that is not this row's sentence.** Both heads in one cockpit frame: `scratchpad/RR/b55/b55-y14.png` (play area 1423 × 800, horizon 387, telemetry `y=13.2 v=0.0 obj=1/2`, A-pillar + wheel + cluster in shot). **Sampled by me, 3 × 3 means, not asserted:** vehicle head — red **(215,85,61) LIT**, amber **(126,81,0)**, green **(17,102,33)**; pedestrian head — red **(139,17,6)**, green **(107,192,106) LIT**. One lamp lit per head, driver RED against pedestrian GREEN, phase-consistent, and a student can tell which is which. Rects off the frame's report: `pedestrian-signal-lamps` **[1093,278,1117,297]** and **[1092,298,1117,317]** (24 × 19 / 25 × 19 px) at 22.9 m; `traffic-light-lamps` i9/i10/i11 at [1277,187,1317,217] / [1276,216,1316,245] / [1275,245,1314,273] at 17.7 m. **THE NEW DEFECT — the pedestrian head is planted 1.13 m in front of a В26 «50».** Head at world (12.82, −34); `signs-limit50-face` i3 at (12.93, −35.13), **24.0 m, rect [1079,286,1125,332]** — BOTH lens rects fall inside the sign's face. From the seat the two objects fuse into a single red-ringed white disc with a green blob in it (`scratchpad/NINE/n-b55-pedhead-10x.png`, 10×): the «50» digits are 100 % hidden and the ped head loses its own silhouette. That is a placement fault in `pe-jay-v1.json` (content/world + the platform/public mirror), not a lens fault; filed in STILL OPEN rather than charged to this row.<br><br>**→ 2026-08-09 RENDER-ROWS → FIXED-SEEN, and the residual the last gate located was in the geometry exactly where it said it was.** The fix is `PED_LENS_R_M` 0.105 → **0.13** and `PED_LENS_Z_M` 0.12 → **0.20** in `WorldProps.tsx` — the remedy the VEHICLE head already had forced on it for the identical complaint (founder R3, doc 62 S1). Nothing else moved: housing, pole, mounting heights and `pedLampColors` are untouched, so the „not your lamp" two-lens silhouette survives. **Photographed and pixel-sampled on `sc-pe-jaywalker` L1 at the shipped 16:9** (play area 1423×800): at **22.9 m** the right-hand pedestrian head's lenses measure **24×19 px and 25×19 px** — not the „1–2 px sliver" this row was held at — and at 10× they are unambiguous colour, `scratchpad/RR/b55/ZOOM-b55-ped-23m.png`. Sampled off the frame, not asserted: **red = rgb(138,16,6)** (the unlit band; the register's own unlit red on the vehicle head is `#841811` = 132,24,17) over **green = rgb(106,192,105)** (lit; the register's lit green is `#67b967` = 103,185,103). One lens lit, one not, and a driver can tell which. **And both of the things he asked for are in ONE frame from the seat:** `scratchpad/RR/b55/b55-y14.png` — his own three-lens vehicle head showing RED at the top right, and the shorter two-lens pedestrian head red-over-green nearer the kerb, with the zebra, the crossing figure, the A-pillar, the wheel and the cluster all in shot. Sizes across the approach for the record: 13×11 px at 36.2 m, 24×19 px at 22.9 m, 60×41 px at 14.2 m.<br><br>Doc 86 L3 said the pedestrian signal head **did not exist anywhere in the simulator** and no lane owned it. It exists now: a `SignalHeadKind` variant, a builder pass and a renderer, and `pe-jay-v1` went 8 → 10 heads with two pedestrian heads at the crossing (x = ±12.82, y = 34.00). I opened the frame myself: **two heads stand together at the crossing on his map**, red lit. `scratchpad/b45r/frames/ZOOM-j31-lights.png`. **Why PARTIAL and not FIXED:** at that zoom I cannot certify the second head is a two-lens pedestrian head rather than a second vehicle head, and I will not claim a thing I could not resolve.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → PARTIAL-SEEN — the lane's own verdict confirmed, and two of its sub-claims corrected.** „A traffic light for us" **is** closed: inside the box the driver's own head is a 22 × 13 px unmistakable **RED** with the jaywalker in her red jacket on the zebra in the same frame (`scratchpad/lights/B55e/B55e-step03-y11-t25.4.png`). But on the approach it is a **5 × 5 px** green lens against a **building facade**, not „clear of the buildings" as reported. **„A traffic light that the pedestrian follows" is still not readable** — the lane's own 14× zoom shows a dark bar with a 1–2 px lens sliver, because the lens sphere (r 0.105 at z +0.12) barely clears a housing whose front face is at z 0.19 and the driver views it 65–77° off-normal. **CORRECTION:** the reported „interior rear-view mirror housing" occlusion at y −2.8 **is not in the frame cited for it** — there is no mirror in that image; what hides the left-hand head is the lesson's own keyboard-help overlay panel, and the forward-right quadrant is a billboard with the advisor card drawn across it.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → VERDICT UPHELD, FRAME NOW STALE — and that is this gate's one real find.** I re-sampled `scratchpad/RR/b55/b55-y14.png` and the row's own question is answered correctly: one lamp lit per head, driver **red** against pedestrian **green**, phase-consistent, in one cockpit frame. **But the same sample shows the PRE-B35 head:** vehicle amber rgb(126,81,0) **S=1.000**, green rgb(17,102,33) S=0.833, ped red rgb(138,16,6) S=0.957 — exactly the saturated dead lenses B35 removed. Frame 2026-08-09 22:18; the lens fix 2026-08-10 01:47. **The verdict stands; the frame must NOT be cited as current evidence of how the head looks.** Re-shoot owed — still-open row 1. |
 | **B56** | 30 Скорост в дъжд (30→32) | *(no complaint)* | **FIXED-SEEN** | Regression check, never re-driven.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN (regression check).** sc-speed-rain on sp-rain-v1 runs correctly: night, visible rain, wet reflective tarmac, headlights lighting the lane, shadow demonstration playing, the «Карай дотук» gate on the road, clean acceleration to 56 km/h, world intact 244 m up a 360 m street. Nothing regressed. **Flagged, not graded:** the L1 gate reads «не по-бързо от 47 км/ч» while the authored cap is 42 and the lesson's own copy calls 48 a mistake — `params.ts widenSpeedCap` pushes the gate above the rain envelope this drill exists to teach. Lead's call whether speed-adaptation drills are exempt from the ladder's speed grace. |
 | **B57** | 31 Пълзящо превишаване (31→33) | "no actual Sign stating 30 exists on the sidewalk … just written on the road" | **FIXED-SEEN** | **A real post-mounted circular red-ring В26 sign stands on the verge of his lesson's street** — I opened it: `scratchpad/b45r/frames/ZOOM-z33-sign.png`. Total signs across 90 districts went 489 → 501 and В26 is restated through long reduced-speed stretches. **Why PARTIAL:** in the crop I have, the numeral inside the ring is not resolvable, so "a sign stating 30" is one step short of certified. The `markings.ts` half of this row was not owned by the signs lane.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** The sign is on the verge and the numeral is legible from the seat with NO zoom. At y 390, ten metres before the 50 → 30 boundary, a large post-mounted В26 «30» stands on the right verge, with a second restating it down the street. Also closes the earlier PARTIAL caveat: the district-entry В26 «50» numeral resolves cleanly at 10×. `tools/clips/headless/.srt/D-sc-speed-creep-y390.png`. **One real defect seen:** at the spawn the entry disc is roughly half occluded — a street tree covers its left arc and the billboard's corner cuts its right, through the digits. Identical on sp-trans-v1 and sp-zone30-v1, so the entry post and the billboard share a sight line on every map from this generator.<br><br>**→ 2026-08-03 LOOK-WAVE — re-confirmed FIXED-SEEN, and this row's cited photograph was STALE and has been re-shot.** The numeral resolves and it says **30**: at y=394, twelve metres before the 50→30 boundary, a post-mounted circular red-ring В26 stands on the right verge with «30» in the middle — legible from the seat at 1280×720 **with no zoom**, unambiguous at 6×, and the cluster in the same frame reads «34 км/ч D» so the sign and the speed it governs are in one photograph. `scratchpad/b67/frames/ZOOM-B57-sign30.png` (6×) · `B57-y394-kmh34.png` (from the seat, no zoom) · `B57-y406-kmh39.png` (the painted «30» glyph still on the tarmac at the boundary — the fix is additive, post AND paint). Census of the shipped world: **three В26 «30» posts on the travelled direction** (district y=406, 450, 570) plus the В26 «50» at y=45 that opens the street. **The correction the register owes:** its cited evidence, `tools/clips/headless/.srt/D-sc-speed-creep-y390.png`, was shot on the **pre-2026-08-03 `sp-creep2-v1`**, with a parked row and a tight terrace that no longer exist — the B63 frontage rebuild regenerated this map (blocks 28 m back, zero parked row, 16.25 m curb-to-curb) and the sign moved with it. **The row survives the regeneration; the photograph did not.** **One residual, and it repeats — THE APPROACH IS SPENT BEHIND THE MIRROR.** The В26 «30» sits at district y=406 on the right verge (world x 8.925) while the car runs the lane at x=4.06 — 4.9 m to the right. That puts it between roughly **7° and 18° right of centre** for the whole stretch from ~40 m out to ~15 m out, which is exactly the screen band the rear-view-mirror inset occupies (x 760–955 at 1280×720). Photographed: at y=388 (18 m out) the disc is nowhere in frame; at y=394 it has cleared the inset and is suddenly large; by y=420 it is behind the driver. **The window in which a student can read the sign is about one second at 34 km/h.** This is the **third** row to hit the same inset (already logged on B61's school board and on the B57/B62 entry disc under the tree and billboard) — **it is one placement problem, not three.** Owner: the mirror inset's screen rect in the cockpit HUD, or `ZONE_SIGN_LATERAL_M` / the entry-post lateral offset in `props.ts`. Both shared; untouched. |
-| **B58** | 32 Превишаване над +10 (32→34) | *(no complaint)* | **BROKEN-SEEN** *(downgraded from PARTIAL-SEEN — 2026-08-09 verify #2)* | **→ 2026-08-09 VERIFY #2 → BROKEN-SEEN, downgraded on purpose, on the B65 precedent.** The lesson's own instruction 2 tells the student „скоростта се чете от знака и скоростомера, не от гърба на предния" — and **the В26 «50» is behind the interior mirror at every distance on the approach.** Settled by an x-ray pair at the shipped 16:9 (1440×900 → play area 1422×799, vFOV 47.0, horizon y = 331), same pose, same pixels: `scratchpad/camlane/zoom-b58-xray-sign.png` with the mirror assembly hidden shows the red-ringed **«50»** plainly on the right verge; `zoom-b58-live-sign.png` with the mirror present shows **a reflection of a white van** in its place. Annotated full cockpit frame `camlane/b58f-annotated.png`: mirror body `[873,64,1155,304]`, the sign `[973,258,1007,291]` — 100% inside it, and 258–280 behind the GLASS, not merely the housing. Swept the approach: **100% / 100% / 81%** occluded at 28.5 / 24.8 / 21.8 m. **It is NOT the `rv` quad** (see the gate section: that quad is `visible = false` in the cockpit view) — it is the cabin's own interior mirror, the window he asked for in B74/B76. **NOT FIXED, and no camera constant fixes it;** two real fixes with owners and numbers are in still-open row 1. Calling this „partial" would be flattering it.<br><br>Regression check, never re-driven.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. He made no complaint here only because he never played it, and TWO things in frame would have got one.** The drill runs end to end and the machinery is alive — cockpit, cluster reading 47 км/ч D the whole way, the lead car pulling away, the overtaker visible in the rear-view inset, the graded zone drawn on the road, 332 m in 40 s. **FIRST — THE GATE INSTRUCTS THE FAULT.** At y=180 the in-world card reads **«Карай дотук — не по-бързо от 57 км/ч» on a street posted 50**, in a lesson whose own instruction 4 says «55–60 е второстепенна грешка» and whose authored objective cap is **52** (`sc-dng-hold` / `sc-dng-finish`, `maxSpeedKmh 52`). **A student who obeys the number the world shows him commits the mistake the world is grading.** `scratchpad/b67/frames/B58-y180-kmh47.png`. **SECOND — THE STREET ENDS INTO A FIELD.** At y=340, fourteen metres short of the finish gate, the carriageway stops at a hard edge and **both flow vehicles — the lead car and the white van — are standing on open grass beyond it, side by side, directly ahead through the windscreen** (`B58-y340-kmh47.png`); the overhead makes it undeniable (`B58-overhead.png`). **THIRD, smaller:** the В26 «50» that instruction 2 tells him to read («Скоростта се чете от знака») is at district y=45 on the right verge per the census, and is in **neither** the spawn frame (30 m ahead, lands behind the rear-view inset) **nor** the y=60 frame (already behind him) — `B58-y15-spawn.png`, `B58-y60-kmh47.png`. Same occlusion as B57. **What is left.** (1) **The gate label:** rendered cap 57, authored cap 52. The register already named this mechanism on **B56** ("the L1 gate reads не по-бързо от 47 км/ч while the authored cap is 42") and named the owner: `widenSpeedCap` in the scenario params ladder. **B58 makes the case sharper than B56 did, because here the widened number is not merely generous — it is itself SPEEDING_OVER_LIMIT by this lesson's own text.** The fix is one of two decisions and it is the lead's: exempt speed-discipline drills from the ladder's speed grace, or clamp the displayed cap to `min(authored, posted limit)`. Shared params file; untouched. (2) **The terminal:** `ov-keepright-v1` is 360 m of edge with no terminus dressing, and the two scripted flow vehicles run past the end of the carriageway and stop on the terrain. Owner: the `ov-keepright` generator + the traffic script's path end. **Same family as B70 ("the column is waiting at the end of the road") and B50/B53's terminus axis — if that TERMINUS work is extended to the PE family it should cover the OV family in the same pass, not as a separate ticket.**<br><br>**→ 2026-08-05 INSTRUMENT GATE — the headline half is FIXED and photographed; two residuals keep the row at PARTIAL.** **(a) The gate no longer instructs the offence it grades.** `newdef/ZOOM-b58-gate-y162.png`, opened: driving a lawful 46 km/h on `ov-keepright-v1` (every road edge posted 50), the in-world gate bar reads «Карай дотук / **не по-бързо от 50 км/ч**». It read **57**. *The answer to “how did a gate come to carry a speed that contradicts the sign” is that it was GENERATED:* `scenario/params.ts` `widenSpeedCap` added the L1 rung's tolerance grace to the authored 52 — nothing authored 57. It is now bounded by `min(widened, max(authored, postedLimitKmh))`, **grading is untouched at 52**, and all three surfaces that PRINT a number are clamped to the sign. **(b) BROKEN, still:** the street ends into a field with the white van and the blue lead car standing **on open grass** (`ZOOM-b58-terminus.png`) — and the graded drive now ends at `y≈321`, so he sees it from 20 m out for the last two seconds. **(c) BROKEN, still:** the В26 «50» that instruction 2 tells him to read is **never in the windscreen** — it is 30 m ahead on the right verge, behind the rear-view inset. Same occlusion class as B57. Both are in STILL OPEN. |
+| **B58** | 32 Превишаване над +10 (32→34) | *(no complaint)* | **FIXED-SEEN** ✅ *(2026-08-10 SIX-ROW PROVENANCE — re-confirmed, and the eye point provably did not move)* | **→ 2026-08-10 SIX-ROW PROVENANCE → FIXED-SEEN HOLDS, checked because closing B67 must not reopen this.** `scratchpad/RR/b58/b58-y25.png`, **shot 2026-08-09 23:05:57** — later than **every** eye-point-defining file (`hero_interior.glb` 15:02:50, `VitokCockpit.tsx` 15:47:18, `cockpit-camera-contract.test.ts` 15:06:16, `CameraRig.tsx` 08-04 15:17), **all four clean in `git status` at gate close**, so nothing has moved the seat since. The gate cropped the verge at 3× and looked: the **red-ringed В26 «50» stands in clear sky, fully legible**, and the mirror assembly — carrying a blue car in its glass — sits **entirely above** it, lower edge ≈ **35 frame px** clear of the sign's top. Frame's own report: `signs-limit50-face` at **23.0 m**, rect [1098,281,1147,329] = **49 × 48 px**, canvas 1423 × 799.56 (aspect **1.7797**). **B67 changed nothing, so this cost nothing.**<br><br>**→ 2026-08-10 THE-NINE-UNOPENED → FIXED-SEEN CONFIRMED — the frame was opened this time and the asset was READ, not quoted.** `scratchpad/RR/b58/b58-y25.png` is a cockpit frame — A-pillar, wheel, full dash, cluster «0 км/ч D» — at play area **1423 × 799.6, aspect 1.7797**, horizon y = 387, telemetry burned in at `y=24.20 v=0.0008 км/ч`. Measured off the frame's own report rather than inherited: `signs-limit50-face` at **23.0 m**, rect **[1098,281,1147,329]** — 49 × 48 px of red-ringed «50» standing in clear sky, the mirror assembly's lower edge ~35 px ABOVE it, and the mirror glass still carrying the road behind (the white van is in it). 4× crop: `scratchpad/NINE/n-b58-sign-vs-mirror-4x.png`. **The shipped tree, read out of the files:** `platform/public/sim/vehicles/hero_interior.glb` node 15 `hotspot_mirror_rear` translation **[0, 1.4580000448226929, −0.5]**, `extensionsUsed` = EXT_texture_webp · KHR_draco_mesh_compression · KHR_materials_emissive_strength; `platform/src/components/sim/vitok/VitokCockpit.tsx:372` `MIRROR_STATION_RAISE_M = 0.105` and :519 `root: { y: 0.86505 + MIRROR_STATION_RAISE_M, z: 0.15 }`. Both files clean in git at `042518a`. **One handed-down number was wrong and is corrected here:** the dash badge in this frame reads **«Кола отзад · 6 м»**, not „7 м". The two terminus residuals stay in STILL OPEN.<br><br>**→ 2026-08-09 RENDER-ROWS → FIXED-SEEN. The row had never been re-verdicted after the fix landed; it is verdicted here on the SHIPPED tree, not on the lane's word.** He chose to move the mirror rather than shrink the signs. Both halves of that fix were re-verified at this gate: the ASSET — `platform/public/sim/vehicles/hero_interior.glb`, node `hotspot_mirror_rear` translation y = **1.4580000448226929** (authored 1.353 + the 0.105 raise), with `EXT_texture_webp`, `KHR_draco_mesh_compression` and `KHR_materials_emissive_strength` all intact — and the CODE, `VitokCockpit.tsx:372` `MIRROR_STATION_RAISE_M = 0.105`. **Re-driven and re-measured** on `sc-speed-dangerous` L1 at the shipped 16:9 (play area 1423×800, horizon y = 387): at **23.0 m** the В26 «50» face sits at `[1098,281,1147,329]` and the whole mirror assembly at `[825,39,1241,235]` — **46 px of clear air between them, zero overlap**, where this register measured **100 % occluded at 24.8 m and 28.5 m** before the raise. At 16.8 m they are side by side (face `[1288,228,1363,300]`, mirror right edge 1241) and still do not touch. `scratchpad/RR/b58/b58-y25.png`: the red-ringed «50» plainly in the windscreen, **and the mirror above it still carrying the road behind** with „Кола отзад · 6 м" on the dash — the raise did not buy the sign by blinding the mirror. **The two terminus residuals below are NOT closed by this** and stay in STILL OPEN as their own items.<br><br>**→ 2026-08-09 VERIFY #2 → BROKEN-SEEN, downgraded on purpose, on the B65 precedent.** The lesson's own instruction 2 tells the student „скоростта се чете от знака и скоростомера, не от гърба на предния" — and **the В26 «50» is behind the interior mirror at every distance on the approach.** Settled by an x-ray pair at the shipped 16:9 (1440×900 → play area 1422×799, vFOV 47.0, horizon y = 331), same pose, same pixels: `scratchpad/camlane/zoom-b58-xray-sign.png` with the mirror assembly hidden shows the red-ringed **«50»** plainly on the right verge; `zoom-b58-live-sign.png` with the mirror present shows **a reflection of a white van** in its place. Annotated full cockpit frame `camlane/b58f-annotated.png`: mirror body `[873,64,1155,304]`, the sign `[973,258,1007,291]` — 100% inside it, and 258–280 behind the GLASS, not merely the housing. Swept the approach: **100% / 100% / 81%** occluded at 28.5 / 24.8 / 21.8 m. **It is NOT the `rv` quad** (see the gate section: that quad is `visible = false` in the cockpit view) — it is the cabin's own interior mirror, the window he asked for in B74/B76. **NOT FIXED, and no camera constant fixes it;** two real fixes with owners and numbers are in still-open row 1. Calling this „partial" would be flattering it.<br><br>Regression check, never re-driven.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. He made no complaint here only because he never played it, and TWO things in frame would have got one.** The drill runs end to end and the machinery is alive — cockpit, cluster reading 47 км/ч D the whole way, the lead car pulling away, the overtaker visible in the rear-view inset, the graded zone drawn on the road, 332 m in 40 s. **FIRST — THE GATE INSTRUCTS THE FAULT.** At y=180 the in-world card reads **«Карай дотук — не по-бързо от 57 км/ч» on a street posted 50**, in a lesson whose own instruction 4 says «55–60 е второстепенна грешка» and whose authored objective cap is **52** (`sc-dng-hold` / `sc-dng-finish`, `maxSpeedKmh 52`). **A student who obeys the number the world shows him commits the mistake the world is grading.** `scratchpad/b67/frames/B58-y180-kmh47.png`. **SECOND — THE STREET ENDS INTO A FIELD.** At y=340, fourteen metres short of the finish gate, the carriageway stops at a hard edge and **both flow vehicles — the lead car and the white van — are standing on open grass beyond it, side by side, directly ahead through the windscreen** (`B58-y340-kmh47.png`); the overhead makes it undeniable (`B58-overhead.png`). **THIRD, smaller:** the В26 «50» that instruction 2 tells him to read («Скоростта се чете от знака») is at district y=45 on the right verge per the census, and is in **neither** the spawn frame (30 m ahead, lands behind the rear-view inset) **nor** the y=60 frame (already behind him) — `B58-y15-spawn.png`, `B58-y60-kmh47.png`. Same occlusion as B57. **What is left.** (1) **The gate label:** rendered cap 57, authored cap 52. The register already named this mechanism on **B56** ("the L1 gate reads не по-бързо от 47 км/ч while the authored cap is 42") and named the owner: `widenSpeedCap` in the scenario params ladder. **B58 makes the case sharper than B56 did, because here the widened number is not merely generous — it is itself SPEEDING_OVER_LIMIT by this lesson's own text.** The fix is one of two decisions and it is the lead's: exempt speed-discipline drills from the ladder's speed grace, or clamp the displayed cap to `min(authored, posted limit)`. Shared params file; untouched. (2) **The terminal:** `ov-keepright-v1` is 360 m of edge with no terminus dressing, and the two scripted flow vehicles run past the end of the carriageway and stop on the terrain. Owner: the `ov-keepright` generator + the traffic script's path end. **Same family as B70 ("the column is waiting at the end of the road") and B50/B53's terminus axis — if that TERMINUS work is extended to the PE family it should cover the OV family in the same pass, not as a separate ticket.**<br><br>**→ 2026-08-05 INSTRUMENT GATE — the headline half is FIXED and photographed; two residuals keep the row at PARTIAL.** **(a) The gate no longer instructs the offence it grades.** `newdef/ZOOM-b58-gate-y162.png`, opened: driving a lawful 46 km/h on `ov-keepright-v1` (every road edge posted 50), the in-world gate bar reads «Карай дотук / **не по-бързо от 50 км/ч**». It read **57**. *The answer to “how did a gate come to carry a speed that contradicts the sign” is that it was GENERATED:* `scenario/params.ts` `widenSpeedCap` added the L1 rung's tolerance grace to the authored 52 — nothing authored 57. It is now bounded by `min(widened, max(authored, postedLimitKmh))`, **grading is untouched at 52**, and all three surfaces that PRINT a number are clamped to the sign. **(b) BROKEN, still:** the street ends into a field with the white van and the blue lead car standing **on open grass** (`ZOOM-b58-terminus.png`) — and the graded drive now ends at `y≈321`, so he sees it from 20 m out for the last two seconds. **(c) BROKEN, still:** the В26 «50» that instruction 2 tells him to read is **never in the windscreen** — it is 30 m ahead on the right verge, behind the rear-view inset. Same occlusion class as B57. Both are in STILL OPEN.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `FIXED-SEEN`; frame opened.** `scratchpad/RR/b58/b58-y25.png` — cockpit, telemetry `y=24.2 v=0.0`. The red-ringed В26 «50» is plainly legible in the windscreen, the mirror assembly's lower edge sits clear **above** it, and the mirror still carries the road behind (the white van is in it). **The lane's correction is confirmed by eye: the dash badge reads «Кола отзад · 6 м», not 7 м.** |
 | **B59** | 33 Зона 30 училище (33→35) | "no Sign on the Sidewalk stating 30 km/h" | **FIXED-SEEN** | Not rendered. Improvement measured but unphotographed: `sp-zone30-v1` went **2 → 6** В26-30 posts through the 360 m school zone.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** A post-mounted В26 «30» stands at the sp-zone30-v1 entry, red ring, white face, numeral readable. `tools/clips/headless/.srt/ZOOM-b59-sign30-spawn.png`. An А19 «Деца» warning triangle with two child pictograms also stands on the verge before the school at y 120. **Defect seen:** at that post the А19 triangle and a circular sign share a sight line and the triangle covers the disc — its numeral is unreadable at any zoom from the approach. |
-| **B60** | 33 | "no kids are playing on the sidewalks and we should do that" | **PARTIAL-SEEN** | Not rendered, and not addressed by any lane.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** Children now exist and render AS children — at y 200 three figures walk the pavement in front of the school behind the green yard railing; four are staged (`SCHOOL_YARD_CHILDREN`) with `variant: "child"`, rendered at height 0.72 / build 0.8 with a proportionally larger head, so the scale cue is real (my first read of the crop said adult and that read was wrong). `tools/clips/headless/.srt/ZOOM-b60-kids.png`. **Why still PARTIAL, plainly: they WALK.** Nobody is playing — no running, no ball, no group. And the body is the placeholder rig of B52.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → UNCHANGED — and the evidence filed against it this wave belongs to a different row.** The signs lane wrote up „no actual Sign stating 30 exists on the sidewalk" as B60. **That sentence is B57/B59**, and B59 has been FIXED-SEEN since 2026-08-02. **B60 is „no kids are playing on the sidewalks and we should do that."** Nothing in this wave touched it; its 2026-08-02 verdict stands. |
+| **B60** | 33 | "no kids are playing on the sidewalks and we should do that" | **PARTIAL-SEEN** *(2026-08-10 — the BEHAVIOUR half is done and photographed; the BODIES are blocked on his Blender machine)* | **→ 2026-08-10 THE-NINE-UNOPENED → PARTIAL-SEEN, and this row's text was STALE: the behaviour half has landed and is photographed.** **What is done, measured in the tree:** `templates-sp.ts` `SCHOOL_YARD_CHILDREN` stages **six** children of whom **three RUN** — `sc-zn-kid-4` at **2.6 m/s**, `sc-zn-kid-5` at **2.9 m/s** one pace over and six metres back so the two read as a chase, and `sc-zn-kid-6` at **2.4 m/s** the other way so the paths CROSS in front of the windscreen — all released on a **70 m radius** off the player's own position, so the chase is under way in the window he drives through at any speed on any rung. The copy was rewritten to match rather than left describing a picture he is not looking at: `sc-speed-zone` instruction 3 now reads «пред оградата му деца ТИЧАТ и се гонят по тротоара, а едно излиза от портата към бордюра». **Photographed from the seat:** `scratchpad/cockpitlane/b60r/b60r-step01-t39.4-y176-v26.png` — cockpit frame, telemetry `y=177.3 v=26.0 км/ч`, cluster «26 км/ч D» with the 30 roundel lit on the dash, five child figures on the pavement in front of the school railing, and instruction 3 legible in the same image. **Why it stays PARTIAL, and the remaining half is HIS not ours:** `scratchpad/cockpitlane/b60/z-kids-y173.png` — the placeholder rig has no run pose, so a still shows upright capsules in orange tops sliding along the pavement. Running IS playing and the world now does it; the BODY that would show it needs his Blender machine (FR-43), the same blocker as B52 and B41.<br><br>Not rendered, and not addressed by any lane.<br><br>**RE-LOOK 2026-08-02 → PARTIAL-SEEN.** Children now exist and render AS children — at y 200 three figures walk the pavement in front of the school behind the green yard railing; four are staged (`SCHOOL_YARD_CHILDREN`) with `variant: "child"`, rendered at height 0.72 / build 0.8 with a proportionally larger head, so the scale cue is real (my first read of the crop said adult and that read was wrong). `tools/clips/headless/.srt/ZOOM-b60-kids.png`. **Why still PARTIAL, plainly: they WALK.** Nobody is playing — no running, no ball, no group. And the body is the placeholder rig of B52.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → UNCHANGED — and the evidence filed against it this wave belongs to a different row.** The signs lane wrote up „no actual Sign stating 30 exists on the sidewalk" as B60. **That sentence is B57/B59**, and B59 has been FIXED-SEEN since 2026-08-02. **B60 is „no kids are playing on the sidewalks and we should do that."** Nothing in this wave touched it; its 2026-08-02 verdict stands.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN`; frame opened.** `scratchpad/cockpitlane/b60r/b60r-step01-t39.4-y176-v26.png` — cockpit, telemetry `y=177.3 v=26.0 км/ч`, cluster 26 км/ч D with the 30 roundel, five child figures on the pavement at the school railing, and the rewritten instruction 3 («деца ТИЧАТ и се гонят по тротоара») legible in the same image. The BODIES half is **blocked on the founder's Blender machine (FR-43)** — a placeholder rig with no run pose can never show a chase in a still. |
 | **B61** | 33 | "no actual school when the question states there should be School" | **FIXED-SEEN** | Not rendered, and not addressed by any lane. Needs either a school building kind or a copy change.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** There is a school now and it is named. At y 170 a blue name board carrying white Cyrillic «…УЧИЛИЩЕ» hangs on a frontage whose palette is deliberately different from the grey residential blocks, with a green yard railing and a gate gap along it (`world/builders/schools.ts`; district building `sp-b-school`, kind "school", footprint x 22.1–38.1 / y 196–240). `tools/clips/headless/.srt/ZOOM-b61-school-board.png`. **One to fix:** at exactly this approach distance the board sits behind the rear-view-mirror inset, which clips its left third — the first moment the driver could read it is the moment the mirror covers it. |
 | **B62** | 34 Преход 50→30 (34→36) | "No street signs, No sign stating 50, no Sign stating 30" | **FIXED-SEEN** | Not rendered.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** Both signs exist and both numerals are legible on sp-trans-v1: a В26 «50» at the district entry readable at 12×, and at the zone boundary a large В26 «30» on a two-post pole legible from the seat with no zoom, with a second smaller В26 «30» restating it. `tools/clips/headless/.srt/ZOOM-b62-sign30.png`. Same entry-sign occlusion note as B57. |
 | **B63** | 34 | "this questions is absolutely same as 31 no difference at all" | **FIXED-SEEN** *(was BROKEN-SEEN)* | **→ 2026-08-03 GATE — closed, and the two frames are the proof.** `gen_sp_transition.mjs` grew a FRONTAGE axis and an explicit `parkingBand`. Catalog **33** (`sc-speed-creep` / `sp-creep2-v1`) is now panel blocks set 28 m back, wide gaps, **zero** parked row, 16.25 m curb-to-curb — an open, big-skied street that *feels* like 70 and is posted 50, which is the lesson. Catalog **36** (`sc-speed-transition` / `sp-trans-v1`) is a continuous tight terrace hard on the pavement with a parked row on the asphalt, 24.25 m. Opened at the gate from the identical spawn pose: `scratchpad/wm/frames/SHEET-B63-33-vs-36.png`. Two different pictures. "Absolutely same, no difference at all" is no longer true of these two frames.<br><br>**Earlier:** Needs 33 and 36 compared directly; neither was played.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN.** He is right about the map and here are the two spawns side by side. Catalog 33 (sc-speed-creep, sp-creep2-v1) and catalog 36 (sc-speed-transition, sp-trans-v1) open on the same street from the same seat: same building line left, same street tree, same В26 «50» planted in front of the same billboard right, same row of parked cars, same sky. Both come out of `tools/maps/gen_sp_transition.mjs` with the same 50→30 structure and differ only in length (680 m vs 360 m). Owner: tools/maps + templates-sp.ts. |
-| **B64** | 35 Рязко спиране (35→37) | "the question states stopping out of nowhere, but why?" | **PARTIAL-SEEN** *(was BROKEN-SEEN — the cell had never been updated to match the 2026-08-02 close-out text below, and the 2026-08-03 drive confirms PARTIAL)* | Not rendered.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN, and it is the biggest structural finding of this pass.** His „why do we stop out of nowhere?“ is still unanswered on screen — and the reason is that **`instructionsBg` is never rendered to a student.** The answering copy WAS written (`templates-sp.ts:809`, „представи си, че това е твоята спирка или адрес“). Verified independently at close-out: every non-test, non-authoring reference to `instructionsBg` in `platform/src` is `scenario/types.ts` (the type), `scenario/validate.ts` (numbering) and `world/referents.ts` (the gate). **`scenario/compile.ts` never maps it into the LessonSpec and no component reads it** — `compile.ts:459` maps `spec.objectiveBg` → `descriptionBg` and objective titles to the banner, and that is all the student gets. So all 150+ templates' numbered instructor steps are authored, validated, gated — and invisible. What the student sees here is the objective banner, the in-world gate and four demonstration cards, none of which says why the car is stopping. `tools/clips/headless/.srt/C-sc-sp-harsh-brake-card03.png`. **Consequence beyond this row: the doc-87 prescription „fix it in the templates' instructionsBg — a copy fix, not an engine fix“ cannot work as written, and every headlight/plural-pedestrian copy fix shipped this wave went into that same dead field.**<br><br>**→ 2026-08-02 SECOND CLOSE-OUT — the DELIVERY half is FIXED-SEEN; the row stays PARTIAL-SEEN for what he actually asked.** `compile.ts` now carries `spec.instructionsBg` onto the new `LessonSpec.briefingBg` (copied, never the shared object) and `LessonPlayShell` renders it in two places — the numbered ИНСТРУКЦИИ card in the objective stack, and a blocking overlay line that ends in „Разбрах". **Photographed by a reviewer who did not build it:** `…/scratchpad/compare/shots/ab-phone-852x393.png` shows the briefing bar on a 852×393 landscape phone („ⓘ ИНСТРУКЦИИ Ниво 3 — По-натоварена улица: Улицата вече не е празна… Защо | Разбрах"), and `d-jx-cockpit.png` / `d-jx-chase.png` show the full numbered card at 1280×591. So all 150+ templates' instructor steps are no longer invisible, and the copy fixes that were stranded — the headlights, the plural pedestrians, the reason to brake — now reach him. **The invariant that stops it recurring:** `ReferentRule.evidence` is now a REQUIRED field over 12 declared channels, and `referent-evidence-reachable.test.ts` fails if a channel's `renderedBy` is not a real `.tsx` — a `.ts` is rejected *by name*, which is exactly how `instructionsBg` passed for three months. Its non-vacuity test reconstructs this very defect and asserts the checker rejects it. **Why the row is not FIXED-SEEN:** his sentence was „stopping out of nowhere, but WHY?" — he asked for a visible reason. He now gets a *sentence* explaining it. The bus stop / doorway / address he could see is still not in the world (FR-49).<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN confirmed by driving to the graded stop point and judging it, which is the half nobody had done.** **The sentence is there:** the ИНСТРУКЦИИ card carries step 2 verbatim — «Напред светещият маркер отбелязва контролната зона — представи си, че това е твоята спирка или адрес. Реши да спреш ОТРАНО, не в последния момент.» **The reason is not.** Standing at the zone (y=180), the right-hand side of the street is a long unbroken row of static parked cars, one dark low canopy/overhang and a plain tall block with vertical columns. **No bus-stop pole, no shelter, no doorway, no shop front, no signage, no address plate, no kerb build-out, no marking on the road.** `scratchpad/jmisc/B64-y172.png` (cockpit at the zone — instruction card and what is actually out the window) · `B64-y184.png` (past it, the canopy block close up). The volumes lane was right to call it honestly an ADDRESS rather than a bus stop — **and from the driver's seat it does not even read as an address, it reads as buildings.** His "stopping out of nowhere, but WHY?" is answered in prose and still unanswered in the world. **Owner is the district generator, not the engine:** `content/world/sp-creep-v1.json` + `platform/public/world/sp-creep-v1.json` (identical, verified) already carry `sp-b-stop-canopy` (3.4 m, x 16.1–20.6, y 173–187), `sp-b-stop-shop` (8.5 m) and `sp-b-stop-neighbour` (11 m). **They render as plain extruded boxes because a `building` is only a footprint + height — there is no facade, signage or street-furniture channel for the renderer to tell a shop from a block of flats.** What would answer him is a placeable street-furniture kind (bus-stop pole + shelter, or a lit shopfront), **not three more volumes** — that is a schema change and belongs to the lead. |
-| **B65** | 35 | "I see many issue with the Map its very Raw, boring" | **BROKEN-SEEN** ⚠️ *(DOWNGRADED 2026-08-05 — re-rendered, and nothing had changed)* | A judgement call that needs his eyes as much as ours. Not rendered.<br><br>**→ 2026-08-03 LOOK-WAVE — rendered at last, plainly, for his eyes, along the whole 360 m of `sp-creep-v1` from the chase camera.** **What IS there:** a straight two-lane grey street with a white edge line and a dashed centre; two large apartment blocks, left and right, that are flat grey boxes with orange rectangles for windows; one row of static parked cars on the right; a green verge with no kerb; a handful of low-poly lollipop trees; distant hills. **What is NOT there:** any moving traffic, any pedestrian, **any street furniture at all** — no lamp posts, bins, benches, bus stops, hydrants, poles or wires; no road signs standing in the world; no crossings, no arrows, no stop bars, no side turnings. **Past y≈220 the buildings stop entirely and the road runs on as bare grey tarmac across a flat green plain until the world ends.** Flat even lighting, no cast shadows on the carriageway. `scratchpad/jmisc/B65-y120.png` (between the two blocks) · `B65-y240.png` (past y≈220: bare road on an empty plain). **As a description of these frames, "very Raw, boring" is accurate, not exaggerated.** The call is his; the job here was to put it in front of him. **Nothing to fix in a file — this is a scope decision.** If he confirms, the smallest honest win is a street-furniture pass on the scenario-street generators (`tools/maps/gen_sp_speed.mjs` and siblings): kerbs, lamp posts, a pavement texture, and **stopping the carriageway at the last building instead of running it into an empty plain**. That is a build lane, not a drive.<br><br>**→ 2026-08-05 INSTRUMENT GATE → DOWNGRADED to BROKEN-SEEN, deliberately.** Re-rendered along `sp-creep-v1` and the gate opened the frames itself (`scratchpad/newdef/b64-step02-t33.4-v26.png` at `y=121`, `b64-step05-t49.7-v29.png` at `y=240.7`). At `y=121`: a straight two-lane grey street, white edge line, dashed centre, **two flat grey slabs with orange window rectangles**, one row of static parked cars, a green verge with no kerb, low-poly trees, distant hills, flat even lighting. At `y=240`: bare grey tarmac running across an empty green plain to the horizon. Across the whole 360 m: no moving traffic, no pedestrian, no crossing, no arrow, no stop bar, no side turning, no kerb, no bin, bench, hydrant or wire — **one lamp post, on the left verge near `y=298`.** *“Very Raw, boring” is an accurate description of these frames, not an exaggeration.* PARTIAL was flattering it; a row where the symptom is wholly intact is BROKEN. It is a street-furniture build lane on the scenario-street generators, and it is named in STILL OPEN with an owner. |
+| **B64** | 35 Рязко спиране (35→37) | "the question states stopping out of nowhere, but why?" | **PARTIAL-SEEN** *(held — the shelter is REAL and now photographed in the forward view, but it leaves the windscreen 14 m before the stop and does not read as a bus stop; RE-OPENED 2026-08-10)* | **→ 2026-08-10 THE-NINE-UNOPENED → PARTIAL-SEEN, the hold CONFIRMED, and §10's forward-view demand is answered with opened images rather than a promise.** All three frames opened. `scratchpad/RR/b64/b64-y150.png` (cockpit, telemetry `y=149.2 v=0.0`) — the canopy IS in the windscreen at 32.8 m, above and behind the parked row on the right; `ZOOM-b64-shelter-33m.png` at 6× resolves a flat roof slab, its posts and a glazed back panel, with the lower half hidden by the parked cars. `b64-y180.png` (cockpit, telemetry `y=179.2 v=0.0`) — **at the graded stop point there is no shelter anywhere in the windscreen**; the right side is an unbroken parked row against grey blocks. So the answer to „does a forward view AT THE MARK contain the reason?" is NO, and the two measurable causes stand: the footprint straddles the mark, and it has no pole, no Д-series face and no kerb marking. Unchanged: PARTIAL.<br><br>**→ 2026-08-09 RENDER-ROWS → PARTIAL-SEEN, held, and for the first time with the forward-view frames §10 demanded plus the numbers that say exactly why it still is not enough.** `sp-b-stop-canopy` now carries `kind: "busStop"` in `sp-creep-v1.json`, so `props.ts` emits a real shelter transform: it is in the scene at **(x 14.27, district y 180)** — the graded stop point itself. Driven on `sc-sp-harsh-brake` L1 at the shipped 16:9 (play area 1423×800), three forward-view poses, all measured off the frame: **at 32.8 m out it IS in the windscreen** at `[987,344,1083,426]` — 96×82 px — and at 6× (`scratchpad/RR/b64/ZOOM-b64-shelter-33m.png`) the canopy roof, the posts and the glazed back panel are all there, on the pavement (`b64-y150.png`). **At 13.9 m it has left the frame to the right** (`[1506,207,…]`, canvas 1423 wide). **At the graded stop point it is 10.6 m away at ~90° to the driver — out of the windscreen entirely** (`b64-y180.png`). So the answer to §10's question is: a forward-view frame at the stop point does NOT contain the reason, because a shelter centred ON the stop point is beside you when you get there. **Two things keep it PARTIAL and both are measurable, not aesthetic.** (1) **Placement:** the footprint is y 173–187, straddling the stop at 180; the reason for stopping has to be visible while the DECISION is being made, i.e. it wants to sit ~10–20 m further up the street, not at the mark. (2) **It does not read as a bus stop:** no pole, no Д-series sign face, no kerb marking, and at 33 m its lower half is behind the parked row — from the seat it is a canopy, and a canopy is not an answer to „why here?". Owner is unchanged: the district generator plus a placeable stop-sign/pole kind, which is the lead's schema call. `scratchpad/RR/b64/b64-y150.png` · `b64-y172.png` · `b64-y180.png`.<br><br>Not rendered.<br><br>**RE-LOOK 2026-08-02 → BROKEN-SEEN, and it is the biggest structural finding of this pass.** His „why do we stop out of nowhere?“ is still unanswered on screen — and the reason is that **`instructionsBg` is never rendered to a student.** The answering copy WAS written (`templates-sp.ts:809`, „представи си, че това е твоята спирка или адрес“). Verified independently at close-out: every non-test, non-authoring reference to `instructionsBg` in `platform/src` is `scenario/types.ts` (the type), `scenario/validate.ts` (numbering) and `world/referents.ts` (the gate). **`scenario/compile.ts` never maps it into the LessonSpec and no component reads it** — `compile.ts:459` maps `spec.objectiveBg` → `descriptionBg` and objective titles to the banner, and that is all the student gets. So all 150+ templates' numbered instructor steps are authored, validated, gated — and invisible. What the student sees here is the objective banner, the in-world gate and four demonstration cards, none of which says why the car is stopping. `tools/clips/headless/.srt/C-sc-sp-harsh-brake-card03.png`. **Consequence beyond this row: the doc-87 prescription „fix it in the templates' instructionsBg — a copy fix, not an engine fix“ cannot work as written, and every headlight/plural-pedestrian copy fix shipped this wave went into that same dead field.**<br><br>**→ 2026-08-02 SECOND CLOSE-OUT — the DELIVERY half is FIXED-SEEN; the row stays PARTIAL-SEEN for what he actually asked.** `compile.ts` now carries `spec.instructionsBg` onto the new `LessonSpec.briefingBg` (copied, never the shared object) and `LessonPlayShell` renders it in two places — the numbered ИНСТРУКЦИИ card in the objective stack, and a blocking overlay line that ends in „Разбрах". **Photographed by a reviewer who did not build it:** `…/scratchpad/compare/shots/ab-phone-852x393.png` shows the briefing bar on a 852×393 landscape phone („ⓘ ИНСТРУКЦИИ Ниво 3 — По-натоварена улица: Улицата вече не е празна… Защо \| Разбрах"), and `d-jx-cockpit.png` / `d-jx-chase.png` show the full numbered card at 1280×591. So all 150+ templates' instructor steps are no longer invisible, and the copy fixes that were stranded — the headlights, the plural pedestrians, the reason to brake — now reach him. **The invariant that stops it recurring:** `ReferentRule.evidence` is now a REQUIRED field over 12 declared channels, and `referent-evidence-reachable.test.ts` fails if a channel's `renderedBy` is not a real `.tsx` — a `.ts` is rejected *by name*, which is exactly how `instructionsBg` passed for three months. Its non-vacuity test reconstructs this very defect and asserts the checker rejects it. **Why the row is not FIXED-SEEN:** his sentence was „stopping out of nowhere, but WHY?" — he asked for a visible reason. He now gets a *sentence* explaining it. The bus stop / doorway / address he could see is still not in the world (FR-49).<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN confirmed by driving to the graded stop point and judging it, which is the half nobody had done.** **The sentence is there:** the ИНСТРУКЦИИ card carries step 2 verbatim — «Напред светещият маркер отбелязва контролната зона — представи си, че това е твоята спирка или адрес. Реши да спреш ОТРАНО, не в последния момент.» **The reason is not.** Standing at the zone (y=180), the right-hand side of the street is a long unbroken row of static parked cars, one dark low canopy/overhang and a plain tall block with vertical columns. **No bus-stop pole, no shelter, no doorway, no shop front, no signage, no address plate, no kerb build-out, no marking on the road.** `scratchpad/jmisc/B64-y172.png` (cockpit at the zone — instruction card and what is actually out the window) · `B64-y184.png` (past it, the canopy block close up). The volumes lane was right to call it honestly an ADDRESS rather than a bus stop — **and from the driver's seat it does not even read as an address, it reads as buildings.** His "stopping out of nowhere, but WHY?" is answered in prose and still unanswered in the world. **Owner is the district generator, not the engine:** `content/world/sp-creep-v1.json` + `platform/public/world/sp-creep-v1.json` (identical, verified) already carry `sp-b-stop-canopy` (3.4 m, x 16.1–20.6, y 173–187), `sp-b-stop-shop` (8.5 m) and `sp-b-stop-neighbour` (11 m). **They render as plain extruded boxes because a `building` is only a footprint + height — there is no facade, signage or street-furniture channel for the renderer to tell a shop from a block of flats.** What would answer him is a placeable street-furniture kind (bus-stop pole + shelter, or a lit shopfront), **not three more volumes** — that is a schema change and belongs to the lead.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN`; the refusal to close is correct.** `scratchpad/RR/b64/b64-y180.png` — cockpit at the graded stop point (telemetry `y=179.2 v=0.0`): **there is no shelter anywhere in the windscreen**, only an unbroken parked row against grey blocks. The answer to §10 is NO. Owner of the remaining work is the lead's schema call (still-open row 10). |
+| **B65** | 35 | "I see many issue with the Map its very Raw, boring" | **PARTIAL-SEEN** *(2026-08-10 DECK+B65 VERIFY — the flanks are planted and it is a real improvement, but **the road still ends at a cut edge at the register's own station**, and the runtime draw budget is breached 3–5× on both maps this gate was told to measure)* | **→ 2026-08-10 DECK+B65 VERIFY → `PARTIAL-SEEN` UPHELD. THE TERMINUS ROW DOES NOT CLOSE, and the draw-call premise is worse than "wrong in two ways" — the product breaches its OWN runtime budget by 3–5×.** **(a) THE FRAME, AT THE STATION THIS REGISTER NAMED.** The row's terminus complaint was photographed at **y = 294.2** (`B65X/b65x-term2-step01-t53.3-v0.png`, shot 13:23:56). Re-driven here on the shipped tree with the drive-rig's readout ON so the frame carries its own proof of station rather than a filename: `scratchpad/VERIFY-DECK-B65/v-after-y294.png`, **shot 17:24:31**, telemetry burned in at `t=32.57s v=0.0km/h x=4.1 y=294.1`, same 1280×720, same scenario/level/quality. **What changed is real:** a treeline now stands across the vista where there was flat olive plain, and the frame no longer reads as a road running into nothing. **What did NOT change is the thing the row is about.** Both frames cropped through ONE tool at ONE region — `[560, 315 170×45] × 7.3`, `ctr-before.png` / `ctr-after.png`, **17:25:27**, both 1241×329 so they are provably comparable — and dead ahead down the road the AFTER crop still shows, floor to horizon: the tarmac's hard edge, the pale verge strip, the olive plain, the haze band and the distant hills, with two trunks at the left margin and one at the right. **The band closes the FLANKS and leaves the AXIS open.** Measured in world metres off the built district (`corridor2.mjs`, `sp-creep-v1`, seed 7): the far band is 21 trees spanning x −27.8..28.3 at z −398..−367, but the nearest tree either side of the centreline is x −0.91 / +5.92 — a **6.8 m clear corridor on the road's own axis**, subtending 3.8–5.4° from this station, which at 1280 px is ~90 px of open plain in the exact middle of the windscreen. And the first trunk is **72.9 m** ahead while the asphalt stops at ~**60.8 m**, so ~12 m of undressed ground lies between the cut edge and the grove before the depth even begins. The fixing lane disclosed this as "a thin band of pale ground"; measured, it is the whole central vista. **(b) TWO OF MY OWN INSTRUMENTS FAILED HERE AND THE VERDICT DOES NOT REST ON THEM.** A colour classifier scored the BEFORE frame 72.3 % "closed" — nonsense, the olive plain is a desaturated yellow-green that reads as canopy. A straight pixel-diff of the vista band then reported 430 of 481 columns changed including the axis, but the demonstration's blue shadow-car sits at the centre of one frame and not the other and the stations differ by 8 cm, so it cannot separate trees from parallax. Both are recorded as failures; the verdict is read off the 7.3× crops of the identical region. **(c) THE LANE'S OWN ZOOM PAIR IS NOT COMPARABLE and should not be cited:** its report claims "the same crop region [380,240..900,440] at 2.4×", but `z-before-term.png` is **1248×432** and `z-after2-term.png` is **1248×480** — 180 source rows against 200. The full frames (both 1280×720) are fine; the crops are not. **(d) DRAW CALLS, MEASURED, AND THIS IS A STOP.** `perfBudget.ts:296-301` scores the budget against a **runtime** median labelled "draw calls / frame (all passes)", so the 70 soft cap is a per-frame number, not a static estimate. Own instrument (`draws.mjs`: raw WebGL counter installed via `addInitScript`, sampled as a per-rAF DELTA, alongside the product's own PerfProbe), `/dev/drive-rig`, 1264×619 @ dpr 1.0, 8 s per run: **`pe-cane-v1` (`sc-crossing-white-cane`) tier low = 217 raw p50 / 193 probe draws and 260 898 tris → 3.1× the 70 soft cap and 2.2× the 100 HARD cap; med = 347/323 → past the 250 hard cap; high = 319–368/336 → over the 300 soft. `d2-v1` (`sc-ed-d2-city-run`) tier low = 328 raw / 275 probe and 2 084 341 tris → 4.7× the soft cap on draws and 7× the HARD cap on triangles; med 553/500 and 3.41 M tris; high 471–577/524 and 5.69 M tris — d2-v1 FAILS every tier on both axes.** `sp-creep-v1` at low measures **221** on the PerfProbe and **342 346** triangles — the fixing lane's two headline figures, reproduced exactly by an independent run, which is the strongest thing I can say for their A/B. **(e) The STATIC census is unchanged and still passes, which is precisely the problem.** My own build of all 105 shipped districts (`census-v2.json`): worst `drawCallEstimate` **67** (`hz-roadworks-v1`, `ov-crest-v1`, `pe-zone-v1`, `pk-rail-v1`), **`d2-v1` 66, `pe-cane-v1` 65, `sp-creep-v1` 59** — every one PASS against the low soft cap of 70. So the number the row has been managed on is **20–27 % of the real frame**, and "one more instanced kind breaches the 70 cap" was never the constraint. **This needs its own row with an owner: either `perfBudget.ts` is wrong about what this product renders, or the product is 3–5× over it. The FPS complaint cannot be closed while that is unknown.** **(f) «Raw» vs «boring», from my own frame.** Raw is substantially answered — frontage both sides, parked row, railings, a crossarmed utility pole with its overhead line, lamp columns, and now the terminus grove. **Boring is not:** nothing is moving on that street but the demonstration's own ghost car, and there is no pedestrian, crossing or side turning. The fixing lane's reason is independently confirmed in source and is correct — `templates-sp.ts:32` "Ambient traffic is ZERO in every drive (seed 7)", `:846` "The street is EMPTY (ambient 0 …) so every cause in the detector's ledger is positively absent", and instruction 1 tells the student «Улицата е празна — никаква опасност». Life on THIS map would break the drill it grades. The honest move is the one they name: re-render B65 on a map that can host life, or give the SP family a staged learn-only actor on the `sc-speed-dangerous` precedent.<br><br>**→ 2026-08-10 RE-SWEEP GATE → `PARTIAL-SEEN` UPHELD, and the row must NOT be closed.** **(a) THE PAIR HOLDS, AND THE STATIONS ARE THE SAME STATIONS.** Checked from each run's own telemetry before either frame was opened: BEFORE `b65furn/b65before-step02-t45.5` sits at **y = 239.20**, AFTER `B65X/b65x-after-step02-t57.8` at **y = 239.21**, same x = 4.06, both frames 1280 × 720 — and step01 is y = 119.27 vs y = 119.21. Opened: at y = 239 the BEFORE frame is grey tarmac with an empty green verge on the left, no buildings, no lamp, no pole, no railing, running to hills; the AFTER frame carries continuous frontage on **both** sides to the end of the run, a lamp column, a crossarmed utility pole with a legible overhead line, a green pavement parapet, trees and the parked row. **It no longer reads as empty.** The mechanism is committed, not in flight: `sp-creep-v1.json` last changed at `042518a` and went from 4 buildings (all inside y 150–220) to 19 spanning y 2.33–356.41. **(b) THE COST, MEASURED HERE OVER ALL 105 SHIPPED DISTRICTS** (`scratchpad/VERIFY-c1/b65-census.json`): `sp-creep-v1` = **59 draws / 25 778 tris / 11 lamps / 11 poles / 10 wire spans / 34 railings / 19 buildings**. **(c) TWO CORRECTIONS TO THE PREMISE THIS ROW WAS BEING MANAGED ON, both verified in this repo's own code.** *First*, the worst shipped district is **67 draws, not 65 or 66, and FOUR districts sit there** — `hz-roadworks-v1`, `ov-crest-v1`, `pe-zone-v1`, `pk-rail-v1`; `d2-v1` is 66 and `pe-cane` is not in the top four. Headroom to the tier-low soft cap is **3, not 4–5**. *Second*, **"one more instanced kind breaches the 70 cap" is false as stated**: `perfBudget.ts:204 scoreCeiling` reads `value <= soft → pass; value <= hard → warn; else fail`, and tier low is **soft 70 / hard 100**, so 68, 69 and 70 all still score **PASS** and 71–100 score WARN, not FAIL. There is real room — just not unlimited room. **(d) A LIVE DISCREPANCY WORTH ONE COMMIT:** `WorldProps.tsx:52` already documents the fixed WorldProps draw count as **28 (was 27)** for the B35 lane's lens-glass mesh, while `builders/buildWorldGeometry.ts:205` still hard-codes **27** — once B35 lands, `drawCallEstimate` under-reports by 1 on every district (worst 67 → 68 real). Owner: the B35 lane, in the same commit. **(e) WHY IT IS NOT FIXED — his sentence, not a lamp count.** In 360 m there is still **no moving traffic** (`leadGapM` null in all 2 668 telemetry samples, 1 event), **no pedestrian**, **no crossing, no stop bar, no side turning**, and the four small furniture kinds derive from the lamp run at `i%9==0 / i%9==4 / i%7==3 / i%5==2` — seven objects over the whole street, one of them identifiable in frame. And the carriageway **still ends at an undressed hard edge into open terrain** ~70 m past the finish objective: opened at `B65X/b65x-term2-step01-t53.3-v0.png`, y = 294.2, the tarmac simply stops and green plain and hills run on — which he sees in the last seconds of the graded drive. **The pass answers «raw». Nobody being on the street is what he will see first, and «boring» is his word to retire, not ours.**<br><br>**→ 2026-08-10 THE-NINE-UNOPENED → UPGRADED to PARTIAL-SEEN, on a before/after pair opened at THIS register's own two stations.** `scratchpad/b65furn/B65-before-after.png` — four cockpit frames of `sc-sp-harsh-brake` on `sp-creep-v1`, telemetry burned into each, at **y = 119** and **y = 239**, the exact poses the 2026-08-05 gate photographed as bare. At y = 239, which this row described as „bare grey tarmac running across an empty green plain to the horizon", buildings now stand on BOTH sides to the end of the run, with trees, a green railing run and a lamp column on the near verge; at y = 119 the frontage is deeper and a lamp column stands on the left. **The mechanism, read in the tree and already committed:** `world/builders/props.ts:1400` now picks `litClasses = lessonScale !== undefined ? SCENARIO_LIT_CLASSES : ARTERIAL_CLASSES`, and `SCENARIO_LIT_CLASSES` (`builders/constants.ts:661`) is ARTERIAL_CLASSES + `residential` + `unclassified` + `living_street` at `SCENARIO_STREETLIGHT_SPACING_M = 32`. Every scenario micro-map in the catalogue is authored `residential`, so the furniture predicate had never once been satisfied on the maps the drills actually run on — and because `WorldProps.furniturePlacements` derives every bench, bin, planter and bollard FROM the lamp run, „no lamp" silently meant „no street furniture of any kind", which is his sentence. City / exam / полигон districts keep `ARTERIAL_CLASSES` and stay byte-identical. **Not FIXED, and the reasons are in the same frames:** still no moving traffic, no pedestrian, no crossing, no arrow and no side turning in either after-frame — and „raw and boring" is his judgement to close, not ours. **One number in the tree is NOT trustworthy and is flagged rather than repeated:** `scratchpad/b65-furniture-before.json` is named „before" but records `sp-creep-v1 streetlights: 11`, i.e. the post-fix shape; the census that returned 0 survives only as a comment in props.ts. Nobody should cite either figure without re-running the census.<br><br>A judgement call that needs his eyes as much as ours. Not rendered.<br><br>**→ 2026-08-03 LOOK-WAVE — rendered at last, plainly, for his eyes, along the whole 360 m of `sp-creep-v1` from the chase camera.** **What IS there:** a straight two-lane grey street with a white edge line and a dashed centre; two large apartment blocks, left and right, that are flat grey boxes with orange rectangles for windows; one row of static parked cars on the right; a green verge with no kerb; a handful of low-poly lollipop trees; distant hills. **What is NOT there:** any moving traffic, any pedestrian, **any street furniture at all** — no lamp posts, bins, benches, bus stops, hydrants, poles or wires; no road signs standing in the world; no crossings, no arrows, no stop bars, no side turnings. **Past y≈220 the buildings stop entirely and the road runs on as bare grey tarmac across a flat green plain until the world ends.** Flat even lighting, no cast shadows on the carriageway. `scratchpad/jmisc/B65-y120.png` (between the two blocks) · `B65-y240.png` (past y≈220: bare road on an empty plain). **As a description of these frames, "very Raw, boring" is accurate, not exaggerated.** The call is his; the job here was to put it in front of him. **Nothing to fix in a file — this is a scope decision.** If he confirms, the smallest honest win is a street-furniture pass on the scenario-street generators (`tools/maps/gen_sp_speed.mjs` and siblings): kerbs, lamp posts, a pavement texture, and **stopping the carriageway at the last building instead of running it into an empty plain**. That is a build lane, not a drive.<br><br>**→ 2026-08-05 INSTRUMENT GATE → DOWNGRADED to BROKEN-SEEN, deliberately.** Re-rendered along `sp-creep-v1` and the gate opened the frames itself (`scratchpad/newdef/b64-step02-t33.4-v26.png` at `y=121`, `b64-step05-t49.7-v29.png` at `y=240.7`). At `y=121`: a straight two-lane grey street, white edge line, dashed centre, **two flat grey slabs with orange window rectangles**, one row of static parked cars, a green verge with no kerb, low-poly trees, distant hills, flat even lighting. At `y=240`: bare grey tarmac running across an empty green plain to the horizon. Across the whole 360 m: no moving traffic, no pedestrian, no crossing, no arrow, no stop bar, no side turning, no kerb, no bin, bench, hydrant or wire — **one lamp post, on the left verge near `y=298`.** *“Very Raw, boring” is an accurate description of these frames, not an exaggeration.* PARTIAL was flattering it; a row where the symptom is wholly intact is BROKEN. It is a street-furniture build lane on the scenario-street generators, and it is named in STILL OPEN with an owner.<br><br>**→ 2026-08-10 OPEN-EVERY-FRAME GATE → UPHELD `PARTIAL-SEEN` (up from BROKEN); the before/after opened at both stations.** `scratchpad/b65furn/B65-before-after.png` — four cockpit panes with telemetry burned in. At **y=239** the BEFORE pane is bare tarmac against an empty green plain; the AFTER pane has buildings on **both** sides to the end of the run, trees, a green railing run and a lamp column. Still **no moving traffic, no pedestrian, no crossing, no side turning** in either after-pane — and «raw and boring» is **the founder's judgement to close, not ours**. |
 | **B66** | 36 Скорост в завой (36→38) | "no sign exists, not 90 not 50 and it says there should be sign A1" | **FIXED-SEEN** *(was UNVERIFIABLE)* | Frames were captured for this scenario but no verdict was returned before the box ran out. The gate still carries `SPEED_TOO_FAST_FOR_CURVE` 1 scenario / 4 rungs in the falsehood budget — **owner: `world/builders/zoneSigns.ts`** — so at least part of this is known-open by number.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. All three signs he said did not exist are there and every numeral was read.** At the spawn of `sc-sp-curve` a red-ringed **В26 «90»** stands on the right verge 30 m up the road, legible in the seat frame before the car moves (`scratchpad/b67/frames/B66-y15-spawn.png`). At **y=145 — 15 m before the А1's post — the pair is unmistakable and fills the top-right of the windscreen**: the **А1 «Опасен завой надясно»** warning triangle, red border, black right-bend arrow, and beside it a **В26 disc reading «50»**, both resolved at 4× with no ambiguity (`ZOOM-B66-A1-and-50.png`); the cluster in the same frame reads «43 км/ч D», so one photograph carries the signs and the speed together (`B66-y145-kmh43.png`). At y=200 the carriageway visibly bends right and the blue guide line swings with it, so the curve the signs warn about is real (`B66-y200-kmh43.png`). The world-builder census agrees: `sp-curve-v1` carries exactly four signs — limit90 at district y=45, the curve triangle at y=160, limit50 at y=158 (1.4 m further out, which is why neither post occludes the other), and a second limit90 on the exit leg. **Two things to LOG, not to fix here.** (1) **The advisory is rendered as a LIMIT.** The template's own copy promises «знак А1 „Опасен завой надясно" с табела „50"» — a supplementary plate under the triangle. What is built is a **full-size В26 «50» prohibitory disc on its OWN post**, beside and slightly above the А1. `zoneSigns.ts`'s comment says it is "a referent, not a second limit", **but nothing on screen says that: a student reads a red-ringed 50 as the legal limit, while the engine keeps grading approach and exit against the posted 90.** That is the T4 disease in a new dress and it deserves a decision before it is copied to more curves. Owner `world/builders/zoneSigns.ts` (`CURVE_ADVISORY_PLATE_*`, ~lines 75–80 and 243–260). (2) **A rural road dressed as a city street:** `sp-curve-v1`'s copy calls it «извънградският път» with a 90 limit, and the frames show an apartment block, an overhanging billboard and a continuous row of parked cars on the verge from spawn to bend. Owner `tools/maps/gen_rural_curve.mjs` + the props frontage pass. Neither touches the graded fault, so neither was weighed into the verdict. |
-| **B67** | 37 Магистрала (37→39) | "I cant go more than 100-105 … the car must go much beyond 160-180" | **PARTIAL-SEEN** *(was UNVERIFIABLE)* | Not rendered. Related and measured: the Нормален governor is now domain-derived rather than a flat cap (see A5), which is the same machinery, but nobody drove the motorway.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. His band IS reachable, on a tier he cannot practically get to — and the drive found a camera defect nobody had filed.** Cockpit at 2 560 m of a 2 600 m motorway, **Нормален** lit in the tier pills, cluster reading **145 км/ч** the whole last kilometre, with the В2 «Влизането забранено» disc at the end of the carriageway; telemetry agrees (145.2 km/h top, 2 570 m, 88 s) — `scratchpad/b67/frames/B67f-y2560-kmh145.png`. Same drive on **Напреднал** with clutched upshifts: **165.1 km/h at y=2567, gear 5, still accelerating when the road ran out — INSIDE his 160–180 band** (`B67adv3-y2560-kmh165.png`). **Two controls prove the 145 is the governor and not the engine:** roll-first with no tier switch also gives exactly 145.2, and an unshifted Напреднал pins at exactly 85.1 km/h — `MANUAL_GEAR_MAX_KMH[2]`, third gear's ceiling, not any cap. **THE UNEXPECTED FINDING — THE POV GOES BACK-SEAT AT SPEED.** From about 68 km/h upward the cockpit camera is behind the driver's seat: at 43 km/h the binnacle reads «45 км/ч D» cleanly (`B67f-y40-kmh43-CLUSTER.png`); at 68, 96, 128, 145 and 165 the frame is the driver's headrest filling the lower-left quadrant, both front seats seen from behind, **no steering wheel, no instrument cluster**, roof lining cutting the top of the windscreen (`B67f-y90-kmh68-CLUSTER.png`, `B67f-y260-kmh96-CLUSTER.png`). It is **not** acceleration sway — a 4 s coast with the throttle shut at 124 km/h is identical (`CAM-C-coasting-124kmh.png`) — and cycling the view C×3 does not recover it. **So no cluster-in-frame photograph exists AT motorway speed: that impossibility IS the finding**, and the speeds come from `window.__ghostDemo` plus the committed traces (`B67f-trace.json`, `B67adv3-trace.json`, `B67adv2-trace.json`). **Two things left, both in shared files.** (1) **The back-seat POV** — owner `components/sim/CameraRig.tsx`, the cockpit branch ~778–826. That block is literally headed «BACK-SEAT-POV FIX (founder-reported)» and states that a world-space lerp toward a car-following target has a steady-state error of `v/rate` — "at 76 km/h with COCKPIT_DAMPING 25 that is ~0.84 m REARWARD, which put the camera behind the seat headrest". **Its feed-forward no longer holds: at 40 m/s the residual is ~1.6 m, which is exactly what the frames show.** G-sway is not the cause and must not be blamed — `COCKPIT_LEAN_LONGITUDINAL` is 0.03 m/g, i.e. 9 mm at 0.3 g, and the defect survives a negative-acceleration coast. Verify the fix with a **positional assertion** (camera-to-`COCKPIT_EYE` under 0.15 m while holding 145 km/h), not by eye — the previous fix passed by eye at 76 km/h and fails at 145. (2) **The tier that reaches his band is unreachable in practice** — `LessonScene.tsx` pins difficulty to `DEFAULT_DIFFICULTY` on every mount by deliberate ruling, and `transmissionModeFor('advanced')` is `'manual'`. Measured: clicking Напреднал while **STOPPED** leaves the car in N and it never moves again (260 s of held W, `]` and `I` both no-ops — the manual needs clutch-Z to pull away); clicking it while **ROLLING** converts D into a speed-matched M gear and the car then pins at that gear's ceiling forever unless the student holds Z and presses `]`. **Honest statement of the row: the default tier tops at 145 by governor, and 165 exists but behind a manual gearbox and a tier that forgets itself every drive.** Whether the motorway lesson should raise the Нормален margin on a 140-domain map, or whether 145 on Нормален is the intended answer, is a **curriculum decision, not a bug fix** — his call.<br><br>**→ 2026-08-05 INSTRUMENT GATE — the back-seat-camera half of this row is REFUTED, with the exact measurement this register demanded, and his own complaint is still open.** The register asked for “camera-to-`COCKPIT_EYE` under 0.15 m while holding 145 km/h, not by eye”. Measured, each row a 20-frame mean: `v=44.2 → errM 0.0072` · `81.4 → 0.0036` · `93.6 → 0.0018` · `110.8 → 0.0020` · `136.5 → 0.0015` · `138.5 → 0.0009`. **That is 100×–165× under the threshold at every speed**, with `localZ = −0.256` against `COCKPIT_EYE.z = −0.255`. The proposed mechanism is dead too: a world-space lerp would trail by `v/rate`, but the error stayed ~0.001 m at **one frame per second**, which it could not do if the lerp were the cause. Photographed and opened by the gate: `newdef/b67probe-v137-err0.00.png` — the binnacle reads **«137 км/ч D»** with the wheel, the full dash and the 140 roundel in frame. **The look-wave's headrest frames could not be reproduced at any speed and nobody can explain them; this gate claims only that the defect is not present now.** **His actual sentence is untouched:** 138.6 km/h is the ceiling inside the lesson and 145.2 km/h on the whole road on the tier a student actually gets. *He still will not see 160* — and the reason is no longer the road (see FR-50 in STILL OPEN: every `mw-v1` lesson finishes at 860–940 m of a 2 600 m carriageway), it is the tier governor and the finish line. **That is the curriculum decision this register has now asked for three times.** |
+| **B67** | 37 Магистрала (37→39) | "I cant go more than 100-105 … the car must go much beyond 160-180" | **PARTIAL-SEEN** *(2026-08-10 SIX-ROW PROVENANCE — **the cockpit half is NOT-A-DEFECT**; his actual sentence, the 160–180 ceiling, is a curriculum call and is what keeps this row open)* | **→ 2026-08-10 SIX-ROW PROVENANCE. THE CAMERA HALF IS NOT-A-DEFECT, AND THE ALLEGATION THAT OPENED IT WAS A MIS-AIMED CROP — the B27 mistake for the third time.** Frames `scratchpad/b67cam/b67a-v130.png` and `b67a-v100.png`, **shot 10:07:58 / 10:07:44**, 18 h after the newest camera file. Opened here: at **131.2 km/h** the binnacle reads **«131 км/ч D»** with the wheel, the full dash, the 140 roundel and the telltale row; at **100.8 km/h**, **«101 км/ч D»**. Re-derived from the raw **124-sample** probe series: camera-to-eye error **0.00130–0.00868 m** against a 0.15 m threshold, and it **falls as speed rises** — the arithmetic opposite of the v/rate lag this row blamed. Two probe-independent measurements agree: `screen_cluster` distance is **1.021 m at 100, 110, 120 and 130 km/h** and `fullyInFrame` at every band (a back-seat camera reads 1.6–2.6 m), and the cluster's **260 → 238 px** shrink is predicted to **238.1 px** by the FOV widen alone, leaving nothing for translation. **The 2026-08-03 frame this row calls „no steering wheel, no instrument cluster" contains both:** the gate's own 2.4× crop of `b67/frames/B67f-y90-kmh68.png` reads **«68 км/ч D»** with the dial, the telltale row and the wheel rim. The `-CLUSTER.png` companions are a fixed 576 × 245 rectangle calibrated at 43 km/h; by 68 the cluster had risen above its top edge. **The reviewer read the crop, not the frame.** See §6.<br><br>**Previously:** Not rendered. Related and measured: the Нормален governor is now domain-derived rather than a flat cap (see A5), which is the same machinery, but nobody drove the motorway.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. His band IS reachable, on a tier he cannot practically get to — and the drive found a camera defect nobody had filed.** Cockpit at 2 560 m of a 2 600 m motorway, **Нормален** lit in the tier pills, cluster reading **145 км/ч** the whole last kilometre, with the В2 «Влизането забранено» disc at the end of the carriageway; telemetry agrees (145.2 km/h top, 2 570 m, 88 s) — `scratchpad/b67/frames/B67f-y2560-kmh145.png`. Same drive on **Напреднал** with clutched upshifts: **165.1 km/h at y=2567, gear 5, still accelerating when the road ran out — INSIDE his 160–180 band** (`B67adv3-y2560-kmh165.png`). **Two controls prove the 145 is the governor and not the engine:** roll-first with no tier switch also gives exactly 145.2, and an unshifted Напреднал pins at exactly 85.1 km/h — `MANUAL_GEAR_MAX_KMH[2]`, third gear's ceiling, not any cap. **THE UNEXPECTED FINDING — THE POV GOES BACK-SEAT AT SPEED.** From about 68 km/h upward the cockpit camera is behind the driver's seat: at 43 km/h the binnacle reads «45 км/ч D» cleanly (`B67f-y40-kmh43-CLUSTER.png`); at 68, 96, 128, 145 and 165 the frame is the driver's headrest filling the lower-left quadrant, both front seats seen from behind, **no steering wheel, no instrument cluster**, roof lining cutting the top of the windscreen (`B67f-y90-kmh68-CLUSTER.png`, `B67f-y260-kmh96-CLUSTER.png`). It is **not** acceleration sway — a 4 s coast with the throttle shut at 124 km/h is identical (`CAM-C-coasting-124kmh.png`) — and cycling the view C×3 does not recover it. **So no cluster-in-frame photograph exists AT motorway speed: that impossibility IS the finding**, and the speeds come from `window.__ghostDemo` plus the committed traces (`B67f-trace.json`, `B67adv3-trace.json`, `B67adv2-trace.json`). **Two things left, both in shared files.** (1) **The back-seat POV** — owner `components/sim/CameraRig.tsx`, the cockpit branch ~778–826. That block is literally headed «BACK-SEAT-POV FIX (founder-reported)» and states that a world-space lerp toward a car-following target has a steady-state error of `v/rate` — "at 76 km/h with COCKPIT_DAMPING 25 that is ~0.84 m REARWARD, which put the camera behind the seat headrest". **Its feed-forward no longer holds: at 40 m/s the residual is ~1.6 m, which is exactly what the frames show.** G-sway is not the cause and must not be blamed — `COCKPIT_LEAN_LONGITUDINAL` is 0.03 m/g, i.e. 9 mm at 0.3 g, and the defect survives a negative-acceleration coast. Verify the fix with a **positional assertion** (camera-to-`COCKPIT_EYE` under 0.15 m while holding 145 km/h), not by eye — the previous fix passed by eye at 76 km/h and fails at 145. (2) **The tier that reaches his band is unreachable in practice** — `LessonScene.tsx` pins difficulty to `DEFAULT_DIFFICULTY` on every mount by deliberate ruling, and `transmissionModeFor('advanced')` is `'manual'`. Measured: clicking Напреднал while **STOPPED** leaves the car in N and it never moves again (260 s of held W, `]` and `I` both no-ops — the manual needs clutch-Z to pull away); clicking it while **ROLLING** converts D into a speed-matched M gear and the car then pins at that gear's ceiling forever unless the student holds Z and presses `]`. **Honest statement of the row: the default tier tops at 145 by governor, and 165 exists but behind a manual gearbox and a tier that forgets itself every drive.** Whether the motorway lesson should raise the Нормален margin on a 140-domain map, or whether 145 on Нормален is the intended answer, is a **curriculum decision, not a bug fix** — his call.<br><br>**→ 2026-08-05 INSTRUMENT GATE — the back-seat-camera half of this row is REFUTED, with the exact measurement this register demanded, and his own complaint is still open.** The register asked for “camera-to-`COCKPIT_EYE` under 0.15 m while holding 145 km/h, not by eye”. Measured, each row a 20-frame mean: `v=44.2 → errM 0.0072` · `81.4 → 0.0036` · `93.6 → 0.0018` · `110.8 → 0.0020` · `136.5 → 0.0015` · `138.5 → 0.0009`. **That is 100×–165× under the threshold at every speed**, with `localZ = −0.256` against `COCKPIT_EYE.z = −0.255`. The proposed mechanism is dead too: a world-space lerp would trail by `v/rate`, but the error stayed ~0.001 m at **one frame per second**, which it could not do if the lerp were the cause. Photographed and opened by the gate: `newdef/b67probe-v137-err0.00.png` — the binnacle reads **«137 км/ч D»** with the wheel, the full dash and the 140 roundel in frame. **The look-wave's headrest frames could not be reproduced at any speed and nobody can explain them; this gate claims only that the defect is not present now.** **His actual sentence is untouched:** 138.6 km/h is the ceiling inside the lesson and 145.2 km/h on the whole road on the tier a student actually gets. *He still will not see 160* — and the reason is no longer the road (see FR-50 in STILL OPEN: every `mw-v1` lesson finishes at 860–940 m of a 2 600 m carriageway), it is the tier governor and the finish line. **That is the curriculum decision this register has now asked for three times.**<br><br>**→ 2026-08-11 DRIVE-IT GATE → PARTIAL-SEEN, and the measurement is worse than this row has ever recorded. THE CEILING IS HIS CALL AND IT IS NOW ASKED FOR THE SIXTH TIME — but a SECOND finding underneath it is not a curriculum call at all, it is a defect.** Measured off the shipped `governorCapKmh` / `tierTopSpeedKmh` and the shipped `speedingBands`, every tier × every max legal speed a category-B licence ever meets (`scratchpad/b67/b67-measured.txt`, re-runnable). **The law, retrieved from the corpus, never free-recalled (ADR-002):** ЗДвП **чл. 21, ал. 1** (изм. ДВ бр. 64 от 2025 г., в сила от 7.09.2025 г.), категория В — населено място **50**, извън населено място **90**, автомагистрала **140**, скоростен път **120**; **ал. 2** a different value is signed; **ал. 3** (нова) the ban applies to the AVERAGE speed over a section too. Наредба № 38, **приложение № 5, т. 10, б. „в"**, verbatim: „за опасна грешка се поставят **10 наказателни точки** … когато изпитваният превиши максимално допустимата скорост за движение с повече от 10 km/h"; **т. 11** — „изпитът е успешно положен, като на изпитвания са поставени не повече от 9 наказателни точки", so ONE опасна fails the exam outright. **THE TOP SPEED PER TIER, MEASURED (cap → achieved top):** Нормален 50→60/**58.8** · 90→100/**96.6** · 120→130/**126.1** · 140→150/**145.2**. Начинаещ 50→40/**39.1** · 90→80/**77.1** · 120→110/**105.4** · 140→130/**126.1**. Напреднал uncapped, terminal **168.3** km/h on every domain. **AND HERE IS WHAT NOBODY HAD MEASURED: the 10-point опасна speeding fault is UNREACHABLE on the DEFAULT tier on EVERY road type category B drives.** It needs `domain + 10`; Нормален's cap IS `domain + 10` (`NORMAL_CAP_MARGIN_KMH = 10 === dangerousSpeedOverKmh`) and the governor eases the throttle to zero over `GOVERNOR_BAND_KMH = 6` below that cap, so the car cannot even reach its own cap: 58.8 < 60, 96.6 < 100, 126.1 < 130, 145.2 < 150. One of only six опасни грешки in the whole practical exam cannot be committed. **The второстепенна band survives but is a hair wide on the fast roads:** graded above 55.0 / 95.0 / 125.0 / 145.0 against tops of 58.8 / 96.6 / 126.1 / **145.2** — **0.2 km/h of usable band on the motorway.** **Начинаещ cannot commit ANY graded speeding fault on any real road** (39.1 < 55.0, 77.1 < 95.0, 105.4 < 125.0, 126.1 < 145.0) — that one is by design ("the training wheel stays UNDER the posted max") but it means the speeding lesson does not exist on that tier and the row should say so out loud. **What would fix the defect half, measured as a sweep:** `NORMAL_CAP_MARGIN_KMH` 10 → **16** is the minimum that makes every опасна reachable; at **20** the tops become 68.5 / 106.3 / 135.6 / 154.7, i.e. **8.5 / 6.3 / 5.6 / 4.7 km/h** of usable headroom above each опасна line. The doctrine minimum is `dangerousSpeedOverKmh + GOVERNOR_BAND_KMH + 1 = 17`. **NOT LANDED HERE:** `vehicle/difficulty.ts` is owned and actively edited by the silent-refusal sweep. **AND ON HIS OWN SENTENCE — read it the right way round.** His words are „I cant go more than **100-105** … the car must go much **beyond** 160-180": he is complaining the car is too SLOW and asking for MORE. The 100–105 reproduces exactly — `Нормален @ domain 90 → top 96.6 km/h` — so his complaint is the governor on a 90 road and nothing else. Reaching 160–180 on Нормален needs a margin of 25–40, i.e. letting a student cruise **2.5–4× the опасна threshold** over the posted motorway limit, on a product whose exam fails him for 10. **That trade is a syllabus decision and it is his, not ours.** A derived candidate if he wants one number: 140 (чл. 21, ал. 1 автомагистрала) + 10 (опасна, прил. № 5 т. 10 б. „в") = **150, the highest speed the product ever grades**, + one `GOVERNOR_BAND_KMH` of headroom + the tractive loss between cap and top = a **160 km/h ceiling on Напреднал** (measured: cap 160 → top 154.7). That meets the floor of his band, refuses 180 on the law, and costs the current Напреднал 168.3 → 154.7. |
 | **B68** | 38 Дистанция на следване (38→40) | *(no complaint)* | **FIXED-SEEN** *(was UNVERIFIABLE)* | Regression check. Not re-driven, but the number doc 86 §12.5 flagged is fixed and pinned: the shadow was demonstrating 1.23 s inside the fire line and now holds 2.60 s.<br><br>**→ 2026-08-03 LOOK-WAVE → FIXED-SEEN. The pinned number reproduces on a live drive, not just in a trace.** His file has nothing written against lesson 38, so the one thing to confirm was the ghost's gap. Drove `sc-follow-distance` L1 with the ShadowCar replay **phase-synced to the staged lead** (sat still until the ghost's replay wrapped to y≈15, then moved off, which is what releases the lead — the only phase in which "what the demonstration shows" means anything). **The frame:** the translucent blue ghost sits **4.2 m** in front of the bonnet and the staged lead — a dark car with its red tail bar lit — sits **a clear stretch of empty road ahead of IT**. Not a bumper-stare. `scratchpad/fol/frames/ZOOM-B68-ghost-lead.png` (4×), `B68-t022.png` (full cockpit). **The numbers, sampled every frame for a full 50 s replay:** ghost 25.9 km/h, lead 25.9 km/h, gap dead steady at **28.9–29.4 m of centres = 24.7–25.3 m of bumpers = 3.44–3.53 s**. Over **368 samples** with the detector armed (>10 km/h): median **3.49 s**, 5th percentile 3.44 s, and the **minimum the demonstration ever shows is 2.58 s**, at the very end as the ghost coasts up to the lead stopped at the road end. So doc 86 §12.5's 1.23 s is gone and the register's pinned 2.60 s reproduces live as **2.58 s**. Both the `FOLLOWING_TOO_CLOSE` fire line (`followSafeSeconds 1.8 × followFireRatio 0.7 = 1.26 s`) and the 2 s the lesson's own objective teaches are cleared with margin for the whole drive. Telemetry `scratchpad/fol/B68.json`. |
 | **B69** | 39 Внезапно спиране (39→41) | *(no complaint)* | **FIXED-SEEN** ✅ *(2026-08-05)* | Regression check, never re-driven.<br><br>**→ 2026-08-03 LOOK-WAVE → PARTIAL-SEEN. The regression check PASSES — and the same drive found a live teaching defect in the drill's own first instruction.** **The check, with frames:** the lead paces at 23.1 m of centres, brake-slams at leadY 234 (authored `slamAt` y=230) from 39.9 km/h to a standstill in ~1.6 s with its brake bar blazing red across the whole rear; the student brakes and stops **7.6 m of bumpers short with NO collision and no fault modal**, and it resumes 3.5 s later (`resumeAfterSec 3`) and drives away. **Nothing regressed.** `scratchpad/fol/frames/B69-t022.png` (the slam) · `B69b-t024.png` (stopped clean behind it) · telemetry `fol/B69b.json`. **THE DEFECT.** Instruction 1 says «Движи се спокойно зад предната кола, около 40 км/ч, и **дръж поне 2 секунди дистанция**». Measured over the whole pre-slam cruise, the staged lead holds **23.1 m of centres = 19.0 m of bumpers, invariantly**, which at the 39 km/h it asks for is **1.74–1.79 s — 12% UNDER the two seconds the same sentence demands.** **And the student cannot obey both halves:** `followGapM` is a DISTANCE and the lead `matchPlayer`s it, so it re-establishes 23 m whatever he does; the only way to reach 2 s is to drop to ≤34 km/h, i.e. to disobey the «около 40 км/ч» in the same instruction. **It is innocent by the detector (1.26 s fire line) — which is exactly why nobody has seen it. The drill demonstrates a sub-two-second gap and calls it the correct approach.** **Owner:** `templates-following.ts`, `FB_LEAD_CAR`. Either `followGapM` 22 → **27** (2 s at 40 km/h needs 22.2 m of bumpers = 26.3 m of centres, and the runner adds ~1 m of controller offset), or change instruction 1's speed from «около 40 км/ч» to «около 34 км/ч». **DO NOT treat this as a one-liner:** the template comment says 22 m was chosen so "the shadow reacts and stops within the 22 m", and both mistake demos (`mistake-late-reaction`, `mistake-no-reaction`) are pinned recordings whose `codeRefs [COLLISION]` depend on rear-ending the stopped lead inside that 22 m. Widening it must be re-checked against `sc-follow-brake-traces.test.ts` and the two committed traces — which is why the look-wave left it. *(Reviewer's own note, filed as not-a-defect: on a first take the brake was held past standstill and the car went into reverse at up to 20 km/h onto the pavement. Re-driven releasing at 2 km/h; not filed, because it cannot be separated from the reviewer's own input tape.)*<br><br>**→ 2026-08-05 INSTRUMENT GATE → FIXED-SEEN, and one image now carries both halves of the row.** `scratchpad/newdef/b69-step03-t31.2-v39.png`, opened by the gate: the ИНСТРУКЦИИ panel reads «Движи се спокойно зад предната кола, около 40 км/ч, и **дръж поне 2 секунди дистанция**» while the live readout in the same frame reads **`lead=26.4m = 2.42s @ 39km/h`**. The drill demonstrated **1.74 s**. Measured in 10 m bins across the whole pre-slam cruise: 2.29 s at `y=70`, 2.37 at 100, 2.42 at 150, 2.42 at 190, at a held 39.2–39.6 km/h; the gap only collapses from `y=200`, which **is** the lesson (the authored slam at `y=230`). `FB_LEAD_CAR.followGapM` 22 → 29 with `hold.offsetM` 40 → 45 — 29 and not 27 because the runner jitters the station ±2 m per session and 27 would still show 1.88 s on an unlucky seed. The two pinned COLLISION demos are answered by test rather than by argument: the whole `traces/__tests__` suite is green, including both mistake traces. |
 | **B70** | 40 Дистанция в колона (40→42) | "the column is waiting at the end of the road … the user just drives and nothing much happens untill the very end" | **FIXED-SEEN** *(was PARTIAL-SEEN — 2026-08-09 verify #2)* | **→ 2026-08-09 VERIFY #2 → FIXED-SEEN, and one clean drive decided it exactly as the row asked.** `sc-follow-standstill` @L1, spawn → queue → stop, result ИЗДЪРЖАН. His sentence measured off the telemetry: **the lead car is 28.9 m ahead on the FIRST METRE** (t = 19.5, y = 15.0), and the gap then runs 28.9 → 24.1 → 24.7 → 18.2 → 18.0 → 20.8 → 24.2 → 28.0 → 28.9 → 30.2 → **31.6** → 28.8 → 23.9 → 18.7 → 17.1 → **14.4 m**. Two authored ease-and-resume events (paceProfile at arc 110 and 150) close it to 18 m and open it to 31.6 — **the student is doing чл. 23 the whole way, not driving 235 m of empty tarmac.** Frames: `scratchpad/lsn6/B70b/B70b-step03-t69.5-v11.png` (a car 18.7 m ahead with the standing queue behind it and the „Спри тук" marker) and `B70-step00-t20.5-v2.png` (a car already in the windscreen on the first frame, lead = 28.8 m). Neither the constant the previous lane condemned nor its fix needed touching — they were already in the tree and they hold.<br><br> **The column is a column now.** I opened the frame: a bus/lorry directly ahead and a queue of six-plus vehicles stretching down the road, with the rear-view mirror inset showing the road behind. `scratchpad/b45r/frames/ZOOM-f42-queue.png`. The copy also stopped claiming the car is moving. **Why PARTIAL:** his complaint was as much about *when* as about *what* — whether anything happens before the very end was not measured.<br><br>**→ 2026-08-04 VERIFY-BY-DRIVING GATE → THE BROKEN-SEEN EVIDENCE IS NOW STALE — DO NOT ACT ON IT WITHOUT A FRESH DRIVE.** The traffic lane photographed 275 m and 26 s of empty carriageway and correctly named the file it was forbidden to touch: `templates-following.ts`, `FS_LEAD_CAR.actor.hold.offsetM: 290` on a 360 m road with the spawn at y 15. **That constant is now `48`** — „(4.06, 48) — 33 m of centres ahead of the spawn" — `FS_QUEUE_AHEAD` has been re-authored with a moving tail and the three `sc-follow-standstill` traces re-recorded. Another wave took the fix. The row needs **one drive** before anyone calls it either way. |
@@ -1969,7 +3734,7 @@ one-way mouths — and is not affected.
 
 | id | finding | verdict | what was seen · frame · who owns what is left |
 |---|---|---|---|
-| **C1** | Landing state is a 100%-of-viewport modal — 0% road, unchanged by the whole wave | **PARTIAL-SEEN** | **The 100% modal is genuinely gone and the road is there:** 88.5% content portrait, 81.8% landscape, 84.8% small-portrait, against the row's 0%. `tools/mobile/.out/run-2026-07-30T19-38-43-150Z/simulator-drive-intro__iphone16-portrait.png`. **He would still complain, and the frame says why:** the top band is three surfaces painted on each other — the audio card with its own «Разбрах», a red-bordered «⚠ Коланът не е поставен» pill overlapping its text, and the tier picker bleeding through behind — plus a fourth full-width «Завърти телефона хоризонтално» overlay in the middle of the road. The harness logged it independently: *"«Разбрах» was not tappable (something is painted over it)."* **Owner:** `lesson-ui/LessonPlayShell.tsx` + `PlayAreaStyles.tsx` — the overlays need mutual exclusion, not just smaller boxes. |
+| **C1** | Landing state is a 100%-of-viewport modal — 0% road, unchanged by the whole wave | **PARTIAL-SEEN** *(2026-08-10 DECK+B65 VERIFY — the off-stage OPEN deck that held this row open is **CLOSED and re-measured against a negative control**; the row stays open because only the deck was verified and the DESKTOP deck carries two unreported collisions)* | **→ 2026-08-10 DECK+B65 VERIFY → THE OPEN-DECK REGRESSION IS CLOSED, on an instrument that was proved not blind BEFORE any zero was believed. Row stays `PARTIAL-SEEN` — the deck is what was verified, not the whole landing stack, and two live collisions on the DESKTOP deck have never been reported.** **THE INSTRUMENT.** Own probe (`scratchpad/VERIFY-DECK-B65/deck-verify.mjs` + `measure.mjs`): WebKit, the repo's four device profiles with real safe-area substitution, own hit-rect union (element ∪ label ∪ absolute pseudo-pads), own overlap arithmetic, `elementFromPoint` occlusion, 44 px floor, off-stage test — and closability tested with a **REAL Playwright click**, where a dispatched `.click()` counts as FAILED. **FOUR PROFILES × FOUR STATES (landing/driving × deck closed/open), `sc-zebra-approach@L1`, 17:31–17:37 — 0 overlapping pairs · 0 occluded · 0 controls under 44 px · 0 off stage in all sixteen**, and in all eight open states the deck closed from its own toggle with `realClick: true, reached: true`. Geometry reproduces the fixing lane's to the tenth of a pixel: open deck **[123, 8, 410×108]** @ 852×393, **[64, 8, 456×108]** @ 780×360, **[239.5, 186, 141.5×284]** @ 393×852, **[218.4, 148, 129.6×284]** @ 360×780; collapsed pill [71, 109] / [12, 97.5] / [239.5, 443.5] / [218.4, 389]. Photographed: `scratchpad/VERIFY-DECK-B65/deck/vd__iphone16-landscape__landing-open.png`, **shot 17:32:09** — one row of 44 px controls standing between «МЕНЮ» and the column, the toggle first and on screen. **THE NEGATIVE CONTROL — and the first one I wrote was a NO-OP, which I found by opening the PNG rather than reading my own JSON.** It snapshotted the deck's computed anchors and re-applied them, but it took the snapshot while the deck was already OPEN, so it re-applied the NEW geometry to itself and the "rollback" frame came back pixel-identical to the fixed one. Replaced with a real rollback: delete the `[data-deck-open="true"]` rules from the live stylesheets outright, which IS the tree before this wave. **2 rules removed per profile** (the base rule + its `@media (max-height: 560px)` twin), and the regression came back: 852×393 the deck drops to **[71, −20.5, 240×156]** with **567 px² (36.6×15.5)** «Затвори демонстрацията» × «Меню на урока»; **780×360 the deck drops to [12, −32, 240×156], 988 px² (36.6×27) on the menu, `elementFromPoint` at the close button's own centre returns «Меню на урока», and the REAL click TIMED OUT at 6 s** — the founder's symptom exactly, reproduced by my own code (`deck2/vd2__small-landscape__NC1-rollback.png`, **17:37:18**). Restore the rules and the same profile measures 0/0/0/0 again in the next line of the same run. Both portraits legitimately show nothing: their new rule is only a `max-height` ceiling (295 px) and the open deck is 284, so it was never binding on this trace. **SECOND CONTROL, for the 44 px floor:** a stylesheet that shrinks the deck's buttons to 32×32 → the probe names exactly **6** of them, on all four profiles. So the floor is measured, not assumed. **THE DECK'S OWN 13 ARE NOW 7, and nothing was shrunk to get there — they were FOLDED.** Open deck on a phone = «Затвори демонстрацията» 44×44, «Пауза» 44×44, «Предишна стъпка» 44×44, «Следваща стъпка» 44×44, «Позиция в демонстрацията» 108–154×44, «Скорост 1× — натисни за следващата» 44×44, «Повтаряй участъка» 44×44. The six that left the tap surface are the **four annotation ticks** (now `aria-hidden pointer-events-none` marks; `TraceTimeline.step()` confirms ⏮/⏭ jump annotation-to-annotation, so the function survives at 44 px instead of 20×28) and **two of the three speed pills** (one cycler). That is a real reduction in visible controls on a phone and it is the trade, stated. **THE FIRST SWEEP DID NOT ACTUALLY TEST THE COLUMN CORRIDOR — mine or theirs.** `[data-hud="notify-column"]` measured **[0,0,0,0]** in every state on every profile, because the probe dismisses the briefing toast before measuring. Re-run clearing DIALOGS ONLY (`deck-column.mjs`, 17:38): column **[541, 8, 240×106.3]** @ 852×393 against the open deck's right edge at 533 = **8.0 px**; **[528, 8, 240×106.3]** @ 780×360 against 520 = **8.0 px**; portrait column **[239.5, 67, 141.5×106.3]** ending y 173.3 against a deck top of 186 = **12.7 px**. Still **0/0/0/0** on all three with a real card in the column, still closable with a real click. `col/col__iphone16-landscape__open.png`, **17:38:23**. **TWO THINGS ON THE DESKTOP DECK THAT NOBODY HAS REPORTED, measured at 1280×800 (17:39:22), and both PRE-DATE this wave — every rule the fixing lane added is scoped `[data-sim-compact="on"]`, verified in the diff.** (1) The deck opens by DEFAULT on a mouse at [940, 509, 320×175], and two annotation ticks one frame apart still occupy **the identical rect [1132, 569, 20×28] — 560 px² of overlap**, which is the very defect the lane's own CSS comment describes and fixes for touch only. (2) With the desktop deck COLLAPSED, its pill and «🗺Покажи мини картата» overlap by **1 060 px²** and `elementFromPoint` at the minimap button's centre returns «🎬Демонстрация ▸» — the minimap button is dead. **Instrument caveats, stated:** the Next dev-overlay «1 Issue» badge is in every frame and is not product; and my desktop pass flags 25–38 controls under 44 px, which is NOISE — 44 px is a touch rule and 1280×800 is a pointer:fine surface. **WHAT I DID NOT VERIFY on this row:** the road-percentage claim, the «Защо» × «✕» 308 px² case, and the lesson menu's SHEET while OPEN (still nobody has measured what is under it).<br><br>**→ 2026-08-10 RE-SWEEP GATE (independent instrument) → THE THREE NAMED OVERLAPS ARE CLOSED. NUMBERS, NOT A VERDICT WORD.** This gate did not read the fixing lane's probe — it wrote its own (WebKit, the repo's four device profiles, real safe-area emulation, world-ready refusal, hit rects unioned with the C2/A6 `::before` pads) and then **proved the instrument is not blind before trusting a zero**: the pre-change geometry was restored in the live DOM from `HEAD` (`bottom = padH + 2.75rem·i + insetB`, `inset = 0.125rem + 5rem·sin((1−i/3)·π/2)`, deck `bottom = min(oldFloor, 45%)`) and re-measured with the same code. **NEGATIVE CONTROL (old geometry, 15:08–15:09, `scratchpad/VERIFY-c1/neg/`)** — iPhone 16 landscape 852×393: «🎬 Демонстрация ▸» × «Клаксон — задръж» **1 861 px²** (44 × 42.3), «Мигач надясно» ⇨ × «Разбрах» **1 157 px²** (44 × 26.3) *and `elementFromPoint` at the indicator's own centre returns the dismiss button*, «🎬 Демонстрация ▸» × the drivetrain pad **1 100 px²**, «Контроли на автомобила» ⚙ × «Разбрах» **602 px²** *and ⚙'s centre returns the card's sentence «Потегли по улицата…» — the settings button was dead while any line spoke*; 780×360: deck × horn **1 936 px²** (44 × 44 — the horn ENTIRELY under the deck), ⇨ × «Разбрах» **1 685 px²**, deck × pad **268 px²**, deck × «Поглед в дясното огледало» **198 px²**, ⚙ × «Разбрах» **194 px²**, «Пауза» ‖ × «Меню на урока» **152 px²**; both portraits: deck × ⚙ **136 px²**. The register's headline figures (1 144 / 1 848) measure **1 157 / 1 861** on this instrument — the same defects, 13 px² apart. **AFTER, current tree, 15:10–15:11, all four profiles × two states = eight measurements:** `v__iphone16-landscape__landing.png`, `…__driving.png`, `v__iphone16-portrait__*`, `v__small-portrait__*`, `v__small-landscape__*` — **0 overlapping pairs, 0 occluded controls, 0 controls under 44 px, on every one.** Station rects reproduce the fixing lane's to the tenth of a pixel (⚙ [747, 155.5], ⇨ [703, 158.3], Д [659, 165.8], 📢 [615, 176] against a column that ends at y 114.3). **Nothing was shrunk to buy it:** every station is still exactly 44 × 44, both pads are unchanged (steer [0,236,267×157], drive [617,220,235×173]). **WHY THE ROW IS NOT CLOSED — the OPEN deck, confirmed here and worse than the fixing lane's own disclosure.** With the transport open the panel lays out at **[71, −96, 240×231.5]** on iPhone 16 landscape and **[12, −107.5, 240×231.5]** on the 780×360 Android — its own «🎬 Демонстрация ▾» toggle is the first child and is **entirely off the top of the stage, so the student cannot close the deck from the deck**. Its pause button lands under «Меню на урока» (**1 024 px²** at 852×393, **864 px²** at 780×360) and `elementFromPoint` returns «Меню». 13 of its own controls are under 44 px on three profiles. **Photographed:** `v__iphone16-landscape__deck-open.png` shows the transport buttons sitting on the «МЕНЮ» pill and no toggle anywhere on screen. The arithmetic confirms the fixing lane's honesty rather than contradicting it: old deck floor 176.85, new floor `152 + 20.5 + 44 + 21 + 20 = 257.5` → **the floor rose 80.65 px** and the panel's overflow went from −15.3 to −96. Real answer is a compact transport in `LessonScene.tsx`. **«Защо» × «✕» 308 px² was NOT reproduced** in either measured state and is therefore NOT closed — the landing state raises ONE card, and 308 = 44 × 7 is the signature of A6's deliberate 44 px `[data-hud-close]::before` on TWO cards stacked 6 px apart. **Instrument caveats, stated:** the Next.js dev-overlay badge («1 Issue») is present bottom-left in every frame and is not part of the product; and `tools/mobile/stability-probe.mjs` still cannot catch this class — its last recorded run is one refused row on the one orientation where the collision does not happen. **Probe + all frames: `scratchpad/VERIFY-c1/`.**<br><br>**→ 2026-08-10 SIX-ROW PROVENANCE → STAYS PARTIAL-SEEN. Portrait is clean with numbers; landscape still stacks two controls and one of them is a driving control.** Frame `scratchpad/UXV/c1-sweep2/landing__iphone16-landscape.png`, **shot 10:38:48**, insets on (verified twice: `assertInsetsApplied()` in `tools/mobile/lib/insets.mjs`, and the geometry — portrait column at y = 67 = 8 + 59, landscape «МЕНЮ» at x = 67 = 8 + 59). **CLEAN:** portrait 393 × 852 → 2 surfaces, **0 intersecting, 0 painted over**, ROAD **95.3 %**; small-portrait 360 × 780 → 2 / 0 / 0, ROAD **93.5 %**; landscape → 2 surfaces, **0 intersecting**, ROAD **90.5 %**. **His fourth surface is genuinely stood down** — `[data-hud="touch-hint"]` in the DOM, `display:none`, 0 px, 0 % of viewport, and the engine really does report `(pointer:coarse) true / (any-pointer:fine) false`. **NOT CLEAN, landscape:** «Мигач надясно» ⇨ **[707,88 44×44]** `coveredBy` «Разбрах» (1144 px² — *a thumb aimed at the right indicator presses «РАЗБРАХ»*), and «Контроли на автомобила» ⚙ **[747,44 44×44]** `coveredBy` the card's own sentence (*the settings button is dead while any line speaks*). A **third, larger** overlap no lane reported: «🎬 Демонстрация ▸» × «Клаксон — задръж» = **1848 px²**. Cause is geometric: the compact column grows to 106 px at y 8 while `TouchControls`' right arc puts stations at y 44 and y 88 on a 393 px stage — **the arc must move.** **Owner: `components/sim/TouchControls.tsx` + `lesson-ui/PlayAreaStyles.tsx`.** See §3.<br><br>**Previously:** **The 100% modal is genuinely gone and the road is there:** 88.5% content portrait, 81.8% landscape, 84.8% small-portrait, against the row's 0%. `tools/mobile/.out/run-2026-07-30T19-38-43-150Z/simulator-drive-intro__iphone16-portrait.png`. **He would still complain, and the frame says why:** the top band is three surfaces painted on each other — the audio card with its own «Разбрах», a red-bordered «⚠ Коланът не е поставен» pill overlapping its text, and the tier picker bleeding through behind — plus a fourth full-width «Завърти телефона хоризонтално» overlay in the middle of the road. The harness logged it independently: *"«Разбрах» was not tappable (something is painted over it)."* **Owner:** `lesson-ui/LessonPlayShell.tsx` + `PlayAreaStyles.tsx` — the overlays need mutual exclusion, not just smaller boxes. |
 | **C2** | Four hit targets under 44 px | **FIXED-SEEN** | **Three of four fixed** — the tier pills and the Демонстрация pill got a `::before` hit-area at −0.75 rem top and bottom, and the sweep reports **0 touch violations on `simulator-drive` on all four device profiles**. **One survives and it is the worst one to have left:** «Разбрах», the audio toast's own dismiss button, measures **62.9 × 24.9 px** — and it is the control that clears the popup C1 is about. `scratchpad/relook/frames/C2__iphone16-portrait__landing.png`. **Owner:** `PlayAreaStyles.tsx` — add the toast's dismiss to the enlargement group.<br><br>**RE-LOOK 2026-08-02 → FIXED-SEEN.** 0 controls under 44 px and 0 covered controls on the LANDING state across all six cells (three device profiles × two orientations). The `::before` hit-area rule now covers the audio chip too, and — the part that actually mattered — `simulator-drive-intro` now GATES on touch targets: it had `touchMustPass:false`, so the one route where the popup's dismiss control is on screen was the one route that never audited it. That is what this row cost. **Honest caveat:** the audio chip is hidden by the new priority rule while the belt warning speaks, so «Разбрах» itself was not on screen in any of the six captures — what is proven is that nothing on that screen is small or covered, not that this control re-measured at 44 px. |
 | **C3** | `/theory`'s fold selector has matched nothing since phase 6 | **FIXED-SEEN** | The selector is alive and measuring a real element: `{selector:'first:#main-content [data-topic-card]', found: 1, fits: true, overflowPx: 0}`. Topic card 01 is fully on screen without scrolling. `tools/mobile/.out/run-…/theory__iphone16-portrait.png`. **And the check can now fail** — `budget.test.mjs:156` pins the failing shape and `selectors.test.mjs:75` fails the build if `routes.mjs` and the markup come apart again. |
 | **C4** | Practice runner screen share fell 73.4% → 51.6% | **FIXED-SEEN on his phone** | The share recovered and is visible: **86.4%** portrait, **85.1%** landscape, against 51.6%. `tools/mobile/.out/run-…/theory-practice__iphone16-landscape.png`. **Why PARTIAL:** the row asks for both a 4-option and a 6-option question, and every question the runner dealt across two sweeps was 4-option, so the specific claim (the card is sized for the six-option worst case) is unmeasured. About the bottom quarter of the landscape frame is still empty.<br><br>**RE-LOOK 2026-08-05 → FIXED-SEEN on his phone, and the six-option gap this row was held open for is CLOSED.** The bank has exactly **two** six-option questions — re-derived from `content/questions/*.json`, not quoted: **1,089 items, 1,013 four-option, 74 five-option, 2 six-option (`q-vehicle-005`, `q-vehicle-063`)**. Both were dealt **by id** rather than waited for, on 4 device profiles × 2 surfaces = **32 six-option cases measured**. On the founder's iPhone 16, PRACTICE clears both of them in both orientations with room to spare (worst option clears the pinned bar by **32 px**, best by 238 px; zero document scroll). **What is still not measured:** the 86.4% / 85.1% screen-share figures above are from the 2026-08-02 sweep and were *not* re-taken tonight — this re-look measured fold geometry, not area. **Residual, named:** `q-vehicle-063` is the hard one and it fails on the 360-wide Android class, in practice (portrait 10 px of an answer hidden; landscape 11 px of scroll, nothing hidden) and worse in the exam (see C5/the exam row). `q-vehicle-005` is clean everywhere. Owner: the practice/exam lane.<br><br>**VERIFY 2026-08-05 (round 3) — the practice column holds at 20/20 on all four profiles, AND THE INSTRUMENT WAS STILL MEASURING A PHONE THAT DOES NOT EXIST.** Re-measured by a third party on the working tree (`ExamRunner.tsx c94af2186d2a`, `PracticeSession.tsx 987ab51523b5`, `questionBudget.ts d2f04f2cafa6`, `fold-rig-client.tsx 2f4a990632e2`), 20 cases per surface per profile, fold = top of the pinned bar found structurally, and scored with an independently written predicate rather than read from any lane's summary. **PRACTICE, env(safe-area-inset)=0:** 393x852 **20/20** (worst option -1 px) · 852x393 **20/20** (-53) · 360x780 **20/20** (0) · 780x360 **19/20** — one case, `q-ptp-062`, still scrolls the document by exactly **1 px**. All seven of the Android failures this row carried are closed and reproduce as closed. **BUT WITH THE iPHONE 16'S REAL SAFE-AREA INSETS the practice runner scores 0/20 in BOTH orientations, and the reason is far worse than the 21/34 px of scroll the previous pass reported.** `body { padding-bottom: env(safe-area-inset-bottom) }` (globals.css:537) under a `min-h-dvh` root makes the document permanently taller than the viewport. `useQuestionBudget`'s `measure()` computes `over = scrollHeight - vh`, which therefore can NEVER reach 0, and subtracts it from the question height on every ResizeObserver tick until it hits `QUESTION_MIN_PX = 62`. **Measured, portrait: the question stem is clamped to 62 px on 20 of 20 cases, hiding 49-173 px of the stem (median 74).** On `q-predimstvo-042` that is 173 of 235 px — three of five lines of the question gone — while roughly 900 device px of the card sits empty below the answers. Landscape: 10 of 20 clamped, 24-74 px hidden. **THIS IS NOT AN ARTEFACT OF THE PROBE.** The sweep injects the inset with `addStyleTag` after hydration, which could have made the budget re-compute. Injecting it BEFORE the document's first layout instead gives byte-identical numbers on all three questions tested (62/235, 62/185, 62/111). **I opened the frame:** `scratchpad/vfy/look/E-C-inject-before-load-q-predimstvo-042.png` — the third line of the question is sliced mid-glyph and lines four and five are not there. **So „it all have to be on the screen without scrolling" is still false on his phone, and on a notched iPhone the QUESTION ITSELF is unreadable on most items, on both runners.** No sweep in this repo has ever seen it, because Playwright's WebKit is the desktop port and env() resolves to 0 there. The fix is the one the exam-header lane already named — a `calc()` on the dashboard root height so the document stops being 34 px too tall — and it is owned by `platform/src/app/(dashboard)/layout.tsx` + `components/dashboard/**`, which no lane in this round was allowed to touch. Frames and raw: `scratchpad/vfy/frames/vfy-insets.jsonl`, `scratchpad/vfy/look/D1..D3`, `E-*`. |
@@ -2041,6 +3806,658 @@ everything after 4 shifted **+2** when Lane 15 inserted two parking drills.
 
 ---
 
+## B82 / B83 — the 2026-08-10 COLLISION-BILLING verify gate (drove it, did not read it)
+
+Three waves landed on one seam: the reducer's accident latch (**B82**), the phase-blind contact
+sentinel (**B81**), and the near-miss card rewrite. This gate re-drove all of it on the production
+trace stack. **Two of the three hold. The third is closed for the reported bug and open for a shape
+the report did not name.**
+
+### What the drives say
+
+| driven | measured | verdict |
+|---|---|---|
+| `sc-follow-brake` — nose into the standing lead, **rest 30 s** | 248 consecutive overlap frames, bodies never apart | **ONE** ПТП · 10 т. The old 3 s rate limit billed this ~11 times / 110 т. **B82 closed for the sustained case.** |
+| `sc-follow-brake` — hit, reverse **6 m** clear, hit again | two reported runs, 1.283 s of silence | **TWO** ПТП · 20 т. Separation re-arms. |
+| `sc-ov-narrow/mistake-barge` | first overlap **23.25 s @ 14.1 km/h**, min sep **−1.7675 m**, **110** frames | `FAILED_TO_YIELD@20.38` + `COLLISION@23.25` · 20 т · passed=false · terminated. **B81 closed** — 1.767 m no longer grades silent. |
+| `sc-ov-narrow/mistake-force` | first overlap **25.77 s @ 11.0 km/h**, min sep **−1.7675 m**, **137** frames | `FAILED_TO_YIELD@23.03` + `COLLISION@25.77` · 20 т. **Closed.** |
+| `sc-ov-narrow/shadow-correct` | min sep **+6.3525 m**, 0 overlap frames | clean, zero violations. No new false positive. |
+| `sc-follow-brake` — the founder's lawful pass at **1.2925 m** of daylight | 0 overlap frames | **ZERO violations.** No regression. |
+| `sc-follow-brake` — nose-in at **39.9 km/h** | first overlap 22.13 s, 44 frames | `COLLISION` · **10 т · опасна · passed=false · terminated=true.** No regression. |
+
+### B83 — THE LATCH MEASURES THE WRONG SILENCE (new, and it re-opens the founder's complaint)
+
+The rule as written in `rules/engine.ts` says an encounter closes after `collisionSeparationSec`
+of silence **because „the bodies have come apart"**. That premise is false. The upstream sentinel
+suppresses its own report whenever closing speed falls to the floor
+(`orchestrator/contact.ts:113` — `b.closingKmh <= b.minClosingKmh`, 2 km/h for a lead car), so the
+stream also goes silent **when the driver simply stops** — which is exactly what a student does
+after hitting something.
+
+**Driven ladder** (`sc-follow-brake`: nose in, stop for *N*, then creep forward 0.6 m — the bodies
+**never separate** in any rung):
+
+| stop dwell | measured silence | ПТП billed |
+|---|---|---|
+| 0.88 s | 1.150 s | 1 |
+| 0.90 s | 1.183 s | 1 |
+| **0.92 s** | **1.200 s** | **1** |
+| **0.94 s** | **1.217 s** | **2** |
+| 1.00 s | 1.283 s | 2 |
+| 3.00 s | 3.283 s | 2 |
+
+Boundary pinned to **one frame (17 ms)**, and it sits exactly on `collisionSeparationSec = 1.2`.
+**A student who noses into a car, sits still for one second, then eases forward 60 cm while still
+touching that same car is billed TWO пътнотранспортни произшествия — 20 наказателни точки — for one
+crash in which the cars never came apart.** That is the founder's original 90-point complaint in a
+smaller form, and the latch cannot see it, because the reducer is told „no contact" when what
+happened is „no movement". Owner: `orchestrator/contact.ts` (report contact state independently of
+closing speed, and gate the *bill* on speed at the encounter's opening) **or** `rules/engine.ts`
+(close an encounter on a separation fact, not on silence). It is a one-question-one-owner call.
+
+### B84 — `sc-follow-standstill`'s standing column is not watched at all (PRE-EXISTING, not this wave)
+
+Asked to count the ПТП on the drill the founder reported, the answer is **ZERO — and that is the
+defect.** Driven down the lane into the staged lead at 30 km/h:
+
+- **1.7675 m** of interpenetration, **93 consecutive frames**, first contact **13.08 s @ 29.8 km/h**;
+- the runner published **0 contact bodies** to the sentinel across **4,334 frames**;
+- sheet: `FOLLOWING_TOO_CLOSE` only — **3 наказателни точки, passed = TRUE.**
+
+Cause: `BrakingLeadCarRunner` latches `watching` **only inside the slam branch**
+(`runners.ts` — under `if (this.approachSpeedKmh === 0) { … return null; }`), and this template
+deliberately keeps the slam tier inert (`minSlamSpeedKmh: 250`, `slamAt` at y = 520 on a 360 m road),
+so the slam can never fire. **Verified pre-existing:** at `HEAD` the inline contact test sat below
+the same gate, so B81 faithfully carried forward a watch that was already empty — its „superset"
+invariant held, over an empty set. The founder's live nine came from the Rapier/`NpcColliders` path,
+which is a different stream; the trace channel has never graded this drill's column at all.
+Owner: `orchestrator/runners.ts`.
+
+### The cards (read as RENDERED, through `MistakeConsequenceOverlay`, not as JSON)
+
+All three near-miss cards now carry the scale, the article and the corrective:
+
+- **`sc-ln-obstacle-meeting/mistake-squeeze`** — „*най-тясното между двете купета е измерено и е 0,19 м.
+  Деветнайсет сантиметра не са преценка, а късмет*" · ЗДвП чл. 44; чл. 20, ал. 2 · „*1 наказателна
+  точка … не контролни точки по книжката*" · corrective „*спираш В СВОЯТА лента … изчакваш насрещната
+  да е ПРАЗНА докрай и минаваш цял*".
+- **`sc-vu-cyclist-group/mistake-cut-in`** — „*измереното … е 0,38 м: ширина на кормило, а не странична
+  дистанция*" · чл. 42 + чл. 23, ал. 1 · 3 т. б. „а", с тавана от т. 11 · „*Решаваш ВЕДНЪЖ, преди да
+  излезеш*".
+- **`sc-vu-child-cyclist/mistake-pass-in-wobble`** — „*измереното между колата и колелото е 1,34 м …
+  1,5 м е насока, не закон*" · чл. 42 + чл. 20, ал. 2 · 3 т. б. „а" · „*изостани, свали скоростта … мини
+  с ЕДНА широка дъга*".
+
+**The `codeRefs[0]` badge defect is confirmed live on the PE card** — see the founder ruling below.
+
+### Gate
+
+`tsc --noEmit --incremental false` **0** · `validate:content` **OK** · `test:tools` **290/290** ·
+`vitest` **4 failed / 11,580 passed / 170 skipped of 11,754** — **two better than the stated baseline
+of 6**, because another lane cleaned `platform/tsconfig.json` mid-session: `include` is now **6
+entries** (`.next-*` also in `exclude`), so both `tsconfigHygiene` rows are green. Remaining four,
+each traced to a file and an owner: `clips/clipPlan.generated.ts` ×2 (three drifting `faultTimeSec`:
+12→12.07, 20.05→20.23, 16.18→16.43 — owner: the sentinel/geometry wave, deliberately not regenerated
+so the moved fault clocks stay visible); `exam/content-bank` ×1 (`ptp-i-parva-pomosht` 31/64 approved
+— the medical-quarantine ruling, owner: content); `lesson/compose` ×1 (`l-accidents-first-aid` has no
+quiz beat — same root, owner: content).
+
+---
+
+## B83 / B84 / THE BADGE — the 2026-08-10 CLOSE-THE-SEAM gate (drove it and looked at it)
+
+The previous gate opened three findings and three lanes closed them. This gate re-drove every one on
+the production stack and re-rendered every card it touched. **All three hold. Two of the gate's own
+numbers did not survive the drive and are corrected below, and one new residual was found by
+rendering.**
+
+### B84 — CLOSED. The standing column is watched, and a clean drive is still clean
+
+`sc-follow-standstill`, driven down the lane into the staged lead at **30 km/h**:
+
+| | before | now |
+|---|---|---|
+| minimum separation | **−1.7675 m** | unchanged — the geometry did not move |
+| overlap frames | **93** consecutive (60 Hz), unbroken | unchanged |
+| first contact | **13.08 s @ 29.8 km/h** | unchanged |
+| contact reports | **0** | **93** |
+| sheet | `FOLLOWING_TOO_CLOSE` · **3 т.** · **passed = TRUE** | `FOLLOWING_TOO_CLOSE` + `COLLISION` · **13 т.** (10 опасни + 3 основни) · terminated · **passed = FALSE** |
+
+**1.7675 m of interpenetration no longer passes.** Driving the WHOLE column (the L1 `stagedAdd`
+queue, three bodies) grades **24 т. · 2 опасни · 1 основна · 1 второстепенна · passed = false** —
+two ПТП rather than three, because the third body is entered 0.06 m inside the first encounter's
+1.2 s window and is honestly the same accident.
+
+**And the false positive was not traded for the false negative.** The shipped `shadow-correct`
+demonstration — the correct drive students watch — was re-driven against the lead alone AND against
+the full three-car column: **minimum separation 5.066 m, ZERO overlap frames, ZERO contact reports,
+ZERO violations, `CLEAN_DRIVING` commended, passed = true** in both. Three declared bodies standing
+in the lane in front of a correct drive produce nothing.
+
+### B83 — CLOSED, and the founder's ladder re-driven rung by rung
+
+`sc-follow-brake`: nose into the standing lead at y = 234, hold, then ease forward 0.6 m.
+**Every rung bills ONE**, and the stream the engine now receives carries a widest silence of **one
+frame (16.7 ms)** at every rung:
+
+| dwell | contact reports | widest silence | still touching at the creep | ПТП billed | what the OLD stream would have billed |
+|---|---|---|---|---|---|
+| 1.150 s | 260 | 0.0167 s | yes (−1.7675 m) | **1** | 2 (1.433 s of silence) |
+| 1.200 s | 260 | 0.0167 s | yes (−1.7675 m) | **1** | 2 (1.483 s) |
+| 1.217 s | 260 | 0.0167 s | yes (−1.7675 m) | **1** | 2 (1.500 s) |
+| 1.283 s | 260 | 0.0167 s | yes (−1.7675 m) | **1** | 2 (1.550 s) |
+| 3.283 s | 250 | 0.0167 s | **no (+0.3488 m)** | **1** | 1 |
+
+Plus, on a struck car that cannot drive away: **hit → reverse 6.000 m into measured daylight → hold
+2 s → hit again = TWO ПТП** (5.233 s of silence, real separation), and **248 consecutive frames of
+sustained contact = ONE ПТП** (bodies never apart, max separation after first contact −0.0237 m).
+
+> **THE 3.283 s RUNG DOES NOT MEASURE WHAT THE LADDER THINKS IT MEASURES, and the register's own
+> earlier row said it did.** `BrakingLeadCarRunner.resumeAfterSec = 3` fires three seconds after the
+> hit resolves and commands the lead to cruise, so **the crashed car drives itself out of the wreck**
+> — lead y 236.19 → 238.47 → 256.22. At a 3.0 s dwell the creep is still embedded (−0.4398 m); at
+> 3.283 s it is already **+0.3488 m clear**. So that rung bills ONE for a different reason from the
+> other four: there is no second contact to bill. The premise „the bodies never separate in any rung"
+> holds up to ~3.0 s on this drill and no further. Owner: `runners.ts` narrative housekeeping — a
+> crashed lead accelerating away at 11 m/s is its own defect and is listed below.
+
+### NO REGRESSION — the four the last gate demanded be re-run
+
+| driven | measured | verdict |
+|---|---|---|
+| the founder's lawful pass at **1.2925 m** of daylight | min separation 1.2925 m, 0 reports | **ZERO violations.** Unchanged. |
+| `sc-follow-brake` nose-in at **39.864 km/h** | 164 reports, outcome `hitLeadCar` @22.12 s | `COLLISION` · **опасна · 10 т · terminateSession=true · passed=false · terminated=true.** Unchanged. |
+| `sc-ov-narrow/mistake-barge` | **110** contact reports | `FAILED_TO_YIELD` (опасна 10) + `COLLISION` (опасна 10) = **20 т · terminated · passed=false.** Unchanged. |
+| `sc-ov-narrow/mistake-force` | **137** contact reports | same: **20 т · terminated · passed=false.** Unchanged. |
+| `sc-ov-narrow/shadow-correct` | 0 reports | clean, zero violations. |
+| `parked-car-pass.test.ts` + `narrow-meeting` + `sc-ov-narrow-traces` + `rules/engine` + `b5-crash-pin-rescue` + `contact-encounter` + `contact-cast` + `gravest` + `mistakeBadge` | 9 files | **132 / 132 green.** |
+
+### THE BADGE — rendered, and the Bulgarian read
+
+`sc-pe-parked-row-scan / mistake-fast-row`, rendered through the real `MistakeConsequenceOverlay`,
+now reads **identically on both paths** (the „Виж демонстрацията" card and the live „Какво направи"
+card, whichever detector the engine latched):
+
+> **«опасна грешка · −10 изпитни т.»** · **«правило: ЗДвП чл. 20, ал. 2»** ·
+> **«оценка: Наредба № 38 приложение № 5, т. 10, б. „в“»** · plus the rider
+> *„Освен точките, сблъсъкът е и единствената грешка, която спира самия изпит: «Практическият изпит
+> се прекратява … при допускане на ПТП» (Наредба № 38, чл. 48, ал. 3)."*
+
+It used to read «второстепенна грешка · −1 изпитна т.» with «правило: ЗДвП чл. 21, ал. 1», «т. 10,
+б. „б“» and no termination line — three lines above its own prose saying „Трето, ударът прекратява
+изпита."
+
+**Census: 336 demo cards over 167 templates; 24 badges move.** 15 change price, 9 keep the price and
+gain the чл. 48, ал. 3 rider with the law chip moving to the collision's чл. 20, ал. 2.
+
+*Price moved (15):* `sc-junction-scan#0`, `#1` (основна −3 → опасна −10, `FAILED_TO_YIELD`) ·
+`sc-sig-green-wave#0` (второстепенна −1 → основна −3, `HARSH_BRAKING_NO_CAUSE`) · and twelve to
+опасна −10 + rider on `COLLISION`: `sc-pk-double-park#1`, `sc-ov-being-overtaken#0`,
+`sc-pe-parked-row-scan#0`, `sc-merge-accel-lane#1`, `sc-merge-lane-end#1`, `sc-vu-blindspot-moto#0`,
+`sc-ac-night-overdrive#0`, `sc-hz-emergency-stop#1`, `sc-fo-motorway-gap#1`,
+`sc-ln-decisive-change#0`, `sc-sign-warning#0`, `sc-animal-hazard#0`.
+
+*Rider only (9):* `sc-jx-equal-left#1`, `sc-mv-uturn-ban#1`, `sc-pe-night-unlit#0`,
+`sc-rb-busy-gap#1`, `sc-rb-lane-choice#1`, `sc-merge-from-property#0`, `sc-vu-bikelane-turn#0`,
+`sc-rx-tram-stop-doors#0`, `sc-lane-control-signal#0`.
+
+**All 336 were rendered, not inspected as data:** the printed severity label, the printed law chip
+and the presence/absence of the чл. 48 rider match the derivation on every card, and a sweep that
+re-renders each card once per code it cites — every possible live latch — finds no card that any
+live moment can under-price. **The badge fix reordered no `codeRefs` and rewrote no Bulgarian prose.**
+
+> **RESIDUAL FOUND BY RENDERING, not in the brief: ON AN EXACT TIE THE LAW CHIP IS STILL DECIDED BY
+> TYPING ORDER.** `gravestViolation` ranks by class, then by „does it end the exam", then keeps the
+> author's order — so when two cited faults are the same class and neither terminates, the chip still
+> shows whichever was typed first. Four of the 37 multi-code cards render differently reversed, and
+> in every one it is the law chip alone that moves — never the class, never the points, never the
+> rider: `sc-ln-turn-lane-arrows#0` (чл. 6, т. 1 ↔ чл. 28, ал. 1), `sc-ln-turn-lane-arrows#1`
+> (чл. 28, ал. 1; чл. 25, ал. 1 ↔ чл. 25, ал. 1), `sc-vu-cyclist-group#1` (чл. 42, ал. 2, т. 1 ↔
+> чл. 23, ал. 1), `sc-mw-min-speed#1` (чл. 22, ал. 1; чл. 55, ал. 1 ↔ чл. 15, ал. 1). The founder's
+> defect — a card under-pricing what the student watched — cannot recur. But the sentence now written
+> into `templates-hazards2.ts`, „the order below is FREE again, in both directions", is true of that
+> card and not of these four. Owner: `rules/gravest.ts` tie-break, or the four cards' `codeRefs`.
+
+### Gate
+
+`tsc --noEmit --incremental false` **0** · `validate:content` **OK — all structural and referential
+checks passed** · `test:tools` **290 / 290** · `vitest` **5 failed / 11,624 passed / 170 skipped of
+11,799**.
+
+The suite grew 11,754 → 11,799 (+45) because the three lanes and one other added gates. **Four of the
+five reds are the declared baseline; the fifth is new and belongs to none of the three waves:**
+
+| red | file | owner |
+|---|---|---|
+| `clipPlan.generated.ts` freshness ×2 | `modules/clips/clipPlan.generated.ts` | the sentinel/geometry wave — deliberately not regenerated so the moved fault clocks stay visible |
+| exam supply ×1 | `exam/content-bank` (`ptp-i-parva-pomosht`) | content — the medical-quarantine ruling |
+| quiz beat ×1 | `lesson/compose` (`l-accidents-first-aid`) | content — same root |
+| **NEW: `notify-column` „keeps the transport at the thumb minimum"** | `components/sim/lesson-ui/TraceTimeline.tsx` | **the annotation-ticks lane, mid-flight.** It extracted the ticks into an `annotationTicks()` layout function and shipped its own gate (`annotationTicks.test.ts`, written 19:17), then rewrote `TraceTimeline.tsx` at **19:25 — during this gate's own vitest run** — without updating `notify-column.test.ts:226`, which asserts the OLD `annotations.map((a, i) => touch ? (<span` source text. Its own `.next-ttlane` build dir is in the tree. Not this seam's: `notify-column.test.ts` reads `TraceTimeline.tsx` as TEXT and imports nothing any of the three waves touched. |
+
+Hygiene: `platform/tsconfig.json` `include` is still the same **6** entries; `git status` carries no
+probe file; every probe was created inside `__tests__`, run, and deleted in-session; no `.next-*` dir
+was created by this gate (three exist — `.next-c5rsw`, `.next-rig`, `.next-ttlane` — all other
+lanes', all left alone). Nothing committed.
+
+---
+
+## B21-RB — the 2026-08-11 DRIVE-HIS-LESSON gate. **HIS COMPLAINT REPRODUCED IN THE COCKPIT, AND THE SAME DRIVE NOW PASSES.**
+
+> **His words:** he drove „Кръговото движение", signalled his exit, and was told he had not.
+>
+> **Verdict: `FIXED-SEEN`.** Frames:
+> `scratchpad/COCKPIT-1-signal-on-the-ring-d15.0m.png` (the stalk lit, on the ring),
+> `scratchpad/COCKPIT-4-full-right-lock-telltale-lit-d22.3m.png` (still lit at 22.3 m — **inside** the
+> boundary the objective used to start looking at).
+
+### What was wrong, in one sentence
+
+The objective asked "is the right stalk lit **right now**, and is the car more than `enterRadiusM`
+from the island?" — and `scene/cabin.ts` extinguishes the stalk **by itself** when the exit turn
+straightens the wheel (ARM 0.22 rad → RELEASE 0.05), which on every shipped geometry happens
+**before** the car reaches `enterRadiusM`. The two facts never overlapped, so the student was
+convicted for a signal he gave and the **car** cancelled.
+
+### The founder's own lesson, driven tick by tick
+
+`l3-pass` · `district-v1` rb-1, centre (−38.03, −342.96), ring lane r 19.83, **enter 26 / exit 45**,
+286.2° traversal. Real Rapier `VehicleSim`, real `CabinControls`, real `stepObjective`; keyboard
+input, 18 km/h, the textbook signal 90° before the exit.
+
+| moment | t | d from island | steer | stalk |
+|---|---|---|---|---|
+| right stalk pressed, ON the ring | 25.48 s | **18.09 m** | 0.000 | **right** |
+| exit turn, full right lock | 30.07 s | 18.76 m | **−0.597 rad** (arm is 0.22) | right |
+| wheel comes back to centre — **the car cancels itself** | 31.07 s | **22.94 m** | 0.000 | **off** |
+| the objective's window finally opens (d > 26) | 31.65 s | 26.07 m | 0.000 | off |
+
+**He missed it by 0.58 s and 3.06 m.** Old evaluator: `voidedExits = 1`, progress 0.50 → 0.00,
+«Излезе от кръговото без десен мигач». New evaluator: **arc banked 1° at d = 26, 4° at d = 45**
+against a 120° gate → **credited, progress 1.00, voidedExits 0.**
+
+### The family — every roundabout objective in the corpus, before vs after
+
+32 drives each (12/15/18/22 km/h × keyboard/analog × four exit sharpnesses, peel −35°…+4°), textbook
+signal 90° before the exit:
+
+| objective | drill | map | ring | enter/exit | traversal | before | **after** |
+|---|---|---|---|---|---|---|---|
+| `sc-rb-ring` | sc-roundabout-entry «Кръгово движение» | rb-mini-v1 | 18.00 | 24 / 34 | 180° | 16/32 | **32/32** |
+| `sc-rbx-exit` | sc-rb-exit-signal | rb-mini-v1 | 18.00 | 24 / 34 | 270° | 16/32 | **32/32** |
+| `sc-rbc-exit` | sc-rb-circulate-priority | rb-mini-v1 | 18.00 | 24 / 34 | 180° | *(= sc-rb-ring)* | **32/32** |
+| `sc-rbg-exit` | sc-rb-busy-gap | rb-mini-v1 | 18.00 | 24 / 34 | 180° | *(= sc-rb-ring)* | **32/32** |
+| `sc-rbp-exit` | sc-rb-ped-exit | rb-ped-v1 | 18.00 | **29 / 34** | 180° | **13/32** | **32/32** |
+| `sc-rb2-exit` | sc-rb-lane-choice (inner lane) | rb-2lane-v1 | 21.94 | 33 / 46 | 270° | 13/32 | **32/32** |
+| `l3-pass` | l3-roundabout — **his lesson** | district-v1 | 19.83 | 26 / 45 | 286.2° | 16/32 | **32/32** |
+| `ex-roundabout` | lex-exam-1 route exam | district-v1 | 19.83 | 26 / 45 | 286.2° | *(= l3-pass)* | **32/32** |
+| `xA-rb` | **all 18,396 exam-bank variants** | district-v1 | 19.83 | 26 / 45 | 286.2° | *(= l3-pass)* | **32/32** |
+
+**The blast radius is not eight objectives — it is 18,427 authored instances**, because every single
+exam-bank variant carries `xA-rb` on his lesson's exact geometry. Half of every exam sitting's
+roundabout was a coin toss.
+
+**The only reliable way to pass, before:** re-flick the stalk **after** you are already out of the
+ring — **32/32 on all five geometries**. The drill exists to punish exactly that.
+
+### What still fails, and must — driven, not argued
+
+| control | before | after | `voidedExits` raised |
+|---|---|---|---|
+| never signalled at all | 0/32 | **0/32** | **32/32** |
+| stalk flicked on the approach *outside* `enterRadiusM`, then silent | 0/32 | **0/32** | **32/32** |
+| stalk flicked at the give-way line, *inside* `enterRadiusM`, then silent | 0/32 | **0/32** | **32/32** |
+| signal announced a whole traversal early (RB-06) | 0/32 | 4/32 | — |
+
+The silent drive, pushed through the **real lesson engine** (`createLessonSession` + `applyTick`) on
+both the compiled `sc-rb-exit-signal` L1 and the real `l3-pass` spec, raises the card verbatim:
+
+> **«Излезе от кръговото без десен мигач»** — „Излизането от кръгово е маневра надясно и се
+> сигнализира — мигачът казва на колите зад теб и на чакащите на изхода, че напускаш кръга. Задачата
+> остава отворена: върни се в кръговото и излез с пуснат десен мигач. Ако продължиш напред, урокът
+> приключва и разборът показва точно това място." · `lawRef: ЗДвП чл. 25`
+
+### Why the fix is measured in DEGREES and not in seconds
+
+The honest and the dishonest drive **overlap in seconds and separate by 120° in arc**:
+
+| | seconds since the stalk last lit | ring arc since the stalk last lit |
+|---|---|---|
+| correct signal, all 160 drives | 0.0 – 9.3 s | **0.2 – 33.5°** |
+| approach-flick cheat, all 160 drives | 9.9 – 36.6 s | **153.8 – 269.3°** |
+
+A 0.6 s gap versus a 120° gap. **And the seconds gap closes to nothing the moment the drill asks the
+student to stop:** `sc-rb-ped-exit` makes him wait for a pedestrian between the ring and the zebra —
+driven at 3 / 6 / 10 / 20 s of waiting, the stalk was last lit **6.9 / 9.9 / 13.9 / 23.9 s** before
+the exit (deep inside the cheat range) while sweeping **1.4° of arc**. All eight halted drives are
+credited; all eight failed before. A stationary car burns seconds and sweeps no arc — that is the
+whole argument, and it is now measured rather than reasoned.
+
+### Where the student may signal — the honest window, mapped
+
+Credited after the fix, on every geometry: **135° · 90° · 45° · 20° before his exit → 32/32** (and of
+the drives that managed to signal at all in the 20° row, **100%**). Announcing at the entry mouth, a
+full traversal early, is still refused (4/32) — that is RB-06, the „подвеждащ сигнал" the sibling
+template exists to teach.
+
+### Why nothing caught this for months
+
+`content/traces/sc-rb-exit-signal/shadow-correct.trace.json` — the committed "correct drive" every
+trace test replays — sets the indicator as a **manual latch with no auto-cancel**: it goes `right` at
+t = 41.55 s (d = 17.98 m) and is **still lit at t = 60**, so it sails through `enterRadiusM = 24` at
+t ≈ 48.75 and the old level test passes. The recorder has no `CabinControls`. Every bot and trace
+test was green while the defect was live in the only place it mattered — a human's hand on a stalk.
+
+### The cockpit, photographed
+
+`/dev/drive-rig?scenario=sc-rb-exit-signal&level=1`, real `LessonPlayShell`, headless Chromium at
+2560×1440. Two drives:
+
+- **Gentle exit.** Stalk on at t = 44.96 s, (9.46, 12.11), d = **15.37 m** — on the ring. Objective 0
+  «Подмини първите два изхода и остани в кръга» ticks. Stalk survives to d = 31.5 m.
+- **Sharp exit — his case.** Stalk on at t = 44.96 s, d = 15.37 m; the car **cancels it itself at
+  t = 51.61 s, d = 23.06 m — 0.94 m inside `enterRadiusM = 24`**; and the objective
+  «Излез на третия изход с включен десен мигач» **completes at t = 59.07 s.** Under the shipped code
+  that drive was void.
+  *(The `FAILED_TO_YIELD` / `WRONG_WAY` toasts in that run are the open-loop rig steering into the
+  oncoming half of the exit arm — a probe artefact, not the objective.)*
+
+### Gate
+
+`tsc --noEmit --incremental false` **0** · `validate:content` **OK** · `test:tools` **290/290** ·
+`vitest run --maxWorkers=4` — **777 files, 11,917 tests, 3 failed.** Two are the declared quarantine
+(`exam/content-bank` `ptp-i-parva-pomosht`, `lesson/compose` `l-accidents-first-aid` — the medical
+ruling). The third is **not this lane's and not a regression**:
+`src/modules/sim/hud/__tests__/predrive-clip-lazy.test.ts` — an **untracked** file written at 11:41
+today by the pre-drive-clip lane, asserting source text (`▶ Пусни видеото · ${weightBg}`) its own
+`PreDriveTutorial.tsx` does not yet contain. This lane changed **no product code at all**; its whole
+output is evidence.
+
+> **A FOURTH red appeared mid-gate and was removed: `src/lib/tsconfigHygiene.test.ts`. The cause is
+> now known and it is not an agent.** `next dev` with `KNIJKA_DIST_DIR=<scratch>` **rewrites
+> `platform/tsconfig.json` itself** on startup and says so —
+> *"We detected TypeScript in your project and reconfigured your tsconfig.json file for you …
+> include was updated to add `.next-<dir>/types/**/*.ts`"*. It did it to this lane
+> (`.next-rbshot`, reverted within the minute) and it had already done it for a concurrent lane
+> (`.next-photo`, reverted here). **AGENTS.md's rule "do NOT add a matching glob to tsconfig.json" is
+> unactionable as written — nobody is adding it; Next is.** The durable fix is a `tsconfigPath`
+> pointed at a throwaway copy for scratch-dir servers, or a hook that reverts the file on dev-server
+> start. Owner: tooling.
+
+Hygiene: `include` is back to the same **6** entries; `git status` carries no probe; the vitest probe
+lived in `lessons/__probe__/` and the two Playwright probes in `tools/clips/headless/`, all created,
+run and deleted in-session; `.next-rbshot` created by this gate and removed. Four scratch dist dirs
+survive from other lanes (`.next-c5rsw`, `.next-photo`, `.next-player`, `.next-rig`, `.next-ttlane`)
+and were left alone. Nothing committed.
+
+---
+
+## STILL OPEN after the 2026-08-11 DRIVE-THE-SEVEN gate — every item has a NAME, an OWNER and a REASON
+
+**Read these first — they need your judgement, not more engineering.**
+
+1. **You gave two instructions today that contradict each other, and the code is following the newer
+   one.** The brief for this gate said: *„stop, lift, press ↓ and hold — «Вдигни крак от педала,
+   натисни пак» must still appear ~1.5 s after the flip."* It does not, and it will not, because
+   earlier the same day you ruled: *„before when pressing S or Arrow Down it automatically went to R
+   and moved backwards and it has to stay like that because thats automatic transmition."* A lane
+   built exactly that. Driven: the lever goes to R at 0.49 s and **the car is already reversing on
+   the same frame**, reaching 25 km/h; nothing is said, because there is nothing left to explain.
+   **What you are trading:** the warning between the R telltale lighting up and the car actually
+   moving has gone from „a deliberate lift and a second press" to about **eight hundredths of a
+   second**. A nervous re-dab of the brake at a stop line now reverses. That is what a real automatic
+   does, and it is what you asked for — but it is the one place where a 17-year-old gets no second
+   chance, so say which you want and we will stop moving it. **The message itself is safe either
+   way:** on the other routes into R the car still holds at **0.000 km/h** under a held foot and
+   still says the line at **+1.47 s**. This gate drove and photographed the `[`-keys route itself;
+   the touch gear sheet and the cockpit lever are that lane's own measurements, not this gate's.
+   *Owner: you; then `engine/reverseAssist.ts` one line either way.*
+
+2. **298 demonstration captions are still cut short — but only when the phone is SIDEWAYS.** Held
+   upright, every one of the 1 811 captions now fits (0 clamped on both portrait phones, measured in
+   the real box in a real browser). Turn the phone sideways and 298 of them lose their last line —
+   the worst is a roundabout explanation that drops *«Правилното място е едно: джобът между кръга и
+   пътеката»*, which is the whole lesson. **This cannot be fixed by moving boxes:** sideways, the
+   deck lives in a 116 px corridor and two lines is all the geometry there is. The fix is to shorten
+   those 298 lines and put the rest behind „ЗАЩО" — a content job over the trace bank, roughly a day.
+   `npm run deck:captions --json out.json` prints every one with the exact words lost. *Owner: a
+   content wave.*
+
+3. **The demonstration button on a phone is still too small to be a button.** «🎬 Демонстрация ▸» is
+   134 × 26.5 px on both iPhone profiles — the rule this project set itself is 44 px. It is the one
+   control that opens the demonstration, and it has been on this list since 2026-08-10. Everything
+   else on the phone passes: with the deck open there is **nothing** under 44 px, no dead control and
+   no two painted panels overlapping, on all four phones. *Owner: `LessonScene.tsx`'s `DemoDeck`.*
+
+4. **Restarting the car leaves the handbrake on, and 26 seconds of full throttle move it 25 cm.**
+   Press R («Рестарт на колата») and the car comes back braked. This is not a defect in itself — a
+   parked car should be — and **the cockpit now says so unprompted** («Ръчната спирачка е вдигната —
+   колата е задържана … клавиш Space»), which is exactly the work this gate was checking. But it is
+   worth your ruling whether *restart* should hand the student a car he then has to release, or a car
+   ready to drive. *Owner: you; then `LessonScene.tsx`'s `resetCar`.*
+
+**Ours, named, not fixed.**
+
+5. **The clutchless-shift refusal was not verified.** On „Напреднал", pressing `[` without the clutch
+   is supposed to refuse and say «Предавката не влезе». By the time this gate reached that check a
+   blocking „Учебен момент" had frozen the simulation clock, so the key was pressed at a paused sim
+   and the result proves nothing. The toast reader is proven live in the same run by three other
+   cards, so this is an unfinished check, not a suspected defect. *Owner: next gate, one drive.*
+
+6. **„Напреднал" has no measured top speed in this gate.** The tier correctly prints no ceiling (it
+   has none), which is the row that mattered — but the hand-shifts in the probe stopped taking after
+   2nd gear and the pull ended at 55.0 km/h in gear 2, gear-limited. No number is claimed for that
+   tier. FR-50's own 165.1 km/h measurement on the motorway still stands and is unaffected.
+   *Owner: next gate.*
+
+**Added by the 2026-08-11 DRIVE-IT-AND-PHOTOGRAPH-IT gate, including two corrections to the list
+above.**
+
+7. **NEEDS YOUR JUDGEMENT — B67, and read your own sentence back before anyone codes it.** You wrote
+   *„I cant go more than 100-105 … the car must go much beyond 160-180"*: you are saying the car is
+   too **slow** and asking for **more**. The 100–105 reproduces exactly — Нормален on a 90 km/h road
+   tops at **96.6 km/h** — so your complaint is the tier governor and nothing else. Every tier,
+   measured off the shipped governor: Нормален **58.8 / 96.6 / 126.1 / 145.2** km/h on the 50 / 90 /
+   120 / 140 roads; Начинаещ **39.1 / 77.1 / 105.4 / 126.1**; Напреднал uncapped, terminal **168.3**.
+   To reach 160–180 on the tier a student actually gets, the governor would have to allow **25–40
+   km/h over the posted motorway limit** — on a product whose exam fails him outright for 10 (Наредба
+   № 38, прил. № 5, т. 10, б. „в"). **A derived alternative if you want one number: a 160 km/h
+   ceiling on „Напреднал"** — 140 (ЗДвП чл. 21, ал. 1, автомагистрала) + 10 (the опасна line) = 150,
+   the highest speed this product ever grades, plus one governor band of headroom; measured, a cap of
+   160 achieves 154.7. It meets the floor of your band and refuses 180 on the law. *Owner: you; then
+   `vehicle/difficulty.ts`.*
+
+8. **NOT A CURRICULUM CALL — A DEFECT, AND IT IS UNDER B67.** The **10-point опасна speeding fault is
+   UNREACHABLE on the default tier on every road category B ever drives.** It needs `limit + 10`;
+   Нормален's cap **is** `limit + 10` (`NORMAL_CAP_MARGIN_KMH === dangerousSpeedOverKmh`) and the
+   governor eases the throttle to zero a full `GOVERNOR_BAND_KMH` (6) below its own cap — so 58.8 <
+   60, 96.6 < 100, 126.1 < 130, 145.2 < 150. One of only six опасни грешки in the whole practical
+   exam cannot be committed. The второстепенна band survives but has **0.2 km/h** of room on the
+   motorway. Measured fix: margin 10 → **16** minimum, **20** for a usable 4.7–8.5 km/h of headroom
+   (`scratchpad/b67/b67-measured.txt`, re-runnable). Not landed: the file is owned and being edited by
+   the silent-refusal sweep. *Owner: `vehicle/difficulty.ts`, then a guard asserting
+   `NORMAL_CAP_MARGIN_KMH > dangerousSpeedOverKmh + GOVERNOR_BAND_KMH`.*
+
+9. **CORRECTION to item 3 above: it is not only the demonstration button.** That item says „with the
+   deck open there is **nothing** under 44 px". Measured on all four profiles, in **both** deck
+   states, with the car in R: the three tier pills are **78 × 25**, **78 × 25** and **85 × 25 px**,
+   and in landscape the overhead cue's own button is **224 × 31 px**. `TouchControls`' own cells are
+   all exactly 44 × 44, so the floor is being kept where it was designed in and missed on three HUD
+   affordances outside it. *Owner: `hud/` — the tier picker and `CameraAidHint.tsx`.*
+
+10. **The overhead cue prints on top of the demonstration deck again, on portrait phones with the
+    deck open — 8 294 px² on 393×852, 5 220 px² on 360×780, photographed.** This is row B13's defect
+    returning in a state B13 never measured. **It is not the copy growing a line**, which is what the
+    „15 px" note above predicts: the cue is pinned at `CUE_MAX_BOTTOM_FRACTION = 0.55` (bottom edge
+    y=384 colliding, y=383 clean — it cannot move) while the **deck's own height** varied 110 → 156 px
+    between two runs of the same probe on the same viewport. The fix belongs at the clamp.
+    `scratchpad/phone/out/iphone-portrait-open.png`. *Owner: `hud/CameraAidHint.tsx`.*
+
+11. **CORRECTION to item 6 above, and a note for whoever writes the next probe.** „Напреднал" does
+    have a measured ceiling — **168.3 km/h**, solved off the shipped tractive curve, on every domain.
+    Separately: `page.waitForFunction(fn, options)` passes `options` as the function's **argument**,
+    so `drive-rig.mjs` and `seat.mjs` both ask for 120 s and silently get Playwright's 30 s default.
+    On a loaded box that is three failed runs before anyone looks at the right line. *Owner: whoever
+    owns `tools/clips/headless/`.*
+
+12. **`platform/next-env.d.ts` is the hole the tsconfig guard does not cover, and it is live.** The
+    tracked `platform/tsconfig.json` survived this whole session byte-identical to HEAD (blob
+    `264e681e`, 6 include entries) with **six** lanes' dev servers running under `KNIJKA_DIST_DIR`
+    — `.next-caption`, `.next-harness`, `.next-parity`, `.next-rig`, `.next-touchaudit`, `.next-w87`.
+    The guard works. But `next-env.d.ts` is gitignored, is inside `include`, and Next rewrites its
+    `import "./.next-<lane>/dev/types/routes.d.ts"` on every boot: it read `.next-touchaudit` at the
+    start of this gate and `.next-parity` at the end. `npm run typecheck` normalises it;
+    `npx tsc --noEmit` — the command this register's gates actually run — does not. Both were green
+    today by luck of the other lane's file being well-formed. *Owner: whoever owns the gate script.*
+
+7. **A collision raises a blocking „Учебен момент" that PAUSES the simulation, and nothing in the
+   telemetry says so.** Three separate measurements in this gate were taken behind a frozen clock
+   before the freeze was noticed — the sim clock pinned at one value while speed and gear kept
+   reporting their last frame, which reads exactly like a clean, stable measurement. Any future probe
+   must assert that `tSec` is advancing before it believes anything. Recorded here so the next lane
+   does not lose the same hour. *Owner: the rig; a `paused` flag on `DriveRigSample` would close it.*
+
+8. **The mouse pedals stay hidden for 15.7 s, not 12, on a loaded machine.** `KEYBOARD_HIDE_MS` is
+   12 000 ms and a `setTimeout` ran ~3.7 s long with four other browsers on the box. It no longer
+   traps anyone — the way back is a quarter-second of mouse movement and the card names it — so this
+   is recorded, not fixed. *Owner: nobody, unless the founder wants a shorter hide.*
+
+---
+
+## STILL OPEN after the 2026-08-10 COUNT-THE-FRAME gate — every item has a NAME, an OWNER and a REASON
+
+**Blocked on the founder — the numbers he needs are in each line, in plain words.**
+
+1. **The phone draw-call budget is unachievable as written, and it is a decision, not a bug.**
+   The cockpit and hero car are **56 draw calls in every district** — the tier-low budget for the
+   *whole frame* is 70 (hard cap 100). The cockpit alone is 80 % of it before one metre of road
+   exists, and this product's whole premise is that you sit in that cockpit. The 70 was never
+   derived: doc 82 §2.1's arithmetic supports the resolution and fill lines only, and the allocation
+   table it cites gives the hero car **30–50 draws inside a 150-draw laptop frame**. The choice:
+   **(a)** re-derive the phone line (a realistic figure looks like 130–160 given a 56-draw cockpit),
+   **(b)** rebuild the cockpit GLB so its static shell merges by material — the single biggest
+   remaining win, maybe −30 draws, but it needs the animated parts (wheels, needles, steering wheel)
+   separated first and it carries real visual risk, or **(c)** accept that every district ships at
+   1.2×–2.3× the hard cap and stop scoring against it. Doing nothing keeps a gate red that nothing
+   in the renderer can turn green. *Owner: founder + an ADR; `PERF_BUDGETS` deliberately untouched.*
+2. **A visual-fidelity-versus-frame-rate trade you should rule on: the prop chunk grid is set to
+   600 m, and 400 m is one constant away.** Measured on the heaviest map (d2-v1, tier low): at
+   **600 m** the frame is 232.9 draws / 1,226,977 triangles; at **400 m** it is 245.7 draws /
+   1,046,833 triangles. So 400 m buys **180,000 fewer triangles for 13 more draw calls**. The lane
+   chose 600 because at rung 3 the 400 m grid measured **+7.8 % draws against the pre-fix code**,
+   and because doc 82 §2.1 says the phone's scarce resource is draw-call submission, not shading.
+   **If you would rather have the triangles than the draw calls, say so** — `PROP_CHUNK_M` is one
+   number and the sweep table is in its docstring. Nothing about either setting changes what is on
+   screen: the culling A/B moves fewer pixels than half a second of the same frame does.
+3. **d2-v1 is 4.1× the tier-low triangle cap and no renderer change will fix it.** 1,228,234
+   triangles/frame after a 30 % cut, of which the trees are the majority: the district holds
+   **4,276 trees** against a 105-district median of **70**, and there is no low-poly tree — the only
+   tree LOD in the product is `treeFraction`, which throws half of them away and leaves the survivors
+   at 280–544 triangles each. Either d2 gets a billboard/low-poly tree at tier low (art work), or its
+   tree count comes down (content work), or the exam city ships over budget. *Owner: founder to pick
+   which; then `tools/maps` or the art pipeline.*
+
+**Ours, named, not fixed.**
+
+4. **The demonstration deck cannot be closed on a 619 px-tall window while the briefing card is up** —
+   and that is the state the lesson ships in. 8 of the open deck's controls answer the notification
+   column on `elementFromPoint`, **including the deck's own close toggle**, which also carries
+   `tabIndex={-1}` so there is no keyboard route. Three forced clicks left it
+   `data-deck-open="true"`. The escape hatch is an 18 × 18 px «Скрий инструкциите» button the
+   student has to find first; dismiss the briefing and the same profile measures 0 overlaps and 0
+   dead controls, so the deck's own geometry is right and the collision is with the column. The reserve
+   rule meant to prevent this is a measured no-op (the shell writes the same `max-height` inline, and
+   inline outranks any selector) and **must not simply be given `!important`** — that leaves the
+   column 102.5 px and clips a five-step authored briefing, which is a THEO-4 violation traded for a
+   layout fix. It needs the treatment landscape got: the open deck changes corridor. Clear at
+   1440 × 900 and on all four phones, so it is a short-window defect. *Owner: `PlayAreaStyles.tsx`
+   + `LessonScene.tsx`'s `DemoDeck`.*
+5. **`frameCost.ts`'s ceiling and ratchet bind 6 districts out of 105.** A new district, or an
+   existing one made heavier, passes everything until somebody re-measures it. The corpus run is
+   ~90 s per district on the existing rig; extending `MEASURED_FRAMES` to the four family
+   representatives per class would make the ratchet mean something. Also: `measuredFrame()` stops an
+   accident, not a lie — a forged provenance string scores `pass`.
+6. **NPC and parked traffic still have 15 `frustumCulled = false` sites** (`traffic/vehicleFleet.ts`
+   ×8, `traffic/TrafficLayer.tsx` ×7+) and cost 40–41 draws / 207,209 triangles per frame in d2-v1.
+   The same `enableInstancedCulling` + `chunkTransforms` treatment applies directly. Untouched
+   because `TrafficLayer.tsx` is in another lane's live edit set.
+7. **The rear mirror still re-renders the world at full prop detail** — 83 draws and 492,716
+   triangles per entry into a **24,576-pixel** target on d2 (down from 156 / 1,286,132, so the fix
+   halved it). A layer-based diet — drop bollards, benches, bins and signs from the mirror pass,
+   where they are sub-pixel — is worth roughly another 6 draws/frame at tier low and double at med.
+   It is a visual trade-off on the founder's own safety-critical mirror (doc 62 #44), so it is his
+   call, not a lane's.
+8. **The collapsed deck pill is 134.2 × 26.5 px on every phone.** It is the one control that opens
+   the demonstration, and row C6 closed on "0 controls under 44 px on any dashboard route".
+9. **Still no frame time, anywhere, for any of this.** Every number in the COUNT-THE-FRAME gate is
+   headless chromium on ANGLE/D3D11 with SwiftShader available. Draw and triangle counts are
+   scene-graph properties and transfer between machines; milliseconds do not. Doc 82 §2.4's Galaxy
+   A16 gate is still open, and **the causal link from these counts to the founder's actual FPS
+   complaint is still unproven.** €125 and four hours over `chrome://inspect` closes it permanently.
+10. **The fifth vitest failure is handed up, not closed over.** `mistakeBadge.test.tsx` is red on the
+    shared tree; everything checkable says it belongs to the collision-billing lane mid-edit (the
+    test file is untracked, its whole import graph is in that lane's modified set, and that lane's
+    own +1,590-line diff argues for the ordering the test does not expect). It needs their pin
+    updated, not a change here.
+
+---
+
+## STILL OPEN after the 2026-08-10 OPEN-EVERY-FRAME gate — every item has a NAME, an OWNER and a REASON
+
+**Blocked on the founder, not on us.** Four of the items below cannot move without a decision only he can
+make. They are listed so they stop being re-counted as engineering debt: **the 29 quarantined first-aid rows**
+(his medical ruling — they are the *only* two reds in the gate), **B52 / B60 / B41's bodies** (his Blender
+machine, FR-43 — a placeholder rig with no run pose, no face and no arms means a still can never show a chase
+or a posture), **B65's „raw and boring"** (his judgement to close, not ours), and **ЗДвП чл. 183, ал. 4, т. 14**
+(a legal ruling: four деяния in one sentence, two of them producible by one botched Б2 junction — one акт or
+two?). ADR-002 forbids inferring that last one, so it is held with its reason rather than guessed.
+
+| # | name | owner | reason it is still open |
+|---|---|---|---|
+| 1 | **B55's frame predates the fix beside it** | the render lane that shot `RR/b55/` | The verdict is sound but the image is not current: shot 2026-08-09 22:18, the B35 lens fix landed 01:47 the next morning. Its vehicle amber samples **S=1.000** — a look that no longer exists in the build. Re-shoot `pe-jay-v1` and swap the path. **Nothing is wrong with the product here; the evidence is simply out of date.** |
+| 2 | **STILL OPEN 7 — «ЗАГАСНАЛ» printed over a lit amber** | the B35 lane | `sc-sig-controller-postures` instruction 1 says the signal is dark; the head measures **amber L=0.289 S=0.593** against an unlit L≈0.03. Confirmed independently by this gate. The one-line fix is a trap: authoring `signalModes` dark would disarm `controllerPermission` (`signals.ts:449`), so it needs a real „controlled but dark" lamp state. Do not race it with row 1. |
+| 3 | **STILL OPEN 6 — the ped head hides a В26 «50»** | `content/world/pe-jay-v1.json` + the `platform/public` mirror | The pedestrian head stands 1.13 m in front of the sign and both lens rects fall inside its face; from the seat they fuse and the speed limit is 100% hidden. Corroborated in this gate's own column scan of `b55-y14.png` (white sign face visible *between* the two ped lenses). |
+| 4 | **Law A4 — a camera instrument nothing proves a camera saw** | `content/law/penalties.json` + `content/law/tools/build-penalties.mjs` | Reproduced here as attack C: „електронен фиш" on a correct чл. 189 ал. 4 citation for an offence no camera established passes the loader **and** the prose gate. Closing it needs a declared detection fact on `PenaltyEntry` — the same move `PenaltyConduct` already made for the offence. Both files are dirty in another lane's tree. |
+| 5 | **The overtake pair is grouped but never photographed** | the scenario/world lane | `OVERTAKING_AT_CROSSING` + `OVERTAKING_IN_BAN_ZONE` are grouped and unit-tested, but no district in reach has an authored В24 span overlapping a crossing zone with a lead car to pass. Until someone drives it, that half is PARTIAL. |
+| 6 | **No overtake id on the runtime event** | the runtime lane (outside `rules/**`) | Without it the three `prioritySituation` overtake codes (return-too-early / insufficient-gap / vulnerable-pass) cannot group the way the zone pair does, and one изпреварване can still raise two of them at **10 контролни точки each — 20 of a new driver's 26.** One field would close it. |
+| 7 | **чл. 179, ал. 2 prints twice after a real crash** | HUD / consequences | `COLLISION` charges it ungated at 300 лв. while seven other codes carry the same 300 лв. as their „ако причини ПТП" branch, so the figure appears once as fact and once as hypothesis. Pinned in `GATED_SHARED_PROVISIONS` and compared against live data on every run. It is a **UI ruling**, not a retrieval. |
+| 8 | **The belt under-charges one shape** | sim rules | A student who moves off unbelted, buckles inside the seatbelt sustain window and unbuckles later has committed two acts and is billed for one. Written into the code rather than hidden. One price instead of two is the safe direction of that error. |
+| 9 | **B40(b) — five signal lessons are one street** | the map lane | Catalog 10/17/18/19/21 are all `sx-v1` from `sx-spawn-south`. Needs a second signalized district; unchangeable from a lesson file. |
+| 10 | **B64 — the shelter does not read as a bus stop** | the lead's schema call | It straddles the graded mark (footprint y 173–187 around a stop at 180) and has no pole, no Д-series face, no kerb marking. Confirmed again here: at y=179.2 there is **no shelter in the windscreen at all.** Needs a placeable stop-pole/sign kind. |
+| 11 | **B5 — `conflictNearFor` convicts too widely** | sim grading | `traffic/system.ts:718-738` tests only distance-to-node, speed ≥ 1 and bearing ≥ 50° — it never asks which side, which road has priority, or whether the vehicle has cleared, so an **oncoming car on the player's own road** satisfies it. Deliberately not attempted: a grading change with a large trace-test surface. |
+| 12 | **The advisor card is drawn across the B27 sign** | `SimOverlay.tsx` / `overlayQueue.ts` / `FaultCard.tsx` | At y −36.3 the card that *names* the Б2 covers its face. Systemic (any right-verge sign over the last ~10 m of an approach), not per-lesson. All three files are modified in another lane's tree right now. |
+| 13 | **The play-area aspect is not pinned by the shell** | the shell / rig | Measured across this wave: viewport 1280×720 → canvas 2.039 · 1366×768 → 2.021 · 1616×1000 → 1.699 · 1366×859 → **1.7787**. A gate demanding 16:9 must name the **viewport**, not the aspect, or frames keep arriving off-ratio. |
+| 14 | **Two frames were shot while the dev server was rebuilding** | the render lanes | `RR/b54/b54-y84.png` and `RR/b40card/b40card-y-33.5.png` carry a live „Compiling …" / „Rendering …" pill. Neither row's claim depends on it and both are upheld — but a frame taken mid-rebuild is not a frame of the shipped build, and the next wave should not shoot through one. |
+| 15 | **The covered belt card has this gate's count but not its image** | this gate | My scroll stack stopped two cards short. The DOM count of „ПЛАТЕНО ВЕДНЪЖ" = 1 is mine; the picture of it is the belt lane's `belt/AFTER3-END-seatbelt-moving.png`, which I opened. Trivial to close on the next drive. |
+
+
+## STILL OPEN after the 2026-08-09 RENDER-ROWS wave — every item has a NAME, an OWNER and a REASON
+
+**What this wave was.** Seven rows that could only close on a cockpit frame — B27 · B35 · B40 · B54 ·
+B55 · B58 · B64 — driven on `/dev/drive-rig` through the real `LessonPlayShell`, every frame at a
+**measured 16:9** and every claim below taken off a screenshot or a pixel sample, never off the
+source. Five closed (B27, B35, B54, B55, B58), two are held on purpose (B40, B64) with the reason
+stated in numbers on their rows. **Two NEW defects were photographed on the way and neither belongs
+to a founder row**, so they are filed here rather than smuggled into one.
+
+| # | what | owner | why it is open |
+|---|---|---|---|
+| 1 | **THE DEMONSTRATION GHOST IS DRAWN INSIDE THE COCKPIT.** When the student stops where the „СЛЕДВАЙ СЯНКАТА" shadow car stopped, the ghost's translucent blue body drapes over the windscreen, the dashboard and the wheel — it fills the lower half of the view. Measured: on `sc-sp-harsh-brake` at the graded mark the ghost hero car is **1.76 m ahead of the eye (2.4 m 3D)**, on `sc-crossing-white-cane` at the halt gate **2.8 m**. | the shadow/ghost renderer + `LessonScene` (a file two other lanes are inside today — **do not race them for it**) | Both frames: `scratchpad/RR/b64/b64-y180.png` and `scratchpad/RR/b54/b54-y84.png`. This is not cosmetic on these two drills: **both of them GRADE a full stop**, so the moment the student does the right thing, the product paints a car over his instruments. The cheap guard is to fade or hide the ghost body below a few metres in the cockpit view — the same thing every racing game does with its own chassis. |
+| 2 | **FOUR CARDS PILE UP IN THE BOTTOM-RIGHT AND PAINT OVER EACH OTHER.** ИНСТРУКЦИИ + the НАУЧИ teach card + the fault/teach card + the ДЕМОНСТРАЦИЯ transport bar occupy one stack with no collision rule, and the text of one is drawn across the text of another — including across a LAW CITATION („ЗДвП чл. 119, ал. 1" is half-covered in the frame below). | the lesson-UI card stack (`LessonPlayShell` / `SimOverlay` — also live under two other lanes today) | `scratchpad/RR/b54/b54-y84.png` (three overlapping cards + the transport) and `scratchpad/RR/b40card/b40card-y-33.5.png`. A product whose whole claim is „every rule is cited and checkable" must not render a citation underneath another card. |
+| 3 | **B40 (b) — five lessons are one street.** Catalog 10, 17, 18, 19, 21 all run `sx-v1` from `sx-spawn-south`. Unchanged by this wave and unchangeable by it. | a second signalized district — a MAP job | His actual sentence on B40. The „who is sleeping" half is now closed with a frame; this half needs a map that does not exist. |
+| 4 | **B64 — the shelter is beside you when you get there, and it does not read as a bus stop.** In the windscreen at 32.8 m, out of it by 13.9 m, 10.6 m off the right shoulder at the mark; no pole, no sign face, no kerb marking, lower half behind the parked row. | the district generator + a placeable stop-pole/sign kind — **a schema call, the lead's** | Numbers and three forward-view frames on the B64 row. |
+| 5 | **`worldLabel.ts` is a SECOND painter, not an extraction — deliberately, and it is written down in the file.** B42's officer bubble still paints itself inside `traffic/TrafficLayer.tsx`. | whoever next touches the actor bubble | Unifying them today would put a closed, photographed row (B42) back at risk for nothing the founder can see. The note in `worldLabel.ts` says to adopt `drawWorldLabel` and delete the second painter when that bubble is next opened. |
+| 6 | **B55 — the pedestrian signal head is planted 1.13 m in front of a В26 «50», and from the seat they fuse.** Head (12.82, −34) at 22.9 m; sign face (12.93, −35.13) at 24.0 m, rect [1079,286,1125,332] with BOTH lens rects inside it. The «50» digits are 100 % hidden and the ped head loses its silhouette against a red ring. | the `pe-jay-v1` district data (`content/world/pe-jay-v1.json` + the `platform/public/world` mirror) | `scratchpad/RR/b55/b55-y14.png` and the 10× crop `scratchpad/NINE/n-b55-pedhead-10x.png`. B55's own ask (a light for him, a light for the pedestrian) IS closed — this is a second object standing behind the first, and it costs the student a speed-limit sign the lesson never mentions. |
+| 7 | **A second lesson tells the student the светофар is ЗАГАСНАЛ over a head whose AMBER is lit.** `sc-sig-controller-postures` («Езикът на регулировчика») — instruction 1 and its own docblock both say the lamps are dark; measured on the frame, amber = (200,154,72) against this renderer's unlit amber (126,81,0) and a 13 %-sky prediction of (134,96,26). Red and green ARE dark. | the B35 lane (`runtime/signals.ts` lampState + whatever they land for the dead head) — **do not race them** | `scratchpad/lsn6/B41/B41-step05-t68.5-v0.png`, 12× at `scratchpad/NINE/n-b41-head-12x.png`. Mechanism: the template never authors `signalModes`, so `setClusterController` leaves the cluster `"controlled"` and `signals.ts:338–348` keeps live lamps there on purpose. The one-line fix is a trap — `controllerPermission` (`signals.ts:449`) returns null off `"controlled"`, so pinning the mode dark would disarm the officer's grading. It needs a „controlled but dark" lamp state, which is exactly the surface B35 is in. |
+
+**A rig note that cost this lane an hour, so nobody pays it twice.** The play area is NOT a fixed
+16:9 — it is sized to its container, so it came out **1422×799 (1.780)** on one lesson and
+**1425×843 (1.691)** on another *in the same 1440×900 window*, and it goes to 1.691 whenever the
+shell has auto-**fullscreened**. Any frame offered as evidence must print its measured aspect;
+`scratchpad/RR-cap.mjs` leaves fullscreen, then trims the window until the play area itself is 16:9,
+and logs the result. Two further traps, both hit here: a stop-and-dwell drive **wakes staged actors
+early** (it photographed an empty junction on B40 and cost a whole frame set — drive to the pose in
+ONE continuous step), and `page.screenshot`'s 30 s default times out on this box under load.
+
 ## STILL OPEN after the 2026-08-09 SCALES gate — every item has a NAME, an OWNER and a REASON
 
 **No percentage closes this section and this report does not end in one.** This gate did not build;
@@ -2081,7 +4498,7 @@ Every figure below was re-derived by running the shipped function, not by readin
 | 4 | **Three lanes disclaimed the third red as „another lane's untracked file". It is this wave's own new file.** | the B35 / four-rows lane | `src/modules/sim/__tests__/law-citations.test.ts` fails on `modules/sim/world/components/__tests__/world-label.test.ts:286`, whose canvas-overflow fixture passes `lawRef: "к"`. `git ls-files --error-unmatch` fails on it — and it is `??` **alongside `worldLabel.ts` and `signalHeadLabels.ts`, the two source files that lane created**. It is not another lane's in-flight file; it is the B35 build's own test, and it is a **one-token fix in their own fixture** (use a real citation, or rename the key so the scanner does not read it as one). |
 | 5 | **The live exam protocol bar and the compact end-of-drive chip are still unphotographed — and the reason is structural, not a dead dev server** | `components/sim/lesson-ui/LessonPlayShell.tsx:2687` and `:1812` | The previous lane blamed a Turbopack compile. It is not that. The bar renders only when `examMode && snap.phase === "driving"`, and the only exam lesson (`lex-exam-1`) opens on a **13-step `preDriveMode: "assess"`** that must be performed on real cockpit **mouse** controls. Driven for 111 s with a keyboard rig: `phase=preDrive obj=0/13`, `v=0.0` at every frame (`V-frames/exam/Vexam-t48.0-v0-y-88.1.png` — the frame is real and shows exam chrome, just not the bar). **Any future lane will hit the same wall.** Both are one-line `pointsBg("exam", …)` calls covered by the scanner; closing them needs either a rig that clicks the pre-drive, or a `?state=` on the existing popup-rig that mounts the shell in `examMode` + `driving`. This is the same wall as row 5 of the „open the app yourself" list above (Урок 1, 1 of 13, mouse-only). |
 | 6 | **The theory exam — the other half of the product — still prints a bare „т.", and the disclosure of that gap is two files short** | `app/(dashboard)/exams/page.tsx` (3), `exams/[attemptId]/page.tsx` (5), **`components/exam/ExamResultView.tsx:134`**, **`components/exam/ExamRunner.tsx:671`** | Ten bare sites on the 97-point scale. The wave declared this deliberately out of scope and it was **right not to relabel it „изпитни т."** — in this product that phrase now means the practical sheet. But its `left` list named only `app/(dashboard)/exams/*` and `admin/page.tsx`; **the two `components/exam` files are the ones the student actually sits in front of during the mock exam** and they were not named. The consequence on screen: a student who has just learned „изпитни т. = the driving mark" opens an *изпит* that says only „т.". Needs a fifth scale (`theoryExam`) in `scales.ts` or its equivalent in `modules/exam`. |
-| 7 | **`MistakeConsequenceOverlay` has still never been photographed** | `components/sim/lesson-ui/MistakeConsequenceOverlay.tsx` | `/dev/popup-rig?state=overlay` renders the scene but not the overlay (text dump: 55 characters, „ЗАДАЧА 2/3 · +1 · Спри плътно до бордюра"). It needs a recorded mistake trace to mount. Verified by source and by the scanner only. |
+| 7 | **`MistakeConsequenceOverlay` has still never been photographed — but it is no longer unread** | `components/sim/lesson-ui/MistakeConsequenceOverlay.tsx` | `/dev/popup-rig?state=overlay` renders the scene but not the overlay (text dump: 55 characters, „ЗАДАЧА 2/3 · +1 · Спри плътно до бордюра"). It needs a recorded mistake trace to mount, and **no frame exists, so by this file's own rule the row stays open.** **What changed 2026-08-10:** „verified by source and by the scanner only" is no longer true. `lesson-ui/mistakeBadge.test.tsx` mounts the real component through `renderToStaticMarkup` and asserts the visible Bulgarian, and the CLOSE-THE-SEAM gate re-rendered **all 336 demo cards on both the demonstration and the live path** — the badge defect was invisible in the JSON and visible in that markup. Markup is not pixels: what is still unseen is the LAYOUT (does the −10 chip collide with the title on a phone, does the чл. 48 rider fit), not the words. |
 
 ### Not a defect — recorded so it is not re-filed
 

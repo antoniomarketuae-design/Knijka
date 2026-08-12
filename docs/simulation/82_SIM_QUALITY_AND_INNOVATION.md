@@ -71,7 +71,13 @@ Measured by GLB inspection: `corva_s.glb` = **228 triangles, 0 textures**. `taxi
 - The asphalt texture (ambientCG Asphalt031) is a near-uniform mid-grey fine grain with no tar seams, cracks or macro variation — and it was itself a fallback because the specified Asphalt025 404'd (`public/sim/LICENSES.md:31-45`). Beyond ~15 m it mips to flat grey.
 - There is **no detail normal**: `macroVariation.ts:14-16` modulates *albedo only*, at an 80 m feature scale. Nothing carries relief at the 0.5–3 m scale the cockpit camera stares at.
 
-**8. There is headroom to fix all of it.** `drawCallEstimate` for a scenario world is ~56 against a test cap of **150 draws / 300,000 triangles** (`world/builders/buildWorldGeometry.ts:145-160`, `world/__tests__/ln-district.test.ts:124-125`). The entire city kit is **4,896 triangles across 16 GLBs** — smaller than the hero car. "It has to stay fast on a phone" is *not* what is limiting the look today.
+**8. ~~There is headroom to fix all of it.~~ RETRACTED 2026-08-10 — this paragraph was written against a number that could not answer the question it was asked.** It read: „`drawCallEstimate` for a scenario world is ~56 against a test cap of 150 draws / 300,000 triangles … 'It has to stay fast on a phone' is *not* what is limiting the look today."
+
+`drawCallEstimate` was a STATIC count of world mesh slots. It had no term for the cockpit, the hero car, the level-1 aids, traffic, the sky, weather, the mirror pass or the composer, and its whole range across all 105 shipped districts was 56–67. The first time the running product was counted — raw WebGL draw counter on `/dev/drive-rig`, tier low, level 1 — **37 of 37 districts sampled were over the hard cap of 100 draws per frame**, at 146–252. The static number was 26–41 % of the frame.
+
+The field is now `world.stats.staticDrawSlots`, it is derived from the placement data (`world/builders/drawSlots.ts`), and it is not comparable to a per-frame budget by construction: `environment/frameCost.ts` owns the frame question and `scoreFrameDrawBudget` accepts only a `MeasuredFrame`. Post-fix measurements and the verdict each district earns are recorded in `frameCost.MEASURED_FRAMES`.
+
+**What survives of the claim:** the city kit really is 4,896 triangles across 16 GLBs, art richness really is not what the budget is being spent on — measured, the biggest single item in a tier-low frame is the 56-draw cockpit and the second is the level-1 ghost — and every fix in this document is still worth doing. What does not survive is „there is headroom": there is not, at tier low, on any district in the product.
 
 ### 1.3 Where the founder's instinct is right, and where it is wrong
 
@@ -91,7 +97,10 @@ Measured by GLB inspection: `corva_s.glb` = **228 triangles, 0 textures**. `taxi
 
 ## 2. THE PERFORMANCE ENVELOPE
 
-Every recommendation below must fit inside these numbers. They are derived, not guessed.
+Every recommendation below must fit inside these numbers. They are derived, not guessed —
+**except the draw-call line, which is not, and §2.6 is the measurement that proves it.** §2.1's
+GFLOP-per-Mpx derivation supports the resolution, fill and shading lines; nothing in it produces
+"≤70/frame". Read §2.6 before quoting the draw-call row of §2.2 at anybody.
 
 ### 2.1 The key insight: the phone is a weak CPU, not a weak GPU
 
@@ -120,7 +129,7 @@ At dpr 1.0 in landscape, **a mid-range Android has roughly the same shading head
 | Reference | Galaxy A16 / Redmi Note — Mali-G57 MP2 or Adreno 619, 4 GB | Iris Xe G7 96EU | Discrete GPU |
 | Resolution | 891×411 CSS, **dpr cap 1.0** | 1920×1080, dpr 1.0–1.25 | 1920×1080, dpr 1.5 |
 | **Target fps** | **30 flat** (floor 24) — do not chase 60 | 60 (floor 45) | 60 |
-| **Draw calls** | **≤70/frame** (hard cap 100), incl. mirror pass | ≤150 (cap 250) | ≤300 |
+| **Draw calls** ⚠️ *not derived — see §2.6* | **≤70/frame** (hard cap 100), incl. mirror pass | ≤150 (cap 250) | ≤300 |
 | **Triangles** | **≤250k/frame** incl. mirror pass | ≤700k | ≤1.5M |
 | **Texture VRAM** | **≤80 MB** transcoded+mips (ASTC 8 bpp) | ≤220 MB | ≤512 MB |
 | Shadow maps | **zero** — blob decals only | one 1024², 55 m | one 2048², 75 m |
@@ -148,15 +157,37 @@ Android 13+ covers 76.7% of Bulgarian devices, so `KTX2Loader.detectSupport(gl)`
 | **Drop `suv_boxy_lux` from the tier-`low` NPC pool** | It is **22,672 triangles / 16 materials** at weight 5 (~1 in 21 moving spawns) — every other fleet model is 180–280 tris. At ~50 agents that is ~54k triangles and 16 draw calls returned for one constant. `traffic/vehicleFleet.ts:1038`. **Best effort-to-win ratio in the entire codebase.** | 1 |
 | **Add a `webglcontextlost` listener with telemetry** | There is currently **none anywhere in `src/`**. On a 4 GB phone an OOM presents as a silent black canvas with no diagnostic. | 1 |
 
-### 2.4 The gate that has never been run
+### 2.4 The device gate — CLOSED 2026-08-11: the founder is the test device
 
-`docs/simulation/68_ALPHA_RECONSTRUCTION_PLAN.md:191` — *"[ ] Runs on a mid-range Android phone: 30+ fps median at tier-low, <10 s load"* — is **unchecked**, and there is no `.har`, Lighthouse run or trace artifact in the repo.
+**Retired on the founder's instruction.** This section used to argue for buying a
+€125 Galaxy A16 and spending four hours over `chrome://inspect` before any phone
+number could be believed. That purchase is unnecessary: **the founder tests every
+build on his own real phone, and his reports are the device evidence.** When he
+says the frame rate is bad on mobile, that is a measurement from real silicon,
+not a prediction — and it outranks anything this repo can produce on a desktop.
 
-A **Samsung Galaxy A16** (Helio G99, Mali-G57 MP2, 4 GB, 1080×2340) is **244.48 лв ≈ €125** at [Technopolis](https://www.technopolis.bg/en/Smartfoni-i-mobilni-telefoni/Smartfon-GSM--SAMSUNG-GALAXY-A16-A165-BLACK/p/505529). Samsung leads Bulgaria at 34.57% mobile vendor share.
+**What this changes, and it is the important part.** The old text was used to
+defer the phone question ("every number in §2.2 is a prediction until a log
+lands"). It can no longer be used that way. A founder report of poor mobile
+performance is now the *primary* signal and must be investigated on its own
+terms, not answered with desktop draw-call arithmetic. That mistake was made on
+2026-08-11: a 3–5× draw-call breach was measured at 1264 × 620 on a desktop and
+reported to him as the cause of his FPS complaint, when nothing phone-shaped had
+ever been profiled.
 
-The instrumentation already exists — `PerfProbe` at `LessonScene.tsx:1312-1365` disables `gl.info.autoReset`, accumulates whole-frame draws/triangles across the mirror and composer passes, and logs fps/draws/tris/programs once per second, with the budget lines already in a comment at `:1321-1322`.
+**What still holds, because it is physics rather than process:** DevTools device
+emulation and Android emulators reproduce a phone's *viewport, touch model and
+user agent* — not its GPU. So an emulated profile is authoritative for layout,
+overflow, hit targets, touch behaviour, main-thread cost, draw counts and
+triangle counts (all scene-graph or DOM properties), and is **not** authoritative
+for frame time. Quote emulated milliseconds to nobody. When frame time is the
+question, the answer comes from the founder's handset.
 
-**€125 + 4 hours over `chrome://inspect` closes this permanently. Every number in §2.2 is a prediction until that log is committed. DevTools device emulation and Android emulators do not emulate the GPU and will give a false green.**
+The instrumentation is built and unchanged — `PerfProbe` at
+`LessonScene.tsx:1312-1365` disables `gl.info.autoReset`, accumulates whole-frame
+draws/triangles across the mirror and composer passes, and logs
+fps/draws/tris/programs once per second, budget lines at `:1321-1322`. It runs on
+his phone as readily as here: `?simPerf=1`.
 
 > **Update 2026-07-26.** The instrument is built and the procedure is written
 > down: [`perf/README.md`](perf/README.md). `PerfProbe` now accumulates
@@ -215,6 +246,397 @@ speeds are unchanged and no bot-completion test moves.
 **Phone numbers remain predictions.** Nothing above was measured on an A16;
 these are desktop build-graph and byte measurements, which is all that can be
 measured without the device.
+
+---
+
+### 2.6 What the frame ACTUALLY costs — counted, before and after, 2026-08-10
+
+For months the project managed `world.stats.drawCallEstimate`: a static count of world mesh slots,
+asserted `≤ 150` in ~50 district tests and — in `b65-street-furniture.test.ts`, under the title
+„keeps every dressed street inside the tier-low draw budget" — asserted against
+`PERF_BUDGETS.low.drawCalls`. Every one of those was green on every district. The running product
+was then counted for the first time and every district sampled was over the hard cap.
+
+A renderer row fixed two defects; this section is the **independent verification** of that row.
+The instrument is a from-scratch raw WebGL counter (`draw*`, `bindFramebuffer` and `viewport`
+wrapped in an `addInitScript`, frames delimited by an rAF chain registered before any page script)
+driven from `/dev/drive-rig` at **1264 × 620, dpr 1**, seatbelt buckled, rolling at 20 km/h, 8-second
+windows (426–508 whole frames per row). The statistic is the one `buildPerfReport` scores: the
+**median over one-second windows of each window's mean**.
+
+**The instrument checks itself twice.** Three.js's own `renderer.info.render` counters were
+accumulated per frame in the same run through a `WebGLRenderer.render` wrap: on every one of the 30
+runs below the two agree **to the digit** (e.g. pe-cane low L1 = 156.64 GL draws / 156.64 three
+draws, 170,203 / 170,203 triangles). And the mirror render-target pass appears in **24.8–25.1 %** of
+tier-low frames, **49.9 %** at med, and **49.8 % + 25.0 % + 25.0 %** at high — exactly
+`MirrorRig`'s cadence constants, which is only possible if the frame boundaries are whole frames.
+
+#### The table
+
+BEFORE is the same rig in the same session with both fixes reversed on the live scene graph
+(`frustumCulled = false` on every `InstancedMesh`; `forceSinglePass = false` on the ghost's
+materials), minus the chunk grid's extra submissions, which are a build-time change that cannot be
+undone at runtime and are therefore removed arithmetically —
+`(chunkMeshes − chunkFamilies) × (1 + mirrorFrameFraction)`, exact for draws and zero for triangles.
+That reconstruction lands within 1.5–2.6 % of the two prior instruments' file-restored baselines.
+
+| district · tier · rung | draws before → after | vs 70 / 100 | triangles before → after | vs cap |
+| --- | --- | --- | --- | --- |
+| pe-cane-v1 low L1 | 185.7 → **156.6** (−15.7 %) | **FAIL** 1.57× hard | 239,852 → **170,203** (−29.0 %) | PASS |
+| pe-cane-v1 low L3 | 138.2 → **129.7** (−6.1 %) | **FAIL** 1.30× hard | 108,522 → **104,588** | PASS |
+| pe-cane-v1 med L1 | 332.9 → **279.4** (−16.1 %) | **FAIL** 1.12× hard | 415,059 → **275,553** (−33.6 %) | PASS |
+| pe-cane-v1 high L1 | 373.0 → **303.8** (−18.5 %) | **WARN** 1.01× soft | 507,977 → **359,802** (−29.2 %) | PASS |
+| d2-v1 low L1 | 256.6 → **233.5** (−9.0 %) | **FAIL** 2.34× hard | 1,764,900 → **1,228,234** (−30.4 %) | **FAIL** 4.1× |
+| d2-v1 low L3 | 206.2 → **206.5** (+0.1 %) | **FAIL** 2.06× hard | 1,628,628 → **1,161,414** (−28.7 %) | **FAIL** |
+| d2-v1 med L1 | 509.0 → **454.7** (−10.7 %) | **FAIL** 1.82× hard | 3,414,685 → **2,244,794** (−34.3 %) | **FAIL** |
+| d2-v1 high L1 | — → **514.5** | **FAIL** 1.29× hard | — → **3,162,498** | **FAIL** |
+| sp-creep-v1 low L1 | 208.2 → **183.7** (−11.7 %) | **FAIL** 1.84× hard | 308,562 → **241,420** (−21.8 %) | PASS |
+| sp-creep-v1 med / high / L3 | — → **346.1 / 422.6 / 156.5** | **FAIL** all three | — → 353,339 / 568,216 / 175,428 | PASS |
+| ov-crest-v1 low L1 | 220.0 → **192.6** (−12.4 %) | **FAIL** 1.93× hard | 575,331 → **505,776** (−12.1 %) | **FAIL** |
+| hz-roadworks-v1 low L1 | 207.7 → **182.9** (−11.9 %) | **FAIL** 1.83× hard | 242,261 → **200,208** (−17.4 %) | PASS |
+| mw-v1 low L1 | 151.2 → **123.1** (−18.6 %) | **FAIL** 1.23× hard | 231,712 → **161,801** (−30.2 %) | PASS |
+
+**Say it plainly: the breach is REDUCED, not CLOSED.** Draw calls fell 6–19 % and triangles 12–34 %,
+and **14 of 15 configurations still fail the draw-call budget** — the lightest district at the most
+generous tier is the single WARN. The triangle budget is a different story: after the fix, tier-low
+triangles PASS on five of the six scenario districts measured; the two that still fail
+(`d2-v1` at 4.1× and `ov-crest-v1` at 2.0×) fail on content, not on the renderer.
+
+#### Re-counted after the mirror cull — 16 configurations, a third instrument, 2026-08-11
+
+The table above was taken before `scene/vitok/mirrorInstanceCull.ts` landed. The whole matrix was
+then counted again, on a from-scratch instrument, over the **four districts × tier low and med ×
+rung 1 and rung 3** the phone tier actually ships — 56 windows, 457–496 whole frames each, 0 page
+errors — with BEFORE reconstructed on the live scene graph in a **fresh page load per window driven
+by the same script from the same scripted start**, so before and after are the same station (all 16
+pairs match to ≤ 0.2 m, recorded per window).
+
+| district · tier · rung | draws before → after | vs budget | triangles before → after | vs budget |
+| --- | --- | --- | --- | --- |
+| pe-cane-v1 low L1 | 184.5 → **153.6** (−16.7 %) | **FAIL** 1.54× hard | 239,123 → **168,131** (−29.7 %) | PASS |
+| d2-v1 low L1 | 249.6 → **214.0** (−14.3 %) | **FAIL** 2.14× hard | 1,763,150 → **1,137,300** (−35.5 %) | **FAIL** 3.79× hard |
+| sp-creep-v1 low L1 | 203.5 → **172.0** (−15.5 %) | **FAIL** 1.72× hard | 307,408 → **230,334** (−25.1 %) | PASS |
+| ov-crest-v1 low L1 | 215.5 → **182.7** (−15.2 %) | **FAIL** 1.83× hard | 573,528 → **490,142** (−14.5 %) | **FAIL** 1.63× hard |
+| pe-cane-v1 low L3 | 135.1 → **126.4** (−6.4 %) | **FAIL** 1.26× hard | 108,314 → **102,587** (−5.3 %) | PASS |
+| d2-v1 low L3 | 203.3 → **190.7** (−6.2 %) | **FAIL** 1.91× hard | 1,630,892 → **1,069,959** (−34.4 %) | **FAIL** 3.57× hard |
+| sp-creep-v1 low L3 | 158.3 → **148.8** (−6.0 %) | **FAIL** 1.49× hard | 176,055 → **164,395** (−6.6 %) | PASS |
+| ov-crest-v1 low L3 | 170.3 → **159.6** (−6.3 %) | **FAIL** 1.60× hard | 441,440 → **422,403** (−4.3 %) | **FAIL** 1.41× hard |
+| pe-cane-v1 med L1 | 331.5 → **272.3** (−17.9 %) | **FAIL** 1.09× hard | 414,155 → **270,982** (−34.6 %) | PASS |
+| d2-v1 med L1 | 500.0 → **422.0** (−15.6 %) | **FAIL** 1.69× hard | 3,411,185 → **2,038,711** (−40.2 %) | **FAIL** 2.27× hard |
+| sp-creep-v1 med L1 | 425.0 → **362.1** (−14.8 %) | **FAIL** 1.45× hard | 582,846 → **428,179** (−26.5 %) | PASS |
+| ov-crest-v1 med L1 | 454.0 → **391.4** (−13.8 %) | **FAIL** 1.57× hard | 1,148,989 → **926,050** (−19.4 %) | **FAIL** 1.03× hard |
+| pe-cane-v1 med L3 | 232.9 → **217.6** (−6.6 %) | **WARN** 1.45× soft | 151,963 → **139,354** (−8.3 %) | PASS |
+| d2-v1 med L3 | 409.5 → **375.5** (−8.3 %) | **FAIL** 1.50× hard | 3,146,684 → **1,905,078** (−39.5 %) | **FAIL** 2.12× hard |
+| sp-creep-v1 med L3 | 334.7 → **315.9** (−5.6 %) | **FAIL** 1.26× hard | 320,140 → **297,037** (−7.2 %) | PASS |
+| ov-crest-v1 med L3 | 363.5 → **344.9** (−5.1 %) | **FAIL** 1.38× hard | 884,813 → **792,614** (−10.4 %) | WARN 1.13× soft |
+
+**0 of 16 pass the draw budget** (15 FAIL, 1 WARN — `pe-cane-v1` med L3 at 217.6 against a 250 hard
+cap). **8 of 16 pass the triangle budget**, 1 WARN, 7 FAIL. Rung 3 is not rescued by the rung-1 aid
+stack dropping: the lightest district at rung 3 on a phone still draws **126.4 calls against a
+70-call budget**.
+
+**The two counters agree.** The product's own `PerfProbe` (three's `gl.info.render`, `autoReset`
+off) ran inside the same windows: worst disagreement **1.36 draw calls and 1.40 % of triangles**
+across all 16, and on five of them the two agree to the digit. Eight of these rows overlap
+`MEASURED_FRAMES` and all eight reproduce within 1.9 % / 1.6 % — `d2-v1` low L1 triangles measured
+1,137,300 against a recorded 1,137,303 — so nothing in `frameCost.ts` was changed.
+
+**Two instrument defects found and fixed before the numbers were believed, both worth stating:**
+
+* **`ShaderMaterial` defaults `forceSinglePass` to TRUE** (`three/src/materials/ShaderMaterial.js:212`),
+  so „every transparent DoubleSide material with `forceSinglePass === true`" is *not* „the materials
+  `ShadowCar`'s fix set" — it also sweeps up 3 ShaderMaterials that are in the scene at rung 3, where
+  there is no ghost at all. Measured by flipping only the excluded set: the first reconstruction
+  over-charged the fix by **3.3–9.0 draws**, and every BEFORE above was re-measured rather than
+  corrected on paper.
+* **A teach card pauses the world while rAF and the raw GL counter keep advancing.** Two of the first
+  three windows were vacuous and were refused by a fourth assertion — the car and the main camera
+  must both have moved ≥ 30 m — not by inspection.
+
+**The mirror, per entry, with the cull put back in the same session:** `d2-v1` low **83.0 → 20.1
+draws and 492,716 → 130,430 triangles**, reproducing the row's own before column to the digit;
+`ov-crest-v1` 73.7 → 33.0 / 327,862 → 226,242; `sp-creep-v1` 62.8 → 33.9; `pe-cane-v1` 41.0 → 27.0;
+`d2-v1` med 84.0 → 20.1 / 571,468 → 161,133. Cadence unchanged at **25.0–25.2 % of frames at low and
+49.9–50.1 % at med**. Whole-frame, the cull alone is −3.3 to −15.8 draws at low and −6.9 to −32.0 at
+med, which is exactly the per-entry delta × the cadence.
+
+**Nothing was removed, and the diff image was opened rather than described.** One page, one station,
+the car at a standstill with the brake held, the framebuffer read back with `gl.readPixels`, the sim
+clock asserted advancing around every capture. On `d2-v1`, two frames of the SAME state 900 ms apart
+differ in **1.726 %** of pixels; flipping the mirror cull differs in **1.518 %**; flipping the whole
+renderer wave differs in **0.473 %** — *both A/Bs move fewer pixels than the noise floor.* The
+overlay paints every differing pixel magenta, and they are **the animated guidance ribbon and its
+reflection in the mirror, and nothing else**: no tree-shaped hole, no missing signal head, no
+building silhouette. Photographed from the driving seat, the glass shows road, lane, ribbon, a lit
+building, five trees and the ridge, at a mean luminance of 122.55 against 122.58 with the cull off;
+the positive control that hides every InstancedMesh for the pass has **no trees at all**.
+
+#### Where the reduction came from, split by mechanism
+
+Measured by ablating one mechanism at a time, tier low, level 1:
+
+| | pe-cane-v1 | d2-v1 |
+| --- | --- | --- |
+| ghost drawn twice (`forceSinglePass`) | **−23.7 draws** · −65,806 tris | **−26.7 draws** · −67,188 tris |
+| frustum culling + the 600 m prop grid | −2.9 draws · −3,836 tris | −56.6 draws · **−469,482 tris** |
+
+On a scenario micro-map the whole win is the ghost: nothing is ever out of frustum on a 360 m
+street. On the city map culling is where the triangles come from — and against the *unchunked*
+pre-fix arrangement the grid costs about **+3 draw calls** for those 469k triangles. That trade is
+the one thing in this row a founder should rule on (§ still-open).
+
+#### The chase camera, measured — the census's guess was wrong
+
+The one subsystem nobody had ever counted. Cockpit → chase (`KeyC`), same rig, same district:
+
+| | draws | triangles |
+| --- | --- | --- |
+| pe-cane-v1 low L1 cockpit → chase | 156.6 → **119.3** | 170,203 → **224,488** |
+| d2-v1 med L1 cockpit → chase | 454.7 → **410.8** | 2,244,794 → **2,218,059** |
+
+Chase is **cheaper in draw calls, not more expensive** (the 56-draw cockpit is hidden; the hero
+exterior that replaces it is one GLB), and costs +54k triangles on the light map. The estimate
+this replaces was "plausibly +40 draws and +130k triangles". Frame-cost ceilings hold.
+
+#### Where the frame goes, per pass (raw GL, framebuffer regions)
+
+d2-v1, tier low: the main pass at 1264 × 619 is 212.4 draws / 1,105,058 triangles; the **rear-mirror
+render target at 256 × 96 — 24,576 pixels, 3.1 % of the main framebuffer — was 83.0 draws and
+492,716 triangles per entry** (156.0 / 1,286,132 before the culling fix). **It is now 20.0 draws and
+128,996 triangles** — see „The mirror was not rendering distant world" below. At med, the shadow map at
+1024² costs 84 draws on d2 (32.7 at 2048² on pe-cane), N8AO's transparency-aware mode re-renders
+the transparent queue twice more at full resolution (51.0 + 42.0 draws), and bloom's mipmap chain is
+~24 one-draw passes from 632 × 310 down to 5 × 3 and back.
+
+#### The mirror was not rendering distant world — it was rendering the district
+
+The obvious explanation for a postage stamp costing a third of the frame is that the pass has no
+tight frustum. It has one: 14° vFOV / 36.3° hFOV, far plane 200 m against the main camera's 900.
+Shortening it buys nothing — measured per mirror entry on d2-v1 at tier low, 8-second windows:
+
+| mirror far plane | draws | triangles |
+| --- | --- | --- |
+| 200 (shipped) | 83.0 | 492,716 |
+| 150 | 83.0 (0.0 %) | 492,716 (0.0 %) |
+| 120 | 81.0 (−2.4 %) | 485,380 (−1.5 %) |
+| 60 | 80.9 (−2.6 %) | 483,393 (−1.9 %) |
+
+The cause is **granularity, not distance**. three culls an `InstancedMesh` against ONE bounding
+sphere that unions every instance, and this world is built from district-spanning sets: measured
+radii on d2-v1 are `traffic-parked-wheels` 1059 m (600 instances), `streetlight-housings` 1089 m
+(280), `traffic-light-lens-glass` 810 m (117), each parked-car body ~1000 m. A sphere a kilometre
+across intersects every frustum that contains the camera, at any far plane. Extracting the mirror
+camera's own frustum planes and testing every instance against them on the live scene: of 417,783
+static triangles submitted, **11,423 were inside the frustum — 97.3 % of the pass could not appear
+in it**. `traffic-parked-wheels` alone sent 112,800 triangles for zero visible wheels.
+
+`scene/vitok/mirrorInstanceCull.ts` therefore does the cull three cannot: keep an `InstancedMesh`
+only if at least one INSTANCE touches the mirror frustum. Same conservative sphere test, one level
+deeper, so nothing that could be seen is removed. Per mirror entry, same-session A/B (the shipped
+cull, then the same camera rendered into the same target with exactly the meshes it hid put back):
+
+| district, tier low L1 | draws | triangles |
+| --- | --- | --- |
+| d2-v1 | 83.0 → **20.0** (−75.9 %) | 492,716 → **128,996** (−73.8 %) |
+| hz-roadworks-v1 | 97.2 → **42.9** (−55.9 %) | 172,994 → **76,950** (−55.5 %) |
+| sp-creep-v1 | 85.9 → **37.1** (−56.8 %) | 176,991 → **88,883** (−49.8 %) |
+| ov-crest-v1 | 75.6 → **36.1** (−52.2 %) | 329,412 → **250,081** (−24.1 %) |
+| mw-v1 | 25.5 → **12.0** (−52.9 %) | 53,566 → **30,068** (−43.9 %) |
+| pe-cane-v1 | 39.0 → **21.0** (−46.2 %) | 49,074 → **38,658** (−21.2 %) |
+| d2-v1, **chase** rear-view window 384 × 160 | 85.0 → **23.7** (−72.1 %) | 548,334 → **204,618** (−62.7 %) |
+
+The last row is `CameraRig`'s chase rear-view window — §3.2's founder item 44, the mirror he
+actually drives with — which had the identical defect and gets the identical fix, as does the Q/E
+door-mirror window.
+
+**The glass is unchanged, and that is checked, not argued.** Reading the 256 × 96 target back twice
+in the SAME frame at the SAME car pose — once as the product renders it, once with the 112 meshes
+the cull hid put back — gives a byte-identical image: 0.00 % of channels differ by more than 8/255,
+max 0. The positive control (hide all 123 instanced meshes) moves 4.27 % of channels, so the
+instrument is not blind. Photographed from the driving seat, the glass still shows road, markings,
+the guidance ribbon, trees and the ridge; mean luminance 130.0, σ 34.0, 0 % black pixels.
+
+Cadence was **not** touched. The pass still enters 24.9–25.2 % of frames at tier low and 50.0 % at
+med, so worst-case mirror staleness is unchanged.
+
+#### What the gate does now, and what it still cannot do
+
+`environment/frameCost.ts` owns the frame question and `scoreFrameDrawBudget` takes a nominal
+`MeasuredFrame`. Verified against the shipped sources:
+
+* `scoreFrameDrawBudget(world.stats.staticDrawSlots)` → **TS2345**, and so does a hand-written object
+  literal that merely looks like a frame. `measuredFrame()` throws `NotAMeasurementError` on a
+  missing instrument/surface/canvas/date, on a canvas that is not `w×h`, on 59 frames, and on a
+  zero count.
+* On all six measured districts the OLD comparison (`staticDrawSlots ≤ PERF_BUDGETS.low.drawCalls`)
+  scores **pass** while the measured frame scores **fail** — the static number is 3.2×–4.0× off.
+* The ceiling is a real bound, not decoration: measured frames sit **8.5 %–42.3 %** under it, and a
+  frame one draw over is rejected by the same assertion `frameCost.test.ts` makes.
+* **It cannot bind an unmeasured district.** The ceiling and the ratchet only cover the 6 districts
+  in `MEASURED_FRAMES`; the other 99 are unchecked. And an author willing to write a false
+  provenance gets a static number through `measuredFrame()` — the guard stops an accident, not a
+  lie.
+
+#### The line that has to be re-derived
+
+`COCKPIT_DRAWS = 56`, measured identically in every district. That is **80 % of the whole tier-low
+frame budget** before one metre of road is drawn, in a product whose thesis (ADR-005) is that the
+cockpit is the thing you sit in. `docs/simulation/quality-gap/13_webgl_perf_budget.md` §2 — the
+allocation table §2.2 cites — gives the hero car **30–50 draws inside a 150-draw LAPTOP frame**, and
+makes per-instance frustum culling a *precondition* that was never implemented until this row.
+Nothing here edits `PERF_BUDGETS`: re-deriving §2.2's draw line is a founder call.
+
+**Still no frame time, anywhere.** Every number above is headless chromium on ANGLE/D3D11 with
+SwiftShader available. Draw and triangle counts are scene-graph properties and transfer between
+machines; milliseconds do not. §2.4's Galaxy A16 gate is still open and nothing here closes it.
+
+### 2.7 The hero car's LOD and the parapet — counted again, 2026-08-11
+
+§2.6 counted the frame before the hero car was decimated. `hero_car.glb` has since gone from
+**65,434 to 11,220 scene triangles (−82.9 %)**, and a second lane proposed swapping the pavement
+parapet for a "3.3× cheaper" railing. This section measures both **through the shipped code path,
+with nothing in the working tree edited**: each asset is fulfilled from a buffer by
+`page.route()` per browser context, so BEFORE and AFTER are the same server, the same build, the
+same station and the same canvas, and the only difference is the bytes.
+
+**BEFORE is `git show HEAD:…/hero_car.glb`, served the same way as AFTER** — both arms go through
+route fulfilment, so neither side gets a different loader path. All 32 windows: 1264 × 620 dpr 1,
+seatbelt buckled, rolling at 20 km/h, 8-second windows, **413–499 whole frames each, 0 page errors,
+0 windows rejected**. Four liveness assertions per window (rAF, raw GL draws, the **sim clock**, and
+the car's own displacement); the 16 station pairs match to **≤ 0.1 m**.
+
+#### Draws and triangles, all 16 configurations
+
+Verdicts are `PERF_BUDGETS`: tier low 70 soft / 100 hard draws, 250k / 300k triangles; tier med
+150 / 250 and 700k / 900k.
+
+| district · tier · rung | draws before → after | draws verdict | triangles before → after | Δ | triangles verdict |
+| --- | --- | --- | --- | --- | --- |
+| pe-cane-v1 low L1 | 153.8 → **153.5** | FAIL 1.54× hard | 168,167 → **114,402** | **−53,765 (−32.0 %)** | PASS 0.38× |
+| pe-cane-v1 low L3 | 126.4 → **126.3** | FAIL 1.26× | 102,587 → **102,470** | −116 | PASS 0.34× |
+| pe-cane-v1 med L1 | 272.3 → **272.3** | FAIL 1.09× | 271,045 → **162,617** | **−108,428 (−40.0 %)** | PASS 0.18× |
+| pe-cane-v1 med L3 | 218.0 → **218.0** | WARN 0.87× | 140,075 → **140,075** | 0 | PASS 0.16× |
+| d2-v1 low L1 | 214.0 → **214.0** | FAIL 2.14× | 1,137,300 → **1,083,086** | −54,214 (−4.8 %) | FAIL **3.61×** |
+| d2-v1 low L3 | 190.8 → **190.8** | FAIL 1.91× | 1,070,484 → **1,070,484** | 0 | FAIL **3.57×** |
+| d2-v1 med L1 | 422.0 → **422.0** | FAIL 1.69× | 2,038,711 → **1,930,283** | −108,428 (−5.3 %) | FAIL **2.14×** |
+| d2-v1 med L3 | 375.5 → **375.5** | FAIL 1.50× | 1,905,078 → **1,905,078** | 0 | FAIL **2.12×** |
+| sp-creep-v1 low L1 | 173.7 → **174.1** | FAIL 1.74× | 230,619 → **176,405** | **−54,214 (−23.5 %)** | PASS 0.59× |
+| sp-creep-v1 low L3 | 148.9 → **148.9** | FAIL 1.49× | 164,721 → **164,699** | −22 | PASS 0.55× |
+| sp-creep-v1 med L1 | 364.1 → **365.6** | FAIL 1.46× | 428,830 → **320,449** | **−108,381 (−25.3 %)** | PASS 0.36× |
+| sp-creep-v1 med L3 | 316.1 → **315.9** | FAIL 1.26× | 297,146 → **297,036** | −110 | PASS 0.33× |
+| ov-crest-v1 low L1 | 182.6 → **182.4** | FAIL 1.82× | 487,766 → **433,633** | **−54,134 (−11.1 %)** | FAIL **1.45×** |
+| ov-crest-v1 low L3 | 159.2 → **159.3** | FAIL 1.59× | 421,381 → **422,385** | +1,004 | FAIL **1.41×** |
+| ov-crest-v1 med L1 | 391.4 → **391.8** | FAIL 1.57× | 925,923 → **819,529** | **−106,394 (−11.5 %)** | **FAIL → WARN** 0.91× |
+| ov-crest-v1 med L3 | 344.9 → **344.9** | FAIL 1.38× | 792,560 → **792,511** | −48 | WARN 0.88× |
+
+**REDUCED, NOT CLOSED — and only on half the matrix.** Draw calls did not move anywhere (the whole
+16-configuration range is **−0.3 to +1.5**) and never could: decimation removes triangles from a
+submission, not submissions. **0 of 16 pass the draw budget, exactly as before (15 FAIL, 1 WARN).**
+Triangles went from 8 PASS / 1 WARN / 7 FAIL to **8 PASS / 2 WARN / 6 FAIL** — **exactly one
+verdict in the whole matrix moved**, `ov-crest-v1 med L1` from FAIL to WARN.
+
+#### The eight rung-3 rows are a negative control, and they behaved
+
+`HeroCarBody` renders inside `<group visible={!cockpitView}>`, so **from the driving seat the
+player's own shell is never submitted**; at rung 1 the 65,434 triangles in frame are the ShadowCar
+**ghost**, which loads the same GLB. At rung 3 there is no ghost and no shell — the census reads
+**0 hero triangles visible in both arms** — so an 82.9 % cheaper car must buy exactly nothing. It
+does: the eight rung-3 deltas are **0, 0, 0, −22, −48, −110, −116 and +1,004 triangles**, all inside
+session drift. **A wave that reported a saving there would have been measuring its own noise.**
+
+The saving is therefore ~54,200 triangles per rung-1 frame at tier low and ~108,400 at tier med —
+the doubling is the mirror pass, which carries the hero at med.
+
+#### Two counters, and they agree
+
+Counter A is a from-scratch raw WebGL wrapper; counter B is the product's own `PerfProbe`
+(`gl.info.render`, `?simPerf=1`) — different author, different arithmetic, same frame. **Worst
+disagreement across all 16 configurations: 1.21 draw calls and 1.37 % of triangles.** All four
+`d2-v1` configurations agree **to the digit** on both metrics. The instrument also reproduces
+numbers it never saw: §2.6's independently-recorded `d2-v1` low L1 (1,137,300) and the committed
+`MEASURED_FRAMES` rows for `d2-v1` low L3 (190.8 / 1,070,484) and med L1 (422.0 / 1,930,283) come
+back **exact**, and `pe-cane-v1` low L1 before-LOD lands on §2.6's 168,131 at **168,167 (0.02 %)**.
+
+#### It still looks right from the seat — photographed, with both controls
+
+DOM hidden, canvas-clipped, same spawn, `pe-cane-v1` tier low.
+
+| comparison | pixels differing > 8/255 | mean channel Δ |
+| --- | --- | --- |
+| cockpit, **the change** (stock → shipped) | **1.752 %** | 0.291 |
+| cockpit, **noise floor** (same car photographed twice) | **2.154 %** | 0.403 |
+| cockpit, **positive control** (hero + interior hidden) | **32.733 %** | 25.771 |
+| cockpit **rung 3**, the change | **0.005 %** | 0.003 |
+| chase cropped to the car, the change | 3.605 % | 0.868 |
+| chase cropped to the car, noise floor | 1.324 % | 0.241 |
+| chase cropped to the car, positive control | 68.137 % | 55.014 |
+
+**From the seat the change is smaller than the frame's own noise, and the difference image says
+why.** Opened and read rather than summarised: the differing pixels are almost entirely the
+**level-1 guidance ribbon** — big blue chevrons down the centre of the road — plus the green lane
+guide. Those same chevrons appear, in the same places and at the same strength, in the **noise-floor
+control where nothing was changed at all**, because the ribbon animates between shutter releases.
+What is left that is genuinely the car is **a few pixels at the vanishing point**, where the
+demonstration ghost sits ~50 m ahead. The dashboard, wheel, binnacle, A-pillar, mirror and
+windscreen frame are **pure white in the diff — bit-identical**. The positive control turns that
+entire cockpit solid blue, so the instrument is demonstrably not blind to the thing it reported
+unchanged.
+
+**From the chase camera the car does change, faintly.** At 3× the difference is a **one-pixel dotted
+trace around the silhouette** (sub-pixel movement, not a shape change) and **mottled specular
+banding across the lower boot lid and rear bumper**. Tail bar, mirrors, wheels, roofline and
+silhouette read as identical. This is the only camera in the product that ever sees the shell —
+cockpit hides it, the marketing hero orbits at 10.5–13.5 m, top-down is at 110 m — and at 6.0 m it
+is the closest any of them gets, which is why one LOD is the whole requirement.
+
+#### The parapet: the two railings are the same fence at different lengths
+
+Both GLBs were Draco-decoded rather than compared by triangle total:
+
+| asset | span | triangles | **per metre** |
+| --- | --- | --- | --- |
+| `railing_run_6m.glb` (ships) | 6.055 m | 672 | **111.0 /m** |
+| `railing_segment.glb` ("cheap") | 2.000 m | 204 | **102.0 /m** |
+
+**The "3.3× cheaper" is 672 ÷ 204 — a 6-metre panel against a 2-metre panel.** Per metre of fence
+the cheap railing is **8.1 % cheaper**, same height, same depth. There is no cheap railing in this
+repo, so there are two different swaps and only one of them yields the headline number: **TILED**
+(3 × segment end to end, 612 tris/panel, balusters keep their 0.143 m pitch) and **STRETCHED**
+(1 × segment scaled 3.03×, 204 tris/panel, baluster pitch 0.143 → **0.432 m** and width ×3.03 —
+precisely the stretched-baluster tell `world/types.ts:616-618` warns about).
+
+Measured on `ov-crest-v1`, rung 1, 83 parapet panels, each variant expressed as node transforms on
+the real segment mesh so `bakeVertexColored()` bakes it exactly as it bakes the shipped panel:
+
+| tier | railing | draws | triangles | Δ vs shipped | verdict |
+| --- | --- | --- | --- | --- | --- |
+| low | ships today (672) | 182.6 | 433,784 | — | FAIL 1.83× draws / FAIL **1.45×** tris |
+| low | tiled (612) | 182.5 | 426,418 | −7,365 | FAIL 1.83× / FAIL **1.42×** |
+| low | stretched (204) | 182.7 | 385,722 | **−48,061** | FAIL 1.83× / FAIL **1.29×** |
+| med | ships today (672) | 391.1 | 815,696 | — | FAIL 1.56× / WARN 0.91× |
+| med | tiled (612) | 391.1 | 808,158 | −7,537 | FAIL 1.56× / WARN 0.90× |
+| med | stretched (204) | 391.5 | 759,739 | **−55,957** | FAIL 1.57× / WARN 0.84× |
+
+**The swap changes no verdict anywhere.** Draws cannot move — the parapet is ONE `InstancedMesh`
+costing ~1.2 draws — and at tier low even the stretched swap leaves **385,722 triangles against a
+300,000 hard cap (1.29×)**. At med, triangles were already WARN *because the hero LOD had landed*,
+so the railing has nothing left to flip. The internal control is exact: hiding the parapet gives
+**369,504 / 369,704 / 369,504** triangles across the three arms, so the runs differed only in the
+railing.
+
+**And the cheap one is visibly worse.** Photographed at two stations, same seat, same canvas
+(1264 × 619, poses reproduced to 2 cm): the **tiled** swap is indistinguishable from what ships; the
+**stretched** swap reads as a different, cheaper object at both distances — chunky posts at three
+times the spacing that you see straight through, a Bulgarian парапет traded for a ranch rail. It
+buys ~11 % of a tier-low frame and still leaves the district at 1.29× the cap.
+
+**The lever on this district is not the fence.** An object-attributed census of the same frames puts
+the procedural **parked-car row at 35.8 % of tier-low triangles (177,805, 38.6 draws)** and **trees
+at 18.9 %** against the parapet's 13.8 % — on an извънградски път with a 90 km/h limit. That is a
+content question before it is a rendering one, and it is untouched.
+
+**Still no frame time.** As §2.6: draw and triangle counts are scene-graph properties and transfer
+between machines; milliseconds do not.
 
 ---
 
@@ -461,7 +883,7 @@ not to this list.
 | `platform/public/sim/LICENSES.md` | `shanghai_riverside_1k.hdr` is loaded (`LessonScene.tsx:944`) but undocumented; `sky_clear_1k.hdr` is documented but appears unused. | **done.** The register now carries a *loaded-by* table (day IBL / night IBL) rather than a bare inventory, because "we own a licence for it" and "we ship it" turned out to be different questions and only the second one has a byte cost. |
 | `platform/public/clips/*.png` | **237 MB of PNG keyframes that no runtime code references** — the manifest references only the 4 MB WebP set. Delete before expanding the clip library. | **done 2026-07-26 — 210 files, 247,317,007 B reclaimed.** Verified before the delete, not assumed: `manifest.json` resolves to 42 `.webm` + 210 `.webp` and **zero** `.png`; every `.webp` it names exists on disk and every `.webp` on disk is named by it; the only `.png`-shaped code left in the clip path is the dev capture route (`api/dev/clips/route.ts`), which *writes* new keyframes, and `clipKeyframeSrc()` (`clips/capture/manifest.ts:76`), which has **no call site** outside that route. Every consumer that reads keyframes — `clipManifest.ts`, `contact-sheet.mjs`, `keyframes-to-webp.mjs` — resolves them through the manifest, so all three followed the WebP. Deleted with the verified tool (`npm run clips:prune-png -- --apply` — the `--` matters, without it npm swallows the flag and the script only dry-runs), which independently refuses any PNG lacking a manifest-referenced WebP sibling; it reported 210 safe / 0 must-keep. `clips-keyframes` in `publicBudget.mjs` stays as a bucket — the capture route still produces PNGs, so the tripwire is still needed. **These were gitignored, so the delete is not revertible**; re-deriving them is the ~4.3 h GPU batch in §6.2 P7. |
 | `platform/src/modules/sim/environment/__tests__/quality.test.ts:130` | Asserts `dpr 2 → "med"`; will need updating when the tier is seeded from device signals. | **done — it did not need updating.** `recommendQuality`'s cold-start branch now delegates to `seedQualityFromSignals`, which reduces to exactly the shipped dpr-only rule when no other signal is known — so a bare `dpr: 2` still answers `"med"`, and a `dpr: 2` panel that is *also* touch-only now answers `"low"`. Both are asserted. |
-| `platform/src/modules/sim/environment/qualityStore.ts` | **`useAutoQualityProbe` is exported and never mounted** — no call site anywhere outside its own module. The simulator's real tier comes from `loadQualityPreset()` (`lesson-ui/QualityPresetSelector`), which had no probe and no seed at all. Found while implementing §2.3 fix 2. Consequence: **a wrong tier does not self-correct**, which is why the device seed is deliberately narrow (it only ever demotes a device with no fine pointer). | **recorded, deliberately not actioned.** Wiring the probe would change render tier mid-drive for an existing user, which is a product decision and not a correction. Left as a standing entry so the next reader finds the reasoning instead of rediscovering the dead export. |
+| `platform/src/modules/sim/environment/qualityStore.ts` | **`useAutoQualityProbe` is exported and never mounted** — no call site anywhere outside its own module. The simulator's real tier comes from `loadQualityPreset()` (`lesson-ui/QualityPresetSelector`), which had no probe and no seed at all. Found while implementing §2.3 fix 2. Consequence: **a wrong tier does not self-correct**, which is why the device seed is deliberately narrow (it only ever demotes a device with no fine pointer). | **CLOSED 2026-08-12 (doc 91 §N2·A), in two steps, and the second one is the interesting half.** (1) `e979dda` mounted it: `useQuality()` arms the probe, so it runs exactly when the canvas does. (2) That was not enough, and nobody had checked. The ONLY reader of the ledger the probe writes is `seedQualityLevel()`, which is **memoized for the page load** — and `/simulator` is a client-routed React app that never reloads the document between lessons. A phone could measure itself drowning, write the verdict down, and be handed the same tier for every lesson of the session: *"applied at the next cold start"* was true of the store and false of the product. `LessonSelectScreen` now calls `refreshSeededQuality()` on mount — the canvas is unmounted, no drive is in progress, and the next lesson has not chosen its texture download plan yet. **The mid-drive change stays refused, and now with evidence rather than caution:** `HeroCarBody`, `VehicleRig` and `MirrorRig` each call `loadQualityPreset()` once at mount and never subscribe, so a live tier change renders a clearcoat hero car inside a `low` environment; the only thing that re-reads them is a `sceneEpoch` remount, which discards the drive. |
 | `platform/public/sim/env/sky_clear_1k.hdr` | 1,522,032 B, `ship: "prod"`, referenced by **no runtime code and no authoring script** — ~11% of the sim's ~13.8 MB runtime payload shipping for nothing. | **deleted 2026-07-26 — 1,522,032 B off every deploy.** Re-verified by grep across `src/`, `scripts/`, `tools/` (including the Blender rigs, which load `sky_urban_1k.hdr`) before removing: the only mentions anywhere were this document and the licence register. Unlike the clip PNGs this file **is** tracked, so the removal is one `git checkout` away from being undone; its Poly Haven provenance stays in `public/sim/LICENSES.md` under a "Removed" heading, because a register that forgets what was once shipped cannot answer a later question about what was once shipped. The `sim-env` bucket ceiling in `publicBudget.mjs` was left at 6 MB rather than re-tightened around the two survivors — that is a tripwire calibration, and calibrating it against a payload that is still mid-change would just have to be redone. |
 | `platform/src/components/sim/vitok/MirrorRig.tsx` | Mirror renders as a solid black rectangle in `public/clips/sc-vp-readiness__m0.k2.webp` despite a real 256×96 render target. | **open.** Re-confirmed against the frame on 2026-07-26 — still a pure black rectangle in the driver's eyeline. Owned by the §6.1 P0 visual bundle (`| — | Bug: …` in §3.2), not by an asset pass. |
 

@@ -7,6 +7,13 @@ node_modules/
 # which showed up as 621 untracked files one `git add -A` away from being
 # committed. The default stays plain `.next`, so this ignores only the opt-ins.
 .next-*/
+# …and the per-lane tsconfig each of those dirs gets. `next dev` APPENDS its
+# `<distDir>/types/**` globs to whatever tsconfig it is pointed at and writes
+# the file back; next.config.ts points it at one of these so the tracked
+# platform/tsconfig.json is never opened for writing. Generated, disposable,
+# one per lane — delete with the build dir. Narrow on purpose: a real
+# tsconfig.build.json would still be tracked.
+tsconfig.next-*.json
 dist/
 build/
 .env
@@ -22,6 +29,9 @@ coverage/
 # clip rig server state (pid + log) — tools/clips/headless/clip-rig.mjs
 tools/clips/headless/.rig/
 tools/clips/headless/.r0look/
+
+# perf harness server state (state.json + server.log) — tools/perf/perf-server.mjs
+tools/perf/.server/
 
 # R0 review frames — captured to LOOK at (doc 66: look before you ship), then
 # thrown away. They are evidence for one review, not product: the pipeline's

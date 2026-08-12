@@ -19,6 +19,10 @@
 ## simulation/
 12 Simulator Architecture · 13 Vehicle Systems · 14 Physics · 15 Traffic AI · 16 NPC Behavior · 17 World/Map System · 18 Weather & Environment · 19 VR & Hardware — all ⚪ (H1+ concerns; 17 needed early for map/data licensing research)
 
+**Produced media (implemented):** [66 Produced-media ground rules](development/66_PRODUCED_MEDIA_GROUND_RULES.md) — R0–R6, LAW for every clip/still ✅ · [69 Headless clip production](development/69_HEADLESS_CLIP_PRODUCTION.md) — the unattended renderer ✅ · [90 FR-19 clip production spec](simulation/90_FR19_CLIP_PRODUCTION_SPEC.md) — which of the thirteen pre-drive steps get a clip, which keep the still, and the reject gate ✅
+
+**Mobile:** [91 Mobile audit](simulation/91_MOBILE_AUDIT.md) — the phone the founder actually drives on: what is broken (§C), why (§D), the smallest fix for each (§I), the wave order (§J), and the measured wave results (§N, performance on a production build) ✅
+
 ## ai/
 20 AI System Architecture · 21 AI Instructor · 22 Driving Twin · 23 AI Memory · 24 Scenario Generator · 25 Dialogue & Voice · 26 Analytics · 27 Recommendations — all ⚪ (20 is on the critical path for H0)
 

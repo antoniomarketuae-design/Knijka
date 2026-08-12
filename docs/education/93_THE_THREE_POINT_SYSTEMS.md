@@ -569,11 +569,112 @@ reaches „другите средства за сигнализиране", whi
 fill it with чл. 185's residual 50 лв. without a retrieval — using it asserts that nothing else
 applies, which is a judgement, not a retrieval.
 
+> **RE-MEASURED 2026-08-10 and CONFIRMED, with the search made reproducible.** „регулировчик"
+> occurs **exactly 13 times** in `content/law/acts/zdvp.json`: чл. 7 (2), чл. 10 (8), чл. 113 (1),
+> чл. 120 (1), чл. 184 (1). Scoping to the 42 units of the penal chapter (чл. 174 … чл. 189и) leaves
+> **one** hit, and it reads „наказва **пешеходец**, който: … 2. не спазва светлинните сигнали на
+> пътните светофари и сигналите на регулировчика". The blank stands. **It is no longer silent,
+> either:** the fault card now says so out loud — „Тук няма число — и това е находка, а не пропуск"
+> — names чл. 184 as the pedestrian article, names чл. 185 without applying it, and still answers
+> the licence question („0 контролни точки — не е в списъка"), which *is* grounded. Rendered and
+> opened: `scratchpad/shots/CONTROLLER_SIGNAL_VIOLATED-w430.png`. **The one thing still owed is his
+> ruling**, not more research: should the residual 50 лв. be SHOWN? The quote is retrieved either
+> way; showing it means asserting a negative about the whole penal chapter.
+
 ### G-12 — 13 of 53 violation codes have no road consequence at all
 Deliberate, pinned by name in `catalog-consequences.test.ts`. Most are faults that break no road
 rule. The two worth another attempt are G-11 above and `PEDESTRIAN_CROSSING_TOO_FAST` (the detector
 fires on the *approach*, before the yield has been failed, so чл. 183, ал. 5, т. 2's 150 лв. would
 charge for an offence not yet established).
+
+> **CLOSED 2026-08-10 — and the count above was measuring the wrong thing.** The real number at
+> `HEAD` was **5 of 53 structured**, not 40: `ROAD_CONSEQUENCES` carried exactly
+> `SPEEDING_DANGEROUS`, `SPEEDING_OVER_LIMIT`, `RED_LIGHT_CROSSED`, `PEDESTRIAN_NOT_YIELDED` and
+> `STOP_SIGN_NO_FULL_STOP`; everything else fell through to the catalogue's authored prose or to the
+> blank. **It is now 53 of 53**, verified by the CONSEQUENCE-AUDIT gate re-deriving every figure
+> from `content/law/acts` with its own reader rather than the lane's test: **307 `LawQuote`s, 307
+> verbatim, 307 inside the unit their citation names**; **167 numeric figures, 167 of which state
+> their own number inside their own quote.** The `authored` prose tier is now unreachable — no code
+> resolves to it.
+>
+> **The shape of the answer is the finding.** 27 rows are priced outright, 2 are the act's own
+> ladder, **17 break a real duty whose money the act gates on a fact the simulator never
+> established**, 6 say plainly that the fault costs points on the sheet and nothing on the street,
+> and 1 is an honest blank naming the act we do not hold.
+>
+> **The licence column, counted across all 53 — and one lane's headline does not survive the wider
+> count.** A lane reported „SEVEN of the twenty take licence points". That is true of *its* twenty
+> rows and **not** of the catalogue: **13 of the 53 take контролни точки outright** —
+> `RED_LIGHT_CROSSED`, `SEATBELT_OFF_WHILE_MOVING`, `PEDESTRIAN_NOT_YIELDED`,
+> `YELLOW_LIGHT_NOT_STOPPED`, `RED_YELLOW_CROSSED`, `OVERTAKING_AT_CROSSING`,
+> `OVERTAKING_IN_BAN_ZONE`, `RAIL_CROSSING_VIOLATION`, `EMERGENCY_LANE_DRIVING`,
+> `OVERTAKE_INSUFFICIENT_GAP`, `OVERTAKE_RETURN_TOO_EARLY`, `VULNERABLE_PASS_TOO_CLOSE`,
+> `PREDRIVE_SEATBELT_SKIPPED`, all at 10. **31 more state an explicit, ungated ZERO** (14 `single`
+> + all 17 `conditional`) because Наредба № Iз-2539 чл. 6, ал. 1 is an exhaustive list of 22
+> offences and they are not on it. **2** are the speeding ladders, where the licence cost runs
+> **0 → 18 by rung**. **7** show no licence row at all — the six `exam-only` and the one blank.
+>
+> Two rows sit next to each other and a student would guess both backwards: an overtake that
+> endangered nobody is **50 лв. and TEN контролни точки** — the same licence cost as running a red
+> light — while failing to make way for an ambulance is an опасна грешка worth **200 лв. and ZERO**.
+
+**The table, re-derived by the gate rather than reported by a lane.** „figures" counts глоба and
+контролни точки on every rung, branch and escalation; „verbatim" counts how many of those state
+their own number inside a quote this gate re-cut from the act.
+
+**single — the act prices it outright (27)** · `COLLISION` 300 лв./0 · `CROSSED_SOLID_LINE`
+50 → 200/0 · `DRIVING_IN_BUS_LANE` 100/0 · `EMERGENCY_LANE_DRIVING` 1000 → 4000/10 ·
+`EMERGENCY_NOT_YIELDED` 200/**0** · `FAILED_TO_YIELD` 100 → 200 → 300/0 · `ILLEGAL_STOP_IN_BAN_ZONE`
+50 → 100/0 · `LANE_CHANGE_WITHOUT_INDICATOR` 50/0 · `LANE_CHANGE_WITHOUT_MIRROR_CHECK` 100 → 200/0 ·
+`MOVE_OFF_WITHOUT_OBSERVATION` 100 → 200/0 · `NOT_KEEPING_RIGHT` 50/0 · `OVERTAKE_INSUFFICIENT_GAP`
+50 → 200 → 300/**10** · `OVERTAKE_RETURN_TOO_EARLY` 50 → 200 → 300/10 · `OVERTAKING_AT_CROSSING`
+50 → 200/10 · `OVERTAKING_IN_BAN_ZONE` 50 → 200/10 · `PEDESTRIAN_NOT_YIELDED` 150/10 ·
+`PREDRIVE_SEATBELT_SKIPPED` 100/10 · `RAIL_CROSSING_VIOLATION` 100/10 · `RED_LIGHT_CROSSED` 150/10 ·
+`RED_YELLOW_CROSSED` 150 → 300/10 · `SEATBELT_OFF_WHILE_MOVING` 100/10 · `STOP_SIGN_NO_FULL_STOP`
+100/0 · `TURN_WITHOUT_INDICATOR` 50/0 · `VULNERABLE_PASS_TOO_CLOSE` 50 → 200 → 300/10 ·
+`WRONG_LANE_FOR_DIRECTION` 100 → 200/0 · `WRONG_WAY` 100 → 200/0 · `YELLOW_LIGHT_NOT_STOPPED`
+150 → 300/10. **All 92 figures verbatim.**
+
+**ladder (2)** · `SPEEDING_DANGEROUS` and `SPEEDING_OVER_LIMIT`, both the six-rung чл. 182, ал. 1
+table 20/50/100/400/600/700 лв. with 0 → 18 контролни точки by rung. **24 of 24 verbatim.**
+
+**conditional — duty broken, every penalty gated (17)** · `CENTER_LINE_TOUCHED` · `CLOSING_ON_LEAD_TOO_FAST` ·
+**`CONTROLLER_SIGNAL_VIOLATED` (no глоба at all — G-11)** · **`DRIVING_TOO_SLOW_FOR_MOTORWAY` (no
+глоба — чл. 185 named, not applied)** · `FOG_LIGHTS_OFF_IN_FOG` · `FOLLOWING_TOO_CLOSE` ·
+`FOLLOWING_TOO_CLOSE_FOR_RAIN` · `HARSH_BRAKING_NO_CAUSE` · `HEADLIGHTS_OFF_AT_NIGHT` ·
+`HEADLIGHTS_OFF_IN_RAIN` · `HIGH_BEAM_NOT_DIPPED` · `JUNCTION_SCAN_INCOMPLETE` ·
+**`PEDESTRIAN_CROSSING_TOO_FAST`** · `POOR_LANE_KEEPING` · `SPEED_TOO_FAST_FOR_CONDITIONS` ·
+`SPEED_TOO_FAST_FOR_CURVE` · `TURN_WITHOUT_OBSERVATION`. **All carry 0 контролни точки UNGATED**
+(true today, no condition required) and their money welded to the act's own „ако…" / „когато…".
+**51 of 51 figures verbatim (92 + 24 + 51 = the 167 total).**
+
+**exam-only — costs points, costs nothing on the street (6)** · `ENGINE_STALLED` ·
+`HANDBRAKE_LEFT_ON` · `HESITATION_AT_GREEN` · `PREDRIVE_STEP_SKIPPED` · `PREDRIVE_WRONG_ORDER` ·
+`STANDSTILL_GAP_TOO_CLOSE`. **honest blank (1)** · `STOP_LINE_OVERSHOOT` — the rule is in ППЗДвП,
+which the corpus does not hold. **These seven state no лв., no €, and no контролни точки anywhere in
+their prose** — checked field by field, not assumed.
+
+> **AND THE BLANKS ARE RIGHT TO BE BLANK — every negative re-derived here, not accepted.**
+> „регулировчик" occurs **13 times** in ЗДвП (чл. 7 ×2, чл. 10 ×8, чл. 113, чл. 120, чл. 184) and
+> **exactly one** falls inside the penal chapter — чл. 184, which opens „наказва **пешеходец**".
+> „загас" occurs **0** times in the whole act and „ръчна спирачка" **0**, so the stalled engine and
+> the handbrake have nothing to be charged under (чл. 179, ал. 6 judges a technically defective
+> vehicle, and the car is not defective). „подготовка" appears 3 times in чл. 174–189, all three
+> about driving schools and psych-testing bodies — never a driver's pre-drive routine. чл. 22, ал. 1
+> forbids moving „с твърде ниска скорост" and a stopped car is not moving; чл. 23, ал. 1 measures
+> the gap to „**движещото се** пред него" and a queue is not moving. чл. 74, ал. 1 reads „може да се
+> използват **само** при…" — a permission with a limit, so ЗДвП never *requires* fog lamps and
+> `FOG_LIGHTS_OFF_IN_FOG` is right to say so in its first sentence. **No lane manufactured a fine to
+> fill a column.**
+>
+> **One row this gate would price differently, and it is not a blank — it is a double.**
+> `PREDRIVE_SEATBELT_SKIPPED` is charged 100 лв. + 10 к.т., and that is *correct*: the machine emits
+> it at **move-off**, so чл. 137а's „когато са **в движение**" is satisfied. But
+> `SEATBELT_OFF_WHILE_MOVING` fires on the same drive by design, carries the **identical**
+> `fine(100, …)` and `CP_T18_SEATBELT`, and `SessionEndScreen` renders one `FaultCard` per mistake
+> with no grouping. **One belt, two cards, 200 лв. and 20 контролни точки if the student adds them
+> up.** Two *exam* marks is deliberate and right. Two *road* prices is the founder's original
+> complaint wearing a different hat. Tracked as `C-3` in `docs/simulation/87`.
 
 ---
 
@@ -711,6 +812,46 @@ quoted from a lane's hand-over.
 
 #### STILL OPEN — every item with a NAME, an OWNER and a REASON
 
+> **STATUS AFTER THE 2026-08-10 CONSEQUENCE-AUDIT GATE — every row below re-tested, not re-read.**
+> **O-1 CLOSED**, **O-2 CLOSED**, **O-3 CLOSED**, **O-4 CLOSED**. **O-5 stands and is sharper than
+> written.** **O-6 · O-7 · O-8 · O-9 untested here or unchanged.** Four new items follow the table
+> as **O-10 … O-13**. Evidence for each closure, re-run against the real bank in the exact form this
+> table describes:
+>
+> - **O-1** — flipping `pen-speeding-urban-21-30`'s `paragraphRef` to „ал. 2" is now **refused**:
+>   „contextQuote is in ЗДвП чл. 182 but NOT in ал. 2". The discriminator this row said no field
+>   carried is now carried — the ladder's own opening („който превиши разрешената максимална скорост
+>   **в населено място**, се наказва, както следва:") sits in `contextQuoteBg` on all four чл. 182
+>   citations, and it occurs in ал. 1 and in no sibling.
+> - **O-2** — rewriting `titleBg` to „Превишена скорост в населено място" on the Б2 row is now
+>   **refused**: „„превишена, скорост, населено, място" occurs in none of this row's verified
+>   quotes". The tie this row said was unshippable was shipped in a form that survives the honest
+>   rows — a 5-character stem match with numerals surviving at any length — and O-1's own fix is
+>   what made it possible, by putting „населено място" into the evidence. **The `id` half of O-2 is
+>   NOT closed and moves to O-12.**
+> - **O-3** — truncating `pen-b2-no-stop-danger`'s phrase to „не спазва предписанието на пътните
+>   знаци" is now **refused**: „the offence phrase stops before the act does … „ако" opens the
+>   condition that decides the figure". The check reads the act's own punctuation inside the
+>   narrowest cited scope, so it needs no new declarable field. It also found a **second live
+>   instance** the gate was not looking for: `pen-b2-no-stop-danger`'s контролни-точки phrase had
+>   dropped the identical „ако" clause from Наредба № Iз-2539 чл. 6, ал. 1, т. 15 — pricing the
+>   no-danger conduct with the danger figure. Fixed in the builder, not exempted.
+> - **O-4** — **closed by execution, which is the part that matters.** The blocker this row names
+>   („the inputs are gitignored scratch, so the tool cannot be re-run") is cleared: all four
+>   originals are on disk and **all four sha256 match `sources.json`**, and this gate re-ran both
+>   builders into a scratch directory and reproduced **all six emitted acts byte-identically** to
+>   the working tree. Removal happens in the extraction and `assertNoVendorPagination` refuses to
+>   emit an act still carrying either signature. **188 pieces across 505 units at `HEAD` → 0.** The
+>   „185" in this row is an undercount: it reported *units* for НСИПМК (3) where it reported *pieces*
+>   for the other two (124, 58); the piece count there is 6.
+> - **O-5** — **stands, and the deletion hole is narrower and sharper than described.** Deleting the
+>   anchor group that carries „Б2" is now caught, but by the **digit** rule („statementBg states
+>   „2", which is in none of the anchors"), not by any widening rule. Deleting the **verb** group
+>   (`не спира` / `не спре`) still returns `[]` from `verifyCitations` against the full bank.
+>   Measured consequence: the pinned discrimination matrix goes **4 → 5**, and the new pair is a
+>   контролни-точки phrase **from the наредба** crossing a row — precisely what that test's own
+>   comment says must never happen. So the repo still catches it and the loader still does not.
+
 | # | name | owner | what is actually wrong | reason it is still open |
 |---|---|---|---|---|
 | **O-1** | `chl-182-alinea-twins` | law-content lane — `content/law/penalties.json` + `lib/content/law/corpus.ts` | ЗДвП чл. 182 ал. 1 т. 3 and ал. 2 т. 3 are **word for word identical**, so flipping `paragraphRef` to „ал. 2" on the in-town speeding row is invisible to every check, including the new alinea-span parser. Harmless at that tier (both 100 лв.); **not harmless at т. 4, where in town is 400 лв. and out of town 300.** Measured: the mutation passes `verifyCitations` AND the whole repo suite. | The discriminator is the alinea's own opening („в населено място" / „извън населено място") and **no citation field carries it.** Closing it means the citation must declare which ladder it is on — a schema addition, not a matcher tweak. The 31–40 row does not exist yet, which is exactly when to fix it. |
@@ -722,3 +863,54 @@ quoted from a lane's hand-over.
 | **O-7** | `score-readout-never-photographed` | theory lane | `ScoreReadout` (the revisited-attempt result) and `HistoryRow` (the index) in the two `exams` `page.tsx` files have **never been rendered by anyone**. `ScoreReadout` is the more-travelled of the two result screens. | They are module-private inside async server components behind `requireUser`; `/exams` returns 307 → `/login`. Needs a seeded user with a finished attempt on the staging DB, or a `/dev` rig that mounts them the way `fold-rig` mounts the runner. |
 | **O-8** | `bare-name-in-a-display-string` | law-content lane | `lib/content/pointScales.ts:122` `CONTROL_SCALE_SOURCE_BG = "Наредба № Iз-2539"` is a bare edition name **shown to the student**, unlike the `consequences.ts` chips which now read „(изм. ДВ, бр. 49 от 2026 г.)". | Not a defect today — it names no article and no figure, so there is nothing an edition could change. Flagged because it is the last bare rendering of that act's name, and the next person to put an article number beside it inherits the original problem. |
 | **O-9** | `readme-table-contradicts-the-resolver` | law-content lane — `content/law/README.md:142` | The alias table still reads „`Наредба № Iз-2539` → the 2025 snapshot — every pre-existing citation, unmoved". **That is the old rule.** The resolver now sends a bare name to the consolidation, and lines 101–121 of the same file say so. | Two statements of one fact in one file, and the stale one is the table a reader will scan first. A one-line edit, left to the owning lane so the correction carries their measurement rather than this gate's.
+
+### Re-measured 2026-08-10 by the CONSEQUENCE-AUDIT gate — six lanes reporting, none believed
+
+| command | result |
+|---|---|
+| `cd platform && npx tsc --noEmit --incremental false` | **EXIT 0**, `grep -c "error TS"` = **0** |
+| `npm run validate:content` | **EXIT 0** — 1 089 questions, 77 signs, 16/16 topics, answer-leak sweep 17 scopes gated / 0 blocking / 0 warning |
+| `npx vitest run --maxWorkers=4` | **EXIT 1** — Test Files **2 failed \| 753 passed \| 1 skipped (756)**; Tests **2 failed \| 11 398 passed \| 170 skipped (11 570)** |
+| `npm run test:tools` | **EXIT 0** — 25 suites, **290 tests, 290 pass, 0 fail** |
+
+**Exactly two reds, both protected**, both the 29 quarantined first-aid rows: `compose.test.ts >
+gives every lesson at least one quiz beat` and `content-bank.test.ts > has no dark, threadbare or
+under-represented topic`. **No third red anywhere** — `unpanel.test.ts`, `sim-overlay-dismiss.test.tsx`,
+`scenery-sightline.test.ts`, `sc-ov-return-gap-traces.test.ts` and `mw-exit-districts.test.ts` all
+pass, and `PlayAreaStyles.tsx` (the 59 `tsc` errors one lane reported) is clean. Seven temporary
+probe files were created under `platform/src` and **all seven deleted**; the numbers above are the
+clean re-run *after* deletion — with the probes present it read 761 files / 11 575 tests, a delta of
+exactly the five files and five tests they contained. Nothing committed.
+
+**The citation-attack sweep: 16 mutations run against the real bank — 15 attacks and 1 negative
+control.** Caught: the чл. 182 alinea flip, the wrong-act re-cite (crude form), the digit-carrying
+anchor deletion, the title rewrite, the phrase truncation, an inflated контролни-точки count, a
+fabricated 5 000 лв. under `status: "grounded"`, and a fabricated 5 000 лв. under
+`status: "not-listed"` — **that last one by the schema, not the loader** („status „not-listed" means
+the offence is absent from an exhaustive list, so amountBgn must be 0"), which is worth knowing
+because the loader alone would have taken it and `describeFine` renders the money regardless of
+status. **Through the loader: five** — the 2025-snapshot re-cite (`corpus.test.ts:1457` catches it),
+the verb-anchor deletion (the discrimination matrix catches it), the id rewrite and the duplicate id
+(named tests catch them incidentally), and **the instrument upgrade, which nothing anywhere catches**.
+The negative control — the untouched bank — was correctly silent.
+
+#### NEW after the 2026-08-10 CONSEQUENCE-AUDIT gate — three of its own attacks, and one it refuses to call closed
+
+| # | name | owner | what is actually wrong | reason it is open |
+|---|---|---|---|---|
+| **O-10** | `instrument-never-checked-against-its-own-rule` | law layer — `lib/content/law/corpus.ts` | Setting `fine.instrument` to „електронен фиш" while `instrumentSource` still quotes **чл. 186, ал. 1 — the фиш rule** passes `verifyCitations`, passes `FinePenaltySchema`, passes `PenaltyEntrySchema` and passes the suite. `describeFine` then renders „51,13 € (100 лв.) **(електронен фиш)**" on a row whose own `noteBg` ends „…затова може да се наложи с **фиш**". **This is the only attack in the sweep that got through every layer.** | One rule closes it: the instrument named must be the one the cited article permits. It is unwritten because `instrumentSource` is deliberately passed no `status` and no `conduct` (it names no offence), so it currently skips checks (3) and (5b) entirely — the exemption is right, but it left the field itself unguarded. |
+| **O-11** | `penalty-id-not-unique` | law layer — `corpus.ts build()` | Two rows may share an `id`. `verifyCitations` returns `[]`, both schemas accept, and `build()` has **no uniqueness guard** — `getPenalty` takes the first match, so the second row becomes silently unreachable. | Free to fix (a `Set` in `build()`), and unnoticed only because all seven ids happen to be named in `corpus.test.ts`, so a duplicate throws there today. That is incidental coverage, not a guard. |
+| **O-12** | `row-id-untied` *(split out of O-2)* | law-content lane | Rewriting a row's `id` to another row's subject leaves the loader and both schemas silent; the rendered card is unaffected because the id is a pure key. Caught only because `corpus.test.ts` names ids 20 times. | Genuinely low blast radius **today** and worth saying why: `describeFine` / `describeControlPoints` are called from **nothing outside the law layer and its tests** — the 7-row penalty bank has no product surface yet. O-10, O-11 and O-12 all become student-visible on the same day the penalty card is built. |
+| **O-13** | `fault-cards-never-seen-over-a-cockpit` | render lane | All 38 rendered consequence-card frames are the shipping `SessionEndScreen` mounted on `/dev/popup-rig` against a **flat** backdrop. No one has ever seen a road-consequence card over a live cockpit. | Not impossible, as previously implied — `scratchpad/uxrows/frames/a2-iphone16-landscape-22-debrief-skip-note.png` shows the same end screen over the live cockpit on a real phone (WebKit, 852×393, `compactAttr "on"`). It simply had **0 наказателни точки**, so no `FaultCard` was in frame. One driven phone session with one graded mistake closes it. |
+
+#### BLOCKED ON THE FOUNDER — named so it is not counted against the build
+
+| item | what is owed | why nobody else can do it |
+|---|---|---|
+| **the 29 first-aid rows** | the medical ruling | They are the **entire** content of the two protected reds (`compose.test.ts`, `content-bank.test.ts`). No engineering change makes them green honestly. |
+| **чл. 185's residual 50 лв.** | show it as a figure, or keep naming it with no number | Applying a residual clause asserts that nothing else in the penal chapter prices the fault. That is a judgement about the whole act. It affects `CONTROLLER_SIGNAL_VIOLATED`, `TURN_WITHOUT_OBSERVATION` and `DRIVING_TOO_SLOW_FOR_MOTORWAY`; the quote is already retrieved, so either ruling is cheap to implement. |
+| **O-2's student-facing titles** | whether row titles may be rewritten into statutory vocabulary | Closed for `titleBg` by a vocabulary rule that the honest rows survive — but the *summary* tie was measured and **refused**: under the same rule 7 of 7 honest summaries go red, and any threshold that saves them is a number somebody picked. Left as prose on purpose. |
+| **`B16`** | his ruling | Recorded in `docs/simulation/87`. |
+| **`B52` / `B60` bodies** | his Blender work | The child rig has no run pose (so a child moving at 2.9 m/s photographs as a standing capsule) and the officer has no cap and no палка. Engineering has done its half: six staged children, three running on converging paths, nearest approach 1.78 m against a 1.5 m contact radius, `onRoad` false on every frame so grading is untouched. |
+| **ППЗДвП and Наредба № РД-02-21-1** | a decision to ingest, or to keep citing them by subject | Both are index-only in `sources.json` (`sha256: null`), verified again by this gate. Three rows are short of an answer purely because of it: `STOP_LINE_OVERSHOOT` (honest blank), `POOR_LANE_KEEPING` and `CENTER_LINE_TOUCHED` (състав named, kept gated). Nothing can close them from inside the repo. |
+| **the two lex.bg source pins** | a decision on how a live web page is pinned | `src-naredba-8121z-532-lex` pins 176 695 B / `f79f2f66…` and today serves 176 965 B / `2da1238f…`; `src-naredba-iz-2539-consolidated-lex` pins 327 253 B / `b66ac515…` and today serves 327 522 B / `5c5e4ea5…`. **Re-verified by this gate.** The derived acts are unaffected — the ingest cuts at `#colleft`…`#colright` and the +270 / +269 bytes are sidebar — but a whole-file hash cannot pin a living page, and `build-sources.mjs` rewrites the whole file, so this is a policy call. |
