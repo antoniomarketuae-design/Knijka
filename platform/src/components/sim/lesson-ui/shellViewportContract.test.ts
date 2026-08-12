@@ -145,10 +145,26 @@ describe("§I11 the compact sheet has a clearance contract against the thumb ban
 
   it("…and its height is capped by the room that is actually left, not only by 0.62", () => {
     // §I11 is explicit that the clearance alone is not the fix: standing on the
-    // thumb band leaves ~137 px, so a sheet still asking for 0.62 of the
-    // viewport would be pushed off the TOP instead of the bottom.
-    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,400}min\(calc\(var\(--sim-vh, 100dvh\) \* 0\.62\)/);
-    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,400}var\(--sim-touch-floor, 0px\)/);
+    // thumb band leaves ~95 px on his phone sideways, so a sheet still asking
+    // for 0.62 of the viewport is pushed off the TOP instead of the bottom.
+    // Measured that way once, on the deployed product: «Затвори» 123.5 px above
+    // the safe-area box and the overlap with the controls UP from 9 680 to
+    // 12 276 px², because a box anchored only by `bottom:` grows upward.
+    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}min\(calc\(var\(--sim-vh, 100dvh\) \* 0\.62\)/);
+    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}var\(--sim-touch-floor, 0px\)/);
+  });
+
+  it("…and the cap has a floor, because `min()` alone collapses the box", () => {
+    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}max\(5\.5rem,\s*min\(/);
+  });
+
+  it("the sheet can never paint outside the box the cap gives it", () => {
+    // Two halves, and BOTH are load-bearing: `overflow-hidden` on the section
+    // (a `max-height` alone does not clip) and `min-h-0` on the scrolling body
+    // (a flex column item refuses to shrink below its content without it).
+    const section = OVERLAY.slice(OVERLAY.indexOf("pointer-events-auto flex w-full max-w-2xl"));
+    expect(section.slice(0, 200)).toContain("overflow-hidden");
+    expect(OVERLAY).toMatch(/className="min-h-0 min-w-0 shrink overflow-y-auto"/);
   });
 
   it("the tall case is still reachable, deliberately", () => {

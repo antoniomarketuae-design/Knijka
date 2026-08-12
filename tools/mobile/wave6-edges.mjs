@@ -521,11 +521,29 @@ for (const device of devices) {
         // §I9 belongs to an ORDINARY page, by its own words („it is unreachable
         // on the screen he was complaining about … it is the ordinary pages
         // that carry it"), so it is measured on one while we are standing here.
+        //
+        // AND IT IS AN A/B, because a raw overflow number cannot tell „the
+        // inset made this page taller than the screen" apart from „this page
+        // has more content than the screen", which is ordinary scrolling and
+        // not a defect. So: measure, remove the payback, measure again, put it
+        // back. If the delta is the inset AND the page fits without it, §L11
+        // is live here. If the page overflows by hundreds of px either way, the
+        // inset is not what the student is scrolling past.
         rec.i9Ordinary = await page.evaluate(() => {
           const de = document.documentElement;
+          const read = () => de.scrollHeight - de.clientHeight;
+          const before = read();
+          const was = document.body.style.paddingBottom;
+          document.body.style.paddingBottom = "0px";
+          void de.offsetHeight;
+          const without = read();
+          document.body.style.paddingBottom = was;
           return {
             route: location.pathname,
-            overflowYPx: de.scrollHeight - de.clientHeight,
+            overflowYPx: before,
+            overflowYWithoutBodyPaddingPx: without,
+            attributableToInsetPx: before - without,
+            fitsWithoutTheInset: without <= 0,
             overflowXPx: de.scrollWidth - de.clientWidth,
             bodyPaddingBottom: Math.round(parseFloat(getComputedStyle(document.body).paddingBottom) || 0),
           };
@@ -557,7 +575,7 @@ for (const device of devices) {
     console.log(`  T1  ${rec.touchActionMap?.zoomableCells}/81 grid cells still permit pinch (${rec.touchActionMap?.distinct.join(", ")})`);
     for (const s of rec.i6?.samples || []) console.log(`  I6  pinch@${s.label} scale ${s.before.scale}→${s.after.scale} offsetLeft ${s.before.ox}→${s.after.ox}  ZOOMED=${s.zoomed}  touch-action ${s.touchAction.at}`);
     if (rec.i6?.positiveControl) console.log(`  I6  POSITIVE CONTROL /theory: scale ${rec.i6.positiveControl.before}→${rec.i6.positiveControl.after} offsetLeft ${rec.i6.positiveControl.offsetLeft} → instrument honest = ${rec.i6.positiveControl.instrumentIsHonest}${rec.i6.positiveControl.error ? ` (${rec.i6.positiveControl.error})` : ""}`);
-    if (rec.i9Ordinary) console.log(`  I9  ordinary page ${rec.i9Ordinary.route}: document overflow y=${rec.i9Ordinary.overflowYPx}px x=${rec.i9Ordinary.overflowXPx}px (body pb ${rec.i9Ordinary.bodyPaddingBottom})`);
+    if (rec.i9Ordinary) console.log(`  I9  ordinary page ${rec.i9Ordinary.route}: overflow y=${rec.i9Ordinary.overflowYPx}px, WITHOUT the body payback ${rec.i9Ordinary.overflowYWithoutBodyPaddingPx}px → attributable to the inset ${rec.i9Ordinary.attributableToInsetPx}px; fits without it = ${rec.i9Ordinary.fitsWithoutTheInset}`);
   }
   await context.close();
 }

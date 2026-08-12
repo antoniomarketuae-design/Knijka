@@ -665,16 +665,32 @@ export function SimOverlay({
           aria-label={shown.lineBg}
         >
           <section
-            className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 rounded-t-2xl border-x border-t bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
+            className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 overflow-hidden rounded-t-2xl border-x border-t bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
             style={{
               borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
-              // §I11, half 2 — the cap. `min()` of the old budget and the room
-              // that is actually there. The 3.5rem is the sheet's own top gutter
-              // plus the notification column's first line, so an expanded sheet
-              // still cannot bury the line that named it.
+              // ── §I11, half 2 — THE CAP, AND THE `max()` IS THE HONEST PART.
+              //
+              // The clearance alone is not the fix and the first attempt at it
+              // proved the point the hard way: standing on the thumb band and
+              // still asking for `--sim-vh × 0.62` pushed the sheet off the TOP
+              // instead of the bottom. Measured on the deployed product with
+              // the clearance in and this cap not yet right — iPhone 16
+              // landscape, «Затвори» and «Разгъни панела» 123.5 px ABOVE the
+              // safe-area box, and the overlap with the controls went UP
+              // (9 680 → 12 276 px²) because a box anchored only by `bottom:`
+              // grows upward and the header row cannot shrink.
+              //
+              // THE ARITHMETIC, on his own phone held sideways: the thumb band
+              // reaches 257.5 px up a 393 px screen (pad 152 + arc rise 20.5 +
+              // station 44 + inset 21 + the band's own 20 px gap), the
+              // instrument band takes 40 more, and what is left is 95.5 px. So
+              // the compact sheet IS a two-line card — a header and one line
+              // that scrolls — exactly as §I11 said it would have to become, and
+              // «⤢» is how the rest is read. `max()` states that floor out loud
+              // rather than letting `min()` collapse the box to nothing.
               maxHeight: sheetExpanded
-                ? "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 3.5rem)"
-                : "min(calc(var(--sim-vh, 100dvh) * 0.62), calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - var(--sim-touch-floor, 0px) - 3.5rem))",
+                ? "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 0.75rem)"
+                : "max(5.5rem, min(calc(var(--sim-vh, 100dvh) * 0.62), calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - var(--sim-touch-floor, 0px) - 0.75rem)))",
             }}
           >
             <div className="flex shrink-0 items-center gap-2">
@@ -706,7 +722,12 @@ export function SimOverlay({
               </button>
             </div>
 
-            <div className="min-w-0 shrink overflow-y-auto">
+            {/* `min-h-0` is what makes the cap above real: without it a flex
+                column item refuses to shrink below its content, so the section
+                overflows its own `max-height` and the box grows off the top of
+                the screen — which is precisely the regression measured when
+                this clearance first shipped. */}
+            <div className="min-h-0 min-w-0 shrink overflow-y-auto">
               {shown.detailBg ? (
                 <p className="text-xs leading-snug text-foreground">{shown.detailBg}</p>
               ) : null}

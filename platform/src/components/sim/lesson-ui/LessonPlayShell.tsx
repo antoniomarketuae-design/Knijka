@@ -994,10 +994,18 @@ function PlayMenuRow({ item, onChosen }: { item: PlayMenuItem; onChosen: () => v
       {...tap}
       // DOC 91 · L9/§I14: measured 226×**39.5** — 4.5 px short of the 44 px a
       // thumb needs, on every row of the sheet that holds «Пауза», the quality
-      // preset and «Завърши сесията». `py-2.5` → `py-3` is the whole fix
-      // (2×12 + 15.5 line box = 39.5 → 44) and it costs 9 px per row on a menu
-      // that is already scrollable.
-      className={`flex items-center gap-2 rounded-xl px-2.5 py-3 text-left text-[13px] font-bold transition active:bg-surface ${
+      // preset and «Завърши сесията».
+      //
+      // §I14 SAYS `py-2.5` → `py-3`, AND ON THIS BUILD THAT LANDS ON 43.5.
+      // Measured, iPhone 16 landscape, production build, authenticated
+      // /simulator: 226×**43.5** on all seven rows — the 13 px type gives a
+      // 19.5 px line box, and 19.5 + 24 is half a pixel short of the rule the
+      // row exists to satisfy. „Half a pixel" is how a 44 px audit passes while
+      // the number in the report still starts with a 4 and a 3. So the floor is
+      // stated as a floor (`min-h-11` = 44 px) and the padding keeps the shape:
+      // a rule that has to be re-derived from a font metric will be wrong again
+      // the next time the type changes.
+      className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 py-3 text-left text-[13px] font-bold transition active:bg-surface ${
         item.tone === "danger" ? "text-danger" : "text-foreground"
       }`}
     >
