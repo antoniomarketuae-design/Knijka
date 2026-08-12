@@ -69,12 +69,59 @@ export const LawSourceSchema = z
     }
   });
 
-export const LawSourceRegisterSchema = z.strictObject({
-  version: z.number().int().positive(),
-  retrievedAt: z.string().regex(ISO_DATE, "retrievedAt must be an ISO date"),
-  registerUrl: z.string().url(),
-  sources: z.array(LawSourceSchema).min(1),
-});
+/**
+ * THE UNIQUENESS GUARD THE REGISTER DID NOT HAVE.
+ *
+ * `PenaltyBankSchema` refuses a duplicate penalty id and `LawActSchema` refuses
+ * a duplicate unit ref — measured, both fire. This file had the same shape of
+ * lookup with no guard at all: `getSource(id)` is a `.find()`, so two rows
+ * sharing an id means the first wins, the second is unreachable, and nothing
+ * says so. It is the worse half of the pair, because a source row is WHICH FILE
+ * A QUOTE CAME FROM: its sha256, its byte count, its ДВ version. Shadow the
+ * ЗДвП row with a second one and every citation in the bank keeps loading while
+ * the provenance printed under it belongs to a different document.
+ *
+ * `actId` is guarded too, for full-text sources: `build()` matches an act to
+ * its source by id and asks only that the source be full-text, so two full-text
+ * rows claiming to be the text of one act is two answers to „which file is
+ * ЗДвП?". Measured on the shipped register before writing this: 34 sources, 34
+ * distinct ids, 8 non-null actIds, 8 distinct — the guard changes nothing today
+ * and refuses the day it would matter.
+ */
+export const LawSourceRegisterSchema = z
+  .strictObject({
+    version: z.number().int().positive(),
+    retrievedAt: z.string().regex(ISO_DATE, "retrievedAt must be an ISO date"),
+    registerUrl: z.string().url(),
+    sources: z.array(LawSourceSchema).min(1),
+  })
+  .check((ctx) => {
+    const seenId = new Set<string>();
+    const actOwner = new Map<string, string>();
+    ctx.value.sources.forEach((s, i) => {
+      if (seenId.has(s.id)) {
+        ctx.issues.push({
+          code: "custom",
+          message: `duplicate source id "${s.id}" — getSource() takes the first, so the second row is unreachable and the provenance shown under a quote could be the wrong file`,
+          input: ctx.value,
+          path: ["sources", i, "id"],
+        });
+      }
+      seenId.add(s.id);
+      if (s.coverage !== "full-text" || s.actId === null) return;
+      const prior = actOwner.get(s.actId);
+      if (prior !== undefined) {
+        ctx.issues.push({
+          code: "custom",
+          message: `sources "${prior}" and "${s.id}" both claim to be the full text of act "${s.actId}" — an act has one file, one sha256 and one ДВ version`,
+          input: ctx.value,
+          path: ["sources", i, "actId"],
+        });
+      } else {
+        actOwner.set(s.actId, s.id);
+      }
+    });
+  });
 
 export const LawUnitSchema = z.strictObject({
   ref: z.string().min(1),

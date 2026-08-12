@@ -23,6 +23,7 @@ import {
   penaltiesForArticle,
   resolveCitation,
   resolveLawRef,
+  ungroundedLabelWords,
   verifyCitations,
   type PenaltyEntry,
 } from "./index";
@@ -30,7 +31,9 @@ import {
   ControlPointsPenaltySchema,
   ExamPointsPenaltySchema,
   FinePenaltySchema,
+  LawSourceRegisterSchema,
   LawSourceSchema,
+  PenaltyBankSchema,
   PenaltyConductSchema,
   PenaltyEntrySchema,
 } from "./schemas";
@@ -365,6 +368,133 @@ describe("penalty bank — three systems, never one number", () => {
     const danger = getPenalty("pen-b2-no-stop-danger")!;
     expect(danger.controlPoints.points).toBe(10);
     expect(danger.fine.instrument).toBe("фиш");
+  });
+
+  /**
+   * CHECK (11) — THE INSTRUMENT AGAINST THE ARTICLE BESIDE IT.
+   *
+   * Every schema in this directory could see that `instrument` and
+   * `instrumentSource` were both present, and that the instrument agreed with
+   * the ban. None of them read the provision. Measured on the shipped bank
+   * before the check existed: pen-b2-no-stop with `instrument` flipped to
+   * „електронен фиш" and its чл. 186, ал. 1 citation left in place gave
+   * `FinePenaltySchema` ✓, `PenaltyEntrySchema` ✓, `PenaltyBankSchema` ✓,
+   * `verifyCitations` → [] and `describeFine` → „51,13 € (100 лв.) (електронен
+   * фиш)" — printed over a noteBg that ends „…затова може да се наложи с фиш".
+   *
+   * The three instruments differ in who may issue, whether a лишаване can ride
+   * along, and the discount (80 % in 7 days against 70 % in 14), so the wrong
+   * one is a real-world consequence the law behind it does not support.
+   */
+  const flipped = (id: string, mutate: (p: PenaltyEntry) => void): string[] => {
+    const { acts, penalties } = getLawCorpus();
+    const row = structuredClone(penalties.find((p) => p.id === id)!);
+    mutate(row);
+    return verifyCitations(acts, [row]);
+  };
+
+  it("refuses електронен фиш standing on the ordinary-фиш rule", () => {
+    const problems = flipped("pen-b2-no-stop", (p) => {
+      p.fine.instrument = "електронен фиш";
+    }).join("\n");
+    expect(problems).toContain("the provision it cites never names one");
+    expect(problems).toContain('ЗДвП чл. 186, ал. 1 names „фиш"');
+  });
+
+  it("refuses an ordinary фиш standing on the camera rule", () => {
+    const problems = flipped("pen-speeding-urban-21-30", (p) => {
+      p.fine.instrument = "фиш";
+    }).join("\n");
+    // „фиш" is a SUBSTRING of „електронен фиш", so the naive includes() this
+    // replaced would have called this pairing correct.
+    expect(problems).toContain('ЗДвП чл. 189, ал. 4 names „електронен фиш"');
+  });
+
+  it("refuses an акт standing on the rule that BARS a фиш", () => {
+    const fisher = getPenalty("pen-b2-no-stop")!.fine.instrumentSource!;
+    const problems = flipped("pen-alcohol-05-08", (p) => {
+      p.fine.instrumentSource = structuredClone(fisher);
+    }).join("\n");
+    expect(problems).toContain("is the rule that BARS a фиш here");
+  });
+
+  /**
+   * The alineas that NAME an instrument and authorise none — the discount
+   * (чл. 186, ал. 7 / чл. 189, ал. 5г), the unpaid фиш that becomes a
+   * наказателно постановление (ал. 8), the уведомление that lists all three
+   * (чл. 189, ал. 4а), the evidentiary force of an акт (чл. 189, ал. 2). Each
+   * is verbatim, each is in ЗДвП, and none of them is why the paper exists.
+   */
+  it("refuses a provision that mentions the instrument without providing for one", () => {
+    const problems = flipped("pen-b2-no-stop", (p) => {
+      p.fine.instrumentSource = {
+        actId: "zdvp",
+        ref: "чл. 186",
+        paragraphRef: "ал. 7",
+        quoteBg:
+          "В 7-дневен срок от налагането на глобата с фиш нарушителят може да заплати 80 на сто от размера й.",
+      };
+    }).join("\n");
+    expect(problems).toContain("does not state that condition");
+  });
+
+  it("refuses a provision that names two instruments at once", () => {
+    // чл. 186, ал. 2 — „…или откаже да подпише фиша, се съставя акт." Both
+    // papers in one sentence, so it cannot be the rule that decides between
+    // them; it is the exception for a driver who disputes.
+    const problems = flipped("pen-alcohol-05-08", (p) => {
+      p.fine.instrumentSource = {
+        actId: "zdvp",
+        ref: "чл. 186",
+        paragraphRef: "ал. 2",
+        quoteBg:
+          "На лице, което оспорва извършеното от него нарушение или откаже да подпише фиша, се съставя акт.",
+      };
+    }).join("\n");
+    expect(problems).toContain("names more than one instrument");
+  });
+
+  it("refuses a quote trimmed so the condition the instrument rests on disappears", () => {
+    const problems = flipped("pen-b2-no-stop", (p) => {
+      p.fine.instrumentSource!.quoteBg =
+        "може да бъде наложена с фиш глоба в размера, посочен в административнонаказателната разпоредба за съответното нарушение.";
+    }).join("\n");
+    expect(problems).toContain("drops the condition the instrument rests on");
+  });
+
+  it("refuses a камера ticket whose quote no longer mentions a камера", () => {
+    const problems = flipped("pen-speeding-urban-21-30", (p) => {
+      p.fine.instrumentSource!.quoteBg =
+        "за което не е предвидено наказание лишаване от право да се управлява моторно превозно средство, с изключение на нарушенията по чл. 179, ал. 3 - 3в, на собственика, на когото е регистрирано превозното средство, а когато в свидетелството за регистрация на превозното средство е вписан ползвател - на ползвателя, се издава електронен фиш в отсъствието на контролен орган и на нарушител";
+    }).join("\n");
+    expect(problems).toContain("установено и заснето с автоматизирано техническо средство");
+  });
+
+  /**
+   * Found by attacking check (11) rather than by reading the code: the point
+   * guard was written „points.size > 0 && …", so naming a point in an alinea
+   * that has NONE switched it off. „ЗДвП, чл. 186, ал. 1, т. 1" then rendered
+   * under the instrument — a coordinate чл. 186, ал. 1 does not have. Same
+   * shape as the deleted `paragraphRef` the alinea checks already refuse.
+   */
+  it("refuses a т. N inside an alinea that has no numbered points", () => {
+    const problems = flipped("pen-b2-no-stop", (p) => {
+      p.fine.instrumentSource!.pointRef = "т. 1";
+    }).join("\n");
+    expect(problems).toContain("is not divided into numbered points");
+  });
+
+  it("refuses an instrument with no rule, and a rule with no instrument", () => {
+    expect(
+      flipped("pen-b2-no-stop", (p) => {
+        p.fine.instrumentSource = null;
+      }).join("\n"),
+    ).toContain("cites no rule that permits it");
+    expect(
+      flipped("pen-b2-no-stop", (p) => {
+        p.fine.instrument = null;
+      }).join("\n"),
+    ).toContain("stand or fall together");
   });
 
   it("says what the camera can and cannot send you", () => {
@@ -887,32 +1017,177 @@ describe("the offence named must be the offence the ROW prices", () => {
   });
 
   /**
-   * THE FLOOR, PINNED SO NOBODY MISTAKES IT FOR COVERAGE.
+   * THE FLOOR, RAISED — and the reason it took a different rule than the
+   * obvious one.
    *
    * Every rope in this file ties one piece of the act to another piece of the
    * act. `titleBg` and `summaryBg` are OURS — the words a student reads in a
-   * list before he opens anything — and nothing ties them to the conduct the
-   * row declares. Rewrite the title of the speeding row to „Преминава на
-   * червено" and the loader is silent, because every citation is still about
-   * speeding and still verified.
+   * list before he opens anything — and until now nothing tied them to
+   * anything at all: rewriting the speeding row's title to „Преминава на
+   * червено" left every citation verified and the whole suite green.
    *
-   * It is not closed here, and the reason is a content decision rather than a
-   * gate one: the natural tie is „the title must satisfy the row's anchors",
-   * and measured against today's titles it fails on both speeding rows —
-   * „Превишена скорост … с 21 – 30 km/h" carries neither „превишаване" nor „от
-   * 21 до 30". Closing it means rewriting student-facing titles into statutory
-   * vocabulary, which is the founder's call, not a loader's.
+   * The obvious tie („the title must satisfy the row's anchors") was measured
+   * and REFUSED, because it fails on honest data: „Превишена скорост … с 21 –
+   * 30 km/h" carries neither „превишаване" (a participle against a verbal noun)
+   * nor „от 21 до 30" (an en dash against a statutory range). A guard that
+   * fails on correct data is turned off within a week, so that rule was not
+   * shipped and the measurement that killed it is kept below.
+   *
+   * What IS shipped asks a weaker question with the same teeth: every WORD of
+   * the title must occur, in some inflected form, inside text the loader has
+   * already proved is in the act. Both failures dissolve — the en dash splits
+   * „21 – 30" into numerals the statute writes as „от 21 до 30", and „превишена"
+   * shares five characters with „превишаване" — and the moved title does not.
    */
-  it("does NOT check the row's own label — the last untied field", () => {
+  it("refuses a title moved to another offence, and the anchors could not have done it", () => {
     const { acts, penalties } = getLawCorpus();
     const mislabelled = structuredClone(penalties.find((p) => p.id === "pen-speeding-urban-21-30")!);
     mislabelled.titleBg = "Преминава на червено";
-    mislabelled.summaryBg = "Червеното е забрана за преминаване.";
-    expect(verifyCitations(acts, [mislabelled])).toEqual([]);
-    // …and here is why the obvious tie is not free: the real title satisfies
-    // neither anchor group, so requiring it would fail the honest row too.
+    expect(verifyCitations(acts, [mislabelled]).join("\n")).toContain(
+      'occurs in none of this row\'s verified quotes',
+    );
+
+    // THE MEASUREMENT THAT KILLED THE OBVIOUS TIE, kept as evidence rather than
+    // as a claim: the real title satisfies neither anchor group, so the rule
+    // „titleBg must satisfy the anchors" would have reported the honest row.
     const real = penalties.find((p) => p.id === "pen-speeding-urban-21-30")!;
     expect(offencePhraseMatchesConduct(real.titleBg, real.conduct)).toBe(false);
+    // …and the rule that IS shipped passes it, on the same data.
+    expect(verifyCitations(acts, [real])).toEqual([]);
+  });
+
+  /**
+   * THE TITLE ATTACKS, and the one that is NOT caught, kept in the same table
+   * so the reader sees the shape of the rule rather than only its wins.
+   */
+  const TITLE_ATTACKS: Array<{ name: string; row: string; title: string; caught: string | null }> = [
+    {
+      name: "moved to another offence entirely",
+      row: "pen-speeding-urban-21-30",
+      title: "Преминава на червено",
+      caught: "преминава, червено",
+    },
+    {
+      name: "the WRONG TIER of the same offence — the sharpest one, and invisible to every other check",
+      row: "pen-speeding-urban-21-30",
+      title: "Превишена скорост в населено място с 11 – 20 km/h",
+      caught: "„11, 20\"",
+    },
+    {
+      name: "the wrong ladder — „извън“ is a word this row's evidence does not have",
+      row: "pen-speeding-urban-21-30",
+      title: "Превишена скорост извън населено място с 21 – 30 km/h",
+      caught: "„извън\"",
+    },
+    {
+      name: "a Latin label nobody would notice in a Cyrillic list",
+      row: "pen-red-light",
+      title: "Преминава при червен signal",
+      caught: "signal",
+    },
+    {
+      // Found by attacking the vocabulary rule, which passes it word for word:
+      // „10" is in the exam quote and „контролни точки" in the наредба quote.
+      // The row's контролни точки figure is 0 — this is the founder's own
+      // complaint, printed in the one line every student reads.
+      name: "a CONSEQUENCE the row does not carry, in vocabulary the row does",
+      row: "pen-speeding-urban-21-30",
+      title: "Превишена скорост в населено място с 21 – 30 km/h и 10 контролни точки",
+      caught: "claims „10 контролни точки\", and this row's figure is 0",
+    },
+    {
+      name: "LIMIT: a title that is merely VAGUER than the row — every word still the act's",
+      row: "pen-speeding-urban-21-30",
+      title: "Превишена скорост",
+      caught: null,
+    },
+  ];
+
+  it.each(TITLE_ATTACKS)("title attack: $name", ({ row, title, caught }) => {
+    const { acts, penalties } = getLawCorpus();
+    const tampered = structuredClone(penalties.find((p) => p.id === row)!);
+    tampered.titleBg = title;
+    const problems = verifyCitations(acts, [tampered]).join("\n");
+    if (caught === null) expect(problems).toEqual("");
+    else expect(problems).toContain(caught);
+  });
+
+  it("every honest title in the bank is already in the act's vocabulary", () => {
+    // The number that decides whether this check survives contact with content.
+    // Non-zero on data nobody tampered with means the RULE is wrong, not the
+    // title — measured at 0 across all seven rows when it was written.
+    for (const p of listPenalties()) {
+      const evidence = [p.fine, p.controlPoints, p.disqualification, p.examPoints]
+        .filter((f) => f !== null && f !== undefined)
+        .flatMap((f) => [f!.source.quoteBg, f!.source.contextQuoteBg, f!.source.offencePhraseBg])
+        .filter((q): q is string => q !== undefined);
+      expect(ungroundedLabelWords(p.titleBg, evidence), p.id).toEqual([]);
+    }
+  });
+
+  /**
+   * `summaryBg` gets the OTHER rule, and the reason is measured rather than
+   * argued. Run the title's vocabulary tie over the summaries and 7 of 7 go red
+   * — „стъпалото, което камерите ловят най-често", „нула дни без книжка",
+   * „учтивост" — because a summary explains where a title names. So what is
+   * checked in a summary is the part that is a claim about the law: an article
+   * number. „чл. 250" reads exactly like „чл. 183", and the numeral gate cannot
+   * see it BY DESIGN — it classifies a citation coordinate as a locator rather
+   * than a figure, which is right for „чл." and wrong for nothing else.
+   */
+  it("refuses an article number our prose invents, and keeps the one two acts away", () => {
+    const { acts, penalties } = getLawCorpus();
+    const invented = structuredClone(penalties.find((p) => p.id === "pen-b2-no-stop")!);
+    invented.summaryBg = "Спирането е задължително — вж. чл. 250 от ЗДвП.";
+    expect(verifyCitations(acts, [invented]).join("\n")).toContain(
+      'names „чл. 250", which exists in none of the acts this row can reach',
+    );
+
+    // …and the honest opposite, which is why the check reads the sentence and
+    // not just the row: the camera-tolerance note reaches чл. 425 of a наредба
+    // this row does not cite, because the sentence names that наредба out loud.
+    const camera = penalties.find((p) => p.id === "pen-speeding-urban-21-30")!;
+    expect(camera.fine.noteBg).toContain("чл. 425");
+    expect(verifyCitations(acts, [camera])).toEqual([]);
+  });
+
+  /**
+   * THE SUMMARY'S LIMIT, WITH THE NUMBER THAT SETS IT. Swap one row's summary
+   * for another's and nothing fires, because the vocabulary rule that catches a
+   * moved TITLE cannot be applied to a summary: measured, 7 of 7 honest
+   * summaries would go red under it, and the grounded fraction runs from 2/16
+   * (pen-speeding-urban-21-30 — „контролни точки", and nothing else) to 9/15.
+   * A threshold in that range is a number somebody picked, and it would be
+   * tuned upward the first time it was inconvenient.
+   *
+   * What IS gated in a summary: its numerals, by the prose gate, and its
+   * article numbers, above. What is not: its prose.
+   */
+  it("does NOT catch a summary swapped for another row's — measured, and why", () => {
+    const { acts, penalties } = getLawCorpus();
+    const swapped = structuredClone(penalties.find((p) => p.id === "pen-speeding-urban-21-30")!);
+    swapped.summaryBg = penalties.find((p) => p.id === "pen-red-light")!.summaryBg;
+    expect(verifyCitations(acts, [swapped])).toEqual([]);
+    // The evidence for the refusal to ship the obvious rule here.
+    const speeding = penalties.find((p) => p.id === "pen-speeding-urban-21-30")!;
+    const evidence = [speeding.fine, speeding.controlPoints, speeding.disqualification, speeding.examPoints]
+      .filter((f) => f !== null && f !== undefined)
+      .flatMap((f) => [f!.source.quoteBg, f!.source.contextQuoteBg, f!.source.offencePhraseBg])
+      .filter((q): q is string => q !== undefined);
+    expect(ungroundedLabelWords(speeding.summaryBg, evidence).length).toBeGreaterThan(0);
+  });
+
+  /**
+   * THE FLOOR, PINNED SO NOBODY MISTAKES IT FOR COVERAGE. `id` is Latin
+   * kebab-case and no rope in this file can reach it from Cyrillic statute
+   * text. It is never shown to a student; `PenaltyBankSchema` only guarantees
+   * it is unique and prefixed.
+   */
+  it("does NOT check the row's id — the last untied field, and why", () => {
+    const { acts, penalties } = getLawCorpus();
+    const renamed = structuredClone(penalties.find((p) => p.id === "pen-red-light")!);
+    renamed.id = "pen-something-else-entirely";
+    expect(verifyCitations(acts, [renamed])).toEqual([]);
   });
 });
 
@@ -961,27 +1236,37 @@ describe("the alinea in the citation is where the sentence actually is", () => {
   });
 
   /**
-   * THE LIMIT, PINNED. This check compares the quote with the alinea it names;
-   * it cannot tell two alineas apart when they contain THE SAME SENTENCE. ЗДвП
-   * чл. 182 does exactly that: ал. 1 is the in-town speeding ladder and ал. 2
-   * the out-of-town one, and their т. 3 is word-for-word identical („за
-   * превишаване от 21 до 30 km/h - с глоба 100 лв."). So flipping the founder's
-   * own row to ал. 2 is invisible here — and harmless at this tier, because the
-   * two alineas agree on the amount.
+   * THE LIMIT THAT WAS PINNED HERE, NOW CLOSED — and the two halves of the fix,
+   * because neither works alone.
    *
-   * WHERE IT WOULD NOT BE HARMLESS: т. 4. In town 31–40 km/h is 400 лв.; out of
-   * town it is 300. A future row for that tier can be cited to the wrong alinea
-   * and only the amount check would notice, and only if the amount was right
-   * for the OTHER alinea. Closing it needs the row to declare which ladder it
-   * is on — the alinea's own opening words („в населено място" / „извън
-   * населено място") are the discriminator, and no citation field carries them.
+   * The alinea check compares the quote with the alinea it names, so it cannot
+   * tell two alineas apart when they contain THE SAME SENTENCE. ЗДвП чл. 182
+   * does exactly that: ал. 1 is the in-town speeding ladder and ал. 2 the
+   * out-of-town one, and their т. 3 is word-for-word identical („за
+   * превишаване от 21 до 30 km/h - с глоба 100 лв."). Flipping the founder's
+   * own row to ал. 2 used to be invisible — harmless at this tier, where both
+   * alineas say 100 лв., and 100 лв. of difference at т. 4, where in town is
+   * 400 and out of town 300.
+   *
+   *  a. THE LOADER refuses a citation whose every quote also lives in another
+   *     alinea. „Nothing this citation shows is unique to ал. 1" is a defect in
+   *     the citation, not a fact about the article: the coordinate is being
+   *     asserted rather than evidenced.
+   *  b. THE ROW then has to quote the ladder's own opening — „който превиши
+   *     разрешената максимална скорост в населено място, се наказва, както
+   *     следва:" — and once it does, the ORIGINAL alinea check does the
+   *     refusing, because ал. 2 does not contain that sentence.
+   *
+   * Both are tested, in that order, because (a) without (b) is a rule nobody
+   * can satisfy and (b) without (a) is a courtesy the next row will skip.
    */
-  it("…and the limit: one sentence in two alineas is still indistinguishable", () => {
+  it("refuses the alinea flip that used to be invisible — in town vs out of town", () => {
     const { acts, penalties } = getLawCorpus();
     const flipped = structuredClone(penalties.find((p) => p.id === "pen-speeding-urban-21-30")!);
     flipped.fine.source.paragraphRef = "ал. 2"; // out of town — the row says in town
-    expect(verifyCitations(acts, [flipped])).toEqual([]);
-    // The reason, stated as evidence rather than as a claim.
+    expect(verifyCitations(acts, [flipped]).join("\n")).toContain("but NOT in ал. 2");
+
+    // The reason the tier alone could never have caught it, as evidence.
     const art = getArticle("zdvp", "чл. 182");
     expect(art.found).toBe(true);
     if (!art.found) return;
@@ -989,6 +1274,249 @@ describe("the alinea in the citation is where the sentence actually is", () => {
       "за превишаване от 21 до 30 km/h - с глоба 100 лв.",
     ).length - 1;
     expect(occurrences).toBe(2);
+  });
+
+  it("…and refuses the citation that made the flip possible: a coordinate with no unique evidence", () => {
+    const { acts, penalties } = getLawCorpus();
+    const bare = structuredClone(penalties.find((p) => p.id === "pen-speeding-urban-21-30")!);
+    // Exactly the shipped citation before this wave: the tier, and nothing that
+    // says which ladder. Every other check in the file passes it.
+    delete bare.fine.source.contextQuoteBg;
+    const problems = verifyCitations(acts, [bare]).join("\n");
+    expect(problems).toContain("nothing this citation shows is unique to ЗДвП чл. 182, ал. 1");
+
+    // …and it does NOT fire on an article whose alineas differ, which is every
+    // other alinea-scoped citation in the bank.
+    const redLight = penalties.find((p) => p.id === "pen-red-light")!;
+    expect(verifyCitations(acts, [redLight])).toEqual([]);
+  });
+
+  /**
+   * …AND THE ESCAPE HATCH, found by attacking the check above rather than by
+   * reading it. A rule that only runs when a coordinate is present is switched
+   * off by DELETING the coordinate: drop `paragraphRef` together with the
+   * ladder's opening and the citation is back to „somewhere in чл. 182", which
+   * is where this whole family of defects lives. Measured across the bank
+   * before it was closed: every citation already names an alinea where the unit
+   * has any, and приложение № 5 — which names none — parses to an alinea run of
+   * length 0, so the exam citations are untouched.
+   */
+  it("refuses a citation that deletes the coordinate instead of proving it", () => {
+    const { acts, penalties } = getLawCorpus();
+    const evasive = structuredClone(penalties.find((p) => p.id === "pen-speeding-urban-21-30")!);
+    delete evasive.fine.source.contextQuoteBg;
+    delete evasive.fine.source.paragraphRef;
+    delete evasive.fine.source.pointRef;
+    expect(verifyCitations(acts, [evasive]).join("\n")).toContain(
+      "is divided into alineas and the citation names none",
+    );
+  });
+
+  /**
+   * THE ROW THAT DOES NOT EXIST YET — built here, because т. 4 is the tier where
+   * the flip stops being free. In town 31–40 km/h is 400 лв., out of town 300,
+   * and both alineas write the sentence the same way apart from the amount. The
+   * whole reason to close this now is that the row is not written yet: whoever
+   * writes it inherits a loader that will not let the coordinate be guessed.
+   *
+   * Three states, and the third is where the honest limit is.
+   */
+  describe("the 31–40 tier, simulated before anybody writes it", () => {
+    const LADDER_1 = "който превиши разрешената максимална скорост в населено място, се наказва, както следва:";
+    const LADDER_2 = "който превиши разрешената скорост извън населено място, се наказва, както следва:";
+
+    const urban31to40 = (): PenaltyEntry => {
+      const row = structuredClone(getPenalty("pen-speeding-urban-21-30")!);
+      row.id = "pen-speeding-urban-31-40";
+      row.titleBg = "Превишена скорост в населено място с 31 – 40 km/h";
+      row.conduct.statementBg =
+        "Водачът превишава разрешената максимална скорост в населено място — превишаване от 31 до 40 km/h.";
+      row.conduct.anchorsBg = [
+        ["превишаване", "превиши"],
+        ["от 31 до 40", "с повече от 10 km/h"],
+      ];
+      row.fine.amountBgn = 400;
+      for (const c of [row.fine.source, row.disqualification.source]) {
+        c.pointRef = "т. 4";
+        c.quoteBg = "за превишаване от 31 до 40 km/h - с глоба 400 лв.";
+        c.contextQuoteBg = LADDER_1;
+        c.offencePhraseBg = "за превишаване от 31 до 40 km/h";
+      }
+      return row;
+    };
+
+    it("the honest in-town row loads clean", () => {
+      const { acts } = getLawCorpus();
+      expect(verifyCitations(acts, [urban31to40()])).toEqual([]);
+    });
+
+    it("flipping only the alinea is refused — the ladder's opening is not in ал. 2", () => {
+      const { acts } = getLawCorpus();
+      const flipped = urban31to40();
+      flipped.fine.source.paragraphRef = "ал. 2";
+      expect(verifyCitations(acts, [flipped]).join("\n")).toContain("but NOT in ал. 2");
+    });
+
+    it("flipping the alinea AND its opening together is refused by the figure — 300 is not 400", () => {
+      const { acts } = getLawCorpus();
+      const coherent = urban31to40();
+      // The full attack: an internally perfect out-of-town citation. The alinea
+      // check is satisfied (everything really is in ал. 2), the uniqueness check
+      // is satisfied (ал. 2's opening is unique to ал. 2) — and the row still
+      // says 400 лв., which is the in-town price.
+      coherent.fine.source.paragraphRef = "ал. 2";
+      coherent.fine.source.quoteBg = "за превишаване от 31 до 40 km/h - с глоба 300 лв.";
+      coherent.fine.source.contextQuoteBg = LADDER_2;
+      expect(verifyCitations(acts, [coherent]).join("\n")).toContain(
+        "quote does not state the figure",
+      );
+    });
+
+    /**
+     * THE LIMIT, MEASURED AND PINNED. Move the amount to 300 as well and the
+     * row is no longer mispriced — it is the out-of-town row wearing the
+     * in-town row's title. Word-level grounding cannot see it, because „извън
+     * населено място" contains both „населено" and „място": the discriminator
+     * is a word the label OMITS, and no containment rule can require the
+     * absence of a word. What is left is that the figure, the quote, the
+     * coordinate and the ladder now all agree with each other and with the law,
+     * and only the Bulgarian preposition in our own title disagrees.
+     */
+    it("…and the one that still gets through: the whole citation moved out of town, price included", () => {
+      const { acts } = getLawCorpus();
+      const moved = urban31to40();
+      moved.fine.amountBgn = 300;
+      moved.fine.source.paragraphRef = "ал. 2";
+      moved.fine.source.quoteBg = "за превишаване от 31 до 40 km/h - с глоба 300 лв.";
+      moved.fine.source.contextQuoteBg = LADDER_2;
+      expect(verifyCitations(acts, [moved])).toEqual([]);
+      // The reason, as evidence: the label's own words survive the move.
+      expect(ungroundedLabelWords(moved.titleBg, [LADDER_2, moved.fine.source.quoteBg])).toEqual([]);
+    });
+
+    it("but writing „извън“ into an in-town title IS refused", () => {
+      const { acts } = getLawCorpus();
+      const mislabelled = urban31to40();
+      mislabelled.titleBg = "Превишена скорост извън населено място с 31 – 40 km/h";
+      expect(verifyCitations(acts, [mislabelled]).join("\n")).toContain("„извън\"");
+    });
+  });
+});
+
+// --------------------------------------------------------------------------
+// THE DECLARATION HOLE — the two rows that differ ONLY by a conditional clause
+//
+// „Не спира на Б2" is 100 лв. and no контролни точки. The same manoeuvre „ако
+// от това е създадена непосредствена опасност за движението" is 200 лв. and 10.
+// Cut those eleven words out of the offence phrase and the row prices the
+// second at the first's conduct — verbatim, inside the quotes, satisfying the
+// row's own declaration. Nothing went red.
+//
+// THE REASON A MATCHER TWEAK COULD NOT DO IT, which is why these tests sit
+// apart from the conduct block: check (5b) requires EVERY phrase on a row to
+// satisfy EVERY anchor group, so a row's declaration can only ever be the
+// weakest common denominator of its own figures. An „опасност" anchor on the
+// danger row would refuse that row's контролни-точки and наказателни-точки
+// citations, whose acts never use the word — приложение № 5 marks the Б2
+// non-stop whether or not danger followed. The condition is therefore enforced
+// from the ACT'S PUNCTUATION instead, one citation at a time.
+// --------------------------------------------------------------------------
+
+describe("an offence phrase may not stop before the act's „ако“", () => {
+  it("refuses the truncation that was live on a shipped row", () => {
+    const { acts, penalties } = getLawCorpus();
+    const cut = structuredClone(penalties.find((p) => p.id === "pen-b2-no-stop-danger")!);
+    // Verbatim. Inside the quotes. Satisfies both of the row's anchor groups
+    // („пътните знаци" and „не спазва предписанието"). Prices 200 лв. + 10 к.т.
+    // for conduct that costs 100 лв. and 0 к.т.
+    cut.fine.source.offencePhraseBg = "не спазва предписанието на пътните знаци";
+    expect(offencePhraseMatchesConduct(cut.fine.source.offencePhraseBg, cut.conduct)).toBe(true);
+    expect(verifyCitations(acts, [cut]).join("\n")).toContain(
+      "the offence phrase stops before the act does",
+    );
+  });
+
+  it("…and the longer truncation, which stops one clause short", () => {
+    const { acts, penalties } = getLawCorpus();
+    const cut = structuredClone(penalties.find((p) => p.id === "pen-b2-no-stop-danger")!);
+    cut.fine.source.offencePhraseBg =
+      "не спазва предписанието на пътните знаци, пътната маркировка и другите средства за сигнализиране, правилата за предимство, за разминаване, за изпреварване или за заобикаляне";
+    expect(verifyCitations(acts, [cut]).join("\n")).toContain(
+      "the offence phrase stops before the act does",
+    );
+  });
+
+  it("the same defect the check found in the shipped bank — Наредба № Iз-2539 чл. 6, ал. 1, т. 15", () => {
+    // Measured, not hypothesised: 21 offence phrases in the bank, 20 clean, and
+    // this one had dropped the identical clause from the наредба that prices
+    // the 10 контролни точки. It was fixed rather than exempted, so the current
+    // phrase carries the condition and the truncated one is refused.
+    const row = getPenalty("pen-b2-no-stop-danger")!;
+    expect(row.controlPoints.source.offencePhraseBg).toContain(
+      "ако от това е създадена непосредствена опасност за движението",
+    );
+    const { acts, penalties } = getLawCorpus();
+    const relapse = structuredClone(penalties.find((p) => p.id === "pen-b2-no-stop-danger")!);
+    relapse.controlPoints.source.offencePhraseBg =
+      'за неспиране на пътен знак "Спри! Пропусни движещите се по пътя с предимство!"';
+    expect(verifyCitations(acts, [relapse]).join("\n")).toContain(
+      "the offence phrase stops before the act does",
+    );
+  });
+
+  it("does NOT fire on a phrase that legitimately opens with „когато“", () => {
+    // приложение № 5's indents ARE conditions („когато изпитваният…"), and every
+    // exam citation in the bank quotes one whole. A rule that read „the phrase
+    // contains a condition" instead of „the act goes on with one" would report
+    // all six of them, which is the shape of guard that gets switched off.
+    const { acts, penalties } = getLawCorpus();
+    for (const p of penalties) {
+      if (p.examPoints === null) continue;
+      expect(p.examPoints.source.offencePhraseBg, p.id).toContain("когато изпитваният");
+    }
+    expect(verifyCitations(acts, penalties)).toEqual([]);
+  });
+
+  /**
+   * TWO ROWS THAT PRICE DIFFERENT MONEY MUST BE TELLABLE APART — the check that
+   * looks at a PAIR, because every other one in this file looks at a row.
+   *
+   * Attacking it first showed how much the existing widening check already
+   * does: collapsing the Б2 pair by adding „не спира" to the danger row's
+   * anchors is refused by (d) before separation is even reached, since no
+   * phrase on that row uses it. The collapse that (d) cannot see is a
+   * NARROWING-BY-DELETION — drop the tier group from both speeding rows and
+   * every remaining alternative is still earning its place, every phrase still
+   * satisfies the declaration, and 50 лв. and 100 лв. become the same offence.
+   */
+  it("two rows that price different fines can be told apart by their declarations", () => {
+    const { acts, penalties } = getLawCorpus();
+    const pair = ["pen-speeding-urban-11-20", "pen-speeding-urban-21-30"].map((id) => {
+      const row = structuredClone(penalties.find((p) => p.id === id)!);
+      // The tier group deleted, and the statement rewritten so that (c) — every
+      // digit in the declaration must be in an anchor — has nothing to say.
+      row.conduct.anchorsBg = [["превишаване", "превиши"]];
+      row.conduct.statementBg =
+        "Водачът допуска превишаване на разрешената максимална скорост в населено място.";
+      return row;
+    });
+    const problems = verifyCitations(acts, pair).join("\n");
+    // Nothing ELSE objects — that is the point.
+    expect(problems).not.toContain("which no offence phrase on this row uses");
+    expect(problems).not.toContain("statementBg");
+    expect(problems).toContain("each row's conduct accepts the other row's fine phrase");
+  });
+
+  it("…and the collapse the existing widening check catches first", () => {
+    const { acts, penalties } = getLawCorpus();
+    const collapsed = structuredClone(penalties.find((p) => p.id === "pen-b2-no-stop-danger")!);
+    collapsed.conduct.anchorsBg = [
+      ["пътен знак", "пътните знаци"],
+      ["не спазва предписанието", "неспиране", "не спре", "не спира"],
+    ];
+    expect(verifyCitations(acts, [collapsed]).join("\n")).toContain(
+      'offers "не спира", which no offence phrase on this row uses',
+    );
   });
 });
 
@@ -1098,6 +1626,33 @@ describe("money is quoted in the currency a student can pay", () => {
     expect(shown.quoteBg).toContain("100 лв.");
   });
 
+  /**
+   * „(електронен фиш)" is a real-world consequence — the ticket arrives by
+   * post, weeks later, addressed to whoever owns the car — and the row used to
+   * render it with no article beside it. THEO-4 says a screen explains what it
+   * states, so the renderer is handed the authorising provision too.
+   */
+  it("hands the renderer the article the instrument stands on", () => {
+    const camera = describeFine(getPenalty("pen-speeding-urban-21-30")!);
+    expect(camera.valueBg).toContain("(електронен фиш)");
+    expect(camera.instrumentBg).toBe("електронен фиш");
+    expect(camera.instrumentCitationBg).toContain("чл. 189, ал. 4");
+    expect(camera.instrumentQuoteBg).toContain("електронен фиш");
+
+    const officer = describeFine(getPenalty("pen-b2-no-stop")!);
+    expect(officer.instrumentBg).toBe("фиш");
+    expect(officer.instrumentCitationBg).toContain("чл. 186, ал. 1");
+
+    // Every other figure leaves the three fields empty — only money arrives on
+    // a piece of paper.
+    const p = getPenalty("pen-b2-no-stop")!;
+    for (const shown of [describeControlPoints(p), describeDisqualification(p)]) {
+      expect(shown.instrumentBg).toBeNull();
+      expect(shown.instrumentCitationBg).toBeNull();
+      expect(shown.instrumentQuoteBg).toBeNull();
+    }
+  });
+
   it("every rendered fine leads with the euro", () => {
     for (const p of listPenalties()) {
       const shown = describeFine(p);
@@ -1155,6 +1710,64 @@ describe("money is quoted in the currency a student can pay", () => {
     expect(PenaltyEntrySchema.safeParse(unsure).success).toBe(true);
     // …and the renderer then shows the money with no instrument attached.
     expect(describeFine(unsure).valueBg).toBe("76,69 € (150 лв.)");
+  });
+});
+
+/**
+ * ONE ID, ONE ROW — the `.find()` guard.
+ *
+ * `getPenalty`, `getSource` and the unit lookup are all `.find()` over an
+ * array: with two rows sharing a key the first wins and the second is
+ * unreachable, silently. `PenaltyBankSchema` and `LawActSchema` already refused
+ * theirs (measured: both fire). `LawSourceRegisterSchema` did not, and it is
+ * the worst of the three to lose, because a source row is WHICH FILE A QUOTE
+ * CAME FROM — its sha256, its byte count, its ДВ version.
+ */
+describe("a lookup key names exactly one row", () => {
+  it("the shipped register has no duplicate ids and no shadowed act", () => {
+    const { sources } = getLawCorpus();
+    const ids = sources.sources.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const fullTextActs = sources.sources
+      .filter((s) => s.coverage === "full-text" && s.actId !== null)
+      .map((s) => s.actId);
+    expect(new Set(fullTextActs).size).toBe(fullTextActs.length);
+    expect(LawSourceRegisterSchema.safeParse(sources).success).toBe(true);
+  });
+
+  it("refuses two sources with one id", () => {
+    const { sources } = getLawCorpus();
+    const shadow = structuredClone(sources.sources[0]);
+    shadow.titleBg = "друг файл, същият id";
+    const result = LawSourceRegisterSchema.safeParse({
+      ...sources,
+      sources: [...sources.sources, shadow],
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error)).toContain("duplicate source id");
+  });
+
+  it("refuses two full-text sources claiming to be the same act", () => {
+    const { sources } = getLawCorpus();
+    const original = sources.sources.find((s) => s.coverage === "full-text")!;
+    const shadow = structuredClone(original);
+    shadow.id = `${original.id}-shadow`;
+    const result = LawSourceRegisterSchema.safeParse({
+      ...sources,
+      sources: [...sources.sources, shadow],
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error)).toContain("both claim to be the full text");
+  });
+
+  it("refuses two penalties with one id", () => {
+    const { penalties } = getLawCorpus();
+    const result = PenaltyBankSchema.safeParse({
+      version: 1,
+      penalties: [...penalties, structuredClone(penalties[0])],
+    });
+    expect(result.success).toBe(false);
+    expect(JSON.stringify(result.error)).toContain("duplicate penalty id");
   });
 });
 

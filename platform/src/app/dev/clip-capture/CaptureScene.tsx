@@ -518,6 +518,11 @@ export function CaptureScene({
               parkedClearZones={core.parkedClearZones}
               hazard={lesson.hazard ?? null}
               hazardActiveRef={hazardActiveRef}
+              // B40(a): the drill mounts the staged-actor caption, so the clip
+              // must too — this file's own R1 rule. A reel of «Спане на зелено»
+              // that omits the card would teach a different lesson from the one
+              // the student just played.
+              actorLabels={lesson.actorLabels ?? null}
               clearcoat={level === "high"}
               controllerFigure={core.runtime}
             />

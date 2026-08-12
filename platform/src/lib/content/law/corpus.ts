@@ -16,6 +16,7 @@ import { bgnWithEurBg } from "../money";
 import { LawActSchema, LawSourceRegisterSchema, PenaltyBankSchema } from "./schemas";
 import type {
   FigureStatus,
+  FineInstrument,
   LawAct,
   LawLookup,
   LawSource,
@@ -27,6 +28,8 @@ import type {
   PenaltyEntry,
 } from "./types";
 import type { LawRef } from "../types";
+// Pure (no fs, no corpus import), so this is a leaf dependency and not a cycle.
+import { inlineCitations } from "../proseFigures";
 
 if (typeof window !== "undefined") {
   throw new Error(
@@ -104,13 +107,19 @@ const ACT_ALIASES: ReadonlyArray<readonly [RegExp, ActId]> = [
   // that does not say which edition it means is not asking for the old one, it
   // is not asking at all, and answering it with a text that has been amended
   // twice since is the product proving a point against a copy of the law that
-  // no longer exists. Worse, that copy is DAMAGED: its чл. 6, т. 3 is a
+  // no longer exists. Worse, that copy WAS DAMAGED: its чл. 6, т. 3 was a
   // sentence cut in half by „Източник: Правно-информационни системи „Сиела" /
   // 24/01/2025 г.", a PDF page footer the extraction swallowed, and the footer
-  // sits inside 16 of its units (see `pageFurniture.test.ts`). „0 контролни
-  // точки, не е в изчерпателния списък" is a true finding under the
-  // consolidation — but a student who followed the chip to check us landed on a
-  // truncated article with a vendor watermark in it.
+  // sat inside 16 of its units. „0 контролни точки, не е в изчерпателния
+  // списък" is a true finding under the consolidation — but a student who
+  // followed the chip to check us landed on a truncated article with a vendor
+  // watermark in it.
+  //
+  // The footer is gone (2026-08-09, `content/law/tools/page-furniture.mjs`;
+  // `pageFurniture.test.ts` now forbids the class outright) and т. 3 is whole
+  // again. THE ORDER BELOW DOES NOT CHANGE. The snapshot is still a photograph
+  // of a text amended twice since, which is the reason a bare name must not
+  // land on it; „the copy was also broken" was the aggravation, not the rule.
   //
   // So: the CONSOLIDATION pattern first (an explicit 2026 marker wins), then
   // the SNAPSHOT but only when the citation says 2025 out loud, then the bare
@@ -282,6 +291,134 @@ function hasAnchorGroup(text: string, group: readonly string[]): boolean {
 }
 
 /**
+ * A CONDITION THE ACT ATTACHES TO AN OFFENCE — and the reason the row's own
+ * `conduct` declaration could never carry it.
+ *
+ * `\b` IS ASCII-ONLY IN JAVASCRIPT, so „ако\b" never matches after a Cyrillic
+ * „о" and a regex written that way passes everything in silence. Measured while
+ * building this: the first draft of the check found ZERO conditions in a bank
+ * that has one. Every boundary here is an explicit negative lookaround, the
+ * same device `content/proseFigures.ts` had to adopt for the same reason.
+ */
+const CONDITION_RE =
+  /(?:^|[\s(„“"'\-,])(ако|когато|освен ако|при условие|в случай)(?![А-Яа-я])/u;
+
+/* -------------------------------------------------------------------------- *
+ * THE INSTRUMENT AND THE ARTICLE THAT AUTHORISES IT — check (11).
+ *
+ * THE DEFECT, reproduced before this was written. `FinePenaltySchema` requires
+ * `instrument` and `instrumentSource` to be null together, and
+ * `PenaltyEntrySchema` derives the instrument from the ban — but NOTHING
+ * compared the instrument with the provision cited beside it. Measured on the
+ * shipped bank: setting pen-b2-no-stop's instrument to „електронен фиш" while
+ * its instrumentSource still quoted ЗДвП чл. 186, ал. 1 gave
+ * `FinePenaltySchema` ✓, `PenaltyEntrySchema` ✓, `PenaltyBankSchema` ✓,
+ * `verifyCitations` → [] and `describeFine` → „51,13 € (100 лв.) (електронен
+ * фиш)" on a row whose own noteBg ends „…затова може да се наложи с фиш". Two
+ * more variants passed the same way: the reverse flip on the speeding row, and
+ * pointing the акт row's instrumentSource at чл. 186, ал. 1 — the rule that
+ * BARS a фиш where лишаване is provided, cited as if it authorised the акт.
+ *
+ * The three are genuinely different in law — who may issue (an officer who is
+ * standing there / a camera with no officer and no driver / a длъжностно лице
+ * drawing up an АУАН), whether a лишаване can ride along, and the discount
+ * (чл. 186, ал. 7 against чл. 189, ал. 5г) — so a wrong pairing is a screen
+ * stating a real-world consequence the law behind it does not support.
+ *
+ * WHAT IS NOT DONE HERE, and why. The obvious fix is a table „фиш → чл. 186,
+ * ал. 1". That table is an article number written from memory, which is what
+ * ADR-002 forbids and what the corpus exists to replace. So no article number
+ * appears below. The row supplies the coordinates; the loader reads the text
+ * they point at and asks three questions OF THE TEXT:
+ *
+ *  a. does this provision name EXACTLY ONE instrument, and is it the row's?
+ *  b. does it CREATE that instrument, or only mention it?
+ *  c. does its own condition agree with the row's ban?
+ *
+ * Together those pin „фиш" to the one alinea that names a bare фиш and makes
+ * the absence of a лишаване its condition, and „електронен фиш" to the one that
+ * does the same for the camera — without either number being written here.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * The condition that decides whether a фиш is lawful at all, quoted from the
+ * ingested ЗДвП: чл. 186, ал. 1 („За административни нарушения, за които не е
+ * предвидено наказание лишаване от право да управлява…") and чл. 189, ал. 4
+ * („За нарушение … за което не е предвидено наказание лишаване от право да се
+ * управлява…") differ only in управлява/се управлява, so the shared span is the
+ * needle. If a future amendment rewords it, every фиш row fails to load with
+ * this sentence in the message — which is the correct failure for a bank whose
+ * whole promise is that its claims are re-read out of the statute each time.
+ */
+const BAN_FREE_CONDITION_RE = /не е предвидено наказание лишаване от право/u;
+
+/**
+ * The OTHER condition an електронен фиш rests on, and the one that separates it
+ * from an ordinary фиш at the same tier: ЗДвП чл. 189, ал. 4 opens „За
+ * нарушение, установено и заснето с автоматизирано техническо средство или
+ * система…". A row may not claim the camera instrument on a quote trimmed so
+ * that the camera has disappeared from it — the whole difference between the
+ * two фишове is who was there, and a student reading „електронен фиш" over a
+ * sentence that never mentions a camera has been told the consequence without
+ * the fact that produces it.
+ *
+ * WHAT THIS STILL DOES NOT REACH, stated here rather than left to be
+ * discovered: nothing in a `PenaltyEntry` declares whether ITS offence is one a
+ * camera can establish. A row for an offence an officer must see can therefore
+ * still claim „електронен фиш" and cite чл. 189, ал. 4 honestly — the pairing
+ * is right, the unproven claim is about detection. Closing that needs a
+ * declared fact on the row (the way `conduct` closed the same shape for the
+ * offence), not another read of the same alinea.
+ */
+const CAMERA_CONDITION_RE = /установено и заснето с автоматизирано техническо средство/u;
+
+/**
+ * A provision that CREATES an instrument rather than describing one. The verbs
+ * are the acts' own, taken from the three provisions the bank cites: „може да
+ * бъде наложена с фиш" (чл. 186, ал. 1), „се издава електронен фиш" (чл. 189,
+ * ал. 4), „Актовете … се съставят" (чл. 189, ал. 1). Without this, чл. 189,
+ * ал. 2 („Редовно съставените актове … имат доказателствена сила") and ал. 3
+ * („Свидетел по акта може да бъде и служебно лице") would each read as an
+ * authority for an акт.
+ *
+ * Same lexical device, and same boundary discipline, as CONDITION_RE above:
+ * `\b` is ASCII-only in JavaScript and matches nothing useful after Cyrillic.
+ */
+const ISSUANCE_RE =
+  /(?<![А-Яа-я])(?:се издава|се издават|бъде наложена|бъде наложено|се налага|се съставя|се съставят)(?![А-Яа-я])/u;
+
+/** Which of the three instruments a passage names — „електронен фиш" is not „фиш". */
+interface InstrumentMentions {
+  фиш: boolean;
+  "електронен фиш": boolean;
+  акт: boolean;
+}
+
+/**
+ * SUBSTRING MATCHING IS BROKEN IN EXACTLY THE DIRECTION OF THE ATTACK: „фиш" is
+ * a substring of „електронен фиш", so a plain-фиш claim citing the camera rule
+ * passes any naive `includes("фиш")`. Every фиш occurrence is therefore
+ * classified by what stands before it, and the endings are the definite forms
+ * the statute actually uses („фишът", „фиша", „електронният фиш").
+ */
+function instrumentMentions(text: string): InstrumentMentions {
+  const hay = anchorText(text);
+  const found: InstrumentMentions = { "фиш": false, "електронен фиш": false, "акт": false };
+  const fish = /(?<![А-Яа-я])фиш(?:ът|а|ове|овете)?(?![А-Яа-я])/gu;
+  for (let m = fish.exec(hay); m !== null; m = fish.exec(hay)) {
+    const before = hay.slice(Math.max(0, m.index - 20), m.index);
+    if (/електронн?[а-я]*\s+$/u.test(before)) found["електронен фиш"] = true;
+    else found["фиш"] = true;
+  }
+  // „акт" only as a word: the trailing guard keeps „актуален" out and the
+  // leading one keeps „фактически" out, neither of which `\b` would.
+  found["акт"] = /(?<![А-Яа-я])акт(?:ът|а|ове|овете)?(?![А-Яа-я])/u.test(hay);
+  return found;
+}
+
+const INSTRUMENTS: readonly FineInstrument[] = ["фиш", "електронен фиш", "акт"];
+
+/**
  * Does a sentence name the conduct the row declared? Exported so that the test
  * that measures how well the anchors discriminate uses THIS function rather
  * than its own copy — two matchers that are supposed to agree drift, and the
@@ -374,6 +511,70 @@ function pointSpans(text: string): Map<string, [number, number]> {
     spans.set(String(mark.n), [mark.at, i + 1 < kept.length ? kept[i + 1].at : text.length]);
   });
   return spans;
+}
+
+/**
+ * THE ROW'S OWN LABEL, BROKEN INTO WORDS — the machine half of the tie that
+ * closes `titleBg`.
+ *
+ * Words of one or two characters are dropped: they are „на", „в", „с", „не",
+ * „по" — grammar, not claims — and a one-letter token would match anything.
+ * Everything else survives, INCLUDING the numerals, because „21" and „30" are
+ * exactly the part of a title that can be quietly wrong.
+ */
+export function labelWords(text: string): string[] {
+  return normaliseForMatch(text)
+    .toLocaleLowerCase("bg")
+    // The comma is inside the character class so that „0,5 на хиляда" stays ONE
+    // token instead of becoming „0" and „5", which would match half the corpus;
+    // it is then trimmed off the ends, where it is punctuation.
+    .split(/[^0-9a-zа-я,]+/u)
+    .map((w) => w.replace(/^,+|,+$/g, ""))
+    // A NUMBER OF ANY LENGTH SURVIVES. „21" and „30" are two characters long and
+    // they are the entire difference between the founder's row and the one below
+    // it — dropping them as too short (which the first draft of this did, and a
+    // wrong-tier title walked straight through) throws away the part of a label
+    // most worth checking.
+    .filter((w) => w.length >= 3 || /^\d/.test(w));
+}
+
+/**
+ * TITLE VOCABULARY THE ROW'S EVIDENCE DOES NOT CARRY.
+ *
+ * The tie the previous wave measured and refused: „titleBg must satisfy the
+ * row's anchors" fails on honest data, because a title is written for a
+ * seventeen-year-old and an anchor is written by the Народно събрание.
+ * „Превишена скорост … с 21 – 30 km/h" carries neither „превишаване" (a
+ * participle against a verbal noun) nor „от 21 до 30" (an en dash against a
+ * statutory range). A guard that fails on correct data gets switched off, so
+ * that tie was correctly not shipped.
+ *
+ * THE TIE THAT DOES HOLD asks a weaker question with the same teeth: does every
+ * word of the label appear, IN SOME FORM, in text the loader has already proved
+ * is in the act? Both failures above dissolve — the en dash splits „21 – 30"
+ * into „21" and „30", which the act's „от 21 до 30 km/h" contains as words, and
+ * „превишена" shares its first five characters with „превишаване". A title that
+ * has been moved to another offence does not dissolve: „Преминава на червено"
+ * over a speeding row leaves „преминава" and „червено", and no quote, context
+ * quote or offence phrase on that row starts either of them.
+ *
+ * FIVE CHARACTERS is the measured setting, not a guess. Bulgarian inflection
+ * lives in the last two or three letters („осигурява"/„осигури",
+ * „спира"/„спирането", „управление"/„управлява"), so a shorter prefix accepts
+ * strangers and a longer one splits real pairs — at six, „създава" no longer
+ * reaches „създадена" and the honest danger row goes red.
+ */
+export function ungroundedLabelWords(label: string, evidence: readonly string[]): string[] {
+  const known = [...new Set(evidence.flatMap(labelWords))];
+  const stem = (w: string): string => w.slice(0, 5);
+  return [
+    ...new Set(
+      labelWords(label).filter(
+        (w) =>
+          !known.some((k) => (w.length < 5 || k.length < 5 ? k === w : stem(k) === stem(w))),
+      ),
+    ),
+  ];
 }
 
 /** The unit a `LawRef` names, resolved against a corpus that may still be loading. */
@@ -509,6 +710,177 @@ function conductProblems(p: PenaltyEntry, acts: ReadonlyMap<string, LawAct>): st
 }
 
 /**
+ * (9) THE ROW'S OWN LABEL — the last field that was tied to nothing.
+ *
+ * Everything else in this file ties one piece of the act to another. `titleBg`
+ * and `summaryBg` are OURS: the words a student reads in a list, before he
+ * opens anything and long before he reads a quote. Rewrite the speeding row's
+ * title to „Преминава на червено" and, until this function existed, every
+ * citation stayed verified and the whole suite stayed green.
+ *
+ * TWO ROPES, and they are deliberately different, because the two fields are
+ * different objects and one rule for both would have to be the weaker one.
+ *
+ *  a. `titleBg` names the offence, so its VOCABULARY must be the offence's.
+ *     Every word of it has to appear — in some inflected form — in text the
+ *     loader has already proved is in the act. Measured over the whole bank:
+ *     zero ungrounded words on all seven honest titles, and the two that used
+ *     to fail („населено", „място") stopped failing not by loosening anything
+ *     but because check (7) forced the speeding rows to quote the ladder's
+ *     opening, which is where the statute says „в населено място".
+ *
+ *  b. `summaryBg` (and every `noteBg`) is EXPLANATION — „стъпалото, което
+ *     камерите ловят най-често", „нула дни без книжка". Measured before
+ *     writing: the same vocabulary rule leaves 7 of 7 summaries red, so it is
+ *     not shipped for them and this is not an oversight. What IS checked there
+ *     is the part that is a claim about the law rather than about the student:
+ *     an ARTICLE NUMBER. „чл. 250" in a note reads exactly like „чл. 183" and
+ *     is invisible to the numeral gate, which classifies it as a citation
+ *     locator and exempts it by design. So every article our prose names must
+ *     resolve — in an act the row cites, or in an act the sentence names
+ *     itself, which is how „НСИПМК чл. 425, ал. 1, т. 2" stays legal.
+ *
+ * The residual hole, stated rather than papered over: `id` is Latin kebab-case
+ * and no rope can reach it from Cyrillic statute text. It is not shown to a
+ * student, and `PenaltyBankSchema` only guarantees it is unique.
+ */
+function labelProblems(p: PenaltyEntry, acts: ReadonlyMap<string, LawAct>): string[] {
+  const problems: string[] = [];
+
+  const evidence = figuresOf(p).flatMap(([, f]) =>
+    [f.source.quoteBg, f.source.contextQuoteBg, f.source.offencePhraseBg].filter(
+      (q): q is string => q !== undefined,
+    ),
+  );
+  const stray = ungroundedLabelWords(p.titleBg, evidence);
+  if (stray.length > 0) {
+    problems.push(
+      `${p.id}.titleBg: „${stray.join(", ")}" occurs in none of this row's verified quotes — the label a student reads in the list must be the offence the citations price, and nothing else in this loader looks at it`,
+    );
+  }
+
+  /**
+   * …and a FIGURE claimed in a label must be the row's own figure.
+   *
+   * Found by attacking the vocabulary rule: „Превишена скорост в населено място
+   * с 21 – 30 km/h и 10 контролни точки" passes it word for word — „10" is in
+   * the exam quote, „контролни точки" is in the наредба quote — while telling a
+   * student that a 100 лв. speeding ticket costs him ten licence points, which
+   * is the founder's whole complaint in one line. The numeral gate does not see
+   * it either: the number and the unit both occur in evidence the row really
+   * holds. Only the ROW knows that its контролни точки figure is 0.
+   *
+   * Measured before shipping: no title and no summary in the bank states a
+   * лв./точки figure at all, so this costs nothing today and refuses the first
+   * one that is wrong.
+   */
+  const LABEL_FIGURE = /(\d+(?:[.,]\d+)?)\s*(контролни точки|наказателни точки|лв\.)/g;
+  const owned: ReadonlyArray<readonly [string, number | null]> = [
+    ["контролни точки", p.controlPoints.points],
+    ["наказателни точки", p.examPoints?.points ?? null],
+    ["лв.", p.fine.amountBgn],
+  ];
+  for (const [where, text] of [
+    ["titleBg", p.titleBg],
+    ["summaryBg", p.summaryBg],
+  ] as const) {
+    for (const m of text.matchAll(LABEL_FIGURE)) {
+      const mine = owned.find(([unit]) => unit === m[2])?.[1] ?? null;
+      if (mine === null || String(mine) !== m[1].replace(",", ".")) {
+        problems.push(
+          `${p.id}.${where}: claims „${m[1]} ${m[2]}", and this row's figure is ${mine === null ? "not established" : mine} — a label may not state a consequence the row does not carry, which is exactly the confusion this bank exists to end`,
+        );
+      }
+    }
+  }
+
+  // …and the article numbers in our own prose.
+  const citedActIds = new Set<string>();
+  for (const [, f] of figuresOf(p)) citedActIds.add(f.source.actId);
+  if (p.fine.instrumentSource) citedActIds.add(p.fine.instrumentSource.actId);
+
+  const fields: Array<readonly [string, string | null]> = [
+    ["titleBg", p.titleBg],
+    ["summaryBg", p.summaryBg],
+    ["fine.noteBg", p.fine.noteBg],
+    ["controlPoints.noteBg", p.controlPoints.noteBg],
+    ["disqualification.noteBg", p.disqualification.noteBg],
+    ["examPoints.noteBg", p.examPoints?.noteBg ?? null],
+  ];
+  for (const [where, text] of fields) {
+    if (text === null || text === "") continue;
+    /**
+     * An act the SENTENCE names is fair game even when the row does not cite
+     * it: the camera-tolerance note reaches „чл. 425 от Наредбата за средствата
+     * за измерване", two documents away from the ЗДвП and legitimately so.
+     * `inlineCitations` is the reader the prose gate already uses for that —
+     * borrowed rather than re-written, because it knows both word orders and
+     * strips the Bulgarian definite article („Наредбата" → „Наредба"), and two
+     * matchers meant to agree drift.
+     */
+    const reachable = new Set(citedActIds);
+    for (const cite of inlineCitations(text)) {
+      const named = actIdForActName(cite.actBg);
+      if (named !== null) reachable.add(named);
+    }
+    for (const m of text.matchAll(/(?<![А-Яа-яЁёA-Za-z0-9])чл\.\s*(\d+[а-я]?)/gi)) {
+      const ref = `чл. ${m[1]}`;
+      const found = [...reachable].some((actId) =>
+        acts.get(actId)?.units.some((u) => u.ref === ref),
+      );
+      if (!found) {
+        problems.push(
+          `${p.id}.${where}: names „${ref}", which exists in none of the acts this row can reach (${[
+            ...reachable,
+          ].join(", ")}) — an article number in our own prose is a claim about the law and the numeral gate cannot see it, because it reads a locator as a coordinate rather than a figure (ADR-002)`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
+/**
+ * (10) TWO ROWS THAT PRICE DIFFERENT MONEY MUST BE TELLABLE APART.
+ *
+ * Every check above is about ONE row. The founder's example is about two: „не
+ * спира на Б2" is 100 лв. and no контролни точки, and the same manoeuvre „ако
+ * от това е създадена непосредствена опасност" is 200 лв. and 10. A student who
+ * is shown the second row's sentence under the first row's price has been
+ * taught the wrong law, and nothing that looks at one row in isolation can see
+ * it.
+ *
+ * Restricted to the FINE phrase, and to pairs whose fines differ, on purpose.
+ * The exam sheet legitimately marks one error for both — приложение № 5 grades
+ * „не спре при наличието на пътен знак Б2" whether or not danger followed —
+ * so requiring every phrase to be unique across the bank would fail on correct
+ * data. The phrase that prices the MONEY is the one that may not be shared.
+ */
+function separationProblems(penalties: readonly PenaltyEntry[]): string[] {
+  const problems: string[] = [];
+  for (const a of penalties) {
+    for (const b of penalties) {
+      if (a.id >= b.id) continue;
+      if (a.fine.amountBgn === null || b.fine.amountBgn === null) continue;
+      if (a.fine.amountBgn === b.fine.amountBgn) continue;
+      const pa = a.fine.source.offencePhraseBg;
+      const pb = b.fine.source.offencePhraseBg;
+      if (pa === undefined || pb === undefined) continue;
+      if (
+        offencePhraseMatchesConduct(pa, b.conduct) &&
+        offencePhraseMatchesConduct(pb, a.conduct)
+      ) {
+        problems.push(
+          `${a.id} and ${b.id} price different fines (${a.fine.amountBgn} лв. / ${b.fine.amountBgn} лв.) but each row's conduct accepts the other row's fine phrase — the two declarations do not tell the two offences apart, so whichever citation is wrong, nothing here can say which`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/**
  * The checks that make a figure grounded rather than asserted:
  *
  *  1. every citation quote occurs verbatim (modulo whitespace / soft hyphens)
@@ -523,6 +895,25 @@ function conductProblems(p: PenaltyEntry, acts: ReadonlyMap<string, LawAct>): st
  *     it, or the citation is refused;
  *  5. and the offence it names is THE ROW'S OFFENCE — checked against the row's
  *     `conduct` declaration, because 1–4 all compare a citation with itself.
+ *
+ * 6–10 were added after a gate attacked 1–5 and got six attacks through. Each
+ * of them is DERIVED FROM THE ACT rather than declared by the row, which is the
+ * property that matters: 1–5 can all be satisfied by an author who writes both
+ * sides of the comparison, and a declaration can be widened or deleted.
+ *
+ *  6. the alinea and point printed beside the quote are where the text is;
+ *  7. …and the citation's own words are enough to prove WHICH alinea, so a
+ *     coordinate that fits two identical ladders is refused rather than
+ *     believed (ЗДвП чл. 182: in town / out of town, 400 лв. against 300);
+ *  8. an offence phrase may not stop before the act's „ако"/„когато" — the
+ *     dropped condition is the entire difference between two rows;
+ *  9. the row's own LABEL speaks the offence's vocabulary, and no article
+ *     number in our prose is one the corpus cannot open;
+ * 10. two rows that price different fines can be told apart by their
+ *     declarations.
+ * 11. and the INSTRUMENT the money arrives on is the one the provision beside
+ *     it actually authorises — added after 1–10 let „електронен фиш" sit on a
+ *     citation of the ordinary-фиш rule with every schema and every test green.
  *
  * Returns human-readable problems, empty when clean.
  */
@@ -546,10 +937,25 @@ export function verifyCitations(
       status?: FigureStatus;
       /** The row's declaration of what it is pricing — see (5). */
       conduct?: PenaltyConduct;
+      /**
+       * Set only on `fine.instrumentSource`: the instrument this citation is
+       * supposed to authorise, and the row's ban status, which is the condition
+       * the authorising provisions state. Turns on check (11).
+       */
+      instrument?: FineInstrument;
+      banStatus?: FigureStatus;
     } = {},
   ): void => {
-    const { mustContain, status, conduct } = opts;
+    const { mustContain, status, conduct, instrument, banStatus } = opts;
     const requireOffencePhrase = status === "grounded";
+    /**
+     * The narrowest text the citation's own coordinates name — the point when
+     * `pointRef` is a bare „т. N", else the alinea, else the whole unit. Set as
+     * the coordinates are resolved below and read by check (8), which asks what
+     * the act says immediately AFTER the offence phrase and would get the wrong
+     * answer from the whole article.
+     */
+    let citedScope: string | null = null;
     const act = acts.get(c.actId);
     if (!act) {
       problems.push(`${penaltyId}.${field}: unknown actId "${c.actId}"`);
@@ -561,12 +967,15 @@ export function verifyCitations(
       return;
     }
     const haystack = normaliseForMatch(unit.textBg);
+    /** False once any quote has failed check 1 — see (7), which then stays quiet. */
+    let quotesResolve = true;
     for (const [name, quote] of [
       ["quote", c.quoteBg],
       ["contextQuote", c.contextQuoteBg],
     ] as const) {
       if (quote === undefined) continue;
       if (!haystack.includes(normaliseForMatch(quote))) {
+        quotesResolve = false;
         problems.push(
           `${penaltyId}.${field}: ${name} is NOT in ${act.abbrBg} ${c.ref} — "${quote.slice(0, 70)}…"`,
         );
@@ -593,6 +1002,20 @@ export function verifyCitations(
      * is not in the article at all is already reported above, so it is not
      * reported twice here.
      */
+    /**
+     * …AND THE COORDINATE MAY NOT SIMPLY BE OMITTED. Found by attacking (7):
+     * deleting `paragraphRef` along with the ladder's opening put the citation
+     * back in the state (7) refuses, because a check that only runs when a
+     * coordinate is present is switched off by removing the coordinate. An
+     * article divided into alineas has to be entered through one — measured
+     * over the bank: every citation already names one, and the exam annex,
+     * which names none, has no alinea run to name (приложение № 5 parses to 0).
+     */
+    if (c.paragraphRef === undefined && alineaSpans(haystack).size > 1) {
+      problems.push(
+        `${penaltyId}.${field}: ${act.abbrBg} ${c.ref} is divided into alineas and the citation names none — a student sent to the whole article has to find the sentence himself, and the checks that verify a coordinate cannot run on a citation that has one`,
+      );
+    }
     if (c.paragraphRef !== undefined) {
       const wanted = alineaKey(c.paragraphRef);
       const spans = alineaSpans(haystack);
@@ -608,6 +1031,8 @@ export function verifyCitations(
           );
         } else {
           const inside = haystack.slice(span[0], span[1]);
+          citedScope = inside;
+          let misfiled = false;
           for (const [name, quote] of [
             ["quote", c.quoteBg],
             ["contextQuote", c.contextQuoteBg],
@@ -615,8 +1040,59 @@ export function verifyCitations(
             if (quote === undefined) continue;
             const needle = normaliseForMatch(quote);
             if (haystack.includes(needle) && !inside.includes(needle)) {
+              misfiled = true;
               problems.push(
                 `${penaltyId}.${field}: ${name} is in ${act.abbrBg} ${c.ref} but NOT in ${c.paragraphRef} — the citation sends the student to an alinea that does not contain the sentence: "${quote.slice(0, 60)}…"`,
+              );
+            }
+          }
+
+          /**
+           * (7) …AND THE CITATION'S OWN WORDS MUST BE ABLE TO PROVE WHICH
+           * ALINEA IT IS. THE LIMIT ABOVE, CLOSED.
+           *
+           * Check (6) compares the quote with the alinea it names. It cannot
+           * tell two alineas apart when they contain THE SAME SENTENCE, and
+           * ЗДвП чл. 182 does exactly that: ал. 1 is the in-town speeding
+           * ladder, ал. 2 the out-of-town one, and their т. 3 is word for word
+           * identical („за превишаване от 21 до 30 km/h - с глоба 100 лв."). So
+           * the founder's own row could be flipped to „ал. 2" and every check
+           * in this file — and all 11,518 tests — stayed green. Harmless at
+           * that tier, where both alineas say 100 лв. NOT harmless at т. 4: in
+           * town 31–40 km/h is 400 лв., out of town 300.
+           *
+           * The discriminator is the alinea's OWN OPENING („който превиши
+           * разрешената максимална скорост в населено място" / „…извън населено
+           * място"), and no citation field carried it — so the rule is not that
+           * a row must declare which ladder it is on, it is that A CITATION
+           * WHOSE EVIDENCE FITS TWO ALINEAS IS NOT A CITATION. Something the
+           * student is shown must be unique to the alinea named. Quote the
+           * opening and check (6) does the rest: flipping to ал. 2 then makes
+           * the opening a sentence that alinea does not contain.
+           *
+           * Measured over the bank before it was written: 26 of 30
+           * alinea-scoped citations were already unique, and the 4 that were
+           * not are the four on чл. 182 — which is the article the defect was
+           * found in. Nothing else moved.
+           */
+          const evidence = [c.quoteBg, c.contextQuoteBg, c.offencePhraseBg].filter(
+            (q): q is string => q !== undefined,
+          );
+          const siblings = [...spans.entries()].filter(([key]) => key !== wanted);
+          // Silent when the quote is not in the article at all, or is in the
+          // wrong alinea: both are already reported, and a citation cannot be
+          // asked to prove WHICH alinea before it has proved it is in one.
+          if (quotesResolve && !misfiled && spans.size > 1 && siblings.length > 0) {
+            const unique = evidence.some((q) => {
+              const needle = normaliseForMatch(q);
+              return (
+                inside.includes(needle) &&
+                !siblings.some(([, s]) => haystack.slice(s[0], s[1]).includes(needle))
+              );
+            });
+            if (!unique) {
+              problems.push(
+                `${penaltyId}.${field}: nothing this citation shows is unique to ${act.abbrBg} ${c.ref}, ${c.paragraphRef} — every quote it carries also occurs in another alinea of the same article, so the coordinate is unverifiable and could be flipped without any check noticing. Quote the alinea's own opening sentence, which is what tells the ladders apart.`,
               );
             }
           }
@@ -636,12 +1112,31 @@ export function verifyCitations(
           if (point !== null) {
             const points = pointSpans(inside);
             const pSpan = points.get(point[1]);
-            if (points.size > 0 && pSpan === undefined) {
+            /**
+             * …AND AN ALINEA WITH NO POINTS CANNOT BE ENTERED THROUGH ONE.
+             *
+             * Found by attacking check (11): adding `pointRef: "т. 1"` to the
+             * фиш row's чл. 186, ал. 1 citation produced zero problems and
+             * rendered „ЗДвП, чл. 186, ал. 1, т. 1" under the instrument — a
+             * coordinate that alinea does not have. The guard below was written
+             * `points.size > 0 && …`, so a citation naming a point in an alinea
+             * that has NONE switched the whole branch off, which is the same
+             * shape as the deleted `paragraphRef` two checks up: a check that
+             * only runs when the text cooperates is disabled by a coordinate
+             * that does not. Measured over the bank before writing it: 13 bare
+             * „т. N" citations, all 13 inside an alinea that really has points.
+             */
+            if (points.size === 0) {
+              problems.push(
+                `${penaltyId}.${field}: ${act.abbrBg} ${c.ref}, ${c.paragraphRef} is not divided into numbered points, and the citation names ${c.pointRef} — the student is sent to a coordinate the act does not have`,
+              );
+            } else if (pSpan === undefined) {
               problems.push(
                 `${penaltyId}.${field}: ${act.abbrBg} ${c.ref}, ${c.paragraphRef} has no ${c.pointRef} — its points run 1–${points.size}`,
               );
-            } else if (pSpan !== undefined) {
+            } else {
               const pointText = inside.slice(pSpan[0], pSpan[1]);
+              citedScope = pointText;
               const lands = [c.quoteBg, c.contextQuoteBg, c.offencePhraseBg]
                 .filter((q): q is string => q !== undefined)
                 .some((q) => pointText.includes(normaliseForMatch(q)));
@@ -729,6 +1224,145 @@ export function verifyCitations(
           );
         }
       }
+
+      /**
+       * (8) …AND IT MAY NOT STOP BEFORE THE ACT HAS FINISHED SAYING WHEN.
+       *
+       * THE DEFECT, and it was live on a shipped row. ЗДвП чл. 179, ал. 1, т. 5
+       * prices „не спазва предписанието на пътните знаци … ако от това е
+       * създадена непосредствена опасност за движението" at 200 лв. and 10
+       * контролни точки. Cut the phrase at „пътните знаци" and the danger clause
+       * is gone — and the danger clause IS the difference between that row and
+       * pen-b2-no-stop, which is 100 лв. and no точки for the same manoeuvre.
+       * The truncation is verbatim, it is inside the quotes, and it satisfies
+       * the row's own conduct. Nothing went red.
+       *
+       * WHY (5b) COULD NOT BE MADE TO CATCH IT, which is why this check exists
+       * beside it rather than inside it. (5b) requires EVERY phrase on the row
+       * to satisfy EVERY anchor group, so the declaration can only ever be the
+       * weakest common denominator of the row's own figures. Adding an
+       * „опасност" group to the danger row would refuse its контролни-точки
+       * citation and its наказателни-точки citation, whose acts do not use the
+       * word — приложение № 5 marks the Б2 non-stop whether or not danger
+       * followed, and says so in its own noteBg. The two rows that differ ONLY
+       * by the danger clause are precisely the two a row-wide AND can never
+       * separate.
+       *
+       * So the condition is not enforced from the row. It is enforced from THE
+       * ACT'S OWN PUNCTUATION: inside the narrowest span the citation names,
+       * read from the end of the phrase to the next „;" — the boundary of the
+       * enumerated item — and if what the phrase left behind opens a condition,
+       * the phrase is quoting an offence the act does not price on its own.
+       * There is no field to declare, widen or delete: the check is derived
+       * from the text every load already re-reads.
+       *
+       * Measured over the whole bank before it was written: 21 offence phrases,
+       * 20 clean, 1 red — pen-b2-no-stop-danger's контролни-точки phrase, which
+       * had dropped the same clause from Наредба № Iз-2539 чл. 6, ал. 1, т. 15.
+       * That row was fixed rather than exempted.
+       */
+      const scope = citedScope ?? haystack;
+      for (let at = scope.indexOf(needle); at !== -1; at = scope.indexOf(needle, at + 1)) {
+        const after = scope.slice(at + needle.length);
+        const semicolon = after.indexOf(";");
+        const tail = semicolon === -1 ? after : after.slice(0, semicolon + 1);
+        const dropped = CONDITION_RE.exec(tail);
+        if (dropped !== null) {
+          problems.push(
+            `${penaltyId}.${field}: the offence phrase stops before the act does — ${act.abbrBg} ${c.ref} goes on „…${tail.slice(0, 90)}", and „${dropped[1]}" opens the condition that decides the figure. A phrase cut before its own „ако"/„когато" is verbatim, is inside the quotes and satisfies the row's conduct, and still prices the wrong conduct: it is the whole difference between 100 лв. and 200 лв. for the same manoeuvre.`,
+          );
+        }
+      }
+    }
+
+    /**
+     * (11) THE INSTRUMENT IS BOUND TO THE ARTICLE THAT AUTHORISES IT.
+     *
+     * Runs only on `fine.instrumentSource`. The long note beside
+     * `instrumentMentions` above has the measured defect and the reason no
+     * article number is written here; this is the three questions themselves,
+     * asked of the narrowest text the citation's own coordinates name.
+     */
+    if (instrument !== undefined) {
+      const scope = citedScope ?? haystack;
+      const shownBg = `${c.quoteBg} ${c.contextQuoteBg ?? ""}`;
+      const inScope = instrumentMentions(scope);
+      const inShown = instrumentMentions(shownBg);
+
+      // (11a) …AND THE PROVISION NAMES THAT INSTRUMENT AND NO OTHER.
+      // „Exactly one" is what does the work. Requiring merely that the row's
+      // instrument be present lets чл. 186, ал. 2 („На лице, което оспорва …
+      // се съставя акт", which also says „фиша") stand as the authority for
+      // either — and a provision that names two instruments is not the rule
+      // that decides between them.
+      const named = INSTRUMENTS.filter((i) => inScope[i]);
+      if (!inScope[instrument]) {
+        problems.push(
+          `${penaltyId}.${field}: the row says the fine arrives as „${instrument}" and the provision it cites never names one — ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} names ${named.length === 0 ? "no instrument at all" : `„${named.join("“, „")}"`}. The instrument is a claim about who may issue the ticket, whether a лишаване can ride along and what the discount is; an instrument whose own citation is about a different piece of paper is a consequence the law behind it does not support.`,
+        );
+      } else if (named.length > 1) {
+        problems.push(
+          `${penaltyId}.${field}: ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} names more than one instrument („${named.join("“, „")}") — a provision that mentions two cannot be the rule that authorises this one. Cite the alinea that provides for „${instrument}" itself.`,
+        );
+      }
+      // …and the student must be shown it, not merely have it be true upstream.
+      if (!inShown[instrument]) {
+        problems.push(
+          `${penaltyId}.${field}: the quotes shown never say „${instrument}" — the student reads the instrument on the screen and the sentence underneath it is about something else.`,
+        );
+      }
+
+      // (11b) …AND THE PROVISION CREATES IT, rather than mentioning it.
+      if (!ISSUANCE_RE.test(anchorText(scope))) {
+        problems.push(
+          `${penaltyId}.${field}: ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} mentions „${instrument}" but does not provide for one — nothing in it is issued, imposed or drawn up. чл. 189, ал. 2 gives актове their доказателствена сила and ал. 3 says who may witness one; neither is the authority to draw one up.`,
+        );
+      }
+
+      // (11c) …AND ITS OWN CONDITION AGREES WITH THE ROW'S BAN.
+      // This is the half that catches a citation which is about the right
+      // instrument and still wrong: the акт row pointed at the фиш rule. Both
+      // фиш provisions make the ABSENCE of a лишаване their condition, so a
+      // row whose ban is grounded cannot be standing on one, and a row that
+      // claims a фиш must be standing on one.
+      const conditioned = BAN_FREE_CONDITION_RE.test(anchorText(scope));
+      const conditionShown = BAN_FREE_CONDITION_RE.test(anchorText(shownBg));
+      const fisher = instrument === "фиш" || instrument === "електронен фиш";
+      if (fisher && !conditioned) {
+        problems.push(
+          `${penaltyId}.${field}: „${instrument}" is permitted only for offences „не е предвидено наказание лишаване от право", and ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} does not state that condition — so this is not the provision that authorises the ticket. The alineas about the discount, about an unpaid фиш and about being notified all name a фиш and authorise none.`,
+        );
+      }
+      if (fisher && !conditionShown) {
+        problems.push(
+          `${penaltyId}.${field}: the quote shown drops the condition the instrument rests on („не е предвидено наказание лишаване от право") — without it the sentence reads as though a фиш were always available, which is the one thing the alinea says it is not.`,
+        );
+      }
+      if (!fisher && conditioned) {
+        problems.push(
+          `${penaltyId}.${field}: this row's лишаване is ${banStatus ?? "?"} and it cites a provision whose condition is that NO лишаване is provided — ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} is the rule that BARS a фиш here, not the rule that authorises the акт.`,
+        );
+      }
+      if (fisher && banStatus !== undefined && banStatus !== "not-listed") {
+        problems.push(
+          `${penaltyId}.${field}: the citation's condition is that no лишаване is provided, and the row's disqualification is "${banStatus}" — the row and the rule it stands on disagree about the fact that decides the instrument.`,
+        );
+      }
+
+      // (11d) …and the camera instrument may not lose its camera. See
+      // CAMERA_CONDITION_RE for what this reaches and what it does not.
+      if (instrument === "електронен фиш") {
+        if (!CAMERA_CONDITION_RE.test(anchorText(scope))) {
+          problems.push(
+            `${penaltyId}.${field}: „електронен фиш" is the paper a CAMERA issues with no officer and no driver present, and ${act.abbrBg} ${c.ref}${c.paragraphRef ? `, ${c.paragraphRef}` : ""} never says the offence is „установено и заснето с автоматизирано техническо средство" — so it is not the provision that authorises one.`,
+          );
+        }
+        if (!CAMERA_CONDITION_RE.test(anchorText(shownBg))) {
+          problems.push(
+            `${penaltyId}.${field}: the quote shown drops „установено и заснето с автоматизирано техническо средство" — the student is told the ticket arrives by post without being shown the one fact that makes that true.`,
+          );
+        }
+      }
     }
 
     /**
@@ -769,8 +1403,27 @@ export function verifyCitations(
     });
     // NOT the offence check: `instrumentSource` cites чл. 186 / чл. 189, which
     // are about the PAPER the fine arrives on and name no offence at all — so
-    // it is passed no status and no conduct, and (3) and (5b) skip it.
-    if (p.fine.instrumentSource) check(p.id, "fine.instrumentSource", p.fine.instrumentSource);
+    // it is passed no status and no conduct, and (3) and (5b) skip it. It gets
+    // check (11) instead, which asks the same question of the paper that (5b)
+    // asks of the offence: is this provision about the thing the row claims?
+    if (p.fine.instrumentSource) {
+      check(p.id, "fine.instrumentSource", p.fine.instrumentSource, {
+        // `instrument` is non-null whenever `instrumentSource` is — the schema
+        // refuses any other pairing — but verifyCitations is exported and gets
+        // hand-built rows in tests, so the invariant is asserted, not assumed.
+        instrument: p.fine.instrument ?? undefined,
+        banStatus: p.disqualification.status,
+      });
+      if (p.fine.instrument === null) {
+        problems.push(
+          `${p.id}.fine.instrumentSource: a rule is cited for an instrument the row does not name — instrument and instrumentSource stand or fall together`,
+        );
+      }
+    } else if (p.fine.instrument !== null) {
+      problems.push(
+        `${p.id}.fine: the row says the fine arrives as „${p.fine.instrument}" and cites no rule that permits it — an instrument asserted without its article is exactly the free recall ADR-002 forbids`,
+      );
+    }
     check(p.id, "controlPoints.source", p.controlPoints.source, {
       mustContain:
         p.controlPoints.status === "grounded" && p.controlPoints.points !== null
@@ -813,7 +1466,9 @@ export function verifyCitations(
       });
     }
     problems.push(...conductProblems(p, acts));
+    problems.push(...labelProblems(p, acts));
   }
+  problems.push(...separationProblems(penalties));
   return problems;
 }
 
@@ -987,14 +1642,31 @@ export interface FigureDisplay {
    */
   offencePhraseBg: string | null;
   noteBg: string | null;
+  /**
+   * THE INSTRUMENT, AND THE ARTICLE THAT AUTHORISES IT — populated by
+   * `describeFine`, null on every other figure.
+   *
+   * `valueBg` carries the instrument inside the money string („51,13 € (100
+   * лв.) (електронен фиш)") because the two are one fact for a student. That
+   * string is a real-world consequence — who may issue the ticket, whether a
+   * лишаване can ride along, whether it lands on the car's owner weeks later —
+   * and until check (11) nothing tied it to a provision. The load now refuses a
+   * wrong pairing; these three fields let the screen SHOW the pairing instead
+   * of asserting it, which is what THEO-4 asks of every decision we state.
+   */
+  instrumentBg: string | null;
+  instrumentCitationBg: string | null;
+  instrumentQuoteBg: string | null;
 }
 
 function describe(
   valueBg: string | null,
   citation: PenaltyCitation,
   noteBg: string | null,
+  instrument: { instrument: FineInstrument; source: PenaltyCitation } | null = null,
 ): FigureDisplay {
   const lookup = resolveCitation(citation);
+  const rule = instrument === null ? null : resolveCitation(instrument.source);
   return {
     valueBg,
     citationBg: lookup.found ? lookup.citationBg : `${citation.ref} (извън наличния корпус)`,
@@ -1002,6 +1674,14 @@ function describe(
     contextQuoteBg: citation.contextQuoteBg ?? null,
     offencePhraseBg: citation.offencePhraseBg ?? null,
     noteBg,
+    instrumentBg: instrument === null ? null : instrument.instrument,
+    instrumentCitationBg:
+      instrument === null || rule === null
+        ? null
+        : rule.found
+          ? rule.citationBg
+          : `${instrument.source.ref} (извън наличния корпус)`,
+    instrumentQuoteBg: instrument === null ? null : instrument.source.quoteBg,
   };
 }
 
@@ -1021,6 +1701,12 @@ export function describeFine(p: PenaltyEntry): FigureDisplay {
     p.fine.amountBgn === null ? null : `${bgnWithEurBg(p.fine.amountBgn)}${instrument}`,
     p.fine.source,
     p.fine.noteBg,
+    // Both or neither — the schema keeps them paired, and check (11) keeps the
+    // pairing honest, so a renderer can print the instrument and its article
+    // side by side without deciding anything itself.
+    p.fine.instrument !== null && p.fine.instrumentSource !== null
+      ? { instrument: p.fine.instrument, source: p.fine.instrumentSource }
+      : null,
   );
 }
 

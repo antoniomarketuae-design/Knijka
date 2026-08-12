@@ -43,7 +43,13 @@ import {
   serializeFlag,
   type HudToast,
 } from "@/modules/sim/hud";
-import { buildSessionSummary, makeViolation, pointsBg } from "@/modules/sim/rules";
+import {
+  VIOLATIONS,
+  buildSessionSummary,
+  makeViolation,
+  pointsBg,
+  type ViolationCode,
+} from "@/modules/sim/rules";
 import type { LessonResult, LessonSpec, RubricScore, TeachMoment } from "@/modules/sim/lessons";
 
 import { ROOMY_HUD_FLOOR_PX } from "@/components/sim/lesson-ui/immersive";
@@ -55,11 +61,24 @@ const BRIEFING = [
   { n: 4, textBg: "Спри плътно до бордюра след кръстовището." },
 ] as const;
 
-function seededResult(): LessonResult {
-  const events = [
-    makeViolation("SPEEDING_OVER_LIMIT", 41.2),
-    makeViolation("TURN_WITHOUT_INDICATOR", 63.8),
-  ];
+/**
+ * `?codes=WRONG_WAY,SEATBELT_OFF_WHILE_MOVING,…` — WHICH FAULT CARDS TO MOUNT.
+ *
+ * Added 2026-08-09 for the consequences wave. The road half of a fault card is
+ * now different for every code — a flat price, a gated one, a ladder, an
+ * exam-only finding — and doc 66 R0 says a row is not closed until somebody has
+ * LOOKED at it. Reaching a particular code by driving is neither deterministic
+ * nor, for „движение в лентата за принудително спиране по автомагистрала",
+ * quick. The default pair is unchanged, so every existing `?state=end` link
+ * still shows exactly what it showed before.
+ */
+function seededResult(codes: readonly string[]): LessonResult {
+  const events =
+    codes.length > 0
+      ? codes
+          .filter((c): c is ViolationCode => c in VIOLATIONS)
+          .map((c, i) => makeViolation(c, 20 + i * 11.3))
+      : [makeViolation("SPEEDING_OVER_LIMIT", 41.2), makeViolation("TURN_WITHOUT_INDICATOR", 63.8)];
   const summary = buildSessionSummary(events);
   return {
     lessonId: "rig-lesson",
@@ -273,11 +292,25 @@ export function PopupRigClient() {
   const [advisorUp, setAdvisorUp] = useState(true);
   const [briefingUp, setBriefingUp] = useState(true);
   const [skipped, setSkipped] = useState(false);
+  /** A6: the compact peek was sent away with its ✕ (the shell filters the same
+   *  way, by candidate id — see `dismissedOverlayIds` in LessonPlayShell). */
+  const [overlayGone, setOverlayGone] = useState(false);
   const [autoOpen, setAutoOpen] = useState(() =>
     readStoredFlag(SESSION_END_AUTO_STORAGE_KEY, true),
   );
 
-  const result = useMemo(seededResult, []);
+  // `?codes=A,B,C` mounts those fault cards instead of the default pair.
+  const codesParam = params.get("codes") ?? "";
+  const result = useMemo(
+    () =>
+      seededResult(
+        codesParam
+          .split(",")
+          .map((c) => c.trim())
+          .filter((c) => c !== ""),
+      ),
+    [codesParam],
+  );
   const dismissToast = useCallback(
     (id: number) => setToasts((prev) => prev.filter((t) => t.id !== id)),
     [],
@@ -369,20 +402,31 @@ export function PopupRigClient() {
             `hidden`, and `SimOverlay` speaks instead. It is here so the phone
             half of row A6 can be MEASURED rather than argued about — the item
             below is non-blocking and carries no detail, which is the ordinary
-            case (a task line, a guidance line), and `interactive` is false for
-            exactly that case. */}
+            case (a task line, a guidance line).
+
+            It USED to say, in this comment, „`interactive` is false for exactly
+            that case", and that sentence was the whole of A6's phone half: the
+            card had no pointer events and no control. It now carries an
+            `onDismiss` like the shell does, so a tap here removes the line —
+            and a rig that could not remove it would still be describing the
+            defect rather than the fix. */}
         {state === "overlay" ? (
           <SimOverlay
-            item={{
-              id: "rig-overlay",
-              kind: "task",
-              tone: "neutral",
-              chipBg: "ЗАДАЧА 2/3",
-              lineBg: "Спри плътно до бордюра след кръстовището.",
-            }}
+            item={
+              overlayGone
+                ? null
+                : {
+                    id: "rig-overlay",
+                    kind: "task",
+                    tone: "neutral",
+                    chipBg: "ЗАДАЧА 2/3",
+                    lineBg: "Спри плътно до бордюра след кръстовището.",
+                  }
+            }
             queued={1}
             frozen={false}
             onOpenChange={() => undefined}
+            onDismiss={() => setOverlayGone(true)}
             renderDetail={() => null}
           />
         ) : null}
@@ -408,9 +452,14 @@ export function PopupRigClient() {
                 // sits under „наказателни точки" and is neither — it is the
                 // product's own quality grade, and it runs the other way.
                 rubric={RIG_RUBRIC}
-                onSkip={compact ? null : () => setSkipped(true)}
+                // A2: `compact ? null : …` on these three was the SHELL's own
+                // rule, mirrored here — and it was the defect. Both surfaces now
+                // offer Skip, the note and the setting on a phone; the rig only
+                // has to keep telling the truth about the shell.
+                compact={compact}
+                onSkip={() => setSkipped(true)}
                 autoOpen={autoOpen}
-                onAutoOpenChange={compact ? null : setAutoOpenPersisted}
+                onAutoOpenChange={setAutoOpenPersisted}
               />
             </div>
           </div>

@@ -160,7 +160,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-driver-distraction",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-driver-distraction/mistake-late-react.trace.json",
-    "faultTimeSec": 12.07,
+    "faultTimeSec": 12,
     "requiredActors": [
       {
         "kind": "pedestrian",
@@ -235,7 +235,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-junction-rhr",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-junction-rhr/mistake-no-look.trace.json",
-    "faultTimeSec": 20.23,
+    "faultTimeSec": 20.05,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -274,7 +274,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-jx-giveway-b1",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-jx-giveway-b1/mistake-barge-priority.trace.json",
-    "faultTimeSec": 45.4,
+    "faultTimeSec": 41.08,
     "requiredActors": [
       {
         "kind": "vehicle",
@@ -374,7 +374,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-ln-obstacle-meeting",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-ln-obstacle-meeting/mistake-pull-out.trace.json",
-    "faultTimeSec": 16.43,
+    "faultTimeSec": 16.18,
     "requiredActors": [
       {
         "kind": "vehicle",
