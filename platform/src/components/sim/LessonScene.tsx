@@ -701,6 +701,23 @@ function ReadyScene({
   const { runtime, geometry, district, traffic, director, minimapPolylines, spawnPoints } =
     built;
 
+  // ── DOC 91 §R · W1 — «ПРОДЪЛЖИ» WAS DEAD WITH A THUMB ON THE PEDAL ────────
+  //
+  // The pause card's resume button was a bare `onClick`, and the second-finger
+  // census in `__tests__/tap-activation.test.ts` already named it as one of the
+  // two honest residues of the §I2 wave („the first-run touch hint's «Разбрах»
+  // and the menu-pause resume"). Wave 7 priced that residue on the product: on
+  // SIX OF SIX profiles, with a thumb resting on the drive pad, pressing
+  // «Пауза» and then «Продължи» does nothing — the browser does not synthesise
+  // a `click` while a second touch point is down — and lifting the pedal thumb
+  // makes the identical press work.
+  //
+  // That is not a cosmetic gap. It is the one card a student raises WHILE
+  // DRIVING, i.e. exactly when a thumb is on the glass, so the failure mode is
+  // „I paused and now I am stuck". The house idiom fixes it and keeps `onClick`
+  // for mouse, keyboard and assistive activation, which is §I2's own rule.
+  const tapResume = useTapActivation(() => setMenuPaused(false));
+
   // S0-View ?ghost=demo: record the scripted shadow drive ONCE per scene
   // (deterministic, <100 ms — the same recorder the vitest suite gates) and
   // play it through ShadowCar + TraceTimeline via a shared clock ref.
@@ -1825,6 +1842,10 @@ function ReadyScene({
               type="button"
               autoFocus
               className="btn-accent"
+              // §R · W1 — the pointer path FIRST, `onClick` kept beside it.
+              // Order matters only for readability; both are live, and the
+              // shared idiom de-duplicates so a mouse click cannot fire twice.
+              {...tapResume}
               onClick={() => setMenuPaused(false)}
             >
               Продължи

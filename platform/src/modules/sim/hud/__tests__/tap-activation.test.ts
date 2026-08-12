@@ -705,12 +705,16 @@ describe("the second-finger census of the compact driving surface", () => {
    *    rework)" and carries `data-hud-keep`. Editing it from this side is the
    *    collision that marker exists to prevent. It reaches a phone through
    *    `SimOverlay`'s `renderDetail`, so its cells are genuinely at risk.
-   *  · LessonScene — FIVE of its six now, the demonstration toggle above
-   *    having been fixed. What is left: the tier pill segments (`display:none`
-   *    on every compact stage since J-WAVE-3, so not a phone control at all),
-   *    two roomy collapsibles, the first-run touch hint's «Разбрах» and the
-   *    menu-pause resume. The last two ARE compact controls and are the honest
-   *    residue of this wave.
+   *  · LessonScene — FOUR of its six now. The demonstration toggle was fixed
+   *    first; **the menu-pause resume «Продължи» was fixed in doc 91 §R (W1)**,
+   *    after wave 7 priced the residue on the product: on six of six profiles,
+   *    with a thumb resting on the drive pad, «Пауза» → «Продължи» did nothing,
+   *    and lifting the thumb made the identical press work. It is the one card
+   *    a student raises WHILE DRIVING, so it was the expensive half of this
+   *    debt. What is left: the tier pill segments (`display:none` on every
+   *    compact stage since J-WAVE-3, so not a phone control at all), two roomy
+   *    collapsibles, and the first-run touch hint's «Разбрах» — which is a
+   *    compact control and is now the single honest residue.
    *
    * NOT IN THIS LIST, and each for a checked reason rather than an oversight:
    * `HudToasts` (roomy only — `LessonPlayShell:3031` renders it under
@@ -722,7 +726,7 @@ describe("the second-finger census of the compact driving surface", () => {
    */
   const UNCOVERED = [
     { rel: "modules/sim/hud/PreDriveChecklist.tsx", buttons: 8, pointer: 0 },
-    { rel: "components/sim/LessonScene.tsx", buttons: 6, pointer: 1 },
+    { rel: "components/sim/LessonScene.tsx", buttons: 6, pointer: 2 },
   ];
   for (const row of UNCOVERED) {
     it(`${row.rel} — ${row.buttons - row.pointer} controls still onClick-only, and no more`, () => {

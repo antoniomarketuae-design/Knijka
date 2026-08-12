@@ -1926,3 +1926,120 @@ complaint this wave is the frame.
 | I17 · I18 · I19 | DONE | DONE, and §I19 is now **100 %** | §I19's residual ~7 R3F renders/s under a card were the shell's HUD tick; §I22 removed them. §Q3 |
 
 ---
+
+## R. WAVE 7 · THE LEDGER, CLOSED — all 27 §I rows fired on the authenticated `/simulator`, 2026-08-12
+
+> **What this section is.** §O read all 27 rows against the *source*. This one presses them. Every
+> verdict below was taken on a `next build && next start` of `314ad94`, signed in, on the six-profile
+> ladder, with `hasCanvas === true`, a non-zero canvas rect and a mounted `[data-hud="touch-controls"]`
+> asserted **before any number was recorded** — the rule §O.5 installed. The verdict
+> **DONE-UNVERIFIED no longer appears**: every row that carried it has now been fired on the product.
+
+### R0 · Method, and the honesty problems it had to solve first
+
+`tools/mobile/wave7-ledger.mjs` (new) presses the controls with real CDP touch points — two of them
+where the row is about a second finger. `tools/mobile/wave6-edges.mjs` and `tools/mobile/perf-passes.mjs`
+were re-fired at this commit. **Ten smoke runs were discarded before the first number was believed**,
+and each discard is a lesson worth keeping:
+
+| the instrument said | what was actually true |
+|---|---|
+| "the brake does not brake" — 25 identical speed samples | the probe drove a **graded** scenario into a pedestrian crossing; the lesson **ended** and the telemetry froze. `l0-free-drive` is the only surface that can carry a sweep this long. |
+| "«Изглед» is ABSENT" | the search matched the rail **toolbar** (`role="toolbar"`, text "ИзгледПаузаКлаксон…", `pointer-events:none`) instead of the 60x44 button. A press is a press on a **button**. |
+| "«СЪЕД» is ABSENT" | «СЪЕД» only exists in «Напреднал»; the probe was in the automatic tier. Its first attempt to switch pressed **«РЪЧНА» — the handbrake** — and then measured a car it had itself immobilised. |
+| "§I1 fails, the pedal never comes back" | the pause card's «Продължи» was under the **lesson menu** the probe had left open — and, once that was fixed, under a genuine defect (W1 below). |
+| "the pre-drive card has a ✕" | the ✕ found was **«Скрий съвета»**, the advisor's own dismiss, which is supposed to be there. |
+
+**The rate limiter is part of the method now:** `/login` is budgeted 10 per 10 minutes per IP
+(`modules/security/policy.ts`), and a sweep that re-signs-in per profile walks into it and then
+reports a login page as simulator geometry. One sign-in per sweep, reused as `storageState`.
+
+### R1 · THE TABLE — all 27 rows
+
+| row | verdict | measured on the deployed build |
+|---|---|---|
+| **I1** dead pedal | **DONE** | 6/6. Thumb on the pedal at 15-16 km/h, «Пауза», then back: **19 to 54 km/h** with the thumb never re-pressed, and the series is *rising*, not a frozen number. **One caveat, and it is a real defect — W1 below: the resume press needs the pedal thumb lifted.** |
+| **I2** buttons under two fingers | **DONE** | 6/6, `TouchEvent.touches.length === 2` recorded page-side while «Изглед» fired. |
+| **I3** inert, not unmounted | **DONE** | 6/6: node kept, `data-sim-touch-inert="on"`, pad `pointer-events:none`, `opacity:0`. |
+| **I4a** the belt trap — the card scrolls | **DONE** | §P, re-confirmed here: the card body renders 130-240 px wide on 6/6 and «Разбрах» is on screen. |
+| **I4b** no auto-modal on compact | **DONE** | §P, 6/6. |
+| **I5a** the 4 px dead end | **DONE** | 6/6 — **no ✕ inside the pre-drive card**; the only ✕ on the page is «Скрий съвета». |
+| **I5b** the way back | **DONE** | «Подготовка n/13» present in the compact menu. |
+| **I6** pinch on the driving surface | **DONE** | 6/6 x 3 targets (road, top rail, **card**): scale 1 to 1, `offsetLeft` 0 to 0. Positive control `/theory` **1 to 3.25-4.473** in the same session, so the zeros are not a dead instrument. Touch-action grid **0 of 81** cells permit pinch. |
+| **I7** stale `--sim-vh` | **DONE** | 6/6 on Chromium: `--sim-vh` equals `visualViewport.height`, **drift [0,0,0]**, `stale=false`. |
+| **I8** 16 px of road | **DONE** | 6/6: shell padding `[0,0,0,0]`, gap 0, canvas short by `{dw:0,dh:0}`. |
+| **I9** document taller than the screen | **DONE (by measurement)** | `/simulator` overflow **y=0 x=0 on 6/6**. The `:has()` scope §I9 prescribes is deliberately *not* applied — it would break `assertInsetsApplied()`, the harness's only negative control that the notch emulation is live. |
+| **I10** minimap on the thumb | **DONE** | Map **turned on** for the measurement (measuring a 0x0 minimap would be the same false green this document is about). `bottom` resolves to 236-382 px — the touch floor, not the 48 px dash floor. **0 controls stolen on 6/6**; 1.9-9.2 k px² of geometric overlap remains with the pads' outer boxes, none of it over a control's own centre. |
+| **I11** the sheet stands on the controls | **OPEN** | 6/6. Portrait **3 of 10** controls dead, landscape **5 of 10**. **And the mechanism has moved:** the thumb pads are free — every dead control is in the **top rail**, and `elementFromPoint` at its centre answers **the expanded instruction panel** ("Потегли по улицата…"), not the sheet. Overlap 4 931 px² portrait / 12 276 px² landscape. |
+| **I12** mouse-only copy | **DONE** | §P, 6/6 ("…с ПРЪСТ…" + ☝). |
+| **I13** captions | **DONE** | §P, 6/6, `scrollWidth === clientWidth` on all five. Seen again in this wave's frames (Д ДЯСН, З ЗАДН, Л ЛЯВО). |
+| **I14** sub-44 px hit rects | **DONE** | **0 controls under 44 px on 6/6** on the driving surface, with the sr-only skip link correctly excluded (it is a 1x1 clipped box by design). |
+| **I15** centre-blind reach table | **DONE** | §P: chip moved from y -88/-81/-81 to y 80/72/72; both mirrors now carry a head turn. |
+| **I16** overlapping overlays | **DONE** | 6/6 on the real surface: `overlayActive=on` gives `[data-hud="touch-hint"]` a computed `display:none`, `bothVisible=false`. |
+| **I17** tier seed | **DONE** | §N2·B; re-confirmed here — every profile seeds `low`. |
+| **I18** the auto-quality probe | **DONE** | §N2·A. |
+| **I19** rendering behind modals | **DONE** | §Q3 (100 % after §I22). |
+| **I20** blur over a live canvas | **DONE** | 6/6, twice, by two instruments: `wave7-ledger` with «Пауза» up = **0 elements / 0 px²**; `perf-passes` idle / card / pause = **0 / 0 / 0 px² of 334 836** (iPhone) and **of 280 800** (Android). |
+| **I21** mirror RTT | **DONE** | 6/6 at this commit: **0.12-0.13 passes/frame**, **4.1-4.2 draws/frame**, **0.184-0.403 ms** = 4.7-8.9 % of the tier-low GPU frame (was 0.25 / 8.2-8.3 / 0.298-0.551 / 9.0-15.0 %). |
+| **I22** React commits | **DONE (arm b)** | §Q3. Arm (a) is not owed by the row's own target. |
+| **I23** camera | **DONE** | 6/6: «Изглед» **60x44**, `elementFromPoint` at its own centre answers **itself**, and pressing it opens the view menu **with a second finger already down**. |
+| **I24** clutch | **DONE** | Verified here for the first time on `/simulator`: tier cycled to «Напреднал», **«СЪЕД» 44x44, self-hit**, `onTop = "Съединител — задръж, докато сменяш предавка"`. |
+| **I25** the pad is absolute | **DONE** | 6/6: dead centre **0 km/h** held for 2.2 s; a motionless press in the upper half **18-19 km/h**; the lower half brakes **18 to 10 to 1 to 0**. His specification, measured. |
+| **I26 (b)** draw budget | **OPEN** | **202.1 draws/frame portrait, 227.5-228.3 landscape**, against a <=150 budget — 1.35-1.52x over. |
+| **I26 (c)** quality preset in the menu | **OPEN** | 6/6: the compact menu is `Съветник · Въпроси · Карта · Изход от цял екран · Завърши сесията · ← Всички уроци`. **No quality entry.** |
+| **I26a′** bundling | **OPEN** | `simulator-client.tsx:145` still resolves the catalogue synchronously. Not attempted; §Q5 sizes it at six files. |
+
+**Count: 24 DONE · 3 OPEN (I11, I26b, I26c) plus I26a′. Zero rows remain unverified.**
+
+### R2 · Two defects this wave FOUND, that no §I row covers
+
+| # | what | evidence |
+|---|---|---|
+| **W1** | **The pause card could not be dismissed while a thumb was on the pedal — FIXED IN THIS WAVE.** `LessonScene.tsx:1828` — «Продължи» is a bare `onClick`, with none of §I2's tap idiom. With a second touch point down the browser does not synthesise the click, so the card stays. **Reproduced on 6 of 6 profiles**; lifting the pedal thumb makes the identical press work. This is §C2's defect on a control §I2's eighteen call sites never reached — and the second-finger census in `tap-activation.test.ts` had already NAMED it ("the first-run touch hint's «Разбрах» and the menu-pause resume … the honest residue of this wave"); what wave 7 added was the price. **Fixed:** `LessonScene.tsx` now carries `useTapActivation` on «Продължи» with `onClick` kept beside it, and the census constant came down from 5 onClick-only controls to 4. |
+| **W2** | **§O.3 N4 is live, and it is landscape-only.** Choosing «Напреднал» raises "Скоростният лост е на ръчна кутия…", and with it up `elementFromPoint` at each rail button's own centre answers **the card**: **iPhone 16 landscape 4 of 4 buried** («Изглед», «Пауза», «Клаксон», «Кола»); **portrait 0 of 4**. Same shape as I11's residue: an expanded panel standing on the top rail. |
+
+### R3 · Performance at `314ad94` — production, tier low, six profiles
+
+Harness fps is printed beside every row, per §G0's rule; `ANGLE (NVIDIA GTX 1060 6GB, D3D11)`, no SwiftShader row.
+
+| profile | harness fps | GPU ms/frame | draws/frame | mirror ms (share) | mirror draws/f | blur over canvas |
+|---|---|---|---|---|---|---|
+| iphone16-portrait | 60.0 | 3.841 | 202.1 | 0.308 (8.0 %) | 4.1 | 0 px² |
+| iphone16-landscape | 60.1 | 4.081 | 228.0 | 0.204 (5.0 %) | 4.2 | 0 px² |
+| small-portrait | 60.1 | 3.624 | 202.1 | 0.197 (5.4 %) | 4.1 | 0 px² |
+| small-landscape | 60.1 | 4.066 | 227.5 | 0.194 (4.8 %) | 4.1 | 0 px² |
+| galaxy-gesturebar-portrait | 59.9 | 3.907 | 202.1 | 0.184 (4.7 %) | 4.1 | 0 px² |
+| galaxy-gesturebar-landscape | 60.0 | 4.511 | 228.3 | 0.403 (8.9 %) | 4.2 | 0 px² |
+
+### R4 · What the instrument could NOT establish, stated rather than glossed
+
+- **The thirteen-step pre-drive was not walked to completion by touch.** The probe pressed the mirror
+  glances and «Потвърди» for thirty passes and the counter never moved — because on a compact
+  viewport the **confirm control lives inside the sheet**, behind «СПИСЪК», which the walk never
+  opened. That is an instrument limitation. **It is NOT a finding that the pre-drive cannot be
+  completed, and it must not be read as one.**
+- **WebKit could not be used against `http://localhost`** — sign-in returns no session cookie there,
+  while the identical credentials work in Chromium against the same server. The geometry rows above
+  are therefore Chromium **with `--block-fullscreen`**, which puts it on the same code path iOS
+  Safari takes (Wave 6's own argument). The one row that showed a WebKit-only residue — §I7's 44 px
+  settle delay on 3 of 6 profiles — is unchanged and still owed.
+
+### R5 · The same six profiles at tier `med` — why "remove any restrictions" is the wrong lever
+
+Identical instrument, identical commit, `--tier med`. This is the tier the deleted 8 GB-Android
+carve-out used to hand a flagship phone (§I17), and it is what a "let it look better" switch would do.
+
+| profile | harness fps | GPU ms/frame | draws/frame | mirror ms (share) | mirror draws/f |
+|---|---|---|---|---|---|
+| iphone16-portrait | 59.7 | 5.792 | 493.6 | 0.433 (7.5 %) | 16.7 |
+| iphone16-landscape | 60.1 | 7.034 | 523.4 | 0.479 (6.8 %) | 17.0 |
+| small-portrait | 60.0 | 6.253 | 494.3 | 0.413 (6.6 %) | 17.1 |
+| small-landscape | 60.1 | 9.279 | 523.7 | 0.584 (6.3 %) | 16.9 |
+| galaxy-gesturebar-portrait | 60.0 | 8.429 | 494.3 | 0.586 (7.0 %) | 17.1 |
+| galaxy-gesturebar-landscape | 59.9 | 6.203 | 524.4 | 0.448 (7.2 %) | 17.2 |
+
+**`med` costs 2.3-2.4x the draw calls (202-228 to 494-524) and 1.4-2.3x the GPU frame, and the mirror
+alone goes from 4.1 to 17 draws a frame.** `low` is already 1.35-1.52x over its own <=150 draw budget
+(§I26b). Until that row moves, promoting a phone buys a worse frame, not a better picture — and the
+right lever is §I18's auto-quality probe, which is mounted and climbs on measured evidence rather
+than on a RAM figure.
