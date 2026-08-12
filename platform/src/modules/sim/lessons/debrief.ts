@@ -26,17 +26,23 @@
 
 import type { LessonSpec } from "../contracts";
 import {
+  COLLISION_CONSEQUENCE_BG,
   EXAM_VS_CONTROL_POINTS_BG,
   VIOLATIONS,
+  billRoadConsequences,
   deriveSpeedingBand,
   examMarkFor,
   examPointsWordBg,
   formatEur,
   instrumentLabelBg,
+  offenceCoveredLineBg,
   parseSpeedMeasurement,
   pointsLabelBg,
   roadConsequenceFor,
   withEurBg,
+  type ConditionalPenalty,
+  type ControlPointsFigure,
+  type OffenceBilling,
   type ViolationCode,
   type ViolationEvent,
 } from "../rules";
@@ -144,8 +150,11 @@ export function buildDebrief(
     );
   }
   if (summary.terminated) {
+    // Both halves, both addresses — the mark is приложение № 5, т. 10, б. „в“,
+    // the ending is чл. 48, ал. 3, and until 2026-08-10 this line cited
+    // neither. (rules/scales.ts COLLISION_CONSEQUENCE_BG.)
     lines.push(
-      "Настъпи сблъсък — на реалния изпит това прекратява изпита незабавно. Продължихме за упражнение, но оценката отразява прекратяване.",
+      `${COLLISION_CONSEQUENCE_BG} В симулатора продължихме за упражнение, но оценката отразява прекратяване.`,
     );
   }
 
@@ -188,6 +197,25 @@ export function buildDebrief(
     if (esc.multiplier > prev) maxEscalationByCode.set(esc.code, esc.multiplier);
   }
   const groups = groupMistakes(summary.mistakes);
+  /**
+   * ONE ACT, ONE ROAD PRICE — the same ruling the result screen renders
+   * (rules/offences.ts), applied to the text so the two surfaces cannot say
+   * different things about the same drive. `groupMistakes` collapses by CODE,
+   * so the question here is per code: was this code ever the row that carried
+   * the price? If it never was, its money is somebody else's line, and printing
+   * it again is the 200 лв. defect in prose.
+   */
+  const billing = billRoadConsequences(summary.mistakes);
+  const billedCodes = new Set<string>();
+  const coveredByCode = new Map<string, NonNullable<OffenceBilling["coveredBy"]>>();
+  summary.mistakes.forEach((m, i) => {
+    const b = billing[i];
+    if (b.billed) billedCodes.add(m.code);
+    else if (b.coveredBy !== null && !coveredByCode.has(m.code)) coveredByCode.set(m.code, b.coveredBy);
+  });
+  /** null = this code pays for itself somewhere in the drive; otherwise, who does. */
+  const coveredElsewhere = (code: string): NonNullable<OffenceBilling["coveredBy"]> | null =>
+    billedCodes.has(code) ? null : (coveredByCode.get(code) ?? null);
   if (groups.length > 0) {
     lines.push("");
     lines.push("Най-важните грешки (подредени по тежест):");
@@ -214,10 +242,27 @@ export function buildDebrief(
       // rephrase this line but must not invent corrective advice.
       const corrective = correctiveFor(g.code);
       if (corrective !== null) lines.push(`  → Правилното действие: ${corrective}`);
+      // The debrief is PLAIN TEXT — it has no FaultCard to carry the rider, and
+      // it is what /review/my-drive replays weeks later. So the one fault that
+      // ends an exam quotes the article that ends it, here, verbatim. Derived
+      // from `terminatesExam`, so a class can never imply it (Наредба № 38
+      // чл. 48, ал. 3 reaches ПТП and повторна намеса — not опасна as such).
+      if (mark !== null && mark.terminatesExam) {
+        lines.push(`  → Спира самия изпит: „${mark.terminationQuoteBg}“ — ${mark.terminationCitationBg}.`);
+      }
       // THE OTHER HALF. A real instructor says both: „this fails your exam,
       // and on the street a camera sends you a фиш for X." Retrieved, never
       // recalled — and silent rather than invented where we hold nothing.
-      const road = codeIsKnown(g.code) ? roadLines(g.code as ViolationCode, g.worstSpeedDetail) : [];
+      const covered = coveredElsewhere(g.code);
+      const road =
+        covered !== null
+          ? // ONE ACT, ONE PRICE. Not silence and not a repeat of the figure:
+            // the sentence that says WHERE the price is and why the two faults
+            // are one offence — the same finding the fault card renders.
+            [offenceCoveredLineBg(covered)]
+          : codeIsKnown(g.code)
+            ? roadLines(g.code as ViolationCode, g.worstSpeedDetail)
+            : [];
       if (road.length === 0) anyBlank = true;
       for (const line of road) lines.push(`  → ${line}`);
     }
@@ -320,6 +365,26 @@ function codeIsKnown(code: string): boolean {
  * quotes are re-cut from `content/law/acts` by its own test; this function
  * composes sentences around them and introduces no figure of its own.
  */
+/** The licence half of any figure, said the one way it is said everywhere. */
+function cpPhraseBg(cp: ControlPointsFigure): string {
+  if (cp.status === "grounded" && cp.points !== null) return `${cp.points} контролни точки от книжката`;
+  if (cp.status === "not-listed") return "0 контролни точки — нарушението не е в изчерпателния списък";
+  return "контролни точки: не е установено";
+}
+
+/**
+ * A gated penalty as one sentence, CONDITION FIRST. The order is the whole
+ * point: „300 € ако стане ПТП" is read as three hundred euro, and „ако от
+ * нарушението настъпи ПТП — 300 €" is read as a condition.
+ */
+function gatedLineBg(step: ConditionalPenalty): string {
+  return (
+    `${step.conditionBg[0].toUpperCase()}${step.conditionBg.slice(1)} — глоба ` +
+    `${formatEur(step.fine.eurCents)} (${step.fine.amountBgn} лв. по текста на закона) и ` +
+    `${cpPhraseBg(step.controlPoints)}. (${step.fine.source.citationBg})`
+  );
+}
+
 function roadLines(code: ViolationCode, speedDetail?: string): string[] {
   const road = roadConsequenceFor(code);
   if (road.kind === "unknown") return [];
@@ -334,17 +399,38 @@ function roadLines(code: ViolationCode, speedDetail?: string): string[] {
   }
 
   if (road.kind === "single") {
-    const cp =
-      road.controlPoints.status === "grounded" && road.controlPoints.points !== null
-        ? `${road.controlPoints.points} контролни точки от книжката`
-        : road.controlPoints.status === "not-listed"
-          ? "0 контролни точки — нарушението не е в изчерпателния списък"
-          : "контролни точки: не е установено";
     return [
       `На пътя (не влиза в оценката на урока): глоба ${formatEur(road.fine.eurCents)} ` +
-        `(${road.fine.amountBgn} лв. по текста на закона) и ${cp}. Пристига като ` +
+        `(${road.fine.amountBgn} лв. по текста на закона) и ${cpPhraseBg(road.controlPoints)}. Пристига като ` +
         `${instrumentLabelBg(road.fine.instruments)}. ` +
         `(${road.fine.source.citationBg}; ${road.controlPoints.source.citationBg})`,
+      ...(road.escalation ?? []).map(gatedLineBg),
+    ];
+  }
+
+  /**
+   * IT COSTS NOTHING ON THE STREET, AND THAT IS THE LINE. Not an empty return:
+   * `roadLines` returns empty for „we have not retrieved this yet", and the
+   * caller then prints one collective apology. A fault we HAVE researched and
+   * found to carry no road penalty must not be swept into that pile — the
+   * student would read „unknown" where the answer is „nothing".
+   */
+  if (road.kind === "exam-only") {
+    return [
+      `На пътя (не влиза в оценката на урока): ${road.headlineBg} ${road.whyBg} ` +
+        `(изпитната половина: ${road.examSource.citationBg})`,
+    ];
+  }
+
+  /** The duty is broken, the money is gated — both halves or neither. */
+  if (road.kind === "conditional") {
+    const licence =
+      road.controlPoints === undefined
+        ? ""
+        : ` Книжка: ${cpPhraseBg(road.controlPoints)}.`;
+    return [
+      `На пътя (не влиза в оценката на урока): ${road.headlineBg}${licence}`,
+      ...road.branches.map(gatedLineBg),
     ];
   }
 

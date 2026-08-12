@@ -35,7 +35,9 @@ function violationCodes(d: RecordedDrive): string[] {
   return d.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code);
 }
 
-const district = loadDistrict("sx-v1");
+// B40(b): «Спане на зелено» has its own signalized district now — one built
+// so the far stop line is READABLE from the seat (see templates-signals.ts).
+const district = loadDistrict(SC_SIGNAL_HESITATION.map.districtId);
 const drives = new Map<ScSignalHesitationTraceName, RecordedDrive>(
   NAMES.map((n) => [n, recordScSignalHesitationDrive(district, n)]),
 );

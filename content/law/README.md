@@ -254,11 +254,33 @@ only processing is:
 * **ЗДвП** — OOXML `<w:t>` extraction from the `.docx`; each `<w:p>` becomes one
   line. Article boundaries are the `Чл. N.` line starts (uppercase `Чл.` only
   ever starts an article; cross-references in running text are lowercase `чл.`).
-* **the наредби** — `pdftotext -enc UTF-8 -nopgbrk`, split on the same marker.
-  *Known artifact:* the SARS PDFs carry a per-page vendor watermark
-  (`Източник: Правно-информационни системи "Сиела" …`) which pdftotext leaves
-  mid-sentence. It is preserved rather than scrubbed — editing the extracted
-  text is exactly the habit this directory exists to prevent.
+* **the наредби** — `pdftotext -enc UTF-8 -nopgbrk`, split on the same marker,
+  **after `tools/page-furniture.mjs` has taken the vendor watermark out.** The
+  SARS and ДАМТН PDFs are printed out of a commercial legal database and carry
+  its advertisement in every page margin (`Източник: Правно-информационни
+  системи "Сиела"` over `24/01/2025 г.`); `-nopgbrk` suppresses the form feed,
+  not what is printed on the page, so pdftotext emits the advertisement in
+  reading order, inside whichever article was open when the page turned. 185
+  pieces of it shipped as statute text until 2026-08-09 — 124 in Наредба № 38
+  across 34 units, 58 in the Iз-2539 snapshot across 16, 3 in НСИПМК — and in
+  чл. 6 of the snapshot it split т. 3 mid-sentence, which is a hole in the
+  exhaustive list the product proves a negative against.
+
+  The removal is **not** an edit of the extracted text and it is not allowed to
+  become one. It deletes the advertisement and closes the page seam the
+  advertisement opened: mid-sentence seams are rejoined with one space,
+  paragraph-boundary seams keep their paragraph. Both builds then **refuse to
+  emit** an act in which either signature survives, and
+  `platform/src/lib/content/law/pageFurniture.test.ts` asserts the same property
+  over every file in `acts/`, ingested by any tool or none. The rejoin is
+  checkable rather than trusted: чл. 6, т. 3 now reads word for word like the
+  same provision in the lex.bg consolidation, which was ingested from HTML and
+  never had a page.
+
+  *Deliberately kept:* the only slash-dates left in the corpus are Наредба № 38's
+  two EU Official Journal references (`ОВ L 321, 20/11/2012`). They are statute
+  text. The datestamp signature insists on the `г.` that only a Bulgarian date
+  carries, which is what tells the two apart.
 
 Refs are canonicalised to lowercase (`чл. 183`, `чл. 167а1`, `§ 6`,
 `приложение № 5`) so the `{ act: "ЗДвП", ref: "чл. 47" }` shape already used

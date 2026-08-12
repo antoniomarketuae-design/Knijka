@@ -209,11 +209,14 @@ export function scVuCyclistGroupMistakeNarrowScript(): DriveScript {
 //     opens → that window records ~2.36 m of centers → VULNERABLE_PASS_TOO_CLOSE.
 //   · Landing in a 20 m hole at 45 km/h leaves ~1.6 s to the rider ahead, held
 //     long enough to sustain → FOLLOWING_TOO_CLOSE (twice, deduped by the gate).
-//   · The car then drifts to the CUT line and runs into rider 2 inside
-//     CYCLIST_CONTACT_M (2.2 m) → COLLISION, emitted by the runner's own contact
-//     channel — a GEOMETRIC consequence of the authored line, not a scripted beat.
+//   · The car then drifts to the CUT line — 1.4625 m of centres, i.e. 0.21 m of
+//     clear air past a rider's handlebar. THIS USED TO BE A THIRD CODE: the old
+//     CYCLIST_CONTACT_M was an isotropic 2.2 m circle around two POINTS, so it
+//     called that a COLLISION. Exact body geometry (sim/collision, 2026-08-10)
+//     does not, and the demo is honest without it — 21 cm is the worst pass the
+//     street can be driven and the clearance code is the one чл. 42 names.
 //
-// THREE CODES FOR ONE ACT, and deliberately so. The backlog asked this demo for
+// TWO CODES FOR ONE ACT, and deliberately so. The backlog asked this demo for
 // OVERTAKE_RETURN_TOO_EARLY; that code is structurally unreachable against a
 // cyclist column (traffic/system.ts `sameDirVehicleNearFor` skips every cyclist
 // proxy — „the cyclist pass is VU-02's act", the one-act-one-code ruling), so

@@ -445,7 +445,12 @@ describe("wave-4 bot completion — sc-vu-cyclist-group at L3", () => {
     });
     const codes = s.events.filter((e) => e.kind === "violation").map((e) => e.code);
     expect(taught).toEqual(["FOLLOWING_TOO_CLOSE"]);
-    expect(codes).toContain("COLLISION");
+    // NO COLLISION since 2026-08-10 (sim/collision): the cut line leaves 0.21 m
+    // of air beside rider 3 — the worst pass this street can be driven, and
+    // still not a contact. It billed as one only because two POINT actors were
+    // compared against a 3 m circle. The demo's remaining two codes are the two
+    // acts it actually committed, and its own card now says as much.
+    expect(codes).not.toContain("COLLISION");
     // The clearance bill is the interesting one, and it is NOT on session.events:
     // this is the student's FIRST encounter with чл. 42's lateral duty, so the
     // engine's decision is "teach" (first-encounter faults are taught, never

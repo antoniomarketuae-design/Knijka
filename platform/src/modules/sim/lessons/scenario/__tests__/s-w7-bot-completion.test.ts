@@ -712,14 +712,17 @@ describe("wave-7 bot completion — sc-ln-obstacle-meeting at L3", () => {
     expect(scoreRubric(r, SC_LN_OBSTACLE_MEETING.rubric!).stars).toBe(1);
   });
 
-  it("counter-proof: the squeeze TEACHES the осева first — and still ends in the same crash", () => {
+  it("counter-proof: the squeeze TEACHES the осева — and gets away with the rest", () => {
     // The mirror image, and the reason both demos exist. This driver never
     // „took" the oncoming lane — he kept telling himself he was still in his own
-    // — and he ends up in exactly the same place, because half a lane each is
-    // not a solution the physics accepts. CENTER_LINE_TOUCHED is второстепенна,
-    // so the first encounter PAUSES with a teach card and costs nothing
-    // (teach-first, doc 76 §0) while the опасна COLLISION is scored: both halves
-    // of teach-first-then-grade on one recording.
+    // — and he passes the oncoming car with 0.29 m to spare.
+    //
+    // IT USED TO END IN A CRASH HERE, and the crash was the 3 m contact circle
+    // (2026-08-10, sim/collision). What survives is the honest half and the
+    // better lesson: CENTER_LINE_TOUCHED is второстепенна, so the first
+    // encounter PAUSES with a teach card and costs nothing (teach-first, doc 76
+    // §0) — and the demo now shows the thing that actually makes this habit
+    // stick, which is that half-a-lane-each USUALLY works. The card says so.
     let s = createLessonSession(compileScenario(SC_LN_OBSTACLE_MEETING, 3));
     const taught: string[] = [];
     recordScLnObstacleMeetingDrive(loadDistrict("ov-narrow-v1"), "mistake-squeeze", {
@@ -732,9 +735,12 @@ describe("wave-7 bot completion — sc-ln-obstacle-meeting at L3", () => {
     const r = buildLessonResult(s);
     expect(taught).toContain("CENTER_LINE_TOUCHED");
     const codes = s.events.filter((e) => e.kind === "violation").map((e) => e.code);
-    expect(codes).toContain("COLLISION");
+    expect(codes).not.toContain("COLLISION"); // 0.29 m of air — measured, not assumed
     expect(codes).not.toContain("FAILED_TO_YIELD"); // sc-ov-narrow's code, not this drill's
+    // …and the drill is STILL failed, which is the point worth keeping: the
+    // objective is to WAIT, and no amount of getting away with it completes it.
     expect(r.objectives.find((o) => o.id === "sc-lnom-wait")!.done).toBe(false);
+    expect(r.completedAll).toBe(false);
     expect(r.passed).toBe(false);
   });
 
@@ -896,7 +902,7 @@ describe("wave-7 bot completion — sc-vu-child-cyclist at L3", () => {
     }
   });
 
-  it("counter-proof: the nudge past the wobbling child is SCORED — on a sheet whose first half was PERFECT", () => {
+  it("counter-proof: the nudge past the wobbling child is TAUGHT — on a sheet whose first half was PERFECT", () => {
     // The template's sharpest claim, made checkable on the student path. This
     // driver's first half is the shadow's, verbatim: he hangs back, he watches
     // the whole swerve, he is the only person on the street who KNOWS the child
@@ -923,7 +929,15 @@ describe("wave-7 bot completion — sc-vu-child-cyclist at L3", () => {
     expect(r.objectives.find((o) => o.id === "sc-vucc-wide")!.done).toBe(false);
     expect(r.completedAll).toBe(false);
     expect(r.passed).toBe(false);
-    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toContain("COLLISION");
+    // NO COLLISION here since 2026-08-10, and the demo is stronger for it: the
+    // pass records 2.35 m of centres against a 0.33 m child's bicycle — 1.33 m
+    // of air. The old 3 m circle billed «Пътнотранспортно произшествие» for a
+    // margin the card itself only ever described as too small. What the sheet
+    // now shows is the clearance fault, scored, on a drive whose first half was
+    // perfect — which is the sentence this counter-proof is named after.
+    expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).not.toContain(
+      "COLLISION",
+    );
   });
 
   it("counter-proof: the SAME metre of air, two seconds earlier, is billed anyway — and he got away with it", () => {

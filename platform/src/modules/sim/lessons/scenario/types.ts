@@ -11,6 +11,7 @@
  */
 
 import type {
+  ActorLabelSpec,
   HazardStimulusSpec,
   LessonAidsSpec,
   SignalPlanSpec,
@@ -486,6 +487,14 @@ export interface ScenarioSpec {
   levels: LevelSpec[];
   /** Template-wide staged encounters (all levels). */
   staged?: StagedEventSpec[];
+  /**
+   * Doc 87 B40(a) — a caption anchored to one of `staged`'s actors, for a
+   * lesson whose SUBJECT is a car the student cannot read at the range the
+   * lesson asks him to read it at. Render-only; graded nothing. The compiler
+   * copies it onto `LessonSpec.actorLabels` and `validate.ts` refuses an
+   * `actorId` that no staged event on this template declares.
+   */
+  actorLabels?: readonly ActorLabelSpec[];
   /** Template-wide base conditions (levels may override). */
   conditions?: ConditionAxis;
   /**

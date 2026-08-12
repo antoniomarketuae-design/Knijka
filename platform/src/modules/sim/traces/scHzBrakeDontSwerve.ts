@@ -175,17 +175,18 @@ export function scHzBrakeDontSwerveMistakeBlindSwerveScript(): DriveScript {
       // (a lane change, not a swerve-in-place — the off-centre window is ~0.4 s,
       // far inside laneKeepSustainSec, so POOR_LANE_KEEPING never bills).
       { kind: "drive", points: [[LANE_X, REVEAL_Y], [ESCORT_X, 185]], targetKmh: CRUISE_KMH, stopAtEnd: false },
-      // The authored consequence (DriveStep.collision — the scMergeLaneEnd
-      // „изтласкване" / scJunctions2 „скритата кола удря носа" beat). HONEST
-      // PROXY, flagged: it is an authored beat, not a physical overlap, and the
-      // reason is measured, not assumed — by the time the wheel lands in lane 1
-      // the escort has been RELEASED (it locked its own cruise at the reveal
-      // and is pulling away), so the runner's contact test (VEHICLE_CONTACT_M
-      // = 3.0) no longer reaches it. Probed: without this beat the drive grades
-      // LANE_CHANGE_WITHOUT_MIRROR_CHECK alone. The gate proves the GEOMETRY the
-      // beat depicts — the wheel goes fully into the escort's lane with no
-      // glance behind it — which is the same standard the merging family holds.
-      { kind: "collision", withWhat: "vehicle" },
+      // THE AUTHORED BEAT IS GONE (2026-08-10) — the crash is the engine's own.
+      //
+      // It used to be a `{ kind: "collision" }` DriveStep with an honest note
+      // explaining why: "by the time the wheel lands in lane 1 the escort has
+      // been RELEASED and is pulling away, so the runner's contact test
+      // (VEHICLE_CONTACT_M = 3.0) no longer reaches it". That reasoning was
+      // sound about the CIRCLE and wrong about the world. Two 4-metre bodies
+      // side by side in one lane are in contact long before their CENTRES come
+      // within 3 m of each other — the circle needed a metre of interpenetration
+      // to notice, which is why it kept "not reaching" a car the wheel was
+      // landing on top of. With exact body geometry the CutInLeadCarRunner bills
+      // it by itself, at t ≈ 14.9 s, from an approach at 49.9 km/h.
       { kind: "annotation", textBg: "Препятствието е разминато — и точно там, където отиде воланът, беше колата." },
       // Post-impact: a real full-force stop ramp, so the ghost's speed trace
       // stays physical (a bare `pause` after a stopAtEnd:false drive would

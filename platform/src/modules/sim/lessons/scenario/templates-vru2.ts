@@ -519,9 +519,32 @@ export const SC_VU_CYCLIST_GROUP: ScenarioSpec = {
     {
       traceRef: { path: "content/traces/sc-vu-cyclist-group/mistake-cut-in.trace.json" },
       titleBg: "Прибиране между велосипедистите",
+      // GEOMETRY CORRECTION 2026-08-10: the third code used to be COLLISION,
+      // and it was never a contact. It was billed as a crash only because the
+      // orchestrator compared two POINTS against a 3 m circle. The two codes
+      // that remain are the two acts the manoeuvre actually committed, and they
+      // are the ones чл. 42 names.
+      //
+      // AND THE CLEARANCE FIGURE HAS BEEN RE-MEASURED, because the first
+      // correction wrote the wrong one into this comment and the wrong RIDER
+      // into the copy. „0.21 m beside rider 3" is a NOMINAL number: authored
+      // lane constants minus the tracker's 1.25 m body allowance
+      // (vu-cyclist-group-districts.test.ts asserts that, and should — it is
+      // about the AUTHORED LINE). It is not what the contact geometry sees on
+      // the recording. Instrumenting ContactProbe.prototype through
+      // recordScVuCyclistGroupDrive gives, per rider, the tightest swept
+      // separation between the hero box and the bicycle rig (1.8 × 0.46):
+      //     rider-2  0.3825 m   ← the tightest on the whole drive
+      //     rider-3  1.2825 m
+      //     rider-4  5.5116 m · rider-5 7.5825 m · rider-1 15.5319 m
+      // So the squeeze is against the rider the car tucks in BEHIND (rider 2,
+      // 3.3 m ahead of the player at that frame), not the one it ends up in
+      // front of — and it is 0.38 m, not 0.21. The copy no longer names an
+      // ordinal at all: which rider the runtime tracker billed is a third fact
+      // this file cannot prove, and two wrong ordinals in one card is enough.
       whatWentWrongBg:
-        "Началото беше правилно: широка дъга и двама изпреварени с истински просвет. После водачът се уплаши от дългата маневра и се прибра „в дупката“ между третия и втория. Сметката дойде на три части и за един-единствен ход: притисна третия до бордюра (без просвет), падна на метри зад втория (без дистанция) и го удари. Между два велосипедиста НЯМА пролука — тя е дълга колкото колата ти, тоест е място за кола само погледнато от насрещната лента, а не и когато си в нея. Изпреварването на група завършва след ПОСЛЕДНИЯ преден велосипедист или изобщо не започва (чл. 42).",
-      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE", "FOLLOWING_TOO_CLOSE", "COLLISION"],
+        "Началото беше правилно: широка дъга и двама изпреварени с истински просвет. После водачът се уплаши от дългата маневра и се прибра „в дупката“ пред себе си. Никой не падна — но измереното до велосипедиста, покрай когото се вмъкна, е 0,38 м: ширина на кормило, а не странична дистанция. При това разстояние едно клатушкане стига. Сметката е на две части за един ход и двете са ОСНОВНИ грешки, по 3 наказателни точки (Наредба № 38 приложение № 5, т. 10, б. „а“): изпреварване без достатъчно странично разстояние (ЗДвП чл. 42) и движение без дистанция зад него (чл. 23, ал. 1). Точките са от изпитния лист, не по книжката — а т. 11 допуска най-много 6 от основни грешки. Между два велосипедиста НЯМА пролука: тя е дълга колкото колата ти. Решаваш ВЕДНЪЖ, преди да излезеш — не стига ли прозорецът за цялата колона, оставаш зад нея.",
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE", "FOLLOWING_TOO_CLOSE"],
     },
   ],
   teach: {
@@ -628,10 +651,13 @@ const VUCC_STREET_M = 300;
  *     he visibly leans into it. `minCutSpeedKmh` 5 is authored DOWN to a floor
  *     no drive can miss: the swerve must be a fact of the street, identical in
  *     all three recordings, never a function of how the driver behaved.
- *  4. THE CONTACT: the runner's ONLY emitted event is collision(vehicle) inside
- *     VEHICLE_CONTACT_M, and only AFTER the cut has fired. Both halves are
- *     load-bearing and both are asserted in the district battery — see the
- *     mistake demos' notes in traces/scVuChildCyclist.ts.
+ *  4. THE CONTACT: the runner's ONLY emitted event is collision(vehicle), and
+ *     since 2026-08-10 it is EXACT BODY GEOMETRY (sim/collision) sized from the
+ *     actor's own `profile` — here "childCyclist", 1.5 × 0.33 m. It used to be
+ *     an isotropic 3.0 m circle around two points, which billed both authored
+ *     demos for a crash they never had (1.33 m of measured air). Neither demo
+ *     contacts the child today; both bill the clearance. See the mistake demos'
+ *     notes in traces/scVuChildCyclist.ts.
  */
 const VUCC_CHILD: CutInLeadCarSpec = {
   id: "sc-vucc-child",
@@ -820,8 +846,26 @@ export const SC_VU_CHILD_CYCLIST: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-vu-child-cyclist/mistake-pass-in-wobble.trace.json" },
       titleBg: "Изпреварване точно в лъкатушенето",
       whatWentWrongBg:
-        "Водачът видя всичко. Изчака детето да излезе от бордюра, изчака го да се успокои — и после мина покрай него точно както би минал покрай кола: на около метър въздух. Само че детето вече не е до бордюра, а В ТВОЯТА ЛЕНТА, и метърът, който му остави, е целият му резерв. Второто залитане дойде, докато колата беше до него. Просветът се мери от линията, на която детето Е СЕГА, и се удвоява, защото то може да я смени пак — това е разликата между чл. 42 и „разминах се“.",
-      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE", "COLLISION"],
+        "Водачът видя всичко. Изчака детето да излезе от бордюра, изчака го да се успокои — и после мина покрай него както би минал покрай кола. Не го докосна: измереното между колата и колелото е 1,34 м. Точно това го прави опасно — 1,34 м прилича на нормално разминаване, а е под просвета, с който се учи изпреварване на велосипедист (1,5 м е насока, не закон), и е ЦЕЛИЯТ резерв на дете, което вече не е до бордюра, а В ТВОЯТА ЛЕНТА. Второто залитане дойде, докато колата беше до него. Затова се отсъжда изпреварване без достатъчно странично разстояние (ЗДвП чл. 42) — основна грешка, 3 наказателни точки от изпитния лист по Наредба № 38 (приложение № 5, т. 10, б. „а“), не контролни точки по книжката. Правилно: изостани, свали скоростта (чл. 20, ал. 2), изчакай детето да покаже линията си и мини с ЕДНА широка дъга през насрещната лента.",
+      // GEOMETRY CORRECTION 2026-08-10: COLLISION was the second code here, and
+      // it was an artefact. The pass records 2.35 m of centres between a 1.70 m
+      // car and a 0.33 m child's bicycle — 1.33 m of measured air. The card's
+      // own words never claimed a hit («залитането дойде, докато колата беше до
+      // него»), and the code did. The bill is the clearance, which is the fault
+      // чл. 42 actually names.
+      //
+      // COPY 2026-08-10. Re-measured through the production ContactProbe on
+      // recordScVuChildCyclistDrive: the tightest swept separation between the
+      // hero box and the childCyclist rig (1.5 × 0.331) is 1.3370 m, player at
+      // (2.31, 136.27) doing 18.9 km/h, child at (4.66, 140.36). So the card's
+      // old „на около метър въздух" understated its own drive by a third of a
+      // metre, and the number now printed is the one the engine computed.
+      // NOTE for whoever tunes this next: the runtime CLEARANCE tracker does
+      // NOT measure this. It works centre-to-centre against a flat 1.25 m body
+      // allowance, so on a child's bicycle it reads 1.10 m of "air" where the
+      // bodies leave 1.34 m — 23 cm of pessimism that happens to point the safe
+      // way here, but it is a second geometry and it is not this one.
+      codeRefs: ["VULNERABLE_PASS_TOO_CLOSE"],
     },
     {
       traceRef: { path: "content/traces/sc-vu-child-cyclist/mistake-narrow.trace.json" },

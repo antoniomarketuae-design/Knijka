@@ -539,9 +539,35 @@ export const SC_HZ_BRAKE_DONT_SWERVE: ScenarioSpec = {
     {
       traceRef: { path: "content/traces/sc-hz-brake-dont-swerve/mistake-blind-swerve.trace.json" },
       titleBg: "Рязко отклонение в съседната кола",
+      // GEOMETRY 2026-08-10 — the contact is now the ENGINE'S, not a script
+      // beat. The `{ kind: "collision" }` DriveStep is gone from
+      // scHzBrakeDontSwerve.ts (its own header carries the argument): with real
+      // body geometry the runner bills the escort itself. Measured through the
+      // production ContactProbe on recordScHzBrakeDontSwerveDrive: the hero box
+      // and `sc-hzbds-escort` overlap by 0.0100 m — a rotated corner clip
+      // mid-swerve, player at (−1.72, 177.80) doing 49.9 km/h, escort at
+      // (−4.06, 180.70). One centimetre of interpenetration is a real contact
+      // and NOT a teaching number; the copy prints the speed, not the depth.
+      //
+      // CODE ORDER WAS PART OF THE CARD, AND IS NOT ANY MORE. It used to be:
+      // MistakeConsequenceOverlay read `demo.codeRefs[0]` for the severity
+      // chip, the point figure and the „does this end the exam" rider, so with
+      // LANE_CHANGE_WITHOUT_MIRROR_CHECK first this card printed „основна
+      // грешка · −3 изпитни т." over a drive that ends in a crash — 7 points
+      // short and the termination invisible. Putting COLLISION first mended
+      // THIS card and left the mechanism, and 24 cards were still under-badged
+      // by it (the worst: sc-pe-parked-row-scan/mistake-fast-row, which runs
+      // over a child and read „второстепенна · −1"). The card now derives all
+      // four citations from the GRAVEST code it cites — `rules/gravest.ts`,
+      // pinned by `lesson-ui/mistakeBadge.test.tsx`, which asserts this very
+      // demo renders identically with its codes back in the old order.
+      //
+      // So the order below is FREE again, in both directions: the trace gate
+      // compares sorted sets and the badge no longer reads position. It stays
+      // COLLISION-first because that is the message this card leads with.
       whatWentWrongBg:
-        "Воланът тръгна преди очите. Мигачът дори светна — и точно това прави грешката поучителна: мигачът ОБЯВЯВА маневра, но не я ПРОВЕРЯВА. В лявата лента, на една ръка разстояние, вече имаше кола; тя беше там през цялото време, откакто потегли. Рефлексът размина препятствието и намери автомобил — сделка, при която единият удар се сменя за друг, само че този път в някой, който няма никаква вина. Препятствието се вижда; колата в мъртвата ти зона — не. Затова първо спирачка, а волан само след огледало.",
-      codeRefs: ["LANE_CHANGE_WITHOUT_MIRROR_CHECK", "COLLISION"],
+        "Воланът тръгна преди очите. Мигачът дори светна — и точно това прави грешката поучителна: мигачът ОБЯВЯВА маневра, но не я ПРОВЕРЯВА. В лявата лента вече имаше кола; тя беше там през цялото време. Рефлексът размина препятствието и намери автомобил — един удар, сменен за друг, този път в невинен. И ударът е истински: колата влиза в чуждата лента с 50 км/ч и допира чуждото купе. Затова се отсъждат ДВЕ неща. Престрояване, преди да си се убедил, че не пречиш (ЗДвП чл. 25, ал. 1) — основна грешка, 3 наказателни точки. И самото ПТП — опасна грешка, 10 наказателни точки (Наредба № 38 приложение № 5, т. 10, б. „в“), единствената грешка, която прекратява изпита (същата наредба, чл. 48, ал. 3). И двете са от изпитния лист, не по книжката. Правилно: пълна спирачка при ПРАВ волан (чл. 20, ал. 2), а волан едва след пълното спиране — огледало, поглед през рамо, мигач.",
+      codeRefs: ["COLLISION", "LANE_CHANGE_WITHOUT_MIRROR_CHECK"],
     },
     {
       traceRef: { path: "content/traces/sc-hz-brake-dont-swerve/mistake-late-brake.trace.json" },

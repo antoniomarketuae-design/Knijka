@@ -35,8 +35,10 @@ import { SC_SIGNAL_CONTROLLER } from "../templates-signals";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
+// B40(b): read the district off the template — the регулировчик drill moved to
+// its own signalized map and a hard-coded id here would replay the wrong street.
 const sxDistrict = JSON.parse(
-  readFileSync(path.join(REPO_ROOT, "content", "world", "sx-v1.json"), "utf-8"),
+  readFileSync(path.join(REPO_ROOT, "content", "world", `${SC_SIGNAL_CONTROLLER.map.districtId}.json`), "utf-8"),
 ) as unknown;
 
 interface DriveOutcome {

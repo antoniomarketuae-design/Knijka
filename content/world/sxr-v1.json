@@ -1,0 +1,600 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sxr",
+  "label": "Тясно централно кръстовище със затворен хоризонт (сценарий JU-08)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_signal_x.mjs",
+  "boundsLocalMeters": {
+   "minX": -80,
+   "minY": -120,
+   "maxX": 70,
+   "maxY": 110
+  },
+  "attribution": {
+   "text": "Учебно светофарно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно светофарно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.34,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 16,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "armNorthM": 70,
+    "armSouthM": 120,
+    "armEastM": 70,
+    "armWestM": 80,
+    "nsClass": "secondary",
+    "ewClass": "residential",
+    "nsMaxKmh": 50,
+    "ewMaxKmh": 30
+   },
+   "junctionNodeId": "sx-n-c",
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "roadscapeNoteBg": "Централно кръстовище с къси рамена: пресечната улица е ограничена на 30 км/ч, а булевардът свършва на 70 м след възела. Няма накъде да „подпълзиш“ на червено-жълто и това се вижда от седалката.",
+   "frontageNoteBg": "Плътна пететажна редица по минималното отстояние от двете страни на подхода, а право напред — сграда, която затваря хоризонта веднага след кръстовището. Единственият затворен изглед в групата.",
+   "derived": {
+    "nsHalfWidthM": 12.13,
+    "nodeOpenRadiusM": 27.13,
+    "stopLineFromNodeM": 27.73
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sx-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "sx-n-e",
+    "x": 70,
+    "y": 0
+   },
+   {
+    "id": "sx-n-n",
+    "x": 0,
+    "y": 70
+   },
+   {
+    "id": "sx-n-s",
+    "x": 0,
+    "y": -120
+   },
+   {
+    "id": "sx-n-w",
+    "x": -80,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sx-e-s",
+    "from": "sx-n-s",
+    "to": "sx-n-c",
+    "class": "secondary",
+    "name": "Булевард — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingSide": "right",
+    "parkingMix": "veteran",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-n",
+    "from": "sx-n-c",
+    "to": "sx-n-n",
+    "class": "secondary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      70
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "veteran",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-w",
+    "from": "sx-n-w",
+    "to": "sx-n-c",
+    "class": "residential",
+    "name": "Пресечна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 80,
+    "geometry": [
+     [
+      -80,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "sx-e-e",
+    "from": "sx-n-c",
+    "to": "sx-n-e",
+    "class": "residential",
+    "name": "Пресечна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 30,
+    "maxspeedSource": "tag",
+    "length": 70,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      70,
+      0
+     ]
+    ],
+    "parkingBand": false
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sx-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sxr-f-es0",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     -112
+    ],
+    [
+     33.2,
+     -112
+    ],
+    [
+     33.2,
+     -100.8
+    ],
+    [
+     17.2,
+     -100.8
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-es1",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     -96.8
+    ],
+    [
+     33.2,
+     -96.8
+    ],
+    [
+     33.2,
+     -85.6
+    ],
+    [
+     17.2,
+     -85.6
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-es2",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     -81.6
+    ],
+    [
+     33.2,
+     -81.6
+    ],
+    [
+     33.2,
+     -70.4
+    ],
+    [
+     17.2,
+     -70.4
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-es3",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     -66.4
+    ],
+    [
+     33.2,
+     -66.4
+    ],
+    [
+     33.2,
+     -55.2
+    ],
+    [
+     17.2,
+     -55.2
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-es4",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     -51.2
+    ],
+    [
+     33.2,
+     -51.2
+    ],
+    [
+     33.2,
+     -40
+    ],
+    [
+     17.2,
+     -40
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ws0",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     -112
+    ],
+    [
+     -33.2,
+     -112
+    ],
+    [
+     -33.2,
+     -100.8
+    ],
+    [
+     -17.2,
+     -100.8
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ws1",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     -96.8
+    ],
+    [
+     -33.2,
+     -96.8
+    ],
+    [
+     -33.2,
+     -85.6
+    ],
+    [
+     -17.2,
+     -85.6
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ws2",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     -81.6
+    ],
+    [
+     -33.2,
+     -81.6
+    ],
+    [
+     -33.2,
+     -70.4
+    ],
+    [
+     -17.2,
+     -70.4
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ws3",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     -66.4
+    ],
+    [
+     -33.2,
+     -66.4
+    ],
+    [
+     -33.2,
+     -55.2
+    ],
+    [
+     -17.2,
+     -55.2
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ws4",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     -51.2
+    ],
+    [
+     -33.2,
+     -51.2
+    ],
+    [
+     -33.2,
+     -40
+    ],
+    [
+     -17.2,
+     -40
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-ne0",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.2,
+     40
+    ],
+    [
+     31.2,
+     40
+    ],
+    [
+     31.2,
+     62
+    ],
+    [
+     17.2,
+     62
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-nw0",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.2,
+     40
+    ],
+    [
+     -31.2,
+     40
+    ],
+    [
+     -31.2,
+     62
+    ],
+    [
+     -17.2,
+     62
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-end0",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -31,
+     90
+    ],
+    [
+     -31,
+     110
+    ],
+    [
+     -3,
+     110
+    ],
+    [
+     -3,
+     90
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-end1",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     3,
+     90
+    ],
+    [
+     3,
+     110
+    ],
+    [
+     31,
+     110
+    ],
+    [
+     31,
+     90
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-en0",
+   "height": 15,
+   "heightSource": "default",
+   "footprint": [
+    [
+     36,
+     16
+    ],
+    [
+     36,
+     30
+    ],
+    [
+     44,
+     30
+    ],
+    [
+     44,
+     16
+    ]
+   ]
+  },
+  {
+   "id": "sxr-f-wn0",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -54,
+     -16
+    ],
+    [
+     -54,
+     -30
+    ],
+    [
+     -36,
+     -30
+    ],
+    [
+     -36,
+     -16
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sx-spawn-south",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "sx-e-s",
+   "name": "Южен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-east",
+   "x": 55,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "sx-e-e",
+   "name": "Източен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-west",
+   "x": -65,
+   "y": -4.06,
+   "heading": 90,
+   "edgeId": "sx-e-w",
+   "name": "Западен подход към светофара"
+  }
+ ]
+}

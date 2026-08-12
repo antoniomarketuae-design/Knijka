@@ -58,24 +58,23 @@
  *    3.5 m/s the closing rate is 1.8 m/s and a pass would not fit on the street.
  *    (The sc-vu-cyclist-group „narrow" demo's ruling, reused.)
  *
- * 3. THE CONTACT BAR IS THE DEMOS' DIVIDING LINE. cutInLeadCar's runner emits
- *    collision inside VEHICLE_CONTACT_M = 3.0 m — a CAR-sized bar (the actor is
- *    a car everywhere except in the A11 cyclist tag) — and, decisively, ONLY
- *    once the cut has fired. So:
- *      · a convict-band pass (2.2–2.45 m of centers) BEFORE the wobble is a
- *        clearance offence and NOTHING else → „Тесен просвет" bills one code;
- *      · the SAME margin AFTER the wobble is a clearance offence AND a contact
- *        → „Изпреварване точно в лъкатушенето" bills two.
- *    One geometric fact, two verdicts, and the difference between them is pure
- *    timing — which is precisely the lesson the two demos exist to teach side
- *    by side. Reported in the agent notes: the 3.0 m bar is the CAR body's, and
- *    a cyclist-tagged cut-in actor should arguably use the 2.2 m one the
- *    cyclistRightHook runner uses. Under the 2.2 m bar this demo would keep its
- *    clearance bill and lose the contact — i.e. it would become a duplicate of
- *    the second demo, and VU-03's „опасна on contact" would have no home in the
- *    shipped stack at all. The pair below is the honest reading of what the
- *    engine grades TODAY; both codes are real, both are cited, and the copy
- *    claims contact only where the engine does.
+ * 3. THERE IS NO CONTACT IN EITHER DEMO, AND THERE NEVER WAS (corrected
+ *    2026-08-10). This block used to read „THE CONTACT BAR IS THE DEMOS'
+ *    DIVIDING LINE": cutInLeadCar's runner emitted a collision inside
+ *    VEHICLE_CONTACT_M = 3.0 m, so the pass driven DURING the wobble billed two
+ *    codes and the identical margin driven 60 m earlier billed one. The block
+ *    even flagged its own smell — „the 3.0 m bar is the CAR body's, and the
+ *    actor is a bike" — and then reasoned that shrinking it would leave „VU-03's
+ *    опасна on contact with no home in the shipped stack".
+ *
+ *    The bar was not too big for a bike. It was an isotropic circle around two
+ *    POINTS, which is not a contact test at any radius. Measured on the actor's
+ *    real bodies — a 1.70 m car beside a 0.33 m child's bicycle at 2.35 m of
+ *    centres — this pass leaves 1.33 m of air. Neither demo touches the child,
+ *    the pair's asymmetry was an artefact, and both now bill the one code the
+ *    driving is guilty of: VULNERABLE_PASS_TOO_CLOSE. „опасна on contact" has a
+ *    home in the shipped stack — it is the drive that actually hits the child,
+ *    and this template does not contain one.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
@@ -195,7 +194,7 @@ export function scVuChildCyclistShadowScript(): DriveScript {
 
 // ---------------------------------------------------------------------------
 // Mistake demo 1 — „Изпреварване точно в лъкатушенето"
-//        (VULNERABLE_PASS_TOO_CLOSE + COLLISION)
+//        (VULNERABLE_PASS_TOO_CLOSE)
 //
 // The demo's honesty is that the FIRST half is the shadow's, verbatim: this
 // driver hangs back at 11 km/h, watches the whole swerve, and is therefore the
@@ -207,11 +206,12 @@ export function scVuChildCyclistShadowScript(): DriveScript {
 //     under the 15 km/h arm floor), so the frozen line is the APEX and the
 //     stand-down never triggers → the clearance is genuinely graded.
 //   · The alongside window records ~2.35 m of centers → < 2.45 CONVICT and
-//     > 2.2 (VULNERABLE_PASS_CONTACT_M) → VULNERABLE_PASS_TOO_CLOSE at pass
-//     completion, and not the collision machinery's silence.
-//   · The same 2.35 m is inside the cut-in runner's VEHICLE_CONTACT_M (3.0), and
-//     the cut has fired → COLLISION, from the runner's own contact channel — a
-//     GEOMETRIC consequence of the authored line, not a scripted beat.
+//     above the contact bar (VULNERABLE_PASS_CONTACT_M, now the 1.25 m body
+//     allowance) → VULNERABLE_PASS_TOO_CLOSE at pass completion.
+//   · AND NOTHING ELSE. The same 2.35 m used to trip the cut-in runner's 3.0 m
+//     circle and bill a COLLISION on top; measured on the real bodies (0.85 car
+//     + 0.166 child's bicycle) it is 1.33 m of clear air, and the phantom is
+//     gone (2026-08-10). Nobody was hit here; somebody was crowded.
 //   · 19 km/h holds the whole pass under followMinSpeedKmh (20), so no FOLLOWING
 //     code can pollute the verdict, while staying over the 15 km/h pass floor.
 // ---------------------------------------------------------------------------

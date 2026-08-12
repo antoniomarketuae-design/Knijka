@@ -725,6 +725,183 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     const r = run(params, [approach, inRing, exiting(2, "left"), out(3)]);
     expect(r.done).toBe(false);
   });
+
+  // -------------------------------------------------------------------------
+  // B21-RB (2026-08-11) — the stalk is not a level. Founder: «I turned on the
+  // signal when leaving it but, it didnt mark it as signal is on and it popped
+  // up an error stating I didnt leave the roundabout with signal».
+  //
+  // The distances below are MEASURED, not invented: fifteen drives of the
+  // rb-mini ring through the real Rapier car and the real CabinControls, with
+  // the right stalk pressed on the ring at φ ≈ 110°. On the exit lines where
+  // the driver holds the ring until his exit is beside him, the wheel comes
+  // back to centre — and CabinControls cancels the stalk, exactly as a real
+  // car does — at d = 21.9–26.7 m. The credit rate for a CORRECT exit was
+  // 12/15 at 24/34, 9/15 at 26/45, 6/15 at 29/34 and 5/15 at 33/46, decided by
+  // the two metres at which the wheel happened to straighten.
+  //
+  // The CURRENCY of the memory was then corrected from seconds to degrees of
+  // ring arc, again by driving: 64 runs (four geometries × keyboard/analog ×
+  // 12/15/18/22 km/h × {textbook signal, flick at the entrance}) put the two
+  // populations 10.20–13.57 s ON TOP OF EACH OTHER in seconds — a 5 s lookback
+  // still failed 16 of 32 correct exits, every one of them a slower drive —
+  // and 64° APART in degrees (1.1–87.7 correct vs 152.1–231.4 for the flick).
+  // See ROUNDABOUT_EXIT_SIGNAL_ARC_DEG.
+  // -------------------------------------------------------------------------
+
+  /** Still ON the ring (22 m from the island centre; enterRadiusM is 26), at
+   *  azimuth `azDeg` about it — 180° is due north of the island, which is where
+   *  `exiting`/`out` sit, so the default keeps the car on that radial. The
+   *  angle matters: the memory is spent in DEGREES OF ARC, not seconds. */
+  const onRing = (t: number, indicator: "off" | "left" | "right", azDeg = 180) =>
+    makeTick({
+      t,
+      position: {
+        x: -38 + 22 * Math.sin((azDeg * Math.PI) / 180),
+        y: -343 - 22 * Math.cos((azDeg * Math.PI) / 180),
+      },
+      indicator,
+    });
+  /** Just OUTSIDE the ring (27 m) — the first frame the old sampler looked at. */
+  const justOut = (t: number, indicator: "off" | "left" | "right" = "off") =>
+    makeTick({ t, position: { x: -38, y: -316 }, indicator });
+
+  it("B21-RB: a signal given ON THE RING that the car auto-cancelled on the exit turn still counts", () => {
+    // 0.4 s from the stalk going dark to the car clearing enterRadiusM — the
+    // measured gap was 0.03–0.45 s on the drives this defect was found on.
+    const r = run(params, [
+      approach,
+      inRing,
+      onRing(1.0, "right"),
+      justOut(1.4, "off"),
+      exiting(3, "off"),
+      out(4, "off"),
+    ]);
+    expect(r.done).toBe(true);
+  });
+
+  it("B21-RB: the credit expires — a stalk that went dark a whole lap ago still voids the traversal", () => {
+    let evalState: ObjectiveEvalState = createEvalState(params);
+    let done = false;
+    const ticks = [
+      approach,
+      inRing,
+      onRing(1.0, "right", 20), // signalled at the south-east of the island…
+      onRing(3.0, "off", 80), // …then killed it and kept circulating, silent,
+      onRing(5.0, "off", 140), // past two more mouths…
+      onRing(7.0, "off", 180),
+      justOut(7.5, "off"), // …so it is 160° of ring stale when he leaves
+      exiting(8.5, "off"),
+      out(9.5, "off"),
+    ];
+    for (const tick of ticks) {
+      const r = stepObjective(params, evalState, tick);
+      evalState = r.evalState;
+      done ||= r.done;
+    }
+    expect(done).toBe(false);
+    expect(evalState).toMatchObject({ type: "roundabout", voidedExits: 1, entered: false });
+  });
+
+  it("B21-RB: a lawful STOP cannot expire the credit — seconds burn, arc does not", () => {
+    // sc-rb-ped-exit makes the student halt between the ring and the zebra and
+    // wait the pedestrian out. Here he signals, the exit turn auto-cancels the
+    // stalk, and he then stands still for twenty seconds. He has driven nowhere
+    // since the signal, so the signal still stands — which is the whole reason
+    // this memory is spent in degrees and not in seconds.
+    const r = run(params, [
+      approach,
+      inRing,
+      onRing(1.0, "right", 170),
+      onRing(1.5, "off", 178),
+      justOut(2.0, "off"),
+      justOut(12.0, "off"), // waiting
+      justOut(22.0, "off"), // still waiting
+      exiting(24.0, "off"),
+      out(25.0, "off"),
+    ]);
+    expect(r.done).toBe(true);
+  });
+
+  it("B21-RB: the arc boundary — 110° of ring since the signal counts, 130° does not", () => {
+    const drive = (staleDeg: number) =>
+      run(params, [
+        approach,
+        inRing,
+        onRing(1.0, "right", 180 - staleDeg),
+        onRing(2.0, "off", 180 - staleDeg / 2),
+        onRing(3.0, "off", 180),
+        justOut(3.5, "off"),
+        exiting(4.5, "off"),
+        out(5.5, "off"),
+      ]);
+    expect(drive(110).done).toBe(true);
+    expect(drive(130).done).toBe(false);
+  });
+
+  it("B21-RB: `entered` does NOT mean on the ring — a signal lit INSIDE enterRadiusM on the approach is still not banked", () => {
+    // The trap in the one-line version of this fix (just delete `d >
+    // enterRadiusM`). enterRadiusM is authored 6–11 m outside the circulatory
+    // carriageway on every shipped ring — 26 against r = 19.83 here — so a
+    // right stalk lit for the give-way line is lit for 1–2 s of APPROACH with
+    // `entered` already true. Deleting the radius test banks it for a silent
+    // lap; the arc memory is what actually closes the hole.
+    const r = run(params, [
+      makeTick({ t: 0, position: { x: -11, y: -343 }, indicator: "right" }), // 27 m — not entered
+      makeTick({ t: 0.5, position: { x: -13, y: -343 }, indicator: "right" }), // 25 m — entered, STILL approaching
+      onRing(1.5, "off", 60), // the stalk dies on the entry turn…
+      onRing(3.0, "off", 120), // …and he rides most of the ring in silence
+      onRing(4.5, "off", 180),
+      justOut(5.0, "off"),
+      exiting(6, "off"),
+      out(7, "off"),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("B21-RB: an APPROACH signal is still not banked — the memory only arms on the ring", () => {
+    // Lit at 30 m (outside enterRadiusM ⇒ not entered), dark from the moment
+    // he is actually in the ring, and out again only 2 s later: well inside the
+    // lookback, and it must STILL earn nothing.
+    const r = run(params, [
+      makeTick({ t: 0, position: { x: -8, y: -343 }, indicator: "right" }), // 30 m
+      inRing, // t = 1, indicator off
+      justOut(2, "off"),
+      exiting(2.5, "off"),
+      out(3, "off"),
+    ]);
+    expect(r.done).toBe(false);
+  });
+
+  it("B21-RB: a voided traversal forgets the ring signal — it cannot bank into the next lap", () => {
+    let evalState: ObjectiveEvalState = createEvalState(params);
+    // Lap 1: silent exit ⇒ voided.
+    for (const tick of [approach, inRing, exiting(2, "off"), out(3, "off")]) {
+      evalState = stepObjective(params, evalState, tick).evalState;
+    }
+    expect(evalState).toMatchObject({
+      type: "roundabout",
+      voidedExits: 1,
+      ringSignalArcDeg: null,
+      prevAzimuthDeg: null,
+    });
+    // Lap 2: back on the ring, signals, then rides most of the ring silent.
+    let done = false;
+    for (const tick of [
+      makeTick({ t: 4, position: { x: -30, y: -330 } }),
+      onRing(5, "right", 10),
+      onRing(6, "off", 90),
+      onRing(7, "off", 170),
+      justOut(12.5, "off"),
+      out(13.5, "off"),
+    ]) {
+      const r = stepObjective(params, evalState, tick);
+      evalState = r.evalState;
+      done ||= r.done;
+    }
+    expect(done).toBe(false);
+    expect(evalState).toMatchObject({ type: "roundabout", voidedExits: 2 });
+  });
 });
 
 describe("completeManeuver / threePointTurn (обратен завой — corridor-locked)", () => {

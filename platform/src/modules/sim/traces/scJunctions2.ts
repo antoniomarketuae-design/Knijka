@@ -110,6 +110,32 @@ function scJunctionGapShadowScript(): DriveScript {
   };
 }
 
+/**
+ * B5 TIMING NOTE (doc 87, 2026-08-10) — why the mistake approach is 20 km/h and
+ * the „кратко спиране" is 0.9 s. Read this before retuning either number.
+ *
+ * These demos claim «колата с предимство трябваше да намали заради теб». Until
+ * this wave that claim was not true of the choreography, and nothing caught it
+ * because `conflictNearFor` convicted on ANY moving crosswise vehicle within
+ * 26 m of the node. Measured at the graded instant (the Б2 line crossing) with
+ * the old script: the priority car was **19.4 m past the node and departing**
+ * on `mistake-cut-gap`, **22.8 m past** on `mistake-creep-out` — it had crossed
+ * the student's path seconds earlier and was leaving. The demo taught a fault
+ * that had not happened.
+ *
+ * The desync is structural, not random. `PriorityFromRightRunner` releases the
+ * pinned car when the player's ETA to the LINE falls under the car's own
+ * transit to the node (`WITNESS_ENTRY_MARGIN_SEC`), i.e. it aims to put the car
+ * in the box exactly as the student arrives. Every second the student spends
+ * after that release — a slow final leg, a long pause — is a second the car
+ * spends leaving. The old 12 km/h leg plus a 1.6 s stop spent ~2.8 s of it.
+ *
+ * 20 km/h + 0.9 s spends ~0.9 s, which lands the car **6.3 m past the node,
+ * still inside the box** at the graded instant (7.5 m on ju3's mirror of this
+ * script) — under CONFLICT_CLEARED_M, so it is still a vehicle he cut across.
+ * 0.9 s is comfortably a graded FULL STOP (`fullStopMinDurationSec` 0.5), which
+ * the gate asserts by requiring no STOP_SIGN_NO_FULL_STOP in these demos.
+ */
 function scJunctionGapMistakeCutScript(): DriveScript {
   return {
     steps: [
@@ -123,10 +149,13 @@ function scJunctionGapMistakeCutScript(): DriveScript {
           [LANE, -45],
           [LANE, -29.2],
         ],
-        targetKmh: 12,
+        targetKmh: 20,
       },
       { kind: "annotation", textBg: "Кратко спиране — и веднага газ, докато колата с предимство е още в кръстовището." },
-      { kind: "pause", sec: 1.6, brake: true },
+      // 0.9 s: still a graded FULL STOP (fullStopMinDurationSec 0.5) and still
+      // „кратко", but no longer 1.6 s of DESYNC. See the timing note on
+      // scJunctionGapMistakeCutScript.
+      { kind: "pause", sec: 0.9, brake: true },
       { kind: "glance", mirror: "left" },
       {
         // Emerge at speed while the priority car is still in the conflict box.
@@ -161,10 +190,10 @@ function scJunctionGapMistakeCreepScript(): DriveScript {
           [LANE, -45],
           [LANE, -29.2],
         ],
-        targetKmh: 12,
+        targetKmh: 20,
       },
       { kind: "annotation", textBg: "Спрях, но носът тръгва навътре, докато колата с предимство приближава." },
-      { kind: "pause", sec: 1.6, brake: true },
+      { kind: "pause", sec: 0.9, brake: true },
       { kind: "glance", mirror: "left" },
       {
         // Creep the nose across the line into the box while the car is present.
@@ -173,7 +202,7 @@ function scJunctionGapMistakeCreepScript(): DriveScript {
           [LANE, -29.2],
           [LANE, -24.06],
         ],
-        targetKmh: 4,
+        targetKmh: 7,
         stopAtEnd: false,
       },
       {

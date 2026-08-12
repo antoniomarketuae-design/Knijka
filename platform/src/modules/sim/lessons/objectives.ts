@@ -308,7 +308,14 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
             attempts: 0,
           };
         case "roundabout":
-          return { type: "roundabout", entered: false, exitSignaled: false, voidedExits: 0 };
+          return {
+            type: "roundabout",
+            entered: false,
+            exitSignaled: false,
+            ringSignalArcDeg: null,
+            prevAzimuthDeg: null,
+            voidedExits: 0,
+          };
         case "threePointTurn":
           return {
             type: "threePointTurn",
@@ -434,6 +441,45 @@ export const PARK_CENTER_TOL_M = 0.5;
 export const PARK_HEADING_TOL_DEG = 10;
 /** Reverse-gear credit for the park accrues only within this radius of the bay, m. */
 export const PARK_MANEUVER_ZONE_M = 15;
+
+/**
+ * B21-RB (2026-08-11) — how far round the island an EXTINGUISHED right
+ * indicator still counts as the exit signal, DEGREES of arc about the ring
+ * centre.
+ *
+ * WHY DEGREES AND NOT SECONDS. The first cut of this fix used seconds (5, the
+ * rule engine's `indicatorLookbackSec`), and seconds cannot do the job — not
+ * at any value. Measured over 64 drives of the real Rapier car through the
+ * real CabinControls, on all four shipped ring geometries, at 12/15/18/22 km/h
+ * and in both input styles, the interval from the stalk's last lit frame to
+ * the exitRadiusM crossing was:
+ *
+ *      textbook signal (just after the exit BEFORE mine)   1.53 – 13.57 s
+ *      flicked once at the ring entrance and forgotten    10.20 – 33.70 s
+ *
+ * The two populations OVERLAP over 10.2–13.6 s, so every threshold either
+ * fails a correct slow driver or credits a silent one. In degrees of arc the
+ * same 64 drives separate completely:
+ *
+ *      textbook signal                                      1.1 – 87.7°
+ *      flicked at the entrance and forgotten              152.1 – 231.4°
+ *
+ * — a 64° dead band, and 120 sits in the middle of it (+32° over the worst
+ * honest drive, −32° under the cheapest cheat). The reason is structural, not
+ * lucky: seconds measure how SLOWLY the student drove, degrees measure how far
+ * past his signal he has travelled, and only the second one is the thing the
+ * drivers waiting at the mouths actually see. It is also why a lawful HALT
+ * cannot expire the credit — sc-rb-ped-exit makes the student stop between the
+ * ring and the zebra and wait the pedestrian out, and a stationary car sweeps
+ * no arc at all, while it burns seconds by the dozen.
+ *
+ * 120° is also the rule as it is taught: signal after the exit BEFORE yours.
+ * On a four-arm ring that is one 90° span plus slack; on district-v1's six-arm
+ * ring it is two. Signalling two exits early is not a stricter kind of correct
+ * — it tells the drivers at the intervening mouth that you are coming out at
+ * theirs, which is the RB-06 fault the sibling template exists to teach.
+ */
+export const ROUNDABOUT_EXIT_SIGNAL_ARC_DEG = 120;
 
 /** Default max |final heading − (start + 180°)| for a three-point turn, deg. */
 export const TURN_TOLERANCE_DEG = 20;
@@ -1006,6 +1052,66 @@ function axisAngleDiffDeg(aDeg: number, bDeg: number): number {
  *    browser. finish.ts now anchors the route on LEAVING the ring, with a
  *    twenty-second window so an immediate second attempt still wins the rung
  *    and a student who drives on gets the debrief instead of a dead lesson.
+ *
+ * B21-RB (2026-08-11, founder: «I turned on the signal when leaving it but, it
+ * didnt mark it as signal is on and it popped up an error stating I didnt
+ * leave the roundabout with signal»). The annulus above was read as a LEVEL —
+ * the stalk had to be lit on some frame with d > enterRadiusM — and the stalk
+ * is not a level. scene/cabin.ts auto-cancels like a real car (ARM 0.22 rad →
+ * RELEASE 0.05), so the exit turn itself extinguishes it: the student is
+ * punished for the indicator behaving like an indicator.
+ *
+ * MEASURED, not reasoned — fifteen drives of the rb-mini ring through the real
+ * Rapier car and the real CabinControls, signalling at φ ≈ 110° (textbook: one
+ * exit early), then exiting normally. Where the driver holds the ring until
+ * his exit is beside him the wheel comes back to centre at d = 21.9–26.7 m,
+ * i.e. INSIDE the sampling boundary, and the objective sees an unlit stalk on
+ * every frame it looks at. The credit rate for a CORRECT exit was:
+ *   24/34  «Кръгово движение» + sc-rb-exit-signal   12/15
+ *   26/45  L3 «Кръгово движение» + the exam bank     9/15
+ *   29/34  sc-rb-ped-exit                            6/15
+ *   33/46  sc-rb-lane-choice                         5/15
+ * — i.e. the verdict was decided by the two metres at which the driver
+ * happened to straighten the wheel, which is unlearnable. A student obeying
+ * the sibling template's own instruction 5 («изключи го веднага след изхода»)
+ * scored 0/15 on three of the four geometries.
+ *
+ * THE FIX IS ADDITIVE. The annulus arm is untouched, so everything that was
+ * credited before is still credited. What is added is the second, honest
+ * signature of the same act: the stalk was live ON THE RING and the car has
+ * not since driven more than ROUNDABOUT_EXIT_SIGNAL_ARC_DEG of arc away from
+ * it. Same treatment register B21 gave the lane-change detector — remember the
+ * signal instead of sampling it as a level — in the currency this geometry
+ * actually needs.
+ *
+ * WHY NOT SECONDS (the first cut of this fix, corrected 2026-08-11 by driving
+ * it): a 5 s lookback still failed 16 of 32 correct exits, because seconds
+ * measure how slowly the student drove. 64 drives of the real car — four
+ * geometries × two input styles × 12/15/18/22 km/h × {textbook signal, flick
+ * at the entrance} — gave overlapping second-counts (1.53–13.57 vs 10.20–33.70)
+ * and cleanly separated degree-counts (1.1–87.7 vs 152.1–231.4). Worst hit was
+ * the keyboard driver, whose lane-keeping corrections arm the auto-cancel on
+ * the ring itself: his stalk dies at d ≈ 17–21 m, a whole exit before the old
+ * window even opens. See ROUNDABOUT_EXIT_SIGNAL_ARC_DEG for the table.
+ *
+ * WHAT STILL FAILS, and must:
+ *  - no signal anywhere in the traversal → void, `voidedExits` counts it, the
+ *    explaining card fires. Unchanged, and it is the whole drill;
+ *  - a signal given and then driven away from — a stalk that went out more
+ *    than 120° of ring ago is gone: the drivers waiting at the mouths you have
+ *    since passed never saw it, and the traversal voids as it did before;
+ *  - the approach signal is not banked either, and this is the part the
+ *    obvious reading of this function gets wrong. `entered` does NOT mean „on
+ *    the ring": enterRadiusM is authored 6–11 m OUTSIDE the circulatory
+ *    carriageway on every shipped geometry (24 vs r18, 26 vs r19.83, 29 vs
+ *    r18, 33 vs r21.94), which is 1–2 s of approach at lesson speed during
+ *    which a right stalk lit for the give-way line would latch. Deleting the
+ *    radius test outright — the tempting one-line "fix" — banks exactly that
+ *    signal for a silent lap. The arc memory is what closes it: measured, that
+ *    approach sweeps only 5.4–23.4° before the car joins the ring, so a signal
+ *    left over from it is 152°+ stale by the exit of any traversal longer than
+ *    one exit — while on a FIRST-exit traversal (73–87°) it is still fresh,
+ *    which is right, because there signalling on approach is what you do.
  */
 function stepRoundabout(
   x: number,
@@ -1022,8 +1128,43 @@ function stepRoundabout(
   let exitSignaled = prev.exitSignaled;
   let voidedExits = prev.voidedExits;
 
-  // Exit window: only ticks AFTER entering, outward of the ring radius.
-  if (entered && d > enterRadiusM && tick.indicator === "right") exitSignaled = true;
+  // Where the car stands on the ring, as an angle about the island. This is the
+  // ONLY extra geometry the fix needs, and the objective already owns it: the
+  // centre is (x, y), which is what `d` is measured from.
+  const azDeg = (Math.atan2(tick.position.x - x, -(tick.position.y - y)) * 180) / Math.PI;
+  let prevAzimuthDeg = prev.prevAzimuthDeg;
+  let ringSignalArcDeg = prev.ringSignalArcDeg;
+
+  if (entered) {
+    // Arc swept since the previous tick, in degrees, unsigned — a car that
+    // stands still (waiting out a pedestrian on the exit crossing) sweeps
+    // none, which is the whole reason this is measured in degrees and not in
+    // seconds. No teleport guard is needed here: a respawn puts the car past
+    // exitRadiusM, which the branch below already reads as a departure.
+    const step = prevAzimuthDeg === null ? 0 : headingDiffDeg(azDeg, prevAzimuthDeg);
+    prevAzimuthDeg = azDeg;
+
+    // The stalk seen ON the ring. Every lit frame RESETS the arc, so what the
+    // counter holds is how far round the island the car has travelled since the
+    // signal went out — by the student's hand or by the car's own auto-cancel,
+    // which the objective cannot and should not tell apart.
+    if (d <= enterRadiusM && tick.indicator === "right") ringSignalArcDeg = 0;
+    else if (ringSignalArcDeg !== null) ringSignalArcDeg += step;
+  }
+
+  // Exit window: only ticks AFTER entering, outward of the ring radius. Two
+  // signatures of the one act — the stalk still lit out here (as shipped), or
+  // a ring-side signal the car has not yet driven away from (B21-RB).
+  if (entered && d > enterRadiusM) {
+    if (tick.indicator === "right") {
+      exitSignaled = true;
+    } else if (
+      ringSignalArcDeg !== null &&
+      ringSignalArcDeg <= ROUNDABOUT_EXIT_SIGNAL_ARC_DEG
+    ) {
+      exitSignaled = true;
+    }
+  }
 
   let done = false;
   if (entered && d >= exitRadiusM) {
@@ -1033,17 +1174,28 @@ function stepRoundabout(
       // Left the roundabout without the exit signal — traversal void, redo.
       // Counted, so the student is TOLD rather than left guessing. The reset
       // of `entered` also stops this branch from re-firing every frame while
-      // the car drives away: one departure, one count.
+      // the car drives away: one departure, one count. The ring-signal memory
+      // clears with it, so a stale signal from the voided lap cannot bank into
+      // the next one.
       voidedExits += 1;
       entered = false;
       exitSignaled = false;
+      ringSignalArcDeg = null;
+      prevAzimuthDeg = null;
     }
   }
 
   return {
     done,
     progress: done ? 1 : entered ? (exitSignaled ? 0.75 : 0.5) : 0,
-    evalState: { type: "roundabout", entered, exitSignaled, voidedExits },
+    evalState: {
+      type: "roundabout",
+      entered,
+      exitSignaled,
+      ringSignalArcDeg,
+      prevAzimuthDeg,
+      voidedExits,
+    },
     detail: { kind: "roundabout", entered, exitSignaled },
   };
 }

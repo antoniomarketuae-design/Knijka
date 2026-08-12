@@ -139,10 +139,22 @@ describe("buildDebrief", () => {
     expect(d.text).not.toMatch(/\d+\s*лв\./);
   });
 
-  it("mentions the collision termination explicitly", () => {
+  it("mentions the collision termination explicitly — and cites BOTH provisions", () => {
+    // The founder asked twice whether a points figure was real. The first time
+    // the number was a money penalty wearing „т."; the second time (a ПТП, 10)
+    // the number was right and the SENTENCE was bare — an exam „прекратен"
+    // with no article behind it. The two halves of a collision come from two
+    // different places in Наредба № 38 and the debrief now says which is which.
     const result = resultWithEvents([makeViolation("COLLISION", 3)]);
     const d = buildDebrief(l0, result);
-    expect(d.text).toContain("прекратява изпита");
+    expect(d.text).toContain("прекратява");
+    // The MARK — приложение № 5, т. 10, б. „в“, and it is ONE fault's price.
+    expect(d.text).toContain("приложение № 5, т. 10, б. „в“");
+    expect(d.text).toContain("ЕДНА опасна грешка");
+    // The ENDING — a different article, quoted rather than asserted.
+    expect(d.text).toContain("чл. 48, ал. 3");
+    // And the scale, because „10" beside a driving simulator reads as the licence.
+    expect(d.text).toContain("НЕ са контролни точки");
   });
 
   it("handles aborted sessions gently", () => {

@@ -45,10 +45,16 @@ function loadDistrict(id: string): unknown {
   return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"));
 }
 
-const sxDistrict = loadDistrict("sx-v1");
+// B40(b): the two drills no longer share a map, so the district is read off
+// the TEMPLATE rather than named here — a recorder that replays a lesson on a
+// street the lesson does not use is exactly the drift this file exists to catch.
+const DISTRICT_OF: Record<ScSignalTemplateId, unknown> = {
+  "sc-signal-dead": loadDistrict(SC_SIGNAL_DEAD.map.districtId),
+  "sc-signal-flashing": loadDistrict(SC_SIGNAL_FLASHING.map.districtId),
+};
 
 function record(templateId: ScSignalTemplateId, name: ScSignalTraceName): RecordedDrive {
-  return recordScSignalDrive(sxDistrict, templateId, name);
+  return recordScSignalDrive(DISTRICT_OF[templateId], templateId, name);
 }
 
 function violationCodes(drive: RecordedDrive): string[] {
@@ -156,17 +162,32 @@ describe("sc-signal-flashing — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-signal-flashing — mistake demos grade FAILED_TO_YIELD (doc 76 §9 stage 5)", () => {
+  // B81 — `mistake-barge` does not merely fail to give way to the car from the
+  // right: it drives into it. MEASURED on the committed script through the
+  // production stack, exact body geometry: first overlap t 19.35 s, 26
+  // consecutive frames, deepest 1.3853 m of interpenetration, combined closing
+  // speed 48.3 km/h. PriorityFromRightRunner had already retired on the
+  // right-hand-rule conviction at t 17.62 — 1.7 s earlier — and `step()`
+  // returns on its `phase === "resolved"` guard, so nobody was watching the
+  // bodies meet. COPY DEBT (copy lane): the demo's narration and the template
+  // codeRefs still say the fault is the priority alone.
+  const MEASURED: Record<string, string[]> = {
+    "mistake-barge": ["COLLISION", "FAILED_TO_YIELD"],
+    "mistake-cut": ["FAILED_TO_YIELD"],
+  };
   for (const name of ["mistake-barge", "mistake-cut"] as const) {
-    it(`${name}: exactly FAILED_TO_YIELD, via the right-hand-rule tracker`, () => {
+    it(`${name}: the right-hand-rule fault, and any crash it really ends in`, () => {
       const drive = flashing.get(name)!;
       const codes = [...new Set(violationCodes(drive))].sort();
-      expect(codes).toEqual(["FAILED_TO_YIELD"]);
+      expect(codes).toEqual(MEASURED[name]);
       expect(commendationCodes(drive)).not.toContain("YIELDED_TO_PRIORITY");
     });
   }
 
-  it("the mistake codes match the template's authored codeRefs", () => {
-    expect([...new Set(violationCodes(flashing.get("mistake-barge")!))]).toEqual(SC_SIGNAL_FLASHING.mistakes[0].codeRefs);
+  it("the authored codeRefs are the priority fault alone — the B81 copy debt", () => {
+    // Pinned, not silently accepted: `mistake-barge` now grades one code more
+    // than its card claims. `mistake-cut` still matches exactly.
+    expect(SC_SIGNAL_FLASHING.mistakes[0].codeRefs).toEqual(["FAILED_TO_YIELD"]);
     expect([...new Set(violationCodes(flashing.get("mistake-cut")!))]).toEqual(SC_SIGNAL_FLASHING.mistakes[1].codeRefs);
   });
 });
@@ -204,7 +225,7 @@ describe("committed trace files — the determinism law", () => {
 
     it(`${templateId}: recording is deterministic (a second run serializes identically)`, () => {
       const name = scSignalTraceNames(templateId)[0];
-      const again = recordScSignalDrive(sxDistrict, templateId, name);
+      const again = recordScSignalDrive(DISTRICT_OF[templateId], templateId, name);
       expect(serializeScenarioTrace(again.trace)).toBe(serializeScenarioTrace(drives.get(name)!.trace));
     });
   }

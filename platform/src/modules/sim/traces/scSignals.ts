@@ -308,7 +308,9 @@ interface SignalTemplateRecordings {
 
 export const SC_SIGNAL_RECORDINGS: Record<ScSignalTemplateId, SignalTemplateRecordings> = {
   [SC_SIGNAL_DEAD_ID]: {
-    districtId: "sx-v1",
+    // B40(b): its own signalized district now (a collector crossing) — the ns
+    // carriageway, the spawn and the derived stop line are byte-identical.
+    districtId: "sxd-v1",
     signalModes: { "sx-n-c": "dark" },
     stagedEvents: [...(SC_SIGNAL_DEAD.staged ?? [])],
     drives: {
@@ -318,7 +320,8 @@ export const SC_SIGNAL_RECORDINGS: Record<ScSignalTemplateId, SignalTemplateReco
     },
   },
   [SC_SIGNAL_FLASHING_ID]: {
-    districtId: "sx-v1",
+    // B40(b): its own signalized district now (a one-way side street).
+    districtId: "sxf-v1",
     signalModes: { "sx-n-c": "flashingAmber" },
     stagedEvents: [...(SC_SIGNAL_FLASHING.staged ?? [])],
     drives: {

@@ -1,0 +1,644 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sxf",
+  "label": "Булевард с еднопосочна пресечка и мигащо жълто (сценарий JU-20)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_signal_x.mjs",
+  "boundsLocalMeters": {
+   "minX": -110,
+   "minY": -120,
+   "maxX": 90,
+   "maxY": 130
+  },
+  "attribution": {
+   "text": "Учебно светофарно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно светофарно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.45,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 18,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "armNorthM": 130,
+    "armSouthM": 120,
+    "armEastM": 90,
+    "armWestM": 110,
+    "nsClass": "secondary",
+    "ewClass": "residential",
+    "nsMaxKmh": 50,
+    "ewMaxKmh": 40
+   },
+   "junctionNodeId": "sx-n-c",
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "roadscapeNoteBg": "Тесен гол булевард: подходът е без крайпътна лента и без нито една паркирана кола (16,25 м от бордюр до бордюр вместо 24,25), а платното се отваря чак СЛЕД кръстовището. Пресечната улица е тиха квартална, също без паркиране — при мигащо жълто нищо не ти помага освен собствената преценка.",
+   "frontageNoteBg": "Висок затворен фронт плътно до тротоара от двете страни на подхода: небето е процеп, кръстовището се появява късно. Точно обратното на откритото панелно кръстовище на угасналия светофар.",
+   "derived": {
+    "nsHalfWidthM": 8.13,
+    "nodeOpenRadiusM": 27.13,
+    "stopLineFromNodeM": 27.73
+   }
+  }
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sx-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "sx-n-e",
+    "x": 90,
+    "y": 0
+   },
+   {
+    "id": "sx-n-n",
+    "x": 0,
+    "y": 130
+   },
+   {
+    "id": "sx-n-s",
+    "x": 0,
+    "y": -120
+   },
+   {
+    "id": "sx-n-w",
+    "x": -110,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sx-e-s",
+    "from": "sx-n-s",
+    "to": "sx-n-c",
+    "class": "secondary",
+    "name": "Булевард — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "sx-e-n",
+    "from": "sx-n-c",
+    "to": "sx-n-n",
+    "class": "secondary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 130,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      130
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "compact",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-w",
+    "from": "sx-n-w",
+    "to": "sx-n-c",
+    "class": "residential",
+    "name": "Пресечна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 110,
+    "geometry": [
+     [
+      -110,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingBand": false
+   },
+   {
+    "id": "sx-e-e",
+    "from": "sx-n-c",
+    "to": "sx-n-e",
+    "class": "residential",
+    "name": "Пресечна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 40,
+    "maxspeedSource": "tag",
+    "length": 90,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      90,
+      0
+     ]
+    ],
+    "parkingBand": false
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sx-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sxf-f-es0",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.2,
+     -111.5
+    ],
+    [
+     34.2,
+     -111.5
+    ],
+    [
+     34.2,
+     -97.5
+    ],
+    [
+     16.2,
+     -97.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-es1",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.2,
+     -92.5
+    ],
+    [
+     34.2,
+     -92.5
+    ],
+    [
+     34.2,
+     -78.5
+    ],
+    [
+     16.2,
+     -78.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-es2",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.2,
+     -73.5
+    ],
+    [
+     34.2,
+     -73.5
+    ],
+    [
+     34.2,
+     -59.5
+    ],
+    [
+     16.2,
+     -59.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-es3",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     16.2,
+     -54.5
+    ],
+    [
+     34.2,
+     -54.5
+    ],
+    [
+     34.2,
+     -40.5
+    ],
+    [
+     16.2,
+     -40.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws0",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -13.2,
+     -111.5
+    ],
+    [
+     -31.2,
+     -111.5
+    ],
+    [
+     -31.2,
+     -97.5
+    ],
+    [
+     -13.2,
+     -97.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws1",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -13.2,
+     -92.5
+    ],
+    [
+     -31.2,
+     -92.5
+    ],
+    [
+     -31.2,
+     -78.5
+    ],
+    [
+     -13.2,
+     -78.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws2",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -13.2,
+     -73.5
+    ],
+    [
+     -31.2,
+     -73.5
+    ],
+    [
+     -31.2,
+     -59.5
+    ],
+    [
+     -13.2,
+     -59.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws3",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -13.2,
+     -54.5
+    ],
+    [
+     -31.2,
+     -54.5
+    ],
+    [
+     -31.2,
+     -40.5
+    ],
+    [
+     -13.2,
+     -40.5
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ne0",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.5,
+     39
+    ],
+    [
+     33.5,
+     39
+    ],
+    [
+     33.5,
+     62.33
+    ],
+    [
+     17.5,
+     62.33
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ne1",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.5,
+     68.33
+    ],
+    [
+     33.5,
+     68.33
+    ],
+    [
+     33.5,
+     91.67
+    ],
+    [
+     17.5,
+     91.67
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ne2",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     17.5,
+     97.67
+    ],
+    [
+     33.5,
+     97.67
+    ],
+    [
+     33.5,
+     121
+    ],
+    [
+     17.5,
+     121
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-nw0",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.5,
+     39
+    ],
+    [
+     -33.5,
+     39
+    ],
+    [
+     -33.5,
+     62.33
+    ],
+    [
+     -17.5,
+     62.33
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-nw1",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.5,
+     68.33
+    ],
+    [
+     -33.5,
+     68.33
+    ],
+    [
+     -33.5,
+     91.67
+    ],
+    [
+     -17.5,
+     91.67
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-nw2",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -17.5,
+     97.67
+    ],
+    [
+     -33.5,
+     97.67
+    ],
+    [
+     -33.5,
+     121
+    ],
+    [
+     -17.5,
+     121
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-en0",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     37,
+     16
+    ],
+    [
+     37,
+     30
+    ],
+    [
+     47,
+     30
+    ],
+    [
+     47,
+     16
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-en1",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     53,
+     16
+    ],
+    [
+     53,
+     30
+    ],
+    [
+     63,
+     30
+    ],
+    [
+     63,
+     16
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws20",
+   "height": 21,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -83,
+     -16
+    ],
+    [
+     -83,
+     -30
+    ],
+    [
+     -63,
+     -30
+    ],
+    [
+     -63,
+     -16
+    ]
+   ]
+  },
+  {
+   "id": "sxf-f-ws21",
+   "height": 18,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -57,
+     -16
+    ],
+    [
+     -57,
+     -30
+    ],
+    [
+     -37,
+     -30
+    ],
+    [
+     -37,
+     -16
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sx-spawn-south",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "sx-e-s",
+   "name": "Южен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-east",
+   "x": 75,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "sx-e-e",
+   "name": "Източен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-west",
+   "x": -95,
+   "y": -4.06,
+   "heading": 90,
+   "edgeId": "sx-e-w",
+   "name": "Западен подход към светофара"
+  }
+ ]
+}

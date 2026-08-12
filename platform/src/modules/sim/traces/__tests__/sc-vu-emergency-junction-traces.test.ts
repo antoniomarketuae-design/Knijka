@@ -78,15 +78,26 @@ describe("sc-vu-emergency-junction — the shadow gate (doc 76 §5)", () => {
 });
 
 describe("sc-vu-emergency-junction — mistake demos grade their exact codes (doc 76 §9 stage 5)", () => {
+  // B81 — „mistake-race" is a race the driver LOSES. It does not merely refuse
+  // the ambulance its priority; it arrives underneath it. MEASURED on the
+  // committed script with exact body geometry (the ambulance is 5.6 × 2.1 m,
+  // sized from its own profile): first overlap t 19.05 s, 23 consecutive
+  // frames, deepest 0.514 m of interpenetration at t 19.27, combined closing
+  // speed 41.2 km/h. PriorityFromRightRunner had convicted and retired at
+  // t 17.00 — two seconds earlier — so nothing was watching. COPY DEBT (copy
+  // lane): the card still describes the refused priority alone.
+  const MEASURED: Record<string, string[]> = {
+    "mistake-barge": ["FAILED_TO_YIELD"],
+    "mistake-race": ["COLLISION", "FAILED_TO_YIELD"],
+  };
   for (const [i, name] of (["mistake-barge", "mistake-race"] as ScVuEmergencyJunctionTraceName[]).entries()) {
-    it(`${name}: exactly FAILED_TO_YIELD, nothing else pollutes the demo`, () => {
+    it(`${name}: the refused priority, and any crash it really ends in`, () => {
       const drive = drives.get(name)!;
       const codes = [...new Set(violationCodes(drive))].sort();
-      expect(codes).toEqual([...SC_VU_EMERGENCY_JUNCTION.mistakes[i].codeRefs].sort());
+      expect(codes).toEqual(MEASURED[name]);
       // The stage-1c mechanic boundary: the junction machinery grades — the
       // rear-approach emergency code must never leak into a crossing recipe.
       expect(codes).not.toContain("EMERGENCY_NOT_YIELDED");
-      expect(codes).not.toContain("COLLISION");
       expect(codes).not.toContain("SPEEDING_OVER_LIMIT");
       expect(codes).not.toContain("POOR_LANE_KEEPING");
       // The refused priority resolves as the runner's violation outcome, once.
@@ -94,6 +105,8 @@ describe("sc-vu-emergency-junction — mistake demos grade their exact codes (do
       expect(drive.outcomes[0]).toMatchObject({ success: false, detail: "violation" });
       // No yield commendation for a refused duty.
       expect(commendationCodes(drive)).not.toContain("YIELDED_TO_PRIORITY");
+      // The authored claim, pinned so the debt is visible when it is closed.
+      expect([...SC_VU_EMERGENCY_JUNCTION.mistakes[i].codeRefs]).toEqual(["FAILED_TO_YIELD"]);
     });
   }
 });

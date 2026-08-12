@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { PEDESTRIAN_BODY_RADIUS_M, PLAYER_HALF_LENGTH_M } from "../../collision";
 import { SC_HZ_EMERGENCY_STOP } from "../../lessons/scenario/templates-hazards2";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import { recordScHzEmergencyStopDrive, type ScHzEmergencyStopTraceName } from "../scHzEmergencyStop";
@@ -92,8 +93,15 @@ describe("sc-hz-emergency-stop — the shadow gate (doc 76 §5)", () => {
     // Came to a full rest before her line, then drove on to the end.
     const rest = samples.find((s) => Math.abs(s.speedKmh) < 1 && s.y > 100);
     expect(rest, "the shadow never came to rest").toBeDefined();
-    expect(rest!.y).toBeLessThan(DART_Y);
-    expect(rest!.y).toBeGreaterThan(DART_Y - 4);
+    // SHORT OF HER BODY, not short of her coordinate. The sample is the hero's
+    // CENTRE and the car is 4.04 m long, so the assertion has to carry the
+    // front overhang — the exact mistake the drive script itself used to make
+    // (it rested at y = 148, i.e. bumper 2 cm PAST a child at y = 150, and the
+    // 1.5 m contact circle in force at the time reported that as clear).
+    const noseY = rest!.y + PLAYER_HALF_LENGTH_M;
+    expect(noseY).toBeLessThan(DART_Y - PEDESTRIAN_BODY_RADIUS_M);
+    expect(DART_Y - PEDESTRIAN_BODY_RADIUS_M - noseY).toBeGreaterThan(1.5); // real air
+    expect(DART_Y - PEDESTRIAN_BODY_RADIUS_M - noseY).toBeLessThan(3); // …and still a STOP
     expect(samples[samples.length - 1].y).toBeGreaterThan(220);
   });
 

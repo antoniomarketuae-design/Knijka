@@ -75,12 +75,24 @@ describe("sc-vu-bikelane-turn — mistake demos grade their exact codes (doc 76 
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
   });
 
-  it("„Отрязване на колелото по алеята“: exactly FAILED_TO_YIELD, never a turn/follow code", () => {
+  it("„Отрязване на колелото по алеята“: the cut, and the rider it actually hits", () => {
+    // B81 — this demo does not cut ACROSS the counter-flow rider, it drives
+    // THROUGH him. MEASURED on the committed script with exact body geometry
+    // (the rider is boxed on the bicycle rig, 1.8 × 0.46 m): first overlap
+    // t 18.38 s, 56 consecutive frames, deepest 0.031 m of interpenetration at
+    // t 18.43, combined closing speed 16.2 km/h. CyclistRightHookRunner had
+    // convicted the hook at t 18.20 — 0.18 s earlier — and retired, so its
+    // contact branch never ran again. Now the sentinel outlives it and the
+    // strike on a vulnerable road user is billed.
+    //
+    // COPY DEBT (copy lane): the card still names the priority fault alone.
     const drive = drives.get("mistake-cut-path")!;
     const codes = [...new Set(violationCodes(drive))].sort();
-    expect(codes).toEqual([...SC_VU_BIKELANE_TURN.mistakes[1].codeRefs].sort());
+    expect(codes).toEqual(["COLLISION", "FAILED_TO_YIELD"]);
+    expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(1);
     expect(codes).not.toContain("TURN_WITHOUT_INDICATOR");
     expect(codes).not.toContain("FOLLOWING_TOO_CLOSE");
+    expect([...SC_VU_BIKELANE_TURN.mistakes[1].codeRefs]).toEqual(["FAILED_TO_YIELD"]);
   });
 });
 

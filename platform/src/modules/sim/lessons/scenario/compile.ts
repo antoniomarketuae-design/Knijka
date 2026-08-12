@@ -1152,6 +1152,10 @@ export function compileScenario(
     // AUTHORS `hazard` mounts the TrafficLayer ball — the scenario director
     // flips hazardActiveRef when its dart runner triggers (ballLeadSec).
     ...(spec.hazard ? { hazard: { ...spec.hazard } } : {}),
+    // Doc 87 B40(a), the same opt-in pattern: only a template that AUTHORS
+    // `actorLabels` gets a caption over a staged actor. Denormalised by value
+    // like every other spec field so nothing at runtime reads the template.
+    ...(spec.actorLabels ? { actorLabels: spec.actorLabels.map((a) => ({ ...a })) } : {}),
   };
 
   const aids = mergeAids(level, rung.aids);

@@ -512,6 +512,20 @@ export type ObjectiveEvalState =
       /** Right indicator observed in the exit window after entering (A10). */
       exitSignaled: boolean;
       /**
+       * B21-RB (2026-08-11): degrees of arc about the island the car has
+       * travelled since the LAST frame the right stalk was live while it was
+       * still ON the ring — null until there has been such a frame, zeroed by
+       * every further lit frame, and cleared by a voided traversal. So what it
+       * holds is how far past his own signal the student now is. Degrees, not
+       * seconds: measured, the two currencies disagree, and only this one
+       * separates a correct slow exit from a signal flicked a lap ago (see
+       * ROUNDABOUT_EXIT_SIGNAL_ARC_DEG).
+       */
+      ringSignalArcDeg: number | null;
+      /** Previous tick's azimuth about the island, deg — the arc integrator's
+       *  only state. Null before entering and after a voided traversal. */
+      prevAzimuthDeg: number | null;
+      /**
        * B6 (2026-07-30): ring exits taken WITHOUT the right indicator. The
        * traversal still resets (the skill has to be performed, not banked),
        * but the reset is no longer SILENT — the engine turns each increment

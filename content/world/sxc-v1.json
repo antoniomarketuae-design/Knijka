@@ -1,0 +1,570 @@
+{
+ "format": "district-v1",
+ "meta": {
+  "district": "sxc",
+  "label": "Голямо кръстовище на две събирателни улици с регулировчик (сценарий JU-18)",
+  "mapKind": "scenario-junction",
+  "generator": "tools/maps/gen_signal_x.mjs",
+  "boundsLocalMeters": {
+   "minX": -170,
+   "minY": -120,
+   "maxX": 170,
+   "maxY": 100
+  },
+  "attribution": {
+   "text": "Учебно светофарно кръстовище — оригинален параметричен дизайн (без данни от OpenStreetMap)",
+   "license": "All rights reserved",
+   "licenseUrl": "/",
+   "copyrightUrl": "/",
+   "obligation": "none — original work, no ODbL attribution required for this map"
+  },
+  "defaults": {
+   "maxspeedUrbanKmh": 50,
+   "note": "Учебно светофарно кръстовище: ограниченията идват от таговете на улиците."
+  },
+  "stats": {
+   "roadKm": 0.56,
+   "nodes": 5,
+   "edges": 4,
+   "intersections": 1,
+   "crossings": 0,
+   "buildings": 14,
+   "spawnPoints": 3
+  },
+  "scenario": {
+   "archetype": "x-junction",
+   "params": {
+    "armNorthM": 100,
+    "armSouthM": 120,
+    "armEastM": 170,
+    "armWestM": 170,
+    "nsClass": "secondary",
+    "ewClass": "tertiary",
+    "nsMaxKmh": 50,
+    "ewMaxKmh": 50
+   },
+   "junctionNodeId": "sx-n-c",
+   "expectedControl": "trafficLight",
+   "expectedClusterGroup": "ns",
+   "roadscapeNoteBg": "Две събирателни улици по 170 м на всяка страна, паркирано и от четирите бордюра — най-голямото и най-натовареното кръстовище в групата, и единственото, на което човек с палка е обяснимо. По подхода е поставен и знак В24 „Забранено е изпреварването“.",
+   "frontageNoteBg": "Представителен булеварден фронт: високи блокове с широко отстояние от двете страни и автобусна спирка на тротоара преди кръстовището.",
+   "derived": {
+    "nsHalfWidthM": 12.13,
+    "nodeOpenRadiusM": 27.13,
+    "stopLineFromNodeM": 27.73
+   }
+  },
+  "zonesVersion": 1
+ },
+ "roads": {
+  "nodes": [
+   {
+    "id": "sx-n-c",
+    "x": 0,
+    "y": 0
+   },
+   {
+    "id": "sx-n-e",
+    "x": 170,
+    "y": 0
+   },
+   {
+    "id": "sx-n-n",
+    "x": 0,
+    "y": 100
+   },
+   {
+    "id": "sx-n-s",
+    "x": 0,
+    "y": -120
+   },
+   {
+    "id": "sx-n-w",
+    "x": -170,
+    "y": 0
+   }
+  ],
+  "edges": [
+   {
+    "id": "sx-e-s",
+    "from": "sx-n-s",
+    "to": "sx-n-c",
+    "class": "secondary",
+    "name": "Булевард — южен подход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 120,
+    "geometry": [
+     [
+      0,
+      -120
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "veteran",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-n",
+    "from": "sx-n-c",
+    "to": "sx-n-n",
+    "class": "secondary",
+    "name": "Булевард — северен изход",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 100,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      0,
+      100
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "veteran",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-w",
+    "from": "sx-n-w",
+    "to": "sx-n-c",
+    "class": "tertiary",
+    "name": "Пресечна улица — запад",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 170,
+    "geometry": [
+     [
+      -170,
+      0
+     ],
+     [
+      0,
+      0
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "freight",
+    "parkingBand": true
+   },
+   {
+    "id": "sx-e-e",
+    "from": "sx-n-c",
+    "to": "sx-n-e",
+    "class": "tertiary",
+    "name": "Пресечна улица — изток",
+    "oneway": false,
+    "roundabout": false,
+    "lanes": 2,
+    "lanesSource": "tag",
+    "maxspeed": 50,
+    "maxspeedSource": "tag",
+    "length": 170,
+    "geometry": [
+     [
+      0,
+      0
+     ],
+     [
+      170,
+      0
+     ]
+    ],
+    "parkingSide": "both",
+    "parkingMix": "freight",
+    "parkingBand": true
+   }
+  ]
+ },
+ "intersections": [
+  {
+   "id": "sx-n-c",
+   "x": 0,
+   "y": 0,
+   "degree": 4,
+   "signalized": true
+  }
+ ],
+ "crossings": [],
+ "roundabouts": [],
+ "buildings": [
+  {
+   "id": "sxc-f-es0",
+   "height": 27,
+   "heightSource": "default",
+   "footprint": [
+    [
+     21,
+     -113
+    ],
+    [
+     39,
+     -113
+    ],
+    [
+     39,
+     -77
+    ],
+    [
+     21,
+     -77
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-eb0",
+   "height": 5,
+   "heightSource": "default",
+   "footprint": [
+    [
+     21,
+     -67
+    ],
+    [
+     33,
+     -67
+    ],
+    [
+     33,
+     -43
+    ],
+    [
+     21,
+     -43
+    ]
+   ],
+   "kind": "busStop"
+  },
+  {
+   "id": "sxc-f-ws0",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -22,
+     -112
+    ],
+    [
+     -40,
+     -112
+    ],
+    [
+     -40,
+     -82
+    ],
+    [
+     -22,
+     -82
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-ws1",
+   "height": 30,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -22,
+     -74
+    ],
+    [
+     -40,
+     -74
+    ],
+    [
+     -40,
+     -44
+    ],
+    [
+     -22,
+     -44
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-ne0",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     21,
+     42
+    ],
+    [
+     37,
+     42
+    ],
+    [
+     37,
+     62
+    ],
+    [
+     21,
+     62
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-ne1",
+   "height": 27,
+   "heightSource": "default",
+   "footprint": [
+    [
+     21,
+     70
+    ],
+    [
+     37,
+     70
+    ],
+    [
+     37,
+     90
+    ],
+    [
+     21,
+     90
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-nw0",
+   "height": 30,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -21,
+     42
+    ],
+    [
+     -37,
+     42
+    ],
+    [
+     -37,
+     62
+    ],
+    [
+     -21,
+     62
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-nw1",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -21,
+     70
+    ],
+    [
+     -37,
+     70
+    ],
+    [
+     -37,
+     90
+    ],
+    [
+     -21,
+     90
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-en0",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     45,
+     21
+    ],
+    [
+     45,
+     39
+    ],
+    [
+     75,
+     39
+    ],
+    [
+     75,
+     21
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-en1",
+   "height": 30,
+   "heightSource": "default",
+   "footprint": [
+    [
+     85,
+     21
+    ],
+    [
+     85,
+     39
+    ],
+    [
+     115,
+     39
+    ],
+    [
+     115,
+     21
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-en2",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     125,
+     21
+    ],
+    [
+     125,
+     39
+    ],
+    [
+     155,
+     39
+    ],
+    [
+     155,
+     21
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-wn0",
+   "height": 30,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -155,
+     -21
+    ],
+    [
+     -155,
+     -39
+    ],
+    [
+     -125,
+     -39
+    ],
+    [
+     -125,
+     -21
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-wn1",
+   "height": 24,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -115,
+     -21
+    ],
+    [
+     -115,
+     -39
+    ],
+    [
+     -85,
+     -39
+    ],
+    [
+     -85,
+     -21
+    ]
+   ]
+  },
+  {
+   "id": "sxc-f-wn2",
+   "height": 27,
+   "heightSource": "default",
+   "footprint": [
+    [
+     -75,
+     -21
+    ],
+    [
+     -75,
+     -39
+    ],
+    [
+     -45,
+     -39
+    ],
+    [
+     -45,
+     -21
+    ]
+   ]
+  }
+ ],
+ "spawnPoints": [
+  {
+   "id": "sx-spawn-south",
+   "x": 4.06,
+   "y": -105,
+   "heading": 0,
+   "edgeId": "sx-e-s",
+   "name": "Южен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-east",
+   "x": 155,
+   "y": 4.06,
+   "heading": 270,
+   "edgeId": "sx-e-e",
+   "name": "Източен подход към светофара"
+  },
+  {
+   "id": "sx-spawn-west",
+   "x": -155,
+   "y": -4.06,
+   "heading": 90,
+   "edgeId": "sx-e-w",
+   "name": "Западен подход към светофара"
+  }
+ ],
+ "zones": [
+  {
+   "id": "sxc-z-noovertaking",
+   "kind": "noOvertaking",
+   "edgeId": "sx-e-s",
+   "fromM": 60,
+   "toM": 92,
+   "signRef": "В24"
+  }
+ ]
+}

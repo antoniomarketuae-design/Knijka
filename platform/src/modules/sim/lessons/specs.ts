@@ -252,7 +252,25 @@ export const LESSONS: readonly LessonSpec[] = [
           nodeId: "n1805512602",
           x: 430.13,
           y: 235.3,
-          radiusM: 30,
+          // 30 → 40 (2026-08-11). `stopLineCrossed` is a ONE-FRAME event and
+          // stepPassSignal only counts it while the car is inside this radius,
+          // so the radius has to reach the PAINT, not the node. It did not.
+          // Measured against district-v1 through the real runtime: the only
+          // trafficLight line guarding n1805512602 is crossed at 32.0 m (right
+          // lane), 34.0 m (middle) and 37.7 m (left) from this centre — every
+          // lane outside 30 — so the event was discarded on every frame it
+          // could ever fire and the objective was UNCOMPLETABLE. Driven proof:
+          // the crossing fires at (436.4, 203.9), 32.05 m out, and the
+          // evaluator never sees it. Objectives are sequential, so this locked
+          // l2-signal-2 behind it and shipped the same brick into the exam
+          // lesson (ex-signal-1).
+          //
+          // 40 and not more: it admits all three of this junction's own lanes
+          // (37.7 + 2.3 m) and still excludes the NEXT signalized junction,
+          // whose nearest drivable crossing is 43.8 m away — so the objective
+          // still cannot be bought by crossing a different light.
+          // objective-window-reachability.test.ts pins both halves.
+          radiusM: 40,
           control: "trafficLight",
         },
       },
@@ -723,7 +741,10 @@ export const EXAM_LESSON: LessonSpec = {
         nodeId: "n1805512602",
         x: 430.13,
         y: 235.3,
-        radiusM: 30,
+        // 30 → 40, the same junction and the same measurement as l2-signal-1
+        // above — this is the EXAM copy of it, and it was uncompletable for
+        // exactly as long. See that comment for the driven numbers.
+        radiusM: 40,
         control: "trafficLight",
       },
     },

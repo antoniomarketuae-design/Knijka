@@ -126,6 +126,37 @@ describe("FR-B5-JAM — a car pinned against what it hit is not left there", () 
     expect(codes).toEqual(["COLLISION"]);
   });
 
+  it("a contact that keeps being REPORTED still bills once, and the rescue still fires", () => {
+    // THE OTHER HALF OF THIS RESCUE, found by the DEDUPE wave and measured on
+    // the shipped code. Gate 3 re-arms on every graded collision — the pose
+    // that matters is the last one — so while the rule engine billed a
+    // continuing contact every 3 s, every bill reset the 10 s stillness clock.
+    // The car pinned against a bumper was therefore charged 10 points every
+    // three seconds AND could never reach the rescue: measured over 40 s,
+    // 14 «Пътнотранспортно произшествие», 140 наказателни точки, phase still
+    // „driving". The reducer now bills the encounter once, so the clock runs.
+    //
+    // 2 Hz is not an arbitrary rate: NpcColliders rebinds its shell pool every
+    // REASSIGN_INTERVAL_SEC = 0.5 s and teleports a rebound shell, which
+    // re-fires rapier's collisionEnter at exactly that cadence.
+    const { state: s0, t } = underWay();
+    let s = collide(s0, t, 40);
+    let tt = t + 0.5;
+    let ended: number | null = null;
+    for (let i = 0; i < 80; i++, tt += 0.5) {
+      s = applyTick(s, frame(tt, 40, 0, [{ kind: "collision", withWhat: "vehicle" }])).state;
+      if (s.phase !== "driving") {
+        ended = tt;
+        break;
+      }
+    }
+    expect(ended, "the pinned drive must still be closed for him").not.toBeNull();
+    expect(ended! - t).toBeLessThanOrEqual(CRASH_PIN_STUCK_S + 4);
+    const collisions = s.events.filter((e) => e.kind === "violation" && e.code === "COLLISION");
+    expect(collisions.length, "one encounter is one accident").toBe(1);
+    expect(collisions[0].kind === "violation" ? collisions[0].points : 0).toBe(10);
+  });
+
   it("never fires without a collision — a standstill alone is not evidence", () => {
     // The B15 lesson, restated: a car standing still is doing the most
     // important thing a learner does at a junction. Twice the pin's dwell.

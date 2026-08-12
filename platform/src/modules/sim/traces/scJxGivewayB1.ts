@@ -104,6 +104,16 @@ export function scJxGivewayB1ShadowScript(): DriveScript {
 // Mistake 1 — „Навлизане пред колата по главния" (FAILED_TO_YIELD)
 // ---------------------------------------------------------------------------
 
+/**
+ * B5 TIMING NOTE (doc 87, 2026-08-10) — the barge approach is 22 km/h, not 14.
+ * scJunctions2.ts:scJunctionGapMistakeCutScript carries the full measurement.
+ * At 14 km/h the priority car was **12.3 m PAST jxg-n-j2 and departing** when
+ * the student crossed the Б1 line — nothing to barge in front of, and the clip
+ * graded only because the old predicate convicted on presence within 26 m. At
+ * 22 km/h it is **6.7 m SHORT of the node and closing at 8 m/s**: the student
+ * genuinely crosses in front of it, which is what „ще се промъкна" means. A
+ * barging driver who keeps his speed is also the truer picture of the fault.
+ */
 export function scJxGivewayB1MistakeBargeScript(): DriveScript {
   return {
     steps: [
@@ -124,9 +134,9 @@ export function scJxGivewayB1MistakeBargeScript(): DriveScript {
       // Approach mouth 2 at a steady yield-ish pace so the priority car syncs
       // right into its node, with a FRESH ляво-дясно scan close to the line
       // (so the ONLY graded fault is the yield failure)…
-      { kind: "drive", points: [[LANE, 74], [LANE, 103]], targetKmh: 14 },
+      { kind: "drive", points: [[LANE, 74], [LANE, 103]], targetKmh: 22 },
       { kind: "glance", mirror: "left" },
-      { kind: "drive", points: [[LANE, 103], [LANE, 113]], targetKmh: 14 },
+      { kind: "drive", points: [[LANE, 103], [LANE, 113]], targetKmh: 22 },
       { kind: "glance", mirror: "right" },
       // …then ROLL across the Б1 line WITHOUT stopping, straight in front of the
       // priority car (still within the mouth's conflict radius) — the „ще се
@@ -134,7 +144,7 @@ export function scJxGivewayB1MistakeBargeScript(): DriveScript {
       {
         kind: "drive",
         points: [[LANE, 113], [LANE, 124], [LANE, 150], [LANE, 180]],
-        targetKmh: 14,
+        targetKmh: 22,
         stopAtEnd: false,
       },
       { kind: "pause", sec: 2, brake: true },

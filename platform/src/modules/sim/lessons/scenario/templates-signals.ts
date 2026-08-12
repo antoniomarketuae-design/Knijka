@@ -228,19 +228,26 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
   conceptIds: ["c-right-hand-rule", "c-signal-hierarchy", "c-junction-approach"],
   map: {
     archetype: "x-junction",
-    // Mirrored in sx-v1.json meta.scenario.params (the signalized X-junction);
-    // the dead-signal mode is a runtime session-start dial, not a map property.
+    // B40(b) — ITS OWN MAP, not sx-v1. Mirrored in sxd-v1.json
+    // meta.scenario.params; the dead-signal mode is still a runtime
+    // session-start dial, not a map property. The cross street is a COLLECTOR
+    // here (tertiary 50, kerbside bands, 150 m straight each way) because this
+    // drill's own card says a dark head makes the junction равнозначно and
+    // hands priority to the right — which only means anything if traffic can
+    // actually come from there. Every pinned number below is unchanged: the
+    // spawn is (4.06, −105) and the derived stop line is 27.725 m from the node
+    // on this map exactly as on sx-v1 (gen_signal_x re-derives and asserts it).
     params: {
-      armNorthM: 90,
+      armNorthM: 80,
       armSouthM: 120,
-      armEastM: 120,
-      armWestM: 170,
+      armEastM: 150,
+      armWestM: 150,
       nsClass: "secondary",
-      ewClass: "residential",
+      ewClass: "tertiary",
       nsMaxKmh: 50,
-      ewMaxKmh: 40,
+      ewMaxKmh: 50,
     },
-    districtId: "sx-v1",
+    districtId: "sxd-v1",
   },
   start: {
     spawnPointId: "sx-spawn-south",
@@ -385,19 +392,23 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
   conceptIds: ["c-right-hand-rule", "c-signal-hierarchy", "c-junction-approach"],
   map: {
     archetype: "x-junction",
-    // Map REUSED from sc-signal-dead — mirrored in sx-v1.json params. The
-    // flashing-amber mode is a runtime session-start dial, not a map property.
+    // B40(b) — NO LONGER "map REUSED from sc-signal-dead". Mirrored in
+    // sxf-v1.json params. The cross street here is a ONE-WAY side street (Д4 at
+    // its mouth, no centre line, no oncoming) and the boulevard is parked both
+    // kerbs: under a light that does not regulate, the one thing that helps is
+    // reading which direction traffic can even come from. The flashing-amber
+    // mode is still a runtime session-start dial, not a map property.
     params: {
-      armNorthM: 90,
+      armNorthM: 130,
       armSouthM: 120,
-      armEastM: 120,
-      armWestM: 170,
+      armEastM: 90,
+      armWestM: 110,
       nsClass: "secondary",
       ewClass: "residential",
       nsMaxKmh: 50,
       ewMaxKmh: 40,
     },
-    districtId: "sx-v1",
+    districtId: "sxf-v1",
   },
   start: {
     spawnPointId: "sx-spawn-south",
@@ -602,20 +613,27 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
   conceptIds: ["c-traffic-light-signals", "c-signal-hierarchy", "c-junction-approach"],
   map: {
     archetype: "x-junction",
-    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
-    // green phase is a runtime session-start dial (signalOffsets), not a map
-    // property.
+    // B40(b) — NO LONGER "map REUSED from the signals family". Mirrored in
+    // sxh-v1.json params, and this map is built around the ONE thing this drill
+    // asks the student to do: see a car standing at the FAR stop line, 62 m
+    // beyond the junction, nose-on. So past the node the road necks (the north
+    // exit carries no kerbside band), nothing is parked there, it runs 150 m
+    // dead straight, and the frontage beyond the junction is low and set back —
+    // the sleeper stands against sky. The approach is a delivery street with
+    // box vans down the RIGHT kerb, which leaves the LEFT side, where
+    // instruction 3 points, empty. The green phase is still a runtime
+    // session-start dial (signalOffsets), not a map property.
     params: {
-      armNorthM: 90,
+      armNorthM: 150,
       armSouthM: 120,
-      armEastM: 120,
-      armWestM: 170,
+      armEastM: 80,
+      armWestM: 100,
       nsClass: "secondary",
       ewClass: "residential",
       nsMaxKmh: 50,
       ewMaxKmh: 40,
     },
-    districtId: "sx-v1",
+    districtId: "sxh-v1",
   },
   start: {
     spawnPointId: "sx-spawn-south",
@@ -672,6 +690,19 @@ export const SC_SIGNAL_HESITATION: ScenarioSpec = {
   ],
   // The lesson's subject, staged. It grades nothing (see the spec's own doc).
   staged: [SC_SIGNAL_HESITATION_SLEEPER],
+  /**
+   * DOC 87 B40(a) — THE ANSWER TO „who ? who is sleeping on green".
+   *
+   * Instruction 3 points at a car 62 m away, NOSE-ON, that measures 26 px in
+   * the shipped frame. The register's own §10 refused the prescribed rear-cue
+   * class on that arithmetic: a brake lamp is on the back of a car the student
+   * is looking at the front of. What survives 26 px is a caption that grows
+   * with range so its apparent size does not shrink, drawn ON the one car in
+   * question — and armed only while that car is genuinely standing still, so
+   * «тя стои» cannot be printed over a car that has pulled away. The copy, the
+   * measurement and the honesty rule live in `traffic/stagedActorLabels.ts`.
+   */
+  actorLabels: [{ actorId: SC_SIGNAL_HESITATION_SLEEPER.id, kind: "standingOnGreen" }],
   rubric: { parTimeSec: 55 },
   // RECORDED: committed deterministic recordings of the authored scripts in
   // traces/scSignalHesitation.ts; the §5 gate (shadow replays ZERO violations)
@@ -793,20 +824,23 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
   conceptIds: ["c-signal-hierarchy", "c-traffic-light-signals", "c-junction-approach"],
   map: {
     archetype: "x-junction",
-    // Map REUSED from the signals family — mirrored in sx-v1.json params. The
-    // controller (mode + timetable + lamp pin) is a runtime session-start
-    // dial armed by the staged event, not a map property.
+    // B40(b) — NO LONGER "map REUSED from the signals family". Mirrored in
+    // sxc-v1.json params: two collectors 170 m each way, parked at all four
+    // kerbs and a posted В24 on the approach — the widest, busiest place in the
+    // family, and the only one where a регулировчик standing in the box is
+    // plausible. The controller (mode + timetable + lamp pin) is still a
+    // runtime session-start dial armed by the staged event, not a map property.
     params: {
-      armNorthM: 90,
+      armNorthM: 100,
       armSouthM: 120,
-      armEastM: 120,
+      armEastM: 170,
       armWestM: 170,
       nsClass: "secondary",
-      ewClass: "residential",
+      ewClass: "tertiary",
       nsMaxKmh: 50,
-      ewMaxKmh: 40,
+      ewMaxKmh: 50,
     },
-    districtId: "sx-v1",
+    districtId: "sxc-v1",
   },
   start: {
     spawnPointId: "sx-spawn-south",
@@ -931,17 +965,22 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
   conceptIds: ["c-traffic-light-signals", "c-signal-hierarchy", "c-junction-approach"],
   map: {
     archetype: "x-junction",
+    // B40(b) — its own map. Mirrored in sxr-v1.json params: every arm is short,
+    // the cross street is posted 30, and the boulevard runs into a slab 20 m
+    // past the north node. The drill is about NOT creeping on червено-жълто,
+    // and here there is visibly nowhere to creep to — the only closed horizon
+    // in the family. The signal phase stays a runtime dial, not a map property.
     params: {
-      armNorthM: 90,
+      armNorthM: 70,
       armSouthM: 120,
-      armEastM: 120,
-      armWestM: 170,
+      armEastM: 70,
+      armWestM: 80,
       nsClass: "secondary",
       ewClass: "residential",
       nsMaxKmh: 50,
-      ewMaxKmh: 40,
+      ewMaxKmh: 30,
     },
-    districtId: "sx-v1",
+    districtId: "sxr-v1",
   },
   start: {
     spawnPointId: "sx-spawn-south",

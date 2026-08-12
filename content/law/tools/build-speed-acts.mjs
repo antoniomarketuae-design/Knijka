@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertNoVendorPagination, stripVendorPagination } from "./page-furniture.mjs";
 
 /**
  * The fetched originals sit next to this script (see .gitignore).
@@ -188,7 +189,21 @@ emitted.push({
 //    nothing to do with road policing; the sha256 in sources.json pins the
 //    whole PDF, so the omission is re-verifiable rather than hidden.
 {
-  const raw = readFileSync(path.join(SCRATCH, "naredba-si.txt"), "utf8");
+  /**
+   * The ДАМТН PDF is printed out of the same commercial database as the two
+   * SARS наредби and carries the same advertisement in every page margin — 139
+   * of them, 3 of which landed inside Раздел XXVI. The removal is shared with
+   * build-corpus.mjs so there is one description of what a page footer is.
+   */
+  const { text: raw, report } = stripVendorPagination(
+    readFileSync(path.join(SCRATCH, "naredba-si.txt"), "utf8"),
+    "naredba-si.txt",
+  );
+  console.log(
+    `naredba-si.txt   vendor pagination removed=${report.removed} ` +
+      `(sentence rejoined ${report.joined}, paragraph kept ${report.paragraphKept}, ` +
+      `at edge ${report.atEdge}, stranded date ${report.loneDate})  date=${report.date}`,
+  );
   const from = raw.indexOf("Раздел XXVI. Скоростомери");
   const to = raw.indexOf("Раздел XXVII", from);
   if (from < 0 || to <= from) throw new Error("НСИПМК: Раздел XXVI bounds not found");
@@ -233,6 +248,11 @@ emitted.push({
     units: fromLex("lex2539.html"),
   },
 });
+
+// Same refusal build-corpus.mjs runs, over the units this tool is about to
+// write — including the two lex.bg acts, which have no page margin at all and
+// therefore prove the check is not scoped to the file that needed it.
+for (const a of emitted) assertNoVendorPagination(a.doc.units, a.doc.actId);
 
 for (const a of emitted) {
   const p = path.join(OUT, "acts", a.file);

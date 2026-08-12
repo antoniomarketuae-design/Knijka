@@ -30,6 +30,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { actorObb, obbSeparationM, playerObb } from "../../collision";
 import type { StagedEventSpec } from "../../contracts";
 import { SC_RB_LANE_CHOICE } from "../../lessons/scenario/templates-roundabout";
 import { createScenarioDirector } from "../../orchestrator";
@@ -80,7 +81,10 @@ interface ActorFrame {
   px: number;
   py: number;
   car: { x: number; y: number; r: number; phi: number };
+  /** Centre-to-centre distance, m (the historical, isotropic measure). */
   sep: number;
+  /** SIGNED BODY separation, m — < 0 = the two footprints overlap. */
+  bodySep: number;
 }
 
 /**
@@ -132,6 +136,10 @@ function replayWithActor(name: ScRbLaneChoiceTraceName): ActorFrame[] {
         py: tick.position.y,
         car: { x: a.x, y: a.y, r: Math.hypot(a.x, a.y), phi: phiDeg(a.x, a.y) },
         sep: Math.hypot(a.x - tick.position.x, a.y - tick.position.y),
+        bodySep: obbSeparationM(
+          playerObb(tick.position.x, tick.position.y, tick.headingDeg),
+          actorObb(a),
+        ),
       });
     },
   });
@@ -285,11 +293,18 @@ describe("sc-rb-lane-choice — the crash is the engine's own (doc 76 §0 honest
     const frames = replayWithActor("mistake-exit-across-outer");
     const at = frames.reduce((b, f) => (Math.abs(f.tSec - hitAt.t) < Math.abs(b.tSec - hitAt.t) ? f : b));
     // The script authors NO `collision` beat — the RoundaboutEntryRunner's own
-    // contact branch (VEHICLE_CONTACT_M = 3) fires on real geometry. Measured
-    // closest approach 1.82 m: two cars in the same two square metres.
-    expect(at.sep).toBeLessThan(3);
+    // contact branch fires on real geometry. THE ASSERTION NOW MEASURES BODIES
+    // (2026-08-10): it used to read `sep < 3`, i.e. centre-to-centre against
+    // the retired VEHICLE_CONTACT_M circle, and the exact test fires EARLIER on
+    // an angled approach than that circle ever did — at this clock the centres
+    // are 3.06 m apart and the two footprints are already interpenetrating,
+    // which is precisely the case a circle cannot express.
+    expect(at.bodySep).toBeLessThanOrEqual(0);
     const minSep = Math.min(...frames.filter((f) => f.tSec > 40).map((f) => f.sep));
     expect(minSep).toBeLessThan(2.5);
+    // …and it keeps getting worse after the bill: this is a crash, not a graze.
+    const minBody = Math.min(...frames.filter((f) => f.tSec > 40).map((f) => f.bodySep));
+    expect(minBody).toBeLessThan(-0.5);
     // …and the car is where the lesson says it is: the OUTER lane, at the mouth
     // the driver is cutting across.
     expect(at.car.r).toBeGreaterThan(LANE_OUTER_R - 1.5);

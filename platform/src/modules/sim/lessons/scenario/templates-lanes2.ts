@@ -1588,9 +1588,33 @@ export const SC_LN_OBSTACLE_MEETING: ScenarioSpec = {
     {
       traceRef: { path: "content/traces/sc-ln-obstacle-meeting/mistake-squeeze.trace.json" },
       titleBg: "Провиране с настъпване на осевата под насрещен",
+      // GEOMETRY CORRECTION 2026-08-10. COLLISION was the second code and it
+      // was the isotropic 3 m circle talking: this drive leans to x = −2.0
+      // against a car on x = −4.06, i.e. 2.06 m of CENTRES between a 1.70 m
+      // body and a 1.84 m body = 0.29 m of clear air. Exact geometry finds no
+      // contact, and it is right — on THIS street. The reason is the one
+      // sc-pk-double-park's header already documents at length:
+      // PERCEPTUAL_ROAD_SCALE (×2.5) draws a 6.5 m carriageway as 16.25 m, so
+      // the squeeze that is real in Sofia has 29 cm of spare asphalt here. The
+      // card keeps the act it can prove (the осева) and stops claiming an
+      // impact the geometry does not produce. THE CAPABILITY THIS IS WAITING
+      // FOR is the same one named in templates-parking2: a per-district lane
+      // width, after which this demo's contact becomes real and the code
+      // returns on its own.
+      //
+      // COPY 2026-08-10, and the 0.29 above is NOT the number the card may
+      // print. 0.29 is the NOMINAL clearance of the authored line (x = −2.0);
+      // the DRIVE is steering, so the boxes are rotated, and the tightest frame
+      // the production ContactProbe actually computes on this recording is
+      // 0.192 m — measured by instrumenting ContactProbe.prototype through
+      // recordScLnObstacleMeetingDrive, against `sc-lnom-stream-0` (the first
+      // oncoming car), player at (−1.56, 126.52) doing 15.0 km/h. A card that
+      // teaches „сантиметри" must name the ones the engine saw, so the prose
+      // carries 0,19 m. It is also why the near miss is worth a card at all:
+      // 19 cm is the whole margin the manoeuvre bought.
       whatWentWrongBg:
-        "Класическото „ще се промъкна“: колата не изчака, а увисна върху осевата линия — нито в своята лента, нито в насрещната, тоест в двете едновременно — и продължи така срещу приближаващата кола, докато не я закачи. Настъпването на осевата не е половин решение, а два проблема наведнъж: ти не си минал покрай препятствието, а вече си отнел на насрещния лентата, по която той се движи, и си му оставил сантиметри за преценка. Тясната улица не се дели: или си зад препятствието и чакаш, или насрещната лента е ПРАЗНА и минаваш цял, с достатъчно странично разстояние (чл. 44).",
-      codeRefs: ["CENTER_LINE_TOUCHED", "COLLISION"],
+        "Класическото „ще се промъкна“: колата не изчака, а увисна върху осевата — нито в своята лента, нито в насрещната — и продължи така срещу приближаващата кола. Никой не се удари: най-тясното между двете купета е измерено и е 0,19 м. Деветнайсет сантиметра не са преценка, а късмет. Затова се отсъжда това, което наистина стана — трайно настъпване на осевата линия: второстепенна грешка, 1 наказателна точка от изпитния лист по Наредба № 38 (приложение № 5, т. 10, б. „б“), не контролни точки по книжката. Малкото число е цената на изхода, не на постъпката. Правилно: спираш В СВОЯТА лента зад препятствието, изчакваш насрещната да е ПРАЗНА докрай и минаваш цял, с достатъчно странично разстояние (ЗДвП чл. 44; чл. 20, ал. 2).",
+      codeRefs: ["CENTER_LINE_TOUCHED"],
     },
   ],
   teach: {

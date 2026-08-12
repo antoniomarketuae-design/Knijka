@@ -42,8 +42,11 @@ const REPO_ROOT = path.resolve(HERE, "../../../../../..");
 const RECORD = process.env.RECORD_TRACES === "1";
 const TEMPLATE_ID = "sc-signal-controller";
 
+// B40(b): the регулировчик drill has its own signalized district now (two
+// collectors, the widest place in the family). Read off the TEMPLATE so a
+// future move cannot leave this recorder replaying the wrong street.
 const sxDistrict = JSON.parse(
-  readFileSync(path.join(REPO_ROOT, "content", "world", "sx-v1.json"), "utf-8"),
+  readFileSync(path.join(REPO_ROOT, "content", "world", `${SC_SIGNAL_CONTROLLER.map.districtId}.json`), "utf-8"),
 ) as unknown;
 
 type LineCrossing = Extract<SimTickEvent, { kind: "stopLineCrossed" }>;

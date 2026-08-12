@@ -1036,16 +1036,26 @@ export const SC_PE_PARKED_ROW_SCAN: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-pe-parked-row-scan/mistake-fast-row.trace.json" },
-      titleBg: "50 покрай редицата — детето е невидимо до последно",
+      titleBg: "Детето е ударено — 50 покрай редица, която го крие",
       whatWentWrongBg:
-        "Колата държеше близо 50 покрай паркираните коли — законно на открито, но не и покрай редица, която крие деца. Три отделни неща се отсъждат тук и всяко има свое основание. Първо, превишаването в зона 40 се брои самостоятелно (чл. 21) — то е причината, не обстоятелството. Второ, детето вече беше стъпило на платното, а колата продължи към пътеката с непроменена скорост: чл. 119 иска скорост, ПОЗВОЛЯВАЩА спиране пред стъпил пешеходец, затова се отсъжда и „приближаване без готовност“. Трето, ударът прекратява изпита. Покрай паркирани коли таванът ти е видимостта, не табелата (чл. 20).",
-      // doc 86 T11: the third code is NEW and it is the point of the fix. The
-      // drill used to author `roadFromM 4.0` — 2.4 m past the real carriageway
-      // edge — so a child already on the tarmac and inside the driver's lane
-      // did not count as „on the crossing" and the speeding driver could not be
-      // billed the чл. 119 approach code at all. With the honest 1.6 the
-      // demo grades what actually happened.
-      codeRefs: ["SPEEDING_OVER_LIMIT", "PEDESTRIAN_CROSSING_TOO_FAST", "COLLISION"],
+        "Колата удари детето. Това се казва първо, защото всичко останало тук е причината за него — и защото само тази грешка спира и самия изпит (Наредба № 38, чл. 48, ал. 3). Ударът не е лош късмет, а сбор от три неща. Скоростта: близо 50 в зона 40 се брои самостоятелно (чл. 21) — но по-важното е, че покрай редица паркирани коли таванът ти е видимостта, а не табелата (чл. 20). Готовността: детето ВЕЧЕ беше стъпило на платното, а колата продължи към пътеката с непроменена скорост, докато чл. 119 иска скорост, ПОЗВОЛЯВАЩА спиране пред стъпил пешеходец. И разстоянието за реакция, което просто го нямаше: от 50 км/ч детето се появява изпод бронята. От 30 км/ч същото това дете спира колата с метри резерв — затова скоростта не е отделна грешка ДО удара, а неговата причина.",
+      // FOUNDER RULING 2026-08-10: this demo LEADS WITH THE STRIKE, and the
+      // speeding is framed as its cause. Until the exact-contact geometry
+      // landed, the 1.5 m isotropic circle measured from the car's CENTRE while
+      // its nose sat 2.02 m further forward, so the engine never saw the child
+      // and this card was authored around a speeding fault. The engine now
+      // grades her struck at 0.113 m inside the body.
+      //
+      // The badge no longer depends on this order — rules/gravest.ts derives
+      // severity, points, law chip and the чл. 48 rider from the gravest code
+      // present — but the ORDER still states what the demo is about, and a card
+      // that opens on a speed limit while a child is under the car does not.
+      //
+      // Kept from doc 86 T11: the чл. 119 approach code only became billable
+      // once `roadFromM` was corrected from 4.0 (2.4 m past the real carriageway
+      // edge) to an honest 1.6, so a child already on the tarmac and inside the
+      // driver's lane counts as „on the crossing".
+      codeRefs: ["COLLISION", "PEDESTRIAN_CROSSING_TOO_FAST", "SPEEDING_OVER_LIMIT"],
     },
     {
       traceRef: { path: "content/traces/sc-pe-parked-row-scan/mistake-hug-row.trace.json" },

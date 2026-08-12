@@ -213,6 +213,24 @@ if (TRIPWIRES.length !== 3) throw new Error("tripwire count changed");
  * The ЗИД tripwires: the two 2026 amendments, cut verbatim. They exist so the
  * staleness notes below can never drift away from what the amending acts say.
  */
+/**
+ * THE ONLY SENTENCE IN ЗДвП чл. 182 THAT SAYS WHICH LADDER YOU ARE ON.
+ *
+ * ал. 1 is the in-town ladder and ал. 2 the out-of-town one, and their numbered
+ * points are word-for-word identical down to т. 3 („за превишаване от 21 до 30
+ * km/h - с глоба 100 лв."). Cite the point alone and the alinea coordinate is
+ * decoration: flipping „ал. 1" to „ал. 2" on the founder's own row passed every
+ * check in the loader and the whole test suite. It is invisible at т. 3, where
+ * both alineas say 100 лв.; at т. 4 in town is 400 лв. and out of town 300.
+ *
+ * The discriminator is the alinea's opening, so the opening is quoted — and the
+ * alinea check that already exists then does the work, because ал. 2 does not
+ * contain this sentence. Two words carry it: „максимална" (ал. 2 says only
+ * „разрешената скорост") and „в населено място" against „извън населено място".
+ * Verified unique: it occurs exactly once in чл. 182.
+ */
+const URBAN_LADDER = "който превиши разрешената максимална скорост в населено място";
+
 const DV22_ALCOHOL = src(
   "naredba-iz-2539-izm-dv22-2026",
   "§ 3",
@@ -477,7 +495,15 @@ const penalties = [
         {
           paragraphRef: "ал. 1",
           pointRef: "т. 15",
-          offencePhrase: 'за неспиране на пътен знак "Спри! Пропусни движещите се по пътя с предимство!"',
+          // THE CONDITION IS PART OF THE OFFENCE, and cutting it here was the
+          // same defect as cutting it out of the чл. 179 phrase: т. 15 does not
+          // take 10 контролни точки for missing a Б2, it takes them for missing
+          // one „ако от това е създадена непосредствена опасност за движението".
+          // A phrase that stops at the sign prices pen-b2-no-stop's conduct —
+          // which costs 0 точки — with pen-b2-no-stop-danger's figure. The
+          // loader now refuses a phrase whose act goes on with „ако"/„когато".
+          offencePhrase:
+            'за неспиране на пътен знак "Спри! Пропусни движещите се по пътя с предимство!", ако от това е създадена непосредствена опасност за движението',
         },
       ),
       noteBg: CP_STILL_CURRENT,
@@ -604,6 +630,8 @@ const penalties = [
   {
     id: "pen-speeding-urban-11-20",
     titleBg: "Превишена скорост в населено място с 11–20 km/h",
+    // (see URBAN_LADDER above — every чл. 182 citation on the two speeding rows
+    // must show the opening that says WHICH ladder it is on.)
     summaryBg: "Първото стъпало, което вече не е символично — и на изпит е опасна грешка още над 10 km/h.",
     conduct: {
       statementBg:
@@ -628,6 +656,7 @@ const penalties = [
       instrumentSource: E_FISH,
       source: src("zdvp", "чл. 182", "за превишаване от 11 до 20 km/h - с глоба 50 лв.", {
         paragraphRef: "ал. 1",
+        contextNeedle: URBAN_LADDER,
         pointRef: "т. 2",
         offencePhrase: "за превишаване от 11 до 20 km/h",
       }),
@@ -644,6 +673,7 @@ const penalties = [
     disqualification: noBan(
       src("zdvp", "чл. 182", "за превишаване от 11 до 20 km/h - с глоба 50 лв.", {
         paragraphRef: "ал. 1",
+        contextNeedle: URBAN_LADDER,
         pointRef: "т. 2",
         offencePhrase: "за превишаване от 11 до 20 km/h",
       }),
@@ -764,6 +794,7 @@ const penalties = [
       instrumentSource: E_FISH,
       source: src("zdvp", "чл. 182", "за превишаване от 21 до 30 km/h - с глоба 100 лв.", {
         paragraphRef: "ал. 1",
+        contextNeedle: URBAN_LADDER,
         pointRef: "т. 3",
         offencePhrase: "за превишаване от 21 до 30 km/h",
       }),
@@ -780,6 +811,7 @@ const penalties = [
     disqualification: noBan(
       src("zdvp", "чл. 182", "за превишаване от 21 до 30 km/h - с глоба 100 лв.", {
         paragraphRef: "ал. 1",
+        contextNeedle: URBAN_LADDER,
         pointRef: "т. 3",
         offencePhrase: "за превишаване от 21 до 30 km/h",
       }),

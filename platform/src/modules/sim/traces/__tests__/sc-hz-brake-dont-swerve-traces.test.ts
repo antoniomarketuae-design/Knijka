@@ -189,11 +189,13 @@ describe("sc-hz-brake-dont-swerve — mistake demos grade their exact codes (doc
   });
 
   it("„Рязко отклонение“ is HONEST: the wheel really does go a full lane over, into the escort's lane", () => {
-    // The COLLISION is an AUTHORED beat (the scMergeLaneEnd „изтласкване"
-    // precedent — the released escort has begun pulling away, so the runner's
-    // 3 m contact test no longer reaches it). What the gate therefore proves is
-    // the GEOMETRY the beat depicts: the car ends up squarely in the lane the
-    // escort occupies, having never looked there.
+    // The COLLISION USED TO BE AN AUTHORED BEAT, on the grounds that "the
+    // released escort has begun pulling away, so the runner's 3 m contact test
+    // no longer reaches it". Since 2026-08-10 the runner measures BODIES, the
+    // contact is real, and the beat has been deleted (doc 76 §0: the crash is
+    // the engine's own). The gate still proves the geometry — the car ends up
+    // squarely in the lane the escort occupies, having never looked there —
+    // and now also proves the engine found it there.
     const drive = drives.get("mistake-blind-swerve")!;
     expect(Math.min(...drive.trace.samples.map((s) => s.x))).toBeCloseTo(ESCORT_X, 1);
     // No left glance exists anywhere in the drive — the blindness is REAL, not
@@ -207,9 +209,12 @@ describe("sc-hz-brake-dont-swerve — mistake demos grade their exact codes (doc
     // …and the indicator IS declared — the „politely signalled and still blind"
     // frame the card is built on (and the reason the INDICATOR code stays out).
     expect(kinds(drive)).toContain("signal-on");
-    // …and the escort never got clear of the player (it never resolves), so it
-    // was still alongside when the wheel arrived — the beat is not fiction.
-    expect(drive.outcomes.find((o) => o.eventId === "sc-hzbds-escort")).toBeUndefined();
+    // …and the escort is where the card says it is: the runner resolves the
+    // encounter as a CONTACT, from a real approach speed. No script beat.
+    const escort = drive.outcomes.find((o) => o.eventId === "sc-hzbds-escort");
+    expect(escort).toBeDefined();
+    expect(escort!.detail).toBe("collision");
+    expect(escort!.approachSpeedKmh).toBeGreaterThan(45);
     // The swerve genuinely MISSES the debris — that is the card's whole point:
     // the reflex „works" against the thing you can see, and finds the thing you
     // cannot. If it ever started clipping the rect, the demo would be billing

@@ -19,9 +19,11 @@
  *     the student's own ABS stop achieves — the sc-ac-wet-braking dual-channel
  *     honesty, applied to a DRY full-force stop. From 50 km/h that envelope
  *     needs ≈ 10.7 m;
- *   - the child never leaves y = 150 and the shadow rests at y = 148, so the
- *     shadow is contact-free BY CONSTRUCTION: |Δy| ≥ 2 m > PEDESTRIAN_CONTACT_M
- *     (1.5) for every frame of the drive, whatever her x.
+ *   - the child never leaves y = 150 and the shadow rests at STOP_MARK_Y, which
+ *     is DERIVED so the car's NOSE stops 2 m short of her body (see the
+ *     constant). The old literal 148 measured the gap from the hero's CENTRE
+ *     and parked its bumper 2 cm past her; the isotropic 1.5 m contact circle
+ *     the runner used could not see that, and exact body geometry does.
  *
  * The trace gate replays exactly these through the production stack:
  *   - shadow: cruises 50, stops FULL-FORCE at the mark 2 m short of the child,
@@ -42,6 +44,7 @@
  * crossings / intersections / zones.
  */
 
+import { PEDESTRIAN_BODY_RADIUS_M, PLAYER_HALF_LENGTH_M } from "../collision";
 import type { StagedEventSpec } from "../contracts";
 import { SC_HZ_EMERGENCY_STOP } from "../lessons/scenario/templates-hazards2";
 import {
@@ -58,8 +61,24 @@ export const SC_HZ_EMERGENCY_STOP_ID = "sc-hz-emergency-stop";
 const LANE_X = 4.06;
 /** The child's line — she crosses at a fixed y, mid-block. */
 const DART_Y = 150;
-/** The shadow's rest mark: 2 m short of her line. */
-const STOP_MARK_Y = 148;
+/**
+ * The shadow's rest mark — 2 m of AIR between the BUMPER and the child.
+ *
+ * IT USED TO BE THE LITERAL 148, commented "2 m short of her line", and it was
+ * measured from the wrong end of the car. The hero is 4.04 m long, so a centre
+ * at y = 148 puts the NOSE at 150.02 — two centimetres PAST her. The model
+ * answer to «Екстрено спиране» was running the child over, and the shadow gate
+ * could not see it because the grader compared two POINTS against a 1.5 m
+ * circle: a walker 1.6 m in front of the centre — i.e. 0.4 m INSIDE the
+ * bonnet — read as clear air. Exact body geometry (sim/collision, 2026-08-10)
+ * bills it on the first frame, which is how it was found.
+ *
+ * Derived, never typed: her body radius + the taught 2 m + the car's own front
+ * overhang. If the chassis or the pedestrian shell ever resizes, the ghost's
+ * stop moves with them instead of quietly parking on top of her.
+ */
+const STOP_AIR_M = 2;
+const STOP_MARK_Y = DART_Y - PEDESTRIAN_BODY_RADIUS_M - STOP_AIR_M - PLAYER_HALF_LENGTH_M; // 145.68
 /**
  * The kinematic twin of a full ABS stop: the live car decelerates at
  * BRAKE_FORCE_N / CHASSIS_MASS ≈ 9.0 m/s² on a full pedal, and the recorder's

@@ -20,6 +20,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { SC_LN_OBSTACLE_MEETING } from "../../lessons/scenario/templates-lanes2";
+import { VEHICLE_PROFILE_WIDTH_M } from "../../traffic/types";
+import { CHASSIS_HALF_EXTENTS } from "../../vehicle/tuning";
 import { parseScenarioTrace, serializeScenarioTrace } from "../parse";
 import {
   recordScLnObstacleMeetingDrive,
@@ -107,31 +109,54 @@ describe("sc-ln-obstacle-meeting — mistake demos grade their exact codes (doc 
     });
   }
 
-  it("both demos hit the SAME staged car, physically — no scripted collision beat", () => {
+  it("the PULL-OUT hits the staged car physically — no scripted collision beat", () => {
     // The contact is the shipped OncomingStreamRunner's own geometric check, so
-    // the card's „и се удариха" is a fact of the recording rather than a story
-    // told over it. Both demos resolve car #1 as a collision; car #2 (the
-    // narrowMeeting actor) is never even reached.
-    for (const name of ["mistake-pull-out", "mistake-squeeze"] as ScLnObstacleMeetingTraceName[]) {
-      const d = drives.get(name)!;
-      const stream = d.outcomes.find((o) => o.eventId === "sc-lnom-stream");
-      expect(stream, name).toBeDefined();
-      expect(stream!.detail, name).toBe("collision");
-      expect(d.outcomes.find((o) => o.eventId === "sc-lnom-meeting"), name).toBeUndefined();
-      // …and it happens SHORT of the стеснение — the crash is the reason the
-      // player never gets there, which is the whole лекция.
-      const last = d.trace.samples[d.trace.samples.length - 1];
-      expect(last.y, name).toBeLessThan(138);
-    }
+    // the card's „и го удари челно" is a fact of the recording rather than a
+    // story told over it. Car #2 (the narrowMeeting actor) is never reached.
+    //
+    // The SQUEEZE used to be in this loop and no longer is (2026-08-10). Its
+    // lean line is x = −2.0 against a car on x = −4.06: 2.06 m of centres
+    // between a 1.70 m body and a 1.84 m body = 0.29 m of CLEAR AIR. The old
+    // 3.0 m centre-to-centre circle called that an impact; exact body geometry
+    // does not, and on a carriageway PERCEPTUAL_ROAD_SCALE draws 16.25 m wide
+    // it is right. Pinned below rather than deleted.
+    const d = drives.get("mistake-pull-out")!;
+    const stream = d.outcomes.find((o) => o.eventId === "sc-lnom-stream");
+    expect(stream).toBeDefined();
+    expect(stream!.detail).toBe("collision");
+    expect(d.outcomes.find((o) => o.eventId === "sc-lnom-meeting")).toBeUndefined();
+    // …and it happens SHORT of the стеснение — the crash is the reason the
+    // player never gets there, which is the whole лекция.
+    const last = d.trace.samples[d.trace.samples.length - 1];
+    expect(last.y).toBeLessThan(138);
   });
 
-  it("the squeeze rides the paint before it hits anything — the two codes are two acts", () => {
+  it("the SQUEEZE misses by 29 cm — and that is the honest verdict, not a lost one", () => {
     const d = drives.get("mistake-squeeze")!;
-    const line = d.ruleEvents.find((e) => e.kind === "violation" && e.code === "CENTER_LINE_TOUCHED")!;
-    const hit = d.ruleEvents.find((e) => e.kind === "violation" && e.code === "COLLISION")!;
-    expect(line.t).toBeLessThan(hit.t);
-    // The осева ride is real: |x| < 0.81 (the band laneOffsetM > 3.25 marks out
-    // on this 1+1) with the indicator dark, sustained past the 3.5 s clock.
+    const stream = d.outcomes.find((o) => o.eventId === "sc-lnom-stream");
+    expect(stream).toBeDefined();
+    expect(stream!.detail).toBe("clear");
+    expect(violationCodes(d)).not.toContain("COLLISION");
+    // The authored lean line, from the two numbers the map and the chassis own:
+    // 2.06 m of centres, 0.85 + 0.92 of bodies.
+    const LEAN_X = -2.0;
+    const ONCOMING_X = -4.06;
+    const air = Math.abs(LEAN_X - ONCOMING_X) - (CHASSIS_HALF_EXTENTS.x + VEHICLE_PROFILE_WIDTH_M.car / 2);
+    expect(air).toBeCloseTo(0.29, 2);
+    expect(air).toBeGreaterThan(0);
+    // The drive still ends short of the стеснение, so FAILED_TO_YIELD still
+    // cannot leak — the лекция's shape is unchanged, only its last claim.
+    const last = d.trace.samples[d.trace.samples.length - 1];
+    expect(last.y).toBeLessThan(138);
+  });
+
+  it("the squeeze rides the paint — the осева ride is the act it IS billed for", () => {
+    const d = drives.get("mistake-squeeze")!;
+    expect(
+      d.ruleEvents.find((e) => e.kind === "violation" && e.code === "CENTER_LINE_TOUCHED"),
+    ).toBeDefined();
+    // |x| < 0.81 (the band laneOffsetM > 3.25 marks out on this 1+1) with the
+    // indicator dark, sustained past the 3.5 s clock.
     const onPaint = d.trace.samples.filter((s) => Math.abs(s.x) < 0.81 && s.indicator === "off");
     expect(onPaint.length).toBeGreaterThan(70); // 20 Hz ⇒ > 3.5 s
   });

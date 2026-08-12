@@ -159,6 +159,24 @@ export function validateScenarioSpec(
     }
   }
 
+  // -- Staged-actor captions (doc 87 B40(a)). A caption over an actor that does
+  // not exist renders nothing and reports nothing — a silent hole exactly like
+  // the one this row was filed for, so a stale `actorId` fails HERE.
+  if (spec.actorLabels) {
+    const stagedIds = new Set((spec.staged ?? []).map((s) => s.id));
+    spec.actorLabels.forEach((a, i) => {
+      if (!stagedIds.has(a.actorId)) {
+        errors.push(
+          `actorLabels[${i}].actorId "${a.actorId}" names no staged event on this template ` +
+            `(staged: ${[...stagedIds].join(", ") || "none"})`,
+        );
+      }
+      if (a.kind !== "standingOnGreen") {
+        errors.push(`actorLabels[${i}].kind "${String(a.kind)}" is not an authored caption (traffic/stagedActorLabels.ts)`);
+      }
+    });
+  }
+
   // -- Start.
   const hasSpawnId = typeof spec.start?.spawnPointId === "string" && spec.start.spawnPointId.length > 0;
   const hasPose = spec.start?.position !== undefined;

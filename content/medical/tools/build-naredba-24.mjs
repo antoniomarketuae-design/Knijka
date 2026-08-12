@@ -40,6 +40,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+// This tool writes into content/law/acts, so it inherits that directory's other
+// refusal too: the PRINT furniture class (a legal database's page-margin
+// advertisement), which the web signatures below cannot see and which reached
+// three acts through the PDF ingests. lex.bg has no page margin, so this can
+// only ever be silent here — which is the point of running it anyway.
+import { assertNoVendorPagination } from "../../law/tools/page-furniture.mjs";
 
 const SCRATCH = path.dirname(fileURLToPath(import.meta.url));
 const OUT = process.argv[2];
@@ -177,5 +183,6 @@ if (dirty.length > 0) {
       `hand a student a lex.bg forum post:\n${dirty.join("\n")}`,
   );
 }
+assertNoVendorPagination(act.units, act.actId);
 writeFileSync(path.join(OUT, "acts", "naredba-24.json"), JSON.stringify(act, null, 1) + "\n", "utf8");
 console.log(`acts/naredba-24.json: ${act.units.length} units — ${act.units.map((u) => u.ref).join(", ")}`);

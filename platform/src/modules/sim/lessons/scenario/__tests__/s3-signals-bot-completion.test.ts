@@ -144,7 +144,7 @@ describe("JU-08 bot completion — sc-signal-redyellow at L3", () => {
   it("the shadow completes the live session: red met, green pass, zero violations", () => {
     const lesson = compileScenario(SC_SIGNAL_REDYELLOW, 3);
     let session = createLessonSession(lesson);
-    recordScSignalRedYellowDrive(loadDistrict("sx-v1"), "shadow-correct", {
+    recordScSignalRedYellowDrive(loadDistrict(SC_SIGNAL_REDYELLOW.map.districtId), "shadow-correct", {
       onTick: (tick) => {
         session = applyTick(session, tick).state;
       },
@@ -158,7 +158,7 @@ describe("JU-08 bot completion — sc-signal-redyellow at L3", () => {
   it("the creep counter-proof: RED_YELLOW_CROSSED grades through the stack", () => {
     const lesson = compileScenario(SC_SIGNAL_REDYELLOW, 3);
     let session = createLessonSession(lesson);
-    const drive = recordScSignalRedYellowDrive(loadDistrict("sx-v1"), "mistake-creep", {
+    const drive = recordScSignalRedYellowDrive(loadDistrict(SC_SIGNAL_REDYELLOW.map.districtId), "mistake-creep", {
       onTick: (tick) => {
         session = applyTick(session, tick).state;
       },

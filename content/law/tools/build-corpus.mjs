@@ -2,13 +2,17 @@
  * Build the article-addressable law corpus from the extracted plain text.
  * NOTHING here invents text: every unit's `textBg` is a verbatim slice of the
  * lines produced by extract.mjs / pdftotext. The only transformations are
- * (a) joining the source lines of one article with "\n" and
- * (b) deriving the citation `ref` from the article's own "Чл. N." header.
+ * (a) joining the source lines of one article with "\n",
+ * (b) deriving the citation `ref` from the article's own "Чл. N." header, and
+ * (c) deleting the PDF's vendor watermark and closing the seam it opened —
+ *     see page-furniture.mjs, which owns that removal and refuses to let this
+ *     tool emit an act that still carries any.
  */
 import { readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertNoVendorPagination, stripVendorPagination } from "./page-furniture.mjs";
 
 /**
  * `fileURLToPath`, not `new URL(...).pathname` — the pathname is percent-encoded
@@ -173,11 +177,29 @@ function dedupeKeepLongest(units) {
 
 // --------------------------------------------------------------------------
 
+/**
+ * Read an extracted text and take the vendor's page furniture out of it BEFORE
+ * anything is split. The report is printed rather than swallowed: a change in
+ * the source PDF has to show up as a changed count, not as silence.
+ */
+function readSource(file) {
+  const raw = readFileSync(path.join(SCRATCH, file), "utf8");
+  const { text, report } = stripVendorPagination(raw, file);
+  if (report.removed > 0) {
+    console.log(
+      `${file.padEnd(16)} vendor pagination removed=${report.removed} ` +
+        `(sentence rejoined ${report.joined}, paragraph kept ${report.paragraphKept}, ` +
+        `at edge ${report.atEdge}, stranded date ${report.loneDate})  date=${report.date}`,
+    );
+  }
+  return text;
+}
+
 const acts = [];
 
 // 1) ЗДвП — from the .docx (line-oriented, highest fidelity source we have).
 {
-  const raw = readFileSync(path.join(SCRATCH, "zdvp.txt"), "utf8");
+  const raw = readSource("zdvp.txt");
   const lines = raw.split("\n");
   const titleBg = lines[0].trim();
   const promulgationBg = lines[1].trim();
@@ -204,7 +226,7 @@ const acts = [];
 
 // 2) Наредба № Iз-2539 — контролни точки.
 {
-  const raw = readFileSync(path.join(SCRATCH, "iz2539.txt"), "utf8");
+  const raw = readSource("iz2539.txt");
   const lines = raw.split("\n").filter((l) => l.trim());
   const units = dedupeKeepLongest([...splitByRegex(raw), ...splitAnnexes(raw)]);
   acts.push({
@@ -224,7 +246,7 @@ const acts = [];
 
 // 3) Наредба № 38 — изпитни точки (the examiner marking scheme).
 {
-  const raw = readFileSync(path.join(SCRATCH, "naredba38.txt"), "utf8");
+  const raw = readSource("naredba38.txt");
   const lines = raw.split("\n").filter((l) => l.trim());
   const units = dedupeKeepLongest([...splitByRegex(raw), ...splitAnnexes(raw)]);
   acts.push({
@@ -241,6 +263,14 @@ const acts = [];
     },
   });
 }
+
+/**
+ * THE REFUSAL, on the emitted units rather than on the input — the removal
+ * above could be right about the text and still be defeated by a shape it did
+ * not anticipate, and a silent trim is exactly how 185 pieces of a vendor's
+ * advertisement reached a seventeen-year-old's citation.
+ */
+for (const a of acts) assertNoVendorPagination(a.doc.units, a.doc.actId);
 
 mkdirSync(path.join(OUT, "acts"), { recursive: true });
 for (const a of acts) {

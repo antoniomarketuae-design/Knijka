@@ -15,6 +15,7 @@
  *    law. Events (glances/signals/driveline) are sparse and may allocate.
  */
 
+import { obbOverlap, type Obb2D } from "../collision";
 import type { StagedEventOutcome, StagedEventSpec, VehicleSample } from "../contracts";
 import { createScenarioDirector } from "../orchestrator";
 import {
@@ -295,47 +296,15 @@ export interface ObstacleRect2D {
  * 2D OBB overlap (separating-axis test over both rects' axes). Pure —
  * exported for the trace-gate tests. Headings: 0 = north, cw-positive
  * (district convention); length runs along the heading.
+ *
+ * The SAT itself now lives in `../collision` — this recorder had the only
+ * correct contact geometry in the codebase while the production orchestrator
+ * graded with a 3 m circle, so the maths was promoted to a shared module
+ * (which also returns the SIGNED separation, not just the verdict) and this is
+ * the thin alias. Same answers, one implementation.
  */
-export function obstacleRectsOverlap(
-  a: { x: number; y: number; headingDeg: number; halfWidthM: number; halfLengthM: number },
-  b: { x: number; y: number; headingDeg: number; halfWidthM: number; halfLengthM: number },
-): boolean {
-  const rects = [a, b];
-  for (let r = 0; r < 2; r++) {
-    const h = (rects[r].headingDeg * Math.PI) / 180;
-    // Axis along the length (sin h, cos h) and across it (cos h, −sin h).
-    const axes: Array<readonly [number, number]> = [
-      [Math.sin(h), Math.cos(h)],
-      [Math.cos(h), -Math.sin(h)],
-    ];
-    for (const [ux, uy] of axes) {
-      let min0 = Infinity;
-      let max0 = -Infinity;
-      let min1 = Infinity;
-      let max1 = -Infinity;
-      for (let i = 0; i < 2; i++) {
-        const rect = rects[i];
-        const hh = (rect.headingDeg * Math.PI) / 180;
-        const axX = Math.sin(hh);
-        const axY = Math.cos(hh);
-        const latX = Math.cos(hh);
-        const latY = -Math.sin(hh);
-        const c = rect.x * ux + rect.y * uy;
-        const ext =
-          rect.halfLengthM * Math.abs(axX * ux + axY * uy) +
-          rect.halfWidthM * Math.abs(latX * ux + latY * uy);
-        if (i === 0) {
-          min0 = c - ext;
-          max0 = c + ext;
-        } else {
-          min1 = c - ext;
-          max1 = c + ext;
-        }
-      }
-      if (max0 < min1 || max1 < min0) return false; // separating axis found
-    }
-  }
-  return true;
+export function obstacleRectsOverlap(a: Obb2D, b: Obb2D): boolean {
+  return obbOverlap(a, b);
 }
 
 export interface DriveScript {

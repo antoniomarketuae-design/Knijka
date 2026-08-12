@@ -95,6 +95,14 @@ function scJunctionLeftShadowScript(): DriveScript {
   };
 }
 
+/**
+ * B5 TIMING NOTE (doc 87, 2026-08-10) — the 20 km/h leg and the 0.9 s stop are
+ * the same repair as sc-junction-gap; scJunctions2.ts carries the measurement
+ * and the reasoning. Here the old pace put the priority car **19.8 m past the
+ * node and departing** at the graded instant (**23.2 m** on the creep demo);
+ * it now sits 6.7 m / 7.0 m past — still transiting the box the student cut
+ * into, which is what these two clips claim happened.
+ */
 function scJunctionLeftMistakeCutScript(): DriveScript {
   return {
     steps: [
@@ -108,10 +116,10 @@ function scJunctionLeftMistakeCutScript(): DriveScript {
           [LANE, -45],
           [LANE, -29.2],
         ],
-        targetKmh: 12,
+        targetKmh: 20,
       },
       { kind: "annotation", textBg: "Кратко спиране — и веднага газ наляво, докато колата с предимство е още в кръстовището." },
-      { kind: "pause", sec: 1.6, brake: true },
+      { kind: "pause", sec: 0.9, brake: true },
       { kind: "glance", mirror: "right" },
       {
         // Emerge left at speed while the priority car is still in the conflict box.
@@ -141,10 +149,10 @@ function scJunctionLeftMistakeCreepScript(): DriveScript {
           [LANE, -45],
           [LANE, -29.2],
         ],
-        targetKmh: 12,
+        targetKmh: 20,
       },
       { kind: "annotation", textBg: "Спрях, но носът тръгва навътре, докато колата с предимство приближава." },
-      { kind: "pause", sec: 1.6, brake: true },
+      { kind: "pause", sec: 0.9, brake: true },
       { kind: "glance", mirror: "right" },
       {
         // Creep the nose across the line into the box while the car is present.
@@ -153,7 +161,7 @@ function scJunctionLeftMistakeCreepScript(): DriveScript {
           [LANE, -29.2],
           [LANE, -18],
         ],
-        targetKmh: 4,
+        targetKmh: 7,
         stopAtEnd: false,
       },
       {

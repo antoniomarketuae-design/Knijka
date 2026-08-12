@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { headingOfDir, obbSeparationM, playerObb } from "../../collision";
 import type { StagedEventSpec } from "../../contracts";
 import { SC_RB_BUSY_GAP } from "../../lessons/scenario/templates-roundabout";
 import { createScenarioDirector } from "../../orchestrator";
@@ -70,8 +71,11 @@ interface ActorFrame {
   /** Player pose this frame (the recorder's own, not a re-simulation). */
   px: number;
   py: number;
+  pHeadingDeg: number;
   lead: { x: number; y: number; phi: number };
   foll: { x: number; y: number; phi: number };
+  /** Follower body heading, from its published travel direction. */
+  follHeadingDeg: number;
 }
 
 /**
@@ -122,8 +126,10 @@ function replayWithActors(name: ScRbBusyGapTraceName): ActorFrame[] {
         tSec: tick.t,
         px: tick.position.x,
         py: tick.position.y,
+        pHeadingDeg: tick.headingDeg,
         lead: { x: a.x, y: a.y, phi: phiDeg(a.x, a.y) },
         foll: { x: b.x, y: b.y, phi: phiDeg(b.x, b.y) },
+        follHeadingDeg: headingOfDir(b.dirX, b.dirY),
       });
     },
   });
@@ -269,13 +275,33 @@ describe("sc-rb-busy-gap — mistake demos grade their exact codes (doc 76 §9 s
     const codes = [...new Set(violationCodes(drive))].sort();
     expect(codes).toEqual([...SC_RB_BUSY_GAP.mistakes[1].codeRefs].sort());
     // The priority fault lands BEFORE the crash it causes — that ordering is the
-    // whole teach (the gap was already refused by physics 4 s before the bang),
-    // and it is also why the crash has to be authored: both runners resolve on
-    // the conviction, so the runner's own contact branch never runs.
+    // whole teach (the gap was already refused by physics before the bang).
+    //
+    // B81 — THE SECOND CLAUSE OF THAT SENTENCE USED TO READ „and it is also why
+    // the crash has to be authored: both runners resolve on the conviction, so
+    // the runner's own contact branch never runs." That was a correct diagnosis
+    // of a real defect, worked around instead of reported: contact used to be a
+    // branch of `step()`, and `step()` returns immediately once the runner has
+    // retired. The watch now lives in the director's ContactSentinel, outside
+    // any runner's lifetime, so the crash is billed FROM THE GEOMETRY:
+    //
+    //   t 20.00  FAILED_TO_YIELD (the gap is refused)
+    //   t 21.78  the follower's body and the player's body overlap — the first
+    //            of 169 consecutive frames of real contact, 2.09 m deep at its
+    //            worst (t 23.43). THIS is now the billed clock.
+    //   t 23.40  the script's authored `collision` beat still fires, 1.62 s
+    //            inside that unbroken overlap — and folds into the SAME
+    //            encounter (collisionSeparationSec), so it is one accident.
+    //
+    // 1.78 s, not the 3.40 s the authored beat used to produce. The authored
+    // beat is now redundant; removing it is the authoring lane's call, because
+    // the demo's annotation copy is timed against it.
     const yieldAt = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "FAILED_TO_YIELD")!;
     const hitAt = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "COLLISION")!;
     expect(yieldAt.t).toBeLessThan(hitAt.t);
-    expect(hitAt.t - yieldAt.t).toBeGreaterThan(2);
+    expect(hitAt.t - yieldAt.t).toBeGreaterThan(1.5);
+    // ONE accident, however many ways it is reported.
+    expect(violationCodes(drive).filter((c) => c === "COLLISION")).toHaveLength(1);
     // This demo is NOT the barge: it stops at the line and lets the lead through
     // first. That is what makes it the harder mistake.
     expect(drive.trace.samples.some((s) => s.speedKmh < 0.5 && s.y > -28 && s.y < -27)).toBe(true);
@@ -294,24 +320,39 @@ describe("sc-rb-busy-gap — mistake demos grade their exact codes (doc 76 §9 s
   });
 });
 
-describe("sc-rb-busy-gap — the authored crash depicts real geometry (doc 76 §0 honesty)", () => {
-  it("the follower is IN the driver's footprint at the authored contact clock", () => {
+describe("sc-rb-busy-gap — the crash depicts real geometry (doc 76 §0 honesty)", () => {
+  it("the follower is IN the driver's footprint from the billed clock onward", () => {
     const drive = drives.get("mistake-short-gap")!;
     const hitAt = drive.ruleEvents.find((e) => e.kind === "violation" && e.code === "COLLISION")!;
     const frames = replayWithActors("mistake-short-gap");
     const at = frames.reduce((b, f) => (Math.abs(f.tSec - hitAt.t) < Math.abs(b.tSec - hitAt.t) ? f : b));
-    // Measured 0.12 m — the two cars are in the same square metre. The scripted
-    // beat is a depiction of the production traffic system's own state, not a
-    // narrative liberty; VEHICLE_CONTACT_M (the runner's own threshold, 3 m) is
-    // the bar it clears more than twenty times over.
-    const sep = Math.hypot(at.foll.x - at.px, at.foll.y - at.py);
-    expect(sep).toBeLessThan(1);
-    // …and it is the closest the two ever get: the crash is authored at the
-    // apex of the geometry, not at a convenient clock.
-    const minSep = Math.min(
-      ...frames.filter((f) => f.tSec > 13).map((f) => Math.hypot(f.foll.x - f.px, f.foll.y - f.py)),
+
+    // B81: the bill now lands where the BODIES meet (t 21.78), not at the
+    // script's authored beat 1.6 s later, so this assertion measures the right
+    // thing with the right instrument. Centre distance was never the right
+    // instrument — a 3.40 m gap of CENTRES between two 4.1 m cars nose-to-tail
+    // is 0.67 m of INTERPENETRATION, and the old `hypot(...) < 1` would have
+    // called that innocent. Exact bodies, exact answer.
+    const sepM = obbSeparationM(
+      playerObb(at.px, at.py, at.pHeadingDeg),
+      { x: at.foll.x, y: at.foll.y, headingDeg: at.follHeadingDeg, halfLengthM: 2.05, halfWidthM: 0.92 },
     );
-    expect(sep - minSep).toBeLessThan(0.25);
+    expect(sepM).toBeLessThanOrEqual(0);
+    // …and the contact is unbroken from there: 169 consecutive frames of real
+    // overlap, which is what makes the whole thing ONE accident and what the
+    // authored beat, landing inside it, now folds into.
+    const overlapping = frames.filter(
+      (f) =>
+        f.tSec >= at.tSec &&
+        obbSeparationM(playerObb(f.px, f.py, f.pHeadingDeg), {
+          x: f.foll.x,
+          y: f.foll.y,
+          headingDeg: f.follHeadingDeg,
+          halfLengthM: 2.05,
+          halfWidthM: 0.92,
+        }) <= 0,
+    );
+    expect(overlapping.length).toBeGreaterThan(100);
   });
 });
 
