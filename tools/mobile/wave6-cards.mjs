@@ -62,7 +62,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const devices = resolveDevices((arg("device", DEFAULT_DEVICE_IDS.join(","))).split(","));
 const KEEP_HINT = process.argv.includes("--keep-hint");
 
-const user = await ensureHarnessUser();
+// ── SIGNING IN TO A REMOTE DEPLOY. ───────────────────────────────────────────
+// `ensureHarnessUser()` writes a user into the LOCAL database and refuses to
+// touch a remote one (`assertLocalDatabase`), which is right — but the VPS has
+// its own database, so measuring the deployed product needs credentials that
+// already exist there. `--email` / `--password` take that path; without them
+// the local harness user is created as before.
+const EMAIL = arg("email", null);
+const PASSWORD = arg("password", null);
+const user =
+  EMAIL !== null && PASSWORD !== null
+    ? { email: EMAIL, password: PASSWORD }
+    : await ensureHarnessUser();
 const browser = await chromium.launch({
   args: ["--use-angle=d3d11", "--enable-gpu", "--ignore-gpu-blocklist", "--enable-unsafe-swiftshader"],
 });
