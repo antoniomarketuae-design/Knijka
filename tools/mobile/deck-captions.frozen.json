@@ -1,0 +1,119 @@
+{
+  "note": "Written by `deck-captions.mjs --prod --freeze`. Do not hand-edit: `tools/mobile/deck-captions.test.mjs` re-checks every number in here against the tree.",
+  "measuredAt": "2026-08-12T06:27:28.646Z",
+  "build": "production",
+  "engine": "webkit",
+  "route": "/simulator?scenario=sc-junction-stop&level=1&simPerf=0",
+  "corpus": {
+    "traces": 503,
+    "captions": 1811,
+    "sha256": "011bf2ed1c5abd81dd978cf995c9f8c98beeb5c799dc16892eab404809e58d75"
+  },
+  "profiles": [
+    {
+      "device": "iphone16-portrait",
+      "label": "iPhone 16 — portrait",
+      "cardWidth": 369,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 110,
+        "chars": 249,
+        "trace": "sc-rb-exit-signal/mistake-barge-entry.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш вече движещите се в кръга (ЗДвП чл. 50, ал. 1). „Пропусни“ не значи „чакай празен кръг“ — значи „не карай никого в кръга да намалява“."
+      }
+    },
+    {
+      "device": "iphone16-landscape",
+      "label": "iPhone 16 — landscape",
+      "cardWidth": 258,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 158,
+        "chars": 249,
+        "trace": "sc-rb-exit-signal/mistake-barge-entry.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш вече движещите се в кръга (ЗДвП чл. 50, ал. 1). „Пропусни“ не значи „чакай празен кръг“ — значи „не карай никого в кръга да намалява“."
+      }
+    },
+    {
+      "device": "small-portrait",
+      "label": "Small Android — portrait (360x780)",
+      "cardWidth": 336,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 126,
+        "chars": 249,
+        "trace": "sc-rb-exit-signal/mistake-barge-entry.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш вече движещите се в кръга (ЗДвП чл. 50, ал. 1). „Пропусни“ не значи „чакай празен кръг“ — значи „не карай никого в кръга да намалява“."
+      }
+    },
+    {
+      "device": "small-landscape",
+      "label": "Small Android — landscape (780x360)",
+      "cardWidth": 304,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 126,
+        "chars": 222,
+        "trace": "sc-rb-busy-gap/mistake-barge-lead.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Б3 не се поставя там — Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1) — дори с цената на пълно спиране на входа."
+      }
+    },
+    {
+      "device": "galaxy-gesturebar-portrait",
+      "label": "Samsung Galaxy — portrait, Android 15 gesture bar (360x780, bottom 24)",
+      "cardWidth": 336,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 126,
+        "chars": 249,
+        "trace": "sc-rb-exit-signal/mistake-barge-entry.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш вече движещите се в кръга (ЗДвП чл. 50, ал. 1). „Пропусни“ не значи „чакай празен кръг“ — значи „не карай никого в кръга да намалява“."
+      }
+    },
+    {
+      "device": "galaxy-gesturebar-landscape",
+      "label": "Samsung Galaxy — landscape, Android 15 gesture bar (780x360, bottom 24)",
+      "cardWidth": 304,
+      "ceiling": 174,
+      "fontSize": "12px",
+      "lineHeight": "16px",
+      "clamped": 0,
+      "tallest": {
+        "px": 126,
+        "chars": 222,
+        "trace": "sc-rb-busy-gap/mistake-barge-lead.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Б3 не се поставя там — Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1) — дори с цената на пълно спиране на входа."
+      }
+    },
+    {
+      "device": "desktop-roomy",
+      "label": "Desktop — 1264x619",
+      "cardWidth": 416,
+      "ceiling": 138,
+      "fontSize": "14px",
+      "lineHeight": "20px",
+      "clamped": 0,
+      "tallest": {
+        "px": 138,
+        "chars": 222,
+        "trace": "sc-rb-busy-gap/mistake-barge-lead.trace.json",
+        "text": "Влизащият НЯМА предимство: на входа стои Б1/Б2 (Б3 не се поставя там — Наредба № РД-02-21-1/23.11.2023 за пътните знаци), значи пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1) — дори с цената на пълно спиране на входа."
+      }
+    }
+  ]
+}

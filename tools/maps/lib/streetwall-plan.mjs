@@ -171,6 +171,16 @@ export const EXCLUDED = [
   ["jx-equal-v1", "„OPEN CORNERS are the contract" + " — four authored corners, battery-pinned"],
   ["ac-bridge-v1 / ac-ice-v1 / ac-aqua-v1", "surface + structure lessons; ac-bridge's 4 blocks encode the deck"],
   ["district-v1", "already 248 authored footprints — the one map that reads as a real place"],
+  [
+    "sxd-v1 / sxf-v1 / sxh-v1 / sxc-v1 / sxr-v1",
+    "doc 87 B40(b): the five new signalised junctions share sx-v1's EDGE IDS by " +
+      "design (five lessons pin coordinates and ship traces against that graph), " +
+      "and this pass keys its jitter on the edge id — `sw-<edgeId>-<side><k>` — " +
+      "so stamping them would hand all six the IDENTICAL wall, which is the exact " +
+      "sameness the row exists to close. Each authors its own frontage in " +
+      "gen_signal_x.mjs instead, and that generator validates the same three " +
+      "clearances this one enforces (kerb+pavement, junction sight leg, spawn)",
+  ],
 ];
 
 // ---------------------------------------------------------------------------

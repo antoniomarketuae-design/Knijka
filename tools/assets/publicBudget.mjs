@@ -25,6 +25,30 @@
  * `ship: "dev"` does NOT mean "delete": these are working assets (encoder
  * sources, review evidence) that belong in the repo. It means the deploy
  * prunes them from the live tree — see prune-public.mjs.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * TWO NUMBERS, AND THIS FILE USED TO KNOW ONLY ONE (2026-08-11).
+ *
+ * Everything above measures BYTES ON DISK. That is DEPLOY SIZE — the repo, the
+ * git history, the VPS tree, the CI artifact — and it is a real constraint. It
+ * is also silent about the number that matters to a 17-year-old on Bulgarian
+ * mobile data:
+ *
+ *   DEPLOY SIZE      bytes under platform/public/. Lazy loading does not move
+ *                    it by one byte. Paid once, by us.
+ *   SESSION DOWNLOAD what ONE STUDENT pulls over the wire in one sitting.
+ *                    Paid every time, by them, out of a data plan.
+ *
+ * The two diverge the moment an asset is fetched on demand rather than at page
+ * load, and `traces` has been making that claim in prose since M-28 („heavy on
+ * disk, light on the wire") with no number attached to it and nothing able to
+ * fail. FR-19 forced the issue: thirteen 10–15 s tutorial clips at the measured
+ * ~5–9 MB each are ~117 MB of deploy AND ~117 MB of session if the card fetches
+ * them without being asked.
+ *
+ * So SESSION_MODELS below states, per feature, what a single session can pull
+ * and what it costs when the student presses play on nothing. Read `sessionCosts`
+ * for the arithmetic and the one thing it cannot see from disk.
  */
 
 import { readdirSync, statSync } from "node:fs";
@@ -135,6 +159,72 @@ export const BUCKETS = [
     why: "HDRI environments for image-based lighting. Not fetched at the low tier (H-11).",
   },
   {
+    // NARROW FIRST — before sim-tutorial-clip, which matches the directory.
+    id: "sim-tutorial-poster",
+    match: (rel) =>
+      rel.startsWith("sim/tutorial/") &&
+      (rel.endsWith(".webp") || rel.endsWith(".jpg") || rel.endsWith(".png")),
+    ship: "prod",
+    // THE THIRD NUMBER: what the thirteen cards cost when the student presses
+    // play on nothing. 500 KB for the whole set, and it is the ONLY tutorial
+    // byte a session pulls without being asked — see SESSION_MODELS.
+    maxBytes: 500_000,
+    // MEASURED, not inherited: the first real poster (adjust-seat.webp,
+    // 2026-08-11) is 27,496 B, so thirteen of them are ~349 KB — which is
+    // exactly the „a few hundred KB for all thirteen" this is supposed to buy.
+    // The house WebP contract it was cut to (854 px, q78) measures 13.9 KB
+    // across the 157 gallery stills and 17.6 KB across the 230 clip posters,
+    // so 27.5 KB is already the wide end of normal. 40 KB is ~45% over the
+    // measured poster: room for a busier frame, impossible for a screenshot.
+    // 13 x 40 KB = 520 KB > the 500 KB total ON PURPOSE — the set cannot all
+    // sit at the per-file max without someone looking at the total.
+    maxFileBytes: 40_000,
+    why: "Poster frames for the FR-19 clips — the still a card shows before (and instead of) fetching 9 MB of video.",
+  },
+  {
+    id: "sim-tutorial-clip",
+    match: (rel) => rel.startsWith("sim/tutorial/"),
+    ship: "prod",
+    // ── WHY THIS WENT FROM 2.5 MB TO 119 MB, AND WHAT STILL SAYS NO ──────────
+    // It was DELIBERATELY SIZED FOR ONE CLIP on 2026-08-10 so clip #2 could not
+    // land silently and would force this conversation. (It also had to come
+    // before sim-models, whose own `why` says Draco-compressed GLB — the first
+    // mp4 landed there unnoticed and took that bucket to 3.72 MB against a
+    // 3.00 MB ceiling.) The conversation happened; the founder ratified the
+    // full set of thirteen. So the ceiling is now sized for thirteen — honestly,
+    // and with two separate things that can still refuse.
+    //
+    // 1. THE TOTAL (deploy). 13 clips at the heavier measured weight is ~117 MB
+    //    added to a 195 MB prod tree. That is the deploy cost of FR-19 stated
+    //    out loud, not a rounding error. 125 MB is ~23% over a realistic set
+    //    (the measured pair averages 7.5 MB → ~98 MB for thirteen), inside this
+    //    file's stated 15-30% convention. Note it is deliberately BELOW
+    //    13 x maxFileBytes (156 MB): a whole set of maximal clips fails here
+    //    even though every single file passed.
+    // 2. THE LUMP (per file) — and now that loading is on demand, this is the
+    //    one that binds. One 30 MB clip is worse for a student than six 5 MB
+    //    ones, because it is paid in a single unskippable go.
+    //    PROVENANCE, because this file's rule is measure-don't-inherit and only
+    //    half of this was measurable here: the ONLY tutorial clip on disk is
+    //    adjust-seat.mp4 at 2,022,418 B (stat'd 2026-08-11, and gated against
+    //    its own declared `bytes` by procedures/__tests__/predrive-clip-weight).
+    //    The Kling 3.0 pair this ceiling is cut for — 5.4 MB (seat) and 9.0 MB
+    //    (walk-around, the heaviest step by nature: most motion, hardest to
+    //    compress) — comes from the render lane's report, NOT from a stat here;
+    //    neither file is in the tree. Read as MiB (the stricter reading), 9.0 MB
+    //    is 9,437,184 B, so 12 MB is ~27% over the worst reported render, inside
+    //    the same convention, and fails the 30 MB case by 2.5x. If a real
+    //    walk-around lands heavier than 12 MB, re-measure and move this line
+    //    with a reason — do not quietly widen it.
+    //    It is also a BITRATE ceiling in disguise: duration is
+    //    separately gated to the founder's 10-15 s (procedures/tutorial.ts), so
+    //    12 MB is 6.4-9.6 Mbps and a breach means the encode slipped, never
+    //    that the clip got longer.
+    maxBytes: 125_000_000,
+    maxFileBytes: 12_000_000,
+    why: "FR-19 pre-drive tutorial clips — one generated clip per checklist step, fetched ONLY when the student presses play. Every step also has an inline-SVG still that costs zero bytes and works offline (hud/PreDriveStill.tsx).",
+  },
+  {
     id: "sim-models",
     match: (rel) => rel.startsWith("sim/"),
     ship: "prod",
@@ -220,6 +310,67 @@ export const BUCKETS = [
   },
 ];
 
+/**
+ * SESSION MODELS — the second number the bucket table cannot answer.
+ *
+ * A bucket total says what WE ship. A session model says what ONE STUDENT
+ * pulls, and it needs one fact per bucket that no filesystem knows: WHEN the
+ * browser fetches it.
+ *
+ *   upfront    fetched because the feature opened, whether or not the student
+ *              asked for anything. This is the floor, and it is the only part
+ *              a student cannot decline.
+ *   onDemand   fetched only on an explicit act — pressing play. Capped by the
+ *              bucket total (they can ask for everything), but not paid by
+ *              default.
+ *
+ * WHAT THIS CANNOT SEE, AND WHERE IT IS PROVEN INSTEAD. `onDemand` is a claim
+ * about a component, not about disk. If a <video> regains `autoPlay`, or loses
+ * `preload="none"`, every byte in the onDemand bucket silently becomes upfront
+ * and the floor below becomes the ceiling — with no file on disk changing size,
+ * so nothing here would notice. That is the same shape as the defect the audit
+ * called out for draw calls: a static estimate standing in for a runtime fact,
+ * wrong for months. So each model names the source file its floor depends on and
+ * the test that pins it. `idleRequires` is not a comment — it is the pointer to
+ * the half of this gate that lives elsewhere.
+ *
+ * Be precise about what that half is worth. For FR-19 it is a SOURCE scan, not
+ * a render: `vitest.config.ts` runs in `environment: "node"`, and the card
+ * renders through `createPortal` behind an effect, so server markup would be an
+ * empty string forever and a markup assertion would pass against nothing. The
+ * zero-bytes-until-tap fact was measured once, by hand, in WebKit on
+ * /dev/predrive-rig with the network panel open; the source scan's job is to
+ * keep the code that was measured the code that ships. That is weaker than a
+ * runtime assertion and it is written down here so nobody upgrades it in their
+ * head later.
+ */
+export const SESSION_MODELS = [
+  {
+    id: "predrive-tutorial",
+    title: "FR-19 pre-drive tutorial — one student, thirteen cards, one lesson",
+    /** The thirteen PreDriveStepIds. One card, one clip, at most one fetch each. */
+    steps: 13,
+    upfront: ["sim-tutorial-poster"],
+    onDemand: ["sim-tutorial-clip"],
+    /**
+     * THE FLOOR: thirteen cards opened in order, play pressed on nothing.
+     * Deliberately equal to the sim-tutorial-poster ceiling — a test asserts
+     * they stay equal, so the duplication is gated rather than drifting. This
+     * is the founder's „a few hundred KB for all thirteen".
+     */
+    maxIdleBytes: 500_000,
+    idleRequires:
+      "hud/PreDriveTutorial.tsx never puts `src` on the <video> until the student taps play " +
+      '(preload="none" on top, hand teardown on unmount) — pinned by ' +
+      "hud/__tests__/predrive-clip-lazy.test.ts, and measured once in WebKit on /dev/predrive-rig",
+    why:
+      "Only one <video> exists at a time (the open card) and React destroys it on a step change, " +
+      "so the worst case is each clip fetched once — not thirteen in flight. Lazy loading does NOT " +
+      "lower that worst case: thirteen played once is thirteen. What it buys is that the worst case " +
+      "stops being the DEFAULT, and the floor drops from ~117 MB to the posters.",
+  },
+];
+
 /** POSIX-ise a path so the rules read the same on Windows and on the VPS. */
 export function toRel(root, absPath) {
   return path.relative(root, absPath).split(path.sep).join("/");
@@ -302,6 +453,103 @@ export function scanPublic(root) {
   };
 }
 
+/**
+ * What ONE STUDENT pulls, per session model — the wire number, next to the
+ * disk number, so neither can be quoted as the other.
+ *
+ * Each model yields three figures and one violation channel:
+ *
+ *   idle       bytes a student cannot decline: the feature opened, they asked
+ *              for nothing. Gated by `maxIdleBytes`.
+ *   worstCase  they asked for everything once — every card, every clip. Not
+ *              separately gated: it IS the sum of the bucket ceilings, and
+ *              gating it twice would just be two numbers to keep in step. It
+ *              is REPORTED because it is what a data plan actually feels.
+ *   biggestFetch  the largest single unskippable lump. Now that loading is on
+ *              demand this is the figure that binds — one 30 MB clip is worse
+ *              for a student than six 5 MB ones. Gated by the onDemand
+ *              bucket's `maxFileBytes`, which the bucket table already fails on.
+ *
+ * `measured` is today's tree. `permitted` is what the declaration allows once
+ * every step is authored — reported because `measured` is VACUOUS on a fresh
+ * clone: the clips are large media, and large media in this repo has a history
+ * of not being in git (public/clips/* is gitignored and scp'd). A ceiling that
+ * only bites on the one box holding the files is not a ceiling.
+ */
+export function sessionCosts(scan) {
+  const byId = new Map(scan.buckets.map((b) => [b.bucket.id, b]));
+  /**
+   * THROWS on an unknown id rather than skipping it. A session model names its
+   * buckets by string, so renaming a bucket would otherwise drop it silently
+   * and the model would report a comfortable 0 MB — the precise shape of green
+   * this gate exists to refuse.
+   */
+  const pick = (ids) =>
+    ids.map((id) => {
+      const row = byId.get(id);
+      if (row === undefined) {
+        throw new Error(`session model names bucket "${id}", which no longer exists in BUCKETS`);
+      }
+      return row;
+    });
+  const total = (rows, f) => rows.reduce((n, b) => n + f(b), 0);
+
+  return SESSION_MODELS.map((model) => {
+    const upfront = pick(model.upfront);
+    const onDemand = pick(model.onDemand);
+
+    const measured = {
+      idleBytes: total(upfront, (b) => b.bytes),
+      onDemandBytes: total(onDemand, (b) => b.bytes),
+      upfrontFiles: total(upfront, (b) => b.files),
+      onDemandFiles: total(onDemand, (b) => b.files),
+      biggestFetch: onDemand.reduce(
+        (best, b) => (b.biggest.bytes > best.bytes ? b.biggest : best),
+        { rel: "", bytes: 0 },
+      ),
+    };
+    measured.worstCaseBytes = measured.idleBytes + measured.onDemandBytes;
+
+    const permitted = {
+      idleBytes: total(upfront, (b) => b.bucket.maxBytes),
+      onDemandBytes: total(onDemand, (b) => b.bucket.maxBytes),
+      biggestFetchBytes: onDemand.reduce(
+        (n, b) => Math.max(n, b.bucket.maxFileBytes ?? b.bucket.maxBytes),
+        0,
+      ),
+    };
+    permitted.worstCaseBytes = permitted.idleBytes + permitted.onDemandBytes;
+
+    const violations =
+      measured.idleBytes > model.maxIdleBytes
+        ? [
+            {
+              kind: "session-idle",
+              id: model.id,
+              bytes: measured.idleBytes,
+              limit: model.maxIdleBytes,
+            },
+          ]
+        : [];
+
+    return { model, measured, permitted, violations };
+  });
+}
+
 export function mb(bytes) {
   return `${(bytes / 1_048_576).toFixed(1)} MB`;
+}
+
+/** Bytes as KB — the poster/idle figures are unreadable in MB. */
+export function kb(bytes) {
+  return `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+/**
+ * The unit that makes a BREACH readable. Reporting the poster floor in MB
+ * printed „0.5 MB > 0.5 MB" — a failure message that shows no daylight between
+ * the value and the limit tells the reader nothing about how far over they are.
+ */
+export function size(bytes) {
+  return bytes < 1_048_576 ? kb(bytes) : mb(bytes);
 }

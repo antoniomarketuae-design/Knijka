@@ -15,7 +15,7 @@
 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUCKETS, mb, scanPublic } from "./publicBudget.mjs";
+import { BUCKETS, kb, mb, scanPublic, sessionCosts, size } from "./publicBudget.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PUBLIC = path.resolve(HERE, "../../platform/public");
@@ -26,6 +26,7 @@ const publicIdx = args.indexOf("--public");
 const root = publicIdx >= 0 ? path.resolve(args[publicIdx + 1]) : DEFAULT_PUBLIC;
 
 const result = scanPublic(root);
+const sessions = sessionCosts(result);
 
 if (asJson) {
   console.log(
@@ -43,6 +44,14 @@ if (asJson) {
         })),
         unclassified: result.unclassified,
         violations: result.violations,
+        sessions: sessions.map((s) => ({
+          id: s.model.id,
+          steps: s.model.steps,
+          measured: s.measured,
+          permitted: s.permitted,
+          maxIdleBytes: s.model.maxIdleBytes,
+          violations: s.violations,
+        })),
       },
       null,
       2,
@@ -67,8 +76,43 @@ if (asJson) {
     );
   }
   console.log(
-    `\ndeployed (prod): ${mb(result.prodBytes)}   working copy only (dev): ${mb(result.devBytes)}   total: ${mb(result.totalBytes)}`,
+    `\nDEPLOY SIZE — bytes on disk, in git, on the VPS. Paid once, by us.` +
+      `\n  deployed (prod): ${mb(result.prodBytes)}   working copy only (dev): ${mb(result.devBytes)}   total: ${mb(result.totalBytes)}`,
   );
+
+  // THE SECOND NUMBER. Lazy loading does not move one byte of the block above;
+  // this is the block it moves. See SESSION_MODELS in publicBudget.mjs.
+  for (const s of sessions) {
+    const { model, measured, permitted } = s;
+    const row = (label, now, allowed, note) =>
+      console.log(`  ${label.padEnd(22)}${now.padEnd(24)}${allowed.padEnd(12)}${note}`);
+
+    console.log(`\nSESSION DOWNLOAD — what ONE STUDENT pulls. Paid every time, out of a data plan.`);
+    console.log(`  ${model.title}`);
+    row("", "measured today", `permitted (${model.steps})`, "");
+    row(
+      "idle (no play)",
+      `${kb(measured.idleBytes)} · ${measured.upfrontFiles} poster(s)`,
+      kb(permitted.idleBytes),
+      "← the floor a student cannot decline",
+    );
+    row(
+      "worst case",
+      `${mb(measured.worstCaseBytes)} · ${measured.onDemandFiles} clip(s)`,
+      mb(permitted.worstCaseBytes),
+      "← every card opened, every clip played once",
+    );
+    row(
+      "biggest single fetch",
+      mb(measured.biggestFetch.bytes),
+      mb(permitted.biggestFetchBytes),
+      "← the unskippable lump; the ceiling that binds",
+    );
+    if (measured.biggestFetch.rel !== "") {
+      console.log(`  ${"".padEnd(22)}(${measured.biggestFetch.rel})`);
+    }
+    console.log(`  the floor holds only while: ${model.idleRequires}`);
+  }
 }
 
 let failed = false;
@@ -85,11 +129,13 @@ if (result.unclassified.length > 0) {
   }
 }
 
-if (result.violations.length > 0) {
+const sessionViolations = sessions.flatMap((s) => s.violations);
+
+if (result.violations.length > 0 || sessionViolations.length > 0) {
   failed = true;
   console.error("\nOVER BUDGET:");
-  for (const v of result.violations) {
-    console.error(`  ${v.kind}  ${v.id}: ${mb(v.bytes)} > ${mb(v.limit)}`);
+  for (const v of [...result.violations, ...sessionViolations]) {
+    console.error(`  ${v.kind}  ${v.id}: ${size(v.bytes)} > ${size(v.limit)}`);
   }
   console.error(
     "\nRaise the ceiling only with a reason written next to it. The 1.1 MB posters\n" +

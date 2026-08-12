@@ -1,0 +1,104 @@
+{
+  "_": [
+    "WHAT A PHONE DOWNLOADS BEFORE IT CAN DRIVE — one instrument, two builds.",
+    "",
+    "Produced by tools/mobile/wire-probe.mjs. This file exists because the mobile",
+    "audit's single largest transferable number (doc 91 §G4: 'script bytes 4,247 KB",
+    "against a 1,200 KB budget') was measured on a `next dev` Turbopack build and",
+    "quoted against a budget field whose own doc comment says 'of which JS, GZIPPED,",
+    "KB'. It compared a raw dev byte to a compressed production budget. The rows",
+    "below are the same route, the same device, the same cold cache and the same",
+    "reader, on both builds, so the dev→prod ratio is a measurement rather than an",
+    "argument.",
+    "",
+    "TO REPRODUCE (both servers need their own port and their own KNIJKA_DIST_DIR):",
+    "  prod: KNIJKA_DIST_DIR=.next-<lane> npx next build && npx next start --port P",
+    "        …behind TLS — see `productionNeedsTls` below, it is not optional.",
+    "        node tools/mobile/wire-probe.mjs --base https://localhost:P --label prod",
+    "  dev:  KNIJKA_DIST_DIR=.next-<lane> npx next dev --port Q",
+    "        node tools/mobile/wire-probe.mjs --base http://localhost:Q --label dev"
+  ],
+  "capturedAt": "2026-08-12T02:26:00.000Z",
+  "engine": "webkit",
+  "route": "/simulator?scenario=sc-zebra-approach&level=1",
+  "loadState": "cold HTTP cache, warm session (signed in in a throwaway context, storageState reused)",
+  "tier": {
+    "level": "low",
+    "readFrom": "[sim-perf] tier=low facadeMaps=colorOnly clearcoat=false maxDpr=1 shadows=false postprocessing=false",
+    "why": "seedQualityFromSignals rule 3 — touch-only and dpr 3 ≥ 2. This IS the tier a phone runs at, so these are phone numbers, not desktop numbers."
+  },
+  "productionNeedsTls": {
+    "fact": "A production build served over plain http://localhost loads ZERO JavaScript.",
+    "mechanism": "next.config.ts adds `upgrade-insecure-requests` to the ENFORCED CSP whenever NODE_ENV === 'production'. Under `next start` on http, every /_next/static/* subresource is rewritten to https:// and fails with SSL connect error; the login form then silently never submits.",
+    "consequence": "doc 91 §J Wave 0b ('Build production once (next build && next start) and repeat the perf sweep') cannot be followed literally. Put a TLS front in front of the server, or the sweep measures a page with no scripts on it.",
+    "notABug": "The header is correct in production, where the app is served over https. Only the localhost verification path needs the TLS front."
+  },
+  "instrumentNotes": [
+    "scriptBytesAsPerfProbeReadsIt = sum of transferSize where initiatorType === 'script' — the exact reading environment/PerfProbe.tsx used when §G4 was written, kept here for continuity.",
+    "jsTransferred = every .js the document pulled, however it was pulled. It is the honest parse budget: Next preloads chunks via <link rel=modulepreload> ('link'), and basis_transcoder.js / draco_wasm_wrapper.js arrive via fetch ('fetch'). PerfProbe missed 39.6 KB of real JS in production this way; that classifier has since been fixed.",
+    "wasm is reported separately and is NOT counted as script bytes — it is stream-compiled, not parsed as JS. It is inside firstPlayableWire.",
+    "resourceEntries is here because the resource-timing buffer holds 250 by default and then drops the rest silently. Dev is at 222 of 250. Anything at or over 250 makes every byte total on that row a FLOOR.",
+    "observedFps is CONTEXT ONLY. Bytes are a property of the build and transfer identically at 4 fps and at 60; no frame-time claim is made from this harness, and none may be attributed to the founder's handset."
+  ],
+  "rows": [
+    {
+      "build": "production (next build + next start)",
+      "device": "iphone16-landscape",
+      "resourceEntries": 138,
+      "bufferOverflowed": false,
+      "scriptBytesAsPerfProbeReadsIt": 1215919,
+      "jsTransferred": 1255538,
+      "jsDecoded": 4730341,
+      "jsFiles": 34,
+      "wasmTransferred": 923939,
+      "firstPlayableWire": 3856669,
+      "observedFps": 5.5
+    },
+    {
+      "build": "next dev (Turbopack) — the build every §G4 figure was taken on",
+      "device": "iphone16-landscape",
+      "resourceEntries": 222,
+      "bufferOverflowed": false,
+      "scriptBytesAsPerfProbeReadsIt": 3859839,
+      "jsTransferred": 3903293,
+      "jsDecoded": 19495303,
+      "jsFiles": 63,
+      "wasmTransferred": 1012875,
+      "firstPlayableWire": 6970487,
+      "observedFps": 3.9
+    }
+  ],
+  "productionIsViewportIndependent": {
+    "claim": "Bytes do not move with the viewport — measured, not assumed.",
+    "sixProfiles": {
+      "iphone16-portrait": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3856669 },
+      "iphone16-landscape": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3856669 },
+      "small-portrait": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3856669 },
+      "small-landscape": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3869833 },
+      "galaxy-gesturebar-portrait": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3856669 },
+      "galaxy-gesturebar-landscape": { "scriptBytesAsPerfProbeReadsIt": 1215919, "firstPlayableWire": 3856669 }
+    },
+    "note": "The URL SET is identical on all six — not one file differs. small-landscape is 13 KB heavier because it fetched /draco/draco_wasm_wrapper.js TWICE (139 entries vs 138, the only duplicate in any profile). Worth a look on its own: a second decoder fetch means something instantiated a second DRACOLoader rather than reusing the cached one."
+  },
+  "productionJsByContent": {
+    "_": "Every chunk /simulator pulls at tier low, attributed by fingerprinting the built file. gz = transferred, raw = decoded (what the JS engine parses). CHUNK NAMES ARE BUILD-SPECIFIC — Turbopack rehashes them on every build, so treat them as evidence of this run, not as handles to grep for later.",
+    "scenarioTemplateData": {
+      "chunks": ["41e0lehmg4fxg.js", "2rdi2z0wo7tgt.js"],
+      "gzBytes": 336500,
+      "rawBytes": 1501820,
+      "cyrillicBytes": 917000,
+      "what": "The whole scenario catalogue — ~150 ScenarioSpec templates with every level, rubric, mistake and Bulgarian instruction string. A session plays exactly one of them.",
+      "why": "simulator-client.tsx calls scenarioById() synchronously inside a useMemo, and scenarioById is a lookup over SCENARIO_TEMPLATES, so the whole array is pulled into the client bundle. The catalogue's titles do NOT need it — page.tsx builds ScenarioCatalogEntry[] server-side and passes them as props."
+    },
+    "threeCore": { "chunks": ["2oox41z235vuc.js", "413atkn7w_mlb.js"], "gzBytes": 260000, "rawBytes": 989000 },
+    "threeExamplesAndDreiLoaders": { "chunks": ["3l3ee6izd51fy.js"], "gzBytes": 144000, "rawBytes": 435000 },
+    "reactDomAndNextRuntime": { "chunks": ["2ejk_26znfoeu.js"], "gzBytes": 64000, "rawBytes": 203000 },
+    "rapierJsGlue": { "chunks": ["3ibk0wi1fjoi2.js"], "gzBytes": 36000, "rawBytes": 203000 },
+    "appCodeAndCopy": { "gzBytes": 415000, "rawBytes": 1399000 }
+  },
+  "composerSplitHoldsInProduction": {
+    "claim": "The doc 82 §2.3 composer code-split — the precedent for this whole line of work — is honoured by the production bundler, not just by the source.",
+    "evidence": "The only built chunk containing SMAAEffect/BloomEffect/EffectAttribute is 2bz7z9pmqe7wg.js (385,879 B raw / 170,396 B gz). It does not appear in the /simulator resource timeline at tier low. __tests__/composerSplit.test.ts can only assert the source; this is the bundler agreeing.",
+    "worth": "170 KB gz / 386 KB raw of must-parse JS kept off a phone, every session."
+  }
+}

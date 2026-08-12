@@ -60,6 +60,14 @@ const ANDROID_UA =
   "Mozilla/5.0 (Linux; Android 14; Pixel 6a) AppleWebKit/537.36 (KHTML, like Gecko) " +
   "Chrome/128.0.0.0 Mobile Safari/537.36";
 
+// A real Galaxy string, Android 15. Samsung is the largest vendor in Bulgaria
+// (34.57%) and had no row in this ladder until 2026-08-11 — see the two
+// galaxy-* profiles below, which exist for the gesture-bar inset rather than
+// for the viewport size.
+const SAMSUNG_UA =
+  "Mozilla/5.0 (Linux; Android 15; SM-A566B) AppleWebKit/537.36 (KHTML, like Gecko) " +
+  "Chrome/131.0.0.0 Mobile Safari/537.36";
+
 /** @typedef {{id:string,label:string,width:number,height:number,dpr:number,ua:string,safeArea:{top:number,right:number,bottom:number,left:number},orientation:"portrait"|"landscape",primary:boolean}} DeviceProfile */
 
 /** @type {Record<string, DeviceProfile>} */
@@ -108,6 +116,55 @@ export const DEVICES = {
     orientation: "landscape",
     primary: false,
   },
+
+  // SAMSUNG, ADDED 2026-08-11 — and it is here for the INSET, not for the size.
+  //
+  // Samsung is 34.57% of the Bulgarian handset market, the largest single
+  // vendor, and until today this ladder had no Samsung in it: both Android rows
+  // carry a Pixel UA and, more importantly, a hard zero safe-area. The header
+  // above says so itself — "Chrome reports a non-zero bottom inset only for an
+  // edge-to-edge page on Android 15+ with gesture navigation (~24dp), and this
+  // project has never measured one of those phones."
+  //
+  // That is the gap. Android 15 made edge-to-edge the default for apps
+  // targeting SDK 35, and a gesture-navigation bar hands the page a ~24dp
+  // bottom inset — 24 CSS px at any dpr, since dp IS the CSS pixel. This app
+  // ships viewportFit:"cover" and globals.css pays back
+  // padding-bottom: env(safe-area-inset-bottom) on <body>, so on such a phone
+  // the bottom 24px is a band our layout has NEVER been measured against. The
+  // driving controls live in exactly that band.
+  //
+  // 360x780 is deliberately the SAME viewport as small-portrait. This row is
+  // not a new size — it is the same size WITH the gesture bar, so the pair is a
+  // controlled A/B: any difference between them is the inset and nothing else.
+  // Keeping small-portrait at zero preserves the control the header argues for.
+  //
+  // The 24 is a SPEC NUMBER, not a measurement, and it stays labelled as one
+  // until a real Galaxy is profiled. It is the documented Android gesture-bar
+  // height; a real device may report a few px either side. The header's rule
+  // stands: if a real Android measurement ever arrives, it replaces this.
+  "galaxy-gesturebar-portrait": {
+    id: "galaxy-gesturebar-portrait",
+    label: "Samsung Galaxy — portrait, Android 15 gesture bar (360x780, bottom 24)",
+    width: 360,
+    height: 780,
+    dpr: 3,
+    ua: SAMSUNG_UA,
+    safeArea: { top: 0, right: 0, bottom: 24, left: 0 },
+    orientation: "portrait",
+    primary: false,
+  },
+  "galaxy-gesturebar-landscape": {
+    id: "galaxy-gesturebar-landscape",
+    label: "Samsung Galaxy — landscape, Android 15 gesture bar (780x360, bottom 24)",
+    width: 780,
+    height: 360,
+    dpr: 3,
+    ua: SAMSUNG_UA,
+    safeArea: { top: 0, right: 0, bottom: 24, left: 0 },
+    orientation: "landscape",
+    primary: false,
+  },
 };
 
 /**
@@ -132,6 +189,13 @@ export const DEFAULT_DEVICE_IDS = [
   "iphone16-landscape",
   "small-portrait",
   "small-landscape",
+  // In the DEFAULT ladder on purpose, by the same argument the comment above
+  // makes for small-landscape: a profile that exists but is never run by
+  // default is a profile nobody notices has gone stale. The gesture bar is a
+  // band the driving controls sit in, so it has to be swept every time, not
+  // when someone remembers to name it.
+  "galaxy-gesturebar-portrait",
+  "galaxy-gesturebar-landscape",
 ];
 
 export function resolveDevices(ids) {
