@@ -54,8 +54,9 @@ import {
   MARKING_Y,
   ROAD_Y,
   SIDEWALK_TOP_Y,
+  sidewalkEndInsetM,
 } from "./constants";
-import { add, mul, perpRight, type Vec2 } from "./math2d";
+import { add, mul, norm, perpRight, polylineLength, type Vec2 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
 import { edgeHalfWidth, edgeTravelHalfWidth, type RoadNetwork } from "./network";
 
@@ -114,32 +115,110 @@ const ISLAND_MIN_RADIUS_M = 3;
 /** Bearing resolution of the ring profile — 1° (0.73 m of arc on a 42 m ring). */
 export const RING_PROFILE_BUCKETS = 360;
 
+// ---------------------------------------------------------------------------
+// B16, THE THIRD LOOK — THE MOUTH WAS A FUNNEL, NOT A GAP
+// ---------------------------------------------------------------------------
+//
+// The founder, a third time, from the seat: „this is not proper round-about it
+// doesnt have the proper shape". The island pass made the INNER boundary a
+// circle; the pass above made the OFF-MOUTH outer boundary a circle. Rasterised
+// top-down out of the shipped `buildWorldGeometry` triangles, what was left is
+// a MALTESE CROSS: four short kerb arcs, and at every arm an octagonal lobe of
+// junction asphalt 34.3 m across (the arm is 16.25 m) with NO KERB ON IT AT
+// ALL, bleeding straight into the terrain.
+//
+// MEASURED on rb-mini-v1 before this section existed:
+//   - the arm's own pavement stops at the junction cut, 35.13 m from the ring
+//     centre; the ring's outer edge is at 21.91 m. Between them, on the exact
+//     bearing the student approaches on, sit **13.2 m of 16.3 m-wide asphalt
+//     with no boundary of any kind**, then another 9 m of unkerbed pad
+//     sideways;
+//   - 172 of the 208 in-mouth bearings had no kerb within 60 m;
+//   - junction asphalt reached 55.7 m past the ring's outer edge in the mouth.
+//
+// That hole IS „a flat open asphalt plaza with an island in it". A roundabout
+// reads as round because its outer edge is a CIRCLE INTERRUPTED BY MOUTHS, and
+// a mouth is a gap in the circle — not a gap in the KERB. On a real one the
+// kerb never stops: it runs round the ring, turns out through an entry radius,
+// and carries on down the approach. Closing that turn is what this section
+// does, and it is the whole fix — it changes no ring radius, no district
+// document, no trace and no template.
+//
+// WHAT IS DERIVED, AND FROM WHAT (nothing here is authored):
+//   - the arm's kerb line is `Approach.halfWidth` — the FULL drawn half width,
+//     the same number the arm's own pavement strip is offset by, so the return
+//     lands on the arm's kerb rather than beside it;
+//   - the return is the circular fillet tangent to the ring's outer edge and to
+//     that kerb line, so both ends meet their neighbour tangentially and there
+//     is no crease and no step anywhere on the boundary;
+//   - the mouth's angular span is then no longer a guess: it is exactly where
+//     that fillet touches the ring circle.
+
 /**
- * Entry flare each side of an arm's TRAVEL carriageway at the mouth, m. A real
- * mouth is wider than the road that feeds it — the kerb peels away before the
- * give-way line so an entering car has somewhere to aim. Deliberately small:
- * every metre of flare is a metre of circle the driver does not see, and the
- * carriageway it is added to is already at PERCEPTUAL_ROAD_SCALE 2.5.
+ * Radius of the kerb return that turns the ring's outer edge into the arm's
+ * kerb, m.
  *
- * Measured from the arm's TRAVEL half width, not `edgeHalfWidth`: the kerbside
- * parking band is not an entry lane, and `PARKING_LANE_END_INSET_M` already
- * stops the band 5 m short of the junction, so counting it opened a mouth
- * across asphalt nobody enters from. On rb-2lane (three-lane primary arms) that
- * one term was the difference between a 0.744 mouth fraction — refused, four
- * kerb stubs, the defect intact — and 0.529, which is a circle with four gaps.
+ * Deliberately small, and the number is a measurement rather than a taste.
+ * Every metre of return radius is a metre of circle the driver does not see:
+ * the tangent point sits at lateral `Ro·(hw+ρ)/(Ro+ρ)` from the arm axis, so ρ
+ * = 9 (the ordinary junction corner radius) would open rb-mini's mouths from
+ * 51.7° to 67.3° and leave 91° of circle where there is 153° today — a closed
+ * boundary that reads WORSE from the seat than the hole it replaced.
+ *
+ * At 2.5 m the mouth lands within a degree of the `RING_MOUTH_FLARE_M` model it
+ * replaces on every shipped ring, which is the point: no entry gets wider or
+ * narrower than the one the committed traces were recorded against, and the
+ * only thing that changes is that the mouth now HAS edges.
  */
-const RING_MOUTH_FLARE_M = 1.5;
+const RING_MOUTH_RETURN_RADIUS_M = 2.5;
 
 /**
- * A ring whose mouths already eat this much of its circumference has no circle
- * left to draw, so the circular kerb is refused and the per-edge strips stand.
- * Drawing four kerb slivers and calling it a circle is the failure this whole
- * module exists to end.
+ * How far past the arm's pavement start a return runs, m. The strips are the
+ * same cross-section, so a small overlap is co-planar and invisible, while a
+ * gap is a metre of missing kerb straight ahead of the driver.
  */
-const RING_MAX_MOUTH_FRACTION = 0.72;
+const RING_RETURN_OVERLAP_M = 0.5;
 
-/** Shortest arc of kerb worth building — below it the strip reads as debris. */
-const RING_MIN_KERB_RUN_M = 4;
+// THE MOUTH-FRACTION REFUSAL IS GONE, AND ITS REMOVAL IS PART OF THE FIX.
+//
+// It read `mouthFraction <= 0.72` — a ring whose mouths ate more than 72 % of
+// its circumference got no derived circle, and fell back to the per-edge
+// junction-trimmed stubs. That was a fair rule in a world where a mouth was a
+// HOLE: four kerb slivers with open plaza between them are not a circle, and
+// saying so was honest.
+//
+// The mouths have EDGES now. Each is closed by two kerb returns, so the
+// boundary is continuous whatever fraction of it is arc and whatever fraction
+// is return, and the arc that survives is decided where it should be — by
+// `RING_MIN_KERB_RUN_M`, run by run, on the ring's own profile.
+//
+// Keeping the bar was not neutral, it was harmful, and it was MEASURED to be:
+// the mouths are now taken against each arm's FULL drawn half width (which is
+// what a return has to land on, because that is where the arm's own pavement
+// stands), and on that honest measurement d2-v1 — real Sofia OSM, eight arms,
+// four of them 24.25 m wide curb-to-curb against a 34.8 m outer radius —
+// crossed 0.72 and lost its circle, its returns AND its junction-pad clip in
+// one go. Its unkerbed lobes came straight back: 51.7 m of asphalt past the
+// ring's outer edge, 200 of 360 bearings with no kerb at all.
+//
+// (The same measurement says something uncomfortable about the OLD number:
+// taking the mouth at the TRAVEL half width understated it by 4.3° a side on
+// those four arms, i.e. the pre-B16 build swept ring kerb across asphalt the
+// ribbon had already laid. Following the asphalt rather than the ideal is this
+// module's founding rule and it was being broken at exactly the mouths.)
+
+/**
+ * Shortest arc of kerb worth building.
+ *
+ * It was 4 m, on the argument that a shorter strip reads as debris — true when
+ * the strip stood alone in an open plaza with nothing at either end. B16 gives
+ * every arc a kerb RETURN at each end, so a short arc is no longer a sliver: it
+ * is the nose of kerb between two closely-spaced arms, joined to the boundary
+ * at both ends, which is a real thing a real roundabout has. At 4 m district-v1
+ * dropped one of its four arcs and left an 8-of-87-bearing hole in the kerb on
+ * the real-Sofia ring; the returns bracketing that hole were already built.
+ */
+const RING_MIN_KERB_RUN_M = 1.5;
 
 const TAU = Math.PI * 2;
 
@@ -159,14 +238,96 @@ export function ringOuterRadiusAt(ring: RoundaboutRing, bearing: number): number
   return ringCentreRadiusAt(ring, bearing) + ring.ringHalfWidthM;
 }
 
+/** Signed bearing offset from a mouth's axis, in (−π, π]. */
+function offsetFrom(bearing: number, axis: number): number {
+  let d = (((bearing - axis) % TAU) + TAU) % TAU;
+  if (d > Math.PI) d -= TAU;
+  return d;
+}
+
 /** Is this bearing inside one of the ring's entry mouths? */
 export function ringBearingInMouth(ring: RoundaboutRing, bearing: number): boolean {
+  return mouthAt(ring, bearing) !== null;
+}
+
+/** The mouth this bearing falls in, or null. Mouths may overlap (d2-v1 has two
+ *  arms 16° apart); the FIRST match wins, which is only ever used to answer
+ *  "is this a mouth", never to attribute one. */
+function mouthAt(ring: RoundaboutRing, bearing: number): RingMouth | null {
   for (const m of ring.mouths) {
-    let d = Math.abs((((bearing - m.bearing) % TAU) + TAU) % TAU);
-    if (d > Math.PI) d = TAU - d;
-    if (d <= m.halfAngle) return true;
+    const d = offsetFrom(bearing, m.bearing);
+    if (d >= -m.halfAngleCw && d <= m.halfAngleCcw) return m;
   }
-  return false;
+  return null;
+}
+
+/**
+ * The radius at which the DRAWN asphalt boundary sits on this bearing — the
+ * ring's outer edge off the mouths, and the mouth's own kerb envelope inside
+ * one. `Infinity` means the boundary is genuinely open here: the ray runs
+ * straight up an arm's carriageway, which is a road and not a hole.
+ *
+ * This is the function that turns four unkerbed lobes into four mouths.
+ */
+export function ringBoundaryRadiusAt(ring: RoundaboutRing, bearing: number): number {
+  const outer = ringOuterRadiusAt(ring, bearing);
+  let lim = Infinity;
+  let inAny = false;
+  for (const m of ring.mouths) {
+    const d = offsetFrom(bearing, m.bearing);
+    if (d < -m.halfAngleCw || d > m.halfAngleCcw) continue;
+    inAny = true;
+    // Overlapping mouths union, so the widest envelope on this bearing wins.
+    lim = Math.max(lim === Infinity ? 0 : lim, mouthEnvelopeRadius(ring, m, bearing));
+  }
+  return inAny ? Math.max(lim, outer) : outer;
+}
+
+/**
+ * How far the asphalt may reach on `bearing` inside mouth `m`: the nearest
+ * crossing of the mouth's own boundary — the two kerb-return fillets and, past
+ * them, the arm's two kerb lines. `Infinity` up the middle of the arm.
+ */
+function mouthEnvelopeRadius(ring: RoundaboutRing, m: RingMouth, bearing: number): number {
+  if (m.returns.length === 0) return Infinity;
+  const c = ring.centre;
+  const w: Vec2 = [Math.cos(bearing), Math.sin(bearing)];
+  let best = Infinity;
+  for (const r of m.returns) {
+    // -- the fillet arc: nearest ray/circle hit that lies ON the arc.
+    const fx = r.centre[0] - c[0];
+    const fy = r.centre[1] - c[1];
+    const proj = w[0] * fx + w[1] * fy;
+    const disc = proj * proj - (fx * fx + fy * fy - r.radius * r.radius);
+    if (disc >= 0) {
+      const s = Math.sqrt(disc);
+      for (const t of [proj - s, proj + s]) {
+        if (t <= 0 || t >= best) continue;
+        const px = c[0] + w[0] * t - r.centre[0];
+        const py = c[1] + w[1] * t - r.centre[1];
+        if (arcContains(r, Math.atan2(py, px))) best = t;
+      }
+    }
+    // -- the straight kerb line past the fillet's arm-side tangent point.
+    const wn = w[0] * m.normal[0] + w[1] * m.normal[1];
+    if (Math.abs(wn) > 1e-9) {
+      const en = (m.node[0] - c[0]) * m.normal[0] + (m.node[1] - c[1]) * m.normal[1];
+      const t = (r.side * m.armHalfWidthM + en) / wn;
+      if (t > 0 && t < best) {
+        const along =
+          (c[0] + w[0] * t - m.node[0]) * m.dir[0] + (c[1] + w[1] * t - m.node[1]) * m.dir[1];
+        if (along >= r.tArmAlongM - 1e-6) best = t;
+      }
+    }
+  }
+  return best;
+}
+
+/** Does `angle` (about the fillet centre) lie on the return's short arc? */
+function arcContains(r: MouthReturn, angle: number): boolean {
+  const span = offsetFrom(r.armAngle, r.ringAngle);
+  const d = offsetFrom(angle, r.ringAngle);
+  return span >= 0 ? d >= -1e-9 && d <= span + 1e-9 : d <= 1e-9 && d >= span - 1e-9;
 }
 
 /**
@@ -235,10 +396,21 @@ function centreProfile(
 }
 
 /**
- * The arms that break the kerb. An arm is any non-ring approach at a node that
- * sits on the ring; its gap is as wide as its own drawn carriageway plus the
- * entry flare, subtended at the outer edge. Derived from the network the world
- * is already built from, so a map cannot post a mouth it does not have.
+ * The arms that break the kerb, and the kerb RETURN that closes each break.
+ *
+ * An arm is any non-ring approach at a node that sits on the ring. Its mouth is
+ * bounded by two fillets, one per side, each tangent to the ring's outer edge
+ * and to that side's arm kerb line; the mouth's angular half-width is where
+ * those fillets touch the circle, so the kerb the ring pass draws and the kerb
+ * the return pass draws meet at a shared point by construction rather than by
+ * two agreeing constants.
+ *
+ * Derived from the network the world is already built from, so a map cannot
+ * post a mouth it does not have. A side whose fillet has no solution (an arm
+ * drawn wider than the ring it meets) keeps no return, and its half width falls
+ * back to the raw carriageway — a bounded mouth we cannot round is still better
+ * than an unbounded one, and pretending otherwise is what this module exists
+ * to end.
  */
 function ringMouths(
   centre: Vec2,
@@ -255,9 +427,99 @@ function ringMouths(
     if (outerR < 1) continue;
     for (const ap of node.approaches) {
       if (ringIds.has(ap.edgeId)) continue;
-      const travelHalf = Math.max(0.5, ap.halfWidth - ap.parkingM);
-      const halfM = Math.min(outerR * 0.98, travelHalf + RING_MOUTH_FLARE_M);
-      out.push({ bearing, halfAngle: Math.asin(halfM / outerR), armEdgeId: ap.edgeId });
+      // THE FULL drawn half width, not the travel half: the kerbside parking
+      // band is asphalt the ribbon actually lays and the arm's own pavement
+      // stands at its edge, so a return built to the travel width would run
+      // the kerb up the middle of the carriageway.
+      const hw = Math.max(0.5, ap.halfWidth);
+      const u = norm(ap.dir);
+      const n = perpRight(u);
+      const d: Vec2 = [node.pos[0] - centre[0], node.pos[1] - centre[1]];
+      const du = d[0] * u[0] + d[1] * u[1];
+      const dn = d[0] * n[0] + d[1] * n[1];
+      const rho = RING_MOUTH_RETURN_RADIUS_M;
+
+      // Where the arm's own pavement strip starts, so the return ends there.
+      const armLine = network.edgeById.get(ap.edgeId)?.line;
+      const armStart =
+        ap.setback +
+        (armLine ? sidewalkEndInsetM(polylineLength(armLine)) : 0) +
+        RING_RETURN_OVERLAP_M;
+
+      const returns: MouthReturn[] = [];
+      let halfCw = Math.asin(Math.min(1, hw / outerR));
+      let halfCcw = halfCw;
+      for (const side of [1, -1] as const) {
+        // The ring's outer radius is not one number — it is the profile, and on
+        // an OSM ring it wanders (district-v1 19.4…20.3 m, d2-v1 26.8…29.3).
+        // Solve the fillet against the radius AT THE NODE, then re-solve it
+        // against the radius at the tangent point the first solve found. Two
+        // passes take rb-mini's step at the mouth edge from 0.115 m to under a
+        // millimetre; one pass leaves a visible notch where the ring kerb ends
+        // and the return begins, which is the seam this whole fix is about.
+        let ro = outerR;
+        let f: Vec2 | null = null;
+        let fd = 0;
+        for (let pass = 0; pass < 3; pass++) {
+          const lat = dn + side * (hw + rho);
+          const root = (ro + rho) * (ro + rho) - lat * lat;
+          if (root <= 0) {
+            f = null;
+            break;
+          }
+          const s = -du + Math.sqrt(root);
+          f = [
+            node.pos[0] + side * (hw + rho) * n[0] + s * u[0],
+            node.pos[1] + side * (hw + rho) * n[1] + s * u[1],
+          ];
+          fd = Math.hypot(f[0] - centre[0], f[1] - centre[1]);
+          if (fd < 1e-6) {
+            f = null;
+            break;
+          }
+          const b = Math.atan2(f[1] - centre[1], f[0] - centre[0]);
+          const next = (profile[bucketOf(b)] ?? 0) + ringHalfWidthM;
+          if (next < 1 || Math.abs(next - ro) < 1e-3) break;
+          ro = next;
+        }
+        if (!f) continue;
+        const tRing: Vec2 = [
+          centre[0] + ((f[0] - centre[0]) / fd) * ro,
+          centre[1] + ((f[1] - centre[1]) / fd) * ro,
+        ];
+        const tArm: Vec2 = [f[0] - side * rho * n[0], f[1] - side * rho * n[1]];
+        const tArmAlongM = (tArm[0] - node.pos[0]) * u[0] + (tArm[1] - node.pos[1]) * u[1];
+        // A return whose arm-side tangent already sits past the arm's own kerb
+        // start has no straight to run: the mouth is longer than the gap, and
+        // the two strips would cross. Keep the fillet, clamp the straight.
+        const ringBearing = Math.atan2(tRing[1] - centre[1], tRing[0] - centre[0]);
+        const off = offsetFrom(ringBearing, bearing);
+        if (off >= 0) halfCcw = Math.max(halfCcw, off);
+        else halfCw = Math.max(halfCw, -off);
+        returns.push({
+          side,
+          centre: f,
+          radius: rho,
+          tRing,
+          tArm,
+          tArmAlongM,
+          armEndM: Math.max(tArmAlongM + 1, armStart),
+          ringAngle: Math.atan2(tRing[1] - f[1], tRing[0] - f[0]),
+          armAngle: Math.atan2(tArm[1] - f[1], tArm[0] - f[0]),
+        });
+      }
+
+      out.push({
+        bearing,
+        halfAngleCw: halfCw,
+        halfAngleCcw: halfCcw,
+        armEdgeId: ap.edgeId,
+        node: node.pos,
+        dir: u,
+        normal: n,
+        armHalfWidthM: hw,
+        returns,
+      });
     }
   }
   return out;
@@ -293,6 +555,13 @@ export interface RoundaboutRing {
    */
   centreProfileM: readonly number[];
   /**
+   * B16 — how much of the circumference is NOT mouth, by union. It decides only
+   * whether circular ARCS are worth sweeping; the BOUNDARY (the pad clip and
+   * the kerb returns) is derived whenever the profile resolves, because a mouth
+   * needs edges however little circle is left between the mouths.
+   */
+  circleFractionOfRing: number;
+  /**
    * Where an ARM breaks the outer kerb: bearing from the centre + the half
    * angle its carriageway and entry flare subtend at the outer edge. Everything
    * that is not a mouth is kerb, all the way round.
@@ -304,10 +573,50 @@ export interface RoundaboutRing {
 export interface RingMouth {
   /** Bearing of the arm node from the ring centre, radians. */
   bearing: number;
-  /** Half the angular width of the gap, radians. */
-  halfAngle: number;
+  /** Angular width of the gap CLOCKWISE of the axis, radians. Split from the
+   *  counter-clockwise half because an OSM arm does not meet its ring square:
+   *  a symmetric mouth would either end the kerb short of the return or run it
+   *  over the return, and both are a visible step in the boundary. */
+  halfAngleCw: number;
+  /** …and counter-clockwise. Equal on every synthetic (radial-arm) map. */
+  halfAngleCcw: number;
   /** The arm's edge id — so a test can name the mouth it is standing in. */
   armEdgeId: string;
+  /** The node where the arm meets the ring. */
+  node: Vec2;
+  /** Unit direction along the arm, AWAY from the ring. */
+  dir: Vec2;
+  /** `perpRight(dir)` — the lateral axis the kerb lines are offset on. */
+  normal: Vec2;
+  /** The arm's full drawn half width (kerb line offset from its centreline). */
+  armHalfWidthM: number;
+  /** The kerb returns that close this mouth — one per side, or none when the
+   *  fillet has no solution (see `ringMouths`). */
+  returns: readonly MouthReturn[];
+}
+
+/**
+ * One kerb return: the fillet tangent to the ring's outer edge and to one of
+ * the arm's kerb lines, plus the straight that carries the kerb on down the arm
+ * to where the arm's own pavement takes over.
+ */
+export interface MouthReturn {
+  /** +1 = the `perpRight(dir)` side of the arm, −1 the other. */
+  side: 1 | -1;
+  /** Fillet centre and radius. */
+  centre: Vec2;
+  radius: number;
+  /** Tangent point on the ring's outer edge. */
+  tRing: Vec2;
+  /** Tangent point on the arm's kerb line. */
+  tArm: Vec2;
+  /** `tArm` measured along `dir` from the node — where the straight begins. */
+  tArmAlongM: number;
+  /** …and where it ends: the start of the arm's own pavement strip. */
+  armEndM: number;
+  /** Angles of `tRing` / `tArm` about `centre`, radians (the arc's ends). */
+  ringAngle: number;
+  armAngle: number;
 }
 
 /** Distance from `c` to the swept carriageway band of segment a→b, half width h.
@@ -408,17 +717,28 @@ export function analyzeRoundabouts(district: District, network: RoadNetwork): Ro
     // empty one means "keep today's per-edge strips" — never "draw a lie".
     const profile = centreProfile(centre, ringIds, edgeById);
     const mouths = profile ? ringMouths(centre, ringIds, ringHalfWidthM, profile, network) : [];
-    // A ring whose arms already eat the circle has no circle left to draw.
-    const mouthFraction = mouths.reduce((s, m) => s + (2 * m.halfAngle) / TAU, 0);
-    const drawCircle = profile !== null && mouthFraction <= RING_MAX_MOUTH_FRACTION;
+    // How much of the circumference is NOT mouth, by UNION over the bearing
+    // buckets rather than by summing the spans: two arms 16° apart are one hole
+    // in the kerb, not two, and d2-v1 (eight arms, several of them within 16°
+    // of another) is the live case the sum gets wrong.
+    const covered = new Array<boolean>(RING_PROFILE_BUCKETS).fill(false);
+    for (const m of mouths) {
+      const lo = Math.floor(((m.bearing - m.halfAngleCw) / TAU) * RING_PROFILE_BUCKETS);
+      const hi = Math.ceil(((m.bearing + m.halfAngleCcw) / TAU) * RING_PROFILE_BUCKETS);
+      for (let k = lo; k <= hi; k++) {
+        covered[((k % RING_PROFILE_BUCKETS) + RING_PROFILE_BUCKETS) % RING_PROFILE_BUCKETS] = true;
+      }
+    }
+    const circleFraction = covered.filter((c) => !c).length / RING_PROFILE_BUCKETS;
 
     out.push({
       id: rb.id,
       centre,
       ringRadiusM,
       ringHalfWidthM,
-      centreProfileM: drawCircle ? profile! : [],
-      mouths: drawCircle ? mouths : [],
+      centreProfileM: profile ?? [],
+      circleFractionOfRing: profile ? circleFraction : 0,
+      mouths: profile ? mouths : [],
       ringLanes,
       ringEdgeIds: ringIds,
       islandRadiusM,
@@ -447,12 +767,37 @@ export function islandContaining(
 }
 
 /**
- * Does this ring carry a DERIVED circular outer kerb? False keeps every
- * consumer on the pre-FR-22 path byte for byte (a broken registration, or one
- * whose arms eat the circle).
+ * Does this ring have a DERIVED OUTER BOUNDARY — a radius-by-bearing profile
+ * and mouths with edges? False keeps every consumer on the pre-FR-22 path byte
+ * for byte (a registration that does not actually go round).
+ *
+ * This is what gates the junction-pad clip and the kerb returns, and it is
+ * deliberately NOT the same question as `hasOuterKerb` below: a mouth needs
+ * edges no matter how little circle is left between the mouths, and gating the
+ * two together is what put d2-v1's unkerbed lobes back (see the note above
+ * `RING_MIN_CIRCLE_FRACTION`).
+ */
+export function hasRingBoundary(ring: RoundaboutRing): boolean {
+  return ring.centreProfileM.length === RING_PROFILE_BUCKETS;
+}
+
+/**
+ * Enough of the circumference must survive as ARC for sweeping circular kerb to
+ * beat the per-edge junction-trimmed strips. Below it the strips stand — not
+ * because the boundary is unknown (it is: see `hasRingBoundary`) but because
+ * there is no circle there to draw, and this module does not draw lies.
+ *
+ * d2-v1 is the whole reason the floor exists: real Sofia OSM, eight arms, four
+ * of them 24.25 m curb-to-curb against a 34.8 m outer radius, meeting the ring
+ * obliquely. Its mouths cover the full 360° by union — there is no arc.
+ */
+const RING_MIN_CIRCLE_FRACTION = 0.08;
+
+/**
+ * Does this ring carry a DERIVED circular outer kerb worth sweeping as arcs?
  */
 export function hasOuterKerb(ring: RoundaboutRing): boolean {
-  return ring.centreProfileM.length === RING_PROFILE_BUCKETS;
+  return hasRingBoundary(ring) && ring.circleFractionOfRing >= RING_MIN_CIRCLE_FRACTION;
 }
 
 /**
@@ -463,7 +808,7 @@ export function hasOuterKerb(ring: RoundaboutRing): boolean {
  */
 export function ringAtPoint(rings: readonly RoundaboutRing[], p: Vec2): RoundaboutRing | null {
   for (const ring of rings) {
-    if (!hasOuterKerb(ring)) continue;
+    if (!hasRingBoundary(ring)) continue;
     const dx = p[0] - ring.centre[0];
     const dy = p[1] - ring.centre[1];
     const r = Math.hypot(dx, dy);
@@ -476,24 +821,28 @@ export function ringAtPoint(rings: readonly RoundaboutRing[], p: Vec2): Roundabo
 }
 
 /**
- * Pull `p` radially back onto the ring's outer edge — the mirror of
+ * Pull `p` radially back onto the ring's drawn boundary — the mirror of
  * `clipOutOfIslands`, and the other half of the same sentence. A junction pad
  * at an arm↔ring node opens at the ARM's radius (17.125 m on rb-mini), so its
  * boundary and its corner fillets flare metres past the circulatory
- * carriageway on bearings no arm points at: probed at up to +10.73 m. Inside a
- * MOUTH nothing is clipped, because that is where the road really does leave
- * the circle. Points already inside come back untouched.
+ * carriageway: probed at up to +10.73 m off the mouths and **+55.7 m inside
+ * one**. Points already inside come back untouched.
+ *
+ * B16, THE THIRD LOOK: this used to return `p` unchanged on any bearing inside
+ * a mouth, which is what left four unkerbed octagonal lobes of junction asphalt
+ * 34.3 m across on a 16.3 m arm. A mouth bounds its asphalt now — with the
+ * arm's own kerb lines and the two returns that reach them — and only the
+ * corridor straight up the arm is genuinely open, because that is a road.
  */
-export function clipIntoRingOuter(ring: RoundaboutRing, p: Vec2): Vec2 {
+export function clipIntoRingBoundary(ring: RoundaboutRing, p: Vec2): Vec2 {
   const dx = p[0] - ring.centre[0];
   const dy = p[1] - ring.centre[1];
   const d = Math.hypot(dx, dy);
   if (d < 1e-6) return p;
   const bearing = Math.atan2(dy, dx);
-  if (ringBearingInMouth(ring, bearing)) return p;
-  const outer = ringOuterRadiusAt(ring, bearing);
-  if (d <= outer + 1e-6) return p;
-  const s = outer / d;
+  const lim = ringBoundaryRadiusAt(ring, bearing);
+  if (!Number.isFinite(lim) || d <= lim + 1e-6) return p;
+  const s = lim / d;
   return [ring.centre[0] + dx * s, ring.centre[1] + dy * s];
 }
 
@@ -560,6 +909,53 @@ export function ringOuterKerbRuns(ring: RoundaboutRing): Vec2[][] {
     const run: Vec2[] = [];
     for (let k = a - 1; k <= b + 1; k++) run.push(stationAt(k));
     out.push(run);
+  }
+  return out;
+}
+
+/** Arc samples per radian of kerb return — 2.5 m radius at 24 gives 10 cm
+ *  chords, so the return reads curved at the range a driver meets it. */
+const RETURN_ARC_SAMPLES_PER_RAD = 24;
+
+/**
+ * THE KERB RETURNS, as polylines OF THE KERB ITSELF (swept at half width 0, so
+ * the caller lays the ordinary pavement cross-section straight onto them).
+ *
+ * Each one runs from the ring's outer edge, round the fillet, and out along the
+ * arm's kerb line to where the arm's own pavement strip begins — so the
+ * boundary of a roundabout is one continuous kerb, exactly as it is in the
+ * street. Returned with the `side` the pavement must be built on.
+ *
+ * The list is empty on a ring with no derived BOUNDARY, which keeps every such
+ * registration byte-identical to the pre-B16 build. A ring that has a boundary
+ * but too little arc to sweep (d2-v1) still gets its returns: they land on the
+ * ring's outer edge, which is exactly where its per-edge strips already are.
+ */
+export function ringMouthKerbRuns(ring: RoundaboutRing): Array<{ line: Vec2[]; side: 1 | -1 }> {
+  if (!hasRingBoundary(ring)) return [];
+  const out: Array<{ line: Vec2[]; side: 1 | -1 }> = [];
+  for (const m of ring.mouths) {
+    for (const r of m.returns) {
+      const line: Vec2[] = [];
+      // The fillet, from the ring tangent point to the arm tangent point.
+      let sweep = offsetFrom(r.armAngle, r.ringAngle);
+      const steps = Math.max(2, Math.round(Math.abs(sweep) * RETURN_ARC_SAMPLES_PER_RAD));
+      for (let i = 0; i <= steps; i++) {
+        const a = r.ringAngle + (sweep * i) / steps;
+        line.push([
+          r.centre[0] + Math.cos(a) * r.radius,
+          r.centre[1] + Math.sin(a) * r.radius,
+        ]);
+      }
+      // …then straight down the arm's kerb line to the arm's own pavement.
+      if (r.armEndM > r.tArmAlongM + 0.05) {
+        line.push([
+          r.tArm[0] + m.dir[0] * (r.armEndM - r.tArmAlongM),
+          r.tArm[1] + m.dir[1] * (r.armEndM - r.tArmAlongM),
+        ]);
+      }
+      if (line.length >= 2) out.push({ line, side: r.side });
+    }
   }
   return out;
 }

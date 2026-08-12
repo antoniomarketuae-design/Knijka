@@ -153,7 +153,7 @@ describe("lot-perp-v1 through the world builder", () => {
   });
 
   it("stays trivially inside the performance budget (micro-map)", () => {
-    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+    expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
     expect(world.stats.triangles).toBeLessThan(300_000);
   });
 

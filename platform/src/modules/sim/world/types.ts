@@ -666,6 +666,25 @@ export interface SchoolPlacement {
   gate: Vec3Tuple;
 }
 
+/**
+ * A mass built at a street end that runs out of the world, to close the vista
+ * the carriageway runs into (B65 — builders/terminus.ts, and the
+ * TERMINUS_CLOSE_* header in builders/constants.ts for why it is a building
+ * volume and not a prop).
+ *
+ * DISTRICT SPACE (x, y), like every footprint in the district document —
+ * not world space. Nothing authored this: `district.buildings` and
+ * `stats.buildings` are untouched by it.
+ */
+export interface TerminusClosurePlacement {
+  /** The dead-end node this volume closes. */
+  nodeId: string;
+  /** Footprint ring, unclosed. */
+  footprint: [number, number][];
+  /** Wall height, m. */
+  heightM: number;
+}
+
 export interface WorldColliderSet {
   /** One flat box under the whole district (roads drive on its top face). */
   ground: { halfExtents: Vec3Tuple; position: Vec3Tuple };
@@ -721,6 +740,14 @@ export interface WorldStats {
    *  circle. 0 means the per-edge junction-trimmed stubs are still standing —
    *  which on a four-arm ring is 2.8 m of kerb per quarter, i.e. not a circle. */
   ringKerbRuns: number;
+  /**
+   * B16 — kerb RETURNS swept, two per arm. Before them the mouth was not a gap
+   * in a circle but a hole in the boundary: the arm's own pavement stopped at
+   * the junction cut, the ring's kerb stopped at the mouth edge, and between
+   * them sat an unkerbed octagonal lobe of junction asphalt twice the arm's
+   * width, bleeding into the terrain. 0 means those lobes are back.
+   */
+  ringReturnRuns: number;
   buildings: number;
   /** Instanced glass towers placed on tall, compact footprints. */
   buildingInstances: number;
@@ -736,6 +763,9 @@ export interface WorldStats {
   utilityWireSpans: number;
   /** Pavement parapet panels (B65). */
   railings: number;
+  /** Masses closing a street end that runs out of the world (B65 — two per
+   *  eligible end, 26 triangles each, zero draw calls). */
+  terminusClosures: number;
   /** Tyre/skid-mark decals in the wear batch (B65 — a subset of `roadDecals`,
    *  counted separately because their placement rule is its own). */
   skidMarks: number;
@@ -744,9 +774,25 @@ export interface WorldStats {
   /** Surface-parking dressing clusters (kiosk + barrier + wheel stops). */
   parkingKits: number;
   vertices: number;
+  /** Triangles in the merged STATIC surfaces only — not the frame's triangles.
+   *  The frame also carries the cockpit, the aids, traffic, props and the
+   *  mirror pass; measured, static geometry is a single-digit percentage of it
+   *  (4.3 % in d2-v1 at tier low). See `sim/environment/frameCost.ts`. */
   triangles: number;
-  /** Rough render draw-call estimate for DistrictWorld (no shadows). */
-  drawCallEstimate: number;
+  /**
+   * How many static mesh slots this district mounts (merged surfaces + city
+   * models + one entry per prop family actually placed), counted from the
+   * placement data by `builders/drawSlots.ts`.
+   *
+   * NOT A FRAME DRAW-CALL COUNT, and renamed from `drawCallEstimate` for
+   * exactly that reason: under the old name ~50 district tests asserted it
+   * against 150 and one asserted it against `PERF_BUDGETS.low.drawCalls`
+   * under the title „keeps every dressed street inside the tier-low draw
+   * budget". They all passed while the running product drew 146–252 calls per
+   * frame at tier low. A name that answers a question it cannot answer is how
+   * that happened, so this one states what it counts.
+   */
+  staticDrawSlots: number;
 }
 
 export interface WorldGeometry {
@@ -818,6 +864,15 @@ export interface WorldGeometry {
   /** Name boards + railings of every `kind: "school"` building (schools.ts).
    *  Empty on every district that authors no school — the additive contract. */
   schools: SchoolPlacement[];
+  /**
+   * The masses that close a street end which runs out of the world (B65,
+   * builders/terminus.ts). They are ALREADY built into `buildingWalls`,
+   * `buildingRoofs` and `colliders.buildings` — this array is the record of
+   * WHERE they are, so a test can answer „is the road's own axis closed"
+   * geometrically instead of counting trees. Empty on every city / exam /
+   * полигон district.
+   */
+  terminusClosures: TerminusClosurePlacement[];
   /** Surface-parking dressing clusters (one transform per pre-merged kit). */
   parkingKits: StaticTransform[];
   colliders: WorldColliderSet;

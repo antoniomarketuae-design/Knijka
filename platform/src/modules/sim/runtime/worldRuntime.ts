@@ -291,7 +291,7 @@ const OVERTAKE_RETURN_MIN_REF_MPS = 1.0;
  *    reality), the episode stands down entirely — the margin the driver SET
  *    is what's graded, never the margin the cyclist consumed;
  *  - a pass that got inside the contact bar is the collision machinery's act
- *    (runner CYCLIST_CONTACT_M parity) — one act, one code;
+ *    (VULNERABLE_PASS_CONTACT_M — one act, one code);
  *  - reverse maneuvering discards (A12).
  */
 export const VULNERABLE_PASS_PROBE_RADIUS_M = 30;
@@ -313,9 +313,25 @@ export const VULNERABLE_PASS_MIN_CLOSING_MPS = 1.0;
 /** The cyclist's OWN lateral drift toward the player (vs its line frozen at
  * arm) that stands the episode down — the VU-03 swerve reality, m. */
 export const VULNERABLE_PASS_SWERVE_M = 0.6;
-/** At/under this center distance the act is a CONTACT — the collision
- * machinery's code (orchestrator CYCLIST_CONTACT_M parity), never this one, m. */
-export const VULNERABLE_PASS_CONTACT_M = 2.2;
+/**
+ * At/under this centre distance the act is a CONTACT — the collision
+ * machinery's code, never this one, m.
+ *
+ * WAS 2.2, "orchestrator CYCLIST_CONTACT_M parity". That parity was with an
+ * isotropic 2.2 m circle, and when the orchestrator's contact test became exact
+ * body geometry (2026-08-10, sim/collision) the two stopped meaning the same
+ * thing: real bodies touch at 1.25 m of centres (the BODY_ALLOWANCE above —
+ * 0.85 hero + 0.4 proxy), so a 2.2 m bar handed 0.95 m of genuine clear air to
+ * a collision detector that — correctly — now says nothing about it. The worst
+ * passes in the product would have graded SILENT.
+ *
+ * So the bar is the body allowance itself: zero air between bodies. The three
+ * bands now read as edge-to-edge air end to end — 0 m contact, 1.2 m convict,
+ * 1.5 m safe — instead of two of them meaning air and the third meaning a
+ * circle. A squeeze at 1.9 m of centres is 0.65 m of air: it is
+ * VULNERABLE_PASS_TOO_CLOSE, and it is not a «Пътнотранспортно произшествие».
+ */
+export const VULNERABLE_PASS_CONTACT_M = VULNERABLE_PASS_BODY_ALLOWANCE_M;
 
 /** Distance to the junction node within which the right-hand-rule check arms,
  * meters (2× — the junction box itself is 2.5× wider). */
@@ -1079,6 +1095,19 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       const events: SimTickEvent[] = [];
 
       // 1. Collisions reported by physics since the last tick.
+      //
+      // This queue is a raw CONTACT STREAM, not a list of accidents, and it
+      // deliberately stays that way: everything pushed since the last sample
+      // is handed on verbatim. Turning contact into „one encounter" is the
+      // reducer's job (rules/engine.ts, the `collision` case) because every
+      // other contact source funnels through the same event.
+      //
+      // MEASURED, because the queue is the natural first suspect when one
+      // touch bills nine times: it does NOT bypass the reducer's guard. Nine
+      // entries drained here arrive as nine events on ONE tick, at one
+      // timestamp, and the reducer bills them once. What the founder's nine
+      // came from was the reducer's old 3 s rate limit re-billing a contact
+      // that kept being re-reported over half a minute.
       while (collisionQueue.length > 0) {
         events.push({ kind: "collision", withWhat: collisionQueue.shift() as CollisionWith });
       }

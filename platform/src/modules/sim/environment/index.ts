@@ -67,6 +67,8 @@ export {
   unknownDeviceSignals,
   medianFpsFromDeltas,
   MIN_PROBE_SAMPLES,
+  maxDprFor,
+  TOUCH_MAX_DPR,
 } from "./quality";
 export type {
   QualityLevel,
@@ -86,6 +88,8 @@ export {
   useAutoQualityProbe,
   readDeviceSignals,
   seedQualityLevel,
+  refreshSeededQuality,
+  canvasMaxDpr,
 } from "./qualityStore";
 export type { QualityState } from "./qualityStore";
 
@@ -99,6 +103,22 @@ export type {
   PerfRunInput,
   PerfWindowSample,
 } from "./perfBudget";
+// The FRAME, as opposed to the static world. `world.stats.staticDrawSlots`
+// answers a different question and cannot be scored against a draw budget —
+// `scoreFrameDrawBudget` takes a nominal `MeasuredFrame` for that reason, and
+// `measuredFrame()` refuses anything without measurement provenance.
+export {
+  COCKPIT_DRAWS,
+  DEFAULT_TRAFFIC_MESHES,
+  LEVEL1_AID_DRAWS,
+  MEASURED_FRAMES,
+  NotAMeasurementError,
+  frameCostTerms,
+  frameDrawCeiling,
+  measuredFrame,
+  scoreFrameDrawBudget,
+} from "./frameCost";
+export type { FrameCostInput, FrameCostTerm, FrameProvenance, MeasuredFrame } from "./frameCost";
 export { PerfProbe } from "./PerfProbe";
 export { GlContextGuard } from "./GlContextGuard";
 export { getContextLossLog, recordContextLoss, resetContextLossLog } from "./contextLoss";

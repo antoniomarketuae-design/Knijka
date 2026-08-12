@@ -78,10 +78,33 @@ import {
 } from "three";
 import {
   PERCEPTUAL_ROAD_SCALE,
+  type ActorLabelSpec,
   type HazardStimulusSpec,
   type SignalPhase,
 } from "../contracts";
 import { edgeTravelHalfWidth, nodeOpenRadiusM } from "../world/builders/network";
+// B40(a) — the EXTRACTED world-label channel (doc 87 B35). This layer keeps its
+// own painter for the B42 officer bubble on purpose (that row is closed and
+// photographed; moving it would put it back at risk for nothing the founder can
+// see, and `worldLabel.ts` carries the note that says so). The STAGED-ACTOR
+// caption is new work, so it adopts the shared channel rather than becoming a
+// third painter.
+import {
+  drawWorldLabel,
+  WORLD_LABEL_GAP_M,
+  WORLD_LABEL_H_M,
+  WORLD_LABEL_TEX_H,
+  WORLD_LABEL_TEX_W,
+  WORLD_LABEL_W_M,
+} from "../world/components/worldLabel";
+import {
+  STAGED_ACTOR_LABEL_MAX_DIST_M,
+  STAGED_ACTOR_LABEL_MAX_SCALE,
+  STAGED_ACTOR_LABEL_REF_DIST_M,
+  STAGED_ACTOR_LABEL_ROOF_M,
+  STAGED_ACTOR_LABEL_STILL_MPS,
+  STAGED_ACTOR_LABELS,
+} from "./stagedActorLabels";
 import {
   BUBBLE_ARM_RAISED,
   BUBBLE_CHEST_OR_BACK,
@@ -169,13 +192,58 @@ const PED_POSE_ARM_EXTEND_RAD = Math.PI / 2;
  * PERCEPTUAL_ROAD_SCALE 2.5 — and `sc-sig-controller-postures`, whose whole
  * teach goal is «разчети позата», asked the student to resolve a gesture on a
  * 1.7 m figure 27 m away. These are PINNED (no hash jitter, the child/elder
- * precedent) so the same figure reads identically on every attempt: a
- * deliberately imposing ~2.1 m officer with a heavier build, which is the
- * silhouette a регулировчик has to have to be found at all in a busy junction.
- * The caption bubble above him does the rest of the work at distance.
+ * precedent) so the same figure reads identically on every attempt.
+ *
+ * A deliberately imposing ~2.1 m officer with a heavier build, which is the
+ * silhouette a uniformed figure has to have to be found at all in a busy
+ * junction. The caption bubble above him does the rest at distance.
  */
 const PED_OFFICER_HEIGHT = 1.22;
 const PED_OFFICER_BUILD = 1.18;
+/**
+ * B41 again, 2026-08-10 — „we spoke that we will make them bigger but I now
+ * see you have not done that", said AFTER the 1.22 above shipped.
+ *
+ * The number is BORROWED, not invented. `world/builders/constants.ts` already
+ * carries his ruling for exactly this problem, in his own words — „those signs
+ * must be big because they are a major part" — as `SCENARIO_SIGN_SCALE = 1.5`,
+ * with the reason written beside it: *„Real-size signs read miniature against
+ * the 2.5× perceptually scaled road; the drills' own signs must be
+ * unmissable."*
+ *
+ * On the three controller drills the регулировчик IS the sign. The lamps are
+ * dark (`SC_SIG_CONTROLLER_POSTURES`) or actively misleading (the other two pin
+ * a green while he halts you), so his body is the whole law source at that
+ * junction — and he was rendering at 1.22× real, BELOW the prominence every
+ * lesson-critical Б2 and Д11 in the product already gets. Now he carries the
+ * same multiplier they do: 1.5 × the 1.73 m skeleton = 2.6 m.
+ *
+ * MEASURED, not predicted — same drill, same seat, same stop at y = −31.8,
+ * officer 20.8 m ahead, canvas 1028×577 inside a 1280×720 frame: the figure
+ * goes from 79 px (`b41/base/B41base-step04`) to 99 px (`b41/fix1/
+ * B41fix-step01`), i.e. +25 % tall and +56 % silhouette. The arm scales with
+ * the height too, so the both-arms-out halt — the thing «разчети позата»
+ * actually asks him to resolve — spans ~2.3 m instead of ~1.9 m.
+ *
+ * WHY IT IS A SEPARATE CONSTANT FROM `PED_OFFICER_*`, and not simply a bigger
+ * number up there: `pedHeight` is keyed on `p.pose !== undefined`, and the
+ * OTHER pose is VP-11 „stopSignal" — the patrol warden who stands at a school
+ * curb (`templates-pe2.ts`) a few metres from the windscreen, beside children
+ * rendered at 0.72 (~1.25 m). He has no legibility problem to solve and a
+ * 2.6 m warden next to 1.25 m children would be a new defect in someone else's
+ * photographed row. The prominence goes to the figure whose posture is the
+ * lesson, at the range the lesson grades it from.
+ *
+ * BUILD 1.30 is free of the arm-legibility question: `bld` scales the torso
+ * capsule radius and the shoulder offset by the SAME factor, so a heavier
+ * officer is not a more fused one. It buys presence in side profile, the
+ * posture that otherwise reads as a bare vertical line at range.
+ *
+ * His FACE, hands and uniform are a modelling job on the founder's own machine
+ * (FR-35/FR-43) and are not something these constants can fix.
+ */
+const PED_CONTROLLER_HEIGHT = 1.5;
+const PED_CONTROLLER_BUILD = 1.3;
 const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
 /** „Внимание" window before the flip, s — sized to the recorded narrations:
  *  the postures shadow's „ръката му се вдига" lands ≈ t 19 on the flip-30
@@ -858,6 +926,19 @@ function makeBlobTexture(): CanvasTexture {
 // `sc-sig-controller-postures` grades him.
 // ---------------------------------------------------------------------------
 const BUBBLE_W_M = 3.6;
+/**
+ * DELIBERATELY UNCHANGED when the sixth line landed (B41, 2026-08-10). The
+ * card gained `priorityBg` and the obvious move was to grow it — 540 → 576 px
+ * of texture, 1.9 → 2.025 m of plane. It was tried, rendered and REJECTED off
+ * the frame: the card rides `BUBBLE_GAP_M` above a head that this same change
+ * raised by 0.45 m, and its top leaves the windscreen at close range. With the
+ * taller card the clip started at ≈ 12.9 m instead of ≈ 10.9 m (eye 1.20 m,
+ * hFOV-locked vFOV, 1264×620), and `b41/near/B41near-step06` — 7.8 m out —
+ * showed a card with its headline cut off. The six lines fit the 540 px card
+ * as it is: the old rhythm left ~60 px of dead space below the law line, which
+ * is exactly where the sixth line went. Keeping the plane at its photographed
+ * size costs nothing and gives back 2 m of approach.
+ */
 const BUBBLE_H_M = 1.9;
 export const BUBBLE_TEX_W = 1024;
 export const BUBBLE_TEX_H = 540;
@@ -962,16 +1043,28 @@ export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbl
 
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
+  // The six answers, each in its own colour so the SLOT is learnable: a student
+  // who has read one bubble knows where „who goes" lives on the next one.
+  // Green = movement, red = the halt, WHITE-ON-ACCENT = whose priority it is —
+  // deliberately the accent, because that line is the one that decides whether
+  // he moves, and it is the one the card used not to carry at all.
+  // Six lines in the 540 px card the five used to rattle around in: the old
+  // rhythm put the law line's baseline at 404 and the body's edge at 506, i.e.
+  // ~60 px of nothing. The gaps tighten from 68/78/66/70 to an even
+  // 66/64/64/62/64 and every type size is untouched, so nothing that was
+  // legible in a shipped frame got smaller.
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.headlineBg, 700, 116, 122, W);
+  bubbleLine(g, copy.headlineBg, 700, 116, 120, W);
   g.fillStyle = "#dbe5f2";
-  bubbleLine(g, copy.poseBg, 600, 44, 190, W);
+  bubbleLine(g, copy.poseBg, 600, 44, 186, W);
   g.fillStyle = "#9ff0c4";
-  bubbleLine(g, copy.goBg, 500, 46, 268, W);
+  bubbleLine(g, copy.goBg, 500, 46, 250, W);
   g.fillStyle = "#ffc9c2";
-  bubbleLine(g, copy.stopBg, 500, 46, 334, W);
+  bubbleLine(g, copy.stopBg, 500, 46, 314, W);
+  g.fillStyle = copy.accent;
+  bubbleLine(g, copy.priorityBg, 600, 44, 376, W);
   g.fillStyle = "#8ea3bd";
-  bubbleLine(g, copy.lawRef, 500, 38, 404, W);
+  bubbleLine(g, copy.lawRef, 500, 38, 440, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
@@ -1052,6 +1145,16 @@ export interface TrafficLayerProps {
    * Omit = the legacy static pose and zero extra per-frame work.
    */
   controllerFigure?: ControllerFigureRead | null;
+  /**
+   * Doc 87 B40(a) — captions anchored to a staged actor (`LessonSpec.actorLabels`).
+   *
+   * Render-only and honesty-gated: a caption is drawn only while its actor is
+   * genuinely stationary (`STAGED_ACTOR_LABEL_STILL_MPS`, read off the live
+   * pose — never off a runner phase), so a card that says „тя стои" cannot
+   * survive the car pulling away. Omit/[] on every other lesson: the block
+   * costs one array-length check per frame.
+   */
+  actorLabels?: readonly ActorLabelSpec[] | null;
 }
 
 export function TrafficLayer({
@@ -1070,6 +1173,7 @@ export function TrafficLayer({
   clearcoat = true,
   dropHeavyFleetModels = false,
   controllerFigure = null,
+  actorLabels = null,
 }: TrafficLayerProps) {
   const nVeh = system.vehicles.length;
   const nPed = system.pedestrians.length;
@@ -1111,6 +1215,19 @@ export function TrafficLayer({
     return new CanvasTexture(c);
   }, []);
   useEffect(() => () => bubbleTex.dispose(), [bubbleTex]);
+  // B40(a) — the staged-actor caption. One billboarded plane: no lesson in the
+  // catalogue labels two actors, and if one ever does, the nearest standing one
+  // wins (see the frame block).
+  const actorLabelRef = useRef<Mesh>(null);
+  const actorLabelTex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = WORLD_LABEL_TEX_W;
+    c.height = WORLD_LABEL_TEX_H;
+    return new CanvasTexture(c);
+  }, []);
+  useEffect(() => () => actorLabelTex.dispose(), [actorLabelTex]);
+  /** Which copy is currently painted into `actorLabelTex` (null = nothing). */
+  const paintedActorLabel = useRef<string | null>(null);
   // L5 hazard ball (single mesh — one per lesson at most).
   const hazardBallRef = useRef<Mesh>(null);
   const hazardBlobRef = useRef<Mesh>(null);
@@ -1307,10 +1424,16 @@ export function TrafficLayer({
       scratch.pedHeadScale[i] = 1;
       scratch.pedStoop[i] = 0;
       scratch.pedCaneOn[i] = 0;
-      // B41: an officer figure is PINNED bigger than any walker — see
-      // PED_OFFICER_HEIGHT. Checked before the body variants because no
-      // shipped actor authors both, and the uniform already wins the same way.
-      if (p.pose !== undefined) {
+      // B41: an officer figure is PINNED bigger than any walker, and the JU-18
+      // регулировчик bigger again — he is the lesson's SIGN, read from the stop
+      // line (see PED_CONTROLLER_HEIGHT). Checked before the body variants
+      // because no shipped actor authors both, and the uniform already wins the
+      // same way.
+      if (p.pose === "directTraffic") {
+        scratch.pedHeight[i] = PED_CONTROLLER_HEIGHT;
+        scratch.pedBuild[i] = PED_CONTROLLER_BUILD;
+        scratch.pedHeadScale[i] = PED_CONTROLLER_HEIGHT;
+      } else if (p.pose !== undefined) {
         scratch.pedHeight[i] = PED_OFFICER_HEIGHT;
         scratch.pedBuild[i] = PED_OFFICER_BUILD;
         scratch.pedHeadScale[i] = PED_OFFICER_HEIGHT;
@@ -1914,7 +2037,11 @@ export function TrafficLayer({
           // point of the ask is that he can read it while there is still road
           // left to act on it.
           const s = Math.min(BUBBLE_MAX_SCALE, Math.max(1, eyeD / BUBBLE_REF_DIST_M));
-          const headY = PED_HEAD_Y * PED_OFFICER_HEIGHT;
+          // The owner's OWN height — the tail has to point at the head it is
+          // captioning, and since B41 the JU-18 регулировчик and the VP-11
+          // curb warden are no longer the same size. Reading it back out of the
+          // per-actor scratch is what keeps the two from ever drifting apart.
+          const headY = PED_HEAD_Y * scratch.pedHeight[bubbleOwner];
           bubble.position.set(
             ox,
             headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2,
@@ -1923,6 +2050,66 @@ export function TrafficLayer({
           bubble.scale.set(s, s, 1);
           bubble.quaternion.copy(frame.camera.quaternion); // billboard
           bubble.visible = true;
+        }
+      }
+    }
+
+    // --- B40(a): the STAGED-ACTOR caption. «Спане на зелено» stages one car
+    // NOSE-ON at 62 m, where it measures 26 px — no cue that lives on the body
+    // survives that, so the affordance is words on a plane that grows with
+    // range. Two gates, both read off the LIVE pose:
+    //   • it must be standing (the card cannot outlive its own claim), and
+    //   • it must be inside STAGED_ACTOR_LABEL_MAX_DIST_M (a caption 134 m out
+    //     at the spawn would answer the question before he has looked).
+    // Hidden on ~166 of 167 templates by a single array-length check.
+    {
+      const actorLabel = actorLabelRef.current;
+      if (actorLabel) {
+        let bestKind: string | null = null;
+        let bestX = 0;
+        let bestZ = 0;
+        let bestDist = Infinity;
+        if (actorLabels && actorLabels.length > 0) {
+          for (const spec of actorLabels) {
+            const view = system.staged(spec.actorId);
+            if (!view || view.kind !== "vehicle") continue;
+            if (Math.abs(view.speedMps) > STAGED_ACTOR_LABEL_STILL_MPS) continue;
+            const ax = view.x;
+            const az = -view.y;
+            const d = Math.hypot(ax - cam.x, az - cam.z);
+            if (d > STAGED_ACTOR_LABEL_MAX_DIST_M || d >= bestDist) continue;
+            bestKind = spec.kind;
+            bestX = ax;
+            bestZ = az;
+            bestDist = d;
+          }
+        }
+        if (bestKind === null) {
+          actorLabel.visible = false;
+        } else {
+          if (paintedActorLabel.current !== bestKind) {
+            paintedActorLabel.current = bestKind;
+            drawWorldLabel(
+              actorLabelTex.image as HTMLCanvasElement,
+              STAGED_ACTOR_LABELS[bestKind as keyof typeof STAGED_ACTOR_LABELS],
+            );
+            actorLabelTex.needsUpdate = true;
+          }
+          const s = Math.min(
+            STAGED_ACTOR_LABEL_MAX_SCALE,
+            Math.max(1, bestDist / STAGED_ACTOR_LABEL_REF_DIST_M),
+          );
+          actorLabel.position.set(
+            bestX,
+            // Clear of the roof and growing UPWARD, never down over the car it
+            // is pointing at — the B35 anchoring lesson, applied to a body
+            // instead of a signal housing.
+            STAGED_ACTOR_LABEL_ROOF_M + WORLD_LABEL_GAP_M + (WORLD_LABEL_H_M * s) / 2,
+            bestZ,
+          );
+          actorLabel.scale.set(s, s, 1);
+          actorLabel.quaternion.copy(frame.camera.quaternion); // billboard
+          actorLabel.visible = true;
         }
       }
     }
@@ -2077,6 +2264,31 @@ export function TrafficLayer({
       <mesh ref={bubbleRef} visible={false} renderOrder={7} frustumCulled={false}>
         <planeGeometry args={[BUBBLE_W_M, BUBBLE_H_M]} />
         <meshBasicMaterial map={bubbleTex} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
+
+      {/* B40(a) — the staged-actor caption, billboarded over the car it names.
+          Named so a placement dump can find it (the B35 lesson: a caption can
+          be present in the scene graph and invisible in the frame, and only a
+          measured dump tells them apart). `depthTest` OFF, unlike the officer
+          bubble: this subject stands 62 m out with the junction furniture and a
+          signal head between it and the eye, and a caption the junction eats is
+          the defect this row already refused once. depthWrite stays off so it
+          carves no hole in what is behind it. */}
+      <mesh
+        name="staged-actor-label"
+        ref={actorLabelRef}
+        visible={false}
+        renderOrder={7}
+        frustumCulled={false}
+      >
+        <planeGeometry args={[WORLD_LABEL_W_M, WORLD_LABEL_H_M]} />
+        <meshBasicMaterial
+          map={actorLabelTex}
+          transparent
+          depthTest={false}
+          depthWrite={false}
+          toneMapped={false}
+        />
       </mesh>
 
       {/* Parked-car blob shadows — the GLB bodies + wheels themselves live in

@@ -30,6 +30,13 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  headingOfDir,
+  isContact,
+  obbDiscSeparationM,
+  PEDESTRIAN_BODY_RADIUS_M,
+  playerObb,
+} from "../collision";
 import { PERCEPTUAL_ROAD_SCALE } from "../contracts";
 import type { LessonSpec, StagedEventSpec } from "../contracts";
 import { createEvalState, parseObjectiveParams, stepObjective } from "../lessons/objectives";
@@ -1838,15 +1845,28 @@ export function checkS4(spec: ScenarioSpec): { ok: boolean; detail: string } {
  * Implemented for `pedestrianDartOut`, the only staged kind whose spec
  * publishes everything the closed form needs (release distance, walker pace,
  * dart direction and the road-occupancy window). Constant-speed sweep at the
- * governing objective cap: closest approach must clear PEDESTRIAN_CONTACT_M.
+ * governing objective cap: the closest approach must leave real air between
+ * the car's BODY and the walker's.
  * Honest caveat, the same one doc 86 T11 states: a student who brakes on the
  * cue avoids contact — what the sweep proves is which way the gradient runs.
+ *
+ * THIS LINT MUST MEASURE WHAT THE RUNNER MEASURES (2026-08-10). It used to
+ * carry its own `PEDESTRIAN_CONTACT_M = 1.5` and compare it against
+ * `Math.hypot(carCentre, walker)` — a copy of the isotropic circle
+ * `PedestrianDartOutRunner` has now dropped for exact box-vs-disc geometry. The
+ * copy was not merely redundant, it was wrong in the dangerous direction: the
+ * car's own nose reaches 2.02 m ahead of the centre this sweep tracked, so a
+ * walker 1.6 m in front of it was already INSIDE the bumper while the lint
+ * called the lesson survivable. It now runs `../collision` — the same bodies,
+ * the same predicate — so a lesson this gate passes is a lesson the runner
+ * will not convict on the obedient drive.
  */
-export const PEDESTRIAN_CONTACT_M = 1.5;
 
 export interface S5Finding {
   eventId: string;
   capKmh: number;
+  /** Signed separation at closest approach, m: metres of air between the two
+   *  bodies, or penetration depth as a negative. */
   closestM: number;
 }
 
@@ -1863,30 +1883,37 @@ export function checkS5(f: ScenarioFacts): S5Finding[] {
     const trigger = ev.triggerDistM;
     // Player closes on the crossing at v; the walker leaves the kerb at t=0.
     // Sample the whole approach at 20 Hz and take the closest approach of the
-    // car's nose-centre to the walker.
+    // car's BODY to the walker's.
+    // The car travels toward the crossing along the road axis (perpendicular to
+    // the walker's `dir`), so that axis is also its heading — which is what
+    // makes the box a box: 2.02 m of car reaches ahead of the pose this sweep
+    // steps, and 0.85 m to each side.
+    const axisX = -ev.dir.y;
+    const axisY = ev.dir.x;
+    const headingDeg = headingOfDir(axisX, axisY);
     let closest = Infinity;
     for (let t = 0; t <= 12; t += 0.05) {
       const along = trigger - v * t;
       if (along < -20) break;
-      const car = {
-        x: ev.crossing.x - ev.dir.x * 0 + 0,
-        y: ev.crossing.y + 0,
-      };
-      // The car travels toward the crossing along the road; the walker travels
-      // across it. Work in the crossing's own frame: the walker's offset from
-      // the crossing centre is (pace*t) along `dir` from `start`.
+      // Work in the crossing's own frame: the walker's offset from the crossing
+      // centre is (pace*t) along `dir` from `start`.
       const walk = Math.min(ev.speedMps * t, ev.travelM);
       const px = ev.start.x + ev.dir.x * walk;
       const py = ev.start.y + ev.dir.y * walk;
-      // Car position: `along` metres short of the crossing, on the road axis
-      // (perpendicular to `dir`).
-      const axisX = -ev.dir.y;
-      const axisY = ev.dir.x;
-      car.x = ev.crossing.x - axisX * along;
-      car.y = ev.crossing.y - axisY * along;
-      closest = Math.min(closest, Math.hypot(px - car.x, py - car.y));
+      // Car position: `along` metres short of the crossing, on the road axis.
+      const carX = ev.crossing.x - axisX * along;
+      const carY = ev.crossing.y - axisY * along;
+      closest = Math.min(
+        closest,
+        obbDiscSeparationM(
+          playerObb(carX, carY, headingDeg),
+          px,
+          py,
+          PEDESTRIAN_BODY_RADIUS_M,
+        ),
+      );
     }
-    if (closest < PEDESTRIAN_CONTACT_M) {
+    if (isContact(closest)) {
       out.push({ eventId: ev.id, capKmh, closestM: closest });
     }
   }

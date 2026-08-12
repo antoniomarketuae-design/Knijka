@@ -222,7 +222,12 @@ export function WorldSchoolsGroup({ schools, night = false }: WorldSchoolsProps)
               mesh.setMatrixAt(i, railing.matrices[i]!);
             }
             mesh.instanceMatrix.needsUpdate = true;
-            mesh.frustumCulled = false;
+            // An InstancedMesh culls on its OWN instance-aware bounding sphere
+            // in three r185 — the base geometry's origin sphere never gets a
+            // look in. See three-helpers.createInstancedMesh for the measured
+            // cost of believing otherwise.
+            mesh.frustumCulled = true;
+            mesh.computeBoundingSphere();
           }}
         >
           <meshStandardMaterial color={RAILING_COLOR} roughness={0.5} metalness={0.35} />

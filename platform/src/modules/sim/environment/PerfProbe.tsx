@@ -31,6 +31,7 @@
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { QUALITY_PRESETS, type QualityLevel } from "./quality";
+import { canvasMaxDpr } from "./qualityStore";
 import { getContextLossLog } from "./contextLoss";
 import {
   buildPerfReport,
@@ -669,6 +670,78 @@ function readGlRenderer(gl: WebGLRenderingContext | WebGL2RenderingContext): str
   }
 }
 
+/**
+ * THE RESOURCE-TIMING BUFFER HOLDS 250 ENTRIES BY DEFAULT AND THEN DROPS THE
+ * REST IN SILENCE.
+ *
+ * `readBootTimings` sums `performance.getEntriesByType("resource")`, and the
+ * spec's default `resourceTimingBufferSize` is 250. Past that the browser stops
+ * recording and nothing in the API says so, so both `scriptTransferBytes` and
+ * `totalTransferBytes` become floors of unknown depth — reported, and read,
+ * as totals.
+ *
+ * IT IS NOT THEORETICAL. Measured 2026-08-12 on /simulator at tier low, cold
+ * cache, WebKit: the PRODUCTION build fetches 138 resources (55% of the cap)
+ * and the `next dev` build fetches 222 (89%). The mobile audit's own §G4 run
+ * reported nearly twice this one's wire weight on a heavier district, which
+ * puts it at or over the line — so the 12.06 MB in that table may itself be a
+ * floor.
+ *
+ * Raising it here rather than in the document head is deliberate and its limit
+ * is stated: this module loads with the simulator chunk, so entries recorded
+ * BEFORE it are already safely in the buffer (they are what fits under 250) and
+ * everything after is now kept. The only case it cannot repair is a page that
+ * had already overflowed before the sim mounted — which is why that case is
+ * shouted about instead of being papered over.
+ */
+function ensureResourceTimingCapacity(): void {
+  if (typeof performance === "undefined") return;
+  try {
+    const DEFAULT_CAP = 250;
+    const already = performance.getEntriesByType("resource").length;
+    if (already >= DEFAULT_CAP) {
+      console.warn(
+        `[sim-perf] resource-timing buffer was already full (${already} entries) before the ` +
+          `probe mounted — the wire and script byte totals below are FLOORS, not totals. ` +
+          `Re-run with performance.setResourceTimingBufferSize() called from the document head.`,
+      );
+    }
+    performance.setResourceTimingBufferSize?.(20_000);
+  } catch {
+    /* engine without the setter — the totals stay as truthful as it allows */
+  }
+}
+
+/**
+ * Is this resource JavaScript the engine had to parse?
+ *
+ * WHY THIS IS NOT `initiatorType === "script"`, WHICH IS WHAT IT USED TO BE.
+ * `initiatorType` records HOW a resource was requested, not WHAT it is, and
+ * three of the ways this app requests JavaScript do not say "script":
+ *
+ *   - `<link rel="modulepreload">` / `<link rel="preload" as="script">` — Next
+ *     preloads route chunks this way, and Resource Timing reports them as
+ *     "link";
+ *   - `fetch()` — /basis/basis_transcoder.js and /draco/draco_wasm_wrapper.js,
+ *     both of which are on the critical path to the first frame;
+ *   - the service-worker registration, reported as "other".
+ *
+ * MEASURED ON THE PRODUCTION BUILD, /simulator at tier low, cold cache, 2026-08-12:
+ * `initiatorType === "script"` saw 1,216 KB across 30 files; every `.js` the
+ * document actually pulled was 1,255 KB across 34 files. So the old reading
+ * under-counted the §2.1 parse budget by 39.5 KB (3.2%) — always downward,
+ * which is the direction that makes a budget look met when it is not.
+ *
+ * The URL test is the honest one here because everything the simulator loads is
+ * same-origin and served by us: there is no third-party script whose extension
+ * we cannot predict. `.wasm` is deliberately NOT counted — it is stream-compiled
+ * rather than parsed as JS, and at 924 KB it would swamp the number this metric
+ * exists to protect. It is still inside `totalTransferBytes`.
+ */
+function isScriptResource(r: PerformanceResourceTiming): boolean {
+  return /\.[cm]?js(\?|$)/.test(r.name) || r.initiatorType === "script";
+}
+
 /** Navigation + resource timings — the §2.1 parse/wire half of the picture. */
 function readBootTimings(): Pick<
   PerfRunInput,
@@ -694,7 +767,7 @@ function readBootTimings(): Pick<
       // means "served from cache" — which is a different (and much better) run
       // than a cold one. Note it in the artifact rather than papering over it.
       totalBytes += r.transferSize || 0;
-      if (r.initiatorType === "script") scriptBytes += r.transferSize || 0;
+      if (isScriptResource(r)) scriptBytes += r.transferSize || 0;
     }
     const mem = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
     return {
@@ -723,6 +796,9 @@ export function PerfProbe({ level }: { level: QualityLevel }) {
   const scene = useThree((s) => s.scene);
 
   useEffect(() => {
+    // Before anything else the probe does: stop the wire totals being silently
+    // capped at 250 resources (see ensureResourceTimingCapacity).
+    ensureResourceTimingCapacity();
     /* eslint-disable react-hooks/immutability -- three's own API for
        whole-frame accounting is a mutable flag on the renderer. With autoReset
        on, three zeroes gl.info after EVERY gl.render, so the mirror RTT passes
@@ -740,9 +816,16 @@ export function PerfProbe({ level }: { level: QualityLevel }) {
   // founder's probe shows which facade/clearcoat path this run is on.
   useEffect(() => {
     const p = QUALITY_PRESETS[level];
+    // BOTH dpr numbers, because they are no longer the same number. The preset
+    // states the tier's cap; `canvasMaxDpr()` states what THIS device is
+    // allowed (doc 91 §N2·C — a touch-only device is clamped to 1.0 on every
+    // tier). Printing only the preset would have this line reporting 1.25 on a
+    // phone rendering at 1.0, and the founder reads this line to answer §K1.
     console.info(
       `[sim-perf] tier=${level} facadeMaps=${p.facadeMaps} clearcoat=${p.clearcoat}` +
-        ` maxDpr=${p.maxDpr} shadows=${p.shadows} postprocessing=${p.postprocessing}`,
+        ` maxDpr=${p.maxDpr} appliedDpr=${canvasMaxDpr(level)}` +
+        ` devicePixelRatio=${typeof window === "undefined" ? "?" : window.devicePixelRatio}` +
+        ` shadows=${p.shadows} postprocessing=${p.postprocessing}`,
     );
   }, [level]);
 

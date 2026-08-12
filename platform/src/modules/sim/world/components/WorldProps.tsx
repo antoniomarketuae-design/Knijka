@@ -44,18 +44,18 @@
  * limit the reducer does not grade, and a fallback face would recreate it.
  *
  * Draw calls (WorldProps only; CityBuildings is separate + chunked):
- *   signals 2 (housing + lamps) + signs 8 (the v1 4 kinds × body+face)
- *   + streetlights 2 (housing + glow)
- *   + trees 4 (boulevard linden + ornamental + leafy_a + leafy_b)
- *   + furniture 4 (bench + bollard + trash_bin + planter)
- *   + billboards 4 (large/small × body+face) + bus stops 2 (body + face)
- *   + parking kit 1 (merged cluster) = 27  (was 18).
- * Zone-sign kinds (SIGN-ASSET drop) add draws ONLY on maps whose zones place
- * them (+2 per textured kind, +1 for the geometry-only crossbuck);
- * zones-less districts render exactly the fixed set above. Each extra В26
- * NUMERAL is likewise +2 only where it is actually posted (a district carries
- * one or two limits, so it is +2 or +4 — the „50" plate on a 40 street cost
- * the same two draws and told the student the wrong number).
+ * THE TALLY THAT USED TO SIT HERE IS GONE ON PURPOSE. It read „… = 28 (was
+ * 27)", and `buildWorldGeometry` carried a second copy of the same tally that
+ * said 27, and neither of them counted the pedestrian-signal trio. Two prose
+ * copies of one number is a drift generator, so the count now lives in exactly
+ * one place and is DERIVED from the placement lists this component gates on:
+ * `world/builders/drawSlots.ts` → `staticDrawSlotTerms`. Add a mesh here and
+ * add its term there; there is no third number to forget.
+ * Each family is mounted only where its list is non-empty, so a district that
+ * posts no billboards mounts no billboard meshes and is charged for none —
+ * including each В26 NUMERAL, which is its own instanced face (the „50" plate
+ * on a 40 street cost the same two draws and told the student the wrong
+ * number).
  * The guarded-crossing BARRIER is the one ANIMATED world prop: post + arm +
  * blink lamp as plain meshes (+3 draws per guarded map, 1–2 barriers ever),
  * the arm pose driven per frame by the runtime's graded timetable
@@ -95,6 +95,12 @@ import {
   type SignalLabelKind,
 } from "./signalHeadLabels";
 import {
+  LAMP_ON_HEX,
+  LENS_EMISSIVE_R_M,
+  LENS_GLASS_HEX,
+  LENS_R_M,
+} from "./signalLensLook";
+import {
   drawWorldLabel,
   WORLD_LABEL_GAP_M,
   WORLD_LABEL_H_M,
@@ -105,9 +111,11 @@ import {
   WORLD_LABEL_W_M,
 } from "./worldLabel";
 import {
+  chunkTransforms,
   createInstancedMesh,
   createOffsetInstancedMesh,
   disposeAll,
+  enableInstancedCulling,
   mergeSafe,
   paintGeometry,
 } from "./three-helpers";
@@ -971,10 +979,10 @@ const LAMP_OFFSETS: [number, number, number][] = [
 /**
  * Top of the vehicle head's housing, m — the anchor the B35 caption hangs
  * above. Derived from the lens the housing is built around rather than typed
- * twice: the red lens centre is `LAMP_OFFSETS[0].y` with r 0.13, and the GLB's
- * hood carries ~0.15 m of visor over it.
+ * twice: the red lens centre is `LAMP_OFFSETS[0].y` with r `LENS_R_M`, and the
+ * GLB's hood carries ~0.15 m of visor over it.
  */
-const SIGNAL_HEAD_TOP_M = LAMP_OFFSETS[0]![1] + 0.13 + 0.15;
+const SIGNAL_HEAD_TOP_M = LAMP_OFFSETS[0]![1] + LENS_R_M + 0.15;
 
 /**
  * Pedestrian head (doc 86 L3): TWO lenses, red over green, on a shorter pole —
@@ -1006,7 +1014,7 @@ const SIGNAL_HEAD_TOP_M = LAMP_OFFSETS[0]![1] + 0.13 + 0.15;
 /** Lens centre, m in front of the housing origin (front face at z 0.19). */
 const PED_LENS_Z_M = 0.2;
 /** Lens radius, m — the vehicle head's value, for the vehicle head's reason. */
-const PED_LENS_R_M = 0.13;
+const PED_LENS_R_M = LENS_R_M;
 const PED_LAMP_OFFSETS: [number, number, number][] = [
   [0, 2.3, PED_LENS_Z_M],
   [0, 2.0, PED_LENS_Z_M],
@@ -1033,53 +1041,143 @@ function buildPedSignalHousing(): THREE.BufferGeometry {
 }
 
 const LAMP_ON = {
-  red: new THREE.Color(0xff3b30),
-  yellow: new THREE.Color(0xffb300),
-  green: new THREE.Color(0x30d158),
-} as const;
-/**
- * UNLIT lens read (doc 86 L2, second half). The lamps draw on a
- * MeshBasicMaterial with toneMapped off, so `on × 0.1` came out at roughly
- * #19-05-04 — indistinguishable from the black housing at any distance, which
- * is why a DARK head (загаснал светофар, sc-signal-dead) had no read at all
- * and the founder reported „no traffic light" on lessons 17/18/19/21/29.
- *
- * A real unlit signal lens is dark tinted GLASS, not a hole: it reflects sky
- * and you can see all three of them. 28 % of the on colour lifted toward a
- * neutral glass grey gives exactly that — clearly present, clearly not lit
- * (the lit lens is 3.5× brighter and fully saturated).
- */
-const LAMP_GLASS = new THREE.Color(0x1a1c20);
-const unlit = (c: THREE.Color) => c.clone().multiplyScalar(0.28).lerp(LAMP_GLASS, 0.35);
-const LAMP_OFF = {
-  red: unlit(LAMP_ON.red),
-  yellow: unlit(LAMP_ON.yellow),
-  green: unlit(LAMP_ON.green),
+  red: new THREE.Color(LAMP_ON_HEX.red),
+  yellow: new THREE.Color(LAMP_ON_HEX.yellow),
+  green: new THREE.Color(LAMP_ON_HEX.green),
 } as const;
 
 /**
- * Lens colors for a lamp state (doc 62 S1): "dark" = every lens unlit
- * (загаснал светофар); "amberFlashOn"/"amberFlashOff" = the flashing-amber
- * blink pair driven by the runtime's signal clock (the getter alternates the
- * STATE, so the per-lamp change cache below repaints exactly on blink edges —
- * no extra render-side timer, no per-frame writes while steady).
+ * WHY A DEAD HEAD LOOKED ALIVE, AND WHAT ACTUALLY FIXES IT — doc 87 B35.
+ *
+ * The four numbers themselves live in `signalLensLook.ts`, with the measured
+ * before/after and the arithmetic gate that stops them drifting back.
+ *
+ * MEASURED FIRST, on the shipped frames the row was refused on
+ * (`RR/b35/b35-y-50.png`, sc-signal-dead, the captioned head at 24.7 m, and
+ * `b35-y-70.png` at 43.8 m — sampled at each lens's own projected rect, not by
+ * eye). Every lens on that head WAS in the unlit branch below, and the pixels
+ * prove it: red rgb(138,17,7), amber rgb(133,87,0), green rgb(21,107,37) —
+ * exactly `LAMP_OFF` as it was authored. The lens colours were never the lie.
+ * TWO other properties were:
+ *
+ *   1. SATURATION. Those three samples sit at 0.948 / 1.000 / 0.801 HSV
+ *      saturation. Nothing in the physical world is a pure, fully saturated
+ *      hue except a light source; paint and glass are not. And two of the
+ *      three „off" lamps were BRIGHTER than the housing they were set in
+ *      (relative luminance 0.118 and 0.108 against 0.066), so this was never
+ *      going to yield to darkening alone. Desaturating is what it needed.
+ *   2. THE MATERIAL WAS EMISSIVE. One `MeshBasicMaterial` with
+ *      `toneMapped: false` drew the lit AND the unlit lens, so an unlit lens
+ *      was a flat, constant, un-shaded, un-tone-mapped patch of colour: it did
+ *      not darken in shadow, did not brighten in sun, had no gradient and no
+ *      highlight. That is the exact signature of something that emits. Between
+ *      the 24.7 m and 43.8 m frames the scene-lit housing went from luminance
+ *      0.066 to 0.213 — 3.2× — while the dead red lens moved 0.058 to 0.063.
+ *      The head's own dead lens was the one part of the scene the sun could
+ *      not touch.
+ *
+ * So the pass is split in two, which is also what the object really is:
+ *
+ *   `traffic-light-lens-glass` — every lens, always, on the SCENE-LIT
+ *      standard material. Dark desaturated glass that takes the sun, the sky
+ *      HDRI and a specular highlight like the housing it is set into. It can
+ *      never look self-luminous, because its brightness tracks its
+ *      surroundings. This is the „dark, desaturated, slightly reflective, not
+ *      a black hole" read, and it costs ONE extra instanced draw for the whole
+ *      district (header budget above: signals 2 → 3).
+ *   `traffic-light-lamps` — the LIT lens only, additively blended over the
+ *      glass. „Off" is `LAMP_DARK` (black), and black adds nothing, so an
+ *      unlit lens is not drawn at all rather than drawn dim. The emissive
+ *      sphere is a hair larger than the glass one so it wins the depth test
+ *      it now has to pass (0.004 m ≈ 0.15 px at 25 m).
+ *
+ * WHAT THIS DOES NOT DO. It does not re-open doc 86 L2 — „no traffic light
+ * exists" on lessons 17/18/19/21/29 — which was a BLACK head with no read at
+ * all. The glass tints below are deliberately lighter than the housing paint
+ * (`buildPedSignalHousing`: 0x1f2226 / 0x2b2f33), so three discs are still
+ * plainly there; they are simply no longer pure hues.
+ */
+const LENS_GLASS = {
+  red: new THREE.Color(LENS_GLASS_HEX.red),
+  yellow: new THREE.Color(LENS_GLASS_HEX.yellow),
+  green: new THREE.Color(LENS_GLASS_HEX.green),
+} as const;
+/** Additive „this lens is not lit": black contributes nothing. */
+const LAMP_DARK = new THREE.Color(0x000000);
+/** Glass tints per lens, in `LAMP_OFFSETS` order (red, amber, green). */
+const LENS_GLASS_TINTS: readonly THREE.Color[] = [
+  LENS_GLASS.red,
+  LENS_GLASS.yellow,
+  LENS_GLASS.green,
+];
+/** Pedestrian head: red over green, no amber lens (see `pedLampColors`). */
+const PED_LENS_GLASS_TINTS: readonly THREE.Color[] = [LENS_GLASS.red, LENS_GLASS.green];
+
+/**
+ * EMISSIVE contribution per lens for a lamp state (doc 62 S1): "dark" = no
+ * lens emits (загаснал светофар); "amberFlashOn"/"amberFlashOff" = the
+ * flashing-amber blink pair driven by the runtime's signal clock (the getter
+ * alternates the STATE, so the per-lamp change cache below repaints exactly on
+ * blink edges — no extra render-side timer, no per-frame writes while steady).
  * Writes into a module-scoped scratch tuple (returned for convenience): blink
  * edges recur at 2 Hz inside useFrame, and the perf law is zero useFrame
  * allocations — callers must consume the tuple before the next call.
  */
 const LAMP_COLORS_SCRATCH: [THREE.Color, THREE.Color, THREE.Color] = [
-  LAMP_OFF.red,
-  LAMP_OFF.yellow,
-  LAMP_OFF.green,
+  LAMP_DARK,
+  LAMP_DARK,
+  LAMP_DARK,
 ];
 function lampColorsFor(state: SignalLampState): [THREE.Color, THREE.Color, THREE.Color] {
   const red = state === "red" || state === "redYellow";
   const yellow = state === "yellow" || state === "redYellow" || state === "amberFlashOn";
   const green = state === "green";
-  LAMP_COLORS_SCRATCH[0] = red ? LAMP_ON.red : LAMP_OFF.red;
-  LAMP_COLORS_SCRATCH[1] = yellow ? LAMP_ON.yellow : LAMP_OFF.yellow;
-  LAMP_COLORS_SCRATCH[2] = green ? LAMP_ON.green : LAMP_OFF.green;
+  LAMP_COLORS_SCRATCH[0] = red ? LAMP_ON.red : LAMP_DARK;
+  LAMP_COLORS_SCRATCH[1] = yellow ? LAMP_ON.yellow : LAMP_DARK;
+  LAMP_COLORS_SCRATCH[2] = green ? LAMP_ON.green : LAMP_DARK;
   return LAMP_COLORS_SCRATCH;
+}
+
+/**
+ * The always-present glass lens pass. Scene-lit (so it has a gradient, a
+ * highlight and a sun/shadow response), low roughness and a sky-catching
+ * envMapIntensity like the other glass/metal in this file.
+ */
+function createLensGlass(
+  lights: readonly StaticTransform[],
+  offsets: readonly [number, number, number][],
+  tints: readonly THREE.Color[],
+  name: string,
+): { geometry: THREE.BufferGeometry; material: THREE.Material; mesh: THREE.InstancedMesh } {
+  const geometry = new THREE.SphereGeometry(LENS_R_M, 10, 8);
+  const material = new THREE.MeshStandardMaterial({
+    metalness: 0.0,
+    roughness: 0.22,
+    envMapIntensity: 1.2,
+  });
+  const mesh = createOffsetInstancedMesh(geometry, material, lights, offsets);
+  mesh.name = name;
+  // The tint never changes — a lens is the colour of its glass whether or not
+  // the bulb behind it is on — so this is written once, not per frame.
+  for (let i = 0; i < lights.length; i++) {
+    for (let j = 0; j < offsets.length; j++) mesh.setColorAt(i * offsets.length + j, tints[j]!);
+  }
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  return { geometry, material, mesh };
+}
+
+/**
+ * The lit-lens pass: additive over the glass, so „off" (black) draws nothing
+ * and a lit lens is a glow on top of the same lens the driver sees when it is
+ * dead — not a different object swapped in.
+ */
+function createLampEmissiveMaterial(): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    toneMapped: false,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
 }
 
 function TrafficLights({
@@ -1113,11 +1211,24 @@ function TrafficLights({
   }, [assets, lights, preset.castShadows]);
   useEffect(() => () => housing.dispose(), [housing]);
 
+  // The dark tinted glass every lens is made of, lit or not (see LENS_GLASS).
+  const glass = useMemo(
+    () => createLensGlass(lights, LAMP_OFFSETS, LENS_GLASS_TINTS, "traffic-light-lens-glass"),
+    [lights],
+  );
+  useEffect(
+    () => () => {
+      disposeAll([glass.geometry, glass.material]);
+      glass.mesh.dispose();
+    },
+    [glass],
+  );
+
   const lamps = useMemo(() => {
     // r 0.13 (was 0.085): the lens must read from a 50+ m approach on the
     // 2.5×-scaled roads — founder R3 "no visible traffic light" (doc 62 S1).
-    const geometry = new THREE.SphereGeometry(0.13, 10, 8);
-    const material = new THREE.MeshBasicMaterial({ toneMapped: false });
+    const geometry = new THREE.SphereGeometry(LENS_EMISSIVE_R_M, 10, 8);
+    const material = createLampEmissiveMaterial();
     const mesh = createOffsetInstancedMesh(geometry, material, lights, LAMP_OFFSETS);
     mesh.name = "traffic-light-lamps";
     // Mount unlit ("dark") — the first frame paints the true state; a wrong
@@ -1293,6 +1404,7 @@ function TrafficLights({
   return (
     <group name="traffic-lights">
       <primitive object={housing} />
+      <primitive object={glass.mesh} />
       <primitive object={lamps.mesh} ref={lampsRef} />
       {/* B35 — the „this one is off" affordance, world-anchored over the head.
           Mounted always and hidden by one boolean per frame on the ~150
@@ -1318,7 +1430,13 @@ function TrafficLights({
           SIGNAL_LABEL_MAX_DIST_M so it cannot float over a building three
           blocks away, and it is drawn transparent — i.e. after the opaque
           pass — so it lands on top of the cabin rather than under it. */}
-      <mesh ref={labelRef} visible={false} renderOrder={7} frustumCulled={false}>
+      <mesh
+        name="signal-head-label"
+        ref={labelRef}
+        visible={false}
+        renderOrder={7}
+        frustumCulled={false}
+      >
         <planeGeometry args={[WORLD_LABEL_W_M, WORLD_LABEL_H_M]} />
         <meshBasicMaterial
           map={labelTex}
@@ -1357,10 +1475,10 @@ function TrafficLights({
  * unlit, which is exactly what the crossing then is: uncontrolled.
  */
 function pedLampColors(state: SignalLampState): [THREE.Color, THREE.Color] {
-  if (state === "dark") return [LAMP_OFF.red, LAMP_OFF.green];
+  if (state === "dark") return [LAMP_DARK, LAMP_DARK];
   // Vehicles stopped ⇒ the walker has his green.
   const walkerGo = state === "red";
-  return walkerGo ? [LAMP_OFF.red, LAMP_ON.green] : [LAMP_ON.red, LAMP_OFF.green];
+  return walkerGo ? [LAMP_DARK, LAMP_ON.green] : [LAMP_ON.red, LAMP_DARK];
 }
 
 function PedestrianSignals({
@@ -1384,14 +1502,29 @@ function PedestrianSignals({
   );
   useEffect(() => () => housing.dispose(), [housing]);
 
+  // The walker's head is made of the same glass as the driver's: a dark
+  // pedestrian head that shows two saturated discs is the same lie as B35.
+  const glass = useMemo(
+    () =>
+      createLensGlass(lights, PED_LAMP_OFFSETS, PED_LENS_GLASS_TINTS, "pedestrian-lens-glass"),
+    [lights],
+  );
+  useEffect(
+    () => () => {
+      disposeAll([glass.geometry, glass.material]);
+      glass.mesh.dispose();
+    },
+    [glass],
+  );
+
   const lamps = useMemo(() => {
-    const geometry = new THREE.SphereGeometry(PED_LENS_R_M, 10, 8);
-    const material = new THREE.MeshBasicMaterial({ toneMapped: false });
+    const geometry = new THREE.SphereGeometry(LENS_EMISSIVE_R_M, 10, 8);
+    const material = createLampEmissiveMaterial();
     const mesh = createOffsetInstancedMesh(geometry, material, lights, PED_LAMP_OFFSETS);
     mesh.name = "pedestrian-signal-lamps";
     for (let i = 0; i < lights.length; i++) {
-      mesh.setColorAt(i * 2, LAMP_OFF.red);
-      mesh.setColorAt(i * 2 + 1, LAMP_OFF.green);
+      mesh.setColorAt(i * 2, LAMP_DARK);
+      mesh.setColorAt(i * 2 + 1, LAMP_DARK);
     }
     return { geometry, material, mesh };
   }, [lights]);
@@ -1430,6 +1563,7 @@ function PedestrianSignals({
   return (
     <group name="pedestrian-signals">
       <primitive object={housing} />
+      <primitive object={glass.mesh} />
       <primitive object={lamps.mesh} ref={lampsRef} />
     </group>
   );
@@ -1569,7 +1703,8 @@ function Signs({
 // rendered arm and tick.railBarred cannot disagree. Down = the authored pose
 // (rotation 0); up = ~86°; exponential damp gives the ~2.5 s real-РЖ swing,
 // no snap. A red lamp on the arm blinks while the barrier is down or moving
-// (the traffic-lamp on/off color pattern, LAMP_ON/LAMP_OFF.red).
+// (the traffic-lamp on/off color pattern, LAMP_ON.red over the same dark
+// tinted glass an unlit signal lens is made of, LENS_GLASS.red).
 //
 // Perf: 1–2 barriers per map ever → plain meshes (shared signBody material,
 // cache-owned geometry; only the tiny lamp geometry + its materials are owned
@@ -1628,7 +1763,7 @@ function RailBarriers({
       const arm = new THREE.Mesh(rb.arm, assets.materials.signBody);
       arm.castShadow = castShadow;
       const lampMaterial = new THREE.MeshBasicMaterial({ toneMapped: false });
-      lampMaterial.color.copy(LAMP_OFF.red);
+      lampMaterial.color.copy(LENS_GLASS.red);
       const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
       lamp.position.set(-1.05, 0, 0.1); // 1 m out on the arm, proud of its face
       pivot.add(arm);
@@ -1671,7 +1806,7 @@ function RailBarriers({
       const lit =
         (down || moving) &&
         state.clock.elapsedTime % BARRIER_BLINK_PERIOD_SEC < BARRIER_BLINK_ON_SEC;
-      r.lampMaterial.color.copy(lit ? LAMP_ON.red : LAMP_OFF.red);
+      r.lampMaterial.color.copy(lit ? LAMP_ON.red : LENS_GLASS.red);
     }
   });
 
@@ -1800,9 +1935,38 @@ function createTreeInstancedMesh(
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = options.castShadow ?? false;
   mesh.matrixAutoUpdate = false;
-  mesh.frustumCulled = false; // see three-helpers.createInstancedMesh
+  enableInstancedCulling(mesh); // see three-helpers.createInstancedMesh
   if (options.name) mesh.name = options.name;
   return mesh;
+}
+
+/**
+ * Trees are the single largest triangle bill in the product — measured, with
+ * my own raw GL counter, at 891,372 triangles per frame in d2-v1 at tier LOW
+ * (50.3 % of the entire frame) from four unculled district-wide InstancedMeshes.
+ * They are also the prop family a district plants most of, so this is where the
+ * chunk grid earns its extra submissions. Same decimation, same models, same
+ * placements — the student sees the identical street; the frame stops carrying
+ * the half of it that is behind the car.
+ */
+function createTreeInstancedMeshes(
+  geometry: THREE.BufferGeometry,
+  material: THREE.Material,
+  placements: readonly TreePlacement[],
+  options: { castShadow?: boolean; name?: string },
+): THREE.InstancedMesh[] {
+  const groups = chunkTransforms(placements);
+  if (groups.length <= 1) {
+    return placements.length > 0
+      ? [createTreeInstancedMesh(geometry, material, placements, options)]
+      : [];
+  }
+  return groups.map((g, i) =>
+    createTreeInstancedMesh(geometry, material, g, {
+      ...options,
+      name: options.name ? `${options.name}-c${i}` : undefined,
+    }),
+  );
 }
 
 function Trees({
@@ -1830,8 +1994,8 @@ function Trees({
       leafyB: [],
     };
     for (const t of kept) buckets[t.kind].push(t);
-    return TREE_KINDS.map((kind) =>
-      createTreeInstancedMesh(assets.trees[kind]!, assets.materials.tree, buckets[kind]!, {
+    return TREE_KINDS.flatMap((kind) =>
+      createTreeInstancedMeshes(assets.trees[kind]!, assets.materials.tree, buckets[kind]!, {
         castShadow,
         name: `trees-${kind}`,
       }),
@@ -1933,10 +2097,16 @@ function Furniture({
  *
  * The `length > 0` guards are load-bearing, not tidiness: every city, exam and
  * полигон district returns empty lists (see constants.SCENARIO_LIT_CLASSES),
- * and an InstancedMesh with count 0 still costs a draw call submission. This
- * way the tier-low draw budget on the heaviest maps in the product is
- * unchanged to the call, which is what `buildWorldGeometry.drawCallEstimate`
- * now claims.
+ * so those maps mount nothing here at all.
+ *
+ * The old wording of this paragraph said a count-0 InstancedMesh „still costs a
+ * draw call submission". It does not, in the three this repo ships:
+ * `WebGLBufferRenderer.renderInstances` returns on `primcount === 0` before
+ * touching gl (`renderers/webgl/WebGLBufferRenderer.js:19-21`). What a count-0
+ * mesh does cost is the CPU walk and the program/state setup that precede it,
+ * which is a real cost on the weak-CPU device this product targets — so the
+ * guards stay. They are just not worth a draw call each, and the draw budget
+ * was never the reason to keep them.
  */
 function B65Furniture({
   world,
@@ -1972,7 +2142,10 @@ function B65Furniture({
         });
         const mesh = new THREE.Mesh(wires, material);
         mesh.name = "utility-wires";
-        mesh.frustumCulled = false;
+        // A plain Mesh CAN cull on its own geometry sphere (unlike an
+        // InstancedMesh it has no instance matrices to confuse it), and the
+        // wire run is one merged ribbon whose sphere covers exactly the run.
+        // Leaving culling off submitted it from behind the car every frame.
         out.push(mesh);
         disposables.push(wires, material);
       }

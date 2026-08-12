@@ -160,7 +160,7 @@ describe("poligon-v1 through the world builder", () => {
   });
 
   it("stays far inside the performance budget (tiny map)", () => {
-    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+    expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
     expect(world.stats.triangles).toBeLessThan(300_000);
   });
 

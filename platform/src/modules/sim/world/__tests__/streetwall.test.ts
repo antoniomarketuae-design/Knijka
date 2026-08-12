@@ -326,7 +326,7 @@ describe.each(POPULATED)("street wall clearance law — %s", (id) => {
   it("rule 5: every plot stays a merged facade prism — zero new draw calls", () => {
     // buildings.ts merges prisms into 4 palette meshes; buildBuildingInstances
     // hands tall-and-compact or small-and-low plots to the 16-model kit, whose
-    // draw calls drawCallEstimate charges FLAT. Keeping every generated height
+    // draw calls staticDrawSlots charges FLAT. Keeping every generated height
     // strictly inside (PAVILION_MAX_HEIGHT_M, TOWER_MIN_HEIGHT_M) is what makes
     // "658 buildings for free" true rather than aspirational.
     for (const b of walls) {

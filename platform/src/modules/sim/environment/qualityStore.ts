@@ -19,6 +19,7 @@ import {
   autoQualityCeiling,
   ledgerFromSample,
   levelFromLedger,
+  maxDprFor,
   medianFpsFromDeltas,
   seedQualityFromSignals,
   unknownDeviceSignals,
@@ -163,6 +164,46 @@ export function seedQualityLevel(): QualityLevel {
   return seededLevel;
 }
 
+/**
+ * DROP THE MEMO SO THE NEXT CANVAS RE-READS THE MEASUREMENT — the missing half
+ * of the probe.
+ *
+ * The probe is mounted and it writes a verdict. `seedQualityLevel()` is the
+ * only thing that reads that verdict, and it is memoized for the whole page
+ * load. /simulator is a client-routed React app: finishing a lesson and
+ * starting another unmounts and remounts the canvas without ever reloading the
+ * document. So the measurement reached the student only on a hard refresh —
+ * a phone could measure itself drowning, write it down, and then be handed the
+ * same tier for every lesson of the session. „Applied at the next cold start"
+ * was true of the STORE and false of the PRODUCT.
+ *
+ * This is the seam, and it is the only place a tier may change: the canvas is
+ * unmounted, no drive is in progress, and the download plan for the next
+ * lesson has not been chosen yet (`TEXTURE_BUDGETS[level]` is read when
+ * LessonScene mounts). Promotion low→med is a 5.2 MB fetch and demotion is a
+ * visible pop; neither costs anything here, which is exactly why the memo must
+ * be dropped HERE and nowhere else. Calling this while a canvas is live would
+ * reintroduce the mid-drive tier change doc 82 §8 refused, so `LessonSelectScreen`
+ * — a component that cannot be on screen at the same time as the play shell —
+ * owns the call.
+ */
+export function refreshSeededQuality(): QualityLevel {
+  seededLevel = null;
+  return seedQualityLevel();
+}
+
+/**
+ * The dpr cap for the Canvas at `level` ON THIS DEVICE (see `maxDprFor`).
+ *
+ * `QUALITY_PRESETS[level].maxDpr` was read straight into `dpr={[1, …]}`, which
+ * made the cap a property of the TIER when doc 82 §2.2's ruling is about the
+ * DEVICE. Reading it through here means a handset renders 1:1 with its CSS
+ * pixels on whatever tier it reaches — by seed, by measurement or by hand.
+ */
+export function canvasMaxDpr(level: QualityLevel): number {
+  return maxDprFor(level, signals());
+}
+
 function loadStored(): QualityState {
   if (typeof window === "undefined") return DEFAULT_STATE;
   // Only `setting` is read back from storage — it is the student's choice, and
@@ -285,6 +326,34 @@ function measurementAllowed(): boolean {
 let measured = false;
 
 /**
+ * Frames the RENDERER actually drew, counted from inside the Canvas
+ * (`SimEnvironment`'s useFrame). Not a statistic and not persisted — the probe
+ * reads two snapshots of it and throws the number away.
+ *
+ * It exists because `frameloop` is no longer always "always": LessonScene puts
+ * the loop on "demand" while the world is paused, so rAF cadence and RENDER
+ * cadence are now different things and only one of them is a frame cost.
+ */
+let renderedFrames = 0;
+
+export function noteRenderedFrame(): void {
+  renderedFrames += 1;
+}
+
+/** The heartbeat's current value — for the probe, and for tests. */
+export function renderedFrameCount(): number {
+  return renderedFrames;
+}
+
+/**
+ * A window is only a measurement if the renderer kept up with the frames that
+ * were timed. 0.9 rather than 1.0: R3F can drop a render on a commit boundary,
+ * and the heartbeat is read one task after the last rAF sample, so a frame or
+ * two of slack is normal. A paused scene scores ~0.
+ */
+export const MIN_RENDERED_FRACTION = 0.9;
+
+/**
  * The FPS probe — the promotion path doc 82 §8 recorded as missing.
  *
  * Mounted WHILE the sim canvas renders (R3F draws inside the main-thread rAF,
@@ -330,15 +399,26 @@ export function useAutoQualityProbe(options?: {
     const t0 = performance.now();
     let last = -1;
     let raf = 0;
+    /** The render heartbeat as the WINDOW opened, not as the effect ran. */
+    let renderedAtWindowStart = -1;
 
     const tick = (now: number) => {
-      if (last >= 0 && now - t0 > warmupMs) deltas.push(now - last);
+      const inWindow = now - t0 > warmupMs;
+      if (inWindow && renderedAtWindowStart < 0) renderedAtWindowStart = renderedFrameCount();
+      if (last >= 0 && inWindow) deltas.push(now - last);
       last = now;
       if (now - t0 < warmupMs + durationMs) {
         raf = requestAnimationFrame(tick);
         return;
       }
       if (deltas.length < MIN_PROBE_SAMPLES) return;
+      // REFUSE A WINDOW THE RENDERER SLEPT THROUGH. A teach card puts the
+      // Canvas on a "demand" loop; rAF keeps ticking at 60 Hz over a scene
+      // nobody is drawing, and timing that would promote a phone for standing
+      // still. Doc 91's instrument rule, applied to the app's own probe: an fps
+      // number without evidence of what produced it is not a measurement.
+      const drew = renderedFrameCount() - Math.max(0, renderedAtWindowStart);
+      if (drew < deltas.length * MIN_RENDERED_FRACTION) return;
       const fpsMedian = medianFpsFromDeltas(deltas);
       if (fpsMedian === null) return;
       writeQualityLedger(

@@ -210,7 +210,7 @@ describe("buildWaterDecals on the fixture street", () => {
     expect(without.waterDecals.positions.length).toBe(0);
     // The zones difference costs exactly the А15 post (+2 draws, zoneSigns)
     // and the ONE water-sheet mesh (+1) — nothing else moves.
-    expect(withWater.stats.drawCallEstimate).toBe(without.stats.drawCallEstimate + 3);
+    expect(withWater.stats.staticDrawSlots).toBe(without.stats.staticDrawSlots + 3);
     // Deterministic (no seed dependence in the water pass).
     const again = buildWorldGeometry(fixtureDistrict([waterZone()]), { seed: 7 });
     expect(again.stats).toEqual(withWater.stats);

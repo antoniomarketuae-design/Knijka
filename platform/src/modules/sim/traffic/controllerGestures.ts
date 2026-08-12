@@ -16,10 +16,22 @@
  *
  * THEO-4. A pose is a bare verdict wearing a costume: a student who sees an
  * arm go up learns nothing from the arm. Every bubble therefore answers the
- * three questions he actually asked — what am I looking at, who goes, who
- * stops — and carries the article that makes it law. ADR-002: `lawRef` is
- * RETRIEVED from the authored `CONTROLLER_GESTURES` (pinned by that test),
- * never recalled by the model.
+ * questions he actually asked — what am I looking at, who goes, who stops,
+ * WHOSE PRIORITY IT IS — and carries the article that makes it law. ADR-002:
+ * `lawRef` is RETRIEVED from the authored `CONTROLLER_GESTURES` (pinned by
+ * that test), never recalled by the model.
+ *
+ * THE FOURTH LINE (2026-08-10, B41). The card shipped with three of the four
+ * and the register closed the row on „all three of his questions are
+ * answered". Read his sentence again: *„what exactly he is pointing, who is he
+ * letting go, whos turn its to pass"* — and then read the drill. Both authored
+ * mistakes on `sc-sig-controller-postures` are priority mistakes, not
+ * who-is-moving mistakes: a student who barges the officer's chest has read
+ * „who goes" correctly (the cross traffic) and still drives, because nothing
+ * told him the officer OUTRANKS the lamp he is looking at. `priorityBg` is
+ * that line, and it names the lamp on purpose — «дори на червено» / «и на
+ * зелено» — because the confusion is always with a light, never in the
+ * abstract.
  *
  * The long-form teaching text — `poseBg` / `goBg` / `stopBg` / `priorityBg` in
  * `CONTROLLER_GESTURES` — stays where it is and is what the debrief and the
@@ -53,6 +65,20 @@ export interface ControllerBubbleCopy {
   goBg: string;
   /** Who must stop. */
   stopBg: string;
+  /**
+   * WHOSE PRIORITY IT IS — his third question, and the one the card was
+   * missing (B41, 2026-08-10).
+   *
+   * „who is he letting go" and „whos turn its to pass" are not the same
+   * question and the drill is built on the difference: `goBg` says which
+   * direction is moving, this says who OUTRANKS whom, and on every one of the
+   * three postures the answer turns on the same clause — the officer beats the
+   * lamp (ЗДвП чл. 7). Without it the card can be read as „the green light and
+   * the officer agree", which is exactly the belief the authored mistake
+   * `mistake-barge-chest` grades as an опасна грешка. The authored long form is
+   * `CONTROLLER_GESTURES[i].priorityBg`; this is that answer cut to a line.
+   */
+  priorityBg: string;
   /** Accent colour for the headline + border: red = spri, green = minavaj,
    *  amber = vnimanie. */
   accent: string;
@@ -66,6 +92,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     poseBg: "Виждаш го СТРАНИЧНО, ръцете долу",
     goBg: "Минава: ти и цялата твоя посока",
     stopBg: "Спира: напречното направление",
+    priorityBg: "Предимството е ТВОЕ — дори на червено",
     accent: "#3ddc84",
     lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
@@ -75,6 +102,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     poseBg: "Обърнат е с ГЪРДИ или ГРЪБ към теб",
     goBg: "Минава: напречното направление",
     stopBg: "Спираш: ти, преди стоп-линията",
+    priorityBg: "Предимството НЕ е твое — и на зелено",
     accent: "#ff6a5a",
     lawRef: "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7",
   },
@@ -84,6 +112,7 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
     poseBg: "Ръката му е ВДИГНАТА нагоре",
     goBg: "Минава: никой — това не е „тръгвай“",
     stopBg: "Спират: всички посоки — сменя фазите",
+    priorityBg: "Предимството не е ничие — чакат всички",
     accent: "#ffb020",
     lawRef: "ППЗДвП сигнали на регулировчика",
   },

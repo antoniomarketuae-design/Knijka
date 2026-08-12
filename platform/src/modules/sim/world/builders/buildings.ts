@@ -234,10 +234,20 @@ function buildOne(
  * `skipFacadesFor`: building ids that render as instanced kit buildings
  * (towers or retail pavilions, buildBuildingInstances) — they get collider +
  * aabb but no wall/roof mesh, so the instance and the prism never z-fight.
+ *
+ * `extraVolumes`: scenery masses the district document does not author —
+ * today, the terminus closure that shuts the vista at a street end that runs
+ * out of the world (builders/terminus.ts). They go through the SAME walls /
+ * roofs / collider accumulators, so they cost no draw call and cannot be
+ * driven through, and they contribute their aabb so trees and terrain see
+ * them. They are deliberately NOT in `count`: `stats.buildings` answers „how
+ * many footprints does this district author", and `buildWorldGeometry.test.ts`
+ * holds it to `district.buildings.length`.
  */
 export function buildBuildings(
   buildings: DistrictBuilding[],
   skipFacadesFor?: ReadonlySet<string>,
+  extraVolumes?: readonly DistrictBuilding[],
 ): BuildingBuildResult {
   const walls = Array.from({ length: FACADE_VARIANTS }, () => new MeshAccumulator(true));
   const roofs = new MeshAccumulator();
@@ -252,6 +262,11 @@ export function buildBuildings(
       buildOne(asTower ? null : walls[variant]!, asTower ? null : roofs, collider, b),
     );
     count++;
+  }
+  for (const b of extraVolumes ?? []) {
+    if (!b.footprint || b.footprint.length < 3) continue;
+    const variant = facadeVariant(b.id, resolveBuildingHeightM(b), b.kind);
+    aabbs.push(buildOne(walls[variant]!, roofs, collider, b));
   }
   return { walls, roofs, collider, aabbs, count };
 }

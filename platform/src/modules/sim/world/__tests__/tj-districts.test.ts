@@ -154,7 +154,7 @@ for (const id of ["tj-rhr-v1", "tj-stop-v1"] as const) {
     });
 
     it("stays trivially inside the performance budget (micro-map)", () => {
-      expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+      expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
       expect(world.stats.triangles).toBeLessThan(300_000);
     });
 

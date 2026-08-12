@@ -56,15 +56,35 @@ describe("controller bubble copy (B42)", () => {
 
   it("answers his three questions on every posture, in Bulgarian (THEO-4)", () => {
     for (const b of CONTROLLER_BUBBLES) {
-      // What am I looking at / who goes / who stops — never a bare verdict.
+      // What am I looking at / who goes / who stops / whose priority it is —
+      // never a bare verdict. His sentence names all four.
       expect(b.poseBg.length, b.posture).toBeGreaterThan(12);
       expect(b.goBg, b.posture).toMatch(/^Минава:/);
       expect(b.stopBg, b.posture).toMatch(/^Спира(ш|т)?:/);
-      for (const s of [b.headlineBg, b.poseBg, b.goBg, b.stopBg]) {
+      expect(b.priorityBg, b.posture).toMatch(/^Предимството /);
+      for (const s of [b.headlineBg, b.poseBg, b.goBg, b.stopBg, b.priorityBg]) {
         expect(s, `${b.posture}: "${s}" must be Bulgarian`).toMatch(/[А-Яа-я]/);
         expect(s, `${b.posture}: "${s}" must have no latin letters`).not.toMatch(/[A-Za-z]/);
       }
     }
+  });
+
+  it("the PRIORITY line answers a different question from the GO line (B41)", () => {
+    // The row this file exists for was closed on „all three of his questions
+    // are answered" while the card carried three of FOUR. The failure mode if
+    // someone ever collapses them again is that `priorityBg` becomes a restated
+    // `goBg` — true, and useless, because the mistake the drill grades is a
+    // student who read „who goes" right and drove anyway.
+    for (const b of CONTROLLER_BUBBLES) {
+      expect(b.priorityBg, b.posture).not.toBe(b.goBg);
+      expect(b.priorityBg, b.posture).not.toBe(b.stopBg);
+    }
+    // Two of the three name the LAMP, because the confusion is never abstract:
+    // it is always „but the light was green". The raised-arm posture is the
+    // exception on purpose — there the answer is that priority is nobody's.
+    const lampAware = CONTROLLER_BUBBLES.filter((b) => /червено|зелено/.test(b.priorityBg));
+    expect(lampAware.map((b) => b.posture)).toEqual(["sideProfile", "chestOrBack"]);
+    expect(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].priorityBg).toMatch(/ничие/);
   });
 
   it("stays short enough to read on a billboard from the approach", () => {
@@ -76,6 +96,7 @@ describe("controller bubble copy (B42)", () => {
       expect(b.poseBg.length, b.posture).toBeLessThanOrEqual(40);
       expect(b.goBg.length, b.posture).toBeLessThanOrEqual(40);
       expect(b.stopBg.length, b.posture).toBeLessThanOrEqual(40);
+      expect(b.priorityBg.length, b.posture).toBeLessThanOrEqual(40);
       // `lawRef` HAD NO CAP, and on 2026-08-09 it grew: the article numbers came
       // off the two acts `content/law/acts` does not hold, so
       // „ППЗДвП чл. 29, ал. 3; ЗДвП чл. 7" (32) became
@@ -119,6 +140,8 @@ describe("controller bubble copy (B42)", () => {
 interface PaintedLine {
   text: string;
   sizePx: number;
+  /** Baseline the painter asked for, px down the 1024×576 canvas. */
+  y: number;
   maxWidth: number | undefined;
   width: number;
 }
@@ -146,7 +169,7 @@ function recordingCanvas(): { canvas: HTMLCanvasElement; lines: PaintedLine[] } 
     strokeStyle: "",
     lineWidth: 0,
     measureText: (t: string) => ({ width: t.length * EM_PER_CHAR * sizePx }),
-    fillText: (text: string, _x: number, _y: number, maxWidth?: number) => {
+    fillText: (text: string, _x: number, y: number, maxWidth?: number) => {
       // What the browser actually paints: `maxWidth` CONDENSES the glyphs, so
       // the ink is min(natural, maxWidth). Modelling that is what makes the
       // floor case honest instead of a stub artefact.
@@ -154,6 +177,7 @@ function recordingCanvas(): { canvas: HTMLCanvasElement; lines: PaintedLine[] } 
       lines.push({
         text,
         sizePx,
+        y,
         maxWidth,
         width: maxWidth === undefined ? natural : Math.min(natural, maxWidth),
       });
@@ -178,7 +202,7 @@ function recordingCanvas(): { canvas: HTMLCanvasElement; lines: PaintedLine[] } 
 describe("the bubble PAINTER clamps its own ink (B41)", () => {
   const INK_BUDGET = BUBBLE_TEX_W - 2 * BUBBLE_PAD_X;
 
-  it("paints all five authored lines for every posture", () => {
+  it("paints all six authored lines for every posture", () => {
     for (const b of CONTROLLER_BUBBLES) {
       const { canvas, lines } = recordingCanvas();
       drawControllerBubble(canvas, b);
@@ -187,8 +211,32 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
         b.poseBg,
         b.goBg,
         b.stopBg,
+        b.priorityBg,
         b.lawRef,
       ]);
+    }
+  });
+
+  it("every painted line sits inside the card body, above the tail (B41)", () => {
+    // Adding a sixth line is where a card silently starts painting over its own
+    // pointer. The baselines are authored constants; this is the only place
+    // that can catch one drifting past the body.
+    const TAIL = 34;
+    for (const b of CONTROLLER_BUBBLES) {
+      const { canvas, lines } = recordingCanvas();
+      drawControllerBubble(canvas, b);
+      let prev = 0;
+      for (const l of lines) {
+        // Ascender above the baseline, descender below — Segoe UI runs ≈0.75 /
+        // ≈0.25 em, rounded away from the card in both directions.
+        expect(l.y - 0.8 * l.sizePx, `${b.posture}: "${l.text}" clips the top`).toBeGreaterThan(0);
+        expect(
+          l.y + 0.3 * l.sizePx,
+          `${b.posture}: "${l.text}" runs into the tail`,
+        ).toBeLessThan(BUBBLE_TEX_H - TAIL);
+        expect(l.y, `${b.posture}: "${l.text}" is out of reading order`).toBeGreaterThan(prev);
+        prev = l.y;
+      }
     }
   });
 
@@ -213,7 +261,7 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
     const grown = "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7 и чл. 6";
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: grown });
-    const law = lines[4];
+    const law = lines[5];
     expect(law.text).toBe(grown); // no ellipsis, no cut — ADR-002
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);
     expect(law.sizePx).toBeLessThan(38); // it did shrink
@@ -228,7 +276,7 @@ describe("the bubble PAINTER clamps its own ink (B41)", () => {
       "ППЗДвП сигнали на регулировчика; ЗДвП чл. 7; ЗДвП чл. 6; ППЗДвП чл. 66; ЗДвП чл. 50";
     const { canvas, lines } = recordingCanvas();
     drawControllerBubble(canvas, { ...CONTROLLER_BUBBLES[1], lawRef: absurd });
-    const law = lines[4];
+    const law = lines[5];
     expect(law.text).toBe(absurd);
     expect(law.sizePx).toBe(Math.floor(38 * BUBBLE_MIN_FONT_SCALE));
     expect(law.width).toBeLessThanOrEqual(INK_BUDGET);

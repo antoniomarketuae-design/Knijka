@@ -7,7 +7,9 @@ import {
   isTouchOnlyDevice,
   ledgerFromSample,
   levelFromLedger,
+  maxDprFor,
   medianFpsFromDeltas,
+  TOUCH_MAX_DPR,
   recommendQuality,
   seedQualityFromSignals,
   unknownDeviceSignals,
@@ -244,13 +246,23 @@ describe("seedQualityFromSignals", () => {
     expect(seedQualityFromSignals(phone({ dpr: 3 }))).toBe("low");
   });
 
-  it("gives a flagship touch device med, but never the €125 reference phone", () => {
-    // Chromium clamps deviceMemory to 8, so a touch-only device REPORTING 8
-    // has ≥8 GB — a flagship Android. The A16 reports 4 and is untouched.
+  it("seeds EVERY touch-only device low — the 8 GB carve-out is gone", () => {
+    // It used to read `touch-only AND deviceMemoryGb >= 8 → med`, on the theory
+    // that a phone reporting Chromium's clamped 8 must be a flagship. Measured
+    // on the production build over six phone profiles, `med` costs 2.4× the
+    // draw calls (205.6 → 492.5/frame on iPhone-16 portrait) and a 1.56× larger
+    // backing store, on a tier already 3.3× over the ≤150 draw budget. And 8 GB
+    // is mid-range silicon in 2026, so the rule was inferring a GPU from a RAM
+    // figure. The FPS probe is mounted now: a real flagship pays `low` for one
+    // session and is promoted on evidence (see ledgerFromSample below).
     expect(seedQualityFromSignals(phone({ deviceMemoryGb: 8, hardwareConcurrency: 8 }))).toBe(
-      "med",
+      "low",
     );
     expect(seedQualityFromSignals(galaxyA16())).toBe("low");
+    // A tablet is a touch-only device too, and it climbs the same way.
+    expect(
+      seedQualityFromSignals(phone({ deviceMemoryGb: 8, hardwareConcurrency: 8, dpr: 2 })),
+    ).toBe("low");
   });
 
   it("falls back to med when the browser exposes nothing", () => {
@@ -350,6 +362,37 @@ describe("autoQualityCeiling", () => {
     expect(isTouchOnlyDevice(laptop({ coarsePointer: true }))).toBe(false);
     expect(autoQualityCeiling(laptop({ coarsePointer: true }))).toBe("high");
     expect(isTouchOnlyDevice(iphone16())).toBe(true);
+  });
+});
+
+describe("maxDprFor", () => {
+  it("renders a handset 1:1 with its CSS pixels on EVERY tier", () => {
+    // The ceiling only bound `auto`. A device promoted to med by measurement,
+    // or a student choosing a tier by hand, still reached maxDpr 1.25 — a
+    // measured 1.56× backing store (492,195 px vs 315,172 px at the iPhone-16
+    // landscape viewport, production build, 2026-08-12). doc 82 §2.2's ruling
+    // is about the DEVICE, so the cap now is too.
+    for (const level of ["low", "med", "high"] as const) {
+      expect(maxDprFor(level, iphone16())).toBe(TOUCH_MAX_DPR);
+      expect(maxDprFor(level, galaxyA16())).toBe(TOUCH_MAX_DPR);
+    }
+  });
+
+  it("leaves every pointing device exactly as it was", () => {
+    for (const level of ["low", "med", "high"] as const) {
+      expect(maxDprFor(level, laptop())).toBe(QUALITY_PRESETS[level].maxDpr);
+      // Including the 300%-scaled Windows laptop the old dpr rule condemned.
+      expect(maxDprFor(level, hidpiLaptop())).toBe(QUALITY_PRESETS[level].maxDpr);
+      expect(maxDprFor(level, laptop({ coarsePointer: true }))).toBe(
+        QUALITY_PRESETS[level].maxDpr,
+      );
+    }
+  });
+
+  it("never raises a cap — it is a clamp, not a setting", () => {
+    expect(maxDprFor("low", laptop())).toBe(1);
+    expect(maxDprFor("low", iphone16())).toBe(1);
+    expect(TOUCH_MAX_DPR).toBeLessThanOrEqual(QUALITY_PRESETS.low.maxDpr);
   });
 });
 

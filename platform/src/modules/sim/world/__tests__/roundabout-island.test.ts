@@ -34,6 +34,8 @@ import { analyzeNetwork } from "../builders/network";
 import {
   analyzeRoundabouts,
   hasOuterKerb,
+  hasRingBoundary,
+  ringBoundaryRadiusAt,
   ringBearingInMouth,
   ringOuterRadiusAt,
   type RoundaboutRing,
@@ -398,22 +400,102 @@ describe("FR-22 — the OUTER boundary is a circle too", () => {
   /** Bearings sampled per ring: 2° — finer than any mouth is narrow. */
   const B = 180;
 
-  /** Every ring that resolved a circular outer kerb, with its district. */
-  function circularRings(): Array<{ id: string; ring: RoundaboutRing }> {
+  /** Every ring that resolved an outer BOUNDARY (profile + closed mouths). */
+  function boundedRings(): Array<{ id: string; ring: RoundaboutRing }> {
     const out: Array<{ id: string; ring: RoundaboutRing }> = [];
     for (const id of RING_DISTRICTS) {
       for (const ring of ringsOf(readDistrict(id))) {
-        if (hasOuterKerb(ring)) out.push({ id, ring });
+        if (hasRingBoundary(ring)) out.push({ id, ring });
       }
     }
     return out;
   }
 
-  it("every shipped ring resolves one — the derivation is not opt-in", () => {
-    // Six registrations, six circles. d2-v1 is included on purpose: its ISLAND
-    // is refused (a primary runs through the interior) but its outside is still
-    // a circle, and those are independent facts about independent boundaries.
-    expect(circularRings().map((r) => r.id).sort()).toEqual([...RING_DISTRICTS].sort());
+  /** …and the subset that has enough ARC left to sweep as circular kerb. */
+  function circularRings(): Array<{ id: string; ring: RoundaboutRing }> {
+    return boundedRings().filter(({ ring }) => hasOuterKerb(ring));
+  }
+
+  it("every shipped ring resolves a BOUNDARY — the derivation is not opt-in", () => {
+    // Six registrations, six closed boundaries. d2-v1 is included on purpose:
+    // its ISLAND is refused (a primary runs through the interior) and it has no
+    // circular ARC left either, but its outside is still bounded — three
+    // independent facts about three independent things.
+    expect(boundedRings().map((r) => r.id).sort()).toEqual([...RING_DISTRICTS].sort());
+  });
+
+  it("five of the six have circular ARC; d2-v1 has none, and says so", () => {
+    // B16. The arc floor is not cosmetic: d2-v1's eight arms — four of them
+    // 24.25 m curb-to-curb against a 34.8 m outer radius, meeting the ring
+    // obliquely — cover the whole circumference by union. There is no circle
+    // there to draw, so the per-edge strips stand and the honest number is
+    // recorded rather than a swept lie.
+    expect(circularRings().map((r) => r.id).sort()).toEqual(
+      RING_DISTRICTS.filter((d) => d !== "d2-v1").sort(),
+    );
+    const d2 = ringsOf(readDistrict("d2-v1"))[0]!;
+    expect(hasRingBoundary(d2)).toBe(true);
+    expect(d2.circleFractionOfRing).toBeLessThan(0.08);
+  });
+
+  it("EVERY mouth is closed by kerb returns — a mouth is a gap in the CIRCLE, not in the KERB", () => {
+    // THE B16 DEFECT, as one assertion. Before it, the arm's own pavement
+    // stopped at the junction cut, the ring's kerb stopped at the mouth edge,
+    // and between them sat an unkerbed octagonal lobe of junction asphalt twice
+    // the arm's width bleeding into the terrain — four of them, which is the
+    // Maltese cross the founder photographed and called „not a proper
+    // round-about".
+    for (const { id, ring } of boundedRings()) {
+      for (const mouth of ring.mouths) {
+        expect(
+          mouth.returns.length,
+          `${id} ${mouth.armEdgeId}: mouth has ${mouth.returns.length} kerb return(s)`,
+        ).toBeGreaterThan(0);
+        for (const r of mouth.returns) {
+          // The fillet touches the ring's outer edge…
+          const rr = Math.hypot(r.tRing[0] - ring.centre[0], r.tRing[1] - ring.centre[1]);
+          const bearing = Math.atan2(r.tRing[1] - ring.centre[1], r.tRing[0] - ring.centre[0]);
+          expect(Math.abs(rr - ringOuterRadiusAt(ring, bearing)), `${id} ${mouth.armEdgeId}`)
+            .toBeLessThan(0.05);
+          // …and the arm's kerb line, at the arm's FULL drawn half width. Half
+          // a metre out on this one number and the return is built over the
+          // carriageway or a lane's width off it.
+          const lat =
+            (r.tArm[0] - mouth.node[0]) * mouth.normal[0] +
+            (r.tArm[1] - mouth.node[1]) * mouth.normal[1];
+          expect(Math.abs(lat - r.side * mouth.armHalfWidthM), `${id} ${mouth.armEdgeId}`)
+            .toBeLessThan(0.05);
+        }
+      }
+    }
+  });
+
+  it("no junction asphalt survives outside the ring's boundary — INCLUDING inside a mouth", () => {
+    // The other half of the same sentence, and the half that was missing: the
+    // pad clip used to return every in-mouth point untouched, so the lobes were
+    // never clipped at all. Probed on the shipped triangles at +55.73 m past
+    // the ring's outer edge on rb-mini before this line; the arm CORRIDOR is
+    // excluded because a road going somewhere is not a hole in a kerb.
+    for (const id of ["rb-mini-v1", "rb-ped-v1", "rb-2lane-v1", "rb-single-v1"] as const) {
+      const ring = ringsOf(readDistrict(id))[0]!;
+      const p = worldOf(id).junctionSurface.positions;
+      let worst = 0;
+      let at = "";
+      for (let i = 0; i < p.length; i += 3) {
+        const x = p[i]! - ring.centre[0];
+        const y = -p[i + 2]! - ring.centre[1];
+        const bearing = Math.atan2(y, x);
+        const lim = ringBoundaryRadiusAt(ring, bearing);
+        if (!Number.isFinite(lim)) continue; // straight up an arm — a road
+        const over = Math.hypot(x, y) - lim;
+        if (over > worst) {
+          worst = over;
+          at = `${((bearing * 180) / Math.PI).toFixed(0)}°`;
+        }
+      }
+      expect(worst, `${id}: junction asphalt ${worst.toFixed(2)} m past the boundary at ${at}`)
+        .toBeLessThanOrEqual(0.25);
+    }
   });
 
   it("there is KERB at every bearing that is not a mouth", () => {
@@ -495,8 +577,19 @@ describe("FR-22 — the OUTER boundary is a circle too", () => {
         const arm = district.roads.edges.find((e) => e.id === mouth.armEdgeId);
         expect(arm, `${id}: mouth names a missing edge ${mouth.armEdgeId}`).toBeTruthy();
         expect(ring.ringEdgeIds.has(mouth.armEdgeId), `${id}: a RING edge is not an arm`).toBe(false);
-        // The gap is a gap, not a hole: never more than a quarter turn.
-        expect(mouth.halfAngle, `${id} ${mouth.armEdgeId}`).toBeLessThan(Math.PI / 4);
+        // The gap is a gap, not a hole. B16 split the mouth in two, because an
+        // OSM arm does not meet its ring square and a symmetric span would put
+        // the kerb run's end and its return's start in different places.
+        //
+        // The bound is 75° a side, not the 45° a synthetic map needs: measured,
+        // district-v1's `e25653914.0` subtends 46.2° clockwise and 9.6°
+        // counter-clockwise off the same axis, because it leaves the ring at an
+        // angle. That asymmetry is the map, not a bug — what makes the mouth a
+        // mouth rather than a hole is the two returns asserted above, not its
+        // width.
+        const bound = (75 * Math.PI) / 180;
+        expect(mouth.halfAngleCw, `${id} ${mouth.armEdgeId} cw`).toBeLessThan(bound);
+        expect(mouth.halfAngleCcw, `${id} ${mouth.armEdgeId} ccw`).toBeLessThan(bound);
       }
     }
   });

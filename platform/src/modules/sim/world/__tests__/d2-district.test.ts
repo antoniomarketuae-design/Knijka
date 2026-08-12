@@ -359,7 +359,7 @@ describe("d2-v1 through the world builder", () => {
   });
 
   it("stays inside the city performance budget (the district-v1 bounds)", () => {
-    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+    expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
     expect(world.stats.triangles).toBeLessThan(900_000);
   });
 

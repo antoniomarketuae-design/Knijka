@@ -13,6 +13,16 @@
  * „there is no shared world-label channel" — were exactly right, and the answer
  * is to extract one rather than to copy 90 lines into a second file.
  *
+ * WHAT IS AND IS NOT SHARED TODAY, stated plainly so nobody reads more into
+ * this file than it does. This is the channel for WORLD GEOMETRY, and the
+ * signal head is its first caller. `traffic/TrafficLayer.tsx` still paints the
+ * officer's bubble with its own painter (its `bubbleTex` + the wrapper above
+ * `fillText`): that bubble is closed, photographed and shipped on row B42, and
+ * moving it here would put a closed row back at risk for no gain the founder
+ * can see. So the duplication is DELIBERATE and temporary — when the actor
+ * bubble is next touched, it should adopt `drawWorldLabel` and delete its own
+ * painter, and this paragraph is the note that says so.
+ *
  * WHAT IT IS. A texture painter plus the numbers a billboarded plane needs. It
  * knows nothing about signals, officers or lessons: a caller supplies a
  * `WorldLabelCopy`, paints it once into its own canvas, and draws it on a plane

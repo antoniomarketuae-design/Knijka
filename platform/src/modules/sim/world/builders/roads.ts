@@ -23,6 +23,7 @@ import {
   PARKING_LANE_Y,
   ROAD_Y,
   SIDEWALK_CLASSES,
+  sidewalkEndInsetM,
   SIDEWALK_SKIRT_M,
   SIDEWALK_SKIRT_TINT,
   SIDEWALK_TOP_Y,
@@ -45,11 +46,12 @@ import {
 import { MeshAccumulator, toWorld, UP } from "./mesh";
 import { isBareVergeSide, type NodeInfo, type RoadNetwork } from "./network";
 import {
-  clipIntoRingOuter,
+  clipIntoRingBoundary,
   clipOutOfIslands,
   hasOuterKerb,
   islandContaining,
   ringAtPoint,
+  ringMouthKerbRuns,
   ringOuterKerbRuns,
   ringOutwardSide,
   type RoundaboutRing,
@@ -71,6 +73,10 @@ export interface RoadBuildResult {
   parkingLaneStripCount: number;
   /** FR-22, the outer half: mouth-free arcs of circular ring kerb swept. */
   ringKerbRunCount: number;
+  /** B16: kerb returns swept — the fillet + straight that carries the boundary
+   *  from the ring's outer edge into each arm's own kerb, so a mouth is a gap
+   *  in the CIRCLE rather than a gap in the KERB. Two per arm. */
+  ringReturnRunCount: number;
   /** Ring edges whose junction-trimmed stub strip the circle replaced. */
   skippedRingStripCount: number;
 }
@@ -264,17 +270,18 @@ function buildJunctionPatch(
   const corners: JunctionPatch["corners"] = [];
   // FR-22, the outer half. `ownRing` is non-null ONLY at a node that stands on
   // a circulatory carriageway, so the outer clip can never reach a junction
-  // that has nothing to do with the roundabout. Off-mouth boundary points are
-  // pulled back onto the ring's outer edge — probed at up to +10.73 m past it
-  // before this line existed, which is the flare that made the outside a square.
+  // that has nothing to do with the roundabout. Boundary points are pulled back
+  // onto the ring's drawn edge — probed at up to +10.73 m past it off the
+  // mouths and +55.7 m inside one before this line existed, which is the flare
+  // that made the outside a square with four lobes on it (B16).
   const ownRing = rings.length === 0 ? null : ringAtPoint(rings, node.pos);
   const clip = (p: Vec2): Vec2 => {
     if (rings.length === 0) return p;
     const q = clipOutOfIslands(rings, p);
-    return ownRing ? clipIntoRingOuter(ownRing, q) : q;
+    return ownRing ? clipIntoRingBoundary(ownRing, q) : q;
   };
   const beyondRing = (p: Vec2): boolean =>
-    ownRing !== null && clipIntoRingOuter(ownRing, p) !== p;
+    ownRing !== null && clipIntoRingBoundary(ownRing, p) !== p;
   for (let i = 0; i < aps.length; i++) {
     const ap = aps[i]!;
     const next = aps[(i + 1) % aps.length]!;
@@ -498,6 +505,7 @@ export function buildRoads(
   let parkingLaneStripCount = 0;
   /** Mouth-free arcs of circular ring kerb swept (FR-22, the outer half). */
   let ringKerbRunCount = 0;
+  let ringReturnRunCount = 0;
   /** Ring edges whose trimmed-stub strip the circle above replaced. */
   let skippedRingStripCount = 0;
 
@@ -559,7 +567,12 @@ export function buildRoads(
       // Pull sidewalk ends back a little so junction corners stay open.
       const lineLen = polylineLength(eb.line);
       if (lineLen > 6) {
-        const inset = Math.min(1.2, lineLen * 0.08);
+        // Shared with the roundabout mouth's kerb return, which has to end
+        // exactly where this strip begins (constants.sidewalkEndInsetM). Two
+        // copies of this expression leave either a hole in the kerb or a
+        // co-planar overlap at every ring mouth, and both are visible from the
+        // driving seat.
+        const inset = sidewalkEndInsetM(lineLen);
         const walkLine = trimPolyline(eb.line, inset, inset, 1.5) ?? eb.line;
         // A bare verge (a divided street's median kerb, a motorway връзка's
         // grass verge — network.ts BareVergeSide) carries no pavement: the
@@ -587,6 +600,15 @@ export function buildRoads(
       sidewalkStripCount++;
       ringKerbRunCount++;
     }
+    // …AND THE KERB RETURNS THAT CLOSE THE MOUTHS (B16). Same call, same
+    // cross-section, same collider: what changes is that the boundary no longer
+    // stops. Swept at half width 0 because these polylines ARE the kerb line —
+    // the ring runs above are centrelines, the arm's kerb is not.
+    for (const { line, side } of ringMouthKerbRuns(ring)) {
+      buildSidewalkStrip(sidewalks, line, 0, side);
+      sidewalkStripCount++;
+      ringReturnRunCount++;
+    }
   }
 
   for (const node of network.nodes.values()) {
@@ -609,6 +631,7 @@ export function buildRoads(
     sidewalkStripCount,
     parkingLaneStripCount,
     ringKerbRunCount,
+    ringReturnRunCount,
     skippedRingStripCount,
   };
 }

@@ -60,6 +60,16 @@ import {
   SIDEWALK_WIDTH_M,
   STREET_TREE_SPACING_M,
   STREETLIGHT_SPACING_M,
+  TERMINUS_TREE_BUDGET,
+  TERMINUS_TREE_COL_PITCH_M,
+  TERMINUS_TREE_DENSITY,
+  TERMINUS_TREE_HALF_W_M,
+  TERMINUS_TREE_NEAR_M,
+  TERMINUS_TREE_ROAD_CLEAR_M,
+  TERMINUS_TREE_ROW_PITCH_M,
+  TERMINUS_TREE_ROWS,
+  TERMINUS_TREE_TERRAIN_INSET_M,
+  TERRAIN_MARGIN_M,
   UTILITY_POLE_SPACING_M,
 } from "./constants";
 import {
@@ -87,6 +97,7 @@ import {
   type Approach,
   type RoadNetwork,
 } from "./network";
+import { terminusEnds } from "./terminus";
 import { buildZoneSigns, scenarioSignScale } from "./zoneSigns";
 import { SCENARIO_SIGN_SCALE } from "./constants";
 
@@ -1629,6 +1640,101 @@ export function buildProps(
       if (insideBuilding(p, 2.5)) continue;
       const pick = rng();
       pushTree(p, pick < 0.45 ? "ornamental" : pick < 0.75 ? "leafyA" : "leafyB");
+    }
+  }
+
+  // -- THE STREET END (B65 — „the carriageway ends at an undressed hard edge") --
+  //
+  // The one thing in this row that a lamp count cannot answer. Read off the
+  // seat at `sp-creep-v1` y = 299.73, 60 m short of the road end: the tarmac
+  // stops at a hard horizontal edge and an empty plain runs on to the hills.
+  // constants.TERMINUS_TREE_* carries the frame, the numbers and why this is
+  // trees rather than a bend, a junction or a terminating building.
+  //
+  // WHICH ENDS. `network.deadEnds` ∩ `nearBoundary` — the ends that run OUT OF
+  // THE WORLD, not a cul-de-sac inside it (a stub street ending mid-map is a
+  // real place with its own frontage and is left alone). Scenario micro-maps
+  // only, on the same SCENARIO_LIT_CLASSES gate as every other B65 pass: a city
+  // or exam district's boundary ends are the edge of an OSM extract, and 249
+  // of them planted would be a forest around Sofia.
+  //
+  // ITS OWN RNG STREAM, and that is load-bearing. Every placement in this
+  // builder after this point draws from the shared `rng`; taking even one
+  // sample from it here would shift the billboards, bus stops and parking kits
+  // of every scenario map by a stream position, i.e. silently re-place props on
+  // 90 districts to add trees to two ends of each. Seeded off the same seed, so
+  // it stays deterministic, and the master stream is untouched — every existing
+  // placement in the product is byte-identical.
+  const terminusRng = mulberry32(options.seed ^ 0x5e11ed);
+  if (placeTrees && lessonScale !== undefined) {
+    const keepInMinX = bounds.minX - TERRAIN_MARGIN_M + TERMINUS_TREE_TERRAIN_INSET_M;
+    const keepInMaxX = bounds.maxX + TERRAIN_MARGIN_M - TERMINUS_TREE_TERRAIN_INSET_M;
+    const keepInMinY = bounds.minY - TERRAIN_MARGIN_M + TERMINUS_TREE_TERRAIN_INSET_M;
+    const keepInMaxY = bounds.maxY + TERRAIN_MARGIN_M - TERMINUS_TREE_TERRAIN_INSET_M;
+    // ONE definition of „an end that runs out of the world", shared with the
+    // pass that closes the AXIS behind this grove (builders/terminus.ts). It
+    // was inlined here and is now `terminusEnds`, same predicate and same
+    // `[...deadEnds].sort()` order — this stream depends on that order, so
+    // every existing placement stays byte-identical.
+    const eligible = terminusEnds(district, network);
+    // THE BUDGET, spent over however many arms this map has (constants.
+    // TERMINUS_TREE_BUDGET carries the catalogue-wide measurement that forced
+    // it). A two-ended street keeps all four rows — the look that was
+    // photographed — while an eight-armed junction takes one row per arm
+    // instead of eight full groves.
+    const columnsPerRow =
+      Math.floor((2 * TERMINUS_TREE_HALF_W_M) / TERMINUS_TREE_COL_PITCH_M) + 1;
+    const perRow = Math.max(1, columnsPerRow * TERMINUS_TREE_DENSITY);
+    const rows = Math.min(
+      TERMINUS_TREE_ROWS,
+      Math.max(1, Math.round(TERMINUS_TREE_BUDGET / (Math.max(1, eligible.length) * perRow))),
+    );
+    for (const { pos, out, lateral, halfWidth } of eligible) {
+      // The NEAREST row keeps the carriageway's own continuation clear, so
+      // anything standing at the end node itself is still seen from the seat.
+      // It is also the reason the AXIS stayed open: measured on the shipped
+      // band, the widest hole through it is 6.8 m wide on the centreline. The
+      // axis is closed BEHIND this grove instead — builders/terminus.ts.
+      const corridorM = halfWidth + 1;
+      for (let row = 0; row < rows; row++) {
+        const s = TERMINUS_TREE_NEAR_M + row * TERMINUS_TREE_ROW_PITCH_M;
+        for (
+          let u = -TERMINUS_TREE_HALF_W_M;
+          u <= TERMINUS_TREE_HALF_W_M + 1e-6;
+          u += TERMINUS_TREE_COL_PITCH_M
+        ) {
+          // Every candidate draws its three samples whether or not it is kept,
+          // so a skipped station cannot re-phase the ones after it.
+          const keep = terminusRng() < TERMINUS_TREE_DENSITY;
+          const ju = (terminusRng() - 0.5) * TERMINUS_TREE_COL_PITCH_M * 0.8;
+          const js = (terminusRng() - 0.5) * TERMINUS_TREE_ROW_PITCH_M * 0.8;
+          const pickKind = terminusRng();
+          if (!keep) continue;
+          const uu = u + ju;
+          if (row === 0 && Math.abs(uu) < corridorM) continue;
+          const p = add(add(pos, mul(out, s + js)), mul(lateral, uu));
+          if (p[0] < keepInMinX || p[0] > keepInMaxX) continue;
+          if (p[1] < keepInMinY || p[1] > keepInMaxY) continue;
+          if (insideBuilding(p, 2)) continue;
+          if (roadGrid.distanceTo(p, TERMINUS_TREE_ROAD_CLEAR_M + 1) < TERMINUS_TREE_ROAD_CLEAR_M)
+            continue;
+          trees.push({
+            position: toWorld(p[0], p[1], 0),
+            yaw: terminusRng() * Math.PI * 2,
+            // BIGGER than a street tree, on purpose and for a measured reason.
+            // MEASURED on the built world: one tree instance costs 378 triangles
+            // of the frame (327,022 → 336,850 at tier low for 26 of them, both
+            // instruments agreeing). Screen coverage goes with the SQUARE of the
+            // scale and triangles do not, so closing this vista with fewer,
+            // larger crowns is strictly cheaper than closing it with more small
+            // ones — and a mass of mature trees is what stands at the end of a
+            // real street anyway.
+            scale: 1.15 + terminusRng() * 0.7,
+            variant: Math.floor(terminusRng() * 3) as 0 | 1 | 2,
+            kind: pickKind < 0.45 ? "leafyA" : pickKind < 0.85 ? "leafyB" : "ornamental",
+          });
+        }
+      }
     }
   }
 

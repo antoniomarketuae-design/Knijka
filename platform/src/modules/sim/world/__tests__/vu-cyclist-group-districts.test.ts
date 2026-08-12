@@ -226,8 +226,20 @@ describe("sc-vu-cyclist-group — the authored lines sit in the bands they claim
     expect(centers).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
   });
 
-  it("THE CUT LINE is inside the contact bar (the cut-in demo's COLLISION)", () => {
-    expect(RIDER_X - CUT_X).toBeLessThan(VULNERABLE_PASS_CONTACT_M);
+  it("THE CUT LINE is the worst squeeze the street has — 0.21 m of air, not a crash", () => {
+    // WAS: "inside the contact bar (the cut-in demo's COLLISION)", asserting
+    // 1.4625 < 2.2. Both halves of that were the isotropic circle talking. The
+    // contact bar is now the BODY ALLOWANCE (0.85 hero + 0.4 rider = 1.25 m of
+    // centres = zero air, worldRuntime), and this line leaves 0.21 m of it — a
+    // handlebar's width, and the most brutal pass the template authors. It is
+    // VULNERABLE_PASS_TOO_CLOSE, which is what «притисна третия до бордюра»
+    // describes; it is not «Пътнотранспортно произшествие», which is what a
+    // 2.2 m circle around two point-actors used to call it.
+    const centers = RIDER_X - CUT_X;
+    expect(centers).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
+    expect(centers - VULNERABLE_PASS_BODY_ALLOWANCE_M).toBeLessThan(0.25);
+    // …and still far inside the convict band, so the bill lands.
+    expect(centers).toBeLessThan(VULNERABLE_PASS_CONVICT_LATERAL_M);
   });
 });
 

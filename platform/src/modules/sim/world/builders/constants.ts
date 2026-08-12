@@ -39,6 +39,24 @@ export const SIDEWALK_WIDTH_M = 3.5;
 export const SIDEWALK_SKIRT_M = 0.35;
 
 /**
+ * How far a street's pavement strip starts INSIDE its junction-trimmed
+ * centreline, so junction corners stay open for the corner apron.
+ *
+ * Extracted so the roundabout mouth's kerb return can end exactly where the
+ * arm's own pavement begins (builders/roundabout.ts `ringMouthKerbRuns`).
+ * Two copies of `Math.min(1.2, len * 0.08)` would leave either a hole in the
+ * kerb or a co-planar overlap at every mouth, and both are visible from the
+ * driving seat.
+ */
+export const SIDEWALK_END_INSET_M = 1.2;
+export const SIDEWALK_END_INSET_FRACTION = 0.08;
+
+/** Pavement start inset for a trimmed centreline `lineLenM` long. */
+export function sidewalkEndInsetM(lineLenM: number): number {
+  return Math.min(SIDEWALK_END_INSET_M, lineLenM * SIDEWALK_END_INSET_FRACTION);
+}
+
+/**
  * Extra open-corner (curb fillet) radius added past the widest approach at
  * junctions, by the junction's dominant road class. Real Sofia curb radii run
  * 6–12 m; the old flat 2 m read like a model railway and forced implausible
@@ -725,6 +743,189 @@ export const RAILING_GAP_PANELS = 4;
  * crossing on the edge clears its own gap.
  */
 export const RAILING_CROSSING_CLEAR_M = 11;
+
+// --- THE STREET END (B65 — the carriageway that stops at a cut edge) --------
+//
+// WHAT HE SEES, AND WHY IT IS THE LOUDEST THING IN THE ROW. The furniture pass
+// above answered „raw": `sp-creep-v1` now carries frontage both sides, a lamp
+// run, an overhead line and a parapet. It did NOT answer the last four seconds
+// of the drive. Photographed from the seat at `y = 299.73`, 60 m short of the
+// road end (scratchpad frame, whole cockpit, car stopped, telemetry burned in):
+// the tarmac runs forward and STOPS at a hard horizontal edge, and beyond it an
+// empty olive plain runs to a haze band and distant hills. Nothing stands in
+// the vista at all. That is not a street that ends; it is a mesh that ends, and
+// it is the single frame in this lesson that reads as a prototype rather than a
+// place.
+//
+// WHY TREES AND NOT A BUILDING, A BEND OR A JUNCTION. All three were on the
+// table; trees are the only one of the four that changes nothing but the view:
+//
+//   * a BEND or a JUNCTION moves the road graph, which moves `speedLimitAt`,
+//     the Locator grid and every committed trace on the map. A scenery change
+//     may not become a grading change (the law tools/maps/lib/streetwall.mjs
+//     already writes down for its own footprints);
+//   * a terminating BUILDING is cheaper in triangles and would read superbly —
+//     but a building carries a COLLIDER, and collision geometry is another
+//     lane's live work this wave. A wall the student can drive through is a
+//     worse artefact than the cut edge it replaces;
+//   * TREE placements carry no collider, no grading input and no new instanced
+//     kind — the four tree draws in WorldProps are paid on every district
+//     already — so a grove costs draw calls exactly zero. It costs TRIANGLES,
+//     which is why the numbers below are as small as they are and why the cost
+//     was measured on the built world rather than estimated.
+//
+// The grove is planted BEYOND the last asphalt, so nothing that can be driven,
+// staged or graded is behind it.
+
+/** How far past the end node the first row stands, m. Beyond the drawn
+ *  carriageway (nothing is ever placed on the asphalt) and near enough that the
+ *  eye reads the road as running INTO the trees rather than stopping at them. */
+export const TERMINUS_TREE_NEAR_M = 8;
+/** Rows in the closing band, and the gap between them. Three rows read as a
+ *  mass from 60 m; one row reads as a hedge with a plain behind it. */
+export const TERMINUS_TREE_ROWS = 4;
+export const TERMINUS_TREE_ROW_PITCH_M = 9;
+/**
+ * Half-width of the band, m. At the 60 m station the frame was shot from, 34 m
+ * subtends ~29° each side of the axis — the middle 58° of a ~76° windscreen,
+ * i.e. the whole part of the vista the flanking frontage and the parked row do
+ * not already close.
+ */
+export const TERMINUS_TREE_HALF_W_M = 26;
+export const TERMINUS_TREE_COL_PITCH_M = 6.5;
+/** Acceptance rate per candidate station — a planted verge, not a wall. */
+export const TERMINUS_TREE_DENSITY = 0.8;
+/**
+ * TREE INSTANCES THIS PASS MAY SPEND ON ONE DISTRICT — a budget, not a rate,
+ * and the reason it is a budget is a measurement.
+ *
+ * The first cut spent TERMINUS_TREE_ROWS on EVERY dressed end. On a straight
+ * street that is two ends and it is right. On a four-arm junction micro-map
+ * every arm ends at the map boundary, so the same rule bought four to eight
+ * groves — measured across the whole catalogue by building it twice:
+ *
+ *     sig-wave-v1     222 -> 435 trees   (+213)
+ *     jxg-giveway-v1  126 -> 287         (+161)
+ *     mw-exit-v1      407 -> 541         (+134)
+ *     sp-creep-v1      13 ->  59         (+46, the street B65 was rendered on)
+ *
+ * At the MEASURED 378 triangles per tree instance, +213 is +80,500 triangles on
+ * a district that already runs above the tier-low triangle budget — which is
+ * exactly the trade doc 82 §2.2 exists to refuse. So the ROW COUNT is derived
+ * from how many ends a district has, and the total is held near this figure
+ * however many arms the map grows: ~24k triangles, about 9 % of the tier-low
+ * SOFT triangle budget and ~7 % of a measured tier-low frame.
+ *
+ * It costs the straight streets nothing — two ends still take the full four
+ * rows, which is the frame that was photographed.
+ */
+export const TERMINUS_TREE_BUDGET = 60;
+/**
+ * NO TERMINUS TREE WITHIN THIS OF ANY ROAD CENTRELINE, m. The band is laid on
+ * the dead end's OWN axis, so this cannot be the park fill's 30 m rule (that
+ * rule is exactly why the vista is empty today). It is a guard against a second
+ * road running past the end — a grove on somebody else's carriageway would be a
+ * far worse defect than the one being fixed.
+ */
+export const TERMINUS_TREE_ROAD_CLEAR_M = 7;
+/**
+ * Keep-in from the drawn ground, m. The builder paves `bounds` +
+ * TERRAIN_MARGIN_M and not one metre more, so a tree planted past that stands
+ * on nothing — the cut edge again, with a tree on it.
+ */
+export const TERMINUS_TREE_TERRAIN_INSET_M = 8;
+
+// --- THE AXIS (B65 — the half of the street end the treeline does not close) --
+//
+// WHAT THE TREELINE ACTUALLY DID, MEASURED ON THE FRAME IT WAS SHIPPED AGAINST.
+// The band above plants the FLANKS and it genuinely helps. It leaves the middle
+// open. On `sp-creep-v1` seed 7 the band is 21 trees spanning x −27.8..28.3 at
+// y 367..398, and the nearest trunk either side of the centreline is x −0.91 /
+// +5.92: a 6.8 m hole on the road's own axis. From the seat at y = 298 that is
+// ≈5.3°, about 90 px of open plain in the middle of a 1264 px frame — and the
+// hole is not plain, it is plain THEN haze band THEN hills. Photographed again
+// at that station before this pass (scratchpad, tier low, canvas 1264×620): the
+// tarmac stops, and dead ahead through the gap the eye goes to the horizon.
+//
+// The row-0 corridor (`TERMINUS_TREE_*`, and the assertion that used to guard
+// it) is what holds that hole open, and it is there for a reason: a thing
+// standing AT the end node has to stay visible from the seat. So the axis
+// cannot be closed by planting it. It has to be closed BEHIND the trees.
+//
+// WHY A BUILDING, AND WHY THE OBJECTION TO ONE WAS WRONG BY HALF. The previous
+// pass declined a terminating building because „a building carries a COLLIDER,
+// and collision geometry is another lane's live work". The collider is the
+// REASON to choose it, not the objection: `buildBuildings` merges every wall
+// quad into `colliders.buildings` in the same pass that draws it, so this mass
+// is the one candidate that is not a wall the student can drive through. It is
+// data through an existing pass — no runtime, rules or billing code is touched.
+// The other candidate the review named, a parapet laid across the road end, was
+// declined here for the opposite reason: `RailingPlacement` carries NO collider
+// at all (props.ts says so where it places them), so a rail across the
+// carriageway is exactly the drive-through artefact, and at 1.1 m tall it
+// closes ≈16 px of a 90 px hole. It does not answer the row.
+//
+// WHAT IT COSTS. Nothing in the currency the phone is short of. The four facade
+// variants + the roof mesh are five draws paid on EVERY district already, so a
+// volume added to them is +0 draws by construction — there is no new mesh, no
+// new material and no new instanced kind. Triangles: 3 wall rows × 4 edges × 2
+// tris + 2 roof tris = 26 per volume, 52 per end. Measured on the running
+// product at tier low, both instruments, at the same station: see the test.
+//
+// The volumes stand BEYOND the last asphalt and beyond anything that drives,
+// stages or is graded — TERMINUS_CLOSE_ROAD_CLEAR_M is the guard, and it is
+// nearly twice the tree band's.
+
+/** Boundary band a dead end must fall in to count as „runs out of the world",
+ *  m. The value props.ts's own `nearBoundary` has always used, named so the
+ *  tree band and the closing mass cannot drift apart. */
+export const TERMINUS_BOUNDARY_MARGIN_M = 40;
+/** How far past the end node the closing frontage starts, m. Past the last
+ *  asphalt and past the first two tree rows (8 m, 17 m), so the trees read as
+ *  standing IN FRONT of it rather than growing out of the wall. */
+export const TERMINUS_CLOSE_NEAR_M = 18;
+/** Depth of one closing volume, m — a block, not a billboard. */
+export const TERMINUS_CLOSE_DEPTH_M = 14;
+/**
+ * Half-width of the closing frontage, m. At the 60 m station 20 m subtends
+ * ~13.5° each side of the axis, which is wider than the hole the treeline
+ * leaves (±2.7°) by a margin that survives the eye being off the centreline —
+ * the seat is at x = 4.06, not 0.
+ */
+export const TERMINUS_CLOSE_HALF_W_M = 20;
+/** How far each half reaches PAST the axis, m. The two halves overlap so the
+ *  join can never open a slit on the one line the driver is looking down. */
+export const TERMINUS_CLOSE_OVERLAP_M = 5;
+/** How much further back the second half stands, m, and what it takes of the
+ *  first one's height. A single 40 m slab across the end is the „Minecraft"
+ *  read this whole row exists to answer; two volumes with a step between them
+ *  read as a street corner, for 26 more triangles. */
+export const TERMINUS_CLOSE_STEP_M = 6;
+export const TERMINUS_CLOSE_STEP_HEIGHT_FRACTION = 0.72;
+/**
+ * Height band, m. The mass takes the MEDIAN height of the district's own
+ * frontage clamped into this band, so it belongs to the street it closes:
+ * sp-creep-v1's blocks run 13.6–34 m and its closure comes out at the cap,
+ * while a low-rise micro-map gets a low-rise end instead of a tower.
+ */
+export const TERMINUS_CLOSE_MIN_HEIGHT_M = 9;
+export const TERMINUS_CLOSE_MAX_HEIGHT_M = 22;
+/** Fallback when a district authors no frontage at all to take a cue from. */
+export const TERMINUS_CLOSE_DEFAULT_HEIGHT_M = 12;
+/**
+ * NO CLOSING VOLUME WITHIN THIS OF ANY ROAD CENTRELINE, m — the guard that
+ * makes the collider safe. It is checked over the whole footprint on a 4 m
+ * lattice, not at its corners: a road crossing the middle of a rectangle
+ * clears all four of them. Nearly twice TERMINUS_TREE_ROAD_CLEAR_M, because
+ * unlike a tree this thing stops a car.
+ */
+export const TERMINUS_CLOSE_ROAD_CLEAR_M = 12;
+/** Keep-in from the drawn ground, m (TERMINUS_TREE_TERRAIN_INSET_M's reason: a
+ *  volume past the paved bounds stands on nothing). */
+export const TERMINUS_CLOSE_TERRAIN_INSET_M = 6;
+/** Clearance from any footprint already on the map, m — the closing mass never
+ *  grows out of the street's own last block. */
+export const TERMINUS_CLOSE_BUILDING_CLEAR_M = 3;
 
 // --- streetscape v2 dressing (doc 70 REF 1 + REF 3) --------------------------
 

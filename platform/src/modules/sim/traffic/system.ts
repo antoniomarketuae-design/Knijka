@@ -11,6 +11,7 @@
  * update path allocates nothing and iterates in fixed order.
  */
 
+import { LANE_WIDTH_M } from "../world/builders/constants";
 import { buildLaneGraph, type LaneGraph } from "./graph";
 import {
   buildPedRoute,
@@ -114,6 +115,36 @@ const CONFLICT_SAME_DIR_DEG = 50;
 const ONCOMING_MIN_DEG = 130;
 /** A vehicle must be at least this far to the player's right to count, meters. */
 const RIGHT_MIN_M = 1.5;
+/**
+ * OWN-CARRIAGEWAY HALF WIDTH for the give-way predicate, m (doc 87 B5).
+ *
+ * `LANE_WIDTH_M` is the perceptually-scaled lane (3.25 m × 2.5 = 8.125), so on
+ * the two-lane roads every give-way district is built from it is EXACTLY the
+ * travel half-width: `network.travelHalfWidthM` = lanes × LANE_WIDTH_M / 2 =
+ * 8.125, and jxg-giveway-v1's northbound lane centre sits at +4.0625, half of
+ * it. An oncoming car inside ±8.125 of the approach axis is therefore in the
+ * student's own carriageway.
+ *
+ * Why not something wider that would also cover a 4-lane boulevard: because
+ * the two failure modes are not symmetric. Too narrow and the predicate keeps
+ * TODAY's behaviour on a wide road (his complaint survives there — honest, and
+ * recorded); too wide and it starts acquitting genuine priority traffic on a
+ * skewed arm, which is the same defect mirrored and strictly worse. It errs
+ * toward convicting, and one lane width is the width it can prove.
+ */
+const OWN_ROAD_HALF_W_M = LANE_WIDTH_M;
+/**
+ * CLEARED DISTANCE, m — how far past the node a DEPARTING vehicle must be
+ * before it stops being a conflict (doc 87 B5, „I let everybody pass").
+ *
+ * Derived, not chosen: the carriageway it just crossed is OWN_ROAD_HALF_W_M
+ * wide from the node, and a car is VEHICLE_LENGTH_M long, so once its centre
+ * is 8.125 + 2.05 = 10.175 m out its TAIL is off that carriageway. Below it a
+ * car straddling the mouth still counts, which is why the departing test alone
+ * would be wrong: a van dead in front of the student at (4.06, 4.06) is
+ * already "moving away from the node" at 5.75 m and is very much in his way.
+ */
+const CONFLICT_CLEARED_M = OWN_ROAD_HALF_W_M + VEHICLE_LENGTH_M / 2;
 /**
  * ROUNDABOUT REACH, m — how near a circulating car must actually be to the
  * DRIVER before it is a car he owes way to (doc 87 B15).
@@ -714,7 +745,46 @@ export function oncomingNearFor(
   return oncomingApproachFor(vehicles, px, py, headingDeg, radiusM) !== null;
 }
 
-/** Pure "conflicting vehicle near a point" test (district space; see interface). */
+/**
+ * Pure "conflicting vehicle near a point" test (district space; see interface).
+ *
+ * THE THREE QUESTIONS IT USED NOT TO ASK (doc 87 B5 — „it said that I didnt let
+ * the traffic cars to pass, when in Fact I let everybody pass").
+ *
+ * Until now this predicate tested exactly three things: inside `radiusM` of the
+ * junction node, `speedMps ≥ 1`, and a travel bearing ≥ CONFLICT_SAME_DIR_DEG
+ * off the approach. It never asked which SIDE the vehicle was on, which road
+ * had PRIORITY, or whether the vehicle had already CLEARED. At Δ = 180° that
+ * made **an oncoming car on the student's own road** a give-way conflict, and a
+ * car that had just finished crossing in front of him stayed one for as long as
+ * it took to drive 26 m. Those are the two shapes of his complaint.
+ *
+ * The frame it reasons in is the give-way line's own: the node (x,y) plus
+ * `approachBearingDeg`, the direction the student travels as he crosses the
+ * line. Forward `f = (sin b, cos b)`, right `r = (cos b, −sin b)`.
+ *
+ *  1. WHICH ROAD (and therefore which has PRIORITY). The single caller is
+ *     `worldRuntime.fireLine` at a Б1/Б2 line, and a give-way line only ever
+ *     stands on the MINOR arm — so the priority road is the CROSSING one and
+ *     the student's own carriageway is not. Same-direction traffic was already
+ *     excluded; a vehicle in the ONCOMING bearing band whose lateral offset
+ *     from the approach axis is inside the student's own carriageway is the
+ *     opposite flow of HIS road, holds no priority at this line, and is graded
+ *     — where it genuinely matters, on a left turn across it — by the separate
+ *     `oncomingApproachFor` channel (`worldRuntime.ts:1244`). Excluded here.
+ *     The corridor gate is deliberately narrow (see OWN_ROAD_HALF_W_M): where
+ *     it cannot tell, it keeps the old behaviour rather than acquit.
+ *  2. HAS IT CLEARED. A vehicle whose heading carries it AWAY from the node and
+ *     which is already CONFLICT_CLEARED_M past it has left the conflict point;
+ *     it is the car he waited for, not the car he cut up.
+ *  3. WHICH SIDE. Falls out of 1 and 2: what survives is crossing traffic from
+ *     the left or the right that is still coming. `conflictFromRightFor` remains
+ *     the separate, stricter right-hand-rule test — this line never called it.
+ *
+ * Direction of travel: every clause can only REMOVE a conviction, never add
+ * one. A crossing car still approaching the mouth convicts exactly as before —
+ * that half is gated by conflict.test.ts, which asserts both directions.
+ */
 export function conflictNearFor(
   vehicles: readonly { x: number; y: number; dirX: number; dirY: number; speedMps: number }[],
   x: number,
@@ -722,16 +792,28 @@ export function conflictNearFor(
   radiusM: number,
   approachBearingDeg: number,
 ): boolean {
+  const rad = (approachBearingDeg * Math.PI) / 180;
+  // Right of the approach axis = forward (sin b, cos b) rotated 90° clockwise.
+  const rx = Math.cos(rad);
+  const ry = -Math.sin(rad);
   const r2 = radiusM * radiusM;
   for (const v of vehicles) {
     const dx = v.x - x;
     const dy = v.y - y;
-    if (dx * dx + dy * dy > r2) continue;
+    const d2 = dx * dx + dy * dy;
+    if (d2 > r2) continue;
     if (v.speedMps < CONFLICT_MIN_SPEED_MPS) continue;
     // Bearing of the vehicle's travel (0 = north, clockwise).
     const vBearing = (Math.atan2(v.dirX, v.dirY) * 180) / Math.PI;
     const delta = Math.abs((((vBearing - approachBearingDeg) % 360) + 540) % 360 - 180);
     if (delta < CONFLICT_SAME_DIR_DEG) continue; // same-direction → not a conflict
+    // (1) Oncoming INSIDE my own carriageway = the opposite flow of MY road,
+    // which the Б1/Б2 line does not ask me to yield to. Applied only in the
+    // oncoming band, so a car merely CROSSING the axis is untouched.
+    if (delta > ONCOMING_MIN_DEG && Math.abs(dx * rx + dy * ry) <= OWN_ROAD_HALF_W_M) continue;
+    // (2) Already cleared: heading away from the node AND far enough past it
+    // that its tail is off the carriageway it crossed.
+    if (dx * v.dirX + dy * v.dirY > 0 && d2 > CONFLICT_CLEARED_M * CONFLICT_CLEARED_M) continue;
     return true;
   }
   return false;

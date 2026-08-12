@@ -62,7 +62,7 @@ import {
   type TimeOfDay,
 } from "./presets";
 import { QUALITY_PRESETS, type QualityLevel } from "./quality";
-import { useQuality } from "./qualityStore";
+import { noteRenderedFrame, useQuality } from "./qualityStore";
 import { TONE_MAPPING_THREE } from "./toneMapping";
 import {
   setWeatherTarget,
@@ -229,6 +229,18 @@ export function SimEnvironment({
   const fogArgs = useMemo<[string, number]>(() => ["#e3c49c", 0.0028], []);
 
   useFrame((state, delta) => {
+    // THE PROBE'S PROOF THAT A FRAME WAS ACTUALLY DRAWN.
+    //
+    // `useAutoQualityProbe` times page rAF deltas and calls the result this
+    // device's frame cost. That reading was only ever honest because the Canvas
+    // ran `frameloop="always"`: rAF ticked, and R3F drew on every tick. Now the
+    // loop goes to "demand" whenever the world is paused (LessonScene), so a
+    // probe window that overlaps a teach card would see a free 60 Hz rAF over a
+    // scene nobody is rendering — and promote a phone on the strength of it.
+    // One increment inside a useFrame that already exists is the whole guard:
+    // the probe compares it against the frames it sampled and throws the window
+    // away if the renderer was not keeping up with it.
+    noteRenderedFrame();
     stepWeather(delta);
     const rainNow = getRainIntensity();
     const fogNow = getFogIntensity();

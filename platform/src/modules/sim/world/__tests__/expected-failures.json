@@ -79,7 +79,7 @@
     "T3": 9,
     "T3b": 0,
     "T4": 0,
-    "T4raw": 95,
+    "T4raw": 93,
     "T6": 0,
     "T8": 0,
     "T8raw": 192,
@@ -100,7 +100,7 @@
     "S5": 6
   },
   "raised": {
-    "T4raw": "WAVE: 95 on 2026-07-31 (wave-0 83). 155 -> 157 templates. Lane 15's sc-park-perp-forward and sc-park-parallel-exit sit on lot-* districts whose aisles post 20, so the wave-0 proxy ('some edge is not 50') counts two more scenarios. Two new drills, not two new defects — the defect row T4 is 0. Wave-0 T4raw = 83.",
+    "T4raw": "WAVE: 93 on 2026-08-10 (was 95; wave-0 83). Doc 87 B40(b) gave the signals family five signalised districts instead of one, and two of them (sxd-v1, sxc-v1) post 50 on BOTH axes — so sc-signal-dead and sc-signal-controller stop matching the wave-0 proxy („some route edge is not 50“). Two scenarios off a NOT-A-DEFECT count, not two fixes: the defect row T4 is still 0. The 95 before it was Lane 15's two lot-* park drills whose aisles post 20. Wave-0 T4raw = 83.",
     "T8raw": "WAVE: 192 on 2026-07-31 (wave-0 178). the same two templates add 3 capped reachZones (181 = 178 + 3), and the lessons-progression wave adds one more (182): sc-crossing-white-cane grew a third task — the FULL STOP before the zebra that PE-14 grades and PE-08 does not (doc 87 B54). Every one of them states its cap on the marker, which is why the defect row T8 is 0.",
     "B4raw": "WAVE: 149 on 2026-07-31 (wave-0 137). the same two templates each carry a capped reachZone (139 = 137 + 2). The evaluator probe passes, which is why the defect row B4 is 0.",
     "L12": "WAVE: WORLD-SCHOOL-ACTORS measured 65 on 2026-07-31 (wave-0 56). The delta is +10 -1. +10: the parking-variants lane landed ten new lot-* templates concurrently (content/world/lot-{45rev,double,gap-judge,gap-long,gap-short,left,night,van,wall,zebra}-v1.json), none of which stages an actor yet. -1: sc-speed-zone LEFT the row — it now stages the four schoolyard children founder item 60 asked for. Same cause explains the +10 on T4raw / T8raw / B3 / B4raw / S3 in the same run. WAVE WORLD-MAPS lowered it to 64 on 2026-08-03: sp-creep-v1 LEFT the row — the harsh-brake drill's control point at y=180 now has a destination in the world to stop AT (three authored shop volumes, founder item B64/FR-49), so its declared surface is no longer one the world can never arm."

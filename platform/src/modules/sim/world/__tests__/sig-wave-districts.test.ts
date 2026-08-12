@@ -167,7 +167,7 @@ describe("sig-wave-v1 through the world builder", () => {
   });
 
   it("stays inside the performance budget (micro-map, ~1.5 km of road)", () => {
-    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(300);
+    expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(300);
     expect(world.stats.triangles).toBeLessThan(600_000);
   });
 

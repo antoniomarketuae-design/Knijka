@@ -207,12 +207,52 @@ export const VEHICLE_PROFILE_LENGTH_M: Readonly<Record<VehicleProfile, number>> 
   animal: 1.4,
 };
 
+/**
+ * Body WIDTH of each vehicle profile, m — the missing half of the table above,
+ * and the reason a circle could ever be mistaken for a contact test.
+ *
+ * MEASURED, not assumed. The procedural rigs are read straight off
+ * vehicleFleet.ts (TRUCK_DIMENSIONS.widthM 2.4, EMERGENCY 2.1, TRAM 2.3, TRAIN
+ * 3.9, BICYCLE_DIMENSIONS.halfWidthM × 2 = 0.46, × CHILD_CYCLIST_SCALE 0.72 =
+ * 0.331, ANIMAL_DIMENSIONS.halfWidthM × 2 = 0.56) and
+ * collision/__tests__/bodies.test.ts asserts every one of them against the rig
+ * constants, so a rig resize cannot silently outrun the grader.
+ *
+ * The two GLB-backed entries were measured from the shipped kit's own POSITION
+ * accessors (body node, wheels excluded):
+ *   · "car" 1.84 — the fleet body x-extents run 1.78 (vela_h3) to 1.83
+ *     (corva_s); 1.84 is ALSO the width of the kinematic shell the player
+ *     actually collides with in rapier (NpcColliders VEH_HALF_W 0.92 × 2), and
+ *     a grading test that disagreed with the physics body would re-open the
+ *     same false-verdict gap from the other side.
+ *   · "van" 1.98 — kargo_v's body node measures 1.98 × 5.34; the length table
+ *     above declares 5.2 for the same rig. Left alone deliberately: that number
+ *     feeds every lead-gap grade and moving it is a grading change, not a
+ *     geometry fix. Recorded here so the discrepancy is known, not lost.
+ */
+export const VEHICLE_PROFILE_WIDTH_M: Readonly<Record<VehicleProfile, number>> = {
+  car: 1.84,
+  van: 1.98,
+  truck: 2.4,
+  emergency: 2.1,
+  tram: 2.3,
+  train: 3.9,
+  cyclist: 0.46,
+  childCyclist: 0.331,
+  animal: 0.56,
+};
+
 /** Half-length of the player's own car, m (half the 4.1 m fleet length). */
 export const PLAYER_HALF_LENGTH_M = VEHICLE_PROFILE_LENGTH_M.car / 2;
 
 /** Half-length of a published vehicle state, m. Absent profile = "car". */
 export function vehicleHalfLengthM(profile?: VehicleProfile): number {
   return (VEHICLE_PROFILE_LENGTH_M[profile ?? "car"] ?? VEHICLE_PROFILE_LENGTH_M.car) / 2;
+}
+
+/** Half-width of a published vehicle state, m. Absent profile = "car". */
+export function vehicleHalfWidthM(profile?: VehicleProfile): number {
+  return (VEHICLE_PROFILE_WIDTH_M[profile ?? "car"] ?? VEHICLE_PROFILE_WIDTH_M.car) / 2;
 }
 
 /**
@@ -630,9 +670,16 @@ export interface TrafficSystem {
   rearGapMeters(px: number, py: number, headingDeg: number): number;
   /**
    * True when a moving vehicle is within `radiusM` of (x,y) on a CONFLICTING
-   * path — i.e. crossing/oncoming relative to `approachBearingDeg` (your
-   * approach direction), not same-direction traffic. Used to grade failing to
-   * give way at a junction. District space; bearings 0 = north, clockwise.
+   * path relative to `approachBearingDeg` (your approach direction at the
+   * give-way line). Used to grade failing to give way at a junction. District
+   * space; bearings 0 = north, clockwise.
+   *
+   * Not a conflict (doc 87 B5): same-direction traffic; ONCOMING traffic inside
+   * your own carriageway (the opposite flow of YOUR road — a Б1/Б2 line does
+   * not ask you to yield to it, and a left turn across it is graded by
+   * `oncomingNear` instead); and a vehicle that has already CLEARED, i.e. is
+   * heading away from the node and far enough past it that its tail is off the
+   * carriageway it crossed. What remains is crossing traffic still coming.
    */
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean;
   /**

@@ -17,6 +17,7 @@ import { ROAD_Y, TERRAIN_MARGIN_M } from "./constants";
 import { buildBuildings } from "./buildings";
 import { buildBuildingInstances, CITY_MODELS } from "./cityBuildings";
 import { buildRoadDecals } from "./decals";
+import { countStaticDrawSlots } from "./drawSlots";
 import { buildCrossingFurniture, buildMarkings } from "./markings";
 import { analyzeNetwork } from "./network";
 import { buildProps } from "./props";
@@ -24,6 +25,7 @@ import { buildRailTracks } from "./railTrack";
 import { buildRoads } from "./roads";
 import { buildSchools } from "./schools";
 import { analyzeRoundabouts, buildRoundabouts } from "./roundabout";
+import { buildTerminusClosure } from "./terminus";
 import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
 
@@ -54,7 +56,18 @@ export function buildWorldGeometry(
   // the prism builder which ids to leave to the instanced pass (doc 68 QW3).
   const buildingInstances = buildBuildingInstances(district.buildings);
   const towerIds = new Set(buildingInstances.map((p) => p.buildingId));
-  const buildings = buildBuildings(district.buildings, towerIds);
+  // THE STREET END, the axis half (B65 — builders/terminus.ts). Scenery masses
+  // the district document does not author, built through the buildings pass so
+  // they cost no draw call and carry the wall collider every other block does.
+  // Empty on every city / exam / полигон district. `buildBuildingInstances`
+  // above deliberately never sees them: a closure is a facade prism, never a
+  // glass tower.
+  const terminusClosures = buildTerminusClosure(district, network);
+  const buildings = buildBuildings(
+    district.buildings,
+    towerIds,
+    terminusClosures.map((c) => c.volume),
+  );
   // School dressing — name board + yard railing per `kind: "school"` footprint
   // (founder item 61). Empty on every district that authors none, so this is
   // additive: no existing map's geometry moves by a vertex.
@@ -115,18 +128,11 @@ export function buildWorldGeometry(
   const signCounts = Object.fromEntries(SIGN_KINDS.map((k) => [k, 0])) as Record<SignKind, number>;
   for (const s of props.signs) signCounts[s.kind]++;
 
-  // Zone-sign draws: +2 per placed textured kind (body + face), +1 for the
-  // geometry-only crossbuck/barrier. Zero on zones-less districts, so their
-  // estimate is untouched. The v1 four (stop/giveWay/В26-50/roundabout) are
-  // already inside the fixed 27 below; every OTHER В26 numeral is a real extra
-  // pair of draws, because each numeral is its own instanced face.
-  const FIXED_SIGN_KINDS: readonly SignKind[] = ["stop", "giveWay", "limit50", "roundabout"];
-  let zoneSignDraws = 0;
-  for (const [kind, count] of Object.entries(signCounts) as [SignKind, number][]) {
-    if (count === 0) continue;
-    if (FIXED_SIGN_KINDS.includes(kind)) continue;
-    zoneSignDraws += kind === "railCross" || kind === "barrier" ? 1 : 2;
-  }
+  // Sign draws are no longer split into "the fixed four" and "the zone extras":
+  // `drawSlots.ts` charges body+face for every kind actually placed (and body
+  // only for the geometry-only crossbuck/barrier), so a district that posts no
+  // STOP is not billed for one. The old split existed only to keep the
+  // hand-written 27 arithmetically true.
 
   const meshes = [
     roads.surface,
@@ -172,6 +178,8 @@ export function buildWorldGeometry(
     ringDividerQuads: roundabouts.ringDividerQuads,
     /** FR-22, the outer half: mouth-free arcs of circular ring kerb swept. */
     ringKerbRuns: roads.ringKerbRunCount,
+    /** B16 — kerb returns that close the mouths (two per arm). */
+    ringReturnRuns: roads.ringReturnRunCount,
     buildings: buildings.count,
     buildingInstances: buildingInstances.length,
     trafficLights: props.trafficLights.length,
@@ -183,33 +191,46 @@ export function buildWorldGeometry(
     utilityPoles: props.utilityPoles.length,
     utilityWireSpans: props.utilityPoles.filter((p) => p.spanM > 0).length,
     railings: props.railings.length,
+    /** B65 — the masses that close a street end running out of the world. */
+    terminusClosures: terminusClosures.length,
     skidMarks: decals.skidCount,
     busStops: props.busStops.length,
     parkingKits: props.parkingKits.length,
     vertices,
     triangles,
-    // 13 static meshes (roads, junctions, sidewalks, parking lanes, markings,
-    // road-decal batch, grass, paved, 4 facade-wall variants, roofs) + 27
-    // fixed WorldProps instanced draws (2 signals + 8 signs + 2 streetlights +
-    // 4 trees + 4 furniture + 4 billboards + 2 bus stops + 1 parking kit) +
-    // zone-sign draws (only on maps whose zones place posts) +
-    // the water-sheet mesh (only on maps with live waterPatch spans) +
-    // the rail deck + rails meshes (only on maps with a railCrossing zone) +
-    // the roundabout planting mesh (only on maps with a drawn central island) +
-    // the B65 dressing (pole row, wire run, parapet — each ONE draw, and each
-    // mounted only when its list is non-empty, so a city/exam district's
-    // draw-call count is unchanged to the call) +
-    // towers (chunked & frustum-culled at runtime; count ~model-order).
-    drawCallEstimate:
-      13 +
-      27 +
-      zoneSignDraws +
-      (water.count > 0 ? 1 : 0) +
-      (rail.deckQuads > 0 ? 2 : 0) +
-      (roundabouts.islands > 0 ? 1 : 0) +
-      (props.utilityPoles.length > 0 ? 2 : 0) +
-      (props.railings.length > 0 ? 1 : 0) +
-      CITY_MODELS.length,
+    // HOW MANY STATIC MESH SLOTS THIS DISTRICT MOUNTS — counted from the
+    // placement data by `drawSlots.ts`, term by term, gated exactly the way
+    // WorldProps gates each mesh.
+    //
+    // This replaced `drawCallEstimate`, which was `13 + 27 + …`. The `27` was a
+    // prose tally of the fixed WorldProps draws; `WorldProps.tsx` carried its
+    // own copy of the same tally that said **28**, and neither counted the
+    // pedestrian-signal trio. Deriving it is what makes that drift impossible
+    // rather than corrected once — there is no longer a number to keep in sync.
+    //
+    // READ THE HEADER OF drawSlots.ts BEFORE USING THIS FOR ANYTHING. It is the
+    // static world only. It is NOT the frame, it is 26–41 % of the frame on the
+    // running product, and scoring it against `PERF_BUDGETS[tier].drawCalls` is
+    // the exact mistake that hid a 3–5× overrun for months. The frame is
+    // `sim/environment/frameCost.ts`.
+    staticDrawSlots: countStaticDrawSlots({
+      trafficLights: props.trafficLights,
+      signCounts,
+      streetlights: props.streetlights,
+      trees: props.trees,
+      billboards: props.billboards,
+      busStops: props.busStops,
+      parkingKits: props.parkingKits,
+      utilityPoles: props.utilityPoles,
+      railings: props.railings,
+      // roads, junctions, sidewalks, parking lanes, markings, road-decal batch,
+      // grass, paved, 4 facade-wall variants, roofs.
+      staticMeshes: 13,
+      cityModels: CITY_MODELS.length,
+      waterSheet: water.count > 0,
+      railDeck: rail.deckQuads > 0,
+      roundaboutIsland: roundabouts.islands > 0,
+    }),
   };
 
   return {
@@ -237,6 +258,7 @@ export function buildWorldGeometry(
     busStops: props.busStops,
     parkingKits: props.parkingKits,
     schools,
+    terminusClosures: terminusClosures.map((c) => c.placement),
     colliders: {
       ground: {
         halfExtents: [spanX / 2, groundThickness / 2, spanY / 2],

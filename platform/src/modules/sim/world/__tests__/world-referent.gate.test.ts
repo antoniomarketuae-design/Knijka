@@ -381,7 +381,20 @@ describe("scenario-world-referent gate", () => {
     // the assertion that actually protects us. This number is spelled out
     // rather than relaxed to a `>=` so the next corpus change also has to be
     // explained here before it can pass.
-    expect(RESULT.districtFiles).toBe(100);
+    //
+    // 100 → 105 is doc 87 B40(b), and it is the same shape of move: FIVE NEW
+    // SIGNALISED JUNCTIONS, one per signals lesson. Measured on the shipped
+    // catalogue, positions 12 / 19 / 20 / 21 / 22 / 23 all ran `sx-v1` from
+    // `sx-spawn-south` — one street wearing six titles, and four of the six
+    // photographed within 1.76–3.20 mean |ΔRGB| of each other at that spawn.
+    // `sxd-v1` (a collector crossing), `sxf-v1` (a bare narrow boulevard),
+    // `sxh-v1` (built so the far stop line stays readable), `sxc-v1` (two
+    // collectors + a posted В24) and `sxr-v1` (a tight centre with a closed
+    // horizon) each carry the SAME node ids, N–S carriageway, spawn poses and
+    // derived stop line — `gen_signal_x.mjs` re-derives and asserts all three
+    // numbers — so every committed trace replays byte-identically and no
+    // per-class count below rises.
+    expect(RESULT.districtFiles).toBe(105);
     // T2's district count was the one figure of the four still at its wave-0
     // value (15) — the spawn poses themselves. Doc 87's founder wave moved them:
     // every generator now ends its spawn list with tools/maps/lib/lane.mjs

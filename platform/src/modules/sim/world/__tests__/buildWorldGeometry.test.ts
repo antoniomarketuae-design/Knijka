@@ -741,7 +741,7 @@ describe("buildWorldGeometry on the real district (Студентски град
   });
 
   it("stays inside the performance budget", () => {
-    expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+    expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
     expect(world.stats.triangles).toBeLessThan(900_000);
     expect(world.stats.trees).toBeGreaterThan(200);
     expect(world.stats.trees).toBeLessThan(4000);

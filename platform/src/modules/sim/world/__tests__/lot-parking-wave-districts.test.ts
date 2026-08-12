@@ -162,7 +162,7 @@ for (const { districtId, angle, bayWidthM } of WAVE) {
           expect(maxIdx).toBeLessThan(c.positions.length / 3);
         }
       }
-      expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+      expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
       expect(world.stats.triangles).toBeLessThan(300_000);
     });
 

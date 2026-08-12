@@ -285,6 +285,47 @@ export function autoQualityCeiling(signals: DeviceSignals): QualityLevel {
 }
 
 /**
+ * The dpr a HANDSET is allowed to render at, whatever tier it is on.
+ *
+ * Doc 82 §2.2's ruling — *"Do not raise the phone dpr cap. dpr 1.5 is 2.25× the
+ * fill and destroys the parity the whole budget rests on"* — was enforced only
+ * by `autoQualityCeiling` keeping `auto` out of `high`. That left two ways past
+ * it: a device promoted to `med` by measurement, and a student choosing a tier
+ * by hand. Both then render at `med`'s dpr 1.25.
+ *
+ * MEASURED, 2026-08-12, production build, `l0-free-drive`, six phone profiles
+ * (this machine at phone dimensions — NOT a handset):
+ *
+ *   iPhone-16 portrait  low  377×836  = 315,172 px   med  471×1045 = 492,195 px
+ *   iPhone-16 landscape low  836×377  = 315,172 px   med 1045×471  = 492,195 px
+ *   Android 360 wide    low  344×764  = 262,816 px   med  430×955  = 410,650 px
+ *
+ * `med` is a **1.56× larger backing store on every profile** — 1.25², paid on
+ * every fragment of every pass, on the tier that also runs a shadow map and a
+ * four-effect composer. The panel's own `devicePixelRatio` is 3 on all six
+ * profiles and it changes NOTHING: the Canvas is wired `dpr={[1, cap]}`, so the
+ * 9×-fill fear about a dpr-3 phone was never real. The only dpr a phone ever
+ * pays is this cap.
+ *
+ * So the cap becomes a property of the DEVICE, applied at the one place the
+ * Canvas reads it, and a phone renders 1:1 with its CSS pixels on every tier.
+ * A student who picks a higher tier on a phone is asking for the lighting —
+ * shadows, AO, bloom, the full facade maps — not for 56 % more fragments.
+ */
+export const TOUCH_MAX_DPR = 1.0;
+
+/**
+ * The Canvas dpr cap for a tier on a given device: the preset's own cap, then
+ * `TOUCH_MAX_DPR` on anything whose primary pointer is a fingertip. Pure, so
+ * the ruling is unit-tested in Node; `canvasMaxDpr()` in the store is the DOM
+ * half that reads the signals.
+ */
+export function maxDprFor(level: QualityLevel, signals: DeviceSignals): number {
+  const preset = QUALITY_PRESETS[level].maxDpr;
+  return isTouchOnlyDevice(signals) ? Math.min(preset, TOUCH_MAX_DPR) : preset;
+}
+
+/**
  * The COLD-START tier, decided from device signals before the first fetch.
  *
  * Why this exists at all (doc 82 §2.3): the `low` preset is not only a render
@@ -326,37 +367,46 @@ export function autoQualityCeiling(signals: DeviceSignals): QualityLevel {
  * first session only, then climbs; the A16 measures ~30 fps against a 57 fps
  * promotion bar and stays exactly where it is.
  *
- * The one touch-family relaxation that cannot hurt the reference device:
- * Chromium clamps `deviceMemory` to 8, so a touch-only device REPORTING 8 has
- * ≥8 GB of RAM — a flagship Android, not a €125 handset (the A16 reports 4).
+ * THE 8 GB CARVE-OUT IS GONE, AND IT WAS MEASURED OUT, NOT ARGUED OUT.
+ *
+ * The rule was `touch-only AND deviceMemoryGb >= 8 → med`, on the reasoning
+ * that Chromium clamps `deviceMemory` to 8, so a phone reporting 8 has ≥8 GB —
+ * *"a flagship Android, not a €125 handset"*. Two things retired it:
+ *
+ *  1. WHAT `med` ACTUALLY COSTS A PHONE, measured on the production build over
+ *     six phone profiles (this machine at phone dimensions — not a handset):
+ *     **2.4× the draw calls** (205.6 → 492.5 per frame on iPhone-16 portrait;
+ *     233.8 → 521.2 landscape; 206.2 → 492.8 on the 360-wide Android) and a
+ *     **1.56× larger backing store**, on top of doc 91 §G1's 5.7× GPU time.
+ *     `low` is already 205–234 draws against a ≤150 budget; `med` is 3.3× over
+ *     the cap. That is not a tier a guess should hand out.
+ *  2. THE RULE INFERRED A GPU FROM A RAM FIGURE, and in 2026 8 GB is mid-range,
+ *     not flagship — a Helio-G99 handset ships with 8 GB. The rule's own
+ *     defence was that *"nothing synchronous and reliable"* separates an
+ *     iPhone from an A16, so RAM had to stand in. That defence expired when the
+ *     FPS probe was finally mounted: measurement now does the promoting, and a
+ *     genuine flagship pays `low` for exactly one session before
+ *     `ledgerFromSample` earns it `med` permanently. The cost of being wrong is
+ *     no longer symmetric — a wrong `low` costs one session of shadows, a wrong
+ *     `med` costs 2.4× the draws and a 5.9 MB texture plan on a 4 GB phone.
+ *
+ * Every touch-only device therefore starts at `low` and climbs on evidence.
  *
  * Rules, first match wins:
  *  1. `deviceMemoryGb ≤ 2` → low, pointer irrespective. Chromium on Android
  *     cannot grow a WASM heap past 256 MB (§2.1); at 2 GB total the med plan's
  *     5.9 MB of maps plus Rapier is not a tier, it is a context-loss.
- *  2. touch-only AND `deviceMemoryGb ≥ 8` → med (the flagship-Android carve-out
- *     above). Still capped at med for life by `autoQualityCeiling`.
- *  3. touch-only AND any one of: `dpr ≥ 2` (every modern phone panel),
- *     `deviceMemoryGb ≤ 4` (the Galaxy A16 / Redmi Note reference device),
- *     `hardwareConcurrency ≤ 4` → low.
- *  4. otherwise → med, exactly as before.
+ *  2. touch-only → low. No memory or core figure buys a handset out of it;
+ *     `ledgerFromSample` does, with a frame time.
+ *  3. otherwise → med, exactly as before.
  *
  * Never returns "high": a cold start has no evidence of headroom, only of its
  * absence. Promotion stays measurement's job.
  */
 export function seedQualityFromSignals(signals: DeviceSignals): QualityLevel {
-  const { deviceMemoryGb, hardwareConcurrency, dpr } = signals;
+  const { deviceMemoryGb } = signals;
   if (deviceMemoryGb !== null && deviceMemoryGb <= 2) return "low";
-  const touchOnly = isTouchOnlyDevice(signals);
-  if (touchOnly && deviceMemoryGb !== null && deviceMemoryGb >= 8) return "med";
-  if (
-    touchOnly &&
-    (dpr >= 2 ||
-      (deviceMemoryGb !== null && deviceMemoryGb <= 4) ||
-      (hardwareConcurrency !== null && hardwareConcurrency <= 4))
-  ) {
-    return "low";
-  }
+  if (isTouchOnlyDevice(signals)) return "low";
   return "med";
 }
 

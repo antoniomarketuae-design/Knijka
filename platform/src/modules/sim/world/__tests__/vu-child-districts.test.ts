@@ -368,27 +368,36 @@ describe("sc-vu-child-cyclist — the authored lines sit in the bands they claim
     expect(centers).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
   });
 
-  it("ONE ACT, TWO VERDICTS: the pair's asymmetry is the cut-in runner's contact bar", () => {
-    // The template's sharpest structural fact, and the reason the two demos
-    // bill differently for the SAME metre of air. The cut-in runner emits
-    // collision inside VEHICLE_CONTACT_M (3.0 — a CAR body's bar), and ONLY
-    // after the cut has fired. So:
+  it("ONE ACT, ONE VERDICT: the identical margin is billed identically (2026-08-10)", () => {
+    // THIS TEST USED TO BE CALLED „ONE ACT, TWO VERDICTS", and the asymmetry it
+    // pinned was a defect, not a fact. It read: the cut-in runner emits a
+    // collision inside CUTIN_CONTACT_M (3.0), so the demo driven DURING the
+    // wobble crashed and the identical margin driven 60 m earlier did not.
+    //
+    // 3.0 m was an isotropic circle around two POINTS. The actor here is a
+    // child on a bicycle 0.33 m wide beside a 1.70 m car: at the authored
+    // 2.35 m of centres there is 1.33 m of measured air, and there is no crash
+    // in either demo. The pair's real difference is the one the cards always
+    // told — the wobble arrives while you are alongside, or two seconds after
+    // you have gone — and its lesson is stronger without the phantom: чл. 42
+    // grades the gap you LEFT, so the same gap is billed the same way whether
+    // or not the child happened to move.
     const nudge = APEX_X - NUDGE_X;
     const squeeze = CURB_X - SQUEEZE_X;
     expect(nudge).toBeCloseTo(squeeze, 1); // identical margins…
-    expect(nudge).toBeLessThan(CUTIN_CONTACT_M); // …both inside the contact bar…
-    expect(squeeze).toBeLessThan(CUTIN_CONTACT_M);
-    // …and only ONE of them is driven after the wobble, which is what makes the
-    // difference. The narrow demo's pass completes ~60 m before the child ever
-    // reaches the drain, so the runner's contact channel is not yet running.
-    // If this ordering ever broke, the two demos would collapse into one code.
+    // …both convict on clearance, and NEITHER is inside a real body contact.
+    expect(nudge).toBeLessThan(VULNERABLE_PASS_CONVICT_LATERAL_M);
+    expect(squeeze).toBeLessThan(VULNERABLE_PASS_CONVICT_LATERAL_M);
+    expect(nudge).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
+    expect(squeeze).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
+    // The ordering that used to carry the asymmetry is still an authored fact
+    // and still worth pinning: the narrow demo is past the child long before
+    // the drain, which is why its card can say „и се размина".
     const wobbleY = (loadRaw() as unknown as Meta).meta.scenario.wobble as Wobble;
     expect(wobbleY.triggerYM).toBeGreaterThan(95); // the narrow demo is clear by y ≈ 95
-    // Reported in the agent notes: 3.0 m is the car body's bar and this actor is
-    // a bike (the cyclistRightHook runner uses 2.2). Under 2.2 the first demo
-    // would keep its clearance bill and lose the contact — i.e. VU-03's „опасна
-    // on contact" would have no home in the shipped stack at all.
-    expect(CUTIN_CONTACT_M).toBeGreaterThan(VULNERABLE_PASS_CONTACT_M);
+    // The retired constant, kept as a tombstone: it was BIGGER than the whole
+    // convict band, which is how a clearance fault could ever read as a crash.
+    expect(CUTIN_CONTACT_M).toBeGreaterThan(VULNERABLE_PASS_CONVICT_LATERAL_M);
   });
 });
 

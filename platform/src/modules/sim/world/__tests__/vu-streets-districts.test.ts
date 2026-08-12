@@ -97,7 +97,7 @@ for (const id of ["vu-pass-v1", "vu-door-v1"] as const) {
         }
       }
       expect(nonFinite).toBe(0);
-      expect(world.stats.drawCallEstimate).toBeLessThanOrEqual(150);
+      expect(world.stats.staticDrawSlots).toBeLessThanOrEqual(150);
     });
 
     it("is deterministic for a fixed seed", () => {

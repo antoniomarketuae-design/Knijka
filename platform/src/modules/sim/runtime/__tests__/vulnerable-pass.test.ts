@@ -150,12 +150,31 @@ describe("vulnerable-pass adjudication (VU-02) — the bands", () => {
     expect(passEventsOf(ticks)).toHaveLength(0);
   });
 
-  it("a sub-contact overlap is the collision machinery's act — silent here", () => {
+  it("a genuine sub-contact overlap is the collision machinery's act — silent here", () => {
     const rt = createWorldRuntime(loadWorld("vu-pass-v1"));
     rt.setCyclistQuery(makeQuery({ ...CYCLIST_AHEAD, x: () => CYCLIST_X }));
-    // x 4.8 → 1.86 m of centers: under the 2.2 m contact bar.
-    const ticks = run(rt, northRun(4.8, 100, OVERTAKE_FRAMES, 30));
+    // Inside the body allowance (1.25 m of centres = zero air): the bodies are
+    // touching, so the COLLISION code owns it and this one stays quiet.
+    const ticks = run(rt, northRun(CYCLIST_X - 1.0, 100, OVERTAKE_FRAMES, 30));
     expect(passEventsOf(ticks)).toHaveLength(0);
+  });
+
+  it("…but 1.86 m of centres is 0.6 m of AIR, and that now convicts", () => {
+    // The old bar was 2.2 m of centres, on "parity" with an isotropic collision
+    // circle that no longer exists. It handed this pass — 0.61 m of clear air
+    // between a 0.85 m half-width car and a 0.4 m half-width rider — to a
+    // collision detector that correctly reports nothing, so the WORST pass in
+    // the band graded silent. It is a squeeze, and it is billed as one.
+    const rt = createWorldRuntime(loadWorld("vu-pass-v1"));
+    rt.setCyclistQuery(makeQuery({ ...CYCLIST_AHEAD, x: () => CYCLIST_X }));
+    const ticks = run(rt, northRun(4.8, 100, OVERTAKE_FRAMES, 30));
+    const events = passEventsOf(ticks);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({
+      kind: "prioritySituation",
+      situation: "vulnerable-pass",
+      violated: true,
+    });
   });
 });
 
