@@ -1213,6 +1213,52 @@ export function PlayAreaStyles() {
       }
 
       /* ══════════════════════════════════════════════════════════════════
+         …AND THE OPEN SHEET OUTRANKS THE NOTIFICATION COLUMN — 2026-08-12,
+         doc 91 §O.3 N4, and it is what was actually stopping «Напреднал».
+
+         MEASURED ON THE DEPLOYED /simulator, two fingers on the glass through
+         CDP, not a rig: on small-landscape and galaxy-gesturebar-landscape the
+         «M►» cell answers «Скоростният лост е на N» at its own centre, and the
+         event log says the finger's pointerdown was delivered to the CARD:
+
+           pointerdown «Съединител …» id4              ← the clutch, held
+           pointerdown «Скоростният лост е на N» id5   ← aimed at «M►»
+           pointerup   «Скоростният лост е на N» id5
+           N → N,  gear never engaged
+
+         while the same clutch with «]» on a keyboard reaches M1 on the same two
+         profiles. So the driveline is fine, useTapActivation IS bound at that
+         cell (SheetCell), and neither of them is the defect: the finger never
+         arrives. THE CARD TEACHING «M►» IS THE RECTANGLE BURYING IT —
+         transmissionSwitchHint() fires the instant «Напреднал» is chosen, and
+         its own text names the control it is standing on.
+
+         WHY z-index AND NOT „display: none" LIKE THE HINT ABOVE. The rule three
+         blocks up this file already states the principle: „A teaching card is
+         never treated this way: it moves, it does not disappear." This card is
+         the sentence that explains the gate; hiding it while the student is
+         doing the thing it teaches is a THEO-4 breach. And it does not need to
+         move either — the sheet paints almost nothing. Its cells are 44 px
+         TRANSPARENT targets carrying a 10 px word (about 370 px² of ink each),
+         so raising them costs the card two words of legibility and buys back
+         every cell the column was answering for.
+
+         The whole root is raised rather than the sheet alone, because
+         [data-hud="touch-controls"] is z-10 and that establishes a stacking
+         context its own children cannot climb out of. Raising it is also the
+         right answer on its own terms: the column is pointer-events-none except
+         on its buttons, the root is pointer-events-none except on its controls,
+         and when a driving control and a notification want the same pixel while
+         the student is holding the control strip open, the control is what the
+         finger meant.
+
+         Scoped to the sheet being OPEN, so nothing changes for the arc, the
+         pads or the rail in the state a lesson is actually driven in. */
+      html[data-sim-car-sheet="open"] [data-hud="touch-controls"] {
+        z-index: 40;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
          PORTRAIT: THE INSTRUMENT READOUT STANDS UP IN THE GAP BETWEEN THE
          THUMBS — 2026-08-12.
 

@@ -62,7 +62,13 @@ import { COCKPIT_HOTSPOTS } from "./hotspots";
  * `forward` is the driving pose and the only one the car is ever driven in —
  * every other pose is a temporary look that eases home when its step is done.
  */
-export type CabinLookPoseId = "forward" | "belt" | "console" | "mirrorRight";
+export type CabinLookPoseId =
+  | "forward"
+  | "belt"
+  | "console"
+  | "mirrorLeft"
+  | "mirrorRight"
+  | "mirrorRear";
 
 export interface CabinLookPose {
   id: CabinLookPoseId;
@@ -102,6 +108,23 @@ export interface CabinLookPose {
  *    the pose is a head turn the student already performs during the mirror
  *    steps, and pressing the mirror after looking produces NO camera jump at
  *    all, because the glance crossfades onto the identical angle.
+ *  · mirrorLeft / mirrorRear — THE TWO THE TABLE NEVER HAD, added by doc 91
+ *    §I15 because the centre test below turned their absence from a silent
+ *    inaccuracy into a dead end. Both pointed at `forward`, and at `forward`
+ *    the geometry says (measured, every aspect the app serves):
+ *      · the LEFT door mirror's centre projects at x −0.005 — five thousandths
+ *        of a frame OUTSIDE the left edge. That is §L10's «🖱 Задръж Ляво
+ *        огледало» at x −76: the chip is centred on that point and is ~145 px
+ *        wide, so −4 px minus half a chip is −76 px, to the pixel.
+ *      · the INTERIOR mirror's box top is ABOVE the frame from 2.0:1 onward
+ *        (−0.134 at his 2.17:1), and the chip is anchored above the box top —
+ *        §L10's «🖱 Задръж Вътрешно огледало» at y −83.
+ *    `looksNeededFor()` skips `forward` by construction (the way home is its
+ *    own permanent control), so „unreachable, pose = forward" would have
+ *    offered the student nothing at all. These two are the honest answer, and
+ *    they are GLANCE_OFFSETS.left / .rear verbatim for exactly the reason
+ *    mirrorRight is: the pose IS the graded glance, so there is no jump when
+ *    the student presses the mirror he has just turned to look at.
  */
 export const CABIN_LOOK_POSES: Record<CabinLookPoseId, CabinLookPose> = {
   forward: {
@@ -125,6 +148,14 @@ export const CABIN_LOOK_POSES: Record<CabinLookPoseId, CabinLookPose> = {
     labelBg: "Погледни към конзолата",
     hintBg: "Наведи поглед към скоростния лост, ръчната спирачка и клаксона",
   },
+  mirrorLeft: {
+    id: "mirrorLeft",
+    // CameraRig GLANCE_OFFSETS.left, verbatim.
+    yaw: 0.67,
+    pitch: -0.15,
+    labelBg: "Погледни към лявото огледало",
+    hintBg: "Обърни глава наляво, към лявото външно огледало",
+  },
   mirrorRight: {
     id: "mirrorRight",
     yaw: -0.93,
@@ -132,13 +163,23 @@ export const CABIN_LOOK_POSES: Record<CabinLookPoseId, CabinLookPose> = {
     labelBg: "Погледни към дясното огледало",
     hintBg: "Обърни глава надясно, към дясното външно огледало",
   },
+  mirrorRear: {
+    id: "mirrorRear",
+    // CameraRig GLANCE_OFFSETS.rear, verbatim.
+    yaw: -0.28,
+    pitch: 0.06,
+    labelBg: "Погледни в огледалото за задно виждане",
+    hintBg: "Вдигни поглед към вътрешното огледало над таблото",
+  },
 };
 
 export const CABIN_LOOK_POSE_IDS: readonly CabinLookPoseId[] = [
   "forward",
   "belt",
   "console",
+  "mirrorLeft",
   "mirrorRight",
+  "mirrorRear",
 ];
 
 // ---------------------------------------------------------------------------
@@ -283,8 +324,41 @@ export function hotspotScreenRect(
  */
 export const MIN_TARGET_SPAN = 0.02;
 
+/**
+ * THE CENTRE TEST — doc 91 · L10/D11/I15, and it is the half this predicate was
+ * missing rather than a tightening of the half it had.
+ *
+ * MEASURED (§L10, on his handset at 2.17:1): «🖱 Задръж Ляво огледало» rendered
+ * at **x −76** and «🖱 Задръж Вътрешно огледало» at **y −83**. Both chips are
+ * gated on `hotspotIsReachable`, so a `true` there is what PUT them there — the
+ * control kept a sliver inside the frame, the span test passed on that sliver,
+ * and the chip was then positioned at the control's own CENTRE, which is off
+ * the canvas. `looksNeededFor()` reads the same predicate, so no head turn was
+ * offered either: the app silently claimed a mirror was in the picture while
+ * the only thing in the picture was its edge.
+ *
+ * So the span rule and this one answer two different questions and the code
+ * needs both:
+ *   · SPAN (`MIN_TARGET_SPAN`) — „is there enough of it to hit?"  Deliberately
+ *     forgiving, because the left door mirror, the selector and the horn are
+ *     half out of frame at the shipped pose and are hit every day on the half
+ *     that shows. That reasoning is unchanged and the constant is untouched.
+ *   · CENTRE — „is the thing itself in the picture, or only its edge?"  This is
+ *     what a LABEL and a CLICK POINT need, and both are derived from here.
+ *
+ * The rect passed to the test is the UNCLIPPED one on purpose: the clipped
+ * rect's centre is inside [0,1] by construction (it is clipped to it), so
+ * testing that would be a no-op that reads like a fix.
+ */
+function screenCentreIsInFrame(r: FrameRect): boolean {
+  const cx = (r.left + r.right) / 2;
+  const cy = (r.top + r.bottom) / 2;
+  return cx >= 0 && cx <= 1 && cy >= 0 && cy <= 1;
+}
+
 /** The visible part of a hotspot, clipped to the canvas — null if nothing of
- *  it is on screen (or it is behind the lens). */
+ *  it is on screen, if only its edge is (see `screenCentreIsInFrame`), or if
+ *  it is behind the lens. */
 export function hotspotVisibleRect(
   name: CockpitHotspotName,
   poseId: CabinLookPoseId,
@@ -292,6 +366,7 @@ export function hotspotVisibleRect(
 ): FrameRect | null {
   const r = hotspotScreenRect(name, poseId, aspect);
   if (r === null) return null;
+  if (!screenCentreIsInFrame(r)) return null;
   const left = Math.max(0, r.left);
   const right = Math.min(1, r.right);
   const top = Math.max(0, r.top);
@@ -343,14 +418,20 @@ export const CABIN_LOOK_FOR_HOTSPOT: Record<CockpitHotspotName, CabinLookPoseId>
   hotspot_belt: "belt",
   hotspot_gear_selector: "console",
   hotspot_parking_brake: "console",
-  hotspot_indicator_stalk: "forward",
-  hotspot_wiper_stalk: "forward",
+  // The two STALKS sit lower in the frame than the switches beside them
+  // (cy 0.935 at 16:9), so on a wide window they cross the bottom edge with
+  // everything else on the lower console. `console` is their fallback for the
+  // same reason it is the selector's — and, exactly as with the selector, a
+  // 16:9 student never sees it offered, because at 16:9 they are reachable
+  // from `forward` and the checklist only offers a look when they are not.
+  hotspot_indicator_stalk: "console",
+  hotspot_wiper_stalk: "console",
   hotspot_headlights: "forward",
   hotspot_hazard: "forward",
   hotspot_horn: "console",
-  hotspot_mirror_left: "forward",
+  hotspot_mirror_left: "mirrorLeft",
   hotspot_mirror_right: "mirrorRight",
-  hotspot_mirror_rear: "forward",
+  hotspot_mirror_rear: "mirrorRear",
   hotspot_fog: "forward",
 };
 

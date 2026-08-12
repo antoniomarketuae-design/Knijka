@@ -212,6 +212,30 @@ export interface SimOverlayItem {
   ackLabelBg?: string | null;
   /** Label for the control that opens the detail; defaults to „Защо". */
   openLabelBg?: string | null;
+  /**
+   * ── DOC 91 · C5/§I5(a) — THE 4-PIXEL DEAD END ─────────────────────────────
+   * „one 4-pixel miss bricks the lesson, silently and permanently."
+   *
+   * MEASURED: «СПИСЪК» at [664,51 61×44] and the ✕ «Скрий известието» at
+   * [729,51 44×44] — **a 4 px gap.** One tap on that ✕ removed the pre-drive
+   * line for good (`dismissedOverlayIds` is added to and never cleared), and on
+   * the three INFO steps whose only completion path is «Потвърди» inside that
+   * checklist the lesson was then unwinnable. Step 1 is an info step, **so tap
+   * #1 of a lesson could do it.**
+   *
+   * This flag is the distinction the A6 ruling („those pop ups need to be able
+   * to be removed when clicked") was always missing: A6 is about TRANSIENT
+   * NOTIFICATIONS — a task line, a „Браво", a piece of guidance. An item that
+   * IS the task is not a notification about the lesson, it is the lesson, which
+   * is also why it carries no TTL. `blocking` is the wrong tool for it: a
+   * blocking item freezes the drive, and the pre-drive is performed by driving
+   * the controls.
+   *
+   * Use it only for an item that (a) has no TTL, (b) reappears identically on
+   * the next poll anyway, and (c) is the student's only route to something he
+   * needs. Everything else on the glass stays one tap from gone.
+   */
+  noDismiss?: boolean;
   /** The caller renders extra React inside the opened sheet (checklist, result). */
   hasRichDetail?: boolean;
   /** Called when the student acknowledges/dismisses. Ignored by the pure selector. */

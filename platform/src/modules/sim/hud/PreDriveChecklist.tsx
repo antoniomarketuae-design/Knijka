@@ -46,11 +46,13 @@ import {
   PRE_DRIVE_STEP_ORDER,
   PRE_DRIVE_STEPS,
   hotspotsForStep,
-  preDriveMouseActionBg,
+  preDriveActionBg,
+  preDriveActionGlyph,
   preDrivePrimaryInput,
   preDriveStepKind,
   type CockpitHotspotName,
   type PreDriveMode,
+  type PreDrivePointer,
   type PreDriveStepId,
 } from "../procedures";
 import {
@@ -62,20 +64,62 @@ import {
 import { setCabinLook, useCabinLook } from "../scene/vitok/cabinLookStore";
 import { PreDriveTutorial, readTutorialAutoOpen } from "./PreDriveTutorial";
 
-const MODE_SUBTITLE: Record<PreDriveMode, string> = {
-  instruction:
-    "Всяка стъпка се прави с МИШКАТА — върху контролите в кабината или върху педалите долу вдясно. Списъкът се отмята сам.",
-  practice: "Изпълни подготовката по памет. Подсказка ще се появи само ако спреш задълго.",
-  assess: "Изпитен режим: изпълни стъпките в правилния ред — редът се оценява.",
+/**
+ * ── DOC 91 · U1/M6/I12 — THE SUBTITLE THAT NAMED A DEVICE HE WAS NOT HOLDING ──
+ * It read «Всяка стъпка се прави с МИШКАТА…» on every device, phone included,
+ * on the panel that opens the step he called „ultra hard". One sentence per
+ * pointer, chosen by the caller from the SAME predicate that decides whether
+ * the on-screen controls exist at all (`hasTouchScreen()` → `hintInput`), so
+ * the copy can never name a mouse to a student who has none.
+ */
+const MODE_SUBTITLE: Record<PreDriveMode, Record<PreDrivePointer, string>> = {
+  instruction: {
+    mouse:
+      "Всяка стъпка се прави с МИШКАТА — върху контролите в кабината или върху педалите долу вдясно. Списъкът се отмята сам.",
+    touch:
+      "Всяка стъпка се прави с ПРЪСТ — по бутоните около екрана, по лентата „Кола“ горе и по подложките долу. Списъкът се отмята сам.",
+  },
+  practice: {
+    mouse: "Изпълни подготовката по памет. Подсказка ще се появи само ако спреш задълго.",
+    touch: "Изпълни подготовката по памет. Подсказка ще се появи само ако спреш задълго.",
+  },
+  assess: {
+    mouse: "Изпитен режим: изпълни стъпките в правилния ред — редът се оценява.",
+    touch: "Изпитен режим: изпълни стъпките в правилния ред — редът се оценява.",
+  },
 };
 
-/** Short mouse label for a row (the pending card shows the full sentence). */
-function rowActionBg(stepId: PreDriveStepId): string | null {
+/**
+ * ── DOC 91 · L9/§I14 — THE 44 px A THUMB NEEDS, ON THE CONTROLS HE MEASURED ──
+ *
+ * Measured on his handset: «Потвърди» 75×**24**, «Покажи ми как» 99×**24**,
+ * «ВСИЧКИ СТЪПКИ (0/13)» 133×**15**, «⌨ КЛАВИШИ ЗА НАПРЕДНАЛИ» 170×**15**.
+ * §L9's own note is what makes this a functional row and not a polish one:
+ * *„the first two are the only completion path for the confirm-only steps"* —
+ * three of the thirteen steps CANNOT be finished any other way.
+ *
+ * THE BOX IS GROWN HERE RATHER THAN A `::before` PAD, and that is a measured
+ * choice, not a preference. `QualityPresetSelector`'s invisible pad (the
+ * precedent §I14 cites) works because its three pills are side by side, so
+ * their pads cannot overlap. These controls are stacked 2–6 px apart: a ±14 px
+ * pad on «Всички стъпки» and «⌨ Клавиши» would overlap by ~26 px, and every
+ * tap in the overlap would go to whichever pseudo-element paints last. The
+ * probe unions `::before` insets into the hit rect, so that version would
+ * MEASURE 44 px while behaving worse than what is there now — which is exactly
+ * the failure mode this wave exists to end.
+ *
+ * `touch-manipulation` rides along on each: it removes the double-tap-zoom
+ * wait, which on a control this size reads as „the button did not answer".
+ */
+const TOUCH_ROW_CLASS = "flex min-h-11 touch-manipulation items-center";
+
+/** Short gesture label for a row (the pending card shows the full sentence). */
+function rowActionBg(stepId: PreDriveStepId, pointer: PreDrivePointer): string | null {
   switch (preDrivePrimaryInput(stepId)) {
     case "click":
-      return "щракни в кабината";
+      return pointer === "touch" ? "натисни бутона" : "щракни в кабината";
     case "pedal":
-      return "задръж педала";
+      return pointer === "touch" ? "задръж подложката" : "задръж педала";
     case "confirm":
       return null;
   }
@@ -154,12 +198,25 @@ export function PreDriveChecklist({
   completedStepIds,
   wrongOrderStepIds,
   mode,
+  pointer = "mouse",
+  compact = false,
   onConfirmStep,
 }: {
   completedStepIds: ReadonlyArray<PreDriveStepId>;
   wrongOrderStepIds: ReadonlyArray<PreDriveStepId>;
   /** Presentation mode; the machine applies the matching scoring rules. */
   mode: PreDriveMode;
+  /** Which device the copy speaks to (§I12). The shell decides it once, from
+   *  `hasTouchScreen()`, so this panel and the touch controls agree. */
+  pointer?: PreDrivePointer;
+  /**
+   * THE PHONE (§I4b). On compact this panel is not a column beside the road,
+   * it is the body of a BOTTOM SHEET — so the tutorial card that used to open
+   * on top of it is a full-screen modal fired by the act of opening the list.
+   * Passed in rather than measured here: the shell already computes it, and
+   * one definition of „compact" is the whole point of that.
+   */
+  compact?: boolean;
   /** Confirm an INFO step (the only click path left — performable steps
    *  complete via their real control). */
   onConfirmStep: (stepId: PreDriveStepId) => void;
@@ -186,13 +243,32 @@ export function PreDriveChecklist({
   const aspect = measuredAspect ?? 16 / 9;
   const pose = useCabinLook();
 
+  // ── DOC 91 · C3/L8/U5 · §I4(b) — NO AUTO-OPENED MODAL ON A PHONE ──────────
+  //
+  // Measured (§C4): with the auto-opened tutorial up, `elementFromPoint` at
+  // each of the TEN touch driving controls' own centres returned the tutorial
+  // card. The auto-open was written for the roomy layout, where this checklist
+  // is a permanently-mounted column and the card is a card; on compact the
+  // checklist only exists WHILE THE BOTTOM SHEET IS OPEN, so the auto-open
+  // turns into „a full-screen modal fires every time the student opens the
+  // list" — over the very controls the step is about, on the device with the
+  // least room to escape it.
+  //
+  // The explanation is NOT taken away, and that distinction is the whole
+  // reason this is a gate and not a deletion: the pending-step card below
+  // carries «Покажи ми как», every row of the full list carries its „?", and
+  // §I12's touch sentence now names the real control on the line above them.
+  // The student opens the explanation when he wants it — which is also the
+  // preference a desktop student can already set («Не отваряй обясненията
+  // сами»), applied by default where the geometry demands it.
   useEffect(() => {
     if (!showGuidance || nextId === null) return;
     if (autoShownRef.current.has(nextId)) return;
     autoShownRef.current.add(nextId);
+    if (compact) return;
     if (!readTutorialAutoOpen()) return;
     setOpenStepId(nextId);
-  }, [showGuidance, nextId]);
+  }, [showGuidance, nextId, compact]);
 
   // AUTOMATIC HEAD TURN (instruction mode only). When the step that is now
   // pending is performed on a control that is nowhere on screen, look at it —
@@ -297,7 +373,9 @@ export function PreDriveChecklist({
         })}
       </ol>
 
-      <p className="shrink-0 text-[11px] leading-snug text-muted">{MODE_SUBTITLE[mode]}</p>
+      <p className="shrink-0 text-[11px] leading-snug text-muted">
+        {MODE_SUBTITLE[mode][pointer]}
+      </p>
 
       {/* THE PENDING STEP — the whole panel in one card, so the thirteen rows
           no longer have to be on screen for the student to know what to do. */}
@@ -324,12 +402,14 @@ export function PreDriveChecklist({
           {showGuidance ? (
             <>
               <p>{PRE_DRIVE_STEPS[nextId].instructionBg}</p>
-              {/* The mouse sentence — never empty, for any of the thirteen. */}
+              {/* The gesture sentence — never empty, for any of the thirteen,
+                  on either pointer (§I12; asserted in
+                  predrive-mouse-first.test.ts for all 13 × 2). */}
               <p className="font-bold text-accent">
                 <span aria-hidden className="mr-1">
-                  🖱
+                  {preDriveActionGlyph(pointer)}
                 </span>
-                {preDriveMouseActionBg(nextId)}
+                {preDriveActionBg(nextId, pointer)}
               </p>
             </>
           ) : null}
@@ -344,7 +424,7 @@ export function PreDriveChecklist({
                   type="button"
                   onClick={() => setCabinLook(poseId)}
                   title={CABIN_LOOK_POSES[poseId].hintBg}
-                  className="rounded-lg border border-accent-2/60 px-2 py-0.5 text-[11px] font-bold text-accent-2 transition hover:bg-accent-2/10 motion-reduce:transition-none"
+                  className={`${TOUCH_ROW_CLASS} rounded-lg border border-accent-2/60 px-2 text-[11px] font-bold text-accent-2 transition hover:bg-accent-2/10 motion-reduce:transition-none`}
                 >
                   👁 {CABIN_LOOK_POSES[poseId].labelBg}
                 </button>
@@ -356,7 +436,7 @@ export function PreDriveChecklist({
             <button
               type="button"
               onClick={() => setOpenStepId(nextId)}
-              className="rounded-lg border border-accent/50 px-2 py-0.5 text-[11px] font-bold text-accent transition hover:bg-accent/10 motion-reduce:transition-none"
+              className={`${TOUCH_ROW_CLASS} rounded-lg border border-accent/50 px-2 text-[11px] font-bold text-accent transition hover:bg-accent/10 motion-reduce:transition-none`}
             >
               Покажи ми как
             </button>
@@ -364,7 +444,7 @@ export function PreDriveChecklist({
               <button
                 type="button"
                 onClick={() => onConfirmStep(nextId)}
-                className="rounded-lg border border-dashed border-border-strong px-2 py-0.5 text-[11px] font-bold text-muted transition hover:border-accent hover:text-foreground motion-reduce:transition-none"
+                className={`${TOUCH_ROW_CLASS} rounded-lg border border-dashed border-border-strong px-2 text-[11px] font-bold text-muted transition hover:border-accent hover:text-foreground motion-reduce:transition-none`}
               >
                 Потвърди
               </button>
@@ -374,7 +454,7 @@ export function PreDriveChecklist({
                 type="button"
                 onClick={() => setCabinLook("forward")}
                 title={CABIN_LOOK_POSES.forward.hintBg}
-                className="rounded-lg border border-border px-2 py-0.5 text-[11px] font-bold text-muted transition hover:text-foreground motion-reduce:transition-none"
+                className={`${TOUCH_ROW_CLASS} rounded-lg border border-border px-2 text-[11px] font-bold text-muted transition hover:text-foreground motion-reduce:transition-none`}
               >
                 ↩ Погледни напред
               </button>
@@ -393,7 +473,7 @@ export function PreDriveChecklist({
         type="button"
         onClick={() => setListOpenChoice(!listOpen)}
         aria-expanded={listOpen}
-        className="mt-0.5 shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none"
+        className={`${TOUCH_ROW_CLASS} shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none`}
       >
         Всички стъпки ({done.size}/{PRE_DRIVE_STEP_ORDER.length}) {listOpen ? "▾" : "▸"}
       </button>
@@ -407,7 +487,7 @@ export function PreDriveChecklist({
             const isNext = id === nextId;
             const isInfo = preDriveStepKind(id) === "info";
             const keys = PRE_DRIVE_STEP_CONTROLS[id]?.keys;
-            const action = rowActionBg(id);
+            const action = rowActionBg(id, pointer);
             return (
               <li
                 key={id}
@@ -498,7 +578,7 @@ export function PreDriveChecklist({
           setListOpenChoice(true);
         }}
         aria-expanded={showKeys}
-        className="mt-0.5 shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none"
+        className={`${TOUCH_ROW_CLASS} shrink-0 self-start text-[10px] font-bold uppercase tracking-wide text-muted transition hover:text-foreground motion-reduce:transition-none`}
       >
         ⌨ Клавиши за напреднали {showKeys ? "▾" : "▸"}
       </button>

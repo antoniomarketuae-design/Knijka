@@ -302,6 +302,48 @@ export function SimOverlay({
   const tapDismissChip = useTapActivation(dismiss);
   const tapDismissCard = useTapActivation(dismiss);
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
+  /**
+   * ── DOC 91 · D4/C4/§I11 — THE SHEET STOOD ON THE DRIVING CONTROLS ─────────
+   *
+   * The sheet's clearance contract was `bottom: var(--sim-dash-h)` — the 40 px
+   * instrument band — and the band it actually has to clear is the THUMB BAND,
+   * which is ~216 px on an 852×393 phone. §D4 named the fix and the reason it
+   * was never applied: „`TouchControls` already publishes the number that would
+   * have prevented it, and `SimOverlay` does not read it."
+   *
+   * Measured on the DEPLOYED product before this change (tools/mobile/wave6-edges.mjs,
+   * authenticated /simulator, live canvas asserted, six-profile ladder, the
+   * sheet opened by its own «Защо»/«СПИСЪК» chip exactly as a student opens it):
+   *
+   *     iPhone 16 landscape  9 680 px² of 44 px controls under the sheet, 3 of 10 DEAD
+   *     iPhone 16 portrait   7 920 px²,                                    4 of 10 DEAD
+   *
+   * „Dead" is `document.elementFromPoint` at a control's own centre answering
+   * with the sheet — «Мигач наляво» and «Поглед в дясното огледало» among them,
+   * i.e. two GRADED actions.
+   *
+   * AND §I11 IS HONEST THAT THE CLEARANCE ALONE IS NOT THE FIX. Standing on the
+   * thumb band leaves ~137 px, not 244, so a sheet that kept asking for
+   * `--sim-vh × 0.62` would simply be pushed off the TOP of the screen. Hence
+   * the two halves below, which have to ship together:
+   *
+   *   1. the height cap is now the smaller of „0.62 of the viewport" and „what
+   *      is actually left above the controls", so the sheet can never overrun
+   *      either edge, and it already scrolls inside itself — nothing is lost,
+   *      it is read by scrolling;
+   *   2. an explicit «⤢» expand, because §I11's own ruling is that the tall
+   *      case must remain reachable and MAY cover the controls — „because the
+   *      student asked for it". Expanded, the sheet drops the clearance and
+   *      takes the height above the instrument band, which is the old geometry,
+   *      now reached deliberately instead of by default.
+   *
+   * It resets on close: an expand is a decision about ONE reading, not a mode.
+   */
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const tapExpandSheet = useTapActivation(() => setSheetExpanded((v) => !v));
+  useEffect(() => {
+    if (!open) setSheetExpanded(false);
+  }, [open]);
   const tapSheetAck = useTapActivation(acknowledge);
 
   if (shown === null) return null;
@@ -312,8 +354,15 @@ export function SimOverlay({
     shown.hasRichDetail === true;
   const hasAck = typeof shown.onAck === "function";
   // A6: the ✕ exists for everything the student is allowed to send away, which
-  // is everything that is not holding the drive still.
-  const closable = !blocking;
+  // is everything that is not holding the drive still…
+  //
+  // …AND IS NOT THE TASK ITSELF (doc 91 · C5/§I5(a)). The pre-drive line sat
+  // 4 px from that ✕ and one miss removed it permanently — see `noDismiss` in
+  // overlayQueue.ts for the measurement and for why `blocking` could not be
+  // used instead. This is deliberately a property of the ITEM and not a new
+  // rule about kinds: the owner declares „this one has no way back", which is
+  // the only party that knows.
+  const closable = !blocking && shown.noDismiss !== true;
   // …and when a card holds no OTHER control, the card itself is the button —
   // the `HudToasts` grammar, so the phone and the desktop dismiss the same way.
   const cardIsDismissButton = closable && !hasDetail && !hasAck;
@@ -383,6 +432,55 @@ export function SimOverlay({
       <span className="line-clamp-3 min-w-0 break-words text-[11px] font-bold leading-tight text-foreground">
         {shown.lineBg}
       </span>
+
+      {/* ══ ROW 2b — THE BODY, ON THE SCREEN, NOT BEHIND «ЗАЩО» ═══════════════
+          *** THEO-4 — REQUIREMENT ZERO. THIS IS THE ROW THAT BREACHED IT. ***
+
+          HIS WORDS: „THE CARDS SHOW BUTTONS AND NO TEXT." What he was looking
+          at was this card with `detailBg` rendered NOWHERE — it appeared only
+          inside the sheet at the bottom of this file, i.e. behind one press of
+          «ЗАЩО» / «СПИСЪК». On a DESKTOP the same content renders inline (the
+          pre-drive panel prints `instructionBg` in the pending-step card; the
+          toast column prints the explanation under the line), so the phone was
+          the one device where the reasoning was hidden — and it is the device
+          with the least discoverable affordance for finding it.
+
+          Requirement zero is founder-ratified and unconditional: no bare
+          verdicts, ever; the student is owed the reasoning. A card whose BODY
+          IS THE INSTRUCTION, hiding the instruction, is the plainest breach of
+          it in the product. Wave 4 measured the collapse and never escalated
+          it. It is not a layout preference and it is not negotiable against a
+          height budget.
+
+          SO THE BUDGET WAS SOLVED RATHER THAN PAID FOR WITH THE TEXT:
+            · The column is ≤240 px on compact (`notifyColumn.ts`), and all
+              thirteen pre-drive instructions are 55–95 characters — three
+              lines at 11 px. They fit whole. Nothing is truncated in the case
+              that produced the complaint.
+            · `line-clamp-6` is the ceiling for the long ones (a five-step
+              briefing, a teach moment's authored WHY). Six lines ≈ 84 px in
+              the RIGHT-EDGE corridor he drew himself — never the middle of the
+              road — and the sheet still holds the full text, the lawRef and
+              any rich detail. A visible six-line body with more behind a
+              labelled control is a „read more"; zero lines with everything
+              behind it is what he photographed.
+            · `whitespace-pre-line` so an authored list keeps its lines.
+          It sits ABOVE the control row on purpose: the words are what the card
+          is for, and «Защо» is now „see the citation", not „see the text".
+          ══════════════════════════════════════════════════════════════════ */}
+      {/* A <p>, deliberately: the UNPANEL register sets the ghost's face to
+          MONO for instrument values and hands `:is(p, h1, h2, h3, blockquote)`
+          back to the reading face. This is an authored sentence, so it is a
+          paragraph — the same split every other authored line in this HUD
+          already relies on. */}
+      {shown.detailBg ? (
+        <p
+          data-sim-overlay-body=""
+          className="line-clamp-6 min-w-0 whitespace-pre-line break-words text-[11px] font-semibold leading-snug text-muted"
+        >
+          {shown.detailBg}
+        </p>
+      ) : null}
 
       {/* Row 3 — the controls, right-aligned under the words. Absent only on the
           card that IS a control. */}
@@ -555,7 +653,13 @@ export function SimOverlay({
           data-sim-overlay={shown.kind}
           data-sim-overlay-state="open"
           className="pointer-events-none absolute inset-x-0 z-40 flex justify-center"
-          style={{ bottom: "var(--sim-dash-h, 0px)" }}
+          // §I11, half 1 — the clearance. `--sim-touch-floor` is published by
+          // the play shell from `TOUCH_CONTROLS_FLOOR` (the constant the arc and
+          // the pads are laid out from), so this follows the thumb band wherever
+          // it goes instead of pinning a copy of today's number — the same rule
+          // that constant's own comment states. It is `0px` on every surface
+          // without a thumb band, so nothing roomy moves.
+          style={{ bottom: sheetExpanded ? "var(--sim-dash-h, 0px)" : "calc(var(--sim-dash-h, 0px) + var(--sim-touch-floor, 0px))" }}
           role="dialog"
           aria-modal="true"
           aria-label={shown.lineBg}
@@ -564,7 +668,13 @@ export function SimOverlay({
             className="pointer-events-auto flex w-full max-w-2xl flex-col gap-2 rounded-t-2xl border-x border-t bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
             style={{
               borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
-              maxHeight: "calc(var(--sim-vh, 100dvh) * 0.62)",
+              // §I11, half 2 — the cap. `min()` of the old budget and the room
+              // that is actually there. The 3.5rem is the sheet's own top gutter
+              // plus the notification column's first line, so an expanded sheet
+              // still cannot bury the line that named it.
+              maxHeight: sheetExpanded
+                ? "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 3.5rem)"
+                : "min(calc(var(--sim-vh, 100dvh) * 0.62), calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - var(--sim-touch-floor, 0px) - 3.5rem))",
             }}
           >
             <div className="flex shrink-0 items-center gap-2">
@@ -574,6 +684,18 @@ export function SimOverlay({
               <h2 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-tight">
                 {shown.lineBg}
               </h2>
+              {/* §I11 — the tall case, on purpose. 44 px in both axes like its
+                  neighbour, and it carries its state in `aria-expanded` so a
+                  screen reader gets the same fact the glyph gives. */}
+              <button
+                type="button"
+                {...tapExpandSheet}
+                aria-expanded={sheetExpanded}
+                aria-label={sheetExpanded ? "Смали панела" : "Разгъни панела"}
+                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted"
+              >
+                <span aria-hidden>{sheetExpanded ? "⤡" : "⤢"}</span>
+              </button>
               <button
                 type="button"
                 {...tapCloseSheet}

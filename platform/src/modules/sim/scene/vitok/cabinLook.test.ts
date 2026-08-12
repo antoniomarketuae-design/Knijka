@@ -120,27 +120,101 @@ describe("cabin look · ALL THIRTEEN answer a mouse click", () => {
     }
   });
 
-  it("at the reference 16:9 window only two controls need a head turn", () => {
+  it("at the reference 16:9 window five controls need a head turn", () => {
+    // ── THIS NUMBER WENT 2 → 5, AND THE CONTROLS DID NOT MOVE. ──────────────
+    // Doc 91 §I15 added the CENTRE test to `hotspotVisibleRect`, and three
+    // controls that used to answer „yes, in frame" on a sliver now answer „no":
+    //   · hotspot_mirror_left  — centre at x −0.005, i.e. OUTSIDE the left edge
+    //   · hotspot_gear_selector — centre at y 1.072, below the bottom edge
+    //   · hotspot_parking_brake — centre at y 1.010
+    //   · hotspot_horn          — centre at y 1.060
+    // The old expectation was not wrong about the geometry; it was reading a
+    // predicate that accepted an EDGE as a control. Each of the four has a pose
+    // in the reach table that genuinely frames it (asserted above), so „needs a
+    // head turn" is now a statement the UI can act on rather than one it
+    // silently contradicted.
     const away = COCKPIT_HOTSPOT_NAMES.filter((n) => !hotspotIsReachable(n, "forward", 16 / 9));
-    expect(away.sort()).toEqual(["hotspot_belt", "hotspot_mirror_right"]);
+    expect(away.sort()).toEqual([
+      "hotspot_belt",
+      "hotspot_gear_selector",
+      "hotspot_horn",
+      "hotspot_mirror_left",
+      "hotspot_mirror_right",
+      "hotspot_parking_brake",
+    ]);
   });
 
   it("a WIDE window costs three more — the reason the console pose exists", () => {
     // The cockpit holds its horizontal FOV across window shapes (doc 71 §4.9),
     // so width is bought with vertical field: at 21:9 the vFOV is 36.7° and the
     // lower console leaves the picture. „Ten of thirteen" was a 16:9 number.
+    // The three ADDED here by the centre test are the two stalks (centre at
+    // y 1.071) and the INTERIOR mirror (centre at y −0.021 — it leaves off the
+    // TOP, which is §L10's «Вътрешно огледало» at y −83).
     const wide = COCKPIT_HOTSPOT_NAMES.filter((n) => !hotspotIsReachable(n, "forward", 21 / 9));
     expect(wide.sort()).toEqual([
       "hotspot_belt",
       "hotspot_gear_selector",
       "hotspot_horn",
+      "hotspot_indicator_stalk",
+      "hotspot_mirror_left",
+      "hotspot_mirror_rear",
       "hotspot_mirror_right",
       "hotspot_parking_brake",
+      "hotspot_wiper_stalk",
     ]);
-    // …and the console pose puts every one of those three back.
-    for (const n of ["hotspot_gear_selector", "hotspot_horn", "hotspot_parking_brake"] as const) {
+    // …and the console pose puts every lower-console control back.
+    for (const n of [
+      "hotspot_gear_selector",
+      "hotspot_horn",
+      "hotspot_parking_brake",
+      "hotspot_indicator_stalk",
+      "hotspot_wiper_stalk",
+    ] as const) {
       expect(hotspotIsReachable(n, "console", 21 / 9), n).toBe(true);
     }
+  });
+
+  it("doc 91 §L10 — an EDGE is not a control, and the two chips prove it", () => {
+    // THE TWO NUMBERS HE PHOTOGRAPHED, as assertions.
+    //
+    // «🖱 Задръж Ляво огледало» rendered at x −76 and «🖱 Задръж Вътрешно
+    // огледало» at y −83. Both chips are gated on `hotspotIsReachable`, so a
+    // `true` there is what put them off the canvas — the control kept a sliver
+    // inside the frame and the span test passed on the sliver, while the chip
+    // is anchored on the control ITSELF (VitokCockpit: `position` = the box
+    // centre in x, its top edge in y, `center`-aligned).
+    const HIS_ASPECT = 852 / 393; // 2.168 — the landscape iPhone he measured on
+
+    // x −76: the left door mirror's centre is five thousandths of a frame
+    // OUTSIDE the left edge, at every window shape the app serves.
+    for (const aspect of ASPECTS) {
+      const r = hotspotScreenRect("hotspot_mirror_left", "forward", aspect)!;
+      expect((r.left + r.right) / 2, `left mirror centre @ ${aspect.toFixed(2)}`).toBeLessThan(0);
+    }
+    expect(hotspotIsReachable("hotspot_mirror_left", "forward", HIS_ASPECT)).toBe(false);
+
+    // y −83: the interior mirror's box top is ABOVE the frame on his phone, so
+    // the chip — which hangs above that top edge — cannot be on screen either.
+    const rear = hotspotScreenRect("hotspot_mirror_rear", "forward", HIS_ASPECT)!;
+    expect(rear.top).toBeLessThan(0);
+
+    // AND THE POINT OF THE ROW: each now HAS a head turn that frames it, so the
+    // checklist can offer one instead of claiming the mirror is already there.
+    expect(hotspotIsReachable("hotspot_mirror_left", "mirrorLeft", HIS_ASPECT)).toBe(true);
+    expect(hotspotIsReachable("hotspot_mirror_rear", "mirrorRear", HIS_ASPECT)).toBe(true);
+    expect(CABIN_LOOK_FOR_HOTSPOT.hotspot_mirror_left).not.toBe("forward");
+    expect(CABIN_LOOK_FOR_HOTSPOT.hotspot_mirror_rear).not.toBe("forward");
+  });
+
+  it("the two new mirror poses ARE the graded glance angles, like mirrorRight", () => {
+    // CameraRig's GLANCE_OFFSETS.left / .rear. Same contract as the right
+    // mirror above: the student turns his head, presses the mirror, and the
+    // glance crossfades onto the identical angle instead of whipping further.
+    expect(CABIN_LOOK_POSES.mirrorLeft.yaw).toBeCloseTo(0.67, 6);
+    expect(CABIN_LOOK_POSES.mirrorLeft.pitch).toBeCloseTo(-0.15, 6);
+    expect(CABIN_LOOK_POSES.mirrorRear.yaw).toBeCloseTo(-0.28, 6);
+    expect(CABIN_LOOK_POSES.mirrorRear.pitch).toBeCloseTo(0.06, 6);
   });
 
   it("the right-mirror pose IS the graded glance angle — no jump at the handover", () => {
@@ -215,6 +289,9 @@ describe("cabin look · the control says its own name, on the car", () => {
     expect(hotspotIsReachable("hotspot_belt", "belt")).toBe(true);
     expect(hotspotIsReachable("hotspot_mirror_right", "forward")).toBe(false);
     expect(hotspotIsReachable("hotspot_mirror_right", "mirrorRight")).toBe(true);
+    // …and since doc 91 §I15 the LEFT one too — it was the counter-example.
+    expect(hotspotIsReachable("hotspot_mirror_left", "forward")).toBe(false);
+    expect(hotspotIsReachable("hotspot_mirror_left", "mirrorLeft")).toBe(true);
   });
 });
 

@@ -26,8 +26,9 @@
 //   content identically to the direct view — see the aim-table comment).
 //   cadence (MIRROR_CADENCE / LOW_REAR_CADENCE): at most ONE mirror pass per
 //   frame —
-//     low    = rear only, every 4th frame (doc 62 #44 — the rear mirror is
-//              safety-critical; doors keep the authored dark-gloss glass);
+//     low    = rear only, every 8th frame (doc 62 #44 — the rear mirror is
+//              safety-critical; doors keep the authored dark-gloss glass.
+//              4 → 8 is doc 91 §I21; the rationale is on LOW_REAR_CADENCE);
 //     medium = rear only, rendered every 2nd frame;
 //     high   = rear every 2nd frame, doors every 4th (staggered on the
 //              rear's off-frames, phases 1 and 3).
@@ -340,7 +341,7 @@ const MIRROR_FOG_MIN_DENSITY = 1.5 / MIRROR_FAR;
  * Per-mirror refresh cadence: render mirror `kind` on frames where
  * frame % interval === phase. Phases are disjoint (rear owns 0 and 2 mod 4,
  * doors own 1 and 3), so AT MOST ONE mirror pass ever runs per frame:
- *   low    (rear only) — rear every 4th frame (~15 Hz; see LOW_REAR_CADENCE);
+ *   low    (rear only) — rear every 8th frame (~7.5 Hz; see LOW_REAR_CADENCE);
  *   medium (rear only) — passes on half the frames;
  *   high (all three)   — rear at 30 Hz, each door at 15 Hz.
  * Glass is small and mostly glanced at — 15 Hz doors read fine.
@@ -355,10 +356,23 @@ const MIRROR_CADENCE: Record<MirrorKind, { interval: number; phase: number }> = 
  *  mirror shows NOTHING": on low the rig used to mount no RTT at all and the
  *  glass stayed authored dark gloss). The rear mirror is the safety-critical
  *  one — a tailgater lesson is unplayable without it — so low now runs the
- *  REAR pass only, at ~15 Hz: one 256×96 reduced-scene render (far plane
- *  200 m, frozen shadows, no composer) every 4th frame. The door mirrors stay
- *  dark gloss on low — that remains the honest budget cut. */
-const LOW_REAR_CADENCE = { interval: 4, phase: 0 } as const;
+ *  REAR pass only: one 256×96 reduced-scene render (far plane 200 m, frozen
+ *  shadows, no composer). The door mirrors stay dark gloss on low — that
+ *  remains the honest budget cut.
+ *
+ *  INTERVAL 4 → 8 (doc 91 §I21 / §D12f, 2026-08-12). The pass is a FIXED
+ *  256×96 target, so unlike the main pass its cost does not shrink with the
+ *  viewport: measured at phone dimensions, tier low, it was 0.61–1.13 ms of a
+ *  2.4–3.2 ms GPU frame — 25–34 % of the whole tier-low GPU budget for 7 % of
+ *  the canvas pixels. With §I19 (frameloop="demand" behind a card) landed it
+ *  became the largest single remaining per-frame GPU line at `low`, exactly as
+ *  §J-10 predicted, so this is the next cut and it is a pure reduction.
+ *
+ *  WHAT IT COSTS, STATED: the rear glass refreshes ~7.5×/s instead of ~15×/s
+ *  on the tier where it is smallest and dimmest. It is still a live mirror —
+ *  a tailgater lesson stays playable (doc 62 #44) — and it is only `low`;
+ *  medium keeps every 2nd frame and high keeps 30 Hz. */
+const LOW_REAR_CADENCE = { interval: 8, phase: 0 } as const;
 
 /** Which mirrors run RTT per quality tier (lesson-ui preset, fixed for the
  *  life of the scene — the selector lives on the pre-lesson screen). */

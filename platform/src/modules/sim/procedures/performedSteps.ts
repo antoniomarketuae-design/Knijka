@@ -158,6 +158,42 @@ export interface PreDriveStepControl {
    * щракнеш.", which is where the founder's mouse-only run stopped dead.
    */
   pedalBg?: string;
+  /**
+   * TOUCH — doc 91 §U1/M6/I12, and it is the same defect as `pedalBg` one
+   * device along.
+   *
+   * His words about the step this field exists for: „it is ultra hard to put
+   * BElts and all the requried buttons to do so." The pre-drive's own root
+   * cause (§D10) was not oversight, it was SHAPE: this interface had exactly
+   * `clickBg`, `pedalBg` and `keys`, so there was no field a touch sentence
+   * could live in, `preDriveMouseActionBg()` could not return one, and
+   * `PreDriveChecklist` hard-coded «Всяка стъпка се прави с МИШКАТА…» to a
+   * student holding a phone that has no mouse.
+   *
+   * THE HONESTY RULE, THIRD DEVICE. A sentence here may only name a control
+   * that a phone actually carries, and every one below was read off
+   * `TouchControls.tsx` rather than invented:
+   *   · the top rail       — «Изглед» «Пауза» «Клаксон» «Кола», plus «Колан»
+   *                          which exists ONLY while the belt is undone (:1602)
+   *                          — i.e. exactly while its own step is pending;
+   *   · the LEFT flank     — «Ляв» / «Дясн», the two indicators (:1621, :1631);
+   *   · the RIGHT flank    — «Дясн» / «Задн» / «Ляво», the three graded mirror
+   *                          glances (:1648, :1657, :1666);
+   *   · the ⚙ strip behind «Кола» — «ДВИГ» «РЪЧНА» «КОЛАН» «СВЕТЛ» «D►»/«M►»
+   *                          (:1730 …), which is CLOSED by default, so every
+   *                          sentence that names a cell in it says how to open
+   *                          it first. Naming a control the student cannot see
+   *                          is the defect one step along, not the fix — the
+   *                          same reasoning as `hud/controlPhrases.ts`'s
+   *                          TOUCH_SHEET_LOCATOR_BG, restated here rather than
+   *                          imported, because `hud` imports `procedures`.
+   *
+   * Authored for all thirteen (the three info steps answer from
+   * `preDriveTapActionBg`'s default), and asserted in
+   * `predrive-mouse-first.test.ts` — same rule as `keys` and `clickBg`, now
+   * with three input devices instead of two.
+   */
+  tapBg?: string;
 }
 
 /** Control metadata for every PERFORMED step (info steps have no entry). */
@@ -166,53 +202,68 @@ export const PRE_DRIVE_STEP_CONTROLS: Partial<Record<PreDriveStepId, PreDriveSte
     keys: "Q E F",
     hotspots: ["hotspot_mirror_left", "hotspot_mirror_right", "hotspot_mirror_rear"],
     clickBg: "Задръж с мишката всяко от трите огледала в кабината",
+    tapBg: "Натисни едно по едно „Дясн“, „Задн“ и „Ляво“ от дясната страна на екрана",
   },
   "fasten-seatbelt": {
     keys: "B",
     hotspots: ["hotspot_belt"],
     clickBg: "Щракни предпазния колан до седалката",
+    // The rail cell exists only while the belt is undone — i.e. exactly while
+    // this step is pending — so naming it here can never point at nothing.
+    tapBg: "Натисни червения бутон „Колан“ горе на екрана",
   },
   "headlights-on": {
     keys: "L",
     hotspots: ["hotspot_headlights"],
     clickBg: "Щракни ключа за светлините на таблото",
+    tapBg: "Отвори „Кола“ горе на екрана и натисни „СВЕТЛ“",
   },
   "start-engine": {
     keys: "I",
     hotspots: ["hotspot_engine_start"],
     clickBg: "Щракни стартера на централната конзола",
+    tapBg: "Отвори „Кола“ горе на екрана и натисни „ДВИГ“",
   },
   "press-brake": {
     keys: "S",
     hotspots: [],
     pedal: true,
     pedalBg: "Задръж с мишката педала „СПИРАЧКА“ долу вдясно",
+    // The drive pad is ABSOLUTE since §I25 („up is forward, middle is stop,
+    // down is backwards" — his ruling): the brake is the LOWER half of it, and
+    // the sentence says the gesture the pad actually implements.
+    tapBg: "Задръж палеца в долната половина на дясната подложка — това е спирачката",
   },
   "select-gear": {
     keys: "]",
     hotspots: ["hotspot_gear_selector"],
     clickBg: "Щракни скоростния лост към D (десен бутон: назад към P)",
+    tapBg: "Отвори „Кола“ горе на екрана и натискай „D►“, докато лостът покаже D",
   },
   "release-handbrake": {
     keys: "Space",
     hotspots: ["hotspot_parking_brake"],
     clickBg: "Щракни ключа на ръчната спирачка",
+    tapBg: "Отвори „Кола“ горе на екрана и натисни „РЪЧНА“",
   },
   "final-mirror-check": {
     keys: "Q E F",
     hotspots: ["hotspot_mirror_left", "hotspot_mirror_right", "hotspot_mirror_rear"],
     clickBg: "Задръж с мишката лявото и вътрешното огледало",
+    tapBg: "Натисни „Ляво“ и „Задн“ от дясната страна на екрана",
   },
   signal: {
     keys: ",",
     hotspots: ["hotspot_indicator_stalk"],
     clickBg: "Щракни лоста за мигачи",
+    tapBg: "Натисни „Ляв“ от лявата страна на екрана — левият мигач",
   },
   "move-off": {
     keys: "W",
     hotspots: [],
     pedal: true,
     pedalBg: "Задръж плавно с мишката педала „ГАЗ“ долу вдясно",
+    tapBg: "Плъзни палеца нагоре по дясната подложка — нагоре е газта",
   },
 };
 
@@ -252,6 +303,38 @@ export function preDriveMouseActionBg(stepId: PreDriveStepId): string {
   }
   if (control.pedal === true) return control.pedalBg ?? "";
   return control.clickBg ?? "";
+}
+
+/**
+ * WHICH POINTER THE PRE-DRIVE IS SPEAKING TO. Deliberately NOT `HintInput`
+ * from `hud/controlPhrases` even though it is the same distinction: `hud`
+ * imports `procedures`, and this module must not import back.
+ * `PreDriveChecklist` maps one to the other in one line at its call site.
+ */
+export type PreDrivePointer = "mouse" | "touch";
+
+/** The touch twin of `preDriveMouseActionBg` — see `PreDriveStepControl.tapBg`
+ *  for the honesty rule and where every named control lives on a phone. */
+export function preDriveTapActionBg(stepId: PreDriveStepId): string {
+  const control = PRE_DRIVE_STEP_CONTROLS[stepId];
+  if (control === undefined) {
+    return "Направи проверката, после натисни „Потвърди“ в списъка";
+  }
+  return control.tapBg ?? "";
+}
+
+/**
+ * THE ONE SENTENCE THE PENDING-STEP CARD PRINTS, for the device in the
+ * student's hands. §I12: „the pre-drive is what he called ultra hard", and the
+ * reason was that this function had no touch arm to return.
+ */
+export function preDriveActionBg(stepId: PreDriveStepId, pointer: PreDrivePointer): string {
+  return pointer === "touch" ? preDriveTapActionBg(stepId) : preDriveMouseActionBg(stepId);
+}
+
+/** The leading glyph that matches the sentence — 🖱 or ☝, never both. */
+export function preDriveActionGlyph(pointer: PreDrivePointer): string {
+  return pointer === "touch" ? "☝" : "🖱";
 }
 
 // ---------------------------------------------------------------------------

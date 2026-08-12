@@ -164,6 +164,10 @@ import {
   requestFullscreen,
   supportsFullscreen,
 } from "./fullscreen";
+// The top of the whole thumb-control band, as a CSS length. Doc 91 §I10: the
+// minimap column stands on THIS and not on `--sim-hud-floor` (the instrument
+// band, 48 px), which is what put the map under the throttle thumb.
+import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";
 import {
   COMPACT_DASH_HEIGHT_PX,
   isCompactViewport,
@@ -175,6 +179,7 @@ import {
 import { MicroQuizOverlay } from "./MicroQuizOverlay";
 import { MistakeConsequenceOverlay } from "./MistakeConsequenceOverlay";
 import {
+  OVERLAY_SCRIM_CLASS,
   PLAY_ASPECT,
   PLAY_BOTTOM_GUTTER_PX,
   PLAY_CHROME_FALLBACK_PX,
@@ -987,7 +992,12 @@ function PlayMenuRow({ item, onChosen }: { item: PlayMenuItem; onChosen: () => v
       type="button"
       role="menuitem"
       {...tap}
-      className={`flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-[13px] font-bold transition active:bg-surface ${
+      // DOC 91 · L9/§I14: measured 226×**39.5** — 4.5 px short of the 44 px a
+      // thumb needs, on every row of the sheet that holds «Пауза», the quality
+      // preset and «Завърши сесията». `py-2.5` → `py-3` is the whole fix
+      // (2×12 + 15.5 line box = 39.5 → 44) and it costs 9 px per row on a menu
+      // that is already scrollable.
+      className={`flex items-center gap-2 rounded-xl px-2.5 py-3 text-left text-[13px] font-bold transition active:bg-surface ${
         item.tone === "danger" ? "text-danger" : "text-foreground"
       }`}
     >
@@ -1317,7 +1327,37 @@ export function LessonPlayShell({
     compact,
     standalone,
   });
-  const viewportH = useVisualViewportHeight(immersive && !isFullscreen);
+  /**
+   * ── DOC 91 · C6/§I7 — THE ARGUMENT, NOT THE BODY ─────────────────────────
+   *
+   * This read `immersive && !isFullscreen`. The hook returns early when its
+   * argument is false and KEEPS ITS LAST VALUE, so entering fullscreen froze
+   * `--sim-vh` at the pre-fullscreen height and the two sheets that size
+   * themselves from it (`TeachMomentOverlay:214`, `SimOverlay`'s open sheet)
+   * were then allowed 0.62 of a viewport that no longer existed. §C6 measured
+   * it across a full rotation: `--sim-vh` read `852px` at every sample while
+   * the viewport went 393×852 → 852×393 → 852×453 → 852×393.
+   *
+   * WHAT MUST STAND DOWN IN FULLSCREEN IS THE INLINE HEIGHT, NOT THE
+   * MEASUREMENT, and the height is guarded separately in the `style` prop
+   * below (`immersive && !isFullscreen`). Widening this argument therefore
+   * changes no element's height; it only makes the published variable true.
+   *
+   * AND IT DOES NOT MOVE THE ARC. The ledger warned that widening this makes
+   * §D6's thumb-arc track the URL bar MORE. Read against the tree, it cannot:
+   * `--sim-vh` has exactly three consumers in the whole app — the two
+   * `maxHeight` calcs above and this element's own `style` — and the arc's
+   * `ARC_RISE` clamp resolves `100%` against its containing block's HEIGHT,
+   * which is the inline height on the line below. That height's condition is
+   * unchanged by this edit. The only state this widens is `isFullscreen`, and
+   * in fullscreen there is no URL bar to track.
+   *
+   * Confirmed on the deployed product before the change (tools/mobile/wave6-edges.mjs,
+   * WebKit, iPhone 16 landscape, authenticated /simulator, live canvas):
+   * after a −44 px viewport change and back, `--sim-vh` read `349px` while
+   * `visualViewport.height` was 393 — 44 px of published lie.
+   */
+  const viewportH = useVisualViewportHeight(immersive || isFullscreen);
 
   // -- The single overlay layer (compact only) ---------------------------------
   // ROOMY LAYOUTS ARE UNTOUCHED. A 1440 px window has room for a banner, a
@@ -1386,6 +1426,31 @@ export function LessonPlayShell({
       const next = new Set(prev);
       next.add(it.id);
       return next;
+    });
+  }, []);
+  /**
+   * ── DOC 91 · C5/§I5(b) — THE WAY BACK, AND THE GENERAL RULE BEHIND IT ─────
+   *
+   * §D9's one-sentence diagnosis of the dead end was „an unbounded dismiss
+   * set": added to at exactly one place, cleared at none. `noDismiss` (§I5(a))
+   * stops the pre-drive line from entering that set in the first place; this is
+   * the SECOND writer, and the two are deliberately independent, because the
+   * rule §I5 draws is general and outlives this one card:
+   *
+   *     ANY LINE THE STUDENT CAN SEND AWAY NEEDS A WAY BACK.
+   *
+   * It is the same recall grammar «Задача» has had since the task line became
+   * transient (three lines further down the menu list) and «Виж разбора» has on
+   * the end screen. A student who lands in a session started before this
+   * shipped, or who reaches the set by any path added later, has a labelled
+   * control that returns the checklist instead of „abort or reload".
+   */
+  const recallPreDriveOverlay = useCallback(() => {
+    setDismissedOverlayIds((prev) => {
+      if (prev.size === 0) return prev;
+      const next = new Set<string>();
+      for (const id of prev) if (!id.startsWith("predrive:")) next.add(id);
+      return next.size === prev.size ? prev : next;
     });
   }, []);
   // -- THE BRIEFING (2026-08-02) -----------------------------------------------
@@ -2421,6 +2486,14 @@ export function LessonPlayShell({
               detailBg: PRE_DRIVE_STEPS[snap.preDriveNextStepId].instructionBg,
               hasRichDetail: true,
               openLabelBg: "Списък",
+              // C5/§I5(a). «СПИСЪК» [664,51 61×44] and the ✕ [729,51 44×44] are
+              // 4 px apart, and one miss used to remove this line for the rest
+              // of the session — on the three INFO steps, whose only completion
+              // path is «Потвърди» inside the checklist behind it, that made
+              // the lesson unwinnable. Step 1 is an info step, so tap #1 could
+              // do it. This item is not a notification ABOUT the task, it IS
+              // the task; see `noDismiss` in overlayQueue.ts.
+              noDismiss: true,
             }
           : null,
 
@@ -2556,6 +2629,23 @@ export function LessonPlayShell({
               },
             ]
           : []),
+        // …AND THE SAME PRICE FOR THE PRE-DRIVE LINE (C5/§I5(b)). The measured
+        // dead end was „no way back to the checklist" — the menu offered
+        // Съветник / Въпроси / Карта / Изход от цял екран / Прекрати урока /
+        // ← Всички уроци and nothing else, so a 4 px miss cost the lesson. The
+        // row is present exactly while the pre-drive is the live task, and it
+        // carries n/13 for the same reason «Задача» carries 2/3: a recall the
+        // student can see the state of is a recall he will use.
+        ...(compact && !ended && snap.phase === "preDrive"
+          ? [
+              {
+                key: "predrive",
+                labelBg: "Подготовка",
+                valueBg: `${snap.preDriveCompleted.length}/${PRE_DRIVE_STEP_ORDER.length}`,
+                onSelect: recallPreDriveOverlay,
+              },
+            ]
+          : []),
         {
           key: "minimap",
           labelBg: "Карта",
@@ -2624,7 +2714,18 @@ export function LessonPlayShell({
         // up with its pedal UI below the fold. Top-anchored + an explicit
         // measured height cannot do that.
         isFullscreen
-          ? "flex h-full flex-col gap-2 overflow-hidden bg-background p-2"
+          ? // DOC 91 · L12/§I8 — THE FULLSCREEN ARM HAD TO LEARN THE SAME RULE.
+            // It hard-coded `gap-2 p-2`, and it is tested FIRST, so a phone that
+            // GRANTS the Fullscreen API never reached the `compact ? "" :` rule
+            // six lines below — the one whose comment is „eight pixels of page
+            // gutter on each side of a driving simulator is eight pixels of
+            // road". Measured on the DEPLOYED product, Chromium (which grants
+            // fullscreen for a <div>; iOS Safari does not), authenticated
+            // /simulator, live canvas: 836×377 inside an 852×393 viewport in
+            // landscape AND 377×836 inside 393×852 in portrait — 16 px of width
+            // and 16 px of height, in both orientations, on every Android phone
+            // in the market. tools/mobile/wave6-edges.mjs, row I8.
+            `flex h-full flex-col overflow-hidden bg-background ${compact ? "" : "gap-2 p-2"}`
           : immersive
             ? `fixed left-0 top-0 z-40 flex w-full flex-col overflow-hidden bg-background ${
                 // Compact: no padding at all. Eight pixels of page gutter on
@@ -2637,10 +2738,73 @@ export function LessonPlayShell({
         ...(immersive && !isFullscreen
           ? { height: viewportH !== null ? `${viewportH}px` : "100dvh" }
           : null),
+        // ── DOC 91 · T1/§I6, SECOND HALF — «IT MOVES LEFT AND RIGHT» ────────
+        //
+        // §I6 shipped `touch-action: none` on the wrapper whose only child is
+        // the scene, and it was right to scope it: the stage contains the
+        // pre-drive tutorial's scroller, whose «Разбрах» is 300–423 px below the
+        // fold on 13 of 13 landscape steps, and `touch-action` resolves up the
+        // ancestor chain — `none` on the shell would have traded a nuisance for
+        // an unwinnable lesson.
+        //
+        // BUT EVERY CARD IS A SIBLING OF THAT WRAPPER, NOT A DESCENDANT, and
+        // `touch-action` is intersected across the elements the touch points
+        // are over. So a pinch that starts on the road was suppressed and a
+        // pinch that starts ON A CARD — which is where his thumbs are the whole
+        // time a card is up — was not. Measured on the DEPLOYED product with a
+        // real two-point CDP `Input.dispatchTouchEvent`, Chromium put on his own
+        // code path (the Fullscreen API refused, exactly as iOS Safari refuses
+        // it), authenticated /simulator, live canvas:
+        //
+        //     pinch on the road   scale 1 → 1      offsetLeft 0 → 0
+        //     pinch on the CARD   scale 1 → 1.28   offsetLeft 0 → 145
+        //
+        // 145 px of leftward pan on an 852 px screen is „the screen is eating
+        // the right side… it is not stabilized, it moves left and right", and
+        // it is also why his «РАЗБРА[Х]» runs off the edge: nothing is clipped
+        // at scale 1 (the same run measured ONE painted thing 2 px outside the
+        // safe-area box on the whole screen) — the card is clipped because the
+        // VISUAL VIEWPORT is zoomed and panned. One gesture, both complaints.
+        //
+        // WHY `pan-y` AND NOT `none`. `none` here would kill the tutorial
+        // card's scroller, the ⚙ sheet's scroller and the hint's, for the reason
+        // §I6 gives above. `pan-y` keeps every one of them scrolling and removes
+        // exactly two behaviours: pinch-zoom and horizontal pan — and the app
+        // has no horizontal scroller inside this shell (one `overflow-x-auto`
+        // exists in the whole sim tree, `FaultCard.tsx:348`, which lives on the
+        // debrief and not under this root). The scene wrapper keeps its `none`;
+        // an ancestor can only narrow a descendant, never widen it.
+        //
+        // AND IT IS SCOPED TO THE DRIVING SHELL, WHICH IS THE POINT. This is an
+        // inline style on ONE element that exists only while a session is on
+        // screen. It is NOT the viewport meta: that export is global, Safari has
+        // ignored `user-scalable`/`maximum-scale` since iOS 10 so it would not
+        // even work on his phone, and it would disable pinch on the theory and
+        // exam screens where minors read dense Bulgarian legal text. The same
+        // run proves those screens still zoom — /theory went scale 1 → 3.568,
+        // which is also the positive control that makes the two zeros above mean
+        // anything at all.
+        ...(immersive || isFullscreen ? { touchAction: "pan-y" } : null),
         // Published for the whole subtree (incl. the scene's TouchControls).
         ["--sim-vh" as string]: viewportH !== null ? `${viewportH}px` : "100dvh",
         ["--sim-dash-h" as string]: `${dashHeightPx}px`,
         ["--sim-hud-floor" as string]: `${hudFloorPx}px`,
+        // ── DOC 91 · D4/§I11 — THE NUMBER `SimOverlay` NEEDED AND COULD NOT SEE.
+        //
+        // §D4's whole diagnosis is „`TouchControls` already publishes the number
+        // that would have prevented it — and `SimOverlay` does not read it."
+        // `TOUCH_CONTROLS_FLOOR` is a CSS length, not a pixel count, so it is
+        // republished AS a length: it keeps its `env(safe-area-inset-bottom)`
+        // and its `ARC_RISE` clamp, both of which have to be resolved by the
+        // engine against the live box rather than frozen into a number here
+        // (and keeping it authored CSS is also what lets the notch harness
+        // substitute a real inset into it — tools/mobile/lib/insets.mjs
+        // rewrites declarations, it cannot reach a number computed in JS).
+        //
+        // `0px` when there is no thumb band to clear: no touch screen, or a
+        // roomy layout, where the sheet standing on the dash was always right.
+        ["--sim-touch-floor" as string]:
+          compact && hintInput === "touch" && !ended ? TOUCH_CONTROLS_FLOOR : "0px",
         ["--sim-minimap-clearance" as string]: `${minimapClearancePx(minimapOn)}px`,
       }}
     >
@@ -2896,6 +3060,12 @@ export function LessonPlayShell({
                   completedStepIds={snap.preDriveCompleted}
                   wrongOrderStepIds={snap.preDriveWrongOrder}
                   mode={preDriveMode}
+                  // §I12 — the copy speaks to the device in his hands, from the
+                  // same `hasTouchScreen()` reading the touch controls mount on.
+                  pointer={hintInput === "touch" ? "touch" : "mouse"}
+                  // §I4(b) — this mount IS the compact one (it is the bottom
+                  // sheet's body), so no tutorial modal opens by itself here.
+                  compact
                   onConfirmStep={(stepId) => {
                     if (preDriveStepKind(stepId) === "info") handlePreDriveStep(stepId);
                   }}
@@ -3194,7 +3364,30 @@ export function LessonPlayShell({
             data-hud="minimap-column"
             className="absolute flex flex-col items-end gap-1.5"
             style={{
-              bottom: "var(--sim-hud-floor, 6.75rem)",
+              // ═══ DOC 91 §I10 / L3 — „THE MINIMAP IS ON MY THUMB" ═══════════
+              //
+              // `--sim-hud-floor` IS THE WRONG FLOOR ON A PHONE AND ALWAYS WAS.
+              // It is where the INSTRUMENT band ends — `dashHeightPx + 8`, i.e.
+              // 48 px on every profile in the ladder — and `TouchControls`
+              // says so in its own words at the `TOUCH_CONTROLS_FLOOR` export:
+              // „a widget that clears the dash can still land squarely on the
+              // steering pad". This column was that widget.
+              //
+              // MEASURED ON THE DEPLOYED /simulator, 2026-08-12, map turned on
+              // the way a student turns it on (micro menu → «Карта»):
+              //   iphone16-portrait   column [205,628,168×168]
+              //       ∩ drivetrain pad            17 112 px²
+              //       ∩ «Поглед в дясното огледало» 1 320 px²
+              //   iphone16-landscape  column [605,169,168×168]
+              //       ∩ drivetrain pad            20 500 px²
+              //       ∩ all three mirror glances   3 950 px²
+              // — i.e. with the map on, the throttle thumb rests on the map.
+              //
+              // `PlayAreaStyles` had already moved the demonstration DECK onto
+              // `TOUCH_CONTROLS_FLOOR` for exactly this reason and never
+              // touched this column. It does now, from the same constant, so
+              // the two cannot drift.
+              bottom: compact ? TOUCH_CONTROLS_FLOOR : "var(--sim-hud-floor, 6.75rem)",
               right: "calc(0.75rem + env(safe-area-inset-right, 0px))",
             }}
           >
@@ -3209,6 +3402,32 @@ export function LessonPlayShell({
                   }
                 }
                 vehicle={snap.vehicle}
+                // …AND THE FLOOR ALONE IS NOT ENOUGH, WHICH IS THE HALF §I10
+                // ITSELF FLAGGED („if that leaves no room in landscape").
+                // `touchControlsFloorPx()` over the six-profile ladder, stage
+                // height (viewport minus the shell's p-2) minus the floor:
+                //   iphone16-portrait  836 − 382 = 454   → 168 fits
+                //   small-portrait     764 − 348 = 416   → 168 fits
+                //   galaxy-portrait    764 − 372 = 392   → 168 fits
+                //   iphone16-landscape 377 − 257 = 120   → 168 DOES NOT
+                //   small-landscape    344 − 235 = 109   → 168 DOES NOT
+                //   galaxy-landscape   344 − 259 =  85   → 168 DOES NOT
+                // A phone held sideways has no 168 px hole anywhere: the left
+                // corridor §I10 offers as the alternative is 108 px tall and
+                // the demonstration deck already stands in it. So the disc
+                // takes what the corridor has instead of moving into somebody
+                // else's, and 168 px stays the ceiling rather than the size.
+                //
+                // 1 rem of headroom so it is never flush with the top station,
+                // and a 72 px floor so „the student turned the map on and saw
+                // nothing" cannot happen on a stage shorter than the band.
+                // `sizePx` is untouched: the BACKING STORE stays 168, so a
+                // shrunk disc is downsampled, not redrawn coarser.
+                displayHeightCss={
+                  compact
+                    ? `max(72px, min(168px, calc(100% - ${TOUCH_CONTROLS_FLOOR} - 1rem)))`
+                    : undefined
+                }
               />
             ) : null}
             {/* Compact layouts reach this from „Карта" in the micro menu —
@@ -3312,6 +3531,10 @@ export function LessonPlayShell({
               completedStepIds={snap.preDriveCompleted}
               wrongOrderStepIds={snap.preDriveWrongOrder}
               mode={preDriveMode}
+              // §I12. A touch LAPTOP reaches this roomy mount with real
+              // on-screen controls mounted beside it, so the vocabulary follows
+              // the device rather than the layout — same predicate, one answer.
+              pointer={hintInput === "touch" ? "touch" : "mouse"}
               onConfirmStep={(stepId) => {
                 // Defense in depth: performable steps NEVER complete by click.
                 if (preDriveStepKind(stepId) === "info") handlePreDriveStep(stepId);
@@ -3423,7 +3646,8 @@ export function LessonPlayShell({
             // whole of what that costs.
             data-hud="end-screen"
             data-hud-keep=""
-            className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
+            // §I20: opaque scrim, no backdrop-filter — see OVERLAY_SCRIM_CLASS.
+            className={`absolute inset-0 z-40 ${OVERLAY_SCRIM_CLASS}`}
           >
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {/* A2: the compact close control USED to be here, unconditional,

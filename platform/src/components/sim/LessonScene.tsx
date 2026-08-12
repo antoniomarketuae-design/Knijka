@@ -1807,7 +1807,14 @@ function ReadyScene({
 
       {menuPaused ? (
         <div
-          className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+          // §I20 COMPANION. §I20 named four full-viewport scrims; this is a
+          // FIFTH, and it is on the one pause §N7 says the product actually
+          // uses besides a teach card — the «ПАУЗА» rail control. Same
+          // mechanism, same cost: a viewport-sized `backdrop-filter: blur()`
+          // composited over a live WebGL canvas. Opaque, for the reasons on
+          // OVERLAY_SCRIM_CLASS. (Not the shared constant: this one centres
+          // its card and does not scroll, so only the paint is shared.)
+          className="absolute inset-0 z-20 flex items-center justify-center bg-background"
           role="dialog"
           aria-modal="true"
           aria-label="Пауза"
@@ -2063,7 +2070,17 @@ function DemoDeck({
             // panel that covers the road, and this is the one the founder has
             // to be able to hit.
             "pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-base text-muted backdrop-blur transition hover:text-foreground"
-          : "pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
+          : // DOC 91 · L9/§I14 — measured 134×**27** closed, 17 px short of the
+            // thumb minimum. The BOX is not grown (a 44 px-tall pill with an
+            // 11 px label reads as a button bar on the road, which is the
+            // furniture the whole UNPANEL pass exists to remove): the TAP AREA
+            // is, with the absolutely-positioned invisible `::before` that
+            // `QualityPresetSelector` already uses and that the mobile probe
+            // explicitly unions into the hit rect (tools/mobile/lib/probe.mjs).
+            // 27 + 2×10 = 47. Safe here because the pill is horizontally
+            // isolated: closed, it is the only child of its column; open, the
+            // compact arm above replaces it with a real 44 px round control.
+            "pointer-events-auto relative flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition before:absolute before:-inset-y-2.5 before:left-0 before:right-0 before:content-[''] hover:text-foreground"
       }
     >
       {compact && open ? (

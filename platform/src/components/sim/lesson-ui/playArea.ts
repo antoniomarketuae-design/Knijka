@@ -78,3 +78,34 @@ export function playMaxWidthPx(availableHeightPx: number): number | null {
   const height = Math.max(availableHeightPx, PLAY_MIN_HEIGHT_PX);
   return Math.round(height * PLAY_ASPECT);
 }
+
+/**
+ * THE FULL-SCREEN OVERLAY SCRIM — OPAQUE, AND NEVER A `backdrop-filter`.
+ *
+ * Doc 91 §I20 / §D12d. Every full-viewport card in the driving shell used to
+ * be `bg-background/85 … backdrop-blur-sm`: a `backdrop-filter: blur()` the
+ * size of the whole viewport, composited over a WebGL canvas. On a phone GPU
+ * that is among the most expensive things the compositor can be asked for, and
+ * §G6 records why nobody had ever seen it — **it runs in the compositor,
+ * outside both the page's WebGL timer and CDP's main-thread metrics**, so it
+ * never appeared in a single budget this project has published.
+ *
+ * WHAT AN OPAQUE SCRIM BUYS, and it is two things, not one:
+ *   1. the blur is not requested at all — no backdrop copy, no two-pass
+ *      Gaussian over the viewport, on every composited frame the card is up;
+ *   2. at alpha 1 the canvas underneath is fully OCCLUDED, so the compositor
+ *      has nothing to read from it either.
+ * §I19 (`frameloop={physicsPaused ? "demand" : "always"}`) and this row were
+ * specified to ship together and only §I19 did; §I19 made the blur's source
+ * nearly static, which is the cheap half. This is the other half.
+ *
+ * IT IS NOT A LOOK CHANGE WORTH ARGUING ABOUT: the previous scrim was already
+ * 85 % opaque AND blurred, i.e. the scene behind it was deliberately
+ * unreadable. This makes unreadable cost nothing.
+ *
+ * ONE CONSTANT, FOUR CALL SITES, because the four drifting apart is exactly
+ * how §D12d survived four waves. Keep `absolute inset-0` and the z-index at
+ * the call site — those differ per overlay and are layout, not scrim.
+ */
+export const OVERLAY_SCRIM_CLASS =
+  "flex items-start justify-center overflow-y-auto bg-background p-4 sm:p-6";

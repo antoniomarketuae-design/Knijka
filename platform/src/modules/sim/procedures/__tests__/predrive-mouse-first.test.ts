@@ -20,9 +20,12 @@ import { COCKPIT_HOTSPOTS } from "../../scene/vitok/hotspots";
 import {
   PRE_DRIVE_INFO_STEPS,
   PRE_DRIVE_STEP_CONTROLS,
+  preDriveActionBg,
+  preDriveActionGlyph,
   preDriveMouseActionBg,
   preDrivePrimaryInput,
   preDriveStepKind,
+  preDriveTapActionBg,
   type CockpitHotspotName,
 } from "../performedSteps";
 import { PRE_DRIVE_STEP_ORDER } from "../steps";
@@ -85,6 +88,58 @@ describe("D9 · the mouse path exists behind every click hint", () => {
       expect(sentence.length, `${id} mouse sentence`).toBeGreaterThan(10);
     }
     expect(PRE_DRIVE_STEP_ORDER).toHaveLength(13);
+  });
+
+  it("ALL THIRTEEN have a TOUCH sentence too — doc 91 §U1/M6/I12", () => {
+    // THE SAME HONESTY RULE, NOW WITH THREE INPUT DEVICES INSTEAD OF TWO.
+    //
+    // §D10: the pre-drive's copy was mouse-only BY DATA SHAPE — `clickBg`,
+    // `pedalBg`, `keys` and no field a touch sentence could live in — so
+    // `PreDriveChecklist` told a student holding a phone that «Всяка стъпка се
+    // прави с МИШКАТА». The step he called „ultra hard to put BElts" is one of
+    // the thirteen below.
+    for (const id of PRE_DRIVE_STEP_ORDER) {
+      const sentence = preDriveTapActionBg(id);
+      expect(sentence.length, `${id} touch sentence`).toBeGreaterThan(10);
+      expect(preDriveActionBg(id, "touch"), id).toBe(sentence);
+      expect(preDriveActionBg(id, "mouse"), id).toBe(preDriveMouseActionBg(id));
+      // A touch sentence may never send a phone student to a mouse.
+      expect(sentence, `${id} must not name a mouse`).not.toMatch(/мишк/i);
+    }
+    // …and every PERFORMED step authors its own rather than falling through to
+    // the info-step default (which is the only sentence that may be shared).
+    for (const [stepId, control] of Object.entries(PRE_DRIVE_STEP_CONTROLS)) {
+      expect(control?.tapBg, `${stepId} tapBg`).toBeDefined();
+      expect(control!.tapBg!.length, stepId).toBeGreaterThan(10);
+    }
+  });
+
+  it("a touch sentence only names controls a phone actually carries", () => {
+    // Read off TouchControls.tsx, not invented: the rail («Изглед» «Пауза»
+    // «Клаксон» «Кола» «Колан»), the two flanks («Ляв»/«Дясн» indicators,
+    // «Дясн»/«Задн»/«Ляво» mirror glances), the two pads, and the ⚙ strip cells
+    // behind «Кола» («ДВИГ» «РЪЧНА» «СВЕТЛ» «D►» …). This is the `keys` /
+    // `clickBg` honesty rule applied to the third device.
+    const PHONE_CONTROLS =
+      /Колан|Кола|Ляв|Дясн|Задн|Ляво|ДВИГ|РЪЧНА|СВЕТЛ|D►|подложк/;
+    for (const id of PRE_DRIVE_STEP_ORDER) {
+      const control = PRE_DRIVE_STEP_CONTROLS[id];
+      if (control?.tapBg === undefined) continue;
+      expect(control.tapBg, `${id} names a real on-screen control`).toMatch(PHONE_CONTROLS);
+    }
+    // Every cell that lives inside the CLOSED ⚙ strip says how to open it —
+    // naming a control the student cannot see is the defect one step along.
+    for (const id of PRE_DRIVE_STEP_ORDER) {
+      const tap = PRE_DRIVE_STEP_CONTROLS[id]?.tapBg;
+      if (tap === undefined) continue;
+      if (!/ДВИГ|РЪЧНА|СВЕТЛ|D►/.test(tap)) continue;
+      expect(tap, `${id} must locate the ⚙ strip`).toMatch(/Кола/);
+    }
+  });
+
+  it("the glyph matches the sentence — 🖱 or ☝, never both", () => {
+    expect(preDriveActionGlyph("mouse")).toBe("🖱");
+    expect(preDriveActionGlyph("touch")).toBe("☝");
   });
 
   it("every one of the SEVEN dashboard controls he named is built", () => {

@@ -99,10 +99,34 @@ export function Minimap({
   vehicle,
   markers = [],
   sizePx = 168,
+  displayHeightCss,
 }: MinimapFrame & {
   vehicle?: { x: number; y: number; headingDeg: number } | null;
   markers?: MinimapMarker[];
   sizePx?: number;
+  /**
+   * WHAT THE DISC IS ALLOWED TO OCCUPY, when that is not a number the caller
+   * can know — doc 91 §I10 (L3, „minimap on the thumb").
+   *
+   * The disc used to be 168 px full stop, and on a phone held sideways there
+   * is no 168 px hole anywhere: measured on the deployed `/simulator`, the
+   * column laid out over the drivetrain pad by 20 500 px² and over all three
+   * mirror glances. The corridor that IS free — between the notification lane
+   * and `TOUCH_CONTROLS_FLOOR` — is a CSS length whose value depends on the
+   * stage height, the safe-area inset and the arc's own clamp, i.e. exactly
+   * the arithmetic `TOUCH_CONTROLS_FLOOR` already spells and that React cannot
+   * evaluate without measuring the DOM.
+   *
+   * So the caller may hand over a CSS `min()`/`max()` expression instead of a
+   * number, and the box takes it as its HEIGHT with `aspect-ratio: 1` doing
+   * the width. Height, not width, because a percentage inside this expression
+   * has to resolve against the stage's HEIGHT — a `width: min(…, 100%)` would
+   * silently measure the stage's width and never bind.
+   *
+   * `sizePx` still decides the BACKING STORE, so the drawing code below is
+   * untouched and a shrunk disc is merely downsampled — crisper, not blurrier.
+   */
+  displayHeightCss?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -177,9 +201,16 @@ export function Minimap({
     <div
       aria-label="Мини карта"
       className="hud-ghost pointer-events-none overflow-hidden rounded-full border border-border select-none"
-      style={{ width: sizePx, height: sizePx }}
+      style={
+        displayHeightCss === undefined
+          ? { width: sizePx, height: sizePx }
+          : { height: displayHeightCss, aspectRatio: "1 / 1" }
+      }
     >
-      <canvas ref={canvasRef} style={{ width: sizePx, height: sizePx }} />
+      <canvas
+        ref={canvasRef}
+        style={displayHeightCss === undefined ? { width: sizePx, height: sizePx } : { width: "100%", height: "100%" }}
+      />
     </div>
   );
 }

@@ -21,6 +21,7 @@ import { CheckControl } from "@/components/ui/CheckControl";
 import type { TriggeredQuiz } from "@/modules/sim/lessons";
 import { POINT_SCALES, pointsBg } from "@/modules/sim/rules";
 import { COMPACT_MAX_HEIGHT_PX, isCompactViewport } from "./immersive";
+import { OVERLAY_SCRIM_CLASS } from "./playArea";
 import type { MicroQuizAnswerResult } from "./types";
 
 /**
@@ -158,7 +159,8 @@ export function MicroQuizOverlay({
 
   return (
     <div
-      className="absolute inset-0 z-30 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
+      // §I20: opaque scrim, no backdrop-filter — see OVERLAY_SCRIM_CLASS.
+      className={`absolute inset-0 z-30 ${OVERLAY_SCRIM_CLASS}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="micro-quiz-title"

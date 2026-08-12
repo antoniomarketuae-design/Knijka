@@ -47,6 +47,7 @@
  */
 
 import dynamic from "next/dynamic";
+import { memo } from "react";
 import type {
   LessonSpec,
   NearMissEvent,
@@ -156,6 +157,58 @@ const LessonScene = dynamic(() => import("../LessonScene"), {
   ),
 });
 
-export function SceneSlot(props: SceneSlotProps) {
+/**
+ * §I22 / §D12e — THE HUD TICK MUST NOT REACH THE CANVAS.
+ *
+ * THE MEASUREMENT THIS EXISTS FOR (doc 91 §D12e, re-measured on production in
+ * §N4): **29.4 React commits a second while driving — 18.05 on the DOM root
+ * and 11.3 on R3F's own reconciler** — with thirty component types doing work
+ * in every commit, `StaticWorld`, `TrafficLayer`, `HeroCarBody`, `VehicleRig`,
+ * `CabinRoof` and `RouteGuidance` among them. And they do not stop when the
+ * world does: 13.4 + 6.7 per second with a teach card up and physics frozen.
+ *
+ * WHY IT HAPPENS. `LessonPlayShell` polls the session every `HUD_POLL_MS`
+ * (150 ms) and `snapshotOf()` returns a FRESH OBJECT every tick, so `setSnap`
+ * always changes identity and the whole shell re-renders — and the shell
+ * renders `SceneSlot` → `LessonScene` → the entire R3F tree, which was not
+ * memoized against it. A speedometer that ticks six times a second was
+ * re-rendering a driving simulator.
+ *
+ * WHY `memo` HERE IS THE RIGHT SHAPE, and doc 91 §I22 names it as option (b):
+ * every prop this component takes is a primitive, a stable `useCallback`, or a
+ * ref object. `driveLocked`, `preDriveHighlightStepId` and
+ * `activeObjectiveIndex` are read off `snap`, but they are a boolean, a step id
+ * and an integer — they change when the LESSON changes, not when the speedo
+ * does. So a shallow compare passes on a HUD tick and fails on everything that
+ * genuinely has to reach the scene. **It cannot drop an update: `memo` compares
+ * every prop, so a prop that changed still re-renders.** The worst case if a
+ * callback identity is ever destabilised upstream is that we are back to
+ * today's behaviour, not a stale scene.
+ *
+ * WHAT IT DOES NOT FIX, STATED PLAINLY: the DOM-root commits. Those are a live
+ * speed readout, a live objective progress bar and a live vehicle position for
+ * the minimap — `HudSnapshot` carries `speedKmh`, `objectiveProgress` and
+ * `vehicle`, all of which genuinely change every tick, so no equality guard can
+ * take them to zero while the numbers are on screen. **What was pure waste is
+ * the R3F half, and that is what this removes.** Option (a) — moving `snap` to
+ * `useSyncExternalStore` so only the leaves that read it re-render — is still
+ * the right long-term shape and is deliberately NOT smuggled in here.
+ *
+ * §M5 SAID "DO NOT ATTEMPT THIS UNTIL THE FURTHER UPDATE SOURCES ARE
+ * ENUMERATED", and they now are — eight independent pollers, not the two the
+ * audit knew about:
+ *   `LessonPlayShell.tsx:1998` HUD_POLL_MS 150 — **unguarded, fresh object**
+ *   `LessonPlayShell.tsx:1431` HUD_POLL_MS 150 — key-guarded (armed telltales)
+ *   `LessonPlayShell.tsx:1976` PRACTICE_HINT_POLL_MS 2000 — pre-drive only
+ *   `TouchControls.tsx:1159`   CABIN_POLL_MS 250 — `sameSnap` guarded
+ *   `StatusDashboard.tsx:370`  DASHBOARD_POLL_MS — hash-guarded, but the hash
+ *                              contains the SPEED, so it commits while moving
+ *   `TelltaleEdgePings.tsx:59` — key-guarded
+ *   `RearProximityCue.tsx:93`  — folded through `stepRearCue`
+ *   `CameraAidHint.tsx:96,134` · `PreDriveChecklist.tsx:127` — phase/measure
+ * Six of the eight already use the `prev === next ? prev : next` idiom. The one
+ * that does not is the one that renders the canvas, which is this row.
+ */
+export const SceneSlot = memo(function SceneSlot(props: SceneSlotProps) {
   return <LessonScene {...props} />;
-}
+});

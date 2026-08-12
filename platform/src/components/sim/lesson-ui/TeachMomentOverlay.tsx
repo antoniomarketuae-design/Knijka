@@ -95,6 +95,7 @@ import {
   examMarkCitationBg,
   minusPointsBg,
 } from "@/modules/sim/rules";
+import { OVERLAY_SCRIM_CLASS } from "./playArea";
 
 /** No Space bar, no hover: the card shows a big tap target instead of a key. */
 function isTouchDevice(): boolean {
@@ -205,7 +206,14 @@ export function TeachMomentOverlay({
         aria-labelledby="teach-moment-title"
       >
         <section
-          className="pointer-events-auto flex w-full max-w-2xl flex-col gap-1.5 rounded-t-2xl border-x border-t border-accent-2/45 bg-background/95 px-3 pb-2 pt-2 backdrop-blur"
+          // §I20 COMPANION, AND ON A PHONE IT IS THE ONE THAT MATTERS. The
+          // scrim §I20 named on this file is the ROOMY branch (:308); a phone
+          // takes THIS branch, so the blur a student actually pays for during
+          // a teach moment — the most frequent pause in the product — is this
+          // one. It is smaller than a full viewport but it is still a
+          // `backdrop-filter` over a live canvas, and the fill it was blurring
+          // was already 95 % covered. Opaque: same picture, no compositor pass.
+          className="pointer-events-auto flex w-full max-w-2xl flex-col gap-1.5 rounded-t-2xl border-x border-t border-accent-2/45 bg-background px-3 pb-2 pt-2"
           // TEACH_SHEET_MAX_FRACTION of the live viewport height. `--sim-vh` is
           // the play shell's measured `visualViewport.height` (see its header
           // on why 100dvh alone is not trustworthy inside iOS Safari), so a
@@ -305,7 +313,8 @@ export function TeachMomentOverlay({
 
   return (
     <div
-      className="absolute inset-0 z-30 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
+      // §I20: opaque scrim, no backdrop-filter — see OVERLAY_SCRIM_CLASS.
+      className={`absolute inset-0 z-30 ${OVERLAY_SCRIM_CLASS}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="teach-moment-title"

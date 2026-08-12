@@ -377,7 +377,33 @@ export function PreDriveTutorial({
       aria-modal="true"
       aria-label={`Стъпка ${stepNumber} от ${stepTotal}: ${spec.titleBg}`}
     >
-      <div className="card m-auto flex w-full max-w-lg flex-col gap-3 p-5">
+      {/* ── DOC 91 · C3/L8/U5 · §I4(a) — THE BELT TRAP ─────────────────────────
+          „it is ultra hard to put BElts and all the requried buttons to do so."
+
+          THE CARD SCROLLS, NOT THE BACKDROP. `m-auto` (above) fixed
+          REACHABILITY — the top of the card stopped being pushed above the
+          scroll origin — and it did nothing for VISIBILITY: the card had no
+          height cap, so on a 393 px landscape screen it laid out an 821 px
+          column and the button row was **300–423 px below the fold on 13 of 13
+          steps**, with nothing on screen saying so. A student who cannot see
+          «Разбрах» and does not know the backdrop scrolls is stuck on step 1 of
+          a thirteen-step procedure.
+
+          Three parts, and each is doing one thing:
+            · `max-h-full` — the cap. Resolves against the fixed backdrop's
+              content box (its `p-4` is already subtracted), so the card can
+              never be taller than the screen it is drawn on.
+            · `overflow-y-auto` — the scroll moves INTO the card. The backdrop
+              keeps its own `overflow-y-auto` as a floor for any browser that
+              disagrees about the percentage.
+            · `overscroll-contain` — a flick that reaches the end of the card
+              must not become a scroll of the page underneath it.
+          `m-auto` still centres, because auto margins collapse to 0 exactly
+          when there is no free space left. Nothing changes on a desktop, where
+          the card was never taller than the window. The sticky button row at
+          the bottom is the other half — see it for why it carries the card's
+          own background and negative margins. ─────────────────────────────── */}
+      <div className="card m-auto flex max-h-full w-full max-w-lg flex-col gap-3 overflow-y-auto overscroll-contain p-5">
         <header className="flex items-baseline justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-wide text-accent-2">
@@ -597,7 +623,22 @@ export function PreDriveTutorial({
           ) : null}
         </section>
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* ── §I4(a), THE OTHER HALF: «РАЗБРАХ» IS ON SCREEN AT EVERY SIZE ─────
+            The cap above stops the card growing past the screen; this is what
+            keeps the ONE control that closes it visible while the student
+            scrolls the 400-character explanation above it.
+
+            `sticky bottom-0` inside the card's own scroll box, with:
+              · `-mx-5 -mb-5 px-5 pb-5` — the row is pulled out to the card's
+                edges so its background covers the full width as content passes
+                UNDER it, then given the padding back as its own. Without this
+                the text would slide through a 40 px gutter either side.
+              · `bg-surface` — the card's own fill (`.card` = `bg-surface`),
+                stated literally because a sticky row over scrolling text must
+                be opaque; a translucent one turns the label into a smear.
+              · `pt-3` + a hairline top border — so the row reads as a footer
+                rather than as a button floating on the paragraph it covers. */}
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-5 pb-5 pt-3">
           <button
             ref={continueRef}
             type="button"

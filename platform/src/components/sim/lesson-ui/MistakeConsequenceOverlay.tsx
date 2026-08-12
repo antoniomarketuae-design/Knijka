@@ -33,6 +33,7 @@ import {
   minusPointsBg,
   type SeverityClass,
 } from "@/modules/sim/rules";
+import { OVERLAY_SCRIM_CLASS } from "./playArea";
 
 const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
   ssr: false,
@@ -137,7 +138,8 @@ export function MistakeConsequenceOverlay({
 
   return (
     <div
-      className="absolute inset-0 z-30 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
+      // §I20: opaque scrim, no backdrop-filter — see OVERLAY_SCRIM_CLASS.
+      className={`absolute inset-0 z-30 ${OVERLAY_SCRIM_CLASS}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="mistake-consequence-title"

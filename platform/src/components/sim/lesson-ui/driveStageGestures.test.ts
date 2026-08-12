@@ -120,6 +120,68 @@ describe("§2 it stays scoped — the hoist that would brick the pre-drive", () 
   });
 });
 
+/**
+ * =============================================================================
+ * §2b — AND THE ROAD WAS ONLY HALF THE SURFACE.
+ *
+ * §1 and §2 above are correct and they were not enough, which this section
+ * exists to state rather than imply. `touch-action` is intersected across the
+ * elements the TOUCH POINTS are over, and every card on this screen — the
+ * notification peek, the teach sheet, the first-run hint, the pre-drive
+ * tutorial — is a SIBLING of the scene wrapper, not a descendant of it. So the
+ * scoping §2 defends also meant a pinch that started on a card was never
+ * covered, and a card is exactly where his thumbs are while a card is up.
+ *
+ * MEASURED ON THE DEPLOYED PRODUCT (tools/mobile/wave6-edges.mjs, Chromium with
+ * the Fullscreen API refused so the shell takes the same `immersive` arm iOS
+ * Safari takes, authenticated /simulator, live canvas asserted, iPhone 16
+ * landscape, real insets):
+ *
+ *     pinch on the road   scale 1 → 1      offsetLeft 0 → 0
+ *     pinch on a CARD     scale 1 → 1.28   offsetLeft 0 → 145   ← his complaint
+ *     positive control    /theory 1 → 3.568                     ← instrument honest
+ *
+ * THE ANSWER IS `pan-y` ON THE SHELL ROOT, AND THE VALUE IS THE WHOLE CARE.
+ * `none` there is the regression §2 forbids — it would kill the tutorial card's
+ * scroller and with it the only way to finish a step. `pan-y` removes exactly
+ * two behaviours, pinch-zoom and horizontal pan, and leaves every vertical
+ * scroller in the subtree working. A descendant can only ever narrow what an
+ * ancestor allows, so the scene wrapper's `none` is unaffected.
+ * =============================================================================
+ */
+describe("§2b no card is a doorway back to pinch-zoom", () => {
+  it("the shell root declares touch-action: pan-y", () => {
+    expect(
+      SHELL_CODE,
+      "the driving shell must refuse pinch-zoom on EVERY surface it owns, not just the road",
+    ).toMatch(/touchAction:\s*"pan-y"/);
+  });
+
+  it("…and it is gated on the shell owning the screen, so a roomy page is untouched", () => {
+    const decl = SHELL_CODE.match(/\.\.\.\((immersive|isFullscreen)[^)]*\?\s*\{\s*touchAction:\s*"pan-y"\s*\}/);
+    expect(
+      decl,
+      "pan-y must be conditional on `immersive || isFullscreen` — the letterboxed shell is a " +
+        "component on an ordinary scrolling page and must not change that page's gestures",
+    ).not.toBeNull();
+  });
+
+  it("it is pan-y and never none — `none` here is the §2 regression by another name", () => {
+    // A future tidy-up that "simplifies" pan-y to none passes §2 (which only
+    // looks 600 chars past the attribute) and bricks the pre-drive. Count both.
+    const panY = SHELL_CODE.match(/touchAction:\s*"pan-y"/g) ?? [];
+    const none = SHELL_CODE.match(/touchAction:\s*"none"/g) ?? [];
+    expect(panY.length, "exactly one shell-level declaration").toBe(1);
+    expect(none.length, "exactly one scene-wrapper declaration").toBe(1);
+  });
+
+  it("the theory and exam screens are not touched by any of this", () => {
+    // The declaration lives on an element that only exists inside a session.
+    // If it ever moves to <body>, html, or a layout, this catches it.
+    expect(LAYOUT_CODE).not.toMatch(/touchAction/);
+  });
+});
+
 describe("§3 the global viewport meta is left alone (accessibility, and it would not work anyway)", () => {
   it("declares no maximum-scale", () => {
     expect(LAYOUT_CODE).not.toMatch(/maximumScale/);

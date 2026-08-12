@@ -659,7 +659,10 @@ describe("the second-finger census of the compact driving surface", () => {
    */
   const COVERED = [
     { rel: "components/sim/TouchControls.tsx", pointer: 5, desktopOnly: 0 },
-    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 6, desktopOnly: 0 },
+    // 6 → 7 on 2026-08-12: doc 91 §I11 gave the open sheet an «⤢» expand, and
+    // this census is exactly the guard that says a NEW control on this surface
+    // must arrive with a pointer path rather than an `onClick`. It did.
+    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 7, desktopOnly: 0 },
     { rel: "components/sim/lesson-ui/TraceTimeline.tsx", pointer: 5, desktopOnly: 2 },
   ];
   it("LessonScene · the demonstration's own open/close toggle", () => {
