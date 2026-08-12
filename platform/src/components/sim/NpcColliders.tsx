@@ -69,6 +69,11 @@ import {
   type TrafficSystem,
 } from "@/modules/sim/traffic";
 import { CHASSIS_HALF_EXTENTS } from "@/modules/sim/vehicle";
+import {
+  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
+  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+  PEDESTRIAN_BODY_RADIUS_M,
+} from "@/modules/sim/collision";
 
 // --- Shell-pool budget (doc 68 A11). Keep these small and fixed: every shell
 // is a rapier body for the WHOLE session; the pool IS the perf contract.
@@ -82,11 +87,17 @@ const PED_SHELL_RADIUS_M = 70;
 
 // --- Shell geometry (one size fits the whole GLB fleet — colliders are sized
 // once; per-model fitting would force collider swaps on rebind).
-const VEH_HALF_W = 0.92; // ~1.84 m wide
+//
+// The ground-plane extents are OWNED BY sim/collision, not by this component:
+// the orchestrator grades contact with exact box geometry on the same numbers,
+// and a physics body that disagreed with the grading body would re-open the
+// false-verdict gap from the other side. Height is presentation-only and stays
+// here.
+const VEH_HALF_W = NPC_VEHICLE_SHELL_HALF_WIDTH_M; // 0.92 → ~1.84 m wide
 const VEH_HALF_H = 0.7; // box spans 0..1.4 m above the tarmac
-const VEH_HALF_L = 2.1; // ~4.2 m long
+const VEH_HALF_L = NPC_VEHICLE_SHELL_HALF_LENGTH_M; // 2.1 → ~4.2 m long
 const PED_CAPSULE_HALF_HEIGHT = 0.55;
-const PED_CAPSULE_RADIUS = 0.3; // capsule spans 0..1.7 m
+const PED_CAPSULE_RADIUS = PEDESTRIAN_BODY_RADIUS_M; // 0.3 — capsule spans 0..1.7 m
 const VEH_CENTER_Y = VEH_HALF_H;
 const PED_CENTER_Y = PED_CAPSULE_HALF_HEIGHT + PED_CAPSULE_RADIUS;
 /** Dormant shells rest here — far below the district AND the player's kill

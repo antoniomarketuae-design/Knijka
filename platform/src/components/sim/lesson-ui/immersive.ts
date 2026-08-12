@@ -122,6 +122,39 @@ export const COMPACT_DASH_HEIGHT_PX = 40;
 export const ROOMY_HUD_FLOOR_PX = 108;
 
 /**
+ * The „🗺" map toggle, px square — and the lane the ROOMY floor owes it.
+ *
+ * THE COLLISION, MEASURED (WebKit, 1264 × 619, the real lesson shell,
+ * `sc-zebra-approach@L1`, deck COLLAPSED): the deck's pill at
+ * [1109.8, 476.5, 134.2 × 26.5] against the map toggle at [1204, 463, 40 × 40]
+ * — **1 060 px²**, and `elementFromPoint` at the toggle's own centre answered
+ * «🎬 Демонстрация ▸». The toggle was dead. With the deck OPEN it was dead too,
+ * under the transport row's own wrapper (the row wraps to two lines at 320 px,
+ * so the deck's box reaches y 491 while the toggle starts at 463) — which is
+ * why this is a lane and not a nudge: BOTH deck states have to clear it.
+ *
+ * They collided because the deck MOVED here. It used to be centred over the
+ * road; the 2026-08-03 pass dragged it into the right-edge column at the same
+ * `ROOMY_HUD_FLOOR_PX` the map toggle and the shadow-line legend were already
+ * standing on, and nothing arbitrated the corner. The deck is the newcomer, so
+ * the deck is what yields — the toggle stays where students find it.
+ *
+ * IT YIELDS SIDEWAYS, and that is a measurement rather than a preference: the
+ * first attempt lifted the deck by this same 48 px, and the re-measure showed
+ * it had pushed the collapsed pill up into the briefing card instead (the hit
+ * test at the pill's centre then answered the notification column) — one dead
+ * control traded for another. Insetting the deck's RIGHT EDGE by the lane moves
+ * nothing vertically and nothing toward the road: the deck keeps the column's
+ * left edge and gives up 48 px of scrub bar. See `PlayAreaStyles`.
+ *
+ * 48 = the toggle (40) + the 8 px gutter this HUD uses everywhere. Read by the
+ * SHELL for the toggle's own box and by `PlayAreaStyles` for the deck's inset,
+ * so the button and the clearance cannot drift apart.
+ */
+export const MINIMAP_TOGGLE_SIZE_PX = 40;
+export const ROOMY_MINIMAP_LANE_PX = MINIMAP_TOGGLE_SIZE_PX + 8;
+
+/**
  * Tallest a teach card may be, as a fraction of the scene box.
  *
  * Founder: the teach hints are „each almost 50% of the screen when popped

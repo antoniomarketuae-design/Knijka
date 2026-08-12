@@ -66,6 +66,8 @@
  */
 
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { governorIsEasing } from "../vehicle";
+import { STALL_RESTART_LABEL_BG, type HintInput } from "./controlPhrases";
 import {
   createDashboardStatus,
   dashboardHash,
@@ -247,11 +249,96 @@ function WiperIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
   );
 }
 
+/**
+ * THE TIER'S CEILING — the number the governor has been enforcing in silence
+ * since the first difficulty tier shipped (2026-08-11).
+ *
+ * THE DEFECT, measured. `vehicle/difficulty.ts` clamps the throttle to zero
+ * across the last `GOVERNOR_BAND_KMH` before a per-tier cap, and the cap is a
+ * function of the tier AND the loaded map: on Начинаещ it is the map's speed
+ * domain − 10, so in the 65 districts posted 50 the car dies at 40 and in the
+ * 31 posted 20–40 it dies at 30. Нормален is domain + 10 floored at 50.
+ * Напреднал has no cap at all. NOT ONE OF THOSE NUMBERS WAS EVER PRINTED
+ * ANYWHERE — `governorCapKmh` was exported and read by exactly one test. A
+ * student pressing the pedal harder and going no faster had no way to learn
+ * that it is the TIER and not the car, which is precisely how a 17-year-old
+ * concludes the software is broken (THEO-4: a silent refusal is a bare
+ * verdict).
+ *
+ * WHY A PERMANENT MARK AND NOT A TOAST. A cap is not an event — it is a
+ * property of this speedometer's world, true before the student ever reaches
+ * it. A toast fires on every full-pedal straight, which is the noise the toast
+ * channel exists to avoid, and it arrives at the one moment the student is
+ * busy driving. A quiet mark is discoverable BEFORE the frustration: pick
+ * „Начинаещ" and „Начинаещ ≤40" appears at once, so the tier ladder becomes a
+ * thing with numbers in it instead of three words.
+ *
+ * …AND IT STILL ANSWERS „AT THE MOMENT IT BITES". The mark turns from muted to
+ * `--warning` exactly when `governorIsEasing` says the physics step has begun
+ * taking throttle away — the same function, not a re-derived inequality, so the
+ * colour and the clamp cannot disagree.
+ *
+ * IT NAMES THE TIER, and that is the whole reason it is not just a number: „it
+ * is the tier and not the car" is the sentence the student needs, and the tier
+ * picker that would otherwise supply it is hidden during a mirror glance and
+ * behind any rank-1 overlay on a phone (PlayAreaStyles).
+ *
+ * IT IS NOT INSIDE `data-hud="speed-block"` — DELIBERATELY, and this is the
+ * one placement decision that is load-bearing. Row C7 folds that group away in
+ * the cockpit camera because the „Виток" 3D cluster already draws speed and the
+ * selector. The cluster does NOT draw the tier's ceiling — no real car has one
+ * — so folding this with the speed would hide it in the camera a lesson OPENS
+ * in. Same argument, same place in the row, as the legal-limit disc: what the
+ * instrument panel cannot say is exactly what survives the fold.
+ *
+ * Nothing here is interactive and nothing paints a box: `text-shadow` on the
+ * glyphs is the ghost register the rest of this file already uses.
+ */
+function GovernorCapMark({
+  capKmh,
+  tierBg,
+  speedKmh,
+  size,
+}: {
+  capKmh: number | null;
+  tierBg: string;
+  speedKmh: number;
+  /** Type scale: the phone readout runs one step below the roomy bar. */
+  size: "compact" | "roomy";
+}) {
+  // No cap („Напреднал", or a headless mount that never wrote one) = no mark.
+  // Printing „no ceiling" would be furniture that teaches nothing.
+  if (capKmh === null) return null;
+  const cap = Math.round(capKmh);
+  const easing = governorIsEasing(capKmh, speedKmh);
+  const nameBg = tierBg.trim() === "" ? "Режимът" : tierBg;
+  const explainBg = easing
+    ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно.`
+    : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя — знакът до скоростта е ограничението.`;
+  return (
+    <span
+      data-hud="governor-cap"
+      aria-label={explainBg}
+      title={explainBg}
+      className={`shrink-0 whitespace-nowrap font-bold leading-none tabular-nums ${
+        size === "compact" ? "text-[9px]" : "text-[10px]"
+      }`}
+      style={{
+        color: easing ? "var(--warning)" : "var(--muted)",
+        opacity: easing ? 1 : 0.9,
+      }}
+    >
+      {nameBg} ≤{cap}
+    </span>
+  );
+}
+
 export function StatusDashboard({
   statusRef,
   limitKmh,
   rejectFlashKey = 0,
   compact = false,
+  input = "keyboard",
 }: {
   /** Scene-written per-frame status (see dashboardStatus.ts header). */
   statusRef: RefObject<DashboardStatus>;
@@ -262,6 +349,18 @@ export function StatusDashboard({
   rejectFlashKey?: number;
   /** Phone-shaped viewport: the three numbers and no band (see header). */
   compact?: boolean;
+  /**
+   * WHICH CONTROLS THE STALL LABEL MAY NAME — doc 91 §J-WAVE-4.
+   *
+   * The engine cell's accessible name has always been „Двигателят угасна —
+   * рестартирай (Z + I)", on every device. A sighted phone student ignores it;
+   * a screen-reader user is handed the ONLY way out of a dead car in keys his
+   * phone does not have, and has no way to discover that it is wrong. Same
+   * defect class as the drivetrain pad's reverse promise (`touchLabels.test.ts`),
+   * one attribute over. Defaults to the desktop wording so a legacy mount is
+   * byte-identical.
+   */
+  input?: HintInput;
 }) {
   const [snap, setSnap] = useState<DashboardStatus>(createDashboardStatus);
 
@@ -349,6 +448,15 @@ export function StatusDashboard({
         >
           {limit}
         </span>
+        {/* The tier's ceiling — outside `speed-block` for the same reason the
+            disc above is: it survives the cockpit fold, because the 3D cluster
+            cannot draw a governor. See GovernorCapMark. */}
+        <GovernorCapMark
+          capKmh={snap.governorCapKmh}
+          tierBg={snap.governorTierBg}
+          speedKmh={snap.speedKmh}
+          size="compact"
+        />
       </div>
     );
   }
@@ -444,6 +552,16 @@ export function StatusDashboard({
         >
           {limit}
         </span>
+        {/* …and the same mark on the roomy bar. Both variants or neither: the
+            compact/roomy pair has drifted apart once already (row C7 — the
+            camera handle was on one of them and not the other, so the fold
+            matched nothing on a desktop). */}
+        <GovernorCapMark
+          capKmh={snap.governorCapKmh}
+          tierBg={snap.governorTierBg}
+          speedKmh={snap.speedKmh}
+          size="roomy"
+        />
       </div>
 
       <Divider />
@@ -453,7 +571,7 @@ export function StatusDashboard({
         className="flex min-w-7 flex-col items-center gap-0.5 sm:min-w-9 md:min-w-11"
         aria-label={
           snap.stalled
-            ? "Двигателят угасна — рестартирай (Z + I)"
+            ? STALL_RESTART_LABEL_BG[input]
             : snap.engineOn
               ? "Двигателят работи"
               : "Двигателят е изключен"
@@ -466,7 +584,12 @@ export function StatusDashboard({
           }`}
           style={{ color: snap.engineOn && !snap.stalled ? "var(--success)" : "var(--danger)" }}
         >
-          {snap.stalled ? "Угасна" : snap.engineOn ? "Вкл." : "Изкл. I"}
+          {/* „Изкл. I" — the key cap is DECORATION here (the state is the
+              reading), so on touch it simply goes, which is the HUD's existing
+              `showKeyHints` idiom. The stall label above is the opposite case:
+              there the control name IS the way out, so it is translated, not
+              dropped. */}
+          {snap.stalled ? "Угасна" : snap.engineOn ? "Вкл." : input === "touch" ? "Изкл." : "Изкл. I"}
         </span>
         <span className={CAPTION}>Двигател</span>
       </div>

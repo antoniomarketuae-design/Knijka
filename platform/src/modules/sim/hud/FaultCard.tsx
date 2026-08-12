@@ -46,13 +46,20 @@ import {
   examMarkFor,
   formatEur,
   instrumentLabelBg,
+  offenceCoveredBodyBg,
+  offenceCoveredExamNoteBg,
+  offenceCoveredHeadlineBg,
+  offenceCoversNoteBg,
   parseSpeedMeasurement,
   minusPointsBg,
   pointsWordsBg,
   roadConsequenceFor,
   withEurBg,
+  type ConditionalPenalty,
   type ControlPointsFigure,
   type FineFigure,
+  type LawQuote,
+  type OffenceBilling,
   type ViolationEvent,
 } from "../rules";
 
@@ -138,8 +145,85 @@ function DerivedRung({ event }: { event: ViolationEvent }) {
   );
 }
 
-function RoadConsequenceBlock({ event }: { event: ViolationEvent }) {
+/**
+ * The rule broken, as opposed to the price of breaking it.
+ *
+ * The label is written ONCE and pluralised, because two rows carry two duties
+ * and „Правилото:" twice in a column reads as a template stutter — measured on
+ * the fog card, where чл. 70, ал. 1 (the binding duty) sits directly above
+ * чл. 74, ал. 1 (the permission that is NOT one), and the pair is the point.
+ */
+function DutyLines({ duties }: { duties: readonly LawQuote[] }) {
+  if (duties.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <p className="text-[11px] leading-relaxed text-muted">
+        <span className="font-bold">{duties.length === 1 ? "Правилото:" : "Правилата:"}</span>{" "}
+        „{duties[0].quoteBg}“ ({duties[0].citationBg})
+      </p>
+      {duties.slice(1).map((d) => (
+        <p key={d.citationBg} className="text-[11px] leading-relaxed text-muted">
+          „{d.quoteBg}“ ({d.citationBg})
+        </p>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * A penalty that exists and is GATED. The condition is rendered FIRST and in
+ * the same sentence as the money, because the whole risk of this shape is a
+ * student reading „300 €" and stopping there.
+ */
+function GatedLine({ step }: { step: ConditionalPenalty }) {
+  return (
+    <p className="text-xs leading-relaxed">
+      <span className="font-bold">{step.conditionBg}</span> — {moneyBg(step.fine)},{" "}
+      {controlPointsBg(step.controlPoints)}. Пристига като {instrumentLabelBg(step.fine.instruments)}.{" "}
+      <Cite>{step.fine.source.citationBg}</Cite>
+    </p>
+  );
+}
+
+/**
+ * THE SECOND SIGHTING OF ONE OFFENCE — the row that does NOT print a price.
+ *
+ * Moving off unbelted raises two faults by design (`procedures/machine.ts`), and
+ * the consequences wave gave both of them the same 100 лв. and the same 10
+ * контролни точки, so this card told a student one belt would cost him 200 лв.
+ * and 20 контролни точки — most of a new licence. The exam marks are right and
+ * stay; the price is one price and is printed once, on the first row of the act.
+ *
+ * NOT AN EMPTY SLOT AND NOT A DASH. The block that replaces the money says which
+ * row carries it and why the two are one offence — a student who sees a gap
+ * where the other card has a figure will assume the figure was forgotten, and
+ * the whole finding here is that it was not.
+ */
+function OffenceCoveredBlock({ covered }: { covered: NonNullable<OffenceBilling["coveredBy"]> }) {
+  return (
+    <div className="flex flex-col gap-1 rounded-lg border border-dashed border-border-strong p-2">
+      <p className="text-[10px] font-black uppercase tracking-wide text-warning">
+        {offenceCoveredHeadlineBg()}
+      </p>
+      <p className="text-xs leading-relaxed">{offenceCoveredBodyBg(covered)}</p>
+      <p className="text-[11px] leading-relaxed text-muted">{offenceCoveredExamNoteBg(covered)}</p>
+      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+        <Cite>{covered.citationBg}</Cite>
+      </div>
+    </div>
+  );
+}
+
+function RoadConsequenceBlock({
+  event,
+  alsoCovers = [],
+}: {
+  event: ViolationEvent;
+  /** Other faults of the SAME act, whose price this block already includes. */
+  alsoCovers?: OffenceBilling["alsoCovers"];
+}) {
   const road = roadConsequenceFor(event.code);
+  const coversNote = offenceCoversNoteBg(alsoCovers);
   const mine =
     road.kind === "ladder" ? parseSpeedMeasurement(event.detail) : null;
   const myTierRef =
@@ -170,6 +254,48 @@ function RoadConsequenceBlock({ event }: { event: ViolationEvent }) {
             </div>
           ) : null}
         </>
+      ) : road.kind === "exam-only" ? (
+        /* THE ROW THAT COSTS NOTHING, SAID SO PLAINLY IT CANNOT BE MISREAD.
+           No money block, no licence block, no empty „—": printing the same
+           three labelled rows with dashes in them reads as missing data, and
+           the whole finding here is that the data is not missing. */
+        <>
+          <p className="text-xs font-semibold leading-relaxed">{road.headlineBg}</p>
+          <p className="text-[11px] leading-relaxed text-muted">{road.whyBg}</p>
+          <DutyLines duties={road.duties} />
+          <p className="text-[11px] leading-relaxed text-muted">
+            <span className="font-bold">На изпита:</span> „{road.examSource.quoteBg}“
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <Cite>{road.examSource.citationBg}</Cite>
+          </div>
+        </>
+      ) : road.kind === "conditional" ? (
+        <>
+          <p className="text-xs font-semibold leading-relaxed">{road.headlineBg}</p>
+          <DutyLines duties={road.duties} />
+          {/* The licence answer comes BEFORE the gated money: it is the one
+              figure here that is true unconditionally, and burying it under a
+              condition turns „нула" into „нула, ако нищо не се случи". */}
+          {road.controlPoints !== undefined ? (
+            <>
+              <p className="text-xs leading-relaxed">
+                <span className="font-bold">Книжка:</span> {controlPointsBg(road.controlPoints)}
+              </p>
+              <p className="text-[11px] leading-relaxed text-muted">{road.controlPoints.noteBg}</p>
+            </>
+          ) : null}
+          {road.branches.length > 0 ? (
+            <>
+              <p className="text-[10px] font-black uppercase tracking-wide text-muted">
+                Кога все пак се плаща
+              </p>
+              {road.branches.map((step) => (
+                <GatedLine key={step.fine.source.citationBg + step.conditionBg} step={step} />
+              ))}
+            </>
+          ) : null}
+        </>
       ) : road.kind === "single" ? (
         <>
           <p className="text-xs leading-relaxed">
@@ -182,6 +308,25 @@ function RoadConsequenceBlock({ event }: { event: ViolationEvent }) {
             <span className="font-bold">Книжка:</span> {controlPointsBg(road.controlPoints)}
           </p>
           <p className="text-[11px] leading-relaxed text-muted">{road.controlPoints.noteBg}</p>
+          {road.offenceQuote !== undefined ? (
+            <p className="text-[11px] leading-relaxed text-muted">
+              <span className="font-bold">Съставът:</span> „{road.offenceQuote.quoteBg}“
+            </p>
+          ) : null}
+          <DutyLines duties={road.duties ?? []} />
+          {road.noteBg !== undefined ? (
+            <p className="text-[11px] leading-relaxed text-muted">{road.noteBg}</p>
+          ) : null}
+          {road.escalation !== undefined && road.escalation.length > 0 ? (
+            <>
+              <p className="text-[10px] font-black uppercase tracking-wide text-muted">
+                Ако от това излезе беля
+              </p>
+              {road.escalation.map((step) => (
+                <GatedLine key={step.fine.source.citationBg + step.conditionBg} step={step} />
+              ))}
+            </>
+          ) : null}
           <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             <Cite>{road.fine.source.citationBg}</Cite>
             <Cite>{road.controlPoints.source.citationBg}</Cite>
@@ -268,6 +413,15 @@ function RoadConsequenceBlock({ event }: { event: ViolationEvent }) {
         </details>
         </>
       )}
+
+      {/* ONE ACT, ONE PRICE — said on the row that carries it, so the figure
+          above cannot be read as „per fault". Last, because it is a statement
+          ABOUT the numbers above it and reads as nonsense before them. */}
+      {coversNote !== null ? (
+        <p className="mt-0.5 rounded-md border border-border-strong bg-surface-2 p-1.5 text-[11px] font-semibold leading-relaxed">
+          {coversNote}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -282,10 +436,18 @@ export interface FaultCardProps {
   correctiveBg: string | null;
   /** Session clock, already formatted („1:07"). */
   atBg: string;
+  /**
+   * Which row of a multi-fault OFFENCE this is (`rules/offences.ts`). Omitted =
+   * a standalone card — the live overlay, the dev rigs, the tests that render
+   * one fault — and a standalone card is always the billed one, so leaving it
+   * out can never suppress a price.
+   */
+  billing?: OffenceBilling;
 }
 
-export function FaultCard({ event, correctiveBg, atBg }: FaultCardProps) {
+export function FaultCard({ event, correctiveBg, atBg, billing }: FaultCardProps) {
   const mark = examMarkFor(event.code);
+  const covered = billing?.billed === false ? billing.coveredBy : null;
 
   return (
     <>
@@ -307,13 +469,29 @@ export function FaultCard({ event, correctiveBg, atBg }: FaultCardProps) {
 
       <p className="text-xs leading-relaxed text-muted">{event.explanationBg}</p>
 
+      {/* THE OTHER PROVISION. The mark above comes from приложение № 5, т. 10;
+          ENDING an exam is чл. 48, ал. 3 and reaches only повторна намеса and
+          допускане на ПТП. The row said neither — it printed a 10 and let the
+          reader guess whether the drive was over. `terminatesExam` is the
+          catalogue's own flag, so a class can never imply this again. */}
+      {mark.terminatesExam ? (
+        <p className="rounded-md border border-danger/40 bg-danger/10 p-1.5 text-[11px] font-semibold leading-relaxed">
+          Тази грешка спира самия изпит: „{mark.terminationQuoteBg}“ —{" "}
+          {mark.terminationCitationBg}.
+        </p>
+      ) : null}
+
       {correctiveBg !== null ? (
         <p className="text-xs font-semibold leading-relaxed">
           <span className="text-success">✔ Правилното действие:</span> {correctiveBg}
         </p>
       ) : null}
 
-      <RoadConsequenceBlock event={event} />
+      {covered !== null ? (
+        <OffenceCoveredBlock covered={covered} />
+      ) : (
+        <RoadConsequenceBlock event={event} alsoCovers={billing?.alsoCovers ?? []} />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <Cite>{event.lawRef}</Cite>

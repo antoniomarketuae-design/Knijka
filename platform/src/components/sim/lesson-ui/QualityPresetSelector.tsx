@@ -79,6 +79,24 @@ function subscribeQuality(onChange: () => void): () => void {
 }
 
 /**
+ * Tell this tab's subscribers to re-read the preset.
+ *
+ * `qualitySnapshot()` is `sessionPreset ?? loadQualityPreset()`, and with no
+ * explicit choice stored that bottoms out in `seedQualityLevel()` — which is
+ * memoized per page load. `refreshSeededQuality()` drops that memo so a
+ * measurement can land; this makes `useSyncExternalStore` notice. The two are
+ * called together, from `LessonSelectScreen` and nowhere else: separately they
+ * are each a no-op, and calling them under a live canvas would change tier
+ * mid-drive.
+ *
+ * A student's own choice is untouched — `sessionPreset` and the storage key
+ * both still win over the seed.
+ */
+export function refreshQualityPreset(): void {
+  for (const notify of listeners) notify();
+}
+
+/**
  * The persisted graphics preset.
  *
  * localStorage IS an external store, so it is read through

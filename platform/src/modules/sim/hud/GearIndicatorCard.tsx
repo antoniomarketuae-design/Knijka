@@ -9,6 +9,7 @@
  */
 
 import type { DrivelineSnapshot } from "../vehicle";
+import { STALL_RESTART_LABEL_BG, type HintInput } from "./controlPhrases";
 import type { HeadlightState, IndicatorState } from "../rules";
 
 function gearLabel(gear: number): string {
@@ -65,6 +66,7 @@ export function GearIndicatorCard({
   seatbeltOn,
   driveline = null,
   rejectFlashKey = 0,
+  input = "keyboard",
 }: {
   gear: number;
   indicator: IndicatorState;
@@ -76,6 +78,9 @@ export function GearIndicatorCard({
    *  telltale flashes red once so the refusal is visible even mid-drive
    *  (founder bug 2026-07-10: silent gate rejections). 0 = never flashed. */
   rejectFlashKey?: number;
+  /** Which controls the stall telltale may name — see STALL_RESTART_LABEL_BG.
+   *  Defaults to the desktop wording so a legacy mount is unchanged. */
+  input?: HintInput;
 }) {
   const d = driveline;
   // Selector letter is the truth when the driveline exists (P R N D / M2);
@@ -111,7 +116,7 @@ export function GearIndicatorCard({
             value="Угасна"
             color="var(--danger)"
             blink
-            ariaLabel="Двигателят угасна — рестартирай (Z + I)"
+            ariaLabel={STALL_RESTART_LABEL_BG[input]}
           />
         ) : (
           <Telltale

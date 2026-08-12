@@ -50,6 +50,20 @@
  * authored `correctiveBg` and law chip — is one click behind it, unchanged.
  * Both controls are omitted entirely (`onSkip == null`) while the I1
  * calibration gate holds the result: there is nothing to skip yet.
+ *
+ * ── 2026-08-09 · A2's OTHER HALF: NONE OF THE ABOVE REACHED A PHONE. ────────
+ * The shell passed `onSkip={!compact && …}` and this file omits BOTH the skip
+ * control and the setting when `onSkip` is null — so on the 393 px screen the
+ * founder reviews on, L15 rendered nothing at all. The block below is now
+ * `compact`-aware instead of roomy-only:
+ *   · the close control spans the phone and reads „▾ Скрий разбора" (it IS the
+ *     button the shell used to draw above this screen — one control, not two);
+ *   · the note beside it says how to skip in TOUCH words, because printing
+ *     „Space" on a device that has no Space key is folklore, not a hint;
+ *   · the setting renders, and on a phone it governs the thing that actually
+ *     pops up there — the blocking end-of-session line (`LessonPlayShell`'s
+ *     overlay candidate 1), which freezes the layer until „Резултат" opens the
+ *     very debrief the student was trying to skip.
  * ---------------------------------------------------------------------------
  */
 
@@ -57,10 +71,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CheckControl } from "@/components/ui/CheckControl";
 import {
+  COLLISION_CONSEQUENCE_BG,
   MANOEUVRE_MAX_PER_LINE,
   POINT_SCALES,
   SEVERITY_POINTS,
   VIOLATIONS,
+  billRoadConsequences,
   pointsEachBg,
   pointsOutOfBg,
   type FailReason,
@@ -225,6 +241,7 @@ export function SessionEndScreen({
   onSkip = null,
   autoOpen = true,
   onAutoOpenChange = null,
+  compact = false,
 }: {
   lessonTitleBg: string;
   result: LessonResult;
@@ -304,6 +321,14 @@ export function SessionEndScreen({
   autoOpen?: boolean;
   /** L15: null → the setting is not offered (same cases as `onSkip`). */
   onAutoOpenChange?: ((next: boolean) => void) | null;
+  /**
+   * A2: phone-shaped viewport. It changes two things and only two — the close
+   * control spans the width of the phone instead of hiding in the corner as a
+   * ghost link, and the note says how to skip in TOUCH words. Printing „Space"
+   * on a device with no Space key is folklore, not a hint; the key binding
+   * itself stays live (a compact window with a keyboard is a real case).
+   */
+  compact?: boolean;
 }) {
   const { summary } = result;
   const score = summary.score;
@@ -334,6 +359,18 @@ export function SessionEndScreen({
   const { mistakeMarkers, nearMissMarkers, commendationMarkers } = useMemo(
     () => buildMapModel(result),
     [result],
+  );
+
+  /**
+   * ONE ACT, ONE ROAD PRICE (rules/offences.ts). The list below renders one card
+   * per FAULT — which is right, an examiner logs two marks for one unbelted
+   * move-off — but it used to render one PRICE per fault too, so a student who
+   * forgot a single belt was shown 200 лв. and 20 контролни точки. The billing
+   * decides which rows carry the money; the score table above is untouched.
+   */
+  const roadBilling = useMemo(
+    () => billRoadConsequences(summary.mistakes),
+    [summary.mistakes],
   );
   const markers = useMemo(
     () => [
@@ -434,24 +471,47 @@ export function SessionEndScreen({
           and ghost-weight so it never competes with „Повтори" / „Следващо
           ниво" — leaving is the cheap action, not the recommended one. */}
       {skipEnabled ? (
-        <div className="flex flex-col items-end gap-1">
+        <div
+          data-hud="end-skip"
+          className={`flex flex-col gap-1 ${compact ? "items-stretch" : "items-end"}`}
+        >
           <button
             type="button"
             onClick={skip}
-            className="btn-ghost px-4 py-1.5 text-xs"
+            // A2, the phone half: on a 393 px screen a right-aligned ghost link
+            // is the control the founder does not find. It becomes the full
+            // width of the column and 44 px tall — the same button the shell
+            // used to render above this screen, now with the note and the
+            // setting attached to it, which is what he asked for.
+            className={
+              compact
+                ? "btn-ghost h-11 w-full shrink-0 justify-center text-xs"
+                : "btn-ghost px-4 py-1.5 text-xs"
+            }
             aria-keyshortcuts="Space"
           >
-            Пропусни разбора
+            {compact ? "▾ Скрий разбора" : "Пропусни разбора"}
           </button>
-          <p className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px] text-muted">
-            <span>
-              <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold">
-                Space
-              </kbd>{" "}
-              {/* SESSION_END_SKIP_HINT_BG is „Space = пропусни"; the kbd chip
-                  already says „Space", so only the tail is spelled out here. */}
-              {SESSION_END_SKIP_HINT_BG.replace("Space = ", "")} разбора
-            </span>
+          <p
+            className={`flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted ${
+              compact ? "justify-center" : "justify-end"
+            }`}
+          >
+            {compact ? (
+              // No `kbd` chip: this device has no Space key. The binding above
+              // is still registered — a compact window with a keyboard attached
+              // is a real case — it is simply not advertised to a thumb.
+              <span>Докосни „▾ Скрий разбора“, за да пропуснеш разбора</span>
+            ) : (
+              <span>
+                <kbd className="rounded border border-border bg-surface px-1.5 py-0.5 font-mono text-[10px] font-bold">
+                  Space
+                </kbd>{" "}
+                {/* SESSION_END_SKIP_HINT_BG is „Space = пропусни"; the kbd chip
+                    already says „Space", so only the tail is spelled out here. */}
+                {SESSION_END_SKIP_HINT_BG.replace("Space = ", "")} разбора
+              </span>
+            )}
             {onAutoOpenChange !== null ? (
               <>
                 <span aria-hidden>·</span>
@@ -468,10 +528,16 @@ export function SessionEndScreen({
           </p>
           {onAutoOpenChange !== null && !autoOpen ? (
             // THEO-4: switching the popup off must never cost the student the
-            // explanation. Say where it went.
-            <p className="text-right text-[11px] font-semibold text-muted">
-              Разборът вече няма да се отваря сам — ще го намираш с „Виж разбора“
-              в лентата след урока.
+            // explanation. Say where it went — and the two device classes put
+            // it in different places, so the sentence names the right one.
+            <p
+              className={`text-[11px] font-semibold text-muted ${
+                compact ? "text-center" : "text-right"
+              }`}
+            >
+              {compact
+                ? "Разборът вече няма да те спира — намираш го с „Резултат“ на реда или с „Виж разбора“ в менюто."
+                : "Разборът вече няма да се отваря сам — ще го намираш с „Виж разбора“ в лентата след урока."}
             </p>
           ) : null}
         </div>
@@ -523,9 +589,17 @@ export function SessionEndScreen({
             Урокът беше прекъснат преди края.
           </p>
         ) : null}
+        {/* THE SECOND POINTS QUESTION (2026-08-10). This line used to read
+            „Настъпи сблъсък — реалният изпит се прекратява незабавно." and
+            nothing else: a 10 six centimetres above it, an ending asserted with
+            no act behind it, and no word on whether the 10 was this one fault
+            or a balance running out. All three are answered now, and the two
+            halves are cited SEPARATELY because they come from separate
+            provisions — приложение № 5, т. 10, б. „в“ sets the mark, чл. 48,
+            ал. 3 stops the exam. See rules/n38.ts N38_TERMINATION_RULE. */}
         {summary.terminated ? (
-          <p className="text-center text-sm font-semibold text-danger">
-            Настъпи сблъсък — реалният изпит се прекратява незабавно.
+          <p className="max-w-prose text-center text-sm font-semibold leading-relaxed text-danger">
+            {COLLISION_CONSEQUENCE_BG}
           </p>
         ) : null}
         {!result.completedAll && !result.aborted ? (
@@ -731,6 +805,7 @@ export function SessionEndScreen({
                     event={m}
                     correctiveBg={correctiveFor(m.code)}
                     atBg={clock(m.t)}
+                    billing={roadBilling[i]}
                   />
                 </li>
               );

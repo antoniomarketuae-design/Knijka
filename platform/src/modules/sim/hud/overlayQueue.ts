@@ -60,14 +60,17 @@ export const OVERLAY_PEEK_MAX_FRACTION = 0.12;
 
 /**
  * Height of the peek pill, px. 44 is Apple's minimum touch target, and the pill
- * IS the tap target when the item has a detail sheet or an acknowledgement —
- * a 28 px pill with a 44 px invisible hit area is the sort of thing that passes
- * an audit and misses a thumb. Items that are pure status (nothing to tap) get
- * `OVERLAY_PEEK_STATUS_HEIGHT_PX`, because a control-sized box for something
- * you cannot press is screen spent for nothing.
+ * IS the tap target — a 28 px pill with a 44 px invisible hit area is the sort
+ * of thing that passes an audit and misses a thumb.
+ *
+ * There used to be a second, smaller floor (`OVERLAY_PEEK_STATUS_HEIGHT_PX`,
+ * 30 px) for „pure status" cards with nothing to press. Row A6 deleted the
+ * category rather than the number: the founder's complaint is that an ordinary
+ * notification could not be removed by clicking it, so every card the drive is
+ * not waiting on now carries a dismiss control, and there is no such thing as a
+ * peek you cannot touch.
  */
 export const OVERLAY_PEEK_HEIGHT_PX = 44;
-export const OVERLAY_PEEK_STATUS_HEIGHT_PX = 30;
 
 /**
  * The centre band — THE ROAD. Fractions of the viewport, as a rect.

@@ -324,6 +324,39 @@ export function shouldShowDebrief(v: DebriefVisibility): boolean {
 }
 
 /**
+ * COMPACT · A2 — does the end-of-session LINE demand an answer?
+ *
+ * On a phone the debrief has never opened itself, so „Показвай разбора
+ * автоматично" had nothing to switch off there and the whole of L15 was
+ * withheld from the device the founder reviews on. What DOES pop up by itself
+ * on a phone is the end-of-session overlay line with `blocking: true`: it holds
+ * the layer and its only control is „Резултат", which opens the very debrief
+ * the student is trying to get past. That is the phone's popup, and this
+ * predicate is what the setting governs.
+ *
+ * `held` outranks everything: the I1 calibration gate is a required step, so
+ * while it holds the result the line blocks whatever the preference says —
+ * otherwise a student who once turned the popup off would silently never be
+ * asked to self-assess again.
+ *
+ * When it returns false the line STAYS on the glass (a verdict is not a thing
+ * to hide) but becomes an ordinary dismissible notification — and THEO-4 is
+ * carried by the shell adding „Виж разбора" to the micro menu for the whole
+ * ended session, so the law-cited explanation is one tap away from anywhere.
+ */
+export function endLineDemandsAnswer(v: {
+  /** I1 „Позна ли се?" is holding the result back. */
+  held: boolean;
+  /** Persisted „Показвай разбора автоматично". */
+  autoOpen: boolean;
+  /** The student skipped the debrief in THIS session. */
+  skipped: boolean;
+}): boolean {
+  if (v.held) return true;
+  return v.autoOpen && !v.skipped;
+}
+
+/**
  * Does the roomy verdict bar (the thing that replaces the popup) render?
  * Exactly the complement of `shouldShowDebrief` on a roomy, ended session —
  * so a roomy student who skipped is NEVER left with no way back to the WHY,

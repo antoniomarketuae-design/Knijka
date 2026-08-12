@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   Euler,
@@ -59,6 +59,7 @@ import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import { CABIN_LOOK_POSES } from "@/modules/sim/scene/vitok/cabinLook";
 import { getCabinLook, resetCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
+import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
 import {
   rearViewBottomFraction,
   rearViewQuadHalfSize,
@@ -97,6 +98,26 @@ import {
 } from "@/modules/sim/scene/cockpitDoorMirror";
 
 export type CameraMode = "chase" | "cockpit" | "topdown";
+
+/**
+ * The two TOP-DOWN AIDS, as an imperative handle — the touch view rail's door
+ * to what only `G` and `N` could reach (doc 91 §E rows 22–23: "NONE / NO").
+ *
+ * Each action returns the value it just set, which is the whole reason it is
+ * shaped this way: a caller can render "40 м" or "СЕВЕР" from the return of
+ * the tap that produced it, and never has to read a mutable ref while React is
+ * rendering.
+ */
+export interface TopdownAidHandle {
+  /** Next zoom preset. Returns the new visible ground width, m. */
+  cycleZoom: () => number;
+  /** North-up ⇄ heading-up. Returns true when the new state is HEADING-up. */
+  toggleOrientation: () => boolean;
+  /** Current preset width, m — for seeding a label when the rail opens. */
+  readZoomM: () => number;
+  /** True when the frame is currently HEADING-up. */
+  readHeadingUp: () => boolean;
+}
 
 /**
  * S0-View top-down mode (doc 76 §4 — "one world, N cameras", founder-
@@ -179,6 +200,15 @@ const published: {
   mirrorPx: number;
   glancePx: number;
 } = { camera: null, glance: null, mirrorPx: -1, glancePx: -1 };
+
+/** Dev-only glance readout (see the write site in the frame loop). One
+ *  module-scope object, mutated in place — nothing allocates per frame. */
+const glanceProbe: {
+  mode: string | null;
+  mirror: string | null;
+  strength: number;
+  at: number;
+} = { mode: null, mirror: null, strength: 0, at: 0 };
 
 function publishCameraMode(mode: CameraMode | null) {
   if (typeof document === "undefined" || published.camera === mode) return;
@@ -326,6 +356,7 @@ export function CameraRig({
   telemetryRef,
   topdownAllowed = true,
   enterTopdown,
+  topdownAidRef,
   driveLocked = false,
 }: {
   chassisGroupRef: RefObject<Group | null>;
@@ -337,6 +368,22 @@ export function CameraRig({
   topdownAllowed?: boolean;
   /** Switch the shared view state into top-down (parent owns cockpit state). */
   enterTopdown?: () => void;
+  /**
+   * G AND N GET A DOOR THAT IS NOT A KEYBOARD — doc 91 §E rows 22–23, §I23.
+   *
+   * The two top-down aids have lived in the refs below since they were
+   * written, reachable only through the `KeyG` / `KeyN` window listener — so
+   * on a phone the zoom is pinned at 40 m forever, on the one view the
+   * codebase itself says reverse-park is unreadable without.
+   *
+   * The state does NOT move out of this component to fix that: it is read once
+   * per frame by the block below and moving it into React would put a render
+   * on a camera tick. Instead the parent hands in a ref and this rig fills it
+   * with the same two actions the keys call — the `cabinRef` idiom, one tree
+   * over. Each action RETURNS the new value, so a caller can show it without
+   * reading a mutable ref during render.
+   */
+  topdownAidRef?: RefObject<TopdownAidHandle | null>;
   /** QW10 pre-drive gate is up: the car cannot move and a held brake is a
    *  procedure step — never a reverse. Vetoes the reversing POV. */
   driveLocked?: boolean;
@@ -365,6 +412,21 @@ export function CameraRig({
   // instead of silently no-op'ing — the founder-reported "G/N don't work".
   // On exam rungs (topdownAllowed=false) they stay inert, and the legend
   // doesn't advertise them.
+  //
+  // BOTH DOORS CALL THE SAME TWO FUNCTIONS. `cycleZoom` / `toggleOrientation`
+  // are defined once and used by the key listener AND by the handle the touch
+  // view rail holds, so a phone and a keyboard can never step the presets
+  // differently — the same discipline the cabin buttons follow (one
+  // CabinControls call path for keys, hotspots and the touch overlay).
+  const cycleZoom = useCallback(() => {
+    topdownZoomRef.current = (topdownZoomRef.current + 1) % TOPDOWN_WIDTHS_M.length;
+    return TOPDOWN_WIDTHS_M[topdownZoomRef.current];
+  }, []);
+  const toggleOrientation = useCallback(() => {
+    topdownHeadingUpRef.current = !topdownHeadingUpRef.current;
+    return topdownHeadingUpRef.current;
+  }, []);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
@@ -373,15 +435,27 @@ export function CameraRig({
         if (!topdownAllowed) return;
         enterTopdown?.();
       }
-      if (e.code === "KeyG") {
-        topdownZoomRef.current = (topdownZoomRef.current + 1) % TOPDOWN_WIDTHS_M.length;
-      } else {
-        topdownHeadingUpRef.current = !topdownHeadingUpRef.current;
-      }
+      if (e.code === "KeyG") cycleZoom();
+      else toggleOrientation();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cameraModeRef, topdownAllowed, enterTopdown]);
+  }, [cameraModeRef, topdownAllowed, enterTopdown, cycleZoom, toggleOrientation]);
+
+  // …and the same two, published for the touch rail. Cleared on unmount so a
+  // stale handle can never be called against a rig that is gone.
+  useEffect(() => {
+    if (!topdownAidRef) return;
+    topdownAidRef.current = {
+      cycleZoom,
+      toggleOrientation,
+      readZoomM: () => TOPDOWN_WIDTHS_M[topdownZoomRef.current],
+      readHeadingUp: () => topdownHeadingUpRef.current,
+    };
+    return () => {
+      topdownAidRef.current = null;
+    };
+  }, [topdownAidRef, cycleZoom, toggleOrientation]);
 
   // K — opt out of (or back into) the automatic reversing POV. Persisted, so
   // the choice survives the lesson; live from the next frame (the rig reads
@@ -670,6 +744,25 @@ export function CameraRig({
     // every other state here. ------------------------------------------------
     const cabin = cabinRef.current;
     const glanceS = cabin?.glanceStrength() ?? 0;
+    // --- GLANCE PROBE (dev builds only; never on the founder's build) --------
+    // Same argument as the B67 probe below, for the control the exam GRADES.
+    // „«Л»/«З»/«Д» produce no camera movement" could only ever be argued about
+    // by diffing screenshots of a world that is never still — and a diff cannot
+    // tell a head that did not turn from a head that turned and came home
+    // before the shutter (a TAP holds for GLANCE_TAP_HOLD_S = 0.9 s and then
+    // eases back on its own). Two numbers end that argument: the mirror the
+    // state machine is holding and the 0..1 envelope the head turn is actually
+    // driven by. Published in EVERY mode on purpose — `data-sim-glance` is
+    // written only in chase (see publishRearView's caller below), so a probe
+    // that reads it reports every cockpit glance dead.
+    if (process.env.NODE_ENV !== "production") {
+      const probe = glanceProbe;
+      probe.mode = mode;
+      probe.mirror = cabin?.glanceMirror ?? null;
+      probe.strength = glanceS;
+      probe.at = performance.now();
+      (window as unknown as { __glanceProbe?: unknown }).__glanceProbe = probe;
+    }
     const swingTarget = reverseViewTarget({
       selector: cabin?.driveline.selector ?? "P",
       speedKmh: sim?.speedKmh ?? 0,
@@ -1009,15 +1102,28 @@ export function CameraRig({
           sky = state.scene.getObjectByName(SKY_DOME_NAME) ?? null;
           skyRef.current = sky;
         }
-        renderMirrorPass(state.gl, {
-          target: rv.target,
-          scene: state.scene as never,
-          camera: rv.camera as never,
-          fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
-          fogMinDensity: REAR_VIEW_FOG_MIN_DENSITY,
-          sky,
-          skyRadius: REAR_VIEW_SKY_RADIUS_M,
-        });
+        // Per-instance cull, same reason as MirrorRig's (mirrorInstanceCull.ts):
+        // three rejects an InstancedMesh on ONE sphere that unions every
+        // instance, and this world's sets are 800-1100 m across, so a backward
+        // camera was sent the whole district for a 384×160 window. The camera
+        // is parentless, so `updateWorldMatrix` is what refreshes the
+        // `matrixWorldInverse` the frustum is extracted from — three does it
+        // inside `render()`, which is too late for a cull that runs before it.
+        rv.camera.updateWorldMatrix(true, false);
+        const cull = cullInstancedForMirror(state.scene, rv.camera);
+        try {
+          renderMirrorPass(state.gl, {
+            target: rv.target,
+            scene: state.scene as never,
+            camera: rv.camera as never,
+            fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
+            fogMinDensity: REAR_VIEW_FOG_MIN_DENSITY,
+            sky,
+            skyRadius: REAR_VIEW_SKY_RADIUS_M,
+          });
+        } finally {
+          cull.restore();
+        }
       }
 
       // 3. Park the quad in front of the main camera, sized from the LIVE fov
@@ -1122,15 +1228,25 @@ export function CameraRig({
           sky = state.scene.getObjectByName(SKY_DOME_NAME) ?? null;
           skyRef.current = sky;
         }
-        renderMirrorPass(state.gl, {
-          target: dm.target,
-          scene: state.scene as never,
-          camera: dm.camera as never,
-          fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
-          fogMinDensity: DOOR_MIRROR_FOG_MIN_DENSITY,
-          sky,
-          skyRadius: DOOR_MIRROR_SKY_RADIUS_M,
-        });
+        // Per-instance cull — see the rear-view pass above and
+        // mirrorInstanceCull.ts. This window is only open during a held glance,
+        // which is exactly when the frame can least afford a second full
+        // submission of the district.
+        dm.camera.updateWorldMatrix(true, false);
+        const cull = cullInstancedForMirror(state.scene, dm.camera);
+        try {
+          renderMirrorPass(state.gl, {
+            target: dm.target,
+            scene: state.scene as never,
+            camera: dm.camera as never,
+            fog: state.scene.fog instanceof FogExp2 ? state.scene.fog : null,
+            fogMinDensity: DOOR_MIRROR_FOG_MIN_DENSITY,
+            sky,
+            skyRadius: DOOR_MIRROR_SKY_RADIUS_M,
+          });
+        } finally {
+          cull.restore();
+        }
       }
 
       // 3. Park the quad in front of the main camera, sized from the LIVE fov

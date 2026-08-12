@@ -89,10 +89,19 @@
  * state at gesture rate, zero per-frame allocations); the only poll is a low-Hz
  * cabin snapshot that early-outs when nothing changed.
  *
- * Visibility: mounts only on touch-capable devices (hasTouchScreen), hides
- * while the sim is paused (menu/quiz/teach/end — the `hidden` prop) and while
- * the keyboard is in recent use (hybrid laptops); a screen touch brings it
- * back. Every hide releases all held axes.
+ * Visibility: mounts only on touch-capable devices (hasTouchScreen), goes
+ * INERT while the sim is paused (menu/quiz/teach/consequence/end — the `hidden`
+ * prop) and while the keyboard is in recent use (hybrid laptops); a screen
+ * touch brings it back.
+ *
+ * „INERT" AND NOT „UNMOUNTED", AND THE DIFFERENCE IS THE FOUNDER'S WORST BUG
+ * (doc 91 §C1/§I3, 2026-08-11). Every hide releases the held axes — it always
+ * did, which is why the car stops under a card instead of running away — AND
+ * NOW ALSO THE PADS' POINTER OWNERSHIP, which it did not, so a thumb that was
+ * on the throttle when the card arrived left its pad owned by a finger that
+ * could never let go and the pedal was dead for the rest of the session. The
+ * pads' nodes now survive the interruption too, so the same thumb picks the
+ * axis straight back up when the card goes.
  */
 
 import {
@@ -106,13 +115,32 @@ import {
   type RefObject,
 } from "react";
 import {
-  driveAxisFromDrag,
+  driveAxisFromPadY,
+  PadPointer,
+  releaseTouchControls,
+  shouldRemapReversePedals,
   steerFromDrag,
-  TOUCH_DRIVE_RANGE_PX,
+  TOUCH_DRIVE_ABSOLUTE_RANGE_PX,
   TOUCH_STEER_RANGE_PX,
   type TouchInputSource,
 } from "@/modules/sim/engine";
+import {
+  NOTIFY_COLUMN_GUTTER_PX,
+  NOTIFY_COLUMN_RIGHT_CSS,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT,
+  NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+  notifyColumnWidthPx,
+  useTapActivation,
+} from "@/modules/sim/hud";
+import {
+  DIFFICULTY_ORDER,
+  DIFFICULTY_PRESETS,
+  type DifficultyMode,
+  type SelectorPosition,
+  type TransmissionMode,
+} from "@/modules/sim/vehicle";
 import type { CabinControls, HeadlightSetting, IndicatorSetting } from "@/modules/sim/scene/cabin";
+import type { CameraMode, TopdownAidHandle } from "./CameraRig";
 
 // ---------------------------------------------------------------------------
 // Steer-mode setting seam (A/B: slider vs tilt). Only the thumb pad is
@@ -145,6 +173,49 @@ function capturePointer(el: Element, pointerId: number): void {
   }
 }
 
+/** One pad's pointer ownership, created once per mount and never replaced.
+ *  `useState`'s lazy initialiser rather than `useRef(new PadPointer())`: it
+ *  allocates exactly one instance instead of one per render, the identity is
+ *  stable (which is what lets it be an effect dependency), and it does not
+ *  touch a ref during render. Nothing here ever calls the setter — the object
+ *  is mutable state that no render reads. */
+function usePadPointer(): PadPointer {
+  const [pad] = useState(() => new PadPointer());
+  return pad;
+}
+
+/**
+ * MAY THIS FREE PAD ADOPT THE FINGER THAT IS ALREADY MOVING ON IT?
+ *
+ * This is the other half of "the pedal comes back the instant the card is
+ * dismissed" (doc 91 §I3). The card releases the pad's ownership on the way in
+ * — it has to, because the `pointerup` for that finger may never arrive — so
+ * when the sim resumes there is a thumb on the throttle that owns nothing. A
+ * pad that only ever claims on `pointerdown` would stay silent until the
+ * student lifted and pressed again, which is precisely the ritual this wave
+ * exists to delete.
+ *
+ * Three conditions, and each one is load-bearing:
+ *   · `live` — never while the scene is interrupted, or a resting thumb would
+ *     drive a paused world through the back door;
+ *   · the pad is FREE — an adoption may never steal an axis from the finger
+ *     that legitimately owns it;
+ *   · `buttons !== 0` — a `pointermove` with nothing pressed is a hovering
+ *     mouse or pen. Touch pointers only move while they are down.
+ *
+ * A finger that started somewhere else cannot arrive here anyway: touch
+ * pointers get implicit capture at `pointerdown`, so their moves keep going to
+ * the element they started on.
+ */
+function adoptable(
+  pad: PadPointer,
+  e: ReactPointerEvent<HTMLDivElement>,
+  live: boolean,
+): boolean {
+  if (!live || e.buttons === 0 || pad.pointerId !== null) return false;
+  return pad.claim(e.pointerId);
+}
+
 /** Driving keys whose use hides the overlay on hybrid (touch+keyboard)
  *  devices — a laptop student driving on WASD keeps a clean screen. */
 const KEYBOARD_DRIVE_CODES = new Set([
@@ -168,26 +239,76 @@ const INSET_L = "env(safe-area-inset-left, 0px)";
 const INSET_R = "env(safe-area-inset-right, 0px)";
 const INSET_B = "env(safe-area-inset-bottom, 0px)";
 
+/** px → a rem literal, so every length below is generated from ONE number and
+ *  the resolver at the foot of this block cannot drift from the shipped CSS.
+ *  Same device as modules/sim/hud/notifyColumn.ts, and for the same reason. */
+function rem(px: number): string {
+  return `${px / 16}rem`;
+}
+
 /**
  * THE PAD BOXES — the hit areas, which paint nothing.
  *
  * Each is `min(percentage, ceiling)`: the percentage keeps a thumb's reach
  * proportional on a small phone, the ceiling stops a tablet from handing a
  * quarter of the screen to a control that only ever needs a thumb's worth of
- * travel. They are also what the two glyph rows above them measure from, so the
- * rows can never land on top of a pad on any device in the ladder (checked at
- * 852×393, 780×360, 393×852 and 360×780).
+ * travel. They are also what the arcs above them measure from, so a station can
+ * never land on top of a pad on any device in the ladder — asserted for the
+ * whole ladder in `touch-arc.test.ts` rather than checked once by hand.
  *
  * These are HIT sizes, not ink: the steering pad is 208 px wide and paints
  * roughly 900 px² — 0.27 % of a landscape iPhone.
  */
-const STEER_PAD_W = "min(42%, 13rem)"; // ≤ 208 px
-const STEER_PAD_H = "min(40%, 8.5rem)"; // ≤ 136 px
-const DRIVE_PAD_W = "min(36%, 11rem)"; // ≤ 176 px
-const DRIVE_PAD_H = "min(44%, 9.5rem)"; // ≤ 152 px
+const STEER_PAD = { fraction: 0.42, capPx: 208 } as const; // of the WIDTH
+const STEER_PAD_HEIGHT = { fraction: 0.4, capPx: 136 } as const; // of the HEIGHT
+const DRIVE_PAD = { fraction: 0.36, capPx: 176 } as const;
+const DRIVE_PAD_HEIGHT = { fraction: 0.44, capPx: 152 } as const;
 
-/** Glyph-row height (px) — one 44 px touch row plus nothing else. */
-const ROW_H = "2.75rem";
+const cssMin = (b: { fraction: number; capPx: number }): string =>
+  `min(${b.fraction * 100}%, ${rem(b.capPx)})`;
+const resolve = (b: { fraction: number; capPx: number }, againstPx: number): number =>
+  Math.min(b.capPx, againstPx * b.fraction);
+
+const STEER_PAD_W = cssMin(STEER_PAD); // ≤ 208 px
+
+/**
+ * WHAT A BOX ANCHORED TO THE OPEN DECK MUST LEAVE ON ITS LEFT TO CLEAR THE
+ * STEERING PAD ENTIRELY, sideways.
+ *
+ * `TOUCH_CONTROLS_FLOOR` already exports this band's HEIGHT for anything that
+ * has to stay above the thumbs. Nothing exported its WIDTH, and sideways that
+ * is the bound that matters: the arc reaches y 236 on a landscape iPhone but
+ * only x 0 → inset + 208, so the whole middle of the screen below the deck is
+ * free and the only thing in the way on the left is this pad. The demonstration
+ * caption lives in exactly that lane (PlayAreaStyles).
+ *
+ * ⚠ IT IS `vw` AND NOT `%`, AND THAT IS THE WHOLE REASON THIS CONSTANT EXISTS
+ * RATHER THAN THE PAD'S OWN WIDTH BEING RE-USED. `STEER_PAD_W` is
+ * `min(42%, 13rem)`, and a percentage resolves against the CONTAINING BLOCK.
+ * Inside TouchControls that block is the full-bleed stage, so 42 % is 42 % of
+ * the screen; inside the deck it is 42 % of the DECK. Written the obvious way
+ * this lane measured 42 % of 410 px and landed 36 px too far left — measured on
+ * production, caption box at x 239 against an arc whose right edge is x 267,
+ * i.e. 1 792 px² of the demonstration's own prose over «Волан» as soon as a
+ * caption grew past two lines. The units matter more than the number.
+ *
+ * The arithmetic, and it comes out inset-independent: the pad's right edge is
+ * `env(safe-area-inset-left) + STEER_PAD_W`, the open deck's left edge is
+ * `env(safe-area-inset-left) + 0.5rem + 3.5rem`, so the clearance is
+ * `STEER_PAD_W − 4rem`, plus this HUD's 8 px gutter. 152 px on both landscape
+ * profiles in the ladder, and it follows the pad if the pad is reshaped.
+ */
+export const STEER_PAD_DECK_CLEARANCE_CSS = `calc(min(${
+  STEER_PAD.fraction * 100
+}vw, ${rem(STEER_PAD.capPx)}) - 4rem + 0.5rem)`;
+const STEER_PAD_H = cssMin(STEER_PAD_HEIGHT); // ≤ 136 px
+const DRIVE_PAD_W = cssMin(DRIVE_PAD); // ≤ 176 px
+const DRIVE_PAD_H = cssMin(DRIVE_PAD_HEIGHT); // ≤ 152 px
+
+/** The touch floor, in px. Every hit box on this screen is this square. */
+const TOUCH_MIN_PX = 44;
+/** Glyph-row height — one 44 px touch row plus nothing else. */
+const ROW_H = rem(TOUCH_MIN_PX);
 
 // ---------------------------------------------------------------------------
 // THE ARCS — founder layout, `Look where I put the lines and i guess there
@@ -204,63 +325,301 @@ const ROW_H = "2.75rem";
 // So the stations are placed on a quarter-arc instead of in a row. Station `k`
 // of `n`, measured as its BOX from the bottom and from the near side edge:
 //
-//     bottom = pad height + ARC_STEP · k
-//     inset  = ARC_EDGE + ARC_BULGE · sin((1 − k/(n−1)) · π/2)
+//     bottom = pad height + ARC_RISE · sin(k/(n−1) · π/2)
+//     inset  = ARC_EDGE + ARC_RUN_STEP · (n−1−k)
 //
-// — station 0 sits exactly on the pad's top edge and ARC_BULGE inboard, the top
-// one is flush against the screen edge, and the curve between them is the sweep
-// he drew. The sine is written out as four decimals rather than called through
-// CSS `sin()`: numbers that can be checked by hand beat a trig function whose
-// browser support is newer than everything else this file relies on.
+// — station 0 sits exactly on the pad's top edge and three run-steps inboard,
+// the top one is flush against the screen edge, and the curve between them is
+// the sweep he drew: constant horizontal progress, decelerating climb. The sine
+// is written out as four decimals rather than called through CSS `sin()`:
+// numbers that can be checked by hand beat a trig function whose browser
+// support is newer than everything else this file relies on.
 //
-// FOUR STATIONS A SIDE, AND THE ARITHMETIC THAT FIXED IT AT FOUR. A station box
-// is 44 px and the run starts at the pad's top edge, so the topmost box ends at
-// `padH + ARC_STEP·(n−1) + 44`. On the SMALLEST device in the ladder — 780 × 360
-// landscape, where DRIVE_PAD_H resolves to its 152 px ceiling:
+// ═══════════════════════════════════════════════════════════════════════════
+// THE ARC USED TO CLIMB AND NOW IT SWEEPS — 2026-08-10, doc 87 row C1, AND THE
+// REASON IS A MEASUREMENT AND NOT A TASTE.
 //
-//     4 stations → 152 + 132 + 44 = 328   fits in 360
-//     5 stations → 152 + 176 + 44 = 372   OVERFLOWS
+// It was written the other way round: a 44 px RISE per station and a 80 px
+// total RUN, i.e. 132 px of climb against 80 px of spread — a near-vertical
+// stack of four buttons up the screen edge. On the founder's phone held
+// SIDEWAYS that put two driving controls inside the notification column, which
+// is anchored at the top of the same edge and is 240 px wide by contract
+// (modules/sim/hud/notifyColumn.ts: its left edge may never come left of 0.60
+// of the width — his own drawing, and arithmetic with a ladder sweep behind
+// it). Measured, WebKit, iPhone 16 landscape 852 × 393 with the real insets:
 //
-// (852 × 393 landscape and both portraits are the same 152 px pad, so 328 is the
-// band's height on every device in the ladder. The steering side is 16 px
-// shorter still.)
+//   «Мигач надясно» ⇨  [707, 88, 44×44]  under «Разбрах» [704.9, 70.3, 76.1×44]
+//                      → 1 157 px² of HIT-BOX overlap, and elementFromPoint at
+//                        the indicator's own centre returns the dismiss button.
+//                        A thumb aimed at the RIGHT INDICATOR presses «Разбрах».
+//   «Контроли…» ⚙      [747, 44, 44×44]  → its centre hit the card's SENTENCE,
+//                        so the settings button was dead while any line spoke.
 //
-// Ten buttons did not fit into eight stations, so 🎥 (camera) and ⛶ (fullscreen)
-// moved into the ⚙ sheet, which is where the other settings already are. Both
-// keep their keys and their sheet cells; nothing became unreachable.
+// A z-index cannot fix that, and neither can a smaller column: the column is
+// anchored at y 8 and a three-line briefing measures 106.3 px, so clearing a
+// station whose top edge is at y 44 would need a 36 px column. THE ARC HAD TO
+// MOVE, and the only direction with room is DOWN AND INBOARD.
 //
-// AND THE PADS GOT SHORTER TO PAY FOR THE RUN. That is affordable rather than a
-// squeeze: both pads read a RELATIVE drag from wherever the thumb lands, and
-// full lock is TOUCH_STEER_RANGE_PX = 84 / TOUCH_DRIVE_RANGE_PX = 64 px of
-// travel (engine/touch.ts). A 152 px pad is still 2.4 × the whole gesture.
+// WHY THE RUN IS THE SEPARATION AND THE RISE IS THE FREE VARIABLE. Two 44 px
+// boxes cannot overlap if they are 44 px apart in EITHER axis. Putting that
+// guarantee in the RUN — one flat 2.75 rem step per station, which is the box's
+// own width — buys the rise the freedom to be anything at all, including almost
+// nothing on a short screen. That is the whole trick, and it is why the arc can
+// follow the stage instead of the stage having to hold still for the arc.
+//
+// THE RISE, THEN, IS WHATEVER THE STAGE CAN SPARE. A thumb's sweep on a phone
+// held sideways genuinely IS wide and shallow, and on a portrait phone it is
+// taller — his drawing is on a phone frame and the curve is the hand, not a
+// shape. The clamp is derived, not chosen, and each of its three numbers comes
+// from a different device:
+//
+//   THE FLOOR, 1.25 rem, is set by the SMALLEST device in the ladder. At
+//   780 × 360 the right corridor has to hold, top to bottom, the column's
+//   0.5 rem inset, the column itself, the 1.25 rem gap in TOUCH_CONTROLS_FLOOR,
+//   one 44 px station box, the rise, and a 152 px pad:
+//
+//       360 − 8 − 44 − 20 − 152 = 136   for the column AND the rise
+//       rise 20  →  column cap 116 px, against a measured worst card of 106.3
+//
+//   THE CEILING, 8.25 rem, is the climb this arc has always had — three station
+//   heights — and PORTRAIT KEEPS IT EXACTLY. Nothing was broken there and
+//   nothing there is being paid for: a first pass at this row flattened both
+//   orientations to one percentage, and the photograph showed the pause glyph
+//   sitting on the speedometer's „40" — 72 px of the arc pushed off the road
+//   and onto the instrument cluster, on the orientation that had no collision.
+//
+//   THE SLOPE between them, half of everything past 22 rem of stage, reaches
+//   the ceiling at 616 px of height. So every portrait phone is at the ceiling,
+//   both landscape phones are at the floor, and a tablet held sideways gets the
+//   sweep in between rather than a cliff at some breakpoint.
+//
+// WHAT THE STATIONS MEASURE NOW, WebKit, iPhone 16 landscape, real insets —
+// and note that the three x's are the ones the old four-station arc put its top
+// three on, because the run step is the box's own width either way:
+// Л [747, 155.5], З [703, 161.5], Д [659, 176] on the throttle flank, ⇨ [61,
+// 171.5] and ⇦ [105, 192] on the steering one, against a column that ends at
+// y 114.3 — 41 px of clearance, and 44 px between every pair of stations.
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// IT WAS FOUR A SIDE UNTIL 2026-08-12 AND THE WIDTH BUDGET IS WHY IT COULD NOT
+// BE FIVE. A side's band is `ARC_EDGE + ARC_RUN_STEP·(n−1) + 44`, and both arcs
+// start from their own screen edge, so at four a side that was 178 + 178 = 356
+// px against the 360 px of the narrowest phone in the ladder — a 4 px gap
+// between the two innermost stations, and five would have crossed.
+//
+// AT TWO AND THREE THAT BUDGET STOPS BINDING: 90 + 134 = 224 px of a 360 px
+// stage, i.e. 136 px of clear corridor between the flanks where there were 4.
+// (Heightwise the tallest band is `152 + rise + 44` = 216 px of a 360 px
+// landscape stage, against 328 before.)
+//
+// WHAT LEFT, AND WHERE IT WENT — see the block on ARC_STATIONS_LEFT below.
+// Pause, the horn and the ⚙ sheet went to the TOP RAIL; the camera came OUT of
+// the ⚙ sheet and joined them there as a word-labelled button, which is the one
+// principle of his reference frame we had never taken. Fullscreen stays a sheet
+// cell. Every one of them keeps its key; nothing became unreachable.
+//
+// AND THE PADS GOT SHORTER TO PAY FOR THE RUN. That is affordable, but it is
+// no longer free on the DRIVE pad and the difference matters now: the steering
+// pad still reads a RELATIVE drag from wherever the thumb lands (full lock =
+// TOUCH_STEER_RANGE_PX 84 px of travel, so a 136 px pad is 1.6 × the gesture),
+// while the drivetrain axis is ABSOLUTE since the 2026-08-11 ruling and needs
+// TOUCH_DRIVE_ABSOLUTE_RANGE_PX (66) of pad ON EACH SIDE of its centre — 132 px
+// inside a pad that is 152 px on every profile in the ladder. **Shortening the
+// drive pad below 132 px would silently cost the top of the throttle and the
+// bottom of the brake**, which is why engine/touch.ts states that floor and
+// touchArc.test.ts sweeps it. Nothing on this screen got smaller to buy row C1:
+// every station is still a 44 × 44 hit area and both pads are the size they were.
 // ---------------------------------------------------------------------------
 
-/** Stations per side. See the arithmetic above before changing it. */
-const ARC_STATIONS = 4;
-/** Rise between stations — the 44 px touch floor, edge to edge. */
-const ARC_STEP = "2.75rem";
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TWO STATIONS LEFT, THREE RIGHT — THE 2026-08-12 CONTROL-SYSTEM REWORK
+ * (doc 91 §H, and the founder's ruling on the indicators).
+ *
+ * It was FOUR A SIDE, and four a side is what put a line of the drive pad's own
+ * teaching text through «Клаксон», both mirror glances and «Мигач наляво» on
+ * every landscape profile: eight 44 px targets stacked into the band the
+ * reference frame keeps EMPTY, with nothing left over for a sentence to be in.
+ *
+ * The flanks now carry ONLY the controls whose meaning is a side of the car:
+ *
+ *   LEFT  (steering thumb)  ⇦ ЛЯВ, ⇨ ДЯСЕН — BOTH indicators.
+ *   RIGHT (throttle thumb)  Д ДЯСНО, З ЗАДНО, Л ЛЯВО — all three mirrors.
+ *
+ * THE INDICATORS ARE ON THE LEFT ON A FOUNDER RULING, and the reason is the
+ * exam: «Мигач надясно» used to sit on the RIGHT arc, so signalling right — a
+ * GRADED act, performed while still going straight — cost the accelerator
+ * thumb. A real LHD car puts the stalk left of the column for the same reason,
+ * and the lower station is the left signal because a real stalk is pushed DOWN
+ * for left.
+ *
+ * THE MIRRORS ARE ON THE RIGHT, and the interaction cost is the teaching:
+ * lifting off the throttle to check a mirror IS what a driver does.
+ *
+ * EVERYTHING ELSE LEFT THE FLANKS ALTOGETHER — pause, horn, the ⚙ sheet, and
+ * the camera that used to be buried two taps inside it — for the TOP RAIL,
+ * where no thumb rests (§H, and the reference's own «PAUSE»/«VIEW» corner).
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const ARC_STATIONS_LEFT = 2;
+export const ARC_STATIONS_RIGHT = 3;
+
+/** How many stations one flank carries. */
+export function arcStationCount(side: "left" | "right"): number {
+  return side === "left" ? ARC_STATIONS_LEFT : ARC_STATIONS_RIGHT;
+}
+
+/** The busier flank — what the band arithmetic and the sweeps have to clear. */
+export const ARC_STATIONS = Math.max(ARC_STATIONS_LEFT, ARC_STATIONS_RIGHT);
+/**
+ * THE RUN — how far inboard each station sits from the one above it.
+ *
+ * 44 px is the station box's own width, so consecutive stations are exactly
+ * edge-to-edge and CANNOT overlap however flat the rise becomes. That is what
+ * makes the rise safe to shrink; see the block above.
+ */
+const ARC_RUN_STEP_PX = TOUCH_MIN_PX;
 /** How close to the screen edge the TOP station sits. */
-const ARC_EDGE = "0.125rem";
-/** How far inboard the BOTTOM station sits — the depth of his curve. */
-const ARC_BULGE = "5rem";
-/** sin((1 − t)·π/2) at t = 0, ⅓, ⅔, 1 — one entry per station, in order.
- *  Hand-checkable, which is the point; see the note above. */
-const ARC_SIN = [1, 0.866, 0.5, 0] as const;
+const ARC_EDGE_PX = 2;
+/**
+ * THE RISE — total climb from the bottom station to the top one.
+ *
+ * 20 px on a phone held sideways, 132 px on a portrait one, ramping between at
+ * half the stage's height past 352. Every number is derived from a device in
+ * the ladder; see the block above before touching any of the four.
+ */
+const ARC_RISE_MIN_PX = 20;
+const ARC_RISE_MAX_PX = 3 * TOUCH_MIN_PX;
+const ARC_RISE_KNEE_PX = 352;
+const ARC_RISE_SLOPE = 0.5;
+const ARC_RISE = `clamp(${rem(ARC_RISE_MIN_PX)}, (100% - ${rem(
+  ARC_RISE_KNEE_PX,
+)}) * ${ARC_RISE_SLOPE}, ${rem(ARC_RISE_MAX_PX)})`;
+/**
+ * sin(k/(n−1) · π/2) — station `k` of `n`, rounded to four decimals.
+ *
+ * It used to be a hand-written four-entry table, and the table was the right
+ * shape while both flanks carried four stations. They no longer do, so the
+ * number is generated from the same formula the block above states in prose —
+ * still four decimals, still hand-checkable (2 of 3 is sin 45° = 0.7071), and
+ * now it cannot be wrong for a flank whose station count somebody changed.
+ */
+function arcSin(index: number, count: number): number {
+  if (count <= 1 || index <= 0) return 0;
+  const t = Math.min(1, index / (count - 1));
+  return Number(Math.sin(t * (Math.PI / 2)).toFixed(4));
+}
 
 /**
  * One station's box, measured from the bottom and from the near side edge.
  *
  * `padH` is the pad this arc has to clear: station 0's box sits exactly on the
  * pad's top edge, which is what keeps a thumb-down on the lowest station from
- * being swallowed by the wheel or the throttle. Every station above it is one
- * ARC_STEP higher and one step further out along the curve.
+ * being swallowed by the wheel or the throttle. Every station after it is one
+ * run-step further out along the curve and a little higher.
  */
-function arcStation(index: number, padH: string): { bottom: string; inset: string } {
+function arcStation(
+  index: number,
+  padH: string,
+  side: "left" | "right",
+): { bottom: string; inset: string } {
+  const count = arcStationCount(side);
   return {
-    bottom: `calc(${padH} + (${ARC_STEP} * ${index}) + ${INSET_B})`,
-    inset: `calc(${ARC_EDGE} + (${ARC_BULGE} * ${ARC_SIN[index] ?? 0}))`,
+    bottom: `calc(${padH} + (${ARC_RISE} * ${arcSin(index, count)}) + ${INSET_B})`,
+    inset: `calc(${rem(ARC_EDGE_PX)} + ${rem(ARC_RUN_STEP_PX * (count - 1 - index))})`,
   };
 }
+
+// ---------------------------------------------------------------------------
+// …AND THE SAME ARITHMETIC AS NUMBERS, so the ladder can be swept.
+//
+// „0 controls painted over" is the summary that let a driving control sit under
+// a dismiss button for a week (doc 87 row C1). The lengths above are CSS, and
+// nothing in this repo could evaluate them — so the only instrument that could
+// see the defect was a browser, and the browser was only ever asked the
+// question after somebody suspected the answer.
+//
+// These resolve the SAME constants for a given stage, which is the notifyColumn
+// device: one set of numbers, the shipped CSS generated from it, and a test
+// that sweeps every device in the ladder generated from it too. They cannot
+// drift, because there is only one of them.
+// ---------------------------------------------------------------------------
+
+/** A rect in stage coordinates: x/y from the stage's top-left, px. */
+export interface StageRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The stage a phone hands this overlay, plus the device's own safe area. */
+export interface StageBox {
+  width: number;
+  height: number;
+  insetTop?: number;
+  insetRight?: number;
+  insetBottom?: number;
+  insetLeft?: number;
+}
+
+/** Total climb of one arc on a given stage, px. */
+export function arcRisePx(stageHeightPx: number): number {
+  const ramp = (stageHeightPx - ARC_RISE_KNEE_PX) * ARC_RISE_SLOPE;
+  return Math.min(ARC_RISE_MAX_PX, Math.max(ARC_RISE_MIN_PX, ramp));
+}
+
+/** The steering / drivetrain pad hit boxes, resolved. */
+export function padRectPx(side: "left" | "right", stage: StageBox): StageRect {
+  const insetB = stage.insetBottom ?? 0;
+  if (side === "left") {
+    const w = resolve(STEER_PAD, stage.width) + (stage.insetLeft ?? 0);
+    const h = resolve(STEER_PAD_HEIGHT, stage.height) + insetB;
+    return { x: 0, y: stage.height - h, w, h };
+  }
+  const w = resolve(DRIVE_PAD, stage.width) + (stage.insetRight ?? 0);
+  const h = resolve(DRIVE_PAD_HEIGHT, stage.height) + insetB;
+  return { x: stage.width - w, y: stage.height - h, w, h };
+}
+
+/** Station `index` of one arc, resolved to a rect on the stage. */
+export function arcStationRectPx(
+  index: number,
+  side: "left" | "right",
+  stage: StageBox,
+): StageRect {
+  const padH = resolve(side === "left" ? STEER_PAD_HEIGHT : DRIVE_PAD_HEIGHT, stage.height);
+  const count = arcStationCount(side);
+  const bottom =
+    padH + arcRisePx(stage.height) * arcSin(index, count) + (stage.insetBottom ?? 0);
+  const inset =
+    ARC_EDGE_PX +
+    ARC_RUN_STEP_PX * (count - 1 - index) +
+    (side === "left" ? (stage.insetLeft ?? 0) : (stage.insetRight ?? 0));
+  return {
+    x: side === "left" ? inset : stage.width - inset - TOUCH_MIN_PX,
+    y: stage.height - bottom - TOUCH_MIN_PX,
+    w: TOUCH_MIN_PX,
+    h: TOUCH_MIN_PX,
+  };
+}
+
+/** Top of the whole control band, px from the BOTTOM of the stage — the number
+ *  `TOUCH_CONTROLS_FLOOR` spells in CSS. */
+export function touchControlsFloorPx(stage: StageBox): number {
+  return (
+    resolve(DRIVE_PAD_HEIGHT, stage.height) +
+    arcRisePx(stage.height) +
+    TOUCH_MIN_PX +
+    (stage.insetBottom ?? 0) +
+    TOUCH_CONTROLS_FLOOR_GAP_PX
+  );
+}
+
+/** The gap in TOUCH_CONTROLS_FLOOR. 20 px, and it is not rounding — see the
+ *  export's own note: the one control that sits on this floor carries a 12 px
+ *  ::before on each side. */
+const TOUCH_CONTROLS_FLOOR_GAP_PX = 20;
 
 /**
  * THE TOP OF THE WHOLE CONTROL BAND, as a CSS length, for anything that has to
@@ -282,20 +641,139 @@ function arcStation(index: number, padH: string): { bottom: string; inset: strin
  *                                                 which stack above the pads
  *   at this value                                 0
  *
- * The band is the tallest stack in this file: the drive pad, plus the two glyph
- * rows that measure from it (see the `bottom:` calcs below), plus the home
- * indicator, plus a small gap so nothing is flush. The steering side is
- * shorter, so the drive side decides.
+ * The band is the tallest stack in this file: the drive pad, plus the ARC that
+ * measures from it (the `bottom:` calcs below), plus the home indicator, plus a
+ * gap so nothing is flush. The steering side is shorter, so the drive side
+ * decides.
+ *
+ * THE GAP IS 1.25 rem AND IT IS NOT ROUNDING. It used to be 0.5 rem, and the
+ * one thing that sits on this floor — the demonstration deck's «🎬 Демонстрация»
+ * toggle — carries a 0.75 rem ::before on each side, because row C2 grew its
+ * hit rect to 44 px without growing the pill (PlayAreaStyles). So the control's
+ * REAL bottom edge is 12 px below the box this floor is measured against, and
+ * with an 8 px gap it reached into the top station: measured 2026-08-10 on the
+ * founder's phone, «🎬 Демонстрация ▸» × «Клаксон — задръж» = 1 861 px², the
+ * largest overlap on the screen, and 1 100 px² more into the drivetrain pad
+ * below it. 20 px clears the pseudo-element with 8 px to spare.
  *
  * EXPORTED RATHER THAN RESTATED. These pads are the one thing on this screen
  * whose geometry is actively being reshaped; anything that reads this follows
  * the band wherever it goes instead of pinning a copy of today's number.
  */
-export const TOUCH_CONTROLS_FLOOR =
-  `calc(${DRIVE_PAD_H} + (${ARC_STEP} * ${ARC_STATIONS}) + ${INSET_B} + 0.5rem)`;
+export const TOUCH_CONTROLS_FLOOR = `calc(${DRIVE_PAD_H} + ${ARC_RISE} + ${ROW_H} + ${INSET_B} + ${rem(
+  TOUCH_CONTROLS_FLOOR_GAP_PX,
+)})`;
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE TOP RAIL — the one corner of a phone held sideways where NO THUMB RESTS.
+
+   His reference frame puts «PAUSE» and «VIEW» there as two chunky, OPAQUE,
+   word-labelled buttons and nothing else, and doc 91 §F names that as the one
+   principle of the five we had simply not taken. Before this rework the corner
+   held exactly one 48 × 44 control on every profile measured — «Меню» — and the
+   camera was two taps deep inside the ⚙ sheet under the name «ИЗГЛ».
+
+   So the rail is where the RARE controls live: camera, pause, horn, the ⚙
+   sheet, and the seatbelt while it is unfastened. None of them belongs under a
+   driving thumb, and every one of them is now a WORD rather than a glyph a
+   17-year-old has to decode.
+
+   THE TWO BOUNDS ARE BOTH SOMEBODY ELSE'S CONTRACT, restated from their own
+   constants rather than copied as numbers:
+
+     LEFT   past «Меню на урока» — the same `0.5rem + 3.5rem` the open landscape
+            deck already stands on (DECK_COMPACT_OPEN_LEFT_CSS). One rail, one
+            clearance; if the menu word ever grows, both move together.
+     RIGHT  clear of the notification column, whose left edge may never come
+            left of 0.60 of the width (notifyColumn.ts). The rail may therefore
+            never reach it, and `topRailBandPx()` below is the same arithmetic
+            in numbers so touchArc.test.ts can sweep the ladder for it.
+
+   IT WRAPS, and that is the portrait answer. A phone held upright leaves about
+   167 px between those two bounds; five 44 px word-buttons need ~310. They fold
+   onto a second and third row against the TOP EDGE, which is where the
+   reference puts information and where nothing else on this screen lives — the
+   column is past 0.60 of the width and the whole control band is at the floor.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Where the rail starts — past the shell's «Меню» button. */
+export const TOP_RAIL_LEFT_CSS = `calc(0.5rem + 3.5rem + ${INSET_L})`;
+/** …and where it must stop: the notification column's own gutter. */
+export const TOP_RAIL_RIGHT_CSS = `calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} + 0.5rem)`;
+export const TOP_RAIL_TOP_CSS = NOTIFY_COLUMN_TOP_CSS_COMPACT;
+/**
+ * ONE RAIL ROW PLUS ITS GUTTER — the lane anything sharing this corridor has to
+ * clear. 2026-08-12, J-WAVE-2 · surfaces.
+ *
+ * THE COLLISION IT EXISTS TO CLOSE, measured (WebKit, real insets,
+ * `/dev/drive-rig` sc-zebra-approach@L1). The rail lands at `top: 0.5rem`,
+ * `left: 0.5rem + 3.5rem` — and `DECK_COMPACT_OPEN_LEFT_CSS` is the SAME
+ * `0.5rem + 3.5rem`, because the block above took the deck's own clearance as
+ * its left bound. In landscape the open deck also hangs from `top: 0.5rem`. So
+ * the two are not near each other, they start at the same point:
+ *
+ *   galaxy-gesturebar-landscape 780×360 (the Samsung gesture-bar row, 34.6 % of
+ *   the market): deck [64,8 456×92] against rail [64,8 456×44]
+ *     → 20 064 px² of surface;
+ *       NINE overlapping control pairs (768 px²) where the transport's 44 px
+ *       hit boxes reach 3 px above their own row — including «Пауза» ∩ «Пауза»,
+ *       the deck's ⏸ and the rail's word, 105 px² apart;
+ *       and with a caption on screen, 14 366 px² of the demonstration's own
+ *       prose lying across «Изглед», «Пауза», «Клаксон», «Кола» and «Колан».
+ *
+ * The rail is the fixed thing here — it is where the founder's reference puts
+ * the two opaque buttons and it must be findable in every state — so the deck
+ * takes the lane below it, the same way it already took a lane beside the map
+ * toggle. Exported rather than restated so the rail's height and the deck's
+ * clearance are one number.
+ */
+export const TOP_RAIL_ROW_CSS = `calc(${ROW_H} + 0.5rem)`;
+
+/** The rail's band on a given stage, px — x, width, and the column it clears. */
+export function topRailBandPx(stage: StageBox): {
+  x: number;
+  w: number;
+  columnLeftPx: number;
+} {
+  const x = 8 + 56 + (stage.insetLeft ?? 0);
+  const columnLeftPx =
+    stage.width -
+    NOTIFY_COLUMN_GUTTER_PX -
+    (stage.insetRight ?? 0) -
+    notifyColumnWidthPx(stage.width, true);
+  return { x, w: Math.max(0, columnLeftPx - 8 - x), columnLeftPx };
+}
+
+/* ── THE CENTRE CORRIDOR — the strip between the two thumb pads ──────────────
+   The pads are the only two things on this screen that are wide, and they are
+   at the two bottom corners. Everything BETWEEN them is road on every profile
+   in the ladder, at every height: 350 px on a landscape iPhone, 78 px on a
+   portrait one. Published so the one transient panel that has to speak while
+   the student is driving — the first-run thumb hint — can be told to live
+   inside it instead of being centred on the screen, which is how a line of its
+   own type ended up across «Клаксон» and both mirror glances (doc 91, the
+   founder's photograph). */
+export const PAD_CORRIDOR_LEFT_CSS = `calc(${STEER_PAD_W} + ${INSET_L} + 0.5rem)`;
+export const PAD_CORRIDOR_RIGHT_CSS = `calc(${DRIVE_PAD_W} + ${INSET_R} + 0.5rem)`;
+
+/** …and in numbers, for the ladder sweep. */
+export function padCorridorPx(stage: StageBox): { x: number; w: number } {
+  const left = padRectPx("left", stage);
+  const right = padRectPx("right", stage);
+  const x = left.x + left.w + 8;
+  return { x, w: Math.max(0, right.x - 8 - x) };
+}
 
 interface CabinSnap {
   gearLabel: string;
+  /**
+   * The real selector and the real gearbox — polled because TWO of this
+   * overlay's labels are only true for some values of them (2026-08-11):
+   * the drivetrain pad's reverse promise and the sheet's „D►" stepper. See
+   * `reverseGestureLive` and the stepper cell.
+   */
+  selector: SelectorPosition;
+  transmission: TransmissionMode;
   engineOn: boolean;
   parkingBrakeOn: boolean;
   hazardsOn: boolean;
@@ -310,6 +788,8 @@ function readCabinSnap(cabin: CabinControls): CabinSnap {
   const d = cabin.driveline;
   return {
     gearLabel: d.gearLabel,
+    selector: d.selector,
+    transmission: d.transmission,
     engineOn: d.engineOn,
     parkingBrakeOn: d.parkingBrakeOn,
     hazardsOn: d.hazardsOn,
@@ -325,6 +805,8 @@ function sameSnap(a: CabinSnap | null, b: CabinSnap): boolean {
   return (
     a !== null &&
     a.gearLabel === b.gearLabel &&
+    a.selector === b.selector &&
+    a.transmission === b.transmission &&
     a.engineOn === b.engineOn &&
     a.parkingBrakeOn === b.parkingBrakeOn &&
     a.hazardsOn === b.hazardsOn &&
@@ -336,28 +818,191 @@ function sameSnap(a: CabinSnap | null, b: CabinSnap): boolean {
   );
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DOES THE REVERSE GESTURE THIS PAD ADVERTISES ACTUALLY EXIST RIGHT NOW?
+ * 2026-08-11 — the „silent refusal" sweep, and the twin of the fix the
+ * KEYBOARD legend already got (`ControlsHelp.reverseAssistEnabled`).
+ *
+ * The pad's `aria-label` has always ended „спряла кола: пусни и натисни пак
+ * надолу за назад". That sentence is FALSE in two whole modes, and a sighted
+ * student discovers it by pressing; a screen-reader user has no way to
+ * discover it at all, which is why this is a defect and not a nicety:
+ *
+ *   · EXAM RUNGS. `LessonScene` sets `reverseAssistEnabled = lesson.examMode
+ *     !== true`, so on an exam neither ReverseAssist nor the pedal swap runs —
+ *     158 of the 169 `level: 4` rungs in the catalogue are exam rungs.
+ *   · „НАПРЕДНАЛ". The manual gate is P—R—N—M1…M5 and N→R REQUIRES THE CLUTCH
+ *     (vehicle/driveline.ts, „going INTO a gear needs the clutch"), so the
+ *     assist's D→N→R stops at N and the car sits in neutral. It is the same
+ *     shape as the founder's own 2026-07-17 report, one tier over.
+ *
+ * AND THE `inReverse` BRANCH IS FALSE IN THE SAME TWO MODES, which is easy to
+ * miss: „надолу назад, нагоре спирачка" describes the PEDAL SWAP, and the swap
+ * is `reverseAssistEnabled && shouldRemapReversePedals(selector, transmission)`
+ * — automatic only. Sitting in R on an exam or on „Напреднал", up is still the
+ * accelerator and down is still the brake, exactly as in a real car.
+ *
+ * So the question is asked of `shouldRemapReversePedals` itself rather than of
+ * a re-stated `transmission === "automatic"`: that predicate is where „the
+ * assist is an automatic-box affordance" is written down, and a label derived
+ * from it cannot drift away from the mapper the way a copied rule would. It is
+ * the same discipline `ReverseStuckWatch` follows — read the mapper, never a
+ * paraphrase of it.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function reverseGestureLive(
+  assistEnabled: boolean,
+  transmission: TransmissionMode,
+): boolean {
+  return assistEnabled && shouldRemapReversePedals("R", transmission);
+}
+
+/**
+ * The drivetrain pad's accessible name — one sentence per REAL behaviour.
+ *
+ * Four cases, not two. The pad itself is unchanged in every one of them: this
+ * function does not gate, permit or refuse anything, it only stops the label
+ * describing a mode the student is not in.
+ *
+ * Exported for the same reason the arc arithmetic is (see `padRectPx`): the
+ * only instrument that could otherwise check this sentence is a person with a
+ * screen reader and an exam rung open.
+ */
+export function driveAxisLabelBg(
+  inReverse: boolean,
+  gestureLive: boolean,
+  transmission: TransmissionMode,
+): string {
+  if (gestureLive) {
+    return inReverse
+      ? "Ход — назад: надолу назад, нагоре спирачка"
+      : "Ход — нагоре напред, в средата спиране, надолу спирачка; спряла кола: пусни и натисни пак надолу за назад";
+  }
+  // No assist and no swap: the pedals keep their real meanings whichever way
+  // the selector points, and the selector is the only way to turn the car
+  // around. Wording follows the legend's own row for the same state.
+  if (inReverse) {
+    return "Ход — в R: нагоре газ (колата тръгва назад), надолу спирачка. Посоката се сменя само с лоста.";
+  }
+  return transmission === "manual"
+    ? "Ход — нагоре газ, в средата спиране, надолу спирачка. В „Напреднал“ заден ход се избира с лоста и съединителя, не с този палец."
+    : "Ход — нагоре газ, в средата спиране, надолу спирачка. На изпит заден ход се избира само с лоста в ⚙ (D → N → R).";
+}
+
+/* ── THE TIER, AS A SHEET CELL ────────────────────────────────────────────────
+   FOUR LETTERS, because a cell is 44 px and its type is 10 px — the same
+   budget «СВЕТЛ» and «АВАР» already live on. The whole Bulgarian word is in
+   the accessible name, where it costs no pixels, exactly as the rail's camera
+   button does it.
+
+   IT CYCLES rather than offering three targets, and that is arithmetic and not
+   taste: three cells is 138 px of a strip that already carries thirteen, and it
+   would push the 360 px Android's sheet from two rows to three. The idiom is
+   this file's own — the top-down zoom cell is «Мащаб отгоре… — натисни за
+   следващия» — and the order is the curriculum's (`DIFFICULTY_ORDER`), so
+   „next" always means „one step less help".
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/** The 4-letter face of a tier. Exported so the test reads the shipped map. */
+export function tierCellTextBg(mode: DifficultyMode): string {
+  return mode === "beginner" ? "НАЧ" : mode === "advanced" ? "НАПР" : "НОРМ";
+}
+
+/** …and the next one round the ring. */
+export function nextTier(mode: DifficultyMode): DifficultyMode {
+  const i = DIFFICULTY_ORDER.indexOf(mode);
+  return DIFFICULTY_ORDER[(i + 1) % DIFFICULTY_ORDER.length] ?? mode;
+}
+
+/** The accessible name: which tier is on, and what a tap will do. */
+export function tierCellLabelBg(mode: DifficultyMode): string {
+  return `Ниво на помощта: ${DIFFICULTY_PRESETS[mode].labelBg} — натисни за ${DIFFICULTY_PRESETS[nextTier(mode)].labelBg}`;
+}
+
 export interface TouchControlsProps {
   /** Shared axis source, already attached to the scene's SimInput. */
   touch: TouchInputSource;
   cabinRef: RefObject<CabinControls | null>;
-  /** True while paused / quiz / teach / end overlays are up — overlay hides
-   *  and releases every held axis. */
+  /**
+   * False on examMode lessons, where `ReverseAssist` and the rule-b pedal swap
+   * are both off for the whole session (LessonScene: `reverseAssistEnabled =
+   * lesson.examMode !== true`) — the same flag `ControlsHelp` already takes,
+   * and for the same reason: the pad's label promises a gesture that mode does
+   * not have. Defaults to the lesson behaviour so a legacy mount is unchanged.
+   */
+  reverseAssistEnabled?: boolean;
+  /** True while paused / quiz / teach / consequence / end overlays are up. The
+   *  overlay goes INERT (it is not unmounted — see the render) and releases
+   *  every held axis AND both pads' pointer ownership. */
   hidden: boolean;
+  /** The C-key cycle. Still wired (the rail's own button does not use it), so
+   *  a hybrid device's keyboard keeps working exactly as it did. */
   onToggleCamera: () => void;
+  /** Which view is live — the rail draws it, it does not guess it. */
+  cameraMode?: CameraMode;
+  /** Pick a view outright. Optional so a legacy mount is unchanged: without
+   *  it the rail falls back to the C cycle on one button. */
+  onSelectCameraMode?: (mode: CameraMode) => void;
+  /** False on exam rungs — the rail then offers two views, not three, exactly
+   *  as the C cycle and the keyboard legend already do. */
+  topdownAllowed?: boolean;
+  /** CameraRig's handle for the two top-down aids (G and N). */
+  topdownAidRef?: RefObject<TopdownAidHandle | null>;
+  /**
+   * The ⚙ sheet opened or closed. The scene uses it to stand the demonstration
+   * deck down — the two are anchored to the same line and cannot share it (the
+   * arbitration and its measurements are at `touchSheetOpen` in LessonScene).
+   */
+  onSheetOpenChange?: (open: boolean) => void;
   onPause: () => void;
   onReset: () => void;
   /** Fullscreen toggle from the shell (QW1 owns the fullscreen element). */
   onToggleFullscreen: (() => void) | null;
+  /**
+   * THE TIER, BECAUSE ON A PHONE IT HAS NOWHERE ELSE TO STAND — J-WAVE-3.
+   *
+   * `[data-hud="difficulty"]` is a three-segment pill in the SCENE tree, pinned
+   * to `top: 0.5rem + inset, right: 0.75rem`. Measured in WebKit with the real
+   * insets it lays out **255 px** («Начинаещ» 78 + «Нормален» 78 + «Напреднал»
+   * 85, two 4 px gaps and 8 px of padding). The top strip it lands in is
+   * already owned:
+   *
+   *   the top rail       x 64 → 231.5 (`TOP_RAIL_LEFT_CSS` past «Меню», stopping
+   *                      8 px short of the notification column) — 167.5 px, and
+   *                      five word-buttons are already wrapping inside it;
+   *   the notify column  x 239.5 → 381 — 141.5 px (`min(15rem, 36vw)`).
+   *
+   * 255 px of demand into a 167.5 px lane or a 141.5 px one. It does not fit in
+   * either, at any font, and abbreviating it does not save it: three 44 px
+   * targets plus gaps need 148 px against the 129.6 px the 360 px Android
+   * leaves. So on a phone the pill is not repositioned, it is REPLACED — by the
+   * cell below, in the sheet that already holds every other switch in this car.
+   * The tier is not decoration here: it is what decides whether this gearbox is
+   * automatic or manual (`transmissionModeFor`), i.e. whether «СЪЕД» two cells
+   * along exists at all. Absent, the sheet simply does not offer the cell and
+   * the scene's own pill keeps the corner, which is what a desktop does.
+   */
+  difficulty?: DifficultyMode;
+  onSelectDifficulty?: (mode: DifficultyMode) => void;
 }
 
 export function TouchControls({
   touch,
   cabinRef,
   hidden,
+  reverseAssistEnabled = true,
   onToggleCamera,
+  cameraMode,
+  onSelectCameraMode,
+  topdownAllowed = true,
+  topdownAidRef,
+  onSheetOpenChange,
   onPause,
   onReset,
   onToggleFullscreen,
+  difficulty,
+  onSelectDifficulty,
 }: TouchControlsProps) {
   // Hybrid devices: recent keyboard use hides the overlay; a screen touch
   // brings it back. Touch-only devices simply never see driving keys.
@@ -379,21 +1024,141 @@ export function TouchControls({
 
   const visible = !hidden && !keyboardActive;
 
-  // Any hide (pause/quiz/teach/keyboard/unmount) releases held axes — a
-  // finger resting on the throttle must never keep driving a frozen scene.
+  // ── The two pads' pointer ownership, and the two knobs that draw them ─────
+  // Both are declared HERE, above the release effect, because that effect has
+  // to be able to let go of every one of them. `PadPointer` is engine state
+  // (modules/sim/engine/touch.ts) rather than a bare `useRef<number|null>` for
+  // the reason written out at length there: the release used to be an
+  // assignment in one place and a method call in another, and the two halves
+  // drifted apart without anything noticing.
+  const steerPad = usePadPointer();
+  const drivePad = usePadPointer();
+  const steerKnobRef = useRef<HTMLDivElement | null>(null);
+  const driveKnobRef = useRef<HTMLDivElement | null>(null);
+
+  /** Both knobs home. The ink must not go on claiming a throttle the hide just
+   *  released — the pad's node now SURVIVES the interruption (see the render
+   *  below), and its inline transform survives with it. */
+  const parkKnobs = useCallback(() => {
+    const steer = steerKnobRef.current;
+    if (steer) {
+      steer.style.transition = "none";
+      steer.style.transform = "translateX(0px)";
+    }
+    const drive = driveKnobRef.current;
+    if (drive) {
+      drive.style.transition = "none";
+      drive.style.transform = "translateY(0px)";
+      drive.style.borderColor = "var(--accent)";
+    }
+  }, []);
+
+  // ═══ ANY HIDE LETS GO OF EVERYTHING — THE AXES *AND* THE POINTERS ════════
+  // (pause / quiz / teach card / consequence / end screen / keyboard takeover
+  //  / unmount — the shell's `paused={ended || activeQuiz !== null ||
+  //  teachQueue.length > 0 || consequence !== null}` → LessonScene's
+  //  `physicsPaused = paused || menuPaused` → this component's `hidden`, so
+  //  every one of those routes arrives here and none of them can take a
+  //  different one. Asserted in touchPadRelease.test.tsx §4, because a sixth
+  //  card kind added to a different prop is exactly how this comes back.)
+  //
+  // The axes half is original and correct: a finger resting on the throttle
+  // must never keep driving a frozen scene, which is why the car STOPS when a
+  // card arrives instead of running away.
+  //
+  // THE POINTER HALF IS DOC 91 §C1, AND IT IS THE WHOLE BUG. The finger is
+  // still on the glass when the card takes the screen; its `pointerup` is
+  // delivered to a node that is no longer in the interaction path, so the pad
+  // went on believing that finger owned it and refused every later touch —
+  // permanently, measured 3/3 with the thumb held against 0/3 with it lifted a
+  // beat earlier. One call now means "let go of everything", so this can never
+  // again be done by half.
   useEffect(() => {
-    if (!visible) touch.releaseAll();
-  }, [visible, touch]);
-  useEffect(() => () => touch.releaseAll(), [touch]);
+    if (!visible) {
+      releaseTouchControls(touch, steerPad, drivePad);
+      parkKnobs();
+    }
+  }, [visible, touch, steerPad, drivePad, parkKnobs]);
+  useEffect(
+    () => () => releaseTouchControls(touch, steerPad, drivePad),
+    [touch, steerPad, drivePad],
+  );
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [snap, setSnap] = useState<CabinSnap | null>(null);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * TELL THE SCENE, BECAUSE THE DEMONSTRATION DECK STANDS ON THIS SAME LINE.
+   * Doc 91 §D4/§I11 — J-WAVE-2.
+   *
+   * The sheet below is `bottom: TOUCH_CONTROLS_FLOOR`. So is the demonstration
+   * deck (PlayAreaStyles). They are not near each other — they are AT THE SAME
+   * ANCHOR, and the sheet is painted last. Measured, WebKit, real insets,
+   * `/dev/drive-rig` sc-zebra-approach@L1, 2026-08-12:
+   *
+   *   galaxy-gesturebar-landscape · sheet open, deck COLLAPSED
+   *     deck [12,73.5 240×27] floor 260px · sheet [2,56 776×44] floor 260px
+   *     → 6 240 px², and the deck's own «🎬 Демонстрация ▸» answered a sheet
+   *       cell at its own centre. The control that OPENS the demonstration
+   *       was dead whenever the car's controls were open.
+   *   galaxy-gesturebar-landscape · sheet open, deck OPEN
+   *     → 20 064 px² of surface, 16 overlapping control pairs, 13 098 px² of
+   *       44 px targets and SEVEN dead controls, every one of them a deck
+   *       transport control.
+   *   iphone16-landscape · 6 480 px² collapsed, 9 840 px² open.
+   *   Portrait, both 360 profiles: 5 590 px² with the deck merely COLLAPSED.
+   *
+   * The scene answers by standing the deck down — suppressed, not closed; it
+   * keeps its step, its playhead and its play state, and pauses itself so
+   * nothing advances off screen. `LessonScene`'s `touchSheetOpen` block has
+   * the arbitration, the arithmetic for why they cannot be stacked instead,
+   * and what the student loses.
+   *
+   * `visible &&` IS LOAD-BEARING: when a teach card arrives this overlay goes
+   * inert and the sheet's node is not rendered at all (the `{visible ? …}`
+   * branch below), so a `true` left published here would keep a demonstration
+   * hidden behind a card that has nothing to do with it.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  useEffect(() => {
+    onSheetOpenChange?.(visible && sheetOpen);
+  }, [visible, sheetOpen, onSheetOpenChange]);
+  // …and on the way out, because an unmount is not a state change the effect
+  // above can see: a lesson that ends with the sheet open must not leave the
+  // next mount's deck suppressed by a component that is gone.
+  useEffect(() => () => onSheetOpenChange?.(false), [onSheetOpenChange]);
+  /**
+   * WHICH CAMERA IS LIVE, so the rail's «ИЗГЛЕД» button can say what it will
+   * give you next instead of being a mystery cycle.
+   *
+   * Read off `<html data-sim-camera>` and not out of React state, because that
+   * attribute is the ONE fact the rig publishes to the DOM and it is written
+   * inside `useFrame` on change only (CameraRig: „a 60 Hz setState would be a
+   * rendering bug"). Sampling it on the cabin poll that already runs costs one
+   * property read every 250 ms and adds no subscription.
+   *
+   * NAMED `cameraModeLive`, NOT `cameraMode` (2026-08-12). A `cameraMode` PROP
+   * was added to this component in the same working tree (`:844`, `:871`,
+   * passed from `LessonScene:1688`) while this state was still called
+   * `cameraMode` — two bindings, one scope, so `tsc` reported
+   * `TS2300: Duplicate identifier 'cameraMode'` twice and Turbopack refused to
+   * build ANY route that reaches TouchControls (i.e. the whole simulator).
+   * Neither is deleted here, because they are not the same fact: the prop is
+   * what the scene INTENDS, this is what the rig has actually PUBLISHED, and
+   * they differ for one poll interval after a switch. The label prefers the
+   * prop and falls back to this, so a legacy mount that passes no prop keeps
+   * the behaviour this state was written for.
+   */
+  const [cameraModeLive, setCameraMode] = useState<string | null>(null);
 
   // Low-Hz cabin poll for button active-states (skips setState when equal —
   // steady-state renders are zero).
   useEffect(() => {
     if (!visible) return;
     const id = window.setInterval(() => {
+      const view = document.documentElement.dataset.simCamera ?? null;
+      setCameraMode((prev) => (prev === view ? prev : view));
       const cabin = cabinRef.current;
       if (!cabin) return;
       const next = readCabinSnap(cabin);
@@ -402,9 +1167,38 @@ export function TouchControls({
     return () => window.clearInterval(id);
   }, [visible, cabinRef]);
 
+  /**
+   * …AND THE SAME FACT PUBLISHED TO THE STYLESHEET, for the surfaces that are
+   * neither this component's nor the scene's to hold a prop for.
+   *
+   * `onSheetOpenChange` above is how the SCENE learns (it suppresses the
+   * demonstration deck, pausing and resuming it — `touchSheetOpen` in
+   * LessonScene). This attribute is how the CASCADE learns, and it currently
+   * has exactly one consumer: the first-run thumb hint, which after this wave's
+   * layout change stands on the SAME `TOUCH_CONTROLS_FLOOR` line as this sheet
+   * and, in portrait, inside the three rows this sheet folds to.
+   *
+   * MEASURED, iPhone 16 portrait, sheet open with the hint still up: 4 964 px²
+   * of the hint's type over five sheet cells and TWO of them dead behind its
+   * «Разбрах». The rule and the ladder it belongs to are in PlayAreaStyles.
+   *
+   * `html[data-sim-*]` is the grammar the camera mode and the mirror glances
+   * already publish on, for the same reason: one fact, written on change only,
+   * read by a stylesheet that spans component trees.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!sheetOpen || !visible) {
+      delete root.dataset.simCarSheet;
+      return;
+    }
+    root.dataset.simCarSheet = "open";
+    return () => {
+      delete root.dataset.simCarSheet;
+    };
+  }, [sheetOpen, visible]);
+
   // ---- steering pad (direct DOM writes, no state) ---------------------------
-  const steerKnobRef = useRef<HTMLDivElement | null>(null);
-  const steerPointer = useRef<number | null>(null);
   const steerStartX = useRef(0);
 
   /** Knob travel, px — the mark's own half-width, NOT the drag range: the
@@ -427,32 +1221,45 @@ export function TouchControls({
     [touch],
   );
 
-  const onSteerDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerPointer.current !== null) return; // one finger owns the wheel
-      steerPointer.current = e.pointerId;
+  /** Seat the wheel's origin under the thumb and start following it. */
+  const steerBegin = useCallback(
+    (clientX: number) => {
       // RELATIVE, not absolute: the gesture starts wherever the thumb landed,
       // so the student never has to find a 26 px dot before they can steer.
-      steerStartX.current = e.clientX;
-      capturePointer(e.currentTarget, e.pointerId);
+      // (The GAS pad no longer works this way — see the drivetrain block and
+      // the founder ruling quoted in engine/touch.ts. Steering keeps it: on
+      // this axis „where my thumb is" is not a meaning a student holds.)
+      steerStartX.current = clientX;
       const knob = steerKnobRef.current;
       if (knob) knob.style.transition = "none";
-      steerApply(e.clientX);
+      steerApply(clientX);
     },
     [steerApply],
+  );
+
+  const onSteerDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!steerPad.claim(e.pointerId)) return; // one finger owns the wheel
+      capturePointer(e.currentTarget, e.pointerId);
+      steerBegin(e.clientX);
+    },
+    [steerBegin, steerPad],
   );
 
   const onSteerMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerPointer.current === e.pointerId) steerApply(e.clientX);
+      if (steerPad.owns(e.pointerId)) {
+        steerApply(e.clientX);
+      } else if (adoptable(steerPad, e, visible)) {
+        steerBegin(e.clientX);
+      }
     },
-    [steerApply],
+    [steerApply, steerBegin, steerPad, visible],
   );
 
   const onSteerEnd = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (steerPointer.current !== e.pointerId) return;
-      steerPointer.current = null;
+      if (!steerPad.release(e.pointerId)) return;
       touch.releaseSteer(); // springs back: keyboard/gamepad regain the axis
       const knob = steerKnobRef.current;
       if (knob) {
@@ -460,20 +1267,37 @@ export function TouchControls({
         knob.style.transform = "translateX(0px)";
       }
     },
-    [touch],
+    [touch, steerPad],
   );
 
   // ---- drivetrain pad: ONE axis, throttle above centre, brake below --------
-  const driveKnobRef = useRef<HTMLDivElement | null>(null);
-  const drivePointer = useRef<number | null>(null);
-  const driveStartY = useRef(0);
+  //
+  // ABSOLUTE (founder ruling 2026-08-11 — „up is forward, middle is stop, down
+  // is backwards"): the axis is WHERE THE THUMB IS on the pad, not how far it
+  // has travelled since it landed. A motionless press above the middle
+  // accelerates; a motionless press below it brakes; the middle 44 px command
+  // nothing. The curve, the neutral band and the sign convention all live in
+  // `driveAxisFromPadY` (engine/touch.ts), which is where the ruling and the
+  // property it costs are written down.
+  //
+  // The centre is READ FROM THE PAD'S OWN BOX at the start of every gesture
+  // rather than computed from the CSS: this pad's height is a `min()` of a
+  // percentage and a cap, its box grows by the home-indicator inset, and both
+  // move under rotation, a URL bar and fullscreen. Asking the element is the
+  // only version of this number that cannot go stale.
+  const driveCentreY = useRef(0);
 
   const DRIVE_KNOB_TRAVEL = 30;
 
+  const seatDriveCentre = useCallback((padEl: Element) => {
+    const box = padEl.getBoundingClientRect();
+    if (box.height > 0) driveCentreY.current = box.top + box.height / 2;
+  }, []);
+
   const driveApply = useCallback(
     (clientY: number) => {
-      const dy = clientY - driveStartY.current;
-      const axis = driveAxisFromDrag(dy, TOUCH_DRIVE_RANGE_PX);
+      const dy = clientY - driveCentreY.current;
+      const axis = driveAxisFromPadY(clientY, driveCentreY.current);
       // Exactly one channel is ever held: both pedals down is ambiguous input
       // and would also veto ReverseAssist's standstill hold.
       if (axis > 0) {
@@ -490,7 +1314,7 @@ export function TouchControls({
       if (knob) {
         const t = Math.max(
           -DRIVE_KNOB_TRAVEL,
-          Math.min(DRIVE_KNOB_TRAVEL, (dy / TOUCH_DRIVE_RANGE_PX) * DRIVE_KNOB_TRAVEL),
+          Math.min(DRIVE_KNOB_TRAVEL, (dy / TOUCH_DRIVE_ABSOLUTE_RANGE_PX) * DRIVE_KNOB_TRAVEL),
         );
         knob.style.transform = `translateY(${t.toFixed(1)}px)`;
         knob.style.borderColor =
@@ -500,30 +1324,40 @@ export function TouchControls({
     [touch],
   );
 
-  const onDriveDown = useCallback(
-    (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (drivePointer.current !== null) return;
-      drivePointer.current = e.pointerId;
-      driveStartY.current = e.clientY;
-      capturePointer(e.currentTarget, e.pointerId);
+  /** Take the pad: read where „middle" is, then obey the thumb immediately. */
+  const driveBegin = useCallback(
+    (padEl: Element, clientY: number) => {
+      seatDriveCentre(padEl);
       const knob = driveKnobRef.current;
       if (knob) knob.style.transition = "none";
-      driveApply(e.clientY);
+      driveApply(clientY);
     },
-    [driveApply],
+    [driveApply, seatDriveCentre],
+  );
+
+  const onDriveDown = useCallback(
+    (e: ReactPointerEvent<HTMLDivElement>) => {
+      if (!drivePad.claim(e.pointerId)) return;
+      capturePointer(e.currentTarget, e.pointerId);
+      driveBegin(e.currentTarget, e.clientY);
+    },
+    [driveBegin, drivePad],
   );
 
   const onDriveMove = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (drivePointer.current === e.pointerId) driveApply(e.clientY);
+      if (drivePad.owns(e.pointerId)) {
+        driveApply(e.clientY);
+      } else if (adoptable(drivePad, e, visible)) {
+        driveBegin(e.currentTarget, e.clientY);
+      }
     },
-    [driveApply],
+    [driveApply, driveBegin, drivePad, visible],
   );
 
   const onDriveEnd = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
-      if (drivePointer.current !== e.pointerId) return;
-      drivePointer.current = null;
+      if (!drivePad.release(e.pointerId)) return;
       touch.releaseThrottle();
       touch.releaseBrake();
       const knob = driveKnobRef.current;
@@ -533,20 +1367,58 @@ export function TouchControls({
         knob.style.borderColor = "var(--accent)";
       }
     },
-    [touch],
+    [touch, drivePad],
   );
 
   const cabin = () => cabinRef.current;
 
-  if (!visible) return null;
-
   const gearLabel = snap?.gearLabel ?? "—";
   const inReverse = gearLabel === "R";
+  // Before the first 250 ms poll the cabin is unread; „automatic" is what a
+  // fresh scene opens in (DEFAULT_DIFFICULTY === "normal"), so the default is
+  // the truth rather than a guess.
+  const transmission: TransmissionMode = snap?.transmission ?? "automatic";
+  const gestureLive = reverseGestureLive(reverseAssistEnabled, transmission);
 
   return (
+    /* ═══ HIDDEN MEANS INERT, NOT GONE — doc 91 §I3 ════════════════════════════
+       This used to be `if (!visible) return null`, and that one line is half of
+       why the founder's session was unrecoverable. Returning null destroys the
+       pads' DOM nodes while the component instance (and every ref in it) lives
+       on, so the thumb that is STILL ON THE GLASS is holding a control that no
+       longer exists: its `pointerup` reaches nobody, and the pad it was holding
+       is left owned by a finger that can never let go (§C1).
+
+       So the overlay now stays mounted and goes INERT for the duration of the
+       card: nothing is hit-testable (`pointer-events: none` on the pads
+       themselves — the root has always been `pointer-events-none` and that says
+       nothing about its children), nothing is announced (`aria-hidden` on the
+       root removes the whole subtree from the accessibility tree), and nothing
+       is tabbable or focusable, because every BUTTON is genuinely unrendered
+       while inert — only the two pads and their ink stay, and they are plain
+       divs with no tabindex. `opacity: 0` keeps the screen exactly as clear as
+       it was before: the pads still occupy their boxes, so anything that
+       measures the control band (CameraAidHint) reads the same numbers it
+       always did, and the student sees nothing.
+
+       What survives is the node identity, which is the entire point: the finger
+       already on the pad delivers its next `pointermove` to the SAME element,
+       `adoptable()` above picks it back up, and the pedal answers again the
+       instant the card is dismissed — no lift-and-press ritual. The axes are
+       still released on the way in (`releaseTouchControls`), so the car stops
+       under the card rather than running away.
+
+       CAVEAT, measured and stated: recovery is driven by the next pointer
+       event. A thumb that stays PERFECTLY motionless through the whole card
+       emits no `pointermove`, so it re-arms on its first pixel of movement (or
+       on the next press). A real thumb wobbles ±3 px; a resting one commands
+       nothing either way, because the pad's middle 44 px are neutral. */
     <div
       data-hud="touch-controls"
+      data-sim-touch-inert={visible ? undefined : "on"}
+      aria-hidden={visible ? undefined : true}
       className="pointer-events-none absolute inset-0 z-10 select-none"
+      style={visible ? undefined : { opacity: 0 }}
     >
       {/* ══ BOTTOM-LEFT ═ steering ═══════════════════════════════════════════
           The box is the hit area and paints nothing at all; the mark inside is
@@ -561,7 +1433,7 @@ export function TouchControls({
         onPointerMove={onSteerMove}
         onPointerUp={onSteerEnd}
         onPointerCancel={onSteerEnd}
-        className="pointer-events-auto absolute touch-none"
+        className={`${visible ? "pointer-events-auto" : "pointer-events-none"} absolute touch-none`}
         style={{
           left: 0,
           bottom: 0,
@@ -591,14 +1463,13 @@ export function TouchControls({
 
       {/* ══ BOTTOM-RIGHT ═ ONE drivetrain axis ═══════════════════════════════
           Up = forward · centre = neutral · down = brake, then reverse (centre
-          the thumb, then press down again — see the header). */}
+          the thumb, then press down again — see the header).
+          …EXCEPT on an exam rung and on „Напреднал", where that last clause is
+          not true and the label no longer says it (see driveAxisLabelBg). The
+          pad's behaviour is untouched: nothing here gates an input. */}
       <div
         role="slider"
-        aria-label={
-          inReverse
-            ? "Ход — назад: надолу назад, нагоре спирачка"
-            : "Ход — нагоре напред, в средата спиране, надолу спирачка; спряла кола: пусни и натисни пак надолу за назад"
-        }
+        aria-label={driveAxisLabelBg(inReverse, gestureLive, transmission)}
         aria-valuemin={-100}
         aria-valuemax={100}
         aria-valuenow={0}
@@ -606,7 +1477,7 @@ export function TouchControls({
         onPointerMove={onDriveMove}
         onPointerUp={onDriveEnd}
         onPointerCancel={onDriveEnd}
-        className="pointer-events-auto absolute touch-none"
+        className={`${visible ? "pointer-events-auto" : "pointer-events-none"} absolute touch-none`}
         style={{
           right: 0,
           bottom: 0,
@@ -614,11 +1485,20 @@ export function TouchControls({
           height: `calc(${DRIVE_PAD_H} + ${INSET_B})`,
         }}
       >
+        {/* THE MARK SITS ON THE PAD'S CENTRE LINE, AND THAT IS NOT DECORATION.
+            Since the axis went absolute, the centre of this box IS „middle is
+            stop" — so the knob's resting place has to be that same line or the
+            ink is lying about where neutral is. It used to be pinned 1.1 rem
+            above the bottom edge, which on the founder's phone is 14 px below
+            the true neutral: a thumb pressed exactly on the dot would have read
+            as a light brake. Centring it also gives the axis its full 66 px
+            each way inside the pad on every device in the ladder. */}
         <div
           className="absolute flex flex-col items-center justify-center"
           style={{
             right: `calc(1.25rem + ${INSET_R})`,
-            bottom: `calc(1.1rem + ${INSET_B})`,
+            top: "50%",
+            transform: "translateY(-50%)",
             width: "1.5rem",
             height: "4.25rem",
           }}
@@ -636,13 +1516,16 @@ export function TouchControls({
         {/* The selector letter, 11 px, directly ABOVE the axis mark — not in
             the corner beside it, which is precisely where the thumb sits. Shown
             only when it is NOT the everyday D: „am I in reverse?" is a real
-            question, „am I in drive?" is not. */}
+            question, „am I in drive?" is not.
+            Measured from the same 50 % centre line the mark now uses (half the
+            mark's 4.25 rem, plus a 0.25 rem gap), so the letter follows the ink
+            instead of holding a copy of where the ink used to be. */}
         {gearLabel !== "D" ? (
           <span
             className="absolute text-[11px] font-black leading-none"
             style={{
               right: `calc(1.6rem + ${INSET_R})`,
-              bottom: `calc(5.6rem + ${INSET_B})`,
+              bottom: "calc(50% + 2.375rem)",
               color: inReverse ? "var(--warning)" : "var(--muted)",
               textShadow: "0 1px 3px rgba(0,0,0,0.9)",
             }}
@@ -653,13 +1536,89 @@ export function TouchControls({
         ) : null}
       </div>
 
-      {/* ══ LEFT ARC ═ the signal, the two graded glances on that side, pause ═
-          His curve: station 0 sits on the steering pad's top edge and five rem
-          inboard, and each one above it climbs and drifts out to the edge. Left
-          thumb, left mirrors, left indicator — nothing crosses the picture. */}
+      {/* ══ EVERY BUTTON, AND ONLY WHILE THE SIM IS LIVE ═════════════════════
+          The pads above stay mounted through a card so the thumb keeps its
+          node; these do not, and the distinction is the accessibility half of
+          §I3. A button that is invisible to a sighted student but still in the
+          tab order and still announced is not "hidden", it is a different
+          defect — and `aria-hidden` alone would create exactly that, because it
+          hides an element from assistive tech WITHOUT taking it out of the tab
+          order. Not rendering them is the only version of inert that is true
+          for every input device at once. */}
+      {visible ? (
+        <>
+      {/* ══ TOP RAIL ═ camera, pause, horn, the sheet, and the belt ══════════
+          The corner where no thumb rests. Words, not glyphs, and every one of
+          them is a control a learner has to be able to FIND — see the rail's
+          own block above TOP_RAIL_LEFT_CSS. */}
+      <div
+        data-hud="top-rail"
+        role="toolbar"
+        aria-label="Бутони на екрана"
+        className="pointer-events-none absolute z-10 flex flex-wrap items-start gap-1"
+        style={{
+          top: TOP_RAIL_TOP_CSS,
+          left: TOP_RAIL_LEFT_CSS,
+          right: TOP_RAIL_RIGHT_CSS,
+        }}
+      >
+        {/* THE CAMERA IS A FIRST-CLASS CONTROL NOW — doc 91 §M1/§I23.
+            It was «ИЗГЛ», two taps deep inside the ⚙ sheet, on a product whose
+            own codebase says reverse parking is unreadable without the top-down
+            view. The reference frame gives the camera a labelled button in this
+            exact corner and it is the one principle of its five we had not
+            taken at all.
+            The WORD does not change with the mode on purpose: a button whose
+            width breathes is a button that moves under the finger reaching for
+            it, which is the founder's own „elements moving". The mode is in the
+            accessible name, where it costs no pixels. */}
+        <ViewRailControl
+          mode={cameraMode ?? cameraModeLive ?? null}
+          topdownAllowed={topdownAllowed}
+          onSelectMode={onSelectCameraMode}
+          onToggleCamera={onToggleCamera}
+          topdownAidRef={topdownAidRef}
+        />
+        <RailButton wordBg="Пауза" labelBg="Пауза" onClick={onPause} />
+        {/* Momentary, and it keeps the horn's own multi-touch-safe idiom. */}
+        <RailHoldButton
+          wordBg="Клаксон"
+          labelBg="Клаксон — задръж"
+          onHold={(on) => cabin()?.driveline.setHorn(on)}
+        />
+        <RailButton
+          wordBg="Кола"
+          labelBg="Контроли на автомобила"
+          active={sheetOpen}
+          onClick={() => setSheetOpen((o) => !o)}
+        />
+        {/* ══ «КОЛАН» ═ THE CELL THAT EXISTS ONLY WHILE IT IS NEEDED ═════════
+            A control required before every drive and never after it should be
+            on screen exactly then, and in the colour of the fault it prevents.
+            The product raises a seatbelt fault within ten seconds of every
+            drive and the only way to fasten it was inside the ⚙ sheet, under a
+            five-letter abbreviation, on a screen the student has never seen.
+            LAST in the rail so that fastening it moves nothing else. */}
+        {snap !== null && !snap.seatbeltOn ? (
+          <RailButton
+            wordBg="Колан"
+            tone="danger"
+            labelBg="Закопчай предпазния колан"
+            onClick={() => cabin()?.toggleSeatbelt()}
+          />
+        ) : null}
+      </div>
+
+      {/* ══ LEFT FLANK ═ BOTH INDICATORS, on the steering thumb ══════════════
+          Founder ruling: signalling must never cost the accelerator. Lower
+          station = left, upper = right, which is the way a real LHD stalk
+          moves. Each carries its own word, because «Мигач наляво» is the thing
+          being TAUGHT — a 20 %-opacity mystery glyph is fine for a throttle the
+          player already knows and fatal for a graded procedure step. */}
       <ArcStation index={0} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач наляво"
+          captionBg="Ляв"
           active={snap?.indicator === "left"}
           onClick={() => cabin()?.indicateLeft()}
         >
@@ -667,55 +1626,47 @@ export function TouchControls({
         </GlyphButton>
       </ArcStation>
       <ArcStation index={1} padH={STEER_PAD_H} side="left">
-        <GlyphButton labelBg="Поглед в лявото огледало" onClick={() => cabin()?.glance("left")}>
-          Л
-        </GlyphButton>
-      </ArcStation>
-      <ArcStation index={2} padH={STEER_PAD_H} side="left">
-        <GlyphButton
-          labelBg="Поглед в огледалото за задно виждане"
-          onClick={() => cabin()?.glance("rear")}
-        >
-          З
-        </GlyphButton>
-      </ArcStation>
-      <ArcStation index={3} padH={STEER_PAD_H} side="left">
-        <GlyphButton labelBg="Пауза" onClick={onPause}>
-          ‖
-        </GlyphButton>
-      </ArcStation>
-
-      {/* ══ RIGHT ARC ═ horn, right mirror, right signal, and the sheet ══════
-          🎥 and ⛶ are NOT here and that is deliberate: eight stations is what
-          fits on the smallest phone in the ladder, so the two settings-shaped
-          buttons moved into the ⚙ sheet with the rest of the settings. Their
-          keys (C, X) are unchanged. */}
-      <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
-        <HoldGlyphButton labelBg="Клаксон — задръж" onHold={(on) => cabin()?.driveline.setHorn(on)}>
-          📢
-        </HoldGlyphButton>
-      </ArcStation>
-      <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
-        <GlyphButton labelBg="Поглед в дясното огледало" onClick={() => cabin()?.glance("right")}>
-          Д
-        </GlyphButton>
-      </ArcStation>
-      <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Мигач надясно"
+          captionBg="Дясн"
           active={snap?.indicator === "right"}
           onClick={() => cabin()?.indicateRight()}
         >
           ⇨
         </GlyphButton>
       </ArcStation>
-      <ArcStation index={3} padH={DRIVE_PAD_H} side="right">
+
+      {/* ══ RIGHT FLANK ═ THE THREE GRADED MIRROR GLANCES ═══════════════════
+          Lifting off the throttle to check a mirror is what a driver does, so
+          the interaction cost teaches the right habit instead of fighting it.
+          Lowest = the right mirror (nearest that thumb), then the rear, then
+          the left. Words again: «Л З Д» is three letters a 17-year-old has no
+          way to decode, and these are scored A2 steps. */}
+      <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
-          labelBg="Контроли на автомобила"
-          active={sheetOpen}
-          onClick={() => setSheetOpen((o) => !o)}
+          labelBg="Поглед в дясното огледало"
+          captionBg="Дясн"
+          onClick={() => cabin()?.glance("right")}
         >
-          ⚙
+          Д
+        </GlyphButton>
+      </ArcStation>
+      <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
+        <GlyphButton
+          labelBg="Поглед в огледалото за задно виждане"
+          captionBg="Задн"
+          onClick={() => cabin()?.glance("rear")}
+        >
+          З
+        </GlyphButton>
+      </ArcStation>
+      <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
+        <GlyphButton
+          labelBg="Поглед в лявото огледало"
+          captionBg="Ляво"
+          onClick={() => cabin()?.glance("left")}
+        >
+          Л
         </GlyphButton>
       </ArcStation>
 
@@ -726,11 +1677,36 @@ export function TouchControls({
           the road, on a screen the founder is measuring in percentages.
 
           This is a wrapping strip of 44 px transparent cells that starts at the
-          left edge, stops 176 px short of the right one (so it can never share
-          a pixel with the right-hand rails) and floats above the drivetrain pad
-          and both of its rows. One row on a landscape phone, three on a
-          portrait one, and its whole ink is twelve short words — about 2 % of
-          the screen while it is open, against 23 %.
+          left edge and floats above the drivetrain pad and both of its rows.
+          One row on a landscape phone, two on a portrait one, and its whole ink
+          is a dozen short words — about 2 % of the screen while it is open,
+          against 23 %.
+
+          ⚠ THE SENTENCE THAT USED TO BE HERE — „stops 176 px short of the right
+          one (so it can never share a pixel with the right-hand rails)" — WAS
+          NOT TRUE OF THIS CODE, and it is corrected rather than deleted because
+          somebody will otherwise read the old claim and stop looking. The style
+          below is `right: 0.125rem + inset`: the strip spans the WHOLE stage,
+          and on a short landscape phone the notification column stands on its
+          right end. Measured 2026-08-12, J-WAVE-3, WebKit, real insets, the
+          Samsung gesture-bar 780 × 360 (34.6 % of the Bulgarian market),
+          `/dev/drive-rig` l0-free-drive with the sheet open and ONE card in the
+          column:
+
+            sheet  [2, 56, 776 × 44]      column card [528, 42, 240 × 44]
+            → `elementFromPoint` at their own centres answered the column for
+              «Рестарт на колата» and «ЗАТВОРИ КОНТРОЛИТЕ» — the ✕ that closes
+              this panel — and, on the manual tier, «M►» as well.
+
+          THE OBVIOUS FIX DOES NOT WORK and the arithmetic is written down so it
+          is not re-tried blind: giving this strip the rail's own right bound
+          leaves 518 px, i.e. 11 cells a row, i.e. TWO rows of 90 px hanging
+          from a floor at 260 — which puts the first row at y 10–54, straight
+          through «Меню на урока» at [8, 8, 48 × 44]. Capping the COLUMN instead
+          leaves it 48 px against a 78 px card, which is the starved column that
+          printed «ЗАЩО» and no sentence on 2026-08-09. The corridor on that one
+          profile cannot hold both, so it needs the arbitration the demo deck
+          got (change corridor), not a patch — handed over, not smuggled in.
 
           Same controls, same CabinControls / DrivelineState calls, same single
           code path as the keys and the cockpit hotspots. */}
@@ -807,55 +1783,96 @@ export function TouchControls({
             active={snap?.fogLightsOn ?? false}
             onClick={() => cabin()?.driveline.toggleFogLights()}
           />
-          {/* Selector stepper. The drivetrain axis handles D↔R on its own (the
-              standstill hold), so this is the explicit lever for P and N and
-              for the manual box — kept because a student must always be able
-              to reach the real control, not only the assist. */}
+          {/* Selector stepper — the explicit lever, kept because a student
+              must always be able to reach the real control and not only the
+              assist. On an exam rung and on „Напреднал" it is the ONLY way to
+              reverse (the pad's gesture does not exist there — see
+              driveAxisLabelBg), which is what the pad's own label now points
+              at instead of promising the gesture.
+
+              THE UP CELL IS NOT ALWAYS „towards D" (2026-08-11). The gate is
+              P—R—N—D on an automatic and P—R—N—M1…M5 on „Напреднал"
+              (vehicle/driveline.ts), so on the manual tier there is no D to
+              step towards and `gearUp()` picks the next GEAR — and needs the
+              clutch to do it. The old label said „стъпка към D" in both, which
+              is the same class of defect as the pad's reverse promise: a
+              sentence that was true when it was written and false in a mode
+              added later. */}
+          {/* ══ «СЪЕД» ═ THE CLUTCH, AND IT IS WHY „НАПРЕДНАЛ" WAS UNPLAYABLE ══
+              Doc 91 §M2/§I24. The clutch had NO touch control anywhere: the
+              manual gate is P—R—N—M1…M5 and vehicle/driveline.ts requires the
+              clutch to go INTO a gear, so on a phone every gear change and
+              every N→R on that tier silently refused. The register's answer to
+              a missing capability was „gate the tier off on touch", and
+              removing a tier removes functionality — so it gets the control
+              instead, next to the lever it is used with.
+              The horn's exact hold idiom (`RailHoldButton`'s sibling below),
+              which is multi-touch-safe by construction: it is a pointer HOLD,
+              so it works with a second thumb planted on a pad, and every
+              release path — up, cancel, lost capture, unmount — lifts it. A
+              clutch latched down by a lost event would freewheel the car. */}
+          {/* ══ «НОРМ» ═ THE TIER, AND IT STANDS IMMEDIATELY BEFORE THE LEVER ══
+              Doc 91 §I, J-WAVE-3. It is here and not in the sky because the
+              three-word pill does not fit the phone's top strip — the
+              arithmetic is on `difficulty` in TouchControlsProps — and it is
+              here rather than at the end of the strip because it is what
+              DECIDES the three cells after it: on „Напреднал" the box is
+              manual, «СЪЕД» appears, and «M►» starts asking for it. Placed
+              BEFORE the conditional clutch cell so the tier's own cell is the
+              one thing in this group that never moves when the tier changes. */}
+          {difficulty !== undefined && onSelectDifficulty ? (
+            <SheetCell
+              textBg={tierCellTextBg(difficulty)}
+              labelBg={tierCellLabelBg(difficulty)}
+              onClick={() => onSelectDifficulty(nextTier(difficulty))}
+            />
+          ) : null}
+          {transmission === "manual" ? (
+            <SheetHoldCell
+              textBg="СЪЕД"
+              labelBg="Съединител — задръж, докато сменяш предавка"
+              onHold={(on) => cabin()?.driveline.setClutch(on)}
+            />
+          ) : null}
           <SheetCell
             textBg="◄P"
             labelBg="Скоростен лост — стъпка към P"
-            active={false}
             onClick={() => cabin()?.driveline.gearDown()}
           />
           <SheetCell textBg={gearLabel} labelBg={`Скоростен лост: ${gearLabel}`} readOnly />
           <SheetCell
-            textBg="D►"
-            labelBg="Скоростен лост — стъпка към D"
-            active={false}
+            textBg={transmission === "manual" ? "M►" : "D►"}
+            labelBg={
+              transmission === "manual"
+                ? "Скоростен лост — към по-висока предавка (иска съединител)"
+                : "Скоростен лост — стъпка към D"
+            }
             onClick={() => cabin()?.driveline.gearUp()}
           />
-          {/* The two that came off the right arc when it went to four stations
-              (see the ARC block at the top of this file). Both are settings,
-              both are already keyed (C / X), and this sheet is where the
-              settings live — so they are one tap further away and no longer
-              standing on the road for the whole drive. */}
-          <SheetCell
-            textBg="ИЗГЛ"
-            labelBg="Смяна на изглед (камера)"
-            active={false}
-            onClick={onToggleCamera}
-          />
+          {/* «ИЗГЛ» IS NO LONGER HERE — it is the rail's «Изглед» button now
+              (doc 91 §I23). Fullscreen stays: it is a setting, it is keyed (X),
+              and unlike the camera it is not something a lesson ever asks a
+              student to do. */}
           {onToggleFullscreen ? (
             <SheetCell
               textBg="ЦЯЛ"
               labelBg="Цял екран"
-              active={false}
               onClick={onToggleFullscreen}
             />
           ) : null}
           <SheetCell
             textBg="РЕСТ"
             labelBg="Рестарт на колата"
-            active={false}
             onClick={onReset}
           />
           <SheetCell
             textBg="✕"
             labelBg="Затвори контролите"
-            active={false}
             onClick={() => setSheetOpen(false)}
           />
         </div>
+      ) : null}
+        </>
       ) : null}
     </div>
   );
@@ -892,7 +1909,7 @@ function ArcStation({
   side: "left" | "right";
   children: ReactNode;
 }) {
-  const { bottom, inset } = arcStation(index, padH);
+  const { bottom, inset } = arcStation(index, padH, side);
   // Spread rather than a computed key: `{ [side]: … }` widens the object to a
   // string index signature, which CSSProperties does not accept.
   const from =
@@ -922,73 +1939,393 @@ function glyphStyle(active: boolean, tone?: "danger" | "warning"): CSSProperties
   };
 }
 
+/**
+ * `active` IS OPTIONAL, AND THE OMISSION IS THE POINT (2026-08-11).
+ *
+ * It used to default to `false` and be spelled straight into `aria-pressed`,
+ * so every button on both arcs announced itself as a TOGGLE THAT IS CURRENTLY
+ * OFF. Four of the eight are not toggles at all — «Пауза» and the three
+ * mirror glances are one-shot actions — and a glance button in particular said
+ * „not pressed" for the whole second the glance was being HELD and graded. It
+ * is the same defect as the drivetrain pad's label, one attribute over: a
+ * state claim that was never true and that a screen-reader user has no way to
+ * check.
+ *
+ * So a caller that has no pressed-state passes none, React omits the attribute
+ * and the button is announced as the plain button it is. Nothing moves and
+ * nothing changes colour: the tint still reads `active ?? false`, and the
+ * ghost sweep that keys on `[aria-pressed="true"]` (PlayAreaStyles) does not
+ * reach inside `[data-hud="touch-controls"]` — these controls paint nothing to
+ * strip.
+ */
 function GlyphButton({
   labelBg,
-  active = false,
+  captionBg,
+  active,
   onClick,
   children,
 }: {
   labelBg: string;
+  /**
+   * A WORD UNDER THE GLYPH, AND IT IS THE PEDAGOGY LINE — doc 91 §F, §I13.
+   *
+   * The reference hides its controls behind 20 %-opacity labels because a
+   * racing player only needs throttle and steering and already knows which is
+   * which. WE GRADE PROCEDURE. Measured on the founder's phone, every graded
+   * control on this screen was an invisible box with a 15 px glyph in it —
+   * about 2.5 mm of ink inside a 7.3 mm target — and a 17-year-old has no way
+   * to know that «З» is the rear-view mirror or that «⇦» is the left indicator.
+   * A student who cannot find the indicator does not signal, the rule engine
+   * marks them down for it, and the product has broken its own north star with
+   * its own UI.
+   *
+   * The word costs about 90 px² of ink and buys the control a name. It is
+   * INSIDE the button, so it is the control's own label and not a line of type
+   * lying across somebody else's target — which is the distinction the sweep
+   * measures and the one the founder photographed.
+   */
+  captionBg?: string;
+  /** Omit on one-shot actions; pass a boolean only on real toggles. */
   active?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
+  // Doc 91 · C2. `onClick` alone is dead while a thumb is on a pad — a touch
+  // `click` is a compatibility mouse event and only the PRIMARY touch point
+  // gets one. `useTapActivation` adds the pointer path the horn beside it has
+  // always had, and keeps `onClick` for mouse, keyboard and screen readers.
+  const tap = useTapActivation(onClick);
   return (
     <button
       type="button"
       aria-label={labelBg}
       title={labelBg}
       aria-pressed={active}
-      onClick={onClick}
-      className="pointer-events-auto flex h-11 w-11 touch-manipulation select-none items-center justify-center text-[15px] font-black leading-none"
-      style={glyphStyle(active)}
+      {...tap}
+      // `touch-none`, not `touch-manipulation`, and it is the horn's class
+      // verbatim. A pointer sequence the browser decides was a scroll ends in
+      // `pointercancel` and fires nothing — and doc 91 · L11 found this
+      // document IS taller than the screen, so a press with any drift on it
+      // was a candidate for exactly that. Nothing here can be panned or
+      // pinched: it is a 44 px transparent target in a corner of a road.
+      className="pointer-events-auto flex h-11 w-11 touch-none select-none flex-col items-center justify-center gap-px text-[15px] font-black leading-none"
+      style={glyphStyle(active ?? false)}
     >
-      {children}
+      <span aria-hidden>{children}</span>
+      {captionBg ? (
+        <span
+          aria-hidden
+          className="text-[8px] font-bold uppercase leading-none tracking-tight"
+        >
+          {captionBg}
+        </span>
+      ) : null}
     </button>
   );
 }
 
-/** Momentary control (horn): down = on, any release path = off. */
-function HoldGlyphButton({
-  labelBg,
-  onHold,
-  children,
-}: {
-  labelBg: string;
-  onHold: (on: boolean) => void;
-  children: ReactNode;
-}) {
-  const downRef = useRef(false);
-  const [held, setHeld] = useState(false);
-  const start = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    capturePointer(e.currentTarget, e.pointerId);
-    downRef.current = true;
-    setHeld(true);
-    onHold(true);
+/**
+ * THE HOLD IDIOM, ONCE — the horn's, which has always been the multi-touch-safe
+ * one in this file (`onPointerDown`/`Up`/`Cancel`/`LostPointerCapture`, never
+ * `onClick`), now shared by the rail's horn and the sheet's clutch.
+ *
+ * Every release path is wired, including unmount: a quiz pause mid-honk must
+ * not latch the horn, and a clutch left down would leave the car freewheeling
+ * (`hasDriveTraction` — vehicle/driveline.ts).
+ */
+function useHoldButton(onHold: (on: boolean) => void): {
+  held: boolean;
+  handlers: {
+    onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => void;
+    onPointerUp: () => void;
+    onPointerCancel: () => void;
+    onLostPointerCapture: () => void;
+    onContextMenu: (e: { preventDefault: () => void }) => void;
   };
-  const end = () => {
+} {
+  const downRef = useRef(false);
+  const holdRef = useRef(onHold);
+  holdRef.current = onHold;
+  const [held, setHeld] = useState(false);
+  const end = useCallback(() => {
     if (!downRef.current) return;
     downRef.current = false;
     setHeld(false);
-    onHold(false);
+    holdRef.current(false);
+  }, []);
+  useEffect(() => end, [end]);
+  return {
+    held,
+    handlers: {
+      onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => {
+        capturePointer(e.currentTarget, e.pointerId);
+        downRef.current = true;
+        setHeld(true);
+        holdRef.current(true);
+      },
+      onPointerUp: end,
+      onPointerCancel: end,
+      onLostPointerCapture: end,
+      onContextMenu: (e: { preventDefault: () => void }) => e.preventDefault(),
+    },
   };
-  // Release on unmount too — a quiz pause mid-honk must not latch the horn.
-  useEffect(() => end, []); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/* ── THE TOP RAIL'S OWN BUTTONS ──────────────────────────────────────────────
+   The ONE register on this screen that is allowed to be opaque, and the only
+   one: his reference frame has exactly two solid word-buttons, in exactly this
+   corner, and everything else on the glass is ghosted. They are the shell's
+   «Меню» classes verbatim rather than a second look — one top-left corner, one
+   grammar, and if the ghost sweep in PlayAreaStyles ever changes, all of them
+   change together.
+   44 px in both axes, `min-w-11` and never a fixed width, so a Cyrillic word
+   sets its own box and nothing is clipped. */
+const RAIL_CLASS =
+  "hud-ghost pointer-events-auto flex h-11 min-w-11 shrink-0 touch-none select-none items-center justify-center rounded-full border px-2 text-[10px] font-black uppercase tracking-[0.1em]";
+
+function railTone(active: boolean, tone?: "danger"): string {
+  if (tone === "danger") return "border-danger text-danger";
+  return active ? "border-accent text-foreground" : "border-border text-foreground";
+}
+
+function RailButton({
+  wordBg,
+  labelBg,
+  active,
+  tone,
+  onClick,
+}: {
+  wordBg: string;
+  labelBg: string;
+  active?: boolean;
+  tone?: "danger";
+  onClick: () => void;
+}) {
+  // Doc 91 · C2, same as every other button in this file: `onClick` alone is
+  // dead while a thumb is on a pad.
+  const tap = useTapActivation(onClick);
   return (
     <button
       type="button"
       aria-label={labelBg}
       title={labelBg}
-      onPointerDown={start}
-      onPointerUp={end}
-      onPointerCancel={end}
-      onLostPointerCapture={end}
-      onContextMenu={(e) => e.preventDefault()}
-      className="pointer-events-auto flex h-11 w-11 touch-none select-none items-center justify-center text-[17px] font-black leading-none"
-      style={glyphStyle(held)}
+      aria-pressed={active}
+      {...tap}
+      className={`${RAIL_CLASS} ${railTone(active ?? false, tone)}`}
     >
-      {children}
+      <span aria-hidden>{wordBg}</span>
     </button>
+  );
+}
+
+function RailHoldButton({
+  wordBg,
+  labelBg,
+  onHold,
+}: {
+  wordBg: string;
+  labelBg: string;
+  onHold: (on: boolean) => void;
+}) {
+  const { held, handlers } = useHoldButton(onHold);
+  return (
+    <button
+      type="button"
+      aria-label={labelBg}
+      title={labelBg}
+      {...handlers}
+      className={`${RAIL_CLASS} ${railTone(held)}`}
+    >
+      <span aria-hidden>{wordBg}</span>
+    </button>
+  );
+}
+
+/** What each published camera mode is called, for the rail button's name. */
+const CAMERA_NAME_BG: Record<string, string> = {
+  cockpit: "кабина",
+  chase: "отвън",
+  topdown: "отгоре",
+};
+
+/**
+ * …AND THE SAME LIST AS DATA, so the ladder can be swept without a browser.
+ *
+ * Same device as `arcStationRectPx` and `driveAxisLabelBg` two hundred lines
+ * up, for the same reason: the rule that decides what a student can reach is
+ * worth more as a value a test can read than as a condition buried in JSX.
+ *
+ * @param topdownAllowed false on exam rungs — where the C cycle skips top-down
+ *        and the keyboard legend does not advertise G or N either.
+ */
+export function viewMenuViewsBg(
+  topdownAllowed: boolean,
+): Array<{ id: CameraMode; wordBg: string }> {
+  const views: Array<{ id: CameraMode; wordBg: string }> = [
+    { id: "cockpit", wordBg: "Кабина" },
+    { id: "chase", wordBg: "Отвън" },
+  ];
+  if (topdownAllowed) views.push({ id: "topdown", wordBg: "Отгоре" });
+  return views;
+}
+
+/**
+ * Do the two top-down aids (G's zoom, N's orientation) belong on screen?
+ *
+ * ONLY while the top-down view is actually live. They are inert in the other
+ * two — the keys are inert there too — so showing them would be the third of
+ * the founder's complaints in one control: a button that does nothing and
+ * says nothing about why. `topdownAllowed` is checked as well, so an exam rung
+ * that can never enter top-down cannot be shown its controls by a stale mode
+ * string either.
+ */
+export function viewMenuShowsTopdownAids(
+  mode: string | null,
+  topdownAllowed: boolean,
+): boolean {
+  return topdownAllowed && mode === "topdown";
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «ИЗГЛЕД» — THE CAMERA, AND THE ONLY DOOR G AND N HAVE EVER HAD ON A PHONE.
+ * Doc 91 §E rows 21–23, §H, §I23. J-WAVE-2.
+ *
+ * THE DESKTOP INVENTORY THIS HAS TO ANSWER, read off `ControlsHelp` (which IS
+ * the desktop contract) and `CameraRig`:
+ *
+ *   C  cycle кабина → отвън → отгоре        ⚙ sheet «ИЗГЛ», two taps  → HERE
+ *   G  top-down zoom 20 / 40 / 80 m         NOTHING, ever              → HERE
+ *   N  top-down north-up / heading-up       NOTHING, ever              → HERE
+ *   K  automatic look-back while reversing  NOTHING, ever              → not here, see below
+ *   Q E F  the three GRADED mirror glances  the flank rails            → STAY THERE
+ *   P  minimap                              the lesson menu            → stays there
+ *
+ * WHAT IS A BUTTON AND WHAT IS NOT, DECIDED BY HOW OFTEN A LEARNER NEEDS IT
+ * WHILE THE CAR IS MOVING — which is the only question that matters here:
+ *
+ *   · THE THREE MIRROR GLANCES ARE NOT IN THIS POPOVER, and that is the most
+ *     important line in this block. They are 10–30 presses a lesson, they are
+ *     SCORED A2 procedure steps, and a scored action two taps behind a menu is
+ *     an action the product is refusing while pretending to offer it. They
+ *     stay where a thumb already rests, in the open, with a word on them.
+ *   · THE VIEW ITSELF is 0–3 presses a lesson and never urgent, so it is one
+ *     tap to a list rather than a blind cycle: cycling costs up to two camera
+ *     transitions to reach the view you wanted, mid-drive, and a student who
+ *     wants the cockpit back has to guess how many taps that is.
+ *   · ЗУМ AND СЕВЕР/ПОСОКА appear ONLY while «отгоре» is live. They are
+ *     meaningless in the other two views — the keys are inert there too — so
+ *     progressive disclosure costs nothing the rest of the time and the
+ *     popover is three cells, not five, for the whole of a normal drive.
+ *   · K (automatic look-back on reverse) IS DELIBERATELY NOT HERE. It is a
+ *     persisted PREFERENCE changed about once ever, not a mid-drive control,
+ *     and putting a sticky setting in the same list as three momentary view
+ *     choices teaches that they are the same kind of thing. It belongs in the
+ *     lesson menu with the other settings — named here so the next reader
+ *     knows it was decided rather than forgotten.
+ *
+ * NO GESTURE. A swipe or a two-finger drag on the road would be a fourth
+ * meaning for a surface that already carries steering, throttle and the
+ * cockpit hotspots, it is undiscoverable (the founder's own „I do not know
+ * what is a button"), and it cannot be labelled — which is precisely the thing
+ * §F says the reference gets away with and we cannot.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+function ViewRailControl({
+  mode,
+  topdownAllowed,
+  onSelectMode,
+  onToggleCamera,
+  topdownAidRef,
+}: {
+  mode: string | null;
+  topdownAllowed: boolean;
+  /** Absent on a legacy mount — the button then falls back to the C cycle. */
+  onSelectMode?: (mode: CameraMode) => void;
+  onToggleCamera: () => void;
+  topdownAidRef?: RefObject<TopdownAidHandle | null>;
+}) {
+  const [open, setOpen] = useState(false);
+  // The two top-down aids' CURRENT values, kept as a display copy that is only
+  // ever written from the return of the tap that changed it (or seeded when the
+  // popover opens). CameraRig owns the real state — it is read once a frame and
+  // must not become React state — and this is how a label can be drawn from it
+  // without reading a mutable ref while rendering.
+  const [zoomM, setZoomM] = useState<number | null>(null);
+  const [headingUp, setHeadingUp] = useState(false);
+  const openPopover = () => {
+    const aid = topdownAidRef?.current;
+    setZoomM(aid ? aid.readZoomM() : null);
+    setHeadingUp(aid ? aid.readHeadingUp() : false);
+    setOpen((o) => !o);
+  };
+  const nameBg = CAMERA_NAME_BG[mode ?? ""] ?? null;
+  const canPick = typeof onSelectMode === "function";
+  const choose = (next: CameraMode) => {
+    onSelectMode?.(next);
+    setOpen(false);
+  };
+  const views = viewMenuViewsBg(topdownAllowed);
+  const showsAids = viewMenuShowsTopdownAids(mode, topdownAllowed);
+  return (
+    <div className="pointer-events-none relative flex shrink-0">
+      <RailButton
+        wordBg="Изглед"
+        labelBg={`Изглед (камера)${nameBg ? ` — сега: ${nameBg}` : ""}`}
+        active={open}
+        // Without a `onSelectMode` prop there is no list to show, so the button
+        // stays exactly what it was: the C cycle, one tap.
+        onClick={canPick ? openPopover : onToggleCamera}
+      />
+      {open && canPick ? (
+        <div
+          data-hud="view-menu"
+          role="menu"
+          aria-label="Изглед"
+          // Anchored to the BUTTON, not to the stage: the rail wraps to two and
+          // three rows on a portrait phone (see TOP_RAIL_LEFT_CSS), so a
+          // stage-anchored popover would drift away from the control that
+          // opened it. `top-full` also keeps it out of the notification column,
+          // which the rail itself may never reach.
+          className="pointer-events-auto absolute left-0 top-full z-20 mt-1 flex w-max max-w-[70vw] flex-wrap gap-1"
+        >
+          {views.map((v) => (
+            <RailButton
+              key={v.id}
+              wordBg={v.wordBg}
+              labelBg={`Изглед: ${v.wordBg.toLowerCase()}`}
+              active={mode === v.id}
+              onClick={() => choose(v.id)}
+            />
+          ))}
+          {/* THE TWO TOP-DOWN AIDS, only where they mean something. */}
+          {showsAids && topdownAidRef ? (
+            <>
+              <RailButton
+                wordBg={zoomM === null ? "Зум" : `${zoomM} м`}
+                labelBg={`Мащаб отгоре${zoomM === null ? "" : `: ${zoomM} метра`} — натисни за следващия`}
+                onClick={() => {
+                  const aid = topdownAidRef.current;
+                  if (aid) setZoomM(aid.cycleZoom());
+                }}
+              />
+              <RailButton
+                wordBg={headingUp ? "Посока" : "Север"}
+                labelBg={
+                  headingUp
+                    ? "Отгоре: посоката на колата е нагоре — натисни за север нагоре"
+                    : "Отгоре: север е нагоре — натисни за посоката на колата"
+                }
+                onClick={() => {
+                  const aid = topdownAidRef.current;
+                  if (aid) setHeadingUp(aid.toggleOrientation());
+                }}
+              />
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1006,18 +2343,23 @@ function HoldGlyphButton({
 function SheetCell({
   labelBg,
   textBg,
-  active = false,
+  active,
   tone,
   onClick,
   readOnly = false,
 }: {
   labelBg: string;
   textBg: string;
+  /** Same rule as GlyphButton: omit on the action cells (◄P, D►, ИЗГЛ, ЦЯЛ,
+   *  РЕСТ, ✕), which are not toggles and used to announce „pressed: false". */
   active?: boolean;
   tone?: "danger" | "warning";
   onClick?: () => void;
   readOnly?: boolean;
 }) {
+  // Same reason as GlyphButton, and it is why «Предпазен колан» could not be
+  // fastened on a phone: every cell of this sheet was `onClick`-only.
+  const tap = useTapActivation(onClick);
   if (readOnly) {
     return (
       <span
@@ -1036,9 +2378,36 @@ function SheetCell({
       aria-label={labelBg}
       title={labelBg}
       aria-pressed={active}
-      onClick={onClick}
-      className="pointer-events-auto flex h-11 w-11 touch-manipulation select-none items-center justify-center text-[10px] font-black uppercase leading-none tracking-tight"
-      style={glyphStyle(active, tone)}
+      {...tap}
+      // Same as GlyphButton. The sheet is a `flex-wrap` strip with no scroller
+      // in it, so there is no gesture here for `touch-none` to take away.
+      className="pointer-events-auto flex h-11 w-11 touch-none select-none items-center justify-center text-[10px] font-black uppercase leading-none tracking-tight"
+      style={glyphStyle(active ?? false, tone)}
+    >
+      {textBg}
+    </button>
+  );
+}
+
+/** A sheet cell that is HELD rather than tapped — today only the clutch. */
+function SheetHoldCell({
+  labelBg,
+  textBg,
+  onHold,
+}: {
+  labelBg: string;
+  textBg: string;
+  onHold: (on: boolean) => void;
+}) {
+  const { held, handlers } = useHoldButton(onHold);
+  return (
+    <button
+      type="button"
+      aria-label={labelBg}
+      title={labelBg}
+      {...handlers}
+      className="pointer-events-auto flex h-11 w-11 touch-none select-none items-center justify-center text-[10px] font-black uppercase leading-none tracking-tight"
+      style={glyphStyle(held, "warning")}
     >
       {textBg}
     </button>

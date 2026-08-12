@@ -57,7 +57,13 @@ import type { DashboardStatus, MinimapFrame } from "@/modules/sim/hud";
 import type { PreDriveStepId } from "@/modules/sim/procedures";
 import type { SimTick } from "@/modules/sim/rules";
 import type { LiveTraceRecorder } from "@/modules/sim/traces";
-import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
+import type { ReverseStuckDirection, StuckStartReason } from "@/modules/sim/engine";
+import type {
+  DrivelineRejection,
+  DrivelineSnapshot,
+  SelectorPosition,
+  TransmissionMode,
+} from "@/modules/sim/vehicle";
 import type { QualityPreset } from "./types";
 
 export interface SceneSlotProps {
@@ -91,6 +97,30 @@ export interface SceneSlotProps {
    *  snapshot — the shell explains WHY via a HUD hint and flashes the gear
    *  telltale (refusals must never be silent — founder bug 2026-07-10). */
   onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
+  /** The pedal-remap guard (engine/reverseAssist.ts LAW 2) has been refusing
+   *  a held pedal long enough to be confusion — the shell says WHY the car
+   *  will not move and how to free it. Same reason as the line above: a
+   *  silently refused input is a bare verdict, which THEO-4 forbids. */
+  onReversePedalStuck?: (direction: ReverseStuckDirection) => void;
+  /** Nothing GUARDED the pedal — the car itself cannot move (engine off,
+   *  selector P/N, parking brake on) and the throttle has been down at a
+   *  standstill long enough to be confusion (engine/stuckStart.ts). The QW10
+   *  hint says this already, but only in the pre-drive phase, which no
+   *  compiled scenario rung has. */
+  onStuckStart?: (reason: StuckStartReason) => void;
+  /** The TIER PILL moved the student's own gear lever. `switchTransmission`
+   *  (vehicle/driveline.ts) puts a standing car into N on the way into
+   *  „Напреднал" — first gear with the clutch up is a stall by definition —
+   *  and did it silently until 2026-08-11. Fired only when the lever really
+   *  moved, so a tier click that changes nothing stays quiet. */
+  onTransmissionChanged?: (
+    transmission: TransmissionMode,
+    movedSelectorTo: SelectorPosition,
+  ) => void;
+  /** The mouse pedals yielded to the keyboard and left the screen, on a
+   *  student who had been holding them (lesson-ui/MousePedals.tsx). Once per
+   *  session — the shell says it and how to bring them back. */
+  onMousePedalsYielded?: () => void;
   /** P1: shell-owned fullscreen toggle (QW1 — the shell root is the
    *  fullscreen element) so the scene's touch overlay can offer ⛶. */
   onToggleFullscreen?: () => void;

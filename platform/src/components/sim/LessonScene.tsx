@@ -32,10 +32,15 @@ import {
   isTouchOnlyDevice,
   ReverseAssist,
   ReversePedalMapper,
+  ReverseStuckWatch,
   shouldRemapReversePedals,
   SimInput,
+  StuckStartWatch,
   TouchInputSource,
   useReverseViewEnabled,
+  type ReverseShiftSource,
+  type ReverseStuckDirection,
+  type StuckStartReason,
 } from "@/modules/sim/engine";
 import {
   CROSSWIND_BRIDGE_N,
@@ -48,6 +53,9 @@ import {
   DIFFICULTY_ORDER,
   DIFFICULTY_PRESETS,
   DEFAULT_DIFFICULTY,
+  // The tier's speed ceiling, so the cluster can print it (2026-08-11: the
+  // governor has clamped the throttle in silence since the first tier shipped).
+  governorCapKmh,
   storeDifficulty,
   SNOW_GRIP_FACTOR,
   WET_GRIP_FACTOR,
@@ -55,6 +63,8 @@ import {
   type DrivelineEvent,
   type DrivelineRejection,
   type DrivelineSnapshot,
+  type SelectorPosition,
+  type TransmissionMode,
   type VehicleInput,
   type VehicleSim,
 } from "@/modules/sim/vehicle";
@@ -89,6 +99,7 @@ import {
   createDashboardStatus,
   RearProximityCue,
   TelltaleEdgePings,
+  useTapActivation,
   type DashboardStatus,
   type MinimapFrame,
 } from "@/modules/sim/hud";
@@ -106,6 +117,7 @@ import {
   RAIN_IBL_DIM,
   PerfProbe,
   GlContextGuard,
+  canvasMaxDpr,
 } from "@/modules/sim/environment";
 import {
   DistrictWorld,
@@ -137,7 +149,7 @@ import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
 import { AudioLessonPrompt } from "./AudioLessonPrompt";
-import { CameraRig, type CameraMode } from "./CameraRig";
+import { CameraRig, type CameraMode, type TopdownAidHandle } from "./CameraRig";
 import { VehicleRig, type CollisionWithWhat, type VehicleSpawn } from "./VehicleRig";
 import { NpcColliders } from "./NpcColliders";
 import { createVehicleSample } from "@/modules/sim/scene/vehicleSample";
@@ -272,13 +284,28 @@ class GatedSimInput extends SimInput {
    *  A2 observer, the scenario director and the recorder all see the
    *  FUNCTIONAL pedals. */
   reversePedalRemap = false;
+  /**
+   * WHICH ROUTE last CHANGED `reversePedalRemap` — written by the driveline
+   * subscription at the moment of the change, because that is the only moment
+   * at which it is known. `read()` runs several times per frame and in no fixed
+   * order relative to the assist's own gate step, so a flag the mapper had to
+   * consume "soon" would be a race; a value bound to the state change is not.
+   */
+  reversePedalRemapSource: ReverseShiftSource = "manual";
   /** LAW 2 (engine/reverseAssist.ts): the swap above is applied THROUGH this
-   *  mapper, never raw, so a pedal held across the flip keeps braking instead
-   *  of becoming the reverse accelerator. It is the input path — not the
-   *  assist's trigger — that guarantees a held brake can never mean throttle,
-   *  which is why the [ / ] keys, the touch gear sheet and the cockpit lever
-   *  are covered by it too. */
+   *  mapper, never raw, so a pedal held across a HAND-WORKED flip keeps braking
+   *  instead of becoming the reverse accelerator — the [ / ] keys, the touch
+   *  gear sheet and the cockpit lever. The assist's own armed press is exempt
+   *  (LAW 1 already proved it was never a brake); see the source above. */
   private readonly reverseMapper = new ReversePedalMapper();
+  /** LAW 2's own verdict on the last read: is a pedal being held THROUGH a
+   *  flip, i.e. contributing zero throttle and going on braking? The frame
+   *  loop feeds it to ReverseStuckWatch so a driver who is standing on a
+   *  disowned pedal is told why the car will not move (engine/reverseStuck.ts
+   *  — founder 2026-08-09 „did it break or ?"). */
+  get reversePedalDisowned(): boolean {
+    return this.reverseMapper.isDisowned;
+  }
   /** Raw (pre-gate) pedal values from the last read — the A2 procedure
    *  observer edge-detects these: a real brake press performs "press-brake",
    *  a throttle press on a ready driveline performs "move-off". */
@@ -288,7 +315,7 @@ class GatedSimInput extends SimInput {
 
   override read(): VehicleInput {
     const out = super.read();
-    this.reverseMapper.apply(out, this.reversePedalRemap);
+    this.reverseMapper.apply(out, this.reversePedalRemap, this.reversePedalRemapSource);
     this.rawThrottle = out.throttle;
     this.rawBrake = out.brake;
     if (this.driveLocked) {
@@ -414,6 +441,29 @@ export interface LessonSceneProps {
    *  fresh snapshot so the message can name the blocking state (founder bug
    *  2026-07-10: refusals must never be silent). */
   onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
+  /** LAW 2 refused the pedal for long enough to be confusion rather than an
+   *  ordinary shift (engine/reverseStuck.ts) — the shell explains WHY the car
+   *  will not move and how to free it. Same contract as the rejection hint
+   *  above: a refusal the student cannot see is a bare verdict (THEO-4). */
+  onReversePedalStuck?: (direction: ReverseStuckDirection) => void;
+  /** The throttle is down, the car is standing still, and the CAR is what is
+   *  refusing — engine off, selector P/N, parking brake on (engine/
+   *  stuckStart.ts). The QW10 „Колата още не е готова" hint says this already
+   *  but only in the pre-drive phase, which no scenario rung has. */
+  onStuckStart?: (reason: StuckStartReason) => void;
+  /** The tier pill moved the student's own gear lever (vehicle/driveline.ts
+   *  `switchTransmission` — a standing car goes D → N on the way into
+   *  „Напреднал", because first gear with the clutch up is a stall). Fired
+   *  ONLY when the lever actually moved; the shell says what the box did. */
+  onTransmissionChanged?: (
+    transmission: TransmissionMode,
+    movedSelectorTo: SelectorPosition,
+  ) => void;
+  /** The mouse pedals just yielded to the keyboard and took themselves off
+   *  screen, on a student who had been HOLDING them (lesson-ui/MousePedals.tsx
+   *  — measured 12.4 s hidden, unclickable, silent). Fires at most once per
+   *  session; the shell says it and how to get them back. */
+  onMousePedalsYielded?: () => void;
   /** A8 (additive): a staged encounter resolved — carries the measurement
    *  record (reaction time, stop gap, …). The graded consequences already
    *  arrived through onTick; the shell folds this via applyStagedOutcome. */
@@ -631,6 +681,10 @@ function ReadyScene({
   onTickCb,
   onDriveline,
   onDrivelineRejection,
+  onReversePedalStuck,
+  onStuckStart,
+  onTransmissionChanged,
+  onMousePedalsYielded,
   onStagedOutcome,
   onNearMiss,
   onToggleFullscreen,
@@ -724,6 +778,20 @@ function ReadyScene({
     setDifficultyState(mode);
     storeDifficulty(mode);
   }, []);
+  /**
+   * THE TIER'S SPEED CEILING, for the instrument readout to PRINT.
+   *
+   * The same three inputs `VehicleRig` hands `applyDifficulty` — tier, the
+   * map's speed domain (#37) and the speed the lesson itself requires (B7) —
+   * so the number on screen is the number the physics is enforcing and cannot
+   * drift from it. It changes only on a tier click, hence a memo and not a
+   * per-frame read; it rides the dashboard channel from here (see the write in
+   * RuntimeDriver's frame block).
+   */
+  const tierCapKmh = useMemo(
+    () => governorCapKmh(difficulty, built.lessonMaxLegalKmh, built.lessonRequiredKmh),
+    [difficulty, built.lessonMaxLegalKmh, built.lessonRequiredKmh],
+  );
 
   // P1 touch layer: capability decides the overlay mount (touch laptops
   // included — the overlay auto-hides while the keyboard is in use, so
@@ -750,6 +818,22 @@ function ReadyScene({
   const [reverseAssist] = useState(() => new ReverseAssist());
   const assistShiftingRef = useRef(false);
   const reverseAssistEnabled = lesson.examMode !== true;
+  // …and the watcher that gives LAW 2 a voice (engine/reverseStuck.ts).
+  // Deliberately NOT gated again on reverseAssistEnabled or on the box: it
+  // reads the MAPPER, and the mapper can only disown a channel it actually
+  // flipped (`input.reversePedalRemap` below already carries the exam gate,
+  // the automatic-only rule and the live selector). So this speaks wherever a
+  // pedal is actually refused — the [ / ] keys, the touch gear sheet, the
+  // cockpit lever — and stays silent everywhere else, which since 2026-08-11
+  // includes the ASSIST route: an armed press is no longer disowned, so there
+  // is nothing to explain and a card explaining a refusal that did not happen
+  // would be worse than silence.
+  const [reverseStuck] = useState(() => new ReverseStuckWatch());
+  // …and its neighbour for the OTHER silence: not a guard refusing the pedal,
+  // but the car itself — engine off / P / N / parking brake on, on a rung with
+  // no pre-drive phase and therefore no QW10 explanation (engine/stuckStart.ts
+  // carries the drive-rig measurement that found it).
+  const [stuckStart] = useState(() => new StuckStartWatch());
   const dismissTouchHint = useCallback(() => {
     setShowTouchHint(false);
     try {
@@ -770,15 +854,79 @@ function ReadyScene({
   // may still opt OUT explicitly (aids: { topdownAllowed: false }) — that rung
   // must really lose G.
   const topdownInCycle = !isScenarioLessonId(lesson.id) || aids?.topdownAllowed === true;
+  /**
+   * THE SAME VIEW, AS A VALUE THE HUD CAN READ — doc 91 §I23.
+   *
+   * `cameraModeRef` stays the per-frame source of truth (CameraRig reads it
+   * once a frame; a camera tick must never cost a render). This mirrors it for
+   * the ONE consumer that has to draw which view is live: the touch view rail,
+   * which is a three-cell popover and not a blind cycle button. It changes only
+   * on an explicit view change — the same edge that already calls `setCockpit`,
+   * so this adds no render that was not happening anyway.
+   */
+  const [cameraMode, setCameraModeState] = useState<CameraMode>("cockpit");
+  /** ONE writer for the view, so the ref, the cockpit flag and the HUD's copy
+   *  cannot drift. Every path below goes through it. */
+  const applyCameraMode = useCallback((next: CameraMode) => {
+    cameraModeRef.current = next;
+    setCockpit(next === "cockpit");
+    setCameraModeState(next);
+  }, []);
   const toggleCamera = useCallback(() => {
     const order: CameraMode[] = topdownInCycle
       ? ["cockpit", "chase", "topdown"]
       : ["cockpit", "chase"];
     const idx = order.indexOf(cameraModeRef.current);
     const next = order[(idx + 1) % order.length]; // idx −1 (stale topdown) → cockpit
-    cameraModeRef.current = next;
-    setCockpit(next === "cockpit");
-  }, [topdownInCycle]);
+    applyCameraMode(next);
+  }, [topdownInCycle, applyCameraMode]);
+  /** Pick a view outright (the touch rail's three cells). Top-down is refused
+   *  where the lesson refuses it, exactly as the C cycle already skips it. */
+  const selectCameraMode = useCallback(
+    (mode: CameraMode) => {
+      if (mode === "topdown" && !topdownInCycle) return;
+      applyCameraMode(mode);
+    },
+    [topdownInCycle, applyCameraMode],
+  );
+  /** CameraRig fills this on mount — the touch rail's door to G and N. */
+  const topdownAidRef = useRef<TopdownAidHandle | null>(null);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * THE DECK IS HIDDEN WHILE THE ⚙ SHEET IS UP — SO IT MUST ALSO STOP.
+   * Doc 91 §D4/§I11 — J-WAVE-2. THIS IS THE HALF CSS CANNOT DO.
+   *
+   * The arbitration itself is written twice already and neither copy is here:
+   * `TouchControls` publishes `html[data-sim-car-sheet]` and `PlayAreaStyles`
+   * turns the deck off against it, because the two surfaces are bottom-anchored
+   * to the SAME `TOUCH_CONTROLS_FLOOR` and measured 5 590–20 064 px² of surface
+   * on top of each other with 7–9 dead controls. Those files carry the numbers.
+   *
+   * WHAT THEY CANNOT CARRY IS THE PLAYHEAD. `display: none` stops a panel being
+   * seen; it does not stop a demonstration RUNNING. The deck auto-plays
+   * (`playing: true` is TraceTimeline's seed), so a student who opened the car
+   * controls mid-demonstration came back to a replay that had gone on without
+   * them — which is exactly the cost this wave was told to answer: "someone
+   * mid-demonstration needs to get back to where they were."
+   *
+   * So the scene, which owns the clock, pauses it for as long as the deck is
+   * off screen and puts it back exactly as it was found. Nothing else about the
+   * deck is touched — its `open` state is its own, the playhead is a ref — so
+   * the way back is the same frame, the same caption and the same position, and
+   * the way back is the same ⚙ that sent it away, which stays on screen and
+   * stays lit the whole time.
+   *
+   * WHAT THE STUDENT STILL LOSES, STATED PLAINLY: while the sheet is open the
+   * demonstration's caption is not readable, and a demonstration cannot be
+   * STARTED from that state — the toggle is off screen with the rest of the
+   * deck. Both are one tap from being back. Neither was true before in any
+   * useful sense: with both surfaces up, the deck's own «🎬 Демонстрация ▸»
+   * answered a sheet cell at its own centre, so the control that opens a
+   * demonstration was already dead — it just looked alive.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  const [touchSheetOpen, setTouchSheetOpen] = useState(false);
 
   // Enter top-down directly (used by the G/N top-down hotkeys so they work
   // from any view instead of silently no-op'ing outside top-down). Guarded by
@@ -786,9 +934,8 @@ function ReadyScene({
   // never enter it.
   const enterTopdown = useCallback(() => {
     if (cameraModeRef.current === "topdown") return;
-    cameraModeRef.current = "topdown";
-    setCockpit(false);
-  }, []);
+    applyCameraMode("topdown");
+  }, [applyCameraMode]);
 
   // D11: is the „виж мястото отгоре" cue allowed on this lesson at all? Pure
   // spec read (bay/turn maneuver + beginner rung + top-down reachable + not an
@@ -946,9 +1093,20 @@ function ReadyScene({
       if (event.kind === "selectorChanged" && !assistShiftingRef.current) {
         reverseAssist.noteManualShift();
       }
-      input.reversePedalRemap =
+      const remap =
         reverseAssistEnabled &&
         shouldRemapReversePedals(cabin.driveline.selector, cabin.driveline.transmission);
+      // LAW 2's scope (engine/reverseAssist.ts, 2026-08-11). The mapper disowns
+      // the channel that INHERITS the throttle role at a flip, because on a
+      // hand-worked selector the foot on it was braking. The assist's own step
+      // is the one flip where that is known to be false — LAW 1 will not arm a
+      // press unless the car was already stopped with the pedal lifted — and
+      // disowning it is what made the founder press ↓ twice to reverse once.
+      // Recorded HERE, on the transition, because `read()` cannot ask later.
+      if (remap !== input.reversePedalRemap) {
+        input.reversePedalRemapSource = assistShiftingRef.current ? "assist" : "manual";
+      }
+      input.reversePedalRemap = remap;
     });
     const unlock = () => audio.unlock();
     window.addEventListener("pointerdown", unlock);
@@ -1022,7 +1180,27 @@ function ReadyScene({
         // logs a deprecation warning on every shadow render (hundreds/session).
         // Explicit type: identical output, silent console.
         shadows="percentage"
-        dpr={[1, QUALITY_PRESETS[level].maxDpr]}
+        // THE ONE THING THE PAUSE NEVER STOPPED — measured, doc 91 §I19.
+        //
+        // `physicsPaused` already stops the world for every card the product
+        // puts on screen (teach moment, micro-quiz, consequence, the lesson
+        // menu, the debrief). The Canvas carried no `frameloop`, which means
+        // R3F's default "always": a scene the student cannot interact with kept
+        // being redrawn at the panel's full rate underneath the card he was
+        // reading. Measured on the production build, `l0-free-drive`,
+        // iPhone-16-landscape viewport at tier low: 233.8 draws/frame while
+        // driving and 233.7 draws/frame with the lesson menu open and the world
+        // paused — 13,805 draw calls a second for a picture that cannot change.
+        // On a phone that is the cheapest saving in the whole audit, and it is
+        // paid at exactly the moment a student is stationary and reading.
+        //
+        // "demand" does NOT mean frozen: R3F re-renders on every commit of this
+        // tree, so anything driven by React state still paints. What stops is
+        // the free-running rAF draw. Nothing in the sim calls `invalidate()`
+        // today, and nothing needs to — every in-canvas animation under a card
+        // is either hidden by it or is the world itself, which is paused.
+        frameloop={physicsPaused ? "demand" : "always"}
+        dpr={[1, canvasMaxDpr(level)]}
         camera={{
           fov: CHASE_FOV,
           near: 0.1,
@@ -1186,8 +1364,15 @@ function ReadyScene({
               audioRef={audioRef}
               attemptRecorderRef={attemptRecorderRef}
               dashboardStatusRef={dashboardStatusRef}
+              // …and the two numbers that make the governor speakable: the
+              // ceiling the tier is enforcing on THIS map, and whose ceiling
+              // it is. Written onto the same per-frame channel the bar polls.
+              tierCapKmh={tierCapKmh}
+              tierNameBg={DIFFICULTY_PRESETS[difficulty].labelBg}
               reverseAssist={reverseAssist}
               reverseAssistEnabled={reverseAssistEnabled}
+              reverseStuck={reverseStuck}
+              stuckStart={stuckStart}
               assistShiftingRef={assistShiftingRef}
               driveLocked={driveLocked}
               drivelineEventsRef={drivelineEventsRef}
@@ -1198,6 +1383,9 @@ function ReadyScene({
               onMinimap={onMinimap}
               onDriveline={onDriveline}
               onDrivelineRejection={onDrivelineRejection}
+              onReversePedalStuck={onReversePedalStuck}
+              onStuckStart={onStuckStart}
+              onTransmissionChanged={onTransmissionChanged}
               onStagedOutcome={onStagedOutcome}
               minimapPolylines={minimapPolylines}
               isNight={isNight}
@@ -1236,6 +1424,10 @@ function ReadyScene({
               parkedClearZones={built.parkedClearZones}
               hazard={lesson.hazard ?? null}
               hazardActiveRef={hazardActiveRef}
+              // B40(a): the caption over a staged actor whose whole teaching
+              // job is to be RECOGNISED at range («Спане на зелено»). Null on
+              // every other lesson, so it costs one check per frame.
+              actorLabels={lesson.actorLabels ?? null}
               // Perf tier (doc 71): SUV clearcoat on the high tier only.
               clearcoat={level === "high"}
               // Perf tier (doc 82 §2.3): at `low` the 22,672-tri / 16-material
@@ -1288,6 +1480,7 @@ function ReadyScene({
               telemetryRef={telemetryRef}
               topdownAllowed={topdownInCycle}
               enterTopdown={enterTopdown}
+              topdownAidRef={topdownAidRef}
               driveLocked={driveLocked}
             />
           </Physics>
@@ -1346,6 +1539,7 @@ function ReadyScene({
       <ControlsHelp
         defaultOpen={!touchOnly && !driveLockedAtMount}
         topdownAllowed={topdownInCycle}
+        reverseAssistEnabled={reverseAssistEnabled}
       />
 
       {/* PROX rear-proximity cue (isolated additive block): „Кола отзад · X м"
@@ -1366,11 +1560,17 @@ function ReadyScene({
 
       {/* S0-View ?ghost=demo: playback deck for the Shadow Car — scrub bar,
           speeds, annotation ticks, step-by-step, loop-section. */}
-      {ghostDemo ? <DemoDeck trace={ghostDemo.trace} clockRef={ghostClockRef} /> : null}
+      {ghostDemo ? (
+        <DemoDeck
+          trace={ghostDemo.trace}
+          clockRef={ghostClockRef}
+          suppressed={touchSheetOpen}
+        />
+      ) : null}
 
       {/* S1 L1 aid: the same playback deck for the scenario's shadow demo. */}
       {shadowTrace && aids?.shadowCar ? (
-        <DemoDeck trace={shadowTrace} clockRef={aidClockRef} />
+        <DemoDeck trace={shadowTrace} clockRef={aidClockRef} suppressed={touchSheetOpen} />
       ) : null}
 
       {/* S1 followHints chip — „you are off the demonstrated line".
@@ -1392,7 +1592,15 @@ function ReadyScene({
           chip: while the staged dashboard lamp is lit, name it and the taught
           response. L3+ strips it — noticing the CLUSTER is the drill. */}
       {telltaleCueOn && aids?.pathRibbon ? (
-        <div className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2">
+        // `data-hud` for the same reason its twin above has one: row C1 moves
+        // every centred text panel into the right-edge notification column, and
+        // the cascade in PlayAreaStyles is the only vocabulary the scene tree
+        // and the shell tree share. Without a name this chip stayed dead centre
+        // over the road while everything around it moved.
+        <div
+          data-hud="telltale-cue"
+          className="pointer-events-none absolute left-1/2 top-24 z-10 -translate-x-1/2"
+        >
           <div className="rounded-full border border-danger/60 bg-background/85 px-3.5 py-1.5 text-xs font-bold text-danger shadow-glow-sm backdrop-blur">
             Контролна лампа: температура! Спри спокойно вдясно
           </div>
@@ -1452,7 +1660,12 @@ function ReadyScene({
           are performable without a keyboard. Pinned open while the pre-drive
           gate is on; afterwards they yield to a student who drives on W/S. */}
       {!touchCapable ? (
-        <MousePedals touch={touchSource} hidden={physicsPaused} pinned={driveLocked} />
+        <MousePedals
+          touch={touchSource}
+          hidden={physicsPaused}
+          pinned={driveLocked}
+          onYieldedToKeyboard={onMousePedalsYielded}
+        />
       ) : null}
 
       {/* P1: touch input overlay — mounts on any touch-capable device, hides
@@ -1464,10 +1677,32 @@ function ReadyScene({
           touch={touchSource}
           cabinRef={cabinRef}
           hidden={physicsPaused}
+          // …the same flag ControlsHelp already takes, for the same reason:
+          // the drivetrain pad's label promised the reverse gesture on exam
+          // rungs, where the assist and the pedal swap are both off.
+          reverseAssistEnabled={reverseAssistEnabled}
           onToggleCamera={toggleCamera}
+          // §I23 — the camera stops being two taps deep inside a settings
+          // sheet and becomes the reference's opaque, word-labelled top-left
+          // button. The rail additionally carries the FIRST touch home G and
+          // N have ever had (top-down zoom + north-up/heading-up).
+          cameraMode={cameraMode}
+          onSelectCameraMode={selectCameraMode}
+          topdownAllowed={topdownInCycle}
+          topdownAidRef={topdownAidRef}
+          // The deck/sheet arbitration — see `touchSheetOpen` above.
+          onSheetOpenChange={setTouchSheetOpen}
           onPause={() => setMenuPaused(true)}
           onReset={resetCar}
           onToggleFullscreen={onToggleFullscreen ?? null}
+          // …AND THE TIER, because on a phone the pill below has nowhere to
+          // stand: 255 px of segmented control against a 167.5 px rail lane and
+          // a 141.5 px column lane (J-WAVE-3 — the arithmetic is on the prop).
+          // The pill is hidden on a compact stage by PlayAreaStyles; this cell
+          // is what the student reaches instead, and it is one tap behind the
+          // «Кола» button the rail already labels.
+          difficulty={difficulty}
+          onSelectDifficulty={setDifficulty}
         />
       ) : null}
 
@@ -1699,18 +1934,147 @@ function cabinPollBaseline(cabin: CabinControls | null, rawBrake: number): Cabin
  * this file is the scene, that one belongs to the play shell, and the number is
  * a device fact (every phone in landscape is under 560 px tall; every tablet is
  * over) rather than a shared decision.
+ *
+ * ── AND ON A PHONE IT IS A DIFFERENT DECK WHEN IT IS OPEN — 2026-08-10.
+ *
+ * The measurement that forced this, WebKit, real insets, sc-zebra-approach@L1:
+ * hanging a 231.5 px panel from the control band on a 393 px-tall stage lays it
+ * out at y = −96. Its first child is this toggle, so the toggle went off the
+ * top of the screen with it and there was no other way to dismiss the panel —
+ * on all four device profiles the deck could be opened and not closed. Its
+ * pause button landed on «Меню на урока» (1 024 px² at 852 × 393, 864 px² at
+ * 780 × 360, and `elementFromPoint` at the button's own centre returned the
+ * menu), and 13 of its controls were under 44 px.
+ *
+ * So the OPEN deck stops being a desktop panel that has been shoved upward:
+ *
+ *   • `data-deck-open` lets PlayAreaStyles give it a landscape-phone geometry
+ *     (top-anchored beside the lesson menu, as wide as the strip that is left)
+ *     without this file learning about orientation — the same attribute
+ *     grammar `data-sim-compact` already uses for every other phone rule;
+ *   • the toggle is handed to the timeline as its row's first control, because
+ *     a 393 px-tall stage has 127.5 px of clear corridor and a toggle on its
+ *     own line costs 48 of them;
+ *   • `touch` puts every control in that row at 44 px (TraceTimeline).
  */
+function useCompactStage(): boolean {
+  // SSR and the first paint answer „roomy", which is what the deck's own
+  // `open` default has always assumed; the effect corrects it before the
+  // student can reach for anything.
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const read = () => setCompact(window.innerHeight <= 560 || window.innerWidth <= 640);
+    read();
+    window.addEventListener("resize", read);
+    window.addEventListener("orientationchange", read);
+    return () => {
+      window.removeEventListener("resize", read);
+      window.removeEventListener("orientationchange", read);
+    };
+  }, []);
+  return compact;
+}
+
 function DemoDeck({
   trace,
   clockRef,
+  suppressed = false,
 }: {
   trace: ScenarioTrace;
   clockRef: React.RefObject<TraceClock>;
+  /**
+   * The ⚙ driveline sheet is open, so `PlayAreaStyles` has this deck
+   * `display: none` (the two stand on the same floor — see `touchSheetOpen` in
+   * LessonScene and the rule keyed on `html[data-sim-car-sheet]`).
+   *
+   * THIS PROP DOES NOT HIDE ANYTHING — the stylesheet already did. It exists
+   * because a hidden transport is still a RUNNING one, and it does exactly one
+   * thing: stop the clock while the panel is off screen and start it again if
+   * it was running. `open` below is untouched and the playhead is the parent's
+   * ref, so the way back is the frame the student left.
+   */
+  suppressed?: boolean;
 }) {
   const [open, setOpen] = useState(
     () =>
       typeof window === "undefined" ||
       !(window.innerHeight <= 560 || window.innerWidth <= 640),
+  );
+  const compact = useCompactStage();
+  // A DEMONSTRATION MAY NOT ADVANCE WHILE IT IS OFF SCREEN. `display: none`
+  // hides a panel; it does not stop a replay. The pause is a ref write, not
+  // state: nothing re-renders, and the transport picks it up on its own next
+  // poll — so this cannot cost a frame on a screen that is not even visible.
+  //
+  // The condition is deliberately the same one the stylesheet uses and NOT
+  // `compact && …`: the rule that hides this deck is not compact-scoped, so a
+  // compact-only pause would leave a roomy touch device running a hidden
+  // replay — a different bug wearing the same fix.
+  useEffect(() => {
+    if (!suppressed) return;
+    // Captured, not re-read in the cleanup: the clock this effect paused is the
+    // one it must un-pause, and `clockRef.current` at teardown could be a
+    // different lesson's. (It is also what react-hooks/exhaustive-deps asks
+    // for, and the rule is right here rather than merely satisfied.)
+    const clock = clockRef.current;
+    if (!clock) return;
+    const wasPlaying = clock.playing;
+    clock.playing = false;
+    return () => {
+      // Only give back what was taken: a demonstration the student had already
+      // paused stays paused.
+      if (wasPlaying) clock.playing = true;
+    };
+  }, [suppressed, clockRef]);
+  /**
+   * DOC 91 · C2 — THE BUTTON THAT OPENS AND CLOSES THE DEMONSTRATION.
+   *
+   * Its five transport controls got the pointer path in J-WAVE-4
+   * (`TraceTimeline`), and leaving this one on `onClick` alone would be the
+   * worse half of a half-fix: on a phone the student could pause the
+   * demonstration with a thumb on the throttle and then not be able to shut it,
+   * which is a control that traps rather than one that is merely missing. A
+   * touch-borne `click` is a compatibility mouse event and is dispatched only
+   * for the PRIMARY touch point — measured on this build, six profiles: with
+   * one finger planted, all 40 controls on the driving screen receive
+   * `pointerdown`/`pointerup` and NOT ONE receives a `click`.
+   *
+   * `onClick` stays underneath it, and so do `tabIndex={-1}` and the
+   * `onMouseDown` preventDefault — this button must not take focus off the
+   * canvas, and neither of those is what C2 is about.
+   */
+  const tapToggle = useTapActivation(() => setOpen((o) => !o));
+  const toggle = (
+    <button
+      type="button"
+      tabIndex={-1}
+      onMouseDown={(e) => e.preventDefault()}
+      {...tapToggle}
+      aria-expanded={open}
+      // ONLY in the row, where the glyph is the whole button and there is no
+      // word to read. Everywhere else the visible label IS the accessible name
+      // — overriding it with a different wording is the „label in name" trap
+      // (WCAG 2.5.3) for anyone driving this by voice.
+      aria-label={compact && open ? "Затвори демонстрацията" : undefined}
+      className={
+        compact && open
+          ? // In the row, and a real 44 px control rather than a 26.5 px pill
+            // wearing row C2's invisible hit pad — it is the CLOSE control of a
+            // panel that covers the road, and this is the one the founder has
+            // to be able to hit.
+            "pointer-events-auto flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border bg-background/80 text-base text-muted backdrop-blur transition hover:text-foreground"
+          : "pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
+      }
+    >
+      {compact && open ? (
+        <span aria-hidden>🎬▾</span>
+      ) : (
+        <>
+          <span aria-hidden>🎬</span>
+          Демонстрация {open ? "▾" : "▸"}
+        </>
+      )}
+    </button>
   );
   return (
     // `bottom-[6.75rem]` is ROOMY_HUD_FLOOR_PX and it is the ROOMY number. On a
@@ -1721,20 +2085,19 @@ function DemoDeck({
     // layout in its own file. `data-hud` is the stable handle that rule needs.
     <div
       data-hud="demo-deck"
-      className="absolute bottom-[6.75rem] left-1/2 z-10 flex w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1"
+      data-deck-open={open ? "true" : "false"}
+      className="absolute bottom-[6.75rem] left-1/2 z-10 flex min-h-0 w-[min(88%,26rem)] -translate-x-1/2 flex-col items-center gap-1"
     >
-      <button
-        type="button"
-        tabIndex={-1}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="pointer-events-auto flex items-center gap-1.5 rounded-lg border border-border bg-background/80 px-2.5 py-1 text-[11px] font-semibold text-muted backdrop-blur transition hover:text-foreground"
-      >
-        <span aria-hidden>🎬</span>
-        Демонстрация {open ? "▾" : "▸"}
-      </button>
-      {open ? <TraceTimeline trace={trace} clockRef={clockRef} compact /> : null}
+      {compact && open ? null : toggle}
+      {open ? (
+        <TraceTimeline
+          trace={trace}
+          clockRef={clockRef}
+          compact
+          touch={compact}
+          leading={compact ? toggle : null}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1755,8 +2118,12 @@ function RuntimeDriver({
   audioRef,
   attemptRecorderRef,
   dashboardStatusRef,
+  tierCapKmh,
+  tierNameBg,
   reverseAssist,
   reverseAssistEnabled,
+  reverseStuck,
+  stuckStart,
   assistShiftingRef,
   driveLocked,
   drivelineEventsRef,
@@ -1767,6 +2134,9 @@ function RuntimeDriver({
   onMinimap,
   onDriveline,
   onDrivelineRejection,
+  onReversePedalStuck,
+  onStuckStart,
+  onTransmissionChanged,
   onStagedOutcome,
   minimapPolylines,
   isNight,
@@ -1797,6 +2167,16 @@ function RuntimeDriver({
   /** Status-dashboard channel — mutated in place per frame (no allocation);
    *  the shell's bar polls it low-Hz. Absent = no writes. */
   dashboardStatusRef?: React.RefObject<DashboardStatus>;
+  /**
+   * The active tier's governor cap (km/h) on THIS map, or null when the tier
+   * has none („Напреднал"). Passed rather than recomputed here so exactly one
+   * `governorCapKmh` call decides both the number the physics enforces and the
+   * number the cluster prints (2026-08-11 — before this the number was printed
+   * nowhere at all and a clamped throttle read as a broken car).
+   */
+  tierCapKmh: number | null;
+  /** …and the tier's own name, so the readout can say WHOSE ceiling it is. */
+  tierNameBg: string;
   /** Auto-reverse assist machine (engine/reverseAssist.ts) — stepped once
    *  per live frame; emitted commands are executed through the SAME
    *  DrivelineState gear gate as the [ / ] keys. */
@@ -1804,6 +2184,12 @@ function RuntimeDriver({
   /** Lesson-static gate: false on examMode lessons (the exam grades the
    *  real selector procedure — the assist stays completely silent). */
   reverseAssistEnabled: boolean;
+  /** LAW 2's voice (engine/reverseStuck.ts) — stepped on the same live frames
+   *  as the assist, off the mapper's own `isDisowned`. */
+  reverseStuck: ReverseStuckWatch;
+  /** „The car itself is refusing" (engine/stuckStart.ts) — stepped on the same
+   *  live frames, off the driveline and the functional throttle. */
+  stuckStart: StuckStartWatch;
   /** True only for the microtask of executing an assist shift, so the
    *  driveline subscription can tell assist steps from MANUAL ones. */
   assistShiftingRef: React.RefObject<boolean>;
@@ -1817,6 +2203,12 @@ function RuntimeDriver({
   onMinimap: (f: MinimapFrame) => void;
   onDriveline?: (snap: DrivelineSnapshot) => void;
   onDrivelineRejection?: (rejection: DrivelineRejection, snap: DrivelineSnapshot) => void;
+  onReversePedalStuck?: (direction: ReverseStuckDirection) => void;
+  onStuckStart?: (reason: StuckStartReason) => void;
+  onTransmissionChanged?: (
+    transmission: TransmissionMode,
+    movedSelectorTo: SelectorPosition,
+  ) => void;
   onStagedOutcome?: (outcome: StagedEventOutcome) => void;
   minimapPolylines: MinimapFrame["polylines"];
   isNight: boolean;
@@ -1881,6 +2273,11 @@ function RuntimeDriver({
       // so an edge ping can only ever name a real, gradeable fault.
       dash.headlightsRequired = isNight || rain;
       dash.fogLightsRequired = fog;
+      // The tier's ceiling and whose it is. Constant between tier clicks, so
+      // writing it every frame costs one assignment and removes the only other
+      // option — a second subscription — from a file that already has enough.
+      dash.governorCapKmh = tierCapKmh;
+      dash.governorTierBg = tierNameBg;
       dashboardStatusRef.current = dash;
     }
 
@@ -1958,6 +2355,20 @@ function RuntimeDriver({
         }
       }
     }
+    // …and the state change nothing REFUSED, which is why it had no voice: the
+    // tier pill moving the student's own lever. `switchTransmission` puts a
+    // standing car into N on the way into „Напреднал" (first gear with the
+    // clutch up is a stall — vehicle/driveline.ts), and until now it did it in
+    // total silence. Same loop, same channel, same grammar as the refusals
+    // above; the event only carries `movedSelectorTo` when the lever actually
+    // moved, so a tier click that changes nothing says nothing.
+    if (onTransmissionChanged && cabin) {
+      for (const event of drivelineEvents) {
+        if (event.kind === "transmissionChanged" && event.movedSelectorTo !== undefined) {
+          onTransmissionChanged(event.transmission, event.movedSelectorTo);
+        }
+      }
+    }
     // S0-View: stream driveline transitions into the attempt trace before
     // the queues drain (sparse events — allocation is allowed there).
     const recorder = attemptRecorderRef?.current;
@@ -1992,6 +2403,12 @@ function RuntimeDriver({
     // from motion and held — the Б2 stop line, a red light, a give-way wait —
     // shifts nothing, because that pedal drove the car backwards into traffic
     // for as long as this assist has existed.
+    //
+    // …and BECAUSE the press had to be lifted first, it also carries through as
+    // the reverse accelerator: the flip it causes is labelled "assist" for the
+    // mapper (see the driveline subscription), so ↓ at a standstill takes R and
+    // moves the car on that one press — founder ruling 2026-08-11, „thats
+    // automatic transmition". Every hand-worked route stays guarded.
     if (reverseAssistEnabled && !driveLocked && cabin) {
       const dl = cabin.driveline;
       if (dl.transmission === "automatic" && dl.engineOn) {
@@ -2004,7 +2421,8 @@ function RuntimeDriver({
         });
         if (cmd) {
           // Mark the steps assist-driven so the driveline subscription does
-          // not count them as manual (which would self-suppress for 2 s).
+          // not count them as manual (which would self-suppress for 2 s) and
+          // so the mapper knows this flip was an ARMED press (LAW 2's scope).
           assistShiftingRef.current = true;
           try {
             const step = cmd === "shiftToR" ? () => dl.gearDown() : () => dl.gearUp();
@@ -2014,6 +2432,73 @@ function RuntimeDriver({
           }
         }
       }
+    }
+
+    // LAW 2's VOICE (engine/reverseStuck.ts). The guard above is only half of
+    // the founder's „it turns to R (reverse) but the car does not move did it
+    // break or ?": the other half is that nothing told him. This reads the
+    // mapper's own `isDisowned` — no second opinion about the pedals, no
+    // reimplementation of the rule — and fires only once the state has lasted
+    // long enough to be confusion (REVERSE_STUCK_HINT_S) rather than the
+    // ordinary held-brake shift a hand-worked reverse begins with.
+    //
+    // Stepped OUTSIDE the assist's own gates on purpose: the flip that disowns
+    // a channel is reachable from [ / ], the touch gear sheet and the cockpit
+    // lever with the assist suppressed (REVERSE_ASSIST_SUPPRESS_S) or with no
+    // assist involved at all, and a student stuck behind it there is stuck in
+    // exactly the same way. The narrower gates it does NOT need are already
+    // inside `input.reversePedalRemap` — exam lessons and the manual box never
+    // swap the pedals, so no channel is ever disowned on them. Since 2026-08-11
+    // an ASSIST flip is not disowned either, so this stays silent there by the
+    // same mechanism rather than by a second gate: nothing was refused, so
+    // nothing is explained. It is reset while the drive is locked: a held brake
+    // during the pre-drive procedure IS a step, and the input gate zeroes the
+    // pedals there anyway.
+    if (driveLocked || !cabin || input === null) {
+      reverseStuck.reset();
+    } else {
+      const stuck = reverseStuck.update({
+        disowned: input.reversePedalDisowned,
+        selector: cabin.driveline.selector,
+        speedKmh: sample.speedKmh,
+        dtSec: dt,
+      });
+      if (stuck !== null) onReversePedalStuck?.(stuck);
+    }
+
+    // …AND THE SILENCE ONE LAYER UP (engine/stuckStart.ts). Nothing has
+    // refused the pedal here — the CAR cannot move: engine off, selector in
+    // P or N, parking brake on. `LessonPlayShell.handleBlockedDriveAttempt`
+    // has said exactly this since QW10, but only through `driveLocked`, i.e.
+    // only in the pre-drive phase — and every compiled scenario rung sets
+    // `preDrive: false` while 130 of them (`{ level: 4, vehicleStart: "cold" }`)
+    // plus 31 whole templates hand over a cold car. Measured on the drive rig:
+    // ten seconds of held throttle on `sc-junction-stop@L4` = 0.00 km/h, no
+    // toast, no event. Same gates as its neighbour above: never while the
+    // drive is locked (QW10 owns that), and the functional throttle it reads
+    // is already zero on a LAW-2-disowned channel, so the two never speak over
+    // each other.
+    if (driveLocked || !cabin || input === null) {
+      stuckStart.reset();
+    } else {
+      const blocked = stuckStart.update({
+        throttlePedal: input.rawThrottle,
+        // …and the OTHER pedal, which nothing in this engine listened to
+        // until 2026-08-11. On the manual tier („Напреднал") ↓/S is the brake,
+        // not the reverse accelerator — `shouldRemapReversePedals` returns
+        // false there by design — so a student who holds ↓ in the neutral the
+        // tier switch itself put him in was answered by nothing at all
+        // (measured: 12.5 s, 0.00 km/h, zero toasts). The watch reads it only
+        // in P/N with the engine running and only as an ARMED press, so a held
+        // brake in D/M/R — the Б2 line, a red light, a give-way wait — is
+        // still not read at all. See the three gates in engine/stuckStart.ts.
+        brakePedal: input.rawBrake,
+        speedKmh: sample.speedKmh,
+        driveline: cabin.driveline.physicsInput,
+        stalled: cabin.driveline.stalled,
+        dtSec: dt,
+      });
+      if (blocked !== null) onStuckStart?.(blocked);
     }
 
     runtime.update(dt);
@@ -2174,11 +2659,28 @@ const CONTROLS_HELP_BOTTOM_INSET = "4.5rem";
 function ControlsHelp({
   defaultOpen = true,
   topdownAllowed = true,
+  reverseAssistEnabled = true,
 }: {
   defaultOpen?: boolean;
   /** Only advertise the top-down view + its G/N controls when it's reachable
    *  (curriculum lessons + scenario L1; exam rungs lock it out). */
   topdownAllowed?: boolean;
+  /**
+   * False on examMode lessons, where `ReverseAssist` and the rule-b pedal swap
+   * are both switched off for the whole session (LessonScene:
+   * `reverseAssistEnabled = lesson.examMode !== true`).
+   *
+   * The legend has to know, because the S / ↓ row was written for the assist
+   * and is FALSE without it — twice over: „пусни и натисни пак" selects
+   * nothing on an exam, and once R is selected by hand the pedals do NOT swap
+   * there, so ↓ is the brake and ↑ is the reverse accelerator, exactly as in a
+   * real automatic. Driven on `sc-junction-stop@L4` (2026-08-11): the row is on
+   * screen, the gesture does nothing, and nothing says why. A product that
+   * prints a control it has disabled is refusing an input in silence with extra
+   * steps — the same THEO-4 failure as the two hints in LessonPlayShell, and
+   * 158 of the 169 `level: 4` rungs in the catalogue are exam rungs.
+   */
+  reverseAssistEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [showAll, setShowAll] = useState(false);
@@ -2199,8 +2701,13 @@ function ControlsHelp({
     { keys: "I", what: "двигател: старт / стоп", essential: true },
     { keys: "[ ]", what: "скорости: към P / към D", essential: true },
     // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
-    // you ask for reverse — see the two laws in engine/reverseAssist.ts.
-    { keys: "S / ↓", what: "на място: пусни и натисни пак → задна / напред" },
+    // you ask for reverse — see the two laws in engine/reverseAssist.ts. On an
+    // exam rung neither the assist nor the pedal swap exists, so the row says
+    // what is actually true there: reverse is the lever, and the pedals keep
+    // their real meanings.
+    reverseAssistEnabled
+      ? { keys: "S / ↓", what: "на място: пусни и натисни пак → задна / напред" }
+      : { keys: "[ ]", what: "на изпит заден ход се избира само с лоста (D → N → R)" },
     { keys: "Space", what: "ръчна спирачка", essential: true },
     { keys: "Z", what: "съединител — задръж („Напреднал“)" },
     { keys: "B", what: "предпазен колан", essential: true },

@@ -168,9 +168,25 @@ describe("UNPANEL — the named web furniture stays unbuilt", () => {
    * that is the one screen where a call to action IS the content. The founder's
    * complaint is about the rail he drives with, so the assertions are too.
    */
-  const peek = /data-sim-overlay-state="peek"[\s\S]*?\n      <\/div>\n      \)\}/.exec(
-    overlay.text,
-  )?.[0];
+  //
+  // RE-ANCHORED 2026-08-09 (row A6). The peek used to be one JSX block ending
+  // in `</div>\n)}`; it is now the card BODY hoisted into a `cardBody` variable
+  // plus two wrappers (a `<button>` when the line has nothing else to press, a
+  // `<div>` when it does — the HudToasts grammar). The old regex matched
+  // nothing after that change and this file said so, loudly, which is what it
+  // is for. The slice now runs from the peek wrapper to the end of the OPEN
+  // sheet's comment, which is the next landmark that cannot move without
+  // somebody noticing.
+  const peek = (() => {
+    const start = overlay.text.indexOf('data-sim-overlay-state="peek"');
+    const end = overlay.text.indexOf("OPEN — the explicit pause");
+    if (start < 0 || end < 0 || end < start) return undefined;
+    // The controls live in `cardBody`, which is declared ABOVE the return —
+    // include it, or the two assertions below inspect the wrappers only.
+    const bodyStart = overlay.text.indexOf("const cardBody = (");
+    return (bodyStart >= 0 ? overlay.text.slice(bodyStart, start) : "") +
+      overlay.text.slice(start, end);
+  })();
 
   it("the peek block is still findable (anchor check)", () => {
     expect(peek, "the peek block moved — re-anchor the two tests below").toBeDefined();
@@ -194,12 +210,21 @@ describe("UNPANEL — the named web furniture stays unbuilt", () => {
   });
 
   it("the overlay peek is no longer a bordered strip", () => {
-    // `rounded-full border` on the peek ROW is what made it a „bar". The two
+    // `rounded-full border` on the peek ROW is what made it a „bar". The
     // CHIPS inside it keep their borders; the row must not have one.
-    const row = /className=\{`hud-ghost sim-overlay-in[^`]*`\}/.exec(peek ?? "")?.[0];
+    //
+    // A6 turned the row's inline class list into ONE constant, because the row
+    // now renders as a `<button>` or a `<div>` depending on whether it has any
+    // other control — two literals would be two places for the border to creep
+    // back into. So the constant is what is asserted, and both wrappers are
+    // checked to be using it.
+    const row = /const CARD_CLASS =\s*\n?\s*"([^"]*)"/.exec(overlay.text)?.[1];
     expect(row, "the peek row's class list moved — re-anchor this test").toBeDefined();
+    expect(row).toContain("hud-ghost");
     expect(row).not.toMatch(/\bborder\b/);
     expect(row).not.toMatch(/\brounded-full\b/);
+    // …and nothing else may declare its own row classes behind its back.
+    expect((peek!.match(/className=\{CARD_CLASS\}/g) ?? []).length).toBe(2);
   });
 });
 

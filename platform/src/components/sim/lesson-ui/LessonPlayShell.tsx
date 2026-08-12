@@ -17,14 +17,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   armedTelltaleWarnings,
+  capBg,
+  clutchHeldObjBg,
+  clutchObjBg,
   createDashboardStatus,
+  endLineDemandsAnswer,
+  gearDownWithBg,
+  gearUpActBg,
+  gearUpWithBg,
+  hintInputFor,
   HudStyles,
   HudToasts,
   Minimap,
   NOTIFY_COLUMN_RIGHT_CSS,
   NOTIFY_COLUMN_TOP_CSS_ROOMY,
   NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
+  leverActBg,
   ObjectiveBanner,
+  parkingBrakeActBg,
   PreDriveChecklist,
   readStoredFlag,
   selectOverlay,
@@ -34,13 +44,19 @@ import {
   shouldShowDebrief,
   shouldShowEndBar,
   SimOverlay,
+  starterActBg,
+  starterWithBg,
   StatusDashboard,
   telltaleWarningsKey,
   TOAST_QUIET_DEFAULT,
   TOAST_QUIET_STORAGE_KEY,
+  TOUCH_SHEET_LOCATOR_BG,
   useHudToastQueue,
+  useTapActivation,
+  withSheetLocatorBg,
   writeStoredFlag,
   type DashboardStatus,
+  type HintInput,
   type MinimapFrame,
   type ObjectiveFlash,
   type SimOverlayItem,
@@ -118,7 +134,17 @@ import {
   VIOLATIONS,
   type SimTick,
 } from "@/modules/sim/rules";
-import type { DrivelineRejection, DrivelineSnapshot } from "@/modules/sim/vehicle";
+import {
+  hasTouchScreen,
+  type ReverseStuckDirection,
+  type StuckStartReason,
+} from "@/modules/sim/engine";
+import type {
+  DrivelineRejection,
+  DrivelineSnapshot,
+  SelectorPosition,
+  TransmissionMode,
+} from "@/modules/sim/vehicle";
 import { finishLessonAction } from "@/app/(dashboard)/simulator/actions";
 import {
   loadMicroQuizBank,
@@ -141,6 +167,7 @@ import {
 import {
   COMPACT_DASH_HEIGHT_PX,
   isCompactViewport,
+  MINIMAP_TOGGLE_SIZE_PX,
   minimapClearancePx,
   ROOMY_HUD_FLOOR_PX,
   shouldGoImmersive,
@@ -182,26 +209,36 @@ const REJECTION_TOAST_COOLDOWN_S = 3;
  * gears on the automatic) from "already in P" / "top manual gear". No lawRef
  * — this is vehicle operation, not a graded rule.
  */
-function rejectionHint(
+export function rejectionHint(
   rejection: DrivelineRejection,
   snap: DrivelineSnapshot,
+  input: HintInput,
 ): { key: string; titleBg: string; explanationBg: string } {
+  const clutch = clutchObjBg(input);
+  const gearDown = gearDownWithBg(input);
+  const gearUp = gearUpWithBg(input, snap.transmission);
   if (rejection.kind === "startRejected") {
     return rejection.reason === "clutch"
       ? {
           key: "start-clutch",
           titleBg: "Двигателят не запали",
-          explanationBg:
-            "Натисни и задръж съединителя (Z) — или премести лоста в P или N — и опитай пак с I.",
+          explanationBg: withSheetLocatorBg(
+            input,
+            `Натисни и задръж ${clutch} — или премести лоста в P или N ${gearDown} — и опитай пак ${starterWithBg(input)}.`,
+          ),
         }
       : {
           key: "start-selector",
           titleBg: "Двигателят не запали",
-          explanationBg: "Постави скоростния лост в P или N (клавиш [), за да запалиш с I.",
+          explanationBg: withSheetLocatorBg(
+            input,
+            `Постави скоростния лост в P или N ${gearDown}, за да запалиш ${starterWithBg(input)}.`,
+          ),
         };
   }
   switch (rejection.reason) {
     case "speed":
+      // No control named, so nothing to translate: the instruction is „stop".
       return {
         key: "shift-speed",
         titleBg: "Скоростта е твърде висока",
@@ -211,15 +248,20 @@ function rejectionHint(
       return {
         key: "shift-clutch",
         titleBg: "Предавката не влезе",
-        explanationBg: "Натисни и задръж съединителя (Z), докато местиш лоста.",
+        explanationBg: withSheetLocatorBg(
+          input,
+          `Натисни и задръж ${clutch}, докато местиш лоста.`,
+        ),
       };
     case "endOfGate":
       if (snap.selector === "D") {
         return {
           key: "gate-d",
           titleBg: "Лостът вече е в D",
-          explanationBg:
-            "Автоматичната кутия сменя предавките сама — напред няма ръчни степени. С [ връщаш към N.",
+          explanationBg: withSheetLocatorBg(
+            input,
+            `Автоматичната кутия сменя предавките сама — напред няма ръчни степени. Към N се връщаш ${gearDown}.`,
+          ),
         };
       }
       if (snap.selector === "M") {
@@ -232,9 +274,263 @@ function rejectionHint(
       return {
         key: "gate-p",
         titleBg: "Лостът вече е в P",
-        explanationBg: "Назад няма повече позиции — с ] тръгваш към R, N и D.",
+        // …AND THE GATE IS NOT THE SAME IN BOTH BOXES. „към R, N и D" was
+        // false on „Напреднал", whose gate is P—R—N—M1…M5 — the same class of
+        // stale sentence as the drivetrain pad's reverse promise, and it had
+        // to be fixed here anyway: the touch face this clause names is «M►»
+        // on that tier, so naming D beside it would have been a NEW lie.
+        explanationBg: withSheetLocatorBg(
+          input,
+          snap.transmission === "manual"
+            ? `Назад няма повече позиции — ${gearUp} тръгваш към R, N и първа предавка.`
+            : `Назад няма повече позиции — ${gearUp} тръгваш към R, N и D.`,
+        ),
       };
   }
+}
+
+/**
+ * THE PEDAL THE CAR REFUSED, IN WORDS — engine/reverseStuck.ts.
+ *
+ * The founder, 2026-08-09: „it turns to R (reverse) but the car does not move
+ * did it break or ?". It did not break. He was holding the pedal he had just
+ * braked with, and LAW 2 (engine/reverseAssist.ts) will not let a pedal that
+ * meant STOP one frame ago mean GO — it keeps braking with it until the foot
+ * genuinely lifts. The guard is right; the silence was the defect.
+ *
+ * TWO JOBS, and the second is the one that matters.
+ *
+ *  1. UNBLOCK. The instruction, and nothing else, is on the LINE — where a
+ *     phone shows it without anything being tapped. A student must not have to
+ *     open a panel to get out of a car that will not move.
+ *
+ *     ITS LENGTH IS MEASURED, and the first draft failed. The compact card
+ *     clamps the line to THREE lines of 13.75 px at 11 px (`line-clamp-3`,
+ *     SimOverlay) in a column that is 141.5 px on an iPhone 16 in portrait and
+ *     129.6 px on a 360-wide Android. „Лостът е на R, но педалът още спира —
+ *     вдигни крак и натисни пак" is 63 characters, which lays out at 55 px
+ *     against a 41 px clamp on BOTH portrait profiles — photographed, not
+ *     inferred — and the words it cut off were „натисни пак". The one job that
+ *     may never be lost was the one the truncation ate.
+ *
+ *     Measured in the shipped card at all four profiles: 45 chars = exactly 3
+ *     lines (41/41, no slack), 37 = 3 lines on the 360, 34 = TWO lines on both
+ *     portraits and one in landscape. So the line is 34 characters, it leads
+ *     with the verb, and it has a whole clamp line of headroom. Everything the
+ *     line no longer says moved into the first sentence of the WHY, which is
+ *     one tap away, never truncated, and always present (THEO-4).
+ *
+ *  2. TEACH. This is a real property of a real car and of the one habit that
+ *     makes it safe: you come off the brake BEFORE you go for the accelerator,
+ *     and until you do, the car is braked. A product that swallowed that and
+ *     printed nothing would be throwing away the exact moment the lesson lands
+ *     — which is the bare verdict THEO-4 forbids.
+ *
+ * NO lawRef, on purpose and for the same reason `rejectionHint` above carries
+ * none: this is vehicle operation, not a graded rule of ЗДвП. Nothing here is
+ * scored — the toast is kind „lesson", the coached, unscored channel.
+ *
+ * BOTH DIRECTIONS, because LAW 2 guards both flips: ↓/S inherits the throttle
+ * role going INTO R, ↑/W inherits it coming back OUT into D. Same refusal and
+ * the same habit, opposite direction of travel — so the LINE is identical (the
+ * instruction does not change) and only the WHY names R or D and назад or
+ * напред. The R case is driven and photographed; the D case is covered by
+ * `reverseStuck.test.ts`.
+ *
+ * DEVICE-NEUTRAL WORDING. No key names: the cockpit is worked with a finger on
+ * a pedal, a mouse on the lever, or the keyboard, and the QW10 hint below
+ * already had to be rewritten once for teaching the keyboard inside a lesson
+ * whose whole premise is the cockpit. „педалът" is true on all three.
+ */
+function reverseStuckHint(direction: ReverseStuckDirection): {
+  titleBg: string;
+  explanationBg: string;
+} {
+  const backward = direction === "backward";
+  return {
+    // 34 characters. See the measurement above before lengthening it.
+    titleBg: "Вдигни крак от педала, натисни пак",
+    explanationBg:
+      `Лостът е на ${backward ? "R" : "D"}, но колата не тръгва: педалът, който държиш, допреди миг беше спирачката — с него спря. Затова не става на газ под крака ти. Докато не го отпуснеш, той продължава да спира. В истинска кола е същото — първо вдигаш крак от спирачката, чак после даваш газ. Вдигни крак, натисни пак и тръгваш ` +
+      (backward ? "назад." : "напред."),
+  };
+}
+
+/**
+ * THE CAR THAT WILL NOT MOVE, IN WORDS — engine/stuckStart.ts.
+ *
+ * `handleBlockedDriveAttempt` below has said the right thing since QW10 —
+ * «Колата още не е готова за потегляне» — and it can only be reached through
+ * the pre-drive phase. Every compiled scenario rung has `preDrive: false`, and
+ * 130 of them (`{ level: 4, vehicleStart: "cold" }`) plus 31 whole templates
+ * hand the student a cold car anyway. Measured on `sc-junction-stop@L4`: ten
+ * seconds of floored throttle, 0.00 km/h, nothing said. Same class as the two
+ * hints above it, so it gets the same channel and the same grammar.
+ *
+ * ONE BLOCKER PER MESSAGE, IN FIX ORDER — the machine names the first thing in
+ * the way and re-speaks the moment the student clears it, so this reads like an
+ * instructor walking someone out of a dead car rather than a checklist. The
+ * QW10 hint is a list because there the checklist IS the lesson; here there is
+ * no checklist on screen at all.
+ *
+ * MOUSE-FIRST, then the key — the wording rule the QW10 hint had to be
+ * rewritten for (B7/B20): the cockpit is worked with the mouse, and the key cap
+ * is the footnote for the advanced. No lawRef: this is vehicle operation, not a
+ * graded rule, and nothing here is scored — kind „lesson", the coached channel.
+ *
+ * TIER-AWARE, because the gate really is different. „Напреднал" is a manual box
+ * (vehicle/driveline.ts `transmissionModeFor`): its forward position is a
+ * numbered gear rather than D, engaging one needs the clutch, and its „ready"
+ * spawn is NEUTRAL by design — so the automatic's crisp «щракни лоста към D»
+ * would be a false instruction on exactly the tier that spawns needing it.
+ * The transmission comes from the live driveline snapshot, not from a guess
+ * about the lesson, because the student can switch tiers mid-drive.
+ */
+export function stuckStartHint(
+  reason: StuckStartReason,
+  transmission: TransmissionMode,
+  input: HintInput,
+): {
+  titleBg: string;
+  explanationBg: string;
+} {
+  const manual = transmission === "manual";
+  const gearUp = gearUpWithBg(input, transmission);
+  switch (reason) {
+    case "engineOff":
+      return {
+        titleBg: "Двигателят е изключен — затова газта не движи колата",
+        explanationBg: withSheetLocatorBg(
+          input,
+          `Педалът работи, но няма двигател, който да върти колелата. ${capBg(starterActBg(input))}, за да запалиш. След това провери скоростния лост и ръчната спирачка — колата тръгва само когато и трите са наред.`,
+        ),
+      };
+    case "stalled":
+      return {
+        titleBg: "Двигателят угасна — газта няма какво да задвижи",
+        // A STALL CAN OUTLIVE THE GEARBOX IT HAPPENED IN, and the old sentence
+        // did not know that: `stalled` latches until the next successful start
+        // (vehicle/driveline.ts) while the tier pill can switch the box under
+        // it, so a student who stalled on „Напреднал" and then went back to
+        // «Нормален» was told to hold a clutch his car no longer has. Found by
+        // the touch corpus in `controlPhrases.test.ts` — the automatic branch
+        // had nothing to name, which is exactly how a false sentence shows up.
+        explanationBg: withSheetLocatorBg(
+          input,
+          manual
+            ? `Колата е останала в предавка без достатъчно обороти и моторът спря. Задръж ${clutchObjBg(input)}, ${starterActBg(input)} отново и потегли по-плавно — малко повече газ и по-бавно отпускане на съединителя.`
+            : `Моторът угасна, докато кутията беше ръчна, и остана изключен. ${capBg(starterActBg(input))} отново — на автоматична кутия съединител няма, така че оттук нататък газта е достатъчна.`,
+        ),
+      };
+    case "parked":
+      return {
+        titleBg: "Лостът е на P — колата е паркирана",
+        explanationBg: withSheetLocatorBg(
+          input,
+          manual
+            ? `В позиция P трансмисията е заключена и газта не стига до колелата. ${capBg(leverActBg(input))} към първа предавка — ${gearUp} минаваш P → R → N → 1 една позиция наведнъж, а за да влезе предавка, дръж ${clutchHeldObjBg(input)}.`
+            : `В позиция P трансмисията е заключена и газта не стига до колелата. ${capBg(leverActBg(input))} към D (или към R за назад) — ${gearUp} минаваш P → R → N → D една позиция наведнъж.`,
+        ),
+      };
+    case "neutral":
+      return {
+        titleBg: "Лостът е на N — двигателят работи, но не е свързан с колелата",
+        explanationBg: withSheetLocatorBg(
+          input,
+          manual
+            ? `Неутрално положение означава точно това: моторът се върти на празен ход. Задръж ${clutchObjBg(input)} и включи първа предавка ${gearUp}, после потегли, като отпускаш съединителя плавно и добавяш газ. В „Напреднал“ колата ти се подава именно на N — гумата тръгва чак когато ти избереш предавка.`
+            : `Неутрално положение означава точно това: моторът се върти на празен ход. ${capBg(leverActBg(input))} към D ${gearUp}, за да тръгнеш напред. N се използва само при кратък престой — за паркиране е P, а за движение назад R.`,
+        ),
+      };
+    case "parkingBrake":
+      return {
+        titleBg: "Ръчната спирачка е вдигната — колата е задържана",
+        explanationBg: withSheetLocatorBg(
+          input,
+          `Задните колела са застопорени и двигателят не може да ги издърпа. ${capBg(parkingBrakeActBg(input))}, за да я свалиш. Свалянето на ръчната е последната стъпка преди потегляне — ако колата тегли или мирише на спирачки, първо провери нея.`,
+        ),
+      };
+  }
+}
+
+/**
+ * THE TIER PILL MOVED YOUR GEAR LEVER — vehicle/driveline.ts
+ * `switchTransmission`.
+ *
+ * The move itself is right and doc 87 A4 argued it properly: „Напреднал" is a
+ * MANUAL box, and dropping a standing car into first gear with the clutch up is
+ * a stall by definition, so the switch parks it in neutral instead. A4 even
+ * wrote down the thing it did not then fix — „the student gets the engine back
+ * but sits in neutral with nothing on screen saying so, which is the same
+ * complaint wearing a different hat" — and closed only the round trip.
+ *
+ * Measured on /dev/drive-rig (`sc-junction-stop@L1`, real shell, a real click on
+ * the pill, 2026-08-11): the selector went D → N and the product said NOTHING,
+ * and holding ↓ for the next 12.5 seconds said nothing either, because on that
+ * tier ↓ is the brake and the car is in neutral. The car was never a dead end —
+ * Z + [ walks the gate to R exactly as it should — but the only way out is a
+ * control the student has no reason to reach for, because nothing told him his
+ * lever had moved. Under THEO-4 that is the same bare verdict as a silent
+ * refusal: the product changed the car under his hand and withheld the why.
+ *
+ * SAME CHANNEL, SAME GRAMMAR. kind „lesson", no lawRef (this is vehicle
+ * operation, not a graded rule of ЗДвП), no new overlay convention — exactly
+ * what `reverseStuckHint` and `stuckStartHint` above established. It fires ONCE
+ * per lever move, on a deliberate click, so it can never become the popping
+ * warning the founder's standing note is about.
+ *
+ * THE LINE IS THE STATE, NOT THE INSTRUCTION, and that is the one difference
+ * from `reverseStuckHint`. There the student was stuck and the line had to be
+ * the way out; here nothing is stuck yet — he has just been handed a different
+ * car — so the line names what changed («Скоростният лост е на N»), which is
+ * the fact he cannot otherwise see, and the WHY carries the gesture. It is 30
+ * characters, under the 34 measured as safe for two lines on both portrait
+ * profiles.
+ */
+export function transmissionSwitchHint(
+  transmission: TransmissionMode,
+  movedSelectorTo: SelectorPosition,
+  input: HintInput,
+): { titleBg: string; explanationBg: string } {
+  if (transmission === "manual") {
+    // THE CARD THE WHOLE TIER OPENS WITH, so it is the one that had to stop
+    // naming keys: on a phone «Напреднал» begins here, and „Z + ]" was a dead
+    // end on the very first sentence of it.
+    const gearUp = gearUpWithBg(input, "manual");
+    return movedSelectorTo === "N"
+      ? {
+          titleBg: "Скоростният лост е на N",
+          explanationBg: withSheetLocatorBg(
+            input,
+            `„Напреднал“ е с ръчна скоростна кутия, затова колата ти се подава на неутрална: първа предавка с вдигнат съединител при спряла кола означава угасване. За да тръгнеш, задръж ${clutchObjBg(input)} и включи първа ${gearUp}, после отпускай съединителя плавно и добавяй газ. Стрелката надолу тук е спирачка — за движение назад е R, също със съединител.`,
+          ),
+        }
+      : {
+          titleBg: "Скоростният лост е на ръчна кутия",
+          explanationBg: withSheetLocatorBg(
+            input,
+            `„Напреднал“ е с ръчна скоростна кутия и лостът влезе в предавката, която отговаря на скоростта ти. Оттук нататък предавките се сменят от теб: задръж ${clutchObjBg(input)} и мини на следващата ${gearUp} или на по-ниска ${gearDownWithBg(input)}. Стрелката надолу е спирачка — за движение назад е R.`,
+          ),
+        };
+  }
+  // Back to an automatic. The round trip (our own D → N undone) never reaches
+  // here — the driveline reports no move for it — so this is the M → D/N case:
+  // the box the student was working by hand is now working itself.
+  return movedSelectorTo === "D"
+    ? {
+        titleBg: "Скоростният лост е на D",
+        explanationBg: withSheetLocatorBg(
+          input,
+          `Върна се на автоматична кутия: предавките се сменят сами и съединител няма. Просто натисни газта, за да тръгнеш напред. За движение назад спри напълно, вдигни крак от спирачката и я натисни отново — или мини на R ${gearDownWithBg(input)}.`,
+        ),
+      }
+    : {
+        titleBg: "Скоростният лост е на N",
+        explanationBg: withSheetLocatorBg(
+          input,
+          `Върна се на автоматична кутия, а двигателят е угаснал, затова лостът е на неутрална — оттам стартерът може да запали. ${capBg(starterActBg(input))}, после премести лоста на D ${gearUpWithBg(input, "automatic")} и потегли.`,
+        ),
+      };
 }
 
 // -- Minimap visibility (founder review 2026-07-28) ---------------------------
@@ -666,6 +962,43 @@ export function BriefingCard({
  * road. The insets are real `env(safe-area-inset-*)` values: with the app now
  * shipping `viewport-fit=cover`, that corner is exactly where the notch is.
  */
+type PlayMenuItem = {
+  key: string;
+  labelBg: string;
+  /** Right-hand state word („вкл." / „Често"), or null for a plain action. */
+  valueBg?: string | null;
+  tone?: "default" | "danger";
+  onSelect: () => void;
+  /** Keep the sheet open (a toggle the student may flip twice). */
+  keepOpen?: boolean;
+};
+
+/**
+ * One row, extracted for one reason: doc 91 · C2 needs a hook per row and a
+ * hook cannot be called inside `items.map`. Nothing else about the row moved.
+ */
+function PlayMenuRow({ item, onChosen }: { item: PlayMenuItem; onChosen: () => void }) {
+  const tap = useTapActivation(() => {
+    item.onSelect();
+    if (item.keepOpen !== true) onChosen();
+  });
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      {...tap}
+      className={`flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-[13px] font-bold transition active:bg-surface ${
+        item.tone === "danger" ? "text-danger" : "text-foreground"
+      }`}
+    >
+      <span className="min-w-0 flex-1 truncate">{item.labelBg}</span>
+      {item.valueBg ? (
+        <span className="shrink-0 text-[11px] font-bold text-accent">{item.valueBg}</span>
+      ) : null}
+    </button>
+  );
+}
+
 function PlayMenu({
   titleBg,
   badgeBg,
@@ -674,18 +1007,14 @@ function PlayMenu({
   titleBg: string;
   /** „Изпит" / „Пясъчник" framing, or null. */
   badgeBg: { textBg: string } | null;
-  items: {
-    key: string;
-    labelBg: string;
-    /** Right-hand state word („вкл." / „Често"), or null for a plain action. */
-    valueBg?: string | null;
-    tone?: "default" | "danger";
-    onSelect: () => void;
-    /** Keep the sheet open (a toggle the student may flip twice). */
-    keepOpen?: boolean;
-  }[];
+  items: PlayMenuItem[];
 }) {
   const [open, setOpen] = useState(false);
+  // Doc 91 · C2 — this menu is where «Пауза», the quality preset and «Завърши
+  // сесията» live, and every row of it was `onClick`-only: dead under a second
+  // finger, which on a driving screen is most of the time. `useTapActivation`
+  // adds the pointer path and keeps the click path for mouse and keyboard.
+  const tapToggle = useTapActivation(() => setOpen((o) => !o));
   return (
     <div
       className="pointer-events-none absolute z-20 flex flex-col items-start gap-1.5"
@@ -718,7 +1047,7 @@ function PlayMenu({
             and keeps its panel. ────────────────────────────────────────────── */}
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          {...tapToggle}
           aria-expanded={open}
           aria-label={open ? "Затвори менюто на урока" : "Меню на урока"}
           title={titleBg}
@@ -746,23 +1075,7 @@ function PlayMenu({
         >
           <p className="truncate px-2 py-1 text-[11px] font-bold text-muted">{titleBg}</p>
           {items.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                item.onSelect();
-                if (item.keepOpen !== true) setOpen(false);
-              }}
-              className={`flex items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-[13px] font-bold transition active:bg-surface ${
-                item.tone === "danger" ? "text-danger" : "text-foreground"
-              }`}
-            >
-              <span className="min-w-0 flex-1 truncate">{item.labelBg}</span>
-              {item.valueBg ? (
-                <span className="shrink-0 text-[11px] font-bold text-accent">{item.valueBg}</span>
-              ) : null}
-            </button>
+            <PlayMenuRow key={item.key} item={item} onChosen={() => setOpen(false)} />
           ))}
           {/* ODbL. The shell's attribution footer is hidden in every immersive
               layout, and compact is now ALWAYS immersive — so on a phone this
@@ -816,6 +1129,18 @@ export function LessonPlayShell({
    */
   onDevTelemetry?: (tick: SimTick, step: LessonStepResult) => void;
 }) {
+  /**
+   * WHICH CONTROLS THIS SESSION'S HINTS MAY NAME — doc 91 §J-WAVE-4 item 2.
+   *
+   * `hasTouchScreen()` is the SAME predicate `LessonScene` mounts
+   * `TouchControls` on, so the copy names on-screen cells exactly when those
+   * cells exist — including on a touch laptop, where both are true and both
+   * are right. Read once, in a lazy initializer: this shell is client-only
+   * (the whole play route is), so there is no SSR pass to mismatch, and a card
+   * whose wording changed mid-lesson because a matchMedia flipped would be a
+   * worse defect than the one being fixed.
+   */
+  const [hintInput] = useState<HintInput>(() => hintInputFor(hasTouchScreen()));
   // Engine state: ref-resident, frame-rate mutations, zero re-renders.
   const [initialSession] = useState(() => createLessonSession(lesson));
   const sessionRef = useRef<LessonSessionState>(initialSession);
@@ -1046,6 +1371,23 @@ export function LessonPlayShell({
   // persisted setting on purpose — skipping once must not silently rewrite a
   // preference, and re-opening once must not silently restore one.
   const [endSkipped, setEndSkipped] = useState(false);
+  // A6: the ids of overlay lines the student has sent away with the ✕. A Set in
+  // state and not a ref, because the filter below has to re-run on the render
+  // that follows the tap — a card that comes back on the next 150 ms HUD poll
+  // has not been dismissed, it has blinked. Ids carry their content (the task
+  // id is `task:2/3:<title>:<ping>`), so dismissing one line never silences the
+  // next one.
+  const [dismissedOverlayIds, setDismissedOverlayIds] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+  const dismissOverlayItem = useCallback((it: SimOverlayItem) => {
+    setDismissedOverlayIds((prev) => {
+      if (prev.has(it.id)) return prev;
+      const next = new Set(prev);
+      next.add(it.id);
+      return next;
+    });
+  }, []);
   // -- THE BRIEFING (2026-08-02) -----------------------------------------------
   //
   // `lesson.briefingBg` is the numbered „какво ще правиш" list every scenario
@@ -1298,7 +1640,7 @@ export function LessonPlayShell({
     (rejection: DrivelineRejection, snap: DrivelineSnapshot) => {
       if (finalizedRef.current) return;
       if (rejection.kind === "shiftRejected") setGearRejectFlash((k) => k + 1);
-      const hint = rejectionHint(rejection, snap);
+      const hint = rejectionHint(rejection, snap, hintInput);
       const t = nowSec();
       const last = rejectionToastAtRef.current[hint.key] ?? Number.NEGATIVE_INFINITY;
       if (t - last < REJECTION_TOAST_COOLDOWN_S) return;
@@ -1308,8 +1650,88 @@ export function LessonPlayShell({
         REJECTION_TOAST_TTL_MS,
       );
     },
-    [nowSec, push],
+    [hintInput, nowSec, push],
   );
+
+  // …and the refusal that has no DrivelineEvent at all, because nothing was
+  // rejected: the selector really did move to R, and the PEDAL is what the car
+  // is declining to read as throttle (engine/reverseAssist.ts LAW 2). It is
+  // the same class of defect as the one above — an input refused for a reason
+  // the student cannot see — so it gets the same treatment and the same
+  // channel. NOT the 3.5 s rejection TTL: this one carries three sentences of
+  // explanation, so it keeps the kind's own 8 s teaching TTL (HudToasts.ts,
+  // TEACHING_TOAST_TTL_MS ≈ 15 chars/s at driving load). The machine's own
+  // REVERSE_STUCK_REPEAT_S rate-limits it upstream, on the STATE rather than
+  // on a clock here — a driver who lifts is never told twice.
+  const handleReversePedalStuck = useCallback(
+    (direction: ReverseStuckDirection) => {
+      if (finalizedRef.current) return;
+      const hint = reverseStuckHint(direction);
+      push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
+    },
+    [push],
+  );
+
+  // …and the same defect with no guard behind it at all: the throttle is down
+  // and the CAR cannot move (engine off / P / N / parking brake on) on a rung
+  // that has no pre-drive phase, so the QW10 hint below can never reach it.
+  // Rate-limited upstream on the STATE (engine/stuckStart.ts), so clearing one
+  // blocker is answered with the next one immediately instead of after a
+  // cooldown — an instructor does not make you wait to be told the next thing.
+  const handleStuckStart = useCallback(
+    (reason: StuckStartReason) => {
+      if (finalizedRef.current) return;
+      // The LIVE tier, not the lesson's — the picker switches it mid-drive.
+      const hint = stuckStartHint(
+        reason,
+        drivelineRef.current?.transmission ?? "automatic",
+        hintInput,
+      );
+      push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
+    },
+    [hintInput, push],
+  );
+
+  // …and the one that is not a refusal at all: the tier pill moved the
+  // student's own gear lever (see transmissionSwitchHint). No rate limit and
+  // none needed — the driveline reports a move only when the lever really
+  // moved, which takes a deliberate click on the pill, and the round trip that
+  // puts a lever back where it was found reports nothing.
+  const handleTransmissionChanged = useCallback(
+    (transmission: TransmissionMode, movedSelectorTo: SelectorPosition) => {
+      if (finalizedRef.current) return;
+      const hint = transmissionSwitchHint(transmission, movedSelectorTo, hintInput);
+      push([{ kind: "lesson", titleBg: hint.titleBg, explanationBg: hint.explanationBg }]);
+    },
+    [hintInput, push],
+  );
+
+  // THE PEDALS THAT LEFT THE SCREEN — lesson-ui/MousePedals.tsx.
+  //
+  // Not a refusal by a guard and not a car that cannot move: a CONTROL removed
+  // itself. The pads yield to a student who has started driving on W/S, which
+  // is the right behaviour and the founder's own screen budget — but measured
+  // on the drive rig 2026-08-11, ONE 120 ms tap of ↓ took them for 12.4 s, no
+  // click brought them back (the hidden branch renders nothing to click) and
+  // nothing was said. On the lane that exists because „first and upmost it must
+  // be with the mouse", a mouse-first student losing his only pedals in silence
+  // is the same bare verdict THEO-4 forbids.
+  //
+  // The way back is now the pointer itself and it is instant, so this sentence
+  // is not the fix — it is the reason, which is the half THEO-4 is about. It
+  // fires at most ONCE per session and only for a student who had actually been
+  // holding a pad, so a keyboard driver who never touched them never sees it.
+  const handleMousePedalsYielded = useCallback(() => {
+    if (finalizedRef.current) return;
+    push([
+      {
+        kind: "lesson",
+        titleBg: "Педалите се скриха — движи мишката",
+        explanationBg:
+          "Натисна клавиш за газ или спирачка, затова екранните педали се отдръпнаха: щом караш от клавиатурата, те само заемат от пътя. Не си ги загубил — върни ги веднага, като помръднеш мишката или щракнеш някъде в картината. Газ и спирачка работят еднакво и от двете места, включително W и S.",
+      },
+    ]);
+  }, [push]);
 
   // -- finalize: fold + persist ------------------------------------------------
   const finalize = useCallback(
@@ -1533,11 +1955,19 @@ export function LessonPlayShell({
         // Wording matches advisor.ts's own mouse-first step copy verbatim, so
         // the toast and the checklist can never say two different things; the
         // keys stay, demoted to the footnote they are for the advanced.
+        //
+        // …AND THE SAME SENTENCE WAS A DEAD END ON A PHONE (J-WAVE-4). „с
+        // мишката, в кабината" is false there twice over — no mouse, and the
+        // controls a thumb reaches are the ⚙ strip's, not the 3-D console's —
+        // so the touch reader now gets the three cells by name. One sentence,
+        // one set of steps, named in whichever controls are actually on screen.
         explanationBg:
-          "Работи с истинските контроли — с мишката, в кабината: щракни стартера на конзолата, щракни скоростния лост към D, щракни ключа на ръчната спирачка. Списъкът вляво се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне. (За напреднали: същото става с I, ] и Space.)",
+          hintInput === "touch"
+            ? `Работи с истинските контроли на екрана: ${starterActBg("touch")}, ${gearUpActBg("touch", drivelineRef.current?.transmission ?? "automatic")}, ${parkingBrakeActBg("touch")}. ${TOUCH_SHEET_LOCATOR_BG} Списъкът се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне.`
+            : "Работи с истинските контроли — с мишката, в кабината: щракни стартера на конзолата, щракни скоростния лост към D, щракни ключа на ръчната спирачка. Списъкът вляво се отмята сам, докато го правиш — потегляш с газта, когато колата наистина може да тръгне. (За напреднали: същото става с I, ] и Space.)",
       },
     ]);
-  }, [nowSec, push]);
+  }, [hintInput, nowSec, push]);
 
   // -- A2 practice mode: gentle hint after ~20 s of pre-drive idling ------------
   useEffect(() => {
@@ -1825,7 +2255,36 @@ export function LessonPlayShell({
                   : result.passed
                     ? "Издържан — виж разбора"
                     : "Неиздържан — виж разбора",
-              blocking: true,
+              // A2 — WHAT „НЕ ПОКАЗВАЙ АВТОМАТИЧНО" TURNS OFF ON A PHONE.
+              //
+              // On a roomy screen the end-of-lesson popup opens itself and the
+              // setting stops it. Compact never had a popup to stop — the
+              // debrief has always been tap-to-open here — so rendering that
+              // setting on a phone would have been a control that does nothing,
+              // which is worse than not offering it.
+              //
+              // What DOES pop up by itself on the phone is THIS line, blocking:
+              // it freezes the layer and the only way past it is „Резултат",
+              // which opens the very debrief the student is trying to skip. So
+              // that is what the preference governs here. Switched off (or once
+              // the student has skipped this run) the line stays — the verdict
+              // is not a thing to hide — but it stops demanding an answer: it
+              // becomes an ordinary notification with a ✕ (row A6) beside a
+              // „Резултат" chip that still opens the full, law-cited debrief.
+              //
+              // THEO-4 survives the dismissal: „Виж разбора" is added to the
+              // micro menu for the whole ended session (see `menuItems`), which
+              // is the same recall the task line has had since 2026-07-29.
+              // I1 outranks both — while the calibration gate holds the result
+              // the line blocks, because self-assessment is a required step.
+              // The rule is `endLineDemandsAnswer` in hud/hudPreferences.ts,
+              // beside `shouldShowDebrief`, so the phone's answer and the
+              // desktop's answer are stated in one file and tested together.
+              blocking: endLineDemandsAnswer({
+                held: resultHeld,
+                autoOpen: endAutoOpen,
+                skipped: endSkipped,
+              }),
               ackLabelBg: "Резултат",
               onAck: () => setEndExpanded(true),
             }
@@ -2009,7 +2468,17 @@ export function LessonPlayShell({
           : null,
       ];
 
-  const overlay = selectOverlay(overlayCandidates);
+  // A6: a line the student sent away is no longer a candidate. Filtered HERE
+  // and not inside SimOverlay, because `overlay.active` is what tells the rest
+  // of the shell that the overlay layer is speaking (`data-sim-overlay-active`,
+  // which hides the difficulty chip and the telltale pings) — hiding the card
+  // without clearing that flag would leave the scene chrome suppressed by a
+  // notification that is not on the screen any more.
+  const overlay = selectOverlay(
+    dismissedOverlayIds.size === 0
+      ? overlayCandidates
+      : overlayCandidates.filter((c) => c === null || !dismissedOverlayIds.has(c.id)),
+  );
 
   // -- L15: is the full-frame debrief on screen? --------------------------------
   //
@@ -2039,7 +2508,17 @@ export function LessonPlayShell({
   }, []);
 
   const menuItems = ended
-    ? [{ key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect }]
+    ? [
+        // A2/A6, THEO-4: once the end line can be sent away with a ✕, the
+        // explanation must still be one tap from anywhere. Same recall grammar
+        // as „Задача" during the drive — the price of a dismissible notification
+        // is a permanent way to bring it back, and a verdict without its
+        // law-cited WHY is exactly what requirement zero forbids.
+        ...(compact && result !== null
+          ? [{ key: "debrief", labelBg: "Виж разбора", onSelect: openDebrief }]
+          : []),
+        { key: "exit", labelBg: "← Всички уроци", onSelect: onExitToSelect },
+      ]
     : [
         ...(!examMode && !mistakeMode
           ? [
@@ -2305,7 +2784,51 @@ export function LessonPlayShell({
               }
         }
       >
-        <div className="h-full w-full">
+        {/* ═══ THE ROAD TAKES NO BROWSER GESTURES — doc 91 §I6/§T1 ═════════════
+            The founder: „the interface can move left/right and portions of the
+            platform can effectively slide outside the visible screen."
+
+            It is NOT overflow and it is NOT the document scrolling. Measured
+            again on this branch (Chromium, 852×393, dpr 3, real insets,
+            `matchMedia("(pointer: coarse)")` verified true, `data-sim-compact`
+            = "on"): `scrollWidth === clientWidth === 852`, and a walk of every
+            rendered element found ZERO nodes crossing 100vw or with a negative
+            left edge. A one-finger drag left `scrollX` and
+            `visualViewport.offsetLeft` at 0. So `overflow-x: hidden` would hide
+            nothing, and the founder was right to forbid it.
+
+            What DOES move is the VISUAL VIEWPORT. A real two-finger pinch,
+            fired through CDP `Input.dispatchTouchEvent` with an explicit
+            two-point `touchPoints` array (Playwright's touchscreen is
+            single-tap and cannot express this, which is why no earlier wave
+            caught it), took the road to `visualViewport.scale` 5 — and one
+            finger then panned it to `offsetLeft` 247, `offsetTop` 24. That is
+            his sentence, reproduced: the picture slides and the edges of the
+            platform go off-screen. The instrument was proved honest first — the
+            same code zooms a known-zoomable positive control 1 → 5, which is
+            the check the audit's own gesture lane failed and had to discard.
+
+            `touch-action: none` is the only mechanism that stops it in EVERY
+            engine: Safari has ignored `user-scalable` / `maximum-scale` since
+            iOS 10, so the viewport meta cannot do this job — and that meta is a
+            GLOBAL export in app/layout.tsx, so reaching for it would disable
+            pinch-zoom on the theory and exam screens, where minors read dense
+            Bulgarian legal text. That is an accessibility regression this
+            product will not pay for a driving-screen bug.
+
+            SCOPED TO THE CANVAS WRAPPER, NOT THE SHELL AND NOT THE STAGE, and
+            the scope is the whole care here. `touch-action` is resolved up the
+            DOM ancestor chain, so `none` on an ancestor silently disables
+            touch scrolling in every descendant. The stage box (`data-sim-stage`,
+            just above) runs to the end of this component and contains the
+            full-screen overlay scroller below, and the pre-drive tutorial card
+            is 743–821 px tall in a 393 px viewport — its «Разбрах» is 300–423 px
+            below the fold on 13 of 13 landscape steps (doc 91 §L8), so scrolling
+            it is the ONLY way to finish a step. Killing that to stop a zoom
+            would trade a nuisance for an unwinnable lesson. This div's only
+            child is the scene, every HUD overlay is a sibling of it, so exactly
+            the road stops taking gestures and nothing else changes. */}
+        <div className="h-full w-full" style={{ touchAction: "none" }}>
           <SceneSlot
             key={sceneEpoch}
             lesson={lesson}
@@ -2333,6 +2856,10 @@ export function LessonPlayShell({
             onMinimapFrame={setMinimapFrame}
             onDriveline={handleDriveline}
             onDrivelineRejection={handleDrivelineRejection}
+            onReversePedalStuck={handleReversePedalStuck}
+            onStuckStart={handleStuckStart}
+            onTransmissionChanged={handleTransmissionChanged}
+            onMousePedalsYielded={handleMousePedalsYielded}
             // P1: the touch overlay's ⛶ button — same QW1 toggle as key X.
             // Omitted where the API does not exist (iPhone Safari): the
             // overlay drops the button rather than offering a no-op.
@@ -2361,6 +2888,8 @@ export function LessonPlayShell({
             queued={overlay.queued}
             frozen={teachQueue.length > 0 || activeQuiz !== null || ended}
             onOpenChange={setOverlaySheetOpen}
+            // A6 — „those pop ups need to be able to be removed when clicked."
+            onDismiss={dismissOverlayItem}
             renderDetail={(item) =>
               item.kind === "predrive" ? (
                 <PreDriveChecklist
@@ -2558,6 +3087,12 @@ export function LessonPlayShell({
         {!ended ? (
           compact ? (
             <div
+              // `data-hud` because PORTRAIT moves this dock into the corridor
+              // between the two thumb pads (PlayAreaStyles, 2026-08-12): on a
+              // phone held upright the two pads are 78 % of the bottom edge, so
+              // „bottom-centre" put the speed-limit disc on the steering pad on
+              // every portrait profile in the ladder.
+              data-hud="dash-dock"
               className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
             >
@@ -2566,6 +3101,9 @@ export function LessonPlayShell({
                 limitKmh={snap.limitKmh}
                 rejectFlashKey={gearRejectFlash}
                 compact
+                // The stall telltale's accessible name was „рестартирай
+                // (Z + I)" on every device — see STALL_RESTART_LABEL_BG.
+                input={hintInput}
               />
             </div>
           ) : (
@@ -2574,6 +3112,7 @@ export function LessonPlayShell({
                 statusRef={dashboardStatusRef}
                 limitKmh={snap.limitKmh}
                 rejectFlashKey={gearRejectFlash}
+                input={hintInput}
               />
             </div>
           )
@@ -2596,6 +3135,17 @@ export function LessonPlayShell({
         (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
         lesson.objectives.length > 0 ? (
           <div
+            // NAMED, 2026-08-10, and the naming is the finding. This legend
+            // stands on the same floor and the same 0.75 rem left gutter as the
+            // open demonstration deck, and it carried NO `data-hud` — so every
+            // overlap probe in this row, all of which iterate `[data-hud]`,
+            // reported a clean zero straight through it. Measured the moment a
+            // probe stopped keying on the attribute: the deck laid out
+            // [20, 304, 416 × 199] over this at [20, 464, 202 × 39], i.e. 7 878
+            // px² and a TOTAL occlusion — the legend entirely inside the deck.
+            // The handle is what lets PlayAreaStyles give it a lane, and what
+            // lets the next probe see it at all.
+            data-hud="ribbon-legend"
             className="hud-ghost absolute left-3 flex flex-col gap-0.5 px-2 py-1.5 text-[10px] font-semibold leading-tight text-muted"
             // …and not `bottom-[6.75rem]`: 108 px was the floating pill's band,
             // hard-coded here and in the minimap column. Both now read the
@@ -2636,6 +3186,12 @@ export function LessonPlayShell({
             the only pointer-events-auto thing in this corner. */}
         {!ended ? (
           <div
+            // `data-hud`: the demonstration deck stands on the SAME floor at
+            // the SAME right edge, and PlayAreaStyles is where the two are told
+            // apart (ROOMY_MINIMAP_LANE_PX). Without a name this column could
+            // only be reached by its shape, which is how it ended up under the
+            // deck's pill in the first place.
+            data-hud="minimap-column"
             className="absolute flex flex-col items-end gap-1.5"
             style={{
               bottom: "var(--sim-hud-floor, 6.75rem)",
@@ -2664,7 +3220,11 @@ export function LessonPlayShell({
                 onClick={toggleMinimap}
                 aria-pressed={minimapOn}
                 title={minimapOn ? "Скрий картата (P)" : "Покажи картата (P)"}
-                className={`hud-ghost pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border text-[15px] transition motion-reduce:transition-none ${
+                // Its size is the number the deck's floor clears (immersive.ts)
+                // — stated once, in the place the clearance is derived from,
+                // rather than as an `h-10 w-10` the stylesheet has to guess at.
+                style={{ width: MINIMAP_TOGGLE_SIZE_PX, height: MINIMAP_TOGGLE_SIZE_PX }}
+                className={`hud-ghost pointer-events-auto flex items-center justify-center rounded-full border text-[15px] transition motion-reduce:transition-none ${
                   minimapOn
                     ? "border-accent/60 text-accent"
                     : "border-border text-muted opacity-70 hover:opacity-100"
@@ -2866,7 +3426,15 @@ export function LessonPlayShell({
             className="absolute inset-0 z-40 flex items-start justify-center overflow-y-auto bg-background/85 p-4 backdrop-blur-sm sm:p-6"
           >
             <div className="flex w-full max-w-2xl flex-col gap-3">
-              {compact ? (
+              {/* A2: the compact close control USED to be here, unconditional,
+                  and it was the whole of what a phone got — a button with no
+                  note beside it and no preference behind it. `SessionEndScreen`
+                  now renders the close, the note and the setting as one block
+                  on both device classes, so this stays only for the one state
+                  that screen does not reach: while the I1 calibration gate
+                  holds the result it renders ONLY the gate, and a phone still
+                  needs a way back out of it. */}
+              {compact && resultHeld ? (
                 <button
                   type="button"
                   onClick={() => setEndExpanded(false)}
@@ -2895,7 +3463,14 @@ export function LessonPlayShell({
                   </p>
                   {result.examTermination !== undefined ? (
                     <p className="mt-1 text-sm font-bold text-danger">
-                      Изпитът се прекратява:{" "}
+                      {/* „Прекратява" is the наредба's own verb and belongs to
+                          the one case it covers (чл. 48, ал. 3 — ПТП). The
+                          other three ends are the VERDICT becoming certain, not
+                          the commission stopping the car, and saying otherwise
+                          taught a student a rule the act does not contain. */}
+                      {result.examTermination.reason === "collision"
+                        ? "Изпитът се прекратява: "
+                        : "Изпитът приключва тук: "}
                       {EXAM_TERMINATION_TEXT_BG[result.examTermination.reason]}.
                     </p>
                   ) : result.aborted ? (
@@ -2964,17 +3539,24 @@ export function LessonPlayShell({
                 // district polylines (LessonScene builds them once) — a static
                 // fit-to-route view needs nothing else.
                 mapPolylines={minimapFrame?.polylines ?? null}
-                // L15: Space skips, the note says so, and the setting in that
-                // note stops the popup opening itself from the next lesson on.
-                // Roomy only — compact already reaches this screen by an
-                // explicit tap, so there is nothing there to skip (the „▾ Скрий
-                // разбора" button above IS its close control) — and never while
-                // the calibration gate holds the result.
-                onSkip={!compact && !resultHeld ? skipDebrief : null}
+                // L15/A2: Space skips, the note says so, and the setting in
+                // that note stops the popup opening itself from the next lesson
+                // on. Withheld only while the calibration gate holds the result
+                // — there is nothing to skip yet.
+                //
+                // `!compact &&` USED TO GUARD ALL THREE, and that single
+                // conjunct is the whole of row A2's phone half: the argument
+                // was „compact reaches this screen by an explicit tap, so there
+                // is nothing to skip". It is wrong twice. The phone had no note
+                // saying how to leave, and it had no way at all to stop the
+                // end-of-session line demanding an answer — which is the thing
+                // that pops up by itself on a phone. Both now render, and
+                // `compact` tells the screen to say it in touch words and to
+                // give the close control the full width of the phone.
+                compact={compact}
+                onSkip={!resultHeld ? skipDebrief : null}
                 autoOpen={endAutoOpen}
-                onAutoOpenChange={
-                  !compact && !resultHeld ? setEndAutoOpenPersisted : null
-                }
+                onAutoOpenChange={!resultHeld ? setEndAutoOpenPersisted : null}
               />
             </div>
           </div>

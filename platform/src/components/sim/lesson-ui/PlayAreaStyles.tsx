@@ -1,14 +1,36 @@
 "use client";
 
-import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";
+import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import {
-  NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT,
+  PAD_CORRIDOR_LEFT_CSS,
+  PAD_CORRIDOR_RIGHT_CSS,
+  STEER_PAD_DECK_CLEARANCE_CSS,
+  TOP_RAIL_ROW_CSS,
+  TOUCH_CONTROLS_FLOOR,
+} from "../TouchControls";
+import { ROOMY_HUD_FLOOR_PX, ROOMY_MINIMAP_LANE_PX } from "./immersive";
+import {
+  CONTROLS_HELP_TOP_INSET_PX,
+  DECK_COMPACT_COLUMN_RESERVE_PX,
+  DECK_COMPACT_OPEN_LEFT_CSS,
+  DECK_COMPACT_OPEN_PORTRAIT_LEFT_CSS,
+  DECK_COMPACT_OPEN_WIDTH_CSS,
+  DECK_ROOMY_LEGEND_GUTTER_PX,
+  DECK_ROOMY_OPEN_HEIGHT_PX,
+  DECK_ROOMY_OPEN_LEFT_CSS,
+  DECK_ROOMY_OPEN_WIDTH_CSS,
+  DECK_TOUCH_CAPTION_HEIGHT_PORTRAIT_PX,
+  DECK_TOUCH_CAPTION_MAX_VAR,
+  DECK_TOUCH_CAPTION_ROAD_MAX_PX,
+  DECK_TOUCH_CAPTION_VAR,
+  DECK_TOUCH_TRANSPORT_ROW_PX,
   NOTIFY_COLUMN_DECK_RESERVE_PX,
   NOTIFY_COLUMN_RIGHT_CSS,
   NOTIFY_COLUMN_TOP_CSS_COMPACT,
   NOTIFY_COLUMN_TOP_CSS_ROOMY,
   NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
   NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
+  RIBBON_LEGEND_LANE_PX,
 } from "@/modules/sim/hud";
 
 /**
@@ -67,9 +89,10 @@ export function PlayAreaStyles() {
              It is already collapsed on touch, but the chip still sits exactly
              where the one control a phone DOES need has to go.
            [data-hud="difficulty"]     the Начинаещ/Нормален/Напреднал picker
-             at right-3 top-3. It stays (difficulty is a real choice), it just
-             moves clear of the notch now that the app ships viewport-fit=cover
-             and that corner can be under a cutout.
+             at right-3 top-3. It used to be nudged clear of the notch and
+             left there; since J-WAVE-3 it is not on a phone at all — see the
+             block on the rule itself for the 255-into-167.5 arithmetic and for
+             where the control went instead.
 
          A CSS rule and not a prop, deliberately: LessonScene belongs to the
          scene lane, both elements already carry stable data-hud names, and a
@@ -80,9 +103,62 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"] [data-hud="controls-help"] {
         display: none;
       }
+      /* ══════════════════════════════════════════════════════════════════
+         THE TIER PICKER LEAVES THE PHONE'S TOP STRIP — 2026-08-12, J-WAVE-3.
+
+         THE DEAD CONTROL, MEASURED (WebKit, real insets, „/dev/drive-rig“
+         l0-free-drive, all three PORTRAIT profiles, in EVERY state and on both
+         routes). „elementFromPoint“ at «Начинаещ»'s own centre answered
+         «Пауза»:
+
+           iphone16-portrait  1 dead, 1 325 px²
+                              «Пауза» [128,67 53×44] ∩ «Начинаещ» [126,72 78×25]
+           small-portrait     1 dead, 1 975 px² — «Пауза»∩«Начинаещ» 1 075,
+                              «Изглед»∩«Начинаещ» 775, «Пауза»∩«Нормален» 125
+           galaxy-portrait    1 dead, 1 975 px² — identical to its 360×780 twin
+
+         and, on the same frames, «Начинаещ» printed straight ACROSS «ИЗГЛЕД»
+         and «ПАУЗА». That scored 0 in the text-over-control column only because
+         the metric skips text inside a button — the number was right and the
+         number was not the whole answer.
+
+         TWO OWNERS, ONE STRIP. „TOP_RAIL_RIGHT_CSS“ reserves the notification
+         column's lane and nothing else; this rule used to pin the picker to
+         „top: 0.5rem + inset, right: 0.75rem“. Neither knew about the other.
+
+         AND THE STRIP CANNOT HOLD BOTH — this is arithmetic, not a taste call.
+         The picker lays out 255 px («Начинаещ» 78 + «Нормален» 78 +
+         «Напреднал» 85, two 4 px gaps, 8 px of padding). What the top band has
+         to offer it, on a 393 px portrait stage:
+
+           the rail's lane   x 64 → 231.5  = 167.5 px, and five word-buttons
+                             are ALREADY wrapping to three rows inside it
+           the column's lane x 239.5 → 381 = 141.5 px (min(15rem, 36vw)), 129.6
+                             on the 360 px Android
+
+         255 into 167.5, or 255 into 141.5. Neither fits, and abbreviating does
+         not rescue it: three targets at the product's own 44 px floor plus two
+         gaps is 148 px, which is already wider than the 129.6 the narrowest
+         phone leaves. Stacking them vertically fits the width and costs 132 px
+         of the notification lane — the corridor the authored sentence lives in.
+
+         SO IT IS NOT MOVED, IT IS REPLACED. The picker is the surface this file
+         has already twice ruled may stand down — „the only one of the three
+         that carries no information" (the glance rule below) and rank 4 of four
+         in row C1, „chrome, and the only one of the four that is still one tap
+         away at any time from the ⚙ sheet". THAT LAST CLAUSE WAS NOT TRUE: the
+         sheet had no tier control. It does now („TouchControls“, the «НОРМ»
+         cell, immediately before «СЪЕД» because the tier is what decides
+         whether that clutch exists) — so the sentence this file has been
+         telling itself since row C1 is finally the sentence it ships.
+
+         ROOMY IS UNTOUCHED. There the corner is 320 px of column starting
+         2.75 rem lower („NOTIFY_COLUMN_TOP_CSS_ROOMY“ clears the picker's row
+         by construction), the rail does not exist, and the segmented control is
+         the right shape for a mouse. This is a phone rule and only a phone rule.
+         ══════════════════════════════════════════════════════════════════ */
       [data-sim-compact="on"] [data-hud="difficulty"] {
-        right: calc(0.75rem + env(safe-area-inset-right, 0px));
-        top: calc(0.5rem + env(safe-area-inset-top, 0px));
+        display: none;
       }
 
       /* ══════════════════════════════════════════════════════════════════
@@ -129,8 +205,42 @@ export function PlayAreaStyles() {
          ══════════════════════════════════════════════════════════════════ */
       [data-hud="demo-deck"] {
         left: auto;
-        right: ${NOTIFY_COLUMN_RIGHT_CSS};
-        width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
+        /* …AND IT LEAVES THE MAP TOGGLE'S LANE AT ITS RIGHT EDGE — 2026-08-10.
+
+           THE COLLISION, MEASURED (WebKit, 1264 × 619, the real lesson shell,
+           sc-zebra-approach@L1). Collapsed: the deck's pill
+           [1109.8, 476.5, 134.2 × 26.5] over the map toggle [1204, 463, 40 × 40]
+           — 1 060 px², and „elementFromPoint" at the toggle's own centre
+           answered «🎬 Демонстрация ▸». Open: the transport row wraps to two
+           lines at this width, so the deck's box reaches y 491 and the hit test
+           at the same point answered the row's wrapper. THE MAP TOGGLE WAS DEAD
+           IN BOTH DECK STATES — a student could not open the minimap on any
+           lesson that carries a demonstration.
+
+           They collided because the deck MOVED here: it used to be centred over
+           the road, and the 2026-08-03 pass dragged it into the right-edge
+           column at the same floor and the same gutter the toggle and the
+           shadow-line legend were already standing on. The deck is the
+           newcomer, so the deck is what yields — the toggle stays exactly where
+           students have been finding it.
+
+           IT YIELDS SIDEWAYS AND NOT UPWARD, and that is the whole measurement,
+           not a taste call. Lifting the deck by the same 48 px was tried first
+           and re-measured: it freed the toggle and pushed the collapsed pill UP
+           into the briefing card, where „elementFromPoint" then answered the
+           column — one dead control traded for another, plus one more of the
+           open deck's controls buried (13 of 13 instead of 12). Insetting the
+           right edge instead moves nothing vertically: the deck keeps the
+           column's LEFT edge, so nothing travels toward the road, and the
+           corner reads as a notch cut for the toggle.
+
+           The lane is the toggle's own size plus this HUD's 8 px gutter
+           (immersive.ts), so the button and the clearance cannot drift.
+           ROOMY only — the compact rule below restates both properties, and on
+           a phone this toggle is not rendered at all (the micro menu carries
+           «Карта»), so there is nothing there to clear. */
+        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${ROOMY_MINIMAP_LANE_PX}px);
+        width: calc(${NOTIFY_COLUMN_WIDTH_CSS_ROOMY} - ${ROOMY_MINIMAP_LANE_PX}px);
         /* BOTH, and "translate" is the one that actually does the work here.
            Tailwind v4 compiles "-translate-x-1/2" to the INDEPENDENT translate
            property, not to transform — so a rule that only cancels transform
@@ -143,16 +253,477 @@ export function PlayAreaStyles() {
         align-items: flex-end;
       }
       [data-sim-compact="on"] [data-hud="demo-deck"] {
-        bottom: min(${TOUCH_CONTROLS_FLOOR}, ${NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT});
+        /* THE 45 % CAP IS GONE — 2026-08-10, row C1, and this is the largest
+           single overlap the row was opened on.
+
+           It used to read „min(TOUCH_CONTROLS_FLOOR, 45%)". The cap was added
+           to stop the deck being LIFTED into the column on a short stage, and
+           it did — by dropping it onto the thumb controls instead. Measured,
+           WebKit, iPhone 16 landscape 852 × 393 with the real insets, the
+           collapsed pill's hit rect [646.8, 177.7, 134.2 × 50.5] against:
+
+             «Клаксон — задръж»  [667, 176, 44×44]   1 861 px²  (44 × 42.3)
+             the drivetrain pad  [617, 220, 235×173] 1 100 px²  (134.2 × 8.2)
+
+           and on the 780 × 360 Android 1 936 px² — the horn ENTIRELY under the
+           deck — plus 198 px² of the right-mirror glance. None of the three was
+           reported by any lane, because a scrub bar landing on the horn is not
+           a shape anybody thought to look for.
+
+           The floor alone is correct now that the arc no longer climbs (see
+           TouchControls' ARC block): TOUCH_CONTROLS_FLOOR clears the whole band
+           INCLUDING this button's own 0.75 rem ::before, which is what the
+           floor's 1.25 rem gap is for. */
+        bottom: ${TOUCH_CONTROLS_FLOOR};
         width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+        /* …AND THE RIGHT EDGE IS RESTATED, NOT INHERITED — 2026-08-10.
+           The base rule above now insets the deck by the map toggle's lane,
+           which is a ROOMY fact: that toggle is not rendered on a phone at all.
+           Without this line the compact deck would inherit the inset and every
+           phone geometry this file measures — the 45 px of clearance above the
+           control band, the landscape strip's width — would silently shift by
+           48 px. It resolves to exactly the value the compact deck already had. */
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+      }
+
+      /* …AND ON A SHORT STAGE IT CHANGES CORRIDOR, because three things do not
+         fit in one — the same sentence this file already writes about the tier
+         picker, one surface further down.
+
+         Landscape 852 × 393, top to bottom, everything the RIGHT corridor is
+         asked to hold: 8 px of inset, a 106.3 px briefing card, the deck's
+         50.5 px hit rect, and a control band of 152 (pad) + 20.5 (rise) + 44
+         (station) + 21 (home indicator) = 237.5. That is 402.3 of a 393 px
+         stage BEFORE a single gutter, and 414.3 with two. It cannot be done,
+         and the two ways to not do it are to hide something or to move it.
+
+         Hiding is worse here than it is for the tier picker: this is the
+         transport for a demonstration that may be PLAYING, and chrome that
+         blinks in and out as cards arrive is the founder's own „elements moving
+         when popups appear". So it MOVES — to the other corridor he drew, which
+         on a phone held sideways is empty from the lesson menu (ends y 52) down
+         to the steering arc (starts y 171.5). Measured there afterwards: the
+         pill at [71, 109, 240 × 26.5] and its hit rect at y 97–147.5, i.e.
+         45 px clear of the menu above it and 24 px clear of the arc below.
+
+         It keeps the DRIVE side's floor rather than the steering side's, which
+         is 16 px taller than it needs to be here — one constant, and the extra
+         clearance is free. Portrait is untouched: there the pill starts at
+         y 443.5 against a column that ends by y 173, so the right corridor
+         holds all three with 270 px to spare. */
+      @media (max-height: 560px) {
+        [data-sim-compact="on"] [data-hud="demo-deck"] {
+          right: auto;
+          left: calc(0.75rem + env(safe-area-inset-left, 0px));
+          align-items: flex-start;
+        }
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         …AND WHEN IT IS OPEN IT IS A DIFFERENT SHAPE — 2026-08-10.
+
+         THE REGRESSION THIS CLOSES, AND WE CAUSED IT. Raising the floor to the
+         whole control band above is right for the COLLAPSED pill (26.5 px,
+         45 px of clearance) and impossible for the OPEN panel (231.5 px). On a
+         393 px landscape stage the panel therefore laid out at y = −96 with its
+         own toggle off the top of the screen: measured on all four device
+         profiles, the deck could be opened and then not closed, its pause
+         button sat on «Меню на урока» (1 024 px² at 852 × 393, 864 px² at
+         780 × 360) and elementFromPoint at the pause button's own centre
+         returned the menu.
+
+         Neither the floor nor the six overlaps it closed are given back. What
+         changes is that the OPEN deck stops hanging from that floor:
+
+         PORTRAIT keeps the floor and gains a ceiling. The deck and the
+         notification column share this corridor, and the column's compact cap
+         already runs down to the band — so the deck, which the student opened
+         and can close, yields DECK_COMPACT_COLUMN_RESERVE_PX to the column,
+         which is where the authored sentence lives. Resolves to 295 px of deck
+         at 393 × 852 and 316 px at 360 × 780, against a measured open height of
+         about 256.
+
+         LANDSCAPE hangs from the TOP instead, beside the lesson menu rather
+         than under it. Under the menu there are 83.5 px of clear corridor
+         (852 × 393) and 72 px (780 × 360) — one row of 44 px controls and no
+         caption. Beside it there are 127.5 and 116, which is a row AND the
+         teach card, and 410–456 px of width for the row to lay out on ONE line.
+         The numbers come from notifyColumn.ts so the CSS here and the arithmetic
+         in the tests cannot drift.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-sim-compact="on"] [data-hud="demo-deck"][data-deck-open="true"] {
+        /* THE TEACH CARD GREW A CEILING INSTEAD OF A HEIGHT — 2026-08-11.
+
+           This used to publish ONE number, 78 px, „four lines fit the portrait
+           column", and it was sized against the pilot trace's longest caption
+           (71 characters). The corpus is 1 811 captions with a median of 80 and
+           a maximum of 249, and measured in this very box on this very phone it
+           clamped 89 % of them — including the founder's own «…броим до три»,
+           which needs 94 px of a 78 px box and loses exactly the four words
+           that say how long to stand still at a Б2. The full sweep, all five
+           profiles, is in notifyColumn.ts.
+
+           A caption is on screen for FOUR SECONDS (traces/sample.ts,
+           activeAnnotationIndex windowSec = 4), so „it scrolls" was never an
+           answer: an unhinted scroll region cannot be discovered, reached and
+           read inside four seconds, and the text is gone before the gesture
+           lands. The box has to FIT.
+
+           So in PORTRAIT the box takes its content (height: auto) up to a ceiling,
+           and the deck below spans the stage instead of the 36 % notification
+           lane it inherited from the collapsed pill. The „nothing moves"
+           contract is not weakened, it is re-derived: this deck is BOTTOM
+           anchored and on a phone its toggle is the first control of the
+           transport ROW — the deck's last child — so the card grows upward into
+           stage that the census says is empty and every control keeps its y.
+           The short-stage rule below restates the fixed height, because a
+           TOP-anchored deck would push its own toggle down the screen. */
+        ${DECK_TOUCH_CAPTION_VAR}: auto;
+        ${DECK_TOUCH_CAPTION_MAX_VAR}: ${DECK_TOUCH_CAPTION_HEIGHT_PORTRAIT_PX / 16}rem;
+        /* …AND THE OPEN PANEL LEAVES THE NOTIFICATION LANE. The collapsed pill
+           keeps it (the rule above); this is the open panel, which is not a
+           notification. Census with the deck open at 393 × 852: nothing paints
+           left of x 239.5 between the deck's ceiling (y 186) and the control
+           band (y 470) — the column above ends at 173.3 and the nearest thumb
+           control is «Пауза» at y 506. Worth 141.5 → 369 px of caption width
+           and one whole fold of the transport (202 → 106 px). */
+        left: ${DECK_COMPACT_OPEN_PORTRAIT_LEFT_CSS};
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+        width: auto;
+        max-height: calc(
+          100% - ${TOUCH_CONTROLS_FLOOR} - ${NOTIFY_COLUMN_TOP_CSS_COMPACT} -
+            ${DECK_COMPACT_COLUMN_RESERVE_PX}px
+        );
+      }
+      @media (max-height: 560px) {
+        [data-sim-compact="on"] [data-hud="demo-deck"][data-deck-open="true"] {
+          /* ══════════════════════════════════════════════════════════
+             THE CAPTION STOPS COMPETING FOR THIS CORRIDOR — 2026-08-12,
+             J-WAVE-4, and the previous rule's own prediction is why.
+
+             That rule (one line, 30 px) said the loss would be limited to
+             „the shortest sideways phone". Measured the next day in WebKit
+             on a PRODUCTION build, on the real /simulator route, with real
+             insets, deck open and a caption live:
+
+               iPhone 16 landscape  caption box 410 ×  13.5  1811/1811 cut
+               780 × 360 Android    caption box 456 ×   2.0  smaller than an
+                                                             EMPTY card
+               Samsung gesture bar  caption box 456 × −22.0  the 58 px
+                                                             transport row does
+                                                             not fit its 40 px
+                                                             deck
+
+             EVERY sideways phone, including the founder's, and photographed:
+             «Напред е път с предимство и знак Б2 „Спри!"…» sliced horizontally
+             through the middle of its glyphs. That is 100 % of the
+             demonstration's authored teaching text — the citations included —
+             gone on the orientation people actually drive in.
+
+             The corridor is not negotiable (75.5 px iPhone, 40 px Samsung,
+             against a shrink-0 58 px transport row), so the caption LEAVES it.
+             Out of flow, the deck is exactly its transport row, which fits
+             everywhere and fixes the Samsung overflow as a side effect. The
+             caption is positioned below the deck, over the road, in the lane
+             the census says is empty — see the deck-caption rule further down.
+             ══════════════════════════════════════════════════════════ */
+          ${DECK_TOUCH_CAPTION_VAR}: auto;
+          ${DECK_TOUCH_CAPTION_MAX_VAR}: ${DECK_TOUCH_CAPTION_ROAD_MAX_PX / 16}rem;
+          /* …AND IT STARTS BELOW THE TOP RAIL — 2026-08-12, J-WAVE-2.
+             The rail landed at "top: 0.5rem", "left: 0.5rem + 3.5rem", and
+             that left bound is THIS DECK'S OWN clearance constant, taken by
+             the rail because it is the one lane past «Меню». Sideways this
+             deck hangs from the same "top", so the two started at the same
+             point. Measured on the Samsung gesture-bar row (780 × 360, the
+             34.6 % profile), deck [64,8 456×92] against rail [64,8 456×44]:
+             20 064 px² of surface, NINE overlapping control pairs (768 px²,
+             the transport's hit boxes reaching 3 px above their own row —
+             «Пауза» ∩ «Пауза», the deck's ⏸ against the rail's word) and,
+             with a caption up, 14 366 px² of the demonstration's own prose
+             lying across all five rail buttons.
+             THE RAIL IS THE FIXED ONE: it is the corner his reference reserves
+             for the two opaque buttons and it has to be findable in every
+             state, including this one. So the deck takes the lane below it —
+             the same yield it already makes to the map toggle's lane, and one
+             property rather than a second overlap patch.
+             THE COST, STATED: this corridor was already tight, so the 52 px
+             came out of the CAPTION, which was the "min-h-0" child here and
+             therefore the thing that gave. That cost was UNDER-STATED — it was
+             the whole caption on every sideways phone, not a few pixels on the
+             shortest — and the block above carries the production measurement
+             and the fix. The rail itself is untouched: it is still the fixed
+             one and this deck still takes the lane below it. */
+          top: calc(${NOTIFY_COLUMN_TOP_CSS_COMPACT} + ${TOP_RAIL_ROW_CSS});
+          bottom: auto;
+          right: auto;
+          left: ${DECK_COMPACT_OPEN_LEFT_CSS};
+          width: ${DECK_COMPACT_OPEN_WIDTH_CSS};
+          /* THE DECK IS ITS TRANSPORT ROW, EXACTLY — 2026-08-12, J-WAVE-4.
+             It used to be "whatever the corridor leaves", and on the Samsung
+             the corridor leaves 40 px against a 58 px shrink-0 row: the deck
+             was overflowing its own container and its caption box computed a
+             NEGATIVE height (−22). With the caption out of flow the row is the
+             only child, so the honest bound is the row. It is still a bound —
+             a second child would clip and the overlap probe would say so — and
+             it is derived, not copied (notifyColumn.ts). */
+          max-height: ${DECK_TOUCH_TRANSPORT_ROW_PX / 16}rem;
+        }
+
+        /* ══════════════════════════════════════════════════════════════
+           …AND THE CAPTION HANGS BELOW IT, OVER THE ROAD — J-WAVE-4.
+
+           WHERE, and it is read off the running product rather than chosen.
+           Census on production with the deck open and a caption live (WebKit,
+           real insets, tools/mobile/.out/j4cap/census.mjs):
+
+             iPhone 16 852×393  deck ends y 118 · arc [0,236 267×157] ·
+                                pad [617,220 235×173] · dash dock y 338
+             Samsung  780×360   deck ends y 118 · arc [0,200 208×160] ·
+                                pad [604,184 176×176] · dash dock y 312
+
+           Below the deck and RIGHT of the steering arc nothing is painted
+           until the dash dock: 212 px of clear road on the iPhone, 186 on the
+           Samsung. The ceiling is 174 (ten whole lines inside the smaller).
+
+           THE LEFT EDGE IS THE ARC'S RIGHT EDGE, and it is TouchControls' own
+           constant rather than a copy of today's 208 —
+           STEER_PAD_DECK_CLEARANCE_CSS, 152 px on both landscape profiles,
+           with the safe-area insets cancelling out of the arithmetic. That
+           constant is in "vw" and not "%" for a reason its own note states:
+           written with the pad's percentage this lane resolved against the
+           DECK instead of the stage and landed at x 239 against an arc whose
+           right edge is 267 — 1 792 px² of prose over «Волан» the moment a
+           caption grew past two lines. Caught by re-measuring, not by reading.
+           "right: 0" keeps the deck's own right edge, which already clears the
+           drive pad (533 < 617) and the notification column (533 < 541).
+
+           "width: auto" is NOT decoration: TraceTimeline gives this box
+           Tailwind's "w-full", and width:100% beats a left/right pair — the
+           box would lay out 410 px wide starting at x 275 and hang off the
+           screen. Same class of trap as the "translate" note above.
+
+           IT PAINTS NO RECTANGLE (the rule after this one). Over the road the
+           card keeps its glyphs and a shadow and drops everything that fills
+           pixels — the treatment LessonScene's first-run hint already uses,
+           and for the reason that block gives. "pointer-events: none" so
+           prose over the road can never answer for a control underneath it;
+           the caption is not interactive and the lint below guarantees it
+           never needs to scroll.
+           ══════════════════════════════════════════════════════════════ */
+        [data-sim-compact="on"]
+          [data-hud="demo-deck"][data-deck-open="true"]
+          [data-hud="deck-caption"] {
+          position: absolute;
+          top: calc(100% + 0.5rem);
+          left: ${STEER_PAD_DECK_CLEARANCE_CSS};
+          right: 0;
+          width: auto;
+          pointer-events: none;
+        }
+        [data-sim-compact="on"]
+          [data-hud="demo-deck"][data-deck-open="true"]
+          [data-hud="deck-caption"]
+          > div {
+          /* The 1 px border stays in the BOX MODEL and only loses its colour,
+             so the card's 14 px of chrome — the number the ceiling above is
+             built from — is still true. */
+          background: none;
+          border-color: transparent;
+          backdrop-filter: none;
+          text-shadow:
+            0 1px 4px rgba(0, 0, 0, 0.96),
+            0 0 14px rgba(0, 0, 0, 0.8);
+        }
       }
 
       /* …and the column stops short of the deck rather than being painted over
          it. The reserve is the deck's own MEASURED open height plus a gutter
          (notifyColumn.ts). :has() so a screen with no demonstration — which is
-         most of them — gets the full column back. */
+         most of them — gets the full column back. ROOMY only; the compact rule
+         below supersedes it and is written to out-specify it.
+
+         ⚠ ON ROOMY THIS RULE IS A NO-OP, and it is left that way ON PURPOSE.
+         The shell writes the same property as an INLINE style
+         („LessonPlayShell": maxHeight: calc(100% − ROOMY_HUD_FLOOR_PX − 3.5rem))
+         and an inline declaration outranks any selector — the exact trap the
+         glance rules below carry an „!important" for. Turning it on would cap
+         the column at 102.5 px on a 619 px window and clip a five-step numbered
+         briefing, i.e. authored prose, i.e. THEO-4. THE COLUMN IS NOT THE ONE
+         THAT MOVES. What the corridor could not hold is settled below, by the
+         DECK changing corridor when it is open — see the block after this one
+         for the 40 691 px² this closes. */
       [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
         max-height: calc(100% - ${NOTIFY_COLUMN_DECK_RESERVE_PX}px - 6.75rem - 3.75rem);
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         THE OPEN DECK CHANGES CORRIDOR ON A DESKTOP TOO — 2026-08-10.
+
+         THE COLLISION, MEASURED IN THE RUNNING PRODUCT (WebKit, 1264 × 619,
+         the real shell on „/dev/drive-rig“, sc-zebra-approach@L1, with the
+         briefing card up — i.e. the state a lesson LANDS in, since the deck
+         opens by default). Liveness was asserted around the survey on two
+         independent counters, a browser rAF tick and a patched WebGL draw
+         entry point: 26 frames and 5 075 draw submissions inside the 1.4 s the
+         measurement was taken, so nothing here was read off a paused scene.
+
+           [data-hud="demo-deck"]     [924, 311.5, 272 × 191.5]
+           [data-hud="notify-column"] [924, 144.5, 320 × 316.6]
+           → **40 691 px²**, and EIGHT of the deck's controls answered a column
+             card at their own centres — its own «🎬 Демонстрация ▾» toggle, all
+             five annotation ticks, ⏸, ⏮ and ⏭. Every occluder computes
+             „pointer-events: auto“, and a click synthesised at each dead centre
+             was delivered to the column, so this is not a hit-test artifact.
+             The student could not operate the transport AND could not close it.
+
+         WHY THE DECK AND NOT THE COLUMN. 316.6 + 191.5 of demand against
+         358.5 px of corridor: it cannot be reserved, only relocated. The column
+         carries the authored sentence (THEO-4) and is the founder's own
+         right-edge rail; the deck is a transport and is the NEWCOMER here (the
+         2026-08-03 pass moved it into this corridor). Same arbitration the map
+         toggle's lane already used, and the same answer landscape already
+         ships: it changes corridor, to the second one the founder drew.
+
+         COLLAPSED IS DELIBERATELY UNTOUCHED — it keeps the right edge, the map
+         toggle's 48 px lane and the verified 8 px gutter at x 1196. Only the
+         open panel moves, and only on a roomy stage: „:not([data-sim-compact])“
+         because the phone rules above already place both states and a phone
+         does not render the legend this one has to clear at all.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-sim-shell]:not([data-sim-compact])
+        [data-hud="demo-deck"][data-deck-open="true"] {
+        right: auto;
+        left: ${DECK_ROOMY_OPEN_LEFT_CSS};
+        width: ${DECK_ROOMY_OPEN_WIDTH_CSS};
+        /* The base rule pins the collapsed pill to the corridor's RIGHT edge;
+           in the left corridor the pill belongs at the left one. */
+        align-items: flex-start;
+        /* THE CEILING IS THE SAME NUMBER THE LEGEND RESERVES, and that identity
+           is the point: the rule below hands this deck
+           DECK_ROOMY_OPEN_HEIGHT_PX of the left rail, so this deck may not take
+           more than DECK_ROOMY_OPEN_HEIGHT_PX. One constant governs both, so a
+           reserve and the thing it reserves for cannot disagree.
+
+           It is inert at the sizes measured — the deck IS 199 px at 1264 × 619
+           and at 1440 × 900, because the caption box is fixed and the transport
+           lays out on one line. It bites only on a narrow ROOMY stage (641 px is
+           the smallest, COMPACT_MAX_WIDTH_PX), where 40 % of the width drops the
+           deck below the 26 rem knee and the transport wraps to two lines again.
+           There the CAPTION gives way — it is the „min-h-0” scrolling child, the
+           same piece TraceTimeline's touch branch already designates — instead
+           of the transport row being pushed up through the ribbon legend. */
+        max-height: ${DECK_ROOMY_OPEN_HEIGHT_PX}px;
+      }
+
+      /* …AND THE KEYBOARD LEGEND KEEPS ITS HANDS OFF THAT SPACE.
+
+         Without this the move only trades one collision for a smaller one:
+         measured with the deck moved and nothing else changed, «⌨ Клавиши»
+         [20, 104.5, 240 × 273.2] against the deck at [20, 328, 320 × 175] was
+         11 928 px², and the legend's own «Всички клавиши» expander went dead
+         under it. The legend is the one surface of the three that carries no
+         live information — it is a static list of key bindings, it is hidden
+         outright on every phone, and it already stands aside for a held glance
+         a few rules below.
+
+         IT IS CAPPED, NOT HIDDEN, and the component was built for exactly this:
+         „the row list is a „min-h-0 overflow-y-auto“ child, so the cap scrolls
+         it instead of hiding rows", with the expander pinned so the way back is
+         never scrolled out of reach. Not one binding is lost.
+
+         „min()“ is what keeps this from being a tax on every desktop: the
+         legend's own 65 % cap wins wherever the corridor is tall enough, so a
+         1440 × 900 window — where the two never collided — is not touched at
+         all. „!important“ because that 65 % cap is an INLINE style, the same
+         trap this file names twice; „:has()“ so it applies only while a deck is
+         actually open. */
+      [data-sim-shell]:not([data-sim-compact])
+        [data-sim-stage]:has([data-hud="demo-deck"][data-deck-open="true"])
+        [data-hud="controls-help"] {
+        max-height: min(
+          calc(${HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION * 100}% - 0.75rem),
+          calc(
+            100% - ${ROOMY_HUD_FLOOR_PX}px - ${DECK_ROOMY_OPEN_HEIGHT_PX}px -
+              ${RIBBON_LEGEND_LANE_PX}px - ${DECK_ROOMY_LEGEND_GUTTER_PX}px -
+              ${CONTROLS_HELP_TOP_INSET_PX}px
+          )
+        ) !important;
+      }
+
+      /* …AND THE SHADOW-LINE LEGEND STEPS ABOVE THE DECK RATHER THAN UNDER IT.
+
+         It stands on the same floor and the same gutter, so the moved deck
+         landed straight on it: [20, 304, 416 × 199] over [20, 464, 202 × 39] —
+         7 878 px², and a TOTAL occlusion, the legend entirely inside the deck's
+         box. It went unreported by the first pass of this lane's own probe
+         because the legend had no „data-hud" and the probe iterated that
+         attribute; it has a name now (notifyColumn.ts, RIBBON_LEGEND_LANE_PX)
+         and the probe counts every top-level positioned box.
+
+         It is NOT hidden. It names which of the two coloured ribbons on the
+         road is the demonstration and which is the route — information a
+         student needs MOST while the demonstration is the thing playing. So it
+         rides one deck-height higher for as long as the deck is open, in the
+         same „step out of the way and come back" grammar the mirror rules use.
+         The three of them then read down the left rail in order: keys, ribbons,
+         transport. */
+      [data-sim-shell]:not([data-sim-compact]):has(
+          [data-hud="demo-deck"][data-deck-open="true"]
+        )
+        [data-hud="ribbon-legend"] {
+        /* !important, and it was NOT optional: this legend's own „bottom" is an
+           INLINE style (the shell writes „var(--sim-hud-floor, 6.75rem)" so the
+           band and the legend cannot drift), and an inline declaration outranks
+           any selector. Written without it the rule read as correct and changed
+           nothing — the re-measure still reported the full 7 878 px². The same
+           trap the glance rules and the column's dead reserve above already
+           carry a note about; three for three in this one file.
+
+           The :has() hangs on the SHELL and not on the stage, because this
+           legend is the shell's own child and the deck is the SCENE's — they do
+           not share the stage element as an ancestor, only the shell. */
+        bottom: calc(
+          var(--sim-hud-floor, 6.75rem) + ${DECK_ROOMY_OPEN_HEIGHT_PX}px +
+            ${DECK_ROOMY_LEGEND_GUTTER_PX}px
+        ) !important;
+      }
+
+      /* …AND IT MUST NOT STARVE THE COLUMN ON A LANDSCAPE PHONE — 2026-08-09.
+         MEASURED, in the real lesson shell, WebKit, iPhone 16 landscape with
+         real insets, sc-zebra-approach@L1 with the demonstration mounted:
+         the reserve above is 248 + 6.75rem + 3.75rem = 416 px of a 393 px
+         stage, i.e. a NEGATIVE budget. The column collapsed, the peek card's
+         44 px min-height held the box, and the flex child that shrank to zero
+         was ROW 2 — THE AUTHORED LINE. innerText of the card read „ЗАЩО"
+         and nothing else: the glyph, the two 44 px chips and no sentence.
+         A card that names a graded mistake and cannot print the sentence is a
+         bare verdict with the WHY behind a button, which is precisely what
+         THEO-4 forbids, and it happened in the orientation people drive in.
+
+         2026-08-10, row C1: THE FLOOR IS THE CONTROL BAND, NOT THE DECK.
+         The 45 % answer that replaced the 416 px one was still asking the wrong
+         question — it reserved room for a surface that has now moved out of
+         this corridor on exactly the stage where the reserve bit. What the
+         column must actually not paint over is the DRIVING CONTROLS, and that
+         edge is TOUCH_CONTROLS_FLOOR, which the arc already publishes and which
+         already carries a 1.25 rem gap.
+
+         Both selectors, and BOTH ARE NEEDED: the second only repeats the first
+         with the „:has()" added so it out-specifies the ROOMY rule above —
+         (0,4,0) against (0,3,0) — which would otherwise win on a compact stage
+         that happens to have a deck and hand the column a 416 px reserve again.
+         The first covers every compact screen with no demonstration on it.
+
+         What it leaves, measured against the 106.3 px worst card:
+           852 × 393  cap 127.5   393 × 852  cap 403
+           780 × 360  cap 116     360 × 780  cap 424
+         The 780 × 360 line is the one that fixes the arc's rise floor; see the
+         derivation in TouchControls' ARC block. */
+      [data-sim-compact="on"] [data-sim-stage] [data-hud="notify-column"],
+      [data-sim-compact="on"] [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
+        max-height: calc(
+          100% - ${TOUCH_CONTROLS_FLOOR} - ${NOTIFY_COLUMN_TOP_CSS_COMPACT}
+        );
       }
       [data-hud="audio-prompt"] {
         left: auto;
@@ -170,6 +741,55 @@ export function PlayAreaStyles() {
          the icon, the sentence and the «Разбрах» need three rows, not one. */
       [data-hud="audio-prompt"] > div {
         flex-wrap: wrap;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         …AND THE TWO CHIPS THAT WERE LEFT BEHIND — 2026-08-09, row C1.
+
+         The 2026-08-03 pass moved the deck and the audio card and then wrote,
+         a few lines below, „The «follow the blue line» chip is still centred
+         and still steps." It is. Photographed on the founder's own device
+         profile (WebKit, iPhone 16 portrait, real insets) on the landing frame
+         of „sc-zebra-approach@L1“: «Следвай синята линия» laid out 410 px wide
+         starting at x = 121 of a 393 px screen — dead across the vanishing
+         point — and its right end painted straight through the «ИНСТРУКЦИИ»
+         card in the column at x = 239.5. That is row C1's exact symptom, two
+         surfaces in the same pixels, on the surface C1 is about.
+
+         Its twin is worse and had no handle at all: the telltale cue
+         («Контролна лампа: температура! Спри спокойно вдясно») is „left-1/2
+         top-24“, i.e. it stacks UNDER the follow chip in the middle of the
+         road — the „three panels down the screen" shape the whole notification
+         column exists to end. It is named „data-hud="telltale-cue"“ in
+         LessonScene as of this row.
+
+         Both join the column on the same terms as the audio card: same right
+         edge, same width, „transform“ AND „translate“ cancelled (Tailwind v4
+         compiles „-translate-x-1/2“ to the independent „translate“ property —
+         cancelling only one of the two leaves the panel half a width off).
+         They keep their vertical order, one under the other, so a session that
+         raises both still reads top to bottom.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-hud="follow-hint"],
+      [data-hud="telltale-cue"] {
+        left: auto;
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
+        transform: none;
+        translate: none;
+        display: flex;
+        justify-content: flex-end;
+      }
+      [data-sim-compact="on"] [data-hud="follow-hint"],
+      [data-sim-compact="on"] [data-hud="telltale-cue"] {
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
+      }
+      /* A pill in a 240 px column wraps rather than running off it — the
+         hud-card-fit rule, applied to the two elements that never had it. */
+      [data-hud="follow-hint"] > div,
+      [data-hud="telltale-cue"] > div {
+        max-width: 100%;
+        text-align: right;
       }
 
       /* ------------------------------------------------------------------
@@ -299,7 +919,11 @@ export function PlayAreaStyles() {
          mobile probe unions exactly these insets into the measured hit rect
          (tools/mobile/lib/probe.mjs, „a common and legitimate trick").
          ------------------------------------------------------------------ */
-      [data-sim-compact="on"] [data-hud="difficulty"] button,
+      /* The tier pills were the FIRST target of this row and are no longer
+         matched: on a compact stage the picker is not rendered at all
+         (J-WAVE-3), and its cell in the ⚙ sheet is a real 44 × 44 „SheetCell“
+         that needs no pseudo-element. The ROOMY picker never took this
+         treatment — a mouse is not what 44 px is about. */
       [data-sim-compact="on"] [data-hud="demo-deck"] > button,
       /* C2 residual (doc 87:238): the fourth target. «Разбрах» measured
          62.9 × 24.9 px — and it is the ONE control that clears the popup C1 is
@@ -309,7 +933,6 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"] [data-hud="audio-prompt"] button {
         position: relative;
       }
-      [data-sim-compact="on"] [data-hud="difficulty"] button::before,
       [data-sim-compact="on"] [data-hud="demo-deck"] > button::before,
       [data-sim-compact="on"] [data-hud="audio-prompt"] button::before {
         content: "";
@@ -434,6 +1057,15 @@ export function PlayAreaStyles() {
            4. the tier picker: chrome, and the only one of the four that is
               still one tap away at any time from the ⚙ sheet.
 
+         ⚠ RANK 4 HAS LEFT THE PHONE ENTIRELY — J-WAVE-3, and the reason is a
+         correction to this very sentence. „Still one tap away from the ⚙ sheet"
+         was written here on 2026-07-30 and was NOT TRUE: the sheet had no tier
+         control, so standing the picker down was standing the setting down.
+         The sheet has the cell now, and the picker itself is gone from every
+         compact stage (the collision it was in is at the head of this file:
+         255 px of segmented control against a 167.5 px rail lane). The three
+         ranks above are unchanged.
+
          Nothing is deleted and nothing moves — each surface simply waits for
          the one above it. All of them come straight back, which on a landing
          screen is a second or two later.
@@ -442,10 +1074,182 @@ export function PlayAreaStyles() {
       [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="touch-hint"] {
         display: none;
       }
-      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="audio-prompt"],
-      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="difficulty"],
-      [data-sim-compact="on"]:has([data-hud="audio-prompt"]) [data-hud="difficulty"] {
+      /* 2026-08-09: the two chips above are rank 3 as well. They now share the
+         column with the overlay line instead of being painted across the road,
+         so „one surface in the band" has to include them or the band is two
+         surfaces deep again the moment a lesson raises an aid. */
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="follow-hint"],
+      [data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="telltale-cue"] {
         display: none;
+      }
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="follow-hint"],
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="telltale-cue"] {
+        display: none;
+      }
+      /* Rank 4 — the tier picker — used to be two more selectors here, standing
+         down behind the hint and behind the audio chip. It is gone from this
+         list because as of J-WAVE-3 it is hidden on EVERY compact stage
+         unconditionally (the block above), so a conditional hide could never
+         match. The priority order itself is unchanged; the surface it applied
+         to simply is not on a phone any more. */
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="audio-prompt"] {
+        display: none;
+      }
+      /* …AND THE DEMONSTRATION DECK IS RANK 3 TOO — 2026-08-12.
+         It was left out of this list, and the omission is measurable: on the
+         360 × 780 Samsung profile the first-run hint's own «Завърти телефона
+         хоризонтално» laid out 897 px² across the deck's «🎬 Демонстрация ▸»
+         toggle, on the LANDING FRAME of a lesson that carries a demonstration.
+         The hint is one sentence, once, and it is the only thing on that screen
+         a student can act on; the deck is a transport that comes straight back. */
+      [data-sim-compact="on"]:has([data-hud="touch-hint"]) [data-hud="demo-deck"] {
+        display: none;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         THE ⚙ CAR SHEET AND THE DEMONSTRATION DECK ARE ONE SURFACE, NOT TWO
+         — 2026-08-12, doc 91 §3, and it is the largest single number in the
+         phone sweep.
+
+         Both stand on TOUCH_CONTROLS_FLOOR. Apart they are fine — the sheet
+         alone measured 0–2 overlapping pairs. TOGETHER, on every one of the six
+         profiles, 7–9 controls went dead and 10 266–13 895 px² of 44 px targets
+         landed on top of each other, worst on the Samsung gesture-bar pair
+         (13 895 px² portrait, 13 098 landscape) which is 34.6 % of the
+         Bulgarian market. Even with the deck merely COLLAPSED the pill sat on
+         «Ръчна спирачка», «Предпазен колан» and «Двигател» and answered for
+         them: on the founder's own phone, sideways, «🎬 Демонстрация ▸» was
+         itself dead behind a sheet cell.
+
+         The notification column already solves exactly this for itself — its
+         peek is „replaced by, not stacked with, the open sheet" (SimOverlay).
+         Same arbitration here, and the deck is the one that yields for the same
+         reason it yielded to the map toggle and to the column: it is a
+         TRANSPORT, the student opened it on purpose, and one tap brings it
+         back. "html[data-sim-car-sheet]" is written by TouchControls, which is
+         the component that owns the sheet and cannot reach the deck's tree —
+         the same grammar "data-sim-camera" and "data-sim-glance" already use.
+         ══════════════════════════════════════════════════════════════════ */
+      html[data-sim-car-sheet="open"] [data-hud="demo-deck"] {
+        display: none;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         THE FIRST-RUN THUMB HINT LEAVES THE MIDDLE OF THE SCREEN — 2026-08-12.
+
+         THIS IS THE FRAME HE PHOTOGRAPHED. The hint is "top: 50%", full-width,
+         three stacked lines; the flanks are 44 px targets at the bottom
+         corners; so the hint's own third line ran straight through them.
+         Measured, WebKit, real insets, iPhone 16 landscape, the state a lesson
+         lands in once the briefing is dismissed:
+
+           «Спряла кола: пусни палеца и натисни пак надолу…»
+              over «Клаксон — задръж»              733 px²
+              over «Поглед в дясното огледало»     355 px²
+              over «Поглед в лявото огледало»      197 px²
+              over «Мигач наляво»                   29 px²
+
+         Reproduced on both other landscape profiles, and on the 360 Samsung the
+         same sentence took «Мигач наляво» for 760 px². No z-index fixes that:
+         the two things want the same pixels.
+
+         So the hint is given a box that CANNOT reach a control, and the box is
+         different in the two orientations because the free space is:
+
+           LANDSCAPE  the corridor BETWEEN THE TWO PADS (PAD_CORRIDOR_*), which
+                      is 350 px wide on an iPhone 16 and free of controls at
+                      every height — the pads are the only wide things on this
+                      screen and they are both at the bottom corners. Sat on the
+                      instrument band, which is where the reference puts
+                      information: the bottom edge.
+           PORTRAIT   the pad corridor is 78 px there, so instead the hint sits
+                      ABOVE the whole control band and stops short of the
+                      notification column. Nothing paints in that strip — the
+                      census taken for the portrait deck found it empty across
+                      the full width — and the deck itself is stood down above.
+
+         Both are "overflow-y: auto" against a "max-height", because a bounded
+         box that scrolls is the only version of this that cannot come back.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-sim-compact="on"] [data-hud="touch-hint"] {
+        top: auto;
+        transform: none;
+        translate: none;
+        left: calc(0.75rem + env(safe-area-inset-left, 0px));
+        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} + 0.5rem);
+        bottom: calc(${TOUCH_CONTROLS_FLOOR} + 0.5rem);
+        max-height: calc(100% - ${TOUCH_CONTROLS_FLOOR} - 4.5rem);
+        overflow-y: auto;
+        align-items: flex-start;
+        text-align: left;
+      }
+      @media (max-height: 560px) {
+        [data-sim-compact="on"] [data-hud="touch-hint"] {
+          left: calc(${PAD_CORRIDOR_LEFT_CSS});
+          right: calc(${PAD_CORRIDOR_RIGHT_CSS});
+          bottom: calc(var(--sim-dash-h, 0px) + 0.5rem);
+          max-height: calc(100% - var(--sim-dash-h, 0px) - 4rem);
+          align-items: center;
+          text-align: center;
+        }
+      }
+      /* …AND IT STANDS DOWN FOR THE ⚙ SHEET, WHICH IS THE SAME LINE IT NOW
+         STANDS ON — measured 2026-08-12, and it is a defect this wave's own
+         first pass created and this rule closes.
+         In PORTRAIT the hint is anchored to "TOUCH_CONTROLS_FLOOR" and so is
+         the sheet, and the sheet is a WRAPPING strip that folds to three rows
+         on a 393 px phone. iPhone 16 portrait, sheet open with the first-run
+         hint still up: «Завърти телефона хоризонтално» over «Ръчна спирачка»,
+         «Предпазен колан» and «Светлини» at 1 144 px² each, the hint's own
+         «Разбрах» over «Скоростен лост — стъпка към D» and «Рестарт» at
+         1 584 px² each, and both of those cells DEAD.
+         The hint is rank 2 in the ladder above; the sheet is a control surface
+         the student opened deliberately, one tap ago, and closes the same way.
+         So the hint waits, exactly as it already waits for the overlay line —
+         and unlike the deck it loses nothing by waiting, because it is a
+         sentence that has not been read yet rather than a running replay. */
+      html[data-sim-car-sheet="open"] [data-hud="touch-hint"] {
+        display: none;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         PORTRAIT: THE INSTRUMENT READOUT STANDS UP IN THE GAP BETWEEN THE
+         THUMBS — 2026-08-12.
+
+         The compact readout is bottom-CENTRE, which is right on a phone held
+         sideways (350 px of clear corridor) and impossible on one held upright:
+         the two pads are 42 % and 36 % of the width, so 78 % of the bottom edge
+         is thumb. Measured on all three portrait profiles, the limit disc — the
+         «50» — laid out 397–457 px² on top of the steering pad.
+
+         It is the pad it collides with, so shrinking either is not available
+         (he rejected shrinking, and the drivetrain pad has a hard floor of
+         2 × TOUCH_DRIVE_ABSOLUTE_RANGE_PX). What is available is the corridor
+         itself: 78–86 px wide on every portrait profile in the ladder, free at
+         every height. The row becomes a COLUMN and stands in it — same three
+         numbers, same 30 px speed digit the founder signed off as legible, same
+         bottom edge, no pad under any of them.
+
+         Landscape is untouched: this is inside the portrait query and the row
+         there has 350 px and no collision. */
+      @media (orientation: portrait) {
+        [data-sim-compact="on"] [data-hud="dash-dock"] {
+          left: ${PAD_CORRIDOR_LEFT_CSS};
+          right: ${PAD_CORRIDOR_RIGHT_CSS};
+        }
+        [data-sim-compact="on"] [data-hud="status-dashboard"],
+        [data-sim-compact="on"] [data-hud="speed-block"] {
+          flex-direction: column;
+          align-items: center;
+          gap: 0;
+        }
+        /* The corridor is 63–71 px of usable width once both gutters are paid,
+           and a three-digit speed at the founder-signed-off 30 px is ~55 of it.
+           The row's own 4 px side padding is the difference between fitting and
+           not, and it buys nothing in a column. */
+        [data-sim-compact="on"] [data-hud="status-dashboard"] {
+          padding-inline: 0;
+        }
       }
 
       /* …AND THE SAME PRIORITY ON A ROOMY SCREEN — 2026-08-03.

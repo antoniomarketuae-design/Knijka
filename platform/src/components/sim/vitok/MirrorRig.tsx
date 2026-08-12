@@ -31,13 +31,16 @@
 //     medium = rear only, rendered every 2nd frame;
 //     high   = rear every 2nd frame, doors every 4th (staggered on the
 //              rear's off-frames, phases 1 and 3).
-//   REDUCED SCENE per pass: mirror far plane 200 m (vs the main camera's 900)
-//   frustum-culls the CityBuildings 200 m chunk grid — the pass submits only
-//   the nearby chunks instead of the whole district — while the fog density
-//   is floored so geometry fades out BEFORE the cull boundary and the
-//   (scale-invariant) sky dome is shrunk into the frustum. Shadows are frozen
-//   (main pass's maps reused); the cabin is layer-excluded; the pass is a raw
-//   gl.render — no composer/postprocessing ever runs for a mirror.
+//   REDUCED SCENE per pass: a PER-INSTANCE cull (mirrorInstanceCull.ts) drops
+//   every InstancedMesh with no instance inside the mirror's own cone — the
+//   thing three cannot do, and the only cut that was ever big here: 97.3 % of
+//   the triangles this pass submitted could not appear in it. The 200 m far
+//   plane (vs the main camera's 900) bounds the merged non-instanced world,
+//   the fog density is floored so geometry fades out BEFORE that boundary
+//   instead of popping at it, and the (scale-invariant) sky dome is shrunk
+//   into the frustum. Shadows are frozen (main pass's maps reused); the cabin
+//   is layer-excluded; the pass is a raw gl.render — no composer/
+//   postprocessing ever runs for a mirror.
 //   Passes only run at all while the cockpit camera is live (`active`).
 //
 // THIS LINE IS NOT „THE MIRROR DOES NOT EXIST IN THE CHASE VIEW" — 2026-08-03.
@@ -80,6 +83,7 @@ import {
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import { COCKPIT_EYE } from "@/modules/sim/vehicle";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
+import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
 import { loadQualityPreset } from "../lesson-ui/QualityPresetSelector";
 
 /**
@@ -278,8 +282,39 @@ const MIRROR_NEAR = 0.3;
  * fix): CityBuildings' 200 m chunk grid has instance-aware bounding spheres
  * with frustumCulled=true, so a 200 m far plane culls every distant chunk
  * from the pass and the mirror renders a small neighbourhood, not the whole
- * district. (frustumCulled=false props — trees/furniture/traffic shells —
- * are still submitted, but they're the cheap minority.)
+ * district.
+ *
+ * THE PARENTHESIS THAT USED TO END THIS PARAGRAPH WAS WRONG AND IT WAS
+ * EXPENSIVE. It said the still-uncullable props — „trees/furniture/traffic
+ * shells" — „are the cheap minority". Counted on the running product with a
+ * raw GL counter (d2-v1, tier low, level 1, 1264×619): ONE entry into this
+ * 256×96 pass submitted 106 draw calls and 1,284,796 triangles — more
+ * triangles than the entire main pass at 1264×619, for 24,576 pixels, because
+ * every tree in the district was `frustumCulled = false` and went to every
+ * camera. The far plane could not save it: culling was switched off, so there
+ * was nothing to cull against.
+ *
+ * `three-helpers` now gives every static prop an instance-aware sphere and
+ * chunks district-spanning sets onto a 600 m grid, and the same pass on the
+ * same district measures 83.0 draws / 492,716 triangles per entry — the
+ * triangle bill for one mirror entry fell by 62 %.
+ *
+ * AND THIS FAR PLANE STILL IS NOT WHAT SAVED IT. Measured after that fix, on
+ * /dev/drive-rig, d2-v1 tier low, per mirror entry, 8-second windows:
+ *
+ *     far 200 (this constant)  83.0 draws  492,716 tris
+ *     far 120                  81.0        485,380   −2.4 % / −1.5 %
+ *     far  60                  80.9        483,393   −2.6 % / −1.9 %
+ *
+ * Shortening it to less than a third of its value removes two draw calls. It
+ * cannot do more, because what the pass submits is not distant world: it is
+ * whole InstancedMeshes whose ONE union-of-all-instances bounding sphere is
+ * 800-1100 m across, which every frustum containing the camera intersects at
+ * any far plane. That is what `mirrorInstanceCull.ts` now handles, by testing
+ * the instances instead of the sphere. The far plane stays at 200 because it
+ * still bounds the non-instanced merged world meshes and because
+ * MIRROR_FOG_MIN_DENSITY is derived from it — shortening it makes the mirror
+ * visibly hazier than the direct view for a 2 % saving.
  *
  * REF 6 GUARD STILL HOLDS: the sky is a mesh dome (radius 520) and a far
  * plane below it clips the entire sky to black clear-colour (the original
@@ -474,22 +509,41 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
     }
     const fog = scene.fog instanceof FogExp2 ? scene.fog : null;
 
-    // Reduced-scene render (see MIRROR_FAR/MIRROR_FOG_MIN_DENSITY): freeze
-    // shadows (reuse the main pass's maps), floor the fog so the short far
-    // plane never pops, shrink the sky dome into the frustum, and — the
-    // black-mirror fix, doc 82 §3.2 — force `autoClear` back on for the pass,
-    // because the composer switched it off globally and a raw gl.render into
-    // an unclear'd depth buffer draws nothing at all. renderMirrorPass owns
-    // saving and restoring all four.
-    renderMirrorPass(gl, {
-      target: entry.target,
-      scene: scene as never,
-      camera: entry.camera as never,
-      fog,
-      fogMinDensity: MIRROR_FOG_MIN_DENSITY,
-      sky,
-      skyRadius: MIRROR_SKY_RADIUS,
-    });
+    // PER-INSTANCE CULL (mirrorInstanceCull.ts). three culls a whole
+    // InstancedMesh against one sphere that unions every instance, and this
+    // world is built from district-spanning sets whose spheres are 800-1100 m
+    // across — so nothing was ever rejected and the pass submitted the entire
+    // district to a 36°-wide cone. Measured on d2-v1 at tier low: 97.3 % of the
+    // triangles it submitted were outside its own frustum. This rejects a mesh
+    // only when NO instance touches the frustum, so it removes nothing that
+    // could have been seen. `updateWorldMatrix` first because the camera's
+    // `matrixWorldInverse` — which is what the frustum is extracted from — is
+    // only refreshed by three inside `render()`, i.e. after we would have
+    // needed it.
+    entry.camera.updateWorldMatrix(true, false);
+    const cull = cullInstancedForMirror(scene, entry.camera);
+    try {
+      // Reduced-scene render (see MIRROR_FAR/MIRROR_FOG_MIN_DENSITY): freeze
+      // shadows (reuse the main pass's maps), floor the fog so the short far
+      // plane never pops, shrink the sky dome into the frustum, and — the
+      // black-mirror fix, doc 82 §3.2 — force `autoClear` back on for the pass,
+      // because the composer switched it off globally and a raw gl.render into
+      // an unclear'd depth buffer draws nothing at all. renderMirrorPass owns
+      // saving and restoring all four.
+      renderMirrorPass(gl, {
+        target: entry.target,
+        scene: scene as never,
+        camera: entry.camera as never,
+        fog,
+        fogMinDensity: MIRROR_FOG_MIN_DENSITY,
+        sky,
+        skyRadius: MIRROR_SKY_RADIUS,
+      });
+    } finally {
+      // NEVER conditional: a throw inside the pass must not leave half the
+      // world invisible in the driver's own view.
+      cull.restore();
+    }
   });
 
   // The cameras join the chassis-local tree so they inherit the interpolated

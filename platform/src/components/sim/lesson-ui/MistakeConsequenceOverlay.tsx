@@ -26,12 +26,12 @@ import { IconArrowRight, IconShield } from "@/components/icons";
 import { traceUrlForRepoPath } from "@/modules/clips/view";
 import type { MistakeDemo, TeachMoment } from "@/modules/sim/lessons";
 import {
+  COLLISION_TERMINATION_SHORT_BG,
   EXAM_POINTS_SHORT_NOTE_BG,
-  VIOLATIONS,
   examMarkCitationBg,
+  gravestViolation,
   minusPointsBg,
   type SeverityClass,
-  type ViolationSpec,
 } from "@/modules/sim/rules";
 
 const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
@@ -45,10 +45,20 @@ const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
 });
 
 /** Fixed severity framing („това щеше да е катастрофа/глоба") — UI chrome
- *  keyed by the STORED official class, exported for tests. */
+ *  keyed by the STORED official class, exported for tests.
+ *
+ *  2026-08-10 — THE опасна LINE WAS A MISSTATEMENT OF THE LAW, on every one of
+ *  the fifteen опасни codes. It read „на изпита прекратява изпита на място",
+ *  and only one fault in the catalogue does that: Наредба № 38, чл. 48, ал. 3
+ *  ends a practical exam „при повторна намеса на комисията … и при допускане на
+ *  ПТП" and reaches nothing else. Not spotting Б2, running a red — those cost
+ *  10 наказателни точки and т. 11 allows 9, so they make the exam НЕИЗДЪРЖАН.
+ *  Different fact, different provision, different moment. The class-level line
+ *  now states the one that is true of the whole class; the termination is a
+ *  rider printed only where `ExamMark.terminatesExam` says so. */
 export const CONSEQUENCE_FRAMING_BG: Record<SeverityClass, string> = {
   opasna:
-    "На пътя това щеше да е катастрофа. Опасна грешка — на изпита прекратява изпита на място.",
+    "На пътя това щеше да е катастрофа. Опасна грешка — 10 наказателни точки за самото деяние, а за целия изпит се допускат 9: една такава грешка сама прави изпита неиздържан.",
   osnovna:
     "На пътя това е глоба и реален риск от сблъсък. Основна грешка — на изпита тежи с основни наказателни точки.",
   vtorostepenna:
@@ -60,12 +70,6 @@ const SEVERITY_LABEL_BG: Record<SeverityClass, string> = {
   osnovna: "основна грешка",
   vtorostepenna: "второстепенна грешка",
 };
-
-/** Catalog spec of a code (string-keyed lookup over the closed record). */
-function catalogSpec(code: string | undefined): ViolationSpec | undefined {
-  if (code === undefined) return undefined;
-  return (VIOLATIONS as Record<string, ViolationSpec | undefined>)[code];
-}
 
 export function MistakeConsequenceOverlay({
   demo,
@@ -102,12 +106,34 @@ export function MistakeConsequenceOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [onRetryCorrect, onDismiss]);
 
-  // Live moment first; the demo path falls back to the catalog spec of the
-  // mistake's first cited code (stored data either way).
-  const fallback = catalogSpec(demo.codeRefs[0]);
-  const severity: SeverityClass = moment?.severity ?? fallback?.severityClass ?? "osnovna";
-  const lawRef = moment?.lawRef ?? fallback?.lawRef;
-  const points = moment?.points ?? fallback?.points;
+  // ALL FOUR CITATIONS COME OFF THE GRAVEST FAULT THE CARD SHOWS.
+  //
+  // They used to come off `codeRefs[0]` (and, on the live path, off whichever
+  // targeted code the engine's one-shot latch happened to reach first). Both
+  // are authoring accidents, not law: the fast-row demo cites SPEEDING_OVER_
+  // LIMIT, PEDESTRIAN_CROSSING_TOO_FAST and COLLISION in the order its lesson
+  // tells them, so the card that ends with a child under the bumper badged
+  // «второстепенна · −1» with no termination line — and on the live path the
+  // badge was decided by a 33-millisecond race between two detectors. Наредба
+  // № 38, приложение № 5, т. 10 prices a fault by its CLASS and чл. 48, ал. 3
+  // ends the exam for one of them; neither provision knows what order anyone
+  // typed. `gravestViolation` is that ordering, and it lives in rules/ because
+  // it is a reading of the act, not a component detail.
+  //
+  // The live moment is folded into the pool rather than preferred over it: its
+  // own severity/points/lawRef are read out of this same catalogue, so it can
+  // only ever agree — and it can never again UNDER-state the card by being the
+  // first thing that fired.
+  const gravest = gravestViolation(
+    moment !== null ? [moment.code, ...demo.codeRefs] : demo.codeRefs,
+  );
+  const severity: SeverityClass = gravest?.spec.severityClass ?? "osnovna";
+  const lawRef = gravest?.spec.lawRef;
+  const points = gravest?.spec.points;
+  // Only a ПТП ends the exam (Наредба № 38, чл. 48, ал. 3) — read off the
+  // catalogue's own flag rather than inferred from the class, which is exactly
+  // the inference the old framing string made and got wrong.
+  const terminatesExam = gravest?.spec.terminateSession === true;
 
   return (
     <div
@@ -166,6 +192,13 @@ export function MistakeConsequenceOverlay({
             </div>
             <div className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3">
               <p className="text-sm leading-relaxed">{CONSEQUENCE_FRAMING_BG[severity]}</p>
+              {/* THEO-4: the exam does not merely end — it ends by a named
+                  article, and only for this one fault. */}
+              {terminatesExam ? (
+                <p className="mt-1.5 text-sm font-semibold leading-relaxed">
+                  {COLLISION_TERMINATION_SHORT_BG}
+                </p>
+              ) : null}
               {points !== undefined ? (
                 <p className="mt-1.5 text-xs leading-relaxed text-muted">
                   {EXAM_POINTS_SHORT_NOTE_BG}

@@ -6,8 +6,10 @@
  * Pure presentation — progression is computed server-side (page.tsx).
  */
 
+import { useEffect } from "react";
 import { EXAM_BANK_SIZE } from "@/modules/sim/lessons";
-import { QualityPresetSelector } from "./QualityPresetSelector";
+import { refreshSeededQuality } from "@/modules/sim/environment";
+import { QualityPresetSelector, refreshQualityPreset } from "./QualityPresetSelector";
 import { LessonCard } from "./LessonCard";
 import type { LessonEntryView, QualityPreset } from "./types";
 
@@ -22,6 +24,24 @@ export function LessonSelectScreen({
   onQualityChange: (q: QualityPreset) => void;
   onStart: (lessonId: string) => void;
 }) {
+  // THE SEAM WHERE A MEASURED TIER IS ALLOWED TO LAND.
+  //
+  // The FPS probe writes what this device actually did; `seedQualityLevel()`
+  // reads it and is memoized for the page load. /simulator never reloads the
+  // document between lessons, so without this the measurement only reached a
+  // student on a hard refresh — a phone could measure itself at 7 fps, write it
+  // down, and be handed the same tier for every lesson of the session.
+  //
+  // This screen is the one place it is free: the canvas is unmounted, no drive
+  // is in progress, and the next lesson has not chosen its texture download
+  // plan yet. It is also the only component that CANNOT be on screen while the
+  // play shell is — which is what keeps this from becoming the mid-drive tier
+  // change doc 82 §8 refused.
+  useEffect(() => {
+    refreshSeededQuality();
+    refreshQualityPreset();
+  }, []);
+
   // Name the prerequisite on locked cards ("Издържи „Свободно каране“…"):
   // полигон/exam-style specs carry an explicit unlockAfterLessonId; curriculum
   // lessons unlock after the previous integer order (computeProgression).

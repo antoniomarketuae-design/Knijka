@@ -60,9 +60,54 @@ const DRIVE_KEYS = new Set([
   "Ы",
 ]);
 
-/** How long the pads stay hidden after a drive key (ms). A pointer press on a
- *  pad brings them back immediately. */
+/**
+ * How long the pads stay hidden after a drive key (ms).
+ *
+ * ===========================================================================
+ * 2026-08-11 — THE TWELVE SECONDS WITH NO WAY BACK. Read before re-tuning.
+ * ===========================================================================
+ * The line under this one used to read „A pointer press on a pad brings them
+ * back immediately". IT WAS NOT TRUE, and it had not been true since the file
+ * was written: the hidden branch is `if (!visible) return null`, so there is no
+ * pad on the page to press, and `wake()` — the only thing that clears the
+ * timer — is reachable ONLY from a pad's own `onValue`. The escape hatch was
+ * documented and unreachable.
+ *
+ * Measured on /dev/drive-rig (real shell, 1280×720, real keyboard, 2026-08-11),
+ * with the negative control run FIRST so „it did not respond" could not be a
+ * dead probe:
+ *
+ *   pads on screen                 СПИРАЧКА 56×96 @1142,604 · ГАЗ @1204,604
+ *   mouse hold before any key      data-pressed="1"  ← the actuator works
+ *   ONE 120 ms tap of ArrowDown    both pads gone
+ *   mouse press on their old spot at 3 s   still gone
+ *   pads returned after            12.4 s
+ *   messages at any point          none
+ *
+ * One accidental key — a tap that did not move the car a millimetre — took the
+ * only pedals a mouse-first student has for twelve and a half seconds, with no
+ * control to click and nothing said. On the lane whose entire reason to exist
+ * is „first and upmost it must be with the mouse", that is the founder's own
+ * defect class: an input silently stops counting.
+ *
+ * THE DURATION IS DELIBERATELY UNCHANGED. It is not what traps anyone — the
+ * missing way back was. With the pointer wake below, the pads return on the
+ * first movement of the mouse, which is the very next thing a hand reaching
+ * for a pedal does; shortening the timer on top of that would only make them
+ * flicker back mid-drive for the keyboard student the hide exists to serve.
+ */
 const KEYBOARD_HIDE_MS = 12_000;
+
+/**
+ * Pointer movement (px) that counts as „the mouse is in use again".
+ *
+ * Not zero: a `pointermove` fires for a bumped desk, a scroll-wheel event and
+ * the synthetic move a page emits under a stationary cursor when the layout
+ * shifts, and any of those would cancel a hide the keyboard student wants. A
+ * hand travelling to a 56 px pad in the corner covers this in the first few
+ * milliseconds, so the threshold costs a genuine reach nothing.
+ */
+const WAKE_POINTER_PX = 24;
 
 /**
  * A MOUSE BUTTON IS BINARY AND A PEDAL IS NOT. Slamming the axis to 1.0 on
@@ -83,29 +128,97 @@ export function MousePedals({
    *  right after a key press: the two pedal steps are the lane's whole reason
    *  to exist and a student must never have to find them. */
   pinned = false,
+  /**
+   * Say, ONCE per session, that the keyboard just took the pedals away — and
+   * how to get them back. Optional: a mount without it (the dev rigs) behaves
+   * exactly as before. The shell routes it into the same coached kind „lesson"
+   * toast every other silent refusal in this product uses; see the call site
+   * for why it fires at most once and only for a student who was using them.
+   */
+  onYieldedToKeyboard,
 }: {
   touch: TouchInputSource;
   hidden: boolean;
   pinned?: boolean;
+  onYieldedToKeyboard?: () => void;
 }) {
   const [keyboardRecent, setKeyboardRecent] = useState(false);
   const timerRef = useRef<number | null>(null);
+  /** Mirror of `keyboardRecent` for the listeners, so the rising edge can be
+   *  read WITHOUT putting a side effect inside a state updater (React may
+   *  invoke an updater twice, and „was it already hidden" is not a render
+   *  question — it is a fact about the last key). */
+  const hiddenRef = useRef(false);
+  /** Has this student ever actually HELD a pad? Only then is losing them to a
+   *  stray key worth a sentence — a keyboard driver who never touched them has
+   *  lost nothing and must not be lectured. */
+  const usedPadsRef = useRef(false);
+  /** One announcement per session, not per key press. */
+  const announcedRef = useRef(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!DRIVE_KEYS.has(e.key)) return;
+      if (!hiddenRef.current && usedPadsRef.current && !announcedRef.current) {
+        announcedRef.current = true;
+        onYieldedToKeyboard?.();
+      }
+      hiddenRef.current = true;
       setKeyboardRecent(true);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => setKeyboardRecent(false), KEYBOARD_HIDE_MS);
+      timerRef.current = window.setTimeout(() => {
+        hiddenRef.current = false;
+        setKeyboardRecent(false);
+      }, KEYBOARD_HIDE_MS);
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     };
-  }, []);
+  }, [onYieldedToKeyboard]);
 
   const visible = !hidden && (!keyboardRecent || pinned);
+
+  // THE WAY BACK (see KEYBOARD_HIDE_MS). While the pads are hidden there is no
+  // pad to press, so the wake cannot live on the pad — it lives on the pointer
+  // itself: the first REAL movement of the mouse, or any button press, means
+  // the hand is back on it and the pedals belong on screen again.
+  //
+  // Mounted only while the pads are hidden BY THE KEYBOARD, so it is not a
+  // listener the sim carries through a whole drive, and it can never fight
+  // `hidden` (a paused scene stays pedal-less). `pointerType === "mouse"`
+  // because this component only mounts on non-touch devices anyway and a
+  // stylus/pen hover should not count as driving.
+  useEffect(() => {
+    if (!keyboardRecent || hidden) return;
+    let anchorX: number | null = null;
+    let anchorY: number | null = null;
+    const wake = () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+      hiddenRef.current = false;
+      setKeyboardRecent(false);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (e.pointerType !== "mouse") return;
+      if (anchorX === null || anchorY === null) {
+        anchorX = e.clientX;
+        anchorY = e.clientY;
+        return;
+      }
+      if (Math.hypot(e.clientX - anchorX, e.clientY - anchorY) >= WAKE_POINTER_PX) wake();
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") wake();
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("pointerdown", onDown, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [keyboardRecent, hidden]);
 
   // ANY path that takes the pads off screen must release both axes — pause,
   // a keyboard takeover, unmount. A pedal left held by a control that is no
@@ -126,6 +239,10 @@ export function MousePedals({
   );
 
   const wake = useCallback(() => {
+    // This student uses the pads. From here on, losing them to a stray key is
+    // worth one sentence (see `onYieldedToKeyboard`).
+    usedPadsRef.current = true;
+    hiddenRef.current = false;
     setKeyboardRecent(false);
     if (timerRef.current !== null) window.clearTimeout(timerRef.current);
   }, []);

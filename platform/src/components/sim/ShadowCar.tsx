@@ -179,6 +179,23 @@ export function ShadowCar({
         g.transparent = true;
         g.opacity = GHOST_OPACITY;
         g.depthWrite = false;
+        // EVERY GHOST MESH WAS DRAWN TWICE. hero_car.glb authors its materials
+        // doubleSided, and three's `renderObject` splits a material that is
+        // `transparent && side === DoubleSide && !forceSinglePass` into a
+        // BackSide pass and a FrontSide pass with a `needsUpdate` between them
+        // (`WebGLRenderer.js:2133-2143`) — two draw calls and two triangle
+        // submissions per mesh, plus a shader re-resolve. Measured with my own
+        // raw GL counter on /dev/drive-rig at tier low, level 1: turning this
+        // on removed 26–31 draw calls per frame in every district tested, and
+        // at med/high it removes four submissions per mesh rather than two,
+        // because N8AO's transparency-aware mode re-renders the transparent
+        // queue at full resolution.
+        //
+        // The ghost is one uniformly tinted translucent shell at opacity
+        // GHOST_OPACITY with depthWrite already off, so the sorted two-pass
+        // render buys nothing a viewer can see; both faces are still
+        // rasterised, in one submission instead of two.
+        g.forceSinglePass = true;
         const std = g as THREE.MeshStandardMaterial;
         if (std.color) std.color.lerp(tint, 0.6);
         if (std.emissive) {

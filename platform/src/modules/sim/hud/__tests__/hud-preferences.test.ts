@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  endLineDemandsAnswer,
   hudToastCarriesWhy,
   parseStoredFlag,
   quietSuppresses,
@@ -313,6 +314,95 @@ describe("L15 · SessionEndScreen.tsx implements the founder's three asks", () =
     expect(SHELL).toMatch(/\{debriefOpen && result \?/);
     // The pre-L15 condition is gone.
     expect(SHELL).not.toMatch(/ended && result && \(!compact \|\| endExpanded\)/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A2 — THE PHONE HALF OF L15
+//
+// Everything above this line is about the roomy screen, and that is exactly the
+// defect: the shell passed `onSkip={!compact && !resultHeld ? … : null}` and
+// SessionEndScreen omits BOTH the skip control and the setting when `onSkip` is
+// null, so on a 393 px coarse-pointer viewport L15 rendered nothing at all.
+// ---------------------------------------------------------------------------
+
+describe("A2 · the end-of-lesson controls reach a phone", () => {
+  it("the shell no longer withholds Skip and the setting from compact", () => {
+    // The exact expression the row names (LessonPlayShell.tsx:2942).
+    expect(SHELL).not.toMatch(/onSkip=\{!compact && !resultHeld \? skipDebrief : null\}/);
+    expect(SHELL).toMatch(/onSkip=\{!resultHeld \? skipDebrief : null\}/);
+    expect(SHELL).toMatch(/onAutoOpenChange=\{!resultHeld \? setEndAutoOpenPersisted : null\}/);
+    // …and the screen is told which grammar to speak.
+    expect(SHELL).toMatch(/compact=\{compact\}/);
+  });
+
+  it("the screen says how to skip in TOUCH words on a phone, not „Space“", () => {
+    // A kbd chip reading „Space" on a device with no Space key is folklore.
+    expect(END_SCREEN).toMatch(/compact \? \(/);
+    expect(END_SCREEN).toMatch(/Докосни .{0,40}Скрий разбора/);
+    // The roomy note is untouched.
+    expect(END_SCREEN).toMatch(/SESSION_END_SKIP_HINT_BG/);
+    expect(END_SCREEN).toMatch(/<kbd/);
+  });
+
+  it("there is ONE close control on a phone, not two", () => {
+    // The shell used to draw „▾ Скрий разбора" above this screen unconditionally
+    // AND the screen drew its own; the shell's copy now survives only for the
+    // one state SessionEndScreen does not reach — the I1 calibration gate.
+    expect(SHELL).toMatch(/\{compact && resultHeld \? \([\s\S]{0,400}?Скрий разбора/);
+    expect(END_SCREEN).toMatch(/Скрий разбора/);
+  });
+
+  it("THEO-4 — a dismissible verdict keeps a permanent route to the WHY", () => {
+    // „Виж разбора" joins the micro menu for the whole ended session, which is
+    // the same recall grammar the task line has had since 2026-07-29.
+    expect(SHELL).toMatch(/key: "debrief", labelBg: "Виж разбора", onSelect: openDebrief/);
+    // …and the compact end line is only dismissible because that exists.
+    expect(SHELL).toMatch(/blocking: endLineDemandsAnswer\(\{/);
+  });
+});
+
+describe("A2 · endLineDemandsAnswer — what the setting turns off on a phone", () => {
+  const base = { held: false, autoOpen: true, skipped: false };
+
+  it("blocks by default: the verdict arrives and waits to be opened", () => {
+    expect(endLineDemandsAnswer(base)).toBe(true);
+  });
+
+  it("stops demanding once the student skips this run", () => {
+    expect(endLineDemandsAnswer({ ...base, skipped: true })).toBe(false);
+  });
+
+  it("stops demanding for good once „не показвай автоматично“ is set", () => {
+    expect(endLineDemandsAnswer({ ...base, autoOpen: false })).toBe(false);
+  });
+
+  it("the I1 calibration gate outranks the preference, both ways", () => {
+    for (const autoOpen of [true, false]) {
+      for (const skipped of [true, false]) {
+        expect(endLineDemandsAnswer({ held: true, autoOpen, skipped })).toBe(true);
+      }
+    }
+  });
+
+  it("agrees with the roomy predicate on the same three facts", () => {
+    // Same inputs, same answer — the phone's popup and the desktop's popup are
+    // governed by one preference, not two that can drift.
+    for (const autoOpen of [true, false]) {
+      for (const skipped of [true, false]) {
+        const roomy: DebriefVisibility = {
+          ended: true,
+          compact: false,
+          expanded: false,
+          held: false,
+          autoOpen,
+          skipped,
+        };
+        expect(endLineDemandsAnswer({ held: false, autoOpen, skipped })).toBe(
+          shouldShowDebrief(roomy),
+        );
+      }
+    }
   });
 });
 
