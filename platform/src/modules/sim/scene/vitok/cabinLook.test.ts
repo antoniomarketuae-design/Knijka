@@ -22,10 +22,13 @@ import {
   CABIN_LOOK_FOR_HOTSPOT,
   CABIN_LOOK_POSE_IDS,
   CABIN_LOOK_POSES,
+  HOTSPOT_LABEL_LIFT_M,
   HUD_LEFT_COLUMN_FRACTION,
   HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION,
   hotspotClickPoint,
   hotspotIsReachable,
+  hotspotLabelIsOnScreen,
+  hotspotLabelPoint,
   hotspotScreenRect,
   hotspotVisibleRect,
   projectCockpitPoint,
@@ -205,6 +208,51 @@ describe("cabin look · ALL THIRTEEN answer a mouse click", () => {
     expect(hotspotIsReachable("hotspot_mirror_rear", "mirrorRear", HIS_ASPECT)).toBe(true);
     expect(CABIN_LOOK_FOR_HOTSPOT.hotspot_mirror_left).not.toBe("forward");
     expect(CABIN_LOOK_FOR_HOTSPOT.hotspot_mirror_rear).not.toBe("forward");
+  });
+
+  it("doc 91 §L10 · the CHIP — a centre inside the frame is not a label inside it", () => {
+    // THE HALF THE CENTRE TEST DOES NOT COVER, found by measuring rather than
+    // by reading. On the production build, three landscape profiles, step 2:
+    // «🖱 Задръж Вътрешно огледало» rendered at y −88 / −81 / −81 — §L10's
+    // y −83 — with `hotspotIsReachable` answering TRUE the whole time, because
+    // at 2.17:1 the interior mirror's centre is six pixels inside the top edge
+    // while the chip hangs above its BOX TOP.
+    const LANDSCAPE = 780 / 360; // 2.167 — three of the six ladder profiles
+    expect(hotspotIsReachable("hotspot_mirror_rear", "forward", LANDSCAPE)).toBe(true);
+    // ABOVE the control there is no room at `forward` — that is the y −83 chip.
+    const above = projectCockpitPoint(
+      [0, 0.908 + HOTSPOT_LABEL_LIFT_M, 0.5],
+      "forward",
+      LANDSCAPE,
+    );
+    expect(1 - above.y, "the ABOVE anchor at forward").toBeLessThan(0);
+    // …so the label flips UNDER the mirror and lands on the canvas instead of
+    // being suppressed: the mirror step is graded, and „which mirror is this"
+    // is the whole job of the chip.
+    expect(hotspotLabelIsOnScreen("hotspot_mirror_rear", "forward", LANDSCAPE)).toBe(true);
+    const p = hotspotLabelPoint("hotspot_mirror_rear", "forward", LANDSCAPE)!;
+    expect(p.side).toBe("below");
+    expect(p.x).toBeGreaterThan(0);
+    expect(p.x).toBeLessThan(1);
+    expect(p.y).toBeGreaterThan(0);
+    expect(p.y).toBeLessThan(1);
+    // The lift is shared with the renderer so the two cannot drift apart.
+    expect(HOTSPOT_LABEL_LIFT_M).toBeCloseTo(0.045, 6);
+  });
+
+  it("every control that is LABELLED in its own pose has its label on screen", () => {
+    // The chip is only ever asked for at a pose that owns the control, so that
+    // is the invariant worth pinning: at the pose the reach table names, the
+    // label lands on the canvas at every window shape the app serves.
+    for (const aspect of ASPECTS) {
+      for (const name of COCKPIT_HOTSPOT_NAMES) {
+        const pose = CABIN_LOOK_FOR_HOTSPOT[name];
+        expect(
+          hotspotLabelIsOnScreen(name, pose, aspect),
+          `${name} label @ ${pose} @ ${aspect.toFixed(2)}`,
+        ).toBe(true);
+      }
+    }
   });
 
   it("the two new mirror poses ARE the graded glance angles, like mirrorRight", () => {

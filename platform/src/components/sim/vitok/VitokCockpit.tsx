@@ -38,7 +38,7 @@ import {
   hotspotMouseVerbBg,
   type HotspotAction,
 } from "@/modules/sim/scene/vitok/hotspots";
-import { hotspotIsReachable } from "@/modules/sim/scene/vitok/cabinLook";
+import { hotspotIsReachable, hotspotLabelPoint } from "@/modules/sim/scene/vitok/cabinLook";
 import { useCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { MirrorRig, type MirrorMeshes } from "./MirrorRig";
 
@@ -1861,12 +1861,24 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
   const labelledSpecs = useMemo(() => {
     if (!enabled || highlightNames.size === 0) return [];
     const aspect = canvas.height > 0 ? canvas.width / canvas.height : 16 / 9;
-    return COCKPIT_HOTSPOTS.filter(
-      (spec) =>
-        highlightNames.has(spec.name) &&
-        spec.name !== hovered &&
-        hotspotIsReachable(spec.name, pose, aspect),
-    );
+    const out: { spec: (typeof COCKPIT_HOTSPOTS)[number]; lift: number }[] = [];
+    for (const spec of COCKPIT_HOTSPOTS) {
+      if (!highlightNames.has(spec.name)) continue;
+      if (spec.name === hovered) continue;
+      if (!hotspotIsReachable(spec.name, pose, aspect)) continue;
+      // ── DOC 91 · L10/§I15, THE HALF THE CENTRE TEST DOES NOT COVER ─────────
+      // `hotspotIsReachable` answers „can a pointer hit it". This chip is not a
+      // pointer: it hangs off the control's top edge, so a control whose CENTRE
+      // is six pixels inside the frame can still put its LABEL outside it.
+      // Measured on the production build, three landscape profiles:
+      // «🖱 Задръж Вътрешно огледало» at y −88 / −81 / −81 — §L10's y −83 from
+      // his own handset, with the centre test already in. So the anchor decides,
+      // and it is computed from the same numbers this element renders with.
+      const anchor = hotspotLabelPoint(spec.name, pose, aspect);
+      if (anchor === null) continue;
+      out.push({ spec, lift: anchor.lift });
+    }
+    return out;
   }, [enabled, highlightNames, hovered, pose, canvas.width, canvas.height]);
 
   return (
@@ -1931,10 +1943,17 @@ function CockpitHotspots({ cabinRef }: { cabinRef: RefObject<CabinControls | nul
           NAME THE CONTROL in this component's header). Not clickable and not
           in the way: `pointer-events: none` so the chip can never steal the
           click it is asking for, and parked above the proxy's own top face. */}
-      {labelledSpecs.map((spec) => (
+      {labelledSpecs.map(({ spec, lift }) => (
         <Html
           key={`label-${spec.name}`}
-          position={[spec.pos[0], spec.pos[1] + spec.size[1] / 2 + 0.045, spec.pos[2]]}
+          // THE LIFT COMES FROM THE PREDICATE, not from a literal repeated here.
+          // `hotspotLabelPoint()` is what decided this chip may render at all,
+          // and it decided it by projecting exactly this point — including the
+          // flip under the control when there is no room above it (the interior
+          // mirror, at every pose). Two copies of the offset would be two
+          // chances for the test and the render to disagree about where the
+          // label is, which is the class of defect §L10 already is.
+          position={[spec.pos[0], spec.pos[1] + lift, spec.pos[2]]}
           center
           style={{ pointerEvents: "none", whiteSpace: "nowrap" }}
           zIndexRange={[29, 10]}

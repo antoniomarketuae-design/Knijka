@@ -643,16 +643,23 @@ export function PreDriveTutorial({
             scrolls the 400-character explanation above it.
 
             `sticky bottom-0` inside the card's own scroll box, with:
-              · `-mx-5 -mb-5 px-5 pb-5` — the row is pulled out to the card's
-                edges so its background covers the full width as content passes
-                UNDER it, then given the padding back as its own. Without this
-                the text would slide through a 40 px gutter either side.
+              · `-mx-5 px-5` — the row is pulled out to the card's left and
+                right edges so its background covers the full width as content
+                passes UNDER it, then given the padding back as its own.
+                Without this the text would slide through a 40 px gutter on
+                each side. Horizontally only: a negative BOTTOM margin lifts a
+                `bottom-0` sticky row off the scrollport floor by exactly that
+                much, and a landscape capture showed a 20 px band of the next
+                paragraph still readable underneath it, which reads as „the
+                card ends here" over text that has not ended. The card's own
+                `p-5` bottom padding sits below the row instead, and padding is
+                empty by definition.
               · `bg-surface` — the card's own fill (`.card` = `bg-surface`),
                 stated literally because a sticky row over scrolling text must
                 be opaque; a translucent one turns the label into a smear.
               · `pt-3` + a hairline top border — so the row reads as a footer
                 rather than as a button floating on the paragraph it covers. */}
-        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-5 pb-5 pt-3">
+        <div className="sticky bottom-0 z-10 -mx-5 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface px-5 pb-3 pt-3">
           <button
             ref={continueRef}
             type="button"

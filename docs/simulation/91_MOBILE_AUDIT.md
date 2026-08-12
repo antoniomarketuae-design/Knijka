@@ -1482,18 +1482,18 @@ published a defect from a window like that one.**
 | **I1** | C1 · dead pedal — release the two pointer-ownership refs on hide | **DONE-UNVERIFIED** | `TouchControls.tsx:1076–1081` — `if (!visible) { releaseTouchControls(touch, steerPad, drivePad); parkKnobs(); }`, plus the unmount twin `:1082–1085`. The refs became `usePadPointer()` engine state (`:1034–1035`, `engine/touch.ts:318`) so release cannot be done by half again. Pinned by `touchPadRelease.test.tsx:158,162`. **Verified on `/dev/drive-rig` and `/dev/pedal-rig` only.** |
 | **I2** | C2 · every button dead under two fingers — one shared tap idiom, keep `onClick` | **DONE** | `modules/sim/hud/tapActivation.ts:337` `useTapActivation`, **18 call sites**: `TouchControls.tsx:1997` (GlyphButton) · `:2106` (RailButton) · `:2362` (SheetCell) · `SimOverlay.tsx:300–305` (six) · `LessonPlayShell.tsx:981,1017` (PlayMenu) · `LessonScene.tsx:2046` · `TraceTimeline.tsx:380–384`. **Production `/simulator`, real second CDP touch point: `tools/mobile/wave4-second-finger-census.mjs`, `parity-cards.mjs`.** |
 | **I3** | C1/C4 · render inert instead of `if (!visible) return null` | **DONE-UNVERIFIED** | `TouchControls.tsx:1417–1421` — root keeps its node, gains `data-sim-touch-inert`, `aria-hidden`, `opacity:0`; pads at `:1436` / `:1480` swap `pointer-events-auto` → `pointer-events-none`. The 30-line comment at `:1384–1416` states the mechanism. **Rig only.** |
-| **I4** | C3/L8/U5 · the belt trap — (a) card scrolls, (b) no auto-open modal on compact | **OPEN** | (a) `PreDriveTutorial.tsx:380` is **still** `card m-auto flex w-full max-w-lg flex-col gap-3 p-5` — no `max-h-full`, no `overflow-y-auto`, no `sticky bottom-0` button row. (b) `PreDriveChecklist.tsx:189–195` auto-opens on `readTutorialAutoOpen()` alone; **the word `compact` does not appear anywhere in that file.** |
-| **I5** | C5 · the 4 px dead end — (a) `noDismiss`, (b) a way back in the menu | **OPEN** | (a) `SimOverlay.tsx:316` is **still** `const closable = !blocking;` and the predrive item (`LessonPlayShell.tsx:2415–2424`) carries no `noDismiss`. (b) menu keys are `debrief · advisor · quiz · task · minimap · fullscreen · finish · abort · exit` — **no «Подготовка» recall**, and `setDismissedOverlayIds` has exactly one writer (`:1384`, the dismiss). The «Задача» recall §I5 told us to copy is at `:2552`, three lines away, and was not copied. |
+| **I4** | C3/L8/U5 · the belt trap — (a) card scrolls, (b) no auto-open modal on compact | **DONE** *(J-WAVE-6)* | (a) `PreDriveTutorial.tsx` — the card is `max-h-full … overflow-y-auto overscroll-contain` and the button row is `sticky bottom-0` with the card's own `bg-surface`, `-mx-5 -mb-5 px-5 pb-5` and a hairline. (b) `PreDriveChecklist.tsx` takes `compact` and returns before `readTutorialAutoOpen()`; the shell passes `compact` at the bottom-sheet mount. **Production, six profiles: §P.** |
+| **I5** | C5 · the 4 px dead end — (a) `noDismiss`, (b) a way back in the menu | **DONE** *(J-WAVE-6)* | (a) `SimOverlay.tsx` — `const closable = !blocking && shown.noDismiss !== true;`, `noDismiss?: boolean` on `SimOverlayItem`, and the predrive item carries it. (b) the menu gains `key: "predrive"` — «Подготовка n/13» — whose `onSelect` is `recallPreDriveOverlay()`, the second writer `setDismissedOverlayIds` never had. **Production, six profiles: §P.** |
 | **I6** | T1 · pinch-zoom on the driving surface — `touch-action: none` scoped to the scene | **DONE-UNVERIFIED** | `LessonPlayShell.tsx:2831` — `<div className="h-full w-full" style={{ touchAction: "none" }}>` wrapping only `SceneSlot`. The comment `:2800–2830` records the CDP two-point reproduction (`visualViewport.scale` → 5, then `offsetLeft` 247) **and refuses the global meta-tag fix for the theory/exam accessibility reason §I6 gave.** **Not re-fired on `/simulator`.** |
 | **I7** | C6 · stale `--sim-vh` — the hook's activation argument | **OPEN** | `LessonPlayShell.tsx:1320` is **still** `useVisualViewportHeight(immersive && !isFullscreen)`; `:2641` still publishes `--sim-vh` from that value unconditionally. Not one character of §I7 was applied. |
 | **I8** | L12 · 16 px of road — the `isFullscreen` arm must respect `compact ? "" : "gap-2 p-2"` | **OPEN** | `LessonPlayShell.tsx:2626` — the `isFullscreen` arm is **still** `"flex h-full flex-col gap-2 overflow-hidden bg-background p-2"`. The `compact ? "" : "gap-2 p-2"` ternary exists six lines below at `:2632` — on the `immersive` arm, which a phone that grants fullscreen never reaches. |
 | **I9** | L11 · document taller than the screen — scope the body payback | **OPEN** | `globals.css:537` — `padding-bottom: env(safe-area-inset-bottom, 0px)` still unscoped. `:has()` is used seven times in the file (`:331`, `:572`, …) — the mechanism §I9 named is present and was not pointed at this rule. |
 | **I10** | L3 · minimap on the thumb — `--sim-hud-floor` → `TOUCH_CONTROLS_FLOOR` on compact | **OPEN** | `LessonPlayShell.tsx:3197` — minimap column still `bottom: "var(--sim-hud-floor, 6.75rem)"`, and `:2181` defines `hudFloorPx = compact ? dashHeightPx + 8 : ROOMY_HUD_FLOOR_PX` — the **dash** floor, ≈48 px, exactly the number `TouchControls.tsx:453–456` warns cannot be used. `PlayAreaStyles` moves the deck onto `TOUCH_CONTROLS_FLOOR` (`:277`, `:1180`) and never touches `[data-hud="minimap-column"]`. |
 | **I11** | D4/C4 · the sheet stands on the controls — `--sim-touch-floor` + a compact redesign | **OPEN** | `SimOverlay.tsx:558` — **still** `bottom: "var(--sim-dash-h, 0px)"` with `maxHeight: "calc(var(--sim-vh, 100dvh) * 0.62)"`. **`--sim-touch-floor` does not exist anywhere in the tree.** §I11 said this one is a redesign, not a one-liner, "and pretending otherwise is how this class of defect keeps coming back" — it was not attempted either way. |
-| **I12** | U1/M6 · mouse-only copy — `tapBg?` per performed step | **OPEN** | `performedSteps.ts:142–160` — the shape is still exactly `clickBg` + `pedalBg` + `keys`; **no `tapBg` in the file or the tree**, so `preDriveMouseActionBg()` (`:248`) still cannot return a touch sentence. `PreDriveChecklist.tsx:67` still reads «Всяка стъпка се прави с **МИШКАТА**…». *(A touch vocabulary DOES exist and IS selected on production — `hintInputFor(hasTouchScreen())`, `LessonPlayShell.tsx:1143`, proved by `wave4-teaching-copy.mjs` and `wave5-card-text.mjs`. It is the **card's** copy. The pre-drive's is untouched, and the pre-drive is what he called "ultra hard".)* |
-| **I13** | U2/L1 · unnamed controls — a caption under each glyph | **DONE-UNVERIFIED** | `TouchControls.tsx:1963,1987,2015–2021` — `captionBg` on `GlyphButton`; all five flank stations carry one: `:1621` Ляв · `:1631` Дясн · `:1648` Дясн · `:1657` Задн · `:1666` Ляво. **Never checked for CLIPPING on a real profile — which is precisely the defect he is reporting on the card.** |
-| **I14** | L9 · sub-44 px hit rects — `py-3` + the `::before` pad | **OPEN** | `LessonPlayShell.tsx:990` — menu row still `px-2.5 py-2.5` (39.5 px). `before:absolute before:-inset-y-*` occurs in **exactly one file in the whole tree**: `QualityPresetSelector.tsx:165` — the precedent §I14 cited. It was never applied to the checklist buttons, the disclosure rows or the demo pill. |
-| **I15** | L10/D11 · centre-blind reach table | **OPEN** | `cabinLook.ts:288–301` — `hotspotVisibleRect()` still returns on clipped **span** alone (`if (right-left < MIN_TARGET_SPAN \|\| bottom-top < MIN_TARGET_SPAN) return null`). No centre test. So `hotspotIsReachable()` (`:304`) still says yes for a mirror whose label lands at x −76. |
+| **I12** | U1/M6 · mouse-only copy — `tapBg?` per performed step | **DONE** *(J-WAVE-6)* | `performedSteps.ts` — `tapBg?: string` on `PreDriveStepControl`, authored on all ten performed steps; `preDriveTapActionBg()`, `preDriveActionBg(stepId, pointer)` and `preDriveActionGlyph()` beside the mouse pair. `PreDriveChecklist` takes `pointer` and `MODE_SUBTITLE` became `Record<PreDriveMode, Record<PreDrivePointer, string>>`. `predrive-mouse-first.test.ts` asserts a touch sentence for all thirteen, that none names a mouse, that each names a control a phone carries, and that every ⚙-strip cell says how to open the strip. **Production, six profiles: §P.** |
+| **I13** | U2/L1 · unnamed controls — a caption under each glyph | **DONE** *(J-WAVE-6)* | `TouchControls.tsx:1963,1987,2015–2021` — `captionBg` on `GlyphButton`, five flank stations. **The clipping question is now answered rather than open: five captions found on every profile, `scrollWidth === clientWidth` on every one, none off-viewport (§P). The captions are not the founder's clipped text.** |
+| **I14** | L9 · sub-44 px hit rects — `py-3` + the `::before` pad | **DONE** *(J-WAVE-6)* | Menu row `min-h-11` + `py-3` (`§I14` said `py-3`, and on this build that lands on **43.5**); the four checklist controls and the two disclosure rows carry `TOUCH_ROW_CLASS` (`flex min-h-11 touch-manipulation items-center`); the demo pill takes the `QualityPresetSelector` `::before` pad (27 → 47). **Production, six profiles: §P — 0 of 7 menu rows and 0 of 4 checklist controls under 44.** |
+| **I15** | L10/D11 · centre-blind reach table | **DONE** *(J-WAVE-6)* | `cabinLook.ts` — `hotspotVisibleRect()` now requires the UNCLIPPED rect's centre to lie inside [0,1] before the span test (`screenCentreIsInFrame`). **And the row could not be closed by that alone:** the left mirror's centre is at x −0.005 at every aspect and the reach table pointed it at `forward`, which `looksNeededFor()` skips — so „unreachable" would have offered the student nothing. `mirrorLeft` and `mirrorRear` poses added (GLANCE_OFFSETS.left / .rear verbatim, the `mirrorRight` precedent), the two stalks moved to `console`. `cabinLook.test.ts` pins the two §L10 numbers. |
 | **I16** | L13 · overlapping overlays — enrol the touch-hint lines in `data-sim-overlay-active` | **DONE-UNVERIFIED** | `PlayAreaStyles.tsx:1073–1074` — `[data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="touch-hint"] { display: none; }`, plus `:1081–1082` for `follow-hint` / `telltale-cue` and `:1086–1087` for the hint-vs-hint rank. The switch is written at `LessonPlayShell.tsx:2615`. **Rig-measured.** |
 | **I17** | D12a · tier seed — delete the 8 GB-Android carve-out | **DONE** | `quality.ts:396–410` — the rule is gone; only `deviceMemoryGb <= 2 → low` survives and every touch-only device falls through. **Production `/simulator`, six profiles × two tiers: §N2·B** (`med` = 2.4× draws, 1.56× backing store, 2.0–3.0× CPU frame). Second half of K4 also taken: `maxDprFor()` (`:323`) clamps touch-only to dpr 1.0 on every tier. |
 | **I18** | D12b · the disconnected safety valve | **DONE** | `qualityStore.ts:297` — `useAutoQualityProbe()` runs inside `useQuality()`. **And the seam nobody had checked was fixed:** `LessonSelectScreen.tsx:41` calls `refreshSeededQuality()` on mount, because `seedQualityLevel()` is memoized per page load and `/simulator` never reloads the document (§N2·A). Probe honesty guard in `SimEnvironment.tsx:234` (§N3). |
@@ -1549,7 +1549,7 @@ were dropped silently.*
 | **K4** | Keep the 8 GB-Android → `med` carve-out? | **✅ SETTLED** (already marked in §K). Both halves taken; production-measured §N2·B. |
 | **K5** | «Напреднал»: build a clutch, or gate the tier off on touch? | **✅ SETTLED — RULED: BUILD THE CLUTCH.** «СЪЕД» shipped (§I24). **But the ruling is not yet delivered**: §O.3 N4 buries the gear cell in landscape. |
 | **K6** | May the indicators move to the LEFT flank? | **✅ SETTLED — RULED YES.** Implemented: `ARC_STATIONS_LEFT = 2`, both indicators left, all three mirrors right (`TouchControls.tsx:444–466`), with the exam reasoning recorded on the constant. |
-| **K7** | Teach the ⚙ strip, or make the cockpit hotspots genuinely reachable? | **🔴 STILL BLOCKS.** It scopes §I11 (sheet clearance + compact redesign), §I12 (`tapBg`) and §I15 (reach table) — **three OPEN rows, and the seatbelt step he called "ultra hard" is the one waiting on the answer.** |
+| **K7** | Teach the ⚙ strip, or make the cockpit hotspots genuinely reachable? | **PARTLY ANSWERED BY SHIPPING BOTH — see §P.5.** §I12 took the cheap-and-honest arm (the pre-drive now names «Кола» → «КОЛАН» / «ДВИГ» / «СВЕТЛ» to a phone). §I15 took a piece of the true arm: the reach table stopped claiming a mirror is in frame when only its edge is, and the two mirrors that had no head turn at all now have one. **What is still HIS to rule is the seatbelt itself:** the buckle has a pose, and on touch the strip is what performs the step — is a cockpit the student never touches acceptable there, or must the buckle become tappable in 3D? |
 | **K8** | May we spend ~0.9 % of the screen on words? | **SETTLED BY SHIPPING**, not by ruling — the captions are in (§I13). Needs his eyes, not his decision. |
 | **K9** | Portrait: keep the rotate-nag, or make portrait first-class? | **🔴 STILL BLOCKS**, and it is now urgent: **§O.3 N6 is his own portrait report** and nothing owns it while this is unanswered. |
 | **K10** | Ship Wave 1 onto the dirty branch, or wait? | **MOOT.** The tree is clean; everything is committed at `97afa9c`, pushed to `origin` **and** `vps`. |
@@ -1557,13 +1557,167 @@ were dropped silently.*
 **Settled: K3 · K4 · K5 · K6 (his four rulings) + K8. Moot: K2 · K10, and K1 in all but one respect.
 Still blocking: K7 and K9 — and between them they own six of the fifteen OPEN rows.**
 
-### O.5 · The rule this section exists to install
+### O.5 · The rule this section exists to install (see also §P, which obeys it)
 
 **A row is closed when it is measured on a production build, on the authenticated `/simulator`, on
 the six-profile ladder — with `hasCanvas === true` and a non-zero canvas rect asserted before any
 number is believed.** Five probes have now reported "0 overflow" from a page with no simulator on
 it. `/dev/drive-rig` calls `notFound()` in production and defaults to `medium` (§O.3 N2); a number
 taken there is not evidence about the product, and no wave may mark a row DONE from it again.
+
+---
+
+## P. J-WAVE-6 · THE CARDS — I4 · I5 · I12 · I13 · I14 · I15, and the collapsed card
+
+Instrument: `tools/mobile/wave6-cards.mjs`. `next build && next start`, authenticated
+`/simulator`, six profiles, `hasCanvas === true` and a non-zero canvas rect asserted before a single
+number is recorded. **The route is `/simulator` → «Започни урока» on «Подготовка и потегляне», not
+the `?scenario=` deep link** — a compiled scenario drill has `preDrive: false`, and the first run of
+this probe against it measured a seat-belt warning card and would have reported a false negative on
+five of these rows.
+
+### P.1 · The headline — THE COLLAPSED CARD WAS A THEO-4 BREACH, AND IT IS CLOSED
+
+His words: **„THE CARDS SHOW BUTTONS AND NO TEXT."** Wave 4 measured the mechanism and never
+escalated it: `SimOverlay` rendered `lineBg` and **nothing else**; `detailBg` existed only inside the
+sheet, behind one press of «ЗАЩО» / «СПИСЪК». On the pre-drive card `detailBg` **is the instruction**
+(`PRE_DRIVE_STEPS[…].instructionBg`), and on a desktop the same sentence renders inline. So the one
+device where the reasoning was hidden was the phone — the device with the least discoverable
+affordance for finding it. Requirement zero is founder-ratified and unconditional.
+
+The budget was solved rather than paid for with the text: the column is ≤240 px
+(`notifyColumn.ts`), all thirteen instructions are 55–95 characters, and `line-clamp-6` is the
+ceiling for the long ones, in the RIGHT-EDGE corridor he drew himself.
+
+| profile | card | body rendered inline | gap to right edge |
+|---|---|---|---|
+| iphone16-portrait | 141×185 | **141×91** | 12 px |
+| iphone16-landscape | 240×126 | **240×45** | 71 px (notch inset) |
+| small-portrait | 130×185 | **130×91** | 12 px |
+| small-landscape | 240×116 | **240×38** | 12 px |
+| galaxy-gesturebar-portrait | 130×185 | **130×91** | 12 px |
+| galaxy-gesturebar-landscape | 240×92 | **240×19** | 12 px |
+
+### P.2 · The six rows, on the six profiles
+
+| profile | canvas | body | I5a no ✕ | I5b recall | I4a | I4b | I12 | I13 | I14 | EDGE |
+|---|---|---|---|---|---|---|---|---|---|---|
+| iphone16-portrait | 393×852 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| iphone16-landscape | 852×393 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| small-portrait | 360×780 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| small-landscape | 780×360 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| galaxy-gesturebar-portrait | 360×780 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| galaxy-gesturebar-landscape | 780×360 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+* **I4a — the belt trap.** «Разбрах — потвърди стъпката» measured **262×44, on screen, `position:
+  sticky`** on all six; the CARD scrolls (`overflow-y: auto`) and the backdrop does not. §I4 had it
+  300–423 px below the fold on 13 of 13 landscape steps.
+* **I4b.** No tutorial modal opened by itself on any compact profile.
+* **I5a.** The ✕ is absent from the pre-drive line on all six — the 4 px dead end cannot be entered.
+* **I5b.** «Подготовка n/13» present in the lesson menu on all six.
+* **I12.** Subtitle «Всяка стъпка се прави с **ПРЪСТ** — по бутоните около екрана, по лентата „Кола“
+  горе и по подложките долу», action line «**☝** Направи проверката, после натисни „Потвърди“ в
+  списъка». Neither sentence names a mouse.
+* **I13.** Five captions found on every profile; `scrollWidth === clientWidth` on every one; none
+  off-viewport. **The captions are not the clipped text he is reporting.**
+* **I14.** Menu rows **226×44** (0 of 7 under); checklist controls «Покажи ми как» 98.8×44,
+  «Потвърди» 75.1×44, «Всички стъпки» 133×44, «⌨ Клавиши за напреднали» 169.8×44 — 0 of 4 under.
+
+### P.3 · §I15 — the row §I got half right, and the measurement that showed it
+
+§I15 says: require the clipped rect's **centre** inside [0,1]. Implemented — and the six-profile run
+then produced **«🖱 Задръж Вътрешно огледало» at y −88 / −81 / −81** on the three landscape profiles,
+which is §L10's **y −83** from his own handset, *with the centre test already in*.
+
+The centre test cannot catch it, and the reason is the row's real lesson: at 2.17:1 the interior
+mirror's centre is **six pixels inside the top edge** (cy 0.015) while its box TOP is at −0.134, and
+`VitokCockpit` anchors the chip **above the box top** so the label does not cover the control it
+names. **The predicate was answering a different question from the one the caller was asking.**
+
+Closed in three parts, all in `cabinLook.ts` + `VitokCockpit.tsx`:
+
+1. `screenCentreIsInFrame` — the row as written. It is what kills «Задръж Ляво огледало» at
+   **x −76**: the left mirror's centre is at x −0.005 *at every aspect the app serves*.
+2. `hotspotLabelPoint()` — the anchor the chip is actually drawn at, computed from the same numbers
+   the component renders with (the lift is one exported constant, not two literals), **with a flip
+   UNDER the control when there is no room above it.** The interior mirror sits above the windscreen
+   by construction, so „above" is off-canvas at every pose; „then it gets no chip" was the other
+   option and it is worse, because the mirror step is a graded A2 action and the chip is how a
+   17-year-old learns which mirror is which.
+3. `mirrorLeft` and `mirrorRear` poses — **the two the reach table never had.** Both mirrors pointed
+   at `forward`, and `looksNeededFor()` skips `forward` by construction, so „unreachable" would have
+   offered the student *nothing at all*. GLANCE_OFFSETS.left / .rear verbatim, the `mirrorRight`
+   precedent, so the pose IS the graded glance and there is no jump at the handover. The two stalks
+   moved to `console` for the same reason the selector already was.
+
+`cabinLook.test.ts` pins both §L10 numbers, the flip, and „every control's label is on the canvas at
+the pose the reach table names, at every aspect".
+
+**Re-measured on the production build after the fix, same three landscape profiles, same step:**
+
+| profile | «🖱 Задръж Вътрешно огледало» before | after |
+|---|---|---|
+| iphone16-landscape | 196×27 @ 509, **−88** | 196×27 @ 505, **80** ✅ |
+| small-landscape | 196×27 @ 458, **−81** | 196×27 @ 454, **72** ✅ |
+| galaxy-gesturebar-landscape | 196×27 @ 458, **−81** | 196×27 @ 454, **72** ✅ |
+
+…and the checklist now offers «👁 Погледни към лявото огледало» and «👁 Погледни към дясното
+огледало» on that step, which is the head turn §I15 said should be offered "instead of silently
+claiming the mirrors are in frame". Before the reach table had the two poses there was nothing to
+offer: both mirrors pointed at `forward`, and `looksNeededFor()` skips `forward`.
+
+### P.4 · The right-edge question — answered, and it is NOT the cards lane's
+
+**„The teach card is CLIPPED at the right edge in both orientations — «РАЗБРА[Х]» runs off."**
+§NR1 proved there is no DOCUMENT-level horizontal overflow and that negative was then read as
+covering this. It does not: a card whose own box clips its own label produces the identical
+screenshot and leaves the document exactly that wide. Three separate questions, asked separately, on
+all six profiles:
+
+| question | result |
+|---|---|
+| does the document scroll sideways? | **no** — `docScrollW === innerWidth` on 6 of 6 (393/852/360/780) |
+| does any element cross the right edge? | **0 of 6 profiles** |
+| does any text box clip its own content? | **0 of 6 profiles** |
+
+**So on the six-profile ladder, in the pre-drive state, the cards are not clipped and the captions
+are not clipped.** The probe suppresses the touch hint by default (`sim.touchHintSeen`) so the
+PRE-DRIVE card is the one in the column — otherwise the hint outranks it and five of the rows above
+measure the wrong card — and the hint is the card that carries «Разбрах» on a phone. So
+`--keep-hint` leaves it alone and re-takes the EDGE rows with it on screen; §P.6 is that run.
+
+**Re-taken with `--keep-hint` (iphone16-landscape, iphone16-portrait, small-landscape):** the same
+three answers — `docScrollW === innerWidth` (852/393/780), **0** elements past the right edge, **0**
+text boxes clipping their own content — and **«Разбрах» 0 on screen**, i.e. the touch hint did not
+raise itself in that session either, so the card his screenshot is of has not been reproduced from
+here in either configuration.
+
+**AND THE FIRST ANSWER TO „NO TEXT" IS §P.1, NOT THIS SECTION.** A card that arrives collapsed
+shows its buttons and no body — which is exactly what he described — and that is now fixed and
+measured on six profiles. The right-edge report is a second, separate claim about a second, separate
+surface; the general case belongs to the other lane's `wave6-edges.mjs`, and this lane's answer is:
+**on this ladder, in this state, nothing is clipped and nothing crosses the edge.** If it survives
+on his handset it is a state neither probe has reached, not the cards measured here.
+
+### P.5 · What this lane found that no row owns
+
+* **The pre-drive checklist rendered at y −319 (iPhone 16 landscape) / y −354 (780×360).** The sheet's
+  `max-height` was `min(243.66px, … min(44%, 152px) …)`: `--sim-touch-floor` republishes
+  `TOUCH_CONTROLS_FLOOR`, which is written in percentages, and in a `max-height` whose containing
+  block is a `bottom:`-anchored box of AUTO height a percentage has no height to be a percentage of,
+  so the engine drops the whole declaration. The sheet then grew to its content (516 px in a 393 px
+  viewport) and went off the TOP — with «Потвърди», the only completion path for the three INFO
+  steps, at y −75. **Step 1 is an info step, so Урок 1 could not be started at all.** Diagnosed here
+  from the computed style; fixed by the §I11 lane in `b1b1205` (`touchControlsFloorCss()`).
+  **Re-measured after that fix: the sheet caps at 88 px and the checklist lands at y 110 / 98 / 74 —
+  on the screen, and the tutorial now opens from a real CDP touch on «Покажи ми как».**
+* **«Покажи ми как» did not answer a real CDP touch** while that was true (it was above the
+  viewport). The probe says so out loud and opens the card programmatically rather than letting a
+  number appear — the card's own geometry is the row, but "the control was not reachable" is a
+  finding and must not be swallowed to produce a green cell. It answers a real touch now.
+* **The compact sheet is 88 px on a landscape phone** once it honours the thumb band, i.e. a header
+  and one line, with «⤢» for the rest. That is arithmetic, not a bug (§I11 said so), but it is what
+  a 13-step checklist has to live in on his own handset and it is worth his eyes.
 
 ---
 ## Q. WAVE 6 · THE PERFORMANCE LANE — the six §I performance rows, closed and priced — production, 2026-08-12

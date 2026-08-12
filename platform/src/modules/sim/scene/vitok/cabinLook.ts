@@ -375,6 +375,83 @@ export function hotspotVisibleRect(
   return { left, right, top, bottom };
 }
 
+/**
+ * ── THE LABEL ANCHOR, AND WHY `hotspotIsReachable` IS NOT IT ─────────────────
+ *
+ * MEASURED ON THE PRODUCTION BUILD, three landscape profiles, authenticated
+ * `/simulator`, on step 2 («Настройка на огледалата») —
+ * `tools/mobile/wave6-cards.mjs`:
+ *
+ *     iPhone 16 landscape          «🖱 Задръж Вътрешно огледало»  @ 509, **−88**
+ *     small landscape 780×360      same chip                      @ 458, **−81**
+ *     galaxy gesture-bar landscape same chip                      @ 458, **−81**
+ *
+ * §L10 photographed that chip at **y −83** on his own handset. The centre test
+ * above did NOT close it, and the reason is worth stating because it is the
+ * whole lesson of this row: at 2.17:1 the interior mirror's centre is at
+ * y 0.015 — six pixels inside the top edge, so `centre ∈ [0,1]` says yes —
+ * while its BOX TOP is at −0.134, and `VitokCockpit` anchors the chip ABOVE the
+ * box top (`pos.y + size.y/2 + 0.045`) precisely so the label does not cover
+ * the control it names. The predicate was answering a different question from
+ * the one the caller was asking.
+ *
+ * So the anchor is computed HERE, from the same numbers the component renders
+ * with, and the component asks about the point it is actually going to use.
+ * `hotspotIsReachable` keeps its own meaning — „can a pointer hit it" — which
+ * is the right question for the checklist's head-turn logic and the wrong one
+ * for a label.
+ */
+export const HOTSPOT_LABEL_LIFT_M = 0.045;
+
+/**
+ * Where the „🖱 Задръж …" chip lands, in canvas fractions from the top-left,
+ * plus WHICH SIDE of the control it had to go on — or null when neither side is
+ * on the canvas, in which case no chip may be drawn at all.
+ *
+ * ABOVE IS THE DEFAULT AND BELOW IS THE FALLBACK, and the fallback is not
+ * hypothetical: the INTERIOR MIRROR sits high in the frame by construction (it
+ * is above the windscreen), so a chip 45 mm above its top edge projects off the
+ * canvas at *every* pose, including the `mirrorRear` glance that exists for it.
+ * „Then it gets no chip" was the other option and it is worse — the mirror step
+ * is a graded A2 action and the label is how a 17-year-old learns which mirror
+ * is which. So it flips under, where there is always room, and the caller
+ * renders it there.
+ */
+export function hotspotLabelPoint(
+  name: CockpitHotspotName,
+  poseId: CabinLookPoseId,
+  aspect: number = COCKPIT_ASPECT_REF,
+): { x: number; y: number; side: "above" | "below"; lift: number } | null {
+  const spec = HOTSPOT_BY_NAME.get(name);
+  if (spec === undefined) return null;
+  const half = spec.size[1] / 2;
+  for (const [side, lift] of [
+    ["above", half + HOTSPOT_LABEL_LIFT_M],
+    ["below", -half - HOTSPOT_LABEL_LIFT_M],
+  ] as const) {
+    const p = projectCockpitPoint(
+      [spec.pos[0], spec.pos[1] + lift, spec.pos[2]],
+      poseId,
+      aspect,
+    );
+    if (!p.ahead) continue;
+    const x = p.x;
+    const y = 1 - p.y; // NDC grows upward, CSS grows downward
+    if (x < 0 || x > 1 || y < 0 || y > 1) continue;
+    return { x, y, side, lift };
+  }
+  return null;
+}
+
+/** True when a chip for this control would be drawn ON the canvas. */
+export function hotspotLabelIsOnScreen(
+  name: CockpitHotspotName,
+  poseId: CabinLookPoseId,
+  aspect: number = COCKPIT_ASPECT_REF,
+): boolean {
+  return hotspotLabelPoint(name, poseId, aspect) !== null;
+}
+
 /** True when enough of the control is on screen for a mouse to hit it. */
 export function hotspotIsReachable(
   name: CockpitHotspotName,
