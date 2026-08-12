@@ -184,6 +184,9 @@ export function SimulatorClient({
         key={scenarioLesson.id}
         lesson={scenarioLesson}
         quality={quality}
+        // §I26(c): the SAME setter the select screen's segmented control uses,
+        // so the lesson menu's quality row and that control are one setting.
+        onQualityChange={setQuality}
         nextLesson={null}
         onExitToSelect={() => {
           setFocusTemplateId(playedTemplateId); // catalog re-anchors here
@@ -294,6 +297,7 @@ export function SimulatorClient({
       key={active.lesson.id}
       lesson={active.lesson}
       quality={quality}
+      onQualityChange={setQuality}
       nextLesson={next ? { id: next.id, titleBg: next.titleBg } : null}
       onExitToSelect={() => {
         setActiveLessonId(null);

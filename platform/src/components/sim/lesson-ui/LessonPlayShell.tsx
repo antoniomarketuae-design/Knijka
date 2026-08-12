@@ -155,6 +155,14 @@ import { recordSelfPredictionAction } from "@/app/(dashboard)/simulator/calibrat
 // server half, and this is a client bundle (audit M-26).
 import { isResultScreenHeld } from "@/modules/learning/calibration";
 import { AdvisorCard } from "./AdvisorCard";
+import {
+  nextQualitySelection,
+  qualityAriaLabelBg,
+  qualityTradeBg,
+  qualityValueBg,
+  type QualitySelection,
+} from "./qualityChoice";
+import { useQualitySelection } from "./QualityPresetSelector";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
 import { HudCloseButton } from "./HudCloseButton";
 import {
@@ -972,6 +980,20 @@ type PlayMenuItem = {
   labelBg: string;
   /** Right-hand state word („вкл." / „Често"), or null for a plain action. */
   valueBg?: string | null;
+  /**
+   * THE TRADE, under the label — doc 91 §I26(c) / THEO-4.
+   *
+   * Only the quality row carries one, and it is the reason that row is not just
+   * a switch: a setting that changes the experience without saying what it
+   * costs is the bare verdict requirement zero forbids, one layer out from the
+   * theory module. Kept to two lines of 10 px type at 208 px (see
+   * `qualityChoice.ts` for the measurement) — a third line costs menu height
+   * the sheet does not have on the tightest profile in the ladder.
+   */
+  hintBg?: string | null;
+  /** Full accessible name when label+value+hint would otherwise read as three
+   *  unlabelled spans. */
+  ariaLabelBg?: string | null;
   tone?: "default" | "danger";
   onSelect: () => void;
   /** Keep the sheet open (a toggle the student may flip twice). */
@@ -987,10 +1009,12 @@ function PlayMenuRow({ item, onChosen }: { item: PlayMenuItem; onChosen: () => v
     item.onSelect();
     if (item.keepOpen !== true) onChosen();
   });
+  const hint = item.hintBg ?? null;
   return (
     <button
       type="button"
       role="menuitem"
+      aria-label={item.ariaLabelBg ?? undefined}
       {...tap}
       // DOC 91 · L9/§I14: measured 226×**39.5** — 4.5 px short of the 44 px a
       // thumb needs, on every row of the sheet that holds «Пауза», the quality
@@ -1005,13 +1029,32 @@ function PlayMenuRow({ item, onChosen }: { item: PlayMenuItem; onChosen: () => v
       // stated as a floor (`min-h-11` = 44 px) and the padding keeps the shape:
       // a rule that has to be re-derived from a font metric will be wrong again
       // the next time the type changes.
-      className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 py-3 text-left text-[13px] font-bold transition active:bg-surface ${
-        item.tone === "danger" ? "text-danger" : "text-foreground"
-      }`}
+      //
+      // A ROW WITH A TRADE LINE KEEPS THE SAME FLOOR AND SPENDS LESS PADDING:
+      // 19.5 (label) + 12.5×2 (two lines of 10 px) + 12 (`py-1.5`) = 56.5, and
+      // the floor still holds it at ≥ 44 if the hint ever renders on one line.
+      // The one-line rows are byte-identical to what §I14 measured.
+      className={`flex min-h-11 flex-col justify-center rounded-xl px-2.5 text-left text-[13px] font-bold transition active:bg-surface ${
+        hint === null ? "py-3" : "gap-0.5 py-1.5"
+      } ${item.tone === "danger" ? "text-danger" : "text-foreground"}`}
     >
-      <span className="min-w-0 flex-1 truncate">{item.labelBg}</span>
-      {item.valueBg ? (
-        <span className="shrink-0 text-[11px] font-bold text-accent">{item.valueBg}</span>
+      <span className="flex w-full items-center gap-2">
+        <span data-menu-label className="min-w-0 flex-1 truncate">
+          {item.labelBg}
+        </span>
+        {item.valueBg ? (
+          <span data-menu-value className="shrink-0 text-[11px] font-bold text-accent">
+            {item.valueBg}
+          </span>
+        ) : null}
+      </span>
+      {hint !== null ? (
+        <span
+          data-menu-hint
+          className="text-[10px] font-medium leading-tight text-muted"
+        >
+          {hint}
+        </span>
       ) : null}
     </button>
   );
@@ -1021,11 +1064,14 @@ function PlayMenu({
   titleBg,
   badgeBg,
   items,
+  compact,
 }: {
   titleBg: string;
   /** „Изпит" / „Пясъчник" framing, or null. */
   badgeBg: { textBg: string } | null;
   items: PlayMenuItem[];
+  /** Phone-shaped stage — the sheet has to pay for every pixel it takes. */
+  compact: boolean;
 }) {
   const [open, setOpen] = useState(false);
   // Doc 91 · C2 — this menu is where «Пауза», the quality preset and «Завърши
@@ -1089,17 +1135,62 @@ function PlayMenu({
         <div
           role="menu"
           aria-label="Меню на урока"
-          className="pointer-events-auto flex min-h-0 w-60 max-w-[70vw] flex-col overflow-y-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur"
+          // ── THE SHEET'S FOOTPRINT, RE-MEASURED FOR §I26(c)'s EXTRA ROW ──────
+          //
+          // Adding a row to this sheet is not free and the ladder says so.
+          // Measured on the deployed build (726d7ef, six profiles,
+          // authenticated /simulator, menu OPEN):
+          //
+          //   portrait   sheet 240×370 at y 58 (117 with the emulated notch);
+          //              the first thumb control above it — «Мигач надясно» —
+          //              has its centre at y 466-490. **3 px of clearance on
+          //              iPhone-16 portrait.**
+          //   landscape  sheet 240×294 in a 360-tall stage: the seventh row
+          //              («← Всички уроци») already falls BELOW the fold and
+          //              `elementFromPoint` at its centre answers the steering
+          //              pad. 4 of 19 controls dead with the menu open.
+          //
+          // So the row is paid for rather than simply added:
+          //
+          //  · LANDSCAPE GOES TWO COLUMNS. Eight rows in four, and the sheet
+          //    gets SHORTER (≈224 px against 294) — nothing falls below the
+          //    fold any more and the steering pad comes back out from under it.
+          //    Width 23rem = 368 px, which stays clear of the notification
+          //    column (x ≥ 528 on the 780 stage, ≥ 541 on the iPhone): that
+          //    column is `z-30` against this sheet's `z-20`, so a menu row
+          //    under a notification card would be a dead row — the exact §I11
+          //    mechanism, and the reason this does not simply go full-width.
+          //  · COMPACT DROPS THE TITLE LINE. 26 px, and on a phone it is pure
+          //    repetition: the student tapped this lesson's card one screen
+          //    ago, and the trigger button still carries `title={titleBg}` for
+          //    a pointer. It stays on a roomy stage, where the sheet is not
+          //    competing with the road for height.
+          className={`pointer-events-auto flex min-h-0 flex-col overflow-y-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur ${
+            compact ? "w-60 max-w-[70vw] [@media(orientation:landscape)]:w-[23rem]" : "w-60 max-w-[70vw]"
+          }`}
         >
-          <p className="truncate px-2 py-1 text-[11px] font-bold text-muted">{titleBg}</p>
-          {items.map((item) => (
-            <PlayMenuRow key={item.key} item={item} onChosen={() => setOpen(false)} />
-          ))}
+          {compact ? null : (
+            <p className="truncate px-2 py-1 text-[11px] font-bold text-muted">{titleBg}</p>
+          )}
+          <div
+            role="none"
+            className={
+              compact
+                ? "grid grid-cols-1 [@media(orientation:landscape)]:grid-cols-2 [@media(orientation:landscape)]:gap-x-1"
+                : "flex flex-col"
+            }
+          >
+            {items.map((item) => (
+              <PlayMenuRow key={item.key} item={item} onChosen={() => setOpen(false)} />
+            ))}
+          </div>
           {/* ODbL. The shell's attribution footer is hidden in every immersive
               layout, and compact is now ALWAYS immersive — so on a phone this
               menu is the only place the district's source can be credited. It
               is required (district-v1.json meta), so it goes where the student
-              can actually reach it rather than nowhere. */}
+              can actually reach it rather than nowhere. It is NOT merged into
+              the title line above: that line truncates on a long lesson name,
+              and a truncated attribution is a missing attribution. */}
           <p className="px-2 pb-0.5 pt-1.5 text-[10px] text-muted">
             © OpenStreetMap contributors
           </p>
@@ -1112,6 +1203,7 @@ function PlayMenu({
 export function LessonPlayShell({
   lesson,
   quality,
+  onQualityChange,
   nextLesson,
   onExitToSelect,
   onStartLesson,
@@ -1120,6 +1212,26 @@ export function LessonPlayShell({
 }: {
   lesson: LessonSpec;
   quality: QualityPreset;
+  /**
+   * §I26(c) — THE QUALITY CONTROL, MID-LESSON.
+   *
+   * His filed complaint, verbatim: *"if the frame rate is bad he still has to
+   * leave the session to change anything."* The preset existed and lived on the
+   * lesson-SELECT screen only, so acting on a bad frame rate cost the whole
+   * session. Passing this makes the row appear in the lesson menu; the owner
+   * (`simulator-client.tsx`) hands over the same `setQuality` the select screen
+   * uses, so the two controls are one setting and cannot disagree.
+   *
+   * NOTHING REMOUNTS WHEN IT FIRES. `SceneSlot`'s `key` is `sceneEpoch` (the
+   * restart counter), not the tier, so the Canvas, the physics world and the
+   * lesson session all survive: what changes is `dpr={[1, canvasMaxDpr(level)]}`
+   * on the live renderer, the preset the environment reads, and the texture
+   * budget — and the PBR loaders resolve to `null` and keep the procedural
+   * fallback rather than suspending, so the world never blanks mid-drive.
+   *
+   * Absent (the /dev rigs) ⇒ no row, exactly as before.
+   */
+  onQualityChange?: (q: QualitySelection) => void;
   /** The following lesson in the curriculum (for „Следващ урок“); null on L4. */
   nextLesson: { id: string; titleBg: string } | null;
   onExitToSelect: () => void;
@@ -1328,6 +1440,12 @@ export function LessonPlayShell({
   // grammar — no chrome rows, an edge-to-edge instrument band, a teach sheet
   // instead of a teach modal.
   const compact = useCompactHud();
+  // WHAT THE STUDENT CHOSE, as opposed to what is rendering (`quality`). The
+  // quality row has to be able to show „Авто · Ниско" — the state where the
+  // auto-quality probe is still the one deciding — and tell it apart from a
+  // deliberate «Ниско». Reading the store rather than threading a second prop
+  // keeps the select screen and this menu on one source of truth.
+  const qualitySelection = useQualitySelection();
   const standalone = useStandaloneDisplay();
   const immersive = shouldGoImmersive({
     isFullscreen,
@@ -2661,6 +2779,37 @@ export function LessonPlayShell({
           onSelect: toggleMinimap,
           keepOpen: true,
         },
+        // ── §I26(c) · THE QUALITY CONTROL, WHERE AN FPS COMPLAINT CAN REACH IT
+        //
+        // „if the frame rate is bad he still has to leave the session to change
+        // anything." It is HERE — beside «Карта» and «Цял екран», the other two
+        // controls that change what the screen shows rather than what the car
+        // does — and it applies to the running lesson.
+        //
+        // IT IS PRESENT IN THE EXAM TOO, deliberately, and it is the one row in
+        // this group that is: «Съветник» and «Въпроси» are coaching and would be
+        // an unfair advantage, but a phone that is drowning during the official
+        // 45-question drive is the worst moment in the product to be told to
+        // abandon the session. Nothing here changes what is scored.
+        //
+        // `keepOpen` because it cycles: Авто → Ниско → Средно → Високо. The
+        // student watches the value AND the trade line change under their thumb,
+        // which is the whole THEO-4 argument for the row having a second line at
+        // all — a setting that changes the experience silently is a bare verdict
+        // one layer out from the theory module.
+        ...(onQualityChange
+          ? [
+              {
+                key: "quality",
+                labelBg: "Качество",
+                valueBg: qualityValueBg(qualitySelection, quality),
+                hintBg: qualityTradeBg(qualitySelection, quality),
+                ariaLabelBg: qualityAriaLabelBg(qualitySelection, quality),
+                onSelect: () => onQualityChange(nextQualitySelection(qualitySelection)),
+                keepOpen: true,
+              },
+            ]
+          : []),
         ...(fullscreenAvailable
           ? [
               {
@@ -3249,6 +3398,7 @@ export function LessonPlayShell({
                   : null
             }
             items={menuItems}
+            compact={compact}
           />
         ) : null}
 

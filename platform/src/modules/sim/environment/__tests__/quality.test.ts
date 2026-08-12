@@ -10,6 +10,7 @@ import {
   maxDprFor,
   medianFpsFromDeltas,
   TOUCH_MAX_DPR,
+  TOUCH_HIGH_MAX_DPR,
   recommendQuality,
   seedQualityFromSignals,
   unknownDeviceSignals,
@@ -366,16 +367,46 @@ describe("autoQualityCeiling", () => {
 });
 
 describe("maxDprFor", () => {
-  it("renders a handset 1:1 with its CSS pixels on EVERY tier", () => {
+  it("renders a handset 1:1 with its CSS pixels on the two tiers `auto` can reach", () => {
     // The ceiling only bound `auto`. A device promoted to med by measurement,
     // or a student choosing a tier by hand, still reached maxDpr 1.25 — a
     // measured 1.56× backing store (492,195 px vs 315,172 px at the iPhone-16
     // landscape viewport, production build, 2026-08-12). doc 82 §2.2's ruling
     // is about the DEVICE, so the cap now is too.
-    for (const level of ["low", "med", "high"] as const) {
+    for (const level of ["low", "med"] as const) {
       expect(maxDprFor(level, iphone16())).toBe(TOUCH_MAX_DPR);
       expect(maxDprFor(level, galaxyA16())).toBe(TOUCH_MAX_DPR);
     }
+  });
+
+  it("gives a handset its OWN screen at `high` — the founder's ruling, twice given", () => {
+    // „we need the highest quality as dpr 3." On his iPhone 16 Pro the flat
+    // clamp rendered 393×852 into a 1179×2556 panel: one rendered pixel over
+    // nine real ones, which is the „resolution is brutally low, ultra bad"
+    // he filed. `high` is not reachable by accident on a phone —
+    // `autoQualityCeiling` pins `auto` at med forever — so this cap is only
+    // ever paid after a deliberate press on a control that states the trade.
+    expect(maxDprFor("high", iphone16())).toBe(3);
+    expect(maxDprFor("high", galaxyA16({ dpr: 2 }))).toBe(2);
+    expect(autoQualityCeiling(iphone16())).toBe("med");
+  });
+
+  it("is the SCREEN's ratio, not the preset's supersample, and never more than 3", () => {
+    // A phone never pays for supersampling: `high`'s authored 1.5 is above
+    // native on a dpr-1 tablet, and there is nothing there to sample.
+    expect(maxDprFor("high", galaxyA16({ dpr: 1 }))).toBe(1);
+    expect(QUALITY_PRESETS.high.maxDpr).toBe(1.5);
+    // …and a future dpr-4 panel cannot quietly ask for 16× low's fill.
+    expect(maxDprFor("high", iphone16({ dpr: 4 }))).toBe(TOUCH_HIGH_MAX_DPR);
+    expect(TOUCH_HIGH_MAX_DPR).toBe(3);
+  });
+
+  it("degrades a nonsense devicePixelRatio to the old clamp, never to a blank buffer", () => {
+    for (const dpr of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(maxDprFor("high", iphone16({ dpr }))).toBeGreaterThanOrEqual(TOUCH_MAX_DPR);
+      expect(maxDprFor("high", iphone16({ dpr }))).toBeLessThanOrEqual(TOUCH_HIGH_MAX_DPR);
+    }
+    expect(maxDprFor("high", iphone16({ dpr: 0 }))).toBe(TOUCH_MAX_DPR);
   });
 
   it("leaves every pointing device exactly as it was", () => {
@@ -389,7 +420,7 @@ describe("maxDprFor", () => {
     }
   });
 
-  it("never raises a cap — it is a clamp, not a setting", () => {
+  it("never raises a cap on the tiers a device did not ask for", () => {
     expect(maxDprFor("low", laptop())).toBe(1);
     expect(maxDprFor("low", iphone16())).toBe(1);
     expect(TOUCH_MAX_DPR).toBeLessThanOrEqual(QUALITY_PRESETS.low.maxDpr);

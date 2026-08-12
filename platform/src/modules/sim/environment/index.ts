@@ -69,6 +69,7 @@ export {
   MIN_PROBE_SAMPLES,
   maxDprFor,
   TOUCH_MAX_DPR,
+  TOUCH_HIGH_MAX_DPR,
 } from "./quality";
 export type {
   QualityLevel,
@@ -90,6 +91,8 @@ export {
   seedQualityLevel,
   refreshSeededQuality,
   canvasMaxDpr,
+  isQualityProbeWindowVoid,
+  resetQualityProbeForTests,
 } from "./qualityStore";
 export type { QualityState } from "./qualityStore";
 

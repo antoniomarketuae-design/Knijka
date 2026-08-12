@@ -120,12 +120,15 @@ describe("seedQualityLevel / refreshSeededQuality", () => {
 });
 
 describe("canvasMaxDpr", () => {
-  it("clamps a handset to 1.0 on every tier, whatever its panel reports", async () => {
+  it("clamps a handset to 1.0 on the tiers `auto` can reach, and hands it the panel at `high`", async () => {
     installBrowser(PHONE); // devicePixelRatio 3
     const { canvasMaxDpr } = await freshStore();
     expect(canvasMaxDpr("low")).toBe(1);
     expect(canvasMaxDpr("med")).toBe(1);
-    expect(canvasMaxDpr("high")).toBe(1);
+    // §I26(c) / the founder's ruling: the top tier is only reachable by an
+    // explicit press in the lesson menu, and when it is reached the phone
+    // renders the pixels its screen actually has.
+    expect(canvasMaxDpr("high")).toBe(3);
   });
 
   it("leaves a pointing device on the preset's own cap", async () => {
@@ -135,6 +138,41 @@ describe("canvasMaxDpr", () => {
     expect(canvasMaxDpr("low")).toBe(QUALITY_PRESETS.low.maxDpr);
     expect(canvasMaxDpr("med")).toBe(QUALITY_PRESETS.med.maxDpr);
     expect(canvasMaxDpr("high")).toBe(QUALITY_PRESETS.high.maxDpr);
+  });
+});
+
+describe("a tier changed mid-window voids the probe's sample (§I26(c))", () => {
+  it("starts valid and latches void the moment the EFFECTIVE tier moves", async () => {
+    installBrowser(PHONE);
+    const { setQualitySetting, isQualityProbeWindowVoid, effectiveQuality, getQualityState } =
+      await freshStore();
+    expect(isQualityProbeWindowVoid()).toBe(false);
+    expect(effectiveQuality(getQualityState())).toBe("low"); // seeded
+    // The student opens the lesson menu mid-drive and asks for «Високо».
+    setQualitySetting("high");
+    expect(effectiveQuality(getQualityState())).toBe("high");
+    // The window that was open was collecting frames at `low` and would have
+    // filed them under `low` — `ledgerFromSample` would then have PROMOTED this
+    // device on the strength of a tier it never ran.
+    expect(isQualityProbeWindowVoid()).toBe(true);
+  });
+
+  it("does not void on a no-op press — the same tier chosen explicitly", async () => {
+    installBrowser(PHONE);
+    const { setQualitySetting, isQualityProbeWindowVoid } = await freshStore();
+    // Seed is `low`; choosing `low` by hand changes the SETTING but not what is
+    // on screen, so the frames in flight are still honest evidence about `low`.
+    setQualitySetting("low");
+    expect(isQualityProbeWindowVoid()).toBe(false);
+  });
+
+  it("stays void for the rest of the page load, including a return to auto", async () => {
+    installBrowser(PHONE);
+    const { setQualitySetting, isQualityProbeWindowVoid } = await freshStore();
+    setQualitySetting("med");
+    expect(isQualityProbeWindowVoid()).toBe(true);
+    setQualitySetting("auto"); // back to the seeded `low`
+    expect(isQualityProbeWindowVoid()).toBe(true);
   });
 });
 

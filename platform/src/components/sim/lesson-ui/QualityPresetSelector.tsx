@@ -7,11 +7,17 @@
  */
 
 import { useCallback, useSyncExternalStore } from "react";
-import { seedQualityLevel } from "@/modules/sim/environment";
+import { seedQualityLevel, setQualitySetting } from "@/modules/sim/environment";
+import type { QualitySelection } from "./qualityChoice";
 import { QUALITY_PRESETS, QUALITY_STORAGE_KEY, type QualityPreset } from "./types";
 
 function isPreset(v: unknown): v is QualityPreset {
   return v === "low" || v === "medium" || v === "high";
+}
+
+/** lesson-ui "medium" → the environment module's "med". */
+function toEnvLevel(q: QualityPreset): "low" | "med" | "high" {
+  return q === "medium" ? "med" : q;
 }
 
 const DEFAULT_PRESET: QualityPreset = "medium";
@@ -37,18 +43,32 @@ function seededPreset(): QualityPreset {
 }
 
 /**
+ * WHAT THE STUDENT CHOSE, which is a different question from what is rendering.
+ *
+ * Nothing stored means `auto` — that has always been this store's behaviour
+ * (the fallback below is the device seed), it just had no name, and the lesson
+ * menu's quality row needs one: „Авто · Ниско" and „Ниско" are different states
+ * and a control that cannot tell them apart cannot offer a way back to the
+ * probe. Storage holds only explicit choices; `auto` is the absence of a key.
+ */
+export function loadQualitySelection(): QualitySelection {
+  try {
+    const stored = window.localStorage.getItem(QUALITY_STORAGE_KEY);
+    return isPreset(stored) ? stored : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+/**
  * Read the persisted preset (client only). With nothing stored, falls back to
  * the device seed rather than a flat "medium" — see `seededPreset`. An
  * explicit stored choice always wins; the seed is a guess, the storage key is
  * a decision.
  */
 export function loadQualityPreset(): QualityPreset {
-  try {
-    const stored = window.localStorage.getItem(QUALITY_STORAGE_KEY);
-    return isPreset(stored) ? stored : seededPreset();
-  } catch {
-    return seededPreset();
-  }
+  const selection = loadQualitySelection();
+  return selection === "auto" ? seededPreset() : selection;
 }
 
 /**
@@ -63,10 +83,15 @@ const listeners = new Set<() => void>();
  * that refuses to persist (Safari private mode, quota) still applies the choice
  * for the rest of the session — the behaviour the previous useState carried.
  */
-let sessionPreset: QualityPreset | null = null;
+let sessionSelection: QualitySelection | null = null;
+
+function selectionSnapshot(): QualitySelection {
+  return sessionSelection ?? loadQualitySelection();
+}
 
 function qualitySnapshot(): QualityPreset {
-  return sessionPreset ?? loadQualityPreset();
+  const selection = selectionSnapshot();
+  return selection === "auto" ? seededPreset() : selection;
 }
 
 function subscribeQuality(onChange: () => void): () => void {
@@ -106,7 +131,7 @@ export function refreshQualityPreset(): void {
  * is a feature — and it is the pattern React Compiler miscompiles. The snapshot
  * is a string, so React's Object.is check is stable without any caching.
  */
-export function useQualityPreset(): [QualityPreset, (q: QualityPreset) => void] {
+export function useQualityPreset(): [QualityPreset, (q: QualitySelection) => void] {
   const quality = useSyncExternalStore(
     subscribeQuality,
     qualitySnapshot,
@@ -117,17 +142,43 @@ export function useQualityPreset(): [QualityPreset, (q: QualityPreset) => void] 
     () => DEFAULT_PRESET,
   );
 
-  const update = useCallback((q: QualityPreset) => {
-    sessionPreset = q;
+  const update = useCallback((q: QualitySelection) => {
+    sessionSelection = q;
     try {
-      window.localStorage.setItem(QUALITY_STORAGE_KEY, q);
+      // `auto` is the ABSENCE of a choice, so it is written by deleting the
+      // key — not by storing the word. Anything else would make "hand it back
+      // to the probe" a fourth stored tier that `loadQualityPreset()` (and
+      // HeroCarBody / VehicleRig / MirrorRig, which each read it directly)
+      // would have to learn about.
+      if (q === "auto") window.localStorage.removeItem(QUALITY_STORAGE_KEY);
+      else window.localStorage.setItem(QUALITY_STORAGE_KEY, q);
     } catch {
       // Private mode etc. — the in-memory value still applies this session.
     }
+    // ── KEEP THE ENVIRONMENT MODULE'S STORE IN STEP. ────────────────────────
+    // There are two quality stores and only this one drives the scene
+    // (`<SceneSlot quality>` → LessonScene). The other one — environment/
+    // qualityStore — owns the AUTO-QUALITY PROBE, and the probe files its
+    // measurement under `effectiveQuality(getQualityState())`: the tier IT
+    // believes is on screen. Before this line those two could disagree, and a
+    // student who picked a tier by hand would have their frame times recorded
+    // against a tier that was never rendering — a false ledger entry that then
+    // decided the cold start of every later session. Mirroring here is also
+    // what voids an in-flight probe window (see `setQualitySetting`), so a tier
+    // changed mid-window cannot poison the sample that window was collecting.
+    setQualitySetting(q === "auto" ? "auto" : toEnvLevel(q));
     for (const notify of listeners) notify();
   }, []);
 
   return [quality, update];
+}
+
+/**
+ * What the student CHOSE (including `auto`) — for a control that has to show
+ * the difference. `useQualityPreset()` above answers "what is rendering".
+ */
+export function useQualitySelection(): QualitySelection {
+  return useSyncExternalStore(subscribeQuality, selectionSnapshot, () => "auto");
 }
 
 export function QualityPresetSelector({

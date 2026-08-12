@@ -250,7 +250,18 @@ function persist(): void {
 
 function setState(next: QualityState): void {
   if (next.setting === state.setting && next.recommendation === state.recommendation) return;
+  const before = effectiveQuality(state);
   state = next;
+  // A SAMPLE BELONGS TO THE TIER THAT PRODUCED IT — and from doc 91 §I26(c) the
+  // tier can now change MID-LESSON, from a row in the lesson menu, which is
+  // exactly when the probe is most likely to be mid-window (it opens at 6 s and
+  // runs 4 s). The probe reads its label ONCE, at the start of the window; if
+  // the student switches «Ниско»→«Високо» at second 7, the remaining frames are
+  // paid at `high` and would be filed under `low` — and `ledgerFromSample` would
+  // then PROMOTE the device on the strength of a tier it never ran. So the
+  // window is voided rather than mislabelled. Evidence that is absent costs one
+  // session's measurement; evidence that is wrong costs every session after it.
+  if (effectiveQuality(state) !== before) probeWindowVoid = true;
   persist();
   for (const fn of listeners) fn();
 }
@@ -324,6 +335,24 @@ function measurementAllowed(): boolean {
 
 /** One measurement per page load, however many components arm the probe. */
 let measured = false;
+
+/**
+ * The tier changed while a window was open — see `setState`. Latched for the
+ * rest of the page load, because the probe only ever opens one window.
+ */
+let probeWindowVoid = false;
+
+/** Test seam: the flags that make the probe a once-per-page-load instrument. */
+export function resetQualityProbeForTests(): void {
+  measured = false;
+  probeWindowVoid = false;
+  renderedFrames = 0;
+}
+
+/** Whether this page load's probe window has been invalidated by a tier change. */
+export function isQualityProbeWindowVoid(): boolean {
+  return probeWindowVoid;
+}
 
 /**
  * Frames the RENDERER actually drew, counted from inside the Canvas
@@ -412,6 +441,9 @@ export function useAutoQualityProbe(options?: {
         return;
       }
       if (deltas.length < MIN_PROBE_SAMPLES) return;
+      // The student changed tier under the window (§I26(c)'s menu row) — the
+      // frames timed here were not all paid at `levelAtStart`. See `setState`.
+      if (probeWindowVoid) return;
       // REFUSE A WINDOW THE RENDERER SLEPT THROUGH. A teach card puts the
       // Canvas on a "demand" loop; rAF keeps ticking at 60 Hz over a scene
       // nobody is drawing, and timing that would promote a phone for standing

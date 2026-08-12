@@ -311,18 +311,69 @@ export function autoQualityCeiling(signals: DeviceSignals): QualityLevel {
  * Canvas reads it, and a phone renders 1:1 with its CSS pixels on every tier.
  * A student who picks a higher tier on a phone is asking for the lighting —
  * shadows, AO, bloom, the full facade maps — not for 56 % more fragments.
+ *
+ * THAT LAST SENTENCE WAS A GUESS, AND THE FOUNDER HAS NOW CONTRADICTED IT
+ * TWICE. Verbatim: *"the resolution is brutally low, ultra bad, not like the
+ * PC"* and *"we need the highest quality as dpr 3"*. On his iPhone 16 Pro this
+ * constant renders 393×852 and hands it to a 1179×2556 panel: **one rendered
+ * pixel stretched over nine real ones**, which is exactly what he is seeing.
+ * The paragraph above is still right about `low` and `med` — it was measured —
+ * but it was written about a €125 Android and then applied to a flagship.
+ *
+ * SO THE CONSTANT STAYS AND STOPS BEING THE WHOLE RULE: see
+ * `TOUCH_HIGH_MAX_DPR` below and `maxDprFor`.
  */
 export const TOUCH_MAX_DPR = 1.0;
 
 /**
- * The Canvas dpr cap for a tier on a given device: the preset's own cap, then
- * `TOUCH_MAX_DPR` on anything whose primary pointer is a fingertip. Pure, so
- * the ruling is unit-tested in Node; `canvasMaxDpr()` in the store is the DOM
- * half that reads the signals.
+ * THE RESOLUTION A HANDSET MAY REACH AT THE TOP TIER — its own screen, and
+ * never more than that.
+ *
+ * THE RULING, AND THE CONSTRAINT IT HAS TO SURVIVE. He must get native dpr on
+ * his phone; a €125 handset must not be handed 9× the fill and die. Those are
+ * not in conflict once you notice that **`high` is not reachable by accident on
+ * a phone**: `autoQualityCeiling()` caps `auto` at `med` on every touch-only
+ * device, forever, so the ONLY way a handset renders at this cap is a student
+ * opening the lesson menu and choosing «Високо» — one deliberate press, on a
+ * control that states the trade in words before the press lands
+ * (`qualityTradeBg`, lesson-ui/qualityChoice.ts). Nothing is granted silently,
+ * which is the thing that would have been indefensible.
+ *
+ * WHY `signals.dpr` AND NOT `QUALITY_PRESETS.high.maxDpr` (1.5). On a desktop,
+ * 1.5 is SUPERSAMPLING — more fragments than the panel has pixels, bought for
+ * edge quality. On a phone the same number is still a downscale: the panel has
+ * three device pixels per CSS pixel, so 1.5 renders 1179×2556 worth of screen
+ * at 590×1278. There is nothing to invent here and nothing to be clever about —
+ * the top tier on a phone means "draw the pixels the screen actually has", and
+ * that is `window.devicePixelRatio`, whatever it happens to be. A dpr-1 tablet
+ * therefore gets 1.0 at `high` and not 1.5: a phone never pays for
+ * supersampling, only for its own glass.
+ *
+ * 3 IS A GUARD, NOT A TARGET. It is the reference device's own ratio and the
+ * top of the shipping range; it exists so a future dpr-4 panel cannot quietly
+ * ask for 16× the fill of `low` on the strength of a constant nobody revisited.
+ */
+export const TOUCH_HIGH_MAX_DPR = 3.0;
+
+/**
+ * The Canvas dpr cap for a tier on a given device.
+ *
+ * Pointing devices: the preset's own cap, exactly as authored — untouched.
+ * Handsets: 1:1 with CSS pixels at `low` and `med` (the tiers `auto` can reach
+ * on its own), and the screen's real pixels at `high` (the tier only an
+ * explicit student choice reaches). Pure, so the ruling is unit-tested in Node;
+ * `canvasMaxDpr()` in the store is the DOM half that reads the signals.
  */
 export function maxDprFor(level: QualityLevel, signals: DeviceSignals): number {
   const preset = QUALITY_PRESETS[level].maxDpr;
-  return isTouchOnlyDevice(signals) ? Math.min(preset, TOUCH_MAX_DPR) : preset;
+  if (!isTouchOnlyDevice(signals)) return preset;
+  if (level === "high") {
+    // A garbage `devicePixelRatio` (0, NaN, negative) must degrade to the old
+    // behaviour, never to a blank drawing buffer.
+    const native = Number.isFinite(signals.dpr) && signals.dpr > 0 ? signals.dpr : TOUCH_MAX_DPR;
+    return Math.min(Math.max(native, TOUCH_MAX_DPR), TOUCH_HIGH_MAX_DPR);
+  }
+  return Math.min(preset, TOUCH_MAX_DPR);
 }
 
 /**
