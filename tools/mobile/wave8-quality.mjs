@@ -40,6 +40,8 @@ const EMAIL = arg("email", "founder@knijka.ai");
 const PASSWORD = arg("password", "Knijka2026!");
 const ROUTE = arg("route", "/simulator?scenario=sc-zebra-approach&level=1");
 const TAG = arg("tag", "after");
+/** How far round the Авто → Ниско → Средно → Високо cycle to press. */
+const PRESSES = Number(arg("presses", "4"));
 const OUT = `${dirname(fileURLToPath(import.meta.url))}/.out/wave8-quality`;
 mkdirSync(`${OUT}/shots`, { recursive: true });
 const only = arg("device", null);
@@ -256,8 +258,10 @@ for (const device of devices) {
     } else {
       console.log(`  §I26(c) · row present: «${row0.label}» = «${row0.value}» ${row0.w}x${row0.h}`);
       console.log(`            hint: „${row0.hint}"`);
+      // `--presses 3` stops the cycle ON «Високо», so the drive test below runs
+      // at the tier the whole dpr ruling is about rather than back at «Авто».
       const steps = [];
-      for (let i = 0; i < 4; i += 1) {
+      for (let i = 0; i < PRESSES; i += 1) {
         const before = await qualityRow();
         if (!before.present) break;
         await tap(before.cx, before.cy, 7);
