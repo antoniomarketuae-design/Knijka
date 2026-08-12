@@ -68,7 +68,14 @@ describe("I10 · the minimap column clears the thumb band", () => {
     );
     // …from the constant, not a copy of today's number. TouchControls is the
     // one file actively reshaping this band; a literal here would strand.
-    expect(SHELL).toContain('import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";');
+    //
+    // Matched on the SYMBOL and its source, not on the whole import line: §I11
+    // added a second thing the shell needs from the same file
+    // (`touchControlsFloorCss`, the percentage-free rendering of this same
+    // floor that a `max-height` can legally resolve), and an exact-line
+    // assertion turns any future co-import into a red test about nothing. What
+    // this row is defending is that the number comes from TouchControls.
+    expect(SHELL).toMatch(/import \{[^}]*\bTOUCH_CONTROLS_FLOOR\b[^}]*\} from "\.\.\/TouchControls";/);
   });
 
   it("shrinks the disc to the corridor, because on a phone held sideways there is no 168 px hole", () => {

@@ -660,9 +660,47 @@ const TOUCH_CONTROLS_FLOOR_GAP_PX = 20;
  * whose geometry is actively being reshaped; anything that reads this follows
  * the band wherever it goes instead of pinning a copy of today's number.
  */
-export const TOUCH_CONTROLS_FLOOR = `calc(${DRIVE_PAD_H} + ${ARC_RISE} + ${ROW_H} + ${INSET_B} + ${rem(
-  TOUCH_CONTROLS_FLOOR_GAP_PX,
-)})`;
+export const TOUCH_CONTROLS_FLOOR = touchControlsFloorCss();
+
+/**
+ * ── THE SAME FLOOR, RESOLVED AGAINST A HEIGHT YOU NAME — doc 91 §I11 ────────
+ *
+ * `TOUCH_CONTROLS_FLOOR` is written in PERCENTAGES, and it has to be: the pads
+ * are a fraction of the stage and the arc's rise is derived from it, so the
+ * band follows the stage instead of the stage having to hold still for it.
+ * That works everywhere it is used today — `bottom:` on an absolutely
+ * positioned child of the stage, whose containing block has a definite height.
+ *
+ * IT DOES NOT WORK IN A `max-height`, AND THAT COST A DEPLOY. A percentage in
+ * `max-height` resolves against the containing block's HEIGHT, and the sheet's
+ * containing block is a `bottom:`-anchored box whose height is auto — an
+ * indefinite reference, so the whole declaration is treated as `none`. Measured
+ * on the deployed product: the cap silently did nothing, the sheet grew to its
+ * content and its «Затвори» stood 123.5 px above the top of the screen.
+ *
+ * So the arithmetic is written ONCE and rendered against whichever height token
+ * the call site can honestly resolve. The shell passes `var(--sim-vh)` — the
+ * measured visual-viewport height it already publishes, which on a compact
+ * stage IS the stage height (no top bar, no shell padding) — and gets a
+ * percentage-free twin that is legal in a `max-height`.
+ *
+ * `env(safe-area-inset-bottom)` stays authored either way, which is not a
+ * detail: `tools/mobile/lib/insets.mjs` substitutes the profile's real inset
+ * into declarations the app AUTHORED and cannot reach a number computed in JS,
+ * so a floor built here in pixels would be 21–34 px short on every sweep and
+ * the harness would report green on a band it had mis-measured.
+ */
+export function touchControlsFloorCss(heightToken = "100%"): string {
+  const padH =
+    heightToken === "100%"
+      ? DRIVE_PAD_H
+      : `min(calc(${heightToken} * ${DRIVE_PAD_HEIGHT.fraction}), ${rem(DRIVE_PAD_HEIGHT.capPx)})`;
+  const rise =
+    heightToken === "100%"
+      ? ARC_RISE
+      : `clamp(${rem(ARC_RISE_MIN_PX)}, (${heightToken} - ${rem(ARC_RISE_KNEE_PX)}) * ${ARC_RISE_SLOPE}, ${rem(ARC_RISE_MAX_PX)})`;
+  return `calc(${padH} + ${rise} + ${ROW_H} + ${INSET_B} + ${rem(TOUCH_CONTROLS_FLOOR_GAP_PX)})`;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THE TOP RAIL — the one corner of a phone held sideways where NO THUMB RESTS.

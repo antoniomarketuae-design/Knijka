@@ -130,7 +130,17 @@ describe("§I11 the compact sheet has a clearance contract against the thumb ban
     // `ARC_RISE` clamp that only the engine can resolve against the live box —
     // and keeping it authored CSS is also what lets the notch harness
     // substitute a real inset into it.
-    expect(SHELL).toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}TOUCH_CONTROLS_FLOOR/);
+    expect(SHELL).toMatch(
+      /\["--sim-touch-floor" as string\]:[\s\S]{0,220}touchControlsFloorCss\("var\(--sim-vh, 100dvh\)"\)/,
+    );
+  });
+
+  it("…and against `var(--sim-vh)`, never the percentage form", () => {
+    // A percentage in the `max-height` the sheet needs resolves against a
+    // `bottom:`-anchored box of auto height — indefinite, so the engine drops
+    // the declaration. Measured on the deployed product exactly once: the cap
+    // did nothing and «Затвори» stood 123.5 px above the top of the screen.
+    expect(SHELL).not.toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}: TOUCH_CONTROLS_FLOOR\b/);
   });
 
   it("…and it is `0px` where there is no thumb band to clear", () => {

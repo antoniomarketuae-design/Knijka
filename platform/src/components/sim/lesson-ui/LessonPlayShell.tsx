@@ -167,7 +167,7 @@ import {
 // The top of the whole thumb-control band, as a CSS length. Doc 91 §I10: the
 // minimap column stands on THIS and not on `--sim-hud-floor` (the instrument
 // band, 48 px), which is what put the map under the throttle thumb.
-import { TOUCH_CONTROLS_FLOOR } from "../TouchControls";
+import { TOUCH_CONTROLS_FLOOR, touchControlsFloorCss } from "../TouchControls";
 import {
   COMPACT_DASH_HEIGHT_PX,
   isCompactViewport,
@@ -2811,8 +2811,18 @@ export function LessonPlayShell({
         //
         // `0px` when there is no thumb band to clear: no touch screen, or a
         // roomy layout, where the sheet standing on the dash was always right.
+        //
+        // Published against `var(--sim-vh)` and NOT as the percentage form: the
+        // sheet needs it in a `max-height`, where a percentage resolves against
+        // a `bottom:`-anchored box of auto height — an indefinite reference the
+        // engine answers by dropping the declaration. That cost one deploy:
+        // the cap did nothing and the sheet's «Затвори» stood 123.5 px above
+        // the top of the screen. Same arithmetic, one definition, in
+        // `touchControlsFloorCss`.
         ["--sim-touch-floor" as string]:
-          compact && hintInput === "touch" && !ended ? TOUCH_CONTROLS_FLOOR : "0px",
+          compact && hintInput === "touch" && !ended
+            ? touchControlsFloorCss("var(--sim-vh, 100dvh)")
+            : "0px",
         ["--sim-minimap-clearance" as string]: `${minimapClearancePx(minimapOn)}px`,
       }}
     >
