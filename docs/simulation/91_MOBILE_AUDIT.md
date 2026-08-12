@@ -1566,3 +1566,192 @@ it. `/dev/drive-rig` calls `notFound()` in production and defaults to `medium` (
 taken there is not evidence about the product, and no wave may mark a row DONE from it again.
 
 ---
+## Q. WAVE 6 · THE PERFORMANCE LANE — the six §I performance rows, closed and priced — production, 2026-08-12
+
+> **THIS MACHINE AT PHONE DIMENSIONS. NOT HIS HANDSET.** Windows 10, GTX 1060 6 GB through
+> ANGLE/D3D11 — the renderer string is read at runtime on every row and a SwiftShader fallback is
+> refused, not reported. **The harness's own frame rate is printed beside every timing** (§G0: a
+> false defect was published from a rig running at 0.4 fps); it was 59.2–60.1 fps on all twelve
+> per-pass rows. Draw counts, pass counts and backing-store dimensions transfer to a phone.
+> Milliseconds do not.
+>
+> **HIS WORDS WERE „the FPS is ultra low … remove any restrictions".** Removing a quality cap makes a
+> slow phone slower, so what shipped is the opposite: **three more reductions**, each measured.
+
+### Q0 · The surface, the instruments, and one confound declared up front
+
+Everything below is `next build && next start`, the authenticated `/simulator`, `l0-free-drive`, tier
+`low` (the tier every touch device now seeds after §I17), on the six-profile ladder. `hasCanvas ===
+true` and a non-zero canvas rect are asserted before any number is believed.
+
+Two instruments. `frame-cost.mjs` (§N's) for frame time, draws and React commits per reconciler root.
+**New: `tools/mobile/perf-passes.mjs`**, because neither of §N's questions could answer §I21 or §I20:
+
+* **§I21 needs per-PASS attribution.** The mirror is ~8 draws out of ~210 and a frame time cannot
+  attribute it. The app's own `__simPerf.gpu(n)` can: it brackets every framebuffer region in an
+  `EXT_disjoint_timer_query_webgl2` query keyed `fb<id>@<w>x<h>`, and **the rear mirror is the 256×96
+  region and nothing else is.** (It needs `?simPerf=1` on the URL — `shouldLogPerf()` disables the
+  localStorage twin under `NODE_ENV=production` on purpose.)
+* **§I20 cannot be priced from here and this document already said so** (§G6, §M4: the
+  `backdrop-filter` runs in the compositor, outside both the WebGL timer and CDP's main-thread
+  metrics). So the probe proves **presence or absence** instead, in the currency that does transfer:
+  the computed `backdrop-filter` of every element over the canvas and the pixel area it covers.
+
+**THE CONFOUND, STATED BEFORE THE NUMBERS.** This branch was being worked by a second lane during the
+sweep. Between the BEFORE build and the AFTER build, `121be3c` (§I6 + §I8) landed — **§I8 gives the
+fullscreen phone back its 16 px**, so the AFTER canvas is 393×852 where BEFORE was 377×836, i.e.
+**6.2 % more fill on every profile.** Therefore: the mirror pass is a FIXED 256×96 target and its
+absolute cost is comparable across the two builds (that is §D12f's whole point); **the GPU TOTAL
+column is not**, and no claim is made from it.
+
+### Q1 · §I21 — the mirror RTT, halved, and it is exactly half
+
+`MirrorRig.tsx:375` `LOW_REAR_CADENCE.interval` 4 → 8. Six profiles, production, tier low, one page
+load each, the driving window verified overlay-free.
+
+| profile | mirror ms/frame BEFORE | AFTER | passes/frame | draws/frame | share of the tier-low GPU frame |
+|---|---|---|---|---|---|
+| iphone16-portrait | 0.421 | **0.284** | 0.25 → **0.13** | 8.2 → **4.1** | 9.9 % → 7.3 % |
+| iphone16-landscape | 0.390 | **0.235** | 0.25 → **0.13** | 8.2 → **4.1** | 15.0 % → 5.7 % |
+| small-portrait | 0.477 | **0.180** | 0.25 → **0.12** | 8.2 → **4.1** | 9.0 % → 5.3 % |
+| small-landscape | 0.381 | **0.176** | 0.25 → **0.13** | 8.3 → **4.2** | 12.6 % → 6.1 % |
+| galaxy-gesturebar-portrait | 0.551 | **0.270** | 0.25 → **0.13** | 8.3 → **4.2** | 13.4 % → 10.7 % |
+| galaxy-gesturebar-landscape | 0.298 | **0.192** | 0.25 → **0.13** | 8.3 → **4.2** | 10.1 % → 5.1 % |
+
+**Read the passes/frame column, not the milliseconds.** 0.25 → 0.13 is one mirror render every 8
+frames instead of every 4, exactly as specified, on 6 of 6 profiles, and it is noise-free. The draw
+count halves with it — **4.1 fewer draw calls per frame, on every profile, and draw calls transfer.**
+The milliseconds agree (0.298–0.551 → 0.176–0.284 ms/frame, i.e. **−0.11 to −0.30 ms of a 2.5–5.3 ms
+tier-low GPU frame**) but they are this box's, and their spread across three repeats of one profile
+was 0.38–0.67 ms, which is §G0 again.
+
+**§D12f said 25–34 %; the honest re-measurement is 9.0–15.0 % before the cut and 5.1–10.7 % after.**
+§D12f was measured before §I19 landed and on a different district. The row is real, the fix is real,
+and the number that was quoted for it was too big.
+
+**What it costs, stated:** the rear glass refreshes ~7.5 ×/s instead of ~15 ×/s **at tier `low` only**.
+Medium keeps every 2nd frame; high keeps 30 Hz. A tailgater lesson is still playable (doc 62 #44).
+
+### Q2 · §I20 — the blur over a live canvas: measured present, then measured gone
+
+**FIRST, A CORRECTION TO §I20's OWN LIST.** The row named four full-screen overlays. On a **compact**
+viewport the shell renders `TeachMomentOverlay` only under `!compact` (`LessonPlayShell.tsx:3472`) and
+routes the same teach moment through the one-line `SimOverlay` instead — so **a census taken behind a
+teach card on a phone reports zero and proves nothing**, which is exactly what the first run of this
+probe did. Two more scrims exist that §I20 did not name, and one of them is the one a phone reaches
+in a single tap:
+
+* `LessonScene.tsx:1808` — the **«ПАУЗА»** scrim. §N7 lists this as one of the two pauses the product
+  actually uses. **Full-viewport `backdrop-filter` over a live canvas, and §I20 missed it.**
+* `TeachMomentOverlay.tsx:208` — the compact bottom sheet's own `backdrop-blur`.
+
+Both were fixed with the four. The census, with «ПАУЗА» up, production, six profiles:
+
+| | elements with a computed `backdrop-filter` over the canvas | area |
+|---|---|---|
+| BEFORE | **1** — `blur(8px)`, `role=dialog`, `bg-background/80` | **100 % of the canvas** (315,172 px on iPhone-16, 262,816 px on the 360-wide Android) |
+| AFTER | **0** | **0 px** |
+
+Six of six, both orientations. Two things that table settles. (1) `backdrop-blur-sm` computes to
+**`blur(8px)`**, not the 4 px this document assumed — the compositor was being asked for more than
+§D12d priced. (2) The old scrim was `bg-background/80`, i.e. **the canvas was not even occluded**, so
+the compositor had to read it, blur it and blend it. The opaque scrim removes the blur AND the read.
+
+**What is NOT claimed: a millisecond.** §G6 says why, and nothing here overrides it. What is claimed
+is that a viewport-sized `backdrop-filter` over a live WebGL canvas is no longer requested on any of
+the six profiles — and that this is a property of what the page asks for, like a draw call.
+**Screenshot after the change: `tools/mobile/.out/pause-after.png` — the card reads correctly on an
+opaque field. R0 satisfied by looking.**
+
+### Q3 · §I22 — the R3F reconciler stops committing, and it takes the last 12 % of §I19 with it
+
+**§M5 blocked this row: "why React commits 17.9 times a second when the two known polls sum to 10.7 —
+I22 must not be attempted until [the further update sources] are enumerated." They are now enumerated
+— eight independent pollers, not two**, listed with file and line in the header comment of
+`SceneSlot.tsx`. Six of the eight already use the `prev === next ? prev : next` idiom. **The one that
+does not is `LessonPlayShell.tsx:1998`, whose `snapshotOf()` returns a fresh object every 150 ms — and
+it is the one that renders the canvas.**
+
+Shipped: option **(b)** of §I22 — `SceneSlot` is `memo`'d, so a HUD tick cannot reach the R3F tree.
+Every prop it takes is a primitive, a stable `useCallback` or a ref; `driveLocked`,
+`preDriveHighlightStepId` and `activeObjectiveIndex` are read off `snap` but are a boolean, a step id
+and an integer. `memo` compares every prop, so **it cannot drop an update.**
+
+Production, tier low, ten rows (both regimes, six profiles; two rows were not reached before the
+sweep's time budget expired, and one is stamped `driveRefused` by the harness's own overlay watchdog):
+
+| reconciler root | BEFORE, driving | AFTER, driving | BEFORE, card up | AFTER, card up |
+|---|---|---|---|---|
+| react-dom (the HUD) | 17.1–22.9 /s | 15.5–23.0 /s — **unchanged, by design** | 13.0–13.5 /s | 13.0–13.5 /s |
+| **R3F (the canvas tree)** | **10.9–11.6 /s** | **0.0 /s** | **6.5–6.7 /s** | **0.0 /s** |
+
+**Ten of ten rows read 0.0.** The DOM root does not move and that is the honest half of the answer:
+`HudSnapshot` carries `speedKmh`, `objectiveProgress` and `vehicle`, all of which genuinely change
+every tick, so no equality guard takes them to zero **while a live speedometer is on screen**. What
+was pure waste was the R3F half — thirty component types including `StaticWorld`, `TrafficLayer`,
+`HeroCarBody`, `VehicleRig` and `CabinRoof` reconciling six to eleven times a second for a speed
+readout — and that is gone. Option (a), `useSyncExternalStore`, remains the right long-term shape and
+was deliberately not smuggled in.
+
+**AND IT COMPOUNDS WITH §I19, WHICH IS THE RESULT NOBODY PREDICTED.** §N2·D recorded that
+`frameloop="demand"` is *not* frozen: "R3F still renders on every commit of its own tree, about 7/s".
+Those commits were the shell's HUD tick arriving through `SceneSlot`. With the memo in place there are
+none, so:
+
+| draws per frame with a teach card up | BEFORE §I19 (§N2·D) | AFTER §I19 alone (§N6) | **AFTER §I19 + §I22** |
+|---|---|---|---|
+| tier low, six profiles | 233.7 (0 % saved) | 22.3–28.3 (86.2–88.9 % saved) | **0.0 — 100 %** |
+
+**Ten of ten rows, both regimes. Zero draw calls behind a card the student is reading.** And the
+picture is still there — the compositor screenshot reads **69.2–71.9 % non-black ink**, a full
+cockpit, and the driving window after the card returns to 199–227 draws/frame at 59.8–59.9 fps
+capped. A demand loop that renders nothing looks identical to a saving in the counters and obvious to
+the eye, so both were checked (§R0).
+
+### Q4 · What did NOT improve, printed because it did not
+
+**The uncapped p50 — the CPU cost of a frame — went from 2.9–3.9 ms to 4.4–4.7 ms between the two
+sweeps, and this wave does not claim it as a regression either.** Three reasons it cannot be read as
+one: the harness's own uncapped rate fell in the same proportion (229–312 → 147–202 fps), which is
+§G0's box-health signal doing its job; §I8 landed in between and gave every profile 6.2 % more fill;
+and a second lane was building and sweeping on the same 16 GB box throughout. **The capped column is
+unchanged and healthy on 10/10 rows: 59.8–59.9 fps, p50 16.7, p95 16.7–16.8, worst 16.8 ms.**
+
+`draws/frame` while driving: 201.8–231.4 → 198.9–227.2. Consistent with §I21's −4.1, and **still
+1.3–1.5× over the ≤150 budget — §I26(b) is untouched and no tier decision fixes it** (§N5).
+
+### Q5 · §I26a′ — NOT shipped, and located precisely so the next attempt is not another discovery
+
+§I26a′ says the catalogue is reachable because `simulator-client.tsx:145` calls `scenarioById()`
+synchronously, and warns that it "is NOT a one-liner and must not be shipped as one". **It is worse
+than one line: there are FIVE static edges from the `/simulator` client graph into
+`scenario/templates.ts`, and deferring any four of them buys nothing.**
+
+| # | edge | what holds it |
+|---|---|---|
+| 1 | `simulator-client.tsx:145` | `scenarioById(pick.templateId)` inside the `useMemo` — the one §I26a′ names |
+| 2 | `LessonPlayShell.tsx:1217` | `scenarioById(scenarioRef.templateId)` — the rubric + teach copy |
+| 3 | `LessonPlayShell.tsx:1236` | `scenarioById(mistakeRef.templateId)` — the THEO-3 sandbox |
+| 4 | `nextStep.ts:66` | `import { SCENARIO_TEMPLATES }` — reached by `resolveScenarioNextSteps`, which the shell imports statically for the end-screen CTA |
+| 5 | `resolve.ts:11` + `mistakeExperience.ts:19` | both `import { scenarioById } from "./templates"`, and the shell imports `parseScenarioLessonId` / `parseMistakeExperienceLessonId` / `MISTAKE_EXPERIENCE_DEMO_OFFER_SEC` from them — **so the catalogue arrives even if edges 1–4 all go lazy**, unless the bundler tree-shakes it, which is not a thing to assume |
+
+The correct shape, sized: split the pure ID-parsing out of `resolve.ts` and `mistakeExperience.ts` so
+neither has a templates edge (their `scenarioLessonById` / `mistakeExperienceSeedForEvent` are
+imported by name from `../resolve` in **nine test files**, so the move has to keep those paths
+working); add one `loadScenarioCatalogue()` promise-cached lazy module; make edges 1–3 resolve through
+it and edge 4 resolve after `result !== null`. **That is six files in the graded scenario path**, and
+it was judged the wrong thing to risk in a wave whose other three rows had to reach his phone. It buys
+`low`'s byte budget, not a rescue (§G4a), and it is a load-time cost, not a frame cost — the founder's
+complaint this wave is the frame.
+
+### Q6 · The ledger, moved
+
+| row | was | is now | evidence |
+|---|---|---|---|
+| **I20** | OPEN | **DONE** | opaque `OVERLAY_SCRIM_CLASS` (`playArea.ts:110`) at the four named sites + the two §I20 missed. Production, six profiles: 1 full-viewport `blur(8px)` → 0. §Q2 |
+| **I21** | OPEN | **DONE** | `MirrorRig.tsx:375` interval 8. Production, six profiles: passes/frame 0.25 → 0.13, draws/frame 8.2 → 4.1, 0.30–0.55 → 0.18–0.28 ms. §Q1 |
+| **I22** | OPEN | **DONE (arm b)** | `SceneSlot.tsx:212` `memo`. Production, ten rows: R3F commits 10.9–11.6 /s → **0.0**, and draws behind a card 22.3–28.3 → **0.0**. §M5 discharged: the eight pollers are enumerated. Arm (a) `useSyncExternalStore` remains open and is not owed by this row's target. §Q3 |
+| **I26a′** | OPEN | **OPEN, scoped** | five static edges named, six-file plan sized. §Q5 |
+| I17 · I18 · I19 | DONE | DONE, and §I19 is now **100 %** | §I19's residual ~7 R3F renders/s under a card were the shell's HUD tick; §I22 removed them. §Q3 |
+
+---
