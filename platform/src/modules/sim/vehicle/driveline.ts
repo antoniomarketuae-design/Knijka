@@ -90,7 +90,28 @@ export type DrivelineEvent =
   | { kind: "wipersChanged"; on: boolean }
   | { kind: "fogLightsChanged"; on: boolean }
   | { kind: "hornChanged"; on: boolean }
-  | { kind: "transmissionChanged"; transmission: TransmissionMode };
+  | {
+      kind: "transmissionChanged";
+      transmission: TransmissionMode;
+      /**
+       * The selector position THE SWITCH ITSELF moved the lever to, when it
+       * moved it — absent when the student's lever was left exactly where he
+       * put it.
+       *
+       * The mechanics of that move were fixed in doc 87 A4 and the reasoning
+       * is on `switchTransmission` below; what was never fixed is that the
+       * move is INVISIBLE. Measured on the drive rig 2026-08-11: a click on
+       * „Напреднал" with the car standing still moved the selector D → N and
+       * produced zero toasts and zero events, and holding ↓ for the next 12.5
+       * seconds produced zero more. A4's own note says it — „the student gets
+       * the engine back but sits in neutral with nothing on screen saying so,
+       * which is the same complaint wearing a different hat" — and then only
+       * the round trip was closed. This field is what lets the shell close the
+       * one-way trip: the cockpit says what the box did, in the same coached
+       * kind „lesson" channel every other refusal in this product uses.
+       */
+      movedSelectorTo?: SelectorPosition;
+    };
 
 export type DrivelineListener = (event: DrivelineEvent) => void;
 
@@ -565,6 +586,9 @@ export class DrivelineState {
    */
   private switchTransmission(next: TransmissionMode): void {
     this.transmission = next;
+    /** Where the SWITCH put the lever, if it moved it — carried out on the
+     *  transmissionChanged event so the cockpit can say so (see the event). */
+    let movedTo: SelectorPosition | null = null;
     if (next === "automatic") {
       if (this.clutchDown) {
         this.clutchDown = false;
@@ -577,10 +601,12 @@ export class DrivelineState {
         const target: SelectorPosition = this.engineOn ? "D" : "N";
         this.selector = target;
         this.tierNeutralFromD = false;
+        movedTo = target;
         this.emit({ kind: "selectorChanged", selector: target, manualGear: this.manualGear });
       } else if (this.selector === "N" && this.tierNeutralFromD) {
         // Undo our own D → N: the round trip must hand the car back exactly
-        // as it was found.
+        // as it was found. NOT announced — putting something back where it was
+        // found is the one move that needs no explanation.
         this.selector = "D";
         this.tierNeutralFromD = false;
         this.emit({ kind: "selectorChanged", selector: "D", manualGear: this.manualGear });
@@ -593,15 +619,21 @@ export class DrivelineState {
       if (standing) {
         this.selector = "N";
         this.tierNeutralFromD = true;
+        movedTo = "N";
         this.emit({ kind: "selectorChanged", selector: "N", manualGear: this.manualGear });
       } else {
         this.selector = "M";
         this.manualGear = gearForSpeedKmh(this.speedKmh);
         this.tierNeutralFromD = false;
+        movedTo = "M";
         this.emit({ kind: "selectorChanged", selector: "M", manualGear: this.manualGear });
       }
     }
-    this.emit({ kind: "transmissionChanged", transmission: next });
+    this.emit({
+      kind: "transmissionChanged",
+      transmission: next,
+      ...(movedTo === null ? {} : { movedSelectorTo: movedTo }),
+    });
   }
 
   private canShiftManualGear(): boolean {

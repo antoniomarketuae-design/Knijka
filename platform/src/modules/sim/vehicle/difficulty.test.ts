@@ -9,6 +9,8 @@ import {
   DIFFICULTY_STORAGE_KEY,
   FULL_LOCK_FADE_END_KMH,
   governorCapKmh,
+  GOVERNOR_BAND_KMH,
+  governorIsEasing,
   loadDifficulty,
   parseDifficultyMode,
   REQUIRED_SPEED_HEADROOM_KMH,
@@ -74,6 +76,52 @@ describe("applyDifficulty", () => {
     // well below cap (and above the creep band): full (halved) throttle
     const below = applyDifficulty(FULL, "beginner", 15, DT, createDriveAssistState());
     expect(below.throttle).toBeCloseTo(0.5, 5);
+  });
+
+  /**
+   * `governorIsEasing` — THE READ CHANNEL THAT MAKES THE CAP SPEAKABLE
+   * (2026-08-11).
+   *
+   * The governor has been taking the student's throttle away since the first
+   * tier shipped and the product never said so: press harder, go no faster,
+   * and the only reading available is „the car is broken". The cluster now
+   * prints the cap and lights it while it bites — but a HUD flag that lit at a
+   * different speed from the clamp would be a NEW lie, so these assert the two
+   * against each other rather than against a re-derived inequality.
+   */
+  describe("governorIsEasing", () => {
+    it("is true exactly where applyDifficulty actually loses throttle", () => {
+      // Начинаещ in the 50 km/h city: cap 40, so the ease begins just above 34.
+      const cap = governorCapKmh("beginner", 50)!;
+      expect(cap).toBe(40);
+      const start = cap - GOVERNOR_BAND_KMH;
+      // The tier's authored authority, measured where nothing else shapes it:
+      // above the creep band (12) and far below the motorway fade (100).
+      const free = applyDifficulty(FULL, "beginner", start, DT, createDriveAssistState());
+      expect(free.throttle).toBeCloseTo(DIFFICULTY_PRESETS.beginner.throttleMul, 5);
+      expect(governorIsEasing(cap, start)).toBe(false);
+
+      for (const kmh of [start + 0.1, start + 3, cap - 0.1]) {
+        const shaped = applyDifficulty(FULL, "beginner", kmh, DT, createDriveAssistState());
+        expect(shaped.throttle, `${kmh} km/h`).toBeLessThan(free.throttle);
+        expect(shaped.throttle, `${kmh} km/h`).toBeGreaterThan(0);
+        expect(governorIsEasing(cap, kmh), `${kmh} km/h`).toBe(true);
+      }
+      // …and at/over the cap, where the throttle is gone entirely.
+      expect(applyDifficulty(FULL, "beginner", cap, DT, createDriveAssistState()).throttle).toBe(0);
+      expect(governorIsEasing(cap, cap)).toBe(true);
+    });
+
+    it("reverse counts — the governor caps both directions, so the mark must too", () => {
+      const cap = governorCapKmh("beginner", 50)!;
+      expect(governorIsEasing(cap, -(cap - 1))).toBe(true);
+      expect(governorIsEasing(cap, -1)).toBe(false);
+    });
+
+    it("no cap („Напреднал“) is never easing — the mark stays off, not zero", () => {
+      expect(governorCapKmh("advanced", 50)).toBeNull();
+      for (const kmh of [0, 60, 200]) expect(governorIsEasing(null, kmh)).toBe(false);
+    });
   });
 
   it("advanced has no speed governor", () => {

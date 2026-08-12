@@ -11,8 +11,20 @@
  *    pedal was genuinely lifted, can toggle direction. The press that stops the
  *    car never does, no matter how long it is held.
  *  LAW 2 (ReversePedalMapper) — whichever channel inherits the throttle role
- *    when the pedals swap keeps BRAKING until the foot comes off it. A held
- *    brake can therefore never become throttle, by any route into R.
+ *    when the pedals swap keeps BRAKING until the foot comes off it, on every
+ *    HAND-WORKED route into R: the [ / ] keys, the touch gear sheet, the
+ *    cockpit lever. A held brake can never become throttle there.
+ *
+ * 2026-08-11 — LAW 2 IS SCOPED, LAW 1 IS NOT. The founder: „before when
+ * pressing S or Arrow Down it automatically went to R and moved backwards and
+ * it has to stay like that because thats automatic transmition." Disowning the
+ * assist's OWN trigger press never prevented that reverse — it charged a second
+ * press for it — because LAW 1 already refuses to arm a press that was not made
+ * at a standstill after a genuine lift. So an "assist" flip carries the press
+ * through; a "manual" flip is guarded exactly as before, and "manual" is the
+ * default so a caller that forgets gets the guard. LAW 1 does not move: the
+ * pedal held from a ROLL is the input that reversed a car into traffic at
+ * 16.8 km/h, and the cases below still pin it shut.
  */
 
 import { describe, expect, it } from "vitest";
@@ -26,6 +38,7 @@ import {
   ReversePedalMapper,
   shouldRemapReversePedals,
   type ReverseAssistCommand,
+  type ReverseShiftSource,
 } from "../reverseAssist";
 
 const DT = 0.05; // 20 Hz frames — HOLD_S (0.35) is exactly 7 frames
@@ -344,6 +357,149 @@ describe("LAW 2: a pedal that means stop never means go", () => {
     const f: VehicleInput = { throttle: 0.7, brake: 0.3, steer: 0.5, handbrake: true };
     m.apply(f, false);
     expect(f).toEqual({ throttle: 0.7, brake: 0.3, steer: 0.5, handbrake: true });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LAW 2's SCOPE — the two laws wired together, because the founder's ruling is
+// about what the SYSTEM does to one press, and neither class can answer it
+// alone. This box is `GatedSimInput.read()` + the frame loop in miniature:
+// merge → rule b → LAW 2 → step the assist on the FUNCTIONAL pedals → execute
+// the command on the selector, in that order, one frame at a time.
+// ---------------------------------------------------------------------------
+class Box {
+  readonly assist = new ReverseAssist();
+  readonly mapper = new ReversePedalMapper();
+  selector: SelectorPosition = "D";
+  private source: ReverseShiftSource = "manual";
+  /** Commands the assist emitted, newest last — for asserting the gate moved. */
+  readonly commands: ReverseAssistCommand[] = [];
+
+  /** One frame of RAW pedals: `up` = ↑/W, `down` = ↓/S. Returns what the
+   *  physics would be handed — i.e. the FUNCTIONAL pedals after both laws. */
+  step(up: number, down: number, speedKmh: number, dtSec = DT): VehicleInput {
+    const input: VehicleInput = { throttle: up, brake: down, steer: 0, handbrake: false };
+    this.mapper.apply(input, this.selector === "R", this.source);
+    const cmd = this.assist.update({
+      speedKmh,
+      selector: this.selector,
+      brakePedal: input.brake,
+      throttlePedal: input.throttle,
+      dtSec,
+    });
+    if (cmd !== null) {
+      this.commands.push(cmd);
+      this.selector = cmd === "shiftToR" ? "R" : "D";
+      this.source = "assist";
+    }
+    return input;
+  }
+
+  /** The [ / ] keys, the touch gear sheet, the cockpit lever — a HAND on the
+   *  selector, which is also what `noteManualShift()` marks in the scene. */
+  shiftByHand(to: SelectorPosition): void {
+    this.selector = to;
+    this.source = "manual";
+    this.assist.noteManualShift();
+  }
+
+  /** Run n frames of the same pedals; returns the LAST functional input. */
+  run(n: number, up: number, down: number, speedKmh: number): VehicleInput {
+    let last = this.step(up, down, speedKmh);
+    for (let i = 1; i < n; i++) last = this.step(up, down, speedKmh);
+    return last;
+  }
+}
+
+describe("LAW 2's scope: the assist's own armed press is not a stop press", () => {
+  it("the founder's gesture reverses the car on ONE press", () => {
+    // „before when pressing S or Arrow Down it automatically went to R and
+    // moved backwards and it has to stay like that because thats automatic
+    // transmition." Stationary car, foot off the pedals, then ↓ and hold.
+    const b = new Box();
+    b.run(LIFT_FRAMES, 0, 0, 0); // foot off, at rest — this is what arms it
+    b.run(7, 0, 1, 0); // ↓ held: 0.35 s → shiftToR on the 7th frame
+    expect(b.commands).toEqual(["shiftToR"]);
+    expect(b.selector).toBe("R");
+    // …and the VERY NEXT frame, with the same unbroken press, is reverse
+    // throttle. No second press, no lift, nothing to explain.
+    const f = b.step(0, 1, 0);
+    expect(f.throttle).toBe(1);
+    expect(f.brake).toBe(0);
+    expect(b.mapper.isDisowned).toBe(false);
+    // and it stays that way for as long as the foot is down
+    expect(b.run(40, 0, 1, -8).throttle).toBe(1);
+  });
+
+  it("the SAME held pedal through a hand-worked selector is still refused", () => {
+    // The [ / ] keys, the touch sheet, the cockpit lever: this foot may be
+    // holding the car still, so its press really was a stop press.
+    const b = new Box();
+    for (let v = 22; v > 0.6; v -= 0.6) b.step(0, 1, v); // braking to rest on ↓
+    b.run(40, 0, 1, 0); // …and standing on it at the line
+    expect(b.selector).toBe("D"); // LAW 1: the assist never moved
+    b.shiftByHand("R"); // the driver's hand, not the assist
+    const f = b.run(600, 0, 1, 0); // 30 s of held pedal in R
+    expect(f.throttle).toBe(0); // ← the 16.8 km/h reverse, still gone
+    expect(f.brake).toBe(1); // ← and the car is still BRAKED
+    expect(b.mapper.isDisowned).toBe(true); // ← so the cockpit still explains it
+  });
+
+  it("no press begun in motion can ever be labelled 'assist'", () => {
+    // The exemption is not a flag anyone can set — it is only ever produced by
+    // a command, and a command requires an armed press. This is the whole
+    // safety argument, so it is asserted rather than reasoned about.
+    const b = new Box();
+    for (let v = 22; v > 0.6; v -= 0.3) b.step(0, 1, v); // press begins at 22 km/h
+    b.run(600, 0, 1, 0); // 30 s at the line, foot never lifts
+    expect(b.commands).toEqual([]);
+    expect(b.selector).toBe("D");
+    expect(b.mapper.isDisowned).toBe(false); // nothing ever flipped
+  });
+
+  it("is symmetric coming OUT of R — ↑ takes D and drives forward", () => {
+    const b = new Box();
+    b.run(LIFT_FRAMES, 0, 0, 0);
+    b.run(7, 0, 1, 0); // ↓ → R
+    b.run(20, 0, 1, -10); // reversing on ↓
+    b.run(LIFT_FRAMES, 0, 0, 0); // stop, foot off — arms the next press
+    b.run(7, 1, 0, 0); // ↑ (the brake in R) held → shiftToD
+    expect(b.commands).toEqual(["shiftToR", "shiftToD"]);
+    const f = b.step(1, 0, 0);
+    expect(f.throttle).toBe(1);
+    expect(f.brake).toBe(0);
+  });
+
+  it("the exemption is not sticky — the next hand-worked flip is guarded", () => {
+    const b = new Box();
+    b.run(LIFT_FRAMES, 0, 0, 0);
+    b.run(7, 0, 1, 0); // assist → R, exempt
+    expect(b.step(0, 1, 0).throttle).toBe(1);
+    b.run(4, 1, 1, 0); // ↑ (the brake in R) comes down to stop the car
+    b.shiftByHand("D"); // …and the hand moves the lever while it is held
+    const f = b.run(200, 1, 0, 0);
+    expect(f.throttle).toBe(0);
+    expect(f.brake).toBe(1);
+  });
+
+  it("an UNLABELLED flip is a guarded flip (the default is 'manual')", () => {
+    // A future caller that forgets the argument must get the guard, never the
+    // exemption — the mistake has to fail safe.
+    const m = new ReversePedalMapper();
+    m.apply({ throttle: 0, brake: 1, steer: 0, handbrake: false }, false);
+    const f: VehicleInput = { throttle: 0, brake: 1, steer: 0, handbrake: false };
+    m.apply(f, true);
+    expect(f.throttle).toBe(0);
+    expect(m.isDisowned).toBe(true);
+  });
+
+  it("an assist flip with the foot ALREADY off changes nothing", () => {
+    const m = new ReversePedalMapper();
+    m.apply({ throttle: 0, brake: 0, steer: 0, handbrake: false }, false, "assist");
+    const f: VehicleInput = { throttle: 0, brake: 0, steer: 0, handbrake: false };
+    m.apply(f, true, "assist");
+    expect(m.isDisowned).toBe(false);
+    expect(f).toEqual({ throttle: 0, brake: 0, steer: 0, handbrake: false });
   });
 });
 

@@ -137,6 +137,71 @@ function declaredSpeedsOf(spec: (typeof SCENARIO_TEMPLATES)[number]): DeclaredSp
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// …AND THE BARE NUMBERS THAT ARE INSTRUCTIONS AFTER ALL — 2026-08-11.
+//
+// The header above says the bare numbers are ignored „because they are facts
+// about the road and about failure, not instructions to reach a speed". That is
+// right about «ограничението е 140 км/ч» and «под 50 км/ч». It is WRONG about a
+// bare number carrying an imperative verb, and the sweep below is that
+// correction: «Потегли и се стабилизирай на 50 км/ч» is an order, and on
+// Начинаещ in a 50 km/h city the car dies at 39.1.
+//
+// This is the CONVERSE of everything above it. Up there a lesson is checked for
+// declaring a speed its tier forbids; here the lesson's own prose is. The
+// student cannot resolve either one: the copy says 50, the pedal gives 39, and
+// (before 2026-08-11) the cluster printed no ceiling at all.
+//
+// IT IS PINNED, NOT ASSERTED AWAY. Fixing these is not this file's to do — the
+// remedy is one line of DATA per map (`meta.scenario.requiredSpeedKmh`, the
+// generic seam scene/lessonSpeedContract.ts already reads, which floors the cap
+// at required + REQUIRED_SPEED_HEADROOM_KMH exactly as the green wave's does).
+// Silently tolerating them, though, is how the wave bug survived eight months.
+// So the known set is written down and a NEW one goes red.
+// ---------------------------------------------------------------------------
+
+/** Verbs that turn a bare number into an order. Deliberately short: these are
+ *  the ones that mean „reach and hold", not „stay under". */
+const SPEED_IMPERATIVE_RE =
+  /(установи|стабилизирай|задръж|дръж|ускори|ускорявай|поддържай|карай)/i;
+/** …and the words that make the very same verb an UPPER bound instead. */
+const SPEED_UPPER_BOUND_RE = /(под|най-много|не повече от|максимум)\s*$/;
+/** A speed in a sentence: a single number or a band, unit optional. */
+const SPEED_IN_SENTENCE_RE = /(\d{1,3})\s*(?:[–—-]\s*(\d{1,3}))?\s*(?:км\/ч)?/g;
+/** Below this the smallest tier cap in the catalogue (Начинаещ 30 → 29.4
+ *  sustainable) clears everything, so a match cannot be a shortfall. */
+const SPEED_DEMAND_MIN_KMH = 20;
+
+/** One „drive at N" order the copy gives, with where it gives it. */
+interface SpeedDemand {
+  kmh: number;
+  source: string;
+}
+
+function imperativeDemandsOf(spec: (typeof SCENARIO_TEMPLATES)[number]): SpeedDemand[] {
+  const out: SpeedDemand[] = [];
+  const copy: [string, string][] = [
+    ["objectiveBg", spec.objectiveBg],
+    ...spec.instructionsBg.map((i, n) => [`instruction ${n + 1}`, i.textBg] as [string, string]),
+  ];
+  for (const [source, text] of copy) {
+    // Split on sentence ends AND on the em dash, which this catalogue uses to
+    // join a fact to an order inside one „sentence".
+    for (const sentence of text.split(/(?<=[.!?])\s+|—/)) {
+      if (!SPEED_IMPERATIVE_RE.test(sentence)) continue;
+      SPEED_IN_SENTENCE_RE.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = SPEED_IN_SENTENCE_RE.exec(sentence)) !== null) {
+        const kmh = Number(m[1]);
+        if (!Number.isFinite(kmh) || kmh < SPEED_DEMAND_MIN_KMH || kmh > 200) continue;
+        if (SPEED_UPPER_BOUND_RE.test(sentence.slice(0, m.index))) continue;
+        out.push({ kmh, source });
+      }
+    }
+  }
+  return out;
+}
+
 interface Finding extends DeclaredSpeed {
   templateId: string;
   districtId: string | undefined;
@@ -399,6 +464,71 @@ describe("tier feasibility — no lesson requires a speed its own tier forbids",
     for (const domain of [20, 30, 40, 50, 70, 90]) {
       expect(governorCapKmh("normal", domain)!).toBeLessThanOrEqual(100);
     }
+  });
+
+  /**
+   * THE CONVERSE GATE — a lesson's own prose ordering a speed its tier forbids.
+   *
+   * Measured 2026-08-11 over all 167 scenario templates × all 105 districts:
+   * ELEVEN orders, in EIGHT templates, ALL of them on Начинаещ, ALL of them on
+   * a 50 km/h map (cap 40, sustainable 39.1). Нормален and Напреднал are clean
+   * — this is a Начинаещ-only defect and always has been.
+   *
+   * (The census in `difficulty.ts` above still says „all 90 districts … 50
+   * (60)". It is stale: the tree is 105 districts today — 20 (14), 30 (4),
+   * 40 (13), 50 (65), 70 (1), 90 (5), 140 (3). Every conclusion it draws
+   * survives — the fade still starts above every non-motorway cap — so this is
+   * a note and not a correction this lane made.)
+   *
+   * Two of the eleven are the same order restated, and three are marginal
+   * („дръж 40" against 39.1 — the student holds 39 and cannot tell). The other
+   * six are not: «стабилизирай се на 50 км/ч» on a tier that stops at 39 is a
+   * 10.9 km/h gap, and until this week the product said nothing at all about
+   * where the missing 11 km/h went.
+   *
+   * WHY PINNED AND NOT FIXED HERE: see the block above `imperativeDemandsOf`.
+   * The remedy is `meta.scenario.requiredSpeedKmh` in each map — a content
+   * change with a governor consequence, which is a different lane's call. If
+   * you make it, delete the row; if you write new copy, do not add one.
+   */
+  it("no lesson's prose orders a speed its own tier cannot reach", () => {
+    const KNOWN_SHORTFALLS: readonly string[] = [
+      // `templateId [tier] source: orders N, sustainable T`
+      "sc-follow-brake [beginner] instruction 1: orders 40, sustainable 39.1",
+      "sc-hz-brake-dont-swerve [beginner] instruction 1: orders 50, sustainable 39.1",
+      "sc-hz-emergency-stop [beginner] instruction 1: orders 50, sustainable 39.1",
+      "sc-jx-priority-confidence [beginner] instruction 3: orders 50, sustainable 39.1",
+      "sc-sp-harsh-brake [beginner] instruction 1: orders 45, sustainable 39.1",
+      "sc-sp-limit-end [beginner] instruction 3: orders 40, sustainable 39.1",
+      "sc-sp-limit-end [beginner] instruction 5: orders 40, sustainable 39.1",
+      "sc-sp-limit-end [beginner] instruction 6: orders 50, sustainable 39.1",
+      "sc-speed-creep [beginner] instruction 1: orders 46, sustainable 39.1",
+      "sc-speed-dangerous [beginner] instruction 5: orders 46, sustainable 39.1",
+      "sc-speed-dangerous [beginner] objectiveBg: orders 46, sustainable 39.1",
+    ];
+    const found: string[] = [];
+    let orders = 0;
+    for (const spec of SCENARIO_TEMPLATES) {
+      const districtId = spec.map?.districtId;
+      const facts = districtId ? DISTRICTS.get(districtId) : undefined;
+      for (const d of imperativeDemandsOf(spec)) {
+        orders++;
+        for (const mode of DIFFICULTY_ORDER) {
+          const top = tierTopSpeedKmh(mode, facts?.domainKmh, facts?.waveKmh);
+          if (top < d.kmh) {
+            found.push(`${spec.id} [${mode}] ${d.source}: orders ${d.kmh}, sustainable ${top}`);
+          }
+        }
+      }
+    }
+    // THE NEGATIVE CONTROL. Both lists below are compared with `toEqual`, and a
+    // `toEqual([])` on an extractor that silently stopped matching passes
+    // beautifully. So: the sweep must still be reading real copy.
+    // Measured 2026-08-11: 31 orders across the catalogue. The floor is well
+    // under it so ordinary copy edits do not redden this, and well over zero so
+    // a broken extractor does.
+    expect(orders, "the imperative extractor has stopped matching any copy").toBeGreaterThan(20);
+    expect([...new Set(found)].sort()).toEqual([...KNOWN_SHORTFALLS].sort());
   });
 
   it("the presets still order beginner < normal < advanced everywhere", () => {

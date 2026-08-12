@@ -92,6 +92,9 @@ export {
   storeDifficulty,
   // Domain-scaled governor (founder review R3 #37 — the motorway drill).
   governorCapKmh,
+  // …and the two the HUD needs to SAY the cap out loud (2026-08-11).
+  GOVERNOR_BAND_KMH,
+  governorIsEasing,
   NORMAL_CAP_MARGIN_KMH,
   BEGINNER_CAP_UNDER_KMH,
   DOMAIN_CAP_FLOOR_KMH,

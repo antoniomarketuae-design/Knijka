@@ -22,14 +22,29 @@ import { PRE_DRIVE_STEP_ORDER } from "../steps";
 import {
   PRE_DRIVE_TUTORIAL_CLIPS,
   PRE_DRIVE_TUTORIALS,
+  preDriveClipWeightBg,
   preDriveTutorialLaw,
   preDriveTutorialMedia,
+  type PreDriveTutorialClip,
 } from "../tutorial";
+
+/**
+ * THE SWAP-SEAM TESTS MUTATE THE SHIPPED REGISTRY, so they must put it back.
+ *
+ * This used to `delete` every key after each test, written when the registry
+ * was empty and „restore" and „empty" were the same thing. The first real clip
+ * (`adjust-seat`, 2026-08-10) turned that into test pollution with a straight
+ * face: the „zero clips shipped" assertion below passed only because the
+ * previous test's cleanup had thrown the shipped clip away. Snapshot/restore
+ * instead, so the file measures the registry that actually ships.
+ */
+const SHIPPED: Partial<Record<string, PreDriveTutorialClip>> = { ...PRE_DRIVE_TUTORIAL_CLIPS };
 
 afterEach(() => {
   for (const k of Object.keys(PRE_DRIVE_TUTORIAL_CLIPS)) {
     delete PRE_DRIVE_TUTORIAL_CLIPS[k as keyof typeof PRE_DRIVE_TUTORIAL_CLIPS];
   }
+  Object.assign(PRE_DRIVE_TUTORIAL_CLIPS, SHIPPED);
 });
 
 describe("pre-drive tutorial content", () => {
@@ -81,20 +96,30 @@ describe("law citation is retrieved, never recalled (ADR-002)", () => {
 });
 
 describe("still → clip swap seam", () => {
-  it("resolves to the inline still for every step today (zero clips shipped)", () => {
-    expect(Object.keys(PRE_DRIVE_TUTORIAL_CLIPS)).toHaveLength(0);
+  it("resolves to the inline still for every step that has no clip", () => {
     for (const id of PRE_DRIVE_STEP_ORDER) {
       const media = preDriveTutorialMedia(id);
-      expect(media.kind, id).toBe("still");
+      expect(media.kind, id).toBe(PRE_DRIVE_TUTORIAL_CLIPS[id] === undefined ? "still" : "clip");
       expect(media.stepId).toBe(id);
+      // The caption is the STEP's, either way — the media never owns it.
       expect(media.captionBg).toBe(PRE_DRIVE_TUTORIALS[id].captionBg);
     }
+  });
+
+  it("the still is the floor: the great majority of steps still have no clip", () => {
+    // THE STILL IS NOT A PLACEHOLDER THE CLIPS ARE REPLACING. It is what the
+    // checklist teaches from when a student never taps play, is offline, or is
+    // on a connection that cannot afford 2–9 MB, and every step must keep one.
+    const withClip = PRE_DRIVE_STEP_ORDER.filter((id) => PRE_DRIVE_TUTORIAL_CLIPS[id]);
+    expect(withClip.length).toBeLessThan(PRE_DRIVE_STEP_ORDER.length);
   });
 
   it("switches that step to the clip the moment one is authored", () => {
     PRE_DRIVE_TUTORIAL_CLIPS["fasten-seatbelt"] = {
       src: "/sim/tutorial/fasten-seatbelt.mp4",
+      posterSrc: "/sim/tutorial/fasten-seatbelt.webp",
       durationSec: 12,
+      bytes: 5_400_000,
       transcriptBg: "Издърпай колана бавно и го щракни.",
     };
     const swapped = preDriveTutorialMedia("fasten-seatbelt");
@@ -115,6 +140,32 @@ describe("still → clip swap seam", () => {
       expect(clip.durationSec, stepId).toBeLessThanOrEqual(15);
       expect(clip.src.startsWith("/"), stepId).toBe(true);
       expect(clip.transcriptBg.length, stepId).toBeGreaterThan(0);
+      // …and every clip declares the two things tap-to-play needs: something
+      // cheap to show first, and the price of the tap. Both are verified
+      // against the real files in `predrive-clip-weight.test.ts`.
+      expect(clip.posterSrc.startsWith("/"), `${stepId} poster`).toBe(true);
+      expect(clip.bytes, `${stepId} bytes`).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("the price printed on the play button", () => {
+  it("reads in decimal MB with a Bulgarian comma — the units a bundle is sold in", () => {
+    expect(preDriveClipWeightBg(2_022_418)).toBe("2,0 MB");
+    expect(preDriveClipWeightBg(8_990_000)).toBe("9,0 MB");
+    expect(preDriveClipWeightBg(5_400_000)).toBe("5,4 MB");
+  });
+
+  it("drops to KB below a megabyte rather than printing „0,0 MB“", () => {
+    expect(preDriveClipWeightBg(27_496)).toBe("27 KB");
+    expect(preDriveClipWeightBg(999_000)).toBe("999 KB");
+    expect(preDriveClipWeightBg(1_000_000)).toBe("1,0 MB");
+  });
+
+  it("never depends on the runtime's ICU data", () => {
+    // `Intl.NumberFormat("bg-BG")` would return "2" on a small-icu build and
+    // "2,0" on a full one; a test that passes on this box and prints an English
+    // decimal point on the VPS is the kind of green nobody checks.
+    expect(preDriveClipWeightBg(2_022_418)).not.toContain(".");
   });
 });

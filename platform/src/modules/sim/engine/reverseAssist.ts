@@ -36,15 +36,55 @@
  *  LAW 2 — a pedal that means stop must never mean go (ReversePedalMapper
  *    below). Whichever channel INHERITS the throttle role when the mapping
  *    flips was, one frame earlier, the brake. If a foot is on it, that foot
- *    pressed it to stop, so it keeps braking until it is lifted. This holds
- *    for every route into and out of R, assist or manual, and it also means
+ *    pressed it to stop, so it keeps braking until it is lifted. It also means
  *    the shift can never leave a stopping car with no brakes at all.
  *
- * Together they satisfy the invariant the rest of this file assumes and never
- * used to guarantee: NO SEQUENCE OF EVENTS CAN TURN A HELD BRAKE INTO
- * THROTTLE. The founder's „↓ should reverse the car" still works — press ↓ at
- * a standstill with your foot off the pedal and the car takes R, exactly as
- * an automatic does when you select R with the lever.
+ * ===========================================================================
+ * 2026-08-11 — AND WHY LAW 2 IS NOW SCOPED TO THE MANUAL ROUTES
+ * ===========================================================================
+ * Founder ruling, verbatim: „before when pressing S or Arrow Down it
+ * automatically went to R and moved backwards and it has to stay like that
+ * because thats automatic transmition."
+ *
+ * Driven on /dev/drive-rig (sc-junction-stop@L1, real keyboard channel):
+ * pressing ↓ at a standstill took the selector to R in 0.43 s and the car then
+ * sat at 0.001 km/h under his foot until he lifted and pressed AGAIN, whereupon
+ * it reversed at 18.6 km/h. So LAW 2 on the assist route never PREVENTED that
+ * reverse — it charged a second press for it, which is precisely the thing he
+ * says an automatic does not do.
+ *
+ * It does not have to. LAW 1 already proves the assist's own trigger press was
+ * never a braking press: to arm, the car must ALREADY be stationary AND the
+ * pedal must have been fully lifted for REVERSE_ASSIST_LIFT_S at that
+ * standstill. There is nothing left for such a press to stop. Disowning it is
+ * therefore redundant on THAT route, and only on that route.
+ *
+ * On the OTHER routes into R — the [ / ] keys, the touch gear sheet, the
+ * cockpit lever — nothing of the kind is known. A driver there may be standing
+ * on the brake precisely to HOLD THE CAR STILL, and moves the selector with his
+ * hand; that pedal really was a stop press, and handing it the throttle role is
+ * the original 16.8 km/h defect. Driven on the same rig for all three: rolled
+ * in at 22.8 / 43.6 / 22.1 km/h, braked to rest without lifting, shifted to R
+ * by hand — 0.001 km/h under the held foot, every time. LAW 2 stays there,
+ * unchanged, and so does its voice (engine/reverseStuck.ts).
+ *
+ * So the mapper is now TOLD which route flipped it (`ReverseShiftSource`), and
+ * the invariant it carries becomes the exact one that is true:
+ *   NO HELD BRAKE CAN BECOME THROTTLE — except the assist's own armed press,
+ *   which by LAW 1 was never a brake.
+ * LAW 1 does NOT move. A pedal held from a ROLL through the stop is the input
+ * that drove the car backwards into traffic, and it still reaches nothing:
+ * measured again 2026-08-11, 22.2 km/h in, ↓ held 9 s through the stop,
+ * selector D throughout.
+ *
+ * WHAT IT COSTS, PLAINLY. Same gesture after the change: R at +0.43 s, moving
+ * at +0.08 s after that, 25.1 km/h backwards in a 6 s press. What shrank is not
+ * whether the car reverses — it always did, on the second press — but the
+ * warning the student gets between the R telltale lighting and the car moving,
+ * from „a deliberate lift and press" to eight hundredths of a second. A nervous
+ * re-dab of the brake at a stop line therefore reverses NOW where it used to
+ * reverse one press later. That is the founder's ruling working as ruled: on a
+ * real automatic, selecting R and standing on the accelerator does exactly this.
  *
  * Pure state machine — no DOM, no React, fully unit-testable in Node. The
  * live-scene glue (LessonScene's RuntimeDriver) feeds it one frame of
@@ -96,6 +136,18 @@ export const REVERSE_ASSIST_SUPPRESS_S = 2;
 export const REVERSE_ASSIST_PEDAL_ON = 0.1;
 
 export type ReverseAssistCommand = "shiftToR" | "shiftToD";
+
+/**
+ * WHICH ROUTE moved the selector — the one thing `ReversePedalMapper` needs to
+ * know and never used to be told.
+ *
+ * "assist" is `ReverseAssist` below and nothing else: an armed press, i.e. a
+ * press that BEGAN at a standstill after REVERSE_ASSIST_LIFT_S of fully lifted
+ * pedal (LAW 1). "manual" is everything else — the [ / ] keys, the touch gear
+ * sheet, the cockpit lever, and any future route — and is the DEFAULT, so a
+ * caller that forgets gets the guard rather than the exemption.
+ */
+export type ReverseShiftSource = "assist" | "manual";
 
 export interface ReverseAssistFrame {
   /** Signed or unsigned — only |speed| is read. */
@@ -231,17 +283,27 @@ export function applyReversePedalRemap(input: VehicleInput): void {
  * frame earlier. So if a foot is on it at the moment of the flip, that foot
  * pressed it to STOP — under no circumstances may the swap read it as GO.
  *
- * The channel is therefore DISOWNED at every flip and stays disowned until it
- * is genuinely released: while disowned it contributes ZERO throttle and goes
- * on braking with the value the driver is applying. Two consequences, both
- * wanted:
+ * …UNLESS THE FLIP WAS THE ASSIST'S OWN ARMED PRESS. That is the whole content
+ * of `source` (see ReverseShiftSource and the 2026-08-11 note at the top of
+ * this file). LAW 1 will not arm a press unless the car was ALREADY stopped and
+ * the pedal had been fully lifted for a quarter second at that standstill — so
+ * that particular press cannot have been the press that stopped anything, and
+ * treating it as a stop press costs the founder a second press for a reverse
+ * that happens either way. Every other route says nothing about the foot, so
+ * every other route is guarded exactly as before.
  *
- *  - the 16.8 km/h reverse into traffic is unreachable — not "unlikely", not
- *    "the trigger no longer fires", but arithmetically impossible from any
- *    route into R (assist, [ / ], touch gear sheet, cockpit lever);
+ * On a guarded flip the channel is DISOWNED and stays disowned until it is
+ * genuinely released: while disowned it contributes ZERO throttle and goes on
+ * braking with the value the driver is applying. Two consequences, both wanted:
+ *
+ *  - the 16.8 km/h reverse into traffic is unreachable from a hand-worked
+ *    selector — not "unlikely", not "the trigger no longer fires", but
+ *    arithmetically impossible ([ / ], touch gear sheet, cockpit lever);
  *  - the shift never strips a stopping car of its brakes. Handing the brake
  *    role to a channel nobody is touching would otherwise leave a car that
  *    the driver believes is braked rolling on whatever the gradient gives it.
+ *    (On the assist route the car is at a standstill BY CONSTRUCTION and the
+ *    driver is asking for the other direction, so there is no stop to protect.)
  *
  * Releasing is judged on VALUE, not time, so the guard is idempotent: read()
  * runs several times per frame (physics step, render glue, cabin visuals) and
@@ -258,11 +320,20 @@ export class ReversePedalMapper {
    * Apply rule b in place when `remap` is on, then enforce LAW 2. Call once
    * per read with the CURRENT remap flag (selector × transmission × lesson —
    * see shouldRemapReversePedals); flips are detected here.
+   *
+   * `source` describes WHICH ROUTE produced the value of `remap` being passed
+   * in, and it must therefore be recorded by the caller AT THE MOMENT the flag
+   * changes, not guessed later — the caller's `read()` runs several times per
+   * frame and in no fixed order relative to the assist's own step. It defaults
+   * to "manual": an unlabelled flip is a guarded flip.
    */
-  apply(input: VehicleInput, remap: boolean): void {
+  apply(input: VehicleInput, remap: boolean, source: ReverseShiftSource = "manual"): void {
     if (remap !== this.remapped) {
       this.remapped = remap;
-      this.disowned = true;
+      // Assignment, not `||=`: an assist flip can only follow a genuine lift
+      // (LAW 1), and a lift has already cleared any earlier disown on value —
+      // so there is never a live guard here for this to drop.
+      this.disowned = source !== "assist";
     }
     if (remap) applyReversePedalRemap(input);
     if (!this.disowned) return;
@@ -274,7 +345,17 @@ export class ReversePedalMapper {
     input.throttle = 0;
   }
 
-  /** Test/telemetry read: is a pedal currently being held through a flip? */
+  /**
+   * Is a pedal currently being held through a flip?
+   *
+   * THIS IS ALSO THE PRODUCT'S ONLY WARNING THAT A DRIVER IS STUCK. For as
+   * long as it was read by nothing but this file's own tests, the cockpit
+   * showed R, kept the car braked and said nothing — founder, 2026-08-09:
+   * „it turns to R (reverse) but the car does not move did it break or ?".
+   * `reverseStuck.ts` decides when a disowned pedal has lasted long enough to
+   * be confusion rather than an ordinary shift; do not delete this getter
+   * thinking it is telemetry.
+   */
   get isDisowned(): boolean {
     return this.disowned;
   }

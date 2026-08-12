@@ -195,6 +195,58 @@ describe("manual mode (behind the difficulty toggle)", () => {
     expect(hasDriveTraction(d.physicsInput)).toBe(true);
   });
 
+  // -------------------------------------------------------------------------
+  // 2026-08-11 — A4's OWN UNFINISHED SENTENCE. Its note reads „the student
+  // gets the engine back but sits in neutral with nothing on screen saying so,
+  // which is the same complaint wearing a different hat" — and then only the
+  // round trip was closed. Measured on /dev/drive-rig the same day: a click on
+  // „Напреднал" with the car standing still moved the selector D → N with ZERO
+  // toasts, and holding ↓ for 12.5 s after it produced zero more.
+  //
+  // `movedSelectorTo` is what lets the cockpit say it. The rule it encodes is
+  // „report a lever THE SWITCH moved, and only that" — so the round trip, which
+  // puts the lever back where it was found, stays silent.
+  // -------------------------------------------------------------------------
+  it("A4: the tier switch REPORTS the lever it moved, so the cockpit can say so", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { ...STILL, transmission: "manual" }); // click „Напреднал"
+    expect(d.selector).toBe("N");
+    expect(events.at(-1)).toEqual({
+      kind: "transmissionChanged",
+      transmission: "manual",
+      movedSelectorTo: "N",
+    });
+  });
+
+  it("A4: a MOVING car reports the gear it landed in, not a neutral it never saw", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { speedKmh: 45, throttle: 0.3, transmission: "manual" });
+    expect(d.selector).toBe("M");
+    expect(events.at(-1)).toEqual({
+      kind: "transmissionChanged",
+      transmission: "manual",
+      movedSelectorTo: "M",
+    });
+  });
+
+  it("A4: putting a lever back where it was found is reported as NO move", () => {
+    const { d, events } = rig("ready");
+    d.update(1 / 60, { ...STILL, transmission: "manual" }); // D → N (ours)
+    d.update(1 / 60, { ...STILL, transmission: "automatic" }); // …undone
+    expect(d.selector).toBe("D");
+    expect(events.at(-1)).toEqual({ kind: "transmissionChanged", transmission: "automatic" });
+  });
+
+  it("A4: a tier switch that moves nothing reports nothing", () => {
+    const { d, events } = rig("ready");
+    d.setClutch(true);
+    d.gearDown(); // D → N, the STUDENT's own choice
+    d.setClutch(false);
+    d.update(1 / 60, { ...STILL, transmission: "manual" });
+    expect(d.selector).toBe("N");
+    expect(events.at(-1)).toEqual({ kind: "transmissionChanged", transmission: "manual" });
+  });
+
   it("A4: a neutral the STUDENT chose in manual is not overwritten by the round trip", () => {
     const { d } = rig("ready");
     d.update(1 / 60, { ...STILL, transmission: "manual" });

@@ -40,15 +40,43 @@ import type { PreDriveStepId } from "./types";
 // Media (the still-now / clip-later seam)
 // ---------------------------------------------------------------------------
 
-/** A generated instructional clip. Authored ONLY when the file really ships —
- *  an entry here is a promise that `src` is fetchable. */
+/**
+ * A generated instructional clip. Authored ONLY when the file really ships —
+ * an entry here is a promise that `src` AND `posterSrc` are both fetchable.
+ *
+ * ── TWO SIZES, AND THEY ARE NOT THE SAME NUMBER ──────────────────────────────
+ * DEPLOY SIZE is what sits in `platform/public/`, in git and on the VPS. It is
+ * the sum of every clip, it does not move when playback is made lazy, and at
+ * thirteen Kling-grade clips it is on the order of 60–120 MB.
+ * SESSION DOWNLOAD is what ONE student's phone actually pulls. Before the tap-
+ * to-play rework this was „the clip for every card that opened, in full, before
+ * the student was asked" — with `autoPlay` on a card that opens by itself, a
+ * student who never wanted a video still paid for it. It is now: the poster
+ * only (tens of KB), and the clip's `bytes` on top ONLY for a card the student
+ * deliberately played. `bytes` exists so the button can say the price out loud
+ * before the student agrees to it, which is the whole point.
+ */
 export interface PreDriveTutorialClip {
   /** Public-path MP4/WebM, e.g. "/sim/tutorial/fasten-seatbelt.mp4". */
   src: string;
-  /** Poster frame shown before playback (and if the clip fails to load). */
-  posterSrc?: string;
+  /**
+   * Poster frame — the clip's own first frame, exported as a WebP a couple of
+   * orders of magnitude smaller than the video. REQUIRED, because a clip
+   * without one opens as an empty rectangle on a slow connection and the
+   * student is asked to spend megabytes on a box he cannot see the inside of.
+   * (`PreDriveStill` remains the floor underneath it: if this 404s or fails to
+   * decode, the popup falls back to the inline SVG — see PreDriveTutorial.tsx.)
+   */
+  posterSrc: string;
   /** Founder spec: 10–15 s. Validated by the tutorial test. */
   durationSec: number;
+  /**
+   * SESSION-DOWNLOAD cost of playing this one clip, in bytes — the MEASURED
+   * size of the file at `src`, not an estimate. `predrive-clip-weight.test.ts`
+   * stats the real file and fails if this drifts, so the „≈ 2 MB" the student
+   * is shown can never become a lie after a re-render.
+   */
+  bytes: number;
   /** Bulgarian narration transcript — accessibility + the muted-tab case. */
   transcriptBg: string;
 }
@@ -63,9 +91,49 @@ export type PreDriveTutorialMedia =
   | { kind: "clip"; stepId: PreDriveStepId; captionBg: string; clip: PreDriveTutorialClip };
 
 /**
- * Generated clips, keyed by step. **Deliberately empty on 2026-07-30** — no
- * video-generation account has balance. Adding one entry here upgrades that
+ * Generated clips, keyed by step. Empty from 2026-07-30 until 2026-08-10 — no
+ * video-generation account had balance. Adding one entry here upgrades that
  * step's tutorial from the still to the clip with zero other edits.
+ *
+ * FIRST ENTRY, 2026-08-10 — ONE CLIP, FOR REVIEW, NOT A COMMITMENT TO THIRTEEN.
+ * PoYo (grok-imagine, 10 s, 16:9) now has credit; the render cost 40 credits,
+ * not the 2 its pricing page advertises, so the full set is ~520 on the
+ * cheapest model. Kept to one until the founder has watched it, because the
+ * open question is not cost — it is whether a generated clip beats the SVG
+ * still FOR THIS STEP. The still cannot be anatomically wrong, works offline
+ * and prints; this step's whole teaching point is that the leg stays BENT, and
+ * a leg is exactly what generative video gets wrong.
+ */
+/**
+ * EMPTY ON PURPOSE. Every step renders its inline-SVG still, which is the floor
+ * this seam was always built on: it costs zero bytes, works offline, and cannot
+ * contradict its own caption.
+ *
+ * WHY `adjust-seat` WAS PULLED ON 2026-08-11, one day after it was added. The
+ * generated clip was reviewed by looking at frames 1, 3 and 5 of five. THE
+ * DEFECT IS AT t = 7.5 s — the fourth frame, the one nobody extracted. There the
+ * driver's leg is open to roughly 150°, straight, with the foot planted flat on
+ * the DASH FASCIA and no pedal beneath it or anywhere in the footwell, under a
+ * caption reading «Свит крак на педала» and a transcript reading „Натисни
+ * спирачния педал докрай… не изпънат".
+ *
+ * So the clip demonstrated, in the student's own language, the exact fault the
+ * step exists to prevent — and a straight leg at the pedal is not a cosmetic
+ * miss: it is why you cannot brake fully in an emergency. That is a THEO-4
+ * breach (no bare verdicts; the student is owed the reasoning), and it is worse
+ * than the still it replaced, because the still was correct.
+ *
+ * Its poster was frame 0, which IS correct — so the picture selling the tap was
+ * right while the 2 MB behind it was wrong.
+ *
+ * DO NOT RE-ADD A CLIP HERE WITHOUT THE §7.2 GATE IN
+ * `docs/simulation/90_FR19_CLIP_PRODUCTION_SPEC.md`: five frames at
+ * t = 0, 0.25D, 0.5D, 0.75D and D−0.2 s, each read at the real 320 px delivery
+ * width AND at ≥2.5× on the body part the caption names and on the wheel boss,
+ * grille, boot and wheel centres for ADR-001. Doc 90 also concludes that eight
+ * of the thirteen steps should be rendered by OUR OWN simulator rather than
+ * generated at all, and that five — this one included — keep the still
+ * permanently, because no medium we can reach shows a knee angle correctly.
  */
 export const PRE_DRIVE_TUTORIAL_CLIPS: Partial<Record<PreDriveStepId, PreDriveTutorialClip>> = {};
 
@@ -232,6 +300,20 @@ export const PRE_DRIVE_TUTORIALS: Record<PreDriveStepId, PreDriveTutorial> = {
  */
 export function preDriveTutorialLaw(stepId: PreDriveStepId): string | undefined {
   return VIOLATIONS[PRE_DRIVE_TUTORIALS[stepId].gradedByCode].lawRef;
+}
+
+/**
+ * The clip's SESSION-DOWNLOAD price, written the way a Bulgarian carrier sells
+ * a bundle: decimal MB (10^6), comma decimal separator. It is printed ON the
+ * play button, because „tap to play" is only a real choice if the student is
+ * told what tapping costs — a 17-year-old on a prepaid plan is the reader.
+ *
+ * Deliberately not `Intl.NumberFormat`: this string is asserted in unit tests
+ * and must not depend on whether the runtime shipped the bg-BG ICU data.
+ */
+export function preDriveClipWeightBg(bytes: number): string {
+  if (bytes < 1_000_000) return `${Math.round(bytes / 1000)} KB`;
+  return `${(bytes / 1_000_000).toFixed(1).replace(".", ",")} MB`;
 }
 
 /**

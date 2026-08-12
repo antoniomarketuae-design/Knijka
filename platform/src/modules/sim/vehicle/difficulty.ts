@@ -164,8 +164,16 @@ export function createDriveAssistState(): DriveAssistState {
   };
 }
 
-/** Speed band (km/h) over which the governor eases the throttle to zero. */
-const GOVERNOR_BAND_KMH = 6;
+/**
+ * Speed band (km/h) over which the governor eases the throttle to zero.
+ *
+ * EXPORTED since 2026-08-11 because the HUD has to be able to say WHEN the
+ * governor starts holding the car back, and „when" is exactly this band: one
+ * `GOVERNOR_BAND_KMH` below the cap the throttle stops being the student's.
+ * Restating the 6 in the HUD would have been a second copy of a number that
+ * decides physics.
+ */
+export const GOVERNOR_BAND_KMH = 6;
 
 // ---------------------------------------------------------------------------
 // Domain-scaled governor (founder review R3 #37, doc 62 S6): the static caps
@@ -370,6 +378,24 @@ function governorScale(capKmh: number | null, absKmh: number): number {
   if (capKmh === null) return 1;
   const over = absKmh - (capKmh - GOVERNOR_BAND_KMH);
   return over > 0 ? clamp01(1 - over / GOVERNOR_BAND_KMH) : 1;
+}
+
+/**
+ * IS THE TIER HOLDING THIS CAR BACK RIGHT NOW? — the read channel for the HUD
+ * (2026-08-11, the „silent refusal" sweep).
+ *
+ * The governor has always been able to take a student's throttle away and the
+ * product has never said so: press harder, go no faster, and the only reading
+ * available to a 17-year-old is „the car is broken". This answers the one
+ * question the cluster could not — and it answers it from `governorScale`
+ * itself rather than from a re-derived inequality, so a HUD claiming „the
+ * governor is easing" and a physics step that is actually easing can never
+ * disagree.
+ *
+ * `speedKmh` may be signed (reverse counts: the governor caps both ways).
+ */
+export function governorIsEasing(capKmh: number | null, speedKmh: number): boolean {
+  return governorScale(capKmh, Math.abs(speedKmh)) < 1;
 }
 
 /**

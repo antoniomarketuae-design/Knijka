@@ -38,6 +38,7 @@ export {
 export {
   PRE_DRIVE_TUTORIAL_CLIPS,
   PRE_DRIVE_TUTORIALS,
+  preDriveClipWeightBg,
   preDriveTutorialLaw,
   preDriveTutorialMedia,
   type PreDriveTutorial,

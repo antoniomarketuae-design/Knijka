@@ -90,6 +90,14 @@ export const WORLD_NAME_BG: Record<string, string> = {
   "sp-trans-v1": "прехода към зона 30",
   "sp-zone30-v1": "улицата в зона 30",
   "sx-v1": "светофарното кръстовище",
+  // Doc 87 B40(b) — the signals family stopped being one street. Each name says
+  // what makes THAT junction different, because the loading line is the first
+  // place a student could notice he is somewhere new.
+  "sxd-v1": "кръстовището на две събирателни улици",
+  "sxf-v1": "булеварда с еднопосочната пресечка",
+  "sxh-v1": "кръстовището с откритата далечна стоп-линия",
+  "sxc-v1": "голямото кръстовище с регулировчик",
+  "sxr-v1": "тясното централно кръстовище",
   "tj-emerge-v1": "Т-кръстовището с кола по главния",
   "tj-occluded-v1": "Т-кръстовището с ограничена видимост",
   "tj-rhr-v1": "Т-кръстовището с предимство отдясно",
