@@ -1,12 +1,18 @@
 # 91 — The mobile audit: six lanes, one phone, and the two bugs that make the car stop answering
 
-**Date:** 2026-08-11 · **Branch:** `scenario-engine` · **Status:** findings only — **no code was changed by this wave**
+**Date:** 2026-08-11, audit · **Ledger (§O) re-read against the code:** 2026-08-12 at `97afa9c` · **Branch:** `scenario-engine`
+**Status:** the audit itself changed no code. Four remediation waves have since run — **§O says which of their 27 rows actually landed, and which of the "landed" ones were only ever seen on a `/dev/*` route that 404s in production.**
 **Commissioned by:** the founder's mobile report (interface moves left/right · buttons misplaced · gas and reverse dead most of the time · dead again after a popup · belts ultra hard · no camera button · FPS)
 **Supersedes nothing.** Extends doc 82 (sim quality), doc 86/87 (the 150-item review), doc 89 (what I missed, incl. his drawn layout).
 
 ---
 
 ## §0 · How to read this
+
+> **⚠ START AT §O — THE LEDGER.** All 27 §I rows, each read against the code at `97afa9c` and marked
+> **DONE / DONE-UNVERIFIED / OPEN** with the line that proves it, plus twelve confirmed problems in
+> §C/§D that **§I never wrote a row for**, plus which of §K he has since ruled. **6 DONE ·
+> 6 DONE-UNVERIFIED · 15 OPEN.** That table is the contract; §A–§N below are the evidence it stands on.
 
 Every claim below carries a provenance tag. This project has twice shipped an inherited number that
 turned out to be wrong, so nothing here is asserted without saying where it came from.
@@ -1443,3 +1449,120 @@ published a defect from a window like that one.**
    it measures nothing: 214.5 draws/frame with the menu open against 216.1 driving. The pause the
    product actually uses is a teach card, a quiz, a consequence, the debrief, or the «ПАУЗА» rail
    control.
+
+---
+
+## O. THE LEDGER — all 27 §I rows, read against the code at `97afa9c`, 2026-08-12
+
+> **THIS TABLE IS THE CONTRACT.** Four mobile waves ran for ~20 hours, all reported green, and the
+> product on his phone was unchanged. Two structural reasons, and this section exists to end both:
+>
+> 1. **Three of the four waves measured `/dev/drive-rig`, which calls `notFound()` under
+>    `NODE_ENV=production`.** Every "0 overflow · 0 dead controls" described a page no student can
+>    open. **That is §D12g, it is diagnosed in this document, and it has no §I row** — see §O.2.
+> 2. **Nobody ever worked from the document.** The waves were shaped by a summary of §I, so no row
+>    was ever ticked off. Same failure as the 150-item register and the P0–P7 plan.
+>
+> **Method.** Every row below was re-read from §I, its named files opened at `97afa9c` (working tree
+> clean, `git status --porcelain` empty), and the verdict is the line that proves it. **No verdict
+> here is taken from a wave's own report.**
+
+### O.1 · The three verdicts, and why the middle one exists
+
+| verdict | meaning |
+|---|---|
+| **DONE** | In the code today **and** exercised on the deployed surface — a production build, authenticated `/simulator`, real device profiles. |
+| **DONE-UNVERIFIED** | In the code today, provably. **Never exercised on `/simulator`.** Its evidence is a unit test, a source read, or a `/dev/*` rig that 404s in production. **This is not a complaint about rigour — it is the exact gap that let four green waves ship a phone that does not work.** |
+| **OPEN** | Not in the code. The line §I named is still the line §I quoted, or the fix's own artefact does not exist anywhere in the tree. |
+
+### O.2 · The ledger
+
+| row | what it is | verdict | evidence at `97afa9c` |
+|---|---|---|---|
+| **I1** | C1 · dead pedal — release the two pointer-ownership refs on hide | **DONE-UNVERIFIED** | `TouchControls.tsx:1076–1081` — `if (!visible) { releaseTouchControls(touch, steerPad, drivePad); parkKnobs(); }`, plus the unmount twin `:1082–1085`. The refs became `usePadPointer()` engine state (`:1034–1035`, `engine/touch.ts:318`) so release cannot be done by half again. Pinned by `touchPadRelease.test.tsx:158,162`. **Verified on `/dev/drive-rig` and `/dev/pedal-rig` only.** |
+| **I2** | C2 · every button dead under two fingers — one shared tap idiom, keep `onClick` | **DONE** | `modules/sim/hud/tapActivation.ts:337` `useTapActivation`, **18 call sites**: `TouchControls.tsx:1997` (GlyphButton) · `:2106` (RailButton) · `:2362` (SheetCell) · `SimOverlay.tsx:300–305` (six) · `LessonPlayShell.tsx:981,1017` (PlayMenu) · `LessonScene.tsx:2046` · `TraceTimeline.tsx:380–384`. **Production `/simulator`, real second CDP touch point: `tools/mobile/wave4-second-finger-census.mjs`, `parity-cards.mjs`.** |
+| **I3** | C1/C4 · render inert instead of `if (!visible) return null` | **DONE-UNVERIFIED** | `TouchControls.tsx:1417–1421` — root keeps its node, gains `data-sim-touch-inert`, `aria-hidden`, `opacity:0`; pads at `:1436` / `:1480` swap `pointer-events-auto` → `pointer-events-none`. The 30-line comment at `:1384–1416` states the mechanism. **Rig only.** |
+| **I4** | C3/L8/U5 · the belt trap — (a) card scrolls, (b) no auto-open modal on compact | **OPEN** | (a) `PreDriveTutorial.tsx:380` is **still** `card m-auto flex w-full max-w-lg flex-col gap-3 p-5` — no `max-h-full`, no `overflow-y-auto`, no `sticky bottom-0` button row. (b) `PreDriveChecklist.tsx:189–195` auto-opens on `readTutorialAutoOpen()` alone; **the word `compact` does not appear anywhere in that file.** |
+| **I5** | C5 · the 4 px dead end — (a) `noDismiss`, (b) a way back in the menu | **OPEN** | (a) `SimOverlay.tsx:316` is **still** `const closable = !blocking;` and the predrive item (`LessonPlayShell.tsx:2415–2424`) carries no `noDismiss`. (b) menu keys are `debrief · advisor · quiz · task · minimap · fullscreen · finish · abort · exit` — **no «Подготовка» recall**, and `setDismissedOverlayIds` has exactly one writer (`:1384`, the dismiss). The «Задача» recall §I5 told us to copy is at `:2552`, three lines away, and was not copied. |
+| **I6** | T1 · pinch-zoom on the driving surface — `touch-action: none` scoped to the scene | **DONE-UNVERIFIED** | `LessonPlayShell.tsx:2831` — `<div className="h-full w-full" style={{ touchAction: "none" }}>` wrapping only `SceneSlot`. The comment `:2800–2830` records the CDP two-point reproduction (`visualViewport.scale` → 5, then `offsetLeft` 247) **and refuses the global meta-tag fix for the theory/exam accessibility reason §I6 gave.** **Not re-fired on `/simulator`.** |
+| **I7** | C6 · stale `--sim-vh` — the hook's activation argument | **OPEN** | `LessonPlayShell.tsx:1320` is **still** `useVisualViewportHeight(immersive && !isFullscreen)`; `:2641` still publishes `--sim-vh` from that value unconditionally. Not one character of §I7 was applied. |
+| **I8** | L12 · 16 px of road — the `isFullscreen` arm must respect `compact ? "" : "gap-2 p-2"` | **OPEN** | `LessonPlayShell.tsx:2626` — the `isFullscreen` arm is **still** `"flex h-full flex-col gap-2 overflow-hidden bg-background p-2"`. The `compact ? "" : "gap-2 p-2"` ternary exists six lines below at `:2632` — on the `immersive` arm, which a phone that grants fullscreen never reaches. |
+| **I9** | L11 · document taller than the screen — scope the body payback | **OPEN** | `globals.css:537` — `padding-bottom: env(safe-area-inset-bottom, 0px)` still unscoped. `:has()` is used seven times in the file (`:331`, `:572`, …) — the mechanism §I9 named is present and was not pointed at this rule. |
+| **I10** | L3 · minimap on the thumb — `--sim-hud-floor` → `TOUCH_CONTROLS_FLOOR` on compact | **OPEN** | `LessonPlayShell.tsx:3197` — minimap column still `bottom: "var(--sim-hud-floor, 6.75rem)"`, and `:2181` defines `hudFloorPx = compact ? dashHeightPx + 8 : ROOMY_HUD_FLOOR_PX` — the **dash** floor, ≈48 px, exactly the number `TouchControls.tsx:453–456` warns cannot be used. `PlayAreaStyles` moves the deck onto `TOUCH_CONTROLS_FLOOR` (`:277`, `:1180`) and never touches `[data-hud="minimap-column"]`. |
+| **I11** | D4/C4 · the sheet stands on the controls — `--sim-touch-floor` + a compact redesign | **OPEN** | `SimOverlay.tsx:558` — **still** `bottom: "var(--sim-dash-h, 0px)"` with `maxHeight: "calc(var(--sim-vh, 100dvh) * 0.62)"`. **`--sim-touch-floor` does not exist anywhere in the tree.** §I11 said this one is a redesign, not a one-liner, "and pretending otherwise is how this class of defect keeps coming back" — it was not attempted either way. |
+| **I12** | U1/M6 · mouse-only copy — `tapBg?` per performed step | **OPEN** | `performedSteps.ts:142–160` — the shape is still exactly `clickBg` + `pedalBg` + `keys`; **no `tapBg` in the file or the tree**, so `preDriveMouseActionBg()` (`:248`) still cannot return a touch sentence. `PreDriveChecklist.tsx:67` still reads «Всяка стъпка се прави с **МИШКАТА**…». *(A touch vocabulary DOES exist and IS selected on production — `hintInputFor(hasTouchScreen())`, `LessonPlayShell.tsx:1143`, proved by `wave4-teaching-copy.mjs` and `wave5-card-text.mjs`. It is the **card's** copy. The pre-drive's is untouched, and the pre-drive is what he called "ultra hard".)* |
+| **I13** | U2/L1 · unnamed controls — a caption under each glyph | **DONE-UNVERIFIED** | `TouchControls.tsx:1963,1987,2015–2021` — `captionBg` on `GlyphButton`; all five flank stations carry one: `:1621` Ляв · `:1631` Дясн · `:1648` Дясн · `:1657` Задн · `:1666` Ляво. **Never checked for CLIPPING on a real profile — which is precisely the defect he is reporting on the card.** |
+| **I14** | L9 · sub-44 px hit rects — `py-3` + the `::before` pad | **OPEN** | `LessonPlayShell.tsx:990` — menu row still `px-2.5 py-2.5` (39.5 px). `before:absolute before:-inset-y-*` occurs in **exactly one file in the whole tree**: `QualityPresetSelector.tsx:165` — the precedent §I14 cited. It was never applied to the checklist buttons, the disclosure rows or the demo pill. |
+| **I15** | L10/D11 · centre-blind reach table | **OPEN** | `cabinLook.ts:288–301` — `hotspotVisibleRect()` still returns on clipped **span** alone (`if (right-left < MIN_TARGET_SPAN \|\| bottom-top < MIN_TARGET_SPAN) return null`). No centre test. So `hotspotIsReachable()` (`:304`) still says yes for a mirror whose label lands at x −76. |
+| **I16** | L13 · overlapping overlays — enrol the touch-hint lines in `data-sim-overlay-active` | **DONE-UNVERIFIED** | `PlayAreaStyles.tsx:1073–1074` — `[data-sim-compact="on"][data-sim-overlay-active="on"] [data-hud="touch-hint"] { display: none; }`, plus `:1081–1082` for `follow-hint` / `telltale-cue` and `:1086–1087` for the hint-vs-hint rank. The switch is written at `LessonPlayShell.tsx:2615`. **Rig-measured.** |
+| **I17** | D12a · tier seed — delete the 8 GB-Android carve-out | **DONE** | `quality.ts:396–410` — the rule is gone; only `deviceMemoryGb <= 2 → low` survives and every touch-only device falls through. **Production `/simulator`, six profiles × two tiers: §N2·B** (`med` = 2.4× draws, 1.56× backing store, 2.0–3.0× CPU frame). Second half of K4 also taken: `maxDprFor()` (`:323`) clamps touch-only to dpr 1.0 on every tier. |
+| **I18** | D12b · the disconnected safety valve | **DONE** | `qualityStore.ts:297` — `useAutoQualityProbe()` runs inside `useQuality()`. **And the seam nobody had checked was fixed:** `LessonSelectScreen.tsx:41` calls `refreshSeededQuality()` on mount, because `seedQualityLevel()` is memoized per page load and `/simulator` never reloads the document (§N2·A). Probe honesty guard in `SimEnvironment.tsx:234` (§N3). |
+| **I19** | D12c · rendering behind modals | **DONE** | `LessonScene.tsx:1202` — `frameloop={physicsPaused ? "demand" : "always"}`. **Production, 24 rows, back-to-back in one page load: 86.2–88.9 % of draw calls behind a card are gone** (§N2·D, §N6). |
+| **I20** | D12d · blur over a live canvas — opaque scrim in four overlays | **OPEN** | `backdrop-blur-sm` is still on all four: `LessonPlayShell.tsx:3426` · `TeachMomentOverlay.tsx:308` · `MicroQuizOverlay.tsx:161` · `MistakeConsequenceOverlay.tsx:140`. §J-9 already records this as not done; §I19 and §I20 were meant to ship **together**, and only one did. |
+| **I21** | D12f · mirror RTT — `LOW_REAR_CADENCE.interval` 4 → 8 | **OPEN** | `MirrorRig.tsx:361` — still `const LOW_REAR_CADENCE = { interval: 4, phase: 0 } as const;`. **With I19 landed this is now the largest remaining per-frame GPU line at tier low**, exactly as §J-10 predicted. |
+| **I22** | D12e · 29.6 React commits/s | **OPEN** | `LessonPlayShell.tsx:193` `HUD_POLL_MS = 150`; `:1998–1999` still `setInterval(() => setSnap(snapshotOf(…)), HUD_POLL_MS)`. No `useSyncExternalStore` in the shell. **Production re-measurement: 29.4/s (18.05 DOM + 11.3 R3F), unchanged from dev** (§N4) — the dev-build discount does not apply, and §M5 still blocks the attempt. |
+| **I23** | M1 · camera — promote «ИЗГЛ» to a labelled top-left rail button | **DONE** | `TouchControls.tsx:2272–2274` — `<RailButton wordBg="Изглед" …>` with the popover at `:2284–2304` carrying зум and север/посока, so it closes **G and N** as well. `:1852` records the removal from the ⚙ sheet. **Production `/simulator`, six profiles: §E rows 21–23, re-derived by `parity-e.mjs`.** |
+| **I24** | M2 · clutch — hold-to-clutch on the horn's idiom, or gate the tier | **DONE**, with a live blocker | `TouchControls.tsx:1832` — «СЪЕД» sheet cell on `useHoldButton` (`:2036–2072`: `onPointerDown`/`Up`/`Cancel`/`LostPointerCapture` + unmount release), i.e. multi-touch-safe by construction. **But `tools/mobile/wave5-landscape-burial.mjs` found on production that the card teaching «M►» stands on «M►» on two of three landscape profiles — his own phone held sideways.** The control exists; the tier is still not drivable there. See §O.3 row N4. |
+| **I25** | T4 · tap does nothing — **his ruling: the pad is ABSOLUTE** | **DONE-UNVERIFIED** | The axis went absolute: `TouchControls.tsx:426` `TOUCH_DRIVE_ABSOLUTE_RANGE_PX` (66 px each side of centre), `:1283` *"The centre is READ FROM THE PAD'S OWN BOX at the start of every gesture"* (`seatDriveCentre`), `:1489` *"Since the axis went absolute, the centre of this box IS „middle is…"*. The steering pad's own comment `:1227–1232` states the split explicitly: steering stays relative, **"The GAS pad no longer works this way"**. His specification holds in source. **Measured on `/dev/pedal-rig` — a dev route.** |
+| **I26** | G4 · budgets — (a) struck through, (b) draws, (c) preset in the menu | **(a) N/A · (b) OPEN · (c) OPEN** | (a) retracted in G4a; production is 1,256 KB. (b) §N5, production: **205–234 draws at low against a ≤150 budget, 489–528 at med** — unchanged, and no tier decision fixes it. (c) the lesson-menu key list (`LessonPlayShell.tsx:2518–2583`) is `debrief · advisor · quiz · task · minimap · fullscreen · finish · abort · exit` — **no quality entry.** An FPS complaint still costs him the whole session to act on, which is the exact complaint he filed. |
+| **I26a′** | G4a · the one bundling win left — defer the scenario catalogue | **OPEN** | `simulator-client.tsx:145` — still `const spec = scenarioById(scenarioPick.templateId);` **synchronously inside the `useMemo`**, over `SCENARIO_TEMPLATES`. No `await import()` near it. 336 KB gz / 1,502 KB raw of templates parsed before a phone can drive a session that plays exactly one. |
+
+**Count: 6 DONE · 6 DONE-UNVERIFIED · 15 OPEN** (I26 counted once, at its worst arm).
+
+**The four waves' claims, against the code.**
+
+| claimed | survives reading the code? |
+|---|---|
+| Wave 1 — I1, I2, I3, I6 | **Yes, all four.** This is the one wave whose claims are true line-for-line. Three of the four were never seen on `/simulator`. |
+| Wave 2 — deck/sheet exclusivity, camera, indicators-left, captions | **Yes.** Deck stand-down `TouchControls.tsx:1124–1126` → `LessonScene` `touchSheetOpen`; camera I23; indicators moved to the LEFT flank on his ruling (`:444–455`, `ARC_STATIONS_LEFT = 2`); captions I13. **But the wave also claimed §I11 territory and I11 is untouched** — the deck was moved off the sheet, the sheet was never moved off the controls. |
+| Wave 3 — tier seed, dpr, portrait tier pill | **Yes**, and it is the only wave measured on the real surface (§N). |
+| Wave 4 — upshift, keyboard-only copy, captions, parity | **Partly.** The card copy does select correctly on production. **The pre-drive copy — which is §I12, and is what he called "ultra hard" — was never touched.** |
+
+### O.3 · Confirmed problems in §C/§D with **no §I row at all**
+
+*The founder asked "see if there is anything missing". A confirmed problem with no fix row is exactly
+the gap that keeps this loop going. C7 is the only one the document knowingly scoped out; the rest
+were dropped silently.*
+
+| # | the problem | still true today? | why it has no row |
+|---|---|---|---|
+| **N1** | **§L2 / §D6 — every driving control moves under his thumb when the browser chrome changes.** −44 px of viewport moved all ten controls 43–44 px; +44 px moved them by **different amounts per station**, so the arc bunches and spreads as well as slides. | **Yes.** `TouchControls.tsx:343–349` `ARC_RISE = clamp(1.25rem, (100% − 22rem) × 0.5, 8.25rem)` in a `bottom:` calc at `:364`, resolved against a containing block whose height is `useVisualViewportHeight` (`LessonPlayShell.tsx:1320`). | **⚠ THE MOST IMPORTANT OMISSION IN §I.** This is his own sentence — *"the buttons are so missplaced"*, *"it moves"* — root-caused to file and line in §D6, and **no §I row was ever written for it.** Worse: §I7, if applied, makes the tracking MORE responsive and the arc move MORE. **I7 must not ship before this row has a design.** |
+| **N2** | **§D12g — every dev harness defaults to `"medium"`, and `/dev/*` 404s in production.** | **Yes.** `drive-rig-client.tsx:61` — `quality: q === "low" \|\| q === "high" ? q : "medium"`. `gw-shell-client.tsx:26` the same. | **This is the mechanism of the twenty wasted hours** — it is diagnosed in §D and has no §I row. The fix is two lines (seed the rigs from the device like `/simulator` does) plus one rule: **no row may be marked closed on a `/dev/*` route.** |
+| **N3** | **The compact peek card hides the instruction body behind one press of «ЗАЩО»/«Списък».** His words: *"THE CARDS SHOW BUTTONS AND NO TEXT."* | **Yes.** `SimOverlay.tsx:383–385` renders only `shown.lineBg` in a `line-clamp-3`; `detailBg` renders **only** inside the open sheet (`:545+`). The predrive item puts `PRE_DRIVE_STEPS[…].instructionBg` — the instruction itself — into `detailBg` (`LessonPlayShell.tsx:2422`). | **A THEO-4 breach: a card whose body IS the instruction, hiding it.** §U4 is the nearest row and it is about auto-open, not about the collapsed peek. Wave 4 measured this and never escalated it. **No row.** |
+| **N4** | **The card that teaches «M►» stands on «M►»** — `transmissionSwitchHint()` raises «Скоростният лост е на N» the instant «Напреднал» is chosen, and on two of three landscape profiles `elementFromPoint` at the gear cell's own centre answers that card. | **Yes** — measured on production by `tools/mobile/wave5-landscape-burial.mjs`. | Found **after** §I was written. It is what stops §I24's delivered control from delivering the tier. **No row.** |
+| **N5** | **The teach card is clipped at the right edge in both orientations** — «РАЗБРА[Х]» runs off. | **Reported from his handset; not yet reproduced here.** §NR1 proves there is no document-level horizontal overflow, so this is **card-box clipping, not page overflow** — a different defect from the one §NR1 retired. | **No row.** §NR1's negative was read as covering it, and it does not. |
+| **N6** | **In portrait the driving HUD is laid out at landscape proportions** — mirror labels cut at both edges, the 3D view a horizontal band with black above and below. | **Reported from his handset.** `isCompactViewport()` (`immersive.ts:58–66`) returns true for both orientations, so `compact` is not the discriminator; the arc's `ARC_RISE` clamp does reflow. **The letterboxing is unexplained and unmeasured.** | **No row**, and §K9 ("keep the rotate-nag or make portrait first-class") was never answered, so nothing owns it. |
+| **N7** | **§L7 — in portrait the ⚙ sheet cannot be closed.** «Рестарт на колата» and «Затвори контролите» are both occluded by the touch hint's «Разбрах». | Partially addressed by I16's rank rules, **not verified.** | No row. §I16 covers the hint-vs-overlay rank, not the hint-vs-sheet collision. |
+| **N8** | **§T2 — no right-click in the cockpit**, so from inside the cockpit a phone student can only ever step toward D, never back toward P. | **Yes** (`VitokCockpit.tsx` `onContextMenu`). | No row. |
+| **N9** | **§T3 — no hover, so cockpit controls are anonymous, and a stray tap on the road switches the engine off.** | **Yes.** | No row. §I13 captions the HUD arc, not the 3D cabin. |
+| **N10** | **§U7 — the open sheet keeps naming the step you already finished** (`openItem` is a frozen copy). | **Yes.** | No row. |
+| **N11** | **§M4 mute · §M5 «Известия тихо/нормално» absent from the compact menu.** | **Yes** — the menu key list has neither. **M5 is doc 86 L14's own complaint pointed at the one device with the least room for toasts.** | No row for either. |
+| **N12** | **§C7 — the first touch after any keyboard drive key is swallowed.** | **Yes.** `TouchControls.tsx:1025` `const visible = !hidden && !keyboardActive;` — and §I3's inert render does not save it, because inert means `pointer-events: none`, so the restoring touch still lands on the canvas. | **The one row the document scoped out on purpose** *("hybrid devices only — not his phone")*. Correctly deprioritised — **but it still wrecks any keyboard-assisted test run**, which has already cost two lanes their runs, and this wave's own instrumentation depends on it. |
+
+### O.4 · §K — what he has since ruled, and what still blocks work
+
+| # | question | status |
+|---|---|---|
+| **K1** | iPhone or Android, and what `tier=` prints | **PARTLY MOOT.** Both things that depended on it were resolved without it: §I6 shipped `touch-action`, which works on **both** engines and is what §I6 itself argued for; §I17 deleted the carve-out so **every** phone seeds `low`. **Still open for one thing only:** whether §C6/§I7 fires on his device at all. |
+| **K2** | Does the pedal come back, or is it dead for the session? | **MOOT.** §I1 + §I3 make the question academic, exactly as §I1 predicted — the pad now re-arms on the next `pointermove` without a lift-and-press. Worth one confirmation from his handset, not a blocker. |
+| **K3** | Should a motionless press mean "go"? | **✅ SETTLED — RULED ABSOLUTE.** *"up is forward, middle is stop, down is backwards."* **Implemented and holding in source** (§I25). Steering deliberately stays relative. |
+| **K4** | Keep the 8 GB-Android → `med` carve-out? | **✅ SETTLED** (already marked in §K). Both halves taken; production-measured §N2·B. |
+| **K5** | «Напреднал»: build a clutch, or gate the tier off on touch? | **✅ SETTLED — RULED: BUILD THE CLUTCH.** «СЪЕД» shipped (§I24). **But the ruling is not yet delivered**: §O.3 N4 buries the gear cell in landscape. |
+| **K6** | May the indicators move to the LEFT flank? | **✅ SETTLED — RULED YES.** Implemented: `ARC_STATIONS_LEFT = 2`, both indicators left, all three mirrors right (`TouchControls.tsx:444–466`), with the exam reasoning recorded on the constant. |
+| **K7** | Teach the ⚙ strip, or make the cockpit hotspots genuinely reachable? | **🔴 STILL BLOCKS.** It scopes §I11 (sheet clearance + compact redesign), §I12 (`tapBg`) and §I15 (reach table) — **three OPEN rows, and the seatbelt step he called "ultra hard" is the one waiting on the answer.** |
+| **K8** | May we spend ~0.9 % of the screen on words? | **SETTLED BY SHIPPING**, not by ruling — the captions are in (§I13). Needs his eyes, not his decision. |
+| **K9** | Portrait: keep the rotate-nag, or make portrait first-class? | **🔴 STILL BLOCKS**, and it is now urgent: **§O.3 N6 is his own portrait report** and nothing owns it while this is unanswered. |
+| **K10** | Ship Wave 1 onto the dirty branch, or wait? | **MOOT.** The tree is clean; everything is committed at `97afa9c`, pushed to `origin` **and** `vps`. |
+
+**Settled: K3 · K4 · K5 · K6 (his four rulings) + K8. Moot: K2 · K10, and K1 in all but one respect.
+Still blocking: K7 and K9 — and between them they own six of the fifteen OPEN rows.**
+
+### O.5 · The rule this section exists to install
+
+**A row is closed when it is measured on a production build, on the authenticated `/simulator`, on
+the six-profile ladder — with `hasCanvas === true` and a non-zero canvas rect asserted before any
+number is believed.** Five probes have now reported "0 overflow" from a page with no simulator on
+it. `/dev/drive-rig` calls `notFound()` in production and defaults to `medium` (§O.3 N2); a number
+taken there is not evidence about the product, and no wave may mark a row DONE from it again.
+
+---
