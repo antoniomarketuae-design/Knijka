@@ -332,7 +332,16 @@ async function measure(browser, device, storageState) {
       row.drawingBuffer = report.drawingBuffer;
       row.passes = report.rows.map((r) => ({
         key: r.key,
-        size: `${r.width ?? "?"}x${r.height ?? "?"}`,
+        // THIS COLUMN HAS PRINTED `?x?` FOR EVERY PASS THIS TOOL EVER MEASURED.
+        // `GpuPassRow` (PerfProbe.tsx) carries no `width`/`height` — nor a
+        // `defaultFb` — so `r.width ?? "?"` could only ever be "?", and the one
+        // column that says whether a backing store scales with the device pixel
+        // ratio was blank in every run. The dimensions were never missing: the
+        // key IS them, built `fb<id>@<w>x<h>`. Decimals are required, not
+        // defensive — a half-res AO target on an odd-width buffer is
+        // `fb8@196.5x426`, and an integer-only pattern drops exactly the rows
+        // that DO scale.
+        size: /@([\d.]+)x([\d.]+)$/.exec(r.key)?.slice(1, 3).join("x") ?? "?x?",
         defaultFb: r.defaultFb,
         drawsPerFrame: Number(r.drawsPerFrame?.toFixed?.(1) ?? r.drawsPerFrame),
         entriesPerFrame: Number(r.entriesPerFrame?.toFixed?.(2) ?? r.entriesPerFrame),
