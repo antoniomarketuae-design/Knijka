@@ -372,7 +372,21 @@ export function PreDriveTutorial({
     // collapse to 0 when there is not, so the card starts at the top and the
     // whole of it scrolls. Same look on a roomy screen, reachable on a small one.
     <div
-      className="fixed inset-0 z-50 flex overflow-y-auto bg-background/85 p-4 backdrop-blur-sm"
+      // §I20, SEVENTH SITE — AND ON A PHONE IT IS THE WORST ONE IN THE PRODUCT.
+      // §I20 listed four full-screen scrims and this file was not among them,
+      // because the row was written against `components/sim/` and this lives in
+      // `modules/sim/hud/`. It is `fixed inset-0` with a viewport-sized
+      // `backdrop-filter: blur(8px)` — and unlike the teach card, the quiz and
+      // the debrief, THE WORLD IS NOT PAUSED BEHIND IT. The pre-drive holds
+      // `driveLocked`, not `paused`, so §I19's `frameloop="demand"` does not
+      // apply: the canvas underneath is rendering at the panel's full rate,
+      // for as long as the student reads a thirteen-step procedure. That makes
+      // this the longest-lived blur-over-a-live-canvas the product has, on the
+      // exact surface he called "ultra hard to put BElts".
+      // Opaque for the reasons on OVERLAY_SCRIM_CLASS (lesson-ui/playArea.ts);
+      // not the shared constant, because this one is `fixed` rather than
+      // `absolute` and does not centre — only the paint is shared.
+      className="fixed inset-0 z-50 flex overflow-y-auto bg-background p-4"
       role="dialog"
       aria-modal="true"
       aria-label={`Стъпка ${stepNumber} от ${stepTotal}: ${spec.titleBg}`}

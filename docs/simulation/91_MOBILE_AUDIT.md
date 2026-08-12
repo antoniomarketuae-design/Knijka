@@ -1657,6 +1657,23 @@ Six of six, both orientations. Two things that table settles. (1) `backdrop-blur
 §D12d priced. (2) The old scrim was `bg-background/80`, i.e. **the canvas was not even occluded**, so
 the compositor had to read it, blur it and blend it. The opaque scrim removes the blur AND the read.
 
+**AND A SEVENTH SITE, FOUND BY GREPPING FOR THE MECHANISM RATHER THAN RE-READING THE LIST —
+and on a phone it is the worst one in the product.** `modules/sim/hud/PreDriveTutorial.tsx:375` is
+`fixed inset-0 … backdrop-blur-sm`, i.e. a viewport-sized blur over the canvas. §I20 did not name it
+because the row was written against `components/sim/` and this lives in `modules/sim/hud/`. **Unlike
+the teach card, the quiz and the debrief, the world is NOT paused behind it:** the pre-drive holds
+`driveLocked`, not `paused`, so §I19's `frameloop="demand"` does not apply and the canvas renders at
+the panel's full rate for as long as a student reads a thirteen-step procedure — the surface he
+called *"ultra hard to put BElts"*. It is now opaque.
+
+**ITS EVIDENCE IS WEAKER THAN THE REST OF THIS SECTION AND IS LABELLED AS SUCH.** Source, typecheck,
+the 509 tests of `modules/sim/hud` + `components/sim/lesson-ui`, and a clean production build — but
+**no /simulator census**, because two probe attempts could not open the tutorial on a compact profile
+(«Покажи ми как» was not found after opening the pre-drive sheet, on both the pre-fix and post-fix
+builds). **That is reported as a probe that did not reach its target, NOT as a claim that the
+tutorial is unreachable on a phone** — §I4(b) has just gated its auto-open off on compact and
+whether the manual opener is reachable there is now an OPEN QUESTION for the lane that owns §I4.
+
 **What is NOT claimed: a millisecond.** §G6 says why, and nothing here overrides it. What is claimed
 is that a viewport-sized `backdrop-filter` over a live WebGL canvas is no longer requested on any of
 the six profiles — and that this is a property of what the page asks for, like a draw call.
