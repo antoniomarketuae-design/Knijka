@@ -38,6 +38,23 @@
 // to equal an inset is unaffected, as it should be — this substitutes values,
 // it does not invent geometry.
 //
+// WHAT IS AND IS NOT IN REACH — 2026-08-12, written down because a fix was
+// deliberately shaped around it. The rewrite reaches CUSTOM PROPERTIES too:
+// `walkInline` scans `[style*="safe-area-inset"]` and `CSSStyleDeclaration`
+// enumerates `--custom` names, so a React inline style like
+// `["--sim-touch-floor"]: "calc(… + env(safe-area-inset-bottom,0px) + …)"`
+// IS substituted. Verified on the deployed product: it came back as
+// `… + 21px + …` on iPhone 16 landscape and `+ 34px` in portrait
+// (tools/mobile/wave6-edges.mjs, row I11, field `touchFloorWasEmulated`).
+//
+// What is NOT in reach is any inset a component computes in JAVASCRIPT — the
+// engine's own `env()` is 0 here, so such a number is 21–34 px short and the
+// harness cannot tell. That is the rule the sim layout now follows on purpose:
+// published lengths stay AUTHORED CSS. If a future fix has to compute an inset
+// in JS, it needs a new mechanism here first, or the next sweep reports green
+// on a band it mis-measured — which is how five sweeps came back green on a
+// screen the founder could see was broken.
+//
 // AND IT MUST BE ABLE TO FAIL. An emulation that silently rewrites nothing is
 // indistinguishable from a phone with no notch — which is the exact shape of
 // the defect it exists to close. So the install COUNTS what it rewrote and

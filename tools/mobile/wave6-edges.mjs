@@ -472,18 +472,30 @@ for (const device of devices) {
         for (let gx = 0; gx < 9; gx += 1) {
           const x = Math.round(((gx + 0.5) / 9) * innerWidth);
           const y = Math.round(((gy + 0.5) / 9) * innerHeight);
+          // THE WHOLE CHAIN, INTERSECTED — not the innermost non-`auto` value.
+          //
+          // The first version of this stopped at the first ancestor that was
+          // not `auto` and reported that. It is wrong in exactly the direction
+          // that matters here: `touch-action` is INTERSECTED down the ancestor
+          // chain, so a button with `touch-manipulation` inside a shell with
+          // `pan-y` permits pan-y and nothing else — while the naive walk
+          // reported `manipulation`, which does permit pinch, and over-counted
+          // 6–10 of 81 cells as zoomable on a screen where a real two-point CDP
+          // pinch measures 1 → 1. An instrument that over-reports a defect is
+          // no better than one that under-reports it.
           let el = document.elementFromPoint(x, y);
-          let effective = "auto";
+          const chain = [];
+          let pinchAllowed = true; // `auto` at the root permits it
           while (el && el !== document.documentElement) {
             const ta = getComputedStyle(el).touchAction;
-            if (ta && ta !== "auto") { effective = ta; break; }
+            chain.push(ta);
+            // Only `auto`, `manipulation` and an explicit `pinch-zoom` keep it.
+            if (!(ta === "auto" || ta === "manipulation" || /pinch-zoom/.test(ta))) pinchAllowed = false;
             el = el.parentElement;
           }
-          // Only `none`, `pan-x`, `pan-y` and combinations WITHOUT `pinch-zoom`
-          // suppress the gesture. `manipulation` kills double-tap, not pinch.
-          const permitsPinch = effective === "auto" || effective === "manipulation" || /pinch-zoom/.test(effective);
-          if (permitsPinch) zoomable += 1;
-          cells.push(effective);
+          const effective = chain.length === 0 ? "auto" : chain.join(" ∩ ");
+          if (pinchAllowed) zoomable += 1;
+          cells.push(pinchAllowed ? `PERMITS: ${effective}` : "blocked");
         }
       }
       return { zoomablePermilleOfGrid: Math.round((zoomable / 81) * 1000), zoomableCells: zoomable, of: 81, distinct: [...new Set(cells)] };
