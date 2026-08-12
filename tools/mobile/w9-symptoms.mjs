@@ -725,12 +725,34 @@ async function sectionNotify(page, cdp, device, rec) {
   //    screenshot. So: hit-test EVERY control at its own centre, with the card
   //    up, and name what answers instead.
   out.buried = await page.evaluate(() => {
+    // ── THE INSTRUMENT DEFECT THIS FUNCTION SHIPPED WITH, FIXED IN PLACE ────
+    // The first version tested `getComputedStyle(el).opacity`, which is the
+    // element's OWN opacity and says nothing about whether a student can see
+    // it. It reported „2 of 11 controls do NOT answer at their own centre" on
+    // 6/6 profiles — the steering pad and the throttle pad, answered by the
+    // canvas — and that read exactly like „nothing happens". It was false.
+    // Measured down the ancestor chain: with a card up, `[data-hud=
+    // touch-controls]` is `opacity: 0` AND `pointer-events: none`, so both pads
+    // are fully invisible and deliberately inert (TouchControls' „ANY HIDE LETS
+    // GO OF EVERYTHING" effect). A control nobody can see is not a buried
+    // control; publishing it as one would have invented a defect.
+    const effectiveOpacity = (el) => {
+      let o = 1;
+      let n = el;
+      while (n && n !== document.documentElement) {
+        o *= Number(getComputedStyle(n).opacity);
+        if (o < 0.05) return 0;
+        n = n.parentElement;
+      }
+      return o;
+    };
     const rows = [];
     for (const el of document.querySelectorAll("button,[role=slider],[role=button],[role=radio]")) {
       const r = el.getBoundingClientRect();
       if (r.width < 20 || r.height < 20) continue;
       const cs = getComputedStyle(el);
-      if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) < 0.05) continue;
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      if (effectiveOpacity(el) < 0.05) continue;
       const cx = Math.round(r.x + r.width / 2);
       const cy = Math.round(r.y + r.height / 2);
       if (cx < 0 || cy < 0 || cx > innerWidth || cy > innerHeight) {
