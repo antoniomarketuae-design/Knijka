@@ -82,7 +82,7 @@
  * `instrumentsForBan` is that one rule, written once.
  */
 
-import { N38_BASIS, N38_OPASNA_CASES, N38_OPASNA_HEADER, N38_OSNOVNA_DEF, N38_PASS_RULE, N38_VTOROSTEPENNA_DEF, type N38OpasnaCase } from "./n38";
+import { N38_BASIS, N38_OPASNA_CASES, N38_OPASNA_HEADER, N38_OSNOVNA_DEF, N38_PASS_RULE, N38_TERMINATION_CITATION, N38_TERMINATION_RULE, N38_UNIT_REF, N38_VTOROSTEPENNA_DEF, type N38OpasnaCase } from "./n38";
 import { VIOLATIONS } from "./catalog";
 import type { SeverityClass, ViolationCode, ViolationPoints } from "./types";
 
@@ -187,6 +187,37 @@ export interface LadderTier {
 }
 
 /**
+ * A penalty that EXISTS in the act and does not fire on its own — the act
+ * attaches a condition to it, and that condition is a fact about the drive
+ * rather than about the manoeuvre.
+ *
+ * Three articles in this file are built this way and between them they cover
+ * most of the driving faults a учебен час produces:
+ *
+ *   ЗДвП чл. 179, ал. 2      — 300 лв., but only „причини пътнотранспортно
+ *                              произшествие… ако деянието не съставлява
+ *                              престъпление"
+ *   ЗДвП чл. 179, ал. 1, т. 5 — 200 лв., but only „ако от това е създадена
+ *                              непосредствена опасност за движението"
+ *   ЗДвП чл. 180, ал. 1, т. 1 — 100 лв., but only „когато в резултат на
+ *                              нарушението е създадена непосредствена опасност
+ *                              за движението"
+ *
+ * The simulator establishes none of those three facts at the moment it marks
+ * the fault — if it had, the event would be a COLLISION or one of the codes
+ * that grades an established conflict. So the figure is shown WITH ITS
+ * CONDITION ATTACHED, in the act's own words, and never as the price of what
+ * the student just did. „300 лв." printed bare under a following-distance
+ * fault is a lie of exactly the kind this whole file exists to stop.
+ */
+export interface ConditionalPenalty {
+  /** The condition, cut from the same sentence as the figure. */
+  conditionBg: string;
+  fine: FineFigure;
+  controlPoints: ControlPointsFigure;
+}
+
+/**
  * What the street does about it — kept in a shape that CANNOT be added to the
  * exam mark: different units, different issuer, different day.
  */
@@ -195,8 +226,32 @@ export type RoadConsequence =
       kind: "single";
       /** One line naming the offence as the penalty article frames it. */
       offenceBg: string;
+      /**
+       * The точка's OWN verbatim words. `fine.source` quotes the alinea's
+       * header, because that is the sentence carrying „глоба 100 лв. водач,
+       * който:" — the offences themselves live in the numbered points below it
+       * and no single sentence holds both. Without this field the card can cite
+       * the money and only PARAPHRASE the conduct, which is the half a student
+       * needs to recognise himself in.
+       */
+      offenceQuote?: LawQuote;
+      /**
+       * The RULE broken, as opposed to the penalty for breaking it. Two
+       * different articles, and a student who is shown only the second learns
+       * the price without learning the duty.
+       */
+      duties?: readonly LawQuote[];
       fine: FineFigure;
       controlPoints: ControlPointsFigure;
+      /**
+       * The dearer article the same act climbs to once harm follows. Empty for
+       * most rows; present where the ladder is the teaching (a close pass of a
+       * cyclist is 50 лв. и 10 контролни точки until the cyclist swerves, and
+       * then it is a different article).
+       */
+      escalation?: readonly ConditionalPenalty[];
+      /** A caveat the row cannot be read correctly without. */
+      noteBg?: string;
     }
   | {
       kind: "ladder";
@@ -230,6 +285,78 @@ export type RoadConsequence =
       kind: "authored";
       textBg: string;
       refsBg: readonly string[];
+    }
+  | {
+      /**
+       * A ROAD RULE IS BROKEN AND THE MONEY IS GATED — the commonest honest
+       * answer in the second half of the catalogue, and the one that had no
+       * shape until now.
+       *
+       * Following too close in the rain breaks ЗДвП чл. 23, ал. 1. The act
+       * charges nothing for it: чл. 179, ал. 2 wants a ПТП first. Both halves
+       * are true and a card that prints only one of them misleads — the first
+       * half alone reads as „free", the second alone reads as „300 лв.". So the
+       * shape carries the duty, the plain headline, and every gated penalty
+       * with the condition still attached to it.
+       */
+      kind: "conditional";
+      offenceBg: string;
+      /**
+       * The duties the drive actually broke — verbatim. A LIST because two rows
+       * need two: fog needs both the lights duty that IS binding and the fog-
+       * lamp article that is only a permission, or the card reads as if чл. 74
+       * required the lamps.
+       */
+      duties: readonly LawQuote[];
+      /** One sentence, plainly: what this costs today, on the street. */
+      headlineBg: string;
+      /** The penalties that exist, each still holding its own condition. */
+      branches: readonly ConditionalPenalty[];
+      /**
+       * THE LICENCE ANSWER FOR THE UNGATED CASE — the one figure on the card
+       * that is not gated on anything, and the reason this field was added to a
+       * shape that already carries `controlPoints` inside every branch.
+       *
+       * „Колко контролни точки ми падат за това?" has an answer even when the
+       * глоба does not: чл. 6, ал. 1 of Наредба № Iз-2539 is an EXHAUSTIVE list
+       * of offences, so an offence absent from it costs zero — today, with no
+       * ПТП and no непосредствена опасност required to make that true. Leaving
+       * it to the branches would print the licence answer only alongside the
+       * condition that gates the money, which reads as „zero, so long as
+       * nothing happens" and is the opposite of what the list says.
+       *
+       * Omitted where the branches genuinely are the whole answer.
+       */
+      controlPoints?: ControlPointsFigure;
+    }
+  | {
+      /**
+       * IT COSTS YOU ON THE EXAM AND NOTHING ON THE STREET — and that is a
+       * finding, not a gap.
+       *
+       * A stalled engine, three seconds of hesitation on green, stopping a
+       * metre too close in a queue, the pre-drive ritual in the wrong order:
+       * these are marked by Наредба № 38 because an examiner is watching, and
+       * by nobody else, because no article of ЗДвП requires a driver to move
+       * off promptly, to hold a particular gap at a standstill, or to adjust
+       * the seat before the mirrors. The instinct is to reach for the nearest
+       * general duty and let the student assume a fine hides behind it. Saying
+       * it plainly is both truer and more useful: it tells him which of his
+       * mistakes are habits to fix and which are offences to fear.
+       *
+       * `duties` may still name a general ЗДвП article the fault brushes
+       * against (чл. 20, ал. 1 — continuous control of the vehicle). Naming it
+       * is not charging it, and `whyBg` says so.
+       */
+      kind: "exam-only";
+      /** „Струва точки на изпита и нищо на пътя." Plain, no figure. */
+      headlineBg: string;
+      /** Наредба № 38's own clause — the exam half, cited as the brief asks. */
+      examSource: LawQuote;
+      /** The general duties it touches. Empty when it touches none. */
+      duties: readonly LawQuote[];
+      /** WHY there is no offence — the searched-and-found-nothing sentence. */
+      whyBg: string;
     }
   | {
       kind: "unknown";
@@ -328,15 +455,24 @@ export function instrumentLabelBg(instruments: readonly EnforcementInstrument[])
  * „the words happen not to have changed" is not a reason to send a student to a
  * repealed edition, and it stops being true the day the next ЗИД lands.
  *
- * THE SECOND IS THAT THE SNAPSHOT IS DAMAGED. Its чл. 6, т. 3 is a sentence
+ * THE SECOND WAS THAT THE SNAPSHOT WAS DAMAGED. Its чл. 6, т. 3 was a sentence
  * broken in half („…откаже да му" ⟨footer⟩ „бъде извършена проверка…") by
  * „Източник: Правно-информационни системи „Сиела" / 24/01/2025 г." — a PDF page
- * footer the extraction swallowed — and that footer sits inside 16 of its 40
- * units, presented as statute text. Its чл. 2, ал. 6 is still the repealed
- * restoration rule. So the citation behind „0 контролни точки" was pointing at
- * a copy of the exhaustive list with a vendor watermark in the middle of it.
- * The FINDING is unchanged under the consolidation; the evidence link was the
- * broken part, and a claim is only as checkable as the copy it points at.
+ * footer the extraction swallowed — and that footer sat inside 16 of its 40
+ * units, presented as statute text. So the citation behind „0 контролни точки"
+ * was pointing at a copy of the exhaustive list with a vendor watermark in the
+ * middle of it. The FINDING was unchanged under the consolidation; the evidence
+ * link was the broken part, and a claim is only as checkable as the copy it
+ * points at.
+ *
+ * That footer is GONE as of 2026-08-09 — removed in the extraction
+ * (`content/law/tools/page-furniture.mjs`), with the source PDFs re-fetched and
+ * their sha256 re-checked against `sources.json`, and т. 3 rejoined into one
+ * sentence that matches the consolidation word for word. IT CHANGES NOTHING
+ * HERE. The move off the snapshot was never only about the footer: чл. 2, ал. 6
+ * of it is still the repealed restoration rule, and its figures still predate
+ * two 2026 ЗИД acts. A repaired photograph of a superseded text is still a
+ * superseded text.
  *
  * A bare „Наредба № Iз-2539" now resolves to the consolidation
  * (`lib/content/law/corpus.ts ACT_ALIASES`) and the snapshot is reachable only
@@ -434,6 +570,22 @@ export interface ExamMark {
   passRuleBg: string;
   /** „Наредба № 38 приложение № 5, т. 11". */
   passRuleCitationBg: string;
+  /**
+   * Does this fault END the practical exam, as distinct from failing it?
+   *
+   * Two different provisions, and the product used to print only the louder
+   * one. The MARK comes from приложение № 5, т. 10; the ENDING comes from
+   * чл. 48, ал. 3, which reaches повторна намеса на комисията and допускане на
+   * ПТП and nothing else. So an опасна грешка that is neither — не спре при Б2,
+   * червен сигнал — costs 10, and 10 > 9 makes the exam НЕИЗДЪРЖАН by т. 11,
+   * but the drive is not stopped. Derived from the catalogue's own
+   * `terminateSession` flag (today: COLLISION alone), never re-declared here.
+   */
+  terminatesExam: boolean;
+  /** чл. 48, ал. 3 verbatim — null when this fault does not end the exam. */
+  terminationQuoteBg: string | null;
+  /** „Наредба № 38, чл. 48, ал. 3" — null when it does not end the exam. */
+  terminationCitationBg: string | null;
 }
 
 /**
@@ -448,6 +600,7 @@ export function examMarkFor(code: ViolationCode): ExamMark {
   const spec = VIOLATIONS[code];
   const basis = N38_BASIS[code];
   const opasnaCase = basis.opasnaCase ?? null;
+  const terminatesExam = spec.terminateSession === true;
   return {
     points: spec.points,
     severityClass: spec.severityClass,
@@ -459,6 +612,9 @@ export function examMarkFor(code: ViolationCode): ExamMark {
     caseQuoteBg: opasnaCase === null ? null : N38_OPASNA_CASES[opasnaCase],
     passRuleBg: N38_PASS_RULE,
     passRuleCitationBg: "Наредба № 38 приложение № 5, т. 11",
+    terminatesExam,
+    terminationQuoteBg: terminatesExam ? N38_TERMINATION_RULE : null,
+    terminationCitationBg: terminatesExam ? N38_TERMINATION_CITATION : null,
   };
 }
 
@@ -1034,14 +1190,890 @@ const SPEEDING_LADDER_FOOTNOTE_BG =
   formatKmh(deviceToleranceKmh(140).kmh) +
   " km/h. Това е точност на уреда, не позволени километри.";
 
+// ---------------------------------------------------------------------------
+// THE SENTENCES THE TWENTY COMMONEST FAULTS SHARE — cut once, quoted everywhere
+// ---------------------------------------------------------------------------
+
+/**
+ * THE SHAPE OF ЧЛ. 183, AND WHY EVERY ROW UNDER IT NEEDS TWO QUOTES.
+ *
+ * The article prices by ALINEA and describes by ТОЧКА. „Наказва се с глоба 100
+ * лв. водач, който:" is the whole of the money and none of the conduct;
+ * „навлиза… в забранената посока на еднопосочен път;" is the whole of the
+ * conduct and none of the money. A row that cites only the first has PROVED an
+ * amount and merely ASSERTED which offence earns it — and that assertion is the
+ * one thing worth checking, because it is where a wrong mapping hides.
+ *
+ * The founder's own measurement is what makes this structural rather than
+ * fussy: чл. 182, ал. 1, т. 3 and ал. 2, т. 3 are word-identical, so a quote can
+ * never say by itself which alinea it came from. Only the citation can, and a
+ * citation is prose until something checks it. Hence `fine.source` (the header,
+ * carrying the лв.) and `offenceQuote` (the точка, carrying the conduct) — both
+ * re-cut from the act, both failing the suite on a single changed word.
+ */
+const F183 = (alineaBg: string, pointBg: string | null, amountBgn: number): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 183",
+  citationBg: `ЗДвП чл. 183, ${alineaBg}${pointBg === null ? "" : `, ${pointBg}`}`,
+  quoteBg: `Наказва се с глоба ${amountBgn} лв. водач, който:`,
+});
+
+/** A точка of чл. 183 — the conduct half, verbatim. */
+const T183 = (alineaBg: string, pointBg: string, quoteBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 183",
+  citationBg: `ЗДвП чл. 183, ${alineaBg}, ${pointBg}`,
+  quoteBg,
+});
+
+/** ЗДвП чл. 179, ал. 1 — the 200 лв. header, шест точки under it. */
+const F179_1 = (pointBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 179",
+  citationBg: `ЗДвП чл. 179, ал. 1, ${pointBg}`,
+  quoteBg: "Наказва се с глоба в размер 200 лв.:",
+});
+
+const T179_1 = (pointBg: string, quoteBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 179",
+  citationBg: `ЗДвП чл. 179, ал. 1, ${pointBg}`,
+  quoteBg,
+});
+
+/**
+ * ЗДвП чл. 179, ал. 2 — the accident article, and the only sentence in this
+ * file that carries its condition, its offence and its figure together. Note
+ * the last clause: „ако деянието не съставлява престъпление". With an injured
+ * person the case leaves ЗДвП entirely and becomes a matter for the НК.
+ */
+const CRASH_179_2: LawQuote = {
+  actFile: "zdvp.json",
+  unitRef: "чл. 179",
+  citationBg: "ЗДвП чл. 179, ал. 2",
+  quoteBg:
+    "Който поради движение с несъобразена скорост, неспазване на дистанция, движение на заден ход или нарушение по ал. 1, както и при нарушение на чл. 20, ал. 1 причини пътнотранспортно произшествие, се наказва с глоба в размер 300 лв., ако деянието не съставлява престъпление.",
+};
+
+/** ЗДвП чл. 180, ал. 1 — the 100 лв. header. */
+const F180_1 = (pointBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 180",
+  citationBg: `ЗДвП чл. 180, ал. 1, ${pointBg}`,
+  quoteBg: "Наказва се с глоба 100 лв. водач, който:",
+});
+
+const T180_1 = (pointBg: string, quoteBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef: "чл. 180",
+  citationBg: `ЗДвП чл. 180, ал. 1, ${pointBg}`,
+  quoteBg,
+});
+
+/** A duty — the rule broken, as opposed to the price of breaking it. */
+const DUTY = (unitRef: string, citationBg: string, quoteBg: string): LawQuote => ({
+  actFile: "zdvp.json",
+  unitRef,
+  citationBg,
+  quoteBg,
+});
+
+/** A точка of the exhaustive контролни точки list, with its figure inside it. */
+const CP = (pointBg: string, points: number, quoteBg: string, noteBg: string): ControlPointsFigure => ({
+  status: "grounded",
+  points,
+  source: {
+    actFile: IZ2539,
+    unitRef: "чл. 6",
+    citationBg: `${IZ2539_BG}, чл. 6, ал. 1, ${pointBg}`,
+    quoteBg,
+  },
+  noteBg,
+});
+
+/**
+ * THE COROBORATION FROM THE OTHER SIDE OF THE 2025 CHANGE.
+ *
+ * ДВ, бр. 64 от 2025 г. struck „или отнемане на контролни точки" out of ЗДвП
+ * чл. 186, ал. 1 and чл. 189, ал. 4; ДВ, бр. 22 от 2026 г. rewrote the наредба
+ * to match, and the consolidated чл. 2, ал. 6 now lists all three instruments
+ * side by side. Both halves of the amendment say the same thing and the
+ * textbooks still teach the old rule, so the card carries the наредба's own
+ * sentence: точки fall by НП, by фиш AND by електронен фиш. What the instrument
+ * still decides is whether a BAN is possible.
+ */
+const CP_TAKEN_BY_ANY_INSTRUMENT: LawQuote = {
+  actFile: IZ2539,
+  unitRef: "чл. 2",
+  citationBg: `${IZ2539_BG}, чл. 2, ал. 6`,
+  quoteBg:
+    "От броя на контролните точки за отчет на извършените нарушения се отнемат точки въз основа на влезли в сила: 1. наказателно постановление, включително и в случаите по чл. 79б от Закона за административните нарушения и наказания; 2. фиш по чл. 186, ал. 1 от ЗДвП; 3. електронен фиш по чл. 189, ал. 4 от ЗДвП, включително и в случаите по чл. 189, ал. 10, т. 4 от ЗДвП.",
+};
+
+/**
+ * The one exemption from the whole контролни точки system, and the one row
+ * below that punches through it. A clean-record driver keeps his points —
+ * EXCEPT where the offence carries лишаване от право, which is precisely the
+ * emergency-lane row.
+ */
+const CP_CLEAN_RECORD_EXEMPTION: LawQuote = {
+  actFile: IZ2539,
+  unitRef: "чл. 6",
+  citationBg: `${IZ2539_BG}, чл. 6, ал. 2`,
+  quoteBg:
+    'На водач със статут "Водач на МПС без наказания" не се отнемат контролни точки при налагане на наказание за нарушение, за което е предвидено отнемане на контролни точки, с изключение на нарушенията, за които е предвидено налагане на наказание лишаване от право да се управлява моторно превозно средство.',
+};
+
+/**
+ * ЗДвП чл. 185 — the residual clause. NAMED in prose below and deliberately
+ * NOT attached to any row as a figure.
+ *
+ * Applying it to a given fault means asserting that no other article in the act
+ * prices that fault. That is a claim about a whole statute, and this file's
+ * standing rule is that a negative is only as strong as the search behind it.
+ * The searches are recorded at the rows that needed them (регулировчик: 13 hits
+ * in ЗДвП, none of them a penalty on the driver side; дистанция: one hit in the
+ * penalty chapter, чл. 179, ал. 2). What the rows do NOT do is turn either
+ * search into a лв. figure, because „I could not find another" and „there is no
+ * other" are different sentences and only one of them is a retrieval.
+ */
+
+// The точки of the exhaustive list this wave newly reaches. Each is quoted with
+// its own figure inside it, so the number and the sentence cannot drift apart.
+const CP_T6_EMERGENCY_LANE = CP(
+  "т. 6",
+  10,
+  "за движение в лентата за принудително спиране по автомагистрала (чл. 178ж, ал. 1, предл. 1 от ЗДвП) - 10 контролни точки;",
+  "Отнемат се от книжката. Тук изключението по чл. 6, ал. 2 не важи: нарушението носи лишаване от право, а точно такива нарушения са изключени от защитата на статута „Водач на МПС без наказания“.",
+);
+
+const CP_T8_EMERGENCY_LANE_REPEAT = CP(
+  "т. 8",
+  20,
+  "когато нарушението по т. 6 и 7 е извършено повторно (чл. 178ж, ал. 2 от ЗДвП) - 20 контролни точки;",
+  "Повторното нарушение взема двойно повече точки от първото — и то от книжка, която при първоначално издаване дори не е пълна.",
+);
+
+const CP_T9_OVERTAKE_DANGER = CP(
+  "т. 9",
+  13,
+  "за неправилно изпреварване, ако от това е създадена непосредствена опасност за движението (чл. 179, ал. 1, т. 5, предл. 5 от ЗДвП) - 13 контролни точки;",
+  "Списъкът стига до чл. 179, ал. 1, т. 5 само в две от предложенията ѝ — изпреварването тук и неспирането на знак „Спри!“ в т. 15. Създадената опасност вдига точките над тези за самото неправилно изпреварване.",
+);
+
+const CP_T11_RAIL = CP(
+  "т. 11",
+  10,
+  "за нарушаване на правилата за преминаване през железопътен прелез (чл. 180, ал. 1, т. 3, предл. 2 от ЗДвП) - 10 контролни точки;",
+  "Отнемат се от книжката. Предложение 2 на чл. 180, ал. 1, т. 3 е точно прелезът — предложение 1 е обособеното платно на релсовото превозно средство.",
+);
+
+/**
+ * т. 16 — 10 контролни точки for an overtake that endangered NOBODY, and the
+ * single most surprising figure in this wave.
+ *
+ * A 50 лв. фиш beside a tenth of the whole licence is not an error: the two
+ * systems are set by different acts and neither reads the other. It is also the
+ * one точка of the list whose ЗДвП address CHANGED under our feet — ДВ, бр. 22
+ * от 2026 г. replaced „чл. 183, ал. 3, т. 6" with „чл. 183, ал. 2, т. 6",
+ * because ДВ, бр. 64 от 2025 г. had repealed ал. 3 and renumbered the offence
+ * into ал. 2. The 28.01.2025 snapshot in this repo still points at the repealed
+ * alinea; the consolidation is what is quoted, and the marker inside the quoted
+ * sentence is the act saying so itself.
+ */
+const CP_T16_OVERTAKE_NO_DANGER = CP(
+  "т. 16",
+  10,
+  "за неправилно изпреварване, без да се създава опасност за движението (чл. 183, ал. 2, т. 6 от ЗДвП) - 10 контролни точки;",
+  "Изненадата в целия списък: глобата е сред най-ниските, а книжката губи повече от една трета от точките, с които тръгва нов водач. Препратката сочи чл. 183, ал. 2, т. 6 след изменението от 2026 г. — по-старите разпечатки още сочат отменената ал. 3.",
+);
+
+const CP_T18_SEATBELT = CP(
+  "т. 18",
+  10,
+  "за неизпълние на задължението за използване на предпазен колан или носене на каска (чл. 183, ал. 4, т. 7, предл. 1 от ЗДвП) - 10 контролни точки;",
+  "Предложение 1 е собственият колан на водача; същата т. 7 наказва и возенето на непристегнат пътник. (Правописът „неизпълние“ е на самата наредба и е оставен непокътнат.)",
+);
+
+const CP_T20_SIGNAL = CP(
+  "т. 20",
+  10,
+  "за преминаване при сигнал на светофара, който не разрешава преминаването (чл. 183, ал. 5, т. 1 от ЗДвП) - 10 контролни точки;",
+  "Отнемат се от книжката, отделно от глобата и отделно от оценката на урока.",
+);
+
+const CP_T22_SIGNAL_REPEAT = CP(
+  "т. 22",
+  13,
+  "когато нарушението по т. 20 или 21 е извършено повторно (чл. 183, ал. 6 от ЗДвП) - 13 контролни точки.",
+  "При повторност точките растат заедно с глобата, а лишаването от право затваря пътя на фиша.",
+);
+
+/**
+ * THE INSTRUMENT SENTENCE FOR THE REPEAT ROWS. Both чл. 183, ал. 6 and чл. 178ж
+ * carry лишаване, so `instrumentsForBan` forecloses фиш and електронен фиш on
+ * them automatically — the ban field is the only input, written once.
+ */
+const BAN_ONE_MONTH = "лишаване от право да управлява моторно превозно средство за срок един месец";
+const BAN_THREE_MONTHS = "лишаване от право да управлява моторно превозно средство за срок от три месеца";
+const BAN_SIX_MONTHS = "лишаване от право да управлява моторно превозно средство за срок от 6 месеца";
+
+/** чл. 183, ал. 6 — повторно преминаване при забраняващ сигнал. */
+const REPEAT_SIGNAL: LawQuote = {
+  actFile: "zdvp.json",
+  unitRef: "чл. 183",
+  citationBg: "ЗДвП чл. 183, ал. 6",
+  quoteBg:
+    "Когато нарушението по ал. 5, т. 1 или 2 е повторно, водачът се наказва с глоба в размер 300 лв. и лишаване от право да управлява моторно превозно средство за срок един месец.",
+};
+
+/** The repeat row, written once and shared by the two signal codes. */
+const SIGNAL_REPEAT_CASE: ConditionalPenalty = {
+  conditionBg: "когато нарушението по ал. 5, т. 1 или 2 е повторно",
+  fine: fine(300, BAN_ONE_MONTH, REPEAT_SIGNAL),
+  controlPoints: CP_T22_SIGNAL_REPEAT,
+};
+
+/**
+ * WHICH SIGNALS „НЕ РАЗРЕШАВАТ ПРЕМИНАВАНЕТО" — the premise under the amber and
+ * the red-plus-amber rows, and the one thing on either card this repo cannot
+ * check.
+ *
+ * ЗДвП чл. 183, ал. 5, т. 1 prices „преминава при сигнал на светофара, който не
+ * разрешава преминаването" and never says which signals those are. ЗДвП чл. 12
+ * gets as far as naming the three colours. The meanings live in ППЗДвП, an act
+ * `content/law/acts` holds NOT ONE BYTE of (index-only, sha256 null). So the
+ * article is named and the number is shown, and the sentence that says amber is
+ * such a signal is named WITHOUT a number, which is the house rule for an act
+ * we cannot open. The exam half is unaffected: Наредба № 38 marks the fault on
+ * its own terms.
+ */
+const SIGNAL_MEANING_CAVEAT_BG =
+  "Кои сигнали „не разрешават преминаването“ се определя от ППЗДвП — правилник, който този продукт не съдържа и затова не цитира с номер. ЗДвП чл. 12 стига дотам да изброи трите цвята. Глобата по-горе е за преминаване при забраняващ сигнал; че жълтото е такъв сигнал, го казва правилникът, не законът.";
+
+/**
+ * THE ONE RULE ABOUT НЕПОСРЕДСТВЕНА ОПАСНОСТ, WRITTEN ONCE.
+ *
+ * Six rows below climb to чл. 179, ал. 1, т. 5 or чл. 180, ал. 1, т. 1 „ако от
+ * това е създадена непосредствена опасност". The rule engine does not establish
+ * that fact — if it had, the event would have been a COLLISION — so the heavier
+ * row is shown as a CONDITION and never as the price of the drive just marked.
+ */
+const DANGER_CONDITION_BG = "ако от нарушението е създадена непосредствена опасност за движението";
+const CRASH_CONDITION_BG = "ако от нарушението настъпи пътнотранспортно произшествие";
+
+/** чл. 179, ал. 1, т. 5 — the aggravated row six of the twenty share. */
+const DANGER_179_1_5 = (noteBg: string): ConditionalPenalty => ({
+  conditionBg: DANGER_CONDITION_BG,
+  fine: fine(200, null, F179_1("т. 5")),
+  controlPoints: notListed(noteBg),
+});
+
+/** The same row where the list DOES reach it — an overtake. */
+const DANGER_179_1_5_OVERTAKE: ConditionalPenalty = {
+  conditionBg: DANGER_CONDITION_BG,
+  fine: fine(200, null, F179_1("т. 5")),
+  controlPoints: CP_T9_OVERTAKE_DANGER,
+};
+
+/** чл. 179, ал. 2 — the crash row. Never in the exhaustive list. */
+const CRASH_CASE: ConditionalPenalty = {
+  conditionBg: CRASH_CONDITION_BG,
+  fine: fine(300, null, CRASH_179_2),
+  controlPoints: notListed(
+    "Самото причиняване на произшествие по чл. 179, ал. 2 не е сред нарушенията в чл. 6, ал. 1 — точки падат за нарушението, довело до него, ако то е в списъка.",
+  ),
+};
+
+// ---------------------------------------------------------------------------
+// THE MANOEUVRE AND JUDGEMENT ROWS — where „nothing" is the retrieved answer
+// ---------------------------------------------------------------------------
+
+/**
+ * TWENTY-EIGHT CODES THAT ARE NOT LIKE THE ONES ABOVE, AND THE DIFFERENCE IS
+ * THE WHOLE WORK.
+ *
+ * The rows this file started with are road offences with a price tag: run a
+ * red, miss a pedestrian crossing, drive 30 over. Most of the codes in THIS
+ * block are not. A stalled engine, three seconds of hesitation on green, the
+ * pre-drive checklist in the wrong order — Наредба № 38 marks them because an
+ * examiner is watching, and no article of ЗДвП touches them at all, because no
+ * such article exists.
+ *
+ * THE TEMPTATION HERE IS TO FILL THE COLUMN. Every row wants a number: the
+ * card looks unfinished without one, and there is always some general duty
+ * loose enough to hang a fine on. That is exactly how „50 метра" for railway
+ * crossings shipped marked approved. So the rule for this block is the
+ * founder's — retrieve first, and where the retrieval says nothing, SAY
+ * NOTHING, out loud, as a finding, with the exam half cited so the student
+ * still learns what the mistake costs him. Seven rows below say precisely
+ * „това ти струва точки на изпита и нищо на пътя", and that is a complete
+ * answer, not an unfinished one.
+ *
+ * WHAT THE RETRIEVAL FOUND FOR THE TWO ROWS THAT LOOK LIKE THEY MUST CARRY A
+ * FINE, since the brief flagged both as the place where a guess would be most
+ * tempting:
+ *
+ *   HIGH_BEAM_NOT_DIPPED breaks a real, explicit, named ban — ЗДвП чл. 70,
+ *   ал. 2, т. 3 forbids long beams behind another vehicle in so many words.
+ *
+ *   FOG_LIGHTS_OFF_IN_FOG breaks NO ban at all. чл. 74, ал. 1 is a PERMISSION
+ *   with a limit („може да се използват само при значително намалена
+ *   видимост") and never a duty. Nothing in ЗДвП requires front fog lamps, so
+ *   a fine sold under чл. 74 would be invented. What IS breakable is the other
+ *   thing: driving in reduced visibility with no lights at all, чл. 70, ал. 1.
+ *
+ * Both then land on the same gate — чл. 180, ал. 1, т. 1 prices light-rule
+ * breaches at 100 лв. only „когато в резултат на нарушението е създадена
+ * непосредствена опасност за движението" — so both are `conditional` and the
+ * figure never leaves its condition.
+ *
+ * AND ONE ROW THAT IS NOT A JUDGEMENT AT ALL. VULNERABLE_PASS_TOO_CLOSE has
+ * real statutory weight and it is not in the money: чл. 183, ал. 2, т. 6 is
+ * 50 лв., and Наредба № Iз-2539 чл. 6, ал. 1, т. 16 takes TEN контролни точки
+ * for the same act — more than a third of the 26 a new licence starts with.
+ * The catalogue's authored sentence for this code quoted the 50 лв. and stopped
+ * there, which understates the real consequence by an order of magnitude.
+ *
+ * ЧЛ. 185 IS NAMED AND NEVER PRICED, following the ruling written above this
+ * block: attaching the residual clause to a row asserts that no other article
+ * in the act prices that fault, and „I could not find another" is not a
+ * retrieval. Three rows here would otherwise have taken a 50 лв. figure from
+ * it. They name the clause in prose, with no number, and stop.
+ */
+
+/**
+ * THE CANONICAL BLANK, hoisted out of `UNKNOWN_ROAD` so a row with a NAMED
+ * reason can open with the same words. Two surfaces assert on its first clause
+ * (`hud/__tests__/fault-card.test.tsx`, `lessons/__tests__/debrief.test.ts`),
+ * and beyond the tests an honest blank should read the same wherever it
+ * appears — the extra sentence says which act is missing, not a different
+ * apology.
+ */
+const UNKNOWN_ROAD_RULE_BG =
+  "Санкцията на пътя за това нарушение още не е извлечена дословно от закона, затова тук няма число — по-добре празно, отколкото сгрешено. Общото правило: глобата се налага с фиш, когато за нарушението не е предвидено лишаване от право (ЗДвП чл. 186, ал. 1); ако е установено и заснето с автоматизирано техническо средство — с електронен фиш (ЗДвП чл. 189, ал. 4); а контролни точки се отнемат само за нарушенията, изброени в чл. 6, ал. 1 от Наредба № Iз-2539.";
+
+// --- the duties these rows break, verbatim ---------------------------------
+
+const D_MARKING_BINDS = DUTY(
+  "чл. 6",
+  "ЗДвП чл. 6, т. 1",
+  "съобразяват своето поведение със сигналите на длъжностните лица, упълномощени да регулират или да контролират движението по пътищата, както и със светлинните сигнали, с пътните знаци и с пътната маркировка;",
+);
+const D_KEEP_RIGHT = DUTY(
+  "чл. 15",
+  "ЗДвП чл. 15, ал. 1",
+  "На пътя водачът на пътно превозно средство се движи възможно най-вдясно по платното за движение, а когато пътните ленти са очертани с пътна маркировка, използва най-дясната свободна лента.",
+);
+const D_NO_ONCOMING_LANE = DUTY(
+  "чл. 16",
+  "ЗДвП чл. 16, ал. 1, т. 1",
+  "когато платното за движение има две пътни ленти - да навлиза и да се движи в лентата за насрещно движение освен при изпреварване или заобикаляне;",
+);
+const D_CONTINUOUS_CONTROL = DUTY(
+  "чл. 20",
+  "ЗДвП чл. 20, ал. 1",
+  "Водачите са длъжни да контролират непрекъснато пътните превозни средства, които управляват.",
+);
+const D_SPEED_FOR_CONDITIONS = DUTY(
+  "чл. 20",
+  "ЗДвП чл. 20, ал. 2",
+  "Водачите на пътни превозни средства са длъжни при избиране скоростта на движението да се съобразяват с атмосферните условия, с релефа на местността, със състоянието на пътя и на превозното средство, с превозвания товар, с характера и интензивността на движението, с конкретните условия на видимост, за да бъдат в състояние да спрат пред всяко предвидимо препятствие.",
+);
+const D_NOT_TOO_SLOW = DUTY(
+  "чл. 22",
+  "ЗДвП чл. 22, ал. 1",
+  "Водачът на пътно превозно средство не трябва да се движи без основателна причина с твърде ниска скорост, когато по този начин пречи на движението на другите пътни превозни средства.",
+);
+const D_FOLLOWING_DISTANCE = DUTY(
+  "чл. 23",
+  "ЗДвП чл. 23, ал. 1",
+  "Водачът на пътно превозно средство е длъжен да се движи на такова разстояние от движещото се пред него друго превозно средство, че да може да спре зад него, когато то намали скоростта или спре рязко.",
+);
+const D_CHECK_BEFORE_MANOEUVRE = DUTY(
+  "чл. 25",
+  "ЗДвП чл. 25, ал. 1",
+  "преди да започне маневрата, трябва да се убеди, че няма да създаде опасност за участниците в движението, които се движат след него, преди него или минават покрай него",
+);
+const D_SIGNAL = DUTY(
+  "чл. 28",
+  "ЗДвП чл. 28, ал. 1",
+  "За предупреждаване на останалите участници в движението за намерението си да извърши маневра водачът на пътно превозно средство подава следните сигнали:",
+);
+const D_OVERTAKE_RETURN = DUTY(
+  "чл. 42",
+  "ЗДвП чл. 42, ал. 1, т. 2",
+  "може да заеме място в пътната лента пред изпреварваното пътно превозно средство, без да го принуждава да намалява скоростта или да изменя посоката на движение.",
+);
+const D_OVERTAKE_SIDE_GAP = DUTY(
+  "чл. 42",
+  "ЗДвП чл. 42, ал. 2, т. 1",
+  "по време на изпреварването да осигури достатъчно странично разстояние между своето и изпреварваното пътно превозно средство;",
+);
+const D_JUNCTION_APPROACH = DUTY(
+  "чл. 47",
+  "ЗДвП чл. 47",
+  "Водач на пътно превозно средство, приближаващо се към кръстовище, трябва да се движи с такава скорост, че при необходимост да може да спре и да пропусне участниците в движението, които имат предимство.",
+);
+/**
+ * NOT A MINIMUM SPEED, and this is the row where everybody assumes there is
+ * one. The 70 km/h is a condition on the VEHICLE's construction, not on how
+ * fast you may drive.
+ */
+const D_MOTORWAY_VEHICLE = DUTY(
+  "чл. 55",
+  "ЗДвП чл. 55, ал. 1",
+  "е разрешено движението само на моторни превозни средства или състав от пътни превозни средства, чиято конструктивна максимална скорост надвишава 70 km/h.",
+);
+const D_LIGHTS_ON = DUTY(
+  "чл. 70",
+  "ЗДвП чл. 70, ал. 1",
+  "При движение през нощта и при намалена видимост моторните превозни средства и трамваите трябва да бъдат с включени къси или дълги светлини, габаритни светлини и светлина за осветяване на задната табела с регистрационния номер.",
+);
+/**
+ * THE BAN THAT REALLY IS A BAN. Note „по- малко" — a broken hyphenation the
+ * Държавен вестник text carries and our copy therefore carries too. Repairing
+ * it would make the sentence unfindable in the file it claims to come from,
+ * and the re-cut test would say so.
+ */
+const D_DIP_HIGH_BEAM = DUTY(
+  "чл. 70",
+  "ЗДвП чл. 70, ал. 2, т. 3",
+  "при движение зад друго моторно превозно средство на разстояние, по- малко от 50 метра.",
+);
+/** THE PERMISSION THAT IS NOT A DUTY — the trap, answered by reading it. */
+const D_FOG_LAMPS_PERMITTED = DUTY(
+  "чл. 74",
+  "ЗДвП чл. 74, ал. 1",
+  "Допълнителни светлини за мъгла може да се използват само при значително намалена видимост поради мъгла, снеговалеж, дъжд или други подобни условия. Тези светлини не може да се използват самостоятелно.",
+);
+const D_SEATBELT = DUTY(
+  "чл. 137а",
+  "ЗДвП чл. 137а, ал. 1",
+  "Водачите и пътниците в моторни превозни средства от категории M1, M2, M3 и N1, N2 и N3, когато са в движение, използват обезопасителните колани, с които моторните превозни средства са оборудвани.",
+);
+
+// --- the offence points these rows are charged under ------------------------
+
+const T_NO_SIGNAL = T183("ал. 2", "т. 7", "не подаде сигнал преди извършването на маневра.");
+const T_PLACEMENT = T183(
+  "ал. 2",
+  "т. 2",
+  "нарушава правилата за разположение на пътно превозно средство върху платното за движение;",
+);
+const T_BAD_OVERTAKE = T183("ал. 2", "т. 6", "при неправилно изпреварване не създава опасност за движението;");
+const T_SEATBELT = T183(
+  "ал. 4",
+  "т. 7",
+  "не изпълнява задължението за използване на предпазен колан или носене на каска",
+);
+/**
+ * ЗДвП чл. 183, ал. 4, т. 14 — one точка, four offences, three of which this
+ * block is charged under. Quoted from „неправилно се включва" onward: the
+ * sentence opens with the Б2 sign in straight double quotes (that half belongs
+ * to STOP_SIGN_NO_FULL_STOP, which already has its own row), and the fragment
+ * below is the part these manoeuvre codes actually fall in.
+ */
+const T_MERGE_LANE_PRIORITY = T183(
+  "ал. 4",
+  "т. 14",
+  "неправилно се включва в движението, неправилно се престроява или не спазва предимството на друг участник в движението;",
+);
+const T_LIGHTS_DANGER = T180_1(
+  "т. 1",
+  "наруши правилата за използване светлините на пътно превозно средство, за престой или за паркиране, за използване на пътното платно, когато в резултат на нарушението е създадена непосредствена опасност за движението;",
+);
+
+// --- why each 0 is a finding, worded per row --------------------------------
+
+const CP_NOT_LISTED_SIGNAL = notListed(
+  "Чл. 183, ал. 2, т. 7 (неподаден сигнал) не е сред нарушенията, изброени в чл. 6, ал. 1 — а списъкът е изчерпателен. Глоба има, контролни точки не падат.",
+);
+const CP_NOT_LISTED_PLACEMENT = notListed(
+  "Чл. 183, ал. 2, т. 2 (разположение върху платното) не е сред нарушенията, изброени в чл. 6, ал. 1 — а списъкът е изчерпателен. Глоба има, контролни точки не падат.",
+);
+const CP_NOT_LISTED_T14 = notListed(
+  "Чл. 183, ал. 4, т. 14 не фигурира в изчерпателния списък по чл. 6, ал. 1: нито едно от четирите деяния в тази точка не носи контролни точки. За сравнение съседната т. 7 от същата алинея — коланът — носи 10.",
+);
+const CP_NOT_LISTED_MARKING_DANGER =
+  "От петте предложения на чл. 179, ал. 1, т. 5 наредбата взима само две: изпреварването (т. 9 — 13 к.т.) и неспирането на знак „Спри!“ (т. 15 — 10 к.т.). Неспазването на знак или маркировка извън тези два случая не е в списъка, затова тук точки не падат.";
+const CP_NOT_LISTED_LIGHTS = notListed(
+  "Чл. 180, ал. 1, т. 1 (правилата за светлините) не е сред нарушенията по чл. 6, ал. 1. От целия чл. 180 списъкът стига само до т. 3, предл. 2 — железопътния прелез.",
+);
+
+/**
+ * THE UNGATED LICENCE ANSWER for a fault the exhaustive list never names.
+ * Kept OUT of the branches on purpose: „0 контролни точки" is true today, with
+ * no ПТП and no непосредствена опасност needed to make it true, and printing it
+ * only beside a condition would read as „нула, докато нищо не се случи".
+ */
+const CP_NONE_NO_OFFENCE = notListed(
+  "Тук няма какво да падне. Чл. 6, ал. 1 изброява нарушения, а за това деяние ЗДвП не предвижда състав — и нулата важи ДНЕС, не „ако нищо не се случи“.",
+);
+const CP_NONE_SPEED_DISTANCE = notListed(
+  "Нито несъобразената скорост, нито неспазената дистанция са сред двадесет и двете нарушения по чл. 6, ал. 1 — списъкът е изчерпателен. Книжката не страда от самото каране; страда от това, което може да излезе от него.",
+);
+
+/** ЗДвП чл. 180, ал. 1, т. 1 — 100 лв., and only on непосредствена опасност. */
+const LIGHTS_DANGER_CASE: ConditionalPenalty = {
+  conditionBg: DANGER_CONDITION_BG,
+  fine: fine(100, null, F180_1("т. 1")),
+  controlPoints: CP_NOT_LISTED_LIGHTS,
+};
+
+/** ЗДвП чл. 183, ал. 4, т. 14 — 100 лв. when the missed look costs a priority. */
+const PRIORITY_NOT_GIVEN_CASE: ConditionalPenalty = {
+  conditionBg: "когато от непълното оглеждане водачът „не спазва предимството на друг участник в движението“",
+  fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+  controlPoints: CP_NOT_LISTED_T14,
+};
+
+// --- Наредба № 38, the exam half of an „exam-only" row ----------------------
+
+/**
+ * The clause a code is charged under, as a citable quote rather than a bare
+ * string. DERIVED from `N38_BASIS`, so an exam-only row cannot claim a clause
+ * the classification table does not give it, and an amendment that moves the
+ * clause moves the citation with it.
+ */
+function n38ClauseSource(code: ViolationCode): LawQuote {
+  const clause = N38_BASIS[code].clause;
+  return {
+    actFile: "naredba-38.json",
+    unitRef: N38_UNIT_REF,
+    citationBg: `Наредба № 38 приложение № 5, т. 10, б. „${clause}“`,
+    quoteBg: N38_CLAUSE_QUOTE[clause],
+  };
+}
+
+/** „Струва ти точки на изпита и нищо на пътя" — the whole shape in one call. */
+function examOnly(
+  code: ViolationCode,
+  headlineBg: string,
+  whyBg: string,
+  duties: readonly LawQuote[] = [],
+): RoadConsequence {
+  return { kind: "exam-only", headlineBg, examSource: n38ClauseSource(code), duties, whyBg };
+}
+
+/**
+ * THE TWENTY-EIGHT. Spread into `ROAD_CONSEQUENCES` below rather than written
+ * inside it, because a second lane is filling the same map from the same brief
+ * on the same afternoon, and two blocks merge where one object literal
+ * collides. Everything above this point — `F183`, `T183`, `DUTY`, `CP`,
+ * `DANGER_179_1_5`, `CRASH_CASE`, `CP_T16_OVERTAKE_NO_DANGER`,
+ * `CP_T18_SEATBELT` — is that lane's work, reused rather than rebuilt.
+ */
+const MANOEUVRE_AND_JUDGEMENT_ROADS: Partial<Record<ViolationCode, RoadConsequence>> = {
+  // === Signals — the cheapest offence in the act ============================
+  TURN_WITHOUT_INDICATOR: {
+    kind: "single",
+    offenceBg: "неподаден сигнал преди маневра",
+    offenceQuote: T_NO_SIGNAL,
+    duties: [D_SIGNAL],
+    fine: fine(50, null, F183("ал. 2", "т. 7", 50)),
+    controlPoints: CP_NOT_LISTED_SIGNAL,
+    noteBg:
+      "Законът не различава мигача при завой от мигача при престрояване — една и съща точка, една и съща глоба. Евтино за грешка, която редовно завършва с удар отзад.",
+  },
+  LANE_CHANGE_WITHOUT_INDICATOR: {
+    kind: "single",
+    offenceBg: "неподаден сигнал преди престрояване",
+    offenceQuote: T_NO_SIGNAL,
+    duties: [D_SIGNAL],
+    fine: fine(50, null, F183("ал. 2", "т. 7", 50)),
+    controlPoints: CP_NOT_LISTED_SIGNAL,
+    noteBg: "Същата точка и същата глоба както при завой без мигач: чл. 183, ал. 2, т. 7 говори за „маневра“ изобщо.",
+  },
+
+  // === Manoeuvres the act prices as престрояване / включване в движението ===
+  LANE_CHANGE_WITHOUT_MIRROR_CHECK: {
+    kind: "single",
+    offenceBg: "неправилно престрояване",
+    offenceQuote: T_MERGE_LANE_PRIORITY,
+    duties: [D_CHECK_BEFORE_MANOEUVRE],
+    fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+    controlPoints: CP_NOT_LISTED_T14,
+    escalation: [DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
+    noteBg:
+      "Двойно повече от мигача, и логиката е ясна: непогледнатото огледало Е маневрата, мигачът е само съобщението за нея.",
+  },
+  MOVE_OFF_WITHOUT_OBSERVATION: {
+    kind: "single",
+    offenceBg: "неправилно включване в движението",
+    offenceQuote: T_MERGE_LANE_PRIORITY,
+    duties: [D_CHECK_BEFORE_MANOEUVRE],
+    fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+    controlPoints: CP_NOT_LISTED_T14,
+    escalation: [DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
+    noteBg:
+      "„Неправилно се включва в движението“ е точно потеглянето от място без оглеждане — чл. 25, ал. 1 изброява именно него сред маневрите, за които водачът е длъжен да се убеди.",
+  },
+  WRONG_LANE_FOR_DIRECTION: {
+    kind: "single",
+    offenceBg: "неправилно престрояване — завой от лента с друга стрелка",
+    offenceQuote: T_MERGE_LANE_PRIORITY,
+    duties: [D_MARKING_BINDS],
+    fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+    controlPoints: CP_NOT_LISTED_T14,
+    escalation: [DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
+    noteBg:
+      "Пише се като неправилно престрояване: за да завиеш оттам, си застанал не в своята лента. Ако от неспазената стрелка е създадена непосредствена опасност, съставът е друг и двойно по-скъп.",
+  },
+
+  // === The mirror check with no priced offence behind it ====================
+  TURN_WITHOUT_OBSERVATION: {
+    kind: "conditional",
+    offenceBg: "неизпълнено задължение да се убедиш преди маневра",
+    duties: [D_CHECK_BEFORE_MANOEUVRE],
+    headlineBg:
+      "Задължението е истинско и изрично, но собствена глоба за него в ЗДвП няма. В наказателните разпоредби (чл. 174–189) думата „маневра“ се среща на едно-единствено място — чл. 183, ал. 2, т. 7 — и то за СИГНАЛА, не за огледалото. Остава общата остатъчна клауза на закона, чл. 185, която тук се назовава без число: прилагането ѝ значи да твърдиш, че никой друг член не наказва деянието, а това е твърдение за целия закон, не извлечена от него сума. Плаща се чак когато завоят засегне някого.",
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [PRIORITY_NOT_GIVEN_CASE, DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
+  },
+
+  // === Position on the roadway — the penalty is held, the rule is not =======
+  POOR_LANE_KEEPING: {
+    kind: "conditional",
+    offenceBg: "неправилно разположение на превозното средство върху платното за движение",
+    duties: [D_KEEP_RIGHT],
+    headlineBg:
+      "На изпита това е грешка при всяко трайно излизане от средата на лентата. На пътя глоба има само ако разположението наистина нарушава правилата за разположение — а самите тези правила, къде минава колелото спрямо маркировката, са в ППЗДвП, който този продукт още не съдържа дословно. Затова съставът е показан, а не обещан.",
+    controlPoints: CP_NOT_LISTED_PLACEMENT,
+    branches: [
+      {
+        conditionBg: "когато водачът „нарушава правилата за разположение на пътно превозно средство върху платното за движение“",
+        fine: fine(50, null, F183("ал. 2", "т. 2", 50)),
+        controlPoints: CP_NOT_LISTED_PLACEMENT,
+      },
+    ],
+  },
+  CENTER_LINE_TOUCHED: {
+    kind: "conditional",
+    offenceBg: "неправилно разположение на превозното средство върху платното за движение",
+    duties: [D_NO_ONCOMING_LANE],
+    headlineBg:
+      "Настъпването на осевата е грешка на изпитния лист. ЗДвП забранява да НАВЛЕЗЕШ в насрещната лента (чл. 16, ал. 1, т. 1) — това вече е друга и по-тежка грешка. Самото стъпване върху линията е въпрос на маркировката, чиито правила са в ППЗДвП, който още не е в корпуса; съставът, под който биха го написали, е показан по-долу.",
+    controlPoints: CP_NOT_LISTED_PLACEMENT,
+    branches: [
+      {
+        conditionBg: "когато водачът „нарушава правилата за разположение на пътно превозно средство върху платното за движение“",
+        fine: fine(50, null, F183("ал. 2", "т. 2", 50)),
+        controlPoints: CP_NOT_LISTED_PLACEMENT,
+      },
+    ],
+  },
+
+  // === Speed and distance: no own fine until something happens ==============
+  SPEED_TOO_FAST_FOR_CONDITIONS: {
+    kind: "conditional",
+    offenceBg: "движение с несъобразена скорост",
+    duties: [D_SPEED_FOR_CONDITIONS],
+    headlineBg:
+      "Несъобразената скорост няма собствена глоба в ЗДвП. В рамките на ограничението контролният орган няма какво да ти напише — на изпита обаче се брои, защото изпитващият вижда това, което камерата не измерва.",
+    controlPoints: CP_NONE_SPEED_DISTANCE,
+    branches: [CRASH_CASE],
+  },
+  SPEED_TOO_FAST_FOR_CURVE: {
+    kind: "conditional",
+    offenceBg: "движение с несъобразена скорост в завой",
+    duties: [D_SPEED_FOR_CONDITIONS],
+    headlineBg:
+      "Препоръчителната скорост под знака е препоръка, не ограничение: превишаването ѝ само по себе си не е нарушение и не се глобява. Затова табелата не се пази с глоба, а със завой — сметката идва, когато излетиш от него.",
+    controlPoints: CP_NONE_SPEED_DISTANCE,
+    branches: [CRASH_CASE],
+  },
+  CLOSING_ON_LEAD_TOO_FAST: {
+    kind: "conditional",
+    offenceBg: "неспазване на дистанция",
+    duties: [D_FOLLOWING_DISTANCE, D_SPEED_FOR_CONDITIONS],
+    headlineBg:
+      "Топящата се дистанция няма собствена глоба: ЗДвП изисква разстоянието (чл. 23, ал. 1), но пари се плащат чак когато от него излезе удар.",
+    controlPoints: CP_NONE_SPEED_DISTANCE,
+    branches: [CRASH_CASE],
+  },
+  FOLLOWING_TOO_CLOSE_FOR_RAIN: {
+    kind: "conditional",
+    offenceBg: "неспазване на дистанция при намалено сцепление",
+    duties: [D_FOLLOWING_DISTANCE, D_SPEED_FOR_CONDITIONS],
+    headlineBg:
+      "Законът не мери дистанцията в секунди и не глобява „две вместо три“. Изискването е функционално — да можеш да спреш зад него — и се превръща в пари едва след произшествие.",
+    controlPoints: CP_NONE_SPEED_DISTANCE,
+    branches: [CRASH_CASE],
+  },
+  HARSH_BRAKING_NO_CAUSE: {
+    kind: "conditional",
+    offenceBg: "нарушение на задължението за непрекъснат контрол върху превозното средство",
+    duties: [D_CONTINUOUS_CONTROL],
+    headlineBg:
+      "Рязкото спиране без причина не е самостоятелно нарушение и няма собствена глоба. На изпитния лист се брои, защото изненадва движещия се зад теб.",
+    // The one row where the link is the ACT'S OWN and not ours: чл. 179, ал. 2
+    // names „нарушение на чл. 20, ал. 1" by number, which is the duty above.
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [CRASH_CASE],
+  },
+
+  // === Lights: one real ban, one permission mistaken for a ban ==============
+  HEADLIGHTS_OFF_IN_RAIN: {
+    kind: "conditional",
+    offenceBg: "нарушени правила за използване на светлините",
+    duties: [D_LIGHTS_ON],
+    headlineBg:
+      "Задължението е истинско и изрично: при намалена видимост колата се движи с включени светлини. Глобата обаче не е автоматична — чл. 180, ал. 1, т. 1 я връзва с условие.",
+    controlPoints: CP_NOT_LISTED_LIGHTS,
+    branches: [LIGHTS_DANGER_CASE],
+  },
+  FOG_LIGHTS_OFF_IN_FOG: {
+    kind: "conditional",
+    offenceBg: "нарушени правила за използване на светлините",
+    duties: [D_LIGHTS_ON, D_FOG_LAMPS_PERMITTED],
+    headlineBg:
+      "Тук трябва да се каже направо: ЗДвП НЕ изисква фарове за мъгла. Чл. 74, ал. 1 е разрешение с граница („може да се използват само при значително намалена видимост“), не задължение — затова неползването им не е нарушение на чл. 74 и глоба по този член няма. Нарушимото е другото: при намалена видимост да се движиш без включени светлини изобщо (чл. 70, ал. 1).",
+    controlPoints: CP_NOT_LISTED_LIGHTS,
+    branches: [LIGHTS_DANGER_CASE],
+  },
+  HIGH_BEAM_NOT_DIPPED: {
+    kind: "conditional",
+    offenceBg: "нарушени правила за използване на светлините",
+    duties: [D_DIP_HIGH_BEAM],
+    headlineBg:
+      "За разлика от фаровете за мъгла тук забраната е изрична и поименна: дългите светлини са забранени при движение зад друга кола. Глобата пак минава през условието на чл. 180, ал. 1, т. 1 — а заслепеният отпред е тъкмо такава опасност; преценява го контролният орган, не симулаторът.",
+    controlPoints: CP_NOT_LISTED_LIGHTS,
+    branches: [LIGHTS_DANGER_CASE],
+  },
+
+  // === The junction scan: looking is not the offence, yielding is ===========
+  JUNCTION_SCAN_INCOMPLETE: {
+    kind: "conditional",
+    offenceBg: "непропускане на участник с предимство",
+    duties: [D_JUNCTION_APPROACH],
+    headlineBg:
+      "Непълното оглеждане само по себе си не е нарушение — законът не може да провери накъде си гледал. Наказва се резултатът: предимството, което не си пропуснал, защото не си видял.",
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [PRIORITY_NOT_GIVEN_CASE, DANGER_179_1_5(CP_NOT_LISTED_MARKING_DANGER)],
+  },
+
+  // === Motorway: there is no minimum speed, and that surprises people =======
+  DRIVING_TOO_SLOW_FOR_MOTORWAY: {
+    kind: "conditional",
+    offenceBg: "движение без основателна причина с твърде ниска скорост, с което се пречи на другите",
+    duties: [D_NOT_TOO_SLOW, D_MOTORWAY_VEHICLE],
+    headlineBg:
+      "Обща задължителна минимална скорост в България НЯМА. 70 km/h в чл. 55, ал. 1 е изискване към КОНСТРУКЦИЯТА на автомобила, не към скоростта, с която караш. Забраненото е друго — „без основателна причина с твърде ниска скорост“, когато пречиш (чл. 22, ал. 1) — и за него законът не предвижда отделно наказание. Остава остатъчната клауза чл. 185, назована тук без число: тя се прилага само за нарушения, „за което не е предвидено друго наказание“, а това е твърдение за целия закон, не извлечена сума.",
+    controlPoints: CP_NONE_NO_OFFENCE,
+    branches: [],
+  },
+
+  // === Overtaking: the two rows that DO cost контролни точки ================
+  OVERTAKE_RETURN_TOO_EARLY: {
+    kind: "single",
+    offenceBg: "неправилно изпреварване, без от това да е създадена опасност за движението",
+    offenceQuote: T_BAD_OVERTAKE,
+    duties: [D_OVERTAKE_RETURN],
+    fine: fine(50, null, F183("ал. 2", "т. 6", 50)),
+    controlPoints: CP_T16_OVERTAKE_NO_DANGER,
+    escalation: [DANGER_179_1_5_OVERTAKE, CRASH_CASE],
+    noteBg:
+      "Глобата изглежда дребна и заблуждава: тежестта на това нарушение е в книжката, не в портфейла. Засичането на изпреварения е записано дословно в чл. 42, ал. 1, т. 2 — „без да го принуждава да намалява скоростта“.",
+  },
+  VULNERABLE_PASS_TOO_CLOSE: {
+    kind: "single",
+    offenceBg: "неправилно изпреварване, без от това да е създадена опасност за движението",
+    offenceQuote: T_BAD_OVERTAKE,
+    duties: [D_OVERTAKE_SIDE_GAP],
+    fine: fine(50, null, F183("ал. 2", "т. 6", 50)),
+    controlPoints: CP_T16_OVERTAKE_NO_DANGER,
+    escalation: [DANGER_179_1_5_OVERTAKE, CRASH_CASE],
+    noteBg:
+      "Това не е преценка на изпитващия — тясното изпреварване на велосипедист има реална тежест в закона: 10 контролни точки от 39, а при нов водач от 26. Забележи и какво НЕ казва законът: числото 1,5 метра го няма в ЗДвП. Чл. 42, ал. 2, т. 1 изисква „достатъчно странично разстояние“, а метър и половина е това, което се учи и преподава като достатъчно.",
+  },
+
+  // === Pre-drive: the exam protocol, and the one part of it that is law =====
+  PREDRIVE_SEATBELT_SKIPPED: {
+    kind: "single",
+    offenceBg: "неизпълнено задължение за използване на предпазен колан",
+    offenceQuote: T_SEATBELT,
+    duties: [D_SEATBELT],
+    fine: fine(100, null, F183("ал. 4", "т. 7", 100)),
+    controlPoints: CP_T18_SEATBELT,
+    noteBg:
+      "Единствената стъпка от подготовката преди потегляне, която е ЗАКОН, а не изпитен ритуал — и най-скъпата: глобата се знае, точките не. Същата точка наказва и возенето на непристегнат пътник.",
+  },
+  PREDRIVE_STEP_SKIPPED: examOnly(
+    "PREDRIVE_STEP_SKIPPED",
+    "Струва ти точка на изпита и нищо на пътя. Пропуснатата стъпка от подготовката не е нарушение: контролният орган не проверява реда, по който си се приготвил, а изпитващият проверява точно него.",
+    "Наказателните разпоредби на ЗДвП (чл. 174–189) не съдържат състав за подготовката преди потегляне; думата „подготовка“ се среща в тях само за учебните форми за обучение на водачи. Приложение № 5 на Наредба № 38 също не изброява контролен списък — б. „б“ е едно изречение с определение. Изключението е коланът, който има свой състав и своя отделна карта.",
+    [D_CONTINUOUS_CONTROL],
+  ),
+  PREDRIVE_WRONG_ORDER: examOnly(
+    "PREDRIVE_WRONG_ORDER",
+    "Струва ти точка на изпита и нищо на пътя. Няма закон, който да казва, че огледалата се нагласят след седалката — има логика, а логиката се проверява на изпита.",
+    "Същото като при пропуснатата стъпка: нито ЗДвП, нито приложение № 5 на Наредба № 38 предписват ред на действията. Редът е методика на обучението, а изпитващият оценява методиката.",
+    [D_CONTINUOUS_CONTROL],
+  ),
+
+  // === Pure examiner judgements — no article, because none exists ===========
+  ENGINE_STALLED: examOnly(
+    "ENGINE_STALLED",
+    "Струва ти точка на изпита и нищо на пътя. Загасването не е нарушение — фиш за загасен двигател не съществува.",
+    "В ЗДвП няма състав за загасване. Най-близкото задължение е общото — непрекъснат контрол върху превозното средство (чл. 20, ал. 1) — но то се превръща в наказание едва през чл. 179, ал. 2, тоест след причинено произшествие. Загасването на място не е такова.",
+    [D_CONTINUOUS_CONTROL],
+  ),
+  HANDBRAKE_LEFT_ON: examOnly(
+    "HANDBRAKE_LEFT_ON",
+    "Струва ти точка на изпита и нищо на пътя. Движението с вдигната ръчна е грешка към колата, не към закона.",
+    "В ЗДвП няма нито един член за ръчната спирачка. Съставът за технически неизправно превозно средство (чл. 179, ал. 6) съди СЪСТОЯНИЕТО на автомобила, а тук автомобилът е изправен — водачът не е свалил спирачката. Значи без глоба и без контролни точки, но с прегрели накладки.",
+    [D_CONTINUOUS_CONTROL],
+  ),
+  HESITATION_AT_GREEN: examOnly(
+    "HESITATION_AT_GREEN",
+    "Струва ти точка на изпита и нищо на пътя. В България няма задължение да потеглиш на зелено — има задължение да не пречиш, докато СЕ ДВИЖИШ.",
+    "Чл. 22, ал. 1 забранява движение „с твърде ниска скорост“, а спрялата кола не се движи; никой друг член не изисква тръгване. Затова колоната зад теб може да ти свири колкото иска — фиш за това няма. На изпита закъснелите действия са грешка, защото кръстовището пропуска по-малко коли за същото зелено.",
+    [],
+  ),
+  STANDSTILL_GAP_TOO_CLOSE: examOnly(
+    "STANDSTILL_GAP_TOO_CLOSE",
+    "Струва ти точка на изпита и нищо на пътя. За разстоянието до спряла кола пред теб глоба не съществува.",
+    "Дистанцията в чл. 23, ал. 1 е спрямо „движещото се пред него друго превозно средство“ — при спряла колона този член просто не важи, а друг за случая няма. Резервът от около два метра е техника: място за заобикаляне и застраховка срещу връщане назад по наклон.",
+    [],
+  ),
+
+  // === The one honest blank in this block ===================================
+  /**
+   * NOT „we did not get to it" — a NAMED gap. The stop-line rule lives in
+   * ППЗДвП, of which `content/law/acts` holds not one byte (index-only,
+   * sha256 null), so there is nothing to quote and nothing to charge. The
+   * canonical blank is reused verbatim underneath, because two surfaces test
+   * for its opening words and because an honest blank should read the same
+   * everywhere.
+   */
+  STOP_LINE_OVERSHOOT: {
+    kind: "unknown",
+    ruleBg:
+      UNKNOWN_ROAD_RULE_BG +
+      " Причината тук е конкретна и си струва да се знае: правилото за стоп-линията живее в ППЗДвП — правилника за прилагане, който е в указателя, но чийто пълен текст още не е в корпуса на този продукт. Докато не е, състав не се показва.",
+  },
+};
+
 /**
  * THE GROUNDED SET — deliberately small, deliberately checkable.
  *
- * Five codes have a road penalty cut verbatim from an act we hold. Every other
- * code falls through to `UNKNOWN_ROAD`. That ratio is not laziness: each entry
- * here is a claim that THIS detector's act is THAT article's offence, and a
- * wrong mapping is exactly the failure mode ADR-002 exists to stop. Adding a
- * row means retrieving the article and pinning its words in the test.
+ * Each entry is a claim that THIS detector's act is THAT article's offence, and
+ * a wrong mapping is exactly the failure mode ADR-002 exists to stop. Adding a
+ * row means retrieving the article and pinning its words in the test; a code
+ * with no row falls through to `UNKNOWN_ROAD`, which shows the rule and no
+ * number at all.
+ *
+ * WHAT THE 2026-08-09 WAVE ADDED, AND THE FIGURE THAT SURPRISED EVERYONE. The
+ * five original rows were the ones that happened to sit near the founder's own
+ * ticket. Twenty more were retrieved for the faults a student actually meets,
+ * and the licence column turned out to be the interesting one: чл. 6, ал. 1 of
+ * Наредба № Iз-2539 is an EXHAUSTIVE list of twenty-two offences, and most of
+ * the twenty are simply not on it. Failing to make way for an ambulance is 200
+ * лв. and ZERO контролни точки. An overtake that endangered nobody is 50 лв.
+ * and TEN. Those two facts next to each other are not a bug in the research —
+ * they are what the two acts say, and a student who does not know it will
+ * guess, badly, in exactly the direction the founder guessed.
  */
 export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> = {
   SPEEDING_DANGEROUS: {
@@ -1065,6 +2097,11 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
   RED_LIGHT_CROSSED: {
     kind: "single",
     offenceBg: "преминаване при сигнал на светофара, който не разрешава преминаването",
+    // Added 2026-08-09 with the twenty: чл. 183 prices by alinea and describes
+    // by точка, and until now this row proved „150 лв." while only ASSERTING
+    // which conduct earns it. Same sentence the amber and red-plus-amber rows
+    // stand on, which is exactly why it has to be quoted rather than trusted.
+    offenceQuote: T183("ал. 5", "т. 1", "преминава при сигнал на светофара, който не разрешава преминаването;"),
     fine: fine(150, null, {
       actFile: "zdvp.json",
       unitRef: "чл. 183",
@@ -1088,6 +2125,7 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
   PEDESTRIAN_NOT_YIELDED: {
     kind: "single",
     offenceBg: "неосигуряване на предимство при преминаване през пешеходна пътека",
+    offenceQuote: T183("ал. 5", "т. 2", "не осигури предимство, когато преминава през пешеходна пътека."),
     fine: fine(150, null, {
       actFile: "zdvp.json",
       unitRef: "чл. 183",
@@ -1111,6 +2149,15 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
     kind: "single",
     offenceBg:
       "неспиране на пътен знак Б2 „Спри! Пропусни движещите се по пътя с предимство!“, без от това да е създадена непосредствена опасност",
+    // The точка that т. 14 actually is: FOUR offences in one sentence, of which
+    // the Б2 sign is the first and „не спазва предимството" (FAILED_TO_YIELD)
+    // the last. Quoting it is what stops two different codes from citing the
+    // same address and meaning different halves of it without saying so.
+    offenceQuote: T183(
+      "ал. 4",
+      "т. 14",
+      'не спира на пътен знак "Спри! Пропусни движещите се по пътя с предимство!", неправилно се включва в движението, неправилно се престроява или не спазва предимството на друг участник в движението;',
+    ),
     fine: fine(100, null, {
       actFile: "zdvp.json",
       unitRef: "чл. 183",
@@ -1121,6 +2168,499 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
       "Чл. 183, ал. 4, т. 14 не фигурира в изчерпателния списък по чл. 6, ал. 1 от Наредба № Iз-2539. Ако обаче от неспирането е създадена непосредствена опасност, деянието минава по друг състав и вече носи контролни точки.",
     ),
   },
+
+  // -- 2026-08-09, consequences-priority wave: the twenty a student meets most
+  //    where the statutory home is unambiguous. ------------------------------
+
+  WRONG_WAY: {
+    kind: "single",
+    offenceBg: "движение в забранената посока на еднопосочен път (или навлизане след знак, забраняващ влизането)",
+    offenceQuote: T183(
+      "ал. 4",
+      "т. 15",
+      "навлиза след знак, забраняващ влизането на съответното пътно превозно средство, или се движи в забранената посока на еднопосочен път.",
+    ),
+    duties: [
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6",
+        "Участниците в движението:",
+      ),
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6, т. 1",
+        "съобразяват своето поведение със сигналите на длъжностните лица, упълномощени да регулират или да контролират движението по пътищата, както и със светлинните сигнали, с пътните знаци и с пътната маркировка;",
+      ),
+    ],
+    fine: fine(100, null, F183("ал. 4", "т. 15", 100)),
+    controlPoints: notListed(
+      "Чл. 183, ал. 4, т. 15 не е сред двадесет и двете нарушения в чл. 6, ал. 1 — а списъкът е изчерпателен. Глоба има, книжката остава непокътната.",
+    ),
+    escalation: [
+      DANGER_179_1_5(
+        "И тежкият състав не е в списъка за този случай: чл. 6, ал. 1 стига до чл. 179, ал. 1, т. 5 само за изпреварване (т. 9) и за неспиране на знак „Спри!“ (т. 15). Забраненото влизане не е нито едното.",
+      ),
+    ],
+    noteBg:
+      "Отделен, много по-тежък състав важи, когато забраната е ВРЕМЕННА (ЗДвП чл. 183, ал. 7) — там законът предвижда и лишаване от право. Този ред е за постоянната забрана и за еднопосочната улица.",
+  },
+
+  NOT_KEEPING_RIGHT: {
+    kind: "single",
+    offenceBg: "неспазване на правилата за разположение на превозното средство върху платното за движение",
+    offenceQuote: T183(
+      "ал. 2",
+      "т. 2",
+      "нарушава правилата за разположение на пътно превозно средство върху платното за движение;",
+    ),
+    duties: [
+      DUTY(
+        "чл. 15",
+        "ЗДвП чл. 15, ал. 1",
+        "На пътя водачът на пътно превозно средство се движи възможно най-вдясно по платното за движение, а когато пътните ленти са очертани с пътна маркировка, използва най-дясната свободна лента.",
+      ),
+    ],
+    fine: fine(50, null, F183("ал. 2", "т. 2", 50)),
+    controlPoints: notListed(
+      "Не е в изчерпателния списък по чл. 6, ал. 1. Една от най-евтините глоби в закона — и въпреки това причината за голяма част от задръстванията и за изпреварванията отдясно.",
+    ),
+  },
+
+  FAILED_TO_YIELD: {
+    kind: "single",
+    offenceBg: "неспазване на предимството на друг участник в движението",
+    offenceQuote: T183(
+      "ал. 4",
+      "т. 14",
+      'не спира на пътен знак "Спри! Пропусни движещите се по пътя с предимство!", неправилно се включва в движението, неправилно се престроява или не спазва предимството на друг участник в движението;',
+    ),
+    duties: [
+      DUTY(
+        "чл. 50",
+        "ЗДвП чл. 50, ал. 1",
+        "На кръстовище, на което единият от пътищата е сигнализиран като път с предимство, водачите на пътни превозни средства от другите пътища са длъжни да пропуснат пътните превозни средства, които се движат по пътя с предимство.",
+      ),
+    ],
+    fine: fine(100, null, F183("ал. 4", "т. 14", 100)),
+    controlPoints: notListed(
+      "Непропускането само по себе си не е в изчерпателния списък по чл. 6, ал. 1. Списъкът стига до предимството само в един случай — неспирането на знак „Спри!“ със създадена опасност (т. 15) — и той се оценява от друга грешка.",
+    ),
+    escalation: [
+      DANGER_179_1_5(
+        "Тежкият състав също не носи точки тук: т. 15 от списъка е писана за знака „Спри!“, не за предимството изобщо.",
+      ),
+      CRASH_CASE,
+    ],
+  },
+
+  EMERGENCY_NOT_YIELDED: {
+    kind: "single",
+    offenceBg:
+      "неосигуряване на път за безпрепятствено преминаване на превозно средство със специален звуков и специален светлинен сигнал",
+    offenceQuote: T179_1(
+      "т. 6",
+      "който не осигури път за безпрепятствено преминаване на превозно средство, сигнализиращо със специален звуков и специален светлинен сигнал, или на съпровожданите от него превозни средства.",
+    ),
+    duties: [
+      DUTY(
+        "чл. 104",
+        "ЗДвП чл. 104, ал. 1",
+        "При приближаване на моторно превозно средство със специален режим на движение водачите на останалите пътни превозни средства са длъжни да освободят достатъчно място на пътното платно, а при необходимост и да спрат, за да осигурят безпрепятствено преминаване както на сигнализиращото, така и на съпровожданите от него превозни средства.",
+      ),
+      DUTY(
+        "чл. 91",
+        "ЗДвП чл. 91, ал. 1",
+        "Моторни превозни средства със специален режим на движение са автомобилите и мотоциклетите, които при движението си подават едновременно светлинен сигнал с проблясваща синя и/или червена светлина и специален звуков сигнал.",
+      ),
+    ],
+    fine: fine(200, null, F179_1("т. 6")),
+    controlPoints: notListed(
+      "Най-неудобният ред в целия списък: това е опасна грешка на изпита и 200 лв. на пътя, но чл. 6, ал. 1 не го изброява — контролни точки НЕ падат. Цената тук не е в точки, а в минутите, които линейката губи.",
+    ),
+  },
+
+  COLLISION: {
+    kind: "single",
+    offenceBg: "причиняване на пътнотранспортно произшествие",
+    fine: fine(300, null, CRASH_179_2),
+    duties: [
+      DUTY(
+        "чл. 20",
+        "ЗДвП чл. 20, ал. 1",
+        "Водачите са длъжни да контролират непрекъснато пътните превозни средства, които управляват.",
+      ),
+    ],
+    controlPoints: notListed(
+      "Самото произшествие не е в списъка по чл. 6, ал. 1. Точки падат за нарушението, което го е причинило — ако то е сред изброените.",
+    ),
+    noteBg:
+      "Последните думи на текста са най-важните: „ако деянието не съставлява престъпление“. С пострадал човек случаят излиза от ЗДвП и минава в Наказателния кодекс, където мерките са от съвсем друг порядък.",
+  },
+
+  CONTROLLER_SIGNAL_VIOLATED: {
+    kind: "conditional",
+    offenceBg: "неизпълнение на разпореждане на лицето, упълномощено да регулира движението",
+    duties: [
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6",
+        "Участниците в движението:",
+      ),
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6, т. 2",
+        "изпълняват разпорежданията на лицата, упълномощени да регулират или да контролират движението по пътищата, независимо от светлинните сигнали, пътните знаци, маркировката на пътя и правилата за движение.",
+      ),
+      DUTY(
+        "чл. 7",
+        "ЗДвП чл. 7, ал. 1",
+        "Когато има несъответствие между сигналите на регулировчика и светлинните сигнали или пътните знаци относно предимството, участниците в движението са длъжни да се съобразяват със сигналите на регулировчика.",
+      ),
+    ],
+    headlineBg:
+      "Тук няма число — и това е находка, а не пропуск. В ЗДвП няма наказателен състав, който да назовава регулировчика откъм ВОДАЧА: думата се среща в закона тринадесет пъти и единственият път, когато стои в санкция, тя наказва ПЕШЕХОДЕЦ (чл. 184). Чл. 179, ал. 1, т. 5 стига до знаците, маркировката и „другите средства за сигнализиране“ — а човек не е средство за сигнализиране. Остава общият остатъчен състав по чл. 185; да кажем, че се прилага той, значи да кажем, че нищо друго не се прилага, а това е преценка, не извличане.",
+    branches: [],
+    controlPoints: notListed(
+      "Това обаче е сигурно: неизпълнението на разпореждане на регулировчик не е сред двадесет и двете нарушения в чл. 6, ал. 1, а списъкът е изчерпателен. Контролни точки не падат. На изпита обаче това е опасна грешка — най-скъпата разлика между двете системи в целия каталог.",
+    ),
+  },
+
+  YELLOW_LIGHT_NOT_STOPPED: {
+    kind: "single",
+    offenceBg: "преминаване при сигнал на светофара, който не разрешава преминаването",
+    offenceQuote: T183("ал. 5", "т. 1", "преминава при сигнал на светофара, който не разрешава преминаването;"),
+    fine: fine(150, null, F183("ал. 5", "т. 1", 150)),
+    controlPoints: CP_T20_SIGNAL,
+    escalation: [SIGNAL_REPEAT_CASE],
+    noteBg: SIGNAL_MEANING_CAVEAT_BG,
+  },
+
+  RED_YELLOW_CROSSED: {
+    kind: "single",
+    offenceBg: "преминаване при сигнал на светофара, който не разрешава преминаването",
+    offenceQuote: T183("ал. 5", "т. 1", "преминава при сигнал на светофара, който не разрешава преминаването;"),
+    fine: fine(150, null, F183("ал. 5", "т. 1", 150)),
+    controlPoints: CP_T20_SIGNAL,
+    escalation: [SIGNAL_REPEAT_CASE],
+    noteBg: SIGNAL_MEANING_CAVEAT_BG,
+  },
+
+  OVERTAKING_AT_CROSSING: {
+    kind: "single",
+    offenceBg: "неправилно изпреварване, без от това да е създадена опасност за движението",
+    offenceQuote: T183("ал. 2", "т. 6", "при неправилно изпреварване не създава опасност за движението;"),
+    duties: [
+      DUTY(
+        "чл. 43",
+        "ЗДвП чл. 43",
+        "Изпреварването на моторни превозни средства, с изключение на мотопеди и мотоциклети без кош, е забранено:",
+      ),
+      DUTY(
+        "чл. 43",
+        "ЗДвП чл. 43, т. 6",
+        "пред и върху сигнализирана пешеходна пътека.",
+      ),
+    ],
+    fine: fine(50, null, F183("ал. 2", "т. 6", 50)),
+    controlPoints: CP_T16_OVERTAKE_NO_DANGER,
+    escalation: [DANGER_179_1_5_OVERTAKE],
+    noteBg:
+      "Прочети двете колони заедно: глобата е от най-ниските в закона, а книжката плаща толкова, колкото и за преминаване на червено. Двете системи се пишат от различни актове и нито един от тях не чете другия.",
+  },
+
+  OVERTAKING_IN_BAN_ZONE: {
+    kind: "single",
+    offenceBg: "неправилно изпреварване в зона със знак В24, без от това да е създадена опасност за движението",
+    offenceQuote: T183("ал. 2", "т. 6", "при неправилно изпреварване не създава опасност за движението;"),
+    duties: [
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6",
+        "Участниците в движението:",
+      ),
+      DUTY(
+        "чл. 6",
+        "ЗДвП чл. 6, т. 1",
+        "съобразяват своето поведение със сигналите на длъжностните лица, упълномощени да регулират или да контролират движението по пътищата, както и със светлинните сигнали, с пътните знаци и с пътната маркировка;",
+      ),
+    ],
+    fine: fine(50, null, F183("ал. 2", "т. 6", 50)),
+    controlPoints: CP_T16_OVERTAKE_NO_DANGER,
+    escalation: [DANGER_179_1_5_OVERTAKE],
+    noteBg:
+      "Знакът В24 стои точно там, където видимостта не стига — тоест там, където горният ред е далеч по-вероятен от долния.",
+  },
+
+  CROSSED_SOLID_LINE: {
+    kind: "single",
+    offenceBg: "неспазване на правилата за разположение върху платното — навлизане отвъд непрекъсната линия",
+    offenceQuote: T183(
+      "ал. 2",
+      "т. 2",
+      "нарушава правилата за разположение на пътно превозно средство върху платното за движение;",
+    ),
+    fine: fine(50, null, F183("ал. 2", "т. 2", 50)),
+    controlPoints: notListed(
+      "Самото пресичане на непрекъснатата линия не е в изчерпателния списък по чл. 6, ал. 1. Ако обаче то е било част от изпреварване, съставът вече е друг — и тогава книжката плаща.",
+    ),
+    escalation: [
+      DANGER_179_1_5(
+        "Тежкият състав по чл. 179, ал. 1, т. 5 обхваща и „пътната маркировка“, но списъкът по чл. 6, ал. 1 стига до тази точка само за изпреварване и за знака „Спри!“ — маркировката сама по себе си не носи точки.",
+      ),
+    ],
+  },
+
+  DRIVING_IN_BUS_LANE: {
+    kind: "single",
+    offenceBg: "движение по лента, сигнализирана само за превозните средства от редовните линии за обществен превоз",
+    offenceQuote: T183(
+      "ал. 4",
+      "т. 12",
+      "управлява моторно превозно средство по пътна лента, сигнализирана за движение само на пътни превозни средства от редовните линии за обществен превоз на пътници, без да има право на това;",
+    ),
+    duties: [
+      DUTY(
+        "чл. 15",
+        "ЗДвП чл. 15, ал. 6",
+        "Когато пътна лента е сигнализирана за движение само на превозни средства от редовните линии за обществен превоз на пътници, се забранява движението на други пътни превозни средства, с изключение на пътните превозни средства, извършващи случаен или специализиран превоз на деца и/или ученици.",
+      ),
+    ],
+    fine: fine(100, null, F183("ал. 4", "т. 12", 100)),
+    controlPoints: notListed(
+      "Не е в изчерпателния списък по чл. 6, ал. 1 — глоба, но не и точки. Това е и едно от нарушенията, които камера хваща сама, така че глобата може да пристигне като електронен фиш по пощата (ЗДвП чл. 189, ал. 4).",
+    ),
+  },
+
+  RAIL_CROSSING_VIOLATION: {
+    kind: "single",
+    offenceBg: "нарушаване на правилата за преминаване през железопътен прелез",
+    offenceQuote: T180_1(
+      "т. 3",
+      "наруши правилата за движение по обособено платно за движение на релсово пътно превозно средство или правилата за преминаване през железопътен прелез.",
+    ),
+    duties: [
+      DUTY(
+        "чл. 51",
+        "ЗДвП чл. 51, ал. 3",
+        "Спирането на пътните превозни средства е задължително пред железопътен прелез, който няма бариери.",
+      ),
+      // THE RETRACTION, MADE USEFUL. A previous wave printed „50 метра" here and
+      // shipped it marked approved; the act says 2 metres, and 1 metre from a
+      // barrier. Quoting the sentence is a better fix than deleting the number:
+      // the student now reads the real distances instead of nothing.
+      DUTY(
+        "чл. 51",
+        "ЗДвП чл. 51, ал. 4",
+        "Ако няма други указания, дадени с пътни знаци или с пътна маркировка, пред железопътния прелез пътните превозни средства спират на разстояние не по-малко от 2 метра преди първата релса, а когато има бариери - на 1 метър от тях.",
+      ),
+      DUTY(
+        "чл. 52",
+        "ЗДвП чл. 52",
+        "На участниците в движението е забранено да преминават през железопътен прелез:",
+      ),
+      DUTY(
+        "чл. 52",
+        "ЗДвП чл. 52, т. 1",
+        "при спуснати, започнали да се спускат или да се вдигат бариери, независимо дали от съответното за това устройство се подават светлинни или звукови сигнали, забраняващи навлизането в прелеза;",
+      ),
+      DUTY(
+        "чл. 53",
+        "ЗДвП чл. 53, ал. 2",
+        "Водачът на пътно превозно средство не трябва да започва преминаването на железопътния прелез, ако не е предварително убеден, че няма да се наложи спиране върху релсите или на разстояние по-малко от 2 метра от тях, поради техническите особености на превозното средство, условията на движение или други предвидими причини.",
+      ),
+    ],
+    fine: fine(100, null, F180_1("т. 3")),
+    controlPoints: CP_T11_RAIL,
+    noteBg:
+      "Глобата е малка, цената на грешката не е: влакът не може нито да спре навреме, нито да те заобиколи. Разстоянията за спиране са в цитираните по-горе текстове — прочети ги там, а не по спомен.",
+  },
+
+  EMERGENCY_LANE_DRIVING: {
+    kind: "single",
+    offenceBg: "движение в лентата за принудително спиране по автомагистрала",
+    duties: [
+      DUTY(
+        "чл. 58",
+        "ЗДвП чл. 58",
+        "При движение по автомагистрала на водача е забранено:",
+      ),
+      DUTY(
+        "чл. 58",
+        "ЗДвП чл. 58, т. 4",
+        "да се движи в платното за насрещно движение или в лентата за принудително спиране.",
+      ),
+      DUTY(
+        "чл. 58",
+        "ЗДвП чл. 58, т. 3",
+        "да спира в лентата за принудително спиране, освен при повреда на пътното превозно средство, както и при здравословни проблеми на водача или пътниците в превозното средство;",
+      ),
+    ],
+    fine: fine(1000, BAN_THREE_MONTHS, {
+      actFile: "zdvp.json",
+      unitRef: "чл. 178ж",
+      citationBg: "ЗДвП чл. 178ж, ал. 1",
+      quoteBg:
+        "Наказва се с лишаване от право да управлява моторно превозно средство за срок от три месеца и глоба 1000 лв. водач, който се движи в лентата за принудително спиране по автомагистрала, без да са налице изключенията по чл. 58, т. 3 или в платното за насрещно движение по автомагистрала и скоростен път.",
+    }),
+    controlPoints: CP_T6_EMERGENCY_LANE,
+    escalation: [
+      {
+        conditionBg: "когато нарушението по ал. 1 е извършено повторно",
+        fine: fine(4000, BAN_SIX_MONTHS, {
+          actFile: "zdvp.json",
+          unitRef: "чл. 178ж",
+          citationBg: "ЗДвП чл. 178ж, ал. 2",
+          quoteBg:
+            "Когато нарушението по ал. 1 е извършено повторно, наказанието е лишаване от право да управлява моторно превозно средство за срок от 6 месеца и глоба 4000 лв.",
+        }),
+        controlPoints: CP_T8_EMERGENCY_LANE_REPEAT,
+      },
+    ],
+    noteBg:
+      "Най-скъпото нарушение в този каталог, и повечето шофьори не го знаят. Тук се събират и трите системи наведнъж: пари, точки и самата книжка. Забележи и разликата между т. 3 и т. 4 на чл. 58 — СПИРАНЕТО при повреда е разрешено, ДВИЖЕНИЕТО по лентата не е никога.",
+  },
+
+  OVERTAKE_INSUFFICIENT_GAP: {
+    kind: "single",
+    offenceBg: "неправилно изпреварване — навлизане в насрещната лента срещу насрещно движещо се превозно средство",
+    offenceQuote: T183("ал. 2", "т. 6", "при неправилно изпреварване не създава опасност за движението;"),
+    duties: [
+      DUTY(
+        "чл. 43",
+        "ЗДвП чл. 43",
+        "Изпреварването на моторни превозни средства, с изключение на мотопеди и мотоциклети без кош, е забранено:",
+      ),
+      DUTY(
+        "чл. 43",
+        "ЗДвП чл. 43, т. 4",
+        "при използване на пътна лента за насрещно движение, когато изпреварващият не може да се върне безпрепятствено в напуснатата пътна лента;",
+      ),
+    ],
+    fine: fine(50, null, F183("ал. 2", "т. 6", 50)),
+    controlPoints: CP_T16_OVERTAKE_NO_DANGER,
+    escalation: [DANGER_179_1_5_OVERTAKE, CRASH_CASE],
+    noteBg:
+      "Тази грешка се дава само когато вече си в насрещната лента срещу приближаващо превозно средство — тоест по описанието си тя сочи ВТОРИЯ ред, не първия. Симулаторът обаче не установява „непосредствена опасност“ като правен факт, затова законовите редове стоят с условията си, а не като цена на това конкретно каране.",
+  },
+
+  ILLEGAL_STOP_IN_BAN_ZONE: {
+    kind: "single",
+    offenceBg: "неправилен престой в зона със знак В27",
+    offenceQuote: T183("ал. 2", "т. 1", "неправилно престоява или е паркирал неправилно;"),
+    fine: fine(50, null, F183("ал. 2", "т. 1", 50)),
+    controlPoints: notListed(
+      "Не е в изчерпателния списък по чл. 6, ал. 1 — само пари. Забележи все пак чл. 186, ал. 3: фиш за неправилно паркиране може да се издаде и без да си там, като се закрепи уведомление на колата.",
+    ),
+    escalation: [
+      {
+        conditionBg: "когато в резултат на нарушението е създадена непосредствена опасност за движението",
+        fine: fine(100, null, F180_1("т. 1")),
+        controlPoints: notListed(
+          "И тежкият състав не е в списъка: чл. 180, ал. 1 попада там само с т. 3 (прелезът), не с т. 1.",
+        ),
+      },
+    ],
+  },
+
+  SEATBELT_OFF_WHILE_MOVING: {
+    kind: "single",
+    offenceBg: "неизпълнение на задължението за използване на предпазен колан",
+    offenceQuote: T183(
+      "ал. 4",
+      "т. 7",
+      "не изпълнява задължението за използване на предпазен колан или носене на каска или превозва пътник, който не изпълнява задължението за използване на предпазен колан или носене на каска;",
+    ),
+    duties: [
+      DUTY(
+        "чл. 137а",
+        "ЗДвП чл. 137а, ал. 1",
+        "Водачите и пътниците в моторни превозни средства от категории M1, M2, M3 и N1, N2 и N3, когато са в движение, използват обезопасителните колани, с които моторните превозни средства са оборудвани.",
+      ),
+    ],
+    fine: fine(100, null, F183("ал. 4", "т. 7", 100)),
+    controlPoints: CP_T18_SEATBELT,
+    noteBg:
+      "Едно от малкото нарушения, които камера установява сама — глобата може да дойде като електронен фиш (ЗДвП чл. 189, ал. 4). И точките падат с него: това е промяната от 2025 – 2026 г., която учебниците още не са догонили.",
+  },
+
+  HEADLIGHTS_OFF_AT_NIGHT: {
+    kind: "conditional",
+    offenceBg: "движение през нощта без включени светлини",
+    duties: [
+      DUTY(
+        "чл. 70",
+        "ЗДвП чл. 70, ал. 1",
+        "При движение през нощта и при намалена видимост моторните превозни средства и трамваите трябва да бъдат с включени къси или дълги светлини, габаритни светлини и светлина за осветяване на задната табела с регистрационния номер.",
+      ),
+    ],
+    headlineBg:
+      "Задължението е безусловно, санкцията не е. Единственият състав в закона, който назовава светлините, е чл. 180, ал. 1, т. 1 — и той се задейства САМО когато от нарушението е създадена непосредствена опасност за движението. Без такава опасност законът, който този продукт съдържа, не поставя цена. Това не прави карането без светлини по-безопасно — прави го само по-евтино, докато нищо не се е случило.",
+    branches: [
+      {
+        conditionBg: "когато в резултат на нарушението е създадена непосредствена опасност за движението",
+        fine: fine(100, null, F180_1("т. 1")),
+        controlPoints: notListed(
+          "Чл. 180, ал. 1 присъства в списъка по чл. 6, ал. 1 само с т. 3 (железопътният прелез). Светлините не носят контролни точки.",
+        ),
+      },
+    ],
+    controlPoints: notListed(
+      "Каквото и да се случи с глобата, книжката не участва: нарушението не е сред изброените в чл. 6, ал. 1.",
+    ),
+  },
+
+  FOLLOWING_TOO_CLOSE: {
+    kind: "conditional",
+    offenceBg: "неспазване на дистанция",
+    duties: [
+      DUTY(
+        "чл. 23",
+        "ЗДвП чл. 23, ал. 1",
+        "Водачът на пътно превозно средство е длъжен да се движи на такова разстояние от движещото се пред него друго превозно средство, че да може да спре зад него, когато то намали скоростта или спре рязко.",
+      ),
+    ],
+    headlineBg:
+      "Дистанцията няма собствен наказателен състав. Думата „дистанция“ се среща в наказателната част на ЗДвП точно веднъж — в чл. 179, ал. 2, и то след като вече има произшествие. Дотогава е безплатна; след това е скъпа. Това е и най-честата причина за верижни удари в градско движение.",
+    branches: [CRASH_CASE],
+    controlPoints: notListed(
+      "Неспазването на дистанция не е сред двадесет и двете нарушения в чл. 6, ал. 1 — контролни точки не падат нито преди, нито след удара.",
+    ),
+  },
+
+  PEDESTRIAN_CROSSING_TOO_FAST: {
+    kind: "conditional",
+    offenceBg: "твърде бързо приближаване към пешеходна пътека",
+    duties: [
+      DUTY(
+        "чл. 119",
+        "ЗДвП чл. 119, ал. 1",
+        "При приближаване към пешеходна пътека водачът на нерелсово пътно превозно средство е длъжен да пропусне сигнализиращите, че ще пресичат платното за движение на пешеходната пътека съгласно чл. 32, ал. 1, стъпилите на пешеходната пътека или преминаващите по нея пешеходци, като намали скоростта или спре.",
+      ),
+      DUTY(
+        "чл. 20",
+        "ЗДвП чл. 20, ал. 2",
+        "Водачите на пътни превозни средства са длъжни при избиране скоростта на движението да се съобразяват с атмосферните условия, с релефа на местността, със състоянието на пътя и на превозното средство, с превозвания товар, с характера и интензивността на движението, с конкретните условия на видимост, за да бъдат в състояние да спрат пред всяко предвидимо препятствие.",
+      ),
+      // The sentence that changes what a crash here COSTS, quoted because it is
+      // the strongest argument for slowing down that the act contains.
+      DUTY(
+        "чл. 119",
+        "ЗДвП чл. 119, ал. 5",
+        "При пътнотранспортно произшествие с пешеходец на обозначена пътна маркировка \"пешеходна пътека\", когато водачът е превишил разрешената максимална скорост за движение или е нарушил друго правило от Закона за движението по пътищата, имащо отношение към произшествието, пешеходецът не се счита за съпричинител за настъпване на съответното произшествие.",
+      ),
+    ],
+    headlineBg:
+      "Самото приближаване с висока скорост няма цена в закона. Чл. 183, ал. 5, т. 2 наказва „не осигури предимство“ — а тази грешка се дава ПРЕДИ предимството да е нарушено, така че да я таксуваме по онзи текст значи да обвиним в нещо, което детекторът не е установил. Онова, което се променя обаче, е кой носи вината, ако все пак стане удар: по чл. 119, ал. 5 пешеходецът не се счита за съпричинител.",
+    branches: [CRASH_CASE],
+    controlPoints: notListed(
+      "Няма състав, значи няма и контролни точки — приближаването не е сред изброените в чл. 6, ал. 1. Ако предимството бъде нарушено, вече говорим за друга грешка — и тогава книжката плаща.",
+    ),
+  },
+
+  // The manoeuvre and judgement rows, spread in from their own block above.
+  // Two lanes filled this map on the same afternoon; keeping the second set in
+  // its own literal is what let both land without either overwriting the other.
+  ...MANOEUVRE_AND_JUDGEMENT_ROADS,
 };
 
 /**
@@ -1130,8 +2670,7 @@ export const ROAD_CONSEQUENCES: Partial<Record<ViolationCode, RoadConsequence>> 
  */
 export const UNKNOWN_ROAD: RoadConsequence = {
   kind: "unknown",
-  ruleBg:
-    "Санкцията на пътя за това нарушение още не е извлечена дословно от закона, затова тук няма число — по-добре празно, отколкото сгрешено. Общото правило: глобата се налага с фиш, когато за нарушението не е предвидено лишаване от право (ЗДвП чл. 186, ал. 1); ако е установено и заснето с автоматизирано техническо средство — с електронен фиш (ЗДвП чл. 189, ал. 4); а контролни точки се отнемат само за нарушенията, изброени в чл. 6, ал. 1 от Наредба № Iз-2539.",
+  ruleBg: UNKNOWN_ROAD_RULE_BG,
 };
 
 /**
@@ -1167,6 +2706,11 @@ export function allLawQuotes(): LawQuote[] {
     TOLERANCE_DELEGATION,
     TOLERANCE_SUBTRACTION,
     TOLERANCE_SIZE,
+    // The наредба's own half of the 2025 – 2026 instrument change, and the one
+    // exemption that the emergency-lane row punches through. Both are quoted in
+    // notes rather than attached to a figure, so nothing else would re-cut them.
+    CP_TAKEN_BY_ANY_INSTRUMENT,
+    CP_CLEAN_RECORD_EXEMPTION,
   ];
   // ALL THREE LADDERS, not only the one ROAD_CONSEQUENCES serves. ал. 2 and
   // ал. 3 are reachable through `deriveSpeedingBand` and would otherwise be the
@@ -1174,12 +2718,39 @@ export function allLawQuotes(): LawQuote[] {
   for (const ladder of Object.values(SPEEDING_LADDERS)) {
     for (const tier of ladder) out.push(tier.fine.source, tier.controlPoints.source);
   }
+  // TOTAL OVER THE UNION, not a branch per shape. `RoadConsequence` grew from
+  // four shapes to six in one afternoon with two lanes writing into it, and a
+  // collector that enumerates the shapes it happens to know silently stops
+  // re-cutting the quotes on a shape added after it — the exact way a figure
+  // gets to ship ungrounded. The switch below is exhaustive by construction:
+  // `never` in the default arm makes a seventh shape a COMPILE error here.
   for (const road of Object.values(ROAD_CONSEQUENCES)) {
     if (road === undefined) continue;
-    if (road.kind === "single") {
-      out.push(road.fine.source, road.controlPoints.source);
-    } else if (road.kind === "ladder") {
-      for (const tier of road.tiers) out.push(tier.fine.source, tier.controlPoints.source);
+    switch (road.kind) {
+      case "single":
+        out.push(road.fine.source, road.controlPoints.source);
+        if (road.offenceQuote !== undefined) out.push(road.offenceQuote);
+        out.push(...(road.duties ?? []));
+        for (const step of road.escalation ?? []) out.push(step.fine.source, step.controlPoints.source);
+        break;
+      case "ladder":
+        for (const tier of road.tiers) out.push(tier.fine.source, tier.controlPoints.source);
+        break;
+      case "conditional":
+        out.push(...road.duties);
+        for (const step of road.branches) out.push(step.fine.source, step.controlPoints.source);
+        if (road.controlPoints !== undefined) out.push(road.controlPoints.source);
+        break;
+      case "exam-only":
+        out.push(road.examSource, ...road.duties);
+        break;
+      case "authored":
+      case "unknown":
+        break;
+      default: {
+        const exhaustive: never = road;
+        throw new Error(`allLawQuotes: unhandled RoadConsequence ${JSON.stringify(exhaustive)}`);
+      }
     }
   }
   return out;

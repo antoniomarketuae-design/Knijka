@@ -311,6 +311,16 @@ export interface LessonSpec {
    */
   stagedEvents?: StagedEventSpec[];
   /**
+   * Doc 87 B40(a) — captions anchored to a STAGED ACTOR, for the case where
+   * the lesson's subject is a car the student cannot read at the range the
+   * lesson asks him to read it at. Render-only: `TrafficLayer` draws one
+   * billboarded world plane per entry while the named actor is genuinely
+   * standing still, and nothing here is graded (see
+   * `traffic/stagedActorLabels.ts` for the measurement and the honesty rule).
+   * Absent on every lesson but «Спане на зелено» — one `?? null` per frame.
+   */
+  actorLabels?: readonly ActorLabelSpec[];
+  /**
    * A13 exam session mode („Пробен практически изпит"). Additive; absent =
    * training lesson. True flips the session to exam-strict behavior:
    *  - coach OFF — every violation grades at catalog points from the FIRST
@@ -390,6 +400,28 @@ export interface LessonSpec {
  * recorder never does — recorded traces pin via authored signalOffsets
  * (the byte-identity gate). Absent = today's behavior, bit-identical.
  */
+/**
+ * Which authored caption a staged actor wears (doc 87 B40(a)).
+ *
+ * The union lives here, in the leaf, and the COPY lives in
+ * `traffic/stagedActorLabels.ts` — the same split `SignalLampState` /
+ * `world/components/signalHeadLabels.ts` uses, and for the same reason:
+ * `contracts.ts` may not import from a layer that imports it.
+ *
+ * `"standingOnGreen"` — a car holding still while its own signal is green,
+ * i.e. the demonstration «Спане на зелено» stages and the founder could not
+ * find („who ? who is sleeping on green").
+ */
+export type StagedActorLabelKind = "standingOnGreen";
+
+/** One caption, anchored to one staged actor for as long as its claim is true. */
+export interface ActorLabelSpec {
+  /** `StagedEventSpec.id` — the orchestrator stages the actor under this id,
+   *  so it is also `TrafficSystem.staged(id)`'s handle. */
+  actorId: string;
+  kind: StagedActorLabelKind;
+}
+
 export interface SignalPlanSpec {
   arm: "greenFresh" | "redFresh";
   /** Trigger ring radius around the target cluster's centroid, m (~45). */

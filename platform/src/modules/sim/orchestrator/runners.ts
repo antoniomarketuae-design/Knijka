@@ -37,8 +37,10 @@ import type {
   TrafficControllerSpec,
   TrainPassSpec,
 } from "../contracts";
+import type { ContactCastMember } from "./contact";
 import type { SimTickEvent } from "../rules";
 import type { Rng } from "../traffic/rng";
+import type { VehicleProfile } from "../traffic/types";
 import type {
   DirectorInput,
   SignalDirectorPort,
@@ -51,14 +53,27 @@ export const BRAKE_ONSET_THRESHOLD = 0.35;
 /** Player heading must point within this many degrees of a target to count
  * as approaching it (loose — roads bend). */
 const APPROACH_MAX_DEG = 80;
-/** Center-to-center distance treated as vehicle/vehicle contact, m
- * (≈ two half-lengths of the 4.3 m fleet cars, minus overlap slack). */
-const VEHICLE_CONTACT_M = 3.0;
-/** Center-to-center distance treated as running over a pedestrian, m. */
-export const PEDESTRIAN_CONTACT_M = 1.5;
-/** Center-to-center distance treated as striking the cyclist proxy, m. */
-const CYCLIST_CONTACT_M = 2.2;
-
+/**
+ * CONTACT IS GEOMETRY NOW, NOT A RADIUS (2026-08-10).
+ *
+ * This block used to hold three isotropic circles —
+ *   VEHICLE_CONTACT_M 3.0 · PEDESTRIAN_CONTACT_M 1.5 · CYCLIST_CONTACT_M 2.2
+ * — each compared against `Math.hypot(player, actor)`. A circle cannot tell
+ * nose-to-tail from side-by-side, and the founder was billed
+ * «Пътнотранспортно произшествие» (10 points, session terminated) for driving
+ * PAST A PARKED CAR with more than a metre of daylight: two 1.84 m bodies side
+ * by side sit 1.84 m of car apart, so the 3.0 m circle fired on every pass
+ * closer than 1.16 m of clear air — roughly the clearance the lesson teaches.
+ * The same constant demanded 1.1 m of interpenetration before it fired
+ * nose-to-tail, so it missed real rear-end contacts at the same time.
+ *
+ * Every contact adjudication below now runs `../collision`: exact
+ * separating-axis geometry on two oriented boxes sized from the ACTOR'S OWN
+ * profile, swept between frames so a fast approach cannot step over the
+ * contact, and returning a signed separation (metres of air, or penetration
+ * depth) rather than a boolean. `isContact(sep)` is `sep <= 0` — real contact
+ * is overlap, with no inflation band.
+ */
 const KMH_TO_MPS = 1 / 3.6;
 
 function dist(ax: number, ay: number, bx: number, by: number): number {
@@ -127,6 +142,39 @@ export interface EventRunner {
   outcome: StagedEventOutcome | null;
   /** True while this runner wants the lesson hazard visual animating. */
   hazardActive: boolean;
+  /**
+   * B81 — set by the director's ContactSentinel BEFORE `step()`, on every
+   * frame one of this runner's cast bodies is in real contact with the
+   * player. The runner reads it to RESOLVE the encounter as a crash; it never
+   * emits the collision itself (the sentinel is the only emitter, so a retired
+   * runner's contact is still billed).
+   */
+  contacted: boolean;
+  /**
+   * THE CAST — every staged body of this event the player can physically
+   * strike. Declared ONCE, at construction, and snapshotted by the director.
+   *
+   * IT IS A FIELD AND NOT A METHOD ON PURPOSE (B84). The B81 version was a
+   * per-frame `contactBodies(traffic, input, out)` call whose contract said
+   * "never read `this.phase`" — and every runner honoured that to the letter
+   * while gating on a `watching` latch set inside a narrative branch instead.
+   * `BrakingLeadCarRunner` latched only in its SLAM branch, so on the drills
+   * that deliberately disable the slam tier the latch could never arm: the
+   * player drove 1.7675 m into a standing car for 93 frames and the runner
+   * published nothing at all. A contract a runner has to keep is weaker than
+   * a shape it cannot break, so contact no longer asks a runner anything —
+   * this array carries no traffic port, no frame input and no callback, and
+   * the sentinel resolves every member's live pose itself, every frame of the
+   * session, from the first.
+   *
+   * EMPTY IS A POLICY, NOT AN OVERSIGHT. Four runners declare no cast (the
+   * signal-only dilemma, the dashboard telltale, the rear tailgater whose
+   * whole point is that a rear-end by the car behind is not the student's
+   * fault, and the police officer standing off the carriageway) — each says
+   * why at its own declaration, and each is a statement about the DRILL, made
+   * once and readable, not a latch that might or might not arm.
+   */
+  readonly contactCast: readonly ContactCastMember[];
   /** N11 cockpit-lamp channel (telltaleStimulus only): true while the staged
    *  dashboard warning telltale is lit — the director ORs it into its own
    *  `telltaleLit` scene seam (the hazardActive twin; the cluster and the
@@ -147,6 +195,40 @@ function outcomeOf(
   extra?: Partial<StagedEventOutcome>,
 ): StagedEventOutcome {
   return { eventId: spec.id, kind: spec.kind, success, detail, tSec: input.tSec, ...extra };
+}
+
+/**
+ * B84 cast helper — one staged VEHICLE body (or the v1 cyclist proxy, which is
+ * a narrow vehicle agent and therefore boxed, not disced).
+ *
+ * `minClosingKmh` is the encounter's own nudge floor, carried over verbatim
+ * from the contact branch B81 replaced: the numbers at each call site are not
+ * new policy, they are the numbers each runner already used — first moved to
+ * where a retirement could not reach them, now to where the runner itself
+ * cannot.
+ */
+function vehicleCast(
+  ownerId: string,
+  actorId: string,
+  profile: VehicleProfile | undefined,
+  /** The floor this encounter has always used, km/h. */
+  minClosingKmh: number,
+  /** "combined" = |player| + actor speed; "player" = the player's alone —
+   *  whichever the replaced branch tested. */
+  closing: "combined" | "player" = "combined",
+  withWhat: "vehicle" | "cyclist" = "vehicle",
+  frontalOnly = false,
+): ContactCastMember {
+  return {
+    actorId,
+    ownerId,
+    withWhat,
+    body: "box",
+    ...(profile !== undefined ? { profile } : {}),
+    minClosingKmh,
+    closing,
+    ...(frontalOnly ? { frontalOnly: true } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +326,7 @@ export class PedestrianDartOutRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private triggerDistM = 0;
   private approachSpeedKmh = 0;
@@ -253,7 +336,27 @@ export class PedestrianDartOutRunner implements EventRunner {
   private releaseAtSec: number | null = null;
   private readonly timer = new ReactionTimer();
 
-  constructor(readonly spec: PedestrianDartOutSpec) {}
+  /**
+   * A walker is a DISC (no body heading; the physics shell is a capsule), so
+   * this is car-box vs person-circle: 1.5 m directly BEHIND the car is not
+   * «прегази пешеходец». Watched from the first frame — she is standing on the
+   * pavement long before she steps off it, and a car that mounts the pavement
+   * has hit a person whether or not her cue has fired.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: PedestrianDartOutSpec) {
+    this.contactCast = [
+      {
+        actorId: spec.id,
+        ownerId: spec.id,
+        withWhat: "pedestrian",
+        body: "disc",
+        minClosingKmh: 5,
+        closing: "player",
+      },
+    ];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -312,6 +415,7 @@ export class PedestrianDartOutRunner implements EventRunner {
     this.approachSpeedKmh = 0;
     this.hazardActive = false;
     this.releaseAtSec = null;
+    this.contacted = false;
     this.timer.reset();
   }
 
@@ -370,9 +474,11 @@ export class PedestrianDartOutRunner implements EventRunner {
     if (onRoad && input.speedKmh <= 12) this.sawSlow = true;
 
     // Contact — the one adjudication no runtime detector can see (ambient
-    // NPCs are unhittable; staged actors must not be).
-    if (input.speedKmh > 5 && dist(input.x, input.y, actor.x, actor.y) < PEDESTRIAN_CONTACT_M) {
-      out.push({ kind: "collision", withWhat: "pedestrian" });
+    // NPCs are unhittable; staged actors must not be). The GEOMETRY and the
+    // BILLING now live in the director's ContactSentinel (see contact.ts): all
+    // that is left here is the resolution, so that retiring on the crossing
+    // violation below can no longer switch the watch off (B81).
+    if (this.contacted) {
       return this.resolve(input, false, "collision");
     }
     // Drove over the occupied crossing — the reducer grades
@@ -568,6 +674,7 @@ export class PriorityFromRightRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private leadSec = 0;
   private sawYield = false;
@@ -579,7 +686,12 @@ export class PriorityFromRightRunner implements EventRunner {
    *  on it would restore the exact deadlock that rule exists to end. */
   private stoppedRelease = false;
 
-  constructor(readonly spec: PriorityFromRightSpec) {}
+  /** The crossing car, solid from its hold pose short of the box onward. */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: PriorityFromRightSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 5)];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -609,6 +721,7 @@ export class PriorityFromRightRunner implements EventRunner {
     this.sawYield = false;
     this.stoppedForSec = 0;
     this.stoppedRelease = false;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -730,12 +843,10 @@ export class PriorityFromRightRunner implements EventRunner {
     if (playerLineDist <= 14 && input.speedKmh <= 8 && Math.abs(carArc) <= 26) {
       this.sawYield = true;
     }
-    // Contact in the box.
-    if (
-      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
-      input.speedKmh + actor.speedMps * 3.6 > 5
-    ) {
-      out.push({ kind: "collision", withWhat: "vehicle" });
+    // Contact in the box — the geometry and the billing live in the director's
+    // ContactSentinel now (contact.ts); retiring on the give-way violation
+    // below can no longer switch the watch off (B81).
+    if (this.contacted) {
       return this.resolve(input, false, "collision");
     }
     // The runtime's own junction adjudication fired on our car: the stop-line
@@ -828,6 +939,7 @@ export class BrakingLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private followGapM = 0;
   /**
@@ -905,7 +1017,29 @@ export class BrakingLeadCarRunner implements EventRunner {
   private reachedSlamPoint = false;
   private readonly timer = new ReactionTimer();
 
-  constructor(readonly spec: BrakingLeadCarSpec) {}
+  /**
+   * B84 — THE LEAD, SOLID FROM THE FIRST FRAME.
+   *
+   * This exact declaration used to be a per-frame publication gated on a
+   * `watching` latch that was set in ONE place: inside the slam branch. Two
+   * entire families of drill never take that branch — `sc-follow-standstill`
+   * parks its slam tier out of reach on purpose (`minSlamSpeedKmh` 250,
+   * `slamAt` y = 520 on a 360 m road) so the lead simply drives its authored
+   * pace profile into a standing queue, and the queue props hold at
+   * `armDistM` 3, i.e. they never arm at all. On those drills the runner
+   * published nothing, ever, and driving into the car was free: measured
+   * 1.7675 m of interpenetration for 93 consecutive frames, first contact at
+   * 29.8 km/h, and a sheet that read «passed».
+   *
+   * The floor and the "player-only" closing convention are the SAME numbers
+   * the slam branch used — nothing about what counts as a crash changed. What
+   * changed is that nothing has to happen first for the car to be a car.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: BrakingLeadCarSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 2, "player")];
+  }
 
   /**
    * B72 / FR-53 — the scheduled-cruise target for an arc position: the LAST
@@ -1024,6 +1158,7 @@ export class BrakingLeadCarRunner implements EventRunner {
     this.resolvedAtSec = null;
     this.resumed = false;
     this.reachedSlamPoint = false;
+    this.contacted = false;
     this.timer.reset();
   }
 
@@ -1113,8 +1248,22 @@ export class BrakingLeadCarRunner implements EventRunner {
     const relY = input.y - actor.y;
     const playerAheadM = relX * actor.dirX + relY * actor.dirY;
 
-    if (gap <= 0.3 && input.speedKmh > 2) {
-      out.push({ kind: "collision", withWhat: "vehicle" });
+    // THE TENTH CIRCLE — it carried no CONTACT constant, so the sweep that
+    // retired VEHICLE_CONTACT_M walked straight past it (2026-08-10).
+    // `gap = hypot(centres) − LEAD_CAR_LENGTH_M ≤ 0.3` is the same isotropic
+    // mistake wearing a subtraction: it fires at 4.6 m between centres in EVERY
+    // direction, so a lawful overtake of the stopped lead — abreast, 2.83 m of
+    // clear air between the flanks — was billed «Пътнотранспортно произшествие».
+    // That is 2.3× the worst case of the constant the founder reported, on the
+    // second-largest staged family in the catalogue (32 events), and this
+    // runner's own `passedWithoutStopping` outcome proves going abreast is an
+    // EXPECTED way to finish the encounter.
+    //
+    // `gap` stays exactly as it was for the REPORTED stopping distance (the
+    // pedagogical number the debrief prints, and the value every recorded
+    // outcome already carries); only the contact DECISION moved to real bodies
+    // — and then, in B81, out of `step()` entirely (see contact.ts).
+    if (this.contacted) {
       return this.resolve(input, false, "hitLeadCar", 0);
     }
     if (input.speedKmh <= LEAD_STOPPED_KMH) {
@@ -1160,12 +1309,24 @@ export class CyclistRightHookRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private releaseDistM = 0;
   private conflictExisted = false;
   private minPlayerJunctionM = Infinity;
 
-  constructor(readonly spec: CyclistRightHookSpec) {}
+  /**
+   * The cyclist proxy is a VEHICLE agent with a real heading on the bicycle
+   * rig (1.8 × 0.46 m), so it is BOXED, not disced: passing a metre off his
+   * elbow is a clearance fault (VULNERABLE_PASS_TOO_CLOSE), never a crash.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: CyclistRightHookSpec) {
+    this.contactCast = [
+      vehicleCast(spec.id, spec.id, spec.actor.profile ?? "cyclist", 3, "player", "cyclist"),
+    ];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -1195,6 +1356,7 @@ export class CyclistRightHookRunner implements EventRunner {
     this.outcome = null;
     this.conflictExisted = false;
     this.minPlayerJunctionM = Infinity;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1218,9 +1380,10 @@ export class CyclistRightHookRunner implements EventRunner {
     if (dPC <= s.conflictWindowM && dPJ <= 45) this.conflictExisted = true;
     if (dPJ < this.minPlayerJunctionM) this.minPlayerJunctionM = dPJ;
 
-    // Contact — grades COLLISION (cyclist) through the existing reducer.
-    if (dPC < CYCLIST_CONTACT_M && input.speedKmh > 3) {
-      out.push({ kind: "collision", withWhat: "cyclist" });
+    // Contact — grades COLLISION (cyclist) through the existing reducer; the
+    // geometry and the billing live in the director's ContactSentinel now, so
+    // retiring on the hook violation below cannot silence a later strike (B81).
+    if (this.contacted) {
       return this.resolve(input, false, "collision");
     }
     // The hook: right turn started at the junction with the cyclist alongside
@@ -1302,13 +1465,27 @@ export class RoundaboutEntryRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private conflictLeadM = 0;
   /** Continuous seconds the player has stood still at the give-way line — the
    *  stopped-witness release (see RB_WITNESS_STOPPED_NEAR_M). */
   private stoppedForSec = 0;
 
-  constructor(readonly spec: RoundaboutEntrySpec) {}
+  /**
+   * The circulator, FRONTAL ONLY — the player must be the striker. A
+   * circulator that runs into the BACK of a car already in the ring is the
+   * traffic guard's business, not the student's fault. That gate is geometric
+   * (it reads this frame's two poses), so it survives as a declared property
+   * of the cast rather than as a branch in a per-frame callback.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: RoundaboutEntrySpec) {
+    this.contactCast = [
+      vehicleCast(spec.id, spec.id, spec.actor.profile, 3, "player", "vehicle", true),
+    ];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -1331,6 +1508,7 @@ export class RoundaboutEntryRunner implements EventRunner {
     this.phase = "armed";
     this.outcome = null;
     this.stoppedForSec = 0;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1383,15 +1561,10 @@ export class RoundaboutEntryRunner implements EventRunner {
     }
 
     // triggered — waiting on the runtime adjudication scanned above.
-    // Player struck the circulator (frontal — the player is the striker).
-    const dPC = dist(input.x, input.y, actor.x, actor.y);
-    if (dPC < VEHICLE_CONTACT_M && input.speedKmh > 3) {
-      const rad = (input.headingDeg * Math.PI) / 180;
-      const ahead = (actor.x - input.x) * Math.sin(rad) + (actor.y - input.y) * Math.cos(rad);
-      if (ahead > 0) {
-        out.push({ kind: "collision", withWhat: "vehicle" });
-        return this.resolve(input, false, "collision");
-      }
+    // Player struck the circulator (frontal — the player is the striker); the
+    // geometry, the frontal gate and the billing live in the sentinel (B81).
+    if (this.contacted) {
+      return this.resolve(input, false, "collision");
     }
     if (dCenter > s.ringRadiusM + RB_EXIT_MARGIN_M) {
       return this.resolve(input, true, "clear");
@@ -1429,6 +1602,7 @@ export class AmberDilemmaRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private flipEtaSec = 0;
   private approachSpeedKmh = 0;
@@ -1438,6 +1612,9 @@ export class AmberDilemmaRunner implements EventRunner {
     readonly spec: AmberDilemmaSpec,
     private readonly signals: SignalDirectorPort | null,
   ) {}
+
+  /** No actor: the dilemma stages a signal phase, not a body. Nothing to hit. */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(_traffic: StagedTrafficPort, rng: Rng, _firstTime: boolean): void {
     // No actor to stage — only the per-attempt jitter draw (determinism:
@@ -1561,13 +1738,19 @@ export class OncomingLeftTurnRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private gapSec = 0;
   private committed = false;
   private sawYield = false;
   private acceptedGapSec: number | undefined;
 
-  constructor(readonly spec: OncomingLeftTurnSpec) {}
+  /** The oncoming car — a moving body from the first frame. */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: OncomingLeftTurnSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 5)];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -1598,6 +1781,7 @@ export class OncomingLeftTurnRunner implements EventRunner {
     this.committed = false;
     this.sawYield = false;
     this.acceptedGapSec = undefined;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1635,11 +1819,11 @@ export class OncomingLeftTurnRunner implements EventRunner {
     }
 
     // Contact in the box (frontal — the player crossed into the oncoming).
-    if (
-      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
-      input.speedKmh + actor.speedMps * 3.6 > 5
-    ) {
-      out.push({ kind: "collision", withWhat: "vehicle" });
+    // The geometry and the billing are the sentinel's now (B81) — which also
+    // closes the sharper edge of the same defect here: the `violated` branch
+    // above retires the runner IN THE SAME FRAME the head-on would have been
+    // read, so an LTAP that ended in a crash could bill the yield fault alone.
+    if (this.contacted) {
       return this.resolve(input, false, "collision");
     }
 
@@ -1754,6 +1938,16 @@ export class NarrowMeetingRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
+
+  /**
+   * THE RUNNER B81 WAS MEASURED ON — the two shipped sc-ov-narrow mistake
+   * demos retire on FAILED_TO_YIELD and the player then drives 1.77 m into the
+   * oncoming body for 110 / 137 frames with nothing billed. Under B84 the
+   * declaration itself is the guarantee: there is no latch here to arm, clear
+   * or forget.
+   */
+  readonly contactCast: readonly ContactCastMember[];
 
   // Section frame (unit start→end + left normal), built once.
   private readonly ux: number;
@@ -1771,6 +1965,7 @@ export class NarrowMeetingRunner implements EventRunner {
   private holding = false; // obstructionSide "oncoming": actor holds at entry
 
   constructor(readonly spec: NarrowMeetingSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 4)];
     const dx = spec.sectionEnd.x - spec.sectionStart.x;
     const dy = spec.sectionEnd.y - spec.sectionStart.y;
     this.lenM = Math.max(1, Math.hypot(dx, dy));
@@ -1833,6 +2028,7 @@ export class NarrowMeetingRunner implements EventRunner {
     this.sawConflict = false;
     this.sawWait = false;
     this.holding = false;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -1846,11 +2042,12 @@ export class NarrowMeetingRunner implements EventRunner {
     const actorAlong = this.along(actor.x, actor.y);
     const dStart = dist(input.x, input.y, s.sectionStart.x, s.sectionStart.y);
 
-    // Contact — the player squeezed into the oncoming.
-    if (
-      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
-      input.speedKmh + actor.speedMps * 3.6 > 4
-    ) {
+    // Contact — the player squeezed into the oncoming. THE PASS ITSELF IS NOT
+    // ONE: a стеснение is driven flank-to-flank, and the old 3.0 m circle
+    // convicted every meeting closer than 1.16 m of clear air. The geometry
+    // and the billing are the sentinel's (B81); the collision it pushes lands
+    // AFTER this frame's runner events, which keeps the teaching order below.
+    if (this.contacted) {
       // Name the LAW before its consequence. `resolve()` retires the runner, so
       // a barge whose contact beat the NM_SUSTAIN_SEC window used to emit a
       // collision and nothing else: the end-of-lesson ledger read «Опасни
@@ -1868,7 +2065,6 @@ export class NarrowMeetingRunner implements EventRunner {
       ) {
         out.push({ kind: "prioritySituation", situation: "narrow-meeting", violated: true });
       }
-      out.push({ kind: "collision", withWhat: "vehicle" });
       return this.resolve(input, false, "collision");
     }
 
@@ -2032,6 +2228,7 @@ export class EmergencyApproachRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private releaseGapM = 0;
   private responseWindowSec = 0;
@@ -2049,7 +2246,12 @@ export class EmergencyApproachRunner implements EventRunner {
   private prevY = 0;
   private prevHeadingDeg = 0;
 
-  constructor(readonly spec: EmergencyApproachSpec) {}
+  /** The ambulance is 5.6 × 2.1 m, not a car: its own profile sizes the box. */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: EmergencyApproachSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 5)];
+  }
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -2086,6 +2288,7 @@ export class EmergencyApproachRunner implements EventRunner {
     this.sawYield = false;
     this.approachSpeedKmh = 0;
     this.shiftRightM = 0;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -2099,12 +2302,10 @@ export class EmergencyApproachRunner implements EventRunner {
     const behindM = -actorAheadM;
 
     // Contact — the player steered into the passing actor (the rear is
-    // covered by the player guard; a side swipe is the player's doing).
-    if (
-      dist(input.x, input.y, actor.x, actor.y) < VEHICLE_CONTACT_M &&
-      input.speedKmh + actor.speedMps * 3.6 > 5
-    ) {
-      out.push({ kind: "collision", withWhat: "vehicle" });
+    // covered by the player guard; a side swipe is the player's doing). The
+    // geometry and the billing are the sentinel's now (B81), so retiring on
+    // the чл. 91 duty cannot hide a side-swipe of the ambulance afterwards.
+    if (this.contacted) {
       return this.resolve(traffic, input, false, "collision");
     }
 
@@ -2241,8 +2442,20 @@ export class PoliceStopRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   constructor(readonly spec: PoliceStopSpec) {}
+
+  /**
+   * NO CAST BY POLICY, not by oversight: this runner emits ZERO SimTick
+   * events, ever (see the block comment above) — an unmodelled duty must not
+   * convict (A12), and the officer really is off the carriageway. Measured on
+   * both shipped posts rather than assumed: templates-cockpit stands him at
+   * x = 15.6 with the graded halt point at x = 13.9 (the right lane's right
+   * edge), and templates-pe2 stands him at the kerb x. If that policy is ever
+   * revisited, this is where the disc goes.
+   */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -2333,6 +2546,7 @@ export class TrafficControllerRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private sawHold = false;
 
@@ -2340,6 +2554,24 @@ export class TrafficControllerRunner implements EventRunner {
     readonly spec: TrafficControllerSpec,
     private readonly signals: SignalDirectorPort | null,
   ) {}
+
+  /**
+   * NO CAST: the регулировчик is a standing figure and this runner emits only
+   * the signal-controller schedule — the lamps grade, not the body
+   * (`traffic-controller.test.ts` pins the silence).
+   *
+   * B84 sweep, MEASURED rather than assumed, because "he is off the road" is
+   * a claim: all three shipped posts stand at (0, −11) on sx-v1, i.e. on the
+   * ROAD's centre line, while the player's approach lane centre is x = 4.06.
+   * Touching is |Δx| = PLAYER_HALF_WIDTH 0.85 + PED_RADIUS 0.3 = 1.15 m, so a
+   * student holding their own lane clears him by 2.91 m and CANNOT reach him
+   * — but one who drifts ~2.9 m left, into the oncoming lane, can, and would
+   * be told nothing. That is the same shape as B84 and it is left open on
+   * purpose: billing it means deciding what running down a traffic officer
+   * grades as and rewriting the три регулировчик cards, which is a content
+   * decision, not a detector fix.
+   */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -2569,6 +2801,7 @@ export class CutInLeadCarRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private paceAheadM = 0;
   private cutAtSec: number | null = null;
@@ -2583,7 +2816,20 @@ export class CutInLeadCarRunner implements EventRunner {
   private indicatorOffAtSec: number | null = null;
   private minDistToCutM = Infinity;
 
-  constructor(readonly spec: CutInLeadCarSpec) {}
+  /**
+   * Sized from the actor's OWN profile: sc-vu-child-cyclist stages a CHILD ON
+   * A BICYCLE here, 0.33 m wide — 2.35 m of centres is 1.2 m of clear air, a
+   * VULNERABLE_PASS_TOO_CLOSE, not «Пътнотранспортно произшествие».
+   *
+   * B84: the latch this replaces armed at the CUT, so the adjacent-lane pace
+   * car — which rides beside the player for the whole approach, often for
+   * tens of seconds — was passable until it decided to merge.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: CutInLeadCarSpec) {
+    this.contactCast = [vehicleCast(spec.id, spec.id, spec.actor.profile, 5)];
+  }
 
   /**
    * Where the actor rides while it is still only pacing, m of centres ahead.
@@ -2701,6 +2947,7 @@ export class CutInLeadCarRunner implements EventRunner {
     this.indicatorOn = false;
     this.indicatorOffAtSec = null;
     this.minDistToCutM = Infinity;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -2827,8 +3074,11 @@ export class CutInLeadCarRunner implements EventRunner {
     // Cut executed — the production FOLLOWING_TOO_CLOSE pipeline grades; the
     // runner only measures and covers physical contact.
     const centerGap = dist(input.x, input.y, actor.x, actor.y);
-    if (centerGap < VEHICLE_CONTACT_M && input.speedKmh + actor.speedMps * 3.6 > 5) {
-      out.push({ kind: "collision", withWhat: "vehicle" });
+    // CONTACT is body geometry; `centerGap` below stays the FOLLOWING-distance
+    // measure it always was (a bumper-gap approximation feeding the cut-in
+    // hold/recovery law), and the two must not be confused again. The geometry
+    // and the billing are the sentinel's now (B81).
+    if (this.contacted) {
       return this.resolve(input, false, "collision");
     }
     const bumperGap = Math.max(0, centerGap - LEAD_CAR_LENGTH_M);
@@ -2910,6 +3160,7 @@ export class RearTailgaterRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   private releaseGapM = 0;
   private followBehindM = 0;
@@ -2923,6 +3174,23 @@ export class RearTailgaterRunner implements EventRunner {
   private indicatorOffAtSec: number | null = null;
 
   constructor(readonly spec: RearTailgaterSpec) {}
+
+  /**
+   * NO CAST BY POLICY (see the block comment above): this actor is PRESSURE
+   * SCENERY that emits zero SimTick events, ever. It is the one staged body
+   * that approaches from BEHIND, and a rear-end by a car glued to your bumper
+   * is not the student's fault — billing it here would convict the victim. The
+   * safety is structural, not a hope: the authored decel cap (12 m/s², above
+   * the hero's max brake) means the лепка stops inside its own cushion even
+   * against a brake-check.
+   *
+   * B84 note, because "it can never touch you" is a claim and not a proof: a
+   * player who REVERSES into the tailgater is still unbilled here. That is the
+   * one case where the victim reasoning inverts, and it is left open
+   * deliberately — closing it means deciding what reversing into the car
+   * behind you grades as, which is a card rewrite, not a detector fix.
+   */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(traffic: StagedTrafficPort, rng: Rng, firstTime: boolean): void {
     const s = this.spec;
@@ -3086,11 +3354,15 @@ export class TelltaleStimulusRunner implements EventRunner {
   hazardActive = false;
   /** The cockpit-lamp channel the director ORs into `telltaleLit`. */
   telltaleLit = false;
+  contacted = false;
 
   private approachSpeedKmh = 0;
   private readonly timer = new ReactionTimer();
 
   constructor(readonly spec: TelltaleStimulusSpec) {}
+
+  /** No actor: the stimulus is a dashboard lamp. Nothing to hit. */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(_traffic: StagedTrafficPort, _rng: Rng, _firstTime: boolean): void {
     // No actor and no jitter draw: the stimulus is authored scenery-of-state
@@ -3172,8 +3444,23 @@ export class OncomingStreamRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
-  constructor(readonly spec: OncomingStreamSpec) {}
+  /**
+   * The stream is SEVERAL bodies, each with its own actorId so the swept probe
+   * tracks them independently. All of them, from the first frame: the stream
+   * stands queued in the oncoming lane before it is released, and a player who
+   * strays into that lane early has hit a car that is standing there.
+   */
+  readonly contactCast: readonly ContactCastMember[];
+
+  constructor(readonly spec: OncomingStreamSpec) {
+    const cast: ContactCastMember[] = [];
+    for (let i = 0; i < spec.count; i++) {
+      cast.push(vehicleCast(spec.id, `${spec.id}-${i}`, spec.actor.profile, 5));
+    }
+    this.contactCast = cast;
+  }
 
   private carId(i: number): string {
     return `${this.spec.id}-${i}`;
@@ -3228,6 +3515,7 @@ export class OncomingStreamRunner implements EventRunner {
     }
     this.phase = "armed";
     this.outcome = null;
+    this.contacted = false;
   }
 
   step(traffic: StagedTrafficPort, input: DirectorInput, out: SimTickEvent[]): StagedEventOutcome | null {
@@ -3245,20 +3533,16 @@ export class OncomingStreamRunner implements EventRunner {
     }
 
     // triggered — clockwork in motion; watch only for contact and completion.
+    // Head-on contact with ANY car of the stream (the sentinel bills it — B81).
+    if (this.contacted) {
+      this.phase = "resolved";
+      this.outcome = outcomeOf(s, input, false, "collision");
+      return this.outcome;
+    }
     let allClear = true;
     for (let i = 0; i < s.count; i++) {
       const car = traffic.staged(this.carId(i));
       if (!car) continue;
-      if (
-        dist(input.x, input.y, car.x, car.y) < VEHICLE_CONTACT_M &&
-        input.speedKmh + car.speedMps * 3.6 > 5
-      ) {
-        // Head-on contact — the one event this runner ever emits.
-        out.push({ kind: "collision", withWhat: "vehicle" });
-        this.phase = "resolved";
-        this.outcome = outcomeOf(s, input, false, "collision");
-        return this.outcome;
-      }
       // Behind the CAR's own travel frame = already met and passed.
       const relAlong =
         (input.x - car.x) * car.dirX + (input.y - car.y) * car.dirY;
@@ -3288,8 +3572,21 @@ export class TrainPassRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
   hazardActive = false;
+  contacted = false;
 
   constructor(readonly spec: TrainPassSpec) {}
+
+  /**
+   * NO CAST — and this one is a KNOWN GAP, not a policy (B81 sweep, restated
+   * unchanged by the B84 sweep). This runner has never had a contact test at
+   * all, so in the TRACE channel a player who drives onto the crossing under a
+   * moving 34.4 m train is billed only by the world-data rail detectors; the
+   * body itself is not watched. The live Rapier path does catch it. Closing it
+   * means deciding what a train strike grades as and re-recording the RX
+   * family, which is its own wave — it is written down here rather than
+   * silently left blank.
+   */
+  readonly contactCast: readonly ContactCastMember[] = [];
 
   stage(traffic: StagedTrafficPort, _rng: Rng, firstTime: boolean): void {
     const s = this.spec;

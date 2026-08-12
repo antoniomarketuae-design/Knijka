@@ -29,6 +29,8 @@ import {
   N38_OPASNA_HEADER,
   N38_OSNOVNA_DEF,
   N38_PASS_RULE,
+  N38_TERMINATION_RULE,
+  N38_TERMINATION_UNIT_REF,
   N38_UNIT_REF,
   N38_VTOROSTEPENNA_DEF,
   type N38Basis,
@@ -129,6 +131,41 @@ describe("б. „в“ is a CLOSED list — and this is that list", () => {
 
   it("our six constants ARE the act's six, verbatim", () => {
     expect(new Set(Object.values(N38_OPASNA_CASES))).toEqual(new Set(enumerated));
+  });
+});
+
+// --- what ENDS an exam, which is NOT in приложение № 5 ----------------------
+
+describe("чл. 48, ал. 3 — the only provision that terminates a practical exam", () => {
+  const terminationUnit = act.units.find((u) => u.ref === N38_TERMINATION_UNIT_REF);
+
+  it("is quoted verbatim from the act", () => {
+    expect(terminationUnit).toBeDefined();
+    expect(norm(terminationUnit!.textBg)).toContain(N38_TERMINATION_RULE);
+  });
+
+  it("is the ONLY place the act ends a practical exam", () => {
+    // If an amendment adds a second termination ground, the copy that cites
+    // this one becomes a partial statement of the law and must be revisited.
+    const enders = act.units.filter((u) => /Практическият изпит се прекратява/.test(norm(u.textBg)));
+    expect(enders.map((u) => u.ref)).toEqual([N38_TERMINATION_UNIT_REF]);
+  });
+
+  it("names exactly two grounds, and a bare опасна грешка is neither", () => {
+    // THE DISTINCTION THE COPY GOT WRONG. The clause reaches повторна намеса
+    // and допускане на ПТП. „Опасна грешка" as such does not appear in it —
+    // an опасна that is neither costs 10 and FAILS the exam by т. 11; it does
+    // not stop it. See the n38.ts header for the founder's question behind it.
+    expect(N38_TERMINATION_RULE).toContain("повторна намеса на комисията");
+    expect(N38_TERMINATION_RULE).toContain("при допускане на ПТП");
+    expect(N38_TERMINATION_RULE).not.toContain("опасна грешка");
+  });
+
+  it("only the codes flagged terminateSession claim it, and ПТП is the only one", () => {
+    const terminating = (Object.keys(VIOLATIONS) as ViolationCode[]).filter(
+      (c) => VIOLATIONS[c].terminateSession === true,
+    );
+    expect(terminating).toEqual(["COLLISION"]);
   });
 });
 

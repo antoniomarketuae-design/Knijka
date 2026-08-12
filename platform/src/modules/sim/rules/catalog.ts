@@ -546,8 +546,17 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,
     titleBg: "Пътнотранспортно произшествие",
+    // 2026-08-10: the old text said „прекратява изпита незабавно" and stopped
+    // there — an ending asserted with no article behind it, beside a 10 with no
+    // word on whether it was this one fault or a balance running out. The
+    // second half is what this prose now answers, in a sentence a 17-year-old
+    // reads; the ENDING moved to where every other legal figure on this card
+    // already lives — `examMarkFor()`, which now carries чл. 48, ал. 3 verbatim
+    // for any code flagged `terminateSession` and prints it under this text.
+    // Repeating the quote here as well was written and then deleted after
+    // looking at the rendered card: it printed twice, two lines apart.
     explanationBg:
-      "Настъпи сблъсък. На реалния изпит това прекратява изпита незабавно. В симулатора продължаваме, за да се учиш — но сесията се оценява като прекратена.",
+      "Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски. В симулатора продължаваме, за да се учиш, но сесията се оценява като прекратена.",
     correctiveBg:
       "Карай така, че винаги да имаш къде да спреш: гледай далеч напред, дръж 2 секунди зад предния и намалявай ПРЕДИ конфликтните точки (кръстовища, пътеки, паркирани коли).",
     // чл. 20, ал. 2 named: „…за да бъдат в състояние да спрат пред всяко

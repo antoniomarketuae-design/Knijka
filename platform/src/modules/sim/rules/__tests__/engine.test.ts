@@ -541,10 +541,10 @@ describe("pedestrian crossing detectors", () => {
 // ---------------------------------------------------------------------------
 
 describe("collision detector", () => {
-  it("collision is опасна, flags session termination, and debounces multi-contact", () => {
+  it("collision is опасна, flags session termination, and bills the encounter once", () => {
     const { state, events } = drive([
       tick(1, { speedKmh: 30, events: [collision("vehicle")] }),
-      tick(2, { speedKmh: 0, events: [collision("staticObject")] }), // inside 3 s cooldown
+      tick(2, { speedKmh: 0, events: [collision("staticObject")] }), // still touching
     ]);
     expect(codes(events)).toEqual(["COLLISION"]);
     expect(events[0]).toMatchObject({
@@ -556,12 +556,90 @@ describe("collision detector", () => {
     expect(state.terminated).toBe(true);
   });
 
-  it("a genuinely separate collision after the cooldown fires again", () => {
+  it("a genuinely separate collision, after the bodies came apart, fires again", () => {
     const { events } = drive([
       tick(1, { speedKmh: 30, events: [collision("vehicle")] }),
       tick(5, { speedKmh: 20, events: [collision("staticObject")] }),
     ]);
     expect(codes(events)).toEqual(["COLLISION", "COLLISION"]);
+  });
+
+  // -------------------------------------------------------------------------
+  // ONE ENCOUNTER = ONE ACCIDENT (the DEDUPE wave). The two cases below are
+  // the definition, and they must both hold or the rule is not the rule:
+  // a scrape is one accident however long it lasts, and a re-hit after the
+  // bodies parted is a second one however quickly it follows.
+  //
+  // What made this necessary, measured on the shipped code: the old rule was a
+  // 3 s RATE LIMIT, so a contact that kept being reported billed 10 points
+  // every 3 s forever — 11 «Пътнотранспортно произшествие» for 30 s of one
+  // touch — while a real second impact 1 s after the first billed nothing.
+  // -------------------------------------------------------------------------
+
+  /** Contact reported on every frame from t0 for `sec`, at `hz`. */
+  function contactStream(t0: number, sec: number, hz: number, gapSec = 0): SimTick[] {
+    const out: SimTick[] = [];
+    const step = 1 / hz;
+    for (let t = t0; t <= t0 + sec + 1e-9; t += step) {
+      const touching = gapSec === 0 || t <= t0 || t > t0 + gapSec;
+      out.push(tick(Number(t.toFixed(4)), {
+        speedKmh: 6,
+        events: touching ? [collision("staticObject")] : [],
+      }));
+    }
+    return out;
+  }
+
+  it("scraping along a wall for four seconds is ONE accident, not two", () => {
+    // 60 Hz of unbroken contact — the render-rate live loop. The old rate limit
+    // billed this twice (t = 0 and t = 3).
+    const { events } = drive(contactStream(0, 4, 60));
+    expect(codes(events)).toEqual(["COLLISION"]);
+    expect(events[0].t).toBe(0);
+  });
+
+  it("thirty seconds pressed against the same bumper is still ONE accident", () => {
+    // The founder's report: nine «Пътнотранспортно произшествие» — 90 points —
+    // out of one encounter down the standing column. Rapier itself does not
+    // re-fire a sustained contact (measured: one enter, zero exits in 30 s);
+    // the NPC shell pool does, because it rebinds every 0.5 s and a rebound
+    // shell is teleported, which re-fires collisionEnter at exactly that
+    // cadence. So this is the founder's stream: contact re-reported at 2 Hz.
+    const frames: SimTick[] = [];
+    for (let t = 0; t <= 30; t += 0.5) {
+      frames.push(tick(t, { speedKmh: 0, events: [collision("vehicle")] }));
+    }
+    const { events } = drive(frames);
+    expect(codes(events)).toEqual(["COLLISION"]);
+  });
+
+  it("hit, reverse out, hit again is TWO accidents", () => {
+    // 2.35 s of daylight — MEASURED in rapier as the fastest a chassis can back
+    // 1 m off a shell and drive back into it, with an instant gearbox and no
+    // interlocks. The real D→N→R gate makes a student's version longer.
+    const { events } = drive([
+      tick(0, { speedKmh: 12, events: [collision("vehicle")] }),
+      ...cruise(0.5, 2, { speedKmh: -6, gear: -1 }), // backing off, no contact
+      tick(2.35, { speedKmh: 8, events: [collision("vehicle")] }),
+    ]);
+    expect(codes(events)).toEqual(["COLLISION", "COLLISION"]);
+  });
+
+  it("the separation window sits clear of BOTH neighbours it has to separate", () => {
+    // Floor: the 0.5 s shell-rebind gap must read as the same encounter.
+    // Ceiling: 2.35 s of daylight must read as a new one. The configured
+    // window has to be strictly between them or one of the two cases breaks.
+    const cfg = createRuleEngine().config;
+    expect(cfg.collisionSeparationSec).toBeGreaterThan(0.5);
+    expect(cfg.collisionSeparationSec).toBeLessThan(2.35);
+  });
+
+  it("a burst of contacts drained into ONE tick bills once", () => {
+    // worldRuntime empties its collisionQueue into whichever tick comes next,
+    // so a paused/slow frame can deliver nine at the same timestamp.
+    const nine = Array.from({ length: 9 }, () => collision("vehicle"));
+    const { events } = drive([tick(1, { speedKmh: 20, events: nine })]);
+    expect(codes(events)).toEqual(["COLLISION"]);
   });
 });
 

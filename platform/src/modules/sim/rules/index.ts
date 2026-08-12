@@ -40,6 +40,15 @@ export {
 } from "./catalog";
 
 /**
+ * WHICH OF SEVERAL CITED FAULTS PRICES A CARD. A surface that shows more than
+ * one code — the mistake-consequence card is the first, and it badged running
+ * over a child as «второстепенна · −1» because SPEEDING_OVER_LIMIT happened to
+ * be typed first — must rank them by Наредба № 38, приложение № 5, т. 10 and
+ * not by authoring order. See gravest.ts for why a reorder is not the fix.
+ */
+export { gravestViolation, severityRank, type GravestViolation } from "./gravest";
+
+/**
  * The one splitter for the `lawRef` strings this subpackage authors. Imported
  * by `modules/tutor` and `modules/hazard` rather than copied — a second
  * implementation of „what does this citation say" is how the two drift, and
@@ -64,6 +73,9 @@ export {
   N38_OSNOVNA_DEF,
   N38_PASS_RULE,
   N38_REF,
+  N38_TERMINATION_CITATION,
+  N38_TERMINATION_RULE,
+  N38_TERMINATION_UNIT_REF,
   N38_UNIT_REF,
   N38_VTOROSTEPENNA_DEF,
   type ConflictEvidence,
@@ -98,6 +110,7 @@ export {
   instrumentLabelBg,
   instrumentsForBan,
   roadConsequenceFor,
+  type ConditionalPenalty,
   type ControlPointsFigure,
   type EnforcementInstrument,
   type ExamMark,
@@ -107,6 +120,36 @@ export {
   type LawQuote,
   type RoadConsequence,
 } from "./consequences";
+
+/**
+ * ONE ACT, ONE ROAD PRICE. The exam sheet counts FAULTS and the street counts
+ * OFFENCES, and moving off unbelted is two of the first and one of the second —
+ * so the result screen was quoting 200 лв. and 20 контролни точки for one belt.
+ * `billRoadConsequences` decides which rows print the road half; nothing here
+ * touches a score. The census that found the pair (and the ones deliberately
+ * left alone) is `SEPARATE_ACTS` / `GATED_SHARED_PROVISIONS`, held to the real
+ * data by `__tests__/offences.test.ts`.
+ */
+export {
+  GATED_SHARED_PROVISIONS,
+  OFFENCE_GROUPS,
+  SEPARATE_ACTS,
+  billRoadConsequences,
+  offenceCoveredBodyBg,
+  offenceCoveredExamNoteBg,
+  offenceCoveredHeadlineBg,
+  offenceCoveredLineBg,
+  offenceCoversNoteBg,
+  offenceGroupFor,
+  sharedChargeFor,
+  ungatedChargeFor,
+  type GatedSharedProvision,
+  type OffenceBilling,
+  type OffenceCharge,
+  type OffenceGroupSpec,
+  type OffencePairing,
+  type SeparateActsSpec,
+} from "./offences";
 
 /**
  * WHICH RUNG, NOT WHICH TABLE. `deriveSpeedingBand` takes the two numbers the
@@ -151,10 +194,14 @@ export {
  * it and adds the Наредба № 38 приложение № 5 clause helpers.
  */
 export {
+  COLLISION_CONSEQUENCE_BG,
+  COLLISION_TERMINATION_SHORT_BG,
   CONTROL_SCALE_SOURCE_BG,
   EXAM_PASS_RULE_BG,
   EXAM_POINTS_SHORT_NOTE_BG,
   EXAM_SCALE_SOURCE_BG,
+  EXAM_TERMINATION_CITATION_BG,
+  EXAM_TERMINATION_RULE_BG,
   MANOEUVRE_MAX_PER_LINE,
   POINT_SCALES,
   THEORY_EXAM_RULE_BG,

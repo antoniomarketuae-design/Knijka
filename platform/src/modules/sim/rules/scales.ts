@@ -49,7 +49,12 @@
  */
 
 import { pointsBg, pointsWordsBg } from "@/lib/content/pointScales";
-import { N38_CLAUSE_CLASS, N38_PASS_RULE } from "./n38";
+import {
+  N38_CLAUSE_CLASS,
+  N38_PASS_RULE,
+  N38_TERMINATION_CITATION,
+  N38_TERMINATION_RULE,
+} from "./n38";
 import { SEVERITY_POINTS, type SeverityClass } from "./types";
 
 /**
@@ -135,6 +140,51 @@ export function examPointsForClassBg(severityClass: SeverityClass): string {
  */
 export const EXAM_POINTS_SHORT_NOTE_BG =
   "Наказателни точки от изпитния лист по Наредба № 38 — важат за този урок. НЕ са контролни точки по книжката.";
+
+// ---------------------------------------------------------------------------
+// The sentence that answers the SECOND misreading: „и изпитът свърши?"
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS IS A SEPARATE VOCABULARY ENTRY AND NOT A PHRASE IN THE CARD.
+ *
+ * A collision says two things to a student at once, and until 2026-08-10 the
+ * product said them as one: „Настъпи сблъсък — реалният изпит се прекратява
+ * незабавно", with a 10 beside it and no act named for either half. The number
+ * and the ending are set by different provisions of the same наредба (the
+ * `N38_TERMINATION_RULE` header in `n38.ts` has the full argument), and the
+ * ending one is NARROWER than the sentence implied — so writing it out by hand
+ * on each surface is how the over-claim spread to four of them.
+ *
+ * `examMarkFor()` now carries the same two facts per code, derived; these are
+ * the ready-made sentences for surfaces that print prose rather than a mark.
+ */
+
+/** чл. 48, ал. 3, verbatim — quote it, never paraphrase it. */
+export const EXAM_TERMINATION_RULE_BG = N38_TERMINATION_RULE;
+
+/** „Наредба № 38, чл. 48, ал. 3". */
+export const EXAM_TERMINATION_CITATION_BG = N38_TERMINATION_CITATION;
+
+/**
+ * What a ПТП costs, both halves, with both addresses — the result screen and
+ * the debrief. Deliberately says „една опасна грешка": the founder's whole
+ * question was whether a 10 beside a driving simulator is a running balance
+ * (контролни точки are), and the answer is that it is a single mark on a single
+ * sheet that exists only while the exam does.
+ */
+export const COLLISION_CONSEQUENCE_BG =
+  `Настъпи сблъсък. Това е ЕДНА опасна грешка: ${examPointsForClassBg("opasna")} за самото деяние, ` +
+  `а не сбор от много дребни (${examMarkCitationBg("opasna")}). ` +
+  `И освен точките, само тази грешка спира и самия изпит (${N38_TERMINATION_CITATION}).`;
+
+/**
+ * The in-drive form, for a card with room for a line and not a paragraph.
+ * Printed only where the code actually terminates (`ExamMark.terminatesExam`).
+ */
+export const COLLISION_TERMINATION_SHORT_BG =
+  "Освен точките, сблъсъкът е и единствената грешка, която спира самия изпит: " +
+  `„Практическият изпит се прекратява … при допускане на ПТП“ (${N38_TERMINATION_CITATION}).`;
 
 /*
  * DELIBERATELY ABSENT: a short paraphrase of the pass rule. There was one here

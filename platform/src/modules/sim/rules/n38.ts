@@ -78,6 +78,49 @@ export const N38_ACT_ID = "naredba-38" as const;
 export const N38_UNIT_REF = "приложение № 5" as const;
 
 // ---------------------------------------------------------------------------
+// чл. 48, ал. 3 — the ONLY provision in the act that ENDS a practical exam
+// ---------------------------------------------------------------------------
+
+/**
+ * THE SECOND POINTS QUESTION, AND THE DISTINCTION IT TURNS ON (2026-08-10).
+ *
+ * The founder read „Настъпи сблъсък — реалният изпит се прекратява незабавно"
+ * beside a 10 and asked, for the second time in two days, whether the number
+ * was real. It is — but the sentence next to it was quoting NO ACT, and the two
+ * halves of it come from two different places in this наредба:
+ *
+ *   THE 10        приложение № 5, т. 10, б. „в" (`N38_OPASNA_HEADER` above).
+ *                 A ПТП is charged under case 5, „създаде предпоставка за
+ *                 допускане на ПТП", по аргумент за по-силното основание — see
+ *                 `N38_BASIS.COLLISION`. It is the price of ONE опасна грешка,
+ *                 not a balance being drained.
+ *   THE ENDING    чл. 48, ал. 3, below. Nothing in приложение № 5 ends an
+ *                 exam; т. 10 only sets marks and т. 11 only decides pass/fail.
+ *
+ * AND THE CLAUSE IS NARROWER THAN THE PRODUCT USED TO SAY. Until this constant
+ * existed, `CONSEQUENCE_FRAMING_BG.opasna` told a student that ANY опасна
+ * грешка „прекратява изпита на място". Read the sentence: the exam is
+ * terminated on повторна намеса на комисията and on допускане на ПТП — and on
+ * nothing else. An опасна that is neither (не спре при Б2, червен сигнал) costs
+ * 10, and 10 > 9, so т. 11 makes the exam НЕИЗДЪРЖАН — a different fact, on a
+ * different scale, at a different moment. Conflating „you have failed" with
+ * „the examiner stopped the car" is the same class of error as conflating
+ * наказателни with контролни точки, and it was live on every опасна card.
+ *
+ * Verbatim from `content/law/acts/naredba-38.json`, unit „чл. 48"; the only
+ * occurrence of the sentence in the act.
+ * `__tests__/naredba-38-classification.test.ts` re-derives it on every run.
+ */
+export const N38_TERMINATION_RULE =
+  "Практическият изпит се прекратява при повторна намеса на комисията, когато действията на кандидата са опасни за другите участници в движението и при допускане на ПТП.";
+
+/** The unit `N38_TERMINATION_RULE` is cut from. */
+export const N38_TERMINATION_UNIT_REF = "чл. 48" as const;
+
+/** The address a surface prints beside the sentence. */
+export const N38_TERMINATION_CITATION = "Наредба № 38, чл. 48, ал. 3" as const;
+
+// ---------------------------------------------------------------------------
 // Per-code grounding
 // ---------------------------------------------------------------------------
 

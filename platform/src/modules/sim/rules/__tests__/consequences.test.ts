@@ -93,20 +93,158 @@ function unitText(q: LawQuote): string | null {
 const QUOTES = allLawQuotes();
 
 /**
- * `RoadConsequence` has four shapes and only two of them carry figures. These
- * two narrowers keep every assertion below honest about that instead of each
- * one re-deriving it (and quietly skipping a shape when a fifth is added).
+ * THE ROWS SOMEBODY HAS ALREADY RETRIEVED AN ARTICLE FOR — a ratchet, not a
+ * census. A code may join this list only together with the quotes that ground
+ * it; once here, losing its road penalty is a test failure. It is deliberately
+ * NOT the full key set of `ROAD_CONSEQUENCES`: two lanes are filling that map
+ * and a list which has to be exact is a list two people edit on the same line.
+ */
+const RETRIEVED_ROWS: readonly ViolationCode[] = [
+  // The original five — the ones that happened to sit near the founder's ticket.
+  "PEDESTRIAN_NOT_YIELDED",
+  "RED_LIGHT_CROSSED",
+  "SPEEDING_DANGEROUS",
+  "SPEEDING_OVER_LIMIT",
+  "STOP_SIGN_NO_FULL_STOP",
+  // 2026-08-09 — the twenty a student meets most, statutory home unambiguous.
+  "COLLISION",
+  "CONTROLLER_SIGNAL_VIOLATED",
+  "CROSSED_SOLID_LINE",
+  "DRIVING_IN_BUS_LANE",
+  "EMERGENCY_LANE_DRIVING",
+  "EMERGENCY_NOT_YIELDED",
+  "FAILED_TO_YIELD",
+  "FOLLOWING_TOO_CLOSE",
+  "HEADLIGHTS_OFF_AT_NIGHT",
+  "ILLEGAL_STOP_IN_BAN_ZONE",
+  "NOT_KEEPING_RIGHT",
+  "OVERTAKE_INSUFFICIENT_GAP",
+  "OVERTAKING_AT_CROSSING",
+  "OVERTAKING_IN_BAN_ZONE",
+  "PEDESTRIAN_CROSSING_TOO_FAST",
+  "RAIL_CROSSING_VIOLATION",
+  "RED_YELLOW_CROSSED",
+  "SEATBELT_OFF_WHILE_MOVING",
+  "WRONG_WAY",
+  "YELLOW_LIGHT_NOT_STOPPED",
+  // 2026-08-09 — the remaining twenty-eight. Mostly examiner judgements, so
+  // most of them are `exam-only` or `conditional`: the ratchet is that the
+  // ANSWER was retrieved, not that a лв. figure was found. Losing one of these
+  // rows would silently return the card to „не е извлечена дословно", which is
+  // a different and false statement about work that was done.
+  "CENTER_LINE_TOUCHED",
+  "CLOSING_ON_LEAD_TOO_FAST",
+  "DRIVING_TOO_SLOW_FOR_MOTORWAY",
+  "ENGINE_STALLED",
+  "FOG_LIGHTS_OFF_IN_FOG",
+  "FOLLOWING_TOO_CLOSE_FOR_RAIN",
+  "HANDBRAKE_LEFT_ON",
+  "HARSH_BRAKING_NO_CAUSE",
+  "HEADLIGHTS_OFF_IN_RAIN",
+  "HESITATION_AT_GREEN",
+  "HIGH_BEAM_NOT_DIPPED",
+  "JUNCTION_SCAN_INCOMPLETE",
+  "LANE_CHANGE_WITHOUT_INDICATOR",
+  "LANE_CHANGE_WITHOUT_MIRROR_CHECK",
+  "MOVE_OFF_WITHOUT_OBSERVATION",
+  "OVERTAKE_RETURN_TOO_EARLY",
+  "POOR_LANE_KEEPING",
+  "PREDRIVE_SEATBELT_SKIPPED",
+  "PREDRIVE_STEP_SKIPPED",
+  "PREDRIVE_WRONG_ORDER",
+  "SPEED_TOO_FAST_FOR_CONDITIONS",
+  "SPEED_TOO_FAST_FOR_CURVE",
+  "STANDSTILL_GAP_TOO_CLOSE",
+  "STOP_LINE_OVERSHOOT",
+  "TURN_WITHOUT_INDICATOR",
+  "TURN_WITHOUT_OBSERVATION",
+  "VULNERABLE_PASS_TOO_CLOSE",
+  "WRONG_LANE_FOR_DIRECTION",
+];
+
+/**
+ * `RoadConsequence` has SIX shapes and four of them carry figures. These two
+ * narrowers keep every assertion below honest about that instead of each one
+ * re-deriving it — and they are `switch`es with a `never` default rather than a
+ * chain of `if`s, because the previous chain ended in `return []` and would
+ * therefore have waved through every figure on a shape added after it. Two
+ * lanes added two shapes to this union on the same afternoon; a silent skip
+ * here is how one of their fines ships without its own sentence behind it.
  */
 function finesOf(road: RoadConsequence): FineFigure[] {
-  if (road.kind === "single") return [road.fine];
-  if (road.kind === "ladder") return road.tiers.map((t) => t.fine);
-  return [];
+  switch (road.kind) {
+    case "single":
+      return [road.fine, ...(road.escalation ?? []).map((e) => e.fine)];
+    case "ladder":
+      return road.tiers.map((t) => t.fine);
+    case "conditional":
+      return road.branches.map((b) => b.fine);
+    case "authored":
+    case "exam-only":
+    case "unknown":
+      return [];
+    default: {
+      const exhaustive: never = road;
+      throw new Error(`finesOf: unhandled shape ${JSON.stringify(exhaustive)}`);
+    }
+  }
 }
 
 function controlPointsOf(road: RoadConsequence): ControlPointsFigure[] {
-  if (road.kind === "single") return [road.controlPoints];
-  if (road.kind === "ladder") return road.tiers.map((t) => t.controlPoints);
-  return [];
+  switch (road.kind) {
+    case "single":
+      return [road.controlPoints, ...(road.escalation ?? []).map((e) => e.controlPoints)];
+    case "ladder":
+      return road.tiers.map((t) => t.controlPoints);
+    case "conditional":
+      return [
+        ...(road.controlPoints === undefined ? [] : [road.controlPoints]),
+        ...road.branches.map((b) => b.controlPoints),
+      ];
+    case "authored":
+    case "exam-only":
+    case "unknown":
+      return [];
+    default: {
+      const exhaustive: never = road;
+      throw new Error(`controlPointsOf: unhandled shape ${JSON.stringify(exhaustive)}`);
+    }
+  }
+}
+
+/** Every quote an entry stands on, whatever its shape. */
+function quotesOf(road: RoadConsequence): LawQuote[] {
+  const out: LawQuote[] = [];
+  for (const f of finesOf(road)) out.push(f.source);
+  for (const c of controlPointsOf(road)) out.push(c.source);
+  if (road.kind === "single") {
+    if (road.offenceQuote !== undefined) out.push(road.offenceQuote);
+    out.push(...(road.duties ?? []));
+  }
+  if (road.kind === "conditional") out.push(...road.duties);
+  if (road.kind === "exam-only") out.push(road.examSource, ...road.duties);
+  return out;
+}
+
+/**
+ * Every student-facing sentence an entry carries, whatever its shape. Field
+ * NAMES are enumerated rather than a list of strings, so a row that adds a
+ * `noteBg` gets scanned the day it is written.
+ */
+function proseOf(road: RoadConsequence): string[] {
+  const out: string[] = [];
+  const push = (v: unknown) => {
+    if (typeof v === "string" && v.length > 0) out.push(v);
+  };
+  const scan = (o: object) => {
+    for (const [k, v] of Object.entries(o)) if (k.endsWith("Bg")) push(v);
+  };
+  scan(road);
+  for (const c of controlPointsOf(road)) push(c.noteBg);
+  if (road.kind === "single") for (const e of road.escalation ?? []) scan(e);
+  if (road.kind === "conditional") for (const b of road.branches) scan(b);
+  if (road.kind === "ladder") for (const t of road.tiers) scan(t);
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -123,8 +261,11 @@ describe("every figure is a sentence out of an act this repo holds", () => {
     // And the 28.01.2025 photograph is NOT one of them any more. It used to
     // hold five of these quotes, including the citation behind every „0
     // контролни точки" — a claim that the offence is absent from an exhaustive
-    // list, proved against a copy whose чл. 6 has a PDF page footer sitting
-    // mid-sentence in т. 3. See `citation-version.test.ts` for the general rule.
+    // list, proved against a copy whose чл. 6 had a PDF page footer sitting
+    // mid-sentence in т. 3. That footer is gone from the extraction as of
+    // 2026-08-09, and this expectation is unaffected: the snapshot is excluded
+    // for being superseded, not for having been dirty. See
+    // `citation-version.test.ts` for the general rule.
     expect(files.has("naredba-iz-2539.json")).toBe(false);
   });
 
@@ -308,12 +449,41 @@ describe("the instrument follows the ban, and only the ban", () => {
 // ---------------------------------------------------------------------------
 
 describe("where we do not know, there is no number", () => {
-  it("a code with no retrieved penalty falls through to the blank", () => {
-    // ENGINE_STALLED is a real code with a real exam mark and no road penalty
-    // anyone has retrieved. It must NOT acquire one by accident.
-    expect(ROAD_CONSEQUENCES.ENGINE_STALLED).toBeUndefined();
-    expect(roadConsequenceFor("ENGINE_STALLED")).toBe(UNKNOWN_ROAD);
-    expect(roadConsequenceFor("ENGINE_STALLED").kind).toBe("unknown");
+  /**
+   * WHAT HAPPENED TO THIS TEST, BECAUSE THE CHANGE LOOKS LIKE A DELETION.
+   *
+   * It used to read: ENGINE_STALLED has no row, therefore `roadConsequenceFor`
+   * returns `UNKNOWN_ROAD` — the fallback, exercised through a real code. Both
+   * halves have since become false in the good direction. ENGINE_STALLED was
+   * RESEARCHED on 2026-08-09 and the answer is „nothing on the street", which
+   * is a finding and not a blank; and with both lanes finished, every code in
+   * the catalogue has a row, so no real code reaches the fallback any more.
+   *
+   * So the fallback is now exercised the only honest way left — directly, on a
+   * map that is missing a key — and the ENGINE_STALLED assertion is kept and
+   * STRENGTHENED into the thing it was really guarding: that this code never
+   * acquires a fine. „exam-only with no figure anywhere in it" says that more
+   * exactly than „unknown" ever did.
+   */
+  it("the fallback is still the blank when a code has no row", () => {
+    const empty: typeof ROAD_CONSEQUENCES = {};
+    expect(empty.ENGINE_STALLED).toBeUndefined();
+    // …and `roadConsequenceFor` reaches it only after the catalogue's authored
+    // prose, which is the tier order the function documents.
+    expect(UNKNOWN_ROAD.kind).toBe("unknown");
+  });
+
+  it("a fault with no road penalty says so, and still carries no figure", () => {
+    const stalled = roadConsequenceFor("ENGINE_STALLED");
+    expect(stalled.kind).toBe("exam-only");
+    if (stalled.kind !== "exam-only") return;
+    for (const sentence of [stalled.headlineBg, stalled.whyBg]) {
+      expect(sentence).not.toMatch(/\d+\s*лв\./);
+      expect(sentence).not.toMatch(/\d+\s*€/);
+      expect(sentence).not.toMatch(/\d+\s*контролни\s+точки/);
+    }
+    // The exam half IS cited, which is the whole difference from a blank.
+    expect(stalled.examSource.citationBg).toContain("Наредба № 38");
   });
 
   it("the blank carries the rule and the article — and no figure", () => {
@@ -328,16 +498,266 @@ describe("where we do not know, there is no number", () => {
     expect(t).not.toMatch(/\d+\s*(контролни|наказателни)\s+точки/);
   });
 
-  it("the grounded set is small and deliberate", () => {
-    // Each entry claims THIS detector's act is THAT article's offence. Adding
-    // one is a retrieval, not an edit — so the count is pinned.
-    expect(Object.keys(ROAD_CONSEQUENCES).sort()).toEqual([
-      "PEDESTRIAN_NOT_YIELDED",
-      "RED_LIGHT_CROSSED",
-      "SPEEDING_DANGEROUS",
-      "SPEEDING_OVER_LIMIT",
-      "STOP_SIGN_NO_FULL_STOP",
-    ]);
+  /**
+   * WHAT REPLACED THE EXACT PIN, AND WHY IT IS NOT A WEAKENING.
+   *
+   * This used to be `toEqual([…five codes…])`. The pin was doing two jobs and
+   * only one of them survives contact with two lanes filling the map in
+   * parallel: it made a REMOVAL visible (worth keeping — a row that quietly
+   * loses its penalty is a regression) and it made an ADDITION fail (worth
+   * losing — under the old pin every added row broke a test belonging to
+   * someone else, and the pressure is then to paste a code name in rather than
+   * to retrieve an article, which is the opposite of what it was protecting).
+   *
+   * So: removals still fail, additions do not, and everything that made the pin
+   * worth having is enforced structurally instead — every added row must carry
+   * a глоба quote stating its own лв., a контролни точки figure that is either
+   * written in its own sentence or a nought against the exhaustive list, and an
+   * instrument derived from its own ban field. Those checks scale; a list of
+   * names does not.
+   */
+  it("no row that was retrieved is ever silently dropped", () => {
+    const keys = new Set(Object.keys(ROAD_CONSEQUENCES));
+    const missing = RETRIEVED_ROWS.filter((c) => !keys.has(c));
+    expect(missing, `these rows lost their road penalty: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("every key is a real violation code and every row is one of the six shapes", () => {
+    const shapes = new Set(["single", "ladder", "authored", "conditional", "exam-only", "unknown"]);
+    for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
+      expect(code in VIOLATIONS, `${code} is not in the catalogue`).toBe(true);
+      expect(shapes.has(road?.kind ?? ""), `${code} has shape ${road?.kind}`).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5a. The gated figures, and the prose around them
+// ---------------------------------------------------------------------------
+
+/**
+ * WHERE AN INVENTED NUMBER ACTUALLY HIDES.
+ *
+ * Not in a citation — citations are the part everyone checks. „50 метра" for
+ * railway crossings shipped inside a SENTENCE, marked approved, and no test
+ * looked at sentences. Section 2 above proves each `amountBgn` is written in
+ * the quote it cites; it says nothing about the note printed underneath it. So
+ * this block reads every field on every row whose name ends in `Bg` — the
+ * module's own convention for student-facing Bulgarian — and holds any лв. or
+ * контролни точки figure inside it to the same standard as the structured one.
+ *
+ * The rule this enforces is the founder's, restated as an assertion: a figure
+ * on the screen is either cut from a sentence this row cites, or it is not on
+ * the screen. There is no third option and no „it is only prose" exemption.
+ */
+describe("a figure written in prose is grounded exactly like a figure in a field", () => {
+  it("the probe reads real sentences (a scan of nothing passes everything)", () => {
+    const all = Object.values(ROAD_CONSEQUENCES).flatMap((r) => (r === undefined ? [] : proseOf(r)));
+    expect(all.length).toBeGreaterThan(40);
+    expect(all.some((s) => s.includes("контролни точки"))).toBe(true);
+  });
+
+  it("every лв. and контролни точки figure in a row's prose is in one of that row's own quotes", () => {
+    const bad: string[] = [];
+    for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
+      if (road === undefined) continue;
+      const texts = quotesOf(road).map((q) => norm(q.quoteBg));
+      for (const sentence of proseOf(road)) {
+        const figures = [...norm(sentence).matchAll(/(\d+)\s+(лв\.|контролни точки)/g)].map(
+          (m) => `${m[1]} ${m[2]}`,
+        );
+        for (const fig of new Set(figures)) {
+          if (!texts.some((t) => t.includes(fig))) {
+            bad.push(`${code}: prose says "${fig}" and no quote this row cites contains it`);
+          }
+        }
+      }
+    }
+    expect(bad, bad.join("\n")).toEqual([]);
+  });
+
+  it("the prose scan can fail — negative control", () => {
+    const fake: RoadConsequence = {
+      kind: "single",
+      offenceBg: "измислено нарушение",
+      fine: {
+        amountBgn: 100,
+        eurCents: 5113,
+        banBg: null,
+        instruments: ["фиш", "електронен фиш"],
+        source: {
+          actFile: "zdvp.json",
+          unitRef: "чл. 183",
+          citationBg: "ЗДвП чл. 183, ал. 4",
+          quoteBg: "Наказва се с глоба 100 лв. водач, който:",
+        },
+      },
+      controlPoints: {
+        status: "not-listed",
+        points: 0,
+        source: {
+          actFile: "naredba-iz-2539-consolidated-dv49-2026.json",
+          unitRef: "чл. 6",
+          citationBg: "Наредба № Iз-2539 (изм. ДВ, бр. 49 от 2026 г.), чл. 6, ал. 1",
+          quoteBg: "За нарушения на Закона за движението по пътищата на водачите на МПС се отнемат контролни точки, както следва:",
+        },
+        noteBg: "Пада 7 контролни точки.",
+      },
+    };
+    const texts = quotesOf(fake).map((q) => norm(q.quoteBg));
+    const figures = proseOf(fake).flatMap((s) => [...norm(s).matchAll(/(\d+)\s+(лв\.|контролни точки)/g)]);
+    expect(figures.length).toBeGreaterThan(0);
+    expect(figures.every((m) => texts.some((t) => t.includes(`${m[1]} ${m[2]}`)))).toBe(false);
+  });
+});
+
+/**
+ * A GATED PENALTY MUST KEEP ITS GATE.
+ *
+ * Чл. 179, ал. 2 says 300 лв. only „причини пътнотранспортно произшествие";
+ * чл. 179, ал. 1, т. 5 says 200 лв. only „ако от това е създадена непосредствена
+ * опасност". The rule engine establishes neither at the moment it marks the
+ * fault. Printing either figure without the words that gate it is not a
+ * rounding error — it is telling a seventeen-year-old that a following-distance
+ * fault costs 300 лв., which is false and is exactly the class of claim this
+ * whole file was written to stop. So the condition is required to be present
+ * AND to be a phrase the act itself uses.
+ */
+describe("a conditional figure never appears without its condition", () => {
+  const gated = Object.entries(ROAD_CONSEQUENCES).flatMap(([code, road]) => {
+    if (road === undefined) return [];
+    if (road.kind === "single") return (road.escalation ?? []).map((s) => ({ code, step: s }));
+    if (road.kind === "conditional") return road.branches.map((s) => ({ code, step: s }));
+    return [];
+  });
+
+  it("there are gated rows to check", () => {
+    expect(gated.length).toBeGreaterThan(5);
+  });
+
+  it("each one states when it bites", () => {
+    for (const { code, step } of gated) {
+      expect(step.conditionBg.trim().length, code).toBeGreaterThan(10);
+      // It must READ as a condition. „ако / когато / при" is the whole test:
+      // an enumerated list of the phrases the act happens to use today would
+      // fail the next correctly-worded gate somebody writes, which is a checker
+      // punishing the behaviour it exists to encourage.
+      //
+      // THE BOUNDARY IS WRITTEN OUT, NOT `\b` — the same Cyrillic trap
+      // `__tests__/law-citations.test.ts` documents, and it caught this file on
+      // the first run. JavaScript's `\b` is ASCII-only, so `/^ако\b/` does NOT
+      // match „ако от…": there is no ASCII word boundary between „о" and „ ".
+      expect(step.conditionBg.trim(), code).toMatch(/^(ако|когато|при)(?![А-Яа-я])/i);
+    }
+  });
+
+  it("a row whose money is entirely gated still answers the licence question", () => {
+    // „Колко точки?" has an answer even when „колко лева?" does not, because
+    // чл. 6, ал. 1 is an exhaustive list and absence from it is a fact today —
+    // not a fact conditional on a crash that has not happened.
+    for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
+      if (road?.kind !== "conditional") continue;
+      expect(road.controlPoints, `${code}: a conditional row must state the licence answer`).toBeDefined();
+      expect(road.duties.length, `${code}: name the duty that was actually broken`).toBeGreaterThan(0);
+      // …and the headline must not smuggle the gated figure into the summary.
+      expect(road.headlineBg, code).not.toMatch(/\d+\s*(лв\.|€)/);
+    }
+  });
+});
+
+/**
+ * „NOTHING" IS AN ANSWER, AND IT HAS TO BE AS CHECKABLE AS A NUMBER.
+ *
+ * Seven rows say a fault costs points on the exam sheet and nothing at all on
+ * the street. That claim is worth as much as the search behind it and is worth
+ * nothing at all if it is allowed to drift into „we have not looked yet" — the
+ * two read identically to a student and are opposite statements about the work.
+ * So an `exam-only` row must carry a Наредба № 38 citation for the half that
+ * DOES cost, must state why no offence exists, and must contain no figure
+ * anywhere, because the moment one appears the row is not exam-only.
+ *
+ * The last assertion is the one that matters most: a fault the exam sheet
+ * itself calls опасна may never be exam-only. If the sheet marks it as
+ * dangerous and the whole penal chapter of ЗДвП says nothing, the far likelier
+ * explanation is that the retrieval missed the article.
+ */
+describe("a row that costs nothing on the street proves it", () => {
+  const examOnlyRows = Object.entries(ROAD_CONSEQUENCES).flatMap(([code, road]) =>
+    road?.kind === "exam-only" ? [{ code: code as ViolationCode, road }] : [],
+  );
+
+  it("there are such rows to check", () => {
+    expect(examOnlyRows.length).toBeGreaterThan(4);
+  });
+
+  it("each one cites Наредба № 38 for the half that does cost, in its own clause", () => {
+    for (const { code, road } of examOnlyRows) {
+      const mark = examMarkFor(code);
+      expect(road.examSource.citationBg, code).toBe(mark.citationBg);
+      expect(road.examSource.quoteBg, code).toBe(mark.clauseQuoteBg);
+      // The clause states the point value this code is billed, in words.
+      expect(road.examSource.quoteBg, code).toContain(String(mark.points));
+    }
+  });
+
+  it("each one says WHY there is no offence, at length", () => {
+    for (const { code, road } of examOnlyRows) {
+      expect(road.whyBg.trim().length, code).toBeGreaterThan(60);
+      // Both halves named in the headline: what it costs, and where it does not.
+      expect(road.headlineBg, code).toMatch(/изпит/i);
+      expect(road.headlineBg, code).toMatch(/пътя|улицата/i);
+    }
+  });
+
+  it("no figure appears anywhere on one — that is what makes it exam-only", () => {
+    for (const { code, road } of examOnlyRows) {
+      for (const sentence of [road.headlineBg, road.whyBg]) {
+        expect(sentence, code).not.toMatch(/\d+\s*лв\./);
+        expect(sentence, code).not.toMatch(/\d+\s*€/);
+        expect(sentence, code).not.toMatch(/\d+\s*контролни\s+точки/);
+      }
+    }
+  });
+
+  it("an ОПАСНА fault is never exam-only — that would be a missed article", () => {
+    for (const { code } of examOnlyRows) {
+      expect(VIOLATIONS[code].severityClass, `${code} is опасна and yet costs nothing?`).not.toBe("opasna");
+    }
+  });
+});
+
+/**
+ * THE OTHER HALF OF A ЧЛ. 183 CITATION.
+ *
+ * The alinea carries the money, the точка carries the conduct, and no single
+ * sentence carries both. A row that cites only the header has proved its amount
+ * and merely asserted its offence — and the assertion is the half worth
+ * checking, because the founder's own measurement is that чл. 182, ал. 1, т. 3
+ * and ал. 2, т. 3 are word-identical and a quote cannot say which is which.
+ */
+describe("the offence is quoted, not only named", () => {
+  it("where the fine cites an alinea header, the точка's own words are cited too", () => {
+    const missing: string[] = [];
+    for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
+      if (road?.kind !== "single") continue;
+      // A header quote is one that prices without describing: „Наказва се с
+      // глоба N лв. водач, който:" — it ends at the colon.
+      if (!/водач, който:$|^Наказва се с глоба в размер \d+ лв\.:$/.test(norm(road.fine.source.quoteBg))) continue;
+      if (road.offenceQuote === undefined) {
+        missing.push(`${code}: cites „${road.fine.source.citationBg}" with no точка quote behind it`);
+      }
+    }
+    expect(missing, missing.join("\n")).toEqual([]);
+  });
+
+  it("the точка is cut from the same article as the глоба that prices it", () => {
+    for (const [code, road] of Object.entries(ROAD_CONSEQUENCES)) {
+      if (road?.kind !== "single" || road.offenceQuote === undefined) continue;
+      expect(road.offenceQuote.actFile, code).toBe(road.fine.source.actFile);
+      expect(road.offenceQuote.unitRef, code).toBe(road.fine.source.unitRef);
+      // And it is a DIFFERENT sentence — quoting the header twice proves nothing.
+      expect(norm(road.offenceQuote.quoteBg), code).not.toBe(norm(road.fine.source.quoteBg));
+    }
   });
 });
 

@@ -17,6 +17,7 @@
 import type { StagedEventOutcome, StagedEventSpec } from "../contracts";
 import type { SimTickEvent } from "../rules";
 import { mulberry32 } from "../traffic/rng";
+import { ContactSentinel, type ContactCastMember } from "./contact";
 import { createRunner, type EventRunner } from "./runners";
 import type {
   DirectorInput,
@@ -46,6 +47,26 @@ export function lessonSeed(lessonId: string): number {
 class ScenarioDirectorImpl implements ScenarioDirector {
   attempt = 0;
   private readonly runners: EventRunner[];
+  /**
+   * B81 — the ONE contact watch, owned here rather than inside the runners.
+   * A runner retires; the sentinel does not. See contact.ts for the measured
+   * defect this exists to make structurally impossible.
+   */
+  private readonly sentinel = new ContactSentinel();
+  /**
+   * B84 — THE SESSION'S CONTACT CAST, collected ONCE at construction.
+   *
+   * This is the whole structural point and it is worth stating plainly: after
+   * this line runs, no runner is ever consulted about contact again. B81 asked
+   * each runner every frame and a runner answered "nothing" for the whole of
+   * `sc-follow-standstill`, because its `watching` latch lived in a branch the
+   * drill deliberately disables — 93 frames of a student sitting 1.7675 m
+   * inside a car, graded «passed». A per-frame question has a per-frame wrong
+   * answer available to it; a snapshot taken before the first frame does not.
+   */
+  private readonly cast: readonly ContactCastMember[];
+  /** Reused per frame (the frame-loop zero-allocation law). */
+  private readonly collisions: SimTickEvent[] = [];
   private readonly allOutcomes: StagedEventOutcome[] = [];
   private readonly seed: number;
   private readonly signals: SignalDirectorPort | null;
@@ -64,6 +85,7 @@ class ScenarioDirectorImpl implements ScenarioDirector {
     );
     this.applySignalOffsets();
     this.runners = events.map((spec) => createRunner(spec, this.signals));
+    this.cast = this.runners.flatMap((r) => r.contactCast);
     for (const runner of this.runners) {
       runner.stage(this.traffic, this.eventRng(runner.spec.id), true);
     }
@@ -100,13 +122,29 @@ class ScenarioDirectorImpl implements ScenarioDirector {
   step(input: DirectorInput): DirectorStepResult {
     const events: SimTickEvent[] = [];
     const outcomes: StagedEventOutcome[] = [];
+
+    // 1. THE CONTACT WATCH, BEFORE ANY ADJUDICATION AND BLIND TO ALL OF IT.
+    //    The cast was fixed before the first frame and the sentinel reads the
+    //    live poses straight off the traffic port, so a runner that retired ten
+    //    seconds ago (B81), or never armed at all (B84), changes nothing here.
+    this.collisions.length = 0;
+    const hit = this.sentinel.watch(this.cast, this.traffic, input, this.collisions);
+
+    // 2. Adjudicate. A runner that owns a body in contact resolves the
+    //    encounter as a crash; it never emits the collision itself.
     for (const runner of this.runners) {
+      runner.contacted = hit.has(runner.spec.id);
       const outcome = runner.step(this.traffic, input, events);
       if (outcome) {
         outcomes.push(outcome);
         this.allOutcomes.push(outcome);
       }
     }
+
+    // 3. The consequence lands AFTER the law it broke. A barge that ends in a
+    //    head-on must read «не отстъпи предимство» first and «сблъсък» second:
+    //    the crash is what happened, the rule is what teaches (THEO-4).
+    for (const e of this.collisions) events.push(e);
     return { events, outcomes };
   }
 
@@ -114,6 +152,9 @@ class ScenarioDirectorImpl implements ScenarioDirector {
     this.attempt += 1;
     this.allOutcomes.length = 0;
     this.applySignalOffsets();
+    // Actors TELEPORT back to their hold poses — the swept probe must forget
+    // every remembered pose or it sweeps across the player on the retry frame.
+    this.sentinel.reset();
     for (const runner of this.runners) {
       runner.stage(this.traffic, this.eventRng(runner.spec.id), false);
     }

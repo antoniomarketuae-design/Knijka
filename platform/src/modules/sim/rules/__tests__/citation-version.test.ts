@@ -15,12 +15,14 @@
  * bare citations stayed behind: the licence budget (39 / 26) and, worst,
  * `CP_LIST_HEADER`, the citation printed behind EVERY „0 контролни точки"
  * verdict on the card. „Не е в изчерпателния списък" is a claim about a
- * document being COMPLETE, and the copy it pointed at is not: 16 of the
- * snapshot's 40 units carry „Източник: Правно-информационни системи „Сиела" /
+ * document being COMPLETE, and the copy it pointed at was not: 16 of the
+ * snapshot's 40 units carried „Източник: Правно-информационни системи „Сиела" /
  * 24/01/2025 г." — a PDF page footer — inside their statute text, and in чл. 6
- * it lands mid-sentence in т. 3. The verdict was right. The evidence link was
+ * it landed mid-sentence in т. 3. The verdict was right. The evidence link was
  * not, and a negative is only as good as the copy of the list you prove it
- * against.
+ * against. (The footer was removed from the extraction on 2026-08-09 and т. 3
+ * is whole; the snapshot is still a superseded text, so every rule here
+ * stands unchanged.)
  *
  * WHAT THE FIX HAD TO BE, AND WHY IT IS NOT „REMEMBER TO NAME THE AMENDMENT".
  * Repointing five quotes fixes five quotes. The MECHANISM is that a bare act
@@ -51,8 +53,29 @@ const ACTS_DIR = path.resolve(process.cwd(), "..", "content", "law", "acts");
 const SNAPSHOT = "naredba-iz-2539.json";
 const CONSOLIDATED = "naredba-iz-2539-consolidated-dv49-2026.json";
 
-const readAct = (file: string): { actId: string; abbrBg: string; units: Array<{ ref: string; textBg: string }> } =>
-  JSON.parse(fs.readFileSync(path.join(ACTS_DIR, file), "utf8"));
+/**
+ * MEMOISED, and the reason is a measurement rather than a preference.
+ *
+ * This helper used to read and `JSON.parse` the act off disk on every call, and
+ * every quote on the card costs at least one call. That was fine at seventeen
+ * quotes. On 2026-08-09 the consequences wave took `allLawQuotes()` past two
+ * hundred, most of them out of `zdvp.json` — 908 KB, re-parsed each time — and
+ * the „nothing is cut from a superseded snapshot" test crossed vitest's 5 s
+ * limit and reported as a FAILURE. Nothing about the tree was wrong; the probe
+ * had simply become quadratic in the thing it is supposed to scale with.
+ *
+ * Worth naming because of how it presents: a red test on a citation check, in
+ * the middle of a wave about citations, is exactly the alarm a person acts on
+ * without reading. The cache makes the cost linear and the assertion unchanged.
+ */
+const actCache = new Map<string, { actId: string; abbrBg: string; units: Array<{ ref: string; textBg: string }> }>();
+const readAct = (file: string): { actId: string; abbrBg: string; units: Array<{ ref: string; textBg: string }> } => {
+  const hit = actCache.get(file);
+  if (hit !== undefined) return hit;
+  const parsed = JSON.parse(fs.readFileSync(path.join(ACTS_DIR, file), "utf8"));
+  actCache.set(file, parsed);
+  return parsed;
+};
 
 const unitText = (file: string, ref: string): string => {
   const unit = readAct(file).units.find((u) => u.ref === ref);

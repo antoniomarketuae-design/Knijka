@@ -170,7 +170,13 @@ export interface RuleEngineState {
   wrongWay: EpisodeState;
   keepRight: EpisodeState;
   crossing: CrossingZoneState | null;
-  collisionCooldownUntil: number | null;
+  /**
+   * THE OPEN CONTACT EPISODE — when the last contact was REPORTED, or null if
+   * the car has never touched anything. An episode stays open while reports
+   * keep arriving and closes after `collisionSeparationSec` of silence; only
+   * the report that OPENS one is billed. See the `collision` case.
+   */
+  lastCollisionContactAt: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
   terminated: boolean;
   /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
@@ -358,7 +364,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     wrongWay: { ...IDLE_EPISODE },
     keepRight: { ...IDLE_EPISODE },
     crossing: null,
-    collisionCooldownUntil: null,
+    lastCollisionContactAt: null,
     terminated: false,
     cleanDistanceM: 0,
     stall: { ...IDLE_EPISODE },
@@ -1938,8 +1944,66 @@ function handleTickEvent(
     }
 
     case "collision": {
-      if (s.collisionCooldownUntil !== null && t < s.collisionCooldownUntil) break;
-      s.collisionCooldownUntil = t + cfg.collisionCooldownSec;
+      // ONE ENCOUNTER, ONE ACCIDENT — and the definition is the whole rule:
+      //
+      //   an encounter OPENS on the first reported contact and stays open for
+      //   as long as contact keeps being reported; it CLOSES only after
+      //   `collisionSeparationSec` in which nothing was reported at all — the
+      //   bodies have come apart. The report that opens an encounter is billed;
+      //   every report inside one is the same accident, still happening.
+      //
+      // Contact is a STATE that persists across frames. What the fault sheet
+      // convicts is an EVENT: a crash. The state has to be converted into
+      // events somewhere, and here is the only place every source funnels
+      // through (live physics, the trace recorder's obstacle channel, the
+      // orchestrator's contact sentinel).
+      //
+      // «THE BODIES HAVE COME APART» IS A CLAIM ABOUT GEOMETRY, AND THIS
+      // REDUCER HAS NONE (B83). It sees events, not poses, so the sentence
+      // above is only true if every reporter treats contact as a STATE and
+      // keeps reporting for as long as the bodies are together. That is a
+      // CONTRACT ON THE REPORTERS, not an inference this code may make, and it
+      // is stated here because it was once silently broken: the orchestrator's
+      // sentinel gated its report on closing speed, so it fell silent when the
+      // DRIVER STOPPED — which is what a shaken student does after hitting
+      // something. Driven on sc-follow-brake: nose into the standing lead,
+      // hold the brake 0.95 s, ease forward 0.6 m still embedded in it, and
+      // this billed TWO пътнотранспортни произшествия, 20 наказателни точки,
+      // for one crash in which the cars never separated — 260 frames of
+      // unbroken overlap of which only the 83 the driver was moving through
+      // were ever reported, and a boundary pinned to the single 16.7 ms frame
+      // that carried the silence past `collisionSeparationSec`.
+      // The fix is in contact.ts, where the geometry is: the nudge floor now
+      // gates only the OPENING of an encounter and the report stops on the
+      // frame the measured separation says the bodies are clear. All three
+      // reporters now honour the contract — rapier's shell pool re-fires a
+      // sustained contact at 2 Hz whether or not the car is moving, and the
+      // recorder's obstacle channel latches per rect and re-arms only on
+      // separation, so neither can manufacture a false silence either.
+      //
+      // Both halves are load-bearing and each defends a real drive:
+      //  · a student who scrapes along a wall for four seconds has had ONE
+      //    accident, so a continuing report must not re-bill. The old rule —
+      //    a 3 s rate limit — billed that scrape twice, and billed a car left
+      //    resting against a bumper 10 points every 3 s indefinitely (measured:
+      //    14 bills / 140 points over 40 s, with the crash-pin rescue disarmed
+      //    by its own re-arming, so the drive could not end either);
+      //  · a student who hits a car, reverses, and hits it again has had TWO,
+      //    so separation must re-arm. The old rule missed that: two impacts
+      //    1 s apart, with a metre of daylight between them, billed once.
+      //
+      // Deliberately NOT keyed by which body was hit: the live channel is told
+      // only the CATEGORY (`withWhat`) — the NPC shells that carry identity are
+      // a rebinding pool, so an id would churn under the latch — and two
+      // different cars struck inside the window therefore read as one
+      // encounter. That errs innocent (A12), which is the cheap direction here.
+      // Plumbing a stable actor id through `pushCollision` is the honest fix
+      // and is listed, not attempted, because that wire runs through
+      // LessonScene.
+      const last = s.lastCollisionContactAt;
+      const sameEncounter = last !== null && t - last <= cfg.collisionSeparationSec;
+      s.lastCollisionContactAt = t;
+      if (sameEncounter) break;
       s.terminated = true;
       out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));
       break;

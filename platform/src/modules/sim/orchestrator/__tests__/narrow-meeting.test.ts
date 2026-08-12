@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import type { NarrowMeetingSpec } from "../../contracts";
 import type { SimTickEvent } from "../../rules";
 import type { StagedActorSpec, StagedActorView, StagedCommand } from "../../traffic/types";
+import { createScenarioDirector } from "../director";
 import { NarrowMeetingRunner } from "../runners";
 import type { DirectorInput, StagedTrafficPort } from "../types";
 import {
@@ -258,31 +259,69 @@ describe("narrowMeeting (integration)", () => {
     // contact beat the NM_SUSTAIN_SEC window emitted a collision and nothing
     // else. He was told he crashed; he was never told he took priority that was
     // not his — which is the only sentence that teaches the rule (THEO-4).
-    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    //
+    // B81: driven through the DIRECTOR now, because the collision no longer
+    // comes from the runner — the director's ContactSentinel is the only
+    // emitter of staged-actor contact (contact.ts). The teaching order is the
+    // director's contract: runner events first, then the crash they caused.
     const port = new SynthPort();
-    r.stage(port, () => 0.5, true);
+    const dir = createScenarioDirector([SYNTH_SPEC], port, { seed: 11 });
 
     // 1) At the section mouth in the own lane → the runner triggers.
     port.set({ x: -4.06, y: 150, s: 90, speedMps: 6 });
-    r.step(port, synthFrame(1, 4.06, 104, 20), []);
-    expect(r.phase).toBe("triggered");
+    dir.step(synthFrame(1, 4.06, 104, 20));
+    expect(dir.snapshot()[0].phase).toBe("triggered");
     // 2) A live conflict frame, so the encounter is genuinely visible.
     port.set({ x: -4.06, y: 140, s: 100, speedMps: 6 });
-    r.step(port, synthFrame(1.2, 4.06, 112, 20), []);
+    dir.step(synthFrame(1.2, 4.06, 112, 20));
     // 3) …then the head-on, inside the стеснение, on the oncoming's side.
     port.set({ x: -4.06, y: 122, s: 118, speedMps: 6 });
-    const out: SimTickEvent[] = [];
-    const outcome = r.step(port, synthFrame(1.4, -4.06, 120, 20), out);
+    const res = dir.step(synthFrame(1.4, -4.06, 120, 20));
 
-    expect(outcome?.detail).toBe("collision");
-    expect(out).toContainEqual({ kind: "collision", withWhat: "vehicle" });
-    expect(out).toContainEqual({
+    expect(res.outcomes[0]?.detail).toBe("collision");
+    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    expect(res.events).toContainEqual({
       kind: "prioritySituation",
       situation: "narrow-meeting",
       violated: true,
     });
     // The rule comes FIRST — the law broken, then its consequence.
-    expect(out[0]).toMatchObject({ kind: "prioritySituation" });
+    expect(res.events[0]).toMatchObject({ kind: "prioritySituation" });
+  });
+
+  it("B81: the runner retires on the yield fault — and the head-on is STILL billed", () => {
+    // THE DEFECT, in three frames. Measured on the two SHIPPED sc-ov-narrow
+    // mistake demos: NarrowMeetingRunner resolves FAILED_TO_YIELD, `step()`
+    // then returns on its `phase === "resolved"` guard, and the player drives
+    // 1.77 m INTO the oncoming body — 110 and 137 consecutive frames of real
+    // overlap — with no COLLISION anywhere. The trace channel renders those
+    // demos to students, so a learner watched two cars occupy the same four
+    // metres of street while the engine called it a yielding fault.
+    const port = new SynthPort();
+    const dir = createScenarioDirector([SYNTH_SPEC], port, { seed: 11 });
+
+    // Trigger, then hold a sustained barge in the oncoming lane with the
+    // oncoming still inbound: that convicts FAILED_TO_YIELD and RETIRES.
+    port.set({ x: -4.06, y: 150, s: 90, speedMps: 6 });
+    dir.step(synthFrame(0, 4.06, 104, 20));
+    for (let i = 0; i < 40; i++) {
+      port.set({ x: -4.06, y: 148, s: 92, speedMps: 0 }); // guard-stopped victim
+      dir.step(synthFrame(0.2 + i * 0.1, -4.06, 120 + i * 0.1, 20));
+    }
+    expect(dir.snapshot()[0].phase).toBe("resolved");
+    expect(dir.outcomes[0].detail).toBe("violation");
+
+    // Now put the two bodies in the same place. The runner is long retired.
+    port.set({ x: -4.06, y: 126, s: 114, speedMps: 0 });
+    const res = dir.step(synthFrame(9, -4.06, 124, 20));
+    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    // Contact is a STATE and the sentinel reports the state, every frame the
+    // bodies are inside each other. Turning that into a count of accidents is
+    // the rule engine's job alone (`collisionSeparationSec`) — the trace gate
+    // proves the arithmetic end to end: sc-ov-narrow's barge overlaps for 110
+    // consecutive frames and the student is billed exactly one COLLISION.
+    const again = dir.step(synthFrame(9.1, -4.06, 124, 20));
+    expect(again.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
   });
 
   it("B80: the meeting is not OVER while the oncoming is still ahead of the player", () => {

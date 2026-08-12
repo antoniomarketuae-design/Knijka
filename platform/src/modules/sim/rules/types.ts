@@ -816,8 +816,44 @@ export interface RuleEngineConfig {
   /** To earn the yield commendation the vehicle must have slowed to at most this, km/h. */
   yieldSlowSpeedKmh: number;
 
-  /** Minimum seconds between two collision violations (physics multi-contact debounce). */
-  collisionCooldownSec: number;
+  /**
+   * WHAT MAKES TWO CONTACTS ONE ACCIDENT — seconds of NO reported contact that
+   * end an encounter. This is not a rate limit; see the engine's `collision`
+   * case for the rule it implements.
+   *
+   * It replaced `collisionCooldownSec: 3`, which was a rate limit, and which
+   * billed a student 10 наказателни точки every three seconds for as long as
+   * anything kept reporting the same touch. MEASURED before it was written:
+   *
+   *   · 30 s of unbroken contact through the reducer → ELEVEN
+   *     «Пътнотранспортно произшествие», at t = 0, 3, 6 … 30. 110 points for
+   *     one bumper;
+   *   · a car held motionless against a body whose contact was re-reported at
+   *     2 Hz for 40 s → 14 bills, 140 points, AND the FR-B5-JAM crash-pin
+   *     rescue never fires: each new bill re-arms the pin with a fresh pose,
+   *     restarting its 10 s stillness clock, so the drive that cannot move is
+   *     also the drive that cannot end. One contact report, same 40 s: one
+   *     bill, rescue at t = 13.5 s;
+   *   · and it had the two cases backwards. A 4 s scrape along a wall billed
+   *     TWICE (one accident); hit → 1 s of daylight → hit again billed ONCE
+   *     (two accidents).
+   *
+   * THE NUMBER. Rapier does not re-fire a sustained contact — measured: a
+   * chassis pushed into a kinematic NPC shell for 30 s emits exactly one
+   * `collisionEnter` and zero exits. What re-fires it is the shell POOL:
+   * NpcColliders rebinds every REASSIGN_INTERVAL_SEC = 0.5 s and a rebound
+   * shell is teleported (`setTranslation`), which measured as a fresh
+   * `collisionEnter` every 0.5 s while the player leant on it. So the window
+   * must clear 0.5 s. Its ceiling is the fastest genuinely separate second
+   * accident: reversing 1 m out and driving back in, with an instant gearbox
+   * and no interlocks, measured 2.35 s of broken contact (the real D→N→R gate
+   * makes it longer). 1.2 s sits 2.4× above the repeater and about half of the
+   * floor under the real second impact.
+   *
+   * Erring long is the cheap direction (A12): the cost is forgiving a second
+   * crash inside 1.2 s, against 90 points for one.
+   */
+  collisionSeparationSec: number;
 
   // -- B1a Wave-1 detector pack (doc 72 capability 1) ------------------------
 
@@ -1314,7 +1350,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   crossingBrakeResponseMps2: 2,
   yieldSlowSpeedKmh: 10,
 
-  collisionCooldownSec: 3,
+  collisionSeparationSec: 1.2,
 
   // B1a Wave-1 (doc 72 capability 1). Every threshold errs innocent (A12).
   moveOffObservationEnabled: false, // see the interface comment — lessons opt in
