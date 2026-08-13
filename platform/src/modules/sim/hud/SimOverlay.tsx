@@ -302,49 +302,85 @@ export function SimOverlay({
   const tapDismissChip = useTapActivation(dismiss);
   const tapDismissCard = useTapActivation(dismiss);
   const tapCloseSheet = useTapActivation(() => setOpenItem(null));
-  /**
-   * ── DOC 91 · D4/C4/§I11 — THE SHEET STOOD ON THE DRIVING CONTROLS ─────────
-   *
-   * The sheet's clearance contract was `bottom: var(--sim-dash-h)` — the 40 px
-   * instrument band — and the band it actually has to clear is the THUMB BAND,
-   * which is ~216 px on an 852×393 phone. §D4 named the fix and the reason it
-   * was never applied: „`TouchControls` already publishes the number that would
-   * have prevented it, and `SimOverlay` does not read it."
-   *
-   * Measured on the DEPLOYED product before this change (tools/mobile/wave6-edges.mjs,
-   * authenticated /simulator, live canvas asserted, six-profile ladder, the
-   * sheet opened by its own «Защо»/«СПИСЪК» chip exactly as a student opens it):
-   *
-   *     iPhone 16 landscape  9 680 px² of 44 px controls under the sheet, 3 of 10 DEAD
-   *     iPhone 16 portrait   7 920 px²,                                    4 of 10 DEAD
-   *
-   * „Dead" is `document.elementFromPoint` at a control's own centre answering
-   * with the sheet — «Мигач наляво» and «Поглед в дясното огледало» among them,
-   * i.e. two GRADED actions.
-   *
-   * AND §I11 IS HONEST THAT THE CLEARANCE ALONE IS NOT THE FIX. Standing on the
-   * thumb band leaves ~137 px, not 244, so a sheet that kept asking for
-   * `--sim-vh × 0.62` would simply be pushed off the TOP of the screen. Hence
-   * the two halves below, which have to ship together:
-   *
-   *   1. the height cap is now the smaller of „0.62 of the viewport" and „what
-   *      is actually left above the controls", so the sheet can never overrun
-   *      either edge, and it already scrolls inside itself — nothing is lost,
-   *      it is read by scrolling;
-   *   2. an explicit «⤢» expand, because §I11's own ruling is that the tall
-   *      case must remain reachable and MAY cover the controls — „because the
-   *      student asked for it". Expanded, the sheet drops the clearance and
-   *      takes the height above the instrument band, which is the old geometry,
-   *      now reached deliberately instead of by default.
-   *
-   * It resets on close: an expand is a decision about ONE reading, not a mode.
-   */
-  const [sheetExpanded, setSheetExpanded] = useState(false);
-  const tapExpandSheet = useTapActivation(() => setSheetExpanded((v) => !v));
-  useEffect(() => {
-    if (!open) setSheetExpanded(false);
-  }, [open]);
   const tapSheetAck = useTapActivation(acknowledge);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE OPEN SHEET IS A READ MODE, AND IT SAYS SO TO THE WHOLE DOCUMENT.
+   * 2026-08-13, doc 91 §I11 + §W2 — the founder's „the buttons need absolute
+   * redesign", answered at the one place the contention actually lives.
+   *
+   * WHAT WAS MEASURED, deployed `/simulator`, WebKit, six profiles, canvas and
+   * `[data-hud="touch-controls"]` asserted, the panel expanded from the
+   * INSTRUCTION hint (not the belt warning — that confound is the previous
+   * commit's whole subject):
+   *
+   *   iphone16-L  852×88 at y 8, FULL-BLEED, 22.4 % — 7 controls dead, 5 of 5
+   *               in the top rail, «Разбрах» CLIPPED by the panel's own height
+   *   small-L / galaxy-L   88 px strips at y −4 / y −28 — 6 dead, 5 of 5 rail
+   *   all three portraits  294–327 px, 34.5–41.9 % — 3 dead, 3 of 5 rail
+   *
+   * «Закопчай предпазния колан» and «Контроли на автомобила» were buried on
+   * 6 of 6 profiles in both orientations: the card telling a student to fasten
+   * the belt was standing on the button that fastens it.
+   *
+   * THE TRAP §I11 NAMES, AND WHY THE OBVIOUS FIX IS WRONG. „Hide the rail" is
+   * self-defeating — «КОЛАН» LIVES in that rail while the belt is unfastened,
+   * so hiding the rail hides the thing the panel is pointing at. And the other
+   * obvious fix, „give the sheet a bigger clearance", is what the code did
+   * until today: it stood on `--sim-touch-floor`, which on a 393 px-tall stage
+   * leaves 95 px — a two-line box whose own «Разбрах» does not fit inside it.
+   *
+   * SO NEITHER YIELDS, BECAUSE THE PREMISE IS WRONG. A paragraph of Bulgarian
+   * legal prose and a row of driving controls are not two things competing for
+   * one strip; they are two things that belong to DIFFERENT DURATIONS:
+   *
+   *   THE RIBBON  the peek. One line, `pointer-events: none`, in the right
+   *               corridor, on screen ~99 % of a lesson. Measured over 40 s of
+   *               unattended driving it buries 0 controls on 6 of 6. Unchanged
+   *               by this commit except that it no longer has an in-place
+   *               expanded state to grow into.
+   *   THE READ    this sheet. It takes the screen above the instrument band —
+   *               and it MAY, because opening it STOPS THE CAR (the shell adds
+   *               `overlaySheetOpen` to `SceneSlot`'s `paused`, which reaches
+   *               `TouchControls` as `hidden` and makes every control inert).
+   *               Nothing is buried, because while the clock is stopped there
+   *               is nothing on the glass to bury.
+   *
+   * THE INVARIANT, stated so it can be tested rather than promised:
+   *   ► WHILE THE SIM CLOCK IS RUNNING, NO LAYER OUTSIDE THE RIBBON'S CORRIDOR
+   *     MAY INTERSECT THE CONTROL EDGES. The read mode is the only layer that
+   *     covers them, and it exists only when the clock is stopped.
+   * `shellViewportContract.test.ts` asserts both halves ship together; if a
+   * future edit removes the pause, the test that guards the full-bleed geometry
+   * fails with it, because the geometry is only legitimate WITH the pause.
+   *
+   * THE `⤢` EXPAND IS GONE. It existed to reach the tall case past a cap that
+   * only existed because of the clearance; with neither, a toggle between „the
+   * whole reading surface" and „the whole reading surface" is a control that
+   * does nothing — which is one of the founder's own three complaints.
+   *
+   * WHY AN ATTRIBUTE ON <html> AND NOT A PROP. Two surfaces that must stand
+   * down for this one live in trees this component cannot reach: the shell's
+   * «Меню» button (measured buried on both 852 and 780 landscape profiles) and
+   * anything a later wave adds to the same corner. `html[data-sim-*]` is the
+   * grammar `data-sim-car-sheet`, `data-sim-camera` and `data-sim-glance`
+   * already use for exactly this, and PlayAreaStyles is where the arbitration
+   * is written down. It is BELT AND BRACES, not the mechanism: the pause is
+   * the mechanism, and this covers the one control the pause cannot reach.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!open) {
+      delete root.dataset.simOverlayRead;
+      return;
+    }
+    root.dataset.simOverlayRead = "open";
+    return () => {
+      delete root.dataset.simOverlayRead;
+    };
+  }, [open]);
 
   if (shown === null) return null;
 
@@ -652,14 +688,24 @@ export function SimOverlay({
         <div
           data-sim-overlay={shown.kind}
           data-sim-overlay-state="open"
+          data-hud="overlay-read"
           className="pointer-events-none absolute inset-x-0 z-40 flex justify-center"
-          // §I11, half 1 — the clearance. `--sim-touch-floor` is published by
-          // the play shell from `TOUCH_CONTROLS_FLOOR` (the constant the arc and
-          // the pads are laid out from), so this follows the thumb band wherever
-          // it goes instead of pinning a copy of today's number — the same rule
-          // that constant's own comment states. It is `0px` on every surface
-          // without a thumb band, so nothing roomy moves.
-          style={{ bottom: sheetExpanded ? "var(--sim-dash-h, 0px)" : "calc(var(--sim-dash-h, 0px) + var(--sim-touch-floor, 0px))" }}
+          // ── THE READ MODE'S ONE CLEARANCE: the instrument band, and nothing
+          // else. See the block at `data-sim-overlay-read` above for why.
+          //
+          // It used to be `calc(var(--sim-dash-h) + var(--sim-touch-floor))` —
+          // standing clear of the thumb band. That was the right answer to the
+          // wrong question: it left 95 px on his phone sideways, which is a box
+          // whose own «Разбрах» is clipped by it (measured, screenshot in
+          // tools/mobile/.out/wave8-census/shots/), and it STILL buried the top
+          // rail on 6 of 6 profiles because an 88 px box anchored at the bottom
+          // and grown upward lands exactly on the rail's band.
+          //
+          // There is no thumb band to clear now: opening this sheet stops the
+          // car, and a stopped car's controls are inert. The instrument band
+          // stays because the speed and the gear are what a student checks the
+          // sentence AGAINST — and because it is 40 px, not 260.
+          style={{ bottom: "var(--sim-dash-h, 0px)" }}
           role="dialog"
           aria-modal="true"
           aria-label={shown.lineBg}
@@ -680,17 +726,18 @@ export function SimOverlay({
               // (9 680 → 12 276 px²) because a box anchored only by `bottom:`
               // grows upward and the header row cannot shrink.
               //
-              // THE ARITHMETIC, on his own phone held sideways: the thumb band
-              // reaches 257.5 px up a 393 px screen (pad 152 + arc rise 20.5 +
-              // station 44 + inset 21 + the band's own 20 px gap), the
-              // instrument band takes 40 more, and what is left is 95.5 px. So
-              // the compact sheet IS a two-line card — a header and one line
-              // that scrolls — exactly as §I11 said it would have to become, and
-              // «⤢» is how the rest is read. `max()` states that floor out loud
-              // rather than letting `min()` collapse the box to nothing.
-              maxHeight: sheetExpanded
-                ? "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 0.75rem)"
-                : "max(5.5rem, min(calc(var(--sim-vh, 100dvh) * 0.62), calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - var(--sim-touch-floor, 0px) - 0.75rem)))",
+              // ONE CAP NOW, AND IT IS THE WHOLE SCREEN ABOVE THE INSTRUMENTS.
+              // The old one was `max(5.5rem, min(0.62 × vh, vh − dash − touch
+              // floor − 0.75rem))`, i.e. 95.5 px on his phone sideways: a
+              // header and one scrolling line, with «Разбрах» clipped off the
+              // bottom. Both of the numbers that made it small are gone — 0.62
+              // was a budget against a road the student is no longer driving,
+              // and `--sim-touch-floor` was a clearance against controls that
+              // are inert while this is up. `--sim-vh` is the shell's measured
+              // visual-viewport height, so this cannot overrun the top edge the
+              // way the first attempt at §I11 did (measured once, deployed:
+              // «Затвори» 123.5 px above the safe-area box).
+              maxHeight: "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 0.75rem)",
             }}
           >
             <div className="flex shrink-0 items-center gap-2">
@@ -700,18 +747,13 @@ export function SimOverlay({
               <h2 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-tight">
                 {shown.lineBg}
               </h2>
-              {/* §I11 — the tall case, on purpose. 44 px in both axes like its
-                  neighbour, and it carries its state in `aria-expanded` so a
-                  screen reader gets the same fact the glyph gives. */}
-              <button
-                type="button"
-                {...tapExpandSheet}
-                aria-expanded={sheetExpanded}
-                aria-label={sheetExpanded ? "Смали панела" : "Разгъни панела"}
-                className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border border-border text-sm font-black text-muted"
-              >
-                <span aria-hidden>{sheetExpanded ? "⤡" : "⤢"}</span>
-              </button>
+              {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
+                  It was the escape hatch from a height cap, and the cap is
+                  gone: this surface is already the whole screen above the
+                  instrument band. A 44 px control that toggles between one
+                  size and the same size is the founder's own „a button that
+                  does nothing and says nothing about why", and it was costing
+                  the header a third of its width on a 360 px phone. */}
               <button
                 type="button"
                 {...tapCloseSheet}

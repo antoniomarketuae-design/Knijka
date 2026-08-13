@@ -110,82 +110,120 @@ describe("§I8 the fullscreen arm obeys the same compact rule as the immersive a
 });
 
 /**
- * ── §I11 · the sheet stood on the driving controls ──────────────────────────
+ * ── §I11 + §W2 · THE READ MODE, AND WHY ITS TWO HALVES MAY NOT BE SEPARATED ──
  *
- * `bottom: var(--sim-dash-h)` clears the 40 px instrument band. The band that
- * had to be cleared is the THUMB band, ~216 px. §D4's diagnosis was that
- * `TouchControls` already publishes the number and `SimOverlay` cannot see it;
- * the shell is the only component that can see both, so the shell republishes
- * it.
+ * THE DEFECT, measured on the deployed build `d795eab`, WebKit, six profiles,
+ * `hasCanvas === true` + a non-zero canvas rect + a mounted
+ * `[data-hud="touch-controls"]` asserted before any number, with the panel
+ * expanded from the INSTRUCTION hint (expanding the BELT WARNING instead is the
+ * instrument error the previous commit is named after — see
+ * `tools/mobile/wave8-panel-and-pro.mjs` header):
  *
- * Measured on the deployed product with the sheet opened by its own chip:
- * 9 680 px² of 44 px controls under it and 3 of 10 DEAD on iPhone 16 landscape;
- * 7 920 px² and 4 of 10 dead in portrait — «Мигач наляво» and «Поглед в дясното
- * огледало» among them, both GRADED actions.
+ *   iphone16-landscape  panel 852×88 at y 8, full-bleed, 22.4 % of the screen
+ *                       7 controls dead — 5 of 5 in the top rail, plus
+ *                       «Меню на урока», plus its own «Разбрах» CLIPPED
+ *   small-L / galaxy-L  88 px strips — 6 dead, 5 of 5 rail
+ *   all three portraits 294–327 px, 34.5–41.9 % — 3 dead, 3 of 5 rail
+ *
+ * «Закопчай предпазния колан» and «Контроли на автомобила» were buried on 6 of
+ * 6 profiles in BOTH orientations: the card telling a student to fasten the belt
+ * standing on the button that fastens it.
+ *
+ * THE TRAP §I11 NAMES is that hiding the rail is self-defeating, because the
+ * rail is where «КОЛАН» lives while the panel is pointing at it. So the answer
+ * is not a z-order or a clearance — it is that a sentence of law and a row of
+ * driving controls belong to different DURATIONS. The read surface takes the
+ * screen and the CAR STOPS.
+ *
+ * ⚠ THE TWO HALVES ARE ONE CHANGE. The full-bleed geometry is a defect without
+ * the pause, and the pause is pointless without the geometry. This block asserts
+ * both, in one place, so neither can be reverted alone.
  */
-describe("§I11 the compact sheet has a clearance contract against the thumb band", () => {
-  it("the shell publishes `--sim-touch-floor` from TOUCH_CONTROLS_FLOOR itself", () => {
-    expect(SHELL).toMatch(/\["--sim-touch-floor" as string\]:/);
-    // As a LENGTH, not a pixel count: the constant carries an `env()` and an
-    // `ARC_RISE` clamp that only the engine can resolve against the live box —
-    // and keeping it authored CSS is also what lets the notch harness
-    // substitute a real inset into it.
-    expect(SHELL).toMatch(
-      /\["--sim-touch-floor" as string\]:[\s\S]{0,220}touchControlsFloorCss\("var\(--sim-vh, 100dvh\)"\)/,
+describe("§I11 + §W2 the read mode stops the car, and that is what earns it the screen", () => {
+  it("HALF 1 — opening the compact overlay sheet pauses the scene", () => {
+    // `paused` reaches LessonScene as `physicsPaused` and TouchControls as
+    // `hidden`, which releases both axes AND both pads' pointer ownership and
+    // renders every button inert. That is what makes „the panel covers the
+    // controls" true-and-fine instead of the 7-dead-controls measurement above.
+    const paused = SHELL.slice(SHELL.indexOf("paused={\n"));
+    expect(paused.slice(0, 400)).toMatch(
+      /paused=\{[\s\S]{0,300}\boverlaySheetOpen\b[\s\S]{0,40}\}/,
     );
   });
 
-  it("…and against `var(--sim-vh)`, never the percentage form", () => {
-    // A percentage in the `max-height` the sheet needs resolves against a
-    // `bottom:`-anchored box of auto height — indefinite, so the engine drops
-    // the declaration. Measured on the deployed product exactly once: the cap
-    // did nothing and «Затвори» stood 123.5 px above the top of the screen.
-    expect(SHELL).not.toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}: TOUCH_CONTROLS_FLOOR\b/);
+  it("…and the shell still feeds that state from SimOverlay's own callback", () => {
+    expect(SHELL).toMatch(/onOpenChange=\{setOverlaySheetOpen\}/);
+    expect(SHELL).toMatch(/const \[overlaySheetOpen, setOverlaySheetOpen\] = useState\(false\)/);
   });
 
-  it("…and it is `0px` where there is no thumb band to clear", () => {
-    expect(SHELL).toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}"0px"/);
+  it("HALF 2 — the read surface clears the instrument band and nothing else", () => {
+    // It used to stand on `--sim-touch-floor` too. On a 393 px-tall stage that
+    // left 95 px: a box whose own «Разбрах» is clipped by it, that STILL landed
+    // on the rail (an 88 px box anchored at the bottom and grown upward lands
+    // exactly there), and that fixed nothing it was written to fix.
+    expect(OVERLAY).toMatch(/style=\{\{ bottom: "var\(--sim-dash-h, 0px\)" \}\}/);
+    expect(OVERLAY).not.toMatch(/bottom:[^\n]{0,120}var\(--sim-touch-floor/);
   });
 
-  it("the open sheet stands on dash + touch floor", () => {
+  it("…and its height is the whole screen above that band, capped by `--sim-vh`", () => {
     expect(OVERLAY).toMatch(
-      /bottom:\s*sheetExpanded[\s\S]{0,180}calc\(var\(--sim-dash-h, 0px\) \+ var\(--sim-touch-floor, 0px\)\)/,
+      /maxHeight: "calc\(var\(--sim-vh, 100dvh\) - var\(--sim-dash-h, 0px\) - 0\.75rem\)"/,
     );
+    // `--sim-vh` and never `100%`: a percentage in `max-height` resolves against
+    // a `bottom:`-anchored box of auto height — an indefinite reference the
+    // engine answers by dropping the declaration. Measured once, deployed: the
+    // cap did nothing and «Затвори» stood 123.5 px above the safe-area box.
+    expect(OVERLAY).not.toMatch(/maxHeight:[^\n]{0,160}100%/);
   });
 
-  it("…and its height is capped by the room that is actually left, not only by 0.62", () => {
-    // §I11 is explicit that the clearance alone is not the fix: standing on the
-    // thumb band leaves ~95 px on his phone sideways, so a sheet still asking
-    // for 0.62 of the viewport is pushed off the TOP instead of the bottom.
-    // Measured that way once, on the deployed product: «Затвори» 123.5 px above
-    // the safe-area box and the overlap with the controls UP from 9 680 to
-    // 12 276 px², because a box anchored only by `bottom:` grows upward.
-    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}min\(calc\(var\(--sim-vh, 100dvh\) \* 0\.62\)/);
-    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}var\(--sim-touch-floor, 0px\)/);
+  it("…so the height cap has no budget left in it that a sentence can lose to", () => {
+    // `0.62 of the viewport` was a budget against a road the student is no
+    // longer driving; `max(5.5rem, min(…))` was the floor that budget needed.
+    // Both are gone with the thing they were rationing.
+    expect(OVERLAY).not.toMatch(/0\.62/);
+    expect(OVERLAY).not.toMatch(/max\(5\.5rem,\s*min\(/);
   });
 
-  it("…and the cap has a floor, because `min()` alone collapses the box", () => {
-    expect(OVERLAY).toMatch(/maxHeight:[\s\S]{0,500}max\(5\.5rem,\s*min\(/);
-  });
-
-  it("the sheet can never paint outside the box the cap gives it", () => {
-    // Two halves, and BOTH are load-bearing: `overflow-hidden` on the section
-    // (a `max-height` alone does not clip) and `min-h-0` on the scrolling body
-    // (a flex column item refuses to shrink below its content without it).
+  it("the surface still cannot paint outside the box the cap gives it", () => {
+    // Two halves, BOTH load-bearing: `overflow-hidden` on the section (a
+    // `max-height` alone does not clip) and `min-h-0` on the scrolling body (a
+    // flex column item refuses to shrink below its content without it).
     const section = OVERLAY.slice(OVERLAY.indexOf("pointer-events-auto flex w-full max-w-2xl"));
     expect(section.slice(0, 200)).toContain("overflow-hidden");
     expect(OVERLAY).toMatch(/className="min-h-0 min-w-0 shrink overflow-y-auto"/);
   });
 
-  it("the tall case is still reachable, deliberately", () => {
-    // §I11's own ruling: expanded, the sheet MAY cover the controls, „because
-    // the student asked for it". A cap with no way past it would have made the
-    // full checklist unreadable on the device that needs it most.
-    expect(OVERLAY).toMatch(/aria-expanded=\{sheetExpanded\}/);
-    expect(OVERLAY).toMatch(/setSheetExpanded/);
+  it("the «⤢» expand is gone, with the cap it was the escape hatch from", () => {
+    // A 44 px control that toggles between the whole screen and the whole
+    // screen is one of the founder's own three complaints, and it was taking a
+    // third of the header's width on a 360 px phone.
+    expect(OVERLAY).not.toMatch(/sheetExpanded/);
+    expect(OVERLAY).not.toMatch(/Разгъни панела/);
   });
 
-  it("and an expand is one reading, not a mode — it resets when the sheet closes", () => {
-    expect(OVERLAY).toMatch(/if \(!open\) setSheetExpanded\(false\)/);
+  it("the read mode announces itself to the whole document", () => {
+    // `html[data-sim-overlay-read]` — the grammar `data-sim-car-sheet`,
+    // `data-sim-camera` and `data-sim-glance` already use. Belt and braces: the
+    // pause is the mechanism; this reaches the one live control the pause
+    // cannot, which is the shell's own «Меню на урока» in a different tree.
+    expect(OVERLAY).toMatch(/root\.dataset\.simOverlayRead = "open"/);
+    expect(OVERLAY).toMatch(/delete root\.dataset\.simOverlayRead/);
+  });
+
+  it("…and the peek is replaced by it, never stacked with it", () => {
+    // The precedent this whole wave copies. If both rendered, the ribbon would
+    // be a second panel on a screen whose entire complaint is stacked panels.
+    expect(OVERLAY).toMatch(/\{open \? null : \(/);
+  });
+
+  it("the shell still publishes `--sim-touch-floor` as an authored length", () => {
+    // Its first consumer gave it back (the read mode has no live thumb band to
+    // clear), but it is still true and still read — `tools/mobile/wave6-edges.mjs`
+    // asserts clearances against it and `lib/insets.mjs` substitutes real insets
+    // into it, which it can only do while this stays authored CSS.
+    expect(SHELL).toMatch(
+      /\["--sim-touch-floor" as string\]:[\s\S]{0,220}touchControlsFloorCss\("var\(--sim-vh, 100dvh\)"\)/,
+    );
+    expect(SHELL).toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}"0px"/);
   });
 });

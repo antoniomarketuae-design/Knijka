@@ -1081,6 +1081,12 @@ function PlayMenu({
   const tapToggle = useTapActivation(() => setOpen((o) => !o));
   return (
     <div
+      // NAMED, 2026-08-13, because it is the ONE live control the read mode's
+      // pause cannot reach: `paused` makes every TouchControls button inert, and
+      // this button is shell chrome in a different tree. Measured buried by the
+      // expanded panel on both 852 and 780 landscape profiles. `data-hud` is the
+      // vocabulary the two trees share; the arbitration is in PlayAreaStyles.
+      data-hud="play-menu"
       className="pointer-events-none absolute z-20 flex flex-col items-start gap-1.5"
       style={{
         left: "calc(0.5rem + env(safe-area-inset-left, 0px))",
@@ -2946,10 +2952,21 @@ export function LessonPlayShell({
         ["--sim-vh" as string]: viewportH !== null ? `${viewportH}px` : "100dvh",
         ["--sim-dash-h" as string]: `${dashHeightPx}px`,
         ["--sim-hud-floor" as string]: `${hudFloorPx}px`,
-        // ── DOC 91 · D4/§I11 — THE NUMBER `SimOverlay` NEEDED AND COULD NOT SEE.
+        // ── DOC 91 · D4/§I11 — WHERE THE THUMB BAND ENDS, PUBLISHED AS A LENGTH.
         //
-        // §D4's whole diagnosis is „`TouchControls` already publishes the number
-        // that would have prevented it — and `SimOverlay` does not read it."
+        // ⚠ ITS FIRST CONSUMER HAS GIVEN IT BACK, ON PURPOSE — 2026-08-13.
+        // §D4's diagnosis was „`TouchControls` already publishes the number that
+        // would have prevented it — and `SimOverlay` does not read it", and the
+        // overlay sheet duly stood on this floor. That fix is superseded: the
+        // sheet is now a READ MODE that stops the car, so there is no live thumb
+        // band for it to clear and standing on one only clipped its own
+        // «Разбрах» (see `data-sim-overlay-read` in SimOverlay.tsx). The
+        // property is KEPT rather than deleted because it is still true and
+        // still read: `tools/mobile/wave6-edges.mjs` asserts clearances against
+        // it, `tools/mobile/lib/insets.mjs` documents it by name, and it is the
+        // one place any future surface that must clear the controls WHILE THE
+        // CLOCK IS RUNNING can get the number without re-deriving the arc.
+        //
         // `TOUCH_CONTROLS_FLOOR` is a CSS length, not a pixel count, so it is
         // republished AS a length: it keeps its `env(safe-area-inset-bottom)`
         // and its `ARC_RISE` clamp, both of which have to be resolved by the
@@ -3165,7 +3182,38 @@ export function LessonPlayShell({
             lesson={lesson}
             quality={quality}
             paused={
-              ended || activeQuiz !== null || teachQueue.length > 0 || consequence !== null
+              ended ||
+              activeQuiz !== null ||
+              teachQueue.length > 0 ||
+              consequence !== null ||
+              // ══ THE READ MODE STOPS THE CAR — 2026-08-13, doc 91 §I11/§W2 ══
+              //
+              // `overlaySheetOpen` is the compact overlay's OPEN state: the
+              // student pressed «Защо» / «Инструкции» / «СПИСЪК» and is now
+              // reading the authored WHY, the law citation or the pre-drive
+              // checklist. Until today that surface tried to share a 393 px-tall
+              // screen with the driving controls and lost: measured on the
+              // deployed build, six profiles, it buried 7 controls in landscape
+              // (5 of 5 in the top rail, «Закопчай предпазния колан» among them)
+              // and 3 in portrait, and clipped its own «Разбрах».
+              //
+              // Adding it here is the OTHER HALF of `SimOverlay`'s read mode and
+              // the two may not be separated: this is what makes covering the
+              // controls legitimate rather than a defect. `paused` reaches
+              // `LessonScene` as `physicsPaused` and `TouchControls` as
+              // `hidden`, which releases both axes and both pads' pointer
+              // ownership (the §C1 fix) and renders every button inert — so
+              // there is nothing under the panel to bury, the car cannot creep
+              // while a minor reads a paragraph of law, and the thumb that was
+              // on the throttle picks the pedal straight back up on the first
+              // `pointermove` after «Затвори» (the §I3 „inert, not gone" path,
+              // which this reuses rather than inventing around).
+              //
+              // IT IS ALSO THE PEDAGOGY. Doc 64 THEO-4 asks this product to
+              // behave like a driving instructor; an instructor pulls over to
+              // explain the hard thing. The alternative shipping today is an
+              // 88 px strip over a moving car with its own button cut off.
+              overlaySheetOpen
             }
             driveLocked={snap.driveLocked && !ended}
             preDriveHighlightStepId={
