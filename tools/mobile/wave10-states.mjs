@@ -256,18 +256,48 @@ const CENSUS = (opts) => {
   }
 
   // ── TEXT OVER A CONTROL, in px² ───────────────────────────────────────────
+  // GLYPH BOXES, NOT CONTAINER BOXES. The first version of this walked
+  // text-bearing elements and used their border box, which charges a wrapper
+  // <div> for every control NESTED INSIDE IT — it reported 408 px² on the read
+  // surface, where the „offending text" was the surface's own container and the
+  // „covered control" was its own «Затвори» sitting inside that container.
+  // A Range over the text node gives the rectangles the engine actually paints
+  // glyphs into, which is the only thing that can be over anything.
   let textOverControlPx2 = 0;
+  const textOverDetail = [];
   const liveCtl = controls.filter((c) => c.live);
-  for (const el of document.querySelectorAll("p,span,h1,h2,h3,li,label,div")) {
-    if (el.closest(SEL)) continue;
-    if (![...el.childNodes].some((n) => n.nodeType === 3 && (n.textContent || "").trim().length > 0)) continue;
-    if (effOpacity(el) <= 0.02) continue;
-    const r = el.getBoundingClientRect();
-    if (r.width < 2 || r.height < 2) continue;
-    for (const c of liveCtl) {
-      const ow = Math.max(0, Math.min(r.right, c.x + c.w) - Math.max(r.x, c.x));
-      const oh = Math.max(0, Math.min(r.bottom, c.y + c.h) - Math.max(r.y, c.y));
-      textOverControlPx2 += ow * oh;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const s = (n.textContent || "").trim();
+    if (!s) continue;
+    const parent = n.parentElement;
+    if (!parent) continue;
+    if (parent.closest(SEL)) continue; // a control's own caption is not „over" it
+    if (effOpacity(parent) <= 0.02) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    for (const r of range.getClientRects()) {
+      if (r.width < 1 || r.height < 1) continue;
+      for (const c of liveCtl) {
+        const ow = Math.max(0, Math.min(r.right, c.x + c.w) - Math.max(r.left, c.x));
+        const oh = Math.max(0, Math.min(r.bottom, c.y + c.h) - Math.max(r.top, c.y));
+        if (ow * oh <= 0.5) continue;
+        // ── AND IT MUST BE ON TOP, NOT MERELY IN THE SAME PLACE ─────────────
+        // Geometry alone cannot tell „a sentence lying across a button" from
+        // „a dashboard glyph showing faintly THROUGH a 95 %-opaque panel".
+        // The first run of this metric counted the speed-limit disc's „50"
+        // under the portrait read sheet as 138 px² of text over «Разбрах» —
+        // a defect report about something that is behind a panel, and the
+        // exact shape of the false positive this project keeps shipping.
+        // `elementFromPoint` at the overlap's own centre settles the z-order.
+        const mx = Math.round(Math.max(r.left, c.x) + ow / 2);
+        const my = Math.round(Math.max(r.top, c.y) + oh / 2);
+        const top = document.elementFromPoint(mx, my);
+        const onTop = !!top && (top === parent || parent.contains(top) || top.contains(parent));
+        if (!onTop) continue;
+        textOverControlPx2 += ow * oh;
+        textOverDetail.push({ text: s.slice(0, 26), over: c.label.slice(0, 26), px2: Math.round(ow * oh) });
+      }
     }
   }
 
@@ -341,6 +371,7 @@ const CENSUS = (opts) => {
     controls,
     grid,
     textOverControlPx2: Math.round(textOverControlPx2),
+    textOverDetail,
     speedKmh: speed,
     // ── THE WITNESSES. A state is only measured if its own witness is present.
     witness: {
@@ -367,6 +398,24 @@ const CENSUS = (opts) => {
     },
   };
 };
+
+/**
+ * IS THE TIER «Напреднал» RIGHT NOW?
+ *
+ * ⚠ AND IT MAY NOT USE `\b`. JavaScript's `\b` is defined against `\w`, which is
+ * `[A-Za-z0-9_]` — CYRILLIC IS NOT A WORD CHARACTER. So «…Напреднал — натисни…»
+ * has NO boundary after the „л", and `/Напреднал\b/` never matches anything in
+ * this product's UI. The first full run of this probe printed
+ * „⚠ NOT ENTERED" for the «Напреднал» states while «СЪЕД» — a control that only
+ * exists on the manual tier — was measured alive on the same screen. A verdict
+ * that contradicts a control in its own dataset is the tell.
+ *
+ * The anchor that does the real work is `Ниво на помощта:` in front: the second
+ * half of the label is „натисни за <next>", which can never follow the colon.
+ * The lookahead only stops a hypothetical longer word starting with the same
+ * eight letters.
+ */
+const TIER_ADVANCED = /Ниво на помощта:\s*Напреднал(?![а-яА-Я])/;
 
 const GRADED = [
   ["Мигач наляво", /^Мигач наляво/],
@@ -447,6 +496,41 @@ for (const device of devices) {
     }
     return 8;
   };
+  // ── BACK TO A DRIVING SCREEN, AND SAY SO IF IT CANNOT GET THERE ──────────
+  // The zebra scenario at 56 km/h earns a fault, and a consequence overlay
+  // stops the car and makes every touch control inert. The first full run then
+  // tried to open the ⚙ dock — a touch control — and MISSED it on the landscape
+  // profiles, so states D, E, F2 and F were all measured behind an overlay:
+  // „0 dead" about a screen with three controls on it. `[data-sim-touch-inert]`
+  // is the app's own witness for exactly this, so the probe waits on it rather
+  // than on a sleep, and a state that could not be reached is reported.
+  const resume = async () => {
+    for (let i = 0; i < 12; i += 1) {
+      const inert = await page.evaluate(() => document.querySelector('[data-sim-touch-inert="on"]') !== null);
+      if (!inert) return true;
+      const c = await page.evaluate(() => {
+        const all = [...document.querySelectorAll("button")].filter((n) => {
+          const t = (n.textContent || "").replace(/\s+/g, " ").trim();
+          return /^(Разбрах|Продължи|Продължи урока|Започни|Ясно|Затвори|Карай нататък|Пробвай пак|Напред)$/.test(t);
+        });
+        // Never the lesson menu's own «Затвори» — pressing that is how the first
+        // run left the read mode open and measured three states of nothing.
+        const b = all.find((n) => !n.closest('[data-hud="play-menu"]')) ?? all[0];
+        if (!b) return null;
+        const r = b.getBoundingClientRect();
+        if (r.width < 1) return null;
+        return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+      });
+      if (!c) return false;
+      await page.mouse.move(c.x, c.y);
+      await page.mouse.down();
+      await sleep(85);
+      await page.mouse.up();
+      await sleep(520);
+    }
+    return false;
+  };
+
   const report = (s, title, expect) => {
     const live = s.controls.filter((c) => c.live);
     const dead = live.filter((c) => !c.self);
@@ -458,6 +542,7 @@ for (const device of devices) {
       under44: live.filter((c) => c.under44).map((c) => ({ label: c.label, box: [c.w, c.h], hit: [c.hitW, c.hitH] })),
       offscreen: live.filter((c) => c.offscreen).map((c) => c.label),
       textOverControlPx2: s.textOverControlPx2,
+      textOver: s.textOverDetail,
       strips: s.strips,
       grid: s.grid,
       witness: s.witness,
@@ -535,6 +620,147 @@ for (const device of devices) {
     await clearCards();
     rec.walk = walk.map((w) => ({ note: w.note, ok: w.ok, label: w.label ?? null }));
 
+    // ══ STATES D AND E COME BEFORE THE DRIVE, AND THAT ORDER IS THE FIX ══════
+    //
+    // They used to run after it, and on all three LANDSCAPE profiles they were
+    // measured behind a consequence overlay: the zebra scenario at 56 km/h earns
+    // a fault, the fault stops the car and makes every touch control inert, and
+    // the probe then „opened" a ⚙ dock whose anchor is a touch control. Three
+    // states of an empty screen, honestly reported as 0 dead.
+    //
+    // The burial question does not need a MOVING car — it needs a LIVE one: the
+    // full driving HUD, every control alive, `paused false`. That is exactly the
+    // state right here, engine on and handbrake off, before the first metre. The
+    // coverage numbers and the frames still come from the drive below, because
+    // those DO need speed on the clock.
+    // ═════════════════════════════════════════════════════════════════════════
+    // ── STATE D · THE ⚙ CAR SHEET ──
+    rec.resumedBeforeD = await resume();
+    await press(/^Контроли на автомобила$/, "open the ⚙ dock");
+    await sleep(700);
+    const d = await census("D-sheet-open");
+    report(d, "D · ⚙ SHEET OPEN", (w) => w.sheet);
+    await page.screenshot({ path: `${OUT}/shots/${device.id}__sheet.png`, timeout: 120_000 });
+    await press(/^Затвори контролите$/, "close the ⚙ dock");
+    await sleep(700);
+
+    // ── STATE E · THE LESSON MENU ──
+    rec.resumedBeforeE = await resume();
+    await press(/^Меню$/, "open «Меню на урока»");
+    await sleep(800);
+    const e = await census("E-menu-open");
+    report(e, "E · LESSON MENU OPEN", (w) => w.menu === true);
+    await page.screenshot({ path: `${OUT}/shots/${device.id}__menu.png`, timeout: 120_000 });
+    if (e.witness.menu === true) {
+      await press(/^Затвори$/, "close the lesson menu");
+      await sleep(700);
+    }
+    await resume();
+
+    // ══ STATE F · «НАПРЕДНАЛ» ═══════════════════════════════════════════════
+    // THE TIER LIVES IN THE ⚙ SHEET, NOT IN THE LESSON MENU — `tierCellLabelBg`
+    // has exactly one call site and it is a `SheetCell`. The first run of this
+    // probe hunted it in the menu and reported `TIER null`, which reads exactly
+    // like „the tier picker is gone".
+    //
+    // AND THE MATCH IS ANCHORED. The cell's accessible name is
+    // „Ниво на помощта: <now> — натисни за <next>", so a bare /Напреднал/ hits
+    // the SECOND half and stops one tier early. Wave 9 shipped that bug and it
+    // reported the clutch as absent, i.e. „the manual tier is unplayable".
+    // …AND IT RUNS HERE, BEFORE THE DRIVE, WITH D AND E. Two attempts at the
+    // alternative failed and both failure modes are worth writing down: run
+    // after the drive and all three landscape profiles measure it behind a
+    // consequence overlay with the controls inert; `page.reload()` to get a
+    // clean screen and the run STALLS — 5+ minutes with the WebKit process idle
+    // at 20 s of CPU, on a box whose free memory was 3.2 GB. A probe step that
+    // can hang is worse than the state it was buying.
+    //
+    // The tier is put back to «Нормален» at the end of this block, because the
+    // drive below has to happen on an automatic — on «Напреднал» the gate is
+    // P—R—N—M1…M5 and the car does not move without the clutch, which would
+    // silently turn the coverage frames into pictures of a stationary car.
+    rec.resumedBeforeF = await resume();
+    await press(/^Контроли на автомобила$/, "open the ⚙ dock to reach the tier");
+    await sleep(700);
+    let tierNow = null;
+    for (let i = 0; i < 4; i += 1) {
+      tierNow = await page.evaluate(() => {
+        const b = [...document.querySelectorAll("button")].find((n) => /Ниво на помощта/.test(n.getAttribute("aria-label") || ""));
+        return b ? b.getAttribute("aria-label") : null;
+      });
+      if (tierNow && TIER_ADVANCED.test(tierNow)) break;
+      const hit = await centre(/Ниво на помощта/);
+      if (!hit) break;
+      await page.mouse.move(hit.x, hit.y);
+      await page.mouse.down();
+      await sleep(90);
+      await page.mouse.up();
+      await sleep(750);
+      const sheetStill = await page.evaluate(() => !!document.querySelector('[role="toolbar"][aria-label="Контроли на автомобила"]'));
+      if (!sheetStill) {
+        await press(/^Контроли на автомобила$/, "re-open the ⚙ dock");
+        await sleep(700);
+      }
+    }
+    // ONE MORE READ AFTER THE LAST PRESS. The loop reads at the top, so the
+    // value it exits with is the label from BEFORE its final tap — the first
+    // run printed „Нировo: Нормален" while «СЪЕД» was on screen, which can only
+    // be true if the tier had in fact changed. A stale read that contradicts a
+    // live control is exactly the shape of a false negative.
+    tierNow = await page.evaluate(() => {
+      const b = [...document.querySelectorAll("button")].find((n) => /Ниво на помощта/.test(n.getAttribute("aria-label") || ""));
+      return b ? b.getAttribute("aria-label") : null;
+    });
+    rec.tierLabel = tierNow;
+    console.log(`  TIER · «${tierNow}»`);
+    const onAdvanced = TIER_ADVANCED.test(tierNow || "");
+
+    // F2 first, because the clutch only exists while the sheet is open.
+    const fSheet = await census("F-advanced-sheet");
+    const clutch = fSheet.controls.find((c) => /Съединител/.test(c.label));
+    rec.clutch = clutch ? { rect: [clutch.x, clutch.y, clutch.w, clutch.h], mm: clutch.thumbMm, band: clutch.thumb, alive: clutch.self, live: clutch.live } : null;
+    report(fSheet, "F2 · «НАПРЕДНАЛ» + ⚙", (w) => w.sheet && onAdvanced);
+    console.log(`  CLUTCH · ${rec.clutch ? `«СЪЕД» [${rec.clutch.rect}] ${rec.clutch.mm} mm ${rec.clutch.band} · ${rec.clutch.alive ? "alive" : "DEAD"}` : "NOT ON SCREEN"}`);
+    await page.screenshot({ path: `${OUT}/shots/${device.id}__advanced-sheet.png`, timeout: 120_000 });
+    await press(/^Затвори контролите$/, "close the ⚙ dock");
+    await sleep(700);
+    await clearCards();
+    await sleep(700);
+    const f = await census("F-advanced", true);
+    report(f, "F · «НАПРЕДНАЛ»", () => onAdvanced);
+    rec.states["F-advanced"].clutchPresent = f.witness.clutch;
+    await page.screenshot({ path: `${OUT}/shots/${device.id}__advanced.png`, timeout: 120_000 });
+
+    // ── PUT THE TIER BACK. The drive below needs an automatic; on «Напреднал»
+    //    the gate is P—R—N—M1…M5 and the car will not move without the clutch.
+    await press(/^Контроли на автомобила$/, "open the ⚙ dock to restore the tier");
+    await sleep(700);
+    for (let i = 0; i < 3; i += 1) {
+      const lbl = await page.evaluate(() => {
+        const b = [...document.querySelectorAll("button")].find((n) => /Ниво на помощта/.test(n.getAttribute("aria-label") || ""));
+        return b ? b.getAttribute("aria-label") : null;
+      });
+      if (lbl && /Ниво на помощта:\s*Нормален/.test(lbl)) break;
+      const hit = await centre(/Ниво на помощта/);
+      if (!hit) break;
+      await page.mouse.move(hit.x, hit.y);
+      await page.mouse.down();
+      await sleep(90);
+      await page.mouse.up();
+      await sleep(750);
+      const still = await page.evaluate(() => !!document.querySelector('[role="toolbar"][aria-label="Контроли на автомобила"]'));
+      if (!still) { await press(/^Контроли на автомобила$/, "re-open the ⚙ dock"); await sleep(700); }
+    }
+    rec.tierRestored = await page.evaluate(() => {
+      const b = [...document.querySelectorAll("button")].find((n) => /Ниво на помощта/.test(n.getAttribute("aria-label") || ""));
+      return b ? b.getAttribute("aria-label") : null;
+    });
+    console.log(`  TIER · restored to «${rec.tierRestored}»`);
+    await press(/^Затвори контролите$/, "close the ⚙ dock");
+    await sleep(700);
+    await clearCards();
+    await resume();
+
     // ══ STATE A · IDLE, CAR MOVING — the frame he judges + the coverage ═════
     const pad = await page.evaluate(() => {
       const p = [...document.querySelectorAll("[aria-label]")].find((e) => /^Ход/.test(e.getAttribute("aria-label") || ""));
@@ -605,20 +831,23 @@ for (const device of devices) {
       });
       console.log(`  CARD · thumb never lifted, card dismissed → ${rec.pedalSurvivesCard.speedKmh} km/h`);
 
-      // ── REGRESSION · EVERY BUTTON FIRES WITH A SECOND THUMB DOWN ────────
-      // The steering thumb stays planted; a mouse press is a second pointer.
-      // `useTapActivation`'s pointer path is what must answer.
-      const horn = await centre(/^Клаксон/);
-      if (horn) {
-        const before = await page.evaluate(() => document.querySelector('[aria-label^="Клаксон"]')?.getAttribute("aria-pressed"));
-        await page.mouse.move(horn.x, horn.y);
-        await page.mouse.down();
-        await sleep(260);
-        const during = await page.evaluate(() => document.querySelector('[aria-label^="Клаксон"]')?.getAttribute("aria-pressed"));
-        await page.mouse.up();
-        rec.secondThumb = { control: "Клаксон", before, during, fired: before !== during || during === "true" };
-        console.log(`  2ND  · «Клаксон» with the drive thumb still down → aria-pressed ${before} → ${during} · fired ${rec.secondThumb.fired}`);
-      }
+      // ── REGRESSION · „EVERY BUTTON FIRES WITH A SECOND THUMB DOWN" IS NOT
+      //    MEASURED HERE, AND PRETENDING IT WAS IS THE WORSE OPTION ──────────
+      //
+      // The first version of this block held the drive pad with `page.mouse`
+      // and then pressed the horn with `page.mouse` — ONE pointer, moved. That
+      // is a drag, not a second finger, and it can neither reproduce nor refute
+      // the C2 defect (a compatibility `click` is dispatched only for the
+      // PRIMARY touch point). It also silently measured nothing: the arc is
+      // inside TouchControls' `{visible ? …}` branch, so while a teach card is
+      // up the horn is not in the DOM at all and the probe recorded `undefined`.
+      //
+      // The instrument that CAN answer it already exists and does it properly —
+      // `tools/mobile/wave4-second-finger-census.mjs` plants a real finger with
+      // CDP `Input.dispatchTouchEvent` (touch id 1) and presses every visible
+      // control with a second (id 2), cross-checked against whether the
+      // authoring component binds the pointer path. It is run alongside this
+      // sweep and reported separately.
       await page.mouse.up();
       await sleep(700);
     }
@@ -657,8 +886,20 @@ for (const device of devices) {
       card = await centre(/^(Защо|ЗАЩО|Инструкции|СПИСЪК)$/);
       if (card === null) await sleep(1500);
     }
+    // ── AND THEN LET IT LAND ─────────────────────────────────────────────────
+    // The teach card ENTERS with a transition, and `motion: "allow"` means the
+    // harness sees it. Censusing on the frame it first becomes findable
+    // photographs it IN FLIGHT: `iphone16-portrait__card.png` from the run
+    // before this wait shows the card still translucent and still off the right
+    // edge, and the metric duly reported 4 390 px² of „text over a control" that
+    // is a mid-animation frame and nothing else. 1.4 s is ~4× the longest
+    // transition in the HUD.
+    await sleep(1400);
     const b = await census("B-card-up");
     report(b, "B · CARD UP", (w) => w.card);
+    // PHOTOGRAPHED, because this is the state whose text-over-control number is
+    // non-zero and a number nobody has looked at is a number nobody should quote.
+    await page.screenshot({ path: `${OUT}/shots/${device.id}__card.png`, timeout: 120_000 });
 
     // ══ STATE C · THE READ MODE (the card, opened) ══════════════════════════
     if (card) {
@@ -710,78 +951,6 @@ for (const device of devices) {
       rec.states["C-read-open"] = { entered: false, why: "no card offered «Защо»" };
     }
 
-    // ══ STATE D · THE ⚙ CAR SHEET ═══════════════════════════════════════════
-    await press(/^Контроли на автомобила$/, "open the ⚙ dock");
-    await sleep(700);
-    const d = await census("D-sheet-open");
-    report(d, "D · ⚙ SHEET OPEN", (w) => w.sheet);
-    await page.screenshot({ path: `${OUT}/shots/${device.id}__sheet.png`, timeout: 120_000 });
-    await press(/^Затвори контролите$/, "close the ⚙ dock");
-    await sleep(700);
-
-    // ══ STATE E · THE LESSON MENU ═══════════════════════════════════════════
-    await press(/^Меню$/, "open «Меню на урока»");
-    await sleep(800);
-    const e = await census("E-menu-open");
-    report(e, "E · LESSON MENU OPEN", (w) => w.menu === true);
-    await page.screenshot({ path: `${OUT}/shots/${device.id}__menu.png`, timeout: 120_000 });
-    const menuOpenNow = e.witness.menu === true;
-
-    // ══ STATE F · «НАПРЕДНАЛ» ═══════════════════════════════════════════════
-    // THE TIER LIVES IN THE ⚙ SHEET, NOT IN THE LESSON MENU — `tierCellLabelBg`
-    // has exactly one call site and it is a `SheetCell`. The first run of this
-    // probe hunted it in the menu and reported `TIER null`, which reads exactly
-    // like „the tier picker is gone".
-    //
-    // AND THE MATCH IS ANCHORED. The cell's accessible name is
-    // „Ниво на помощта: <now> — натисни за <next>", so a bare /Напреднал/ hits
-    // the SECOND half and stops one tier early. Wave 9 shipped that bug and it
-    // reported the clutch as absent, i.e. „the manual tier is unplayable".
-    if (menuOpenNow) {
-      await press(/^Затвори$/, "close the lesson menu");
-      await sleep(700);
-    }
-    await press(/^Контроли на автомобила$/, "open the ⚙ dock to reach the tier");
-    await sleep(700);
-    let tierNow = null;
-    for (let i = 0; i < 4; i += 1) {
-      tierNow = await page.evaluate(() => {
-        const b = [...document.querySelectorAll("button")].find((n) => /Ниво на помощта/.test(n.getAttribute("aria-label") || ""));
-        return b ? b.getAttribute("aria-label") : null;
-      });
-      if (tierNow && /Ниво на помощта:\s*Напреднал\b/.test(tierNow)) break;
-      const hit = await centre(/Ниво на помощта/);
-      if (!hit) break;
-      await page.mouse.move(hit.x, hit.y);
-      await page.mouse.down();
-      await sleep(90);
-      await page.mouse.up();
-      await sleep(750);
-      const sheetStill = await page.evaluate(() => !!document.querySelector('[role="toolbar"][aria-label="Контроли на автомобила"]'));
-      if (!sheetStill) {
-        await press(/^Контроли на автомобила$/, "re-open the ⚙ dock");
-        await sleep(700);
-      }
-    }
-    rec.tierLabel = tierNow;
-    console.log(`  TIER · «${tierNow}»`);
-    const onAdvanced = /Ниво на помощта:\s*Напреднал\b/.test(tierNow || "");
-
-    // F2 first, because the clutch only exists while the sheet is open.
-    const fSheet = await census("F-advanced-sheet");
-    const clutch = fSheet.controls.find((c) => /Съединител/.test(c.label));
-    rec.clutch = clutch ? { rect: [clutch.x, clutch.y, clutch.w, clutch.h], mm: clutch.thumbMm, band: clutch.thumb, alive: clutch.self, live: clutch.live } : null;
-    report(fSheet, "F2 · «НАПРЕДНАЛ» + ⚙", (w) => w.sheet && onAdvanced);
-    console.log(`  CLUTCH · ${rec.clutch ? `«СЪЕД» [${rec.clutch.rect}] ${rec.clutch.mm} mm ${rec.clutch.band} · ${rec.clutch.alive ? "alive" : "DEAD"}` : "NOT ON SCREEN"}`);
-    await page.screenshot({ path: `${OUT}/shots/${device.id}__advanced-sheet.png`, timeout: 120_000 });
-    await press(/^Затвори контролите$/, "close the ⚙ dock");
-    await sleep(700);
-    await clearCards();
-    await sleep(700);
-    const f = await census("F-advanced", true);
-    report(f, "F · «НАПРЕДНАЛ»", () => onAdvanced);
-    rec.states["F-advanced"].clutchPresent = f.witness.clutch;
-    await page.screenshot({ path: `${OUT}/shots/${device.id}__advanced.png`, timeout: 120_000 });
   } catch (error) {
     rec.error = String(error?.message || error).split("\n")[0];
     console.log(`  ERROR · ${rec.error}`);

@@ -168,11 +168,43 @@ for (const device of devices) {
       seen.add(el);
       const cx = Math.round(r.x + r.width / 2), cy = Math.round(r.y + r.height / 2);
       const hit = document.elementFromPoint(cx, cy);
+      // ── LIVE, NOT MERELY PRESENT — 2026-08-13, §W3 ─────────────────────────
+      // «Меню на урока» now STOPS THE CAR (the sheet buried 2–3 live controls
+      // on 6 of 6 with the clock running, incl. a 208×160 steering pad). That
+      // makes `TouchControls` inert: opacity 0, pointer-events none, DOM nodes
+      // kept so a resting thumb picks the pedal back up. A finger there does
+      // hit the canvas — and this census duly reported the two thumb pads as
+      // „dead (menu open) 2/10", which is a defect report about controls that
+      // are deliberately not there. That is the exact error the commit
+      // „the burial census was counting controls nobody can see" is named
+      // after, one instrument along. An inert control cannot be buried.
+      //
+      // ⚠ AND THE TEST IS CUMULATIVE OPACITY PLUS THE ELEMENT'S OWN
+      // `pointer-events`, NOT „any ancestor says none". `pointer-events: none`
+      // on an ancestor is OVERRIDDEN by `auto` on a descendant, and PlayMenu is
+      // built exactly that way — a `pointer-events-none` positioning wrapper
+      // around a `pointer-events-auto` sheet. The first version of this check
+      // walked up until it met the wrapper and declared the menu's own eight
+      // rows inert, which would have hidden a real burial behind a designed
+      // one. This is the same walk `wave10-states.mjs` uses.
+      let inert = getComputedStyle(el).pointerEvents === "none";
+      if (!inert) {
+        let o = 1;
+        for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+          const cs = getComputedStyle(n);
+          if (cs.visibility === "hidden" || cs.display === "none") { o = 0; break; }
+          const v = Number(cs.opacity);
+          if (Number.isFinite(v)) o *= v;
+          if (o <= 0.02) break;
+        }
+        inert = o <= 0.02;
+      }
       controls.push({
         zone,
         label: (el.getAttribute("aria-label") || (el.textContent || "").trim()).slice(0, 40),
         ...box(el), cx, cy,
-        self: !!hit && (hit === el || el.contains(hit)),
+        inert,
+        self: inert || (!!hit && (hit === el || el.contains(hit))),
         onTop: hit ? (hit.closest("[aria-label],[role='menuitem']")?.getAttribute("aria-label")?.slice(0, 46)
           ?? (hit.closest("[role='menuitem']") ? (hit.closest("[role='menuitem']").textContent || "").trim().slice(0, 46) : hit.tagName)) : null,
       });
@@ -247,7 +279,9 @@ for (const device of devices) {
     const deadClosed = rec.censusClosed.controls.filter((c) => !c.self);
     console.log(`  MENU · rect ${JSON.stringify(rec.censusOpen.menu)} · rail ${JSON.stringify(rec.censusOpen.rail)}`);
     console.log(`  MENU · menu ∩ top-rail = ${rec.censusOpen.menuRailPx2} px²`);
-    console.log(`  DEAD · closed ${deadClosed.length}/${rec.censusClosed.controls.length} · OPEN ${deadOpen.length}/${rec.censusOpen.controls.length}`);
+    const inertOpen = rec.censusOpen.controls.filter((c) => c.inert);
+    console.log(`  DEAD · closed ${deadClosed.length}/${rec.censusClosed.controls.length} · OPEN ${deadOpen.length}/${rec.censusOpen.controls.length}` +
+      (inertOpen.length ? ` · (${inertOpen.length} INERT while the menu holds the car stopped, not counted: ${inertOpen.map((c) => c.label.slice(0, 18)).join(", ")})` : ""));
     for (const c of deadOpen) console.log(`  DEAD · [${c.zone}] «${c.label}» at ${c.cx},${c.cy} → a finger there hits «${c.onTop}»`);
 
     // ── A + B · THE ROW, PRESSED ──────────────────────────────────────────────

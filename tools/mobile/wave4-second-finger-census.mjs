@@ -98,7 +98,24 @@ function coverage(relRaw) {
   return `partial — ${f.tap} tap + ${f.hold} hold + ${f.pointer} raw over ${f.buttons} <button>`;
 }
 
-const user = await ensureHarnessUser();
+// ── SIGN IN AS AN EXISTING ACCOUNT WHEN ONE IS GIVEN — 2026-08-13, §W3 ──────
+//
+// `ensureHarnessUser()` PROVISIONS a throwaway admin through Prisma, and
+// `assertLocalDatabase` correctly refuses to do that against anything but
+// localhost (ADR-004: the real users are minors). That rail is about CREATING a
+// row, not about signing in — every wave-8/9/10 probe already signs the founder
+// account into staging through the real credentials form. So this census, which
+// is the only instrument in the harness that can answer „does every button fire
+// with a second thumb down", was the one thing that could not be pointed at the
+// DEPLOYED product. Passing `--email` and `--password` uses `signIn` and
+// provisions nothing; omit them and the local-only provisioning path is
+// unchanged.
+const CLI_EMAIL = arg("email", null);
+const CLI_PASSWORD = arg("password", null);
+const user =
+  CLI_EMAIL && CLI_PASSWORD
+    ? { email: CLI_EMAIL, password: CLI_PASSWORD, provisioned: false }
+    : await ensureHarnessUser();
 const devices = resolveDevices([arg("device", "iphone16-portrait")]);
 const browser = await chromium.launch();
 const report = [];
