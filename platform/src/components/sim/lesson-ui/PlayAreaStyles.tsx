@@ -1183,6 +1183,40 @@ ${TOUCH_BAND_CSS_VARS}
         display: none;
       }
 
+      /* …AND THE DEMONSTRATION DECK, WHICH THE SWEEP FOUND AFTER THE FACT —
+         2026-08-13, wave 9.
+
+         The rule above was written for «Меню на урока» because that was the
+         seventh buried control in the wave-8 census. Re-measured against the
+         rebuilt screen on the deployed build (six profiles, canvas asserted,
+         car moving), ONE live control was still under the reading surface, on
+         all three landscape profiles and none of the portrait ones:
+
+           «🎬Демонстрация ▸» [71,110,134×27] → answered by the read surface's
+           own sentence, «Непропускане на пешеходец»
+
+         It is the same kind of object as the menu and the answer is the same
+         rule, not a new one: a demonstration is a BETWEEN-ATTEMPTS thing, the
+         car is stopped while this surface is up, and the deck comes straight
+         back with the ✕. It already yields to the ⚙ sheet above for exactly
+         this reason — this adds the one surface that was missed.
+
+         visibility AND NOT display, and the distinction is load-bearing here in
+         a way it is not for the menu: the deck owns a REPLAY CLOCK, and this
+         file's own §1 note puts it in one line — display:none hides a panel; it
+         does not stop a replay. It would also drop the deck's layout box, and
+         the caption lane is measured off it. The scene is already told about
+         the read mode through the same pause that stops the car, so the clock
+         is handled; this rule only has to stop the deck painting over the
+         words.
+
+         (No backticks in this comment ON PURPOSE — the whole stylesheet is one
+         template literal, so a backtick here ends it. That is exactly how this
+         rule failed to compile the first time it was written.) */
+      html[data-sim-overlay-read="open"] [data-sim-compact="on"] [data-hud="demo-deck"] {
+        visibility: hidden;
+      }
+
       /* ══════════════════════════════════════════════════════════════════
          THE FIRST-RUN THUMB HINT LEAVES THE MIDDLE OF THE SCREEN — 2026-08-12.
 
