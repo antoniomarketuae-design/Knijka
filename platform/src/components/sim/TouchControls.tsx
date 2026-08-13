@@ -575,73 +575,170 @@ export function arcStationCount(side: "left" | "right"): number {
 export const ARC_STATIONS = Math.max(ARC_STATIONS_LEFT, ARC_STATIONS_RIGHT);
 /**
  * ═══════════════════════════════════════════════════════════════════════════
- * THE RUN — how far inboard each station sits from the one above it — AND WHY
- * IT IS NO LONGER A CONSTANT. 2026-08-13, the control redesign.
+ * THE RUN IS GONE — 2026-08-14, „FIX · FLANKS". IT IS WHY HE CALLED THEM DEBRIS.
  *
- * THE RULE, ONCE: two 44 px boxes cannot overlap if they are 44 px apart in
- * EITHER axis. This file used to put that guarantee entirely in the RUN, at one
- * box-width per station, because the rise can be as little as 20 px — and that
- * is exactly why it could not carry a fourth station. A side's band is
- * `2 + run·(n−1) + 44`, so four a side at a 44 px run is 178 + 178 = 356 px
- * against the 360 px of the narrowest phone in the ladder: the 4 px corridor
- * this file's own history warns about. Worse than tight — measured, the
- * innermost station would stand squarely in `padCorridorPx`, the lane the speed
- * readout lives in, on both 360 px Androids AND the iPhone in portrait.
+ * THE RUN was how far inboard each station stepped from the one above it, and
+ * for two waves it was ALSO the separation guarantee ("two 44 px boxes cannot
+ * overlap if they are 44 px apart in EITHER axis"). Putting the guarantee in the
+ * horizontal axis is what made a flank a DIAGONAL, and a diagonal over a moving
+ * 3-D scene is litter. Measured on the deployed build (`wave12-flanks.mjs`,
+ * WebKit, real insets, sc-zebra-approach@L1, all six profiles):
  *
- * But the rise is 132 px upright. At four stations that is 44 px of VERTICAL
- * separation per pair, which satisfies the rule on its own — so upright the run
- * is free, and it drops to 24 px. A four-station flank is then 118 px wide,
- * SIXTY PX NARROWER than the three-station flank it replaces. The arc got busier
- * and the screen got wider.
+ *   iPhone 16 LANDSCAPE   left  ⊙[61,172] ⇨[105,182] ⇦[149,192]
+ *                         right Л[747,156] З[703,163] Д[659,169] ⚠[615,176]
+ *     → THREE and FOUR different depths, 88 px and 132 px of stagger, against
+ *       10 px and 6.7 px of vertical pitch. That is not an arc. It is a ROW
+ *       tilted eight degrees, walking out of the corner and onto the road —
+ *       and on the left the ⇦ label ends up to the RIGHT of the ⇨ one, which is
+ *       why they read as scattered text rather than as controls.
+ *   iPhone 16 PORTRAIT    the same shape at 48 px and 72 px of stagger, laid
+ *       across the instrument cluster: «Дясн» printed over the dial's «120».
  *
- *     verticalGap = rise / (n − 1)
- *     run = verticalGap ≥ 44 px ? 24 px : 44 px
+ * SO THE GUARANTEE MOVES TO THE AXIS THAT CAN AFFORD IT. Every station on a
+ * flank now shares ONE inset — that is what makes it a BAND — and the vertical
+ * PITCH is 44 px, the box's own height, which satisfies the same rule with
+ * nothing left over to argue about:
  *
- * …which is landscape 44 (unchanged, and it must be: the rise is 20 there and
- * the run is carrying everything) and portrait 24. `touchArc.test.ts` sweeps the
- * invariant itself over the whole ladder rather than trusting either number.
+ *     inset  = ARC_EDGE                      (identical for every station)
+ *     bottom = padH + ARC_LIFT + PITCH · k   (44 px apart, always)
+ *
+ * `insetSpread` — max inset minus min inset across a flank — is therefore 0,
+ * and `touchArc.test.ts` sweeps THAT rather than trusting this paragraph. It
+ * was 88 and 132.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-const ARC_RUN_LANDSCAPE_PX = TOUCH_MIN_PX;
-const ARC_RUN_PORTRAIT_PX = 24;
-const ARC_RUN = `var(--sim-arc-run, ${rem(ARC_RUN_PORTRAIT_PX)})`;
-/** How close to the screen edge the TOP station sits. */
-const ARC_EDGE_PX = 2;
 /**
- * THE RISE — total climb from the bottom station to the top one.
+ * The vertical step between two stations on the same band, px.
  *
- * 20 px on a phone held sideways, 132 px on a portrait one, AND NOTHING IN
- * BETWEEN — 2026-08-13, doc 91 §N1.
+ * IT IS THE BOX'S OWN HEIGHT AND IT CANNOT BE LESS. With the run at zero this
+ * single number IS the separation guarantee — there is no horizontal offset
+ * left to fall back on — so `TOUCH_MIN_PX` is not a coincidence here and not a
+ * value to tune: below 44 the boxes overlap, above 44 the band grows taller
+ * than the stage can spare (see THE HEIGHT BUDGET below).
+ */
+const ARC_PITCH_PX = TOUCH_MIN_PX;
+const ARC_PITCH = `var(--sim-arc-pitch, ${rem(ARC_PITCH_PX)})`;
+/**
+ * How far the WHOLE band sits above the pad it measures from, px — and it is
+ * the piece PORTRAIT NEEDED ITS OWN ARITHMETIC FOR.
  *
- * IT USED TO RAMP, and the ramp is the defect this wave exists to close:
+ * „the LEFT flank is on the dashboard rather than beside the road." Measured,
+ * iPhone 16 portrait 393 × 852, the deployed build: the left band ran y 506–682
+ * and the cockpit's cowl starts at y ≈ 558, so two of its three stations were
+ * painted on the DASHBOARD and one of them — «⇨ Дясн» at [26, 572] — sat
+ * squarely on the speedometer's «120». Landscape has no such problem: the frame
+ * is wide and shallow, the cowl is below everything, and the band clears it at
+ * a lift of zero.
  *
- *     clamp(1.25rem, (100% − 22rem) * 0.5, 8.25rem)
+ * 132 px = 3 × 44, i.e. three rows of the same grid the band is built on, and
+ * it is derived from the picture rather than chosen: the cowl's top edge is at
+ * 0.663 of the portrait frame's height (measured off the shipped camera, both
+ * portrait profiles have the same aspect to within 0.0002), so the road's lower
+ * edge is 0.337 × H above the bottom — 287 px at 852, 263 px at 780. The band's
+ * LOWEST station must start above that line:
  *
- * Read against a stage that IS the live visual viewport, that expression is a
- * function of Safari's URL bar. Every portrait phone sat on the 8.25 rem
- * ceiling and every landscape phone in the ladder sat on the 1.25 rem floor, so
- * six waves of measurement saw a constant — but the founder's iPhone 16 Pro is
- * 402 CSS px wide held sideways, the ONLY device in the set inside the varying
- * band, and there the rise slid 25 → 20 px the first time the bar moved. That
- * is the „it is not stabilized" he reported, and no clamp fixes it, because the
- * clamp is not what is wrong — the input is.
+ *   iPhone 16 portrait   left 34 + 136 + 132 = 302 ≥ 287 ✓   right 318 ✓
+ *   360 × 780            left  0 + 136 + 132 = 268 ≥ 263 ✓   right 284 ✓
+ *   360 × 780 + gesture  left 24 + 136 + 132 = 292 ≥ 263 ✓   right 308 ✓
  *
- * So the two endpoints ARE the value. They are unchanged on five of the six
- * ladder profiles (both portraits were already at 132, both landscapes already
- * at 20); the one device that changes is his, where the rise stops sliding and
- * settles at 20. The derivation of the two numbers is unchanged and still
- * stands in the block above — 20 px is what the 780 × 360 phone's notification
- * corridor can spare, 132 px is the founder's own drawn climb — and both are
- * now stated rather than computed from a height.
+ * IT IS A CONSTANT, NOT A FRACTION OF THE HEIGHT, and that is the whole point
+ * of the last wave: `clamp(…, (100% − 22rem) × 0.5, …)` read against a stage
+ * that IS the live visual viewport is a function of Safari's URL bar, which is
+ * the „it is not stabilized" the founder reported. Two constants and an
+ * `@media (orientation: …)` cannot do that.
+ */
+const ARC_LIFT_LANDSCAPE_PX = 0;
+const ARC_LIFT_PORTRAIT_PX = 3 * TOUCH_MIN_PX;
+const ARC_LIFT = `var(--sim-arc-lift, ${rem(ARC_LIFT_PORTRAIT_PX)})`;
+/**
+ * How close to the screen edge the band sits, px.
+ *
+ * IT WAS 2 AND HE COULD SEE IT: „the right-flank labels sit hard against the
+ * right edge". Measured, iPhone 16 portrait: «Л ЛЯВО» ended at x = 379.6 of a
+ * 393 px screen — 13.4 px of glass — and 2 px of that is the box, the rest is
+ * the caption's own centring inside it. 8 px puts the WORD about 19 px in,
+ * which is a margin rather than a near-miss, and it costs the corridor between
+ * the two bands 12 px it demonstrably has (see `padCorridorPx`).
+ */
+const ARC_EDGE_PX = 8;
+/**
+ * THE LANE EACH BAND OWNS, px — and this is the mechanism behind „NOTHING may
+ * ever cover them".
+ *
+ * A band is 44 px wide against the edge and it is now TALL: 132 px on the
+ * steering flank, 176 px on the throttle one. Everything else on this screen
+ * that hangs from `TOUCH_CONTROLS_FLOOR` sits INSIDE that vertical span, so
+ * clearance can no longer be bought with height — measured, iPhone 16
+ * landscape, the ⚙ sheet lands at y 92–136 and the band runs y 44–220.
+ *
+ * So clearance is bought SIDEWAYS instead: the band's lane is reserved, and the
+ * two surfaces that would otherwise reach into it — the ⚙ sheet and the
+ * notification column — are given left/right offsets that end before it starts.
+ * Disjoint lanes are a guarantee no z-index and no measurement can undo, and
+ * `wave12-flanks.mjs` tests it the way a student meets it: `elementFromPoint`
+ * at every station's centre AND its four corners.
+ *
+ * 8 (edge) + 44 (the box) + 8 (a gap wide enough to read as a gap) = 60.
+ */
+export const FLANK_LANE_PX = ARC_EDGE_PX + TOUCH_MIN_PX + 8;
+export const FLANK_LANE_LEFT_CSS = `calc(${rem(FLANK_LANE_PX)} + ${INSET_L})`;
+export const FLANK_LANE_RIGHT_CSS = `calc(${rem(FLANK_LANE_PX)} + ${INSET_R})`;
+/**
+ * THE RISE — AND WHAT IT MEANS SINCE THE BAND REPLACED THE ARC. READ THIS
+ * BEFORE USING IT FOR ANYTHING; THE NAME IS OLDER THAN THE THING.
+ *
+ * It USED to be the arc's total climb. It is not that any more — the band's
+ * climb is `ARC_PITCH × (stations − 1)`, and it is 88 px on the steering flank
+ * and 132 px on the throttle one, in BOTH orientations.
+ *
+ * What this variable still is, and the only thing it is still used for, is the
+ * RESERVE INSIDE `TOUCH_CONTROLS_FLOOR`: the height above the drivetrain pad
+ * that every surface hanging from that floor keeps clear. It is deliberately
+ * left at its 2026-08-13 values, 20 px sideways and 132 px upright, because
+ * moving it moves the ⚙ sheet, the demonstration deck, the minimap, the trace
+ * timeline and the rotate hint, none of which this wave is about — and because
+ * the band's own clearance is now HORIZONTAL (`FLANK_LANE_PX`) rather than
+ * vertical, so the floor no longer has to be tall enough to clear it. On a
+ * 393 px landscape stage a floor that cleared the whole band would be 369 px of
+ * 393, i.e. every one of those surfaces pushed off the top of the screen.
  *
  * The ORIENTATION is a `@media (orientation: …)` query in PlayAreaStyles, not a
  * height comparison: a media query is discrete, so it cannot produce the „a
- * little bit different at every height" behaviour this wave is deleting. A
+ * little bit different at every height" behaviour the last wave deleted. A
  * phone does not change orientation while the URL bar slides.
  */
 const ARC_RISE_LANDSCAPE_PX = 20;
 const ARC_RISE_PORTRAIT_PX = 3 * TOUCH_MIN_PX;
 const ARC_RISE = `var(--sim-arc-rise, ${rem(ARC_RISE_PORTRAIT_PX)})`;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE HEIGHT BUDGET — what a band costs a stage, per profile, at rest.
+ *
+ * A band is `insetBottom + padH + ARC_LIFT + PITCH × (n − 1) + 44` tall, and
+ * the throttle flank is the tall one (four stations, the 152 px pad):
+ *
+ *   iPhone 16   852 × 393   21 + 152 +   0 + 132 + 44 = 349 of 393   44 spare
+ *   Android     780 × 360    0 + 152 +   0 + 132 + 44 = 328 of 360   32 spare
+ *   Galaxy      780 × 360   24 + 152 +   0 + 132 + 44 = 352 of 360    8 spare
+ *   iPhone 16   393 × 852   34 + 152 + 132 + 132 + 44 = 494 of 852  358 spare
+ *   Android     360 × 780    0 + 152 + 132 + 132 + 44 = 460 of 780  320 spare
+ *   Galaxy      360 × 780   24 + 152 + 132 + 132 + 44 = 484 of 780  296 spare
+ *
+ * IT FITS ON ALL SIX AT REST AND THE GALAXY SIDEWAYS IS THE ONE TO WATCH: 8 px.
+ * A browser toolbar that takes more than that off a 360 px landscape stage
+ * clips the top station, and `BAND_LIFT` cannot help — it holds the band still
+ * against a GROWING stage, not a shrinking one.
+ *
+ * WHAT IS NOT BUILT, AND SAYING SO IS THE POINT (the same stance the collapse
+ * block below already takes): there is no two-station fallback. Four stations
+ * at a 44 px pitch simply do not fit a 270 px landscape stage — 270 − 24 − 132
+ * leaves 114 px of pad against the 132 px the absolute drivetrain axis needs —
+ * so the honest options there are dropping a station or dropping the pitch, and
+ * both are decisions about which control a student can reach, not geometry to
+ * be picked on the way past. No device in the ladder reaches that at rest.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════
@@ -688,17 +785,36 @@ const ARC_RISE_COLLAPSED_PX = 12;
  * renders TouchControls without this sheet gets the portrait rise and the full
  * pads rather than a broken layout.
  */
+/** The gap in `TOUCH_CONTROLS_FLOOR` and in the column's floor. 20 px, and it
+ *  is not rounding — see the export's own note: the one control that sits on
+ *  that floor carries a 12 px ::before on each side. */
+const TOUCH_CONTROLS_FLOOR_GAP_PX = 20;
+
+/* The column's two floors, resolved. The block below `TOUCH_BAND_CSS_VARS`
+   explains why the column does not share `TOUCH_CONTROLS_FLOOR`; these have to
+   be declared here because the stylesheet interpolates them. */
+const COLUMN_FLOOR_LANDSCAPE_PX = DRIVE_PAD_H_PX + TOUCH_CONTROLS_FLOOR_GAP_PX;
+const COLUMN_FLOOR_PORTRAIT_PX =
+  DRIVE_PAD_H_PX +
+  ARC_LIFT_PORTRAIT_PX +
+  ARC_PITCH_PX * (ARC_STATIONS_RIGHT - 1) +
+  TOUCH_MIN_PX +
+  TOUCH_CONTROLS_FLOOR_GAP_PX;
+
 export const TOUCH_BAND_CSS_VARS = `
       :root {
         --sim-pad-steer-h: ${rem(STEER_PAD_H_PX)};
         --sim-pad-drive-h: ${rem(DRIVE_PAD_H_PX)};
         --sim-arc-rise: ${rem(ARC_RISE_PORTRAIT_PX)};
-        --sim-arc-run: ${rem(ARC_RUN_PORTRAIT_PX)};
+        --sim-arc-pitch: ${rem(ARC_PITCH_PX)};
+        --sim-arc-lift: ${rem(ARC_LIFT_PORTRAIT_PX)};
+        --sim-column-floor: ${rem(COLUMN_FLOOR_PORTRAIT_PX)};
       }
       @media (orientation: landscape) {
         :root {
           --sim-arc-rise: ${rem(ARC_RISE_LANDSCAPE_PX)};
-          --sim-arc-run: ${rem(ARC_RUN_LANDSCAPE_PX)};
+          --sim-arc-lift: ${rem(ARC_LIFT_LANDSCAPE_PX)};
+          --sim-column-floor: ${rem(COLUMN_FLOOR_LANDSCAPE_PX)};
         }
       }
       @media (max-height: ${rem(BAND_COLLAPSE_MAX_STAGE_PX)}) {
@@ -712,50 +828,95 @@ export const TOUCH_BAND_CSS_VARS = `
         :root { --sim-svh: 100svh; }
       }
 `;
-/**
- * `k / (n−1)` — station `k` of `n` along a STRAIGHT RAMP.
- *
- * IT WAS `sin(k/(n−1) · π/2)` AND THE SINE HAD TO GO, for the same reason the
- * run stopped being a constant: the curve decelerated towards the top, so the
- * gaps were not equal and „44 px apart in either axis" was only ever true of the
- * widest pair. At four stations upright the sine puts the top two 17.7 px apart
- * (132 × (1 − 0.866)) — under the floor — which is precisely the pair a 24 px
- * run leaves nothing else to separate. A linear ramp makes the vertical gap one
- * number, `rise / (n−1)`, which is what the rule above can be stated in and what
- * the test can sweep.
- *
- * Sideways, where the rise is 20 px, the two curves differ by at most 6 px and
- * the run carries the separation either way — so nothing visible was traded for
- * this, and the arc is still the sweep the founder drew on his own screenshot.
- */
-function arcRiseAtPx(index: number, count: number, risePx: number): number {
-  if (count <= 1 || index <= 0) return 0;
-  return (risePx * Math.min(index, count - 1)) / (count - 1);
-}
 
 /**
- * …and the same term as CSS. `calc(rise * k / (n−1))`, NOT `calc(rise * 0.3333)`.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE NOTIFICATION COLUMN'S OWN FLOOR — why it is not `TOUCH_CONTROLS_FLOOR`.
  *
- * The four-decimal literal is what the sine used and it is 0.0044 px short of
- * the truth at k=1 of 4 — which sounds like nothing and is not: upright the
- * vertical gap IS the separation guarantee (the run is only 24 px there), so
- * 132 × 0.3333 = 43.9956 px puts two 44 px boxes 0.0044 px inside each other and
- * the invariant this file exists to hold becomes false by a rounding artefact.
- * CSS `calc()` divides exactly; so does the resolver above. One expression, both
- * sides, no literal to round.
+ * The column is the ONE surface in this shell that shares the throttle flank's
+ * corner, so it is the one whose clearance cannot be a copy of everybody
+ * else's. The two orientations solve it in opposite directions, and that is why
+ * this is a variable rather than a number:
+ *
+ *   LANDSCAPE — the lanes are DISJOINT. `PlayAreaStyles` gives the column a
+ *     right offset of `FLANK_LANE_PX` and takes the same width off it, so its
+ *     box ends 8 px before the band starts and its LEFT edge does not move at
+ *     all (852 − 59 − 12 − 240 = 541 before; 852 − 59 − 72 − 180 = 541 after —
+ *     `notifyColumnLeftFraction` is unchanged and so is its 0.60 contract).
+ *     Having stopped sharing the lane, the column no longer has to clear the
+ *     band's HEIGHT either — it only has to clear the drivetrain pad. That
+ *     takes the compact cap from 128 px to 192 px on the founder's phone:
+ *     180 × 192 = 34 560 px² against 240 × 128 = 30 720, i.e. THE CARD GETS
+ *     12 % MORE ROOM out of this wave rather than less, which matters because
+ *     it is already hiding 333 px of the body it is given.
+ *
+ *   PORTRAIT — the column is only `min(15rem, 36vw)` = 141 px wide, so taking
+ *     a 60 px lane off it would leave 81 px and that is not a card. Upright
+ *     there is height to spare instead, so the column keeps its full width and
+ *     stops ABOVE the band: floor = pad + lift + climb + one box + the gap.
+ *     393 × 852 → cap 330 px against a briefing card measured at ~205 px, so
+ *     nothing is actually given up; 360 × 780 → 292; the Galaxy → 268.
+ *
+ * Both arms keep `BAND_LIFT`, which is the term that holds everything still
+ * while Safari's URL bar slides.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
+/** The floor the notification column hangs above — see the block above. */
+export function notifyColumnFloorCss(heightToken = "100%"): string {
+  return `calc(${bandLiftCss(heightToken)} + var(--sim-column-floor, ${rem(
+    COLUMN_FLOOR_PORTRAIT_PX,
+  )}) + ${INSET_B})`;
+}
+
+/** …resolved, for the ladder sweep. */
+export function notifyColumnFloorPx(stage: StageBox): number {
+  const isP = stage.height >= stage.width;
+  return (
+    bandLiftPx(stage) +
+    (isP ? COLUMN_FLOOR_PORTRAIT_PX : COLUMN_FLOOR_LANDSCAPE_PX) +
+    (stage.insetBottom ?? 0)
+  );
+}
+/**
+ * `PITCH · k` — station `k`'s climb above the band's lowest box, px.
+ *
+ * IT WAS `rise · k / (n−1)`, i.e. a total climb SHARED OUT between however many
+ * stations the flank carried, and that is why the two flanks disagreed: the
+ * same 132 px rise gave the three-station flank a 66 px pitch and the
+ * four-station one 44 px. A band cannot be built out of a total — it is built
+ * out of a STEP, the same step on both sides, so the two flanks read as one
+ * system and the separation rule is a single number that no station count can
+ * dilute.
+ *
+ * There is nothing to round: `44 · k` is exact in both this resolver and CSS
+ * `calc()`, which is what the old division needed a whole paragraph to promise.
+ */
+function arcRiseAtPx(index: number, count: number, pitchPx: number): number {
+  if (count <= 1 || index <= 0) return 0;
+  return pitchPx * Math.min(index, count - 1);
+}
+
+/** …and the same term as CSS. */
 function arcRiseTermCss(index: number, count: number): string {
   if (count <= 1 || index <= 0) return "0px";
-  return `(${ARC_RISE} * ${Math.min(index, count - 1)} / ${count - 1})`;
+  return `(${ARC_PITCH} * ${Math.min(index, count - 1)})`;
 }
 
 /**
  * One station's box, measured from the bottom and from the near side edge.
  *
- * `padH` is the pad this arc has to clear: station 0's box sits exactly on the
- * pad's top edge, which is what keeps a thumb-down on the lowest station from
- * being swallowed by the wheel or the throttle. Every station after it is one
- * run-step further out along the curve and a little higher.
+ * TWO TERMS AND NEITHER OF THEM DEPENDS ON THE STATION'S NEIGHBOURS ANY MORE:
+ *
+ *   inset  = ARC_EDGE                     — the SAME for every station on the
+ *            flank. That single fact is what turns a scatter into a band, and
+ *            it is what `insetSpreadPx === 0` asserts.
+ *   bottom = padH + ARC_LIFT + PITCH · k  — 44 px apart, always, both flanks.
+ *
+ * `padH` is the pad this band has to clear: without the lift, station 0's box
+ * sits exactly on the pad's top edge, which is what keeps a thumb-down on the
+ * lowest station from being swallowed by the wheel or the throttle. `ARC_LIFT`
+ * then raises the WHOLE band together — zero sideways, 132 px upright, where
+ * the pads alone would have left it on the dashboard.
  */
 function arcStation(
   index: number,
@@ -766,12 +927,12 @@ function arcStation(
   return {
     // `BAND_LIFT` first, and it is the same term the pad below carries — the
     // two are measured independently upward from ONE fixed line rather than
-    // the arc being measured from the pad's live box, so neither can move the
-    // other. (`padH` here is a constant; before this wave both it and the rise
-    // were functions of the stage, which is how a 15 px pad resize turned into
-    // a 22 px station move.)
-    bottom: `calc(${BAND_LIFT} + ${padH} + ${arcRiseTermCss(index, count)} + ${INSET_B})`,
-    inset: `calc(${rem(ARC_EDGE_PX)} + (${ARC_RUN} * ${count - 1 - index}))`,
+    // the band being measured from the pad's live box, so neither can move the
+    // other. (`padH` here is a constant; before the 2026-08-13 wave both it and
+    // the climb were functions of the stage, which is how a 15 px pad resize
+    // turned into a 22 px station move.)
+    bottom: `calc(${BAND_LIFT} + ${padH} + ${ARC_LIFT} + ${arcRiseTermCss(index, count)} + ${INSET_B})`,
+    inset: rem(ARC_EDGE_PX),
   };
 }
 
@@ -827,23 +988,33 @@ function isCollapsed(stage: StageBox): boolean {
   return stage.height <= BAND_COLLAPSE_MAX_STAGE_PX;
 }
 
-/** Total climb of one arc on a given stage, px — a constant per orientation. */
+/**
+ * `TOUCH_CONTROLS_FLOOR`'s reserve above the drivetrain pad, px.
+ *
+ * NOT the band's climb any more — see the block at `ARC_RISE_LANDSCAPE_PX`. It
+ * is exported under its old name because that is what every consumer and every
+ * pinned test already calls it, and renaming an exported number across five
+ * files is not a thing to do inside a geometry fix.
+ */
 export function arcRisePx(stage: StageBox): number {
   if (isCollapsed(stage)) return ARC_RISE_COLLAPSED_PX;
   return isPortrait(stage) ? ARC_RISE_PORTRAIT_PX : ARC_RISE_LANDSCAPE_PX;
 }
 
 /**
- * How far inboard each station steps, px — the numeric twin of `--sim-arc-run`.
- *
- * Follows the rise, because the rise is what it has to make up for: see the
- * block at `ARC_RUN_LANDSCAPE_PX`. The collapsed stage keeps the landscape run,
- * and it must — its rise is 12 px, so the run is carrying the whole separation
- * guarantee there more than anywhere else.
+ * The vertical step between two neighbouring stations, px — the numeric twin of
+ * `--sim-arc-pitch`, and the ONLY thing keeping two 44 px boxes apart now that
+ * the run is gone. One number, both orientations, both flanks, every stage:
+ * that is what makes the separation rule checkable in one line instead of a
+ * case analysis over rises and counts.
  */
-export function arcRunStepPx(stage: StageBox): number {
-  if (isCollapsed(stage)) return ARC_RUN_LANDSCAPE_PX;
-  return isPortrait(stage) ? ARC_RUN_PORTRAIT_PX : ARC_RUN_LANDSCAPE_PX;
+export function arcPitchPx(_stage: StageBox): number {
+  return ARC_PITCH_PX;
+}
+
+/** How far the whole band sits above its pad, px — 0 sideways, 132 upright. */
+export function arcLiftPx(stage: StageBox): number {
+  return isPortrait(stage) ? ARC_LIFT_PORTRAIT_PX : ARC_LIFT_LANDSCAPE_PX;
 }
 
 /** One pad's height, px — a constant, and the point of this wave. */
@@ -876,7 +1047,7 @@ export function padRectPx(side: "left" | "right", stage: StageBox): StageRect {
   return { x: stage.width - w, y: stage.height - lift - h, w, h };
 }
 
-/** Station `index` of one arc, resolved to a rect on the stage. */
+/** Station `index` of one band, resolved to a rect on the stage. */
 export function arcStationRectPx(
   index: number,
   side: "left" | "right",
@@ -886,12 +1057,13 @@ export function arcStationRectPx(
   const bottom =
     bandLiftPx(stage) +
     padHeightPx(side, stage) +
-    arcRiseAtPx(index, count, arcRisePx(stage)) +
+    arcLiftPx(stage) +
+    arcRiseAtPx(index, count, arcPitchPx(stage)) +
     (stage.insetBottom ?? 0);
+  // ONE inset for every station on the flank — this is the band, stated as the
+  // absence of an index term. It used to read `+ arcRunStepPx · (n−1−index)`.
   const inset =
-    ARC_EDGE_PX +
-    arcRunStepPx(stage) * (count - 1 - index) +
-    (side === "left" ? (stage.insetLeft ?? 0) : (stage.insetRight ?? 0));
+    ARC_EDGE_PX + (side === "left" ? (stage.insetLeft ?? 0) : (stage.insetRight ?? 0));
   return {
     x: side === "left" ? inset : stage.width - inset - TOUCH_MIN_PX,
     y: stage.height - bottom - TOUCH_MIN_PX,
@@ -912,11 +1084,6 @@ export function touchControlsFloorPx(stage: StageBox): number {
     TOUCH_CONTROLS_FLOOR_GAP_PX
   );
 }
-
-/** The gap in TOUCH_CONTROLS_FLOOR. 20 px, and it is not rounding — see the
- *  export's own note: the one control that sits on this floor carries a 12 px
- *  ::before on each side. */
-const TOUCH_CONTROLS_FLOOR_GAP_PX = 20;
 
 /**
  * THE TOP OF THE WHOLE CONTROL BAND, as a CSS length, for anything that has to
@@ -1954,6 +2121,7 @@ export function TouchControls({
           far edge of any published envelope. It is the least frequent of the
           three, so it takes the furthest station: ~13 mm sideways and ~45 mm
           upright, against 54.9 and 109.6. */}
+      <FlankGhost side="left" padH={STEER_PAD_H} stations={ARC_STATIONS_LEFT} />
       <ArcStation index={0} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач наляво"
@@ -2015,6 +2183,7 @@ export function TouchControls({
 
           Lowest = the dock, then the right mirror (nearest that thumb), the
           rear, and the left at the top. */}
+      <FlankGhost side="right" padH={DRIVE_PAD_H} stations={ARC_STATIONS_RIGHT} />
       <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
         {snap !== null && !snap.seatbeltOn ? (
           <GlyphButton
@@ -2111,13 +2280,20 @@ export function TouchControls({
           aria-label="Контроли на автомобила"
           className="pointer-events-auto absolute flex flex-wrap items-end justify-start gap-x-0.5 gap-y-0.5"
           style={{
-            // Above the WHOLE band — both arcs and both pads — so it can never
-            // share a pixel with a station on any device in the ladder. It is
-            // the same TOUCH_CONTROLS_FLOOR everything else measures from, so
-            // reshaping the arcs moves this with them instead of stranding a
-            // hard-coded copy of today's geometry.
-            left: `calc(0.125rem + ${INSET_L})`,
-            right: `calc(0.125rem + ${INSET_R})`,
+            // ── THE LANES, 2026-08-14 ────────────────────────────────────────
+            // It used to run edge to edge at `0.125rem`, and the comment above
+            // it claimed clearance it did not have — this file already carried
+            // the correction. With the arcs replaced by BANDS the claim is not
+            // even arguable: a band is 132–176 px tall and this strip hangs at
+            // `TOUCH_CONTROLS_FLOOR`, which is INSIDE that span on every
+            // profile (iPhone 16 sideways: strip y 92–136, band y 44–220). So
+            // the clearance is horizontal now and it is structural — the strip
+            // simply stops where each band's lane begins, 8 px short of it.
+            // Landscape leaves it 732 px of a 852 px stage (16 cells in a row,
+            // it needs 13); portrait 273 px, i.e. the three rows it already
+            // folded into.
+            left: FLANK_LANE_LEFT_CSS,
+            right: FLANK_LANE_RIGHT_CSS,
             bottom: TOUCH_CONTROLS_FLOOR,
           }}
         >
@@ -2312,9 +2488,71 @@ function ArcStation({
       ? { left: `calc(${inset} + ${INSET_L})` }
       : { right: `calc(${inset} + ${INSET_R})` };
   return (
-    <div className="absolute flex items-center" style={{ bottom, height: ROW_H, ...from }}>
+    // `data-arc` / `data-arc-side` ARE THE INSTRUMENT'S HANDLE, and they are in
+    // the shipped markup on purpose. Every sweep before wave 12 had to GUESS
+    // which boxes were stations — the first run of `wave12-flanks.mjs` matched
+    // on shape and reported a fourth left station reading «ИзгледПауза», which
+    // is the top rail. A layout that can be read off the DOM is a layout whose
+    // claims can be checked by somebody who has not read this file.
+    <div
+      data-arc={index}
+      data-arc-side={side}
+      className="absolute flex items-center"
+      style={{ bottom, height: ROW_H, ...from }}
+    >
       {children}
     </div>
+  );
+}
+
+/**
+ * THE GHOST BAND — the ink that makes three controls read as ONE RAIL.
+ *
+ * Doc 91 §H asks for „ghost fill + word, not a bare glyph", and this is the
+ * fill half. Until now every station was a fully transparent 44 px box with a
+ * 15 px glyph in it, so what the founder's eye received was three or four
+ * unrelated marks floating over a moving street — his word for it was DEBRIS,
+ * and the geometry fix alone does not answer that: boxes in a column with
+ * nothing behind them are still boxes with nothing behind them.
+ *
+ * It is a GRADIENT and not a slab, and the direction is the argument: strongest
+ * against the glass, ~0 at the inboard edge. That reads as an edge rail rather
+ * than as a panel laid on the road, and it puts the density where the eye needs
+ * it — the outer half of each glyph — for a fraction of a slab's ink. Measured
+ * cost is in the wave's own before/after table rather than asserted here.
+ *
+ * No `backdrop-filter`, deliberately: doc 91 §I20/§D12d priced a blur over a
+ * live WebGL canvas and it is among the most expensive things a phone
+ * compositor can be asked for. A flat gradient is free.
+ */
+function FlankGhost({
+  side,
+  padH,
+  stations,
+}: {
+  side: "left" | "right";
+  padH: string;
+  stations: number;
+}) {
+  const bottom = `calc(${BAND_LIFT} + ${padH} + ${ARC_LIFT} + ${INSET_B})`;
+  const height = `calc(${ARC_PITCH} * ${stations - 1} + ${ROW_H})`;
+  const edge = side === "left" ? INSET_L : INSET_R;
+  const from = side === "left" ? { left: edge } : { right: edge };
+  return (
+    <div
+      aria-hidden
+      data-flank-ghost={side}
+      className="pointer-events-none absolute"
+      style={{
+        bottom,
+        height,
+        width: `calc(${rem(ARC_EDGE_PX)} + ${ROW_H})`,
+        ...from,
+        background: `linear-gradient(to ${side === "left" ? "right" : "left"}, rgba(0,0,0,0.34), rgba(0,0,0,0.05))`,
+        [side === "left" ? "borderTopRightRadius" : "borderTopLeftRadius"]: "0.75rem",
+        [side === "left" ? "borderBottomRightRadius" : "borderBottomLeftRadius"]: "0.75rem",
+      }}
+    />
   );
 }
 

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  arcLiftPx,
+  arcPitchPx,
   arcRisePx,
-  arcRunStepPx,
   arcStationCount,
   arcStationRectPx,
   ARC_STATIONS_LEFT,
   ARC_STATIONS_RIGHT,
+  FLANK_LANE_PX,
+  notifyColumnFloorPx,
   padCorridorPx,
   padRectPx,
   topRailBandPx,
@@ -111,15 +114,31 @@ function overlap(a: StageRect, b: StageRect): number {
   return ox > 0 && oy > 0 ? ox * oy : 0;
 }
 
-/** Where the compact notification column lands, at its measured worst height. */
+/**
+ * Where the compact notification column lands, at its measured worst height.
+ *
+ * SIDEWAYS IT GIVES THE BAND ITS LANE BACK — 2026-08-14, „FIX · FLANKS", and
+ * this is the arithmetic PlayAreaStyles ships: `right` grows by FLANK_LANE_PX
+ * and `width` loses the same 60 px, so the box's LEFT edge does not move and
+ * `notifyColumnLeftFraction`'s 0.60 contract reads exactly what it read before.
+ * Upright the column keeps its full 141 px — 141 − 60 is not a card — and the
+ * separation is bought with height instead (`notifyColumnFloorPx`).
+ */
 function notifyColumnRect(stage: StageBox): StageRect {
-  const width = notifyColumnWidthPx(stage.width, true);
-  const right = NOTIFY_COLUMN_GUTTER_PX + (stage.insetRight ?? 0);
+  const lane = stage.height >= stage.width ? 0 : FLANK_LANE_PX;
+  const width = notifyColumnWidthPx(stage.width, true) - lane;
+  const right = NOTIFY_COLUMN_GUTTER_PX + lane + (stage.insetRight ?? 0);
   return {
     x: stage.width - right - width,
     y: COLUMN_TOP_PX + (stage.insetTop ?? 0),
     w: width,
-    h: MEASURED_WORST_CARD_PX,
+    h: stage.height >= stage.width
+      ? MEASURED_WORST_CARD_PX
+      : // Sideways the column may now reach its whole cap, which is the point
+        // of the new floor — so the sweep charges it the full box rather than
+        // the 106.3 px card, or it would be testing a column that cannot
+        // happen. 192 px on the founder's phone.
+        stage.height - notifyColumnFloorPx(stage) - COLUMN_TOP_PX - (stage.insetTop ?? 0),
   };
 }
 
@@ -166,11 +185,11 @@ describe("every station is a thumb target, on every device in the ladder", () =>
 });
 
 describe("nothing on this screen is under anything else on this screen", () => {
-  it("no two stations overlap — the RUN is what guarantees it", () => {
-    // Consecutive stations are exactly one box-width apart horizontally, so
-    // they touch and never cross however flat the rise becomes. That is the
-    // whole reason the rise is free to follow the stage; if someone shrinks
-    // ARC_RUN_STEP_PX below 44 to „tighten" the arc, this is what fails.
+  it("no two stations overlap — the PITCH is what guarantees it", () => {
+    // Consecutive stations are exactly one box-height apart VERTICALLY, so they
+    // touch and never cross. The run used to carry this and that is precisely
+    // why the flanks were diagonals; if someone shrinks ARC_PITCH_PX below 44
+    // to „tighten" the band, this is what fails.
     const bad: string[] = [];
     for (const { id, stage } of LADDER) {
       const all = stations(stage);
@@ -224,7 +243,17 @@ describe("nothing on this screen is under anything else on this screen", () => {
     const stage = LADDER[1].stage; // the founder's phone, sideways
     const padH = Math.min(152, stage.height * 0.44);
     const oldSin = [1, 0.866, 0.5, 0];
-    const column = notifyColumnRect(stage);
+    // THE COLUMN AS IT WAS THEN, spelled out rather than read from the helper.
+    // `notifyColumnRect` now models the lane the column gives back sideways, so
+    // reading it here would score the 2026-08-10 arc against a 2026-08-14
+    // column and the two numbers below would drift for a reason that has
+    // nothing to do with the defect they record.
+    const column: StageRect = {
+      x: stage.width - (NOTIFY_COLUMN_GUTTER_PX + (stage.insetRight ?? 0)) - notifyColumnWidthPx(stage.width, true),
+      y: COLUMN_TOP_PX + (stage.insetTop ?? 0),
+      w: notifyColumnWidthPx(stage.width, true),
+      h: MEASURED_WORST_CARD_PX,
+    };
     const old = (k: number): StageRect => ({
       x: stage.width - (2 + 80 * oldSin[k] + (stage.insetRight ?? 0)) - TOUCH_MIN_PX,
       y: stage.height - (padH + 44 * k + (stage.insetBottom ?? 0)) - TOUCH_MIN_PX,
@@ -255,32 +284,98 @@ describe("nothing on this screen is under anything else on this screen", () => {
 
 describe("the control band leaves the column its authored sentence", () => {
   it("caps the compact column above 106.3 px on every device in the ladder", () => {
-    // PlayAreaStyles: max-height = 100% − TOUCH_CONTROLS_FLOOR − column top.
+    // PlayAreaStyles: max-height = 100% − notifyColumnFloorPx − column top.
+    // The floor is the COLUMN'S OWN since „FIX · FLANKS" — see the block on
+    // notifyColumnFloorCss. It goes UP sideways (the lanes are disjoint, so the
+    // column no longer has to clear the band's height) and down upright, where
+    // it was never binding.
     const tight: string[] = [];
     for (const { id, stage } of LADDER) {
-      const cap = stage.height - touchControlsFloorPx(stage) - COLUMN_TOP_PX - (stage.insetTop ?? 0);
+      const cap = stage.height - notifyColumnFloorPx(stage) - COLUMN_TOP_PX - (stage.insetTop ?? 0);
       if (cap < MEASURED_WORST_CARD_PX) tight.push(`${id} cap ${cap.toFixed(1)} px`);
     }
     expect(tight).toEqual([]);
   });
 
-  it("the smallest phone in the ladder is the one that sets the rise floor", () => {
-    // Stated as a number so „just make the arc taller" cannot land quietly:
-    // 780 x 360 has 116 px of column above the band and 106.3 px of card.
-    const small = LADDER[3].stage;
-    expect(arcRisePx(small)).toBe(20);
-    expect(small.height - touchControlsFloorPx(small) - COLUMN_TOP_PX).toBe(116);
+  it("the card GAINS room sideways out of this wave, and loses none upright", () => {
+    // Stated as numbers so „the flanks got fixed and the card got worse" cannot
+    // be true silently. Sideways is the orientation people drive in and the one
+    // where the card was measured hiding 333 px of its own body.
+    const cap = (stage: StageBox) =>
+      stage.height - notifyColumnFloorPx(stage) - COLUMN_TOP_PX - (stage.insetTop ?? 0);
+    const iphoneL = LADDER[1].stage;
+    const smallL = LADDER[3].stage;
+    expect(cap(iphoneL)).toBe(192); // was 127.5 under TOUCH_CONTROLS_FLOOR
+    expect(cap(smallL)).toBe(180); // was 116
+    // …and the area, which is what a sentence actually needs: the column gives
+    // 60 px of width to the lane and gets 64 px of height back.
+    const area = (stage: StageBox) => {
+      const r = notifyColumnRect(stage);
+      return Math.round(r.w * r.h);
+    };
+    expect(area(iphoneL)).toBe(180 * 192);
+    expect(area(iphoneL)).toBeGreaterThan(240 * 127.5);
+    // Upright the cap drops from 403 to 330 and the measured card is ~205 px,
+    // so nothing that ships is clipped by it.
+    expect(cap(LADDER[0].stage)).toBe(330);
+    expect(cap(LADDER[0].stage)).toBeGreaterThan(MEASURED_WORST_CARD_PX * 2);
   });
 
-  it("portrait keeps the founder's full climb — nothing was paid for there", () => {
-    // The first attempt at this row flattened both orientations with one
-    // percentage and pushed the pause glyph onto the speedometer, on the
-    // orientation that had no collision. Both portraits are at the ceiling.
-    expect(arcRisePx({ width: 393, height: 852 })).toBe(132);
-    expect(arcRisePx({ width: 360, height: 780 })).toBe(132);
-    // …and both landscape phones are at the floor.
-    expect(arcRisePx({ width: 852, height: 393 })).toBe(20);
-    expect(arcRisePx({ width: 780, height: 360 })).toBe(20);
+  it("TOUCH_CONTROLS_FLOOR did NOT move — every other surface stands still", () => {
+    // The whole reason the column got its own floor: this one is spelled into
+    // the ⚙ sheet, the demonstration deck, the minimap, the trace timeline and
+    // the rotate hint, and none of those is what this wave is about. A floor
+    // that cleared the new band would be 369 px of a 393 px landscape stage,
+    // i.e. all five pushed off the top of the screen.
+    expect(touchControlsFloorPx(LADDER[1].stage)).toBe(257);
+    expect(arcRisePx(LADDER[3].stage)).toBe(20);
+    expect(LADDER[3].stage.height - touchControlsFloorPx(LADDER[3].stage) - COLUMN_TOP_PX).toBe(116);
+  });
+
+  it("the band's climb is a PITCH now, and it is the same on both flanks", () => {
+    // The first attempt at this row shared ONE total climb between the flanks,
+    // so 132 px gave the three-station side a 66 px pitch and the four-station
+    // side 44 — two different-looking rails from one number. A band is built
+    // out of a step, not out of a total.
+    for (const { stage } of LADDER) expect(arcPitchPx(stage)).toBe(44);
+    // …and the LIFT is where portrait gets its own arithmetic: zero sideways,
+    // 132 px upright, because upright the pads alone leave the band on the
+    // dashboard (the cowl starts at 0.663 of the portrait frame).
+    expect(arcLiftPx({ width: 852, height: 393 })).toBe(0);
+    expect(arcLiftPx({ width: 780, height: 360 })).toBe(0);
+    expect(arcLiftPx({ width: 393, height: 852 })).toBe(132);
+    expect(arcLiftPx({ width: 360, height: 780 })).toBe(132);
+  });
+
+  it("upright, every station clears the cockpit's own cowl", () => {
+    // „the LEFT flank is on the dashboard rather than beside the road."
+    // The cowl's top edge sits at 0.663 of the portrait frame's height — the
+    // shipped camera, both portrait profiles within 0.0002 of the same aspect —
+    // so a station is „beside the road" when its BOTTOM edge is above that.
+    const COWL_FRACTION = 0.663;
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      // PHONE portrait only. The fraction is a property of the shipped camera
+      // at the two portrait PHONE aspects (0.4613 and 0.4615); a tablet held
+      // upright is 0.75 and frames the cockpit differently, so asserting a
+      // phone's cowl line there would be measuring nothing.
+      if (stage.height < stage.width || stage.width > 420) continue;
+      const cowlY = stage.height * COWL_FRACTION;
+      for (const s of stations(stage)) {
+        if (s.rect.y + s.rect.h > cowlY) {
+          bad.push(`${id} ${s.id} bottom ${s.rect.y + s.rect.h} > cowl ${cowlY.toFixed(0)}`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+
+    // …and it did not pass by accident: the lift is what does it. At lift 0 the
+    // left flank is where the founder photographed it — on the dashboard, with
+    // «⇨ Дясн» across the speedometer's «120».
+    const p = LADDER[0].stage;
+    const withoutLift = p.height - (136 + (p.insetBottom ?? 0)) - TOUCH_MIN_PX;
+    expect(withoutLift).toBe(638);
+    expect(withoutLift + TOUCH_MIN_PX).toBeGreaterThan(p.height * COWL_FRACTION);
   });
 });
 
@@ -391,8 +486,12 @@ describe("defect 1 · nothing on this screen is a function of the viewport heigh
     for (const delta of SWEEP) {
       expect(arcRisePx({ width: 874, height: 402 + delta })).toBe(20);
       expect(arcRisePx({ width: 402, height: 874 + delta })).toBe(132);
-      expect(arcRunStepPx({ width: 874, height: 402 + delta })).toBe(44);
-      expect(arcRunStepPx({ width: 402, height: 874 + delta })).toBe(24);
+      expect(arcLiftPx({ width: 874, height: 402 + delta })).toBe(0);
+      expect(arcLiftPx({ width: 402, height: 874 + delta })).toBe(132);
+      // …and the pitch is the same number on both sides of the query, which is
+      // what makes the two bands read as one system.
+      expect(arcPitchPx({ width: 874, height: 402 + delta })).toBe(44);
+      expect(arcPitchPx({ width: 402, height: 874 + delta })).toBe(44);
     }
   });
 
@@ -400,10 +499,19 @@ describe("defect 1 · nothing on this screen is a function of the viewport heigh
     // The two must be generated from one set of numbers or the sweep above
     // stays green while the phone does not — the notifyColumn.ts device.
     expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-rise: 8.25rem");
-    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-run: 1.5rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-lift: 8.25rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-column-floor: 30rem");
     expect(TOUCH_BAND_CSS_VARS).toContain("@media (orientation: landscape)");
     expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-rise: 1.25rem");
-    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-run: 2.75rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-lift: 0rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-column-floor: 10.75rem");
+    // THE RUN IS GONE FROM THE STYLESHEET, not merely set to zero: a variable
+    // nothing reads is a variable somebody re-wires by accident.
+    expect(TOUCH_BAND_CSS_VARS).not.toContain("--sim-arc-run");
+    // The pitch is ONE value with no media query over it — 44 px, both
+    // orientations, both flanks. That is the separation guarantee.
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-pitch: 2.75rem");
+    expect(TOUCH_BAND_CSS_VARS.match(/--sim-arc-pitch/g)).toHaveLength(1);
     // …and the clamp against the live stage that caused the defect is gone.
     expect(TOUCH_CONTROLS_FLOOR).not.toContain("clamp(");
     // The two terms that WERE functions of the stage height now read through
@@ -466,24 +574,70 @@ describe("the separation rule holds on every flank of every device", () => {
     expect(bad).toEqual([]);
   });
 
-  it("…and the run follows the rise, which is what buys the corridor back", () => {
-    // Sideways the rise is 20 px, so the run carries the whole guarantee at the
-    // box's own width. Upright the rise is 132 px — 44 px of vertical
-    // separation at four stations — so the run drops to 24 and a four-station
-    // flank is 118 px wide instead of 178.
-    const landscape: StageBox = { width: 852, height: 393 };
-    const portrait: StageBox = { width: 393, height: 852 };
-    expect(arcRunStepPx(landscape)).toBe(44);
-    expect(arcRunStepPx(portrait)).toBe(24);
-    const band = (stage: StageBox, side: "left" | "right") =>
-      2 + arcRunStepPx(stage) * (arcStationCount(side) - 1) + TOUCH_MIN_PX;
-    expect(band(landscape, "right")).toBe(178);
-    expect(band(portrait, "right")).toBe(118);
-    // Both flanks together against the narrowest phone in the ladder: the old
-    // arithmetic would have been 356 of 360 px — a 4 px corridor.
-    expect(band(portrait, "left") + band(portrait, "right")).toBe(212);
+  /**
+   * THE ROW THIS WAVE EXISTS FOR. „strung DIAGONALLY ACROSS THE ROAD … at three
+   * different depths, rather than grouped in a readable arc."
+   *
+   * A BAND IS A COLUMN OF BOXES AT ONE DEPTH. That is not a description, it is
+   * a number: the spread between the furthest-in and the furthest-out station
+   * on a flank. It was 88 px on the steering flank and 132 px on the throttle
+   * one sideways, 48 and 72 upright — measured on the deployed build, six
+   * profiles, `tools/mobile/.out/wave12-flanks/before.json`.
+   */
+  it("every station on a flank is at the SAME depth — insetSpread is 0", () => {
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      for (const side of SIDES) {
+        const insets = Array.from({ length: arcStationCount(side) }, (_, i) => {
+          const r = arcStationRectPx(i, side, stage);
+          return side === "left" ? r.x : stage.width - (r.x + r.w);
+        });
+        const spread = Math.max(...insets) - Math.min(...insets);
+        if (spread !== 0) bad.push(`${id} ${side} spread ${spread} px — insets ${insets.join(",")}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("…and it did not pass by accident: the OLD run fails this same check", () => {
+    // A negative control, because a green from a check nobody has seen fire is
+    // not evidence. The layout this replaced stepped one box-width inboard per
+    // station sideways and 24 px upright.
+    const oldInset = (stage: StageBox, side: "left" | "right", k: number) =>
+      8 + (stage.height >= stage.width ? 24 : 44) * (arcStationCount(side) - 1 - k);
+    for (const stage of [LADDER[1].stage, LADDER[0].stage]) {
+      for (const side of SIDES) {
+        const n = arcStationCount(side);
+        const insets = Array.from({ length: n }, (_, i) => oldInset(stage, side, i));
+        expect(Math.max(...insets) - Math.min(...insets)).toBeGreaterThan(0);
+      }
+    }
+    // The exact numbers off the deployed build, so this reads as the report and
+    // not as a re-derivation: left 88 / right 132 sideways, 48 / 72 upright.
+    expect(44 * (ARC_STATIONS_LEFT - 1)).toBe(88);
+    expect(44 * (ARC_STATIONS_RIGHT - 1)).toBe(132);
+    expect(24 * (ARC_STATIONS_LEFT - 1)).toBe(48);
+    expect(24 * (ARC_STATIONS_RIGHT - 1)).toBe(72);
+  });
+
+  it("the two bands leave a corridor, and it is wider than the old flanks", () => {
+    // A band is `edge + 44` wide, full stop — the station count no longer
+    // widens it, which is the other half of deleting the run. Both flanks
+    // together take 104 px of the narrowest phone in the ladder, against the
+    // 212 px the run-based arithmetic took and the 356 px it took before that.
+    const band = ARC_EDGE_FOR_TEST + TOUCH_MIN_PX;
+    expect(band).toBe(52);
+    expect(band * 2).toBe(104);
+    for (const { id, stage } of LADDER) {
+      const corridor = stage.width - band * 2 - (stage.insetLeft ?? 0) - (stage.insetRight ?? 0);
+      expect(`${id} ${corridor}`).toBe(`${id} ${corridor}`);
+      expect(corridor).toBeGreaterThan(200);
+    }
   });
 });
+
+/** ARC_EDGE_PX is module-private; the ladder sweep above reads it off a rect. */
+const ARC_EDGE_FOR_TEST = arcStationRectPx(0, "left", { width: 852, height: 393 }).x;
 
 describe("the shipped CSS is generated from the same numbers", () => {
   it("TOUCH_CONTROLS_FLOOR spells what touchControlsFloorPx computes", () => {
@@ -510,42 +664,47 @@ describe("the shipped CSS is generated from the same numbers", () => {
     expect(TOUCH_CONTROLS_FLOOR).toMatch(/var\(--sim-pad-drive-h,\s*[^)]+\)/);
   });
 
-  it("resolves to the numbers measured in WebKit on the founder's phone", () => {
-    // iPhone 16 landscape, real insets, sc-zebra-approach@L1.
-    //
-    // THE RIGHT FLANK GAINED A FOURTH STATION AT ITS FOOT — the ⚙ dock, which
-    // becomes «КОЛАН» while the belt is unfastened. It takes the box the right
-    // mirror used to stand on, 25.5 mm from the resting throttle thumb, and the
-    // three mirrors step up one each. That single move is the largest measured
-    // win in the wave: the belt was 70.4 mm away here and 101.6 mm upright, in
-    // a rail no thumb reaches, under a panel that buried it on 6 of 6.
+  it("resolves to the band the founder asked for, on his own phone", () => {
+    // iPhone 16 landscape 852 × 393, real insets, sc-zebra-approach@L1 — the
+    // frame he photographed. Every station on a flank shares an x; the y's step
+    // by exactly 44. What was measured on the deployed build is in the comment
+    // beside each one, so the two can be read against each other.
     const stage = LADDER[1].stage;
-    const dock = arcStationRectPx(0, "right", stage); // ⚙ / КОЛАН
-    expect(dock.x).toBe(615);
-    expect(dock.y).toBe(176);
-    const rightMirror = arcStationRectPx(1, "right", stage); // Д
-    expect(rightMirror.x).toBe(659);
-    expect(rightMirror.y).toBeCloseTo(169.3, 1);
-    const rearMirror = arcStationRectPx(2, "right", stage); // З
-    expect(rearMirror.x).toBe(703);
-    expect(rearMirror.y).toBeCloseTo(162.7, 1);
-    const leftMirror = arcStationRectPx(3, "right", stage); // Л
-    expect(leftMirror.x).toBe(747);
-    expect(leftMirror.y).toBe(156);
+    const dock = arcStationRectPx(0, "right", stage); // ⚙ / КОЛАН   was [615,176]
+    expect(dock).toEqual({ x: 741, y: 176, w: 44, h: 44 });
+    const rightMirror = arcStationRectPx(1, "right", stage); // Д     was [659,169.3]
+    expect(rightMirror).toEqual({ x: 741, y: 132, w: 44, h: 44 });
+    const rearMirror = arcStationRectPx(2, "right", stage); // З      was [703,162.7]
+    expect(rearMirror).toEqual({ x: 741, y: 88, w: 44, h: 44 });
+    const leftMirror = arcStationRectPx(3, "right", stage); // Л      was [747,156]
+    expect(leftMirror).toEqual({ x: 741, y: 44, w: 44, h: 44 });
 
     // …and the two indicators are on the STEERING flank, which is the founder's
     // ruling: signalling right used to cost the accelerator thumb. The horn
-    // joined them at the top station — it is pressed while the car is MOVING,
-    // and in the rail it was 54.9 mm sideways and 109.6 mm upright.
-    const left = arcStationRectPx(0, "left", stage); // ⇦
-    expect(left.x).toBe(149);
-    expect(left.y).toBe(192);
-    const right = arcStationRectPx(1, "left", stage); // ⇨
-    expect(right.x).toBe(105);
-    expect(right.y).toBe(182);
-    const horn = arcStationRectPx(2, "left", stage); // ⊙
-    expect(horn.x).toBe(61);
-    expect(horn.y).toBe(172);
+    // joined them at the top station — it is pressed while the car is MOVING.
+    // The old x's were 149 / 105 / 61, i.e. the ⇦ label ended up to the RIGHT of
+    // the ⇨ one and 88 px of road separated the two ends of the flank.
+    const left = arcStationRectPx(0, "left", stage); // ⇦             was [149,192]
+    expect(left).toEqual({ x: 67, y: 192, w: 44, h: 44 });
+    const right = arcStationRectPx(1, "left", stage); // ⇨            was [105,182]
+    expect(right).toEqual({ x: 67, y: 148, w: 44, h: 44 });
+    const horn = arcStationRectPx(2, "left", stage); // ⊙             was [61,172]
+    expect(horn).toEqual({ x: 67, y: 104, w: 44, h: 44 });
+  });
+
+  it("…and to a band beside the road on his phone held upright", () => {
+    // 393 × 852, real insets. Everything here used to be on the dashboard: the
+    // left flank ran y 506–682 against a cowl that starts at y ≈ 565, and
+    // «⇨ Дясн» at [26,572] printed across the speedometer's «120».
+    const stage = LADDER[0].stage;
+    expect(arcStationRectPx(0, "left", stage)).toEqual({ x: 8, y: 506, w: 44, h: 44 });
+    expect(arcStationRectPx(1, "left", stage)).toEqual({ x: 8, y: 462, w: 44, h: 44 });
+    expect(arcStationRectPx(2, "left", stage)).toEqual({ x: 8, y: 418, w: 44, h: 44 });
+    expect(arcStationRectPx(0, "right", stage)).toEqual({ x: 341, y: 490, w: 44, h: 44 });
+    expect(arcStationRectPx(3, "right", stage)).toEqual({ x: 341, y: 358, w: 44, h: 44 });
+    // The edge inset is 8 px and not 2: «Л ЛЯВО» ended 13.4 px from the glass,
+    // which is what „hard against the right edge" measures as.
+    expect(arcStationRectPx(3, "right", stage).x + 44).toBe(stage.width - 8);
   });
 
   it("the flanks carry the seven controls a moving car needs and nothing else", () => {
