@@ -145,10 +145,14 @@ describe("§I11 + §W2 the read mode stops the car, and that is what earns it th
     // `hidden`, which releases both axes AND both pads' pointer ownership and
     // renders every button inert. That is what makes „the panel covers the
     // controls" true-and-fine instead of the 7-dead-controls measurement above.
+    // Matched as a TERM inside the expression rather than as its last line:
+    // §W3 added `playMenuOpen` after it, and an assertion that breaks when a
+    // second correct term joins the seam is an assertion that teaches people to
+    // delete assertions.
     const paused = SHELL.slice(SHELL.indexOf("paused={\n"));
-    expect(paused.slice(0, 400)).toMatch(
-      /paused=\{[\s\S]{0,300}\boverlaySheetOpen\b[\s\S]{0,40}\}/,
-    );
+    const expr = paused.slice(0, paused.indexOf("driveLocked="));
+    expect(expr).toMatch(/\boverlaySheetOpen\b/);
+    expect(expr.length).toBeLessThan(900);
   });
 
   it("…and the shell still feeds that state from SimOverlay's own callback", () => {
@@ -225,5 +229,49 @@ describe("§I11 + §W2 the read mode stops the car, and that is what earns it th
       /\["--sim-touch-floor" as string\]:[\s\S]{0,220}touchControlsFloorCss\("var\(--sim-vh, 100dvh\)"\)/,
     );
     expect(SHELL).toMatch(/\["--sim-touch-floor" as string\]:[\s\S]{0,220}"0px"/);
+  });
+});
+
+/**
+ * ── §W3 · «МЕНЮ НА УРОКА» IS A PAUSED-STATE OBJECT ──────────────────────────
+ *
+ * The defect wave 9 closed one surface and left open on the next. Measured on
+ * the deployed build (f85f49a), WebKit, real insets, six profiles, THE CAR
+ * MOVING and `paused false`:
+ *
+ *   landscape  both indicator stations dead under the sheet; on the Samsung
+ *              gesture-bar 780×360 THE STEERING PAD ITSELF, 208×160, 24 602 px²
+ *   portrait   «Клаксон», «Кола» and «Колан» dead
+ *   6 of 6     2–3 live controls answering for the menu instead of themselves
+ *
+ * There is no geometric fix and the arithmetic is on PlayMenu's `onOpenChange`:
+ * eight rows, landscape already two-column to keep the seventh above the fold,
+ * both flanks owned by the arc from the corner down, 360 px of stage.
+ *
+ * So it is the same answer as the read mode, one surface over — every row in
+ * there is a between-attempts decision, so the car stops while it is up and the
+ * covering stops being a defect. ⚠ AND THE TWO HALVES ARE ONE CHANGE, exactly
+ * as they are for the read mode: without the pause this is 24 602 px² of dead
+ * steering pad; without the sheet there is nothing to pause for.
+ */
+describe("§W3 the lesson menu stops the car too", () => {
+  it("HALF 1 — opening «Меню на урока» pauses the scene", () => {
+    const paused = SHELL.slice(SHELL.indexOf("paused={\n"));
+    const expr = paused.slice(0, paused.indexOf("driveLocked="));
+    expect(expr).toMatch(/\bplayMenuOpen\b/);
+  });
+
+  it("HALF 2 — and the shell feeds that state from PlayMenu's own callback", () => {
+    expect(SHELL).toMatch(/const \[playMenuOpen, setPlayMenuOpen\] = useState\(false\)/);
+    expect(SHELL).toMatch(/onOpenChange=\{setPlayMenuOpen\}/);
+  });
+
+  it("…published by an EFFECT, so no close path can leave the car frozen", () => {
+    // The sheet closes from the trigger, from `onChosen` on every row, and on
+    // unmount. A callback wired at one call site and not the others is a car
+    // that stays stopped after the menu has gone — worse than the defect.
+    const menu = SHELL.slice(SHELL.indexOf("function PlayMenu("));
+    expect(menu.slice(0, 2600)).toMatch(/useEffect\(\(\) => \{\s*onOpenChange\?\.\(open\);\s*\}, \[open, onOpenChange\]\)/);
+    expect(menu.slice(0, 2600)).toMatch(/useEffect\(\(\) => \(\) => onOpenChange\?\.\(false\), \[onOpenChange\]\)/);
   });
 });

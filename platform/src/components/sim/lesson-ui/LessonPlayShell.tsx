@@ -1065,6 +1065,7 @@ function PlayMenu({
   badgeBg,
   items,
   compact,
+  onOpenChange,
 }: {
   titleBg: string;
   /** „Изпит" / „Пясъчник" framing, or null. */
@@ -1072,6 +1073,31 @@ function PlayMenu({
   items: PlayMenuItem[];
   /** Phone-shaped stage — the sheet has to pay for every pixel it takes. */
   compact: boolean;
+  /** ══ THE MENU IS A PAUSED-STATE OBJECT — 2026-08-13, doc 91 §W3 ══
+   *
+   *  Published so the shell can stop the car, exactly as it already does for
+   *  the read mode. This is not a nicety: measured on the deployed build
+   *  (f85f49a, six profiles, WebKit, car MOVING) this sheet buried 2–3 LIVE
+   *  controls on 6 of 6 with `paused false` — both indicator stations in
+   *  landscape, «Клаксон» / «Кола» / «Колан» in portrait, and on the Samsung
+   *  gesture-bar landscape THE STEERING PAD ITSELF (208 × 160, 24 602 px²).
+   *
+   *  The geometric fix does not exist. The sheet is 8 rows; landscape already
+   *  went two-column to stop the seventh falling below the fold; the flanks
+   *  own both outer edges from the corner down. There is no corridor left on a
+   *  360 px stage that holds a menu and clears the arc.
+   *
+   *  So the answer is the one this screen already gives, one surface over:
+   *  nothing in here is needed while the car moves. «Пауза», the quality
+   *  preset, the advisor toggle, the map, «Прекрати урока», „← Всички уроци" —
+   *  every row is a between-attempts decision. A 17-year-old opening a menu
+   *  mid-drive should have the car stopped anyway, and once it IS stopped the
+   *  covering is legitimate rather than a defect: `paused` reaches
+   *  `TouchControls` as `hidden`, which releases both axes and both pads'
+   *  pointer ownership and renders every station inert. There is nothing live
+   *  underneath to bury.
+   */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   // Doc 91 · C2 — this menu is where «Пауза», the quality preset and «Завърши
@@ -1079,6 +1105,14 @@ function PlayMenu({
   // finger, which on a driving screen is most of the time. `useTapActivation`
   // adds the pointer path and keeps the click path for mouse and keyboard.
   const tapToggle = useTapActivation(() => setOpen((o) => !o));
+  // One effect, not a callback at every call site: the sheet closes from the
+  // trigger, from `onChosen` on every row, and on unmount — and a `paused` seam
+  // that misses ONE of those paths is a car that stays frozen after the menu
+  // has gone, which is a worse defect than the one being fixed.
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
+  useEffect(() => () => onOpenChange?.(false), [onOpenChange]);
   return (
     <div
       // NAMED, 2026-08-13, because it is the ONE live control the read mode's
@@ -1508,6 +1542,9 @@ export function LessonPlayShell({
   const [endExpanded, setEndExpanded] = useState(false);
   // A detail sheet is open → the scene's own corner chrome stands down too.
   const [overlaySheetOpen, setOverlaySheetOpen] = useState(false);
+  // …and «Меню на урока», for the same reason and by the same seam. See the
+  // block on PlayMenu's `onOpenChange`.
+  const [playMenuOpen, setPlayMenuOpen] = useState(false);
 
   // -- Doc 86 L14/L15: the ROOMY notification settings -------------------------
   //
@@ -3213,7 +3250,17 @@ export function LessonPlayShell({
               // behave like a driving instructor; an instructor pulls over to
               // explain the hard thing. The alternative shipping today is an
               // 88 px strip over a moving car with its own button cut off.
-              overlaySheetOpen
+              overlaySheetOpen ||
+              // ══ …AND «МЕНЮ НА УРОКА», 2026-08-13, doc 91 §W3 ══
+              //
+              // The same seam, the same argument, and the defect the wave-9
+              // sweep left open behind the one it closed: measured on f85f49a
+              // with the car MOVING, this sheet buried 2–3 LIVE controls on 6
+              // of 6 profiles — the steering pad itself on the Samsung
+              // landscape. Every row of it is a between-attempts decision, so
+              // the car stops while it is up and the covering stops being a
+              // defect. The full derivation is on PlayMenu's `onOpenChange`.
+              playMenuOpen
             }
             driveLocked={snap.driveLocked && !ended}
             preDriveHighlightStepId={
@@ -3447,6 +3494,7 @@ export function LessonPlayShell({
             }
             items={menuItems}
             compact={compact}
+            onOpenChange={setPlayMenuOpen}
           />
         ) : null}
 

@@ -1153,6 +1153,50 @@ ${TOUCH_BAND_CSS_VARS}
       }
 
       /* ══════════════════════════════════════════════════════════════════
+         …AND THE NOTIFICATION COLUMN, ON A SHORT LANDSCAPE STAGE — the
+         hand-over TouchControls' own sheet block wrote down and refused to
+         patch. 2026-08-13, doc 91 §W3.
+
+         Measured on the deployed build, WebKit, real insets, the Samsung
+         gesture-bar 780 x 360 (34.6 % of the Bulgarian market), sheet open with
+         ONE card in the column:
+
+           sheet  [2, 56, 776 x 44]      column card [528, 42, 240 x 44]
+
+         elementFromPoint at their own centres answered the COLUMN for the
+         sheet's «Рестарт на колата», for «ЗАТВОРИ КОНТРОЛИТЕ» — the button that
+         closes the sheet — and, on the manual tier, for «M►». Reproduced on all
+         three landscape profiles and on none of the portrait ones, 5 728-7 139
+         px2 of 44 px targets. The column is z-30 against the sheet's z-20, and
+         the touch root is deliberately raised while the sheet is open, so the
+         stack does not resolve itself.
+
+         THE GEOMETRIC FIX DOES NOT EXIST, and the arithmetic is in TouchControls
+         so it is not re-tried blind: the column's own top is 42 and the sheet's
+         floor-anchored row starts at 56 on a 360-tall stage, so „clear each
+         other vertically" needs a 14 px column; and giving the sheet the rail's
+         right bound leaves 518 px, i.e. two rows, i.e. a row through «Меню на
+         урока» at [8, 8, 48 x 44]. One corridor, two surfaces, 360 px.
+
+         So it is the same arbitration as the deck above, and it is the WEAKER
+         claim of the two: the sheet is modal, the student opened it on purpose,
+         its ✕ is 44 px and one tap brings the column straight back. A teaching
+         card is not being deleted — it is being deferred for the two seconds a
+         hand is in the car's switch panel, and it returns to the same corridor
+         it left.
+
+         SCOPED TO LANDSCAPE-COMPACT AND NOTHING ELSE. Portrait folds this sheet
+         into three rows at the floor while the column sits under the corner, and
+         the sweep measures 0 dead there — so portrait keeps its card, and this
+         rule is exactly as wide as the defect it answers.
+         ══════════════════════════════════════════════════════════════════ */
+      @media (orientation: landscape) {
+        html[data-sim-car-sheet="open"] [data-sim-compact="on"] [data-hud="notify-column"] {
+          visibility: hidden;
+        }
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
          …AND THE READ MODE REPLACES THE LESSON MENU, FOR THE SAME REASON —
          2026-08-13, doc 91 §I11 + §W2.
 
@@ -1214,6 +1258,31 @@ ${TOUCH_BAND_CSS_VARS}
          template literal, so a backtick here ends it. That is exactly how this
          rule failed to compile the first time it was written.) */
       html[data-sim-overlay-read="open"] [data-sim-compact="on"] [data-hud="demo-deck"] {
+        visibility: hidden;
+      }
+
+      /* …AND THE SAME DECK YIELDS TO «МЕНЮ НА УРОКА», which is the LAST live
+         control the wave-10 sweep found buried anywhere — 2026-08-13, §W3.
+
+         Measured on the deployed build, WebKit, iPhone 16 landscape, menu open:
+         «🎬Демонстрация ▸» [71, 110, 134 x 27] answered by «Меню на урока», and
+         88 px2 of the menu's own type over it. Making the menu stop the car
+         does NOT fix this one: the deck is not a driving control, so the pause
+         leaves it live and the sheet simply stands on it.
+
+         Third instance of one rule, so it is written as the same rule: a
+         transport the student opened on purpose is replaced by the surface on
+         top of it, not stacked with it, and one tap brings it straight back.
+         visibility AND NOT display for the reason the block above gives —
+         display:none hides a panel, it does not stop a replay clock.
+
+         NO NEW ATTRIBUTE. The menu holds its open state in React and publishes
+         nothing to the cascade, and adding a root attribute for one rule is
+         more moving parts than the rule is worth. ":has()" reads the DOM the
+         menu already renders, and this file uses that grammar in four other
+         places. Scoped to compact, where PlayMenu is the only thing that
+         mounts. */
+      [data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"] {
         visibility: hidden;
       }
 

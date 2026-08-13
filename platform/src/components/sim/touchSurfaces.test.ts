@@ -288,3 +288,55 @@ describe("§4 · the tier picker is off the phone's top strip", () => {
     );
   });
 });
+
+/**
+ * ── §1c · THE LAST TWO CORRIDOR COLLISIONS — 2026-08-13, §W3 ────────────────
+ *
+ * Wave 10 swept six profiles × seven states on the deployed build and found
+ * exactly two live controls still answering for something else:
+ *
+ *   ⚙ SHEET vs THE NOTIFICATION COLUMN, landscape only. Measured on the
+ *   Samsung gesture-bar 780×360: sheet [2, 56, 776×44] against a column card
+ *   [528, 42, 240×44]. The column is z-30 over the sheet's z-20, so «Рестарт на
+ *   колата», «ЗАТВОРИ КОНТРОЛИТЕ» — the button that closes the sheet — and, on
+ *   the manual tier, «M►» all answered the column. 5 728–7 139 px². The
+ *   geometric fix does not exist and TouchControls' own sheet block writes down
+ *   why: the column's top is 42 and the sheet's floor-anchored row starts at 56,
+ *   so clearing vertically needs a 14 px column; and narrowing the sheet to the
+ *   rail's right bound puts a second row through «Меню на урока» at [8,8,48×44].
+ *
+ *   THE DEMONSTRATION DECK vs THE LESSON MENU. «🎬Демонстрация ▸»
+ *   [71, 110, 134×27] answered by «Меню на урока», with 88 px² of the menu's own
+ *   type over it. Making the menu stop the car does NOT fix this one — the deck
+ *   is not a driving control, so the pause leaves it live and the sheet stands
+ *   on it.
+ *
+ * Both take the arbitration this file already applies twice: a transport the
+ * student opened on purpose is REPLACED BY the surface on top of it, never
+ * stacked with it, and one 44 px tap brings it back.
+ */
+describe("§1c · the ⚙ sheet and the lesson menu each clear their corridor", () => {
+  it("the notification column yields to the ⚙ sheet, and only where the collision is", () => {
+    expect(STYLES_CODE).toContain(
+      'html[data-sim-car-sheet="open"] [data-sim-compact="on"] [data-hud="notify-column"]',
+    );
+    // SCOPED TO LANDSCAPE. Portrait folds the sheet into three rows at the floor
+    // with the column up under the corner and measures 0 dead — so portrait
+    // keeps its teaching card, and the rule is exactly as wide as the defect.
+    const at = STYLES_CODE.indexOf('html[data-sim-car-sheet="open"] [data-sim-compact="on"] [data-hud="notify-column"]');
+    expect(STYLES_CODE.slice(Math.max(0, at - 120), at)).toContain("@media (orientation: landscape)");
+  });
+
+  it("the demonstration deck yields to the lesson menu, by the DOM the menu already renders", () => {
+    expect(STYLES_CODE).toContain(
+      '[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"]',
+    );
+  });
+
+  it("…and both use `visibility`, never `display`, because a deck owns a replay clock", () => {
+    const deckAt = STYLES_CODE.indexOf('[data-sim-compact="on"]:has([data-hud="play-menu"] [role="menu"]) [data-hud="demo-deck"]');
+    expect(STYLES_CODE.slice(deckAt, deckAt + 130)).toContain("visibility: hidden");
+    const colAt = STYLES_CODE.indexOf('html[data-sim-car-sheet="open"] [data-sim-compact="on"] [data-hud="notify-column"]');
+    expect(STYLES_CODE.slice(colAt, colAt + 130)).toContain("visibility: hidden");
+  });
+});
