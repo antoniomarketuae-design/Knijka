@@ -148,6 +148,99 @@ export function tickNumeral(i: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// R2 — HOW BIG A GLYPH ACTUALLY IS ON A SCREEN, AND WHEN IT STOPS BEING ONE
+// ---------------------------------------------------------------------------
+//
+// EVERYTHING ABOVE THIS BLOCK IS EXPRESSED IN DESIGN UNITS, WHICH ARE NOT A
+// SIZE. That is how the dial numerals came to ship at a third of the size they
+// were reviewed at: the SAME component mounts twice from one implementation —
+// portalled onto the cabin's `screen_cluster` quad, and pinned in front of the
+// reel camera at 0.42 of the frame width (CaptureScene CLUSTER_FRAME_FRACTION,
+// ≈538 px of face on a 1280 px frame). „32 units tall" is legible on one of
+// those mounts and is not a number at all on the other, and nothing in this
+// file could tell them apart.
+//
+// MEASURED ON THE DEPLOYED BUILD, iPhone 16, WebKit
+// (tools/mobile/wave12-cluster.mjs — it projects these constants through the
+// live camera and reads the shipped atlas back with getImageData):
+//
+//   mount                     face width   dial numeral ink   digital readout
+//   cockpit, landscape 852×393   158 px        5.6 px             16.7 px
+//   cockpit, portrait  393×852   234 px        8.3 px             24.8 px
+//   reel, 1280×720               538 px       19.1 px             57.4 px
+//
+// On his panel (460 ppi, dpr 3 → 6.04 CSS px per mm) 5.6 px is 0.93 mm of ink,
+// which subtends 10.6′ at arm's length. The published floor for a value that is
+// GLANCED at rather than studied is ~20–25′ („5 mm at 700 mm" = 24.6′). The
+// dial numerals ship at HALF the floor; the digital readout on the same texture
+// clears it three times over, which is exactly why the founder can read
+// «0 км/ч D» in the same frame in which «120» reads as «12B».
+
+/**
+ * Ink height and width of a mono glyph as a fraction of its atlas CELL.
+ *
+ * MEASURED off the shipped atlas, not derived from font metrics: the painter
+ * sets `700 110px` mono into a 64×128 cell and where the ink lands depends on
+ * the font the device actually resolved. wave12 reads the live CanvasTexture
+ * back with getImageData and reports 0.5625 × 0.875 (72 × 56 of 128 × 64).
+ *
+ * A QUAD IS NOT A GLYPH, and forgetting that is a repeat offence in this file —
+ * see the R1 note on UNIT_CELL, where a word floating in an over-wide cell
+ * reached the cockpit as a 3-pixel smudge.
+ */
+export const CHAR_INK_H_FRACTION = 0.5625;
+export const CHAR_INK_W_FRACTION = 0.875;
+
+/**
+ * The ink height, in CSS px, that a design-unit height renders at when the face
+ * plate is `faceWidthCssPx` wide on screen. Accurate to ~1 % against the
+ * measured projection (perspective across the face is the residual).
+ */
+export function inkHeightCssPx(designUnitsH: number, faceWidthCssPx: number): number {
+  return (faceWidthCssPx * designUnitsH * CHAR_INK_H_FRACTION) / FACE_W;
+}
+
+/**
+ * The glance floor in CSS px of ink: 20 arcminutes at 300 mm on a 460 ppi
+ * handset at dpr 3. Below this a number is not read, it is guessed at — and
+ * this instrument is read while the student is steering.
+ */
+export const GLANCE_FLOOR_CSS_PX = 10.5;
+
+/**
+ * THE FACE WIDTH AT WHICH DIAL NUMERALS BECOME LEGIBLE — ≈300 CSS px.
+ *
+ * This is the whole finding in one number. The reel mount gives 538 px and the
+ * numerals were authored and signed off there. The cockpit gives 158 px in
+ * landscape and 234 px in portrait, so on the founder's phone they cannot be
+ * read in either orientation, and no amount of render resolution changes that:
+ * 0.93 mm of ink is 0.93 mm of ink on a 460 ppi panel and on a 4000 ppi one.
+ *
+ * The dial CANNOT be given bigger numerals in place, either, and that is
+ * arithmetic rather than taste: the numeral ring is r=48 inside a tick band
+ * that starts at r=74, five labels sit 56 units of arc apart, and «160» at
+ * double height would be 88 units wide. The ring has no room, and the dial has
+ * no room to grow — it already spans x −254…−74 of a face whose edge is −256.
+ */
+export const DIAL_NUMERALS_MIN_FACE_CSS_PX =
+  (GLANCE_FLOOR_CSS_PX * FACE_W) / (DIAL_NUM_CHAR_H * CHAR_INK_H_FRACTION);
+
+/**
+ * May this mount draw dial numerals at all?
+ *
+ * The honest division of labour when the answer is no: the DIAL keeps the job
+ * an analogue instrument is actually for — needle angle, tick band, and the arc
+ * lighting up with speed, all of which are large shapes that survive at 55 px
+ * of diameter — and the VALUE comes from the digital readout beside it, which
+ * is three times the height and measured legible. What is removed is the one
+ * element that was neither: numerals too small to read but big enough to look
+ * like information, which is the worse of the two failures.
+ */
+export function dialNumeralsLegibleAt(faceWidthCssPx: number): boolean {
+  return faceWidthCssPx >= DIAL_NUMERALS_MIN_FACE_CSS_PX;
+}
+
+// ---------------------------------------------------------------------------
 // Readouts
 // ---------------------------------------------------------------------------
 

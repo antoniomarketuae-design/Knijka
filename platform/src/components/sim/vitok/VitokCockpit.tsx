@@ -1597,10 +1597,32 @@ export function VitokCockpit({
       {clusterMesh
         ? createPortal(
             <group position={[0, 0, CLUSTER_Z_OFFSET_M]}>
+              {/* NO DIAL NUMERALS AT THIS MOUNT. Measured on the deployed build
+                  on the founder's phone (tools/mobile/wave12-cluster.mjs, which
+                  projects the cluster's own layout constants through the live
+                  camera): the face plate lands 158 CSS px wide in landscape and
+                  234 in portrait, so a numeral is 5.6 / 8.3 px of ink — 0.93 mm
+                  on a 460 ppi panel, 10.6′ at arm's length, half the ~20′ floor
+                  for a value that is GLANCED at. The founder's own frames show
+                  the result: «80» as «8₀», «120» as «12B».
+
+                  They cannot be enlarged in place — the ring is r=48 inside a
+                  band starting at r=74 and «160» at double height is 88 units
+                  wide against 56 units of arc — and the dial cannot grow, so
+                  the choice is between numerals that are read and numerals that
+                  are guessed at. The DIAL keeps what it is actually good at
+                  here (needle angle, tick band, the arc filling with speed —
+                  all large shapes at 55 px of diameter) and the VALUE comes
+                  from the digital readout on the same face, which is 3× the
+                  height and measured legible in the same frames.
+
+                  The reel mount keeps them: at 538 px of face they are 19 px of
+                  ink, which is where they were authored and signed off. */}
               <InstrumentCluster
                 widthM={CLUSTER_FACE_W_M}
                 sample={sampleCluster}
                 layer={INTERIOR_LAYER}
+                dialNumerals={false}
               />
             </group>,
             clusterMesh,

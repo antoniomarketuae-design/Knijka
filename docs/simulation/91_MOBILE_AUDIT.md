@@ -2043,3 +2043,151 @@ alone goes from 4.1 to 17 draws a frame.** `low` is already 1.35-1.52x over its 
 (§I26b). Until that row moves, promoting a phone buys a worse frame, not a better picture — and the
 right lever is §I18's auto-quality probe, which is mounted and climbs on measured evidence rather
 than on a RAM figure.
+
+## S. WAVE 12 · THE INSTRUMENT CLUSTER — why the speedometer cannot be read, in millimetres
+
+Instrument: `tools/mobile/wave12-cluster.mjs`, six profiles, WebKit, on the deployed build.
+
+### S0 · The instrument, and why every previous sweep scored the cluster zero
+
+Wave 11 declared this as its own blind spot and was right to. The dial, its ticks and its
+0/40/80/120/160 are **quads inside the WebGL canvas** sampling a texture atlas: no DOM node, no
+`getBoundingClientRect`, no computed style. Wave 11's five detectors all start from a rect, so none
+of them could see the cluster, and neither could the six sweeps before it.
+
+Wave 12 does not look for text. It **projects the geometry**:
+
+1. `__THREE_DEVTOOLS__` is installed as an `EventTarget` before the app's first script. three's
+   `Scene` and `WebGLRenderer` constructors both dispatch an `observe` event to it
+   (`three.core.js:15135`, `three.module.js:19563`). That yields the live renderer with **no change
+   to the app and no `/dev/` route** — the founder's build, unmodified.
+2. That renderer instance's `render` is wrapped once to capture the active camera of the **main pass
+   only** (`getRenderTarget() === null`, so the mirror rigs' cameras are excluded).
+3. The cluster's face mesh is found by its atlas — the one material in the scene whose `map.image`
+   is a 1024x512 canvas. Its `matrixWorld` maps the 512x256 design grid straight to world space.
+4. Every constant in `clusterLayout.ts` is projected corner by corner into CSS pixels.
+5. **The atlas is read back.** `map.image` is the canvas the app painted, so `getImageData` over a
+   character cell gives the TRUE ink box. A 32-unit quad is not a 32-unit glyph — the ink is
+   0.5625 x 0.875 of its cell, measured, not assumed. (`clusterLayout`'s own R1 note records what
+   guessing that fraction cost the first time: «км/ч» shipped as a 3-pixel smudge.)
+
+### S1 · The numbers, at rest and at 47-51 km/h
+
+Ink height of one glyph, and the angle it subtends at 300 mm on each panel. The glance floor for a
+value read while steering is ~20-25 arcmin ("5 mm at 700 mm" = 24.6').
+
+| profile | face plate | dial numeral | on panel | angle | digital readout | angle |
+|---|---|---|---|---|---|---|
+| iphone16-landscape | 161.01 px | **5.73 px** | 0.95 mm | **10.89'** | 17.04 px | 32.35' |
+| iphone16-portrait | 234.07 px | **8.34 px** | 1.38 mm | **15.82'** | 24.78 px | 47.03' |
+| small-landscape | 147.40 px | 5.25 px | 1.00 mm | 11.46' | 15.60 px | 34.06' |
+| small-portrait | 214.29 px | 7.63 px | 1.45 mm | 16.66' | 22.68 px | 49.51' |
+| galaxy-landscape | 147.40 px | 5.25 px | 1.04 mm | 11.91' | 15.60 px | 35.38' |
+| galaxy-portrait | 214.29 px | 7.63 px | 1.51 mm | 17.31' | 22.68 px | 51.44' |
+
+(The two Android pairs share a viewport and therefore a CSS-pixel column; they differ in the mm and
+arcmin columns only because their panels differ — 400 ppi against 385. Panel pitch is SPEC data,
+carried in `wave12-cluster.mjs` and labelled there, exactly like the safe-area insets in
+`devices.mjs`. The iPhone row is the founder's own phone and is the one that decides this.)
+
+**Every profile fails on the dial and passes on the readout.** Same atlas, same material, same
+camera, same distance (eye to dial 1.03 m on all six). The only variable is `DIGIT_H = 96` against
+`DIAL_NUM_CHAR_H = 32` — a ratio of 2.97, which is the entire difference between a number the
+founder reads and one he cannot.
+
+Measured again at speed (belt fastened, throttle held): **51 km/h landscape, 47 km/h portrait**. The
+numerals change by less than 0.1 % — they are static geometry. The needle moves and is legible as a
+pointer at 54-56 px of dial diameter. That split is the finding: **the dial works, its numbers do
+not.**
+
+### S2 · Three independent causes, all measured
+
+1. **SIZE — the numerals were authored at a mount 3.3x bigger than the one they ship on.** The same
+   component mounts twice from one implementation. `CaptureScene.tsx` pins it in front of the reel
+   camera at `CLUSTER_FRAME_FRACTION = 0.42` of a 1280 px frame = **538 px of face**, which is where
+   the ring was drawn, reviewed and signed off ("at reel scale these are the numbers the founder
+   could not read, so they get the whole cell"). The cabin mount gives **147-234 px**. This answers
+   the question directly: **the dial is being drawn at a size its tick labels were never authored
+   for.** The labels are not "collapsing in world space" — they project exactly as their constants
+   say they should.
+2. **TRACKING — the digits of one label are laid down touching, by arithmetic.**
+   `DIAL_NUM_TRACK = 14` units; the measured ink is `0.875 x DIAL_NUM_CHAR_W = 14.0` units wide. The
+   gap is **zero by construction**, measured at -0.31 to +0.13 CSS px across all five labels and all
+   six profiles. That is why «120» arrives as «12B» and «80» as «8₀» — they are one shape.
+   The two existing collision tests both passed on this build because **both measure QUADS**, and
+   the quad is 16 units where the ink is 14. Every question anyone had asked about this ring had
+   been asked in the wrong units.
+3. **SAMPLING — 12.6-13.9 atlas texels per screen pixel, with no mip chain.**
+   `InstrumentCluster` sets `generateMipmaps = false` and `minFilter = LinearFilter`, on the
+   argument that "the cluster is never minified hard enough for aliasing to be the worse trade."
+   Measured, it is minified ~13x on the numerals and ~4.3x on the digits. The comment is wrong by an
+   order of magnitude. It is NOT the binding constraint — the digits are legible in the frames at
+   4.3 texels/px — but it is the reason the numerals read as noise rather than as small type.
+
+And underneath all three: the drawing buffer is **1:1 with CSS pixels**. A handset cold-starts on the
+`low` tier, whose cap is `TOUCH_MAX_DPR = 1.0` (`quality.ts`), so 5.73 CSS px is **5.73 real rendered
+pixels**, upscaled 3x onto a 460 ppi panel. Raising the tier would sharpen them; it would not make
+them bigger, because 0.95 mm is 0.95 mm at any resolution.
+
+### S3 · Why the numerals cannot simply be enlarged — arithmetic, not taste
+
+The numeral ring is r=48 inside a tick band that starts at r=74. Five labels sit **56 units of arc**
+apart. «160» at double height would be **88 units wide**. Dropping to three labels (0/80/160) frees
+113 units of arc but pushes the ring outside its own tick band unless it moves to r=40, leaving 6
+units of clearance and crowding the needle hub — and it costs 40 and 120, the two speeds a Bulgarian
+city lesson is actually about. Doubling still only reaches 21' in landscape, i.e. the floor, not
+above it.
+
+The dial cannot grow either: it already spans x -254...-74 on a face whose edge is -256.
+
+**`DIAL_NUMERALS_MIN_FACE_CSS_PX` = 298.7.** The cabin gives 147-234. The reel gives 538.
+
+### S4 · The decision, and what was changed
+
+**The cabin mount draws no dial numerals. The reel mount keeps them.** One prop,
+`InstrumentCluster dialNumerals`, defaulting to the authored behaviour; `VitokCockpit` passes false
+with the measurements in the comment.
+
+The division of labour this leaves is the honest one, and it is how a real cluster splits the job
+when the dial is small:
+
+- **The DIAL keeps what it is good at** — needle angle, the tick band with its longer majors every
+  20 km/h, and the arc lighting up with speed. All large shapes; all still legible at 54-82 px of
+  diameter, verified in the frames at 51 km/h.
+- **The VALUE comes from the digital readout on the same face** — 2.7-4.1 mm, 31-49', measured
+  legible in the very frames the founder sent, and it is already what he read off them.
+- **What is removed is the element that was neither**: numerals too small to be read but big enough
+  to look like information. A dial that is decoration is worse than no dial.
+
+Cost: 11 quads. `tickQuad`, `digitQuad`, `gearQuad` and both lamp banks are unchanged except for a
+uniform index shift, which the new test pins.
+
+### S5 · What is reported and NOT decided here
+
+- **THE FLANK LABELS PRINT ON THE DIAL.** Portrait, all three profiles: «⇨» 237 px² on the dial,
+  «Дясн» 218 px², «⇦» 71 px². «Дясн» lands on «120» and the arrow through the «0» of «80» — the
+  founder's «ДЯСН120» smear, character for character. Removing the numerals stops it corrupting a
+  NUMBER, but the labels are still printed on the instrument. This is the same work item as wave
+  11's diagonal-scatter finding and belongs with the flank lane (`wave12-flanks.mjs`), not here.
+- **THE PORTRAIT FRAME CROPS THE INSTRUMENT.** `cockpitVFovForAspect` holds hFOV at 75.4° until the
+  56° vertical ceiling bites; at 393x852 the ceiling wins and **hFOV collapses to 27.6°**. Measured:
+  the face plate's left edge lands at x = **-2.7**, and the dial rim at x = **+0.1**. The housing
+  bezel (16 units further out) is off the glass. That is the founder's "chopped by the left edge",
+  and its cause is the FOV clamp, not the cluster. Landscape is unaffected (hFOV 75.4°, face at
+  x 289-450 of 852). **His to rule** — it is the same lever as the edge trade.
+- **THE 20-140 BAND SITS BEHIND THE WHEEL RIM.** `clusterLayout` R1 assumed the rim hides everything
+  below y = -20; the numeral ring's lowest labels are at y = -4 and the frames show them cut. The
+  assumption is off by ~16 units against the shipped GLB.
+
+### S6 · Staging was serving a half-built app, and nobody had opened it
+
+Found on the first navigation of this wave. `/simulator` rendered the shell and then the error
+boundary; four static assets returned **500** (`chunks/1kiyryvna44qq.js`, `chunks/067gon9t0bse2.css`
+and two fonts). On the VPS: **no `.next/BUILD_ID`**, 106 chunks, and `.next/diagnostics` reading
+`"buildStage": "compile"` — the previous `next build` was killed part way through. `pm2` had
+restarted `knijka` 97 times.
+
+Git said `e21ffb5` and `.next` was newer than the commit, so **every hash-and-mtime check passed on a
+build that could not run a lesson**. A deploy check that reads git and file times but never loads a
+page cannot see this. Re-running `deploy.sh` fixed it (BUILD_ID present, `buildStage:
+"static-generation"`), and the whole of §S was measured after that.

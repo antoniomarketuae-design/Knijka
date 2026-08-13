@@ -218,7 +218,22 @@ const INK_MUTED = hexRgba("#8fa0b8", 1);
 const INK_FORE = hexRgba("#e8eef8", 1);
 const INK_HIDDEN = hexRgba("#000000", 0);
 
-export function buildClusterFaceMesh(): ClusterFaceMesh {
+export interface ClusterFaceOptions {
+  /**
+   * Draw the 0/40/80/120/160 numerals on the dial's inner ring.
+   *
+   * NOT A STYLE SWITCH — a legibility one, and the mount is the only place that
+   * knows the answer (see clusterLayout's R2 block and
+   * `dialNumeralsLegibleAt`). The reel mount renders the face at ~538 CSS px,
+   * where the numerals are 19 px of ink and were reviewed; the cabin mount
+   * renders it at 158–234 px, where they are 5.6–8.3 px, i.e. under half the
+   * glance floor, and «120» arrives on the founder's phone as «12B».
+   */
+  dialNumerals?: boolean;
+}
+
+export function buildClusterFaceMesh(options: ClusterFaceOptions = {}): ClusterFaceMesh {
+  const { dialNumerals = true } = options;
   const b = newBuilder();
   const white = cellUv(WHITE_CELL);
   const halo = cellUv(HALO_CELL);
@@ -271,7 +286,16 @@ export function buildClusterFaceMesh(): ClusterFaceMesh {
   //      the dial is an arc of dashes and no speed can be read off it. They
   //      sample the same mono strip as the big readout, so the scale and the
   //      number are visibly the same typeface — one instrument, not two.
-  for (let i = 0; i < TICK_COUNT; i++) {
+  //
+  //      R2: …AND AT THE CABIN MOUNT THEY ARE NOT NUMBERS. R1 is right about
+  //      the REEL, which is the only place this ring was ever looked at. On the
+  //      founder's phone the same ring is 5.6 px of ink per digit and the
+  //      characters of one label are laid down TOUCHING — DIAL_NUM_TRACK is 14
+  //      units and the measured ink is 0.875 × 16 = 14.0 units wide, so the gap
+  //      is zero by arithmetic and «120» renders as one shape. Two separate
+  //      reasons, one conclusion, and `dialNumerals` is where the mount states
+  //      which of the two sizes it is.
+  for (let i = 0; dialNumerals && i < TICK_COUNT; i++) {
     const label = tickNumeral(i);
     if (!label) continue;
     const a = dialAngleRad(tickSpeedKmh(i));

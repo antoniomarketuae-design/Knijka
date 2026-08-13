@@ -65,6 +65,13 @@ import {
   tickNumeral,
   tickSpeedKmh,
   DIAL_MAX_KMH,
+  CHAR_INK_H_FRACTION,
+  CHAR_INK_W_FRACTION,
+  DIAL_NUMERALS_MIN_FACE_CSS_PX,
+  DIAL_NUM_CHAR_H,
+  GLANCE_FLOOR_CSS_PX,
+  dialNumeralsLegibleAt,
+  inkHeightCssPx,
 } from "./clusterLayout";
 import { PERF_BUDGETS } from "../environment/perfBudget";
 
@@ -445,5 +452,87 @@ describe("per-frame writers", () => {
     const warn = hexRgba("#ff6a58");
     expect(warn.r).toBeCloseTo(1, 5);
     expect(warn.g).toBeCloseTo(0x6a / 255, 5);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// R2 — THE TESTS THAT WOULD HAVE CAUGHT IT
+// ---------------------------------------------------------------------------
+//
+// The dial already had two collision tests and both PASSED on the build the
+// founder photographed, because both of them measure QUADS. The quad is 16
+// units wide; the ink inside it is 14. Every question anybody had asked about
+// this ring was asked in the wrong units.
+describe("dial numerals — legibility, not just collision", () => {
+  it("the characters of ONE label are laid down touching, in INK", () => {
+    // THIS IS THE «120» → «12B» DEFECT, AS ARITHMETIC. `DIAL_NUM_TRACK` is the
+    // advance between two characters of the same label; the ink is
+    // CHAR_INK_W_FRACTION of the CHAR quad. Subtract and there is nothing left
+    // between two digits — measured on the deployed build at −0.20…+0.08 CSS px
+    // across five labels, i.e. the two glyphs are one shape.
+    //
+    // The test is deliberately an ASSERTION OF THE DEFECT rather than a
+    // prohibition of it: the ring cannot be spaced any wider (five labels sit
+    // 56 units of arc apart and «160» is already 44 wide), so this number is a
+    // FACT ABOUT THE RING that the cabin mount has to route around, and if
+    // someone later widens the track this test should fail and be re-thought
+    // rather than quietly deleted.
+    const inkGapUnits = DIAL_NUM_TRACK - DIAL_NUM_CHAR_W * CHAR_INK_W_FRACTION;
+    expect(inkGapUnits).toBeCloseTo(0, 6);
+  });
+
+  it("estimates ink height to within 2 % of the live projection", () => {
+    // Three rows MEASURED through the live camera on the deployed build
+    // (wave12-cluster.mjs, iPhone 16). If this estimator drifts, every
+    // threshold built on it is decoration. The residual is perspective across
+    // the face, which the estimator deliberately does not model — so the bound
+    // is relative and tight rather than `toBeCloseTo`'s ±0.5, which at 5.7 px
+    // would be ±9 % and would not catch a real drift.
+    const within2pc = (got: number, measured: number) =>
+      expect(Math.abs(got - measured) / measured).toBeLessThan(0.02);
+    within2pc(inkHeightCssPx(DIAL_NUM_CHAR_H, 161.01), 5.73);
+    within2pc(inkHeightCssPx(DIAL_NUM_CHAR_H, 234.07), 8.34);
+    within2pc(inkHeightCssPx(DIGIT_H, 161.01), 17.04);
+  });
+
+  it("needs a ~300 px face, and the cabin gives 158–234", () => {
+    expect(DIAL_NUMERALS_MIN_FACE_CSS_PX).toBeGreaterThan(280);
+    expect(DIAL_NUMERALS_MIN_FACE_CSS_PX).toBeLessThan(320);
+    // The two cabin mounts the founder photographed.
+    expect(dialNumeralsLegibleAt(157.86)).toBe(false); // landscape 852×393
+    expect(dialNumeralsLegibleAt(234.07)).toBe(false); // portrait 393×852
+    // The reel mount: 0.42 of a 1280 px frame, where they were signed off.
+    expect(dialNumeralsLegibleAt(538)).toBe(true);
+  });
+
+  it("the DIGITAL readout clears the glance floor on the same face that fails", () => {
+    // The whole argument in one assertion: identical atlas, identical material,
+    // identical camera and distance. DIGIT_H is 96 units and DIAL_NUM_CHAR_H is
+    // 32, and that ratio is the entire difference between a number the founder
+    // reads and one he cannot.
+    expect(inkHeightCssPx(DIGIT_H, 157.86)).toBeGreaterThan(GLANCE_FLOOR_CSS_PX);
+    expect(inkHeightCssPx(DIAL_NUM_CHAR_H, 157.86)).toBeLessThan(GLANCE_FLOOR_CSS_PX / 1.8);
+    expect(CHAR_INK_H_FRACTION).toBeGreaterThan(0.5);
+  });
+
+  it("the cabin mount emits no numeral quads, and loses nothing else", () => {
+    const withNumerals = buildClusterFaceMesh();
+    const without = buildClusterFaceMesh({ dialNumerals: false });
+    // 0/40/80/120/160 = 1+2+2+3+3 = 11 character quads, and ELEVEN exactly:
+    // the numerals are the only thing that goes.
+    const dropped = withNumerals.quadCount - without.quadCount;
+    expect(dropped).toBe(11);
+
+    // Everything the dial is actually good at survives. The numerals are
+    // emitted BEFORE the readouts, so every later handle shifts by exactly the
+    // number dropped — which is a stronger statement than "unchanged": it says
+    // nothing else was removed and nothing was reordered.
+    expect(without.tickQuad).toEqual(withNumerals.tickQuad); // ticks come first
+    expect(without.digitQuad).toEqual(withNumerals.digitQuad.map((q) => q - dropped));
+    expect(without.gearQuad).toBe(withNumerals.gearQuad - dropped);
+    for (const key of LAMP_KEYS) {
+      expect(without.lampGlyphQuad[key]).toBe(withNumerals.lampGlyphQuad[key] - dropped);
+      expect(without.lampHaloQuad[key]).toBe(withNumerals.lampHaloQuad[key] - dropped);
+    }
   });
 });

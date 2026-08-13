@@ -119,6 +119,18 @@ export interface InstrumentClusterProps {
   layer?: number;
   /** Base renderOrder; the three meshes take base, base+1, base+2. */
   renderOrder?: number;
+  /**
+   * Draw the numerals on the dial ring. Default true — the reel mount, where
+   * they were authored and reviewed.
+   *
+   * THE CABIN MOUNT PASSES FALSE, and the reason is measured rather than
+   * argued: `widthM` is a size in METRES and the thing that decides whether a
+   * glyph is a number is its size in the STUDENT'S PIXELS, which depends on the
+   * mount's distance and the camera as well. This component cannot know that;
+   * the mount can. clusterLayout's R2 block carries the measurements and
+   * `dialNumeralsLegibleAt()` carries the threshold.
+   */
+  dialNumerals?: boolean;
 }
 
 export function InstrumentCluster({
@@ -127,6 +139,7 @@ export function InstrumentCluster({
   overlay = false,
   layer,
   renderOrder = 0,
+  dialNumerals = true,
 }: InstrumentClusterProps) {
   const groupRef = useRef<Group>(null);
   const needleRef = useRef<Object3D>(null);
@@ -154,7 +167,7 @@ export function InstrumentCluster({
 
   // --- Geometry: built once from the pure builders --------------------------
   const built = useMemo(() => {
-    const face = buildClusterFaceMesh();
+    const face = buildClusterFaceMesh({ dialNumerals });
     const housing = buildClusterHousingMesh();
     const needle = buildClusterNeedleMesh();
 
@@ -182,7 +195,9 @@ export function InstrumentCluster({
     needleGeometry.setIndex(new BufferAttribute(needle.indices, 1));
 
     return { face, faceGeometry, housingGeometry, needleGeometry, faceColors, faceUvs };
-  }, []);
+    // `dialNumerals` is a MOUNT-time decision (a constant per call site), so
+    // this rebuilds once per mount and never in a frame loop.
+  }, [dialNumerals]);
 
   useEffect(() => {
     const { faceGeometry, housingGeometry, needleGeometry } = built;
