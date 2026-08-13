@@ -653,7 +653,16 @@ for (const device of devices) {
     // deep run its first profile before it was caught. The card is still up in
     // the driving frame; the sheet is one press away from here.
     const whyAt = await page.evaluate(() => {
-      const b = [...document.querySelectorAll("button")].find((n) => /^(Защо|Списък)$/.test((n.textContent || "").trim()));
+      // «ПРОЧЕТИ» JOINED THIS LIST ON 2026-08-14 AND THE OMISSION COST A RUN.
+      // The briefing's open control was «Защо» until the card stopped being
+      // able to finish printing its instruction; „why" is the right word over a
+      // graded fault and the wrong one over a sentence that was cut, so it is
+      // «Прочети» there now (LessonPlayShell §4c). This probe kept looking for
+      // the old label and reported „NO «Защо» BUTTON FOUND — cannot open the
+      // read sheet on this profile" on all six — an instrument saying nothing
+      // is on screen because it was asking for the wrong word, which is the
+      // same failure mode as the `scrollWidth` test this whole file replaced.
+      const b = [...document.querySelectorAll("button")].find((n) => /^(Защо|Списък|Прочети)$/.test((n.textContent || "").trim()));
       if (!b) return null;
       const r = b.getBoundingClientRect();
       return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };

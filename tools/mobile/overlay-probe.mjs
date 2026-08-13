@@ -286,6 +286,14 @@ function overlayProbeBody(config) {
 
   // THEO-4, asserted from the DOM. An overlay that names a mistake must offer a
   // way to the authored WHY — a „Защо" control, or an already-open sheet.
+  //
+  // «ПРОЧЕТИ» IS THE SAME CONTROL UNDER A HONEST NAME (2026-08-14). The
+  // briefing's open control stopped being «Защо» when the card stopped being
+  // able to finish printing its instruction: „why" answers a graded fault, and
+  // what a student needs from a sentence that was cut is the rest of it. This
+  // list has to follow the product or it starts reporting `reachableWhy:false`
+  // on a card whose WHY is one 44 px tap away — a probe lying in the direction
+  // of alarm, which is how six waves of real defects got buried under noise.
   const MISTAKE_KINDS = ["teach", "violation", "hint", "warning"];
   const theo4 = roots
     .filter((r) => MISTAKE_KINDS.includes(r.getAttribute("data-sim-overlay")))
@@ -297,7 +305,7 @@ function overlayProbeBody(config) {
       return {
         kind: r.getAttribute("data-sim-overlay"),
         state,
-        reachableWhy: state === "open" || buttons.some((t) => /Защо|Списък/.test(t)),
+        reachableWhy: state === "open" || buttons.some((t) => /Защо|Списък|Прочети/i.test(t)),
         buttons,
       };
     });
