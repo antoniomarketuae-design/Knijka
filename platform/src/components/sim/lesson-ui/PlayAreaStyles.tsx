@@ -1135,6 +1135,37 @@ export function PlayAreaStyles() {
       }
 
       /* ══════════════════════════════════════════════════════════════════
+         …AND THE READ MODE REPLACES THE LESSON MENU, FOR THE SAME REASON —
+         2026-08-13, doc 91 §I11 + §W2.
+
+         The expanded instruction panel buried SEVEN controls on the founder's
+         phone held sideways. Six of them are TouchControls' and they are
+         answered by the mechanism, not by a rule: opening the panel now stops
+         the car (LessonPlayShell's "paused" prop), which makes every one of
+         them inert — a control nobody can see is not a buried control, and the
+         pads keep their DOM nodes so the thumb picks the pedal straight back up
+         (§I3; "display: none" on that tree would BE the §C1 bug).
+
+         «Меню на урока» is the seventh, and it is the exception: it is the
+         shell's own chrome, in a different tree, and no pause reaches it.
+         Measured buried on iphone16-landscape (its centre sits 1 px inside the
+         reading surface's left edge) and reachable-by-luck on the 780 profiles,
+         which is worse than a clean rule.
+
+         So it yields, exactly as the demonstration deck yields to the ⚙ sheet
+         above: replaced by, not stacked with. It loses nothing by waiting — it
+         is a paused-state object (pause, quality, quit, „← Всички уроци"), the
+         car is already stopped, and the reading surface's own ✕ is 44 px and
+         brings it straight back.
+
+         Scoped to compact: PlayMenu only mounts there, and on a roomy screen
+         the sheet is a centred bottom sheet with the top bar well clear of it.
+         ══════════════════════════════════════════════════════════════════ */
+      html[data-sim-overlay-read="open"] [data-sim-compact="on"] [data-hud="play-menu"] {
+        display: none;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
          THE FIRST-RUN THUMB HINT LEAVES THE MIDDLE OF THE SCREEN — 2026-08-12.
 
          THIS IS THE FRAME HE PHOTOGRAPHED. The hint is "top: 50%", full-width,

@@ -260,9 +260,36 @@ function rem(px: number): string {
  * roughly 900 px² — 0.27 % of a landscape iPhone.
  */
 const STEER_PAD = { fraction: 0.42, capPx: 208 } as const; // of the WIDTH
-const STEER_PAD_HEIGHT = { fraction: 0.4, capPx: 136 } as const; // of the HEIGHT
 const DRIVE_PAD = { fraction: 0.36, capPx: 176 } as const;
-const DRIVE_PAD_HEIGHT = { fraction: 0.44, capPx: 152 } as const;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE PAD HEIGHTS ARE CONSTANTS NOW, AND THAT IS DEFECT 1 — doc 91 §N1.
+ *
+ * They used to be `min(40 % / 44 % of the stage, 136 / 152 px)`. On every phone
+ * in the ladder AT REST the percentage loses to the cap, so the pads were
+ * already 136 and 152 px — the percentage bought nothing. What it cost is the
+ * founder's „it is not stabilized, it moves": a percentage of the stage height
+ * is a percentage of a number SAFARI OWNS. Measured with CDP, his handset,
+ * sweeping the height the way the URL bar does:
+ *
+ *   402 (rest) → drive pad 173 px   ·   312 (−90) → drive pad 158 px
+ *   small-landscape: 152 → 139 → 119
+ *
+ * The pad his thumb is resting on changed size under it while he drove. The cap
+ * is the value in every case at rest, so pinning it costs NOTHING on any device
+ * in the ladder and deletes the motion outright.
+ *
+ * WHY NOT `svh`, WHICH THE DESIGN PROPOSED. `svh` is constant and always on
+ * screen, and it would work — but these two boxes are anchored `bottom: 0` and
+ * measured UPWARD, so they never needed a viewport height at all. A constant
+ * measured from the bottom edge is strictly stronger than a constant viewport
+ * unit: there is no unit left for a browser to reinterpret, and no
+ * `@supports (height: 100svh)` fallback to get wrong on an old Android.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const STEER_PAD_HEIGHT_PX = 136;
+const DRIVE_PAD_HEIGHT_PX = 152;
 
 const cssMin = (b: { fraction: number; capPx: number }): string =>
   `min(${b.fraction * 100}%, ${rem(b.capPx)})`;
@@ -301,9 +328,9 @@ const STEER_PAD_W = cssMin(STEER_PAD); // ≤ 208 px
 export const STEER_PAD_DECK_CLEARANCE_CSS = `calc(min(${
   STEER_PAD.fraction * 100
 }vw, ${rem(STEER_PAD.capPx)}) - 4rem + 0.5rem)`;
-const STEER_PAD_H = cssMin(STEER_PAD_HEIGHT); // ≤ 136 px
+const STEER_PAD_H = rem(STEER_PAD_HEIGHT_PX); // 136 px, flat
 const DRIVE_PAD_W = cssMin(DRIVE_PAD); // ≤ 176 px
-const DRIVE_PAD_H = cssMin(DRIVE_PAD_HEIGHT); // ≤ 152 px
+const DRIVE_PAD_H = rem(DRIVE_PAD_HEIGHT_PX); // 152 px, flat
 
 /** The touch floor, in px. Every hit box on this screen is this square. */
 const TOUCH_MIN_PX = 44;
@@ -461,8 +488,8 @@ const ROW_H = rem(TOUCH_MIN_PX);
  * where no thumb rests (§H, and the reference's own «PAUSE»/«VIEW» corner).
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export const ARC_STATIONS_LEFT = 2;
-export const ARC_STATIONS_RIGHT = 3;
+export const ARC_STATIONS_LEFT = 3;
+export const ARC_STATIONS_RIGHT = 4;
 
 /** How many stations one flank carries. */
 export function arcStationCount(side: "left" | "right"): number {
@@ -478,36 +505,118 @@ export const ARC_STATIONS = Math.max(ARC_STATIONS_LEFT, ARC_STATIONS_RIGHT);
  * edge-to-edge and CANNOT overlap however flat the rise becomes. That is what
  * makes the rise safe to shrink; see the block above.
  */
-const ARC_RUN_STEP_PX = TOUCH_MIN_PX;
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE SEPARATION RULE, STATED ONCE — and it is what lets a flank carry FOUR
+ * stations on a 360 px phone without crossing the corridor between the pads.
+ *
+ * Two 44 px boxes cannot overlap if they are 44 px apart in EITHER axis. The
+ * old arc put that guarantee entirely in the RUN (one 44 px step per station,
+ * the box's own width) because the rise could be as little as 20 px. That is
+ * still true SIDEWAYS — but a phone held upright has a 132 px rise, and at four
+ * stations that is 44 px of vertical separation on its own. There, the run is
+ * free, and it has to be: four stations a side at a 44 px step is 178 + 178 =
+ * 356 px of a 360 px screen, which is the 4 px corridor the file's own history
+ * warns about — and, worse, it puts a station squarely in the lane the speed
+ * readout lives in (`padCorridorPx`).
+ *
+ * So the run is derived from the rise instead of being a constant:
+ *
+ *     verticalGap = rise / (count − 1)
+ *     run = verticalGap ≥ 44 ? 24 px : 44 px
+ *
+ * Landscape (rise 20): 44 px, exactly as it shipped. Portrait (rise 132): 24 px,
+ * and a four-station flank is 2 + 72 + 44 = 118 px — 60 px NARROWER than the
+ * three-station flank it replaces at the old step. The arc got busier and the
+ * screen got wider.
+ *
+ * AND THE CURVE IS A STRAIGHT RAMP NOW, NOT A SINE. The sine decelerated
+ * towards the top, so at four stations in portrait the last two were 17.7 px
+ * apart vertically — under the floor, and the rule above would have been a lie.
+ * A linear ramp makes `verticalGap` a single number the rule can be stated in,
+ * and `touchArc.test.ts` proves the invariant over the whole ladder instead of
+ * trusting a trig table. Sideways the two curves differ by ≤ 6 px.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const ARC_RUN_FLAT_PX = TOUCH_MIN_PX;
+const ARC_RUN_TALL_PX = 24;
 /** How close to the screen edge the TOP station sits. */
 const ARC_EDGE_PX = 2;
 /**
  * THE RISE — total climb from the bottom station to the top one.
  *
- * 20 px on a phone held sideways, 132 px on a portrait one, ramping between at
- * half the stage's height past 352. Every number is derived from a device in
- * the ladder; see the block above before touching any of the four.
- */
-const ARC_RISE_MIN_PX = 20;
-const ARC_RISE_MAX_PX = 3 * TOUCH_MIN_PX;
-const ARC_RISE_KNEE_PX = 352;
-const ARC_RISE_SLOPE = 0.5;
-const ARC_RISE = `clamp(${rem(ARC_RISE_MIN_PX)}, (100% - ${rem(
-  ARC_RISE_KNEE_PX,
-)}) * ${ARC_RISE_SLOPE}, ${rem(ARC_RISE_MAX_PX)})`;
-/**
- * sin(k/(n−1) · π/2) — station `k` of `n`, rounded to four decimals.
+ * 20 px on a phone held sideways, 132 px on a portrait one. THEY ARE CONSTANTS
+ * AND THE STEP BETWEEN THEM IS AN ORIENTATION, NOT A HEIGHT — that is the other
+ * half of defect 1. It used to be
  *
- * It used to be a hand-written four-entry table, and the table was the right
- * shape while both flanks carried four stations. They no longer do, so the
- * number is generated from the same formula the block above states in prose —
- * still four decimals, still hand-checkable (2 of 3 is sin 45° = 0.7071), and
- * now it cannot be wrong for a flank whose station count somebody changed.
+ *     clamp(1.25rem, (100% − 22rem) × 0.5, 8.25rem)
+ *
+ * resolved against the LIVE stage height, so Safari's URL bar sliding reshaped
+ * the arc under his thumb: measured on his 402 px-tall landscape stage, the
+ * indicator gap compressed 25 → 20 px and the mirror gap 18 → 14 px the first
+ * time the bar moved. The ladder could not see it because its landscape stage
+ * is 393 px, which is already at the clamp's floor — his is 402, the only
+ * device in the set inside the varying band.
+ *
+ * The two values are what the old clamp already produced at rest on every
+ * profile in the ladder (both portraits at the 8.25 rem ceiling, both landscapes
+ * at the 1.25 rem floor), so this changes exactly one device: his, where the
+ * rise stops sliding.
+ *
+ * THE DISCRIMINATOR IS `orientation`, AND THAT CHOICE IS THE WHOLE POINT.
+ * A media query on HEIGHT would be the same defect in a step function — and
+ * worse, it would be invisible to the harness, which sweeps the viewport height
+ * exactly the way the URL bar does. `(orientation: portrait)` cannot flip under
+ * a 90 px height sweep, so „nothing moves" is a claim a probe can actually
+ * falsify. The `(min-height: 40rem)` clause beside it is for a TABLET held
+ * sideways — 768 px of stage, where today's clamp already returns the ceiling —
+ * and 640 px is 238 px clear of the tallest landscape phone in the ladder, so
+ * no URL bar can drive a phone across it.
  */
-function arcSin(index: number, count: number): number {
+const ARC_RISE_FLAT_PX = 20;
+const ARC_RISE_TALL_PX = 3 * TOUCH_MIN_PX;
+/** A stage at least this tall gets the portrait climb even held sideways. */
+const ARC_TALL_MIN_HEIGHT_PX = 640;
+/** The CSS custom properties the whole band is now laid out from. */
+const ARC_RISE = "var(--sim-arc-rise, 1.25rem)";
+const ARC_RUN = "var(--sim-arc-run, 2.75rem)";
+
+/**
+ * THE ONE STYLE BLOCK THAT DECIDES THE TWO CONSTANTS.
+ *
+ * Exported because `PlayAreaStyles` and the shell both spell
+ * `TOUCH_CONTROLS_FLOOR` into surfaces that exist whether or not this overlay is
+ * mounted; every consumer therefore reads the properties WITH the landscape
+ * fallback baked in, so a missing declaration degrades to the flat arc rather
+ * than dropping the whole `calc()`.
+ */
+export const TOUCH_GEOMETRY_VARS_CSS = `
+:root {
+  --sim-arc-rise: ${rem(ARC_RISE_FLAT_PX)};
+  --sim-arc-run: ${rem(ARC_RUN_FLAT_PX)};
+}
+@media (orientation: portrait), (min-height: ${rem(ARC_TALL_MIN_HEIGHT_PX)}) {
+  :root {
+    --sim-arc-rise: ${rem(ARC_RISE_TALL_PX)};
+    --sim-arc-run: ${rem(ARC_RUN_TALL_PX)};
+  }
+}`;
+
+/** Does this stage get the tall (portrait) arc? The numeric twin of the query. */
+export function arcIsTall(stage: StageBox): boolean {
+  return stage.height > stage.width || stage.height >= ARC_TALL_MIN_HEIGHT_PX;
+}
+
+/**
+ * `index / (count − 1)` — station `k` of `n` along a straight ramp.
+ *
+ * Was `sin(k/(n−1) · π/2)`. See the separation block above for why the curve
+ * had to stop decelerating: a rule about the minimum gap needs the gaps to be
+ * equal, or the rule is only true of the widest pair.
+ */
+function arcFraction(index: number, count: number): number {
   if (count <= 1 || index <= 0) return 0;
-  const t = Math.min(1, index / (count - 1));
-  return Number(Math.sin(t * (Math.PI / 2)).toFixed(4));
+  return Number((Math.min(1, index / (count - 1))).toFixed(4));
 }
 
 /**
@@ -516,7 +625,7 @@ function arcSin(index: number, count: number): number {
  * `padH` is the pad this arc has to clear: station 0's box sits exactly on the
  * pad's top edge, which is what keeps a thumb-down on the lowest station from
  * being swallowed by the wheel or the throttle. Every station after it is one
- * run-step further out along the curve and a little higher.
+ * run-step further out along the ramp and a little higher.
  */
 function arcStation(
   index: number,
@@ -525,8 +634,8 @@ function arcStation(
 ): { bottom: string; inset: string } {
   const count = arcStationCount(side);
   return {
-    bottom: `calc(${padH} + (${ARC_RISE} * ${arcSin(index, count)}) + ${INSET_B})`,
-    inset: `calc(${rem(ARC_EDGE_PX)} + ${rem(ARC_RUN_STEP_PX * (count - 1 - index))})`,
+    bottom: `calc(${padH} + (${ARC_RISE} * ${arcFraction(index, count)}) + ${INSET_B})`,
+    inset: `calc(${rem(ARC_EDGE_PX)} + (${ARC_RUN} * ${count - 1 - index}))`,
   };
 }
 
@@ -564,9 +673,13 @@ export interface StageBox {
 }
 
 /** Total climb of one arc on a given stage, px. */
-export function arcRisePx(stageHeightPx: number): number {
-  const ramp = (stageHeightPx - ARC_RISE_KNEE_PX) * ARC_RISE_SLOPE;
-  return Math.min(ARC_RISE_MAX_PX, Math.max(ARC_RISE_MIN_PX, ramp));
+export function arcRisePx(stage: StageBox): number {
+  return arcIsTall(stage) ? ARC_RISE_TALL_PX : ARC_RISE_FLAT_PX;
+}
+
+/** How far inboard each station sits from the one above it, px. */
+export function arcRunStepPx(stage: StageBox): number {
+  return arcIsTall(stage) ? ARC_RUN_TALL_PX : ARC_RUN_FLAT_PX;
 }
 
 /** The steering / drivetrain pad hit boxes, resolved. */
@@ -574,12 +687,15 @@ export function padRectPx(side: "left" | "right", stage: StageBox): StageRect {
   const insetB = stage.insetBottom ?? 0;
   if (side === "left") {
     const w = resolve(STEER_PAD, stage.width) + (stage.insetLeft ?? 0);
-    const h = resolve(STEER_PAD_HEIGHT, stage.height) + insetB;
-    return { x: 0, y: stage.height - h, w, h };
+    return { x: 0, y: stage.height - (STEER_PAD_HEIGHT_PX + insetB), w, h: STEER_PAD_HEIGHT_PX + insetB };
   }
   const w = resolve(DRIVE_PAD, stage.width) + (stage.insetRight ?? 0);
-  const h = resolve(DRIVE_PAD_HEIGHT, stage.height) + insetB;
-  return { x: stage.width - w, y: stage.height - h, w, h };
+  return {
+    x: stage.width - w,
+    y: stage.height - (DRIVE_PAD_HEIGHT_PX + insetB),
+    w,
+    h: DRIVE_PAD_HEIGHT_PX + insetB,
+  };
 }
 
 /** Station `index` of one arc, resolved to a rect on the stage. */
@@ -588,13 +704,13 @@ export function arcStationRectPx(
   side: "left" | "right",
   stage: StageBox,
 ): StageRect {
-  const padH = resolve(side === "left" ? STEER_PAD_HEIGHT : DRIVE_PAD_HEIGHT, stage.height);
+  const padH = side === "left" ? STEER_PAD_HEIGHT_PX : DRIVE_PAD_HEIGHT_PX;
   const count = arcStationCount(side);
   const bottom =
-    padH + arcRisePx(stage.height) * arcSin(index, count) + (stage.insetBottom ?? 0);
+    padH + arcRisePx(stage) * arcFraction(index, count) + (stage.insetBottom ?? 0);
   const inset =
     ARC_EDGE_PX +
-    ARC_RUN_STEP_PX * (count - 1 - index) +
+    arcRunStepPx(stage) * (count - 1 - index) +
     (side === "left" ? (stage.insetLeft ?? 0) : (stage.insetRight ?? 0));
   return {
     x: side === "left" ? inset : stage.width - inset - TOUCH_MIN_PX,
@@ -608,8 +724,8 @@ export function arcStationRectPx(
  *  `TOUCH_CONTROLS_FLOOR` spells in CSS. */
 export function touchControlsFloorPx(stage: StageBox): number {
   return (
-    resolve(DRIVE_PAD_HEIGHT, stage.height) +
-    arcRisePx(stage.height) +
+    DRIVE_PAD_HEIGHT_PX +
+    arcRisePx(stage) +
     TOUCH_MIN_PX +
     (stage.insetBottom ?? 0) +
     TOUCH_CONTROLS_FLOOR_GAP_PX
@@ -691,15 +807,17 @@ export const TOUCH_CONTROLS_FLOOR = touchControlsFloorCss();
  * the harness would report green on a band it had mis-measured.
  */
 export function touchControlsFloorCss(heightToken = "100%"): string {
-  const padH =
-    heightToken === "100%"
-      ? DRIVE_PAD_H
-      : `min(calc(${heightToken} * ${DRIVE_PAD_HEIGHT.fraction}), ${rem(DRIVE_PAD_HEIGHT.capPx)})`;
-  const rise =
-    heightToken === "100%"
-      ? ARC_RISE
-      : `clamp(${rem(ARC_RISE_MIN_PX)}, (${heightToken} - ${rem(ARC_RISE_KNEE_PX)}) * ${ARC_RISE_SLOPE}, ${rem(ARC_RISE_MAX_PX)})`;
-  return `calc(${padH} + ${rise} + ${ROW_H} + ${INSET_B} + ${rem(TOUCH_CONTROLS_FLOOR_GAP_PX)})`;
+  // `heightToken` NO LONGER CHANGES THE ANSWER, and that is the point of this
+  // wave rather than an oversight. Both terms that used to need a height — the
+  // pad (a percentage of the stage) and the rise (a clamp against it) — are now
+  // constants chosen by an orientation media query, so this expression is
+  // already percentage-free and legal in a `max-height`. The parameter and the
+  // call sites stay so the shell keeps passing the height it can honestly
+  // resolve; if a future term needs one again, it is already threaded.
+  void heightToken;
+  return `calc(${DRIVE_PAD_H} + ${ARC_RISE} + ${ROW_H} + ${INSET_B} + ${rem(
+    TOUCH_CONTROLS_FLOOR_GAP_PX,
+  )})`;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1458,6 +1576,12 @@ export function TouchControls({
       className="pointer-events-none absolute inset-0 z-10 select-none"
       style={visible ? undefined : { opacity: 0 }}
     >
+      {/* THE TWO CONSTANTS THE WHOLE BAND IS LAID OUT FROM. A media query and
+          not a `calc()` against the stage — see the ARC_RISE block. It is
+          emitted here, by the component that owns the geometry, and every
+          consumer outside this file reads the properties with the flat-arc
+          fallback baked in. */}
+      <style>{TOUCH_GEOMETRY_VARS_CSS}</style>
       {/* ══ BOTTOM-LEFT ═ steering ═══════════════════════════════════════════
           The box is the hit area and paints nothing at all; the mark inside is
           a 62 px rule and a 22 px knob. */}
@@ -1585,10 +1709,22 @@ export function TouchControls({
           for every input device at once. */}
       {visible ? (
         <>
-      {/* ══ TOP RAIL ═ camera, pause, horn, the sheet, and the belt ══════════
-          The corner where no thumb rests. Words, not glyphs, and every one of
-          them is a control a learner has to be able to FIND — see the rail's
-          own block above TOP_RAIL_LEFT_CSS. */}
+      {/* ══ THE CORNER ═ TWO OPAQUE WORDS, AND NOTHING ELSE ══════════════════
+          His reference frame has exactly two chunky labelled buttons in this
+          corner — «PAUSE» and «VIEW» — and this rail had FIVE, which in portrait
+          wrapped onto three rows and parked every one of them 101.6–118.5 mm
+          from either thumb. The most generous published thumb envelope is
+          ~75 mm: NO THUMB REACHED ANY OF THEM without regripping the phone, and
+          one of them («Колан») was a graded pre-drive step.
+
+          So the corner now holds only the two controls a learner may legitimately
+          regrip for, because neither is ever time-critical: the camera and the
+          pause. The other three went to the flanks, under the thumb —
+            «Клаксон» → left arc, top station   (109.6 mm → ~45 mm portrait)
+            «Кола» ⚙  → right arc, station 0    (110.7 mm → ~27 mm)
+            «Колан»   → the same station's face (101.6 mm → ~27 mm)
+          — and with five boxes out of this strip, the horizontal band a
+          horizontal panel could land on stopped existing. */}
       <div
         data-hud="top-rail"
         role="toolbar"
@@ -1618,41 +1754,21 @@ export function TouchControls({
           topdownAidRef={topdownAidRef}
         />
         <RailButton wordBg="Пауза" labelBg="Пауза" onClick={onPause} />
-        {/* Momentary, and it keeps the horn's own multi-touch-safe idiom. */}
-        <RailHoldButton
-          wordBg="Клаксон"
-          labelBg="Клаксон — задръж"
-          onHold={(on) => cabin()?.driveline.setHorn(on)}
-        />
-        <RailButton
-          wordBg="Кола"
-          labelBg="Контроли на автомобила"
-          active={sheetOpen}
-          onClick={() => setSheetOpen((o) => !o)}
-        />
-        {/* ══ «КОЛАН» ═ THE CELL THAT EXISTS ONLY WHILE IT IS NEEDED ═════════
-            A control required before every drive and never after it should be
-            on screen exactly then, and in the colour of the fault it prevents.
-            The product raises a seatbelt fault within ten seconds of every
-            drive and the only way to fasten it was inside the ⚙ sheet, under a
-            five-letter abbreviation, on a screen the student has never seen.
-            LAST in the rail so that fastening it moves nothing else. */}
-        {snap !== null && !snap.seatbeltOn ? (
-          <RailButton
-            wordBg="Колан"
-            tone="danger"
-            labelBg="Закопчай предпазния колан"
-            onClick={() => cabin()?.toggleSeatbelt()}
-          />
-        ) : null}
       </div>
 
-      {/* ══ LEFT FLANK ═ BOTH INDICATORS, on the steering thumb ══════════════
+      {/* ══ LEFT FLANK ═ BOTH INDICATORS AND THE HORN, on the steering thumb ══
           Founder ruling: signalling must never cost the accelerator. Lower
           station = left, upper = right, which is the way a real LHD stalk
           moves. Each carries its own word, because «Мигач наляво» is the thing
           being TAUGHT — a 20 %-opacity mystery glyph is fine for a throttle the
-          player already knows and fatal for a graded procedure step. */}
+          player already knows and fatal for a graded procedure step.
+
+          THE HORN JOINS THEM AT THE TOP STATION, and the reason is a
+          measurement: it is pressed WHILE THE CAR IS MOVING, and in the top rail
+          it sat 109.6 mm from either thumb in portrait — past the far edge of
+          any published thumb envelope. It is the least frequent of the three, so
+          it takes the furthest station; that is ~13 mm sideways and ~45 mm
+          upright, against 54.9 and 109.6. */}
       <ArcStation index={0} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач наляво"
@@ -1673,14 +1789,60 @@ export function TouchControls({
           ⇨
         </GlyphButton>
       </ArcStation>
+      <ArcStation index={2} padH={STEER_PAD_H} side="left">
+        {/* Momentary, and it keeps the horn's own multi-touch-safe idiom —
+            a pointer HOLD, so it works with a second thumb on a pad. */}
+        <GlyphHoldButton
+          labelBg="Клаксон — задръж"
+          captionBg="Клакс"
+          onHold={(on) => cabin()?.driveline.setHorn(on)}
+        >
+          ⊙
+        </GlyphHoldButton>
+      </ArcStation>
 
-      {/* ══ RIGHT FLANK ═ THE THREE GRADED MIRROR GLANCES ═══════════════════
+      {/* ══ RIGHT FLANK ═ THE DOCK, THEN THE THREE GRADED MIRROR GLANCES ═════
           Lifting off the throttle to check a mirror is what a driver does, so
           the interaction cost teaches the right habit instead of fighting it.
-          Lowest = the right mirror (nearest that thumb), then the rear, then
-          the left. Words again: «Л З Д» is three letters a 17-year-old has no
-          way to decode, and these are scored A2 steps. */}
+          Words again: «Л З Д» is three letters a 17-year-old has no way to
+          decode, and these are scored A2 steps.
+
+          STATION 0 — THE NEAREST BOX ON THE SCREEN — IS THE DOCK ANCHOR, and
+          while the belt is unfastened it IS the belt. That single move is the
+          largest measured win in this wave: «Закопчай предпазния колан» was
+          70.4 mm away sideways and 101.6 mm upright, in a rail no thumb reaches,
+          under a panel that buried it on 6 of 6 profiles — the card telling you
+          to fasten the belt was standing on the button that fastens it. Here it
+          is ~25 mm, it is the only red thing on the screen, and fastening it
+          hands the same box back to the ⚙ dock.
+
+          THE ORDER IS SAFE AND IT IS THE PRODUCT'S OWN: the canonical pre-drive
+          sequence (procedures/steps.ts) is seat → mirrors → surroundings →
+          BELT → dashboard → lights → engine → brake → gear → handbrake, so
+          nothing inside the dock is asked for before the belt is on. */}
       <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
+        {snap !== null && !snap.seatbeltOn ? (
+          <GlyphButton
+            labelBg="Закопчай предпазния колан"
+            captionBg="Колан"
+            tone="danger"
+            active
+            onClick={() => cabin()?.toggleSeatbelt()}
+          >
+            ⚠
+          </GlyphButton>
+        ) : (
+          <GlyphButton
+            labelBg="Контроли на автомобила"
+            captionBg="Кола"
+            active={sheetOpen}
+            onClick={() => setSheetOpen((o) => !o)}
+          >
+            ⚙
+          </GlyphButton>
+        )}
+      </ArcStation>
+      <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в дясното огледало"
           captionBg="Дясн"
@@ -1689,7 +1851,7 @@ export function TouchControls({
           Д
         </GlyphButton>
       </ArcStation>
-      <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
+      <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в огледалото за задно виждане"
           captionBg="Задн"
@@ -1698,7 +1860,7 @@ export function TouchControls({
           З
         </GlyphButton>
       </ArcStation>
-      <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
+      <ArcStation index={3} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в лявото огледало"
           captionBg="Ляво"
@@ -2000,6 +2162,7 @@ function GlyphButton({
   labelBg,
   captionBg,
   active,
+  tone,
   onClick,
   children,
 }: {
@@ -2025,6 +2188,8 @@ function GlyphButton({
   captionBg?: string;
   /** Omit on one-shot actions; pass a boolean only on real toggles. */
   active?: boolean;
+  /** `danger` is reserved for the one control that prevents a fault — the belt. */
+  tone?: "danger" | "warning";
   onClick: () => void;
   children: ReactNode;
 }) {
@@ -2047,7 +2212,50 @@ function GlyphButton({
       // was a candidate for exactly that. Nothing here can be panned or
       // pinched: it is a 44 px transparent target in a corner of a road.
       className="pointer-events-auto flex h-11 w-11 touch-none select-none flex-col items-center justify-center gap-px text-[15px] font-black leading-none"
-      style={glyphStyle(active ?? false)}
+      style={glyphStyle(active ?? false, tone)}
+    >
+      <span aria-hidden>{children}</span>
+      {captionBg ? (
+        <span
+          aria-hidden
+          className="text-[8px] font-bold uppercase leading-none tracking-tight"
+        >
+          {captionBg}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/**
+ * THE HORN'S STATION — a `GlyphButton` whose action is a HOLD.
+ *
+ * It is the rail's `RailHoldButton` moved onto the glass, in the ghost register
+ * the rest of the arc uses, and it shares `useHoldButton` with the sheet's
+ * clutch so every release path — up, cancel, lost capture, unmount — is the one
+ * that has always been wired. A horn latched down by a lost event is a car
+ * sounding through a quiz.
+ */
+function GlyphHoldButton({
+  labelBg,
+  captionBg,
+  onHold,
+  children,
+}: {
+  labelBg: string;
+  captionBg?: string;
+  onHold: (on: boolean) => void;
+  children: ReactNode;
+}) {
+  const { held, handlers } = useHoldButton(onHold);
+  return (
+    <button
+      type="button"
+      aria-label={labelBg}
+      title={labelBg}
+      {...handlers}
+      className="pointer-events-auto flex h-11 w-11 touch-none select-none flex-col items-center justify-center gap-px text-[15px] font-black leading-none"
+      style={glyphStyle(held)}
     >
       <span aria-hidden>{children}</span>
       {captionBg ? (
@@ -2156,28 +2364,9 @@ function RailButton({
   );
 }
 
-function RailHoldButton({
-  wordBg,
-  labelBg,
-  onHold,
-}: {
-  wordBg: string;
-  labelBg: string;
-  onHold: (on: boolean) => void;
-}) {
-  const { held, handlers } = useHoldButton(onHold);
-  return (
-    <button
-      type="button"
-      aria-label={labelBg}
-      title={labelBg}
-      {...handlers}
-      className={`${RAIL_CLASS} ${railTone(held)}`}
-    >
-      <span aria-hidden>{wordBg}</span>
-    </button>
-  );
-}
+/* `RailHoldButton` was the horn's, and the horn is on the glass now. Deleted
+   rather than kept as an unused twin of `GlyphHoldButton`: two hold idioms in
+   one file is how the two drift. */
 
 /** What each published camera mode is called, for the rail button's name. */
 const CAMERA_NAME_BG: Record<string, string> = {

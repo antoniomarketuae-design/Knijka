@@ -50,6 +50,8 @@ const TOUCH_CODE = flat(strip(TOUCH));
 const SCENE = norm("LessonScene.tsx");
 const SCENE_CODE = flat(strip(SCENE));
 const STYLES_CODE = flat(strip(norm("lesson-ui/PlayAreaStyles.tsx")));
+const SHELL_CODE = flat(strip(norm("lesson-ui/LessonPlayShell.tsx")));
+const OVERLAY_CODE = flat(strip(norm("../../modules/sim/hud/SimOverlay.tsx")));
 
 describe("§1 · the ⚙ sheet and the demonstration deck are one surface", () => {
   it("publishes the sheet as an attribute the stylesheet can arbitrate on", () => {
@@ -98,6 +100,50 @@ describe("§1 · the ⚙ sheet and the demonstration deck are one surface", () =
     expect(deck.length).toBeGreaterThan(200);
     expect(deck).not.toMatch(/if \(suppressed\) return null/);
     expect(deck).not.toMatch(/suppressed[^;]{0,40}setOpen/);
+  });
+});
+
+/**
+ * ── §1b · THE SAME ARBITRATION, ONE SURFACE OVER — 2026-08-13, §I11 + §W2 ────
+ *
+ * The read mode (the expanded instruction panel) buried SEVEN controls on the
+ * founder's phone held sideways. Six are TouchControls' and the pause answers
+ * them — `paused` → `physicsPaused` → `hidden`, which makes them inert, and a
+ * control nobody can see is not a buried control (the previous commit's whole
+ * subject). «Меню на урока» is the seventh and the pause CANNOT reach it: it is
+ * shell chrome in a different tree, and its centre sits 1 px inside the reading
+ * surface's left edge on iphone16-landscape.
+ *
+ * So it stands down, exactly as the demonstration deck stands down for the ⚙
+ * sheet above — replaced by, not stacked with — and it loses nothing by waiting,
+ * because every row in it is a paused-state action and the car is already
+ * stopped.
+ */
+describe("§1b · the read mode and the lesson menu are one surface", () => {
+  it("the read mode publishes itself as an attribute the stylesheet can arbitrate on", () => {
+    expect(OVERLAY_CODE).toContain('root.dataset.simOverlayRead = "open"');
+    expect(OVERLAY_CODE).toContain("delete root.dataset.simOverlayRead");
+  });
+
+  it("…and the menu carries the name the rule needs", () => {
+    expect(SHELL_CODE).toContain('data-hud="play-menu"');
+  });
+
+  it("…and the rule stands it down, scoped to the compact stage", () => {
+    expect(STYLES_CODE).toContain(
+      'html[data-sim-overlay-read="open"] [data-sim-compact="on"] [data-hud="play-menu"] { display: none; }',
+    );
+  });
+
+  it("but NOT the touch controls, because unmounting those IS the §C1 bug", () => {
+    // A `display: none` on `[data-hud="touch-controls"]` would destroy the pads'
+    // DOM nodes while a thumb is still on the glass — its `pointerup` reaches
+    // nobody and the pad stays owned by a finger that can never let go. That is
+    // the founder's unrecoverable session, and the read mode must not
+    // re-introduce it by taking the shortcut that looks the same from outside.
+    expect(STYLES_CODE).not.toMatch(
+      /data-sim-overlay-read="open"\][^{]{0,80}\[data-hud="touch-controls"\][^{]{0,20}\{ display: none/,
+    );
   });
 });
 
