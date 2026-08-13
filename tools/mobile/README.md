@@ -164,6 +164,72 @@ and whether the app's stylesheets reference `safe-area-inset` at all.
 
 ---
 
+## The tenth instrument defect: the clipping test could only ever return zero
+
+Six sweeps reported **"0 clipped text"** on a screen that, opened and looked at,
+shows letters sliced through the middle of the glyphs. The instrument was the
+bug, and the bug was one line — `wave6-cards.mjs:383`:
+
+```js
+clipsOwnText: el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0
+```
+
+That asks *"does this box overflow **itself**"*. It is structurally incapable of
+seeing any of the three ways text is actually lost:
+
+| what really happens | why `scrollWidth > clientWidth` returns 0 |
+| --- | --- |
+| a **parent** clips the text | the `<p>` fits its own content exactly; the offender is two levels up and is never consulted |
+| the **viewport** clips the text | a panel at `top:-18px` has a `<p>` whose rect starts at `y = -6`; every box in the chain is internally consistent, and the screen is not in the chain |
+| **ellipsis / line-clamp** | truncation is a property of the *block*, and the block is exactly as wide as it is allowed to be |
+
+Run side by side with the instrument below on the deployed build, six profiles,
+four states: the old test's **only** hit was `«Към съдържанието»` — the `sr-only`
+skip link, which is *supposed* to be clipped. Zero true positives, one false
+positive per profile.
+
+### `wave11-seeing-eye.mjs` — the replacement
+
+It does not ask a box about itself. For **every text node in the document** it
+answers the question a student's eye asks — *which of these characters can I
+actually read?* — character by character, with a `Range`, against the
+intersection of every clipping ancestor's padding box **and** the viewport box.
+Five detectors, because each of the founder's frames fails a different one:
+
+- **A — ancestor clip.** Every text rect against the padding box of every
+  ancestor whose `overflow-x/y` is `hidden|clip|auto|scroll`, innermost offender
+  named. Scrollable ancestors are reported apart from `hidden` ones: content you
+  can scroll to is *hidden now*, content under `hidden` is *gone*.
+- **B — viewport clip.** Every text rect against `{0,0,innerWidth,innerHeight}`.
+- **C — glyph slice.** Per **line box**, the visible fraction and the surviving
+  line height. `2.6 of 14px` is not "mostly fine" — it is a row of decapitated
+  letters, and it is what the founder photographed.
+- **D — truncation.** `text-overflow:ellipsis` / `-webkit-line-clamp` read off
+  the **clamping ancestor**, never the text element, plus the full string.
+- **E — overprint.** Pairwise intersection of text rects from unrelated
+  elements — after each rect is clipped to its own visible window, because
+  comparing raw line boxes invents collisions between ink that is not painted.
+
+Two things it deliberately does **not** claim:
+
+- `sr-only` (`width:1px;height:1px;overflow:hidden`) is excluded and counted
+  separately. An instrument that cannot tell the visually-hidden idiom from a
+  defect buries the defect under boilerplate.
+- Anything painted **inside the WebGL canvas** — the cockpit's analogue dial and
+  its 40/80/120/160 — is a texture, not a node. No DOM instrument can see it,
+  ever. `wave11-zoom.mjs` captures those regions at device scale so a human can,
+  and prints which DOM text lands inside each region so the two can be argued
+  against each other.
+
+`wave11-rotate-card.mjs` / `wave11-rotate-race.mjs` exist for the same reason in
+the other direction: `[data-hud="touch-hint"]` is `display:none` whenever an
+overlay is up (`PlayAreaStyles` §ROW C1), and in a lesson the overlay queue is
+never empty — so a probe that waits six seconds for the scene to settle measures
+a card that is not on the screen and reports it as fine. The race probe polls
+from first paint and says so out loud when the card never renders at all.
+
+---
+
 ## The ninth instrument defect: the whole harness ran at inset 0
 
 Carrying the real numbers in `devices.mjs` was only half the job, and the half
