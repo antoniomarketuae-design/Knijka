@@ -74,6 +74,10 @@ export {
 // shell (roomy), SimOverlay (compact) and the CSS that pulls the scene-owned
 // panels over (PlayAreaStyles).
 export {
+  // The driving band's reserved lane, as the variable name this column reads.
+  // Declared by components/sim/TouchControls (TOUCH_BAND_CSS_VARS); pinned to
+  // that declaration by touchArc.test.ts.
+  FLANK_LANE_VAR,
   notifyColumnLeftFraction,
   notifyColumnWidthPx,
   rectIsInNotifyColumn,

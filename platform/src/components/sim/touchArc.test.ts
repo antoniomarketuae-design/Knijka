@@ -8,6 +8,7 @@ import {
   ARC_STATIONS_LEFT,
   ARC_STATIONS_RIGHT,
   FLANK_LANE_PX,
+  FLANK_LANE_VAR_NAME,
   notifyColumnFloorPx,
   padCorridorPx,
   padRectPx,
@@ -20,6 +21,7 @@ import {
 } from "./TouchControls";
 import {
   notifyColumnWidthPx,
+  FLANK_LANE_VAR,
   NOTIFY_COLUMN_GUTTER_PX,
 } from "@/modules/sim/hud";
 import {
@@ -512,6 +514,17 @@ describe("defect 1 · nothing on this screen is a function of the viewport heigh
     // orientations, both flanks. That is the separation guarantee.
     expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-pitch: 2.75rem");
     expect(TOUCH_BAND_CSS_VARS.match(/--sim-arc-pitch/g)).toHaveLength(1);
+    // THE LANE CROSSES A MODULE BOUNDARY AS A VARIABLE NAME, so the two
+    // spellings are pinned to each other. This file DECLARES it (0 upright,
+    // 60 px sideways); modules/sim/hud/notifyColumn.ts READS it, and
+    // SimOverlay writes that read into an inline style — which is the only
+    // form that survives, because inline outranks every selector and the
+    // first attempt at this wave lost a deploy to exactly that.
+    expect(FLANK_LANE_VAR_NAME).toBe("--sim-flank-lane");
+    expect(FLANK_LANE_VAR).toBe(`var(${FLANK_LANE_VAR_NAME}, 0px)`);
+    expect(TOUCH_BAND_CSS_VARS).toContain(`${FLANK_LANE_VAR_NAME}: 0rem`);
+    expect(TOUCH_BAND_CSS_VARS).toContain(`${FLANK_LANE_VAR_NAME}: ${FLANK_LANE_PX / 16}rem`);
+    expect(FLANK_LANE_PX).toBe(60);
     // …and the clamp against the live stage that caused the defect is gone.
     expect(TOUCH_CONTROLS_FLOOR).not.toContain("clamp(");
     // The two terms that WERE functions of the stage height now read through

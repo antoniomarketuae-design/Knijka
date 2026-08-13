@@ -143,6 +143,37 @@ export const NOTIFY_COLUMN_TOP_CSS_COMPACT = `calc(0.5rem + env(safe-area-inset-
 export const NOTIFY_COLUMN_TOP_CSS_ROOMY = `calc(3.25rem + env(safe-area-inset-top, 0px))`;
 
 /**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DRIVING BAND'S LANE, AS THE COLUMN SEES IT — 2026-08-14, „FIX · FLANKS".
+ *
+ * The driving controls' flanks became BANDS: a 44 px column of stations hard
+ * against each edge, 132 px tall on the steering side and 176 px on the
+ * throttle one. The throttle band and this column share the same corner, and
+ * measured on the founder's phone held sideways they shared 44 px of x —
+ * `elementFromPoint` answered the briefing card at the centre of all four
+ * stations, so a thumb aimed at a GRADED mirror glance pressed the card.
+ *
+ * Sideways this column therefore stops 8 px short of that band. It is
+ * expressed as a CSS VARIABLE and not as a number because the amount is an
+ * ORIENTATION (0 upright — this column is only `min(15rem, 36vw)` = 141 px
+ * there, and 141 − 60 is not a card) and because the two declarations it
+ * modifies are written INLINE by `SimOverlay`, which outranks any stylesheet.
+ * A variable is the only form that survives that cascade.
+ *
+ * `--sim-flank-lane` is DECLARED by `TOUCH_BAND_CSS_VARS` (components/sim/
+ * TouchControls), which owns the band's geometry and is the only place that
+ * should ever set it; `touchArc.test.ts` asserts the two agree, so the name
+ * cannot drift apart across the module boundary.
+ *
+ * The width given up here is bought back in height — the column's cap is no
+ * longer the whole control band's floor, because the lanes are disjoint. Net at
+ * 852 × 393: 240 × 128 = 30 720 px² → 180 × 192 = 34 560, and the LEFT edge does
+ * not move, so `notifyColumnLeftFraction`'s 0.60 rule reads what it read before.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const FLANK_LANE_VAR = "var(--sim-flank-lane, 0px)";
+
+/**
  * Room kept at the BOTTOM of the column for the demonstration transport, px.
  *
  * MEASURED, not guessed: at 1280×800 with the ghost demo open, the deck laid

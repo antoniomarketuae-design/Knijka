@@ -113,6 +113,23 @@ const CENSUS = () => {
 
   // Does this element PAINT anything a human would see? Background, border,
   // shadow, backdrop-filter, an image — or its own (non-inherited) text.
+  /** The strongest alpha in a colour or gradient string — 0 when there is none. */
+  const peakAlpha = (value) => {
+    if (!value || value === "none") return 0;
+    let peak = 0;
+    // `rgb(...)` with no alpha is opaque; `rgba(...)` carries it; a gradient is
+    // a list of either. One regex over all of them, biggest stop wins.
+    const re = /rgba?\(([^)]+)\)/g;
+    let m;
+    while ((m = re.exec(value)) !== null) {
+      const p = m[1].split(",").map((s) => parseFloat(s));
+      peak = Math.max(peak, p.length >= 4 ? (Number.isFinite(p[3]) ? p[3] : 1) : 1);
+    }
+    // A url()/image gradient we cannot parse counts as opaque rather than free.
+    if (peak === 0 && /url\(|gradient/.test(value)) peak = 1;
+    return peak;
+  };
+
   const paintsInfo = (el, cs) => {
     const why = [];
     if (alpha(cs.backgroundColor) > 0.02) why.push(`bg${Math.round(alpha(cs.backgroundColor) * 100)}`);
@@ -155,7 +172,14 @@ const CENSUS = () => {
   const rows = Math.max(1, Math.ceil(stage.height / CELL));
   const inkGrid = new Uint8Array(cols * rows);
   const reachGrid = new Uint8Array(cols * rows);
-  const zones = {}; // per data-hud bucket → own grid, filled after the fact
+  // …AND THE SAME UNION WEIGHTED BY HOW OPAQUE IT ACTUALLY IS.
+  // A boolean grid scores a 5 %-alpha gradient exactly as it scores a solid
+  // panel, and this wave adds a deliberately faint one behind each flank — so
+  // a boolean-only headline would report the ghost rail as though it were
+  // chrome. `alphaGrid` keeps the STRONGEST alpha any element laid on each
+  // cell, so the two numbers together say „how much of the picture has
+  // something on it" AND „how much of it is actually obscured".
+  const alphaGrid = new Float32Array(cols * rows);
 
   const mark = (grid, r) => {
     const x0 = Math.max(0, Math.floor((r.left - stage.left) / CELL));
@@ -229,6 +253,27 @@ const CENSUS = () => {
       painters += 1;
       const fresh = mark(inkGrid, r);
       mark(zoneGrid(zoneOf(el)), r);
+      // How much of the picture this element actually HIDES. Text is charged a
+      // nominal 0.35 of its line box rather than its glyph coverage — a text
+      // node's rect is mostly the spaces between letters, and charging it 1.0
+      // would make a sentence read like a panel.
+      const strength = Math.max(
+        peakAlpha(cs.backgroundColor),
+        peakAlpha(cs.backgroundImage),
+        why.includes("text") ? 0.35 * Math.max(0.2, alpha(cs.color)) : 0,
+      );
+      if (strength > 0) {
+        const x0 = Math.max(0, Math.floor((r.left - stage.left) / CELL));
+        const x1 = Math.min(cols, Math.ceil((r.right - stage.left) / CELL));
+        const y0 = Math.max(0, Math.floor((r.top - stage.top) / CELL));
+        const y1 = Math.min(rows, Math.ceil((r.bottom - stage.top) / CELL));
+        for (let y = y0; y < y1; y += 1) {
+          for (let x = x0; x < x1; x += 1) {
+            const i = y * cols + x;
+            if (alphaGrid[i] < strength) alphaGrid[i] = strength;
+          }
+        }
+      }
       // WHO ACTUALLY EATS THE PICTURE — the elements that contributed NEW
       // cells, biggest first. Without this the headline is a number nobody can
       // argue with, which is how „0 clipped" survived six waves.
@@ -279,6 +324,9 @@ const CENSUS = () => {
     }
   }
   const centrePct = centreTotal ? Math.round((centreCells / centreTotal) * 1000) / 10 : 0;
+  let alphaSum = 0;
+  for (let i = 0; i < alphaGrid.length; i += 1) alphaSum += alphaGrid[i];
+  const obscuredPct = Math.round((alphaSum / (cols * rows)) * 1000) / 10;
 
   // ── THE FLANK STATIONS ────────────────────────────────────────────────────
   // Read off the DOM, not off the source: `data-arc` is the station marker and
@@ -386,6 +434,7 @@ const CENSUS = () => {
     touchControls: !!document.querySelector('[data-hud="touch-controls"]'),
     catalogCards: document.querySelectorAll('[data-testid="scenario-card"]').length,
     inkPct: pct(count(inkGrid)),
+    obscuredPct,
     centrePct,
     reachPct: pct(count(reachGrid)),
     painters,
@@ -408,6 +457,7 @@ function report(title, c, device) {
   line(`\n  ── ${title} ──`);
   line(`     stage ${c.stage.w}x${c.stage.h} at (${c.stage.x},${c.stage.y})  ${c.stageIsCanvas ? "= THE CANVAS" : "= VIEWPORT FALLBACK (no live canvas!)"}  · ${c.stagePctOfViewport}% of the glass`);
   line(`     UI INK OVER THE DRIVING VIEW   ${String(c.inkPct).padStart(5)}%  ${bar(c.inkPct)}   (${c.painters} painting elements, union, 2px cells)`);
+  line(`     …OF WHICH ACTUALLY OBSCURED   ${String(c.obscuredPct).padStart(5)}%  ${bar(c.obscuredPct)}   (the same union weighted by alpha — a ghost is not a panel)`);
   line(`     INK IN THE CENTRE CORRIDOR     ${String(c.centrePct).padStart(5)}%  ${bar(c.centrePct)}   (middle 50% of the width — where the road is)`);
   line(`     stations found via ${c.stationSource} · ${c.stations.length}`);
   line(`     thumb REACH (incl. invisible)  ${String(c.reachPct).padStart(5)}%  ${bar(c.reachPct)}`);
@@ -569,7 +619,7 @@ line(`\n${"█".repeat(100)}`);
 line(`[w12] SUMMARY · tag ${TAG}`);
 line("█".repeat(100));
 line(
-  `${"profile".padEnd(26)}${"ink open".padStart(9)}${"ink drive".padStart(10)}${"centre".padStart(8)}${"L spread".padStart(10)}${"R spread".padStart(10)}${"minHit".padStart(8)}${"covered".padStart(9)}`,
+  `${"profile".padEnd(26)}${"ink open".padStart(9)}${"ink drive".padStart(10)}${"obscur".padStart(8)}${"centre".padStart(8)}${"L spread".padStart(10)}${"R spread".padStart(10)}${"minHit".padStart(8)}${"covered".padStart(9)}`,
 );
 for (const r of results) {
   if (r.fatal) {
@@ -583,7 +633,7 @@ for (const r of results) {
   const mh = Math.min(d.perSide.left?.minHitPx ?? 999, d.perSide.right?.minHitPx ?? 999);
   const cov = (d.perSide.left?.covered.length ?? 0) + (d.perSide.right?.covered.length ?? 0);
   line(
-    `${r.device.padEnd(26)}${String(o.inkPct).padStart(9)}${String(d.inkPct).padStart(10)}${String(d.centrePct).padStart(8)}${String(ls).padStart(10)}${String(rs).padStart(10)}${String(mh).padStart(8)}${String(cov).padStart(9)}`,
+    `${r.device.padEnd(26)}${String(o.inkPct).padStart(9)}${String(d.inkPct).padStart(10)}${String(d.obscuredPct).padStart(8)}${String(d.centrePct).padStart(8)}${String(ls).padStart(10)}${String(rs).padStart(10)}${String(mh).padStart(8)}${String(cov).padStart(9)}`,
   );
 }
 const path = `${OUT}/${TAG}.json`;

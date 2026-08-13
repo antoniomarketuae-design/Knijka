@@ -684,6 +684,28 @@ export const FLANK_LANE_PX = ARC_EDGE_PX + TOUCH_MIN_PX + 8;
 export const FLANK_LANE_LEFT_CSS = `calc(${rem(FLANK_LANE_PX)} + ${INSET_L})`;
 export const FLANK_LANE_RIGHT_CSS = `calc(${rem(FLANK_LANE_PX)} + ${INSET_R})`;
 /**
+ * …AND THE SAME LANE AS A VARIABLE, WHICH IS THE ONLY FORM THAT REACHES THE
+ * NOTIFICATION COLUMN. Measured on the first deployed attempt at this wave:
+ * the band was correct on all six profiles and `elementFromPoint` still
+ * answered the briefing card at the centre of all FOUR throttle stations.
+ *
+ * The cause is not specificity, it is the cascade: `SimOverlay` writes the
+ * column's `right` and `width` as INLINE STYLES, and an inline style outranks
+ * every selector in every stylesheet. So the `@media (orientation: landscape)`
+ * override this file's stylesheet shipped could not have worked no matter how
+ * it was written — the rule was applied and then thrown away.
+ *
+ * A variable is the one thing that crosses that line: the media query stays in
+ * the stylesheet, where a media query has to be, and the inline style reads it.
+ * 0 upright (the column is 141 px wide there and 141 − 60 is not a card; it
+ * buys its separation with height instead), 60 px sideways.
+ */
+const FLANK_LANE_PORTRAIT_PX = 0;
+/** The variable's NAME lives with its other consumer (modules/sim/hud/
+ *  notifyColumn.ts) so the two spellings cannot drift; this file DECLARES it,
+ *  and `touchArc.test.ts` asserts the declaration and the reader agree. */
+export const FLANK_LANE_VAR_NAME = "--sim-flank-lane";
+/**
  * THE RISE — AND WHAT IT MEANS SINCE THE BAND REPLACED THE ARC. READ THIS
  * BEFORE USING IT FOR ANYTHING; THE NAME IS OLDER THAN THE THING.
  *
@@ -809,12 +831,14 @@ export const TOUCH_BAND_CSS_VARS = `
         --sim-arc-pitch: ${rem(ARC_PITCH_PX)};
         --sim-arc-lift: ${rem(ARC_LIFT_PORTRAIT_PX)};
         --sim-column-floor: ${rem(COLUMN_FLOOR_PORTRAIT_PX)};
+        --sim-flank-lane: ${rem(FLANK_LANE_PORTRAIT_PX)};
       }
       @media (orientation: landscape) {
         :root {
           --sim-arc-rise: ${rem(ARC_RISE_LANDSCAPE_PX)};
           --sim-arc-lift: ${rem(ARC_LIFT_LANDSCAPE_PX)};
           --sim-column-floor: ${rem(COLUMN_FLOOR_LANDSCAPE_PX)};
+          --sim-flank-lane: ${rem(FLANK_LANE_PX)};
         }
       }
       @media (max-height: ${rem(BAND_COLLAPSE_MAX_STAGE_PX)}) {

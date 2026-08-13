@@ -97,6 +97,7 @@ import {
   type SimOverlayTone,
 } from "./overlayQueue";
 import {
+  FLANK_LANE_VAR,
   NOTIFY_COLUMN_RIGHT_CSS,
   NOTIFY_COLUMN_TOP_CSS_COMPACT,
   NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
@@ -777,8 +778,29 @@ export function SimOverlay({
         className="pointer-events-none absolute z-30 flex flex-col items-end"
         style={{
           top: NOTIFY_COLUMN_TOP_CSS_COMPACT,
-          right: NOTIFY_COLUMN_RIGHT_CSS,
-          width: NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
+          // ── THE FLANK LANE, 2026-08-14 · „FIX · FLANKS" ────────────────────
+          // This column is the ONE surface that shares the throttle band's
+          // corner, and „NOTHING may ever cover them" is a hard constraint on
+          // that band. Sideways the two boxes shared x 741–785 on the founder's
+          // phone and `elementFromPoint` answered THIS CARD at the centre of
+          // all four mirror/dock stations — a thumb aimed at a graded mirror
+          // glance pressed the briefing.
+          //
+          // The width the column gives up here it gets back in height:
+          // PlayAreaStyles caps it against `notifyColumnFloorCss()`, which no
+          // longer has to clear the band now that the lanes are disjoint. Its
+          // LEFT edge does not move at all, so notifyColumn.ts's 0.60 contract
+          // is untouched.
+          //
+          // A VARIABLE AND NOT A CONSTANT, and not a stylesheet rule either:
+          // these two declarations are INLINE, so they outrank every selector —
+          // the first attempt at this wave shipped a `@media` override that was
+          // applied and then discarded by the cascade, and the sweep caught it.
+          // The orientation split lives in TOUCH_BAND_CSS_VARS, where a media
+          // query can exist; upright the lane is 0 and the separation is bought
+          // with height instead.
+          right: `calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR})`,
+          width: `calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR})`,
         }}
       >
         {/* A6 — TWO SHAPES, AND THEY ARE THE DESKTOP'S TWO.

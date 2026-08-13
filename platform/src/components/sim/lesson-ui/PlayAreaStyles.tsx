@@ -2,7 +2,6 @@
 
 import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import {
-  FLANK_LANE_PX,
   notifyColumnFloorCss,
   PAD_CORRIDOR_LEFT_CSS,
   PAD_CORRIDOR_RIGHT_CSS,
@@ -759,36 +758,17 @@ ${TOUCH_BAND_CSS_VARS}
         );
       }
 
-      /* ══════════════════════════════════════════════════════════════════
-         …AND SIDEWAYS IT ALSO LEAVES THE LANE — 2026-08-14, „FIX · FLANKS".
-
-         „NOTHING may ever cover them." A band is 44 px wide against the glass
-         and 176 px tall on the throttle side; this column is 240 px wide
-         against the SAME glass and its cap lets it reach 200 px down. The two
-         boxes share x 741–785 on the founder's phone held sideways, so height
-         alone cannot separate them and no z-index would make the card stop
-         being ON the mirror glances.
-
-         So the column gives the lane back: right grows by FLANK_LANE_PX and
-         width loses exactly the same 60 px. THE LEFT EDGE THEREFORE DOES NOT
-         MOVE — 852 − 59 − 12 − 240 = 541 before, 852 − 59 − 72 − 180 = 541
-         after — so notifyColumnLeftFraction's 0.60 contract (his own drawing,
-         notifyColumn.ts) reads exactly what it read yesterday. The card is
-         narrower and, because of the floor rule above, half again as tall: at
-         852 × 393 it goes from 240 × 128 = 30 720 px² to 180 × 192 = 34 560.
-
-         PORTRAIT DOES NOT GET THIS AND MUST NOT: the compact column there is
-         min(15rem, 36vw) = 141 px, and 141 − 60 = 81 px is not a card. Upright
-         the separation is bought with height instead — see the floor above,
-         which stops the column 20 px short of the band's top station.
-         ══════════════════════════════════════════════════════════════════ */
-      @media (orientation: landscape) {
-        [data-sim-compact="on"] [data-sim-stage] [data-hud="notify-column"],
-        [data-sim-compact="on"] [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
-          right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_PX}px);
-          width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_PX}px);
-        }
-      }
+      /* …AND THE LANE ITSELF IS NOT WRITTEN HERE, WHICH COST THIS WAVE A
+         DEPLOY AND IS WORTH THE THREE LINES. The first attempt put the
+         column's right/width override in exactly this file, inside an
+         orientation media query. It was correct CSS and it did nothing:
+         SimOverlay writes both declarations as INLINE STYLES, and an inline
+         style outranks every selector in every stylesheet. The band came back
+         perfect on all six profiles and elementFromPoint still answered the
+         briefing card at the centre of all four throttle stations.
+         The lane is therefore a VARIABLE (--sim-flank-lane, declared in
+         TOUCH_BAND_CSS_VARS above and read by the inline style itself) — the
+         one form that crosses the cascade. */
       [data-hud="audio-prompt"] {
         left: auto;
         right: ${NOTIFY_COLUMN_RIGHT_CSS};
