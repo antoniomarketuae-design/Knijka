@@ -17,6 +17,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   armedTelltaleWarnings,
+  briefingBodyBg,
+  briefingLineBg,
   capBg,
   clutchHeldObjBg,
   clutchObjBg,
@@ -2624,19 +2626,77 @@ export function LessonPlayShell({
             }
           : null,
 
-        // 4c. THE BRIEFING (`lesson.briefingBg`) — step 1 on the line, the whole
-        //     numbered list one tap behind it. Blocking: a briefing that scrolls
+        // 4c. THE BRIEFING (`lesson.briefingBg`) — step 1 on the line, the REST
+        //     of the numbered list under it. Blocking: a briefing that scrolls
         //     past is the compiled-away field all over again, so it waits for
         //     „Разбрах" (Space on a keyboard) and then never returns. Not in the
         //     sandbox — there the assignment is the mistake.
+        //
+        // ══ THE SAME SENTENCE WAS PRINTED TWICE — 2026-08-14, THE FOUNDER'S
+        //    OWN FRAMES, BOTH ORIENTATIONS, ALL SIX PROFILES. ══════════════════
+        //
+        // HIS WORDS: „there are TWO copies of it on screen, in different
+        // styling, both cut." He was reading ONE card. `detailBg` used to be
+        // `briefing.map(...)`, i.e. the WHOLE list — and `lineBg` is
+        // `briefing[0]`, i.e. its first item. So `SimOverlay`'s row 2 printed
+        // step 1 in bold and row 2b re-printed it two millimetres lower, in the
+        // reading face, prefixed „1. ". Verbatim, character for character:
+        //
+        //   row 2   «Потегли по улицата и се движи спокойно в своята лента. По…»
+        //   row 2b  «1. Потегли по улицата и се движи спокойно в своята лента.
+        //            По тъмно първо провери късите светлини (чл. 70): пред
+        //            пешеходна пътека…»
+        //
+        // IT IS A REGRESSION OF THE THEO-4 FIX, not an old bug. Until row 2b
+        // landed, `detailBg` rendered ONLY inside the read sheet — a different
+        // surface, one tap away, where a header and its list may repeat. The
+        // moment the body came onto the CARD to stop the phone hiding the
+        // reasoning, the card started saying everything twice, and nobody
+        // re-read this line. The sheet inherited it too (see the 2026-08-13
+        // «ЗАЩО» frame: its <h2> and its first body line are the same 219
+        // characters).
+        //
+        // WHAT IT COSTS, MEASURED ON THE SHIPPED CORPUS (probe over all 167
+        // scenario templates, compiled): the duplicate is 219 of the 556
+        // characters the card must hold on `sc-zebra-approach@L1` — 39 % — and
+        // 412 of 972 on the same scenario at L4, where step 1 is the exam
+        // complication. Deleting it is the single largest reduction available
+        // in what the card has to fit, and it loses NOTHING: every character
+        // still ships, once.
+        //
+        // STEP 1 STAYS ON THE LINE and the body starts at step 2. That ordering
+        // is a contract, not a preference — `compile.ts` puts the rung's
+        // complication at `briefingBg[0]` precisely so „the one sentence that
+        // says WHY the rung is harder is the one sentence nobody can skip", and
+        // the line is the row that cannot be scrolled away from. The numbering
+        // is preserved (2., 3., …) so the list still reads as a sequence whose
+        // first item is the bold sentence above it.
+        //
+        // `null` when a briefing has a single step: there is then no second
+        // surface to offer and «ПРОЧЕТИ» correctly does not render. No shipped
+        // template is in that case — the step-count histogram over all 167 is
+        // {4:5, 5:118, 6:30, 7:12, 8:2} — but a curriculum LessonSpec may be,
+        // and a sheet that opens onto nothing is worse than no sheet.
         briefingOpen && briefing.length > 0 && !mistakeMode && !ended
           ? {
               id: "briefing",
               kind: "hint" as const,
               tone: "neutral" as const,
               chipBg: "Инструкции",
-              lineBg: briefing[0]!.textBg,
-              detailBg: briefing.map((s) => `${s.n}. ${s.textBg}`).join("\n"),
+              // Both halves come from `hud/overlayQueue.ts` and not from an
+              // expression written here, so `briefing-no-echo.test.ts` can put
+              // every compiled rung of all 167 templates through the SAME code
+              // the card renders. A rule that lives only in a component is a
+              // rule six waves of measurement can walk past — this one did.
+              lineBg: briefingLineBg(briefing),
+              detailBg: briefingBodyBg(briefing),
+              // …and the control that reaches them says what it opens. «ЗАЩО» is
+              // the right word over a graded fault — „why was that wrong" — and
+              // the wrong word over an instruction the card could not finish
+              // printing. The student is not asking for a justification, he is
+              // asking for the rest of the sentence, and a control that names
+              // the wrong thing is why six waves of truncation went unreported.
+              openLabelBg: "Прочети",
               blocking: true,
               ackLabelBg: "Разбрах",
               onAck: closeBriefing,

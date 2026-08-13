@@ -29,6 +29,8 @@ export {
 // deciding independently that they owned the top of the screen.
 export { SimOverlay } from "./SimOverlay";
 export {
+  briefingBodyBg,
+  briefingLineBg,
   hasWhy,
   isAmbientOverlay,
   overlayCentreBand,
@@ -41,6 +43,7 @@ export {
   OVERLAY_CENTRE_BAND,
   OVERLAY_PEEK_HEIGHT_PX,
   OVERLAY_PEEK_MAX_FRACTION,
+  type BriefingStepBg,
   type OverlayRect,
   type OverlaySelection,
   type SimOverlayItem,

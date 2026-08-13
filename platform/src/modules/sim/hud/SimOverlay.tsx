@@ -88,6 +88,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import {
@@ -432,13 +433,113 @@ export function SimOverlay({
   // radius to outline — a coloured tone glyph, a coloured chip and a line of
   // type on the road.
   const CARD_CLASS =
-    "hud-ghost sim-overlay-in pointer-events-auto touch-manipulation flex w-full min-w-0 flex-col items-stretch gap-0.5 text-left";
+    "hud-ghost sim-overlay-in pointer-events-auto touch-manipulation flex w-full min-w-0 min-h-0 flex-col items-stretch gap-0.5 text-left";
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     THE TEXT WINDOW — 2026-08-14. WHY THE LETTERS WERE CUT THROUGH THE WAIST.
+
+     FOUNDER, BOTH ORIENTATIONS, HIS OWN PHONE: «Потегли по улицата и се движи»
+     renders whole, and the line under it is a row of decapitated glyph-tops.
+     Reproduced on all six profiles. It is NOT the screen's top edge — zero of
+     432 text nodes have any rect above y = 0, and the top-edge band at device
+     scale cuts nothing. The card does it to itself, and here is the chain,
+     measured on the deployed build (852 × 393, `wave11-why-sliced.mjs`):
+
+       [data-hud="notify-column"]  max-height 128 px
+         └ the card                 flex column, height 128, shortfall 0
+             ├ row 1  chip          ~18 px
+             ├ row 2  `line-clamp-3`  wants  96 px · GIVEN 19.1 px
+             ├ row 2b `line-clamp-6`  wants 257 px · GIVEN 41.9 px
+             └ row 3  two 44 px chips
+
+     The two text rows were the ONLY shrinkable items in that column, and they
+     were shrinkable for a reason nobody had noticed: `line-clamp` compiles to
+     `overflow: hidden`, and an overflow other than `visible` zeroes a flex
+     item's AUTOMATIC MINIMUM SIZE. So the entire 353 px shortfall landed on
+     them. 19.1 px of a 13.75 px line box is 1.38 lines — line 2 keeps 0.38 of
+     its height and `overflow: hidden` guillotines it through the middle of the
+     glyphs. On the 780 × 360 Samsung the headline is a 2.6 px sliver: gone.
+
+     THREE THINGS CHANGE, AND EACH ONE IS LOAD-BEARING.
+
+     1. THE SHORTFALL MOVES INTO A SCROLLER. The two rows go inside one
+        `min-h-0 shrink overflow-y-auto` window and become `shrink-0`
+        themselves. A flex item that cannot shrink is laid out at its natural
+        height — a WHOLE number of line boxes — so nothing is ever asked to be
+        1.38 lines tall again. Whatever does not fit is BELOW the fold instead
+        of amputated, which is the difference between „there is more" and „this
+        product is broken".
+
+     2. THE CUT IS FADED, NOT GUILLOTINED. A scroller still ends where it ends,
+        and its own bottom edge would cut the next line exactly as before. The
+        mask turns those last 10 px into a fade, so a partly visible line reads
+        as CONTINUING rather than as a rendering fault — and `padding-bottom`
+        is the same 10 px, which is what keeps a text that FITS from being
+        faded at all: scrolled to the end, the last line's box bottom sits on
+        the fade's opaque edge. (Bottom padding joins the scrollable overflow
+        in every engine this ships on; that is what makes the two numbers agree.)
+
+     3. THE ELLIPSIS GOES WITH THE CLAMP. `line-clamp-3` / `line-clamp-6` were
+        hiding 77 px and 215 px of authored Bulgarian behind „…" and telling
+        the student nothing — 110 px of a 219-character headline and 333 px of
+        a 556-character body on the founder's own frame. An ellipsis is a claim
+        that the rest is not worth the space; under THEO-4 the rest is the
+        lesson. A scroll window makes the same content REACHABLE, and «ПРОЧЕТИ»
+        beside it opens the whole thing with the car stopped.
+
+     WHY NOT „JUST GIVE THE CARD MORE ROOM". Because there is none, and the
+     arithmetic is not arguable: in landscape the column's cap is
+     `100% − TOUCH_CONTROLS_FLOOR − top` = 128 px of a 393 px stage, and what
+     it is standing off is the DRIVING CONTROLS — this peek does not stop the
+     car, so it may not paint over them. The cap's own comment says it was
+     „measured against the 106.3 px worst card"; the card a scenario lesson
+     actually raises wants ~400. The cap is correct arithmetic against content
+     that does not ship, and the answer to that is not a bigger box on top of
+     the road — the founder's note on this very defect ends „an instruction he
+     can read but which hides the hazard it is about is a different failure."
+     ══════════════════════════════════════════════════════════════════════════ */
+  const TEXT_FADE_PX = 10;
+  const textWindowStyle: CSSProperties = {
+    // ── AND IT IS STILL A PEEK — 2026-08-14, the other half of his note.
+    //
+    // „AND MIND WHERE IT SITS: it is over the road. The founder's reference
+    // keeps the centre clear. An instruction he can read but which hides the
+    // hazard it is about is a different failure."
+    //
+    // Without a ceiling this window would take everything the column's cap
+    // allows, and in PORTRAIT that cap is 403 px — 47 % of an 852 px screen,
+    // because portrait has height to spare and the landscape arithmetic that
+    // produced 128 never bit there. The card would go from 106 px to the full
+    // 403 and hang down past the horizon (measured off his own frame: the road
+    // starts at y ≈ 205), in the corridor beside the lane he is driving in.
+    // Readable and in the way is not the trade he asked for.
+    //
+    // 8 rem = 128 px, and it is deliberately THE SAME NUMBER as the landscape
+    // column cap (`100% − TOUCH_CONTROLS_FLOOR − top` at 852 × 393). One
+    // constant, both orientations: the peek is never taller than the tightest
+    // budget it has to survive, so it cannot grow into the picture on the
+    // roomier axis. In landscape it does not bind — the column's own cap is
+    // already the smaller of the two — so nothing about that orientation
+    // changes except that the glyphs are whole.
+    maxHeight: "8rem",
+    // Both spellings: `mask-image` is unprefixed in current WebKit and
+    // prefixed in the versions still on phones in this market.
+    WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+    maskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+    paddingBottom: `${TEXT_FADE_PX}px`,
+    // The card carries `touch-manipulation`; a window that scrolls has to say
+    // which axis it owns, or the stage's gesture handling keeps the drag.
+    touchAction: "pan-y",
+    overscrollBehavior: "contain",
+  };
 
   const cardBody = (
     <>
       {/* Row 1 — the tone glyph, the chip, the „+N" badge and (when the whole
-          card is the dismiss button) the ✕ that says so. */}
-      <div className="flex min-w-0 items-center gap-1.5">
+          card is the dismiss button) the ✕ that says so. `shrink-0`: this row
+          is 18 px of label and it is never what gives when the column is
+          short — see THE TEXT WINDOW above. */}
+      <div className="flex min-w-0 shrink-0 items-center gap-1.5">
         <ToneGlyph tone={shown.tone} frozen={frozen} />
         {shown.chipBg ? (
           <span className="min-w-0 truncate text-[10px] font-black uppercase tracking-wider">
@@ -460,16 +561,27 @@ export function SimOverlay({
         ) : null}
       </div>
 
-      {/* Row 2 — THE LINE. `line-clamp-3` and not `truncate`: in a column the
-          sentence has somewhere to go, and „…" after four words is how a THEO-4
-          explanation turns back into a bare verdict. `break-words` because
-          «Пътнотранспортно» is one unbreakable 16-letter word and the stage
-          clips rather than scrolls (hud-card-fit.test.ts). */}
-      <span className="line-clamp-3 min-w-0 break-words text-[11px] font-bold leading-tight text-foreground">
-        {shown.lineBg}
-      </span>
+      {/* ── THE TEXT WINDOW. Rows 2 and 2b live inside it and neither of them
+             shrinks any more; the WINDOW is what gives when the column is
+             short, and it gives by scrolling. The long block above this
+             component's `cardBody` has the measurements. */}
+      <div
+        data-sim-overlay-text=""
+        className="flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto"
+        style={textWindowStyle}
+      >
+        {/* Row 2 — THE LINE. No clamp: it is `shrink-0` inside the window, so it
+            lays out at a whole number of line boxes and the window scrolls past
+            it. „…" after four words is how a THEO-4 explanation turns back into
+            a bare verdict, and `line-clamp-3` was doing exactly that to a
+            219-character authored instruction. `break-words` because
+            «Пътнотранспортно» is one unbreakable 16-letter word and the stage
+            clips rather than scrolls (hud-card-fit.test.ts). */}
+        <span className="min-w-0 shrink-0 break-words text-[11px] font-bold leading-tight text-foreground">
+          {shown.lineBg}
+        </span>
 
-      {/* ══ ROW 2b — THE BODY, ON THE SCREEN, NOT BEHIND «ЗАЩО» ═══════════════
+        {/* ══ ROW 2b — THE BODY, ON THE SCREEN, NOT BEHIND «ЗАЩО» ═══════════════
           *** THEO-4 — REQUIREMENT ZERO. THIS IS THE ROW THAT BREACHED IT. ***
 
           HIS WORDS: „THE CARDS SHOW BUTTONS AND NO TEXT." What he was looking
@@ -493,35 +605,38 @@ export function SimOverlay({
               thirteen pre-drive instructions are 55–95 characters — three
               lines at 11 px. They fit whole. Nothing is truncated in the case
               that produced the complaint.
-            · `line-clamp-6` is the ceiling for the long ones (a five-step
-              briefing, a teach moment's authored WHY). Six lines ≈ 84 px in
-              the RIGHT-EDGE corridor he drew himself — never the middle of the
-              road — and the sheet still holds the full text, the lawRef and
-              any rich detail. A visible six-line body with more behind a
-              labelled control is a „read more"; zero lines with everything
-              behind it is what he photographed.
+            · `line-clamp-6` WAS the ceiling for the long ones — and it is gone
+              as of 2026-08-14, because it was hiding 215 px of a 257 px body
+              behind „…" and saying nothing. Six lines is not a „read more"
+              when the reader is not told there are seventeen. The window
+              above scrolls instead, and «ПРОЧЕТИ» opens the lot with the car
+              stopped.
             · `whitespace-pre-line` so an authored list keeps its lines.
           It sits ABOVE the control row on purpose: the words are what the card
-          is for, and «Защо» is now „see the citation", not „see the text".
+          is for, and the control beside it names what it opens.
           ══════════════════════════════════════════════════════════════════ */}
-      {/* A <p>, deliberately: the UNPANEL register sets the ghost's face to
-          MONO for instrument values and hands `:is(p, h1, h2, h3, blockquote)`
-          back to the reading face. This is an authored sentence, so it is a
-          paragraph — the same split every other authored line in this HUD
-          already relies on. */}
-      {shown.detailBg ? (
-        <p
-          data-sim-overlay-body=""
-          className="line-clamp-6 min-w-0 whitespace-pre-line break-words text-[11px] font-semibold leading-snug text-muted"
-        >
-          {shown.detailBg}
-        </p>
-      ) : null}
+        {/* A <p>, deliberately: the UNPANEL register sets the ghost's face to
+            MONO for instrument values and hands `:is(p, h1, h2, h3, blockquote)`
+            back to the reading face. This is an authored sentence, so it is a
+            paragraph — the same split every other authored line in this HUD
+            already relies on. */}
+        {shown.detailBg ? (
+          <p
+            data-sim-overlay-body=""
+            className="min-w-0 shrink-0 whitespace-pre-line break-words text-[11px] font-semibold leading-snug text-muted"
+          >
+            {shown.detailBg}
+          </p>
+        ) : null}
+      </div>
 
       {/* Row 3 — the controls, right-aligned under the words. Absent only on the
-          card that IS a control. */}
+          card that IS a control. `shrink-0`, and that is the half of this fix
+          that keeps it from being a trap: these two 44 px chips are the only
+          way out of a blocking briefing, and a flex row that shrinks would put
+          them under the fold of a card the student cannot scroll past. */}
       {cardIsDismissButton ? null : (
-        <div className="mt-0.5 flex items-center justify-end gap-1">
+        <div className="mt-0.5 flex shrink-0 items-center justify-end gap-1">
           {hasDetail ? (
             <button
               type="button"
@@ -762,13 +877,35 @@ export function SimOverlay({
               maxHeight: "calc(var(--sim-vh, 100dvh) - var(--sim-dash-h, 0px) - 0.75rem)",
             }}
           >
+            {/* ══ THE READ MODE'S OWN HEADER WAS A FRAGMENT — 2026-08-14 ══════
+                This row used to carry the line as a `truncate`-d heading, and
+                on the deployed build it ate 146 of the 219 characters of the
+                instruction it was heading — «…По тъмно първо про…», one third
+                of the line, with an ellipsis. This is the surface a student is
+                SENT TO because the peek could not finish printing; a read mode
+                whose title is itself cut off is the defect one level deeper,
+                and it was in the frame nobody had opened.
+
+                So the title stops living in a fixed-height row and joins the
+                SCROLLING body below, where a 412-character exam complication
+                (the worst in the shipped corpus) is simply the first paragraph
+                of what the student came here to read. What stays here is the
+                tone glyph, the card's own chip — «ИНСТРУКЦИИ», a label, always
+                short — and the ✕. Nothing in this row can now be too long for
+                it, which is the only way a header row is honest.
+
+                The dialog keeps `aria-label={lineBg}`, so a screen reader still
+                announces the sheet by its sentence and loses nothing. ══════ */}
             <div className="flex shrink-0 items-center gap-2">
               <span style={{ color }}>
                 <ToneGlyph tone={shown.tone} frozen={false} />
               </span>
-              <h2 className="min-w-0 flex-1 truncate text-sm font-extrabold leading-tight">
-                {shown.lineBg}
-              </h2>
+              <span
+                className="min-w-0 flex-1 truncate text-[10px] font-black uppercase tracking-wider"
+                style={{ color }}
+              >
+                {shown.chipBg ?? ""}
+              </span>
               {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
                   It was the escape hatch from a height cap, and the cap is
                   gone: this surface is already the whole screen above the
@@ -792,8 +929,23 @@ export function SimOverlay({
                 the screen — which is precisely the regression measured when
                 this clearance first shipped. */}
             <div className="min-h-0 min-w-0 shrink overflow-y-auto">
+              {/* The sentence the peek could not finish, in full and first. */}
+              <h2 className="break-words text-sm font-extrabold leading-snug text-foreground">
+                {shown.lineBg}
+              </h2>
+              {/* ── `whitespace-pre-line`, AND IT WAS MISSING HERE FOR THE WHOLE
+                     LIFE OF THIS SHEET. The card's own body has carried it since
+                     row 2b landed; this copy did not, so a five-step briefing
+                     arrived as ONE run-on paragraph — photographed 2026-08-13,
+                     iPhone 16 landscape: „…дали да стъпи. 2. Видиш ли пешеходната
+                     пътека, вдигни… 3. Стъпи ли пешеходец…" with no break
+                     anywhere. The steps are authored as a numbered list and the
+                     one surface that shows all of them was the one that threw
+                     the numbering's shape away. */}
               {shown.detailBg ? (
-                <p className="text-xs leading-snug text-foreground">{shown.detailBg}</p>
+                <p className="mt-1.5 whitespace-pre-line break-words text-xs leading-snug text-foreground">
+                  {shown.detailBg}
+                </p>
               ) : null}
               {shown.lawRef ? (
                 <span className="mt-1.5 inline-block rounded-full border border-border bg-surface px-2 py-0.5 text-[10px] font-bold text-muted">

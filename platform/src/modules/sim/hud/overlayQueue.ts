@@ -304,6 +304,67 @@ export function hasWhy(item: SimOverlayItem): boolean {
   return typeof item.detailBg === "string" && item.detailBg.trim().length > 0;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE BRIEFING'S TWO HALVES — AND WHY THEY LIVE HERE AND NOT IN THE SHELL.
+
+   FOUNDER, 2026-08-14, frames from both orientations: „there are TWO copies of
+   it on screen, in different styling, both cut." One card. `lineBg` was
+   `briefingBg[0].textBg` and `detailBg` was `briefingBg.map(...)` — the WHOLE
+   list, step 1 included — so `SimOverlay` printed the same 219 characters
+   twice, bold and then grey-prefixed „1. ", and clamped both. The read sheet
+   inherited it: its <h2> and its first body line were the same sentence.
+
+   It was a one-line expression inside a 4 000-line component, which is exactly
+   why six waves of measurement walked past it: there was nothing to assert
+   against. It is two pure functions now, so `briefing-no-echo.test.ts` can put
+   every compiled rung of all 167 shipped templates through them and fail on any
+   scenario where the body starts repeating the line again.
+
+   THE RULE, stated once: THE CARD MAY NEVER PRINT THE SAME SENTENCE TWICE.
+   Not a layout preference — the peek's whole budget in landscape is 128 px,
+   and 39–42 % of what it was being asked to hold was an echo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** One authored step of `LessonSpec.briefingBg`. */
+export interface BriefingStepBg {
+  readonly n: number;
+  readonly textBg: string;
+}
+
+/**
+ * THE LINE: step 1, and it is step 1 by contract rather than by convenience.
+ *
+ * `scenario/compile.ts` puts a rung's complication at `briefingBg[0]` precisely
+ * so that „the one sentence that says WHY the rung is harder is the one
+ * sentence nobody can skip" — the line is the row that is always painted first
+ * and cannot be scrolled away from. Changing which step lands here breaks that
+ * delivery, so it is written down in both files.
+ */
+export function briefingLineBg(steps: readonly BriefingStepBg[]): string {
+  return steps.length > 0 ? steps[0]!.textBg : "";
+}
+
+/**
+ * THE BODY: everything AFTER step 1, numbered as authored.
+ *
+ * The numbers are kept (2., 3., …) rather than renumbered from 1: the list is a
+ * sequence whose first item is the bold sentence directly above it, and
+ * renumbering would make the body claim to be a different list.
+ *
+ * `null` for a single-step briefing — there is then no second surface to offer,
+ * and `SimOverlay` correctly renders no «ПРОЧЕТИ». No shipped template is in
+ * that case (the step-count histogram over all 167 is {4:5, 5:118, 6:30, 7:12,
+ * 8:2}), but a hand-written curriculum `LessonSpec` may be, and a control that
+ * opens onto an empty sheet is worse than no control.
+ */
+export function briefingBodyBg(steps: readonly BriefingStepBg[]): string | null {
+  if (steps.length < 2) return null;
+  return steps
+    .slice(1)
+    .map((s) => `${s.n}. ${s.textBg}`)
+    .join("\n");
+}
+
 export interface OverlaySelection {
   /** The ONE overlay on screen, or null when the road is clean. */
   active: SimOverlayItem | null;
