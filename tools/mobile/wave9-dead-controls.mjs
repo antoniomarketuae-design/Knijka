@@ -167,8 +167,18 @@ const CENSUS = (gridStep) => {
   out.coveredPx2 = Math.round(out.coveredPx2);
 
   const touchRoot = document.querySelector('[data-hud="touch-controls"]');
-  const panel = document.querySelector('[data-sim-overlay-state="open"]');
-  const peek = document.querySelector('[data-hud="notify-column"]');
+  // THE SECTION, NOT ITS WRAPPER. The wrapper is `inset-x-0` and
+  // `pointer-events: none` — it paints nothing and intercepts nothing, so
+  // quoting its width would report a 672 px reading surface as „full-bleed 39 %"
+  // on an 852 px screen. The painted box is the section inside it.
+  const panel =
+    document.querySelector('[data-sim-overlay-state="open"] section') ??
+    document.querySelector('[data-sim-overlay-state="open"]');
+  // ⚠ `[data-hud="notify-column"]` is NOT the peek: the SHELL owns a column with
+  // that same name (LessonPlayShell — the roomy stack), it is always mounted and
+  // usually empty, and asking for it reported a 0×0 box on every state of the
+  // first run of this probe. The peek is the one carrying the state attribute.
+  const peek = document.querySelector('[data-sim-overlay-state="peek"]');
   const box = (el) => {
     if (!el) return null;
     const r = el.getBoundingClientRect();
@@ -186,7 +196,8 @@ const CENSUS = (gridStep) => {
   out.carSheetAttr = document.documentElement.dataset.simCarSheet ?? null;
   out.panel = box(panel);
   out.peek = box(peek);
-  out.overlayKind = (panel ?? peek)?.getAttribute?.("data-sim-overlay") ?? null;
+  out.overlayKind = (panel ?? peek)?.getAttribute("data-sim-overlay") ?? null;
+  out.overlayText = ((panel ?? peek)?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 90);
   return out;
 };
 
@@ -303,51 +314,107 @@ for (const device of devices) {
       return c;
     };
 
-    // ── clear the landing cards ─────────────────────────────────────────────
-    for (let i = 0; i < 8; i += 1) {
-      const ack = await findButton(page, /^(Разбрах|Продължи|Започни|Ясно|Напред)$/);
-      if (!(await tapIf(page, ack, 600))) break;
-    }
-    // …and let the belt warning age out into the instruction hint, so state C
-    // expands the INSTRUCTION panel and not the warning. That confound is the
-    // whole subject of the commit before this wave.
-    for (let i = 0; i < 20; i += 1) {
-      const kind = await page.evaluate(
-        () => document.querySelector("[data-sim-overlay]")?.getAttribute("data-sim-overlay") ?? null,
-      );
-      if (kind === "hint") break;
-      await sleep(1000);
+    // ── clear the BLOCKING landing cards, and stop the moment a peek exists ──
+    //
+    // The first run of this probe tapped a fixed 8 acknowledgements and then
+    // waited for the instruction hint, and on the deployed build the hint never
+    // came back: every state was measured with an EMPTY overlay, „0 dead" six
+    // times over. That is precisely the shape of green the brief warns about,
+    // caught by the probe's own bookkeeping (`overlayKind: null` in all six).
+    // So the loop now stops on a CONDITION rather than a count.
+    const peekUp = () =>
+      page.evaluate(() => document.querySelector('[data-sim-overlay-state="peek"]') !== null);
+    for (let i = 0; i < 10; i += 1) {
+      if (await peekUp()) break;
+      const ack = await findButton(page, /^(Разбрах|Продължи|Започни|Ясно)$/);
+      if (!(await tapIf(page, ack, 700))) {
+        await sleep(1500);
+      }
     }
 
-    // ── A · idle, and B · card up ───────────────────────────────────────────
-    // They are the same frame when a peek is present, so both are recorded and
-    // the peek's own box is reported with each: „idle" is honest only if what
-    // was on screen is stated.
+    // ── A · idle — whatever is genuinely on screen, stated ──────────────────
     await record("A-idle");
-    const dismissed = await tapIf(page, await findButton(page, /^Скрий известието/, { attr: "label" }), 900);
-    if (dismissed) await record("A-idle-clean");
-    // bring the line back for state B / C
-    for (let i = 0; i < 12; i += 1) {
-      const kind = await page.evaluate(
-        () => document.querySelector("[data-sim-overlay]")?.getAttribute("data-sim-overlay") ?? null,
-      );
-      if (kind !== null) break;
-      await sleep(1000);
+
+    // ── B · card up. RAISE ONE DELIBERATELY IF THE TRANSIENT ONE HAS GONE.
+    // Every line in this HUD is on a TTL by design („the ambient state of this
+    // layer is an empty screen"), so waiting for one is a coin toss. «Задача» in
+    // the lesson menu exists exactly to bring it back — the shell's own comment
+    // says so: „the price of making the banner transient is that it must be
+    // recallable in one tap."
+    if (!(await peekUp())) {
+      const menu = await findButton(page, /^Меню на урока$/, { attr: "label" });
+      if (await tapIf(page, menu, 900)) {
+        await tapIf(page, await findButton(page, /^Задача/), 1200);
+      }
+      // the menu closes itself on a row tap; make sure it is not still open
+      const close = await findButton(page, /^Затвори менюто на урока$/, { attr: "label" });
+      if (close) await tapIf(page, close, 700);
     }
+    rec.peekRaised = await peekUp();
     await record("B-card-up");
 
     // ── C · THE READ MODE — §I11 + §W2, the state the wave exists for ───────
-    const why = await findButton(page, /^(Защо|Инструкции|Списък|СПИСЪК)$/);
+    //
+    // The «Защо» chip is SCOPED TO THE PEEK: a same-named control anywhere else
+    // on the screen would measure a different surface and call it this one.
+    //
+    // AND THE TAP IS VERIFIED, NOT ASSUMED. Every line in this HUD is on a TTL,
+    // so the card can retire between „find the chip" and „tap where it was" —
+    // measured on the first full sweep, 4 of 6 profiles recorded a state called
+    // `C-read-open` that was the IDLE SCREEN (`read=-`, `paused false`), and it
+    // reported 0 dead controls, truthfully, about nothing. A state you did not
+    // enter is a state you did not test. So: raise, expand, CHECK the attribute,
+    // and retry — and if it still will not open, say so instead of recording a
+    // clean screen under this name.
+    const readOpen = () =>
+      page.evaluate(() => document.documentElement.dataset.simOverlayRead === "open");
+    const findWhy = () =>
+      page.evaluate(() => {
+        const peek = document.querySelector('[data-sim-overlay-state="peek"]');
+        if (!peek) return null;
+        for (const el of peek.querySelectorAll("button")) {
+          const t = (el.textContent || "").trim();
+          if (!/^(Защо|Инструкции|Списък|СПИСЪК|Резултат)$/.test(t)) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 1) continue;
+          return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), label: t };
+        }
+        return null;
+      });
+    const raiseCard = async () => {
+      const menu = await findButton(page, /^Меню на урока$/, { attr: "label" });
+      if (!(await tapIf(page, menu, 900))) return;
+      await tapIf(page, await findButton(page, /^Задача/), 1200);
+      const close = await findButton(page, /^Затвори менюто на урока$/, { attr: "label" });
+      if (close) await tapIf(page, close, 700);
+    };
+
+    let why = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      why = await findWhy();
+      if (why === null) {
+        await raiseCard();
+        why = await findWhy();
+      }
+      if (why === null) continue;
+      await tapIf(page, why, 1500);
+      if (await readOpen()) break;
+      why = null;
+      await raiseCard();
+    }
     rec.whyControl = why;
-    if (await tapIf(page, why, 1400)) {
+    if (why !== null && (await readOpen())) {
       await record("C-read-open");
       await page
         .screenshot({ path: `${OUT}/shots/${device.id}__C-read-open.png`, timeout: 120_000 })
         .catch(() => {});
       await tapIf(page, await findButton(page, /^Затвори$/, { attr: "label" }), 900);
     } else {
-      rec.states["C-read-open"] = { skipped: "no «Защо» / «Инструкции» control on screen" };
-      console.log("  C-read-open  SKIPPED — no «Защо» control found");
+      rec.states["C-read-open"] = {
+        skipped:
+          "the read mode would not open in 3 attempts — no peek card with a «Защо» chip stayed on screen long enough",
+      };
+      console.log(`  C-read-open  NOT ENTERED — ${rec.states["C-read-open"].skipped}`);
     }
 
     // ── D · the ⚙ car sheet ─────────────────────────────────────────────────
@@ -359,15 +426,22 @@ for (const device of devices) {
     }
 
     // ── F · «Напреднал», WITH THE SHEET OPEN, because that is where «СЪЕД» is
-    // The tier cell cycles НАЧ → НОРМ → НАПР; tap until the label says so.
+    //
+    // The cell cycles НАЧ → НОРМ → НАПР and its accessible name is
+    // „Ниво на помощта: <CURRENT> — натисни за <NEXT>". The first run of this
+    // probe matched /Напреднал/ anywhere in that string, so it matched the NEXT
+    // tier while the current one was still «Нормален», broke out without tapping
+    // anything, and reported state F as identical to state D — with «СЪЕД»
+    // absent, which is exactly what „the clutch is unusable" would look like.
+    // The anchor is what makes the two halves of the sentence distinguishable.
     let tier = null;
     for (let i = 0; i < 4; i += 1) {
       tier = await findButton(page, /^Ниво на помощта/, { attr: "label" });
-      if (tier === null || /Напреднал/.test(tier.label)) break;
-      await tapIf(page, tier, 1200);
+      if (tier === null || /^Ниво на помощта: Напреднал/.test(tier.label)) break;
+      await tapIf(page, tier, 1400);
     }
     rec.tierControl = tier;
-    if (tier && /Напреднал/.test(tier.label)) {
+    if (tier && /^Ниво на помощта: Напреднал/.test(tier.label)) {
       await sleep(1500); // let transmissionSwitchHint() raise its card
       const c = await record("F-advanced");
       c.clutch = await page.evaluate(() => {
@@ -390,6 +464,33 @@ for (const device of devices) {
       await page
         .screenshot({ path: `${OUT}/shots/${device.id}__F-advanced.png`, timeout: 120_000 })
         .catch(() => {});
+      // …AND THE CARD THAT SWITCH RAISES, EXPANDED. This is the state the brief
+      // names: „Choosing «Напреднал» buries all four rail controls — which is
+      // also what stops the delivered clutch being usable."
+      //
+      // THE SHEET IS CLOSED FIRST, and that is not tidiness. The first run tapped
+      // the «Защо» chip's coordinates with the sheet still open — and the sheet
+      // is exactly what makes that chip DEAD (see state D) — so the tap landed on
+      // a sheet cell and the „expanded" state that got recorded was the idle
+      // screen with a different tier. A probe that drives a control it has itself
+      // just measured as dead is measuring its own mistake.
+      await tapIf(page, await findButton(page, /^Затвори контролите$/, { attr: "label" }), 800);
+      const whyF = await page.evaluate(() => {
+        const peek = document.querySelector('[data-sim-overlay-state="peek"]');
+        if (!peek) return null;
+        for (const el of peek.querySelectorAll("button")) {
+          const t = (el.textContent || "").trim();
+          if (!/^(Защо|Инструкции|Списък|СПИСЪК)$/.test(t)) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 1) continue;
+          return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), label: t };
+        }
+        return null;
+      });
+      if (await tapIf(page, whyF, 1500)) {
+        await record("F-advanced-read");
+        await tapIf(page, await findButton(page, /^Затвори$/, { attr: "label" }), 900);
+      }
     } else {
       rec.states["F-advanced"] = { skipped: "tier cell not reachable (the sheet may not have opened)" };
       console.log("  F-advanced   SKIPPED — tier cell not found");
@@ -417,7 +518,15 @@ for (const device of devices) {
 // THE VERDICT — one table, and the one line that decides whether this shipped.
 // -----------------------------------------------------------------------------
 console.log(`\n${"=".repeat(104)}\nDEAD CONTROLS PER STATE — the whole sweep\n`);
-const STATES = ["A-idle", "A-idle-clean", "B-card-up", "C-read-open", "D-sheet-open", "F-advanced", "E-menu-open"];
+const STATES = [
+  "A-idle",
+  "B-card-up",
+  "C-read-open",
+  "D-sheet-open",
+  "F-advanced",
+  "F-advanced-read",
+  "E-menu-open",
+];
 console.log(
   `${"profile".padEnd(30)}${STATES.map((s) => s.padEnd(14)).join("")}`,
 );
@@ -438,8 +547,43 @@ for (const r of results) {
 }
 console.log(
   `\nWORST: ${worstDead} dead control(s)${worstState ? ` — ${worstState}` : ""}.  ` +
-    `${worstDead === 0 ? "PASS — every live control answers at its own centre in every state entered." : "FAIL — see the per-state lines above."}`,
+    `${worstDead === 0 ? "PASS — every live control answers at its own centre in every state entered." : "see the per-state lines above."}`,
 );
+
+// ── THE ONE VERDICT THIS WAVE IS ACCOUNTABLE FOR ────────────────────────────
+// §I11 + §W2 is the READ MODE. The other surfaces are measured here because the
+// brief asks for every state, but they are other lanes' and are reported as
+// such rather than folded into one number that hides which is which.
+const readStates = ["C-read-open", "F-advanced-read"];
+let entered = 0;
+let readDead = 0;
+let unpaused = 0;
+for (const r of results) {
+  for (const s of readStates) {
+    const c = r.states?.[s];
+    if (!c || c.skipped) continue;
+    entered += 1;
+    readDead += c.dead.length;
+    if (!c.paused) unpaused += 1;
+  }
+}
+console.log(
+  `\n§I11/§W2 READ MODE — entered ${entered} time(s) across the ladder · ` +
+    `${readDead} dead control(s) · ${unpaused} of them with the car still running.\n` +
+    `  (before, on d795eab: 7 dead in landscape — 5 of 5 top-rail — and 3 in portrait, on 6 of 6 profiles.)\n` +
+    `  ${readDead === 0 && unpaused === 0 && entered > 0 ? "PASS." : "FAIL — the read mode must bury nothing, and must never be up while the clock runs."}`,
+);
+const others = [];
+for (const r of results) {
+  for (const [s, c] of Object.entries(r.states ?? {})) {
+    if (readStates.includes(s) || !c || c.skipped || c.dead.length === 0) continue;
+    others.push(`  ${r.device.padEnd(28)} ${s.padEnd(14)} ${c.dead.map((d) => `«${d.label}»←${d.onTop}`).join(", ")}`);
+  }
+}
+if (others.length > 0) {
+  console.log(`\nSTILL BURYING CONTROLS — OTHER SURFACES, OTHER LANES, NOT FIXED HERE:`);
+  console.log(others.join("\n"));
+}
 writeFileSync(`${OUT}/dead-controls.json`, JSON.stringify(results, null, 1));
 console.log(`\n[w9-dead] wrote ${OUT}/dead-controls.json`);
 await browser.close();
