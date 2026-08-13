@@ -2162,6 +2162,37 @@ when the dial is small:
 Cost: 11 quads. `tickQuad`, `digitQuad`, `gearQuad` and both lamp banks are unchanged except for a
 uniform index shift, which the new test pins.
 
+**The dial is not decoration and the numerals were** — that distinction is the whole call, and both
+halves are visible in the frames rather than argued. At 51 km/h the needle is a clean blade whose
+angle is unambiguous at 54 px of diameter, and the lit arc reads at a glance; «120» in the same
+frame is a single smeared shape. One of those two things a student can use.
+
+**If he wants numbers on the dial anyway, there is exactly one lever and it is his:** the face has to
+be ~300 CSS px wide, so either the cluster grows physically or the camera comes forward. Both change
+a founder-ratified pose (`COCKPIT_CAM_OFFSET`, aft 0.375 m, with its own acceptance test) and both
+are the same lever as the edge trade in §S5. Nothing inside the cluster can buy it.
+
+### S4a · Verified on the deployed build, and a note on what verified it
+
+Deployed `2be87dd` (commit 22:29:06 UTC, `.next/BUILD_ID` 22:32:02 UTC, `buildStage:
+"static-generation"`). All six profiles re-measured, belt fastened, driven to **47-50 km/h**.
+
+**The instrument that found this defect cannot confirm its fix, and saying so is the point.**
+Detectors that project `clusterLayout`'s constants report where a numeral *would* land; they went on
+printing "8.34 px" for a glyph that is no longer emitted. So `wave12-cluster.mjs` gained one line
+that reads the BUFFER instead of the layout — `faceMesh.geometry.attributes.position.count / 4`:
+
+| | quads on the face mesh |
+|---|---|
+| `buildClusterFaceMesh()` — the reel | 52 |
+| `{ dialNumerals: false }` — the cabin | 41 |
+| **measured on the deployed cabin build** | **41** |
+
+And the frames, which are the verdict: at 50 km/h the dial is a clean tick band with a legible
+needle and its lit arc on every profile, «50 км/ч D» crisp beside it, and in portrait «ДЯСН» now
+sits on empty dial face — still printed on the instrument (§S5, the flank lane's item) but no longer
+fused to a number. Before/after frames: `tools/mobile/.out/wave12-before/` and `wave12-after/`.
+
 ### S5 · What is reported and NOT decided here
 
 - **THE FLANK LABELS PRINT ON THE DIAL.** Portrait, all three profiles: «⇨» 237 px² on the dial,

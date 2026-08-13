@@ -479,6 +479,21 @@ const MEASURE = () => {
 
   // ── camera + material facts, so the mechanism is in the record ────────────
   const mat = Array.isArray(faceMesh.material) ? faceMesh.material[0] : faceMesh.material;
+
+  // WHAT IS ACTUALLY IN THE BUFFER, not what the layout says should be.
+  //
+  // EVERY OTHER NUMBER IN THIS FILE IS A PROJECTION OF clusterLayout's
+  // CONSTANTS — it computes where a numeral WOULD land, which is exactly what
+  // was needed to prove the defect and is exactly the wrong instrument for
+  // proving the FIX: it would go on reporting 8.34 px for a glyph that is no
+  // longer emitted. So the face mesh is also asked how many quads it really
+  // has. 4 vertices per quad; the numerals are 11 of them (0/40/80/120/160 =
+  // 1+2+2+3+3).
+  const posAttr = faceMesh.geometry && faceMesh.geometry.attributes
+    ? faceMesh.geometry.attributes.position
+    : null;
+  out.faceQuads = posAttr ? posAttr.count / 4 : null;
+
   out.ok = true;
   out.camera = {
     fovDeg: camera.fov,
@@ -494,7 +509,13 @@ const MEASURE = () => {
     faceMesh.localToWorld(c);
     return c.distanceTo(camera.position);
   })();
-  out.scale = { x: faceMesh.matrixWorld.elements[0], note: "world metres per design unit (row 0 length is only exact for an unrotated mount)" };
+  // World metres per design unit — the LENGTH of the transformed basis vector,
+  // not `elements[0]`, which is only the scale when the mount is unrotated and
+  // this one is not (the GLB's `screen_cluster` node is pitched 10°).
+  out.metresPerDesignUnit = (() => {
+    const e = faceMesh.matrixWorld.elements;
+    return Math.hypot(e[0], e[1], e[2]);
+  })();
   out.texture = {
     generateMipmaps: !!(mat && mat.map && mat.map.generateMipmaps),
     minFilter: mat && mat.map ? mat.map.minFilter : null,
@@ -602,6 +623,17 @@ function physical(cssPx, device) {
  */
 const GLANCE_ARCMIN_FLOOR = 20;
 
+/**
+ * Face-mesh quad count at or above which the dial numerals are still being
+ * emitted. MEASURED off the builder, not guessed: `buildClusterFaceMesh()`
+ * returns 52 quads and `{dialNumerals:false}` returns 41 — the ring is the 11
+ * between them (0/40/80/120/160 = 1+2+2+3+3). 47 is the midpoint, so either
+ * build can gain or lose a handful of elements before this reads the wrong
+ * answer, and if the face ever changes shape this constant is what has to be
+ * re-derived — never the conclusion drawn from it.
+ */
+const NUMERALS_PRESENT_QUADS = 47;
+
 function report(title, m, device) {
   console.log(`\n  ${"─".repeat(96)}`);
   console.log(`  ${title}`);
@@ -636,6 +668,13 @@ function report(title, m, device) {
       ` (${m.texture.minFilter === 1006 ? "LinearFilter — NO mip chain" : "mipmapped"}) · anisotropy ${m.texture.anisotropy}`,
   );
   console.log(`  speed  · DOM «${m.speedDom}»   needle ${f2(m.needleKmh)} km/h`);
+  // THE ONLY LINE HERE THAT DESCRIBES THE BUFFER RATHER THAN THE LAYOUT.
+  console.log(
+    `  BUFFER · face mesh carries ${m.faceQuads == null ? "?" : m.faceQuads} quads → dial numerals ` +
+      `${m.faceQuads == null ? "UNKNOWN" : m.faceQuads >= NUMERALS_PRESENT_QUADS ? "ARE DRAWN" : "ARE NOT DRAWN"}` +
+      `.  The table below projects the LAYOUT CONSTANTS and is blind to this: it reports where a` +
+      ` numeral WOULD land, which is what proved the defect and is the wrong instrument for the fix.`,
+  );
 
   const line = (name, cssPx, extra) => {
     const p = physical(cssPx, device);
