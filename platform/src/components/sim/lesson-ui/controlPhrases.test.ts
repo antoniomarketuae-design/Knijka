@@ -92,9 +92,16 @@ describe("the touch names are the faces that are actually on the glass", () => {
     expect(TOUCH_CONTROLS_SRC).toContain(`"${face}"`);
   });
 
-  it("…and «Кола», the rail button the locator sentence sends the student to", () => {
-    expect(TOUCH_CONTROLS_SRC).toContain('wordBg="Кола"');
+  it("…and «Кола», the station the locator sentence sends the student to", () => {
+    // ⚠ `wordBg` → `captionBg` on 2026-08-13: «Кола» left the top rail (a
+    // word-button 110.7 mm from either thumb) for the lowest station on the
+    // right-hand arc (a ghost glyph with its word under it, ~27 mm). The FACE
+    // is unchanged, which is what this row is really about — the sentence names
+    // a control the student can see.
+    expect(TOUCH_CONTROLS_SRC).toContain('captionBg="Кола"');
     expect(TOUCH_SHEET_LOCATOR_BG).toContain("Кола");
+    // …and the sentence must not still be pointing at the top of the screen.
+    expect(TOUCH_SHEET_LOCATOR_BG).not.toContain("горе");
   });
 
   it("every face the vocabulary can print appears in that list", () => {

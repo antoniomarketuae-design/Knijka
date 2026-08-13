@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   arcRisePx,
+  arcRunStepPx,
   arcStationCount,
   arcStationRectPx,
   ARC_STATIONS_LEFT,
@@ -9,6 +10,7 @@ import {
   padRectPx,
   topRailBandPx,
   touchControlsFloorPx,
+  TOUCH_BAND_CSS_VARS,
   TOUCH_CONTROLS_FLOOR,
   type StageBox,
   type StageRect,
@@ -266,7 +268,7 @@ describe("the control band leaves the column its authored sentence", () => {
     // Stated as a number so „just make the arc taller" cannot land quietly:
     // 780 x 360 has 116 px of column above the band and 106.3 px of card.
     const small = LADDER[3].stage;
-    expect(arcRisePx(small.height)).toBe(20);
+    expect(arcRisePx(small)).toBe(20);
     expect(small.height - touchControlsFloorPx(small) - COLUMN_TOP_PX).toBe(116);
   });
 
@@ -274,11 +276,212 @@ describe("the control band leaves the column its authored sentence", () => {
     // The first attempt at this row flattened both orientations with one
     // percentage and pushed the pause glyph onto the speedometer, on the
     // orientation that had no collision. Both portraits are at the ceiling.
-    expect(arcRisePx(852)).toBe(132);
-    expect(arcRisePx(780)).toBe(132);
+    expect(arcRisePx({ width: 393, height: 852 })).toBe(132);
+    expect(arcRisePx({ width: 360, height: 780 })).toBe(132);
     // …and both landscape phones are at the floor.
-    expect(arcRisePx(393)).toBe(20.5);
-    expect(arcRisePx(360)).toBe(20);
+    expect(arcRisePx({ width: 852, height: 393 })).toBe(20);
+    expect(arcRisePx({ width: 780, height: 360 })).toBe(20);
+  });
+});
+
+/**
+ * =============================================================================
+ * DEFECT 1 — THE ARC RESHAPED UNDER HIS THUMB WHILE HE DROVE. doc 91 §N1 calls
+ * it „THE MOST IMPORTANT OMISSION IN §I"; it was reproduced 6/6 and never fixed.
+ *
+ * Safari's URL bar sliding changes the viewport height, and every length on this
+ * screen was derived from that height:
+ *
+ *     ARC_RISE = clamp(1.25rem, (100% − 22rem) × 0.5, 8.25rem)
+ *     pad      = min(44 % of the stage, 9.5rem)
+ *
+ * Measured with CDP on his own dimensions (402 px of landscape stage, the only
+ * device in the set inside the clamp's varying band): the indicator gap
+ * compressed 25 → 20 px and the mirror gap 18 → 14 px the first time the bar
+ * moved, and on the ladder's profiles the drive pad shrank 152 → 139 → 119.
+ *
+ * THE FIX IS NOT A NEW CLAMP — a control whose geometry is a function of browser
+ * chrome is wrong however the arithmetic is tuned. So: constants, chosen by an
+ * ORIENTATION media query, measured upward from the bottom edge. This block is
+ * the proof, and it is the shape of the defect: sweep the stage height the way
+ * the URL bar does and assert that NOTHING MOVES.
+ * =============================================================================
+ */
+describe("defect 1 · nothing on this screen is a function of the viewport height", () => {
+  /** The three heights a sliding URL bar puts a stage at (§N1's own sweep). */
+  const SWEEP = [0, -44, -90];
+
+  for (const { id, stage } of LADDER) {
+    it(`${id}: every control keeps its rect through a 90 px sweep`, () => {
+      const moved: string[] = [];
+      for (const delta of SWEEP.slice(1)) {
+        const swept: StageBox = { ...stage, height: stage.height + delta };
+        // Everything is anchored to the BOTTOM edge, so a shorter stage moves
+        // the whole band up with the edge — by exactly `delta`, together. What
+        // must never change is a control's SIZE or its distance from any other
+        // control, which is what „it is not stabilized" was about.
+        for (const side of SIDES) {
+          const padRest = padRectPx(side, stage);
+          const padSwept = padRectPx(side, swept);
+          if (padRest.h !== padSwept.h) {
+            moved.push(`${side} pad height ${padRest.h} → ${padSwept.h} at ${delta}`);
+          }
+          if (padRest.y - padSwept.y !== -delta) {
+            moved.push(`${side} pad moved ${padSwept.y - padRest.y} instead of ${delta}`);
+          }
+          const count = arcStationCount(side);
+          for (let i = 1; i < count; i += 1) {
+            const gapRest =
+              arcStationRectPx(i - 1, side, stage).y - arcStationRectPx(i, side, stage).y;
+            const gapSwept =
+              arcStationRectPx(i - 1, side, swept).y - arcStationRectPx(i, side, swept).y;
+            if (gapRest !== gapSwept) {
+              moved.push(`${side} gap ${i - 1}→${i} ${gapRest} → ${gapSwept} at ${delta}`);
+            }
+            const runRest =
+              arcStationRectPx(i, side, stage).x - arcStationRectPx(i - 1, side, stage).x;
+            const runSwept =
+              arcStationRectPx(i, side, swept).x - arcStationRectPx(i - 1, side, swept).x;
+            if (runRest !== runSwept) {
+              moved.push(`${side} run ${i - 1}→${i} ${runRest} → ${runSwept} at ${delta}`);
+            }
+          }
+        }
+      }
+      expect(moved).toEqual([]);
+    });
+  }
+
+  it("and it did not pass by accident: the OLD arithmetic fails this same sweep", () => {
+    // A negative control. Without one, „nothing moved" is indistinguishable
+    // from „nothing was measured" — and this project has shipped that summary
+    // before. These are the two expressions this wave deleted, evaluated on his
+    // own 874 x 402 landscape stage.
+    const oldRise = (h: number) => Math.min(132, Math.max(20, (h - 352) * 0.5));
+    const oldPad = (h: number) => Math.min(152, h * 0.44);
+    const oldSin = (i: number, n: number) => Math.sin((i / (n - 1)) * (Math.PI / 2));
+
+    // THE RISE. 402 → 25, and the first 44 px of URL bar takes it to the floor.
+    expect(oldRise(402)).toBe(25);
+    expect(oldRise(402 - 44)).toBe(20);
+    // …which is the measured 25 → 20 px indicator gap, at two stations.
+    expect(oldRise(402) * oldSin(1, 2) - oldRise(358) * oldSin(1, 2)).toBe(5);
+
+    // THE PAD. Stable until the bar has taken 57 px, then it shrinks under the
+    // thumb — 15 px on his phone, 33 px on the 360 px Androids.
+    expect(oldPad(402)).toBe(152);
+    expect(Math.round(oldPad(402 - 90))).toBe(137);
+    expect(Math.round(oldPad(360 - 90))).toBe(119);
+
+    // …and the same three numbers under what ships now: flat, on both.
+    expect(arcRisePx({ width: 874, height: 402 })).toBe(
+      arcRisePx({ width: 874, height: 402 - 90 }),
+    );
+    expect(padRectPx("right", { width: 874, height: 402 }).h).toBe(
+      padRectPx("right", { width: 874, height: 402 - 90 }).h,
+    );
+  });
+
+  it("the discriminator is an ORIENTATION, which a URL bar cannot flip", () => {
+    // Stated because the obvious cheap fix — a media query on HEIGHT — is the
+    // same defect in a step function, AND it would be invisible to the harness,
+    // which sweeps the viewport height exactly the way the URL bar does. His
+    // landscape stage is 402 px and portrait 874; neither crosses the other's
+    // side of `orientation` under any sweep this side of the 240 px collapse.
+    for (const delta of SWEEP) {
+      expect(arcRisePx({ width: 874, height: 402 + delta })).toBe(20);
+      expect(arcRisePx({ width: 402, height: 874 + delta })).toBe(132);
+      expect(arcRunStepPx({ width: 874, height: 402 + delta })).toBe(44);
+      expect(arcRunStepPx({ width: 402, height: 874 + delta })).toBe(24);
+    }
+  });
+
+  it("the CSS says the same thing as the arithmetic, in a media query", () => {
+    // The two must be generated from one set of numbers or the sweep above
+    // stays green while the phone does not — the notifyColumn.ts device.
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-rise: 8.25rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-run: 1.5rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("@media (orientation: landscape)");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-rise: 1.25rem");
+    expect(TOUCH_BAND_CSS_VARS).toContain("--sim-arc-run: 2.75rem");
+    // …and the clamp against the live stage that caused the defect is gone.
+    expect(TOUCH_CONTROLS_FLOOR).not.toContain("clamp(");
+    // The two terms that WERE functions of the stage height now read through
+    // the variables above. The one `100%` left in this length is the band lift
+    // (`100% − svh`), which is the opposite thing: it exists to hold the band
+    // still against the small viewport when the chrome slides away.
+    expect(TOUCH_CONTROLS_FLOOR).toContain("var(--sim-pad-drive-h");
+    expect(TOUCH_CONTROLS_FLOOR).toContain("var(--sim-arc-rise");
+    expect(TOUCH_CONTROLS_FLOOR).not.toContain("* 0.44");
+    expect(TOUCH_CONTROLS_FLOOR).not.toContain("min(44%");
+  });
+
+  it("the rise term divides rather than multiplying a rounded literal", () => {
+    // 132 × 0.3333 = 43.9956, which is 0.0044 px INSIDE the neighbour it has to
+    // clear — and upright the vertical gap is the whole separation guarantee,
+    // because the run is only 24 px there. A four-decimal literal would make
+    // this file's central invariant false by a rounding artefact, silently, on
+    // the orientation with the least margin. So the CSS divides.
+    const portrait: StageBox = { width: 393, height: 852 };
+    const gaps: number[] = [];
+    for (let i = 1; i < arcStationCount("right"); i += 1) {
+      gaps.push(
+        arcStationRectPx(i - 1, "right", portrait).y -
+          arcStationRectPx(i, "right", portrait).y,
+      );
+    }
+    expect(gaps).toEqual([44, 44, 44]);
+  });
+});
+
+/**
+ * =============================================================================
+ * THE SEPARATION RULE — what lets a flank carry FOUR stations on a 360 px phone.
+ *
+ * Two 44 px boxes cannot overlap if they are 44 px apart in EITHER axis. The old
+ * arc put that guarantee entirely in the RUN, at one box-width per station, and
+ * that is why four a side was „178 + 178 = 356 px against 360" — the 4 px
+ * corridor this file's own history warns about. It is also why the sine had to
+ * go: it decelerated, so the top pair was 17.7 px apart in portrait and the
+ * „44 px in either axis" claim was only ever true of the widest pair.
+ * =============================================================================
+ */
+describe("the separation rule holds on every flank of every device", () => {
+  it("consecutive stations clear 44 px in at least one axis", () => {
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      for (const side of SIDES) {
+        const count = arcStationCount(side);
+        for (let i = 1; i < count; i += 1) {
+          const a = arcStationRectPx(i - 1, side, stage);
+          const b = arcStationRectPx(i, side, stage);
+          const dx = Math.abs(a.x - b.x);
+          const dy = Math.abs(a.y - b.y);
+          if (dx < TOUCH_MIN_PX && dy < TOUCH_MIN_PX) {
+            bad.push(`${id} ${side}#${i - 1}→#${i}: dx ${dx} dy ${dy.toFixed(1)}`);
+          }
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("…and the run follows the rise, which is what buys the corridor back", () => {
+    // Sideways the rise is 20 px, so the run carries the whole guarantee at the
+    // box's own width. Upright the rise is 132 px — 44 px of vertical
+    // separation at four stations — so the run drops to 24 and a four-station
+    // flank is 118 px wide instead of 178.
+    const landscape: StageBox = { width: 852, height: 393 };
+    const portrait: StageBox = { width: 393, height: 852 };
+    expect(arcRunStepPx(landscape)).toBe(44);
+    expect(arcRunStepPx(portrait)).toBe(24);
+    const band = (stage: StageBox, side: "left" | "right") =>
+      2 + arcRunStepPx(stage) * (arcStationCount(side) - 1) + TOUCH_MIN_PX;
+    expect(band(landscape, "right")).toBe(178);
+    expect(band(portrait, "right")).toBe(118);
+    // Both flanks together against the narrowest phone in the ladder: the old
+    // arithmetic would have been 356 of 360 px — a 4 px corridor.
+    expect(band(portrait, "left") + band(portrait, "right")).toBe(212);
   });
 });
 
@@ -287,9 +490,10 @@ describe("the shipped CSS is generated from the same numbers", () => {
     // The failure this closes: a hand-edited CSS string that no longer matches
     // the resolver, so the sweep above stays green while the phone does not.
     // 152 px pad (9.5rem) + the rise + a 44 px station (2.75rem) + the inset +
-    // a 1.25 rem gap.
-    expect(TOUCH_CONTROLS_FLOOR).toContain("min(44%, 9.5rem)");
-    expect(TOUCH_CONTROLS_FLOOR).toContain("clamp(1.25rem, (100% - 22rem) * 0.5, 8.25rem)");
+    // a 1.25 rem gap. The first two terms used to be a percentage and a clamp
+    // against the live stage; they are constants now (defect 1).
+    expect(TOUCH_CONTROLS_FLOOR).toContain("9.5rem");
+    expect(TOUCH_CONTROLS_FLOOR).toContain("var(--sim-arc-rise, 8.25rem)");
     expect(TOUCH_CONTROLS_FLOOR).toContain("2.75rem");
     expect(TOUCH_CONTROLS_FLOOR).toContain("env(safe-area-inset-bottom, 0px)");
     // The gap is 1.25 rem and not 0.5 rem, and that is the whole of the
@@ -298,43 +502,59 @@ describe("the shipped CSS is generated from the same numbers", () => {
     // the box this floor measures against.
     expect(TOUCH_CONTROLS_FLOOR).toContain("1.25rem");
     expect(TOUCH_CONTROLS_FLOOR).not.toContain("0.5rem");
+    // THE FALLBACK IS NOT COSMETIC. Consumers outside TouchControls spell this
+    // length into surfaces that exist whether or not the overlay is mounted; a
+    // bare `var(--sim-arc-rise)` with nothing declared makes the whole `calc()`
+    // invalid and the declaration is dropped — the panel would land on the road.
+    expect(TOUCH_CONTROLS_FLOOR).toMatch(/var\(--sim-arc-rise,\s*[^)]+\)/);
+    expect(TOUCH_CONTROLS_FLOOR).toMatch(/var\(--sim-pad-drive-h,\s*[^)]+\)/);
   });
 
   it("resolves to the numbers measured in WebKit on the founder's phone", () => {
     // iPhone 16 landscape, real insets, sc-zebra-approach@L1.
     //
-    // THE THREE MIRROR GLANCES NOW OCCUPY THE THREE STATIONS THE RIGHT FLANK
-    // HAS, and they land on the same three x's the old four-station arc put its
-    // top three on — the run step is the box's own width either way, so the
-    // curve did not move, it lost its innermost station. What changed is WHAT
-    // is standing on them: «Клаксон», «Мигач надясно» and ⚙ went to the top
-    // rail, where no thumb rests.
+    // THE RIGHT FLANK GAINED A FOURTH STATION AT ITS FOOT — the ⚙ dock, which
+    // becomes «КОЛАН» while the belt is unfastened. It takes the box the right
+    // mirror used to stand on, 25.5 mm from the resting throttle thumb, and the
+    // three mirrors step up one each. That single move is the largest measured
+    // win in the wave: the belt was 70.4 mm away here and 101.6 mm upright, in
+    // a rail no thumb reaches, under a panel that buried it on 6 of 6.
     const stage = LADDER[1].stage;
-    const rightMirror = arcStationRectPx(0, "right", stage); // Д
+    const dock = arcStationRectPx(0, "right", stage); // ⚙ / КОЛАН
+    expect(dock.x).toBe(615);
+    expect(dock.y).toBe(176);
+    const rightMirror = arcStationRectPx(1, "right", stage); // Д
     expect(rightMirror.x).toBe(659);
-    expect(rightMirror.y).toBe(176);
-    const rearMirror = arcStationRectPx(1, "right", stage); // З
+    expect(rightMirror.y).toBeCloseTo(169.3, 1);
+    const rearMirror = arcStationRectPx(2, "right", stage); // З
     expect(rearMirror.x).toBe(703);
-    expect(rearMirror.y).toBeCloseTo(161.5, 1);
-    const leftMirror = arcStationRectPx(2, "right", stage); // Л
+    expect(rearMirror.y).toBeCloseTo(162.7, 1);
+    const leftMirror = arcStationRectPx(3, "right", stage); // Л
     expect(leftMirror.x).toBe(747);
-    expect(leftMirror.y).toBeCloseTo(155.5, 1);
+    expect(leftMirror.y).toBe(156);
 
     // …and the two indicators are on the STEERING flank, which is the founder's
-    // ruling: signalling right used to cost the accelerator thumb.
+    // ruling: signalling right used to cost the accelerator thumb. The horn
+    // joined them at the top station — it is pressed while the car is MOVING,
+    // and in the rail it was 54.9 mm sideways and 109.6 mm upright.
     const left = arcStationRectPx(0, "left", stage); // ⇦
-    expect(left.x).toBe(105);
+    expect(left.x).toBe(149);
     expect(left.y).toBe(192);
     const right = arcStationRectPx(1, "left", stage); // ⇨
-    expect(right.x).toBe(61);
-    expect(right.y).toBeCloseTo(171.5, 1);
+    expect(right.x).toBe(105);
+    expect(right.y).toBe(182);
+    const horn = arcStationRectPx(2, "left", stage); // ⊙
+    expect(horn.x).toBe(61);
+    expect(horn.y).toBe(172);
   });
 
-  it("the flanks carry the five side-of-the-car controls and nothing else", () => {
+  it("the flanks carry the seven controls a moving car needs and nothing else", () => {
     // Stated as a number so „just add one more station" cannot land quietly:
-    // the band this file sweeps is what it is because five controls are on it.
-    expect(ARC_STATIONS_LEFT).toBe(2);
-    expect(ARC_STATIONS_RIGHT).toBe(3);
+    // the band this file sweeps is what it is because seven controls are on it.
+    // LEFT  ⇦ ⇨ and the horn — the steering thumb's.
+    // RIGHT the ⚙ dock (= the belt while it is off) and the three mirrors.
+    expect(ARC_STATIONS_LEFT).toBe(3);
+    expect(ARC_STATIONS_RIGHT).toBe(4);
   });
 });
 

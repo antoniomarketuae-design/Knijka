@@ -77,7 +77,18 @@ export function hintInputFor(touchCapable: boolean): HintInput {
  * «ЗАЩО», which is never truncated — see `reverseStuckHint`), but it is still
  * a sentence a student reads mid-drive.
  */
-export const TOUCH_SHEET_LOCATOR_BG = "Тези бутони са зад „Кола“ горе на екрана.";
+/**
+ * ⚠ „ГОРЕ НА ЕКРАНА" WAS TRUE UNTIL 2026-08-13 AND IS NOW WRONG.
+ *
+ * «Кола» left the top rail in the control redesign: it was 110.7 mm from either
+ * thumb sideways and 101.7 mm upright, in a corner no thumb reaches without
+ * regripping the phone. It is the lowest station on the right-hand arc now —
+ * directly above the throttle thumb, under the three mirrors — so a sentence
+ * that sends a student to the top of the screen sends them to the wrong end of
+ * it. This is the same class of defect as the drivetrain pad's reverse promise:
+ * a sentence that was true when it was written.
+ */
+export const TOUCH_SHEET_LOCATOR_BG = "Тези бутони са зад „Кола“ вдясно, над газта.";
 
 /** Append the locator to a touch sentence that names a ⚙-strip cell. */
 export function withSheetLocatorBg(input: HintInput, sentence: string): string {
@@ -166,7 +177,7 @@ export function gearDownActBg(input: HintInput): string {
  */
 export const STALL_RESTART_LABEL_BG: Record<HintInput, string> = {
   keyboard: "Двигателят угасна — рестартирай (Z + I)",
-  touch: "Двигателят угасна — рестартирай с „ДВИГ“ в „Кола“ горе; при ръчна кутия задръж и „СЪЕД“",
+  touch: "Двигателят угасна — рестартирай с „ДВИГ“ в „Кола“ вдясно; при ръчна кутия задръж и „СЪЕД“",
 };
 
 /**

@@ -6,6 +6,7 @@ import {
   PAD_CORRIDOR_RIGHT_CSS,
   STEER_PAD_DECK_CLEARANCE_CSS,
   TOP_RAIL_ROW_CSS,
+  TOUCH_BAND_CSS_VARS,
   TOUCH_CONTROLS_FLOOR,
 } from "../TouchControls";
 import { ROOMY_HUD_FLOOR_PX, ROOMY_MINIMAP_LANE_PX } from "./immersive";
@@ -77,6 +78,23 @@ export function PlayAreaStyles() {
         max-width: none;
         padding: 0.5rem;
       }
+
+      /* ══ THE THUMB BAND'S FOUR LENGTHS — doc 91 §N1, 2026-08-13 ═══════════
+         Authored HERE and not as an inline style on TouchControls because
+         three of the four need an AT-RULE and a React style prop cannot carry
+         one: @supports is the older-engine fallback for svh, @media
+         (orientation) is the arc's landscape/portrait split, and @media
+         (max-height) is the one short-stage collapse. The values and the
+         reasoning are in TouchControls (TOUCH_BAND_CSS_VARS); this file only
+         mounts them, so there is still one definition.
+
+         --sim-svh DELIBERATELY HAS NO DECLARATION OUTSIDE @supports. Every
+         consumer writes var(--sim-svh, 100vh), so an engine without
+         small-viewport units falls back to 100vh — on iOS the LARGE viewport,
+         which is stable too, and on this shell's stage always at least the
+         stage, so the band lift resolves to 0 and the layout is exactly what
+         shipped before this wave. It degrades to the status quo. */
+${TOUCH_BAND_CSS_VARS}
 
       /* ------------------------------------------------------------------
          COMPACT (phone-shaped viewport, 2026-07-28 second pass).

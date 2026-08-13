@@ -603,7 +603,11 @@ describe("the four call sites bind the pointer path", () => {
     // the horn, and a sheet that closes mid-shift must not latch the clutch.
     expect(hook).toContain("useEffect(() => end");
     // Both hold controls go through it — neither may grow its own handlers.
-    for (const marker of ["function RailHoldButton(", "function SheetHoldCell("]) {
+    // `RailHoldButton` → `GlyphHoldButton` on 2026-08-13: the horn left the top
+    // rail for the top station of the steering flank, because it is pressed
+    // WHILE THE CAR IS MOVING and in the rail it was 109.6 mm from either thumb
+    // in portrait. Same hook, same four release paths, new register.
+    for (const marker of ["function GlyphHoldButton(", "function SheetHoldCell("]) {
       const body = slice(source, marker, undefined).slice(0, 900);
       expect(body, `${marker} must use the shared hook`).toContain("useHoldButton(");
     }
@@ -662,7 +666,12 @@ describe("the second-finger census of the compact driving surface", () => {
     // 6 → 7 on 2026-08-12: doc 91 §I11 gave the open sheet an «⤢» expand, and
     // this census is exactly the guard that says a NEW control on this surface
     // must arrive with a pointer path rather than an `onClick`. It did.
-    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 7, desktopOnly: 0 },
+    // 7 → 6 on 2026-08-13: «⤢» is gone. It existed to grow an 88 px strip into
+    // a taller strip, and the strip is a whole page now — the read mode stops
+    // the car, so there is no thumb band left for the panel to clear and no
+    // height cap for a control to escape. A ratchet that only ever counts UP
+    // would make deleting a control harder than adding one, which is backwards.
+    { rel: "modules/sim/hud/SimOverlay.tsx", pointer: 6, desktopOnly: 0 },
     { rel: "components/sim/lesson-ui/TraceTimeline.tsx", pointer: 5, desktopOnly: 2 },
   ];
   it("LessonScene · the demonstration's own open/close toggle", () => {

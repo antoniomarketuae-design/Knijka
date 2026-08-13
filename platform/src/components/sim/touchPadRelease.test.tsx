@@ -242,13 +242,26 @@ describe("§4 THE SEAM — every card raises the same one boolean", () => {
     expect(SCENE).toContain("physicsPaused={paused || menuPaused}");
   });
 
-  it("the shell's `paused` still covers all four card kinds", () => {
-    // End screen · micro-quiz · teach moment · mistake consequence. If a fifth
+  it("the shell's `paused` still covers all four card kinds — and now the read mode", () => {
+    // End screen · micro-quiz · teach moment · mistake consequence. If a sixth
     // is added it belongs in THIS expression; if one is moved out of it, that
     // card stops releasing the pads and the founder's session breaks again.
-    expect(SHELL).toContain(
-      "paused={ ended || activeQuiz !== null || teachQueue.length > 0 || consequence !== null }",
-    );
+    //
+    // A FIFTH ARRIVED ON 2026-08-13 and it is `overlaySheetOpen` — the read
+    // mode. Asserted term-by-term rather than as one formatted line, because
+    // the expression is now multi-line and an exact-string match on a
+    // prettier-owned layout is a test about whitespace. What this row defends
+    // is WHICH FACTS raise the flag.
+    for (const term of [
+      "ended",
+      "activeQuiz !== null",
+      "teachQueue.length > 0",
+      "consequence !== null",
+      "overlaySheetOpen",
+    ]) {
+      const paused = SHELL.slice(SHELL.indexOf("paused={"), SHELL.indexOf("driveLocked={"));
+      expect(paused, `\`paused\` must still cover ${term}`).toContain(term);
+    }
   });
 
   it("the overlay is mounted under a flag that never changes — the defect's premise", () => {

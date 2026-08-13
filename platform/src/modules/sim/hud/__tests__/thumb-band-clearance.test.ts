@@ -112,22 +112,31 @@ describe("I10 · the minimap column clears the thumb band", () => {
     // The worst case in the ladder, stated as a number so a future change to
     // the pad, the arc's clamp or the gesture-bar inset moves this test and not
     // just the pixels: Samsung, sideways, 34.6 % of the Bulgarian market.
+    // ⚠ 85 → 84 and 109 → 108 on 2026-08-13, and the 1 px is the whole of
+    // defect 1. The drive pad was `min(44 % of the stage, 152px)`, and on a
+    // 344 px landscape stage 44 % is 151.36 — so the pad was 0.64 px SHORT of
+    // its cap, i.e. still on the sloping part of the expression, i.e. still
+    // changing size as Safari's URL bar moved. It is a flat 152 px now, which
+    // is what the cap already produced everywhere else, and the corridor loses
+    // the 0.64 px the shrinking used to give it back.
     const galaxy = LADDER.find((s) => s.id === "galaxy-gesturebar-landscape")!;
-    expect(Math.round(corridor(galaxy))).toBe(85);
+    expect(Math.round(corridor(galaxy))).toBe(84);
     // …and the whole ladder, so a change to the pad, the gap or the inset has
     // to come past a number rather than past a screenshot.
     expect(LADDER.map((s) => `${s.id}=${Math.round(corridor(s))}`)).toEqual([
       "iphone16-portrait=454",
       "iphone16-landscape=120",
       "small-portrait=416",
-      "small-landscape=109",
+      "small-landscape=108",
       "galaxy-gesturebar-portrait=392",
-      "galaxy-gesturebar-landscape=85",
+      "galaxy-gesturebar-landscape=84",
     ]);
     // The arc is at its floor on every landscape stage and at its ceiling on
     // every portrait one — the reason the two orientations differ this much.
-    expect(arcRisePx(galaxy.height)).toBe(20);
-    expect(arcRisePx(836)).toBe(132);
+    // As of 2026-08-13 those are the only two values it has: the clamp against
+    // the live stage height was defect 1 (§N1), and it is an orientation now.
+    expect(arcRisePx(galaxy)).toBe(20);
+    expect(arcRisePx({ width: 393, height: 836 })).toBe(132);
   });
 });
 

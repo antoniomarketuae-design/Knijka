@@ -571,13 +571,35 @@ export function SimOverlay({
             // A6, the rich-card half: the ✕ as a third chip, the same 44 px in
             // both axes as its two neighbours. A blocking item never gets one —
             // it has an acknowledgement, and that is what clears it.
+            //
+            // ── IT PAINTED 0 % OF ITS OWN BOX, AND 0 % IS NOT QUIET, IT IS
+            //    ABSENT — 2026-08-13, the control census.
+            //
+            // Every graded control on this screen is a GHOST: ~22 % ink of its
+            // own box at 0.82 effective opacity, which is the register that lets
+            // a control be findable without costing the road. This one measured
+            // 0.0 % in both orientations, sitting next to «Защо» at 81.8 % — a
+            // 44 px target a student has no way to see. The census's rule for it
+            // is „give it ink or delete it": it is not graded, so it is allowed
+            // to be quiet, but it is not allowed to be invisible.
+            //
+            // 12 % of the card's own tone, which is the ack chip's 18 % one step
+            // down — the same colour, one register quieter, so the pair still
+            // reads as „the loud one clears the line, the quiet one hides it".
+            // `data-hud-ink` is what exempts it from the UNPANEL sweep, exactly
+            // as the acknowledgement beside it does; without it the sweep's
+            // `background-color: transparent !important` would put the 0 % back.
             <button
               type="button"
               data-hud-close=""
+              data-hud-ink=""
               {...tapDismissChip}
               aria-label="Скрий известието"
               className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-full border text-muted"
-              style={{ borderColor: `color-mix(in srgb, ${color} 35%, transparent)` }}
+              style={{
+                backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+                borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
+              }}
             >
               <DismissGlyph />
             </button>
