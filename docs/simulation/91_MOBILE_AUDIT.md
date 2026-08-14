@@ -2222,3 +2222,133 @@ Git said `e21ffb5` and `.next` was newer than the commit, so **every hash-and-mt
 build that could not run a lesson**. A deploy check that reads git and file times but never loads a
 page cannot see this. Re-running `deploy.sh` fixed it (BUILD_ID present, `buildStage:
 "static-generation"`), and the whole of §S was measured after that.
+
+---
+
+## T. WAVE 13 · HIS OWN CHECKLIST, MEASURED — the sentence quoted back, and the guard that was blind
+
+Verification wave. **No product code changed.** The founder asked for pictures and numbers against
+the seven things he listed, then a deploy. What follows is what the deployed build actually does,
+including the two places where the honest answer is "not fixed" and the one place where a guard
+that has been reporting green was structurally unable to see a defect.
+
+Instrument: `tools/mobile/wave13-verdict.mjs` (new), plus re-runs of `wave12-flanks.mjs` and
+`wave12-cluster.mjs`. WebKit, six profiles, real safe-area insets substituted, motion `allow`,
+against staging at `9ddbbc0`.
+
+### T1 · Why this instrument quotes a STRING instead of reporting a COUNT
+
+Six waves reported "0 clipped" while the headline was being cut through the waist of its own
+letters. A count can be wrong in the reassuring direction and nobody can tell. So the census reads
+the card **character by character** with a `Range`, against the intersection of every clipping
+ancestor's padding box and the viewport, and prints three separate strings: what the DOM holds,
+what survives clipping, and what is below the fold. He can read those and compare them to his
+screen.
+
+**The distinction that had to be built in.** A line cut by a HARD CAP with no way to reach the rest
+is the defect he photographed. A line fading at the bottom of a **scrollable** window, under a fade
+mask, with a 44 px «ПРОЧЕТИ» beside it, is the affordance that says *this continues*. Scoring both
+as "sliced" would have condemned the fix that replaced the defect. The census therefore asks the
+clipping ancestor whether it scrolls, and reports the two separately.
+
+### T2 · The instruction — what actually renders, per phone
+
+Zero guillotined characters, zero ellipsis firing, zero duplicate copies, on all six. The read
+sheet censuses clean on all six. **But "the whole first instruction fits on the card" is true on
+exactly one of six profiles**, and that is the number worth carrying:
+
+| profile | chars shown on the card | ends on | below the fold |
+|---|---|---|---|
+| iPhone 16 landscape 852x393 | **219 of 219 — the whole sentence** | «…решава дали да стъпи.» | 333 (steps 2–5) |
+| small landscape 780x360 | 212 | «…решава дали да» | 340 |
+| iPhone 16 portrait 393x852 | 197 | «…по който пешеходецът» | 355 |
+| small / galaxy portrait 360x780 | 176 | «…и знакът,» | 376 |
+| galaxy landscape 780x360 +24 | 168 | «…към тротоара, и» | 384 |
+
+So on five of six the sentence is interrupted mid-clause. It is interrupted **honestly** — no
+ellipsis pretending the text ended, a fade that reads as continuation, the rest reachable by
+scrolling the card or by one 44 px tap on «ПРОЧЕТИ», and the sheet then renders every authored
+character with 0 clipped / 0 truncated. That is the option he allowed ("or offer an honest way to
+read the rest"). It is not the same claim as "the instruction is readable", and it should not be
+reported as one.
+
+### T3 · The flanks, the cluster, the edge trade
+
+* **Flanks.** `insetSpread` 0 on both flanks on all six; pitch 44; min hit 44 px; **0 stations
+  covered** by anything (centre + four corners). Ink over the driving view 24.4 / 28.4 / 29.3 /
+  31.2 / 29.3 / 31.2 %, alpha-weighted 7.7–10.0 %. Against the pre-fix build's 10.6–13.5 % ink —
+  most of the rise is the un-truncated briefing, not the rails; the confound stays visible.
+* **Cluster.** All six driven into the band he asked for (census 45–49 km/h; the frame is captured a
+  beat later, with the throttle still held, at 47–57). The digital readout is crisp at rest and at
+  speed in both orientations. **Zero DOM text printed over the dial on any profile** — his
+  «ДЯСН120» smear is gone, both because the flanks became bands and because the numerals were
+  removed in wave 12. **Portrait still crops the dial's left arc against the screen edge** — the
+  hFOV collapse §S names, deliberately undecided, same lever as the edge trade.
+* **Edge trade.** Unchanged and undecided, as instructed. Landscape: 59 px left + 59 px right =
+  **118 of 852 px = 13.8 % of the picture** under the Dynamic Island and the rounded corners.
+  Portrait pays 0. Frame: `wave13-verdict/w13edge-iphone16-landscape-5-edge-trade.png` (the red
+  hatching is an instrument overlay, injected for one capture and removed; the census is re-run
+  afterwards to prove the page went back).
+
+### T4 · THE GUARD WAS BLIND — stations that leave the glass are still counted as present
+
+The height guard has been reporting "geometry unchanged · inset d0 · spread d0 · pitch d0 · count
+d0" since wave 12. It compares insets, pitches and a **count of `[data-arc]` nodes**. A station
+pushed above `y = 0` is still in the DOM and still counted — so the guard returned all-zero deltas
+on a stage where two graded mirror controls had left the screen.
+
+Measured, on the deployed build, with the box compared to the stage instead of the DOM:
+
+| profile | stations off the glass at −44 px | at −90 px |
+|---|---|---|
+| iPhone 16 landscape | 0 | **2** — «З Задн» (top −2), «Л Ляво» (top −46) |
+| small landscape 780x360 | **1** — «Л Ляво» (−12) | **2** — «З Задн» (−14), «Л Ляво» (−58) |
+| galaxy landscape 780x360 +24 | **1** — «Л Ляво» (−36) | **3** — «⊙ Клакс» (−22), «З Задн» (−38), «Л Ляво» (−82) |
+| all three portrait profiles | 0 | 0 |
+
+Landscape only, always the **top** of the band, always the mirror-glance controls — which are
+graded. −44 px and −90 px are what a browser toolbar takes off the stage, i.e. the state a student
+is in before they have scrolled anything. This is not a regression from wave 12; it is the exact
+risk wave 12's own hand-off named ("the Galaxy sideways has 8 px of headroom at rest… no two-station
+fallback is built") now measured instead of predicted. It is **not fixed here**: four 44 px stations
+at a 44 px pitch need 176 px of band above a 152 px drive pad, and a 270 px stage does not have it.
+Which controls survive a short stage is a decision about what a student can reach, not geometry to
+pick on the way past.
+
+`wave13-verdict.mjs` now carries `fullyOnStage` / `clippedBy` per station and prints the off-stage
+list in the guard, so this cannot go back to reading green.
+
+### T5 · The black driving view after a resize — reproduced, mechanism found, NOT attributed
+
+Every frame this harness captures **after** `setViewportSize` shows a black 3-D view — in wave 13
+and, unremarked, in wave 12's published `*-3-short-stage.png` frames. It does not recover, even
+after the viewport is restored.
+
+What is established: the **WebGL context is not lost** (`isContextLost() === false` at rest, after
+−90, while driving, and after restore); the **drawing buffer tracks the resize correctly**
+(852x393 → 852x303 → 852x393); the document is `visible`; the HUD renders normally throughout. And
+`LessonScene.tsx:1219` runs `frameloop={physicsPaused ? "demand" : "always"}` — with a blocking card
+up the physics is paused, so R3F renders **on demand only**, and a surface reallocation with no new
+frame requested composites black.
+
+That is a complete explanation of the harness result and it is **not** a claim about the product.
+Playwright's `setViewportSize` reallocates the window; iOS Safari's URL-bar slide changes the visual
+viewport and may not. Whether a real phone can land in this state is a real-device question and this
+harness cannot answer it. Flagged, not fixed, not dismissed.
+
+### T6 · The regression guards he named
+
+`spread 0 at ±44 and ±90` OK (both deltas 0, both flanks, all six) · `nothing under 44 px` OK
+(min hit 44 px everywhere, before and after the resizes) · `0 stations covered` OK (24 checks per
+profile) · `the absolute pad reads exactly 0 at dead centre` OK (`aria-valuenow 0`, speed 0 km/h, all
+six) · `«Високо» renders dpr 3` OK (drawing buffer 2556x1179 over 852x393 css, and the equivalent on
+every profile — read off the buffer, not off the store).
+
+### T7 · The staging false alarm, recorded because it looks exactly like §S6
+
+The first read of the VPS this wave showed `NO BUILD_ID`, `buildStage: "type-checking"`, 106 chunks
+and pm2 restart count 103 — the §S6 signature. It was **not** §S6. The 2-minute autodeploy timer had
+started a build at 23:28:17 UTC and it completed at 23:30:40 with `BUILD_ID` present; the read landed
+inside that window. A deploy check that samples during a build sees a half-built app that is about to
+be fine. Worth knowing before the next wave reports it as an incident — and worth noting that it
+makes §S6 harder to distinguish, not easier.
