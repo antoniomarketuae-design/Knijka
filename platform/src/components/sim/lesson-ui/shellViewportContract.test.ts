@@ -51,11 +51,11 @@ const OVERLAY = strip(
  */
 describe("§I7 the published viewport height is measured whenever the shell owns the screen", () => {
   it("the hook is armed by `immersive || isFullscreen`", () => {
-    expect(SHELL).toMatch(/useVisualViewportHeight\(\s*immersive\s*\|\|\s*isFullscreen\s*\)/);
+    expect(SHELL).toMatch(/useVisualViewportBox\(\s*immersive\s*\|\|\s*isFullscreen\s*\)/);
   });
 
   it("and NEVER again by `immersive && !isFullscreen` — that conjunction IS the bug", () => {
-    expect(SHELL).not.toMatch(/useVisualViewportHeight\([^)]*&&\s*!isFullscreen/);
+    expect(SHELL).not.toMatch(/useVisualViewportBox\([^)]*&&\s*!isFullscreen/);
   });
 
   it("the INLINE HEIGHT is still the thing that stands down in fullscreen", () => {
@@ -70,6 +70,57 @@ describe("§I7 the published viewport height is measured whenever the shell owns
 
   it("`--sim-vh` is published unconditionally, which is only safe now", () => {
     expect(SHELL).toMatch(/\["--sim-vh" as string\]:\s*viewportH !== null/);
+  });
+});
+
+/**
+ * ── 2026-08-14 · THE OTHER THREE AXES ───────────────────────────────────────
+ *
+ * The founder photographed the simulator on his iPhone 16 Pro with the HUD cut
+ * on BOTH edges at once — «ЕНЮ» sliced left and «Л ЛЯВО» sliced right in one
+ * frame. Height had followed `visualViewport` since §I7; width, left and top
+ * still came from the class list (`fixed left-0 top-0 w-full`), i.e. the LAYOUT
+ * viewport. Under site zoom that box is wider than the window, so both ends
+ * hang off the screen.
+ *
+ * MEASURED, same rig, both builds — Chromium, 402×874 (his actual phone, which
+ * the device ladder never had), page scale 1.15, authenticated /simulator:
+ *   pre-fix   shell 402 px wide inside a 350 px window → 7 HUD nodes off-screen
+ *             («Колан», «Дясн», «Задн», «Ляво» — the whole right rail — plus
+ *             the instruction body and «Разбрах»), cut by 33–40 px
+ *   post-fix  shell 349 px → 0 off-screen
+ *
+ * Note the fix is NOT pinch suppression: §I6 already stops a pinch on the
+ * driving canvas, and the rig's positive control proved it does. Safari stores
+ * zoom PER SITE, so the zoom arrives from the lesson list, the dashboard or a
+ * theory screen — where pinch is deliberately allowed for minors reading legal
+ * text — and no gesture handler on the sim can undo it. The shell has to follow
+ * the window instead. There is also no API to reset browser zoom, and Safari
+ * has ignored `user-scalable` / `maximum-scale` since iOS 10.
+ */
+describe("the shell follows the VISIBLE window on every axis, not just height", () => {
+  it("left, top and width are driven by the measured box", () => {
+    expect(SHELL).toMatch(/left:\s*`\$\{viewportBox\.left\}px`/);
+    expect(SHELL).toMatch(/top:\s*`\$\{viewportBox\.top\}px`/);
+    expect(SHELL).toMatch(/width:\s*`\$\{viewportBox\.w\}px`/);
+  });
+
+  it("they stand down together with the height, inside the same non-fullscreen arm", () => {
+    // Same argument as the height pin above: in fullscreen the UA sizes the
+    // element, and pinning it to the visual viewport there would fight it.
+    expect(SHELL).toMatch(/viewportBox !== null\s*\n?\s*\?\s*\{\s*\n?\s*left:/);
+  });
+
+  it("the box tracks PANNING, not only zooming", () => {
+    // offsetLeft/offsetTop change on `scroll`, not `resize`. Losing this
+    // listener leaves the shell correct in size and in the wrong place — which
+    // still puts the left rail off the screen.
+    expect(SHELL).toMatch(/vv\?\.addEventListener\("scroll", read\)/);
+  });
+
+  it("the compact decision reads the visible width, not the layout width", () => {
+    expect(SHELL).toMatch(/vv\?\.width \?\? window\.innerWidth/);
+    expect(SHELL).not.toMatch(/isCompactViewport\(\s*\n?\s*window\.innerWidth/);
   });
 });
 

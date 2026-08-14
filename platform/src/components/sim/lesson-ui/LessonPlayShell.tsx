@@ -769,18 +769,29 @@ function readStoredAdvisorOn(lesson: LessonSpec): boolean {
 function useCompactHud(): boolean {
   const [compact, setCompact] = useState(false);
   useEffect(() => {
-    const read = () =>
+    const read = () => {
+      // The VISIBLE box, not the layout one — same reason as the shell's own
+      // geometry (see `useVisualViewportBox`). A zoomed phone reports an
+      // `innerWidth` the student cannot see all of, and deciding "is this a
+      // phone-shaped screen" from it answers a question nobody asked.
+      // `coarsePointer` still gates the whole thing, so a desktop user zooming
+      // a page in cannot fall into the thumb layout.
+      const vv = window.visualViewport;
       setCompact(
         isCompactViewport(
-          window.innerWidth,
-          window.innerHeight,
+          vv?.width ?? window.innerWidth,
+          vv?.height ?? window.innerHeight,
           window.matchMedia?.("(pointer: coarse)").matches === true,
         ),
       );
+    };
     read();
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", read);
     window.addEventListener("resize", read);
     window.addEventListener("orientationchange", read);
     return () => {
+      vv?.removeEventListener("resize", read);
       window.removeEventListener("resize", read);
       window.removeEventListener("orientationchange", read);
     };
@@ -825,19 +836,74 @@ function useStandaloneDisplay(): boolean {
  * publishes it as `--sim-vh` and uses it for its own height, so nothing it
  * lays out can ever be under browser chrome. `null` until measured (and on
  * engines without the API) → the CSS `100dvh` fallback stands.
+ *
+ * ── 2026-08-14: THE OTHER THREE AXES, AND WHY HEIGHT ALONE WAS NOT ENOUGH ───
+ *
+ * The founder photographed the simulator on his own iPhone 16 Pro with the
+ * interface CUT ON BOTH EDGES AT ONCE — «ЕНЮ» sliced on the left and «Л ЛЯВО»
+ * sliced on the right in the same frame, and «Завърти телефона хоризонтално»
+ * broken into «авърт / елефон / изонта». Content clipped on BOTH sides is
+ * never overflow; it is a box wider than the window, centred in it.
+ *
+ * This hook read `height` and nothing else. So the shell was:
+ *      height ← visualViewport      (correct, and it is why nothing was ever
+ *                                    cut at the TOP or BOTTOM)
+ *      width  ← `w-full`            }  the LAYOUT viewport, which under zoom
+ *      left   ← `left-0`            }  is the box the student CANNOT fully see
+ *
+ * Under a pinch the visible window is [offsetLeft, offsetLeft + width] while
+ * the shell still spans [0, layoutWidth]. Both ends hang off the screen. §I6
+ * already suppresses new pinches on the canvas and was right to, but Safari
+ * stores zoom PER SITE: one accidental pinch anywhere in the product — the
+ * lesson list, the dashboard, a theory screen where pinch is deliberately
+ * allowed for minors reading legal text — and every later simulator session
+ * opens already zoomed. That is why his frames looked wrong "from the start"
+ * and why suppression alone could never have fixed them.
+ *
+ * There is no API to reset browser zoom, and Safari has ignored
+ * `user-scalable` / `maximum-scale` since iOS 10 — so the shell cannot undo
+ * it. What it CAN do is follow the window: track all four numbers and the
+ * scale, and the HUD stays on screen at 80 %, at 115 %, under iOS Display
+ * Zoom, under Dynamic Type and mid-pinch. Adapting to the student's chosen
+ * zoom is also the only accessible answer; overriding it would take the
+ * setting away from the person who needs it most.
  */
-function useVisualViewportHeight(active: boolean): number | null {
-  const [px, setPx] = useState<number | null>(null);
+type VisualViewportBox = {
+  /** Visible height in CSS px. */
+  h: number;
+  /** Visible WIDTH in CSS px — under zoom this is < `window.innerWidth`. */
+  w: number;
+  /** Left edge of the visible window within the layout viewport. */
+  left: number;
+  /** Top edge of the visible window within the layout viewport. */
+  top: number;
+  /** 1 when unzoomed. > 1 means the student is looking at part of the page. */
+  scale: number;
+};
+
+function useVisualViewportBox(active: boolean): VisualViewportBox | null {
+  const [box, setBox] = useState<VisualViewportBox | null>(null);
   useEffect(() => {
     if (!active) return;
     const read = () => {
       const vv = window.visualViewport;
-      // Round DOWN: half a pixel of overshoot is a scrollbar or a 1 px sliver
-      // of the page showing under the shell.
-      setPx(Math.floor(vv?.height ?? window.innerHeight));
+      // Round DOWN on the sizes: half a pixel of overshoot is a scrollbar or a
+      // 1 px sliver of the page showing under the shell. Round the OFFSETS to
+      // nearest — they are a position, not an extent, and flooring a pan makes
+      // the shell trail the window by a pixel on every scroll event.
+      setBox({
+        h: Math.floor(vv?.height ?? window.innerHeight),
+        w: Math.floor(vv?.width ?? window.innerWidth),
+        left: Math.round(vv?.offsetLeft ?? 0),
+        top: Math.round(vv?.offsetTop ?? 0),
+        scale: vv?.scale ?? 1,
+      });
     };
     read();
     const vv = window.visualViewport;
+    // `scroll` matters as much as `resize` here: a pinch changes the size, but
+    // PANNING the zoomed page changes only the offsets, and that is the half
+    // that decides whether the left rail is on the screen.
     vv?.addEventListener("resize", read);
     vv?.addEventListener("scroll", read);
     window.addEventListener("resize", read);
@@ -849,7 +915,7 @@ function useVisualViewportHeight(active: boolean): number | null {
       window.removeEventListener("orientationchange", read);
     };
   }, [active]);
-  return px;
+  return box;
 }
 
 function QuizFrequencySelector({
@@ -1525,7 +1591,8 @@ export function LessonPlayShell({
    * after a −44 px viewport change and back, `--sim-vh` read `349px` while
    * `visualViewport.height` was 393 — 44 px of published lie.
    */
-  const viewportH = useVisualViewportHeight(immersive || isFullscreen);
+  const viewportBox = useVisualViewportBox(immersive || isFullscreen);
+  const viewportH = viewportBox?.h ?? null;
 
   // -- The single overlay layer (compact only) ---------------------------------
   // ROOMY LAYOUTS ARE UNTOUCHED. A 1440 px window has room for a banner, a
@@ -2996,7 +3063,25 @@ export function LessonPlayShell({
       }
       style={{
         ...(immersive && !isFullscreen
-          ? { height: viewportH !== null ? `${viewportH}px` : "100dvh" }
+          ? {
+              height: viewportH !== null ? `${viewportH}px` : "100dvh",
+              // THE OTHER THREE AXES — see `useVisualViewportBox`. The class
+              // list says `fixed left-0 top-0 w-full`, i.e. the LAYOUT
+              // viewport; under zoom that is a box wider than the window, so
+              // the shell hung off BOTH edges and the founder's rails were
+              // sliced on the left and the right in the same frame. Inline
+              // styles outrank the utility classes, so these three simply
+              // retarget the same element at the window the student can
+              // actually see — and when the API is absent (`null`) the classes
+              // stand exactly as they shipped.
+              ...(viewportBox !== null
+                ? {
+                    left: `${viewportBox.left}px`,
+                    top: `${viewportBox.top}px`,
+                    width: `${viewportBox.w}px`,
+                  }
+                : null),
+            }
           : null),
         // ── DOC 91 · T1/§I6, SECOND HALF — «IT MOVES LEFT AND RIGHT» ────────
         //
