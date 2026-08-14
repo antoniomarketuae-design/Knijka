@@ -67,6 +67,11 @@ const DEFAULT_CHAIN_MAX_KMH = 50;
 const MIN_PROBE_KMH = 6;
 /** The car must still be inside the runtime's conflict band at the arrival. */
 const CONFLICT_BAND_M = 30;
+/** The taught ease-down of the stop-short probe, m/s² — deliberate, not a slam. */
+const TAUGHT_STOP_DECEL_MPS2 = 2;
+/** How long the stop-short probe is willing to sit and wait, s. Longer than
+ *  any authored walk, so „she never came" is a finding and not a timeout. */
+const TAUGHT_STOP_WAIT_SEC = 30;
 
 // ---------------------------------------------------------------------------
 // Census
@@ -349,9 +354,32 @@ interface DartProbe {
   released: boolean;
   onRoadWhileApproaching: boolean;
   detail: string | null;
+  /**
+   * The walker's own walk position AT THE MOMENT the player reaches the
+   * crossing, m — the pedestrian twin of `PriorityProbe.arcAtArrivalM`, and
+   * the measurement whose ABSENCE let the sc-zebra-approach defect ship.
+   * `onRoadWhileApproaching` only asks whether she was ever on the tarmac
+   * within 45 m of an approaching car; a walker who steps out at 55 m, crosses
+   * the whole carriageway and is standing on the far pavement by the time a
+   * slow car arrives satisfies it perfectly. Inside `[roadFromM, roadToM]`
+   * here is the thing the lesson actually needs. `NaN` = the player never
+   * reached the crossing (the stop-short drives below never do).
+   */
+  sAtArrivalM: number;
+  /** Was she on the carriageway while the player sat at a full standstill? */
+  onRoadWhileStopped: boolean;
+  /** Where the player came to rest, m short of the crossing (`NaN` = rolled). */
+  restedAtM: number;
 }
 
-function probeDart(e: Entry, speedKmh: number): DartProbe {
+/**
+ * `stopShortM`: drive the TAUGHT approach instead of a constant one — ease off
+ * and come to a full stop this many metres before the crossing, then wait.
+ * That is instruction 3 of the zebra briefing verbatim („намали плавно и спри
+ * напълно на няколко метра преди нея"), and it is the drive the founder made
+ * when he photographed a stopped car in front of a bare zebra.
+ */
+function probeDart(e: Entry, speedKmh: number, stopShortM?: number): DartProbe {
   const s = e.spec as PedestrianDartOutSpec;
   const tr = trafficFor(e.districtId);
   const runner = new PedestrianDartOutRunner(s);
@@ -365,26 +393,56 @@ function probeDart(e: Entry, speedKmh: number): DartProbe {
   let px = s.crossing.x - ax * startBackM;
   let py = s.crossing.y - ay * startBackM;
   const headingDeg = bearingDeg(ax, ay);
-  const mps = speedKmh / 3.6;
   const out: SimTickEvent[] = [];
   let t = 0;
-  const probe: DartProbe = { released: false, onRoadWhileApproaching: false, detail: null };
+  let v = speedKmh / 3.6;
+  let waitedSec = 0;
+  const probe: DartProbe = {
+    released: false,
+    onRoadWhileApproaching: false,
+    detail: null,
+    sAtArrivalM: NaN,
+    onRoadWhileStopped: false,
+    restedAtM: NaN,
+  };
 
   for (let i = 0; i < MAX_FRAMES; i++) {
+    // Signed distance still to run to the crossing along the road axis.
+    const ahead = (s.crossing.x - px) * ax + (s.crossing.y - py) * ay;
+    if (stopShortM !== undefined) {
+      // A comfortable, entirely ordinary stop: brake late enough to be a
+      // deliberate ease-down, never a slam.
+      const toRest = ahead - stopShortM;
+      const brakeFromM = (v * v) / (2 * TAUGHT_STOP_DECEL_MPS2);
+      if (toRest <= brakeFromM) v = Math.max(0, v - TAUGHT_STOP_DECEL_MPS2 * DT);
+      if (v <= 0.05) {
+        v = 0;
+        if (Number.isNaN(probe.restedAtM)) probe.restedAtM = ahead;
+        waitedSec += DT;
+      }
+    }
     t += DT;
-    px += ax * mps * DT;
-    py += ay * mps * DT;
-    advanceTraffic(tr, px, py, speedKmh, headingDeg);
-    const outcome = runner.step(tr, input(t, px, py, speedKmh, headingDeg), out);
+    px += ax * v * DT;
+    py += ay * v * DT;
+    const nowKmh = v * 3.6;
+    advanceTraffic(tr, px, py, nowKmh, headingDeg);
+    const outcome = runner.step(tr, input(t, px, py, nowKmh, headingDeg), out);
     if (outcome) probe.detail = outcome.detail;
     const actor = tr.staged(s.id);
     if (actor && actor.s > 0.05) probe.released = true;
     const d = Math.hypot(px - s.crossing.x, py - s.crossing.y);
-    if (actor && actor.s >= s.roadFromM && actor.s <= s.roadToM && d <= 45) {
-      probe.onRoadWhileApproaching = true;
+    const onRoad = !!actor && actor.s >= s.roadFromM && actor.s <= s.roadToM;
+    if (onRoad && d <= 45) probe.onRoadWhileApproaching = true;
+    if (onRoad && v === 0) probe.onRoadWhileStopped = true;
+    // The arrival snapshot: the first frame the crossing is under the axle.
+    const nowAhead = (s.crossing.x - px) * ax + (s.crossing.y - py) * ay;
+    if (Number.isNaN(probe.sAtArrivalM) && nowAhead <= 0) {
+      probe.sAtArrivalM = actor ? actor.s : NaN;
     }
-    // Stop once the player has driven a car length past the crossing.
-    if ((px - s.crossing.x) * ax + (py - s.crossing.y) * ay > 5) break;
+    // Stop once the player has driven a car length past the crossing — or,
+    // on a stop-short drive, once the wait has outlasted the whole walk.
+    if (-nowAhead > 5) break;
+    if (waitedSec > TAUGHT_STOP_WAIT_SEC) break;
   }
   return probe;
 }
@@ -438,6 +496,110 @@ describe("encounter battery · REACHABILITY — the pedestrian always steps out 
           `${v.toFixed(0)} km/h: an ambient figure stepped onto the road — it is a hazard, ` +
             `so drop \`ambient\` and let the reachability battery grade it`,
         ).toBe(false);
+      }
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 2b. ETA SYNC — obeying the briefing must not delete the encounter
+// ---------------------------------------------------------------------------
+
+/**
+ * The hole invariant 1 left open, and the reason it stayed open for so long.
+ *
+ * REACHABILITY above asks whether the walker ever stood on the tarmac while an
+ * approaching car was within 45 m. That is satisfied by a walker who steps off
+ * the kerb at 55 m, crosses the whole carriageway in 12.8 s and is standing on
+ * the far pavement by the time a 14 km/h car arrives — which is exactly the
+ * sc-zebra-approach defect the founder photographed: stopped at 0 км/ч in
+ * front of an empty zebra, praised by the coach card for yielding to nobody.
+ * The priority-car half of the same battery has always measured the right
+ * thing (`arcAtArrivalM` — where the conflict car is WHEN THE PLAYER GETS
+ * THERE); the pedestrian half never did.
+ *
+ * These are the two drives that catch it: the walk position at arrival across
+ * the whole permitted speed band, and the taught ease-down-and-wait.
+ */
+describe("encounter battery · ETA SYNC — she is still crossing when you get there", () => {
+  const synced = of<PedestrianDartOutSpec>("pedestrianDartOut").filter(
+    (e) => (e.spec as PedestrianDartOutSpec).triggerEtaSec !== undefined,
+  );
+
+  it("the catalog really does author ETA-synced walkers (census guard)", () => {
+    expect(synced.length).toBeGreaterThanOrEqual(1);
+  });
+
+  for (const e of synced) {
+    const s = e.spec as PedestrianDartOutSpec;
+    const eta = s.triggerEtaSec as number;
+    // Below this the seconds bind; above it the authored metres still do.
+    const crossoverKmh = (s.triggerDistM / eta) * 3.6;
+    const floorKmh = s.minTriggerSpeedKmh;
+    const speeds = [
+      Math.max(e.chainMaxKmh, floorKmh),
+      Math.max(e.chainMaxKmh / 2, floorKmh),
+      floorKmh,
+    ];
+
+    it(`${e.scenarioId}/${s.id}: ON THE CARRIAGEWAY at arrival at ${speeds.map((v) => v.toFixed(0)).join(" / ")} km/h`, () => {
+      for (const v of speeds) {
+        const r = probeDart(e, v);
+        expect(r.released, `${v.toFixed(0)} km/h: she never left the curb`).toBe(true);
+        expect(
+          Number.isNaN(r.sAtArrivalM),
+          `${v.toFixed(0)} km/h: the probe never reached the crossing`,
+        ).toBe(false);
+        expect(
+          r.sAtArrivalM,
+          `${v.toFixed(0)} km/h: she was ${r.sAtArrivalM.toFixed(2)} m along her walk when the ` +
+            `car reached the paint — the roadway is [${s.roadFromM}, ${s.roadToM}], so the ` +
+            `student arrived at a BARE crossing and the lesson had nothing to teach`,
+        ).toBeGreaterThanOrEqual(s.roadFromM);
+        expect(r.sAtArrivalM).toBeLessThanOrEqual(s.roadToM);
+      }
+    });
+
+    it(`${e.scenarioId}/${s.id}: below ${crossoverKmh.toFixed(1)} km/h the meeting point is SPEED-INVARIANT`, () => {
+      // The whole point of the field: under the crossover the release is a
+      // clock, so she is at `speedMps × triggerEtaSec` when the car arrives no
+      // matter how slowly it came. Tolerance is frame quantisation only (the
+      // battery's rng draw is fixed, so the ±3 m trigger jitter is zero).
+      const want = s.speedMps * eta;
+      for (const v of [floorKmh, (floorKmh + crossoverKmh) / 2, crossoverKmh - 1]) {
+        if (v < floorKmh) continue;
+        const r = probeDart(e, v);
+        expect(
+          Math.abs(r.sAtArrivalM - want),
+          `${v.toFixed(1)} km/h: met her at ${r.sAtArrivalM.toFixed(2)} m, wanted ${want.toFixed(2)} m`,
+        ).toBeLessThanOrEqual(0.5);
+      }
+    });
+
+    it(`${e.scenarioId}/${s.id}: the TAUGHT drive — ease down, stop short, wait — meets her`, () => {
+      // Stops at „няколко метра" and at the furthest halt the spec's own
+      // numbers promise to cover — computed from the AUTHORED floor and
+      // horizon, never from `dartFloorReleaseM`, so that neutering the runner
+      // cannot quietly move this test's goalposts with it. The approach speeds
+      // bracket the floor: one ordinary, one BELOW it (the crawl that used to
+      // suppress her outright).
+      const reach = (floorKmh / 3.6) * eta;
+      for (const stopShortM of [3, 8, Math.max(3, reach - 3)]) {
+        for (const approachKmh of [Math.max(e.chainMaxKmh, floorKmh), floorKmh * 0.8]) {
+          const r = probeDart(e, approachKmh, stopShortM);
+          expect(
+            Number.isNaN(r.restedAtM),
+            `${approachKmh.toFixed(1)} km/h: the probe never came to rest`,
+          ).toBe(false);
+          expect(
+            r.onRoadWhileStopped,
+            `approached at ${approachKmh.toFixed(1)} km/h and stopped ${r.restedAtM.toFixed(1)} m ` +
+              `short of the crossing: she was NEVER on the carriageway while the car stood ` +
+              `there. This is the founder's photograph — a student who obeys „намали плавно и ` +
+              `спри напълно" waits in front of an empty zebra`,
+          ).toBe(true);
+          expect(r.detail, "the encounter was cancelled").not.toBe("notEncountered");
+        }
       }
     });
   }

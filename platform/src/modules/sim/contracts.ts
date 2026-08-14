@@ -714,6 +714,33 @@ export interface PedestrianDartOutSpec extends StagedEventBase {
   /** …approaching it, at or above this speed. */
   minTriggerSpeedKmh: number;
   /**
+   * OPTIONAL TIME-TO-ARRIVAL RELEASE — the fix for a hazard that CAREFUL
+   * DRIVING SUPPRESSED (2026-08-14, sc-zebra-approach / PE-01).
+   *
+   * `triggerDistM` is metres; the walk is a clock. ZEBRA_PED released at 55 m
+   * and needs 12.75 s to clear the 16.25 m carriageway at 1.4 m/s. So a student
+   * who obeyed «вдигни крака от газта и бъди готов да спреш» either never
+   * released her (the `minTriggerSpeedKmh` floor) or released her early enough
+   * that she had finished crossing before he arrived — and the car reached a
+   * BARE zebra while the card congratulated him for yielding. Obeying the
+   * instruction deleted the hazard the instruction was teaching.
+   *
+   * With this authored, the walker is released on the first frame the player's
+   * time-to-arrival drops to it — `d <= speed × triggerEtaSec` — AND he is
+   * still inside `triggerDistM`. The distance becomes an OUTER bound, so
+   * nobody is released earlier than the authored metres and every committed
+   * recording is untouched; the seconds become what actually fires. She is
+   * therefore at the SAME point of her walk when the car arrives, whatever
+   * speed it came in at.
+   *
+   * IT DOES NOT WEAKEN `minTriggerSpeedKmh`: the floor is still ANDed onto the
+   * release, so nothing steps out in front of a car parked at spawn, and the
+   * reversing geometries that rely on the floor do not author this field.
+   *
+   * ABSENT = the pure distance gate, byte for byte.
+   */
+  triggerEtaSec?: number;
+  /**
    * Presentation body variant of the walker (founder R3 #25–28, doc 62 P6):
    * "child" renders the small pedestrian rig (~0.72 scale, bigger head — the
    * CHILD_CYCLIST proportion precedent), "elder" the stooped rig CARRYING THE

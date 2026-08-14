@@ -199,9 +199,39 @@ export const SC_JUNCTION_RHR: ScenarioSpec = {
     },
     {
       id: "sc-jrhr-cross",
-      titleBg: "Премини кръстовището наляво, след като пропуснеш идващия отдясно",
-      // West-arm westbound lane center, past the 40 m junction area (the
-      // right-hand-rule tracker commends on leaving it).
+      titleBg: "Завий наляво и излез от кръстовището на запад",
+      /**
+       * TITLE-TRUTH WAVE, the give-way convention — READ THIS ONE, the other
+       * six rows in this family cite it.
+       *
+       * WHAT IT USED TO CLAIM: «Премини кръстовището наляво, СЛЕД КАТО
+       * ПРОПУСНЕШ идващия отдясно» — a certified yield. The objective cannot
+       * see a yield and never could: `stepReachZone(params, prev, tick)`
+       * (objectives.ts) is handed one SimTick, and a SimTick carries no other
+       * actor's priority and no yield outcome (rules/types.ts). Unlike
+       * `stepPassSignal` it is not even given an ObjectiveContext, so the
+       * staged runner's verdict is out of reach too. The disc ticked off the
+       * barge-through and the patient wait on exactly the same frame. No value
+       * of any readable param can prove it — so the title claims only what is
+       * measured, and the duty keeps its voice elsewhere.
+       *
+       * WHO STILL GRADES THE YIELD: the uncontrolled node's own
+       * right-hand-rule tracker (FAILED_TO_YIELD — the barge mistake demo
+       * below; YIELDED_TO_PRIORITY as the commendation on leaving the box),
+       * plus instruction steps 3–5 and `teach.examinerBg`, which say it in
+       * words. Nothing is lost but the false certificate.
+       *
+       * WHAT THE ZONE REALLY PROVES: west-arm westbound lane center, 50 m out
+       * on tj-rhr-v1's 150 m west arm, past the 40 m junction area. From the
+       * south-stem spawn (4.06, −105) that point is reachable only by
+       * completing the left turn, so «наляво» and «на запад» are both
+       * measured. The LANE is deliberately NOT named: r 9 on the 8.125 m lane
+       * pitch covers the oncoming centre too, and „in your lane" would be the
+       * next false certificate.
+       *
+       * PARAMS UNTOUCHED — `done` is bit-identical, so no drive that passed
+       * yesterday fails today and THEO-4 owes no new card.
+       */
       params: { kind: "reachZone", x: -50, y: 4.06, radiusM: 9 },
     },
   ],
@@ -312,8 +342,21 @@ export const SC_JUNCTION_STOP: ScenarioSpec = {
     },
     {
       id: "sc-jstop-exit",
-      titleBg: "Завий надясно и продължи по пътя с предимство",
-      // East-arm eastbound lane center, past the junction area.
+      titleBg: "Завий надясно и излез от кръстовището на изток",
+      // TITLE-TRUTH WAVE (see sc-jrhr-cross for the full argument). It read
+      // «Завий надясно и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО»: the manoeuvre half
+      // was measured, but «пътя с предимство» is the one phrase in the title a
+      // student can read as „the app confirmed I handled the priority" — and
+      // priority is precisely what a reachZone tick cannot see. The compass
+      // arm CAN be seen, so that is what it now says.
+      //
+      // East-arm eastbound lane center, 55 m out on tj-stop-v1's 150 m east
+      // arm, past the junction area: from the south-stem spawn (4.06, −105)
+      // only the completed right turn reaches it. The Б2 duty is graded next
+      // door — sc-jstop-line's passSignal + STOP_SIGN_NO_FULL_STOP (both
+      // mistake demos) — and the road's rank is taught in the instructions
+      // and `teach`. Params untouched, `done` bit-identical, no THEO-4 card
+      // owed. Lane not named: r 9 > the 8.125 m pitch.
       params: { kind: "reachZone", x: 55, y: -4.06, radiusM: 9 },
     },
   ],
@@ -432,7 +475,15 @@ export const SC_SIGNAL_RESPONSE: ScenarioSpec = {
     },
     {
       id: "sc-sig-pass",
-      titleBg: "Премини светофара, след като изчакаш червен сигнал",
+      // 2026-08-14 — WAS: «Премини светофара, след като изчакаш червен сигнал».
+      // Read literally that is „cross the light after waiting for a RED" — an
+      // instruction to drive through a red, printed in the student's own task
+      // list, contradicting briefing step 4 («потегли чак на чисто зелено») and
+      // the in-world beacon («Премини на зелено»). The ENGINE was never wrong:
+      // `requireRedMet` means „you must have actually handled a red", so a
+      // lucky all-green run cannot complete. Only the sentence was wrong, and a
+      // sentence is what the student obeys.
+      titleBg: "Изчакай червения сигнал и премини на зелено",
       // A10 requireRedMet: a greens-only luck run cannot complete — the
       // student must actually handle a red (stop in zone + green crossing).
       params: {
@@ -603,8 +654,21 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
     },
     {
       id: "sc-ltap-turn",
-      titleBg: "Завърши левия завой на юг, пропуснал насрещните",
-      // South-arm southbound lane center, past the junction area.
+      titleBg: "Завърши левия завой и излез от кръстовището на юг",
+      // TITLE-TRUTH WAVE (see sc-jrhr-cross for the full argument). It read
+      // «Завърши левия завой на юг, ПРОПУСНАЛ НАСРЕЩНИТЕ» — a yield the tick
+      // cannot see: SimTick carries no oncoming actor's priority and no
+      // gap-judgment outcome, so the disc credited the 1.5-second cut and the
+      // 4-second wait identically. The cut is graded where it is actually
+      // measured: the runtime's left-turn tracker fires FAILED_TO_YIELD (the
+      // mistake-cut-gap demo below), and steps 3–5 + `teach.examinerBg` teach
+      // the interval in words.
+      //
+      // South-arm southbound lane center, 50 m down sx-v1's 120 m south arm,
+      // past the junction area. From the east spawn (105, 4.06) heading west,
+      // only the completed left turn reaches it — «левия завой» and «на юг»
+      // are both measured. Params untouched, `done` bit-identical, no THEO-4
+      // card owed.
       params: { kind: "reachZone", x: -4.06, y: -50, radiusM: 9 },
     },
   ],
@@ -775,7 +839,15 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     },
     {
       id: "sc-jscan-exit",
-      titleBg: "Завий надясно и продължи по пътя с предимство",
+      titleBg: "Завий надясно и излез от кръстовището на изток",
+      // TITLE-TRUTH WAVE (see sc-jrhr-cross). Same rewrite as sc-jstop-exit,
+      // same map: it read «…и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО», and a reachZone
+      // tick can prove neither priority nor the ляво-дясно-ляво scan this
+      // drill is about. East-arm eastbound lane center, 55 m out on
+      // tj-stop-v1's 150 m east arm, reachable only through the completed
+      // right turn. The scan stays graded by the config-gated
+      // JUNCTION_SCAN_INCOMPLETE detector (ruleConfig below) and the stop by
+      // sc-jscan-line; params untouched, `done` bit-identical.
       params: { kind: "reachZone", x: 55, y: -4.06, radiusM: 9 },
     },
   ],

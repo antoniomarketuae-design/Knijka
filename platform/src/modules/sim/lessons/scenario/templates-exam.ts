@@ -434,9 +434,44 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
   success: [
     {
       id: "sc-edpr-b2",
-      titleBg: "Спри напълно на знак Б2 и огледай",
-      // Just past the Б2 node n2945503673, on the slip road's only lane.
-      params: { kind: "reachZone", x: -300.35, y: 79.94, radiusM: 12 },
+      // WAS «Спри напълно на знак Б2 и огледай» on a bare radius-12 disc — two
+      // claims, neither measured. The disc carried NO speed cap, so it ticked
+      // for any car that merely arrived: the committed rolling-stop demo rolls
+      // the paint at 11.9 km/h and was certified as having stopped напълно
+      // (s-w4-bot-completion said so in its own words). And it was authored at
+      // route s ≈ 94 — measured 50 m PAST the paint it named, 23 m past node
+      // n2945503673 — so „на знак Б2" pointed into the middle of the slip road.
+      // The GLANCE half is unfixable and is dropped rather than faked: the
+      // rubric note below says the observation channel is not wired to a glance
+      // feed, and a reachZone tick carries no glances at all. The look is
+      // graded where it actually can be — the config-gated JU-23 detector this
+      // template enables (ruleConfig below), which the partial-scan demo proves.
+      titleBg: "Спри напълно на стоп-линията на знак Б2",
+      // The mark now IS the paint: e171919146.0@42.7:stopSign, derived by
+      // runtime/stoplines.ts at (−268.56, 119.61) — the slip road is 1-lane
+      // oneway, so the lane centre IS the polyline and the line sits on it.
+      // maxSpeedKmh 3 makes this a HALT DEMAND (≤ REACH_ZONE_HALT_CAP_KMH 8):
+      // it opens the approach capsule, so stopping SHORT of the line still
+      // counts, and params.ts never widens a halt cap — «спри» reads the same
+      // at L1 as at L5. acceptBeforeMarkM 0 cuts the disc at the paint, so
+      // credit runs from 11 m short of the line (radius 6 + REACH_ZONE_GRACE_M
+      // 5) up to the line and not one centimetre past it.
+      // ACHIEVABLE IN THIS WORLD (measured through the recorder, not guessed):
+      // the shadow rests 4.56 m short of the paint at 0.00 km/h — inside the
+      // radius with 1.4 m to spare and mid-capsule — while the rolling demo
+      // never drops below 11.9 km/h anywhere inside the 11 m window. The spawn
+      // is 42.65 m away, so `everOutside` latches long before the ring: no free
+      // tick at t = 0. THEO-4 needs nothing new here: `overCapNoted` already
+      // latches „на точката и още твърде бързо" and engine.ts turns it into the
+      // card that names the 3 km/h and the speed actually driven.
+      params: {
+        kind: "reachZone",
+        x: -268.56,
+        y: 119.61,
+        radiusM: 6,
+        maxSpeedKmh: 3,
+        acceptBeforeMarkM: 0,
+      },
     },
     {
       id: "sc-edpr-signal",
@@ -446,7 +481,15 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
     },
     {
       id: "sc-edpr-leftturn",
-      titleBg: "Завий наляво по „Златовръх“ след насрещния",
+      // WAS «…след насрещния» — the same certificate sc-edpr-finish below could
+      // not issue, for the same reason: nothing in a tick says whether the
+      // oncoming car was let through. Arrival on Златовръх proves the turn was
+      // completed. чл. 37 keeps its grader — the runtime's left-turn tracker
+      // and FAILED_TO_YIELD (the recording header notes a MEASURED conviction
+      // at a 3.1 s gap, which is why the shadow waits the car out). The disc is
+      // radius 10 on an 8.125 m lane pitch, so it may not claim a lane either.
+      // Params untouched ⇒ `done` is bit-identical; THEO-4 owes no card.
+      titleBg: "Завий наляво по „Златовръх“ и продължи по нея",
       // Златовръх's single lane, ~35 m past the n4547529959 mouth — clear of
       // the turn arc (where the line legitimately rides wide of lane center)
       // and still short of the next node.
@@ -454,7 +497,18 @@ export const SC_ED_D2_PRIORITY_RUN: ScenarioSpec = {
     },
     {
       id: "sc-edpr-finish",
-      titleBg: "Пропусни колата отдясно и довърши сегмента",
+      // WAS «Пропусни колата отдясно и довърши сегмента» — a certificate this
+      // gate cannot issue. A SimTick carries no other actor's priority and no
+      // yield outcome, and stepReachZone is handed (params, prev, tick) with no
+      // ObjectiveContext, so „пропусна ли я" is unanswerable here at any value
+      // of any param. Arrival proves the junction was CLEARED, and that is what
+      // the title now says. The duty keeps its voice: FAILED_TO_YIELD in
+      // mistakes[] below, convicted by the runtime's right-hand-rule tracker —
+      // whose 18 m core is exactly why SC_ED_D2_PRIORITY_RIGHT pins the
+      // shadow's yield pose at lineDistM 20, OUTSIDE it. Params untouched: this
+      // objective's `done` is bit-identical to before, so nothing can newly
+      // fail and THEO-4 owes no card.
+      titleBg: "Премини равнозначното кръстовище и довърши сегмента",
       // Златовръх ~25 m past n248572866 — far enough to prove the equal
       // junction was actually cleared, and short of the segment's end node
       // (whose own service stub would capture a gate placed right on it).

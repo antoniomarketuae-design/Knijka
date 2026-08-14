@@ -1009,12 +1009,33 @@ export const SC_SIGNAL_REDYELLOW: ScenarioSpec = {
       // The mark is 6.275 m short of sx-e-s; the L1 ladder widened radius 8 →
       // 12, so the objective ticked itself off 5.72 m PAST the paint — the
       // lesson named the line and then graded the far side of it.
+      //
+      // THE OTHER HALF OF THE SAME SENTENCE, and the older lie: the cut fixed
+      // WHERE, and the cap still said 40 km/h. A gate titled „спри" that
+      // completes at 40 is not a stop drill, it is a drive-through — and the
+      // ladder made it worse than authored, widening 40 → 45 at L1 so the bar
+      // painted across the lane read «не по-бързо от 45 км/ч» under the word
+      // СПРИ, on a street posted 50 (params.ts B58: the number the world shows
+      // him is an instruction he obeys). maxSpeedKmh 3 is the house halt value
+      // (sc-mfp-stop-line: radius 3 at 3 km/h is a real halt, not a roll). It
+      // makes this a HALT DEMAND (≤ REACH_ZONE_HALT_CAP_KMH 8), which both
+      // opens the approach capsule — stopping SHORT of the paint now counts,
+      // where before only the disc did — and freezes the number: params.ts
+      // never widens a halt cap, so «спри» reads 3 on every rung.
+      // ACHIEVABLE IN THIS WORLD, and not merely achievable — compulsory: the
+      // signalPlan below (`redFresh` at 45 m) guarantees the student ARRIVES at
+      // a fresh 26 s red, so the whole lesson is the wait. Measured on the
+      // committed shadow: 804 ticks inside the acceptance at 0.00 km/h, resting
+      // at y = −29.5, i.e. 2.2 m short of the paint at −27.725 and 12.5 m
+      // inside the near edge. THEO-4 is already paid: `overCapNoted` latches
+      // „на линията и още твърде бързо" and engine.ts speaks the card naming
+      // the 3 km/h and the speed actually driven — no bare verdict anywhere.
       params: {
         kind: "reachZone",
         x: 4.06,
         y: -34,
         radiusM: 8,
-        maxSpeedKmh: 40,
+        maxSpeedKmh: 3,
         acceptBeforeMarkM: -6.275,
       },
     },

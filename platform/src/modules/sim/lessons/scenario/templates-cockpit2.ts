@@ -320,7 +320,26 @@ export const SC_VP_TELLTALE_RED: ScenarioSpec = {
     },
     {
       id: "sc-vptr-red-stop",
-      titleBg: "Спри плътно вдясно при червената лампа",
+      // WAS «Спри плътно вдясно…». The STOP half is real and stays: 4 km/h is a
+      // halt demand (≤ REACH_ZONE_HALT_CAP_KMH 8), never widened by the ladder,
+      // and the shadow rests inside the disc at 0.00 km/h. „ПЛЪТНО" was the
+      // false half. The acceptance is a disc of radius 3 (4.5 at L1) around a
+      // mark 1.71 m curb-ward of the right-lane centre (TTR_RIGHT 12.19, curb
+      // 16.25): every rung of it stays inside the right lane — the inner lane
+      // centre is never within 5 m of it — so „вдясно" is measured, but its
+      // left edge reaches 1.29 m PAST the lane centre, so a car resting mid-lane
+      // is credited too, and „плътно до бордюра" is precisely what this gate
+      // cannot tell apart from it. Tightening the disc was refused twice over:
+      // the radius is single truth with VP_TELLTALE_RED_LAMP's halt contract
+      // above (the runner resolves the encounter by the same three numbers, and
+      // the committed traces are a byte gate on them), and params.ts's
+      // WIDEN-ONLY doctrine says a waypoint radius is a completability gate,
+      // never a skill — a 1.5 m bullseye would fail students who pulled over
+      // correctly. So the title claims the side, not the centimetres; „плътно до
+      // бордюра" keeps its voice in instruction 3, in teach.examinerBg, and in
+      // the panic-stop mistake card. Params untouched ⇒ nothing newly fails and
+      // THEO-4 owes no card.
+      titleBg: "Спри напълно вдясно при червената лампа",
       // The RED verdict — completable ONLY at near-stop speed at the curb-side
       // halt point (the sc-pk-smooth-stop stop-mark pattern), 80 m PAST the red
       // trigger. Same values as the staged TelltaleStimulusSpec's halt contract

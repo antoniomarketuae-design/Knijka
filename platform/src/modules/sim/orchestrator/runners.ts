@@ -257,6 +257,60 @@ function vehicleCast(
 export const DART_CREEP_RELEASE_M = 8;
 
 /**
+ * THE OTHER HALF OF L8 — the creep backstop closed the „she never left the
+ * curb" hole, and left „she left it, crossed, and was GONE before he arrived"
+ * wide open.
+ *
+ * Founder report, sc-zebra-approach (PE-01/PE-02), portrait, deployed build:
+ * car stopped at 0 км/ч, the zebra completely bare, and the coach card reading
+ * «Чакаш правилно — пешеходецът на пътеката минава пръв». He was congratulated
+ * for yielding to nobody, on the flagship pedestrian lesson.
+ *
+ * The arithmetic behind that picture: `triggerDistM` is METRES, the walk is
+ * SECONDS. ZEBRA_PED releases at 55 m and needs 12.8 s to clear the 16.25 m
+ * carriageway at 1.4 m/s; at 40 km/h the car covers those 55 m in 4.9 s (she
+ * is mid-road — the lesson), at 15.5 km/h in exactly 12.8 s, and at anything
+ * slower she has finished and stepped up onto the pavement before the car gets
+ * there. The briefing tells the student to lift off the gas and be ready to
+ * stop. Do that well and the hazard deletes itself — and below
+ * `minTriggerSpeedKmh` it never fires at all, with the flat 8 m creep radius
+ * out of reach of a car halted „на няколко метра" short.
+ *
+ * `triggerEtaSec` (contracts.ts) states the horizon in seconds of travel
+ * instead, and these two helpers are the whole implementation. Both are the
+ * identity for a spec that does not author it.
+ *
+ * THIS ONE: the release horizon in metres for THIS frame — the authored
+ * seconds converted at the player's current speed. `Infinity` (no extra
+ * constraint) when the spec authors no ETA, i.e. the pure distance gate.
+ */
+function dartEtaHorizonM(spec: PedestrianDartOutSpec, speedKmh: number): number {
+  if (spec.triggerEtaSec === undefined) return Infinity;
+  return speedKmh * KMH_TO_MPS * spec.triggerEtaSec;
+}
+
+/**
+ * Release radius for a player BELOW the speed floor (creeping, or stopped and
+ * waiting). Without an authored ETA this is the flat 8 m the creep backstop
+ * has always used. With one it is the same ETA rule evaluated at the floor
+ * speed, which is the only value that makes the release continuous across the
+ * floor: a car at 10.1 km/h and a car at 0 km/h meet the walker at the same
+ * point of the road instead of 20 m apart.
+ *
+ * Deliberately NOT exported. The encounter battery probes exactly this case
+ * and recomputes the number from the spec's own authored fields instead, so
+ * that breaking the rule here cannot silently move the test's goalposts with
+ * it (it did, on the first draft of that test).
+ */
+function dartFloorReleaseM(spec: PedestrianDartOutSpec): number {
+  if (spec.triggerEtaSec === undefined) return DART_CREEP_RELEASE_M;
+  return Math.max(
+    DART_CREEP_RELEASE_M,
+    spec.minTriggerSpeedKmh * KMH_TO_MPS * spec.triggerEtaSec,
+  );
+}
+
+/**
  * L9 second-order (register rows B14 / B46 / B47 / B49) — where the walk ENDS.
  *
  * The founder reported the same thing four times, in four lessons: *„the
@@ -439,10 +493,20 @@ export class PedestrianDartOutRunner implements EventRunner {
         // instead of awarding the drill.
         return this.resolve(input, false, "notEncountered");
       }
+      // The release, in three ANDed parts (see dartEtaHorizonM above):
+      //   1. inside the authored METRES — the outer bound, never released
+      //      earlier than the author asked;
+      //   2. pointed at the crossing;
+      //   3. either moving at/above the floor AND inside this frame's ETA
+      //      horizon, or slower than the floor and inside the floor's own
+      //      release radius (creeping / halted short of the paint).
+      // With no `triggerEtaSec` the horizon is Infinity and the radius is the
+      // flat 8 m: the gate is byte-identical to the pure distance version.
       if (
         d <= this.triggerDistM &&
         approaching(input, s.crossing.x, s.crossing.y) &&
-        (input.speedKmh >= s.minTriggerSpeedKmh || d <= DART_CREEP_RELEASE_M)
+        ((input.speedKmh >= s.minTriggerSpeedKmh && d <= dartEtaHorizonM(s, input.speedKmh)) ||
+          d <= dartFloorReleaseM(s))
       ) {
         // R3 #27 ball cue: with `ballLeadSec` authored, the trigger first
         // rolls the lesson's hazard ball (the WARNING the anticipation

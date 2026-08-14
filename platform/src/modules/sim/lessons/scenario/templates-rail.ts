@@ -577,7 +577,22 @@ export const SC_RX_TRAM_LEFT: ScenarioSpec = {
     },
     {
       id: "sc-rxtl-turn",
-      titleBg: "Завърши левия завой на юг, пропуснал трамвая",
+      // WAS «Завърши левия завой на юг, пропуснал трамвая» — the „пропуснал"
+      // half was never checked. stepReachZone reads (params, prevState, tick),
+      // and SimTick has no field for another vehicle's priority or for whether
+      // a yield happened; the mistake-cut-tram recording — the car that turned
+      // 1.6 s in front of the tram — lands in this very circle and was being
+      // certified as „пропуснал трамвая" by it.
+      // WHAT THE DISC ACTUALLY PROVES: (−4.06, −50) is the south arm's
+      // southbound lane centre 50 m past the node, and the only way onto it
+      // from the east-arm spawn is through the junction — i.e. the rails WERE
+      // crossed and the left turn completed. That is what the title says now.
+      // The tram's priority stays graded exactly where it was: the N1
+      // left-turn tracker convicts the 1.6 s cut as FAILED_TO_YIELD (the
+      // mistake below, gated in traces/__tests__/sc-rx-tram-traces.test.ts)
+      // and the shadow earns YIELDED_TO_PRIORITY. Params untouched — `done` is
+      // bit-identical, so nothing new can fail and no THEO-4 card is owed.
+      titleBg: "Завърши левия завой през трасето и излез на юг",
       // South-arm southbound lane center, past the junction area.
       params: { kind: "reachZone", x: -4.06, y: -50, radiusM: 9 },
     },
@@ -741,7 +756,23 @@ export const SC_RX_TRAM_ISLAND: ScenarioSpec = {
     },
     {
       id: "sc-rxti-clear",
-      titleBg: "Премини покрай острова, пропуснал пресичащия пътник",
+      // WAS «Премини покрай острова, пропуснал пресичащия пътник» — the
+      // yield clause is invisible to this evaluator. stepReachZone sees one
+      // tick, and no field on it says whether the passenger was let through;
+      // mistake-squeeze-past drives THROUGH the crossing while she is on the
+      // carriageway and still arrives here, so the gate signed off on
+      // „пропуснал пресичащия пътник" for the exact drive the template calls
+      // профучаване.
+      // WHAT THE DISC ACTUALLY PROVES: (4.06, 122) sits on the player's own
+      // lane centre 32 m past the zebra at y = 90 and 16 m past the north end
+      // of the island span [92, 106] on this 150 m street — arrival means the
+      // stop with the island was driven past and the segment run out. The duty
+      // keeps its grader: the pedestrian chain bills PEDESTRIAN_NOT_YIELDED
+      // (and COLLISION for the second mistake) off crossing occupancy, чл. 66,
+      // ал. 2 is spelled out in teach.whyBg, and instructions 3–5 still say
+      // спри и изчакай. Params untouched — `done` is bit-identical, nothing
+      // new can fail, no THEO-4 card owed.
+      titleBg: "Подмини спирката с острова и продължи до края на отсечката",
       params: { kind: "reachZone", x: 4.06, y: 122, radiusM: 10 },
     },
   ],

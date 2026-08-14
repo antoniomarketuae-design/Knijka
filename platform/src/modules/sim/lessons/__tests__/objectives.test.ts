@@ -1134,6 +1134,13 @@ describe("reachZone acceptBeforeMarkM — the acceptance stops where the paint d
    * of the mark and the cut is −6.275. At L1 the ladder takes radius 8 → 12,
    * which used to credit a car standing 5.72 m past a red light's stop line
    * with having stopped AT it.
+   *
+   * THE CAP BELOW IS DELIBERATELY THE OLD ONE. The template's authored cap was
+   * 40 when this case was written and is now 3 — the title-honesty pass made
+   * the word „спри" ask for a stop (a cap of 40 completed a stop drill at 40).
+   * These fixtures are about the CUT, and the cut needs a driver who can be
+   * legal on one side of the paint and illegal on the other, which a halt cap
+   * would collapse. Kept at 40 on purpose; it is a fixture, not a mirror.
    */
   describe("the negative cut — when the RADIUS, not the mark, crosses the paint", () => {
     const SRY_PAINT_Y = -27.725;

@@ -149,18 +149,45 @@ export const SC_SIG_FLASH_AMBER_PED: ScenarioSpec = {
       // Stem lane center, before the junction mouth (stop line at −27.7).
       // FR-24: mark 2.275 m short of that line; the L1 ladder widens radius
       // 8 → 12, so credit reached 9.72 m into the junction until this cut.
+      //
+      // „НАМАЛЕНА" — намалена ДОКЪДЕ. The title was true only against the
+      // posted 50, and this drill teaches a different number in its own words:
+      // instruction 3 says «дръж под 30 км/ч покрай пътеката» and the
+      // несъобразена-скорост card below defines повишено внимание as „под 30
+      // км/ч". The gate said 35, and the L1 ladder printed 40 across the lane
+      // (35 + 5, under the posted 50 so nothing clipped it) — the world
+      // instructing 40 into an unregulated junction with an occupied crossing
+      // 64 m beyond it, i.e. the approach the same lesson bills as
+      // PEDESTRIAN_CROSSING_TOO_FAST. 30 is the catalog's own value for this
+      // exact sentence (sc-rxti-approach and sc-rts-approach, both «с намалена
+      // скорост», both 30) and it is the number the student is told.
+      // ACHIEVABLE IN THIS WORLD (measured, not guessed): the committed shadow
+      // crosses this window at 27.85 km/h peak — 2.15 km/h of room — and every
+      // rung stays at or under today's authored 35 (L1 35, L2 32.5, L3+ 30), so
+      // no rung is looser than it was. THEO-4: `overCapNoted` already turns the
+      // refusal into engine.ts's card naming the 30 and the speed actually
+      // driven, so nothing fails in silence.
       params: {
         kind: "reachZone",
         x: LANE_2,
         y: -30,
         radiusM: 8,
-        maxSpeedKmh: 35,
+        maxSpeedKmh: 30,
         acceptBeforeMarkM: -2.275,
       },
     },
     {
       id: "sc-sfap-clear",
-      titleBg: "Премини пътеката след кръстовището, когато е свободна",
+      // WAS «…, когато е свободна». Same class as the approach gate above and
+      // the harder half: a SimTick carries no pedestrian, no priority and no
+      // yield outcome, and stepReachZone gets no ObjectiveContext — so „чиста
+      // ли беше пътеката" cannot be answered here at any radius. Arrival 36 m
+      // up the north arm proves the crossing was PASSED, and that is what the
+      // title now says. The чл. 119 duty is graded where it is measurable:
+      // PEDESTRIAN_NOT_YIELDED (mistakes[] below), fed by the crossing-zone
+      // tracker that also carries the commendation on the shadow. Params
+      // untouched ⇒ `done` is bit-identical and THEO-4 owes no card.
+      titleBg: "Подмини пътеката след кръстовището и продължи на север",
       // North-arm northbound lane center, well past the crossing at y = 34.
       params: { kind: "reachZone", x: LANE_2, y: 70, radiusM: 10 },
     },

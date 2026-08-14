@@ -227,7 +227,29 @@ export const SC_JX_EQUAL_LEFT: ScenarioSpec = {
     },
     {
       id: "sc-jxeq-cross",
-      titleBg: "Завий наляво, след като пропуснеш и десния, и насрещния",
+      // WAS «Завий наляво, след като пропуснеш и десния, и насрещния» — a
+      // certificate this gate cannot issue. stepReachZone is handed
+      // (params, prevState, tick) and nothing else: SimTick carries position,
+      // speed, lane, indicator … and NO other actor's priority, no yield
+      // outcome, not even a fault list. So the circle ticked «пропуснал» for
+      // the student who cut in front of the right-hand car exactly as fast as
+      // for the one who waited: mistake-cut-right — the drive whose own
+      // annotation says «колата отдясно трябваше да намали заради теб» — comes
+      // to rest at (−51.96, 4.06), 1.96 m from this centre, and completes it.
+      // (mistake-cut-oncoming ends at x = −17.98, short of the disc: the crash
+      // stops the drive, not the gate.)
+      // WHAT THE DISC ACTUALLY PROVES: (−50, 4.06) is the west arm's
+      // westbound lane centre 50 m out, so arrival means the left turn was
+      // completed and the 40 m junction area cleared. It does NOT prove the
+      // lane either — r9 on the 8.125 m pitch reaches the oncoming centre — so
+      // the title claims the manoeuvre and the compass arm, which are the two
+      // things measured. The двете задължения keep their teeth where they
+      // always had them: both mistakes cite FAILED_TO_YIELD, convicted by the
+      // runtime's right-hand-rule tracker (east arm) and the N1
+      // left-turn-across-path tracker (north arm), and their voice in
+      // instructions 3–5 + teach.examinerBg. Params untouched — `done` is
+      // bit-identical, nothing new can fail, so no THEO-4 card is owed.
+      titleBg: "Завий наляво и излез от кръстовището на запад",
       // West-arm westbound lane center, past the 40 m junction area.
       params: { kind: "reachZone", x: -50, y: 4.06, radiusM: 9 },
     },

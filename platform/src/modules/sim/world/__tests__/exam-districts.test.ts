@@ -22,6 +22,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { PERCEPTUAL_ROAD_SCALE } from "../../contracts";
 import { createWorldRuntime, type DistrictWorldRuntime } from "../../runtime";
+import { DistrictIndex } from "../../runtime/spatial";
 import { assertDistrict, type District } from "../types";
 
 function loadD2Raw(): unknown {
@@ -391,7 +392,11 @@ describe("d2-v1 carries the sc-ed-d2-priority-run chain (Яворов → Сто
     // The template's success gates are denormalized route points; a gate that
     // drifts off its lane silently makes the drill unpassable.
     const gates: Array<[string, number, number, string]> = [
-      ["sc-edpr-b2", -300.35, 79.94, "e695511390.0"],
+      // MOVED (title-honesty pass): sc-edpr-b2 used to be pinned at
+      // (−300.35, 79.94) on e695511390.0 — measured 50 m PAST the Б2 paint the
+      // objective's own title names, and 23 m past the node. It now sits ON the
+      // derived line (asserted against the runtime's own derivation below).
+      ["sc-edpr-b2", -268.56, 119.61, "e171919146.0"],
       ["sc-edpr-signal", -516.35, -128.17, "e285878100.0"],
       ["sc-edpr-leftturn", -671.26, 33.98, "e1382335108.0"],
       ["sc-edpr-finish", -735.77, -214.49, "e856821053.1"],
@@ -401,6 +406,22 @@ describe("d2-v1 carries the sc-ed-d2-priority-run chain (Яворов → Сто
       expect(hit.edgeId, `${id} edge`).toBe(edgeId);
       expect(Math.abs(hit.laneOffsetM), `${id} lane offset`).toBeLessThan(2.5);
     }
+  });
+
+  it("the Б2 gate IS the derived stop line — not a point near it", () => {
+    // The pairing the template's «Спри напълно на стоп-линията» stands on: the
+    // objective is authored with acceptBeforeMarkM 0, which cuts its acceptance
+    // at the MARK, so the mark and the paint have to be the same place. A
+    // re-cut of Лозенец that moves the line by more than a few centimetres
+    // moves the gate off the paint and this names it.
+    const [gx, gy] = [-268.56, 119.61];
+    const b2 = runtime
+      .debugStopLines()
+      .filter((l) => l.control === "stopSign" && l.junctionNodeId === PR_B2_NODE);
+    expect(b2.length, "one Б2 line at the node").toBe(1);
+    const index = new DistrictIndex(runtime.district);
+    const [lx, ly] = index.pointAt(b2[0].edgeIdx, b2[0].sM);
+    expect(Math.hypot(lx - gx, ly - gy), "gate ↔ paint").toBeLessThan(0.1);
   });
 });
 

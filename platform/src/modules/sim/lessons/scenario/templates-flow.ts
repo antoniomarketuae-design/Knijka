@@ -73,6 +73,41 @@ const ZEBRA_PED: PedestrianDartOutSpec = {
   roadToM: 17.85,
   triggerDistM: 55,
   minTriggerSpeedKmh: 10,
+  // ETA SYNC (contracts.ts PedestrianDartOutSpec.triggerEtaSec). 55 m is a
+  // DISTANCE and her walk is a CLOCK, so the 55 m alone made the encounter a
+  // function of how fast the student drove: at 40 km/h she is mid-carriageway
+  // when he arrives, at 15.5 km/h she finishes as he arrives, and below that
+  // he reaches a bare zebra — i.e. obeying instruction 2 („вдигни крака от
+  // газта") deleted the hazard instruction 3 exists to teach. Under 10 км/ч
+  // she never left the curb at all. The founder photographed the end state:
+  // stopped at 0 км/ч in front of an empty crossing, congratulated for
+  // yielding to nobody.
+  //
+  // 9.0 s is chosen from the PICTURE it guarantees, and every number in it is
+  // this spec's own:
+  //   · she is `speedMps × 9` = 12.6 m along the walk when the car reaches the
+  //     crossing, whatever speed it came in at. From start.x −9.73 that is
+  //     x = +2.87 — INSIDE the student's own lane (the northbound lane spans
+  //     x 0…8.125), 1.2 m short of the line his bonnet tracks. Not „somewhere
+  //     on the paint": in his path, at every speed.
+  //   · 55 / 9 = 22.0 km/h is where the two gates cross. ABOVE it the authored
+  //     55 m still binds, so the too-fast demo (45 km/h) and every ordinary
+  //     approach release exactly where they always did — all three committed
+  //     recordings are byte-identical, and not marginally: the shadow's own
+  //     time-to-arrival at the 55 m gate is 7.10 s and the too-fast demo's is
+  //     5.82 s, both comfortably inside a 9 s horizon. BELOW 22 km/h the
+  //     seconds bind, and that is precisely the band the briefing asks him to
+  //     drive in.
+  //   · under the 10 km/h floor the same rule at the floor speed gives
+  //     2.78 × 9 = 25.0 m. That number has to beat one specific distance: the
+  //     first objective's reachZone is centred (4.06, 78) r 10, so a student
+  //     who completes this lesson AT ALL must come within hypot(4.06, 22) =
+  //     22.4 m of the crossing. 25.0 > 22.4, so there is no longer any way to
+  //     drive this lesson — however timidly, including stopping dead and
+  //     waiting — without meeting her. The flat 8 m creep radius could not
+  //     reach a car halted „на няколко метра" before the paint, which is
+  //     exactly what instruction 3 tells him to do.
+  triggerEtaSec: 9.0,
 };
 
 /**

@@ -136,8 +136,23 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
     },
     {
       id: "sc-jgap-exit",
-      titleBg: "Завий надясно и продължи по пътя с предимство",
-      // East-arm eastbound lane center, past the junction area.
+      titleBg: "Завий надясно и излез от кръстовището на изток",
+      // TITLE-TRUTH WAVE (the full argument lives on sc-jrhr-cross in
+      // templates-junctions.ts). It read «Завий надясно и ПРОДЪЛЖИ ПО ПЪТЯ С
+      // ПРЕДИМСТВО»: the turn is measured, but „предимство" is the one word
+      // here a student can read as „the app confirmed the gap I took" — and
+      // the gap is exactly what a reachZone tick cannot see (SimTick carries
+      // no other actor's priority, no yield outcome; `stepReachZone` gets no
+      // ObjectiveContext). The gap misjudgment is graded where it is really
+      // measured: the stop-line give-way check → FAILED_TO_YIELD (both
+      // mistake demos below), with steps 3–5 and `teach` saying it in words.
+      //
+      // East-arm eastbound lane center, 55 m out on tj-emerge-v1's 160 m east
+      // arm, past the junction area. From the south-stem spawn (4.06, −85)
+      // only the completed right turn reaches it, so «надясно» and «на изток»
+      // are both measured. Lane NOT named — r 9 covers the opposite centre on
+      // the 8.125 m pitch. Params untouched: `done` is bit-identical, so no
+      // drive that passed yesterday fails today and no THEO-4 card is owed.
       params: { kind: "reachZone", x: 55, y: -4.06, radiusM: 9 },
     },
   ],
@@ -260,8 +275,20 @@ export const SC_JUNCTION_BLIND: ScenarioSpec = {
     },
     {
       id: "sc-jblind-cross",
-      titleBg: "Премини наляво, след като пропуснеш идващия отдясно",
-      // West-arm westbound lane center, past the 40 m junction area.
+      titleBg: "Завий наляво и излез от кръстовището на запад",
+      // TITLE-TRUTH WAVE (see sc-jrhr-cross in templates-junctions.ts). It
+      // read «Премини наляво, СЛЕД КАТО ПРОПУСНЕШ идващия отдясно» — a
+      // certified yield on a drill whose whole point is that the car is
+      // HIDDEN until late. The tick cannot see the yield (no priority, no
+      // outcome on SimTick), so the disc credited the blind barge and the
+      // careful crawl on the same frame; the tracker is what actually convicts
+      // (FAILED_TO_YIELD / COLLISION on the two mistake demos, and the
+      // approach's own ≤ 22 km/h cap grades the crawl).
+      //
+      // West-arm westbound lane center, 50 m out on tj-occluded-v1's 140 m
+      // west arm, past the 40 m junction area — from the south-stem spawn
+      // (4.06, −115) reachable only by completing the left turn. Params
+      // untouched, `done` bit-identical, no THEO-4 card owed.
       params: { kind: "reachZone", x: -50, y: 4.06, radiusM: 9 },
     },
   ],
@@ -400,8 +427,19 @@ export const SC_JUNCTION_LEFT: ScenarioSpec = {
     },
     {
       id: "sc-jleft-exit",
-      titleBg: "Завий наляво и продължи по пътя с предимство",
-      // West-arm westbound lane center, past the junction area.
+      titleBg: "Завий наляво и излез от кръстовището на запад",
+      // TITLE-TRUTH WAVE (see sc-jrhr-cross in templates-junctions.ts). Same
+      // rewrite as sc-jgap-exit on the same map: «…и ПРОДЪЛЖИ ПО ПЪТЯ С
+      // ПРЕДИМСТВО» let the word „предимство" stand in a sentence the
+      // objective settles by geometry alone. The left turn here crosses one
+      // carriageway and merges into the other — two priority questions, both
+      // adjudicated by the stop-line give-way check (FAILED_TO_YIELD on both
+      // mistake demos), none of them visible to a reachZone tick.
+      //
+      // West-arm westbound lane center, 55 m out on tj-emerge-v1's 160 m west
+      // arm, past the junction area; from the south-stem spawn (4.06, −85)
+      // only the completed left turn reaches it. Params untouched, `done`
+      // bit-identical, no THEO-4 card owed.
       params: { kind: "reachZone", x: -55, y: 4.06, radiusM: 9 },
     },
   ],

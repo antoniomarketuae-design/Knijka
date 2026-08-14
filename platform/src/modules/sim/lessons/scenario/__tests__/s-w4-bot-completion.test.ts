@@ -1088,10 +1088,17 @@ describe("wave-4 bot completion — sc-ed-d2-priority-run at L3", () => {
     ]);
     expect(r.score).toBe(10);
     expect(r.passed).toBe(false);
-    // It rolled PAST the node, so the geometric b2 gate does land — and that is
-    // the honest reading: the gate measures where the car went, the code
-    // measures how it got there. The exam is lost on the code, not the route.
-    expect(r.objectives.find((o) => o.id === "sc-edpr-b2")!.done).toBe(true);
+    // FLIPPED (title-honesty pass). This assertion used to read `true`, with a
+    // comment calling it „the honest reading: the gate measures where the car
+    // went". It was the opposite — the gate's own title says «Спри напълно на
+    // стоп-линията», and it was handing that certificate to a car recorded
+    // rolling the paint at 11.9 km/h. sc-edpr-b2 now carries maxSpeedKmh 3 (a
+    // halt demand) on the derived Б2 line, so the rolling demo fails the gate
+    // AND takes the code — one act, one verdict, in both channels. The
+    // full-stop drives still land it: the partial-scan demo below stops at the
+    // same place and completes it, which is why «и огледай» had to leave the
+    // title (a reachZone cannot see a glance; JU-23 grades the look).
+    expect(r.objectives.find((o) => o.id === "sc-edpr-b2")!.done).toBe(false);
     expect(r.completedAll).toBe(false);
   });
 
