@@ -64,9 +64,24 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
         <h2 id="mastery-title" className="font-display text-base font-extrabold">
           Усвояване по теми
         </h2>
+        {/* 78.4 x 16 BEFORE THIS, and 17px to a thumb — the smallest hit
+            target the harness found anywhere on /dashboard (WebKit, iPhone 16,
+            both orientations, deployed build). It is the only way out of this
+            panel and into the topic list.
+
+            The BOX is not grown: this link sits on a `.panel-head` baseline
+            next to the „Усвояване по теми" heading, and a 44px box there would
+            push the rule under the heading out of alignment on every panel in
+            the product that shares the pattern. The TAP AREA is grown instead,
+            with an absolutely positioned ::before at −14px top and bottom
+            (16 + 28 = 44) — the technique lesson-ui/QualityPresetSelector
+            established for the same reason and the one tools/mobile/lib/probe.mjs
+            already unions into its hit rects. `relative` is what the ::before
+            resolves against; without it the pseudo-element would size against
+            the panel and swallow the heading's taps. */}
         <Link
           href="/theory"
-          className="text-xs font-bold text-accent hover:underline"
+          className="relative text-xs font-bold text-accent before:absolute before:-inset-y-3.5 before:left-0 before:right-0 before:content-[''] hover:underline"
         >
           Всички теми
         </Link>
@@ -91,9 +106,22 @@ export function TopicMasteryGrid({ readiness }: { readiness: ReadinessSnapshot }
           <ul className="mt-2 flex flex-wrap gap-2">
             {weakestConcepts.map((c) => (
               <li key={c.conceptId}>
+                {/* 30px tall before this, on every device profile, and 31px to
+                    a thumb — five of them, and they are the product's own
+                    recommendation of what to practise next, i.e. the row a
+                    student is most likely to aim at from this panel.
+
+                    `min-h-11` GROWS THE BOX here rather than the ::before trick
+                    used on „Всички теми" above, and the difference is the
+                    layout, not taste: these wrap in a `gap-2` list, so a
+                    pseudo-element reaching the 14px it would need (30 + 14)
+                    would eat the whole 8px gutter and overlap the row below by
+                    3px — a tap landing between two rows would be a coin flip
+                    over which topic it opens. A taller box keeps the 8px gutter
+                    intact and every pill unambiguous. */}
                 <Link
                   href={c.href}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-hair bg-surface-2 px-3 py-1.5 text-xs font-semibold transition duration-200 hover:border-border-strong hover:text-accent motion-reduce:transition-none"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-hair bg-surface-2 px-3 py-1.5 text-xs font-semibold transition duration-200 hover:border-border-strong hover:text-accent motion-reduce:transition-none"
                 >
                   <span
                     aria-hidden

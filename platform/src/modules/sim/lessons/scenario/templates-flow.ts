@@ -14,6 +14,75 @@
  * mistake demo cites EXISTING rules-catalog codes — verified by replaying
  * the committed traces through the production stack
  * (traces/__tests__/sc-*-traces.test.ts, the §5/§9 gates).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE BRIEFING BUDGET — 2026-08-16. WHY EVERY STEP IN THIS FILE IS SHORT AND
+ * STARTS WITH A VERB. Written out once, here, because this file holds the
+ * worst case; templates-following / -conditions / -conditions2 / -parking3
+ * carry the same rewrite and point back at this block.
+ *
+ * THE DEFECT. `instructionsBg` is compiled into `LessonSpec.briefingBg`
+ * (compile.ts) and rendered by SimOverlay's compact card as TWO rows: step 1
+ * is THE LINE (`briefingLineBg`) and steps 2..n are THE BODY
+ * (`briefingBodyBg`), both inside one 8 rem scroll window. That window's clamp
+ * was sized against the thirteen PRE-DRIVE instructions, which are 55–95
+ * characters. Nobody re-checked it against the scenario briefings the same card
+ * renders: across 166 scenarios / 883 steps the median is 109 characters, p90
+ * 174, max 342, and 586 of 883 are outside the band the card was built for.
+ *
+ * MEASURED ON THE DEPLOYED BUILD, NOT INFERRED (WebKit, real insets, signed in,
+ * `/simulator?scenario=sc-zebra-approach&level=1`, speedometer reading
+ * «Скорост 0 километра в час» at rest so the probe is honest). A per-character
+ * Range walk of both rows against the scroll window's own visible band — its
+ * box minus the 10 px mask fade — gives the fold in AUTHORED CHARACTERS:
+ *
+ *   iPhone 16 LANDSCAPE  window 180 × 127, band 117 px
+ *   iPhone 16 PORTRAIT   window 141.5 × 128, band 118 px
+ *
+ *     LINE chars │ body chars still visible  (landscape / portrait)
+ *     ───────────┼──────────────────────────────────────────────────
+ *          34    │      122 / 110
+ *          42    │      122 / 110
+ *          52    │       96 / 110
+ *          76    │       96 /  90
+ *          96    │       68 /  68
+ *         219    │        0 /   0   ← what shipped
+ *
+ * So the old 219-character step 1 of sc-zebra-approach did not merely clip
+ * itself (85 % / 72 % of it survived) — IT DELETED THE ENTIRE BODY. Steps 2–5
+ * measured 0 characters visible on both profiles. The graded objective
+ * `sc-za-approach` is a ≤ 40 km/h gate 12 m before the zebra, i.e. step 2. The
+ * student was graded on an instruction the phone never displayed.
+ *
+ * THE THREE RULES THIS WAVE APPLIES, each one arithmetic off that table:
+ *   1. THE ACT COMES FIRST — the imperative is the first word of every step.
+ *      A condition („По тъмно…“), a law citation or a rationale in front of the
+ *      verb spends the only characters that are guaranteed to be painted.
+ *   2. EVERY STEP ≤ 95 CHARACTERS — back inside the band the card was sized
+ *      for. A line of 96 still leaves 68 characters of body above the fold.
+ *   3. THE GRADED ACT IS THE LINE where the drill allows it, because
+ *      `briefingBg[0]` is the one row that is always painted and can never be
+ *      scrolled past — and step 2 is held to 65 characters (+ the „2. “ the
+ *      body prefixes it with) so that it renders WHOLE above the fold at the
+ *      line length the template actually authors.
+ *
+ * NOTHING IS DELETED. Condition clauses, чл. citations and rationale moved to
+ * their own steps BEHIND the act, or into the step where they apply. The whole
+ * briefing is still reachable by scrolling the window, still opens in full
+ * behind «ПРОЧЕТИ» with the car stopped, and `teach` is untouched. THEO-4
+ * requires that the student gets the reasoning — not that he gets it in the
+ * first sentence of a card that clips.
+ *
+ * WHAT THIS WAVE COULD NOT FIX, stated rather than hidden: on every rung that
+ * adds a complication the LINE is not authored here at all — compile.ts puts
+ * `complicationBriefingText` at `briefingBg[0]`, and that string is 309–509
+ * characters on 61 of the 165 rungs these five files compile. By the table
+ * above anything past ~96 zeroes the body, so L4/L5 briefings still show the
+ * student nothing but the complication. The fix belongs in compile.ts /
+ * complications.ts, which this lane does not own.
+ * The probes: `brief-fold.mjs` (what the shipped copy shows) and
+ * `brief-budget.mjs` (what the box holds), both driving the deployed build.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type {
@@ -137,24 +206,36 @@ export const SC_ZEBRA_APPROACH: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // Ledger L10: the L5 rung compiles night and HEADLIGHTS_OFF_AT_NIGHT is an
-    // основна fault armed with no config gate (ЗДвП чл. 70).
-    { n: 1, textBg: "Потегли по улицата и се движи спокойно в своята лента. По тъмно първо провери късите светлини (чл. 70): пред пешеходна пътека нощем те са и твоят поглед към тротоара, и знакът, по който пешеходецът решава дали да стъпи." },
-    {
-      n: 2,
-      textBg:
-        "Видиш ли пешеходната пътека, вдигни крака от газта и наблюдавай тротоарите от двете страни.",
-    },
-    {
-      n: 3,
-      textBg:
-        "Стъпи ли пешеходец на пътеката, намали плавно и спри напълно на няколко метра преди нея.",
-    },
-    {
-      n: 4,
-      textBg: "Изчакай пешеходеца да освободи цялата пътека — не потегляй, докато е на платното.",
-    },
-    { n: 5, textBg: "Огледай се и премини спокойно, когато пътеката е свободна." },
+    // THE STEP THE PHONE NEVER SHOWED. Step 1 was 219 characters, of which 68 %
+    // was a level-5 night clause; measured on the deployed build it filled the
+    // whole text window and left the body at 0 % VISIBLE on BOTH profiles — so
+    // steps 2-5 did not exist for a phone. The graded objective (sc-za-approach,
+    // a <=40 km/h gate 12 m short of the zebra) was step 2. He was graded on an
+    // instruction the card never printed.
+    // SO THE GRADED ACT IS NOW THE LINE. briefingBg[0] is the one row that is
+    // always painted and can never be scrolled away from (overlayQueue
+    // briefingLineBg), so the approach speed lives there and nowhere else.
+    // AND THE NIGHT CLAUSE IS ITS OWN STEP, LAST. It is conditional — at L1-L4 it
+    // is not true yet — and it is what pushed the action off the screen. Nothing
+    // is deleted: at the rung where it DOES apply (L5 night) the ladder's own
+    // complication is briefingBg[0] and already names късите светлини
+    // (complications.ts „По тъмно“), so the duty is on the LINE exactly when it
+    // arises, and this pair is the crossing-specific half the complication has
+    // no way to say. Ledger L10 (ЗДвП чл. 70) stays satisfied either way.
+    // 66 ch
+    { n: 1, textBg: "Потегли, движи се в своята лента и приближи пътеката с под 40 км/ч." },
+    // 46 ch
+    { n: 2, textBg: "Вдигни крак от газта и огледай двата тротоара." },
+    // 65 ch
+    { n: 3, textBg: "Спри няколко метра преди пътеката, ако пешеходец е стъпил на нея." },
+    // 77 ch
+    { n: 4, textBg: "Изчакай пешеходеца да освободи цялото платно — не потегляй, докато е на него." },
+    // 42 ch
+    { n: 5, textBg: "Премини спокойно, щом пътеката е свободна." },
+    // 60 ch
+    { n: 6, textBg: "Включи късите светлини по тъмно (чл. 70) още преди пътеката." },
+    // 76 ch
+    { n: 7, textBg: "Помни: нощем фаровете са и погледът ти към тротоара, и знакът за пешеходеца." },
   ],
   success: [
     {
@@ -322,18 +403,21 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Приближи кръговото спокойно и намали още преди знака „Пропусни движението“." },
-    {
-      n: 2,
-      textBg:
-        "Гледай наляво: движещите се в кръга са с предимство. Има ли кола в кръга — спри на линията и я пропусни.",
-    },
-    { n: 3, textBg: "Влез плавно в подходящ интервал и се движи по кръга обратно на часовниковата стрелка." },
-    {
-      n: 4,
-      textBg: "Подмини първия изход. Преди твоя изход — вторият, направо на север — включи десния мигач.",
-    },
-    { n: 5, textBg: "Излез от кръга с включен десен мигач и продължи по улицата на север." },
+    // Step 2 was two sentences and 104 characters — a look and a yield welded
+    // together. Split: what to look at, then what to do about it. Step 4 likewise
+    // carried the pass-the-first-exit fact and the indicator order in one breath.
+    // 62 ch
+    { n: 1, textBg: "Приближи кръговото и намали преди знака „Пропусни движението“." },
+    // 53 ch
+    { n: 2, textBg: "Гледай наляво — движещите се в кръга имат предимство." },
+    // 60 ch
+    { n: 3, textBg: "Спри на линията и пропусни всяка кола, която вече е в кръга." },
+    // 66 ch
+    { n: 4, textBg: "Влез плавно в подходящ интервал, обратно на часовниковата стрелка." },
+    // 57 ch
+    { n: 5, textBg: "Подмини първия изход — твоят е вторият, направо на север." },
+    // 65 ch
+    { n: 6, textBg: "Включи десния мигач преди своя изход и излез по улицата на север." },
   ],
   success: [
     {
@@ -516,13 +600,24 @@ export const SC_LANE_CHANGE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // Ledger L10: the L5 rung compiles rain AND night — both headlight faults
-    // are armed with no config gate (ЗДвП чл. 70).
-    { n: 1, textBg: "Потегли и се установи стабилно в дясната лента с постоянна скорост. По тъмно или в дъжд включи първо късите светлини (чл. 70): престрояването зависи изцяло от това дали колата в съседната лента те вижда в огледалото си." },
-    { n: 2, textBg: "Провери лявото огледало — има кола в лявата лента зад теб. Прецени скоростта ѝ." },
+    // The same 219-character step 1 as the zebra drill, the same night/rain
+    // clause, the same 0 % body. The unconditional act (settle in the right lane)
+    // is the line; the lamp duty and its WHY are steps 6-7, where the condition
+    // is stated before the reason instead of the other way round.
+    // 67 ch
+    { n: 1, textBg: "Потегли и се установи стабилно в дясната лента с постоянна скорост." },
+    // 81 ch
+    { n: 2, textBg: "Провери лявото огледало: в лявата лента зад теб има кола — прецени скоростта ѝ." },
+    // 66 ch
     { n: 3, textBg: "Включи левия мигач и задръж — сигналът винаги предхожда маневрата." },
-    { n: 4, textBg: "Бърз поглед през рамо към мъртвата зона — огледалото не показва всичко." },
-    { n: 5, textBg: "Премести се плавно и по диагонал в лявата лента и изключи мигача." },
+    // 73 ch
+    { n: 4, textBg: "Хвърли поглед през рамо към мъртвата зона — огледалото не показва всичко." },
+    // 70 ch
+    { n: 5, textBg: "Премести се плавно и по диагонал в лявата лента, после изключи мигача." },
+    // 71 ch
+    { n: 6, textBg: "Включи късите светлини по тъмно и в дъжд (чл. 70) преди престрояването." },
+    // 65 ch
+    { n: 7, textBg: "Помни: съседната кола те пуска само ако те вижда в огледалото си." },
   ],
   success: [
     {

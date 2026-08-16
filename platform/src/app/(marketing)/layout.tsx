@@ -72,25 +72,46 @@ export default function MarketingLayout({
           with a blur, so the 3D scene keeps running underneath it instead of
           being cropped by a header-shaped box. */}
       <header className="sticky top-0 z-50 border-b border-hair bg-background/70 backdrop-blur-md">
+        {/* EVERY CONTROL IN THIS BAR WAS UNDER 44px, and this is the first
+            screen in the product. Measured on the deployed build (WebKit,
+            iPhone 16, real insets, both orientations), box AND hit area, which
+            for these agree because none of them enlarges itself:
+
+              „Книжка.AI — начало"  136.5 x 32
+              „За автошколи"        123.1 x 36   (≥sm only)
+              „Вход"                 56.8 x 36
+              „Регистрация"         125.8 x 36
+
+            „Вход" and „Регистрация" are the two controls the whole landing page
+            exists to be tapped through, and they were 8px short on a phone.
+            `min-h-11` states the 44 directly instead of hoping padding adds up
+            to it — the same instrument the dashboard topbar's hamburger uses
+            after the same finding. The bar's own height does not move: it is
+            `py-3.5` around a 36px row, i.e. 64px, and a 44px row inside 64px
+            still has 10px of clearance a side. */}
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
-          <Link href="/" aria-label="Книжка.AI — начало" className="rounded-lg">
+          <Link
+            href="/"
+            aria-label="Книжка.AI — начало"
+            className="flex min-h-11 items-center rounded-lg"
+          >
             <Wordmark />
           </Link>
 
           <nav aria-label="Основна навигация" className="flex items-center gap-1 sm:gap-2">
             <Link
               href="/za-avtoshkoli"
-              className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none sm:block"
+              className="hidden min-h-11 items-center rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none sm:flex"
             >
               За автошколи
             </Link>
             <Link
               href="/login"
-              className="rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none"
+              className="flex min-h-11 items-center rounded-xl px-3 py-2 text-sm font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none"
             >
               Вход
             </Link>
-            <Link href="/register" className="btn-accent px-4 py-2">
+            <Link href="/register" className="btn-accent min-h-11 px-4 py-2">
               Регистрация
             </Link>
           </nav>
@@ -113,14 +134,27 @@ export default function MarketingLayout({
               </p>
             </div>
 
+            {/* 15px tall, all four of them, and 16px to a thumb — the smallest
+                targets on the landing page. These are the privacy notice, the
+                terms and the cookie policy, on a product whose users are minors
+                (ADR-004): „reachable on a phone" is not a nicety here, it is
+                the consent surface.
+
+                Grown rather than pseudo-enlarged, for the reason the dashboard
+                chips were: they are stacked in a `gap-2` column, so a ::before
+                reaching the 29px it would need would overlap the row below and
+                make a tap between two rows a coin flip over which legal
+                document opens. `w-fit` so the 44px row is only as wide as its
+                own label — a full-width block here would put an invisible tap
+                target across the whole footer column. */}
             <nav aria-label="Правна информация">
               <p className="hud-label">Документи</p>
-              <ul className="mt-3 flex flex-col gap-2">
+              <ul className="mt-1 flex flex-col">
                 {LEGAL_LINKS.map(({ href, labelBg }) => (
                   <li key={href}>
                     <Link
                       href={href}
-                      className="text-xs font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none"
+                      className="flex min-h-11 w-fit items-center text-xs font-semibold text-muted transition hover:text-foreground motion-reduce:transition-none"
                     >
                       {labelBg}
                     </Link>

@@ -1997,6 +1997,81 @@ const NM_YIELD_CREDIT_ZONE_M = 20;
 const NM_CONTACT_ZONE_M = 25;
 /** Actor sync clamp, m/s. */
 const NM_SYNC_MIN_MPS = 1.5;
+/**
+ * THE STOPPED-WITNESS RELEASE, NARROW-STREET EDITION (B80's remaining half) —
+ * the oncoming holds at the mouth of the стеснение until the player is
+ * genuinely about to arrive, expressed as seconds at his TRUE pace.
+ *
+ * The arrival sync below divides by `max(playerSpeed, 2 m/s)`, so a student
+ * obeying the drill's own «приближавай бавно» at 4 km/h is MODELLED AT 7.2 and
+ * the car is dispatched for an arrival that is minutes early. It then reached
+ * the mouth, was released by the old unconditional `carDistToEntry <= 4`, and
+ * transited an empty street. Measured on the live sc-ov-narrow@L1 /
+ * ov-narrow-v1 stack (b80-instrument profile D, 4 km/h approach), section
+ * y 110→145:
+ *
+ *   release at t 57.0 s, player at y 78.1 — playerAlong −31.9 m
+ *   they pass each other at t ≈ 66.8 s, y ≈ 93 — playerAlong −17 m
+ *   runner resolves t 67.8 s  success:true detail:"yielded"
+ *   → violations []   commendations ["YIELDED_TO_PRIORITY"]
+ *
+ * …and only THEN does he swing to x −4.1 and drive the whole 35 m narrowing on
+ * the wrong side, with the runner retired and nothing left to convict. He was
+ * commended for a meeting that happened 17 m before the drill began.
+ *
+ * This is the third sighting of ONE bug — junction L7/T7 (WITNESS_STOPPED_NEAR_M),
+ * ring B15 (RB_WITNESS_STOPPED_NEAR_M), narrow street here: obeying the
+ * instruction deletes the encounter. So the gate is written the way those two
+ * are, and for the same reason.
+ *
+ * WHY AN ETA TO THE SECTION AND NOT A DISTANCE. A constant `nearM` cannot
+ * express «the car should be IN the стеснение when he gets there», because that
+ * depends on how long the CAR needs to cross it. Worked through on this
+ * geometry: the actor holds at y 149, 4 m short of its entrance at the section's
+ * north end (y 145), and needs 35 m at ≈6 m/s ≈ 5.8 s to reach the south end. A
+ * flat 25 m distance gate releases it when the 4 km/h player is 25 m out — 22.5 s
+ * of crawling — so it still clears the whole section and meets him well short of
+ * it. Only «release when his ETA to the mouth is within a section-transit of the
+ * car's» puts the two bodies inside the same 35 m of street. Same shape as
+ * WITNESS_ENTRY_MARGIN_SEC at the junction, same justification.
+ */
+const NM_RELEASE_MARGIN_SEC = 1.5;
+/**
+ * …and the bound on the STOPPED-witness release below: a standstill this far
+ * back does not send the car through, m. WITNESS_STOPPED_NEAR_M's reason
+ * verbatim — a student who merely pauses far up the approach must not release a
+ * car that then clears the section long before he arrives.
+ *
+ * DEFERRAL ONLY is the invariant, and it is measured rather than argued: of the
+ * ten b80-instrument profiles on the live sc-ov-narrow@L1 stack, eight are
+ * byte-identical before and after (A, B, C, E, F, G, H, I) and the two that
+ * change are the two false commendations — D (4 km/h crawl) and J (hold at the
+ * marker, then cut in front), both [] + YIELDED_TO_PRIORITY before,
+ * FAILED_TO_YIELD + COLLISION after. At a scripted pace the car reaches its
+ * entrance only once the player is already inside the −8 m band above, so this
+ * branch is never consulted at all on those runs.
+ */
+const NM_RELEASE_NEAR_M = 25;
+/**
+ * True-speed floor for that ETA, m/s. Deliberately far below the sync's 2 m/s:
+ * a crawling or stopped student must read as NOT arriving, so the car waits for
+ * him instead of crossing an empty narrowing. Verbatim the WITNESS_MIN_SPEED_MPS
+ * precedent, and for the identical reason (doc 62 S2).
+ */
+const NM_TRUE_MIN_MPS = 0.5;
+/**
+ * The backstop. Once the staged car has held the mouth this long it goes,
+ * whatever the player is doing.
+ *
+ * It exists because the release above was a reachable state with NO exit — a
+ * player stopped 26–70 m back satisfied neither the witness bound nor the ETA
+ * gate, so both cars waited on each other for the rest of the session, and
+ * nothing in `director.ts` (no timeout, no watchdog, no force-resolve) would
+ * ever have broken the tie. Eight seconds is long enough that it never pre-empts
+ * a student who is genuinely arriving (the ETA gate fires at ~7.3 s on this
+ * geometry) and short enough that a lesson cannot be lost to it.
+ */
+const NM_MOUTH_WAIT_MAX_SEC = 8;
 
 export class NarrowMeetingRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
@@ -2024,6 +2099,8 @@ export class NarrowMeetingRunner implements EventRunner {
   private condSince: number | null = null; // conflict-visible onset
   private convictSince: number | null = null; // live barge condition onset
   private blockSince: number | null = null; // oncoming guard-stopped onset
+  private stoppedSince: number | null = null; // B80 stopped-witness dwell onset
+  private mouthWaitSince: number | null = null; // NM_MOUTH_WAIT_MAX_SEC backstop onset
   private sawConflict = false;
   private sawWait = false;
   private holding = false; // obstructionSide "oncoming": actor holds at entry
@@ -2089,6 +2166,8 @@ export class NarrowMeetingRunner implements EventRunner {
     this.condSince = null;
     this.convictSince = null;
     this.blockSince = null;
+    this.stoppedSince = null;
+    this.mouthWaitSince = null;
     this.sawConflict = false;
     this.sawWait = false;
     this.holding = false;
@@ -2159,9 +2238,80 @@ export class NarrowMeetingRunner implements EventRunner {
     if (this.phase === "armed") {
       if (dStart > s.armDistM && playerAlong < -8) return null;
       const carDistToEntry = entryArc - actor.s;
-      if (carDistToEntry <= 4 || playerAlong > -8) {
+      if (playerAlong > -8) {
+        // He is AT the widening — the meeting is now, whatever the car is doing.
         traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
         this.phase = "triggered";
+        return null;
+      }
+      if (carDistToEntry <= 4) {
+        // B80 — THE CAR IS AT THE MOUTH AND USED TO GO REGARDLESS. It now
+        // leaves only for a player who is genuinely arriving; otherwise it
+        // waits here. See NM_RELEASE_MARGIN_SEC for the measurement.
+        //
+        // The dwell latch is the T7 lesson repeated: bound purely by ETA, a
+        // student who STOPS to give way (the drill's own correct answer, and
+        // what the N1 integration test does 16 m out) reads as never arriving
+        // and is marooned in front of a car that will not move. A driver
+        // stopped at the widening is the most attentive witness there is, so he
+        // releases it — the WITNESS_STOPPED_KMH / WITNESS_STOPPED_HOLD_SEC pair
+        // verbatim, bounded to the mouth by NM_RELEASE_NEAR_M exactly as
+        // WITNESS_STOPPED_NEAR_M bounds it at the junction.
+        const trueSpeedMps = Math.max(input.speedKmh * KMH_TO_MPS, NM_TRUE_MIN_MPS);
+        const playerEtaSec = -playerAlong / trueSpeedMps;
+        const sectionTransitSec = this.lenM / Math.max(this.transitSpeedMps, NM_SYNC_MIN_MPS);
+
+        // ── 2026-08-15: THE EARLY YIELDER USED TO HANG THE DRILL FOREVER ────
+        //
+        // The stopped-witness release was bounded to NM_RELEASE_NEAR_M (25 m),
+        // copying WITNESS_STOPPED_NEAR_M from the junction. At a junction that
+        // bound is right — a witness has to be AT the line to be a witness. At
+        // a narrow meeting it deadlocks, because this is the branch where the
+        // PLAYER MUST YIELD and stopping IS the answer the drill teaches:
+        //
+        //   player stopped at playerAlong = −28
+        //     stoppedWitness  → needs >= −25            → false forever
+        //     playerEtaSec    → 28 / 0.5 = 56 s vs 7.3  → false forever
+        //     → cruise 0 every frame, both cars waiting on each other.
+        //
+        // Stopping inside 25 m worked; stopping at 26–70 m — earlier, safer,
+        // more courteous driving — hung the lesson with no way out, and
+        // `director.ts` has no timeout, watchdog or force-resolve anywhere.
+        // The old code's own comment names this failure ("marooned in front of
+        // a car that will not move") and then reintroduced it just outside 25 m.
+        //
+        // A STOPPED PLAYER IS YIELDING WHEREVER HE IS STOPPED. That is the whole
+        // semantic: the oncoming car is already at the mouth, and a driver who
+        // has come to rest is not going to contest it. So the distance bound
+        // goes. The dwell (WITNESS_STOPPED_HOLD_SEC) still does the work of
+        // distinguishing "stopped to give way" from "passing through slowly".
+        if (input.speedKmh <= WITNESS_STOPPED_KMH) {
+          if (this.stoppedSince === null) this.stoppedSince = input.tSec;
+        } else {
+          this.stoppedSince = null;
+        }
+        const stoppedWitness =
+          this.stoppedSince !== null &&
+          input.tSec - this.stoppedSince >= WITNESS_STOPPED_HOLD_SEC;
+
+        // AND A BACKSTOP, because the bug above was a reachable state with no
+        // escape and nothing else in the orchestrator would have caught it. Once
+        // the actor has held the mouth this long it goes regardless of what the
+        // player is doing. A wasted encounter costs one re-run; an unwinnable
+        // lesson costs the student the lesson.
+        if (this.mouthWaitSince === null) this.mouthWaitSince = input.tSec;
+        const mouthHeldSec = input.tSec - this.mouthWaitSince;
+
+        if (
+          stoppedWitness ||
+          mouthHeldSec >= NM_MOUTH_WAIT_MAX_SEC ||
+          playerEtaSec <= sectionTransitSec + NM_RELEASE_MARGIN_SEC
+        ) {
+          traffic.stagedCommand(s.id, { type: "cruise", speedMps: this.transitSpeedMps });
+          this.phase = "triggered";
+          return null;
+        }
+        traffic.stagedCommand(s.id, { type: "cruise", speedMps: 0 });
         return null;
       }
       // Sync the actor to reach its entrance about when the player reaches

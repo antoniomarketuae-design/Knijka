@@ -170,17 +170,70 @@ export const SC_FO_BRAKELIGHT_CHAIN: ScenarioSpec = {
   success: [
     {
       id: "sc-fbc-read",
-      titleBg: "Следвай колоната на съобразена дистанция",
-      // Cap 32 km/h keeps the calm chain-reading posture; the gap grading itself
-      // is the rule engine's job (FOLLOWING_TOO_CLOSE against the middle car).
+      // TITLE-TRUTH (doc 86 D3, the reachZone census after cdb2f71). This read
+      // «Следвай колоната на съобразена ДИСТАНЦИЯ» over a place and a speed
+      // cap, and the old comment said the split out loud — „the gap grading
+      // itself is the rule engine's job". A cap measures a speed. Two cars can
+      // cross this circle at the same 32 км/ч, one at three seconds of headway
+      // and one at nine tenths, and the objective ticked green for both.
+      //
+      // NOT REPAIRABLE BY A PARAM, MEASURED. `stepReachZone(params, prev, tick)`
+      // never reads a gap: fed a tick carrying `leadGapM: 0.2` — bumper
+      // touching — at this very mark under the cap, the zone completes. A
+      // `minLeadGapM`/`minLeadGapSec` gate was built for exactly this family and
+      // dropped after two adversarial passes (see the cdb2f71 message): a flat
+      // metre floor sat ABOVE this product's own taught two-second rule, and the
+      // latch is any-frame, so one qualifying frame in 168 certified a whole
+      // tailgating pass. A false refusal teaches as hard as a false certificate.
+      // Grading a following distance needs a DURATION semantic, not a
+      // parameter, and that is its own change — so the honest move here is the
+      // give-way remedy: say only what the gate sees.
+      //
+      // WHAT IT SEES: this place, reached calmly. The cap is 32 on a street
+      // posted 50 (compiled 37 at L1 and 34.5 at L2 — the ladder's flat 5 км/ч
+      // speedometer grace, bounded by the sign, B58), which is why the title
+      // says «спокойно» and deliberately prints NO number: a title claiming
+      // «под 32» over a gate that accepts 37 would be the same defect one
+      // decimal smaller. Measured at this circle, every rung: the shadow crosses
+      // at 25.87 км/ч and completes; both mistake demos are refused by the cap
+      // alone (47.92 and 37.88 км/ч) at every rung.
+      //
+      // The distance is not lost — it is billed where it always was: this
+      // drill's own `mistake-bumper-stare` cites FOLLOWING_TOO_CLOSE, and
+      // instruction 3 («Дръж поне 2 секунди дистанция») still teaches it.
+      titleBg: "Следвай колоната спокойно",
       params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12, maxSpeedKmh: 32 },
     },
     {
       id: "sc-fbc-stop",
-      titleBg: "Спри зад колоната, без да я удариш",
+      // «БЕЗ ДА Я УДАРИШ» IS A DISTANCE CLAIM and nothing checked it — the same
+      // census row, one gate later. The cap 6 ≤ REACH_ZONE_HALT_CAP_KMH is a
+      // genuine halt demand and is never widened by the ladder, so «Спри» is
+      // true on every rung; „without hitting it" is the clause the tick cannot
+      // see. Proved rather than argued: the same `leadGapM: 0.2` probe completes
+      // THIS gate too, i.e. a car standing 20 cm off the column's bumper is
+      // credited with having stopped without hitting it.
+      //
+      // WHY GEOMETRY CANNOT RESCUE IT HERE. The column is `matchPlayer`-pinned
+      // (FBC_MID paceAheadM 26), so the car in front has no fixed resting place
+      // to size a disc against — where it stops depends on where the player
+      // stops. The recorded crash escapes this circle only by accident of its
+      // own late braking (`mistake-late-brake` holds 37.88 км/ч through all 53–73
+      // of its in-disc frames and comes to rest at y = 251.96, outside even the
+      // L1 grace capsule), and a claim that survives on the timing of one
+      // recording is not a checked claim.
+      //
+      // So the clause goes and the collision keeps its grader: this drill's own
+      // `mistake-late-brake` cites COLLISION, billed by the contact probe on
+      // bodies, and instruction 5 still says «Спри плавно зад колоната». Params
+      // untouched — `done` is bit-identical, nothing new can fail, no THEO-4
+      // card is owed.
+      //
       // The shadow lifts on the HEAD's brake lights (player ~212) and rolls to
       // rest well short of the stopped chain; the low speed cap makes reaching
-      // this AT REST the drill.
+      // this AT REST the drill (measured: it satisfies the cap at y = 223.61,
+      // 5.87 км/ч, at every rung).
+      titleBg: "Спри зад спрялата колона",
       params: { kind: "reachZone", x: LANE_X, y: 222, radiusM: 14, maxSpeedKmh: 6 },
     },
     {
@@ -334,16 +387,81 @@ export const SC_FO_MOTORWAY_GAP: ScenarioSpec = {
   success: [
     {
       id: "sc-fmg-gap",
-      titleBg: "Дръж 2-секундната дистанция със скоростта на потока",
-      // maxSpeedKmh 140: the whole point is holding flow speed AND the gap — the
-      // gap grading is the rule engine's job (FOLLOWING_TOO_CLOSE against the lead).
+      // TITLE-TRUTH, and the LOUDEST row of the census: the title named the
+      // number — «2-СЕКУНДНАТА дистанция» — and the params carried only
+      // „maxSpeedKmh 140", a cap 19 км/ч above anything the shadow does. The old
+      // comment said both halves out loud („holding flow speed AND the gap")
+      // and then measured one of them, in the one drill whose entire subject is
+      // that at this speed the headway is 72 metres.
+      //
+      // The gap is not expressible here — `stepReachZone` reads one SimTick and
+      // never consults `leadGapM` (a tick carrying 0.2 m completes a zone), and
+      // the parameter built for it was dropped as a false-refusal machine
+      // (cdb2f71: a flat floor above the taught rule, an any-frame latch).
+      // Grading a following distance needs a DURATION semantic and gets its own
+      // change; until then the title says what the gate sees.
+      //
+      // WHAT THE CAP IS WORTH, and why it is the half worth naming: 140 IS the
+      // posted limit of mw-v1, so the B58 ceiling pins the compiled cap at
+      // exactly 140 on EVERY rung (measured L1…L5) — cap and sign are one
+      // number here, which is what lets the title say «в рамките на
+      // ограничението» and mean it on the aided rungs too. And it is the only
+      // thing that refuses anything today: both mistake demos cross this circle
+      // at 143.88 км/ч and are turned away by the cap alone, while the shadow
+      // crosses at 120.91 км/ч and completes, at every rung.
+      //
+      // The NUMBER is deliberately not in the title: `advisorPromptForObjective`
+      // already appends «— дръж под 140 км/ч» to every capped reachZone, so
+      // spelling it here would print it twice in one sentence.
+      //
+      // The 2 seconds keep their grader — BOTH mistakes cite FOLLOWING_TOO_CLOSE
+      // (the second also COLLISION) — and their voice: instruction 2 spells out
+      // «правилото за 2 секунди тук значи цели 72 метра», and the drill's own
+      // title is «Дистанция при 130».
+      // 2026-08-15 — WAS «Продължи по магистралата в рамките на ограничението».
+      //
+      // That title claimed a RUN and the gate samples an INSTANT.
+      // `stepReachZone` latches `capMet` on the first frame at or under the cap
+      // anywhere inside this 8 m disc, on a ~800 m drive — so one compliant
+      // frame certified «within the limit» for the whole motorway. It was also
+      // unguarded: deleting `maxSpeedKmh: 140`, the sole backing for the claim,
+      // left 125 files / 2323 tests green, because the new title-truth net only
+      // knows «спри» / «изчакай» and «в рамките на ограничението» sits in no tier.
+      //
+      // Speed over a stretch is the rule engine's job and it already does it
+      // (SPEEDING fires on the band, continuously, and the drill's own mistakes
+      // cite FOLLOWING_TOO_CLOSE). So the title claims only what an 8 m disc can
+      // prove — that he got there — and the cap stays as an arrival condition
+      // rather than as a sentence about the journey.
+      titleBg: "Стигни края на отсечката по магистралата",
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 400, radiusM: 8, maxSpeedKmh: 140 },
     },
     {
       id: "sc-fmg-stop",
-      titleBg: "Спри зад спирачещия, без да го удариш",
-      // The shadow absorbs the firm brake and rolls to rest with a big margin
-      // (~46 m); the low speed cap makes reaching this AT REST the drill.
+      // A TITLE THAT CERTIFIED ITS OWN CRASH DEMO — the hardest-measured row of
+      // the census, and the one that is not a matter of principle at all.
+      // «Спри зад спирачещия, БЕЗ ДА ГО УДАРИШ» is a distance claim over
+      // `{radiusM: 18, maxSpeedKmh: 8}` — a place and a halt cap, nothing that
+      // measures a distance to anything. Replayed through the production
+      // evaluator, `mistake-bumper-crash` — the drive whose own copy reads «удар
+      // отзад на магистрала… сред най-тежките ПТП» and whose codeRefs carry
+      // COLLISION — completes this gate at L1, L2, L3, L4 AND L5, at t = 29.35 s,
+      // at (0, 800.00) and 0.00 км/ч: it came to rest by hitting him, and was
+      // ticked off as having stopped without hitting him.
+      //
+      // NO RADIUS SEPARATES THEM. The shadow rests at y = 791.96 and the crash
+      // at y = 800.00 — eight metres apart, against an L1 widening of five, so a
+      // disc tight enough to exclude the crash would refuse a student who simply
+      // braked a little later and stopped forty metres clear. That is the false
+      // REFUSAL this catalogue has already paid for once. So the clause goes
+      // (the give-way remedy) and the collision keeps its grader: the demo above
+      // cites COLLISION, and instruction 5 still teaches the smooth stop.
+      //
+      // Params untouched — `done` is bit-identical, nothing new can fail, no
+      // THEO-4 card is owed. The shadow absorbs the firm brake and rolls to rest
+      // with a big margin; the low speed cap makes reaching this AT REST the
+      // drill (measured: it satisfies the cap at y = 791.51, 7.87 км/ч).
+      titleBg: "Спри зад спирачещия автомобил",
       params: { kind: "reachZone", x: MW_X_CRUISE, y: 790, radiusM: 18, maxSpeedKmh: 8 },
     },
   ],

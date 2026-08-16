@@ -171,10 +171,49 @@ export const SC_LN_DECISIVE_CHANGE: ScenarioSpec = {
     },
     {
       id: "sc-lndc-merged",
-      titleBg: "Влез решително в пролуката зад отминалата кола",
-      // Same lane-pinning radius on the TARGET lane — the completed decisive
-      // merge, in the left-lane center (not straddling the divider).
-      params: { kind: "reachZone", x: LN_LEFT, y: 300, radiusM: 4 },
+      // TITLE-TRUTH (doc 86 D3, the reachZone census after cdb2f71) — the one
+      // row of the census that carried NOTHING: no cap, no constraint, a bare
+      // presence check under «Влез РЕШИТЕЛНО в ПРОЛУКАТА зад отминалата кола».
+      // Both promised words were unmeasured, and the comment that stood here
+      // („not straddling the divider") was measurably false at EVERY rung.
+      //
+      // IT CERTIFIED ITS OWN COUNTER-DEMO. `mistake-half-merge` — the drive
+      // whose own copy reads «увисна на границата между двете ленти, нито в
+      // едната, нито в другата» — parks at x = 7.50 (the paint is at 8.125) and
+      // stands there. Its distance to this mark can never be less than
+      // |7.50 − 4.06| = 3.44 m, and the authored r4 admitted it: replayed
+      // through the production evaluator it completed at L1, L2, L3, L4 AND L5
+      // (47 / 43 / 38 / 38 / 38 frames inside the disc). The ladder made the
+      // aided rungs worse still — r4 widens to 6 at L1 and 5 at L2 (params.ts
+      // widenRadius; the chain budget against sc-lndc-finish was 21.5 m then and
+      // is 22.5 m now, so only the 5 m grace ceiling has ever bound here),
+      // reaching x = −1.94 and −0.94, i.e. back into the RIGHT lane the student
+      // is supposed to have left.
+      //
+      // THE RADIUS NOW MEANS THE LANE. r2 compiles to 3.0 / 2.5 / 2.0 / 2.0 /
+      // 2.0 across the ladder — every rung inside the 4.0625 m half-pitch (so
+      // only the TARGET lane reaches the mark, which is what the old comment
+      // claimed and could not deliver) and every rung short of the 3.44 m
+      // straddle, by 0.44 m at the widest. Measured on the shipped shadow,
+      // which arcs through this mark at x = 5.43–5.86 (closest approach 1.22 m,
+      // 33.9 км/ч): it holds 12 / 9 / 7 / 7 / 7 frames inside the compiled disc
+      // at L1…L5, where the authored r4 gave it 25 / 21 / 16. `mistake-half-
+      // merge` holds ZERO at every rung, and `mistake-blind-spot` never arrives
+      // at all (the crash ends it at y = 190, 110 m short).
+      //
+      // AND THE TITLE NOW CLAIMS ONLY THAT. «пролука» is a gap and no readable
+      // field carries one — `stepReachZone` sees one SimTick and never reads
+      // even `leadGapM` (a tick carrying 0.2 m of bumper still completes a
+      // zone). «решително» is worse: a student who crawls into the same place
+      // at 5 км/ч performs the opposite of the lesson and no param can tell.
+      // Both go rather than stay as false certificates. Neither is lost: they
+      // keep being taught (instruction 5, in capitals) and keep being graded
+      // where they always were — LANE_CHANGE_WITHOUT_INDICATOR and
+      // POOR_LANE_KEEPING, the two codes this drill's own half-merge demo
+      // cites. What replaces them is what the disc now measures: the target
+      // lane, in the middle of it, behind the car that has gone by.
+      titleBg: "Заеми лявата лента зад отминалата кола, в средата ѝ",
+      params: { kind: "reachZone", x: LN_LEFT, y: 300, radiusM: 2 },
     },
     {
       id: "sc-lndc-finish",

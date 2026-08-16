@@ -226,7 +226,24 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     //
     // Inert everywhere else: env() falls back to 0px on any display without a
     // cutout, and `calc(100dvh - 0px)` is `100dvh`.
-    <div className="flex min-h-[calc(100dvh-env(safe-area-inset-bottom,0px))] flex-col lg:grid lg:grid-cols-[16rem_1fr]">
+    //
+    // THE SUBTRAHEND HAS TO BE WHATEVER <body> PAYS, NOT THE INSET BY NAME.
+    // Since 2026-08-16 body's bottom padding is
+    // `max(env(safe-area-inset-bottom, 0px), var(--pinned-bar-h, 0px))` — the
+    // install bar is `fixed bottom-0` and had never been reserved for, so it
+    // sat on 49 % of the „Теория" card on /dashboard (globals.css §BODY has the
+    // measurements). Naming only the inset here would re-open the exact defect
+    // this calc exists to close, one bar-height instead of one notch: a root
+    // asking for more height than body's content box has overflows it, the
+    // document scrolls by that much on every screen, and `useQuestionBudget`
+    // reads the difference as „the question must give this back" and clamps the
+    // stem against a floor it can never reach. So the two expressions are the
+    // same expression, and pinnedBarInset.test.ts refuses to let them drift.
+    //
+    // Identical to the previous value on every route: `--pinned-bar-h` is only
+    // set while a pinned bar is actually mounted, which is /dashboard and / and
+    // only until the student says „не, благодаря".
+    <div className="flex min-h-[calc(100dvh-max(env(safe-area-inset-bottom,0px),var(--pinned-bar-h,0px)))] flex-col lg:grid lg:grid-cols-[16rem_1fr]">
       {/* Desktop sidebar — a console SLAB, not a column with a border on it:
           it catches the cabin light down the edge that faces the deck and drops
           a short shadow onto it (`.console` + `.console-right`, globals.css §9).

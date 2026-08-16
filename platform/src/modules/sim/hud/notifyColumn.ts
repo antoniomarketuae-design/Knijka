@@ -67,6 +67,108 @@ export const NOTIFY_COLUMN_WIDTH_FRACTION_COMPACT = 0.36;
  */
 export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE SAME RULE FOR THE OTHER AXIS — 2026-08-16, „THE HUD IS STANDING ON
+   THE ROAD".
+
+   THE RULE ABOVE IS ABOUT x AND ONLY ABOUT x. It has been satisfied since
+   2026-08-03 and the founder's complaint did not go away, because a column that
+   is correctly at the right edge can still run all the way DOWN the picture:
+
+     MEASURED ON THE DEPLOYED BUILD (WebKit, real insets, iPhone 16 landscape
+     852 × 393, `/simulator?scenario=sc-zebra-approach&level=1`, the landing
+     frame, canvas asserted):
+
+       [data-hud="notify-column"]  [541, 8, 180 × 192]
+
+     left fraction 0.635 — the x rule passes with room to spare — and a FLOOR at
+     y = 200, i.e. 0.509 of the stage. His words: „it sits exactly over the
+     RIGHT-HAND PAVEMENT, which is where the pedestrian comes from, and clips
+     the crossing warning sign. A card that covers the hazard the lesson is
+     about is worse than a card that is merely large."
+
+   WHERE THE HAZARD IS, IN FRAME COORDINATES, AND IT IS DERIVED RATHER THAN
+   EYEBALLED. `cabinLook.test.ts` already asserts the cockpit projection: a
+   point at infinity lands at y = 0.58 of the canvas, so that is the HORIZON.
+   The cockpit holds a ~75.4° horizontal FOV (cabinLook), which at the 2.168
+   aspect of a landscape iPhone is 39.2° vertically. An object of height h above
+   the 1.2 m eye point, at distance d, therefore lands
+   `0.58 − atan(h/d) / 39.2°` of the way down the frame:
+
+     a 2.2 m sign face   at 30 m → 0.531   ·  at 15 m → 0.483  ·  at 8 m → 0.398
+     a 1.75 m pedestrian at 30 m → 0.556   ·  at 15 m → 0.531
+
+   So everything the student is being TAUGHT to look at on this rung enters the
+   frame at or below **0.53**, and it enters there at the distance where it can
+   still be acted on (27 m is reaction plus braking at the 50 km/h limit).
+
+   0.43 IS THAT LINE WITH A TENTH OF THE FRAME OF CLEARANCE — the same grammar
+   and the same margin `HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION` uses one file over
+   („0.55 leaves a tenth of the frame of clearance" below a hotspot at 0.65).
+   It is a CEILING and not a height: it is applied with `min()` against the
+   control band's own budget, so whichever is tighter wins.
+
+   WHAT IT COSTS, STATED, because it is paid in authored Bulgarian. At
+   852 × 393 the column goes 192 → 161 px and the peek's text window 116 → ~71,
+   i.e. about eight visible lines down to about five. That is only acceptable
+   because the other half of this row ships with it: the fold is no longer a
+   silent 10 px fade — `SimOverlay` counts the lines below it and prints
+   «↓ още N реда» beside «ПРОЧЕТИ», which opens the whole authored text with the
+   car stopped. Measured on the same frame before the change: 580 characters in
+   the card, 232 of them on screen, 348 below an unhinted fold and NOTHING on
+   the glass saying so — including the founder's own «…дали да стъпи.», whose
+   missing four words are what row 2 of his letter is about.
+
+   PORTRAIT IS UNTOUCHED BY CONSTRUCTION: 0.43 × 852 = 366 px is larger than the
+   control band's own cap there (330), so the `min()` picks the band and not
+   one pixel moves.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The cockpit horizon, as a fraction of the canvas — `cabinLook.test.ts`'s own
+ * assertion (`at([0.24, 0.71, 1e6]).y ≈ 0.58`), quoted here so the arithmetic
+ * above can be re-run rather than trusted.
+ */
+export const COCKPIT_HORIZON_FRACTION = 0.58;
+
+/**
+ * The top of the band a hazard is projected into, as a fraction of the stage.
+ * See the derivation above: a 2.2 m sign at 30 m and a pedestrian at 15 m both
+ * land at 0.53, and 30/15 m is where they still have to be noticed.
+ */
+export const HAZARD_BAND_TOP_FRACTION = 0.53;
+
+/** …and the ceiling the peek keeps above it. A tenth of the frame of clearance. */
+export const NOTIFY_COLUMN_MAX_STAGE_FRACTION = 0.43;
+
+/**
+ * The peek's ceiling as shipped CSS — the tighter of the two budgets.
+ *
+ * `floorCss` is what the control band leaves (TouchControls' own
+ * `notifyColumnFloorCss()`); `topCss` is where the column starts. Both are
+ * subtracted from the sky budget too, because a `max-height` is measured from
+ * the box's own top edge and the column's top is not the stage's.
+ */
+export function notifyColumnMaxHeightCss(floorCss: string, topCss: string): string {
+  return `min(
+          calc(100% - ${floorCss} - ${topCss}),
+          calc(${NOTIFY_COLUMN_MAX_STAGE_FRACTION * 100}% - ${topCss})
+        )`;
+}
+
+/** …resolved, so the ladder sweep and the tests can assert on numbers. */
+export function notifyColumnMaxHeightPx(
+  stageHeightPx: number,
+  bandFloorPx: number,
+  topPx: number,
+): number {
+  if (!Number.isFinite(stageHeightPx) || stageHeightPx <= 0) return 0;
+  return Math.min(
+    stageHeightPx - bandFloorPx - topPx,
+    stageHeightPx * NOTIFY_COLUMN_MAX_STAGE_FRACTION - topPx,
+  );
+}
+
 /** Column width in CSS px for a viewport. */
 export function notifyColumnWidthPx(viewportWidthPx: number, compact: boolean): number {
   const cap = compact

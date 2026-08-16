@@ -1635,8 +1635,13 @@ export function VitokCockpit({
           visibly mounted to something. */}
       <CabinRoof />
 
-      {/* A4: functional render-to-texture mirrors on the GLB mirror glass. */}
-      <MirrorRig mirrors={mirrorMeshes} active={cockpitView} />
+      {/* A4: functional render-to-texture mirrors on the GLB mirror glass.
+          `cabinRef` is what lets the two DOOR mirrors render at all below
+          `high`: their passes now follow the head (scene/vitok/mirrorAttention)
+          instead of being cut entirely, which is what made the left door
+          mirror a matte-black pod on every preset a student can reach —
+          measured median luminance 0, 73.9 % near-black, 2026-08-16. */}
+      <MirrorRig mirrors={mirrorMeshes} active={cockpitView} cabinRef={cabinRef} />
 
       {/* Rear-mirror shell + bezel, portalled INTO the glass quad so it rides
           every transform MirrorRig applies to it (see MirrorHousing). */}

@@ -531,10 +531,35 @@ body {
      one orientation that has the least height to spare.
 
      env() falls back to 0px on engines without it, so this is inert on
-     desktop and on every phone without a cutout. */
+     desktop and on every phone without a cutout.
+
+     …AND THE BOTTOM EDGE NOW ALSO PAYS FOR A PINNED BAR, WHICH IS A SECOND
+     CLAIM ON THE SAME STRIP. `components/pwa/InstallHint` is
+     `fixed inset-x-0 bottom-0`, and until 2026-08-16 nothing reserved a pixel
+     for it, so every page it is allowed on simply ran underneath it. Measured
+     on the deployed build (WebKit, iPhone 16, real insets, signed in, at rest
+     on /dashboard): the bar overlapped the „Теория" module card by 34,284 px²
+     in portrait — 49 % of it — and the „ПРОДЪЛЖИ УРОКА" hero card by
+     34,944 px² in landscape, and `document.elementFromPoint` at the centre of
+     the „Елементи на пътя" practice link returned the BAR. That link's own
+     middle was not tappable.
+
+     `max()`, NOT `+`. The bar already carries
+     `max(0.75rem, env(safe-area-inset-bottom))` as its own bottom padding, so
+     its measured height ALREADY contains the home-indicator strip; adding the
+     two would reserve that strip twice and leave a 34px hole under every page
+     in the product. Taking the larger of the two reserves exactly the taller
+     claim, which is what „both surfaces are clear" means.
+
+     `--pinned-bar-h` is published by components/ui/PinnedBarInset (measured,
+     because the bar has four heights and three are decided at runtime) and is
+     ABSENT whenever no bar is mounted — which is every route but two, and both
+     of those the moment the student dismisses it. With the property absent the
+     fallback makes this `max(env(safe-area-inset-bottom, 0px), 0px)`, i.e.
+     character-for-character the behaviour that shipped before it existed. */
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--pinned-bar-h, 0px));
 }
 
 /* ============================================================

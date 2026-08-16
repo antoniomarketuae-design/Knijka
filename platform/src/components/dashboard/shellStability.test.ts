@@ -140,8 +140,33 @@ describe("<body> still pays the inset back for ordinary in-flow content", () => 
    * screen that is NOT position:fixed. The stability sweep measured 0 blocking
    * safe-area findings on all six surfaces because of these three lines.
    */
-  it.each(["left", "right", "bottom"])("pads %s on <body>", (edge) => {
+  it.each(["left", "right"])("pads %s on <body>", (edge) => {
     expect(flat(GLOBALS)).toContain(flat(`padding-${edge}: env(safe-area-inset-${edge}, 0px);`));
+  });
+
+  /**
+   * THE BOTTOM EDGE HAS A SECOND CLAIMANT SINCE 2026-08-16, so it is asserted
+   * separately — and this test moved rather than being deleted, because the
+   * guarantee it was written for has not changed by one pixel.
+   *
+   * The PWA install bar is `fixed inset-x-0 bottom-0` and nothing reserved a
+   * pixel for it, so on /dashboard it sat on 49 % of the „Теория" card and
+   * `document.elementFromPoint` at the centre of the „Елементи на пътя"
+   * practice link returned the BAR (measured on the deployed build, WebKit,
+   * iPhone 16, both orientations). The declaration is now
+   * `max(env(safe-area-inset-bottom, 0px), var(--pinned-bar-h, 0px))` — the
+   * larger of the two claims on the same strip, never their sum, because the
+   * bar's own bottom padding already contains the home-indicator inset.
+   *
+   * With no bar mounted the custom property is absent and this resolves to
+   * `max(env(safe-area-inset-bottom, 0px), 0px)`, i.e. exactly what this test
+   * originally pinned. components/ui/pinnedBarInset.test.ts owns the rest of
+   * the contract.
+   */
+  it("pays the LARGER of the home indicator and a pinned bar on the bottom", () => {
+    expect(flat(GLOBALS)).toContain(
+      flat("padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--pinned-bar-h, 0px));"),
+    );
   });
 
   /** Top is deliberately absent — layout.tsx explains why (statusBarStyle). */

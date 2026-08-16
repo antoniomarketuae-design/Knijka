@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { createDashboardStatus, dashboardHash } from "../dashboardStatus";
+import { GovernorCapMark } from "../StatusDashboard";
 
 /**
  * =============================================================================
@@ -198,5 +201,116 @@ describe("the channel re-renders when the tier changes", () => {
     expect(dashboardHash({ ...base, governorCapKmh: 30, governorTierBg: "Начинаещ" })).not.toBe(
       dashboardHash({ ...base, governorCapKmh: 30, governorTierBg: "Нормален" }),
     );
+  });
+});
+
+/**
+ * =============================================================================
+ * THE MODE CAP IS NOT LEGAL ADVICE — 2026-08-16.
+ *
+ * THE DEFECT, MEASURED on the deployed build (iPhone-16 landscape,
+ * `sc-vp-handbrake` L1): the whole bar was 104 px wide and read, as one string,
+ * **„D 6 км/ч 50 Нормален ≤60"**. The red-ringed В26 disc occupied x 378–402
+ * and this mark began at x 408 — **6 px** between a legal prohibition sign and
+ * a training-mode throttle ceiling, with no rule, no label and no register
+ * change between them. Founder: „…it reads as «the limit is 50, you may do 60»,
+ * to a 17-year-old learning the law."
+ *
+ * The 60 is `rules/engine.ts:562` NORMAL_CAP_MARGIN_KMH = 10 — posted limit
+ * plus ten, a governor on the PEDAL. Nothing on screen said so.
+ *
+ * WHY THESE ARE RENDER TESTS AND THE ONES ABOVE ARE NOT. The bar's state
+ * arrives through an interval effect, so a static render of `StatusDashboard`
+ * always carries `governorCapKmh: null` and never draws the mark — which is
+ * why every existing guard here reads the source instead. A grep cannot tell
+ * „the clause renders when the cap is above the limit" from „the string exists
+ * somewhere in the file", and that conditional is the whole of this change, so
+ * `GovernorCapMark` is now exported and rendered directly.
+ * =============================================================================
+ */
+describe("the governor cap cannot be read as a permission", () => {
+  const mark = (capKmh: number | null, limitKmh: number, speedKmh = 20) =>
+    renderToStaticMarkup(
+      createElement(GovernorCapMark, {
+        capKmh,
+        limitKmh,
+        speedKmh,
+        tierBg: "Нормален",
+        size: "compact" as const,
+      }),
+    );
+
+  it("names the REGISTER the number belongs to — a mode of the car, not the road", () => {
+    // OLD: the mark was the bare string „Нормален ≤60". In Bulgarian that parses
+    // as „Normal ≤60" — the tier's name is an ordinary adjective, so the one
+    // word available to disambiguate was disambiguating the wrong way.
+    //
+    // The assertion is on the LABELLED span and not on the substring „Режим":
+    // the first draft searched the whole markup, and the aria-label has always
+    // opened with „Режимът „Нормален“ пуска…", so it passed on the old bare
+    // mark too. A guard that green-lights the defect it was written for is
+    // worse than no guard, and it took reverting the component to notice.
+    const html = mark(60, 50);
+    expect(html).toContain('data-hud="governor-register"');
+    expect(html).toMatch(/data-hud="governor-register"[^>]*>\s*Режим\s*</);
+  });
+
+  it("says the sign wins when the mode ceiling is ABOVE the posted limit", () => {
+    // The founder's own frame: cap 60, sign 50.
+    expect(mark(60, 50)).toContain("знакът важи");
+  });
+
+  it("…and says nothing of the kind when the ceiling is at or under the sign", () => {
+    // Below the limit there is no misreading to correct, and a permanent
+    // disclaimer would be furniture. This is the assertion that proves the
+    // clause is CONDITIONAL rather than always-on — i.e. that the component
+    // was actually told what the law says on this road.
+    expect(mark(40, 50)).not.toContain("знакът важи");
+    expect(mark(50, 50)).not.toContain("знакът важи");
+    // Negative control: the 40 case still rendered a mark at all, so the
+    // `not.toContain` above is not passing on an empty string.
+    expect(mark(40, 50)).toContain("Нормален ≤40");
+  });
+
+  it("still prints whose ceiling it is, and still vanishes when there is none", () => {
+    expect(mark(60, 50)).toContain("Нормален ≤60");
+    expect(mark(null, 50)).toBe(""); // „Напреднал" — no cap, no mark
+  });
+
+  it("the register label survives on the PHONE, where he read it", () => {
+    // The telltale captions in this file are `hidden … sm:block`. If the
+    // register word had borrowed that class it would be invisible on exactly
+    // the device the complaint came from, and this suite would still be green.
+    const src = SRC.slice(
+      SRC.indexOf("export function GovernorCapMark"),
+      SRC.indexOf("export function StatusDashboard"),
+    );
+    expect(src).toContain('data-hud="governor-register"');
+    expect(src).not.toMatch(/governor-register[\s\S]{0,400}?\bhidden\b/);
+    // …and it must not dress itself as a road sign: a red ring with a numeral
+    // in it IS В26, and that shape is reserved for the law (see the disc).
+    expect(src).not.toContain("rounded-full");
+    expect(src).not.toContain("--danger");
+  });
+
+  it("a hairline separates the В26 disc from the mark, in BOTH variants", () => {
+    // 6 px of whitespace was the entire separation. The compact variant drops
+    // the band and every divider with it, which is right for instruments that
+    // are merely adjacent and wrong for the one adjacency that changes what a
+    // number MEANS — so the rule had to be added back for this pair only.
+    for (const variant of [COMPACT, ROOMY]) {
+      const disc = variant.indexOf("Ограничение ${limit}");
+      const rule = variant.indexOf("<Divider short />", disc);
+      const cap = variant.indexOf("<GovernorCapMark", disc);
+      expect(disc).toBeGreaterThan(-1);
+      expect(rule).toBeGreaterThan(disc);
+      expect(cap).toBeGreaterThan(rule);
+    }
+  });
+
+  it("the mark is told the posted limit by both variants", () => {
+    // Without this the conditional above silently becomes dead code.
+    const passes = SRC.match(/limitKmh=\{limitKmh\}/g) ?? [];
+    expect(passes).toHaveLength(2); // compact + roomy
   });
 });

@@ -50,6 +50,8 @@ import {
   DASH_GAP_M,
   DASH_LENGTH_M,
   DASH_WIDTH_M,
+  EDGE_LINE_INSET_M,
+  EDGE_LINE_WIDTH_M,
   LANE_WIDTH_M,
   MARKING_Y,
   ROAD_Y,
@@ -1080,6 +1082,9 @@ export interface RoundaboutBuildResult {
   islands: number;
   /** Ring divider dashes painted (0 on single-lane rings — nothing to divide). */
   ringDividerQuads: number;
+  /** Outer edge-line quads painted (0 where the island — and so the ring — is
+   *  refused). Solid off-mouth, broken across every entry and exit. */
+  ringEdgeQuads: number;
   /** Planted crowns + shrubs of every island — its own mesh (see below). */
   islandPlanting: MeshAccumulator;
 }
@@ -1311,6 +1316,169 @@ function buildRingDivider(ring: RoundaboutRing, markings: MeshAccumulator): numb
   return quads;
 }
 
+// ---------------------------------------------------------------------------
+// B16, THE FOURTH LOOK — THE CIRCLE THE KERB IS NOT ALLOWED TO DRAW
+// ---------------------------------------------------------------------------
+//
+// The three passes above each closed a real half of his sentence and the row is
+// still open, because all three spend the same currency: KERB. Kerb cannot
+// close a mouth — a mouth is where cars drive in. So the outer boundary of the
+// tight rings is, and must remain, mostly gap:
+//
+//     rb-mini-v1    mouth union 206.0°   outer kerb 154.0°
+//     rb-ped-v1     mouth union 206.0°   outer kerb 154.0°
+//     rb-2lane-v1   mouth union 246.0°   outer kerb 114.0°
+//     district-v1   mouth union 184.5°   outer kerb 175.5°
+//
+// (measured here over 720 bearings on the shipped `analyzeRoundabouts` output).
+// More than half of the boundary of the ring he drove is, by necessity, open
+// asphalt — and that is why the windscreen reads „a wide flat asphalt junction
+// whose kerbs run left-to-right across the frame".
+//
+// THE MEASUREMENT THAT NAMES THE ACTUAL GAP. Paint has none of the kerb's
+// problem: a driver may cross paint, so paint may close the full 360°. So the
+// question is what paint is on the ring's outer edge today. Counted on the
+// shipped `markings` buffer, one-degree buckets, any painted vertex within
+// ±1.0 m of `ringOuterRadiusAt(bearing)`:
+//
+//     rb-mini-v1      0 / 360        rb-single-v1   20 / 360
+//     rb-ped-v1       0 / 360        district-v1    16 / 360
+//     rb-2lane-v1     0 / 360        d2-v1          88 / 360
+//
+// **Zero.** On the three tight rings there is not one square centimetre of
+// marking anywhere on the outer edge of the circulatory carriageway, on any
+// bearing. `buildRingDivider` above draws the ONE circle this module has, and
+// it refuses single-lane rings by design (there is no lane boundary to draw) —
+// so on rb-mini and rb-ped the only circular thing in the whole world is the
+// island kerb 13.75 m away, and the annulus the student is supposed to read has
+// a boundary on its inner side only.
+//
+// So this pass draws the outer edge of the circulatory carriageway, all the way
+// round, and it is not an invention: an М1 edge line at the carriageway's edge
+// and a broken line where traffic crosses it is exactly the marking Наредба № 2
+// puts there. SOLID where the boundary is kerb, BROKEN across each mouth —
+// which is the correct sign as well as the pretty one, because "broken = you
+// may cross this" is precisely what an entry and an exit are.
+//
+// WHAT IT COSTS. Zero draw calls: the quads go into the SAME `markings`
+// accumulator every lane line already lives in. Zero colliders: paint is not
+// geometry a wheel can hit. Zero content, zero template, zero trace — no
+// radius, no arm width and no acceptance zone moves, so nothing recorded
+// against this map is invalidated.
+//
+// WHAT IT DOES NOT FIX, stated here rather than in a report nobody reads: the
+// mouths still eat 206–246° of the circumference, because mouth width is arm
+// width ÷ ring radius and the generators author 16.25 m arms into an 18 m ring.
+// This makes the ring VISIBLE as a ring; it does not make it PROPORTIONED as
+// one. That half is the founder's ruling (register B16: R = 46 m would cost 36
+// re-recorded traces and reads WORSE from the seat), and it is not taken here.
+
+/** Centre width of the ring's outer edge line — the same М1 the streets use. */
+const RING_EDGE_LINE_WIDTH_M = EDGE_LINE_WIDTH_M;
+
+/**
+ * Dash pitch used where the edge line crosses a mouth.
+ *
+ * Deliberately much finer than the 5 m / 8 m open-road dash: at a mouth the
+ * line is crossed at right angles rather than followed, and the driver has to
+ * read it as "the circle continues here" in the second or so it is in front of
+ * him. 1.2 m on / 1.2 m off puts three to five marks across a 16 m entry, which
+ * is what a real entry carries.
+ */
+const RING_EDGE_DASH_M = 1.2;
+const RING_EDGE_GAP_M = 1.2;
+
+/** Arc step of the edge line, m. 0.6 m keeps the polygon inside a centimetre of
+ *  the circle on the smallest shipped ring (17.85 m) — the same tolerance
+ *  `buildRingDivider` argues for its 3 m dashes. */
+const RING_EDGE_STEP_M = 0.6;
+
+/**
+ * The outer edge line of the circulatory carriageway, drawn as a circle.
+ *
+ * REFUSED on exactly the registrations the island is refused on, and for the
+ * same reason: where the middle is not free the "ring" is a junction with a ring
+ * tag (d2-v1 — a primary boulevard is drawn through its interior), and a
+ * painted circle round a shape that is not one is the pretty lie this module's
+ * header rules out. A map may be missing a circle; it may not be given a false
+ * one.
+ */
+function buildRingEdgeLine(ring: RoundaboutRing, markings: MeshAccumulator): number {
+  if (ring.islandRadiusM === null) return 0;
+
+  // Radius of the LINE CENTRE. markings.ts puts a kerbside edge line at
+  // `travelHalf - EDGE_LINE_INSET_M`; the identical arithmetic here keeps the
+  // ring's edge line the same distance off its kerb as every street's is off
+  // its own, so the two read as one marking system rather than two.
+  const radiusAt = (bearing: number) =>
+    ringOuterRadiusAt(ring, bearing) - EDGE_LINE_INSET_M;
+
+  // A representative radius only decides HOW MANY steps to walk; each step
+  // takes its own radius from the profile, so an OSM ring that wanders still
+  // gets a line on its own asphalt rather than on a fitted circle.
+  const nominalR = ring.ringRadiusM + ring.ringHalfWidthM - EDGE_LINE_INSET_M;
+  if (nominalR <= 1) return 0;
+  const steps = Math.max(24, Math.round((TAU * nominalR) / RING_EDGE_STEP_M));
+
+  const halfW = RING_EDGE_LINE_WIDTH_M / 2;
+  const pitch = RING_EDGE_DASH_M + RING_EDGE_GAP_M;
+  let quads = 0;
+  // Arclength is accumulated as we walk so the in-mouth dashes have a real
+  // metric pitch on every ring, whatever its radius.
+  let s = 0;
+
+  for (let i = 0; i < steps; i++) {
+    const b0 = (i / steps) * TAU;
+    const b1 = ((i + 1) / steps) * TAU;
+    const r0 = radiusAt(b0);
+    const r1 = radiusAt(b1);
+    const p0: Vec2 = [
+      ring.centre[0] + Math.cos(b0) * r0,
+      ring.centre[1] + Math.sin(b0) * r0,
+    ];
+    const p1: Vec2 = [
+      ring.centre[0] + Math.cos(b1) * r1,
+      ring.centre[1] + Math.sin(b1) * r1,
+    ];
+    const segLen = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+
+    // Mouth membership is taken at the segment's MIDPOINT bearing, so a step
+    // never half-belongs to a mouth and half to the kerb.
+    const inMouth = ringBearingInMouth(ring, (b0 + b1) / 2);
+    const on = inMouth ? (s + segLen / 2) % pitch < RING_EDGE_DASH_M : true;
+    s += segLen;
+    if (!on) continue;
+
+    // Rails are the RADIAL offsets of the two endpoints, so consecutive quads
+    // share an edge exactly and a solid run has no seam.
+    const a: Vec2 = [
+      ring.centre[0] + Math.cos(b0) * (r0 - halfW),
+      ring.centre[1] + Math.sin(b0) * (r0 - halfW),
+    ];
+    const b: Vec2 = [
+      ring.centre[0] + Math.cos(b0) * (r0 + halfW),
+      ring.centre[1] + Math.sin(b0) * (r0 + halfW),
+    ];
+    const c: Vec2 = [
+      ring.centre[0] + Math.cos(b1) * (r1 + halfW),
+      ring.centre[1] + Math.sin(b1) * (r1 + halfW),
+    ];
+    const d: Vec2 = [
+      ring.centre[0] + Math.cos(b1) * (r1 - halfW),
+      ring.centre[1] + Math.sin(b1) * (r1 - halfW),
+    ];
+    const idx = [a, b, c, d].map((p, k) =>
+      markings.vertex(toWorld(p[0], p[1], MARKING_Y), UP, [
+        k === 1 || k === 2 ? 1 : 0,
+        k >= 2 ? 1 : 0,
+      ]),
+    );
+    markings.quad(idx[0]!, idx[1]!, idx[2]!, idx[3]!);
+    quads++;
+  }
+  return quads;
+}
+
 /**
  * Draw every roundabout the district registers: the kerbed central island and
  * the ring's circular markings. Meshes are the EXISTING sidewalk/terrain/paint
@@ -1323,12 +1491,14 @@ export function buildRoundabouts(
   const islandPlanting = new MeshAccumulator();
   let islands = 0;
   let ringDividerQuads = 0;
+  let ringEdgeQuads = 0;
   for (const ring of rings) {
     if (ring.islandRadiusM !== null) {
       buildIsland(ring, meshes.sidewalks, islandPlanting);
       islands++;
     }
     ringDividerQuads += buildRingDivider(ring, meshes.markings);
+    ringEdgeQuads += buildRingEdgeLine(ring, meshes.markings);
   }
-  return { islands, ringDividerQuads, islandPlanting };
+  return { islands, ringDividerQuads, ringEdgeQuads, islandPlanting };
 }

@@ -217,9 +217,14 @@ export function ClassroomRoom({
           <span className="min-w-0 flex-1 truncate text-[12px] text-muted">
             Следващ урок: <strong className="text-foreground">{next.titleBg}</strong>
           </span>
+          {/* 32px without the floor (`py-1.5` against the canonical `py-3`),
+              and it is the way onward at the end of a lesson. The 12px it costs
+              are spent below the scene, not inside it: this strip is
+              deliberately outside `ClassroomScene`, which is the pinned,
+              height-budgeted surface — see the comment on the block above. */}
           <Link
             href={`/classroom/${next.id}`}
-            className="btn-accent shrink-0 px-3 py-1.5 text-[12px] font-bold"
+            className="btn-accent min-h-11 shrink-0 px-3 py-1.5 text-[12px] font-bold"
           >
             Продължи
           </Link>

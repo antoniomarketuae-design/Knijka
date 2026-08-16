@@ -631,14 +631,26 @@ describe("nothing else moved", () => {
     expect(world.stats.ringDividerQuads).toBe(0);
   });
 
-  it("is deterministic for a fixed seed on every ring district", () => {
-    for (const id of RING_DISTRICTS) {
-      const district = readDistrict(id);
-      const a = buildWorldGeometry(district, { seed: 7 });
-      const b = buildWorldGeometry(district, { seed: 7 });
-      expect(a.stats, id).toEqual(b.stats);
-    }
-  });
+  // TWELVE full district builds, deliberately uncached (the point is that two
+  // builds of the same document agree, so `worldOf` must not be used). Timed on
+  // this box: 0.18–0.46 s per synthetic ring and 0.9–1.2 s per OSM district,
+  // i.e. 5–12 s for the loop — which is either side of vitest's 5 s default
+  // depending only on what else the machine is doing. It has been sitting on
+  // that edge and tipping over as a phantom failure; the budget is stated here
+  // instead of being rediscovered by whoever's change happens to add the last
+  // 3 %.
+  it(
+    "is deterministic for a fixed seed on every ring district",
+    () => {
+      for (const id of RING_DISTRICTS) {
+        const district = readDistrict(id);
+        const a = buildWorldGeometry(district, { seed: 7 });
+        const b = buildWorldGeometry(district, { seed: 7 });
+        expect(a.stats, id).toEqual(b.stats);
+      }
+    },
+    30_000,
+  );
 });
 
 /** Sidewalk positions of a district's built world (the kerb mesh). */

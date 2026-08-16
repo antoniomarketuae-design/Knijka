@@ -175,12 +175,26 @@ class SynthPort implements StagedTrafficPort {
     finished: false,
   } as StagedActorView;
 
+  /** Every command the runner issued, in order — the release gate's only
+   *  observable output is WHAT SPEED IT COMMANDS, so it has to be recorded. */
+  readonly commands: StagedCommand[] = [];
+
   stage(_spec: StagedActorSpec): StagedActorView | null {
     return this.view;
   }
-  stagedCommand(_id: string, _command: StagedCommand): void {}
+  stagedCommand(_id: string, command: StagedCommand): void {
+    this.commands.push(command);
+  }
   staged(_id: string): StagedActorView | null {
     return this.view;
+  }
+  /** The speed of the last `cruise` command, or null if none was issued. */
+  lastCruiseMps(): number | null {
+    for (let i = this.commands.length - 1; i >= 0; i--) {
+      const c = this.commands[i];
+      if (c.type === "cruise") return c.speedMps ?? null;
+    }
+    return null;
   }
   /** Place the oncoming: world pose + path arc + speed. */
   set(p: { x: number; y: number; s: number; speedMps: number }): void {
@@ -369,6 +383,119 @@ describe("narrowMeeting (integration)", () => {
     expect(outcome!.success).toBe(true);
     expect(out).toHaveLength(0); // no YIELDED_TO_PRIORITY he never earned
   });
+
+  it("B80: the oncoming HOLDS at the mouth while the student is still crawling in", () => {
+    // THE THIRD SIGHTING OF ONE BUG — junction L7/T7, ring B15, narrow street
+    // here: obeying «приближавай бавно» deletes the encounter. The arrival sync
+    // divides by `max(playerSpeed, 2 m/s)`, so a 4 km/h student is MODELLED AT
+    // 7.2 and the car is dispatched for an arrival half a minute before his.
+    // It reached its entrance, the old `carDistToEntry <= 4` released it
+    // unconditionally, and it transited an empty street.
+    //
+    // Measured end to end on the live sc-ov-narrow@L1 / ov-narrow-v1 stack
+    // (b80-instrument profile D — 4 km/h approach, section y 110→145):
+    //   release t 57.0 s at playerAlong −31.9 m · they pass at y ≈ 93
+    //   → outcome success:true "yielded", violations [], commendations
+    //     ["YIELDED_TO_PRIORITY"] — and only THEN does he swing to x −4.06 and
+    //     drive the whole 35 m narrowing on the wrong side, ungraded.
+    // After: FAILED_TO_YIELD + COLLISION, commendations [].
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    // The car is AT its entrance (arc 95 − 4); the player is 32 m short of the
+    // section doing the pace the drill's own instruction asks for.
+    port.set({ x: -4.06, y: 149, s: 91, speedMps: 1.5 });
+    port.commands.length = 0;
+    expect(r.step(port, synthFrame(1, 4.06, 78, 4), [])).toBeNull();
+    expect(r.phase).toBe("armed"); // OLD: "triggered" — released regardless
+    expect(port.lastCruiseMps()).toBe(0); // OLD: 6 m/s, gone before he arrives
+  });
+
+  it("B80: …and it is DEFERRAL ONLY — a student genuinely arriving still meets it", () => {
+    // The invariant that keeps every recorded choreography intact. At any
+    // scripted pace the release test is already true on the frame the car
+    // reaches the mouth, so nothing that used to transit stops transiting: at
+    // 20 km/h the same 32 m is 5.8 s away, inside one section-transit
+    // (35 / 6 = 5.8 s) plus the margin.
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    port.set({ x: -4.06, y: 149, s: 91, speedMps: 1.5 });
+    port.commands.length = 0;
+    expect(r.step(port, synthFrame(1, 4.06, 78, 20), [])).toBeNull();
+    expect(r.phase).toBe("triggered");
+    expect(port.lastCruiseMps()).toBeGreaterThan(5);
+  });
+
+  it("B80: a student STOPPED at the widening releases it — the T7 deadlock stays fixed", () => {
+    // Bounded purely by ETA, a driver who stops to give way (the drill's own
+    // correct answer, and what the N1 integration test above does 16 m out)
+    // reads as never arriving: 16 m at the 0.5 m/s floor is 32 s. He would be
+    // marooned in front of a car that will not move — the founder's «I let
+    // everybody pass … but Error appeared that I made error», which is exactly
+    // what WITNESS_STOPPED_* exists to prevent at the junction. Same pair here.
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    port.set({ x: -4.06, y: 149, s: 91, speedMps: 1.5 });
+    // Stopped 16 m short of the section. The dwell has not elapsed yet, so the
+    // car still waits — a brake dab must not release it.
+    port.commands.length = 0;
+    expect(r.step(port, synthFrame(1, 4.06, 94, 0), [])).toBeNull();
+    expect(r.phase).toBe("armed");
+    expect(port.lastCruiseMps()).toBe(0);
+    // …still stopped WITNESS_STOPPED_HOLD_SEC later: he is genuinely giving
+    // way, so the car goes and he gets the encounter he waited for.
+    expect(r.step(port, synthFrame(3.5, 4.06, 94, 0), [])).toBeNull();
+    expect(r.phase).toBe("triggered");
+    expect(port.lastCruiseMps()).toBeGreaterThan(5);
+  });
+
+  it("B80: the drill ALWAYS resolves — an early yielder cannot hang it forever", () => {
+    // THIS TEST USED TO ASSERT THE OPPOSITE, AND THE OPPOSITE WAS A DEADLOCK.
+    //
+    // It stepped 60 frames with the player stopped 40 m out and asserted
+    // `phase === "armed"` / `cruise 0` — i.e. it codified "the car never comes"
+    // as correct. The bound it was defending (the stopped-witness release
+    // capped at NM_RELEASE_NEAR_M, copied from the junction) left this branch
+    // with two exits and a reachable state satisfying neither:
+    //
+    //   stopped at playerAlong = −28  →  witness needs >= −25          false
+    //                                    eta 28/0.5 = 56 s vs 7.3 s    false
+    //   → cruise 0 every frame, both cars waiting on each other, and
+    //     `director.ts` has no timeout to break the tie.
+    //
+    // This is the branch where the PLAYER MUST YIELD, so stopping is the
+    // drill's own correct answer — and stopping EARLIER than 25 m, which is
+    // better driving, was the thing that hung it. The old test ran 6 seconds
+    // and never asked whether the drill could ever finish.
+    //
+    // The original concern was real and is preserved in spirit: a far-back
+    // pause should not make the encounter evaporate. But it can only cost
+    // NM_MOUTH_WAIT_MAX_SEC now, because the backstop releases the mouth
+    // regardless — and a wasted encounter costs one re-run where a hang costs
+    // the lesson.
+    const r = new NarrowMeetingRunner(SYNTH_SPEC);
+    const port = new SynthPort();
+    r.stage(port, () => 0.5, true);
+    port.set({ x: -4.06, y: 149, s: 91, speedMps: 1.5 });
+    port.commands.length = 0;
+    // Stopped 40 m out — outside the old 25 m witness bound, the exact band
+    // that used to deadlock. Step well past the dwell.
+    for (let i = 0; i < 60; i++) r.step(port, synthFrame(1 + i * 0.1, 4.06, 70, 0), []);
+    expect(r.phase).toBe("triggered");
+    expect(port.lastCruiseMps()).toBeGreaterThan(5);
+  });
+
+  // NOT COVERED HERE, AND SAID SO RATHER THAN IMPLIED: a player who never stops
+  // and never arrives (a permanent crawl) stalls in the SYNC branch above
+  // instead — the actor's sync target is proportional to the player's ETA, so it
+  // approaches the mouth slower and slower and the `carDistToEntry <= 4` branch
+  // this fix guards is never reached. NM_MOUTH_WAIT_MAX_SEC cannot help there
+  // because it only starts once the actor holds the mouth. A test asserting the
+  // crawl resolves was written, failed for that reason, and was removed rather
+  // than left claiming a coverage this fix does not have. Whether the sync
+  // branch needs its own floor is open.
 
   it("same seed + same driving = identical outcomes (deterministic staging)", () => {
     const runOnce = () => {

@@ -40,7 +40,50 @@
  * conditions family already teaches under.
  */
 
-import type { LevelSpec, RubricSpec, ScenarioLevel } from "./types";
+import type { ConditionAxis, LevelSpec, RubricSpec, ScenarioLevel } from "./types";
+
+/**
+ * THE L5 FLOOR — the one mechanism the LADDER itself is allowed to reach for
+ * when an authored L5 turns out to add nothing at all.
+ *
+ * MEASURED 2026-08-16, every adjacent rung pair of all 167 templates compiled
+ * and diffed (`lessons/difficulty.ts` carries the full census). L4 → L5:
+ *
+ *   142 rungs change the WORLD (weather, grip, a staged actor, the street)
+ *     3 rungs change NOTHING but a tolerance number
+ *    22 templates author no L5 at all
+ *
+ * Those three are the founder's B19 read literally — *„same question 6 just
+ * this time L5 and it has no difference at all"*: `sc-park-parallel` and
+ * `sc-maneuver-3point` author `toleranceScale: 0.8` plus a rubric identical to
+ * their own L4's, and `sc-rx-barrier-drop` authors the bare `{ level: 5 }` that
+ * `__tests__/level-seam.test.ts` has carried on its S4 allowlist as „a dead L5"
+ * since the seam landed. A tolerance the student cannot see is not a rung.
+ *
+ * WHY NIGHT, AND WHY IT IS THE ONLY THING THE LADDER MAY ADD BY ITSELF. Every
+ * other mechanism in this kit needs something the compiler cannot see:
+ *  · traffic needs a street with room on it (and the measured ceiling of 6 is
+ *    already reached on the families that have one — see the baseline table);
+ *  · a staged actor needs map coordinates;
+ *  · rain/snow/fog compose with `physics.wetGrip`/`snowGrip`, and a grip change
+ *    re-tunes the car under ghosts that were recorded dry (the 4a discipline);
+ *  · a tighter rubric needs an authored measured component — 20 of 167
+ *    templates carry `rubric.economy` and 19 of those already override it at
+ *    L4, so the ladder would reach exactly one template.
+ *
+ * Night needs none of that. It touches NO physics (see `l5Night` — render-only
+ * by design), `conditionSpeedNightFactor` is 1 so it arms no speed rule, and it
+ * is a property of the sky rather than the district, so it is safe on a parking
+ * lot, a level crossing and a boulevard alike. What it costs the student is the
+ * one thing worth costing: the drill now has to be driven inside a 40-metre
+ * beam, and the lamp duty is stated in the same breath it becomes gradeable
+ * (the ladder's own „По тъмно" copy carries светлини — compile.ts).
+ *
+ * It is deliberately the SAME conditions object `l5Night()` authors, so the
+ * hand-authored recipe and the ladder floor cannot drift; pinned by
+ * `lessons/__tests__/rung-ladder-census.test.ts`.
+ */
+export const L5_LADDER_FLOOR_CONDITIONS: ConditionAxis = { night: true };
 
 /**
  * МОКЪР ПАВАЖ — the rendered rain AND the grip that goes with it.

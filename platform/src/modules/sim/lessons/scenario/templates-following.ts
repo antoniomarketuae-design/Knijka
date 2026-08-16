@@ -47,6 +47,22 @@
  * SPEEDING_OVER_LIMIT off the player's own choices).
  */
 
+/**
+ * THE BRIEFING BUDGET — 2026-08-16. Every `instructionsBg` step in this file
+ * was rewritten so that THE ACT IS THE FIRST WORD and no step exceeds 95
+ * characters. The measurement that forced it, the per-character fold table it
+ * is derived from and the one thing this lane could not fix are written out in
+ * full at the top of `templates-flow.ts`; read that block before lengthening
+ * anything here.
+ *
+ * This file's share of the defect, counted before the rewrite: 35 authored
+ * steps, 21 of them past the 95-character band the compact card was sized
+ * against, longest 269 characters (sc-follow-rain-gap step 1, 269 ch). On the
+ * deployed build a step-1 past ~96 characters leaves ZERO characters of the
+ * rest of the briefing above the fold — measured on an iPhone 16 in both
+ * orientations, not inferred.
+ */
+
 import type {
   BrakingLeadCarSpec,
   CutInLeadCarSpec,
@@ -167,13 +183,25 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // Ledger L10: L5 compiles rain and HEADLIGHTS_OFF_IN_RAIN grades with no
-    // config gate, so the lamps belong in the copy (ЗДвП чл. 70).
-    { n: 1, textBg: "Потегли по правата улица — пред теб се движи друга кола в твоята лента. Вали ли, включи първо късите светлини (чл. 70): мокрото платно гълта светлина, а предният те чете само по фаровете ти в огледалото си." },
-    { n: 2, textBg: "Измери дистанцията в секунди: когато предният подмине някой ориентир, преброй „едно-и-две“ — стигнеш ли ориентира преди „две“, си твърде близо." },
-    { n: 3, textBg: "Карай спокойно и остави поне 2 секунди до предния — това е около една дължина на колата на всеки 15 км/ч скорост." },
-    { n: 4, textBg: "Не се изкушавай да залепиш, за да „не те засичат“ — колкото по-бързо караш, толкова по-голяма дистанция ти трябва." },
-    { n: 5, textBg: "Задръж съобразената дистанция до края на отсечката." },
+    // 206-character step 1: „потегли“ plus a conditional rain clause plus the
+    // reason the rain clause exists. The two-second gap — the thing sc-fd-follow
+    // actually grades — was buried at step 3 inside 113 characters.
+    // 63 ch
+    { n: 1, textBg: "Потегли след колата пред теб и остави поне 2 секунди дистанция." },
+    // 69 ch
+    { n: 2, textBg: "Измери я в секунди: щом предният подмине ориентир, брой „едно-и-две“." },
+    // 64 ch
+    { n: 3, textBg: "Стигнеш ли ориентира преди „две“ — твърде близо си, вдигни крак." },
+    // 61 ch
+    { n: 4, textBg: "Помни: 2 секунди са около една дължина кола на всеки 15 км/ч." },
+    // 72 ch
+    { n: 5, textBg: "Не залепвай, за да „не те засичат“ — по-бързо значи по-голяма дистанция." },
+    // 51 ch
+    { n: 6, textBg: "Задръж съобразената дистанция до края на отсечката." },
+    // 70 ch
+    { n: 7, textBg: "Включи късите светлини в дъжд (чл. 70): мокрото платно гълта светлина." },
+    // 60 ch
+    { n: 8, textBg: "Помни: предният те чете само по фаровете ти в огледалото си." },
   ],
   success: [
     {
@@ -316,11 +344,32 @@ export const SC_FOLLOW_BRAKE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
+    // STEP 1 IS DELIBERATELY UNTOUCHED, and it is the one step in these five files
+    // that may not be re-worded freely: vehicle/tier-feasibility.test.ts pins
+    // „sc-follow-brake [beginner] instruction 1: orders 40, sustainable 39.1“ as a
+    // KNOWN shortfall, keyed by the instruction INDEX. Moving the imperative or
+    // the number to another step silently re-labels that row and the pin goes red
+    // against a defect that has not changed. It is 84 characters — inside the
+    // budget — so there is nothing to fix here anyway.
+    // …AND IT IS THE ONE LINE IN THESE FILES THAT COSTS THE BODY SOMETHING.
+    // 84 characters puts the line in the 77–96 bucket, where the measurement
+    // (brief-budget.mjs, both profiles) leaves only 68 characters of body above
+    // the fold. Step 2 is therefore held to 65 + the „2. “ prefix, and the
+    // reason it exists is step 3 — one line further down, still whole, still
+    // authored. A 74-character step 2 here was the single case in all 33
+    // templates where the second instruction did not survive the card.
+    // 84 ch
     { n: 1, textBg: "Движи се спокойно зад предната кола, около 40 км/ч, и дръж поне 2 секунди дистанция." },
-    { n: 2, textBg: "Гледай далеч напред — не в бронята на предния, а през и над него, за да усетиш спирането възможно най-рано." },
-    { n: 3, textBg: "Спре ли предният внезапно, реагирай веднага: пълна спирачка, без да въртиш волана встрани." },
-    { n: 4, textBg: "Дистанцията, която държиш, е точно разстоянието, в което имаш време да спреш — затова тя не е излишна." },
-    { n: 5, textBg: "Спри напълно зад предния, изчакай и продължи, когато той потегли." },
+    // 58 ch
+    { n: 2, textBg: "Гледай далеч напред — през и над предния, не в бронята му." },
+    // 47 ch
+    { n: 3, textBg: "Помни: така усещаш спирането възможно най-рано." },
+    // 71 ch
+    { n: 4, textBg: "Натисни пълна спирачка, ако предният спре внезапно — без волан встрани." },
+    // 69 ch
+    { n: 5, textBg: "Помни: дистанцията е точно разстоянието, в което имаш време да спреш." },
+    // 65 ch
+    { n: 6, textBg: "Спри напълно зад предния, изчакай и продължи, когато той потегли." },
   ],
   success: [
     {
@@ -518,15 +567,23 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // B70 / FR-51: say what is actually on the road — and there is now
-    // something on it from the first metre. The column ahead IS already
-    // standing (two parked-up cars at y = 297/304); the car in FRONT of the
-    // student is the one that arrives and joins it, so both halves are named.
-    { n: 1, textBg: "Потегли след колата пред теб и я следвай на съобразена дистанция — тя ще те заведе до колоната." },
-    { n: 2, textBg: "Тя ще намалява и ще ускорява по своя си работа, а не заради теб. Намалявай с нея веднага и връщай дистанцията плавно, не с газ." },
-    { n: 3, textBg: "Напред в лентата вече стои спряла колона — виждаш я отдалеч. Колата пред теб ще се нареди последна в нея." },
-    { n: 4, textBg: "Спри зад нея на разумно разстояние: колкото да виждаш къде задните ѝ гуми опират в асфалта — около два метра. Толкова ти дава място да заобиколиш при нужда и резерв, ако предният се върне назад по наклон." },
-    { n: 5, textBg: "Изчакай спокойно зад него на тази дистанция до края на упражнението." },
+    // Step 4 was 204 characters: the stopping distance, the way to judge it and
+    // two separate reasons for it. The act (stop two metres back) is now its own
+    // step and each reason follows it.
+    // 65 ch
+    { n: 1, textBg: "Потегли след колата пред теб и я следвай на съобразена дистанция." },
+    // 62 ch
+    { n: 2, textBg: "Намалявай с нея веднага и връщай дистанцията плавно, не с газ." },
+    // 65 ch
+    { n: 3, textBg: "Помни: тя намалява и ускорява по своя си работа, а не заради теб." },
+    // 71 ch
+    { n: 4, textBg: "Гледай напред: там стои спряла колона и предният ще се нареди последен." },
+    // 75 ch
+    { n: 5, textBg: "Спри зад него на около два метра — колкото да виждаш къде гумите му опират." },
+    // 74 ch
+    { n: 6, textBg: "Помни: толкова стигат, за да заобиколиш и ако предният се върне по наклон." },
+    // 68 ch
+    { n: 7, textBg: "Изчакай спокойно зад него на тази дистанция до края на упражнението." },
   ],
   success: [
     {
@@ -714,16 +771,25 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // Ledger L10: this drill is WET on all four rungs, HEADLIGHTS_OFF_IN_RAIN is
-    // armed unconditionally, and L4 hands the student a cold car — so the lamps
-    // are step one or the exam rung bills an основна fault for a duty the lesson
-    // never stated. Grounded by retrieval, not recall: ЗДвП чл. 70 (content bank
-    // q-nosht-023 — „при намалена видимост се минава ръчно на къси").
-    { n: 1, textBg: "Вали. Първо светлините: при дъжд късите се включват РЪЧНО, преди да потеглиш (чл. 70) — дневните светят само напред и оставят задните ти габарити тъмни точно в пръските, където те са единственото, което те прави видим отзад. После потегли спокойно след колата пред теб." },
-    { n: 2, textBg: "В дъжд дистанцията се увеличава: същите метри при по-висока скорост значат по-малко време за спиране." },
-    { n: 3, textBg: "Дръж поне 3 секунди до предния при мокър път — брой „едно-и-две-и-три“, докато той подмине ориентир." },
-    { n: 4, textBg: "Не карай бързо на къса дистанция „както при сухо“ — на мокро спирачният път е с около половина по-дълъг." },
-    { n: 5, textBg: "Задръж увеличената дистанция до края на отсечката." },
+    // 269 characters of step 1 — the longest in this file — and the act it exists
+    // for („потегли“) was the LAST word of it. Rain is this template's own
+    // environment at every rung, not a ladder complication, so the lamp step
+    // stays first: it is the first thing the hands do. Ledger L10 reads it.
+    // 71 ch
+    // РЪЧНО is load-bearing and stays: the daytime running lamps come on by
+    // themselves and leave the tail lamps dark, which is the whole point of the
+    // step below it.
+    { n: 1, textBg: "Включи късите светлини РЪЧНО — вали (чл. 70) — и потегли след предния." },
+    // 69 ch
+    { n: 2, textBg: "Дръж поне 3 секунди до предния — брой „едно-и-две-и-три“ по ориентир." },
+    // 76 ch
+    { n: 3, textBg: "Помни: дневните светят само напред и оставят габаритите ти тъмни в пръските." },
+    // 81 ch
+    { n: 4, textBg: "Увеличи дистанцията в дъжд: същите метри при по-висока скорост са по-малко време." },
+    // 78 ch
+    { n: 5, textBg: "Не карай „както при сухо“ — на мокро спирачният път е около половина по-дълъг." },
+    // 50 ch
+    { n: 6, textBg: "Задръж увеличената дистанция до края на отсечката." },
   ],
   success: [
     {
@@ -932,17 +998,25 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    // Ledger L10: the L5 rung is камион + дъжд and the rain-lights fault grades
-    // unconditionally, so the duty is stated here (ЗДвП чл. 70).
-    { n: 1, textBg: "Пред теб в твоята лента се движи камион — потегли спокойно след него. Вали ли, включи късите светлини още преди да тръгнеш (чл. 70): зад висок камион си в облак пръски, където габаритите ти са единственото, което те показва на идващия отзад." },
-    { n: 2, textBg: "Зад камион не виждаш нищо от пътя напред: нито пешеходци, нито спрели коли, нито какво го кара да натисне спирачката." },
-    { n: 3, textBg: "Затова дистанцията расте: дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“, докато той подмине ориентир." },
-    {
-      n: 4,
-      textBg:
-        "И не мисли за изпреварване: насрещното платно е заето, а зад камиона не виждаш нищо от него. Оставането зад камиона не е примирение — то е единственото разумно решение тук.",
-    },
-    { n: 5, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш. Задръж увеличената дистанция до края на отсечката." },
+    // 241-character step 1. The lamp clause keeps its place (rain is authored on
+    // the template) but loses the 130-character explanation of itself, which is
+    // now the last step — after the acts, where a reason belongs.
+    // 73 ch
+    { n: 1, textBg: "Потегли спокойно зад камиона и включи късите светлини, ако вали (чл. 70)." },
+    // 69 ch
+    { n: 2, textBg: "Дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“ по ориентир." },
+    // 84 ch
+    { n: 3, textBg: "Помни: зад висок камион не виждаш нито пешеходци, нито спрели коли, нито защо спира." },
+    // 74 ch
+    { n: 4, textBg: "Не мисли за изпреварване — насрещното е заето, а зад камиона не го виждаш." },
+    // 69 ch
+    { n: 5, textBg: "Приеми, че оставането зад камиона тук е единственото разумно решение." },
+    // 80 ch
+    { n: 6, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш." },
+    // 50 ch
+    { n: 7, textBg: "Задръж увеличената дистанция до края на отсечката." },
+    // 77 ch
+    { n: 8, textBg: "Помни: в облака пръски габаритите ти са единственото, което те показва отзад." },
   ],
   success: [
     {
@@ -1095,11 +1169,18 @@ export const SC_FOLLOW_CUTIN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по булеварда в дясната лента — кола отляво се движи почти редом с теб." },
-    { n: 2, textBg: "Колата отляво се вклинява на метри пред теб. Това се случва всеки ден — не е по твоя вина." },
-    { n: 3, textBg: "Реагирай с газта, не със спирачката: вдигни крака и остави дистанцията да се отвори сама." },
-    { n: 4, textBg: "Не задържай открадната дистанция „по инерция“ и не я затваряй „за наказание“ — и двете са лепене." },
-    { n: 5, textBg: "Щом възглавницата от 2 секунди е възстановена, продължи спокойно до края на отсечката." },
+    // Nothing here was over 100 characters; the fault was ORDER. Step 2 opened
+    // with the other driver's manoeuvre and step 5 with its own precondition.
+    // 64 ch
+    { n: 1, textBg: "Потегли по булеварда в дясната лента и наблюдавай колата отляво." },
+    // 69 ch
+    { n: 2, textBg: "Очаквай тя да се вклини на метри пред теб — това се случва всеки ден." },
+    // 84 ch
+    { n: 3, textBg: "Реагирай с газта, не със спирачката — вдигни крак и остави дистанцията да се отвори." },
+    // 86 ch
+    { n: 4, textBg: "Не затваряй дистанцията „за наказание“ и не я задържай „по инерция“ — двете са лепене." },
+    // 73 ch
+    { n: 5, textBg: "Продължи спокойно до края, щом възглавницата от 2 секунди е възстановена." },
   ],
   success: [
     {
@@ -1263,11 +1344,23 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
+    // Step 2 stated a fact and a prohibition in 117 characters; the prohibition
+    // is the instruction, so it gets its own step. Step 3 did the same with an
+    // act and its reason.
+    // 71 ch
     { n: 1, textBg: "Потегли по булеварда в дясната лента и се установи на спокойна скорост." },
-    { n: 2, textBg: "В огледалото се появява кола, залепена на метри зад теб. Не е приятно — и не е твой проблем за решаване със спирачка." },
-    { n: 3, textBg: "Вдигни газта плавно и увеличи дистанцията НАПРЕД: тя поема и твоето спиране, и грешката на лепката." },
-    { n: 4, textBg: "Не ускорявай гузно и не натискай спирачката „за урок“ — и двете само влошават положението." },
-    { n: 5, textBg: "Дръж десния край на лентата и я остави да те изпревари — после продължи спокойно до края." },
+    // 56 ch
+    { n: 2, textBg: "Погледни в огледалото: кола е залепена на метри зад теб." },
+    // 66 ch
+    { n: 3, textBg: "Не решавай това със спирачка — не е приятно, но не е твой проблем." },
+    // 49 ch
+    { n: 4, textBg: "Вдигни газта плавно и увеличи дистанцията НАПРЕД." },
+    // 62 ch
+    { n: 5, textBg: "Помни: тя поема и твоето спиране, и грешката на лепката отзад." },
+    // 83 ch
+    { n: 6, textBg: "Не ускорявай гузно и не натискай спирачката „за урок“ — двете влошават положението." },
+    // 80 ch
+    { n: 7, textBg: "Дръж десния край на лентата и я остави да те изпревари — после продължи до края." },
   ],
   success: [
     {

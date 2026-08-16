@@ -160,7 +160,10 @@ export function buildWorldGeometry(
     junctionPatches: roads.junctionPatchCount,
     sidewalkStrips: roads.sidewalkStripCount,
     markingQuads:
-      markings.markingQuads + roundabouts.ringDividerQuads + crossingFurniture.furnitureQuads,
+      markings.markingQuads +
+      roundabouts.ringDividerQuads +
+      roundabouts.ringEdgeQuads +
+      crossingFurniture.furnitureQuads,
     stopLines: markings.stopLines,
     zebraCrossings: markings.zebraCrossings,
     parkingBays: markings.parkingBays,

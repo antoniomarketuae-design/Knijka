@@ -155,7 +155,18 @@ export default async function ClassroomIndexPage() {
               {done.completed > 0 && ` · ${done.completed} завършени`}
             </p>
           </div>
-          <Link href={`/classroom/${next.id}`} className="btn-accent shrink-0 px-5 py-2.5 text-sm font-bold">
+          {/* `min-h-11` because this call site overrides the canonical button.
+              `.btn-accent` is `px-5 py-3` in globals.css, which comes to
+              exactly 44px; `py-2.5` here spends 4 of those and the control
+              measured 319 x 40 on the deployed build (WebKit, iPhone 16, both
+              orientations) — 40px on the primary control of the lesson list,
+              the one tap that starts a lesson. The floor is stated rather than
+              the padding restored so the compact horizontal proportions the
+              card was designed with survive. */}
+          <Link
+            href={`/classroom/${next.id}`}
+            className="btn-accent min-h-11 shrink-0 px-5 py-2.5 text-sm font-bold"
+          >
             {resume?.kind === "continue" ? "Продължи урока" : "Влез в класната стая"}
           </Link>
         </section>

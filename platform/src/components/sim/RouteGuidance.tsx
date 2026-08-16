@@ -51,10 +51,20 @@ import {
   buildRouteGraph,
   deriveGuidanceRoute,
   guidanceGoalFor,
+  crossingMuteSpans,
+  markerApproachDir,
   markerRingRadii,
+  markerSignOffset,
+  markerSignOpacity,
   nearestArcOnRoute,
   routePointAt,
   stopLinesForGuidance,
+  MARKER_SIGN_PANEL_H_M,
+  MARKER_SIGN_PANEL_W_M,
+  MARKER_SIGN_PANEL_Y,
+  MARKER_SIGN_POST_BASE_Y,
+  MARKER_SIGN_POST_RADIUS_M,
+  CROSSING_MUTE_MAX_SPANS,
   type DerivedRoute,
   type GuidanceGoal,
   type GuidancePointGoal,
@@ -143,20 +153,23 @@ const PILLAR_RADIUS = 1.0;
 const BAR_DEPTH_HALT_M = 1.6;
 const BAR_DEPTH_THROUGH_M = 0.7;
 
-const LABEL_Y = 4.4;
-/** Art pass 2026-08-03: was 7.2 × 2.4 m. At the acceptance pose that filled
- *  the middle of the windscreen (register B24 photographed it "rendered big
- *  enough to span half the sky"). 5.0 × 1.67 m keeps the same 3:1 chip and
- *  the same 480 × 160 canvas — only the world quad shrinks, so nothing about
- *  legibility at the 60–100 m read distance changes. */
-const LABEL_WIDTH_M = 5.0;
-const LABEL_HEIGHT_M = 1.67;
+/**
+ * WHERE THE CHIP STANDS AND HOW BIG IT IS is a teaching contract, not styling,
+ * so the numbers live in `scene/guidanceRoute.ts` next to the rest of the
+ * marker's geometry and are asserted as angles at the driver's eye by
+ * `scene/guidance-marker-sign.test.ts`. Read the MARKER'S SIGN section header
+ * there before moving any of them — it carries the founder's frame and the
+ * three separate things that made a route marker read as an unfinished
+ * billboard hanging over the vanishing point.
+ */
+const LABEL_WIDTH_M = MARKER_SIGN_PANEL_W_M;
+const LABEL_HEIGHT_M = MARKER_SIGN_PANEL_H_M;
 const LABEL_PX_W = 480;
 const LABEL_PX_H = 160;
-/** The label is at full strength beyond this… */
-const LABEL_FADE_START_M = 30;
-/** …and gone at the mark itself. Same handover as the shaft's dissolve. */
-const LABEL_FADE_END_M = 11;
+/** The panel's LOWER EDGE is where the post has to end, so it is derived here
+ *  rather than authored — the two can then never drift apart. */
+const POST_TOP_Y = MARKER_SIGN_PANEL_Y - LABEL_HEIGHT_M / 2;
+const POST_HEIGHT_M = POST_TOP_Y - MARKER_SIGN_POST_BASE_Y;
 
 /** Distance at which the speed-cap warning arms — far enough that easing off
  *  still works, near enough that it is clearly about THIS marker. */
@@ -203,6 +216,18 @@ const RIBBON_VERT = /* glsl */ `
   }
 `;
 
+/** Ramp length at each end of a crossing gap, m. */
+const MUTE_EDGE_M = 1.2;
+/**
+ * Sentinel for an unused mute slot — far past any route this product derives
+ * (LOOKAHEAD_MAX_M is 170 m and the longest single leg is EMERGENCY_AHEAD_M at
+ * 150), and deliberately NOT 1e9: the shader evaluates
+ * `smoothstep(s − MUTE_EDGE_M, s, vS)` on every slot, and at 1e9 a float32
+ * cannot represent the 1.2 m offset, so edge0 == edge1 and the smoothstep
+ * divides by zero. 1e6 keeps the two edges distinct with six digits to spare.
+ */
+const MUTE_UNUSED_S = 1e6;
+
 const RIBBON_FRAG = /* glsl */ `
   uniform vec3 uColor;
   uniform float uHeadS;
@@ -210,6 +235,11 @@ const RIBBON_FRAG = /* glsl */ `
   uniform float uTime;
   uniform float uFlowSpeed;
   uniform float uOpacity;
+  // Arclength spans the ribbon must not paint over — the pedestrian crossings
+  // on this route. See crossingMuteSpans() in scene/guidanceRoute.ts for the
+  // frame that forced it. Unused slots are parked at MUTE_UNUSED_S and cost
+  // two smoothsteps that resolve to zero.
+  uniform vec2 uMute[${CROSSING_MUTE_MAX_SPANS}];
   varying float vS;
   varying float vSide;
   void main() {
@@ -225,7 +255,16 @@ const RIBBON_FRAG = /* glsl */ `
     // +s (travel direction); bands drift forward at uFlowSpeed m/s.
     float band = fract(vS / 7.0 + abs(vSide) * 0.22 - uTime * uFlowSpeed / 7.0);
     float dash = smoothstep(0.05, 0.22, band) * (1.0 - smoothstep(0.5, 0.68, band));
-    float a = uOpacity * edge * fadeAhead * fadeBehind * legMix * (0.35 + 0.65 * dash);
+    // The crossing gap. Ramped over ${MUTE_EDGE_M.toFixed(1)} m at each end
+    // rather than cut square: a hard edge across the ribbon reads as a second
+    // painted bar, which is the last thing a zebra needs beside it.
+    float mute = 1.0;
+    for (int i = 0; i < ${CROSSING_MUTE_MAX_SPANS}; i++) {
+      float inSpan = smoothstep(uMute[i].x - ${MUTE_EDGE_M.toFixed(1)}, uMute[i].x, vS)
+                   * (1.0 - smoothstep(uMute[i].y, uMute[i].y + ${MUTE_EDGE_M.toFixed(1)}, vS));
+      mute = min(mute, 1.0 - inSpan);
+    }
+    float a = uOpacity * edge * fadeAhead * fadeBehind * legMix * mute * (0.35 + 0.65 * dash);
     if (a < 0.003) discard;
     gl_FragColor = vec4(uColor, a);
   }
@@ -588,6 +627,16 @@ export function RouteGuidance({
           uTime: { value: 0 },
           uFlowSpeed: { value: reducedMotion ? 0 : 6.0 },
           uOpacity: { value: 0.42 },
+          // Allocated ONCE and mutated in place by the layout effect — the
+          // module's whole perf contract is "no allocation after mount", and a
+          // fresh Vector2[] per objective would break it in the one place a
+          // reviewer would never look.
+          uMute: {
+            value: Array.from(
+              { length: CROSSING_MUTE_MAX_SPANS },
+              () => new THREE.Vector2(MUTE_UNUSED_S, MUTE_UNUSED_S),
+            ),
+          },
         },
         transparent: true,
         depthWrite: false,
@@ -663,6 +712,10 @@ export function RouteGuidance({
   const pillarMatRef = useRef<THREE.ShaderMaterial>(null);
   const poolMatRef = useRef<THREE.ShaderMaterial>(null);
   const labelRef = useRef<THREE.Mesh>(null);
+  /** The whole roadside sign — post + panel — carried to the kerb side of the
+   *  route as ONE transform, so the panel can never drift off its own post. */
+  const signRef = useRef<THREE.Group>(null);
+  const postMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   const routeRef = useRef<DerivedRoute | null>(null);
   const goalRef = useRef<GuidanceGoal | null>(null);
@@ -693,6 +746,16 @@ export function RouteGuidance({
     if (ribbonRef.current) ribbonRef.current.visible = route !== null && geo !== null;
     if (ribbonMatRef.current) {
       ribbonMatRef.current.uniforms.uGoalS.value = route ? route.goalS : 1e9;
+      // Where this leg crosses a painted zebra the ribbon goes quiet, so the
+      // bars are the only thing on that asphalt. Written in place; unused slots
+      // are parked past every route length this product derives.
+      const spans = crossingMuteSpans(route, district);
+      const slots = ribbonMatRef.current.uniforms.uMute.value as THREE.Vector2[];
+      for (let i = 0; i < slots.length; i++) {
+        const span = spans[i];
+        if (span) slots[i]!.set(span[0], span[1]);
+        else slots[i]!.set(MUTE_UNUSED_S, MUTE_UNUSED_S);
+      }
     }
     if (arrowRef.current) arrowRef.current.visible = false; // per-frame logic re-shows it
     const marker = markerRef.current;
@@ -710,6 +773,16 @@ export function RouteGuidance({
       if (gateShape) gate.rotation.y = Math.atan2(gateShape.dirY, gateShape.dirX);
     }
     if (labelRef.current) labelRef.current.visible = labelTexture !== null;
+    // The sign steps off the carriageway onto the kerb side of the approach.
+    // Marker space has no yaw of its own, and district (x, y) maps to three
+    // (x, ·, −y), so a district offset is applied straight to the group.
+    const sign = signRef.current;
+    if (sign) {
+      sign.visible = labelTexture !== null;
+      const dir = goal && goal.kind === "point" ? markerApproachDir(goal, route) : null;
+      const off = dir ? markerSignOffset(dir.x, dir.y) : { x: 0, y: 0 };
+      sign.position.set(off.x, 0, -off.y);
+    }
     // A fresh objective starts innocent — the cap tint re-arms per frame.
     overCapRef.current = false;
     if (ringMatRef.current) ringMatRef.current.color.copy(accent);
@@ -726,6 +799,7 @@ export function RouteGuidance({
     accent,
     spawnStart,
     sampleRef,
+    district,
   ]);
 
   useFrame((state) => {
@@ -752,22 +826,25 @@ export function RouteGuidance({
       // The label carries a real teaching contract («Карай дотук / не по-бързо
       // от 35 км/ч»), so it is never removed — but at the acceptance pose it
       // was 7.2 × 2.4 m of world-space text that "spanned half the sky"
-      // (register B24/B27). It now fades on the same schedule as the shaft:
-      // the contract is read on the APPROACH, and at the mark the student's
-      // eyes belong on the junction. `visible` stays owned by the layout
-      // effect (label texture present or not); only opacity moves here.
+      // (register B24/B27), and beyond ~80 m it is a dark rectangle parked on
+      // the vanishing point with text nobody can resolve (the founder's frames,
+      // 2026-08-14). `markerSignOpacity` is the band it exists in, at both
+      // ends; the POST fades with it, because a post standing under nothing is
+      // the same defect wearing the other hat. `visible` stays owned by the
+      // layout effect (label texture present or not); only opacity moves here.
       const label = labelRef.current;
-      if (label?.visible) {
+      const sign = signRef.current;
+      if (label?.visible && sign) {
         label.quaternion.copy(state.camera.quaternion);
         const lm = label.material as THREE.MeshBasicMaterial;
-        const dx = state.camera.position.x - marker.position.x;
-        const dz = state.camera.position.z - marker.position.z;
-        const dist = Math.hypot(dx, dz);
-        const k = Math.max(
-          0,
-          Math.min(1, (dist - LABEL_FADE_END_M) / (LABEL_FADE_START_M - LABEL_FADE_END_M)),
-        );
-        lm.opacity = 0.95 * k;
+        // Distance to the SIGN, not to the marker: it now stands a lane's half
+        // width to the side, and the band it fades in is measured off the thing
+        // the eye is actually reading.
+        const dx = state.camera.position.x - (marker.position.x + sign.position.x);
+        const dz = state.camera.position.z - (marker.position.z + sign.position.z);
+        const alpha = markerSignOpacity(Math.hypot(dx, dz));
+        lm.opacity = alpha;
+        if (postMatRef.current) postMatRef.current.opacity = alpha * 0.85;
       }
       if (sample && goalNow.maxSpeedKmh !== undefined) {
         const dx = sample.position.x - goalNow.x;
@@ -914,17 +991,51 @@ export function RouteGuidance({
             />
           </mesh>
         </group>
-        {/* «Спри тук» / «Премини на зелено» + the hidden cap, spelled out. */}
-        <mesh ref={labelRef} position={[0, LABEL_Y, 0]} renderOrder={22}>
-          <planeGeometry args={[LABEL_WIDTH_M, LABEL_HEIGHT_M]} />
-          <meshBasicMaterial
-            map={labelTexture}
-            transparent
-            opacity={0.95}
-            depthWrite={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
+        {/* THE ROADSIDE SIGN: «Спри тук» / «Карай дотук» + the hidden cap,
+            spelled out — on a post, at the kerb, at sign height.
+
+            The group's position is set imperatively (kerb side of the
+            approach); the post and the panel are fixed inside it, so whatever
+            the marker does the panel is always standing on its own post.
+
+            Cost: ONE extra transparent draw of a 6-sided open cylinder — 12
+            triangles, no texture, identical at every quality tier. */}
+        <group ref={signRef}>
+          <mesh position={[0, MARKER_SIGN_POST_BASE_Y + POST_HEIGHT_M / 2, 0]} renderOrder={21}>
+            <cylinderGeometry
+              args={[
+                MARKER_SIGN_POST_RADIUS_M,
+                MARKER_SIGN_POST_RADIUS_M,
+                POST_HEIGHT_M,
+                6,
+                1,
+                true,
+              ]}
+            />
+            {/* NormalBlending like the acceptance ring, not additive: a post is
+                a solid object and an additive one glows into the road behind
+                it — the „untextured emissive primitive" read this whole marker
+                has been walking back since the 2026-08-03 art pass. */}
+            <meshBasicMaterial
+              ref={postMatRef}
+              color={accent}
+              transparent
+              opacity={0.8}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+          <mesh ref={labelRef} position={[0, MARKER_SIGN_PANEL_Y, 0]} renderOrder={22}>
+            <planeGeometry args={[LABEL_WIDTH_M, LABEL_HEIGHT_M]} />
+            <meshBasicMaterial
+              map={labelTexture}
+              transparent
+              opacity={0.95}
+              depthWrite={false}
+              side={THREE.DoubleSide}
+            />
+          </mesh>
+        </group>
       </group>
     </group>
   );

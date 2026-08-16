@@ -37,6 +37,20 @@
  *    by the measured delta (`rungDelta`). Not generation: ADR-002 fixed text,
  *    chosen by evidence.
  *
+ * AND WHERE THE RUNG PRODUCED NO DIFFERENCE AT ALL (2026-08-16, register B2 /
+ * B19 — *„L2 L3 L4 L5 THEY HAVE NOTHING MORE"*, *„same question 6 just this
+ * time L5 and it has no difference at all"*). The two bullets above can only
+ * EXPLAIN a delta; they cannot make one. Re-measuring every adjacent rung pair
+ * of all 167 templates found three L5 rungs whose entire difference from their
+ * own L4 was `toleranceScale` — a number the student cannot perceive, which is
+ * exactly the defect he is naming. `l5LadderFloorApplies` closes that: an L5
+ * that adds nothing the compiler can measure is driven at NIGHT
+ * (`L5_LADDER_FLOOR_CONDITIONS`, complications.ts, which explains the choice).
+ * The floor never overrules an author — it fires only when the measured delta
+ * is empty — so it changes three rungs today and makes a fourth impossible.
+ * The full census, and the per-family verdict on the rungs the ladder CANNOT
+ * fill, live in `lessons/difficulty.ts`.
+ *
  * Either way the sentence is compiled into `briefingBg` as step 1 — the field
  * `LessonPlayShell` renders and blocks the session on. 115 rungs used to
  * change the road and tell nobody; that is a difficulty TAX, and THEO-4
@@ -75,6 +89,7 @@
 
 import type { LessonAidsSpec, LessonObjective, LessonSpec, ParkingBaySpec } from "../../contracts";
 import { REACH_ZONE_GRACE_M, parseObjectiveParams } from "../objectives";
+import { L5_LADDER_FLOOR_CONDITIONS } from "./complications";
 import { serializeObjectiveParams } from "./params";
 import { assertScenarioSpec } from "./validate";
 import {
@@ -603,8 +618,18 @@ export interface RungDelta {
   trafficLaddered: boolean;
 }
 
-/** Compare the rung at `idx` with the next LOWER authored rung. */
-function rungDelta(spec: ScenarioSpec, idx: number): RungDelta {
+/**
+ * Compare the rung at `idx` with the next LOWER authored rung, reading ONLY
+ * what the template and the rung AUTHOR.
+ *
+ * The „authored" in the name is load-bearing: `l5LadderFloorApplies` below asks
+ * this function whether a rung added anything, and answers by adding something
+ * itself. Were the floor visible here the question would answer itself — every
+ * silent L5 would report a night it only has because it reported nothing. So
+ * the core never consults the ladder, and `rungDelta` (which does) is the only
+ * thing the rest of the compiler calls.
+ */
+function rungDeltaAuthored(spec: ScenarioSpec, idx: number): RungDelta {
   const hi = spec.levels[idx];
   const lo = spec.levels[idx - 1];
   const d: RungDelta = {
@@ -675,6 +700,82 @@ function rungDelta(spec: ScenarioSpec, idx: number): RungDelta {
       rHi.economy.attemptsFor2Stars < rLo.economy.attemptsFor2Stars);
   if (added || tightened) d.adds.add("rubric");
 
+  return d;
+}
+
+/**
+ * THE L5 FLOOR — „an L5 that adds nothing is driven at night" (register B2/B19,
+ * 2026-08-16).
+ *
+ * THE MEASUREMENT THAT FORCED IT. Every adjacent rung pair of all 167 shipped
+ * templates compiled and diffed (the census lives in `lessons/difficulty.ts`):
+ * L4 → L5 changed the WORLD on 142 rungs, changed NOTHING but a tolerance
+ * number on 3 — `sc-park-parallel`, `sc-maneuver-3point` (both
+ * `toleranceScale: 0.8` beside a rubric identical to their own L4's) and
+ * `sc-rx-barrier-drop` (the bare `{ level: 5 }` that level-seam.test.ts has
+ * carried on its S4 allowlist as „a dead L5") — and did not exist at all on 22
+ * templates. Those three ARE his sentence: *„same question 6 just this time L5
+ * and it has no difference at all"*.
+ *
+ * THE RULE, and it is deliberately the narrowest one that closes the hole:
+ *  · L5 only. Night at «Частична помощ» would be a difficulty the rung's own
+ *    name contradicts; «Усложнени» is the rung whose job is to add.
+ *  · Only when the MEASURED delta over the rung below is empty. One authored
+ *    car, one degree of weather, one staged actor and the ladder stays silent —
+ *    the compiler never overrules an author, it only refuses to ship a rung
+ *    that is the rung below plus a number.
+ *  · Only when the drill is not already at night, so the floor can never
+ *    „add" something the template has been doing since L1.
+ *  · Only where there IS a rung below (idx > 0): the lowest authored rung has
+ *    nothing to be harder than, and the whole complication contract rests on
+ *    that (see resolveScenarioComplication).
+ *
+ * WHY NIGHT AND NOT ANYTHING ELSE is argued at `L5_LADDER_FLOOR_CONDITIONS`
+ * (complications.ts) — in one line, it is the only mechanism in the kit that
+ * needs nothing the compiler cannot see, and it touches no physics, so no
+ * dry-tuned ghost is invalidated.
+ *
+ * WHAT THIS DOES NOT FIX, said out loud rather than counted as won: twelve
+ * junction/signals L5 rungs whose entire addition is the family ladder's
+ * 5 → 6 ambient car. That rise sits inside the noise of the measurement that
+ * set the ceiling (n=5 → 4.0–9.0 passes/min, n=6 → 3.7–11 — the floor of the
+ * busier street is BELOW the quieter one on some districts), so it is very
+ * probably a rung the student cannot perceive either. They are named, and
+ * capped, in `lessons/difficulty.ts` rather than silently nightfallen: giving
+ * twelve give-way drills a night sky is a change nobody has driven, and a
+ * junction whose ambient cars may not render headlamps is exactly the kind of
+ * „harder to FINISH" this ladder is forbidden to produce.
+ */
+export function l5LadderFloorApplies(spec: ScenarioSpec, level: ScenarioLevel): boolean {
+  if (level !== 5) return false;
+  const idx = spec.levels.findIndex((l) => l.level === 5);
+  if (idx <= 0) return false;
+  if (rungConditions(spec, spec.levels[idx]).night) return false;
+  return rungDeltaAuthored(spec, idx).adds.size === 0;
+}
+
+/** The conditions a rung actually compiles under: what it authors, plus the L5
+ *  floor where the rung authored a difference the student could not see. */
+function effectiveConditions(spec: ScenarioSpec, rung: LevelSpec) {
+  const authored = rungConditions(spec, rung);
+  return l5LadderFloorApplies(spec, rung.level)
+    ? { ...authored, ...L5_LADDER_FLOOR_CONDITIONS }
+    : authored;
+}
+
+/**
+ * The delta the rest of the compiler reads: the authored one, plus the L5 floor
+ * where it fires. The floor is folded in HERE and not in the core so the
+ * night the ladder adds is explained by the same „По тъмно" copy an authored
+ * night gets — the student is never told less because the sentence came from
+ * the ladder rather than the template.
+ */
+function rungDelta(spec: ScenarioSpec, idx: number): RungDelta {
+  const d = rungDeltaAuthored(spec, idx);
+  if (l5LadderFloorApplies(spec, spec.levels[idx].level)) {
+    d.weather.add("night");
+    d.adds.add("weather");
+  }
   return d;
 }
 
@@ -980,7 +1081,12 @@ export function compileScenario(
   // with the AC-08 winter story (snow haze + tick.snow conditions envelope).
   // The reduced-grip PHYSICS is deliberately NOT implied by the weather tag:
   // it stays the template's explicit physics opt-in (the wet precedent).
-  const conditions = rungConditions(spec, rung);
+  //
+  // `effectiveConditions`, not `rungConditions`: an L5 that measured out as
+  // „the rung below plus a tolerance number" is driven at night by the ladder
+  // floor (see l5LadderFloorApplies). Every other rung reads exactly what it
+  // authors, so 164 of 167 templates compile bit-identically.
+  const conditions = effectiveConditions(spec, rung);
   const environment: LessonSpec["environment"] | undefined =
     conditions.night ||
     conditions.weather === "rain" ||

@@ -176,9 +176,32 @@ export const SC_RX_QUEUE_CLEAR: ScenarioSpec = {
     },
     {
       id: "sc-rxq-cross",
-      titleBg: "Премини прелеза едва след като пътят отвъд се е освободил",
-      // Twelve meters past the queue tail's rest pose: reachable only once
-      // the tail has actually rolled away — the „свободен изход" made graded.
+      // TITLE-TRUTH (doc 86 D3, the cdb2f71 give-way remedy applied to the row
+      // its net could not reach — that guard covers SCENARIO_TEMPLATES_RAIL and
+      // this file is RAIL2). It read «Премини прелеза ЕДВА СЛЕД КАТО пътят
+      // отвъд се е освободил», and „едва след като" is a claim about WHEN the
+      // student entered, which one SimTick of position and speed cannot carry.
+      //
+      // MEASURED, on this template's own counter-demo: `mistake-stop-on-rails`
+      // — the drive that followed the queue onto the коловоз and stood between
+      // the rails, cited RAIL_CROSSING_VIOLATION — completes this gate at every
+      // rung (t = 63.40 s at L1 against the shadow's 59.60 s; 43 / 36 / 29 / 29 /
+      // 29 frames inside the disc). Of course it does: it entered too early,
+      // waited on the track, and then drove on past this mark like everybody
+      // else. The old comment („reachable only once the tail has actually rolled
+      // away") was true and beside the point — what it proves is that the road
+      // beyond is clear BY THE TIME YOU GET HERE, never that you waited for it
+      // before you rolled onto the rails.
+      //
+      // So the title claims only the geometry. (RX_LANE, 178) is twelve metres
+      // past the queue tail's rest pose at y = 166 and twenty-two past the far
+      // rail, on the player's own lane: arrival means the band was crossed and
+      // left behind. The duty keeps its grader — the rail block bills the
+      // „stopped-on-track" arm as RAIL_CROSSING_VIOLATION (the demo above), чл.
+      // 52–53 is spelled out in teach.whyBg, and instructions 3–4 still say
+      // изчакай. Params untouched — `done` is bit-identical, nothing new can
+      // fail, no THEO-4 card is owed.
+      titleBg: "Премини прелеза и излез отвъд релсите",
       params: { kind: "reachZone", x: RX_LANE, y: 178, radiusM: 6 },
     },
     {
@@ -401,7 +424,34 @@ export const SC_RX_TRAM_STOP: ScenarioSpec = {
     },
     {
       id: "sc-rts-clear",
-      titleBg: "Премини покрай спрелия трамвай, пропуснал слизащия пътник",
+      // TITLE-TRUTH — the give-way certificate cdb2f71 struck from
+      // `sc-rxti-clear` («Премини покрай острова, пропуснал пресичащия пътник»),
+      // surviving VERBATIM one file over because that change's drift net reads
+      // SCENARIO_TEMPLATES_RAIL and this template lives in RAIL2. The wording is
+      // the same, the geometry is the same, and so is the defect.
+      //
+      // `stepReachZone` is handed (params, prevState, tick) and nothing else:
+      // SimTick carries position, speed, lane, indicator … and NO pedestrian
+      // occupancy, no other actor's priority, no yield outcome. Measured on this
+      // drill's own ❌ demo: `mistake-creep-through` — the drive whose copy reads
+      // «пропълзя през пътеката, докато пътникът още пресичаше платното», cited
+      // PEDESTRIAN_NOT_YIELDED — completes this gate at every rung (t = 26.65 s
+      // at L1 against the shadow's 30.65 s; 142 / 126 / 109 / 109 / 109 frames
+      // inside the disc). The crawl-through was being signed off as «пропуснал
+      // слизащия пътник». (`mistake-thread-doors` never arrives — the collision
+      // ends it 28 m short — so the crash fails the gate by accident of where it
+      // stopped, not by anything the gate checked.)
+      //
+      // WHAT THE DISC ACTUALLY PROVES: (4.06, 122) is the player's own lane
+      // centre 32 m past the door zebra at y = 90 and 25 m past the halted
+      // tram's body centre at y = 97 on this 150 m street — arrival means the
+      // stopped tram was driven past and the segment run out. That is what the
+      // title says now. The duty keeps its grader: the pedestrian chain bills
+      // PEDESTRIAN_NOT_YIELDED off crossing occupancy (both demos cite it), чл.
+      // 66, ал. 1 is spelled out in teach.whyBg, and instructions 3–5 still say
+      // спри напълно и изчакай. Params untouched — `done` is bit-identical,
+      // nothing new can fail, no THEO-4 card is owed.
+      titleBg: "Подмини спрелия трамвай и продължи до края на отсечката",
       params: { kind: "reachZone", x: RTS_LANE, y: 122, radiusM: 10 },
     },
   ],

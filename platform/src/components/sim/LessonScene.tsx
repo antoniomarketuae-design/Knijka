@@ -1776,46 +1776,148 @@ function ReadyScene({
           founder's own complaint („very hard to switch to reverse") and because
           holding the brake at a standstill is invisible by design. The „⚙"
           sentence is gone: that button is on screen, it has a label, and a
-          student who taps it learns more than a student who reads about it. */}
+          student who taps it learns more than a student who reads about it.
+
+          ── 2026-08-16 · IT WAS STILL PROSE ACROSS THE MIDDLE OF THE ROAD. ────
+          This block was authored `inset-x-0 top-1/2 -translate-y-1/2` — dead
+          centre, full width — and stayed that way for a year of reviews because
+          a 2026-08-12 rule in `PlayAreaStyles` moved it on a compact stage and
+          the row was called closed. The rule moved it DOWN, not OFF. Measured
+          on the deployed build (WebKit, real insets, iPhone 16 landscape
+          852 × 393, sc-zebra-approach@L1, immediately after «РАЗБРАХ»):
+
+            [data-hud="touch-hint"]  [275, 202, 334 × 143]
+
+          x 275→609 of 852 is the middle 39 % of the width, centred 16 px off
+          the vanishing point; y 202→345 CROSSES the cockpit horizon (0.58 of
+          the stage = 228 px, `cabinLook.test.ts`). 47 762 px² — 14.3 % of the
+          picture — of teal type over the road the student is about to drive
+          down. That is the founder's row 3, and his own frame shows the
+          «Кола отзад · 12 м» proximity chip (which is `bottom-[6.75rem]
+          left-1/2`, i.e. also dead centre) inserted between two lines of it.
+
+          TWO THINGS CHANGE AND THE SECOND IS WHY THE FIRST STICKS.
+
+          1. THE HINT JOINS THE RIGHT-EDGE CORRIDOR — the founder's own drawing,
+             and the lane every other front-of-screen text panel was moved into
+             on 2026-08-03 and 2026-08-09 (the audio card, the follow chip, the
+             telltale cue, the objective line). The geometry is written ONCE in
+             `PlayAreaStyles` from `notifyColumn.ts`, exactly as those four are,
+             so this file no longer holds a copy of where the corridor is.
+             The C1 priority ladder already guarantees the lane is never shared:
+             the hint stands down while the overlay column speaks, and the audio
+             chip, the follow chip, the telltale cue and the deck all stand down
+             while the hint is up.
+
+          2. THE AUTHORED CLASSES STOP SAYING „CENTRE". A cascade rule that
+             relocates a centred box is one runtime condition away from not
+             applying — `[data-sim-compact="on"]` is decided by a coarse-pointer
+             check and a size check, and a touch laptop, a tablet or a phone
+             that reports a fine pointer lands back on `top-1/2`. The default
+             here is now the top-right corner, so the worst case is a hint in a
+             slightly wrong corner rather than a paragraph on the vanishing
+             point.
+
+          THE TYPE DROPS 14 px → 11 px WITH THE LANE, because the lane is
+          180 px wide sideways and 141.5 upright. That is the notification
+          column's own register — the instruction card beside it has been 11 px
+          since the column shipped — so the two read as one surface rather than
+          as a poster and a card. Measured at 180 px: the two thumb sentences
+          lay out 2 and 3 lines, and the whole hint is ~135 px against the
+          corridor's 161 px hazard-band ceiling. */}
       {showTouchHint ? (
         <div
           data-hud="touch-hint"
-          className="pointer-events-none absolute inset-x-0 top-1/2 z-30 flex -translate-y-1/2 flex-col items-center gap-2.5 px-5 text-center"
+          // Position and width come from PlayAreaStyles (one definition of the
+          // corridor, from notifyColumn.ts). What is authored here is the SHAPE
+          // — a right-aligned column of small type with a real button under it
+          // — and a corner that is not the road, so the degradation when the
+          // cascade rule does not match is a misplaced card and never a
+          // paragraph over the vanishing point.
+          className="pointer-events-none absolute right-3 top-3 z-30 flex min-h-0 max-w-full flex-col items-end gap-1.5 overflow-hidden text-right"
           role="note"
           aria-label="Съвети за игра на телефон"
           style={{ textShadow: "0 1px 4px rgba(0,0,0,0.96), 0 0 14px rgba(0,0,0,0.8)" }}
         >
-          {/* PORTRAIT SAYS ONE THING. Measured on iPhone 16: the two thumb
-              lines below wrap to four in portrait and the whole hint costs
-              16.6 % of the screen — on an orientation where the thumb layout
-              cannot be used yet anyway. So portrait carries the one instruction
-              that is actionable right now, and the gesture teaching arrives in
-              landscape, where the thumbs are. */}
-          <p className="hidden text-base font-black [@media(orientation:portrait)]:block">
-            Завърти телефона хоризонтално
-          </p>
-          {/* `max-w-2xl`, not `max-w-md`: the screen budget charges TEXT over
-              its real glyph line boxes, so the same sentence costs twice as
-              much wrapped as it does on one line. At 448 px each of these
-              wrapped to two lines on a landscape iPhone — four line boxes of
-              chrome for two sentences. One line each, and nothing is cut. */}
-          <p className="max-w-2xl text-sm font-bold leading-snug [@media(orientation:portrait)]:hidden">
-            Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.
-          </p>
-          {/* The sentence used to read „задръж надолу" — hold down. That was
-              the instruction that made a Б2 stop select reverse, so it is now
-              what it always should have been: STOP first, LIFT the thumb, then
-              press down again. Two acts of the foot, exactly like selecting R
-              with the lever in a real automatic. */}
-          <p className="max-w-2xl text-sm font-bold leading-snug text-accent-2 [@media(orientation:portrait)]:hidden">
-            Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.
-          </p>
+          {/* ── THE WORDS SCROLL, THE BUTTON DOES NOT. ────────────────────────
+              The corridor's ceiling is the hazard band's (notifyColumn.ts), and
+              measured on the deployed build with everything else in place the
+              hint wanted 172 px of a 161 px box on an iPhone 16 sideways and of
+              a 147 px box on the 780 × 360 profile. With the whole card as the
+              scroller that overflow lands on «РАЗБРАХ» — the one control that
+              clears it — 10.9 px below its own fold, which is the trap this
+              screen has already been caught in twice (the deck's toggle off the
+              top of the stage, the read sheet's «Разбрах» clipped by its own
+              height).
+              So the shape is SimOverlay's, which solved exactly this: a
+              `min-h-0 shrink` window that owns the overflow, and a `shrink-0`
+              control under it that is laid out at its natural 44 px whatever
+              the ceiling is. The card itself is `overflow-hidden`, so its box
+              is the honest one and a probe can measure it. */}
+          <div className="flex min-h-0 w-full shrink flex-col gap-1.5 overflow-y-auto">
+            {/* PORTRAIT SAYS ONE THING. Measured on iPhone 16: the two thumb
+                lines below wrap to four in portrait and the whole hint costs
+                16.6 % of the screen — on an orientation where the thumb layout
+                cannot be used yet anyway. So portrait carries the one
+                instruction that is actionable right now, and the gesture
+                teaching arrives in landscape, where the thumbs are. */}
+            <p className="hidden shrink-0 text-xs font-black [@media(orientation:portrait)]:block">
+              Завърти телефона хоризонтално
+            </p>
+            {/* `w-full`, not `max-w-2xl`: the width is the corridor's now, and a
+                cap of 672 px inside a 180 px lane is a number that describes a
+                layout this hint has not had since it left the middle of the
+                screen. `leading-tight` is the notification column's own leading
+                — the peek's two text rows have been 11 px at `leading-tight`
+                since the column shipped, and this card is now beside them. */}
+            <p className="w-full shrink-0 text-[11px] font-bold leading-tight [@media(orientation:portrait)]:hidden">
+              Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.
+            </p>
+            {/* The sentence used to read „задръж надолу" — hold down. That was
+                the instruction that made a Б2 stop select reverse, so it is now
+                what it always should have been: STOP first, LIFT the thumb,
+                then press down again. Two acts of the foot, exactly like
+                selecting R with the lever in a real automatic. */}
+            <p className="w-full shrink-0 text-[11px] font-bold leading-tight text-accent-2 [@media(orientation:portrait)]:hidden">
+              Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.
+            </p>
+          </div>
           <button
             type="button"
             autoFocus
             onClick={dismissTouchHint}
-            // 44 px of thumb, and the only thing here that paints a box.
-            className="pointer-events-auto mt-0.5 flex min-h-11 items-center rounded-full bg-accent px-6 text-sm font-bold text-background"
+            // ── IT PAINTED 0 % OF ITS OWN BOX, AND NOBODY HAD LOOKED AT IT.
+            //
+            // The line that stood here said „44 px of thumb, and the only thing
+            // here that paints a box". Photographed on the deployed build
+            // (WebKit, iPhone 16 landscape, sc-zebra-approach@L1, the frame
+            // straight after the briefing is acknowledged): «Разбрах» is bare
+            // DARK type on a bright road, with no box at all. `bg-accent` never
+            // reached the screen — `[data-hud="touch-hint"]` is on
+            // `GHOST_SURFACES`, and the UNPANEL sweep sets
+            // `background-color: transparent !important` on every child of a
+            // ghost that is not marked `data-hud-ink`. So the one control that
+            // clears this card had been stripped to `text-background` (#04070e)
+            // over tarmac since the sweep landed — the same „0 % of its own box
+            // is not quiet, it is absent" finding the control census made about
+            // the peek's ✕, on the surface directly beside it.
+            //
+            // `data-hud-ink` is the sweep's own opt-out for the handful of fills
+            // that ARE the information, and this is the case row A6 and row C2
+            // are both literally about („«Разбрах» was not tappable").
+            //
+            // NOT THE SOLID PILL IT USED TO ASK FOR, though: the 2026-08-03
+            // review named a „SOLID BRAND-BLUE «Разбрах» button" as the thing
+            // that made this screen read as a cookie banner. This is the
+            // register that replaced it and that he signed off — SimOverlay's
+            // ack chip, 18 % tint on a 55 % hairline, light ink — so the two
+            // acknowledgements on this screen are one object rather than two.
+            data-hud-ink=""
+            className="pointer-events-auto flex min-h-11 shrink-0 items-center rounded-full border px-4 text-[11px] font-black uppercase tracking-wider text-foreground"
+            style={{
+              backgroundColor: "color-mix(in srgb, var(--accent) 18%, transparent)",
+              borderColor: "color-mix(in srgb, var(--accent) 55%, transparent)",
+            }}
           >
             Разбрах
           </button>

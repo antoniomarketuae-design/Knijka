@@ -171,7 +171,11 @@ const CLAIMS = [
     id: "med-breathing-check",
     topicBg: "Проверката за дишане и редът спрямо обаждането на 112",
     conceptIds: ["c-cpr-basics", "c-first-aid-priorities"],
-    questionIds: ["q-ptp-013", "q-ptp-017", "q-ptp-037"],
+    // q-ptp-057 („как и колко време проверяваш дишането") беше извън този
+    // списък, макар да е ЕДИНСТВЕНИЯТ въпрос в банката, чийто верен отговор Е
+    // 10-секундният прозорец — тоест точно фигурата, която този иск носи във
+    // `figureQuote`. Регистърът описваше числото и не знаеше кого учи то.
+    questionIds: ["q-ptp-013", "q-ptp-017", "q-ptp-037", "q-ptp-057"],
     figureBg: "не повече от 10 секунди",
     figureQuote: q("src-erc-2025-layperson", "for a maximum of 10 seconds."),
     naredba24TopicBg: "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
@@ -198,7 +202,12 @@ const CLAIMS = [
     id: "med-bleeding-direct-pressure",
     topicBg: "Първо действие при животозастрашаващо кървене",
     conceptIds: ["c-bleeding-control"],
-    questionIds: ["q-ptp-018", "q-ptp-039", "q-ptp-040", "q-ptp-062"],
+    // q-ptp-019 (забито стъкло) стои тук за ПОЛОВИНАТА си отговор — „притискаш
+    // около раната" е този иск, приложен встрани от предмета. Другата половина
+    // („остави предмета в раната") няма източник никъде и живее отделно, в
+    // med-impaled-object, за да не се подпише общото изречение за директен
+    // натиск под правило, което насоките изобщо не съдържат.
+    questionIds: ["q-ptp-018", "q-ptp-019", "q-ptp-039", "q-ptp-040", "q-ptp-062"],
     figureBg: null,
     naredba24TopicBg: "чл. 9, т. 5 — спиране на кръвотечение, обработка на рани, превръзки",
     authoritative: q("src-rcuk-2025-first-aid", "Apply firm, direct manual pressure to any bleeding injury site."),
@@ -341,6 +350,184 @@ const CLAIMS = [
     statusBg: "ungrounded-inferred-only",
     noteBg:
       "ПРАЗНИНА. Нито ERC 2025, нито RCUK 2025 споменават сваляне на каска. Нашият верен отговор („не я сваляш, ако диша“) е СЪВМЕСТИМ с „минимизирай движението на врата“, но това е извод, а не цитат. Не го обяснявай на ученика като насока — обясни правилото за врата, от което следва.",
+  },
+  {
+    id: "med-airway-opening",
+    topicBg: "Отваряне на дихателния път — и защо при ПТП има ВТОРА хватка",
+    conceptIds: ["c-first-aid-priorities"],
+    questionIds: ["q-ptp-056"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+    authoritative: q(
+      "src-erc-2025-layperson",
+      "Place one hand on the forehead and the fingertips of your other hand under the point of the chin",
+    ),
+    corroborating: [
+      // ERC слага този въпрос НЕПОСРЕДСТВЕНО пред хватката, на същия ред от
+      // A – Airway. Той е причината отговорът на q-ptp-056 да е „внимателно",
+      // а не просто „отмяташ".
+      q("src-erc-2025-layperson", "Has the person fallen from a height or experienced major trauma?"),
+      q("src-rcuk-2025-first-aid", "using the ‘jaw-thrust’ technique"),
+    ],
+    conflicts: [],
+    statusBg: "grounded-agreed",
+    noteBg:
+      "ДВЕ ХВАТКИ ЗА ДВА МОМЕНТА, не две правила, които се бият — и това е причината и q-ptp-056, и q-ptp-022 да са верни, макар отговорите им да звучат обратно. Докато ОЩЕ НЕ ЗНАЕШ дали диша: отваряш пътя (ERC, A – Airway). След като вече ЗНАЕШ, че диша нормално: не пипаш главата, а RCUK дава избутване на долната челюст, ако все пак се наложи — „Airway opening, if required, always has priority over in-line immobilisation“. Забележи, че разграничителят е състояние на знанието на спасителя, а не различие между източниците: затова `conflicts` е празен.",
+  },
+  {
+    id: "med-aed-use",
+    topicBg: "Автоматичен външен дефибрилатор (AED) от неопитен спасител",
+    conceptIds: ["c-cpr-basics"],
+    questionIds: ["q-ptp-059"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+    authoritative: q("src-rcuk-2025-bls", "Anyone can use an Automated External Defibrillator (AED)."),
+    corroborating: [
+      q("src-rcuk-2025-bls", "no training is needed to use an AED"),
+      q("src-rcuk-2025-bls", "Some AEDs automatically turn on when opened"),
+      q("src-rcuk-2025-bls", "Follow the audio/visual prompts from the AED."),
+      q("src-rcuk-2025-bls", "Ensure that nobody touches the person whilst the AED is analysing the heart rhythm."),
+      q("src-rcuk-2025-bls", "If a shock is indicated, ensure that nobody is touching the person."),
+      q("src-rcuk-2025-bls", "After the shock has been delivered, immediately restart chest compressions."),
+    ],
+    conflicts: [],
+    statusBg: "grounded-agreed",
+    noteBg:
+      "И четирите опции на q-ptp-059 се решават от цитати, а не от преразказ. Верният отговор е двусъставен и всяка му част има свое изречение: „следваш гласовите указания“ ← „Follow the audio/visual prompts from the AED.“; „не докосваш по време на анализ и разряд“ ← двете отделни изречения за анализа и за разряда. Дистракторът „само за медицински лица“ е ТОЧНО обратното на водещото изречение на RCUK, а „разряд веднага, без анализ“ противоречи на реда, в който самите указания се дават. ERC 2025 подкрепя същото по-общо („These initial 3-C life-saving actions can be performed by anyone“), но конкретиката е у RCUK и затова той е основанието.",
+  },
+  {
+    id: "med-shock-recognition",
+    topicBg: "Разпознаване на шок/кръвозагуба и какво се прави до линейката",
+    conceptIds: ["c-bleeding-control", "c-first-aid-priorities"],
+    // q-ptp-035 е същата грижа при ПОСТРАДАЛ В СЪЗНАНИЕ (топлина, спокоен глас,
+    // наблюдение) и стоеше само под med-legal-duty — иск, чиито източници са
+    // ЗДвП. Тоест трите му верни действия бяха клинични, цитираха ERC/RCUK в
+    // текста си и не бяха вързани за нито един клиничен източник.
+    questionIds: ["q-ptp-035", "q-ptp-061"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 5 — спиране на кръвотечение, обработка на рани, превръзки",
+    authoritative: q("src-erc-2025-layperson", "Pale, cool or clammy skin?"),
+    corroborating: [
+      q("src-erc-2025-layperson", "Make the person comfortable."),
+      q("src-erc-2025-layperson", "Continue to monitor the person carefully for deterioration"),
+      // Забележи локатора: текстът на ERC е „n P revent hypothermia…“ —
+      // извличането от PDF-а разделя главната буква от думата (същият артефакт
+      // е и в „n L isten“, „n H yperthermia“). Локаторът тръгва от „revent“,
+      // защото ЦИТАТЪТ е верен, а разкъсването е наше. Ако някой „поправи“
+      // локатора на „Prevent hypothermia“, билдът ще падне с LOCATOR MISS — и
+      // това е правилното поведение, а не повод да се пренапише цитатът.
+      q("src-erc-2025-layperson", "revent hypothermia – remove wet clothes and use blankets to warm them."),
+      q("src-erc-2025-layperson", "Do not move the person unless they are in an unsafe situation."),
+      // За q-ptp-035. Пак разкъсан ред: изречението на ERC е „If the person is
+      // responsive: talk to them calmly.“, но „talk to“ свършва ред 753, а
+      // „them calmly.“ отваря 754. Локаторът хваща реда, който носи думите.
+      q("src-erc-2025-layperson", "them calmly. Ask for permission to check"),
+      q("src-rcuk-2025-first-aid", "cover the person with dry blankets or clothing to minimise heat loss."),
+    ],
+    conflicts: [],
+    statusBg: "grounded-agreed",
+    noteBg:
+      "ТРИТЕ ВЕРНИ ОТГОВОРА НА q-ptp-061 НЕ СА ЕДНАКВО ЗАЗЕМЕНИ и въпросът вече го казва на ученика вместо да го скрие. „Обади се и кажи какво подозираш“ и „легнал, завит, под око“ излизат право от изреченията горе. „Нищо през устата и без обезболяващи“ НЕ Е в ERC/RCUK 2025 — утвърдена практика е и обяснението го обявява така. Отделно: изданията от 2025 г. НЕ съдържат нито „по гръб“, нито „с вдигнати крака“ при шок, затова тези дистрактори са грешни по липса, а не по забрана.",
+  },
+  {
+    id: "med-responsiveness-check",
+    topicBg: "Как се проверява съзнание — глас и ЛЕКО СТИСКАНЕ, не разтърсване",
+    conceptIds: ["c-first-aid-priorities"],
+    questionIds: ["q-ptp-015"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 2 — съзнание и неговите нарушения при черепно-мозъчна травма",
+    authoritative: q("src-erc-2025-layperson", "Gently stimulate the person."),
+    corroborating: [
+      // Разкъсан ред отново: AVPU-редът свършва с „…on squeezing their“ на 816
+      // и „shoulder.“ отваря 817. Локаторът спира там, където спира редът —
+      // да се допише „shoulder“ значи да се цитира изречение, което нито един
+      // ред не съдържа, а точно това ADR-002 забранява.
+      q("src-erc-2025-layperson", "responds to pain on squeezing their"),
+    ],
+    conflicts: [],
+    statusBg: "grounded-agreed",
+    noteBg:
+      "ТОВА Е ИЗТОЧНИКЪТ ЗА ЕДНА ВЕЧЕ НАПРАВЕНА ПОПРАВКА, а не нова находка: q-ptp-015 обяснява защо отговорът е „леко стисване по рамото“, а не старото „разтърси го за раменете“, и се позовава на това, че глаголът shake не се среща в нито един от източниците. Проверено отново на 2026-08-16: „shake“ дава нула попадения в ERC 2025, RCUK BLS 2025, RCUK First Aid 2025 и БЧК. Регистърът вече носи и двата цитата, на които поправката стъпва, така че тя е машинно проверима, а не въпрос на доверие към обяснението.",
+  },
+  {
+    id: "med-call-early",
+    topicBg: "Обаждането на 112 — рано, на високоговорител, диспечерът води",
+    conceptIds: ["c-first-aid-priorities"],
+    questionIds: ["q-ptp-014"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 1 — общи принципи на първата долекарска помощ",
+    authoritative: q("src-rcuk-2025-first-aid", "Always call for help early and, ideally, use a speakerphone"),
+    corroborating: [
+      q("src-erc-2025-layperson", "If unresponsive call your local emergency number and follow the dispatcher’s instructions."),
+    ],
+    conflicts: [],
+    statusBg: "grounded-agreed",
+    noteBg:
+      "ВНИМАНИЕ КАКВО Е ЗАЗЕМЕНО. Заземено е ПОВЕДЕНИЕТО при обаждането: рано, на високоговорител, и следваш диспечера. НЕ Е заземен СПИСЪКЪТ „какво да кажеш“ (място, брой и състояние на пострадалите, допълнителна опасност) — той е практика на спешните служби и не се среща като изречение в ERC 2025 или RCUK 2025. q-ptp-014 вече казва това на ученика дословно; искът съществува, за да не може някой по-късно да припише списъка на насока. Правното задължение ДА уведомиш е отделно и е в lawRefs на въпроса (ЗДвП чл. 123, ал. 1, т. 2, б. „а“ и чл. 124, т. 2).",
+  },
+  {
+    id: "med-triage-unresponsive-first",
+    topicBg: "Двама пострадали — при кого се отива първо",
+    conceptIds: ["c-first-aid-priorities"],
+    questionIds: ["q-ptp-033"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 4 — поведение при остри нарушения на дишането и сърдечната дейност",
+    // authoritative остава null НАРОЧНО, по прецедента на med-helmet-removal.
+    // Насоките подреждат ВНИМАНИЕТО при един пострадал; готово правило „кой от
+    // ДВАМА е пръв“ за неспециалист не публикуват. Отговорът следва от
+    // подредбата, а извод не се повишава в основание, защото е убедителен.
+    authoritative: null,
+    corroborating: [
+      q("src-rcuk-2025-first-aid", "Pay immediate attention to safety, the responsiveness of the victim, and life-threatening bleeding."),
+      q("src-rcuk-2025-bls", "Suspect cardiac arrest in any person who is unresponsive."),
+      q("src-rcuk-2025-bls", "If there is any doubt, assume cardiac arrest and start CPR"),
+    ],
+    conflicts: [],
+    statusBg: "ungrounded-inferred-only",
+    noteBg:
+      "Изводът е тесен и затова издържа: RCUK подрежда вниманието безопасност → реакция → животозастрашаващо кървене, а липсата на реакция е самостоятелен спусък за спряло сърце. От двете следва, че неподвижният се проверява преди кървящата ръка. Но това е СГЛОБЕНО от нас, а не прочетено — и q-ptp-033 го признава пред ученика със същите думи („насоките не публикуват готово правило кой от двама пострадали е пръв“). Затова статусът е inferred-only, а не grounded.",
+  },
+  {
+    id: "med-nothing-by-mouth",
+    topicBg: "Нищо през устата на пострадал при ПТП — и единственото изключение",
+    conceptIds: ["c-first-aid-priorities"],
+    questionIds: ["q-ptp-034"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 3 — поведение при шок",
+    // Пак null: ERC 2025 и RCUK 2025 НЕ разглеждат прием през устата при
+    // травма. Правилото идва от спешната и анестезиологичната практика.
+    authoritative: null,
+    corroborating: [
+      q("src-rcuk-2025-first-aid", "only use equipment and medications you have been trained to use"),
+      // Единственото място, където изданията от 2025 г. НАРЕЖДАТ нещо през
+      // устата — и то е за друг случай. Стои тук, за да се вижда границата.
+      q("src-erc-2025-layperson", "f suspected hypoglycaemia, give the person a sugar-containing drink or sweets or dextrose tablets (via mouth)."),
+    ],
+    conflicts: [],
+    statusBg: "ungrounded-inferred-only",
+    noteBg:
+      "ПРАЗНИНА, обявена. Търсено на 2026-08-16: нито ERC 2025, нито RCUK 2025 съдържат указание за прием на течности/храна след травма. Верният отговор на q-ptp-034 („нищо през устата, най-много навлажняваш устните“) идва от практиката, а не от насока, и обяснението вече го казва така. Двата цитата очертават границата ѝ: RCUK ограничава спасителя до това, за което е обучен, а ERC дава ЕДИНСТВЕНИЯ случай, в който изрично се дава нещо през устата — съмнение за ниска кръвна захар, тоест човек в съзнание БЕЗ травма. Изключението не се пренася върху пострадал след удар.",
+  },
+  {
+    id: "med-impaled-object",
+    topicBg: "Забит предмет в раната — оставя ли се на място",
+    conceptIds: ["c-bleeding-control"],
+    questionIds: ["q-ptp-019"],
+    figureBg: null,
+    naredba24TopicBg: "чл. 9, т. 5 — спиране на кръвотечение, обработка на рани, превръзки",
+    // Нула цитата, нарочно — и точно това прави статуса проверим. Търсено на
+    // 2026-08-16 във ВСИЧКИ осем регистрирани източника, с термините
+    // impaled / embedded / foreign object / penetrating: НУЛА попадения.
+    // Правилото „не вади предмета“ е утвърдена практика на първата помощ, но
+    // не е изречение, което държим. Ако някой утре го намери, проверката
+    // „ungrounded-no-reachable-source не носи нито един цитат“ ще счупи билда,
+    // докато статусът не бъде пренаписан — вместо мълчаливо да остарее.
+    authoritative: null,
+    corroborating: [],
+    conflicts: [],
+    statusBg: "ungrounded-no-reachable-source",
+    noteBg:
+      "ПРАЗНИНА, обявена, а не запълнена. q-ptp-019 има ДВА верни отговора и те стъпват на различни неща: „притискаш около раната“ е med-bleeding-direct-pressure (цитирано), а „оставяш стъклото и го стабилизираш“ няма източник в нито един от осемте регистрирани документа. Обяснението на въпроса вече казва това на ученика дословно — „правилото за забития предмет е утвърдена практика на първата помощ, а не цитат от насока“ — и този иск е машинната половина на същото признание. Придобиването на учебната програма на БЧК по Наредба № 24, чл. 8, ал. 1 е начинът да се затвори.",
   },
   {
     id: "med-legal-duty",

@@ -47,14 +47,14 @@ silently.
 content/medical/
   README.md          ← this file
   sources.json       ← 8 sources: URL, HTTP status, raw + text sha256, byte counts, what each covers
-  claims.json        ← 13 clinical claims, every quote cut from a fetched source
+  claims.json        ← 21 clinical claims, every quote cut from a fetched source
   tools/
     fetch.sh             ← re-fetch every original (browser UA — see below)
     extract.mjs          ← the one definition of "the text of this page"
     build-sources.mjs    ← emits sources.json; re-fetches to observe hash stability
     build-claims.mjs     ← emits claims.json; THROWS if a locator no longer matches
     build-naredba-24.mjs ← emits content/law/acts/naredba-24.json
-    verify-claims.mjs    ← the gate: re-extract, re-hash, re-check all 50 quotes
+    verify-claims.mjs    ← the gate: re-extract, re-hash, re-check all 80 quotes
 ```
 
 Regenerating, from `content/medical/tools/`:
@@ -69,6 +69,37 @@ node verify-claims.mjs ..        # exit 1 if anything drifted
 
 The fetched originals are **not** committed (~18 MB, mostly the ERC book);
 `sources.json` pins each one, exactly as `content/law` does.
+
+## The half that was missing: the questions have to cite BACK
+
+A register that describes the guidelines correctly changes nothing on its own,
+because the tutor grounds on what the **row** cites, not on what this directory
+knows. Measured before it was fixed: **this register named 28 first-aid rows
+across 35 (question, claim) pairs, and not one of those rows carried a
+`sourceRefs` entry** — 2 of 1,089 questions in the whole bank had one at all.
+So `claims.json` said „ERC 2025 says 5–6 cm" while `q-ptp-036` still offered
+retrieval nothing but **ЗДвП чл. 123**, the duty to stop and assist. That is
+the Tier C defect (docs/education/90 §14.5) still fully intact, behind a
+directory that made it look closed.
+
+All 29 now carry `sourceRefs` — `{ sourceId, ref, claimId }`, derived from this
+register rather than chosen by hand — and the join is gated in both directions
+by `platform/src/modules/theory` (`findGroundingGaps`), which walks the CLAIMS
+and looks for the row. A checker that walked the rows instead would report a
+perfectly clean bank the moment every row cited nothing, which is exactly the
+state the bank was in.
+
+Two claims deliberately have **no** `sourceRefs` pointing at them, and neither
+is an oversight:
+
+* `med-legal-duty` — every quote is ЗДвП. That belongs in `lawRefs`, and is
+  already there. `sourceRefs` is for what a statute cannot settle.
+* `med-impaled-object` — zero quotes, because an exhaustive sweep of all eight
+  registered sources for *impaled / embedded / foreign object / penetrating*
+  returns nothing. Manufacturing a citation for it would be the чл. 123 mistake
+  wearing a new coat, so `q-ptp-019` cites only the half that IS grounded
+  (direct pressure) and its explanation tells the student the rest is
+  established practice rather than a guideline.
 
 > **`resus.org.uk` answers 403 to a default curl/wget User-Agent.** That is the
 > entire reason an earlier attempt recorded it as unreachable. `fetch.sh` sends
@@ -150,7 +181,23 @@ exactly this scenario: substituting 4–5 cm into the depth claim makes it exit 
 
 ## What we still cannot ground
 
-`claims.json` marks these `ungrounded-*` rather than papering over them.
+`claims.json` marks these `ungrounded-*` rather than papering over them. Five
+of the twenty-one now carry that prefix — the count went UP when the register
+was extended to the rows it had been silent about, which is the right
+direction: each one is a place the product was already teaching something and
+this file was not admitting it could not cite it.
+
+* **`med-impaled-object` (`q-ptp-019`).** Zero quotes, by construction. See the
+  section above.
+* **`med-triage-unresponsive-first` (`q-ptp-033`).** RCUK orders a rescuer's
+  attention (safety → responsiveness → life-threatening bleeding) and treats
+  unresponsiveness as a trigger on its own, but publishes no lay rule for
+  choosing between TWO casualties. Our answer follows from the ordering; it is
+  assembled, not read, so `authoritative` is null.
+* **`med-nothing-by-mouth` (`q-ptp-034`).** Neither ERC 2025 nor RCUK 2025
+  addresses oral intake after trauma at all. The one place they DO direct
+  something by mouth — suspected hypoglycaemia — is quoted alongside precisely
+  so the boundary is visible rather than assumed.
 
 * **`med-extrication-technique` (`q-ptp-063`, the burning car).** Наредба № 24
   чл. 9, т. 8 makes *"извличане и транспортиране на пострадали при ПТП"*

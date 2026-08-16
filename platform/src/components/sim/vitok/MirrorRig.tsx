@@ -24,14 +24,28 @@
 //   targets: rear 256x96 (24.6k px) + 2x 160x96 (15.4k px each) ≈ 0.45 MB
 //   RGBA16F + depth total (HalfFloat so the composer tone-maps mirror
 //   content identically to the direct view — see the aim-table comment).
-//   cadence (MIRROR_CADENCE / LOW_REAR_CADENCE): at most ONE mirror pass per
+//   cadence (scene/vitok/mirrorAttention.ts): at most ONE mirror pass per
 //   frame —
-//     low    = rear only, every 8th frame (doc 62 #44 — the rear mirror is
-//              safety-critical; doors keep the authored dark-gloss glass.
-//              4 → 8 is doc 91 §I21; the rationale is on LOW_REAR_CADENCE);
-//     medium = rear only, rendered every 2nd frame;
-//     high   = rear every 2nd frame, doors every 4th (staggered on the
-//              rear's off-frames, phases 1 and 3).
+//     low    = rear every 8th frame (doc 91 §I21), doors every 8th WHILE
+//              LOOKED THROUGH (phases 2 and 6, clear of the rear's 0);
+//     medium = rear every 2nd frame, doors every 4th WHILE LOOKED THROUGH;
+//     high   = rear every 2nd frame, doors every 4th free-running, exactly as
+//              before — this rig's `high` behaviour is unchanged.
+//
+//   „WHILE LOOKED THROUGH" IS THE 2026-08-16 FIX AND IT REPLACES „doors keep
+//   the authored dark-gloss glass" on low/medium. Founder: „the left door
+//   mirror is a featureless matte-black pod with no glass and no reflection."
+//   It was, on every preset a student can actually reach — `medium` is the
+//   default and `autoQualityCeiling()` hard-caps every touch-only device at
+//   `med`, so no phone has ever rendered a door mirror. Measured on the
+//   deployed build, the same 105 × 95 px rect of left-door glass at the same
+//   held-left glance: median luminance **0** and **73.9 % near-black** at
+//   medium, against **108** and **0.9 %** at high.
+//   Why the fix is a gate and not a switch: `cabinLook.ts` measures the door
+//   mirrors at frame-x −0.005 (left) and 1.358 (right) at the DRIVING pose —
+//   both outside the picture — so free-running door passes spend the tier-low
+//   budget on quads nobody can see. The full argument, and the cadence tables,
+//   are in `scene/vitok/mirrorAttention.ts`.
 //   REDUCED SCENE per pass: a PER-INSTANCE cull (mirrorInstanceCull.ts) drops
 //   every InstancedMesh with no instance inside the mirror's own cone — the
 //   thing three cannot do, and the only cut that was ever big here: 97.3 % of
@@ -69,7 +83,7 @@
 // GRADING IS UNTOUCHED: mirror glances stay camera/key/click events through
 // CabinControls.glance() — RTT is visual truth, not the graded signal.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   FogExp2,
@@ -83,8 +97,16 @@ import {
 } from "three";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import { COCKPIT_EYE } from "@/modules/sim/vehicle";
+import type { CabinControls } from "@/modules/sim/scene/cabin";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
+import {
+  MIRROR_BIT,
+  mirrorKindsFor,
+  selectMirrorPass,
+  type MirrorKind,
+} from "@/modules/sim/scene/vitok/mirrorAttention";
+import { getCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { loadQualityPreset } from "../lesson-ui/QualityPresetSelector";
 
 /**
@@ -122,7 +144,20 @@ export interface MirrorMeshes {
   rear: Mesh | null;
 }
 
-type MirrorKind = keyof MirrorMeshes;
+// `MirrorKind` now comes from `scene/vitok/mirrorAttention` (the decision half)
+// so the rig and the scheduler cannot drift on the SET of mirrors. This is the
+// compile-time proof that they agree in BOTH directions — a one-way `extends`
+// would let the scheduler quietly grow a fourth mirror this rig has no mesh
+// for, and `entries.find()` would then return undefined every time its phase
+// came round: a mirror scheduled forever and rendered never.
+type MirrorKindsMatchMeshes =
+  [MirrorKind] extends [keyof MirrorMeshes]
+    ? [keyof MirrorMeshes] extends [MirrorKind]
+      ? true
+      : never
+    : never;
+const _kindsAgree: MirrorKindsMatchMeshes = true;
+void _kindsAgree;
 
 interface MirrorDef {
   /** Render-target size — small on purpose; mirrors are ~0.1-0.2 m of glass. */
@@ -337,49 +372,11 @@ const MIRROR_SKY_RADIUS = 190;
  */
 const MIRROR_FOG_MIN_DENSITY = 1.5 / MIRROR_FAR;
 
-/**
- * Per-mirror refresh cadence: render mirror `kind` on frames where
- * frame % interval === phase. Phases are disjoint (rear owns 0 and 2 mod 4,
- * doors own 1 and 3), so AT MOST ONE mirror pass ever runs per frame:
- *   low    (rear only) — rear every 8th frame (~7.5 Hz; see LOW_REAR_CADENCE);
- *   medium (rear only) — passes on half the frames;
- *   high (all three)   — rear at 30 Hz, each door at 15 Hz.
- * Glass is small and mostly glanced at — 15 Hz doors read fine.
- */
-const MIRROR_CADENCE: Record<MirrorKind, { interval: number; phase: number }> = {
-  rear: { interval: 2, phase: 0 },
-  left: { interval: 4, phase: 1 },
-  right: { interval: 4, phase: 3 },
-};
-
-/** LOW-preset rear cadence (founder review doc 62 #44 — "the cockpit rear
- *  mirror shows NOTHING": on low the rig used to mount no RTT at all and the
- *  glass stayed authored dark gloss). The rear mirror is the safety-critical
- *  one — a tailgater lesson is unplayable without it — so low now runs the
- *  REAR pass only: one 256×96 reduced-scene render (far plane 200 m, frozen
- *  shadows, no composer). The door mirrors stay dark gloss on low — that
- *  remains the honest budget cut.
- *
- *  INTERVAL 4 → 8 (doc 91 §I21 / §D12f, 2026-08-12). The pass is a FIXED
- *  256×96 target, so unlike the main pass its cost does not shrink with the
- *  viewport: measured at phone dimensions, tier low, it was 0.61–1.13 ms of a
- *  2.4–3.2 ms GPU frame — 25–34 % of the whole tier-low GPU budget for 7 % of
- *  the canvas pixels. With §I19 (frameloop="demand" behind a card) landed it
- *  became the largest single remaining per-frame GPU line at `low`, exactly as
- *  §J-10 predicted, so this is the next cut and it is a pure reduction.
- *
- *  WHAT IT COSTS, STATED: the rear glass refreshes ~7.5×/s instead of ~15×/s
- *  on the tier where it is smallest and dimmest. It is still a live mirror —
- *  a tailgater lesson stays playable (doc 62 #44) — and it is only `low`;
- *  medium keeps every 2nd frame and high keeps 30 Hz. */
-const LOW_REAR_CADENCE = { interval: 8, phase: 0 } as const;
-
-/** Which mirrors run RTT per quality tier (lesson-ui preset, fixed for the
- *  life of the scene — the selector lives on the pre-lesson screen). */
-function activeKindsFor(preset: "low" | "medium" | "high"): MirrorKind[] {
-  if (preset === "high") return ["rear", "left", "right"];
-  return ["rear"]; // medium AND low — see LOW_REAR_CADENCE
-}
+// The cadence tables and the "is he looking through it" rule live in
+// `scene/vitok/mirrorAttention.ts` — the decision half, unit-tested without a
+// GPU, exactly like `mirrorPass.ts` and `mirrorInstanceCull.ts`. The doc-91
+// §I21 rationale for the low rear's interval 8, and the measurement behind the
+// door gate, are both recorded there.
 
 interface MirrorRigEntry {
   kind: MirrorKind;
@@ -395,7 +392,27 @@ interface MirrorRigEntry {
  * pass, so the glass shows this frame's world). Inactive tiers/mirrors keep
  * the authored dark-gloss glass material — the "static dark glass" look.
  */
-export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: boolean }) {
+export function MirrorRig({
+  mirrors,
+  active,
+  cabinRef,
+}: {
+  mirrors: MirrorMeshes;
+  active: boolean;
+  /**
+   * The cabin, for the ONE question this rig asks it: which mirror is the
+   * driver looking through right now (`glanceMirror` + `glanceStrength`). A
+   * ref and not a prop value because the answer changes at frame rate and a
+   * React state for it would re-render the cockpit 60×/s to schedule a
+   * 160×96 render target.
+   *
+   * Optional so an existing mount (and the clip rig's CaptureScene, which has
+   * no CabinControls) keeps compiling: with no cabin the doors fall back to
+   * the cabin-look pose alone, which is still strictly more than the dark
+   * gloss they had.
+   */
+  cabinRef?: RefObject<CabinControls | null>;
+}) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   // Read once on mount: the quality selector lives on the lesson-select
@@ -403,7 +420,7 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
   const [preset] = useState(() => loadQualityPreset());
 
   const entries = useMemo<MirrorRigEntry[]>(() => {
-    return activeKindsFor(preset).flatMap((kind) => {
+    return mirrorKindsFor(preset).flatMap((kind) => {
       const mesh = mirrors[kind];
       if (!mesh) return [];
       const def = MIRROR_DEFS[kind];
@@ -496,6 +513,20 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
   }, [entries]);
 
   const frameRef = useRef(0);
+  /**
+   * Which targets have never been rendered, as a bitmask (see
+   * mirrorAttention.MIRROR_BIT). The RTT material is swapped onto the glass on
+   * mount, so a door target that has never had a pass would show an
+   * uninitialised buffer — a black quad — for the whole of the student's first
+   * glance, which is precisely the defect this lane is closing. Every mirror
+   * therefore gets one unconditional pass on its own phase, and only then does
+   * the attention rule take over. Re-armed with `entries` because a GLB
+   * re-clone builds new targets.
+   */
+  const unprimedRef = useRef(0);
+  useEffect(() => {
+    unprimedRef.current = entries.reduce((m, e) => m | MIRROR_BIT[e.kind], 0);
+  }, [entries]);
   // The SkyDome mesh, resolved lazily by name (it mounts in a sibling tree,
   // possibly after us) and re-resolved if the environment remounts.
   const skyRef = useRef<Object3D | null>(null);
@@ -503,18 +534,24 @@ export function MirrorRig({ mirrors, active }: { mirrors: MirrorMeshes; active: 
   useFrame(() => {
     if (!active || entries.length === 0) return;
     const frame = frameRef.current++;
-    // MIRROR_CADENCE phases are disjoint → at most one entry matches. The low
-    // preset carries only the rear entry, at its own gentler cadence.
-    let entry: MirrorRigEntry | null = null;
-    for (const e of entries) {
-      const c =
-        preset === "low" && e.kind === "rear" ? LOW_REAR_CADENCE : MIRROR_CADENCE[e.kind];
-      if (frame % c.interval === c.phase) {
-        entry = e;
-        break;
-      }
-    }
+    // WHICH mirror (cadence + „is he looking through it") is decided by
+    // `selectMirrorPass`; phases are disjoint, so it can only ever name one.
+    // The cabin is read here rather than subscribed to: `glanceMirror` and
+    // `glanceStrength()` are plain reads off the live CabinControls, and
+    // `getCabinLook()` is a module read by design (see cabinLookStore).
+    const cabin = cabinRef?.current ?? null;
+    const kind = selectMirrorPass(
+      frame,
+      preset,
+      cabin?.glanceMirror ?? null,
+      cabin?.glanceStrength() ?? 0,
+      getCabinLook(),
+      unprimedRef.current,
+    );
+    if (kind === null) return;
+    const entry = entries.find((e) => e.kind === kind) ?? null;
     if (!entry) return;
+    unprimedRef.current &= ~MIRROR_BIT[kind];
 
     let sky = skyRef.current;
     if (!sky || !sky.parent) {

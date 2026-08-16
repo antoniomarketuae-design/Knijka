@@ -34,6 +34,10 @@ import {
   NOTIFY_COLUMN_WIDTH_CSS_ROOMY,
   RIBBON_LEGEND_LANE_PX,
 } from "@/modules/sim/hud";
+// Deep import, and for the reason LessonScene's own two deep imports state: the
+// barrel belongs to the HUD lane, this wave does not own it, and a rule that
+// needs one new length is not worth a cross-lane edit to a re-export list.
+import { FLANK_LANE_VAR, notifyColumnMaxHeightCss } from "@/modules/sim/hud/notifyColumn";
 
 /**
  * One CSS rule, mounted by the play shell: while a LETTERBOXED session is on
@@ -751,11 +755,28 @@ ${TOUCH_BAND_CSS_VARS}
          Sideways — the orientation people drive in, and the one where the card
          was measured hiding 333 px of its own body — the card GAINS. Upright it
          loses cap it was not using: the briefing card measures ~205 px there. */
+      /* 2026-08-16 · „THE HUD IS STANDING ON THE ROAD", row 1: THE BAND IS NOT
+         THE ONLY THING THIS COLUMN HAS TO CLEAR. The rule above asks „what is
+         left above the driving controls" and answers 192 px on an iPhone 16
+         sideways — which is 0.509 of the stage, and the founder photographed
+         exactly that box lying over the right-hand pavement on the one rung
+         whose whole subject is the right-hand pavement.
+         Measured on the deployed build, the landing frame of
+         sc-zebra-approach@L1: [data-hud="notify-column"] [541, 8, 180 × 192].
+         „notifyColumnMaxHeightCss()“ adds the second budget — the HAZARD BAND,
+         derived from the cockpit projection rather than chosen (notifyColumn.ts
+         has the arithmetic: horizon 0.58, a 2.2 m sign at 30 m at 0.531, a
+         pedestrian at 15 m at 0.531, so 0.43 leaves a tenth of the frame). The
+         „min()“ keeps the band rule intact wherever it is the tighter of the
+         two, which is every portrait profile in the ladder.
+           852 × 393  192 → 161      393 × 852  330 → 330 (unchanged)
+           780 × 360  188 → 147      360 × 780  292 → 292 (unchanged) */
       [data-sim-compact="on"] [data-sim-stage] [data-hud="notify-column"],
       [data-sim-compact="on"] [data-sim-stage]:has([data-hud="demo-deck"]) [data-hud="notify-column"] {
-        max-height: calc(
-          100% - ${notifyColumnFloorCss()} - ${NOTIFY_COLUMN_TOP_CSS_COMPACT}
-        );
+        max-height: ${notifyColumnMaxHeightCss(
+          notifyColumnFloorCss(),
+          NOTIFY_COLUMN_TOP_CSS_COMPACT,
+        )};
       }
 
       /* …AND THE LANE ITSELF IS NOT WRITTEN HERE, WHICH COST THIS WAVE A
@@ -1313,13 +1334,13 @@ ${TOUCH_BAND_CSS_VARS}
       }
 
       /* ══════════════════════════════════════════════════════════════════
-         THE FIRST-RUN THUMB HINT LEAVES THE MIDDLE OF THE SCREEN — 2026-08-12.
+         THE FIRST-RUN THUMB HINT LEAVES THE MIDDLE OF THE SCREEN — 2026-08-12,
+         AND THEN ACTUALLY LEAVES IT — 2026-08-16.
 
-         THIS IS THE FRAME HE PHOTOGRAPHED. The hint is "top: 50%", full-width,
-         three stacked lines; the flanks are 44 px targets at the bottom
-         corners; so the hint's own third line ran straight through them.
-         Measured, WebKit, real insets, iPhone 16 landscape, the state a lesson
-         lands in once the briefing is dismissed:
+         THE FRAME THAT OPENED THIS ROW IN 2026-08-12. The hint was "top: 50%",
+         full-width, three stacked lines; the flanks are 44 px targets at the
+         bottom corners; so the hint's own third line ran straight through them.
+         Measured, WebKit, real insets, iPhone 16 landscape:
 
            «Спряла кола: пусни палеца и натисни пак надолу…»
               over «Клаксон — задръж»              733 px²
@@ -1327,64 +1348,105 @@ ${TOUCH_BAND_CSS_VARS}
               over «Поглед в лявото огледало»      197 px²
               over «Мигач наляво»                   29 px²
 
-         Reproduced on both other landscape profiles, and on the 360 Samsung the
-         same sentence took «Мигач наляво» for 760 px². No z-index fixes that:
-         the two things want the same pixels.
+         That rule put the hint in the corridor BETWEEN THE TWO PADS, standing
+         on the instrument band. It closed every one of those overlaps and it
+         did not answer the founder's actual sentence, which he has now written
+         three times: THE CENTRE OF THE SCREEN IS ROAD. Measured on the deployed
+         build, same profile, the state a lesson lands in once the briefing is
+         acknowledged:
 
-         So the hint is given a box that CANNOT reach a control, and the box is
-         different in the two orientations because the free space is:
+           [data-hud="touch-hint"]  [275, 202, 334 × 143]
 
-           LANDSCAPE  the corridor BETWEEN THE TWO PADS (PAD_CORRIDOR_*), which
-                      is 350 px wide on an iPhone 16 and free of controls at
-                      every height — the pads are the only wide things on this
-                      screen and they are both at the bottom corners. Sat on the
-                      instrument band, which is where the reference puts
-                      information: the bottom edge.
-           PORTRAIT   the pad corridor is 78 px there, so instead the hint sits
-                      ABOVE the whole control band and stops short of the
-                      notification column. Nothing paints in that strip — the
-                      census taken for the portrait deck found it empty across
-                      the full width — and the deck itself is stood down above.
+         — the middle 39 % of the width, centred 16 px off the vanishing point,
+         crossing the cockpit horizon (0.58 of the stage = 228 px), 47 762 px²
+         or 14.3 % of the picture. „Off the controls" and „off the road" are two
+         different requirements and only the first had been met.
 
-         Both are "overflow-y: auto" against a "max-height", because a bounded
-         box that scrolls is the only version of this that cannot come back.
+         SO IT JOINS THE RIGHT-EDGE CORRIDOR, on exactly the terms the audio
+         card, the follow chip and the telltale cue already join it: same right
+         inset, same width, same top, all four interpolated from
+         notifyColumn.ts. Nothing new is invented and no fifth geometry exists.
+
+         IT CANNOT COLLIDE WITH THE COLUMN IT NOW SHARES A LANE WITH, and that
+         is a fact about the C1 ladder rather than a hope: the hint is „display:
+         none“ while the overlay column speaks (rank 1 beats rank 2, further up
+         this file), and the audio chip, the follow chip, the telltale cue and
+         the demonstration deck are all „display: none“ while the hint is up
+         (rank 2 beats rank 3). One surface in the corridor, always.
+
+         AND IT NO LONGER FIGHTS «Кола отзад · 12 м». „RearProximityCue“ is
+         „bottom-[6.75rem] left-1/2“, i.e. also dead centre, and the founder's
+         own frame has that chip inserted BETWEEN two lines of the teal hint.
+         Moving the hint out of the centre band ends that collision without
+         touching a file this lane does not own. ⚠ The cue itself is still
+         centred and still has NO „data-hud“ name, so no probe in this project
+         can see it — the same trap the shadow-line legend was in until
+         „RIBBON_LEGEND_LANE_PX“ named it. Handed over, not fixed here.
+
+         "overflow-y: auto" against a "max-height" stays, because a bounded box
+         that scrolls is the only version of this that cannot come back — and
+         the ceiling is the column's own, so the hint is bound by the same
+         hazard band the peek is (notifyColumn.ts).
          ══════════════════════════════════════════════════════════════════ */
-      [data-sim-compact="on"] [data-hud="touch-hint"] {
-        top: auto;
+      [data-hud="touch-hint"] {
+        top: ${NOTIFY_COLUMN_TOP_CSS_ROOMY};
+        bottom: auto;
+        left: auto;
+        right: ${NOTIFY_COLUMN_RIGHT_CSS};
+        width: ${NOTIFY_COLUMN_WIDTH_CSS_ROOMY};
         transform: none;
         translate: none;
-        left: calc(0.75rem + env(safe-area-inset-left, 0px));
-        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} + 0.5rem);
-        bottom: calc(${TOUCH_CONTROLS_FLOOR} + 0.5rem);
-        max-height: calc(100% - ${TOUCH_CONTROLS_FLOOR} - 4.5rem);
-        overflow-y: auto;
-        align-items: flex-start;
-        text-align: left;
+        align-items: flex-end;
+        text-align: right;
+        /* …and the OVERFLOW IS THE WORDS', not the card's. It used to be
+           „overflow-y: auto" here, i.e. the whole hint scrolled — and measured
+           on the deployed build that put «РАЗБРАХ», the one control that clears
+           it, 10.9 px below its own fold on an iPhone 16 sideways. The words
+           now live in their own scroller and the button is a shrink-0 sibling
+           (LessonScene), so this box only has to be honest about its size. */
+        overflow: hidden;
       }
-      @media (max-height: 560px) {
-        [data-sim-compact="on"] [data-hud="touch-hint"] {
-          left: calc(${PAD_CORRIDOR_LEFT_CSS});
-          right: calc(${PAD_CORRIDOR_RIGHT_CSS});
-          bottom: calc(var(--sim-dash-h, 0px) + 0.5rem);
-          max-height: calc(100% - var(--sim-dash-h, 0px) - 4rem);
-          align-items: center;
-          text-align: center;
-        }
+      /* …AND IT PAYS THE FLANK'S LANE, WHICH THE FIRST PASS AT THIS ROW DID
+         NOT, AND THE RE-MEASURE IS THE ONLY REASON WE KNOW. Written with the
+         column's width alone the hint laid out [541, 8, 240 × 141.6] on the
+         deployed build — right edge 781 — straight across «Л ЛЯВО» [741,44],
+         «З ЗАДН» [741,88] and «Д ДЯСН» [741,132], with its own pointer-events
+         «Разбрах» over the last two. Three graded mirror glances, buried by the
+         card that teaches the thumbs.
+         The peek beside it has paid this lane since 2026-08-14 („FIX · FLANKS")
+         and it pays it as a VARIABLE because its own declarations are inline;
+         here a stylesheet is doing the writing, so the same variable is simply
+         read. Landscape 3.75 rem, upright 0 — the orientation split lives in
+         TOUCH_BAND_CSS_VARS and nowhere else. Re-measured: [541, 8, 180 × …],
+         right edge 721, twenty pixels clear of the band. */
+      [data-sim-compact="on"] [data-hud="touch-hint"] {
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT};
+        right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});
+        width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
+        max-height: ${notifyColumnMaxHeightCss(
+          notifyColumnFloorCss(),
+          NOTIFY_COLUMN_TOP_CSS_COMPACT,
+        )};
       }
-      /* …AND IT STANDS DOWN FOR THE ⚙ SHEET, WHICH IS THE SAME LINE IT NOW
-         STANDS ON — measured 2026-08-12, and it is a defect this wave's own
-         first pass created and this rule closes.
-         In PORTRAIT the hint is anchored to "TOUCH_CONTROLS_FLOOR" and so is
-         the sheet, and the sheet is a WRAPPING strip that folds to three rows
-         on a 393 px phone. iPhone 16 portrait, sheet open with the first-run
-         hint still up: «Завърти телефона хоризонтално» over «Ръчна спирачка»,
-         «Предпазен колан» and «Светлини» at 1 144 px² each, the hint's own
-         «Разбрах» over «Скоростен лост — стъпка към D» and «Рестарт» at
-         1 584 px² each, and both of those cells DEAD.
-         The hint is rank 2 in the ladder above; the sheet is a control surface
-         the student opened deliberately, one tap ago, and closes the same way.
-         So the hint waits, exactly as it already waits for the overlay line —
-         and unlike the deck it loses nothing by waiting, because it is a
+      /* …AND IT STANDS DOWN FOR THE ⚙ SHEET — measured 2026-08-12, kept in
+         2026-08-16, and the REASON changed with the hint's corridor.
+
+         WHEN IT WAS WRITTEN: the hint was anchored to "TOUCH_CONTROLS_FLOOR"
+         and so is the sheet, and the sheet is a WRAPPING strip that folds to
+         three rows on a 393 px phone. iPhone 16 portrait, sheet open with the
+         first-run hint still up: «Завърти телефона хоризонтално» over «Ръчна
+         спирачка», «Предпазен колан» and «Светлини» at 1 144 px² each, the
+         hint's own «Разбрах» over «Скоростен лост — стъпка към D» and «Рестарт»
+         at 1 584 px² each, and both of those cells DEAD.
+
+         WHY IT STAYS: the hint now stands in the notification corridor, and
+         that corridor is the one this file ALREADY hides in landscape while the
+         sheet is open (§W3, a few rules up — the sheet's floor-anchored row
+         starts at y 91.5 on an 852 × 393 stage and runs the full width, through
+         x 541–721 where the corridor is). Same corridor, same arbitration, and
+         the hint is the weaker claim of the two for the same reason the column
+         is: the sheet is modal, the student opened it one tap ago, and its ✕ is
+         44 px. Unlike the deck the hint loses nothing by waiting — it is a
          sentence that has not been read yet rather than a running replay. */
       html[data-sim-car-sheet="open"] [data-hud="touch-hint"] {
         display: none;
@@ -1434,6 +1496,136 @@ ${TOUCH_BAND_CSS_VARS}
          pads or the rail in the state a lesson is actually driven in. */
       html[data-sim-car-sheet="open"] [data-hud="touch-controls"] {
         z-index: 40;
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         «КОЛАН» IS THE ONE RED THING ON THE SCREEN, AND IT WAS THE QUIETEST
+         — 2026-08-16, „THE HUD IS STANDING ON THE ROAD", row 4.
+
+         FOUNDER: „«КОЛАН» is the least visible thing on screen and it faults
+         the student 4.5 s in … the affordance the student needs FIRST is the
+         one hardest to find."
+
+         MEASURED ON THE DEPLOYED BUILD (WebKit, real insets, iPhone 16
+         landscape 852 × 393, sc-zebra-approach@L1, belt off, canvas asserted):
+
+           «Закопчай предпазния колан»  [741, 176, 44 × 44]
+             color            rgb(255, 106, 88)   — var(--danger)
+             font-size        15px (the ⚠) · 8px (the word)
+             background-color rgba(0, 0, 0, 0)    ← nothing
+             border           0px                 ← nothing
+
+         and its three neighbours on the same flank — «Л ЛЯВО», «З ЗАДН»,
+         «Д ДЯСН» — are the SAME 44 × 44 transparent box, the SAME 15 px glyph
+         and the SAME 8 px caption, in white. So the one control that is an
+         alert is distinguished from three ordinary controls by HUE ALONE, at
+         about 2.5 mm² of ink, over whatever the road happens to be — in his
+         frame, a parked car. TouchControls' own note already claims the
+         opposite („it is the only red thing on the screen, and fastening it
+         hands the same box back to the ⚙ dock"); the claim was true about the
+         COLOUR and false about the SALIENCE, and nobody had measured the ink.
+
+         WHAT CHANGES: fill, hairline and a slow pulse. NOT geometry — the box
+         stays 44 × 44 („box-sizing: border-box“, so the 1 px ring is inside
+         it), the station keeps its place on the band, and „touchArc.test.ts“
+         reads the same rects it read yesterday. Nothing else on the screen
+         gains ink, which is the whole point: scarcity is what makes „the
+         reddest thing on the screen IS the instruction" true.
+
+         WHY IT IS A STYLESHEET RULE. The markup is „TouchControls.tsx“, which
+         this lane does not own, and „data-hud“ / „data-arc“ are the vocabulary
+         the two trees share — the same mechanism this file already uses for the
+         deck, the audio card, the follow chip and the telltale cue. The button
+         is named by its ACCESSIBLE NAME rather than by its position, exactly as
+         row A2's two end-screen controls are: „aria-label“ is what this control
+         IS, and a „:nth-child“ chain would be a private detail of somebody
+         else's file that stops matching the day a wrapper moves — the failure
+         mode where a fix reports green and the founder still cannot see the
+         button. It is additionally pinned to station 0 of the right flank, so
+         the rule cannot leak onto a future control that reuses the label.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-hud="touch-controls"]
+        [data-arc="0"][data-arc-side="right"]
+        button[aria-label="Закопчай предпазния колан"] {
+        border-radius: 9999px;
+        border-width: 1px;
+        border-color: color-mix(in srgb, var(--danger) 72%, transparent);
+        background-color: color-mix(in srgb, var(--danger) 20%, transparent);
+        animation: sim-belt-pulse 1800ms ease-in-out infinite;
+      }
+      /* …and the word gets the two pixels the ring can pay for. 8 px is the
+         flank's caption size and it is right for «ДЯСН» — a reminder of a
+         control the student already knows. This one is being READ for the
+         first time, under time pressure, by a 17-year-old. 15 px glyph + 1 px
+         gap + 10 px word = 26 px inside a 44 px box; nothing reflows. */
+      [data-hud="touch-controls"]
+        [data-arc="0"][data-arc-side="right"]
+        button[aria-label="Закопчай предпазния колан"]
+        > span:last-child {
+        font-size: 10px;
+        letter-spacing: 0;
+      }
+      @keyframes sim-belt-pulse {
+        0%, 100% { background-color: color-mix(in srgb, var(--danger) 20%, transparent); }
+        50%      { background-color: color-mix(in srgb, var(--danger) 42%, transparent); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        [data-hud="touch-controls"]
+          [data-arc="0"][data-arc-side="right"]
+          button[aria-label="Закопчай предпазния колан"] {
+          animation: none;
+          /* …and it keeps the loud end of the ramp rather than the quiet one:
+             reduced motion is a request about movement, not about salience. */
+          background-color: color-mix(in srgb, var(--danger) 34%, transparent);
+        }
+      }
+
+      /* ══════════════════════════════════════════════════════════════════
+         THE TWO PAD MARKS STOP BEING „TWO UNSTYLED BLUE CROSSHAIRS" —
+         2026-08-16, row 5.
+
+         WHAT THEY ACTUALLY ARE, found by hit-testing the two coordinates in his
+         frame rather than by guessing (WebKit, iPhone 16 landscape, deployed):
+
+           (107, 341)  → „[role="slider"][aria-label^="Волан"]“   the steering
+                         pad's rule: a 62 × 1 px line, two 1 × 8 px end ticks and
+                         a 22 px ring, „bg-accent/45“ + „border-accent“
+           (763, 304)  → „[role="slider"][aria-label^="Ход"]“     the drivetrain
+                         pad's rule: the same shape rotated, ring border written
+                         INLINE as „var(--accent)“
+
+         They are not stray widgets and they are not debris — they are the only
+         ink either pad has, and on the absolute drive axis the ring's resting
+         place IS „middle is stop". But a horizontal rule with two end ticks and
+         a ring through it reads as a crosshair, and both were painted in BRAND
+         BLUE at full saturation: the only two saturated marks left on a screen
+         whose every other instrument was moved to a neutral hairline register
+         by the UNPANEL pass. „[data-hud="touch-controls"]“ was deliberately left
+         off „GHOST_SURFACES“ („these controls paint nothing to strip") and that
+         is exactly how these two kept their colour.
+
+         SO THE TOKEN IS RESTATED, NOT THE DECLARATIONS. Overriding the colours
+         directly cannot work and the reason is worth writing down: the drive
+         ring's border is set AT RUNTIME as information — green while the thumb
+         asks for throttle, red while it brakes, accent at neutral
+         („TouchControls“' „driveApply“) — written inline, so a stylesheet rule
+         strong enough to beat it („!important“) would kill the one piece of
+         live feedback the pad has. Redefining „--accent“ (and „--color-accent“,
+         which is what Tailwind's „bg-accent/45“ and „border-accent“ resolve
+         through) on the slider's own subtree moves the NEUTRAL colour and
+         leaves „var(--success)“ / „var(--danger)“ untouched. Same mechanism the
+         UNPANEL register uses one section down — „inherited by the subtree, so
+         „text-foreground“ / „text-muted“ inside a ghost follow without any
+         component having to know".
+
+         The value is the register's own ink at 0.62, which puts the rules at
+         0.28 after Tailwind's own 45 % modifier — the same weight as the flank
+         ghost's hairline, so the pads read as part of the same instrument
+         family instead of as two brand-coloured targets floating on a street.
+         ══════════════════════════════════════════════════════════════════ */
+      [data-hud="touch-controls"] [role="slider"] {
+        --accent: rgba(226, 234, 247, 0.62);
+        --color-accent: rgba(226, 234, 247, 0.62);
       }
 
       /* ══════════════════════════════════════════════════════════════════

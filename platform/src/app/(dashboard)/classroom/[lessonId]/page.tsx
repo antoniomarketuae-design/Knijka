@@ -90,13 +90,21 @@ export default async function ClassroomLessonPage({ params }: Props) {
             Урокът остава в курса и ще се отвори сам, щом съдържанието му е потвърдено. Дотогава
             другите уроци по темата вървят нормално.
           </p>
+          {/* Both are 40px without the floor: `py-2.5` is 4px short of the
+              44px `.btn-accent` already comes to at its own `py-3`, and the
+              second one is not a `.btn-*` at all so it never had the base to
+              fall back on. This is the dead end a student reaches when a lesson
+              is held back — the only two ways out of it. */}
           <div className="flex flex-wrap gap-2 pt-1">
-            <Link href="/classroom" className="btn-accent px-5 py-2.5 text-sm font-bold">
+            <Link
+              href="/classroom"
+              className="btn-accent min-h-11 px-5 py-2.5 text-sm font-bold"
+            >
               Обратно към курса
             </Link>
             <Link
               href="/theory"
-              className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-border-strong"
+              className="inline-flex min-h-11 items-center rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground transition-colors hover:border-border-strong"
             >
               Към тренировката
             </Link>

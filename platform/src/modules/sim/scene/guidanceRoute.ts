@@ -78,6 +78,7 @@
 import { parseObjectiveParams, type LessonSpec } from "@/modules/sim/lessons";
 import { LANE_WIDTH_M, createWorldRuntime } from "@/modules/sim/runtime";
 import { DistrictIndex } from "@/modules/sim/runtime/spatial";
+import { paintsZebra } from "@/modules/sim/world/builders/constants";
 import {
   JUNCTION_TRIM_MAX_FRACTION,
   STOP_LINE_BEYOND_CUT_M,
@@ -211,6 +212,20 @@ export interface RouteEdgeLike {
 }
 export interface RouteDistrictLike {
   roads: { nodes: { id: string; x: number; y: number }[]; edges: RouteEdgeLike[] };
+  /**
+   * Pedestrian crossings, when the caller has them. Optional so nothing that
+   * feeds guidance a roads-only shape has to change; `LessonScene` passes the
+   * whole `District`, which always carries them. Used by
+   * `crossingMuteSpans` — see its header for the frame that forced it.
+   */
+  crossings?: readonly RouteCrossingLike[];
+}
+
+/** The part of `DistrictCrossing` guidance reasons about. */
+export interface RouteCrossingLike {
+  x: number;
+  y: number;
+  kind: string;
 }
 
 /**
@@ -454,6 +469,155 @@ export function markerRingRadii(goal: GuidancePointGoal): { innerM: number; oute
   const outerM = goal.shape.radiusM;
   const band = Math.min(1.25, Math.max(0.35, outerM * 0.14));
   return { innerM: Math.max(0.05, outerM - band), outerM };
+}
+
+// ---------------------------------------------------------------------------
+// THE MARKER'S SIGN — where the «Карай дотук» chip stands
+// ---------------------------------------------------------------------------
+//
+// THE DEFECT, from the founder's own frames (scratchpad/play/01-arrival.png and
+// lessons/sc-zebra-approach/portrait-18-overlay-hint.png, sc-zebra-approach at
+// spawn): „«КАРАЙ ДОТУК» HANGS IN MID-AIR … a dark billboard floating at
+// BUILDING HEIGHT in the middle of the street … It reads as unfinished, and it
+// sits on the vanishing point — the exact place a driver must look."
+//
+// He is describing three separate things, and all three were true of the chip:
+//
+//  1. NOTHING HELD IT UP. The panel was a camera-facing quad at y = 4.4 m with
+//     no support of any kind. The 11 m marker shaft that is nominally under it
+//     is fully transparent below SHAFT_EYE_CLEAR_M = 2.6 m and dissolves
+//     entirely inside 9 m, so from the seat there is never anything between the
+//     panel and the road.
+//  2. IT WAS ON THE AXIS. The chip hung over the marker itself, i.e. over the
+//     centre of the student's own lane, so on a straight street it projects
+//     onto the vanishing point at every distance.
+//  3. IT WAS FULL STRENGTH AT ANY RANGE. The fade ramp ran 30 m → 11 m and had
+//     no far end, so at 120 m — where 5 m of panel subtends 2.4° and the
+//     28 px of text in it cannot be read at all — it still drew at 0.95 alpha.
+//     That is the state every one of his frames catches it in.
+//
+// The fix keeps the panel a billboard (a fixed-plane sign is unreadable when
+// the route bends into it) and changes where and when it exists:
+//
+//   · it stands on a POST that reaches the road surface — the thing that turns
+//     „floating panel" into „sign";
+//   · it moves to the KERB SIDE of the route, so the axis the driver reads the
+//     road down is clear;
+//   · it is at real sign height instead of first-floor height;
+//   · and it fades out beyond the distance at which its text is legible, so it
+//     is never again a dark rectangle parked on the horizon.
+//
+// The numbers live here rather than in the component because they are a
+// TEACHING contract, not a styling choice, and `guidance-marker-sign.test.ts`
+// asserts them as angles at the eye rather than as metres in a file.
+
+/**
+ * Lateral offset of the sign from the route, m — kerb side (right of travel).
+ *
+ * `GATE_HALF_WIDTH_M` is half the perceptual lane, so this stands the post one
+ * metre beyond the lane edge: on the pavement, where road signs are, and
+ * clear of the wheel track of a car that drives through the gate.
+ */
+export const MARKER_SIGN_LATERAL_M = GATE_HALF_WIDTH_M + 1;
+
+/**
+ * The panel itself. 5.0 × 1.67 m and a 480 × 160 canvas since the 2026-08-03
+ * art pass (it was 7.2 × 2.4 m and „spanned half the sky" at the mark). The
+ * size lives here with the placement because the two are one contract: the
+ * post's top, the lower edge of the panel and the angular clearance from the
+ * road axis are all derived from these two numbers.
+ */
+export const MARKER_SIGN_PANEL_W_M = 5.0;
+export const MARKER_SIGN_PANEL_H_M = 1.67;
+
+/** Height of the panel's CENTRE, m. The panel is 1.67 m tall, so its lower edge
+ *  sits at 2.07 m — the clearance a real sign keeps over a pavement, and the
+ *  reason the post beneath it is short enough to read as a post. */
+export const MARKER_SIGN_PANEL_Y = 2.9;
+
+/** The post runs from the road surface to the panel's lower edge. Base at 0 is
+ *  the whole point of this pass and is asserted, not assumed. */
+export const MARKER_SIGN_POST_BASE_Y = 0;
+export const MARKER_SIGN_POST_RADIUS_M = 0.08;
+
+/**
+ * The band in which the chip exists, m from the eye.
+ *
+ * FAR: 5.0 m of panel subtends 4.8° at 60 m and 2.4° at 120 m; the second line
+ * («не по-бързо от 45 км/ч», 42 px on a 480 px canvas) is below the resolution
+ * of any phone the mobile audit covers past ~80 m. Beyond FAR_END the chip is
+ * therefore not information, it is a dark rectangle on the vanishing point.
+ * NEAR: unchanged from the previous pass — at the mark the student's eyes
+ * belong on the junction, and the contract has already been read.
+ */
+export const MARKER_SIGN_FAR_END_M = 82;
+export const MARKER_SIGN_FAR_START_M = 56;
+export const MARKER_SIGN_NEAR_START_M = 30;
+export const MARKER_SIGN_NEAR_END_M = 11;
+/** Peak alpha of the panel (unchanged). */
+export const MARKER_SIGN_MAX_OPACITY = 0.95;
+
+/**
+ * Alpha of the sign at a given eye distance — one ramp up out of the near
+ * field, one ramp down into the far field, nothing in between to tune.
+ */
+export function markerSignOpacity(distM: number): number {
+  const near = clamp(
+    (distM - MARKER_SIGN_NEAR_END_M) / (MARKER_SIGN_NEAR_START_M - MARKER_SIGN_NEAR_END_M),
+    0,
+    1,
+  );
+  const far = clamp(
+    (MARKER_SIGN_FAR_END_M - distM) / (MARKER_SIGN_FAR_END_M - MARKER_SIGN_FAR_START_M),
+    0,
+    1,
+  );
+  return MARKER_SIGN_MAX_OPACITY * Math.min(near, far);
+}
+
+/**
+ * District-space offset of the sign from the marker, given the direction the
+ * student APPROACHES on.
+ *
+ * Right of travel is `(dy, −dx)` — the same convention `GATE_LATERAL_MAX_M`
+ * slides a stop bar on, so the sign lands on the same side of the road as the
+ * kerb the bar is measured from. A zero-length or non-finite direction (a route
+ * that could not be derived) yields no offset rather than an arbitrary one: a
+ * chip over the middle of the lane is the old defect, but a chip flung onto an
+ * unknown bearing would be a worse one.
+ */
+export function markerSignOffset(dirX: number, dirY: number): { x: number; y: number } {
+  const len = Math.hypot(dirX, dirY);
+  if (!Number.isFinite(len) || len < EPS) return { x: 0, y: 0 };
+  const ux = dirX / len;
+  const uy = dirY / len;
+  return { x: uy * MARKER_SIGN_LATERAL_M, y: -ux * MARKER_SIGN_LATERAL_M };
+}
+
+/**
+ * The direction the student approaches the goal on, read off the derived route
+ * a few metres back from the marker. Falls back to the gate's own normal for a
+ * bar across a stop line, and to null when neither is available.
+ */
+export function markerApproachDir(
+  goal: GuidancePointGoal,
+  route: DerivedRoute | null,
+): { x: number; y: number } | null {
+  if (route && route.count >= 2) {
+    const a = { x: 0, y: 0 };
+    const b = { x: 0, y: 0 };
+    // 6 m is the same window `turnsFromRaw` measures junction headings over —
+    // long enough to ignore the densifier's sample noise, short enough that a
+    // corner just before the marker does not average the sign onto the wrong
+    // side of the road.
+    routePointAt(route, Math.max(0, route.goalS - TURN_DIR_WINDOW_M), a);
+    routePointAt(route, route.goalS, b);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (Math.hypot(dx, dy) > EPS) return { x: dx, y: dy };
+  }
+  if (goal.shape.kind === "gate") return { x: goal.shape.dirX, y: goal.shape.dirY };
+  return null;
 }
 
 export function guidanceGoalFor(
@@ -1505,6 +1669,82 @@ export function nearestArcOnRoute(route: DerivedRoute, x: number, y: number): nu
     }
   }
   return route.arc[best];
+}
+
+// ---------------------------------------------------------------------------
+// THE RIBBON DOES NOT OWN THE ZEBRA
+// ---------------------------------------------------------------------------
+//
+// THE FRAME. `scratchpad/lessons/sc-zebra-approach/landscape-13-phase-stopped-
+// before-zebra.png`, cropped [200, 380 1100×420] × 2 — the student is stopped
+// at the crossing, the advisor card says «Изчакай човекът да освободи платното»,
+// and the guidance ribbon runs straight over the crossing with its chevrons
+// pointing forward. The founder read it as a contradiction on the glass, and it
+// is one; but the crop shows something narrower and worse that is not a matter
+// of taste at all:
+//
+//   the ribbon is ADDITIVELY BLENDED (RIBBON_FRAG, `THREE.AdditiveBlending`) at
+//   RIBBON_Y = 0.045, and the zebra's bars are painted at MARKING_Y = 0.032.
+//   Where the two meet the bars are washed teal and their edges disappear.
+//
+// So on `sc-zebra-approach` — the drill whose entire objective is „видиш ли
+// пешеходната пътека, вдигни крака от газта" — the HUD is painting over the
+// marking the lesson exists to teach the student to SEE. That is the same
+// defect as register B24/B27 („the marker curtain occludes the very left-right
+// scan the lesson exists to teach"), in a different surface.
+//
+// The ribbon therefore stops at a marked crossing and starts again past it.
+// Nothing is invented: the span comes from `district.crossings`, the same list
+// `markings.ts` paints the zebra from and the same one the rule engine's
+// CrossingZoneTracker grades on, so the gap in the ribbon is exactly the ground
+// the bars occupy. The route, the acceptance radii and the grading are all
+// untouched — this changes what is DRAWN over 8 m of asphalt, nothing else.
+
+/**
+ * Half-length of the quiet span, m. The painted zebra is ~4 m of bars deep
+ * (`ZEBRA_*` in builders/constants.ts) and the ribbon has to be clear of them
+ * rather than tangent, so 4 m either side leaves the bars with a metre of
+ * unlit asphalt around them at the perceptual road scale.
+ */
+export const CROSSING_MUTE_HALF_M = 4;
+
+/**
+ * How far off the route a crossing may sit and still count, m. A crossing on
+ * the parallel street is not on this route; one on the route's own edge is
+ * within half a carriageway of it even where the ribbon rides a lane offset.
+ */
+const CROSSING_MUTE_MAX_OFFSET_M = LANE_WIDTH_M;
+
+/** Most spans the shader carries. Four crossings on one derived route is more
+ *  than any district in the catalogue puts on a single objective's leg; past
+ *  that the nearest ones win, because they are the ones on the glass. */
+export const CROSSING_MUTE_MAX_SPANS = 4;
+
+/**
+ * Arclength spans of `route` that lie over a painted pedestrian crossing.
+ *
+ * Returned sorted by arclength and capped at CROSSING_MUTE_MAX_SPANS, so the
+ * consumer can write them straight into a fixed-size uniform.
+ */
+export function crossingMuteSpans(
+  route: DerivedRoute | null,
+  district: RouteDistrictLike | null | undefined,
+): Array<[number, number]> {
+  const crossings = district?.crossings;
+  if (!route || !crossings || crossings.length === 0) return [];
+  const out: Array<[number, number]> = [];
+  const at = { x: 0, y: 0 };
+  for (const c of crossings) {
+    // Only crossings that are actually PAINTED: an unmarked one has no bars to
+    // wash out, and breaking the ribbon there would be a gap with no cause.
+    if (!paintsZebra(c)) continue;
+    const s = nearestArcOnRoute(route, c.x, c.y);
+    routePointAt(route, s, at);
+    if (Math.hypot(at.x - c.x, at.y - c.y) > CROSSING_MUTE_MAX_OFFSET_M) continue;
+    out.push([s - CROSSING_MUTE_HALF_M, s + CROSSING_MUTE_HALF_M]);
+  }
+  out.sort((a, b) => a[0] - b[0]);
+  return out.slice(0, CROSSING_MUTE_MAX_SPANS);
 }
 
 /** Point at arclength `s` (clamped), written into `out` — zero allocation. */

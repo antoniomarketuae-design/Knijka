@@ -524,7 +524,15 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
    */
   it("the app shell's root height subtracts the home-indicator inset", () => {
     const SHELL = read("components/dashboard/DashboardShell.tsx");
-    expect(SHELL).toContain("min-h-[calc(100dvh-env(safe-area-inset-bottom,0px))]");
+    // 2026-08-15: the literal moved, the PROPERTY did not. The root now reads
+    // `calc(100dvh - max(env(safe-area-inset-bottom,0px), var(--pinned-bar-h,0px)))`
+    // — still subtracting the home-indicator inset, and additionally the height
+    // of a pinned bar where one exists (`PinnedBarInset`). Pinning the old exact
+    // string made this test fail on a change that strengthened what it guards,
+    // and put it in direct contradiction with `ui/pinnedBarInset.test.ts`, which
+    // asserts the old literal is GONE. Two guards, one tree, opposite demands.
+    // Assert the subtraction, not the spelling.
+    expect(SHELL).toContain("100dvh-max(env(safe-area-inset-bottom,0px)");
     expect(SHELL).not.toMatch(/className="flex min-h-dvh flex-col/);
     // And the rig has to be the same product, or it measures a screen nobody
     // gets. It stands in for the (dashboard) group's root, which is `flex-1`
@@ -562,12 +570,25 @@ describe("sticky action bars (the founder's scroll-per-answer)", () => {
    * positioning and not about taste: it IS `fixed`, and it keeps its calc.
    */
   it("the home indicator is paid for ONCE — by <body> for sticky bars, by the surface itself for fixed ones", () => {
-    const GLOBALS = read("app/globals.css");
-    // <body> pays it, for everything in flow. If this rule ever moves, the
-    // bars have to start paying again and this test is the reason to notice.
-    expect(GLOBALS.replace(/\s+/g, " ")).toContain(
-      "padding-bottom: env(safe-area-inset-bottom, 0px);",
-    );
+    // 2026-08-15 — THE PAYER MOVED, AND THIS TEST IS THE REASON TO NOTICE.
+    //
+    // It used to assert `<body>` carried `padding-bottom:
+    // env(safe-area-inset-bottom, 0px)`. That rule is gone: the pinned-bar work
+    // replaced it with `PinnedBarInset`, because a `fixed` bar reserved no space
+    // and body padding could not reserve it either — see
+    // `components/ui/PinnedBarInset.tsx`. `ui/pinnedBarInset.test.ts` now
+    // asserts that literal is ABSENT, so pinning it here asserted the tree must
+    // both contain and not contain the same string.
+    //
+    // The property this test exists for is UNCHANGED and is what is asserted
+    // now: the indicator is paid EXACTLY ONCE. Both consumers spend it through
+    // `max()` against the safe-area inset rather than adding to it, so a
+    // student never pays the home indicator twice and never pays it zero times.
+    const SHELL = read("components/dashboard/DashboardShell.tsx");
+    expect(SHELL).toContain("max(env(safe-area-inset-bottom,0px),var(--pinned-bar-h,0px))");
+    // Negative control: `max()` and not a sum — a `+` here would be the
+    // double-payment this test is named after.
+    expect(SHELL).not.toMatch(/env\(safe-area-inset-bottom,0px\)\s*\+\s*var\(--pinned-bar-h/);
 
     for (const [name, source] of [["practice", PRACTICE], ["exam", EXAM]] as const) {
       for (const variant of ["max-sm:sticky", "short:sticky"]) {

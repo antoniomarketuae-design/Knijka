@@ -1567,8 +1567,83 @@ export const SC_OV_RETURN_GAP: ScenarioSpec = {
     },
     {
       id: "sc-ovr-finish",
-      titleBg: "Прибери се вдясно с дистанция и завърши",
-      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+      // TITLE-TRUTH (doc 86 D3, the reachZone census after cdb2f71). It read
+      // «Прибери се вдясно с дистанция и завърши» and BOTH halves were false in
+      // different ways.
+      //
+      // «С ДИСТАНЦИЯ» — UNPROVABLE, so it goes (the give-way remedy). The gap
+      // this drill is about is the one to the car BEHIND you at the moment you
+      // tuck in; `SimTick` carries no rear gap at all, and `stepReachZone`
+      // reads no gap of any kind — measured, not assumed: a tick carrying
+      // `leadGapM: 0.2` (bumper touching) at a mark completes the zone. So the
+      // clause could never be checked, and it is not lost by leaving: BOTH
+      // mistake demos of this very template cite OVERTAKE_RETURN_TOO_EARLY,
+      // which is the code that convicts an early tuck-in, and instruction 4
+      // («едва когато видиш ЦЕЛИЯ изпреваран в огледалото») still teaches it.
+      //
+      // «ВДЯСНО» — PROVABLE, and the radius did not prove it. Lane pitch is
+      // 8.125 m (own centre +4.06, oncoming −4.06), so the disc must stay
+      // inside half a pitch — 4.0625 m — of the mark or a car still straddling
+      // the centre line is credited with having come back. The AUTHORED radius
+      // is the L3 radius; the ladder widens the place by up to
+      // `toleranceScale − 1` of it (scenario/params.ts widenRadius, ceiling
+      // REACH_ZONE_GRACE_M = 5, chain budget here 141 m so it never binds), so
+      // the shipped r5 compiled to:
+      //     L1 7.50 → disc edge x = −3.44   (3.44 m INTO the oncoming lane)
+      //     L2 6.25 → x = −2.19
+      //     L3/4/5 5.00 → x = −0.94
+      // — every rung across the centre line, and the aided rungs, where the
+      // beginners are, within 0.6 m of the oncoming lane CENTRE.
+      //
+      // 2.7 is sized backwards from the widest rung so the claim and the number
+      // are one thing: 2.7 × 1.5 = 4.05 at L1 (edge x = +0.01, still on our own
+      // paint), 3.38 at L2 (x = +0.68), 2.7 at L3/L4/L5 (x = +1.36).
+      //
+      // REACHABLE, measured on the shipped shadow through the production stack
+      // at every rung: it drives this street on the lane centre and sits at
+      // x = 4.06 EXACTLY across the circle (closest approach 0.20 m from the
+      // mark, 40.1–45.4 км/ч), so shrinking the disc costs only along-track
+      // frames — 14 / 12 / 10 / 10 / 10 at L1…L5, where r5 gave 28 / 23 / 18 —
+      // and both mistake demos enter NEITHER radius (they end at y = 400 and
+      // y = 410, i.e. 130–140 m short of this mark), so nothing regresses in
+      // either direction.
+      //
+      // WHY ONLY THIS ROW AND NOT ITS TWO NEIGHBOURS. `sc-ovg-finish` and
+      // `sc-ova-finish` sit on the SAME mark of the same map at the same r5 and
+      // make the same claim («…и завърши в своята лента»), and they are two of
+      // the 26 rows the lane-claim census found across these families. Sizing
+      // twenty-six radii against twenty-six committed recordings is its own
+      // wave; the list is machine-checked and shrink-only in
+      // __tests__/objective-title-truth-lanes-following2-rail2.test.ts, so it
+      // cannot grow while it waits.
+      // ── OPEN, MEASURED, AND DELIBERATELY NOT CHANGED TONIGHT ───────────────
+      //
+      // Shrinking r fixed the false CERTIFICATE and introduced a small false
+      // REFUSAL at the other end. Measured, synthetic straight runs at every
+      // lateral x through the compiled disc:
+      //     L1 r=4.05 accepts x ∈ [0.25, 8.00]
+      //     L2 r=3.38 accepts x ∈ [0.75, 7.25]
+      //     L3/L4/L5 r=2.70 accepts x ∈ [1.50, 6.75]
+      // A real-size car fully inside its own paint has centre x ∈ [0.92, 7.21],
+      // so at the three unaided rungs a car tucked hard against the KERB —
+      // x ∈ (6.75, 7.21], which is precisely where this title's own verb points
+      // — is refused. The disc checks lane-CENTRE proximity; the title claims
+      // lane MEMBERSHIP, and a circle on the centre cannot express the second.
+      //
+      // The fix is to move the MARK rather than the radius: centring it right
+      // of the lane centre (≈ x 5.0) accepts the kerb-side band at every rung
+      // while L1's widened 4.05 still lands at x ≈ 0.95, i.e. clear of the
+      // centre line. That is a geometry change against a committed recording
+      // and it belongs with the 26-row lane-claim census above, measured, not
+      // typed in from a report at the end of a long session — the same
+      // discipline that stopped a free-running-mirror "fix" from re-buying the
+      // 0d1c922 FPS regression today.
+      //
+      // Impact bound, so the decision is reviewable: the refused band is the
+      // outer ~0.45 m at the kerb, at L3+ only, and the shipped shadow sits at
+      // x = 4.06 dead centre and passes at every rung.
+      titleBg: "Прибери се вдясно в своята лента и завърши отсечката",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 2.7 },
     },
   ],
   rubric: { parTimeSec: 70 },

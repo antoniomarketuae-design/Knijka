@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Exo_2, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import { InstallHint } from "@/components/pwa/InstallHint";
 import { RegisterServiceWorker } from "@/components/pwa/RegisterServiceWorker";
+import { PinnedBarInset } from "@/components/ui/PinnedBarInset";
 import { IOS_SPLASH_PLATES } from "@/lib/pwa/iosSplash.generated";
 import "./globals.css";
 
@@ -188,9 +189,20 @@ export default function RootLayout({
             InstallHint gates itself: it renders on two routes, never in
             standalone, never after a refusal, and never inside an in-app
             webview that has no Add to Home Screen. See lib/pwa/install.ts for
-            why the simulator and both runners are excluded. */}
+            why the simulator and both runners are excluded.
+
+            PinnedBarInset is what makes the hint cost the page the strip it
+            actually occupies. Without it the bar is `fixed bottom-0` over a
+            layout that reserved nothing, and on /dashboard it sat on 49 % of
+            the „Теория" card and owned the centre pixel of a practice link
+            outright — measured on the deployed build, both orientations. The
+            wrapper generates no box (`display: contents`); all it does is
+            publish the bar's measured height as `--pinned-bar-h` for
+            globals.css §BODY and the dashboard shell to spend. */}
         <RegisterServiceWorker />
-        <InstallHint />
+        <PinnedBarInset>
+          <InstallHint />
+        </PinnedBarInset>
       </body>
     </html>
   );

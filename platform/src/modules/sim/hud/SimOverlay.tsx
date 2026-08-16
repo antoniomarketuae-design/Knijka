@@ -384,6 +384,84 @@ export function SimOverlay({
     };
   }, [open]);
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     THE FOLD HAS A NAME AND A NUMBER — 2026-08-16, „THE HUD IS STANDING ON THE
+     ROAD", row 2.
+
+     FOUNDER: „the card shows «…пешеходецът решава дали да»; the authored text
+     ends «…дали да стъпи.»" — and a previous wave reported „219 of 219
+     characters, the whole sentence" on this exact profile.
+
+     MEASURED ON THE DEPLOYED BUILD, character by character against every
+     clipping ancestor (WebKit, real insets, iPhone 16 landscape 852 × 393,
+     sc-zebra-approach@L1, the landing frame):
+
+       in the DOM        580 characters
+       on the screen     232
+       below the fold    348 — the last word of the headline («стъпи.») and
+                         then the WHOLE of authored steps 2, 3, 4 and 5
+
+     So the sweep that said „whole sentence" was reading `innerText`, which
+     answers for the DOM and not for the eye. The text is not truncated — it is
+     SCROLLED, and the difference only matters if the student can tell. He
+     cannot: the window's own edge is a 10 px fade (the 2026-08-14 mask, which
+     was right to replace a guillotine and was never a way to SAY there is more)
+     and nothing on the card carries a number.
+
+     THIS IS THE HALF THAT PAYS FOR ROW 1. The column's new hazard-band ceiling
+     (notifyColumn.ts) takes the peek from about eight visible lines to about
+     five, and that trade is only honest if what falls below the fold is
+     ANNOUNCED and one 44 px tap away with the car stopped. «ПРОЧЕТИ» was
+     already the tap; this is the announcement.
+
+     WHY IT IS MEASURED AND NOT COUNTED FROM THE STRING. How much fits depends
+     on the column's width, the safe-area insets, the orientation, Dynamic Type
+     and the student's browser zoom — every one of them a browser fact. A
+     character budget computed in TypeScript is exactly the „measures something
+     weaker than the requirement it is named for" trap this project has already
+     paid for twice (the deck caption sized against a pilot trace, the peek
+     sized against a 106.3 px card). `scrollHeight − clientHeight` is the
+     browser's own answer to the only question being asked.
+
+     NO SYNCHRONOUS READ IN THE EFFECT BODY, deliberately, and it is not a
+     style point: this component re-renders on the shell's 150 ms HUD poll, so a
+     layout read per render is six forced reflows a second over a live WebGL
+     canvas. `ResizeObserver` fires once for each target the moment it is
+     observed — that IS the initial measurement — and afterwards only when a box
+     actually changes size. Engines without it simply print no count, which is
+     today's behaviour and not a worse one.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const textWindowRef = useRef<HTMLDivElement | null>(null);
+  const [foldLines, setFoldLines] = useState(0);
+  // The identity of what is being SAID, not the object: the poll hands this
+  // component a new item object six times a second with the same words in it.
+  const foldKey =
+    shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""}`;
+  useEffect(() => {
+    const el = textWindowRef.current;
+    if (el === null || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      // The leading of the card's own first text row, not a constant: the two
+      // rows are 11 px at `leading-tight` today, and a number copied here would
+      // be the third place in this file that has to be re-derived when the type
+      // changes.
+      const probe = el.firstElementChild;
+      const leading =
+        probe === null ? Number.NaN : Number.parseFloat(getComputedStyle(probe).lineHeight);
+      const step = Number.isFinite(leading) && leading > 0 ? leading : 14;
+      // 2 px of slack: sub-pixel layout makes `scrollHeight` exceed
+      // `clientHeight` by a fraction on boxes that fit perfectly, and „↓ още 0
+      // реда" on a card with nothing below it is a lie in the other direction.
+      const hiddenPx = el.scrollHeight - el.clientHeight;
+      setFoldLines(hiddenPx > 2 ? Math.max(1, Math.round(hiddenPx / step)) : 0);
+    });
+    ro.observe(el);
+    // …and every child, because the WINDOW keeps its size while the text inside
+    // it changes: a new item with a longer body resizes the rows, not the box.
+    for (const child of Array.from(el.children)) ro.observe(child);
+    return () => ro.disconnect();
+  }, [foldKey]);
+
   if (shown === null) return null;
 
   const color = TONE_COLOR[shown.tone];
@@ -523,6 +601,24 @@ export function SimOverlay({
     // already the smaller of the two — so nothing about that orientation
     // changes except that the glyphs are whole.
     maxHeight: "8rem",
+    // ── …AND A FLOOR, ADDED 2026-08-16 WITH THE HAZARD-BAND CEILING.
+    //
+    // This window is the ONE shrinkable item in the card (rows 2 and 2b are
+    // `shrink-0` inside it, row 1 and row 3 are `shrink-0` outside it), so
+    // every pixel the column's cap gives up comes out of here. That was safe
+    // while the cap was „whatever the control band leaves"; it is not safe now
+    // that a second, tighter budget can bind, because the failure mode is the
+    // one the block above was written for — a window of 1.38 line boxes, whose
+    // `overflow: hidden` cuts the second line through the middle of its glyphs.
+    //
+    // 2.375 rem = TWO whole 13.75 px line boxes plus the 10 px fade. Below that
+    // the card overflows its column instead, which is visible and reportable;
+    // silently amputated Bulgarian is neither. It is inert at every size that
+    // ships (the tightest cap in the ladder, 780 × 360 landscape, leaves this
+    // window ~67 px) and exists so that a future tightening of
+    // `NOTIFY_COLUMN_MAX_STAGE_FRACTION` cannot re-create the 2026-08-14 defect
+    // by arithmetic nobody re-measures.
+    minHeight: "2.375rem",
     // Both spellings: `mask-image` is unprefixed in current WebKit and
     // prefixed in the versions still on phones in this market.
     WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
@@ -567,6 +663,7 @@ export function SimOverlay({
              short, and it gives by scrolling. The long block above this
              component's `cardBody` has the measurements. */}
       <div
+        ref={textWindowRef}
         data-sim-overlay-text=""
         className="flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto"
         style={textWindowStyle}
@@ -630,6 +727,29 @@ export function SimOverlay({
           </p>
         ) : null}
       </div>
+
+      {/* ── ROW 2c — THE FOLD, IN WORDS AND WITH A NUMBER. 2026-08-16.
+             The block at `textWindowRef` above has the measurement (580
+             characters in the card, 232 on the screen, 348 below a 10 px fade
+             and nothing saying so). It is a LABEL and not a control on purpose:
+             the two ways to the rest are already there and are both bigger than
+             it — the window itself scrolls (`pan-y`, and this line is the only
+             thing on the card that says an unhinted scroll region is there at
+             all), and «ПРОЧЕТИ» on the row directly under it is 44 px and opens
+             the lot with the car stopped. A 10 px button would be the touch
+             target this file has already spent two rows removing.
+             `aria-hidden`: assistive technology reads the whole body out of the
+             DOM regardless of what is scrolled into view, so announcing a fold
+             to a screen reader would describe a problem it does not have. */}
+      {foldLines > 0 ? (
+        <span
+          data-sim-overlay-fold=""
+          aria-hidden
+          className="mt-0.5 shrink-0 self-end text-[10px] font-black uppercase leading-none tracking-wider opacity-90"
+        >
+          ↓ още {foldLines} {foldLines === 1 ? "ред" : "реда"}
+        </span>
+      ) : null}
 
       {/* Row 3 — the controls, right-aligned under the words. Absent only on the
           card that IS a control. `shrink-0`, and that is the half of this fix

@@ -120,14 +120,34 @@ function Telltale({
   );
 }
 
-function Divider() {
+function Divider({ short = false }: { short?: boolean }) {
   // `data-hud-ink`: the UNPANEL sweep clears fills off everything inside a
   // ghost, and a divider IS its fill. It survives as a 1 px hairline in the
   // stage's neutral border token — which is what the reference uses to group
   // its own instruments (the thin rules between the tyre-temp figures), and
   // the only thing still saying which numbers belong together now that the
   // band they sat in is gone.
-  return <span aria-hidden data-hud-ink="" className="h-9 w-px shrink-0 bg-border md:h-11" />;
+  //
+  // `short` is the compact variant's rule. The phone readout drops the band and
+  // every divider with it, which is right for instruments that are merely
+  // adjacent — and wrong for the ONE adjacency that changes what a number
+  // means (the В26 disc against the governor cap; see GovernorCapMark).
+  return (
+    <span
+      aria-hidden
+      data-hud-ink=""
+      className={
+        // `short` is sized against the В26 DISC it stands next to, not against
+        // the bar: the disc is h-6 on the phone and h-8/h-9 on the roomy bar,
+        // so 16 px / 24 px reads as a rule between two items rather than as a
+        // break between two groups (which is what the full-height one means
+        // everywhere else in this bar).
+        short
+          ? "h-4 w-px shrink-0 self-center bg-border md:h-6"
+          : "h-9 w-px shrink-0 bg-border md:h-11"
+      }
+    />
+  );
 }
 
 /** Turn-signal arrow — lit green on the real blink clock (or hazard relay). */
@@ -293,16 +313,70 @@ function WiperIcon({ on, cls = ICON }: { on: boolean; cls?: string }) {
  *
  * Nothing here is interactive and nothing paints a box: `text-shadow` on the
  * glyphs is the ghost register the rest of this file already uses.
+ *
+ * ── 2026-08-16 · IT WAS READING AS LEGAL ADVICE, AND THE GAP WAS 6 px ───────
+ *
+ * Founder: „the dashboard shows a red-ringed «50» speed-limit sign glyph
+ * immediately beside «Нормален ≤60» … rendered in the same visual register as
+ * the limit sign it reads as «the limit is 50, you may do 60», to a 17-year-old
+ * learning the law."
+ *
+ * MEASURED on the deployed build, iPhone-16 landscape, `sc-vp-handbrake` L1:
+ * the whole bar was 104 px wide and read, as one string, **„D 6 км/ч 50
+ * Нормален ≤60"**. The В26 disc occupied x 378–402 and this mark began at
+ * x 408 — **6 px of clear space between a legal prohibition sign and a
+ * training-mode throttle ceiling**, with no rule, no label and no register
+ * change between them. `rules/engine.ts:562` NORMAL_CAP_MARGIN_KMH = 10 is
+ * where the 60 comes from: posted limit + 10, a governor, not a permission.
+ *
+ * AND THE COPY MADE IT WORSE, which nobody had noticed. In Bulgarian
+ * «Нормален ≤60» parses as „Normal ≤60" — the tier's NAME is an ordinary
+ * adjective, so the string reads as „normally, up to 60". The one word doing
+ * the disambiguating was a word that disambiguates in the wrong direction.
+ *
+ * THREE CHANGES, and none of them removes the governor or the limit:
+ *  1. A HAIRLINE between the disc and this mark, on BOTH variants (Divider
+ *     `short`). Adjacency was doing the damage; 6 px is not a separator.
+ *  2. A REGISTER LABEL, «РЕЖИМ», always visible — not the `sm:block` caption
+ *     the telltales use, because the phone is exactly where the founder read
+ *     it and where that caption is hidden. It names the thing the number
+ *     belongs to: a mode of the CAR, not a property of the ROAD.
+ *  3. WHEN THE CAP EXCEEDS THE POSTED LIMIT — which is the founder's own
+ *     frame, 60 against 50, and the only case where the misreading is
+ *     dangerous — the mark says «знакът важи» outright, pointing at the disc
+ *     it stands beside. Below the limit there is nothing to misread and the
+ *     clause does not render, so the bar does not carry permanent furniture.
+ *
+ * The `{nameBg} ≤{cap}` core is deliberately unchanged: `governor-cap.test.ts`
+ * pins it as „the mark says WHOSE ceiling it is", and that argument still
+ * holds — this pass adds the register around it rather than rewriting it.
  */
-function GovernorCapMark({
+// Exported for `governor-cap.test.ts` ONLY, and deliberately not re-exported
+// from `hud/index.ts`: the mark is an internal part of this bar, not a HUD
+// surface another module may mount. It is exported at all because the previous
+// guard for this component could only READ THE SOURCE — the bar's own state
+// arrives through an interval effect, so a static render of StatusDashboard
+// always shows `governorCapKmh: null` and never draws the mark at all. A grep
+// cannot tell „the sign clause renders when the cap is above the limit" from
+// „the string exists somewhere in the file", and that distinction is the whole
+// of this change.
+export function GovernorCapMark({
   capKmh,
   tierBg,
   speedKmh,
+  limitKmh,
   size,
 }: {
   capKmh: number | null;
   tierBg: string;
   speedKmh: number;
+  /**
+   * The POSTED limit the В26 disc is showing, so the mark can tell the one
+   * case that misreads (cap above the sign) from the one that cannot. Passed
+   * in rather than re-derived: the disc and this mark must never disagree
+   * about what the law says on this road.
+   */
+  limitKmh: number;
   /** Type scale: the phone readout runs one step below the roomy bar. */
   size: "compact" | "roomy";
 }) {
@@ -312,15 +386,19 @@ function GovernorCapMark({
   const cap = Math.round(capKmh);
   const easing = governorIsEasing(capKmh, speedKmh);
   const nameBg = tierBg.trim() === "" ? "Режимът" : tierBg;
+  // The sign clause renders only when the ceiling sits ABOVE the posted limit
+  // — the founder's 60-against-50. When the governor is at or under the sign,
+  // obeying it cannot break the law and there is nothing to disclaim.
+  const overLimit = cap > Math.round(limitKmh);
   const explainBg = easing
-    ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно.`
+    ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно. Това е таван на РЕЖИМА, не разрешение: важи знакът до скоростта.`
     : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя — знакът до скоростта е ограничението.`;
   return (
     <span
       data-hud="governor-cap"
       aria-label={explainBg}
       title={explainBg}
-      className={`shrink-0 whitespace-nowrap font-bold leading-none tabular-nums ${
+      className={`flex shrink-0 items-baseline gap-1 whitespace-nowrap font-bold leading-none tabular-nums ${
         size === "compact" ? "text-[9px]" : "text-[10px]"
       }`}
       style={{
@@ -328,7 +406,23 @@ function GovernorCapMark({
         opacity: easing ? 1 : 0.9,
       }}
     >
-      {nameBg} ≤{cap}
+      {/* The register word. Muted and letter-spaced like every other caption in
+          this file, but NEVER hidden — a caption that disappears on the phone
+          would leave the phone reading exactly the string the founder read. */}
+      <span
+        data-hud="governor-register"
+        className="text-[7px] font-bold uppercase tracking-widest opacity-80 md:text-[8px]"
+      >
+        Режим
+      </span>
+      <span>
+        {nameBg} ≤{cap}
+      </span>
+      {overLimit ? (
+        <span data-hud="governor-sign-wins" className="font-bold opacity-90">
+          · знакът важи
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -448,6 +542,11 @@ export function StatusDashboard({
         >
           {limit}
         </span>
+        {/* THE RULE BETWEEN THE LAW AND THE MODE. The disc above is a В26 sign;
+            everything after this hairline is a property of the car. On the
+            phone these two sat 6 px apart and read as one sentence — see
+            GovernorCapMark. */}
+        {snap.governorCapKmh === null ? null : <Divider short />}
         {/* The tier's ceiling — outside `speed-block` for the same reason the
             disc above is: it survives the cockpit fold, because the 3D cluster
             cannot draw a governor. See GovernorCapMark. */}
@@ -455,6 +554,7 @@ export function StatusDashboard({
           capKmh={snap.governorCapKmh}
           tierBg={snap.governorTierBg}
           speedKmh={snap.speedKmh}
+          limitKmh={limitKmh}
           size="compact"
         />
       </div>
@@ -552,14 +652,16 @@ export function StatusDashboard({
         >
           {limit}
         </span>
-        {/* …and the same mark on the roomy bar. Both variants or neither: the
-            compact/roomy pair has drifted apart once already (row C7 — the
-            camera handle was on one of them and not the other, so the fold
-            matched nothing on a desktop). */}
+        {/* …and the same rule and the same mark on the roomy bar. Both variants
+            or neither: the compact/roomy pair has drifted apart once already
+            (row C7 — the camera handle was on one of them and not the other, so
+            the fold matched nothing on a desktop). */}
+        {snap.governorCapKmh === null ? null : <Divider short />}
         <GovernorCapMark
           capKmh={snap.governorCapKmh}
           tierBg={snap.governorTierBg}
           speedKmh={snap.speedKmh}
+          limitKmh={limitKmh}
           size="roomy"
         />
       </div>
