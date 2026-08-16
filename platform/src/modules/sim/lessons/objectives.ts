@@ -481,6 +481,68 @@ export const PARK_MANEUVER_ZONE_M = 15;
  */
 export const ROUNDABOUT_EXIT_SIGNAL_ARC_DEG = 120;
 
+/**
+ * SMOOTH STOP — the window the deceleration is measured over, SECONDS
+ * (2026-08-16; the rule engine's audit M-18 fix, finally applied to this file).
+ *
+ * WHAT WAS BROKEN. `stepSmoothStop` differentiated speed between CONSECUTIVE
+ * FRAMES, and the frames it is fed are RENDER frames: `onTick` runs inside
+ * `useFrame` (LessonScene), and `tick.speedKmh` is the raw Rapier `linvel`
+ * projected on the body's forward axis (VehicleSim) — unsmoothed, and the
+ * projection swings as the chassis pitches, which is exactly what a braking
+ * car does. At 120 fps a frame lasts ~8 ms, so the repo's own measured
+ * driveline wobble of 0.06 km/h differentiates to ~2.1 m/s² of pure noise —
+ * and the evaluator keeps the PEAK over hundreds of frames, so it collects the
+ * worst sample of the whole stop, not a typical one.
+ *
+ * Measured on a constant 2.5 m/s² stop against the shipped 3.5 cap, 20 trials
+ * per cell, wobble amplitude in km/h (one deterministic seed of the same shape
+ * is pinned in lost-credit-objectives.test.ts, which fails on the old code):
+ *
+ *      tick rate    0        0.03      0.06      0.12
+ *      20 Hz     20/20     20/20     20/20      2/20
+ *      60 Hz     20/20     20/20      0/20      0/20
+ *     120 Hz     20/20      0/20      0/20      0/20
+ *
+ * The whole trace suite is KINEMATIC (recorder.ts computes speed analytically
+ * ⇒ wobble exactly 0), which is why every gate was green while only the live
+ * car failed. And the failure is worse than „not credited": a rejected attempt
+ * disarms, so the student must accelerate back over the approach speed and try
+ * again at the same odds — on `l1-smooth-stop`, lesson one, objective two.
+ *
+ * THE FIX is the rule engine's, one file over: anchor the derivative on a
+ * sample at least a WINDOW old instead of on the previous frame, and never let
+ * the denominator fall below the window. Noise then divides by 0.5 s instead of
+ * by 8 ms — 2 × 0.12 km/h of wobble becomes 0.13 m/s², under a seventh of the
+ * 1.0 m/s² headroom the cap leaves a textbook stop — while a real slam is
+ * untouched: 0.5 s is a fifth of the ~2.5 s a genuine emergency stop from
+ * 40 km/h takes, so every window inside the slam reads the slam's own rate.
+ *
+ * 0.5 s and not the engine's `accelWindowSec` (0.04): that window feeds gates
+ * with a 7 m/s² threshold and no peak-hold, this one has 1 m/s² of headroom and
+ * keeps the maximum over the whole attempt, where the extreme value — not the
+ * typical one — is what decides.
+ *
+ * At the 1 Hz trace/replay rate the span already exceeds the window on every
+ * frame, so recorded drives differentiate EXACTLY as before (the objectives
+ * suite is unchanged, harsh stops included).
+ */
+export const SMOOTH_STOP_DECEL_WINDOW_SEC = 0.5;
+
+/**
+ * How far BEHIND a passSignal node a stop still counts as „waiting at its red",
+ * metres, measured both from the node and from the stop line the tick reports
+ * ahead (2026-08-16 — the queue arm of signature 2 in stepPassSignal).
+ *
+ * 60 m is the queue the radius cannot see. The shipped templates author 40–50 m
+ * node radii, which covers the first six or seven cars; a Sofia light routinely
+ * holds twice that, and the student who joins the tail is the one being asked to
+ * do it right. Past 60 m of a line he is not queueing at this junction — he is
+ * somewhere else on the street — and the bound stays tight enough that the
+ * neighbouring junction's red can never certify this one.
+ */
+export const PASS_SIGNAL_QUEUE_REACH_M = 60;
+
 /** Default max |final heading − (start + 180°)| for a three-point turn, deg. */
 export const TURN_TOLERANCE_DEG = 20;
 /** Default continuous seconds at rest (facing back, in the corridor) to finish a turn. */
@@ -640,8 +702,47 @@ function stepReachZone(
   // mark on the same line is stopping there, done earlier; stopping in a
   // different lane is a different place, and both halves of the module have to
   // say so with one voice.
+  //
+  // RE-LATCHED ON EVERY FRESH APPROACH (2026-08-16). The axis used to be frozen
+  // on FIRST contact and never revised, so a student who touched the ring badly
+  // — came in off the line, or clipped it while still cornering — then backed
+  // off and re-approached properly down the road was judged with a capsule
+  // built for the attempt he ABANDONED: `lateral` measured across the wrong
+  // axis, and on an `acceptBeforeMarkM` waypoint `along` too, so a stop
+  // genuinely short of the paint could read as past it. Self-correction is the
+  // one thing a drill must never punish.
+  //
+  // The re-latch fires on the RING ENTRY EDGE (outside last frame, inside this
+  // one) and reads the same thing the first latch read — the previous frame's
+  // position, outside the ring. Everything between entries is byte-identical to
+  // shipped: the axis is frozen for the whole time the car is near the mark,
+  // which is what makes the grace a capsule instead of a circle.
+  //
+  // IT MAY NOT TURN AROUND, and that guard is the whole safety of the change:
+  // the re-latch is refused when the fresh direction opposes the latched one
+  // (dot ≤ 0). Without it, a car that overshot the paint, left the ring and came
+  // back the other way would have „short of the mark" redefined to the far side
+  // of the line, and B18/FR-24 („I have to stop BEFORE the line not after it")
+  // would hand credit for the exact stop it exists to refuse. Under 90° the
+  // acceptance half-plane can only rotate toward the honest approach; it can
+  // never flip.
   const here = { x: tick.position.x, y: tick.position.y };
-  const approachFrom = st.approachFrom ?? (inGraceRing ? (st.prevPos ?? here) : null);
+  const prevInGraceRing =
+    st.prevPos !== null &&
+    dist(st.prevPos.x, st.prevPos.y, params.x, params.y) <= params.radiusM + REACH_ZONE_GRACE_M;
+  let approachFrom = st.approachFrom;
+  if (inGraceRing && !prevInGraceRing) {
+    const entryFrom = st.prevPos ?? here;
+    if (approachFrom === null) {
+      approachFrom = entryFrom;
+    } else {
+      const oldX = params.x - approachFrom.x;
+      const oldY = params.y - approachFrom.y;
+      const newX = params.x - entryFrom.x;
+      const newY = params.y - entryFrom.y;
+      if (oldX * newX + oldY * newY > 0) approachFrom = entryFrom;
+    }
+  }
   let inApproachGrace = false;
   let beyondMark = false;
   if (approachFrom !== null) {
@@ -750,15 +851,26 @@ function stepReachZone(
  * of crossing (SimTick contract), a met red has two observable signatures:
  *   1. crossing ON red (met the hard way — completes progression, costs the
  *      10-point опасна from the rule engine), or
- *   2. a full stop inside the zone during the current visit, followed by a
- *      crossing on green — the signature of waiting a red out. (A student who
- *      voluntarily stops at a green and proceeds matches it too; with the
- *      crossing-time-only sensor that stop-verify-proceed behavior is the
- *      closest honest proxy, and it is exactly the drilled sequence.)
+ *   2. a full stop on the current APPROACH — inside the zone, or (2026-08-16)
+ *      at the back of the queue with the tick reporting a red/red-yellow light
+ *      ahead — followed by a crossing on green: the signature of waiting a red
+ *      out. (A student who voluntarily stops at a green inside the zone matches
+ *      it too; with the crossing-time-only sensor that stop-verify-proceed
+ *      behavior is the closest honest proxy, and it is exactly the drilled
+ *      sequence.)
  * Reds met by EARLIER passSignal objectives count via ctx.redsMetInRun.
  * Feasibility: runtime SIGNAL_TIMING gives every light red 26 s of every
  * 50 s cycle, so a student who crossed on green can always re-approach, stop
  * at the line, and meet a red within ≤ 24 s — the gate can never deadlock.
+ *
+ * WHY THE QUEUE ARM EXISTS. Signature 2 used to count a stop only INSIDE the
+ * node radius (40–50 m in the shipped templates). A student who joins the back
+ * of a queue beyond it, waits the whole red out properly and creeps to the line
+ * already rolling never latched `stoppedInZoneVisit`, so `redMet` never fired
+ * and the L2 gate stayed open although he handled the red exactly as taught —
+ * the queue length decided, not the driving. Outside the circle the arm demands
+ * MORE than the inside one, not less: the world must positively report a
+ * forbidding light ahead.
  */
 function stepPassSignal(
   params: PassSignalParams,
@@ -768,13 +880,39 @@ function stepPassSignal(
 ): ObjectiveStepResult {
   if (prev.type !== "passSignal") return { done: false, progress: 0, evalState: prev };
 
-  const inZone =
-    dist(tick.position.x, tick.position.y, params.x, params.y) <= params.radiusM;
+  const nodeDistM = dist(tick.position.x, tick.position.y, params.x, params.y);
+  const inZone = nodeDistM <= params.radiusM;
 
-  // Visit-scoped stop memory: leaving the zone forgets the stop, so a halt
-  // elsewhere can never certify this junction's red.
-  const stoppedInZoneVisit = inZone
-    ? prev.stoppedInZoneVisit || tick.speedKmh <= STOPPED_SPEED_KMH
+  const halted = Math.abs(tick.speedKmh) <= STOPPED_SPEED_KMH;
+  // THE QUEUE THE RADIUS CANNOT SEE (2026-08-16). A stop that
+  // certifies this junction's red is a stop made ON THIS APPROACH to it, and
+  // the approach is longer than the acceptance circle: the tail of the queue is
+  // where a student who arrives late is supposed to be. So the stop memory is
+  // scoped to the approach rather than to the zone, and a halt made outside the
+  // circle counts only on POSITIVE evidence from the world-context channel —
+  // the runtime saying the light he is queued behind is actually forbidding.
+  //
+  // All three context fields are optional by the SimTick contract, and a tick
+  // that cannot answer them leaves this evaluator exactly as shipped: hand-built
+  // ticks, recorded traces and every legacy source are byte-identical.
+  //
+  // The SECOND HALF of the signature is unchanged and is what keeps this from
+  // becoming a free pass: the certified red is only spent by a later crossing
+  // ON GREEN, i.e. by waiting it out. A student who stops at the red and then
+  // creeps over on red+yellow still fails the gate — measured on the shipped
+  // `sc-signal-redyellow / mistake-creep` demo, which is exactly that drive.
+  const onApproach = nodeDistM <= params.radiusM + PASS_SIGNAL_QUEUE_REACH_M;
+  const queuedAtRed =
+    !inZone &&
+    params.control === "trafficLight" &&
+    tick.nextStopLineControl === "trafficLight" &&
+    (tick.nextStopLineState === "red" || tick.nextStopLineState === "redYellow") &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= PASS_SIGNAL_QUEUE_REACH_M;
+  // Approach-scoped stop memory: leaving the approach forgets the stop, so a
+  // halt elsewhere can never certify this junction's red.
+  const stoppedInZoneVisit = onApproach
+    ? prev.stoppedInZoneVisit || (halted && (inZone || queuedAtRed))
     : false;
   let redMet = prev.redMet;
   let crossed = prev.crossed;
@@ -810,6 +948,16 @@ function stepPassSignal(
   return { done, progress, evalState, detail };
 }
 
+/**
+ * Smooth stop — completes on a stop whose PEAK deceleration stayed under the
+ * authored cap.
+ *
+ * `prevSpeedKmh` / `prevT` hold the WINDOW ANCHOR, not the previous frame: the
+ * oldest sample the current derivative is still measured against, re-taken once
+ * it is `SMOOTH_STOP_DECEL_WINDOW_SEC` old. See that constant for the frame-rate
+ * measurement that forced it (the field names are the eval-state contract's and
+ * live in lessons/types.ts, another lane's file).
+ */
 function stepSmoothStop(
   minApproachKmh: number,
   maxDecelMs2: number,
@@ -819,12 +967,32 @@ function stepSmoothStop(
   if (prev.type !== "smoothStop") return { done: false, progress: 0, evalState: prev };
 
   let { armed, maxDecelMs2: peakDecel } = prev;
-  const { prevSpeedKmh, prevT } = prev;
+  let anchorSpeedKmh = prev.prevSpeedKmh;
+  let anchorT = prev.prevT;
 
-  // Track deceleration between consecutive ticks while an attempt is armed.
-  if (armed && prevSpeedKmh !== null && prevT !== null && tick.t > prevT) {
-    const decel = ((prevSpeedKmh - tick.speedKmh) * KMH_TO_MS) / (tick.t - prevT);
+  // Track deceleration against the window anchor while an attempt is armed.
+  // The denominator never falls below the window, so a span shorter than it
+  // (the frames inside one window, and the truncated tail at the standstill)
+  // is measured CONSERVATIVELY — noise cannot be amplified, and a real brake
+  // application still shows up, scaled by how much of the window it fills.
+  if (!armed) {
+    // Nothing to measure yet: the anchor rides the live frame so the attempt
+    // arms on a fresh sample instead of one banked before the approach.
+    anchorSpeedKmh = tick.speedKmh;
+    anchorT = tick.t;
+  } else if (anchorSpeedKmh !== null && anchorT !== null && tick.t > anchorT) {
+    const spanSec = tick.t - anchorT;
+    const decel =
+      ((anchorSpeedKmh - tick.speedKmh) * KMH_TO_MS) /
+      Math.max(spanSec, SMOOTH_STOP_DECEL_WINDOW_SEC);
     if (decel > peakDecel) peakDecel = decel;
+    // Re-anchor only once the sample is a full window old — at trace/replay
+    // rates that is every frame (identical to the old frame-to-frame delta),
+    // at render rates it is every ~30-60th.
+    if (spanSec >= SMOOTH_STOP_DECEL_WINDOW_SEC) {
+      anchorSpeedKmh = tick.speedKmh;
+      anchorT = tick.t;
+    }
   }
 
   if (!armed && tick.speedKmh >= minApproachKmh) {
@@ -850,8 +1018,8 @@ function stepSmoothStop(
       type: "smoothStop",
       armed,
       maxDecelMs2: peakDecel,
-      prevSpeedKmh: tick.speedKmh,
-      prevT: tick.t,
+      prevSpeedKmh: anchorSpeedKmh,
+      prevT: anchorT,
     },
   };
 }

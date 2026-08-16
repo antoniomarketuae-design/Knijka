@@ -483,6 +483,131 @@ export function terminalRescueZone(
 }
 
 // ---------------------------------------------------------------------------
+// THE RUN-OUT — B-NEW-1/zebra (founder: «the session ended itself»), measured
+// 2026-08-16 on `sc-zebra-approach` L1.
+//
+// TOLERANCE IS FORGIVENESS FOR THE TASK. IT IS NOT A RELOCATION OF THE FINISH
+// LINE — and until this block the engine spent it twice.
+//
+// A `reachZone` completes on ENTERING its acceptance ring (objectives.ts
+// `stepReachZone`: `inZone = d <= radiusM`). On the TERMINAL objective that
+// same frame also ended the session (engine.ts, the chain-complete branch), so
+// the drive stopped one whole radius SHORT of the mark the author placed —
+// short of the very point the guidance ribbon had been pointing at all along
+// (`guidanceGoalFor`, cited in this file's own header).
+//
+// MEASURED, on the shipped catalogue rather than argued:
+//   · 674 authored rungs end on a `reachZone`. Mean radius 10.03 m, so the mean
+//     drive is cut TEN METRES short of its own end; the worst is
+//     `sc-fo-motorway-gap` L1 at 23 m.
+//   · `sc-zebra-approach` L1: mark (4.06, 130), radius 12 → 17 after the L1
+//     ladder. All three COMMITTED recordings — shadow-correct,
+//     mistake-not-yielded, mistake-too-fast — end at y = 113.0…113.1. The
+//     authored end of that route is 17 m further on, and the crossing the
+//     lesson exists to teach is at y = 90: the founder's drive closed 23 m and
+//     3.0 s after driving through an occupied zebra.
+//   · AND THE LADDER IS UPSIDE DOWN. `toleranceScale` (compile.ts) widens the
+//     acceptance at the LOW rungs so a beginner is not failed for stopping a
+//     few metres off. Because the same number ended the drive, the kinder the
+//     rung the SHORTER the road: mean terminal radius L1 12.67 m vs L5 8.91 m,
+//     and on 119 of 140 templates L1 loses more road than L5. On the zebra the
+//     beginner got 4.6 m less street than the expert, on the same street, for
+//     the same drive. Nobody chose that; it fell out of one number doing two
+//     jobs.
+//
+// SO THE RUN-OUT SEPARATES THE TWO JOBS. The objective is still awarded on
+// EXACTLY the frame it is awarded today — nothing here grades, credits or
+// withholds anything, and no student gains or loses a tick — but the DRIVE
+// carries on to the mark, and ends when the car has actually got there.
+//
+// It is bounded three ways, because a drive that cannot end is the worse bug
+// (the whole completability battery exists for it):
+//   ARRIVED — within FINISH_MIN_RADIUS_M of the mark, or past it along the
+//     approach (the same „along the axis" convention `stepReachZone` uses for
+//     its capsule, so the two halves of the module agree about „beyond").
+//   AT REST — a full standstill. A student who has finished every task and
+//     stopped HAS finished the drive, wherever he stopped.
+//   SPENT — ROUTE_RUNOUT_MAX_S, the backstop that makes hanging impossible.
+// The lawful-wait freeze (B15) applies to the last two for the same reason it
+// applies to the finish gates: a second spent stopped because the road said so
+// is evidence of nothing, and closing the drive on a student yielding correctly
+// at the very end would be B15 all over again.
+// ---------------------------------------------------------------------------
+
+/**
+ * How close to the mark counts as ARRIVED, meters.
+ *
+ * Deliberately this file's own FINISH_MIN_RADIUS_M rather than a new number:
+ * that constant is already the module's statement of the smallest zone it is
+ * honest to draw („below this a zone is smaller than the car"). It is only a
+ * tolerance for a car that comes to rest ON the mark — a car that drives
+ * through is caught by the past-the-mark half, which no frame rate can miss.
+ */
+export const ROUTE_RUNOUT_ARRIVE_M = FINISH_MIN_RADIUS_M;
+
+/**
+ * The ceiling on a run-out, seconds. Past it the drive ends where it stands.
+ *
+ * Derived from the run-out's own worst case, which is bounded by construction:
+ * the car starts inside the terminal ring, so it is at most that radius from
+ * the mark, and the widest terminal ring in the catalogue is 23 m
+ * (`sc-fo-motorway-gap` L1). Twenty seconds covers 23 m at anything above
+ * 4.1 km/h; below that a car is either stopping — where the standstill exit
+ * takes over within a second or two — or crawling nowhere, which is what a
+ * ceiling is for. It can only ever ADD road to a drive that used to end
+ * instantly, never withhold an ending.
+ */
+export const ROUTE_RUNOUT_MAX_S = 20;
+
+/**
+ * Where the route's last task was authored to happen, or null when running on
+ * to it makes no sense.
+ *
+ * Null on purpose for everything that is not an ARRIVAL WAYPOINT:
+ *  - a placeless terminal (drive N metres, stop smoothly, brake for the
+ *    hazard) has no mark to run to;
+ *  - a MANEUVER terminal ends by DEPARTURE, not arrival — finish.ts already
+ *    models the roundabout and the turn box as `mode: "outside"`, and running
+ *    a finished student back toward the island he has just left would be
+ *    absurd. A `parkInBay` is excluded for the opposite reason: it completes
+ *    with the car at rest inside the rect, i.e. already at the mark and
+ *    already at a standstill, so a run-out has nothing to add;
+ *  - a `passSignal` terminal is excluded because its defect was NOT measured.
+ *    Its mark is the node while its completion is the painted line at the
+ *    junction MOUTH, so it plausibly loses road the same way — but the mouth
+ *    setback is derived per node (runtime/stoplines.ts) and can put the node
+ *    inside the box, and this pass is not going to guess at junction geometry
+ *    it has not driven.
+ * What is left is `reachZone`, which is the class the 674-rung census above
+ * actually measured.
+ */
+export function routeEndMark(objectives: readonly ObjectiveParams[]): Point | null {
+  if (objectives.length < 1) return null;
+  const terminal = objectives[objectives.length - 1];
+  if (terminal.kind !== "reachZone") return null;
+  return { x: terminal.x, y: terminal.y };
+}
+
+/**
+ * Has the car got to the end of the route? True on arrival at the mark and on
+ * passing it — `from` is where the run-out began, which is inside the terminal
+ * ring and therefore always on the approach side of the mark.
+ */
+export function routeRunOutArrived(
+  mark: Point,
+  from: Point,
+  here: Point,
+): boolean {
+  if (dist(here, mark) <= ROUTE_RUNOUT_ARRIVE_M) return true;
+  const ax = mark.x - from.x;
+  const ay = mark.y - from.y;
+  const m = Math.hypot(ax, ay);
+  if (m < 1e-6) return true; // began ON the mark — there is nowhere to run to
+  // + = beyond the mark, the sign convention of stepReachZone's capsule.
+  return ((here.x - mark.x) * ax + (here.y - mark.y) * ay) / m > 0;
+}
+
+// ---------------------------------------------------------------------------
 // THE LAWFUL WAIT — B15 (founder, „Кръгово движение"): «the roundabout convicts
 // me the instant the wheels turn after I have waited properly at the give-way
 // line. I waited about 40 seconds.»

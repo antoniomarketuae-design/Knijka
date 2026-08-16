@@ -146,8 +146,14 @@ export interface RuleEngineState {
    * ляво-дясно scan made at the mouth does NOT go stale while the driver
    * legally WAITS for the priority car to pass — the world they scanned was
    * not moving past them. Moving time still ages the scan normally (a glance
-   * at mouth 1 stays stale by mouth 2). Scan-only: the lane-change mirror
-   * lookback and move-off observation keep the plain wall-clock windows.
+   * at mouth 1 stays stale by mouth 2).
+   *
+   * 2026-08-16: the LANE-CHANGE mirror now reads the same ledger, capped at
+   * `mirrorWaitFreezeMaxSec` — see that config field for why the drilled order
+   * (огледало → мигач → изчакай пролука → маневра) could not be performed
+   * inside a fixed 8 s wall clock. Move-off observation still keeps the plain
+   * window: it grades the transition out of rest itself, where „time spent at
+   * rest" is the whole of what is being observed.
    */
   scanStopCreditSec: { left: number; right: number };
   stop: {
@@ -786,7 +792,19 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     const lastOn = s.lastIndicatorOnAt[dir];
     const indicatorOk = lastOn !== null && t - lastOn <= cfg.indicatorLookbackSec;
     const lastGlance = s.lastGlanceAt[dir];
-    const mirrorOk = lastGlance !== null && t - lastGlance <= cfg.mirrorLookbackSec;
+    // WAIT-FREEZE (2026-08-16 — the lost-credit sweep; JU-23's ledger, reused).
+    // The taught order is огледало → мигач → ИЗЧАКАЙ ПРОЛУКА → маневра, and the
+    // wait is the beat with no upper bound: a student holding at a stopped
+    // queue's tail for a gap burns the whole 8 s window standing still, and is
+    // then billed for a mirror check he made, signalled and waited on. Standing
+    // time is subtracted from the glance's age exactly as the junction scan
+    // subtracts it — a car that swept no ground past its mirrors did not watch
+    // the road it observed go by — and capped, because a blind spot behind a
+    // stationary car does fill in eventually (the junction scan is uncapped for
+    // the opposite reason: the driver keeps facing the road he scanned).
+    const waitFreezeSec = Math.min(s.scanStopCreditSec[dir], cfg.mirrorWaitFreezeMaxSec);
+    const mirrorOk =
+      lastGlance !== null && t - lastGlance - waitFreezeSec <= cfg.mirrorLookbackSec;
     const legacyBasis = tick.edgeId === undefined || s.prevEdgeId === undefined;
     const gradableWithEdge =
       !basisChanged &&
@@ -1003,13 +1021,32 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // reverse maneuvering (A12). When this specific condition is armed the
   // GENERIC lane-keeping episode is suppressed — one act, one code, no
   // double-billing.
+  //
+  // THE STALK IS AN EDGE, NOT A LEVEL (2026-08-16 — the lost-credit sweep, the
+  // B21-RB mechanism again). `tick.indicator === "off"` asked whether the lamp
+  // is lit ON THIS FRAME, and the lamp is not the student's to keep lit:
+  // CabinControls.update auto-cancels at ARM 0.22 → RELEASE 0.05 rad, and
+  // squeezing past a parked obstacle at 15 km/h exceeds 0.22 rad — so the stalk
+  // extinguishes in the middle of the manoeuvre, while the car is still riding
+  // the осева, and `centerLineSustainSec` (3.5 s) then starts counting on a
+  // driver who DID declare. The exemption now uses the same lookback every
+  // other indicator gate in this engine uses (`indicatorLookbackSec`, 5 s,
+  // whose own doc says the thing that extinguishes the signal is usually not
+  // the student). A lit stalk is `t - lastOn === 0`, so a signalled frame is
+  // byte-identical; what changes is only the 5 s tail behind it, after which an
+  // undeclared ride on the line arms and bills exactly as shipped.
+  const declaredAt = Math.max(
+    s.lastIndicatorOnAt.left ?? Number.NEGATIVE_INFINITY,
+    s.lastIndicatorOnAt.right ?? Number.NEGATIVE_INFINITY,
+  );
+  const maneuverDeclared = t - declaredAt <= cfg.indicatorLookbackSec;
   const centerLineCond =
     centreLinePainted &&
     s.inLaneSeen &&
     tick.oneway === false &&
     tick.laneId === (tick.laneCount ?? 1) - 1 &&
     tick.laneOffsetM > cfg.laneKeepMaxOffsetM &&
-    tick.indicator === "off" &&
+    !maneuverDeclared &&
     moving &&
     forwardGear &&
     !solidCrossExcursion;
@@ -1246,6 +1283,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // carriageway the world draws no divider on, there is no rightmost lane to be
   // out of — the lane id is a procedural band, not something the student can
   // see — so the code stands down exactly as CENTER_LINE_TOUCHED does above.
+  //
+  // NOT FIXED HERE — the overtake this code cannot see (2026-08-16, the
+  // lost-credit sweep; the measurement, so the next reader does not re-derive
+  // it). The escape below is a LIT left stalk read as a LEVEL, and correct
+  // practice extinguishes it — you cancel once established in the left lane,
+  // and CabinControls cancels it for you at ARM 0.22 rad on the way out — while
+  // passing a truck at a 10 km/h differential takes ~18 s against a 12 s
+  // sustain. Both repairs are one line each (`s.overtakePullOutAt`, already
+  // tracked for H-5; or the `indicatorLookbackSec` treatment CENTER_LINE_TOUCHED
+  // gets above) and BOTH silence a shipped mistake demo: driven through the
+  // production stack, `sc-ln-boulevard-discipline / mistake-left-lane-hog` pulls
+  // out at t=5.1 past a lead 37.7 m ahead, stops at t=21.7 and is convicted at
+  // t=17.1 — 4.6 s of slack against the overtake window, 3.2 s against the
+  // indicator lookback. With the telemetry that exists, a genuine 18 s pass and
+  // that 16.6 s stint are the SAME SIGNAL (the passed vehicle leaves `leadGapM`
+  // the instant you change lane, in both), so no threshold separates them: the
+  // demo has to hog for longer before the rule can be widened, and that is a
+  // trace/content edit, not this file's.
   const rightmostRequiredLane =
     tick.busLaneRight === true || tick.emergencyLaneRight === true ? 1 : 0;
   const hoggingLeft =
@@ -1586,6 +1641,25 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // engine RUNNING — a stall at the green is already billed as
   // ENGINE_STALLED; charging the restart seconds again as hesitation would
   // double-bill one act (C3 FP case: "stalled at the green").
+  //
+  // THE BLOCKED EXIT (2026-08-16 — the lost-credit sweep). „Box clear" was one
+  // bumper distance, 12 m, and the queue that makes a junction unclearable
+  // stands on the FAR side of it: on the shipped correct demonstration of
+  // `sc-jx-blocked-exit` the tail sits 56.4 m out and the engine convicted the
+  // refusal to enter after 5.0 s (violation:HESITATION_AT_GREEN@t=17.5, graded
+  // with DEFAULT_RULE_CONFIG). The drill only survives on a per-template
+  // `hesitationClearGapM: 63`, which no other scenario and no exam spec carries
+  // — so on the exam the чл. 50 duty the product teaches was a graded fault.
+  // The wider gate is deliberately paired with a MOTION test rather than being
+  // widened alone: standing traffic ahead means the exit is not there to be
+  // reached; traffic that is opening the gap will clear it, and waiting behind
+  // THAT is the hesitation this code exists for. `followRecoveryRateMps` is the
+  // engine's existing „this gap is opening" line, reused so the two detectors
+  // cannot disagree about what a departing lead looks like.
+  const exitQueued =
+    leadGapM !== null &&
+    leadGapM <= cfg.hesitationQueueGapM &&
+    gapOpeningMps < cfg.followRecoveryRateMps;
   const hesitating =
     tick.nextStopLineControl === "trafficLight" &&
     tick.nextStopLineState === "green" &&
@@ -1594,6 +1668,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     speed <= cfg.fullStopMaxSpeedKmh &&
     tick.indicator === "off" &&
     (leadGapM === null || leadGapM > cfg.hesitationClearGapM) &&
+    !exitQueued &&
     s.crossing === null &&
     tick.stalled !== true &&
     forwardGear;

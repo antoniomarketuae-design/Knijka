@@ -57,8 +57,11 @@ import {
   CRASH_PIN_RADIUS_M,
   CRASH_PIN_STUCK_S,
   FINISH_STANDSTILL_KMH,
+  ROUTE_RUNOUT_MAX_S,
   createFinishGate,
+  routeEndMark,
   routeFinishZone,
+  routeRunOutArrived,
   stepFinishGate,
   stepYieldWait,
   terminalRescueZone,
@@ -579,6 +582,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   let currentIndex = prev.currentObjectiveIndex;
   let phase: LessonPhase = prev.phase;
   let endedAtSec = prev.endedAtSec;
+  // THE RUN-OUT (finish.ts). `undefined` = the chain has not finished yet;
+  // an object = running out to the mark; `null` = the chain finished on a
+  // route that ends nowhere, which terminates on the spot exactly as it always
+  // did. Folded after the lawful-wait below, because two of its three exits
+  // must not be allowed to spend a second the student is right to be standing
+  // still for.
+  let runOut: LessonSessionState["routeRunOut"] | null | undefined = prev.routeRunOut;
 
   // FRAME-ZERO POSE GUARD (doc 87 B3/B10/B11). The chain does not advance
   // until a tick has described the vehicle: motion, or a position other than
@@ -641,10 +651,32 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       }
     }
 
-    // All objectives done => the lesson route is complete.
+    // All objectives done => the lesson's TASKS are complete. Where the DRIVE
+    // stops is a second question, and it used to be answered by accident: this
+    // branch fired on the frame the terminal `reachZone` was entered, i.e. one
+    // whole tolerance radius short of the mark the author placed (mean 10.03 m
+    // over 674 authored rungs; 17 m on `sc-zebra-approach` L1, whose three
+    // committed recordings all stop at y = 113 against a mark at y = 130). See
+    // finish.ts „THE RUN-OUT" for the census and for why the low rungs — the
+    // forgiving ones — were the ones cut shortest.
+    //
+    // So: arm the run-out and let him drive to the end. If the route ends
+    // nowhere, or he is already at the mark, this is bit-identical to the line
+    // it replaces — it terminates below, on this same frame.
     if (currentIndex >= objectives.length && objectives.length > 0) {
-      phase = "completed";
-      endedAtSec = tick.t;
+      if (runOut === undefined) {
+        const mark = routeEndMark(objectives.map((o) => o.params));
+        runOut =
+          mark === null
+            ? null
+            : {
+                markX: mark.x,
+                markY: mark.y,
+                fromX: tick.position.x,
+                fromY: tick.position.y,
+                elapsedSec: 0,
+              };
+      }
     }
   }
 
@@ -730,6 +762,48 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // with time nobody spent waiting would corrupt the par-time line below.
       const dt = Math.min(Math.max(tick.t - prev.lastT, 0), 1);
       yieldWaitSec = (yieldWaitSec ?? 0) + dt;
+    }
+  }
+
+  // THE RUN-OUT'S THREE EXITS (finish.ts). The tasks are done; this decides
+  // where the DRIVE stops. `null` is a route that ends nowhere — it stops here,
+  // which is the behaviour this branch always had.
+  if (phase === "driving" && runOut !== undefined) {
+    if (runOut === null) {
+      phase = "completed";
+      endedAtSec = tick.t;
+    } else {
+      const here = { x: tick.position.x, y: tick.position.y };
+      const mark = { x: runOut.markX, y: runOut.markY };
+      const from = { x: runOut.fromX, y: runOut.fromY };
+      // ARRIVED — at the mark, or past it. Checked before the freeze, because
+      // getting there is a fact about the road and not about the clock.
+      if (routeRunOutArrived(mark, from, here)) {
+        phase = "completed";
+        endedAtSec = tick.t;
+      } else if (yieldWait?.holding === true) {
+        // B15's freeze, for the third time in this file and for the third time
+        // for the same reason: a student stopped at the very end of the route
+        // because a pedestrian is still on the paint is doing the lesson, not
+        // finishing it. Neither exit below may spend this second.
+      } else if (Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH) {
+        // AT REST — every task is done and the car has stopped. Wherever he
+        // chose to stop IS the end of his drive; nothing is served by making
+        // him roll the last few metres.
+        phase = "completed";
+        endedAtSec = tick.t;
+      } else {
+        const dt = Math.min(Math.max(tick.t - prev.lastT, 0), 1);
+        const elapsedSec = runOut.elapsedSec + dt;
+        runOut = { ...runOut, elapsedSec };
+        // SPENT — the backstop. A run-out cannot be long (the car started
+        // inside the terminal ring), so this only ever catches a car going
+        // nowhere in particular, and it ends the drive rather than holding it.
+        if (elapsedSec >= ROUTE_RUNOUT_MAX_S) {
+          phase = "completed";
+          endedAtSec = tick.t;
+        }
+      }
     }
   }
 
@@ -958,6 +1032,10 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       ...(yieldWait !== undefined ? { yieldWait } : {}),
       ...(yieldWaitSec !== undefined ? { yieldWaitSec } : {}),
       ...(yieldVoice !== undefined ? { yieldVoice } : {}),
+      // The run-out's `null` (a route that ends nowhere) is a decision, not a
+      // state to carry: it terminated the session on the frame it was taken, so
+      // only the live object is ever written back.
+      ...(runOut !== undefined && runOut !== null ? { routeRunOut: runOut } : {}),
       // FR-B5-JAM: the one field that must be able to go BACK to absent (the
       // student reversed out and drove away), which the additive spread above
       // cannot express over `...prev` — so it is written unconditionally.

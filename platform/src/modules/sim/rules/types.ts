@@ -641,6 +641,20 @@ export interface RuleEngineConfig {
    * lane drawn at PERCEPTUAL_ROAD_SCALE. See the default.
    */
   mirrorLookbackSec: number;
+  /**
+   * Ceiling on the STOPPED time subtracted from a lane-change glance's age
+   * (2026-08-16). The window above is a wall clock, and the drilled sequence
+   * has an unbounded beat in the middle of it: огледало → мигач → изчакай
+   * пролука → маневра. Waiting for a real gap from a standstill routinely
+   * outlasts 8 s, so the glance expired on a student who looked, signalled and
+   * waited — the three things the lesson asked for — and LANE_CHANGE_WITHOUT_
+   * MIRROR_CHECK fired on the pull-away. The engine already owns the ledger
+   * (`scanStopCreditSec`, founder R3 #13); this is how much of it the mirror
+   * may spend. Capped, unlike the junction scan's use of the same ledger: a
+   * driver waiting at a mouth keeps FACING the road he scanned, while a blind
+   * spot behind a standing car fills in without him.
+   */
+  mirrorWaitFreezeMaxSec: number;
   /** Lane-id changes below this speed are ignored (parking shuffles, not lane changes). */
   laneChangeMinSpeedKmh: number;
   /**
@@ -923,6 +937,33 @@ export interface RuleEngineConfig {
   hesitationMaxLineDistM: number;
   /** Lead gap at/under this means someone blocks the box — never fire, m. */
   hesitationClearGapM: number;
+  /**
+   * THE OTHER WAY THE BOX IS NOT CLEAR (2026-08-16). `hesitationClearGapM` is
+   * a bumper distance — it answers „is a car standing on top of me", and 12 m
+   * is roughly one car plus a mouth. It cannot answer the question чл. 50 ал. 2
+   * actually asks, which is „can I get OUT the far side", because the queue
+   * that blocks the exit is by definition on the far side of the junction and
+   * therefore FAR AWAY.
+   *
+   * Measured on the shipped correct demonstration of `sc-jx-blocked-exit` — the
+   * drill whose entire subject is not entering a junction you cannot clear —
+   * re-graded with DEFAULT_RULE_CONFIG: the driver stops at the line at t=12.5
+   * with the light green and the queue tail 56.4 m beyond the mouth, and is
+   * convicted of закъснели действия 5.0 s later. The drill survives ONLY
+   * because its template carries a one-line `ruleConfig: { hesitationClearGapM:
+   * 63 }`; no other scenario carries it, and lessons/specs.ts — the
+   * official-format exam on real Sofia streets — carries no ruleConfig at all.
+   *
+   * So the escape is widened to the distance a blocked exit actually sits at,
+   * and the thing that keeps it from swallowing the detector whole is not the
+   * distance but the SECOND condition beside it in engine.ts: the traffic ahead
+   * must not be moving away. A lead that is opening the gap will clear the box,
+   * and freezing behind it is the hesitation JU-09 grades; a lead that is
+   * standing still is the exit you cannot reach, and entering would be the
+   * fault the lesson teaches. A road with nobody on it (leadGapM absent) never
+   * touches this and grades exactly as shipped.
+   */
+  hesitationQueueGapM: number;
 
   // -- B1a Wave-2 detector pack (doc 72 capability 1) ------------------------
 
@@ -1289,6 +1330,12 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // lane-change-beginner-window.test.ts).
   indicatorLookbackSec: 5,
   mirrorLookbackSec: 8,
+  // 20 s of standing time, i.e. a glance may be at most 28 s old and only if
+  // the extra 20 were spent at a standstill. That covers the gap-wait a merge
+  // out of a stopped queue actually takes, and stops well short of „he looked
+  // once, a minute ago" — the same ceiling logic as the 8 s above, applied to
+  // the one kind of second that does not age an observation as fast.
+  mirrorWaitFreezeMaxSec: 20,
   laneChangeMinSpeedKmh: 10,
   laneChangeJointGraceSec: 1.5, // C1 — see the interface comment
 
@@ -1371,6 +1418,11 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   hesitationSustainSec: 5, // DVSA marks ~3 s; we grade only a clear freeze
   hesitationMaxLineDistM: 12,
   hesitationClearGapM: 12,
+  // 70 m clears the measured 56.4 m of the blocked-exit drill with room for a
+  // longer Sofia junction, and stays under the 120 m the runtime watches its
+  // signals at. It only ever applies to a lead that is NOT opening the gap —
+  // see the interface comment.
+  hesitationQueueGapM: 70,
 
   // B1a Wave-2 (doc 72 capability 1). Every threshold errs innocent (A12).
   // FO-08: 1.5 m is unambiguously bumper-kissing; the exam-bot rests ~6 m and

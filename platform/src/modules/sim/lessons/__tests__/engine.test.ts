@@ -59,9 +59,21 @@ describe("lesson lifecycle without pre-drive", () => {
     });
     expect(s.phase).toBe("driving");
 
-    // Reach the zone => last objective done => session completes itself.
+    // Reach the zone => last objective done. The DRIVE then runs out to the
+    // mark itself (finish.ts „THE RUN-OUT"): x=95 is inside the radius-10
+    // acceptance, so the task is ticked there, but the route ends at x=100 and
+    // the car is still doing 36 km/h. This line used to read `[50, 95]` and
+    // assert `completed` — it was the old rule written down: the drive stopped
+    // wherever the tolerance happened to begin, five metres short of its own
+    // end, and a wider tolerance stopped it sooner still.
     const r2 = driveEastwards(s, 3, [50, 95]);
     s = r2.state;
+    expect(s.objectives[1].status).toBe("done");
+    expect(s.phase).toBe("driving");
+
+    // …and ends on the frame the car is past the mark.
+    const r3 = driveEastwards(s, 5, [105]);
+    s = r3.state;
     expect(s.phase).toBe("completed");
     expect(s.endedAtSec).not.toBeNull();
 

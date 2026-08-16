@@ -145,6 +145,11 @@ import {
 } from "@/modules/sim/scene/cabin";
 import { lessonRequiredSpeedKmh } from "@/modules/sim/scene/lessonSpeedContract";
 import { TouchControls } from "./TouchControls";
+// The lesson clock's ceiling. Imported from `lesson-ui/` rather than declared
+// here because it has to be unit-testable in Node: this file drags in R3F,
+// rapier wasm and the district loader, and the ONE number that decides how much
+// world time a frame is worth cannot sit behind that. See the file's header.
+import { sessionClockAdvance } from "./lesson-ui/sessionClock";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
@@ -1982,11 +1987,19 @@ function FollowHintProbe({
   onChange: (on: boolean) => void;
 }) {
   const path = useMemo(() => tracePathForRibbon(trace, 1.0, 2048), [trace]);
-  const stateRef = useRef({ nextPollT: 0, offSince: null as number | null, on: false });
-  useFrame((state) => {
+  const stateRef = useRef({ t: 0, nextPollT: 0, offSince: null as number | null, on: false });
+  useFrame((_, delta) => {
     if (paused) return;
     const s = stateRef.current;
-    const now = state.clock.elapsedTime;
+    // DRIVING seconds, not wall seconds — the same ceiling the graded clock
+    // uses (sessionClock.ts), for the same measured reason. `clock.elapsedTime`
+    // was wall time: on the PC trace's 2.33 s frames a SINGLE deviated frame
+    // cleared the 2 s sustain, so the chip fired after 0.5 s of road instead of
+    // 2 s of it — and because that clock also ran through every teach-moment
+    // pause, a student who was off the line when the card appeared came back to
+    // an instant hint. Above 10 fps this is the raw delta and nothing moves.
+    s.t += sessionClockAdvance(delta);
+    const now = s.t;
     if (now < s.nextPollT) return;
     s.nextPollT = now + FOLLOW_HINT_POLL_S;
     const pos = sampleRef.current.position;
@@ -2522,7 +2535,43 @@ function RuntimeDriver({
     drivelineEvents.length = 0;
     glances.length = 0;
 
-    const dt = Math.min(delta, 0.1);
+    // ══ THE LESSON'S CLOCK IS THE WORLD'S CLOCK — 2026-08-16, measured on PC ══
+    //
+    // This line used to read `Math.min(delta, 0.1)`, and that 0.1 was a second,
+    // independent guess at a ceiling the physics had already chosen. rapier
+    // clamps a frame at 0.5 s before its accumulator sees it, so on any frame
+    // longer than 0.1 s the car's body advanced up to FIVE TIMES further than
+    // the clock the same frame handed the rule engine.
+    //
+    // Measured, staging, Chromium 1440×900 @2, sc-zebra-approach L1: the PC
+    // render graph (three mirror RTT passes + the chase rear-view camera + the
+    // N8AO/SMAA composer) costs 2.33 s/frame at dsf1 and 3.57 s/frame at dsf2.
+    // At 3.57 s the world gained 0.5 s and `tRef` gained 0.1 s, so 700 m of
+    // road driven at 42 km/h was booked as 140 m — engine.ts integrates
+    // `cleanDistanceM` as `(speed / 3.6) * (t - prevT)`, and 250 m buys a
+    // CLEAN_DRIVING commendation. Two earned, none awarded.
+    //
+    // AND THE SAME FIFTH WAS BEING CHARGED TO EVERY DUTY MEASURED IN SECONDS.
+    // The give-way witness gate is the one a student feels: runners.ts does
+    // `this.stoppedForSec += input.dtSec` and asks for
+    // WITNESS_STOPPED_HOLD_SEC = 2.0 — so a genuine two-second standstill at a
+    // Б2 was credited as 0.4 s and the objective refused. That is a FALSE
+    // FAILURE manufactured by the frame rate, and the fix is the clock, not the
+    // gate: the duty is still two seconds, it is now two seconds of the world
+    // the car is driving in. `accelMps2`, every sustain/lookback window, the
+    // director's `tSec` and the attempt trace's timestamps were all paying it.
+    //
+    // Above 10 fps this is bit-identical to what it replaced: both ceilings are
+    // inert and the advance is the raw delta. See lesson-ui/sessionClock.ts —
+    // its test re-reads rapier's literal out of node_modules so the two cannot
+    // drift apart again.
+    //
+    // NOT FIXED HERE, and not this lane's file: `traffic/system.ts` clamps its
+    // own step at MAX_DT_SEC = 0.1, so NPC cars and staged pedestrians still
+    // walk at a fifth of the ego car's pace on a sub-10-fps frame. `dt` is
+    // handed to `traffic.update()` below unchanged in effect (it re-clamps to
+    // the same 0.1 it used to receive), so nothing there moves either way.
+    const dt = sessionClockAdvance(delta);
     tRef.current += dt;
     const sample = sampleRef.current;
 

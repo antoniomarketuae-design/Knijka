@@ -914,6 +914,31 @@ export interface LessonSessionState {
     y: number;
     stillSinceSec: number | null;
   };
+  /**
+   * THE RUN-OUT (additive, 2026-08-16) — the drive between finishing the last
+   * task and reaching the end of the route.
+   *
+   * Armed on the frame the sequential chain completes, IF the route ends at an
+   * arrival waypoint the car has not physically reached yet — which was the
+   * normal case, because a `reachZone` is satisfied at the EDGE of its
+   * tolerance and the terminal ring is 10 m wide on catalogue average. See
+   * finish.ts `routeEndMark` for the measurement and for which routes get one.
+   *
+   * `fromX/fromY` pin where the run-out began (always on the approach side of
+   * the mark) so „past the mark" has an axis; `elapsedSec` accrues only on
+   * frames that are evidence — the lawful-wait freeze skips it, exactly as it
+   * skips the finish gates' dwell.
+   *
+   * Absent on every route that ends nowhere and on every drive that was
+   * already at the mark, so those terminate on the chain exactly as before.
+   */
+  routeRunOut?: {
+    markX: number;
+    markY: number;
+    fromX: number;
+    fromY: number;
+    elapsedSec: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
