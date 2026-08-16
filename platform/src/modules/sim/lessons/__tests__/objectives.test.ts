@@ -241,6 +241,93 @@ describe("reachZone", () => {
       expect(r.done).toBe(false);
     });
   });
+
+  // -------------------------------------------------------------------------
+  // A WAYPOINT IS CROSSED, NOT SAMPLED (2026-08-16)
+  //
+  // Since d1f5e18 the lesson clock is the world clock and both clamp at
+  // PHYSICS_MAX_FRAME_DT = 0.5 s, so ONE tick advances the car by up to half a
+  // second of travel — 6.94 m at 50 km/h, 8.33 m at 60. Measured on staging,
+  // `sc-lane-change` L1 ran at 0.46 fps and `sc-roundabout-entry` L1 at 0.33,
+  // i.e. every tick spending the whole clamp. The catalogue census: of 674
+  // terminal reachZone rungs, 17 have a DIAMETER under one 50 km/h tick and 177
+  // a radius under it; `sc-lane-change` L3-L5 is radius 4 on a 50 km/h street.
+  //
+  // The ticks below are that arithmetic, not an invention: 7 m apart at 50 km/h
+  // is one honest frame of the shipped build.
+  // -------------------------------------------------------------------------
+  describe("the disc is CROSSED, not sampled — one 0.5 s tick can step over it", () => {
+    // sc-lane-change's own terminal gate at L3+: (4.06, 260), radius 4, no cap.
+    const lc = parsed("reachZone", { x: 4.06, y: 260, radiusM: 4 });
+
+    it("FAILS ON THE OLD CODE: a 7 m tick over the mark, 2 m off its line, is credited", () => {
+      // Chord through the disc at a 2 m offset is 2·√(16−4) = 6.93 m, so a
+      // 7 m step can straddle it with neither endpoint inside. Both samples are
+      // 4.1 m from the mark — outside the authored radius by a decimetre.
+      const before = { x: 6.06, y: 256.5 };
+      const after = { x: 6.06, y: 263.5 };
+      expect(Math.hypot(before.x - 4.06, before.y - 260)).toBeGreaterThan(4);
+      expect(Math.hypot(after.x - 4.06, after.y - 260)).toBeGreaterThan(4);
+      const r = run(lc, [
+        makeTick({ t: 0.0, position: before, speedKmh: 50 }),
+        makeTick({ t: 0.5, position: after, speedKmh: 50 }),
+      ]);
+      expect(r.done).toBe(true);
+    });
+
+    it("the OTHER direction: a tick that passes 5 m wide of the disc is still refused", () => {
+      // Same 7 m step, same street, one lane over (8.13 m pitch): the path
+      // never touches the circle and nothing here may invent room for it.
+      const r = run(lc, [
+        makeTick({ t: 0.0, position: { x: 9.06, y: 256.5 }, speedKmh: 50 }),
+        makeTick({ t: 0.5, position: { x: 9.06, y: 263.5 }, speedKmh: 50 }),
+        makeTick({ t: 1.0, position: { x: 9.06, y: 270.5 }, speedKmh: 50 }),
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("a RESET does not draw an acceptance line across the district", () => {
+      // A respawn is a teleport, not a drive: the segment from the old position
+      // to the new one may not credit every waypoint on the line between them.
+      // TELEPORT_JUMP_M (50) is the same guard driveDistance uses.
+      const r = run(lc, [
+        makeTick({ t: 0, position: { x: 4.06, y: 200 }, speedKmh: 40 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 320 }, speedKmh: 40 }), // 120 m jump
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("speed is sampled even though position is swept — the B5 slide is still refused", () => {
+      // The counter-proof of the counter-proof. A segment says WHERE the car
+      // went and nothing about how fast it was at each point, so the swept face
+      // feeds the arrival latch only: a car that slid through a halt mark at 30
+      // and stopped 5 m past it must not collect „slowed to the cap at the mark".
+      const haltMark = parsed("reachZone", { x: 4.06, y: 118, radiusM: 4, maxSpeedKmh: 6 });
+      const r = run(haltMark, [
+        makeTick({ t: 0, position: { x: 4.06, y: 100 }, speedKmh: 40 }),
+        makeTick({ t: 1, position: { x: 4.06, y: 118 }, speedKmh: 30 }),
+        makeTick({ t: 2, position: { x: 4.06, y: 123 }, speedKmh: 0 }),
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("B18/FR-24 survives: sweeping a stop-line waypoint and ENDING past the paint fails", () => {
+      // `beyondMark` reads the tick's own position, not the segment, so the
+      // sweep can never redefine „before the line".
+      const paint = parsed("reachZone", {
+        x: 4.06,
+        y: -34,
+        radiusM: 9,
+        maxSpeedKmh: 25,
+        acceptBeforeMarkM: 1.725,
+      });
+      const r = run(paint, [
+        makeTick({ t: 0, position: { x: 4.06, y: -48 }, speedKmh: 24 }),
+        makeTick({ t: 1, position: { x: 4.06, y: -30 }, speedKmh: 24 }), // swept the disc, ended past the bars
+      ]);
+      expect(r.done).toBe(false);
+    });
+  });
 });
 
 describe("passSignal", () => {
@@ -320,16 +407,82 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
     expect(r.detail).toMatchObject({ kind: "passSignal", redMetHere: true });
   });
 
-  it("crossing ON red also counts as a met red (progression; the rule engine grades it)", () => {
+  // 2026-08-16 — THIS TEST USED TO ASSERT THE OPPOSITE, and the founder's
+  // staging run is what overturned it: «✓ Изчакай червения сигнал и премини на
+  // зелено — Изчака червения сигнал и потегли на зелено» printed in the same
+  // second as «Преминаване на червен сигнал −10 изпитни т.», on both platforms.
+  // A gate that its own forbidden act satisfies teaches that act; and the
+  // debrief line rendered from `redMetHere` was a sentence about waiting that
+  // no waiting produced. See stepPassSignal's header.
+  it("crossing ON red does NOT close the gated objective, and certifies no red", () => {
     const r = run(gated, [
       tickWithEvents(2, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red" }], {
         ...at(400),
         speedKmh: 30,
       }),
     ]);
+    expect(r.done).toBe(false);
+    expect(r.detail).toMatchObject({ redMetHere: false, redsMetInRun: 0 });
+  });
+
+  it("…and the same crossing still COMPLETES a plain junction (progression is untouched)", () => {
+    const plain = parsed("passSignal", {
+      nodeId: "n5997970086",
+      x: 400,
+      y: 200,
+      radiusM: 30,
+      control: "trafficLight",
+    });
+    const r = run(plain, [
+      tickWithEvents(2, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red" }], {
+        ...at(400),
+        speedKmh: 30,
+      }),
+    ]);
+    expect(r.done).toBe(true);
+  });
+
+  it("…and the prescribed retry still completes it: back, stop, wait, cross on green", () => {
+    const r = run(gated, [
+      tickWithEvents(2, [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red" }], {
+        ...at(400),
+        speedKmh: 30,
+      }),
+      makeTick({ t: 20, ...at(300), speedKmh: 25 }), // turned round, off the approach
+      makeTick({ t: 40, ...at(396), speedKmh: 0 }), // stopped at the line this time
+      crossGreen(60),
+    ]);
     expect(r.done).toBe(true);
     expect(r.detail).toMatchObject({ redMetHere: true });
   });
+
+  it("ЗДвП чл. 7: a регулировчик's wave through a red IS a met red (sc-sig-controller-live)", () => {
+    // No stop at all — the drill's own bot rolls over the line at 22 km/h on the
+    // officer's signal. It is the only path that completes that template, so the
+    // permission arm has to survive this fix intact.
+    const r = run(gated, [
+      tickWithEvents(
+        2,
+        [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "red", controller: "proceed" }],
+        { ...at(400), speedKmh: 22 },
+      ),
+    ]);
+    expect(r.done).toBe(true);
+    expect(r.detail).toMatchObject({ redMetHere: true });
+  });
+
+  it("red+yellow is not green: creeping off the line does not certify the red", () => {
+    const r = run(gated, [
+      makeTick({ t: 1, ...at(396), speedKmh: 0 }), // waited the red out properly…
+      tickWithEvents(
+        2,
+        [{ kind: "stopLineCrossed", control: "trafficLight", lightState: "redYellow" }],
+        { ...at(400), speedKmh: 8 },
+      ), // …then went one phase early
+    ]);
+    expect(r.done).toBe(false);
+  });
+
 
   it("a red met earlier in the run (ctx.redsMetInRun) satisfies the gate", () => {
     const ctx: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 1 };
@@ -901,6 +1054,83 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     }
     expect(done).toBe(false);
     expect(evalState).toMatchObject({ type: "roundabout", voidedExits: 2 });
+  });
+
+  // -------------------------------------------------------------------------
+  // NOBODY LEAVES A ROUNDABOUT BACKWARDS — 2026-08-16.
+  //
+  // Driving `sc-roundabout-entry` L1 on staging to find out why the founder's
+  // exit went uncredited produced the opposite result. The bench rolled 5 m
+  // into the south mouth (d = 17.85 against enterRadiusM 24), flicked the right
+  // stalk there, and REVERSED back out down the same arm past exitRadiusM 34 —
+  // and «✓ Премини през кръговото и излез с десен мигач» flashed on the way out.
+  // The identical drive with no stalk left the objective open and dropped the
+  // banner's bar from 50 % to 0 % (the void's own `entered` reset), so both
+  // directions of the SIGNAL half work on the deployed build; what did not work
+  // is that neither half asks whether a roundabout was driven at all.
+  // -------------------------------------------------------------------------
+  describe("the exit is a DEPARTURE — a reversing car has not left", () => {
+    const inMouth = (t: number, indicator: "off" | "right" = "off") =>
+      makeTick({ t, position: { x: -30, y: -330 }, indicator, gear: 1 }); // ~15 m in
+    const backOut = (t: number, gear: number, indicator: "off" | "right" = "off") =>
+      makeTick({ t, position: { x: -38, y: -290 }, indicator, gear }); // 53 m — outside
+
+    it("FAILS ON THE OLD BEHAVIOUR: nose in, signal, reverse out — not a traversal", () => {
+      const r = run(params, [approach, inMouth(1, "right"), backOut(2, -1)]);
+      expect(r.done).toBe(false);
+    });
+
+    it("…it is not VOIDED either — the card would accuse him of the wrong thing", () => {
+      // «Излезе от кръговото без десен мигач» at a student who never left, with
+      // his stalk lit, is a worse lie than silence. Backing out ABANDONS the
+      // attempt instead: latches cleared, nothing said, nothing counted.
+      let evalState: ObjectiveEvalState = createEvalState(params);
+      let done = false;
+      for (const tick of [approach, inMouth(1, "right"), backOut(2, -1), backOut(3, -1)]) {
+        const r = stepObjective(params, evalState, tick);
+        evalState = r.evalState;
+        done ||= r.done;
+      }
+      expect(done).toBe(false);
+      expect(evalState).toMatchObject({
+        type: "roundabout",
+        entered: false,
+        exitSignaled: false,
+        ringSignalArcDeg: null,
+        voidedExits: 0,
+      });
+    });
+
+    it("…and the cheat does not just move one frame later: forward AFTER backing out is nothing", () => {
+      // The measured drive really did end up outside, pointing away, with the
+      // stalk memory intact. A guard that only withheld `done` while the gear
+      // was negative would have handed the tick over on the next forward frame.
+      const r = run(params, [
+        approach,
+        inMouth(1, "right"),
+        backOut(2, -1), // out past exitRadiusM in reverse — attempt abandoned
+        backOut(3, 1), // …now driving forward, still outside
+        backOut(4, 1, "right"),
+      ]);
+      expect(r.done).toBe(false);
+    });
+
+    it("the OTHER direction: the same exit driven FORWARD still completes", () => {
+      const r = run(params, [approach, inMouth(1, "right"), backOut(2, 1)]);
+      expect(r.done).toBe(true);
+    });
+
+    it("…and a forward exit with no signal still voids, exactly as before", () => {
+      let evalState: ObjectiveEvalState = createEvalState(params);
+      let done = false;
+      for (const tick of [approach, inMouth(1, "off"), backOut(2, 1, "off")]) {
+        const r = stepObjective(params, evalState, tick);
+        evalState = r.evalState;
+        done ||= r.done;
+      }
+      expect(done).toBe(false);
+      expect(evalState).toMatchObject({ type: "roundabout", voidedExits: 1, entered: false });
+    });
   });
 });
 

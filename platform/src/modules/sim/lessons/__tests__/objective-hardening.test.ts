@@ -258,14 +258,27 @@ describe("L2-style met-red gate through the engine (A10)", () => {
     expect(s.phase).toBe("completed");
   });
 
-  it("running a red counts as met (progression) while the rule engine grades it", () => {
+  // 2026-08-16 — the second half of this test used to expect the OPPOSITE, and
+  // it is the same defect the founder reproduced one junction downstream: a red
+  // that was RUN was counted as a red that was MET, so the run-wide tally
+  // (`countRedsMet`) carried it forward and certified the gate at a junction
+  // the student never handled. The first half is unchanged and is the
+  // progression/correctness split doing its job — the plain junction is still
+  // completed, and the 10-point опасна is still billed for the same act.
+  it("running a red completes the PLAIN junction but certifies no red for the gate", () => {
     let s = createLessonSession(signalsLesson);
     const r1 = applyTick(s, crossAt(1, 100, "red", 30));
     s = r1.state;
     // Objective done AND the 10-point опасна graded — two separate questions.
     expect(s.objectives[0].status).toBe("done");
     expect(s.events.some((e) => e.kind === "violation" && e.code === "RED_LIGHT_CROSSED")).toBe(true);
+    expect(s.objectives[0].detail).toMatchObject({ kind: "passSignal", redMetHere: false });
     s = applyTick(s, crossAt(2, 300, "green")).state;
+    expect(s.objectives[1].status).toBe("active");
+
+    // …and the drilled sequence at the second junction still closes it.
+    s = applyTick(s, makeTick({ t: 30, position: { x: 0, y: 295 }, speedKmh: 0 })).state;
+    s = applyTick(s, crossAt(60, 300, "green")).state;
     expect(s.objectives[1].status).toBe("done");
   });
 });

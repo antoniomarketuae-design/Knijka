@@ -427,6 +427,66 @@ const STOPPED_SPEED_KMH = 1;
 export const REACH_ZONE_GRACE_M = 5;
 
 /**
+ * A WAYPOINT IS CROSSED, NOT SAMPLED — 2026-08-16, measured on staging.
+ *
+ * `stepReachZone` asked one question per tick: „is the car's CENTRE POINT
+ * inside the authored circle right now". A point test on a discretely sampled
+ * path only works while the sample spacing is small next to the target, and
+ * since d1f5e18 („one frame, one clock") the spacing is stated outright:
+ * `PHYSICS_MAX_FRAME_DT = 0.5`, so one tick advances the world by up to half a
+ * second of travel, however long the frame took in wall time.
+ *
+ *      0.5 s at 30 km/h = 4.17 m      0.5 s at  50 km/h =  6.94 m
+ *      0.5 s at 60 km/h = 8.33 m      0.5 s at 130 km/h = 18.06 m
+ *
+ * And that is not a headless artefact. The render graph in LessonScene's own
+ * measurement costs 2.33 s/frame at dsf1 and 3.57 s/frame at dsf2 on the
+ * founder's PC profile; this box measured `sc-lane-change` L1 on staging at
+ * 0.46 fps and `sc-roundabout-entry` L1 at 0.33 fps, i.e. every single tick
+ * spending the whole 0.5 s clamp. Every device slower than 2 fps is here.
+ *
+ * AGAINST THE SHIPPED CATALOGUE (674 terminal reachZone rungs; radius min 2.2,
+ * median 10, max 23), counting rungs whose whole acceptance disc is narrower
+ * than one tick of travel:
+ *
+ *      speed      diameter < one tick        radius < one tick
+ *      30 km/h            0                          70
+ *      50 km/h           17                         177
+ *      60 km/h           70                         235
+ *      90 km/h          167                         524
+ *
+ * A rung in the first column can be driven through DEAD CENTRE with no sample
+ * inside it at all; one in the second is missed by any line more than a metre
+ * or two off the mark. `sc-lane-change` L3-L5 is the founder's own case:
+ * radius 4, no cap, on a 50 km/h street — 8 m of disc against a 6.94 m tick, so
+ * every approach further than 1.2 m off the mark's own line has a chord shorter
+ * than one step. Across all 1,720 reachZone gates in the catalogue, 71 are
+ * narrower than a single 50 km/h tick.
+ *
+ * THE FIX ADDS NO TOLERANCE. It replaces „was a sample inside the circle" with
+ * „did the path cross the circle" — the segment from the previous tick's
+ * position to this one, which the evaluator already stores (`prevPos`, kept for
+ * the grace capsule's approach axis). Nothing outside the authored disc is
+ * credited, at any rung, at any speed; a car that never drove through it still
+ * gets nothing.
+ *
+ * The straight segment is honest at this cadence: the deviation of a real arc
+ * from its chord over a tick is a·T²/8, and at the sim's lateral-grip ceiling
+ * (~3 m/s²) over 0.5 s that is 0.09 m — two orders under the smallest authored
+ * radius in the catalogue.
+ *
+ * Guarded by TELEPORT_JUMP_M so a reset/respawn cannot draw an acceptance line
+ * across the district, and applied ONLY to the authored disc: the grace capsule,
+ * the `acceptBeforeMarkM` cut and the speed cap are evaluated at the tick's own
+ * position exactly as before. That ordering matters for B18/FR-24 — a car that
+ * sweeps through a stop-line waypoint and ENDS past the paint is still refused,
+ * because `beyondMark` reads where the car actually is.
+ *
+ * (No constant to tune: the swept test IS the arrival test. See `segmentDist`
+ * and its one call site in `stepReachZone`.)
+ */
+
+/**
  * The standstill arm of the grace only applies to a zone whose cap is a STOP
  * demand. At or below walking-plus pace the objective is „спри тук" and
  * stopping short of it is the same act done earlier; above it the cap is a
@@ -573,6 +633,24 @@ function dist(ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(ax - bx, ay - by);
 }
 
+/** Closest distance from (px, py) to the segment a→b — the swept arrival test. */
+function segmentDist(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const vx = bx - ax;
+  const vy = by - ay;
+  const len2 = vx * vx + vy * vy;
+  if (len2 <= 1e-12) return Math.hypot(px - ax, py - ay);
+  let t = ((px - ax) * vx + (py - ay) * vy) / len2;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
 /**
  * Advance the ACTIVE objective by one tick. Pure — returns fresh eval state.
  * `ctx` carries the session-level facts (staged outcomes, reds tally); the
@@ -682,6 +760,30 @@ function stepReachZone(
   const d = dist(tick.position.x, tick.position.y, params.x, params.y);
   const speedKmh = Math.abs(tick.speedKmh); // reverse reads negative
   const inZone = d <= params.radiusM;
+  // A WAYPOINT IS CROSSED, NOT SAMPLED (2026-08-16 — the block comment of the
+  // same name in the constants section above). The disc is additionally tested
+  // against the SEGMENT the car covered since the previous tick, because at the
+  // frame rates this product actually runs at the whole disc fits between two
+  // consecutive samples.
+  //
+  // POSITION IS SWEPT; SPEED IS NOT. This flag feeds the ARRIVAL latch only.
+  // A segment says where the car went, and nothing at all about how fast it was
+  // at each point of it, so letting it satisfy the speed cap would credit „I
+  // slowed down at the mark" to a car that slid through the mark at 30 and came
+  // to rest five metres past it — the B5 counter-proof, which is a shipped
+  // regression test one screen down and stays red under any looser reading.
+  const sweptZone =
+    inZone ||
+    (st.prevPos !== null &&
+      dist(st.prevPos.x, st.prevPos.y, tick.position.x, tick.position.y) < TELEPORT_JUMP_M &&
+      segmentDist(
+        params.x,
+        params.y,
+        st.prevPos.x,
+        st.prevPos.y,
+        tick.position.x,
+        tick.position.y,
+      ) <= params.radiusM);
   const cap = params.maxSpeedKmh;
   // B18/FR-24: a `stopBeforeMark` zone needs the approach direction too, so
   // its ring arms on proximity alone rather than on carrying a speed cap.
@@ -810,7 +912,11 @@ function stepReachZone(
   // of the line keeps every metre of forgiveness he had, at every rung, while
   // one who rolls past it is simply not credited with having stopped at it.
   const inAcceptance = inZone && !beyondMark;
-  const reached = st.reached || inAcceptance || (graceArmed && halted && isHaltDemand);
+  // The swept face of the same acceptance — the ARRIVAL half only. `beyondMark`
+  // still reads the tick's own position, so a car that sweeps a stop-line
+  // waypoint and ENDS past the paint is refused exactly as it was.
+  const sweptAcceptance = sweptZone && !beyondMark;
+  const reached = st.reached || sweptAcceptance || (graceArmed && halted && isHaltDemand);
   const capMet =
     cap === undefined
       ? true
@@ -840,6 +946,15 @@ function stepReachZone(
 }
 
 /**
+ * A lamp that FORBIDS entry — the two states a driver has to be let through by
+ * someone. Red-yellow rides with red because ППЗДвП treats it as „prepare, do
+ * not go"; a регулировчик waving through either one is the чл. 7 case.
+ */
+function isForbiddingLamp(lightState: string | undefined): boolean {
+  return lightState === "red" || lightState === "redYellow";
+}
+
+/**
  * Pass a controlled junction (A10-hardened for traffic lights).
  *
  * Base completion: a stopLineCrossed event of the matching control type near
@@ -849,8 +964,10 @@ function stepReachZone(
  * requireRedMet gate (L2): the objective additionally demands that the RUN
  * has met at least one red. With `lightState` only observable at the moment
  * of crossing (SimTick contract), a met red has two observable signatures:
- *   1. crossing ON red (met the hard way — completes progression, costs the
- *      10-point опасна from the rule engine), or
+ *   1. crossing a FORBIDDING LAMP on a регулировчик's `proceed` — ЗДвП чл. 7,
+ *      the officer's signal outranks the светофар, so this is a red the student
+ *      MET and handled lawfully. `sc-sig-controller-live` is built on exactly
+ *      this and nothing else completes it;
  *   2. a full stop on the current APPROACH — inside the zone, or (2026-08-16)
  *      at the back of the queue with the tick reporting a red/red-yellow light
  *      ahead — followed by a crossing on green: the signature of waiting a red
@@ -862,6 +979,34 @@ function stepReachZone(
  * Feasibility: runtime SIGNAL_TIMING gives every light red 26 s of every
  * 50 s cycle, so a student who crossed on green can always re-approach, stop
  * at the line, and meet a red within ≤ 24 s — the gate can never deadlock.
+ *
+ * ── THE OBJECTIVE THAT CREDITED ITSELF AGAINST ITS OWN FAULT ────────────────
+ * Reproduced on staging on BOTH platforms, `sc-signal-response` L1:
+ * «✓ Изчакай червения сигнал и премини на зелено — Изчака червения сигнал и
+ * потегли на зелено» printed in THE SAME SECOND as «Преминаване на червен
+ * сигнал −10 изпитни т.».
+ *
+ * Signature 1 used to read „crossing ON red, met the hard way" — the lamp
+ * alone, with nothing asked about PERMISSION. One crossing on red therefore set
+ * `crossed` AND `redMet` on the same tick, so `done` was true on the exact
+ * frame the rule engine billed the опасна. Worse than a silent tick: the
+ * debrief detail line is rendered from `redMetHere` (SessionEndScreen) and it
+ * SAYS, in words, „Изчака червения сигнал и потегли на зелено" — a sentence
+ * about an act that did not happen, printed beside the fault proving it did
+ * not. An objective that can be satisfied by the act it exists to forbid
+ * teaches that act.
+ *
+ * The repair is the one word that was missing, and only that word: a red DRIVEN
+ * THROUGH is not a red met; a red an officer WAVED YOU THROUGH is. `crossed`
+ * still latches on any crossing, so every plain junction, every stop-sign
+ * junction and every recorded trace evaluates bit-identically, and the
+ * progression/correctness split above is intact — what stops is a GATE
+ * certifying itself with the offence it exists to forbid.
+ *
+ * The retry this leaves the student is the one the gate was designed around and
+ * finish.ts already protects (`terminalRescue: params.requireRedMet !== true`,
+ * so the drive is not closed underneath him): re-approach, stop at the line,
+ * wait the red out, cross on green — feasible inside 24 s, every time.
  *
  * WHY THE QUEUE ARM EXISTS. Signature 2 used to count a stop only INSIDE the
  * node radius (40–50 m in the shipped templates). A student who joins the back
@@ -920,9 +1065,18 @@ function stepPassSignal(
   if (inZone) {
     for (const e of tick.events) {
       if (e.kind !== "stopLineCrossed" || e.control !== params.control) continue;
+      // PROGRESSION IS UNTOUCHED: crossing the line completes a plain
+      // passSignal on red exactly as it always has, and the rule engine grades
+      // the law separately (the split at the top of this file).
       crossed = true;
       if (params.control === "trafficLight") {
-        if (e.lightState === "red") redMet = true;
+        // A red a регулировчик waved you through IS met: you encountered a
+        // forbidding lamp and dealt with it the way чл. 7 says to. This is the
+        // whole thesis of sc-sig-controller-live, whose bot crosses red lamps
+        // at 22 km/h on the officer's signal and must still complete.
+        if (isForbiddingLamp(e.lightState) && e.controller === "proceed") redMet = true;
+        // …and a red you WAITED OUT is met: stopped on this approach, then
+        // away on green. Unchanged since A10.
         else if (e.lightState === "green" && stoppedInZoneVisit) redMet = true;
       }
     }
@@ -1334,9 +1488,58 @@ function stepRoundabout(
     }
   }
 
+  // NOBODY LEAVES A ROUNDABOUT BACKWARDS — 2026-08-16, measured on staging.
+  //
+  // Driving `sc-roundabout-entry` L1 to find out why the founder's exit went
+  // uncredited produced the opposite result, and it is worse: the credit is
+  // reachable WITHOUT A TRAVERSAL. Logged off the live session, azimuth about
+  // the island in the same convention this function uses:
+  //
+  //     d 27.56  az  8.5°  banner bar   0 %   (approaching, not entered)
+  //     d 17.85  az 13.1°  bar  50 %          right stalk flicked HERE
+  //     d 23.86  az 10.8°  bar  50 %          reversing back out the same mouth
+  //     d 29.85  az  9.1°  bar  75 %          exitSignaled — arc arm, 37 s later
+  //     d ≥ 34            «✓ Премини през кръговото и излез с десен мигач»
+  //
+  // Four degrees of arc. The car entered the south mouth, stopped, and reversed
+  // straight back out of the south mouth, and the objective whose title
+  // promises a PASSAGE ticked. The latches only ever asked „was I inside 24 m,
+  // am I now outside 34 m, was the stalk lit somewhere between". (The same run
+  // is the live proof that the B21-RB arc memory works: the stalk had been out
+  // for 37 s — every seconds-based lookback would have expired — and 4° of arc
+  // carried it, exactly as the degrees-not-seconds table above predicts.)
+  //
+  // The gear is the half of that this evaluator can honestly close on its own,
+  // and it is a true statement about the world rather than a threshold: an exit
+  // is a departure, and a car in reverse is not departing — it is UNDOING its
+  // entry. So backing out past `exitRadiusM` ABANDONS the attempt: the latches
+  // clear and the student must enter again, exactly as after a void — but it is
+  // not counted as one and says nothing, because „Излезе от кръговото без десен
+  // мигач" aimed at a student who never left, with his stalk lit, is a worse
+  // lie than silence.
+  //
+  // Clearing rather than merely refusing is the whole of it. A guard that only
+  // withheld `done` on the reversing tick would leave `entered` and the signal
+  // memory standing, so the same bench drive would collect the tick on its
+  // first forward frame out at d = 47 — the cheat moved one frame later, not
+  // closed.
+  //
+  // WHAT THIS DOES NOT CLOSE, recorded so it is scheduled rather than assumed:
+  // the objective still measures no ARC. A car that noses into the mouth, turns
+  // round inside it and drives out forwards would satisfy it. Closing that
+  // needs an arc-since-entry accumulator in the eval state — lessons/types.ts,
+  // another lane's file — so it is named here and not half-done.
+  const leavingForward = tick.gear >= 0;
+
   let done = false;
   if (entered && d >= exitRadiusM) {
-    if (exitSignaled) {
+    if (!leavingForward) {
+      // Backed out of the mouth: not an exit, not a void — an abandoned attempt.
+      entered = false;
+      exitSignaled = false;
+      ringSignalArcDeg = null;
+      prevAzimuthDeg = null;
+    } else if (exitSignaled) {
       done = true;
     } else {
       // Left the roundabout without the exit signal — traversal void, redo.

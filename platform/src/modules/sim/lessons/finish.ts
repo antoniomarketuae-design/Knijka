@@ -243,6 +243,22 @@ export const CRASH_PIN_RADIUS_M = 6;
  * shunt and a quarter of the forty the founder's drive spent going nowhere.
  * NOTE the pause aid: at L1/L2 a graded fault freezes physics behind a teach
  * card and sim time does not advance, so the card can never spend this clock.
+ *
+ * OPEN, AND NOT THIS LANE'S TO CLOSE (recorded 2026-08-16 while widening
+ * YIELD_STOP_LINE_REACH_M below). `engine.ts` drops this pin's partial dwell on
+ * every frame `yieldWait.holding` is true, on the argument that „B15's freeze
+ * applies here for the same reason it applies to the other two gates". That
+ * reason does not transfer. The other two gates read only position and speed,
+ * which is why a lawful standstill is invisible to them; THIS one has already
+ * been handed independent evidence that the standstill is involuntary — a
+ * graded collision, and a car that has not left the pose it hit in. A pinned
+ * car is not waiting for the light, it is unable to move, and freezing its
+ * rescue postpones the drive's end to YIELD_WAIT_MAX_S + CRASH_PIN_STUCK_S ≈
+ * 190 s instead of 10. The interaction predates this file's widening — it is
+ * already live for a rear-ender into the back of a queue at the line, which is
+ * the likeliest place to have one — and 12 → 26 m widens the band it can
+ * happen in. The fix is one condition in `engine.ts` (exempt the crash pin from
+ * the freeze), which is another lane's file.
  */
 export const CRASH_PIN_STUCK_S = 10;
 
@@ -673,12 +689,62 @@ export function routeRunOutArrived(
  * How close ahead a controlled line has to be for a standstill to read as
  * waiting AT it, meters. The runtime watches 120 m of road (NEXT_LINE_WATCH_M)
  * — far too generous here: a car stopped 80 m short of a give-way line is
- * stopped in open road, not at the line. Twelve metres is the shipped
+ * stopped in open road, not at the line.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-16 — 12 → 26. THE CLIFF AT A METRE AND A HALF (founder, driven on
+ * staging, `sc-signal-response@L1`, three runs of the SAME junction):
+ *   · stopped 10.6 m short of the paint (PC) — the whole arc fires: the
+ *     «Чакаш правилно на червено» card, «Защо чакаш: червен сигнал»,
+ *     «Чакането Е маневрата», and «Изчака сигнала и тръгна чисто» after green.
+ *   · stopped 12.5 m short (phone) — NOTHING, for seventy-five seconds. The
+ *     only thing on the screen for the whole wait was «Кола отзад · 2 м».
+ * The difference between the two drives is 1.9 m, and the MORE cautious one is
+ * the one the product went silent on. Twelve was the whole reason.
+ *
+ * THE OLD NUMBER'S OWN JUSTIFICATION WAS THE ERROR. It read „the shipped
  * junction-mouth setback (STOP_LINE_BEYOND_CUT_M band) plus a car length and
- * change, so a driver stopped ON the paint, or one car back in a queue, is
- * inside it and nothing further out is.
+ * change" — but STOP_LINE_BEYOND_CUT_M is 0.6 m (world/builders/network.ts), so
+ * that sentence describes ~5 m, not 12. Twelve was never derived from anything;
+ * it was a round number wearing a derivation.
+ *
+ * WHAT IT IS DERIVED FROM NOW — the queue the line itself creates, in the
+ * numbers the shipped traffic actually forms with:
+ *     VEHICLE_LENGTH_M 4.1 (traffic/system.ts) + minGapM 2.0 (traffic/types.ts
+ *     DEFAULT_TRAFFIC_CONFIG) = 6.1 m per stopped car, centre to centre;
+ *     the leader's own centre rests 1.78 m short of the paint — not a guess,
+ *     it is the pose the shipped shadow drives hold (traces/scSignals.ts
+ *     YIELD_Y −29.5 against the sx-v1 line at −27.725).
+ *   ⇒ 1.78 + 4 × 6.1 = 26.18 m is the FIFTH car in a stopped queue.
+ *
+ * AND IT IS FORCED FROM ABOVE AND BELOW, which is what stops it being taste:
+ *
+ *   FROM BELOW — a lesson may not refuse to recognise the pose it sends the
+ *   student to. FOUR shipped drills park their approach checkpoint one lane off
+ *   the axis, 45 m from the node, r 8 — far edge 53 m out against a line
+ *   27.725 m out (JUNCTION_STOP_LINE_M), i.e. 25.28–25.46 m short of the paint:
+ *   `sc-sig-approach` (светофар), `sc-jstop-approach` and `sc-jscan-approach`
+ *   (both control stopSign — so this is not a traffic-light quirk) and
+ *   `sc-ltap-approach`, all in templates-junctions.ts. At 12 m the window
+ *   covered 2.7 m of a 16 m zone the lesson's OWN objective tells him to stop
+ *   in. 26 contains all of it, with 0.5 m to spare — deliberately tight, so
+ *   that authoring a gate further out has to be a decision rather than a
+ *   regression (`__tests__/signal-stop-line-window.test.ts` fails on it).
+ *
+ *   FROM ABOVE — the founder's own line, and the trap this fix had to avoid:
+ *   „a student who stops 40 m short has NOT stopped at the line and must not be
+ *   told he did". 26 < 40, with the fifth-car derivation as the reason rather
+ *   than the gap. Beyond it the hold is withheld, the finish gates resume, and
+ *   the drive ends with the objectives honestly unticked.
+ *
+ * WHAT WIDENING THIS CAN AND CANNOT COST. It grades nothing (the contract this
+ * whole section opens with): its only two effects are that the idle finish may
+ * not spend these seconds, and that the instructor is allowed to speak. The
+ * price is that a tab abandoned within 26 m of a controlled line is held for
+ * YIELD_WAIT_MAX_S instead of FINISH_STUCK_S — bounded, and the same trade B15
+ * already made at 12.
  */
-export const YIELD_STOP_LINE_REACH_M = 12;
+export const YIELD_STOP_LINE_REACH_M = 26;
 
 /**
  * How far SHORT of a ring the car may stand and still read as waiting to enter
@@ -773,7 +839,28 @@ export function yieldReasonAt(
   ctx: YieldWaitContext,
   pedestrianCrossingIds: readonly string[],
 ): YieldReason | null {
-  // 1-3. A controlled line the runtime can see, within reach ahead.
+  // 1-3. A controlled line the runtime can see, within reach AHEAD.
+  //
+  // ONE-SIDED, AND DELIBERATELY SO — the third of the founder's three runs is
+  // this side of the same junction: stopped 8.5 m PAST the line, inside the
+  // mouth, seventy-five seconds, and the same total silence. `nextStopLineM`
+  // is published only for a line ahead in the travel direction (worldRuntime
+  // `d >= 0`), so a car that has crossed reports no line at all and falls out
+  // of this clause however wide the window gets.
+  //
+  // That silence is a real defect and it is NOT this function's to fix. A car
+  // standing inside a junction is not lawfully waiting for anything: it must
+  // get no hold (its session has to be allowed to end so the student reaches
+  // the debrief that explains the overshoot) and no reason (every line of copy
+  // keyed to `redLight` opens with «Спрял си ПРЕД стоп-линията», which is the
+  // one thing that is not true of him). Both of those are already what happens
+  // — the widening above must not quietly change it, so the past-the-line pose
+  // is pinned by test rather than merely left alone. What is owed to that
+  // student is a FAULT and a card, and both live outside this module: the
+  // STOP_LINE_OVERSHOOT detector can only see a nose over the paint while the
+  // centre is still short of it (rules/engine.ts, `nextStopLineM <=
+  // stopOvershootCenterM`), and there is no reason in the `YieldReason` union
+  // for „stopped in the junction" to be said with.
   const lineM = tick.nextStopLineM;
   if (lineM !== undefined && lineM <= YIELD_STOP_LINE_REACH_M) {
     if (tick.nextStopLineControl === "giveWay") return "giveWayLine";

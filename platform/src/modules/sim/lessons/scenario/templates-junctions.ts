@@ -14,6 +14,18 @@
  *   - the tj-rhr junction derives NO control at all → right-hand rule;
  *   - sx-n-c is ONE single-node signal cluster (natural FNV-1a offset 1).
  *
+ * APPROACH GATES vs THE LAWFUL-WAIT WINDOW (2026-08-16). Three drills in this
+ * file author their approach checkpoint at (±4.06, ∓45) r 8 — `sc-sig-approach`
+ * (светофар), `sc-jstop-approach` and `sc-jscan-approach` (both Б2) — so the
+ * far edge of each sits 53 m from the node, i.e. 25.275 m short of that map's
+ * line. Any window that decides „is this standstill about that line" must
+ * therefore reach at least 25.275 m, or the lesson goes silent on a student
+ * standing exactly where its own objective put him. It reached 12 m until the
+ * founder drove the gap; `YIELD_STOP_LINE_REACH_M` (finish.ts) carries the
+ * derivation and the three measured runs. The invariant is pinned by
+ * `__tests__/signal-stop-line-window.test.ts` so a future approach gate cannot
+ * be authored back outside it.
+ *
  * Grading note recorded during S2-B (the mission's JU-15 verification): the
  * STOP_LINE_OVERSHOOT detector (rules/engine.ts) requires
  * nextStopLineControl === "trafficLight" + a red/redYellow lamp — on a Б2
@@ -471,6 +483,21 @@ export const SC_SIGNAL_RESPONSE: ScenarioSpec = {
     {
       id: "sc-sig-approach",
       titleBg: "Приближи светофара с готовност за спиране",
+      // THE POSE SET THIS GATE SENDS HIM TO, measured against the paint —
+      // recorded here because it is what forced YIELD_STOP_LINE_REACH_M
+      // (finish.ts) from 12 m to 26 m on 2026-08-16.
+      //
+      // The zone spans y ∈ [−53, −37]; the sx-v1 south line is at
+      // −JUNCTION_STOP_LINE_M = −27.725. So a car anywhere inside this
+      // objective is 9.275–25.275 m short of the line it is about to be graded
+      // at. The lawful-wait window was 12 m, i.e. it covered 2.7 m of a 16 m
+      // zone THIS lesson tells him to stop in — and the founder's phone run,
+      // stopped 12.5 m short (y ≈ −40.2, dead centre of this gate), got nothing
+      // said to it for seventy-five seconds while the 10.6 m run got the whole
+      // red-wait arc. The gate is untouched: it is authored where the driver
+      // must already be ready to stop, and moving a graded zone that four
+      // committed traces pass through to fit a constant is the wrong half of
+      // the pair to move.
       params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 45 },
     },
     {
