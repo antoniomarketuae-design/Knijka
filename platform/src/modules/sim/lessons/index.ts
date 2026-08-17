@@ -312,6 +312,7 @@ export type {
   ObjectiveStatus,
   ParkAlignment,
   ReactionBand,
+  RedMetVia,
   RouteFinishZone,
   SessionNearMiss,
   SimLessonGamificationEvent,

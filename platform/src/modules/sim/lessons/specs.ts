@@ -285,9 +285,14 @@ export const LESSONS: readonly LessonSpec[] = [
           radiusM: 30,
           control: "trafficLight",
           // A10 (audit D4): the L2 run must include at least one MET red —
-          // a full stop at a red followed by proceeding on green (or a
-          // crossing on red, graded separately) at either light of the
-          // route. Lucking greens leaves this final objective open.
+          // at either light of the route, a full stop followed by proceeding
+          // on GREEN. That is the only signature available on this route: the
+          // other lawful one (a регулировчик waving you through a forbidding
+          // lamp, ЗДвП чл. 7) needs an officer, and L2 has none. Driving
+          // THROUGH a red is not a met red and never satisfies this — the gate
+          // would otherwise be closed by the offence it exists to forbid; see
+          // PassSignalParams.requireRedMet. Lucking greens leaves this final
+          // objective open.
           // FEASIBILITY (verified against runtime/signals.ts SIGNAL_TIMING):
           // every signal group cycles green 20 s / yellow 3 s / redYellow
           // 1 s / red 26 s in a fixed 50 s cycle — red is up 52% of the

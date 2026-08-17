@@ -87,6 +87,7 @@ import {
   type LessonResult,
   type ObjectiveDetail,
   type ParkAlignment,
+  type RedMetVia,
   type RubricScore,
 } from "../lessons";
 import { FaultCard, ThreeSystemsNote } from "./FaultCard";
@@ -144,8 +145,40 @@ function correctiveFor(code: string): string | null {
   return VIOLATIONS[code as ViolationCode].correctiveBg;
 }
 
+/**
+ * The met-red account, one sentence per SIGNATURE — never one sentence for
+ * both.
+ *
+ * A red is met in exactly two lawful ways (lessons/types.ts · RedMetVia), and
+ * they are opposite acts: one waits, one deliberately does not. This line used
+ * to be rendered from `redMetHere` alone, so BOTH printed „Изчака червения
+ * сигнал и потегли на зелено". On `sc-sig-controller-live` that was false on
+ * every successful run without exception — the officer's wave is that
+ * template's only completion path, and the bot crosses the red line at 22 km/h
+ * having stopped for nothing. The student was congratulated, in words, for a
+ * wait he never made.
+ *
+ * THEO-4 forbids answering that by printing nothing: a bare ✓ owes the student
+ * the reasoning. So the регулировчик case states what he actually did AND why
+ * it was right — ЗДвП чл. 7, the officer above the светофар, which is also why
+ * the rule engine bills no опасна for it (rules/engine.ts: „proceed" is
+ * innocent even on red).
+ */
+const RED_MET_TEXT_BG: Record<RedMetVia, string> = {
+  waitedOutGreen: "Изчака червения сигнал и потегли на зелено",
+  controllerProceed:
+    "Премина на забраняващ сигнал по знака на регулировчика, без да чака зелено — по ЗДвП чл. 7 сигналите на регулировчика са над светофара, затова това е правилно, а не преминаване на червен сигнал",
+};
+
+/**
+ * Replayed pre-2026-08-17 payloads recorded the boolean but not the act (see
+ * wire.ts). True of both signatures, claims neither: the one honest thing left
+ * to say when the record cannot say which.
+ */
+const RED_MET_UNRECORDED_BG = "Срещна забраняващ сигнал на това кръстовище и го премина правилно";
+
 /** A10 measurement channel → one human line on the objective row. */
-function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null {
+export function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null {
   if (detail === undefined) return null;
   switch (detail.kind) {
     case "emergencyStop": {
@@ -166,8 +199,11 @@ function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null
       }
       return `Паркиране: ${parts.join(" · ")}`;
     }
-    case "passSignal":
-      return detail.redMetHere ? "Изчака червения сигнал и потегли на зелено" : null;
+    case "passSignal": {
+      if (!detail.redMetHere) return null;
+      if (detail.redMetVia === null) return RED_MET_UNRECORDED_BG;
+      return RED_MET_TEXT_BG[detail.redMetVia];
+    }
     case "roundabout":
       return detail.exitSignaled ? "Излезе от кръговото с десен мигач" : null;
     case "threePointTurn": {

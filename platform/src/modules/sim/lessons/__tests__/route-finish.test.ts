@@ -712,11 +712,28 @@ describe("a task that will not complete says why, once", () => {
         },
       ],
     };
+    // The RIDE matters as of 2026-08-17: the void card belongs to a student who
+    // drove the roundabout and left it silently, so the drive has to contain a
+    // roundabout. These three poses are on the ring (r = 18 about (0, 400)) at
+    // 20° / 70° / 120° about the island — a first-exit passage. A car that only
+    // touched the entry circle and turned away is a different student, gets no
+    // card, and is the false pass ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG refuses.
+    const onRing = (t: number, azDeg: number, speedKmh = 20): SimTick =>
+      makeTick({
+        t,
+        speedKmh,
+        position: {
+          x: 18 * Math.sin((azDeg * Math.PI) / 180),
+          y: 400 - 18 * Math.cos((azDeg * Math.PI) / 180),
+        },
+      });
     const ticks: SimTick[] = [
       makeTick({ t: 0, speedKmh: 30, position: { x: 120, y: 150 } }), // waypoint 1
       makeTick({ t: 1, speedKmh: 30, position: { x: 0, y: 340 } }), // approaching
-      makeTick({ t: 2, speedKmh: 20, position: { x: 0, y: 395 } }), // on the ring
-      makeTick({ t: 3, speedKmh: 25, position: { x: 0, y: 440 } }), // out, no indicator
+      onRing(2, 20), // in at the south-east mouth…
+      onRing(2.5, 70),
+      onRing(3, 120), // …round past the east exit
+      makeTick({ t: 4, speedKmh: 25, position: { x: 0, y: 440 } }), // out, no indicator
     ];
     const r = run(createLessonSession(rbLesson), ticks);
     const cards = r.hud.filter(

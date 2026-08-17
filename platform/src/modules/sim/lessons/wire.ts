@@ -48,6 +48,7 @@ import type {
   LessonResult,
   ObjectiveDetail,
   ObjectiveOutcome,
+  RedMetVia,
   SessionNearMiss,
 } from "./types";
 
@@ -387,7 +388,20 @@ function parseWireObjectiveDetail(value: unknown): ObjectiveDetail | null {
     case "passSignal": {
       if (!Number.isInteger(d.redsMetInRun) || (d.redsMetInRun as number) < 0 || (d.redsMetInRun as number) > 1000) return null;
       if (typeof d.redMetHere !== "boolean") return null;
-      return { kind: "passSignal", redsMetInRun: d.redsMetInRun as number, redMetHere: d.redMetHere };
+      // `redMetVia` is ADDITIVE (2026-08-17): payloads written before it — every
+      // stored session and recorded trace — simply omit it and decode to null,
+      // which the debrief renders as the sentence true of BOTH signatures
+      // rather than inventing one. Absent is legal; a wrong value is not.
+      const via = d.redMetVia;
+      if (via !== undefined && via !== null && via !== "waitedOutGreen" && via !== "controllerProceed") {
+        return null;
+      }
+      return {
+        kind: "passSignal",
+        redsMetInRun: d.redsMetInRun as number,
+        redMetHere: d.redMetHere,
+        redMetVia: (via ?? null) as RedMetVia | null,
+      };
     }
     case "roundabout": {
       if (typeof d.entered !== "boolean" || typeof d.exitSignaled !== "boolean") return null;

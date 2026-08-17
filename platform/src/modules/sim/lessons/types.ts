@@ -111,14 +111,29 @@ export interface PassSignalParams {
   control: "trafficLight" | "stopSign";
   /**
    * A10 (trafficLight only): the objective completes only if the RUN has met
-   * at least one red — either this objective (or an earlier passSignal
-   * objective, via ObjectiveContext.redsMetInRun) observed a full stop inside
-   * its zone followed by a green-light crossing (waiting out a red), or a
-   * crossing ON red (met the hard way; the rule engine grades that
-   * separately). Guards against a greens-only luck run "passing" L2 without
-   * the student ever handling a red. The signal cycle guarantees feasibility:
-   * every light shows red 26 s of every 50 s (runtime SIGNAL_TIMING), so
-   * stopping at the line always meets a red within ≤ 24 s.
+   * at least one red — this objective, or an earlier passSignal objective via
+   * ObjectiveContext.redsMetInRun. A red counts as MET only when it was
+   * HANDLED LAWFULLY, and there are exactly two ways to do that:
+   *   · WAITED OUT — a full stop on this approach (inside the zone, or queued
+   *     behind a light the world reports as forbidding), then a crossing on
+   *     GREEN;
+   *   · WAVED THROUGH — a crossing of a forbidding lamp carrying a
+   *     регулировчик's `proceed`, which ЗДвП чл. 7 ranks above the светофар.
+   * A red simply DRIVEN THROUGH, with nobody's permission, is not a met red;
+   * it used to be, and the gate then certified itself with the very offence it
+   * exists to forbid (stepPassSignal's header carries the staging
+   * reproduction).
+   *
+   * Which of the two happened is recorded on the detail as `redMetVia`,
+   * because the debrief prints it IN WORDS (SessionEndScreen) and the two are
+   * opposite acts — one waited and one deliberately did not. No single
+   * sentence covers both honestly, so the boolean alone is not a sufficient
+   * record.
+   *
+   * Guards against a greens-only luck run "passing" L2 without the student
+   * ever handling a red. The signal cycle guarantees feasibility: every light
+   * shows red 26 s of every 50 s (runtime SIGNAL_TIMING), so stopping at the
+   * line always meets a red within ≤ 24 s.
    */
   requireRedMet?: boolean;
 }
@@ -490,6 +505,13 @@ export type ObjectiveEvalState =
       stoppedInZoneVisit: boolean;
       /** This objective's junction contributed a met red to the run (A10). */
       redMet: boolean;
+      /**
+       * WHICH of the two lawful signatures certified it, latched with `redMet`
+       * on the frame it first fired; null while no red has been met here. The
+       * debrief says this out loud, so it has to survive the run and not be
+       * re-derived from a boolean that cannot tell the two apart.
+       */
+      redMetVia: RedMetVia | null;
     }
   | { type: "driveDistance"; accumulatedM: number; prevPos: Vec2 | null }
   | {
@@ -525,6 +547,36 @@ export type ObjectiveEvalState =
       /** Previous tick's azimuth about the island, deg — the arc integrator's
        *  only state. Null before entering and after a voided traversal. */
       prevAzimuthDeg: number | null;
+      /**
+       * 2026-08-17: NET degrees of arc travelled about the island while INSIDE
+       * `enterRadiusM`, since the current attempt latched — signed, so a car
+       * that shuffles at the give-way line cancels itself out and only real
+       * rotation about the island accumulates. This is the „премини ПРЕЗ
+       * кръговото" half of the objective: `entered` alone is satisfied 6–11 m
+       * short of the carriageway, so without this a car that reached the
+       * give-way line, turned right down the side road and drove off collected
+       * the traversal. Cleared by a void and by an abandoned attempt.
+       *
+       * NULL MEANS UNMEASURABLE, and it is not a corner case: objectives are
+       * SEQUENTIAL (engine.ts steps only the current one), so four of the five
+       * shipped roundabout drills start evaluating this objective with the car
+       * ALREADY on the ring or in the pocket past it — sc-rb-ped-exit's own
+       * header spells the arithmetic out. The evaluator cannot demand arc it
+       * was never watching, so the passage is required only of attempts it saw
+       * begin from OUTSIDE `exitRadiusM`; in every such drill an earlier
+       * objective (a zone ON the ring) has already gated the traversal.
+       * See ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG.
+       */
+      traversalArcDeg: number | null;
+      /**
+       * Previous azimuth sampled while INSIDE `enterRadiusM`, deg — null
+       * whenever the last tick was outside it. Separate from `prevAzimuthDeg`
+       * (which keeps running out to `exitRadiusM`, because the signal memory is
+       * spent by driving away) so that arc travelled OUTSIDE the ring can never
+       * be banked as traversal: without it, a lap around the outside of the
+       * roundabout and back into the mouth would read as a passage.
+       */
+      insideAzimuthDeg: number | null;
       /**
        * B6 (2026-07-30): ring exits taken WITHOUT the right indicator. The
        * traversal still resets (the skill has to be performed, not banked),
@@ -581,6 +633,23 @@ export type ParkAlignment = "centered" | "acceptable" | "sloppy";
 export type ReactionBand = "otlichen" | "dobur" | "baven";
 
 /**
+ * The two lawful ways a red can be MET at a signalized junction — kept apart
+ * because they are OPPOSITE ACTS and the debrief prints them in words:
+ *  · "waitedOutGreen"    — stopped on the approach, then away on GREEN;
+ *  · "controllerProceed" — never stopped, crossed a forbidding lamp on a
+ *    регулировчик's signal (ЗДвП чл. 7 puts him above the светофар, and the
+ *    rule engine treats such a crossing as innocent even on red).
+ *
+ * The distinction exists because one sentence used to serve both. The debrief
+ * said „Изчака червения сигнал и потегли на зелено" for every met red, so
+ * `sc-sig-controller-live` — whose bot crosses red at 22 km/h on the officer's
+ * wave and whose ONLY completion path is that wave — congratulated the student,
+ * in words, for a wait that never happened, on every successful run. THEO-4:
+ * the student is owed the reasoning, which means the account has to be true.
+ */
+export type RedMetVia = "waitedOutGreen" | "controllerProceed";
+
+/**
  * Structured per-objective measurements the evaluators surface alongside
  * done/progress (A10). Additive: only the hardened evaluators emit one; the
  * engine mirrors it onto ObjectiveProgress and buildLessonResult copies it
@@ -615,6 +684,13 @@ export type ObjectiveDetail =
       redsMetInRun: number;
       /** This objective's junction contributed a met red. */
       redMetHere: boolean;
+      /**
+       * HOW that red was met — see RedMetVia. Null when none was met here, and
+       * on pre-2026-08-17 payloads replayed through wire.ts, which recorded the
+       * boolean but not the act; the debrief falls back to a sentence true of
+       * both signatures rather than guessing one.
+       */
+      redMetVia: RedMetVia | null;
     }
   | { kind: "roundabout"; entered: boolean; exitSignaled: boolean }
   | {

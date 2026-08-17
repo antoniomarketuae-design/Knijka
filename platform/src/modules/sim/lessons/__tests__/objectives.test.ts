@@ -394,7 +394,12 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
     const r = run(gated, [makeTick({ t: 1, ...at(360), speedKmh: 40 }), crossGreen(2)]);
     expect(r.done).toBe(false);
     expect(r.progress).toBe(0.5); // crossed, but the run never met a red
-    expect(r.detail).toMatchObject({ kind: "passSignal", redMetHere: false, redsMetInRun: 0 });
+    expect(r.detail).toMatchObject({
+      kind: "passSignal",
+      redMetHere: false,
+      redsMetInRun: 0,
+      redMetVia: null,
+    });
   });
 
   it("completes after stopping at the light, then proceeding on green (waited out a red)", () => {
@@ -404,7 +409,11 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
       crossGreen(30),
     ]);
     expect(r.done).toBe(true);
-    expect(r.detail).toMatchObject({ kind: "passSignal", redMetHere: true });
+    expect(r.detail).toMatchObject({
+      kind: "passSignal",
+      redMetHere: true,
+      redMetVia: "waitedOutGreen",
+    });
   });
 
   // 2026-08-16 — THIS TEST USED TO ASSERT THE OPPOSITE, and the founder's
@@ -422,7 +431,7 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
       }),
     ]);
     expect(r.done).toBe(false);
-    expect(r.detail).toMatchObject({ redMetHere: false, redsMetInRun: 0 });
+    expect(r.detail).toMatchObject({ redMetHere: false, redsMetInRun: 0, redMetVia: null });
   });
 
   it("…and the same crossing still COMPLETES a plain junction (progression is untouched)", () => {
@@ -453,7 +462,7 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
       crossGreen(60),
     ]);
     expect(r.done).toBe(true);
-    expect(r.detail).toMatchObject({ redMetHere: true });
+    expect(r.detail).toMatchObject({ redMetHere: true, redMetVia: "waitedOutGreen" });
   });
 
   it("ЗДвП чл. 7: a регулировчик's wave through a red IS a met red (sc-sig-controller-live)", () => {
@@ -468,7 +477,12 @@ describe("passSignal / requireRedMet (A10 — L2 must meet a red)", () => {
       ),
     ]);
     expect(r.done).toBe(true);
-    expect(r.detail).toMatchObject({ redMetHere: true });
+    // …and the record says WHICH act certified it. `redMetHere` alone made the
+    // debrief print „Изчака червения сигнал и потегли на зелено" for this run,
+    // in which nothing stopped and nothing waited — and since this branch is
+    // the ONLY completion path of sc-sig-controller-live, that false sentence
+    // was printed by every successful run of the template.
+    expect(r.detail).toMatchObject({ redMetHere: true, redMetVia: "controllerProceed" });
   });
 
   it("red+yellow is not green: creeping off the line does not certify the red", () => {
@@ -816,11 +830,61 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     exitRadiusM: 45,
   });
   const approach = makeTick({ t: 0, position: { x: 20, y: -343 } }); // 58 m out
-  const inRing = makeTick({ t: 1, position: { x: -30, y: -330 } }); // ~15 m
   const exiting = (t: number, indicator: "off" | "left" | "right") =>
     makeTick({ t, position: { x: -38, y: -300 }, indicator }); // 43 m — annulus
   const out = (t: number, indicator: "off" | "left" | "right" = "off") =>
     makeTick({ t, position: { x: -38, y: -290 }, indicator }); // 53 m — outside
+
+  /** ON the ring (22 m from the island centre; enterRadiusM is 26), at azimuth
+   *  `azDeg` about it — 180° is due north of the island, which is where
+   *  `exiting`/`out` sit, so the default keeps the car on that radial. The angle
+   *  matters twice: the exit-signal memory is spent in DEGREES OF ARC, and so
+   *  (2026-08-17) is the passage itself. */
+  const onRing = (
+    t: number,
+    indicator: "off" | "left" | "right",
+    azDeg = 180,
+    over: Partial<ReturnType<typeof makeTick>> = {},
+  ) =>
+    makeTick({
+      t,
+      position: {
+        x: -38 + 22 * Math.sin((azDeg * Math.PI) / 180),
+        y: -343 - 22 * Math.cos((azDeg * Math.PI) / 180),
+      },
+      indicator,
+      ...over,
+    });
+  /** Just OUTSIDE the ring (27 m) — the first frame the old sampler looked at. */
+  const justOut = (t: number, indicator: "off" | "left" | "right" = "off") =>
+    makeTick({ t, position: { x: -38, y: -316 }, indicator });
+
+  /**
+   * THE PASSAGE — in at the east mouth (az 88°) and round the island to the
+   * north exit's radial (az 180°), sampled every 0.2 s.
+   *
+   * IT REPLACED A SINGLE TICK (2026-08-17), and that is the point. Every drive
+   * in this describe used to be `[approach, inRing, exiting, out]`: one sample
+   * inside the entry circle, the next one outside it, no arc between them. That
+   * is not a roundabout being driven — it is the shape of the false pass
+   * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG exists to refuse (reach the give-way line,
+   * turn off down the side road, leave). The fixtures were never asserting a
+   * traversal; they were asserting the SIGNAL rules and happened to be handed
+   * `done` by latches that asked for nothing else. Each test below keeps its own
+   * assertion exactly as it was — what changed is that the car now goes round
+   * the island first, 92° of it, the first-exit passage the shipped rings
+   * measure at 70–99°.
+   */
+  const ringRide = (
+    t: number,
+    indicator: "off" | "left" | "right" = "off",
+    over: Partial<ReturnType<typeof makeTick>> = {},
+  ) => [
+    onRing(t, indicator, 88, over),
+    onRing(t + 0.2, indicator, 111, over),
+    onRing(t + 0.4, indicator, 134, over),
+    onRing(t + 0.6, indicator, 157, over),
+  ];
 
   it("requires entering before exiting counts", () => {
     // Approaching from 100 m away — outside exitRadius means nothing yet.
@@ -829,19 +893,19 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
   });
 
   it("completes after enter → exit with the right indicator in the exit window", () => {
-    const r = run(params, [approach, inRing, exiting(2, "right"), out(3)]);
+    const r = run(params, [approach, ...ringRide(1), exiting(2, "right"), out(3)]);
     expect(r.done).toBe(true);
   });
 
   it("the indicator on the exit-crossing tick itself also counts", () => {
-    const r = run(params, [approach, inRing, out(2, "right")]);
+    const r = run(params, [approach, ...ringRide(1), out(2, "right")]);
     expect(r.done).toBe(true);
   });
 
   it("D4 cheat path: enter → exit WITHOUT the signal no longer completes, and voids the traversal", () => {
     let evalState: ObjectiveEvalState = createEvalState(params);
     let done = false;
-    for (const tick of [approach, inRing, exiting(2, "off"), out(3, "off")]) {
+    for (const tick of [approach, ...ringRide(1), exiting(2, "off"), out(3, "off")]) {
       const r = stepObjective(params, evalState, tick);
       evalState = r.evalState;
       done ||= r.done;
@@ -854,7 +918,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     expect(r.detail).toMatchObject({ kind: "roundabout", entered: false });
     // …the student must go around again and exit properly.
     for (const tick of [
-      makeTick({ t: 5, position: { x: -30, y: -330 } }),
+      ...ringRide(5),
       makeTick({ t: 6, position: { x: -38, y: -300 }, indicator: "right" }),
     ]) {
       r = stepObjective(params, evalState, tick);
@@ -870,12 +934,12 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
       position: { x: -8, y: -343 }, // 30 m out — inside the annulus, not entered
       indicator: "right",
     });
-    const r = run(params, [signaledApproach, inRing, exiting(2, "off"), out(3)]);
+    const r = run(params, [signaledApproach, ...ringRide(1), exiting(2, "off"), out(3)]);
     expect(r.done).toBe(false);
   });
 
   it("a LEFT indicator (or none) in the exit window does not count", () => {
-    const r = run(params, [approach, inRing, exiting(2, "left"), out(3)]);
+    const r = run(params, [approach, ...ringRide(1), exiting(2, "left"), out(3)]);
     expect(r.done).toBe(false);
   });
 
@@ -902,29 +966,12 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
   // See ROUNDABOUT_EXIT_SIGNAL_ARC_DEG.
   // -------------------------------------------------------------------------
 
-  /** Still ON the ring (22 m from the island centre; enterRadiusM is 26), at
-   *  azimuth `azDeg` about it — 180° is due north of the island, which is where
-   *  `exiting`/`out` sit, so the default keeps the car on that radial. The
-   *  angle matters: the memory is spent in DEGREES OF ARC, not seconds. */
-  const onRing = (t: number, indicator: "off" | "left" | "right", azDeg = 180) =>
-    makeTick({
-      t,
-      position: {
-        x: -38 + 22 * Math.sin((azDeg * Math.PI) / 180),
-        y: -343 - 22 * Math.cos((azDeg * Math.PI) / 180),
-      },
-      indicator,
-    });
-  /** Just OUTSIDE the ring (27 m) — the first frame the old sampler looked at. */
-  const justOut = (t: number, indicator: "off" | "left" | "right" = "off") =>
-    makeTick({ t, position: { x: -38, y: -316 }, indicator });
-
   it("B21-RB: a signal given ON THE RING that the car auto-cancelled on the exit turn still counts", () => {
     // 0.4 s from the stalk going dark to the car clearing enterRadiusM — the
     // measured gap was 0.03–0.45 s on the drives this defect was found on.
     const r = run(params, [
       approach,
-      inRing,
+      ...ringRide(0.2),
       onRing(1.0, "right"),
       justOut(1.4, "off"),
       exiting(3, "off"),
@@ -938,7 +985,8 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     let done = false;
     const ticks = [
       approach,
-      inRing,
+      // No ringRide here: this drive IS the ride, and a longer one — in at the
+      // south-east mouth and round past two more of them, 160° of island.
       onRing(1.0, "right", 20), // signalled at the south-east of the island…
       onRing(3.0, "off", 80), // …then killed it and kept circulating, silent,
       onRing(5.0, "off", 140), // past two more mouths…
@@ -964,7 +1012,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     // this memory is spent in degrees and not in seconds.
     const r = run(params, [
       approach,
-      inRing,
+      ...ringRide(0.2),
       onRing(1.0, "right", 170),
       onRing(1.5, "off", 178),
       justOut(2.0, "off"),
@@ -980,7 +1028,8 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     const drive = (staleDeg: number) =>
       run(params, [
         approach,
-        inRing,
+        // The stale span IS the passage here (110° / 130° of island), so no
+        // separate ringRide — prepending one would only make it longer.
         onRing(1.0, "right", 180 - staleDeg),
         onRing(2.0, "off", 180 - staleDeg / 2),
         onRing(3.0, "off", 180),
@@ -1018,7 +1067,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     // lookback, and it must STILL earn nothing.
     const r = run(params, [
       makeTick({ t: 0, position: { x: -8, y: -343 }, indicator: "right" }), // 30 m
-      inRing, // t = 1, indicator off
+      ...ringRide(1), // the whole passage driven with the stalk dark
       justOut(2, "off"),
       exiting(2.5, "off"),
       out(3, "off"),
@@ -1029,7 +1078,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
   it("B21-RB: a voided traversal forgets the ring signal — it cannot bank into the next lap", () => {
     let evalState: ObjectiveEvalState = createEvalState(params);
     // Lap 1: silent exit ⇒ voided.
-    for (const tick of [approach, inRing, exiting(2, "off"), out(3, "off")]) {
+    for (const tick of [approach, ...ringRide(1), exiting(2, "off"), out(3, "off")]) {
       evalState = stepObjective(params, evalState, tick).evalState;
     }
     expect(evalState).toMatchObject({
@@ -1041,7 +1090,6 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     // Lap 2: back on the ring, signals, then rides most of the ring silent.
     let done = false;
     for (const tick of [
-      makeTick({ t: 4, position: { x: -30, y: -330 } }),
       onRing(5, "right", 10),
       onRing(6, "off", 90),
       onRing(7, "off", 170),
@@ -1070,13 +1118,21 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
   // is that neither half asks whether a roundabout was driven at all.
   // -------------------------------------------------------------------------
   describe("the exit is a DEPARTURE — a reversing car has not left", () => {
-    const inMouth = (t: number, indicator: "off" | "right" = "off") =>
-      makeTick({ t, position: { x: -30, y: -330 }, indicator, gear: 1 }); // ~15 m in
+    /**
+     * The ring driven FORWARD, all 92° of it, ending on the north exit radial.
+     * It used to be one tick 15 m inside the mouth (2026-08-17): with the
+     * traversal arc in place that drive abandons for want of arc before the
+     * gear is ever consulted, so these fixtures would have passed while testing
+     * nothing. The car now genuinely completes the passage — the ONLY thing
+     * left for each test below to turn on is the gear it leaves in.
+     */
+    const ringForward = (t: number, indicator: "off" | "right" = "off") =>
+      ringRide(t, indicator, { gear: 1 });
     const backOut = (t: number, gear: number, indicator: "off" | "right" = "off") =>
       makeTick({ t, position: { x: -38, y: -290 }, indicator, gear }); // 53 m — outside
 
-    it("FAILS ON THE OLD BEHAVIOUR: nose in, signal, reverse out — not a traversal", () => {
-      const r = run(params, [approach, inMouth(1, "right"), backOut(2, -1)]);
+    it("FAILS ON THE OLD BEHAVIOUR: drive the ring, signal, reverse out — not a departure", () => {
+      const r = run(params, [approach, ...ringForward(1, "right"), backOut(2, -1)]);
       expect(r.done).toBe(false);
     });
 
@@ -1086,7 +1142,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
       // attempt instead: latches cleared, nothing said, nothing counted.
       let evalState: ObjectiveEvalState = createEvalState(params);
       let done = false;
-      for (const tick of [approach, inMouth(1, "right"), backOut(2, -1), backOut(3, -1)]) {
+      for (const tick of [approach, ...ringForward(1, "right"), backOut(2, -1), backOut(3, -1)]) {
         const r = stepObjective(params, evalState, tick);
         evalState = r.evalState;
         done ||= r.done;
@@ -1107,7 +1163,7 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
       // was negative would have handed the tick over on the next forward frame.
       const r = run(params, [
         approach,
-        inMouth(1, "right"),
+        ...ringForward(1, "right"),
         backOut(2, -1), // out past exitRadiusM in reverse — attempt abandoned
         backOut(3, 1), // …now driving forward, still outside
         backOut(4, 1, "right"),
@@ -1116,14 +1172,14 @@ describe("completeManeuver / roundabout (A10 — exit under right indicator)", (
     });
 
     it("the OTHER direction: the same exit driven FORWARD still completes", () => {
-      const r = run(params, [approach, inMouth(1, "right"), backOut(2, 1)]);
+      const r = run(params, [approach, ...ringForward(1, "right"), backOut(2, 1)]);
       expect(r.done).toBe(true);
     });
 
     it("…and a forward exit with no signal still voids, exactly as before", () => {
       let evalState: ObjectiveEvalState = createEvalState(params);
       let done = false;
-      for (const tick of [approach, inMouth(1, "off"), backOut(2, 1, "off")]) {
+      for (const tick of [approach, ...ringForward(1, "off"), backOut(2, 1, "off")]) {
         const r = stepObjective(params, evalState, tick);
         evalState = r.evalState;
         done ||= r.done;

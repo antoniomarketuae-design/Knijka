@@ -595,10 +595,23 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
       id: "sc-sctl-cross",
       titleBg: "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
       // requireRedMet is not decoration here, it is the drill's thesis made
-      // gradable: the ONLY way this run completes is a crossing the lamp said no
-      // to (objectives.ts: lightState "red" at the crossing IS a met red). A
-      // student who waits for green never satisfies it — by then the officer has
-      // halted him, and the crossing costs the 10-point опасна instead.
+      // gradable: the ONLY way this run completes is a crossing the lamp said
+      // no to WITH the officer's permission — objectives.ts counts a red as met
+      // when the crossing carries a forbidding lightState AND controller
+      // "proceed" (ЗДвП чл. 7), never on the lamp alone. Ignore the officer and
+      // drive through the red on your own authority and you complete nothing:
+      // that is not a met red, it is the 10-point опасна. A student who instead
+      // waits for „his" green never satisfies it either — by then the officer
+      // has turned his chest to this approach, and crossing on controller
+      // "halt" bills CONTROLLER_SIGNAL_VIOLATED, the same 10 points.
+      //
+      // AND THE DEBRIEF MUST SAY SO. Because this branch is the template's only
+      // completion path, whatever the session screen prints for a met red here
+      // is what EVERY successful run of it prints. It printed „Изчака червения
+      // сигнал и потегли на зелено" — of a bot that stops for nothing and rolls
+      // over the red line at 22 km/h. The detail now carries `redMetVia`, so
+      // this template gets the чл. 7 account instead of a wait that never
+      // happened (lessons/types.ts · RedMetVia).
       params: {
         kind: "passSignal",
         nodeId: "sx-n-c",

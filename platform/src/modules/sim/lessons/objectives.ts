@@ -283,7 +283,13 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
         everOutside: false,
       };
     case "passSignal":
-      return { type: "passSignal", crossed: false, stoppedInZoneVisit: false, redMet: false };
+      return {
+        type: "passSignal",
+        crossed: false,
+        stoppedInZoneVisit: false,
+        redMet: false,
+        redMetVia: null,
+      };
     case "driveDistance":
       return { type: "driveDistance", accumulatedM: 0, prevPos: null };
     case "completeManeuver":
@@ -314,6 +320,11 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
             exitSignaled: false,
             ringSignalArcDeg: null,
             prevAzimuthDeg: null,
+            // null, not 0: nothing has been watched yet, and an objective that
+            // starts evaluating with the car already on the ring must not be
+            // owed a passage it could not see (see the field's doc in types.ts).
+            traversalArcDeg: null,
+            insideAzimuthDeg: null,
             voidedExits: 0,
           };
         case "threePointTurn":
@@ -540,6 +551,65 @@ export const PARK_MANEUVER_ZONE_M = 15;
  * theirs, which is the RB-06 fault the sibling template exists to teach.
  */
 export const ROUNDABOUT_EXIT_SIGNAL_ARC_DEG = 120;
+
+/**
+ * 2026-08-17 — how much of the island a car must actually have gone AROUND
+ * before leaving counts as «Премини през кръговото», in net degrees of arc
+ * swept while inside `enterRadiusM`.
+ *
+ * THE HOLE THIS FILLS, on the FIXED code (the reverse-gear guard below closed
+ * only the half that needed a deliberate R selection). A car rolls up to the
+ * give-way line — d = 25 against an `enterRadiusM` of 26 — decides against the
+ * roundabout, and turns RIGHT down the near side road with its right stalk lit,
+ * because that turn genuinely needs the stalk. It drives away FORWARDS, crosses
+ * `exitRadiusM`, and collects «✓ Премини през кръговото и излез с десен мигач».
+ * Nothing was faked: `entered` latches at d ≤ enterRadiusM, and enterRadiusM is
+ * authored 6–11 m OUTSIDE the circulatory carriageway on every shipped ring, so
+ * „entered the roundabout" was satisfied by APPROACHING one. This is the same
+ * residual the gear fix named and left open — „the objective still measures no
+ * ARC" — now measured and closed.
+ *
+ * WHY ARC AND NOT DEPTH, which is the tempting one-liner. „He must get closer
+ * than some fraction of enterRadiusM" cannot be authored safely: on rb-2lane
+ * the OUTER ring lane rides 28.5 m against enterRadiusM 33 (0.86 of it) while
+ * the false pass above sits at 0.96 — no threshold fits between a correct
+ * two-lane traversal and a car at the give-way line on every geometry at once,
+ * and getting it wrong costs a green tick for correct driving, which is the
+ * failure the founder ranks worst. Arc has no such conflict: going round the
+ * island is what the objective's own title promises, and it is the one thing
+ * the turn-away never does.
+ *
+ * MEASURED on the shipped geometry, not reasoned — every path below is walked
+ * off the registered polylines (district-v1 rb-1) or off the generated rings'
+ * own radii and lane offsets, sampled at 0.2 m:
+ *
+ *   LEGITIMATE, the SHORTEST passage each ring allows (first exit):
+ *     district-v1 r19.83 · enter 26 · mouths 290°→351°      78.3 – 99.1°
+ *     rb-mini     r18    · enter 24 · arm lane 4.06              70.5°
+ *     rb-ped      r18    · enter 29 · arm lane 4.06              73.8°
+ *     rb-2lane    r26    · enter 33 · outer / inner lane   71.6 / 83.9°
+ *
+ *   THE TURN-AWAY, same four rings, junction at the give-way line, 8 m
+ *   right-hander, the side road leading away as a side road does:
+ *     district-v1 41.2° · rb-mini 45.7° · rb-ped 37.8° · rb-2lane 33.8°
+ *   and pessimistically, the same turn taken tight enough to CUT across the
+ *   circulatory carriageway on its way out (minD 15–26 m): 35.2 – 59.0°.
+ *
+ * 45° is deliberately NOT the midpoint. It sits 36 % under the worst honest
+ * traversal and only just over the pessimistic turn-away, because the two
+ * errors are not equal: refusing a correct drive is the one the founder is
+ * angriest about, so the slack is spent on that side. What stays admissible is
+ * named rather than hidden — a car that carves through the carriageway itself
+ * on a wide right-hander sweeps 45–59° and can still be credited. That drive
+ * really was on the ring; it is a lane fault, and lane faults are the rule
+ * engine's to grade, not this latch's.
+ *
+ * NET, not gross, degrees: a car shuffling at the give-way line, or a stationary
+ * one whose position jitters, cancels itself out; only rotation ABOUT the island
+ * survives. Direction is not required — |net| is compared — so a wrong-way ring
+ * (its own violation, graded elsewhere) is not silently re-punished here.
+ */
+export const ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG = 45;
 
 /**
  * SMOOTH STOP — the window the deceleration is measured over, SECONDS
@@ -1008,6 +1078,21 @@ function isForbiddingLamp(lightState: string | undefined): boolean {
  * so the drive is not closed underneath him): re-approach, stop at the line,
  * wait the red out, cross on green — feasible inside 24 s, every time.
  *
+ * ── AND THE SENTENCE SURVIVED THE REPAIR (2026-08-17) ──────────────────────
+ * Narrowing `redMet` fixed the GATE and left the WORDS. `redMetHere` is a
+ * boolean, so the debrief still rendered one sentence — the wait — for both
+ * surviving signatures, and signature 1 is the one where nothing waits: the
+ * `sc-sig-controller-live` bot rolls over a red line at 22 km/h on the
+ * officer's wave, and that wave is the template's ONLY completion path. So
+ * every successful run of it printed „Изчака червения сигнал и потегли на
+ * зелено" about a student who did no such thing — the same false sentence as
+ * before, now on a run with no fault beside it to contradict it.
+ * `redMetVia` records WHICH signature fired, latched with `redMet` on the
+ * frame it first fires, and SessionEndScreen renders the matching account:
+ * the wait for signature 2, and for signature 1 the чл. 7 reasoning that makes
+ * the crossing lawful. THEO-4 — the student is owed the reasoning, and the
+ * reasoning has to be about what he actually did.
+ *
  * WHY THE QUEUE ARM EXISTS. Signature 2 used to count a stop only INSIDE the
  * node radius (40–50 m in the shipped templates). A student who joins the back
  * of a queue beyond it, waits the whole red out properly and creeps to the line
@@ -1060,6 +1145,10 @@ function stepPassSignal(
     ? prev.stoppedInZoneVisit || (halted && (inZone || queuedAtRed))
     : false;
   let redMet = prev.redMet;
+  // WHICH signature certified the red, latched with it. The debrief renders a
+  // SENTENCE from this, and the two signatures are opposite acts — see
+  // RedMetVia in lessons/types.ts for the run that forced them apart.
+  let redMetVia = prev.redMetVia;
   let crossed = prev.crossed;
 
   if (inZone) {
@@ -1073,11 +1162,19 @@ function stepPassSignal(
         // A red a регулировчик waved you through IS met: you encountered a
         // forbidding lamp and dealt with it the way чл. 7 says to. This is the
         // whole thesis of sc-sig-controller-live, whose bot crosses red lamps
-        // at 22 km/h on the officer's signal and must still complete.
-        if (isForbiddingLamp(e.lightState) && e.controller === "proceed") redMet = true;
+        // at 22 km/h on the officer's signal and must still complete. NOTHING
+        // IN THIS BRANCH WAITED — hence `redMetVia`, so the debrief stops
+        // describing it as a wait.
+        if (isForbiddingLamp(e.lightState) && e.controller === "proceed") {
+          if (!redMet) redMetVia = "controllerProceed";
+          redMet = true;
+        }
         // …and a red you WAITED OUT is met: stopped on this approach, then
         // away on green. Unchanged since A10.
-        else if (e.lightState === "green" && stoppedInZoneVisit) redMet = true;
+        else if (e.lightState === "green" && stoppedInZoneVisit) {
+          if (!redMet) redMetVia = "waitedOutGreen";
+          redMet = true;
+        }
       }
     }
   }
@@ -1090,11 +1187,13 @@ function stepPassSignal(
     crossed,
     stoppedInZoneVisit,
     redMet,
+    redMetVia,
   };
   const detail: ObjectiveDetail = {
     kind: "passSignal",
     redsMetInRun: ctx.redsMetInRun + (redMet && !prev.redMet ? 1 : 0),
     redMetHere: redMet,
+    redMetVia,
   };
   // Crossed on lucky greens with the gate unmet: half progress — the banner
   // keeps the objective open until the student meets a red.
@@ -1434,6 +1533,30 @@ function axisAngleDiffDeg(aDeg: number, bDeg: number): number {
  *    left over from it is 152°+ stale by the exit of any traversal longer than
  *    one exit — while on a FIRST-exit traversal (73–87°) it is still fresh,
  *    which is right, because there signalling on approach is what you do.
+ *
+ * AND THE OTHER HALF OF «ПРЕМИНИ ПРЕЗ КРЪГОВОТО» (2026-08-17). Everything above
+ * grades the SIGNAL. Nothing graded the PASSAGE: `entered` latches at
+ * d ≤ enterRadiusM, and that radius sits 6–11 m outside the carriageway, so a
+ * car that only ever reached the give-way line satisfied it. `traversalArcDeg`
+ * is the missing measurement — net arc about the island, counted only while
+ * inside the entry circle — and leaving without at least
+ * ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG of it ABANDONS the attempt (silently, like
+ * backing out) instead of completing or voiding it. The two halves are
+ * independent on purpose: the signal arm is untouched, so nothing that was
+ * credited for signalling correctly on a real traversal loses its tick.
+ *
+ * …AND IT IS ONLY DEMANDED OF ATTEMPTS THE EVALUATOR ACTUALLY WATCHED. Found by
+ * running it, not by reading it: objectives are SEQUENTIAL (engine.ts steps only
+ * the current one), and four of the five shipped roundabout drills put a zone ON
+ * THE RING immediately before this objective — sc-rb-ped-exit's authored shadow
+ * drive begins being graded by this function while STOPPED IN THE POCKET at
+ * r = 27.3 of an enterRadiusM of 29, its 164° of island already behind it and
+ * invisible. Demanding arc from that car refuses a textbook drive, which is the
+ * one failure the founder ranks above every other. So `traversalArcDeg` is NULL
+ * until a tick is seen OUTSIDE the entry circle with the attempt not yet
+ * latched, and null is „unmeasurable — do not ask": the passage is required only
+ * of a car this objective watched approach. Nothing is lost by that, because in
+ * every such drill the preceding zone is itself the proof of the traversal.
  */
 function stepRoundabout(
   x: number,
@@ -1456,6 +1579,42 @@ function stepRoundabout(
   const azDeg = (Math.atan2(tick.position.x - x, -(tick.position.y - y)) * 180) / Math.PI;
   let prevAzimuthDeg = prev.prevAzimuthDeg;
   let ringSignalArcDeg = prev.ringSignalArcDeg;
+  let traversalArcDeg = prev.traversalArcDeg;
+  let insideAzimuthDeg = prev.insideAzimuthDeg;
+
+  // The attempt becomes MEASURABLE the moment this objective sees the car
+  // OUT of the roundabout — past `exitRadiusM`, this objective's own definition
+  // of „left it" — with nothing latched: from there every metre of the approach
+  // is watched, so the passage can be asked for. Until then the counter stays
+  // null, because the sequential engine hands this evaluator a car that is
+  // already on the ring in four of the five shipped drills, and arc it never
+  // saw is not a debt.
+  //
+  // WHY `exitRadiusM` AND NOT `enterRadiusM`, which is the obvious choice: the
+  // arming must not depend on where a zone happens to be satisfied to the
+  // metre. sc-rb-ped-exit's pocket zone reaches r = 29.9 against an
+  // enterRadiusM of 29, so a student who rolls the last metre and stops AT the
+  // zebra instead of mid-pocket would arm the gate on his way OUT of a ring he
+  // had already driven — and be refused for it. Against exitRadiusM (34) the
+  // whole pocket is inside, the gate stays down for that activation, and the
+  // verdict no longer turns on 90 cm. Every shipped rung lands cleanly on one
+  // side or the other; roundabout-traversal.test.ts holds the census.
+  if (!prev.entered && d >= exitRadiusM) traversalArcDeg ??= 0;
+
+  // How far round the island this attempt has actually travelled, counted ONLY
+  // between two consecutive samples that were both inside enterRadiusM, and
+  // SIGNED so that shuffling at the line nets nothing. Arc swept outside the
+  // circle is not traversal — driving round the OUTSIDE of a roundabout and
+  // back into a mouth is not a passage through it, and the ring-signal memory
+  // above is the only thing that legitimately spends arc out there.
+  if (entered && d <= enterRadiusM) {
+    if (insideAzimuthDeg !== null && traversalArcDeg !== null) {
+      traversalArcDeg += signedAzimuthDiffDeg(azDeg, insideAzimuthDeg);
+    }
+    insideAzimuthDeg = azDeg;
+  } else {
+    insideAzimuthDeg = null;
+  }
 
   if (entered) {
     // Arc swept since the previous tick, in degrees, unsigned — a car that
@@ -1524,21 +1683,36 @@ function stepRoundabout(
   // first forward frame out at d = 47 — the cheat moved one frame later, not
   // closed.
   //
-  // WHAT THIS DOES NOT CLOSE, recorded so it is scheduled rather than assumed:
-  // the objective still measures no ARC. A car that noses into the mouth, turns
-  // round inside it and drives out forwards would satisfy it. Closing that
-  // needs an arc-since-entry accumulator in the eval state — lessons/types.ts,
-  // another lane's file — so it is named here and not half-done.
+  // WHAT THIS DID NOT CLOSE, and what closed it (2026-08-17). The gear guard
+  // left the whole family of forward non-traversals standing — nosing into the
+  // mouth, turning round inside it, driving out; or simply reaching the
+  // give-way line, thinking better of it and turning off down the side road —
+  // because the objective measured no ARC. That is the accumulator below, now
+  // that the eval state carries one.
   const leavingForward = tick.gear >= 0;
+  // …AND NOBODY PASSES THROUGH A ROUNDABOUT WITHOUT GOING ROUND ONE — the
+  // residual the paragraph above named and scheduled, now measured and closed.
+  // See ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG for the drive that got the tick
+  // without a traversal and for both populations of arc it was chosen between.
+  const traversed =
+    traversalArcDeg === null ||
+    Math.abs(traversalArcDeg) >= ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG;
 
   let done = false;
   if (entered && d >= exitRadiusM) {
-    if (!leavingForward) {
-      // Backed out of the mouth: not an exit, not a void — an abandoned attempt.
+    if (!leavingForward || !traversed) {
+      // Backed out of the mouth, or never went round at all: not an exit, not a
+      // void — an abandoned attempt. SILENT for the same reason the reversing
+      // case is silent: „Излезе от кръговото без десен мигач" aimed at a student
+      // who turned off before the ring, stalk lit for the turn he did make, is
+      // a worse lie than saying nothing. He is told by the bar dropping back to
+      // 0 %, and the objective stays open for the roundabout he has not driven.
       entered = false;
       exitSignaled = false;
       ringSignalArcDeg = null;
       prevAzimuthDeg = null;
+      traversalArcDeg = null;
+      insideAzimuthDeg = null;
     } else if (exitSignaled) {
       done = true;
     } else {
@@ -1553,6 +1727,8 @@ function stepRoundabout(
       exitSignaled = false;
       ringSignalArcDeg = null;
       prevAzimuthDeg = null;
+      traversalArcDeg = null;
+      insideAzimuthDeg = null;
     }
   }
 
@@ -1565,10 +1741,26 @@ function stepRoundabout(
       exitSignaled,
       ringSignalArcDeg,
       prevAzimuthDeg,
+      traversalArcDeg,
+      insideAzimuthDeg,
       voidedExits,
     },
     detail: { kind: "roundabout", entered, exitSignaled },
   };
+}
+
+/**
+ * SIGNED shortest angle from `bDeg` to `aDeg`, −180..180. The traversal
+ * integrator needs the sign that `headingDiffDeg` throws away: unsigned steps
+ * rectify noise, so a car creeping back and forth at the give-way line would
+ * accumulate arc it never travelled, and the one thing this counter must not do
+ * is manufacture a passage out of shuffling. Between consecutive samples of a
+ * real drive the step is far under 180°, so the shortest-way reading is the
+ * true one.
+ */
+function signedAzimuthDiffDeg(aDeg: number, bDeg: number): number {
+  const raw = (((aDeg - bDeg) % 360) + 360) % 360; // 0..360
+  return raw > 180 ? raw - 360 : raw; // −180..180
 }
 
 /** Absolute DIRECTED angle difference, folded to 0..180° (NOT the 0..90° axis
