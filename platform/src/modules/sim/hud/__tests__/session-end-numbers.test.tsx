@@ -191,7 +191,9 @@ describe("the XP chip says what the XP is for when the verdict disagrees", () =>
     expect(text).toContain("+150 XP");
     expect(text).not.toContain("за завършеното каране");
     expect(text).not.toContain("не за резултата");
-    expect(xpChipBg(150, true).noteBg).toBeNull();
+    // The chip takes the VERDICT since the badge became three-way — a run that
+    // merely never finished must not be apologised to with „Неиздържан".
+    expect(xpChipBg(150, "passed").noteBg).toBeNull();
   });
 
   it("says nothing at all when no XP was awarded (an aborted session)", () => {

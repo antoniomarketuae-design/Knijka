@@ -16,7 +16,9 @@
  *   - a sweeping needle AND an exact mono readout on the same dial;
  *   - a big gear glyph — the thing three unreadable reels were teaching;
  *   - a telltale rail whose lit lamps throw a halo, so a red belt warning
- *     reads as a WARNING from across a 1280×720 frame.
+ *     reads as a WARNING from across a 1280×720 frame — TRUE OF THE REEL
+ *     MOUNT ONLY. In the cabin the steering wheel is in front of the rail and
+ *     none of the eight lamps reaches the student. Measured in R3 below.
  *
  * It mounts two ways from one implementation, which is the point: portalled
  * onto the interior GLB's `screen_cluster` quad for the cockpit view, and
@@ -74,6 +76,60 @@ import {
   type LampTone,
   type Rgba,
 } from "@/modules/sim/cockpit";
+
+// ---------------------------------------------------------------------------
+// R3 — THE CABIN MOUNT'S TELLTALE RAIL IS BEHIND THE STEERING WHEEL
+// ---------------------------------------------------------------------------
+//
+// OPEN DEFECT, MEASURED 2026-08-18, NOT FIXED HERE — the constants that decide
+// it are clusterLayout's, and this note exists so the next reader does not
+// trust the header bullet above and stop looking. Three catalogue rows
+// (sc-vp-telltale, sc-vp-handbrake, sc-vp-telltale-red — all critical) report
+// „no lamp of any colour renders in any frame". They are right about the frame
+// and wrong about the cause: the state IS fed and this file DOES paint it. The
+// lamps are simply occluded.
+//
+// MEASURED OFF THE SHIPPED FRAMES, not argued from the layout table
+// (.audit-frames/sweep161/sc-vp-readiness/mobile-right/04-t102s.png, 2556×1179,
+// the phone-class landscape the founder reviews on). The face plate lands at
+// x 866…1352, y 860…1049 px, i.e. 0.949 px per design unit across and 0.738
+// down — the dash tilt foreshortens the vertical, which is why a face that is
+// 2:1 in the layout arrives ~2.6:1 on screen. Reading the wheel's silhouette
+// off that plate, the lowest design-y still VISIBLE per design-x is:
+//
+//     x −220 → −45   x −115 → −16   x −9 → +41 (the wheel boss)
+//     x +107 → −48   x +233 → −119 (the plate's own bottom edge is −128)
+//
+// The rail sits at LAMP_CY −98 and a halo is LAMP_HALO/2 = 28 units tall, so it
+// occupies y −70…−126 at all eight slots (lampSlotX: −196 … +196). Sampling the
+// plate tone at each slot's pixel column through that band returns steering
+// wheel at every one of the eight — zero lamp glyph centres visible. The PC
+// frame (sc-vp-telltale/pc-right/04-t063s.png) is the same picture with one
+// crumb: a ~8 px slit between rim and column shroud lets the top of ONE lit
+// halo through at the belt slot, which is how the rail was shown to be lit at
+// all. RULE_Y (−70) and the „В И Т О К" wordmark (MARK_CY −44) are gone too.
+//
+// WHY IT IS NOT A ONE-LINE LIFT. The clear band above the wheel is ~110 design
+// units tall and the dial (r 90 at DIAL_CY 30), the three digit cells and the
+// gear letter already fill it; eight slots at LAMP_PITCH 56 are 392 units wide
+// and there is nowhere above the rim to put them at that pitch. It is a layout
+// pass in clusterLayout.ts + buildClusterFaceMesh, not a mount override like
+// `dialNumerals` below.
+//
+// ── and a second, independent defect the same frames show ──────────────────
+// The palette reaches the GPU in the wrong colour space. `hexRgba` (clusterGeometry)
+// parses sRGB hex straight into the vertex-colour attribute, which three reads
+// as linear — ColorManagement converts Color.setHex but never a raw
+// BufferAttribute. Two exact matches in the frame above: the housing ground
+// #05070c (5,7,12) renders (38,46,61), and INK_FORE #e8eef8 (232,238,248)
+// renders (245,247,252) — both to the digit predicted by treating sRGB as
+// linear. It lifts the „deep ground" to mid slate, flattens TICK_DARK against
+// TICK_LIT so the arc-fill stops reading as a rate, and — the part that costs a
+// lesson — turns warn #ff6a58 into pale salmon and caution #ffc24b into pale
+// cream, which is the red-versus-yellow triage sc-vp-telltale-red is built on.
+// The fix is the one line in `hexRgba`, so that both this file's runtime tones
+// and the builder's static ones move together; converting only the tones below
+// would invert TICK_DARK against the plate and make it worse.
 
 /** Telltale pulse rate. Slow enough to read as an instrument warning, fast
  *  enough that a 3-second reel beat contains a full cycle. */

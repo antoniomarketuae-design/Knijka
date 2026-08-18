@@ -33,6 +33,15 @@ import { buildWaterDecals } from "./waterDecals";
 export const DEFAULT_SEED = 1337;
 
 /**
+ * The road class that IS a parking lot's own roadway. Not a new vocabulary —
+ * constants.MARKED_CLASSES already keeps `service` out of the lane-line pass
+ * with exactly this reading („a car-park aisle, a driveway and a delivery
+ * lane … the lot maps are the reason"), and all 14 committed `scenario-lot`
+ * maps author their aisle as `service` and their approach as `residential`.
+ */
+const LOT_AISLE_CLASS = "service";
+
+/**
  * THE BAY SET A DISTRICT PAINTS WHEN THE CALLER SAYS NOTHING.
  *
  * The default used to be `LESSON_PARKING_BAYS` flat, and that list is the CITY
@@ -88,12 +97,38 @@ function defaultParkingBays(district: District): readonly ParkingBaySpec[] {
  * (sc-park-bay-exit-rev, whose car starts IN a bay at x = 5.03 facing east with
  * 3 m of carriageway left in front of it and nothing but grass after).
  *
- * So the bay band's own rect goes into the zoning pass as one apron footprint
- * and the lot becomes the concrete terrain.ts's `paved` mesh is documented for
+ * So the lot's own rect goes into the zoning pass as one apron footprint and
+ * the lot becomes the concrete terrain.ts's `paved` mesh is documented for
  * („concrete courtyards / parking"). No new constant: the pass pads whatever it
  * is given by TERRAIN_PAVE_NEAR_BUILDING_M (20 m), which on lot-gap-short-v1
  * carries the paving from y = -34.05 to +34.05 — joining the kiosk's apron at
  * y = -25 into one continuous surface from the approach through the lot.
+ *
+ * THE APRON IS THE LOT, NOT THE BAY BAND — the second half of the same defect,
+ * measured over all 14 committed `scenario-lot` maps rather than the one the
+ * first pass sampled. Every one of them is a 60–90 m `residential` approach
+ * plus a ~70 m `service` AISLE running y ∈ [-30, +40], and on ELEVEN of them the
+ * bay band is shorter than the aisle it is served from. Padding the bay band
+ * alone therefore stopped the concrete short of the aisle's own dead end —
+ * `terrainPaved`'s northmost vertex, against an aisle that ends at y = 40:
+ *
+ *     lot-narrow                                    25.0  (15.0 m short)
+ *     lot-perp / lot-van / lot-wall / lot-double
+ *       / lot-left                                  27.5  (12.5 m)
+ *     lot-45 / lot-45rev                            30.0  (10.0 m)
+ *     lot-gap-short / lot-par                       35.0  ( 5.0 m)
+ *     lot-gap-judge                                 37.5  ( 2.5 m)
+ *
+ * i.e. the last stretch of the parking aisle the drill actually drives to stood
+ * on a lawn and the roadway ended in a field — sweep161's „the world runs out
+ * mid-lesson" (sc-park-gap-short) on the very map whose bays were, by then,
+ * correctly painted and correctly paved. sc-park-bay-exit-rev is the sharpest
+ * case: task 2 completes at y = 20 and the student then drives the remaining
+ * 20 m of aisle across grass. So the AISLE's own geometry is unioned into the
+ * footprint (`service` is this codebase's word for a lot's roadway — see
+ * constants.MARKED_CLASSES, „a car-park aisle, a driveway and a delivery
+ * lane"), and the apron covers the ground the drill uses. The centre LINE is
+ * enough: the 20 m pad already reaches 11.9 m past a 8.125 m half-width kerb.
  *
  * STRICTLY ADDITIVE, twice over:
  *  - `scenario-lot` is the only mapKind gated in (14 of 105 committed maps).
@@ -132,6 +167,19 @@ function lotApronFootprint(district: District): [number, number, number, number]
         minY = Math.min(minY, y);
         maxY = Math.max(maxY, y);
       }
+    }
+  }
+  // …and the aisle the bays are served from, so the concrete does not stop
+  // where the last bay stops. The centre LINE, not the network's ribbon: the
+  // pad already supplies the width (20 m against an 8.125 m half-width), and
+  // reading `district.roads` keeps this a pure read of the document.
+  for (const edge of district.roads.edges) {
+    if (edge.class !== LOT_AISLE_CLASS) continue;
+    for (const [x, y] of edge.geometry) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
     }
   }
   return [minX, minY, maxX, maxY];

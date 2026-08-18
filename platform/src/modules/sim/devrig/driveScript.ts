@@ -91,7 +91,27 @@ export const STOP_HOLD_S = 0.4;
 export const STANDSTILL_BRAKE_ON_S = 0.22;
 /** Brake-off part, s: long enough that the assist's hold timer resets. */
 export const STANDSTILL_BRAKE_OFF_S = 0.12;
-/** Hard cap on any single step (s) so a script can never hang a render forever. */
+/**
+ * Hard cap on a step that names NO duration of its own (s), so a script can
+ * never hang a render forever.
+ *
+ * 2026-08-18 — IT IS A FLOOR UNDER THE DEFAULT, NOT A CEILING OVER `forSec`.
+ * `validateDriveSteps` accepts `forSec` up to 3600 — the gate says a 150 s leg
+ * is a drive the rig can honour — and then this constant quietly ended it at
+ * 90. MEASURED on the test plant: `{speedKmh: 130, forSec: 150}` logged
+ * `reason: "timeout"` at t=90.017 s having covered 3036.3 m, byte-identical to
+ * `forSec: 90`, and the script then reported `finished` so the rig released the
+ * pedals and the car coasted. 2.4 km of the lesson's road — 44 % of it —
+ * missing, on a step whose duration was stated and accepted.
+ *
+ * That is the shape sweep161 filed as „Урокът беше прекъснат преди края": a
+ * drive that ends before its route is done and a debrief that cannot tell the
+ * difference between that and a student who gave up. The sweep's own drives ran
+ * 190-208 s, so every one of them is longer than this cap.
+ *
+ * `stepTimeoutSec` therefore honours an explicit `forSec`, and the step is
+ * still bounded — by `forSec`, which the gate caps at 3600.
+ */
 export const DEFAULT_STEP_TIMEOUT_S = 90;
 
 const KP_THROTTLE = 0.55;
@@ -138,7 +158,12 @@ export interface DriveStep {
   steer?: number;
   /** End the step after this many seconds inside it. */
   forSec?: number;
-  /** Safety cap, seconds. Default 90. A step that hits it is logged as "timeout". */
+  /**
+   * Safety cap, seconds. A step that hits it is logged as "timeout".
+   * Given explicitly it wins outright, shorter than `forSec` included. Omitted,
+   * the cap is `DEFAULT_STEP_TIMEOUT_S` — or `forSec` when that asks for longer,
+   * because a cap must not silently shorten a duration the script stated.
+   */
   timeoutSec?: number;
   /**
    * Keyboard codes HELD for the duration of the step — e.g. `["KeyE"]` for a
@@ -203,6 +228,13 @@ export interface DriveScriptState {
   readonly standstillBraking: boolean;
   readonly finished: boolean;
   readonly log: readonly DriveStepLogEntry[];
+  /**
+   * Frames the controller REFUSED because the scene handed it a non-finite
+   * measurement. Never silently zero-by-omission: a drive whose evidence is
+   * „the car never sustained a speed" has to be able to say whether the
+   * controller was driving or blind. See the guard in `stepDriveScript`.
+   */
+  readonly badSamples: number;
 }
 
 /**
@@ -228,6 +260,7 @@ export function createDriveScript(steps: readonly DriveStep[], tSec = 0): DriveS
     standstillBraking: true,
     finished: steps.length === 0,
     log: [],
+    badSamples: 0,
   };
 }
 
@@ -246,6 +279,27 @@ const IDLE: DriveCommand = { throttle: 0, brake: 0, steer: 0 };
 function distanceTo(sample: DriveSample, p: WorldPoint): number {
   return Math.hypot(sample.x - p.x, sample.y - p.y);
 }
+
+/**
+ * The safety cap this step actually runs under, seconds.
+ *
+ * An explicit `timeoutSec` is the caller's OWN cap and wins outright, including
+ * when it is shorter than `forSec` — that spelling is how a script says „give
+ * this leg 150 s of road but abandon it after 20". The default only applies to
+ * a step that named no duration, and it can never cut one that did.
+ */
+function stepTimeoutSec(step: DriveStep): number {
+  if (step.timeoutSec !== undefined) return step.timeoutSec;
+  if (step.forSec === undefined) return DEFAULT_STEP_TIMEOUT_S;
+  return Math.max(DEFAULT_STEP_TIMEOUT_S, step.forSec);
+}
+
+/**
+ * A sample the controller can close a loop on. Anything else is not a slow
+ * frame, it is NO frame — see the guard at the top of `stepDriveScript`.
+ */
+const isFiniteSample = (s: DriveSample): boolean =>
+  Number.isFinite(s.t) && Number.isFinite(s.speedKmh) && Number.isFinite(s.x) && Number.isFinite(s.y);
 
 /**
  * Target speed (m/s) for this step at this sample: the cruise cap, lowered by
@@ -273,6 +327,28 @@ export function stepDriveScript(
   state: DriveScriptState,
   sample: DriveSample,
 ): { state: DriveScriptState; command: DriveCommand; transitioned: boolean } {
+  // -- the sample must be a measurement before it can be a loop --------------
+  // 2026-08-18. Every branch below is a comparison against `sample`, and a
+  // comparison with NaN is FALSE — so a scene that hands over one bad number
+  // does not produce an error, it produces a plausible drive that is not one.
+  // MEASURED, three ways, on the state this rig actually keeps:
+  //   t: NaN         dt = clamp(NaN) = NaN, so the integral term is NaN and the
+  //                  command comes out `throttle: NaN`. That NaN goes to the
+  //                  synthetic pad and on into VehicleInput. Worse, `lastT` was
+  //                  stamped with it, so the NEXT frame — a perfectly good one —
+  //                  measured throttle NaN as well.
+  //   speedKmh: NaN  err is NaN, BOTH pedal comparisons are false, the command
+  //                  is throttle 0 / brake 0.
+  //   x or y: NaN    the same, via a NaN `stopAt` distance, AND the positional
+  //                  terminator can never fire, so the step runs to its cap.
+  // The last two are the exact evidence sweep161 filed nine times over: „the
+  // car neither accelerates nor coasts", „never sustains a speed". This
+  // controller must never be the thing that manufactures that picture — so a
+  // non-finite sample is not driven, is not counted as time, and is COUNTED.
+  if (!isFiniteSample(sample)) {
+    return { state: { ...state, badSamples: state.badSamples + 1 }, command: IDLE, transitioned: false };
+  }
+
   const step = currentStep(state);
   if (step === null) {
     return {
@@ -349,7 +425,7 @@ export function stepDriveScript(
     reason = "stopped";
   else if (step.untilNear !== undefined && distanceTo(sample, step.untilNear) <= within)
     reason = "near";
-  else if (elapsed >= (step.timeoutSec ?? DEFAULT_STEP_TIMEOUT_S)) reason = "timeout";
+  else if (elapsed >= stepTimeoutSec(step)) reason = "timeout";
 
   const command: DriveCommand = { throttle, brake, steer: step.steer ?? 0 };
 
@@ -477,6 +553,19 @@ export function validateDriveSteps(steps: unknown): string | null {
       }
     }
     if (o.stopAt !== undefined && !isPoint(o.stopAt)) return `step ${i}: stopAt is not a finite {x,y}`;
+    // THE SAME BROKEN DRIVE AS `decelMs2: 0`, REACHED THROUGH A DIFFERENT FIELD.
+    // `targetSpeedMs` is `min(cruise, ramp)`, so a cruise of 0 is a target of 0
+    // at EVERY distance: „drive to this point and stop" becomes „stop where you
+    // already are". MEASURED on the test plant with `{speedKmh: 0, stopAt:
+    // {x:0,y:60}}` — the car never left 0.000 km/h, covered 0.000 m, and the
+    // step ended `reason: "timeout"` at t=90.02 s having never approached the
+    // point. The legal spelling of the same instruction, `{speedKmh: 20,
+    // stopAt: {x:0,y:60}}`, arrives `reason: "stopped"` at t=13.48 s / 59.40 m.
+    // A wait where the car already is needs no `stopAt`; a wait somewhere else
+    // needs a cruise to get there.
+    if (o.stopAt !== undefined && o.speedKmh === 0) {
+      return `step ${i}: speedKmh=0 with stopAt — the ramp targets 0 everywhere, so the car can never reach the point`;
+    }
     if (o.untilNear !== undefined && !isPoint(o.untilNear)) return `step ${i}: untilNear is not a finite {x,y}`;
     if (o.label !== undefined && typeof o.label !== "string") return `step ${i}: label is not a string`;
     if (o.holdBrake !== undefined && typeof o.holdBrake !== "boolean") return `step ${i}: holdBrake is not a boolean`;

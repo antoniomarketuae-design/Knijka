@@ -122,6 +122,50 @@ function paintSolidLine(acc: MeshAccumulator, line: Vec2[], width: number): numb
   return quads;
 }
 
+/**
+ * Dash MIDPOINT arclengths for one drawn line — the SINGLE walk both dashed
+ * painters below use, so the plain pass and the span-excluding pass cannot
+ * drift apart (they used to carry two copies of the same `while` loop).
+ *
+ * COUNT is the fixed-pitch walk's, verbatim: start half a gap in, step
+ * dashLen + gapLen, keep every dash that fits whole. Nothing is added and
+ * nothing is dropped, so every district's marking quad count — and every
+ * suite that pins one — is unchanged by this function's existence.
+ *
+ * SPACING is then fitted to the run instead of being anchored at the near end.
+ * The old walk paid out its slack entirely at the FAR end, which on a
+ * junction-trimmed arm is the junction mouth, and the residue was pure phase
+ * luck. Measured on the sweep-161 junction maps (drawn line length → metres of
+ * unpainted осева between the last dash and the mouth):
+ *   jx-equal-v1   all four arms 111.27 m → 11.27 m
+ *   tj-occluded-v1 south stem    111.27 m → 11.27 m   (the sc-junction-blind arm)
+ *   tj-emerge-v1  south stem      71.28 m → 10.28 m   (the Б2 arm)
+ *   sx-v1         north arm       61.28 m →  0.28 m
+ *                 east/south arms 91.28 m →  4.28 m
+ * Four arms of the SAME class at the SAME junction ending their paint anywhere
+ * from 0.3 m to 11.3 m short of the mouth is the audit's „the same road class
+ * renders three different ways across the set", and on the two равнозначни
+ * junctions it is 11.3 m of bare asphalt on top of the 17.1 m junction patch.
+ * With the rhythm fitted, EVERY run — every arm, every district — starts and
+ * ends exactly gapLen/2 = 4.0 m from its own ends, the way a marking crew lays
+ * a dashed line between two fixed joints. The interior gap absorbs the slack
+ * (jx-equal-v1: 8.00 m → 9.04 m), and it can never fall below dashLen because
+ * the fixed-pitch walk had already fitted `n` dashes at gapLen.
+ */
+function dashStations(total: number, dashLen: number, gapLen: number): number[] {
+  let n = 0;
+  for (let s = gapLen / 2; s + dashLen < total; s += dashLen + gapLen) n++;
+  if (n === 0) return [];
+  // One dash has no rhythm to fit — centre it, which is the n > 1 rule's own
+  // limit (equal margins at both ends).
+  if (n === 1) return [total / 2];
+  const margin = gapLen / 2;
+  const gap = (total - 2 * margin - n * dashLen) / (n - 1);
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(margin + i * (dashLen + gap) + dashLen / 2);
+  return out;
+}
+
 /** Dashed line along a polyline. Returns quad count. */
 function paintDashedLine(
   acc: MeshAccumulator,
@@ -130,14 +174,11 @@ function paintDashedLine(
   dashLen = DASH_LENGTH_M,
   gapLen = DASH_GAP_M,
 ): number {
-  const total = polylineLength(line);
-  let s = gapLen / 2;
   let quads = 0;
-  while (s + dashLen < total) {
-    const mid = pointAlong(line, s + dashLen / 2);
+  for (const s of dashStations(polylineLength(line), dashLen, gapLen)) {
+    const mid = pointAlong(line, s);
     paintQuad(acc, mid.point, mid.tangent, dashLen / 2, width / 2);
     quads++;
-    s += dashLen + gapLen;
   }
   return quads;
 }
@@ -294,6 +335,11 @@ function authoredSolidBoundaries(
  * (an authored solid covers those). `exclude` is in the same arclength frame as
  * the walk (line-frame ≈ offset-line frame; the sub-dash miter drift on curves
  * is cosmetically irrelevant against 100 m+ spans).
+ *
+ * The byte-identity is now STRUCTURAL rather than promised: both painters walk
+ * the one `dashStations` list, so a change to the rhythm cannot land on the
+ * plain pass while the suppression pass keeps the old stations — which would
+ * paint a dash the authored solid was supposed to cover.
  */
 function paintDashedLineExcluding(
   acc: MeshAccumulator,
@@ -303,11 +349,8 @@ function paintDashedLineExcluding(
   dashLen = DASH_LENGTH_M,
   gapLen = DASH_GAP_M,
 ): number {
-  const total = polylineLength(line);
-  let s = gapLen / 2;
   let quads = 0;
-  while (s + dashLen < total) {
-    const mid = s + dashLen / 2;
+  for (const mid of dashStations(polylineLength(line), dashLen, gapLen)) {
     let skip = false;
     for (const ex of exclude) {
       if (mid >= ex.from && mid <= ex.to) {
@@ -315,12 +358,10 @@ function paintDashedLineExcluding(
         break;
       }
     }
-    if (!skip) {
-      const p = pointAlong(line, mid);
-      paintQuad(acc, p.point, p.tangent, dashLen / 2, width / 2);
-      quads++;
-    }
-    s += dashLen + gapLen;
+    if (skip) continue;
+    const p = pointAlong(line, mid);
+    paintQuad(acc, p.point, p.tangent, dashLen / 2, width / 2);
+    quads++;
   }
   return quads;
 }
@@ -359,8 +400,17 @@ function paintZoneSolids(acc: MeshAccumulator, district: District, network: Road
 /**
  * Stop line across the incoming half of an approach (or full width when
  * oneway). Placed at the ribbon cut cross-section, i.e. the junction mouth.
+ *
+ * Returns the quads it painted — ONE for the solid М7 (Б2/светофар), but the
+ * М7 линия за изчакване under a Б1 is a row of `n` dashes, and the caller used
+ * to book every stop line as a single quad whatever it drew. Measured on the
+ * shipped give-way maps: a residential arm's dashed line emits 4 quads and a
+ * 2+2 secondary arm 8, all of them counted as 1, so `WorldStats.markingQuads`
+ * under-reported the paint on every Б1 approach in the world. That stat is the
+ * number an audit reads to ask „did the world draw what it claims" — the whole
+ * complaint family this file sits under — so it may not be an estimate.
  */
-function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): void {
+function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): number {
   const away = ap.cutTangentAway;
   const rightOfAway = perpRight(away);
   // Incoming traffic drives toward the node on ITS right side, which is the
@@ -383,11 +433,12 @@ function paintStopLine(acc: MeshAccumulator, ap: Approach, dashed: boolean): voi
       // give-way line: short dashes along the stop line direction
       paintQuad(acc, add(base, mul(lineDir, -t)), lineDir, 0.5, STOP_LINE_WIDTH_M / 2);
     }
-  } else {
-    const mid = (from + to) / 2;
-    const half = (to - from) / 2;
-    paintQuad(acc, add(base, mul(lineDir, -mid)), lineDir, half, STOP_LINE_WIDTH_M / 2);
+    return n;
   }
+  const mid = (from + to) / 2;
+  const half = (to - from) / 2;
+  paintQuad(acc, add(base, mul(lineDir, -mid)), lineDir, half, STOP_LINE_WIDTH_M / 2);
+  return 1;
 }
 
 /**
@@ -485,6 +536,13 @@ function paintParkingBay(acc: MeshAccumulator, bay: ParkingBaySpec): number {
   return 3;
 }
 
+/** Widest an ANGLED crossing may be skewed off perpendicular before its own
+ *  1/cos span widening stops describing a crossing (2× the carriageway). Every
+ *  shipped angled crossing is inside it — gen_pe_crossings.mjs authors 18° and
+ *  −12° — so the clamp changes no map that exists; it exists so a bad number
+ *  cannot hang the build (see paintZebra). */
+const ZEBRA_MAX_SKEW_DEG = 60;
+
 /** Rotate a unit direction by `deg` (positive = toward the road's right). */
 function rotate(d: Vec2, deg: number): Vec2 {
   if (deg === 0) return d;
@@ -514,7 +572,17 @@ function paintZebra(
   halfWidth: number,
   furniture: { islandHalfW?: number; skewDeg?: number; staggerM?: number } = {},
 ): number {
-  const skew = furniture.skewDeg ?? 0;
+  // `skewDeg` is authored data and assertDistrict validates nothing about it,
+  // so the 1/cos widening below has to be given a domain. At |skew| → 90° the
+  // factor diverges: skewDeg 90 on a 16.25 m street asks for a 2.6e17 m span,
+  // i.e. ~1.9e17 bars, and the loop below never returns — a world build that
+  // hangs forever with no error, from ONE bad number in a map generator.
+  // Clamped rather than refused on purpose: `runtime/zones` grades the crossing
+  // off `paintsZebra`, which knows nothing about skew, so dropping the paint
+  // would grade a пешеходна пътека the world never drew — this file's whole
+  // complaint family, pointed the other way. MAX keeps the widening at 2×,
+  // past which a „bar" is longer than two carriageways and is not a crossing.
+  const skew = Math.max(-ZEBRA_MAX_SKEW_DEG, Math.min(ZEBRA_MAX_SKEW_DEG, furniture.skewDeg ?? 0));
   const islandHalfW = furniture.islandHalfW ?? 0;
   const stagger = furniture.staggerM ?? 0;
   const barDir = rotate(roadDir, skew);
@@ -902,13 +970,11 @@ export function buildMarkings(
     for (const ap of node.approaches) {
       if (!ap.incoming) continue;
       if (node.signalized || stopSignEdges.has(`${node.id}:${ap.edgeId}`)) {
-        paintStopLine(acc, ap, false);
+        markingQuads += paintStopLine(acc, ap, false);
         stopLines++;
-        markingQuads++;
       } else if (giveWayEdges.has(`${node.id}:${ap.edgeId}`)) {
-        paintStopLine(acc, ap, true);
+        markingQuads += paintStopLine(acc, ap, true);
         stopLines++;
-        markingQuads++;
         // …and the М18 symbol the М7 line is allowed to carry. Painted here,
         // next to the line it belongs to, so the pair can never be placed by
         // two different derivations.

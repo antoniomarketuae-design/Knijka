@@ -1062,7 +1062,31 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
     {
       id: "sc-ovbus-finish",
       titleBg: "Прибери се вдясно след края на бус лентата",
-      params: { kind: "reachZone", x: OVBUS_RIGHT, y: 470, radiusM: 5 },
+      // THE LANE CLAIM THE CENSUS NET CANNOT SEE, because this row says
+      // «вдясно» and the net (objective-title-truth-lanes-following2-rail2
+      // §5 LANE_WORDS) matches «дясната лента». Same defect as its five
+      // siblings, hidden by one word: authored r5 is the L3 number and the
+      // ladder multiplies it, so the L1 disc was 7.50 around x = 12.19 and
+      // reached x = 4.69 — 3.44 m of the GENERAL lane, i.e. the lane the
+      // student is being asked to leave. Measured through the production
+      // evaluator on straight drives held at one x through the mark:
+      //     OLD L1 r7.50   x = 5.0 / 6.0 / 7.0 / 8.0  all done = TRUE
+      //     OLD L3 r5.00   x = 8.0                        done = TRUE
+      //     NEW (below)    every one of them refused at EVERY rung
+      // A car creeping the general lane to the end of the boulevard was
+      // credited with «прибери се вдясно» on the rung beginners are given.
+      //
+      // TWO NUMBERS, both read off the district and the recording rather than
+      // chosen: the radius becomes LANE_TRUE_RADIUS_M (widest rung 4.05, which
+      // is inside the 4.0625 m half-pitch, so the disc is the bus/right lane
+      // and nothing else — the whole of it still counts, x ∈ [8.14, 16.24]),
+      // and the mark moves the 2 m onto the coordinate the shadow actually
+      // comes to rest at, so the tighter disc is centred on the drive instead
+      // of trailing it. Measured on the committed shadow: closest 2.05 m and
+      // 55 frames inside before, 0.05 m and 54 frames inside after — the
+      // longitudinal margin GREW while the lateral claim became true. Both
+      // bus-lane demos are refused at every rung, as they were before.
+      params: { kind: "reachZone", x: OVBUS_RIGHT, y: 468, radiusM: LANE_TRUE_RADIUS_M },
     },
   ],
   rubric: { parTimeSec: 75 },
@@ -1241,16 +1265,50 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
     {
       id: "sc-mwe-pass",
       titleBg: "Подмини авариралата кола в лентата за движение — под 110 км/ч",
-      // Just past the breakdown scene (MWE_BREAKDOWN stands at y = 780 on the
-      // emergency lane, x = 8.13 — live since ledger T15, and the recorder's
-      // rect twin sits on the same coordinate).
+      // ANCHORED ON THE CAR IT NAMES (y = MWE_BREAKDOWN_Y), AND IT WAS NOT.
+      //
+      // SWEEP 161's second finding against this row: «ticks as a bare position
+      // gate … never checked which lane the pass was made from — which is the
+      // only thing the task title claims to measure». The radius repair below
+      // answered half of it and the mark answers the other half. The mark stood
+      // at y = 830, i.e. FIFTY METRES PAST the stalled car at y = 780, so what
+      // the disc witnessed was not the pass — it was where the car happened to
+      // be afterwards. Measured, production evaluator, on a drive that pulls
+      // onto the shoulder at y = 735, rides it past the breakdown, and merges
+      // back into the cruise lane by y = 820 at 100 км/ч — the undertake this
+      // lesson exists to forbid, done and tidied up before the old mark:
+      //     OLD mark y = 830   done = TRUE  at every rung (L1…L5)
+      //     NEW mark y = 780   done = false at every rung
+      // The two committed counter-demos could not have caught it: both leave
+      // the shoulder at y ≈ 660/690 (measured: `mistake-undertake` rides
+      // x = 8.13 over y ∈ [361, 659], `mistake-shoulder-cruise` over
+      // y ∈ [281, 690]), so both are lawfully in the cruise lane at BOTH marks
+      // and complete this row either way. Their EMERGENCY_LANE_DRIVING
+      // conviction is the channel that bills them, and it is untouched.
+      //
+      // AT THE NEW MARK, measured on the committed recordings:
+      //     shadow-correct           closest 0.30 m, 4 frames inside at L3 /
+      //                              6 at L1, 95.0 км/ч ✓
+      //     mistake-undertake        closest 0.56 m ✓ (in the cruise lane here)
+      //     mistake-shoulder-cruise  closest 0.47 m ✓ (likewise)
+      // and, in the other direction, a plain lawful 100 км/ч cruise-lane pass
+      // still completes at every rung while the shoulder-hold and the 139 км/ч
+      // blast are refused at every rung, exactly as before this move.
+      //
+      // The mark is pinned to the actor and not re-typed: the breakdown holds
+      // at `offsetM: MWE_BREAKDOWN_Y` on mw-n-nb-start → mw-n-nb-end, an edge
+      // that runs (0,0) → (0,1000), so its arc metre IS a district y. The
+      // sweep-161 battery asserts the two are the same number, so the gate can
+      // never drift off the car again.
       //
       // „RADIUS 6 PINS THE CRUISE LANE — A CAR RIDING THE EMERGENCY LANE MISSES
       // IT" IS WHAT THIS COMMENT USED TO SAY, AND IT WAS FALSE ON THE RUNG THE
       // SWEEP RAN. The ladder multiplies the authored radius, so L1 compiled to
       // 9.00 and the disc reached x = ±9.00 — past the emergency-lane centre at
       // +8.13 AND past the overtaking-lane centre at −8.12. Measured, on a
-      // synthetic drive holding x = 8.13 (the shoulder) through y = 830:
+      // synthetic drive holding x = 8.13 (the shoulder) through the mark of the
+      // day, y = 830 — it is refused at the new mark too, and the battery keeps
+      // re-measuring it there:
       //     OLD r9.00 (L1)  done = true   ← the undertake certified as „в
       //                                     лентата за движение"
       //     NEW r4.05 (L1)  done = false
@@ -1271,8 +1329,16 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
       // Measured at the mark: shadow 95.0 км/ч, mistake-undertake 76.8,
       // mistake-shoulder-cruise 76.7 — 15 км/ч of headroom on the tightest
       // rung, and `done` is unchanged for all three (a cap can only ever
-      // refuse; objectives.ts proves that monotonicity).
-      params: { kind: "reachZone", x: MW_X_CRUISE, y: 830, radiusM: LANE_TRUE_RADIUS_M, maxSpeedKmh: 110 },
+      // refuse; objectives.ts proves that monotonicity). Re-measured at the new
+      // mark: shadow 95.0, mistake-undertake 100.0, mistake-shoulder-cruise
+      // 99.9 — the headroom narrows to 10 км/ч and every one still completes.
+      params: {
+        kind: "reachZone",
+        x: MW_X_CRUISE,
+        y: MWE_BREAKDOWN_Y,
+        radiusM: LANE_TRUE_RADIUS_M,
+        maxSpeedKmh: 110,
+      },
     },
     {
       id: "sc-mwe-finish",

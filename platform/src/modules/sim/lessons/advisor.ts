@@ -123,30 +123,6 @@ export function advisorPromptForPreDriveStep(stepId: PreDriveStepId): AdvisorPro
 const ADVISOR_HALT_CAP_KMH = 8;
 
 /**
- * The number this card may print, given the street's own limit (doc 87 B58).
- *
- * The gate keeps grading exactly what the template authored — re-authoring the
- * 32 catalog gates that sit above their own street's limit would move graded
- * gates and their committed traces, which is a decision, not a bug fix. What is
- * not defensible is SAYING those numbers to a student in the instructor's
- * voice. On «Превишаване над +10» the card read, in one sentence: «Задръж под
- * 50, докато потокът те подминава — дръж под 52 км/ч» — a title and a suffix
- * that contradict each other, in the drill whose whole subject is that going
- * over 50 is the fault. So the printed number is clamped to the sign: the card
- * may be stricter than the gate, never more permissive than the law.
- *
- * A HALT demand is never clamped — «спри — под 5 км/ч» is already far below any
- * posted limit, and a min() there would silently turn a stop into a limit.
- */
-function shownCapKmh(capKmh: number, postedLimitKmh?: number): number {
-  if (capKmh <= ADVISOR_HALT_CAP_KMH) return capKmh;
-  if (postedLimitKmh === undefined || !Number.isFinite(postedLimitKmh) || postedLimitKmh <= 0) {
-    return capKmh;
-  }
-  return Math.min(capKmh, postedLimitKmh);
-}
-
-/**
  * THE NUMBER THE AUTHOR ALREADY PUT IN THE TITLE — sweep161, and the same crime
  * as B58 one level in.
  *
@@ -189,6 +165,88 @@ function titleCapKmh(titleBg: string): number | undefined {
     if (strictest === undefined || n < strictest) strictest = n;
   }
   return strictest;
+}
+
+/**
+ * WHETHER THIS CARD MAY SPEAK A NUMBER AT ALL — sweep161 part A/D, and the end
+ * of the line B58 and titleCapKmh each walked one step of.
+ *
+ * Both earlier fixes CLAMPED the printed figure — to the sign, then to the
+ * author's own ceiling — and both are silent where neither clamp bites. There
+ * the raw `params.maxSpeedKmh` went on the glass as an instruction, and the
+ * audit photographed what that reads like beside the briefing on the same
+ * screen (`.audit-frames/sweep161/<lesson>/pc-right/`):
+ *
+ *   sc-speed-transition  «…до знака за зоната — дръж под 57 км/ч»  (limit 50)
+ *   sc-speed-transition  «Влез в зона 30 … — дръж под 38 км/ч»     (zone 30)
+ *   sc-sp-curve          «…с препоръчителната скорост — под 60»    (plate 50)
+ *   sc-sp-eco-coast      «…вече намалил — дръж под 41 км/ч»        (no number
+ *                                                       anywhere in the drill)
+ *   sc-vu-cyclist-hook   «Приближи завоя с готовност да пропуснеш — под 40»
+ *   sc-mw-min-speed      «Влез в ритъма на потока — дръж под 140 км/ч», on the
+ *                        drill whose whole subject is a MINIMUM speed
+ *
+ * MEASURED HERE, over every compiled rung of every template: **953 reachZone
+ * cards carry a cap, and 433 of them (77 distinct titles) had no number the
+ * student could see or had been told** — the figure was `maxSpeedKmh` alone,
+ * i.e. the author's gate plus the rung's grace (`scenario/params.ts`
+ * widenSpeedCap). 95 printed a FRACTION of a km/h — «дръж под 54.5 км/ч» — a
+ * speedometer cannot show it and no instructor says it, which is the tolerance
+ * signing its own name. After this gate 494 cards say the sentence without a
+ * number and 459 still carry one; every one of the 95 fractions is gone.
+ *
+ * So the test stops being „how big may the number be" and becomes „whose number
+ * is it". Exactly three sources qualify:
+ *
+ *  1. THE HALT BAND. At or below ADVISOR_HALT_CAP_KMH `widenSpeedCap` returns
+ *     early and adds nothing, so a „под 6 км/ч" IS the author's own figure and
+ *     it means come to rest — 309 of the 953 cards, 158 of them inside the 433
+ *     (every parking „Задача 1: спри в изходната позиция").
+ *  2. THE AUTHOR'S TITLE (titleCapKmh) — authored copy, which is what this file
+ *     defers to (ADR-002, the rule it opens with).
+ *  3. THE SIGN (doc 87 B58), but only WHERE IT BINDS. B58 is the same crime one
+ *     level out: on «Превишаване над +10» the card read, in one sentence,
+ *     «Задръж под 50, докато потокът те подминава — дръж под 52 км/ч», in the
+ *     drill whose whole subject is that going over 50 is the fault. The gate
+ *     keeps grading what the template authored — re-authoring the 32 catalog
+ *     gates that sit above their street's limit would move graded gates and
+ *     their committed traces, which is a decision, not a bug fix — but the card
+ *     says the sign. A posted limit BELOW the gate is the number the world shows
+ *     him and the one he is held to. A posted limit ABOVE the gate says nothing
+ *     about this zone: sc-sp-curve's street is 90 and the A1 plate recommends
+ *     50, so „under 90" would have licensed the card's 60 through a curve the
+ *     lesson exists to slow him down for.
+ *
+ * With none of the three the number is the grader's tolerance and nothing else,
+ * and the card falls back to the objective's own authored title — the fallback
+ * this module already uses everywhere else. It is not a silent card: the
+ * sentence the author wrote stays, only the invented figure goes.
+ *
+ * The `Math.min` at the end is the half that must not be dropped. Where the
+ * visible number is LOOSER than the gate (an authored „под 90 км/ч" over a gate
+ * that refuses above 50) the card must still say 50, or it coaches the student
+ * straight into failing the task he is being coached through.
+ */
+function spokenCapKmh(
+  capKmh: number,
+  titleBg: string,
+  postedLimitKmh?: number,
+): number | undefined {
+  if (capKmh <= ADVISOR_HALT_CAP_KMH) return capKmh;
+  const authored = titleCapKmh(titleBg);
+  const posted =
+    postedLimitKmh !== undefined &&
+    Number.isFinite(postedLimitKmh) &&
+    postedLimitKmh > 0 &&
+    postedLimitKmh < capKmh
+      ? postedLimitKmh
+      : undefined;
+  if (authored === undefined && posted === undefined) return undefined;
+  const visible = Math.min(
+    authored ?? Number.POSITIVE_INFINITY,
+    posted ?? Number.POSITIVE_INFINITY,
+  );
+  return Math.min(visible, capKmh);
 }
 
 /**
@@ -237,13 +295,10 @@ export function advisorPromptForObjective(
     case "reachZone": {
       // Speed-capped zones: the cap is the coachable part (approach discipline).
       if (params.maxSpeedKmh === undefined) return { textBg: titleBg, keys: [] };
-      // The sign clamps it (B58); the author's own number in the title clamps
-      // it again where that is stricter (titleCapKmh) — one sentence, one
-      // number, and never one the gate would refuse.
-      const shown = Math.min(
-        shownCapKmh(params.maxSpeedKmh, postedLimitKmh),
-        titleCapKmh(titleBg) ?? Number.POSITIVE_INFINITY,
-      );
+      // One sentence, one number, and it belongs to the sign, the author or
+      // the halt band — never to the grader's tolerance alone (spokenCapKmh).
+      const shown = spokenCapKmh(params.maxSpeedKmh, titleBg, postedLimitKmh);
+      if (shown === undefined) return { textBg: titleBg, keys: [] };
       return { textBg: `${titleBg} — дръж под ${shown} км/ч`, keys: [] };
     }
 
@@ -319,18 +374,45 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
 
   if (s.phase !== "driving") return null;
 
+  if (s.currentObjectiveIndex >= s.objectives.length) {
+    // Nothing left to advise — but a live yield is still worth a card, because
+    // standing still lawfully is an answer to „what now" even on the run-out.
+    const trailing = s.yieldWait;
+    return trailing !== undefined && trailing.holding && trailing.reason !== null
+      ? yieldWaitAdvisorPrompt(trailing.reason)
+      : null;
+  }
+  const active = s.objectives[s.currentObjectiveIndex];
+
   // B15-VOICE: a live yield OUTRANKS the objective. While the student is
   // lawfully standing still, „what am I supposed to be doing" has a different
   // and more urgent answer than the waypoint at the far end of the route — he
   // is already doing it, and the card's job is to say so and name what he is
   // waiting for. The objective prompt returns the frame he moves off.
+  //
+  // ONE JUNCTION TAKES THE RANK BACK, and it is the one that convicted a
+  // correct drive. MEASURED, sc-sig-controller-live/mobile-right/run.log: the
+  // harness read this card at t=52 s («Чакаш правилно»), held for the 20 s it
+  // asked for, went when the lamp turned green, and finished НЕИЗДЪРЖАН with
+  // −10 «Неизпълнение на сигнала на регулировчика — премина стоп-линията,
+  // докато регулировчикът спираше твоето направление». The grader was right;
+  // the CARD was wrong. `yieldWaitAdvisorPrompt("redLight")` is generic copy
+  // that ends „Тръгваш на зелено", and at a regulated junction the lamp
+  // decides nothing (ЗДвП чл. 6, т. 2 — the officer's orders bind „НЕЗАВИСИМО
+  // от светлинните сигнали" — and чл. 7, ал. 1 the hierarchy).
+  //
+  // Same test, same doctrine as the objective branch above: where the AUTHOR
+  // put the officer in the title, the authored sentence is the instruction and
+  // the generic lamp copy stands down. Only `redLight` is displaced — a
+  // pedestrian, a Б2 or a roundabout at a regulated junction is still exactly
+  // what its own card says it is.
   const waiting = s.yieldWait;
   if (waiting !== undefined && waiting.holding && waiting.reason !== null) {
-    return yieldWaitAdvisorPrompt(waiting.reason);
+    const lampOutranked =
+      waiting.reason === "redLight" && titleNamesController(active.spec.titleBg);
+    if (!lampOutranked) return yieldWaitAdvisorPrompt(waiting.reason);
   }
 
-  if (s.currentObjectiveIndex >= s.objectives.length) return null;
-  const active = s.objectives[s.currentObjectiveIndex];
   return advisorPromptForObjective(
     active.spec.titleBg,
     active.params,

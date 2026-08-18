@@ -179,7 +179,7 @@ export const SC_SIGNAL_DEAD_CONFLICT: PriorityFromRightSpec = {
   junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["sx-n-e", "sx-n-c", "sx-n-w"],
-    hold: { nodeIndex: 1, offsetM: -95 }, // 95 m east of the junction
+    hold: { nodeIndex: 1, offsetM: -90 }, // 95 m east of the junction
     cruiseSpeedMps: 8,
   },
   junctionNodeIndex: 1,
@@ -365,6 +365,38 @@ export const SC_SIGNAL_FLASHING_CONFLICT: PriorityFromRightSpec = {
   junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["sx-n-e", "sx-n-c", "sx-n-w"],
+    /**
+     * −95 → −90 (sweep 161). T7 AGAIN, one map later, and this time the number
+     * was not wrong by a rule — it was wrong by a MAP. `−95` is
+     * sc-signal-dead's constant, correct on ITS 150 m east arm; B40(b) then
+     * gave THIS drill its own district, and sxf-v1's east arm is 90 m. An
+     * offset of 95 asks for an arc 5 m BEHIND the path's own start, and
+     * `clampArc` (traffic/staged.ts) silently pins it to 0 — so the spec said
+     * 95 and the runner timed the encounter with 90.
+     *
+     * MEASURED through createTrafficSystem + the production `stage()` path,
+     * the two districts side by side (signals-sweep161.test.ts §1):
+     *   sxd-v1  nodeS[1] 150   arc 55   carDist 95 m  ← delivers what it says
+     *   sxf-v1  nodeS[1]  90   arc  0   carDist 90 m  ← clamped, said 95
+     * It is the silent failure OncomingStreamRunner guards against by hand at
+     * stage time („the intended column silently collapses"); the
+     * priorityFromRight runner has no such guard, so this one just went quiet.
+     *
+     * 90 IS THE TRUTH, NOT A TUNE — AND DELIBERATELY NOT LESS. The pose does
+     * not move a millimetre: at −90 the hold arc is 0 by arithmetic rather
+     * than by clamp, the car stands exactly where it has always stood, and the
+     * three committed demos in content/traces/sc-signal-flashing keep their
+     * exact codes. That mattered more than tidiness: −75 was tried first (the
+     * pose gen_signal_x itself certifies as on-road — its eastern spawn sits
+     * 15 m inside every arm) and it MOVED THE ENCOUNTER. Released 15 m nearer,
+     * the crossing car cleared the box before the recorded shadow reached it —
+     * `s3-signals-bot-completion` lost both YIELDED_TO_PRIORITY and the
+     * mistake-cut FAILED_TO_YIELD, i.e. founder R3 #17 („колата минава много
+     * рано") reintroduced by a cosmetic improvement. The honest fix for the
+     * hold POSE is a longer east arm, which lives in tools/maps/gen_signal_x.mjs
+     * + sxf-v1.json and would require re-recording all three demos; this file
+     * can only stop the constant from lying, and does.
+     */
     hold: { nodeIndex: 1, offsetM: -95 },
     cruiseSpeedMps: 8,
   },

@@ -2552,7 +2552,53 @@ export function TouchControls({
         <RailButton wordBg="Пауза" labelBg="Пауза" onClick={onPause} />
       </div>
 
-      {/* ══ LEFT FLANK ═ BOTH INDICATORS AND THE HORN, on the steering thumb ══
+      {/* ══ THE WORD UNDER A GLYPH NAMES THE CONTROL'S CLASS, NOT ITS SIDE ═════
+          Catalogue sweep 2026-08-17, four rows, and the auditor's own reading of
+          the two flanks is the measurement:
+
+            sc-junction-gap/mobile-right/01-arrival.png — «the gear cluster
+              Л/З/Д is ghost text on the building facade»
+            sc-pk-move-off  · sc-vp-handbrake — «the mobile HUD offers no mirror
+              control … of any kind», on the two lessons whose graded core IS
+              the mirror check
+            sc-park-night — the same column enumerated as «Д/З/Л», unnamed
+
+          Those three letters ARE the three graded mirror glances. Somebody who
+          had driven all 195 legs and had every frame in front of him read them
+          as a gearbox and then wrote, twice, that the control does not exist.
+
+          COUNTED OFF THE SHIPPED FACES, which is why it happened. The eight
+          words on the two flanks were «Ляв · Дясн · Клакс · Кола | Колан · Дясн
+          · Задн · Ляво». «ДЯСН» named two different controls on two flanks and
+          so did «ЛЯВ/ЛЯВО»; «ЗАДН» is the Bulgarian selector word for reverse
+          and it stood three rows from a cluster reading «D»; and the word
+          «огледало» — the noun both lessons grade — appeared in ZERO pixels of
+          visible ink, only inside `aria-label`, where an eye cannot reach it.
+          Four faces, two meanings, and the two flanks shared a vocabulary.
+
+          SO THE CAPTION CARRIES THE CLASS AND THE GLYPH CARRIES THE SIDE. «⇦ /
+          ⇨» and «Л / З / Д» are unambiguous about WHICH; nothing was unambiguous
+          about WHAT. The two rails now share no word at all, and neither word is
+          a gear.
+
+          THE SIDE IS NOT LOST AND IT MUST NOT BE FAKED. The full sentence stays
+          in `labelBg` («Мигач наляво», «Поглед в дясното огледало») for the
+          screen reader, and the glyph is the sighted student's — a mirror button
+          that merely SAID «оглед» would be claiming the whole procedure, and the
+          procedure is mirror AND a look over the shoulder into the blind spot.
+          There is no shoulder-check station to claim: `MirrorGlanceKind` is
+          `"left" | "right" | "rear"` and stops there (scene/cabin.ts), which is
+          the other half of those two rows and is not this file's to close.
+
+          WIDTH, MEASURED RATHER THAN HOPED. A station is `TOUCH_MIN_PX` = 44 px
+          and `FLANK_LANE_PX` = 8 + 44 + 8 keeps a further 8 px clear on each
+          side of it, so a caption has 60 px before it reaches any other surface.
+          «ОГЛЕДАЛО» is the longest new face: 8 uppercase Cyrillic glyphs at
+          `text-[8px] tracking-tight`, ≈ 5.2 px each ⇒ ≈ 42 px. It is
+          `whitespace-nowrap` so it can only ever overflow CENTRED into that
+          gutter, never wrap into a second line that would move the glyph.
+
+          ══ LEFT FLANK ═ BOTH INDICATORS AND THE HORN, on the steering thumb ══
           Founder ruling: signalling must never cost the accelerator. Lower
           station = left, upper = right, which is the way a real LHD stalk
           moves. Each carries its own word, because «Мигач наляво» is the thing
@@ -2569,7 +2615,7 @@ export function TouchControls({
       <ArcStation index={0} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач наляво"
-          captionBg="Ляв"
+          captionBg="Мигач"
           active={snap?.indicator === "left"}
           onClick={() => cabin()?.indicateLeft()}
         >
@@ -2579,7 +2625,7 @@ export function TouchControls({
       <ArcStation index={1} padH={STEER_PAD_H} side="left">
         <GlyphButton
           labelBg="Мигач надясно"
-          captionBg="Дясн"
+          captionBg="Мигач"
           active={snap?.indicator === "right"}
           onClick={() => cabin()?.indicateRight()}
         >
@@ -2626,6 +2672,12 @@ export function TouchControls({
           the interaction cost teaches the right habit instead of fighting it.
           Words again: «Л З Д» is three letters a 17-year-old has no way to
           decode, and these are scored A2 steps.
+
+          THAT SENTENCE STOOD HERE WHILE THE FACES READ «ДЯСН · ЗАДН · ЛЯВО» —
+          i.e. the file named the defect and then shipped it, and the words it
+          shipped were the gearbox's. The caption is «ОГЛЕДАЛО» on all three now
+          and the letter is only the side; the block above the left flank has the
+          sweep rows, the face census and the width arithmetic.
 
           ══ STATION 0 — THE NEAREST BOX ON THE SCREEN — IS THE BELT ══════════
 
@@ -2674,7 +2726,7 @@ export function TouchControls({
       <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в дясното огледало"
-          captionBg="Дясн"
+          captionBg="Огледало"
           onClick={() => cabin()?.glance("right")}
         >
           Д
@@ -2683,7 +2735,7 @@ export function TouchControls({
       <ArcStation index={2} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в огледалото за задно виждане"
-          captionBg="Задн"
+          captionBg="Огледало"
           onClick={() => cabin()?.glance("rear")}
         >
           З
@@ -2692,7 +2744,7 @@ export function TouchControls({
       <ArcStation index={3} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в лявото огледало"
-          captionBg="Ляво"
+          captionBg="Огледало"
           onClick={() => cabin()?.glance("left")}
         >
           Л
@@ -3023,6 +3075,23 @@ function FlankGhost({
 
 const GLYPH_SHADOW = "0 1px 3px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.6)";
 
+/**
+ * The word under a glyph, in ONE place — `GlyphButton` and `GlyphHoldButton`
+ * carried this string twice and the horn is the only member of the second
+ * family, so a caption change made for the rail was a coin-flip on whether
+ * «КЛАКС» came with it.
+ *
+ * `whitespace-nowrap` is the part with an argument behind it. The longest face
+ * is now the eight-letter «ОГЛЕДАЛО» in a 44 px box (the block above the left
+ * flank has the arithmetic: ≈ 42 px of type, with `FLANK_LANE_PX` keeping a
+ * further 8 px clear each side). A wrap would push the 15 px glyph up out of the
+ * station's vertical centre and move a control under a thumb already reaching
+ * for it — the founder's own „elements moving" — where an overflow is centred,
+ * stays inside that gutter and moves nothing.
+ */
+const CAPTION_CLASS =
+  "whitespace-nowrap text-[8px] font-bold uppercase leading-none tracking-tight";
+
 function glyphStyle(active: boolean, tone?: "danger" | "warning"): CSSProperties {
   return {
     color: active
@@ -3119,10 +3188,7 @@ function GlyphButton({
     >
       <span aria-hidden>{children}</span>
       {captionBg ? (
-        <span
-          aria-hidden
-          className="text-[8px] font-bold uppercase leading-none tracking-tight"
-        >
+        <span aria-hidden className={CAPTION_CLASS}>
           {captionBg}
         </span>
       ) : null}
@@ -3162,10 +3228,7 @@ function GlyphHoldButton({
     >
       <span aria-hidden>{children}</span>
       {captionBg ? (
-        <span
-          aria-hidden
-          className="text-[8px] font-bold uppercase leading-none tracking-tight"
-        >
+        <span aria-hidden className={CAPTION_CLASS}>
           {captionBg}
         </span>
       ) : null}

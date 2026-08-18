@@ -2877,10 +2877,154 @@ function RuntimeDriver({
  * keys a student needs to get the car moving and look around; everything else
  * is reference material behind „Всички клавиши".
  */
-interface ControlsHelpRow {
+export interface ControlsHelpRow {
+  /**
+   * THE ROW'S IDENTITY, AND IT IS NOT THE KEY CAP — 2026-08-18.
+   *
+   * The list used to be keyed `key={row.keys}` and that is a duplicate on every
+   * exam rung. `reverseAssistEnabled` is `lesson.examMode !== true`, and when it
+   * is false the reverse row stops being «S / ↓» and becomes a SECOND «[ ]» row
+   * beside the gear row — two children of one list with the identical React key,
+   * on every exam rung in the catalogue.
+   *
+   * MEASURED, not quoted — the neighbouring comment's „158 of the 169" is from
+   * an older catalogue. Walking `SCENARIO_TEMPLATES` × levels 1–5 through
+   * `scenarioLessonById` today (2026-08-18):
+   *
+   *   808 compiled rungs · 162 carry `examMode` · all 162 of them are level 4
+   *
+   * so the collision is present on one rung in five, and on EVERY rung a
+   * student sits as an exam.
+   *
+   * What that costs is not the console warning. React's keyed diff builds a map
+   * from key → old fiber, so the second «[ ]» overwrites the first: the next
+   * time this list re-renders with a changed row set — pressing K (the
+   * reversing-POV row prints its LIVE state), or «Всички клавиши», which is the
+   * only view where both «[ ]» rows are on screen at once — the reconciler can
+   * match the gear row's element to the exam row's fiber and print the wrong
+   * sentence against «[ ]». A legend that lies about which key does what is the
+   * one failure this panel cannot have; its own header says so.
+   *
+   * So identity is a slot name, chosen so the two spellings of the reverse row
+   * are ONE row that says different things on an exam and off it — which is
+   * what they are — while the gear row keeps its own.
+   */
+  id: string;
   keys: string;
   what: string;
   essential?: boolean;
+}
+
+/**
+ * The legend's rows, as data.
+ *
+ * Pulled out of the component so the table can be driven exhaustively without a
+ * DOM (`__tests__/controlsHelpRows.test.tsx` sweeps all eight flag combinations):
+ * the two flags below each rewrite rows rather than merely hiding them, and the
+ * sweep's own frames are about rows that were WRONG rather than rows that were
+ * missing — an orphaned «D» in ghost type over a building, and a gesture row
+ * printed on a rung where the gesture does nothing.
+ */
+export function controlsHelpRows({
+  topdownAllowed,
+  reverseAssistEnabled,
+  reverseViewOn,
+}: {
+  topdownAllowed: boolean;
+  reverseAssistEnabled: boolean;
+  /** Live state of the K setting — the row prints it, so the legend never
+   *  describes a view the student will not get. */
+  reverseViewOn: boolean;
+}): ControlsHelpRow[] {
+  return [
+    // FIRST ROW, AND THE FIRST THING READ IN THIS COLUMN — „we read on left".
+    // The founder's sentence about this panel is „We should re-work the whole
+    // engine with the buttons, BECAUSE WE READ ON LEFT": the top-left corner is
+    // where the eye lands, and what stood there was twenty-two keyboard rows,
+    // with the mouse buried at row fifteen. The keys are all still here and all
+    // still real — but the sheet now OPENS with the fact that the whole cabin
+    // is clickable, and the pill above says this list is the advanced path.
+    {
+      id: "click",
+      keys: "Клик",
+      what: "всичко в кабината се прави с мишката",
+      essential: true,
+    },
+    { id: "steer", keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
+    { id: "ignition", keys: "I", what: "двигател: старт / стоп", essential: true },
+    // NON-BREAKING SPACES BEFORE THE TWO GEAR LETTERS. This column is
+    // `w-[min(15rem,45%)]` minus a 3.75 rem key cap, and the sweep photographed
+    // what that leaves: on sc-follow-distance/pc-right the row wrapped as
+    // «скорости: към P / към» with an orphaned «D» alone on the next line, i.e.
+    // the one character that carries the meaning separated from the word that
+    // introduces it, in ghost type over a building. U+00A0 binds each letter to
+    // its «към»; the row still wraps, it just cannot wrap THERE. Written as the
+    // escape and not the literal glyph, so a reader of this file can SEE it.
+    {
+      id: "gears",
+      keys: "[ ]",
+      what: "скорости: към\u00a0P / към\u00a0D",
+      essential: true,
+    },
+    // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
+    // you ask for reverse — see the two laws in engine/reverseAssist.ts. On an
+    // exam rung neither the assist nor the pedal swap exists, so the row says
+    // what is actually true there: reverse is the lever, and the pedals keep
+    // their real meanings. ONE slot, two sentences — see `id` on the interface
+    // for why the exam spelling must not borrow the gear row's identity.
+    reverseAssistEnabled
+      ? {
+          id: "reverse",
+          keys: "S / ↓",
+          what: "на място: пусни и натисни пак → задна / напред",
+        }
+      : {
+          id: "reverse",
+          keys: "[ ]",
+          what: "на изпит заден ход се избира само с лоста (D → N → R)",
+        },
+    { id: "handbrake", keys: "Space", what: "ръчна спирачка", essential: true },
+    { id: "clutch", keys: "Z", what: "съединител — задръж („Напреднал“)" },
+    { id: "belt", keys: "B", what: "предпазен колан", essential: true },
+    { id: "indicators", keys: ", .", what: "мигач ляво / дясно", essential: true },
+    { id: "lights", keys: "L", what: "светлини" },
+    { id: "fog", keys: "V", what: "фарове за мъгла" },
+    { id: "hazards", keys: "J", what: "аварийни светлини" },
+    { id: "wipers", keys: "T", what: "чистачки" },
+    { id: "horn", keys: "H", what: "клаксон — задръж" },
+    {
+      id: "mirrors",
+      keys: "Q E F",
+      what: "огледала — задръж (ляво / дясно / назад)",
+      essential: true,
+    },
+    {
+      id: "view",
+      keys: "C",
+      what: topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън",
+      essential: true,
+    },
+    {
+      id: "reverse-view",
+      keys: "K",
+      what: `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
+    },
+    // Founder 2026-07-28: the minimap is off by default and comes back on
+    // demand — the key has to be discoverable or the map is simply gone.
+    { id: "minimap", keys: "P", what: "мини карта (вкл./изкл.)", essential: true },
+    ...(topdownAllowed
+      ? [
+          {
+            id: "topdown-zoom",
+            keys: "G",
+            what: "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)",
+          },
+          { id: "topdown-north", keys: "N", what: "отгоре: север горе / посока горе" },
+        ]
+      : []),
+    { id: "fullscreen", keys: "X", what: "цял екран" },
+    { id: "reset-pause", keys: "R  ·  Esc", what: "рестарт · пауза", essential: true },
+  ];
 }
 
 /**
@@ -2919,8 +3063,16 @@ const CONTROLS_HELP_BOTTOM_INSET = "4.5rem";
  * first time the car is genuinely moving, once per lesson, and a student who
  * re-opens it mid-drive keeps it open (`controlsLegendLifetime.ts` — the three
  * frames, the floor, and why the latch is one-way).
+ *
+ * EXPORTED FOR ITS TEST, and that is the whole reason. The two guards this
+ * panel had were `expect(SCENE).toContain(…)` over this file's own source —
+ * which is the failure mode this repo has been bitten by before, because a
+ * string that is present proves nothing about a component that renders. It is
+ * a leaf with no canvas, no physics and no world, so a server render is enough
+ * to assert what the sweep actually photographed
+ * (`__tests__/controlsHelpRows.test.tsx`).
  */
-function ControlsHelp({
+export function ControlsHelp({
   defaultOpen = true,
   topdownAllowed = true,
   reverseAssistEnabled = true,
@@ -2943,7 +3095,9 @@ function ControlsHelp({
    * screen, the gesture does nothing, and nothing says why. A product that
    * prints a control it has disabled is refusing an input in silence with extra
    * steps — the same THEO-4 failure as the two hints in LessonPlayShell, and
-   * 158 of the 169 `level: 4` rungs in the catalogue are exam rungs.
+   * 162 of the 808 compiled rungs are exam rungs — every one of them a level-4
+   * rung, re-measured 2026-08-18 (the arithmetic is on `ControlsHelpRow.id`,
+   * which needed the same population).
    */
   reverseAssistEnabled?: boolean;
   /**
@@ -2993,69 +3147,7 @@ function ControlsHelp({
   // (CameraRig owns the key, with G/N) — the row shows its live state so the
   // legend never lies about which way the view will turn.
   const reverseViewOn = useReverseViewEnabled();
-  const rows: ControlsHelpRow[] = [
-    // FIRST ROW, AND THE FIRST THING READ IN THIS COLUMN — „we read on left".
-    // The founder's sentence about this panel is „We should re-work the whole
-    // engine with the buttons, BECAUSE WE READ ON LEFT": the top-left corner is
-    // where the eye lands, and what stood there was twenty-two keyboard rows,
-    // with the mouse buried at row fifteen. The keys are all still here and all
-    // still real — but the sheet now OPENS with the fact that the whole cabin
-    // is clickable, and the pill above says this list is the advanced path.
-    { keys: "Клик", what: "всичко в кабината се прави с мишката", essential: true },
-    { keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
-    { keys: "I", what: "двигател: старт / стоп", essential: true },
-    // NON-BREAKING SPACES BEFORE THE TWO GEAR LETTERS. This column is
-    // `w-[min(15rem,45%)]` minus a 3.75 rem key cap, and the sweep photographed
-    // what that leaves: on sc-follow-distance/pc-right the row wrapped as
-    // «скорости: към P / към» with an orphaned «D» alone on the next line, i.e.
-    // the one character that carries the meaning separated from the word that
-    // introduces it, in ghost type over a building. U+00A0 binds each letter to
-    // its «към»; the row still wraps, it just cannot wrap THERE. Written as the
-    // escape and not the literal glyph, so a reader of this file can SEE it.
-    { keys: "[ ]", what: "скорости: към\u00a0P / към\u00a0D", essential: true },
-    // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
-    // you ask for reverse — see the two laws in engine/reverseAssist.ts. On an
-    // exam rung neither the assist nor the pedal swap exists, so the row says
-    // what is actually true there: reverse is the lever, and the pedals keep
-    // their real meanings.
-    reverseAssistEnabled
-      ? { keys: "S / ↓", what: "на място: пусни и натисни пак → задна / напред" }
-      : { keys: "[ ]", what: "на изпит заден ход се избира само с лоста (D → N → R)" },
-    { keys: "Space", what: "ръчна спирачка", essential: true },
-    { keys: "Z", what: "съединител — задръж („Напреднал“)" },
-    { keys: "B", what: "предпазен колан", essential: true },
-    { keys: ", .", what: "мигач ляво / дясно", essential: true },
-    { keys: "L", what: "светлини" },
-    { keys: "V", what: "фарове за мъгла" },
-    { keys: "J", what: "аварийни светлини" },
-    { keys: "T", what: "чистачки" },
-    { keys: "H", what: "клаксон — задръж" },
-    {
-      keys: "Q E F",
-      what: "огледала — задръж (ляво / дясно / назад)",
-      essential: true,
-    },
-    {
-      keys: "C",
-      what: topdownAllowed ? "изглед: кокпит / отвън / отгоре" : "изглед: кокпит / отвън",
-      essential: true,
-    },
-    {
-      keys: "K",
-      what: `автоматичен поглед назад при заден ход: ${reverseViewOn ? "вкл." : "изкл."}`,
-    },
-    // Founder 2026-07-28: the minimap is off by default and comes back on
-    // demand — the key has to be discoverable or the map is simply gone.
-    { keys: "P", what: "мини карта (вкл./изкл.)", essential: true },
-    ...(topdownAllowed
-      ? [
-          { keys: "G", what: "мащаб отгоре: 20 / 40 / 80 м (влиза в изглед отгоре)" },
-          { keys: "N", what: "отгоре: север горе / посока горе" },
-        ]
-      : []),
-    { keys: "X", what: "цял екран" },
-    { keys: "R  ·  Esc", what: "рестарт · пауза", essential: true },
-  ];
+  const rows = controlsHelpRows({ topdownAllowed, reverseAssistEnabled, reverseViewOn });
   const essentials = rows.filter((r) => r.essential);
   const visible = showAll ? rows : essentials;
   const hiddenCount = rows.length - essentials.length;
@@ -3102,7 +3194,24 @@ function ControlsHelp({
               reflow every row. */}
           <div className="flex min-h-0 flex-col gap-1 overflow-y-auto p-2.5 pb-1 [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]">
             {visible.map((row) => (
-              <div key={row.keys} className="flex shrink-0 items-center gap-2 text-[11px]">
+              // `row.id`, not `row.keys` — the two «[ ]» rows on an exam rung
+              // are a duplicate React key, and a duplicate key here is a legend
+              // that can print the wrong sentence against a key cap. The
+              // reasoning is on `ControlsHelpRow.id`.
+              <div
+                key={row.id}
+                // …and the SAME identity on the node, because until now no
+                // probe in this project could name a row of this panel. The
+                // sweep's sc-follow-distance finding is „the gear row wrapped
+                // as «скорости: към P / към» with an orphaned «D»" and it had
+                // to be read off a screenshot by eye: the rows were eleven
+                // anonymous divs. `data-row` is the same vocabulary
+                // `data-hud` already is, and it is what lets
+                // `__tests__/controlsHelpRows.test.tsx` assert on the RENDERED
+                // list rather than on this file's source text.
+                data-row={row.id}
+                className="flex shrink-0 items-center gap-2 text-[11px]"
+              >
                 <kbd className="min-w-[3.75rem] shrink-0 rounded bg-surface px-1.5 py-0.5 text-center font-mono text-[10px] font-bold text-accent">
                   {row.keys}
                 </kbd>

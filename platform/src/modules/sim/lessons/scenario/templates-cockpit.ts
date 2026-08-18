@@ -144,17 +144,54 @@ export const SC_VP_READINESS: ScenarioSpec = {
 
 /** PK-05 — потегляне от място с оглеждане (ЗДвП чл. 25: преди навлизане в
  *  движението и всяка маневра водачът се убеждава, че няма да създаде опасност
- *  и няма да попречи на другите — огледало + поглед през рамо преди тръгване от
- *  банкета). Config-gated: the move-off-observation detector ships OFF and this
+ *  и няма да попречи на другите — огледало + поглед през рамо преди тръгване).
+ *  Config-gated: the move-off-observation detector ships OFF and this
  *  drill opts it IN (ruleConfig below → the LIVE session grades the student too;
- *  the recorder passes the same override for the §9 code assert). */
+ *  the recorder passes the same override for the §9 code assert).
+ *
+ *  SWEEP 161 — TWO THINGS THE BRIEFING SAID THAT THE WINDSCREEN DID NOT.
+ *  Frame sweep161/sc-pk-move-off/mobile-right/01-arrival.png, and both are
+ *  fixed below (the gate is __tests__/cockpit-sweep161-truth.test.ts).
+ *
+ *  1. „КОЛАТА Е СПРЯЛА НА БАНКЕТА" — SHE IS NOT. The start resolves to
+ *     `vp-spawn-approach`, and vp-ready-v1 puts that point at x = 4.06, which
+ *     IS `meta.scenario.laneCenterRightM` to the centimetre: the car spawns on
+ *     the running-lane centre line, 4.06 m short of the kerb of an 8.125 m
+ *     lane, and the frame shows it between the two guide ribbons. The district
+ *     owns exactly two spawn points (vp-spawn-approach, vp-spawn-finish) and
+ *     both are that same lane centre, so there is no kerbside pose to move to
+ *     from here; the three committed traces all open at x = 4.06 as well, so a
+ *     hand-authored curb pose would leave the shadow car parked 4 m away from
+ *     the student at t = 0. THE COPY IS THEREFORE THE THING THAT WAS WRONG, and
+ *     nothing is lost by fixing it: the detector (rules/engine.ts §1b) grades
+ *     the session's FIRST move-off from rest whatever the car was resting
+ *     against — its own comment says „curb exits are indistinguishable from
+ *     queue move-offs with current telemetry". `teach.*` keeps „от банкета"
+ *     because that is a sentence about the RULE and true on every map (the
+ *     sp-world-claims precedent), and so does the mistake-demo title „Поглед
+ *     само към бордюра" — a kerb the car is NEAR is not a kerb it is parked on.
+ *     A kerbside START would need, in files this template does not own: a third
+ *     spawn point in the district (tools/maps/gen_ac_vp_streets.mjs +
+ *     content/world/vp-ready-v1.json) and all three traces re-recorded
+ *     (traces/scPkMoveOff.ts, RECORD_TRACES=1).
+ *  2. THE BELT WAS LIT AND UNMENTIONED. The red «КОЛАН» badge is on the arrival
+ *     frame because LessonScene hands every „ready" spawn a car with the belt
+ *     undone on purpose (the founder's „the seatbelt is the only item left"
+ *     ruling, 265629d) — and `SEATBELT_OFF_WHILE_MOVING` is an ungated основна
+ *     that fires after 1 s of motion (rules/engine.ts, cfg.seatbeltSustainSec).
+ *     So a student who obeyed this briefing to the letter — mirror, shoulder,
+ *     signal, go — collected a 3-point основна the briefing never warned about.
+ *     Instruction 1 now names it, which is also the order the real procedure
+ *     runs in. THE CAUSE IS WIDER THAN THIS FILE: every scenario spawns the
+ *     same way, and only sc-vp-readiness (whose subject IS the belt) said so.
+ */
 export const SC_PK_MOVE_OFF: ScenarioSpec = {
   id: "sc-pk-move-off",
   family: "cockpit",
   tagsBg: ["потегляне от място", "оглеждане", "огледала", "мъртва зона", "изпитни упражнения"],
   titleBg: "Потегляне от място с оглеждане",
   objectiveBg:
-    "Потегли от банкета правилно: преди да тръгнеш, погледни в огледалото и през лявото рамо в мъртвата зона — потеглянето от място е маневра и започва с оглеждане, не с газта.",
+    "Потегли от място правилно: преди да тръгнеш, погледни в огледалото и през лявото рамо в мъртвата зона — потеглянето от място е маневра и започва с оглеждане, не с газта.",
   // Doc-72 provenance: PK-05 IS this moment (move-off without observation —
   // DVSA move-off top-5; the BG изпит starts with потегляне от място).
   archetypeIds: ["PK-05"],
@@ -170,12 +207,22 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
     spawnPointId: "vp-spawn-approach",
     vehicleStart: "ready",
   },
+  // Still FIVE steps and every one still inside the 95-character band the
+  // compact card was sized for (briefing-card-budget.test.ts): the belt takes
+  // the slot freed by folding „потегли" and „продължи" into one closing step,
+  // because a sixth step is body text a phone pushes under the fold.
   instructionsBg: [
-    { n: 1, textBg: "Колата е спряла на банкета. Потеглянето от място е маневра — започва с оглеждане." },
-    { n: 2, textBg: "Погледни в лявото огледало и прецени идва ли кола или колоездач отзад." },
-    { n: 3, textBg: "Хвърли поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва." },
-    { n: 4, textBg: "Чак когато е чисто, пусни мигач при нужда и потегли плавно в дясната лента." },
-    { n: 5, textBg: "Продължи спокойно и центрирано по отсечката, под ограничението." },
+    { n: 1, textBg: "Закопчай колана — таблото свети „КОЛАН“, докато не го направиш." },
+    { n: 2, textBg: "Колата е спряла в дясната лента. Потеглянето от място е маневра — започва с оглеждане." },
+    { n: 3, textBg: "Погледни в лявото огледало и прецени идва ли кола или колоездач отзад." },
+    // The shoulder check STAYS, and stays unfaked: `MirrorGlanceKind` is
+    // „left" | „right" | „rear" and there is no blind-spot station to tap
+    // (scene/cabin.ts; the ruling and its gate are in
+    // components/sim/__tests__/touchFlankNaming.test.tsx §4). The procedure a
+    // driver must own is mirror AND shoulder; shrinking the briefing to the
+    // half the cockpit can measure would teach the wrong habit for good.
+    { n: 4, textBg: "Хвърли поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва." },
+    { n: 5, textBg: "Чак когато е чисто: мигач при нужда, потегли плавно и карай центрирано под ограничението." },
   ],
   success: [
     {
@@ -200,7 +247,7 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-pk-move-off/mistake-no-look.trace.json" },
       titleBg: "Потегляне без оглеждане",
       whatWentWrongBg:
-        "Колата потегли от банкета, без нито едно оглеждане — „нали ще тръгна бавно“. Потеглянето от място е маневра (чл. 25): приближаващият отзад-отляво остана невидим до последно. Едно огледало и поглед през рамо преди тръгване спестяват челен удар отстрани.",
+        "Колата потегли от място, без нито едно оглеждане — „нали ще тръгна бавно“. Потеглянето от място е маневра (чл. 25): приближаващият отзад-отляво остана невидим до последно. Едно огледало и поглед през рамо преди тръгване спестяват челен удар отстрани.",
       codeRefs: ["MOVE_OFF_WITHOUT_OBSERVATION"],
     },
     {
@@ -250,7 +297,40 @@ export const SC_PK_MOVE_OFF: ScenarioSpec = {
  *  stalled flag reaches the rule engine, which grades each RISING EDGE as one
  *  ENGINE_STALLED — the restart re-arms the episode, so the repeat demo grades
  *  it twice. The shipped detector is default-ON (no ruleConfig needed): the
- *  LIVE student session grades the same fault. */
+ *  LIVE student session grades the same fault — ON THE TIER THAT HAS A CLUTCH.
+ *
+ *  SWEEP 161 — THE CLUTCH LESSON THAT WAS BEING TAUGHT TO AN AUTOMATIC.
+ *  Frame sweep161/sc-vp-stall/pc-right/04-t012s.png: the cluster reads „D", the
+ *  key card offers gears only as „към P / към D", and the cabin strip runs
+ *  ДВИГАТЕЛ · КОЛАН · СВЕТЛИНИ · МЪГЛА · ЧИСТАЧКИ · РЪЧНА · АВАР. with no
+ *  «СЪЕД» in it — while instructions 1–4 commanded a clutch, first gear and a
+ *  bite point. Every one of those four steps was unperformable.
+ *
+ *  IT IS ONE MEASUREMENT, TAKEN TWICE. `transmissionModeFor` (vehicle/
+ *  driveline.ts) returns „manual" for exactly one DifficultyMode — „advanced" —
+ *  and `DEFAULT_DIFFICULTY` is „normal"; and the stall itself is guarded by
+ *  `this.transmission === "manual"` in `Driveline.update`. So on the tier a
+ *  student arrives on, the car has no clutch AND CANNOT STALL: the fault this
+ *  lesson exists to teach could not be committed, could not be avoided, and
+ *  could not be graded. That is the exact defect DEFAULT_DIFFICULTY's own
+ *  founder-ruling comment names — „the student physically could not make the
+ *  mistake the lesson exists to catch — an unfailable trap, not teaching".
+ *
+ *  WHY THE FIX IS A SENTENCE AND NOT A FIELD. A ScenarioSpec cannot pick the
+ *  tier: difficulty is a per-student setting held in LessonScene state and
+ *  persisted to localStorage (vehicle/difficulty.ts DIFFICULTY_STORAGE_KEY),
+ *  and no channel carries it from a template. So instruction 1 now sends the
+ *  student to the selector — which is on screen on both platforms (the НАЧ /
+ *  НОРМ / НАПР cell, TouchControls `tierCellTextBg`) and works mid-drive: the
+ *  switch puts a standing car in N (`switchTransmission`), which is precisely
+ *  where „съединител + първа предавка" begins. THE DEEPER FIX IS A LESSON-LEVEL
+ *  TRANSMISSION CHANNEL and it belongs in files this template does not own
+ *  (contracts.ts LessonSpec, compile.ts, LessonScene.tsx, vehicle/driveline.ts)
+ *  — until it ships, a briefing that names the clutch must name the tier, and
+ *  __tests__/cockpit-sweep161-truth.test.ts §2 is the gate that says so.
+ *
+ *  The DEMOS are unaffected and stay manual: a trace carries its own stall
+ *  channel ({kind:"stall"}) and replays identically on any tier. */
 export const SC_VP_STALL: ScenarioSpec = {
   id: "sc-vp-stall",
   family: "cockpit",
@@ -271,11 +351,18 @@ export const SC_VP_STALL: ScenarioSpec = {
     spawnPointId: "vp-spawn-approach",
     vehicleStart: "ready",
   },
+  // Step 1 is the belt and the tier: without the tier, steps 2–4 name controls
+  // the car does not have (see the header); without the belt, the pull-away
+  // procedure this drill enumerates is missing its own first step and the
+  // ungated основна `SEATBELT_OFF_WHILE_MOVING` bills a student who followed it
+  // (the sc-vp-readiness precedent — its instruction 1 has always said so).
+  // The five steps stay five and stay inside the 95-character band
+  // (briefing-card-budget.test.ts) — the old step 4 was 98.
   instructionsBg: [
-    { n: 1, textBg: "Преди потегляне: съединител докрай, включи първа предавка и дай лек газ." },
-    { n: 2, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване — усещаш как колата „поляга“ напред." },
-    { n: 3, textBg: "Задръж крака в точката на зацепване, докато колата тръгне, и чак тогава отпусни докрай." },
-    { n: 4, textBg: "Ако двигателят все пак загасне: спокойно — съединител докрай, запали отново и повтори процедурата." },
+    { n: 1, textBg: "Закопчай колана. Урокът иска ниво „Напреднал“ — с ръчни скорости и съединител." },
+    { n: 2, textBg: "Съединител докрай („СЪЕД“ / Z), включи първа предавка (]) и дай лек газ." },
+    { n: 3, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване и задръж, докато колата тръгне." },
+    { n: 4, textBg: "Загасне ли двигателят: съединител докрай, запали отново и повтори спокойно." },
     { n: 5, textBg: "Продължи плавно по отсечката, без нито едно загасване, до края." },
   ],
   success: [

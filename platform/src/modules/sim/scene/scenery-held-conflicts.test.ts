@@ -198,10 +198,18 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
     }
     expect(tooClose).toEqual([]);
     expect(sharingGround).toEqual([]);
-    // 458 bodies survive over these templates (470 before rule 3) — the census
-    // in scenarioSceneryProps.ts. A change that deleted the rows wholesale
-    // would trip this floor.
-    expect(bodies).toBe(458);
+    // 417 bodies survive over these templates — the census in
+    // scenarioSceneryProps.ts. A change that deleted the rows wholesale would
+    // trip this floor.
+    //
+    // It read 458 (470 before rule 3) until sweep 161 removed
+    // sc-follow-standstill's held column, which took that template out of
+    // TEMPLATES_WITH_DRESSING and its map's 41 curb bodies out of the census
+    // with it. None of the 41 moved or vanished — fo-follow-v1 still seats
+    // exactly the row it always did; it is simply no longer a drill this file
+    // has cause to walk. (Rule 3 never removed any of them: the row stands at
+    // |x| = 10.13 and the two held circles reached 4.69 m from x = 4.0625.)
+    expect(bodies).toBe(417);
   }, 120_000);
 
   it("is what removed them — without rule 3 the same drills seat 12 strangers", () => {

@@ -185,6 +185,144 @@ describe("scoreRubric", () => {
     expect(line.detailBg).toMatch(/чиста маневра/);
   });
 
+  // -------------------------------------------------------------------------
+  // THE SAME COUNT, THE OTHER ARM — sweep161 · sc-maneuver-uturn/mobile-right.
+  //
+  // The debrief printed „Не всички задачи от маршрута бяха изпълнени" and
+  // „– Задача 2: обърни посоката на 180° в едно движение" (a dash — unmet), and
+  // one card higher „Икономичност на маневрата 2 / 2 т. за изпълнение · Обратен
+  // завой в 1 движения — чиста маневра." (RUN.log / 08-debrief.png). The park
+  // arm had been given the settled fold; this arm had not. `movements` is
+  // `reversals + 1` and `reversals` keeps counting while the objective is open,
+  // so the count is final only once the turn came to rest facing back inside
+  // the corridor — which is what `done` means here.
+  // -------------------------------------------------------------------------
+  const TURN_RUBRIC: RubricSpec = {
+    economy: { objectiveId: "turn", attemptsFor3Stars: 1, attemptsFor2Stars: 2 },
+    parTimeSec: 45,
+  };
+
+  function turnResult(
+    over: Partial<LessonResult>,
+    detail: ObjectiveDetail | undefined,
+    done: boolean,
+  ): LessonResult {
+    return makeResult(
+      {
+        objectives: [
+          { id: "turn", titleBg: "Обърни посоката", done, completedAtSec: done ? 40 : null, detail },
+        ],
+        ...over,
+      },
+      undefined,
+    );
+  }
+
+  const turnDetail = (movements: number): ObjectiveDetail => ({
+    kind: "threePointTurn",
+    entered: true,
+    reversals: Math.max(0, movements - 1),
+    movements,
+    headingToTargetDeg: 3,
+  });
+
+  it("economy withholds praise for a turn that never came to rest in the corridor", () => {
+    // Swung round in one arc and rolled on out of the box: the facing came
+    // back (so objectives.ts reports a movement) but the maneuver never
+    // finished, and the count could still have grown.
+    const rolledOn = turnResult({ completedAll: false, passed: false }, turnDetail(1), false);
+    const line = scoreRubric(rolledOn, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(false); // was true, with points: 2
+    expect(line.points).toBeNull();
+    expect(line.detailBg).not.toMatch(/чиста маневра/);
+    expect(line.detailBg).toMatch(/Едно движение/); // the count is still reported
+  });
+
+  it("economy still convicts a turn on a count that can no longer improve", () => {
+    // The counter-direction: 4 movements is already past attemptsFor2Stars, and
+    // settling later cannot rescue it — abstaining here would be the opposite
+    // false verdict.
+    const shunting = turnResult({ completedAll: false, passed: false }, turnDetail(4), false);
+    const line = scoreRubric(shunting, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(true);
+    expect(line.points).toBe(0);
+  });
+
+  it("economy praises a single-arc turn that DID finish", () => {
+    // The guard must not swallow the credit it exists to qualify — this is the
+    // shipped sc-maneuver-uturn shadow (done, 1 movement → 2/2).
+    const line = scoreRubric(turnResult({}, turnDetail(1), true), TURN_RUBRIC).breakdownBg.find(
+      (l) => l.id === "economy",
+    )!;
+    expect(line.measured).toBe(true);
+    expect(line.points).toBe(2);
+    expect(line.detailBg).toMatch(/чиста маневра/);
+    // „Обратен завой в 1 движения" was printed on the card for the BEST result
+    // this rubric can award.
+    expect(line.detailBg).toBe("Обратен завой в едно движение — чиста маневра.");
+  });
+
+  // -------------------------------------------------------------------------
+  // THE GOAL IN THE SENTENCE IS THE AUTHORED GOAL.
+  // -------------------------------------------------------------------------
+  it("the „acceptable“ line names the rubric's own target, not a remembered three", () => {
+    // sc-maneuver-uturn is „Обръщане в ЕДНО движение" (attemptsFor3Stars: 1);
+    // a two-movement turn is OVER that goal and used to be told „целта е в три".
+    const twoArcs = turnResult({}, turnDetail(2), true);
+    const line = scoreRubric(twoArcs, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.points).toBe(1);
+    expect(line.detailBg).not.toMatch(/целта е в три/);
+    expect(line.detailBg).toBe("2 движения — приемливо, целта е в едно движение.");
+  });
+
+  it("a three-point turn still hears three — the fix reads the number, it does not lower it", () => {
+    // templates-maneuver.ts SC_MANEUVER_3POINT: 3 / 5. Four movements is the
+    // „приемливо" band there, and three IS the goal.
+    const threePoint: RubricSpec = {
+      economy: { objectiveId: "turn", attemptsFor3Stars: 3, attemptsFor2Stars: 5 },
+    };
+    const line = scoreRubric(turnResult({}, turnDetail(4), true), threePoint).breakdownBg.find(
+      (l) => l.id === "economy",
+    )!;
+    expect(line.points).toBe(1);
+    expect(line.detailBg).toBe("4 движения — приемливо, целта е в 3 движения.");
+  });
+
+  // -------------------------------------------------------------------------
+  // THE „NOT MEASURED" SENTENCE NAMES A SHAPE THE LESSON ACTUALLY HAS.
+  // sweep161 · sc-maneuver-uturn/mobile-wrong: task 1 was never met, so task 2
+  // never became current and produced no detail (engine.ts steps only the
+  // current objective) — and a boulevard U-turn card told the student „колата
+  // не е влизала в очертанията". There is no bay in that lesson.
+  // -------------------------------------------------------------------------
+  it("a turn that was never reached is not told about bay outlines", () => {
+    const neverReached = turnResult({ completedAll: false, passed: false }, undefined, false);
+    const line = scoreRubric(neverReached, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(false);
+    expect(line.detailBg).not.toMatch(/очертания/);
+    expect(line.detailBg).toBe("Няма измерване — до тази маневра не се стигна.");
+  });
+
+  it("a turn that was entered but never turned says corridor, not outlines", () => {
+    const enteredOnly = turnResult({ completedAll: false, passed: false }, turnDetail(0), false);
+    const line = scoreRubric(enteredOnly, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(false);
+    expect(line.detailBg).not.toMatch(/очертания/);
+    expect(line.detailBg).toBe("Няма измерване — завоят не е направен в коридора.");
+  });
+
+  it("a PARK that never entered still hears about the outlines — the copy follows the channel", () => {
+    // The counter-direction: naming the corridor must not become naming it
+    // everywhere. A bay drill keeps the bay sentence.
+    const noEntry = makeResult(
+      { completedAll: false, passed: false },
+      parkDetail({ attempts: 0, inBay: false, alignment: null, centerOffsetM: null, headingOffsetDeg: null }),
+    );
+    const line = scoreRubric(noEntry, RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(false);
+    expect(line.detailBg).toBe("Няма измерване — колата не е влизала в очертанията.");
+  });
+
   it("an observation component with no authored moments measures nothing", () => {
     // Was: `ratio = 1` → a full 2/2 for every driver alive, counted as a
     // MEASURED component, off a check nobody wrote. `validate.ts:261` rejects

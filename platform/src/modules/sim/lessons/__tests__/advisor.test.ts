@@ -120,7 +120,23 @@ describe("pre-drive prompts", () => {
 });
 
 describe("driving prompts (objective-driven)", () => {
-  it("speed-capped reachZone advises the cap", () => {
+  // SWEEP161 (advisor.ts `spokenCapKmh`): this used to pass a title with no
+  // number and no posted limit and assert the raw cap came out — the exact
+  // shape the audit photographed as «Пусни газта отрано … — дръж под 41 км/ч».
+  // The cap is only advisable when it is somebody's number: the sign's, the
+  // author's, or the halt band's. Both directions are asserted here.
+  it("speed-capped reachZone advises the cap the STREET declares", () => {
+    const p = advisorPromptForObjective(
+      "Стигни до кръговото",
+      { kind: "reachZone", x: 0, y: 0, radiusM: 10, maxSpeedKmh: 32 },
+      undefined,
+      30,
+    );
+    expect(p.textBg).toContain("дръж под 30 км/ч");
+    expect(p.keys).toEqual([]);
+  });
+
+  it("a cap that is nobody's number but the grader's is not advised", () => {
     const p = advisorPromptForObjective("Стигни до кръговото", {
       kind: "reachZone",
       x: 0,
@@ -128,8 +144,7 @@ describe("driving prompts (objective-driven)", () => {
       radiusM: 10,
       maxSpeedKmh: 30,
     });
-    expect(p.textBg).toContain("дръж под 30 км/ч");
-    expect(p.keys).toEqual([]);
+    expect(p).toEqual({ textBg: "Стигни до кръговото", keys: [] });
   });
 
   it("plain reachZone falls back to the objective's own title", () => {

@@ -45,6 +45,47 @@ const ROAD_TO_M = 17.85;
 const TRAVEL_M = 23.45;
 
 // ---------------------------------------------------------------------------
+// CLEAR_TITLE_NOTE — why no gate in this file says «след като е свободна»
+// (sweep 161, 2026-08-18)
+// ---------------------------------------------------------------------------
+//
+// `.audit-frames/sweep161/sc-crossing-dart/mobile-wrong/08-debrief.png`:
+//   «✓ Приближи пътеката с готовност за спиране 0:31»
+//   «✓ Премини пътеката, след като е свободна   0:34»
+// on a run the same screen scores НЕИЗДЪРЖАН — top speed 59 км/ч, ZERO full
+// stops, ZERO lawful waits. The second tick is the sharper one: nothing in a
+// `SimTick` carries another actor, `stepReachZone` is handed
+// (params, prev, tick) and no `ObjectiveContext` at all, and the staged
+// walker's `StagedEventOutcome` reaches only `completeManeuver/emergencyStop`.
+// So „беше ли свободна пътеката" is not a fact this evaluator can be wrong
+// about — it is a fact it cannot be asked. At radius 12, 38 m past the zebra,
+// the gate credits anyone who drove that far up the road, which is exactly
+// what the frame shows it doing.
+//
+// This is the catalogue rule `lessons/__tests__/stop-claim-gates.test.ts`
+// already enforces (ACTOR_CLAIM), and the remedy is the one commit cdb2f71
+// established for `sc-sfap-clear` and `sc-edpr-leftturn`: THE TITLE SAYS WHAT
+// THE DISC MEASURES, and the duty keeps its own grader in the rule engine —
+// PEDESTRIAN_NOT_YIELDED, which every template below already cites in its own
+// `mistakes[]` and which the crossing-zone tracker feeds. NOT ONE PARAM MOVES,
+// so `done` is bit-identical on every rung and THEO-4 owes no explaining card.
+//
+// WHY SIX SIBLINGS CHANGED AND ONLY ONE WAS AUDITED: ACTOR_CLAIM matches
+// «когато е свободна» and does not match «СЛЕД КАТО е свободна», which is the
+// wording seven rows of this family use — so the catalogue census read them as
+// clean. The audit found one by its pixels; the other six are the same
+// sentence about the same disc. Two more rows outside this file wear it and
+// are named in the report rather than reached for: `sc-za-clear`
+// (templates-flow.ts) and `sc-prs-clear` (templates-pe2.ts). `sc-jay-clear`
+// below is left ALONE on purpose — it says «когато е свободна», so it is
+// already a NAMED row in ACTOR_CLAIM_KNOWN_OPEN, and retiring it here would
+// require deleting its entry from a test file this lane does not own.
+//
+// __tests__/pe-sweep161-truth.test.ts holds the rule for this file, with the
+// «след като е свободна» wording ACTOR_CLAIM cannot see.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
 // 1. sc-crossing-let-pass — „Изчакай пътеката" (PE-03: squeezing past a
 //    pedestrian on the crossing) on pe-clear-v1 (crossing at y = 90)
 // ---------------------------------------------------------------------------
@@ -171,7 +212,9 @@ export const SC_CROSSING_LET_PASS: ScenarioSpec = {
     },
     {
       id: "sc-clp-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — CLEAR_TITLE_NOTE at the
+      // top of this file. Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 128, radiusM: 12 },
     },
   ],
@@ -287,7 +330,9 @@ export const SC_CROSSING_SLOW_CROSSER: ScenarioSpec = {
     },
     {
       id: "sc-scr-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — CLEAR_TITLE_NOTE at the
+      // top of this file. Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 122, radiusM: 12 },
     },
   ],
@@ -408,7 +453,9 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
     },
     {
       id: "sc-crs-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — CLEAR_TITLE_NOTE at the
+      // top of this file. Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 132, radiusM: 12 },
     },
   ],
@@ -467,8 +514,42 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
 
 // ---------------------------------------------------------------------------
 // 4. sc-crossing-dart — „Внезапен пешеходец на пътеката" (PE-02 dart-out at a
-//    MARKED crossing) on pe-dart-v1 (crossing at y = 80, a corner shop west of
-//    the zebra hides the curb — the reaction emergency, not the patience test)
+//    MARKED crossing) on pe-dart-v1 (crossing at y = 80) — the reaction
+//    emergency, not the patience test.
+//
+// ⚠ THE OCCLUSION THIS SECTION USED TO PROMISE IS NOT IN THE MAP (sweep 161,
+//   `.audit-frames/sweep161/sc-crossing-dart/mobile-right/04-t013s.png` and
+//   `04-t028s.png`: the west approach is open ground, iron railings, and a
+//   block set well back — the walker's pavement is in view the whole way, and
+//   a figure is plainly visible standing on it two frames before the zebra).
+//
+//   MEASURED against the shipped district (content/world/pe-dart-v1.json):
+//   the authored corner volume `pe-b-corner` is 9 m tall and spans
+//   x ∈ [−32.0, −16.6], y ∈ [50.0, 78.5]. Its `meta.scenario.streetscapeNoteBg`
+//   claims it is «изнесена до самия бордюр 1,5 м преди зебрата» — the LENGTH
+//   half is true (it ends 1.5 m short of the zebra) and the WIDTH half is not:
+//   the west kerb is at x = −8.125 and the back of the 3.5 m footway at
+//   −11.625, so the volume stands 8.5 m off the kerb and 5.0 m behind the
+//   pavement. The sightline from the right-lane centre (x = 4.06) to the
+//   walker's start (−9.73, 80) never reaches west of −9.73, so a volume that
+//   begins at −16.6 is a BACKDROP behind her, not an occluder in front of her.
+//   Probable cause, for the lane that owns the generator: the plot was cleared
+//   against the WIDEST carriageway segment on this street (the bay pocket,
+//   `curbToCurbM` 24.25 over y ∈ [18, 50] ⇒ 12.125 + 3.5 + 1.5 ≈ 17.1 m), and
+//   the street necks back to 16.25 m exactly where the zebra is.
+//
+//   The COPY below therefore no longer certifies a blocked view — the
+//   bus-shadow precedent one section down («камион», not «автобус»): the world
+//   decides what the copy may claim. __tests__/pe-sweep161-truth.test.ts §3
+//   pins the 8.5 m and fails the build if the claim comes back without the
+//   geometry. When the generator lane DOES push the volume onto the kerb line
+//   its own note describes, that test starts passing WITH the old copy, and
+//   restoring it is then the right move — the rule is „claim it only if it is
+//   there", never „never claim it".
+//
+//   NOTHING GRADED CHANGES: the occlusion was always „world dressing, zero
+//   grading change" — the drill's delta is SUDDENNESS (26 m / 2.5 m/s), which
+//   the world does deliver.
 // ---------------------------------------------------------------------------
 
 /**
@@ -481,12 +562,13 @@ export const SC_CROSSING_RAIN_SPRINT: ScenarioSpec = {
  * as sc-crossing-let-pass. Now the figure appears ~2.5 s before a 40 km/h
  * arrival: still stoppable at the graded 40 km/h approach cap (≈ 20 m
  * reaction + braking), but ONLY with an immediate brake — the reaction
- * emergency the PE-02 archetype is. The corner shop the generator places just
- * west of the zebra hides the curb until the last moment (the occluded start —
- * occlusion world dressing, zero grading change; NOT PE-04: that archetype is
- * an unmarked mid-block child behind PARKED CARS, sc-hz-emergency-stop's
- * drill). Delta discipline vs the siblings: let-pass 55 m/1.4 (patience),
- * night-unlit 30 m/1.4 (visibility), THIS 26 m/2.5 (suddenness).
+ * emergency the PE-02 archetype is. (This paragraph used to end „the corner
+ * shop … hides the curb until the last moment"; it does not — see the section
+ * header for the 8.5 m measurement. NOT PE-04 either: that archetype is an
+ * unmarked mid-block child behind PARKED CARS, sc-hz-emergency-stop's drill.)
+ * Delta discipline vs the siblings: let-pass 55 m/1.4 (patience), night-unlit
+ * 30 m/1.4 (visibility), THIS 26 m/2.5 (suddenness) — and suddenness is the
+ * half the world really does deliver, with or without the corner.
  */
 const DART_PED: PedestrianDartOutSpec = {
   id: "sc-drt-ped",
@@ -503,15 +585,19 @@ const DART_PED: PedestrianDartOutSpec = {
   minTriggerSpeedKmh: 10,
 };
 
-/** PE-02 — внезапен пешеходец на пътеката иззад закрита гледка (ЗДвП чл. 119 +
- *  чл. 20: скорост и внимание, позволяващи спиране при внезапна поява). */
+/** PE-02 — внезапна поява на пешеходец на пътеката (ЗДвП чл. 119 + чл. 20:
+ *  скорост и внимание, позволяващи спиране при внезапна поява). */
 export const SC_CROSSING_DART: ScenarioSpec = {
   id: "sc-crossing-dart",
   family: "pedestrians",
   tagsBg: ["пешеходци", "пешеходна пътека", "внезапна поява", "реакция"],
   titleBg: "Внезапен пешеходец на пътеката",
+  // WAS «…изскача иззад ъгъла…». There is no corner to come out from: the
+  // section header has the 8.5 m measurement off pe-dart-v1.json. What the
+  // world does stage is the SUDDENNESS (release at 26 m, 2.5 m/s), and that is
+  // what the copy now promises.
   objectiveBg:
-    "Приближи пешеходната пътека с готовност за спиране: пешеходец изскача иззад ъгъла точно когато наближаваш — реагирай навреме, спри и го пропусни, вместо да минеш през него.",
+    "Приближи пешеходната пътека с готовност за спиране: пешеходец стъпва на зебрата в последния момент — реагирай навреме, спри и го пропусни, вместо да минеш през него.",
   archetypeIds: ["PE-02"],
   conceptIds: ["c-crosswalk-yield", "c-pedestrian-rights-duties", "c-speed-adaptation"],
   map: {
@@ -526,7 +612,12 @@ export const SC_CROSSING_DART: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Потегли по улицата и приближавай пешеходната пътека с готовност за спиране — кракът над спирачката." },
-    { n: 2, textBg: "Ъгловият магазин вляво крие тротоара — не разчитай, че щом не виждаш никого, няма никой." },
+    // WAS «Ъгловият магазин вляво крие тротоара — не разчитай, че щом не
+    // виждаш никого, няма никой.» The pavement is NOT hidden (section header,
+    // 8.5 m). The lesson keeps its point by telling the truth about it: seeing
+    // the pavement is not protection, because one step is all the warning
+    // there is. 92 chars — inside the 95 the compact card can show.
+    { n: 2, textBg: "Тротоарът вляво се вижда — но една крачка стига: човек стъпва на зебрата без предупреждение." },
     { n: 3, textBg: "Пешеходец изскача на пътеката точно когато наближаваш. Реагирай веднага: спирачка, без да завиваш встрани." },
     { n: 4, textBg: "Спри напълно преди зебрата и го изчакай да освободи цялото платно." },
     { n: 5, textBg: "Премини спокойно едва когато пътеката е свободна." },
@@ -535,11 +626,35 @@ export const SC_CROSSING_DART: ScenarioSpec = {
     {
       id: "sc-drt-approach",
       titleBg: "Приближи пътеката с готовност за спиране",
-      params: { kind: "reachZone", x: LANE_2, y: 68, radiusM: 10, maxSpeedKmh: 40 },
+      // ⚠ 40 → 30 — the sc-bsh-approach repair one section down, on the drill
+      // the sweep actually caught. `.audit-frames/sweep161/sc-crossing-dart/
+      // mobile-wrong/08-debrief.png`: «✓ Приближи пътеката с готовност за
+      // спиране 0:31» printed one panel above «✗ Твърде бързо приближаване към
+      // пешеходна пътека −10 изпитни т. ОПАСНА ГРЕШКА», on a run with a 59 км/ч
+      // top and 0 full stops. The two panels were both right about their own
+      // number and the pair was a lie: the rule engine bills
+      // PEDESTRIAN_CROSSING_TOO_FAST above `DEFAULT_RULE_CONFIG
+      // .crossingApproachMaxKmh` = 30 (rules/types.ts) with a pedestrian on the
+      // crossing, and this gate certified «готовност за спиране» up to 40.
+      // A gate 10 км/ч above the law the same drill enforces teaches the
+      // offence it is about to convict.
+      //
+      // It costs the student nothing he was not already doing: the three
+      // committed drives hold 26 km/h and their scripts call 30 „the approach
+      // cap" in their own headers (traces/scCrossingDart.ts). It cannot make
+      // the drill unstoppable either — 30 km/h is 8.33 m/s, and reaction 1.0 s
+      // + 7 m/s² braking is 8.33 + 4.96 = 13.3 m against a release at 26 m
+      // (± the director's 3 m jitter). Both halves are asserted in
+      // __tests__/pe-sweep161-truth.test.ts.
+      params: { kind: "reachZone", x: LANE_2, y: 68, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
       id: "sc-drt-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — see CLEAR_TITLE_NOTE at
+      // the top of this file. Arrival 38 m past the zebra proves the crossing
+      // was PASSED; чл. 119 keeps its grader in PEDESTRIAN_NOT_YIELDED
+      // (mistakes[] below). Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 118, radiusM: 12 },
     },
   ],
@@ -557,18 +672,24 @@ export const SC_CROSSING_DART: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-crossing-dart/mistake-collision.trace.json" },
       titleBg: "Удар в пешеходеца",
       whatWentWrongBg:
-        "Погледът беше другаде и колата изобщо не спря — блъсна изскочилия пешеходец на самата пътека. Пред пешеходна пътека, особено със закрита гледка, скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
+        "Погледът беше другаде и колата изобщо не спря — блъсна стъпилия на пътеката пешеходец. Пред пешеходна пътека скоростта и вниманието трябва да позволяват спиране при внезапна поява (чл. 20). Ударът прекратява изпита.",
       codeRefs: ["COLLISION"],
     },
   ],
   teach: {
+    // WAS «На всяка пешеходна пътека, чиято гледка е закрита от сграда…» —
+    // written as if THIS map were the occluded case, which it is not (section
+    // header, 8.5 m). The transfer is still true and is now stated as a
+    // transfer: every zebra, and worst where the view is short.
     whenBg:
-      "На всяка пешеходна пътека, чиято гледка е закрита от сграда, паркирани коли или спрял автобус — там, където пешеходец може да се появи без предупреждение точно преди зебрата.",
+      "На всяка пешеходна пътека в града: пешеходец може да стъпи на зебрата без предупреждение — а най-зле е там, където гледката е къса (сграда на ъгъла, паркирани коли, спрял автобус).",
     whyBg:
       "Внезапната поява на пешеходец е защитаваната урбанистична спешност за начинаещите: секунда закъсняла реакция при 50 км/ч е близо 14 метра слепешком. Единствената защита е приближаване с готовност за спиране — вдигнат газ, крак над спирачката — и незабавна реакция със спирачка, не със завиване встрани.",
     lawRef: "ЗДвП чл. 119",
+    // …and «при приближаване към закрита пътека» → the cap this drill actually
+    // grades, which is also the law's own number (crossingApproachMaxKmh 30).
     examinerBg:
-      "Изпитващият очаква намалена скорост и готовност за спиране при приближаване към закрита пътека, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
+      "Изпитващият очаква намалена скорост и готовност за спиране при приближаване към пътеката, отчетлива реакция при появата на пешеходец и пълно спиране преди зебрата. Преминаване през пешеходец е опасна грешка, а удар — прекратяване на изпита.",
   },
   levels: [
     { level: 1 },
@@ -705,7 +826,9 @@ export const SC_CROSSING_BUS_SHADOW: ScenarioSpec = {
     },
     {
       id: "sc-bsh-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — CLEAR_TITLE_NOTE at the
+      // top of this file. Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 126, radiusM: 12 },
     },
   ],
@@ -838,7 +961,9 @@ export const SC_CROSSING_CHILD_BALL: ScenarioSpec = {
     },
     {
       id: "sc-cbl-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, след като е свободна» — CLEAR_TITLE_NOTE at the
+      // top of this file. Params untouched ⇒ `done` is bit-identical.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 116, radiusM: 12 },
     },
   ],
@@ -996,7 +1121,13 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
     },
     {
       id: "sc-wcn-clear",
-      titleBg: "Потегли чак когато е слязъл от цялото платно",
+      // WAS «Потегли чак когато е слязъл от цялото платно» — the same
+      // certificate as the six «след като е свободна» rows above, worded round
+      // the person instead of the paint (CLEAR_TITLE_NOTE). „Слязъл ли е" is a
+      // fact about the walker; the disc sees a place. The halt gate above is
+      // the measurable half of the duty and keeps its 6 км/ч; the rest is
+      // PEDESTRIAN_NOT_YIELDED's, in mistakes[] below. Params untouched.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 130, radiusM: 12 },
     },
   ],
@@ -1058,6 +1189,28 @@ export const SC_CROSSING_WHITE_CANE: ScenarioSpec = {
  * player crosses the stop line on green (natural phases in live play only
  * admit a line crossing on green, so the story holds structurally; the
  * recorded ghosts pin the canonical green via signalOffsets).
+ *
+ * ── A SWEEP-161 FINDING THAT IS REFUTED, WRITTEN DOWN SO IT IS NOT „FIXED" ──
+ * The audit filed, against this template: „the vehicle signal facing the player
+ * reads RED while the lesson is about a pedestrian who crosses against HIS
+ * signal — the world's signal phase contradicts the lesson's own premise",
+ * quoting „red aspect lit on both near-side heads" off
+ * `.audit-frames/sweep161/sc-pe-jaywalker/mobile-right/04-t092s.png`.
+ *
+ * Those two heads are the WALKER'S, not the driver's. `world/builders/props.ts`
+ * places one PEDESTRIAN head per kerb at every `crossings[].signalized` (doc 86
+ * L3 / founder item 29) — a two-lens housing, red over green — and
+ * `WorldProps.pedLampColors` lights its RED whenever the vehicle phase is
+ * anything but red. Enlarging the frame settles it: the near-side pair are
+ * TWO-lens housings with the top lens lit, and the three-lens VEHICLE head
+ * beside the right one is showing GREEN on its bottom lens.
+ *
+ * So the frame the finding cites is a picture of the premise HOLDING: driver
+ * green, pedestrian red, the woman on the zebra anyway — «Пешеходец на
+ * червено», exactly as authored. Nothing here is to be „corrected": inverting
+ * this phase would delete the lesson. The finding's SIBLING — the red the
+ * student really was convicted at, 60 m earlier at the stop line — is real and
+ * is closed at `signalPlan` below.
  */
 const JAY_PED: PedestrianDartOutSpec = {
   id: "sc-jay-ped",
@@ -1188,16 +1341,59 @@ export const SC_PE_JAYWALKER: ScenarioSpec = {
    * encounter never happened either.
    *
    * `greenFresh` pins a full 20 s green the first frame the player enters the
-   * ring. triggerM 90 puts that ring boundary at y = −73 (the cluster centroid
-   * is (0, 17), the midpoint of the junction node and the crossing): 32 m past
-   * the spawn — so the pin is an approach-relative arrival, not a session-start
-   * dial — and 45.3 m short of the stop line, which even a 15 km/h crawl covers
-   * in 10.9 s of the 20 s green. clusterId names the junction node explicitly
-   * rather than relying on the cluster's id being the alphabetically-first
-   * member. The trace recorder never reads signalPlan, so the committed ghosts
-   * keep their authored signalOffsets byte-identically (contracts.ts:223).
+   * ring. The cluster centroid is (0, 17), the midpoint of the junction node
+   * and the crossing, so `triggerM` is measured from there. clusterId names the
+   * junction node explicitly rather than relying on the cluster's id being the
+   * alphabetically-first member. The trace recorder never reads signalPlan, so
+   * the committed ghosts keep their authored signalOffsets byte-identically
+   * (contracts.ts:223).
+   *
+   * ── ⚠ 90 → 55: A 20 s GREEN IS A DISTANCE BUDGET, AND 90 SPENT IT ON THE
+   *    APPROACH (sweep 161, 2026-08-18) ───────────────────────────────────────
+   *
+   * The T10 fix above reasoned from „even a 15 km/h crawl covers 45.3 m in
+   * 10.9 s". Nobody drives this lesson at a constant 15. The sweep drove it
+   * twice, correctly, on both platforms — and the SAME script came out
+   * ИЗДЪРЖАН · 0 наказателни точки on pc and НЕИЗДЪРЖАН · 10 т. on a phone,
+   * the phone billed «Преминаване на червен сигнал» (опасна). Both drives were
+   * stop-and-go: `pc-right` top 15 км/ч with 13 full stops and objective 1
+   * ticked at 0:49 (52 m in 49 s ≈ 1.06 m/s ≈ 3.8 км/ч mean), `mobile-right`
+   * top 19 км/ч, 13 full stops, objective 1 at 0:59. The pc run survived only
+   * by stopping at the red it met and waiting it out — its «1 lawful wait
+   * (27 s)» IS the red. The phone kept rolling and was convicted. That is not
+   * two different drives; it is one drive against a coin.
+   *
+   * triggerM 90 put the ring at y = −72.9 and the line 45.2 m further on, so
+   * the promised green only survived an approach averaging ≥ 45.2/20 = 2.26 m/s
+   * = 8.1 км/ч. MEASURED on `createWorldRuntime(pe-jay-v1)` by replaying the
+   * harness's own 5 s-throttle / 5 s-coast-to-rest profile — the phase the
+   * runtime reports AT y = −27.725:
+   *
+   *      profile          triggerM 90     triggerM 55
+   *      const  4 км/ч       RED             green
+   *      const  8 км/ч       YELLOW          green
+   *      burst peak  8       RED             green
+   *      burst peak 11       RED             green   ← pc-right's own top
+   *      burst peak 15       YELLOW          green
+   *      burst peak 20       green           green
+   *
+   * 55 puts the ring at y = 17 − √(55² − 4.06²) = −37.85, i.e. 10.1 m short of
+   * the line: 20 s of green covers it down to 0.5 m/s. It is the LARGEST value
+   * that is green across the whole swept grid (constant 2…50 км/ч and burst
+   * peaks 4…45), which is how the number was chosen rather than picked — going
+   * further out starts failing the slow end again (58 loses const 2, 62 loses
+   * burst 6, 64 loses const 3), and going nearer only buys crawls nobody
+   * drives at the cost of the warning distance. 10.1 m is ~9 s of green in
+   * hand at the pace this drill's own copy invites, and the lamp stands 37.9 m
+   * ahead of the ring, well inside reading range.
+   *
+   * The spawn stays outside the ring as the contract requires (122.1 m from the
+   * centroid), and no staged runner on this map pins a signal, so nothing has
+   * to fire second. A student who genuinely STOPS DEAD for 20 s inside the ring
+   * and then drives over without looking is still convicted — that one is a red
+   * light run, and the gate must keep saying so.
    */
-  signalPlan: { arm: "greenFresh", triggerM: 90, clusterId: "sx-n-c" },
+  signalPlan: { arm: "greenFresh", triggerM: 55, clusterId: "sx-n-c" },
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

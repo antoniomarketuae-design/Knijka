@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { codes, drive, tick } from "./fixtures";
+import { reduceTick } from "../engine";
 import type { SimTick } from "../types";
 
 /**
@@ -387,5 +388,190 @@ describe("speeding — the repeat cadence stops at the опасна line", () =>
   it("a drive that never crosses the limit still bills nothing", () => {
     expect(billsOf("SPEEDING_DANGEROUS", overspeed(50, 200))).toBe(0);
     expect(billsOf("SPEEDING_OVER_LIMIT", overspeed(50, 200))).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6 · ONE LATCH FOR EVERY BODY IN THE WORLD — the acquittal the dedupe bought
+// ---------------------------------------------------------------------------
+//
+// Section 4 above closed the duplication with a third conjunct: the vehicle
+// ahead has to have been SEEN off the bumper before a second bill. It was put
+// on a SINGLE latch shared by every body in the world, and a reading off
+// `tick.leadGapM` is a statement about exactly one of them — the in-lane
+// vehicle ahead.
+//
+// So the wave that stopped `sc-ov-solid-return` printing thirteen accidents for
+// one truck also stopped a pedestrian being billed at all, if the car that was
+// hit first was still in front. The student shunts a car, drives on nose-to-tail
+// in the queue, knocks somebody down thirty seconds later — and the second
+// accident waits for the FIRST body's bumper to clear, which in a queue it
+// never does. Two bills before that wave, one after.
+//
+// It was already shipping. Dumping the contact channel of the template's own
+// mistake demo `sc-hz-accident-scene / mistake-squeeze` — 26 reports at
+// 45.9 км/ч: t=13.13 the first wreck (vehicle), t=13.43…13.82 the BYSTANDER
+// dragged along at 60 Hz (pedestrian), t=14.23 the second wreck — the sheet
+// printed ONE «Пътнотранспортно произшествие», the parked wreck. The man under
+// the wheels cost nothing on a lesson whose entire subject is that people are
+// standing there.
+//
+// A false pass and a false conviction are the same crime, so every case below
+// is paired with the duplication case it must not re-buy. The rule now: the
+// encounter is per BODY-KIND, silence and travel are asked of every kind
+// because they are properties of the CAR, and daylight is asked only of
+// `vehicle` because that is the only body the gap channel can see.
+
+/** How many «Пътнотранспортно произшествие» rows a drive prints. */
+const bills = (ticks: SimTick[]): number =>
+  codes(drive(ticks).events).filter((c) => c === "COLLISION").length;
+
+describe("contact — the episode is per body-kind", () => {
+  it("a pedestrian struck half a minute after a car crash is still billed", () => {
+    // THE REGRESSION, to the drive. Crash into the car ahead at 20 км/ч, then
+    // 30 s of creeping forward still nose-to-tail behind it (leadGapM 0.3 —
+    // under CONTACT_LEAD_GAP_M's 0.5 the whole way, so the shared latch never
+    // re-armed), then a pedestrian. MEASURED: 2 bills before the daylight
+    // conjunct shipped, 1 with it on a global latch, 2 with it per body-kind.
+    const ticks: SimTick[] = [
+      tick(0, { speedKmh: 20, leadGapM: 0, events: [{ kind: "collision", withWhat: "vehicle" }] }),
+    ];
+    for (let t = 0.25; t <= 30; t += 0.25) ticks.push(tick(t, { speedKmh: 8, leadGapM: 0.3 }));
+    ticks.push(
+      tick(30.25, {
+        speedKmh: 8,
+        leadGapM: 0.3,
+        events: [{ kind: "collision", withWhat: "pedestrian" }],
+      }),
+    );
+    expect(bills(ticks)).toBe(2);
+  });
+
+  it("…and so is one struck during the shunt itself", () => {
+    // The same acquittal at its worst: the car never comes apart from the truck
+    // it is pushing (section 4's shunt, verbatim), and a pedestrian goes under
+    // the wheels in the middle of it. The truck must still bill ONCE — re-buying
+    // section 4 would be no better — and the pedestrian must bill.
+    const withPedestrian = shunt(30, 4, 4);
+    withPedestrian.push(
+      tick(30.25, {
+        speedKmh: 4,
+        leadGapM: 0.1,
+        events: [{ kind: "collision", withWhat: "pedestrian" }],
+      }),
+    );
+    expect(bills(withPedestrian)).toBe(2);
+    // …and the shunt on its own is still the single row section 4 pinned.
+    expect(bills(shunt(30, 4, 4))).toBe(1);
+  });
+
+  it("one body, one bill — a pedestrian dragged along re-reports for free", () => {
+    // The opposite direction, and the one a per-kind key must not lose. The
+    // recorder re-fires a sustained pedestrian contact at the shell-pool cadence
+    // exactly as it does a vehicle's; four seconds of it is ONE accident. If the
+    // travel floor stopped holding for non-vehicle kinds this reads as nine.
+    const ticks: SimTick[] = [];
+    for (let t = 0; t <= 4; t += 0.5) {
+      ticks.push(tick(t, { speedKmh: 0, events: [{ kind: "collision", withWhat: "pedestrian" }] }));
+    }
+    expect(bills(ticks)).toBe(1);
+  });
+
+  it("a cyclist and a pedestrian in the same second are two accidents", () => {
+    // Two vulnerable road users, two bodies, two ПТП — and they arrive inside
+    // collisionSeparationSec, which is precisely where a shared latch merged
+    // them. Nothing about the car changed between the two frames; what changed
+    // is who was hit.
+    const ticks: SimTick[] = [
+      tick(0, { speedKmh: 25, events: [{ kind: "collision", withWhat: "cyclist" }] }),
+      tick(0.5, { speedKmh: 20, events: [{ kind: "collision", withWhat: "pedestrian" }] }),
+    ];
+    expect(bills(ticks)).toBe(2);
+  });
+
+  it("the truck a student follows for 200 s is ONE accident, not seven", () => {
+    // `.audit-frames/sweep161/sc-follow-truck/mobile-right/08-debrief.png`:
+    // «71 наказателни точки», and in run.log «Пътнотранспортно произшествие ×7
+    // — опасна, 70 наказателни т.» printed above the card's own sentence that a
+    // collision is ONE dangerous error worth ten. The same log's «23 full stops
+    // · top 22 км/ч» is the stuttering crawl behind the truck that produced it:
+    // reports arriving in bursts with the bumper never once clear.
+    const ticks: SimTick[] = [];
+    let nextReport = 0;
+    for (let t = 0; t <= 200; t += 0.25) {
+      const kmh = Math.floor(t / 8) % 2 === 0 ? 22 : 0; // crawl, rest, crawl…
+      const reports = t >= nextReport;
+      if (reports) nextReport = t + 4;
+      ticks.push(
+        tick(t, {
+          speedKmh: kmh,
+          leadGapM: 0.2,
+          events: reports ? [{ kind: "collision", withWhat: "vehicle" }] : [],
+        }),
+      );
+    }
+    expect(bills(ticks)).toBe(1);
+  });
+
+  it("a static scrape is graded on silence and travel, as it always was", () => {
+    // Daylight is the LEAD VEHICLE's alibi, so a wall may not be asked for one —
+    // and must not be able to borrow one either. The same drive twice: once with
+    // no gap channel at all, once tailgating a car that never leaves the bumper.
+    // Both bill twice, because what the channel says about a car it can see is
+    // no evidence at all about a wall it cannot.
+    const scrape = (over: Partial<SimTick>): SimTick[] => {
+      const out: SimTick[] = [
+        tick(0, { speedKmh: 20, ...over, events: [{ kind: "collision", withWhat: "staticObject" }] }),
+      ];
+      for (let t = 0.25; t <= 3; t += 0.25) out.push(tick(t, { speedKmh: -3, ...over }));
+      out.push(
+        tick(3.25, {
+          speedKmh: 10,
+          ...over,
+          events: [{ kind: "collision", withWhat: "staticObject" }],
+        }),
+      );
+      return out;
+    };
+    expect(bills(scrape({}))).toBe(2);
+    expect(bills(scrape({ leadGapM: 0.1 }))).toBe(2);
+  });
+
+  it("the 2 m floor and the silence window still hold for every kind", () => {
+    // The per-kind key must not become a way of buying extra bills by
+    // relabelling. Each kind embedded at 0 км/ч for a minute bills exactly one,
+    // and four kinds embedded together bill exactly four — one per BODY, never
+    // one per report.
+    const kinds = ["vehicle", "pedestrian", "cyclist", "staticObject"] as const;
+    const embedded = (hit: ReadonlyArray<(typeof kinds)[number]>): SimTick[] => {
+      const out: SimTick[] = [];
+      for (let t = 0; t <= 60; t += 0.5) {
+        out.push(
+          tick(t, {
+            speedKmh: 0,
+            events:
+              t % 4 === 0 ? hit.map((k) => ({ kind: "collision" as const, withWhat: k })) : [],
+          }),
+        );
+      }
+      return out;
+    };
+    for (const k of kinds) expect(bills(embedded([k]))).toBe(1);
+    expect(bills(embedded(kinds))).toBe(4);
+  });
+
+  it("the reducer does not write a bill into the caller's state", () => {
+    // The episode ledger is a record now, and cloneState copies it shallowly on
+    // the promise that entries are REPLACED rather than mutated. Break that
+    // promise and the reducer mutates its input: the same frame replayed off the
+    // same state — which is exactly what a debrief scrub does — grades
+    // differently the second time.
+    const crash = { kind: "collision" as const, withWhat: "vehicle" as const };
+    const first = drive([tick(0, { speedKmh: 20, events: [crash] })]);
+    const before = JSON.stringify(first.state.contactEpisodes);
+    const replayA = reduceTick(first.state, tick(4, { speedKmh: 20, events: [crash] }));
+    expect(JSON.stringify(first.state.contactEpisodes)).toBe(before);
+    const replayB = reduceTick(first.state, tick(4, { speedKmh: 20, events: [crash] }));
+    expect(codes(replayB.events)).toEqual(codes(replayA.events));
   });
 });

@@ -211,6 +211,64 @@
  *      which on sc-vu-emergency-junction is exactly the east arm instruction 2
  *      orders the student to look down (pc-right/04-t032s.png); on the phone
  *      the coach tip covers the mirror sc-vu-emergency's instruction 2 names.
+ *
+ * ── 2026-08-18 (THIRD READ) · THE LAST OF THAT PARAGRAPH GOES TOO ───────────
+ *
+ * „The junction one is real … and the frames DO under-sample: at 5–6 s spacing
+ * a 3 s crossing is missed more often than caught" is the half nobody retracted,
+ * and the number it rests on is off by six. Replayed here at the sweep's own
+ * careful pace (2.8 m/s on the live hero ramp) the tj-rhr EV holds at x = 95
+ * until t = 13.3 s and then runs the east arm in front of the climbing student:
+ * x = 81 at t = 17 s · 58 at t = 22 · 20 at t = 27 · through the box at t ≈ 29.5
+ * · past x = −30 at t = 32.0. EIGHTEEN AND A HALF SECONDS, inside 110 m of him
+ * at every one of those marks, on a 150 m arm — and the sweep photographed FIVE
+ * frames inside that window (t017, t022, t027, t032, t038). Five looks, no
+ * ambulance. The cadence was never the explanation.
+ *
+ * WHAT THE FOUR STAGED VRU LESSONS ACTUALLY SHOW, and the one line between
+ * them. Both cyclist lessons DRAW their actor: sc-vu-cyclist-hook/mobile-right/
+ * 04-t061s.png carries the bicycle rig — frame, wheels, rider, helmet — at the
+ * kerb, and sc-vu-pass-clearance/pc-wrong/04-t012s.png carries it ~70 m up the
+ * street. Neither emergency lesson draws anything at all, on either platform,
+ * in any frame. The difference is which rig the fleet is asked for, and THIS
+ * FILE'S HALF OF THAT HANDOFF IS MET — measured through the production stack:
+ *
+ *   sc-vue-approach · sc-vuej-ev    → published profile "emergency"
+ *                                   → modelForVehicle = EMERGENCY_MODEL_INDEX
+ *   sc-vu-cyclist · sc-vup-cyclist  → published profile "cyclist"
+ *                                   → modelForVehicle = CYCLIST_MODEL_INDEX
+ *
+ * …and the ambulance is not merely staged, it is IN SHOT. On sc-vu-emergency at
+ * the sweep's careful pace it is 15.3 m BEHIND the player at t = 1 s, 3.0 m
+ * behind at t = 6 s and 61 m AHEAD in the left lane at t = 12 s — the three
+ * instants whose frames show an empty mirror (04-t001s, 04-t006s) and an empty
+ * four-lane boulevard (04-t012s). So neither the numbers below nor the frame
+ * spacing can account for it. The question is why EMERGENCY_MODEL_INDEX draws
+ * nothing while CYCLIST_MODEL_INDEX draws, and it lives in traffic/
+ * vehicleFleet.ts (buildEmergencyRig, and the `counts[m]` pass in
+ * buildTrafficFleet that allocates no InstancedMesh for a model with zero
+ * vehicles at build time) and in its callers TrafficLayer.tsx +
+ * LessonScene.tsx. Both measurements above are executable in
+ * scenario/__tests__/vru-actor-in-frame.test.ts, so the day this file's half of
+ * the contract breaks, the routing goes red instead of quietly becoming true.
+ *
+ *  (d) AND sc-vu-cyclist-hook's OWN EVENT CANNOT HAPPEN UNDER THE SWEEP, which
+ *      is not a fault of the lesson. tools/mobile/lesson-audit.mjs actuates two
+ *      keys — hold KeyW, cap with KeyS — and NEVER STEERS. A lesson whose event
+ *      IS a right turn therefore gets a car that goes straight, and both legs
+ *      did: from vu-spawn-west (−115, −4.06) the through road runs out at the
+ *      district's own maxX = 130, i.e. 245 m on, after which the car is off the
+ *      built tile among backdrop geometry. Both ended «Пътнотранспортно
+ *      произшествие» — 20 наказателни точки, НЕИЗДЪРЖАН, the careful leg and
+ *      the flat-out leg alike (pc-right/04-t179s.png at t = 179 s and
+ *      pc-wrong/04-t023s.png at t = 23 s are the same orange wall). Two
+ *      questions, neither of them this file's: the harness needs a steering
+ *      channel before any turning lesson can be judged by it, and — the same
+ *      world-boundary question as (a) — leaving the built world must not be
+ *      billed as a road-traffic accident. What IS this file's, the disc that
+ *      grades the manoeuvre, is sound and now pinned in BOTH directions: the
+ *      straight-through drive misses sc-vu-turned by 40.94 m of a 10 m disc,
+ *      and the committed shadow, which turns, completes it.
  */
 
 import type {
@@ -379,6 +437,14 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
       // "cyclist-right-hook"), and instructions 3–4 + teach.examinerBg say the
       // duty in words. Params untouched — `done` is bit-identical, so nothing
       // new can fail and no THEO-4 card is owed.
+      //
+      // THE „ONLY FROM A COMPLETED RIGHT TURN" CLAIM ABOVE IS NOW MEASURED
+      // rather than asserted in prose (2026-08-18): a car holding the through
+      // lane from vu-spawn-west at any speed passes 40.94 m from this 10 m
+      // disc — four radii — and the committed shadow, which turns, completes
+      // it. Both directions in vru-actor-in-frame.test.ts §4, which is also
+      // where the sweep's own drive is written down: its bot never steers, so
+      // it went straight past the mouth and off the tile (header item (d)).
       titleBg: "Завий надясно и продължи по страничната улица",
       params: { kind: "reachZone", x: STEM_LANE_X, y: -45, radiusM: 10 },
     },
@@ -524,9 +590,24 @@ const EM_APPROACH: EmergencyApproachSpec = {
     accelMps2: 1.5,
     extraRightOffsetM: -8.125, // dead-centre the LEFT lane (x = 4.06) — the EV's own corridor
     colorIndex: 0,
-    profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
+    // white rig + blue light bar (ADR-001 fictional). NOT decoration: this
+    // string is the whole of `modelForVehicle`'s decision, so deleting it turns
+    // the чл. 91 lesson's ambulance into an ordinary fleet hatchback. Pinned,
+    // together with the resulting EMERGENCY_MODEL_INDEX, in
+    // scenario/__tests__/vru-actor-in-frame.test.ts §1 — and see the header's
+    // third-read section for why that test exists: the deployed scene drew
+    // nothing here even though this half of the contract is met.
+    profile: "emergency",
   },
-  releaseGapM: 14, // roll the instant the ghost takes its 15 m lead — no dormant blow-out
+  // Roll the instant the ghost takes its 15 m lead — no dormant blow-out.
+  // MEASURED (2026-08-18): ln-spawn-start is y = 15 and the hold is y = 0, so
+  // `behindM` is already 15 on frame one and the release is immediate for every
+  // draw of the ±4 jitter below 15. That is harmless BECAUSE `accelMps2` 1.5 is
+  // under the hero car's 1.95 — the ambulance launches with the student and
+  // falls back before closing — but it means the choreography never has a
+  // "waiting ambulance" phase, and a later hand raising this number would give
+  // it one at the cost of the recorded demos on ln-v1.
+  releaseGapM: 14,
   armBehindM: 60,
   responseWindowSec: 7,
   yieldShiftM: 0.8,
@@ -793,6 +874,17 @@ const VUEJ_LANE = 4.0625;
  * already rolling while the student sets off — which is what an emergency
  * vehicle already en route actually does).
  *
+ * AND THE SECOND RUNG NOW BUYS TWO THINGS, not one (2026-08-18, third read).
+ * `armDistM 110` also lengthens the only window in which this lesson's actor is
+ * on screen at all: today the EV is dormant at x = 95 for the first 13.3 s of a
+ * careful approach and only then starts its 18.6 s run (header, third-read
+ * section). Rolling from the spawn makes the blue lamp part of the approach the
+ * copy describes rather than something that appears once the student is already
+ * at the mouth. It does NOT explain the sweep's empty frames — measured, the EV
+ * is inside 110 m of the player at t = 17/22/27 s and the frames at those exact
+ * marks contain no vehicle — but when the render defect is fixed this is the
+ * rung that makes the lesson read the way its instructions promise.
+ *
  * WHY NEITHER IS APPLIED HERE. Both were applied and measured, and both turn
  * the §5/§9 gate red — not because the world got worse but because the three
  * committed demos were choreographed against the broken timing:
@@ -817,7 +909,9 @@ const VU_EV_CROSSING: PriorityFromRightSpec = {
     hold: { nodeIndex: 1, offsetM: -95 },
     cruiseSpeedMps: 10, // ~36 km/h through the box — EV urgency, still plausible
     colorIndex: 0,
-    profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
+    // white rig + blue light bar (ADR-001 fictional) — the same load-bearing
+    // string as EM_APPROACH's, pinned in vru-actor-in-frame.test.ts §1.
+    profile: "emergency",
   },
   junctionNodeIndex: 1,
   armDistM: 70,
@@ -1071,7 +1165,12 @@ const VUP_CYCLIST_X = 6.35;
  *   The one frame in the whole sweep that contains the rider is
  *   sc-vu-pass-clearance/pc-wrong/04-t012s.png — a rider-sized rig at the kerb
  *   ~70 m out, gone again by t017. He is staged and he is drawn; he is simply
- *   never MET.
+ *   never MET. (Re-checked 2026-08-18 against a fresh finding that reads „the
+ *   cyclist never appears … there is no cyclist anywhere": enlarged, that frame
+ *   carries the bicycle rig, rider and helmet at the kerb. „Never appears" is
+ *   the symptom of „never met", and the cure is the coordinated retime below,
+ *   not a second hunt for a render defect that is real only on the two
+ *   EMERGENCY actors — see the header's third-read section.)
  *
  * THE FIX AND WHY IT IS NOT APPLIED HERE. Hold him until the driver has closed,
  * and start him where he would have been at that instant so the recorded demos

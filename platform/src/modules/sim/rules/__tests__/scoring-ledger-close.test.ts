@@ -62,15 +62,33 @@ describe("the sweep's own drives, re-scored", () => {
     expect(careful.totalPoints).toBeLessThanOrEqual(reckless.totalPoints);
   });
 
-  it("sc-ov-crossing-overtake mobile-wrong: 16 ПТП + a pre-crash speeding bill is 11, not 161", () => {
-    const events = [
-      speeding(19), // earned BEFORE the crash — it must survive
+  it("sc-ov-crossing-overtake mobile-wrong: «161» is 10 — the speeding row came AFTER", () => {
+    // TRANSCRIPTION CORRECTED 2026-08-18. This case was written with the
+    // speeding bill FIRST and pinned at 11. The leg's own list
+    // (`sc-ov-crossing-overtake/mobile-wrong/log.txt`, `MISTAKES (17)`, which is
+    // chronological) is sixteen ПТП rows and THEN «Превишена скорост −1» — so
+    // the second-order fault is on the far side of the closure and the leg
+    // scores 10, not 11. The old number was right about a stream nobody drove.
+    const s = accumulateScore([
       ...Array.from({ length: 16 }, (_, i) => collision(44 + i * 2.5)),
-    ];
-    const s = accumulateScore(events);
+      speeding(91),
+    ]);
+    expect(s.totalPoints).toBe(10);
+    expect(s.opasniPoints).toBe(10);
+    expect(s.vtorostepenniPoints).toBe(0); // taught, not billed — the exam ended at 44
+    expect(s.unscoredAfterClose).toBe(16);
+  });
+
+  it("…and the same seventeen rows the other way round DO cost 11", () => {
+    // The mirror, and the reason the correction above is not a loosening: move
+    // the same second-order fault BEFORE the first contact and it is billed.
+    // The fold reads `t`, not „is there a crash in this array".
+    const s = accumulateScore([
+      speeding(19),
+      ...Array.from({ length: 16 }, (_, i) => collision(44 + i * 2.5)),
+    ]);
     expect(s.totalPoints).toBe(11);
     expect(s.vtorostepenniPoints).toBe(1);
-    expect(s.opasniPoints).toBe(10);
   });
 });
 
@@ -293,5 +311,136 @@ describe("the sweep legs routed to this file, re-scored", () => {
     expect(s.totalPoints).toBe(100);
     expect(s.ledgerClosedAtSec).toBeNull();
     expect(s.unscoredAfterClose).toBe(0);
+  });
+});
+
+/**
+ * THE SECOND WAVE OF BROKEN FINDINGS ROUTED HERE (2026-08-18).
+ *
+ * Same construction as the block above — each stream is one leg's own
+ * `MISTAKES (n)` list in the order it printed — and every leg below was named
+ * by a finding that the block above did not reach. Nine of them are the junction
+ * family, which the earlier `run.log`-only corpus could not see at all: those
+ * legs write `drive.log` or `log.txt` (see the scoring.ts header).
+ */
+const YIELD: Code = "FAILED_TO_YIELD"; // опасна, 10 т., NOT terminating
+const GAP: Code = "STANDSTILL_GAP_TOO_CLOSE"; // второстепенна, 1 т.
+
+describe("the junction family, and the legs the first wave did not reach", () => {
+  it("sc-ov-ban-overtake/mobile-wrong: «640» — sixty-four contact reports are one exam, 10", () => {
+    // The largest headline the sweep photographed, in the biggest type on the
+    // page, directly above the card's own «Това е ЕДНА опасна грешка… а не сбор
+    // от много дребни». The finding's word for it was „unbounded": 64 rows, all
+    // ПТП, nothing else on the sheet. The mobile-RIGHT leg of the same lesson
+    // (three separated contacts, «30») is pinned further up; this is the leg the
+    // finding actually quoted.
+    const s = accumulateScore(streamOf(Array.from({ length: 64 }, () => PTP)));
+    expect(s.totalPoints).toBe(10);
+    expect(s.opasniCount).toBe(1);
+    expect(s.unscoredAfterClose).toBe(63);
+    expect(isPassing(s)).toBe(false);
+  });
+
+  // sc-junction-stop/pc-wrong, all 50 rows in order. Verified against the frame
+  // `.audit-frames/sweep161/sc-junction-stop/pc-wrong/08-debrief.png`, whose
+  // table reads «Опасни 38 · 380 | Основни 1 · 3 | Второстепенни 11 · 11 | Общо
+  // (допустими 9) 50 · 394» — this array reproduces all four rows exactly.
+  const junctionStopPcWrong: ReadonlyArray<Code> = [
+    FAST, B2, YIELD, SLOW, FAST, B2, YIELD, FAST, B2, SLOW, FAST, B2, YIELD, SLOW, FAST,
+    PTP, // ← row 16: the exam ends here
+    B2, PTP, FAST, B2, SLOW, FAST, B2, YIELD, SLOW, FAST, B2, DIST, PTP, FAST, B2, SLOW,
+    FAST, B2, YIELD, SLOW, FAST, B2, YIELD, SLOW, FAST, B2, SLOW, FAST, B2, YIELD, SLOW,
+    FAST, PTP, GAP,
+  ];
+
+  it("sc-junction-stop/pc-wrong: «394» becomes 133, and the 123 that remain are NOT this ledger's", () => {
+    // The critical finding: «Това е ЕДНА опасна грешка… а не сбор от много
+    // дребни» printed directly above «Опасни грешки 38 · 380». Four of those 38
+    // were ПТП and three fall away with the closure. The other 34 that survive
+    // are FAST ×5, Б2 ×4 and YIELD ×3 before the crash — THREE conditions
+    // re-reported per sample, plus SLOW ×3 — and collapsing them here is the
+    // move the header forbids, because the same collapse applied to второстепенни
+    // turns a 10-point fail into a 7-point pass. Pinned at 133 so the residue
+    // stays legible to the engine's episode gate instead of being capped away.
+    const s = accumulateScore(streamOf(junctionStopPcWrong));
+    expect(junctionStopPcWrong).toHaveLength(50); // the frame's «Общо … 50»
+    expect(s.totalPoints).toBe(133);
+    expect(s.opasniCount).toBe(13); // was 38 — one ПТП now, not four
+    expect(s.vtorostepenniCount).toBe(3);
+    expect(s.osnovniCount).toBe(0); // the «Несъобразена дистанция» is row 28, after the crash
+    expect(s.ledgerClosedAtSec).toBe(10 + 15); // streamOf: t = 10 + index
+    expect(s.unscoredAfterClose).toBe(34);
+  });
+
+  it("…and its three sibling legs do NOT move, because none of them re-billed a crash", () => {
+    // The opposite direction on the same lesson, and the reason 394 → 133 is not
+    // an amnesty. pc-right is a give-way failure and THEN a crash: two faults,
+    // 20 points, and the ledger must not touch it. mobile-wrong is four
+    // DIFFERENT опасни with the crash last — the most a single leg can honestly
+    // carry — and stays 40.
+    const right = accumulateScore(streamOf([YIELD, PTP]));
+    expect(right.totalPoints).toBe(20); // «20 наказателни точки», unchanged
+    expect(right.opasniCount).toBe(2);
+    expect(right.unscoredAfterClose).toBe(0);
+
+    const wrong = accumulateScore(streamOf([FAST, B2, YIELD, PTP]));
+    expect(wrong.totalPoints).toBe(40); // «40», unchanged
+    expect(wrong.opasniCount).toBe(4);
+    expect(wrong.unscoredAfterClose).toBe(0);
+
+    const one = accumulateScore(streamOf([PTP]));
+    expect(one.totalPoints).toBe(10); // «10», unchanged
+    expect(one.unscoredAfterClose).toBe(0);
+  });
+
+  const oneCrashLegs: ReadonlyArray<[string, number, ReadonlyArray<Code>]> = [
+    // chunk-1 · the careful drive graded three times as badly as the reckless
+    // one on the same lesson: mobile-RIGHT «30» against pc-wrong «20».
+    ["sc-ac-highbeam-lead/mobile-right", 30, [PTP, PTP, PTP]],
+    // chunk-1 · the second сняг leg; the finding named both.
+    ["sc-ac-snow/mobile-wrong", 20, [PTP, PTP]],
+    // chunk-11 · the finding was „all four legs identical"; the first wave pinned
+    // the two pc legs, these are the two mobile ones.
+    ["sc-merge-roadworks-shift/mobile-right", 20, [PTP, PTP]],
+    ["sc-merge-roadworks-shift/mobile-wrong", 20, [PTP, PTP]],
+    // chunk-4 · the same inversion again, wider: the RIGHT drive «71», the WRONG
+    // drive «20». Both are one truck met once.
+    ["sc-follow-truck/mobile-right", 71, [PTP, PTP, PTP, PTP, GAP, PTP, PTP, PTP]],
+    ["sc-follow-truck/mobile-wrong", 20, [PTP, PTP]],
+  ];
+
+  it.each(oneCrashLegs)("%s: «%i наказателни точки» is one crash, 10", (_leg, was, codes) => {
+    const s = accumulateScore(streamOf(codes));
+    expect(was).toBeGreaterThan(10);
+    expect(s.totalPoints).toBe(10);
+    expect(s.opasniCount).toBe(1);
+    expect(s.ledgerClosedAtSec).toBe(10); // all six opened on the crash
+    expect(s.unscoredAfterClose).toBe(codes.length - 1);
+    expect(isPassing(s)).toBe(false);
+  });
+
+  it("the careful drive can no longer score worse than the reckless one", () => {
+    // What both inversions above cost a student, stated as the invariant they
+    // broke. sc-follow-truck: «71» for the scripted RIGHT drive against «20» for
+    // the WRONG one. A learner reading that sheet is taught that care is
+    // expensive, which is the exact opposite of the lesson.
+    const careful = accumulateScore(streamOf([PTP, PTP, PTP, PTP, GAP, PTP, PTP, PTP]));
+    const reckless = accumulateScore(streamOf([PTP, PTP]));
+    expect(careful.totalPoints).toBeLessThanOrEqual(reckless.totalPoints);
+    expect(careful.totalPoints).toBe(10);
+  });
+
+  it("sc-ln-obstacle-meeting/pc-right: «11» becomes 10 — and the dropped точка is real", () => {
+    // The smallest leg in the set, and the clearest statement of what the
+    // closure costs: a genuine «Твърде малка дистанция при спиране в колона»
+    // committed AFTER the crash stops being billed. It keeps its card in the
+    // list — nothing here touches the mistake list — and `unscoredAfterClose`
+    // is the field a debrief needs to say so out loud.
+    const s = accumulateScore(streamOf([PTP, GAP]));
+    expect(s.totalPoints).toBe(10);
+    expect(s.vtorostepenniCount).toBe(0);
+    expect(s.unscoredAfterClose).toBe(1);
+    // …and the same fault BEFORE the crash still costs its точка.
+    expect(accumulateScore(streamOf([GAP, PTP])).totalPoints).toBe(11);
   });
 });

@@ -542,9 +542,15 @@ describe("pedestrian crossing detectors", () => {
 
 describe("collision detector", () => {
   it("collision is опасна, flags session termination, and bills the encounter once", () => {
+    // Both reports name the same KIND of body, because that is what "still
+    // touching" means — a car you are embedded in does not become a bollard
+    // between two frames. The fixture used to switch to "staticObject" here
+    // and the assertion held only because the encounter latch was global; with
+    // the latch per body-kind (see the `collision` case) that spelling is a
+    // second victim, and the case below now pins it as one.
     const { state, events } = drive([
       tick(1, { speedKmh: 30, events: [collision("vehicle")] }),
-      tick(2, { speedKmh: 0, events: [collision("staticObject")] }), // still touching
+      tick(2, { speedKmh: 0, events: [collision("vehicle")] }), // still touching
     ]);
     expect(codes(events)).toEqual(["COLLISION"]);
     expect(events[0]).toMatchObject({
@@ -554,6 +560,21 @@ describe("collision detector", () => {
       detail: "vehicle",
     });
     expect(state.terminated).toBe(true);
+  });
+
+  it("a car and then a bollard, one second apart, is TWO accidents", () => {
+    // The opposite of the case above and the reason it had to be respelled: a
+    // second later is INSIDE collisionSeparationSec, so a global latch billed
+    // this once. Two bodies were hit; two «Пътнотранспортно произшествие» are
+    // owed. The encounter is per body-kind, and one second is not enough time
+    // for a car to have become a bollard.
+    const { events } = drive([
+      tick(1, { speedKmh: 30, events: [collision("vehicle")] }),
+      tick(2, { speedKmh: 20, events: [collision("staticObject")] }),
+    ]);
+    expect(codes(events)).toEqual(["COLLISION", "COLLISION"]);
+    expect(events[0]).toMatchObject({ detail: "vehicle" });
+    expect(events[1]).toMatchObject({ detail: "staticObject" });
   });
 
   it("a genuinely separate collision, after the bodies came apart, fires again", () => {
@@ -625,10 +646,38 @@ describe("collision detector", () => {
     expect(codes(events)).toEqual(["COLLISION", "COLLISION"]);
   });
 
+  it("a guardrail scraped at speed is ONE accident — the silence window, driven", () => {
+    // THE SILENCE WINDOW HAD NO BEHAVIOURAL TEST. Deleting the conjunct left
+    // every collision case in the repo green, because the two drives that
+    // exercise the rule at low speed are already held by the 2 m floor. At
+    // road speed they are not: 30 км/ч covers 4.2 m between two shell-pool
+    // rebinds, so the floor is cleared 0.5 s after every report, and the road
+    // ahead is clear so the daylight stamp is fresh too. Only the separation
+    // window is left standing between one scrape down a guardrail and eight
+    // «Пътнотранспортно произшествие», 80 наказателни точки against an
+    // allowance of 9.
+    const crashes = (ticks: SimTick[]): string[] =>
+      codes(drive(ticks).events).filter((c) => c === "COLLISION");
+    const frames: SimTick[] = [];
+    for (let t = 0; t <= 4; t += 0.5) {
+      // 40 m of clear road — daylight for the latch, and far enough back that
+      // the following-distance detector has nothing to say about it.
+      frames.push(tick(t, { speedKmh: 30, leadGapM: 40, events: [collision("staticObject")] }));
+    }
+    expect(crashes(frames)).toEqual(["COLLISION"]);
+    // The opposite direction on the identical drive: hold the rebind cadence
+    // but let the reporter go quiet past the window, and the second scrape is
+    // a second accident that must still cost its ten.
+    const parted = frames.filter((f) => f.t <= 0.5 || f.t >= 2.5);
+    expect(crashes(parted)).toEqual(["COLLISION", "COLLISION"]);
+  });
+
   it("the separation window sits clear of BOTH neighbours it has to separate", () => {
     // Floor: the 0.5 s shell-rebind gap must read as the same encounter.
     // Ceiling: 2.35 s of daylight must read as a new one. The configured
     // window has to be strictly between them or one of the two cases breaks.
+    // The behavioural halves are the two cases above this one and «hit,
+    // reverse out, hit again»; this pins the number they both ride on.
     const cfg = createRuleEngine().config;
     expect(cfg.collisionSeparationSec).toBeGreaterThan(0.5);
     expect(cfg.collisionSeparationSec).toBeLessThan(2.35);

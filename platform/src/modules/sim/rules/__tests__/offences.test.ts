@@ -26,9 +26,11 @@ import { VIOLATIONS, makeViolation } from "../catalog";
 import { roadConsequenceFor } from "../consequences";
 import {
   GATED_SHARED_PROVISIONS,
+  LADDER_SHARED_LADDERS,
   OFFENCE_GROUPS,
   SEPARATE_ACTS,
   billRoadConsequences,
+  ladderIdentityFor,
   offenceCoversNoteBg,
   offenceGroupFor,
   sharedChargeFor,
@@ -139,6 +141,133 @@ describe("the census of shared penalty provisions", () => {
         codes.includes("PREDRIVE_SEATBELT_SKIPPED") && codes.includes("SEATBELT_OFF_WHILE_MOVING"),
     );
     expect(seatbelt).toBeDefined();
+  });
+
+  /**
+   * THE GUARD THE CENSUS WAS MISSING, AND THE ONE THAT MAKES IT A CENSUS.
+   *
+   * Every test above walks `ungatedChargeFor`, which answers only for the
+   * `single` shape — so for as long as this file has existed, a `ladder` row was
+   * in no cluster, in no group and in no `SEPARATE_ACTS` entry, and the two
+   * speeding codes rode the identical чл. 182 ladder with nothing watching.
+   * A census that cannot say which codes it never looked at is not a census.
+   *
+   * The allow-list is by SHAPE and is deliberately short: `conditional` prints
+   * its money behind a condition (and the gated census counts those), `exam-only`
+   * prints none, `unknown` prints prose. `authored` is NOT on it — those rows
+   * print a лв. sentence of their own, so the day one appears somebody has to
+   * decide whether it can double, rather than inherit silence.
+   *
+   * MUTATION: make `ladderIdentityFor` return `null` unconditionally — i.e. put
+   * the blindness back — and this goes red naming SPEEDING_OVER_LIMIT (ladder)
+   * and SPEEDING_DANGEROUS (ladder).
+   */
+  it("leaves no catalogued code invisible to every census", () => {
+    const blind: string[] = [];
+    for (const code of ALL_CODES) {
+      const road = roadConsequenceFor(code);
+      const seen =
+        ungatedChargeFor(code) !== null ||
+        ladderIdentityFor(code) !== null ||
+        road.kind === "conditional" ||
+        road.kind === "exam-only" ||
+        road.kind === "unknown";
+      if (!seen) blind.push(`${code} (${road.kind})`);
+    }
+    expect(
+      blind,
+      "These codes put a price on the result screen that no census in offences.ts can see, " +
+        "so nothing can tell whether two of them double it. Give the shape a census or say why it needs none.",
+    ).toEqual([]);
+  });
+
+  /**
+   * The ladder census, pinned against the real acts — same contract as the
+   * gated one. MUTATION: change `codeCount` to 1 (or drop the entry) and this
+   * goes red on the measured-vs-declared comparison.
+   */
+  it("matches the pinned census of shared LADDERS", () => {
+    const byLadder = new Map<string, Set<ViolationCode>>();
+    for (const code of ALL_CODES) {
+      const id = ladderIdentityFor(code);
+      if (id === null) continue;
+      const key = `${id.offenceBg} | ${id.scopeBg} | ${id.tierCount}`;
+      const set = byLadder.get(key) ?? new Set<ViolationCode>();
+      set.add(code);
+      byLadder.set(key, set);
+    }
+    const measured = [...byLadder.entries()]
+      .filter(([, codes]) => codes.size > 1)
+      .map(([key, codes]) => `${key.split(" | ").slice(0, 2).join(" | ")} × ${codes.size}`)
+      .sort();
+    const declared = LADDER_SHARED_LADDERS.map(
+      (l) => `${l.offenceBg} | ${l.scopeBg} × ${l.codeCount}`,
+    ).sort();
+    expect(measured).toEqual(declared);
+    for (const l of LADDER_SHARED_LADDERS) expect(l.reason.length).toBeGreaterThan(80);
+  });
+
+  /**
+   * THE OTHER DIRECTION. A detector that answers „yes" for everything finds
+   * every pair and protects nothing — the exact failure mode that makes a false
+   * pass out of a guard. `ladderIdentityFor` must answer for a ladder and for
+   * nothing else, one live code per remaining shape.
+   *
+   * MUTATION: drop the `road.kind !== "ladder"` bail and this goes red on the
+   * `single`, `exam-only` and `conditional` rows below.
+   */
+  it("ladderIdentityFor answers for a ladder row and for no other shape", () => {
+    expect(ladderIdentityFor("SPEEDING_OVER_LIMIT")).not.toBeNull();
+    expect(ladderIdentityFor("SPEEDING_DANGEROUS")).not.toBeNull();
+    expect(ladderIdentityFor("PREDRIVE_SEATBELT_SKIPPED")).toBeNull(); // single
+    expect(ladderIdentityFor("ENGINE_STALLED")).toBeNull(); // exam-only
+    expect(ladderIdentityFor("FOLLOWING_TOO_CLOSE")).toBeNull(); // conditional
+    expect(ladderIdentityFor("STOP_LINE_OVERSHOOT")).toBeNull(); // unknown
+  });
+
+  /**
+   * The pair itself, read back out of the acts rather than retyped: same
+   * деяние, same alinea, same rungs — one състав carrying two exam classes.
+   * This is what makes the double price on `sc-speed-creep/pc-wrong` a doubled
+   * ONE offence and not two priced offences.
+   */
+  it("the two speeding codes ride one and the same ladder", () => {
+    const a = roadConsequenceFor("SPEEDING_OVER_LIMIT");
+    const b = roadConsequenceFor("SPEEDING_DANGEROUS");
+    if (a.kind !== "ladder" || b.kind !== "ladder") throw new Error("both rows must stay `ladder`");
+    expect(b.offenceBg).toBe(a.offenceBg);
+    expect(b.scopeBg).toBe(a.scopeBg);
+    expect(b.tiers).toEqual(a.tiers);
+  });
+
+  /**
+   * THE UNDER-CHARGE GUARD, which is the half that keeps this a report instead
+   * of a quiet ruling. `billRoadConsequences` bills the EARLIEST member of an
+   * act, and a creeping overspeed enters the второстепенна band first — so a
+   * group declared here without a ladder-aware charge and a declared-order
+   * primary would keep the CHEAP rung and silence the опасна one.
+   *
+   * `sharedChargeFor` must refuse the pair, so that mistake yields no collapse
+   * rather than a cheap one. MUTATION: let `ungatedChargeFor` fall through for
+   * the `ladder` shape (returning the first tier's fine, say) and this goes red.
+   */
+  it("refuses to collapse the speeding pair — a ladder has no shared ungated charge", () => {
+    expect(ungatedChargeFor("SPEEDING_OVER_LIMIT")).toBeNull();
+    expect(ungatedChargeFor("SPEEDING_DANGEROUS")).toBeNull();
+    expect(sharedChargeFor(["SPEEDING_OVER_LIMIT", "SPEEDING_DANGEROUS"])).toBeNull();
+
+    const grouped = new Set<ViolationCode>();
+    for (const g of OFFENCE_GROUPS) for (const c of g.codes) grouped.add(c);
+    expect(grouped.has("SPEEDING_OVER_LIMIT")).toBe(false);
+    expect(grouped.has("SPEEDING_DANGEROUS")).toBe(false);
+
+    // And the walker leaves both rows printing their own rung — which is the
+    // honest state until the ruling lands, not the fixed one.
+    const billing = billRoadConsequences([
+      at("SPEEDING_OVER_LIMIT", 30),
+      at("SPEEDING_DANGEROUS", 46),
+    ]);
+    expect(billing.map((b) => b.billed)).toEqual([true, true]);
   });
 
   it("lists no code in SEPARATE_ACTS that does not actually share the charge", () => {

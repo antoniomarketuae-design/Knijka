@@ -124,6 +124,33 @@
  *      kill the harness, and a lane that dies before it drives is now
  *      distinguishable from one that was never dispatched.
  *
+ * ── AND THEN THE SAME SWEEP WAS RE-READ, AND THREE HOLES WERE STILL OPEN ───
+ *
+ * Re-measured over the 54 lanes the findings name: 206 zero-byte frames, 5
+ * truncated, 18 lanes with not one usable picture — and NOT ONE of the 54
+ * carrying an `_audit-status.json`, because the four fixes above landed after
+ * the sweep. Reading what they would have written on those lanes found three
+ * places where they would still have answered wrongly:
+ *
+ *   5. THE STATUS FILE LIED ABOUT LANES THAT DIED. `framesWritten` was copied
+ *      into it by hand at two call sites, so every lane that never reached
+ *      `complete` published "0 written, 0 lost" beside a folder of real
+ *      frames — sc-sig-controller-live/mobile-right holds 5 whole PNGs and
+ *      stops mid-drive. It is read off the ledger at every save now.
+ *   6. A CRASH LEFT NO NOTE. sc-park-gap-short/pc-wrong's RUN.log ends on a
+ *      frame line and `Node.js v24.18.0`, with `grep -c Error` == 0: the
+ *      runtime's own obituary did not survive. The harness writes its own —
+ *      `phase: "crashed"`, the phase it died in, the reason, the stack, and
+ *      the transcript beside the frames — before the process is allowed to go.
+ *   7. THE ENGINES LOADED BEFORE THE GUARD DID. A static import of
+ *      `lib/pw.mjs` is evaluated before this file's first line, so a box that
+ *      cannot resolve playwright died leaving nothing at all — the state the
+ *      sweep could not tell apart from "never dispatched". `open()` loads them.
+ *
+ * The exit codes are named for the same reason (EXIT_* below): "the harness
+ * died" and "some frames are missing" were both `1`, and no re-drive lane can
+ * separate those out of one integer.
+ *
  * NOTHING HERE IS TUNED TO A LESSON. Every handle above is written by
  * LessonScene / SimOverlay / LessonPlayShell / SessionEndScreen for all 161
  * scenarios; there is not one scenario id, objective id or Bulgarian lesson
@@ -133,13 +160,26 @@
  *   node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> <mobile|pc> <right|wrong>
  *
  * EXIT CODE IS ABOUT EVIDENCE, NOT ABOUT THE LESSON. 0 = this run can be
- * judged. Non-zero = it cannot, and re-driving it is the only honest response.
+ * judged. Non-zero = it cannot, and re-driving it is the only honest response:
+ *   0 judgeable · 1 frames/log lost · 2 never dispatched (bad usage)
+ *   3 sign-in refused · 4 the harness crashed (`why` is in the status file)
  * A lesson that fails its own drive still exits 0: that is a finding, not a
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, statSync, writeFileSync } from "node:fs";
 
-import { webkit, chromium } from "./lib/pw.mjs";
+// ── THE ENGINES ARE LOADED IN open(), NOT HERE ─────────────────────────────
+// A static `import … from "./lib/pw.mjs"` is evaluated before the FIRST LINE of
+// this file's body — before `mkdirSync(OUT)`, before `_audit-status.json`,
+// before the crash guard below exists. So on a box where playwright cannot be
+// resolved, or where `E:\ms-playwright` has no browsers, this harness died
+// leaving a lane byte-for-byte identical to one that was never dispatched, and
+// that is precisely the confusion sc-crossing-bus-shadow and
+// sc-crossing-child-ball were filed under ("the harness created the output tree
+// and then died before it opened a browser" vs sc-crossing-let-pass, which was
+// never dispatched at all). pw.mjs is ~500 MB of playwright behind a top-level
+// await; deferring it by four lines costs nothing measurable and moves every
+// way it can fail INSIDE the guard, where it is recorded.
 import { newDeviceContext } from "./lib/insets.mjs";
 import { DEVICES } from "./lib/devices.mjs";
 import { signIn } from "./lib/auth.mjs";
@@ -149,13 +189,29 @@ const [OUT, SCENARIO, PLATFORM = "mobile", MODE = "right"] = process.argv.slice(
 export const BASE =
   process.env.KNIJKA_BASE ?? "https://icon-undertaken-earliest-zope.trycloudflare.com";
 
+// ── WHAT EACH EXIT CODE MEANS, IN ONE PLACE ────────────────────────────────
+//
+// Named because the sweep already lost a distinction it needed: a run that
+// CRASHED and a run whose evidence is merely incomplete both left `1` behind,
+// and a re-drive lane cannot tell "this lane needs the harness fixed" from
+// "this lane needs photographing again" out of one integer. Every one of these
+// is about EVIDENCE, never about whether the student passed — see the note at
+// the bottom of the file.
+const EXIT_JUDGEABLE = 0; //  the drive happened and every frame it claims exists
+const EXIT_EVIDENCE_INCOMPLETE = 1; //  it drove, but frames and/or the log were lost
+const EXIT_USAGE = 2; //  nothing was dispatched; no output directory was even made
+const EXIT_SIGNIN_REFUSED = 3; //  the lane never reached the lesson
+const EXIT_CRASHED = 4; //  the harness itself died — see `phase`/`why` in the status file
+
 // A missing argument used to produce frames at `undefined/01-arrival.png` and a
-// run that looked like every other. Refuse before the browser costs anything.
+// run that looked like every other. Refuse before the browser costs anything —
+// and before `mkdirSync`, so a mis-dispatched lane leaves NO directory at all
+// and can never be mistaken for one that ran.
 if (!OUT || !SCENARIO) {
   console.error(
     "[lesson-audit] usage: node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> [mobile|pc] [right|wrong]",
   );
-  process.exit(2);
+  process.exit(EXIT_USAGE);
 }
 mkdirSync(OUT, { recursive: true });
 
@@ -179,6 +235,16 @@ const log = [];
  */
 let stdoutBroken = null;
 process.stdout.on("error", (error) => { stdoutBroken ??= String(error?.code ?? error?.message ?? error); });
+// AND THE SAME GUARD ON THE OTHER STREAM, because the cause was never "stdout"
+// — it was "an unhandled 'error' event on a write stream ends the process", and
+// only one of the two streams had been immunised. Every lane is invoked
+// `> run.log 2>&1`, so fd 2 is backed by the same SyncWriteStream on the same
+// disk that filled; playwright writes its own warnings there, and one of those
+// hitting ENOSPC would kill the drive exactly the way `note()` did. The field
+// keeps the name `stdoutBroken` because it is already the key readers look for
+// in `_audit-status.json` and in the MACHINE SUMMARY; the stream is named in
+// the value instead.
+process.stderr.on("error", (error) => { stdoutBroken ??= `${String(error?.code ?? error?.message ?? error)} (stderr)`; });
 const note = (s) => {
   log.push(s);
   try {
@@ -216,15 +282,117 @@ const status = {
   framesWritten: 0, framesLost: 0, lostFrames: [],
   cameraStopped: null, stdoutBroken: null, ended: null, verdict: null, exit: null,
 };
+
+// ── THE LEDGER IS MIRRORED HERE, NOT COPIED IN BY HAND ─────────────────────
+//
+// It WAS copied by hand, at two call sites out of ten, and the hole that left
+// is the same false pass this file exists to end: `framesWritten` was only ever
+// filled in on a lost frame and at `phase: "complete"`, so EVERY lane that died
+// mid-drive published `framesWritten: 0, framesLost: 0, lostFrames: []` —
+// beside a folder holding good frames. sc-sig-controller-live/mobile-right is
+// that lane exactly: measured on disk it holds 5 whole PNGs, 20 empty ones and
+// 4 truncated at 512 KiB/1 MiB, and it never reaches `complete` (its run.log
+// has no MACHINE SUMMARY). A status file that answered "0 written, 0 lost"
+// there would be a confident lie about all 29, and a reader who caught it would
+// go straight back to counting files in the folder — the original crime.
+//
+// So the ledger is read at EVERY save instead. `frames` starts as a standing
+// zero and is re-pointed at the real ledger's state object once the camera is
+// built below (the camera needs `loud`, which needs `note`, which needs this
+// block); `patch` still wins, so a caller can override, but nobody has to
+// remember to.
+let frames = { written: 0, lost: 0, names: [], cameraStopped: null };
+// AND WHAT EACH SURVIVING FRAME WEIGHED. sc-sig-controller-live and
+// sc-signal-controller lost four frames each to a truncation that happened
+// AFTER the drive — every file in both folders carries one identical mtime, so
+// the corruption was in the copy into `.audit-frames`, not in the capture. This
+// harness cannot police a copy step it does not own, but it is the only witness
+// to what it actually wrote, so it says: 02-briefing.png was 1,203,441 bytes.
+// A copy that hands a reader 524,288 is then provably corrupt rather than
+// arguably unlucky. One `statSync` per frame, against a screenshot measured at
+// 200 ms (mobile) and 11,999 ms (pc).
+const framesOnDisk = [];
 const saveStatus = (patch = {}) => {
-  Object.assign(status, patch, { stdoutBroken, updatedAt: new Date().toISOString() });
+  Object.assign(
+    status,
+    {
+      framesWritten: frames.written,
+      framesLost: frames.lost,
+      lostFrames: frames.names,
+      cameraStopped: frames.cameraStopped,
+      frames: framesOnDisk,
+    },
+    patch,
+    { stdoutBroken, updatedAt: new Date().toISOString() },
+  );
   // The status file is the LAST thing that may fail silently — but it lives on
   // the same disk that was full, so it cannot be allowed to throw either.
   try { writeFileSync(STATUS, `${JSON.stringify(status, null, 2)}\n`); } catch { /* the disk is gone; the log tail is all there is */ }
 };
 saveStatus();
 
+// ── THE DEATH THAT LEFT NO NOTE ────────────────────────────────────────────
+//
+// `.audit-frames/sweep161/sc-park-gap-short/pc-wrong/RUN.log` is the artifact
+// this block is written against. Measured: 57 PNGs, of which 54 are 0 bytes and
+// one is truncated at 524,288; the log's last two lines are
+//     [04-t130s] 49 км/ч  card=-/-
+//     Node.js v24.18.0
+// and `grep -c Error` over the whole file returns ZERO. Node's fatal report
+// goes to stderr and did not survive whatever killed the process, so the only
+// thing on disk saying the run died at all is the version banner at the end of
+// somebody else's message. The audit read it and wrote "the node process then
+// died outright at t130s with no error text in RUN.log … nothing in the log
+// says why."
+//
+// A harness cannot rely on the runtime's own obituary. It writes its own, into
+// a few hundred bytes of JSON it controls, before the process is allowed to go:
+//
+//   phase: "crashed"   — not "driving", which a reader would take for a lane
+//                        still in flight, and not "complete", ever
+//   diedDuring         — the phase it was in, so "died before it opened a
+//                        browser" and "died at t130s of the drive" are two
+//                        different rows and not one shrug
+//   why                — the message AND the top frames of the stack
+//   _audit-transcript.log — because `process.exit()` truncates a piped stdout,
+//                        and on this harness stdout IS the evidence
+//
+// A LATE FAILURE AFTER A GOOD RUN IS NOT A CRASH. Playwright can reject a
+// dangling promise while the process is winding down; overwriting a `complete`
+// status with `crashed` there would throw away a verdict that was correctly
+// captured and send a re-drive after a lane that is fine. A false failure and a
+// false pass are the same crime, so the guard checks and stands down.
+let dying = false;
+const die = (kind, error) => {
+  const why = String(error?.stack ?? error?.message ?? error)
+    .split("\n")
+    .map((l) => l.trim())
+    // Playwright's "run npx playwright install" advice arrives as a six-line
+    // box; a reason that is four fifths ║ is not a reason. Borders out, words
+    // and stack frames in.
+    .filter((l) => l && !/^[╔╗╚╝║═│┌┐└┘─\s]*$/.test(l))
+    .slice(0, 5)
+    .join(" ⏎ ");
+  if (status.phase === "complete") {
+    note(`  (a late ${kind} AFTER the run had finished, ignored: ${why})`);
+    return;
+  }
+  if (dying) return; // a second failure while handling the first must not loop
+  dying = true;
+  const diedDuring = status.phase;
+  loud(`THE HARNESS DIED (${kind}) DURING «${diedDuring}» — ${why}`);
+  loud(`this lane produced no verdict of its own; RE-DRIVE it. Nothing below is a finding about the lesson.`);
+  saveStatus({ phase: "crashed", diedDuring, kind, why, exit: EXIT_CRASHED });
+  try { writeFileSync(`${OUT}/_audit-transcript.log`, `${log.join("\n")}\n`); } catch { /* the disk really is gone */ }
+  process.exit(EXIT_CRASHED);
+};
+process.on("uncaughtException", (error) => die("uncaughtException", error));
+process.on("unhandledRejection", (error) => die("unhandledRejection", error));
+
 async function open() {
+  // Deferred on purpose — see the note on the imports. Node caches the module,
+  // so the two branches below share one load.
+  const { webkit, chromium } = await import("./lib/pw.mjs");
   if (PLATFORM === "pc") {
     // ── THE PC LEG RUNS ON THE REAL GPU, AND IT HAD TO ─────────────────────
     //
@@ -333,18 +501,27 @@ const ledger = createFrameLedger({
   loud,
   capture: (target, path, opts) => timed("screenshot", () => captureFrame(target, path, opts)),
 });
-const frames = ledger.state;
+// Re-point the standing zero declared above at the real ledger. From here every
+// `saveStatus()` — including the one the crash guard writes — publishes what
+// the camera has actually got, rather than what somebody remembered to copy.
+frames = ledger.state;
 
 const shot = async (n) => {
   const ok = await ledger.shoot(page, `${OUT}/${n}.png`, n);
-  if (!ok) {
-    saveStatus({
-      framesWritten: frames.written,
-      framesLost: frames.lost,
-      lostFrames: frames.names,
-      cameraStopped: frames.cameraStopped,
-    });
+  if (ok) {
+    // The weight of the frame AS THIS PROCESS LEFT IT — the only number that
+    // can later convict a truncated copy. `captureFrame` has already stat'd it
+    // to prove the IEND, but the ledger returns a boolean, so read it again
+    // rather than reach into another module's shape.
+    let bytes = null;
+    try { bytes = statSync(`${OUT}/${n}.png`).size; } catch { /* it decoded a moment ago; if it is gone now the ledger is the wrong place to shout */ }
+    framesOnDisk.push({ name: n, bytes });
   }
+  // EVERY frame, not only the lost ones. A lane that dies at t130s has to leave
+  // a true count behind it, and the count is only true if it was written down
+  // before the death. One ~2-8 KB rewrite against a 200 ms (mobile) to 12 s
+  // (pc) screenshot.
+  saveStatus();
   return ok;
 };
 
@@ -611,9 +788,13 @@ try {
 } catch (error) {
   const why = String(error?.message ?? error).split("\n")[0];
   loud(`SIGN-IN WAS REFUSED — this lane never reached the lesson: ${why}`);
-  saveStatus({ phase: "signin-refused", why, exit: 3 });
+  saveStatus({ phase: "signin-refused", why, exit: EXIT_SIGNIN_REFUSED });
   await browser.close().catch(() => {});
-  process.exit(3);
+  // A REFUSAL IS NOT A CRASH, and the crash guard must never relabel it. This
+  // lane's failure has a name, a reason and its own exit code; burying that
+  // under "the harness died" would send a re-drive after the harness instead of
+  // after the login rate-limiter that actually did it.
+  process.exit(EXIT_SIGNIN_REFUSED);
 }
 saveStatus({ phase: "loading-lesson" });
 await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, {
@@ -1562,7 +1743,7 @@ note(`DEBRIEF TEXT >>> ${debrief.body.slice(0, 1800)}`);
 // Making them exit non-zero would send a re-drive lane after 137 healthy runs
 // and bury the 54 that actually lost their evidence. A false failure and a
 // false pass are the same crime.
-const exit = frames.lost || stdoutBroken ? 1 : 0;
+const exit = frames.lost || stdoutBroken ? EXIT_EVIDENCE_INCOMPLETE : EXIT_JUDGEABLE;
 if (stdoutBroken) {
   // The one recovery attempt for a transcript that never reached run.log. It
   // shares the disk that just failed, so it is allowed to fail too — but
@@ -1571,11 +1752,10 @@ if (stdoutBroken) {
   try { writeFileSync(`${OUT}/_audit-transcript.log`, `${log.join("\n")}\n`); } catch { /* the disk really is gone */ }
 }
 saveStatus({
+  // The four frame fields used to be repeated here. They are not, any more:
+  // `saveStatus` reads the ledger itself, so `complete` and every phase before
+  // it now report the same numbers from the same place.
   phase: "complete",
-  framesWritten: frames.written,
-  framesLost: frames.lost,
-  lostFrames: frames.names,
-  cameraStopped: frames.cameraStopped,
   ended,
   endedNaturally,
   forcedBy,

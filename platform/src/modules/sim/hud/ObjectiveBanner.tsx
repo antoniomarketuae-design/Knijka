@@ -92,9 +92,113 @@
  * 312 px content box is 45 characters, and PlayAreaStyles' own comparison puts
  * the reading face at 1.46× the characters per line. The `Задача i/т` chip stays
  * a `<span>`: a counter IS telemetry and belongs in the telemetry face.
+ *
+ * ── 2026-08-18: THE LINE BREAK LANDS INSIDE THE GRADED NUMBER. ───────────────
+ *
+ * The redrive of the 161-scenario catalogue routed thirty-six BROKEN findings
+ * here. All but one are somebody else's lane and are listed at the bottom of
+ * this block. The one that is OURS is `sc-ac-aquaplane`, filed as minor and
+ * photographed on `pc-right/01-arrival.png`:
+ *
+ *     «… дръж под 63 км/»
+ *     «ч»
+ *
+ * The unit is cut in half by a wrap. It is a `<p>` with `break-words`, and
+ * `break-words` is not what did it — UAX #14 gives SOLIDUS a break opportunity
+ * AFTER it, so «км/ч» carries a legal wrap point in its own middle, and the
+ * engine takes it whenever the line fills to just past the slash. That is a
+ * one-character window, which is why it shows on one frame out of a hundred
+ * and not on all of them.
+ *
+ * The frame that says why a one-in-a-hundred wrap is worth a fix is
+ * `sc-ac-rain-lights/pc-right/04-t090s.png`, filed MAJOR for the same shape on
+ * a world label: „«не по-бързо от 47 км/» … so the one figure the student is
+ * being scored against is unreadable". A speed cap is not decoration; it is the
+ * threshold the rung is graded on.
+ *
+ * MEASURED over the shipped catalogue, 2026-08-18 (663 compiled rungs, 1 575
+ * rung-objectives, the same sweep the line-budget block at the foot of
+ * `objective-banner-surface.test.ts` walks):
+ *
+ *     40 of 1 575 objective titles carry «км/ч» (10 distinct sentences)
+ *     «км/ч» is the ONLY token following a numeral that contains a solidus —
+ *       the rest of the tail is «с» (16) and «метра» (4), neither of which has
+ *       a break opportunity inside it
+ *     the longest is 61 characters — «Подмини авариралата кола в лентата за
+ *       движение — под 110 км/ч» — i.e. it sits ON the 65-character reading
+ *       line this column buys, so it is the one most likely to wrap at all
+ *
+ * So the numeral and its unit are bound into one `white-space: nowrap` run and
+ * NOTHING ELSE IS. A blanket `nowrap` on the title would be the „loosen the
+ * check until everybody passes" move in layout form: it would take a 77-
+ * character title (the catalogue's worst) and push it straight out of a 312 px
+ * column, trading a rare amputated unit for a guaranteed clipped sentence.
+ * `withUnitsUnbroken` below therefore binds only what was measured, and the
+ * text content is left byte-for-byte identical — no word joiners, no NBSPs —
+ * because `advisorEchoTrim` in the shell compares the advisor's sentence
+ * against this exact string, and a probe that reads `textContent` must keep
+ * reading the authored title.
+ *
+ * WHAT IS NOT THIS FILE'S, of the other thirty-five, with where it went:
+ *   · the objective printed twice (the advisor card repeating `titleBg`
+ *     verbatim) — `advisorEchoTrim` in `LessonPlayShell.tsx`, landed;
+ *   · the banner painted across the interior rear-view mirror, including the
+ *     one CRITICAL finding (`sc-vu-emergency`) — `NOTIFY_COLUMN_TOP_CSS_ROOMY`
+ *     in `notifyColumn.ts`, landed (52 px → 156.55 px on a 1264 × 619 stage);
+ *   · «Следвай синята линия» composited into the title — `follow-hint` is
+ *     still `top-16` in `LessonScene.tsx` while this column now starts at
+ *     156.55 px, so the collision is gone, but the pill has been left sitting
+ *     INSIDE the mirror band (0.24 × 619 + 8 = 156.6 px) that the column just
+ *     stepped out of. It needs the column's top, not the column's x alone;
+ *   · «Задача 3/3» read as „three of three DONE" against a debrief that ticks
+ *     two — the ⚙ sheet's rows are `LessonPlayShell.tsx` 3123 / 3222, and the
+ *     notation is shared with the chip below. A copy decision, not a layout
+ *     one, and it must move in all three places at once.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+
+/**
+ * «км/ч» with the numeral in front of it, as ONE run.
+ *
+ * The numeral is inside the group on purpose: «под 110» / «км/ч» separates the
+ * figure from its unit, which is the same defect one break earlier, and both
+ * are the shape `sc-ac-rain-lights` was filed for. `[.,]` because Bulgarian
+ * copy uses the comma decimal, though nothing in the shipped catalogue does
+ * today (all 40 are whole numbers).
+ *
+ * Global because `matchAll` requires it; safe as a module singleton because
+ * `String.prototype.matchAll` clones the regex rather than advancing this
+ * one's `lastIndex`.
+ */
+const GRADED_SPEED_UNIT = /(?:\d+(?:[.,]\d+)?\s*)?км\/ч/gu;
+
+/**
+ * The authored sentence, with every graded speed bound against the wrap.
+ *
+ * Returns the string untouched — not an array of one — when there is nothing to
+ * bind, so the 1 535 titles that carry no unit render as a single text node and
+ * the markup this component emits for them does not change at all.
+ */
+function withUnitsUnbroken(text: string): ReactNode {
+  const runs = [...text.matchAll(GRADED_SPEED_UNIT)];
+  if (runs.length === 0) return text;
+
+  const out: ReactNode[] = [];
+  let cut = 0;
+  runs.forEach((run, i) => {
+    const at = run.index;
+    if (at > cut) out.push(text.slice(cut, at));
+    out.push(
+      <span key={`u${i}`} style={{ whiteSpace: "nowrap" }}>
+        {run[0]}
+      </span>,
+    );
+    cut = at + run[0].length;
+  });
+  if (cut < text.length) out.push(text.slice(cut));
+  return out;
+}
 
 export interface ObjectiveFlash {
   titleBg: string;
@@ -153,12 +257,14 @@ export function ObjectiveBanner({
         </span>
         {/* The completed objective is the SAME authored sentence as the one
             below, so it takes the same tag for the same reason — the UNPANEL
-            exemption is by tag, not by class. */}
+            exemption is by tag, not by class — and the same unit binding: the
+            tick card is 1.6 s long and narrower by `px-3`, i.e. the branch a
+            wrap is MORE likely on, not less. */}
         <p
           className="min-w-0 break-words text-[11px] font-bold leading-tight"
           style={{ color: "var(--success)" }}
         >
-          {flash.titleBg}
+          {withUnitsUnbroken(flash.titleBg)}
         </p>
       </div>
     );
@@ -181,7 +287,7 @@ export function ObjectiveBanner({
           in the reading face, and as a `<span>` this sentence was set in
           JetBrains Mono at 6.8 px a character. */}
       <p className="break-words text-[11px] font-bold leading-tight text-foreground">
-        {titleBg}
+        {withUnitsUnbroken(titleBg)}
       </p>
       {progress !== null ? (
         // A progress bar IS its fill — both halves are marked so the sweep

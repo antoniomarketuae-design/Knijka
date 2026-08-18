@@ -36,6 +36,50 @@
  * traces through the production stack
  * (traces/__tests__/sc-rb-ped-exit-traces.test.ts, the §5/§9 gates).
  *
+ * SWEEP 161, 2026-08-18 — WHAT THE FRAMES SAID, so the next reader does not
+ * re-litigate this shelf from the verdict lines alone.
+ *
+ * THE HEADLINE IS NOT IN THIS FILE. Three BROKEN findings were routed here, two
+ * critical, both of the shape „not one of the three tasks is ticked in any of
+ * the four legs; the careful drive (7 full stops, 2 lawful waits) is stamped
+ * НЕИЗДЪРЖАН 10 т. exactly like the 49 км/ч one". The cause is that the sweep's
+ * driver HAS NO STEERING: tools/mobile/lesson-audit.mjs actuates
+ * `page.keyboard[down|up]("KeyW")` and `…("KeyS")` and nothing else — a census
+ * of the whole harness returns zero KeyA / KeyD / Arrow* tokens. So it leaves
+ * the south arm and drives onto the central island, which is exactly what
+ * mobile-right/04-t065s photographs: grass filling the windscreen, the coach
+ * card reading «Интервалът беше добър · Изчака 24 с и влезе — и при влизането
+ * не беше отчетено нарушение на предимството», and the collision billed five
+ * seconds later. The signature is family-wide and file-independent, counted off
+ * the sweep's own logs: 20 of 20 legs across the five roundabout drills that
+ * have one collided, against 24 of 98 pc-right legs sweep-wide.
+ * s-w6-bot-completion.test.ts is what says this drill grades — the authored
+ * drive completes all three objectives through the real session with zero
+ * violations at 3★.
+ *
+ * WHAT THE FRAMES DID EXPOSE HERE, fixed at the two `success` rows below and
+ * held by roundabout2-title-truth.test.ts — both are the same crime in the two
+ * directions the founder ranks equally: a gate that credits the act its own
+ * title forbids.
+ *   · sc-rbp-past-east sat ON the east mouth, so the car that TOOK the first
+ *     exit collected «Подмини първия изход и остани в кръга»;
+ *   · sc-rbp-pocket was authored for L3 and the L1/L2 ladder widened it out of
+ *     the pocket at both ends — into the ring band and past the zebra.
+ * Each row records its own arithmetic.
+ *
+ * REPORTED RATHER THAN TOUCHED (all outside this file):
+ *  · The Part-G finding „no give-way markings, no roundabout sign, no lane
+ *    arrows" is refuted by the frame it cites: mobile-right/04-t001s shows Б1
+ *    (inverted triangle), the blue roundabout sign and the 40 limit on the
+ *    south approach, with the broken give-way transverse across the mouth in
+ *    04-t044s. What IS true is that the Б2-shaped triangle on the EAST arm
+ *    renders untextured grey (same frame, right edge) — a scene/renderer row.
+ *  · The lawful-wait card freezes its own text: mobile-right shows «Стоиш вече
+ *    15 секунди» unchanged five seconds apart, and pc-right shows the identical
+ *    «Чакаш правилно» card at t=22 s and t=92 s — 70 s later, with the car
+ *    pinned after a collision. A stale card read as a live instruction is what
+ *    made the harness hold for 90 s. That is advisor.ts / the HUD card queue.
+ *
  * Content provenance (doc 76 §9 stage 0 — original items, never listovki):
  * q-predimstvo-032 (завиваш надясно; пешеходец на пътеката на улицата, в която
  * НАВЛИЗАШ — чл. 119: the exact rule, one geometry away),
@@ -54,6 +98,18 @@ import type { ScenarioSpec } from "./types";
 
 /** Ring centerline radius (rb-ped-v1 meta.scenario.params.ringRadiusM). */
 const RING_R = 18;
+/** Half the drawn ring lane (8.125 / 2) — so the circulatory carriageway runs
+ *  r ∈ [13.94, 22.06], the two edges world/__tests__/rb-ped-district.test.ts
+ *  pins as RING_INNER/RING_OUTER_EDGE_M. */
+const RING_LANE_HALF_M = 4.06;
+/**
+ * The ring point halfway between the exit that is SKIPPED (east, ring angle 0°)
+ * and the exit that is TAKEN (north, 90°) — 12.73, 12.73, i.e. 13.78 m of chord
+ * from each mouth. The east gate lives here; see the row for why it may not
+ * live on the mouth itself.
+ */
+const MID_ARC_X = 12.7279;
+const MID_ARC_Y = 12.7279;
 /** Arm right-lane center (rb-ped-v1 meta.scenario.laneCenterRightM) — the
  *  northbound lane of the south arm the player approaches and yields in, and
  *  the outbound lane of the north arm they exit into. */
@@ -261,22 +317,135 @@ export const SC_RB_PED_EXIT: ScenarioSpec = {
     {
       id: "sc-rbp-past-east",
       titleBg: "Подмини първия изход и остани в кръга",
-      // The east mouth on the ring centerline (rb-ped-v1: R = 18 around (0, 0);
-      // the east node sits at (18, 0)). maxSpeedKmh 20 is the ring's own
-      // envelope on R = 18 (a brisker circulation trips the turn detector — see
-      // the trace script's window arithmetic), not a slow-down demand.
-      params: { kind: "reachZone", x: RING_R, y: 0, radiusM: 6, maxSpeedKmh: 20 },
+      // ── THE GATE USED TO SIT ON THE MOUTH THE TITLE FORBIDS TAKING ────────
+      //
+      // Shipped as a disc at the east node (18, 0) r6, and both clauses of the
+      // sentence were collectable by the drive that did neither, because
+      // `stepReachZone` credits a PATH THAT CROSSES the disc (the swept
+      // waypoint test, objectives.ts) — and a car peeling off down the east arm
+      // crosses the east mouth at exactly the ring pace the car staying in the
+      // ring does. Taking the first exit is not an exotic cheat: it is THE
+      // classic roundabout error, the one instruction 3 spends a sentence
+      // forbidding («Подмини първия изход (изток) мълчаливо»). Driven at all
+      // five rungs in roundabout2-title-truth.test.ts („the first exit taker
+      // does not collect the rung that forbids taking it"), which is red on the
+      // shipped params and green on these.
+      //
+      // 45° OF RING IS WHAT MAKES THE SENTENCE MEASURABLE, and the arithmetic
+      // is the whole of the choice. Both arms are 16.25 m wide, so each mouth's
+      // opening in the ring's outer edge ends at atan2(8.125, √(22.06² −
+      // 8.125²)) = ±21.6° of ring angle. A disc centred at 45° with r = 4.06
+      // spans 45 ± asin(4.06/18) = 32.0°..58.0°: clear of the east opening by
+      // 10.4° and of the north one by the same, so the only way through it is
+      // to have stayed on the carriageway between the two exits. The peel-off
+      // drive's closest approach to it is 13.54 m — three discs away.
+      //
+      // AND r = 4.06 IS THE RING LANE'S OWN HALF-WIDTH, which makes the second
+      // clause literally true at the graded rungs: 18 ± 4.06 = [13.94, 22.06]
+      // is the circulatory carriageway exactly, so the disc IS a slice of the
+      // ring — inscribed, touching both kerbs, favouring no line. A learner
+      // hugging the outer edge (r = 21) and one cutting the island (r = 15) are
+      // both 3.0 m from the centre and both credited; that pair is driven in
+      // the same file so no future tightening can manufacture a false failure
+      // out of a legal lane position. (The L1/L2 ladder multiplies the radius
+      // by 1.5/1.25 — `DEFAULT_LEVEL_TOLERANCE` — so the aided rungs spill up
+      // to 2.03 m onto verge and island kerb at 45°. There is no exit and no
+      // lane there, and the mouth clearance above survives the widening with
+      // 3.6° to spare, which is the property the test asserts per rung.)
+      //
+      // maxSpeedKmh 20 is unchanged: the ring's own envelope on R = 18 (a
+      // brisker circulation trips the turn detector — see the trace script's
+      // window arithmetic), not a slow-down demand.
+      params: {
+        kind: "reachZone",
+        x: MID_ARC_X,
+        y: MID_ARC_Y,
+        radiusM: RING_LANE_HALF_M,
+        maxSpeedKmh: 20,
+      },
     },
     {
       id: "sc-rbp-pocket",
       titleBg: "Спри в джоба между кръга и пътеката",
       // THE POCKET, gated as an objective: rb-ped-v1's clear span runs from the
-      // circulatory carriageway's outer edge (r = 22.06) to the zebra (r = 30).
-      // The zone is centred at y = 26 — the pocket's middle — with radiusM 3.6
-      // so it cannot be satisfied from inside the ring band NOR from beyond the
-      // crossing. maxSpeedKmh 6: this rung is passed by STOPPING there, which
-      // is the sentence the whole template teaches.
-      params: { kind: "reachZone", x: X_ARM_LANE, y: 26, radiusM: 3.6, maxSpeedKmh: 6 },
+      // circulatory carriageway's outer edge (r = 22.06) to the zebra (y = 30).
+      // The zone is centred at (4.06, 26) — the pocket's middle on the outbound
+      // lane, r = 26.32 from the island — so it cannot be satisfied from inside
+      // the ring band NOR from beyond the crossing. maxSpeedKmh 6: this rung is
+      // passed by STOPPING there, which is the sentence the whole template
+      // teaches, and 6 is at or under REACH_ZONE_HALT_CAP_KMH (8), the band
+      // `params.ts widenSpeedCap` refuses to widen on any rung.
+      //
+      // ── THE RADIUS IS AUTHORED FOR L1, NOT FOR L3 — sweep 161 ─────────────
+      //
+      // It shipped as 3.6, which fits the pocket at the rungs that compile it
+      // unchanged and NOWHERE ELSE. `params.ts widenRadius` multiplies an
+      // authored radius by `DEFAULT_LEVEL_TOLERANCE` (L1 1.5, L2 1.25) under a
+      // budget that only ever looks at the NEXT ZONE — it knows nothing of
+      // kerbs or paint — so 3.6 became 5.4 at L1, and the disc then reached
+      // r = 20.92 (1.14 m INTO the ring band) and y = 31.4 (1.4 m PAST the
+      // zebra). On the beginner rung, therefore:
+      //   · a car stopped in the ring — the fault instruction 4, the teach text
+      //     and the examiner note all name («там ще запушиш кръга за всички зад
+      //     теб») — collected «Спри в джоба между кръга и пътеката»;
+      //   · so did a car stopped BEYOND the crossing, i.e. the drive the
+      //     mistake demo below bills as PEDESTRIAN_NOT_YIELDED.
+      // Both are driven at L1 in roundabout2-title-truth.test.ts and are red on
+      // 3.6.
+      //
+      // 2.4 is the largest authored radius whose WIDEST rung still fits: L1
+      // compiles it back to exactly the 3.6 disc that shipped — 26.32 − 3.6 =
+      // 22.72 ≥ 22.06 and 26 + 3.6 = 29.6 ≤ 30 — and L3-L5 grade on 2.4, which
+      // is 0.66 m of margin to the ring and 1.6 m to the paint. Nothing
+      // legitimate is refused by the tighter disc: a 4.3 m car whose tail is
+      // clear of the ring band and whose nose is short of the paint has its
+      // centre in y ∈ [23.83, 27.85], and the 2.4 disc covers y ∈ [23.6, 28.4]
+      // on this lane — the whole legal window, with the committed shadow's own
+      // stop (4.1, 27.0) sitting 1.0 m from the centre. That direction is
+      // driven too, at every rung, in the same file.
+      //
+      // …AND THE RADIUS ALONE IS NOT ENOUGH, because a halt gate is not just
+      // its disc. `stepReachZone` concedes an arrival to a car HALTED anywhere
+      // in the capsule stretched radius + REACH_ZONE_GRACE_M (5 m) back down
+      // the approach — „stopping short of a mark is stopping there, done
+      // earlier", which is right nearly everywhere and wrong HERE: five metres
+      // short of this pocket is inside the roundabout. That is why the stop at
+      // (4.06, 20.6) was credited at L1 even after the radius was fixed.
+      //
+      // `acceptBeforeMarkM` is the shipped lever for exactly this, and its
+      // documented sign convention states the geometry outright: it is the
+      // SIGNED offset from the PAINT to the authored mark, and the paint here
+      // is the exit zebra 4 m ahead of the mark ⇒ −4. It does two things at
+      // once and the ladder carries it through untouched at every rung
+      // (params.ts: „an aided rung forgives a student who stops early; no rung
+      // forgives one who stops past the line"):
+      //   · the far side is cut AT THE ZEBRA — stated rather than left to the
+      //     radius arithmetic, which at L1 clears the paint by only 0.4 m;
+      //   · the capsule keeps its length and SLIDES forward, so its back end
+      //     comes to radius + 1 m instead of radius + 5. Driven down the taught
+      //     exit line, the stop at (4.06, 20.6) — a car half in the ring, its
+      //     nose barely past the band's outer edge — measures 4.87 m back along
+      //     the capsule axis against bounds of 3.4 m at L3-L5 and 4.6 m at L1:
+      //     refused on every rung, by 1.47 m at the graded ones and 0.27 m on
+      //     the aided one.
+      //
+      // WHAT IS LEFT, and it is not this file's to close. The capsule is
+      // radius + 5 m long against a pocket 7.94 m deep, so its worst-case reach
+      // behind the mark on a TILTED approach is √(r² + (r + 1)²) — 4.16 m at
+      // the graded rungs, but 5.84 m once L1 multiplies the radius by 1.5,
+      // which is 1.5 m inside the ring band. No authored radius closes that
+      // without also refusing a car that stopped correctly two metres off the
+      // lane centre (driven, both directions, in the same file). The remainder
+      // is an objectives.ts row: the grace capsule cannot see the kerb it is
+      // reaching over.
+      params: {
+        kind: "reachZone",
+        x: X_ARM_LANE,
+        y: 26,
+        radiusM: 2.4,
+        maxSpeedKmh: 6,
+        acceptBeforeMarkM: -4,
+      },
     },
     {
       id: "sc-rbp-exit",

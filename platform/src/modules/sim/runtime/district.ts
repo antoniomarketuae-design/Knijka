@@ -126,6 +126,14 @@ export interface DistrictSpawnPoint {
   name: string;
 }
 
+/**
+ * The district's box in local meters. NOT decoration: `DistrictIndex`
+ * (runtime/spatial.ts) derives its uniform-grid ORIGIN and column count from
+ * these four numbers, and the world layer pads them (`TERRAIN_MARGIN_M`) into
+ * the drawn ground. A document that does not carry all four as finite numbers
+ * therefore does not merely look wrong — it cannot be located on. See the
+ * measurement at `parseDistrict`.
+ */
 export interface DistrictBounds {
   minX: number;
   minY: number;
@@ -353,8 +361,49 @@ export function parseDistrict(raw: unknown): District {
     if (!Array.isArray(d[key])) throw new Error(`district: missing ${key}[]`);
   }
   const meta = d.meta as District["meta"] | undefined;
-  if (!meta || typeof meta.boundsLocalMeters !== "object") {
+  // THE BOUNDS GATE — the one check in this file whose failure is SILENT.
+  //
+  // `typeof meta.boundsLocalMeters !== "object"` was the whole test, and
+  // `typeof null === "object"`, so `boundsLocalMeters: null` and `{}` both
+  // walked through the wrong-file guard this function exists to be. What they
+  // walk into is DistrictIndex's constructor, which reads
+  // `minX/minY - CELL_M` and `ceil((maxX - minX) / CELL_M)` straight out of
+  // this object: absent numbers make every cell index NaN, `for (cx = c0x;
+  // cx <= c1x; cx++)` never iterates, and the spatial grid is built EMPTY.
+  //
+  // Measured against the committed maps, sampling the midpoint of every edge —
+  // points that are on the carriageway by construction:
+  //
+  //   district-v1  healthy bounds  323/323 located, 0 on the wrong edge
+  //   district-v1  bounds {}         0/323 located, NOTHING thrown
+  //   tj-rhr-v1    bounds {}         0/3   located, NOTHING thrown
+  //   *            bounds null       raw TypeError from spatial.ts, not from
+  //                                  the parser that was asked to vet the file
+  //
+  // Zero located means the car is off-road on its own street for the whole
+  // lesson: no edge, no lane, no `maxspeed`, and every road-referent objective
+  // and detector stands down without a word. So the four numbers are checked
+  // here, where a bad file is still a file and the error can still name it.
+  //
+  // ONLY finiteness is checked. An INVERTED box (min/max swapped) was measured
+  // too and located 323/323 correctly on district-v1 and 3/3 on tj-rhr-v1 —
+  // the insert and the query share `cellOf`, so a negative column count is
+  // self-consistent. It is not rejected, because a check nothing can be shown
+  // to need is a false failure waiting to happen.
+  //
+  // Verified across all 210 committed district-v1 documents (content/world +
+  // platform/public/world): zero fail this gate.
+  const bounds = meta?.boundsLocalMeters as Partial<DistrictBounds> | null | undefined;
+  if (!meta || typeof bounds !== "object" || bounds === null) {
     throw new Error("district: missing meta.boundsLocalMeters");
+  }
+  for (const key of ["minX", "minY", "maxX", "maxY"] as const) {
+    const v = bounds[key];
+    if (typeof v !== "number" || !Number.isFinite(v)) {
+      throw new Error(
+        `district: meta.boundsLocalMeters.${key} must be a finite number (got ${String(v)})`,
+      );
+    }
   }
   // ZONE-BAN layer (ADR-006 stage 2a): OPTIONAL — absent is plain v1; when
   // present it must at least be an array (wrong-file guard, same bar as the

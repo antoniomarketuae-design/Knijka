@@ -60,6 +60,44 @@
  * traces/__tests__/sc-rb-circulate-priority-traces.test.ts and
  * traces/__tests__/sc-rb-busy-gap-traces.test.ts, the §5/§9 gates).
  *
+ * SWEEP 161, 2026-08-18 — WHAT THE FRAMES ACTUALLY SAID ABOUT THIS SHELF, so
+ * the next reader does not re-litigate it from the verdict lines alone.
+ *
+ * Four BROKEN findings were routed here, three of them critical, all of the
+ * shape „every leg ends in a collision, the careful drive scores no better than
+ * the reckless one, the tasks never tick". THE HEADLINE CAUSE IS NOT IN THIS
+ * FILE: the sweep's driver has no steering. Its entire actuation is
+ * `page.keyboard[down|up]("KeyW")` and `…("KeyS")` (tools/mobile/
+ * lesson-audit.mjs, two call sites; a census of the whole harness returns zero
+ * occurrences of KeyA / KeyD / Arrow* / any steer token). A car that only
+ * accelerates and brakes leaves the south arm and drives into the central
+ * island — which is exactly where mobile-right's last frame shows it parked, on
+ * the grass. The signature is family-wide and file-independent: all SIX
+ * roundabout drills across THREE template files (this one, templates-flow.ts's
+ * sc-roundabout-entry, templates-roundabout2.ts's sc-rb-ped-exit) collided on
+ * every leg, while only 24 of 98 pc-right legs collided sweep-wide. The four
+ * templates here each complete the FULL production pipeline — compile → session
+ * → wire → regrade — with every objective done, zero violations and 3★
+ * (s-w1/s-w2/s-w3/s-w4-bot-completion.test.ts).
+ *
+ * WHAT THE FRAMES DID EXPOSE IN THIS FILE, and what is fixed at the three rows
+ * below: three objective titles certifying a skill their gate cannot see —
+ * D3, the law `junctions-title-truth.test.ts` states for the JUNCTIONS group.
+ * `roundabout-title-truth.test.ts` now holds it for this shelf, with the
+ * measurement recorded at each site. No gate params moved.
+ *
+ * WHAT IS REPORTED RATHER THAN TOUCHED (both outside this file's ownership):
+ *  · sc-rb-lane-choice starts at `rb2-spawn-south-inner`, i.e. IN the answer,
+ *    so its lane gate `sc-rb2-inner-lane` was collected by all four sweep legs
+ *    — including the 58 km/h drive that never turned a wheel. The district
+ *    publishes `rb2-spawn-south-outer` and instruction 2 already demands the
+ *    left indicator for the change, so the honest drill is the outer spawn;
+ *    that moves the committed shadow and both mistake traces (traces/
+ *    scRbLaneChoice.ts), which is a re-record, not a title fix.
+ *  · The briefing sheet prints step 1 as an unnumbered lead and then „2., 3.,
+ *    …" (hud/overlayQueue.ts `briefingLineBg` + `briefingBodyBg`) — a shared
+ *    renderer behaviour on all 167 templates, not an authoring defect here.
+ *
  * Content provenance (доc 76 §9 stage 0 — original items, never listovki):
  * q-krastovishta-013 (влизане в интервал, чл. 50, ал. 1), q-krastovishta-015
  * (изход и предимство при смяна на лента, чл. 25, ал. 2 + чл. 28, ал. 1, т. 2),
@@ -411,7 +449,37 @@ export const SC_RB_CIRCULATE_PRIORITY: ScenarioSpec = {
   success: [
     {
       id: "sc-rbc-past-east",
-      titleBg: "Подмини източния изход, без да спираш в кръга",
+      // ── THE TITLE SAID «БЕЗ ДА СПИРАШ В КРЪГА» AND NOTHING MEASURED IT ────
+      //
+      // Sweep 161, .audit-frames/sweep161/sc-rb-circulate-priority/. All four
+      // legs, and the counts are the point: pc-right made 7 full stops,
+      // mobile-right 8, and neither drive was told once that a stop was the
+      // problem. It could not be — the clause is unmeasured on BOTH sides of
+      // the module:
+      //
+      //  · THE GATE CANNOT SEE IT. `stepReachZone` is handed one position and
+      //    one speed per tick (objectives.ts) and keeps no history of rests.
+      //    Worse, the claim graded BACKWARDS: a car that comes to a dead stop
+      //    inside this disc satisfies a 20 km/h cap more comfortably than one
+      //    at ring pace, so stopping — the one act the sentence forbade —
+      //    HELPED collect the tick. That is measured, not argued, by
+      //    `roundabout-title-truth.test.ts` („a dead stop in the ring still
+      //    collects the east gate").
+      //  · AND NO DETECTOR COVERS IT EITHER. This template's own panic-brake
+      //    mistake card, two screens down, already concedes why:
+      //    HARSH_BRAKING_NO_CAUSE is structurally unable to fire inside any
+      //    roundabout (junction proximity ≤ 35 m is a braking CAUSE, and every
+      //    point of an R = 18 ring is within 13.8 m of a mouth).
+      //
+      // So the certificate goes and the duty stays. What survives is what the
+      // disc genuinely sees at (18, 0): the car is at the east mouth and is
+      // still ON THE RING rather than out on the east arm — the D3 remedy the
+      // JUNCTIONS group took (`junctions-title-truth.test.ts`: „name the
+      // manoeuvre and the compass arm, and leave the rest to what measures
+      // it"). The coaching is not lost: `objectiveBg` and instructions 2-4 say
+      // „НЕ спирай" in the student's own words, where a claim costs nothing.
+      // Params are byte-identical — no drive that passed yesterday fails today.
+      titleBg: "Подмини източния изход, без да излизаш от кръга",
       // The east mouth on the ring centerline (rb-mini-v1: R = 18 around
       // (0, 0); the east node sits at (18, 0)). maxSpeedKmh 20 is the ring's
       // own envelope (a faster circulation on R = 18 trips the turn detector
@@ -671,7 +739,18 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
   success: [
     {
       id: "sc-rbg-yield-line",
-      titleBg: "Спри на линията за пропускане и изчакай пролука",
+      // THE HALT SURVIVES, THE WAIT DOES NOT — the sc-rbc-past-east ruling
+      // applied to this drill's own titles (sweep 161,
+      // .audit-frames/sweep161/sc-rb-busy-gap/). „Спри" is a real demand here:
+      // the cap is 6, i.e. at or under REACH_ZONE_HALT_CAP_KMH (8), which is
+      // what makes a zone a stop demand and is never widened by the L1/L2
+      // ladder (`scenario/params.ts widenSpeedCap` returns early at/below the
+      // halt band). „изчакай пролука" was the half nothing read: one frame at
+      // ≤ 6 km/h on the paint is a halt, and a driver who halts for that one
+      // frame and then barges into the short gap collected the sentence in
+      // full. The gap judgment is graded — by FAILED_TO_YIELD and COLLISION on
+      // the short-gap demo below — just not here, so it is not claimed here.
+      titleBg: "Спри на линията за пропускане преди входа",
       // The patience gate, and it has teeth: radius 3 m around the yield line
       // on the south arm's northbound lane, capped at 6 km/h. Only a car that
       // actually came down to yield speed AT the mouth satisfies it — the barge
@@ -680,7 +759,19 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
     },
     {
       id: "sc-rbg-past-east",
-      titleBg: "Влез в истинската пролука и подмини първия изход",
+      // «Влез в истинската пролука» was a certificate for the one decision
+      // this drill is entirely about, issued by a disc that cannot see it. A
+      // reachZone reads the EGO's position and speed only (objectives.ts): the
+      // short-gap entry and the correct one arrive at (18, 0) on the same arc,
+      // at the same pace, and differ solely in where the FOLLOWER was — which
+      // is not in a SimTick. Sweep 161's evidence for the direction: on
+      // mobile-right the drive was convicted of «Непропускане» AND a collision
+      // and would still have been handed this tick had it steered far enough
+      // round. WHICH gap is graded, and severely — FAILED_TO_YIELD + COLLISION
+      // on the short-gap demo — it is just not graded by this disc. Same D3
+      // remedy as sc-rbc-past-east: name the mouth and the ring, claim nothing
+      // about the other car. Params byte-identical.
+      titleBg: "Подмини първия изход (изток), без да излизаш от кръга",
       // The east mouth on the ring centerline (rb-mini-v1: R = 18 around
       // (0, 0); the east node sits at (18, 0)). maxSpeedKmh 20 is the ring's
       // own envelope (a faster circulation on R = 18 trips the turn detector —

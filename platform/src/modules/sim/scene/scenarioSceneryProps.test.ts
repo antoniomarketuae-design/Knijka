@@ -173,24 +173,21 @@ describe("heldSceneryFor — per-template dressing", () => {
     expect(BUS_OBSTACLE.halfWidthM * 2).toBeGreaterThanOrEqual(2.4);
   });
 
-  it("sc-follow-standstill's kolona stands AHEAD of the staged lead, visual-only", () => {
-    // Founder R3 #40: the lead (FS_LEAD_CAR, templates-following.ts) holds at
-    // (4.0625, 290); the queue bodies continue the column past it. The player
-    // and shadow never pass y ≈ 281, so the dressing can never be driven into.
-    const held = heldSceneryFor("sc-follow-standstill@L2", loadDistrict("fo-follow-v1"));
-    expect(held.length).toBe(2);
-    let prevY = 290; // the staged lead's pinned rest
-    for (const o of held) {
-      expect(o.kind).toBe("vehicle");
-      if (o.kind !== "vehicle") continue;
-      expect(o.visual).toBe(true);
-      expect(o.x).toBe(4.0625); // the lead's own lane center
-      expect(o.headingDeg).toBe(0); // queued northbound, like the lead
-      // A queue, not a scatter: 4.5–12 m of centers between consecutive cars.
-      expect(o.y - prevY).toBeGreaterThanOrEqual(4.5);
-      expect(o.y - prevY).toBeLessThanOrEqual(12);
-      prevY = o.y;
-    }
+  it("sc-follow-standstill holds NO dressing — its column is staged actors now", () => {
+    // Founder R3 #40 was answered here with two visual-only cars at
+    // (4.0625, 298 / 306). Sweep 161 killed that answer twice over: from
+    // COCKPIT_EYE (1.20 m) a 1.45 m roof directly behind another 1.45 m roof
+    // is occluded at EVERY distance, and templates-following.ts now stages the
+    // queue as actors with rooflines (FS_QUEUE_AHEAD — a van at 298, a truck
+    // at 307), so the held cars were drawn inside them. See the block comment
+    // in scenarioSceneryProps.ts and __tests__/held-vs-staged.test.ts.
+    expect(heldSceneryFor("sc-follow-standstill@L2", loadDistrict("fo-follow-v1"))).toEqual([]);
+    // …and the table is not simply empty: its neighbours in the same wave keep
+    // their bodies, so this assertion cannot pass by gutting HELD_SCENERY.
+    expect(
+      heldSceneryFor("sc-ov-narrow@L1", loadDistrict("ov-narrow-v1")).length,
+    ).toBeGreaterThanOrEqual(12);
+    expect(heldSceneryFor("sc-hazard-obstacle@L1", loadDistrict("hz-obstacle-v1")).length).toBe(1);
   });
 
   it("sc-ov-narrow's both-side rows narrow the corridor without touching a driven line", () => {

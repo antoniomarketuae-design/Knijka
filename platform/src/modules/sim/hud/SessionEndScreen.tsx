@@ -266,8 +266,117 @@ export function manoeuvreGradeReasonBg(result: LessonResult): string | null {
   return null;
 }
 
+/* ---------------------------------------------------------------------------
+ * SWEEP 161 · THE BADGE THAT CONVICTED SIX FAULTLESS DRIVES
+ *
+ * MEASURED · ten findings, one shape: sc-sp-curve, sc-follow-distance,
+ * sc-follow-rain-gap, sc-follow-cutin, sc-follow-tailgater, sc-ov-oncoming-gap,
+ * sc-ov-return-gap, sc-ov-night-gap, sc-ov-crest-curve, sc-ov-being-overtaken.
+ * The frame that shows it whole is
+ * `.audit-frames/sweep161/sc-ov-being-overtaken/pc-wrong/08-debrief.png`:
+ * „Опасни грешки 0 0 · Основни грешки 0 0 · Второстепенни грешки 0 0 · Общо
+ * (допустими 9) 0 0" — and directly above that table a red НЕИЗДЪРЖАН with NOT
+ * ONE bullet beneath it, because `summary.failReasons` is empty and there is
+ * nothing for `FAIL_REASON_TEXT` to print. A verdict with no evidence, on the
+ * screen whose entire job is evidence. sc-ov-crest-curve records the scale:
+ * 28 of 28 runs in that chunk ended НЕИЗДЪРЖАН, six of them with zero mistakes
+ * and zero точки.
+ *
+ * NOTHING BELOW LOOSENS THE GRADE AND `result.passed` IS NOT TOUCHED. No run
+ * becomes a pass, no lesson unlocks, no star is added: `passed` stays „official
+ * rule AND every objective AND not aborted" (lessons/types.ts) and
+ * `scenarioCtaRow` / `onNextLesson` still read exactly that. What changes is
+ * that the badge stops printing the one word it had no basis for.
+ *
+ * НЕИЗДЪРЖАН IS A FINDING OF THE ИЗПИТЕН ЛИСТ and of nothing else — Наредба
+ * № 38's sheet, decided by `summary.passed` together with `summary.failReasons`
+ * (rules/summary.ts: hasDangerous · >9 общо · >6 основни). A drive that broke
+ * none of those and simply never reached the end of the route has no such
+ * finding against it. It is not издържан either — an unfinished lesson is not a
+ * passed one, and the two warning lines already on this card („Урокът беше
+ * прекъснат преди края." / „Не всички задачи от маршрута бяха изпълнени.") say
+ * why. It is НЕЗАВЪРШЕН: the state the run was actually in, taking nothing the
+ * student earned and granting nothing he did not.
+ * ------------------------------------------------------------------------- */
+
+/** passed · failed (the изпитен лист says so) · unfinished (nothing says so). */
+export type SessionVerdict = "passed" | "failed" | "unfinished";
+
 /**
- * What the XP chip says when the verdict directly above it is „Неиздържан".
+ * The three-way read of one `LessonResult`. `result.passed` is the AND of three
+ * conditions and this splits the false branch by WHICH of them failed — it
+ * never re-derives any of them.
+ */
+export function sessionVerdict(result: LessonResult): SessionVerdict {
+  if (result.passed) return "passed";
+  // The изпитен лист is the only authority for „Неиздържан". When it is clean
+  // the drive failed no rule; it merely stopped early — see the block above.
+  return result.summary.passed ? "unfinished" : "failed";
+}
+
+export const SESSION_VERDICT_LABEL_BG: Record<SessionVerdict, string> = {
+  passed: "Издържан",
+  failed: "Неиздържан",
+  unfinished: "Незавършен",
+};
+
+/** Warning, not danger: an unfinished run is unresolved, not condemned. */
+const VERDICT_PILL_CLASS: Record<SessionVerdict, string> = {
+  passed: "bg-success/15 text-success",
+  failed: "bg-danger/15 text-danger",
+  unfinished: "bg-warning/15 text-warning",
+};
+
+/**
+ * THEO-4 on the one badge that had no explanation available to it.
+ *
+ * „Неиздържан" always had the `failReasons` list under it and „Издържан" needs
+ * no defence; „Незавършен" is the state with nothing authored, so it gets the
+ * sentence that says both halves — why it is not the one word and not the other
+ * — and what to do about it. Null for the other two verdicts: they are already
+ * accounted for, and a third sentence would be wallpaper.
+ */
+export function unfinishedVerdictNoteBg(result: LessonResult): string | null {
+  if (sessionVerdict(result) !== "unfinished") return null;
+  const sheetBg =
+    result.score === 0
+      ? "Изпитният лист остана чист"
+      : `${pointsWordsBg("exam", result.score)} — в допустимото по изпитния лист`;
+  return (
+    `${sheetBg}, затова тук не пише „Неиздържан“: няма нарушение, което да го ` +
+    `отсъди. Не пише и „Издържан“ — зачита се само урок, изкаран докрай. ` +
+    `Карай го отново и стигни до края, за да получиш оценка.`
+  );
+}
+
+/**
+ * The tone of the НАКАЗАТЕЛНИ-ТОЧКИ number — read off the number, never off the
+ * verdict beside it.
+ *
+ * MEASURED · sc-lane-change/mobile-right/08-debrief.png: a 96 px „0" painted in
+ * `--danger`, forty pixels above a red НЕИЗДЪРЖАН, on a drive that was cut
+ * short with a spotless sheet. sc-park-gap-long/mobile-right reads the same
+ * („0 наказателни точки … НЕИЗДЪРЖАН"), and sc-zebra-approach/pc-right pins the
+ * other half of it: THE SAME ZERO IS GREEN THERE, because that run happened to
+ * pass. One number, one meaning, two opposite colour codes between lessons.
+ *
+ * The cause was `result.passed ? "text-success" : "text-danger"` — the headline
+ * number wearing the VERDICT's colour, so the two carried one bit between them
+ * and a clean drive could not be told from a wrecked one at a glance.
+ *
+ * The bands are the exam sheet's own: zero is the only clean score, everything
+ * up to the allowance is a warning, and past it — or with an опасна anywhere —
+ * it is danger. `examSheetPassed` is `summary.passed` (rules/summary.ts), i.e.
+ * the same predicate the табло's «допустими 9» row is measured against, so this
+ * cannot drift green while the sheet says otherwise.
+ */
+export function pointsToneClass(points: number, examSheetPassed: boolean): string {
+  if (points === 0) return "text-success";
+  return examSheetPassed ? "text-warning" : "text-danger";
+}
+
+/**
+ * What the XP chip says when the verdict directly above it disagrees with it.
  *
  * MEASURED · sc-rb-exit-signal/mobile/right · 08-debrief.png: „НЕИЗДЪРЖАН" and
  * „+40 XP" stacked ~60 px apart on one card, over a collision and zero
@@ -276,18 +385,66 @@ export function manoeuvreGradeReasonBg(result: LessonResult): string | null {
  * counts, guessing/grinding doesn't win"), which is also why an aborted session
  * is paid nothing at all and this chip never renders there. A bare „+40 XP"
  * under a red НЕИЗДЪРЖАН says none of that; it reads as a reward for the run.
+ *
+ * It takes the VERDICT and not a boolean since the badge became three-way: the
+ * note names the word the student can see, and on
+ * sc-ov-being-overtaken/pc-wrong (0 точки · 0 of 2 objectives · +40 XP) that
+ * word is „Незавършен". A note that said „Неиздържан" beside a badge reading
+ * „Незавършен" would be the same contradiction one line lower down.
+ *
+ * AND THE CHIP STOPS DRESSING AS A PRIZE. MEASURED ·
+ * sc-park-van/mobile-right/08-debrief.png: the „+40 XP" pill is the same shape
+ * and the same weight as the „НЕИЗДЪРЖАН" pill 45 px above it, in the accent
+ * colour this product uses for the recommended action — over a collision.
+ * sc-ln-turn-lane-arrows/mobile-right files it in one line: „a green reward
+ * chip under a failed, crash-ending run". On a non-pass it becomes a plain
+ * outlined receipt in muted ink: the same words, none of the celebration.
  */
 export function xpChipBg(
   xpEarned: number,
-  passed: boolean,
-): { labelBg: string; noteBg: string | null } {
-  if (passed) return { labelBg: `+${xpEarned} XP`, noteBg: null };
+  verdict: SessionVerdict,
+): { labelBg: string; noteBg: string | null; chipClass: string } {
+  if (verdict === "passed") {
+    return {
+      labelBg: `+${xpEarned} XP`,
+      noteBg: null,
+      chipClass: "bg-accent/15 text-accent",
+    };
+  }
   return {
     labelBg: `+${xpEarned} XP за завършеното каране`,
     noteBg:
       "XP се дава за времето зад волана, не за резултата — оценката на този " +
-      "опит остава „Неиздържан“.",
+      `опит остава „${SESSION_VERDICT_LABEL_BG[verdict]}“.`,
+    chipClass: "border border-border text-muted",
   };
+}
+
+/**
+ * The I1 gate's leftover scroll offset, cleared on the element that holds it.
+ *
+ * `scrollIntoView` moves every scrollable ANCESTOR and, by definition, never an
+ * element's OWN `scrollTop` — and this screen's root IS a scroll container
+ * (`max-h-full … overflow-y-auto`, the innermost one a thumb can grab). The
+ * locked and unlocked returns are both a `<div>` in the same position, so React
+ * reconciles them onto the SAME DOM node and that node's `scrollTop` outlives
+ * the swap. Resetting it is the half `scrollIntoView` cannot reach; the call
+ * that follows is the other half, for the shell's scrim and the document.
+ *
+ * A parameter object rather than an effect body so the pair can be driven:
+ * the suite is `environment: "node"` (vitest.config.ts) and has no DOM.
+ */
+export function releaseGateScroll(
+  el: { scrollTop: number; scrollIntoView: (opts: ScrollIntoViewOptions) => void } | null,
+): void {
+  if (el === null) return;
+  el.scrollTop = 0;
+  el.scrollIntoView({ block: "start" });
+}
+
+/** The gate RELEASE edge — never the gate's current state. See the effect. */
+export function gateReleased(wasLocked: boolean, isLocked: boolean): boolean {
+  return wasLocked && !isLocked;
 }
 
 /** A10 measurement channel → one human line on the objective row. */
@@ -602,12 +759,22 @@ export function SessionEndScreen({
   // mount would have put it rather than flush against the edge. A no-op
   // whenever the offset was already zero: the roomy case, and every mount that
   // did not come through the gate.
+  //
+  // ── 2026-08-18: THE OTHER BOX. `scrollIntoView` alone could not have cleared
+  // this, and the four frames that still show the slice say so — sc-crossing-
+  // dart, sc-signal-flashing, sc-ed-poligon-chain and the sc-rb-exit-signal
+  // frame above, all mobile, all with «Сесията завърши — първо се самооцени» on
+  // the 07-end frame before them. The root below is itself a scroll container
+  // (`max-h-full … overflow-y-auto`) and it is the INNERMOST one under a thumb,
+  // so it is where the gate's offset lands; `scrollIntoView` is specified to
+  // move ancestors and never the element's own `scrollTop`. `releaseGateScroll`
+  // does both, in that order.
   const resultRef = useRef<HTMLDivElement>(null);
   const wasCalibrationLocked = useRef(calibrationLocked);
   useEffect(() => {
-    const released = wasCalibrationLocked.current && !calibrationLocked;
+    const released = gateReleased(wasCalibrationLocked.current, calibrationLocked);
     wasCalibrationLocked.current = calibrationLocked;
-    if (released) resultRef.current?.scrollIntoView({ block: "start" });
+    if (released) releaseGateScroll(resultRef.current);
   }, [calibrationLocked]);
 
   // Sweep 161's three sentences, derived once each (see the helper block above).
@@ -616,6 +783,11 @@ export function SessionEndScreen({
     score.opasniPoints,
   );
   const manoeuvreReasonBg = manoeuvreGradeReasonBg(result);
+
+  // The badge, and the number's tone read off the number rather than off the
+  // badge — see SESSION_VERDICT_LABEL_BG and pointsToneClass.
+  const verdict = sessionVerdict(result);
+  const unfinishedNoteBg = unfinishedVerdictNoteBg(result);
 
   // The class legend. „(10 т.)" beside a headline about наказателни точки was
   // the last bare unit left on the repaired result screen, and the tariff is
@@ -750,9 +922,10 @@ export function SessionEndScreen({
 
         <p className="flex items-baseline gap-2">
           <span
-            className={`text-6xl font-black tabular-nums ${
-              result.passed ? "text-success" : "text-danger"
-            }`}
+            className={`text-6xl font-black tabular-nums ${pointsToneClass(
+              result.score,
+              summary.passed,
+            )}`}
           >
             {result.score}
           </span>
@@ -767,21 +940,26 @@ export function SessionEndScreen({
         </p>
 
         <p
-          className={`rounded-full px-4 py-1.5 text-sm font-black uppercase tracking-wide ${
-            result.passed ? "bg-success/15 text-success" : "bg-danger/15 text-danger"
-          }`}
+          className={`rounded-full px-4 py-1.5 text-sm font-black uppercase tracking-wide ${VERDICT_PILL_CLASS[verdict]}`}
         >
-          {result.passed ? "Издържан" : "Неиздържан"}
+          {SESSION_VERDICT_LABEL_BG[verdict]}
         </p>
+        {/* „Незавършен" is the one badge with no authored account behind it —
+            `failReasons` is empty by definition there (see the block above). */}
+        {unfinishedNoteBg !== null ? (
+          <p className="-mt-1 max-w-prose text-center text-xs font-semibold leading-relaxed text-warning">
+            {unfinishedNoteBg}
+          </p>
+        ) : null}
 
         {/* The chip says what the XP is FOR whenever the verdict above it
             disagrees with it — see xpChipBg. */}
         {xpEarned !== null ? (
           (() => {
-            const xp = xpChipBg(xpEarned, result.passed);
+            const xp = xpChipBg(xpEarned, verdict);
             return (
               <>
-                <p className="rounded-full bg-accent/15 px-3 py-1 text-xs font-black text-accent">
+                <p className={`rounded-full px-3 py-1 text-xs font-black ${xp.chipClass}`}>
                   {xp.labelBg}
                 </p>
                 {xp.noteBg !== null ? (
@@ -857,7 +1035,9 @@ export function SessionEndScreen({
               <td className="py-2 text-right font-black tabular-nums">
                 {score.opasniCount + score.osnovniCount + score.vtorostepenniCount}
               </td>
-              <td className={`py-2 text-right font-black tabular-nums ${result.passed ? "text-success" : "text-danger"}`}>
+              {/* Same tone rule as the headline, on the same number — this cell
+                  read red on a „0 0" row in the frames (pointsToneClass). */}
+              <td className={`py-2 text-right font-black tabular-nums ${pointsToneClass(score.totalPoints, summary.passed)}`}>
                 {score.totalPoints}
               </td>
             </tr>

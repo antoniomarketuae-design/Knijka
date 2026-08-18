@@ -94,6 +94,86 @@ const EXIT_CLEAR_M = 70;
  * slower. 4 m/s is a walking-pace pull-away, not a lurch.
  */
 const EXIT_MIN_SPEED_MPS = 4;
+/**
+ * FR-B5-RETURN (sweep161, 2026-08-18) — …AND THEN IT HAS TO COME BACK.
+ *
+ * FR-B5-EXIT above ends „the actor parks on the last metre of its path" by
+ * driving it 70 m further on, and its own justification names the property that
+ * number stands for: „past this an ambient agent no longer sees the actor at
+ * all, WHICH IS THE PROPERTY THAT HAS TO HOLD, not the number". It then checks
+ * that property against one observer. There are two. The second is the student,
+ * and on the maps these lessons are set on the property is simply false for
+ * him: `LessonScene` draws traffic to **420 m** (`maxDrawDistanceM={420}`) and
+ * ln-v1 is **400 m** long end to end. There is no „past this" to drive to.
+ *
+ * MEASURED at level 1 by replaying the audit bot's OWN logged speed profile
+ * (`.audit-frames/sweep161/sc-ln-decisive-change/pc-right/run.log` — a stop-go
+ * crawl of 0…14 км/ч for the whole 210 s, which is the drive the frames were
+ * taken of, not the 42 s shadow trace):
+ *
+ *   t= 10 s  player y= 37   `sc-lndc-target` y= 32, 7.1 m/s  ← the encounter
+ *   t= 30 s  player y= 69                    y=322, 15.0 m/s ← passed, leaving
+ *   t= 40 s  player y= 85                    y=470,  0.0 m/s ← retired
+ *   t=123 s  player y=203                    y=470,  0.0 m/s ← 267 m dead ahead
+ *   t=208 s  player y=330                    y=470,  0.0 m/s ← 151 m dead ahead
+ *
+ * The last two rows are the finding's two cited frames, and cropping them shows
+ * exactly that: a stationary blue body standing in the LEFT lane at the end of
+ * the road — the very lane «Изчакай колата в съседната лента» is about — from
+ * t = 37 s to the 210 s cap. 25 seconds of lesson and 173 seconds of horizon.
+ * Same shape on `sc-merge-accel-lane`: `sc-mrg-mainline` at rest at y = 1030,
+ * 70 m past the 960 m end of the motorway, from t ≈ 68 s.
+ *
+ * So an actor that has run its script and cleared the scene RETURNS TO ITS HOLD
+ * POSE and drives its path again, the way a boulevard keeps producing cars. The
+ * hold pose is the one place on these maps that is off-scene by construction —
+ * the template authors put it there precisely so the actor is unseen before its
+ * cue (`sc-lndc-target` „15 m behind the spawn", `sc-mrg-mainline` „dormant at
+ * (0, 30) — deep behind the nose").
+ *
+ * THREE THINGS IT MAY NOT BECOME, each one a guard below:
+ *
+ *  1. …a car that pops into the student's windscreen. Re-entry is allowed only
+ *     once he is RETURN_CLEAR_M PAST the hold pose measured along the actor's
+ *     own path — the same projection `matchPlayer` already takes, so the
+ *     re-entry always happens behind him on the road he is driving, never in
+ *     front of him.
+ *  2. …a second, unscripted run of a ONE-SHOT HAZARD. The discriminator is
+ *     `railPath`: an actor riding an authored line OUTSIDE the road graph is
+ *     the RX „жп прелез" train (the only `railPath` spec in the catalogue,
+ *     templates-rail.ts), and a second train crossing a level crossing the
+ *     lesson has just declared clear would convict a student who did exactly
+ *     as told. It gets the one run it is written for.
+ *
+ *     NOT `playerGuard`, which was the first thing tried here and is WRONG:
+ *     the two `playerGuard: false` actors in the catalogue are that train and
+ *     the лепка (runners.ts `RearTailgaterRunner`), and the лепка's flag is a
+ *     POSE flag, stated as such at its own site — „playerGuard OFF by design:
+ *     the guard's stop-6-m-short corridor forbids the sub-6 m лепка pose",
+ *     with structural safety instead (an authored 12 m/s² decel cap that
+ *     out-brakes the hero). Excluding on it would have retired precisely the
+ *     two actors these findings are about (`sc-lndc-target`, `sc-mrg-mainline`
+ *     are both rearTailgaters) and closed nothing.
+ *  3. …a body materialising inside another one. The hold pose has to be clear of
+ *     the ambient fleet by the same standoff `closesOnAmbient` enforces.
+ *
+ * And a RETURNING actor is guarded against the student even when its spec is
+ * not (`playerGuarded` below). The лепка's flag buys one authored thing — a
+ * sub-6 m pose during a scripted encounter that is over by the time anything
+ * returns. Carrying the flag into a second, unscripted run would mean a car
+ * re-entering at its pass speed with no clamp against the one body it must
+ * never touch, and „the actor stopped parking at the horizon" is not worth
+ * buying with a rear-end.
+ *
+ * What a RUNNER sees is unchanged in the direction that matters: `finished`
+ * still latches on exactly the frame the path ends, and every runner that reads
+ * it resolves on that frame (all seven sites in runners.ts are
+ * `… || actor.finished` → resolve, and each `step` returns early once
+ * `phase === "resolved"`). The un-latch cannot come earlier than the full
+ * retirement run — EXIT_CLEAR_M / exitSpeed, ≥ 4.7 s — so no runner is still
+ * looking.
+ */
+const RETURN_CLEAR_M = EXIT_CLEAR_M;
 /** Numeric ids for published staged states (ambient ids are 0..count-1). */
 export const STAGED_STATE_ID_BASE = 1000;
 
@@ -270,6 +350,13 @@ export interface StagedVehicleAgent {
   /** Speed of the retirement run, m/s (0 = not retiring; set once, at the
    *  frame the actor runs out of path, so the run is a constant coast). */
   exitSpeed: number;
+  /** FR-B5-RETURN: the published pose at `holdS`, cached at stage() time so the
+   *  re-entry checks cost no sampling and no allocation per frame. */
+  holdX: number;
+  holdY: number;
+  /** How many times this actor has come back round (0 for every actor that
+   *  never retires — the counter a test can read without a stopwatch). */
+  returns: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -362,14 +449,73 @@ function closesOnAmbient(agent: StagedVehicleAgent, env: StagedEnv, step: number
  * actors authored to ignore the player (the staged collisions) keep ignoring
  * him here too.
  */
+/**
+ * Does the player guard apply to this actor right now? The spec's answer,
+ * except that FR-B5-RETURN's second and later runs are ordinary flow rather
+ * than an authored pose (see the RETURN_CLEAR_M block) and are always guarded.
+ */
+function playerGuarded(agent: StagedVehicleAgent): boolean {
+  return agent.returns > 0 || (agent.spec.playerGuard ?? true);
+}
+
 function closesOnPlayer(agent: StagedVehicleAgent, env: StagedEnv, step: number): boolean {
-  if (!env.hasPlayer || (agent.spec.playerGuard ?? true) === false) return false;
+  if (!env.hasPlayer || !playerGuarded(agent)) return false;
   const nx = agent.state.x + agent.state.dirX * step;
   const ny = agent.state.y + agent.state.dirY * step;
   const dAfter = Math.hypot(env.playerX - nx, env.playerY - ny);
   if (dAfter >= GUARD_STOP_SHORT_M) return false;
   const dBefore = Math.hypot(env.playerX - agent.state.x, env.playerY - agent.state.y);
   return dAfter < dBefore;
+}
+
+/**
+ * FR-B5-RETURN — may this retired actor go back to its hold pose and drive the
+ * path again? The three guards named in the RETURN_CLEAR_M block, in order of
+ * how cheap they are to answer.
+ */
+function canReturnToHold(agent: StagedVehicleAgent, env: StagedEnv): boolean {
+  // (2) A one-shot hazard on its own rail crosses the road once, as written.
+  if (agent.spec.railPath !== undefined) return false;
+  // (3) Never materialise inside a body: the hold pose has to be clear of the
+  //     ambient fleet by the standoff `closesOnAmbient` enforces.
+  for (let i = 0; i < env.ambient.length; i++) {
+    const a = env.ambient[i];
+    if (a === agent.state) continue;
+    const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
+    if (Math.hypot(a.x - agent.holdX, a.y - agent.holdY) < sep) return false;
+  }
+  if (!env.hasPlayer) return true;
+  // (1) …and never in his windscreen. Measured ALONG THE ACTOR'S OWN PATH (the
+  //     projection `matchPlayer` already takes), so „behind him" means behind on
+  //     the road, not merely far away in a straight line: he must be past the
+  //     hold arc by the same clearance the retirement run drives.
+  const proj = projectOntoPolyline(
+    agent.path.px,
+    agent.path.py,
+    agent.path.cum,
+    env.playerX,
+    env.playerY,
+  );
+  return proj.s - agent.holdS >= RETURN_CLEAR_M;
+}
+
+/**
+ * The BODY half of `reset` — pose, lateral channel and retirement state back to
+ * the authored hold. Factored so the orchestrator's re-arm and FR-B5-RETURN's
+ * own re-entry cannot drift apart; `reset` additionally forces the command to
+ * „hold", which is the one thing a return must NOT do (it is re-entering the
+ * flow under the command it left with).
+ */
+function rewindToHold(agent: StagedVehicleAgent): void {
+  agent.s = agent.holdS;
+  agent.speed = 0;
+  agent.segHint = 0;
+  agent.finished = false;
+  agent.lat = 0;
+  agent.latTarget = 0;
+  agent.latRate = 0;
+  agent.exitM = 0;
+  agent.exitSpeed = 0;
 }
 
 export function createStagedVehicle(
@@ -426,8 +572,15 @@ export function createStagedVehicle(
     indicator: "off",
     exitM: 0,
     exitSpeed: 0,
+    holdX: 0,
+    holdY: 0,
+    returns: 0,
   };
   publishVehicle(agent);
+  // FR-B5-RETURN: `s` is `holdS` and both offset terms (`lat`, `exitM`) are 0
+  // on this first publish, so the pose just written IS the hold pose.
+  agent.holdX = agent.state.x;
+  agent.holdY = agent.state.y;
   return agent;
 }
 
@@ -533,16 +686,8 @@ export function applyStagedCommand(
         break;
       case "reset":
         v.command.type = "hold";
-        v.s = v.holdS;
-        v.speed = 0;
-        v.segHint = 0;
-        v.finished = false;
-        v.lat = 0;
-        v.latTarget = 0;
-        v.latRate = 0;
+        rewindToHold(v);
         v.indicator = "off";
-        v.exitM = 0;
-        v.exitSpeed = 0;
         publishVehicle(v);
         break;
     }
@@ -620,7 +765,7 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
 
   // 2) Player guard — never ram the player from behind (skip while slamming:
   //    a brake command is already the strongest stop available).
-  if (cmd.type !== "brake" && (spec.playerGuard ?? true) && env.hasPlayer) {
+  if (cmd.type !== "brake" && playerGuarded(agent) && env.hasPlayer) {
     const relX = env.playerX - agent.state.x;
     const relY = env.playerY - agent.state.y;
     const along = relX * agent.state.dirX + relY * agent.state.dirY;
@@ -730,6 +875,14 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
         agent.exitM += step;
         agent.speed = agent.exitM >= EXIT_CLEAR_M ? 0 : agent.exitSpeed;
       }
+    } else if (canReturnToHold(agent, env)) {
+      // FR-B5-RETURN (see RETURN_CLEAR_M): the run is over, the actor is out of
+      // every observer's way, and there is nowhere further to drive on a 400 m
+      // map the camera draws 420 m of. So it comes back round rather than
+      // standing at the horizon in the lane the briefing is about — under the
+      // command it left with, because staged actors never invent their own.
+      rewindToHold(agent);
+      agent.returns++;
     } else {
       agent.speed = 0;
     }

@@ -5,9 +5,11 @@
  * The sweep drove every template on a phone and on a desktop, twice each, and
  * photographed the result. Six rows came back BROKEN against
  * templates-lanes2.ts. Two of them are repairable from a template and are what
- * this file defends; the other four name causes that live in runners.ts,
- * contracts.ts and the traffic fleet's night rig, and are written up at their
- * sites in the template rather than half-fixed here.
+ * this file defends; the other four are answered in
+ * `lanes2-sweep161-refutation.test.ts`, which measures them instead of
+ * accepting them — three turn out to be the audit program's own 12 km/h,
+ * stop-scheduled, NEVER-STEERING drive, and one (the night lamps) is refuted
+ * off the audit's own frame.
  *
  *   §1 sc-ov-crest-curve — «There is no crest». The map is a 135 m / 90° bend
  *      on flat ground (gen_ov_crest.mjs; the frames show a flat horizon at both
@@ -304,11 +306,14 @@ describe("§3 the being-overtaken ceiling keeps its work and loses its coinciden
 // ---------------------------------------------------------------------------
 
 describe("§4 the sweep's remaining causes are still exactly where the comments say", () => {
-  it("no staged actor can be asked for lamps — the night cue is a renderer gap", () => {
-    // sc-ov-night-gap's premise is „преценка по фаровете" and the frames show a
-    // dark road with nothing lit but the ego's own beam. If a lighting field
-    // ever lands on StagedActorPathSpec this assertion is the tripwire that
-    // sends someone back to the header comment.
+  it("no staged actor carries a PER-ACTOR lamp state — the fleet lights them globally", () => {
+    // NOT „the lamps are missing": they are not (the refutation file measures
+    // 4074/4200 px of TAIL_ON on the lead's rear bar in the audit's own night
+    // frame). TrafficLayer lights the whole fleet off ONE `night` prop, so what
+    // no template can author is a single actor whose lamps differ from the rest
+    // — the car driving with its lights OFF, which is its own drill. If a
+    // lighting field ever lands on StagedActorPathSpec this assertion is the
+    // tripwire that sends someone back to the header comment.
     const staged = SC_OV_NIGHT_GAP.staged ?? [];
     expect(staged.length).toBeGreaterThan(0);
     for (const ev of staged) {
@@ -321,6 +326,9 @@ describe("§4 the sweep's remaining causes are still exactly where the comments 
     // maxMatchSpeedMps caps the lead at the player's speed and nothing floors
     // it, which is why a crawling student gets a crawling „20 km/h" crawler and
     // a standing truck. A minimum-pace field is the fix and does not exist yet.
+    // What it costs is the drill's STORY, not its gates: none of the six rows
+    // this file and the refutation file defend reads a staged actor, and the
+    // refutation file drives all of them home at 30 % of the shadow's speed.
     for (const [spec, id] of [
       [SC_LN_BOULEVARD_DISCIPLINE, "sc-lnbd-crawler"],
       [SC_OV_CREST_CURVE, "sc-ovcc-lead"],

@@ -1,7 +1,7 @@
 /**
  * SWEEP161 — WHAT THE ADVISOR SAID, MEASURED OFF THE GLASS.
  *
- * Five defects, every one photographed in `.audit-frames/sweep161`, every one
+ * Seven defects, every one photographed in `.audit-frames/sweep161`, every one
  * a sentence this module SPOKE to a student:
  *
  *  1. TWO NUMBERS IN ONE SENTENCE. sc-sp-limit-end/pc/right 01-arrival.png:
@@ -33,6 +33,19 @@
  *     because the voice counted the seconds he spent ROLLING between two holds
  *     at the same zebra and the engine's `yieldWaitSec` counts only standstill.
  *
+ *  6. THE SAME LEAK AS 1, WHERE NOTHING CLAMPED IT (part D). Where the street
+ *     declares no limit and the author wrote no figure, `params.maxSpeedKmh`
+ *     itself went on the glass: «— дръж под 41 км/ч» on sc-sp-eco-coast, «60»
+ *     in sc-sp-curve's recommended-50 bend, «140» on sc-mw-min-speed, whose
+ *     subject is a MINIMUM. 433 of 953 compiled cards; 95 of them printing a
+ *     FRACTION of a km/h no speedometer can show.
+ *
+ *  7. AND THE WAIT CARD SENT HIM INTO THE PENALTY OF 3.
+ *     sc-sig-controller-live/mobile-right/run.log lines 167/196/358: the live
+ *     wait card outranks the objective card fixed in 3, so the harness read
+ *     «Чакаш правилно … Тръгваш на зелено», held 20 s, went on green and was
+ *     billed −10 «Неизпълнение на сигнала на регулировчика».
+ *
  * Each block below pins the fix AND the opposite direction — a card that stops
  * printing numbers, a lamp rule that stops applying, or a reassurance that a
  * creep silently deletes would each pass a one-sided test.
@@ -43,16 +56,24 @@ import {
   YIELD_VOICE_NAME_S,
   YIELD_VOICE_SETTLE_S,
   advisorPromptForObjective,
+  advisorPromptForSession,
   createYieldVoice,
   stepYieldVoice,
+  yieldWaitAdvisorPrompt,
 } from "../advisor";
+import { createLessonSession } from "../engine";
 import { compileScenario } from "../scenario/compile";
 import { SCENARIO_TEMPLATES } from "../scenario/templates";
 import type { ScenarioLevel } from "../scenario/types";
 import { LESSONS } from "../specs";
 import { VIOLATIONS } from "../../rules";
 import type { HudEvent } from "../../contracts";
-import type { YieldReason, YieldVoiceState, YieldWaitState } from "../types";
+import type {
+  LessonSessionState,
+  YieldReason,
+  YieldVoiceState,
+  YieldWaitState,
+} from "../types";
 
 const template = (id: string) => {
   const spec = SCENARIO_TEMPLATES.find((s) => s.id === id);
@@ -120,7 +141,17 @@ describe("sweep161 — the card no longer prints the grader's tolerance beside t
   });
 
   // --- the opposite direction -------------------------------------------
-  it("a title that names no speed still gets the gate's cap — the card did not go silent", () => {
+  //
+  // REPLACED, and the replacement is the point. This slot used to read „a title
+  // that names no speed still gets the gate's cap — the card did not go silent"
+  // and pinned «Стигни зоната — дръж под 52 км/ч». It was defending the
+  // PRESENCE of a number, and part D of the same sweep photographed what that
+  // number is when nothing clamps it: 41 on a drill that names no speed, 60
+  // in a curve whose plate recommends 50, 140 on a MINIMUM-speed lesson (see
+  // the block below). What must not go silent is the SENTENCE — the authored
+  // title survives whole — and the number must still appear wherever it is
+  // somebody's: the sign's, the author's, or the halt band's.
+  it("the card does not go silent — the authored sentence survives whole", () => {
     const p = advisorPromptForObjective("Стигни зоната", {
       kind: "reachZone",
       x: 0,
@@ -128,7 +159,8 @@ describe("sweep161 — the card no longer prints the grader's tolerance beside t
       radiusM: 9,
       maxSpeedKmh: 52,
     });
-    expect(p.textBg).toBe("Стигни зоната — дръж под 52 км/ч");
+    expect(p.textBg).toBe("Стигни зоната");
+    expect(p.keys).toEqual([]);
   });
 
   it("a title may only make the card STRICTER — it can never license more than the gate", () => {
@@ -148,6 +180,144 @@ describe("sweep161 — the card no longer prints the grader's tolerance beside t
     const { prompt } = cardFor("sc-speed-dangerous", "sc-dng-hold");
     expect(prompt.textBg).toContain("дръж под 50 км/ч");
     expect(prompt.textBg).not.toContain("52");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 1b. PART D — THE SAME NUMBER WHERE NOTHING CLAMPED IT
+//
+// The clamps above bite only where a sign is declared or the author already
+// wrote a figure. Part D of the sweep photographed the cards where neither is
+// true, and there `params.maxSpeedKmh` — the author's gate plus the ladder's
+// grace — went on the glass as the instruction itself:
+//
+//   sc-speed-transition  01-arrival.png  «…до знака за зоната — дръж под 57
+//                        км/ч», beside instruction 1 «ограничението е все още
+//                        50 км/ч»; and «Влез в зона 30 … — дръж под 38 км/ч»
+//                        beside «около 26–28 км/ч» in a posted 30.
+//   sc-sp-curve          04-t120s.png    «…с препоръчителната скорост — дръж
+//                        под 60 км/ч», with the A1 plate reading 50.
+//   sc-sp-eco-coast      01-arrival.png  «…вече намалил — дръж под 41 км/ч» —
+//                        41 appears nowhere else in the drill.
+//   sc-vu-cyclist-hook   01-arrival.png  «Приближи завоя с готовност да
+//                        пропуснеш — дръж под 40 км/ч» on a yielding task.
+//   sc-mw-min-speed      01-arrival.png  «…— дръж под 140 км/ч» on the lesson
+//                        whose whole subject is a MINIMUM.
+//
+// A card may only speak a number that is somebody's: the sign's where it
+// binds, the author's, or the halt band's. The census below is the guard that
+// keeps the next generated figure from arriving quietly.
+// ---------------------------------------------------------------------------
+
+/** Every compiled reachZone card in the catalog, with what produced it. */
+function everyCappedCard(): {
+  id: string;
+  objectiveId: string;
+  cap: number;
+  posted: number | undefined;
+  titleBg: string;
+  textBg: string;
+}[] {
+  const out = [];
+  for (const spec of SCENARIO_TEMPLATES) {
+    for (const rung of spec.levels) {
+      const lesson = compileScenario(spec, rung.level as ScenarioLevel);
+      for (const o of lesson.objectives) {
+        if (o.kind !== "reachZone") continue;
+        const cap = (o.params as { maxSpeedKmh?: number }).maxSpeedKmh;
+        if (cap === undefined) continue;
+        out.push({
+          id: lesson.id,
+          objectiveId: o.id,
+          cap,
+          posted: lesson.postedLimitKmh,
+          titleBg: o.titleBg,
+          textBg: advisorPromptForObjective(
+            o.titleBg,
+            { kind: "reachZone", ...(o.params as object) } as never,
+            undefined,
+            lesson.postedLimitKmh,
+          ).textBg,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+describe("sweep161 part D — the card stops publishing the grader's tolerance as the target", () => {
+  const cases: [string, string, number][] = [
+    ["sc-speed-transition", "sc-trn-approach", 57],
+    ["sc-speed-transition", "sc-trn-in-zone", 38],
+    ["sc-sp-curve", "sc-spcv-curve", 60],
+    ["sc-sp-eco-coast", "sc-ecoc-coast", 41],
+    ["sc-vu-cyclist-hook", "sc-vu-approach", 40],
+    ["sc-mw-min-speed", "sc-mwms-join", 140],
+  ];
+  for (const [scenarioId, objectiveId, photographed] of cases) {
+    it(`${scenarioId}/${objectiveId}: «дръж под ${photographed} км/ч» is gone and the sentence survives`, () => {
+      const { objective, prompt } = cardFor(scenarioId, objectiveId);
+      // The GATE is untouched — this is a copy fix, not a re-authored objective.
+      expect((objective.params as { maxSpeedKmh?: number }).maxSpeedKmh).toBe(photographed);
+      expect(prompt.textBg).not.toContain("дръж под");
+      expect(prompt.textBg).toBe(objective.titleBg);
+      expect(prompt.textBg.length).toBeGreaterThan(10);
+    });
+  }
+
+  it("no compiled card anywhere speaks a number that is neither the sign's, the author's, nor a halt", () => {
+    const bad: string[] = [];
+    for (const c of everyCappedCard()) {
+      if (!c.textBg.includes("дръж под")) continue;
+      const spoken = KMH_NUMBERS(c.textBg).at(-1);
+      const authored = KMH_NUMBERS(c.titleBg);
+      const isHalt = c.cap <= 8;
+      const isSign = c.posted !== undefined && c.posted < c.cap && spoken === c.posted;
+      const isAuthored = spoken !== undefined && authored.includes(spoken);
+      // The gate may still cap a LOOSER authored figure (see below) — that is
+      // the one remaining case where the spoken number is the gate's own.
+      const isGateUnderAuthor =
+        spoken === c.cap && authored.some((n) => n > c.cap);
+      if (!isHalt && !isSign && !isAuthored && !isGateUnderAuthor) {
+        bad.push(`${c.id} ${c.objectiveId}: cap=${c.cap} posted=${c.posted} → ${c.textBg}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("no compiled card speaks a FRACTION of a km/h — the tolerance's own signature", () => {
+    // 95 of the 953 capped cards read «дръж под 54.5 км/ч» / «37.5» / «38.5»
+    // before this fix. A speedometer cannot show it and no instructor says it;
+    // it can only be `maxSpeedKmh` after widenSpeedCap's grace.
+    const fractional = everyCappedCard()
+      .filter((c) => /\d+[.,]\d+\s*км\/ч/.test(c.textBg))
+      .map((c) => `${c.id} ${c.objectiveId}: ${c.textBg}`);
+    expect(fractional).toEqual([]);
+  });
+
+  // --- the opposite direction --------------------------------------------
+  it("a HALT demand keeps its number — «спри … под 6 км/ч» is the author's own", () => {
+    // widenSpeedCap returns at or below the halt band untouched, so no grace
+    // was ever added: the figure IS authored, and it means come to rest.
+    const { prompt } = cardFor("sc-park-parallel", "sc-ppl-position");
+    expect(prompt.textBg).toContain("дръж под 6 км/ч");
+  });
+
+  it("the number still appears wherever the STREET declares one under the gate", () => {
+    const { prompt } = cardFor("sc-sp-curve", "sc-spcv-approach");
+    expect(prompt.textBg).toBe("Измини подхода с разрешената скорост — дръж под 90 км/ч");
+  });
+
+  it("and wherever the AUTHOR wrote one (sc-sp-limit-end is unchanged by part D)", () => {
+    const { prompt } = cardFor("sc-sp-limit-end", "sc-sple-hold-to-junction");
+    expect(prompt.textBg).toContain("дръж под 40 км/ч");
+  });
+
+  it("a majority of the catalog keeps its number — this did not silence the coach", () => {
+    const all = everyCappedCard();
+    const spoken = all.filter((c) => c.textBg.includes("дръж под"));
+    expect(all.length).toBeGreaterThan(900);
+    expect(spoken.length).toBeGreaterThan(400);
   });
 });
 
@@ -351,5 +521,90 @@ describe("sweep161 — the instructor and the debrief count the same seconds", (
     // hold alone would make a student who stood 6 s, crept, and stood 4 s more
     // wait a further 10 s for a line that is about the doubt he already has.
     expect(said.some((x) => x.line.titleBg.includes("Чакането Е маневрата"))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. AND THE WAIT CARD SENT HIM INTO THE SAME PENALTY — sweep161 part A,
+//    sc-sig-controller-live/mobile-right/run.log, the RIGHT lane.
+//
+// Block 2 fixed the objective card. The live wait card OUTRANKS it
+// (`advisorPromptForSession`, B15-VOICE) and it is the one the harness
+// actually read:
+//
+//   167:  LAWFUL WAIT declared at t=52s («Чакаш правилно») — the sim says
+//         standing still IS the manoeuvre; holding.
+//   196:  LAWFUL WAIT declared at t=70s («Чакането Е маневрата»)
+//   358:  ✗ Неизпълнение на сигнала на регулировчика −10 изпитни т. ОПАСНА
+//         ГРЕШКА … Премина стоп-линията, докато регулировчикът спираше твоето
+//         направление.
+//
+// The grader was right and the CARD was wrong: `yieldWaitAdvisorPrompt
+// ("redLight")` is generic copy that ends „Тръгваш на зелено", and at a
+// regulated junction the lamp decides nothing (ЗДвП чл. 6, т. 2 / чл. 7,
+// ал. 1). The drive that followed the coaching failed the lesson the coaching
+// was for.
+// ---------------------------------------------------------------------------
+
+/** A driving session parked on one objective with a live lawful wait. */
+function waitingSession(
+  scenarioId: string,
+  objectiveId: string,
+  reason: YieldReason,
+): LessonSessionState {
+  const lesson = compileScenario(template(scenarioId), 1);
+  const base = createLessonSession(lesson);
+  const idx = lesson.objectives.findIndex((o) => o.id === objectiveId);
+  if (idx < 0) throw new Error(`no such objective: ${scenarioId}/${objectiveId}`);
+  return {
+    ...base,
+    phase: "driving",
+    currentObjectiveIndex: idx,
+    yieldWait: heldWait(reason, 1),
+  };
+}
+
+describe("sweep161 — the live wait card stops telling the officer's junction to watch the lamp", () => {
+  it("sc-sig-controller-live: the card is the officer's instruction, not «Тръгваш на зелено»", () => {
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-cross", "redLight");
+    const p = advisorPromptForSession(s);
+    expect(p?.textBg).not.toContain("Тръгваш на зелено");
+    expect(p?.textBg).toBe(
+      "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
+    );
+  });
+
+  it("…and on its approach objective too — read the officer, not the lamp", () => {
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-read", "redLight");
+    expect(advisorPromptForSession(s)?.textBg).toBe(
+      "Приближи бавно и прочети регулировчика, не лампата",
+    );
+  });
+
+  // --- the opposite direction --------------------------------------------
+  it("an ORDINARY red-light wait still gets the lawful-wait card", () => {
+    const s = waitingSession("sc-signal-response", "sc-sig-pass", "redLight");
+    const p = advisorPromptForSession(s);
+    expect(p?.textBg).toBe(yieldWaitAdvisorPrompt("redLight").textBg);
+    expect(p?.textBg).toContain("Тръгваш на зелено");
+  });
+
+  it("a PEDESTRIAN wait at the officer's own junction still gets the pedestrian card", () => {
+    // Only the lamp copy is displaced. A человек on the zebra outranks
+    // everything, officer included, and that card must survive verbatim.
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-cross", "pedestrian");
+    expect(advisorPromptForSession(s)?.textBg).toBe(
+      yieldWaitAdvisorPrompt("pedestrian").textBg,
+    );
+  });
+
+  it("a wait after the last objective is still answered (the run-out card)", () => {
+    const s = waitingSession("sc-signal-response", "sc-sig-pass", "giveWayLine");
+    const done = { ...s, currentObjectiveIndex: s.objectives.length };
+    expect(advisorPromptForSession(done)?.textBg).toBe(
+      yieldWaitAdvisorPrompt("giveWayLine").textBg,
+    );
+    // …and with no wait, an exhausted chain still advises nothing.
+    expect(advisorPromptForSession({ ...done, yieldWait: freeWait() })).toBeNull();
   });
 });

@@ -135,17 +135,31 @@ describe("staged brake lamps — the standing hold (B40)", () => {
     expect(lamp(traffic).braking).toBe(true);
   });
 
-  it("an actor that RAN OUT OF PATH is parked, not waiting — lamps off", () => {
-    // The distinction the fix has to keep: `finished` actors are scenery that
-    // has come to a stop, and a parked car with its brake lights on is a lie in
-    // the other direction. (This is also the FR-B5-VAN shape — an actor stuck at
-    // the end of its path must not read as a car that is about to move.)
+  it("an actor that RAN OUT OF PATH is leaving, not waiting — lamps off for all of it", () => {
+    // The distinction the fix has to keep: a `finished` actor is on its way out,
+    // and lit lamps on a departing car are a lie in the other direction. (This
+    // is also the FR-B5-VAN shape — an actor at the end of its path must not
+    // read as a car that is about to move.)
+    //
+    // Asserted over EVERY frame the actor spends finished rather than at one
+    // tick count. The old spot check read `speedMps` 12 s in and found 0 only
+    // because the actor stood at the path end for good; under FR-B5-RETURN it
+    // clears and comes back round, so a tick-count probe would be measuring
+    // where the stopwatch happened to land, not the lamps.
     const traffic = sys();
     const car = stageCar(traffic, "car", 380);
     traffic.stagedCommand("car", { type: "cruise", speedMps: 10 });
-    tick(traffic, 60 * 12); // 380 → 400 m of a 400 m path, then finished
-    expect(car.speedMps).toBe(0);
-    expect(lamp(traffic).braking).toBe(false);
+    let framesFinished = 0;
+    let litWhileFinished = 0;
+    for (let i = 0; i < 60 * 12; i++) {
+      tick(traffic, 1); // 380 → 400 m of a 400 m path, then finished
+      if (car.finished) {
+        framesFinished++;
+        if (lamp(traffic).braking) litWhileFinished++;
+      }
+    }
+    expect(framesFinished).toBeGreaterThan(60); // it really did run out of path
+    expect(litWhileFinished, `${litWhileFinished} lit frames while finished`).toBe(0);
   });
 
   it("NON-VACUITY: the pre-fix predicate would have left the standing car dark", () => {

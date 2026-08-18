@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REVERSE_ASSIST_HOLD_S, REVERSE_ASSIST_STANDSTILL_KMH } from "../../engine";
 import {
+  DEFAULT_STEP_TIMEOUT_S,
   STANDSTILL_BRAKE_OFF_S,
   STANDSTILL_BRAKE_ON_S,
   STOP_SPEED_MS,
@@ -441,6 +442,49 @@ describe("terminators", () => {
     expect(state.log[0]!.reason).toBe("timeout");
   });
 
+  /**
+   * THE SAFETY CAP MUST NOT SHORTEN A DURATION THE SCRIPT STATED.
+   *
+   * `validateDriveSteps` accepts `forSec` up to 3600 — the gate says a 150 s leg
+   * is a drive this rig can honour — and `DEFAULT_STEP_TIMEOUT_S` then ended it
+   * at 90 and logged the reason as "timeout", on a step that had asked for a
+   * duration and been told yes. sweep161's motorway rows ran 190-208 s each and
+   * were filed as „Урокът беше прекъснат преди края"; that sweep did not drive
+   * through this controller, but any drive that did would have been cut in the
+   * same place, and the debrief cannot tell an abandoned lesson from a rig that
+   * let go of the pedals two thirds of the way down the road.
+   */
+  it("honours a forSec longer than the default safety cap instead of cutting it at 90 s", () => {
+    const plant = { seconds: 200, accelMs2: 4, dragPerS: 0.06 };
+    const { state, trace } = simulate([{ label: "cruise", speedKmh: 130, forSec: 150 }], plant);
+    const leg = state.log[0]!;
+    // MEASURED BEFORE: reason "timeout" at t=90.017 s, 3036.3 m of road —
+    // byte-identical to `forSec: 90` — and `finished`, so the rig let go.
+    expect(leg.reason).toBe("forSec");
+    expect(leg.endedAtSec).toBeGreaterThanOrEqual(150);
+    expect(leg.endedAtSec).toBeLessThan(151);
+    // …and the extra sixty seconds are real ROAD, not a longer clock: 130 km/h
+    // for 150 s is ~5.4 km against the 3.0 km the cap used to allow.
+    expect(trace[trace.length - 1]!.y).toBeGreaterThan(5000);
+  });
+
+  it("…while an explicit timeoutSec still cuts a longer forSec, and a step with no forSec still gets the default", () => {
+    // The other direction, and the one that would make the fix a defect of its
+    // own: „bounded by whatever the step feels like" is not a safety cap. An
+    // explicit `timeoutSec` is the caller's own cap and must still win when it
+    // is SHORTER than `forSec` — that spelling is how a script abandons a leg.
+    const capped = simulate([{ label: "give up", speedKmh: 40, forSec: 150, timeoutSec: 20 }], { seconds: 60 });
+    expect(capped.state.log).toHaveLength(1); // it ended at all — the cap is still a cap
+    expect(capped.state.log[0]!.reason).toBe("timeout");
+    expect(capped.state.log[0]!.endedAtSec).toBeLessThan(21);
+    // …and a step that never says how long it wants is still bounded by the
+    // default, so an endless step cannot hang a render.
+    const open = simulate([{ label: "open", speedKmh: 40 }], { seconds: 200 });
+    expect(open.state.log[0]!.reason).toBe("timeout");
+    expect(open.state.log[0]!.endedAtSec).toBeGreaterThanOrEqual(DEFAULT_STEP_TIMEOUT_S);
+    expect(open.state.log[0]!.endedAtSec).toBeLessThan(DEFAULT_STEP_TIMEOUT_S + 1);
+  });
+
   it("an empty script is finished immediately and commands nothing", () => {
     const s = createDriveScript([], 0);
     expect(s.finished).toBe(true);
@@ -480,6 +524,80 @@ describe("the controller cannot be fooled by a stalled tab", () => {
     const res = stepDriveScript(state, { t: 5, speedKmh: 0, x: 0, y: 0 });
     expect(Number.isFinite(res.command.throttle)).toBe(true);
     expect(res.command.throttle).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/**
+ * A NON-FINITE MEASUREMENT IS NOT A SLOW FRAME, IT IS NO FRAME.
+ *
+ * Every branch of the controller is a comparison against the sample, and a
+ * comparison with NaN is FALSE — so one bad number out of the scene does not
+ * raise anything, it produces a car that never touches a pedal. That is
+ * word-for-word the evidence sweep161 filed nine times („the car neither
+ * accelerates nor coasts; it twitches", „never sustains a speed"), and this
+ * file already documents the identical downstream picture for `decelMs2: -1`.
+ * Whatever upstream defect puts a NaN in a tick, this controller must not be
+ * the thing that turns it into a plausible drive.
+ */
+describe("the controller refuses a sample it cannot measure", () => {
+  it("never puts NaN on a pedal, and one bad frame does not poison the next good one", () => {
+    // MEASURED BEFORE: `t: NaN` produced `throttle: NaN` — which goes straight
+    // to the synthetic pad and into VehicleInput — and stamped `lastT` with the
+    // NaN, so the NEXT frame, a perfectly good one, was ALSO NaN.
+    let state = createDriveScript([{ speedKmh: 50, forSec: 999 }], 0);
+    const healthy = stepDriveScript(state, { t: 0.1, speedKmh: 10, x: 0, y: 0 });
+    state = healthy.state;
+    expect(healthy.command.throttle).toBeGreaterThan(0);
+
+    const bad = stepDriveScript(state, { t: NaN, speedKmh: 10, x: 0, y: 0 });
+    expect(bad.command).toEqual({ throttle: 0, brake: 0, steer: 0 });
+    expect(bad.state.lastT).toBe(0.1); // the last frame that WAS a measurement
+
+    const recovered = stepDriveScript(bad.state, { t: 0.2, speedKmh: 10, x: 0, y: 0 });
+    expect(Number.isFinite(recovered.command.throttle)).toBe(true);
+    expect(recovered.command.throttle).toBeGreaterThan(0);
+  });
+
+  it("counts every refused frame instead of reporting a blind drive as a driven one", () => {
+    // A drive whose evidence is „the car never sustained a speed" has to be able
+    // to say whether the controller was driving or blind. Silence there is how a
+    // review row gets argued from a video.
+    let state = createDriveScript([{ speedKmh: 50, forSec: 999 }], 0);
+    expect(state.badSamples).toBe(0);
+    for (const sample of [
+      { t: NaN, speedKmh: 10, x: 0, y: 0 },
+      { t: 0.2, speedKmh: NaN, x: 0, y: 0 },
+      { t: 0.3, speedKmh: 10, x: NaN, y: 0 },
+      { t: 0.4, speedKmh: 10, x: 0, y: Infinity },
+    ]) {
+      const res = stepDriveScript(state, sample);
+      state = res.state;
+      expect(res.command).toEqual({ throttle: 0, brake: 0, steer: 0 });
+    }
+    expect(state.badSamples).toBe(4);
+    // …and a blind frame is not time: it cannot end a step, and it cannot be
+    // the frame a positional terminator fires on.
+    expect(state.log).toHaveLength(0);
+    expect(state.index).toBe(0);
+  });
+
+  it("…and still drives every sample that IS a measurement", () => {
+    // The other direction, and the one that would make the guard worse than the
+    // defect: a guard that refuses real frames is a rig that never drives. Zero,
+    // negative and signed-zero readings are all measurements.
+    let state = createDriveScript([{ speedKmh: 0, forSec: 40 }], 0);
+    const reversing = stepDriveScript(state, { t: 0.1, speedKmh: -16, x: -0, y: 0 });
+    expect(reversing.command.brake).toBeGreaterThan(0.9);
+    expect(reversing.state.badSamples).toBe(0);
+
+    state = createDriveScript([{ speedKmh: 30, forSec: 999 }], 0);
+    const fromRest = stepDriveScript(state, { t: 0, speedKmh: 0, x: 0, y: 0 });
+    expect(fromRest.command.throttle).toBeGreaterThan(0);
+    expect(fromRest.state.badSamples).toBe(0);
+
+    // …and a whole ordinary drive refuses nothing at all.
+    const { state: driven } = simulate([{ speedKmh: 40, forSec: 20 }], { seconds: 25 });
+    expect(driven.badSamples).toBe(0);
   });
 });
 
@@ -542,6 +660,30 @@ describe("parseDriveScript", () => {
     expect(parseDriveScript('[{"speedKmh":20,"untilNear":{"x":"3","y":4}}]')).toBeNull();
     expect(parseDriveScript('[{"speedKmh":20,"keys":["KeyE",7]}]')).toBeNull();
     expect(parseDriveScript('[{"speedKmh":20,"label":7}]')).toBeNull();
+  });
+
+  it("refuses a stop point the ramp can never reach — speedKmh 0 with stopAt", () => {
+    // The `decelMs2: 0` row of NUMERIC_RANGE reached through a different field.
+    // `targetSpeedMs` is min(cruise, ramp), so a cruise of 0 is a target of 0 at
+    // EVERY distance and „drive to this point and stop" becomes „stop where you
+    // already are". MEASURED on the plant below: the car never left 0.000 km/h,
+    // covered 0.000 m, and burned the whole 90 s cap on reason "timeout".
+    expect(parseDriveScript('[{"speedKmh":0,"stopAt":{"x":0,"y":60}}]')).toBeNull();
+    expect(validateDriveSteps([{ speedKmh: 0, stopAt: { x: 0, y: 60 } }])).toMatch(/step 0: speedKmh=0 with stopAt/);
+    expect(() => createDriveScript([{ speedKmh: 0, stopAt: { x: 0, y: 60 } }], 0)).toThrow(/speedKmh=0 with stopAt/);
+  });
+
+  it("…and both legal spellings of the same instruction still drive", () => {
+    // The other direction. A wait where the car already is needs no `stopAt`,
+    // and a wait somewhere else needs a cruise to get there — refusing either
+    // would be the same crime as accepting the frozen one.
+    expect(parseDriveScript('[{"speedKmh":0,"forSec":40}]')).toEqual([{ speedKmh: 0, forSec: 40 }]);
+    const { state, trace } = simulate([{ label: "approach", speedKmh: 20, stopAt: { x: 0, y: 60 } }], { seconds: 60 });
+    // MEASURED: arrives "stopped" at t=13.48 s / 59.40 m, against 0.000 m in
+    // 90 s for the refused spelling.
+    expect(state.log[0]!.reason).toBe("stopped");
+    expect(trace[trace.length - 1]!.y).toBeGreaterThan(55);
+    expect(Math.max(...trace.map((s) => s.speedKmh))).toBeGreaterThan(15);
   });
 
   it("…while every value a real script uses still parses", () => {

@@ -49,6 +49,103 @@ import { getAttemptTraceStore } from "@/modules/sim/traces/attemptStore";
 import type { FinishLessonActionResult } from "@/components/sim/lesson-ui/types";
 import { canDriveSimulator } from "./access";
 
+// ---------------------------------------------------------------------------
+// THE POOL-ACQUIRE TIMEOUT — the one failure on this path that is worth another
+// try, and the only one that is PROVABLY safe to retry.
+//
+// WHAT WAS OBSERVED. Three of sweep 161's ~700 finishes were refused. One was
+// an abort (sc-sig-green-wave/mobile-right); the other two were CLEAN PASSES —
+// sc-vp-telltale-red and sc-follow-standstill, mobile · right, 08-debrief.png.
+// Both frames show „0 наказателни точки · ИЗДЪРЖАН" and, across the foot of the
+// same screen, „Сесията не се записа (SAVE_FAILED)". The grade was right, the
+// debrief was right, and the row was gone — and a finished drive cannot be
+// re-submitted: the result exists only in that browser tab, and the end screen
+// offers „Повтори" (drive it again), not „save it again".
+//
+// WHAT IT IS ATTRIBUTED TO, and how firmly. No server log from the sweep
+// survives, so the exact throw is not on record; what IS on record is that the
+// run was ~78 lanes against one staging box, that the failures are scattered
+// and unreproducible, and that `lib/db.ts` gives the pg pool `max: 20` with
+// `connectionTimeoutMillis: 5000` — which converts pool saturation into a
+// rejected query after 5 s. That note defends the choice with „A student who is
+// shown a failure can retry". True of a PAGE, which has a retry button. Never
+// true here. Whatever the trigger was, the property that turned it into
+// permanent loss is the one fixed below: a single attempt at the one row in the
+// product that cannot be rebuilt afterwards.
+//
+// WHY IT IS SAFE TO RETRY, which is the whole argument. pg-pool raises this by
+// draining the PENDING QUEUE (`pg-pool/index.js:224`): the waiter is removed
+// from `_pendingQueue` and rejected without ever being handed a client, so no
+// statement was sent and nothing can have been committed. A retry cannot write
+// a second SimSession. Every OTHER error is left alone for exactly that
+// reason — a statement that may have reached Postgres must never be replayed
+// against a `create()` with no idempotency key.
+//
+// WHY A STRING AND NOT A PRISMA CODE. Under the driver adapter there is no
+// Rust pool, so this is not `P2024`. It is a bare `Error` from pg-pool with no
+// `code` and no `severity`, and `@prisma/adapter-pg`'s `convertDriverError`
+// rethrows exactly such errors untouched (`adapter-pg/dist/index.js:436-453`).
+// The message is the only marker there is, and it is a safe one: a grep of the
+// whole dependency tree finds it in exactly two files — `pg-pool/index.js` and
+// the copy of the same code bundled into `@prisma/query-plan-executor` — both
+// of them this one pending-queue drain, nothing else.
+// ---------------------------------------------------------------------------
+
+/** pg-pool's wording, verbatim (`pg-pool/index.js:224`). */
+const POOL_ACQUIRE_TIMEOUT = "timeout exceeded when trying to connect";
+
+/**
+ * Backoff ladders, in ms. Every attempt already costs up to
+ * POOL_ACQUIRE_TIMEOUT_MS (5 s in lib/db.ts) before it rejects, so these only
+ * add breathing room for a slot to come free — the wait is dominated by the
+ * timeout itself, not by these numbers.
+ *
+ * Budgets differ because the stakes do:
+ *  - WRITE: two extra attempts, worst case ≈ 5 + 0.2 + 5 + 0.6 + 5 = 15.8 s.
+ *    Long, but the end screen is already painted (the shell renders its own
+ *    debrief while the save is in flight) and the calibration card that waits
+ *    on the save carries its own skip. Fifteen seconds of a spinner against a
+ *    passed lesson deleted for good is not a close call.
+ *  - READS: one extra attempt (≈ 10.2 s worst case each). They are cheaper to
+ *    lose but not free — see the two call sites.
+ */
+const SAVE_RETRY_BACKOFF_MS = [200, 600] as const;
+const READ_RETRY_BACKOFF_MS = [200] as const;
+
+/** Walk `cause` a little way: Prisma rethrows this one raw, but a future
+ *  wrapper would nest it rather than change the sentence. */
+function isPoolAcquireTimeout(err: unknown): boolean {
+  let e: unknown = err;
+  for (let depth = 0; e !== null && e !== undefined && depth < 4; depth++) {
+    const message = (e as { message?: unknown }).message;
+    if (typeof message === "string" && message.includes(POOL_ACQUIRE_TIMEOUT)) return true;
+    e = (e as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
+/**
+ * Run `op`, retrying ONLY the pool-acquire timeout, at most `backoffMs.length`
+ * extra times. Anything else propagates on the first throw, unchanged.
+ */
+async function retryOnPoolAcquireTimeout<T>(
+  label: string,
+  backoffMs: readonly number[],
+  op: () => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await op();
+    } catch (err) {
+      if (attempt >= backoffMs.length || !isPoolAcquireTimeout(err)) throw err;
+      console.warn(
+        `simulator: ${label} — pool-acquire timeout, retry ${attempt + 1}/${backoffMs.length}`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt]));
+    }
+  }
+}
+
 export async function finishLessonAction(
   input: unknown,
 ): Promise<FinishLessonActionResult> {
@@ -80,7 +177,20 @@ export async function finishLessonAction(
   // client can reach this line (the play shell only mounts behind the gated
   // page), so it is an abuse signal, not a UI state, exactly like the invalid
   // payloads askTutorAction throws on.
-  if (!(await canDriveSimulator(user))) {
+  //
+  // The gate READS the DB, so it shares the write's failure mode — and worse:
+  // a pool-acquire timeout here throws, the whole action rejects, and
+  // LessonPlayShell turns ANY rejection of this action into the same
+  // „Сесията не се записа (SAVE_FAILED)" banner (LessonPlayShell.tsx:2414). So
+  // a paid-up student's passed drive is deleted AND mislabelled as a refused
+  // write, which is the false sentence doc 91 S4 spent a whole code on
+  // preventing. Retried, never relaxed: a clean `false` still throws on the
+  // first answer, and a non-timeout error still propagates on the first throw.
+  if (
+    !(await retryOnPoolAcquireTimeout("entitlement", READ_RETRY_BACKOFF_MS, () =>
+      canDriveSimulator(user),
+    ))
+  ) {
     throw new Error("finishLessonAction: no simulator entitlement");
   }
 
@@ -123,7 +233,15 @@ export async function finishLessonAction(
   let previouslyPassed = false;
   let historyRows: SimSessionListRow[] = [];
   try {
-    historyRows = await getSimSessionStore().listSessions(user.id);
+    // Retried for the same reason the write is, and it is NOT merely coaching
+    // that rides on it: the scenario level gate below reads `historyRows`, so
+    // on a lost read an L2+ drive is refused as LEVEL_LOCKED and discarded even
+    // though the student had unlocked it. The gate itself stays strict — an
+    // empty history still locks; see the note at that `return` for the residual
+    // this retry narrows but cannot close.
+    historyRows = await retryOnPoolAcquireTimeout("listSessions", READ_RETRY_BACKOFF_MS, () =>
+      getSimSessionStore().listSessions(user.id),
+    );
     const mine = historyRows.filter((r) => r.lessonId === lesson.id);
     const scores = mine
       .filter((r) => r.score !== null)
@@ -160,6 +278,16 @@ export async function finishLessonAction(
         { unlockAll: user.isAdmin },
       )
     ) {
+      // OPEN, and deliberately not closed here: `historyRows` is [] both when
+      // the student has no history AND when the read above failed outright, and
+      // this line cannot tell those apart. On a failed read an L2+ drive is
+      // therefore discarded as LEVEL_LOCKED — a false failure. The retry above
+      // removes the common trigger; the remaining gap needs a code of its own
+      // („не можахме да проверим нивото, опитай пак"), which means a new member
+      // in components/sim/lesson-ui/types.ts and a branch in LessonPlayShell.
+      // NOT fixed by defaulting to unlocked: a read that failed must never be
+      // allowed to mean „unlocked", or the gate credits everybody the moment the
+      // database wobbles.
       return { ok: false, code: "LEVEL_LOCKED" };
     }
     if (scenarioSpec.rubric !== undefined) {
@@ -233,14 +361,19 @@ export async function finishLessonAction(
 
   let sessionId: string;
   try {
-    const saved = await getSimSessionStore().saveSession(user.id, {
-      lessonId: lesson.id,
-      startedAt: new Date(wire.startedAtMs),
-      finishedAt: new Date(wire.finishedAtMs),
-      score: result.score,
-      events: payload,
-      debrief: debrief.text,
-    });
+    // ONE attempt was the whole policy here, and this is the one row in the
+    // product that cannot be reconstructed afterwards — see the pool-acquire
+    // note at the top of the file for what that cost sweep 161.
+    const saved = await retryOnPoolAcquireTimeout("saveSession", SAVE_RETRY_BACKOFF_MS, () =>
+      getSimSessionStore().saveSession(user.id, {
+        lessonId: lesson.id,
+        startedAt: new Date(wire.startedAtMs),
+        finishedAt: new Date(wire.finishedAtMs),
+        score: result.score,
+        events: payload,
+        debrief: debrief.text,
+      }),
+    );
     sessionId = saved.id;
   } catch (err) {
     console.warn("simulator: saveSession failed", err);

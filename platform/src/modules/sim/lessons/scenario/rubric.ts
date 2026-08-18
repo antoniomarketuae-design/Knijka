@@ -5,9 +5,10 @@
  *
  *  - placement  ← the parkInBay ObjectiveDetail (A10): alignment
  *                 centered/acceptable/sloppy + centre/heading offsets;
- *  - economy    ← the same detail's bay-entry `attempts` counter (a count
- *                 that is still running can convict but not praise — see the
- *                 settled test there);
+ *  - economy    ← the same detail's bay-entry `attempts` counter, OR the
+ *                 threePointTurn detail's direction-change `movements`. On
+ *                 BOTH channels a count that is still running can convict but
+ *                 not praise — see the settled tests there;
  *  - observation← authored glance moments vs the observed set (the S1 trace
  *                 recorder feeds it; until then the component reports
  *                 measured: false and stays OUT of the star math);
@@ -57,14 +58,34 @@ function parkChannelOf(result: LessonResult, objectiveId: string): ParkChannel |
   return null;
 }
 
-function turnDetailOf(result: LessonResult, objectiveId: string): Extract<ObjectiveDetail, { kind: "threePointTurn" }> | null {
+/**
+ * The threePointTurn measurement channel, WITH the objective's own `done` flag
+ * — the SAME pairing `ParkChannel` needs, kept for the same reason: the
+ * economy component prices praise off a count, and a count is only evidence
+ * once it has stopped growing (the settled fold below).
+ */
+interface TurnChannel {
+  detail: Extract<ObjectiveDetail, { kind: "threePointTurn" }>;
+  done: boolean;
+}
+
+function turnChannelOf(result: LessonResult, objectiveId: string): TurnChannel | null {
   for (const o of result.objectives) {
-    if (o.id === objectiveId && o.detail?.kind === "threePointTurn") return o.detail;
+    if (o.id === objectiveId && o.detail?.kind === "threePointTurn") return { detail: o.detail, done: o.done };
   }
   return null;
 }
 
 const fmt1 = (v: number) => (Math.round(v * 10) / 10).toString().replace(".", ",");
+
+/**
+ * „едно движение" / „N движения" — бройна форма. The turn rows counted in
+ * digits throughout, so the single-arc U-turn — the BEST outcome the
+ * sc-maneuver-uturn rubric can award (attemptsFor3Stars: 1) — printed
+ * „Обратен завой в 1 движения" on the debrief card
+ * (.audit-frames/sweep161/sc-maneuver-uturn/mobile-right/08-debrief.png).
+ */
+const movementsBg = (n: number) => (n === 1 ? "едно движение" : `${n} движения`);
 
 export function scoreRubric(
   result: LessonResult,
@@ -109,14 +130,25 @@ export function scoreRubric(
     }
   }
 
-  // -- Maneuver economy (bay-entry attempts; direction-change counting rides
-  //    the S1 trace channel later — attempts are the honest signal today).
+  // -- Maneuver economy: bay-entry `attempts` on the parkInBay channel, or
+  //    direction-change `movements` on the threePointTurn one.
   if (rubric.economy) {
     const park = parkChannelOf(result, rubric.economy.objectiveId);
     const d = park?.detail ?? null;
     // The economy channel rides EITHER the parkInBay bay-entry attempts OR the
     // threePointTurn direction-change movements (a clean turn = 3 movements).
-    const turn = d ? null : turnDetailOf(result, rubric.economy.objectiveId);
+    const turnCh = d ? null : turnChannelOf(result, rubric.economy.objectiveId);
+    const turn = turnCh?.detail ?? null;
+    // THE GOAL IS THE AUTHORED ONE. „целта е в три" and „целта е от първия"
+    // were written in, and the catalog does not agree with either everywhere:
+    // of the 54 authored economy rubrics 51 carry `attemptsFor3Stars: 1` and 3
+    // carry 3 (the two three-point-turn templates, templates-maneuver.ts). So
+    // sc-maneuver-uturn — „Обръщане в ЕДНО движение", 1/2 at L1–L3 — told a
+    // two-movement turn „приемливо, целта е в три": the student is OVER the
+    // authored goal and the sentence congratulates him for being under it.
+    // A rung may also tighten it (that template's L4/L5 go to 1/1), so the
+    // number has to be read, not remembered.
+    const goal = rubric.economy.attemptsFor3Stars;
     // A bay-entry count is FINAL only once the maneuver came to rest in the
     // outline (`alignment` is set at exactly `inBay && stopped` —
     // objectives.ts stepParkInBay) or the objective completed. Before that it
@@ -129,7 +161,7 @@ export function scoreRubric(
     // evidence yet.
     const settled = park !== null && (park.done || park.detail.alignment !== null);
     if (d !== null && d.attempts > 0) {
-      const points = d.attempts <= rubric.economy.attemptsFor3Stars ? 2 : d.attempts <= rubric.economy.attemptsFor2Stars ? 1 : 0;
+      const points = d.attempts <= goal ? 2 : d.attempts <= rubric.economy.attemptsFor2Stars ? 1 : 0;
       if (points > 0 && !settled) {
         breakdownBg.push({
           id: "economy",
@@ -148,33 +180,75 @@ export function scoreRubric(
             points === 2
               ? `Паркира от ${d.attempts === 1 ? "първи опит" : `${d.attempts} опита`} — чиста маневра.`
               : points === 1
-                ? `${d.attempts} опита — приемливо, целта е от първия.`
+                ? `${d.attempts} опита — приемливо, целта е ${goal === 1 ? "от първия" : `до ${goal} опита`}.`
                 : `${d.attempts} опита — твърде много корекции; подмини по-широко и започни отново.`,
           points: points as 0 | 1 | 2,
           measured: true,
         });
       }
     } else if (turn && turn.movements > 0) {
-      const points = turn.movements <= rubric.economy.attemptsFor3Stars ? 2 : turn.movements <= rubric.economy.attemptsFor2Stars ? 1 : 0;
-      earned += points;
-      measuredCount += 1;
-      breakdownBg.push({
-        id: "economy",
-        labelBg: "Икономичност на маневрата",
-        detailBg:
-          points === 2
-            ? `Обратен завой в ${turn.movements} движения — чиста маневра.`
-            : points === 1
-              ? `${turn.movements} движения — приемливо, целта е в три.`
-              : `${turn.movements} движения — твърде много превключвания; при по-широко начало завоят става в три.`,
-        points: points as 0 | 1 | 2,
-        measured: true,
-      });
+      const points = turn.movements <= goal ? 2 : turn.movements <= rubric.economy.attemptsFor2Stars ? 1 : 0;
+      // THE SAME FOLD AS THE BAY COUNT ABOVE, ON THE ARM IT WAS NEVER APPLIED
+      // TO. `movements` is `reversals + 1` and `reversals` keeps counting for
+      // as long as the objective stays open (objectives.ts stepThreePointTurn),
+      // so until the turn has come to rest facing back inside the corridor —
+      // which is exactly what `done` means for this maneuver — the count can
+      // still grow. It therefore supports the grade it can no longer escape
+      // and no better one: „твърде много превключвания" stays a conviction,
+      // „чиста маневра" over a turn that never finished does not.
+      //
+      // MEASURED · sweep161 · sc-maneuver-uturn/mobile-right: the debrief
+      // printed „Задачи от маршрута – Задача 2: обърни посоката на 180° в едно
+      // движение" — a DASH, the task unmet, „Не всички задачи от маршрута бяха
+      // изпълнени" above it — and one card higher „Икономичност на маневрата
+      // 2 / 2 т. за изпълнение · Обратен завой в 1 движения — чиста маневра."
+      // (RUN.log, 08-debrief.png). objectives.ts has since stopped counting a
+      // movement before the facing comes back, which takes that particular
+      // drive to 0; it does not reach the turn that DID swing round and then
+      // rolled out of the corridor, nor the residual its own comment names
+      // (entering the box already facing back). Both land here.
+      const turnSettled = turnCh !== null && turnCh.done;
+      if (points > 0 && !turnSettled) {
+        breakdownBg.push({
+          id: "economy",
+          labelBg: "Икономичност на маневрата",
+          detailBg: `${turn.movements === 1 ? "Едно движение" : `${turn.movements} движения`} досега — завоят не спря в коридора, затова икономичността не се оценява.`,
+          points: null,
+          measured: false,
+        });
+      } else {
+        earned += points;
+        measuredCount += 1;
+        breakdownBg.push({
+          id: "economy",
+          labelBg: "Икономичност на маневрата",
+          detailBg:
+            points === 2
+              ? `Обратен завой в ${movementsBg(turn.movements)} — чиста маневра.`
+              : points === 1
+                ? `${turn.movements} движения — приемливо, целта е в ${movementsBg(goal)}.`
+                : `${turn.movements} движения — твърде много превключвания; при по-широко начало завоят става в ${movementsBg(goal)}.`,
+          points: points as 0 | 1 | 2,
+          measured: true,
+        });
+      }
     } else {
       breakdownBg.push({
         id: "economy",
         labelBg: "Икономичност на маневрата",
-        detailBg: "Няма измерване — колата не е влизала в очертанията.",
+        // THE SENTENCE NAMES THE SHAPE THIS LESSON HAS. „очертания" are a bay;
+        // a U-turn drill has a corridor and no bay anywhere in it, and an
+        // objective the route never reached has neither. MEASURED · sweep161 ·
+        // sc-maneuver-uturn/mobile-wrong: task 1 was never met, so task 2 never
+        // became current and never produced a detail (engine.ts steps only the
+        // current objective) — and the boulevard U-turn card read „Няма
+        // измерване — колата не е влизала в очертанията" (RUN.log).
+        detailBg:
+          turn !== null
+            ? "Няма измерване — завоят не е направен в коридора."
+            : d !== null
+              ? "Няма измерване — колата не е влизала в очертанията."
+              : "Няма измерване — до тази маневра не се стигна.",
         points: null,
         measured: false,
       });

@@ -39,6 +39,7 @@ import {
   examMarkFor,
   examPointsWordBg,
   formatEur,
+  gravestViolation,
   instrumentLabelBg,
   offenceCoveredLineBg,
   parseSpeedMeasurement,
@@ -206,7 +207,7 @@ export function buildDebrief(
    * изминат докрай маршрут" as arithmetic rather than as emphasis.
    */
   const criteriaBroken: string[] = [];
-  if (summary.score.hasDangerous) criteriaBroken.push("допусната е опасна грешка");
+  if (summary.score.hasDangerous) criteriaBroken.push(dangerousCriterionBg(summary));
   // „10 т. общо" was the exact string the founder read as his licence. The
   // unit rides on the number now, everywhere it is printed.
   if (summary.score.totalPoints > 9) {
@@ -587,6 +588,48 @@ export function buildDebrief(
 // ---------------------------------------------------------------------------
 
 /**
+ * „допусната е опасна грешка" WITH THE ACT IN IT.
+ *
+ * MEASURED · sweep 161 · `sc-rx-guarded` · pc · wrong
+ * (`.audit-frames/sweep161/sc-rx-guarded/pc-wrong/08-debrief.png`, and the DOM
+ * dump beside it in `run.log`): everything above the fold on a 1440×900 desktop
+ * read «Не всички задачи от маршрута бяха изпълнени», «допусната е опасна
+ * грешка — директно неиздържан», «повече от 9 наказателни точки от изпитния
+ * лист» and a 1/0/0 table. The offence — «Нарушение на правилата за жп прелез»
+ * — was named exactly once in the whole document, in the mistakes block, which
+ * on that viewport sat below two more cards. The student is shown a verdict and
+ * a number with nothing attached to either. A verdict is not a verdict until it
+ * says what for, and this file owns the one sentence that carries the criteria.
+ *
+ * THE PICK IS `rules/gravest.ts`, NOT `mistakes[0]`. Наредба № 38 ranks by class
+ * and then by чл. 48, ал. 3 (a ПТП outranks a merely-failed sheet at the same 10
+ * points); chronological order has no standing at all, which is that file's
+ * entire subject. Nothing is re-priced here — the ordering is borrowed, the
+ * points stay where the summary put them.
+ *
+ * Falls back to the bare clause when nothing resolves. `summary.mistakes` can in
+ * principle carry a code the catalogue does not (pre-drive machine, future
+ * codes), and a verdict reading „опасна грешка «undefined»" is worse than one
+ * that says less — the same discipline as `roadLines` returning empty rather
+ * than guessing a fine.
+ */
+function dangerousCriterionBg(summary: LessonResult["summary"]): string {
+  const dangerous = summary.mistakes.filter((m) => m.severityClass === "opasna");
+  const gravest = gravestViolation(dangerous.map((m) => m.code));
+  // The EVENT's own titleBg and not the catalogue row's: RAIL_CROSSING_VIOLATION
+  // grades three different acts under one code and carries per-act copy
+  // (rules/catalog.ts), so the row would name the code where the event names the
+  // deed. «…» around it for `unfinishedTaskPhrase`'s reason — catalogue titles
+  // quote signs in „…“, and the outer pair has to be the one that moves.
+  const worst =
+    (gravest === null ? undefined : dangerous.find((m) => m.code === gravest.code)) ?? dangerous[0];
+  if (worst === undefined) return "допусната е опасна грешка";
+  return summary.score.opasniCount > 1
+    ? `допуснати са ${summary.score.opasniCount} опасни грешки, най-тежката «${worst.titleBg}»`
+    : `допусната е опасна грешка: «${worst.titleBg}»`;
+}
+
+/**
  * WHICH task was left — by name, from `ObjectiveOutcome.titleBg`.
  *
  * The sentence used to end at „остана неизпълнена задача от маршрута", and a
@@ -805,16 +848,29 @@ function improvementLine(
   if (result.aborted || priorBestScore === null || priorBestScore === undefined) {
     return null;
   }
-  // Same unit discipline as everywhere else in this file: „т." on its own
-  // reads as контролни точки, so the first number in each sentence carries it.
+  /**
+   * EVERY number in these three sentences, not just the first one.
+   *
+   * The rule this file is built on is `pts`'s own docstring — „Every point
+   * figure this file prints goes through here" — and two figures in this
+   * function did not. MEASURED · sweep 161 · `sc-signal-flashing` · mobile ·
+   * right (`.audit-frames/sweep161/sc-signal-flashing/mobile-right/08-debrief
+   * .png`; the sentence is in `audit.log` under INSTRUCTOR DEBRIEF): «Най-
+   * добрият ти резултат за този урок остава 0 наказателни т. по изпитния лист;
+   * този път допусна повече (40).» A bare „(40)" two sentences after a „10
+   * изпитни т." and one sentence before the контролни-точки explainer — the
+   * exact reading the founder made of his own lesson score, printed on the
+   * drive with four collisions on it. The comparison sentence had the same hole
+   * in „срещу най-добрите ти 4 досега".
+   */
   const now = result.score;
   if (now < priorBestScore) {
-    return `Личен напредък: ${pts(now)} по изпитния лист срещу най-добрите ти ${priorBestScore} досега за този урок — свали резултата, продължавай така.`;
+    return `Личен напредък: ${pts(now)} по изпитния лист срещу най-добрите ти ${pts(priorBestScore)} досега за този урок — свали резултата, продължавай така.`;
   }
   if (now === priorBestScore) {
     return `Изравни най-добрия си резултат за този урок (${pts(priorBestScore)} по изпитния лист). Следващата цел е да го подобриш.`;
   }
-  return `Най-добрият ти резултат за този урок остава ${pts(priorBestScore)} по изпитния лист; този път допусна повече (${now}). Спокойно — повтори го и ще го стигнеш.`;
+  return `Най-добрият ти резултат за този урок остава ${pts(priorBestScore)} по изпитния лист; този път допусна повече (${pts(now)}). Спокойно — повтори го и ще го стигнеш.`;
 }
 
 /**

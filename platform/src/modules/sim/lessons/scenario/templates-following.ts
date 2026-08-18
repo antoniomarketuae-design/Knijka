@@ -403,6 +403,23 @@ const FB_LEAD_CAR: BrakingLeadCarSpec = {
    * them, and moving the other side of the `||` between 8 and 25 changes
    * nothing they do; `fo-follow-brake-traces.test.ts` re-asserts the recordings
    * byte-for-byte.
+   *
+   * AND NOW DRIVEN, NOT ARGUED (`__tests__/following-encounter-reach.test.ts`).
+   * Everything above is arithmetic about a constant, and the finding was never
+   * about a constant — it was 205 s in which nothing happened. So the crawl is
+   * put through the production stack (recordScriptedDrive on fo-brake-v1, real
+   * director, real runners, real rule engine) at the photographed pace:
+   *
+   *   11 км/ч straight through, floor 25 → NO outcome, NO rule event, 129 s
+   *   11 км/ч straight through, floor  8 → hitLeadCar @ t≈70 s, log [COLLISION]
+   *   11 км/ч stopping at y = 205        → stoppedInTime @ t≈64 s, 18.4 m of
+   *                                        bumper gap left, ZERO faults
+   *   40 км/ч (the demos' pace)          → identical second at BOTH floors
+   *
+   * The third line is the one that had to be measured rather than reasoned: a
+   * floor that arms a slam the taught gap cannot absorb would have traded a
+   * silent drill for an unavoidable collision, and a false failure costs this
+   * family exactly what a false certificate does.
    */
   minSlamSpeedKmh: 8,
   proximityFallbackM: 0.5,
@@ -747,6 +764,16 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
   success: [
     {
       id: "sc-fs-approach",
+      // SWEEP 161, the negative result — recorded so the next lane does not
+      // "fix" this row with a decoration. Four «Следвай … спокойно» rows in this
+      // family acquired a pace cap; this one deliberately did not. Measured at
+      // this circle (y = 150 ± 12) on the three committed recordings: ALL THREE
+      // hold 20.9 км/ч for all 83 of their in-zone frames — the lead's own eased
+      // leg paces them identically, and the two demos only diverge 130 m later
+      // at the standstill. Any cap that clears the shadow clears both mistakes,
+      // i.e. refuses nobody, which is `sc-fb-approach`'s finding one drill over.
+      // The title claims no measurement (no дистанция, no «спри»), so it stays
+      // as authored and the graded claim lives on `sc-fs-stopped` below.
       titleBg: "Следвай спокойно преди спирането",
       params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12 },
     },
@@ -1465,6 +1492,22 @@ const FC_CUTTER: CutInLeadCarSpec = {
    * the actor reaches its cut point at y = 150. The binding condition on every
    * recording is the geometry, not this number, so moving it between 15 and 25
    * changes nothing they do.
+   *
+   * DRIVEN (`__tests__/following-encounter-reach.test.ts`), on ln-v1 through
+   * the production stack, because „the car never moved" is a behaviour and not
+   * a number:
+   *
+   *   16 км/ч  floor 25 → notEncountered @ t≈48 s ·  floor 15 → cut lands, t≈34
+   *   20 км/ч  floor 25 → notEncountered @ t≈38 s ·  floor 15 → cut lands, t≈30
+   *   10 км/ч  BOTH floors → notEncountered — under the 14.2 км/ч honest-theft
+   *            line the manoeuvre steals nothing, and the runner says so
+   *   30 км/ч  identical second at both floors (the demos' own pace)
+   *
+   * The 10 км/ч row is the open half, now measured rather than asserted: the
+   * runner reports honestly and NOTHING in `lessons/` consumes `notEncountered`
+   * (grep says two runners produce it, zero consumers), so the drill still
+   * awards three position gates for a lesson that did not happen. That is an
+   * objectives.ts change, not a template one.
    */
   minCutSpeedKmh: 15,
   cutShiftM: CUT_LANE_SHIFT, // one lane RIGHT — into the player's lane

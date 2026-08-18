@@ -13,9 +13,15 @@
  *   - front wheels steer per steerRad, all wheels roll per speed;
  *   - indicator blinkers blink, brake lights light on brakeOn (corner quads —
  *     model-independent, no per-lamp GLB knowledge required);
- *   - glance events flash a mirror icon sprite above the roof;
+ *   - glance events flash a mirror icon sprite ON the roof;
  *   - the full path draws as a ground ribbon through the SHARED A7 ribbon
  *     mesh builder (ribbonStrip.ts) — the reference image's colored lines.
+ *
+ * Two channels answer catalogue sweep 161 rather than the trace, and each is
+ * derived beside its own constants below: a PROXIMITY FADE, because a ghost
+ * drawn at the camera is drawn through the student's dashboard, and a
+ * FOOTPRINT HALO, because on a phone there is no legend to say which of the
+ * cars on the carriageway is the hologram.
  *
  * The ghost ADVANCES the shared clock while `playing` (single time driver,
  * inside useFrame); TraceTimeline only reads/writes the same ref from the
@@ -44,6 +50,9 @@ const HERO_YAW = Math.PI;
 const WHEEL_RADIUS_M = 0.34;
 /** Ghost shell opacity (doc 76 §5 — translucent, clearly not a real car). */
 const GHOST_OPACITY = 0.45;
+/** Indicator/brake quad opacity. Lifted out of the JSX so the proximity fade
+ *  below scales the lamps from the SAME number the meshes render at. */
+const LAMP_OPACITY = 0.95;
 /** Ground clearance of the pose group (ROAD_Y — tyres kiss the asphalt). */
 const GHOST_Y = 0.02;
 const DEG2RAD = Math.PI / 180;
@@ -51,6 +60,138 @@ const DEG2RAD = Math.PI / 180;
 const BLINK_PERIOD_S = 0.75;
 /** Mirror-icon flash window after a glance event, s. */
 const GLANCE_FLASH_S = 0.9;
+
+// ---------------------------------------------------------------------------
+// THE GHOST DRAWN THROUGH THE STUDENT'S OWN COCKPIT (catalogue sweep 161)
+// ---------------------------------------------------------------------------
+/**
+ * Four of the sweep's eight defects against this file are ONE defect: the
+ * ghost is posed straight from the trace and nothing ever asked where the
+ * CAMERA is, so a translucent hero car is free to be drawn exactly where the
+ * student's own body is.
+ *
+ *   sc-park-van/mobile-right/05-stopped.png       (critical) — bonnet, screen
+ *     and A-pillars laid over the dashboard; „0 км/ч" and „D" are read
+ *     THROUGH a second car's body.
+ *   sc-follow-distance/mobile-right/04-t077s.png  — the same, from the
+ *     arrival frame onward, on both platforms.
+ *   sc-mw-emergency-lane/mobile-right/04-t209s.png — the same at t209 s.
+ *   sc-jx-blocked-exit/mobile-right/06-waited.png — one car-length ahead,
+ *     burying the stop line and the light the lesson is asking about.
+ *
+ * It is NOT a pose bug and there is no pose to fix: playback loops
+ * (`clock.tSec = 0` in useFrame), so on every lap the demonstration sweeps
+ * through wherever the student has stopped. Nor is „the ghost is opaque on
+ * mobile" (sc-zebra-approach, sc-jx-blocked-exit) a second defect: the shell
+ * has `depthWrite = false` and renders both faces, so at contact range the eye
+ * composites ~6 surfaces — 1 − (1 − 0.45)^6 = 0.97, i.e. solid. One cause,
+ * and the cause is that the ghost is allowed to occupy the viewer.
+ *
+ * The law is geometric, not aesthetic:
+ *   HIDE 2.4 m — CHASSIS_HALF_EXTENTS.z (2.02) plus the 0.255 m COCKPIT_EYE
+ *     sits behind the ego's centre, plus a hand's margin. Inside it the camera
+ *     is inside the shell and nothing is drawn at all.
+ *   FULL 8.0 m — two car lengths (4.04 m each). Past it the ghost is a lead
+ *     vehicle rather than an obstruction and pays nothing.
+ * Smoothstep between them. Checked against the frames above: at the sc-jx stop
+ * line (~4.5 m) each surface drops to 0.45 × 0.32 = 0.14 and the stop line
+ * reads through; at the sc-zebra crossing (~15 m) the ghost is untouched —
+ * which matters, because a ghost nobody can see is the same failure as a ghost
+ * nobody can see past.
+ */
+export const GHOST_FADE_HIDE_M = 2.4;
+export const GHOST_FADE_FULL_M = 8.0;
+
+/** Ghost-surface opacity multiplier at `distanceM` from the camera. */
+export function ghostProximityFade(distanceM: number): number {
+  // Written as `!(d > HIDE)` rather than `d <= HIDE` so a NaN distance hides
+  // the ghost instead of leaving it at full strength over the dashboard.
+  if (!(distanceM > GHOST_FADE_HIDE_M)) return 0;
+  if (distanceM >= GHOST_FADE_FULL_M) return 1;
+  const t = (distanceM - GHOST_FADE_HIDE_M) / (GHOST_FADE_FULL_M - GHOST_FADE_HIDE_M);
+  return t * t * (3 - 2 * t);
+}
+
+/** One fadeable ghost surface: its material and the opacity that material
+ *  renders at when the ghost is at full strength. */
+export interface GhostFadeTarget {
+  material: { opacity: number };
+  baseOpacity: number;
+}
+
+/** Scale every ghost surface by `fade`. Allocation-free — runs per frame. */
+export function applyGhostFade(targets: readonly GhostFadeTarget[], fade: number): void {
+  for (let i = 0; i < targets.length; i++) {
+    targets[i].material.opacity = targets[i].baseOpacity * fade;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// THE GLANCE MARKER'S ANCHOR (sc-pe-zone-living/pc-wrong/04-t017s.png)
+// ---------------------------------------------------------------------------
+/**
+ * That frame photographs the 👀 quad reading as a pair of cartoon eyes pasted
+ * on an apartment block three storeys up. Measured on an 8× crop of it, using
+ * the ghost's own 1.70 m width (CHASSIS_HALF_EXTENTS.x × 2 — the fit target
+ * below) as the scale bar, 680 crop px wide, i.e. 400 crop px/m:
+ *
+ *   ghost roofline            475 px above the tyre contact = 1.19 m
+ *   old quad (y 2.15, s 0.85) lower edge                    = 1.725 m
+ *   → 0.53 m of EMPTY AIR between the roof and the marker
+ *   old glyph                 255 × 230 px                  = 0.64 × 0.58 m
+ *   → 38 % of the car's own width, floating free of it
+ *
+ * Nothing was at the wrong depth — the sprite is depth-tested and really was
+ * in front of the facade. What was wrong is that at that size, with that much
+ * air beneath it, the marker has no visible owner, so the eye gives it to the
+ * nearest thing that has a surface. Anchoring it on the roof and cutting it to
+ * icon size gives it one.
+ */
+export const GHOST_WIDTH_M = CHASSIS_HALF_EXTENTS.x * 2;
+export const GHOST_ROOF_Y = 1.19;
+export const GLANCE_ICON_SCALE = 0.46;
+export const GLANCE_ICON_Y = 1.46;
+/** Above this much air the marker has stopped belonging to the car. */
+export const GLANCE_ANCHOR_MAX_GAP_M = 0.25;
+/** Empty air between the ghost's roofline and the marker's lower edge, m. */
+export function glanceIconGapM(
+  iconY: number,
+  iconScale: number,
+  roofY: number = GHOST_ROOF_Y,
+): number {
+  return iconY - iconScale / 2 - roofY;
+}
+
+// ---------------------------------------------------------------------------
+// THE FOOTPRINT HALO — „which of these cars is the hologram?" (sweep 161)
+// ---------------------------------------------------------------------------
+/**
+ * sc-signal-flashing/mobile-right/04-t017s.png and
+ * sc-rb-exit-signal/mobile-right/06-waited.png both photograph the ghost
+ * sharing a carriageway with solid NPC traffic with no distinction but
+ * transparency; sc-zebra-approach/mobile-right/06-waited.png adds the reason
+ * transparency is not enough on its own — the legend that explains the blue
+ * („синя — пътят на колата-сянка") is desktop chrome, and a phone gets none.
+ * The composite arithmetic above says the same thing from the other end: at
+ * close range „translucent" stops being translucent.
+ *
+ * The halo is an ELLIPSE, not a ring. A circle large enough to clear a 4.04 m
+ * car is 4.9 m across and reads as a lit patch of road rather than as THIS
+ * car's footprint; the radii instead hug the chassis box
+ * (CHASSIS_HALF_EXTENTS + ≤0.43 m) and carry the ribbon's tint, which is what
+ * binds the car to the blue path the legend names.
+ */
+export const HALO_RX = 1.25;
+export const HALO_RZ = 2.45;
+/** How far outside the chassis box a halo radius may sit before it has
+ *  stopped tracing the car and started lighting the road. */
+export const HALO_MARGIN_MAX_M = 0.6;
+const HALO_OPACITY = 0.5;
+/** Local to the pose group (world 0.04 m — above the road, under RIBBON_Y). */
+const HALO_Y = 0.02;
+/** Unit ring, scaled anisotropically to HALO_RX × HALO_RZ. */
+const HALO_RING_OUTER = 1.16;
+const HALO_SEGMENTS = 48;
 
 /** Ribbon styling (the reference image's colored path lines). */
 const RIBBON_MAX_SAMPLES = 1024;
@@ -280,6 +421,8 @@ export function ShadowCar({
   const ribbonGeoRef = useRef<THREE.BufferGeometry>(null);
   const ribbonMatRef = useRef<THREE.ShaderMaterial>(null);
   const glanceSpriteRef = useRef<THREE.Sprite>(null);
+  const badgeSpriteRef = useRef<THREE.Sprite>(null);
+  const haloMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const indLeftFRef = useRef<THREE.Mesh>(null);
   const indLeftRRef = useRef<THREE.Mesh>(null);
   const indRightFRef = useRef<THREE.Mesh>(null);
@@ -291,6 +434,29 @@ export function ShadowCar({
     const geo = ribbonGeoRef.current;
     if (geo) writeRibbonStrip(geo, ribbonPath, RIBBON_Y, RIBBON_HALF_W);
   }, [ribbonPath]);
+
+  /** The ❌ sprite exists only on mistake demos — and only when the caller
+   *  wants it, which is what the fade list has to be rebuilt for. */
+  const hasBadge = kind === "mistake" && showBadge;
+
+  // Every surface the proximity fade owns, gathered ONCE after commit — the
+  // shell, the six lamp quads, the roof markers and the halo. A per-frame
+  // `traverse` would rediscover the same ~30 nodes on every frame.
+  const fadeTargets = useRef<GhostFadeTarget[]>([]);
+  useLayoutEffect(() => {
+    const list: GhostFadeTarget[] = [];
+    for (const m of ghostMaterials) list.push({ material: m, baseOpacity: GHOST_OPACITY });
+    for (const r of [indLeftFRef, indLeftRRef, indRightFRef, indRightRRef, brakeLRef, brakeRRef]) {
+      const mat = r.current?.material;
+      if (mat && !Array.isArray(mat)) list.push({ material: mat, baseOpacity: LAMP_OPACITY });
+    }
+    const glanceMat = glanceSpriteRef.current?.material;
+    if (glanceMat) list.push({ material: glanceMat, baseOpacity: 1 });
+    const badgeMat = hasBadge ? badgeSpriteRef.current?.material : undefined;
+    if (badgeMat) list.push({ material: badgeMat, baseOpacity: 1 });
+    if (haloMatRef.current) list.push({ material: haloMatRef.current, baseOpacity: HALO_OPACITY });
+    fadeTargets.current = list;
+  }, [ghostMaterials, hasBadge]);
 
   // Per-frame playback scratch — zero allocation.
   const ptRef = useRef(createTracePoint());
@@ -355,11 +521,24 @@ export function ShadowCar({
       sprite.visible = active;
     }
 
+    // Proximity fade — the ghost may never be drawn on top of the viewer.
+    // `group.position` is world (the parent <group> carries no transform), so
+    // this is the camera-to-ghost-origin distance with no allocation.
+    const fade = showGhost ? ghostProximityFade(group.position.distanceTo(state.camera.position)) : 0;
+    applyGhostFade(fadeTargets.current, fade);
+    // Inside the shell there is nothing worth submitting; the clock above has
+    // already advanced, so the ghost stays the single time driver either way.
+    group.visible = showGhost && fade > 0;
+
     const mat = ribbonMatRef.current;
     if (mat) mat.uniforms.uTime.value = state.clock.elapsedTime;
   });
 
   const lampGeoArgs = useMemo<[number, number]>(() => [0.16, 0.12], []);
+  const haloGeoArgs = useMemo<[number, number, number]>(
+    () => [1, HALO_RING_OUTER, HALO_SEGMENTS],
+    [],
+  );
 
   return (
     <group>
@@ -371,40 +550,60 @@ export function ShadowCar({
           <primitive object={model} />
         </group>
 
+        {/* Footprint halo: the ghost's one distinction from solid traffic that
+            survives both range and contact (see „THE FOOTPRINT HALO"). Unit
+            ring scaled to the chassis ellipse; it rides the pose group, so it
+            turns with the car and fades with it. */}
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, HALO_Y, 0]}
+          scale={[HALO_RX, HALO_RZ, 1]}
+          renderOrder={18}
+        >
+          <ringGeometry args={haloGeoArgs} />
+          <meshBasicMaterial ref={haloMatRef} color={tint} transparent opacity={HALO_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+        </mesh>
+
         {/* Indicator + brake lamp quads (car-local: +Z forward, +X left). */}
         <mesh ref={indLeftFRef} position={[0.78, 0.62, 1.95]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ffb300" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ffb300" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={indLeftRRef} position={[0.78, 0.62, -1.95]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ffb300" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ffb300" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={indRightFRef} position={[-0.78, 0.62, 1.95]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ffb300" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ffb300" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={indRightRRef} position={[-0.78, 0.62, -1.95]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ffb300" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ffb300" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={brakeLRef} position={[0.55, 0.68, -2.0]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ff2020" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ff2020" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
         <mesh ref={brakeRRef} position={[-0.55, 0.68, -2.0]} visible={false}>
           <planeGeometry args={lampGeoArgs} />
-          <meshBasicMaterial color="#ff2020" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
+          <meshBasicMaterial color="#ff2020" transparent opacity={LAMP_OPACITY} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} />
         </mesh>
 
-        {/* Glance flash: mirror-check icon above the roof. */}
-        <sprite ref={glanceSpriteRef} position={[0, 2.15, 0]} scale={[0.85, 0.85, 1]} visible={false}>
+        {/* Glance flash: mirror-check icon ON the roof, not floating over it
+            — the numbers and the frame that produced them are above. */}
+        <sprite
+          ref={glanceSpriteRef}
+          position={[0, GLANCE_ICON_Y, 0]}
+          scale={[GLANCE_ICON_SCALE, GLANCE_ICON_SCALE, 1]}
+          visible={false}
+        >
           <spriteMaterial map={glanceTexArgs[0]} transparent depthWrite={false} />
         </sprite>
 
         {/* Mistake demos carry the ❌ chrome — never a neutral pattern. */}
-        {kind === "mistake" && showBadge ? (
-          <sprite position={[0, 2.9, 0]} scale={[0.8, 0.8, 1]}>
+        {hasBadge ? (
+          <sprite ref={badgeSpriteRef} position={[0, 2.9, 0]} scale={[0.8, 0.8, 1]}>
             <spriteMaterial map={badgeTexArgs[0]} transparent depthWrite={false} />
           </sprite>
         ) : null}

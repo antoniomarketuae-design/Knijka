@@ -207,22 +207,38 @@ export const SC_LN_TURN_LANE_ARROWS: ScenarioSpec = {
 // no daytime meaning); L5 adds drizzle as a RENDER/conditions axis only: no
 // `physics`, so the dry-tuned ghost envelope stands (ADR-006 stage 4a).
 //
-// SWEEP 161 — THE PREMISE IS NOT ON SCREEN, AND NO TEMPLATE CAN PUT IT THERE.
-// The world goes dark and the ego's own beam is drawn, but NOTHING ELSE IS LIT:
-// on .audit-frames/sweep161/sc-ov-night-gap/mobile-right/04-t054s.png the lead
-// car 16 m ahead shows no illuminated tail lamps (the red band across its back
-// is body trim — the identical band it wears in the daylight scenarios), the
-// parked queue on the shoulder is unlit, and every street lamp along the road
-// is dark. A drill whose whole subject is „преценка по фаровете" is therefore
-// asking the student to read a cue the renderer never draws.
-// THIS FILE CANNOT REPAIR IT: `StagedActorPathSpec` (contracts.ts) carries
-// pathNodes / hold / speeds / offset / colour / profile / indicator and no
-// lighting channel at all, so no scenario spec can ask an actor for lamps —
-// exactly the shape of the gap the `indicator` field was added to close for
-// чл. 43б. The repair is in the traffic fleet's night rig (tail + head lamp
-// emissives driven off the same isNight the tick already carries) and in the
-// world builder's street-lamp props; it is written up in the sweep-161 report.
-// What this file OWNS is not certifying the missing cue — see sc-ovn-wait.
+// SWEEP 161 — «NO LIT LAMPS», MEASURED OFF THE AUDIT'S OWN FRAME AND REFUTED.
+// The row said the premise was not on screen: „the lead car shows no illuminated
+// tail lamps (the red band across its back is body trim, unchanged from the
+// daylight scenarios)". That is checkable, and it is wrong. Counting pixels of
+// the lead's rear bar against the fleet's own authored constants (TrafficLayer
+// .tsx TAIL_ON `#7c130b` = the night glow, BRAKE_OFF `#3a0f0b` = the unlit day
+// lens), within a 10 % fuzz:
+//
+//   .../sc-ov-night-gap/mobile-right/04-t054s.png  bar 300×14 px at (1180,570)
+//        4074 / 4200 px are TAIL_ON        154 / 4200 px are BRAKE_OFF
+//   .../sc-follow-brake/mobile-right/04-t023s.png  bar 160×12 px at (1240,513)
+//           0 / 1920 px are TAIL_ON       1440 / 1920 px are BRAKE_OFF
+//
+// Same instanced bar, same fleet, two lessons: LIT at night, dark by day. The
+// night rig the row asked for already ships and already runs here — the audit
+// read a lit lamp as paint. `conditions.night` → compileScenario's
+// `environment.timeOfDay` → LessonScene's `isNight` → `<TrafficLayer night>` is
+// the whole chain, and §1 of lanes2-sweep161-refutation.test.ts holds its
+// template end so a dropped rung cannot put the lamps out unnoticed.
+//
+// WHAT THE FRAMES DO SHOW DARK, and neither belongs to this file: the street-
+// lamp HEADS (WorldProps.tsx `Streetlights` claims `emissiveIntensity: night ?
+// 2.6 : 0` and the head is black in the frame), and the oncoming HEADLIGHTS —
+// but the frames cannot convict on the second, because they never contain an
+// oncoming car: with `gapsM: [560]` (see OVN_STREAM) car 0 has already swept
+// past the audit's 12 km/h crawl by t 12 s and car 1 is still ~510 m up the
+// road, i.e. outside the fleet's own `maxDrawDistanceM` of 420 (LessonScene).
+// So the night cue this drill is built on is rendered; whether the SECOND
+// window announces itself early enough is a draw-distance question, owned by
+// LessonScene and the streetlight props, and reported rather than guessed at.
+// What this file OWNS is not certifying an ORDER the evaluator cannot read —
+// see sc-ovn-wait, whose repair stands on that reason and not on this one.
 // ---------------------------------------------------------------------------
 
 /** ov-oncoming-v1 own (northbound) lane center / road length — pinned by value
@@ -340,18 +356,18 @@ export const SC_OV_NIGHT_GAP: ScenarioSpec = {
       // SWEEP 161 — THE TICK THAT WENT TO THE DRIVER WHO DID NOT WAIT.
       //
       // This row shipped as „Изчакай зад бавната кола, докато първите фарове
-      // минат" on a mark at (4.06, 150) r4. Two separate things were wrong with
-      // that, and the audit caught both from one frame
+      // минат" on a mark at (4.06, 150) r4. The audit gave two reasons; ONE of
+      // them survives measurement, and it is enough on its own
       // (.audit-frames/sweep161/sc-ov-night-gap/mobile-right/04-t054s.png):
       //
-      //   1. THE CUE IS NOT THERE. Nothing on this road is lit at night — the
-      //      lead shows no tail lamps, the oncoming cars no headlights, the
-      //      street lamps no emissive. `StagedActorPathSpec` (contracts.ts) has
-      //      no lighting field at all, so no template can ask for one; the
-      //      repair is in the traffic fleet's night rig, not here. A title may
-      //      not certify a cue the world does not render.
+      //   1. „THE CUE IS NOT THERE" — WITHDRAWN. The lamps do render: 4074 of
+      //      the 4200 px of the lead's rear bar in that very frame are the
+      //      fleet's TAIL_ON night glow, against 0 of 1920 on the same bar in a
+      //      daylight lesson (the full count is in the header). The repair
+      //      below therefore rests on reason 2 alone — recorded here because a
+      //      fix defended by a false reason is a fix that gets reverted.
       //
-      //   2. THE ORDER IS NOT MEASURED EITHER. `stepReachZone` reads position
+      //   2. THE ORDER IS NOT MEASURED. `stepReachZone` reads position
       //      and speed and nothing else — no clock, no actor. At y = 150 the
       //      trap car (instant model y = 310 − 12·t) is long gone: it crosses
       //      150 at t ≈ 13.3 s and the shadow arrives at t = 17.1 s, so the
@@ -621,6 +637,18 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
       // and binding an objective to an actor needs an objective KIND that does
       // not exist (ObjectiveParams carries no stagedEventId outside
       // emergencyStop). Only the sentence that outran the measurement moved.
+      //
+      // THE SAME SWEEP'S OTHER ROW — «the world contradicts the briefing… the
+      // correct drive tops out at 21 км/ч with 26 full stops… there is no
+      // overtaking car to be passive about» — is the audit's own program, not
+      // this template. `tools/mobile/lesson-audit.mjs` cruises `CRUISE_KMH = 12`
+      // and stops on a schedule, which is why 21 km/h is the FASTEST «correct»
+      // drive in the entire 161-lesson sweep. Both gates here sit on the own
+      // lane at y 380 / 520, ~370 / ~505 m of road: at that program's pace the
+      // 210 s budget buys ~150 m and the car never arrives. Replayed at 30 % of
+      // the shadow's speed — the same ~20 km/h — both gates complete through
+      // the shipped evaluator (§4 of lanes2-sweep161-refutation.test.ts). The
+      // briefing's 70 km/h is the STUDENT's instruction and stays.
       titleBg: "Не ускорявай — задръж под 75 км/ч",
       // THE speed-band gate. y = 380 is the ALONGSIDE point for the shadow,
       // measured not guessed: the overtaker resolves passAheadM at t ≈ 28.1
@@ -769,15 +797,23 @@ const OVCC_EXIT_ONCOMING_Y = 379.06;
  * Its slam tier is authored out of reach (the OVN/OVB mold): this is
  * deterministic moving traffic, not a braking drill.
  *
- * SWEEP 161 — and the same floor is missing here as on LNBD_CRAWLER (see its
- * doc, which carries the full write-up): maxMatchSpeedMps is a CEILING, so a
- * student who crawls gets a truck that crawls with him. The audit's correct
- * drive topped out at 21 km/h and stopped 27 times, and at t 172 s the 57 km/h
- * truck is standing 40 m ahead on a flat, empty road
- * (.audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png): the
- * 450 m straight the second and third gates live on is then never reached, and
- * all three objectives stay dark. Not authorable from a template — the field
- * `BrakingLeadCarSpec` would need is a minimum pace, and it does not exist.
+ * SWEEP 161 — the same missing floor as on LNBD_CRAWLER (see its doc, which
+ * carries the full write-up): maxMatchSpeedMps is a CEILING, so a student who
+ * crawls gets a truck that crawls with him, and at t 172 s the 57 km/h truck is
+ * standing 40 m ahead of a stopped ego on a flat, empty road
+ * (.audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png). That is
+ * real and it is `BrakingLeadCarSpec`'s to fix (it has no minimum-pace field).
+ *
+ * BUT IT IS NOT WHY THE THREE GATES STAYED DARK, and the earlier note here said
+ * it was. The audit's «correct» driver is a fixed program, not a student:
+ * `tools/mobile/lesson-audit.mjs` holds `CRUISE_KMH = 12` and alternates a roll
+ * phase with a scheduled full stop, and it presses no steering key at all (no
+ * KeyA/KeyD, no arrows, anywhere in the file). So it covers ~150 m of a 750 m
+ * route inside the 210 s budget and cannot change lane on any map. Replaying
+ * this template's OWN shadow line at 30 % speed — a ~15 km/h drive — through
+ * the shipped evaluator completes ALL THREE gates (§3 of
+ * lanes2-sweep161-refutation.test.ts). The gates do not need speed; the audit
+ * needed road and a steering wheel.
  */
 const OVCC_LEAD_TRUCK: BrakingLeadCarSpec = {
   id: "sc-ovcc-lead",
@@ -1345,24 +1381,34 @@ const LNBD_LIMIT = 40;
  *     follow band is 0.7 × 1.8 s × 6.1 ≈ 7.7 m of bumpers, and the gap never
  *     goes near it. FOLLOWING_TOO_CLOSE cannot leak into a demo about mirrors.
  *
- * SWEEP 161 — THE CEILING HAS NO FLOOR, AND THAT IS WHY THE DRILL CAN BECOME
- * UNWINNABLE. `matchPlayer` (runners.ts BrakingLeadCarRunner.commandPace) holds
- * the station at the PLAYER'S speed, capped at maxMatchSpeedMps and floored at
- * nothing. So instruction 2's «бавна кола с около 20 км/ч» is only true above
- * 20 km/h: at or below it the crawler mirrors the student, sits 45 m ahead
- * forever, and the overtake this template exists for cannot be performed at
- * all. The audit drove exactly that student — top 17 km/h, 13 full stops
- * (.audit-frames/sweep161/sc-ln-boulevard-discipline/mobile-right/run.log) —
- * and both remaining gates stayed dark in all four legs; the same picture is on
- * the crest sibling's frame, where a 57 km/h truck stands still 40 m ahead of a
- * stopped ego (…/sc-ov-crest-curve/mobile-right/04-t172s.png).
- * NOT AUTHORABLE HERE: `BrakingLeadCarSpec` has no minimum-pace field, and the
- * alternative it does have — paceMode "scheduledCruise" — is the opposite
- * failure (the crawler simply drives away and the student meets an empty
- * boulevard, which this file's own bot-completion gate calls the drill
- * inverting into its own mistake demo). The fix is a `minMatchSpeedMps` floor
- * on the matchPlayer command; it belongs to runners.ts / contracts.ts and is
- * written up in the sweep-161 report rather than guessed at from here.
+ * SWEEP 161 — THE CEILING HAS NO FLOOR, WHICH COSTS THE DRILL ITS STORY BUT
+ * NOT ITS GATES. `matchPlayer` (runners.ts BrakingLeadCarRunner.commandPace)
+ * holds the station at the PLAYER'S speed, capped at maxMatchSpeedMps and
+ * floored at nothing. So instruction 2's «бавна кола с около 20 км/ч» is only
+ * true above 20 km/h: at or below it the crawler mirrors the student and sits
+ * 45 m ahead forever, so there is nothing to draw level with and pull past.
+ * That is a real defect and it is NOT authorable here — `BrakingLeadCarSpec`
+ * has no minimum-pace field, and the alternative it does have, paceMode
+ * "scheduledCruise", is the opposite failure (the crawler drives away and the
+ * student meets an empty boulevard, which this file's own bot-completion gate
+ * calls the drill inverting into its own mistake demo). The fix is a
+ * `minMatchSpeedMps` floor on the matchPlayer command, in runners.ts /
+ * contracts.ts.
+ *
+ * WHAT IT IS NOT: the reason the sweep's two remaining gates stayed dark. The
+ * earlier note here claimed that, and the claim does not survive replay. NONE
+ * of the three gates reads the crawler — they are plain reachZones on position
+ * and speed — and driving this template's OWN shadow line at 30 % speed (a
+ * ~12 km/h drive, i.e. the audit's own cruise) completes all three through the
+ * shipped evaluator. The same line pinned to the curb lane completes gates 1
+ * and 3 and NOT gate 2. §2 of lanes2-sweep161-refutation.test.ts holds both
+ * directions. The audit's «correct» driver is a fixed program — `CRUISE_KMH
+ * = 12` in tools/mobile/lesson-audit.mjs, a roll phase alternating with a
+ * scheduled full stop, and NOT ONE steering key pressed anywhere in that file —
+ * so on a drill whose second gate is one lane to the left it could not have
+ * ticked whatever the crawler did. Gate 3 then stays dark because the objective
+ * chain is strictly sequential (lessons/engine.ts advances only currentIndex),
+ * not because the student failed to come home.
  */
 const LNBD_CRAWLER: BrakingLeadCarSpec = {
   id: "sc-lnbd-crawler",

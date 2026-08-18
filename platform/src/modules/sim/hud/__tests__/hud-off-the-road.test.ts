@@ -203,7 +203,17 @@ describe("row 2 · the fold has a name and a number", () => {
     expect(OVERLAY_CODE).toContain(
       "scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop",
     );
-    expect(OVERLAY_CODE).toMatch(/getComputedStyle\(probe\)\.lineHeight/);
+    // ── 2026-08-18. THE `probe` LOCAL IS GONE AND THE RULE IS BIGGER, NOT
+    //    SMALLER. `foldWindowPx` needs every row's grid, not just the one the
+    //    cut lands in, so the walk builds a `FoldRow[]` — and each row still
+    //    takes its leading from the engine, which is the whole of what this
+    //    assertion has ever been about.
+    expect(OVERLAY_CODE).toMatch(/getComputedStyle\(child\)\.lineHeight/);
+    // …and the ROW GEOMETRY comes off the browser too, by rect and not by
+    // arithmetic on a font size. Whole-pixel `offsetTop`/`offsetHeight` would
+    // round the 15.125 px grid back into the letters the snap exists to spare.
+    expect(OVERLAY_CODE).toContain("child.getBoundingClientRect()");
+    expect(OVERLAY_CODE).not.toContain("offsetHeight");
     // Both windows are wired to the browser's own scroll event, or the zero
     // above is unreachable: a scroll is not a resize.
     expect(OVERLAY_CODE).toContain("onScroll={peekFold.onScroll}");

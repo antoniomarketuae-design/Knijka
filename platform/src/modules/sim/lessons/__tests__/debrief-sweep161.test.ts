@@ -195,3 +195,131 @@ describe("debrief — „Учебни моменти (не влизат в то�
     expect(d.text).toContain("• Превишена скорост");
   });
 });
+
+describe("debrief — the verdict names the опасна it failed for (sc-rx-guarded · pc · wrong)", () => {
+  /**
+   * MEASURED: everything above the fold read «Не всички задачи от маршрута бяха
+   * изпълнени», «допусната е опасна грешка — директно неиздържан», «повече от 9
+   * наказателни точки от изпитния лист» and a 1/0/0 table. «Нарушение на
+   * правилата за жп прелез» was named once in the whole document, in the
+   * mistakes block, two cards below the fold — so the student was shown a
+   * verdict and a number with no offence attached to either.
+   *
+   * Fails on the old file, whose clause was the literal „допусната е опасна
+   * грешка" and stopped there.
+   */
+  it("names the act in the criteria clause, not only in the mistakes block", () => {
+    const d = buildDebrief(l2, unfinishedResult([makeViolation("FAILED_TO_YIELD", 12)]));
+    expect(d.text).toContain(
+      "допусната е опасна грешка: «Непропускане на пътно превозно средство с предимство»",
+    );
+  });
+
+  /**
+   * THE ORDERING IS НАРЕДБА № 38's, NOT THE CLOCK'S. FAILED_TO_YIELD and
+   * COLLISION are both опасни and both cost 10; only the second ends the exam
+   * (чл. 48, ал. 3), so only the second may be called „най-тежката" — which is
+   * `rules/gravest.ts`'s whole subject. A version that reached for
+   * `mistakes[0]` passes the test above and fails here, because the yield fault
+   * is the earlier event.
+   */
+  it("picks the gravest by the act's ranking when more than one опасна is on the sheet", () => {
+    const d = buildDebrief(
+      l0,
+      resultWithEvents([makeViolation("FAILED_TO_YIELD", 20), makeViolation("COLLISION", 66)]),
+    );
+    expect(d.text).toContain(
+      "допуснати са 2 опасни грешки, най-тежката «Пътнотранспортно произшествие»",
+    );
+    expect(d.text).not.toContain("допусната е опасна грешка:");
+  });
+
+  /**
+   * THE OTHER DIRECTION, and the reason the clause is gated on `hasDangerous`
+   * rather than on „!passed": a sheet that fails on POINTS has no опасна to
+   * name, and a verdict that invents one is the same crime pointing the other
+   * way. Four основни are 12 т. — over the nine т. 11 allows and over the six
+   * it allows from основни — with nothing dangerous anywhere.
+   */
+  it("names no act, and no опасна, when the sheet failed on points alone", () => {
+    const d = buildDebrief(
+      l0,
+      resultWithEvents([
+        makeViolation("TURN_WITHOUT_INDICATOR", 10),
+        makeViolation("TURN_WITHOUT_INDICATOR", 20),
+        makeViolation("TURN_WITHOUT_INDICATOR", 30),
+        makeViolation("TURN_WITHOUT_INDICATOR", 40),
+      ]),
+    );
+    const verdict = d.text.split("\n")[0];
+    expect(verdict).toContain("не е издържан по официалните критерии");
+    expect(verdict).toContain("12 наказателни точки от изпитния лист (допустими 9)");
+    expect(verdict).not.toContain("опасна");
+  });
+});
+
+describe("debrief — the unit rides on EVERY number (sc-signal-flashing · mobile · right)", () => {
+  /**
+   * MEASURED, in the debrief printed under four collisions: «Най-добрият ти
+   * резултат за този урок остава 0 наказателни т. по изпитния лист; този път
+   * допусна повече (40).» A bare „(40)" one sentence before the paragraph that
+   * exists to explain that these are NOT контролни точки — the founder's own
+   * misreading, reproduced by the one function in the file whose figures did
+   * not go through `pts`.
+   *
+   * Fails on the old file, which printed the naked integer.
+   */
+  it("puts the unit on the «допусна повече» figure", () => {
+    const d = buildDebrief(l0, resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 5)]), {
+      priorBestScore: 2,
+    });
+    expect(d.text).toContain("този път допусна повече (10 наказателни т.)");
+  });
+
+  /**
+   * The same hole in the sentence that goes the other way — „срещу най-добрите
+   * ти 4 досега". Fails on the old file for the same reason.
+   */
+  it("puts the unit on the personal best it is compared against", () => {
+    const d = buildDebrief(l0, resultWithEvents([makeViolation("HANDBRAKE_LEFT_ON", 5)]), {
+      priorBestScore: 4,
+    });
+    expect(d.text).toContain("срещу най-добрите ти 4 наказателни т. досега");
+  });
+
+  /**
+   * THE OTHER DIRECTION — the numbers must still be the drive's own, and the
+   * three branches must still be three. A fix that unit-stamped the figures by
+   * dropping them, or that collapsed „по-добре / изравнено / по-зле" into one
+   * sentence, passes both tests above and fails here. The regex is the general
+   * form of the defect: a parenthesised bare figure anywhere in the improvement
+   * line, which is exactly what the frame showed.
+   */
+  it("keeps all three verdicts distinct and leaves no bare parenthesised figure", () => {
+    const better = buildDebrief(l0, resultWithEvents([makeViolation("HANDBRAKE_LEFT_ON", 5)]), {
+      priorBestScore: 4,
+    }).text;
+    const equal = buildDebrief(l0, resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 5)]), {
+      priorBestScore: 10,
+    }).text;
+    const worse = buildDebrief(l0, resultWithEvents([makeViolation("RED_LIGHT_CROSSED", 5)]), {
+      priorBestScore: 2,
+    }).text;
+
+    expect(better).toContain("Личен напредък: 1 наказателна т. по изпитния лист");
+    expect(equal).toContain("Изравни най-добрия си резултат за този урок (10 наказателни т.");
+    expect(worse).toContain("остава 2 наказателни т. по изпитния лист");
+
+    for (const [name, text] of [
+      ["better", better],
+      ["equal", equal],
+      ["worse", worse],
+    ] as const) {
+      const line = text.split("\n").find((l) => /най-добри|личен напредък|изравни/i.test(l));
+      expect(line, `${name}: no improvement line at all`).toBeDefined();
+      expect(line, `${name}: bare parenthesised figure in „${line}“`).not.toMatch(
+        /\(\d+(?:[.,]\d+)?\)/,
+      );
+    }
+  });
+});

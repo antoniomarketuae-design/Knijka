@@ -127,20 +127,41 @@ const PARKED_ROW: readonly ScenarioObstacleSpec[] = (
  * every vehicle (see the header for why), colliders on the poligon cones.
  */
 /**
- * The sc-follow-standstill „колона" (founder R3 #40 — „line of cars is ONE
- * car"): 1–2 visual-only queue cars AHEAD of the staged stationary lead, so
- * the column the copy narrates exists. Truth: the lead is FS_LEAD_CAR
- * (templates-following.ts) held at y = 290 on the fo-follow-v1 northbound
- * lane center x = 4.0625; the shadow rests at y ≈ 281 and the player stops
- * behind it — nothing ever drives past y 290, so bodies at y = 298 / 306
- * (≈ 3.9 m bumper gaps — a real queue) are pure dressing. Grading unchanged:
- * leadGapM still measures the REAL staged lead (visual bodies are not
- * traffic), the trace bytes carry no world actors — no re-record.
+ * SWEEP 161 — THE sc-follow-standstill „колона" MOVED OUT OF THIS TABLE, and
+ * the entry is gone rather than retuned. Recorded here because the pose it
+ * used to hold is the one thing a future editor would otherwise re-add.
+ *
+ * It was two visual-only cars at (4.0625, 298) and (4.0625, 306), answering
+ * founder R3 #40 („line of cars is ONE car") behind FS_LEAD_CAR's y = 290
+ * rest. Two things were true of them at once:
+ *
+ *  1. THEY WERE NEVER VISIBLE. Same lane centre, same 1.45 m fleet roofline
+ *     (ScenarioObstacles rigTopY's own default), seen from COCKPIT_EYE 1.20 m
+ *     up (vehicle/tuning.ts) with the student at rest at y ≈ 281. Over the
+ *     lead's roof at 9 m the sight line climbs 0.25/9 = 0.0278 m per metre, so
+ *     at the first body (17 m) it is already 1.67 m and at the second (25 m)
+ *     1.89 m — both roofs 1.45 m. A same-height body directly behind another
+ *     on one line can never poke above it from an eye BELOW the rooflines, at
+ *     any distance. The frame agrees: `.audit-frames/sweep161/
+ *     sc-follow-standstill/pc-right/05-stopped.png` shows one car and bare
+ *     tarmac behind it. Height is the only axis that clears a roofline.
+ *  2. THEY NOW STAND INSIDE REAL BODIES. templates-following.ts stages the
+ *     column as ACTORS with rooflines — FS_QUEUE_AHEAD, a `van` held at
+ *     offsetM 298 and a `truck` at 307 on the same lane — so these two cars
+ *     were drawn inside a 5.2 m van (0.0 m of centres apart) and 1 m from a
+ *     7.5 m truck's centre. Two vehicles in one volume is the very defect the
+ *     held tables exist to remove.
+ *
+ * So the dressing tier has nothing left to add here: a body that the actor
+ * layer already stages, at a height that layer can set and this one cannot,
+ * is not dressing. `__tests__/held-vs-staged.test.ts` is the guard — it fails
+ * if any held body is ever re-seated inside a staged actor's hold pose.
+ *
+ * Nothing else moves: `parkedClearZonesFor` loses the two RULE-3 circles these
+ * bodies opened, and that removes no decoration — fo-follow-v1's curb row
+ * stands at |x| = 10.13, 6.07 m from the lane centre, against a circle of
+ * 2.247 + 2.442 = 4.69 m (measured in the same test).
  */
-const STANDSTILL_COLUMN: readonly ScenarioObstacleSpec[] = [
-  { kind: "vehicle", x: 4.0625, y: 298, headingDeg: 0, model: "corva_s", seed: 21, visual: true },
-  { kind: "vehicle", x: 4.0625, y: 306, headingDeg: 0, model: "vela_h3", seed: 22, visual: true },
-];
 
 /**
  * The sc-ov-narrow corridor dressing (founder R3 #49 — „street not actually
@@ -278,7 +299,8 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
     { kind: "prop", prop: "cone", x: 146.5, y: -129, headingDeg: 0 },
   ],
   "sc-pe-parked-row-scan": PARKED_ROW,
-  "sc-follow-standstill": STANDSTILL_COLUMN,
+  // sc-follow-standstill has NO entry on purpose — see the block above the
+  // NARROW_ROWS comment: its column is staged actors with rooflines now.
   "sc-ov-narrow": NARROW_ROWS,
   // traces/scReels.ts accidentMistake(): the parked car the „собствено ПТП"
   // demo hits then flees. The demo authors the COLLISION as a recorder beat
@@ -380,8 +402,9 @@ export interface ParkedClearZone {
  * districts and the allowlist entry is dead. What is left here are the classes
  * the district alone cannot know, because they are SCENARIO content and not map
  * content: a staged pedestrian's authored walk line (rule 1, below), the kerb a
- * bus stop needs empty (rule 2), and the ground the drill's own held dressing
- * stands on (rule 3).
+ * bus stop needs empty (rule 2 — as a shelter FRONTAGE, and since sweep 161 as
+ * an authored kerb SPAN too, rule 2b), and the ground the drill's own held
+ * dressing stands on (rule 3).
  *
  * A `pedestrianDartOut` walks a 2-point polyline (orchestrator/runners.ts
  * stages `[start, start + dir·travelM]`) with no obstacle query of any kind —
@@ -411,6 +434,11 @@ const WALK_CLEAR_PITCH_M = WALK_CLEAR_RADIUS_M;
  *  metres are the bay a bus needs to pull in and out of, which is exactly the
  *  span that has to be empty for the shelter to be visible from the road. */
 const BUS_STOP_NO_PARK_MARGIN_M = 6;
+/** Centre of TrafficLayer's curb-decoration band, m outboard of the driven
+ *  carriageway edge — `PARK_BAND_CENTER_M`, pinned BY VALUE (the L7 copy law;
+ *  __tests__/bus-stop-kerb.test.ts re-asserts it against the real
+ *  `computeParkedCars` row rather than trusting the copy). */
+const PARKED_BAND_CENTER_M = 2.0;
 
 // --- RULE 3 (doc 88): NOTHING IS PARKED ON TOP OF THE LESSON'S OWN PROP -----
 //
@@ -436,8 +464,10 @@ const BUS_STOP_NO_PARK_MARGIN_M = 6;
 // One derived rule, no list, same doctrine as the two above: a held body opens
 // a circle wide enough that no decoration body's FOOTPRINT can reach it. The
 // curb pass has no colliders and feeds no proximity query, so this only ever
-// deletes pixels — 470 bodies over these templates become 458 and every
-// surviving one keeps its coordinates, model and seed.
+// deletes pixels — 429 bodies over these templates become 417 and every
+// surviving one keeps its coordinates, model and seed. (It read 470 -> 458
+// until sweep 161 dropped sc-follow-standstill's dressing, which took that
+// drill's 41-body map out of the census walk; none of the 41 moved.)
 
 /** Held-body half-diagonals, m — pinned BY VALUE from the rigs that draw them
  *  (vehicleFleet TRUCK_DIMENSIONS 7.5 × 2.4 and ANIMAL_DIMENSIONS 1.1 × 0.28
@@ -467,6 +497,55 @@ function heldHalfDiagM(o: ScenarioObstacleSpec): number {
           ? HELD_VAN_HALF_DIAG_M
           : HELD_CAR_HALF_DIAG_M;
   }
+}
+
+/**
+ * The x of the curb-decoration band on the RIGHT-hand kerb of a district that
+ * authors `meta.scenario.laneCenterRightM` + `lanesPerDirection`; null when it
+ * authors neither (every map written before the scenario-street generator).
+ * `laneCenterRightM` is the OUTERMOST lane centre, which sits (2L − 1) half
+ * lanes from the centre line, so one half-lane is C/(2L − 1) and the driven
+ * edge is 2L of them. Sign carries the side — a spirka is on the right.
+ */
+function parkedKerbXOf(scenario: Record<string, unknown>): number | null {
+  const c = scenario.laneCenterRightM;
+  const l = scenario.lanesPerDirection;
+  if (typeof c !== "number" || !Number.isFinite(c) || c === 0) return null;
+  if (typeof l !== "number" || !Number.isFinite(l) || l < 1) return null;
+  const halfLane = Math.abs(c) / (2 * l - 1);
+  return Math.sign(c) * (2 * l * halfLane + PARKED_BAND_CENTER_M);
+}
+
+/** The bus-stop spans a district authors in `meta.scenario` (district y). */
+function authoredStopSpansOf(
+  scenario: Record<string, unknown>,
+): Array<{ fromY: number; toY: number }> {
+  const out: Array<{ fromY: number; toY: number }> = [];
+  for (const key of ["busBayY", "busStopPocketY"]) {
+    const span = scenario[key];
+    if (typeof span !== "object" || span === null) continue;
+    const { fromY, toY } = span as { fromY?: unknown; toY?: unknown };
+    if (typeof fromY !== "number" || !Number.isFinite(fromY)) continue;
+    if (typeof toY !== "number" || !Number.isFinite(toY)) continue;
+    out.push({ fromY: Math.min(fromY, toY), toY: Math.max(fromY, toY) });
+  }
+  return out;
+}
+
+/** Circles covering the kerb line x = kerbX from fromY to toY, each wide
+ *  enough that a decoration body CENTRED on that kerb inside the span is
+ *  caught (the curb pass tests centres, not footprints). */
+function kerbSpanZones(kerbX: number, fromY: number, toY: number): ParkedClearZone[] {
+  const out: ParkedClearZone[] = [];
+  const steps = Math.max(1, Math.ceil((toY - fromY) / PARKED_HALF_DIAG_M));
+  for (let i = 0; i <= steps; i++) {
+    out.push({
+      x: kerbX,
+      y: fromY + ((toY - fromY) * i) / steps,
+      radiusM: PARKED_HALF_DIAG_M,
+    });
+  }
+  return out;
 }
 
 /** Circles covering the segment (ax,ay)→(bx,by) at WALK_CLEAR_RADIUS_M. */
@@ -545,6 +624,58 @@ export function parkedClearZonesFor(
         cy /= b.footprint.length;
         for (const [px, py] of b.footprint) half = Math.max(half, Math.hypot(px - cx, py - cy));
         zones.push({ x: cx, y: cy, radiusM: half + BUS_STOP_NO_PARK_MARGIN_M });
+      }
+    }
+    // ── RULE 2b (sweep 161): A STOP IS A SPAN OF KERB, NOT ONLY A SHELTER. ──
+    //
+    // Rule 2 above reads `buildings[].kind === "busStop"`, and it was written
+    // against `sp-creep-v1`, which has one. TWO districts in the shipped tree
+    // author a bus stop as a SPAN in `meta.scenario` instead — and they are the
+    // two whose entire lesson IS the stop:
+    //
+    //   mg-busstop-v1  busBayY        { fromY 130, toY 176 }  sc-merge-bus-pullout
+    //   pk-busstop-v1  busStopPocketY { fromY 180, toY 210 }  sc-pk-busstop-ban
+    //
+    // Neither carries a `busStop` building (measured: `buildings[].kind` is
+    // `null` on both), so rule 2 was a silent no-op exactly where the founder
+    // and the sweep were looking. Sweep 161 on `sc-merge-bus-pullout`: „an
+    // unbroken row of privately parked cars occupying the supposed bus lane"
+    // — and it is unbroken, straight through the bay. Measured against the real
+    // `computeParkedCars`: SIX decoration bodies stand inside the authored bay
+    // (y = 129.8, 136.4, 149.6, 156.2, 162.8, 169.4 at the x = 18.25 kerb),
+    // i.e. six private cars parked in the bus stop the drill is about, on a
+    // street whose every metre is also a `busLane` zone (ЗДвП чл. 98, ал. 1 —
+    // спиране и престой на спирка е забранено).
+    //
+    // Derived, no list, same doctrine as rules 2/3: the span and the kerb both
+    // come from the district's OWN authored numbers. The kerb line is where the
+    // curb pass puts its band — `laneWidth × lanes ÷ 2 + PARK_BAND_CENTER_M`,
+    // rebuilt here from `laneCenterRightM` (the OUTERMOST lane centre, i.e.
+    // (2·lanesPerDirection − 1) half-lanes out) so no lane width is guessed:
+    //   mg-busstop-v1  L=2, C=12.19 → half-lane 4.063, edge 16.25, kerb 18.25
+    //   pk-busstop-v1  L=1, C=4.06  → half-lane 4.06,  edge  8.12, kerb 10.12
+    // both within 0.01 m of the row `computeParkedCars` actually emits, and the
+    // circles are PARKED_HALF_DIAG_M wide, so the slop cannot matter. Stops sit
+    // on the right-hand kerb, so the sign of `laneCenterRightM` picks the side
+    // and the opposite kerb is never touched.
+    //
+    // pk-busstop-v1 is the control: its pocket is already inside an authored
+    // `noStopping` zone, so the curb pass keeps that kerb empty on its own and
+    // this rule removes NOTHING there — the test asserts that byte-for-byte, so
+    // a rule that started deleting kerbs it has no business deleting fails.
+    const scenario = (districtRaw as { meta?: { scenario?: unknown } }).meta?.scenario;
+    if (typeof scenario === "object" && scenario !== null) {
+      const kerbX = parkedKerbXOf(scenario as Record<string, unknown>);
+      if (kerbX !== null) {
+        for (const span of authoredStopSpansOf(scenario as Record<string, unknown>)) {
+          zones.push(
+            ...kerbSpanZones(
+              kerbX,
+              span.fromY - BUS_STOP_NO_PARK_MARGIN_M,
+              span.toY + BUS_STOP_NO_PARK_MARGIN_M,
+            ),
+          );
+        }
       }
     }
   }

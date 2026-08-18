@@ -62,6 +62,55 @@ const RX_BAND_TO = 156;
 const RX_BAND_CENTER_Y = 153;
 /** rx-*-v1: the СТОП-cross / barrier stop line (meta.scenario stopLineY). */
 const RX_STOP_LINE_Y = 145;
+
+/**
+ * THE CAP ON EVERY „СПРИ / ИЗЧАКАЙ" GATE OF THIS FAMILY, km/h — sweep 161,
+ * measured 2026-08-18. It was 5, and 5 is not a stop.
+ *
+ * WHAT WAS BROKEN. Every rail drill's first rung is titled with a STANDSTILL —
+ * «Спри напълно на стоп-линията преди релсите — колелата неподвижни, не „почти
+ * спрях"» (instruction 3, verbatim), «Изчакай зад стоп-линията…». The gate
+ * behind all three accepted anything at or under 5 км/ч, i.e. a walking-pace
+ * ROLL with the wheels turning — the exact „почти спрях" the copy names as the
+ * failure.
+ *
+ * And on the UNGUARDED drill the two halves of the product then contradicted
+ * each other on ONE drive. Replayed through the production stack (compile →
+ * createLessonSession → applyTick, `rail-stop-gate-truth.test.ts` §1) a car
+ * that dips to 4 км/ч at the line and rolls on across the band produces:
+ *
+ *     objectives   sc-rxu-stop=done  sc-rxu-finish=done      ← ✓ «Спри напълно»
+ *     rule engine  RAIL_CROSSING_VIOLATION detail "no-stop"  ← опасна, −10,
+ *                  «Преминаване без спиране» → НЕИЗДЪРЖАН
+ *
+ * The green tick and the disqualifying conviction describe the same 4 км/ч. The
+ * rule engine is the half that is right: чл. 51–53 makes the full stop the
+ * whole duty at an unguarded crossing, and `engine.ts` reads it off the Б2
+ * full-stop ledger, whose threshold is `DEFAULT_RULE_CONFIG.fullStopMaxSpeedKmh
+ * = 1`. `objectives.ts` calls the same number `STOPPED_SPEED_KMH = 1` for its
+ * own standstill grace. So the gate now carries the number the rest of the
+ * runtime already uses for „the wheels are stopped", and there is exactly one.
+ *
+ * NOT A TIGHTENING FOR ITS OWN SAKE — the receipts, all nine committed rail
+ * recordings replayed at L1/L3/L5 (the ladder widens the RADIUS; `params.ts`
+ * widenSpeedCap returns early at or below REACH_ZONE_HALT_CAP_KMH = 8, so the
+ * cap itself is identical on every rung):
+ *
+ *   min speed inside the disc — shadow 0.00 км/ч on all three maps; the three
+ *   „drove through" demos 29.83 / 29.83 / 20.86; the three „stopped" demos 0.00
+ *
+ * so every shipped drive completes (or fails) exactly as it did at 5. The ONLY
+ * verdicts that move are drives in the 1–5 км/ч band — the rolling creep, which
+ * is the act instruction 3 forbids and the act the rule engine convicts.
+ *
+ * WHY NOT LOOSER, AND WHY THE GRACE MAKES IT SAFE: a student who stops SHORT of
+ * the mark keeps every metre of forgiveness he had (objectives.ts
+ * REACH_ZONE_GRACE_M — the capsule reaches radius + 5 m back down his own
+ * approach, and its standstill arm needs `halted`, i.e. this same ≤ 1 км/ч), so
+ * the refusal falls only on a car that never stopped anywhere.
+ */
+const RX_FULL_STOP_KMH = 1;
+
 /** rx-*-v1: the perpendicular rail line the staged TRAIN rides — east→west at
  *  the band centre, reaching well off-frame both ways (meta.scenario
  *  .railCrossing.railPath; pinned by value, the rail-district battery asserts
@@ -183,9 +232,17 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     {
       id: "sc-rxu-stop",
       titleBg: "Спри напълно на стоп-линията преди релсите",
-      // Completable ONLY at near-stop speed at the СТОП-cross line (the
-      // pk-smooth-stop mark discipline) — the stop IS the drill.
-      params: { kind: "reachZone", x: RX_LANE, y: RX_STOP_LINE_Y, radiusM: 4, maxSpeedKmh: 5 },
+      // Completable ONLY at a genuine STANDSTILL at the СТОП-cross line — the
+      // stop IS the drill, and RX_FULL_STOP_KMH is the number the rule engine
+      // grades the same duty on (the 4 км/ч roll that used to earn this tick
+      // was being billed RAIL_CROSSING_VIOLATION "no-stop" on the same drive).
+      params: {
+        kind: "reachZone",
+        x: RX_LANE,
+        y: RX_STOP_LINE_Y,
+        radiusM: 4,
+        maxSpeedKmh: RX_FULL_STOP_KMH,
+      },
     },
     {
       id: "sc-rxu-finish",
@@ -290,13 +347,27 @@ export const SC_RX_GUARDED: ScenarioSpec = {
     {
       id: "sc-rxg-wait",
       titleBg: "Изчакай зад стоп-линията пред бариерата",
-      // Completable ONLY at near-stop speed at the barrier line — the wait IS
-      // the drill (a blast-through at speed can never satisfy it).
-      params: { kind: "reachZone", x: RX_LANE, y: RX_STOP_LINE_Y, radiusM: 4, maxSpeedKmh: 5 },
+      // Completable ONLY at a genuine STANDSTILL at the barrier line — the wait
+      // IS the drill, and «изчакай» at 5 км/ч was a creep, not a wait
+      // (RX_FULL_STOP_KMH; instruction 3 «не се промъквай» is the same act).
+      params: {
+        kind: "reachZone",
+        x: RX_LANE,
+        y: RX_STOP_LINE_Y,
+        radiusM: 4,
+        maxSpeedKmh: RX_FULL_STOP_KMH,
+      },
     },
     {
       id: "sc-rxg-finish",
-      titleBg: "Премини прелеза след вдигането и стигни края",
+      // WAS «Премини прелеза СЛЕД ВДИГАНЕТО и стигни края» — see sc-rxd-finish
+      // for the class. Refuted here by this drill's own two ❌ demos: replayed
+      // through the shipped evaluator, `mistake-run-barrier` completes this
+      // disc at t = 33.4 s and `mistake-creep-barred` at t = 46.9 s, both drives
+      // billed RAIL_CROSSING_VIOLATION "entered-barred" for crossing while the
+      // arm was down ([0, 40) of 90 s). Params untouched — `done` is
+      // bit-identical; the lift keeps its grader in the rule engine.
+      titleBg: "Премини прелеза и стигни края на отсечката",
       params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
     },
   ],
@@ -406,14 +477,45 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
   success: [
     {
       id: "sc-rxd-wait",
-      titleBg: "Изчакай зад стоп-линията пред спускащата се бариера",
-      // Completable ONLY at near-stop speed at the barrier line — the wait IS
-      // the drill (diving under the descending arm can never satisfy it).
-      params: { kind: "reachZone", x: RX_LANE, y: RX_STOP_LINE_Y, radiusM: 4, maxSpeedKmh: 5 },
+      // WAS «Изчакай зад стоп-линията пред СПУСКАЩАТА СЕ бариера» — sweep 161,
+      // `sc-rx-barrier-drop/pc-right/01-arrival.png`: the chip carried the
+      // drill's whole subject as a certificate, and the disc cannot see an arm.
+      // MEASURED (rail-stop-gate-truth.test.ts §2): this map's barrier is world
+      // data, down [20, 60) of every 90 s, so it stands FULLY RAISED AND
+      // MOTIONLESS for the first 20 s of the session — and the stop line is
+      // 130 m from the spawn on a 50 км/ч street. A brisk lawful approach banks
+      // this rung at t ≈ 14.8 s; even the shipped shadow, scripted to meet the
+      // descent, banks it at t = 19.45 s. Both are „пред спускащата се бариера"
+      // while nothing is descending. The title now claims only the two things
+      // the params prove — the PLACE and the STANDSTILL — and the drill's
+      // subject stays where it is graded: instruction 2–3, the teach card, and
+      // the rule engine's own `entered-barred` arm.
+      titleBg: "Изчакай зад стоп-линията пред бариерата",
+      // Completable ONLY at a genuine STANDSTILL at the barrier line — «Изчакай
+      // … — дръж под 5 км/ч» was the audit's own sentence for what a rolling
+      // creep under a dropping arm gets credited as (RX_FULL_STOP_KMH).
+      params: {
+        kind: "reachZone",
+        x: RX_LANE,
+        y: RX_STOP_LINE_Y,
+        radiusM: 4,
+        maxSpeedKmh: RX_FULL_STOP_KMH,
+      },
     },
     {
       id: "sc-rxd-finish",
-      titleBg: "Премини прелеза след вдигането и стигни края",
+      // WAS «Премини прелеза СЛЕД ВДИГАНЕТО и стигни края» — the same claim one
+      // rung later, and this one is refuted by the template's OWN ❌ demo.
+      // MEASURED: `mistake-dive-barrier` — the drive whose copy says it dove
+      // under the descending arm at t ≈ 26 s, and which the rule engine bills
+      // RAIL_CROSSING_VIOLATION detail "entered-barred" — completes this disc
+      // at t = 42.1 s (L1 and L3 alike), while the barrier is still down
+      // ([20, 60)) and has never lifted. A ✓ reading «след вдигането» for the
+      // race under the arm is the certificate this family already retired twice
+      // (sc-rxtl-turn, sc-rxti-clear) and once next door (templates-rail2
+      // sc-rxq-cross). The disc proves arrival at the far end of the section;
+      // that is now all it says. Params untouched — `done` is bit-identical.
+      titleBg: "Премини прелеза и стигни края на отсечката",
       params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
     },
   ],

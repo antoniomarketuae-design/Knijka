@@ -188,9 +188,18 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
   instructionsBg: [
     { n: 1, textBg: "Потегли и се движи спокойно в своята лента — улицата пред теб минава край училище." },
     {
+      // THE RUNG NUMBER IS NOT THE LESSON'S TO SAY (sweep161, the PE-04 row —
+      // the same leak, both drills). `instructionsBg` is TEMPLATE-WIDE:
+      // compileScenario copies it verbatim onto every rung and the ONLY
+      // rung-varying line is the complication step it prepends as n:0
+      // („Ниво 5 — …", complicationBriefingText). So a „(ниво 5)" inside a
+      // step is printed identically on L1–L4, where it is false, and on L5,
+      // where the compiler has already said it one line above. The condition
+      // stays where it belongs — in the „Вали ли" clause, which is true at
+      // every rung and asserts nothing about THIS run's weather.
       n: 2,
       textBg:
-        "Вали ли (ниво 5), включи късите светлини още преди да тръгнеш: в дъжд те не са за да виждаш ти, а за да те видят децата от бордюра — и спирачният път пред училището е с около 40% по-дълъг.",
+        "Вали ли, включи късите светлини още преди да тръгнеш: в дъжд те не са за да виждаш ти, а за да те видят децата от бордюра — и спирачният път пред училището е с около 40% по-дълъг.",
     },
     {
       n: 3,
@@ -733,7 +742,24 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
     },
     {
       id: "sc-pzl-halt",
-      titleBg: "Спри пред хората на платното",
+      // A STANDING DUTY, NOT A PRESENT FACT (sweep161, pc-right/04-t090s..t100s).
+      // The chip read «Спри пред ХОРАТА на платното» over three consecutive
+      // frames in which both walkers were still on the far footway behind the
+      // railing; they stepped onto the tarmac at t105s. The reason is
+      // structural and no param can move it: objectives are STRICTLY
+      // SEQUENTIAL, so this one becomes the live order the instant sc-pzl-zone
+      // ticks — measured on the compiled L1 geometry, at the near edge of that
+      // disc, y ≈ 135.5 — while the walkers cannot be moving before
+      // ZL_CROSSING_Y − (triggerDistM + the director's 3 m jitter) = 182.
+      // That is ~46 m of road (the sweep's own 15 s) in which a definite
+      // «хората» names nobody. Raising triggerDistM is NOT the fix: 53 m would
+      // release them at y = 162, inside the map's y 120..180 speed-only window,
+      // and the „Квартална улица с 50" demo would stop grading exactly
+      // SPEEDING_DANGEROUS (pe-zone-districts.test pins that window).
+      // So the TITLE carries the duty instead: чл. 61–62 is a standing order in
+      // a жилищна зона — you stop for anyone who steps onto the carriageway,
+      // whether or not one has yet — and it reads true at both moments.
+      titleBg: "Спри пред всеки, стъпил на платното",
       // Single truth with the shadow's rest point — the чл. 61–62 duty, as a mark.
       params: { kind: "reachZone", x: LANE_2, y: ZL_HALT_Y, radiusM: 4, maxSpeedKmh: 5 },
     },
@@ -991,9 +1017,21 @@ export const SC_PE_PARKED_ROW_SCAN: ScenarioSpec = {
   },
   instructionsBg: [
     {
+      // sweep161 · pc-right/01-arrival: this step was read on a Ниво 1 run in
+      // flat daylight under a blue sky, and it graded „в здрач и нощем
+      // (ниво 5)" — a condition the run does not have and a rung the student
+      // is not in. Both halves are the same defect: `instructionsBg` is
+      // TEMPLATE-WIDE (compileScenario copies it byte-for-byte onto all five
+      // rungs; only the prepended complication step n:0 knows the rung), so
+      // the parenthetical is false on 4 of 5 rungs and redundant on the fifth,
+      // where complicationBriefingText has already printed „Ниво 5 — …".
+      // The lamp duty is kept — it is the row's own reason — but as the
+      // CONDITIONAL it always was („стъмни ли се"), which is true whatever the
+      // rung serves, and the act the step demands (check the lights before you
+      // pull away) is one the daylight world can exercise.
       n: 1,
       textBg:
-        "Преди да потеглиш провери светлините: в здрач и нощем (ниво 5) късите светлини се включват ПРЕДИ да ти потрябват — покрай редица паркирани коли те са единственото, което прави детето видимо навреме.",
+        "Преди да потеглиш провери светлините: стъмни ли се, късите се включват ПРЕДИ да ти потрябват — покрай паркирана редица те са единственото, което прави детето видимо навреме.",
     },
     {
       n: 2,

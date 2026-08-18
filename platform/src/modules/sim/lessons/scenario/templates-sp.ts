@@ -719,6 +719,31 @@ export const SC_SPEED_ZONE: ScenarioSpec = {
   localeBg: "bg-BG",
 };
 
+// THE 210 s SWEEP BUDGET IS NOT A ROUTE LENGTH — measured, because the obvious
+// „fix" is the wrong one and someone will reach for it.
+//
+// sweep161 filed four SP lessons as „the right drive cannot finish": creep on
+// BOTH legs, and zone / rain / dangerous on the phone leg only. NONE of it is
+// route length. The audit harness's `right` mode (tools/mobile/lesson-audit.mjs)
+// is a CAUTIOUS-DRIVER control law — CRUISE_KMH 12, ROLL_DISTANCE_M 15, then a
+// full 3 s standstill — deliberately scenario-independent, and its drives are
+// capped at DRIVE_BUDGET_MS = 210 s of wall clock.
+//   · MEASURED from the run logs: sc-speed-creep/pc-right ticked objective 1
+//     (y = 240) at 2:42, i.e. 225 m in 162 s = 1.39 m/s mean — 26 full stops.
+//     680 m of route at that pace is ~490 s. On the 360 m maps the same law
+//     finishes at 3:32–3:41 of scene clock (zone / rain / dangerous, pc, all
+//     ИЗДЪРЖАН, 3 stars) and the phone leg — same data, same route, ~10 %
+//     slower scene clock — was cut with roughly a third of the road left.
+//   · At the pace THIS LESSON TEACHES the same road takes 400 m ÷ 46 км/ч +
+//     280 м ÷ 27 км/ч ≈ 68 s of driving, against rubric.parTimeSec 90; the
+//     product prints „Ориентировъчно време … спокойно, точността е преди
+//     скоростта" and imposes no cutoff at all.
+// So SHORTENING these routes, or lifting the 30-zone caps so a 12 км/ч creep
+// can finish sooner, would trade a real lesson for a harness constant. If the
+// sweep is to answer completability, the budget has to follow the ROUTE
+// (lesson-audit.mjs already has the SLOW_DRIVE_BUDGET_MS precedent — it just
+// keys off tick cost, not metres). Routed there; nothing to change here.
+
 // ---------------------------------------------------------------------------
 // 5. sc-speed-transition — „Преход 50→30 (навлизане в зона 30)" (SP-03) on
 //    sp-trans-v1: a street built from TWO segments — a 160 m approach posted 50
@@ -747,7 +772,11 @@ const TRANS_Y = 160;
 export const SC_SPEED_TRANSITION: ScenarioSpec = {
   id: "sc-speed-transition",
   family: "speed",
-  tagsBg: ["скорост", "зона 30", "преход на зони", "навлизане в зона", "училищна зона"],
+  // „училищна зона" REMOVED — sweep161 sc-speed-transition/pc-right/04-t076s.
+  // The tag (and instruction 2, below) promised a school this map has never
+  // carried; see the measurement at the instruction. „жилищна зона" is the tag
+  // sp-trans-v1 actually earns: BOTH its edges are class `residential`.
+  tagsBg: ["скорост", "зона 30", "преход на зони", "навлизане в зона", "жилищна зона"],
   titleBg: "Преход 50→30 — навлизане в зона 30",
   objectiveBg:
     "Намали НАВРЕМЕ на знака за зона 30: улицата минава от 50 на 30 км/ч в средата на маршрута, а скоростта трябва да падне заедно със знака — пренесеш ли скоростта от преди зоната, тя става грешка още с влизането.",
@@ -766,7 +795,27 @@ export const SC_SPEED_TRANSITION: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Потегли по правата улица — тук ограничението все още е 50 км/ч." },
-    { n: 2, textBg: "Напред следва знак за зона 30 (училище/жилищна). Забележи го отрано — намаляването започва преди знака, не след него." },
+    // THE SCHOOL THIS STREET NEVER HAD (sweep161, sc-speed-transition/pc-right/
+    // 04-t076s.png). The line used to read „знак за зона 30 (училище/жилищна)".
+    // MEASURED against the district the lesson loads: content/world/
+    // sp-trans-v1.json carries 7 buildings and NOT ONE of them has
+    // `kind: "school"` — the only thing that puts a school on any map
+    // (world/builders/schools.ts derives the УЧИЛИЩЕ board, the yard railing
+    // and the А19 „Деца" posts from that kind alone). It also stages no
+    // children, so the frame at t=076s is what the founder already objected to
+    // in doc 87 B61 on the OTHER 30-street: office/apartment blocks, lamps and
+    // a rank of parked cars, with the red 30 disc the one true thing in it.
+    //
+    // sc-speed-zone is the lesson that MAY say школа: sp-zone30-v1 authors
+    // `sp-b-school` and six staged yard children. This one may not, and asking
+    // a student to lift off for a building that is not out the windscreen is
+    // the exact judgement this drill claims to teach.
+    //
+    // What is left is what the map really is, and it is enough: the В26 disc at
+    // y = 160 and a `residential` street behind it. The zone-transition IS the
+    // lesson (see the header above) — the school was never carrying it.
+    // The claim gate: __tests__/sp-world-claims.test.ts.
+    { n: 2, textBg: "Напред следва знак за зона 30 — жилищна улица. Забележи го отрано: намаляването започва преди знака, не след него." },
     { n: 3, textBg: "Вдигни крака от газта навреме и влез в зоната вече под 30 км/ч — около 26–28 км/ч." },
     { n: 4, textBg: "Не пренасяй скоростта от преди зоната: същите 50 км/ч, законни допреди малко, в зоната са над +10 км/ч — опасна грешка." },
     { n: 5, textBg: "Задръж под 30 км/ч до края на зоната." },
@@ -996,6 +1045,24 @@ export const SC_SP_CURVE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
+    // „ИЗВЪНГРАДСКИЯТ ПЪТ" LOOKS LIKE A CITY, AND THE COPY IS THE HALF THAT IS
+    // RIGHT (sweep161, sc-sp-curve/pc-right/01-arrival.png: five-storey blocks
+    // both sides, street lamps, kerbs, a continuous rank of parked cars — the
+    // rural road only appears after the first minute). This line stays as it
+    // is: the district IS an extra-urban 90 road (content/world/sp-curve-v1
+    // .json — one edge, maxspeed 90, one building, a barn) and the А1 + 90 disc
+    // are posted correctly in the frame. Rewriting the copy to say „city" would
+    // make the lesson legally wrong (90 км/ч inside a built-up area is not a
+    // thing) — the DRESSING is what lies, not the sentence.
+    // MEASURED cause, routed out of this file: the streetscape builders key off
+    // edge CLASS, and gen_rural_curve.mjs authors this rural road as
+    // `unclassified`, which world/builders/props.ts treats as residential-ish
+    // (lamps, parapets, the tree pass at props.ts's `cls !== "residential" &&
+    // cls !== "unclassified"` gate), cityBuildings.ts fills with blocks and
+    // TrafficLayer parks its procedural row along. Fix belongs in
+    // tools/maps/gen_rural_curve.mjs + world/builders/{props,cityBuildings}.ts;
+    // there is no scenario-side lever (the spec carries no streetscape field,
+    // and sp-curve-v1's only other spawn is PAST the curve).
     { n: 1, textBg: "Потегли по извънградския път — тук ограничението е 90 км/ч и правата е свободна." },
     { n: 2, textBg: "Напред следва знак А1 „Опасен завой надясно“ с табела „50“ — препоръчителната скорост за завоя." },
     { n: 3, textBg: "Свали скоростта ПРЕДИ завоя: вдигни газта отрано и спри намаляването около 45–50 км/ч още на правата." },
@@ -1091,6 +1158,33 @@ const MW_X_CRUISE = 0;
  * flow car is a mobile chicane). Detectors are default-ON and structurally
  * data-armed (edge motorway tag + emergencyLane span — no other map carries
  * them), so no ruleConfig is needed — the LIVE student session grades both.
+ * RE-VERIFIED 2026-08-18 against the shipped defaults: rules/types.ts
+ * `motorwayMinSpeedEnabled: true` and `keepRightSustainSec: 12`.
+ *
+ * THE MISSING „ПОТОК" (sweep161 — sc-mw-discipline/pc-right/04-t103s.png and
+ * every frame of all four legs: not one other vehicle anywhere). The concept
+ * this lesson names is the speed of the flow, and there is no flow to read.
+ * The finding is REAL and is NOT closed. Two ways it could be closed, and why
+ * neither belongs in this file alone:
+ *   · STAGED flow actors — the right shape, and sc-speed-dangerous above is the
+ *     working precedent (a learn-only lead + passer that cannot grade). But
+ *     traces/scMwDiscipline.ts feeds `SC_MW_DISCIPLINE.staged` straight into
+ *     `recordScriptedDrive`, so adding one here changes all three committed
+ *     recordings and reds traces/__tests__/sc-mw-discipline-traces.test.ts,
+ *     whose §3 asserts the files are byte-for-byte these scripts. It needs the
+ *     actor AND a re-record (RECORD_TRACES=1) in the same change.
+ *   · AMBIENT traffic (`spec.traffic.vehicleCount`) — REFUSED, and this is the
+ *     trap worth writing down: the crawl detector exempts a car that is merely
+ *     stuck behind someone (`leadGapM > cfg.motorwaySlowQueueGapM`,
+ *     rules/engine.ts). An ambient car that happens to be ahead would turn a
+ *     real 40 км/ч crawl into a clean pass — a FALSE PASS bought to fix a
+ *     staging complaint. The determinism law (ambient 0, seed 7) already
+ *     forbids it; this is the second reason.
+ * The wrong-drive column of that same sweep leg is NOT evidence of a hole here:
+ * pc-wrong held the throttle, ran 136 км/ч in the cruise lane and passed with
+ * 0 errors — which is the correct verdict, because on a 140 motorway that IS a
+ * lawful drive. The two faults this lesson grades are both proven reachable by
+ * the trace gate above.
  */
 export const SC_MW_DISCIPLINE: ScenarioSpec = {
   id: "sc-mw-discipline",
@@ -1116,7 +1210,24 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, платното е разделено с мантинела." },
+    // THE МАНТИНЕЛА THAT IS NOT THERE (sweep161, sc-mw-discipline/mobile-right/
+    // 04-t208s.png — and every other frame of all four legs). The line used to
+    // read „платното е разделено с мантинела". MEASURED: nothing in this
+    // product can build a median crash barrier. `DistrictZone.barrier`
+    // (world/types.ts) is the railCrossing BOOM timetable, not a guard rail;
+    // the only railing props.ts builds is the pavement parapet (RAILING_*),
+    // which stands at the back of a KERB, takes the LEFT verge first and
+    // `continue`s outright when the verge is bare — and a motorway median is
+    // exactly a bare verge. So the sentence could never have been true on any
+    // map, and on mw-v1 the student looks at a grey strip with grass.
+    //
+    // What IS authored stays said: mw-v1's meta.scenario.params.medianM is 6
+    // and the two carriageways really do sit apart (nb x = 0, sb x = -30.37),
+    // so „отделни платна, разделени с ивица" is a fact the world renders. The
+    // claim gate: __tests__/sp-world-claims.test.ts — and it fails the moment
+    // any SP briefing names a мантинела again, until a builder exists to draw
+    // one (routed: world/builders/props.ts + a district-schema feature).
+    { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, а двете посоки вървят по отделни платна, разделени с ивица по средата." },
     { n: 2, textBg: "Ускорявай уверено и се установи около 120–130 км/ч — на магистрала се кара със скоростта на потока." },
     { n: 3, textBg: "Дръж ДЯСНАТА лента за движение: лявата е само за изпреварване, а аварийната вдясно не е лента за движение изобщо." },
     { n: 4, textBg: "Не пълзи: трайно движение далеч под потока (под 50 км/ч без причина) прави от колата ти подвижно препятствие." },

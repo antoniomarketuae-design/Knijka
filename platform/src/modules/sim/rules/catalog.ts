@@ -306,8 +306,19 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Движение без предпазен колан",
+    // THE ROW IS ALSO THE *WARNING*, AND IT WAS WRITTEN AS A VERDICT (sweep 161,
+    // 2026-08-16). `hud/telltaleWarnings.ts` deliberately carries a CODE and no
+    // prose — „the prose has exactly one home (rules/catalog.ts, ADR-002)" — and
+    // `LessonPlayShell.tsx` prints `spec.explanationBg` + `spec.correctiveBg`
+    // for an ARMED cabin fault, i.e. one that has NOT been committed yet. The
+    // belt telltale arms on `moving || engineOn`, so it fires on a stationary
+    // car. MEASURED · `sc-rx-tram-left/mobile-right/run.log`: „[01-arrival]
+    // 0 км/ч … P" then „[02-briefing] 0 км/ч card=warning/peek · Коланът не е
+    // поставен · Движеше се без поставен колан." The car had never moved and the
+    // screen said it had. See TELLTALE_TENSE_NOTE below the catalogue for the
+    // invariant and the control that keeps it honest.
     explanationBg:
-      "Движеше се без поставен колан. При удар с 50 км/ч тялото без колан удря арматурата със сила колкото падане от третия етаж.",
+      "Коланът трябва да е закопчан, преди колелата да се завъртят — не „като излезем на голямото“. При удар с 50 км/ч тялото без колан удря арматурата със сила колкото падане от третия етаж, а въздушната възглавница е разчетена да работи ЗАЕДНО с колана, не вместо него.",
     correctiveBg:
       "Закопчай колана преди потегляне — винаги, дори за 100 метра. Ако се е откопчал в движение, спри на безопасно място и го сложи.",
     lawRef: "ЗДвП чл. 137а, ал. 1",
@@ -338,8 +349,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "osnovna",
     points: SEVERITY_POINTS.osnovna,
     titleBg: "Движение нощем без светлини",
+    // Same telltale contract as the belt row (see it): the lights ping arms on
+    // `moving || engineOn`, so this string is printed at a standstill too.
     explanationBg:
-      "Движеше се на тъмно с изключени светлини. Нощем виждаш само осветеното от фаровете — а без тях и другите не виждат теб.",
+      "На тъмно светлините трябва да са включени, преди колата да тръгне. Нощем виждаш само осветеното от фаровете — а без тях и другите не виждат теб, което е по-опасната половина.",
     correctiveBg:
       "Включи късите светлини още със запалването на двигателя — по тъмно те светят през цялото време, не „когато се стъмни съвсем“.",
     // ал. 1 named: „При движение през нощта и при намалена видимост моторните
@@ -403,8 +416,10 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,
     titleBg: "Мъгла без фарове за мъгла",
+    // Same telltale contract as the belt row (see it): the fog ping arms on
+    // `moving || engineOn`, so this string is printed at a standstill too.
     explanationBg:
-      "Караше в гъста мъгла без включени предни фарове за мъгла. Те светят ниско и широко под пелената — осветяват маркировката пред теб и те правят видим за другите там, където късите светлини се отразяват в капките.",
+      "В гъста мъгла предните фарове за мъгла трябва да светят. Те светят ниско и широко под пелената — осветяват маркировката пред теб и те правят видим за другите там, където късите светлини се отразяват в капките.",
     correctiveBg:
       "Щом видимостта падне значително, включи предните фарове за мъгла (клавиш V) заедно с късите светлини — и ги изгаси, щом мъглата се вдигне.",
     // HONEST ABOUT WHAT THE ACT SAYS, 2026-08-09. чл. 74, ал. 1 is a PERMISSION
@@ -555,6 +570,21 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // for any code flagged `terminateSession` and prints it under this text.
     // Repeating the quote here as well was written and then deleted after
     // looking at the rendered card: it printed twice, two lines apart.
+    //
+    // ONE STRING FOR FOUR DIFFERENT CRASHES (sweep 161, 2026-08-16). The event
+    // has carried `detail` = the body struck ("vehicle" | "pedestrian" |
+    // "cyclist" | "staticObject", `engine.ts` → `e.withWhat`) since the contact
+    // channel shipped, and the card pooled ONE paragraph over all four.
+    // MEASURED · `sc-junction-gap/mobile-wrong/04-t100s.png`: the car at rest ON
+    // A FOOTWAY, nose into a building corner with a tree through the windscreen
+    // view at 5 км/ч, and the only thing said to the student is
+    // «Пътнотранспортно произшествие · Настъпи сблъсък» — with a corrective
+    // about holding two seconds behind the car in front. MEASURED ·
+    // `sc-pk-ban-stop/pc-wrong/08-debrief.png`: „Опасни грешки 2 · 20" with the
+    // SAME paragraph on both rows, so two different crashes read as one repeated
+    // sentence. The split is COLLISION_CONTACT_COPY below, applied by
+    // `makeViolation` exactly as the rail one is — this string stays the
+    // control-neutral row that code reads with no event in hand.
     explanationBg:
       "Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски. В симулатора продължаваме, за да се учиш, но сесията се оценява като прекратена.",
     correctiveBg:
@@ -1332,8 +1362,42 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
   },
 };
 
+/*
+ * ---------------------------------------------------------------------------
+ * TELLTALE_TENSE_NOTE — THE ROWS THAT ARE ALSO READ BEFORE THE FAULT EXISTS
+ * ---------------------------------------------------------------------------
+ * `hud/telltaleWarnings.ts` names four codes and carries no prose of its own,
+ * on purpose: „the prose has exactly one home (rules/catalog.ts, ADR-002) and a
+ * second copy here would be a second thing to keep true." `LessonPlayShell.tsx`
+ * then prints `spec.explanationBg` + `spec.correctiveBg` on the armed-warning
+ * card. So four rows in this file answer TWO questions with one string —
+ * „какво направи" on the fault card, and „какво липсва" on a warning fired
+ * BEFORE anything was done.
+ *
+ * THE INVARIANT, and it is mechanical rather than stylistic: a row may assert
+ * that the car MOVED only if the telltale that prints it cannot arm at a
+ * standstill. Three of the four arm on `moving || engineOn`:
+ *
+ *   belt   SEATBELT_OFF_WHILE_MOVING   arms parked  → may not assert movement
+ *   lights HEADLIGHTS_OFF_AT_NIGHT     arms parked  → may not assert movement
+ *   fog    FOG_LIGHTS_OFF_IN_FOG       arms parked  → may not assert movement
+ *   hand   HANDBRAKE_LEFT_ON           `moving && parkingBrakeOn` → may, and does
+ *
+ * The handbrake row is the CONTROL: it opens „Потегли с вдигната ръчна
+ * спирачка" and that is correct, because its lamp cannot appear on a stopped
+ * car. A check that scrubbed the past tense out of all four would be the same
+ * defect pointed the other way. `__tests__/telltale-warning-tense.test.ts`
+ * drives `armedTelltaleWarnings` at 0 км/ч to derive which codes are at stake
+ * instead of listing them, and asserts both directions.
+ *
+ * MEASURED · `sc-rx-tram-left/mobile-right/run.log`: „[01-arrival] 0 км/ч …
+ * P" → „[02-briefing] 0 км/ч card=warning/peek · Коланът не е поставен ·
+ * Движеше се без поставен колан." A car that had never left Park, told in the
+ * past tense that it had driven unbelted.
+ */
+
 // ---------------------------------------------------------------------------
-// Per-ACT copy (the one code that grades three different acts)
+// Per-ACT copy (the codes whose ONE row grades several different acts)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1396,17 +1460,85 @@ export const RAIL_CROSSING_ACT_COPY: Record<
   },
 };
 
+/**
+ * COLLISION's four struck bodies, keyed by the `detail` string `engine.ts`
+ * already stamps on every contact it bills (`e.withWhat` — SimTickEvent
+ * "collision"). The catalogue row above records the two frames; this is the
+ * half that answers „в какво се ударих".
+ *
+ * WHY THIS CODE AND NOT ONLY RAIL. Since the per-body-kind contact episode
+ * landed (`engine.ts`: „SO THE EPISODE IS PER BODY-KIND"), one drive can
+ * legitimately bill a vehicle AND a pedestrian, and `scoring.ts` closes the
+ * ledger so the second row costs nothing extra. Its whole purpose is therefore
+ * to SAY SOMETHING the first row did not — and with one pooled paragraph it
+ * said the same sentence twice. The discriminator was already on the wire; only
+ * the copy was pooled, exactly as with the rail code.
+ *
+ * `lawRef` DOES NOT SPLIT HERE, and the difference from the rail case is worth
+ * stating rather than leaving as an omission. The rail acts break three
+ * DIFFERENT articles, so the event chip narrows the row's list to the one it
+ * broke. Every contact here breaks the SAME rule — чл. 20, ал. 2, the duty to
+ * pick a speed that leaves you able to stop before any foreseeable obstacle and
+ * to brake the moment a danger appears — which is true of a wall, a car, a
+ * pedestrian and a cyclist alike. A per-body citation would therefore be a NEW
+ * claim rather than a narrowing (the pedestrian duty of care lives in its own
+ * article, which this row does not cite and this split may not smuggle in), and
+ * `content/hazard/items.json` echoes this row's `lawRef` under a bank check
+ * that fails the build when the two drift. The row keeps the citation; the
+ * split keeps to the copy.
+ *
+ * `correctiveBg` also stays pooled — same reason as the rail row: it is looked
+ * up BY CODE at display time (SessionEndScreen, debrief, attemptReel) with no
+ * event in hand. Its „гледай далеч напред, 2 секунди зад предния, намалявай
+ * ПРЕДИ конфликтните точки" reads as lead-car advice next to a building corner,
+ * and that is the honest limit of a code-keyed slot; the per-body EXPLANATION
+ * is where the wall, the person and the bicycle each get their own sentence.
+ */
+export const COLLISION_CONTACT_COPY: Record<
+  "vehicle" | "pedestrian" | "cyclist" | "staticObject",
+  { titleBg: string; explanationBg: string }
+> = {
+  vehicle: {
+    titleBg: "Удар в друго превозно средство",
+    explanationBg:
+      "Удари друго превозно средство. Между вас е имало точно толкова път, колкото ти е трябвал, за да спреш — и е бил по-малко. Скоростта и дистанцията се избират ПРЕДИ конфликтната точка: щом другата кола е вече в спирачния ти път, воланът и спирачката не решават нищо.",
+  },
+  pedestrian: {
+    titleBg: "Удар в пешеходец",
+    explanationBg:
+      "Удари човек. Това е най-тежкият изход на пътя и няма лека негова версия — пешеходецът няма нито ламарина, нито колан, нито въздушна възглавница, а при 50 км/ч ударът е почти сигурна тежка травма. Затова към пешеходците се кара с готовност да спреш, преди да си сигурен, че те са те видели, а не след това.",
+  },
+  cyclist: {
+    titleBg: "Удар във велосипедист",
+    explanationBg:
+      "Удари велосипедист. Колелото е тясно, тихо и по-бавно, отколкото изглежда, и се движи там, където най-често не се гледа — вдясно, в мъртвата зона и малко преди кръстовището. Разминаването с колоездач иска странична дистанция и намаляване, не изчакване той да се отдръпне.",
+  },
+  staticObject: {
+    titleBg: "Удар в неподвижно препятствие",
+    explanationBg:
+      "Удари неподвижен предмет — стълб, дърво, ограда, сграда или бордюр. Неподвижното препятствие не се появява внезапно и не може да сгреши: то е било там през цялото време, а колата е стигнала до него, защото пътят ѝ е излязъл извън платното за движение. Излизането от платното е самото произшествие, а ударът е само краят му.",
+  },
+};
+
+/**
+ * The per-act tables, keyed by the code that owns each. A registry rather than a
+ * chain of `if (code === …)`: the next code that grades more than one act adds a
+ * row here and `makeViolation` picks it up for every producer at once.
+ */
+const PER_ACT_COPY: Partial<
+  Record<ViolationCode, Record<string, { titleBg: string; explanationBg: string; lawRef?: string }>>
+> = {
+  RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,
+  COLLISION: COLLISION_CONTACT_COPY,
+};
+
 /** The per-act copy for an event, or `null` when the code pools one string. */
 function actCopy(
   code: ViolationCode,
   detail: string | undefined,
-): { titleBg: string; explanationBg: string; lawRef: string } | null {
-  if (code !== "RAIL_CROSSING_VIOLATION" || detail === undefined) return null;
-  return (
-    (RAIL_CROSSING_ACT_COPY as Record<string, { titleBg: string; explanationBg: string; lawRef: string }>)[
-      detail
-    ] ?? null
-  );
+): { titleBg: string; explanationBg: string; lawRef?: string } | null {
+  if (detail === undefined) return null;
+  return PER_ACT_COPY[code]?.[detail] ?? null;
 }
 
 // ---------------------------------------------------------------------------

@@ -96,19 +96,35 @@
  * copy it drops is a DUPLICATE of a fault already applied, so `hasDangerous`
  * was true before the drop and stays true after it.
  *
- * WHAT THIS LEDGER DOES NOT REACH, MEASURED. Re-scoring every mistake list the
- * sweep photographed (every `run.log` under `.audit-frames/sweep161`, 348 legs
- * carrying one): 198 finished over the 9-point allowance; through this ledger 26
- * are still over 30, and not one of those 26 is a collision. They are a single
- * continuing condition billed per sample — WRONG_WAY ×5–7 and
- * EMERGENCY_LANE_DRIVING ×6 on sc-ac-wind-truck-pass and sc-merge-accel-lane,
- * SPEEDING_DANGEROUS ×10–11 on sc-ed-reverse-line and the sc-park lessons,
- * STOP_SIGN_NO_FULL_STOP ×11 on sc-merge-from-property. That is the episode
- * gate in engine.ts (`__tests__/sweep161-fault-episodes.test.ts`), not this
- * ledger, and it must NOT be answered here by collapsing repeats: two red
- * lights are two faults, and collapsing repeated второстепенни would turn a
- * 10-point fail into a 7-point pass — the one direction a scorer may never
- * move.
+ * WHAT THIS LEDGER DOES NOT REACH, MEASURED — AND THE CORPUS THAT MEASUREMENT
+ * WAS TAKEN OVER (re-measured 2026-08-18). The figure that stood here — „every
+ * `run.log` under `.audit-frames/sweep161`, 348 legs carrying one… 26 are still
+ * over 30" — reproduces exactly, and 348 is not the sweep. A leg writes its
+ * mistake list to whichever name its chunk of the harness used: `run.log` on
+ * 348 legs, `log.txt` on 123, `drive.log` on 23 — 494 in all. Reading one name
+ * dropped 146 legs, and the 11 residual legs among them are ALL junction
+ * lessons, which is where the worst of it lives: sc-junction-scan/pc-wrong
+ * «356» — the largest residue in the corpus — sc-junction-scan/mobile-wrong
+ * «287»→206, sc-junction-stop/pc-wrong «394»→133, sc-junction-left/pc-wrong
+ * «344»→113, sc-junction-gap/mobile-wrong «243»→111. A corpus selected by
+ * filename hid the family with the most to say.
+ *
+ * Over all 494: 279 legs finished over the 9-point allowance; through this
+ * ledger 37 are still over 30, and 13,245 photographed points become 6,385.
+ * Two invariants hold across every one of the 494 — no leg bills more than 10
+ * points of ПТП (one crash, one bill, on real drives and not only on the
+ * fixtures below), and of the 3,307 points left in those 37 legs exactly 170
+ * are collision points: one closer each in the 17 of them that crashed at all.
+ * The other 3,137 are a single continuing condition billed per sample —
+ * WRONG_WAY ×5–7 and EMERGENCY_LANE_DRIVING ×6 on sc-ac-wind-truck-pass and
+ * sc-merge-accel-lane, SPEEDING_DANGEROUS ×10–11 on sc-ed-reverse-line and the
+ * sc-park lessons, STOP_SIGN_NO_FULL_STOP ×11 on sc-merge-from-property,
+ * SPEEDING_DANGEROUS/STOP_SIGN_NO_FULL_STOP/FAILED_TO_YIELD ×3–5 each through
+ * the junction family. That is the episode gate in engine.ts
+ * (`__tests__/sweep161-fault-episodes.test.ts`), not this ledger, and it must
+ * NOT be answered here by collapsing repeats: two red lights are two faults,
+ * and collapsing repeated второстепенни would turn a 10-point fail into a
+ * 7-point pass — the one direction a scorer may never move.
  *
  * WHAT IS STILL SHOWN. Nothing here touches the mistake LIST. Post-closure
  * faults keep their cards, their explanations and their concept ids — the sim

@@ -83,6 +83,50 @@
  * orientations, not inferred.
  */
 
+/**
+ * THE BRIEFING NAMES THE CEILING IT IS GRADED AGAINST — sweep161, six lessons
+ * in this file at once. The founder's sentence for the class: „the briefing
+ * does not match what is graded."
+ *
+ * Every adverse-conditions drill briefed a TARGET („около 25 км/ч") and was
+ * then graded against a CEILING the student was never told, which the world
+ * printed at him on the gate bar as an instruction. Measured over this file's
+ * compiled rungs, before:
+ *
+ *   lesson              briefing   authored gate   bar/card at L1
+ *   sc-ac-night-lights  под 50           55              50   ← the coach said 55
+ *   sc-ac-rain-lights   ~38              42              47
+ *   sc-ac-wet-braking   ~38              42              47
+ *   sc-ac-fog           ~25              30              35
+ *   sc-ac-snow          ~22              25              30
+ *   sc-ac-crosswind     ~34              40              45
+ *   sc-ac-aquaplane     под 60           58              58   ← copy LOOSER than gate
+ *
+ * Three different defects wear one shape, and they are fixed separately:
+ *  1. night-lights authored a gate ABOVE the posted limit — a false PASS, and
+ *     the only one of the seven that moves a graded number (see sc-acn-lit).
+ *  2. aquaplane briefed 60 over a gate of 58 — a false FAILURE: a student who
+ *     obeys „под 60 км/ч" at 59 is refused the objective at L3+. The copy is
+ *     tightened onto the gate; the gate is NOT loosened onto the copy.
+ *  3. the other five briefed a target and hid the ceiling. Each now names both
+ *     in the same step — the target to aim at and the ceiling that is graded —
+ *     so the number the gate bar shows is a number he was told.
+ *
+ * WHAT THIS FILE COULD NOT CLOSE, so it is written down rather than implied:
+ * at L1/L2 the bar still reads authored + 5 / + 2.5 (`params.ts` widenSpeedCap,
+ * `SPEED_CAP_GRACE_KMH_PER_TOLERANCE`). Its only ceiling is the POSTED limit,
+ * which in adverse conditions is the wrong ceiling — the L1 bar of a rain drill
+ * reads 47 while the rule engine bills SPEED_TOO_FAST_FOR_CONDITIONS above
+ * 0.85 × 50 = 42.5, and fog's reads 35 over an envelope of 30. That is B58 one
+ * level in (the world instructing the fault it is about to bill), it is not
+ * authorable from here, and the caps below are already AT their envelope.
+ *
+ * The steps that carry a ceiling keep the bare number OUT of any imperative
+ * clause: `vehicle/tier-feasibility.test.ts` reads „дръж/карай/стабилизирай …
+ * N" as an order to REACH N, and a ceiling is not a target. The demand set of
+ * every step below is unchanged by this wave.
+ */
+
 import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 import { l5Night, l5Wet } from "./complications";
@@ -142,7 +186,35 @@ export const SC_AC_NIGHT_LIGHTS: ScenarioSpec = {
     {
       id: "sc-acn-lit",
       titleBg: "Мини контролната зона осветен",
-      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 55 },
+      // THE GATE MAY NOT LICENSE THE SPEED THE STREET FORBIDS — sweep161,
+      // `sc-ac-night-lights/pc-wrong/04-t012s.png`. ac-night-v1 is posted 50,
+      // step 2 says „под 50 км/ч" and the В26 plate in the frame reads 50 —
+      // and this gate was authored at 55. `lessons/engine.ts` prints
+      // `params.maxSpeedKmh` RAW in its live nudge, so the coach's own sentence
+      // in that frame was «Задачата иска да си тук с не повече от 55 км/ч, а в
+      // момента караш 59 км/ч»: the instructor licensing a 10 % offence inside
+      // the 50 zone his own briefing had just named. B58 had already clamped
+      // the two channels that read the sign (RouteGuidance's bar, the advisor
+      // card — both printed 50 in the same frame), which is exactly what left
+      // the contradiction visible instead of uniform.
+      //
+      // The 55 was never the ladder's doing and could not be undone there:
+      // `scenario/params.ts` widenSpeedCap bounds grace by
+      // max(authored, posted), so an authored over-post compiles UNCHANGED at
+      // every rung (measured: 55 at L1–L5) and that file deliberately refuses
+      // to tighten it — „tightening it is an authoring decision, not the
+      // ladder's". This is that authoring decision. At night the prudent-speed
+      // factor is 1 (lit urban Sofia — the envelope note at the top of this
+      // file), so the conditions envelope here IS the sign: 50.
+      //
+      // MEASURED AFTER: authored 50 → compiled 50 at L1–L5, so the world bar
+      // (min(cap, posted)) is 50, the engine nudge that prints the raw param is
+      // 50, the advisor card can no longer be handed anything above 50, and the
+      // briefing already said 50 — every surface reads the sign. The shadow
+      // drives 44 km/h (traces/scAcNightLights.ts), so the demonstration and
+      // the L3 bot are untouched; what changes is that a 51–55 km/h drive now
+      // FAILS the gate it used to be credited by.
+      params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 50 },
     },
     {
       id: "sc-acn-finish",
@@ -225,8 +297,10 @@ export const SC_AC_RAIN_LIGHTS: ScenarioSpec = {
     // rule first, the vanishing grey car second.
     // 69 ch
     { n: 1, textBg: "Включи късите светлини — вали, макар да е ден: „чистачки → светлини“." },
-    // 77 ch
-    { n: 2, textBg: "Потегли по правата улица със съобразена за дъжда скорост — тук около 38 км/ч." },
+    // 74 ch — the graded ceiling (sc-acr-lit, 42) now stands beside the target
+    // it was hidden behind; „таванът тук е 42" carries no imperative, so
+    // tier-feasibility still reads zero speed ORDERS in this step.
+    { n: 2, textBg: "Потегли със съобразена за дъжда скорост — около 38 км/ч, таванът тук е 42." },
     // 59 ch
     { n: 3, textBg: "Помни: късите в дъжд не са за да виждаш, а за да те виждат." },
     // 73 ch
@@ -360,8 +434,11 @@ export const SC_AC_HIGHBEAM_LEAD: ScenarioSpec = {
     { n: 1, textBg: "Потегли с включени къси светлини — тъмно е и пред теб има кола." },
     // 77 ch
     { n: 2, textBg: "Превключи на къси, щом настигнеш кола — иначе я заслепяваш през огледалата ѝ." },
-    // 72 ch
-    { n: 3, textBg: "Следвай предната кола на дистанция и с КЪСИ светлини през целия участък." },
+    // 72 ch — sc-ahl-follow grades 45 and the world prints it on the gate bar;
+    // this drill was the last capped gate in the file whose number the briefing
+    // never spoke. No finding named it: it is here because the rule below is a
+    // rule, and a rule with one silent exception is a list.
+    { n: 3, textBg: "Следвай предната кола на дистанция и с КЪСИ светлини — таванът тук е 45." },
     // 68 ch
     { n: 4, textBg: "Мини на дълги чак когато няма нито изпреварвана, нито насрещна кола." },
     // 62 ch
@@ -483,8 +560,11 @@ export const SC_AC_WET_BRAKING: ScenarioSpec = {
   instructionsBg: [
     // Step 4 welded two different pedal acts (lift earlier, brake softer) into
     // one 107-character sentence. They are two acts; they are two steps.
-    // 56 ch
-    { n: 1, textBg: "Включи късите светлини и потегли с около 38 км/ч — вали." },
+    // 74 ch — sc-acw-approach grades 42; step 1 is the row the compact card
+    // always paints, so the ceiling goes there (the sc-zebra-approach rule in
+    // briefing-card-budget.test.ts: the number he is graded against on the
+    // line he cannot scroll away from).
+    { n: 1, textBg: "Включи късите светлини и потегли с около 38 км/ч — вали, таванът тук е 42." },
     // 64 ch
     { n: 2, textBg: "Спри плавно на маркираната позиция зад спрелия отпред автомобил." },
     // 66 ch
@@ -612,8 +692,11 @@ export const SC_AC_FOG: ScenarioSpec = {
     // tier, so the row must stay recognisably the same row.
     // 72 ch
     { n: 1, textBg: "Включи късите светлини и фаровете за мъгла (клавиш V) преди да потеглиш." },
-    // 46 ch
-    { n: 2, textBg: "Потегли бавно и се стабилизирай около 25 км/ч." },
+    // 71 ch — sc-acf-adapted grades 30 (= the 0.6 × 50 fog envelope). „25"
+    // stays inside the „стабилизирай" clause, so it remains the ONE speed
+    // order tier-feasibility sees here, at instruction 2, exactly as the note
+    // above requires; the ceiling sits after the dash, orderless.
+    { n: 2, textBg: "Потегли бавно и се стабилизирай около 25 км/ч — таванът в мъглата е 30." },
     // 66 ch
     { n: 3, textBg: "Карай толкова бързо, колкото виждаш — не колкото позволява знакът." },
     // 63 ch
@@ -751,8 +834,9 @@ export const SC_AC_SNOW: ScenarioSpec = {
     // reason recorded on sc-ac-fog above.
     // 57 ch
     { n: 1, textBg: "Включи късите светлини и потегли меко — пътят е заснежен." },
-    // 68 ch
-    { n: 2, textBg: "Стабилизирай се около 22 км/ч — на сняг това е наполовина под знака." },
+    // 77 ch — sc-acs-approach grades 25 (= the 0.5 × 50 snow envelope). Same
+    // shape as fog: „22" keeps the imperative clause, the ceiling follows it.
+    { n: 2, textBg: "Стабилизирай се около 22 км/ч — зимният таван тук е 25, наполовина под знака." },
     // 59 ch
     { n: 3, textBg: "Помни: зимната скорост не е „малко по-бавно“, а наполовина." },
     // 79 ch
@@ -860,9 +944,29 @@ export const SC_AC_SNOW: ScenarioSpec = {
  *    snow lesson acquires wind. Only this template AUTHORS the flag.
  *  - HONEST VISUAL SCOPE (stated, not hidden): no windsock/foliage assets and
  *    no per-zone exposure model ship in this slice — the live wind blows over
- *    the whole map; the copy narrates the exposed segment (y ≈ 150–265, the
- *    „мост"), and the предупредителен знак for strong crosswind is copy-only.
- *    Wind zones are doc-65 Phase-4 work.
+ *    the WHOLE map, evenly, from the first metre to the last.
+ *
+ * THE COPY MAY ONLY NARRATE THAT — sweep161, severity critical. This template
+ * used to describe an exposed span („на моста", „открития участък", y ≈ 150–265)
+ * and a lorry to be passed. Six of its eight steps did. Opened side by side
+ * with `.audit-frames/sweep161/sc-ac-crosswind/pc-right/01-arrival.png` and
+ * `04-t191s.png`, the world it runs on is fo-follow-v1: a dense 1+1 city street
+ * with six-storey blocks, street trees and a kerbside row of parked cars on
+ * BOTH sides for all 360 m. `content/world/fo-follow-v1.json` carries no
+ * `zones` array at all, so there is no span to be exposed on and nothing marks
+ * one; there is no bridge, no lorry, and wind is depicted nowhere — no swaying
+ * tree, no drifting debris, no leaning vehicle. The founder's words: „the world
+ * does not contain what the briefing promises."
+ *
+ * So the copy below narrates the wind that is REAL — steady, everywhere, with
+ * the deterministic gusts of `vehicle/crosswind.test.ts` — and nothing else.
+ * The places a crosswind is actually met (bridges, gaps between blocks, forest
+ * edges, tunnel mouths, the lee of a lorry) survive in `teach.whenBg`, where
+ * they are knowledge about the road rather than a claim about THIS road.
+ * Giving the drill a genuinely exposed span is district work (a fo-follow-v1
+ * successor with an authored wind zone + the exposure model); the предупреди-
+ * телен знак for strong crosswind is likewise unplaceable — fo-follow-v1
+ * declares zero signs. Both stay doc-65 Phase-4.
  */
 export const SC_AC_CROSSWIND: ScenarioSpec = {
   id: "sc-ac-crosswind",
@@ -870,7 +974,7 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
   tagsBg: ["условия", "страничен вятър", "пориви", "контрол на волана"],
   titleBg: "Страничен вятър",
   objectiveBg:
-    "Мини открития участък въпреки страничния вятър: намали преди него, дръж волана здраво и посрещай поривите с леки, постоянни корекции — поривът бута колата към осевата линия, а рязката свръхкорекция е точно толкова опасна.",
+    "Задръж лентата по цялата отсечка въпреки страничния вятър: намали още в началото, дръж волана здраво с двете ръце и посрещай поривите с леки, постоянни корекции — поривът бута колата към осевата линия, а рязката свръхкорекция е точно толкова опасна.",
   archetypeIds: ["AC-12"],
   conceptIds: ["c-speed-adaptation", "c-vehicle-controls", "c-general-care-duty"],
   map: {
@@ -888,12 +992,17 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
     // Step 1 spent 76 of its 125 characters describing the bridge before naming
     // the act (both hands on the wheel). Step 4's „втора корекция“ warning is the
     // one that kills, so it is no longer the tail of a 149-character sentence.
-    // 56 ch
-    { n: 1, textBg: "Хвани волана здраво с двете ръце преди открития участък." },
-    // 47 ch
-    { n: 2, textBg: "Очаквай на моста силен страничен вятър отдясно." },
-    // 50 ch
-    { n: 3, textBg: "Намали ПРЕДИ открития участък — тук около 34 км/ч." },
+    //
+    // Steps 1, 2, 3 and 8 named a bridge, an „открит участък" and a lorry that
+    // fo-follow-v1 does not contain (the block above this template). They now
+    // name the wind, which it does — blowing over the whole route, which is
+    // exactly how `physics.crosswind` applies it.
+    // 74 ch
+    { n: 1, textBg: "Хвани волана здраво с двете ръце — по цялата отсечка духа страничен вятър." },
+    // 76 ch
+    { n: 2, textBg: "Очаквай пориви отдясно през целия маршрут — вятърът духа напряко на улицата." },
+    // 66 ch — sc-acx-open grades 40; the target and the ceiling, together.
+    { n: 3, textBg: "Намали сега, преди първия порив — тук около 34 км/ч, таванът е 40." },
     // 65 ch
     { n: 4, textBg: "Помни: колкото по-бавно караш, толкова по-малко те мести поривът." },
     // 73 ch
@@ -903,12 +1012,12 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
     // 69 ch
     { n: 7, textBg: "Пази се от рязката „втора корекция“ — тя изхвърля колата към бордюра." },
     // 70 ch
-    { n: 8, textBg: "Дръж лентата до края и очаквай нов порив край сграда, мост или камион." },
+    { n: 8, textBg: "Дръж лентата до края — поривите не спират, докато не свърши отсечката." },
   ],
   success: [
     {
       id: "sc-acx-open",
-      titleBg: "Мини открития участък със съобразена скорост",
+      titleBg: "Мини отсечката със съобразена за вятъра скорост",
       // Cap 40 is the prudent-wind band this drill teaches (the shadow runs
       // ~34): both mistake demos carry near-50 through the gap and cannot
       // complete it — чл. 20 ал. 2 is graded by the objective, the LANE
@@ -929,9 +1038,9 @@ export const SC_AC_CROSSWIND: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ac-crosswind/mistake-full-speed.trace.json" },
-      titleBg: "Полет през открития участък",
+      titleBg: "Полет срещу поривите",
       whatWentWrongBg:
-        "Колата влезе в открития участък с 50 км/ч и отпусната ръка — поривът я премести с метри наляво и тя яздеше осевата линия срещу насрещното, докато водачът реагира. На открито място скоростта се смъква ПРЕДИ порива, а воланът се държи здраво (чл. 20, ал. 2).",
+        "Колата вървеше с 50 км/ч и отпусната ръка на волана — поривът я премести с метри наляво и тя яздеше осевата линия срещу насрещното, докато водачът реагира. При страничен вятър скоростта се смъква ПРЕДИ порива, а воланът се държи здраво (чл. 20, ал. 2).",
       codeRefs: ["CENTER_LINE_TOUCHED"],
     },
     {
@@ -1021,7 +1130,7 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
   tagsBg: ["условия", "дъжд", "аквапланинг", "стояща вода", "съобразена скорост"],
   titleBg: "Аквапланинг",
   objectiveBg:
-    "Мини участъка със стояща вода на извънградския път: намали под 60 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
+    "Мини участъка със стояща вода на извънградския път: намали под 58 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
   archetypeIds: ["AC-07"],
   conceptIds: ["c-rain-aquaplaning", "c-speed-adaptation", "c-braking-distance"],
   map: {
@@ -1047,8 +1156,12 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
     { n: 3, textBg: "Гледай напред — в ниското платното е покрито със стояща вода." },
     // 72 ch
     { n: 4, textBg: "Знай: над ~65 км/ч гумите „изплуват“ — воланът олеква и колата не слуша." },
-    // 56 ch
-    { n: 5, textBg: "Намали ПРЕДИ водата — под 60 км/ч, още на чистия асфалт." },
+    // 56 ch — 60 → 58, the number sc-acq-before actually grades. „под 60" was
+    // 2 km/h LOOSER than the gate, so at L3/L4 (no ladder grace) a student who
+    // obeyed the briefing at 59 was refused the objective. Tightening the copy
+    // costs nothing; loosening the gate to 60 would eat the margin under the
+    // 65 km/h float speed, which is the whole lesson.
+    { n: 5, textBg: "Намали ПРЕДИ водата — под 58 км/ч, още на чистия асфалт." },
     // 66 ch
     { n: 6, textBg: "Отпусни газта плавно и спирай меко, преди да си стъпил във водата." },
     // 86 ch
@@ -1059,7 +1172,10 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
   success: [
     {
       id: "sc-acq-before",
-      titleBg: "Намали под 60 ПРЕДИ водата",
+      // The title says the SAME number the params grade (58). It said 60, and
+      // `advisor.ts` titleCapKmh takes the strictest of the two, so the card
+      // read „под 60" at L1 and „под 58" at L3 for one unchanged gate.
+      titleBg: "Намали под 58 ПРЕДИ водата",
       // Cap 58 sits UNDER the 65 km/h float speed with margin: a car that
       // passes here at 58 or less physically cannot aquaplane in the span.
       // The dry-habit 85+ (and the „lawful" 72) blow this zone.
@@ -1118,7 +1234,7 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
 };
 
 // ---------------------------------------------------------------------------
-// 9. sc-ac-ice — „Лед по моста" (AC-08 ice band) on ac-ice-v1 (360 m street,
+// 9. sc-ac-ice — „Черен лед" (AC-08 ice band) on ac-ice-v1 (360 m street,
 //    limit 50, COLD CLEAR MORNING — day, dry, NO physics flag: the icePatch
 //    span in the map data is the whole hazard)
 // ---------------------------------------------------------------------------
@@ -1130,23 +1246,44 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
 const ICE_STOP_MARK_Y = 280;
 
 /**
- * AC-08 (ice band) — лед по открит участък в ясна студена сутрин (ЗДвП чл. 20,
- * ал. 2: скоростта се съобразява със СЪСТОЯНИЕТО НА ПЪТЯ — и невидимото;
- * знакът А15 „Опасност от хлъзгане" в разказа предупреждава, но истинският
- * урок е да очакваш лед там, където пътят е открит: мостове, надлези, сенки).
+ * AC-08 (ice band) — ЧЕРЕН ЛЕД върху обикновена улица в ясна студена сутрин
+ * (ЗДвП чл. 20, ал. 2: скоростта се съобразява със СЪСТОЯНИЕТО НА ПЪТЯ — и
+ * невидимото; урокът е да очакваш лед след влажна нощ с минус, там където
+ * пътят изглежда просто сух).
+ *
+ * THIS DRILL IS NOT THE BRIDGE DRILL — sweep161, severity critical. It shipped
+ * as „Лед по моста" and its briefing told the student to slow BEFORE the
+ * bridge, to know the bridge has no warm ground under it, to read an А15 plate
+ * before it and to look at a car stranded ON it. Opened against
+ * `.audit-frames/sweep161/sc-ac-ice/pc-right/04-t098s.png` (and 03-ready,
+ * mobile 05-stopped) the world is ac-ice-v1: a dead-straight street running to
+ * the horizon between buildings and parked cars. Checked in
+ * `content/world/ac-ice-v1.json`, three of the four promises cannot be kept
+ * from here at all — the document declares NO bridge geometry, `signs` is
+ * absent entirely (the „А15" lives only as `zones[0].signRef`, a data label
+ * nothing places or renders), and the stalled car is a RECORDER rect with no
+ * entry in `scene/scenarioSceneryProps.ts`, so the live student drives past
+ * empty asphalt where the briefing points.
+ *
+ * The bridge arm of AC-08 already has its own lesson — `sc-ac-bridge-ice`
+ * („Мостът замръзва пръв", templates-conditions2.ts) on ac-bridge-v1, whose
+ * icePatch IS authored as a deck. So the copy here stops competing with it and
+ * takes the arm this map can actually stage: BLACK ICE ON AN ORDINARY STREET,
+ * where the invisibility is the whole hazard. „Мостове, надлези, сенки" survive
+ * in teach.whenBg as knowledge about the road, not as a claim about this one.
  *
  * THE MAP IS THE WHOLE HAZARD (the first icePatch template — and the first
  * template whose reduced grip arrives PURELY through district data):
  *  - NO physics flag is authored (base grip 1 — clear, dry, cold morning;
  *    contrast sc-ac-aquaplane's wetGrip base) and NO weather tag (dry day —
- *    ice on a bridge deck under a blue sky IS the doc-72 surprise);
+ *    ice under a blue sky on asphalt that looks dry IS the doc-72 surprise);
  *  - ac-ice-v1's `icePatch` span [210, 300] (patchGripFactor 0.15 —
  *    tuning.ICE_PATCH_GRIP_FACTOR) is resolved by LessonScene and applied
  *    by VehicleRig: MIN(1, 0.15) = 0.15 on the span, at ANY speed (ice has
  *    no float gate). Measured: braking ≈ 5.5× longer, steering ≈ 0.14×
  *    (vehicle/surface-grip.test.ts) — on the ice the car answers almost
  *    nothing, so every input must be tiny and everything decided BEFORE
- *    the bridge.
+ *    the icy span begins.
  *  - DUAL-CHANNEL HONESTY: the demos are kinematic — the mistakes' slides
  *    are AUTHORED (the brake-on-ice ramp runs SCRIPT_DECEL ×
  *    ICE_PATCH_GRIP_FACTOR ≈ 0.69 m/s² and STILL cannot stop the car; the
@@ -1155,16 +1292,21 @@ const ICE_STOP_MARK_Y = 280;
  *  - NO NEW RULE CODE: COLLISION into the staged car and POOR_LANE_KEEPING
  *    for the sliding swerve — shipped detectors only.
  *  - HONEST VISUAL SCOPE: no ice sheen decal ships (the snow precedent) —
- *    invisibility is not a descope here but the POINT of black ice; the
- *    copy, the А15 story and the ghosts carry the warning.
+ *    invisibility is not a descope here but the POINT of black ice; the copy
+ *    and the ghosts carry the warning. What IS a gap, and is not this file's
+ *    to close: the stalled car has no `scenarioSceneryProps.ts` entry (the
+ *    sc-ac-wet-braking and sc-ac-snow vans have one), so the mistake demos
+ *    below narrate a collision with a body the scene never draws. The copy
+ *    the LIVE student is given therefore points at the marked position, which
+ *    the guidance layer does draw, and stays true either way.
  */
 export const SC_AC_ICE: ScenarioSpec = {
   id: "sc-ac-ice",
   family: "conditions",
-  tagsBg: ["условия", "лед", "зимни условия", "плавни движения", "мостове"],
-  titleBg: "Лед по моста",
+  tagsBg: ["условия", "лед", "черен лед", "зимни условия", "плавни движения"],
+  titleBg: "Черен лед",
   objectiveBg:
-    "Ясна студена сутрин — а откритият участък на моста е заледен: намали до пълзене ПРЕДИ моста, мини по леда с равна газ и прав волан и спри свръхплавно на позицията зад закъсалия автомобил — върху лед спирачката и воланът почти не съществуват.",
+    "Ясна студена сутрин, а платното напред е заледено, без да личи: намали до пълзене ОЩЕ на чистия асфалт, мини ледения участък с равна газ и прав волан и спри свръхплавно на маркираната позиция — върху лед спирачката и воланът почти не съществуват.",
   archetypeIds: ["AC-08"],
   conceptIds: ["c-winter-ice", "c-braking-distance", "c-general-care-duty"],
   map: {
@@ -1180,40 +1322,50 @@ export const SC_AC_ICE: ScenarioSpec = {
   },
   instructionsBg: [
     // THE GRADED ACT IS THE LINE. sc-aci-before grades the slow-down BEFORE the
-    // bridge, and it was the second half of a 139-character step 2 whose first
-    // half explained bridge thermodynamics. The sign, the physics and the reason
-    // all still ship — behind the act instead of in front of it.
-    // 58 ch
-    { n: 1, textBg: "Намали до около 25 км/ч ОЩЕ ПРЕДИ моста, на чистия асфалт." },
-    // 71 ch
-    { n: 2, textBg: "Прочети знака А15 „Опасност от хлъзгане“ преди моста — той не е украса." },
+    // ice, and it was the second half of a 139-character step 2 whose first
+    // half explained bridge thermodynamics. The physics and the reason all
+    // still ship — behind the act instead of in front of it.
+    //
+    // Steps 1, 2, 4, 7 and 9 pointed at a bridge, an А15 plate and a stranded
+    // car, none of which ac-ice-v1 contains (the block above this template).
+    // They now point at the three things it DOES have: the clean approach
+    // asphalt, the invisible ice, and the marked stop position the guidance
+    // layer draws.
+    // 64 ch — sc-aci-before grades 30; the target and the ceiling, together.
+    { n: 1, textBg: "Намали до около 25 км/ч ОЩЕ на чистия асфалт — таванът тук е 30." },
+    // 74 ch
+    { n: 2, textBg: "Гледай напред: платното изглежда сухо, но нощта е била влажна и мразовита." },
     // 68 ch
     { n: 3, textBg: "Помни: откритите участъци замръзват първи при минус след влажна нощ." },
     // 73 ch
-    { n: 4, textBg: "Знай: мостът няма топла земя отдолу и е заледен, макар улицата да е суха." },
+    { n: 4, textBg: "Знай: черният лед е прозрачен — под него асфалтът изглежда сух или мокър." },
     // 72 ch
     { n: 5, textBg: "Дръж равна газ и прав волан — никаква рязка спирачка, никакво завъртане." },
     // 52 ch
     { n: 6, textBg: "Помни: върху леда сцеплението е около 15% от сухото." },
-    // 61 ch
-    { n: 7, textBg: "Виж закъсалия автомобил на моста — подхлъзнал се е преди теб." },
+    // 72 ch
+    { n: 7, textBg: "Виж маркираната позиция напред — до нея се стига само с пълзене по леда." },
     // 65 ch
     { n: 8, textBg: "Започни да спираш многократно по-рано, с едва докосната спирачка." },
-    // 75 ch
-    { n: 9, textBg: "Спри напълно на позицията зад него и задръж колата — плавността е умението." },
+    // 76 ch
+    { n: 9, textBg: "Спри напълно на маркираната позиция и задръж колата — плавността е умението." },
   ],
   success: [
     {
       id: "sc-aci-before",
-      titleBg: "Намали до пълзене ПРЕДИ моста",
-      // Cap 30: the winter crawl must be established on the DRY approach —
+      titleBg: "Намали до пълзене ПРЕДИ леда",
+      // Cap 30: the winter crawl must be established on the CLEAN approach —
       // slowing ON the ice is exactly what the 0.15 grip cannot deliver.
       params: { kind: "reachZone", x: LANE_X, y: 190, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
       id: "sc-aci-mark",
-      titleBg: "Спри свръхплавно на позицията зад закъсалия",
-      // ON the icy span (the stalled car stands where it slid to a stop) —
+      // Was „…зад закъсалия": the stalled car is a recorder rect with no
+      // scenery-prop entry, so the live student is sent to look at nothing.
+      // The marked position IS drawn, and stays the right words if the prop
+      // ever lands.
+      titleBg: "Спри свръхплавно на маркираната позиция",
+      // ON the icy span (where the demos' stalled car slid to a stop) —
       // completable only by a crawl with an absurdly early, feather-light
       // brake; any dry habit blows through at speed.
       params: { kind: "reachZone", x: LANE_X, y: ICE_STOP_MARK_Y, radiusM: 4, maxSpeedKmh: 6 },
@@ -1229,25 +1381,25 @@ export const SC_AC_ICE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ac-ice/mistake-brake-on-ice.trace.json" },
       titleBg: "Спирачка върху леда",
       whatWentWrongBg:
-        "Улицата е суха и колата носи 50 — а мостът е заледен. Водачът видя закъсалия автомобил и натисна спирачката ВЪРХУ леда: при 15% сцепление тя почти не забавя и колата се плъзна десетки метри право в спрелия — ударът дойде с около 40 км/ч. Върху лед се пристига бавно: намаляването става ПРЕДИ открития участък, на чист асфалт (чл. 20, ал. 2).",
+        "Улицата изглежда суха и колата носи 50 — а участъкът напред е заледен. Водачът видя закъсалия автомобил и натисна спирачката ВЪРХУ леда: при 15% сцепление тя почти не забавя и колата се плъзна десетки метри право в спрелия — ударът дойде с около 40 км/ч. Върху лед се пристига бавно: намаляването става ПРЕДИ ледения участък, на чист асфалт (чл. 20, ал. 2).",
       codeRefs: ["COLLISION"],
     },
     {
       traceRef: { path: "content/traces/sc-ac-ice/mistake-harsh-steer.trace.json" },
       titleBg: "Рязък волан върху леда",
       whatWentWrongBg:
-        "Вместо спирачка — паническо дръпване на волана: върху леда завъртяното колело не води, а ПОДНАСЯ. Колата се плъзна косо покрай закъсалия на сантиметри, олюлявайки се чак до бордюра, и се събра в лентата едва след моста. Оцеляването ѝ беше късмет, не умение — на лед всяко движение е малко и плавно, а скоростта пада преди моста.",
+        "Вместо спирачка — паническо дръпване на волана: върху леда завъртяното колело не води, а ПОДНАСЯ. Колата се плъзна косо покрай закъсалия на сантиметри, олюлявайки се чак до бордюра, и се събра в лентата едва след ледения участък. Оцеляването ѝ беше късмет, не умение — на лед всяко движение е малко и плавно, а скоростта пада ПРЕДИ леда.",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
   ],
   teach: {
     whenBg:
-      "Във всяка студена сутрин след влажна нощ — и винаги на откритите места: мостове, надлези, крайречни участъци, сенките на сгради и дървета. Мостът замръзва пръв, защото няма топла земя под платното. Знакът А15 и термометърът около нулата значат едно: смъкни скоростта ПРЕДИ открития участък и мини по него без нито едно рязко движение.",
+      "Във всяка студена сутрин след влажна нощ — и с особено внимание на откритите места: мостове, надлези, крайречни участъци, сенките на сгради и дървета, които не се топят. Мостът замръзва пръв, защото няма топла земя под платното. Знакът А15 и термометърът около нулата значат едно: смъкни скоростта ПРЕДИ участъка и мини по него без нито едно рязко движение.",
     whyBg:
-      "Ледът оставя на гумите около 10–20% от сухото сцепление — спирачният път от 40 км/ч става колкото сухият от 100, а завъртеният волан не завива, а отключва занасяне. Най-коварното е, че ледът не се вижда: пътят изглежда сух, докато мостът лъщи под същото синьо небе. Затова законът връзва скоростта със СЪСТОЯНИЕТО на пътя, не с изгледа му (чл. 20, ал. 2) — който очаква леда там, където той се ражда, пристига върху него бавно и с прав волан.",
+      "Ледът оставя на гумите около 10–20% от сухото сцепление — спирачният път от 40 км/ч става колкото сухият от 100, а завъртеният волан не завива, а отключва занасяне. Най-коварното е, че ледът не се вижда: черният лед е прозрачен и под него асфалтът изглежда просто сух под същото синьо небе. Затова законът връзва скоростта със СЪСТОЯНИЕТО на пътя, не с изгледа му (чл. 20, ал. 2) — който очаква леда там, където той се ражда, пристига върху него бавно и с прав волан.",
     lawRef: "ЗДвП чл. 20, ал. 2",
     examinerBg:
-      "Изпитващият очаква „зимно четене“ на пътя: разпознат риск от заледяване, намаляване преди открития участък, меки команди и многократно по-ранно спиране. Рязката спирачка или воланът върху лед е грешка в преценката, а плъзгането в препятствие прекратява изпита.",
+      "Изпитващият очаква „зимно четене“ на пътя: разпознат риск от заледяване, намаляване ПРЕДИ съмнителния участък, меки команди и многократно по-ранно спиране. Рязката спирачка или воланът върху лед е грешка в преценката, а плъзгането в препятствие прекратява изпита.",
   },
   levels: [
     { level: 1 },

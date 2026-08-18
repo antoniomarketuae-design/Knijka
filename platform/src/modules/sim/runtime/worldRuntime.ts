@@ -47,6 +47,15 @@ import {
 import { CrossingZoneTracker, type PedestrianQuery } from "./zones";
 import { buildLaneArrowSpans, laneArrowAt } from "./laneArrows";
 import { JUNCTION_AREA_RADIUS_M, TurnDetector } from "./turns";
+import {
+  makeSurfaceFix,
+  resolveDistrictDrivableSurface,
+  surfaceAt,
+  OFF_CARRIAGEWAY_BODY_ALLOWANCE_M,
+  type DrivableSurface,
+  type SurfaceFix,
+} from "./surface";
+import type { District as WorldDistrict } from "../world/types";
 
 /** A stop line can re-fire only after this long (jitter at the line must not
  * spam RED_LIGHT_CROSSED; a genuine re-approach takes longer anyway). */
@@ -56,6 +65,81 @@ const STOP_LINE_REFIRE_SEC = 5;
 const NEXT_LINE_WATCH_M = 120;
 /** Junction-proximity context radius (harsh-brake cause gate), m. */
 const JUNCTION_CONTEXT_RADIUS_M = 80;
+
+// ---------------------------------------------------------------------------
+// THE SURFACE CONSULT (sweep161 — „the car left the road and nothing noticed")
+// ---------------------------------------------------------------------------
+//
+// THE TWO FRAMES. Both were routed here, and they are ONE defect:
+//   · sc-ov-oncoming-gap / mobile-wrong / 04-t146s.png — 97 км/ч on a
+//     featureless grey plane, no road, marking or boundary anywhere, HUD still
+//     asserting «90 · знакът важи». No off-route stop, no reset, no penalty.
+//   · sc-ln-turn-lane-arrows / pc-right / 04-t064s.png — the ego on bare
+//     ground with the junction's buildings floating at the far edge, while
+//     01-arrival on the SAME run shows the district fully painted (lane lines,
+//     М10 arrows, kerbs, pavements, a 50 sign). The map is not missing; the
+//     car is off it, and again the sim says nothing.
+//
+// THE CAUSE — this runtime had no way to ask whether there is asphalt under
+// the car. `locator.ts` calls 30 m from every CENTRELINE off-road, and that is
+// a lock-ACQUISITION radius, not a kerb. Measured on the two frames' own maps:
+//
+//   ov-oncoming-v1  carriageway ends at |x| ≈ 12.1 m and at y = 900;
+//                   (4.06, 902) is 2 m off the asphalt, (4.06, 929) is 29 m
+//                   off — and the locator still hands back edge `ovg-e-road`,
+//                   lane 0, maxspeed 90 and PAINTED markings for every one of
+//                   those points.
+//   ln-arrows-v1    (20.31, −152) — 2 m past the south arm's end — is already
+//                   off the asphalt, same lock, same fabricated facts.
+//
+// So between the kerb and the 30 m ring the runtime states, as fact, that a car
+// standing in a field is in a lane with paint around it, and the reducer bills
+// «Неустойчиво движение в лентата» for drifting off the middle of a lane that
+// is not there (the -1 второстепенна in the mobile-wrong debrief, t129s/t134s).
+//
+// WHAT CHANGES HERE. `runtime/surface.ts` (its own slice) reads the asphalt the
+// world builder actually laid, triangle for triangle. sample() now consults it
+// every frame and does exactly two things with the answer:
+//   1. when the car's whole flank is past the kerb it publishes
+//      centreLinePainted/laneLinesPainted = FALSE — the doc-86 T1 contract's
+//      own polarity ("the world builder painted NOTHING here"), applied to the
+//      one place where the answer is beyond argument;
+//   2. it exposes the measurement through `surfaceUnderCar` so the layer that
+//      OWNS convictions can grade it.
+//
+// WHAT DELIBERATELY DOES NOT CHANGE. `maxSpeedKmh`, `wrongWay`, the zone flags
+// and every опасна channel stay exactly as shipped off the asphalt. Silencing
+// them would trade a wrong charge for NO charge, and the replacement — an
+// off-carriageway violation code, and the lesson's off-route stop — lives in
+// files this slice does not own (see the report accompanying this change).
+//
+// COST, measured on this box:
+//   resolve  105 shipped districts in 320 ms total — median 0.4 ms, every
+//            scenario micro-map ≤ 15 ms, and only the two OSM districts are
+//            expensive (district-v1 86.6 ms, d2-v1 122.4 ms at ~20k asphalt
+//            triangles). Once per runtime, lazily, on the first sample().
+//   query    0.6 µs on the road, 2.4 µs out in the field, per tick.
+// `setDrivableSurface` lets a caller that already built the world geometry
+// (LessonScene builds it for the renderer anyway) hand the index over and skip
+// the rebuild entirely.
+
+/**
+ * The car's centre this far past the kerb ⇒ the whole flank is off the road,
+ * m. Not a new number: `surface.ts` derives it from the chassis half-width
+ * plus the deliberately-drivable kerb, and states that the THRESHOLD belongs to
+ * the consumer. This is that consumer, and it uses the number unchanged.
+ */
+const OFF_CARRIAGEWAY_M = OFF_CARRIAGEWAY_BODY_ALLOWANCE_M;
+
+/**
+ * Resolved surfaces, keyed on the district DOCUMENT. A lesson restart, a retry
+ * and the whole runtime test suite hand the same parsed object to
+ * `createWorldRuntime` again and again; without this each of them pays the
+ * resolve (86 ms on district-v1) afresh. Weak, so a district that goes out of
+ * scope takes its index with it. `null` is a cached FAILURE — a document the
+ * builders cannot sweep must not be retried once per runtime either.
+ */
+const surfaceByDistrict = new WeakMap<object, DrivableSurface | null>();
 /**
  * Amber adjudication (B1a, doc 72 JU-06): at the green→yellow flip the
  * runtime freezes the last green-frame snapshot (distance to line + speed);
@@ -555,6 +639,31 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    * recorded traces keep their authored signalOffsets byte-identically.
    */
   armSignalPlan(plan: SignalPlanSpec, near?: { x: number; y: number }): void;
+  /**
+   * THE DRIVABLE SURFACE under the car at the LAST GRADED frame — what it
+   * stood on (`carriageway` / `footway` / `island` / `verge`) and how far its
+   * CENTRE was from the nearest asphalt. Written into `out` (caller-owned
+   * slot, the `signalControllerFigure` discipline — the frame loop must not
+   * allocate).
+   *
+   * Returns FALSE — leaving `out` untouched — when this district's asphalt
+   * could not be indexed, or when sample() has not run yet. That is not
+   * pedantry: `makeSurfaceFix()` reads "nowhere near a road", so a caller who
+   * mistook an unbuilt index for an answer would convict every student on the
+   * map. Unknown must stay unknown (A12).
+   *
+   * Read from the SAME query sample() graded on, at the same frame — the
+   * `railBarrierDownAt` rule: no consumer runs a second clock.
+   */
+  surfaceUnderCar(out: SurfaceFix): boolean;
+  /**
+   * Hand over an already-resolved drivable surface (`resolveDrivableSurface`
+   * over the `WorldGeometry` the renderer builds anyway) instead of letting
+   * this runtime rebuild it. Pure optimisation — the lazy self-resolve costs
+   * 0.4 ms on a median district and 122 ms on the largest OSM one. `null`
+   * clears an injected index and restores the lazy path.
+   */
+  setDrivableSurface(surface: DrivableSurface | null): void;
   /** Install the traffic module's pedestrian lookup (default: nobody anywhere). */
   setPedestrianQuery(fn: PedestrianQuery | null): void;
   /** Install the traffic module's junction-conflict lookup (default: none). */
@@ -616,6 +725,44 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   const turns = new TurnDetector();
   const locator = new Locator(index);
   const defaultLimit = district.meta.defaults?.maxspeedUrbanKmh ?? BG_URBAN_DEFAULT_KMH;
+
+  // THE SURFACE CONSULT (see the header block). Lazy: a runtime that is never
+  // sampled — the content tools, the catalogue tests — pays nothing, and a
+  // caller with the geometry already in hand can inject it instead.
+  let drivable: DrivableSurface | null = null;
+  let drivableResolved = false;
+  let drivableInjected = false;
+  /** Per-tick scratch (zero allocation on the sample path). */
+  const surfaceFix = makeSurfaceFix();
+  /** Did the LAST sample() get a real answer? Until then `surfaceUnderCar`
+   *  reports unknown rather than the "nowhere near a road" default. */
+  let surfaceKnown = false;
+
+  function drivableSurface(): DrivableSurface | null {
+    if (!drivableResolved) {
+      drivableResolved = true;
+      const cached = surfaceByDistrict.get(district);
+      if (cached !== undefined) return (drivable = cached);
+      try {
+        // parseDistrict returns the raw document unchanged, so this IS the
+        // builder's own input; the runtime's District type merely omits the
+        // keys (buildings) that the road/junction sweep never reads.
+        const s = resolveDistrictDrivableSurface(district as unknown as WorldDistrict);
+        // An index with NO asphalt in it is not the statement "this district
+        // is one big field" — it is the statement "the sweep produced
+        // nothing", which every hand-built test fixture in this repo can
+        // trigger. Treated as unknown, because the alternative is a runtime
+        // that reports every point of every such map off-road.
+        drivable = s.counts.carriageway > 0 ? s : null;
+      } catch {
+        // A fixture the world builders cannot sweep must not take the drive
+        // down with it (the curveAdvisory tolerance discipline, A12).
+        drivable = null;
+      }
+      surfaceByDistrict.set(district, drivable);
+    }
+    return drivable;
+  }
 
   const lineLastFired = new Float64Array(stopLines.all.length).fill(-Infinity);
   const collisionQueue: CollisionWith[] = [];
@@ -1658,6 +1805,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // 5. Pedestrian-crossing zones.
       zones.update(v.position.x, v.position.y, v.headingDeg, fix.edgeIdx, pedQuery, events);
 
+      // 5b. THE SURFACE CONSULT (see the header block). One query per frame,
+      // against the asphalt the world builder actually laid — the lane fix
+      // above answers "which edge is nearest", which is a different question
+      // and, past the kerb, a fabricated answer.
+      const surface = drivableSurface();
+      surfaceKnown = surface !== null;
+      const offCarriageway =
+        surface !== null &&
+        surfaceAt(surface, v.position.x, v.position.y, surfaceFix).outsideKerbM >
+          OFF_CARRIAGEWAY_M;
+
       const edgeRt = fix.edgeIdx >= 0 ? index.edgeRt(fix.edgeIdx) : null;
       const maxSpeedKmh = edgeRt ? edgeRt.edge.maxspeed : defaultLimit;
       const wrongWay =
@@ -1730,6 +1888,25 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
             Math.abs(signedDeltaDeg(v.headingDeg, bearingDeg(otx, oty))) <= 90 ? 1 : -1;
           if (headingSign !== fix.travelDir) tick.opposingBank = true;
         }
+      }
+      // PAST THE KERB THERE IS NO PAINT (the surface consult, header block).
+      // The two paint flags above are resolved from `laneMarkingAt`, which
+      // answers for the EDGE — it is a function of arclength, not of whether
+      // the car is on the roadway at all — so within the locator's 30 m lock
+      // ring a car standing in a field inherits the road's markings and the
+      // lane detectors grade it against them. Overrides the block above
+      // deliberately: this is the same T1 question ("does the world draw a
+      // line where the car is") answered by the strictly better referent.
+      //
+      // ONE-SIDED, and only in the direction the evidence supports: a car on
+      // the asphalt is byte-identical to before (`offCarriageway` false ⇒ this
+      // block never runs), so nothing here can acquit a student on the road.
+      // The false-conviction sweep in drivable-surface.test.ts — every lane
+      // centre of every drawn ribbon on all 105 shipped districts, 86,907
+      // points — is what licenses that claim.
+      if (offCarriageway) {
+        tick.centreLinePainted = false;
+        tick.laneLinesPainted = false;
       }
       // М10 lane-intent arrow of the lane the car is actually in (M-17) —
       // resolved from the committed fix like every other authored span, and
@@ -2246,6 +2423,32 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
     locate(pos: { x: number; y: number }): { edgeId: string | null; laneId: number; laneOffsetM: number } {
       const fix = locator.peek(pos.x, pos.y);
       return { edgeId: fix.edgeId, laneId: fix.laneId, laneOffsetM: fix.laneOffsetM };
+    },
+
+    surfaceUnderCar(out: SurfaceFix): boolean {
+      if (!surfaceKnown) return false;
+      out.under = surfaceFix.under;
+      out.outsideKerbM = surfaceFix.outsideKerbM;
+      return true;
+    },
+
+    setDrivableSurface(surface: DrivableSurface | null): void {
+      if (surface === null) {
+        // Clearing an injection must not leave the lazy path believing it has
+        // already resolved — otherwise a null hand-over permanently blinds the
+        // consult.
+        if (drivableInjected) {
+          drivableInjected = false;
+          drivable = null;
+          drivableResolved = false;
+        }
+        return;
+      }
+      drivableInjected = true;
+      drivableResolved = true;
+      // Same guard as the lazy path: an index with no asphalt is "unknown",
+      // never "the whole world is off-road".
+      drivable = surface.counts.carriageway > 0 ? surface : null;
     },
 
     setPedestrianQuery(fn: PedestrianQuery | null): void {

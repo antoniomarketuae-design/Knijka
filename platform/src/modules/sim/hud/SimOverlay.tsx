@@ -196,6 +196,16 @@ export const FOLD_SLACK_PX = 2;
 export const FOLD_FALLBACK_LEADING_PX = 14;
 
 /**
+ * The fade band, and now also the grain the snap below is allowed to shave.
+ *
+ * MOVED TO MODULE SCOPE 2026-08-18 (it was declared inside the component) so
+ * `foldMaskCss` — which is pure, exported and tested — can be written against
+ * the same number the two windows pad themselves with. The declaration is
+ * unchanged and `sim-overlay-fold.test.ts` still pins its text.
+ */
+const TEXT_FADE_PX = 10;
+
+/**
  * How many whole lines are still BELOW the reader, right now.
  *
  * Pure, exported and tested (`sim-overlay-fold.test.ts`) rather than left as an
@@ -231,6 +241,204 @@ export function foldLinesBelow(
   return Math.max(1, Math.round(hidden / step));
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FADE WAS STILL CUTTING THE LETTERS IN HALF — 2026-08-18, sweep 161.
+
+   TWENTY-NINE of the sixty BROKEN findings routed to this file are one
+   sentence, filed verbatim against twenty-three different lessons:
+
+     „The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF
+      GLYPHS — the last visible row is sliced horizontally in half — and then
+      offers «↓ ОЩЕ N РЕДА»."
+
+   Opened, at device resolution (2556 × 1179 = iPhone 16 landscape 852 × 393 at
+   dpr 3), three frames, three lessons, the identical picture:
+
+     sc-rb-exit-signal/mobile-right/04-t035s.png
+       …«стои знак „Път с предимство“» whole, then «там винаги е Б1 или Б2»
+       with its TOP HALF inked and the rest gone, then «↓ още 9 реда»
+     sc-jx-blocked-exit/mobile-right/06-waited.png
+       …«нещо тук. На червено се спира» whole, «напълно ПРЕД линията — без»
+       cut through the waist, then «↓ още 7 реда»
+     sc-merge-lane-end/mobile-right/04-t115s.png   (car moving, 19 км/ч)
+       …«твое, не на другите.» whole, «2. Забележи края на лентата» halved
+
+   AND THE ARITHMETIC SAYS IT COULD NEVER HAVE BEEN ANYTHING ELSE. The body is
+   `text-[11px] leading-snug` — an 11 × 1.375 = 15.125 px line box — and the
+   fade is a FIXED 10 px band at the bottom of the window. The window's height
+   is whatever the column's cap leaves after rows 1, 2c and 3, which is not a
+   multiple of 15.125 of anything. So the line that straddles the opaque edge
+   keeps `(clientHeight − 10) mod 15.125` px of full-strength ink — between 0
+   and 5.1 px of a line whose cap height is ~8 px — and loses the rest inside
+   the band. Whatever the remainder happens to be, the reader sees GLYPH TOPS
+   at declining alpha. That is decapitation, and the founder reads it, exactly
+   as the 2026-08-14 note predicted of the guillotine it replaced, as „this
+   product is broken" rather than as „there is more".
+
+   A GRADIENT CANNOT FIX THIS, WHICH IS WHY THE 2026-08-14 PASS DID NOT. Widen
+   the band to a whole line box and the straddling line simply fades from full
+   ink at its cap height to nothing at its baseline — the same amputation, more
+   slowly. Any band that ends inside a line box ends inside its letters. The
+   only cut that is not through a letter is a cut BETWEEN LINE BOXES.
+
+   SO THE WINDOW IS MASKED TO THE LINE GRID, AT BOTH ENDS. `foldWindowPx` finds
+   the last line-box edge that fits and the first one that clears the top (row
+   16 of the sweep is „clipped at BOTH ends on this viewport"), and the mask
+   becomes opaque between them and transparent outside. A partial line is not
+   dimmed, it is simply not shown, and the row that says how many lines are
+   below is COUNTED AGAINST THE CUT rather than against the box — otherwise the
+   fix would quietly hide one more line than the counter admits, which is the
+   same silence one line further down.
+
+   WHY THE COUNTER IS ENOUGH ON ITS OWN. The fade was never the cue: this
+   card's «↓ още N реда» row and the 44 px «ПРОЧЕТИ» beside it are, and both
+   are already there and already tested. The band's remaining job — keeping a
+   text that FITS from being faded at all — is unchanged: no fold, no cut, and
+   the soft 10 px gradient is emitted exactly as before.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * One row of the scroll window, in the window's own content coordinates.
+ *
+ * `heightPx` is always a whole number of that row's line boxes (a block of text
+ * is laid out as N line boxes and nothing else), which is what lets the edges
+ * be reconstructed without walking every line with a `Range`. `lineHeightPx` is
+ * `NaN` whenever the engine cannot answer — `line-height: normal`, and every
+ * row under vitest's `node` environment — and such a row contributes only its
+ * own two edges, i.e. it is treated as one indivisible block.
+ */
+export type FoldRow = {
+  offsetTop: number;
+  heightPx: number;
+  lineHeightPx: number;
+};
+
+/**
+ * Where the window may be opaque: the line-grid edges nearest its two borders.
+ *
+ * Offsets are from the TOP OF THE VISIBLE BOX, which is what a `mask-image`
+ * gradient is measured in. `hardEdge` is the answer to „is anything being cut
+ * at all" and it is returned rather than inferred from the two numbers, because
+ * the two agree with „nothing is cut" in a case where plenty is: a grid edge
+ * that lands within the sub-pixel slack of the window's floor gives back
+ * `bottomPx === clientHeight` while there are still ten lines underneath. Left
+ * to infer, that window would fall back to the old fixed band and fade the
+ * bottom two thirds of a WHOLE line — the defect, on the one geometry where the
+ * grid happened to fit.
+ *
+ * TWO REFUSALS TO SNAP, and each guards against turning a sliced line into a
+ * deleted paragraph:
+ *
+ *   · NOTHING IS OVERFLOWING. Then there is no cut to move and the window is
+ *     handed back whole. A snap here would hide a line the student can already
+ *     read — the false-failure twin of the defect being fixed.
+ *   · THE SNAP WOULD COST MORE THAN ONE LINE BOX. A partial line is at most one
+ *     line box tall, so a snap that shaves more than that is not landing on a
+ *     text grid at all: it is landing on the top of an opaque row whose insides
+ *     this function cannot see (`renderDetail` mounts a whole checklist into the
+ *     sheet's window). Hiding that wholesale to tidy an edge is strictly worse
+ *     than the edge, so the window is handed back whole and the pre-2026-08-18
+ *     fade is what ships for that one row.
+ */
+// NO `padBottomPx` HERE, and its absence is the point: `foldLinesBelow` needs
+// it because `scrollHeight` includes the fade's twin padding, but this function
+// works from the ROWS, whose `heightPx` is text and nothing else. A parameter
+// accepted and not read is a claim the caller can rely on and cannot.
+export function foldWindowPx(
+  rows: readonly FoldRow[],
+  scroll: { scrollTop: number; clientHeight: number },
+  slackPx: number = FOLD_SLACK_PX,
+): { topPx: number; bottomPx: number; hardEdge: boolean } {
+  const whole = { topPx: 0, bottomPx: scroll.clientHeight, hardEdge: false };
+  if (rows.length === 0) return whole;
+
+  const viewTop = scroll.scrollTop;
+  const viewBottom = scroll.scrollTop + scroll.clientHeight;
+
+  // Every line-box edge the rows put on the grid, plus each row's own two
+  // borders — the gap between two rows (`gap-0.5`) is on neither grid, so both
+  // of its sides have to be offered as places the cut may land.
+  const edges: number[] = [];
+  let contentTop = Number.POSITIVE_INFINITY;
+  let contentBottom = Number.NEGATIVE_INFINITY;
+  let grain = 0;
+  for (const row of rows) {
+    const top = row.offsetTop;
+    const bottom = row.offsetTop + row.heightPx;
+    contentTop = Math.min(contentTop, top);
+    contentBottom = Math.max(contentBottom, bottom);
+    edges.push(top, bottom);
+    const leading = row.lineHeightPx;
+    if (Number.isFinite(leading) && leading > 0) {
+      grain = Math.max(grain, leading);
+      const lines = Math.max(1, Math.round(row.heightPx / leading));
+      for (let k = 1; k < lines; k += 1) edges.push(top + k * leading);
+    }
+  }
+  if (grain === 0) grain = FOLD_FALLBACK_LEADING_PX;
+
+  let bottomPx = scroll.clientHeight;
+  let hardEdge = false;
+  if (contentBottom > viewBottom + slackPx) {
+    let best = Number.NEGATIVE_INFINITY;
+    for (const edge of edges) {
+      if (edge <= viewBottom + slackPx && edge > best) best = edge;
+    }
+    const snapped = best - viewTop;
+    // …and the two refusals. `snapped > 0` is the window too short for even one
+    // line box (the `minHeight: 2.375rem` floor exists so this cannot happen at
+    // any size that ships); the grain test is the opaque-row case above.
+    if (snapped > 0 && scroll.clientHeight - snapped <= grain + slackPx) {
+      // Clamped: an edge inside the slack sits a fraction of a pixel BELOW the
+      // floor, and a mask stop past the box is meaningless. The cut is still
+      // hard — see `hardEdge` above for the case this exists for.
+      bottomPx = Math.min(snapped, scroll.clientHeight);
+      hardEdge = true;
+    }
+  }
+
+  let topPx = 0;
+  if (contentTop < viewTop - slackPx) {
+    let best = Number.POSITIVE_INFINITY;
+    for (const edge of edges) {
+      if (edge >= viewTop - slackPx && edge < best) best = edge;
+    }
+    const snapped = best - viewTop;
+    if (snapped > 0 && snapped < bottomPx && snapped <= grain + slackPx) {
+      topPx = snapped;
+      hardEdge = true;
+    }
+  }
+
+  return { topPx, bottomPx, hardEdge };
+}
+
+/**
+ * The window's `mask-image`, from the grid edges above.
+ *
+ * NO FOLD → THE 2026-08-14 GRADIENT, CHARACTER FOR CHARACTER. That band's job
+ * in the no-overflow case is the one it does well: `padding-bottom` is the same
+ * 10 px, so a text that fits has its last line's box bottom sitting on the
+ * fade's opaque edge and nothing is dimmed at all.
+ *
+ * A FOLD → A HARD EDGE ON THE LINE GRID. Two coincident stops, so the cut falls
+ * between line boxes and never inside one. The reader is told what is under it
+ * by the «↓ още N реда» row outside the window and by «ПРОЧЕТИ» beside it —
+ * both of which were already there, and neither of which the band was doing.
+ */
+export function foldMaskCss(
+  win: { topPx: number; bottomPx: number; hardEdge: boolean },
+  fadePx: number = TEXT_FADE_PX,
+): string {
+  if (!win.hardEdge) {
+    return `linear-gradient(to bottom, #000 calc(100% - ${fadePx}px), transparent)`;
+  }
+  return (
+    `linear-gradient(to bottom, transparent ${win.topPx}px, #000 ${win.topPx}px, ` +
+    `#000 ${win.bottomPx}px, transparent ${win.bottomPx}px)`
+  );
+}
+
 /**
  * The counter, wired to a scroll window.
  *
@@ -252,37 +460,65 @@ export function foldLinesBelow(
 function useFoldLines(key: string): {
   ref: RefObject<HTMLDivElement | null>;
   lines: number;
+  maskCss: string;
   onScroll: () => void;
 } {
   const ref = useRef<HTMLDivElement | null>(null);
   const [lines, setLines] = useState(0);
+  // The mask starts as the plain 2026-08-14 gradient, which is also what an
+  // engine with no `ResizeObserver` and the server render keep: the snap can
+  // only ever improve on it, never be a prerequisite for the card working.
+  const [maskCss, setMaskCss] = useState(() =>
+    foldMaskCss({ topPx: 0, bottomPx: 0, hardEdge: false }),
+  );
   const measure = useCallback(() => {
     const el = ref.current;
     if (el === null) return;
-    const fold = el.scrollTop + el.clientHeight;
-    // The last child that STARTS above the fold is the one the cut runs
-    // through, so its line box is the unit the hidden pixels are counted in.
-    let probe: Element | null = el.firstElementChild;
-    for (const child of Array.from(el.children)) {
-      if ((child as HTMLElement).offsetTop <= fold) probe = child;
-    }
-    const leading =
-      probe === null ? Number.NaN : Number.parseFloat(getComputedStyle(probe).lineHeight);
+    // RECTS AND NOT `offsetTop`/`offsetHeight`, as of 2026-08-18: both of those
+    // round to whole pixels and the grid this snaps to is fractional (15.125 px
+    // at `text-[11px] leading-snug`). Rounding twice, five rows down, walks the
+    // cut a whole pixel back into the letters it exists to stay out of.
+    const box = el.getBoundingClientRect();
+    const rows: FoldRow[] = Array.from(el.children).map((child) => {
+      const rect = child.getBoundingClientRect();
+      return {
+        offsetTop: rect.top - box.top + el.scrollTop,
+        heightPx: rect.height,
+        lineHeightPx: Number.parseFloat(getComputedStyle(child).lineHeight),
+      };
+    });
     // The fade's twin: both windows pad their own bottom by `TEXT_FADE_PX` so
     // that a text which FITS is not faded, and that padding joins the
     // scrollable overflow. Counting it would announce a line that is not there.
-    const padBottomPx = Number.parseFloat(getComputedStyle(el).paddingBottom);
+    const padBottomRaw = Number.parseFloat(getComputedStyle(el).paddingBottom);
+    const padBottomPx = Number.isFinite(padBottomRaw) ? padBottomRaw : 0;
+    const win = foldWindowPx(rows, {
+      scrollTop: el.scrollTop,
+      clientHeight: el.clientHeight,
+    });
+    const fold = el.scrollTop + el.clientHeight;
+    // The last child that STARTS above the fold is the one the cut runs
+    // through, so its line box is the unit the hidden pixels are counted in.
+    let leading = rows.length === 0 ? Number.NaN : rows[0].lineHeightPx;
+    for (const row of rows) {
+      if (row.offsetTop <= fold) leading = row.lineHeightPx;
+    }
     setLines(
       foldLinesBelow(
         {
           scrollTop: el.scrollTop,
           scrollHeight: el.scrollHeight,
-          clientHeight: el.clientHeight,
-          padBottomPx: Number.isFinite(padBottomPx) ? padBottomPx : 0,
+          // THE CUT, NOT THE BOX — 2026-08-18. The snap above stops showing the
+          // line the fade used to halve, so counting against `clientHeight`
+          // would report one line fewer than is really unread: a clean edge
+          // bought with a lie, which is this defect one row further down.
+          clientHeight: win.bottomPx,
+          padBottomPx,
         },
         leading,
       ),
     );
+    setMaskCss(foldMaskCss(win));
   }, []);
   useEffect(() => {
     const el = ref.current;
@@ -294,7 +530,7 @@ function useFoldLines(key: string): {
     for (const child of Array.from(el.children)) ro.observe(child);
     return () => ro.disconnect();
   }, [key, measure]);
-  return { ref, lines, onScroll: measure };
+  return { ref, lines, maskCss, onScroll: measure };
 }
 
 /** Tone → the one colour token the pill is tinted with. */
@@ -751,7 +987,8 @@ export function SimOverlay({
      the road — the founder's note on this very defect ends „an instruction he
      can read but which hides the hazard it is about is a different failure."
      ══════════════════════════════════════════════════════════════════════════ */
-  const TEXT_FADE_PX = 10;
+  // `TEXT_FADE_PX` now lives at module scope (see `foldMaskCss`), because the
+  // band and the SNAP that replaces it when there is a fold are one rule.
   const textWindowStyle: CSSProperties = {
     // ── AND IT IS STILL A PEEK — 2026-08-14, the other half of his note.
     //
@@ -793,10 +1030,18 @@ export function SimOverlay({
     // `NOTIFY_COLUMN_MAX_STAGE_FRACTION` cannot re-create the 2026-08-14 defect
     // by arithmetic nobody re-measures.
     minHeight: "2.375rem",
+    // ── THE BAND IS NOW THE LINE GRID WHENEVER THERE IS A FOLD — 2026-08-18.
+    //
+    // It used to be a fixed 10 px gradient, and sweep 161 filed the result 29
+    // times against 23 lessons: a 10 px band at the bottom of a window whose
+    // height is not a multiple of the 15.125 px line box leaves the straddling
+    // line with between 0 and 5.1 px of full-strength ink — glyph tops, then
+    // nothing. `foldMaskCss` has the measurement and the three frames.
+    //
     // Both spellings: `mask-image` is unprefixed in current WebKit and
     // prefixed in the versions still on phones in this market.
-    WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
-    maskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+    WebkitMaskImage: peekFold.maskCss,
+    maskImage: peekFold.maskCss,
     paddingBottom: `${TEXT_FADE_PX}px`,
     // The card carries `touch-manipulation`; a window that scrolls has to say
     // which axis it owns, or the stage's gesture handling keeps the drag.
@@ -1374,8 +1619,13 @@ export function SimOverlay({
               data-sim-overlay-sheet-text=""
               className="min-h-0 min-w-0 shrink overflow-y-auto"
               style={{
-                WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
-                maskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+                // The same rule as the peek's, from the same hook: the filed
+                // frame here is «6.» with its ascenders sliced flat 8 px above
+                // the blue «Разбрах», which is a 10 px band over a 16.5 px line
+                // box — 61 % of the line inside the fade. `foldMaskCss` snaps
+                // the cut to this window's own line grid instead.
+                WebkitMaskImage: sheetFold.maskCss,
+                maskImage: sheetFold.maskCss,
                 paddingBottom: `${TEXT_FADE_PX}px`,
                 touchAction: "pan-y",
                 overscrollBehavior: "contain",

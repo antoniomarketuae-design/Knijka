@@ -69,6 +69,7 @@ import {
   CylinderGeometry,
   DynamicDrawUsage,
   Object3D,
+  type Matrix4,
   Quaternion,
   Mesh,
   SphereGeometry,
@@ -156,16 +157,26 @@ const BLOB_Y = 0.03;
 // matrix (yaw · swing about local X) both places and swings each limb.
 const PED_HIP_Y = 0.76;
 const PED_SHOULDER_Y = 1.42;
-const PED_HEAD_Y = 1.6;
-const PED_SHOULDER_HALF = 0.21; // arm lateral offset from spine
+export const PED_HEAD_Y = 1.6;
+export const PED_SHOULDER_HALF = 0.21; // arm lateral offset from spine
 const PED_HIP_HALF = 0.09; // leg lateral offset from spine
+/** Torso capsule radius at scale 1, m — also the figure's silhouette half-depth
+ *  seen in profile (a capsule is rotationally symmetric about its own axis).
+ *  Exported: the officer-arm legibility measurement is stated against it. */
+export const PED_TORSO_RADIUS_M = 0.155;
+const PED_ARM_RADIUS_M = 0.048;
+const PED_ARM_CYL_M = 0.5;
+/** Shoulder joint → fingertip at scale 1, m: the arm capsule's full length
+ *  (cylinder + both caps), which is why the geometry is translated by half of
+ *  it to bake the origin at the shoulder. Exported for the same reason. */
+export const PED_ARM_REACH_M = PED_ARM_CYL_M + 2 * PED_ARM_RADIUS_M; // 0.596
 const PED_LEG_SWING_RAD = 0.55;
 const PED_ARM_SWING_RAD = 0.3;
 /** Walking speed (m/s) at which the swing reaches full amplitude. */
 const PED_SWING_FULL_SPEED_MPS = 1.1;
 /** "stopSignal" pose: the RIGHT arm held rotated ~166° about the shoulder —
  *  raised nearly straight up, the стоп-сигнал gesture (VP-11 officer). */
-const PED_POSE_ARM_RAISE_RAD = 2.9;
+export const PED_POSE_ARM_RAISE_RAD = 2.9;
 /** "directTraffic" pose (JU-18 регулировчик): the RIGHT arm held rotated 90°
  *  about the shoulder — extended horizontally along the facing direction.
  *  LEGACY STATIC fallback only — with a `controllerFigure` channel wired the
@@ -234,17 +245,65 @@ const PED_OFFICER_BUILD = 1.18;
  * photographed row. The prominence goes to the figure whose posture is the
  * lesson, at the range the lesson grades it from.
  *
- * BUILD 1.30 is free of the arm-legibility question: `bld` scales the torso
- * capsule radius and the shoulder offset by the SAME factor, so a heavier
- * officer is not a more fused one. It buys presence in side profile, the
- * posture that otherwise reads as a bare vertical line at range.
+ * BUILD 1.30 WAS CLAIMED TO BE „free of the arm-legibility question" HERE, and
+ * sweep161 photographed the opposite — see OFC_ARM_FWD_RAD below, which is the
+ * repair. What 1.30 does buy is honest and narrower than the old sentence: it
+ * scales the torso capsule radius and the shoulder offset by the SAME factor,
+ * so a heavier officer is not a more FUSED one.
  *
  * His FACE, hands and uniform are a modelling job on the founder's own machine
  * (FR-35/FR-43) and are not something these constants can fix.
  */
-const PED_CONTROLLER_HEIGHT = 1.5;
-const PED_CONTROLLER_BUILD = 1.3;
-const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
+export const PED_CONTROLLER_HEIGHT = 1.5;
+export const PED_CONTROLLER_BUILD = 1.3;
+export const OFC_ARM_OUT_RAD = 1.47; // both-arms-out sideways raise (about local Z)
+/**
+ * FR-OFC-ARMS (sweep161, `sc-signal-controller/mobile-right/04-t053s.png`) —
+ * THE ARMS THE WHOLE DRILL ASKS HIM TO READ SUBTEND ZERO WIDTH FROM THE SEAT.
+ *
+ * The finding, in the auditor's words: *„through the whole approach (t017s to
+ * t058s, i.e. the entire decision window) he renders as a featureless olive
+ * capsule with a bare head on a dark post: at 300–400 % zoom on 04-t053s there
+ * are no arms visible at all"*, and *„the code comment in TrafficLayer.tsx
+ * claims 'BUILD 1.30 is free of the arm-legibility question'; the frames say it
+ * is not"*. Confirmed by looking: at 8× on that frame the near arm is behind
+ * the torso and the far arm is a two-pixel nub.
+ *
+ * THE CAUSE IS GEOMETRIC AND WAS ALWAYS GOING TO HAPPEN. `OFC_ARM_OUT_RAD`
+ * swings both arms out along the officer's own LATERAL axis. The лекция's
+ * „премини" posture is the one where the driver sees his SIDE PROFILE — and a
+ * driver seeing the profile is, by definition, standing on that lateral axis.
+ * The arms therefore point straight at his eye and straight away from it, and
+ * a foreshortened capsule is a dot: reach × sin(0) = 0.000 m of silhouette,
+ * against a torso that hides 0.202 m of it. Zero arms is not a small arm.
+ *
+ * THE FIX IS A SAGITTAL TILT, NOT A LONGER ARM: both extended arms are also
+ * pitched FORWARD (toward the chest) by this angle, so no viewing direction
+ * can ever be parallel to them. Composition is qYaw · qLat · qRoll, so the
+ * tip's local direction is (cosθ·sinφ, −cosθ·cosφ, −sinθ) with φ =
+ * ±OFC_ARM_OUT_RAD — i.e. the tilt spends `sinθ` of the reach on the officer's
+ * FORWARD axis (local −Z is his chest direction) and keeps `cosθ` of it
+ * lateral.
+ *
+ * MEASURED at the pinned controller scale (reach 0.596 × height 1.50 =
+ * 0.894 m; torso 0.155 × build 1.30 = 0.202 m of silhouette to clear):
+ *   • profile-visible arm, θ = 0.00 → 0.894 × sin 0    = 0.000 m — invisible,
+ *   • profile-visible arm, θ = 0.44 → 0.894 × sin 0.44 = 0.381 m, i.e. 0.179 m
+ *     of clear air BEYOND the torso outline: ≈ 24 px on the audited 2556 px
+ *     phone frame at the 27 m the drill grades from, ≈ 16 px at 40 m;
+ *   • the cost, in the direction a „fix" must not break: the chest-on halt
+ *     wall spans 2 × (0.21 × 1.30 + 0.894 × cos θ × sin 1.47) = 2.325 m at
+ *     θ = 0 and 2.156 m at θ = 0.44 — 7.3 % narrower, and that photographed
+ *     silhouette is why the angle is 0.44 rad (25°) and not the 45° that would
+ *     read the arms best in profile and cost 23 % of the wall.
+ *
+ * ППЗДвП/ЗДвП чл. 7 is not touched by this: the article's own wording for the
+ * permitting posture is „ръце, изпънати настрани ИЛИ СПУСНАТИ" — the signal is
+ * carried by which side of him you are on, not by the exact arm angle. A 25°
+ * forward tilt renders the same posture legibly; a 0° one renders it not at
+ * all, which is the only reading a student can actually get wrong.
+ */
+export const OFC_ARM_FWD_RAD = 0.44;
 /** „Внимание" window before the flip, s — sized to the recorded narrations:
  *  the postures shadow's „ръката му се вдига" lands ≈ t 19 on the flip-30
  *  drills (raise = 30 − 11), and the live drill's shadow crosses at ≈ t 13,
@@ -328,6 +387,38 @@ export function blinkerSides(
     left: indicator === "left" || (indicator !== "right" && steer > BLINK_STEER_THRESH),
     right: indicator === "right" || (indicator !== "left" && steer < -BLINK_STEER_THRESH),
   };
+}
+
+/** Where one of the live officer's arms is asked to be, in his own joint
+ *  angles: `lat` = the sideways raise about local Z, `sag` = the sagittal
+ *  pitch about local X (positive = toward his chest). */
+export interface OfficerArmTarget {
+  lat: number;
+  sag: number;
+}
+
+/**
+ * The JU-18 officer's arm pose, as a target pair (FR-OFC-ARMS).
+ *
+ * Extracted because the rule is stated TWICE in the frame loop — once when the
+ * figure is first sighted (land IN pose, no settle-in at session start) and
+ * once as the per-frame damp target — and the sweep161 defect was exactly a
+ * rule that has to hold in both places. `out` is a caller-owned record so the
+ * hot path keeps its zero-allocation law.
+ *
+ * `side` follows the limb loop: 0 = left (sign +1), 1 = right (sign −1).
+ */
+export function officerArmTarget(
+  attention: boolean,
+  side: number,
+  out: OfficerArmTarget,
+): void {
+  const sign = side === 0 ? 1 : -1;
+  // „Внимание": right arm straight up, left dropped, neither one out.
+  // Otherwise: both out sideways AND pitched forward, so the posture has a
+  // silhouette from every viewing direction (see OFC_ARM_FWD_RAD).
+  out.lat = attention ? 0 : sign * OFC_ARM_OUT_RAD;
+  out.sag = attention ? (side === 1 ? PED_POSE_ARM_RAISE_RAD : 0) : OFC_ARM_FWD_RAD;
 }
 
 /** Shortest-signed angular difference a-b wrapped to (-pi, pi]. */
@@ -916,16 +1007,19 @@ function makeBlobTexture(): CanvasTexture {
 // card: it belongs ON the thing he is being asked to read, and the register's
 // other rows show what happens to DOM overlays here — they land on top of each
 // other. This is a billboarded plane painted from a canvas, so it costs one
-// draw, obeys occlusion, and cannot collide with any HUD layer.
+// draw and obeys occlusion. What it does NOT do is „cannot collide with any HUD
+// layer", which this comment used to claim: a world plane and a screen-space
+// HUD share the same pixels, and sweep161 photographed the card's surviving
+// bottom lines lying across the „МЕНЮ" button. See `bubbleWhollyVisible`.
 //
 // Sized to stay LEGIBLE, which is the whole point of the ask: at
 // BUBBLE_REF_DIST_M and closer it is its natural size; beyond that it grows
-// with distance up to BUBBLE_MAX_SCALE so its apparent size stays roughly
-// constant — the student can read the posture's meaning from the approach, at
-// the distance where he still has time to act on it, which is exactly where
+// with distance up to BUBBLE_MAX_SCALE so its apparent size stays constant —
+// the student can read the posture's meaning from the approach, at the distance
+// where he still has time to act on it, which is exactly where
 // `sc-sig-controller-postures` grades him.
 // ---------------------------------------------------------------------------
-const BUBBLE_W_M = 3.6;
+export const BUBBLE_W_M = 3.6;
 /**
  * DELIBERATELY UNCHANGED when the sixth line landed (B41, 2026-08-10). The
  * card gained `priorityBg` and the obvious move was to grow it — 540 → 576 px
@@ -939,14 +1033,136 @@ const BUBBLE_W_M = 3.6;
  * is exactly where the sixth line went. Keeping the plane at its photographed
  * size costs nothing and gives back 2 m of approach.
  */
-const BUBBLE_H_M = 1.9;
+export const BUBBLE_H_M = 1.9;
 export const BUBBLE_TEX_W = 1024;
 export const BUBBLE_TEX_H = 540;
 /** Bubble base sits this far above the figure's head. */
-const BUBBLE_GAP_M = 0.42;
-/** Distance at which the bubble is drawn at 1:1 world size, m. */
-const BUBBLE_REF_DIST_M = 16;
-const BUBBLE_MAX_SCALE = 3.4;
+export const BUBBLE_GAP_M = 0.42;
+/**
+ * Distance at which the bubble is drawn at 1:1 world size, m — i.e. the
+ * apparent size the whole band is pinned to.
+ *
+ * FR-OFC-CARD (sweep161, `sc-sig-controller-live/mobile-right/04-t012s.png`):
+ * *„only the headline word resolves during the approach; the five body lines
+ * that carry the actual rule are a low-resolution texture that blurs to
+ * unreadable mush even at 600 % zoom … they only become readable once the car
+ * is nearly at the stop line — after the stop/go choice has been made."*
+ *
+ * MEASURED on `sc-signal-controller/mobile-right/04-t053s.png` (2556 × 1179):
+ * the card spans ≈ 383 device px, so a 46 px body line in a 540 px texture
+ * lands at 46/540 × 383 × (1.9/3.6) ≈ 17 px of em, ≈ 12 px of Cyrillic cap
+ * height, against a 116 px headline at ≈ 30 px of cap height — which is
+ * exactly the split the auditor describes, headline crisp and body mush.
+ *
+ * The lever is the REFERENCE DISTANCE, not the type: `bubbleLine` already
+ * shrinks-to-fit at BUBBLE_MIN_FONT_SCALE, so growing the authored point sizes
+ * mostly buys shrink (the longest line, „Предимството е ТВОЕ — дори на
+ * червено", is already within ~12 % of the 936 px ink box). Pinning the
+ * apparent size to 11.5 m instead of 16 m makes every glyph 16/11.5 = 1.39×
+ * bigger at EVERY range in the band: ≈ 17 px of cap height, across the floor.
+ * BUBBLE_MAX_SCALE moves with it so the band still runs to 11.5 × 4.75 ≈ 54.6 m
+ * (it was 16 × 3.4 = 54.4 m) — the far end is unchanged, only the size is.
+ *
+ * What this costs, stated in both directions:
+ *  - the plane is a bigger world object (17.1 m wide at the cap, was 12.2 m).
+ *    Nobody but the student ever sees it, and he sees it at a fixed 17.4°;
+ *  - a taller card reaches higher above a fixed head, so the range at which it
+ *    stops fitting the windscreen moves out from ≈ 11.2 m to ≈ 11.7 m on the
+ *    audited phone aspect. That is half a metre of the very end of the
+ *    approach, and the лекция's own stop line is SIGNAL_SETBACK_M = 17.5 m
+ *    back — so the card is whole everywhere the drill actually grades the
+ *    read, which `officer-and-caption-legibility.test.ts` pins.
+ */
+export const BUBBLE_REF_DIST_M = 11.5;
+export const BUBBLE_MAX_SCALE = 4.75;
+/**
+ * World scale of the gesture card at `eyeD` metres from the camera.
+ *
+ * Exported because it IS the legibility law of the caption, and FR-OFC-CARD's
+ * far half is a finding about this one line.
+ *
+ * A LOWER FLOOR WAS TRIED AND REJECTED, and the arithmetic is recorded here so
+ * the next reader does not try it again. The obvious answer to the near half of
+ * the same finding — the card growing into the HUD — is to let it shrink below
+ * the reference distance too. It cannot work: the officer's HEAD climbs the
+ * frame as the driver closes, and it is the head, not the card, that dominates.
+ * The card's top sits at (2.40 head + 0.42 gap + 1.90·s) m against an eye at
+ * 1.20 m, so staying inside the audited phone's 16.9° vertical half-FOV needs
+ * s ≤ (0.3038·d − 1.62)/1.90: that is s ≤ 0.75 at 10 m, s ≤ 0.43 at 8 m and
+ * s ≤ 0.11 at 6 m. A 0.11 card is 0.21 m of plane — the type is gone long
+ * before the plane fits. No monotone floor satisfies it, and the honest rule is
+ * the one `bubbleWhollyVisible` states instead.
+ */
+export function bubbleScale(eyeD: number): number {
+  return Math.min(BUBBLE_MAX_SCALE, Math.max(1, eyeD / BUBBLE_REF_DIST_M));
+}
+
+/** NDC half-extent a corner may reach and still count as on screen. Two values
+ *  = hysteresis, the same device the ANFAS thresholds above use: a caption that
+ *  blinks on and off as the driver steers is its own defect. */
+const BUBBLE_ON_SCREEN_ENTER = 0.97;
+const BUBBLE_ON_SCREEN_EXIT = 1.03;
+
+/** The minimum a projection needs from a camera. Structural, so the test can
+ *  hand this a real `PerspectiveCamera` and the frame loop its live one. */
+export interface BubbleCamera {
+  matrixWorld: { elements: ArrayLike<number> };
+  matrixWorldInverse: Matrix4;
+  projectionMatrix: Matrix4;
+}
+
+/**
+ * Is the WHOLE card on screen? (FR-OFC-CARD, near half.)
+ *
+ * A clipped caption is not a caption. sweep161's `04-t076s.png` shows what the
+ * half of one does instead: its surviving bottom lines land on the HUD's
+ * top-left corner and make the „МЕНЮ" button illegible. Below ~10 m no scale
+ * law can keep the card whole — the officer's own head climbs the frame as the
+ * driver closes, and shrinking the card fast enough to compensate would make it
+ * unreadable before it went off the edge (the arithmetic is under
+ * `bubbleScale`) — so the honest rule is the one this function states: show it
+ * while it can be read whole, and otherwise not at all. It never hides a card
+ * that fits, so no readable caption is lost, and the range where it does hide
+ * (≈ 11.7 m and in, on the audited phone) is INSIDE the лекция's own stop line
+ * at SIGNAL_SETBACK_M = 17.5 m — i.e. past the point where the posture read is
+ * still a decision. What it removes is the half-card the frame photographed
+ * lying across the „МЕНЮ" button.
+ *
+ * The card is billboarded, so its plane axes ARE the camera's right/up; the
+ * four corners come off `matrixWorld` without a quaternion or an allocation.
+ * `tmp` is caller-owned (the frame-loop zero-allocation law).
+ */
+export function bubbleWhollyVisible(
+  camera: BubbleCamera,
+  cx: number,
+  cy: number,
+  cz: number,
+  halfW: number,
+  halfH: number,
+  wasVisible: boolean,
+  tmp: Vector3,
+): boolean {
+  const e = camera.matrixWorld.elements;
+  const rx = e[0] * halfW;
+  const ry = e[1] * halfW;
+  const rz = e[2] * halfW;
+  const ux = e[4] * halfH;
+  const uy = e[5] * halfH;
+  const uz = e[6] * halfH;
+  const m = wasVisible ? BUBBLE_ON_SCREEN_EXIT : BUBBLE_ON_SCREEN_ENTER;
+  for (let k = 0; k < 4; k++) {
+    const sr = k & 1 ? 1 : -1;
+    const su = k & 2 ? 1 : -1;
+    tmp.set(cx + sr * rx + su * ux, cy + sr * ry + su * uy, cz + sr * rz + su * uz);
+    tmp.applyMatrix4(camera.matrixWorldInverse).applyMatrix4(camera.projectionMatrix);
+    // z outside (-1, 1) is behind the eye or past the far plane; either way the
+    // projected x/y are not a position on this screen.
+    if (tmp.z <= -1 || tmp.z >= 1) return false;
+    if (tmp.x < -m || tmp.x > m || tmp.y < -m || tmp.y > m) return false;
+  }
+  return true;
+}
+
 /** |cos| between the officer's facing and the direction to the camera above
  *  which the student is seeing him ANFAS (chest or back). Two thresholds =
  *  hysteresis, so the caption cannot flicker while he turns at a phase flip.
@@ -959,6 +1175,24 @@ const BUBBLE_ANFAS_EXIT = 0.45;
  *  border stroke is 7 px and the corner radius 34, so 44 keeps a centred line
  *  clear of the rounded accent frame rather than merely inside the bitmap. */
 export const BUBBLE_PAD_X = 44;
+
+/**
+ * Authored type size of each card line, px of the BUBBLE_TEX_H-tall canvas.
+ *
+ * Exported and read by the painter rather than written inline, because the
+ * FR-OFC-CARD measurement is stated in these numbers: the finding is that the
+ * headline resolves on the approach and the five body lines do not, and a
+ * legibility gate that quoted 46 from its own copy of the layout would keep
+ * passing after someone edited the painter. One source, both readers.
+ */
+export const BUBBLE_LINE_PX = {
+  headline: 116,
+  pose: 44,
+  go: 46,
+  stop: 46,
+  priority: 44,
+  law: 38,
+} as const;
 
 /**
  * Paint one centred line, SHRUNK TO FIT (doc 87 B41).
@@ -1054,17 +1288,17 @@ export function drawControllerBubble(c: HTMLCanvasElement, copy: ControllerBubbl
   // 66/64/64/62/64 and every type size is untouched, so nothing that was
   // legible in a shipped frame got smaller.
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.headlineBg, 700, 116, 120, W);
+  bubbleLine(g, copy.headlineBg, 700, BUBBLE_LINE_PX.headline, 120, W);
   g.fillStyle = "#dbe5f2";
-  bubbleLine(g, copy.poseBg, 600, 44, 186, W);
+  bubbleLine(g, copy.poseBg, 600, BUBBLE_LINE_PX.pose, 186, W);
   g.fillStyle = "#9ff0c4";
-  bubbleLine(g, copy.goBg, 500, 46, 250, W);
+  bubbleLine(g, copy.goBg, 500, BUBBLE_LINE_PX.go, 250, W);
   g.fillStyle = "#ffc9c2";
-  bubbleLine(g, copy.stopBg, 500, 46, 314, W);
+  bubbleLine(g, copy.stopBg, 500, BUBBLE_LINE_PX.stop, 314, W);
   g.fillStyle = copy.accent;
-  bubbleLine(g, copy.priorityBg, 600, 44, 376, W);
+  bubbleLine(g, copy.priorityBg, 600, BUBBLE_LINE_PX.priority, 376, W);
   g.fillStyle = "#8ea3bd";
-  bubbleLine(g, copy.lawRef, 500, 38, 440, W);
+  bubbleLine(g, copy.lawRef, 500, BUBBLE_LINE_PX.law, 440, W);
 }
 
 /** Structural slice of the runtime's JU-18 read model (module boundary: the
@@ -1281,11 +1515,11 @@ export function TrafficLayer({
   // one instance matrix swings the limb; torso origin at the hips. Owned here,
   // disposed on unmount.
   const pedGeoms = useMemo(() => {
-    const torso = new CapsuleGeometry(0.155, 0.44, 4, 10);
+    const torso = new CapsuleGeometry(PED_TORSO_RADIUS_M, 0.44, 4, 10);
     torso.translate(0, 0.375, 0); // origin at the hips, extends up
     const head = new SphereGeometry(0.135, 10, 8);
-    const arm = new CapsuleGeometry(0.048, 0.5, 3, 8);
-    arm.translate(0, -0.298, 0); // origin at the shoulder, hangs down
+    const arm = new CapsuleGeometry(PED_ARM_RADIUS_M, PED_ARM_CYL_M, 3, 8);
+    arm.translate(0, -PED_ARM_REACH_M / 2, 0); // origin at the shoulder, hangs down
     const leg = new CapsuleGeometry(0.068, 0.62, 3, 8);
     leg.translate(0, -0.378, 0); // origin at the hip, hangs down
     // PE-14 white cane (elder variant only — everyone else zero-scales it).
@@ -1333,11 +1567,17 @@ export function TrafficLayer({
     ofcYaw: Float32Array; // damped whole-figure facing
     ofcArmLat: Float32Array; // nPed*2 — damped sideways arm raise (local Z)
     ofcArmSag: Float32Array; // nPed*2 — damped sagittal arm raise (local X)
+    /** Reused out-record for officerArmTarget (frame loop allocates nothing). */
+    armTarget: OfficerArmTarget;
     /** Reused out-record for the once-per-frame signalControllerFigure read. */
     figure: { halted: "ns" | "ew"; secToFlip: number };
     /** B42 caption: index into CONTROLLER_BUBBLES currently painted into the
      *  canvas (-1 = never painted). Repaint only on a real posture change. */
     bubblePosture: number;
+    /** Was the caption wholly on screen last frame? (FR-OFC-CARD hysteresis.) */
+    bubbleWhole: boolean;
+    /** Reused projection scratch for bubbleWhollyVisible. */
+    v3: Vector3;
     // L5 hazard animation clock (seconds since hazardActiveRef went true).
     hazardT: number;
     // Reused rotation scratch.
@@ -1382,8 +1622,11 @@ export function TrafficLayer({
       ofcYaw: new Float32Array(nPed),
       ofcArmLat: new Float32Array(nPed * 2),
       ofcArmSag: new Float32Array(nPed * 2),
+      armTarget: { lat: 0, sag: 0 },
       figure: { halted: "ns", secToFlip: Infinity },
       bubblePosture: -1,
+      bubbleWhole: false,
+      v3: new Vector3(),
       hazardT: 0,
       qYaw: new Quaternion(),
       qRoll: new Quaternion(),
@@ -1854,10 +2097,11 @@ export function TrafficLayer({
             // First sighting: land IN pose (no settle-in at session start).
             scratch.ofcSeeded[i] = 1;
             scratch.ofcYaw[i] = targetYaw;
-            scratch.ofcArmLat[i * 2] = attention ? 0 : OFC_ARM_OUT_RAD;
-            scratch.ofcArmLat[i * 2 + 1] = attention ? 0 : -OFC_ARM_OUT_RAD;
-            scratch.ofcArmSag[i * 2] = 0;
-            scratch.ofcArmSag[i * 2 + 1] = attention ? PED_POSE_ARM_RAISE_RAD : 0;
+            for (let side = 0; side < 2; side++) {
+              officerArmTarget(attention, side, scratch.armTarget);
+              scratch.ofcArmLat[i * 2 + side] = scratch.armTarget.lat;
+              scratch.ofcArmSag[i * 2 + side] = scratch.armTarget.sag;
+            }
           } else {
             scratch.ofcYaw[i] += wrapPi(targetYaw - scratch.ofcYaw[i]) * ofcTurnT;
           }
@@ -1939,12 +2183,14 @@ export function TrafficLayer({
           // extended horizontally (static fallback — the scheduled officer
           // branch below replaces it); everything else swings with the walk.
           if (officer) {
-            // Live officer arms: both out sideways (the halt wall / the
-            // wave-through profile), except the „внимание" window — right
-            // arm straight up, left dropped. Damped per-side toward target.
+            // Live officer arms: both out sideways AND pitched forward (the
+            // halt wall / the wave-through profile — FR-OFC-ARMS), except the
+            // „внимание" window: right arm straight up, left dropped. Damped
+            // per-side toward the target the shared rule states.
             const li = i * 2 + side;
-            const latTarget = attention ? 0 : sign * OFC_ARM_OUT_RAD;
-            const sagTarget = attention && side === 1 ? PED_POSE_ARM_RAISE_RAD : 0;
+            officerArmTarget(attention, side, scratch.armTarget);
+            const latTarget = scratch.armTarget.lat;
+            const sagTarget = scratch.armTarget.sag;
             scratch.ofcArmLat[li] += (latTarget - scratch.ofcArmLat[li]) * ofcArmT;
             scratch.ofcArmSag[li] += (sagTarget - scratch.ofcArmSag[li]) * ofcArmT;
             scratch.qLat.setFromAxisAngle(AXIS_Z, scratch.ofcArmLat[li]);
@@ -2036,20 +2282,31 @@ export function TrafficLayer({
           // Constant APPARENT size past the reference distance: the whole
           // point of the ask is that he can read it while there is still road
           // left to act on it.
-          const s = Math.min(BUBBLE_MAX_SCALE, Math.max(1, eyeD / BUBBLE_REF_DIST_M));
+          const s = bubbleScale(eyeD);
           // The owner's OWN height — the tail has to point at the head it is
           // captioning, and since B41 the JU-18 регулировчик and the VP-11
           // curb warden are no longer the same size. Reading it back out of the
           // per-actor scratch is what keeps the two from ever drifting apart.
           const headY = PED_HEAD_Y * scratch.pedHeight[bubbleOwner];
-          bubble.position.set(
-            ox,
-            headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2,
-            oz,
-          );
+          const cy = headY + BUBBLE_GAP_M + (BUBBLE_H_M * s) / 2;
+          bubble.position.set(ox, cy, oz);
           bubble.scale.set(s, s, 1);
           bubble.quaternion.copy(frame.camera.quaternion); // billboard
-          bubble.visible = true;
+          // …and drawn only while it can be read WHOLE (FR-OFC-CARD): a card
+          // clipped by the top of the windscreen spends its remainder on the
+          // HUD, which is the defect sweep161 photographed over the „МЕНЮ"
+          // button. The live camera answers it exactly, on every aspect.
+          scratch.bubbleWhole = bubbleWhollyVisible(
+            frame.camera,
+            ox,
+            cy,
+            oz,
+            (BUBBLE_W_M * s) / 2,
+            (BUBBLE_H_M * s) / 2,
+            scratch.bubbleWhole,
+            scratch.v3,
+          );
+          bubble.visible = scratch.bubbleWhole;
         }
       }
     }

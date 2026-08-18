@@ -97,11 +97,18 @@ describe("staged vehicle commands", () => {
     expect(view.speedMps).toBeCloseTo(10, 1);
     const sAfter5 = view.s;
     expect(sAfter5).toBeGreaterThan(50 + 25);
-    // Runs through B (s=300) onto BC and parks at the path end (600).
-    run(system, 60, ctx());
-    expect(view.finished).toBe(true);
-    expect(view.s).toBeCloseTo(view.pathLengthM, 6);
-    expect(view.speedMps).toBe(0);
+    // Runs through B (s=300) onto BC and latches `finished` ON the path end
+    // (600). Stepped a frame at a time and caught at the latch, because that is
+    // the frame every runner in runners.ts reads it on; FR-B5-RETURN un-latches
+    // it again once the retirement run has cleared, so a probe 60 s later would
+    // be asking a different question and getting a different actor.
+    let latchedAtArc = -1;
+    for (let i = 0; i < Math.round(60 / DT) && latchedAtArc < 0; i++) {
+      const wasFinished = view.finished;
+      system.update(DT, ctx());
+      if (!wasFinished && view.finished) latchedAtArc = view.s;
+    }
+    expect(latchedAtArc).toBeCloseTo(view.pathLengthM, 6);
   });
 
   it("matchPlayer holds the commanded gap ahead of a moving player", () => {

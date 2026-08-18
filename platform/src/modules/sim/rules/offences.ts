@@ -56,6 +56,12 @@
  * shares a citation + amount and forces each one to be either grouped here or
  * listed in `SEPARATE_ACTS` with a reason — so the next pair cannot land
  * unnoticed the way this one did.
+ *
+ * That enumeration had a hole for as long as it existed: it walked only the
+ * `single` shape. `LADDER_SHARED_LADDERS` is the third census that closes it,
+ * and the test now refuses to let ANY road-consequence shape be invisible to
+ * every census at once — which is how the speeding pair sat here unseen while
+ * two other censuses ran over it.
  */
 
 import { roadConsequenceFor } from "./consequences";
@@ -69,11 +75,27 @@ import type { ViolationCode, ViolationEvent } from "./types";
  * The UNGATED price a code puts on the screen — the only thing a group is
  * allowed to collapse.
  *
- * Deliberately `null` for every shape except `single`. A `conditional` row
- * prints its money behind a condition („ако от това настъпи ПТП…“), a `ladder`
- * prints the student's own rung, an `exam-only` row prints no money at all: none
- * of those is a figure two rows could double, and collapsing them would hide a
- * difference rather than a duplicate.
+ * Deliberately `null` for a `conditional` row, which prints its money behind a
+ * condition („ако от това настъпи ПТП…“), and for an `exam-only` row, which
+ * prints no money at all: neither is a figure two rows could double, and
+ * collapsing them would hide a difference rather than a duplicate.
+ *
+ * THE `ladder` SHAPE IS THE EXCEPTION, AND THIS DOCSTRING USED TO DENY IT. It
+ * listed the ladder beside those two and said none of the three „is a figure two
+ * rows could double" — so the census below never looked at a ladder row, and the
+ * one shape that could still put two prices on one act was the one shape nothing
+ * was watching. A ladder row does not merely name a range: `FaultCard`'s
+ * `DerivedRung` prints „Твоят случай" — the arithmetic, the money verdict and
+ * the контролни точки of the rung the student's own measured speed lands on. Two
+ * ladder rows print two of those, exactly the way the belt printed two.
+ *
+ * MEASURED RATHER THAN REASONED. `.audit-frames/sweep161/sc-speed-creep/pc-wrong`
+ * — a lesson literally called „Пълзящо превишаване на скоростта", whose whole
+ * subject is ONE speed that creeps — closed with `MISTAKES (4)` holding both
+ * „Превишаване с повече от 10 км/ч" (опасна) and „Превишена скорост"
+ * (второстепенна). Seven drives in that sweep carry both titles. `ladderIdentityFor`
+ * is what lets the census see them; why the pair is REPORTED and not merged is
+ * written at `LADDER_SHARED_LADDERS`.
  */
 export interface OffenceCharge {
   /** „ЗДвП чл. 183, ал. 4, т. 7“ — the penalty provision, as retrieved. */
@@ -322,6 +344,84 @@ export const GATED_SHARED_PROVISIONS: readonly GatedSharedProvision[] = [
     codeCount: 2,
     noteBg:
       "Повторното преминаване при забраняващ сигнал. Двата кода, които го носят, се изключват взаимно в двигателя — не могат да се съберат на един екран от едно деяние.",
+  },
+];
+
+/**
+ * THE THIRD CENSUS — the ladder, and the pair the other two could not see.
+ *
+ * `ungatedChargeFor` answers `null` for a `ladder`, so a ladder row sat in no
+ * cluster, in no group and in no `SEPARATE_ACTS` entry: invisible to every guard
+ * in this file, including the one written to make invisibility impossible. That
+ * blindness is the finding. The two codes it hid do not merely share a точка —
+ * they share the WHOLE ladder, which is a tighter identity than the seatbelt
+ * group has.
+ *
+ * The identity is READ OFF the retrieved consequence and never inferred: the
+ * `offenceBg` the ladder prices, the `scopeBg` naming which alinea's ladder it is
+ * as the data itself labels it, and the rung count — so two ladders cannot be
+ * called one on prose alone.
+ */
+export interface LadderIdentity {
+  /** The деяние the ladder prices, as retrieved. */
+  offenceBg: string;
+  /** Which alinea's ladder, in the retrieved row's own words. */
+  scopeBg: string;
+  /** Rung count — the structural half of the identity. */
+  tierCount: number;
+}
+
+export function ladderIdentityFor(code: ViolationCode): LadderIdentity | null {
+  const road = roadConsequenceFor(code);
+  if (road.kind !== "ladder") return null;
+  return {
+    offenceBg: road.offenceBg,
+    scopeBg: road.scopeBg,
+    tierCount: road.tiers.length,
+  };
+}
+
+export interface LadderSharedSpec {
+  offenceBg: string;
+  scopeBg: string;
+  /** How many codes ride this exact ladder. Checked, not remembered. */
+  codeCount: number;
+  /** Why it is reported rather than merged. */
+  reason: string;
+}
+
+/**
+ * The census output, pinned — the same contract as `GATED_SHARED_PROVISIONS`:
+ * `__tests__/offences.test.ts` re-measures it from the acts on every run, so a
+ * THIRD code joining this ladder arrives as a red test.
+ *
+ * WHY THIS PAIR IS NOT GROUPED, EVEN THOUGH ITS IDENTITY IS THE STRONGEST HERE.
+ * Grouping collapses the road half onto ONE row, and `billRoadConsequences`
+ * picks that row by time — the earliest member of the act. A creeping overspeed
+ * enters the второстепенна band first, so the surviving row would be the CHEAP
+ * rung and the опасна row — the band the student actually reached — would be the
+ * one that stopped printing a price. That is not the belt defect corrected; that
+ * is the belt defect pointed the other way, and an under-charge is the same
+ * crime as the double charge. Closing it needs three things this module cannot
+ * take on its own: a ladder-aware `sharedChargeFor` (a ladder has no single
+ * `citationBg`/`amountBgn` for `OffenceCharge` to compare or for the covered
+ * row's copy to name), a primary chosen by DECLARED order rather than by time
+ * (`OffenceGroupSpec.codes` already promises „PRIMARY FIRST" and the walker does
+ * not honour it — latent today only because both shipped groups happen to fire in
+ * declared order), and a founder ruling on whether one continuous stretch that
+ * climbed from +8 to +25 is one нарушение priced at the top band or two.
+ *
+ * Reported, therefore, and guarded in the safe direction: the test below asserts
+ * `sharedChargeFor` REFUSES this pair, so a future lane that declares the group
+ * without doing the three things above gets no collapse rather than a cheap one.
+ */
+export const LADDER_SHARED_LADDERS: readonly LadderSharedSpec[] = [
+  {
+    offenceBg: "превишаване на разрешената максимална скорост",
+    scopeBg: "в населено място (ЗДвП чл. 182, ал. 1)",
+    codeCount: 2,
+    reason:
+      "Двата кода за скорост са ЕДИН състав на една и съща стълбица — различават се само по прага, на който симулаторът ги вдига, и затова Наредба № 38 ги брои като второстепенна и като опасна грешка поотделно. Пълзящо превишаване минава през долната лента и продължава в горната, така че едно непрекъснато деяние отпечатва двете стъпала: две суми и две пъти контролни точки за едно и също превишаване. Измерено в .audit-frames/sweep161/sc-speed-creep/pc-wrong (MISTAKES (4): „Превишаване с повече от 10 км/ч“ и „Превишена скорост“ в едно каране). НЕ Е ОБЕДИНЕНО: обединяването би оставило по-евтиното стъпало, а подценяването е същото престъпление като удвояването. На изпитния лист двете грешки при всички положения се броят поотделно — това не се пипа.",
   },
 ];
 

@@ -108,6 +108,62 @@
  * semantic for an existing field is how the next false certificate is issued.
  */
 
+/**
+ * THE OTHER FIVE ROWS — 2026-08-18, sweep 161, read off the PNGs this time.
+ *
+ * The block above closed the rows that were a wrong SENTENCE. The remaining
+ * five said something much larger — „a lesson with a 0/4 pass rate on its own
+ * scripted correct drive is not teachable" (sc-park-gap-long), „Passing is
+ * impossible" (sc-park-left), „The lesson has no drivable success path in this
+ * build" (sc-park-van) — and all five were written from a DEBRIEF. The frames
+ * say something else, and the difference decides whether the next edit is a
+ * fix or a false certificate.
+ *
+ * WHAT THE „CORRECT DRIVE" IS. `tools/mobile/lesson-audit.mjs` `right` is a
+ * control law, not a script of this manoeuvre: closed-loop speed with a
+ * roll/stop cadence, no steering input at all, and it explicitly REFUSES a
+ * standstill brake press because that press is what selects R („refused 5
+ * standstill brake presses (would have selected R)" — every parking run.log).
+ * A driver who never steers and never reverses cannot complete a reverse-park
+ * in any catalogue. So the unticked Задача 2 on all ten is the probe's shape,
+ * not the drill's, and the honest response to it is a guard against the fix it
+ * invites, not the fix.
+ *
+ * WHAT THE COLLISIONS WERE. Not the gap and not its colliders:
+ *   sweep161/sc-park-gap-short/mobile-right/04-t156s.png — open GRASS, no road
+ *     and no parked car in frame, 16 s BEFORE the ПТП card in 04-t172s.png.
+ *     Задача 1 had ticked at 1:41.
+ *   sweep161/sc-park-left/mobile-right/04-t131s.png — the same empty field, 7 s
+ *     before that run's ПТП. Задача 1 had ticked at 1:37.
+ * The drive finished the only objective a forward-only driver can finish, kept
+ * rolling north out of a lot whose aisle ends at y = 40, and was billed for
+ * running out of world. That is a world-bounds finding, routed, not authored
+ * here — no field on a ScenarioSpec places a kerb.
+ *
+ * THE TWO NUMBERS THIS FILE IS ACCOUNTABLE FOR, measured against the rect the
+ * scene actually mounts (`traces` PARKED_CAR_HALF_WIDTH_M 0.9 / HALF_LENGTH
+ * 2.25), not the bay's U-paint:
+ *   +0.420 m — the corridor left beside the row for a car holding the drawn
+ *              curb lane (x = 4.0625) on all six PARALLEL drills. Thin, and
+ *              real: the recorded shadow buys 0.78 m by easing to x = 3.7.
+ *   −2.180 m (90°) / −2.387 m (135°) — the four blocked drills, i.e. the row
+ *              stands ACROSS the only drawn lane. §3 of parking3-claim-gates
+ *              already made all four name «средата на алеята» in the briefing.
+ * Both are `gen_parking_lot.mjs`'s geometry, and BOTH are now re-derived every
+ * build by parking3-sweep161-refutation.test.ts §1 — which also pins that the
+ * paint metric reads 0.35 m tighter than the car metric, so the choice of
+ * rectangle can never quietly become a free one.
+ *
+ * AND THE ONE CENTIMETRE. On sc-park-45-rev the drawn lane passes 0.74 m from
+ * the terminal bay's centre while the L1 ladder compiles `centerTolM` 0.5 to
+ * 0.75. The park is refused — it needs `usedReverse` AND a heading within 15°
+ * of 135° — but the CENTRING half of the gate is one authored digit from
+ * crediting a car that merely drove past the bay. That digit is in this file;
+ * §3 of the refutation battery drives the sweep's own forward-only line
+ * through the production evaluator at every rung of all ten drills and fails
+ * the moment one of them completes. Do not widen it to make a sweep go green.
+ */
+
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 
