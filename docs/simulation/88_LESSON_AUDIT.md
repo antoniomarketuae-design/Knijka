@@ -5816,6 +5816,18 @@ The predicted failure mode arrived: **83 lanes launched, 46 returned, 44 of the 
 were actually written, and nothing gated any lane against any other.** Third occurrence of the same
 process finding (§6.9), and the first at a scale where it dominates the gate.
 
+**Two kinds of red, and they mean different things.** `[gated]` `git cat-file -e 730da10:<file>`
+separates them:
+
+- **3 failures are true regressions** — assertions that were **green before wave 3** in test files
+  that already existed: `b58-gate-never-over-posted.test.ts` ×2 and `s-w8-bot-completion.test.ts` ×1.
+  Some lane changed production code out from under a passing guard.
+- **17 failures arrived red in files written by this wave** — `markings-paint-truth.test.ts` (15,
+  brand new) and `signals-sweep161.test.ts` (2, brand new). **A lane wrote a test file and shipped it
+  failing.** That is not a collision in the fixture sense; for the 8 dash rows and the 3 crashes below
+  it is a lane that never ran the file it authored, and the 529 outage explains why nothing caught it
+  — the refuter that would have is one of the 69 agents that were killed.
+
 - **`markings-paint-truth.test.ts` × 3 — the fixture dies inside a file no lane owned.** `[gated]`
   `a run too short for one whole dash stays unpainted`, `a shipped skew (18°)…` and
   `skew 90° neither hangs the build…` all die with
@@ -5935,37 +5947,31 @@ This is the entire list. Seven rows against 1,012.
 
 **C7 closes an 8 m band, not the defect class.** See §4 N3.
 
-### 2.2 — Class A · Never opened: 107 files, 387 findings, 101 critical
+### 2.2 — Class A · Never opened: 85 files, 247 findings, 46 critical
 
-`[corpus]` Nobody has edited these files in either wave. Every finding in them is open, and the
-reason is the same for all 387: **no one looked.** Paths are shortened against
+`[corpus]` Nobody has edited these files in any of the three waves. Every finding in them is open,
+and the reason is the same for all 247: **no one looked.** Paths are shortened against
 `platform/src/modules/sim/` and `platform/src/components/sim/`; the format is `file  findings/critical`.
 
-**With criticals (58 files, 173 findings, 101 critical) — this is the repair queue:**
+**With criticals (36 files, 122 findings, 46 critical) — this is the repair queue:**
 
-`lessons/scenario/templates-pe2.ts` 10/4c · `collision/probe.ts` 8/4c · `environment/weather.ts` 6/4c ·
-`collision/index.ts` 6/4c · `lessons/scenario/progress.ts` **26/3c** · `lessons/scenario/templates-conditions.ts` 11/3c ·
-`scenarios/coach.ts` 8/3c · `traffic/TrafficLayer.tsx` 7/3c · `components/cockpit/InstrumentCluster.tsx` 6/3c ·
-`rules/offences.ts` 5/3c · `lessons/scenario/templates-merging.ts` 5/3c · `runtime/district.ts` 5/3c ·
-`lessons/scenario/templates-roundabout.ts` 4/3c · `runtime/surface.ts` 3/3c (every finding in it critical) ·
-`unknown` 22/2c · `lessons/scenario/templates-sp.ts` 9/2c · `components/ShadowCar.tsx` 8/2c ·
-`lessons/scenario/templates-signals.ts` 5/2c · `rules` (module-level) 5/2c · `lessons/scenario/templates-pe.ts` 4/2c ·
-`lessons/scenario/templates-cockpit.ts` 3/2c · `lessons/scenario/templates-rail.ts` 3/2c ·
-`lessons/scenario/templates-roundabout2.ts` 3/2c · `app/(dashboard)/simulator/actions.ts` 2/2c ·
-`runtime/worldRuntime.ts` 2/2c · `components/lesson-ui/LessonCard.tsx` 12/1c · `world/builders/markings.ts` 6/1c ·
-`tools/mobile/lib/auth.mjs` 5/1c · `components/lesson-ui/ExamBriefingCard.tsx` 5/1c · `scene/lessonWorldRecipe.ts` 5/1c ·
+`environment/weather.ts` 6/4c · `collision/index.ts` 6/4c · `scenarios/coach.ts` 8/3c ·
+`unknown` 22/2c · `rules` (module-level) 5/2c · `components/lesson-ui/LessonCard.tsx` 12/1c ·
+`components/lesson-ui/ExamBriefingCard.tsx` 5/1c · `scene/lessonWorldRecipe.ts` 5/1c ·
 `lessons/scenario/templates-parking2.ts` 4/1c · `lessons/scenario/templates-conditions2.ts` 4/1c ·
-`lessons/specs.ts` 4/1c · `components/ScenarioObstacles.tsx` 3/1c · `collision` 3/1c · `hud/PreDriveTutorial.tsx` 3/1c ·
-`vehicle` 3/1c · `lessons/scenario/templates-flow.ts` 3/1c · `lessons/scenario/templates-junctions3.ts` 3/1c ·
-`lessons/scenario/observation.ts` 2/1c · `components/lesson-ui/PlayAreaStyles.tsx` 2/1c ·
-`lessons/scenario/templates-speed2.ts` 2/1c · `engine/reverseAssist.ts` 2/1c · `lessons/scenario/events.ts` 1/1c ·
-`scenarios/event-library.json` 1/1c · `world/builders/zoneSigns.ts` 1/1c · `lessons/scenario/templates-merging2.ts` 1/1c ·
+`lessons/specs.ts` 4/1c · `components/ScenarioObstacles.tsx` 3/1c · `collision` 3/1c ·
+`hud/PreDriveTutorial.tsx` 3/1c · `vehicle` 3/1c · `lessons/scenario/templates-flow.ts` 3/1c ·
+`lessons/scenario/templates-junctions3.ts` 3/1c · `lessons/scenario/observation.ts` 2/1c ·
+`components/lesson-ui/PlayAreaStyles.tsx` 2/1c · `lessons/scenario/templates-speed2.ts` 2/1c ·
+`engine/reverseAssist.ts` 2/1c · `lessons/scenario/events.ts` 1/1c · `scenarios/event-library.json` 1/1c ·
+`world/builders/zoneSigns.ts` 1/1c · `lessons/scenario/templates-merging2.ts` 1/1c ·
 `world/builders/railTrack.ts` 1/1c · `scene/cabin.ts` 1/1c · `lessons/scenario/templates-pk.ts` 1/1c ·
-`world/builders/network.ts` 1/1c · `collision/bodies.ts` 1/1c · `world/builders/roundabout.ts` 1/1c ·
-`traces/scHzAccidentScene.ts` 1/1c · `hud/telltaleWarnings.ts` 1/1c · `lessons/scenario/templates-junctions2.ts` 1/1c ·
-`platform/public/world/ov-oneway-v1.json` 1/1c · `runtime/laneArrows.ts` 1/1c
+**`world/builders/network.ts` 1/1c** · `collision/bodies.ts` 1/1c · `world/builders/roundabout.ts` 1/1c ·
+`traces/scHzAccidentScene.ts` 1/1c · `hud/telltaleWarnings.ts` 1/1c ·
+`lessons/scenario/templates-junctions2.ts` 1/1c · `platform/public/world/ov-oneway-v1.json` 1/1c ·
+`runtime/laneArrows.ts` 1/1c
 
-**No criticals (49 files, 214 findings — 188 major, 26 minor):**
+**No criticals (49 files, 125 findings):**
 
 `scene/lessonSpeedContract.ts` 22 · `hud/FaultCard.tsx` 13 · `hud/HudToasts.tsx` 9 ·
 `components/lesson-ui/TeachMomentOverlay.tsx` 8 · `components/lesson-ui/AdvisorCard.tsx` 6 ·
@@ -5985,23 +5991,32 @@ reason is the same for all 387: **no one looked.** Paths are shortened against
 `lessons/scenario/templates-junctions4.ts` · `platform/public/world/ov-crossing-v1.json` ·
 `platform/public/world/mw-v1.json`
 
-Three of these deserve to be lifted out of the list, because a reader will otherwise scan past them:
+**What moved off this list, and what did not.** Wave 3 opened `lessons/scenario/progress.ts` (26
+findings — the largest untouched bucket in the previous pass), `app/(dashboard)/simulator/actions.ts`
+(2 findings, both critical), `collision/probe.ts`, `runtime/surface.ts`, `runtime/district.ts`,
+`runtime/worldRuntime.ts` and 16 others. Two rows still deserve lifting out, because a reader will
+otherwise scan past them:
 
-- **`lessons/scenario/progress.ts` — 26 findings, the largest untouched bucket in the product**, and
-  the file that owns the `НЕИЗДЪРЖАН` with **0 fault points** printed on `sc-mw-min-speed`
-  (§5, carried). Named as untouched in the previous pass too. Still untouched.
-- **`orchestrator/runners.ts`** — one finding, no criticals, and it is where the *only* fix for the
-  regулировчик lesson family has to land (§3 lane D). A one-finding file is not a low-value file.
-- **`app/(dashboard)/simulator/actions.ts` — 2 findings, both critical**, and it is the live caller
-  that makes `debrief.ts`'s `coachedMistakes` filter dead in production (§6.6). `[read]` today:
-  `buildDebrief` is still passed only `microQuiz` / `priorBestScore` / `conceptTitles`.
+- **`world/builders/network.ts` — 1 finding, 1 critical, never opened** — and it is the file the gate
+  now dies in. Its lane was one of the 39 killed. `assertDistrict` returning an unvalidated `District`
+  (§0.1) is a hole in the *contract* that file depends on, not in the file itself, and neither has an
+  owner. A one-finding file that three test cases crash inside is not a low-value file.
+- **`orchestrator/runners.ts`** — one finding, no criticals, and still where the *only* fix for the
+  регулировчик lesson family has to land (§3 lane D). Named as untouched in the previous pass. Still
+  untouched, three waves in.
 
-### 2.3 — Class B · File opened, finding not addressed: ~618 of the 625
+### 2.3 — Class B · File opened, finding not addressed: the great majority of the 765
 
-The seven closures in §2.1 land in four files. Everything else in the 31 opened files is open for the
+The seven closures in §2.1 land in four files. Everything else in the 53 opened files is open for the
 same reason as Class A — nobody addressed it — with the aggravating difference that a reader looking
 at the diff will believe otherwise. The counts per file are in the table in §1 and in the per-file
 sections above; the closure delta is what §7 says does not exist.
+
+**Wave 3 makes this the document's biggest lie risk.** 44 files were written, ~20,000 lines landed,
+and **the closure ledger §7 asks for still does not exist**, so nothing in the tree distinguishes „a
+lane rewrote this file and closed nine of its rows" from „a lane rewrote this file and closed none".
+The only per-finding closure evidence wave 3 produced is what its lanes wrote about the findings they
+could **not** close — §2.6 — which is the inverse of the ledger and is not a substitute for it.
 
 ### 2.4 — Class C · Addressed, and the address does not hold
 
@@ -6014,6 +6029,35 @@ of prose arguing it — and does not do what the prose says.
 - The two content-signature reds (§8) — a human signature, not a patch.
 - The 47 lessons in §5 that have never been judged or never been driven — a reader and a harness.
 - The evidence-integrity rows in §7 — a backup path and a bookkeeping field.
+
+### 2.6 — What wave 3's lanes reported they could not close, and why
+
+`[read]` Every row below was written into the tree by the lane that failed to close it, and read out
+of the file named today. Four are *structured*: a lane declared a typed `KNOWN_OPEN` array so that a
+row silently disappearing turns its own staleness test red — the closest thing the programme has to
+the `closedBy` field §7 keeps asking for, pointed backwards. **Never add a row to one for a finding
+you could have fixed** is the rule each of them states.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O1 | `sc-animal-hazard/reach-end` claims «Спри за животното» with no halt cap | the stop happens at y ≈ 150 and the only gate is the finish at y = 325 — **no cap can be placed on it**; the agreed remedy retitles the row in `templates-reels.ts`, another lane's file | `lessons/__tests__/stop-claim-gates.test.ts` `HALT_CLAIM_KNOWN_OPEN` |
+| O2 | **8 gates certify another road user's behaviour that no disc can witness** — `sc-ln-decisive-change` · `sc-hz-emergency-stop` · `sc-jx-giveway-b1` · `sc-pe-zone-living` · `sc-merge-from-property` · `sc-pe-jaywalker` · `sc-vu-child-cyclist` · `sc-vu-cyclist-group` | a `reachZone` disc measures **place and speed only**; „пропусни / изчакай / остани зад" is graded by `FAILED_TO_YIELD`, `PEDESTRIAN_NOT_YIELDED` or the vulnerable-pass tracker. The remedy is a retitle across `templates-lanes*` / `hazards2` / `junctions*` / `pe*` / `merging*` / `vru*` — **six template files this lane did not own** | same file, `ACTOR_CLAIM_KNOWN_OPEN` |
+| O3 | **3 gates certify the car's own lamps** — `sc-ac-night-lights` · `sc-ac-rain-lights` · `sc-ac-highbeam-lead` | **the cause is upstream of the objective.** On `sc-ac-night-lights/pc-right` the sweep recorded «✓ Мини контролната зона осветен», ИЗДЪРЖАН, 0 points, with the СВЕТЛИНИ telltale dim in all four frames and `HEADLIGHTS_OFF_AT_NIGHT` firing **zero** times — the night/lamp channel reaches *neither* grader, so a lamp gate in `stepReachZone` would read the same blind channel and change nothing | same file, `LAMP_CLAIM_KNOWN_OPEN` |
+| O4 | `sc-pe-jaywalker/sc-jay-clear` — «когато е свободна» | **deadlocked between two lanes**: retiring the title here without deleting the `ACTOR_CLAIM_KNOWN_OPEN` entry reds the catalogue staleness test; deleting that entry without moving the title reds this file. Neither lane owns both | `lessons/scenario/__tests__/pe-sweep161-truth.test.ts` `CLEAR_CLAIM_KNOWN_OPEN` |
+| O5 | **5 crossing-approach gates cap above the law they bill** — `sc-clp-approach` 40 · `sc-wcn-approach` 40 · `sc-scr-approach` 35 · `sc-crs-approach` 35 · `sc-cbl-approach` 32, against `crossingApproachMaxKmh` **30** | each has **committed traces that must be replayed before its number moves**; only the one drill the sweep photographed (`sc-crossing-dart`) was closed | same file, `CAP_ABOVE_LAW_KNOWN_OPEN` |
+| O6 | The adverse-conditions gate bar still reads authored + 5 / + 2.5 at L1/L2 | its only ceiling is the **posted** limit, which in rain/fog is the wrong ceiling — the L1 bar of a rain drill reads 47 while the engine bills `SPEED_TOO_FAST_FOR_CONDITIONS` above 0.85 × 50 = 42.5, and fog reads 35 over an envelope of 30. **B58 one level in, and not authorable from this file** | `lessons/scenario/templates-conditions.ts:115` |
+| O7 | `sc-mw-discipline` — the missing «поток»: not one other vehicle in any frame of any of the four legs | **REAL and NOT closed.** Staged flow actors need the actor *and* a `RECORD_TRACES=1` re-record in the same change or `sc-mw-discipline-traces.test.ts` §3 goes red. Ambient traffic was **refused**: the crawl detector exempts a car stuck behind someone, so an ambient lead would turn a real 40 км/ч crawl into a **false pass** | `lessons/scenario/templates-sp.ts:1167` |
+| O8 | `sc-follow-cutin` at 10 км/ч — the runner refuses to stage a theft the geometry cannot commit **and says so**, and nothing consumes that report | „the half of the finding this lane could not close" — the reporting channel has no consumer | `lessons/scenario/__tests__/following-encounter-reach.test.ts:35` |
+| O9 | `sc-ov-narrow` — the demos' narration and `codeRefs` describe a priority fault alone, so a learner is now shown a **crash the card does not mention** | **copy debt, owned by the copy lane.** Either the scripts stop short of contact or the copy owns the crash — both are authoring calls. Pinned as `MEASURED` so the gap cannot widen unseen | `traces/__tests__/sc-ov-narrow-traces.test.ts:83` |
+| O10 | A lost `listSessions` read still refuses an unlocked L2+ drive as `LEVEL_LOCKED` and discards it | the retry **narrows but cannot close** the residual; the gate itself stays strict and an empty history still locks | `app/(dashboard)/simulator/actions.ts:241` |
+
+**O2, O3 and O5 are classes, not instances — 16 lessons between them** — and every one is a green
+tick a student is shown for a skill the product never measured. That is the same shape as the
+document's opening warning (*passing 2 while failing 3*), now with names.
+
+**And the 39 lanes that never ran reported nothing at all.** Their 177 findings, 91 critical, have
+neither a fix nor a reason: absence of a report there means the agent was killed, not that the
+finding was examined and left.
 
 ## 3 · Wave 2, lane by lane — what survived refutation and what did not
 
@@ -6175,11 +6219,16 @@ Every row is a test that is **green whether or not the behaviour it names exists
 7. **`following-claim-gates.test.ts` §8/§9 do not hold the tightening direction** — N4. **Open.**
 8. **`approach-cap-contract.test.ts` proves the rule on 3-tick fixtures**, not on drives, which is
    why R6 is invisible to it. **Open.**
-9. **New: nothing in the tree gates two lanes against each other.** Twice now (`session-end-numbers`
-   in wave 1, `finish-outside-annulus` + `sweep161-fault-episodes` in wave 2) a file has been red in
-   a reviewer's tree and green in the finished one because two correct lanes disagreed about a
-   fixture. Nothing detects that except a full run at the end, and a full run at the end is 344 s
-   that only the last lane pays. **Open, process.**
+9. **Nothing in the tree gates two lanes against each other — and wave 3 proved the cost.** Wave 1
+   (`session-end-numbers`) and wave 2 (`finish-outside-annulus` + `sweep161-fault-episodes`) each saw
+   a file red in a reviewer's tree and green in the finished one because two correct lanes disagreed
+   about a fixture; both resolved themselves. **Wave 3 did not.** 83 lanes launched into one tree
+   with no pairwise gate, and the finished tree carries **20 new failures — 3 of them assertions that
+   were green before the wave** (`b58-gate-never-over-posted` ×2, `s-w8-bot-completion` ×1) **and 17
+   in files that arrived red on the day they were written** (§0.1). The
+   detector is still only a full run at the end — now **477 s**, still paid by whoever runs last, and
+   wave 3's own session ran it, read `22 failed in 6 files`, and **named 4**. A gate nobody reads the
+   whole of is not a gate. **Open, process, and now the highest-cost row in this section.**
 
 ## 7 · Evidence integrity and bookkeeping
 
@@ -6193,12 +6242,17 @@ Every row is a test that is **green whether or not the behaviour it names exists
   corpus for this document — **16,272 readable frames and 24 JSONL files** — exists on **one
   7,200 rpm HDD and nowhere else**. Every «A finding without a frame is not a finding» row above is
   one disk failure from unverifiable. No backup path is defined. **Open.**
-- **There is still no per-finding closure ledger.** This is why §2 can only be honest at file
-  granularity, and it is now the single largest piece of missing bookkeeping in the programme: after
-  two waves the answer to *„how much of the sweep is repaired"* is **„7 named findings of 1,012, in
-  4 files of 138"**. The fix is one field on the record — `closedBy` (commit or file:symbol) plus
-  `closedEvidence` (the test that goes red without it) — and a rule that no lane may claim a row
-  without filling both. **Open.**
+- **There is still no per-finding closure ledger, and wave 3 made its absence structural.** This is
+  why §2 can only be honest at file granularity, and it is now the single largest piece of missing
+  bookkeeping in the programme: after **three** waves, 53 files opened and ~20,000 lines landed, the
+  answer to *„how much of the sweep is repaired"* is still **„7 named findings of 1,012, in 4 files
+  of 138"** — because 44 files' worth of wave-3 work claimed nothing per-finding and nothing in the
+  tree required it to. `[corpus]` The fix is unchanged and is now overdue by one whole wave: one
+  field on the record — `closedBy` (commit or file:symbol) plus `closedEvidence` (the test that goes
+  red without it) — and a rule that no lane may claim a row without filling both. Wave 3's
+  `KNOWN_OPEN` arrays (§2.6) show the mechanism works when a lane bothers: a typed list whose
+  staleness is asserted is exactly the shape the ledger needs, built by lanes for the rows they
+  **could not** close while the rows they did close went unrecorded. **Open.**
 
 ## 8 · Known-red, NOT a blocker, and needing a signature no agent may give
 
@@ -6221,3 +6275,11 @@ dist dirs** — `platform/.next-rig` · `platform/.next-w2inset` · `platform/.n
 `platform/AGENTS.md` is explicit that these inject phantom `tsc` errors and that each dist dir runs
 0.2–1.1 GB on a box the founder's own notes call chronically squeezed. They belong to other sessions,
 which is why they have not been deleted from under a running one — but they are still here.
+
+**New, and it is committed rather than ignored:**
+`platform/src/modules/sim/world/builders/__tests__/_scratch.test.ts` — a lane's **debug dump**, 42
+lines, landed in `2f5ce8f`. It asserts `expect(1).toBe(1)`, and its real body writes a marking-quad
+census to a **hard-coded absolute path inside one session's scratchpad**
+(`C:/Users/Ljh/AppData/Local/Temp/claude/…/8942546c-…/scratchpad/out.txt`). It runs on every `vitest`
+invocation on every machine, it will fail or litter on any box that is not this one, and it guards
+nothing. `[read]` It should be deleted, not fixed.

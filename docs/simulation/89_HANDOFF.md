@@ -221,3 +221,73 @@ holds, or when something genuinely cannot be fixed — named, with the reason.
 concurrent agents** regardless of how many lanes are queued. 34 lanes ≈ 6 hours.
 That is the price of finishing; do not shrink the lane count to make the number
 look better — that mistake cost two waves and closed 7 findings out of 1,012.
+
+---
+
+## 9 · CORRECTIONS — the final gate contradicted two things I told the founder
+
+Both are recorded because trusting the earlier numbers would waste the next session's time.
+
+### 9.1 The red is 20 new failures, not 4
+
+Commit `2f5ce8f`'s message names four. **There are twenty**, and the whole of
+`world/builders/__tests__/markings-paint-truth.test.ts` (15) went unnamed — a
+bigger red surface than every named row combined. The gate split them by
+`git cat-file -e 730da10:<file>`, and the split matters because the two classes
+mean different things:
+
+**3 are TRUE REGRESSIONS** (green before wave 3, in pre-existing files):
+
+- `b58-gate-never-over-posted.test.ts` ×2 — **collision, no product defect.** A
+  later lane rewrote `lessons/advisor.ts` with `spokenCapKmh`, which is *stronger*:
+  a card may print a number only from the halt band, the authored title, or a
+  binding sign — otherwise **no number at all** (494 of 953 cards). B58's survey
+  regex then matches nothing, `Number(undefined)` is `NaN`, and `!(NaN <= posted)`
+  books every numberless card as an offender. **Fix B58's two rows to the newer
+  contract.**
+- `s-w8-bot-completion.test.ts` — **judge on the engine, not the test.**
+  `sc-hz-accident-scene` L3 now scores `["COLLISION","COLLISION"]` against a
+  pinned `["COLLISION"]`. That is precisely the defect C3 claims to have closed
+  (one continuous shunt billed as many accidents); a wave-3 `rules/engine.ts`
+  lane moved the boundary C3 installed.
+- `signals-sweep161.test.ts` ×2 — **also a real finding.** `stageActor` returns
+  `carDistM` **90** where two independent districts author **95**. Two maps
+  clamping to the same wrong number means a placement clamp changed in
+  `traffic/staged.ts`.
+
+**17 ARRIVED RED — a lane shipped a test file it never ran.** Of the 15 in
+`markings-paint-truth.test.ts`: 3 die inside `world/builders/network.ts:415`
+because `assertDistrict` (`world/types.ts:320`) **never checks `intersections` or
+`roundabouts`** although `District` declares both required and `analyzeNetwork`
+dereferences both unguarded — a validator returning a `District` it never
+validated. 8 are the instrument, not the paint: `clusterAlongS(centre,
+DASH_LENGTH_M / 2)` puts a dash quad's corners 5.0 m apart against a 2.5 m
+threshold, so **every dash counts twice** (16 for 8, 46 for 23, exactly).
+
+### 9.2 The remaining-lane count: mine said 34, the gate says 39
+
+I derived 34 from agent transcripts (a lane "done" if it returned without a 529).
+The gate derived **39 never landed, carrying 177 findings / 91 critical** — from
+files actually **written**, which is the stronger test: a lane can return cleanly
+and still have changed nothing.
+
+**Trust the gate's method, and re-derive before launching Wave A.** Its list
+includes `lessons/objectives.ts` (51 findings / 32 critical) and
+`lessons/finish.ts` (22 / 13) — two of the largest lanes in the corpus, which my
+`lanes-remaining.json` does **not** contain. Take the union of both lists, or
+recompute from the diff.
+
+Coverage across all three waves, recomputed over the frozen corpus:
+
+| | files | BROKEN | critical |
+|---|---:|---:|---:|
+| ever opened | **53** | 765 | 272 |
+| never opened | **85** | 247 | 46 |
+
+### 9.3 Ten things wave 3's lanes said they could not close (doc 88 §2.6)
+
+Three are *classes* covering **16 lessons**, each a green tick for a skill never
+measured: **O2** eight gates certifying another road user's behaviour a disc
+cannot witness · **O3** three lamp gates where the night/lamp channel reaches
+neither grader · **O5** five crossing gates capping above чл. 119's 30 км/ч.
+Four are typed `KNOWN_OPEN` arrays whose staleness is self-asserting.
