@@ -191,6 +191,19 @@ export interface RuleEngineState {
    * drives that made silence alone insufficient.
    */
   travelSinceContactM: number;
+  /**
+   * DAYLIGHT SEEN SINCE THE LAST REPORTED CONTACT — the third conjunct of "the
+   * bodies have come apart", and the only one of the three that is a
+   * MEASUREMENT rather than a proxy. False from every report until a tick
+   * actually shows the vehicle ahead clear of the bumper (`CONTACT_LEAD_GAP_M`).
+   *
+   * Unknown counts as apart: a tick with no lead-gap channel (absent, ∞, or a
+   * body the channel cannot see — a wall, a pedestrian, a car outside the
+   * in-lane corridor) leaves this true, so every drive that has no gap reading
+   * grades byte-identically to before. See the `collision` case for the shunt
+   * this was written against.
+   */
+  leadSeenApartSinceContact: boolean;
   /** Set once a collision occurs — the session grades as terminated. */
   terminated: boolean;
   /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
@@ -351,6 +364,56 @@ const IDLE_EPISODE: EpisodeState = {
 const COLLISION_REOPEN_TRAVEL_M = 2;
 
 /**
+ * HOW MUCH DAYLIGHT COUNTS AS DAYLIGHT, metres — the gap at which the vehicle
+ * ahead is no longer against the bumper.
+ *
+ * THE CONSTANT ABOVE ARGUES ITS CONTRAPOSITIVE AND THE CODE USED ITS CONVERSE.
+ * „A car that has not moved cannot have come apart from what it is inside of"
+ * is true; „a car that HAS moved 2 m has come apart" is the sentence the gate
+ * actually asked, and it is false for the commonest contact in the catalogue —
+ * A SHUNT, where the car is moving BECAUSE it is still inside something. At the
+ * 4 км/ч of `sc-ov-solid-return / mobile-wrong` the 2 m floor is crossed in
+ * 1.8 s, so it stopped nothing at all: path length is not separation.
+ *
+ * MEASURED, and it reproduces the frame exactly. 90 s of one unbroken contact
+ * at 4 км/ч, re-reported at the cadence the shell pool gives an ambient car
+ * (`__tests__/sweep161-fault-episodes.test.ts`, the shunt table):
+ *
+ *   reporter cadence   0.5 s    2 s     4 s     7 s
+ *   bills, before          1     46      23      13
+ *   bills, after           1      1       1       1
+ *
+ * — 13 at a 7 s cadence being, to the row, the «SCORE: 130 наказателни точки ·
+ * mistakes=13 (all «Пътнотранспортно произшествие»)» photographed on
+ * `.audit-frames/sweep161/sc-ov-solid-return/mobile-wrong/08-debrief.png`, and
+ * 14 what `sc-ln-boulevard-discipline` printed on the same shape. The frame at
+ * `04-t072s.png` is the whole diagnosis in one picture: 4 км/ч, the shunted
+ * truck filling the windscreen, its red band across the bonnet, and the HUD's
+ * own «+2» repeat counter — a car that has never once been apart from the body
+ * it is billing itself for leaving.
+ *
+ * WHY THE GAP AND NOT A BIGGER FLOOR. No distance can work, because the shunt
+ * supplies distance; the reducer had to be given something that MEASURES the
+ * thing the sentence claims. `tick.leadGapM` is that measurement — the same
+ * bumper-to-bumper separation `contact.ts` closes an encounter on — and it is
+ * read as a LATCH, not as an instantaneous test: the bodies must have been seen
+ * apart at some point between the two reports. Instantaneously they are never
+ * apart at a report, since the gap is 0 at every impact by definition, so a
+ * point test would have suppressed the SECOND genuine crash instead of the
+ * first false one.
+ *
+ * THE NUMBER. Above the touch: the following-lesson probes use `leadGapM: 0.2`
+ * to mean „bumper touching" (templates-following2.ts), so the floor has to
+ * clear 0.2. Below the re-hit: the shipped „hit, reverse out, hit again" case
+ * backs about 1 m off before returning. 0.5 m sits 2.5× over the touch and 2×
+ * under the reverse, and both directions are pinned by tests.
+ *
+ * A module constant for the same reason as the floor above: it is not a
+ * tolerance to tune per lesson but a statement about what „apart" means.
+ */
+const CONTACT_LEAD_GAP_M = 0.5;
+
+/**
  * HOW LONG THE RIGHT WAY MUST BE HELD BEFORE A SECOND WRONG-WAY RUN, seconds.
  *
  * `WRONG_WAY` is a 10-point опасна riding a boolean the runtime computes from
@@ -449,6 +512,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     crossing: null,
     lastCollisionContactAt: null,
     travelSinceContactM: 0,
+    leadSeenApartSinceContact: true,
     terminated: false,
     cleanDistanceM: 0,
     stall: { ...IDLE_EPISODE },
@@ -894,6 +958,13 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // integrator's — a pause/resume jump (every teach card pauses the sim) must
   // not fabricate metres the car never drove and re-arm a bill with them.
   s.travelSinceContactM += (Math.abs(speed) / 3.6) * Math.min(dt, 2);
+  // …and the daylight latch that goes with it (CONTACT_LEAD_GAP_M). Accrued on
+  // the same frames and for the same reason: a report arriving now is judged
+  // against what was SEEN up to it, and the bodies are never apart on the frame
+  // of an impact. `leadGapM` is the reducer's derived gap, so an absent or
+  // infinite channel is already null here — unknown reads as apart, which is
+  // what keeps every drive without a lead reading byte-identical.
+  if (leadGapM === null || leadGapM >= CONTACT_LEAD_GAP_M) s.leadSeenApartSinceContact = true;
 
   // -- 2. discrete zone / contact events
   for (const e of tick.events) {
@@ -1070,6 +1141,33 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   ) {
     events.push(makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }));
   }
+  // THE REPEAT CADENCE STOPS AT THE ОПАСНА LINE (2026-08-18, the redrive).
+  //
+  // `speedingRepeatSec` exists so that a continuing offence keeps costing more
+  // than a corrected one, and in the второстепенна band it does real work: a
+  // point a rung, and it is those rungs that turn a 7 км/ч overspeed held for
+  // three minutes into a fail rather than a shrug. So the minor call above
+  // passes `cfg.speedingRepeatSec` byte-identically, and must keep doing so —
+  // collapsing it would move a 10-point fail to a 1-point pass, the one
+  // direction a scorer may never move (see rules/scoring.ts's header).
+  //
+  // In the опасна band there is no work left for it to do. One bill is 10
+  // наказателни точки against an allowance of 9, so the exam is НЕИЗДЪРЖАН at
+  // the first rung and every later rung changes nothing the student is told —
+  // except the count, and the count is the thing the sweep photographed:
+  // `sc-park-left / pc-wrong` and `sc-park-zebra / pc-wrong` each printed
+  // ELEVEN «Превишаване с повече от 10 км/ч» rows, «110 наказателни точки ·
+  // Общо (допустими 9) 11», for one continuous overspeed
+  // (`.audit-frames/sweep161/sc-park-left/pc-wrong/08-debrief.png`). MEASURED
+  // through the reducer, 200 s held at 70 in a 50: 10 bills / 100 points
+  // before, 1 bill / 10 points after
+  // (`__tests__/sweep161-fault-episodes.test.ts`).
+  //
+  // It cannot credit anybody, structurally: the opening bill still stands and
+  // 10 > 9, so a drive that failed on this fault still fails on it. And the
+  // M-16 invariant it was half of survives — a saw-tooth in the опасна band
+  // does not re-arm inside `speedingRearmSec` either, so sustained is still
+  // never cheaper than oscillating, both now being one bill.
   if (
     stepSustainedEpisode(
       s.speedingDangerous,
@@ -1078,7 +1176,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       t,
       cfg.speedingDangerousSustainSec,
       cfg.speedingRearmSec,
-      cfg.speedingRepeatSec,
+      0,
     )
   ) {
     events.push(makeViolation("SPEEDING_DANGEROUS", t, { detail: speedDetail }));
@@ -2218,11 +2316,13 @@ function handleTickEvent(
       // ONE ENCOUNTER, ONE ACCIDENT — and the definition is the whole rule:
       //
       //   an encounter OPENS on the first reported contact and stays open for
-      //   as long as contact keeps being reported; it CLOSES only once BOTH
-      //   `collisionSeparationSec` has passed with nothing reported at all AND
-      //   the car has driven `COLLISION_REOPEN_TRAVEL_M` since the last report
-      //   — the bodies have come apart. The report that opens an encounter is
-      //   billed; every report inside one is the same accident, still happening.
+      //   as long as contact keeps being reported; it CLOSES only once ALL
+      //   THREE of `collisionSeparationSec` has passed with nothing reported at
+      //   all, the car has driven `COLLISION_REOPEN_TRAVEL_M` since the last
+      //   report, and the vehicle ahead has been SEEN clear of the bumper
+      //   (`CONTACT_LEAD_GAP_M`) — the bodies have come apart. The report that
+      //   opens an encounter is billed; every report inside one is the same
+      //   accident, still happening.
       //
       // Contact is a STATE that persists across frames. What the fault sheet
       // convicts is an EVENT: a crash. The state has to be converted into
@@ -2287,13 +2387,25 @@ function handleTickEvent(
       // Plumbing a stable actor id through `pushCollision` is the honest fix
       // and is listed, not attempted, because that wire runs through
       // LessonScene.
+      //
+      // 2026-08-18, THE REDRIVE: the travel half did not hold either, and the
+      // reason is written on `CONTACT_LEAD_GAP_M` — it measured PATH, and a
+      // shunt supplies path without ever supplying separation. Thirteen and
+      // fourteen «Пътнотранспортно произшествие» rows for one contact, on a
+      // sheet whose own caption says nine points are allowed. So the third
+      // conjunct is the one that is not a proxy: the vehicle ahead has to have
+      // been SEEN off the bumper between the two reports. Unknown still reads
+      // as apart, so this can only ever REMOVE a second bill — it cannot
+      // manufacture a first one, and no drive that bills once today stops.
       const last = s.lastCollisionContactAt;
       const cameApart =
         last === null ||
-        (t - last > cfg.collisionSeparationSec &&
+        (s.leadSeenApartSinceContact &&
+          t - last > cfg.collisionSeparationSec &&
           s.travelSinceContactM >= COLLISION_REOPEN_TRAVEL_M);
       s.lastCollisionContactAt = t;
       s.travelSinceContactM = 0;
+      s.leadSeenApartSinceContact = false;
       if (!cameApart) break;
       s.terminated = true;
       out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));

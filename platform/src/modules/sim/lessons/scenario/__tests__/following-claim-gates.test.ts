@@ -35,9 +35,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { BrakingLeadCarSpec, CutInLeadCarSpec } from "../../../contracts";
 import { VEHICLE_PROFILE_LENGTH_M } from "../../../traffic/types";
+import { TRUCK_DIMENSIONS } from "../../../traffic/vehicleFleet";
 import {
   createEvalState,
   parseObjectiveParams,
+  REACH_ZONE_CAP_SLACK_KMH,
   REACH_ZONE_HALT_CAP_KMH,
   stepObjective,
 } from "../../objectives";
@@ -427,5 +429,419 @@ describe("every following gate stays under its own street's posted limit", () =>
       }
     }
     expect(over, over.join("\n")).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7–10. THE NUMBERS THE PROSE ARGUES HARDEST FOR, WHICH NOTHING HELD
+//
+// Doc 88 §3 item 6, re-verified here BEFORE a line of this was written. Four
+// numbers in `templates-following.ts` carry paragraphs of measured reasoning
+// and no test. Each was mutated on its own and the 30-file observer set of this
+// template — every test file in the gate that imports the family or names an
+// `sc-follow-*` id — was re-run against it:
+//
+//   sc-fd-follow   maxSpeedKmh        32 → 26            30/30 files green
+//   sc-fs-stopped  maxSpeedKmh         1 → 3             30/30 files green
+//   sc-fs-stopped  acceptBeforeMarkM  −2.9 → −0.01       30/30 files green
+//   FS_QUEUE_AHEAD deepest profile    truck → van        30/30 files green
+//
+// (The first was also run against the WHOLE gate: 639 files, 9 850 tests,
+// exit 0. Sections 1–6 above are not the hole — they assert PASS/REFUSE on the
+// three committed recordings, and all three recordings survive all four
+// mutations unchanged. A recording can only ever say which side of a boundary
+// it fell; it cannot say where the boundary is.)
+//
+// Every one of the four is a defect the template argues against in writing.
+// 26 leaves the demonstrated-correct drive 0.1 км/ч of margin — T18 / founder
+// item 48 („I received an error I have been tailing him too close and in fact I
+// wasn't"), one decimal smaller. 3 credits a car that never stopped under a
+// title that says «Спри», which is the sweep-161 finding verbatim. −0.01
+// refuses the student who stops exactly where instruction 5 sends him. And a
+// van's roofline is a GLB height no module in this repo states, so swapping it
+// in deletes the proof and keeps the sentence.
+//
+// Each section below therefore fails on the mutation AND on the lazy
+// over-correction in the other direction, because a cap loosened until it
+// credits everybody is the same crime as one tightened until it refuses the
+// shadow.
+// ---------------------------------------------------------------------------
+
+/** Samples of a committed recording named the way the templates name them
+ *  (`spec.shadow.path`, `spec.mistakes[].traceRef.path`). */
+function samplesAtPath(relPath: string): TraceSample[] {
+  const j = JSON.parse(readFileSync(path.join(REPO_ROOT, relPath), "utf-8")) as {
+    samples: TraceSample[];
+  };
+  expect(j.samples.length, `${relPath} has samples`).toBeGreaterThan(50);
+  return j.samples;
+}
+
+interface Disc {
+  x: number;
+  y: number;
+  radiusM: number;
+}
+
+/** What a recording's speedometer read while it was inside an authored disc —
+ *  the exact measurement every cap in this file was chosen from, recomputed
+ *  rather than quoted. */
+function inZoneSpeeds(samples: readonly TraceSample[], disc: Disc): number[] {
+  return samples
+    .filter((s) => Math.hypot(s.x - disc.x, s.y - disc.y) <= disc.radiusM)
+    .map((s) => s.speedKmh);
+}
+
+interface FlowGate {
+  specId: string;
+  objectiveId: string;
+  capKmh: number;
+  disc: Disc;
+  shadowPath: string;
+  mistakePaths: string[];
+}
+
+/** Every gate in the family that grades a PACE — a reachZone cap ABOVE the halt
+ *  band. `sc-fs-stopped`'s 1 is a halt demand, a different instrument with a
+ *  different failure mode, and §8/§9 grade it. */
+function flowCappedGates(): FlowGate[] {
+  const out: FlowGate[] = [];
+  for (const spec of SCENARIO_TEMPLATES_FOLLOWING) {
+    for (const o of spec.success) {
+      if (o.params.kind !== "reachZone") continue;
+      const cap = o.params.maxSpeedKmh;
+      if (cap === undefined || cap <= REACH_ZONE_HALT_CAP_KMH) continue;
+      out.push({
+        specId: spec.id,
+        objectiveId: o.id,
+        capKmh: cap,
+        disc: { x: o.params.x, y: o.params.y, radiusM: o.params.radiusM },
+        shadowPath: spec.shadow.path,
+        mistakePaths: (spec.mistakes ?? []).map((m) => m.traceRef.path),
+      });
+    }
+  }
+  return out;
+}
+
+describe("a following cap is a measurement, and a measurement has two edges", () => {
+  const gates = flowCappedGates();
+
+  it("the sweep sees every pace cap in the family — and only those", () => {
+    // A cap added here without a shadow to clear and a mistake to refuse is the
+    // defect this census was opened for; landing one now costs a line in this
+    // list and an answer to both assertions below.
+    expect(gates.map((g) => g.objectiveId).sort()).toEqual([
+      "sc-fc-rebuild",
+      "sc-fd-follow",
+      "sc-fr-follow",
+      "sc-ft-follow",
+      "sc-ftg-ease",
+    ]);
+  });
+
+  it("no cap sits inside a speedometer's error of the drive it must CREDIT", () => {
+    /**
+     * MEASURED HERE, at each gate's own authored disc (the same circles the
+     * template comments quote, recomputed from the committed tapes):
+     *
+     *   gate           cap   shadow holds   margin
+     *   sc-fd-follow    32     25.9 (×56)     6.1
+     *   sc-fr-follow    30     24.9 (×58)     5.1   ← 0.1 км/ч inside the rule
+     *   sc-ft-follow    30     20.8 (×70)     9.2
+     *   sc-fc-rebuild   34     28.0 (×52)     6.0
+     *   sc-ftg-ease     36     28.0 (×51)     8.0
+     *
+     * The floor is REACH_ZONE_CAP_SLACK_KMH — this product's own number for
+     * „speedometer/physics slack, which does not grow because the road is
+     * faster" (objectives.ts, borrowed from the rule engine's
+     * speedingGraceMaxKmh). A cap closer than that to the pace the lesson
+     * DEMONSTRATES is decided by needle wobble, and the hardest rung gets no
+     * ladder grace to hide it: L5 compiles the authored number unchanged.
+     */
+    const tight: string[] = [];
+    for (const g of gates) {
+      const shadow = inZoneSpeeds(samplesAtPath(g.shadowPath), g.disc);
+      expect(shadow.length, `${g.objectiveId}: the shadow crosses its own circle`).toBeGreaterThan(
+        20,
+      );
+      const ceilKmh = Math.max(...shadow);
+      if (g.capKmh - ceilKmh < REACH_ZONE_CAP_SLACK_KMH) {
+        tight.push(
+          `${g.specId}/${g.objectiveId}: cap ${g.capKmh} over a shadow holding ${ceilKmh.toFixed(
+            1,
+          )} км/ч — ${(g.capKmh - ceilKmh).toFixed(1)} км/ч of margin`,
+        );
+      }
+    }
+    expect(tight, tight.join("\n")).toEqual([]);
+  });
+
+  it("…and every refusal it makes is by more than that error, with one to make", () => {
+    /**
+     * The other edge. Same discs, the mistake demos each template ships:
+     *
+     *   sc-fd-follow   47.9 / 47.9   → refuses both by 15.9
+     *   sc-fr-follow   38.5 / 39.9   → refuses both by ≥ 8.5
+     *   sc-ft-follow   47.9 / 47.9   → refuses both by 17.9
+     *   sc-fc-rebuild  39.9 / 40.1   → refuses both by ≥ 5.9
+     *   sc-ftg-ease    57.9          → refuses one by 21.9
+     *
+     * `mistake-brake-check` is deliberately not among them: it stands still in
+     * its zone (0–33.4 км/ч over 118 frames) and a cap cannot see a brake check.
+     * Its fault is HARSH_BRAKING_NO_CAUSE and the rule engine bills it — which
+     * is why the requirement is „at least one" rather than „all". A cap that
+     * refuses NONE of its drill's own recorded mistakes is not a check.
+     */
+    const bad: string[] = [];
+    for (const g of gates) {
+      const seen = g.mistakePaths
+        .map((p) => ({ p, speeds: inZoneSpeeds(samplesAtPath(p), g.disc) }))
+        .filter((m) => m.speeds.length > 0)
+        .map((m) => ({ p: m.p, floorKmh: Math.min(...m.speeds) }));
+      const refused = seen.filter((m) => m.floorKmh > g.capKmh);
+      if (refused.length === 0) {
+        bad.push(
+          `${g.specId}/${g.objectiveId}: cap ${g.capKmh} refuses none of its own ${seen.length} mistake demo(s)`,
+        );
+        continue;
+      }
+      for (const m of refused) {
+        if (m.floorKmh - g.capKmh < REACH_ZONE_CAP_SLACK_KMH) {
+          bad.push(
+            `${g.specId}/${g.objectiveId}: cap ${g.capKmh} refuses ${m.p} by only ${(
+              m.floorKmh - g.capKmh
+            ).toFixed(1)} км/ч`,
+          );
+        }
+      }
+    }
+    expect(bad, bad.join("\n")).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. «СПРИ» means stopped — which is only a claim if a car that never stopped
+//    is refused, and only honest if one that did is still credited
+// ---------------------------------------------------------------------------
+
+/** The graded standstill gate, and the lane metre it is authored on. */
+const FS_STOP_PARAMS = SC_FOLLOW_STANDSTILL.success.find((o) => o.id === "sc-fs-stopped")!
+  .params as {
+  kind: "reachZone";
+  x: number;
+  y: number;
+  radiusM: number;
+  maxSpeedKmh?: number;
+  acceptBeforeMarkM?: number;
+};
+
+/**
+ * A straight run up this drill's own lane, one sample every 0.25 m, optionally
+ * ending at rest for `restSec`.
+ *
+ * SYNTHETIC ON PURPOSE, and this is the whole lesson of §3 item 6: the three
+ * committed recordings come to rest in exactly TWO places (y = 280.95 and
+ * y = 284.66) and roll the approach at one speed, so between them they can only
+ * ever report which side of a boundary they fell on. They cannot report where
+ * the boundary is — which is why all four mutations left them, and every test
+ * built on them, green.
+ */
+function laneRun(opts: {
+  fromY: number;
+  toY: number;
+  speedKmh: number;
+  restSec?: number;
+}): TraceSample[] {
+  const { fromY, toY, speedKmh, restSec = 0 } = opts;
+  const stepM = 0.25;
+  const mps = speedKmh / 3.6;
+  const out: TraceSample[] = [];
+  let t = 0;
+  for (let y = fromY; y <= toY + 1e-9; y += stepM) {
+    out.push({ tSec: t, x: FS_STOP_PARAMS.x, y: Math.min(y, toY), speedKmh });
+    t += stepM / mps;
+  }
+  for (let i = 0; i < Math.round(restSec * 10); i++) {
+    t += 0.1;
+    out.push({ tSec: t, x: FS_STOP_PARAMS.x, y: toY, speedKmh: 0 });
+  }
+  return out;
+}
+
+describe("sc-fs-stopped: «Спри» refuses the car that never stopped", () => {
+  it("no roll past the mark earns it, at any speed inside the halt band", () => {
+    // The measurement that opened this row: at the shipped `maxSpeedKmh: 6` all
+    // three recordings ticked this objective AT 6.0 км/ч, because `capMet` asks
+    // `speedKmh <= cap` and a car rolling AT the cap satisfies it. Every speed
+    // below is one a HALT demand may not accept — 2 and 3 because the title
+    // says «Спри» and they are not stopping, 6 because that is the number this
+    // row was opened against, and REACH_ZONE_HALT_CAP_KMH (8) because it is the
+    // top of the band inside which a cap still means „come to rest here". The
+    // drive never once drops under the standstill line; it simply drives past.
+    for (const rollKmh of [2, 3, 6, REACH_ZONE_HALT_CAP_KMH]) {
+      const rollThrough = laneRun({ fromY: 250, toY: 300, speedKmh: rollKmh });
+      for (const level of [1, 2, 3, 4, 5] as const) {
+        expect(
+          objectiveCompletes(SC_FOLLOW_STANDSTILL, level, "sc-fs-stopped", rollThrough),
+          `${rollKmh} км/ч roll-through at L${level}`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("…and the student who really stops, short of the mark, still gets it", () => {
+    // The opposite direction, and the reason the answer is not „demand zero and
+    // be done with it": B4/B5 is the founder's own rescue — a halt gate credits
+    // a car that comes to REST before the mark, inside the approach capsule
+    // (radius 8 + REACH_ZONE_GRACE_M, far end cut at the paint). This drive
+    // never enters the disc at all: it stops at y = 272, nine metres out, and
+    // is credited at every rung because it stopped. Push the cap out of the
+    // halt band to make the assertion above pass and this credit vanishes with
+    // it — the capsule only opens for a halt demand.
+    const stopsShort = laneRun({ fromY: 250, toY: 272, speedKmh: 6, restSec: 3 });
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(
+        objectiveCompletes(SC_FOLLOW_STANDSTILL, level, "sc-fs-stopped", stopsShort),
+        `stops short at L${level}`,
+      ).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 9. «НА РАЗУМНО РАЗСТОЯНИЕ» — the boundary is the taught two metres, and it is
+//    bounded from BOTH sides or it is a number nobody is holding
+// ---------------------------------------------------------------------------
+
+describe("sc-fs-stopped: the acceptance ends where the briefing says it does", () => {
+  /** Instruction 5: «Спри зад него на около два метра». */
+  const TAUGHT_STANDSTILL_GAP_M = 2;
+  /** The tail's measured rest pose — the metre every graded number here hangs
+   *  off (the standstill gap is `290 − playerY − 4.1`). */
+  const TAIL_REST_Y = 290;
+  /** Bumper-to-bumper: tail rear at 290 − 2.05 = 287.95, hero front at y + 2.05,
+   *  so the closest lawful rest pose is 287.95 − 2 − 2.05 = 283.9. */
+  const CLOSEST_LAWFUL_REST_Y =
+    TAIL_REST_Y - CAR_LENGTH_M / 2 - TAUGHT_STANDSTILL_GAP_M - CAR_LENGTH_M / 2;
+
+  it("the tail still parks where that arithmetic starts", () => {
+    // If the last leg moves, every number in this describe is stale — so it is
+    // asserted rather than assumed. 289.5 + the 2.2²/(2×4.5) = 0.54 m the ramp
+    // overshoots is the measured rest at y = 290.0.
+    const tail = SC_FOLLOW_STANDSTILL.staged![0] as unknown as BrakingLeadCarSpec;
+    const legs = tail.paceProfile ?? [];
+    const last = legs[legs.length - 1];
+    expect(last?.speedMps, "the tail comes to rest").toBe(0);
+    expect(last?.atS, "the arc metre it rests at").toBe(289.5);
+    expect(CLOSEST_LAWFUL_REST_Y).toBeCloseTo(283.9, 6);
+  });
+
+  it("credits the student who stops exactly where instruction 5 sends him", () => {
+    // THE MUTATION THIS EXISTS FOR: `acceptBeforeMarkM −2.9 → −0.01` cuts the
+    // acceptance at the mark itself (y = 281.01) instead of at the taught pose
+    // (y = 283.9), and all three committed recordings survive it — the two that
+    // pass come to rest at y = 280.95, BEHIND the cut, and the one that fails
+    // fails on the far side of both. The student who does exactly as he is told
+    // is the only drive that can tell −2.9 from −0.01, and nothing in the repo
+    // was driving him. He rolls in at the 6 км/ч the gate used to accept and
+    // stops 2.05 m off the tail's bumper — five centimetres inside the taught
+    // two, so the assertion is about the boundary and not about float noise.
+    const atTaughtGap = laneRun({
+      fromY: 250,
+      toY: CLOSEST_LAWFUL_REST_Y - 0.05,
+      speedKmh: 6,
+      restSec: 3,
+    });
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(
+        objectiveCompletes(SC_FOLLOW_STANDSTILL, level, "sc-fs-stopped", atTaughtGap),
+        `stops at the taught two metres, L${level}`,
+      ).toBe(true);
+    }
+  });
+
+  it("…and refuses the recorded bumper-hugger's own resting pose", () => {
+    // The other side of the same boundary, read off the committed tape rather
+    // than typed: `mistake-bumper-kiss` comes to rest at y = 284.66 — 1.24 m of
+    // clear air, which its own `whatWentWrongBg` calls «под метър и половина
+    // разстояние». Loosen the cut past that and the drill certifies the pose it
+    // ships as a mistake. Together with the assertion above the boundary is
+    // pinned into a 0.81 m window, each end held by a drive rather than by a
+    // preference.
+    const kiss = samplesOf("sc-follow-standstill", "mistake-bumper-kiss");
+    const kissRestY = kiss[kiss.length - 1].y;
+    expect(kissRestY, "the recorded bumper-kiss rest pose").toBeCloseTo(284.66, 2);
+    const atKissPose = laneRun({ fromY: 250, toY: kissRestY, speedKmh: 6, restSec: 3 });
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      expect(
+        objectiveCompletes(SC_FOLLOW_STANDSTILL, level, "sc-fs-stopped", atKissPose),
+        `stops at the bumper-kiss pose, L${level}`,
+      ).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 10. The column is only a column if the deepest car in it has a roofline this
+//     repository can actually prove
+// ---------------------------------------------------------------------------
+
+describe("sc-follow-standstill: the queue's depth is proven, not asserted", () => {
+  /**
+   * The vehicle heights this repository HOLDS, in metres. `truck` is the
+   * procedural box-truck rig's own body plan (`TRUCK_DIMENSIONS.boxHeightM`,
+   * traffic/vehicleFleet.ts) — a number the renderer builds geometry from. The
+   * van is the kargo_v GLB and no module in this repo states its height, so it
+   * is deliberately ABSENT: the template's own block declines to claim it
+   * («The van's rig height is a GLB this lane did not measure, so it is not
+   * being claimed here»), and a roofline nobody measured cannot be the thing
+   * that clears a sight line.
+   */
+  const PROVEN_ROOF_M = new Map<string, number>([["truck", TRUCK_DIMENSIONS.boxHeightM]]);
+
+  /**
+   * The sight line over the stopped tail's roof, at the deepest queue member,
+   * from the credited rest pose: 1.59 m — the arithmetic in the template's own
+   * SWEEP 161 block, and the reason the audit read „a single vehicle roughly
+   * 40 m ahead, with nothing behind it" off two separate frames
+   * (`sc-follow-standstill/pc-right/05-stopped.png`, and again at t = 156 s).
+   * Three 1.45 m cars nose-to-tail were all under it.
+   */
+  const SIGHT_LINE_OVER_TAIL_M = 1.59;
+
+  it("the last vehicle in the queue stands above that line", () => {
+    // THE MUTATION THIS EXISTS FOR: `truck → van` on the deepest member leaves
+    // the sibling assertion in §5 green — it counts profiles that are „van or
+    // truck" and two vans still count two — while deleting the only measured
+    // height in the column. The word «колона» would again be a claim the
+    // cockpit does not keep, which is the exact defect B70 fixed one layer up.
+    const queue = (SC_FOLLOW_STANDSTILL.levels[0].stagedAdd ?? []) as BrakingLeadCarSpec[];
+    expect(queue.length, "a queue to be deep at all").toBeGreaterThanOrEqual(2);
+    const deepest = [...queue].sort(
+      (a, b) => b.actor.hold.offsetM - a.actor.hold.offsetM,
+    )[0];
+    const profile = deepest.actor.profile ?? "car";
+    const roofM = PROVEN_ROOF_M.get(profile);
+    expect(
+      roofM,
+      `${deepest.id} is a «${profile}» — this repo states no height for it, so its roofline proves nothing`,
+    ).toBeDefined();
+    expect(roofM!, `${deepest.id} roofline vs the sight line over the tail`).toBeGreaterThan(
+      SIGHT_LINE_OVER_TAIL_M,
+    );
+  });
+
+  it("…and the proof is not bought by making the GRADED lead tall", () => {
+    // The opposite direction. Every graded number on this drill is computed
+    // from a CAR's 4.1 m — the standstill gap `290 − playerY − 4.1`, the
+    // credited rest pose of §9, the two convictions at y = 284.7 — and all
+    // three committed recordings depict a car in front of them. Clearing the
+    // roofline by promoting the tail instead of the queue would move every one
+    // of those silently, and this file's whole subject is numbers that move
+    // without anything going red.
+    const tail = SC_FOLLOW_STANDSTILL.staged![0] as unknown as BrakingLeadCarSpec;
+    expect(tail.id).toBe("sc-fs-lead");
+    expect(tail.actor.profile, "the graded lead is a plain car").toBeUndefined();
   });
 });

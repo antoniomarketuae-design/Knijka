@@ -22,7 +22,16 @@
 > **This file is generated from the findings corpus, not typed.** Source: 24 JSONL files under
 > `E:\AI driver\.audit-frames\findings\`. Every count, ranking and grouping below was computed by
 > script over all 1,712 records, because the last attempt at this document was written by eye and
-> lost 985 findings. Re-run `build.js` against the corpus and this file reproduces byte for byte.
+> lost 985 findings. **The generator was never committed** — there is no `build.js` anywhere in this
+> tree, so „re-run the build and it reproduces byte for byte", which is what this line used to claim,
+> was a promise nothing could keep. What IS reproducible, and was re-run on 2026-08-18, is the
+> ARITHMETIC: read all 24 JSONL files, then drop every record whose `scenario` was re-driven in
+> `chunk-redrive.jsonl` except the re-drive's own rows (22 lessons, 26 records). The remainder is
+> **1,686 standing records — 161 `SUMMARY`, 1,012 `BROKEN` (318 of them critical, over 138 suspect
+> files), 512 `UNPOLISHED`, 1 `COULD_NOT_TEST`**, and every count, ranking and grouping below is
+> that tally to the row. The PROSE around the counts was written by hand and is not regenerable;
+> the closing OPEN LIST is hand-maintained in full and says so where it starts. Committing a
+> generator that rebuilds the tables is an open item there.
 
 ---
 
@@ -5751,257 +5760,387 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — closing the first repair wave, 2026-08-18
+# THE OPEN LIST — after two repair waves, 2026-08-18
 
-> **This section is hand-maintained, and it has to be said out loud** because the header of this
-> file says the file is generated from the corpus. It is — everything above this line is. Nothing
-> below it can be: it is about *code that was written after the corpus was frozen*, and the corpus
-> knows nothing about it. There is also no `build.js` in the tree, so the reproduce-byte-for-byte
-> claim above is currently **unverifiable** — the generator was never committed. Both facts are
-> listed as open items below rather than quietly left for the next reader to trip over.
+> **This section is hand-maintained, and it has to be said out loud** because everything above this
+> line is a tally of the frozen corpus and nothing below it can be: it is about *code written after
+> the corpus was frozen*, and the corpus knows nothing about it. The header's own reproducibility
+> claim was repaired on 2026-08-18 for the same reason — it promised a `build.js` that has never
+> existed in this tree — and what replaced it is the recomputation rule, which was re-run today and
+> reproduces **1,686 standing records · 1,012 `BROKEN` · 318 of them critical · 138 suspect files**
+> exactly.
 >
-> **Provenance is marked on every row.** `[gated]` = I ran it. `[adversarial]` = a reviewer whose
-> only job was to break the fix measured it and it survived the attempt to refute it; I did not
-> re-run their instrument. `[frame]` = read off a PNG.
+> **Provenance is marked on every row.** `[gated]` = I ran the command and read its own exit code.
+> `[corpus]` = computed over the 24 JSONL files today. `[adversarial]` = a reviewer whose only job
+> was to break a fix measured it; where their measurement survives my re-reading of the code it is
+> recorded as theirs, not re-run by me. `[frame]` = read off a PNG. `[read]` = read out of the file
+> named, today.
+>
+> **What „open" means here.** A BROKEN finding is CLOSED only when someone can name it, name the
+> code that closes it, and show a test that goes red without that code. Everything else is open —
+> including findings in files this programme has edited, which is the distinction §1 exists to make
+> and the one most likely to be lost in a summary.
 
 ## 0 · The gate, exactly as it stands
 
-Run from a clean checkout of the working tree on 2026-08-18, **each command's own exit code read
-directly and never through a pipe** — `| tail` reports the *pipe's* status and has already once
-reported a red suite in this project as `EXIT:0`:
+Run over the whole tree on 2026-08-18 with the wave-2 diff in the working tree, **each command's own
+exit code read directly and never through a pipe** — `| tail` reports the *pipe's* status and has
+already once reported a red suite in this project as `EXIT:0`. `[gated]`
 
-| gate | first pass | after this pass |
+| gate | result | exit |
 |---|---|---|
-| `npx tsc --noEmit` | exit 0 | **exit 0** |
-| `npx vitest run --maxWorkers=2` | 840 files · 13 031 tests · **3 files / 4 tests red** | 840 files · **13 034 tests · 2 files / 2 tests red**, and both are the content-signature item in §6 |
-| `node platform/scripts/validate-content.mjs` | exit 0 | **exit 0** — 1 089 questions, 16/16 topics, 0 blocking answer-leak scopes |
+| `npx tsc --noEmit` | clean | **0** |
+| `npx vitest run --maxWorkers=2` | **842 files** — 839 passed · 2 failed · 1 skipped · **13,107 tests** — 12,935 passed · **2 failed** · 170 skipped · 343.8 s | **1** |
+| `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking** | **0** |
 
-`vitest` therefore still exits **1**, on purpose: the two remaining reds are §6 and must not be
-muted. Everything else in the suite is green, including the three tests this pass added.
+`vitest` exits **1 on purpose.** Both failures are the content-signature pair in §8 and must stay red
+until a human signs. Nothing else in the suite is red: the two files the wave-2 reviewers each
+reported red mid-wave — `lessons/__tests__/finish-outside-annulus.test.ts` and
+`rules/__tests__/sweep161-fault-episodes.test.ts` — are **both green in the finished tree**. They
+were red because two lanes were landing into the same tree at the same time, which is the same
+failure shape §0 of the previous pass recorded for `session-end-numbers.test.tsx`: *neither lane was
+wrong; nothing checked them against each other.* That has now happened twice. It is a process
+finding, and it is open.
 
-The one repaired here was `src/modules/sim/hud/__tests__/session-end-numbers.test.tsx`, and it is
-worth a paragraph because it is the shape of failure this wave is most exposed to. Two lanes landed
-in the same 24 hours: one taught `SessionEndScreen` to reconcile «Това е ЕДНА опасна грешка: 10» with
-a protocol table reading «2 20», and the other taught `scoring.ts` that Наредба № 38 чл. 48 ал. 3
-**closes the ledger** at the first ПТП. The screen lane's fixture was two collisions — which is what
-`sc-vu-cyclist-hook/pc-wrong` actually did — and after the scoring lane those two bill as **one**.
-The fixture is now `RED_LIGHT_CROSSED` + ПТП, which is the shape that still reaches «2 20» (a red
-light is опасна and does NOT terminate), and the old event list is pinned in its own test so it
-cannot come back silently. **Neither lane was wrong; nothing checked them against each other.**
+**The wave-2 diff is UNCOMMITTED and is not to be committed from this session:** 9 modified files
+(1,829 insertions / 67 deletions) plus 2 new test files (792 lines) —
+`rules/engine.ts` · `lessons/finish.ts` · `lessons/objectives.ts` ·
+`lessons/scenario/templates-signals2.ts` · `components/sim/TouchControls.tsx` and their tests, and
+the new `lessons/__tests__/park-bay-shape.test.ts` ·
+`lessons/scenario/__tests__/signals2-controller-clock.test.ts`.
 
-## 1 · What the wave actually covered — and what "covered" does not mean
+## 1 · The coverage arithmetic — 31 of 138 files, and touching is not closing
 
-138 suspect files carry the 1 012 BROKEN findings above. This wave's diff touches **30** of them.
+`[corpus]` The 1,012 BROKEN findings are spread over **138 suspect files**. Two repair waves have
+now edited **31** of them.
 
-| | files | BROKEN findings in those files | of which critical |
+| | files | BROKEN findings in them | of which critical |
 |---|---:|---:|---:|
-| touched by this wave | 30 | 623 | 216 |
-| **not touched at all** | **108** | **389** | **102** |
+| wave 1 (commit `ec1f56f`) | 30 | 623 | 216 |
+| wave 2 (working tree) | 5 | 174 | 109 |
+| **union — ever opened** | **31** | **625** | **217** |
+| **never opened at all** | **107** | **387** | **101** |
 
-**Touching a file is not closing its findings**, and the 623 must not be read as 623 closed. Each
-lane closed the specific rows it names in its own source comments; the rest of each file's bucket is
-untouched. There is no per-finding closure ledger in this programme yet, and building one is the
-single largest piece of missing bookkeeping — see item 8.
+The two rows do not add up because **wave 2 opened exactly ONE file the corpus knows about that wave
+1 had not** — `lessons/scenario/templates-signals2.ts`, 2 findings, 1 critical — **and that lane
+closed neither of them** (§3, lane D: the fix belongs in `orchestrator/runners.ts`, which is itself
+an untouched file in the list below). The other four wave-2 files were already wave-1 files. So the
+whole second wave moved catalogue coverage by **one file and two findings**, and moved the closed
+count by less than that.
 
-The 108 untouched files, ranked by criticals, start:
-`lessons/scenario/templates-pe2.ts` (4c) · `collision/probe.ts` (4c) · `collision/index.ts` (4c) ·
-`environment/weather.ts` (4c) · `lessons/scenario/progress.ts` (3c/26 findings — the largest
-untouched bucket) · `lessons/scenario/templates-conditions.ts` (3c) · `scenarios/coach.ts` (3c) ·
-`traffic/TrafficLayer.tsx` (3c) · `cockpit/InstrumentCluster.tsx` (3c) ·
-`lessons/scenario/templates-merging.ts` (3c) · `rules/offences.ts` (3c) · `runtime/district.ts` (3c) ·
-`lessons/scenario/templates-roundabout.ts` (3c) · `runtime/surface.ts` (3c/3 — every finding in it is
-critical). **Not one of these was opened in this wave.**
+**Touching a file is not closing its findings**, and 625 must never be read as 625 closed. Each lane
+closed the specific rows it names in its own source comments; the rest of each file's bucket is
+untouched by construction. The four deepest buckets in the product are all files both waves have now
+edited, and all four are still overwhelmingly open:
 
-## 2 · Regressions this wave introduces, verified, and NOT closed
+| file | BROKEN | critical | what the two waves actually addressed in it |
+|---|---:|---:|---|
+| `rules/engine.ts` | 65 | 41 | one class (repeat collision bills) + one cadence (`speedingRepeatSec` in the опасна band) |
+| `lessons/objectives.ts` | 51 | 32 | two evaluators (`stepParkInBay` rest gate + bay shape), one approach cap (refuted, §4 R6) |
+| `components/sim/TouchControls.tsx` | 34 | 22 | the release edges and the adoption door |
+| `lessons/finish.ts` | 22 | 13 | the annulus and its standstill face (partly refuted, §4 N3) |
 
-These are new. They did not exist before the diff and they are open now.
+## 2 · THE OPEN LIST
 
-**R1 · `finish.ts` — the widened annulus can stop a lesson from ever ending.** `[adversarial]`
-`normalizeOutside` now pushes every "outside" departure circle to `armWithinM + 8 m`, and its
-docstring claims *"no drive that ends today stops ending"*. Driven through the real engine
-(`applyTick` / `createLessonSession`) on `sc-sig-green-wave@L1` with the chain stalled at objective
-0, a car that comes to rest **42 m or 45 m past node3** is `completed` at t = 97 s on the shipped
-build and **never ends** with the fix — 173 s of ticks, `phase=driving`. Widening the departure
-circle grows the no-escape disc from 40 m to 48 m *in every direction*; the claim is true of a car
-that is moving and false of a car that has stopped. This matters because *"the lesson would not end,
-the harness had to press «Прекрати урока»"* is the sweep's single most common ending — **13 of the 22
-findings in that band** — so the fix adds a new 8 m-deep instance of the class it was written
-against. **Open decision, not a code fix:** the terminal rescue needs a dwell for a *stationary* car
-inside the band, which is a design question this lane did not own.
+### 2.1 — Everything anyone can name as CLOSED
 
-**R2 · `finish.ts` — the defect being fixed is not reachable without reversing.** `[adversarial]`
-Same engine, shipped code: hesitating **41 m short** of the junction on the approach never ends
-(approach distance is monotonic), and stopping legally **on the paint** never ends. Only *stop at the
-paint, then reverse 13.3 m* reaches the harm, and the new test encodes that as an instantaneous
-backward jump at `speedKmh: 0` — a tick stream no vehicle produces. The fix also does not remove the
-class, it raises the bar to ~20 m of reverse. **The census claim is also wrong**: the docstring says
-only the 5 green-wave rungs move; **ten** rungs move (`sc-rb-ped-exit@L1-L5` moves too).
+This is the entire list. Seven rows against 1,012.
 
-**R3 · `staged.ts` — FIXED IN THIS PASS, recorded because it was shipped-and-green for a day.**
-`[gated]` The FR-B5-EXIT retirement run consulted `closesOnAmbient` and nothing else, while the
-player guard works by lowering `target`, which the retirement branch does not read. Measured with
-the player 20 m past the path end and `playerGuard` defaulted: **closest approach to the PLAYER
-0.000 m at 10 m/s**, against 4.667 m for an ambient body in identical geometry — a correct student,
-stopped where the drill told him to stop, driven into and billed COLLISION −10 опасна. Closed here
-by `closesOnPlayer` in `platform/src/modules/sim/traffic/staged.ts`, with both directions asserted in
-`staged-exit-run.test.ts` (the clamp, and that `playerGuard: false` actors still make contact).
-Mutation-checked: disabling the guard turns the new test red at `0.000 m`. **The lesson generalises
-and is open**: that test file's own describe block is titled *"not a licence to drive through
-anything"* and only ever put an *ambient* car in the way.
+| # | finding closed | evidence | provenance |
+|---|---|---|---|
+| C1 | `objectives.ts` `stepParkInBay` graded rest on an **unsigned** `speedKmh`, so a reversing car read as „at rest" and the park was credited before it stopped | replayed over the committed authored-correct shadows: **69 of 85 compiled rungs changed verdict time**, always later (`sc-park-zebra` 42.3 s → 45.4 s against a true rest at 43.85 s + `holdSec` 1.5); reverting only `objectives.ts` = 9 red, 8 of them behavioural | `[adversarial]` |
+| C2 | `objectives.ts` accepted a park on **one disc** where the bay is a rectangle — simultaneously too tight in depth (a car reversed fully home in a 5.5 m bay refused) and too loose across (0.75 m at L1, a third of the car in the neighbour's bay, with a green tick) | `lessons/__tests__/park-bay-shape.test.ts` §1–§7, incl. the compiled-catalogue sweep; `PARK_CAR_HALF_LENGTH/WIDTH_M` pinned to `tuning.ts` `CHASSIS_HALF_EXTENTS` by §5 | `[read]` + `[adversarial]` |
+| C3 | `rules/engine.ts` billed **one continuous shunt as many accidents** — `sc-ov-solid-return/mobile-wrong` 13 × «Пътнотранспортно произшествие» / 130 т., `sc-ln-boulevard-discipline` 14 / 140 | third conjunct `leadSeenApartSinceContact` (`CONTACT_LEAD_GAP_M` 0.5 m); 4 independent mutations each red on the right test; the gap channel verified live from `LessonScene.tsx:2785` through `traffic/system.ts` | `[adversarial]` |
+| C4 | `TouchControls.tsx` — an **adopted** pointer never captured, so `onLostPointerCapture` could not fire for it and a mouse-driven gesture left an axis owned for the rest of the session (a permanent veto of the brake key, since `mergeInto` is a priority REPLACE) | `touchPadRelease.test.tsx` §8; removing `capturePointer` from either adopt branch = 3 red | `[adversarial]` |
+| C5 | The previous pass's §3.1–§3.3 — the touch-axis watchdog was guarded by `toContain` over source only, and `AXIS_RECONCILE_MS` and the `if (!visible)` guard were unpinned | §7 now runs the effect instead of spelling it: killing the `useEffect` while leaving both grepped strings intact = 2 red; `AXIS_RECONCILE_MS` 250 → 3,600,000 = red. The proof the old guard guarded nothing: the **pre-change** test file run against the dead watchdog was **27/27 green** | `[adversarial]` |
+| C6 | wave 1's R3 — `traffic/staged.ts` drove a retirement run **through the player** at 0.000 m closest approach because the FR-B5-EXIT branch consulted `closesOnAmbient` only | `closesOnPlayer` + `staged-exit-run.test.ts`, both directions | `[gated]` (wave 1) |
+| C7 | wave 1's R1 — the widened annulus left a car resting **41–47 m** past the terminal node with no ending at all | `FINISH_OUTSIDE_STUCK_S = 75`; stops at 41/42/44/46/47 m now end 75.0 s after the stop | `[adversarial]` |
 
-**R4 · `buildWorldGeometry.ts` — `d2-v1` still inherits the city's L7 bay.** `[adversarial]` The new
-`defaultParkingBays` tests membership by *bounds*, and `L7_PARKING_BAY` (681.26, −199.54) is inside
-`d2-v1`'s bounds — so that district still paints 3 quads of a bay it does not own, on a district
-whose own curriculum set is empty. The docstring's premise (*"A District document carries no
-lesson-district id"*) is false: `meta.district` is `"studentski-grad"` / `"lozenets"`, which is an
-exact decidable test in this layer. `specs.ts:965` states the requirement as law: *the default MUST
-stay district-v1-only*.
+**C7 closes an 8 m band, not the defect class.** See §4 N3.
 
-**R5 · `tools/mobile/lesson-audit.mjs` — the new 3-consecutive-loss breaker destroys evidence.**
-`[adversarial]` Replayed over all 653 lane folders, the policy aborts lanes that would otherwise have
-produced frames — including a verdict frame. The module underneath it (`tools/mobile/lib/frames.mjs`)
-is sound (18 mutations, 16 red, no inert behaviour) and the zero-byte/truncation detection is real
-and needed; **the breaker's policy is the open part**, not the detector.
+### 2.2 — Class A · Never opened: 107 files, 387 findings, 101 critical
 
-**R6 · `objectives.ts` — the approach cap fix is far weaker than its docstring.** `[adversarial]`
-`REACH_ZONE_CAP_SLACK_KMH` can only bite between the capsule's rear edge and the acceptance disc,
-which is exactly `REACH_ZONE_GRACE_M` = 5 m at every radius and every rung, because the engine
-advances `currentIndex` on completion and never re-steps. Over 40 physically honest accelerating
-drives at the audited arrival speeds the fix changes **nothing**, and an acceleration sweep flips a
-verdict only at a ≥ 4 m/s² and only for caps 40 and 46. `sc-hz-breakdown-pulloff` (cap 130) still
-ticks at **145.1 км/ч**, the exact audited number, at every acceleration up to 12 m/s². The five
-drills the constant's own table names are therefore **not closed**; the fix is real on the arrival
-frame and inert on the approach the docstring describes.
+`[corpus]` Nobody has edited these files in either wave. Every finding in them is open, and the
+reason is the same for all 387: **no one looked.** Paths are shortened against
+`platform/src/modules/sim/` and `platform/src/components/sim/`; the format is `file  findings/critical`.
 
-**R7 · `rubric.ts` — the economy fix cannot change a star, anywhere.** `[adversarial]` A/B over every
-template × rung × detail shape (95 160 cells): **1 020 deltas, 0 star-deltas**, because
-`!settled ⇒ !completedAll` and the existing cap already floors those runs at one star. It is a
-copy fix and should be described as one; the write-up frames it as a full 2/2 being withdrawn.
+**With criticals (58 files, 173 findings, 101 critical) — this is the repair queue:**
 
-**R8 · WATCH — `LANE_TRUE_RADIUS_M` is the one change class in this wave that can refuse a correct
-drive by construction.** `[adversarial]` Ten lane/overtaking objectives moved from 4–6 m acceptance
-discs to `2.7 m` (compiled 4.05 / 3.38 / 2.70 / 2.70 / 2.70 by rung), so that «излез в лявата лента»
-can only be claimed from inside that lane. The arithmetic is real — `ov-oncoming-v1` gives an 8.12 m
-lane pitch, and the widest compiled radius 4.05 sits under the 4.0625 half-pitch — and every recorded
-shadow tape completes at every rung, `passed=true, score=0`. **But a shadow tape is an ideal line.**
-Nothing in this wave measures a *human* who completes the overtake 2 m off lane centre at L3–L5,
-where the disc is 2.7 m. This is not a defect; it is the row to check first if students start
-reporting «направих го и не ми се призна».
+`lessons/scenario/templates-pe2.ts` 10/4c · `collision/probe.ts` 8/4c · `environment/weather.ts` 6/4c ·
+`collision/index.ts` 6/4c · `lessons/scenario/progress.ts` **26/3c** · `lessons/scenario/templates-conditions.ts` 11/3c ·
+`scenarios/coach.ts` 8/3c · `traffic/TrafficLayer.tsx` 7/3c · `components/cockpit/InstrumentCluster.tsx` 6/3c ·
+`rules/offences.ts` 5/3c · `lessons/scenario/templates-merging.ts` 5/3c · `runtime/district.ts` 5/3c ·
+`lessons/scenario/templates-roundabout.ts` 4/3c · `runtime/surface.ts` 3/3c (every finding in it critical) ·
+`unknown` 22/2c · `lessons/scenario/templates-sp.ts` 9/2c · `components/ShadowCar.tsx` 8/2c ·
+`lessons/scenario/templates-signals.ts` 5/2c · `rules` (module-level) 5/2c · `lessons/scenario/templates-pe.ts` 4/2c ·
+`lessons/scenario/templates-cockpit.ts` 3/2c · `lessons/scenario/templates-rail.ts` 3/2c ·
+`lessons/scenario/templates-roundabout2.ts` 3/2c · `app/(dashboard)/simulator/actions.ts` 2/2c ·
+`runtime/worldRuntime.ts` 2/2c · `components/lesson-ui/LessonCard.tsx` 12/1c · `world/builders/markings.ts` 6/1c ·
+`tools/mobile/lib/auth.mjs` 5/1c · `components/lesson-ui/ExamBriefingCard.tsx` 5/1c · `scene/lessonWorldRecipe.ts` 5/1c ·
+`lessons/scenario/templates-parking2.ts` 4/1c · `lessons/scenario/templates-conditions2.ts` 4/1c ·
+`lessons/specs.ts` 4/1c · `components/ScenarioObstacles.tsx` 3/1c · `collision` 3/1c · `hud/PreDriveTutorial.tsx` 3/1c ·
+`vehicle` 3/1c · `lessons/scenario/templates-flow.ts` 3/1c · `lessons/scenario/templates-junctions3.ts` 3/1c ·
+`lessons/scenario/observation.ts` 2/1c · `components/lesson-ui/PlayAreaStyles.tsx` 2/1c ·
+`lessons/scenario/templates-speed2.ts` 2/1c · `engine/reverseAssist.ts` 2/1c · `lessons/scenario/events.ts` 1/1c ·
+`scenarios/event-library.json` 1/1c · `world/builders/zoneSigns.ts` 1/1c · `lessons/scenario/templates-merging2.ts` 1/1c ·
+`world/builders/railTrack.ts` 1/1c · `scene/cabin.ts` 1/1c · `lessons/scenario/templates-pk.ts` 1/1c ·
+`world/builders/network.ts` 1/1c · `collision/bodies.ts` 1/1c · `world/builders/roundabout.ts` 1/1c ·
+`traces/scHzAccidentScene.ts` 1/1c · `hud/telltaleWarnings.ts` 1/1c · `lessons/scenario/templates-junctions2.ts` 1/1c ·
+`platform/public/world/ov-oneway-v1.json` 1/1c · `runtime/laneArrows.ts` 1/1c
 
-## 2b · Residuals the lanes named themselves, and which are therefore open
+**No criticals (49 files, 214 findings — 188 major, 26 minor):**
 
-Each of these is written into the source comment of the fix that created it. They are collected here
-so they exist somewhere a reader of *this* file can find them.
+`scene/lessonSpeedContract.ts` 22 · `hud/FaultCard.tsx` 13 · `hud/HudToasts.tsx` 9 ·
+`components/lesson-ui/TeachMomentOverlay.tsx` 8 · `components/lesson-ui/AdvisorCard.tsx` 6 ·
+`world/components/worldLabel.ts` 5 · `components/lesson-ui/MistakeConsequenceOverlay.tsx` 4 ·
+`components/lesson-ui/TraceTimeline.tsx` 4 · `cockpit/clusterLayout.ts` 3 · `components/CameraRig.tsx` 3 ·
+`hud/StatusDashboard.tsx` 2 · `engine/reverseView.ts` 2 · `components/vitok/MirrorRig.tsx` 2 ·
+`traffic/index.ts` 2 · `cockpit/index.ts` 2 · `world/components/signFaces.ts` 2 · `components/HeroCarBody.tsx` 2 ·
+`hud/tapActivation.ts` 2 · `orchestrator/contact.ts` 2 · and 30 files carrying one finding each —
+`environment/WindshieldDroplets.tsx` · `world/components/cityModels.ts` · `components/lesson-ui/GlanceEdgePings.tsx` ·
+`components/VehicleRig.tsx` · `environment/SimEnvironment.tsx` · `traces/scMergeLaneEnd.ts` ·
+`traces/scMergeMotorwayExit.ts` · `hud/SpeedCard.tsx` · `lessons/scenario/compile.ts` · `scene/obstacleSpec.ts` ·
+`lessons/progression.ts` · `scene/ribbonStrip.ts` · `world/builders` · `traffic/controllerGestures.ts` ·
+`world/builders/waterDecals.ts` · `components/lesson-ui/CalibrationGate.tsx` · `world/builders/props.ts` ·
+`lessons/scenario/templates-exam.ts` · `environment` · `rules/summary.ts` · `traffic` ·
+`components/lesson-ui/HudCloseButton.tsx` · `hud/RearProximityCue.tsx` · `lessons/scenario/templates-hazards.ts` ·
+`hud/overheadHint.ts` · `traffic/oncoming.test.ts` · **`orchestrator/runners.ts`** ·
+`lessons/scenario/templates-junctions4.ts` · `platform/public/world/ov-crossing-v1.json` ·
+`platform/public/world/mw-v1.json`
 
-- **`objectives.ts` `stepPassSignal`** — the Б2 stop memory is scoped to the APPROACH, not to the
-  last six seconds, so a stop made early on the approach and gone stale by the rule engine's
-  `stopRecencySec` (6) still certifies the objective while the engine convicts
-  `STOP_SIGN_NO_FULL_STOP`. Fixing it needs a stop-TIME in `ObjectiveEvalState` (`lessons/types.ts`).
-- **`objectives.ts` `stepThreePointTurn`** — a car that enters the corridor ALREADY facing back
-  (driving in from the far end) still counts as one movement and can still take a 2/2 economy row.
-  Same blocker: the entry heading is not in the eval state.
-- **`finish.ts` header, P1 + P2** — the crash pin is voided twice over and neither is this lane's
-  file. **P1:** `engine.ts` re-arms on every graded collision and that re-arm sets
-  `stillSinceSec: null`, while `rules/engine.ts` reopens a COLLISION every 2 m of travel — measured
-  **65 collisions in a single 177 s drive** — so the ten-second clock is reset by the very condition
-  it is timing. **P2:** the standstill test reads `tick.speedKmh > FINISH_STANDSTILL_KMH` unsigned,
-  alone in the module, so a student reversing out of what he hit at −20 км/ч is counted as standing
-  still and banks dwell toward having his lesson closed for him.
-- **`lessons/finish.ts` FR-B5-JAM** — the crash pin is still frozen by B15's lawful-wait freeze; the
-  one-condition exemption lives in `engine.ts`.
-- **Whole-catalogue** — `sc-mw-min-speed`-class runs still finish `НЕИЗДЪРЖАН` with **0 fault
-  points** when the route runs out. `[frame]` `sc-mw-min-speed/pc-right/08-debrief.png`: «0
-  наказателни точки» · НЕИЗДЪРЖАН · «Урокът беше прекъснат преди края.» · 1 star. That is a grading
-  question in `lessons/finish.ts` / `scenario/progress.ts` and **nothing in this wave touches it** —
-  and `progress.ts` is the largest untouched bucket in item 1 (26 findings).
+Three of these deserve to be lifted out of the list, because a reader will otherwise scan past them:
 
-## 3 · Tests that guard nothing (verified, still open)
+- **`lessons/scenario/progress.ts` — 26 findings, the largest untouched bucket in the product**, and
+  the file that owns the `НЕИЗДЪРЖАН` with **0 fault points** printed on `sc-mw-min-speed`
+  (§5, carried). Named as untouched in the previous pass too. Still untouched.
+- **`orchestrator/runners.ts`** — one finding, no criticals, and it is where the *only* fix for the
+  regулировчик lesson family has to land (§3 lane D). A one-finding file is not a low-value file.
+- **`app/(dashboard)/simulator/actions.ts` — 2 findings, both critical**, and it is the live caller
+  that makes `debrief.ts`'s `coachedMistakes` filter dead in production (§6.6). `[read]` today:
+  `buildDebrief` is still passed only `microQuiz` / `priorBestScore` / `conceptTitles`.
 
-Every row here is a test that is **green whether or not the behaviour it names exists**.
+### 2.3 — Class B · File opened, finding not addressed: ~618 of the 625
 
-1. **The touch-axis watchdog's runtime caller is grep-coverage only.** `[gated + adversarial]`
-   `platform/src/components/sim/touchPadRelease.test.tsx:425–426` assert
-   `expect(CODE).toContain("reconcileHeldAxes(touch, steerPad, drivePad)")` and
-   `toContain("AXIS_RECONCILE_MS")` against comment-stripped source. Deleting the `useEffect` that
-   actually runs the reconciliation and replacing it with `if (Number.NaN > 0) { …same text… }`
-   leaves the **entire suite green**. The pure function `reconcileHeldAxes` *is* genuinely covered in
-   both directions (3 reds for a no-op body, 2 for an unconditional release); the wiring is not.
-2. **`AXIS_RECONCILE_MS` is unpinned.** `[adversarial]` 250 ms → 3 600 000 ms: all green.
-3. **The watchdog's `if (!visible) return;` guard is unpinned.** `[adversarial]` Deleting it: all green.
-4. **The controls-legend auto-collapse interval body is unpinned.** `[adversarial]` Five mutations of
-   the leaf predicate each go red, but inserting `if (Date.now() > 0) return;` as the first line of
-   the interval body — every grepped string intact, the collapse permanently dead — is **green 10/10**.
-5. **`staged-exit-run.test.ts` claimed more than it tested** — closed in this pass, see R3.
-6. **Numbers the prose argues hardest for are the ones the tests do not hold.** `[adversarial]` In
-   `templates-following.ts`: `maxSpeedKmh 32 → 26` green, `1 → 3` green,
-   `acceptBeforeMarkM −2.9 → −0.01` green (anything in ≈(−3.6, 0) passes), truck → van green (no
-   height is ever proven).
-7. **`approach-cap-contract.test.ts` proves the rule on 3-tick fixtures**, not on drives, which is
-   why R6 above is invisible to it.
-8. **`debrief.ts`'s `coachedMistakes` filter is logic-correct and dead in production.**
-   `[adversarial]` `actions.ts:187` still passes only `microQuiz` / `priorBestScore` /
-   `conceptTitles`, so the filter has no live caller. Mutation-red, production-inert.
+The seven closures in §2.1 land in four files. Everything else in the 31 opened files is open for the
+same reason as Class A — nobody addressed it — with the aggravating difference that a reader looking
+at the diff will believe otherwise. The counts per file are in the table in §1 and in the per-file
+sections above; the closure delta is what §7 says does not exist.
 
-## 4 · Lessons still untested, and why — nothing here has moved
+### 2.4 — Class C · Addressed, and the address does not hold
 
-The four groups in «WHAT COULD NOT BE TESTED, AND WHY» are **unchanged by this wave**. No lesson was
-re-judged and no lesson was re-driven; what changed is that a re-drive can now *detect* its own
-failure (`tools/mobile/lib/frames.mjs` — zero-byte and truncated-PNG detection, 17/17 green,
-harness exits 3 with `phase: "signin-refused"` instead of writing stubs).
+Twelve rows: §4 R1–R8 carried from the previous pass with today's status, and N1–N5 opened by wave 2.
+These are the most dangerous rows in the document, because each one has a fix, a test and a paragraph
+of prose arguing it — and does not do what the prose says.
+
+### 2.5 — Class D · Cannot be closed by code in this repo
+
+- The two content-signature reds (§8) — a human signature, not a patch.
+- The 47 lessons in §5 that have never been judged or never been driven — a reader and a harness.
+- The evidence-integrity rows in §7 — a backup path and a bookkeeping field.
+
+## 3 · Wave 2, lane by lane — what survived refutation and what did not
+
+Every lane below was measured by an independent reviewer whose only task was to refute it. `[adversarial]`
+
+**Lane A · `rules/engine.ts`, repeat collisions — PARTIALLY FIXED.** The collision half survives
+whole (C3). The speeding half does not: the write-up claims «eleven rows for one continuous
+overspeed… now 10 points», and the run.log's own speed samples are a **saw-tooth** — 49 км/ч with
+dips to 1, 5, 6 and 20 км/ч in a zone the HUD shows as 20. Those dips sit at or under the limit, so
+`speedReset` fires and `speedingRearmSec: 4` re-arms a **new** bill that `repeatSec: 0` cannot reach.
+Replaying all 39 logged samples through the real reducer reproduces the photographed 11 exactly and
+then gives **2 (linear) / 6 (step)** after the fix. Directionally right; the headline is wrong by a
+factor of two to six, and **the re-arm path is untouched and open.**
+
+**Lane B · `components/sim/TouchControls.tsx` — FIXED, DIAGNOSIS NOT.** C4 and C5 hold. The lane's
+§2 explanation of *why* mobile legs are convicted (the four-clock pedal-vs-world ramp) was measured
+wrong by the reviewer. What is **not** in doubt and is open: the mobile-only conviction is real and
+reproduces today — `sc-zebra-approach · pc · right` = **ИЗДЪРЖАН · 0 наказателни точки · 3/3**,
+0 guard firings; the same lesson `· mobile · right` = **НЕИЗДЪРЖАН · 10 точки · 1/3**, «Настъпи
+сблъсък» + «Непропускане на пешеходец», 6 guard firings. 217 guard firings on **73 of 97**
+`mobile-right` legs against **1 of 98** `pc-right`. The cause is now unnamed again.
+
+**Lane C · `lessons/objectives.ts` — SURVIVES, and understates itself.** C1 + C2. The lane presented
+the rest gate as a fixture-only find; it fires on **81 % of shipped rungs**. Controlled swap:
+3,025 passed / 0 failed with the fix, 9 failed without it.
+
+**Lane D · `lessons/scenario/templates-signals2.ts` — NOT FIXED, and the lane says so.** The
+diagnosis survives every attack: the world clock burns before the first metre because
+`ScenarioDirectorImpl` stages runners in its **constructor**, `SignalController.tSec` advances on
+every unpaused frame, and `paused` does not cover the briefing card. **≥ 37 s** of dead time is a
+measured lower bound off `pc-right/04-t001s.png`. Both legs of the drill score **0 наказателни
+точки · MISTAKES (0)** at 59 км/ч. The reviewer implemented the delegated cure in
+`orchestrator/runners.ts` and measured it: at dead times 0/12/36/60/**120** s the reckless drive is
+convicted 10 т. every time and the careful drive passes every time, with all 57 controller-trace
+tests unchanged. **The cure is verified and NOT IN THE TREE.** Worse than the lane recorded: on the
+LIVE mirror `sc-sig-controller-live`, a *correct* careful drive is **falsely convicted 10 т.
+(опасна)** at 36 s of dead time. That is a correct student failed by a clock.
+
+**Lane E · `lessons/finish.ts` — NOT FIXED as reported.** C7 is real; the rest is §4 N3.
+
+**Lane F · `templates-following.ts` claim gates — rows closed, guards weaker than their prose.** §7
+and §10 are genuine: `maxSpeedKmh 32 → 26` produces **exactly one failure in 611 files / 9,603
+tests**, so the row was a real repo-wide hole and the new test is its sole guard; §10 survives four
+independent structural mutations. §8 and §9 do not guard the tightening direction at all — see §6.7.
+
+## 4 · Regressions and new defects — carried and new
+
+### Carried from the previous pass
+
+| | status today |
+|---|---|
+| **R1** `finish.ts` — widened annulus could stop a lesson from ever ending | **CLOSED for 41–47 m** by `FINISH_OUTSIDE_STUCK_S` (C7). The 0–40 m disc it also named is **open** — see N3. |
+| **R2** `finish.ts` — the defect being fixed is not reachable without ~13 m of reverse, and the census in the docstring is wrong (**ten** rungs move, not five: `sc-rb-ped-exit@L1–L5` moves too) | **OPEN.** `[read]` the docstring still says *„the same five rungs this constant was written for"*. Nobody corrected the census. |
+| **R3** `traffic/staged.ts` retirement run drove through the player | **CLOSED** (C6). The generalisation it named — that the file's own describe block is titled *„not a licence to drive through anything"* and only ever put an **ambient** car in the way — is **open**. |
+| **R4** `buildWorldGeometry.ts` — `d2-v1` still inherits the city's L7 parking bay, because the new default tests membership by **bounds** and `L7_PARKING_BAY` is inside `d2-v1`'s. `specs.ts:965` states the requirement as law | **OPEN, untouched by wave 2.** |
+| **R5** `tools/mobile/lesson-audit.mjs` — the 3-consecutive-loss breaker aborts lanes that would have produced frames, including verdict frames | **OPEN.** The detector under it (`tools/mobile/lib/frames.mjs`) is sound; the **policy** is the open part. |
+| **R6** `objectives.ts` — the approach cap can only bite inside `REACH_ZONE_GRACE_M` = 5 m, so over 40 honest accelerating drives it changes **nothing**; `sc-hz-breakdown-pulloff` still ticks at **145.1 км/ч** against a cap of 130 | **OPEN.** Wave 2 edited this file twice more and did not touch it. |
+| **R7** `rubric.ts` — the economy fix cannot change a star anywhere (95,160 cells → 1,020 deltas, **0 star-deltas**) | **OPEN as a description defect**: it is a copy fix and the write-up frames it as a withdrawn 2/2. |
+| **R8** WATCH · `LANE_TRUE_RADIUS_M` — ten lane/overtaking objectives moved to a **2.7 m** acceptance disc at L3–L5; every ideal shadow tape completes, no human line was ever measured | **OPEN, and unchanged.** First row to check if students report «направих го и не ми се призна». |
+
+### New, opened by wave 2
+
+**N1 · `engine.ts` — the collision latch is GLOBAL, not per-actor, and it can now swallow a real
+crash.** `[adversarial]` `leadSeenApartSinceContact` is one boolean on the engine state. Measured:
+hit a car at t = 0, then strike a **pedestrian** 30 s and 166 m later while tucked 0.3 m behind an
+unrelated lead vehicle — **2 bills before the fix, 1 after.** The unbilled event is a struck
+pedestrian. This is the one direction a scorer may never move, it is the exact defect class the
+episode rule exists to prevent in reverse, and the fix's own header concedes the shape of it
+(*„plumbing a stable actor id through `pushCollision` is the honest fix and is listed, not
+attempted, because that wire runs through LessonScene"*). **Open, and it is the highest-severity row
+this wave created.**
+
+**N2 · `engine.ts` — the опасна speeding count is 11 → 2–6, not 11 → 1.** See §3 lane A. The
+saw-tooth re-arm is untouched, so multi-row speeding bills for one continuous overspeed **still
+ship**. The docstring's measured table (200 s held at 70 in a 50 → 10 bills before / 1 after) is true
+of a *held* overspeed and not of the drives it was photographed on.
+
+**N3 · `finish.ts` — the stranded face closes an 8 m band while its table claims a 48 m disc, and it
+breaks the invariant it says it preserves.** `[adversarial]`
+- **The headline table is wrong for 6 of its 10 rows.** Driven on the real compiled lesson through
+  `applyTick`, 200 s of standstill: D = 0/10/20/30/36/39 m → **never ends**, 0/3 objectives, phase
+  `driving`. D = 41/42/44/46/47 → ends 75.0 s after the stop. D = 48 → ends at 20.0 s on the
+  pre-existing `FINISH_LEAVE_S` path. The docstring's own body says the 0–40 m disc still hangs and
+  is right; the summary table says all ten end. **The summary contradicts its source file on the one
+  number a founder reads.**
+- **„The arming circle's interior is untouched, so B1 holds exactly as written" is FALSE for the
+  turn box.** `finishAnchor` gives a `threePointTurn` an `armWithinM` of
+  `min(halfWidthM, halfLengthM)` — an **inscribed circle**, not the authored corridor. Poses
+  strictly *inside* the authored corridor therefore now sit in the „annulus" and end the drive at
+  75 s where they never ended before: `sc-maneuver-3point@L1` (corridor 8 × 12, arm 8) at (0, 71.5),
+  d = 11.5 → ends; `sc-maneuver-uturn@L1` (15 × 14, arm 14) at (14.5, 76), d = 14.5 → ends. **A
+  student pausing 75 s inside a manoeuvre box now has his lesson closed for him.**
+- The reviewer's verdict also records **one class of drive ending 20 s early**; only the headline is
+  in hand here, not the replay, and it is listed so it is not lost.
+
+**N4 · the new following gates do not guard the direction that hurts.** `[adversarial]`
+`sc-fs-stopped maxSpeedKmh 1 → 0` passes **611 files / 9,439 tests**. So does `1 → 0.4`. Every
+fixture rests at exactly `0.000 км/ч`, so no fixture can separate any cap in `[0, 1]` — while the
+template argues twenty lines for `1` = `STOPPED_SPEED_KMH` and its own comment says *„the reason the
+answer is not «demand zero and be done with it»"*. Demand zero and the gate says yes. Cap 0 also
+desynchronises the objective from the rule engine's `fullStopMaxSpeedKmh: 1`. §9's acceptance window
+straddles the rule engine's fault line, which is the defect class that file opens by naming.
+
+**N5 · the calibration reference is NOT deterministic, and three reviewers proved it against each
+other.** `[adversarial]` `sc-zebra-approach` is the lesson every lane drives to prove the harness is
+honest. On the **same PC right leg**: two reviewers measured **ИЗДЪРЖАН · 0 наказателни точки ·
+3/3 звезди**, and a third measured **НЕИЗДЪРЖАН · 10 точки · 1/3** with a dangerous
+«Непропускане на пешеходец» — reproducibly, across three runs at 08:13, 08:17 and later, failing on
+a *different* fault each time (one on «Настъпи сблъсък»). Its wrong leg meanwhile scored
+**0 наказателни точки with 0 mistakes convicted** while running 59 км/ч in a 50 zone with the КОЛАН
+telltale lit and an in-drive teach card reading «Превишена скорост» — and the debrief told that
+driver *„чисто каране без нито едно нарушение"*. **Consequence:** every claim in this programme of
+the form „I drove the reference and it was calibrated" is worth less than it reads, in both
+directions, and the drives that produced the corpus were produced by the same harness.
+
+## 5 · Lessons still untested, and why — nothing here has moved
+
+The four groups in «WHAT COULD NOT BE TESTED, AND WHY» are **unchanged by both waves**. No lesson was
+re-judged and no lesson was re-driven.
 
 | group | count | why it is still open |
 |---|---:|---|
-| **1 — judged before their frames were written** | **17** | Frames are on disk *now*, 4 lanes + 4 debriefs each. Needs a **reader**, not a harness. Cheapest coverage in the programme and nobody has spent it. |
-| **2 — genuinely produced nothing** | **7** | `sc-park-double` · `sc-park-judge` · `sc-pk-crossing-ban` · `sc-rx-barrier-drop` · `sc-rx-queue-clear` · `sc-rx-tram-island` · `sc-rx-tram-left`. Needs a **re-drive**. The harness lane is now instrumented for it — but see R5: the breaker can abort a lane that would have produced frames. |
+| **1 — judged before their frames were written** | **17** | Frames are on disk *now*, 4 lanes + 4 debriefs each. Needs a **reader**, not a harness. Cheapest coverage in the programme and nobody has spent it, twice running. |
+| **2 — genuinely produced nothing** | **7** | `sc-park-double` · `sc-park-judge` · `sc-pk-crossing-ban` · `sc-rx-barrier-drop` · `sc-rx-queue-clear` · `sc-rx-tram-island` · `sc-rx-tram-left`. Needs a **re-drive** — and see R5, the breaker can abort a lane that would have produced frames. |
 | **3 — never opened by anyone** | **5** | `sc-park-45` · `sc-park-narrow` · `sc-park-parallel` · `sc-park-parallel-exit` · `sc-park-perp-forward`. Complete frame sets, zero records. Still zero records. |
-| **4 — judged on fewer than 4 lanes** | **18** | Verdicts stand, coverage does not. **Nine** of them were judged on a **single** lane: `sc-merge-bus-pullout` · `sc-merge-motorway-exit` · `sc-park-night` · `sc-pk-busstop-ban` · `sc-rb-exit-signal` · `sc-rx-guarded` · `sc-rx-unguarded` · `sc-sig-controller-live` · `sc-signal-controller`. A one-lane verdict cannot answer question 2 against question 3 — it saw either the right drive or the wrong one, never both. |
+| **4 — judged on fewer than 4 lanes** | **18** | **Nine** on a single lane: `sc-merge-bus-pullout` · `sc-merge-motorway-exit` · `sc-park-night` · `sc-pk-busstop-ban` · `sc-rb-exit-signal` · `sc-rx-guarded` · `sc-rx-unguarded` · `sc-sig-controller-live` · `sc-signal-controller`. A one-lane verdict cannot answer question 2 against question 3. |
 
-And the residual under all four: **the ten devrig findings are NOT fixed and the lane says so
-itself.** `[gated]` `tools/mobile/lesson-audit.mjs:837` is still `const CRUISE_KMH = 12`, `:857`
-`ROLL_DISTANCE_M = 15`, `:859` `STOP_MS = 3000` — a roll-15 m/stop-3 s phase machine driving a
-motorway lesson whose briefing asks for 110–130 км/ч. That is the `0 → 11 → 2 → 0` signature in the
-frames, and it means **every motorway and speed lesson in the sweep was judged from a drive the
-harness could not perform**. `driveScript.ts` was repaired (18/18 mutations red); the harness
-constants that actually drive the sweep were not.
+And the residual under all four, **re-verified today** `[read]`: `tools/mobile/lesson-audit.mjs:837`
+is still `const CRUISE_KMH = 12`, `:857` `ROLL_DISTANCE_M = 15`, `:858` `STOP_MS = 3000` — a
+roll-15 m / stop-3 s phase machine driving motorway lessons whose briefings ask for 110–130 км/ч.
+**Every motorway and speed lesson in the sweep was judged from a drive the harness could not
+perform.** `driveScript.ts` was repaired in wave 1; the constants that actually drive the sweep were
+not, in either wave.
 
-## 5 · Evidence-integrity items opened by this wave
+Carried with it: `sc-mw-min-speed`-class runs still finish **НЕИЗДЪРЖАН with 0 fault points** when
+the route runs out. `[frame]` `sc-mw-min-speed/pc-right/08-debrief.png`: «0 наказателни точки» ·
+НЕИЗДЪРЖАН · «Урокът беше прекъснат преди края.» · 1 star. That lives in `lessons/finish.ts` /
+`scenario/progress.ts` — and `progress.ts` is the largest untouched bucket in §2.2.
 
-- **`.gitignore` now ignores `.audit-frames/`.** Correct for repo size, and it means **the entire
-  evidence corpus for this document — 16 272 readable frames and 24 JSONL files — exists on one
-  7 200 rpm HDD and nowhere else.** Every «A finding without a frame is not a finding» row above is
-  one disk failure from being unverifiable. No backup path is defined.
-- **This file claims to be generated and its generator is not in the tree.** No `build.js` exists
-  under `.audit-frames/` or anywhere else, so the byte-for-byte reproduction claim in the header
-  cannot be exercised. Either commit the generator or downgrade the claim.
-- **There is no per-finding closure ledger.** 1 012 BROKEN rows and no field on any of them that
-  says *closed by*, so "how much of the sweep is repaired" is currently answerable only as
-  "30 of 138 files were touched" — which is item 1, and which is not the same question.
+## 6 · Tests that guard nothing
 
-## 6 · Known-red, NOT a blocker, and needing a signature no agent may give
+Every row is a test that is **green whether or not the behaviour it names exists**.
 
-Two suite failures stand and are **deliberately not repaired here**, because repairing them would
-mean an agent signing content that only a human may sign:
+1. ~~The touch-axis watchdog's runtime caller is grep-coverage only~~ — **CLOSED** (C5).
+2. ~~`AXIS_RECONCILE_MS` is unpinned~~ — **CLOSED** (C5).
+3. ~~The watchdog's `if (!visible) return;` guard is unpinned~~ — **CLOSED** (C5).
+4. **The controls-legend auto-collapse interval body is unpinned.** `[adversarial]` Five mutations of
+   the leaf predicate each go red, but inserting `if (Date.now() > 0) return;` as the first line of
+   the interval body — every grepped string intact, the collapse permanently dead — is green 10/10.
+   **Open.** `components/lesson-ui/controlsLegendLifetime.ts` was not re-opened in wave 2.
+5. **`touchPadRelease.test.tsx` §6 still asserts by spelling.** `[read]` `:625`
+   `expect(CODE).toContain(edge)` over comment-stripped source is exactly the construction §7 was
+   rewritten to remove — it catches a deleted string and not a dead handler. The lane's own reviewer
+   reports one guard in this file still inert. **Open.**
+6. **`debrief.ts`'s `coachedMistakes` filter is logic-correct and dead in production.**
+   `[read]` today: `app/(dashboard)/simulator/actions.ts` still passes only `microQuiz` /
+   `priorBestScore` / `conceptTitles` to `buildDebrief`. Mutation-red, production-inert. **Open** —
+   and that file is in the never-opened list of §2.2 with 2 critical findings of its own.
+7. **`following-claim-gates.test.ts` §8/§9 do not hold the tightening direction** — N4. **Open.**
+8. **`approach-cap-contract.test.ts` proves the rule on 3-tick fixtures**, not on drives, which is
+   why R6 is invisible to it. **Open.**
+9. **New: nothing in the tree gates two lanes against each other.** Twice now (`session-end-numbers`
+   in wave 1, `finish-outside-annulus` + `sweep161-fault-episodes` in wave 2) a file has been red in
+   a reviewer's tree and green in the finished one because two correct lanes disagreed about a
+   fixture. Nothing detects that except a full run at the end, and a full run at the end is 344 s
+   that only the last lane pays. **Open, process.**
+
+## 7 · Evidence integrity and bookkeeping
+
+- **The generator claim in the header is repaired, not satisfied.** `[gated]` `find . -name build.js`
+  outside `node_modules` returns **nothing**; there is no generator in the tree and there never was
+  one committed. The header now states the **recomputation rule** instead — re-read the 24 JSONL
+  files, drop every record for a `scenario` re-driven in `chunk-redrive.jsonl` except the re-drive's
+  own rows — which was re-run today and reproduces 1,686 / 1,012 / 318 / 138 exactly. **The prose is
+  still not regenerable and is not claimed to be.** Committing the generator remains open.
+- **`.gitignore` ignores `.audit-frames/`.** Correct for repo size, and it means the entire evidence
+  corpus for this document — **16,272 readable frames and 24 JSONL files** — exists on **one
+  7,200 rpm HDD and nowhere else**. Every «A finding without a frame is not a finding» row above is
+  one disk failure from unverifiable. No backup path is defined. **Open.**
+- **There is still no per-finding closure ledger.** This is why §2 can only be honest at file
+  granularity, and it is now the single largest piece of missing bookkeeping in the programme: after
+  two waves the answer to *„how much of the sweep is repaired"* is **„7 named findings of 1,012, in
+  4 files of 138"**. The fix is one field on the record — `closedBy` (commit or file:symbol) plus
+  `closedEvidence` (the test that goes red without it) — and a rule that no lane may claim a row
+  without filling both. **Open.**
+
+## 8 · Known-red, NOT a blocker, and needing a signature no agent may give
+
+Two suite failures stand and are **deliberately not repaired**, because repairing them would mean an
+agent signing content only a human may sign. `[gated]`
 
 | red | what it is |
 |---|---|
-| `src/modules/exam/__tests__/content-bank.test.ts` › *has no dark, threadbare or under-represented topic* | **`ptp-i-parva-pomosht` is 31/64 approved against a 50 % floor.** The remaining items need human review before they may be dealt to a student — and the validator's own line is the reason it matters: *"human-approved (signed, hash matches): 0 of 1089 — this is the only tier a student may be dealt as authoritative"*, while 796 unsigned "approved" rows are dealt today. |
-| `src/modules/lesson/__tests__/compose.test.ts` › *gives every lesson at least one quiz beat* | **`l-accidents-first-aid` has no quiz beat.** Authoring one is content work on the first-aid module, which is exactly the topic above. |
+| `src/modules/exam/__tests__/content-bank.test.ts` › *has no dark, threadbare or under-represented topic* | **`ptp-i-parva-pomosht` is 31/64 (48 %) approved against a 50 % floor** — `REVIEW_DEBT`, most of the topic withheld from exams. The validator's own line is why it matters: *„human-approved (signed, hash matches): 0 of 1089 — this is the only tier a student may be dealt as authoritative"*, while **796 unsigned „approved" rows are dealt to students today**. |
+| `src/modules/lesson/__tests__/compose.test.ts` › *gives every lesson at least one quiz beat* | **`l-accidents-first-aid` has no quiz beat.** Authoring one is content work on the first-aid module — which is the same topic as the row above. |
 
-Both are content-signature items. They are red on purpose and they should stay red until a human
-signs, rather than be muted.
+Both are content-signature items. They are red on purpose and must stay red until a human signs,
+rather than be muted.
 
-## 7 · Housekeeping left in the tree (named, not deleted)
+## 9 · Housekeeping still in the tree — verified present today
 
-Deleted in this pass: six probe PNGs under `tools/clips/headless/.park10/` (`BEFORE-*`, `AFTER-*`,
-`ZOOM-*` — the world-geometry before/after shots) and the whole of `tools/clips/headless/.zebra/`.
-Two **tracked** reference frames that a probe had deleted —
-`tools/clips/headless/.park10/sc-park-gap-short-cockpit.png` and `-overhead.png` — were **restored**;
-they are committed corpus and no lane's report claims them.
-
-Left in place, because they belong to other sessions and deleting a build dir out from under a
-running one is worse than naming it: **23 gitignored `platform/tsconfig.next-*.json` stubs** (35
-bytes each, 2026-08-11 → 08-17) and **three stale scratch dist dirs** —
-`platform/.next-rig` (08-11), `platform/.next-w2inset` (08-16), `platform/.next-simoverlay` (08-17).
-`platform/AGENTS.md` is explicit that these inject phantom `tsc` errors and that each runs
-0.2–1.1 GB on a box the founder's own notes call chronically squeezed. They should go.
-
+`[gated]` Unchanged since the previous pass, so it is now a standing item rather than a note:
+**23 gitignored `platform/tsconfig.next-*.json` stubs** (35 bytes each) and **three stale scratch
+dist dirs** — `platform/.next-rig` · `platform/.next-w2inset` · `platform/.next-simoverlay`.
+`platform/AGENTS.md` is explicit that these inject phantom `tsc` errors and that each dist dir runs
+0.2–1.1 GB on a box the founder's own notes call chronically squeezed. They belong to other sessions,
+which is why they have not been deleted from under a running one — but they are still here.

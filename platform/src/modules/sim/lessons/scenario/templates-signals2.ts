@@ -464,11 +464,39 @@ const SX_LANE = 4.0625;
  * red one proves the point twice — the officer's halt REPLACES the lamp grading,
  * so it is never RED_LIGHT_CROSSED.
  *
- * ACCEPTED CONSEQUENCE (instructionsBg step 4 exists for it): the permission
- * window rides the SESSION clock and the schedule carries ONE flip
- * (SignalControllerSchedule), so a student who dawdles past t = 26 is halted for
- * the rest of the attempt and must retry. That is the drill: the officer's wave
- * is an instruction with an expiry, not a standing offer.
+ * THE „ACCEPTED CONSEQUENCE" WAS NOT ACCEPTABLE — IT WAS THE WHOLE LESSON
+ * (sweep 161, 2026-08-16; measured, not argued). This header used to say: the
+ * permission window rides the SESSION clock and carries ONE flip, so a student
+ * who dawdles past t = 26 is halted and must retry — „the officer's wave is an
+ * instruction with an expiry". The premise under it was that the dawdling is
+ * the student's. It is not. `ScenarioDirectorImpl`'s constructor stages every
+ * runner (director.ts), so `setSignalClusterController` is posted at SCENE
+ * MOUNT, and `SignalController.tSec` — the clock `controllerPermission` and
+ * `figureState` both compare `flipAtSec` against — advances on every unpaused
+ * frame from that moment (LessonScene `runtime.update(dt)`), i.e. through the
+ * arrival card, the briefing, the touch hint and the 51-second L1
+ * demonstration that auto-plays before anyone touches the throttle.
+ *
+ * MEASURED OFF THE SWEEP'S OWN FRAMES: on the desktop legs of the sibling
+ * drill the ghost demo's transport reads 0:37 / 0:51 in `04-t001s.png` — 36 s
+ * of world clock spent before the first metre, twice. THIS drill's own frames
+ * show what that buys it: the audit reports the officer's caption reading
+ * «СПРИ» from `sc-sig-controller-live/mobile-right/01-arrival.png` straight
+ * through t012s, i.e. the POST-flip posture from the moment the student first
+ * sees the junction — and TrafficLayer picks that caption off `fig.halted`,
+ * the same schedule read `controllerPermission` grades with. The auditor found
+ * the identical inversion on sc-signal-controller and wrote it plainly: „by
+ * 03-ready — before the student has moved — it has already flipped".
+ *
+ * SO THE PERMISSION WINDOW THIS TEMPLATE IS BUILT ON IS ALWAYS ALREADY SHUT,
+ * and the drill inverts: the student never meets the profile he is told to act
+ * on, only the chest that comes after it. Nothing here is authored wrong —
+ * `flipAtSec` needs a clock that starts when the DRIVE starts. The exact fix
+ * is one latch in `TrafficControllerRunner` (see the twin note on
+ * SC_SIG_CONTROLLER_POSTURES below, which carries it); this file cannot reach
+ * it, and no constant here can stand in for it — the dead time is unbounded
+ * (a student may read the briefing for a minute), so any number big enough to
+ * survive it is a number the careful driver waits out at the line.
  *
  * Grading is 100% the production pipeline: the runtime attaches the permission
  * to stopLineCrossed and the reducer grades it (halt → CONTROLLER_SIGNAL_VIOLATED
@@ -715,16 +743,81 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
  * VIOLATED regardless of lamp, proceed → innocent). Both mistakes cross while
  * the officer halts the approach — barging past his chest, and false-starting
  * on the raised arm — so both grade EXACTLY that opasna code (ЗДвП чл. 7).
+ * THAT SENTENCE IS TRUE OF THE RECORDED DRIVES AND NOT OF A LIVE ONE, and the
+ * difference is the whole defect below: a trace starts driving at t ≈ 0 and
+ * meets the halt; a student starts at t ≈ 36 s and never does.
  * HESITATION_AT_GREEN is structurally unreachable: with a controller posted a
  * halted approach reads „red" however the dark lamp renders, so the wait at
  * the line is never billed — only moving against the posture is. The figure
  * (pose "directTraffic", ADR-001 fictional) is the visual anchor; the authored
  * timetable encodes the posture the drill grades.
  *
- * ACCEPTED CONSEQUENCE (instructionsBg step 4 exists for it): the permission
- * rides the SESSION clock and the schedule carries ONE flip — a student who
- * has not read the officer by the flip still gets his „go" at t = 30; the
- * drill is reading the posture, not racing a stopwatch.
+ * THE LESSON CONVICTS NOBODY, AND THE REASON IS THE CLOCK — NOT THE MAP, THE
+ * RULE, THE ACTOR OR THE LIMIT (sweep 161, 2026-08-16). The audit drove this
+ * drill at L1 on a phone and a desktop, twice each: the reckless leg passes the
+ * регулировчик at 59 км/ч without slowing and collects «0 наказателни точки ·
+ * mistakes=0» on BOTH platforms, while the careful leg gets ИЗДЪРЖАН 0 т. and
+ * three stars. One verdict for two opposite drives is not a grading bug — it
+ * is a drill whose only gradeable event never arms.
+ *
+ * WHERE IT GOES, MEASURED THROUGH THE PRODUCTION STACK (the §1 battery in
+ * __tests__/signals2-controller-clock.test.ts replays both drives through
+ * compileScenario → recordScriptedDrive → createLessonSession/applyTick):
+ *
+ *   pre-drive 0 s   → the 59 км/ч crossing carries controller "halt" at
+ *                     t = 8.4 s → CONTROLLER_SIGNAL_VIOLATED, 10 наказателни т.
+ *   pre-drive 36 s  → the SAME drive crosses at t = 43.4 s carrying "proceed",
+ *                     over a lamp the runtime reports RED, and bills NOTHING.
+ *
+ * 36 s is not a guess: the sweep's own desktop frames time it. The ghost demo's
+ * transport reads 0:37 / 0:51 in `04-t001s.png` of both pc-right and pc-wrong —
+ * the world clock had run for 36 s before the first metre, because
+ * `ScenarioDirectorImpl` stages every runner in its CONSTRUCTOR (director.ts)
+ * and `SignalController.tSec` then advances on every unpaused frame of the
+ * arrival card, the briefing, the touch hint and the 51-second L1 demonstration
+ * that auto-plays there. `flipAtSec: 30` is spent before anyone drives. On the
+ * phone the officer says so himself: `mobile-right/04-t002s.png` already paints
+ * the SIDE-PROFILE bubble («МИНАВАШ ТИ · Предимството е ТВОЕ — дори на червено»)
+ * at the second metre of a drill whose instruction 3 asserts he is chest-on.
+ * After the single flip the halt sits on "ew" for the rest of the session, so
+ * `controllerPermission("ns")` answers "proceed" to every crossing there will
+ * ever be and CONTROLLER_SIGNAL_VIOLATED — the ONLY code this template can
+ * produce — is structurally unreachable. The pass is as hollow as the acquittal:
+ * the careful driver is credited for obeying a posture that was never shown.
+ *
+ * WHY NO NUMBER IN THIS FILE FIXES IT, arithmetic rather than opinion (§3 of
+ * that battery asserts it): a constant `flipAtSec` F must clear the reckless
+ * crossing (F > deadTime + 8.4) and still release the careful driver, who is at
+ * the line by deadTime + 15. The dead time is unbounded — 0 s for a student who
+ * skips the demo, 36 s measured, more for one who reads the briefing — so the F
+ * that convicts the slowest start makes the fastest start wait ~50 s at a line
+ * with nothing happening. There is no F. The flip has to be counted from the
+ * student's own start, and that is exactly what the shipped
+ * PedestrianDartOutSpec.triggerEtaSec precedent did for the zebra hazard that
+ * careful driving switched off: the authored seconds stay, the clock they are
+ * counted on becomes the student's. The signals family has already conceded
+ * the same point once, for the lamp: sc-signal-hesitation carries
+ * `signalPlan: { arm: "greenFresh", triggerM: 45 }` because „wall-clock arrival
+ * could land on red and turn the anti-hesitation drill into a red wait". The
+ * officer's timetable needs exactly that treatment and never got it — which is
+ * also why the „NO signalPlan (deliberate)" note below is right as far as it
+ * goes: rebasing the LAMP alone would desync it from a SESSION-time flip. Both
+ * clocks move, or neither.
+ *
+ * THE FIX, WHICH IS NOT IN THIS FILE (orchestrator/runners.ts,
+ * TrafficControllerRunner — two lanes may not share it): do not post
+ * `flipAtSec` in `stage()`. Post the schedule with the halt alone — a static
+ * halt is the correct pre-drive state, the officer is holding the axis for as
+ * long as the briefing lasts — and in `step()`, on the FIRST frame the player
+ * is genuinely under way, latch `input.tSec + spec.flipAtSec` and re-post the
+ * schedule with that absolute flip. One latch, no RNG, deterministic per drive.
+ * Every committed recording is untouched: the trace scripts start driving at
+ * t ≈ 0, so the rebase lands on the authored 30 and the §5/§9 gates in
+ * traces/__tests__/sc-sig-controller-postures-traces.test.ts grade the same
+ * codes at the same times. §2 of the battery proves the cure by handing the
+ * recorder the rebased schedule at four dead times: the 59 км/ч drive is
+ * convicted at every one of them, and the careful drive still passes at every
+ * one of them.
  *
  * Geometry pinned to sx-v1 (battery sx-district.test.ts): single-node cluster
  * sx-n-c at the origin; south-approach stop line 27.725 m south of it

@@ -257,8 +257,83 @@ export const FINISH_LEAVE_S = 20;
  * perceptual exaggeration, the same pitch FINISH_LANE_FLOOR_M is derived from
  * — rounded down: a car that has genuinely left a work site is at least a lane
  * clear of it, and a car being shuffled about at its edge is not.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-18, LATER THE SAME DAY — „~1 s AT DRILL SPEED" ASSUMED A DRILL SPEED.
+ * The paragraph above costs a car that is genuinely leaving eight metres, and
+ * that is true of every car that is still moving. A car that has STOPPED in
+ * the band travels them never, and the band is then not a delay but a wall.
+ *
+ * MEASURED by driving the compiled `sc-sig-green-wave` L1 (the same five rungs
+ * this constant was written for) through `applyTick`, stopping the car a swept
+ * distance past its terminal node and holding it there 200 s. Stops at 0, 10,
+ * 20, 30, 36, 39, 41, 42, 44 and 46 m past tl3 all ran the full 200 s of
+ * standstill ticks with the phase still "driving" and 0 of 3 objectives
+ * ticked; the stop at 48 m ended at 95.3 s. With the band at zero the
+ * departure circle is the arming circle, so every one of those rests from
+ * 41 m out is in the region and trips on FINISH_LEAVE_S instead — this
+ * constant turned a working ending into a trap for a car resting in 40–48 m.
+ *
+ * FINISH_OUTSIDE_STUCK_S below closes that band. It does NOT close the 0–40 m
+ * disc inside the arming circle, which never had an ending either and is B1's
+ * deliberate ruling rather than this constant's doing; see that constant for
+ * what remains open there and why widening into it is a different decision.
  */
 export const FINISH_OUTSIDE_ANNULUS_M = 8;
+
+/**
+ * THE STRANDED FACE of an "outside" gate — seconds at a FULL STANDSTILL in the
+ * ANNULUS before the drive is closed where it stands.
+ *
+ * WHY IT HAS TO EXIST AT ALL. The band above is a margin, not a place: it is
+ * neither the work site (which B1 protects, and still does — the arming
+ * circle's interior is untouched by this) nor the far side. A car MOVING
+ * through it is doing exactly what the band was drawn for and is left alone.
+ * A car that STOPS in it has no exit at all: it is not in the region, so the
+ * departure dwell never runs, and it is not moving, so the region never
+ * arrives. Every other anchor in the file has a standstill face —
+ * FINISH_STUCK_S at a waypoint, FINISH_BAY_STUCK_S beside a bay — because
+ * every other anchor can be stood in. This is that face for the one shape that
+ * shipped without one, and the bar is what separates „paused" from „not going
+ * anywhere".
+ *
+ * MEASURED AGAINST REAL DRIVES, not against the shadow tapes — the tapes are
+ * ideal and would only prove that an ideal driver never pauses. Every run.log
+ * of the sweep161 audit (332 lanes, 174 scenarios, 7,398 speed samples at a
+ * 5.2 s cadence) was walked for maximal runs of |v| ≤ FINISH_STANDSTILL_KMH
+ * that the drive RESUMED from — i.e. pauses a real student took and then drove
+ * on out of, which is exactly the thing this bar may not cut short. Of 1,569
+ * such pauses:
+ *      longest   69 s  sc-ed-d2-priority-run · mobile · right (t 65 → 134)
+ *      next four 45 / 43 / 43 / 43 s — sc-ed-d2-priority-run,
+ *                sc-merge-from-property and two roundabout give-way waits
+ *                (sc-rb-circulate-priority, sc-rb-ped-exit)
+ *      p99 21 s · p95 6 s · median 0 s
+ * 69 s is a SAMPLED length, so the true pause is at most one cadence longer:
+ * 69 + 5.2 = 74.2 ⇒ 75. Above the longest standstill any of the 332 audited
+ * drives ever resumed from, and 1.7× the worst roundabout give-way wait in the
+ * set — which is the case this bar is most likely to meet, because B15's
+ * lawful-wait window opens at `enterRadiusM` and a car nosed INSIDE it gets no
+ * hold (`yieldReasonAt` case 5, `d > p.enterRadiusM`).
+ *
+ * Deliberately NOT applied to "inside" zones: they already have their own
+ * standstill faces and their own measured bars, and every one of them stays
+ * bit-identical. B15's freeze applies here exactly as it does to the rest of
+ * the module — a lawful wait is evidence of nothing, and the engine drops the
+ * partial dwell on every frame of one, so a wait cannot be banked toward this.
+ *
+ * WHAT IS STILL OPEN, AND IS NOT THIS BAND'S TO CLOSE. The arming circle's
+ * INTERIOR has no automatic ending either, and never had one — that is B1's
+ * ruling and its own test. It costs nothing on a roundabout (a 24 m ring the
+ * student is working) or a turn box (an 8 m corridor), but `passSignal` arms
+ * on the objective's GRADING radius rather than on a work site, so on
+ * `sc-sig-green-wave` the ending-free disc is 40 m in every direction from the
+ * node — measured above: a car resting 0–40 m past tl3 still runs out the
+ * capture with the drive live. Closing that means giving the `passSignal`
+ * anchor an arm that describes the junction instead of the acceptance ring,
+ * which changes when drives ARM and is a founder-visible call, not a widening.
+ */
+export const FINISH_OUTSIDE_STUCK_S = 75;
 
 // ---------------------------------------------------------------------------
 // FR-B5-JAM (doc 87, 2026-08-05) — THE CRASH PIN
@@ -399,9 +474,14 @@ function targetPoint(params: ObjectiveParams): Point | null {
  *
  * `forRescue` asks for the anchor's OTHER face: the same place, but with the
  * evidence a stuck TERMINAL objective needs instead of the evidence a stalled
- * chain needs (see `terminalRescueZone`). An "outside" anchor has only one
- * face — leaving the work site already proves the work is over — so the flag
- * does nothing there.
+ * chain needs (see `terminalRescueZone`). The flag does nothing for an
+ * "outside" anchor, and that is a fact about WHERE the second face lives
+ * rather than about it having none: an outside zone carries both faces at once
+ * (departure, and the FINISH_OUTSIDE_STUCK_S standstill), and `stepFinishGate`
+ * picks between them from the pose. It cannot be split into two zones here —
+ * the engine consults the stalled-chain zone only while the chain is NOT on
+ * its terminal objective, so a rescue zone that dropped the departure face
+ * would silently delete the ending of every drive that reaches the last gate.
  */
 function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZone | null {
   switch (params.kind) {
@@ -525,10 +605,16 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
  * constant for the five rungs that shipped with the circles coincident and
  * what a car standing at a green light one metre outside them cost.
  *
- * Both operations are one-way and in the safe direction: the arm can only
- * shrink to the zone it belongs to, and the region can only grow, so no drive
- * that ends today stops ending — a car that has genuinely left the work site
- * simply travels the band before it counts.
+ * Both operations are one-way: the arm can only shrink to the zone it belongs
+ * to, and the region can only grow. THAT IS NOT THE SAME AS SAFE, and the
+ * sentence that used to stand here („no drive that ends today stops ending —
+ * a car that has genuinely left the work site simply travels the band before
+ * it counts") was false for the only car that matters: one that has stopped.
+ * Growing the region moved 40–48 m out of „left" and into „neither", and a car
+ * resting there travels nothing, ever — measured on `sc-sig-green-wave` L1 at
+ * FINISH_OUTSIDE_ANNULUS_M. The band is honest; what it needed was a floor in
+ * TIME as well as one in distance, and that is FINISH_OUTSIDE_STUCK_S in
+ * `stepFinishGate`.
  */
 function normalizeOutside(zone: RouteFinishZone): RouteFinishZone {
   const armWithinM = Math.min(zone.armWithinM ?? zone.radiusM, zone.radiusM);
@@ -608,8 +694,11 @@ export function routeFinishZone(objectives: readonly ObjectiveParams[]): RouteFi
  *    approach, a creep toward the mark and a park shuffle all keep moving,
  *    and a red-light wait ends by itself.
  *
- * An "outside" anchor needs neither change — leaving the work site already
- * means the work is over — so it is returned as-is.
+ * An "outside" anchor needs neither change: leaving the work site already
+ * means the work is over, and the standstill evidence the other two anchors
+ * get from this function it gets from `stepFinishGate` instead
+ * (FINISH_OUTSIDE_STUCK_S), on the same zone, because this zone is also the
+ * only one the engine consults on the terminal objective.
  */
 export function terminalRescueZone(
   objectives: readonly ObjectiveParams[],
@@ -688,6 +777,21 @@ export const ROUTE_RUNOUT_ARRIVE_M = FINISH_MIN_RADIUS_M;
 
 /**
  * The ceiling on a run-out, seconds. Past it the drive ends where it stands.
+ *
+ * IT IS NOT A SESSION BACKSTOP, and the block above says „the backstop that
+ * makes hanging impossible" about a great deal less than it sounds like.
+ * Asked (2026-08-18) why this did not save the car stranded 42–48 m past
+ * `sc-sig-green-wave`'s terminal node, the answer is two independent noes and
+ * neither is a defect in the run-out:
+ *   1. IT IS NEVER ARMED FOR A STRANDED DRIVE. `engine.ts` arms it in the
+ *      `currentIndex >= objectives.length` branch — i.e. only once every task
+ *      is DONE. A car stranded with its terminal objective open has a chain
+ *      that never completes, so this clock never starts. The run-out bounds
+ *      the drive AFTER the tasks, and nothing else;
+ *   2. even armed, `routeEndMark` is null for a `passSignal` terminal (see it
+ *      for why), and a null mark terminates on the spot rather than counting.
+ * The only thing that can end a stranded drive is a finish gate, which is why
+ * the fix for that car is FINISH_OUTSIDE_STUCK_S and not a number here.
  *
  * Derived from the run-out's own worst case, which is bounded by construction:
  * the car starts inside the terminal ring, so it is at most that radius from
@@ -1079,6 +1183,18 @@ export function createFinishGate(): FinishGateState {
  * zone demands a stop — latch `reachedAtSec`. Any disqualifying frame restarts
  * the count. The latch is permanent: the engine ends the session on that same
  * frame, and nothing can un-finish a finished drive.
+ *
+ * STRANDED (2026-08-18). An "outside" zone has a SECOND qualifying state, and
+ * it is the one it shipped without: armed, at a full standstill, and IN THE
+ * ANNULUS — past the arming circle, short of the departure one. That is a car
+ * that has reached the work site, left it, and then stopped in the margin this
+ * module draws around it; it will never reach the region, because reaching the
+ * region is what it has stopped doing. It counts against FINISH_OUTSIDE_STUCK_S
+ * instead of `zone.dwellSec`; see that constant for the audit the bar is
+ * measured from. Motion in the band still qualifies for nothing at all — every
+ * shuffle, hover and queue-nudge the band exists for is unaffected — and the
+ * arming circle's interior is untouched, so B1's „standing still in the middle
+ * of the work can never end a drive" holds exactly as written.
  */
 export function stepFinishGate(
   prev: FinishGateState,
@@ -1098,7 +1214,31 @@ export function stepFinishGate(
   const arming = outsideMode ? d <= (zone.armWithinM ?? zone.radiusM) : d > zone.radiusM;
   const armed = prev.armed || arming;
 
-  if (!inRegion) {
+  // The stranded face, above — THE BAND ONLY, never the arming circle it
+  // guards. Inside `armWithinM` is the work site, and B1's rule there is not
+  // being amended: standing still in the middle of the work still cannot end a
+  // drive, at any duration (`route-finish.test.ts` pins two motionless minutes
+  // on the ring). The band is not the work site — it is the margin this module
+  // added around it — and a car resting in a margin is the one case with
+  // nowhere to go.
+  //
+  // The two dwells are geometrically exclusive, so one `insideSinceSec` times
+  // both and the threshold is read off THIS frame's pose. They are adjacent at
+  // `radiusM`, so a clock could in principle be carried across it — but only
+  // by a car that crosses the whole band without once exceeding
+  // FINISH_STANDSTILL_KMH (≥ 29 s of continuous sub-1-km/h creep over the
+  // 8 m), which is one unbroken standstill by any reading and would have spent
+  // this bar where it stood. Any real crossing spends a frame in the band
+  // MOVING, which qualifies for neither and clears the count.
+  const stranded =
+    outsideMode &&
+    armed &&
+    !inRegion &&
+    d > (zone.armWithinM ?? zone.radiusM) &&
+    Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH;
+  const dwellSec = inRegion ? zone.dwellSec : FINISH_OUTSIDE_STUCK_S;
+
+  if (!inRegion && !stranded) {
     // Outside the finish region: clears any partial dwell, and may arm.
     return armed === prev.armed && prev.insideSinceSec === null
       ? prev
@@ -1116,7 +1256,7 @@ export function stepFinishGate(
   }
 
   const since = prev.insideSinceSec ?? tick.t;
-  if (tick.t - since >= zone.dwellSec) {
+  if (tick.t - since >= dwellSec) {
     return { armed, insideSinceSec: since, reachedAtSec: tick.t };
   }
   return prev.insideSinceSec === since && prev.armed === armed

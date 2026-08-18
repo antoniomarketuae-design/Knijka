@@ -198,3 +198,194 @@ describe("wrong-way — one run, one bill", () => {
     expect(wrongWayBills(ticks)).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 4 · the shunt — one contact, thirteen accidents
+// ---------------------------------------------------------------------------
+//
+// `.audit-frames/sweep161/sc-ov-solid-return/mobile-wrong/08-debrief.png`:
+// «130 наказателни точки», thirteen identical «Пътнотранспортно произшествие
+// −10 изпитни т.» rows, printed under the card's own sentence that the ten is
+// the price of the single act. `sc-ln-boulevard-discipline / mobile-wrong`
+// printed fourteen. The mid-drive frame `04-t072s.png` shows what was actually
+// happening: 4 км/ч, the shunted truck filling the windscreen with its red band
+// across the bonnet, and the HUD's «+2» repeat counter — one contact that never
+// broke, billed for coming apart.
+//
+// The travel gate could not see it because it measured PATH, and a shunt is
+// precisely the contact that supplies path without supplying separation: at
+// 4 км/ч the 2 m floor is crossed in 1.8 s.
+
+/**
+ * ONE UNBROKEN CONTACT, `durSec` long, with the car creeping forward at `kmh`
+ * still inside what it hit — `leadGapM` never leaves the bumper — while the
+ * reporter re-fires only every `cadenceSec`. That cadence is the variable and
+ * not the fault: it is a property of the DEVICE (the rapier shell pool re-arms
+ * a sustained contact only when it rebinds), which is why the same script
+ * scored thirteen on a phone and five on a desktop.
+ */
+function shunt(durSec: number, kmh: number, cadenceSec: number): SimTick[] {
+  const out: SimTick[] = [];
+  let nextReport = 0;
+  for (let t = 0; t <= durSec; t += 0.25) {
+    const reports = t >= nextReport;
+    if (reports) nextReport = t + cadenceSec;
+    out.push(
+      tick(t, {
+        speedKmh: kmh,
+        leadGapM: 0.1, // bumper against bumper: never once apart
+        events: reports ? [{ kind: "collision", withWhat: "vehicle" }] : [],
+      }),
+    );
+  }
+  return out;
+}
+
+const crashBills = (ticks: SimTick[]): number =>
+  codes(drive(ticks).events).filter((c) => c === "COLLISION").length;
+
+describe("contact — one shunt, one accident", () => {
+  it("bills ONCE however slowly the reporter re-fires — the whole 13-row card", () => {
+    // The measured table. Before: 1 / 46 / 23 / 13 bills. The last is the
+    // photographed «130 наказателни точки», to the row.
+    for (const cadenceSec of [0.5, 2, 4, 7]) {
+      expect(crashBills(shunt(90, 4, cadenceSec))).toBe(1);
+    }
+  });
+
+  it("…on the very drive the travel floor alone could never stop", () => {
+    // 90 s at 4 км/ч integrates to 100 m of path — 50x COLLISION_REOPEN_TRAVEL_M,
+    // every metre of it still inside the body being billed for leaving.
+    expect((4 / 3.6) * 90).toBeGreaterThanOrEqual(50 * 2);
+    expect(crashBills(shunt(90, 4, 7))).toBe(1);
+  });
+
+  it("a car that hits, reverses OUT, and drives back in has had TWO accidents", () => {
+    // The opposite direction, and the shipped case the travel floor was written
+    // to keep: a metre of daylight opens between the bodies, so the second
+    // impact is a second accident and must still cost its own ten.
+    const ticks: SimTick[] = [
+      tick(0, { speedKmh: 20, leadGapM: 0, events: [{ kind: "collision", withWhat: "vehicle" }] }),
+    ];
+    for (let t = 0.25; t <= 3; t += 0.25) ticks.push(tick(t, { speedKmh: -3, leadGapM: 1 }));
+    ticks.push(
+      tick(3.25, {
+        speedKmh: 10,
+        leadGapM: 0,
+        events: [{ kind: "collision", withWhat: "vehicle" }],
+      }),
+    );
+    expect(crashBills(ticks)).toBe(2);
+  });
+
+  it("…and so has one that hits, drives on, and hits something else", () => {
+    // The gap reads clear road for the whole run between the two crashes and is
+    // 0 again at the instant of the second — which is why the daylight is a
+    // LATCH and not a test on the reporting frame. A point test would suppress
+    // the second, genuine crash instead of the first, false one.
+    const ticks: SimTick[] = [
+      tick(0, { speedKmh: 30, leadGapM: 0, events: [{ kind: "collision", withWhat: "vehicle" }] }),
+    ];
+    for (let t = 0.5; t <= 6; t += 0.5) ticks.push(tick(t, { speedKmh: 30, leadGapM: 40 - t * 4 }));
+    ticks.push(
+      tick(6.5, {
+        speedKmh: 30,
+        leadGapM: 0,
+        events: [{ kind: "collision", withWhat: "vehicle" }],
+      }),
+    );
+    expect(crashBills(ticks)).toBe(2);
+  });
+
+  it("a drive with no lead-gap channel grades exactly as it did before", () => {
+    // Unknown reads as apart. A wall, a pedestrian, a parked car outside the
+    // in-lane corridor: the gate falls back to silence + travel, byte-identical
+    // to the shipped behaviour, and this drive still bills twice.
+    const ticks: SimTick[] = [
+      tick(0, { speedKmh: 20, events: [{ kind: "collision", withWhat: "staticObject" }] }),
+    ];
+    for (let t = 0.25; t <= 3; t += 0.25) ticks.push(tick(t, { speedKmh: -3 }));
+    ticks.push(
+      tick(3.25, { speedKmh: 10, events: [{ kind: "collision", withWhat: "staticObject" }] }),
+    );
+    expect(crashBills(ticks)).toBe(2);
+  });
+
+  it("an embedded car at 0 км/ч still bills once — the 2 m floor is untouched", () => {
+    const ticks: SimTick[] = [];
+    for (let t = 0; t <= 60; t += 0.5) {
+      ticks.push(
+        tick(t, {
+          speedKmh: 0,
+          events: t % 4 === 0 ? [{ kind: "collision", withWhat: "vehicle" }] : [],
+        }),
+      );
+    }
+    expect(crashBills(ticks)).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5 · the repeat cadence at the опасна line
+// ---------------------------------------------------------------------------
+//
+// `.audit-frames/sweep161/sc-park-left/pc-wrong/08-debrief.png`: «Опасни грешки
+// 11 · 110 · Общо (допустими 9) 11 · 110» — eleven «Превишаване с повече от
+// 10 км/ч» rows for one continuous overspeed. `sc-park-zebra` printed the same
+// eleven on PC and ten on mobile.
+
+const overspeed = (kmh: number, durSec: number): SimTick[] => {
+  const out: SimTick[] = [];
+  for (let t = 0; t <= durSec; t += 0.25) out.push(tick(t, { speedKmh: kmh, maxSpeedKmh: 50 }));
+  return out;
+};
+
+const billsOf = (code: string, ticks: SimTick[]): number =>
+  codes(drive(ticks).events).filter((c) => c === code).length;
+
+describe("speeding — the repeat cadence stops at the опасна line", () => {
+  it("one continuous overspeed above +10 is ONE опасна, not eleven", () => {
+    // 200 s at 70 in a 50. Before: 10 bills, 100 наказателни точки.
+    expect(billsOf("SPEEDING_DANGEROUS", overspeed(70, 200))).toBe(1);
+  });
+
+  it("two genuinely separate stints, the limit HELD between, still bill twice", () => {
+    // The opposite direction: the episode re-arms on a real correction. 6 s at
+    // the limit clears speedingRearmSec.
+    const ticks: SimTick[] = [
+      ...overspeed(70, 6),
+      ...Array.from({ length: 25 }, (_, i) =>
+        tick(6.25 + i * 0.25, { speedKmh: 50, maxSpeedKmh: 50 }),
+      ),
+      ...Array.from({ length: 25 }, (_, i) =>
+        tick(12.5 + i * 0.25, { speedKmh: 70, maxSpeedKmh: 50 }),
+      ),
+    ];
+    expect(billsOf("SPEEDING_DANGEROUS", ticks)).toBe(2);
+  });
+
+  it("the второстепенна band keeps its cadence — collapsing it would buy a pass", () => {
+    // 200 s at 57 in a 50 is ten второстепенни, ten наказателни точки, a fail
+    // against the allowance of nine. One bill would be a PASS, and that is the
+    // one direction a scorer may never move (rules/scoring.ts's header).
+    expect(billsOf("SPEEDING_OVER_LIMIT", overspeed(57, 200))).toBe(10);
+  });
+
+  it("sustained dangerous speeding is still never cheaper than oscillating (M-16)", () => {
+    const pointsOf = (ticks: SimTick[]): number =>
+      drive(ticks).events.reduce((sum, e) => sum + (e.kind === "violation" ? e.points : 0), 0);
+    const saw: SimTick[] = [];
+    let t = 0;
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      saw.push(tick(t++, { speedKmh: 70, maxSpeedKmh: 50 }));
+      saw.push(tick(t++, { speedKmh: 70, maxSpeedKmh: 50 }));
+      saw.push(tick(t++, { speedKmh: 48, maxSpeedKmh: 50 }));
+    }
+    expect(pointsOf(overspeed(70, 60))).toBeGreaterThanOrEqual(pointsOf(saw));
+  });
+
+  it("a drive that never crosses the limit still bills nothing", () => {
+    expect(billsOf("SPEEDING_DANGEROUS", overspeed(50, 200))).toBe(0);
+    expect(billsOf("SPEEDING_OVER_LIMIT", overspeed(50, 200))).toBe(0);
+  });
+});

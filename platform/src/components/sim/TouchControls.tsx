@@ -206,6 +206,36 @@ function usePadPointer(): PadPointer {
  * A finger that started somewhere else cannot arrive here anyway: touch
  * pointers get implicit capture at `pointerdown`, so their moves keep going to
  * the element they started on.
+ *
+ * ── AND AN ADOPTION MUST CAPTURE, EXACTLY AS A PRESS DOES — 2026-08-18 ───────
+ *
+ * This is a SECOND DOOR into the same gesture, and until now only the first one
+ * (`onPointerDown`) called `capturePointer`. That asymmetry is not cosmetic,
+ * because of what was wired to the pads the day before: `onLostPointerCapture`
+ * — „the fourth release edge", the block at `onDriveEnd` — CAN ONLY FIRE FOR A
+ * POINTER THAT HAS CAPTURE. An adopted pointer had none, so for a gesture that
+ * came through this door the pads were back to the two edges they had before
+ * that fix, in a file whose own tests assert that they have four.
+ *
+ * WHAT THAT COSTS, in this component's own vocabulary. The sentence above —
+ * „touch pointers get implicit capture at `pointerdown`" — is the reason it has
+ * never bitten a thumb: a finger that reaches this branch got its implicit
+ * capture on THIS pad, so its `pointerup` lands here whatever happens next. It
+ * is not true of a mouse. A mouse has no implicit capture, and `buttons !== 0`
+ * admits one: press outside the pad, drag across it (adopted, uncaptured),
+ * release outside it. The `pointerup` goes to the element under the cursor, the
+ * pad is never told, and `PadPointer` goes on owning a button that is no longer
+ * down — with its axis still ACTIVE. `TouchInputSource.mergeInto` is a priority
+ * REPLACE and not a max, so from that moment the overlay overwrites that axis
+ * on every `SimInput.read()`: a stale brake is a car that will not pull away, a
+ * stale throttle is a car that accelerates under a held brake key, and neither
+ * heals — `reconcileHeldAxes` only ever frees a pad that owns NOBODY.
+ *
+ * A mouse on a touch-capable device is a 2-in-1 or a tablet with a trackpad,
+ * i.e. exactly the machine `keyboardTakeoverAllowed()` answers `true` for; the
+ * takeover used to sweep this away as a side effect, and since 2026-08-17 it
+ * only does so if the student also presses a driving key. One call closes it
+ * for good, and it is the same call the other door already makes.
  */
 function adoptable(
   pad: PadPointer,
@@ -260,7 +290,7 @@ export function reconcileHeldAxes(
  *  its own effect, because this number is a stuck-pedal window and not a UI
  *  refresh rate, and a future „the cabin poll got cheaper at 1 Hz" must not
  *  silently make it four times longer. */
-const AXIS_RECONCILE_MS = 250;
+export const AXIS_RECONCILE_MS = 250;
 
 /** Driving keys whose use hides the overlay on hybrid (touch+keyboard)
  *  devices — a laptop student driving on WASD keeps a clean screen. */
@@ -2052,6 +2082,11 @@ export function TouchControls({
       if (steerPad.owns(e.pointerId)) {
         steerApply(e.clientX);
       } else if (adoptable(steerPad, e, visible)) {
+        // The adoption door captures too — see the block at `adoptable()`.
+        // Without this the pad's `onLostPointerCapture` edge cannot fire for
+        // this gesture, and an uncaptured pointer that lifts elsewhere leaves
+        // the wheel owned for the rest of the session.
+        capturePointer(e.currentTarget, e.pointerId);
         steerBegin(e.clientX);
       }
     },
@@ -2150,6 +2185,11 @@ export function TouchControls({
       if (drivePad.owns(e.pointerId)) {
         driveApply(e.clientY);
       } else if (adoptable(drivePad, e, visible)) {
+        // …and the same on the pedals, where a stranded axis is the one that
+        // OVERWRITES the keyboard's brake rather than merely failing to add to
+        // it (the block at `adoptable()`, and the priority-replace note at
+        // `onDriveEnd`).
+        capturePointer(e.currentTarget, e.pointerId);
         driveBegin(e.currentTarget, e.clientY);
       }
     },
@@ -2190,15 +2230,55 @@ export function TouchControls({
    * and the frames prove it — `sweep161/sc-crossing-child-ball/mobile-right/
    * 05-stopped.png` shows «МЕНЮ» alone where the strip was. An overlay that
    * has released everything cannot have been the veto path in those runs, so
-   * this is NOT a retro-diagnosis of them; their cause is upstream of this
-   * file and is written up in the report.
+   * this is NOT a retro-diagnosis of them.
+   *
+   * ── AND THE CAUSE THAT SENTENCE USED TO LEAVE UNNAMED — 2026-08-18 ───────
+   *
+   * It is the FOURTH CLOCK, and it is a sibling of the three
+   * `lesson-ui/sessionClock.ts` was written to reconcile („three clocks that
+   * only agreed above 10 fps"). `engine/input.ts` ramps the KEYBOARD pedals
+   * against wall time and clamps each `read()` to `MAX_RAMP_DT_S = 0.1`, while
+   * the world advances on rapier's own `PHYSICS_MAX_FRAME_DT = 0.5` — and
+   * `read()` writes `lastReadMs` on every call, so the FIRST read of a frame
+   * takes the whole elapsed and the rest of that frame's reads take nothing.
+   * One frame therefore buys 0.1 s of PEDAL and 0.5 s of WORLD:
+   *
+   *   ≥10 fps   0.1 : 0.1   the clamp never binds — this is the PC leg
+   *    2 fps    0.1 : 0.5   BRAKE_ATTACK_S 0.25 → 2.5 frames → 1.25 s of world
+   *                         with the brake still arriving, and
+   *                         THROTTLE_RELEASE_S 0.25 → 1.25 s more of world with
+   *                         the throttle still leaving
+   *
+   * AND THE SWEEP'S TWO LEGS ARE NOT TWO DEVICES, THEY ARE TWO BROWSERS — which
+   * is what makes „only ever on the mobile leg" a statement about frame rate.
+   * `lesson-audit.mjs` launches the PC leg as headless CHROMIUM with
+   * `--use-angle=d3d11 --enable-gpu` at DPR 1, and records why: it read
+   * `UNMASKED_RENDERER_WEBGL` before and after and went from SwiftShader to a
+   * GTX 1060. The mobile leg is `webkit.launch({ headless: true })` — no args,
+   * because there are none to pass — on the iPhone 16 profile at DPR 3, i.e.
+   * nine times the pixels on the software rasteriser the PC leg was just taken
+   * off. The frame time that leg is left with is the one `sessionClock.ts`
+   * measured on the PC leg BEFORE that flag: 2.33 s at DPR 1, 3.57 s at DPR 2.
+   * Both are far below the 10 fps at which this clamp starts to bind, and the
+   * guard's platform split is dated after the flag landed.
+   *
+   * So on the mobile leg a held brake key genuinely does take ~1.25 s of WORLD
+   * time to arrive while the car keeps its throttle for the same span — which
+   * is „7 -> 10 км/ч, brake held", exactly. IT IS A KEYBOARD PATH. The pads on
+   * this screen are not ramped at all (`driveApply` writes the position
+   * straight through and `mergeInto` REPLACES), so the one input this defect
+   * cannot reach is the one a phone student actually uses — and the one it hits
+   * hardest is a student on a weak laptop, which is the device the product is
+   * aimed at. The fix is not here; it is `MAX_RAMP_DT_S`, and it belongs beside
+   * `PHYSICS_MAX_FRAME_DT` rather than five times under it.
    *
    * What the takeover fix DID do is make this overlay live on a phone for the
    * whole drive for the first time. Until 2026-08-17 a stray drive key was
    * also, accidentally, the thing that swept a stranded axis away every few
    * seconds. That crutch is gone. A stranded axis is now permanent, and the
-   * two edges that can strand one — a capture lost without an up, and any
-   * release path a future edit forgets — are closed here and below.
+   * three edges that can strand one — a capture lost without an up, a gesture
+   * ADOPTED without one (the block at `adoptable()`), and any release path a
+   * future edit forgets — are closed here, above and below.
    * ═══════════════════════════════════════════════════════════════════════
    */
   const onDriveEnd = useCallback(

@@ -571,12 +571,81 @@ export const REACH_ZONE_HALT_CAP_KMH = 8;
  */
 export const REACH_ZONE_CAP_SLACK_KMH = 5;
 
-/** Default max distance of the car centre from the bay centre at rest, m. */
+/**
+ * Default centring tolerance at rest, m — the authored CENTRING bar, and since
+ * sweep 161 no longer the whole acceptance. See `PARK_CAR_HALF_LENGTH_M` for
+ * the shape it is now composed with and for the measured reason.
+ */
 export const PARK_CENTER_TOL_M = 0.5;
 /** Default max |heading − bay axis| at rest, degrees. */
 export const PARK_HEADING_TOL_DEG = 10;
 /** Reverse-gear credit for the park accrues only within this radius of the bay, m. */
 export const PARK_MANEUVER_ZONE_M = 15;
+
+/**
+ * A BAY IS A RECTANGLE AND SO IS THE CAR — sweep 161, 2026-08-18. The ego
+ * footprint's half-extents in metres, along and across.
+ *
+ * PINNED BY VALUE from `vehicle/tuning.ts` CHASSIS_HALF_EXTENTS (z = 2.02
+ * along, x = 0.85 across) — the rapier collider every cabin session actually
+ * drives, i.e. a 4.04 × 1.70 m compact. Copied rather than imported for the
+ * same reason the templates copy their district geometry (the L7 copy law):
+ * this evaluator is a pure function of a tick and stays free of the driveline.
+ * `objectives.test.ts` asserts the copy against tuning, so it cannot drift.
+ *
+ * WHAT WAS BROKEN. `stepParkInBay` accepted on ONE number — the Euclidean
+ * distance from the car centre to the bay centre, against `centerTolM`. A disc
+ * cannot describe a rectangle, and the shipped bays are not square: measured
+ * across all 85 compiled parking rungs in the catalogue, what is left of a bay
+ * once this car is squarely inside it is
+ *
+ *     bay (l × w)   drills                                depth   across
+ *     6.5 × 2.5     sc-park-gap-long                     ±1.23    ±0.40
+ *     5.5 × 2.5     sc-park-zebra · -night · -parallel   ±0.73    ±0.40
+ *     5.0 × 2.7     eleven drills, incl. -left · -wall   ±0.48    ±0.50
+ *     5.0 × 2.5     sc-park-narrow                       ±0.48    ±0.40
+ *     4.5 × 2.5     sc-park-gap-short                    ±0.23    ±0.40
+ *     4.2 × 2.5     sc-park-judge                        ±0.08    ±0.40
+ *
+ * against an authored `centerTolM` of 0.5 at L3–L5, widened by the aid ladder
+ * to 0.63 at L2 and 0.75 at L1. So the one number was simultaneously
+ *
+ *  · TOO TIGHT IN DEPTH. On sc-park-zebra a car reversed fully home — square,
+ *    entirely between the lines, 0.73 m back of centre, which is the pose an
+ *    instructor asks for so the nose does not overhang the aisle — is 46 % over
+ *    a 0.5 m disc. It is refused, and `alignment` calls it „sloppy". On
+ *    sc-park-gap-long the legitimate span is 2.46 m of a 6.5 m gap and the disc
+ *    admits the middle metre of it.
+ *  · TOO LOOSE ACROSS. On every 2.5 m bay the disc reaches 0.5 m sideways where
+ *    the paint allows 0.40 — and at L1 „Пълна помощ", the rung every sweep-161
+ *    leg was driven at, it reaches 0.75, putting a third of a metre of the car
+ *    inside the neighbouring bay with a green tick on «паркирай в мястото».
+ *
+ * THE FIX IS ONE TRUE STATEMENT SPLIT ONTO THE TWO AXES, and the asymmetry is
+ * the point — the two over-runs do not cost the same thing:
+ *
+ *  · ACROSS, `min(centerTolM, widthSlack)`: over the line sideways is INTO THE
+ *    NEIGHBOUR. Nothing may credit it, and the aid ladder may not widen past
+ *    the paint — the same ruling FR-24 made when the L1 ladder widened a
+ *    stop-line disc 9.72 m into the junction. This half only ever REFUSES.
+ *  · IN DEPTH, `max(centerTolM, depthSlack)`: over-run there costs aisle, not a
+ *    neighbour, and under-run is simply parked further back. A car whose
+ *    footprint is inside the painted bay has performed «паркирай в гнездото»,
+ *    so it is credited — while `alignment` keeps grading the centring, so the
+ *    polish this gives up is reported rather than lost (a fully-home park reads
+ *    „acceptable", not „centered").
+ *
+ * THE SLACKS ARE COMPUTED SQUARE, not at the car's actual yaw, and that is
+ * deliberate. Folding the yaw in is more exact — at 15° this car sweeps 2.69 m
+ * across, so a 2.5 m bay has NEGATIVE room — but it would make the aid ladder's
+ * own `headingTolDeg` of 15 unreachable on every 2.5 m bay and turn a beginner
+ * rung into a refusal machine. The residual it leaves (a park at the tolerance
+ * yaw AND at the tolerance offset is marginally over the line) is the authored
+ * ladder's choice, and `headingTolDeg` is what grades it.
+ */
+export const PARK_CAR_HALF_LENGTH_M = 2.02;
+/** @see PARK_CAR_HALF_LENGTH_M — the across half-extent of the same footprint. */
+export const PARK_CAR_HALF_WIDTH_M = 0.85;
 
 /**
  * B21-RB (2026-08-11) — how far round the island an EXTINGUISHED right
@@ -1544,7 +1613,9 @@ function stepEmergencyStop(
 
 /**
  * Reverse-park (A10) — BAY-LOCKED: completes only when the car is at rest
- * INSIDE the authored bay rect, centred within `centerTolM`, aligned with
+ * INSIDE the authored bay rect, placed within the bay-shaped tolerance
+ * (`centerTolM` composed with the paint on each axis — PARK_CAR_HALF_LENGTH_M
+ * has the census and the reason it is not one disc), aligned with
  * the bay axis within `headingTolDeg` (folded to 180° — the rect is
  * symmetric; facing direction is the rule engine's business), with reverse
  * gear used during the current attempt (and within PARK_MANEUVER_ZONE_M of
@@ -1596,14 +1667,35 @@ function stepParkInBay(
       : tick.gear > 0
     : false;
 
-  const stopped = tick.speedKmh <= STOPPED_SPEED_KMH;
+  // REVERSE READS NEGATIVE, and this is the one evaluator that lives in it.
+  // `tick.speedKmh` is signed (the same convention `stepReachZone`,
+  // `stepPassSignal` and `stepThreePointTurn` all fold), so an unsigned
+  // `speedKmh <= 1` called EVERY REVERSING FRAME „at rest": measured on the
+  // committed shadows of the four depth drills, 156 / 167 / 186 / 164 frames
+  // per run carry a negative speed down to −3.83 км/ч, and all of them ran the
+  // hold clock. The gate whose title is «влез на заден ход и СПРИ НАПЪЛНО»
+  // could not see a stop — a car reversing straight through the bay collected
+  // it if the crossing happened to take `holdSec`, which at a 3 км/ч creep is
+  // 1.25 m of travel and therefore inside the acceptance band of every bay
+  // 5.5 m or longer. The bay-shaped tolerance above widens exactly those
+  // bands, so this is fixed with it and not after it.
+  const stopped = Math.abs(tick.speedKmh) <= STOPPED_SPEED_KMH;
   // The hold clock only runs at rest INSIDE the bay.
   const stoppedSinceT = stopped && inBay ? (prev.stoppedSinceT ?? tick.t) : null;
   const heldFor = stoppedSinceT !== null ? tick.t - stoppedSinceT : 0;
 
   const centerOffsetM = Math.hypot(lonM, latM);
   const headingOffsetDeg = axisAngleDiffDeg(tick.headingDeg, bay.headingDeg);
-  const aligned = centerOffsetM <= centerTolM && headingOffsetDeg <= headingTolDeg;
+  // The acceptance is the BAY's shape, not a disc drawn on top of it — the two
+  // axes carry different tolerances because the two over-runs cost different
+  // things. See PARK_CAR_HALF_LENGTH_M for the 85-rung census this is built on.
+  // Across: never past the paint, so the aid ladder can tighten here and never
+  // widen. In depth: never less than the paint allows, so a car that is fully
+  // home is credited for the park and graded on the centring separately.
+  const lonTolM = Math.max(centerTolM, bay.lengthM / 2 - PARK_CAR_HALF_LENGTH_M);
+  const latTolM = Math.min(centerTolM, bay.widthM / 2 - PARK_CAR_HALF_WIDTH_M);
+  const aligned =
+    Math.abs(lonM) <= lonTolM && Math.abs(latM) <= latTolM && headingOffsetDeg <= headingTolDeg;
 
   // The entry-gear gate: reverse credit (the A10 default) or the S2 forward
   // entry, per the authored param.
