@@ -202,14 +202,26 @@ const SCRIPTS: Record<
 export function recordScHzAccidentSceneDrive(
   districtRaw: unknown,
   name: ScHzAccidentSceneTraceName,
-  extra?: Pick<RecordScriptedDriveOptions, "onTick">,
+  extra?: Pick<RecordScriptedDriveOptions, "onTick" | "stagedEvents">,
 ): RecordedDrive {
   const { kind, script } = SCRIPTS[name];
   return recordScriptedDrive(districtRaw, script(), {
     scenarioId: SC_HZ_ACCIDENT_SCENE_ID,
     kind,
     seed: 7,
-    stagedEvents: [...(SC_HZ_ACCIDENT_SCENE.staged ?? [])] as StagedEventSpec[],
+    /**
+     * `spec.staged` IS NOT THE SHIPPED CAST, and a caller that replays this
+     * drive into a compiled LESSON must say so. `compile.ts` merges
+     * `spec.staged` with the rung's `stagedAdd`, and every rung of this
+     * template adds `sc-hzac-bystander-2` — so a session compiled at L3 stages
+     * THREE actors while this default stages TWO, and anything graded off the
+     * resulting tick stream is structurally blind to the second bystander the
+     * founder specifically asked for. The default stays two so the COMMITTED
+     * recordings under content/traces/ do not move; the override exists so a
+     * live-session replay can drive the world the student actually gets.
+     */
+    stagedEvents:
+      extra?.stagedEvents ?? ([...(SC_HZ_ACCIDENT_SCENE.staged ?? [])] as StagedEventSpec[]),
     obstacles: hzAccidentObstacles(),
     collisionMinKmh: 5,
     ...(SC_HZ_ACCIDENT_SCENE.ruleConfig ? { ruleConfig: SC_HZ_ACCIDENT_SCENE.ruleConfig } : {}),

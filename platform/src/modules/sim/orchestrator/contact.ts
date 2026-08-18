@@ -261,7 +261,16 @@ export class ContactSentinel {
         this.openKeys.add(m.actorId);
       }
       this.hitOwners.add(m.ownerId);
-      out.push({ kind: "collision", withWhat: m.withWhat });
+      // THE ID TRAVELS WITH THE REPORT. This loop has always known exactly
+      // WHICH staged body it is inside of — `m.actorId` is the probe's own
+      // memory key, three lines up — and used to hand the rule engine only the
+      // category, which then had to latch per KIND and gave the second of two
+      // staged bodies away free (see engine.ts's `collision` case). Nothing
+      // about the reporting cadence changes: this is still a per-frame report
+      // for as long as the geometry says the bodies overlap, and the engine
+      // still collapses that stream into one bill. It is the same rising edge,
+      // told which body it belongs to.
+      out.push({ kind: "collision", withWhat: m.withWhat, actorId: m.actorId });
     }
     return this.hitOwners;
   }

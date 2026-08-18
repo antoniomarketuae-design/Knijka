@@ -1532,8 +1532,19 @@ const PER_ACT_COPY: Partial<
   COLLISION: COLLISION_CONTACT_COPY,
 };
 
-/** The per-act copy for an event, or `null` when the code pools one string. */
-function actCopy(
+/**
+ * The per-act copy for an event, or `null` when the code pools one string.
+ *
+ * EXPORTED BECAUSE A LIST HAS TO GROUP BY IT. `makeViolation` stamps the act's
+ * own title and explanation onto the event, and any surface that then collapses
+ * rows BY CODE puts two different acts under one of the two titles and throws
+ * the other away. That is not a display nicety: on 2026-08-18 the debrief for a
+ * drive that struck a car and then a person printed «Удар в друго превозно
+ * средство ×2», and the word «пешеходец» appeared nowhere in it. A caller that
+ * asks this first can key its groups on the ACT — see `lessons/debrief.ts`
+ * `groupMistakes`.
+ */
+export function actCopy(
   code: ViolationCode,
   detail: string | undefined,
 ): { titleBg: string; explanationBg: string; lawRef?: string } | null {

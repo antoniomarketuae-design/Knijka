@@ -140,8 +140,23 @@ export type SimTickEvent =
   | { kind: "crossingZoneExited"; crossingId: string }
   /** Vehicle committed to a turn at an intersection (steering into it). */
   | { kind: "turnStarted"; direction: TurnDirection }
-  /** Physical contact with another body. */
-  | { kind: "collision"; withWhat: "vehicle" | "pedestrian" | "cyclist" | "staticObject" }
+  /**
+   * Physical contact with another body.
+   *
+   * `actorId` NAMES THE BODY, and it is what turns „one crash" from a guess
+   * into a fact. Without it the engine is told only the CATEGORY, so two
+   * different parked cars struck a second apart read as one encounter and the
+   * second bills nothing (measured on sc-hz-accident-scene: two wreck rects at
+   * y=150 and y=162, struck 1.1 s apart, inside `collisionSeparationSec` —
+   * one bill). Reporters that KNOW which body they hit supply it and are then
+   * graded per body; reporters that do not omit it and are graded per
+   * category, exactly as before. See `engine.ts`'s `collision` case.
+   */
+  | {
+      kind: "collision";
+      withWhat: "vehicle" | "pedestrian" | "cyclist" | "staticObject";
+      actorId?: string;
+    }
   /** Player looked at a mirror (gaze/hover/click — input layer decides). */
   | { kind: "mirrorGlance"; mirror: MirrorKind }
   /**

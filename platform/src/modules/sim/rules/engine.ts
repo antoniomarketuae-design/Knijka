@@ -73,20 +73,36 @@ interface EpisodeState {
 }
 
 /**
- * WHICH BODY WAS HIT, at the only resolution the reducer is given. The live
- * channel is told the CATEGORY and nothing more (`SimTickEvent`'s collision
- * arm), so this alias is derived from the event rather than restated — a fifth
- * kind added there becomes a fifth episode here and cannot silently share a
- * latch with a fourth.
+ * WHICH BODY WAS HIT, at the FINEST resolution the reporter offered.
+ *
+ * A reporter that knows which body it struck stamps `actorId` and gets its own
+ * episode; one that only knows the CATEGORY (the live rapier channel, whose NPC
+ * shells are a rebinding pool and so have no stable id) falls back to the
+ * category, byte-identically to the shipped per-kind behaviour. The fallback
+ * half is derived from the event rather than restated, so a fifth kind added
+ * there becomes a fifth fallback key here and cannot silently share a latch
+ * with a fourth.
+ *
+ * Prefixed so a future actor literally named "vehicle" can never collide with
+ * the category fallback of the same name.
  */
-type ContactActor = Extract<SimTickEvent, { kind: "collision" }>["withWhat"];
+function contactKey(e: Extract<SimTickEvent, { kind: "collision" }>): string {
+  return e.actorId === undefined ? `kind:${e.withWhat}` : `actor:${e.actorId}`;
+}
 
-/** One open contact encounter with one kind of body — see the `collision` case. */
+/** One open contact encounter with one body — see the `collision` case. */
 interface ContactEpisode {
-  /** When contact with this kind of body was last REPORTED. */
+  /** When contact with this body was last REPORTED. */
   at: number;
   /** `contactOdometerM` at that report — the baseline the 2 m floor measures from. */
   odoM: number;
+  /**
+   * The body's CATEGORY, carried so an ANONYMOUS report can be matched against
+   * this episode. Without it a channel that cannot name what it hit would open
+   * a second episode alongside a named one for the same body and bill the same
+   * crash twice — see the `collision` case's mixed-resolution paragraph.
+   */
+  withWhat: Extract<SimTickEvent, { kind: "collision" }>["withWhat"];
 }
 
 interface CrossingZoneState {
@@ -194,21 +210,23 @@ export interface RuleEngineState {
   keepRight: EpisodeState;
   crossing: CrossingZoneState | null;
   /**
-   * THE OPEN CONTACT EPISODES, ONE PER KIND OF BODY — when the last contact
-   * with that kind was REPORTED, and the odometer reading at that moment. An
-   * episode stays open while reports keep arriving and closes after
+   * THE OPEN CONTACT EPISODES, ONE PER BODY — when the last contact with that
+   * body was REPORTED, and the odometer reading at that moment. An episode
+   * stays open while reports keep arriving and closes after
    * `collisionSeparationSec` of silence AND `COLLISION_REOPEN_TRAVEL_M` of
    * travel (AND, for `vehicle`, measured daylight); only the report that OPENS
-   * one is billed. Absent key = never touched a body of that kind.
+   * one is billed. Absent key = never touched that body.
    *
-   * Keyed, not global, because one latch made a pedestrian struck half a minute
-   * after a car crash FREE. See the `collision` case for that drive.
+   * Keyed by `contactKey`, not global, because one latch made a pedestrian
+   * struck half a minute after a car crash FREE — and keyed by BODY rather than
+   * by kind, because a per-kind latch made the second of two wrecked cars free
+   * in the same way. See the `collision` case for both drives.
    *
    * `cloneState` copies the record and an entry is only ever assigned whole, so
    * the reducer writes bills into its own frame and never into the caller's —
    * pinned by "the reducer does not write a bill into the caller's state".
    */
-  contactEpisodes: Partial<Record<ContactActor, ContactEpisode>>;
+  contactEpisodes: Record<string, ContactEpisode>;
   /**
    * Path length driven since the session began, metres — a monotone odometer
    * clamped per frame, never reset. Each episode remembers its own reading, so
@@ -1788,6 +1806,27 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // В28 (noParkZone) deliberately does NOT convict — престоят под В28 е
   // разрешен, and parking vs престой is indistinguishable with current
   // telemetry (the same A12 bar; PK-07 rides the zone later).
+  //
+  // THE ONE INNOCENT REST THIS LIST CANNOT SEE, and it is not hypothetical:
+  // A PERSON STANDING IN THE LANE. Sweep 161, `sc-hz-accident-scene/pc-right`
+  // (frame 04-t092s): a НАУЧИ card convicts «Спиране в забранена зона … под
+  // знак В27» at the exact moment the car has stopped because a bystander is
+  // in front of it. Stopping for a pedestrian is taught as an offence, on the
+  // lesson whose whole subject is that people are standing there — the north
+  // star inverted in one card.
+  //
+  // EVERY OTHER TRAFFIC-SHAPED REST IS ACQUITTED ABOVE, so the omission is
+  // structural rather than an oversight in the list: `banZoneQueue` reads
+  // `leadGapM`, which is the VEHICLE ahead; `s.crossing` needs an armed
+  // crossing zone, and hz-accident-v1 ships `crossings: []` precisely so no
+  // PEDESTRIAN_* code can fire on it. There is no third channel — `SimTick`
+  // carries no „person ahead" measurement of any kind, so this reducer
+  // literally cannot see the man it is convicting the student for stopping in
+  // front of. Naming that here rather than approximating it: the honest fix is
+  // a tick channel (the contact sentinel already resolves staged pedestrian
+  // poses every frame and could publish the nearest one's forward distance),
+  // and it lands in the runtime/orchestrator, not in this file. Until it
+  // exists, any acquittal written here would be a guess dressed as a rule.
   const banZoneQueue = leadGapM !== null && leadGapM <= cfg.banZoneStopQueueGapM;
   const banZoneControl =
     (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.banZoneStopLineClearM) ||
@@ -2460,34 +2499,83 @@ function handleTickEvent(
       // rows on it. What the extra row buys is the thing THEO-4 asks for — the
       // debrief can no longer stay silent about the man in the road.
       //
-      // SO THE EPISODE IS PER BODY-KIND, and each conjunct is asked only where
-      // it means something. Silence and travel are properties of the CAR and
-      // apply to every kind; daylight is a property of the LEAD VEHICLE and is
+      // SO THE EPISODE IS PER BODY, and each conjunct is asked only where it
+      // means something. Silence and travel are properties of the CAR and apply
+      // to every body; daylight is a property of the LEAD VEHICLE and is
       // required only of a `vehicle` episode. For a wall, a pedestrian or a
       // cyclist the gap channel is not looking at the body that was hit, so
       // demanding its testimony is a category error — those episodes fall back
       // to silence + travel, byte-identically to the shipped behaviour the
       // "no lead-gap channel" test pins.
       //
-      // WHAT THIS STILL CANNOT SEE, stated because it is a real gap and not a
-      // rounding: the live channel is told only the CATEGORY, so two different
-      // CARS struck inside one window still read as one encounter. The NPC
-      // shells that carry identity are a rebinding pool, so an id would churn
-      // under the latch; plumbing a stable actor id through `pushCollision` is
-      // the honest fix and is listed, not attempted, because that wire runs
-      // through LessonScene. Category is the finest grain that exists on this
-      // side of it, and the residue errs innocent (A12).
-      const open = s.contactEpisodes[e.withWhat];
-      // Daylight is the lead vehicle's alibi and only a vehicle may call it.
-      const daylight =
-        e.withWhat !== "vehicle" ||
-        (s.lastLeadApartAt !== null && open !== undefined && s.lastLeadApartAt > open.at);
-      const cameApart =
-        open === undefined ||
-        (daylight &&
+      // «PER BODY» USED TO MEAN «PER BODY-KIND», AND THAT COST A SECOND VICTIM
+      // (2026-08-18, the refutation). The key was `e.withWhat`, so the contract
+      // it enforced was not „one contact with one body bills once" but „one
+      // contact with one KIND of body bills once" — and those differ on every
+      // drive that stages two of anything. Measured on this very lesson: the
+      // sc-hz-accident-scene wreck tableau is TWO rects (y = 150 and y = 162),
+      // struck 1.1 s apart at 45.9 км/ч. Inside `collisionSeparationSec` (1.2 s)
+      // the first rect's episode is still open, so the SECOND WRECKED CAR BILLED
+      // ZERO. Two cars, one bill, and the residue is not innocent-erring in any
+      // sense a student can read: the sheet said he hit a car when he hit two.
+      //
+      // The reporters that KNOW which body they touched now say so
+      // (`SimTickEvent.actorId`): the orchestrator's contact sentinel already
+      // held `m.actorId` and discarded it at the push, and the trace recorder's
+      // obstacle channel already latched per RECT and discarded `i`. Both now
+      // stamp it, and `contactKey` uses it. The live rapier channel still cannot
+      // — its NPC shells are a rebinding pool, so an id would churn under the
+      // latch — and it therefore keeps the category fallback, which is the
+      // finest grain that exists on that side of the wire and errs innocent
+      // (A12). What is no longer true is that the finest grain is category
+      // EVERYWHERE; two of the three reporters were throwing identity away.
+      // …AND THE REPORTERS DO NOT ALL SPEAK AT THE SAME RESOLUTION, which is
+      // the trap a per-body key sets and a per-kind key hid. A drive can have
+      // BOTH channels pointed at one body: on `sc-merge-from-property`'s
+      // walk-through demo the contact sentinel reports `sc-mfp-walker` at 60 Hz
+      // from t = 6.30, and at t = 6.57 the script's own authored consequence
+      // beat fires an ANONYMOUS pedestrian report into the same overlap. Keyed
+      // naively that is two episodes and TWO ПТП for one person under the
+      // wheels — measured, and it is exactly the shape («one body billed
+      // twice») that the older per-accident rule was binned for. Same story on
+      // `sc-rb-busy-gap`'s short-gap demo at t = 23.40 against
+      // `sc-rbg-follower`.
+      //
+      // So a report is matched against every episode it COULD be a
+      // continuation of, and the asymmetry is the whole content of the rule:
+      //  · a NAMED report rules out every OTHER named body — that is what the
+      //    name is for — but not the anonymous episode of its own kind, which
+      //    may well be this very body seen by a channel that could not name it;
+      //  · an ANONYMOUS report rules out nothing, so it is a continuation of
+      //    ANY open episode of its kind. It bills only when none is open.
+      // The residue errs innocent in the one direction that has no name to
+      // appeal to (A12), and a genuinely new named body is unaffected: two
+      // wrecked cars are two names, so both still bill.
+      const key = contactKey(e);
+      const candidates: ContactEpisode[] = [];
+      const own = s.contactEpisodes[key];
+      if (own !== undefined) candidates.push(own);
+      if (e.actorId !== undefined) {
+        const anon = s.contactEpisodes[`kind:${e.withWhat}`];
+        if (anon !== undefined) candidates.push(anon);
+      } else {
+        for (const [k, ep] of Object.entries(s.contactEpisodes)) {
+          if (k !== key && ep.withWhat === e.withWhat) candidates.push(ep);
+        }
+      }
+      // Empty candidate list = a body never touched before, which always bills.
+      const cameApart = candidates.every((open) => {
+        // Daylight is the lead vehicle's alibi and only a vehicle may call it.
+        const daylight =
+          e.withWhat !== "vehicle" ||
+          (s.lastLeadApartAt !== null && s.lastLeadApartAt > open.at);
+        return (
+          daylight &&
           t - open.at > cfg.collisionSeparationSec &&
-          s.contactOdometerM - open.odoM >= COLLISION_REOPEN_TRAVEL_M);
-      s.contactEpisodes[e.withWhat] = { at: t, odoM: s.contactOdometerM };
+          s.contactOdometerM - open.odoM >= COLLISION_REOPEN_TRAVEL_M
+        );
+      });
+      s.contactEpisodes[key] = { at: t, odoM: s.contactOdometerM, withWhat: e.withWhat };
       if (!cameApart) break;
       s.terminated = true;
       out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));

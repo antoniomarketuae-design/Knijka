@@ -709,9 +709,23 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
   /** Replay a demo through a LIVE session at one rung, splitting the coach's two
    *  channels: what it TAUGHT (first-encounter pause card) vs what it SCORED. */
   const replay = (name: Parameters<typeof recordScHzAccidentSceneDrive>[1], level: 3 | 4) => {
-    let s = createLessonSession(compileScenario(SC_HZ_ACCIDENT_SCENE, level));
+    const lessonAtRung = compileScenario(SC_HZ_ACCIDENT_SCENE, level);
+    let s = createLessonSession(lessonAtRung);
     const taught: string[] = [];
     recordScHzAccidentSceneDrive(loadDistrict("hz-accident-v1"), name, {
+      /**
+       * THE WORLD THE LESSON STAGES, NOT THE ONE THE RECORDER DEFAULTS TO. This
+       * replay compiles a rung and then graded a DIFFERENT street: the compiled
+       * lesson stages three actors (`compile.ts` merges `spec.staged` with the
+       * rung's `stagedAdd`, and every rung here adds `sc-hzac-bystander-2`)
+       * while the recorder's default stages the two of `spec.staged`. Every
+       * claim below was therefore made about a cast the student never drives,
+       * and structurally could not see the second bystander at all. Harmless on
+       * today's tuning — bystander 2 is released 34 m out and has walked clear
+       * by arrival — and load-bearing the moment his trigger moves, which is
+       * exactly when two pedestrians stand inside one contact window.
+       */
+      stagedEvents: lessonAtRung.stagedEvents ?? [],
       onTick: (tick) => {
         const step = applyTick(s, tick);
         s = step.state;
@@ -788,17 +802,23 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
     // put on a latch shared by EVERY body in the world, so the bystander's bill
     // was made to wait for the WRECK's bumper to clear, which, nose-deep in it,
     // it never did. The man under the wheels cost nothing, on the one lesson
-    // whose entire subject is that people are standing there. `engine.ts`'s
-    // `collision` case now keys the episode per body-kind (silence and travel
-    // are properties of the CAR and are asked of every kind; daylight is a
-    // property of the LEAD VEHICLE and is asked only of a `vehicle` episode);
-    // `rules/__tests__/sweep161-fault-episodes.test.ts` pins both directions on
-    // synthetic frames and this is the same claim on the real drive.
+    // whose entire subject is that people are standing there.
     //
-    // Both directions live in the line below: swallow the bystander and it reads
-    // ["vehicle"]; re-bill either body and it grows a third entry.
-    expect(l3.struck).toEqual(["vehicle", "pedestrian"]);
-    expect(l3.scored).toEqual(["COLLISION", "COLLISION"]);
+    // IT THEN READ ["vehicle", "pedestrian"], AND THAT WAS STILL A CAR SHORT.
+    // The repair keyed the episode per body-KIND, and „kind" is not „body" on
+    // any drive that stages two of anything: the wreck tableau is TWO rects
+    // (y = 150 and y = 162), the second struck 1.1 s after the first — inside
+    // `collisionSeparationSec` (1.2 s), so with one `vehicle` latch the SECOND
+    // WRECKED CAR BILLED ZERO. The engine now keys per BODY (`contactKey`, off
+    // the `actorId` this recorder's obstacle channel and the orchestrator's
+    // contact sentinel both had in hand and were discarding), so the sheet
+    // reads what the drive did: wreck, bystander, wreck.
+    //
+    // Every direction lives in the line below: swallow the bystander and it
+    // reads ["vehicle", "vehicle"]; swallow the second wreck and it is two
+    // entries again; re-bill any ONE body and a fourth appears.
+    expect(l3.struck).toEqual(["vehicle", "pedestrian", "vehicle"]);
+    expect(l3.scored).toEqual(["COLLISION", "COLLISION", "COLLISION"]);
     // Still ten, not twenty: `rules/scoring.ts` closes the ledger at the first
     // terminating опасна (чл. 48, ал. 3) and marks every later one
     // `unscoredAfterClose`. The second row costs no points — it buys the debrief

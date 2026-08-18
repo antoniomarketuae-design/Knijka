@@ -31,8 +31,16 @@ export {
 } from "./types";
 
 export {
+  COLLISION_CONTACT_COPY,
   COMMENDATIONS,
   VIOLATIONS,
+  /**
+   * THE ACT, NOT THE CODE. Two contacts and three rail acts share one code each
+   * and carry their own authored title/explanation; a surface that lists faults
+   * must group on what this returns, or it prints one act's copy over the other
+   * act's row. See catalog.ts's doc for the drive that proved it.
+   */
+  actCopy,
   makeCommendation,
   makeViolation,
   type CommendationSpec,
@@ -236,6 +244,13 @@ export {
   applyViolation,
   emptyScore,
   isPassing,
+  /**
+   * PER ROW, WHAT `unscoredAfterClose` ONLY COUNTS. Any surface that prints a
+   * per-fault or per-group point figure must fold this, or it publishes a total
+   * the verdict beside it contradicts.
+   */
+  ledgerBilling,
+  ledgerCloseTime,
   type ScoreBreakdown,
 } from "./scoring";
 

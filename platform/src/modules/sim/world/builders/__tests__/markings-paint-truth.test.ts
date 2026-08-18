@@ -23,6 +23,27 @@
  * must equal the fixed-pitch walk's, so re-spacing the rhythm cannot smuggle
  * in extra paint.
  *
+ * That sentence was FALSE AS WRITTEN for one wave and is worth reading twice
+ * before trusting the rest. When the instrument above was rebuilt, three
+ * assertions were re-expressed in terms the rewritten reader could serve, and
+ * each of the three quietly stopped being able to fail — the file went green,
+ * the paint was fine, and nothing guarded it. An adversarial re-read found all
+ * three by construction, not by argument; §3 now carries the constructions
+ * themselves, so „this check is real" is a check. What went wrong, in one line
+ * each, because it is the same mistake three times:
+ *
+ *   the reader identified a dash BY ITS OWN LENGTH ALONE (`dashesOn`: quads
+ *   5.000 m ± 1 mm) and asserted position from the quad CENTROID alone. A
+ *   centroid is invariant under rotation, so every lateral claim became
+ *   unfalsifiable; a length filter is blind to paint of any other length, so
+ *   every „and nothing else" claim became unfalsifiable too.
+ *
+ * Both readings are still taken — they are exact and they are what pins the
+ * paint to the millimetre — but no claim rests on them alone any more: lateral
+ * claims are made on the CORNERS (`tLo`/`tHi`, `cornerSpread`) and „nothing
+ * else" claims on a CENSUS OF EVERY QUAD (`censusOnEdge`), never on the dash
+ * filter that found the paint in the first place.
+ *
  * ── THE INSTRUMENT, and why it is written the way it is ────────────────────
  * This file shipped RED: fifteen of its twenty-eight tests failed the first
  * time anybody ran it, and FOURTEEN of the fifteen were the MEASUREMENT and
@@ -76,6 +97,30 @@
  *
  * The last two are the pair that matters most: one proves the guard convicts a
  * broken document, the other proves it still acquits all 105 real ones.
+ *
+ * And the three the weakened wave could NOT convict. Each was run against this
+ * file as it stood — 31/31 GREEN on every one — and against it as it stands:
+ *
+ *   paintDashedLine → turn every dash 10° off the axis
+ *       was: 31/31 green, corners 0.619 m out, „ON THE AXIS" passing
+ *       now: RED — осева corner 0.619 m vs the 0.302 m the bend allows,
+ *            ov-keepright divider corner 0.557 m vs 0.125 m
+ *   paintDashedLine → turn every dash 15° off the axis
+ *       was: 31/31 green, corners 0.828 m out — 4.4× the осева's half-stroke
+ *       now: RED, same two assertions
+ *   paintDashedLine → one 3.0 m dash centred on a run that fits none
+ *       was: 31/31 green, a 3 m осева painted s = 2.50…5.50 m of an 8 m stub,
+ *            under a test titled „must not invent the stub's first dash"
+ *       now: RED — the stub carries paint at |t| < 1 m
+ *   lane loop → one extra dashed line at t = +4.06 m in 4.00 m dashes
+ *       was: 31/31 green, 25 phantom dashes on ov-lane-v1 beside the 23 real
+ *            ones, markingQuads 103 → 128, a lane boundary down the middle of
+ *            the lane the student is being taught to hold
+ *       now: RED — 25 unclassified quads on ov-lane-v1, 30 on ov-keepright-v1
+ *
+ * Reproduce them the same way as the rows above: make the edit in markings.ts
+ * and run this file. §3 also carries each one as a MESH-level mutation that
+ * needs no edit at all.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -89,9 +134,14 @@ import {
   ZEBRA_LENGTH_M,
   CENTER_LINE_WIDTH_M,
   DASH_WIDTH_M,
+  EDGE_LINE_WIDTH_M,
+  EDGE_LINE_INSET_M,
 } from "../constants";
 import {
+  add,
+  mul,
   norm,
+  perpRight,
   pointAlong,
   polylineLength,
   projectOntoPolyline,
@@ -282,6 +332,20 @@ interface EdgeQuad {
   s: number;
   /** Lateral offset of that centre, + = right of geometry-forward. */
   t: number;
+  /**
+   * Lateral offset of its LEFTMOST and RIGHTMOST CORNER — the reading `t`
+   * cannot make.
+   *
+   * A rectangle's centroid is INVARIANT under rotation about its own centre, so
+   * a centroid-only lateral assertion cannot fail at ANY angle: turn every dash
+   * on ov-lane-v1 ten degrees across the road and `t` still reads 6e-15 m while
+   * the corners stand 0.685 m off the axis — 3.7× the осева's own half-stroke.
+   * That is measured, not argued (§3, „the осева check convicts a dash TURNED
+   * across the road"), and it is why every lateral claim here is made on the
+   * corners and only pinned on the centroid.
+   */
+  tLo: number;
+  tHi: number;
   /** Arclengths of its nearest and furthest corner. */
   from: number;
   to: number;
@@ -314,6 +378,7 @@ function quadsOnEdge(built: Built, edgeId: string, quads?: MeshQuad[]): EdgeQuad
     const inFrame = q.corners.map((c) => resolveOwned(frames, mine, c));
     if (inFrame.some((r) => r === null)) continue; // not this edge's paint
     const ss = inFrame.map((r) => r!.s);
+    const ts = inFrame.map((r) => r!.t);
     const centre: Vec2 = [
       (q.corners[0][0] + q.corners[1][0] + q.corners[2][0] + q.corners[3][0]) / 4,
       (q.corners[0][1] + q.corners[1][1] + q.corners[2][1] + q.corners[3][1]) / 4,
@@ -323,6 +388,8 @@ function quadsOnEdge(built: Built, edgeId: string, quads?: MeshQuad[]): EdgeQuad
     out.push({
       s: mid.s,
       t: mid.t,
+      tLo: Math.min(...ts),
+      tHi: Math.max(...ts),
       from: Math.min(...ss),
       to: Math.max(...ss),
       along: Math.hypot(q.corners[3][0] - q.corners[0][0], q.corners[3][1] - q.corners[0][1]),
@@ -399,6 +466,19 @@ function centreDashesOn(built: Built, edgeId: string): EdgeQuad[] {
   return dashesOn(built, edgeId).filter((q) => Math.abs(q.t) < 1);
 }
 
+/**
+ * How far the quad's furthest CORNER stands from the boundary at `off`, m.
+ *
+ * This is the quantity „on the line" means to a driver: a dash whose centre is
+ * on the осева but whose ends swing 0.7 m into the oncoming lane is not on the
+ * осева. Asserted against `dashChordOffsetM(line) + stroke/2`, which is the
+ * whole budget a straight dash is entitled to on a bending line — the chord's
+ * sagitta plus its own half-width — and not a metre more.
+ */
+function cornerSpread(q: EdgeQuad, off: number): number {
+  return Math.max(Math.abs(q.tHi - off), Math.abs(q.tLo - off));
+}
+
 /** The junction-trimmed line markings.ts actually walks on this edge. */
 function drawnLine(built: Built, edgeId: string): { line: Vec2[]; s0: number; length: number } {
   const eb = built.net.edgeById.get(edgeId)!;
@@ -436,6 +516,91 @@ function dashChordOffsetM(line: Vec2[], dashLen = DASH_LENGTH_M): number {
   return worst;
 }
 
+/** Every quad on one edge, sorted into what the painter may lay there and what it may not. */
+interface PaintCensus {
+  /** Dash quads per authored lane boundary, keyed by that boundary's offset. */
+  onBoundary: Map<number, EdgeQuad[]>;
+  /** The solid М1 carriageway edge-line strips, both sides. */
+  edgeLines: EdgeQuad[];
+  /** Paint that is neither — the bucket every „no other paint" claim empties. */
+  other: EdgeQuad[];
+  /** Where the edge lines run, ±, from the painter's own arithmetic. */
+  edgeOff: number;
+  /** The most a straight 5 m dash may chord off this edge's drawn line. */
+  sagitta: number;
+}
+
+/**
+ * EVERY quad on one edge, sorted — the instrument the „no other paint" claims
+ * are made with.
+ *
+ * They used to be made with `dashesOn`, which selects quads whose own long edge
+ * is 5.000 m, so they could only ever see paint that ALREADY LOOKED LIKE A
+ * DASH. Its refuter added one dashed line to every edge of every district at
+ * t = +4.06 m — `laneCenterRightM`, i.e. straight down the middle of the lane
+ * the student drives in — with 4.00 m dashes instead of 5.00 m: 25 phantom
+ * dashes appeared on ov-lane-v1 beside the 23 real ones, `markingQuads` went
+ * 103 → 128, and all 31 tests here stayed GREEN. It slipped past „the whole
+ * carriageway carries no OTHER dash", past „three internal boundaries and no
+ * fourth", and past `triangles === 2·markingQuads − giveWayTriangles` (which
+ * holds because the extra quads were booked honestly). A phantom lane boundary
+ * down the middle of a 1+1 residential road is the exact defect class this file
+ * exists to catch, inverted — so the census reads ALL quads and classifies by
+ * SHAPE AND PLACE, and the tests assert the leftover bucket is empty.
+ *
+ * On a marked, zoneless, crossing-free, junction-free edge — which is what both
+ * overtaking districts are — the painter lays exactly two kinds of quad:
+ *  · a DASH on an authored boundary: 5.000 m long, at that boundary's own
+ *    stroke (T16 — CENTER_LINE_WIDTH_M on the осева, DASH_WIDTH_M on a
+ *    same-direction divider), within half a lane of the boundary. The BAND is
+ *    deliberately loose and the stroke deliberately exact: a dash nudged off
+ *    its boundary must land in a boundary's bucket and be convicted there by
+ *    `cornerSpread`, not vanish into `other` where the diagnosis is vaguer;
+ *  · a SOLID EDGE-LINE strip: EDGE_LINE_WIDTH_M across, centred within its own
+ *    half-stroke of ±edgeOff, one quad per geometry segment (so its `along` is
+ *    whatever that segment is — 6.99…7.90 m on ov-lane-v1's 41-vertex S-curve,
+ *    358.40 m on ov-keepright-v1's single straight).
+ * Edge lines are matched FIRST: they are pinned to a place no lane boundary
+ * occupies, so the order cannot cost a dash its bucket.
+ */
+function censusOnEdge(
+  built: Built,
+  edgeId: string,
+  boundaries: readonly number[],
+  quads?: MeshQuad[],
+): PaintCensus {
+  const eb = built.net.edgeById.get(edgeId)!;
+  // markings.ts's own two lines, restated here rather than imported so a change
+  // in the painter shows up as a failure instead of tracking itself silently.
+  const travelHalf = eb.halfWidth - eb.parkingM;
+  const edgeOff = eb.parkingM > 0 ? travelHalf : travelHalf - EDGE_LINE_INSET_M;
+  const sagitta = dashChordOffsetM(drawnLine(built, edgeId).line);
+  const strokeAt = (off: number): number =>
+    !eb.edge.oneway && Math.abs(off) < 1e-6 ? CENTER_LINE_WIDTH_M : DASH_WIDTH_M;
+
+  const onBoundary = new Map<number, EdgeQuad[]>(boundaries.map((b) => [b, []]));
+  const edgeLines: EdgeQuad[] = [];
+  const other: EdgeQuad[] = [];
+  for (const q of quadsOnEdge(built, edgeId, quads)) {
+    if (
+      Math.abs(q.across - EDGE_LINE_WIDTH_M) < 1e-3 &&
+      Math.abs(Math.abs(q.t) - edgeOff) < EDGE_LINE_WIDTH_M / 2
+    ) {
+      edgeLines.push(q);
+      continue;
+    }
+    const home = boundaries.find(
+      (b) =>
+        Math.abs(q.along - DASH_LENGTH_M) < 1e-3 &&
+        Math.abs(q.across - strokeAt(b)) < 1e-9 &&
+        Math.abs(q.t - b) < LANE_WIDTH_M / 2,
+    );
+    if (home === undefined) other.push(q);
+    else onBoundary.get(home)!.push(q);
+  }
+  return { onBoundary, edgeLines, other, edgeOff, sagitta };
+}
+
 /**
  * How many dashes the OLD fixed-pitch walk fitted on a run this long — the
  * count the re-spaced rhythm must reproduce exactly. Written out longhand
@@ -471,18 +636,50 @@ describe("the marking each lesson names is on the road", () => {
     const dashes = dashesOn(built, "ov-ln-street");
     expect(dashes.length).toBeGreaterThanOrEqual(20);
 
-    // ON THE AXIS, not merely near it, and at the осева's own stroke. Both are
-    // asserted AFTER the fact — `dashesOn` selects on length alone — so neither
-    // can be satisfied by the filter that found them. The centre of a dash quad
-    // is `pointAlong(line, s)` itself, a point on the drawn line, so „on the
-    // axis" is exact even through the S-bend: worst measured |t| is 4e-16 m.
+    // ON THE AXIS, not merely near it, and at the осева's own stroke. All three
+    // are asserted AFTER the fact — `dashesOn` selects on length alone — so
+    // none can be satisfied by the filter that found them.
+    //
+    // The CENTROID claim is exact: a dash quad's centre is `pointAlong(line, s)`
+    // itself, a point on the drawn line, so it holds through the S-bend at
+    // 6e-15 m. It is also, on its own, UNFALSIFIABLE — a rectangle's centroid
+    // does not move when the rectangle turns about it — and this file spent a
+    // wave asserting only that: rotate every dash 10° across the road and the
+    // test titled „ON THE AXIS, not merely near it" still passed, with corners
+    // 0.685 m out. So the load-bearing claim is the CORNER one below.
+    //
+    // Its budget is measured, not chosen: `dashChordOffsetM` walks this edge's
+    // own drawn line and returns 0.11488 m — the most a straight 5 m dash can
+    // chord off a bend of this radius — and half the осева's stroke is
+    // 0.1875 m. Worst corner actually painted: 0.25679 m against the 0.30238 m
+    // allowed. That is 0.046 m of headroom, and about one degree of turn spends
+    // it (10° reads 0.685 m). The 0.25 m FLAT number this file shipped with
+    // left 0.0625 m over the half-stroke for a sagitta that measures 0.0693 m,
+    // which is why it fired on good paint — real crews lay straight dashes on
+    // bends too. „No wider than the geometry forces" is the check; deleting it
+    // was not the way to stop it firing.
+    const bound = dashChordOffsetM(drawnLine(built, "ov-ln-street").line) + CENTER_LINE_WIDTH_M / 2 + 1e-6;
     for (const d of dashes) {
       expect(Math.abs(d.t)).toBeLessThan(1e-6);
+      expect(cornerSpread(d, 0)).toBeLessThan(bound);
       expect(d.across).toBeCloseTo(CENTER_LINE_WIDTH_M, 9);
     }
-    // …and the whole carriageway carries no OTHER dash — a 1+1 residential has
+    // …and the whole carriageway carries no OTHER PAINT — a 1+1 residential has
     // exactly one internal boundary, so nothing is painted at ±LANE_WIDTH_M.
-    expect(dashesOn(built, "ov-ln-street").filter((d) => Math.abs(d.t) >= 1)).toEqual([]);
+    // Read off the CENSUS, not off `dashesOn`: the version that asked only
+    // „is there another 5.000 m quad?" was green with 25 extra 4.00 m dashes
+    // laid down the middle of the driver's own lane. Every one of this edge's
+    // 103 quads must be the осева's 23 dashes or the 80 М1 edge-line strips.
+    const census = censusOnEdge(built, "ov-ln-street", [0]);
+    expect(census.other).toEqual([]);
+    expect(census.onBoundary.get(0)!.length).toBe(dashes.length);
+    expect(census.edgeLines.length).toBeGreaterThan(0);
+    // …and no quad escaped the census by being painted somewhere else in the
+    // district either: ov-lane-v1 is ONE edge, it paints no М18 triangle, so
+    // every quad the builder booked has to have been read back on it.
+    expect(census.other.length + census.edgeLines.length + census.onBoundary.get(0)!.length).toBe(
+      built.markings.markingQuads,
+    );
 
     // And it runs the WHOLE street, not just the straight bit — the S-bend is
     // the lesson. Both ends inside a dash pitch of the drawn line's own ends.
@@ -499,25 +696,54 @@ describe("the marking each lesson names is on the road", () => {
     // 1+1 residential has one. That is the SAME rule, not two.
     const built = build(OV_KEEPRIGHT);
     const dashes = dashesOn(built, "ov-kr-road");
+    const BOUNDARIES = [-LANE_WIDTH_M, 0, LANE_WIDTH_M];
     // The chord allowance is the offset lines' own: a divider LANE_WIDTH_M out
     // from a bending axis chords across the bend, so its quad centres read a
-    // few centimetres in. Derived from this edge's drawn line, not chosen.
+    // few centimetres in. Derived from this edge's drawn line, not chosen —
+    // and on this one it is 5.7e-14 m, because ov-kr-road is a single straight
+    // segment. Which is why the CORNER bound below bites so hard here.
     const slack = dashChordOffsetM(drawnLine(built, "ov-kr-road").line) + 1e-6;
-    for (const off of [-LANE_WIDTH_M, 0, LANE_WIDTH_M]) {
+    for (const off of BOUNDARIES) {
       const stroke = off === 0 ? CENTER_LINE_WIDTH_M : DASH_WIDTH_M;
       const on = dashes.filter((d) => Math.abs(d.t - off) < LANE_WIDTH_M / 2);
       expect(on.length, `boundary at ${off} m`).toBeGreaterThanOrEqual(20);
       for (const d of on) {
         expect(Math.abs(d.t - off), `boundary at ${off} m`).toBeLessThan(slack);
+        // …with its ENDS on the boundary too, not just its middle. Same reason
+        // as on the осева: the centroid claim above cannot fail at any angle,
+        // and on a straight road the whole budget a dash has is its own
+        // half-stroke — 0.125 m on a divider, 0.1875 m on the осева, which is
+        // exactly what the paint measures.
+        expect(cornerSpread(d, off), `boundary at ${off} m`).toBeLessThan(slack + stroke / 2);
         // …painted at the стъпка that boundary is entitled to: the осева is
         // 1.5× a same-direction divider (T16), and that width is the one cue
         // telling the student which line has oncoming traffic behind it.
         expect(d.across, `boundary at ${off} m`).toBeCloseTo(stroke, 9);
       }
     }
-    // Three internal boundaries and no fourth: every dash on this carriageway
-    // belongs to one of them.
-    expect(dashes.filter((d) => Math.min(...[-LANE_WIDTH_M, 0, LANE_WIDTH_M].map((o) => Math.abs(d.t - o))) >= LANE_WIDTH_M / 2)).toEqual([]);
+    // Three internal boundaries and no fourth — and no other PAINT of any
+    // shape, which is the half that was missing. Filtering `dashesOn` asked
+    // only whether a fourth boundary was drawn in 5.000 m dashes; a fourth
+    // drawn in 4.00 m dashes at t = +4.06 m (the centre of the driver's own
+    // lane) sailed through it. All 83 quads: 81 dashes on the three
+    // boundaries, 2 М1 edge-line strips, nothing else.
+    const census = censusOnEdge(built, "ov-kr-road", BOUNDARIES);
+    expect(census.other).toEqual([]);
+    expect(census.edgeLines.length).toBe(2);
+    // …and the corner bound above really was as tight as it looks: this edge is
+    // one straight segment, so a dash on it has no sagitta to spend and the
+    // whole budget is its own half-stroke.
+    expect(census.sagitta).toBeLessThan(1e-9);
+    // The М1 edge lines sit on the travel/parking boundary here (parkingM = 4 m,
+    // so `edgeOff` is travelHalf itself and not travelHalf − EDGE_LINE_INSET_M).
+    expect(census.edgeOff).toBeCloseTo(16.25, 9);
+    for (const strip of census.edgeLines) expect(Math.abs(strip.t)).toBeCloseTo(census.edgeOff, 9);
+    for (const off of BOUNDARIES) {
+      expect(census.onBoundary.get(off)!.length, `boundary at ${off} m`).toBeGreaterThanOrEqual(20);
+    }
+    expect(
+      census.edgeLines.length + BOUNDARIES.reduce((n, o) => n + census.onBoundary.get(o)!.length, 0),
+    ).toBe(built.markings.markingQuads);
   });
 
   it(`${TJ_EMERGE}: the Б2 arm carries a solid М7 stop line at its mouth — sc-junction-left, refuted`, () => {
@@ -684,15 +910,199 @@ describe("the dashed rhythm is fitted to its run, both ends alike", () => {
     expect(fixedPitchDashCount(DASH_GAP_M / 2 + DASH_LENGTH_M + 0.01)).toBe(1);
 
     const built = build(STUB);
-    expect(dashesOn(built, "stub-e")).toEqual([]);
-    // …and the edge is genuinely marked otherwise, so the zero above is the
-    // dash rule and not a district the painter skipped wholesale.
+    // The absence of PAINT, not the absence of 5.000 m quads. Asked the second
+    // way — `dashesOn(built, "stub-e")` — this test cannot fail: emit ONE 3.00 m
+    // dash on the too-short run and the stub carries a 3 m осева from y = 2.50
+    // to y = 5.50 with all 31 tests green, which is precisely the „must not
+    // invent the stub's first dash" the comment above claims to forbid. A
+    // painter that invents a dash is not going to invent it at the one length
+    // the reader looks for.
+    const census = censusOnEdge(built, "stub-e", [0]);
+    expect(quadsOnEdge(built, "stub-e").filter((q) => Math.abs(q.t) < 1)).toEqual([]);
+    expect(census.onBoundary.get(0)).toEqual([]);
+    expect(census.other).toEqual([]);
+    // …and the edge is genuinely marked otherwise, so the zeroes above are the
+    // dash rule and not a district the painter skipped wholesale: 6.40 m of
+    // drawn line still carries its two М1 edge-line strips at t = ±7.625 m.
     expect(built.markings.markingQuads).toBeGreaterThan(0);
+    expect(census.edgeLines.length).toBe(built.markings.markingQuads);
+    expect(census.edgeLines.length).toBe(2);
+    expect(census.edgeOff).toBeCloseTo(7.625, 9);
+    for (const strip of census.edgeLines) {
+      expect(Math.abs(strip.t)).toBeCloseTo(census.edgeOff, 9);
+      expect(strip.along).toBeCloseTo(drawnLine(built, "stub-e").length, 9);
+    }
   });
 });
 
 // ---------------------------------------------------------------------------
-// 3. markingQuads counts the paint it emitted — including the Б1 М7 line
+// 3. The three checks this battery once deleted, each pinned by the mutation
+//    that walked through the hole
+// ---------------------------------------------------------------------------
+
+/**
+ * Every DASH quad in `quads`, turned `deg` about its OWN centroid.
+ *
+ * The mesh-level twin of turning `paintDashedLine`'s `mid.tangent` by the same
+ * angle, and exactly equivalent to it: `paintQuad` builds a rectangle as
+ * centre ± alongHalf·dir ± acrossHalf·perpRight(dir), so rotating `dir` rotates
+ * all four corners about that centre and moves nothing else. Done here rather
+ * than in markings.ts because a mutation that has to be applied by hand, to a
+ * file this test does not own, gets applied once and then remembered wrongly.
+ */
+function turnDashes(quads: readonly MeshQuad[], deg: number): MeshQuad[] {
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return quads.map((q) => {
+    const along = Math.hypot(q.corners[3][0] - q.corners[0][0], q.corners[3][1] - q.corners[0][1]);
+    if (Math.abs(along - DASH_LENGTH_M) >= 1e-3) return q;
+    const c: Vec2 = [
+      (q.corners[0][0] + q.corners[1][0] + q.corners[2][0] + q.corners[3][0]) / 4,
+      (q.corners[0][1] + q.corners[1][1] + q.corners[2][1] + q.corners[3][1]) / 4,
+    ];
+    const turn = (p: Vec2): Vec2 => [
+      c[0] + (p[0] - c[0]) * cos - (p[1] - c[1]) * sin,
+      c[1] + (p[0] - c[0]) * sin + (p[1] - c[1]) * cos,
+    ];
+    return { corners: q.corners.map(turn) as [Vec2, Vec2, Vec2, Vec2], idx0: q.idx0 };
+  });
+}
+
+/**
+ * One extra rectangle on an edge's drawn line, `alongM` × `acrossM`, centred
+ * `s` along that line and `t` beside it — the mesh-level twin of one extra
+ * `paintQuad` call. `idx0` is −1: nothing here splices it back into a buffer.
+ */
+function phantomQuad(
+  built: Built,
+  edgeId: string,
+  at: { s: number; t: number; alongM: number; acrossM: number },
+): MeshQuad {
+  const { line } = drawnLine(built, edgeId);
+  const f = pointAlong(line, at.s);
+  const r = perpRight(f.tangent);
+  const c = add(f.point, mul(r, at.t));
+  const corner = (a: number, b: number): Vec2 =>
+    add(add(c, mul(f.tangent, (a * at.alongM) / 2)), mul(r, (b * at.acrossM) / 2));
+  // paintQuad's own order: back-left, back-right, front-right, front-left.
+  return { corners: [corner(-1, -1), corner(-1, 1), corner(1, 1), corner(1, -1)], idx0: -1 };
+}
+
+/** A whole extra dashed line at offset `t`, walked at the fixed pitch. */
+function phantomLine(built: Built, edgeId: string, t: number, alongM: number, acrossM: number): MeshQuad[] {
+  const total = polylineLength(drawnLine(built, edgeId).line);
+  const out: MeshQuad[] = [];
+  for (let s = DASH_GAP_M / 2; s + alongM < total; s += alongM + DASH_GAP_M) {
+    out.push(phantomQuad(built, edgeId, { s, t, alongM, acrossM }));
+  }
+  return out;
+}
+
+describe("the three checks a green wave deleted, and the paint each one lets through", () => {
+  // These are not hypotheticals. Each mutation below was constructed by the
+  // refuter that reopened this file, applied to markings.ts, and run: all 31
+  // tests stayed GREEN on every one of them. They are reproduced here on the
+  // mesh — which is where every assertion in this file reads anyway — so that
+  // „this check is real" is itself a check, and so the next person to answer a
+  // failing assertion by widening it has to delete a test that says why.
+
+  it("the осева check convicts a dash TURNED across the road — 10° and 15°", () => {
+    // A · the centroid hole. `|t| < 1e-6` on the quad CENTRE replaced `|t| <
+    // 0.25` on every VERTEX, and a rectangle's centroid does not move when the
+    // rectangle turns about it, so the assertion titled „ON THE AXIS, not
+    // merely near it" could not fail at ANY angle — 10°, 15°, or 90°.
+    const built = build(OV_LANE);
+    const real = readQuads(built.markings.markings.indicesView, built.markings.markings.positionsView);
+    const bound = dashChordOffsetM(drawnLine(built, "ov-ln-street").line) + CENTER_LINE_WIDTH_M / 2 + 1e-6;
+    expect(bound).toBeCloseTo(0.3024, 4);
+
+    for (const [deg, corner] of [
+      [10, 0.685],
+      [15, 0.892],
+    ] as const) {
+      const turned = dashesOn(built, "ov-ln-street", turnDashes(real, deg));
+      // …invisible to everything the weakened test asserted: same 23 dashes,
+      // same 5.000 m length, same 0.375 m stroke, centroids still on the axis
+      // to 6e-15 m. Every one of these lines passes on the mutated mesh.
+      expect(turned.length).toBe(23);
+      for (const d of turned) {
+        expect(Math.abs(d.t), `${deg}°`).toBeLessThan(1e-6);
+        expect(d.across, `${deg}°`).toBeCloseTo(CENTER_LINE_WIDTH_M, 9);
+      }
+      // …and convicted the moment the corners are read. 0.685 m at 10° is
+      // 3.7× the осева's own half-stroke: paint standing that far out of the
+      // lane it divides is the defect a student would drive into.
+      const worst = Math.max(...turned.map((d) => cornerSpread(d, 0)));
+      expect(worst, `${deg}°`).toBeGreaterThan(bound);
+      expect(worst, `${deg}°`).toBeCloseTo(corner, 2);
+    }
+  });
+
+  it("the stub check convicts ONE invented 3 m dash", () => {
+    // B · the shape hole. „A run too short for one whole dash stays unpainted"
+    // was asserted as „there is no 5.000 m quad here", which is not what it
+    // says: the natural way to break it is a painter that CENTRES A SHORTER
+    // dash when the fixed walk fits none — 3.00 m because that is what fits,
+    // from y = 2.50 to y = 5.50 down the middle of an 8 m stub. All 31 tests
+    // were green with that осева painted.
+    const built = build(STUB);
+    const real = readQuads(built.markings.markings.indicesView, built.markings.markings.positionsView);
+    const { line } = drawnLine(built, "stub-e");
+    const invented = phantomQuad(built, "stub-e", {
+      s: polylineLength(line) / 2,
+      t: 0,
+      alongM: 3,
+      acrossM: CENTER_LINE_WIDTH_M,
+    });
+    const mutated = [...real, invented];
+
+    // The assertion that was here says nothing at all about this paint…
+    expect(dashesOn(built, "stub-e", mutated)).toEqual([]);
+    // …while the paint is unmistakably there, 3.00 m of осева from s = 2.50 m
+    // to s = 5.50 m of an edge whose whole drawn line is 6.40 m.
+    const painted = quadsOnEdge(built, "stub-e", mutated).filter((q) => Math.abs(q.t) < 1);
+    expect(painted.length).toBe(1);
+    expect(painted[0]!.along).toBeCloseTo(3, 9);
+    expect(painted[0]!.from).toBeCloseTo(2.5, 9);
+    expect(painted[0]!.to).toBeCloseTo(5.5, 9);
+    // …and the census convicts it as paint the painter had no licence to lay.
+    expect(censusOnEdge(built, "stub-e", [0], mutated).other.length).toBe(1);
+  });
+
+  it("the census convicts a phantom boundary down the middle of the driver's own lane", () => {
+    // C · the length hole. Every „no other paint" claim read `dashesOn`, so it
+    // could only see 5.000 m quads. One extra dashed line at t = +4.06 m — the
+    // `laneCenterRightM` both districts author, i.e. the centre of the lane the
+    // student is being taught to hold — drawn in 4.00 m dashes was invisible to
+    // all of them: 25 phantom dashes on ov-lane-v1 beside the 23 real ones,
+    // markingQuads 103 → 128, 31/31 green.
+    for (const [id, edgeId, boundaries] of [
+      [OV_LANE, "ov-ln-street", [0]],
+      [OV_KEEPRIGHT, "ov-kr-road", [-LANE_WIDTH_M, 0, LANE_WIDTH_M]],
+    ] as const) {
+      const built = build(id);
+      const real = readQuads(built.markings.markings.indicesView, built.markings.markings.positionsView);
+      const phantom = phantomLine(built, edgeId, 4.06, 4, DASH_WIDTH_M);
+      expect(phantom.length, id).toBeGreaterThan(20);
+      const mutated = [...real, ...phantom];
+
+      // Not one of the 4 m dashes is a „dash" to the reader that was here…
+      expect(dashesOn(built, edgeId, mutated).length, id).toBe(dashesOn(built, edgeId).length);
+      // …and t = +4.06 m is inside boundary 0's half-lane band, so even a band
+      // widened to catch it would have filed it under the осева rather than
+      // reporting it. The census convicts on SHAPE AND PLACE together.
+      expect(Math.abs(4.06 - 0)).toBeLessThan(LANE_WIDTH_M / 2);
+      expect(censusOnEdge(built, edgeId, boundaries, mutated).other.length, id).toBe(phantom.length);
+    }
+    // The count the refuter reported on ov-lane-v1, pinned: 25 phantom dashes.
+    const built = build(OV_LANE);
+    expect(phantomLine(built, "ov-ln-street", 4.06, 4, DASH_WIDTH_M).length).toBe(25);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. markingQuads counts the paint it emitted — including the Б1 М7 line
 // ---------------------------------------------------------------------------
 
 describe("WorldStats.markingQuads is a count, not an estimate", () => {
@@ -731,7 +1141,7 @@ describe("WorldStats.markingQuads is a count, not an estimate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. An angled crossing cannot hang the build
+// 5. An angled crossing cannot hang the build
 // ---------------------------------------------------------------------------
 
 /**
@@ -912,7 +1322,7 @@ describe("paintZebra survives an out-of-domain skew", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. assertDistrict guards every field District declares required
+// 6. assertDistrict guards every field District declares required
 // ---------------------------------------------------------------------------
 
 describe("assertDistrict checks what District declares", () => {

@@ -293,7 +293,7 @@ describe("narrowMeeting (integration)", () => {
     const res = dir.step(synthFrame(1.4, -4.06, 120, 20));
 
     expect(res.outcomes[0]?.detail).toBe("collision");
-    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle", actorId: "b80-synth" });
     expect(res.events).toContainEqual({
       kind: "prioritySituation",
       situation: "narrow-meeting",
@@ -328,14 +328,14 @@ describe("narrowMeeting (integration)", () => {
     // Now put the two bodies in the same place. The runner is long retired.
     port.set({ x: -4.06, y: 126, s: 114, speedMps: 0 });
     const res = dir.step(synthFrame(9, -4.06, 124, 20));
-    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    expect(res.events).toContainEqual({ kind: "collision", withWhat: "vehicle", actorId: "b80-synth" });
     // Contact is a STATE and the sentinel reports the state, every frame the
     // bodies are inside each other. Turning that into a count of accidents is
     // the rule engine's job alone (`collisionSeparationSec`) — the trace gate
     // proves the arithmetic end to end: sc-ov-narrow's barge overlaps for 110
     // consecutive frames and the student is billed exactly one COLLISION.
     const again = dir.step(synthFrame(9.1, -4.06, 124, 20));
-    expect(again.events).toContainEqual({ kind: "collision", withWhat: "vehicle" });
+    expect(again.events).toContainEqual({ kind: "collision", withWhat: "vehicle", actorId: "b80-synth" });
   });
 
   it("B80: the meeting is not OVER while the oncoming is still ahead of the player", () => {

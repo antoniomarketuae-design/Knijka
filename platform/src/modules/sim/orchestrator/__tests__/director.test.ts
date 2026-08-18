@@ -189,7 +189,15 @@ describe("scenario director core", () => {
     view.y = 91;
     view.s = 9.7; // mid-road
     const res = director.step(frame(1.4, 90.2, 42));
-    expect(res.events).toContainEqual({ kind: "collision", withWhat: "pedestrian" });
+    // …AND IT NAMES WHICH BODY. The report used to carry the category alone,
+    // which forced the rule engine to latch per KIND — two staged pedestrians
+    // struck in one window then billed once. `actorId` is asserted, not
+    // tolerated: a report that dropped it would pass a `toMatchObject`.
+    expect(res.events).toContainEqual({
+      kind: "collision",
+      withWhat: "pedestrian",
+      actorId: "t-dart",
+    });
     expect(res.outcomes[0]).toMatchObject({ success: false, detail: "collision" });
   });
 

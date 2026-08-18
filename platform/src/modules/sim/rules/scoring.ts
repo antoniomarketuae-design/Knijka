@@ -235,23 +235,57 @@ function closesTheLedger(e: ScorableEvent): boolean {
   return e.kind === "violation" && e.terminateSession === true && e.severityClass === "opasna";
 }
 
-export function accumulateScore(events: ReadonlyArray<ScorableEvent>): ScoreBreakdown {
+/**
+ * WHICH ROWS THE LEDGER ACTUALLY CHARGED — one flag per event of `events`, in
+ * the same order, `false` for the ones the closure taught instead of scoring.
+ *
+ * IT EXISTS BECAUSE `unscoredAfterClose` IS A COUNT, AND A COUNT CANNOT BE
+ * PRINTED NEXT TO A ROW. Every surface that lists faults was therefore summing
+ * `points` itself, which is the ledger's own arithmetic performed WITHOUT the
+ * closure — and it said so out loud. Measured 2026-08-18 on the
+ * sc-hz-accident-scene squeeze (a car and a pedestrian struck 0.3 s apart): the
+ * verdict read «10 наказателни точки», and the mistake list two lines below it
+ * read «20 наказателни т.» over the same two rows. Both numbers came out of
+ * this module; only one of them came out of this function.
+ *
+ * The closure rule is not restated here — `accumulateScore` folds this array,
+ * so the flags and the totals cannot drift apart by construction.
+ */
+export function ledgerBilling(events: ReadonlyArray<ScorableEvent>): boolean[] {
   const closeAt = ledgerCloseTime(events);
-  let score = emptyScore();
-  score.ledgerClosedAtSec = closeAt;
   // The exam ends once, so the fault that ends it is billed once — including
   // against a copy sharing the closing frame, which `t > closeAt` cannot see.
   let closerBilled = false;
+  const billed: boolean[] = [];
   for (const e of events) {
-    if (e.kind !== "violation") continue;
+    if (e.kind !== "violation") {
+      billed.push(false);
+      continue;
+    }
     if ((closeAt !== null && e.t > closeAt) || (closesTheLedger(e) && closerBilled)) {
       // Taught, not scored — the exam was already over when this happened.
-      score = { ...score, unscoredAfterClose: score.unscoredAfterClose + 1 };
+      billed.push(false);
       continue;
     }
     // Set BEFORE the fold step so the closer is applied exactly once; that
     // application is what makes `hasDangerous` true at every closed ledger.
     if (closesTheLedger(e)) closerBilled = true;
+    billed.push(true);
+  }
+  return billed;
+}
+
+export function accumulateScore(events: ReadonlyArray<ScorableEvent>): ScoreBreakdown {
+  const billed = ledgerBilling(events);
+  let score = emptyScore();
+  score.ledgerClosedAtSec = ledgerCloseTime(events);
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    if (e.kind !== "violation") continue;
+    if (!billed[i]) {
+      score = { ...score, unscoredAfterClose: score.unscoredAfterClose + 1 };
+      continue;
+    }
     score = applyViolation(score, e);
   }
   return score;

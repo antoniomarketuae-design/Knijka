@@ -223,12 +223,17 @@ export type DriveStep =
   | { kind: "annotation"; textBg: string }
   /**
    * S1 mistake-demo seam: an AUTHORED consequence at the current clock — the
-   * scripted „пешеходец зад колата" of a no-observation demo. Pushed into the
-   * production runtime (pushCollision), so the rule engine grades it exactly
-   * like a physics contact would; it is a scripted narrative beat, never a
-   * geometric check (those are `obstacles` below).
+   * scripted „пешеходец зад колата" of a no-observation demo. Queued into the
+   * next frame's tick exactly as a physics contact would be, so the rule engine
+   * grades it identically; it is a scripted narrative beat, never a geometric
+   * check (those are `obstacles` below).
+   *
+   * `id` names the struck body for the engine's per-body episode. Omitted, the
+   * beat is anonymous and falls back to per-category grading — which is right
+   * for a script that stages ONE consequence, and wrong the moment a script
+   * stages two of the same kind, so a two-body script must name them.
    */
-  | { kind: "collision"; withWhat: TraceCollisionWith }
+  | { kind: "collision"; withWhat: TraceCollisionWith; id?: string }
   /**
    * Cockpit-state channels (capability phase — the AC/VP unlock). Each sets a
    * discrete telemetry channel the rule engine reads, at the current clock,
@@ -280,6 +285,18 @@ export interface ObstacleRect2D {
   halfWidthM: number;
   halfLengthM: number;
   withWhat: TraceCollisionWith;
+  /**
+   * WHICH BODY THIS RECT IS, for the rule engine's per-body contact episode
+   * (`SimTickEvent.actorId`). Defaults to the rect's INDEX in the authored
+   * array, which is already a stable identity within one recording — supply a
+   * name only when a set is reordered often enough for the index to lie.
+   *
+   * It exists because the index was in scope and thrown away. Two wreck rects
+   * on `sc-hz-accident-scene` (y = 150, y = 162) are struck 1.1 s apart, inside
+   * `collisionSeparationSec`; with the engine latching per KIND the second car
+   * billed nothing at all.
+   */
+  id?: string;
   /**
    * TIMED-OBSTACLE activation (doc 72 VU-04 „Вратата" — the door-swing
    * unlock): the rect is INERT until the PLAYER first comes within
@@ -620,7 +637,21 @@ export function recordScriptedDrive(
   const obstacles = options.obstacles ?? [];
   const obstacleContact = new Array<boolean>(obstacles.length).fill(false);
   const obstacleArmed = obstacles.map((o) => o.trigger === undefined);
+  const obstacleIds = obstacles.map((o, i) => o.id ?? `obstacle-${i}`);
   const collisionMinKmh = options.collisionMinKmh ?? 10;
+  /**
+   * CONTACT REPORTS WAITING FOR A TICK TO RIDE IN — the recorder's own half of
+   * the `pushCollision` contract, kept here rather than in the runtime's queue
+   * because the runtime's queue cannot carry WHICH BODY was struck and this
+   * loop knows (see ObstacleRect2D.id).
+   *
+   * Timing is preserved exactly, which is the whole reason it is a queue and
+   * not a direct push: the obstacle sweep below runs at the TOP of `stepStack`
+   * and drains at the bottom of the SAME frame's `sample()` — as the runtime
+   * queue did — while a scripted `collision` step runs BETWEEN frames and so
+   * drains on the NEXT one, again as before.
+   */
+  const pendingContacts: Array<{ withWhat: TraceCollisionWith; actorId?: string }> = [];
   const heroRect = {
     x: 0,
     y: 0,
@@ -631,8 +662,8 @@ export function recordScriptedDrive(
 
   /** One production-ordered frame: runtime → traffic → sample → director → rules. */
   const stepStack = () => {
-    // Obstacle contacts push BEFORE sample() — the pushCollision contract
-    // (events drain into the next tick, exactly like a physics handler).
+    // Obstacle contacts queue BEFORE sample() — the pushCollision contract
+    // (events drain into that tick, exactly like a physics handler).
     if (obstacles.length > 0) {
       heroRect.x = pose.x;
       heroRect.y = pose.y;
@@ -654,7 +685,12 @@ export function recordScriptedDrive(
         }
         const hit = obstacleRectsOverlap(heroRect, obstacles[i]);
         if (hit && !obstacleContact[i] && speedKmh >= collisionMinKmh) {
-          runtime.pushCollision(obstacles[i].withWhat);
+          // `i` IS THE DISCRIMINATOR, and it used to die on this line. The latch
+          // above is already per rect — a second rect struck while the first is
+          // still overlapping is a second body — but the report handed the rule
+          // engine only `withWhat`, which made the engine latch per KIND and
+          // gave the second wrecked car away free.
+          pendingContacts.push({ withWhat: obstacles[i].withWhat, actorId: obstacleIds[i] });
         }
         obstacleContact[i] = hit;
       }
@@ -685,6 +721,17 @@ export function recordScriptedDrive(
     };
     pendingGlance = null;
     const tick = runtime.sample(vehicleSample, t, isNight, rain, leadGap, fog, snow);
+    // …and drain HERE, before the director reads `tick.events`: that is exactly
+    // where the runtime's own queue used to put them, so the director sees the
+    // same stream it always did.
+    while (pendingContacts.length > 0) {
+      const c = pendingContacts.shift()!;
+      tick.events.push(
+        c.actorId === undefined
+          ? { kind: "collision", withWhat: c.withWhat }
+          : { kind: "collision", withWhat: c.withWhat, actorId: c.actorId },
+      );
+    }
     if (director) {
       const res = director.step({
         tSec: t,
@@ -743,8 +790,13 @@ export function recordScriptedDrive(
     }
     if (step.kind === "collision") {
       // Authored consequence — drains into the NEXT frame's tick (a pause or
-      // drive step must follow so a frame exists to grade it).
-      runtime.pushCollision(step.withWhat);
+      // drive step must follow so a frame exists to grade it), because this
+      // runs BETWEEN frames while the queue is drained inside one.
+      pendingContacts.push(
+        step.id === undefined
+          ? { withWhat: step.withWhat }
+          : { withWhat: step.withWhat, actorId: step.id },
+      );
       continue;
     }
     if (step.kind === "headlights") {

@@ -31,6 +31,7 @@ import {
   buildSessionSummary,
   createRuleEngine,
   isScorableEvent,
+  ledgerBilling,
   reduceTick,
   type RuleEngineConfig,
   type RuleEvent,
@@ -1139,11 +1140,34 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
   const completedAll = objectives.every((o) => o.done);
   const aborted = state.phase === "aborted";
 
-  // A9: fold the coach's repeat escalations into the training-layer score.
-  // The official verdict below stays on official base points (see
-  // escalation.ts header for the rationale).
+  /**
+   * A9: fold the coach's repeat escalations into the training-layer score. The
+   * official verdict below stays on official base points (see escalation.ts's
+   * header for the rationale).
+   *
+   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — the training total is a
+   * WEIGHTING of the exam's arithmetic, not a second arithmetic. Handed the
+   * whole mistake list it silently re-instates every fault Наредба № 38,
+   * чл. 48, ал. 3 closed over, and then escalates them.
+   *
+   * MEASURED 2026-08-18, `sc-hz-accident-scene` L3: a wrecked car struck at
+   * t = 13.13 and a bystander at t = 13.43. The exam ended at the first —
+   * `score` 10, `unscoredAfterClose` 1. This call, over both rows, returned 25:
+   * the free row's ten points came back, and the coach had additionally graded
+   * it a REPEAT (×1.5) because it saw a second event with the same code. Two
+   * victims in one crash are not a repeat of anything; the student read
+   * «повторна грешка ×1.5» and «Тренировъчен резултат: 25 наказателни т.»
+   * beside an official 10, three numbers for one drive.
+   *
+   * Filtering the MISTAKES fixes both halves at once, because escalation.ts
+   * pairs its records to events by (code, t): a row that is not folded cannot
+   * carry its record either, so the false «повторна грешка» disappears with the
+   * false total. A genuine repeat — two red lights, no termination — is
+   * untouched: nothing closes that ledger, so every row is still billed.
+   */
+  const billed = ledgerBilling(summary.mistakes);
   const { effectiveTotalPoints, escalated } = applyEscalations(
-    summary.mistakes,
+    summary.mistakes.filter((_, i) => billed[i]),
     state.penaltyEscalations,
   );
 

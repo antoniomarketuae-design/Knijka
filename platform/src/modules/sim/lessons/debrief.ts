@@ -34,6 +34,7 @@ import {
   EXAM_VS_CONTROL_POINTS_BG,
   SEVERITY_POINTS,
   VIOLATIONS,
+  actCopy,
   billRoadConsequences,
   deriveSpeedingBand,
   examMarkFor,
@@ -41,6 +42,7 @@ import {
   formatEur,
   gravestViolation,
   instrumentLabelBg,
+  ledgerBilling,
   offenceCoveredLineBg,
   parseSpeedMeasurement,
   pointsBg,
@@ -122,7 +124,27 @@ interface MistakeGroup {
   severityLabel: string;
   points: number;
   count: number;
+  /**
+   * Points the LEDGER charged for this group — Σ over its BILLED rows only
+   * (`rules/scoring.ts ledgerBilling`), which is not Σ `points`. Faults after
+   * the exam ended are shown and taught but cost nothing (Наредба № 38, чл. 48,
+   * ал. 3), and summing them here is how one drive came to print «20
+   * наказателни т.» four lines under a verdict of «10».
+   */
   totalPoints: number;
+  /** How many of `count` rows the ledger actually charged. */
+  billedCount: number;
+  /**
+   * The ACT this group is, when its code grades more than one
+   * (`rules/catalog.ts actCopy`): the struck body for COLLISION, the act for
+   * RAIL_CROSSING_VIOLATION. Undefined for every code that pools one string.
+   * Part of the group KEY — see `groupMistakes`.
+   */
+  actKey: string | undefined;
+  /** The act's own authored explanation, when it has one. */
+  actExplanationBg: string | undefined;
+  /** Session times of this group's events — pairs it to its escalation records. */
+  times: number[];
   /**
    * The speeding measurement of the WORST event in the group, when the code
    * carries one (`rules/consequences.ts encodeSpeedMeasurement`). Grouping
@@ -376,14 +398,26 @@ export function buildDebrief(
 
   // -- mistakes ---------------------------------------------------------------
   const mistakeBlock: string[] = [];
-  // A9: repeat mistakes graded harder (×1.5/×2.0) — name that per group and
-  // show the training total, keeping the official score clearly separate.
-  const maxEscalationByCode = new Map<string, number>();
+  /**
+   * A9: repeat mistakes graded harder (×1.5/×2.0) — name that per group and show
+   * the training total, keeping the official score clearly separate.
+   *
+   * PAIRED BY (code, t), NOT BY CODE. An escalation record names the EVENT it
+   * escalated, and with one row per ACT a code can now own two groups: keying
+   * this by code alone printed «повторна грешка ×1.5» on the vehicle row for a
+   * multiplier the PEDESTRIAN row had earned. (Two victims in one crash are not
+   * a repeat at all — that is fixed where the record is made, in engine.ts's
+   * `buildLessonResult`; this pairing is what stops a real repeat's note from
+   * landing on the wrong act.)
+   */
+  const escalationAt = new Map<string, number>();
   for (const esc of result.escalations) {
-    const prev = maxEscalationByCode.get(esc.code) ?? 1;
-    if (esc.multiplier > prev) maxEscalationByCode.set(esc.code, esc.multiplier);
+    const key = `${esc.code}@${esc.t}`;
+    const prev = escalationAt.get(key) ?? 1;
+    if (esc.multiplier > prev) escalationAt.set(key, esc.multiplier);
   }
-  const groups = groupMistakes(summary.mistakes);
+  const ledgerBilled = ledgerBilling(summary.mistakes);
+  const groups = groupMistakes(summary.mistakes, ledgerBilled);
   /**
    * ONE ACT, ONE ROAD PRICE — the same ruling the result screen renders
    * (rules/offences.ts), applied to the text so the two surfaces cannot say
@@ -410,9 +444,15 @@ export function buildDebrief(
     // these points belong to. „10 т." with no unit reads as контролни точки.
     mistakeBlock.push(EXAM_VS_CONTROL_POINTS_BG);
     let anyBlank = false;
+    /** Codes whose road half has already been printed on an earlier act row. */
+    const roadSaidForCode = new Set<string>();
     for (const g of groups.slice(0, MAX_MISTAKE_LINES)) {
       const times = g.count > 1 ? ` ×${g.count}` : "";
-      const escMult = maxEscalationByCode.get(g.code);
+      let escMult: number | undefined;
+      for (const tAt of g.times) {
+        const m = escalationAt.get(`${g.code}@${tAt}`);
+        if (m !== undefined && (escMult === undefined || m > escMult)) escMult = m;
+      }
       const escNote = escMult !== undefined ? ` — повторна грешка ×${fmtPoints(escMult)}` : "";
       // The citation on this line is now the clause the POINTS come from
       // (Наредба № 38, приложение № 5, т. 10), with the rule that was broken
@@ -420,9 +460,43 @@ export function buildDebrief(
       // up looking like the source of a ten-point exam mark.
       const mark = codeIsKnown(g.code) ? examMarkFor(g.code as ViolationCode) : null;
       const basis = mark === null ? g.lawRef : `${mark.citationBg}; правилото: ${g.lawRef}`;
-      mistakeBlock.push(
-        `• ${g.titleBg}${times} — ${g.severityLabel}, ${pts(g.totalPoints)} по изпитния лист (${basis})${escNote}`,
-      );
+      /**
+       * THE MONEY HALF OF THE ROW, and it has two readings because the ledger
+       * has two. A group the exam charged prints its charge; a group it closed
+       * over prints WHY it is free instead of printing a zero, because „0
+       * наказателни т." next to «Удар в пешеходец» reads as „this did not
+       * matter" — the precise opposite of the lesson.
+       */
+      /**
+       * …AND A ×N ROW HAS TO SAY WHICH OF THE N WERE CHARGED, or the figure is
+       * ambiguous in exactly the way this lane exists to end. On the real L3
+       * squeeze the student strikes two wrecked cars and a bystander, and the
+       * vehicle row reads «×2 … 10 наказателни т.» — the same «10» a single
+       * crash prints. Without this clause the reader has to guess whether two
+       * crashes cost ten or whether one of them is missing from the sum.
+       */
+      const partial =
+        g.billedCount > 0 && g.billedCount < g.count
+          ? ` (от тях ${g.billedCount} влиза в точките)`
+          : "";
+      const priced =
+        g.billedCount > 0
+          ? `${pts(g.totalPoints)} по изпитния лист${partial} (${basis})`
+          : `без допълнителни точки — изпитът вече беше прекратен (${basis})`;
+      mistakeBlock.push(`• ${g.titleBg}${times} — ${g.severityLabel}, ${priced}${escNote}`);
+      /**
+       * WHAT WAS STRUCK, IN ITS OWN WORDS (THEO-4). `makeViolation` stamps the
+       * act's authored explanation onto the event and this list used to drop it
+       * on the floor: on the drive that opened this lane the debrief never once
+       * contained the word «пешеходец», though the student had run a man over.
+       * Printed only where the code grades more than one act (COLLISION's four
+       * bodies, the three rail acts), because everywhere else the corrective
+       * below already carries the teaching and a second paragraph per row would
+       * bury it.
+       */
+      if (g.actExplanationBg !== undefined) {
+        mistakeBlock.push(`  → Какво стана: ${g.actExplanationBg}`);
+      }
       // A15: the authored corrective — WHAT the right action was, from the
       // violation catalog (ADR-002: authored copy, never generated). Part of
       // the grounding draft for the post-Alpha LLM debrief: the LLM may
@@ -441,16 +515,28 @@ export function buildDebrief(
       // and on the street a camera sends you a фиш for X." Retrieved, never
       // recalled — and silent rather than invented where we hold nothing.
       const covered = coveredElsewhere(g.code);
+      /**
+       * …AND IT IS PRICED BY CODE, so a code split across two ACT rows must not
+       * print its money twice. `roadLines` takes a code and nothing else, so the
+       * two rows of one crash would carry the identical «глоба 153,39 €»
+       * paragraph and a student adding them up reads 306,78 € for one impact.
+       * The figure we hold is per code; saying it once is the whole of what the
+       * data supports.
+       */
+      const roadAlreadySaid = roadSaidForCode.has(g.code);
       const road =
         covered !== null
           ? // ONE ACT, ONE PRICE. Not silence and not a repeat of the figure:
             // the sentence that says WHERE the price is and why the two faults
             // are one offence — the same finding the fault card renders.
             [offenceCoveredLineBg(covered)]
-          : codeIsKnown(g.code)
-            ? roadLines(g.code as ViolationCode, g.worstSpeedDetail)
-            : [];
+          : roadAlreadySaid
+            ? ["Санкцията на пътя за това нарушение е изписана на реда по-горе — не я броим втори път тук."]
+            : codeIsKnown(g.code)
+              ? roadLines(g.code as ViolationCode, g.worstSpeedDetail)
+              : [];
       if (road.length === 0) anyBlank = true;
+      else if (covered === null && !roadAlreadySaid) roadSaidForCode.add(g.code);
       for (const line of road) mistakeBlock.push(`  → ${line}`);
     }
     if (anyBlank) {
@@ -460,6 +546,26 @@ export function buildDebrief(
     }
     if (groups.length > MAX_MISTAKE_LINES) {
       mistakeBlock.push(`• …и още ${groups.length - MAX_MISTAKE_LINES} вида нарушения — виж пълния списък в резултата.`);
+    }
+    /**
+     * THE RECONCILIATION, SAID OUT LOUD. `unscoredAfterClose` has existed since
+     * the ledger learned to close and no surface ever printed it, so a student
+     * was left to reconcile a verdict of 10 against a list of two dangerous
+     * rows in his own head — and the arithmetic he would do there is 20. The
+     * list is deliberately NOT trimmed to the billed rows: чл. 48, ал. 3 ends
+     * the exam, not the drive, and what happened after it is exactly what the
+     * simulator kept running to teach.
+     */
+    if (summary.score.unscoredAfterClose > 0) {
+      const rest =
+        summary.score.unscoredAfterClose === 1
+          ? "затова следващото нарушение се показва, но не добавя точки"
+          : `затова следващите ${summary.score.unscoredAfterClose} нарушения се показват, но не добавят точки`;
+      mistakeBlock.push(
+        `• Само първата опасна грешка влиза в точките: изпитът се прекратява при нея ` +
+          `(Наредба № 38, чл. 48, ал. 3), ${rest}. Показани са, защото в симулатора продължихме да ` +
+          `караме за упражнение — на истински изпит дотук щеше да е свършило.`,
+      );
     }
     if (result.effectiveScore > result.score) {
       mistakeBlock.push(
@@ -917,18 +1023,53 @@ function excessOf(detail: string | undefined): number | null {
   return m === null ? null : m.measuredKmh - m.limitKmh;
 }
 
-function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] {
-  const byCode = new Map<string, MistakeGroup>();
-  for (const m of mistakes) {
-    const g = byCode.get(m.code);
+/**
+ * ONE ROW PER ACT, PRICED BY THE LEDGER — not one row per CODE, priced by
+ * addition.
+ *
+ * MEASURED 2026-08-18, `sc-hz-accident-scene` L3, the tight-and-fast squeeze:
+ * the student strikes a wrecked car and then a bystander 0.3 s later. The
+ * engine bills both, `makeViolation` stamps each with its own authored copy
+ * («Удар в друго превозно средство» / «Удар в пешеходец»), the ledger closes at
+ * the first and scores 10 — and this function collapsed the two into one group
+ * by CODE, took the FIRST row's title for both, and added the points. The
+ * debrief then told a seventeen-year-old, in four separate false sentences,
+ * that he had hit two VEHICLES for 20 points as a REPEATED mistake worth a
+ * training total of 25. «Пешеходец» appeared nowhere in it. The one thing that
+ * actually happened — he ran over a person — was the thing grouping deleted.
+ *
+ * So the key is (code, act) and the price is what `ledgerBilling` says was
+ * charged. Both halves matter and each defends a direction:
+ *  · keying on the ACT alone would split a speeding group by its measurement
+ *    (`detail` carries the km/h) and print five rows for one continuing
+ *    offence, so only codes with AUTHORED per-act copy split — `actCopy`
+ *    answers that, and answers it from the catalogue rather than from a list
+ *    kept here that would rot the next time a code grades two acts;
+ *  · summing `points` would keep publishing a figure the verdict contradicts,
+ *    and it is the SHOWN rows that make the list long, so `count` still counts
+ *    every row and only the money follows the ledger.
+ */
+function groupMistakes(
+  mistakes: ReadonlyArray<ViolationEvent>,
+  billed: ReadonlyArray<boolean>,
+): MistakeGroup[] {
+  const byAct = new Map<string, MistakeGroup>();
+  mistakes.forEach((m, i) => {
+    const act = codeIsKnown(m.code) ? actCopy(m.code as ViolationCode, m.detail) : null;
+    const actKey = act === null ? undefined : m.detail;
+    const paid = billed[i] === true ? m.points : 0;
+    const key = `${m.code}|${actKey ?? ""}`;
+    const g = byAct.get(key);
     if (g) {
       g.count += 1;
-      g.totalPoints += m.points;
+      g.billedCount += billed[i] === true ? 1 : 0;
+      g.totalPoints += paid;
+      g.times.push(m.t);
       const here = excessOf(m.detail);
       const best = excessOf(g.worstSpeedDetail);
       if (here !== null && (best === null || here > best)) g.worstSpeedDetail = m.detail;
     } else {
-      byCode.set(m.code, {
+      byAct.set(key, {
         code: m.code,
         titleBg: m.titleBg,
         lawRef: m.lawRef,
@@ -937,13 +1078,22 @@ function groupMistakes(mistakes: ReadonlyArray<ViolationEvent>): MistakeGroup[] 
         severityLabel: SEVERITY_LABEL[m.severityClass],
         points: m.points,
         count: 1,
-        totalPoints: m.points,
+        billedCount: billed[i] === true ? 1 : 0,
+        totalPoints: paid,
+        actKey,
+        actExplanationBg: act?.explanationBg,
+        times: [m.t],
         worstSpeedDetail: excessOf(m.detail) === null ? undefined : m.detail,
       });
     }
-  }
-  return [...byCode.values()].sort((a, b) => {
+  });
+  return [...byAct.values()].sort((a, b) => {
     const rank = SEVERITY_RANK[b.severityClass] - SEVERITY_RANK[a.severityClass];
-    return rank !== 0 ? rank : b.totalPoints - a.totalPoints;
+    if (rank !== 0) return rank;
+    const paid = b.totalPoints - a.totalPoints;
+    // A row the closure zeroed still outranks a lighter one that was charged —
+    // running a person over is not the least of the drive because the exam had
+    // already ended. Ties inside a class fall back to how many rows there were.
+    return paid !== 0 ? paid : b.count - a.count;
   });
 }
