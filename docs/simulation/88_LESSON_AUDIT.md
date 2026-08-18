@@ -5760,7 +5760,7 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after two repair waves, 2026-08-18
+# THE OPEN LIST — after three repair waves, 2026-08-18
 
 > **This section is hand-maintained, and it has to be said out loud** because everything above this
 > line is a tally of the frozen corpus and nothing below it can be: it is about *code written after
@@ -5783,50 +5783,127 @@ under. No finding was placed by hand and none was left out.
 
 ## 0 · The gate, exactly as it stands
 
-Run over the whole tree on 2026-08-18 with the wave-2 diff in the working tree, **each command's own
-exit code read directly and never through a pipe** — `| tail` reports the *pipe's* status and has
-already once reported a red suite in this project as `EXIT:0`. `[gated]`
+Run over the whole tree on 2026-08-18 at commit `2f5ce8f` (working tree **clean** — wave 3 was
+committed by its own session before this gate ran), **each command's own exit code read directly and
+never through a pipe** — `| tail` reports the *pipe's* status and has already once reported a red
+suite in this project as `EXIT:0`. The vitest run below was redirected to a file, not piped, and its
+`$?` read from the same shell. `[gated]`
 
 | gate | result | exit |
 |---|---|---|
 | `npx tsc --noEmit` | clean | **0** |
-| `npx vitest run --maxWorkers=2` | **842 files** — 839 passed · 2 failed · 1 skipped · **13,107 tests** — 12,935 passed · **2 failed** · 170 skipped · 343.8 s | **1** |
+| `npx vitest run --maxWorkers=2` | **880 files** — 873 passed · **6 failed** · 1 skipped · **13,700 tests** — 13,508 passed · **22 failed** · 170 skipped · 477.5 s | **1** |
 | `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking** | **0** |
 
-`vitest` exits **1 on purpose.** Both failures are the content-signature pair in §8 and must stay red
-until a human signs. Nothing else in the suite is red: the two files the wave-2 reviewers each
-reported red mid-wave — `lessons/__tests__/finish-outside-annulus.test.ts` and
-`rules/__tests__/sweep161-fault-episodes.test.ts` — are **both green in the finished tree**. They
-were red because two lanes were landing into the same tree at the same time, which is the same
-failure shape §0 of the previous pass recorded for `session-end-numbers.test.tsx`: *neither lane was
-wrong; nothing checked them against each other.* That has now happened twice. It is a process
-finding, and it is open.
+**`vitest` exits 1, and only 2 of the 22 are the deliberate content debt.** The wave-3 commit message
+names four new failures. **There are twenty.** The whole of
+`world/builders/__tests__/markings-paint-truth.test.ts` — **15 failures** — went unnamed, which is a
+larger red surface than every named row put together. The full breakdown, every row read off the
+finished run:
 
-**The wave-2 diff is UNCOMMITTED and is not to be committed from this session:** 9 modified files
-(1,829 insertions / 67 deletions) plus 2 new test files (792 lines) —
-`rules/engine.ts` · `lessons/finish.ts` · `lessons/objectives.ts` ·
-`lessons/scenario/templates-signals2.ts` · `components/sim/TouchControls.tsx` and their tests, and
-the new `lessons/__tests__/park-bay-shape.test.ts` ·
-`lessons/scenario/__tests__/signals2-controller-clock.test.ts`.
+| file | failed | class |
+|---|---:|---|
+| `world/builders/__tests__/markings-paint-truth.test.ts` | **15** | **cross-lane, unnamed until now** |
+| `lessons/scenario/__tests__/b58-gate-never-over-posted.test.ts` | 2 | cross-lane (named) |
+| `lessons/scenario/__tests__/signals-sweep161.test.ts` | 2 | cross-lane (named) — **may be a real regression** |
+| `lessons/scenario/__tests__/s-w8-bot-completion.test.ts` | 1 | cross-lane (named) — **may be a real regression** |
+| `exam/__tests__/content-bank.test.ts` | 1 | §8, human signature |
+| `lesson/__tests__/compose.test.ts` | 1 | §8, human signature |
 
-## 1 · The coverage arithmetic — 31 of 138 files, and touching is not closing
+### 0.1 — The collisions, each one diagnosed
 
-`[corpus]` The 1,012 BROKEN findings are spread over **138 suspect files**. Two repair waves have
-now edited **31** of them.
+The predicted failure mode arrived: **83 lanes launched, 46 returned, 44 of the planned suspect files
+were actually written, and nothing gated any lane against any other.** Third occurrence of the same
+process finding (§6.9), and the first at a scale where it dominates the gate.
+
+- **`markings-paint-truth.test.ts` × 3 — the fixture dies inside a file no lane owned.** `[gated]`
+  `a run too short for one whole dash stays unpainted`, `a shipped skew (18°)…` and
+  `skew 90° neither hangs the build…` all die with
+  `TypeError: Cannot read properties of undefined (reading 'filter')` at
+  `world/builders/network.ts:415`, `district.intersections.filter(…)`. The markings lane built two
+  inline districts through `assertDistrict`, and **`assertDistrict` (`world/types.ts:320`) never
+  checks `intersections` or `roundabouts`** though `District` declares both required and
+  `analyzeNetwork` dereferences both unguarded. `[read]` All **105** shipped `content/world/*.json`
+  carry both fields, so no map is broken — the hole is that the validator returns a `District` it
+  never validated. **`world/builders/network.ts` is one of the 39 lanes that never landed** (1
+  finding, 1 critical): this is precisely the stated signature — *a test failing on a file no lane
+  owned*.
+- **`markings-paint-truth.test.ts` × 8 — the instrument is wrong, not the paint.** `[read]` The eight
+  `dashed rhythm` rows measure dashes with `clusterAlongS(centre, DASH_LENGTH_M / 2)`. A dash quad's
+  corners sit at `mid ± DASH_LENGTH_M/2` — **5.0 m apart in s against a 2.5 m cluster threshold** — so
+  every dash counts as two clusters and the assertion sees exactly `2n`: `tj-occluded` 16 for 8,
+  `ov-lane` 46 for 23. Where the arm also carries a stop line, that quad lands inside the `|t| < 0.25`
+  centre filter *outside* the trimmed run, which is the negative leading margin (`tj-emerge` −0.60 m,
+  `sx-v1` −27.93 m) and the extra clusters (11 for 10, 24 for 22). The production `dashStations`
+  re-spacing is sound; the measurement needs a threshold strictly between `DASH_LENGTH_M` and the
+  fitted gap, and needs paint outside `[s0, s0 + length]` dropped.
+- **`markings-paint-truth.test.ts` × 2 — another lane's paint landed in the window being measured.**
+  `ov-lane-v1: the осева IS painted` fails on `0.2568 < 0.25` — one centre-line vertex on the S-curve
+  sits 0.257 m off axis against a tolerance the test's own comment derives as half of
+  `CENTER_LINE_WIDTH_M` (0.1875) but writes as 0.25. `tj-emerge-v1: the Б2 arm carries a solid М7 stop
+  line` expects **2** transverse vertices and finds **10** — the same commit changed `paintStopLine`
+  to return its real quad count and changed `buildWorldGeometry.ts` (52 lines) alongside it.
+- **`b58-gate-never-over-posted.test.ts` × 2 — a stricter rule landed under an older test.** `[read]`
+  The B58 lane clamped the advisor card's printed cap to the posted sign. A later lane rewrote
+  `lessons/advisor.ts` with `spokenCapKmh`, which is **strictly stronger**: a card may print a number
+  only from the halt band, the author's own title, or a sign that binds — otherwise it prints **no
+  number at all** (494 of 953 cards). B58's survey regex `/дръж под (\d+…) км\/ч$/` then matches
+  nothing, `Number(undefined)` is `NaN`, and `!(NaN <= posted)` books every numberless card as an
+  offender. Its sibling row pins the pre-advisor string byte-for-byte
+  (`"Стигни зоната — дръж под 52 км/ч"`), which is the behaviour the advisor lane deliberately
+  removed. **No product defect in either lane** — B58's two rows must be rewritten to the newer
+  contract (*no number, or a number ≤ posted*). B58's headline row still passes.
+- **`s-w8-bot-completion.test.ts` × 1 — treat as a regression until proven otherwise.**
+  `sc-hz-accident-scene` L3 `mistake-squeeze` scores `["COLLISION","COLLISION"]` where the test pins
+  `["COLLISION"]` and `score` 10. That is **the exact defect class §2.1 C3 claims to have closed** —
+  one continuous shunt billed as many accidents. A wave-3 `rules/engine.ts` lane moved the episode
+  boundary C3 installed. This is not obviously a fixture disagreement and must be judged on the
+  engine, not on the test.
+- **`signals-sweep161.test.ts` × 2 — treat as a regression until proven otherwise.** `stageActor`
+  returns `carDistM` **90** where both `sc-sflash-conflict` (authored offset) and `SC_SIGNAL_DEAD`'s
+  own 95 m expect 95. Two independent districts clamping to the same 90 says a placement clamp
+  changed, and the test's claim — *the crossing car is held at the distance the spec claims* — is a
+  finding, not a fixture. `traffic/staged.ts` was rewritten in this wave.
+
+**Nothing in this session was committed.** The doc edit below is the only working-tree change.
+
+## 1 · The coverage arithmetic — 53 of 138 files, and touching is not closing
+
+`[corpus]` Re-run today over the 24 JSONL files by the header's rule. The corpus is frozen and did
+not move: **1,712 records · 26 superseded · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318
+critical) · 512 `UNPOLISHED` · 1 `COULD_NOT_TEST`**, over **138 suspect files**. Three repair waves
+have now edited **53** of them.
 
 | | files | BROKEN findings in them | of which critical |
 |---|---:|---:|---:|
 | wave 1 (commit `ec1f56f`) | 30 | 623 | 216 |
-| wave 2 (working tree) | 5 | 174 | 109 |
-| **union — ever opened** | **31** | **625** | **217** |
-| **never opened at all** | **107** | **387** | **101** |
+| wave 2 (commit `730da10`) | 5 | 174 | 109 |
+| wave 3 (commit `2f5ce8f`) | 44 | 581 | 225 |
+| **union — ever opened** | **53** | **765** | **272** |
+| **never opened at all** | **85** | **247** | **46** |
 
-The two rows do not add up because **wave 2 opened exactly ONE file the corpus knows about that wave
-1 had not** — `lessons/scenario/templates-signals2.ts`, 2 findings, 1 critical — **and that lane
-closed neither of them** (§3, lane D: the fix belongs in `orchestrator/runners.ts`, which is itself
-an untouched file in the list below). The other four wave-2 files were already wave-1 files. So the
-whole second wave moved catalogue coverage by **one file and two findings**, and moved the closed
-count by less than that.
+Wave 3 was the first wave to move coverage materially: it opened **22 files the corpus knows about
+that no earlier wave had touched — 140 findings, 55 critical.** Against waves 1–2, which between them
+had opened 31 files, that is the single largest jump the programme has made.
+
+**But it was planned as 83 lanes and delivered 44 files.** `[read]` `.audit-frames/lanes-crit.json`
+holds one lane per suspect file carrying a critical finding — 83 of them. Wave 3's commit changed
+**44**; **39 lanes never landed at all**, killed by the platform 529 incident their commit message
+records. Those 39 carry **177 findings, 91 critical**, and they include the two deepest untouched
+buckets in the product:
+
+| lane that never landed | BROKEN | critical |
+|---|---:|---:|
+| `lessons/objectives.ts` | 51 | 32 |
+| `lessons/finish.ts` | 22 | 13 |
+| `environment/weather.ts` | 6 | 4 |
+| `collision/index.ts` | 6 | 4 |
+| `scenarios/coach.ts` | 8 | 3 |
+
+`objectives.ts` and `finish.ts` are *opened* files (waves 1–2 edited both, and §2.1 C1/C2/C7 land in
+them) whose wave-3 lane — the one aimed at the remaining 73 findings and 45 criticals between them —
+never ran. **Coverage of 53 files is not progress toward 138 at a constant rate: the 85 that remain
+are the ones nobody has looked at three times running.**
 
 **Touching a file is not closing its findings**, and 625 must never be read as 625 closed. Each lane
 closed the specific rows it names in its own source comments; the rest of each file's bucket is

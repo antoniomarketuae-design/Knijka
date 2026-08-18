@@ -167,3 +167,57 @@ Blocked on his Blender machine: register rows **B52** and the *bodies* half of
 And the **UNPOLISHED** bucket — 512 findings, empty pavements, repeated
 buildings, flat sky — is his ruling to make. Nobody spends a wave on it until he
 does.
+
+---
+
+## 8 · THE AUTO-QUEUE — computed, not left to be derived
+
+The founder's standing instruction is that waves chain **without asking him**.
+This is the chain. Each stage launches the moment the previous one gates.
+
+**Files are already on disk — do not recompute them:**
+
+| file | what it holds |
+|---|---|
+| `E:\AI driver\.audit-frames\lanes-crit.json` | all 83 critical-bearing lanes |
+| `E:\AI driver\.audit-frames\lanes-remaining.json` | **the 34 that still need running** |
+| `~/.claude/projects/E--AI-driver/workflows/scripts/knijka-all-lanes.js` | the lane workflow; takes the array as `args` |
+
+### WAVE A — the 34 lanes the outage killed  ← START HERE
+
+**49 of 83 fix lanes completed** before the 529 band; 34 did not.
+**133 findings, 35 critical.** Launch `knijka-all-lanes.js` with the contents of
+`lanes-remaining.json` as `args`.
+
+Do **not** pass all 83 again — the 49 that finished have already written their
+changes into the tree (they are in commit `2f5ce8f`), and re-running them would
+undo or duplicate that work.
+
+The heaviest rows in the remainder: `hud/SimOverlay.tsx` (1 critical but **60
+findings**, the largest single file in the corpus), `modules/sim/rules` (2c/5),
+`tools/mobile/lib/auth.mjs` (1c/5 — this is the **login rate-limiter** that made
+22 lessons look broken; worth doing early so no future sweep loses legs to it).
+
+### WAVE B — the 54 files with findings but no criticals
+
+`lanes-crit.json` is the 83 files carrying at least one critical. The corpus has
+**137 suspect files**, so ~54 remain with major/minor findings only. Derive them
+by recomputing from `.audit-frames\findings\*.jsonl` and subtracting the 83.
+Same workflow, same rules.
+
+### WAVE C — verify and close
+
+Re-drive every lesson that had a BROKEN finding closed in waves A/B, read the
+**debrief**, and confirm it is actually gone. Then update
+`docs/simulation/88_LESSON_AUDIT.md`'s open list.
+
+### THE LOOP CONDITION
+
+Keep chaining until **the open list is empty** *and* `sc-zebra-approach` still
+passes both directions on both platforms. Report to the founder only when that
+holds, or when something genuinely cannot be fixed — named, with the reason.
+
+**Concurrency reality:** this box is 8 CPUs / 16 GB, so the workflow cap is **6
+concurrent agents** regardless of how many lanes are queued. 34 lanes ≈ 6 hours.
+That is the price of finishing; do not shrink the lane count to make the number
+look better — that mistake cost two waves and closed 7 findings out of 1,012.
