@@ -179,7 +179,7 @@ export const SC_SIGNAL_DEAD_CONFLICT: PriorityFromRightSpec = {
   junctionControl: "uncontrolled",
   actor: {
     pathNodes: ["sx-n-e", "sx-n-c", "sx-n-w"],
-    hold: { nodeIndex: 1, offsetM: -90 }, // 95 m east of the junction
+    hold: { nodeIndex: 1, offsetM: -95 }, // 95 m east of the junction
     cruiseSpeedMps: 8,
   },
   junctionNodeIndex: 1,
@@ -396,8 +396,19 @@ export const SC_SIGNAL_FLASHING_CONFLICT: PriorityFromRightSpec = {
      * hold POSE is a longer east arm, which lives in tools/maps/gen_signal_x.mjs
      * + sxf-v1.json and would require re-recording all three demos; this file
      * can only stop the constant from lying, and does.
+     *
+     * LANDED 180 LINES AWAY THE FIRST TIME (sweep 161, wave 3). This note was
+     * written here and the −95 → −90 it argues for was applied to
+     * SC_SIGNAL_DEAD_CONFLICT instead — the sxd-v1 drill above, whose 150 m arm
+     * holds 95 correctly. So both templates ended up carrying the other's
+     * number, and the tell sat in plain sight: line 182 read `offsetM: -90`
+     * under the comment „95 m east of the junction". Restored here, both ways.
+     * DO NOT make signals-sweep161 §1 green by loosening `clampArc`
+     * (traffic/staged.ts): dropping its lower bound parks this car at arc −5,
+     * five metres behind the start of its own path, which is the silent
+     * failure the whole note above exists to describe.
      */
-    hold: { nodeIndex: 1, offsetM: -95 },
+    hold: { nodeIndex: 1, offsetM: -90 },
     cruiseSpeedMps: 8,
   },
   junctionNodeIndex: 1,

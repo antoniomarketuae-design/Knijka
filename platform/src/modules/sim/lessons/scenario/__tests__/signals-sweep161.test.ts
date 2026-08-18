@@ -10,10 +10,56 @@
  *       the audit did not name it: the crossing car's authored hold falls 5 m
  *       off the start of its own path on sxf-v1, and `clampArc` swallows it, so
  *       the spec documented 95 m while the runner timed the encounter with 90.
- *       Fixed here (offsetM −95 → −90 — the truth, and byte-identical staging).
  *       This section is the guard, and it is directional: it is red on the old
  *       value and on any future spec pushed past its own arm, and green on
  *       sc-signal-dead's 95 m, which its 150 m arm honours.
+ *
+ *       …AND THE GUARD IS DOING ITS JOB RIGHT NOW — 2026-08-18, the wave that
+ *       cleared the red at HEAD. This header used to end „Fixed here (offsetM
+ *       −95 → −90)". That fix NEVER LANDED. Commit 2f5ce8f wrote the 32-line
+ *       justification for it onto `SC_SIGNAL_FLASHING_CONFLICT` and then applied
+ *       the NUMBER to `SC_SIGNAL_DEAD_CONFLICT`, 180 lines above it — the two
+ *       sites read `hold: { nodeIndex: 1, offsetM: -95 }` character for
+ *       character, and the tell it left behind is sxd-v1's trailing comment,
+ *       still saying „// 95 m east of the junction" beside a −90. So both specs
+ *       are wrong in OPPOSITE directions, and §1 is red twice for two true
+ *       reasons:
+ *
+ *         sc-sflash-conflict  still −95 on a 90 m arm  → asks 95, gets 90
+ *         sc-sdead-conflict   demoted to −90 on a 150 m arm → the arm holds 95
+ *
+ *       MEASURED here through `createTrafficSystem` + the production `stage()`,
+ *       sweeping the offset on each district (zz-probe, this wave):
+ *
+ *         sxd-v1  nodeS[1] 150.000   −95 → arc 55.000  carDist 95.000  x 95.000
+ *                                    −90 → arc 60.000  carDist 90.000  x 90.000
+ *         sxf-v1  nodeS[1]  90.000   −95 → arc  0.000  carDist 90.000  x 90.000
+ *                                    −90 → arc  0.000  carDist 90.000  x 90.000
+ *
+ *       Read the arcs, not the carDists: on sxd-v1 the arc is 55, so 95 m is
+ *       reached by ARITHMETIC and the arm honours it — the −90 there is a
+ *       regression, not a clamp. On sxf-v1 −95 pins the arc to 0 and −90 lands
+ *       on 0 by arithmetic, same pose to the millimetre — 90 is the truth there.
+ *       ONE map clamps, not two; the matching 90s are a coincidence of two
+ *       different causes, which is exactly how this looked like a placement bug
+ *       in `traffic/staged.ts` and was not.
+ *
+ *       `clampArc` IS NOT THE DEFECT, and loosening it is the trap. Mutation:
+ *       drop its lower bound (`return s < 0 ? 0 : …` → no floor) and the first
+ *       expectation below goes GREEN on the broken spec — carDist finally reads
+ *       95 — while the car is standing at arc −5, five metres off the start of
+ *       its own path, and `at.x` moves 90 → 95. Two further assertions catch it
+ *       (`hold arc` ≥ 0, and the direction test's `clamped.arcM === 0`). A
+ *       „fix" there buys the documented number by putting a body off the road.
+ *
+ *       THE PATCH IS TWO NUMBERS IN `templates-signals.ts`, WHICH THIS FILE DOES
+ *       NOT OWN: `SC_SIGNAL_DEAD_CONFLICT.actor.hold.offsetM` −90 → −95 (a
+ *       restore — it was −95 for the whole history before 2f5ce8f, which is the
+ *       value all three committed sc-signal-dead demos were recorded against),
+ *       and `SC_SIGNAL_FLASHING_CONFLICT.actor.hold.offsetM` −95 → −90 (the edit
+ *       its own comment already argues for at length; byte-identical staging, so
+ *       no demo moves). Verified by the sweep above, not by reasoning: those two
+ *       values are the ones that make all four §1 expectations true.
  *
  *   §2  sc-signal-dead — «The guided line drives the car INTO A BUILDING …
  *       objective 2 never ticks anywhere» (critical). REFUTED, with numbers.
@@ -168,9 +214,19 @@ describe("§1 the crossing car is held at the distance the spec claims", () => {
     // THE DIRECTION TEST. sc-signal-dead's 95 m is correct on its 150 m arm and
     // must stay accepted; the SAME number on sxf-v1's 90 m arm must be caught.
     // Without this pair the assertion above could be satisfied by any check
-    // loose enough to credit everybody. (Restoring `offsetM: -95` on the
-    // flashing spec turns its §1 test red on the first expectation; this test
-    // is red on the old value too, and green on both maps as shipped.)
+    // loose enough to credit everybody.
+    //
+    // AND IT EARNED ITS KEEP — this is the assertion that caught 2f5ce8f's
+    // mis-targeted edit (see the header). The `95` below is a LITERAL on
+    // purpose, never `-SC_SIGNAL_DEAD_CONFLICT.actor.hold.offsetM`: reading it
+    // off the spec would let the pin follow the spec's own drift and go quietly
+    // green on the demotion to −90 that it is here to convict. The 90 m half
+    // does read the clamp's answer, because that half is a fact about the MAP
+    // (sxf-v1's east arm) and no spec can move it.
+    //
+    // The 90 m half is green at HEAD; the 95 m half is RED at HEAD and correct
+    // to be — the second of §1's two true reds, closed by the same two-number
+    // patch in `templates-signals.ts` the header names.
     const clamped = stageActor(SC_SIGNAL_FLASHING.map.districtId, {
       ...SC_SIGNAL_FLASHING_CONFLICT,
       actor: { ...SC_SIGNAL_FLASHING_CONFLICT.actor, hold: { nodeIndex: 1, offsetM: -95 } },

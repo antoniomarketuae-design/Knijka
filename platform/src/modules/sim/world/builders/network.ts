@@ -411,6 +411,22 @@ export function analyzeNetwork(
 ): RoadNetwork {
   const { nodes, edges } = district.roads;
   const nodePos = new Map<string, Vec2>(nodes.map((n) => [n.id, [n.x, n.y] as Vec2]));
+  // `intersections` and `roundabouts` are dereferenced here WITHOUT a `?? []`
+  // fallback, and deliberately so. `District` declares both required, and a
+  // default would silently turn a truncated document into a district with no
+  // signalized nodes and no ring — i.e. a world that builds, renders, and
+  // grades a junction the map said was signalized as if it were равнозначно.
+  // A missing array is a broken document, not a bare one.
+  //
+  // What WAS wrong is that nothing said so at the seam: `assertDistrict`
+  // validated `format`, `roads.nodes`, `roads.edges`, `buildings` and
+  // `meta.attribution.text` and nothing else, so a document without these two
+  // passed the guard and crashed HERE with „Cannot read properties of
+  // undefined (reading 'filter')" — pointing at the builder rather than at the
+  // data. The guard now checks every field `District` declares required
+  // (world/types.ts), proved against all 105 committed districts by
+  // `builders/__tests__/markings-paint-truth.test.ts`. If a later pass revisits
+  // this line: the fix belongs in the guard, never in a `?? []` here.
   const signalizedIds = new Set(
     district.intersections.filter((i) => i.signalized).map((i) => i.id),
   );

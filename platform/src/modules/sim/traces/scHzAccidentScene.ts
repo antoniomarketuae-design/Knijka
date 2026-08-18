@@ -30,9 +30,30 @@
  *   - „Зяпане със спиране в лентата" grades EXACTLY ILLEGAL_STOP_IN_BAN_ZONE
  *     (stops dead at y = 140 inside the span for 5.5 s — a gawk-stop the В27
  *     forbids, with no queue/control to excuse it);
- *   - „Минаване плътно и бързо покрай хората" grades EXACTLY COLLISION (holds
- *     46 km/h on the tight line x = 5.5 straight into the wreck rects — wheel in
- *     the lane, so no POOR_LANE_KEEPING; under the limit, so no SPEEDING).
+ *   - „Минаване плътно и бързо покрай хората" grades EXACTLY COLLISION, and it
+ *     grades it TWICE — once per BODY (holds 46 km/h on the tight line x = 5.5
+ *     straight into the wreck rects — wheel in the lane, so no
+ *     POOR_LANE_KEEPING; under the limit, so no SPEEDING).
+ *
+ *     THE TWO BODIES ARE THE POINT OF THE DEMO, so they are written down here
+ *     rather than left to be rediscovered. MEASURED contact channel, 26 reports
+ *     at 45.9 км/ч: t=13.13 the first wreck rect (vehicle) · t=13.43…13.82 the
+ *     BYSTANDER dragged along at 60 Hz (24 pedestrian reports) · t=14.23 the
+ *     second wreck rect. The sheet prints ПТП(vehicle) then ПТП(pedestrian) —
+ *     the 24 pedestrian reports are one accident still happening, and the second
+ *     wreck arrives 1.1 s after the first, inside collisionSeparationSec (1.2 s),
+ *     so the vehicle episode is still open and does not re-bill. The residue,
+ *     stated because it is real: the reducer is told the body's CATEGORY and
+ *     nothing more, so those two distinct wrecked CARS read as one encounter —
+ *     it errs innocent (A12) and closing it means a stable actor id on
+ *     `pushCollision`, not a change here.
+ *
+ *     Trace-gate note: `__tests__/sc-hz-accident-scene-traces.test.ts` compares
+ *     a de-duplicated `new Set(codes)` against the template's codeRefs, so it is
+ *     blind to how many rows each code printed. The row COUNT and the BODIES are
+ *     pinned on the live-session path instead —
+ *     `lessons/scenario/__tests__/s-w8-bot-completion.test.ts`, „the
+ *     tight-and-fast squeeze is опасна".
  *
  * Geometry pinned to content/world/hz-accident-v1.json: a 260 m two-way street
  * on x = 0, northbound right-lane center x = 4.06 (lane width 8.125), spawn
@@ -140,8 +161,10 @@ export function scHzAccidentSceneMistakeSqueezeScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[LANE_X, 15], [LANE_X, 60], [LANE_X, 110]], targetKmh: 46, stopAtEnd: false },
       { kind: "annotation", textBg: "Без да сваля скорост, тръгвам плътно покрай сцената…" },
-      // Onto the tight line (x = 5.5) and straight into the wreck rects — wheel
-      // stays in the lane (offset +1.44 < 3.25), speed under the 50 limit.
+      // Onto the tight line (x = 5.5) and straight into the wreck rects AND the
+      // bystander standing between them — wheel stays in the lane (offset
+      // +1.44 < 3.25), speed under the 50 limit. Two bodies, two ПТП rows; the
+      // header carries the measured channel.
       { kind: "drive", points: [[LANE_X, 110], [TIGHT_X, 140], [TIGHT_X, 150]], targetKmh: 46, stopAtEnd: false },
       { kind: "drive", points: [[TIGHT_X, 150], [TIGHT_X, 162]], targetKmh: 46, stopAtEnd: false },
       { kind: "annotation", textBg: "Тесен и бърз проход не оставя нито метър за грешката им — и я намери." },

@@ -721,6 +721,17 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
     return {
       taught,
       scored: s.events.filter((e) => e.kind === "violation").map((e) => e.code),
+      /**
+       * WHICH BODY each «Пътнотранспортно произшествие» row names, in order —
+       * `engine.ts`'s `collision` case stamps `detail` = the body struck. A bare
+       * list of codes cannot tell ONE body billed twice from TWO bodies billed
+       * once, and those are the two opposite ways this reducer has already been
+       * wrong; on this template's squeeze demo the difference is whether the
+       * sheet names the man under the wheels or stays silent about him.
+       */
+      struck: s.events
+        .filter((e) => e.kind === "violation" && e.code === "COLLISION")
+        .map((e) => (e as { detail?: string }).detail),
       r: buildLessonResult(s),
     };
   };
@@ -753,12 +764,45 @@ describe("wave-8 bot completion — sc-hz-accident-scene at L3", () => {
   it("counter-proof: the tight-and-fast squeeze is опасна — scored on the spot, never a card", () => {
     // The template's sharpest claim on the student path. This driver did not
     // misjudge a metre — he took the tight line at speed past people whose next
-    // move he could not know, and found the wreck. COLLISION is опасна, so it is
-    // SCORED with a toast rather than paused into a card (a dangerous code must
-    // never pop a modal mid-manoeuvre); the A9 teach channel is EMPTY even at L3.
+    // move he could not know, and found the wreck AND the people. COLLISION is
+    // опасна, so it is SCORED with a toast rather than paused into a card (a
+    // dangerous code must never pop a modal mid-manoeuvre); the A9 teach channel
+    // is EMPTY even at L3.
     const l3 = replay("mistake-squeeze", 3);
     expect(l3.taught).toEqual([]);
-    expect(l3.scored).toEqual(["COLLISION"]);
+    // TWO BODIES, TWO ROWS — and the BODIES are the assertion, never the count.
+    //
+    // MEASURED (2026-08-18) on this exact drive's contact channel — 26 reports
+    // at 45.9 км/ч: t=13.13 the first wreck (vehicle) · t=13.43…13.82 the
+    // BYSTANDER dragged along at 60 Hz (24 pedestrian reports) · t=14.23 the
+    // second wreck. The graded sheet: ПТП(vehicle) t=13.13, ПТП(pedestrian)
+    // t=13.43 — one row per BODY. The 24 pedestrian re-reports are ONE accident
+    // still happening, and the second wreck lands 1.1 s after the first, inside
+    // collisionSeparationSec (1.2 s), so the vehicle episode is still open and
+    // does not re-bill.
+    //
+    // THIS PIN USED TO READ ["COLLISION"], and that single row was the stale
+    // half of a known regression rather than a stricter test. The conjunct that
+    // stopped one shunt printing thirteen «Пътнотранспортно произшествие» rows —
+    // the lead vehicle must be SEEN off the bumper before a second bill — was
+    // put on a latch shared by EVERY body in the world, so the bystander's bill
+    // was made to wait for the WRECK's bumper to clear, which, nose-deep in it,
+    // it never did. The man under the wheels cost nothing, on the one lesson
+    // whose entire subject is that people are standing there. `engine.ts`'s
+    // `collision` case now keys the episode per body-kind (silence and travel
+    // are properties of the CAR and are asked of every kind; daylight is a
+    // property of the LEAD VEHICLE and is asked only of a `vehicle` episode);
+    // `rules/__tests__/sweep161-fault-episodes.test.ts` pins both directions on
+    // synthetic frames and this is the same claim on the real drive.
+    //
+    // Both directions live in the line below: swallow the bystander and it reads
+    // ["vehicle"]; re-bill either body and it grows a third entry.
+    expect(l3.struck).toEqual(["vehicle", "pedestrian"]);
+    expect(l3.scored).toEqual(["COLLISION", "COLLISION"]);
+    // Still ten, not twenty: `rules/scoring.ts` closes the ledger at the first
+    // terminating опасна (чл. 48, ал. 3) and marks every later one
+    // `unscoredAfterClose`. The second row costs no points — it buys the debrief
+    // the right to say a person was hit (THEO-4).
     expect(l3.r.score).toBe(10); // one опасна > the 9-point budget (Наредба-38)
     expect(l3.r.passed).toBe(false);
     // He never even earned the first gate: holding 46 km/h to the scene misses

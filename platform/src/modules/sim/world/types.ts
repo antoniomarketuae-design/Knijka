@@ -316,19 +316,55 @@ export interface District {
   zones?: DistrictZone[];
 }
 
-/** Cheap structural guard for data loaded from JSON at the integration seam. */
+/**
+ * Cheap structural guard for data loaded from JSON at the integration seam.
+ *
+ * It checks EVERY field `District` declares required, and that is not
+ * pedantry. It used to check `format`, `roads.nodes`, `roads.edges`,
+ * `buildings` and `meta.attribution.text` — and nothing else — while the
+ * interface above declares `intersections`, `crossings`, `roundabouts` and
+ * `spawnPoints` required too, and `builders/network.analyzeNetwork`
+ * dereferences the first two unguarded on its second statement. So a document
+ * missing them type-checked (the cast below hands back a `District` whatever
+ * it was given), PASSED the guard, and then died deep inside the builder with
+ *
+ *     TypeError: Cannot read properties of undefined (reading 'filter')
+ *       at analyzeNetwork (builders/network.ts:415)
+ *
+ * — a message naming neither the document nor the field at fault. A guard that
+ * returns what it never validated is worse than no guard at all: it moves the
+ * failure away from its cause, which is exactly what happened to three tests
+ * in `builders/__tests__/markings-paint-truth.test.ts`.
+ *
+ * THE FALSE-REFUSAL DIRECTION IS PROVED, NOT ARGUED. That battery pushes every
+ * file in content/world/*.json through this function and requires all of them
+ * to pass; at the time of writing that is 105 districts and every one already
+ * carries all four arrays, so no real map changes hands. If a future generator
+ * emits a document without them, the right answer is to fix the generator —
+ * making a field optional here would only move the crash back into the builder.
+ *
+ * Still deliberately shallow BELOW the top level (it is the cheap seam guard,
+ * not a schema validator): element shapes, `skewDeg` domains and the like are
+ * the builders' own business, and `zones` stays optional because `District`
+ * declares it optional.
+ */
 export function assertDistrict(data: unknown): District {
   const d = data as District;
-  if (
-    !d ||
-    d.format !== "district-v1" ||
-    !d.roads ||
-    !Array.isArray(d.roads.nodes) ||
-    !Array.isArray(d.roads.edges) ||
-    !Array.isArray(d.buildings) ||
-    !d.meta?.attribution?.text
-  ) {
-    throw new Error("assertDistrict: data is not a district-v1 document");
+  const required: Array<[string, unknown]> = [
+    ["roads.nodes", d?.roads?.nodes],
+    ["roads.edges", d?.roads?.edges],
+    ["intersections", d?.intersections],
+    ["crossings", d?.crossings],
+    ["roundabouts", d?.roundabouts],
+    ["buildings", d?.buildings],
+    ["spawnPoints", d?.spawnPoints],
+  ];
+  const notArrays = required.filter(([, v]) => !Array.isArray(v)).map(([k]) => k);
+  if (!d || d.format !== "district-v1" || !d.meta?.attribution?.text || notArrays.length) {
+    throw new Error(
+      "assertDistrict: data is not a district-v1 document" +
+        (notArrays.length ? ` (missing or not an array: ${notArrays.join(", ")})` : ""),
+    );
   }
   return d;
 }
