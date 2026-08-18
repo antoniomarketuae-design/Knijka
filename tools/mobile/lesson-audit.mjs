@@ -25,6 +25,9 @@
  *    earlier sweeps "verified" a page no student can open.
  *  · THE BUILD IS RECORDED WITH THE RUN. A proof phase once graded a build whose
  *    fixes had never been deployed.
+ *  · A FRAME IS A FILE THAT DECODES, NOT A FILE THAT EXISTS. `.catch(() => {})`
+ *    around a screenshot lost 333 frames and 54 whole lanes while every log
+ *    stayed green — see the 2026-08-18 section below.
  *
  * ── 2026-08-16 · THE LAST FAILURE, AND WHY IT SURVIVED FOUR SELECTORS ───────
  *
@@ -76,6 +79,51 @@
  * `[data-hud="end-screen"]`, `#sim-result-title`, `section[aria-label="Грешки"]`
  * — and the verdict is lifted out of the verdict card itself.
  *
+ * ── 2026-08-18 · THE SWEEP LOST 333 FRAMES AND EVERY LOG STAYED GREEN ───────
+ *
+ * The 161-scenario sweep ran. Then the audit that read it filed 24 lessons
+ * COULD_NOT_TEST, and the reason was not the product: it was this file.
+ *
+ *   MEASURED over all 166 folders of .audit-frames/sweep161, size + first and
+ *   last 8 bytes of every PNG:
+ *     16,605 frames written · 16,266 decode
+ *        333 are 0 BYTES
+ *          6 are TRUNCATED (valid signature, no IEND) at exactly 512 KiB ×5, 1 MiB ×1
+ *         54 of 653 lanes hold NOT ONE usable frame; 26 are empty folders
+ *
+ * `shot()` was `page.screenshot({ path }).catch(() => {})`. Playwright writes
+ * with `fs.promises.writeFile`, which CREATES the file before it writes the
+ * bytes, so a failed write leaves a stub — and the empty catch threw the reason
+ * away. sc-rx-queue-clear/mobile-right is the pair, still on disk: a run.log
+ * carrying a confident
+ *     [01-arrival] 0 км/ч  card=hint/peek
+ * with a full nine-line control-strip readout, beside a 01-arrival.png of ZERO
+ * BYTES. The log says the lesson was reached. The evidence is blank. Nothing
+ * anywhere reconciled the two.
+ *
+ * THE CAUSE UNDER THE CAUSE was a full disk — sc-rx-unguarded/pc-wrong/run.log
+ * ends on `Error: ENOSPC: no space left on device, write`, thrown out of
+ * `note()` itself, an unhandled 'error' event that killed the process
+ * mid-drive. The sweep then carried on for hours writing empty files, because
+ * nothing was watching and nothing could stop.
+ *
+ * FOUR THINGS CHANGED, and they are four because fixing only the loud one
+ * leaves the sweep just as blind:
+ *   1. `shot()` READS THE FILE BACK (lib/frames.mjs). Signature + IEND, not
+ *      `size > 0` — a size test credits all six truncated files, and half a
+ *      megabyte of PNG that no reader will open is worth exactly zero bytes.
+ *      One retry, then the stub is DELETED so absent evidence looks absent.
+ *   2. THE LEDGER. Every lost frame is named, counted, printed in the MACHINE
+ *      SUMMARY and written to `_audit-status.json`, so a judge never has to
+ *      infer coverage by counting files in a folder — which is precisely how
+ *      "10 zero-byte PNGs" got scored as a tested leg.
+ *   3. THE BREAKER. A full disk, or three losses in a row, stops the CAMERA
+ *      (not the run — the text is often the only surviving evidence, as it was
+ *      for sc-sig-controller-live) and says so on its own line.
+ *   4. `note()` AND THE STATUS FILE SURVIVE THE DISK. Logging can no longer
+ *      kill the harness, and a lane that dies before it drives is now
+ *      distinguishable from one that was never dispatched.
+ *
  * NOTHING HERE IS TUNED TO A LESSON. Every handle above is written by
  * LessonScene / SimOverlay / LessonPlayShell / SessionEndScreen for all 161
  * scenarios; there is not one scenario id, objective id or Bulgarian lesson
@@ -83,21 +131,98 @@
  *
  * Usage:
  *   node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> <mobile|pc> <right|wrong>
+ *
+ * EXIT CODE IS ABOUT EVIDENCE, NOT ABOUT THE LESSON. 0 = this run can be
+ * judged. Non-zero = it cannot, and re-driving it is the only honest response.
+ * A lesson that fails its own drive still exits 0: that is a finding, not a
+ * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
+import { mkdirSync, writeFileSync } from "node:fs";
+
 import { webkit, chromium } from "./lib/pw.mjs";
 import { newDeviceContext } from "./lib/insets.mjs";
 import { DEVICES } from "./lib/devices.mjs";
 import { signIn } from "./lib/auth.mjs";
+import { captureFrame, createFrameLedger } from "./lib/frames.mjs";
 
 const [OUT, SCENARIO, PLATFORM = "mobile", MODE = "right"] = process.argv.slice(2);
 export const BASE =
   process.env.KNIJKA_BASE ?? "https://icon-undertaken-earliest-zope.trycloudflare.com";
 
+// A missing argument used to produce frames at `undefined/01-arrival.png` and a
+// run that looked like every other. Refuse before the browser costs anything.
+if (!OUT || !SCENARIO) {
+  console.error(
+    "[lesson-audit] usage: node tools/mobile/lesson-audit.mjs <outDir> <scenarioId> [mobile|pc] [right|wrong]",
+  );
+  process.exit(2);
+}
+mkdirSync(OUT, { recursive: true });
+
 const log = [];
-const note = (s) => { log.push(s); console.log(s); };
+/**
+ * …AND LOGGING CANNOT BE ALLOWED TO KILL THE RUN.
+ *
+ * sc-rx-unguarded/pc-wrong died here, mid-drive, at this exact function:
+ *   Error: ENOSPC: no space left on device, write
+ *     at console.log … at note (lesson-audit.mjs:97:44)
+ * When stdout is a redirected file (`> run.log`, which is how every lane in the
+ * sweep is invoked) Node backs it with a SyncWriteStream, and a write error
+ * there is an unhandled 'error' event — i.e. process death, with the drive
+ * abandoned and no summary. The harness has to be able to outlive its own log:
+ * the in-memory `log` array keeps the transcript, `stdoutBroken` records that
+ * the file on disk is short, the status file says so where a reader will find
+ * it, and the end of the run tries once to save the transcript beside the
+ * frames as `_audit-transcript.log`. All three are best-effort by construction
+ * — they share the disk that just failed — but a run that keeps driving with a
+ * broken log still beats one that dies at t060s with no summary at all.
+ */
+let stdoutBroken = null;
+process.stdout.on("error", (error) => { stdoutBroken ??= String(error?.code ?? error?.message ?? error); });
+const note = (s) => {
+  log.push(s);
+  try {
+    console.log(s);
+  } catch (error) {
+    stdoutBroken ??= String(error?.code ?? error?.message ?? error);
+  }
+};
 /** Every failure this harness can have prints a line that starts like this. A
  *  run that cannot answer its own question must never look like a quiet pass. */
 const loud = (s) => note(`  !! ${s}`);
+
+// ── THE PER-LANE STATUS FILE ───────────────────────────────────────────────
+//
+// THE FINDING IT CLOSES, in the audit's own words: *"the capture wrote empty
+// files rather than failing, so a re-drive lane that only checks for file
+// existence would score this leg as tested."* Counting files in a folder is not
+// a measure of coverage, and four separate lessons were mis-scored by it.
+//
+// It also separates three states that a bare directory listing renders
+// identical, and which the sweep confused: sc-crossing-bus-shadow's four EMPTY
+// FOLDERS ("the harness created the output tree and then died before it opened
+// a browser") read the same as sc-crossing-let-pass, which was NEVER DISPATCHED
+// at all. Now:
+//   no _audit-status.json          -> this lane was never dispatched
+//   phase !== "complete"           -> the harness started and died; `phase` says where
+//   complete + framesLost > 0      -> it ran, and this much of the evidence is missing
+// Written FIRST, before sign-in, and rewritten at every phase change, because a
+// status file that only appears on success answers nothing about the failures.
+const STATUS = `${OUT}/_audit-status.json`;
+const status = {
+  scenario: SCENARIO, platform: PLATFORM, mode: MODE,
+  startedAt: new Date().toISOString(),
+  phase: "starting",
+  framesWritten: 0, framesLost: 0, lostFrames: [],
+  cameraStopped: null, stdoutBroken: null, ended: null, verdict: null, exit: null,
+};
+const saveStatus = (patch = {}) => {
+  Object.assign(status, patch, { stdoutBroken, updatedAt: new Date().toISOString() });
+  // The status file is the LAST thing that may fail silently — but it lives on
+  // the same disk that was full, so it cannot be allowed to throw either.
+  try { writeFileSync(STATUS, `${JSON.stringify(status, null, 2)}\n`); } catch { /* the disk is gone; the log tail is all there is */ }
+};
+saveStatus();
 
 async function open() {
   if (PLATFORM === "pc") {
@@ -137,6 +262,13 @@ async function open() {
     // is chronically short of both. Override with KNIJKA_PC_DPR when a row
     // really is about pixels.
     const dpr = Number(process.env.KNIJKA_PC_DPR || 1);
+    // The notch rule in insets.test.mjs exists so a probe never measures a phone
+    // without its cutout. This leg is not a phone — it is the 1440×900 DESKTOP
+    // that exercises the ROOMY UI — and handing safe-area insets to it would be
+    // the same error pointing the other way. The `mobile` leg below IS a phone
+    // and does go through newDeviceContext, so the rule still binds where it
+    // means anything.
+    // insets-exempt: the pc leg is a 1440×900 desktop, which has no safe areas.
     const b2 = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: dpr });
     return { browser: b, context: b2 };
   }
@@ -171,8 +303,49 @@ const costLine = () =>
     })
     .join(" · ");
 
+// ── THE CAMERA, AND THE PROOF THAT IT FIRED ────────────────────────────────
+//
+// This was `page.screenshot({ path }).catch(() => {})` and it cost the sweep
+// 333 frames and 54 lanes (see the 2026-08-18 note in the banner). Three
+// properties replace the empty catch, and each answers a specific casualty:
+//
+//   IT READS THE FILE BACK — lib/frames.mjs checks the PNG signature and the
+//   IEND marker, because `size > 0` credits all six of the truncated frames and
+//   a half-written PNG is worth exactly as much as an empty one.
+//
+//   IT NAMES WHAT IT LOST — into the log AND into the ledger below, so nobody
+//   ever has to infer coverage by counting files again.
+//
+//   IT STOPS. Three losses in a row, or one ENOSPC, and the camera is switched
+//   off. NOT the run: sc-sig-controller-live's verdict survived only in its
+//   run.log after 24 of its 29 frames died, so the TEXT is often the last
+//   evidence standing and must keep being written. What stops is the pretence
+//   that frames are being taken — and, on the pc leg where a frame costs 12 s,
+//   that also stops the harness spending a fifth of the drive photographing
+//   nothing.
+//
+// The POLICY (verify, retry once, delete the stub, count, stop) lives in
+// lib/frames.mjs so it can be tested without a browser — frames.test.mjs is
+// where each clause of the paragraph above is pinned to the casualty that
+// bought it. This is the adapter: it supplies the timing hook and mirrors the
+// ledger into the status file after every loss.
+const ledger = createFrameLedger({
+  loud,
+  capture: (target, path, opts) => timed("screenshot", () => captureFrame(target, path, opts)),
+});
+const frames = ledger.state;
+
 const shot = async (n) => {
-  await timed("screenshot", () => page.screenshot({ path: `${OUT}/${n}.png` }).catch(() => {}));
+  const ok = await ledger.shoot(page, `${OUT}/${n}.png`, n);
+  if (!ok) {
+    saveStatus({
+      framesWritten: frames.written,
+      framesLost: frames.lost,
+      lostFrames: frames.names,
+      cameraStopped: frames.cameraStopped,
+    });
+  }
+  return ok;
 };
 
 // ── the reading surface ────────────────────────────────────────────────────
@@ -425,7 +598,24 @@ if (PLATFORM === "pc") {
   }
 }
 
-await signIn(page, { email: "founder@knijka.ai", password: "Knijka2026!" }, BASE);
+// A REFUSED SIGN-IN IS RECORDED, NOT JUST THROWN. sc-rb-exit-signal/mobile-wrong
+// is the shape: nine 0-byte PNGs and an EMPTY log.txt beside a
+// log-signin-refused-1.txt, so "a later reader counting files would conclude
+// this lane was audited". `signIn` throwing kills the process before anything
+// says which lane died or why, and the same refusal hit sc-pk-rail-ban/pc-wrong,
+// sc-crossing-dart/pc-right and sc-rx-guarded/pc-right in the same sweep. The
+// status file has to carry it, because that is the artifact a re-drive reads.
+saveStatus({ phase: "signing-in" });
+try {
+  await signIn(page, { email: "founder@knijka.ai", password: "Knijka2026!" }, BASE);
+} catch (error) {
+  const why = String(error?.message ?? error).split("\n")[0];
+  loud(`SIGN-IN WAS REFUSED — this lane never reached the lesson: ${why}`);
+  saveStatus({ phase: "signin-refused", why, exit: 3 });
+  await browser.close().catch(() => {});
+  process.exit(3);
+}
+saveStatus({ phase: "loading-lesson" });
 await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, {
   waitUntil: "domcontentloaded",
   timeout: 300_000,
@@ -433,6 +623,7 @@ await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, {
 await page.waitForTimeout(25_000);
 
 note(`=== ${SCENARIO} · ${PLATFORM} · ${MODE} ===`);
+saveStatus({ phase: "arrived" });
 await beat("01-arrival");
 
 // THE FULL BRIEFING — open the sheet, read it, and CLOSE IT AGAIN. The close is
@@ -847,6 +1038,7 @@ let shotStopped = false, shotWaited = false;
 
 if (MODE !== "right") await throttle(true);
 
+saveStatus({ phase: "driving" });
 let budgetMs = DRIVE_BUDGET_MS;
 let budgetSaid = false;
 const medianTick = () => {
@@ -1095,6 +1287,7 @@ note(
   }
 }
 await page.waitForTimeout(2500);
+saveStatus({ phase: "reaching-debrief", ended });
 await beat("07-end");
 
 // ── THE DEBRIEF — AND IT IS FORCED, NOT HOPED FOR ──────────────────────────
@@ -1316,6 +1509,25 @@ if (!hasVerdict) {
 note(`  ended naturally: ${endedNaturally}${endedNaturally ? "" : `  (forced via «${forcedBy ?? "nothing"}» — itself a finding)`}`);
 
 note(`\n--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE}) ---`);
+// THE FRAME LEDGER GOES IN THE SUMMARY, not only in the loud lines above, and
+// it goes in FIRST. Every judgement below this point was made from pixels, so a
+// reader has to know how many of those pixels exist before reading a word of it
+// — the sweep it replaces produced folders whose 08-debrief.png was 0 bytes and
+// whose summary read exactly like a lesson that had been photographed.
+note(
+  `frames: ${frames.written} captured · ${frames.lost} LOST` +
+    (frames.cameraStopped ? ` · camera stopped (${frames.cameraStopped})` : "") +
+    (frames.lost ? ` — ${frames.names.join(" | ")}` : ""),
+);
+if (frames.lost) {
+  loud(
+    `${frames.lost} frame${frames.lost === 1 ? "" : "s"} named above ${frames.lost === 1 ? "does" : "do"} not exist on disk. ` +
+      `Any part of this lane's verdict that needs one of them is UNANSWERED, not answered in the negative.`,
+  );
+}
+if (stdoutBroken) {
+  loud(`the run log itself could not be written in full (${stdoutBroken}) — what follows may be missing from the file on disk.`);
+}
 note(`ended: ${ended} · endedNaturally: ${endedNaturally} · forcedBy: ${forcedBy ?? "-"}`);
 note(`ladder: ${trail.length} action(s) over ${rungsUsed} step(s)${trail.length ? ` — ${trail.join(" | ")}` : ""}`);
 note(`drive: top ${topSpeed} км/ч · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч`);
@@ -1337,4 +1549,49 @@ if ((facts.nearMisses ?? []).length) {
 }
 note(`INSTRUCTOR DEBRIEF >>> ${facts.debriefText || "(empty)"}`);
 note(`DEBRIEF TEXT >>> ${debrief.body.slice(0, 1800)}`);
+
+// ── THE EXIT CODE IS ABOUT EVIDENCE, NOT ABOUT THE LESSON ──────────────────
+//
+// Every lane in the sweep exited 0, including the ones that wrote nothing but
+// empty files, so whatever dispatched them recorded 644 successes. The only
+// question this code answers is: CAN THIS RUN BE JUDGED?
+//
+// It deliberately does NOT go non-zero on a failed drive, an unreached verdict
+// card or a forced session end. Those are FINDINGS — they are the product's
+// answer, captured correctly, and a re-drive would faithfully reproduce them.
+// Making them exit non-zero would send a re-drive lane after 137 healthy runs
+// and bury the 54 that actually lost their evidence. A false failure and a
+// false pass are the same crime.
+const exit = frames.lost || stdoutBroken ? 1 : 0;
+if (stdoutBroken) {
+  // The one recovery attempt for a transcript that never reached run.log. It
+  // shares the disk that just failed, so it is allowed to fail too — but
+  // sc-rx-unguarded/pc-wrong lost its entire drive this way and one try is
+  // free.
+  try { writeFileSync(`${OUT}/_audit-transcript.log`, `${log.join("\n")}\n`); } catch { /* the disk really is gone */ }
+}
+saveStatus({
+  phase: "complete",
+  framesWritten: frames.written,
+  framesLost: frames.lost,
+  lostFrames: frames.names,
+  cameraStopped: frames.cameraStopped,
+  ended,
+  endedNaturally,
+  forcedBy,
+  verdict: facts.verdict ?? null,
+  score: facts.score ?? null,
+  reachedVerdictCard: reached,
+  exit,
+});
+note(
+  `EVIDENCE: ${exit === 0 ? "complete — this lane can be judged" : "INCOMPLETE — re-drive this lane"} ` +
+    `(exit ${exit}; the lesson's own verdict is above and is not what this code is about)`,
+);
 await browser.close();
+// `process.exitCode`, NOT `process.exit()`. A forced exit can drop whatever is
+// still buffered in stdout, and on this harness stdout IS the evidence — it was
+// the only surviving record of sc-sig-controller-live's verdict. The browser is
+// already closed, so nothing holds the loop open and the process ends on its
+// own with this code, having written every line first.
+process.exitCode = exit;

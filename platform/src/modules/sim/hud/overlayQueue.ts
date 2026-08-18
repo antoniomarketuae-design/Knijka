@@ -23,7 +23,12 @@
  *   3. It never paints inside the CENTRE BAND (`overlayCentreBand`). That band
  *      is the road, and on a reading screen it is the question.
  *   4. Full-bleed is reserved for an EXPLICIT pause — something the student
- *      asked for by tapping. Nothing arrives full-bleed on its own.
+ *      asked for by tapping. Nothing arrives full-bleed on its own, and while
+ *      such a surface is up the queue says nothing at all
+ *      (`OVERLAY_SCREEN_OWNERS` / `overlayQueueMaySpeak` / `overlayHoldsDrive`).
+ *      This rule was PROSE ONLY until 2026-08-17, which is how the lesson menu
+ *      came to share a screen with a live coaching card; the block above
+ *      `OverlayScreenOwner` has the frame and the derivation.
  *
  * THEO-4 (requirement zero, founder-ratified) is why the line is not the whole
  * story. A one-line overlay may never degrade into a bare correct/wrong
@@ -365,6 +370,131 @@ export function briefingBodyBg(steps: readonly BriefingStepBg[]): string | null 
     .join("\n");
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RULE 4 HAD NO FUNCTION — SO THE SHELL WROTE IT TWICE AND THE TWO DIVERGED.
+
+   CATALOGUE SWEEP 2026-08-17, ten BROKEN findings routed at this file. Rule 4
+   at the top of this module — „Full-bleed is reserved for an EXPLICIT pause …
+   Nothing arrives full-bleed on its own" — was prose. Rules 1 and 3 at least
+   compile to `selectOverlay` and `overlayCentreBand`; rule 4 compiled to
+   nothing, so every consumer had to restate it by hand, and `LessonPlayShell`
+   restates it TWICE, 833 lines apart, for the two halves of the same question:
+
+     line 3585  `paused={…}`      — must the CAR be frozen?      6 disjuncts
+     line 2752  `pauseModalUp`    — may the QUEUE speak?         2 disjuncts
+
+   Nothing said they were the same list, so they stopped being the same list.
+   Laid side by side against the surfaces that actually take the screen:
+
+     surface                    freezes the car   silences the queue
+     ────────────────────────   ───────────────   ──────────────────
+     micro-quiz                 yes               yes
+     THEO-3 consequence card    yes               ONLY IF `mistakeMode`   ←
+     «Меню на урока»            yes               NO                      ←←
+     the overlay's own sheet    yes               no  (correct — same item)
+
+   REPRODUCED TODAY, deployed build, WebKit, iPhone 16 landscape, the shipped
+   harness (`tools/mobile/lesson-audit.mjs sc-hz-breakdown-pulloff mobile
+   right`, frame `07b-menu.png`): the lesson menu is open, the cluster reads
+   «0 км/ч D» — so the car IS frozen, `playMenuOpen` did its job — and the
+   queue's own `warning` card «Контролна лампа: температура! / Спри спокойно
+   вдясно» is painted live at the top right of the same frame, over an
+   undimmed road. Two interaction layers on one screen, one of them
+   instructing the student to pull over a car that cannot move.
+
+   THE FIX IS NOT „ADD `playMenuOpen` TO THE OTHER LIST". That repairs this
+   frame and leaves the shape that produced it: two hand-kept lists, no third
+   thing that knows they are one list. So the census moves HERE, where rule 4
+   is written, and both answers are DERIVED from it — `overlayQueueMaySpeak`
+   and `overlayHoldsDrive` read the same table, so a surface added to one is
+   in the other by construction and cannot be forgotten.
+
+   WHAT IS DELIBERATELY NOT IN THE CENSUS, because both omissions look like
+   holes and neither is:
+
+     `ended` — a session PHASE, not a surface. The queue must keep speaking
+       when the session ends: the `end` item IS how the verdict is delivered,
+       and silencing the queue there would remove the «Резултат» chip that is
+       the only route to the debrief on a phone.
+     `teachQueue.length > 0` — the queue's OWN blocking item, named by its
+       producer instead of by its property. That is what `blocking` and the
+       new `held` below are for; see the block on `OverlaySelection.held`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** A surface OUTSIDE the overlay queue that can take the drive screen. */
+export type OverlayScreenOwner =
+  /** A micro-quiz: asks a question and waits for the answer. */
+  | "quiz"
+  /** THEO-3 consequence card — „ето какво щеше да стане". */
+  | "consequence"
+  /** «Меню на урока» — the sheet behind МЕНЮ / ЗАТВОРИ. */
+  | "playMenu"
+  /** The overlay's OWN detail sheet («ПРОЧЕТИ» / «ЗАЩО» / «СПИСЪК»). */
+  | "readSheet";
+
+export interface OverlayScreenOwnerSpec {
+  readonly id: OverlayScreenOwner;
+  /** Who renders it — so the next reader can go and look. */
+  readonly ownerFile: string;
+  /**
+   * Is this surface the overlay layer ITSELF?
+   *
+   * The one bit that is not uniform, and the reason the census cannot just be
+   * a list of booleans. `readSheet` is the opened state of the very item the
+   * queue selected: blanking the queue while it is up would delete the card
+   * the sheet belongs to and, with it, the «Разбрах» that closes it. Every
+   * other owner is a DIFFERENT owner, and two owners on one screen is the
+   * defect. „One overlay at a time" has to mean across the whole layer.
+   */
+  readonly isQueueSurface: boolean;
+}
+
+/**
+ * THE CENSUS. Exhaustive by type: a new `OverlayScreenOwner` that is not given
+ * a row here is a `tsc` error, which is a stronger guard than any test — the
+ * 2026-08-17 divergence existed precisely because nothing was exhaustive over
+ * these four things.
+ */
+export const OVERLAY_SCREEN_OWNERS: Readonly<
+  Record<OverlayScreenOwner, OverlayScreenOwnerSpec>
+> = {
+  quiz: {
+    id: "quiz",
+    ownerFile: "components/sim/lesson-ui/LessonPlayShell.tsx (activeQuiz)",
+    isQueueSurface: false,
+  },
+  consequence: {
+    id: "consequence",
+    ownerFile: "components/sim/lesson-ui/LessonPlayShell.tsx (consequence)",
+    isQueueSurface: false,
+  },
+  playMenu: {
+    id: "playMenu",
+    ownerFile: "components/sim/lesson-ui/LessonPlayShell.tsx (PlayMenu, playMenuOpen)",
+    isQueueSurface: false,
+  },
+  readSheet: {
+    id: "readSheet",
+    ownerFile: "modules/sim/hud/SimOverlay.tsx (overlaySheetOpen)",
+    isQueueSurface: true,
+  },
+} as const;
+
+/** Does this owner take the screen away from the queue, or is it the queue? */
+export function overlaySilencesQueue(owner: OverlayScreenOwner): boolean {
+  return !OVERLAY_SCREEN_OWNERS[owner].isQueueSurface;
+}
+
+/**
+ * May the queue paint at all?
+ *
+ * This is `LessonPlayShell`'s `pauseModalUp`, inverted and complete. Passing
+ * `[]` — nothing owns the screen — is the ordinary drive.
+ */
+export function overlayQueueMaySpeak(owners: readonly OverlayScreenOwner[]): boolean {
+  return !owners.some(overlaySilencesQueue);
+}
+
 export interface OverlaySelection {
   /** The ONE overlay on screen, or null when the road is clean. */
   active: SimOverlayItem | null;
@@ -372,6 +502,63 @@ export interface OverlaySelection {
   queued: number;
   /** Everything except `active`, in priority order — for tests and debugging. */
   waiting: SimOverlayItem[];
+  /**
+   * MUST THE DRIVE BE FROZEN FOR THIS SELECTION? — 2026-08-17.
+   *
+   * `SimOverlayItem.blocking` says, in this file, „the item holds the drive
+   * frozen until it is acknowledged". NOTHING READ IT. `paused` freezes the
+   * car for `teachQueue.length > 0` — the teach moment named by its PRODUCER —
+   * so the one other item that ships `blocking: true`, the briefing card at
+   * `LessonPlayShell` line ~2986, has been declaring a pause that never
+   * happened.
+   *
+   * MEASURED, same harness run (`sc-ac-rain-lights mobile right`):
+   *
+   *   [01-arrival]  0 км/ч   card=warning/peek
+   *
+   * At arrival the briefing (`kind: "hint"`, priority 60, `blocking: true`)
+   * and an armed telltale (`kind: "warning"`, priority 70) are both candidates
+   * and PRIORITY alone decides, so the warning takes the glass and the
+   * briefing's «Разбрах» — the only control that clears it — is not on screen.
+   * The drive is not frozen, so the student drives away from an instruction he
+   * never dismissed; `briefingOpen` is `useState(true)` closed only by that
+   * ack, so the card is a candidate for the rest of the session and returns
+   * every time the warning's 5 s TTL lapses. That is the sweep's „the
+   * instructions card is still open 13 seconds into the drive" (sc-vp-stall),
+   * „identical panel 105 seconds later" (sc-ac-rain-lights) and „the coaching
+   * state never advances … at t=180 s the cluster reads 49 км/ч"
+   * (sc-ed-reverse-line) — one mechanism, three frames.
+   *
+   * So `held` is computed over ALL candidates and not over `active`: a
+   * blocking item that lost the priority contest still holds the drive. That
+   * is the whole point of the field — if it only reported on the item that
+   * happens to be painted, it would report exactly the state above as „not
+   * held", which is the frame this is written against.
+   */
+  held: boolean;
+}
+
+/**
+ * MUST THE CAR BE FROZEN? — the other half of the census, same table.
+ *
+ * This is `LessonPlayShell`'s `paused`, less the `ended` phase which is not a
+ * surface. Every owner freezes the drive (that is what „owns the screen"
+ * means, and it is why `isQueueSurface` gates only the SILENCING half), and so
+ * does a blocking item still waiting for its acknowledgement.
+ */
+export function overlayHoldsDrive(
+  owners: readonly OverlayScreenOwner[],
+  selection: OverlaySelection,
+): boolean {
+  return owners.length > 0 || selection.held;
+}
+
+export interface SelectOverlayOptions {
+  /**
+   * Which non-queue surfaces currently own the screen. Default `[]` — the
+   * ordinary drive, and the behaviour every existing call site already has.
+   */
+  screenOwners?: readonly OverlayScreenOwner[];
 }
 
 /**
@@ -380,12 +567,24 @@ export interface OverlaySelection {
  * Stable: equal priority keeps caller order, so the newest toast (which the
  * caller unshifts) wins over an older one of the same kind, and a re-render
  * with unchanged inputs cannot make the line flicker between two items.
+ *
+ * `screenOwners` is rule 4, applied: while a DIFFERENT surface owns the drive
+ * screen the queue says nothing — no active item, nothing counted. `held` is
+ * still answered honestly, because the car must stay frozen for a blocking
+ * item whether or not the menu on top of it lets that item be painted.
  */
 export function selectOverlay(
   candidates: ReadonlyArray<SimOverlayItem | null | undefined>,
+  options: SelectOverlayOptions = {},
 ): OverlaySelection {
   const items = candidates.filter((c): c is SimOverlayItem => c != null);
-  if (items.length === 0) return { active: null, queued: 0, waiting: [] };
+  // Over ALL candidates, and before the gate below — see `OverlaySelection.held`.
+  const held = items.some((i) => i.blocking === true);
+
+  if (!overlayQueueMaySpeak(options.screenOwners ?? [])) {
+    return { active: null, queued: 0, waiting: [], held };
+  }
+  if (items.length === 0) return { active: null, queued: 0, waiting: [], held };
 
   const ordered = items
     .map((item, index) => ({ item, index }))
@@ -399,5 +598,6 @@ export function selectOverlay(
     active,
     queued: waiting.filter((i) => !AMBIENT.has(i.kind)).length,
     waiting,
+    held,
   };
 }

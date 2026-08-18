@@ -70,3 +70,4 @@ tools/mobile/.engprog/
 scratchpad/
 **/scratchpad/
 tools/clips/headless/.srt/
+.audit-frames/

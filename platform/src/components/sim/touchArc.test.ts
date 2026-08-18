@@ -7,6 +7,10 @@ import {
   arcStationRectPx,
   ARC_STATIONS_LEFT,
   ARC_STATIONS_RIGHT,
+  playMenuRectPx,
+  PLAY_MENU_LEFT_CSS,
+  PLAY_MENU_W_PX,
+  TOP_RAIL_LEFT_CSS,
   FLANK_LANE_PX,
   FLANK_LANE_VAR_NAME,
   notifyColumnFloorPx,
@@ -88,6 +92,23 @@ const LADDER: { id: string; stage: StageBox }[] = [
   // numbers is a coincidence: a small tablet held both ways.
   { id: "tablet-portrait 768x1024", stage: { width: 768, height: 1024 } },
   { id: "tablet-landscape 1024x768", stage: { width: 1024, height: 768 } },
+  // ── AND THE TWO THE HARNESS HAS CARRIED SINCE 2026-08-11 AND THIS FILE HAD
+  //    NOT — added 2026-08-18, and their absence is half of why the ⚙ dock
+  //    shipped under «МЕНЮ».
+  //
+  //    The header above says this list IS `tools/mobile/lib/devices.mjs` and
+  //    that „the two lists must agree or this file is testing a phone nobody
+  //    owns". They did not agree: `DEFAULT_DEVICE_IDS` has six rows and this
+  //    ladder had four, missing exactly the profile with a bottom inset on a
+  //    360-tall stage — which is the profile every band that measures upward
+  //    from the pad is TIGHTEST on, and the one Samsung sells 34.6 % of the
+  //    Bulgarian fleet as.
+  //
+  //    Appended rather than interleaved so the index references below
+  //    (LADDER[0]-[3], the founder's own two phones) keep pointing at the same
+  //    stages they were written for.
+  { id: "galaxy-gesturebar-portrait 360x780+24", stage: { width: 360, height: 780, insetBottom: 24 } },
+  { id: "galaxy-gesturebar-landscape 780x360+24", stage: { width: 780, height: 360, insetBottom: 24 } },
 ];
 
 /** WCAG/HIG, and the number row C6 was closed on. */
@@ -203,6 +224,115 @@ describe("nothing on this screen is under anything else on this screen", () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * …AND NOTHING ON THE OTHER SIDE OF THE MODULE BOUNDARY IS EITHER — the
+   * shell's «МЕНЮ» button against the steering band, 2026-08-18.
+   *
+   * THE HOLE THIS CLOSES, stated as the shape of the old evidence rather than
+   * as a rule: every check in this file compared TouchControls to TouchControls.
+   * The ⚙ dock's own clearance argument (TouchControls, `ARC_STATIONS_LEFT`)
+   * compared the LEFT band to the RIGHT band — „four left stations top out
+   * 16 px BELOW the four right ones" — and `touchDock.test.tsx` has fifteen
+   * tests, none of which knows the shell exists. So the one surface the fourth
+   * station could actually collide with was the one surface nothing measured:
+   *
+   *   iphone16-landscape           dock [67,60,44,44]  menu [67,8,48,44]   +8 px
+   *   small-landscape 780×360      dock [ 8,48,44,44]  menu [ 8,8,48,44]   −4 px
+   *   galaxy-gesturebar-landscape  dock [ 8,24,44,44]  menu [ 8,8,48,44]  −28 px
+   *
+   * 28 of 44 px is 64 % of the dock, under a `z-20` element, on the profile
+   * this ladder had also been missing. The rule is swept over EVERY profile and
+   * EVERY station, not just the dock and not just the two phones — a band that
+   * grows a fifth station, or a menu word that grows a letter, has to fail here.
+   * ═════════════════════════════════════════════════════════════════════════
+   */
+  it("no station is under the shell's «МЕНЮ» button, on any device in the ladder", () => {
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      const menu = playMenuRectPx(stage);
+      for (const s of stations(stage)) {
+        const px2 = overlap(s.rect, menu);
+        if (px2 > 0) {
+          bad.push(
+            `${id} ${s.id} ${JSON.stringify(s.rect)} x menu ${JSON.stringify(menu)} = ` +
+              `${Math.round(px2)} px² (${Math.round((100 * px2) / (TOUCH_MIN_PX * TOUCH_MIN_PX))} % of the box)`,
+          );
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("…and it clears by a readable margin rather than by a rounding", () => {
+    // Touching is not clearing: two boxes 0 px apart are a control whose edge
+    // pixel belongs to the other one. 8 px is the same gap `FLANK_LANE_PX`
+    // buys the band on its inboard side, so the two margins are one number.
+    const bad: string[] = [];
+    for (const { id, stage } of LADDER) {
+      const menu = playMenuRectPx(stage);
+      for (const s of stations(stage)) {
+        // Disjoint boxes clear on at least one axis; the margin is the better
+        // of the two, which is what a thumb actually gets.
+        const gapX = Math.max(menu.x - (s.rect.x + s.rect.w), s.rect.x - (menu.x + menu.w));
+        const gapY = Math.max(menu.y - (s.rect.y + s.rect.h), s.rect.y - (menu.y + menu.h));
+        if (Math.max(gapX, gapY) < 8) {
+          bad.push(`${id} ${s.id} clears the menu by ${Math.max(gapX, gapY).toFixed(1)} px`);
+        }
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("and it did not pass by accident: the OLD menu offset fails this same sweep", () => {
+    // A negative control, because a green from a check nobody has seen fire is
+    // not evidence. The shell shipped `left: calc(0.5rem + env(...left))` — the
+    // band's own 8 px edge, with no lane — and this is that box, against the
+    // dock resolved by the shipped resolver on the two 360-tall landscape
+    // profiles. The numbers are the ones in the header above.
+    const oldMenu = (stage: StageBox): StageRect => ({
+      x: 8 + (stage.insetLeft ?? 0),
+      y: 8 + (stage.insetTop ?? 0),
+      w: PLAY_MENU_W_PX,
+      h: TOUCH_MIN_PX,
+    });
+    const stageOf = (id: string) => LADDER.find((d) => d.id.startsWith(id))!.stage;
+    const small = stageOf("small-landscape"); // 780 × 360, no insets
+    const galaxy = stageOf("galaxy-gesturebar-landscape"); // …+ the 24 px bar
+    expect(arcStationRectPx(3, "left", small)).toEqual({ x: 8, y: 48, w: 44, h: 44 });
+    expect(arcStationRectPx(3, "left", galaxy)).toEqual({ x: 8, y: 24, w: 44, h: 44 });
+    // 4 px of the dock's height on the Android, 28 px on the Samsung — and 44
+    // px of width in both, because the old menu shared the band's own column.
+    expect(overlap(arcStationRectPx(3, "left", small), oldMenu(small))).toBe(4 * 44);
+    expect(overlap(arcStationRectPx(3, "left", galaxy), oldMenu(galaxy))).toBe(28 * 44);
+    // The founder's own phone was the one that cleared — 8 px — which is how a
+    // defect on two of three landscape profiles looked like no defect at all.
+    const iphone = LADDER[1].stage;
+    expect(overlap(arcStationRectPx(3, "left", iphone), oldMenu(iphone))).toBe(0);
+    // …and the same three boxes are clear under what ships now.
+    for (const stage of [small, galaxy, iphone]) {
+      expect(overlap(arcStationRectPx(3, "left", stage), playMenuRectPx(stage))).toBe(0);
+    }
+  });
+
+  it("the CSS the shell writes says the same thing as the resolver", () => {
+    // The resolver above can be perfect while the button lands somewhere else —
+    // the shell writes an INLINE style, which is the one form no stylesheet in
+    // this repo can correct (that cascade cost the flank wave a deploy). So the
+    // length is exported from TouchControls, imported by the shell, and pinned
+    // to the same lane variable the notification column reads.
+    expect(PLAY_MENU_LEFT_CSS).toContain(`var(${FLANK_LANE_VAR_NAME}`);
+    expect(PLAY_MENU_LEFT_CSS).toContain("env(safe-area-inset-left, 0px)");
+    expect(PLAY_MENU_LEFT_CSS).toContain("0.5rem");
+    // …and the rail is still „one clearance past «МЕНЮ»", derived rather than
+    // restated, so the two cannot drift apart when the button moves again.
+    expect(TOP_RAIL_LEFT_CSS).toContain(PLAY_MENU_LEFT_CSS);
+    for (const { id, stage } of LADDER) {
+      const menu = playMenuRectPx(stage);
+      expect(`${id} ${topRailBandPx(stage).x}`).toBe(`${id} ${menu.x + menu.w + 8}`);
+    }
   });
 
   it("no station is swallowed by the pad it measures from", () => {
@@ -627,10 +757,19 @@ describe("the separation rule holds on every flank of every device", () => {
     }
     // The exact numbers off the deployed build, so this reads as the report and
     // not as a re-derivation: left 88 / right 132 sideways, 48 / 72 upright.
-    expect(44 * (ARC_STATIONS_LEFT - 1)).toBe(88);
-    expect(44 * (ARC_STATIONS_RIGHT - 1)).toBe(132);
-    expect(24 * (ARC_STATIONS_LEFT - 1)).toBe(48);
-    expect(24 * (ARC_STATIONS_RIGHT - 1)).toBe(72);
+    //
+    // THEY ARE LITERALS AND NOT `44 * (ARC_STATIONS_LEFT - 1)` ANY MORE
+    // (2026-08-17). That spelling was a re-derivation wearing a measurement's
+    // clothes: the left flank carried THREE stations when the 88 was measured,
+    // it carries four now that the ⚙ dock has its own box, and the derivation
+    // would quietly have "measured" 132 on a build nobody ever photographed.
+    // A report of what a browser once showed does not move when the code does.
+    const OLD_LEFT_STATIONS = 3; // the flank as deployed on 2026-08-12
+    const OLD_RIGHT_STATIONS = 4;
+    expect(44 * (OLD_LEFT_STATIONS - 1)).toBe(88);
+    expect(44 * (OLD_RIGHT_STATIONS - 1)).toBe(132);
+    expect(24 * (OLD_LEFT_STATIONS - 1)).toBe(48);
+    expect(24 * (OLD_RIGHT_STATIONS - 1)).toBe(72);
   });
 
   it("the two bands leave a corridor, and it is wider than the old flanks", () => {
@@ -703,6 +842,17 @@ describe("the shipped CSS is generated from the same numbers", () => {
     expect(right).toEqual({ x: 67, y: 148, w: 44, h: 44 });
     const horn = arcStationRectPx(2, "left", stage); // ⊙             was [61,172]
     expect(horn).toEqual({ x: 67, y: 104, w: 44, h: 44 });
+
+    // …and the ⚙ dock's own box, added 2026-08-17. Nothing below it moved —
+    // the three above are the same rects this test asserted yesterday, which
+    // is the point of indexing a band from the bottom.
+    const carSheet = arcStationRectPx(3, "left", stage); // ⚙
+    expect(carSheet).toEqual({ x: 67, y: 60, w: 44, h: 44 });
+    // THE CLEARANCE ARGUMENT, AS ARITHMETIC RATHER THAN AS PROSE: a fourth left
+    // station is free because the band budget is set by the busier flank, and
+    // the left band hangs off the SHORTER pad. Its top edge lands 16 px below
+    // the right band's top edge, which every sweep in this file already clears.
+    expect(carSheet.y).toBe(arcStationRectPx(3, "right", stage).y + 16);
   });
 
   it("…and to a band beside the road on his phone held upright", () => {
@@ -720,12 +870,19 @@ describe("the shipped CSS is generated from the same numbers", () => {
     expect(arcStationRectPx(3, "right", stage).x + 44).toBe(stage.width - 8);
   });
 
-  it("the flanks carry the seven controls a moving car needs and nothing else", () => {
+  it("the flanks carry the eight controls a moving car needs and nothing else", () => {
     // Stated as a number so „just add one more station" cannot land quietly:
-    // the band this file sweeps is what it is because seven controls are on it.
-    // LEFT  ⇦ ⇨ and the horn — the steering thumb's.
-    // RIGHT the ⚙ dock (= the belt while it is off) and the three mirrors.
-    expect(ARC_STATIONS_LEFT).toBe(3);
+    // the band this file sweeps is what it is because eight controls are on it.
+    // LEFT  ⇦ ⇨, the horn, and the ⚙ dock at the top — the steering thumb's.
+    // RIGHT the belt at station 0 and the three mirrors.
+    //
+    // IT WAS SEVEN UNTIL 2026-08-17, and the eighth is not a new control — it
+    // is the ⚙ dock finally having a box of its own instead of being the second
+    // face of the belt's. The measurement that forced it is at
+    // `ARC_STATIONS_LEFT` in TouchControls.tsx: with the belt off, the deployed
+    // phone showed «⚠Колан ДДясн ЗЗадн ЛЛяво» and no dock anywhere, i.e. no
+    // lights, wipers, fog lamps, engine or gearbox on the whole screen.
+    expect(ARC_STATIONS_LEFT).toBe(4);
     expect(ARC_STATIONS_RIGHT).toBe(4);
   });
 });

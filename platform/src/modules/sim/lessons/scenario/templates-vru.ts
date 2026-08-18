@@ -98,6 +98,119 @@
  *
  * VU-05/06 stay 🟡 PARTIAL (recipe/world only) and VU-03 (scripted swerve
  * actor)/07/08/11/12/13/14 stay 🔴 NEW — later waves.
+ *
+ * ── 2026-08-17 · WHAT THE DEPLOYED BUILD ACTUALLY DID, MEASURED ─────────────
+ *
+ * The catalogue sweep drove all five of these on staging (tools/mobile/
+ * lesson-audit.mjs, mobile + pc, a careful drive and a flat-out drive each) and
+ * read the credit off the DEBRIEF. Four defects survived every test in this
+ * repository because every test in this repository replays the AUTHORED ghost,
+ * and an authored ghost does exactly what its author meant:
+ *
+ *  1. FIVE reachZone rows certified a fact `stepReachZone` cannot see. It is
+ *     handed (params, prevState, tick) and SimTick carries position, speed,
+ *     lane, indicator — and NOTHING about another road user. So «след като
+ *     велосипедистът е преминал», «пропусни линейката», «след като линейката е
+ *     преминала», «Изпревари велосипедиста» and «Подмини вратата» were all
+ *     awarded for arriving at a coordinate. MEASURED: sc-vu-pass-clearance
+ *     finished ИЗДЪРЖАН · 0 т. · ★★★ on BOTH drives — the flat-out 59 км/ч run
+ *     ticked «Изпревари велосипедиста с широка дъга» at 0:47 and the careful
+ *     run at 2:34 having never caught the rider at all. Same remedy as the
+ *     junctions3/rail rows (commit cdb2f71): the title says what the disc
+ *     measures, the duty keeps its grader in the rule engine.
+ *  2. sc-vu-emergency handed the чл. 91 COMMENDATION to the drive that ignored
+ *     the ambulance. MEASURED: «✓ Правилно отстъпено предимство» at 0:06 (pc)
+ *     and 0:14 (mobile) on the run that held the throttle for 210 s and never
+ *     braked. Cause + fix at EM_APPROACH.accelMps2 below.
+ *  3. sc-vue-made-way's disc was r8 on a map whose lane pitch is 8.125 m, so
+ *     „вдясно" rested on thirteen centimetres. Tightened to r4; see the row.
+ *
+ *     THE OTHER HALF OF THAT ENTRY WAS WRONG AND IS RECORDED HERE RATHER THAN
+ *     DELETED (2026-08-18). It read: „`maxSpeedKmh: 55` on a road posted 50 is
+ *     a cap nobody driving lawfully can fail, which nonetheless ARMS the
+ *     evaluator's grace capsule and hands every student 5 extra metres —
+ *     removed." Nobody driving LAWFULLY can fail it, and that is the point: the
+ *     tier governor reaches 58–59 км/ч here, so the cap refused the unlawful
+ *     run and printed the one teach card this row ever produced. And the
+ *     capsule reaches only `capMet`, never `reached`, on a cap that is not a
+ *     halt demand — so a capped zone accepts a strict subset of what the same
+ *     zone without one accepts, and „it can only widen" is not something a cap
+ *     is able to do. The cap is back at 55; the property is swept in
+ *     objectives.test.ts.
+ *  4. sc-vu-pass-clearance had no gradient at all: the lane centre itself
+ *     landed inside the runtime's SILENT grace band, so a driver who never
+ *     touched the wheel was neither convicted nor commended. Arithmetic and
+ *     fix at VU_PASS_CYCLIST.
+ *
+ * WHAT THE SWEEP GOT WRONG, recorded here so it is not "fixed" again: it filed
+ * „there is no ambulance" against sc-vu-emergency and sc-vu-emergency-junction.
+ * The junction one is real — mobile-wrong books «Непропускане на ППС с
+ * предимство» against it — and the frames DO under-sample: at 5–6 s spacing a
+ * 3 s crossing is missed more often than caught.
+ *
+ * ── 2026-08-18 · THE SAME FRAMES (sweep161), OPENED AND READ AGAIN ──────────
+ *
+ * THE OTHER HALF OF THAT PARAGRAPH WAS WRONG. It used to go on: „There is. The
+ * rear-view mirror of sc-vu-emergency/mobile-right carries the blue-lit rig at
+ * t = 7 s and t = 12 s and the runner resolves at 0:14." Both proofs fail when
+ * the crops are enlarged:
+ *   · 04-t007s.png carries a SOLID BLUE car body in the mirror — the demo
+ *     ghost's colour. The special-regime rig is a WHITE van with a blue bar
+ *     (vehicleFleet EMERGENCY_MODEL_INDEX). 04-t012s.png carries only the ghost
+ *     path's blue glow, and on the phone the coach tip covers half the mirror.
+ *   · „the runner resolves at 0:14" IS the «✓ Правилно отстъпено предимство»
+ *     entry 2 of this same header condemns as a false certificate. Citing it as
+ *     evidence the actor exists is circular.
+ * The desktop leg settles it without any cropping: sc-vu-emergency/pc-right at
+ * t = 6 s and t = 12 s shows an EMPTY four-lane boulevard ahead AND an empty
+ * mirror, on a drive that had barely left the spawn. Replayed here through the
+ * production stack at that drive's own pace the EV is at y = 27 m (t = 6 s) and
+ * y = 108 m (t = 12 s) with the player at y = 30 / 47 — i.e. filling the left
+ * lane of the windscreen in both frames. The headless stack stages it, moves it
+ * and grades against it; the DEPLOYED SCENE did not draw it. That is a
+ * LessonScene/fleet question, not a number in this file, and it is the first
+ * thing to check before anybody re-tunes anything below.
+ *
+ * FOUR MORE DEFECTS, measured the way the four above were: replayed
+ * frame-by-frame through runtime → traffic → director → rules at the live hero
+ * car's ramp (1.95 m/s²), against a CRAWL (10 км/ч — the sweep's careful bot,
+ * 22–27 full stops in three minutes) and a FLAT-OUT (59 км/ч — the tier
+ * governor's ceiling). NOT ONE of them can be closed inside this file. Two (5
+ * and 7) are decided inside a runner this template only parameterises, and the
+ * dial each one exposes is measurably the wrong lever. The other two (6 and 8)
+ * ARE this file's numbers — and both are pinned by demo choreography in
+ * traces/ + content/traces/ recorded against the very numbers that are wrong:
+ * the corrected values were applied and measured here, and the §5/§9 gates
+ * named exactly which demo each one broke. All four are replayed as
+ * executable measurements in scenario/__tests__/vru-staged-encounter-reach
+ * .test.ts, each pinned as a TRIPWIRE that goes red the day its repair lands
+ * and names its own replacement assertion. The measurement, the ladder
+ * and the coordinated change each one needs are written at its own site:
+ *
+ *  5. sc-vu-cyclist-hook hands the чл. 25 COMMENDATION to a car that never
+ *     turned right at all — see VU_CYCLIST.
+ *  6. sc-vu-emergency-junction cannot CONVICT the barge its own two mistake
+ *     demos are about — see VU_EV_CROSSING (with the arm/hold ladder).
+ *  7. sc-vu-emergency commends a car that merely never got going — see
+ *     EM_APPROACH.
+ *  8. sc-vu-pass-clearance's hold has never held — see VU_PASS_CYCLIST.
+ *
+ * AND THREE THAT ARE NOT THIS MODULE'S, recorded so the routing is not repeated:
+ *  (a) tj-rhr-v1 has no north arm, so a student who does not turn left drives
+ *      off the built tile and spends the rest of the session on a bare plane
+ *      with the route ribbon still drawn ahead of him and the mirror still
+ *      rendering the city behind (sc-vu-emergency-junction/pc-right/04-t049s
+ *      .png, 160 s of it). A world-boundary / off-route-abort question.
+ *  (b) the «Демонстрация» overlay runs its recorded annotations on its own 0:46
+ *      loop, so «Линейката премина, пътят е чист — завиваме наляво уверено» is
+ *      on screen at t = 40 s of a drive that has never met an ambulance and is
+ *      collecting «Превишена скорост» (pc-wrong/04-t040s.png). The demo player
+ *      must not speak in the coach's voice while it is out of phase with the
+ *      live drive.
+ *  (c) the ИНСТРУКЦИИ panel occupies the right third of the desktop viewport,
+ *      which on sc-vu-emergency-junction is exactly the east arm instruction 2
+ *      orders the student to look down (pc-right/04-t032s.png); on the phone
+ *      the coach tip covers the mirror sc-vu-emergency's instruction 2 names.
  */
 
 import type {
@@ -154,6 +267,33 @@ const VU_CYCLIST: CyclistRightHookSpec = {
   // so the closest centre-to-centre gap sits ~22 m — 25 lets that count as the
   // "a real conflict existed" gate for the YIELDED_TO_PRIORITY commendation
   // (it gates ONLY the yield credit; the hook uses dangerRadiusM).
+  //
+  // DEFECT 5 (2026-08-18) — AND WHY THIS NUMBER IS NOT THE CURE. The commendation
+  // this window gates is being paid to the drive that does the OPPOSITE of the
+  // lesson. MEASURED on staging (sweep161 debriefs): pc-wrong and mobile-wrong —
+  // 59 км/ч, ZERO full stops, TWO «Пътнотранспортно произшествие», 20 наказателни
+  // точки, НЕИЗДЪРЖАН — both carry «★ ✓ Правилно отстъпено предимство» (0:37 and
+  // 0:44), while pc-right and mobile-right, which stopped 23 and 24 times, carry
+  // none. Reproduced here through the production stack: a car held at 59 км/ч
+  // straight EAST along y = −4.06, never indicating, never turning, comes back
+  // ["violation:SPEEDING_OVER_LIMIT", "commendation:YIELDED_TO_PRIORITY"] with
+  // outcome "yielded".
+  //   CyclistRightHookRunner pays the credit on three facts —
+  //   `minPlayerJunctionM < HOOK_PASS_NEAR_M` (16) once, `dPJ > HOOK_PASS_FAR_M`
+  //   (22) again, and `conflictExisted` — and `conflictExisted` is only
+  //   „the rider was ever inside conflictWindowM while I was inside 45 m".
+  //   NOTHING in it asks whether the driver turned right, slowed, or left the
+  //   rider ahead. On this map the through road runs straight on past the mouth,
+  //   so DRIVING PAST AT SPEED satisfies all three.
+  //   Tightening this window cannot help and would only take the credit off the
+  //   yielding student too: the flat-out car passes the rider at dPC ≈ 3.7 m,
+  //   inside ANY upper bound. The fix belongs where the credit is decided —
+  //   orchestrator/runners.ts CyclistRightHookRunner: the "yielded" branch must
+  //   require the turn the lesson is about (a `turnStarted`/`direction: "right"`
+  //   seen while armed) AND the rider clear (`cyclistArc >= CYCLIST_CLEAR_ARC_M`)
+  //   at resolution; a straight-through pass resolves "clear", which is what it
+  //   is. The three demos keep citing FAILED_TO_YIELD and are unaffected: all
+  //   three DO turn right.
   conflictWindowM: 25,
 };
 
@@ -222,9 +362,24 @@ export const SC_VU_CYCLIST_HOOK: ScenarioSpec = {
     },
     {
       id: "sc-vu-turned",
-      titleBg: "Завий надясно, след като велосипедистът е преминал",
-      // Down the south stem after the turn — reachable ONLY from a completed
-      // right turn (a car continuing east never nears y = −45).
+      // WAS «Завий надясно, след като велосипедистът е преминал» — a certificate
+      // for the rider's progress, issued by a disc that has never heard of him.
+      // `stepReachZone` is handed (params, prevState, tick); SimTick carries no
+      // staged actor, no arc, no yield outcome, so „е преминал" was decided by
+      // the car's own coordinate and nothing else. The hook demo that turns
+      // ACROSS the rider (mistakes[2], graded FAILED_TO_YIELD) lands in this
+      // same stem and would tick it.
+      // WHAT THE DISC DOES PROVE: (−4.06, −45) r10 is the south stem's
+      // west-of-travel lane centre, 45 m down an arm reachable ONLY from a
+      // completed right turn (a car continuing east never nears y = −45). So
+      // the title claims the manoeuvre and the arm, which are the two things
+      // measured. The rider's priority keeps its teeth where it always had
+      // them: all three mistake demos cite FAILED_TO_YIELD and the
+      // CyclistRightHookRunner convicts it live (prioritySituation
+      // "cyclist-right-hook"), and instructions 3–4 + teach.examinerBg say the
+      // duty in words. Params untouched — `done` is bit-identical, so nothing
+      // new can fail and no THEO-4 card is owed.
+      titleBg: "Завий надясно и продължи по страничната улица",
       params: { kind: "reachZone", x: STEM_LANE_X, y: -45, radiusM: 10 },
     },
   ],
@@ -314,18 +469,41 @@ const EM_RIGHT = 12.19;
  * The old releaseGapM 38 held the EV dormant until the ghost was 38 m ahead,
  * then launched it from a standstill while the ghost was already at cruise — so
  * the gap BLEW OUT to ~68 m before the EV could close, and the clip opened on a
- * distant speck that read as an empty road. Two changes pin it to the ghost's
- * tail for the WHOLE clip instead: (1) release at 14 m (the EV rolls the instant
- * the ghost takes its lead, never falling back); (2) accelMps2 2.2 — the EV's
- * ramp is held to the ghost's own launch pace (recorder SCRIPT_ACCEL), so an
- * early-released EV rides ~15 m off the ghost's bumper through the slow launch
- * INSTEAD of surging past it. That surge was also a GRADING trap: an EV that
- * out-accelerates the still-slow ghost arms the yield duty while the ghost is
- * under the make-way threshold, and the runner reads the slow launch as a yield
- * (EMERGENCY_NOT_YIELDED never fires). Matching the ramp arms the duty only once
- * the ghost is at cruise, in the corridor, refusing — so the fault convicts AND
- * the ambulance is a close, constant tail on screen (playerGuard pins it ~15 m
- * back against the un-yielding ghost, its own lane, lights on).
+ * distant speck that read as an empty road. Release at 14 m pins it to the
+ * ghost's tail instead: the EV rolls the instant the ghost takes its lead and
+ * never falls back.
+ *
+ * …AND THE RAMP THAT WAS SUPPOSED TO GO WITH IT WAS SET AGAINST THE WRONG CAR
+ * (2026-08-17, measured on staging). The paragraph that used to stand here
+ * diagnosed the trap exactly right — „an EV that out-accelerates the still-slow
+ * ghost arms the yield duty while the ghost is under the make-way threshold,
+ * and the runner reads the slow launch as a yield" — and then chose 2.2 m/s²,
+ * the RECORDER's SCRIPT_ACCEL. The recorder is not the product. The live hero
+ * car launches at ~1.9-2.0 m/s² (17 км/ч at t = 1 s, 52 км/ч at t = 6 s, read
+ * off the sweep's own speed probe), so an EV at 2.2 still out-accelerates it,
+ * still becomes „closing" at t ≈ 3 s with the student at ~22 км/ч, and
+ * `sawYield` latches PERMANENTLY on that one frame because `slowedKeepingRight`
+ * only asks „is the car at or under 38 км/ч" — which every car is, on its way
+ * up from zero.
+ *
+ * MEASURED CONSEQUENCE: the drive that held the throttle for the whole session
+ * and never once touched the brake finished with «✓ Правилно отстъпено
+ * предимство» at 0:06 (pc) / 0:14 (mobile). The lesson congratulated a student
+ * for making way while he was accelerating past the ambulance.
+ *
+ * 1.5 m/s² is BELOW the hero car's launch ramp, which is what „held to the
+ * player's pace" was always meant to mean. The EV can then only out-SPEED the
+ * player once the player has stopped accelerating — i.e. once he is at cruise,
+ * in the corridor, and his speed is a DECISION rather than a stage of the
+ * launch. Worked through at the посочените 50 км/ч: the player caps at ~16.4
+ * m/s around t = 8.5 s; the EV passes his speed + EM_CLOSING_MIN_KMH at
+ * t ≈ 11.5 s with ~35 m still behind him (inside armBehindM 60), so the duty
+ * arms at 59 км/ч, `sawYield` does NOT latch, and responseWindowSec expires
+ * into EMERGENCY_NOT_YIELDED. A student who slows or pulls right inside those
+ * 7 s latches it and keeps the commendation. The picture survives too: the gap
+ * peaks at ~35 m instead of the old ~15 m — a light bar filling the mirror
+ * rather than a speck at 68 m — and playerGuard still pins the EV behind an
+ * un-yielding car in its own lane.
  *
  * The EmergencyApproachRunner adjudicates (prioritySituation "emergency"): a
  * rightward shift ≥ 0.8 m, slowing to ≤ 38 km/h while keeping right, or
@@ -340,7 +518,10 @@ const EM_APPROACH: EmergencyApproachSpec = {
     pathNodes: ["ln-n-start", "ln-n-end"],
     hold: { nodeIndex: 0, offsetM: 0 }, // y = 0 — 15 m behind ln-spawn-start
     cruiseSpeedMps: 19, // ~68 km/h: the EV runs above the 50 limit (чл. 91)
-    accelMps2: 2.2, // held to the ghost's launch ramp — ride its tail, don't surge past it
+    // BELOW the live hero car's ~1.9-2.0 m/s² launch ramp — see the block
+    // comment above. Was 2.2 (the RECORDER's SCRIPT_ACCEL), which let the EV
+    // out-accelerate the launching student and latched the yield at ~22 км/ч.
+    accelMps2: 1.5,
     extraRightOffsetM: -8.125, // dead-centre the LEFT lane (x = 4.06) — the EV's own corridor
     colorIndex: 0,
     profile: "emergency", // white rig + blue light bar (ADR-001 fictional)
@@ -349,6 +530,31 @@ const EM_APPROACH: EmergencyApproachSpec = {
   armBehindM: 60,
   responseWindowSec: 7,
   yieldShiftM: 0.8,
+  // DEFECT 7 (2026-08-18) — THE FIX ABOVE CLOSED ONE DOOR AND THIS THRESHOLD IS
+  // THE OTHER. `accelMps2: 1.5` fixed the case it was measured against — the EV
+  // out-accelerating a LAUNCHING student — and the flat-out drive now convicts
+  // (replayed here: 59 км/ч in the right lane comes back
+  // ["violation:SPEEDING_OVER_LIMIT", "violation:EMERGENCY_NOT_YIELDED"], and
+  // the make-way drive keeps its commendation; both directions are pinned in
+  // vru-title-truth-and-encounter.test.ts). What it does NOT reach is the
+  // student who was never going fast in the first place. MEASURED here at the
+  // sweep's careful pace: a car held at a flat 10 км/ч in the right lane, no
+  // brake, no shift, no indicator, comes back with a bare
+  // ["commendation:YIELDED_TO_PRIORITY"] and outcome "yielded" — the whole
+  // encounter decided by t ≈ 2 s, which is the 0:06 (pc) / 0:14 (mobile) stamp
+  // the sweep photographed on BOTH careful legs.
+  //   `slowedKeepingRight` asks an ABSOLUTE question — „is this car at or under
+  //   38 км/ч while keeping right" — and a car that has never been over it
+  //   answers yes forever. Lowering this number cannot fix that and would start
+  //   refusing the student who lawfully slows to 30: чл. 91 is satisfied by
+  //   slowing OR pulling right, and a false refusal teaches the wrong thing
+  //   exactly as hard as a false certificate (the ruling already recorded at
+  //   sc-vue-made-way). The fix is a DELTA, not a level, and it lives in
+  //   orchestrator/runners.ts EmergencyApproachRunner: latch the slow half only
+  //   on a measured drop after the duty arms (speed at arm − current ≥ a real
+  //   margin, or the existing `yieldShiftM` lateral move), so „made way" means
+  //   the driver did something. Leave this at 38: it is the level a genuine
+  //   yielder has to reach, and it is correct.
   yieldSlowKmh: 38, // ~12 under the posted 50
   passAheadM: 18,
   clearSpeedMps: 21,
@@ -402,10 +608,73 @@ export const SC_VU_EMERGENCY: ScenarioSpec = {
   success: [
     {
       id: "sc-vue-made-way",
-      titleBg: "Отдръпни се вдясно и пропусни линейката",
-      // Mid-boulevard checkpoint in the RIGHT lane, at yield pace — passing it
-      // slowly and to the right is the make-way posture itself.
-      params: { kind: "reachZone", x: EM_RIGHT, y: 180, radiusM: 8, maxSpeedKmh: 55 },
+      /**
+       * THE ROW THE SWEEP CAUGHT TWICE (2026-08-17). It read
+       * «Отдръпни се вдясно и пропусни линейката», params
+       * `(12.19, 180) r8, ≤55` — and it ticked at 2:23 on the mobile run, i.e.
+       * TWO MINUTES AND NINE SECONDS after the ambulance had passed and the
+       * encounter had resolved (the commendation is stamped 0:14). Nothing
+       * about the ambulance could have been in that tick, because
+       * `stepReachZone` never sees one.
+       *
+       * ‣ THE CAP, AND THE HALF OF THIS ROW THE FIRST FIX GOT BACKWARDS. It was
+       *   removed on 2026-08-17 as „a constraint that cannot bind and can only
+       *   forgive": `maxSpeedKmh: 55` sits above the road's posted 50, so no
+       *   LAWFUL drive can fail it, while carrying it arms `inGraceRing` in
+       *   objectives.ts and stretches the acceptance 5 m back down the approach.
+       *
+       *   NEITHER CLAUSE SURVIVES BEING MEASURED, and the removal cost this row
+       *   its only teaching.
+       *
+       *   „Cannot bind": the tier governor reaches 58–59 км/ч on this 400 m
+       *   boulevard, so the cap was refusing the UNLAWFUL run and saying why —
+       *   sweep log t = 17 s, «Задачата иска да си тук с не повече от 55 км/ч,
+       *   а в момента караш 59 км/ч…» (lessons/engine.ts `objectiveNotice`,
+       *   THEO-4's own shape: what was observed, what is wanted, what to do
+       *   about it). That card is the ONLY thing this row has ever said out
+       *   loud, and deleting the cap both silenced it and credited the 59 км/ч
+       *   run the row used to refuse.
+       *
+       *   „Can only widen": arithmetically impossible. The grace capsule
+       *   reaches `capMet` and never `reached` unless the cap is a HALT demand
+       *   (`REACH_ZONE_HALT_CAP_KMH`), so a capped `done` is a strict SUBSET of
+       *   the uncapped one — a cap can refuse, and can credit nobody the
+       *   capless row did not already credit. `objectives.test.ts` sweeps that
+       *   as a property over seven drives rather than trusting this paragraph,
+       *   and objectives.ts states it beside `inGraceRing` so the next sweep
+       *   does not delete another cap for it.
+       *
+       *   So the cap comes back, at the same 55 every sibling row in this
+       *   library carries on a road posted 50 (templates-cockpit.ts,
+       *   templates-conditions.ts).
+       *
+       *   IT IS A LAWFULNESS GATE AND NOT THE чл. 91 DUTY, which is why the
+       *   title does not name it: чл. 91 is satisfied by pulling right OR by
+       *   slowing, and the EmergencyApproachRunner grades both (`yieldShiftM`
+       *   0.8, `yieldSlowKmh` 38). A gate demanding the slow half would refuse
+       *   the student who lawfully chose the other, and a false refusal teaches
+       *   the wrong thing exactly as hard as a false certificate.
+       * ‣ THE RADIUS THAT COULD NOT PROVE THE LANE. ln-v1's lane pitch is
+       *   8.125 m: right-lane centre 12.19, LEFT-lane centre 4.06, divider
+       *   8.125. r8 accepts x ≥ 4.19 — it stopped 0.13 m short of the EV's own
+       *   corridor centre, so „вдясно" rested on thirteen centimetres. r4
+       *   accepts x ∈ [8.19, 16.19]: left bound the divider itself, right bound
+       *   the far kerb. Now the disc IS the right lane, the mistake ghosts'
+       *   left-lane line (x = 4.06) is 8.13 m outside it, and no student
+       *   holding his own lane is refused. Tightening only — this can credit
+       *   nobody it did not credit before.
+       *
+       * The make-way DUTY keeps its grader: both mistake demos cite
+       * EMERGENCY_NOT_YIELDED, the EmergencyApproachRunner convicts it live,
+       * and instructions 3–4 + teach.examinerBg carry it in words.
+       */
+      // The second clause is a fact about the MAP, not about the run — ln-v1's
+      // left lane is the EV's чл. 91 corridor on every drive, whatever the
+      // student does — so it explains the ask (THEO-4) without certifying that
+      // anything was yielded to. The tick says one thing and one thing only:
+      // at the mid-boulevard mark this car was in the right lane.
+      titleBg: "Мини средата на отсечката в дясната лента — лявата е коридорът на линейката",
+      params: { kind: "reachZone", x: EM_RIGHT, y: 180, radiusM: 4, maxSpeedKmh: 55 },
     },
     {
       id: "sc-vue-finish",
@@ -481,6 +750,61 @@ const VUEJ_LANE = 4.0625;
  * right-hand-rule tracker adjudicates (FAILED_TO_YIELD / YIELDED_TO_PRIORITY),
  * the runner only records the outcome. Faster than the JU-01 civilian
  * (cruise 10 m/s, clear sprint 14) — an EV moves with urgency.
+ *
+ * DEFECT 6 (2026-08-18) — THE BARGE IS NEVER CONVICTED, AND THE ARITHMETIC IS
+ * WHY. Both mistake demos below are about entering the box in front of the
+ * ambulance, and both cite FAILED_TO_YIELD. A live student who does exactly
+ * that is charged with nothing of the sort. MEASURED on staging: pc-wrong ran
+ * the stem at 60 км/ч and came back with TWELVE «Превишена скорост» and NO
+ * чл. 91 conviction at all (only mobile-wrong, whose slower legs re-timed the
+ * sync, booked «Непропускане на ППС с предимство»). Reproduced here through the
+ * production stack — a car held flat out up the stem crosses y = 0 at
+ * t ≈ 10.5 s and the EV is still 70 m out on the east arm; it reaches the node
+ * at t ≈ 17.5 s, seven seconds and 115 m behind him, and the runner resolves
+ * "clear".
+ *
+ * The EV cannot get there, and the two numbers that decide it are `armDistM`
+ * and the hold:
+ *   armDistM 70 − lineDistM 18 = 52 m of approach after the sync starts;
+ *   at the tier governor's 16.4 m/s that is 3.2 s, and with leadSec −3.5 the
+ *   EV has 6.7 s to be at the box. From 95 m at cruise 10 m/s its own transit
+ *   is ≥ 9.5 s before the sync's speed cap is even considered. It is four
+ *   seconds short by construction, and no live drive can make that up.
+ *
+ * MEASURED LADDER (flat-out 59 км/ч; „EV x" is how far out on the east arm the
+ * ambulance still is around the player's crossing, read off a 2 s probe grid —
+ * the two rungs the battery pins carry their exact crossing-FRAME figures,
+ * 68.1 m shipped and 18.1 m at hold −45. The CRAWL leg was re-measured at every
+ * rung and does not move: the EV crosses at t ≈ 30.4 s with the student still
+ * ~23 m short of the mouth, watching it flash through, exactly as authored):
+ *
+ *   hold −95, arm  70  (shipped)  EV 70 m out   →  no conviction · "clear"
+ *   hold −60, arm  70             EV 35 m out   →  no conviction · "clear"
+ *   hold −45, arm  70             EV 24 m out   →  FAILED_TO_YIELD
+ *   hold −40, arm  70             EV 19 m out   →  FAILED_TO_YIELD
+ *   hold −35, arm  70             EV 14 m out   →  FAILED_TO_YIELD + COLLISION
+ *   hold −95, arm 110             EV 27 m out   →  FAILED_TO_YIELD
+ *   hold −95, arm  90             EV 53 m out   →  no conviction · "clear"
+ *
+ * — so the two honest repairs are `hold −45` (the widest that convicts, with
+ * −40 measured below it as margin against the −35 rung where the barge starts
+ * HITTING the ambulance and the „exactly FAILED_TO_YIELD" gate would break), or
+ * `armDistM 110` (the spawn sits 105 m from the node, so the ambulance is
+ * already rolling while the student sets off — which is what an emergency
+ * vehicle already en route actually does).
+ *
+ * WHY NEITHER IS APPLIED HERE. Both were applied and measured, and both turn
+ * the §5/§9 gate red — not because the world got worse but because the three
+ * committed demos were choreographed against the broken timing:
+ *   hold −45  → shadow loses YIELDED_TO_PRIORITY, mistake-barge loses
+ *               FAILED_TO_YIELD, mistake-race loses COLLISION;
+ *   arm 110   → the same three, same direction (the EV now crosses before the
+ *               authored slow approach arrives).
+ * The change is therefore a COORDINATED one and this file owns only its third:
+ * retime the authored drives in traces/scVuEmergencyJunction.ts so each still
+ * meets the EV where its copy says it does, re-record with RECORD_TRACES=1
+ * (content/traces/sc-vu-emergency-junction/ + platform/public/traces/…), and
+ * only then move the number below. Do not move it alone.
  */
 const VU_EV_CROSSING: PriorityFromRightSpec = {
   id: "sc-vuej-ev",
@@ -559,9 +883,22 @@ export const SC_VU_EMERGENCY_JUNCTION: ScenarioSpec = {
     },
     {
       id: "sc-vuej-cross",
-      titleBg: "Премини кръстовището, след като линейката е преминала",
-      // West-arm westbound lane center, past the 40 m junction area (the
-      // right-hand-rule tracker commends on leaving it).
+      // WAS «Премини кръстовището, след като линейката е преминала» — the same
+      // unissuable certificate as sc-vu-turned and sc-vue-made-way: the disc
+      // reads one SimTick, which carries no staged actor and no yield outcome,
+      // so „след като линейката е преминала" was decided by a coordinate. The
+      // barge demo — the drive whose own copy says the car entered the box with
+      // the ambulance inbound — completes the left turn and would tick it.
+      // WHAT THE DISC PROVES: (−50, 4.0625) r9 is the west arm's westbound lane
+      // centre 50 m out, so arrival means the left turn was completed and the
+      // 40 m junction area cleared. It does NOT prove the lane — r9 on the
+      // 8.125 m pitch reaches the oncoming centre — so the title claims the
+      // manoeuvre and the compass arm and nothing else. The чл. 91 duty keeps
+      // its grader: both mistakes cite FAILED_TO_YIELD, convicted live by the
+      // runtime's own right-hand-rule tracker against the crossing EV, and
+      // instructions 2–4 + teach.examinerBg say it in words. Params untouched —
+      // `done` is bit-identical.
+      titleBg: "Завий наляво и излез от кръстовището на запад",
       params: { kind: "reachZone", x: -50, y: VUEJ_LANE, radiusM: 9 },
     },
   ],
@@ -619,13 +956,89 @@ export const SC_VU_EMERGENCY_JUNCTION: ScenarioSpec = {
 
 /** vu-pass-v1 northbound lane center (0.5 drawn lane east — the L7 pattern). */
 const VUP_LANE_X = 4.06;
-/** The cyclist's curb line: lane center + extraRightOffsetM 2.6 → x ≈ 6.66.
- *  Pass-geometry honesty (runtime VULNERABLE_PASS_* doc): center-to-center
- *  lateral carries ~1.25 m of bodies, so the clean line x 2.2 gives 4.46 m of
- *  centers ≈ 3.2 m of air (≥ the 1.5 m norm), while the squeeze line x 4.3
- *  gives 2.36 m of centers ≈ 1.1 m of air — inside the convict band, still
- *  0.16 m clear of the runner's 2.2 m contact radius. */
-const VUP_CYCLIST_X = 6.66;
+/**
+ * The cyclist's curb line: lane center + extraRightOffsetM → x = 6.16.
+ *
+ * THE LESSON HAD NO GRADIENT AT ALL, AND THE ARITHMETIC IS WHY (2026-08-17).
+ * The runtime bands are centre-to-centre with a ~1.25 m body allowance
+ * (worldRuntime VULNERABLE_PASS_BODY_ALLOWANCE_M): convict below 2.45 m of
+ * centres (≈ 1.2 m of air), commend at or above 2.75 m (≈ 1.5 m — the taught
+ * norm), SILENT in between. At the old curb line x = 6.66 those bands fell on
+ * the car's lane position like this:
+ *
+ *   commend   x ≤ 3.91   ·   SILENT 3.91 < x ≤ 4.21   ·   convict x > 4.21
+ *
+ * and the northbound lane CENTRE is 4.06 — dead inside the silent band. So the
+ * clearance grader, the one thing this lesson is about, could not speak about a
+ * student who never touched the wheel, and the „осезаемо отместване" the copy
+ * demands was worth FIFTEEN CENTIMETRES.
+ *
+ * MEASURED on staging: both sweep drives finished ИЗДЪРЖАН · 0 наказателни
+ * точки · ★★★ · +100 XP, byte-identical — the 59 км/ч flat-out run passed the
+ * rider at 2.60 m of centres (1.35 m of air, 0.15 m inside the grace band) and
+ * the lesson said nothing at all. MEASURED again here, off the production stack
+ * at the recorder's calmer 45 км/ч, which is where the shape is clearest —
+ * the whole ladder of lines a student can take, before and after:
+ *
+ *   line x   6.66 (shipped)                    6.35 (this file)
+ *   4.06     FOLLOWING_TOO_CLOSE               FOLLOWING + VULNERABLE_PASS ✔
+ *   3.50     FOLLOWING · commended             FOLLOWING · commended
+ *   2.60     clean · commended                 FOLLOWING · commended
+ *   2.20     clean · commended                 clean · commended
+ *
+ * — i.e. the un-shifted line went from „graded on the wrong subject" to „graded
+ * on this lesson's subject", the shadow's authored line stayed clean, and the
+ * commendation kept costing the same real shift.
+ *
+ * The tell was in this file already: both mistake demos squeeze at x = 4.3,
+ * „a hand's width off the lane center" (traces/scVuPass.ts), and convict — so
+ * the entire distance between the taught fault and no fault at all was the
+ * 24 cm between 4.06 and 4.3. That is not a lesson, it is a coin.
+ *
+ * THE CORRECTION IS BOXED IN BY A FOURTH THRESHOLD, AND THE FIRST ATTEMPT HIT
+ * IT. Moving the rider to 6.16 made the do-nothing line convict — and put the
+ * shadow's own wide line 4 cm inside `LEAD_CORRIDOR_M` (traffic/system.ts, 4.0
+ * m of lateral), so the demonstration of the CORRECT pass came back billed
+ * «Несъобразена дистанция» at t = 13.48 s, two metres behind the rider it was
+ * about to overtake. Measured, not reasoned: the shadow gate went red and named
+ * the code. So the rider's curb line has to satisfy both at once —
+ *
+ *   convict the un-shifted line   →   x_cyclist <  4.06 + 2.45 = 6.51
+ *   keep the taught line off the follow corridor
+ *                                 →   x_cyclist ≥  2.20 + 4.00 = 6.20
+ *
+ * — a THIRTY-ONE-CENTIMETRE window, and 6.35 is its middle: 0.16 m of margin
+ * under the convict threshold, 0.15 m clear of the follow corridor.
+ * extraRightOffsetM 2.6 → 2.29 puts the rider there and moves the bands onto
+ * the acts they are named for:
+ *
+ *   commend   x ≤ 3.60   ·   silent 3.60 < x ≤ 3.90   ·   convict x > 3.90
+ *
+ *   · the DO-NOTHING line (lane centre 4.06) now gives 2.29 m of centres
+ *     ≈ 1.04 m of air and CONVICTS — a squeeze, which is what passing a
+ *     curb-rider without changing your line is;
+ *   · the commendation costs a real 0.46 m of lateral shift, still entirely
+ *     inside the student's own lane (the М1 осева is at x = 0);
+ *   · the committed demos are unaffected in KIND: shadow x 2.2 → 4.15 m of
+ *     centres ≈ 2.90 m of air, still ≥ the norm and still outside the follow
+ *     corridor; squeeze/fast-close x 4.3 → 2.05 m ≈ 0.80 m of air, still
+ *     convicting and still 0.80 m clear of VULNERABLE_PASS_CONTACT_M (1.25 m of
+ *     centres), so the „exactly VULNERABLE_PASS_TOO_CLOSE, never COLLISION"
+ *     gate holds.
+ *
+ * The rider ends up 1.78 m off the 8.125 m half-carriageway's kerb line, which
+ * is where a city cyclist actually rides on a lane this wide — clear of the
+ * drains and the door zone he is elsewhere in this file taught to fear.
+ *
+ * WHAT THIS DOES NOT FIX, stated so nobody „fixes" it by widening a band:
+ * VULNERABLE_PASS_SAFE_LATERAL_M (2.75) sits BELOW LEAD_CORRIDOR_M (4.0), so a
+ * student who leaves exactly the taught metre and a half is inside the
+ * following detector's corridor while he overtakes, on this street and on every
+ * other. That contradiction is in the runtime, not in this template's numbers,
+ * and squeezing this constant further would only move which of the two lessons
+ * lies.
+ */
+const VUP_CYCLIST_X = 6.35;
 
 /**
  * The staged CYCLIST on vu-pass-v1: rides the east curb northbound the whole
@@ -636,6 +1049,46 @@ const VUP_CYCLIST_X = 6.66;
  * exceeds the spawn's ~345 m node distance, so the cyclist cruises from the
  * first frame (no hold theater on an empty street). The GRADING is the
  * runtime's vulnerable-pass tracker.
+ *
+ * DEFECT 8 (2026-08-18) — THE HOLD HAS NEVER HELD, AND THAT SENTENCE ABOVE IS
+ * THE BUG WRITTEN DOWN AS A DECISION. `releaseDistM` means „release when the
+ * driver is this close to the path's far node"; the far node is (0, 360), the
+ * spawn is (4.06, 15), i.e. 345.02 m away — so 360 is satisfied on the first
+ * frame the car rolls, and the field describes a hold this street has never
+ * had. The rider therefore starts running the moment the lesson does, from
+ * 95 m ahead, at 3.0 m/s.
+ *
+ * WHAT THAT COSTS, measured through the production stack:
+ *   · a driver slower than 3.0 m/s (10.8 км/ч) NEVER closes. Over 40 s at the
+ *     sweep's careful pace the gap GROWS from 95 m to 103 m; the drive comes
+ *     back with ZERO rule events and ZERO staged outcomes — the lesson's only
+ *     actor and its only grader are both silent. That is the ИЗДЪРЖАН · 0
+ *     наказателни точки · ★★★ the sweep photographed on both careful legs.
+ *   · the rider leaves the 360 m street at t ≈ 83 s after release, and from
+ *     then on the street is empty while the task banner still names him.
+ *   · the encounter therefore exists only for a driver who reaches ~45 км/ч
+ *     promptly; at 15 км/ч it lands at y ≈ 353, seven metres from the end.
+ *   The one frame in the whole sweep that contains the rider is
+ *   sc-vu-pass-clearance/pc-wrong/04-t012s.png — a rider-sized rig at the kerb
+ *   ~70 m out, gone again by t017. He is staged and he is drawn; he is simply
+ *   never MET.
+ *
+ * THE FIX AND WHY IT IS NOT APPLIED HERE. Hold him until the driver has closed,
+ * and start him where he would have been at that instant so the recorded demos
+ * meet him in the same place: `hold.offsetM −250 → −230` (y 110 → 130) with
+ * `releaseDistM 360 → 295` (release as the driver reaches y ≈ 65). Applied and
+ * measured: the rider now stands at the kerb until the driver is 65 m behind
+ * him, the flat-out leg still convicts VULNERABLE_PASS_TOO_CLOSE, the shadow
+ * gate stays green and the squeeze demo stays green — but the LATE-DIVE demo
+ * goes red. Its dive is authored at y 130→140 in and 165→180 out, tuned to a
+ * rider who has been rolling since t = 0; with the hold the pass happens ~12 m
+ * earlier, on the wide line, and «Бързо изпреварване с късно отместване» comes
+ * back convicting nothing. So this is a COORDINATED change and this file owns
+ * only its third: move the dive in traces/scVuPass.ts to where the held rider
+ * actually is, re-record with RECORD_TRACES=1, and only then move the numbers
+ * below. (While in that file: its header still says the curb line is 6.6625 and
+ * the clean line 4.46 m of centres — both stale since extraRightOffsetM went to
+ * 2.29; the live values are 6.35 and 4.15.)
  */
 const VU_PASS_CYCLIST: CyclistRightHookSpec = {
   id: "sc-vup-cyclist",
@@ -646,7 +1099,12 @@ const VU_PASS_CYCLIST: CyclistRightHookSpec = {
     pathNodes: ["vup-n-start", "vup-n-end"],
     hold: { nodeIndex: 1, offsetM: -250 }, // y = 110 — ~95 m ahead of the spawn
     cruiseSpeedMps: 3.0,
-    extraRightOffsetM: 2.6, // the curb line (tags the proxy as a cyclist, A11)
+    // The curb line (tags the proxy as a cyclist, A11). 2.6 → 2.29: see
+    // VUP_CYCLIST_X for the band arithmetic this number decides — at 2.6 the
+    // do-nothing lane-centre line landed inside the runtime's SILENT band and
+    // the lesson graded neither direction; below 2.14 the taught line falls
+    // inside the following detector's corridor and the CORRECT pass is billed.
+    extraRightOffsetM: 2.29,
     colorIndex: 1,
   },
   junctionNodeIndex: 1,
@@ -705,8 +1163,24 @@ export const SC_VU_PASS_CLEARANCE: ScenarioSpec = {
   success: [
     {
       id: "sc-vup-pass",
-      titleBg: "Изпревари велосипедиста с широка дъга",
-      // Post-pass checkpoint back in the lane, ~60 m past where the pass lands.
+      // WAS «Изпревари велосипедиста с широка дъга» — a certificate for a
+      // MANOEUVRE AGAINST ANOTHER ACTOR, issued by a disc 195 m up an empty
+      // street. `stepReachZone` sees one SimTick: position, speed, lane,
+      // indicator. It cannot know whether a rider was passed, let alone how
+      // wide. MEASURED on staging: the careful drive ticked this at 2:34 with
+      // the cyclist STILL AHEAD of the car (the rider cruises 3.0 m/s and a
+      // creeping student never closes), and the flat-out drive ticked it at
+      // 0:47 having buzzed him at 1.35 m of air. Three stars, both times.
+      // WHAT THE DISC PROVES: (4.06, 210) r9 is the northbound lane centre 195 m
+      // up a junction-free street — the car came back to its lane and carried
+      // on. That is a real, teachable half of the manoeuvre (the copy's step 5,
+      // „прибери се плавно вдясно"), and it is all this row may claim.
+      // The CLEARANCE half is graded where it can be measured: the runtime's
+      // vulnerable-pass tracker, which after the VUP_CYCLIST_X correction above
+      // convicts VULNERABLE_PASS_TOO_CLOSE on the un-shifted line and awards
+      // YIELDED_TO_PRIORITY on the taught one. Params untouched — `done` is
+      // bit-identical.
+      titleBg: "Прибери се в лентата и продължи по улицата",
       params: { kind: "reachZone", x: VUP_LANE_X, y: 210, radiusM: 9 },
     },
     {
@@ -820,22 +1294,54 @@ export const SC_VU_DOOR_ZONE: ScenarioSpec = {
       textBg:
         "Още преди редицата се отмести наляво в своята лента: дръж поне една отворена врата разстояние от паркираните коли.",
     },
+    // STEPS 3–4, MADE HONEST ABOUT THIS STREET (2026-08-17). The scene descope
+    // documented in the header — the row is mounted from meta.scenario.bays,
+    // the DOOR is a timed obstacle that exists only inside the recorded demos —
+    // has a cost the copy was not paying. Step 3 read „крака под браниците,
+    // сенки между колите, светнали стопове, глава зад волана", four cues to
+    // hunt for; the live row is a line of sealed, unoccupied, unlit shells and
+    // the student hunts 300 m of nothing. Step 4 read „Ако врата се отвори пред
+    // теб…", promising an event no live drive can produce. Copy that describes
+    // a world the student is not in teaches him to distrust the copy.
+    //
+    // The TEACHING is not cut — cutting it would trade a false promise for a
+    // silent gap, and the four telltales are the whole skill (THEO-4: the
+    // student is owed the reason). It is re-voiced as what it is: the habit he
+    // is building here and will need on a real street, with this street's own
+    // discipline — the line — as the thing he is actually doing right now.
     {
       n: 3,
       textBg:
-        "Намали и гледай КРАЙ колите, не само пътя: крака под браниците, сенки между колите, светнали стопове, глава зад волана.",
+        "Намали и се научи да гледаш КРАЙ колите, не само пътя. На улицата издайниците са четири: крака под браниците, сенки между колите, светнали стопове, глава зад волана. Тук редицата е празна — упражняваш самото оглеждане.",
     },
     {
       n: 4,
       textBg:
-        "Ако врата се отвори пред теб, спокойно продължи по линията си — дистанцията, която държиш, Е спасението; не свивай рязко в насрещното.",
+        "Дръж линията си докрай, без да я поправяш в последния момент. Отвори ли се врата — тук или на истинска улица — спасението е дистанцията, която ВЕЧЕ си взел; рязкото свиване в насрещното е по-големият риск.",
     },
     { n: 5, textBg: "След края на редицата се върни плавно към средата на лентата и продължи." },
   ],
   success: [
     {
       id: "sc-vud-row",
-      titleBg: "Подмини вратата по своята линия — без да излизаш в насрещното",
+      /**
+       * …AND THEN THE TITLE NAMED THE ONE THING ON THIS STREET THAT ISN'T THERE
+       * (2026-08-17). The doc-87 pass below moved this gate onto the door's y
+       * and shrank it to the lateral band — good work, and the params keep it —
+       * but it left the row called «Подмини ВРАТАТА по своята линия». The live
+       * scene mounts no door (the descope in this file's header), so on every
+       * real drive that sentence is a task the student cannot perform and a
+       * tick he cannot connect to anything he saw. MEASURED on staging: the
+       * mistake drive — two collisions, 20 наказателни точки, НЕИЗДЪРЖАН —
+       * carries «✓ Подмини вратата…» at 0:44 on its own verdict screen.
+       *
+       * The word goes; the measurement does not move. What the disc proves is
+       * the LINE at the door's own y, and that is what it now says. The door
+       * keeps its teaching in briefing step 4, in teach.whyBg (чл. 95 and чл.
+       * 20 together) and in the mistake demo that hits it — all places that do
+       * not promise the student he will meet one.
+       */
+      titleBg: "Мини покрай редицата по своята линия — без да излизаш в насрещното",
       /**
        * THE GATE THAT MEASURES WHAT ITS TITLE PROMISES (doc 87, 2026-08-09).
        *

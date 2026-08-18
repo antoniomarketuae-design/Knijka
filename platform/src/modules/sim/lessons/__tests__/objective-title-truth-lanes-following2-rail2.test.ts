@@ -511,10 +511,10 @@ const LANE_CLAIM_BACKLOG: readonly string[] = [
   "sc-ln-obstacle-meeting/sc-lnom-wait",
   "sc-ln-turn-lane-arrows/sc-lnta-finish",
   "sc-ln-turn-lane-arrows/sc-lnta-lane",
-  "sc-mw-emergency-lane/sc-mwe-pass",
-  "sc-ov-ban-overtake/sc-ovb-finish",
+  // (sweep 161 — sc-mw-emergency-lane/sc-mwe-pass and sc-ov-ban-overtake/
+  //  sc-ovb-finish and sc-ov-bus-lane/sc-ovbus-general left this list here:
+  //  all three are now authored at 2.7, i.e. 4.05 at the widest rung.)
   "sc-ov-being-overtaken/sc-ovbo-finish",
-  "sc-ov-bus-lane/sc-ovbus-general",
   "sc-ov-crest-curve/sc-ovcc-finish",
   "sc-ov-crossing-overtake/sc-ovc-approach",
   "sc-ov-keep-right/sc-ovkr-finish",
@@ -523,8 +523,9 @@ const LANE_CLAIM_BACKLOG: readonly string[] = [
   "sc-ov-lane-keeping/sc-ovln-finish",
   "sc-ov-lane-keeping/sc-ovln-west-apex",
   "sc-ov-night-gap/sc-ovn-finish",
-  "sc-ov-oncoming-gap/sc-ovg-finish",
-  "sc-ov-return-gap/sc-ovr-pass",
+  // (sweep 161 — sc-ov-oncoming-gap/sc-ovg-finish and sc-ov-return-gap/
+  //  sc-ovr-pass left this list here too; the latter's mark also moved onto
+  //  the oncoming lane CENTRE, which is the claim it makes.)
   "sc-ov-solid-line/sc-ovsl-finish",
   "sc-ov-solid-line/sc-ovsl-hold",
   "sc-ov-solid-return/sc-ovsr-finish",

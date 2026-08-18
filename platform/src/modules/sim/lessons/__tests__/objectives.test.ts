@@ -220,16 +220,141 @@ describe("reachZone", () => {
     });
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * A SPEED CAP CAN ONLY REFUSE — the property a cap was deleted for lacking.
+   *
+   * THE FRAME. The 2026-08-17 catalogue sweep took `maxSpeedKmh: 55` off
+   * `sc-vue-made-way` (templates-vru.ts) on the argument that a cap above the
+   * road's posted 50 „cannot bind but can only widen", because CARRYING one
+   * arms `inGraceRing` and stretches the acceptance 5 m back down the approach.
+   * Both halves were wrong, and the second is the one that needs arithmetic
+   * rather than prose:
+   *
+   *   · the capsule never reaches `reached` on a flow cap — that arm demands
+   *     `isHaltDemand` — so the ARRIVAL is the authored disc either way;
+   *   · so `done = reached && capMet` under a cap is a strict SUBSET of the
+   *     uncapped `done`. A cap cannot credit anybody the same zone without one
+   *     did not already credit. It is monotone, and „it can only widen" is not
+   *     a thing it is able to do.
+   *
+   * What it CAN do is refuse — and refusing the 58–59 km/h run the tier
+   * governor produces on that boulevard, with the card that names 55 against
+   * 59, was the only teaching that row ever emitted.
+   *
+   * Swept over a set of drives rather than asserted once, because the claim is
+   * about every drive and a single example is how the false version of it
+   * survived review.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  describe("a reachZone speed cap is monotone — it refuses, it never credits", () => {
+    // `sc-vue-made-way`'s own shape: the mid-boulevard mark on ln-v1, r4 at the
+    // right-lane centre, capped at the lawful 55 on a road posted 50. The
+    // approach runs up +y; the left lane (the ambulance's corridor) is 8.13 m
+    // to the left, i.e. outside the capsule's lateral bound.
+    const CAPPED = { x: 12.19, y: 180, radiusM: 4, maxSpeedKmh: 55 };
+    const UNCAPPED = { x: 12.19, y: 180, radiusM: 4 };
+    const at = (y: number, speedKmh: number, t: number, x = 12.19) =>
+      makeTick({ t, position: { x, y }, speedKmh });
+
+    /** Every drive below, named, so a failure says which one. */
+    const DRIVES: ReadonlyArray<{ id: string; ticks: ReturnType<typeof makeTick>[] }> = [
+      { id: "lawful 50 through the mark", ticks: [at(170, 50, 0), at(180, 50, 1)] },
+      { id: "lawful, sampled either side (swept)", ticks: [at(174, 50, 0), at(184, 50, 1)] },
+      { id: "flat-out 59 all the way", ticks: [at(172, 59, 0), at(180, 59, 1), at(188, 59, 2)] },
+      {
+        id: "59, at the cap 7 m short (the B4 approach grace)",
+        ticks: [at(160, 59, 0), at(173, 55, 1), at(180, 59, 2)],
+      },
+      { id: "never enters the disc", ticks: [at(160, 40, 0), at(166, 40, 1)] },
+      { id: "in the LEFT lane at the mark", ticks: [at(170, 40, 0, 4.06), at(180, 40, 1, 4.06)] },
+      { id: "stopped on the mark", ticks: [at(174, 10, 0), at(180, 0, 1)] },
+    ];
+
+    it("credits nobody the same zone without a cap does not — on every drive", () => {
+      const wrong: string[] = [];
+      for (const { id, ticks } of DRIVES) {
+        const capped = run(parsed("reachZone", CAPPED), ticks).done;
+        const uncapped = run(parsed("reachZone", UNCAPPED), ticks).done;
+        if (capped && !uncapped) wrong.push(`${id}: capped credits it, uncapped does not`);
+      }
+      expect(wrong).toEqual([]);
+    });
+
+    it("…and it is not a no-op: the unlawful drive is credited without it and refused with it", () => {
+      // Without the pair above this whole block could pass on a cap that does
+      // nothing at all, which is exactly what the row shipped as.
+      const flatOut = DRIVES.find((d) => d.id === "flat-out 59 all the way")!.ticks;
+      expect(run(parsed("reachZone", UNCAPPED), flatOut).done).toBe(true);
+      expect(run(parsed("reachZone", CAPPED), flatOut).done).toBe(false);
+    });
+
+    it("THE CARD THE REMOVAL DELETED: the refusal latches for the engine to explain", () => {
+      // `overCapNoted` is what lessons/engine.ts turns into «Задачата иска да
+      // си тук с не повече от 55 км/ч, а в момента караш 59 км/ч…» — THEO-4's
+      // own shape (what was observed, what is wanted, what to do about it), and
+      // the sweep read it off staging at t = 17 s. With the cap gone this state
+      // is unreachable and the row says nothing at all, on any drive.
+      const r = run(
+        parsed("reachZone", CAPPED),
+        DRIVES.find((d) => d.id === "flat-out 59 all the way")!.ticks,
+      );
+      expect(r.evalState).toMatchObject({ reached: true, capMet: false, overCapNoted: true });
+      // …and the uncapped row cannot produce it, which is the defect stated as
+      // a state rather than as a screenshot.
+      const bare = run(
+        parsed("reachZone", UNCAPPED),
+        DRIVES.find((d) => d.id === "flat-out 59 all the way")!.ticks,
+      );
+      expect(bare.evalState).toMatchObject({ overCapNoted: false });
+    });
+
+    it("the capsule never lends the ARRIVAL a metre on a flow cap", () => {
+      // The half the sweep was actually worried about, measured. Stopped dead
+      // 7 m short of the mark — inside the grace ring, at zero — and the zone
+      // is not reached, because the standstill arm demands a genuine halt
+      // demand (`REACH_ZONE_HALT_CAP_KMH`) and 55 is a lawfulness gate.
+      const r = run(parsed("reachZone", CAPPED), [at(160, 40, 0), at(173, 0, 1), at(173, 0, 2)]);
+      expect(r.done).toBe(false);
+      expect(r.evalState).toMatchObject({ reached: false });
+      // …and the uncapped zone refuses the same drive, so the two agree on
+      // arrival exactly as the block header claims.
+      expect(run(parsed("reachZone", UNCAPPED), [at(160, 40, 0), at(173, 0, 1)]).done).toBe(false);
+    });
+  });
+
   describe("B4 — the latches survive the whole visit, not one frame", () => {
     const capped = parsed("reachZone", { x: 0, y: 100, radiusM: 4, maxSpeedKmh: 6 });
 
     it("the cap met on the approach still counts after a fast frame in the zone", () => {
+      // RE-POINTED, sweep 161 (2026-08-18). The frame in the zone used to read
+      // 22 км/ч against a cap of 6 and this asserted the credit stood. It does
+      // not any more, and the number is why: the driveline wobble a „spike"
+      // means is 0.06–0.12 км/ч (SMOOTH_STOP_DECEL_WINDOW_SEC's measured
+      // table), while 22 at a 6 км/ч halt gate is a car accelerating away from
+      // the mark it was told to stop on — the sc-crossing-dart shape, which
+      // shipped five green ticks for drives convicted of the same approach in
+      // the same protocol. The latch still survives the visit; what it no
+      // longer survives is being thrown away before arriving
+      // (REACH_ZONE_CAP_SLACK_KMH, and approach-cap-contract.test.ts).
       const r = run(capped, [
         makeTick({ t: 0, position: { x: 0, y: 88 }, speedKmh: 20 }),
         makeTick({ t: 1, position: { x: 0, y: 94 }, speedKmh: 4 }), // 6 m short, at the cap
-        makeTick({ t: 2, position: { x: 0, y: 100 }, speedKmh: 22 }), // a spike, inside the zone
+        makeTick({ t: 2, position: { x: 0, y: 100 }, speedKmh: 10 }), // a spike, inside the zone
       ]);
       expect(r.done).toBe(true);
+    });
+
+    it("…but a car ACCELERATING back over the cap loses it before it arrives", () => {
+      // The other direction of the same latch, so „survives the visit" can
+      // never again be read as „survives anything at all".
+      const r = run(capped, [
+        makeTick({ t: 0, position: { x: 0, y: 88 }, speedKmh: 20 }),
+        makeTick({ t: 1, position: { x: 0, y: 94 }, speedKmh: 4 }), // 6 m short, at the cap
+        makeTick({ t: 2, position: { x: 0, y: 100 }, speedKmh: 22 }), // on the mark, 16 over
+      ]);
+      expect(r.done).toBe(false);
+      expect(r.evalState).toMatchObject({ reached: true, capMet: false, overCapNoted: true });
     });
 
     it("blowing through and never slowing near it does not", () => {
@@ -1271,7 +1396,13 @@ describe("completeManeuver / threePointTurn (обратен завой — corri
       at(3, 0, 0, { speedKmh: 0, gear: 0, headingDeg: 0 }), // held long — direction not reversed
     ]);
     expect(r.done).toBe(false);
-    expect(r.detail).toMatchObject({ kind: "threePointTurn", movements: 1, headingToTargetDeg: 180 });
+    // RE-POINTED, sweep 161 (2026-08-18): 0, not 1. `movements` used to count
+    // from the corridor ENTRY, and rubric.ts prices the economy row off it —
+    // so this car, which turned nothing, was printed «Икономичност на
+    // маневрата 2 / 2 т. · Обратен завой в 1 движения — чиста маневра» beside
+    // the dash for the objective it failed, on both platforms of both U-turn
+    // drills. See approach-cap-contract.test.ts.
+    expect(r.detail).toMatchObject({ kind: "threePointTurn", movements: 0, headingToTargetDeg: 180 });
   });
 
   it("FIRES ON FAILURE: an incomplete turn (stops facing east, ~90°) does not complete", () => {

@@ -641,6 +641,72 @@ describe("collision detector", () => {
     const { events } = drive([tick(1, { speedKmh: 20, events: nine })]);
     expect(codes(events)).toEqual(["COLLISION"]);
   });
+
+  // -------------------------------------------------------------------------
+  // …AND THE SILENCE IS NOT ENOUGH ON ITS OWN (the 2026-08-16 catalogue sweep).
+  //
+  // Every case above assumes a reporter that keeps reporting for as long as the
+  // bodies are together. The sweep found four scenarios where one did not, and
+  // the engine converted the gap into fresh accidents: 490 наказателни точки on
+  // `sc-follow-standstill`, 420 on `sc-ov-abort`, 252 on `sc-ov-return-gap`,
+  // 141 on `sc-ov-oncoming-gap` — each printed above the card's own sentence
+  // saying a collision is ONE dangerous error worth ten.
+  //
+  // The pair below is the contract: a car that did not move cannot re-open an
+  // encounter no matter how the reports arrive, and a car that genuinely left
+  // and came back still bills twice. Both directions, because a rule that only
+  // ever forgives is the false-pass version of the same crime.
+  //
+  // AND THE POINTS ARE NOT THE ONLY THING IT COSTS. Every bill carrying
+  // `terminateSession` re-arms the FR-B5-JAM crash pin with a fresh pose and a
+  // null stillness clock (`lessons/engine.ts`, the crashPin block), so a drive
+  // billed every 4 s can never complete the CRASH_PIN_STUCK_S = 10 s the
+  // rescue needs — the drive that cannot move is also the drive that cannot
+  // end. Driven 2026-08-17 through `tools/mobile/lesson-audit.mjs` on
+  // `sc-follow-standstill · mobile · wrong`: «the drive stopped after 211s
+  // without the session ending (its whole 210s budget)», the collision card
+  // still up at 4 км/ч, and «no control on this screen ends the session».
+  // -------------------------------------------------------------------------
+
+  it("an embedded car whose reporter falls silent for 4 s at a time is ONE accident", () => {
+    // The `sc-ov-abort` stream, reduced to its mechanism: contact re-reported
+    // every 4 s (past the 1.2 s separation window) while the car sits at
+    // 0 км/ч inside the lead's body. MEASURED on the shipped rule before the
+    // travel gate: 16 bills / 160 наказателни точки over 60 s.
+    const frames: SimTick[] = [];
+    for (let t = 0; t <= 60; t += 0.5) {
+      const reported = Math.abs(t % 4) < 1e-9;
+      frames.push(
+        tick(t, { speedKmh: 0, events: reported ? [collision("vehicle")] : [] }),
+      );
+    }
+    const { events } = drive(frames);
+    expect(codes(events)).toEqual(["COLLISION"]);
+  });
+
+  it("…and the same silence still bills twice once the car has actually driven away", () => {
+    // The other direction, and the reason the gate is 2 m and not „any motion":
+    // struck at t = 0, then 20 km/h for four seconds — 22 m of road, the car is
+    // demonstrably somewhere else — and the next contact is a second accident.
+    // Without this the fix would be a blanket amnesty for anyone who crashes
+    // twice in one drive.
+    const frames: SimTick[] = [tick(0, { speedKmh: 20, events: [collision("vehicle")] })];
+    for (let t = 0.5; t < 4; t += 0.5) frames.push(tick(t, { speedKmh: 20 }));
+    frames.push(tick(4, { speedKmh: 20, events: [collision("staticObject")] }));
+    const { events } = drive(frames);
+    expect(codes(events)).toEqual(["COLLISION", "COLLISION"]);
+  });
+
+  it("the travel a stopped car accrues over a long silence is zero, not „whatever dt says\"", () => {
+    // A teach card pauses the sim, so a single frame can carry a 90 s dt. The
+    // clamp is what stops that pause from being spent as metres the car never
+    // drove: same 90 s, car stationary throughout, still one accident.
+    const { events } = drive([
+      tick(0, { speedKmh: 0, events: [collision("vehicle")] }),
+      tick(90, { speedKmh: 0, events: [collision("vehicle")] }),
+    ]);
+    expect(codes(events)).toEqual(["COLLISION"]);
+  });
 });
 
 // ---------------------------------------------------------------------------

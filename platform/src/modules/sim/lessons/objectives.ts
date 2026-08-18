@@ -506,6 +506,71 @@ export const REACH_ZONE_GRACE_M = 5;
  */
 export const REACH_ZONE_HALT_CAP_KMH = 8;
 
+/**
+ * A CAP IS A CONTRACT ON THE APPROACH, NOT A MOMENT — sweep 161, 2026-08-18.
+ * How far over its own cap a car may be AT the mark and still keep a cap
+ * honoured earlier on the approach, km/h.
+ *
+ * WHAT WAS BROKEN. `capMet` latched on „the cap was honoured at least once
+ * inside the authored radius, OR on the approach to it" (B4, above) and was
+ * never asked again. B4 was written for a car that BRAKES: it slows to the cap
+ * before the hazard and drifts a shade over as it arrives. Nothing in it
+ * considered the car that crosses the same speed FROM BELOW — every drive
+ * starts at rest, so an accelerating car passes through „at or under the cap"
+ * somewhere inside the capsule as a matter of arithmetic, and banked the whole
+ * speed contract on its way past. The faster it then arrives, the less it is
+ * asked.
+ *
+ * Five shipped drills, both platforms, all from the same sweep — every one an
+ * authored cap, a mistake-demo drive that never braked, and a green tick:
+ *
+ *   drill                      cap   arrived   the protocol printed beside it
+ *   sc-crossing-dart            40    51–59    «Твърде бързо приближаване към
+ *                                              пешеходна пътека» −10 ОПАСНА
+ *   sc-crossing-white-cane      40    59       0 full stops, ✓ at 0:37
+ *   sc-crossing-bus-shadow      30    57       0 full stops, ✓ at 0:33
+ *   sc-hazard-obstacle          46    59       ИЗДЪРЖАН ★★★ +100 XP
+ *   sc-hz-breakdown-pulloff    130   145       «Превишена скорост» × 4
+ *
+ * `sc-crossing-dart/mobile-wrong/04-t007s.png` is the whole defect in one
+ * frame: the ✓ toast «Приближи пътеката с готовност за спиране» sitting over a
+ * cluster reading 51 км/ч, with the zebra still ahead of the bonnet.
+ *
+ * THE CODE NOW SAYS WHAT THE HUD ALREADY PROMISED. lessons/engine.ts renders
+ * this exact sentence off `overCapNoted`: «Задачата иска да си тук с не повече
+ * от N км/ч, а в момента караш M км/ч … Ако я подминеш с тази скорост,
+ * задачата остава неизпълнена.» Passing it at that speed did NOT leave the
+ * task unfulfilled whenever the latch had already been banked — the card was
+ * describing behaviour the evaluator did not have.
+ *
+ * AND THE REFUSAL IS NOT SILENT, which is the bar doc 86 B4 set for this whole
+ * evaluator. That card fires on `overCapNoted`, and `overCapNoted` is gated on
+ * `!done` — so on exactly these drives it used to stay quiet, because the
+ * banked latch made `done` true on the arrival frame. The same fix that stops
+ * the tick starts the sentence, on the frame it happens.
+ *
+ * WHY 5 AND NOT ZERO. Zero revokes B4/B5, the founder's own rescue: the
+ * shipped counter-proof arrives 3 км/ч over a 6 км/ч halt gate after stopping
+ * short, and refusing that is the failure he ranks worst. 5 is not a new
+ * number — it is the rule engine's `speedingGraceMaxKmh` (DEFAULT_RULE_CONFIG,
+ * rules/types.ts), whose own comment states the reasoning this borrows:
+ * „speedometer/physics slack, which does not grow because the road is faster".
+ * approach-cap-contract.test.ts pins the two together so a change to one is a
+ * failing test rather than a drift.
+ *
+ * NOT the engine's RATIO form (10 % of the limit, capped at 5). Against a halt
+ * gate of 6 that is 0.6 км/ч — under the founder's 3 — so the proportional
+ * reading would have re-broken B5 at exactly the drills B5 was written for.
+ * The measured driveline wobble this must not trip on is 0.06–0.12 км/ч
+ * (SMOOTH_STOP_DECEL_WINDOW_SEC's table), i.e. 5 clears noise by forty times.
+ *
+ * IT CANNOT TRAP ANYONE, and that is checked rather than asserted: the
+ * withdrawal is not a latch. Braking to the cap while still on the mark
+ * re-earns it on the next frame, and so does a fresh approach — the same two
+ * ways out a student who never met the cap has always had.
+ */
+export const REACH_ZONE_CAP_SLACK_KMH = 5;
+
 /** Default max distance of the car centre from the bay centre at rest, m. */
 export const PARK_CENTER_TOL_M = 0.5;
 /** Default max |heading − bay axis| at rest, degrees. */
@@ -782,20 +847,22 @@ export function stepObjective(
 }
 
 /**
- * Reach a waypoint (B4/B5-hardened, 2026-07-30) — two INDEPENDENT, MONOTONIC
- * latches instead of one same-frame conjunction:
+ * Reach a waypoint (B4/B5-hardened, 2026-07-30) — two INDEPENDENT latches
+ * instead of one same-frame conjunction:
  *
  *   reached — the car was inside the authored radius, OR (on a zone whose cap
  *             is a genuine stop demand) came to a FULL STOP inside the
- *             approach capsule. The second arm is what lets a student stop
- *             SHORT of a halt mark with the better sightline and still be
- *             credited: the drill is „stop here", and stopping four metres
- *             earlier is stopping here, done better.
- *   capMet  — the arrival speed cap was honoured at least once inside the
- *             authored radius, or on the approach to it. Uncapped zones start
- *             met (see createEvalState), so an uncapped waypoint is
- *             bit-identical to the pre-B4 evaluator: done exactly when the car
- *             is inside the authored radius, at any speed, on any frame.
+ *             approach capsule. Monotonic. The second arm is what lets a
+ *             student stop SHORT of a halt mark with the better sightline and
+ *             still be credited: the drill is „stop here", and stopping four
+ *             metres earlier is stopping here, done better.
+ *   capMet  — the arrival speed cap was honoured inside the authored radius or
+ *             on the approach to it, AND not thrown away again before arriving
+ *             (REACH_ZONE_CAP_SLACK_KMH — the one place this latch can fall
+ *             back, and the sweep-161 fix). Uncapped zones start met (see
+ *             createEvalState), so an uncapped waypoint is bit-identical to
+ *             the pre-B4 evaluator: done exactly when the car is inside the
+ *             authored radius, at any speed, on any frame.
  *
  * The grace is not a ring but a CAPSULE: the authored circle stretched back
  * down the approach and not one centimetre sideways (see REACH_ZONE_GRACE_M
@@ -857,6 +924,33 @@ function stepReachZone(
   const cap = params.maxSpeedKmh;
   // B18/FR-24: a `stopBeforeMark` zone needs the approach direction too, so
   // its ring arms on proximity alone rather than on carrying a speed cap.
+  //
+  // ── WHAT ARMING THIS RING CAN AND CANNOT DO, since a wave was spent getting
+  //    it wrong in both directions (2026-08-18) ────────────────────────────
+  //
+  // It arms on „this zone has a speed contract or a paint boundary", and the
+  // 2026-08-17 catalogue sweep read that as „carrying a cap WIDENS the zone by
+  // REACH_ZONE_GRACE_M" and deleted a cap to close it. It does not, and the
+  // arithmetic is worth stating once so nobody deletes another one:
+  //
+  //   · `reached` — untouched. Its only grace arm is `graceArmed && halted &&
+  //     isHaltDemand`, so on a FLOW cap (20, 42, 55, 80 km/h) the arrival is
+  //     the authored disc, swept, and nothing else. The capsule cannot let a
+  //     car that never entered the disc claim it.
+  //   · `capMet`  — this is what the ring is for, and it is B4 by design: „the
+  //     cap was honoured inside the authored radius, OR on the approach to it".
+  //     `objectives.test.ts` („slowing to the cap on the APPROACH counts") and
+  //     the world-referent gate's own `reachZoneProbe` both pin it; narrowing
+  //     it to halt demands turns the B4 census from 0 back to 150 scenarios,
+  //     which is how this was measured. What the ring does NOT do since sweep
+  //     161 is bank that credit against the arrival: honouring the cap while
+  //     accelerating through it and then arriving 19 км/ч over spends the
+  //     latch again (REACH_ZONE_CAP_SLACK_KMH).
+  //
+  // So `done = reached && capMet` with a cap is a strict SUBSET of `done`
+  // without one: adding a cap can refuse people, and can credit nobody the
+  // uncapped zone did not already credit. That monotonicity is the property
+  // `objectives.test.ts` now sweeps, rather than restating it here.
   const inGraceRing =
     (cap !== undefined || params.acceptBeforeMarkM !== undefined) &&
     d <= params.radiusM + REACH_ZONE_GRACE_M;
@@ -987,10 +1081,24 @@ function stepReachZone(
   // waypoint and ENDS past the paint is refused exactly as it was.
   const sweptAcceptance = sweptZone && !beyondMark;
   const reached = st.reached || sweptAcceptance || (graceArmed && halted && isHaltDemand);
+  // THE APPROACH SIDE OF THE MARK — the acceptance disc plus the capsule
+  // stretched back down the approach, and NOT one metre of the far side. A cap
+  // named «приближи … с готовност за спиране» is a promise about getting there;
+  // once the mark is behind the car the drill has been performed and the drive
+  // away from it is the rule engine's to grade, not this latch's. (In practice
+  // the far side is unreachable here anyway — crossing the disc sets `reached`,
+  // and the engine never re-steps a completed objective — but the geometry is
+  // stated rather than relied upon.)
+  const onApproachSide = inAcceptance || inApproachGrace;
+  // A cap honoured and then thrown away before arrival is not honoured. See
+  // REACH_ZONE_CAP_SLACK_KMH for the five drills that banked one during their
+  // acceleration run and arrived 11–19 км/ч over it with a green tick.
+  const capSpent =
+    cap !== undefined && onApproachSide && speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH;
   const capMet =
     cap === undefined
       ? true
-      : st.capMet || (speedKmh <= cap && (inAcceptance || graceArmed));
+      : (st.capMet && !capSpent) || (speedKmh <= cap && (inAcceptance || graceArmed));
   const done = reached && capMet;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
@@ -1101,6 +1209,69 @@ function isForbiddingLamp(lightState: string | undefined): boolean {
  * the queue length decided, not the driving. Outside the circle the arm demands
  * MORE than the inside one, not less: the world must positively report a
  * forbidding light ahead.
+ *
+ * ── AND THE LAMP WAS NEVER THE SIGNAL WHEN AN OFFICER WAS STANDING THERE ────
+ * 2026-08-17, `sc-sig-controller-live` on staging, mobile/right. The bot stopped
+ * at the line, waited, and drove off when its lamp went GREEN — while the
+ * регулировчик stood chest-on with both arms out, i.e. stopping this direction.
+ * The debrief printed, on one screen:
+ *   «✓ Премини стоп-линията по разрешение на регулировчика — въпреки червената
+ *    лампа 1:27 · Изчака червения сигнал и потегли на зелено»
+ *   «✗ Неизпълнение на сигнала на регулировчика −10 изпитни т. ОПАСНА ГРЕШКА»
+ * Signature 2 read `e.lightState === "green"` and asked nothing about the
+ * officer, so the ONE act this template exists to forbid — the drive that
+ * ships as its own `mistake-wait-for-green` demo — satisfied the `requireRedMet`
+ * gate whose comment in templates-signals2.ts promises the opposite. Exactly the
+ * shape of the sc-signal-response bug two paragraphs up, mirrored: there a red
+ * DRIVEN THROUGH certified itself, here a green DRIVEN THROUGH AGAINST THE
+ * OFFICER did.
+ *
+ * The repair is the contract, read as written. `stopLineCrossed.controller` is
+ * documented in rules/types.ts as „the EFFECTIVE signal … overrides `lightState`
+ * ENTIRELY (ЗДвП чл. 7)": on "halt" the lamp does not exist, whatever colour it
+ * is showing, and there is nothing to have waited out. So signature 2 now reads
+ * the effective signal instead of the lamp. `controller` is optional by the same
+ * contract and ABSENT on every junction without an officer — every plain light,
+ * every recorded trace and every hand-built tick evaluates bit-identically.
+ *
+ * ── AND Б2 IS A STOP, NOT A PLACE YOU DRIVE PAST (2026-08-17) ───────────────
+ * The same sweep, three templates, both platforms. `sc-junction-gap` mobile/wrong:
+ *   «✓ Премини стоп-линията след пълно спиране и пропуснат интервал 0:23»
+ *   «✗ Неспиране на знак Б2 „Спри!" × 7»   (243 наказателни точки, 0 full stops)
+ * `sc-junction-left` mobile/wrong repeats it with × 11 and 295 точки;
+ * `sc-junction-stop` pc/wrong reaches ЗАДАЧА 3/3 having been convicted × 13.
+ *
+ * A `control: "stopSign"` objective completed on the CROSSING ALONE, so five of
+ * the six shipped Б2 rungs — every one of whose titles contains the words
+ * «след пълно спиране» — certified in writing a stop the evaluator never asked
+ * for, beside the conviction proving it never happened. That is the exact class
+ * `stop-claim-gates.test.ts` guards for reachZone («an objective title is a
+ * certificate»); passSignal was outside its reach because it grades events, not
+ * geometry — and it is the one evaluator here that CAN witness a stop: the
+ * approach-scoped stop memory built for the red-light gate is the same memory.
+ *
+ * WHY THIS IS NOT A THRESHOLD SOMEBODY PICKED. The demand is the control's own
+ * documented meaning, one module over: rules/types.ts on the same event says
+ * "stopSign" = Б2 „Стоп" — a full stop at the line is demanded REGARDLESS OF
+ * TRAFFIC (ЗДвП чл. 50)", and in the same breath that "giveWay" (Б1) demands
+ * none. So the gate is asked of `stopSign` and of nothing else: Б1 keeps its
+ * lawful roll, and a trafficLight keeps green = go.
+ *
+ * WHAT IT COSTS AND WHY THAT IS RIGHT. `crossed` is the completion latch here
+ * (a stop sign has no `requireRedMet` half), so gating it means a rolled Б2
+ * leaves the objective at 0 % instead of 50 %, and the sequential engine holds
+ * the following rungs shut. That is the honest reading of «Премини стоп-линията
+ * след пълно спиране»: he did not. He is not left guessing either — the rule
+ * engine bills STOP_SIGN_NO_FULL_STOP with its card on the same frame — and he
+ * is not trapped: stop anywhere on this approach and cross again and it
+ * completes, on any of the shipped rungs, at any rung width.
+ *
+ * THE RESIDUAL, named rather than hidden: the memory is scoped to the APPROACH,
+ * not to the last six seconds, so a stop made early on the approach and gone
+ * stale by the rule engine's `stopRecencySec` (6) still certifies here while the
+ * engine convicts. That is a narrower disagreement than the one being closed and
+ * it needs a stop-TIME in the eval state to fix; `ObjectiveEvalState` lives in
+ * lessons/types.ts, another lane's file.
  */
 function stepPassSignal(
   params: PassSignalParams,
@@ -1139,10 +1310,25 @@ function stepPassSignal(
     (tick.nextStopLineState === "red" || tick.nextStopLineState === "redYellow") &&
     tick.nextStopLineM !== undefined &&
     tick.nextStopLineM <= PASS_SIGNAL_QUEUE_REACH_M;
+  // The SAME queue, at a Б2. The stop gate below turns this memory into the
+  // completion condition for a stop sign, and a gate that could only see the
+  // node radius would refuse the student who does it RIGHT behind a queue:
+  // tj-emerge-v1's line sits 27.7 m out against a radius of 45, so four cars
+  // ahead of him put his own lawful stop outside the circle. Positive evidence
+  // only, exactly as at the lamp — the world must report that the line ahead of
+  // him is a stop line and that it is within the queue reach. A Б2 carries no
+  // state to check (it forbids always), which is why this arm has no analogue of
+  // the red/red-yellow test and no lamp can be borrowed to stand in for one.
+  const queuedAtStopSign =
+    !inZone &&
+    params.control === "stopSign" &&
+    tick.nextStopLineControl === "stopSign" &&
+    tick.nextStopLineM !== undefined &&
+    tick.nextStopLineM <= PASS_SIGNAL_QUEUE_REACH_M;
   // Approach-scoped stop memory: leaving the approach forgets the stop, so a
-  // halt elsewhere can never certify this junction's red.
+  // halt elsewhere can never certify this junction's red — nor, now, its Б2.
   const stoppedInZoneVisit = onApproach
-    ? prev.stoppedInZoneVisit || (halted && (inZone || queuedAtRed))
+    ? prev.stoppedInZoneVisit || (halted && (inZone || queuedAtRed || queuedAtStopSign))
     : false;
   let redMet = prev.redMet;
   // WHICH signature certified the red, latched with it. The debrief renders a
@@ -1154,10 +1340,21 @@ function stepPassSignal(
   if (inZone) {
     for (const e of tick.events) {
       if (e.kind !== "stopLineCrossed" || e.control !== params.control) continue;
-      // PROGRESSION IS UNTOUCHED: crossing the line completes a plain
-      // passSignal on red exactly as it always has, and the rule engine grades
-      // the law separately (the split at the top of this file).
-      crossed = true;
+      // PROGRESSION IS UNTOUCHED AT A LAMP: crossing the line completes a plain
+      // trafficLight passSignal on red exactly as it always has, and the rule
+      // engine grades the law separately (the split at the top of this file).
+      //
+      // AT A Б2 THE STOP IS THE PASS. `crossed` is the whole completion latch
+      // for a stop sign, so the demand rides here rather than in a second gate:
+      // a line rolled without a stop on this approach is not a crossing of Б2,
+      // it is STOP_SIGN_NO_FULL_STOP with the car ending up on the other side.
+      // A second crossing after a stop still completes it — the memory is live,
+      // not consumed. (`stoppedInZoneVisit` is this tick's value and the engine
+      // never re-steps a completed objective, so the certificate cannot be
+      // withdrawn afterwards, and a stop made PAST the junction — still inside
+      // the 60 m approach reach — cannot retroactively buy a crossing that is
+      // already behind the car.)
+      if (params.control !== "stopSign" || stoppedInZoneVisit) crossed = true;
       if (params.control === "trafficLight") {
         // A red a регулировчик waved you through IS met: you encountered a
         // forbidding lamp and dealt with it the way чл. 7 says to. This is the
@@ -1170,8 +1367,13 @@ function stepPassSignal(
           redMet = true;
         }
         // …and a red you WAITED OUT is met: stopped on this approach, then
-        // away on green. Unchanged since A10.
-        else if (e.lightState === "green" && stoppedInZoneVisit) {
+        // away on green. Unchanged since A10 EXCEPT for whose green it is —
+        // `controller: "halt"` means the officer is stopping this direction and
+        // the lamp is not the signal at all (rules/types.ts: the controller
+        // „overrides `lightState` entirely"), so there is no green here to have
+        // been released onto and nothing was waited out. Absent controller =
+        // every ordinary junction = byte-identical to shipped.
+        else if (e.lightState === "green" && e.controller !== "halt" && stoppedInZoneVisit) {
           if (!redMet) redMetVia = "waitedOutGreen";
           redMet = true;
         }
@@ -1781,6 +1983,9 @@ function headingDiffDeg(aDeg: number, bDeg: number): number {
  * curb/obstacle contact grades COLLISION through the obstacle-rect machinery,
  * separately. No hard reverse requirement — the narrow corridor + curbs make the
  * reverse physically necessary; a wide one-arc U-turn is a 1-movement completion.
+ * The count is reported only once the facing has actually come back (sweep 161 —
+ * see the comment on `movements` below for the two drills that scored 2 / 2 т.
+ * «чиста маневра» for entering the box and standing there).
  */
 function stepThreePointTurn(
   params: ThreePointTurnParams,
@@ -1826,7 +2031,41 @@ function stepThreePointTurn(
 
   const done = entered && inCorridor && reversedFacing && stopped && heldFor >= holdSec;
 
-  const movements = entered ? reversals + 1 : 0;
+  // A MANOEUVRE IS COUNTED WHEN IT HAS BEEN PERFORMED — sweep 161, 2026-08-18.
+  //
+  // `movements = reversals + 1` was reported from the moment the car ENTERED
+  // the corridor, so a car that drove in and did nothing at all reported ONE
+  // movement. One is the best score there is: rubric.ts prices the economy row
+  // off this number (`turn.movements > 0`, then `<= attemptsFor3Stars`) and
+  // SessionEndScreen prints it as the objective's evidence line. Both shipped
+  // U-turn drills therefore printed, on the same screen, in the same protocol:
+  //
+  //     «Икономичност на маневрата 2 / 2 т. — Обратен завой в 1 движения —
+  //      чиста маневра.»
+  //     «– Задача 2: обърни посоката на 180° … — Обратен завой: 1 движение»
+  //
+  // — a perfect mark and a dash for one act. Read off sc-maneuver-uturn and
+  // sc-maneuver-3point, mobile AND pc, and the run logs settle which half was
+  // lying: «refused 2 (4) standstill brake presses (would have selected R)»,
+  // gear D in every captured frame, 7–11 full stops. No reverse leg was ever
+  // engaged and the heading never came back — there was no обратен завой to
+  // score, and the car was never asked to be anywhere else than in the box.
+  //
+  // The condition is the manoeuvre's own definition and not a threshold: the
+  // turn is a REVERSAL OF TRAVEL DIRECTION, so it is counted once the facing
+  // has actually come back within `toleranceDeg` of start + 180°. A completed
+  // objective is unaffected — `done` demands the same `reversedFacing`, so
+  // every clean 3-movement turn and every single-arc U-turn in the trace suite
+  // reports exactly what it reported before. What stops is a score for a turn
+  // that did not happen; the row falls back to rubric.ts's honest
+  // „Няма измерване" and SessionEndScreen drops the evidence line (both already
+  // branch on 0 — no consumer needed changing).
+  //
+  // THE RESIDUAL, named rather than hidden: a car that enters the corridor
+  // ALREADY facing back — driving in from the far end — still counts as one
+  // movement. Separating that needs the entry heading in the eval state, and
+  // `ObjectiveEvalState` lives in lessons/types.ts, another lane's file.
+  const movements = entered && reversedFacing ? reversals + 1 : 0;
   const progress = done
     ? 1
     : entered

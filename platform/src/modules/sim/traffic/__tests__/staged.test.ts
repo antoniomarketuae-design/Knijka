@@ -380,14 +380,23 @@ describe("staged vehicle on an authored railPath (the RX train)", () => {
     expect(system.vehicleCollisionKind(view === null ? -1 : 1000)).toBe("vehicle");
   });
 
-  it("runs east across the axis on cruise and finishes at the far end", () => {
+  it("runs east across the axis on cruise, finishes at the far end, and leaves", () => {
     const system = squareSystem();
     system.stage(RAIL_TRAIN);
     system.stagedCommand("rail-train", { type: "cruise" });
+    // The arc reaches the 260 m rail end at t ≈ 22 s; 30 s also covers the
+    // FR-B5-EXIT retirement run that follows it.
     run(system, 30, ctx());
     const view = system.staged("rail-train")!;
     expect(view.finished).toBe(true);
-    expect(view.x).toBeCloseTo(130); // reached the east end
+    // The ARC still ends exactly at the rail end — `finished` and `s` are what
+    // the runners read, and FR-B5-EXIT deliberately leaves both untouched.
+    expect(view.s).toBeCloseTo(view.pathLengthM, 6);
+    // The BODY, though, has left: a train that reaches the end of its rail has
+    // gone, not parked across the crossing the lesson is about. 130 + the 70 m
+    // retirement run.
+    expect(view.x).toBeCloseTo(200);
     expect(view.y).toBeCloseTo(153); // never left the rail line
+    expect(view.speedMps).toBe(0); // …and is at rest once it is clear
   });
 });

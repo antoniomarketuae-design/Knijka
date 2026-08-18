@@ -132,6 +132,25 @@ describe("row 1 · the peek is bounded by the sky, not only by the control band"
     expect(css).toContain("var(--floor)");
     expect(css).toContain(`${NOTIFY_COLUMN_MAX_STAGE_FRACTION * 100}%`);
   });
+
+  it("…but on a PHONE it is the inline style that binds, since 2026-08-17", () => {
+    // THE RULE ABOVE IS NO LONGER THE ONE THAT TAKES EFFECT ON `data-sim-compact`,
+    // and a test that kept saying it was would be this project's own most
+    // expensive mistake repeated (PlayAreaStyles: „It was correct CSS and it
+    // did nothing" — an inline style outranks every selector).
+    //
+    // The mirror lane moved this column's `top` off the phone layout's corner
+    // datum, and a `max-height` is measured from the box's own top edge, so the
+    // ceiling had to be recomputed in the same declaration or the card's floor
+    // would have gone from 0.43 of the stage to 0.596 — straight through the
+    // hazard band this row is about. `sim-overlay-mirror-lane.test.ts` holds
+    // that pair and asserts the half-landed version fails.
+    expect(OVERLAY_CODE).toContain("maxHeight: notifyColumnMaxHeightCss(");
+    expect(OVERLAY_CODE).toContain("NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,");
+    // The stylesheet rule stays for the ROOMY column and as the fallback for
+    // any compact surface that is not this one; it is the sibling lane's to
+    // retire, not this file's to pretend is live.
+  });
 });
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -148,12 +167,26 @@ describe("row 1 · the peek is bounded by the sky, not only by the control band"
    fade and there was no number anywhere.
    ─────────────────────────────────────────────────────────────────────────── */
 describe("row 2 · the fold has a name and a number", () => {
-  it("the card prints how many lines are below it", () => {
-    expect(OVERLAY).toContain('data-sim-overlay-fold=""');
-    expect(OVERLAY).toContain("↓ още {foldLines}");
+  it("the card prints how many lines are below it — and so does the READ SHEET", () => {
+    // ── 2026-08-17. THE ASSERTIONS IN THIS `describe` RUN ON `OVERLAY_CODE`
+    //    FROM HERE ON, AND THAT IS THE ROW'S OWN LESSON APPLIED TO ITSELF.
+    //    Sweep 161 filed the read sheet for the identical defect one surface
+    //    deeper, the fix quotes the old expression in the block that explains
+    //    why it changed — and every `toContain` below went on passing against
+    //    the PARAGRAPH. The stripped copy is what this file already uses for
+    //    „the string is absent"; it has to be what „the string is present"
+    //    uses too, or the guard is a ban on writing the reason down.
+    expect(OVERLAY_CODE).toContain('data-sim-overlay-fold=""');
+    expect(OVERLAY_CODE).toContain("↓ още {peekFold.lines}");
     // Bulgarian counts: one ред, many реда. A count that is grammatically wrong
     // in the language the product teaches is a count nobody believes.
-    expect(OVERLAY).toContain('{foldLines === 1 ? "ред" : "реда"}');
+    expect(OVERLAY_CODE).toContain('{peekFold.lines === 1 ? "ред" : "реда"}');
+    // …and the surface the peek SENDS the student to, which had no counter, no
+    // fade and no scrollbar at all — 36 px over on `sc-hz-accident-scene@L1`,
+    // the whole of authored step 6 (`sim-overlay-fold.test.ts` has the
+    // character-by-character measurement and holds this row's other half).
+    expect(OVERLAY_CODE).toContain('data-sim-overlay-sheet-fold=""');
+    expect(OVERLAY_CODE).toContain("↓ още {sheetFold.lines}");
   });
 
   it("…measured off the browser, never counted off the string", () => {
@@ -161,8 +194,20 @@ describe("row 2 · the fold has a name and a number", () => {
     // orientation, Dynamic Type and the student's browser zoom. A character
     // budget in TypeScript is the „measures something weaker than the
     // requirement it is named for" trap this project has paid for twice.
-    expect(OVERLAY).toContain("el.scrollHeight - el.clientHeight");
-    expect(OVERLAY).toMatch(/getComputedStyle\(probe\)\.lineHeight/);
+    //
+    // `scrollTop` IS PART OF THE QUESTION and was missing until 2026-08-17: the
+    // expression answered „how much does not fit" and never „how much is still
+    // below you", so a reader who had scrolled to the end was still being told
+    // «↓ още 8 реда». A counter that cannot reach zero teaches its reader to
+    // ignore it.
+    expect(OVERLAY_CODE).toContain(
+      "scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop",
+    );
+    expect(OVERLAY_CODE).toMatch(/getComputedStyle\(probe\)\.lineHeight/);
+    // Both windows are wired to the browser's own scroll event, or the zero
+    // above is unreachable: a scroll is not a resize.
+    expect(OVERLAY_CODE).toContain("onScroll={peekFold.onScroll}");
+    expect(OVERLAY_CODE).toContain("onScroll={sheetFold.onScroll}");
   });
 
   it("…and never with a layout read on the 150 ms poll's render path", () => {
@@ -170,12 +215,17 @@ describe("row 2 · the fold has a name and a number", () => {
     // render is six forced reflows a second over a live WebGL canvas.
     // `ResizeObserver` fires once on observe — that IS the first measurement —
     // and afterwards only when a box changes size.
-    expect(OVERLAY).toContain("new ResizeObserver(");
-    expect(OVERLAY).toContain("ro.observe(el)");
-    expect(OVERLAY).toMatch(/\}, \[foldKey\]\)/);
+    expect(OVERLAY_CODE).toContain("new ResizeObserver(");
+    expect(OVERLAY_CODE).toContain("ro.observe(el)");
+    // The rule moved into `useFoldLines` when the sheet needed the same one, so
+    // the subscription's key is the hook's argument rather than a bare
+    // `[foldKey]` dependency — and BOTH windows are keyed off the same string.
+    expect(OVERLAY_CODE).toMatch(/\}, \[key, measure\]\)/);
+    expect(OVERLAY_CODE).toContain("useFoldLines(`peek ${foldKey}`)");
+    expect(OVERLAY_CODE).toContain('useFoldLines(`sheet ${open ? "open" : "shut"} ${foldKey}`)');
     // The key is what is SAID, not the object: the poll hands this component a
     // fresh item object with the same words in it six times a second.
-    expect(OVERLAY).toMatch(/const foldKey =\s*\n?\s*shown === null \? "" : `\$\{shown\.id\}/);
+    expect(OVERLAY_CODE).toMatch(/const foldKey =\s*\n?\s*shown === null \? "" : `\$\{shown\.id\}/);
   });
 
   it("the text window keeps a floor of two whole line boxes plus the fade", () => {

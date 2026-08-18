@@ -51,6 +51,49 @@ const GUARD_LATERAL_M = 3.0;
 const GUARD_STOP_SHORT_M = 6;
 /** matchPlayer proportional gain: m/s of speed delta per meter of gap error. */
 const MATCH_GAIN = 0.55;
+/**
+ * FR-B5-EXIT (sweep161, 2026-08-18) — HOW FAR A RETIRING ACTOR DRIVES AWAY.
+ *
+ * A non-looping actor that ran out of path used to stop on the last metre of
+ * it and stand there for the rest of the lesson. Doc 87 FR-B5-VAN named that
+ * exact sentence as the defect ("a staged vehicle that runs out of path stops
+ * on the last metre of it and never moves again (staged.ts `finished`)") and
+ * then repaired it by lengthening ONE template's path. Every path is finite,
+ * so the mechanism simply moved: measured on the sweep's own runs, at level 1,
+ * with each scenario's compiled ambient count and a 210 s lesson —
+ *
+ *   sc-ln-decisive-change  `sc-lndc-target` at rest (4.06, 400.00) from
+ *                          t ≈ 25 s → 185 s of a 210 s lesson with the LEFT
+ *                          lane the briefing is about empty to the horizon;
+ *   sc-merge-accel-lane    `sc-mrg-mainline` at rest (−8.13, 960.00) from
+ *                          t ≈ 40 s → 170 s of empty motorway;
+ *   sc-jx-giveway-b1       `sc-jxgb-conflict` at rest (−120.00, 154.06) — the
+ *                          last metre of its path, in a live boulevard lane —
+ *                          with ambient #2 dammed 6.2 m behind it and #0
+ *                          12.5 m behind that.
+ *
+ * That last one is the whole finding. Driving the drill correctly and holding
+ * at the Б1 line, EVERY body in the world covered **0.0 m** over t = 150…210 s.
+ * The control settles it: with the staged actors not staged, the same two
+ * ambient cars covered 562.7 m and 560.1 m over the same 60 s. The priority
+ * stream the lesson asks the student to wait for never clears because the
+ * lesson's own actor is parked across it.
+ *
+ * So a car that reaches the end of its path LEAVES, the way real traffic does,
+ * instead of becoming scenery in a live lane. 70 m because the ambient fleet's
+ * own corridor is `cfg.lookaheadM` 60 m (types.ts) plus a body length and a
+ * margin — past this an ambient agent no longer sees the actor at all, which
+ * is the property that has to hold, not the number.
+ */
+const EXIT_CLEAR_M = 70;
+/**
+ * …and the retirement run is driven at the speed the actor arrived with, so it
+ * simply keeps going. The floor only covers an actor that crawls over its own
+ * finish line: without it a car arriving at 0.2 m/s would take 350 s to clear
+ * and would still be an obstacle for the whole lesson — the defect again,
+ * slower. 4 m/s is a walking-pace pull-away, not a lurch.
+ */
+const EXIT_MIN_SPEED_MPS = 4;
 /** Numeric ids for published staged states (ambient ids are 0..count-1). */
 export const STAGED_STATE_ID_BASE = 1000;
 
@@ -221,6 +264,12 @@ export interface StagedVehicleAgent {
   latRate: number;
   /** Commanded turn indicator (ledger L6) — published, never inferred. */
   indicator: VehicleIndicator;
+  /** FR-B5-EXIT: metres driven PAST the end of the path while retiring. 0 for
+   *  every actor that never reaches its end — byte-identical publishing. */
+  exitM: number;
+  /** Speed of the retirement run, m/s (0 = not retiring; set once, at the
+   *  frame the actor runs out of path, so the run is a constant coast). */
+  exitSpeed: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -261,6 +310,66 @@ const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
 
 function clampArc(path: StagedPath, s: number): number {
   return s < 0 ? 0 : s > path.length ? path.length : s;
+}
+
+/**
+ * Would advancing `step` m along the published heading put this actor inside
+ * an ambient body it is not already inside? The FR-B5-FREEZE rule, factored so
+ * the on-path advance and the FR-B5-EXIT retirement run answer to one clamp:
+ * refuse only a CLOSING step, because a step that grows the separation cannot
+ * create an overlap the previous pose did not already have.
+ */
+function closesOnAmbient(agent: StagedVehicleAgent, env: StagedEnv, step: number): boolean {
+  const nx = agent.state.x + agent.state.dirX * step;
+  const ny = agent.state.y + agent.state.dirY * step;
+  for (let i = 0; i < env.ambient.length; i++) {
+    const a = env.ambient[i];
+    if (a === agent.state) continue;
+    const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
+    const dAfter = Math.hypot(a.x - nx, a.y - ny);
+    if (dAfter >= sep) continue;
+    const dBefore = Math.hypot(a.x - agent.state.x, a.y - agent.state.y);
+    if (dAfter >= dBefore) continue; // moving away — never a reason to freeze
+    return true;
+  }
+  return false;
+}
+
+/**
+ * …AND THE SAME QUESTION ABOUT THE PLAYER — 2026-08-18, the gate pass.
+ *
+ * `closesOnAmbient` was factored out so „the on-path advance and the
+ * FR-B5-EXIT retirement run answer to one clamp". Only HALF of the on-path
+ * promise was carried over: step 2 above is the PLAYER guard, and it works by
+ * lowering `target`, which the retirement branch does not read — it drives on
+ * `exitSpeed`, fixed at the frame the path ran out. So a retiring actor was
+ * held off every ambient body in the world and off nothing else.
+ *
+ * MEASURED with the player standing 20 m past the end of the path,
+ * `playerGuard` defaulted: closest approach to the PLAYER 0.000 m at 10.0 m/s,
+ * against 4.667 m for an ambient body in the identical geometry — and on the
+ * pre-FR-B5-EXIT build the actor came to rest 20 m short of him. That is a
+ * correct student, stopped where the drill asked him to stop, driven into from
+ * behind and billed COLLISION −10 опасна by a car whose only remaining job is
+ * to leave the scene. „A staged actor that runs out of path parks in a live
+ * lane" is the defect FR-B5-EXIT exists to end; ending it by driving THROUGH
+ * the student is not an improvement, it is the same lane's worse twin.
+ *
+ * Same shape as the ambient clamp — refuse only a CLOSING step, so an actor
+ * that is already inside the standoff can still drive out of it — and the same
+ * standoff the on-path guard aims for (`GUARD_STOP_SHORT_M`, from the player's
+ * centre). Gated on `spec.playerGuard` exactly as step 2 is, so the handful of
+ * actors authored to ignore the player (the staged collisions) keep ignoring
+ * him here too.
+ */
+function closesOnPlayer(agent: StagedVehicleAgent, env: StagedEnv, step: number): boolean {
+  if (!env.hasPlayer || (agent.spec.playerGuard ?? true) === false) return false;
+  const nx = agent.state.x + agent.state.dirX * step;
+  const ny = agent.state.y + agent.state.dirY * step;
+  const dAfter = Math.hypot(env.playerX - nx, env.playerY - ny);
+  if (dAfter >= GUARD_STOP_SHORT_M) return false;
+  const dBefore = Math.hypot(env.playerX - agent.state.x, env.playerY - agent.state.y);
+  return dAfter < dBefore;
 }
 
 export function createStagedVehicle(
@@ -315,6 +424,8 @@ export function createStagedVehicle(
     latTarget: 0,
     latRate: 0,
     indicator: "off",
+    exitM: 0,
+    exitSpeed: 0,
   };
   publishVehicle(agent);
   return agent;
@@ -430,6 +541,8 @@ export function applyStagedCommand(
         v.latTarget = 0;
         v.latRate = 0;
         v.indicator = "off";
+        v.exitM = 0;
+        v.exitSpeed = 0;
         publishVehicle(v);
         break;
     }
@@ -575,33 +688,51 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   //     „never clip" guarantee exactly (a step that grows the separation cannot
   //     create an overlap) and lets a boxed-in actor drive out.
   if (env.ambient.length > 0 && agent.s > sBefore) {
-    const step = agent.s - sBefore;
-    const nx = agent.state.x + agent.state.dirX * step;
-    const ny = agent.state.y + agent.state.dirY * step;
-    for (let i = 0; i < env.ambient.length; i++) {
-      const a = env.ambient[i];
-      if (a === agent.state) continue;
-      const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
-      const dAfter = Math.hypot(a.x - nx, a.y - ny);
-      if (dAfter >= sep) continue;
-      const dBefore = Math.hypot(a.x - agent.state.x, a.y - agent.state.y);
-      if (dAfter >= dBefore) continue; // moving away — never a reason to freeze
+    if (closesOnAmbient(agent, env, agent.s - sBefore)) {
       agent.s = sBefore;
       agent.speed = 0;
-      break;
     }
   }
 
-  // 4) Path end / loop wrap.
+  // 4) Path end / loop wrap / retirement run.
   if (spec.loop) {
     if (agent.s >= agent.path.length) {
       agent.s -= agent.path.length;
       agent.segHint = 0;
     }
   } else if (agent.s >= agent.path.length) {
+    // FR-B5-EXIT (see EXIT_CLEAR_M): the actor has run out of road, so it
+    // DRIVES AWAY instead of parking on the last metre of a live lane.
+    //
+    // `finished` still latches on exactly the frame it used to, and `agent.s`
+    // stays pinned to `path.length` — every runner that reads `actor.finished`
+    // or `actor.s` sees the identical number on the identical frame. What
+    // changes is only where the BODY is: it keeps going in its final direction
+    // until it is EXIT_CLEAR_M past the end, then comes to rest off-scene.
     agent.s = agent.path.length;
-    agent.speed = 0;
-    agent.finished = true;
+    if (!agent.finished) {
+      agent.finished = true;
+      agent.exitSpeed = Math.max(agent.speed, EXIT_MIN_SPEED_MPS);
+    }
+    if (agent.exitM < EXIT_CLEAR_M) {
+      // The retirement run is held to the SAME promise as the on-path advance
+      // above — it is still a body moving through a world with other bodies in
+      // it, and „never clip" does not lapse because the path did. BOTH halves
+      // of that promise: the ambient fleet (step 2b) and the player (step 2).
+      // See `closesOnPlayer` for what the missing half measured.
+      const step = Math.min(agent.exitSpeed * dt, EXIT_CLEAR_M - agent.exitM);
+      if (
+        (env.ambient.length > 0 && closesOnAmbient(agent, env, step)) ||
+        closesOnPlayer(agent, env, step)
+      ) {
+        agent.speed = 0;
+      } else {
+        agent.exitM += step;
+        agent.speed = agent.exitM >= EXIT_CLEAR_M ? 0 : agent.exitSpeed;
+      }
+    } else {
+      agent.speed = 0;
+    }
   }
 
   // 4b) Lateral glide (laneShift): pure dt integration toward the target,
@@ -639,9 +770,18 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
   // `finished` is excluded on purpose: an actor that has run out of path is
   // parked, not waiting, and a parked car with its brake lights on is a lie
   // in the other direction.
+  //
+  // FR-B5-EXIT adds one more exclusion, for the same reason in the same
+  // direction: an actor on its retirement run is DRIVING AWAY at a constant
+  // coast while `target` is 0 (a finished cruise targets 0), so the middle
+  // clause would light both lamps on a car that is accelerating out of the
+  // scene. Lit brake lights on a departing car is the same lie as unlit ones
+  // on a waiting one.
+  const retiring = agent.finished && agent.exitM < EXIT_CLEAR_M && agent.speed > 0;
   const holding = target <= HOLD_LIT_TARGET_MPS && agent.speed <= HOLD_LIT_SPEED_MPS;
   agent.state.braking =
-    cmd.type === "brake" || agent.speed > target + 0.3 || (holding && !agent.finished);
+    !retiring &&
+    (cmd.type === "brake" || agent.speed > target + 0.3 || (holding && !agent.finished));
 
   publishVehicle(agent);
 }
@@ -652,8 +792,12 @@ function publishVehicle(agent: StagedVehicleAgent): void {
   // Lateral channel: offset the published pose to the RIGHT of travel
   // (right normal of (dx, dy) is (dy, -dx) — the offsetPolyline convention).
   // lat = 0 for every actor never laneShift-ed → byte-identical publishing.
-  agent.state.x = samp.x + samp.dirY * agent.lat;
-  agent.state.y = samp.y - samp.dirX * agent.lat;
+  //
+  // FR-B5-EXIT: …and the retirement run rides straight on past the end of the
+  // polyline along its final direction. exitM = 0 for every actor that never
+  // reaches its end, so this term likewise changes nothing for them.
+  agent.state.x = samp.x + samp.dirY * agent.lat + samp.dirX * agent.exitM;
+  agent.state.y = samp.y - samp.dirX * agent.lat + samp.dirY * agent.exitM;
   if (samp.dirX !== 0 || samp.dirY !== 0) {
     if (agent.latRate !== 0 && agent.lat !== agent.latTarget && agent.speed > 0.1) {
       // Mid-glide: publish the true velocity direction (path motion + the

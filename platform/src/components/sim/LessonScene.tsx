@@ -150,6 +150,21 @@ import { TouchControls } from "./TouchControls";
 // rapier wasm and the district loader, and the ONE number that decides how much
 // world time a frame is worth cannot sit behind that. See the file's header.
 import { sessionClockAdvance } from "./lesson-ui/sessionClock";
+// The first-run touch hint's LIFETIME, next door for the same reason and in the
+// same words: it had none, so it printed itself over the rear-view mirror for a
+// whole 3 min 39 s lesson. See that file's header for the four frames.
+import {
+  TOUCH_HINT_POLL_MS,
+  touchHintStandsDown,
+} from "./lesson-ui/touchHintLifetime";
+// …and the SAME missing lifetime on the desktop twin of that card: the «⌨
+// Клавиши» legend opened itself on every mouse lesson and then printed key caps
+// over the left third of the windscreen for the whole drive. See that file's
+// header for the three frames.
+import {
+  CONTROLS_LEGEND_POLL_MS,
+  controlsLegendStandsDown,
+} from "./lesson-ui/controlsLegendLifetime";
 import { CockpitInteractionContext } from "@/modules/sim/scene/vitok/hotspots";
 import { HUD_LEFT_PANEL_MAX_HEIGHT_FRACTION } from "@/modules/sim/scene/vitok/cabinLook";
 import { SimAudio } from "@/modules/sim/scene/simAudio";
@@ -856,6 +871,7 @@ function ReadyScene({
   // no pre-drive phase and therefore no QW10 explanation (engine/stuckStart.ts
   // carries the drive-rig measurement that found it).
   const [stuckStart] = useState(() => new StuckStartWatch());
+  /** THE ACKNOWLEDGED exit: read, understood, gone for good on this device. */
   const dismissTouchHint = useCallback(() => {
     setShowTouchHint(false);
     try {
@@ -864,6 +880,44 @@ function ReadyScene({
       // Private mode — the hint just shows again next session.
     }
   }, []);
+  // …and §C2's pointer path beside it, because `onClick` is the one activation
+  // a driver cannot reach. A touch-borne `click` is a COMPATIBILITY MOUSE EVENT
+  // and the spec dispatches those only for the PRIMARY touch point, so with a
+  // thumb already on a pedal pad this button produced `pointerdown → pointerup`
+  // and nothing else — the card's only exit, dead in exactly the posture the
+  // card is read in. `tapActivation.ts`'s own census had this button pinned as
+  // „the single honest residue"; this is it coming off the list. `onClick`
+  // STAYS: keyboard Enter/Space, assistive activation and `element.click()`
+  // arrive as a click and produce no pointer event to hang off, and the shared
+  // idiom de-duplicates so a mouse press cannot fire twice.
+  const tapDismissTouchHint = useTapActivation(dismissTouchHint);
+
+  // ── AND THE AUTOMATIC EXIT — THE HINT USED TO HAVE NO LIFETIME AT ALL ──────
+  //
+  // Measured on sc-park-night: present in 43 of 43 driving frames, 03-ready
+  // → 07-end, 3 min 39 s, printed across ~70 % of the interior rear-view mirror
+  // in the one lesson whose briefing grades mirror use. It is a ghost surface —
+  // bare type on the world — so every second it is up is a second of the world
+  // deleted, and nothing but a press could end it.
+  //
+  // The hint teaches where the thumbs go; a rolling car is the proof they
+  // landed. So it stands down at the rule engine's own „moving" floor (5 km/h,
+  // `touchHintLifetime.ts`) — and it stands down WITHOUT persisting, unlike the
+  // button above: an automatic exit may get the words out of the way, but it may
+  // never decide on the student's behalf that they were read. A student who
+  // drove off without reading meets the card again next lesson, at a standstill,
+  // where it is legible and covers nothing that moves.
+  //
+  // The poll runs only while the hint is up (a few seconds, once per device) and
+  // reads one number off the sample the frame loop already writes — the frame
+  // loop that grades gains no line for a piece of disappearing type.
+  useEffect(() => {
+    if (!showTouchHint) return;
+    const id = window.setInterval(() => {
+      if (touchHintStandsDown(sampleRef.current.speedKmh)) setShowTouchHint(false);
+    }, TOUCH_HINT_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [showTouchHint]);
 
   // Camera toggle + car reset, shared by the key callbacks (C/R) and the
   // touch overlay buttons — one code path per action. S0-View: C CYCLES three
@@ -1562,6 +1616,12 @@ function ReadyScene({
         defaultOpen={!touchOnly && !driveLockedAtMount}
         topdownAllowed={topdownInCycle}
         reverseAssistEnabled={reverseAssistEnabled}
+        // …AND THE LIFETIME THE DEFAULT ABOVE NEVER HAD. `defaultOpen` decides
+        // how the lesson OPENS; nothing decided how it ends, so on every desktop
+        // scenario rung the sheet was still open — as ghost type on the
+        // buildings — at 12 s and 11 км/ч (sc-follow-distance/pc-right).
+        // `controlsLegendLifetime.ts` carries the three frames and the rule.
+        sampleRef={sampleRef}
       />
 
       {/* PROX rear-proximity cue (isolated additive block): „Кола отзад · X м"
@@ -1890,6 +1950,12 @@ function ReadyScene({
           <button
             type="button"
             autoFocus
+            // §C2 — the pointer path FIRST, `onClick` kept beside it (the
+            // «Продължи» order, and for the same reason: both are live and the
+            // shared idiom de-duplicates). Without this the card's ONLY exit is
+            // unreachable while a thumb rests on a pedal pad, which is the exact
+            // posture a driver reads it in — see the wiring block above.
+            {...tapDismissTouchHint}
             onClick={dismissTouchHint}
             // ── IT PAINTED 0 % OF ITS OWN BOX, AND NOBODY HAD LOOKED AT IT.
             //
@@ -2844,11 +2910,21 @@ const CONTROLS_HELP_BOTTOM_INSET = "4.5rem";
  * all 20 rows ate ~22 % of the windscreen. The full sheet is one click away
  * and stays open for the rest of the session. Touch-only devices still start
  * fully collapsed — the touch overlay is the primary input there.
+ *
+ * …AND IT NOW HAS AN END AS WELL AS A BEGINNING (2026-08-18). The paragraph
+ * above is about how the lesson OPENS and it is unchanged; what was missing is
+ * that nothing ever closed the sheet, so the sweep photographed it open — as
+ * ghost type on the buildings, and capped by the deck rule to four of eleven
+ * rows — at 12 s and 11 км/ч of a graded drive. It collapses to its pill the
+ * first time the car is genuinely moving, once per lesson, and a student who
+ * re-opens it mid-drive keeps it open (`controlsLegendLifetime.ts` — the three
+ * frames, the floor, and why the latch is one-way).
  */
 function ControlsHelp({
   defaultOpen = true,
   topdownAllowed = true,
   reverseAssistEnabled = true,
+  sampleRef,
 }: {
   defaultOpen?: boolean;
   /** Only advertise the top-down view + its G/N controls when it's reachable
@@ -2870,9 +2946,49 @@ function ControlsHelp({
    * 158 of the 169 `level: 4` rungs in the catalogue are exam rungs.
    */
   reverseAssistEnabled?: boolean;
+  /**
+   * The per-frame vehicle sample the scene already writes — read for ONE
+   * number, `speedKmh`, and only while the sheet is open and the one-time
+   * collapse has not fired yet. Optional so the component stays renderable on
+   * its own (the storybook-less way this file's sub-components are exercised);
+   * absent, the sheet keeps the pre-2026-08-18 behaviour of never closing
+   * itself, which is the failure that costs a panel rather than a lesson.
+   */
+  sampleRef?: React.RefObject<VehicleSample>;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [showAll, setShowAll] = useState(false);
+  /**
+   * THE ONE-WAY LATCH, and it is the half of this that is easy to get wrong.
+   *
+   * The collapse below is an EVENT ("the car started moving"), not a condition
+   * ("the car is moving"). Written as a condition it would re-fire every 250 ms,
+   * so a student who reached up at 40 км/ч to check which key is the horn would
+   * watch the sheet shut again a quarter of a second later and conclude the pill
+   * is broken. An auto-hide that will not let you look is the same crime as a
+   * panel that will not go away, pointing the other way — so once this is set
+   * the poll never runs again for this lesson and the pill is the only authority
+   * left. It is a ref rather than state: latching it must not cost a render.
+   */
+  const autoCollapsedRef = useRef(false);
+  /**
+   * …and the poll that trips it. Guarded on `open` so it does not exist on a
+   * touch-only device or a pre-drive lesson (both start collapsed), and on the
+   * latch so it does not come back when the student re-opens the sheet.
+   *
+   * Deliberately NOT routed through some shared "is driving" state: this is a
+   * piece of furniture folding itself away, and it must not be able to add a
+   * render — or a line in the frame loop that grades — for anything else.
+   */
+  useEffect(() => {
+    if (!open || !sampleRef || autoCollapsedRef.current) return;
+    const id = window.setInterval(() => {
+      if (!controlsLegendStandsDown(sampleRef.current.speedKmh)) return;
+      autoCollapsedRef.current = true;
+      setOpen(false);
+    }, CONTROLS_LEGEND_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [open, sampleRef]);
   // The reversing-POV setting is persisted and toggled by K inside the canvas
   // (CameraRig owns the key, with G/N) — the row shows its live state so the
   // legend never lies about which way the view will turn.
@@ -2888,7 +3004,15 @@ function ControlsHelp({
     { keys: "Клик", what: "всичко в кабината се прави с мишката", essential: true },
     { keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
     { keys: "I", what: "двигател: старт / стоп", essential: true },
-    { keys: "[ ]", what: "скорости: към P / към D", essential: true },
+    // NON-BREAKING SPACES BEFORE THE TWO GEAR LETTERS. This column is
+    // `w-[min(15rem,45%)]` minus a 3.75 rem key cap, and the sweep photographed
+    // what that leaves: on sc-follow-distance/pc-right the row wrapped as
+    // «скорости: към P / към» with an orphaned «D» alone on the next line, i.e.
+    // the one character that carries the meaning separated from the word that
+    // introduces it, in ghost type over a building. U+00A0 binds each letter to
+    // its «към»; the row still wraps, it just cannot wrap THERE. Written as the
+    // escape and not the literal glyph, so a reader of this file can SEE it.
+    { keys: "[ ]", what: "скорости: към\u00a0P / към\u00a0D", essential: true },
     // NOT „задръж" (hold). Holding the brake is how you stop; it is not how
     // you ask for reverse — see the two laws in engine/reverseAssist.ts. On an
     // exam rung neither the assist nor the pedal swap exists, so the row says

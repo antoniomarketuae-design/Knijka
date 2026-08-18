@@ -179,10 +179,18 @@ export interface RuleEngineState {
   /**
    * THE OPEN CONTACT EPISODE — when the last contact was REPORTED, or null if
    * the car has never touched anything. An episode stays open while reports
-   * keep arriving and closes after `collisionSeparationSec` of silence; only
-   * the report that OPENS one is billed. See the `collision` case.
+   * keep arriving and closes after `collisionSeparationSec` of silence AND
+   * `COLLISION_REOPEN_TRAVEL_M` of travel; only the report that OPENS one is
+   * billed. See the `collision` case.
    */
   lastCollisionContactAt: number | null;
+  /**
+   * Path length driven since the last REPORTED contact, metres (reset to 0 by
+   * every report, including the ones inside an open encounter). The second
+   * half of "the bodies have come apart" — see the `collision` case for the
+   * drives that made silence alone insufficient.
+   */
+  travelSinceContactM: number;
   /** Set once a collision occurs — the session grades as terminated. */
   terminated: boolean;
   /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
@@ -290,6 +298,13 @@ export interface RuleEngineState {
    */
   motorwaySlow: EpisodeState;
   /**
+   * Seconds of crawl ACCRUED inside the currently-open motorway episode — see
+   * `stepAccruedEpisode` and the crawl detector for why the sustain counts
+   * qualifying seconds instead of demanding they be consecutive. Zeroed by the
+   * same reset that re-arms the episode (recovery / leaving the motorway).
+   */
+  motorwayCrawlSec: number;
+  /**
    * Sustained DRIVING in the лента за принудително спиране (laneId 0 inside
    * an authored emergencyLane span). One bill per excursion; re-arms on
    * leaving the lane/span.
@@ -303,6 +318,68 @@ const IDLE_EPISODE: EpisodeState = {
   resetSince: null,
   lastEmitAt: null,
 };
+
+/**
+ * HOW FAR A CAR MUST DRIVE BEFORE IT CAN HAVE HAD A SECOND ACCIDENT, metres.
+ *
+ * The encounter rule below was written as „silence ends an encounter", with the
+ * separation itself delegated to a CONTRACT ON THE REPORTERS (see the
+ * `collision` case). Trusting a contract is how the 2026-08-16 catalogue sweep
+ * found «490 наказателни точки» — 49 пътнотранспортни произшествия — printed on
+ * the same card as the sentence saying a collision is ONE dangerous error worth
+ * ten; and 420, 290, 252, 141, 94 on other lessons, all of them one contact.
+ *
+ * A contract cannot be the only defence, because the reducer is the one place
+ * that survives every reporter. This is the part it can check ITSELF, from
+ * telemetry it already has: A CAR THAT HAS NOT MOVED CANNOT HAVE COME APART
+ * FROM WHAT IT IS INSIDE OF. Two accidents need the body to be left and reached
+ * again, so the path between them is at least twice the daylight in between.
+ * 2 m is that floor measured against the case the encounter rule was built to
+ * KEEP billing: the shipped „hit, reverse out, hit again" gate is the fastest
+ * real re-hit rapier could produce (`collisionSeparationSec`'s 2.35 s), and
+ * integrating its own frames gives 4.4 m of path — 2.2× the floor, so that
+ * drive still bills twice. A car resting embedded in a bumper at 0 км/ч accrues
+ * nothing and can never open a second one, however the reporter behaves.
+ *
+ * MEASURED, one embedded contact re-reported with 4 s gaps for 60 s at 0 км/ч
+ * (`engine.test.ts` „an embedded car whose reporter falls silent…"): 16 bills /
+ * 160 points before, 1 bill / 10 points after. It is a module constant and not
+ * a `RuleEngineConfig` field on purpose — it is not a tolerance to tune per
+ * lesson but a statement about what „apart" means, and a lesson that could
+ * lower it could re-buy the 490.
+ */
+const COLLISION_REOPEN_TRAVEL_M = 2;
+
+/**
+ * HOW LONG THE RIGHT WAY MUST BE HELD BEFORE A SECOND WRONG-WAY RUN, seconds.
+ *
+ * `WRONG_WAY` is a 10-point опасна riding a boolean the runtime computes from
+ * heading against edge direction — and heading is derived from motion, so at
+ * crawl speed it is the noisiest signal in the tick. `stepEpisode` re-arms on
+ * the FIRST frame the condition is false, which is the exact M-16 defect the
+ * speeding episode was rewritten to close: one flickering signal becomes N
+ * separate convictions. The 2026-08-17 catalogue sweep photographed the price
+ * on a road nothing signs one-way — `sc-ac-wind-truck-pass / pc-right`, a
+ * careful drive at 13–16 км/ч, «Движение в обратна посока по еднопосочна улица
+ * ×5 — опасна, 50 наказателни т.» on a sheet whose whole allowance is 9; the
+ * same code appears the same way on `sc-ed-d2-city-run / pc-right` (five to
+ * eight bills) and on `sc-ac-truck-spray`.
+ *
+ * A driver who genuinely runs a one-way street twice must still be billed
+ * twice, so the episode re-arms — but only after the lawful direction has been
+ * HELD, which is what a second act requires and what a flicker never delivers.
+ * 4 s is the number this engine already uses for „a correction that counts"
+ * (`speedingRearmSec`); it is a module constant rather than a config field for
+ * the same reason the travel floor above is — a lesson that could lower it
+ * could re-buy the 50.
+ *
+ * NOT the whole defect, and deliberately said out loud: the sweep found no
+ * one-way sign or arrow in ANY frame of the three lessons where this fires, so
+ * the flag itself is wrong on those roads. That is the locator's/district
+ * data's half and it is reported, not patched here — this half is the reducer's
+ * own, and it is the difference between one false conviction and five.
+ */
+const WRONG_WAY_REARM_SEC = 4;
 
 /**
  * JU-23 per-CONTROL copy for JUNCTION_SCAN_INCOMPLETE (doc 87, item 5 of the
@@ -371,6 +448,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     keepRight: { ...IDLE_EPISODE },
     crossing: null,
     lastCollisionContactAt: null,
+    travelSinceContactM: 0,
     terminated: false,
     cleanDistanceM: 0,
     stall: { ...IDLE_EPISODE },
@@ -393,6 +471,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     railRest: { ...IDLE_EPISODE },
     curveSpeed: { ...IDLE_EPISODE },
     motorwaySlow: { ...IDLE_EPISODE },
+    motorwayCrawlSec: 0,
     emergencyLane: { ...IDLE_EPISODE },
   };
 }
@@ -495,6 +574,12 @@ function stepEpisode(
  * `lastEmitAt` carries the episode's last bill; `resetSince` the moment the
  * driver came back under the limit. Both live on the same EpisodeState so the
  * 25 detectors that do not opt in are byte-identical (rearm/repeat default 0).
+ *
+ * 2026-08-17: WRONG_WAY opts in too, with `repeatSec` 0 — it needs only the
+ * first half. Its condition is a runtime boolean rather than a threshold on a
+ * measured number, so it has no saw-tooth to counterweight; what it has is a
+ * signal that flickers, and `rearmSec` is exactly the guard against a flicker
+ * being read as a second act (see WRONG_WAY_REARM_SEC).
  */
 function stepSustainedEpisode(
   e: EpisodeState,
@@ -534,6 +619,61 @@ function stepSustainedEpisode(
     return true;
   }
   return false;
+}
+
+/**
+ * ACCRUED-SUSTAIN variant (2026-08-17 — the 161-lesson catalogue sweep).
+ *
+ * `stepEpisode` demands that the condition hold on EVERY frame of the sustain:
+ * one frame of falsehood sets `activeSince` back to null and the clock starts
+ * over. That is right for a condition which is genuinely a state (belt off,
+ * handbrake on) and wrong for one that describes a STRETCH OF ROAD, because the
+ * worst driving is the least continuous. Measured, `sc-mw-min-speed / pc-right`
+ * («Магистрален ритъм — не пълзи»): 205 s on a 140 км/ч motorway, top speed
+ * 15 км/ч, TWENTY-EIGHT full stops — and «Опасни 0 · Основни 0 · Второстепенни
+ * 0», the one fault the lesson is named after never booked, because the crawl
+ * dropped under `movingSpeedKmh` between every creep. `sc-mw-discipline`
+ * scored the same 0 on the same shape.
+ *
+ * So the clock counts QUALIFYING SECONDS instead of demanding they be
+ * consecutive: every per-frame gate the caller passes in stays exactly as
+ * shipped (this loosens none of them — a frame that does not qualify still
+ * contributes nothing), and only the requirement that qualifying frames be
+ * adjacent is dropped. The episode's ledger survives the gaps and is zeroed by
+ * the SAME reset that re-arms the bill, so a genuine recovery still buys a
+ * clean slate and the „one bill per episode" latch is untouched.
+ *
+ * The per-frame credit is clamped at 2 s, exactly as the clean-driving and
+ * contact-travel integrators clamp theirs and for the same reason: a
+ * pause/resume time jump (every teach card pauses the sim) must not hand the
+ * ledger seconds nobody drove.
+ */
+function stepAccruedEpisode(
+  e: EpisodeState,
+  accruedSec: number,
+  cond: boolean,
+  reset: boolean,
+  t: number,
+  dt: number,
+  sustainSec: number,
+): { accruedSec: number; fired: boolean } {
+  if (reset) {
+    e.activeSince = null;
+    e.emitted = false;
+    return { accruedSec: 0, fired: false };
+  }
+  if (!cond) {
+    // The episode is still open — hold the ledger, stop the clock.
+    e.activeSince = null;
+    return { accruedSec, fired: false };
+  }
+  if (e.activeSince === null) e.activeSince = t;
+  const next = accruedSec + Math.max(0, Math.min(dt, 2));
+  if (!e.emitted && next >= sustainSec) {
+    e.emitted = true;
+    return { accruedSec: next, fired: true };
+  }
+  return { accruedSec: next, fired: false };
 }
 
 /**
@@ -744,6 +884,16 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (stepEpisode(s.stall, tick.stalled === true, tick.stalled !== true, t, 0)) {
     events.push(makeViolation("ENGINE_STALLED", t));
   }
+
+  // Path length since the last reported contact (COLLISION_REOPEN_TRAVEL_M).
+  // Accrued BEFORE the event loop, so a report arriving on this frame is judged
+  // against the ground covered up to it. MAGNITUDE, not direction: the live
+  // channel hands the reducer a SIGNED speed (negative in reverse, the same
+  // asymmetry contact.ts documents), and backing 1 m off a car you just hit is
+  // exactly the travel this measures. dt is clamped like the clean-driving
+  // integrator's — a pause/resume jump (every teach card pauses the sim) must
+  // not fabricate metres the car never drove and re-arm a bill with them.
+  s.travelSinceContactM += (Math.abs(speed) / 3.6) * Math.min(dt, 2);
 
   // -- 2. discrete zone / contact events
   for (const e of tick.events) {
@@ -1262,8 +1412,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Wrong way against a one-way street (runtime sets tick.wrongWay). Reverse
   // gear is exempt (A12): reversing into a parking spot moves against the
   // flow by definition and is judged as a maneuver, not as wrong-way driving.
+  //
+  // ONE RUN, ONE BILL (2026-08-17 — see WRONG_WAY_REARM_SEC). The episode is
+  // stepped with the M-16 hysteresis and NO repeat cadence: the driver has to
+  // hold the lawful direction for the re-arm before a second run can be
+  // charged, so a heading signal that flickers at crawl speed cannot turn one
+  // stretch of road into five 10-point опасни.
   const goingWrongWay = tick.wrongWay === true && moving && forwardGear;
-  if (stepEpisode(s.wrongWay, goingWrongWay, !goingWrongWay, t, cfg.wrongWaySustainSec)) {
+  if (
+    stepSustainedEpisode(
+      s.wrongWay,
+      goingWrongWay,
+      !goingWrongWay,
+      t,
+      cfg.wrongWaySustainSec,
+      WRONG_WAY_REARM_SEC,
+      0,
+    )
+  ) {
     events.push(makeViolation("WRONG_WAY", t));
   }
 
@@ -1357,15 +1523,25 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
     !inEmergencyLane &&
     forwardGear;
-  if (
-    stepEpisode(
-      s.motorwaySlow,
-      motorwayCrawl,
-      tick.motorway !== true || speed >= cfg.motorwayMinFlowKmh,
-      t,
-      cfg.motorwaySlowSustainSec,
-    )
-  ) {
+  // ACCRUED, NOT CONSECUTIVE (2026-08-17 — see `stepAccruedEpisode`). The gates
+  // above are unchanged; what changed is that the 4 s no longer has to be one
+  // unbroken run. THE STOP-START CRAWL IS THE FAULT'S OWN SHAPE — `pc-right` on
+  // `sc-mw-min-speed` creeps 0→11→0 km/h for 205 s with 28 full stops, and the
+  // old clock was reset by every one of those stops (`moving` false) and by
+  // every launch (|a| above the steady band), so the lesson whose entire subject
+  // is „не пълзи" booked Опасни 0 / Основни 0 / Второстепенни 0. Only the
+  // plateau at the top of each creep qualifies, and now those plateaus add up.
+  const crawlStep = stepAccruedEpisode(
+    s.motorwaySlow,
+    s.motorwayCrawlSec,
+    motorwayCrawl,
+    tick.motorway !== true || speed >= cfg.motorwayMinFlowKmh,
+    t,
+    dt,
+    cfg.motorwaySlowSustainSec,
+  );
+  s.motorwayCrawlSec = crawlStep.accruedSec;
+  if (crawlStep.fired) {
     events.push(makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", t));
   }
 
@@ -1569,7 +1745,27 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // kill) and a short sustain — resting on rails is never innocent. A stop
   // BEFORE the band (the stop line, the approach queue) is a different phase
   // ("approach") and never arms this. Driving on re-arms one bill per rest.
-  const restingOnRail = railPhase === "on" && speed <= cfg.fullStopMaxSpeedKmh && forwardGear;
+  //
+  // …BUT YOU HAVE TO HAVE DRIVEN ONTO IT (2026-08-17 — the catalogue sweep).
+  // The two ENTRY cases above already refuse to grade a band the car never
+  // approached, because „a vehicle materialising ON the band (spawn/teleport)
+  // is structurally innocent" — and this case, which is the same claim about
+  // the same band, carried no such gate. `sc-pk-rail-ban / pc-right` is what
+  // that costs: at t=117 s the card «ОПАСНА ГРЕШКА −10 изпитни т. — Нарушение
+  // на правилата за жп прелез» fires while the car sits at 0 км/ч on an empty
+  // street with no rails, no barrier and no А34 anywhere in the frame, and that
+  // single 10 is the WHOLE of the correct drive's debrief (1 опасна грешка,
+  // НЕИЗДЪРЖАН). A student is failed for a rule at a place the world does not
+  // show. Sharing the entry gate credits nobody who actually drove onto a
+  // crossing: the runtime reports "approach" before "on" for every real one
+  // (every RX-03 fixture in `rail-crossing-detectors.test.ts` opens that way,
+  // one of them titled „after a CORRECT entry"), and the latch is only cleared
+  // by leaving the crossing entirely.
+  const restingOnRail =
+    railPhase === "on" &&
+    s.rail.approachSeen &&
+    speed <= cfg.fullStopMaxSpeedKmh &&
+    forwardGear;
   if (
     stepEpisode(
       s.railRest,
@@ -2022,10 +2218,11 @@ function handleTickEvent(
       // ONE ENCOUNTER, ONE ACCIDENT — and the definition is the whole rule:
       //
       //   an encounter OPENS on the first reported contact and stays open for
-      //   as long as contact keeps being reported; it CLOSES only after
-      //   `collisionSeparationSec` in which nothing was reported at all — the
-      //   bodies have come apart. The report that opens an encounter is billed;
-      //   every report inside one is the same accident, still happening.
+      //   as long as contact keeps being reported; it CLOSES only once BOTH
+      //   `collisionSeparationSec` has passed with nothing reported at all AND
+      //   the car has driven `COLLISION_REOPEN_TRAVEL_M` since the last report
+      //   — the bodies have come apart. The report that opens an encounter is
+      //   billed; every report inside one is the same accident, still happening.
       //
       // Contact is a STATE that persists across frames. What the fault sheet
       // convicts is an EVENT: a crash. The state has to be converted into
@@ -2034,11 +2231,24 @@ function handleTickEvent(
       // orchestrator's contact sentinel).
       //
       // «THE BODIES HAVE COME APART» IS A CLAIM ABOUT GEOMETRY, AND THIS
-      // REDUCER HAS NONE (B83). It sees events, not poses, so the sentence
-      // above is only true if every reporter treats contact as a STATE and
-      // keeps reporting for as long as the bodies are together. That is a
-      // CONTRACT ON THE REPORTERS, not an inference this code may make, and it
-      // is stated here because it was once silently broken: the orchestrator's
+      // REDUCER HAS NONE (B83). It sees events, not poses, so the silence half
+      // of the sentence above is only true if every reporter treats contact as
+      // a STATE and keeps reporting for as long as the bodies are together.
+      // That was left as a CONTRACT ON THE REPORTERS, and a contract is
+      // exactly what the 2026-08-16 catalogue sweep broke again: 49 bills on
+      // `sc-follow-standstill`, 42 on `sc-ov-abort` (189 s of them, on a car
+      // photographed at 0 км/ч), 25 on `sc-ov-return-gap`, 14 on
+      // `sc-ov-oncoming-gap` — and 8 on mobile against 1 on desktop for the
+      // same script, because a reporter's cadence is a property of the DEVICE
+      // and the bill was riding on it. So the reducer now also checks the half
+      // it CAN check without geometry: the car has to have gone somewhere
+      // (COLLISION_REOPEN_TRAVEL_M — its comment carries the argument and the
+      // measurement). Silence alone no longer re-arms anything.
+      //
+      // The contract is still stated, and still owed, because the travel gate
+      // only stops a false SECOND bill — a reporter that stays wrongly silent
+      // is still the difference between one accident and none. It was once
+      // silently broken and the shape is worth keeping in view: the orchestrator's
       // sentinel gated its report on closing speed, so it fell silent when the
       // DRIVER STOPPED — which is what a shaken student does after hitting
       // something. Driven on sc-follow-brake: nose into the standing lead,
@@ -2066,6 +2276,8 @@ function handleTickEvent(
       //  · a student who hits a car, reverses, and hits it again has had TWO,
       //    so separation must re-arm. The old rule missed that: two impacts
       //    1 s apart, with a metre of daylight between them, billed once.
+      //    The travel gate is written to that case and not against it: that
+      //    test's own frames integrate to 4.4 m, 2.2× the 2 m floor.
       //
       // Deliberately NOT keyed by which body was hit: the live channel is told
       // only the CATEGORY (`withWhat`) — the NPC shells that carry identity are
@@ -2076,9 +2288,13 @@ function handleTickEvent(
       // and is listed, not attempted, because that wire runs through
       // LessonScene.
       const last = s.lastCollisionContactAt;
-      const sameEncounter = last !== null && t - last <= cfg.collisionSeparationSec;
+      const cameApart =
+        last === null ||
+        (t - last > cfg.collisionSeparationSec &&
+          s.travelSinceContactM >= COLLISION_REOPEN_TRAVEL_M);
       s.lastCollisionContactAt = t;
-      if (sameEncounter) break;
+      s.travelSinceContactM = 0;
+      if (!cameApart) break;
       s.terminated = true;
       out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));
       break;

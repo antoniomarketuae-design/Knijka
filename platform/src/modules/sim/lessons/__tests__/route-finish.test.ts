@@ -152,8 +152,15 @@ describe("the drive ends at the finish even when it was driven badly", () => {
     // corrective ride along with every listed mistake.
     expect(text).toContain(result.summary.mistakes[0].lawRef!);
     expect(text).toContain("Правилното действие:");
-    // And it explains why the route itself did not count.
-    expect(text).toContain("остана неизпълнена задача от маршрута");
+    // And it explains why the route itself did not count. STRENGTHENED
+    // 2026-08-17: the verdict used to end at the bare „остана неизпълнена
+    // задача от маршрута", which the 2026-08-16 sweep caught being useless —
+    // sc-ov-keep-right's student was told a task was open and never which one.
+    // It now quotes the open rows by title (debrief.ts `unfinishedTaskPhrase`),
+    // so this asserts the NAME and not just the excuse. This drive skips both
+    // side waypoints, so the plural head is the one that prints.
+    expect(text).toContain("останаха неизпълнени задачите");
+    expect(text).toContain(`«${WAYPOINT_1.titleBg}»`);
   });
 
   it("FINISHING IS NOT PASSING — the ended drive is reported as failed", () => {

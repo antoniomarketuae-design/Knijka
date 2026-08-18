@@ -1774,11 +1774,22 @@ export function reachZoneEvaluatorProbe(): { memory: boolean; voice: boolean } {
     }
     return { done, st };
   };
-  // Cap honoured 9 m out on the approach; over it by 6 km/h across the mark.
+  // Cap honoured 9 m out on the approach; over it by 4 km/h across the mark.
+  //
+  // WAS 26 (+6), sweep 161 (2026-08-18). „A shade above" now has a number:
+  // objectives.ts REACH_ZONE_CAP_SLACK_KMH, which is the rule engine's own
+  // `speedingGraceMaxKmh` (5) — a cap honoured on the approach and then thrown
+  // away by MORE than that before arriving is no longer honoured, because five
+  // shipped drills were crediting «приближи с готовност за спиране» to
+  // mistake-demo drives arriving 11–19 км/ч over their cap (see that constant
+  // for the table and the frame). +6 sat one km/h the wrong side of the new
+  // boundary, so this fixture — and nothing else in the census — had to move.
+  // It probes the same thing it always did: the latch survives the visit
+  // rather than demanding cap-and-place on one frame, which is the B4 repair.
   const memory = drive([
     tick(0, -20, 30, 0),
     tick(0, -9, 18, 1),
-    tick(0, 0, 26, 2),
+    tick(0, 0, 24, 2),
   ]).done;
   // On the mark, still too fast — the state that used to produce nothing.
   const blown = drive([tick(0, -20, 30, 0), tick(0, 0, 26, 1)]).st;

@@ -32,6 +32,11 @@ function parkDetail(over: Partial<Extract<ObjectiveDetail, { kind: "parkInBay" }
   };
 }
 
+/** N bay entries with the car NOT at rest in the outline — a count still running. */
+function unsettled(attempts: number): ObjectiveDetail {
+  return parkDetail({ attempts, inBay: false, alignment: null, centerOffsetM: null, headingOffsetDeg: null });
+}
+
 function makeResult(over: Partial<LessonResult> = {}, detail: ObjectiveDetail | undefined = parkDetail()): LessonResult {
   return {
     lessonId: "sc-park-perp-rev@L3",
@@ -117,6 +122,15 @@ describe("scoreRubric", () => {
     expect(scoreRubric(makeResult({ completedAll: false, passed: false }), RUBRIC).stars).toBe(1);
   });
 
+  // OPEN ITEM, recorded not repaired — see the same note at the fold in
+  // rubric.ts. sweep161: six of the seven cockpit scenarios carry a
+  // `parTimeSec`-only rubric (doc 86 D7: 128 of 154), so `measuredCount` is 0
+  // on every run of them — and every ИЗДЪРЖАН lane printed „3 от 3 звезди",
+  // `sc-pk-move-off/pc-wrong` included: the lane driven WRONG on purpose,
+  // 59 км/ч in a 50 zone with the tutor's speeding card up (`04-t012s.png`),
+  // three filled gold stars on the debrief (`08-debrief.png`). The 3 below is
+  // the SHIPPED contract (~141 assertions encode it; 72 are named „earns full
+  // stars from cleanliness"), so it stands until an ADR moves it.
   it("no measurable channels: stars come from official cleanliness alone", () => {
     const result = makeResult({}, undefined); // objective has no detail
     const clean = scoreRubric(result, { parTimeSec: 60 });
@@ -126,6 +140,73 @@ describe("scoreRubric", () => {
       { parTimeSec: 60 },
     );
     expect(dirty.stars).toBe(2);
+  });
+
+  // -------------------------------------------------------------------------
+  // A COUNT THAT IS STILL RUNNING IS NOT EVIDENCE YET.
+  //
+  // `attempts` counts bay ENTRIES, so a car that crossed the outline once and
+  // then hit the van reads `attempts: 1` — which scored a full 2/2 and printed
+  // „Паркира от първи опит — чиста маневра" over a park that never happened.
+  // The conviction side of the same counter is final (more attempts cannot
+  // make „too many corrections" untrue) and is kept.
+  // -------------------------------------------------------------------------
+  it("economy withholds praise for a park that never came to rest in the bay", () => {
+    const crashedOnFirstEntry = makeResult({
+      completedAll: false,
+      passed: false,
+      objectives: [{ id: "park", titleBg: "Паркирай", done: false, completedAtSec: null, detail: unsettled(1) }],
+    });
+    const line = scoreRubric(crashedOnFirstEntry, RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(false); // was true, with points: 2
+    expect(line.points).toBeNull();
+    expect(line.detailBg).not.toMatch(/чиста маневра/);
+    expect(line.detailBg).toMatch(/Един опит/); // the count is still reported
+  });
+
+  it("economy still convicts on a count that can no longer improve", () => {
+    // 4 entries is already past attemptsFor2Stars — settling later cannot
+    // rescue it, so the 0 stands even though the car never came to rest.
+    const shuffling = makeResult({
+      completedAll: false,
+      passed: false,
+      objectives: [{ id: "park", titleBg: "Паркирай", done: false, completedAtSec: null, detail: unsettled(4) }],
+    });
+    const line = scoreRubric(shuffling, RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(true);
+    expect(line.points).toBe(0);
+  });
+
+  it("economy praises a first-attempt park that DID finish", () => {
+    // The guard must not swallow the credit it exists to qualify.
+    const line = scoreRubric(makeResult(), RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
+    expect(line.measured).toBe(true);
+    expect(line.points).toBe(2);
+    expect(line.detailBg).toMatch(/чиста маневра/);
+  });
+
+  it("an observation component with no authored moments measures nothing", () => {
+    // Was: `ratio = 1` → a full 2/2 for every driver alive, counted as a
+    // MEASURED component, off a check nobody wrote. `validate.ts:261` rejects
+    // an empty `moments` at authoring time; this is the same refusal at the
+    // scorer, where the runtime-merged rubric of `simulator/actions.ts` lands.
+    const vacuous = { observation: { moments: [] }, parTimeSec: 60 };
+    const result = makeResult({}, undefined);
+    const obs = scoreRubric(result, vacuous, { observedMomentIds: [] }).breakdownBg.find(
+      (l) => l.id === "observation",
+    )!;
+    expect(obs.measured).toBe(false);
+    expect(obs.points).toBeNull();
+  });
+
+  it("a component with moments still measures — the empty guard is not a blanket excuse", () => {
+    // The opposite direction: refusing to grade nothing must not become
+    // refusing to grade anything.
+    const obs = scoreRubric(makeResult(), RUBRIC, { observedMomentIds: ["m1", "m2"] }).breakdownBg.find(
+      (l) => l.id === "observation",
+    )!;
+    expect(obs.measured).toBe(true);
+    expect(obs.points).toBe(2);
   });
 
   it("placement/economy report measured:false when the maneuver never landed in the bay", () => {

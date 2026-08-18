@@ -26,8 +26,12 @@
  *         1.7 m beyond it (register B18);
  *       · a «спри тук» / «премини» label plus the objective's hidden speed cap,
  *         and a live amber tint the moment the student is above that cap.
- *  4. Label chip — a canvas-textured billboard so the marker says what it
- *     wants in Bulgarian instead of being a silent circle.
+ *  4. Label chip — a canvas-textured billboard on a kerbside post, so the
+ *     marker says what it wants in Bulgarian instead of being a silent circle.
+ *     It exists only where it can be READ: `markerSignOpacity` is the authored
+ *     band and `signPanelAlpha` is the legibility floor under it, so the chip
+ *     is a sign or it is absent — never the half-transparent veil sweep 161
+ *     photographed over a facade, over the В14 and under the «РАЗБРАХ» pill.
  *
  * PERF contract: geometry rebuilds ONLY on objective change (route derivation
  * included); per frame we update uniforms + one transform, allocation-free.
@@ -174,6 +178,104 @@ const POST_HEIGHT_M = POST_TOP_Y - MARKER_SIGN_POST_BASE_Y;
 /** Distance at which the speed-cap warning arms — far enough that easing off
  *  still works, near enough that it is clearly about THIS marker. */
 const CAP_WARN_LEAD_M = 35;
+
+/**
+ * THE SIGN MAY NOT BE A VEIL — the legibility floor under the chip.
+ *
+ * SWEEP 161 (2026-08-16/17) photographed the same chip in the same state on
+ * three different lessons, and the reviewer read all four frames the same way
+ * — „an enormous mid-grey ghost pasted flat on a beige building facade at
+ * almost the same value as the wall":
+ *
+ *   `sc-ln-obstacle-meeting/mobile-right/04-t074s.png` — the car is STOPPED on
+ *     the wait mark (the dash in the same frame reads 0 км/ч) and «Спри тук /
+ *     спри — под 6 км/ч» stands over the facade at the top right as a wash the
+ *     eye cannot resolve, with the HUD's «РАЗБРАХ» pill in the middle of it.
+ *   `…/04-t090s.png` — the same chip, now smeared across the block on the left;
+ *     the sweep filed it as „world labels render THROUGH buildings", and it is
+ *     not that (the street trees and the В14 in the frames below occlude the
+ *     panel correctly) — it is a 5 m billboard at 0.2 alpha in front of a
+ *     distant wall.
+ *   `sc-follow-cutin/mobile-right/04-t157s.png` — «Карай дотук / не по-бързо от
+ *     39 км/ч» dissolving into a facade, under the teach card.
+ *   `sc-maneuver-3point/pc-right/03-ready.png` — the chip and the world's own
+ *     В14 «40» in the same pixels. The В14 is opaque and crisp; the chip is
+ *     transparent enough to read the building's window frames through it. The
+ *     two objects side by side ARE the defect: one is a sign, one is a veil.
+ *
+ * ONE CAUSE. `markerSignOpacity` is a function of DISTANCE alone, and its near
+ * ramp spends 19 m (30 → 11 m) taking the panel from full to nothing. A car
+ * that crawls through that band — or STOPS in it, which is exactly what a halt
+ * gate asks for — parks a 5 × 1.67 m half-transparent billboard across the
+ * windscreen for as long as it stands there.
+ *
+ * MEASURED OFF THE GLASS, `sc-park-gap-long/mobile-right/07-end.png`, which is
+ * the one frame whose backdrop is clean sky and can therefore be solved rather
+ * than judged. The «Паркирай тук» panel is **590 px wide — 23 % of the frame** —
+ * and the sky reads (153,161,170) beside it against (124,132,140) through it.
+ * Against the plate's own (6,18,22) that is an effective plate alpha of
+ * **0.197 / 0.203 / 0.203** on R/G/B — i.e. 0.20, so a material alpha of 0.28,
+ * so an eye distance of **16.6 m** on `markerSignOpacity`. At 0.28 the panel's
+ * own text stands at about **1.5:1** against its own plate. That is the ghost,
+ * in numbers: a quarter of the windscreen, at a contrast ratio no glyph
+ * survives, with the HUD's «РАЗБРАХ» pill splitting the word on top of it.
+ *
+ * MEASURED AS INK (WCAG relative luminance, glyph-over-backdrop against
+ * plate-over-backdrop, on the three backdrops those frames catch it on — lit
+ * window 235,220,195 · hazy sky 190,200,210 · beige facade 200,190,175):
+ *
+ *   plate α 0.72, cap #9fe8dc  (what shipped) → needs 0.66 alpha to clear 3:1
+ *   plate α 0.96, cap #bef5e9  (this pass)    → needs 0.47
+ *
+ * So the shipped chip was DRAWN over 82 → 11 m and could only be READ over
+ * 63.9 → 24.2 m: 31.3 m of its own 71 m band — 44 % — was veil. Two changes
+ * close it, both here:
+ *
+ *   1. the plate goes near-opaque and every glyph gets a dark halo, which moves
+ *      the floor from 0.66 to 0.47;
+ *   2. below the floor the sign is NOT DRAWN AT ALL. „Beyond FAR_END the chip
+ *      is not information, it is a dark rectangle on the vanishing point" is
+ *      the argument `guidanceRoute.ts` already makes for the far end; the near
+ *      end is the same argument and had never been made.
+ *
+ * The chip is now shown 68.3 → 21.0 m — 47.3 m of road, every metre of it above
+ * 3:1 — which is still longer than the ≥3 s at the posted 50 km/h that
+ * `guidance-marker-sign.test.ts` requires the student be given to act on it.
+ *
+ * A threshold pops, and this file's own turn arrow already pops at
+ * `ARROW_VISIBLE_AHEAD_M` for the identical reason. The pop here is a half-alpha
+ * panel leaving the frame 21 m short of a mark whose ring, gate bar, ground pool
+ * and objective banner are all still on screen: nothing readable is lost, only
+ * the veil over the road, the buildings, the В14 and the HUD's own controls.
+ */
+export const MIN_LEGIBLE_SIGN_ALPHA = 0.5;
+
+/** The chip's own ink, exported because the floor above is COMPUTED from these
+ *  three by `routeGuidanceSignLegibility.test.ts` rather than asserted as
+ *  taste — change a colour and the test re-derives the floor and reds if the
+ *  shipped one no longer holds. */
+export const SIGN_PLATE_RGB: readonly [number, number, number] = [6, 18, 22];
+export const SIGN_PLATE_ALPHA = 0.96;
+export const SIGN_TITLE_RGB: readonly [number, number, number] = [234, 255, 251];
+export const SIGN_CAP_RGB: readonly [number, number, number] = [190, 245, 233];
+
+/**
+ * The alpha the panel is ACTUALLY drawn at, given the eye distance.
+ *
+ * `markerSignOpacity` is the authored BAND — a teaching contract asserted in
+ * `scene/guidance-marker-sign.test.ts`. This is the legibility gate on top of
+ * it, and it may only ever take alpha away: a sign brighter than its band is
+ * the old „dark rectangle on the horizon" defect pointing the other way.
+ */
+export function signPanelAlpha(distM: number): number {
+  const banded = markerSignOpacity(distM);
+  return banded >= MIN_LEGIBLE_SIGN_ALPHA ? banded : 0;
+}
+
+/** The exported triples, as canvas ink. */
+function rgb([r, g, b]: readonly [number, number, number]): string {
+  return `rgb(${r}, ${g}, ${b})`;
+}
 
 /** HUD token palette — holo cyan (--accent-2), the telemetry colour, and
  * --warning for the "you are above this gate's cap" state. Read from the live
@@ -471,7 +573,13 @@ export function capLineBg(goal: GuidancePointGoal, postedKmh?: number): string {
     : `не по-бързо от ${Math.round(shown)} км/ч`;
 }
 
-function makeLabelTexture(
+/** Exported for the same reason `capLineBg` is: the chip's ink is a teaching
+ *  surface, and R0 says look at it before shipping it. There is no WebGL in the
+ *  suite, so the 2026-08-17 look painted THIS function's own canvas over the
+ *  three backdrops at the alphas the band allows (scratch only — frames never
+ *  enter the repo), which is how the shipped ghost and the new plate were put
+ *  side by side instead of argued about. */
+export function makeLabelTexture(
   goal: GuidancePointGoal | null,
   postedKmh?: number,
 ): THREE.CanvasTexture | null {
@@ -483,7 +591,12 @@ function makeLabelTexture(
   if (!ctx) return null;
   const cap = capLineBg(goal, postedKmh);
   ctx.clearRect(0, 0, LABEL_PX_W, LABEL_PX_H);
-  ctx.fillStyle = "rgba(6, 18, 22, 0.72)";
+  // Near-opaque, not 0.72. The panel's job is to be the GROUND its own text
+  // stands on; at 0.72 the world's value came through it and the glyphs were
+  // measured against a sunlit wall instead — see the MIN_LEGIBLE_SIGN_ALPHA
+  // block for the numbers and the frames.
+  const [pr, pg, pb] = SIGN_PLATE_RGB;
+  ctx.fillStyle = `rgba(${pr}, ${pg}, ${pb}, ${SIGN_PLATE_ALPHA})`;
   const r = 26;
   ctx.beginPath();
   ctx.moveTo(r, 6);
@@ -493,14 +606,34 @@ function makeLabelTexture(
   ctx.arcTo(6, 6, LABEL_PX_W - 6, 6, r);
   ctx.closePath();
   ctx.fill();
+  // A sign has an EDGE. A dark plate on a light facade with no border reads as
+  // a smudge on the wall — the border is what makes the shape read as an
+  // object at the alphas the fade band leaves it at.
+  ctx.strokeStyle = "rgba(23, 225, 196, 0.6)";
+  ctx.lineWidth = 5;
+  ctx.stroke();
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = "#eafffb";
+  // A dark halo under every glyph. The plate carries the contrast while the sign
+  // is at full strength; the halo carries it while the sign is fading, because
+  // it darkens the two pixels around each stroke — which is exactly where a
+  // light glyph on a light wall dies.
+  ctx.lineJoin = "round";
+  ctx.miterLimit = 2;
+  const halo = "rgba(2, 10, 12, 0.9)";
+  const titleY = cap ? 60 : LABEL_PX_H / 2;
   ctx.font = "600 54px system-ui, sans-serif";
-  ctx.fillText(goal.labelBg, LABEL_PX_W / 2, cap ? 60 : LABEL_PX_H / 2, LABEL_PX_W - 40);
+  ctx.strokeStyle = halo;
+  ctx.lineWidth = 9;
+  ctx.strokeText(goal.labelBg, LABEL_PX_W / 2, titleY, LABEL_PX_W - 40);
+  ctx.fillStyle = rgb(SIGN_TITLE_RGB);
+  ctx.fillText(goal.labelBg, LABEL_PX_W / 2, titleY, LABEL_PX_W - 40);
   if (cap) {
-    ctx.fillStyle = "#9fe8dc";
     ctx.font = "400 36px system-ui, sans-serif";
+    ctx.strokeStyle = halo;
+    ctx.lineWidth = 7;
+    ctx.strokeText(cap, LABEL_PX_W / 2, 118, LABEL_PX_W - 40);
+    ctx.fillStyle = rgb(SIGN_CAP_RGB);
     ctx.fillText(cap, LABEL_PX_W / 2, 118, LABEL_PX_W - 40);
   }
   const tex = new THREE.CanvasTexture(canvas);
@@ -778,6 +911,10 @@ export function RouteGuidance({
     // (x, ·, −y), so a district offset is applied straight to the group.
     const sign = signRef.current;
     if (sign) {
+      // Seed only: "is there a sign for this objective at all". Whether it is
+      // near enough to be READ is a live eye distance, so useFrame owns this
+      // flag from the first rendered frame (R3F runs the frame subscribers
+      // before every draw, in "always" and in "demand" alike).
       sign.visible = labelTexture !== null;
       const dir = goal && goal.kind === "point" ? markerApproachDir(goal, route) : null;
       const off = dir ? markerSignOffset(dir.x, dir.y) : { x: 0, y: 0 };
@@ -829,9 +966,13 @@ export function RouteGuidance({
       // (register B24/B27), and beyond ~80 m it is a dark rectangle parked on
       // the vanishing point with text nobody can resolve (the founder's frames,
       // 2026-08-14). `markerSignOpacity` is the band it exists in, at both
-      // ends; the POST fades with it, because a post standing under nothing is
-      // the same defect wearing the other hat. `visible` stays owned by the
-      // layout effect (label texture present or not); only opacity moves here.
+      // ends; `signPanelAlpha` is the legibility floor UNDER that band (sweep
+      // 161 — see MIN_LEGIBLE_SIGN_ALPHA), and the POST fades with the panel,
+      // because a post standing under nothing is the same defect wearing the
+      // other hat. `label.visible` stays owned by the layout effect (texture
+      // present or not) and is the guard below; the SIGN GROUP's visibility is
+      // owned here, because it is the one that depends on the live eye
+      // distance — the marker's own ring, bar and pool are untouched by it.
       const label = labelRef.current;
       const sign = signRef.current;
       if (label?.visible && sign) {
@@ -842,7 +983,11 @@ export function RouteGuidance({
         // the eye is actually reading.
         const dx = state.camera.position.x - (marker.position.x + sign.position.x);
         const dz = state.camera.position.z - (marker.position.z + sign.position.z);
-        const alpha = markerSignOpacity(Math.hypot(dx, dz));
+        const alpha = signPanelAlpha(Math.hypot(dx, dz));
+        // Shown or gone, never a veil: below the floor the whole sign leaves —
+        // panel AND post — instead of hanging over the road at an alpha its own
+        // text cannot be told from its own plate at.
+        sign.visible = alpha > 0;
         lm.opacity = alpha;
         if (postMatRef.current) postMatRef.current.opacity = alpha * 0.85;
       }

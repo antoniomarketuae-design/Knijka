@@ -163,18 +163,34 @@ describe("wave-6 bot completion — sc-sig-controller-live at L3", () => {
     expect(graded.result.score).toBe(0);
   });
 
-  it("counter-proof: waiting for green is SCORED 10 (опасна, never a modal) — on a sheet that COMPLETES", () => {
+  it("counter-proof: waiting for green is SCORED 10 (опасна, never a modal) — and the чл. 7 crossing is NOT certified", () => {
     // CONTROLLER_SIGNAL_VIOLATED is опасна, so it is SCORED with a
     // non-blocking toast rather than pausing into a teach card — a dangerous
     // code must never pop a modal mid-junction. So it lands on session.events
     // and the A9 teach channel stays empty.
     //
-    // And the sheet is the template's sharpest claim: this student drove a
-    // textbook approach, stopped at the line, waited patiently and left on a
-    // green — he completes EVERY gate, including the requireRedMet crossing
-    // (his own red wait certified it), and still fails. The route was never the
-    // problem; the authority he obeyed was. A drill that failed him on geometry
-    // instead would let a student believe чл. 7 is about where the car went.
+    // ── THIS ASSERTION USED TO READ `completedAll === true`, 2026-08-17 ──────
+    // Its argument was that the student drove the route faultlessly and failed
+    // only on authority, so „a drill that failed him on geometry instead would
+    // let a student believe чл. 7 is about where the car went". The staging
+    // sweep showed what that produced on the actual screen:
+    //
+    //   ✓ «Премини стоп-линията ПО РАЗРЕШЕНИЕ НА РЕГУЛИРОВЧИКА — въпреки
+    //      червената лампа» 1:27 · «Изчака червения сигнал и потегли на зелено»
+    //   ✗ «Неизпълнение на сигнала на регулировчика −10 · ОПАСНА ГРЕШКА»
+    //
+    // The tick is not geometry — the objective's own title certifies a
+    // PERMISSION, and this student had none; the subtitle then narrates a wait
+    // that никога did not happen. templates-signals2.ts calls `requireRedMet`
+    // here „the drill's thesis made gradable" and promises in writing that
+    // „ignore the officer and drive through on your own authority and you
+    // complete nothing"; the evaluator was reading the LAMP and handing the
+    // certificate to the very drive this file records as the mistake demo.
+    //
+    // So the counter-proof is now the sharper one: he fails, he is scored, he
+    // is told which authority he broke — and the sheet does not also hand him a
+    // green tick saying he crossed by the officer's leave. Everything else here
+    // is unchanged, including the single code and the one star.
     let s = createLessonSession(compileScenario(SC_SIG_CONTROLLER_LIVE, 3));
     const taught: string[] = [];
     recordScSigControllerLiveDrive(loadDistrict("sx-v1"), "mistake-wait-for-green", {
@@ -189,7 +205,13 @@ describe("wave-6 bot completion — sc-sig-controller-live at L3", () => {
     expect(s.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([
       "CONTROLLER_SIGNAL_VIOLATED",
     ]);
-    expect(r.completedAll).toBe(true);
+    expect(r.completedAll).toBe(false);
+    // …and it is the CROSSING gate that refuses, by name — not the approach and
+    // not the exit. A student who is told „не изпълни задачата" must be able to
+    // point at which one, and it must be the one about the officer.
+    const byId = new Map(r.objectives.map((o) => [o.id, o.done]));
+    expect(byId.get("sc-sctl-read")).toBe(true);
+    expect(byId.get("sc-sctl-cross")).toBe(false);
     expect(r.score).toBe(10);
     expect(r.passed).toBe(false);
     expect(scoreRubric(r, SC_SIG_CONTROLLER_LIVE.rubric!).stars).toBe(1);

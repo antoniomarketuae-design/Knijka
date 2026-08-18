@@ -90,6 +90,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   OVERLAY_PEEK_HEIGHT_PX,
@@ -98,11 +99,203 @@ import {
 } from "./overlayQueue";
 import {
   FLANK_LANE_VAR,
+  notifyColumnMaxHeightCss,
   NOTIFY_COLUMN_RIGHT_CSS,
-  NOTIFY_COLUMN_TOP_CSS_COMPACT,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
   NOTIFY_COLUMN_WIDTH_CSS_COMPACT,
 } from "./notifyColumn";
 import { useTapActivation } from "./tapActivation";
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE CONTROL BAND'S FLOOR, AS THIS COLUMN HAS TO SPELL IT — 2026-08-17.
+ *
+ * This is `TouchControls.notifyColumnFloorCss()`, character for character, and
+ * it is a COPY rather than an import for one reason that is not negotiable:
+ * `components/sim/**` consumes `modules/sim/**` through its `index.ts` and
+ * never the other way round (docs/architecture/05; `hud/index.ts` line 3 says
+ * so out loud). A component file importing a length out of a component would
+ * invert that for a string.
+ *
+ * IT IS ONLY A STRING OF PUBLISHED NAMES, which is what makes the copy safe to
+ * make and cheap to keep honest. Every term is either an `env()` or a CSS
+ * custom property `TOUCH_BAND_CSS_VARS` declares — the identical arrangement
+ * `FLANK_LANE_VAR` already uses two hundred lines below, and for the identical
+ * cascade reason: these declarations are INLINE, and a variable is the one form
+ * that crosses that boundary.
+ *
+ *   max(0px, calc(100% - var(--sim-svh)))   the band's LIFT — how far the stage
+ *                                           overhangs the small viewport when
+ *                                           browser chrome is out
+ *   var(--sim-column-floor)                 the pad row itself; 10.75rem
+ *                                           sideways, 30rem upright, switched
+ *                                           by TOUCH_BAND_CSS_VARS' own media
+ *                                           query. The fallback is the UPRIGHT
+ *                                           number, i.e. the conservative one:
+ *                                           if the variable never arrives the
+ *                                           column is too short, never too tall
+ *   env(safe-area-inset-bottom)             the home indicator
+ *
+ * AND THE COPY IS PINNED, NOT PROMISED. `sim-overlay-mirror-lane.test.ts`
+ * asserts this constant is exactly what `notifyColumnFloorCss()` returns, so
+ * the two cannot drift; if TouchControls re-derives its floor, that test fails
+ * here rather than a phone reporting it three waves later.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const SIM_OVERLAY_COLUMN_FLOOR_CSS =
+  "calc(max(0px, calc(100% - var(--sim-svh, 100vh))) + var(--sim-column-floor, 30rem) + env(safe-area-inset-bottom, 0px))";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE FOLD, AS ONE RULE INSTEAD OF ONE EXPRESSION PER SURFACE — 2026-08-17.
+
+   This component has TWO scroll windows and only one of them was telling the
+   truth about what is under it. The peek's counter («↓ още N реда») landed on
+   2026-08-16; the READ SHEET — which is the surface the peek SENDS the student
+   to, precisely because the peek could not finish printing — had no counter, no
+   fade and no scrollbar. Sweep 161 filed it, and it reproduces on the deployed
+   build exactly as filed:
+
+     sc-hz-accident-scene@L1 · WebKit · real insets · iPhone 16 landscape
+     852 × 393 · «ПРОЧЕТИ» open (tools/…/sheet-fold, the Range-per-character
+     method `tools/mobile/brief-fold.mjs` uses on the peek):
+
+       section    672 × 341 at (90, 12) — AT its cap, there is no more room
+       scroller   646 × 220 · clientH 220 · scrollH 256 · OVERFLOW 36 px
+       title      286 authored · 286 visible (100 %)
+       body       769 authored · 638 visible (83 %)
+       LOST       «6. Щом подминеш сцената и платното пред теб е чисто, чак
+                   тогава се върни в средата на лентата и ускори плавно до
+                   края на отсечката.»
+       announced  NOTHING
+
+   131 of 769 authored characters — the WHOLE of step 6 — under a 36 px fold,
+   on a BLOCKING card whose only exit is «Разбрах», which sits 8 px below the
+   cut. The student presses it having been shown five of six instructions and
+   nothing said a sixth existed. That is the compiled-away briefing field all
+   over again, one surface deeper.
+
+   AND THE COUNTER THE PEEK ALREADY HAD WAS HALF A RULE. It read
+
+       const hiddenPx = el.scrollHeight - el.clientHeight;
+
+   which ignores `scrollTop`, so it answers „how much does not fit" and never
+   „how much is still below you". A student who HAS scrolled to the end was
+   still being told «↓ още 8 реда». A counter that cannot reach zero teaches
+   the reader to ignore it, which costs the sheet the one affordance it is
+   getting. So the rule is written once, here, with `scrollTop` in it, and both
+   windows read it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * 2 px of slack: sub-pixel layout makes `scrollHeight` exceed `clientHeight` by
+ * a fraction on boxes that fit perfectly, and „↓ още 0 реда" on a card with
+ * nothing below it is a lie in the other direction.
+ */
+export const FOLD_SLACK_PX = 2;
+/** Used only when the engine cannot answer for the leading (jsdom, `normal`). */
+export const FOLD_FALLBACK_LEADING_PX = 14;
+
+/**
+ * How many whole lines are still BELOW the reader, right now.
+ *
+ * Pure, exported and tested (`sim-overlay-fold.test.ts`) rather than left as an
+ * expression inside an effect: „a rule that lives only in a component is a rule
+ * six waves of measurement can walk past" is written two hundred lines below
+ * about this component's other shared rule, and this one had already been
+ * walked past once — see the block above for the half of it that was missing.
+ */
+export function foldLinesBelow(
+  scroll: {
+    scrollTop: number;
+    scrollHeight: number;
+    clientHeight: number;
+    /**
+     * The window's own bottom padding, which is the fade's twin and is NOT
+     * text. Both windows carry `padding-bottom: TEXT_FADE_PX` so that a text
+     * which fits is not faded — and padding joins the scrollable overflow in
+     * every engine this ships on, so a raw `scrollHeight − clientHeight`
+     * counts those 10 px as if they were a line of Bulgarian. On the measured
+     * sheet that is the difference between «↓ още 2 реда» (true: authored step
+     * 6 is two lines) and «↓ още 3 реда» (a line that does not exist).
+     */
+    padBottomPx?: number;
+  },
+  lineHeightPx: number,
+  slackPx: number = FOLD_SLACK_PX,
+): number {
+  const hidden =
+    scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop - (scroll.padBottomPx ?? 0);
+  if (!(hidden > slackPx)) return 0;
+  const step =
+    Number.isFinite(lineHeightPx) && lineHeightPx > 0 ? lineHeightPx : FOLD_FALLBACK_LEADING_PX;
+  return Math.max(1, Math.round(hidden / step));
+}
+
+/**
+ * The counter, wired to a scroll window.
+ *
+ * NO SYNCHRONOUS READ IN THE EFFECT BODY, deliberately, and it is not a style
+ * point: this component re-renders on the shell's 150 ms HUD poll, so a layout
+ * read per render is six forced reflows a second over a live WebGL canvas.
+ * `ResizeObserver` fires once for each target the moment it is observed — that
+ * IS the initial measurement — and afterwards only when a box actually changes
+ * size. Engines without it simply print no count, which is the pre-2026-08-16
+ * behaviour and not a worse one. `onScroll` is the other input and it is cheap:
+ * `setFoldLines` with an unchanged value bails out of the re-render.
+ *
+ * THE LEADING COMES FROM THE ROW THE FOLD IS ACTUALLY IN. It used to be
+ * `firstElementChild`, which on the peek is a `text-[11px]` line whose sibling
+ * body is also 11 px — harmless there and wrong on the sheet, where the `<h2>`
+ * leads at 19.25 px and the numbered body it is cut inside leads at 16.5. A
+ * step taken from the wrong row is a count that is wrong by a quarter.
+ */
+function useFoldLines(key: string): {
+  ref: RefObject<HTMLDivElement | null>;
+  lines: number;
+  onScroll: () => void;
+} {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [lines, setLines] = useState(0);
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (el === null) return;
+    const fold = el.scrollTop + el.clientHeight;
+    // The last child that STARTS above the fold is the one the cut runs
+    // through, so its line box is the unit the hidden pixels are counted in.
+    let probe: Element | null = el.firstElementChild;
+    for (const child of Array.from(el.children)) {
+      if ((child as HTMLElement).offsetTop <= fold) probe = child;
+    }
+    const leading =
+      probe === null ? Number.NaN : Number.parseFloat(getComputedStyle(probe).lineHeight);
+    // The fade's twin: both windows pad their own bottom by `TEXT_FADE_PX` so
+    // that a text which FITS is not faded, and that padding joins the
+    // scrollable overflow. Counting it would announce a line that is not there.
+    const padBottomPx = Number.parseFloat(getComputedStyle(el).paddingBottom);
+    setLines(
+      foldLinesBelow(
+        {
+          scrollTop: el.scrollTop,
+          scrollHeight: el.scrollHeight,
+          clientHeight: el.clientHeight,
+          padBottomPx: Number.isFinite(padBottomPx) ? padBottomPx : 0,
+        },
+        leading,
+      ),
+    );
+  }, []);
+  useEffect(() => {
+    const el = ref.current;
+    if (el === null || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    // …and every child, because the WINDOW keeps its size while the text inside
+    // it changes: a new item with a longer body resizes the rows, not the box.
+    for (const child of Array.from(el.children)) ro.observe(child);
+    return () => ro.disconnect();
+  }, [key, measure]);
+  return { ref, lines, onScroll: measure };
+}
 
 /** Tone → the one colour token the pill is tinted with. */
 const TONE_COLOR: Record<SimOverlayTone, string> = {
@@ -431,36 +624,17 @@ export function SimOverlay({
      actually changes size. Engines without it simply print no count, which is
      today's behaviour and not a worse one.
      ══════════════════════════════════════════════════════════════════════════ */
-  const textWindowRef = useRef<HTMLDivElement | null>(null);
-  const [foldLines, setFoldLines] = useState(0);
   // The identity of what is being SAID, not the object: the poll hands this
   // component a new item object six times a second with the same words in it.
   const foldKey =
     shown === null ? "" : `${shown.id} ${shown.lineBg} ${shown.detailBg ?? ""}`;
-  useEffect(() => {
-    const el = textWindowRef.current;
-    if (el === null || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      // The leading of the card's own first text row, not a constant: the two
-      // rows are 11 px at `leading-tight` today, and a number copied here would
-      // be the third place in this file that has to be re-derived when the type
-      // changes.
-      const probe = el.firstElementChild;
-      const leading =
-        probe === null ? Number.NaN : Number.parseFloat(getComputedStyle(probe).lineHeight);
-      const step = Number.isFinite(leading) && leading > 0 ? leading : 14;
-      // 2 px of slack: sub-pixel layout makes `scrollHeight` exceed
-      // `clientHeight` by a fraction on boxes that fit perfectly, and „↓ още 0
-      // реда" on a card with nothing below it is a lie in the other direction.
-      const hiddenPx = el.scrollHeight - el.clientHeight;
-      setFoldLines(hiddenPx > 2 ? Math.max(1, Math.round(hiddenPx / step)) : 0);
-    });
-    ro.observe(el);
-    // …and every child, because the WINDOW keeps its size while the text inside
-    // it changes: a new item with a longer body resizes the rows, not the box.
-    for (const child of Array.from(el.children)) ro.observe(child);
-    return () => ro.disconnect();
-  }, [foldKey]);
+  const peekFold = useFoldLines(`peek ${foldKey}`);
+  // …and the sheet's own window, which had no counter at all. A SECOND hook and
+  // not a shared one: the two boxes are never on screen together (the peek is
+  // not rendered while the sheet is up — `open ? null :` below), they lead at
+  // different sizes, and the sheet is the one of the two the student is
+  // expected to read all the way to the end.
+  const sheetFold = useFoldLines(`sheet ${open ? "open" : "shut"} ${foldKey}`);
 
   if (shown === null) return null;
 
@@ -663,7 +837,8 @@ export function SimOverlay({
              short, and it gives by scrolling. The long block above this
              component's `cardBody` has the measurements. */}
       <div
-        ref={textWindowRef}
+        ref={peekFold.ref}
+        onScroll={peekFold.onScroll}
         data-sim-overlay-text=""
         className="flex min-h-0 min-w-0 shrink flex-col gap-0.5 overflow-y-auto"
         style={textWindowStyle}
@@ -741,13 +916,13 @@ export function SimOverlay({
              `aria-hidden`: assistive technology reads the whole body out of the
              DOM regardless of what is scrolled into view, so announcing a fold
              to a screen reader would describe a problem it does not have. */}
-      {foldLines > 0 ? (
+      {peekFold.lines > 0 ? (
         <span
           data-sim-overlay-fold=""
           aria-hidden
           className="mt-0.5 shrink-0 self-end text-[10px] font-black uppercase leading-none tracking-wider opacity-90"
         >
-          ↓ още {foldLines} {foldLines === 1 ? "ред" : "реда"}
+          ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
         </span>
       ) : null}
 
@@ -897,7 +1072,60 @@ export function SimOverlay({
         data-hud="notify-column"
         className="pointer-events-none absolute z-30 flex flex-col items-end"
         style={{
-          top: NOTIFY_COLUMN_TOP_CSS_COMPACT,
+          // ── THE MIRROR IS AN INSTRUMENT — 2026-08-17, „THE HUD IS STANDING
+          //    ON THE MIRROR". This is the inline declaration `notifyColumn.ts`
+          //    published `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN` for and could
+          //    not make itself.
+          //
+          // It read `NOTIFY_COLUMN_TOP_CSS_COMPACT` — which is not this
+          // column's top, it is the PHONE LAYOUT'S TOP-LEFT CORNER DATUM, and
+          // `TouchControls.TOP_RAIL_TOP_CSS` and the sideways demonstration
+          // deck stand on it too. 8 px from the top of the stage, in the corner
+          // the cockpit projects its INTERIOR MIRROR into. Measured on the
+          // deployed build (sweep161, WebKit, real insets, iPhone 16 landscape
+          // 852 × 393, sc-ov-solid-line/mobile-right/01-arrival.png):
+          //
+          //   [data-hud="notify-column"]    [541, 8, 180 × 161]
+          //   the interior mirror, painted  [524, 0 → 707, 70]
+          //   → 166 × 62 = 10 292 px², and it is the TOP of the card — chip,
+          //     title and first authored line, printed on a live reflection.
+          //
+          // The mirror does not move, the HUD does (PlayAreaStyles B74/B76,
+          // in those words). `notify-column-mirror.test.ts` derives the lane
+          // from `cabinLook.hotspotScreenRect("hotspot_mirror_rear", …)` rather
+          // than from a screenshot, and `sim-overlay-mirror-lane.test.ts` is
+          // what pins THIS declaration to it.
+          top: NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
+          // ── …AND THE CEILING HAD TO MOVE WITH IT, IN THE SAME COMMIT.
+          //
+          // A `max-height` is measured from the box's own top edge, so the two
+          // are one change and not two. `PlayAreaStyles` writes this column's
+          // `max-height` from the DATUM; leaving it there while the top moves
+          // 8 → 73.2 px puts the card's floor at 73.2 + 161 = 234.2, i.e.
+          // **0.596 of the stage** against a hazard band that starts at 0.53
+          // (`NOTIFY_COLUMN_MAX_STAGE_FRACTION`) — it would trade the mirror
+          // defect for the one the 2026-08-16 ceiling exists to close, on the
+          // same frame. `sim-overlay-mirror-lane.test.ts` asserts that
+          // half-landed pair fails.
+          //
+          // SO IT IS WRITTEN HERE, INLINE, and that is deliberate rather than
+          // convenient: an inline style outranks every selector, which is the
+          // cascade fact this column already relies on for `right`/`width`
+          // below (PlayAreaStyles' own note: „The first attempt put the
+          // column's right/width override in exactly this file … It was correct
+          // CSS and it did nothing"). The stylesheet's compact `max-height`
+          // rule is therefore now INERT for this element — it is the sibling
+          // lane's to delete, and the report of this wave says so.
+          //
+          // `notifyColumnMaxHeightCss` is imported rather than re-typed, so the
+          // `min()` of the two budgets has one definition. Resolved, with the
+          // floor `SIM_OVERLAY_COLUMN_FLOOR_CSS` names:
+          //   852 × 393  top 8 → 73.23   ceiling 161 → 95.76   floor 0.43 stage
+          //   780 × 360  top 8 → 67.76   ceiling 147 → 87.04   floor 0.43 stage
+          maxHeight: notifyColumnMaxHeightCss(
+            SIM_OVERLAY_COLUMN_FLOOR_CSS,
+            NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
+          ),
           // ── THE FLANK LANE, 2026-08-14 · „FIX · FLANKS" ────────────────────
           // This column is the ONE surface that shares the throttle band's
           // corner, and „NOTHING may ever cover them" is a hard constraint on
@@ -1048,6 +1276,51 @@ export function SimOverlay({
               >
                 {shown.chipBg ?? ""}
               </span>
+              {/* ── THE SHEET'S FOLD, IN WORDS AND WITH A NUMBER — 2026-08-17.
+                     The counterpart of row 2c on the peek. It lands in the
+                     HEADER, and the placement is the whole of the argument.
+
+                     IT COSTS NO AUTHORED BULGARIAN, WHICH IS WHY IT IS HERE.
+                     The section is a `flex-col gap-2` at its cap (341 of the
+                     341 px between the stage's top and the instrument band on
+                     an iPhone 16 sideways) and the scroller is its ONLY
+                     shrinkable child — so a fourth row would have taken its own
+                     10 px plus an 8 px gap straight out of the text it is
+                     counting, pushing the accident-scene fold from 36 px to 54
+                     and hiding a THIRD line to announce that two were hidden.
+                     Under THEO-4 the text is the lesson; this row is chrome. In
+                     this header it takes zero height: the row is 44 px of
+                     button already, the chip beside it is `flex-1 truncate` and
+                     yields the width, and on the narrowest stage the three
+                     items still lay out inside 369 px.
+
+                     AND THE BOTTOM STILL SAYS „CONTINUES", because the fade
+                     added to the scroller in the same commit is what a cut line
+                     needs — the filed frame's real damage is that the
+                     guillotined «6.» read as a rendering fault. Announcement at
+                     the top, continuation cue at the bottom, nothing deleted.
+
+                     IT REACHES ZERO, which the peek's version could not: the
+                     rule at the top of this file has `scrollTop` in it and the
+                     window below is wired to `onScroll`, so a reader who has
+                     scrolled to the end sees the row disappear. A counter stuck
+                     at «↓ още 2 реда» while he is already at the bottom teaches
+                     him to ignore it.
+
+                     `aria-hidden`: assistive technology reads the whole body
+                     out of the DOM regardless of what is scrolled into view, so
+                     announcing a fold to a screen reader would describe a
+                     problem it does not have. */}
+              {sheetFold.lines > 0 ? (
+                <span
+                  data-sim-overlay-sheet-fold=""
+                  aria-hidden
+                  className="shrink-0 whitespace-nowrap text-[10px] font-black uppercase leading-none tracking-wider"
+                  style={{ color }}
+                >
+                  ↓ още {sheetFold.lines} {sheetFold.lines === 1 ? "ред" : "реда"}
+                </span>
+              ) : null}
               {/* «⤢ Разгъни панела» STOOD HERE AND IS DELETED, NOT MOVED.
                   It was the escape hatch from a height cap, and the cap is
                   gone: this surface is already the whole screen above the
@@ -1069,8 +1342,45 @@ export function SimOverlay({
                 column item refuses to shrink below its content, so the section
                 overflows its own `max-height` and the box grows off the top of
                 the screen — which is precisely the regression measured when
-                this clearance first shipped. */}
-            <div className="min-h-0 min-w-0 shrink overflow-y-auto">
+                this clearance first shipped.
+
+                ── AND IT CUT ITS OWN LAST STEP IN SILENCE — 2026-08-17, sweep
+                   161. The measurement is in the block at `foldLinesBelow`:
+                   36 px over on `sc-hz-accident-scene@L1`, the whole of
+                   authored step 6 below the fold, and the section is already AT
+                   its cap (341 of the 341 px between the top of the stage and
+                   the instrument band), so there is no room to give it.
+
+                   THE FADE IS THE HALF THAT ANSWERS THE FRAME. A scroll
+                   container ends where it ends, and its own bottom edge cuts
+                   the next line through the glyphs — the filed frame shows the
+                   ascenders of «6.» sliced flat with the blue «Разбрах» 8 px
+                   under them, which reads as a rendering fault and not as
+                   „there is more". The same 10 px `TEXT_FADE_PX` mask and the
+                   same 10 px of bottom padding the peek has carried since
+                   2026-08-14: padding joins the scrollable overflow in every
+                   engine this ships on, so a text that FITS is not faded at all
+                   — scrolled to the end, the last line's box bottom sits on the
+                   fade's opaque edge.
+
+                   `pan-y` / `overscroll-contain` for the reason the peek's
+                   window carries them: the stage owns touch gestures unless a
+                   scroller says which axis is its own. This one had neither,
+                   which is part of why the fold was undiscoverable on a phone
+                   even for a student who thought to try. */}
+            <div
+              ref={sheetFold.ref}
+              onScroll={sheetFold.onScroll}
+              data-sim-overlay-sheet-text=""
+              className="min-h-0 min-w-0 shrink overflow-y-auto"
+              style={{
+                WebkitMaskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+                maskImage: `linear-gradient(to bottom, #000 calc(100% - ${TEXT_FADE_PX}px), transparent)`,
+                paddingBottom: `${TEXT_FADE_PX}px`,
+                touchAction: "pan-y",
+                overscrollBehavior: "contain",
+              }}
+            >
               {/* The sentence the peek could not finish, in full and first. */}
               <h2 className="break-words text-sm font-extrabold leading-snug text-foreground">
                 {shown.lineBg}

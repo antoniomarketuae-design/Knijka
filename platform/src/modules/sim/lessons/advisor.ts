@@ -147,6 +147,81 @@ function shownCapKmh(capKmh: number, postedLimitKmh?: number): number {
 }
 
 /**
+ * THE NUMBER THE AUTHOR ALREADY PUT IN THE TITLE — sweep161, and the same crime
+ * as B58 one level in.
+ *
+ * B58 stopped the card printing a number above the SIGN. It could not see the
+ * case where the sign is not declared, and there the ladder's grace went
+ * straight onto the glass beside the author's own number, in ONE sentence:
+ *
+ *   sc-sp-limit-end  «Стигни кръстовището, още в зоната и под 40 км/ч
+ *                     — дръж под 48 км/ч»        (01-arrival.png, pc/right)
+ *   sc-speed-creep   «Мини зоната 30 под 30 км/ч — дръж под 38 км/ч»
+ *   sc-ov-night-gap  «Дръж своята лента под 45 км/ч — дръж под 50 км/ч»
+ *
+ * The census: **47 compiled objectives across 10 distinct titles** print an
+ * authored „под N км/ч" and then a different generated number after the dash.
+ * sc-sp-limit-end is the sharpest — its whole subject is a В26 „40" zone, and
+ * the sentence licenses 48 in it.
+ *
+ * The two numbers are not two opinions. The title is AUTHORED copy; the suffix
+ * is `params.maxSpeedKmh`, which is the GRADER'S TOLERANCE after
+ * `scenario/params.ts` widenSpeedCap added the rung's grace. Grace is
+ * forgiveness at the gate; it was never a sentence to say to a student. And
+ * this file's own opening rule settles which one wins — the advisor falls back
+ * to authored copy and NEVER invents instructions (ADR-002). Where the author
+ * did put the number in the title that is a deliberate choice, documented from
+ * the other side in `templates-following2.ts`: „The NUMBER is deliberately not
+ * in the title: `advisorPromptForObjective` already appends «— дръж под 140
+ * км/ч» … so spelling it here would print it twice in one sentence."
+ *
+ * So: the title's own ceiling wins where it is STRICTER. It may never license
+ * more than the gate would accept (that would be a card inviting the student to
+ * fail the task), which is why the caller takes a `Math.min` rather than a
+ * substitution. All ten titles in the census read „под N км/ч" — a ceiling —
+ * and the strictest match is taken, so a range like „26–28 км/ч" reads as 28.
+ */
+function titleCapKmh(titleBg: string): number | undefined {
+  let strictest: number | undefined;
+  for (const m of titleBg.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)) {
+    const n = Number(m[1].replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) continue;
+    if (strictest === undefined || n < strictest) strictest = n;
+  }
+  return strictest;
+}
+
+/**
+ * Does this objective's authored title put the РЕГУЛИРОВЧИК at the junction?
+ *
+ * MEASURED, sc-sig-controller-live/mobile/right (run.log + 04-t053s.png of
+ * sc-signal-controller). The drill's own objective is titled «Премини
+ * стоп-линията по разрешение на регулировчика — въпреки червената лампа», and
+ * `advisorPromptForObjective` answered it with its generic `requireRedMet`
+ * sentence — «Спри на стоп-линията на светофара и изчакай зелено». The harness
+ * obeyed the card, waited the lamp out twice (20 s of declared LAWFUL WAIT) and
+ * finished НЕИЗДЪРЖАН with −10 «Неизпълнение на сигнала на регулировчика».
+ * The coach and the grader were wired to opposite rules and the coach was the
+ * one that was wrong: ЗДвП чл. 6, т. 2 makes the officer's orders binding
+ * „НЕЗАВИСИМО от светлинните сигнали", and objectives.ts counts the red as met
+ * only on a crossing the officer permitted.
+ *
+ * `requireRedMet` does not mean „wait for green" — it means „the crossing must
+ * have answered a forbidding signal". The generic gloss is a wrong reading of
+ * the parameter, and it is wrong ONLY where an officer is present. There is no
+ * controller flag on `SimTick` or on `PassSignalParams` to read (see the report
+ * for the field that would carry it), but the template that stages one says so
+ * in the sentence it authored, and authored copy is what this file defers to.
+ *
+ * Four objectives in the whole catalog carry `requireRedMet`; exactly one of
+ * them names the officer, so the generic sentence keeps serving the other
+ * three.
+ */
+function titleNamesController(titleBg: string): boolean {
+  return /регулировчик/i.test(titleBg);
+}
+
+/**
  * Prompt for the ACTIVE driving objective. `evalState` (when the caller has
  * it) sharpens phase-dependent maneuvers — currently the roundabout, whose
  * exit-indicator hint only makes sense once the ring has been entered.
@@ -159,20 +234,29 @@ export function advisorPromptForObjective(
   postedLimitKmh?: number,
 ): AdvisorPrompt {
   switch (params.kind) {
-    case "reachZone":
+    case "reachZone": {
       // Speed-capped zones: the cap is the coachable part (approach discipline).
-      return params.maxSpeedKmh !== undefined
-        ? {
-            textBg: `${titleBg} — дръж под ${shownCapKmh(params.maxSpeedKmh, postedLimitKmh)} км/ч`,
-            keys: [],
-          }
-        : { textBg: titleBg, keys: [] };
+      if (params.maxSpeedKmh === undefined) return { textBg: titleBg, keys: [] };
+      // The sign clamps it (B58); the author's own number in the title clamps
+      // it again where that is stricter (titleCapKmh) — one sentence, one
+      // number, and never one the gate would refuse.
+      const shown = Math.min(
+        shownCapKmh(params.maxSpeedKmh, postedLimitKmh),
+        titleCapKmh(titleBg) ?? Number.POSITIVE_INFINITY,
+      );
+      return { textBg: `${titleBg} — дръж под ${shown} км/ч`, keys: [] };
+    }
 
     case "passSignal":
       if (params.control === "stopSign") {
         return { textBg: "Спри напълно на стоп-линията при знака „Стоп“", keys: ["S"] };
       }
       if (params.requireRedMet === true) {
+        // A REGULATED junction is the one place the lamp is not the authority
+        // (titleNamesController — measured on sc-sig-controller-live). The
+        // authored title is the instruction there; the chip still names the
+        // brake, because reading the officer is done stopped.
+        if (titleNamesController(titleBg)) return { textBg: titleBg, keys: ["S"] };
         // The drilled sequence the gate certifies (objectives.ts): stop at
         // the line, wait the red out, cross on green.
         return { textBg: "Спри на стоп-линията на светофара и изчакай зелено", keys: ["S"] };
@@ -426,8 +510,18 @@ const LAW_ROUNDABOUT = "ЗДвП чл. 50, ал. 1; Наредба № РД-02-2
  * „Забранено е навлизането в кръстовище дори и при разрешаващ сигнал на
  * светофара, ако обстановката в кръстовището ще принуди водача да спре в
  * кръстовището или да възпрепятства напречното движение."
+ *
+ * THE THIRD REF IS SWEEP161'S (04-t053s.png, sc-signal-controller/mobile/right).
+ * In one frame the in-world board over the junction read «Предимството е ТВОЕ —
+ * дори на червено» and this card read «На червено се спира напълно ПРЕД
+ * линията — БЕЗ ИЗКЛЮЧЕНИЯ — и се потегля чак на зелено». The board was right
+ * and the coach was wrong: there is exactly one exception and ЗДвП names it.
+ * The pair is RETRIEVED from the catalog row that grades the same duty
+ * (CONTROLLER_SIGNAL_VIOLATED — чл. 6, т. 2 the duty, чл. 7, ал. 1 the
+ * hierarchy), so the sentence spoken while he waits cites byte-identically what
+ * the toast would cite if he obeyed the lamp and got billed for it.
  */
-const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50а`;
+const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50а; ${VIOLATIONS.CONTROLLER_SIGNAL_VIOLATED.lawRef}`;
 
 interface YieldVoiceCopy {
   /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
@@ -455,7 +549,15 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: в кръга имат предимство",
     namedBg:
       "Спрял си правилно. На входа на кръгово кръстовище не може да стои знак „Път с предимство“ — там винаги е Б1 или Б2, тоест ти си на пътя без предимство и пропускаш движещите се в кръга. Гледай НАЛЯВО. Интервалът, който чакаш, е такъв, че да влезеш и да набереш скоростта на кръга, без движещият се в него да намалява заради теб.",
-    settledTitleBg: "Чакането Е маневрата",
+    // THE HEADING NAMES ITS OWN DUTY (sweep161, sc-turn-left-oncoming
+    // 04-t043s.png). All five reasons used to head their middle line with the
+    // bare «Чакането Е маневрата», so one НАУЧИ title carried a different body
+    // in every lesson that raised it — the audit found it on three — and the
+    // reader has no way to tell a roundabout card from a stop-sign one by its
+    // heading. Each now says which wait it is about. The phrase itself stays in
+    // front, because it is the sentence the whole stage exists to say and two
+    // tests key on it.
+    settledTitleBg: "Чакането Е маневрата — кръгът командва",
     settledBg: (sec) =>
       `Стоиш вече ${sec} секунди и това е правилно — на кръгово се чака точно толкова, колкото поиска кръгът. Тези секунди не ти струват нито точка и се изваждат от ориентировъчното време на урока, така че не бързай. И не гледай надясно за „ред“: редът на пристигане не е правило за предимство — гледай наляво и тръгвай на първия истински интервал.`,
     verdictTitleBg: "Интервалът беше добър",
@@ -469,7 +571,7 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: знак Б1 „Пропусни движението“",
     namedBg:
       "Спрял си правилно. Знакът Б1 те поставя на пътя БЕЗ предимство: на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него. Пълно спиране Б1 не изисква — задължението е да пропуснеш. Огледай ляво–дясно–ляво и чакай интервал, в който пресичаш, без някой по главния път да намалява заради теб.",
-    settledTitleBg: "Чакането Е маневрата",
+    settledTitleBg: "Чакането Е маневрата — знак Б1",
     settledBg: (sec) =>
       `${sec} секунди на линията са правилни, не бавни. Времето, което стоиш заради предимство, се изважда от ориентировъчното време на урока и не ти струва точки — законът иска да приближаваш кръстовището с такава скорост, че при необходимост да спреш и да пропуснеш, тоест да можеш да чакаш толкова, колкото поиска главният път. Ако видимостта е лоша, изнеси се напред бавно, докато видиш, и пак спри.`,
     verdictTitleBg: "Пропусна и тръгна в истински интервал",
@@ -483,7 +585,7 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
     namedBg:
       "Спрял си правилно, и точно тук пълното спиране е задължително — на Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен. Колелата неподвижни, брой наум до три, огледай ляво–дясно–ляво. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
-    settledTitleBg: "Чакането Е маневрата",
+    settledTitleBg: "Чакането Е маневрата — знак Б2",
     settledBg: (sec) =>
       `${sec} секунди на стоп-линията са правилни. Пълното спиране е изпълнено — това, което тече сега, е втората половина на задължението: пропускането. Тези секунди не се броят в ориентировъчното време на урока, така че изчакай спокойно да мине всичко, което има предимство.`,
     verdictTitleBg: "Спря докрай и пропусна",
@@ -493,25 +595,45 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   },
   redLight: {
     cardBg:
-      "Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че кръстовището е свободно.",
+      "Чакаш правилно на червено. Тръгваш на зелено — освен ако регулировчик не пуска твоята посока: тогава важи само неговият сигнал.",
     namedTitleBg: "Защо чакаш: червен сигнал",
+    // SWEEP161: this line used to say „без изключения" and there IS one. The
+    // exception is retrieved, not recalled — the second sentence is the rule
+    // catalog's own `correctiveBg` for CONTROLLER_SIGNAL_VIOLATED, so the coach
+    // and the fault that grades the same duty now say the same words.
     namedBg:
-      "Спрял си пред стоп-линията и това е единственото правилно нещо тук. На червено се спира напълно ПРЕД линията — без изключения — и се потегля чак на зелено. Дръж крак на спирачката и гледай светофара за ТВОЯТА посока. Когато светне зелено, преди да тръгнеш погледни самото кръстовище: навлизане е забранено дори при разрешаващ сигнал, ако обстановката вътре ще те принуди да спреш в кръстовището и да пречиш на напречното движение.",
+      "Спрял си пред стоп-линията и на червено това е правилното: спира се напълно ПРЕД линията и се потегля на зелено. Изключението е човек, не лампа — сигналите на регулировчика са НАД светофара и знаците: има ли регулировчик на кръстовището, гледай неговите ръце, не светофара, и изпълнявай само неговия сигнал, дори когато твоята лампа свети червено. Няма ли регулировчик, дръж крак на спирачката и гледай светофара за ТВОЯТА посока; когато светне зелено, преди да тръгнеш погледни самото кръстовище — навлизане е забранено дори при разрешаващ сигнал, ако обстановката вътре ще те принуди да спреш в кръстовището и да пречиш на напречното движение.",
+    // The one settled title that stays bare: `signal-stop-line-window.test.ts`
+    // pins this exact string in the emitted titles of a red-light wait.
     settledTitleBg: "Чакането Е маневрата",
     settledBg: (sec) =>
       `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги: виж кой стои насреща, кой ще завива и къде са пешеходците, за да тръгнеш на зелено с готова картина вместо да я събираш в движение.`,
     verdictTitleBg: "Изчака сигнала и тръгна чисто",
     verdictBg: (sec) =>
-      `Изчака ${sec} с и премина — без отчетено нарушение на сигнала. Зеленото е разрешение да минеш, не задължение да тръгнеш веднага: проверката, която току-що направи — свободно ли е кръстовището отсреща — е тази, която пази от засядане в средата му.`,
+      `Изчака ${sec} с и премина — без отчетено нарушение на сигнала. Разрешаващият сигнал е разрешение да минеш, не задължение да тръгнеш веднага: проверката, която току-що направи — свободно ли е кръстовището отсреща — е тази, която пази от засядане в средата му. И помни кой го дава: има ли регулировчик, разрешението е неговото, а не на лампата.`,
     lawRef: LAW_RED_LIGHT,
   },
   pedestrian: {
     cardBg:
       "Чакаш правилно — пешеходецът на пътеката минава пръв. Изчакай да освободи платното; не минавай зад гърба му.",
     namedTitleBg: "Защо чакаш: пешеходец на пътеката",
+    // SWEEP161, sc-crossing-dart/mobile/right 06-waited.png: the car is halted
+    // with its nose already over the first zebra bars — the painted stripes run
+    // out from under the bonnet — and this line read «Спрял си правилно».
+    // Briefing point 4 of that very lesson is «Спри напълно преди зебрата», so
+    // stopping ON the crossing was taught as correct.
+    //
+    // The module cannot see WHERE he stopped: `advisorPromptForSession` and
+    // `stepYieldVoice` are handed a reason and a speed, never a pose (finish.ts
+    // makes the same point about the red-light copy — every line keyed to
+    // `redLight` opens with «Спрял си ПРЕД стоп-линията», „which is the one
+    // thing that is not true of him"). So the praise is withdrawn and the rule
+    // is stated instead: praising a position it cannot measure is the half that
+    // was wrong, and naming where the stop belongs teaches the sloppy stop
+    // without convicting anybody for it.
     namedBg:
-      "Спрял си правилно. При приближаване към пешеходна пътека си длъжен да пропуснеш стъпилите на нея или преминаващите по нея пешеходци, като намалиш скоростта или спреш. Изчакай човекът да освободи платното — не го заобикаляй и не минавай зад гърба му, дори да изглежда, че има място. Погледни и встрани от пътеката: който сигнализира, че ще пресича, също се пропуска.",
-    settledTitleBg: "Чакането Е маневрата",
+      "Правилно е да чакаш тук. При приближаване към пешеходна пътека си длъжен да пропуснеш стъпилите на нея или преминаващите по нея пешеходци, като намалиш скоростта или спреш. Мястото на спирането е ПРЕД зебрата, не върху нея: колата не влиза в самата пътека, докато по нея има човек. Изчакай го да освободи платното — не го заобикаляй и не минавай зад гърба му, дори да изглежда, че има място. Погледни и встрани от пътеката: който сигнализира, че ще пресича, също се пропуска.",
+    settledTitleBg: "Чакането Е маневрата — пешеходецът минава пръв",
     settledBg: (sec) =>
       `${sec} секунди пред пътеката са правилни и не ти струват нищо — това време се изважда от ориентировъчното време на урока. Пешеходецът може да е бавен, да се върне или да поведе дете: не тръгвай на предположение, тръгни, когато го видиш от другата страна.`,
     verdictTitleBg: "Пропусна пешеходеца",
@@ -628,6 +750,22 @@ export function stepYieldVoice(
       // a new episode is allowed to be explained from the top.
       sinceSec = wait.sinceSec ?? t;
       spoken = 0;
+    } else if (endedAtSec !== null) {
+      // RESUMING AFTER MOTION — the lecture must not re-open (that is what
+      // `spoken` carries across), but the CLOCK must not count the metres he
+      // drove in between as seconds he stood.
+      //
+      // MEASURED, sc-crossing-dart/mobile/right: two holds at the same zebra
+      // with a roll between them, and this line said «10 секунди пред пътеката
+      // са правилни» while the debrief on the same drive credited «8 с чакане
+      // на предимство». The engine's own `yieldWaitSec` accumulates only
+      // `holding` frames, so the instructor was quoting a bigger number than
+      // the product itself would subtract from his ориентировъчно време —
+      // measured against the wrong clock, in the voice that must not be
+      // guessing. `sinceSec` is re-anchored so that `t - sinceSec` is the
+      // seconds STOOD, gap excluded: the reassurance still survives a creep up
+      // a queue, and the number it speaks is the one the debrief credits.
+      sinceSec = t - Math.max(0, endedAtSec - sinceSec);
     }
     reason = wait.reason; // identical when continuing; the live duty otherwise
     endedAtSec = null;

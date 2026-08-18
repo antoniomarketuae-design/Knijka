@@ -16,7 +16,7 @@
  *  2. TEMPLATE DRESSING (keyed by template id — never by district, because
  *     districts are shared: ac-rain-v1 also hosts the van-less rain/fog
  *     drills; poligon-v1 also hosts reverse-line and free drive):
- *      - the five stalled/wreck vehicles are VISUAL-ONLY (`visual: true`,
+ *      - the stalled/wreck vehicles are VISUAL-ONLY (`visual: true`,
  *        no collider): for these templates the collision consequence is the
  *        RECORDER's ObstacleRect2D channel + the objective zones BY DESIGN
  *        (each template header names it — "a RECORDER obstacle rect, not a
@@ -219,10 +219,57 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
     { kind: "vehicle", x: 4.06, y: 310, headingDeg: 0, model: VAN_MODEL, seed: 3, visual: true },
   ],
   // traces/scHzAccidentScene.ts hzAccidentObstacles(): two damaged cars
-  // askew in the curb-half of the lane (the wide-pass tableau).
+  // askew in the curb-half of the lane (the wide-pass tableau) — PINNED, plus
+  // one body of pure dressing that is pinned to nothing (see below).
+  //
+  // Doc 88 sweep, „the crash scene is not a crash": the briefing promises
+  // „смачкани коли и хора около тях" and the frame showed ONE dark saloon
+  // standing square on the kerb line 12 m ahead of another — two parked cars,
+  // not a collision. Both are askew by only 20° / −15°, which at 12 m apart
+  // reads as bad parking; nothing in the tableau is ACROSS anything.
+  //
+  // The two pinned bodies may not move: they are the recorder's own graded
+  // rects (the drill's COLLISION channel) and the three committed traces were
+  // recorded against them, so a nudge here would break the painted-rect-
+  // equals-graded-rect law. What the tableau CAN gain is a third body that is
+  // dressing only — and one car lying BROADSIDE is the single cue that turns a
+  // kerb queue into a crash.
+  //
+  // Pose measured against the whole committed envelope, so it adds a picture
+  // and not a new consequence (all numbers from the drill's own artefacts):
+  //   • lane depth — heading 100° puts its x-extent at 7.6 ± 2.179 =
+  //     [5.42, 9.78]. That is the SAME curb-half depth the pinned wrecks
+  //     already reach (5.40 / 5.78), so the shadow's widest sample in the
+  //     band (x = 4.06, flank 4.91) clears it by 0.51 m — the pinned wreck's
+  //     own margin is 0.49 m — and the squeeze demo, which holds x = 5.50
+  //     (flank 6.35) from y 138 to 164 precisely so it CLIPS the wreckage,
+  //     clips this body too, exactly as it already clips the other two.
+  //   • the two bystanders — y-extent 158.3 ± 1.262 = [157.04, 159.56]. The
+  //     staged walks run at y = 152 (x 4.4→7.8) and y = 155.2 (x 4.6→7.8);
+  //     the nearer of them clears the body by 1.49 m of walker shoulder.
+  //   • the tangle — it stops 0.22 m short of the second wreck's y-extent
+  //     ([159.78, 164.22]), so the three bodies read as one mass from 147.8 to
+  //     164.2 m instead of two cars with 7.5 m of empty kerb between them.
+  //   • nothing else is there — hz-accident-v1's east-side street furniture in
+  //     y ∈ [130, 190] is one streetlight at (12.03, 144), and the curb pass's
+  //     nearest decoration body is 33.6 m away.
+  // `visual: true`, like every other wreck body: the consequence stays in the
+  // trace channel the drill authored.
+  //
+  // NOT fixed here, and it is the rest of the finding: «изял е половината от
+  // твоята лента» is not true of ANY body this table may place. The ego lane
+  // is x ∈ [0, 8.125] and the demonstrated-correct line runs to x = 4.06 —
+  // the wreckage would have to reach the lane centre to eat half of it, and
+  // the shadow would then drive through it. Half the lane needs a re-recorded
+  // shadow (traces/scHzAccidentScene.ts) or a briefing that says „half the
+  // curb side"; both are owned elsewhere.
   "sc-hz-accident-scene": [
     { kind: "vehicle", x: 7.0, y: 150, headingDeg: 20, model: "corva_s", seed: 5, visual: true },
     { kind: "vehicle", x: 7.2, y: 162, headingDeg: -15, model: "vela_h3", seed: 6, visual: true },
+    // DRESSING (no rect twin): the car that was hit broadside, still across
+    // the kerb line where it was pushed. 100° = nose east, i.e. square across
+    // the direction of travel.
+    { kind: "vehicle", x: 7.6, y: 158.3, headingDeg: 100, model: "arden_x", seed: 9, visual: true },
   ],
   // traces/scEdPoligonChain.ts poligonChainConeObstacles(): the bay-mouth
   // cones („Подмини гнездото между конусите") — HITTABLE, the twin contract.
@@ -277,6 +324,17 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // FREE on purpose so no civilian car is drawn on top of it. Wider and ~0.45 m
   // longer than a compact — it protrudes further into the aisle than the parked
   // cars beside it, which is the sight-line the drill teaches around.
+  //
+  // „The bay is left free on purpose" was a SENTENCE, not a guard, and the doc
+  // 88 sweep read the frame as two vehicles in one volume. Measured, they are
+  // not: the van (kargo_v body 1.98 × 5.34, traffic/types VEHICLE_PROFILE_WIDTH_M
+  // „van") at y = −2.70 spans y ∈ [−3.69, −1.71]; lotvn-bay-1 is `occupied` and
+  // its civilian (1.84 wide) at y = −5.40 spans y ∈ [−6.32, −4.48]. Daylight
+  // 0.79 m — a real 2.7 m bay pitch leaves 0.86 m, so this is a normal
+  // neighbour, and what the frame shows is the nearer, lower saloon correctly
+  // occluding the further, taller box. The sentence is now a gate as well:
+  // scenery-held-conflicts.test.ts fails if any held body's FOOTPRINT ever
+  // touches an occupied bay's, and it convicts a van moved one bay south.
   "sc-park-van": [
     { kind: "vehicle", x: 5.03, y: -2.7, headingDeg: 90, model: "kargo_v", seed: 41 },
   ],
@@ -319,9 +377,11 @@ export interface ParkedClearZone {
  * The junction case is now structural: `TrafficLayer.computeParkedCars`
  * measures the curb walk against the junction mouth `nodeOpenRadiusM` opens
  * plus ЗДвП чл. 98's 5 m, so no body can stand in a junction on ANY of the 90
- * districts and the allowlist entry is dead. What is left here is the one
- * class the district alone cannot know: a STAGED PEDESTRIAN's authored walk
- * line, which is scenario content, not map content.
+ * districts and the allowlist entry is dead. What is left here are the classes
+ * the district alone cannot know, because they are SCENARIO content and not map
+ * content: a staged pedestrian's authored walk line (rule 1, below), the kerb a
+ * bus stop needs empty (rule 2), and the ground the drill's own held dressing
+ * stands on (rule 3).
  *
  * A `pedestrianDartOut` walks a 2-point polyline (orchestrator/runners.ts
  * stages `[start, start + dir·travelM]`) with no obstacle query of any kind —
@@ -352,6 +412,63 @@ const WALK_CLEAR_PITCH_M = WALK_CLEAR_RADIUS_M;
  *  span that has to be empty for the shelter to be visible from the road. */
 const BUS_STOP_NO_PARK_MARGIN_M = 6;
 
+// --- RULE 3 (doc 88): NOTHING IS PARKED ON TOP OF THE LESSON'S OWN PROP -----
+//
+// The curb pass and the held table place bodies from two different frames and
+// neither has ever seen the other. Census on the shipped tree, `computeParkedCars`
+// against `heldSceneryFor` for every template that has dressing: 12 decoration
+// bodies over 5 drills stand inside a held body's own footprint radius —
+//
+//   sc-ov-narrow           27 -> 20   (the corridor rows at |x| = 7.0 got a
+//                                      SECOND row of strangers at |x| = 10.13)
+//   sc-pe-parked-row-scan   2 ->  0   (the titular „редица" doubled the same way)
+//   sc-hazard-obstacle     27 -> 26   (a stranger at (10.13, 129.8), beside the
+//                                      stalled car at (5.5, 130) the whole
+//                                      lesson is about)
+//   sc-accident-own-conduct 27 -> 26  ((10.13, 149.6) beside the struck car)
+//   sc-merge-roadworks-shift 32 -> 31 ((10.13, 215.6) inside the cone taper)
+//
+// — and the harm is the same one every time: the object the drill points at
+// stops reading as special, because an identical body is standing next to it.
+// That is exactly how the doc 88 sweep read the crash tableau ("ONE undamaged
+// dark pickup parked square on the kerb line").
+//
+// One derived rule, no list, same doctrine as the two above: a held body opens
+// a circle wide enough that no decoration body's FOOTPRINT can reach it. The
+// curb pass has no colliders and feeds no proximity query, so this only ever
+// deletes pixels — 470 bodies over these templates become 458 and every
+// surviving one keeps its coordinates, model and seed.
+
+/** Held-body half-diagonals, m — pinned BY VALUE from the rigs that draw them
+ *  (vehicleFleet TRUCK_DIMENSIONS 7.5 × 2.4 and ANIMAL_DIMENSIONS 1.1 × 0.28
+ *  half-extents; traffic/types VEHICLE_PROFILE_* „car" 4.1 × 1.84 and „van"
+ *  kargo_v 5.34 × 1.98). Re-asserted in scenery-held-conflicts.test.ts. */
+const HELD_CAR_HALF_DIAG_M = Math.hypot(2.05, 0.92);
+const HELD_VAN_HALF_DIAG_M = Math.hypot(2.67, 0.99);
+const HELD_TRUCK_HALF_DIAG_M = Math.hypot(3.75, 1.2);
+const HELD_ANIMAL_HALF_DIAG_M = Math.hypot(1.1, 0.28);
+/** A cone/pole is a slim marker (0.25 m half-extents); its own reach is nearly
+ *  negligible beside the 2.44 m the parked body brings, but it is not zero. */
+const HELD_PROP_HALF_DIAG_M = Math.hypot(0.25, 0.25);
+
+/** Half-diagonal of one held body's footprint, m. */
+function heldHalfDiagM(o: ScenarioObstacleSpec): number {
+  switch (o.kind) {
+    case "wall":
+      return Math.hypot(o.lengthM / 2, (o.thicknessM ?? 0.3) / 2);
+    case "prop":
+      return HELD_PROP_HALF_DIAG_M;
+    case "animal":
+      return HELD_ANIMAL_HALF_DIAG_M;
+    default:
+      return o.model === "box_truck"
+        ? HELD_TRUCK_HALF_DIAG_M
+        : o.model === "kargo_v"
+          ? HELD_VAN_HALF_DIAG_M
+          : HELD_CAR_HALF_DIAG_M;
+  }
+}
+
 /** Circles covering the segment (ax,ay)→(bx,by) at WALK_CLEAR_RADIUS_M. */
 function corridorZones(
   ax: number,
@@ -377,10 +494,11 @@ const walkZoneCache = new Map<string, readonly ParkedClearZone[]>();
 
 /**
  * Clear zones for one lesson's parked-car curb pass ([] when the template
- * stages no walking pedestrian). Flows through LessonWorldCore so the drill
- * and the capture rig mount the SAME filtered decoration (doc 66 R5 — one
- * recipe). Purely visual: the curb pass has no colliders and feeds no
- * proximity query, so removing a body changes zero grading.
+ * stages no walker, its map names no bus stop and its template holds no
+ * dressing). Flows through LessonWorldCore so the drill and the capture rig
+ * mount the SAME filtered decoration (doc 66 R5 — one recipe). Purely visual:
+ * the curb pass has no colliders and feeds no proximity query, so removing a
+ * body changes zero grading.
  */
 export function parkedClearZonesFor(
   lessonId: string,
@@ -429,6 +547,16 @@ export function parkedClearZonesFor(
         zones.push({ x: cx, y: cy, radiusM: half + BUS_STOP_NO_PARK_MARGIN_M });
       }
     }
+  }
+  // ── RULE 3 (doc 88): nothing parks on the lesson's own prop. ─────────────
+  // Derived from the SAME table that places the dressing, so a new held body
+  // clears its own kerb and a template without dressing is byte-identical.
+  for (const held of heldSceneryFor(lessonId, districtRaw)) {
+    zones.push({
+      x: held.x,
+      y: held.y,
+      radiusM: heldHalfDiagM(held) + PARKED_HALF_DIAG_M,
+    });
   }
   if (spec) {
     const staged = [

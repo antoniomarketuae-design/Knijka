@@ -77,8 +77,10 @@ import {
   SEVERITY_POINTS,
   VIOLATIONS,
   billRoadConsequences,
+  pointsBg,
   pointsEachBg,
   pointsOutOfBg,
+  pointsWordsBg,
   type FailReason,
   type ViolationCode,
 } from "../rules";
@@ -176,6 +178,117 @@ const RED_MET_TEXT_BG: Record<RedMetVia, string> = {
  * to say when the record cannot say which.
  */
 const RED_MET_UNRECORDED_BG = "Срещна забраняващ сигнал на това кръстовище и го премина правилно";
+
+/* ---------------------------------------------------------------------------
+ * SWEEP 161 · THREE NUMBERS THAT CONTRADICTED THE WORDS BESIDE THEM
+ *
+ * Each of the three was read off a drive of the shipped build, not reasoned
+ * about; the frame is named at the helper that answers it. NONE of them moves a
+ * number. The grading, the star fold and the XP award are all correct and all
+ * stay exactly as they are — what was missing every time is the sentence that
+ * ties the number to the one printed next to it, which is THEO-4's whole ask:
+ * no verdict on this screen stands bare.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * The collision paragraph's arithmetic — supplied only when the collision is
+ * NOT the whole dangerous account.
+ *
+ * MEASURED · sc-vu-cyclist-hook/pc/wrong · 08-debrief.png: „Настъпи сблъсък.
+ * Това е ЕДНА опасна грешка: 10 изпитни т. …" printed ~35 px under a „20
+ * наказателни точки" headline and ~190 px above a row reading „Опасни грешки
+ * (по 10 изпитни т.) 2 20". Every figure on that frame is right, and the
+ * paragraph itself is the founder's own ruling (rules/scales.ts
+ * COLLISION_CONSEQUENCE_BG) — it is right ABOUT THE COLLISION. But read where
+ * it sits it is the account OF THE HEADLINE, and as that account it says ten
+ * while the headline says twenty.
+ *
+ * So the ruled copy is untouched and the missing half is supplied. The two can
+ * only ever disagree when the drive carried a SECOND опасна beside the
+ * collision, so that is the only case this speaks in: null otherwise, because a
+ * run whose only опасна IS the collision would get a sentence that restates the
+ * table and teaches nothing.
+ */
+export function collisionTotalReconcileBg(
+  opasniCount: number,
+  opasniPoints: number,
+): string | null {
+  if (opasniCount <= 1) return null;
+  return (
+    `Числото горе е за целия урок: ${opasniCount} опасни грешки ` +
+    `${pointsEachBg("exam", SEVERITY_POINTS.opasna)} правят ` +
+    `${pointsBg("exam", opasniPoints)} — сблъсъкът е една от тях.`
+  );
+}
+
+/**
+ * Why the manoeuvre grade landed where it did.
+ *
+ * MEASURED · sc-ed-reverse-line: a run with „0 наказателни точки · Общо
+ * (допустими 9) 0" and a run with „100 наказателни точки · Опасни грешки 10
+ * 100" printed the SAME „Оценка на маневрата ★☆☆" — one star, identically. Both
+ * stars are arithmetically right: doc 76 §6 floors the grade at one star
+ * whenever legality is in question and both of those runs were. What the card
+ * never said is WHICH question, so the one score that exists to grade quality
+ * of execution could not tell a flawless drive from a catastrophic one.
+ *
+ * THE STAR NUMBER IS NOT RECOMPUTED HERE. This reads the same four facts
+ * `scoreRubric` (lessons/scenario/rubric.ts) caps on, in the order it applies
+ * them, and names them. `session-end-numbers.test.tsx` drives the real
+ * `scoreRubric` and fails if the two ever disagree about which runs are
+ * floored — the note explaining a cap must not be able to outlive the cap.
+ */
+export function manoeuvreGradeReasonBg(result: LessonResult): string | null {
+  const floors: string[] = [];
+  // A collision IS the опасна, named precisely — printing both reads as two.
+  if (result.summary.terminated) floors.push("има сблъсък");
+  else if (result.summary.score.hasDangerous) floors.push("има опасна грешка");
+  if (result.aborted) floors.push("урокът беше прекъснат");
+  if (!result.completedAll) floors.push("остана неизпълнена задача от маршрута");
+  if (floors.length > 0) {
+    return (
+      `Само една звезда, защото ${floors.join(", ")}. Оценката на маневрата не ` +
+      `може да надскочи закона: докато това е в сила, тя стои на дъното, ` +
+      `колкото и чисто да е било останалото каране.`
+    );
+  }
+  if (result.score > 0) {
+    return (
+      `Най-много две звезди, защото има ${pointsWordsBg("exam", result.score)} ` +
+      // „без нито една точка" would be a BARE точка, i.e. контролни точки to a
+      // Bulgarian reader — the misreading this whole vocabulary exists to stop
+      // (rules/__tests__/point-scales.test.ts caught it here).
+      `по изпитния лист. Третата се дава само на каране без нито една наказателна точка.`
+    );
+  }
+  // Nothing capped it: the breakdown rows below ARE the explanation — every
+  // measured line carries its own 0–2 and its own sentence.
+  return null;
+}
+
+/**
+ * What the XP chip says when the verdict directly above it is „Неиздържан".
+ *
+ * MEASURED · sc-rb-exit-signal/mobile/right · 08-debrief.png: „НЕИЗДЪРЖАН" and
+ * „+40 XP" stacked ~60 px apart on one card, over a collision and zero
+ * objectives met. THE AWARD IS CORRECT AND STAYS: 40 is `XP_SIM_COMPLETED` and
+ * A14 pays it for finishing the drive on purpose (gamification/xp.ts — „effort
+ * counts, guessing/grinding doesn't win"), which is also why an aborted session
+ * is paid nothing at all and this chip never renders there. A bare „+40 XP"
+ * under a red НЕИЗДЪРЖАН says none of that; it reads as a reward for the run.
+ */
+export function xpChipBg(
+  xpEarned: number,
+  passed: boolean,
+): { labelBg: string; noteBg: string | null } {
+  if (passed) return { labelBg: `+${xpEarned} XP`, noteBg: null };
+  return {
+    labelBg: `+${xpEarned} XP за завършеното каране`,
+    noteBg:
+      "XP се дава за времето зад волана, не за резултата — оценката на този " +
+      "опит остава „Неиздържан“.",
+  };
+}
 
 /** A10 measurement channel → one human line on the objective row. */
 export function objectiveDetailText(detail: ObjectiveDetail | undefined): string | null {
@@ -461,6 +574,49 @@ export function SessionEndScreen({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [skipEnabled, skip]);
 
+  // -- I1 RELEASE: PUT THE READER AT THE TOP OF WHAT JUST APPEARED ------------
+  //
+  // MEASURED · sc-rb-exit-signal/mobile/right · 08-debrief.png (852 × 393 CSS
+  // px): the FIRST thing on the result screen is the bottom half of „Докосни
+  // „▾ Скрий разбора“, за да пропуснеш разбора" and a sliced „Не показвай
+  // автоматично" pill — rows y≈0–25 — with the 44 px control that owns them
+  // entirely above the top edge. A ~64 px offset, i.e. exactly the button plus
+  // the gap plus the scrim's p-4.
+  //
+  // NOTHING ON THIS SCREEN SCROLLED. The CALIBRATION GATE did. The gate and the
+  // result are the same mounted subtree inside the shell's one scrolling scrim
+  // (LessonPlayShell `data-hud="end-screen"` + playArea.ts
+  // OVERLAY_SCRIM_CLASS, which carries the `overflow-y-auto`) — `calibrationLocked`
+  // only swaps what this component RETURNS, the scrim never remounts — so the
+  // offset a thumb needed to reach «Пропусни» at the bottom of the gate card is
+  // still there when a document five times as long replaces it. That run's
+  // ladder log names the gate as its last rung, and the PC leg of the same
+  // sweep shows no offset at all: at 900 px the gate fits and nothing had to
+  // scroll. Three facts, one mechanism.
+  //
+  // `scrollIntoView` on our OWN root and not a reach into the scrim: it asks
+  // the browser to put THIS element at the top of whatever scrolls it, which is
+  // the shell's business to change and not ours to know — and it moves the
+  // document too on a layout where that is the scroller. `scroll-mt-4` on the
+  // root gives back the scrim's own p-4, so the button lands where a fresh
+  // mount would have put it rather than flush against the edge. A no-op
+  // whenever the offset was already zero: the roomy case, and every mount that
+  // did not come through the gate.
+  const resultRef = useRef<HTMLDivElement>(null);
+  const wasCalibrationLocked = useRef(calibrationLocked);
+  useEffect(() => {
+    const released = wasCalibrationLocked.current && !calibrationLocked;
+    wasCalibrationLocked.current = calibrationLocked;
+    if (released) resultRef.current?.scrollIntoView({ block: "start" });
+  }, [calibrationLocked]);
+
+  // Sweep 161's three sentences, derived once each (see the helper block above).
+  const collisionReconcileBg = collisionTotalReconcileBg(
+    score.opasniCount,
+    score.opasniPoints,
+  );
+  const manoeuvreReasonBg = manoeuvreGradeReasonBg(result);
+
   // The class legend. „(10 т.)" beside a headline about наказателни точки was
   // the last bare unit left on the repaired result screen, and the tariff is
   // read off the engine's own SEVERITY_POINTS rather than retyped here.
@@ -481,7 +637,11 @@ export function SessionEndScreen({
   }
 
   return (
-    <div className="flex max-h-full w-full max-w-2xl flex-col gap-4 overflow-y-auto p-1">
+    <div
+      ref={resultRef}
+      // `scroll-mt-4` pairs with the effect above — see OVERLAY_SCRIM_CLASS's p-4.
+      className="flex max-h-full w-full max-w-2xl scroll-mt-4 flex-col gap-4 overflow-y-auto p-1"
+    >
       {/* Row-flash animation (scoped to this screen; motion-reduce = no flash). */}
       <style>{`
         @keyframes sim-end-row-flash {
@@ -614,10 +774,24 @@ export function SessionEndScreen({
           {result.passed ? "Издържан" : "Неиздържан"}
         </p>
 
+        {/* The chip says what the XP is FOR whenever the verdict above it
+            disagrees with it — see xpChipBg. */}
         {xpEarned !== null ? (
-          <p className="rounded-full bg-accent/15 px-3 py-1 text-xs font-black text-accent">
-            +{xpEarned} XP
-          </p>
+          (() => {
+            const xp = xpChipBg(xpEarned, result.passed);
+            return (
+              <>
+                <p className="rounded-full bg-accent/15 px-3 py-1 text-xs font-black text-accent">
+                  {xp.labelBg}
+                </p>
+                {xp.noteBg !== null ? (
+                  <p className="-mt-2 max-w-prose text-center text-[11px] font-semibold text-muted">
+                    {xp.noteBg}
+                  </p>
+                ) : null}
+              </>
+            );
+          })()
         ) : null}
 
         {result.aborted ? (
@@ -636,6 +810,10 @@ export function SessionEndScreen({
         {summary.terminated ? (
           <p className="max-w-prose text-center text-sm font-semibold leading-relaxed text-danger">
             {COLLISION_CONSEQUENCE_BG}
+            {/* …and, when the collision was not the only опасна, the arithmetic
+                that reconciles „ЕДНА … 10" with the total above and the count
+                below it (sweep 161 — see collisionTotalReconcileBg). */}
+            {collisionReconcileBg !== null ? <> {collisionReconcileBg}</> : null}
           </p>
         ) : null}
         {!result.completedAll && !result.aborted ? (
@@ -700,17 +878,30 @@ export function SessionEndScreen({
               aria-label={`${rubric.stars} от 3 звезди`}
               className="ml-auto text-lg tracking-wide"
             >
+              {/* HOLLOW glyph for an unearned star, not a grey filled one.
+                  Colour alone carried the whole grade here: on a one-star run
+                  the row's text content was „★★★", so every reader that reads
+                  text rather than pixels — the audit harness's own ledger
+                  included — was handed three stars for the worst drive in the
+                  sweep, and a student in bright sun reads it the same way. */}
               {[1, 2, 3].map((s) => (
                 <span
                   key={s}
                   aria-hidden
                   style={{ color: s <= rubric.stars ? "var(--warning)" : "var(--border-strong)" }}
                 >
-                  ★
+                  {s <= rubric.stars ? "★" : "☆"}
                 </span>
               ))}
             </span>
           </div>
+          {/* WHY it landed there. Without this the flawless run and the
+              catastrophic one print the same ★☆☆ — see manoeuvreGradeReasonBg. */}
+          {manoeuvreReasonBg !== null ? (
+            <p className="text-xs font-semibold leading-relaxed text-warning">
+              {manoeuvreReasonBg}
+            </p>
+          ) : null}
           {/* THE FOURTH SCALE, AND THE ONE A FIND-AND-REPLACE WOULD HAVE GOT
               WRONG. „1 / 2 т." sits a few centimetres under a headline reading
               „20 наказателни точки", and it is NOT the exam sheet, NOT the

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { PadPointer, releaseTouchControls, TouchInputSource } from "@/modules/sim/engine";
-import { TouchControls } from "./TouchControls";
+import { TouchControls, reconcileHeldAxes } from "./TouchControls";
 import type { CabinControls } from "@/modules/sim/scene/cabin";
 
 /**
@@ -271,5 +271,158 @@ describe("§4 THE SEAM — every card raises the same one boolean", () => {
     // standing between a held finger and a dead pad.
     expect(SCENE).toContain("const [touchCapable] = useState(() => hasTouchScreen());");
     expect(SCENE).toMatch(/\{touchCapable \? \(? ?<TouchControls/);
+  });
+});
+
+/**
+ * =============================================================================
+ * §5 THE STRANDED AXIS — a pad that lets go of the finger but not of the pedal.
+ *
+ * §1–§4 are about the pad being DEAD (it kept an id it should have dropped).
+ * This is the same omission read the other way round: the pad drops the id and
+ * keeps the AXIS, and because `TouchInputSource.mergeInto` is a priority
+ * replace and not a max, that is not a pedal that stops working — it is a
+ * pedal that outranks every other device for the rest of the session.
+ *
+ * `!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the
+ *  key; re-asserting it.`   — sweep161, mobile leg, 20 of 22 lessons in chunk F
+ *
+ * The runs that printed that line were captured before `keyboardTakeoverAllowed`
+ * and had this overlay released and inert (the frame shows «МЕНЮ» alone), so
+ * they are not this defect's evidence — they are the reason it was looked for.
+ * What the takeover fix changed is that a stray drive key no longer sweeps a
+ * stranded axis away every few seconds, so from 2026-08-17 a stranded axis is
+ * permanent. Both halves below are the price of that.
+ * =============================================================================
+ */
+describe("§5 THE STRANDED AXIS — an axis is held only while its pad owns a finger", () => {
+  /** A brake key held flat out, as `SimInput.read()` hands it to the merge. */
+  const keyboardBrakingHard = () => ({
+    steer: 0,
+    throttle: 0,
+    brake: 1,
+    handbrake: false,
+    clutch: 0,
+  });
+
+  it("THE DEFECT: a capture lost without a pointerup vetoes the keyboard brake", () => {
+    const touch = new TouchInputSource();
+    const steer = new PadPointer();
+    const drive = new PadPointer();
+
+    // A thumb feathers the brake, then the browser takes the capture away and
+    // no `pointerup` and no `pointercancel` is ever delivered to the pad.
+    drive.claim(4);
+    touch.setBrake(0.15);
+    drive.release(4);
+
+    // Every later read: the student's full brake key is replaced by 0.15.
+    const vetoed = keyboardBrakingHard();
+    touch.mergeInto(vetoed);
+    expect(vetoed.brake).toBe(0.15);
+
+    // …and the invariant check is what gives it back.
+    reconcileHeldAxes(touch, steer, drive);
+    const restored = keyboardBrakingHard();
+    touch.mergeInto(restored);
+    expect(restored.brake).toBe(1);
+  });
+
+  it("THE HARNESS'S OWN SENTENCE: a stranded throttle accelerates under a held brake", () => {
+    const touch = new TouchInputSource();
+    const drive = new PadPointer();
+    drive.claim(4);
+    touch.setThrottle(0.9); // the thumb was above centre when capture went
+    drive.release(4);
+
+    const braking = keyboardBrakingHard();
+    touch.mergeInto(braking);
+    expect(braking.brake).toBe(1); // the brake key does arrive…
+    expect(braking.throttle).toBe(0.9); // …under a throttle nobody is holding
+
+    reconcileHeldAxes(touch, new PadPointer(), drive);
+    const after = keyboardBrakingHard();
+    touch.mergeInto(after);
+    expect(after.throttle).toBe(0);
+  });
+
+  it("THE OPPOSITE DIRECTION: a thumb that IS on the pedal keeps its axis", () => {
+    // The crime a watchdog commits is releasing a live gesture — the student
+    // presses the glass brake, a drive key is held from a hybrid keyboard or a
+    // stuck key, and the check hands the car to the key mid-stop.
+    const touch = new TouchInputSource();
+    const steer = new PadPointer();
+    const drive = new PadPointer();
+    drive.claim(4);
+    steer.claim(2);
+    touch.setBrake(1);
+    touch.setSteer(-0.6);
+
+    reconcileHeldAxes(touch, steer, drive);
+
+    const out = { steer: 0, throttle: 1, brake: 0, handbrake: false, clutch: 0 };
+    touch.mergeInto(out);
+    expect(out.brake).toBe(1); // the thumb still outranks the key
+    expect(out.throttle).toBe(1); // …and it did not invent a throttle release
+    expect(out.steer).toBe(-0.6);
+  });
+
+  it("frees one pad without touching the other's live axis", () => {
+    const touch = new TouchInputSource();
+    const steer = new PadPointer();
+    const drive = new PadPointer();
+    steer.claim(2);
+    touch.setSteer(0.5);
+    touch.setThrottle(0.7); // stranded: the drive pad owns nobody
+
+    reconcileHeldAxes(touch, steer, drive);
+
+    const out = { steer: 0, throttle: 0, brake: 0, handbrake: false, clutch: 0 };
+    touch.mergeInto(out);
+    expect(out.steer).toBe(0.5);
+    expect(out.throttle).toBe(0);
+  });
+
+  it("is a no-op on a free, already-released overlay (it cannot fabricate input)", () => {
+    const touch = new TouchInputSource();
+    reconcileHeldAxes(touch, new PadPointer(), new PadPointer());
+    const out = { steer: 0.3, throttle: 0.4, brake: 0.5, handbrake: true, clutch: 0 };
+    touch.mergeInto(out);
+    expect(out).toEqual({ steer: 0.3, throttle: 0.4, brake: 0.5, handbrake: true, clutch: 0 });
+  });
+});
+
+describe("§6 THE WIRING — both pads carry all four release edges", () => {
+  /** The pad's own JSX attribute list, from `role="slider"` to the `style`. */
+  function padTag(nth: 0 | 1): string {
+    const tags = CODE.split('role="slider"').slice(1);
+    expect(tags.length, "both pads must still be sliders").toBe(2);
+    return tags[nth].slice(0, tags[nth].indexOf("className="));
+  }
+
+  it.each([
+    [0 as const, "onSteerEnd"],
+    [1 as const, "onDriveEnd"],
+  ])("pad %i ends on up, cancel AND lost capture — all three call %s", (nth, ender) => {
+    const tag = padTag(nth);
+    expect(tag).toContain(`onPointerUp={${ender}}`);
+    expect(tag).toContain(`onPointerCancel={${ender}}`);
+    // The edge that was missing. `setPointerCapture` is released without a
+    // `pointerup` when the browser takes it back, and the axis outlives the
+    // finger for the rest of the session when nothing answers it.
+    expect(tag).toContain(`onLostPointerCapture={${ender}}`);
+  });
+
+  it("the horn keeps the four edges it has always had (they are not traded)", () => {
+    // `useHoldButton` is where the four-edge idiom is written down; the pads
+    // borrowed it. A future edit that "unifies" them must not unify downward.
+    for (const edge of ["onPointerUp:", "onPointerCancel:", "onLostPointerCapture:"]) {
+      expect(CODE).toContain(edge);
+    }
+  });
+
+  it("the invariant is re-checked while the overlay is live, on its own clock", () => {
+    expect(CODE).toContain("reconcileHeldAxes(touch, steerPad, drivePad)");
+    expect(CODE).toContain("AXIS_RECONCILE_MS");
   });
 });

@@ -34,7 +34,14 @@ export {
   hasWhy,
   isAmbientOverlay,
   overlayCentreBand,
+  // Rule 4, 2026-08-17: the census of surfaces that can take the drive screen,
+  // and the TWO answers derived from it — „may the queue speak" and „must the
+  // car be frozen". They are exported together because the defect they close
+  // was the two being kept apart by hand in `LessonPlayShell`.
+  overlayHoldsDrive,
   overlayPriority,
+  overlayQueueMaySpeak,
+  overlaySilencesQueue,
   peekWithinBudget,
   rectClearsCentreBand,
   rectViewportFraction,
@@ -43,9 +50,13 @@ export {
   OVERLAY_CENTRE_BAND,
   OVERLAY_PEEK_HEIGHT_PX,
   OVERLAY_PEEK_MAX_FRACTION,
+  OVERLAY_SCREEN_OWNERS,
   type BriefingStepBg,
   type OverlayRect,
+  type OverlayScreenOwner,
+  type OverlayScreenOwnerSpec,
   type OverlaySelection,
+  type SelectOverlayOptions,
   type SimOverlayItem,
   type SimOverlayKind,
   type SimOverlayTone,

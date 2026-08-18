@@ -78,7 +78,12 @@
 import { parseObjectiveParams, type LessonSpec } from "@/modules/sim/lessons";
 import { LANE_WIDTH_M, createWorldRuntime } from "@/modules/sim/runtime";
 import { DistrictIndex } from "@/modules/sim/runtime/spatial";
-import { paintsZebra } from "@/modules/sim/world/builders/constants";
+import {
+  GIVE_WAY_TRIANGLE_LENGTH_M,
+  GIVE_WAY_TRIANGLE_SETBACK_M,
+  STOP_LINE_WIDTH_M,
+  paintsZebra,
+} from "@/modules/sim/world/builders/constants";
 import {
   JUNCTION_TRIM_MAX_FRACTION,
   STOP_LINE_BEYOND_CUT_M,
@@ -1672,6 +1677,46 @@ export function nearestArcOnRoute(route: DerivedRoute, x: number, y: number): nu
 }
 
 // ---------------------------------------------------------------------------
+// THE RIBBON DOES NOT OWN THE PAINT AT A JUNCTION MOUTH EITHER
+// ---------------------------------------------------------------------------
+//
+// THE FRAME (catalogue sweep 2026-08-17, `sc-sig-controller-live`, mobile/right
+// — the only one of 24 combinations that produced evidence). `05-stopped.png`,
+// crop [1080, 400 320×160] × 6: a регулировчик stands in the box with both arms
+// out, the callout reads «СПРИ» — and the ribbon runs unbroken across the stop
+// line, chevrons forward, into and through the junction he is closing. The same
+// unbroken ribbon is in `04-t012s.png` and in `01-arrival.png`.
+//
+// MEASURED, on the recorded correct drive of that lesson (L1, sx-v1): when
+// `sc-sctl-cross` goes live at t = 10.75 s the derived route is 84.31 m long
+// and `goalS` is 10.00 — so 74 m of it, three quarters, is the look-ahead leg
+// running THROUGH the junction, and the graded line it crosses at s ≈ 10.8 had
+// nothing drawn at it at all.
+//
+// WHAT THIS IS AND IS NOT. The ribbon is a ROUTE, not a signal state: making it
+// go dark because a controller has his arms out would put the light's state on
+// the asphalt, which is a bigger lie than the one being fixed (and the
+// look-ahead leg exists on purpose — register B24: the turn must be announced
+// before the junction, not after the nose is in it). But the leg had no
+// business being painted OVER the paint. `STOP_LINE_WIDTH_M` is 0.8 m of М7 bar
+// at MARKING_Y = 0.032, under an ADDITIVELY blended ribbon at RIBBON_Y = 0.045 —
+// the identical mechanism as the zebra below, at the identical two centimetres
+// of separation.
+//
+// AND THE MOUTH'S PAINT IS NOT THE SAME DEPTH ON EVERY ARM. `markings.ts` adds
+// the М8 give-way triangles — a further `GIVE_WAY_TRIANGLE_SETBACK_M +
+// GIVE_WAY_TRIANGLE_LENGTH_M` = 8.4 m back from the bar — in the giveWayEdges
+// branch ONLY. A signalised arm like this one, and a Б2 „Стоп" arm, carry the
+// bar and nothing else. The first version of this mute took the give-way depth
+// off every arm, i.e. 8 m of dark ribbon over bare asphalt at every light in
+// the catalogue; `stopLineMuteBeforeM` is where that is now decided, from the
+// line's own `control`.
+//
+// So the ribbon goes quiet over the mouth's paint, exactly as it already does
+// over a zebra: there IS a change of state at the line, it is the line's own
+// paint that carries it, and the leg beyond still announces the turn.
+//
+// ---------------------------------------------------------------------------
 // THE RIBBON DOES NOT OWN THE ZEBRA
 // ---------------------------------------------------------------------------
 //
@@ -1709,39 +1754,164 @@ export function nearestArcOnRoute(route: DerivedRoute, x: number, y: number): nu
 export const CROSSING_MUTE_HALF_M = 4;
 
 /**
- * How far off the route a crossing may sit and still count, m. A crossing on
- * the parallel street is not on this route; one on the route's own edge is
- * within half a carriageway of it even where the ribbon rides a lane offset.
+ * How far off the route a crossing or a stop line may sit and still count, m. A
+ * crossing on the parallel street is not on this route; one on the route's own
+ * edge is within half a carriageway of it even where the ribbon rides a lane
+ * offset.
  */
-const CROSSING_MUTE_MAX_OFFSET_M = LANE_WIDTH_M;
+const MUTE_MAX_OFFSET_M = LANE_WIDTH_M;
 
-/** Most spans the shader carries. Four crossings on one derived route is more
+/**
+ * The quiet span at a junction mouth, m, measured from the LINE'S OWN CENTRE
+ * (`paintedLinesFor` / `runtime/stoplines.ts` both anchor on the bar's centre).
+ *
+ * BEFORE: whatever the world actually paints on the approach — and that is TWO
+ * different depths, which is what this pair exists to keep straight. See the
+ * block on `STOP_LINE_MUTE_BEFORE_GIVE_WAY_M` below.
+ * AFTER: half the М7 bar (`STOP_LINE_WIDTH_M` / 2) and the same one metre of
+ * unlit asphalt `CROSSING_MUTE_HALF_M` leaves around a zebra's bars. The span
+ * stops there on purpose: past the line is the junction box, and a ribbon that
+ * went dark across the whole box would be answering „is it my turn" — a
+ * question the route layer must never appear to answer.
+ */
+export const STOP_LINE_MUTE_AFTER_M = STOP_LINE_WIDTH_M / 2 + 1;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * HOW FAR BACK THE MUTE REACHES DEPENDS ON WHAT IS PAINTED THERE — 2026-08-18.
+ *
+ * ONE NUMBER SHIPPED FOR ALL THREE CONTROLS AND IT WAS THE GIVE-WAY ONE. The
+ * М18 triangles are the deepest thing the world paints on an approach — base
+ * `GIVE_WAY_TRIANGLE_SETBACK_M` (3.0 m) before the bar, apex a further
+ * `GIVE_WAY_TRIANGLE_LENGTH_M` (5.4 m) out — so 8.4 m of paint, plus a metre of
+ * clearance. But `markings.ts` paints them in exactly one branch:
+ *
+ *     if (node.signalized || stopSignEdges.has(key))  paintStopLine(ap, false)
+ *     else if (giveWayEdges.has(key))                 paintStopLine(ap, true)
+ *                                                     paintGiveWayTriangles(ap)
+ *
+ * — so a SIGNALISED arm and a Б2 „Стоп" arm get one 0.8 m bar and no symbol at
+ * all, while the mute took 9.4 m off the ribbon in front of them. 9.4 − 1.4 =
+ * 8.0 m, and on sx-v1's signalised crossroads — the map `sc-sig-controller-live`
+ * runs on, and the only junction `guidance-stopline-mute.test.ts` ever measured
+ * — every metre of that is bare asphalt. That is precisely the failure this
+ * function's own guards are written against, quoted from the one 20 lines down:
+ * „a gap with no cause is the thing this function exists to avoid."
+ *
+ * `GuidanceStopLine` has carried `control` since it was written; the mute loop
+ * simply never read it. It does now, and the two lengths are derived from the
+ * two branches above rather than chosen.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+/** The М18 triangles' own depth plus a metre — a Б1 give-way arm, and only it. */
+export const STOP_LINE_MUTE_BEFORE_GIVE_WAY_M =
+  GIVE_WAY_TRIANGLE_SETBACK_M + GIVE_WAY_TRIANGLE_LENGTH_M + 1;
+/** Half the М7 bar plus a metre — a signalised or Б2-controlled arm, where the
+ *  bar is the whole of the paint. Symmetric with `STOP_LINE_MUTE_AFTER_M`,
+ *  which is the same half-bar measured the other way. */
+export const STOP_LINE_MUTE_BEFORE_BAR_M = STOP_LINE_WIDTH_M / 2 + 1;
+
+/** …resolved for one line. The default is the BAR, not the triangles: a control
+ *  this switch has never heard of paints no symbol we know about, and the
+ *  conservative answer to „what is drawn here" is „the line itself". */
+export function stopLineMuteBeforeM(control: GuidanceStopLine["control"]): number {
+  return control === "giveWay" ? STOP_LINE_MUTE_BEFORE_GIVE_WAY_M : STOP_LINE_MUTE_BEFORE_BAR_M;
+}
+
+/**
+ * Direction agreement required between the ribbon and a line's own travel
+ * direction before that line is treated as being ON this route. Same number and
+ * same meaning as `APPROACH_ALIGN_DOT` above: the cross-street's Б2 at the same
+ * junction is not this driver's paint, and blanking his ribbon for it would be
+ * a gap with no cause — the exact failure `crossingMuteSpans` already refuses
+ * for a crossing on the parallel street.
+ */
+const MUTE_ALONG_DOT = 0.5;
+/** Window the ribbon's own direction is measured over at a mute candidate, m —
+ *  one densify step either side, so a corner does not read as a reversal. */
+const MUTE_DIR_WINDOW_M = DENSIFY_STEP_M;
+
+/** Most spans the shader carries. Four markings on one derived route is more
  *  than any district in the catalogue puts on a single objective's leg; past
  *  that the nearest ones win, because they are the ones on the glass. */
 export const CROSSING_MUTE_MAX_SPANS = 4;
 
+/** The ribbon's own travel direction at arclength `s`, unit — two clamped
+ *  `routePointAt` reads into points the caller owns. Unlike everything under
+ *  „per-frame helpers" above, this one runs on OBJECTIVE CHANGE only (it has a
+ *  single caller), so the returned pair is allocated rather than written out. */
+function routeDirAtArc(
+  route: DerivedRoute,
+  s: number,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): { x: number; y: number } | null {
+  routePointAt(route, s - MUTE_DIR_WINDOW_M, a);
+  routePointAt(route, s + MUTE_DIR_WINDOW_M, b);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len = Math.hypot(dx, dy);
+  return len > EPS ? { x: dx / len, y: dy / len } : null;
+}
+
 /**
- * Arclength spans of `route` that lie over a painted pedestrian crossing.
+ * Arclength spans of `route` the ribbon must not paint over: the marked
+ * pedestrian crossings on it, and the stop / give-way / traffic-light paint at
+ * every junction mouth it drives across (see the two section headers above —
+ * one mechanism, two surfaces, both of them a lesson's own teaching object).
+ *
+ * Nothing here is invented. The crossings come from `district.crossings`, the
+ * list `markings.ts` paints the zebra from and `CrossingZoneTracker` grades on;
+ * the lines come from `stopLinesForGuidance`, the same set every marker in this
+ * module resolves against (and memoized on the same district object the caller
+ * already passed to it, so this costs a WeakMap hit).
  *
  * Returned sorted by arclength and capped at CROSSING_MUTE_MAX_SPANS, so the
- * consumer can write them straight into a fixed-size uniform.
+ * consumer can write them straight into a fixed-size uniform. Sorted-then-
+ * sliced means the spans that survive are the NEAREST ones — the ones on the
+ * glass while the route is fresh.
  */
 export function crossingMuteSpans(
   route: DerivedRoute | null,
   district: RouteDistrictLike | null | undefined,
 ): Array<[number, number]> {
-  const crossings = district?.crossings;
-  if (!route || !crossings || crossings.length === 0) return [];
+  if (!route || !district) return [];
   const out: Array<[number, number]> = [];
   const at = { x: 0, y: 0 };
-  for (const c of crossings) {
+  const scratch = { x: 0, y: 0 };
+  for (const c of district.crossings ?? []) {
     // Only crossings that are actually PAINTED: an unmarked one has no bars to
     // wash out, and breaking the ribbon there would be a gap with no cause.
     if (!paintsZebra(c)) continue;
     const s = nearestArcOnRoute(route, c.x, c.y);
     routePointAt(route, s, at);
-    if (Math.hypot(at.x - c.x, at.y - c.y) > CROSSING_MUTE_MAX_OFFSET_M) continue;
+    if (Math.hypot(at.x - c.x, at.y - c.y) > MUTE_MAX_OFFSET_M) continue;
     out.push([s - CROSSING_MUTE_HALF_M, s + CROSSING_MUTE_HALF_M]);
+  }
+  const back = { x: 0, y: 0 };
+  for (const line of stopLinesForGuidance(district)) {
+    const near = nearestArcOnRoute(route, line.x, line.y);
+    routePointAt(route, near, at);
+    if (Math.hypot(at.x - line.x, at.y - line.y) > MUTE_MAX_OFFSET_M) continue;
+    // …and the student must be driving ACROSS it, not past the mouth of the
+    // side street it belongs to.
+    const dir = routeDirAtArc(route, near, back, scratch);
+    if (!dir || dir.x * line.dirX + dir.y * line.dirY < MUTE_ALONG_DOT) continue;
+    // `nearestArcOnRoute` returns a SAMPLE's arclength, so it is quantized to
+    // DENSIFY_STEP_M — up to 1.25 m of error, which the zebra's ±4 m span
+    // absorbs and a 1.4 m tail past a stop bar does not. Project the line onto
+    // the ribbon's own direction to recover the sub-sample arclength.
+    const s = near + (line.x - at.x) * dir.x + (line.y - at.y) * dir.y;
+    // A line the ribbon does not actually run over: already behind its head
+    // (the re-derivation at a Б2 leaves the bar under the nose), or past its
+    // tail. Either way there is no ribbon on that paint to take off it, and a
+    // gap with no cause is the thing this function exists to avoid.
+    if (s < -PAST_LINE_TOLERANCE_M || s > route.totalLen) continue;
+    // …and the span is as deep as the PAINT on this particular arm, which is
+    // decided by its control and by nothing else (see `stopLineMuteBeforeM`):
+    // only a Б1 give-way arm carries the М18 triangles, so only it is worth
+    // 9.4 m. A signalised or Б2 arm is one 0.8 m bar and takes 1.4.
+    out.push([s - stopLineMuteBeforeM(line.control), s + STOP_LINE_MUTE_AFTER_M]);
   }
   out.sort((a, b) => a[0] - b[0]);
   return out.slice(0, CROSSING_MUTE_MAX_SPANS);

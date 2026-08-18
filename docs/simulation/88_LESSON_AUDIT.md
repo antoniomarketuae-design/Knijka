@@ -1,0 +1,6007 @@
+# 88 — The lesson audit: every lesson driven twice on two devices, judged from its own frames
+
+> **Why this file exists.** Doc 87 holds one row per sentence the founder wrote about catalog
+> positions 1–50. It has a structural blind spot and says so: *it holds exactly what he happened to
+> notice.* This file is the other pass — **drive every lesson in the catalogue, twice (once following
+> the briefing, once doing the opposite), on a phone and on a desktop, and judge each one from the
+> frames it produced.** Nobody was asked what they thought. Every row below was written by opening a
+> PNG.
+>
+> **The three questions each lesson was asked, and they are not the same question.**
+> 1. *Does it teach what it says it teaches?* — the world, the cockpit and the copy agree.
+> 2. *Is the right drive credited?* — the drive that follows the briefing is passed **for following it**.
+> 3. *Is the wrong drive convicted?* — the drive that does the opposite is billed **for the offence the
+>    lesson is named after**, not for something incidental.
+>
+> A lesson can fail 3 while passing 2, and that is the most dangerous combination in the product: it
+> tells a careless student they were perfect.
+>
+> **`SWEEP` = `E:\AI driver\.audit-frames\sweep161\`.** Every frame path below is relative to it.
+> **A finding without a frame is not a finding** — same rule as doc 87.
+>
+> **This file is generated from the findings corpus, not typed.** Source: 24 JSONL files under
+> `E:\AI driver\.audit-frames\findings\`. Every count, ranking and grouping below was computed by
+> script over all 1,712 records, because the last attempt at this document was written by eye and
+> lost 985 findings. Re-run `build.js` against the corpus and this file reproduces byte for byte.
+
+---
+
+# THE ARITHMETIC, BEFORE ANYTHING ELSE
+
+**1,712 records arrived across 24 files. 26 of them are superseded** — `chunk-redrive.jsonl`
+re-drove 22 lessons whose first pass captured nothing, so the earlier `COULD_NOT_TEST` rows for
+those 22 lessons are dropped in favour of the re-drive. **1,686 records stand**, and every number in
+this file is computed over those 1,686.
+
+| | count |
+|---|---:|
+| records in the corpus | 1,712 |
+| superseded by the re-drive | 26 |
+| **records that stand** | **1,686** |
+| of which `SUMMARY` (one per lesson) | 161 |
+| of which **`BROKEN`** | **1,012** |
+| of which **`UNPOLISHED`** | **512** |
+| of which `COULD_NOT_TEST` filed as its own bucket | 1 |
+| **lessons carrying a record** | **161** |
+| lessons actually judged from frames | 137 |
+| lessons recorded `COULD_NOT_TEST` | 24 |
+
+---
+
+# THE THREE PLAIN NUMBERS
+
+Doc 87's rule is that the uncomfortable numbers go at the top, unrounded, before any analysis that
+might soften them.
+
+**1 — CLEAN: 0 of 137 judged lessons.** A lesson is CLEAN when it teaches what it claims
+(`works: YES`), credits the right drive, convicts the wrong one, **and carries no BROKEN finding**.
+Not one lesson in this sweep meets that bar. 8 lessons reach `works: YES`, 26 grade both
+directions correctly, and 8 carry no critical defect — but every judged lesson in the catalogue
+carries at least one BROKEN finding. That is the honest headline and it is not softened below.
+**It is also not the whole truth: the section «WHAT ALREADY WORKS» names, with frames, the parts of
+this product that are already right — because a sweep that reports only problems hides how much
+already works.**
+
+**2 — COULD NOT BE TESTED: 24 of 161 lessons carry a `COULD_NOT_TEST` verdict, and 5 more lesson
+folders were never opened at all.** They are not one thing and must not be blurred into one number —
+**17 of the 24 were judged too early**: their frames exist on disk *now*, four lanes and four
+debriefs each, written after the judge looked. Only 7 are genuinely unjudgeable. Full partition below.
+
+**3 — FINDINGS THAT NAMED NO FRAME: 5 of 1,686.** 1,681 records name a frame path and
+**every one of those paths resolves to a file that exists on disk** — checked with `fs.existsSync`, not
+assumed. 47 of them point at a run log or a directory rather than a PNG; those are the records that
+exist to say *nothing was captured*, and they are marked as such.
+
+---
+
+## Verdict vocabulary — use exactly these
+
+| column | value | means |
+|---|---|---|
+| **works** | `YES` | what the lesson claims to teach reaches the score sheet |
+| | `PARTIAL` | some of what the lesson claims to teach reaches the score sheet; some does not |
+| | `NO` | **nothing** the lesson exists to teach reaches the score sheet |
+| | `COULD_NOT_TEST` | no judgeable frame existed when the lesson was opened |
+| **right credited** | `YES` / `NO` | the drive that followed the briefing was passed **for following it** |
+| **wrong convicted** | `YES` / `NO` | the drive that did the opposite was billed **for the offence the lesson is named after** |
+
+`works: PARTIAL` is not a compliment. Every `PARTIAL` in this file grades geometry — *were you in
+this circle, under this speed* — and calls that the lesson.
+
+## How a drive ended — the codes in the ledger
+
+Derived by script from the `endedBecause` sentence each lesson carries; a lesson can hold more than
+one code because its four lanes ended differently. **The codes flatten and the sentences do not, so
+every sentence is printed in full in «WHY EACH DRIVE ENDED».**
+
+| code | means |
+|---|---|
+| `TASK-DONE` | an objective completed and that ended the session — **the only good ending** |
+| `ROUTE-OUT` | the route geometry ran out; no task decided anything |
+| `FORCED` | the drive budget expired with the lesson unfinished; closed through «Прекрати урока» |
+| `CRASH` | ended on collisions |
+| `STUCK` | ended off the carriageway or pinned, unable to continue |
+| `NATURAL` | ended on its own, with the record naming no more specific cause |
+| `NO-CAPTURE` | nothing was captured; nothing ended because nothing ran |
+
+## The seven parts each lesson was judged on
+
+`A` grading and teaching · `B` the world · `C` the car and cockpit · `D` the HUD over the glass · `E` audio · `F` consistency, platform to platform and lesson to lesson · `G` free observation
+
+---
+
+# THE COUNT
+
+| | BROKEN | UNPOLISHED | total |
+|---|---:|---:|---:|
+| **critical** | 318 | 1 | 319 |
+| **major** | 613 | 123 | 736 |
+| **minor** | 81 | 376 | 457 |
+| **info** | — | 12 | 12 |
+| **total** | **1,012** | **512** | **1,524** |
+
+| part | BROKEN | UNPOLISHED | what it is |
+|---|---:|---:|---|
+| `A` grading and teaching | **427** | 3 | the lesson does not grade, or does not contain, what it claims to teach |
+| `D` the HUD over the glass | **342** | 81 | the interface destroys, hides or truncates the thing being taught |
+| `F` consistency, platform to platform and lesson to lesson | **98** | 31 | the same drive scores or renders differently on two devices |
+| `G` free observation | **61** | 86 | found by looking, filed by nobody |
+| `C` the car and cockpit | **42** | 72 | the control or instrument the briefing names does not exist or does not move |
+| `B` the world | **33** | 145 | the object the briefing points at is not rendered |
+| `E` audio | **9** | 94 | stills cannot carry sound — these are mostly "no control exists anywhere", which a still *can* carry |
+
+**427 of 1,012 BROKEN findings are `A`** — lessons that do not grade what they teach — and
+**342 are `D`**, the interface hiding the teaching from the student. Between them they are
+76% of everything broken here. That ratio held at 18 lessons and it holds at 137.
+
+---
+
+# THE LEDGER — one row per lesson
+
+**161 rows, one per lesson that carries a record.** BROKEN is `critical / major / minor`;
+UNPOLISHED is `major / minor`. Sorted by lesson id.
+
+| # | lesson | works | right credited | wrong convicted | how it ended | BROKEN | UNPOL |
+|---:|---|---|---|---|---|---|---|
+| 1 | `sc-ac-aquaplane` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 3/6/1 | 3/3 |
+| 2 | `sc-ac-bridge-ice` | **NO** | **NO** | **NO** | `ROUTE-OUT` · `FORCED` | 2/1/1 | 0/1 |
+| 3 | `sc-ac-crosswind` | **NO** | YES | YES | `TASK-DONE` · `ROUTE-OUT` · `CRASH` | 3/4/0 | 1/1 |
+| 4 | `sc-ac-fog` | PARTIAL | YES | YES | `ROUTE-OUT` · `FORCED` | 2/3/0 | 0/2 |
+| 5 | `sc-ac-highbeam-lead` | PARTIAL | YES | YES | `ROUTE-OUT` · `FORCED` · `CRASH` | 3/5/0 | 1/0 |
+| 6 | `sc-ac-ice` | PARTIAL | YES | YES | `TASK-DONE` · `CRASH` | 2/2/0 | 2/1 |
+| 7 | `sc-ac-night-lights` | PARTIAL | YES | YES | `ROUTE-OUT` · `FORCED` | 2/3/3 | 1/4 |
+| 8 | `sc-ac-night-overdrive` | PARTIAL | **NO** | YES | `FORCED` | 1/3/0 | 0/2 |
+| 9 | `sc-ac-rain-lights` | PARTIAL | YES | YES | `ROUTE-OUT` · `FORCED` | 2/3/1 | 1/2 |
+| 10 | `sc-ac-snow` | **NO** | YES | YES | `TASK-DONE` · `ROUTE-OUT` · `CRASH` | 3/3/1 | 0/0 |
+| 11 | `sc-ac-truck-spray` | **NO** | **NO** | **NO** | `ROUTE-OUT` · `FORCED` | 3/4/0 | 0/0 |
+| 12 | `sc-ac-wet-braking` | YES | YES | YES | `TASK-DONE` · `ROUTE-OUT` | 0/3/0 | 1/1 |
+| 13 | `sc-ac-wind-truck-pass` | **NO** | **NO** | PARTIAL | `TASK-DONE` · `ROUTE-OUT` · `FORCED` | 2/5/0 | 1/0 |
+| 14 | `sc-accident-own-conduct` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 15 | `sc-animal-hazard` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 16 | `sc-crossing-bus-shadow` | PARTIAL | YES | YES | `NATURAL` | 2/6/0 | 0/4 |
+| 17 | `sc-crossing-child-ball` | YES | YES | YES | `TASK-DONE` | 1/5/0 | 0/4 |
+| 18 | `sc-crossing-dart` | **NO** | **NO** | YES | `ROUTE-OUT` | 4/9/2 | 5/5 |
+| 19 | `sc-crossing-let-pass` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 1/0/0 | 0/0 |
+| 20 | `sc-crossing-rain-sprint` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 1/0/0 | 0/0 |
+| 21 | `sc-crossing-slow-crosser` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 1/0/0 | 0/0 |
+| 22 | `sc-crossing-white-cane` | PARTIAL | **NO** | **NO** | `TASK-DONE` | 3/6/0 | 0/4 |
+| 23 | `sc-driver-distraction` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 24 | `sc-ed-d2-city-run` | **NO** | **NO** | YES | `ROUTE-OUT` · `FORCED` | 3/1/0 | 1/3 |
+| 25 | `sc-ed-d2-priority-run` | **NO** | **NO** | YES | `TASK-DONE` · `FORCED` | 2/8/0 | 2/2 |
+| 26 | `sc-ed-d2-stop-address` | PARTIAL | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` · `FORCED` | 1/5/1 | 2/3 |
+| 27 | `sc-ed-poligon-chain` | **NO** | **NO** | PARTIAL | `TASK-DONE` · `ROUTE-OUT` · `FORCED` | 2/4/1 | 2/2 |
+| 28 | `sc-ed-reverse-line` | **NO** | **NO** | PARTIAL | `FORCED` | 2/4/2 | 2/1 |
+| 29 | `sc-fo-brakelight-chain` | **NO** | **NO** | YES | `FORCED` | 1/4/0 | 2/2 |
+| 30 | `sc-fo-motorway-gap` | **NO** | **NO** | YES | `TASK-DONE` · `FORCED` · `CRASH` | 2/2/0 | 1/3 |
+| 31 | `sc-follow-brake` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 3/5/2 | 1/1 |
+| 32 | `sc-follow-cutin` | **NO** | YES | **NO** | `TASK-DONE` · `CRASH` | 3/4/1 | 1/1 |
+| 33 | `sc-follow-distance` | PARTIAL | YES | YES | `TASK-DONE` · `FORCED` · `CRASH` | 2/10/3 | 3/2 |
+| 34 | `sc-follow-rain-gap` | PARTIAL | YES | YES | `TASK-DONE` · `FORCED` · `CRASH` | 1/4/1 | 1/0 |
+| 35 | `sc-follow-standstill` | PARTIAL | YES | YES | `TASK-DONE` · `CRASH` | 2/4/1 | 1/0 |
+| 36 | `sc-follow-tailgater` | PARTIAL | YES | **NO** | `TASK-DONE` · `CRASH` | 1/5/1 | 1/1 |
+| 37 | `sc-follow-truck` | PARTIAL | **NO** | YES | `TASK-DONE` · `CRASH` | 2/4/1 | 2/0 |
+| 38 | `sc-hazard-obstacle` | **NO** | YES | **NO** | `ROUTE-OUT` | 2/4/0 | 1/5 |
+| 39 | `sc-hz-accident-scene` | PARTIAL | **NO** | **NO** | `CRASH` · `STUCK` | 3/4/0 | 1/3 |
+| 40 | `sc-hz-brake-dont-swerve` | PARTIAL | YES | YES | `NATURAL` | 1/3/0 | 1/5 |
+| 41 | `sc-hz-breakdown-pulloff` | **NO** | **NO** | YES | `FORCED` | 3/2/0 | 2/3 |
+| 42 | `sc-hz-emergency-stop` | **NO** | **NO** | YES | `ROUTE-OUT` | 3/3/0 | 2/3 |
+| 43 | `sc-junction-blind` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 2/8/2 | 1/5 |
+| 44 | `sc-junction-gap` | PARTIAL | **NO** | YES | `FORCED` | 4/5/0 | 1/3 |
+| 45 | `sc-junction-left` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 1/5/1 | 1/3 |
+| 46 | `sc-junction-rhr` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 3/7/0 | 2/4 |
+| 47 | `sc-junction-scan` | PARTIAL | **NO** | YES | `FORCED` | 3/3/0 | 1/3 |
+| 48 | `sc-junction-stop` | PARTIAL | **NO** | YES | `TASK-DONE` · `FORCED` | 3/6/0 | 1/3 |
+| 49 | `sc-jx-blocked-exit` | PARTIAL | **NO** | YES | `CRASH` | 1/4/2 | 1/2 |
+| 50 | `sc-jx-equal-left` | **NO** | **NO** | YES | `CRASH` · `STUCK` | 2/6/0 | 1/2 |
+| 51 | `sc-jx-giveway-b1` | **NO** | **NO** | YES | `TASK-DONE` · `FORCED` | 3/3/0 | 1/3 |
+| 52 | `sc-jx-priority-confidence` | PARTIAL | YES | **NO** | `TASK-DONE` | 1/3/0 | 1/3 |
+| 53 | `sc-lane-change` | **NO** | **NO** | PARTIAL | `FORCED` | 1/7/0 | 2/1 |
+| 54 | `sc-lane-control-signal` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 55 | `sc-ln-boulevard-discipline` | **NO** | **NO** | **NO** | `NATURAL` | 3/4/0 | 0/4 |
+| 56 | `sc-ln-decisive-change` | **NO** | **NO** | **NO** | `FORCED` | 4/5/0 | 1/1 |
+| 57 | `sc-ln-obstacle-meeting` | PARTIAL | **NO** | YES | `TASK-DONE` · `CRASH` · `STUCK` | 3/7/3 | 2/2 |
+| 58 | `sc-ln-turn-lane-arrows` | **NO** | **NO** | YES | `TASK-DONE` | 3/6/0 | 1/2 |
+| 59 | `sc-maneuver-3point` | PARTIAL | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` | 1/6/2 | 1/1 |
+| 60 | `sc-maneuver-uturn` | PARTIAL | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` | 1/5/1 | 1/0 |
+| 61 | `sc-merge-accel-lane` | **NO** | **NO** | YES | `TASK-DONE` · `FORCED` | 5/4/0 | 1/3 |
+| 62 | `sc-merge-bus-pullout` | **NO** | **NO** | COULD_NOT_TEST | `FORCED` | 2/3/1 | 1/3 |
+| 63 | `sc-merge-from-property` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 1/6/1 | 1/2 |
+| 64 | `sc-merge-lane-end` | PARTIAL | **NO** | **NO** | `ROUTE-OUT` | 2/6/0 | 2/5 |
+| 65 | `sc-merge-motorway-exit` | **NO** | **NO** | COULD_NOT_TEST | `FORCED` | 2/4/1 | 1/2 |
+| 66 | `sc-merge-roadworks-shift` | PARTIAL | **NO** | **NO** | `CRASH` | 2/5/0 | 1/2 |
+| 67 | `sc-mv-uturn-ban` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 1/4/0 | 0/4 |
+| 68 | `sc-mw-discipline` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 4/6/2 | 0/2 |
+| 69 | `sc-mw-emergency-lane` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 3/5/0 | 1/3 |
+| 70 | `sc-mw-min-speed` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 3/4/2 | 0/1 |
+| 71 | `sc-ov-abort` | PARTIAL | **NO** | YES | `FORCED` | 3/4/0 | 0/4 |
+| 72 | `sc-ov-ban-overtake` | PARTIAL | **NO** | YES | `TASK-DONE` · `FORCED` · `CRASH` | 1/3/0 | 1/0 |
+| 73 | `sc-ov-being-overtaken` | **NO** | **NO** | **NO** | `FORCED` | 4/2/0 | 0/3 |
+| 74 | `sc-ov-bus-lane` | **NO** | **NO** | **NO** | `TASK-DONE` | 1/1/0 | 2/0 |
+| 75 | `sc-ov-crest-curve` | **NO** | **NO** | YES | `FORCED` | 2/5/0 | 0/3 |
+| 76 | `sc-ov-crossing-overtake` | PARTIAL | YES | YES | `CRASH` | 0/5/0 | 1/0 |
+| 77 | `sc-ov-keep-right` | **NO** | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` · `FORCED` | 2/3/0 | 1/3 |
+| 78 | `sc-ov-lane-keeping` | PARTIAL | **NO** | YES | `ROUTE-OUT` · `FORCED` | 2/5/0 | 1/3 |
+| 79 | `sc-ov-narrow` | **NO** | **NO** | **NO** | `TASK-DONE` · `CRASH` | 1/2/0 | 1/1 |
+| 80 | `sc-ov-night-gap` | PARTIAL | **NO** | YES | `FORCED` | 2/4/0 | 0/4 |
+| 81 | `sc-ov-oncoming-gap` | PARTIAL | **NO** | YES | `FORCED` | 4/8/0 | 0/5 |
+| 82 | `sc-ov-oneway` | PARTIAL | **NO** | **NO** | `FORCED` | 2/1/0 | 2/2 |
+| 83 | `sc-ov-return-gap` | PARTIAL | **NO** | YES | `FORCED` | 2/4/0 | 0/3 |
+| 84 | `sc-ov-solid-line` | PARTIAL | YES | **NO** | `TASK-DONE` | 1/1/0 | 1/1 |
+| 85 | `sc-ov-solid-return` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 3/4/0 | 0/4 |
+| 86 | `sc-park-45-rev` | **NO** | **NO** | **NO** | `CRASH` | 3/5/0 | 0/4 |
+| 87 | `sc-park-bay-exit-rev` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 4/3/1 | 0/2 |
+| 88 | `sc-park-double` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 89 | `sc-park-gap-long` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 3/4/0 | 0/2 |
+| 90 | `sc-park-gap-short` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 3/4/0 | 0/2 |
+| 91 | `sc-park-judge` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` · `CRASH` | 2/0/0 | 0/0 |
+| 92 | `sc-park-left` | **NO** | **NO** | **NO** | `FORCED` | 3/4/0 | 0/4 |
+| 93 | `sc-park-night` | PARTIAL | **NO** | UNKNOWN | `TASK-DONE` · `FORCED` · `CRASH` | 4/6/0 | 1/2 |
+| 94 | `sc-park-van` | PARTIAL | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` · `CRASH` | 5/4/0 | 3/6 |
+| 95 | `sc-park-wall` | **NO** | **NO** | **NO** | `CRASH` | 1/4/0 | 0/4 |
+| 96 | `sc-park-zebra` | **NO** | **NO** | **NO** | `FORCED` | 3/4/0 | 0/4 |
+| 97 | `sc-pe-jaywalker` | PARTIAL | **NO** | YES | `NATURAL` | 2/6/0 | 0/4 |
+| 98 | `sc-pe-night-unlit` | PARTIAL | **NO** | **NO** | `CRASH` | 2/5/2 | 1/6 |
+| 99 | `sc-pe-parked-row-scan` | PARTIAL | YES | YES | `CRASH` | 0/3/3 | 1/4 |
+| 100 | `sc-pe-school-patrol` | YES | YES | YES | `NATURAL` | 1/4/0 | 0/4 |
+| 101 | `sc-pe-zone-living` | PARTIAL | **NO** | YES | `FORCED` | 2/7/1 | 1/2 |
+| 102 | `sc-pk-ban-stop` | PARTIAL | YES | YES | `TASK-DONE` · `CRASH` | 0/3/1 | 0/5 |
+| 103 | `sc-pk-busstop-ban` | YES | YES | COULD_NOT_TEST | `TASK-DONE` | 1/3/1 | 1/4 |
+| 104 | `sc-pk-crossing-ban` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/1/0 | 0/0 |
+| 105 | `sc-pk-double-park` | YES | YES | YES | `TASK-DONE` · `CRASH` | 1/3/0 | 0/5 |
+| 106 | `sc-pk-driveway` | **NO** | **NO** | YES | `FORCED` · `CRASH` | 3/5/0 | 0/5 |
+| 107 | `sc-pk-move-off` | **NO** | **NO** | **NO** | `TASK-DONE` · `ROUTE-OUT` | 6/3/0 | 1/1 |
+| 108 | `sc-pk-rail-ban` | **NO** | **NO** | YES | `CRASH` | 4/2/0 | 0/4 |
+| 109 | `sc-pk-smooth-stop` | YES | YES | YES | `CRASH` | 0/2/2 | 0/5 |
+| 110 | `sc-pk-stop-vs-park` | PARTIAL | YES | YES | `TASK-DONE` · `FORCED` · `CRASH` | 0/4/3 | 0/7 |
+| 111 | `sc-rb-busy-gap` | **NO** | **NO** | **NO** | `CRASH` | 2/5/0 | 0/4 |
+| 112 | `sc-rb-circulate-priority` | **NO** | **NO** | **NO** | `CRASH` · `STUCK` | 2/5/0 | 0/4 |
+| 113 | `sc-rb-exit-signal` | PARTIAL | **NO** | UNKNOWN | `FORCED` | 3/6/3 | 4/7 |
+| 114 | `sc-rb-lane-choice` | **NO** | **NO** | **NO** | `CRASH` | 2/4/0 | 0/4 |
+| 115 | `sc-rb-ped-exit` | **NO** | **NO** | **NO** | `FORCED` | 3/5/0 | 0/4 |
+| 116 | `sc-roundabout-entry` | **NO** | **NO** | YES | `ROUTE-OUT` | 3/3/0 | 1/2 |
+| 117 | `sc-rx-barrier-drop` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 1/1/0 | 0/4 |
+| 118 | `sc-rx-guarded` | PARTIAL | UNKNOWN | YES | `ROUTE-OUT` | 1/3/0 | 0/2 |
+| 119 | `sc-rx-queue-clear` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 1/0/0 | 0/0 |
+| 120 | `sc-rx-tram-island` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/1 |
+| 121 | `sc-rx-tram-left` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/2/0 | 0/2 |
+| 122 | `sc-rx-tram-stop-doors` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 123 | `sc-rx-unguarded` | **NO** | **NO** | UNKNOWN | `ROUTE-OUT` | 3/6/0 | 0/5 |
+| 124 | `sc-sig-controller-live` | **NO** | **NO** | UNKNOWN | `TASK-DONE` | 5/4/0 | 2/4 |
+| 125 | `sc-sig-controller-postures` | PARTIAL | YES | **NO** | `NATURAL` | 1/5/0 | 0/4 |
+| 126 | `sc-sig-flash-amber-ped` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 127 | `sc-sig-green-wave` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 128 | `sc-sign-warning` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 129 | `sc-signal-controller` | PARTIAL | UNKNOWN | UNKNOWN | `NO-CAPTURE` · `FORCED` | 3/10/2 | 5/5 |
+| 130 | `sc-signal-dead` | **NO** | **NO** | **NO** | `CRASH` | 2/5/0 | 0/4 |
+| 131 | `sc-signal-flashing` | PARTIAL | **NO** | **NO** | `CRASH` | 3/5/3 | 2/5 |
+| 132 | `sc-signal-hesitation` | PARTIAL | YES | **NO** | `NATURAL` | 2/4/0 | 0/4 |
+| 133 | `sc-signal-redyellow` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 134 | `sc-signal-response` | PARTIAL | YES | **NO** | `TASK-DONE` · `CRASH` | 3/3/0 | 1/3 |
+| 135 | `sc-sp-curve` | PARTIAL | **NO** | YES | `FORCED` · `STUCK` | 3/7/0 | 2/3 |
+| 136 | `sc-sp-eco-coast` | YES | YES | YES | `TASK-DONE` | 0/6/1 | 0/2 |
+| 137 | `sc-sp-harsh-brake` | **NO** | **NO** | **NO** | `FORCED` | 2/4/0 | 2/3 |
+| 138 | `sc-sp-limit-end` | PARTIAL | **NO** | YES | `FORCED` | 3/4/3 | 0/1 |
+| 139 | `sc-sp-wet-limit-plate` | **NO** | UNKNOWN | **NO** | `TASK-DONE` | 5/5/1 | 0/0 |
+| 140 | `sc-speed-creep` | **NO** | **NO** | YES | `FORCED` | 2/4/0 | 0/4 |
+| 141 | `sc-speed-dangerous` | PARTIAL | **NO** | YES | `TASK-DONE` · `FORCED` | 1/5/0 | 0/4 |
+| 142 | `sc-speed-rain` | PARTIAL | **NO** | YES | `TASK-DONE` · `FORCED` | 1/5/0 | 0/4 |
+| 143 | `sc-speed-transition` | PARTIAL | **NO** | YES | `FORCED` | 2/4/1 | 2/3 |
+| 144 | `sc-speed-zone` | PARTIAL | **NO** | YES | `TASK-DONE` · `FORCED` | 1/5/0 | 0/4 |
+| 145 | `sc-turn-left-oncoming` | PARTIAL | **NO** | YES | `FORCED` · `CRASH` | 2/5/1 | 1/3 |
+| 146 | `sc-vp-handbrake` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 3/3/0 | 1/0 |
+| 147 | `sc-vp-police-stop` | YES | YES | YES | `CRASH` | 0/3/2 | 2/0 |
+| 148 | `sc-vp-readiness` | PARTIAL | **NO** | **NO** | `TASK-DONE` · `FORCED` | 2/8/0 | 1/2 |
+| 149 | `sc-vp-stall` | **NO** | **NO** | **NO** | `TASK-DONE` · `FORCED` | 3/4/0 | 0/1 |
+| 150 | `sc-vp-telltale` | **NO** | YES | YES | `CRASH` | 1/2/1 | 1/1 |
+| 151 | `sc-vp-telltale-red` | **NO** | YES | YES | `CRASH` | 2/2/0 | 1/0 |
+| 152 | `sc-vu-bikelane-turn` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 153 | `sc-vu-blindspot-moto` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 154 | `sc-vu-child-cyclist` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 155 | `sc-vu-cyclist-group` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 156 | `sc-vu-cyclist-hook` | **NO** | **NO** | YES | `CRASH` | 4/4/2 | 0/0 |
+| 157 | `sc-vu-door-zone` | `COULD_NOT_TEST` | UNKNOWN | UNKNOWN | `NO-CAPTURE` | 0/0/0 | 0/0 |
+| 158 | `sc-vu-emergency` | PARTIAL | YES | YES | `TASK-DONE` | 4/7/0 | 0/1 |
+| 159 | `sc-vu-emergency-junction` | **NO** | **NO** | YES | `FORCED` | 5/6/2 | 1/4 |
+| 160 | `sc-vu-pass-clearance` | **NO** | YES | **NO** | `ROUTE-OUT` | 3/6/2 | 1/3 |
+| 161 | `sc-zebra-approach` | PARTIAL | **NO** | YES | `TASK-DONE` · `ROUTE-OUT` | 2/9/2 | 2/0 |
+| | **161 lessons** | 8 YES · 65 PARTIAL · **64 NO** · 24 n/t | 36 YES · **98 NO** | 83 YES · **42 NO** | | **1,012** | **512** |
+
+**Read the two verdict columns together, because that is where the danger is.**
+
+| right credited | wrong convicted | lessons | what a student experiences |
+|---|---|---:|---|
+| YES | YES | **26** | the grader discriminates — the best state in this sweep |
+| **NO** | **NO** | **32** | **the grader does not discriminate at all** |
+| YES | **NO** | **9** | **careless driving is passed** |
+| **NO** | YES | **56** | careful driving is failed and careless driving is billed for something else |
+| other / unknown | | 14 | the record did not resolve one of the two columns |
+
+**32 lessons cannot tell a good drive from a bad one in either direction.** 9 more actively pass the
+bad one. And the largest single group — **56 lessons** — fails the careful drive while convicting the
+careless one **for something other than the offence the lesson is named after**: the grader is firing,
+but not at the subject being taught.
+
+### The lessons where the grader does not discriminate at all (`NO` / `NO`)
+
+`sc-ac-bridge-ice` · `sc-ac-truck-spray` · `sc-crossing-white-cane` · `sc-hz-accident-scene` · `sc-ln-boulevard-discipline` · `sc-ln-decisive-change` · `sc-merge-lane-end` · `sc-merge-roadworks-shift` · `sc-mw-discipline` · `sc-mw-emergency-lane` · `sc-mw-min-speed` · `sc-ov-being-overtaken` · `sc-ov-bus-lane` · `sc-ov-narrow` · `sc-ov-oneway` · `sc-ov-solid-return` · `sc-park-45-rev` · `sc-park-left` · `sc-park-wall` · `sc-park-zebra` · `sc-pe-night-unlit` · `sc-pk-move-off` · `sc-rb-busy-gap` · `sc-rb-circulate-priority` · `sc-rb-lane-choice` · `sc-rb-ped-exit` · `sc-signal-dead` · `sc-signal-flashing` · `sc-sp-harsh-brake` · `sc-vp-handbrake` · `sc-vp-readiness` · `sc-vp-stall`
+
+### The lessons where careless driving is passed (right `YES`, wrong `NO`)
+
+`sc-follow-cutin` · `sc-follow-tailgater` · `sc-hazard-obstacle` · `sc-jx-priority-confidence` · `sc-ov-solid-line` · `sc-sig-controller-postures` · `sc-signal-hesitation` · `sc-signal-response` · `sc-vu-pass-clearance`
+
+---
+
+# WHY EACH DRIVE ENDED — the sentence behind the code
+
+Codes flatten. These do not, and the register's rule is that the flattening never replaces the
+sentence.
+
+1. **`sc-ac-aquaplane`** — RIGHT: no natural end — the harness had to force «Прекрати урока» after ~3:30; task 2/2 (Спри зад авариралия) never reached. WRONG: ended naturally on collision at ~0:34.
+2. **`sc-ac-bridge-ice`** — RIGHT: no natural end — forced via «Прекрати урока», objective 3 (Ускори чак на сухото) never reached. WRONG: ended naturally at route end.
+3. **`sc-ac-crosswind`** — All four runs ended naturally on route end. pc-right ticked both objectives and passed; mobile-right ticked only the first and was failed on 30 наказателни точки from three collisions; both wrong runs failed with 0 penalty points, purely for unfinished tasks.
+4. **`sc-ac-fog`** — pc-right / pc-wrong / mobile-wrong ended on route end; mobile-right was force-ended via «Прекрати урока». The wrong runs failed only for unfinished route tasks, never for driving unlit in fog.
+5. **`sc-ac-highbeam-lead`** — pc-right, pc-wrong and mobile-wrong ended on route end; mobile-right was force-ended via «Прекрати урока». Convictions came only from collisions, never from beam misuse.
+6. **`sc-ac-ice`** — RIGHT: ended naturally — both objectives ticked (1:56 and 2:59) and the session closed on its own. WRONG: ended naturally on collision.
+7. **`sc-ac-night-lights`** — pc-right, pc-wrong and mobile-wrong ended on route end; mobile-right never reached the route end in 4:30 and had to be force-ended via «Прекрати урока». The wrong runs were failed for «не всички задачи бяха изпълнени», never for driving unlit.
+8. **`sc-ac-night-overdrive`** — RIGHT: no natural end — forced via «Прекрати урока» after ~3:30, objective 2 (Спри на позицията) never reached. WRONG: ended naturally after driving into a building at 95 км/ч.
+9. **`sc-ac-rain-lights`** — pc-right / pc-wrong / mobile-wrong ended on route end; mobile-right was force-ended via «Прекрати урока» with the route unfinished.
+10. **`sc-ac-snow`** — All four runs ended naturally on route end; both right runs ticked «Приближи със зимна скорост» and «Спри точно на маркираната позиция», both wrong runs failed on 20 наказателни точки from collisions.
+11. **`sc-ac-truck-spray`** — RIGHT: no natural end — forced via «Прекрати урока» after ~3:30 with 0 of 2 objectives. WRONG (pc): ended naturally at the route end with 0 of 2 objectives.
+12. **`sc-ac-wet-braking`** — All four runs ended naturally on route end; both right runs ticked «Приближи със съобразена за дъжда скорост» and «Спри точно на маркираната позиция» and passed, both wrong runs failed with 20 наказателни точки.
+13. **`sc-ac-wind-truck-pass`** — RIGHT: no natural end — forced via «Прекрати урока» with 0 of 2 objectives and 70 наказателни точки. WRONG: ended naturally at route end with BOTH objectives ticked and 38 наказателни точки.
+14. **`sc-accident-own-conduct`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+15. **`sc-animal-hazard`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+16. **`sc-crossing-bus-shadow`** — all four legs ended naturally; right ИЗДЪРЖАН 0 т. on both platforms, wrong convicted on both
+17. **`sc-crossing-child-ball`** — all four legs ended naturally on task completion; right: 6 full stops, one 9 s lawful wait, ИЗДЪРЖАН 0 т. with the commendation «Правилно пропускане на пешеходец»; wrong: 59 км/ч straight through, НЕИЗДЪРЖАН 10 т. опасна
+18. **`sc-crossing-dart`** — the route ran out — the car reached the y=118 reachZone and the session closed on open road far past the crossing; nothing about the pedestrian task gated the end
+19. **`sc-crossing-let-pass`** — never attempted — no folder for this lesson exists under sweep161 at all
+20. **`sc-crossing-rain-sprint`** — never attempted — no folder for this lesson exists under sweep161 at all
+21. **`sc-crossing-slow-crosser`** — never attempted — no folder for this lesson exists under sweep161 at all
+22. **`sc-crossing-white-cane`** — ended naturally in all four legs, but mobile-right ended with every task ticked AND a dangerous-error conviction; mobile-wrong ended with a clean 0-point sheet
+23. **`sc-driver-distraction`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+24. **`sc-ed-d2-city-run`** — RIGHT (pc): ended naturally at route end but with 80 наказателни точки; RIGHT (mobile): forced via «Прекрати урока». WRONG: ended naturally with 50 т. Objectives 2, 3 and 4 never fire in any of the four runs.
+25. **`sc-ed-d2-priority-run`** — the 210 s harness cap forced «Прекрати урока»; only objective 1 of 4 ever ticked in ANY of the four runs
+26. **`sc-ed-d2-stop-address`** — PC: route ran out with objective 3 unmet; mobile: 210 s cap forced «Прекрати урока»
+27. **`sc-ed-poligon-chain`** — 210 s cap on PC/mobile right; route ran out on the wrong runs — not one of the five objectives ever fired in any run
+28. **`sc-ed-reverse-line`** — the 210 s cap forced «Прекрати урока» in every run; the reversing objectives never resolved
+29. **`sc-fo-brakelight-chain`** — Both careful drives were force-ended by the harness «Прекрати урока» at the ~210 s cap with objective 3 «Продължи с колоната до края на отсечката» never reached; the wrong drives ended naturally after repeated contact with the lead car.
+30. **`sc-fo-motorway-gap`** — Both careful drives were force-ended by «Прекрати урока» with 0 of 2 objectives ticked; the pc wrong drive was also force-ended, the mobile wrong drive ended naturally after collisions.
+31. **`sc-follow-brake`** — Both RIGHT drives ran the full 205 s harness cap without the staged brake-slam ever firing and without reaching the finish zone; both debriefs read 0 t. but НЕИЗДЪРЖАН with the lesson cut short. Both WRONG drives collided within 22 s and kept going.
+32. **`sc-follow-cutin`** — pc-right ticked all three position gates and was credited 0 t. ИЗДЪРЖАН 3 stars +150 XP without the cut-in ever happening; mobile-right hit the 205 s cap; pc-wrong ended at ~25 s after the cut-in and a collision (23 t.); mobile-wrong ended at ~20 s with 0 наказателни точки.
+33. **`sc-follow-distance`** — pc-right: both reach zones ticked, section end reached, self-assessment then debrief 0 t. IZDARZHAN 3 stars. mobile-right: 205 s harness cap, debrief says the lesson was cut short. Both wrong runs: repeated collisions with the lead car.
+34. **`sc-follow-rain-gap`** — pc-right completed both zones under the 30 km/h cap and was credited 0 t. ИЗДЪРЖАН 3 stars; mobile-right hit the 205 s cap and was marked cut short; wrong runs collided.
+35. **`sc-follow-standstill`** — pc-right and mobile-right reached the stop zone under 6 km/h, both objectives ticked, debrief 0 t. ИЗДЪРЖАН 3 stars. Wrong runs collided and ran on.
+36. **`sc-follow-tailgater`** — pc-right completed both zones under the 41 km/h cap and was credited 0 t. ИЗДЪРЖАН 3 stars +150 XP; mobile-right hit the 205 s cap; pc-wrong ended at ~20 s with 0 наказателни точки; mobile-wrong ended at ~45 s with 31 t. after a collision.
+37. **`sc-follow-truck`** — pc-right completed and was credited 0 t. ИЗДЪРЖАН 3 stars; mobile-right ended with a collision and 71 наказателни точки НЕИЗДЪРЖАН; pc-wrong ended after repeated collisions at 75 t.
+38. **`sc-hazard-obstacle`** — All four runs reached the end of the route naturally.
+39. **`sc-hz-accident-scene`** — All four runs ended naturally; on PC the careful drive ended because it drove into a bystander standing in the lane and the car was pinned in place.
+40. **`sc-hz-brake-dont-swerve`** — Both drives ended naturally — the careful drive at the stop mark, the reckless drive after driving into geometry.
+41. **`sc-hz-breakdown-pulloff`** — All four runs were force-ended by the harness «Прекрати урока» at the ~210 s cap; objective 2 «Спри плътно вдясно в аварийната лента» was never completed in any run on either platform.
+42. **`sc-hz-emergency-stop`** — Both drives reached the end of the route naturally; the ball-and-child hazard the lesson exists for never fired in any run on either platform.
+43. **`sc-junction-blind`** — Neither run finished the task. The RIGHT drive collided at ~1:04, was shoved off the authored world onto a bare green plane, and the harness cut it ~2.5 min later; debrief header reads 'Урокът беше прекъснат преди края'. Objective 2 (left turn out of the junction) never fired in any of the 4 runs.
+44. **`sc-junction-gap`** — every lane was forced out with «Прекрати урока» at ~206-209 s; objective 3/3 «Завий надясно и излез от кръстовището на изток» never ticked on any platform. No lane ended on task completion.
+45. **`sc-junction-left`** — Route never completed. On pc the drive was clean (0 penalty points, two commendations) but the third objective 'Завий наляво и излез от кръстовището на запад' never fired and the session was cut — 'Урокът беше прекъснат преди края'. On mobile the same 'right' drive collided twice (40 pts).
+46. **`sc-junction-rhr`** — Both right drives ran the full ~140-210 s clock with task 2/2 «Завий наляво и излез от кръстовището на запад» never ticked and a collision already logged; pc-wrong had to be forced out with «Прекрати урока». Nothing ended because the task was done.
+47. **`sc-junction-scan`** — pc-right and pc-wrong were forced out with «Прекрати урока» at ~205-207 s; objective 3/3 «Завий надясно и излез от кръстовището на изток» never ticked on any lane. mobile-right ended naturally but also with 3/3 open.
+48. **`sc-junction-stop`** — Forced out with «Прекрати урока» at ~210 s; objective 3/3 «Завий надясно и излез от кръстовището на изток» never ticked on either platform. Not a task-completion ending.
+49. **`sc-jx-blocked-exit`** — On pc the right drive completed all three route objectives at 2:07 and passed. On mobile the same correct drive completed all three and was still convicted of running a red. The wrong runs ended on collision.
+50. **`sc-jx-equal-left`** — Collision immobilised the car — the pc-wrong learn card reads 'Край на упражнението след удара'. The second objective 'Завий наляво и излез от кръстовището на запад' never fired in any of the 4 runs.
+51. **`sc-jx-giveway-b1`** — pc-right was forced out with «Прекрати урока» at ~205 s having ticked NONE of its three objectives, after spending 180 of those seconds in lawful waits at the Б1. Nothing ended because a task was done.
+52. **`sc-jx-priority-confidence`** — The right drive completed both route objectives ('Премини кръстовището и продължи по главната' at 2:38) — the only lesson of the seven that ended because the task was done. The wrong drive ended on 'Край на маршрута' with both objectives unticked.
+53. **`sc-lane-change`** — the 210 s cap forced «Прекрати урока» on both right runs; the lane-change objective never fired in any of the four runs
+54. **`sc-lane-control-signal`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+55. **`sc-ln-boulevard-discipline`** — ended naturally but with the overtake never performed — tasks 2 and 3 never tick in any leg
+56. **`sc-ln-decisive-change`** — nothing ended it. mobile-right ran 272 s against a 60 s benchmark and had to be forced through «Прекрати урока»; on PC even «Прекрати урока» did not work and the result screen was never reached
+57. **`sc-ln-obstacle-meeting`** — the car was immobilised by a collision — the end card reads «Край на упражнението след удара» — not because the task was finished; mobile-right ran 126 s against a 90 s benchmark with only 1 of 3 objectives ticked
+58. **`sc-ln-turn-lane-arrows`** — all four runs ended on their own, but with none of the three objectives completed — the end line reads «Не всички задачи от маршрута бяха изпълнени»
+59. **`sc-maneuver-3point`** — the route ran out with the turn objective still unticked — the end card says Спря в края на маршрута, но задачата тук не се отчете; 88 s against a 55 s benchmark
+60. **`sc-maneuver-uturn`** — the route ran out with the turn objective unticked — Спря в края на маршрута, но задачата тук не се отчете; 114 s against a 45 s benchmark
+61. **`sc-merge-accel-lane`** — nothing ended it in any of the four runs — every one had to be forced through «Прекрати урока»; mobile-right ran 274 s against a 55 s benchmark with none of the three objectives ever ticked
+62. **`sc-merge-bus-pullout`** — the session was aborted — debrief reads «Урокът беше прекъснат преди края»; the bus the whole lesson is about never appeared
+63. **`sc-merge-from-property`** — a collision — pc-right 10 pts / 1 dangerous error, mobile-right 30 pts plus «Урокът беше прекъснат преди края»
+64. **`sc-merge-lane-end`** — time/route ran out — debrief on all four runs says «Не всички задачи от маршрута бяха изпълнени»; the pc right drive ended nose-first against a building facade at t161s
+65. **`sc-merge-motorway-exit`** — the session was aborted — «Урокът беше прекъснат преди края», task chip never left 1/3
+66. **`sc-merge-roadworks-shift`** — a collision — every run ends «Настъпи сблъсък» plus «Не всички задачи от маршрута бяха изпълнени»
+67. **`sc-mv-uturn-ban`** — Both correct legs ran clean — 0 наказателни точки — and both were still stamped НЕИЗДЪРЖАН: PC with „Не всички задачи от маршрута бяха изпълнени“ (1 star), mobile with „Урокът беше прекъснат преди края“. pc-wrong ended on a collision plus a speeding penalty (11 т.). mobile-wrong never started — the harness sign-in failed.
+68. **`sc-mw-discipline`** — RIGHT: 208 s of crawling 0-13 km/h, never left ЗАДАЧА 1/2, session force-ended — debrief prints „Урокът беше прекъснат преди края.“ WRONG: reached 125 km/h, completed ЗАДАЧА 2/2 „Стигни края на участъка“ in ~33 s and ended on task completion.
+69. **`sc-mw-emergency-lane`** — the WRONG drive ended BECAUSE both tasks ticked (0:55 and 0:58) after a 139 km/h blast; the RIGHT drives were force-ended at 254–270 s with neither task ticked. The verdict is inverted.
+70. **`sc-mw-min-speed`** — RIGHT: 208 s of crawling 0-18 km/h, route never finished — debrief prints „Урокът беше прекъснат преди края.“ WRONG: accelerated to 138 km/h and finished the section in ~38 s, ending on task completion.
+71. **`sc-ov-abort`** — the RIGHT drives and mobile-wrong never ended — the 210 s budget expired and the harness forced «Прекрати урока»; only pc-wrong ended naturally
+72. **`sc-ov-ban-overtake`** — mobile-right rear-ended the slow lead car at 35 s and was force-ended at 269 s; pc-right ticked task 1 at 2:10 and was terminated with task 2 never done; both wrong drives ended on collisions.
+73. **`sc-ov-being-overtaken`** — the correct drives ran out their 210 s budget and had to be forced; the wrong drives ended on their own — in every case with 0 of 2 objectives done
+74. **`sc-ov-bus-lane`** — all four runs were terminated before the end with neither route task ticked; the ego spent the drive inside the bus-lane span and was never faulted for it.
+75. **`sc-ov-crest-curve`** — none of the four runs ended on its own — every one ran its 210 s budget out and was forced through «Прекрати урока», with 0 of 3 objectives done
+76. **`sc-ov-crossing-overtake`** — pc-right ended BECAUSE both route tasks were done (✓ 1:59, ✓ 3:11); mobile-right ended on the third collision; both wrong drives ended on collisions.
+77. **`sc-ov-keep-right`** — Nothing was ever completed. pc: 'Стигна края на маршрута' with both tasks unfinished after 225 s against a 60 s benchmark. mobile: session cut after 271 s. Neither objective ticked in ANY of the four runs.
+78. **`sc-ov-lane-keeping`** — Session cut before the route end — 287 s (mobile) / 256 s (pc) against a 55 s benchmark, debrief reads 'Урокът беше прекъснат преди края'. The two apex objectives do fire; the third, 'Излез от S-извивката центрирано в лентата', never fires in any of the 4 runs.
+79. **`sc-ov-narrow`** — every run ends in a collision with the parked row / the oncoming vehicle. mobile-right 20 т. after 93 s, pc-right 20 т., mobile-wrong 10 т. after 17 s, pc-wrong 10 т. No route task ticked on any run.
+80. **`sc-ov-night-gap`** — the RIGHT drives and mobile-wrong never ended — the 210 s budget expired and the harness forced the end; only pc-wrong ended naturally
+81. **`sc-ov-oncoming-gap`** — the RIGHT drives never ended — the 210 s budget expired and the harness had to force «Прекрати урока»; only the WRONG drives ended on their own
+82. **`sc-ov-oneway`** — neither drive finished the route: the RIGHT drive drove off the end of the built world into bare terrain and was force-ended; the WRONG drive was terminated by the harness. Route tasks 2 and 3 never ticked on any of the 4 runs.
+83. **`sc-ov-return-gap`** — three of the four runs never ended — the 210 s budget expired and the harness forced «Прекрати урока»; only pc-wrong ended naturally
+84. **`sc-ov-solid-line`** — the RIGHT drives ended BECAUSE both route tasks completed (✓ 1:54, ✓ 3:34, ИЗДЪРЖАН 0 т. ★★★ on both platforms); the WRONG drives were terminated with the tasks undone.
+85. **`sc-ov-solid-return`** — both right legs ran out the full 210 s budget and were force-closed with the third task unticked; the wrong legs ended naturally
+86. **`sc-park-45-rev`** — ended on collisions; neither task ticks in any of the four legs
+87. **`sc-park-bay-exit-rev`** — mobile-right ended on a collision (20 т., НЕИЗДЪРЖАН) while driving across an empty grass field. pc-wrong hit the session cap („Урокът беше прекъснат преди края“) with 10 dangerous errors / 100 т. pc-right wrote only zero-byte PNGs.
+88. **`sc-park-double`** — nothing renderable was captured — mobile-right, mobile-wrong and pc-right each hold a 0-byte 01-arrival.png and a run log that stops right after sign-in; pc-wrong has no directory at all
+89. **`sc-park-gap-long`** — Both correct legs ended on a collision with „Урокът беше прекъснат преди края“ — pc-right 10 т. НЕИЗДЪРЖАН, mobile-right 10 т. НЕИЗДЪРЖАН. pc-wrong reached 110 точки / 11 опасни грешки, mobile-wrong 90 точки. All four legs failed.
+90. **`sc-park-gap-short`** — Both correct legs ended on a collision — mobile-right 10 т. НЕИЗДЪРЖАН, pc-right 10 т. НЕИЗДЪРЖАН with „Урокът беше прекъснат преди края“ — while manoeuvring in a void with no kerb. mobile-wrong ended at 91 т. pc-wrong wrote 55 zero-byte PNGs and the node process died at t130s.
+91. **`sc-park-judge`** — nothing ran — the two mobile lanes wrote a 0-byte 01-arrival.png and stopped; the PC lane crashed at sign-in before the browser reached the lesson
+92. **`sc-park-left`** — mobile-right and pc-wrong ran out the 210 s budget and were force-closed; the reverse-park task never ticks in any leg
+93. **`sc-park-night`** — the harness aborted it at ~208 s after the car had left the lot into open grass; the debrief reads 'Урокът беше прекъснат преди края' plus a collision, and neither route task was credited
+94. **`sc-park-van`** — collision + route ran out with both tasks unticked
+95. **`sc-park-wall`** — ended on collisions; neither task ticks in any leg
+96. **`sc-park-zebra`** — ALL FOUR legs ran out the 210 s budget and had to be force-closed with «Прекрати урока»; the reverse-park task never ticks
+97. **`sc-pe-jaywalker`** — ended naturally in all four legs; pc-right ИЗДЪРЖАН 0 т., mobile-right НЕИЗДЪРЖАН 10 т. for a red light the briefing never mentions
+98. **`sc-pe-night-unlit`** — PC: right drive ended because all 3 tasks were done (chip reached 3/3, debrief 0 pts ИЗДЪРЖАН, 3 stars); PC wrong ended on a dangerous error at 58 km/h. MOBILE: the SAME right drive ended in a COLLISION (20 pts, НЕИЗДЪРЖАН) and the mobile wrong drive ended after ~10 s with zero errors of any class recorded
+99. **`sc-pe-parked-row-scan`** — both right drives ended because the tasks were done — PC 0 pts / ИЗДЪРЖАН / 3 stars, mobile 0 pts / ИЗДЪРЖАН; both wrong drives ended on collisions — PC 4 dangerous errors / 40 pts, mobile 1 dangerous error / 10 pts
+100. **`sc-pe-school-patrol`** — all four legs ended naturally; right ИЗДЪРЖАН 0 т. + commendation on both platforms, wrong convicted on both (mobile 10 т., pc 30 т.)
+101. **`sc-pe-zone-living`** — PC: right drive ran 5/5 tasks and ended credited (0 pts, ИЗДЪРЖАН, 3 stars); PC wrong ended on 3 dangerous errors / 30 pts. MOBILE: the right drive sat at 0 km/h from t208s to the end and the debrief says 'Урокът беше прекъснат преди края' — it ran out of session, it did not finish the task; mobile wrong correctly failed at 20 pts
+102. **`sc-pk-ban-stop`** — right — the car stopped at the permitted place after the В27 zone and the task completed (0 точки, ИЗДЪРЖАН, ★★★); wrong — a collision, with «Не всички задачи от маршрута бяха изпълнени»
+103. **`sc-pk-busstop-ban`** — the task was finished — the chip advanced 1/2 → 2/2 and the debrief reads ИЗДЪРЖАН with 0 наказателни точки, +150 XP and 3/3 stars
+104. **`sc-pk-crossing-ban`** — unknown — no frame survived the capture
+105. **`sc-pk-double-park`** — Both right legs ended on task completion — ИЗДЪРЖАН, 0 наказателни точки, 3 звезди, +150 XP on PC and on mobile. mobile-wrong ended on a collision (20 т., НЕИЗДЪРЖАН). pc-wrong wrote only zero-byte PNGs after 01-arrival.
+106. **`sc-pk-driveway`** — a collision, plus «Не всички задачи от маршрута бяха изпълнени» — the reverse-into-the-driveway was never performed; the route/task budget ran out
+107. **`sc-pk-move-off`** — PC lanes ended on task completion; the mobile right drive ended when the route ran out and was the only lane to fail
+108. **`sc-pk-rail-ban`** — pc-right was convicted of a railway-crossing violation (10 т., 1 star, НЕИЗДЪРЖАН) at a crossing that is not rendered anywhere in the world. mobile-wrong ended on a collision (20 т.). mobile-right wrote 33 zero-byte PNGs. pc-wrong never started — harness sign-in failed.
+109. **`sc-pk-smooth-stop`** — both right drives ended because the stop was made on the marked position — PC 0 pts / ИЗДЪРЖАН / 3 stars / +100 XP, mobile 0 pts / ИЗДЪРЖАН / +150 XP; both wrong drives ended in a collision — PC 2 dangerous errors / 20 pts, mobile 20 pts / 'Настъпи сблъсък'
+110. **`sc-pk-stop-vs-park`** — pc-right ended on task completion (ИЗДЪРЖАН, 0 т., 3 звезди, +150 XP). mobile-right ran to the 206 s session cap and ended НЕИЗДЪРЖАН with „Урокът беше прекъснат преди края“ despite 0 наказателни точки. pc-wrong ended on a collision at ~38 s, before it ever reached the В28 band. mobile-wrong wrote only zero-byte PNGs.
+111. **`sc-rb-busy-gap`** — no leg completed the manoeuvre; every leg ended on a collision
+112. **`sc-rb-circulate-priority`** — no leg ended on task completion; every leg ended on a collision, pc-right after 90 s stuck in the lawful-wait state
+113. **`sc-rb-exit-signal`** — the RIGHT run ended with the car parked on the roundabout's central grass island at 73 s of an 85 s reference, both route objectives still marked '-' on 08-debrief; it did NOT end because the task was done. The WRONG run never executed at all (sign-in refused), so nothing could be convicted.
+114. **`sc-rb-lane-choice`** — no leg completed the manoeuvre; every leg ended on one or two collisions
+115. **`sc-rb-ped-exit`** — no leg ended on task completion; pc-right sat 90 s in a permanent lawful-wait state and the harness had to move it off
+116. **`sc-roundabout-entry`** — the route ended with the car in the middle of the grass island; objective 2 never fired in any run
+117. **`sc-rx-barrier-drop`** — unknown — no lane reached 07-end; pc-right died at t001s and every other PNG in the lesson is 0 bytes or missing
+118. **`sc-rx-guarded`** — «Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени» — the route ended, the barrier wait never happened (0 full stops, 0 lawful waits, top speed 59 км/ч)
+119. **`sc-rx-queue-clear`** — no drive completed — the only capture (01-arrival) is a 0-byte PNG on both mobile legs, pc-right died right after sign-in with no PNG at all, and pc-wrong was never attempted; no 07-end and no 08-debrief frame exists for any leg
+120. **`sc-rx-tram-island`** — unknown — no lane produced a single readable frame
+121. **`sc-rx-tram-left`** — unknown — the run was cut mid-drive at t060s; no 07-end and no 08-debrief exist and every PNG in all four lanes is 0 bytes
+122. **`sc-rx-tram-stop-doors`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+123. **`sc-rx-unguarded`** — the route ran out — «Сесията завърши — първо се самооцени» appears while the car is still rolling at 12 км/ч, not because the crossing was completed correctly
+124. **`sc-sig-controller-live`** — the task WAS completed - the third objective 'Излез от кръстовището на север' ticked at 2:04 and the session ended naturally (endedNaturally: true) after 111 s against a 55 s benchmark
+125. **`sc-sig-controller-postures`** — all four legs ended naturally; right ИЗДЪРЖАН 0 т. on both platforms
+126. **`sc-sig-flash-amber-ped`** — no scenario folder exists under sweep161 at all - the sweep never reached this lesson
+127. **`sc-sig-green-wave`** — no scenario folder exists under sweep161 at all - the sweep never reached this lesson
+128. **`sc-sign-warning`** — never driven — no scenario directory was created under sweep161 for any of the four platform/mode legs
+129. **`sc-signal-controller`** — it did not end - capture stops mid-drive at t081s (04-t081s.png is 0 bytes, audit.log has no MACHINE SUMMARY, there is no 07-end and no 08-debrief). The mobile-wrong lane died at sign-in after one frame of DOM text.
+130. **`sc-signal-dead`** — ended naturally, but on collisions — the second task never ticks in any leg
+131. **`sc-signal-flashing`** — the RIGHT run ended jammed against a building facade on the footway after a collision punted the braked car from 0 to 44 км/ч, 133 s against a 65 s reference, objective 2 still '-'; the WRONG run ended mid-boulevard still travelling at 59 км/ч after 36 s of a 65 s reference. Neither run ended because the task was done.
+132. **`sc-signal-hesitation`** — all four legs ended naturally; right ИЗДЪРЖАН 0 т. on both platforms
+133. **`sc-signal-redyellow`** — no scenario folder exists under sweep161 at all - the sweep never reached this lesson
+134. **`sc-signal-response`** — pc-right ended naturally with all three objectives ticked — the only lane in this chunk that ended BECAUSE the task was done. mobile-right ended naturally but with objective 3/3 open after a collision. pc-wrong never ran.
+135. **`sc-sp-curve`** — NEITHER right drive ended because the task was done. PC right: 0 наказателни точки but НЕИЗДЪРЖАН · Урокът беше прекъснат преди края, one star, and 07-end shows the car off the carriageway on grass against a guardrail at 7 км/ч. Mobile right: same verdict, and 07-end shows the car standing in an empty green field with no road anywhere in view at 2 км/ч. Both wrong drives WERE convicted — pc 31 точки (8 основни, 7 второстепенни), mobile 27 точки — and the Несъобразена скорост в завой rule does fire.
+136. **`sc-sp-eco-coast`** — RIGHT: all three tasks completed — approached the red having lifted off, waited at the line, crossed on green; debrief shows a clean pass with no unfinished-task banner. WRONG: „Не всички задачи от маршрута бяха изпълнени“ plus one dangerous error worth 10 points.
+137. **`sc-sp-harsh-brake`** — PC right drive ended BECAUSE the task was done — ИЗДЪРЖАН, 0 наказателни точки, +100 XP, three stars, TASK 1/2 then 2/2 Стигни края на отсечката. Mobile right drive ended because the session clock ran out with the car never having moved (0 км/ч at t=065s, t=208s and 07-end) — debrief НЕИЗДЪРЖАН · Урокът беше прекъснат преди края. BOTH wrong drives ended on route timeout, not on conviction: Не всички задачи от маршрута бяха изпълнени, with 0 наказателни точки and 0 in every error class.
+138. **`sc-sp-limit-end`** — RIGHT: 207 s of crawling 0-14 km/h, never finished the route — debrief prints „Урокът беше прекъснат преди края.“ WRONG: held 59 km/h through the В26 40 zone, booked 2 dangerous + 2 minor errors (22 points) and was correctly failed.
+139. **`sc-sp-wet-limit-plate`** — BOTH drives ended on route completion and BOTH produced the identical debrief: 0 наказателни точки, ИЗДЪРЖАН, +100 XP, 3 stars. The correct drive and the mistake drive are indistinguishable in the result.
+140. **`sc-speed-creep`** — BOTH right legs ran the full 210 s drive budget without the session ending and had to be closed with «Прекрати урока» — they ended because time ran out, not because the task was done
+141. **`sc-speed-dangerous`** — pc-right ended naturally ИЗДЪРЖАН at 3:41; mobile-right ran out its whole 210 s budget and was force-closed with only task 1 ticked
+142. **`sc-speed-rain`** — pc-right ended naturally ИЗДЪРЖАН at 3:32; mobile-right ran out its 210 s budget with only task 1 ticked
+143. **`sc-speed-transition`** — PC right drive ended BECAUSE the task was done — debrief reads ИЗДЪРЖАН, 0 наказателни точки, +150 XP, 3 stars, and TASK 2/3 carries a green tick. Mobile right drive of the same lesson ended with the car at 0 км/ч and the debrief reads НЕИЗДЪРЖАН · Урокът беше прекъснат преди края (0 points, nothing scored). Both wrong drives ended early BECAUSE a dangerous error fired: 10 наказателни точки, 1 опасна грешка, директно неиздържан.
+144. **`sc-speed-zone`** — pc-right ended naturally ИЗДЪРЖАН at 3:41; mobile-right ran out its 210 s budget with only task 1 ticked
+145. **`sc-turn-left-oncoming`** — pc-right and mobile-right were forced out with «Прекрати урока» at ~206-210 s with objective 2/2 «Завърши левия завой и излез от кръстовището на юг» never ticked. Only the wrong lanes ended naturally, after crashing.
+146. **`sc-vp-handbrake`** — pc-right completed the route; mobile-right and both wrong lanes ended when route/time ran out — nothing ended on the handbrake check being satisfied
+147. **`sc-vp-police-stop`** — the right lanes ended on the stop task being registered; the wrong lanes ended on a scored collision that also terminated the exam
+148. **`sc-vp-readiness`** — pc-right reached the end of the segment and was credited; mobile-right, pc-wrong and mobile-wrong all ended when the route/time ran out — debrief said the lesson was cut short, not that the task was done
+149. **`sc-vp-stall`** — pc-right completed the route; mobile-right and both wrong lanes ended when route/time ran out — the engine never stalled in any lane, so nothing ended because the task was done
+150. **`sc-vp-telltale`** — the right lanes ended on the stop task registering; the wrong lanes ended on a scored collision — but no lane ended because a warning lamp was correctly answered, since no lamp ever lit
+151. **`sc-vp-telltale-red`** — the right lanes ended on the stop task registering and the wrong lanes on a scored collision; no lane ended on a lamp colour being correctly triaged, because no lamp of either colour ever lit
+152. **`sc-vu-bikelane-turn`** — not run — no frames captured
+153. **`sc-vu-blindspot-moto`** — not run — no frames captured
+154. **`sc-vu-child-cyclist`** — not run — no frames captured
+155. **`sc-vu-cyclist-group`** — not run — no frames captured
+156. **`sc-vu-cyclist-hook`** — BOTH drives ended with the car embedded in a building facade and a collision booked. Identical debrief for right and wrong: 20 наказателни точки, 2 dangerous errors, НЕИЗДЪРЖАН, „Не всички задачи от маршрута бяха изпълнени.“
+157. **`sc-vu-door-zone`** — not run — no frames captured
+158. **`sc-vu-emergency`** — RIGHT: completed both tasks and ended on route completion — ИЗДЪРЖАН, +100 XP, 3 stars, 0 errors. WRONG: ended with „Не всички задачи от маршрута бяха изпълнени“ — failed for unfinished tasks, but with 0 errors of every class, so nothing was booked against it for not yielding.
+159. **`sc-vu-emergency-junction`** — Both drives ended on «Урокът беше прекъснат преди края.» — cut off by time/route, not by the task being done; the task chip was still asking for the ambulance
+160. **`sc-vu-pass-clearance`** — The route ran out. The flat-out drive reached ЗАДАЧА 2/2 «Продължи до края на отсечката» in ~17 s at 59 км/ч and ended; the careful drive ended at ~200 s. Nothing about a cyclist gated either ending.
+161. **`sc-zebra-approach`** — the route ended naturally after the crossing; both objectives ticked on both platforms
+
+---
+
+# WHAT ALREADY WORKS
+
+**0 lessons are CLEAN by the definition at the top of this file.** Every judged lesson carries at
+least one BROKEN finding. That is the headline and it stands.
+
+**But a sweep that reports only problems hides how much already works, so here is what worked, named
+with the same precision as the failures — every claim below is a record in the corpus with a frame
+behind it.**
+
+- **The grader discriminates in 26 of 137 judged lessons** — it credits the model drive **and**
+  convicts the wrong one. 26 lessons where a student gets a true answer to "was that good?":
+  `sc-ac-crosswind` · `sc-ac-fog` · `sc-ac-highbeam-lead` · `sc-ac-ice` · `sc-ac-night-lights` · `sc-ac-rain-lights` · `sc-ac-snow` · `sc-ac-wet-braking` · `sc-crossing-bus-shadow` · `sc-crossing-child-ball` · `sc-follow-distance` · `sc-follow-rain-gap` · `sc-follow-standstill` · `sc-hz-brake-dont-swerve` · `sc-ov-crossing-overtake` · `sc-pe-parked-row-scan` · `sc-pe-school-patrol` · `sc-pk-ban-stop` · `sc-pk-double-park` · `sc-pk-smooth-stop` · `sc-pk-stop-vs-park` · `sc-sp-eco-coast` · `sc-vp-police-stop` · `sc-vp-telltale` · `sc-vp-telltale-red` · `sc-vu-emergency`
+- **8 lessons reach `works: YES`** — what the lesson claims to teach actually reaches the score sheet:
+  `sc-ac-wet-braking` · `sc-crossing-child-ball` · `sc-pe-school-patrol` · `sc-pk-busstop-ban` · `sc-pk-double-park` · `sc-pk-smooth-stop` · `sc-sp-eco-coast` · `sc-vp-police-stop`
+- **8 judged lessons carry no critical defect at all:**
+  `sc-ac-wet-braking` (3 major, 0 minor) · `sc-ov-crossing-overtake` (5 major, 0 minor) · `sc-pe-parked-row-scan` (3 major, 3 minor) · `sc-pk-ban-stop` (3 major, 1 minor) · `sc-pk-smooth-stop` (2 major, 2 minor) · `sc-pk-stop-vs-park` (4 major, 3 minor) · `sc-sp-eco-coast` (6 major, 1 minor) · `sc-vp-police-stop` (3 major, 2 minor)
+- **16,272 readable frames were captured across 166 lesson folders and 599 of 653 lanes**, with
+  591 debrief frames. The harness itself is largely working; where it failed it failed loudly and
+  those lanes are named below rather than averaged away.
+- **1,681 of 1,686 records name a frame that exists on disk.** This is the first sweep in this
+  repository where evidence can be checked mechanically end to end — doc 87's founding complaint.
+
+**The specific things the frames show working, quoted from the records that say so.** Several of
+these sentences sit inside a finding that is otherwise a defect — the record says *this part is
+right, and here is what ruins it*. Both halves are printed, because the half worth protecting is the
+half a rework is most likely to throw away.
+
+- **`sc-signal-flashing` · A · CRITICAL** — The lesson's own event is genuinely good — the amber lamp really does flash (lit at t001, whole head dark at t002), all four approaches carry signal heads, and cross traffic really does come from the right — but the grading is inverted at both ends: the correct drive collects 40 penalty points and the deliberately-wrong drive collects zero and a compliment.
+  «0 наказателни точки · Неиздържан — виж разбора»
+  `sc-signal-flashing/mobile-wrong/08-debrief.png`
+- **`sc-rx-barrier-drop` · A · major** — Only one readable frame survives in the whole lesson (pc-right/01-arrival.png). From it the world does match the briefing — the А34 triangle and a raised red-and-white barrier boom are both present ahead on the right — but the task chip already contradicts the briefing, and whether the barrier ever drops could not be observed.
+  «Бариерата тръгва надолу · Ниво 1 — Пълна помощ»
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-ac-crosswind` · G · minor** — Nothing else to add for this lesson beyond the parts above — stated explicitly rather than left blank. The one genuinely good thing worth protecting across all seven: the debrief's separation of наказателни точки по Наредба № 38 from the simulator's own 0-2 «Оценка на маневрата» stars, with the plain-language warning that the two scales run in opposite directions, is clear and honest and should survive any rework.
+  «оценка на симулатора — не е закон»
+  `sc-ac-crosswind/pc-right/08-debrief.png`
+- **`sc-ac-night-lights` · G · minor** — The 07-end self-estimate gate («Позна ли се?» — predict your own penalty points before seeing the protocol) is the strongest teaching idea in the whole flow, but it is wasted here: both the right and the wrong run score exactly 0 наказателни точки, so the student who answers 0 is told they were right after driving the entire lesson unlit.
+  «Позна ли се?»
+  `sc-ac-night-lights/pc-right/07-end.png`
+- **`sc-ac-night-overdrive` · G · minor** — FREE OBSERVATION: the pedagogy in the text layer is genuinely good where it survives — the demo captions explain the mechanism rather than the verdict („Водата свърши. Напред е аварирал автомобил — вдигаме газта отрано: мокрият спирачен път е ~1,4 пъти по-дълъг“, „Докато сме до камиона, сме в неговия завет — вятърът мълчи“), and the fault explanations cite Наредба № 38 and ЗДвП correctly. The failure in this chunk is not the writing, it is that the world and the grading do not back the writing up.
+  «Докато сме до камиона, сме в неговия завет — вятърът мълчи. Точно затова следващата секунда е коварна.»
+  `sc-ac-wind-truck-pass/pc-right/04-t096s.png`
+- **`sc-ac-wet-braking` · A · minor** — The best-behaved lesson of the seven: the stop mark and the stopped truck really exist, both objectives fire on the real event, and right and wrong separate correctly on both platforms.
+  «Спри точно на маркираната позиция — дръж под 6 км/ч»
+  `sc-ac-wet-braking/pc-right/04-t175s.png`
+- **`sc-ed-d2-city-run` · A · minor** — The one thing that works cleanly: the traffic light changes, the red is held for 17 seconds and the coach confirms it in plain language before the student moves off. This is the model the other objectives in this chunk should follow.
+  «Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че кръстовището е свободно.»
+  `sc-ed-d2-city-run/pc-right/06-waited.png`
+- **`sc-ov-being-overtaken` · G · minor** — Free observation: the pre-result calibration gate «Позна ли се?» asks the student to predict their own penalty points before the protocol — a genuinely good instructional idea that is undermined here, because the answer it grades against is a fabricated fail with no findings behind it.
+  «Преди да видиш протокола: колко наказателни точки мислиш, че направи в това каране?»
+  `sc-ov-being-overtaken/pc-wrong/07-end.png`
+- **`sc-pe-parked-row-scan` · G · minor** — Nothing else of note beyond the items above — the route ribbon, the target ring and the task chip all behaved coherently through this run, and the drive genuinely ended on task completion rather than on a timer.
+  `sc-pe-parked-row-scan/pc-right/07-end.png`
+- **`sc-pk-ban-stop` · G · minor** — Free observation: the В27 sign is rendered correctly (blue disc, red rim, red saltire) and stands on the correct side, so the world does match the briefing here — this is the one lesson in the chunk where sign, briefing and credit line up. Worth protecting as the reference implementation.
+  `sc-pk-ban-stop/pc-right/04-t012s.png`
+- **`sc-roundabout-entry` · G · minor** — Free observation: the pre-debrief 'Позна ли се?' self-prediction gate is genuinely good teaching — it asks the student to guess his own penalty points before the protocol appears — and it is the one screen in this chunk that is clean, well spaced and free of collisions.
+  «Позна ли се?»
+  `sc-roundabout-entry/pc-right/07-end.png`
+- **`sc-sp-curve` · G · minor** — Free observation, in the lesson's favour: ADR-001 is respected — every vehicle in every frame is a generic unbranded low-poly shape with no badge, grille or model geometry that could be read as a real marque, and the map credit line © OpenStreetMap contributors is present on both platforms. Also noted: the cockpit limit chip correctly switches from white to amber when the car is over the posted limit (mobile-wrong t=024s), which is a genuinely good touch.
+  `sc-sp-curve/mobile-wrong/04-t024s.png`
+- **`sc-sp-eco-coast` · A · minor** — The only lesson of the seven whose two drives separate correctly: right credited, wrong convicted, and the traffic light really does cycle.
+  «ИЗДЪРЖАН · +150 XP»
+  `sc-sp-eco-coast/pc-right/08-debrief.png`
+- **`sc-pe-school-patrol` · G · info** — Nothing beyond the shared findings — this is the one lesson in the chunk that credits the right drive and convicts the wrong one on both platforms, and it is worth protecting as the reference the broken ones should be measured against.
+  `sc-pe-school-patrol/mobile-right/04-t001s.png`
+
+---
+
+# WHAT COULD NOT BE TESTED, AND WHY
+
+**Four different kinds of "could not", and they must not be blurred into one number.**
+
+**1 — 17 lessons that were judged before their frames were written.** The record for each says the
+folder did not exist; **the folder exists now, with four lanes and four debrief frames.** The sweep was
+still running when the judging ran. **These need no re-drive — they need re-judging from frames that
+are already on disk**, and that is the cheapest 17 lessons of coverage available anywhere in this
+programme.
+
+| lesson | lanes with frames | readable frames | debriefs |
+|---|---:|---:|---:|
+| `sc-accident-own-conduct` | 4/4 | 78 | 4 |
+| `sc-animal-hazard` | 4/4 | 177 | 4 |
+| `sc-crossing-let-pass` | 4/4 | 53 | 4 |
+| `sc-crossing-rain-sprint` | 4/4 | 54 | 4 |
+| `sc-crossing-slow-crosser` | 4/4 | 54 | 4 |
+| `sc-driver-distraction` | 4/4 | 80 | 4 |
+| `sc-lane-control-signal` | 4/4 | 109 | 4 |
+| `sc-rx-tram-stop-doors` | 4/4 | 123 | 4 |
+| `sc-sig-flash-amber-ped` | 4/4 | 73 | 4 |
+| `sc-sig-green-wave` | 4/4 | 158 | 4 |
+| `sc-sign-warning` | 4/4 | 112 | 4 |
+| `sc-signal-redyellow` | 4/4 | 107 | 4 |
+| `sc-vu-bikelane-turn` | 4/4 | 114 | 4 |
+| `sc-vu-blindspot-moto` | 4/4 | 111 | 4 |
+| `sc-vu-child-cyclist` | 4/4 | 94 | 4 |
+| `sc-vu-cyclist-group` | 4/4 | 106 | 4 |
+| `sc-vu-door-zone` | 4/4 | 98 | 4 |
+
+**2 — 7 lessons that genuinely produced nothing judgeable.** Zero-byte PNGs, runs that died at sign-in,
+lanes that were never attempted. **These need a re-drive.**
+
+| lesson | lanes | readable frames | what the record says (full sentence in «WHY EACH DRIVE ENDED») |
+|---|---:|---:|---|
+| `sc-park-double` | 3 | 0 | nothing renderable was captured — mobile-right, mobile-wrong and pc-right each hold a 0-byte 01-arrival.png and a run log that stops right after … |
+| `sc-park-judge` | 3 | 0 | nothing ran — the two mobile lanes wrote a 0-byte 01-arrival.png and stopped; the PC lane crashed at sign-in before the browser reached the lesson |
+| `sc-pk-crossing-ban` | 3 | 0 | unknown — no frame survived the capture |
+| `sc-rx-barrier-drop` | 3 | 1 | unknown — no lane reached 07-end; pc-right died at t001s and every other PNG in the lesson is 0 bytes or missing |
+| `sc-rx-queue-clear` | 3 | 0 | no drive completed — the only capture (01-arrival) is a 0-byte PNG on both mobile legs, pc-right died right after sign-in with no PNG at all, and … |
+| `sc-rx-tram-island` | 3 | 0 | unknown — no lane produced a single readable frame |
+| `sc-rx-tram-left` | 3 | 0 | unknown — the run was cut mid-drive at t060s; no 07-end and no 08-debrief exist and every PNG in all four lanes is 0 bytes |
+
+**3 — 5 lesson folders that were never judged at all.** They hold complete frame sets and never
+appear in the corpus in any form. **Nobody looked at them.** They are the sweep's silent gap and they
+are named here so the gap cannot close over:
+
+| lesson | lanes with frames | readable frames | debriefs |
+|---|---:|---:|---:|
+| `sc-park-45` | 4/4 | 51 | 4 |
+| `sc-park-narrow` | 4/4 | 57 | 4 |
+| `sc-park-parallel` | 4/4 | 195 | 4 |
+| `sc-park-parallel-exit` | 4/4 | 32 | 4 |
+| `sc-park-perp-forward` | 4/4 | 59 | 4 |
+
+**4 — 18 judged lessons rendered on fewer than four lanes**, so a platform comparison was made from
+partial evidence. Their verdicts stand but their coverage does not:
+
+`sc-crossing-dart` (2/4) · `sc-merge-bus-pullout` (1/4) · `sc-merge-from-property` (3/4) · `sc-merge-motorway-exit` (1/4) · `sc-mv-uturn-ban` (3/4) · `sc-park-bay-exit-rev` (3/4) · `sc-park-night` (1/4) · `sc-park-van` (2/4) · `sc-pk-busstop-ban` (1/4) · `sc-pk-rail-ban` (2/4) · `sc-pk-stop-vs-park` (3/4) · `sc-rb-exit-signal` (1/4) · `sc-rx-guarded` (1/4) · `sc-rx-unguarded` (1/4) · `sc-sig-controller-live` (1/4) · `sc-signal-controller` (1/4) · `sc-signal-flashing` (2/4) · `sc-signal-response` (3/4)
+
+**Sweep coverage on disk, for the re-run to beat:** 166 lesson folders · 599 of 653 lane folders
+carrying at least one readable frame · **16,272 readable frames** · 591 debrief frames.
+
+---
+
+# WHAT NAMED NO FRAME, AND WHAT WAS DROPPED
+
+**5 findings of 1,686 name no frame.** They are listed here in full rather than deleted, because a reader must be able to see exactly what cannot be checked:
+
+- **`sc-vu-door-zone` · SUMMARY · A · major** — COULD_NOT_TEST — no folder E:\AI driver\.audit-frames\sweep161\sc-vu-door-zone exists at all (sweep161 contains only sc-vu-cyclist-hook, sc-vu-emergency, sc-vu-emergency-junction and sc-vu-pass-clearance under the sc-vu- prefix). The scenario itself is real and defined in platform/src/modules/sim/lessons/scenario/templates-vru.ts, so this is a sweep capture gap, not a missing lesson. Needs a re-drive.
+- **`sc-vu-blindspot-moto` · SUMMARY · A · major** — COULD_NOT_TEST — no folder under E:\AI driver\.audit-frames\sweep161. The scenario is defined in platform/src/modules/sim/lessons/scenario/templates-vru2.ts, so this is a sweep capture gap. Needs a re-drive.
+- **`sc-vu-cyclist-group` · SUMMARY · A · major** — COULD_NOT_TEST — no folder under E:\AI driver\.audit-frames\sweep161. The scenario is defined in platform/src/modules/sim/lessons/scenario/templates-vru2.ts, so this is a sweep capture gap. Needs a re-drive.
+- **`sc-vu-child-cyclist` · SUMMARY · A · major** — COULD_NOT_TEST — no folder under E:\AI driver\.audit-frames\sweep161. The scenario is defined in platform/src/modules/sim/lessons/scenario/templates-vru2.ts, so this is a sweep capture gap. Needs a re-drive.
+- **`sc-vu-bikelane-turn` · SUMMARY · A · major** — COULD_NOT_TEST — no folder under E:\AI driver\.audit-frames\sweep161. The id appears in platform/src/modules/clips/clipPlan.generated.ts, so it is a known scenario; this is a sweep capture gap. Needs a re-drive.
+
+**1,681 findings name a frame that exists.** Checked by stat-ing every path, not by trusting the
+string. **0 name a path that does not resolve.**
+
+**47 findings point at a run log or a directory instead of a PNG.** They are the records whose whole
+content is *nothing was captured*; they are kept and marked, because "no frame exists" is itself
+evidence when it is written down with the path that is missing.
+
+**Nothing was merged and nothing was dropped, and here is the arithmetic that proves it:** 1,686
+records stand · 1,012 printed in full under «THE BROKEN FINDINGS» · 512 printed in full under
+«THE UNPOLISHED FINDINGS» · 161 lesson summaries printed twice, once as a ledger row and once as a
+full sentence under «WHY EACH DRIVE ENDED» · 1 filed under its own `COULD_NOT_TEST` bucket and
+carried in its lesson's row. **1,012 + 512 + 161 + 1 = 1,686.**
+Doc 87's lesson — *deduplication is the right way to fix and the wrong way to verify* — applies here
+exactly: when eight lessons independently show the same defect, they are eight rows, because eight
+lessons are wrong on a student's screen.
+
+---
+
+# THE BROKEN FINDINGS, GROUPED BY SUSPECT FILE
+
+**1,012 findings across 138 files.** Ranked by **critical count first, then total** — because the
+question a repair programme asks is not "where is the most noise" but "where is the most danger".
+
+| # | file | critical | major | minor | total |
+|---:|---|---:|---:|---:|---:|
+| 1 | `modules/sim/rules/engine.ts` | 41 | 22 | 2 | **65** |
+| 2 | `modules/sim/lessons/objectives.ts` | 32 | 19 | 0 | **51** |
+| 3 | `components/sim/TouchControls.tsx` | 22 | 12 | 0 | **34** |
+| 4 | `modules/sim/lessons/finish.ts` | 13 | 9 | 0 | **22** |
+| 5 | `modules/sim/lessons/debrief.ts` | 10 | 11 | 6 | **27** |
+| 6 | `tools/mobile/lesson-audit.mjs` | 10 | 3 | 0 | **13** |
+| 7 | `modules/sim/devrig/driveScript.ts` | 9 | 1 | 0 | **10** |
+| 8 | `modules/sim/lessons/scenario/templates-parking3.ts` | 9 | 1 | 0 | **10** |
+| 9 | `modules/sim/world/builders/buildWorldGeometry.ts` | 7 | 2 | 0 | **9** |
+| 10 | `modules/sim/lessons/scenario/templates-vru.ts` | 7 | 0 | 0 | **7** |
+| 11 | `components/sim/LessonScene.tsx` | 6 | 34 | 0 | **40** |
+| 12 | `modules/sim/rules/scoring.ts` | 6 | 12 | 0 | **18** |
+| 13 | `modules/sim/lessons/scenario/templates-following.ts` | 5 | 7 | 1 | **13** |
+| 14 | `modules/sim/lessons/scenario/templates-lanes.ts` | 5 | 7 | 0 | **12** |
+| 15 | `modules/sim/lessons/scenario/rubric.ts` | 5 | 5 | 1 | **11** |
+| 16 | `modules/sim/lessons/scenario/templates-lanes2.ts` | 5 | 1 | 0 | **6** |
+| 17 | `modules/sim/traffic/staged.ts` | 5 | 0 | 0 | **5** |
+| 18 | `modules/sim/lessons/advisor.ts` | 4 | 5 | 3 | **12** |
+| 19 | `modules/sim/lessons/scenario/templates-pe2.ts` | 4 | 5 | 1 | **10** |
+| 20 | `modules/sim/collision/probe.ts` | 4 | 4 | 0 | **8** |
+| 21 | `modules/sim/scene/scenarioSceneryProps.ts` | 4 | 3 | 0 | **7** |
+| 22 | `modules/sim/collision/index.ts` | 4 | 2 | 0 | **6** |
+| 23 | `modules/sim/environment/weather.ts` | 4 | 2 | 0 | **6** |
+| 24 | `modules/sim/lessons/scenario/progress.ts` | 3 | 23 | 0 | **26** |
+| 25 | `modules/sim/hud/SessionEndScreen.tsx` | 3 | 14 | 5 | **22** |
+| 26 | `components/sim/lesson-ui/touchHintLifetime.ts` | 3 | 11 | 0 | **14** |
+| 27 | `modules/sim/lessons/scenario/templates-conditions.ts` | 3 | 8 | 0 | **11** |
+| 28 | `modules/sim/scenarios/coach.ts` | 3 | 5 | 0 | **8** |
+| 29 | `modules/sim/traffic/TrafficLayer.tsx` | 3 | 3 | 1 | **7** |
+| 30 | `components/sim/cockpit/InstrumentCluster.tsx` | 3 | 2 | 1 | **6** |
+| 31 | `modules/sim/lessons/scenario/templates-merging.ts` | 3 | 2 | 0 | **5** |
+| 32 | `modules/sim/rules/offences.ts` | 3 | 2 | 0 | **5** |
+| 33 | `modules/sim/runtime/district.ts` | 3 | 2 | 0 | **5** |
+| 34 | `modules/sim/lessons/scenario/templates-roundabout.ts` | 3 | 0 | 1 | **4** |
+| 35 | `modules/sim/runtime/surface.ts` | 3 | 0 | 0 | **3** |
+| 36 | `unknown` | 2 | 19 | 1 | **22** |
+| 37 | `modules/sim/rules/catalog.ts` | 2 | 6 | 2 | **10** |
+| 38 | `modules/sim/lessons/scenario/templates-sp.ts` | 2 | 7 | 0 | **9** |
+| 39 | `components/sim/ShadowCar.tsx` | 2 | 5 | 1 | **8** |
+| 40 | `modules/sim/lessons/scenario/templates-signals.ts` | 2 | 1 | 2 | **5** |
+| 41 | `modules/sim/rules` | 2 | 3 | 0 | **5** |
+| 42 | `modules/sim/lessons/scenario/templates-pe.ts` | 2 | 2 | 0 | **4** |
+| 43 | `modules/sim/lessons/scenario/templates-cockpit.ts` | 2 | 1 | 0 | **3** |
+| 44 | `modules/sim/lessons/scenario/templates-rail.ts` | 2 | 1 | 0 | **3** |
+| 45 | `modules/sim/lessons/scenario/templates-roundabout2.ts` | 2 | 1 | 0 | **3** |
+| 46 | `app/(dashboard)/simulator/actions.ts` | 2 | 0 | 0 | **2** |
+| 47 | `modules/sim/runtime/worldRuntime.ts` | 2 | 0 | 0 | **2** |
+| 48 | `modules/sim/hud/SimOverlay.tsx` | 1 | 48 | 11 | **60** |
+| 49 | `modules/sim/hud/ObjectiveBanner.tsx` | 1 | 32 | 3 | **36** |
+| 50 | `components/sim/lesson-ui/LessonCard.tsx` | 1 | 10 | 1 | **12** |
+| 51 | `modules/sim/world/builders/markings.ts` | 1 | 5 | 0 | **6** |
+| 52 | `components/sim/lesson-ui/ExamBriefingCard.tsx` | 1 | 3 | 1 | **5** |
+| 53 | `modules/sim/scene/lessonWorldRecipe.ts` | 1 | 4 | 0 | **5** |
+| 54 | `tools/mobile/lib/auth.mjs` | 1 | 4 | 0 | **5** |
+| 55 | `modules/sim/lessons/scenario/templates-conditions2.ts` | 1 | 3 | 0 | **4** |
+| 56 | `modules/sim/lessons/scenario/templates-parking2.ts` | 1 | 3 | 0 | **4** |
+| 57 | `modules/sim/lessons/specs.ts` | 1 | 3 | 0 | **4** |
+| 58 | `components/sim/ScenarioObstacles.tsx` | 1 | 2 | 0 | **3** |
+| 59 | `modules/sim/collision` | 1 | 2 | 0 | **3** |
+| 60 | `modules/sim/hud/PreDriveTutorial.tsx` | 1 | 2 | 0 | **3** |
+| 61 | `modules/sim/lessons/scenario/templates-flow.ts` | 1 | 2 | 0 | **3** |
+| 62 | `modules/sim/lessons/scenario/templates-junctions3.ts` | 1 | 2 | 0 | **3** |
+| 63 | `modules/sim/vehicle` | 1 | 2 | 0 | **3** |
+| 64 | `components/sim/lesson-ui/PlayAreaStyles.tsx` | 1 | 1 | 0 | **2** |
+| 65 | `modules/sim/engine/reverseAssist.ts` | 1 | 1 | 0 | **2** |
+| 66 | `modules/sim/lessons/scenario/observation.ts` | 1 | 1 | 0 | **2** |
+| 67 | `modules/sim/lessons/scenario/templates-signals2.ts` | 1 | 1 | 0 | **2** |
+| 68 | `modules/sim/lessons/scenario/templates-speed2.ts` | 1 | 1 | 0 | **2** |
+| 69 | `modules/sim/scene/guidanceRoute.ts` | 1 | 1 | 0 | **2** |
+| 70 | `platform/public/world/ov-oneway-v1.json` | 1 | 0 | 0 | **1** |
+| 71 | `modules/sim/collision/bodies.ts` | 1 | 0 | 0 | **1** |
+| 72 | `modules/sim/hud/telltaleWarnings.ts` | 1 | 0 | 0 | **1** |
+| 73 | `modules/sim/lessons/scenario/events.ts` | 1 | 0 | 0 | **1** |
+| 74 | `modules/sim/lessons/scenario/templates-junctions2.ts` | 1 | 0 | 0 | **1** |
+| 75 | `modules/sim/lessons/scenario/templates-merging2.ts` | 1 | 0 | 0 | **1** |
+| 76 | `modules/sim/lessons/scenario/templates-pk.ts` | 1 | 0 | 0 | **1** |
+| 77 | `modules/sim/runtime/laneArrows.ts` | 1 | 0 | 0 | **1** |
+| 78 | `modules/sim/scenarios/event-library.json` | 1 | 0 | 0 | **1** |
+| 79 | `modules/sim/scene/cabin.ts` | 1 | 0 | 0 | **1** |
+| 80 | `modules/sim/traces/scHzAccidentScene.ts` | 1 | 0 | 0 | **1** |
+| 81 | `modules/sim/world/builders/network.ts` | 1 | 0 | 0 | **1** |
+| 82 | `modules/sim/world/builders/railTrack.ts` | 1 | 0 | 0 | **1** |
+| 83 | `modules/sim/world/builders/roundabout.ts` | 1 | 0 | 0 | **1** |
+| 84 | `modules/sim/world/builders/zoneSigns.ts` | 1 | 0 | 0 | **1** |
+| 85 | `components/sim/lesson-ui/LessonPlayShell.tsx` | 0 | 59 | 12 | **71** |
+| 86 | `components/sim/RouteGuidance.tsx` | 0 | 15 | 8 | **23** |
+| 87 | `modules/sim/scene/lessonSpeedContract.ts` | 0 | 22 | 0 | **22** |
+| 88 | `modules/sim/hud/FaultCard.tsx` | 0 | 13 | 0 | **13** |
+| 89 | `modules/sim/hud/HudToasts.tsx` | 0 | 5 | 4 | **9** |
+| 90 | `components/sim/lesson-ui/TeachMomentOverlay.tsx` | 0 | 8 | 0 | **8** |
+| 91 | `modules/sim/hud/notifyColumn.ts` | 0 | 7 | 0 | **7** |
+| 92 | `components/sim/lesson-ui/AdvisorCard.tsx` | 0 | 5 | 1 | **6** |
+| 93 | `modules/sim/hud/overlayQueue.ts` | 0 | 4 | 1 | **5** |
+| 94 | `modules/sim/world/components/worldLabel.ts` | 0 | 3 | 2 | **5** |
+| 95 | `components/sim/lesson-ui/MistakeConsequenceOverlay.tsx` | 0 | 2 | 2 | **4** |
+| 96 | `components/sim/lesson-ui/TraceTimeline.tsx` | 0 | 4 | 0 | **4** |
+| 97 | `components/sim/CameraRig.tsx` | 0 | 3 | 0 | **3** |
+| 98 | `modules/sim/cockpit/clusterLayout.ts` | 0 | 2 | 1 | **3** |
+| 99 | `components/sim/HeroCarBody.tsx` | 0 | 2 | 0 | **2** |
+| 100 | `components/sim/vitok/MirrorRig.tsx` | 0 | 2 | 0 | **2** |
+| 101 | `modules/sim/cockpit/index.ts` | 0 | 2 | 0 | **2** |
+| 102 | `modules/sim/engine/reverseView.ts` | 0 | 2 | 0 | **2** |
+| 103 | `modules/sim/hud/StatusDashboard.tsx` | 0 | 2 | 0 | **2** |
+| 104 | `modules/sim/hud/tapActivation.ts` | 0 | 2 | 0 | **2** |
+| 105 | `modules/sim/orchestrator/contact.ts` | 0 | 2 | 0 | **2** |
+| 106 | `modules/sim/traffic/index.ts` | 0 | 2 | 0 | **2** |
+| 107 | `modules/sim/world/components/signFaces.ts` | 0 | 1 | 1 | **2** |
+| 108 | `platform/public/world/mw-v1.json` | 0 | 1 | 0 | **1** |
+| 109 | `platform/public/world/ov-crossing-v1.json` | 0 | 1 | 0 | **1** |
+| 110 | `components/sim/lesson-ui/briefingOverflow.test.tsx` | 0 | 1 | 0 | **1** |
+| 111 | `components/sim/lesson-ui/CalibrationGate.tsx` | 0 | 0 | 1 | **1** |
+| 112 | `components/sim/lesson-ui/GlanceEdgePings.tsx` | 0 | 1 | 0 | **1** |
+| 113 | `components/sim/lesson-ui/HudCloseButton.tsx` | 0 | 0 | 1 | **1** |
+| 114 | `components/sim/VehicleRig.tsx` | 0 | 1 | 0 | **1** |
+| 115 | `modules/sim/environment` | 0 | 1 | 0 | **1** |
+| 116 | `modules/sim/environment/SimEnvironment.tsx` | 0 | 1 | 0 | **1** |
+| 117 | `modules/sim/environment/WindshieldDroplets.tsx` | 0 | 0 | 1 | **1** |
+| 118 | `modules/sim/hud/overheadHint.ts` | 0 | 1 | 0 | **1** |
+| 119 | `modules/sim/hud/RearProximityCue.tsx` | 0 | 1 | 0 | **1** |
+| 120 | `modules/sim/hud/SpeedCard.tsx` | 0 | 1 | 0 | **1** |
+| 121 | `modules/sim/lessons/progression.ts` | 0 | 0 | 1 | **1** |
+| 122 | `modules/sim/lessons/scenario/compile.ts` | 0 | 1 | 0 | **1** |
+| 123 | `modules/sim/lessons/scenario/templates-exam.ts` | 0 | 1 | 0 | **1** |
+| 124 | `modules/sim/lessons/scenario/templates-hazards.ts` | 0 | 1 | 0 | **1** |
+| 125 | `modules/sim/lessons/scenario/templates-junctions4.ts` | 0 | 1 | 0 | **1** |
+| 126 | `modules/sim/orchestrator/runners.ts` | 0 | 1 | 0 | **1** |
+| 127 | `modules/sim/rules/summary.ts` | 0 | 1 | 0 | **1** |
+| 128 | `modules/sim/scene/obstacleSpec.ts` | 0 | 1 | 0 | **1** |
+| 129 | `modules/sim/scene/ribbonStrip.ts` | 0 | 1 | 0 | **1** |
+| 130 | `modules/sim/traces/scMergeLaneEnd.ts` | 0 | 1 | 0 | **1** |
+| 131 | `modules/sim/traces/scMergeMotorwayExit.ts` | 0 | 1 | 0 | **1** |
+| 132 | `modules/sim/traffic` | 0 | 1 | 0 | **1** |
+| 133 | `modules/sim/traffic/controllerGestures.ts` | 0 | 1 | 0 | **1** |
+| 134 | `modules/sim/traffic/oncoming.test.ts` | 0 | 1 | 0 | **1** |
+| 135 | `modules/sim/world/builders` | 0 | 0 | 1 | **1** |
+| 136 | `modules/sim/world/builders/props.ts` | 0 | 1 | 0 | **1** |
+| 137 | `modules/sim/world/builders/waterDecals.ts` | 0 | 1 | 0 | **1** |
+| 138 | `modules/sim/world/components/cityModels.ts` | 0 | 1 | 0 | **1** |
+
+**The top 18 lanes carry 365 of the 1,012 BROKEN findings and 201 of the
+318 criticals.** That is the repair programme, in rank order.
+
+**Ranked the other way it is a different list, and the difference is the point.** By raw count the
+biggest files are `components/sim/lesson-ui/LessonPlayShell.tsx` (71, 0 critical) · `modules/sim/rules/engine.ts` (65, 41 critical) · `modules/sim/hud/SimOverlay.tsx` (60, 1 critical) · `modules/sim/lessons/objectives.ts` (51, 32 critical) — the
+top file by volume carries 0 criticals. **Volume is a layout problem; criticals are a
+student being told they were perfect when they were not.** This document ranks by the second.
+
+**22 findings name no file** and are grouped under `unknown` at their rank. They are kept in the
+ranking rather than hidden in an appendix, because a defect nobody could attribute is still a defect.
+
+
+---
+
+## `platform/src/modules/sim/rules/engine.ts` — 65 findings (41 critical, 22 major, 2 minor)
+
+- **`sc-ac-bridge-ice` · A · CRITICAL** — The wrong drive — 59 км/ч in a posted 50 through the ice lesson, no objective met — earns 0 наказателни точки, +40 XP and the instructor line that his driving was clean without a single violation. The identical drive on PC is convicted of speeding. A student can therefore be told he drove perfectly through black ice on a bridge he never slowed for.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-ac-bridge-ice/mobile-wrong/08-debrief.png`
+- **`sc-ac-crosswind` · A · CRITICAL** — The wrong drive crossed the supposed wind section at 59 км/ч and scored 0 наказателни точки in all three classes — no speed offence, no lane-discipline offence, nothing. With the wind itself absent from the world there is no behaviour the lesson can actually mark either way.
+  `sc-ac-crosswind/pc-wrong/08-debrief.png`
+- **`sc-ac-fog` · A · CRITICAL** — The wrong drive crossed the fogged section at 59 км/ч with no lamps and scored 0 наказателни точки in every class; the fog-lamp offence in rules/catalog.ts:407 never fires, and the instructor debrief praises the run for driving without a single violation.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-ac-fog/pc-wrong/08-debrief.png`
+- **`sc-ac-highbeam-lead` · A · CRITICAL** — The careful drive was convicted of three road accidents. mobile-right never exceeded 23 км/ч and came to 25 full stops, yet scored 30 наказателни точки in three «Пътнотранспортно произшествие» rows and was failed. A student who crawls and stops repeatedly is being told they crashed three times.
+  «Пътнотранспортно произшествие»
+  `sc-ac-highbeam-lead/mobile-right/04-t098s.png`
+- **`sc-ac-night-lights` · A · CRITICAL** — The wrong drive ran the whole night section at 59 км/ч with no lights and scored 0 наказателни точки — Опасни 0, Основни 0, Второстепенни 0. The offence «Движение нощем без светлини» is defined in platform/src/modules/sim/rules/catalog.ts:340 but never fires. Worse, the instructor debrief then praises the unlit run for clean driving, which actively teaches the opposite of the lesson.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-ac-night-lights/pc-wrong/08-debrief.png`
+- **`sc-ac-rain-lights` · A · CRITICAL** — The wrong drive did the whole rain section at 59 км/ч with no lights and no wipers and scored 0 наказателни точки in all three error classes. The offence «Движение в дъжд без светлини» is defined in rules/catalog.ts:391 and never fires; the instructor debrief then congratulates the run on flawless driving.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-ac-rain-lights/pc-wrong/08-debrief.png`
+- **`sc-ac-truck-spray` · A · CRITICAL** — The wrong drive holds 131 км/ч for the whole run and the instructor debrief tells the student his driving was clean without a single violation and to keep this level. Zero penalty points, +40 XP, and explicit praise for the behaviour the lesson is built to punish. The identical bot on mobile collected 72 points and twelve faults, so the same drive is both exemplary and disastrous depending on platform.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-ac-truck-spray/pc-wrong/08-debrief.png`
+- **`sc-ac-wind-truck-pass` · A · CRITICAL** — The careful drive is convicted of five separate Движение в обратна посока по еднопосочна улица (10 т. each) plus Движение по аварийната лента, on a road the briefing describes as a two-lane road you overtake a truck on. A student driving at 16 км/ч collects 50 points of dangerous errors for one-way violations on a road that is not signed one-way anywhere in the frames.
+  «Движение в обратна посока по еднопосочна улица ×5 — опасна, 50 наказателни т.»
+  `sc-ac-wind-truck-pass/pc-right/04-t096s.png`
+- **`sc-crossing-bus-shadow` · A · CRITICAL** — pc-wrong lists «Пътнотранспортно произшествие» FOUR separate times, −10 each, for one continuous contact, totalling 60 т. — while the card's own text says the opposite in as many words. The mobile leg of the identical wrong drive scored 10 т. The score is a function of how long you keep pushing, not of what you did.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от…»
+  `sc-crossing-bus-shadow/pc-wrong/08-debrief.png`
+- **`sc-crossing-white-cane` · A · CRITICAL** — mobile-right ticks ALL THREE tasks — including «Спри НАПЪЛНО преди зебрата» and «Потегли чак когато е слязъл от цялото платно» — and is still stamped НЕИЗДЪРЖАН with «Непропускане на пешеходец» −10 опасна. A drive cannot simultaneously have waited for the blind pedestrian to clear the whole carriageway and have driven across him. The identical drive on pc is ИЗДЪРЖАН 0 т. with a commendation.
+  «✓ Спри НАПЪЛНО преди зебрата … ✗ Непропускане на пешеходец −10 изпитни т. ОПАСНА ГРЕШКА»
+  `sc-crossing-white-cane/mobile-right/08-debrief.png`
+- **`sc-crossing-white-cane` · A · CRITICAL** — mobile-wrong drove the blind pedestrian's crossing at 59 км/ч with 0 full stops and 0 waits and was awarded 0 наказателни точки and NO mistake at all — while the same wrong drive on pc scored 20 т. with two dangerous errors. On a phone the white-cane lesson convicts nothing.
+  «НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · mistakes=0»
+  `sc-crossing-white-cane/mobile-wrong/08-debrief.png`
+- **`sc-ed-d2-city-run` · A · CRITICAL** — The correct drive is convicted of five to eight Движение в обратна посока по еднопосочна улица (10 т. each) plus two collisions, at 16 км/ч, on the lesson's own scripted route. Either the route sends the student the wrong way down its own one-way streets or the detector misfires — the student who does exactly what he is told is handed 80 penalty points and a fail.
+  «допусната е опасна грешка — директно неиздържан»
+  `sc-ed-d2-city-run/pc-right/08-debrief.png`
+- **`sc-follow-brake` · A · CRITICAL** — Mobile penalty runaway again: 210 наказателни точки, under the same sentence stating a collision costs 10.
+  «210 наказателни точки»
+  `sc-follow-brake/mobile-wrong/08-debrief.png`
+- **`sc-follow-distance` · A · CRITICAL** — Mobile penalty total runs away: 420 наказателни точки on a sheet whose own caption says 9 are allowed, printed directly under the sentence that a collision is ONE dangerous error worth 10 points and not a sum of many small ones. The mid-drive fault card shows repeat counters +1, +2 as the car keeps shoving the lead vehicle for 168 s.
+  «420 наказателни точки … Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-follow-distance/mobile-wrong/08-debrief.png`
+- **`sc-follow-rain-gap` · A · CRITICAL** — Mobile penalty runaway: 430 наказателни точки against a 9-point sheet, under the sentence that says a collision is one dangerous error worth 10.
+  «430 наказателни точки»
+  `sc-follow-rain-gap/mobile-wrong/08-debrief.png`
+- **`sc-follow-standstill` · A · CRITICAL** — Mobile penalty runaway, worst of the chunk: 490 наказателни точки, printed under the sentence that a collision is one dangerous error worth 10.
+  «490 наказателни точки»
+  `sc-follow-standstill/mobile-wrong/08-debrief.png`
+- **`sc-junction-gap` · A · CRITICAL** — Runaway scoring: 365 наказателни точки with 35 опасни / 1 основна / 12 второстепенни = 48 mistakes in one ~207 s lesson, including «Пътнотранспортно произшествие» logged four separate times for what the same debrief insists is one indivisible dangerous error.
+  «365 наказателни точки»
+  `sc-junction-gap/pc-wrong/08-debrief.png`
+- **`sc-junction-scan` · A · CRITICAL** — Runaway scoring: 356 наказателни точки with 30 опасни / 14 основни / 14 второстепенни = 58 mistakes in one lesson. The offence list is «Превишаване с повече от 10 км/ч», «Неспиране на знак Б2», «Непълно оглеждане при знак Б2» and «Превишена скорост» repeating in a fixed cycle roughly fourteen times — one standing state is being re-convicted every tick.
+  «356 наказателни точки»
+  `sc-junction-scan/pc-wrong/08-debrief.png`
+- **`sc-junction-stop` · A · CRITICAL** — Runaway scoring: the wrong lane finishes on 394 наказателни точки with 38 опасни / 1 основна / 11 второстепенни = 50 mistakes in one ~210 s lesson. The offence list shows «Превишаване с повече от 10 км/ч», «Неспиране на знак Б2», «Непропускане на ППС с предимство» repeating roughly fifteen times each — the rule engine re-fires the same standing violation instead of latching it once.
+  «394 наказателни точки»
+  `sc-junction-stop/pc-wrong/08-debrief.png`
+- **`sc-jx-blocked-exit` · A · CRITICAL** — The same correct drive passes on pc and fails on mobile. pc-right: 0 наказателни точки, ИЗДЪРЖАН, +100 XP, three objectives at 1:01/1:54/2:07. mobile-right: three objectives at 1:11/2:03/2:16 — all ticked — and a 'Преминаване на червен сигнал' dangerous error, 10 points, НЕИЗДЪРЖАН. A student who does every step right is failed for a red light on a phone and passed on a laptop.
+  «Пресече стоп-линията на червено.»
+  `sc-jx-blocked-exit/mobile-right/08-debrief.png`
+- **`sc-jx-equal-left` · A · CRITICAL** — The lesson cannot tell right from wrong. On mobile the correct drive scores 20 наказателни точки and the deliberately-wrong drive scores 20 наказателни точки — the same number, the same verdict, the same star count. Whatever the student does, the debrief says the same thing.
+  «20 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-jx-equal-left/mobile-right/08-debrief.png`
+- **`sc-jx-priority-confidence` · A · CRITICAL** — The WRONG drive is acquitted and praised. It ran to 59 км/ч against a 50 sign (cockpit repeater: disc 50, 'знакът важи') and made zero full stops, and the debrief awards 0 наказателни точки with every error class at 0, then tells the student in the instructor debrief 'Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.' It fails only for unfinished route tasks. A student is being told to keep speeding.
+  «чисто каране без нито едно нарушение — задръж това ниво»
+  `sc-jx-priority-confidence/mobile-wrong/08-debrief.png`
+- **`sc-ln-boulevard-discipline` · A · CRITICAL** — mobile-wrong lists FOURTEEN «Пътнотранспортно произшествие» rows = 140 наказателни точки for one sustained contact.
+  «SCORE: 140 наказателни точки · mistakes=14»
+  `sc-ln-boulevard-discipline/mobile-wrong/08-debrief.png`
+- **`sc-mw-discipline` · A · CRITICAL** — 208 seconds of crawling at 0-13 km/h on a 140 km/h motorway produced ZERO errors of any class (Опасни 0, Основни 0, Второстепенни 0). Instruction 4 of this very lesson says crawling under 50 km/h makes the car a moving obstacle, so the fault the briefing names is the one the engine never books. DRIVING_TOO_SLOW_FOR_MOTORWAY requires |accel| below a steady threshold, and the stop-start crawl never satisfies it.
+  «Не пълзи: трайно движение далеч под потока (под 50 км/ч без причина) прави от колата ти подвижно препятствие.»
+  `sc-mw-discipline/pc-right/08-debrief.png`
+- **`sc-mw-emergency-lane` · A · CRITICAL** — The WRONG drive passes. On the lesson titled 'Аварийната лента не е лента за движение' the reckless run reaches 139 км/ч, is awarded ИЗДЪРЖАН, 0 наказателни точки, three stars and +100 XP on both platforms. A student who blasts down this motorway is told he drove a clean lesson.
+  «✓ Подмини авариралата кола в лентата за движение 0:55 ✓ Стигни края на участъка 0:58»
+  `sc-mw-emergency-lane/mobile-wrong/07-end.png`
+- **`sc-mw-emergency-lane` · G · CRITICAL** — FREE OBSERVATION, the pattern behind all seven: not one lesson-specific fault code appears on any of the 28 debriefs. Every conviction in this chunk is one of three generic engine faults — Пътнотранспортно произшествие, Превишена скорост, Несъобразена скорост. Wrong-way entry, overtaking at a crossing, refusing priority in a narrowing, overtaking under В24, crossing М1, driving in a bus lane and driving in the emergency lane are all ungraded. The lessons are staged in the world but the grader never consults the world, so seven different offences all resolve to 'you hit something' or 'you were fast'.
+  «Превишена скорост −1 изпитна т.»
+  `sc-ov-bus-lane/pc-wrong/08-debrief.png`
+- **`sc-mw-min-speed` · A · CRITICAL** — This is the template whose whole purpose is to grade the FLOOR („Магистрален ритъм — не пълзи“), and 208 s of crawling at 0-18 km/h on a 140 km/h motorway produced Опасни 0 / Основни 0 / Второстепенни 0. The crawl detector never fired once. The lesson measures only two geometric reach zones, so the fault it is named after cannot be booked.
+  «Не сваляй скоростта без причина. Продължително пълзене далеч под потока (тук около 40 км/ч) превръща колата ти в подвижно препятствие»
+  `sc-mw-min-speed/pc-right/08-debrief.png`
+- **`sc-ov-abort` · A · CRITICAL** — 420 penalty points from 42 identical collision entries in a system whose own text says a collision is ONE dangerous mistake worth ten. The number shown to the student is meaningless.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние»
+  `sc-ov-abort/mobile-wrong/04-t089s.png`
+- **`sc-ov-bus-lane` · A · CRITICAL** — The ego travels on the bus-lane side of the solid seam for the whole run and collects 0 наказателни точки and no error of any kind. The lesson's one graded act — 'движението на автомобили в бус лентата е забранено, дори тя да е празна' — is not detected at all.
+  «3. Пътувай в общата лента през целия участък — движението на автомобили в бус лентата е забранено, дори тя да е празна.»
+  `sc-ov-bus-lane/pc-right/04-t102s.png`
+- **`sc-ov-oncoming-gap` · A · CRITICAL** — One collision is charged over and over. mobile-wrong shows 14 × «Пътнотранспортно произшествие» = 141 points, while the card's own text insists the ten points are for the single act and not a sum. The score sheet contradicts the explanation printed next to it.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски.»
+  `sc-ov-oncoming-gap/mobile-wrong/04-t027s.png`
+- **`sc-ov-oneway` · A · CRITICAL** — The WRONG drive is convicted only of Превишена скорост ×8 (mobile) / ×9 (pc). Not one fault names the thing the lesson teaches — entering a one-way street against its direction. A student who drives the wrong way down the еднопосочна is told, in the debrief, that his only mistake was speed.
+  «Превишена скорост −1 изпитна т. ВТОРОСТЕПЕННА ГРЕШКА»
+  `sc-ov-oneway/mobile-wrong/08-debrief.png`
+- **`sc-ov-solid-line` · A · CRITICAL** — The wrong drive scores 0 наказателни точки on both platforms. CROSSED_SOLID_LINE — the single fault code this lesson is built around, worth 3 т. as основна грешка per its own teach text — never fires. The lesson fails the student only for not reaching the end zone, never for the offence.
+  «Опасни грешки (по 10 изпитни т.) 0 0 · Основни грешки (по 3 изпитни т.) 0 0 · Второстепенни грешки 0 0»
+  `sc-ov-solid-line/mobile-wrong/08-debrief.png`
+- **`sc-ov-solid-return` · A · CRITICAL** — mobile-wrong lists THIRTEEN «Пътнотранспортно произшествие» rows = 130 наказателни точки for one sustained contact.
+  «SCORE: 130 наказателни точки · mistakes=13 (all «Пътнотранспортно произшествие»)»
+  `sc-ov-solid-return/mobile-wrong/08-debrief.png`
+- **`sc-park-left` · A · CRITICAL** — pc-wrong accumulates ELEVEN separate «Превишаване с повече от 10 км/ч» rows, −10 each, for one continuous speeding episode = 110 наказателни точки against a 9-point allowance. A continuing condition is billed per sample instead of once.
+  «SCORE: 110 наказателни точки · mistakes=11 (all «Превишаване с повече от 10 км/ч»)»
+  `sc-park-left/pc-wrong/08-debrief.png`
+- **`sc-park-zebra` · A · CRITICAL** — mobile-wrong 100 т. / pc-wrong 110 т., built out of ten and eleven identical «Превишаване с повече от 10 км/ч» rows for one continuous overspeed. The same duplication that inflates collisions inflates speeding.
+  «SCORE: 110 наказателни точки · mistakes=11»
+  `sc-park-zebra/pc-wrong/08-debrief.png`
+- **`sc-pk-rail-ban` · A · CRITICAL** — The correct drive is convicted of an invisible offence. At t117s a toast fires „ОПАСНА ГРЕШКА -10 изпитни т. — Нарушение на правилата за жп прелез“ while the car sits at 0 км/ч on an empty street with no crossing on screen; that single penalty is the whole of the pc-right debrief (1 опасна грешка, 10 точки, НЕИЗДЪРЖАН). The student is failed for breaking a rule at a place that is not shown to exist.
+  «ОПАСНА ГРЕШКА -10 изпитни т. Нарушение на правилата за жп прелез»
+  `sc-pk-rail-ban/pc-right/04-t117s.png`
+- **`sc-signal-flashing` · A · CRITICAL** — One stuck contact is re-scored as three separate road-traffic accidents. After the ego is pushed onto the footway it grinds along a building facade, and «Пътнотранспортно произшествие −10 изпитни т.» fires again at t105, t110 and t121. The debrief presents four dangerous errors totalling 40 points as four independent events, when three of them are the same car touching the same wall while stationary or at 12 км/ч. The card's own text says the ten points are the price of ONE act, then charges it three more times.
+  «Опасни грешки (по 10 изпитни т.) 4 40»
+  `sc-signal-flashing/mobile-right/04-t121s.png`
+- **`sc-sp-curve` · A · CRITICAL** — The car drives off the carriageway into an infinite flat green plane and the simulator keeps grading as if nothing happened. mobile-wrong t=024s: 96 км/ч with no road anywhere in the windscreen, only grass and a painted mountain band. mobile-wrong t=129s: 92 км/ч still in the field, and a Несъобразена скорост в завой card fires there — the engine is scoring a corner the car is not on. mobile-right 07-end: standing in the same void. There is no boundary, no verge, no off-road penalty, no recovery prompt and no rule that notices the car has left the road.
+  «РЕЖИМ Нормален ≤100 · знакът важи»
+  `sc-sp-curve/mobile-wrong/04-t024s.png`
+- **`sc-sp-harsh-brake` · A · CRITICAL** — The lesson's own offence is never graded. The wrong drive debrief reads 0 наказателни точки with Опасни 0, Основни 0, Второстепенни 0 — and still awards +40 XP. The only reason it says НЕИЗДЪРЖАН is that the route tasks were not all completed, which is a timeout, not a conviction. A student who slams the brakes on an empty street for no reason is told, on the only honest screen in the product, that they made no error at all. Identical on mobile-wrong.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-sp-harsh-brake/pc-wrong/08-debrief.png`
+- **`sc-sp-wet-limit-plate` · A · CRITICAL** — The WRONG drive held 59 km/h on a street whose base sign is 50 and whose plate the briefing says caps it at 40 — and the debrief books zero errors of any class, ИЗДЪРЖАН, +100 XP and 3 stars. Neither SPEED_TOO_FAST_FOR_CONDITIONS nor SPEEDING_OVER_LIMIT fired. Both codes this template declares are unreachable at the rung that ships first.
+  «Опасни грешки (по 10 изпитни т.) 0 0»
+  `sc-sp-wet-limit-plate/pc-wrong/08-debrief.png`
+- **`sc-vu-emergency` · A · CRITICAL** — Failing to give way to an emergency vehicle carries no penalty. The WRONG drive was failed only for unfinished tasks — Опасни 0, Основни 0, Второстепенни 0, total 0 points. Not yielding to a vehicle in special regime is a serious offence, and the debrief books nothing for it, so the student is never told what he actually did wrong.
+  «Общо (допустими 9) 0 0»
+  `sc-vu-emergency/pc-wrong/08-debrief.png`
+- **`sc-ac-aquaplane` · A · major** — The wrong drive holds 93–97 км/ч in a torrential-rain aquaplaning lesson and the rule engine convicts only Пътнотранспортно произшествие. No Несъобразена с условията скорост, no aquaplaning fault, no speeding (the HUD chip reads РЕЖИМ Нормален ≤100 next to a 90 sign, so 93 is tolerated). The one behaviour the lesson exists to punish is never named in the verdict.
+  «РЕЖИМ Нормален ≤100 · знакът важи»
+  `sc-ac-aquaplane/pc-wrong/04-t018s.png`
+- **`sc-ac-highbeam-lead` · A · major** — A collision card fires with visibly clear road: at t073s in the mobile wrong run the −10 ОПАСНА ГРЕШКА card is on screen while the ego is at 7 км/ч and the lead car sits two to three car lengths ahead with daylight between the bumpers. Either the trigger re-fires long after contact or it fires without contact.
+  «Настъпи сблъсък.»
+  `sc-ac-highbeam-lead/mobile-wrong/04-t073s.png`
+- **`sc-ac-truck-spray` · F · major** — CONSISTENCY: the same wrong-drive input is graded differently on PC and mobile. truck-spray wrong: 0 т. on pc, 72 т. on mobile. bridge-ice wrong: 1 т. on pc, 0 т. on mobile. wind wrong: 38 т. on pc, 37 т. on mobile with different fault lists. A verdict that depends on which device the student holds is not a verdict.
+  «0 наказателни точки»
+  `sc-ac-truck-spray/pc-wrong/08-debrief.png`
+- **`sc-ac-wet-braking` · A · major** — The wrong drive is convicted for the wrong thing. It failed on two «Пътнотранспортно произшествие» rows — i.e. it hit the truck — but nothing in the protocol names the lesson's actual fault, that the approach speed was not adjusted for the wet. A student reads only «you crashed», never «your braking distance on wet is 1.4x».
+  «Помни: на мокро спирачният път е около 1,4 пъти по-дълъг от сухия.»
+  `sc-ac-wet-braking/pc-wrong/08-debrief.png`
+- **`sc-ac-wind-truck-pass` · F · major** — CONSISTENCY: Движение в обратна посока по еднопосочна улица fires in four of the seven lessons — on a motorway (truck-spray), on an overtaking road (wind), on a city exam segment (city-run) — and never once is a one-way sign or arrow visible in any frame of those lessons. The detector and the drawn world disagree everywhere it fires.
+  «Движеше се срещу платното на еднопосочна улица.»
+  `sc-ac-wind-truck-pass/pc-right/04-t096s.png`
+- **`sc-follow-brake` · F · major** — Cross-platform inconsistency of the same run: 41 наказателни точки on PC against 210 on mobile.
+  «210 наказателни точки»
+  `sc-follow-brake/mobile-wrong/08-debrief.png`
+- **`sc-follow-distance` · F · major** — The same lesson, same driving script, reports penalty totals an order of magnitude apart between platforms: 55 наказателни точки on PC, 420 on mobile.
+  «420 наказателни точки»
+  `sc-follow-distance/mobile-wrong/08-debrief.png`
+- **`sc-follow-tailgater` · F · major** — Same lesson, same wrong script, opposite verdicts by platform: PC records 0 наказателни точки and no fault of any class, mobile records 31 with a collision.
+  «31 наказателни точки»
+  `sc-follow-tailgater/mobile-wrong/08-debrief.png`
+- **`sc-jx-priority-confidence` · F · major** — Speeding is convicted inconsistently between lessons. 59 км/ч over a posted limit produces 'Превишена скорост' twelve times in sc-junction-blind pc-wrong and eight times in sc-ov-lane-keeping pc-wrong, but produces zero convictions here at the same 59 км/ч against a 50 sign.
+  «Опасни грешки (по 10 изпитни т.) 0 0»
+  `sc-jx-priority-confidence/mobile-wrong/08-debrief.png`
+- **`sc-ln-turn-lane-arrows` · G · major** — Free observation: the traffic light exists and shows red, and the ego stops for it — so the signal half of the lesson is present — yet the objective «Премини светофара от правилната лента» is still never credited on any of the four runs. The engine is not consulting the signal it renders.
+  «– Премини светофара от правилната лента»
+  `sc-ln-turn-lane-arrows/mobile-right/04-t096s.png`
+- **`sc-mv-uturn-ban` · A · major** — The wrong drive is convicted for a crash and a speed slip, not for the U-turn ban. The debrief lists 1 опасна (сблъсък) + 1 второстепенна (превишена скорост) = 11 точки and never mentions В23 or turning against a solid axis line. The lesson's own rule is never the ground of the verdict on either the right or the wrong side.
+  «Настъпи сблъсък. … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-mv-uturn-ban/pc-wrong/08-debrief.png`
+- **`sc-ov-being-overtaken` · F · major** — Speed enforcement differs between platforms for the same drive. Both wrong runs peaked at 97 км/ч on a road signed 90; mobile-wrong was convicted of «Превишена скорост» once, pc-wrong not at all.
+  «Второстепенни грешки (по 1 изпитна т.) 0»
+  `sc-ov-being-overtaken/pc-wrong/08-debrief.png`
+- **`sc-ov-lane-keeping` · A · major** — The RIGHT drive is convicted of 'Неустойчиво движение в лентата' on mobile — the correct drive is penalised for the exact skill it is demonstrating — while the identical pc right drive takes 0 points. Both are then stamped НЕИЗДЪРЖАН anyway.
+  «Неустойчиво движение в лентата −1 изпитна т.»
+  `sc-ov-lane-keeping/mobile-right/08-debrief.png`
+- **`sc-ov-narrow` · A · major** — 'Отнемане на предимство' — the fault the briefing spends two of its five lines on — never appears in any debrief. The only conviction available is Пътнотранспортно произшествие, so barging into the narrowing and being hit are graded as the same thing.
+  «4. Не се вклинявай в насрещната лента, докато другата кола е още в стеснението — това е отнемане на предимство.»
+  `sc-ov-narrow/mobile-right/02-briefing.png`
+- **`sc-ov-night-gap` · C · major** — 39 collisions and 390 penalty points on mobile-wrong from vehicles that interpenetrate rather than collide; the same single contact is charged ten points thirty-nine times.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото»
+  `sc-ov-night-gap/mobile-wrong/04-t044s.png`
+- **`sc-pk-double-park` · A · major** — The wrong drive is again convicted for the wrong reason. The debrief's only cause is „Настъпи сблъсък“ plus „Не всички задачи от маршрута бяха изпълнени“ — nothing about stopping alongside an already-parked car (чл. 98, ал. 1), which is the entire subject of the lesson. The student is punished but not taught.
+  «Настъпи сблъсък. … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-pk-double-park/mobile-wrong/08-debrief.png`
+- **`sc-pk-rail-ban` · A · major** — The wrong drive is convicted for a collision (20 т.) rather than for stopping in the чл. 98 ban zone — the exact distinction the lesson exists to teach (престой пред прелеза = основна грешка, спиране върху него = опасна). Neither error class appears in the debrief.
+  «Настъпи сблъсък. … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-pk-rail-ban/mobile-wrong/08-debrief.png`
+- **`sc-pk-stop-vs-park` · A · major** — The wrong drive is convicted, but not for the rule the lesson teaches. The debrief's only stated cause is „Настъпи сблъсък“ — a crash at ~38 s, still on ЗАДАЧА 1/3, long before the В28→В27 transition at 170 m. A student reading this debrief learns nothing about престой vs паркиране.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-pk-stop-vs-park/pc-wrong/08-debrief.png`
+- **`sc-rb-circulate-priority` · G · major** — mobile-right ends with the car parked ON THE CENTRAL ISLAND, nose in the grass, and the sim raises no off-carriageway error at all — leaving the road is simply not detected.
+  `sc-rb-circulate-priority/mobile-right/04-t049s.png`
+- **`sc-roundabout-entry` · F · major** — The two platforms convict different things for the same drive: PC one collision (10 pts), mobile a failure-to-yield plus a collision (20 pts), and the wrong run inverts it — mobile 10, PC 20. The wrong drive is punished less than the right one on PC.
+  «VERDICT: НЕИЗДЪРЖАН · SCORE: 20 наказателни точки»
+  `sc-roundabout-entry/mobile-right/04-t062s.png`
+- **`sc-sp-limit-end` · F · major** — 59 km/h is a dangerous error worth 10 exam points here (posted 40 in the В26 zone) but produces zero errors and a 3-star pass in sc-sp-wet-limit-plate, whose plate caps the street at 40 too. The same speed on the same class of street is judged two opposite ways.
+  «Превишаване с повече от 10 км/ч»
+  `sc-sp-wet-limit-plate/pc-wrong/08-debrief.png`
+- **`sc-zebra-approach` · A · major** — Same wrong drive, two different verdicts by platform: PC 20 points with two dangerous faults (too-fast approach plus failure to yield), mobile 10 points with only the second. The 'too fast at a crossing' rule does not fire on mobile at the identical 59 км/ч.
+  «Твърде бързо приближаване към пешеходна пътека»
+  `sc-zebra-approach/pc-wrong/04-t006s.png`
+- **`sc-ed-d2-stop-address` · F · minor** — The same careful drive scores differently on the two platforms: PC 11 points with two faults, mobile 0 points with none. Neither the world nor the rules should depend on the screen.
+  «VERDICT: НЕИЗДЪРЖАН · SCORE: 11 наказателни точки»
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-pk-stop-vs-park` · G · minor** — A seatbelt violation card fires while the speedometer reads 0 км/ч and the gear is still being selected, and its text asserts motion that has not happened: „Движеше се без поставен колан“. The car starts every mobile run belt-off with a red КОЛАН button, so the student's first feedback in the lesson is a penalty for something the frame contradicts.
+  «Коланът не е поставен — Движеше се без поставен колан.»
+  `sc-pk-stop-vs-park/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/lessons/objectives.ts` — 51 findings (32 critical, 19 major, 0 minor)
+
+- **`sc-ac-aquaplane` · A · CRITICAL** — The objective „Намали под 60 ПРЕДИ водата“ is ticked ✓ at 2:19 on a drive whose top speed for the whole session was 15 км/ч (pc) / 22 км/ч (mobile). A gate that says reduce below 60 hands out a green tick to a car that never went near 60 — it measures arrival, not the skill it names. Same green tick appears in both right runs.
+  «✓ Намали под 60 ПРЕДИ водата 2:19»
+  `sc-ac-aquaplane/pc-right/08-debrief.png`
+- **`sc-ac-fog` · A · CRITICAL** — Both the СВЕТЛИНИ and the МЪГЛА telltales stay dim from arrival through t101s, yet «Мини контролната зона със съобразена за мъглата скорост» ticks ✓ at 1:56 and the run passes 3/3 with zero penalties. Instruction 1 makes both lamps a precondition of moving off and neither is measured.
+  «Включи късите светлини и фаровете за мъгла (клавиш V) преди да потеглиш.»
+  `sc-ac-fog/pc-right/04-t101s.png`
+- **`sc-ac-highbeam-lead` · A · CRITICAL** — On mobile the WRONG drive was credited with the lesson's core objective: «Следвай предната кола с къси светлини» ticked ✓ at 1:11 and «Стигни края на отсечката» ✓ at 1:39, in a run that also logged 18 collisions and 180 penalty points. The same wrong drive on PC ticked neither. The objective is scored off position alone and gives the dazzling driver the green tick for beam discipline.
+  «Следвай предната кола с къси светлини»
+  `sc-ac-highbeam-lead/mobile-wrong/08-debrief.png`
+- **`sc-ac-night-lights` · A · CRITICAL** — The objective «Мини контролната зона осветен» ticks ✓ at 1:56 while the headlights are demonstrably OFF. At t116s (the tick moment) the СВЕТЛИНИ telltale is dim grey, and at t011/t063/t116/t183 the road ahead has no headlight pool at any point of the drive. The lesson credits the student for the one thing it exists to teach. Proof the telltale can render lit: sc-ac-highbeam-lead/pc-right/01-arrival.png shows the same control green and labelled КЪСИ with a beam pool on the tarmac.
+  «Мини контролната зона осветен»
+  `sc-ac-night-lights/pc-right/04-t116s.png`
+- **`sc-ac-night-overdrive` · A · CRITICAL** — Objective „Мини неосветения участък със съобразена за видимостта скорост“ is ticked ✓ at 2:45 on a drive that never exceeded 15 км/ч. A speed-appropriate-to-visibility gate that a walking-pace car satisfies teaches nothing, and it is the only objective the right run ever earns.
+  «✓ Мини неосветения участък със съобразена за видимостта скорост 2:45»
+  `sc-ac-night-overdrive/pc-right/08-debrief.png`
+- **`sc-ac-rain-lights` · A · CRITICAL** — The objective «Мини контролната зона осветен и съобразен» ticks ✓ at 2:03 and the run passes 3/3 stars while both the СВЕТЛИНИ and the ЧИСТАЧКИ telltales stay dim for the entire drive. Instruction 1 is literally the wipers-then-lights pairing and neither half is measured.
+  «Включи късите светлини — вали, макар да е ден: „чистачки → светлини“.»
+  `sc-ac-rain-lights/pc-right/04-t090s.png`
+- **`sc-ac-snow` · A · CRITICAL** — «Приближи със зимна скорост» ticks ✓ at 1:25 and the run passes 3/3 while the СВЕТЛИНИ telltale is dim throughout, exactly as in the other four unlit lessons. Instruction 1 demands the dipped beams and nothing measures them.
+  «Приближи със зимна скорост»
+  `sc-ac-snow/pc-right/04-t102s.png`
+- **`sc-ac-wind-truck-pass` · A · CRITICAL** — The objective literally named „със съобразена скорост“ is ticked at 0:43 on a run whose top speed is 146 км/ч, and is withheld from the run that never exceeded 16 км/ч. The gate is measuring distance travelled along the route, not the speed it names, so the faster and more dangerous the drive the sooner it earns the green tick.
+  «✓ Върни се в дясната лента и стигни края на отсечката 1:55»
+  `sc-ac-wind-truck-pass/pc-wrong/08-debrief.png`
+- **`sc-ed-d2-city-run` · A · CRITICAL** — Three of four route tasks never fire in any run on either platform: „Премини второто светофарно кръстовище по сигнала“, „Дръж дясната лента по булеварда“ and „Довърши сегмента след пешеходната пътека“ show „–“ in all four debriefs. The lesson advertises a full exam segment and delivers one junction.
+  «– Премини второто светофарно кръстовище по сигнала»
+  `sc-ed-d2-city-run/mobile-right/08-debrief.png`
+- **`sc-ed-d2-priority-run` · A · CRITICAL** — The right drive is not credited: it stopped fully at Б2, earned a commendation, took 0 penalty points — and the debrief still stamps НЕИЗДЪРЖАН with 1 of 3 stars because the route it could never finish counts against it. Flawless driving is graded as a fail.
+  «VERDICT: НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · 1 от 3 звезди»
+  `sc-ed-d2-priority-run/pc-right/04-t192s.png`
+- **`sc-ed-reverse-line` · A · CRITICAL** — The 'straight line in reverse' objective does not check direction or gear. The wrong run ticked it at 0:59 while driving FORWARD in D at up to 60 км/ч and collecting ten speeding faults; the careful run, doing the same forward crawl, never got it. Direction of travel is simply not measured.
+  «✓ Дръж права линия по средата на заден ход 0:59»
+  `sc-ed-reverse-line/pc-wrong/08-debrief.png`
+- **`sc-fo-motorway-gap` · A · CRITICAL** — The careful drive completes ZERO of two objectives on both platforms and is stamped НЕИЗДЪРЖАН with 0 penalty points, while the 134-138 км/ч drive — which collides, drives the hard shoulder and changes lane without a mirror check — is the only one credited with «Стигни края на отсечката по магистралата». The reckless driver gets the route credit the careful driver is denied.
+  «0 наказателни точки · НЕИЗДЪРЖАН · Урокът беше прекъснат преди края.»
+  `sc-fo-motorway-gap/mobile-right/08-debrief.png`
+- **`sc-hazard-obstacle` · A · CRITICAL** — THE WRONG DRIVE PASSES. 59 км/ч in a posted 50 zone, zero stops, the whole section covered in 43 seconds, straight past where the obstacle is meant to be — and the debrief surface reads 0 наказателни точки, ИЗДЪРЖАН, three stars, +100 XP, with all three objectives ticked including «Приближи обекта с контролирана скорост». Identical result on mobile. A student learns that flooring it is the correct answer.
+  «0 наказателни точки · ИЗДЪРЖАН»
+  `sc-hazard-obstacle/pc-wrong/08-debrief.png`
+- **`sc-junction-rhr` · A · CRITICAL** — The correct drive is convicted, not credited. Debrief: 20 наказателни точки, НЕИЗДЪРЖАН, 2 опасни грешки, and «Не всички задачи от маршрута бяха изпълнени». A student who drives this lesson right is told they failed. Identical on mobile (20 pts).
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-junction-rhr/pc-right/08-debrief.png`
+- **`sc-jx-giveway-b1` · F · CRITICAL** — Same lesson, same scripted correct drive: PC ticks 0 of 3 objectives and scores 0, mobile ticks 2 of 3 (at 1:55 and 2:47) and scores 3. Whether a student progresses in this lesson depends on the device they use.
+  `sc-jx-giveway-b1/pc-right/08-debrief.png`
+- **`sc-ln-decisive-change` · A · CRITICAL** — An objective was credited for a thing that never happened. Изчакай колата в съседната лента carries a green tick at 2:12 in the mobile-right debrief although no car exists in that lane in any captured frame — the same class of defect the founder already ruled on.
+  «✓ Изчакай колата в съседната лента, вместо да се хвърлиш пред нея 2:12»
+  `sc-ln-decisive-change/mobile-right/08-debrief.png`
+- **`sc-maneuver-3point` · A · CRITICAL** — The quality metric rewards exactly what the objective forbids. Икономичност на маневрата gives 2 / 2 т. and calls it чиста маневра for a turn done in one movement, while the objective directly below demands the turn be done in three and is scored not-done for the same reason. The student is told he was both perfect and failed for the same act.
+  «Икономичност на маневрата 2 / 2 т. за изпълнение — Обратен завой в 1 движения — чиста маневра. / – Задача 2: обърни посоката на 180° в три движения»
+  `sc-maneuver-3point/mobile-right/08-debrief.png`
+- **`sc-maneuver-uturn` · A · CRITICAL** — The objective is contradicted by the metric printed next to it. Задача 2 asks for a 180 degree turn in ONE movement; the manoeuvre card on the same screen reports Обратен завой: 1 движение and awards 2 / 2 т. calling it чиста маневра — yet the objective carries a dash, not a tick, and the verdict is НЕИЗДЪРЖАН on 0 penalty points. By the simulator's own count the task was done and it was not credited.
+  «– Задача 2: обърни посоката на 180° в едно движение — Обратен завой: 1 движение»
+  `sc-maneuver-uturn/mobile-right/08-debrief.png`
+- **`sc-merge-accel-lane` · A · CRITICAL** — Not one of the three objectives was ticked in any of the four runs, and the correct drive still collected 9 наказателни точки for three основни грешки — two lane changes without a mirror check and one without an indicator — inside a lesson whose entire subject is signalling and mirror discipline while merging. The right drive was convicted of the lesson's own topic.
+  «• повече от 6 наказателни точки от основни грешки»
+  `sc-merge-accel-lane/mobile-right/08-debrief.png`
+- **`sc-merge-bus-pullout` · A · CRITICAL** — The right drive is not credited: 0 наказателни точки, НЕИЗДЪРЖАН, 1/3 stars, and the only explanation offered is that the lesson was cut short. No XP badge is shown here although every other failed run in this chunk awarded +40 XP.
+  «Урокът беше прекъснат преди края.»
+  `sc-merge-bus-pullout/pc-right/08-debrief.png`
+- **`sc-merge-lane-end` · A · CRITICAL** — The correct drive is not credited. The debrief shows 0 наказателни точки yet stamps НЕИЗДЪРЖАН because the route tasks were never ticked. A student who does everything right sees a red FAIL next to a perfect error count — the two numbers on the same card contradict each other.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-merge-lane-end/pc-right/08-debrief.png`
+- **`sc-merge-motorway-exit` · A · CRITICAL** — The right drive is not credited: the task counter never leaves 1/3 and the debrief gives 0 наказателни точки with НЕИЗДЪРЖАН and only 'the lesson was cut short' as an explanation. The exit is never reached, so nothing the lesson is named after is ever assessed.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-merge-motorway-exit/mobile-right/08-debrief.png`
+- **`sc-ov-keep-right` · A · CRITICAL** — Neither of the two objectives — 'Престрой се в дясната лента' and 'Стигни края на отсечката в дясната лента' — ticks in ANY of the four runs. Both appear as unfilled dashes on all four debriefs. The lane-change detector never fires, so this lesson has no reachable pass state at all.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-ov-keep-right/pc-right/08-debrief.png`
+- **`sc-ov-solid-return` · A · CRITICAL** — pc-wrong — a 70 км/ч drive that collides and is convicted five times — is the ONLY leg of the four that gets ✓ on «Премини участъка с непрекъсната линия в своята лента», the skill the lesson is named for. Both correct drives are force-closed before they can earn it. The lesson credits its core competence to the drive that failed it.
+  «✓ Премини участъка с непрекъсната линия в своята лента 1:14 … ✗ Пътнотранспортно произшествие −10 изпитни т.»
+  `sc-ov-solid-return/pc-wrong/08-debrief.png`
+- **`sc-rb-exit-signal` · A · CRITICAL** — The RIGHT drive is convicted, never credited. 08-debrief: НЕИЗДЪРЖАН, 20 наказателни точки, COMMENDATIONS (0), and BOTH route objectives still show the '-' bullet — even though the sim itself twice declared the drive correct mid-run («Спрял си правилно», «Чакаш правилно», «Чакането Е маневрата») and honoured 19 s of lawful waiting. A student who does exactly what the coaching says is told they failed and is given no positive tick for the one thing they demonstrably did right (yielding at the entry).
+  «–Подмини първите два изхода и остани в кръга · –Излез на третия изход с включен десен мигач»
+  `sc-rb-exit-signal/mobile-right/08-debrief.png`
+- **`sc-rx-unguarded` · A · CRITICAL** — The RIGHT drive is convicted after obeying the sim. It earned a green ✓ on «Спри напълно на стоп-линията преди релсите» during the drive (visible at t088s), then the debrief returns 10 наказателни точки, НЕИЗДЪРЖАН, Опасни грешки 1. The lesson ticks the skill and fails the student in the same run.
+  «10 наказателни точки · НЕИЗДЪРЖАН»
+  `sc-rx-unguarded/mobile-right/08-debrief.png`
+- **`sc-sig-controller-live` · A · CRITICAL** — The same debrief credits and convicts the same act. The objective 'Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа' is ticked ✓ at 1:27, and its own evidence line underneath reads 'Изчака червения сигнал и потегли на зелено' - literally the opposite behaviour, obeying the lamp instead of the officer. Two rows lower the mistake list convicts that identical act: 'Неизпълнение на сигнала на регулировчика … Премина стоп-линията, докато регулировчикът спираше твоето направление', опасна грешка, −10, straight to НЕИЗДЪРЖАН. The objective tick and the dangerous-error conviction are describing one moment and disagreeing about it.
+  «✓ Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа 1:27 Изчака червения сигнал и потегли на зелено»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-sig-controller-live` · A · CRITICAL** — An objective hands out a green tick for a skill it never measured. 'Приближи бавно и прочети регулировчика, не лампата' is ticked ✓ at 1:16 on a drive whose own recorded evidence is that it read the lamp ('Изчака червения сигнал и потегли на зелено') and whose mistake row is failure to obey the officer. The objective is evidently satisfied by the 'slowly' half alone and never checks the 'read the officer, not the lamp' half - which is the entire point of the lesson.
+  «✓ Приближи бавно и прочети регулировчика, не лампата 1:16»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-sig-controller-live` · F · CRITICAL** — The two sibling lessons grade the identical act in opposite directions. Waiting at a red lamp while the officer signals GO is praised in sc-signal-controller ('Изчака сигнала и тръгна чисто … без отчетено нарушение на сигнала') and convicted as a dangerous error in sc-sig-controller-live ('Неизпълнение на сигнала на регулировчика', −10, НЕИЗДЪРЖАН). Same officer model, same street, same briefing hierarchy - opposite verdicts.
+  «Неизпълнение на сигнала на регулировчика»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-vu-emergency-junction` · A · CRITICAL** — The WRONG drive is convicted for the wrong thing. pc-wrong debrief: 0 опасни грешки, 0 основни грешки, 12 второстепенни грешки = 12 т. — i.e. twelve repeats of «Превишена скорост −1 изпитна т.» accumulated while driving across an empty field. Nothing in the protocol names failure to give way to a vehicle in special regime, so the one rule this lesson teaches (чл. 91) is not graded at all. The student is failed for speeding and told nothing about the ambulance.
+  «Второстепенни грешки (по 1 изпитна т.) 12 12»
+  `sc-vu-emergency-junction/pc-wrong/08-debrief.png`
+- **`sc-vu-pass-clearance` · A · CRITICAL** — The WRONG drive is not convicted of anything — its debrief is byte-for-byte the same verdict as the RIGHT drive: 0 наказателни точки, ИЗДЪРЖАН, +100 XP, «Оценка на маневрата ★★★», 0 опасни / 0 основни / 0 второстепенни. It reached ЗАДАЧА 2/2 at t017s while holding 59 км/ч. Confirmed on pc-wrong AND mobile-wrong. A student can drive flat out past a cyclist and be told they performed the manoeuvre perfectly.
+  «0 наказателни точки … ИЗДЪРЖАН … Оценка на маневрата ★★★»
+  `sc-vu-pass-clearance/pc-wrong/08-debrief.png`
+- **`sc-vu-pass-clearance` · A · CRITICAL** — «Изпревари велосипедиста с широка дъга» is credited for arriving at a coordinate, not for overtaking anything. The chip flips 1/2 -> 2/2 on both drives with no cyclist ever passed, on the careful run at ~t141s and on the flat-out run before t017s. The RIGHT drive's ИЗДЪРЖАН · ★★★ is therefore unearned credit for a manoeuvre that never happened — exactly the class of green tick commit cdb2f71 was supposed to have removed.
+  «ЗАДАЧА 2/2 · Продължи до края на отсечката»
+  `sc-vu-pass-clearance/pc-right/04-t141s.png`
+- **`sc-ac-ice` · A · major** — Both objectives are ticked green — „Намали до пълзене ПРЕДИ моста“ 2:04 and „Спри свръхплавно на позицията зад закъсалия“ 3:07 — for world features that are not in the world. The engine grades geometry markers, not the scene the student is looking at.
+  «✓ Намали до пълзене ПРЕДИ моста 2:04»
+  `sc-ac-ice/pc-right/08-debrief.png`
+- **`sc-crossing-bus-shadow` · A · major** — pc-wrong was credited ✓ «Приближи камиона и пътеката с готовност за спиране» at 0:33 on a 57 км/ч run with 0 full stops. The readiness-to-stop objective ticks for a drive that never slowed.
+  «✓ Приближи камиона и пътеката с готовност за спиране 0:33 … top 57 км/ч · 0 full stops»
+  `sc-crossing-bus-shadow/pc-wrong/08-debrief.png`
+- **`sc-crossing-dart` · A · major** — The approach objective's own 40 км/ч cap did not hold. sc-drt-approach carries params.maxSpeedKmh = 40, yet 04-t007s.png of the wrong drive shows the ✓ tick toast «Приближи пътеката с готовност за спиране» already awarded with the cluster reading 51 км/ч, and the debrief credits it at 0:31 on a drive whose top speed was 59 км/ч.
+  «Приближи пътеката с готовност за спиране»
+  `sc-crossing-dart/mobile-wrong/04-t007s.png`
+- **`sc-crossing-white-cane` · A · major** — mobile-wrong was still credited ✓ «Разпознай белия бастун отдалеч и намали още преди пътеката» at 0:37 on a run whose top speed was 59 км/ч and which never braked. The objective hands out a green tick for a skill it never measured.
+  «✓ Разпознай белия бастун отдалеч и намали още преди пътеката 0:37 … top 59 км/ч · 0 full stops»
+  `sc-crossing-white-cane/mobile-wrong/08-debrief.png`
+- **`sc-ed-poligon-chain` · F · major** — The wrong run is convicted of three speeding faults at 49-50 км/ч while the identical 0/5 objective record earns the careful run nothing — the two drives differ only in penalties, never in credit, so the lesson can distinguish bad from worse but never good from bad.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-ed-poligon-chain/mobile-wrong/08-debrief.png`
+- **`sc-hz-accident-scene` · A · major** — A commendation «★ ✓ Правилно отстъпено предимство» is awarded on both platforms in a lesson that contains no junction, no crossing, no priority sign and no yielding task — the district JSON for hz-accident-v1 holds zero intersections and zero crossings. The student is praised for a skill the lesson never measured.
+  «Похвали ✓ Правилно отстъпено предимство»
+  `sc-hz-accident-scene/mobile-right/08-debrief.png`
+- **`sc-hz-breakdown-pulloff` · A · major** — The debrief surface ticks «✓ Мини участъка с разрешена скорост 0:41» in the very same protocol that lists four counts of «Превишена скорост» after a 145 км/ч run in a 140 zone. The objective is a reachZone with maxSpeedKmh 130 that credits the skill it simultaneously convicts.
+  «Задачи от маршрута ✓ Мини участъка с разрешена скорост 0:41»
+  `sc-hz-breakdown-pulloff/pc-wrong/08-debrief.png`
+- **`sc-hz-emergency-stop` · A · major** — The debrief ticks «✓ Спри преди детето — с пълна спирачка, в лентата» in the same protocol that convicts the drive of a collision, and there is no child anywhere in the world to stop before. The student is congratulated for a manoeuvre with no object and punished for hitting nothing, in one document.
+  «Спри преди детето — с пълна спирачка, в лентата»
+  `sc-hz-emergency-stop/pc-right/08-debrief.png`
+- **`sc-junction-blind` · A · major** — Objective 2 'Завий наляво и излез от кръстовището на запад' never ticks in any of the four runs — it shows as an unfilled dash on every debrief, mobile and pc, right and wrong. Only objective 1 (approach slowly) ever fires.
+  «– Завий наляво и излез от кръстовището на запад»
+  `sc-junction-blind/mobile-right/08-debrief.png`
+- **`sc-junction-left` · A · major** — Objective 3 'Завий наляво и излез от кръстовището на запад' never ticks in any of the four runs — dash on every debrief. The lesson has no reachable end state.
+  «– Завий наляво и излез от кръстовището на запад»
+  `sc-junction-left/pc-right/08-debrief.png`
+- **`sc-jx-giveway-b1` · A · major** — Objective 1 is explicitly «без излишно спиране», the drive made 21 full stops and four lawful waits, and the engine convicted nothing and credited nothing. The one behaviour the lesson is named after is not measured at all — a repeat of the objectives-that-grade-nothing class of defect.
+  «Премини първия Б1 след оглед, без излишно спиране»
+  `sc-jx-giveway-b1/pc-right/08-debrief.png`
+- **`sc-jx-priority-confidence` · A · major** — The lesson is titled 'По пътя с предимство — без излишни спирания' and its point is not to stop needlessly on a priority road. The credited drive made 14 full stops (pc) / 17 full stops (mobile), peaked at 15–19 км/ч and took 135–160 s against a 40 s benchmark — and was given ИЗДЪРЖАН, 3 of 3 stars, +100/+150 XP and a commendation. The behaviour the lesson forbids is never measured.
+  «Ориентировъчно време — 135 с при ориентир 40 с»
+  `sc-jx-priority-confidence/pc-right/08-debrief.png`
+- **`sc-ln-decisive-change` · A · major** — Right and wrong are indistinguishable in the protocol. The PC wrong drive ends on 0 наказателни точки with no fault of any class and is failed only because objectives were left undone — exactly the same verdict shape a careful but unfinished drive receives. Nothing in the debrief tells the student what he actually did wrong.
+  «0 наказателни точки · НЕИЗДЪРЖАН · Не всички задачи от маршрута бяха изпълнени.»
+  `sc-ln-decisive-change/pc-wrong/08-debrief.png`
+- **`sc-ov-lane-keeping` · A · major** — Objective 3 'Излез от S-извивката центрирано в лентата' never ticks in any of the four runs, so the lesson never reaches its own end state; every run is closed by the session being cut after four to five minutes against a 55 s benchmark.
+  «– Излез от S-извивката центрирано в лентата»
+  `sc-ov-lane-keeping/mobile-right/08-debrief.png`
+- **`sc-pk-driveway` · A · major** — Task 2 orders the R gear («Премести лоста на R и паркирай на заден ход в клетката») but the instrument cluster reads D in every single captured frame of every lane, including at 0 км/ч. The reverse manoeuvre — the entire subject of the lesson — never occurs and is never graded.
+  «Премести лоста на R и паркирай на заден ход в клетката»
+  `sc-pk-driveway/pc-right/04-t045s.png`
+- **`sc-rx-guarded` · A · major** — Objective one — «Изчакай зад стоп-линията пред бариерата» — is never separately graded. The run recorded 0 full stops, 0 lawful waits, top speed 59 км/ч and two unmet objectives, yet exactly one mistake was raised and zero commendations. Failing to wait at a closing barrier and failing to reach the end of the route collapse into a single generic code.
+  «drive: top 59 км/ч · 0 full stops · 0 lawful waits (0s)»
+  `sc-rx-guarded/pc-wrong/08-debrief.png`
+- **`sc-rx-tram-left` · A · major** — The lawful-wait state flickers. The log shows the wait being withdrawn after eight seconds — «the lawful wait was withdrawn after 8s — moving off» — and then re-declared at t=64s with «Чакането Е маневрата». In a lesson whose whole point is yielding to an oncoming tram before turning left, the sim cannot hold a stable opinion about whether standing still counts.
+  «LAWFUL WAIT declared at t=64s («Чакането Е маневрата»)»
+  `sc-rx-tram-left/mobile-right/run.log`
+- **`sc-vu-emergency-junction` · G · major** — FREE OBSERVATION — the reference 'correct' drive crawls at 10–11 км/ч for well over two minutes on a road posted 40 with mode ≤50, and nothing anywhere flags it as too slow, as obstructing, or as failing «спокойна градска скорост». Meanwhile the flat-out drive is penalised once per tick for the mirror-image fault. The engine grades one side of the speed envelope only, so 'drive at walking pace forever' is an unpunished strategy for the whole lesson set.
+  `sc-vu-emergency-junction/pc-right/04-t168s.png`
+- **`sc-vu-pass-clearance` · A · major** — The posted sign is not enforced here although the HUD claims it is. The speed chip shows the 50 sign with «знакът важи» and the car holds 59 км/ч for the whole run, yet the protocol records 0 второстепенни грешки. In sc-vu-emergency-junction the identical HUD state (40 sign, «знакът важи») produced repeated «Превишена скорост −1 изпитна т.» toasts at 47–49 км/ч. Same rule, opposite outcome between two lessons in the same chunk.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-vu-pass-clearance/mobile-wrong/04-t018s.png`
+
+---
+
+## `platform/src/components/sim/TouchControls.tsx` — 34 findings (22 critical, 12 major, 0 minor)
+
+- **`sc-crossing-bus-shadow` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-crossing-bus-shadow/mobile-right/05-stopped.png`
+- **`sc-crossing-child-ball` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-crossing-child-ball/mobile-right/05-stopped.png`
+- **`sc-crossing-white-cane` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-crossing-white-cane/mobile-right/05-stopped.png`
+- **`sc-follow-truck` · A · CRITICAL** — The RIGHT drive on mobile collides and fails: 71 наказателни точки, НЕИЗДЪРЖАН, with the collision card on the debrief and the lesson also cut short. The correct-behaviour reference run of this lesson does not survive on a phone.
+  «71 наказателни точки … Урокът беше прекъснат преди края.»
+  `sc-follow-truck/mobile-right/08-debrief.png`
+- **`sc-ln-boulevard-discipline` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-ln-boulevard-discipline/mobile-right/05-stopped.png`
+- **`sc-ov-solid-return` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-ov-solid-return/mobile-right/05-stopped.png`
+- **`sc-park-45-rev` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-park-45-rev/mobile-right/05-stopped.png`
+- **`sc-park-left` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-park-left/mobile-right/05-stopped.png`
+- **`sc-park-zebra` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-park-zebra/mobile-right/05-stopped.png`
+- **`sc-pe-jaywalker` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-pe-jaywalker/mobile-right/05-stopped.png`
+- **`sc-pe-school-patrol` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-pe-school-patrol/mobile-right/05-stopped.png`
+- **`sc-pk-move-off` · A · CRITICAL** — Briefing steps 2 and 3 are the graded core of the lesson — check the left mirror, then glance over the left shoulder into the blind spot. The mobile HUD offers no mirror control and no shoulder-check control of any kind, so the student is instructed to perform actions the interface cannot accept.
+  «3. Хвърли поглед и през ЛЯВОТО рамо — в мъртвата зона, която огледалото не показва.»
+  `sc-pk-move-off/mobile-right/02-briefing.png`
+- **`sc-rb-busy-gap` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-rb-busy-gap/mobile-right/05-stopped.png`
+- **`sc-rb-circulate-priority` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-rb-circulate-priority/mobile-right/05-stopped.png`
+- **`sc-rb-lane-choice` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-rb-lane-choice/mobile-right/05-stopped.png`
+- **`sc-rb-ped-exit` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-rb-ped-exit/mobile-right/05-stopped.png`
+- **`sc-signal-dead` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-signal-dead/mobile-right/05-stopped.png`
+- **`sc-signal-hesitation` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-signal-hesitation/mobile-right/05-stopped.png`
+- **`sc-speed-creep` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-speed-creep/mobile-right/05-stopped.png`
+- **`sc-speed-dangerous` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-speed-dangerous/mobile-right/05-stopped.png`
+- **`sc-speed-rain` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-speed-rain/mobile-right/05-stopped.png`
+- **`sc-speed-zone` · F · CRITICAL** — THE TOUCH BRAKE IS DROPPED MID-PRESS. The harness's own guard fired on this lesson: the brake was held and the car ACCELERATED anyway, so the input never reached the sim. It fires on 20 of the 22 lessons in this chunk and only ever on the mobile leg — which is the mechanism behind the mobile-only false convictions (the creep over a stop line that becomes «Преминаване на червен сигнал», the missed full stop that becomes «Непропускане на пешеходец»).
+  «!! the brake is held and the car went 7 -> 10 км/ч — the sim never got the key; re-asserting it.»
+  `sc-speed-zone/mobile-right/05-stopped.png`
+- **`sc-ac-fog` · D · major** — The mobile briefing tells a phone user to press a keyboard key. Instruction 1 reads «(клавиш V)» on a touch device that has no keyboard, no fog-lamp button and no fog telltale anywhere in its UI or in its ⚙ sheet.
+  «Включи късите светлини и фаровете за мъгла (клавиш V) преди да потеглиш.»
+  `sc-ac-fog/mobile-right/02-briefing.png`
+- **`sc-ac-highbeam-lead` · C · major** — This lesson is about switching between long and dipped beam and there is no long-beam indicator anywhere. PC shows a single control relabelled КЪСИ with no second state visible in any frame, and mobile shows no light control or telltale at all — so on a phone the lesson's only action cannot be performed or verified.
+  «Превключи на къси, щом настигнеш кола — иначе я заслепяваш през огледалата ѝ.»
+  `sc-ac-highbeam-lead/mobile-right/04-t127s.png`
+- **`sc-ac-night-lights` · C · major** — Mobile has no cockpit telltale strip at all. PC shows ДВИГАТЕЛ / КОЛАН / СВЕТЛИНИ / МЪГЛА / ЧИСТАЧКИ / РЪЧНА / АВАР.; on mobile the only chrome is a МЕНЮ button, a speedo and the limit chip, and the ⚙ sheet offers only Съветник / Задача / Качество / Въпроси / Карта. On a lesson whose instruction 1 is «turn on the dipped beams», the phone student can neither operate nor see the light switch.
+  `sc-ac-night-lights/mobile-right/07b-menu.png`
+- **`sc-junction-gap` · D · major** — Mobile controls collide with the world and with each other: the ПРОЧЕТИ and РАЗБРАХ buttons sit on top of parked cars and the «Карай дотук» world label; the gear cluster Л/З/Д is ghost text on the building facade; the КОЛАН seatbelt warning disc is drawn on top of a yellow world car; КЛАКС and the two indicator arrows are unbacked text on the pavement.
+  «КОЛАН»
+  `sc-junction-gap/mobile-right/01-arrival.png`
+- **`sc-ov-oncoming-gap` · C · major** — Held brake input is dropped by the sim. The harness logged it five separate times in this one run — the brake key is down and the car accelerates anyway. A student holding the brake pedal would watch the car roll into the vehicle ahead.
+  `sc-ov-oncoming-gap/mobile-right/04-t029s.png`
+- **`sc-park-night` · D · major** — There is no headlight control on mobile. The touch dock at 01-arrival offers Изглед, Пауза, ⇦Ляв, ⇨Дясн, ⊙Клакс, ⚠Колан and Д/З/Л, and the settings sheet at 07b-menu offers Съветник, Въпроси, Задача, Карта, Качество, Прекрати урока. Neither has a lamp switch, and the cluster has no headlight telltale. Even if the car were handed over dark, a phone student could not obey instruction 1 or verify instruction 8.
+  «8. Дръж светлините включени, докато не спреш двигателя.»
+  `sc-park-night/mobile-right/07b-menu.png`
+- **`sc-pe-zone-living` · D · major** — An undismissed tutorial card ('Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка. / Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.') with its РАЗБРАХ button sits over the top-right quadrant for the whole mobile drive, burying the mini-map, the world marker 'Карай дотук' and the roadside speed sign behind it. Its text also contradicts the dash, which reads D while the card explains reverse.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-pe-zone-living/mobile-right/04-t208s.png`
+- **`sc-pk-smooth-stop` · D · major** — Same undismissed touch tutorial as sc-pe-zone-living: 'Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка. / Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.' plus a РАЗБРАХ button sits over the top-right for the entire mobile drive, covering the roadside round speed-limit sign and the 'Карай дотук' marker — the two pieces of world information this lesson grades against.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-pk-smooth-stop/mobile-right/05-stopped.png`
+- **`sc-sig-controller-live` · C · major** — The car does not behave like a car and the sim loses input. The harness log records 're-asserted the brake 4× after the sim lost the key' - a held brake is silently dropped - and 'refused 5 standstill brake presses (would have selected R)': pressing the brake pedal while stopped shifts to reverse. The drive shows 12 full stops and a top speed of 24 км/ч over a straight 50 км/ч boulevard, i.e. it lurched rather than drove.
+  «DRIVE: right · top 24 км/ч · 12 full stops · 2 lawful waits honoured (20s) · refused 5 standstill brake presses (would have selected R) · re-asserted the brake 4× after the sim lost the key»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-sig-controller-live` · D · major** — Same control unmount as the sibling: the full touch strip (Изглед/Пауза/⇦Ляв/⇨Дясн/⊙Клакс/⚠Колан/Д/З/Л) is present at 01-arrival and 03-ready and is gone from both the pixels and the DOM from 04-t001s onward, leaving only 'Меню' for the rest of the drive.
+  `sc-sig-controller-live/mobile-right/03-ready.png`
+- **`sc-signal-controller` · D · major** — Every on-screen driving control unmounts the moment the drive starts, and never returns. 01-arrival and 03-ready carry the full strip - Изглед, Пауза, ⇦Ляв, ⇨Дясн, ⊙Клакс, ⚠Колан, Д/Дясн, З/Задн, Л/Ляво. From 04-t001s onward both the pixels and the DOM dump contain only 'Меню'. On a touch build that means the student cannot indicate, cannot sound the horn and cannot check a mirror for the rest of the lesson - in a lesson about approaching a directed junction where indicating and mirror checks are part of the manoeuvre.
+  `sc-signal-controller/mobile-right/04-t001s.png`
+- **`sc-vp-handbrake` · A · major** — Briefing step 3 states the check-list does not end at the dashboard and requires a mirror check plus a glance over the left shoulder before the wheels turn. The mobile control set provides neither, so a graded step of the lesson cannot be carried out on a phone.
+  «последната стъпка е огледът — огледало и поглед през ЛЯВОТО рамо, преди колелата да се завъртят.»
+  `sc-vp-handbrake/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/lessons/finish.ts` — 22 findings (13 critical, 9 major, 0 minor)
+
+- **`sc-ac-aquaplane` · A · CRITICAL** — A drive with 0 наказателни точки, 0 mistakes and 0 near-misses is presented as НЕИЗДЪРЖАН with 1 of 3 stars, because the second objective is unreachable inside the run. A student who does everything right is told he failed.
+  «0 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-ac-aquaplane/pc-right/08-debrief.png`
+- **`sc-ac-aquaplane` · F · CRITICAL** — CONSISTENCY: five of the seven lessons (aquaplane, night-overdrive, truck-spray, bridge-ice, wind-truck-pass) cannot be finished by driving — the harness had to force «Прекрати урока» on the right run and the debrief then prints „Урокът беше прекъснат преди края“ over a 0-point scoreboard. Only sc-ac-ice ends because the task was done. The pass path exists in exactly one lesson out of seven.
+  «Урокът беше прекъснат преди края.»
+  `sc-ac-night-overdrive/pc-right/08-debrief.png`
+- **`sc-junction-blind` · A · CRITICAL** — After the impact the ego leaves the authored world entirely. From t063s to t209s the windscreen is a featureless green plane under a hazy horizon — no road, no kerb, no buildings — and the lesson keeps running for ~2.5 more minutes with the task chip still demanding 'Завий наляво и излез от кръстовището на запад'. Nothing stops the session when the car is off-map.
+  «Завий наляво и излез от кръстовището на запад»
+  `sc-junction-blind/pc-right/04-t090s.png`
+- **`sc-junction-gap` · A · CRITICAL** — The correct drive is convicted: 10 наказателни точки for a collision and НЕИЗДЪРЖАН, on a run that had already earned both of the lesson's commendations at 1:37 and 2:18. The student is rewarded and failed for the same drive.
+  «10 наказателни точки»
+  `sc-junction-gap/pc-right/08-debrief.png`
+- **`sc-junction-left` · A · CRITICAL** — A drive with zero faults and two commendations ('Правилно отстъпено предимство', 'Правилно спиране на знак Б2') is stamped НЕИЗДЪРЖАН with 1 of 3 stars, and the huge headline '0' is printed in the fail red. The student is told their flawless drive failed, with no error to point at.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-junction-left/pc-right/08-debrief.png`
+- **`sc-junction-scan` · A · CRITICAL** — The correct drive is convicted despite doing everything the lesson asks: 10 наказателни точки for a collision, НЕИЗДЪРЖАН, even though the same run earned both available commendations («Правилно отстъпено предимство» at 1:52 and «Правилно спиране на знак Б2» at 2:36). Two green ticks and a fail on the same drive.
+  «10 наказателни точки»
+  `sc-junction-scan/pc-right/08-debrief.png`
+- **`sc-junction-stop` · A · CRITICAL** — The correct drive is not credited: 20 наказателни точки, 2 опасни грешки, НЕИЗДЪРЖАН, «Урокът беше прекъснат преди края». The car made 15 full stops and two lawful waits totalling 91 s and still ended convicted.
+  «20 наказателни точки»
+  `sc-junction-stop/pc-right/08-debrief.png`
+- **`sc-jx-giveway-b1` · A · CRITICAL** — A flawless drive is failed. The debrief shows 0 наказателни точки and a completely empty error table — 0 опасни, 0 основни, 0 второстепенни, «Общо (допустими 9) 0» — and still prints НЕИЗДЪРЖАН with a one-of-three star rating and no XP badge at all, unlike every other debrief in the chunk which awards at least +40 XP.
+  «Общо (допустими 9) 0»
+  `sc-jx-giveway-b1/pc-right/08-debrief.png`
+- **`sc-ln-decisive-change` · A · CRITICAL** — On PC the correct drive can never reach a result. The car is still rolling at 7 км/ч on the end frame, «Прекрати урока» is visible in the toolbar and pressing it does nothing, and the harness recorded that no control on the screen leads to the verdict card. A student who does this lesson right on a desktop is trapped in it.
+  «Прекрати урока»
+  `sc-ln-decisive-change/pc-right/07-end.png`
+- **`sc-ln-decisive-change` · A · CRITICAL** — The mobile session never terminates by itself: 272 s driven against a 60 s benchmark, verdict card headed Прекратена сесия, 0 наказателни точки and still НЕИЗДЪРЖАН. The lesson has no completion condition that fires.
+  «Прекратена сесия · Урокът беше прекъснат преди края.»
+  `sc-ln-decisive-change/mobile-right/08-debrief.png`
+- **`sc-merge-accel-lane` · A · CRITICAL** — The session has no completion condition that fires on any platform. mobile-right 274 s, mobile-wrong 277 s, pc-right and pc-wrong likewise — all four had to be terminated by the harness, all four verdicts read Прекратена сесия or Урокът беше прекъснат преди края against a 55 s benchmark.
+  «Урокът беше прекъснат преди края.»
+  `sc-merge-accel-lane/mobile-right/08-debrief.png`
+- **`sc-signal-controller` · A · CRITICAL** — The sim awards a 'lawful wait' and then praises the drive for the behaviour the lesson forbids. At t046s and t062s it declares a LAWFUL WAIT ('Чакаш правилно на червено', 'Чакането Е маневрата') and at t076s it congratulates: 'Изчака сигнала и тръгна чисто … Изчака 20 с и премина — без отчетено нарушение на сигнала.' The officer was signalling GO the entire time. The lesson's pass condition and its praise are wired to the lamp, not to the officer.
+  «Изчака 20 с и премина — без отчетено нарушение на сигнала.»
+  `sc-signal-controller/mobile-right/04-t076s.png`
+- **`sc-turn-left-oncoming` · A · CRITICAL** — The correct drive is convicted: 10 наказателни точки, 1 опасна грешка (collision), НЕИЗДЪРЖАН, and the lesson had to be force-ended after 25 full stops and 206 s at a 15 км/ч top speed. The student who obeys the briefing is failed.
+  «10 наказателни точки»
+  `sc-turn-left-oncoming/pc-right/08-debrief.png`
+- **`sc-fo-brakelight-chain` · A · major** — The careful drive breaks no rule — 0 наказателни точки, 0 dangerous, 0 basic, 0 minor — and is still stamped НЕИЗДЪРЖАН with 1 of 3 stars, purely because the route was not finished in time. A student who drove perfectly is told they failed, with no line distinguishing «you drove badly» from «you ran out of road».
+  «Урокът беше прекъснат преди края.»
+  `sc-fo-brakelight-chain/pc-right/08-debrief.png`
+- **`sc-jx-equal-left` · F · major** — This lesson ends the session on collision with a 'Край на упражнението след удара' learn card; sc-junction-blind takes the same collision and lets the car keep rolling off the map for another two and a half minutes. The same event has two different endings depending on the scenario.
+  «Край на упражнението след удара»
+  `sc-jx-equal-left/pc-right/07-end.png`
+- **`sc-ov-keep-right` · A · major** — The right drive earns 0 наказателни точки and still reads НЕИЗДЪРЖАН with 1 of 3 stars and the huge headline '0' in the fail red, purely because objectives that cannot fire did not fire. The wrong drive is convicted only for crashing (2 collisions, 20 pts) — never for the keep-right failure the lesson exists to teach.
+  «0 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-ov-keep-right/pc-right/08-debrief.png`
+- **`sc-park-night` · G · major** — 07-end is byte-for-byte the mid-drive view — no 'Сесията завърши' end line, no result pill, nothing. The session had to be ended through the menu ('Прекрати урока' at 07b-menu). Where sc-park-van reached an end surface on its own, this lesson has no natural terminator: par time is 120 s and the run was still live at 208 s with no time-out, no hint and no prompt.
+  «Прекрати урока»
+  `sc-park-night/mobile-right/07-end.png`
+- **`sc-rx-unguarded` · A · major** — The lesson does not end because the task was done. The 07-end frame shows «Сесията завърши — първо се самооцени» while the car is still moving at 12 км/ч across an open plaza with no road markings ahead — the session was cut by the route budget, mid-drive.
+  «Сесията завърши — първо се самооцени»
+  `sc-rx-unguarded/mobile-right/07-end.png`
+- **`sc-sig-controller-live` · A · major** — Zero commendations on a 3-of-3 objectives drive. COMMENDATIONS (0): (none credited) despite every route task ticked. Nothing in the debrief tells the student what he did right, so the only feedback is a fail and a dangerous-error row - which for a 17-year-old on lesson one of a hierarchy topic is all punishment and no instruction. This is the theory requirement-zero rule (doc 64 THEO-4) applied to the sim: no bare verdicts.
+  «COMMENDATIONS (0): (none credited)»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-signal-dead` · G · major** — After driving into the building the run continues for ~30 s with the camera inside opaque geometry — there is no recovery, no reset offer and no 'you have left the road' state; the student stares at a wall while the clock runs.
+  `sc-signal-dead/mobile-right/04-t001s.png`
+- **`sc-vu-emergency-junction` · A · major** — The lesson never terminates because the task was completed — all four runs end on «Урокът беше прекъснат преди края.» with the task banner left standing at 2/2 asking the student to cross the junction after an ambulance that never arrived. There is no success exit condition reachable from the frames.
+  «Урокът беше прекъснат преди края.»
+  `sc-vu-emergency-junction/mobile-wrong/08-debrief.png`
+- **`sc-vu-pass-clearance` · G · major** — FREE OBSERVATION — the two configurations produce wildly different lesson lengths: the 'wrong' runs captured 8 and 9 frames (~17 s) against 37 and 45 for the 'right' runs. Driving briskly ends the lesson in seventeen seconds with a pass and full XP, so the fastest route to ★★★ is to never slow down enough to meet any road user. That is the opposite of the behaviour the lesson exists to build.
+  «Кола отзад · 12 м»
+  `sc-vu-pass-clearance/pc-wrong/04-t017s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/debrief.ts` — 27 findings (10 critical, 11 major, 6 minor)
+
+- **`sc-crossing-dart` · A · CRITICAL** — RIGHT AND WRONG RETURN THE SAME VERDICT CARD. mobile-right/08-debrief.png and mobile-wrong/08-debrief.png are the same picture pixel for pixel: 10 наказателни точки, НЕИЗДЪРЖАН, +40 XP, 1 опасна грешка, same two bullets. The careful drive (6 full stops, top 20 км/ч, waited at the zebra) and the reckless drive (0 stops, top 59 км/ч, straight through) are graded identically. A student cannot learn anything from a verdict that does not move.
+  «10 наказателни точки · НЕИЗДЪРЖАН · +40 XP»
+  `sc-crossing-dart/mobile-wrong/08-debrief.png`
+- **`sc-hz-emergency-stop` · A · CRITICAL** — The careful drive and the reckless drive receive the IDENTICAL verdict and the IDENTICAL score: НЕИЗДЪРЖАН, 10 наказателни точки, 1 of 3 stars, on both platforms. The grading carries no signal at all — driving well and driving badly are indistinguishable in the protocol the student is shown.
+  «10 наказателни точки · НЕИЗДЪРЖАН»
+  `sc-hz-emergency-stop/pc-right/08-debrief.png`
+- **`sc-ln-obstacle-meeting` · A · CRITICAL** — The correct drive is punished harder than the deliberately wrong one. mobile-right (the RIGHT drive) debriefs at 20 наказателни точки with two Пътнотранспортно произшествие entries and НЕИЗДЪРЖАН; mobile-wrong debriefs at only 10. A student who does the lesson properly is told he did worse than one who does not.
+  «20 наказателни точки от изпитния лист по Наредба № 38 · НЕИЗДЪРЖАН»
+  `sc-ln-obstacle-meeting/mobile-right/08-debrief.png`
+- **`sc-pk-driveway` · A · CRITICAL** — pc-right and pc-wrong produce the SAME debrief — 20 наказателни точки, НЕИЗДЪРЖАН, +40 XP, same collision paragraph, same 2/0/0 error table. The lesson cannot distinguish a correct drive from a deliberately wrong one on desktop.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-pk-driveway/pc-wrong/08-debrief.png`
+- **`sc-pk-move-off` · A · CRITICAL** — On PC the wrong drive is rewarded +150 XP while the correct drive receives only +100 XP for the same lesson. The deliberately bad drive is the better-paid one.
+  «ИЗДЪРЖАН … +100 XP»
+  `sc-pk-move-off/pc-right/08-debrief.png`
+- **`sc-signal-flashing` · A · CRITICAL** — The deliberately-WRONG drive is not convicted of anything. It ran the boulevard at 59 км/ч in a posted 50, never made a single stop, never gave way and never reached the junction task — and 08-debrief reports 0 наказателни точки, 0 опасни, 0 основни, 0 второстепенни, MISTAKES (0) 'none convicted', and the instructor writes «чисто каране без нито едно нарушение». This is 24 s after the sim itself put a «Превишена скорост» card with a +1 badge on the student's screen at 59 км/ч. Whatever the internal classification, the student is shown a speeding notice and then handed a clean sheet with praise. (rules/catalog.ts defines SPEEDING_OVER_LIMIT as severityClass 'vtorostepenna' worth 1 point, so it should score.)
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-signal-flashing/mobile-wrong/04-t012s.png`
+- **`sc-signal-response` · A · CRITICAL** — The wrong drive is not convicted — it is praised. mobile-wrong drove the signalled junction at a 59 км/ч top speed with 0 full stops and 0 lawful waits, and the debrief returns 0 наказателни точки, 0 опасни / 0 основни / 0 второстепенни, and an instructor line congratulating the student on driving without a single violation. This actively teaches the wrong lesson.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-signal-response/mobile-wrong/08-debrief.png`
+- **`sc-sp-wet-limit-plate` · A · CRITICAL** — The coaching card and the debrief contradict each other in the same session. Mid-drive a НАУЧИ card appears saying the student was over the permitted speed; the debrief for that same drive reports 0 errors, 0 points and a pass. The student is told off during the drive and congratulated afterwards.
+  «Превишена скорост — Движеше се над разрешената скорост. Ограничението е таван, не цел»
+  `sc-sp-wet-limit-plate/pc-wrong/04-t012s.png`
+- **`sc-sp-wet-limit-plate` · F · CRITICAL** — Right and wrong debriefs are byte-identical here (both ИЗДЪРЖАН, +100 XP, 3 stars, 0/0/0), while in sc-vu-cyclist-hook right and wrong are also byte-identical but both НЕИЗДЪРЖАН with 20 points. Two lessons in the same sweep collapse their two drives into one verdict — in opposite directions.
+  `sc-sp-wet-limit-plate/pc-right/08-debrief.png`
+- **`sc-zebra-approach` · A · CRITICAL** — Both objectives are ticked green (0:41 and 1:25) and the verdict is still НЕИЗДЪРЖАН. A student reading his own debrief sees every task done and a fail stamped on it, with no line reconciling the two.
+  «✓ Приближи пътеката с готовност за спиране 0:41 ✓ Премини пътеката, след като е свободна 1:25»
+  `sc-zebra-approach/mobile-right/08-debrief.png`
+- **`sc-ln-decisive-change` · A · major** — The PC wrong drive is graded as a clean drive. The debrief table shows Опасни 0, Основни 0, Второстепенни 0, Общо 0 — while a fault card reading Второстепенна −1 изпитна т. Неустойчиво движение в лентата is present on the very same screen. The protocol drops the fault it just announced.
+  «Второстепенна −1 изпитна т. Неустойчиво движение в лентата»
+  `sc-ln-decisive-change/pc-wrong/08-debrief.png`
+- **`sc-maneuver-3point` · A · major** — The right drive is never credited: 0 наказателни точки, no fault of any class, the instructor prose itself says чисто каране без нито едно нарушение — and the verdict is still НЕИЗДЪРЖАН with one star of three.
+  «Какво се получи добре: чисто каране без нито едно нарушение — задръж това ниво.»
+  `sc-maneuver-3point/mobile-right/08-debrief.png`
+- **`sc-mw-discipline` · F · major** — The identical 0-13 km/h stop-start drive is graded НЕИЗДЪРЖАН „прекъснат преди края“ here and in sc-mw-min-speed / sc-sp-limit-end, but ИЗДЪРЖАН with 3 stars and +100 XP in sc-sp-wet-limit-plate and sc-vu-emergency. The same student behaviour gets opposite verdicts depending on which lesson he opened.
+  «ИЗДЪРЖАН»
+  `sc-sp-wet-limit-plate/pc-right/08-debrief.png`
+- **`sc-pe-night-unlit` · D · major** — The debrief prints '0 наказателни точки' in the FAILURE red next to НЕИЗДЪРЖАН. Zero points is the best possible score; painting it red as the headline of a failure teaches the student the wrong reading of the number. Compare mobile-right/08-debrief.png where 20 is printed in the identical red.
+  «0 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-pe-night-unlit/mobile-wrong/08-debrief.png`
+- **`sc-pk-driveway` · A · major** — The debrief contradicts itself on the same screen: the red paragraph insists the collision is ONE dangerous error worth 10 points, while the table directly beneath it reads Опасни грешки — БРОЙ 2, ТОЧКИ 20. The narrative copy does not scale with the count.
+  «Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-pk-driveway/pc-right/08-debrief.png`
+- **`sc-rx-guarded` · A · major** — On the debrief screen itself the only reasons printed are «Не всички задачи от маршрута бяха изпълнени», «допусната е опасна грешка — директно неиздържан» and «повече от 9 наказателни точки». The act is never named on the visible screen — the student sees a verdict and a number with no offence attached.
+  «• допусната е опасна грешка — директно неиздържан»
+  `sc-rx-guarded/pc-wrong/08-debrief.png`
+- **`sc-signal-flashing` · A · major** — The same drive is convicted of failing to give way AND commended for giving way correctly. 08-debrief carries «✗ Непропускане на пътно превозно средство с предимство −10 изпитни т.» (raised at t066) and «★ ✓ Правилно отстъпено предимство 1:23» side by side, with no timeline or explanation reconciling them. A student reading the debrief cannot tell what they actually did.
+  «Какво се получи добре: • Правилно отстъпено предимство»
+  `sc-signal-flashing/mobile-right/08-debrief.png`
+- **`sc-sp-wet-limit-plate` · A · major** — The RIGHT drive never exceeded 11 km/h across 189 s on a 50 km/h city street, stopping dead roughly every 10 seconds in a live traffic lane, and was awarded ИЗДЪРЖАН with 3 stars for manoeuvre quality. A drive that would be stopped by any examiner is graded as a model run.
+  «ИЗДЪРЖАН · +100 XP · ★★★»
+  `sc-sp-wet-limit-plate/pc-right/08-debrief.png`
+- **`sc-vp-readiness` · A · major** — The failing wrong drive is still awarded +40 XP, while on mobile the faultless right drive is awarded a fail. The reward signal points the student away from correct driving.
+  «НЕИЗДЪРЖАН … +40 XP»
+  `sc-vp-readiness/mobile-wrong/08-debrief.png`
+- **`sc-vp-telltale` · F · major** — The same wrong drive is scored 10 penalty points on mobile and 20 on PC, even though both debriefs quote the identical collision rule and the identical 10-point tariff. The same fault costs twice as much on one platform as the other.
+  «10 наказателни точки … Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т.»
+  `sc-vp-telltale/mobile-wrong/08-debrief.png`
+- **`sc-vu-emergency` · A · major** — The RIGHT drive never exceeded 16 km/h in 206 s on a 50 km/h boulevard, halting completely every few seconds, and still collected ИЗДЪРЖАН with 3 stars for manoeuvre quality. A car crawling at 13 km/h cannot demonstrate the „отдръпни се и намали, докато премине“ manoeuvre the lesson grades.
+  «ИЗДЪРЖАН · +100 XP · ★★★»
+  `sc-vu-emergency/mobile-right/04-t121s.png`
+- **`sc-maneuver-3point` · D · minor** — Grammar fault in the result card visible to every student: Обратен завой в 1 движения — the numeral 1 takes the singular движение, not the plural. The string is clearly built by concatenation without agreement.
+  «Обратен завой в 1 движения — чиста маневра.»
+  `sc-maneuver-3point/mobile-right/08-debrief.png`
+- **`sc-pe-parked-row-scan` · F · minor** — The identical passing result pays different XP on the two bands: pc-right shows '+100 XP' and mobile-right shows '+150 XP' for the same lesson, same 0 наказателни точки, same ИЗДЪРЖАН. The same split appears in sc-pk-smooth-stop (+100 PC / +150 mobile), so it is systematic, not a one-off.
+  «+100 XP»
+  `sc-pe-parked-row-scan/pc-right/08-debrief.png`
+- **`sc-pk-smooth-stop` · F · minor** — Same XP split as sc-pe-parked-row-scan: an identical pass (0 наказателни точки, ИЗДЪРЖАН) pays '+100 XP' on pc-right and '+150 XP' on mobile-right. Two lessons out of four show it, so the reward depends on the device rather than on the driving.
+  «+150 XP»
+  `sc-pk-smooth-stop/mobile-right/08-debrief.png`
+- **`sc-sp-limit-end` · G · minor** — PC: the debrief page is cut off at the viewport bottom — the „Оценка на маневрата“ explanation is sliced mid-line and the row it belongs to is unreachable without the page scrolling, so the star rating is shown with its explanation truncated.
+  «Не са наказателни точки по Наредба № 38 и не са»
+  `sc-sp-limit-end/pc-right/08-debrief.png`
+- **`sc-vp-police-stop` · F · minor** — The same correct drive is worth +150 XP on mobile and +100 XP on PC. XP for an identical outcome depends on which device the student happens to be holding.
+  «ИЗДЪРЖАН … +150 XP»
+  `sc-vp-police-stop/mobile-right/08-debrief.png`
+- **`sc-vp-telltale` · F · minor** — The same correct drive earns +150 XP on mobile and +100 XP on PC.
+  «ИЗДЪРЖАН … +150 XP»
+  `sc-vp-telltale/mobile-right/08-debrief.png`
+
+---
+
+## `tools/mobile/lesson-audit.mjs` — 13 findings (10 critical, 3 major, 0 minor)
+
+- **`sc-crossing-let-pass` · G · CRITICAL** — COULD_NOT_TEST — E:\AI driver\.audit-frames\sweep161\sc-crossing-let-pass does not exist. The sweep root lists 137 scenario folders and this is not one of them, and no sweep log (progress.txt, runner.out, chunk*.log) mentions the id, so the lesson was never dispatched rather than dispatched and failed. Its template does exist in the codebase (traces/scCrossingLetPass.ts, templates-pe.ts), so it is a sweep dispatch gap.
+  `E:/AI driver/.audit-frames/sweep161`
+- **`sc-crossing-rain-sprint` · G · CRITICAL** — COULD_NOT_TEST — E:\AI driver\.audit-frames\sweep161\sc-crossing-rain-sprint does not exist and no sweep log mentions the id. Template present in the codebase (traces/scCrossingRainSprint.ts, RAIN_SPRINT_PED in templates-pe.ts), so the lesson was never dispatched. This one also carries conditions {weather:'rain', night:true}, the only night+rain drill in my set — its absence leaves the wet/night pedestrian path entirely unaudited.
+  `E:/AI driver/.audit-frames/sweep161`
+- **`sc-crossing-slow-crosser` · G · CRITICAL** — COULD_NOT_TEST — E:\AI driver\.audit-frames\sweep161\sc-crossing-slow-crosser does not exist and no sweep log mentions the id. Template present in the codebase (traces/scCrossingSlowCrosser.ts), so the lesson was never dispatched.
+  `E:/AI driver/.audit-frames/sweep161`
+- **`sc-park-bay-exit-rev` · G · CRITICAL** — The whole pc-right leg is 13 zero-byte PNGs — 01-arrival through 08-debrief — so the only PC evidence for this lesson comes from the wrong drive. Combined with the empty world on mobile, this lesson has never once been observed working.
+  `sc-park-bay-exit-rev/pc-wrong/08-debrief.png`
+- **`sc-park-judge` · G · CRITICAL** — COULD_NOT_TEST — the only two PNGs this lesson produced, mobile-right/01-arrival.png and mobile-wrong/01-arrival.png, are BOTH 0 bytes on disk. The Read tool rejects them as empty images. The harness wrote the file handle, probed the DOM (the _run.log carries a full control-strip readout at 0 км/ч) and then never wrote pixels, so the screenshot step failed silently and the run stopped at arrival on both lanes.
+  «[01-arrival] 0 км/ч card=hint/peek»
+  `sc-park-judge/mobile-right/01-arrival.png`
+- **`sc-pk-double-park` · G · CRITICAL** — The pc-wrong leg produced 10 zero-byte PNG files (03-ready through 08-debrief) — the capture wrote empty files rather than failing, so a re-drive lane that only checks for file existence would score this leg as tested. Same failure shape in sc-pk-stop-vs-park/mobile-wrong, sc-park-bay-exit-rev/pc-right, sc-pk-rail-ban/mobile-right and sc-park-gap-short/pc-wrong.
+  `sc-pk-double-park/pc-wrong/08-debrief.png`
+- **`sc-pk-rail-ban` · G · CRITICAL** — Three of this lesson's four legs produced no usable evidence: mobile-right wrote 33 zero-byte PNGs, pc-wrong never signed in, and mobile-wrong is the only wrong-side data point. The one leg with pictures is the one that proves the crossing is missing — so the failure was caught by luck, not by coverage.
+  `sc-pk-rail-ban/mobile-wrong/02-briefing.png`
+- **`sc-rx-queue-clear` · G · CRITICAL** — The audit harness reports a frame it did not actually write. `shot()` at tools/mobile/lesson-audit.mjs:175 is `page.screenshot({path}).catch(() => {})` — the empty catch swallows every capture failure, and Playwright has already created the file by the time it throws, so a 0-byte PNG is left on disk while `beat()` logs a confident `[01-arrival] 0 км/ч card=hint/peek` line as though the frame were captured. The run.log therefore looks like a successful arrival while the audit evidence is empty. This is the mechanism by which a sweep silently loses whole lessons: the log is green, the disk is blank, and nothing surfaces the discrepancy. A capture failure must fail loudly (or delete the stub) instead of being caught and discarded.
+  «[01-arrival] 0 км/ч card=hint/peek»
+  `sc-rx-queue-clear/mobile-right/01-arrival.png`
+- **`sc-sig-controller-live` · G · CRITICAL** — 12 of this lesson's 29 PNGs are 0 bytes and 4 more are truncated at exactly 512 KB / 1 MB, including 05-stopped, 06-waited, 07-end and 08-debrief. The verdict above had to be read from run.log because the debrief frame does not decode. Only the mobile-right lane produced anything at all - mobile-wrong, pc-right and pc-wrong folders exist and are completely empty, so the wrong drive was never tested on any platform and neither PC lane ran.
+  `sc-sig-controller-live/mobile-right/08-debrief.png`
+- **`sc-signal-controller` · G · CRITICAL** — The frame set itself was corrupted at collection. 04-t081s.png is 0 bytes here; in the live sibling 12 of 29 PNGs are 0 bytes and four more are truncated at exactly 512 KB or 1 MB - including 06-waited, 07-end and 08-debrief, the only honest verdict surface. Every file in both folders carries one identical mtime (21:29/21:30), so the loss happened in the copy into .audit-frames, not during the drive. Any sweep that judges credit from these folders will read UNKNOWN where the run actually produced an answer.
+  `sc-sig-controller-live/mobile-right/08-debrief.png`
+- **`sc-park-gap-short` · G · major** — The pc-wrong leg wrote 55 zero-byte PNGs and the node process then died outright at t130s with no error text in RUN.log (the log simply ends with the frame line and „Node.js v24.18.0“). No wrong-side PC evidence exists for this lesson and nothing in the log says why.
+  «91 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-park-gap-short/mobile-wrong/08-debrief.png`
+- **`sc-rb-exit-signal` · G · major** — The mobile-wrong lane produced nine ZERO-BYTE PNGs and an empty log.txt — files that look like captured frames in any listing but contain nothing. The only real artefact is log-signin-refused-1.txt: the harness could not sign in («Грешен имейл или парола»), so the wrong drive never ran. A later reader counting files would conclude this lane was audited.
+  «Error: [mobile-harness] no session cookie after sign-in. Form said: Имейл Парола Покажи Грешен имейл или парола. Влез»
+  `sc-rb-exit-signal/mobile-wrong/log-signin-refused-1.txt`
+- **`sc-rx-unguarded` · G · major** — COULD_NOT_TEST for three of four lanes: sc-rx-unguarded/mobile-wrong, /pc-right and /pc-wrong contain only 0-byte PNGs. run.log ends with a Node ENOSPC write error, so the capture host filled its disk mid-sweep. Needs a re-drive.
+  «code: 'ENOSPC'»
+  `sc-rx-unguarded/pc-wrong/run.log`
+
+---
+
+## `platform/src/modules/sim/devrig/driveScript.ts` — 10 findings (9 critical, 1 major, 0 minor)
+
+- **`sc-mw-discipline` · A · CRITICAL** — The debrief inverts the two drives. RIGHT run: „0 наказателни точки“ but НЕИЗДЪРЖАН, 1 star, no XP badge. WRONG run: „0 наказателни точки“, ИЗДЪРЖАН, +100 XP, 3 stars. Identical on mobile and pc. A student who drives the lesson correctly is told he failed; a student who drives it wrongly is told he passed.
+  «ИЗДЪРЖАН · +100 XP»
+  `sc-mw-discipline/pc-wrong/08-debrief.png`
+- **`sc-mw-discipline` · C · CRITICAL** — The car does not accelerate, brake or coast like a car in the RIGHT drive: the cluster reads 0 at t038, 10 at t123, 0 at t208, 13 at 07-end. It lurches to ~11 km/h and drops back to 0 every few seconds for the whole session — never once reaching the 120-130 km/h the briefing demands on a motorway.
+  «Ускорявай уверено и се установи около 120–130 км/ч»
+  `sc-mw-discipline/mobile-right/07-end.png`
+- **`sc-mw-min-speed` · A · CRITICAL** — Verdicts inverted on both platforms. RIGHT: НЕИЗДЪРЖАН, 1 star, „Урокът беше прекъснат преди края.“ WRONG: ИЗДЪРЖАН, +100 XP, 3 stars, zero errors. The drive that crawled is failed for running out of route, and the drive that raced to 138 km/h is held up as the model.
+  «Урокът беше прекъснат преди края.»
+  `sc-mw-min-speed/pc-right/08-debrief.png`
+- **`sc-mw-min-speed` · C · CRITICAL** — RIGHT drive: 0 → 11 → 2 → 0 km/h on repeat for 208 s, cluster confirming it at every sample. WRONG drive: a clean 14 → 59 → 86 → 99 → 110 → 124 → 135 ramp. The car is capable of driving properly, so the correct-drive motion is a control fault, not a physics limit.
+  `sc-mw-min-speed/pc-right/01-arrival.png`
+- **`sc-sp-limit-end` · A · CRITICAL** — The correct drive was never credited: 0 penalty points but НЕИЗДЪРЖАН, 1 star, and the route abandoned after 207 s of stop-start crawling at 0-14 km/h. The lesson can be failed by driving nothing wrong at all.
+  «0 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-sp-limit-end/pc-right/08-debrief.png`
+- **`sc-sp-limit-end` · C · CRITICAL** — The RIGHT drive oscillates 0 → 11 → 2 → 0 km/h continuously for 207 s and never once approaches the 37-38 km/h approach speed the briefing asks for. Nothing about the motion reads as a car: no sustained acceleration, no coast, no settled cruise.
+  «Свали скоростта преди знака и влез в зоната вече около 37–38 км/ч.»
+  `sc-sp-limit-end/pc-right/04-t104s.png`
+- **`sc-sp-wet-limit-plate` · C · CRITICAL** — RIGHT drive motion is not car-like: 17 → 0 → 12 → 0 → 1 → 13 → 0 km/h repeating for 189 s. The cockpit itself is fine — needle, digital readout and D indicator all track the value — but the vehicle never sustains a speed.
+  `sc-sp-wet-limit-plate/pc-right/01-arrival.png`
+- **`sc-vu-cyclist-hook` · C · CRITICAL** — RIGHT drive: 16 → 0 → 7 → 0 → 4 → 13 → 0 km/h repeating for 190 s before ending against a wall. The car neither accelerates nor coasts; it twitches.
+  `sc-vu-cyclist-hook/pc-right/04-t049s.png`
+- **`sc-vu-emergency` · C · CRITICAL** — RIGHT drive: 16 → 5 → 0 → 8 → 15 → 0 km/h repeating for 206 s. The manoeuvre being taught — settle at a calm speed, ease right, slow while it passes, then rejoin — is impossible at that motion profile, yet it scored full marks.
+  «Потегли по булеварда в дясната лента и се установи на спокойна скорост.»
+  `sc-vu-emergency/pc-right/04-t103s.png`
+- **`sc-sp-eco-coast` · C · major** — The RIGHT drive never exceeds ~14 km/h across 104 s on a 50 km/h boulevard, lurching between 0 and low double digits, yet is awarded 3 stars for manoeuvre quality. The lesson is about releasing the throttle early from cruising speed; there is no cruising speed to release from.
+  `sc-sp-eco-coast/pc-right/04-t050s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-parking3.ts` — 10 findings (9 critical, 1 major, 0 minor)
+
+- **`sc-park-45-rev` · A · CRITICAL** — NEITHER task ticks in ANY leg. mobile-right collides three times (30 т.) — the guided line drives the car into a parked car, which fills the windscreen at 1:16. The 45° reverse-park lesson cannot be completed by anyone.
+  «– Задача 1: подмини мястото и спри успоредно на алеята · – Задача 2: влез на заден ход по линиите»
+  `sc-park-45-rev/mobile-right/04-t076s.png`
+- **`sc-park-45-rev` · A · CRITICAL** — The task says «влез на заден ход ПО ЛИНИИТЕ» but the world has no bay lines: the parking area is a bare grey strip on green field with no markings, no kerbs and no bay geometry visible anywhere. The world does not carry what the briefing grades.
+  «Задача 2: влез на заден ход по линиите и спри напълно»
+  `sc-park-45-rev/mobile-right/04-t076s.png`
+- **`sc-park-gap-long` · A · CRITICAL** — Not one of the four legs passes. pc-right and mobile-right both end НЕИЗДЪРЖАН at 10 точки with „Настъпи сблъсък“; pc-wrong racks up 11 опасни грешки / 110 точки and mobile-wrong 90 точки. A lesson with a 0/4 pass rate on its own scripted correct drive is not teachable.
+  «10 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-park-gap-long/mobile-right/08-debrief.png`
+- **`sc-park-gap-short` · A · CRITICAL** — The correct drive fails on both platforms with the same cause. mobile-right and pc-right each end НЕИЗДЪРЖАН with exactly 1 опасна грешка / 10 точки and „Настъпи сблъсък“ — a correct drive that crashes identically on two platforms points at the staged geometry (the gap or its colliders), not at the driver.
+  «10 наказателни точки … НЕИЗДЪРЖАН … Настъпи сблъсък.»
+  `sc-park-gap-short/pc-right/08-debrief.png`
+- **`sc-park-left` · A · CRITICAL** — «Задача 2: паркирай на заден ход в лявото гнездо» — the whole point of the lesson — never ticks in any of the four legs, and both right legs collide (10 т.). Passing is impossible.
+  «– Задача 2: паркирай на заден ход в лявото гнездо · ✗ Пътнотранспортно произшествие −10 изпитни т.»
+  `sc-park-left/mobile-right/08-debrief.png`
+- **`sc-park-night` · A · CRITICAL** — The briefing does not match what is graded. The scenario's objectiveBg promises 'първо включи късите светлини и спри в изходната позиция', but the two graded tasks are 'Задача 1: спри в изходната позиция до предната кола' (a reachZone) and 'Задача 2: паркирай на заден ход' (parkInBay) — no success criterion touches the lamps at all. The student is briefed on a duty the scoring never looks at.
+  «Помни: нощем фаровете не са само за да виждаш, а за да те виждат.»
+  `sc-park-night/mobile-right/02-briefing.png`
+- **`sc-park-van` · A · CRITICAL** — The RIGHT drive is CONVICTED, not credited. 08-debrief shows 10 наказателни точки / НЕИЗДЪРЖАН for the correct-behaviour run, COMMENDATIONS (0), and both objectives ('Задача 1: спри в изходната позиция покрай гнездото', 'Задача 2: паркирай на заден ход, без да опираш буса') left unticked. The lesson has no drivable success path in this build.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-park-van/mobile-right/08-debrief.png`
+- **`sc-park-wall` · A · CRITICAL** — NEITHER task ticks in ANY of the four legs and both right legs collide twice (20 т.), scoring the same as or worse than the wrong drives. The lesson cannot be passed.
+  «– Задача 1: спри рано, в средата на алеята · – Задача 2: паркирай на заден ход в крайното гнездо»
+  `sc-park-wall/mobile-right/08-debrief.png`
+- **`sc-park-zebra` · A · CRITICAL** — All four legs are force-closed on the time budget and «Задача 2: паркирай на заден ход в разрешеното място» never ticks. The right legs also collide. Nothing about this lesson can be completed or graded.
+  «the drive stopped after 211s without the session ending (its whole 210s budget)»
+  `sc-park-zebra/mobile-right/08-debrief.png`
+- **`sc-park-45-rev` · G · major** — The parking 'lot' is a bare grey rectangle laid on a green field with no kerb, no markings, no surrounding buildings and no horizon detail — it reads as a test fixture, not a place.
+  `sc-park-45-rev/mobile-right/04-t001s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/buildWorldGeometry.ts` — 9 findings (7 critical, 2 major, 0 minor)
+
+- **`sc-park-bay-exit-rev` · A · CRITICAL** — World does not match the briefing at all. Briefing line 1 promises „Колата е паркирана с предницата навътре, а вляво и вдясно има коли“ and lines 3–6 talk about reversing into „алеята“; 03-ready, t027s, t093s and 07-end all show an unbroken grass plane with nothing on it. content/world/lot-perp-v1.json does carry five bays with occupancy XX_XX and a targetBayId, so the data exists and the renderer is not drawing it.
+  «Колата е паркирана с предницата навътре, а вляво и вдясно има коли.»
+  `sc-park-bay-exit-rev/mobile-right/03-ready.png`
+- **`sc-park-bay-exit-rev` · B · CRITICAL** — Out the windscreen there is literally nothing: one flat olive plane meeting a hazy sky, from 03-ready to 07-end. No road surface, no kerb, no line, no prop, no shadow, no horizon detail. This is not an unpolished street, it is the absence of a street.
+  `sc-park-bay-exit-rev/mobile-right/07-end.png`
+- **`sc-park-gap-long` · A · CRITICAL** — The final task cannot be performed as written. Task 2 and briefing step 8 both say „спри успоредно на бордюра“ (ЗДвП чл. 94), but at t189s the car is arcing into the space across an untextured grey plane — no kerb, no bay line, no pavement, no buildings — with only the target car and the shadow-car ghost in view. There is nothing to be parallel to.
+  «Задача 2: влез НАПРЕД в мястото и спри успоредно на бордюра»
+  `sc-park-gap-long/pc-right/04-t189s.png`
+- **`sc-park-gap-long` · B · CRITICAL** — The world dissolves before the lesson's payload. At 05-stopped there is a boulevard with a railing, lamp posts, a tree and a parked row; at t189s all of it is gone and the car manoeuvres on bare grey ground. On mobile the wrong run at t204s is doing 49 км/ч down a grey strip with green fields on both sides and no city at all.
+  `sc-park-gap-long/mobile-wrong/04-t204s.png`
+- **`sc-park-gap-short` · A · CRITICAL** — The manoeuvre is performed in a void. 05-stopped shows a proper street (kerb, markings, parked row, buildings, trees); by t178s the buildings, pavement and kerb are gone and only two cars and a „Паркирай тук“ marker float on a grey strip; by t205s there is no road surface at all, just grey ground. On mobile at t183s the car is alone on green grass. The briefing's operative instruction — „спри успоредно на бордюра“ — names a kerb that is not there.
+  «Влез до дъното, подкарай леко напред за центъра и спри успоредно на бордюра.»
+  `sc-park-gap-short/pc-right/04-t178s.png`
+- **`sc-park-gap-short` · B · CRITICAL** — The world runs out mid-lesson. Between t178s and t205s the street degrades from tarmac-with-kerb to an untextured grey plane under sky, with the target cars left hanging in it. On mobile the same lesson finishes on plain green grass with nothing in view at all.
+  `sc-park-gap-short/mobile-right/04-t183s.png`
+- **`sc-pk-rail-ban` · B · CRITICAL** — Out the windscreen: a plausible enough two-lane street with buildings, poplars and parked cars — and no railway. For a lesson titled „Никакъв престой около жп прелез“ the single most important object in the scene is missing, and the surrounding street offers no compensating cue (no crossing warning post, no chevrons, no road-surface change).
+  `sc-pk-rail-ban/pc-right/04-t176s.png`
+- **`sc-park-gap-long` · A · major** — The briefing's judgement rule („Мери от броня до броня: под две дължини кола — заден ход; над две — напред“ and „тук има три дължини кола“) is untestable in the world it is set in: at 05-stopped the target gap is a distant blue blob on a street, and by the time the car reaches it every measuring reference has been removed.
+  «Виж: тук има три дължини кола — заден ход е за малко място, не по навик.»
+  `sc-park-gap-long/pc-right/05-stopped.png`
+- **`sc-park-gap-short` · A · major** — The briefing is measured in metres the world cannot show. „Премери мястото: малко над седем метра при кола от четири и половина“ and the teach card „Мястото между двете коли е късо — малко над седем метра“ ask the student to judge a length, but by the time the two cars are on screen every reference object (kerb, bay line, pavement edge) has disappeared, so the measurement cannot be made.
+  «Мястото между двете коли е късо — малко над седем метра.»
+  `sc-park-gap-short/pc-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-vru.ts` — 7 findings (7 critical, 0 major, 0 minor)
+
+- **`sc-vu-cyclist-hook` · A · CRITICAL** — The correct drive is convicted of a crash. RIGHT and WRONG produce the identical debrief — 20 points, 2 dangerous errors, НЕИЗДЪРЖАН — with the collision banner in both. A student who does everything the briefing asks is told he caused a road-traffic accident.
+  «И освен точките, само тази грешка спира и самия изпит (Наредба № 38, чл. 48, ал. 3).»
+  `sc-vu-cyclist-hook/pc-right/08-debrief.png`
+- **`sc-vu-cyclist-hook` · A · CRITICAL** — The lesson's own event never happens. The cyclist is present at the kerb approaching the junction, but neither drive ever performs the right turn across him — the right drive crawls off the road into a building at t184 and the wrong drive does the same at t023. Nothing in either debrief cites a cyclist code; the two dangerous errors are the collision and its follow-on.
+  «Завий надясно едва когато велосипедистът е преминал и е чист»
+  `sc-vu-cyclist-hook/mobile-right/04-t061s.png`
+- **`sc-vu-emergency` · A · CRITICAL** — The ambulance is never visible. The advisor announces „Синя лампа отзад — линейка със специален режим“, the task chip says to pull right and let it through, and the 05-stopped frame captures the moment of yielding — yet there is no ambulance, no blue light and no vehicle of any kind in the mirror, in the windscreen or in the road behind in any frame on either platform. The lesson's central event exists only as text.
+  «Синя лампа отзад — линейка със специален режим. Правим Й път.»
+  `sc-vu-emergency/mobile-right/05-stopped.png`
+- **`sc-vu-emergency-junction` · A · CRITICAL** — The drivable world ends a few metres past the junction. From t043s (pc) / t044s (mobile) the asphalt, kerbs, markings, buildings, trees and parked cars all stop at a hard edge and the car spends the remaining ~160 s crossing a bare green/grey plane under an empty horizon, while the green route ribbon and the blue ghost trail continue into the void. The rear-view mirror inset simultaneously still renders the city, proving the ego has simply left the built tile.
+  `sc-vu-emergency-junction/pc-right/04-t049s.png`
+- **`sc-vu-emergency-junction` · A · CRITICAL** — The lesson's own actor is never observable to the student. The briefing and the coach both put an ambulance with a blue lamp crossing from the RIGHT at the junction; across every sampled frame of both drives on both platforms — approach (t017–t038), the junction itself (t043/t044) and after — no ambulance or blue-lamp vehicle appears through the windscreen, and the rear-view mirror inset shows only the blue ghost trail. NOTE: templates-vru.ts lines 135–142 argue a previous sweep was wrong about this and points at the mirror at t=7s/t=12s — those crops were checked here and carry a blue ghost-path glow, not an ambulance body, and on mobile the mirror is additionally covered by the coach tip text.
+  «Синя лампа отдясно: линейка със специален режим. Тя минава първа — винаги (чл. 91).»
+  `sc-vu-emergency-junction/pc-right/04-t070s.png`
+- **`sc-vu-emergency-junction` · A · CRITICAL** — Coach narration runs on a fixed timeline completely decoupled from the world state. On the WRONG drive at t040s the coach declares the ambulance has passed and the road is clear, while the car is doing 47 км/ч across an empty grass plane, has never encountered an ambulance, is collecting «Превишена скорост» penalties, and the task chip is still stuck on 1/2 («Приближи кръстовището бавно»). The narration therefore actively misinforms a student about what just happened.
+  «Линейката премина, пътят е чист — завиваме наляво уверено.»
+  `sc-vu-emergency-junction/pc-wrong/04-t040s.png`
+- **`sc-vu-pass-clearance` · A · CRITICAL** — The cyclist never appears. The briefing puts a cyclist by the right kerb and the coach caption repeats it, but across every sampled frame of both drives on both platforms (t001–t202) there is no cyclist anywhere — only parked cars along the kerb and the blue ghost car in our own lane. The world does not match the briefing, so the taught judgement (how much air to leave a rider) cannot be practised or observed.
+  «Покрай десния бордюр кара велосипедист — планирай широката дъга отрано.»
+  `sc-vu-pass-clearance/pc-right/04-t028s.png`
+
+---
+
+## `platform/src/components/sim/LessonScene.tsx` — 40 findings (6 critical, 34 major, 0 minor)
+
+- **`sc-follow-truck` · A · CRITICAL** — The 3D world disappears mid-drive. From t=18 s to at least t=23 s the whole windscreen is one featureless flat field — pale grey at 18 s, dark grey at 23 s — with no road, no lane markings, no buildings and no truck, while the speedometer still reads 10 km/h and the rule engine fires 'Несъобразена дистанция'. The scene is back at t=55 s. Either the camera is inside the truck's box mesh or the scene stopped rendering; either way the student is grading blind.
+  «ОСНОВНА ГРЕШКА · -3 ИЗПИТНИ Т. · Несъобразена дистанция»
+  `sc-follow-truck/pc-wrong/04-t018s.png`
+- **`sc-ov-being-overtaken` · D · CRITICAL** — The lesson is entirely a mirror exercise — step 2 is literally 'look in the mirror' — and on mobile the teach card is pinned over the rear-view mirror for every frame of the drive. The skill being taught is physically unobservable on the phone.
+  «2. Погледни в огледалото: колата зад теб се приближава и излиза наляво — започва да те изпреварва.»
+  `sc-ov-being-overtaken/mobile-right/04-t098s.png`
+- **`sc-ov-return-gap` · D · CRITICAL** — This lesson is graded on the rear-view mirror — step 4 says to signal right only once the WHOLE overtaken car is visible in it — and on mobile the teach card is parked over the rear-view mirror for every frame of the drive. The one instrument the lesson depends on is covered by the HUD.
+  «4. Прибери се с десен мигач едва когато видиш ЦЕЛИЯ изпреваран автомобил в огледалото за обратно виждане.»
+  `sc-ov-return-gap/mobile-right/05-stopped.png`
+- **`sc-park-night` · D · CRITICAL** — Same as sc-park-van: the mobile touch dock vanishes once the drive starts and never returns. 01-arrival has the full dock; every frame from 04-t001s to 07-end has only 'МЕНЮ' plus an undismissed teach card whose 'РАЗБРАХ' is still on screen 208 seconds later — including the landscape-phone-told-to-rotate heading.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-park-night/mobile-right/04-t034s.png`
+- **`sc-park-van` · A · CRITICAL** — A collision is scored but not simulated. After the −10 the ego is INSIDE the parked green car — its body passes straight through the bonnet and windscreen plane and the camera sits within the other car's front wing. Nothing blocked, nothing deformed, no impulse. A student who hits a car and drives on through it learns the opposite of the point.
+  «Пътнотранспортно произшествие»
+  `sc-park-van/mobile-wrong/04-t018s.png`
+- **`sc-park-van` · D · CRITICAL** — On mobile the entire touch control dock disappears the moment the drive starts and never comes back. 03-ready shows Изглед/Пауза/⇦Ляв/⇨Дясн/⊙Клакс/⚠Колан/Д/З/Л; from 04-t002s through 07-end only 'МЕНЮ' remains, hidden behind a teach card whose 'РАЗБРАХ' is still on screen 74 s later. A phone student has no steering, throttle, brake, indicators, horn or gear selector for the whole lesson.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-park-van/mobile-right/04-t002s.png`
+- **`sc-crossing-bus-shadow` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-crossing-bus-shadow/mobile-right/05-stopped.png`
+- **`sc-crossing-bus-shadow` · G · major** — The translucent blue shadow/demonstration car is rendered THROUGH the player's own cockpit: at 0:59 its body fills the bonnet, dashboard and steering wheel and tints the instrument cluster blue. Also the lesson id says 'bus' and the district is 'pe-bus-v1' while the title and every instruction say «камион» and a box truck is what spawns.
+  `sc-crossing-bus-shadow/mobile-right/04-t001s.png`
+- **`sc-crossing-child-ball` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-crossing-child-ball/mobile-right/05-stopped.png`
+- **`sc-crossing-white-cane` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-crossing-white-cane/mobile-right/05-stopped.png`
+- **`sc-crossing-white-cane` · G · major** — The lesson's whole recognition cue is invisible at the distance it must be recognised: the white cane is a ~2 px white line held by a featureless dark-grey blob with no face, clothing or contrast. A student cannot 'recognise the white cane from afar' from what is drawn.
+  `sc-crossing-white-cane/mobile-right/04-t001s.png`
+- **`sc-follow-distance` · D · major** — On PC the 'Клавиши · за напреднали' panel sits semi-transparent over the upper-left world in every frame and its own text is clipped: the gear line breaks as 'скорости: към P / към' with an orphaned 'D' on the next row, and 'Всички клавиши (+11)' is unreadable against the buildings behind it.
+  «скорости: към P / към»
+  `sc-follow-distance/pc-right/04-t012s.png`
+- **`sc-junction-rhr` · D · major** — The «Клавиши · за напреднали» keyboard-help panel is expanded by default and renders as translucent ghost text straight onto the street with no panel background. It covers the left third of the windscreen for the whole drive and is unreadable against buildings.
+  «всичко в кабината се прави с мишката»
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-junction-rhr` · D · major** — The ИНСТРУКЦИИ panel is pinned over the right third of the windscreen — exactly the side the priority vehicle arrives from in a right-hand-priority lesson. The student is told to look right and the UI covers right.
+  «Преди устието се огледай: първо наляво, после НАДЯСНО.»
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-jx-giveway-b1` · D · major** — The «Клавиши · за напреднали» panel again renders as translucent ghost text over the buildings with no background, and the guidance-ribbon legend («синя — пътят на колата-сянка / зелена — маршрутът до целта») is drawn over it, so two text layers overlap on the world.
+  «зелена — маршрутът до целта»
+  `sc-jx-giveway-b1/pc-right/01-arrival.png`
+- **`sc-ln-boulevard-discipline` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ln-boulevard-discipline/mobile-right/05-stopped.png`
+- **`sc-ln-turn-lane-arrows` · D · major** — The mobile teach card covers the rear-view mirror for the whole drive in a lesson whose step 3 explicitly instructs mirror-signal-manoeuvre.
+  «3. Прочети стрелките отдалеч и започни престрояването рано: огледало, мигач, после маневра.»
+  `sc-ln-turn-lane-arrows/mobile-right/04-t011s.png`
+- **`sc-ov-abort` · D · major** — The mobile teach card again occupies the rear-view mirror for the entire drive, and the violation card that replaces it occupies the same square — so the mirror is never usable in a lesson whose step 3 tells the student to signal right and tuck back in.
+  «3. Щом прецениш, че прозорецът се затваря: НЕ настоявай. Спирачка, мигач надясно и се прибери зад бавната кола.»
+  `sc-ov-abort/mobile-right/04-t092s.png`
+- **`sc-ov-oncoming-gap` · D · major** — The mobile teach card is pinned over the rear-view mirror for the entire drive and its own heading is cut off above the top of the viewport — the visible text starts mid-card at «Ляв палец — волан», while «Завърти телефона хоризонтално» (which the DOM confirms is in the card) is off-screen. It also returns after being dismissed; the harness had to drain it twice.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ov-oncoming-gap/mobile-right/03-ready.png`
+- **`sc-ov-solid-return` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ov-solid-return/mobile-right/05-stopped.png`
+- **`sc-park-45-rev` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-park-45-rev/mobile-right/05-stopped.png`
+- **`sc-park-left` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-park-left/mobile-right/05-stopped.png`
+- **`sc-park-van` · D · major** — The first-run hint tells a phone that is ALREADY in landscape to turn itself landscape. Every frame in this run is 2556x1179 landscape, and the teach layer still carries 'Завърти телефона хоризонтално' as its heading — and the heading is itself pushed off the top edge / behind the mirror, so the student sees the thumb instructions with no title.
+  «Завърти телефона хоризонтално»
+  `sc-park-van/mobile-right/03-ready.png`
+- **`sc-park-wall` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-park-wall/mobile-right/05-stopped.png`
+- **`sc-park-zebra` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-park-zebra/mobile-right/05-stopped.png`
+- **`sc-pe-jaywalker` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-pe-jaywalker/mobile-right/05-stopped.png`
+- **`sc-pe-night-unlit` · A · major** — The world contradicts the briefing. The lesson is 'Неосветена пътека нощем' and step 1 says without dipped beams you do not even have the 40 m they give you — yet the street is lit end to end: every facade carries lit windows, the road surface and the far buildings are readable for hundreds of metres, and at t063s the whole carriageway ahead is bright. Nothing in the picture teaches the 40 m lesson the text is grading.
+  «Нощ е и улицата е неосветена. Провери, че късите светлини са включени — без тях нямаш дори 40-те метра, които те показват.»
+  `sc-pe-night-unlit/pc-right/04-t063s.png`
+- **`sc-pe-night-unlit` · B · major** — The headlights do not read as headlights. What renders is a narrow blue-white wedge a few metres long on the tarmac plus a wide, soft grey halo around the car that is not beam-shaped and has no cut-off. In a lesson whose entire subject is how far dipped beam reaches, the beam itself is the one thing not modelled.
+  `sc-pe-night-unlit/mobile-right/07-end.png`
+- **`sc-pe-school-patrol` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-pe-school-patrol/mobile-right/05-stopped.png`
+- **`sc-rb-busy-gap` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-rb-busy-gap/mobile-right/05-stopped.png`
+- **`sc-rb-circulate-priority` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-rb-circulate-priority/mobile-right/05-stopped.png`
+- **`sc-rb-lane-choice` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-rb-lane-choice/mobile-right/05-stopped.png`
+- **`sc-rb-ped-exit` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-rb-ped-exit/mobile-right/05-stopped.png`
+- **`sc-sig-controller-postures` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-sig-controller-postures/mobile-right/05-stopped.png`
+- **`sc-signal-dead` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-signal-dead/mobile-right/05-stopped.png`
+- **`sc-signal-hesitation` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-signal-hesitation/mobile-right/05-stopped.png`
+- **`sc-speed-creep` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-speed-creep/mobile-right/05-stopped.png`
+- **`sc-speed-dangerous` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-speed-dangerous/mobile-right/05-stopped.png`
+- **`sc-speed-rain` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-speed-rain/mobile-right/05-stopped.png`
+- **`sc-speed-zone` · D · major** — The first-run touch hint («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» + «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.») is painted with no panel straight onto the rear-view mirror and the sky, and it is STILL up 54–81 s into the drive on several lessons, occluding the mirror for the whole lesson. Its «РАЗБРАХ» button floats detached below the text with no visual tie to it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-speed-zone/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/rules/scoring.ts` — 18 findings (6 critical, 12 major, 0 minor)
+
+- **`sc-ac-highbeam-lead` · A · CRITICAL** — One collision is billed 18 times. The mobile wrong run lists 18 identical «Пътнотранспортно произшествие −10 изпитни т.» rows for 180 points, while the text inside each of those very cards states that the ten is the price of the single act and not a running total. The debrief contradicts its own arithmetic. Same pattern at 3x in mobile-right, 2x in pc-wrong.
+  «Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски.»
+  `sc-ac-highbeam-lead/pc-wrong/04-t018s.png`
+- **`sc-junction-stop` · A · CRITICAL** — The same debrief contradicts itself: it prints «Това е ЕДНА опасна грешка... а не сбор от много дребни» directly above a table counting 38 опасни грешки for 380 points. A student reading this is taught the opposite of the rule the paragraph states.
+  «Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-junction-stop/pc-wrong/08-debrief.png`
+- **`sc-ln-obstacle-meeting` · A · CRITICAL** — One crash is billed twice. The mistake list carries Пътнотранспортно произшествие −10 изпитни т. as two separate rows totalling 20, while the debrief prose on the same card insists the crash is ONE dangerous fault whose whole ten points are the price of the single act.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-ln-obstacle-meeting/mobile-right/08-debrief.png`
+- **`sc-merge-lane-end` · A · CRITICAL** — The wrong drive is not convicted. pc-wrong and mobile-wrong debriefs are pixel-for-pixel the same card as the right drives: 0 опасни / 0 основни / 0 второстепенни, НЕИЗДЪРЖАН, +40 XP. The wrong run was doing 59 км/ч under a posted 50 sign at t017s and still collected zero points, so the grader never looked at the drive at all.
+  «Общо (допустими 9) 0 0»
+  `sc-merge-lane-end/pc-wrong/08-debrief.png`
+- **`sc-merge-roadworks-shift` · A · CRITICAL** — Right and wrong are graded identically on both platforms: pc-right, pc-wrong, mobile-right and mobile-wrong all produce 20 points, 2 dangerous errors, НЕИЗДЪРЖАН and +40 XP. Nothing the student does changes the verdict.
+  «20 наказателни точки … НЕИЗДЪРЖАН … +40 XP»
+  `sc-merge-roadworks-shift/pc-wrong/08-debrief.png`
+- **`sc-ov-ban-overtake` · A · CRITICAL** — The result headline prints 640 наказателни точки in the largest type on the page, immediately above its own sentence saying a collision is ONE dangerous fault worth 10 and not a sum. The total is unbounded, so a car scraping an obstacle accumulates hundreds of points and the headline number stops meaning anything.
+  «640 наказателни точки … Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-ov-ban-overtake/mobile-wrong/08-debrief.png`
+- **`sc-ac-snow` · A · major** — Both wrong runs were failed purely on two «Пътнотранспортно произшествие» rows — the same doubled-collision billing seen in highbeam-lead — and never on the winter-speed rule the lesson teaches.
+  «Пътнотранспортно произшествие»
+  `sc-ac-snow/pc-wrong/08-debrief.png`
+- **`sc-ed-d2-priority-run` · G · major** — The wrong run logs the identical fault 'Пътнотранспортно произшествие' five separate times, −10 each, which is how it reaches 87 points against a scale whose ceiling is 'допустими 9'. One collision should be one row.
+  «Пътнотранспортно произшествие −10 изпитни т.»
+  `sc-ed-d2-priority-run/pc-right/04-t192s.png`
+- **`sc-ed-reverse-line` · A · major** — The wrong run scores 100 наказателни точки built from ten identical 'Превишаване с повече от 10 км/ч' rows, on a sheet whose stated ceiling is 'допустими 9'. The same fault repeated ten times is not ten faults, and a 100 against a 9-point scale is meaningless to a learner.
+  «Общо (допустими 9) 10 100»
+  `sc-ed-reverse-line/pc-wrong/08-debrief.png`
+- **`sc-follow-brake` · A · major** — PC wrong run charges 4 опасни грешки = 40 точки for what the card narrates as one collision; total 41 with a single второстепенна.
+  «Опасни грешки (по 10 изпитни т.) 4 40»
+  `sc-follow-brake/pc-wrong/08-debrief.png`
+- **`sc-follow-distance` · A · major** — Same contradiction on PC at smaller scale: the card says the collision is ONE dangerous error of 10 points, the table right below it charges 4 опасни грешки = 40 точки, total 55.
+  «Опасни грешки (по 10 изпитни т.) 4 40»
+  `sc-follow-distance/pc-wrong/08-debrief.png`
+- **`sc-follow-rain-gap` · A · major** — PC wrong run charges 4 опасни грешки = 40 точки for one narrated collision; total 43.
+  «Опасни грешки (по 10 изпитни т.) 4 40»
+  `sc-follow-rain-gap/pc-wrong/08-debrief.png`
+- **`sc-follow-standstill` · A · major** — PC wrong run charges 8 опасни грешки = 80 точки for the same single collision narrative; total 83 against a sheet that allows 9.
+  «Опасни грешки (по 10 изпитни т.) 8 80»
+  `sc-follow-standstill/pc-wrong/08-debrief.png`
+- **`sc-follow-truck` · A · major** — PC wrong run charges 6 опасни грешки = 60 точки under the sentence saying one collision costs 10; total 75.
+  «Опасни грешки (по 10 изпитни т.) 6 60»
+  `sc-follow-truck/pc-wrong/08-debrief.png`
+- **`sc-merge-from-property` · F · major** — The identical scripted right drive is graded differently by platform: 10 наказателни точки on PC, 30 наказателни точки on mobile, and only the mobile card adds 'Урокът беше прекъснат преди края'. Grading depends on the device.
+  «30 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-merge-from-property/mobile-right/08-debrief.png`
+- **`sc-merge-from-property` · A · major** — The wrong drive returns 280 наказателни точки from 27 опасни грешки plus 10 второстепенни — on a scale the app's own self-assessment card defines as a whole number from 0 to 30, and while the red copy on the same screen insists a collision is ONE dangerous error and not a sum of many small ones. One crash is being re-counted every frame.
+  «280 наказателни точки … Опасни грешки (по 10 изпитни т.) 27 270»
+  `sc-merge-from-property/pc-wrong/08-debrief.png`
+- **`sc-merge-roadworks-shift` · D · major** — The debrief contradicts itself in adjacent lines. The red paragraph insists a collision is ONE dangerous error and explicitly not a sum of many small ones; the table two centimetres below reports Опасни грешки БРОЙ 2 / ТОЧКИ 20. The same screen states the rule and then breaks it.
+  «Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни … Опасни грешки (по 10 изпитни т.) 2 20»
+  `sc-merge-roadworks-shift/pc-right/08-debrief.png`
+- **`sc-ov-crossing-overtake` · A · major** — The result headline prints 161 наказателни точки. The same debrief card says a collision is ONE dangerous fault worth 10 points and not a sum of many, and the self-assessment card on the previous screen tells the student the scale is a whole number from 0 to 30. The number on the biggest type on the screen is off its own scale by 5×.
+  «161 наказателни точки … Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-ov-crossing-overtake/mobile-wrong/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-following.ts` — 13 findings (5 critical, 7 major, 1 minor)
+
+- **`sc-follow-brake` · A · CRITICAL** — The staged brake-slam is gated behind a hidden minimum player speed (minSlamSpeedKmh 25 in the template). The right drive never exceeded ~11 km/h, so the lead car never slammed, the sudden-stop lesson never presented a sudden stop, and the drive simply timed out. A cautious learner — exactly the learner this level is for — can never see the event.
+  «ЗАДАЧА 2/2 · Продължи след спирането до края на отсечката»
+  `sc-follow-brake/pc-right/04-t205s.png`
+- **`sc-follow-brake` · A · CRITICAL** — The coach congratulates the student on an event that did not occur: at t=42 s it announces a full stop without hitting the car in front while the speedometer reads 11 km/h and the lead car is roughly 40 m ahead, still rolling. The lesson praises a manoeuvre the world never staged.
+  «Спря напълно, без да удариш предния — дистанцията ти даде време.»
+  `sc-follow-brake/pc-right/04-t042s.png`
+- **`sc-follow-cutin` · A · CRITICAL** — The cut-in never happens. Across the entire 189 s right drive the staged car holds station in the LEFT lane at the same screen position at t=34, 87, 130 and 189 s and never moves across. The cut is gated on the player doing at least 25 km/h (minCutSpeedKmh 25 in the template) and this drive ran 6–12 km/h. All three objectives still ticked and the debrief awarded ИЗДЪРЖАН, 0 наказателни точки, three stars and +150 XP for a skill that was never presented, never attempted and never measured.
+  «ЗАДАЧА 3/3 · Стигни края на отсечката»
+  `sc-follow-cutin/pc-right/04-t189s.png`
+- **`sc-follow-cutin` · A · CRITICAL** — Caught on a single frame: the objective 'Възстанови дистанцията след вклиняването' carries a green tick in the banner at the same instant the engine's own teach card states the current gap is 0,0 s (0 m). The tick is a position gate; the number beside it is the truth.
+  «Дистанция в момента: 0,0 с (0 м) — дръж поне 2 с.»
+  `sc-follow-cutin/pc-wrong/04-t017s.png`
+- **`sc-follow-distance` · A · CRITICAL** — The headline objective 'Следвай на съобразена дистанция' is a bare position gate (reachZone at y=175, no gap term at all), so it ticks green for a driver the engine is convicting of tailgating in the same second. In the wrong drive the fault card 'Несъобразена дистанция' fires at t=17 s and by t=38 s the chip has already advanced to ЗАДАЧА 2/2 with objective 1 ticked. A student sees a green tick for the exact skill he just failed.
+  «ЗАДАЧА 2/2 · Стигни края на отсечката»
+  `sc-follow-distance/pc-wrong/04-t038s.png`
+- **`sc-follow-brake` · A · major** — Objective 1 'Следвай спокойно преди спирането' is a plain position gate and had already ticked on the wrong drive, which by then had collided; the chip reads 2/2 while four dangerous errors are on the sheet.
+  «ЗАДАЧА 2/2 · Продължи след спирането до края на отсечката»
+  `sc-follow-brake/pc-wrong/04-t028s.png`
+- **`sc-follow-distance` · A · major** — The briefing carries a rain step in a scenario authored as dry (conditions weather dry at level 1). Step 7 orders the student to switch dipped beams on 'in rain' and explains that the wet carriageway swallows light, in bright dry daylight with a dry road on screen.
+  «7. Включи късите светлини в дъжд (чл. 70): мокрото платно гълта светлина.»
+  `sc-follow-distance/mobile-right/02-briefing.png`
+- **`sc-follow-rain-gap` · A · major** — The objective is titled as a distance skill and graded as a speed cap: the banner itself tells the student the criterion is to stay under 35 km/h, so what gets the tick is a speedometer reading, not the three-second gap the lesson teaches.
+  «Следвай с увеличена за дъжда дистанция — дръж под 35 км/ч»
+  `sc-follow-rain-gap/pc-right/01-arrival.png`
+- **`sc-follow-standstill` · A · major** — The briefing promises a standing column and the world shows one car. Instruction 4 says a stopped column is standing ahead and the car in front will join the back of it; at the recorded stop and again at t=156 s the player's lane holds a single vehicle roughly 40 m ahead, with nothing behind it. The lesson is named 'дистанция при спиране в КОЛОНА'.
+  «4. Гледай напред: там стои спряла колона и предният ще се нареди последен.»
+  `sc-follow-standstill/pc-right/05-stopped.png`
+- **`sc-follow-tailgater` · A · major** — The objective titled 'Успокой темпото и увеличи дистанцията напред' is graded purely as a position gate with a 41 km/h cap, so the forward gap it names is never measured and neither is any easing of the pressure from behind.
+  «Успокой темпото и увеличи дистанцията напред — дръж под 41 км/ч»
+  `sc-follow-tailgater/pc-right/01-arrival.png`
+- **`sc-follow-truck` · A · major** — The briefing describes conditions the dry scenario does not have: step 8 tells the student that in the spray cloud his side lights are all that shows him from behind, in a lesson authored as dry with a dry road on screen.
+  «8. Помни: в облака пръски габаритите ти са единственото, което те показва отзад.»
+  `sc-follow-truck/pc-right/01-arrival.png`
+- **`sc-follow-truck` · A · major** — Objective titled 'Следвай камиона с увеличена дистанция' is graded as a position gate with a 35 km/h cap; nothing measures the gap to the truck, which is the entire skill.
+  «Следвай камиона с увеличена дистанция — дръж под 35 км/ч»
+  `sc-follow-truck/pc-wrong/04-t018s.png`
+- **`sc-follow-brake` · A · minor** — Briefing and world disagree on pace: instruction 1 asks for a calm ~40 km/h behind the lead car, and the graded drive that the product itself scored 0 faults on ran the whole lesson at 11 km/h with no nudge that the pace itself was the problem until the clock ran out.
+  «1. Движи се спокойно зад предната кола, около 40 км/ч, и дръж поне 2 секунди дистанция.»
+  `sc-follow-brake/pc-right/04-t205s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-lanes.ts` — 12 findings (5 critical, 7 major, 0 minor)
+
+- **`sc-mw-emergency-lane` · A · CRITICAL** — Verdict inversion within the same lesson: the careful drive is НЕИЗДЪРЖАН with neither task ticked on both platforms while the reckless drive is ИЗДЪРЖАН with three stars. Whatever the grader is measuring, it rewards speed and punishes care.
+  «– Подмини авариралата кола в лентата за движение – Стигни края на участъка»
+  `sc-mw-emergency-lane/pc-right/08-debrief.png`
+- **`sc-ov-abort` · A · CRITICAL** — Credit is inverted again: the pc-wrong run — 46 penalty points, 4 collisions, a 0.3 m near-miss — is the ONLY run of the four in which the lesson's finishing objective is ticked. Both careful drives are told they did not finish.
+  «✓ Довърши изпреварването на чист път и завърши 1:07»
+  `sc-ov-abort/pc-right/01-arrival.png`
+- **`sc-ov-narrow` · A · CRITICAL** — The lesson cannot be passed. On both platforms the careful drive crawls to the narrowing at 6 km/h, follows the 'Спри тук — спри под 6 км/ч' waypoint, and still ends wedged against a vehicle for 20 наказателни точки with neither route task ticked.
+  «3. Спри на разширението преди стеснението, в своята лента, и пусни насрещния да премине.»
+  `sc-ov-narrow/mobile-right/04-t087s.png`
+- **`sc-ov-oncoming-gap` · A · CRITICAL** — Credit is INVERTED. The reckless drive (mobile-wrong, 14 collisions, 141 penalty points; pc-wrong, 5 collisions, 57 points) earns BOTH route objectives — including «Изпревари в големия прозорец и завърши в своята лента» at 2:31 — while the careful drive earns only the first. A student who ploughs through the lead car is told the overtake was completed.
+  «✓ Изпревари в големия прозорец и завърши в своята лента 2:31»
+  `sc-ov-oncoming-gap/mobile-right/08-debrief.png`
+- **`sc-ov-oncoming-gap` · A · CRITICAL** — The lead 'slow car' is effectively stationary: over 210 s the correct drive never exceeded 25 км/ч and came to 25 full stops on a road signed 90. At t051s and t171s the ego reads 0 and 1 км/ч with the lead directly ahead. The overtaking window the briefing promises is never reachable at that crawl.
+  «Потегли по двупосочния път — пред теб пълзи бавна кола, а насреща идват автомобили.»
+  `sc-ov-oncoming-gap/mobile-right/04-t051s.png`
+- **`sc-mw-emergency-lane` · A · major** — 'Подмини авариралата кола в лентата за движение' ticks as a bare position gate. It fired on the run that simply held one lane at 139 км/ч and never checked which lane the pass was made from — which is the only thing the task title claims to measure.
+  «ЗАДАЧА 1/2 Подмини авариралата кола в лентата за движение»
+  `sc-mw-emergency-lane/pc-wrong/04-t028s.png`
+- **`sc-ov-abort` · C · major** — The careful drive never gets above 20 км/ч in 210 s and stops 26 times behind a lead car that barely moves; on pc-right it is 16 км/ч and 28 stops. On a road signed 90 the car never behaves like a car in traffic.
+  `sc-ov-abort/mobile-right/04-t092s.png`
+- **`sc-ov-ban-overtake` · A · major** — The second route task — 'Изпревари след зоната и завърши в дясната лента', i.e. the actual overtake the lesson exists to teach — never ticks on either platform. The best run reaches only task 1 (patience through the zone) and is then terminated.
+  «– Изпревари след зоната и завърши в дясната лента»
+  `sc-ov-ban-overtake/pc-right/08-debrief.png`
+- **`sc-ov-ban-overtake` · A · major** — In the RIGHT drive the staged slow lead car stops dead and the ego rear-ends it at ~12 km/h at t035s, earning a 10-point опасна грешка in the first 35 seconds of a lesson whose instruction is 'остани зад бавната кола с равномерна дистанция'. Doing exactly what the briefing asks produces the worst fault in the book.
+  «3. Остани зад бавната кола с равномерна дистанция и изчакай търпеливо края на зоната.»
+  `sc-ov-ban-overtake/mobile-right/04-t035s.png`
+- **`sc-ov-bus-lane` · A · major** — Neither route task ever ticks on either platform, so the lesson has no reachable success state. The 'right' drive is scored НЕИЗДЪРЖАН with a perfect 0-point record purely for not finishing.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-ov-bus-lane/pc-right/08-debrief.png`
+- **`sc-ov-oneway` · A · major** — On both platforms the 'right' drive ends in a Пътнотранспортно произшествие (10 т., опасна грешка) and only task 1 of 3 ever ticks. A careful drive of this lesson cannot be credited.
+  «✓ Приближи кръстовището овладяно, готов за завой 2:04 – Влез в еднопосочната по посоката ѝ (надясно) – Продължи по посоката до края на улицата»
+  `sc-ov-oneway/mobile-right/07-end.png`
+- **`sc-ov-return-gap` · A · major** — The briefing states the oncoming lane is free and overtaking is permitted, yet the correct drive spends the whole 210 s crawling at 15-19 км/ч behind the lead with 27 full stops and never gets to execute the manoeuvre the briefing describes.
+  «Потегли и се установи зад бавната кола — насрещната лента е свободна, изпреварването е разрешено.»
+  `sc-ov-return-gap/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/rubric.ts` — 11 findings (5 critical, 5 major, 1 minor)
+
+- **`sc-park-van` · A · CRITICAL** — Nothing the lesson claims to teach is ever measured, yet it still prints a star score. All three rubric rows read 'не се измерва' on BOTH runs ('Няма измерване — колата не е влизала в очертанията'), and 'Наблюдение' says 'Все още не се измерва в този режим' — while the machine summary awards '1 от 3 звезди' and +40 XP. A star rating computed from zero measurements is a green tick for a skill never tested.
+  «Точност на позицията не се измерва · Икономичност на маневрата не се измерва · Наблюдение не се измерва»
+  `sc-park-van/mobile-right/08-debrief.png`
+- **`sc-pk-move-off` · A · CRITICAL** — Both WRONG lanes are stamped ИЗДЪРЖАН with 0 penalty points — pc-wrong with +150 XP and 3 stars, mobile-wrong with +100 XP — even though the tutor raised a speeding card citing the law at 59 km/h in a 50 zone during that same drive.
+  «ИЗДЪРЖАН … +150 XP … Общо (допустими 9) 0»
+  `sc-pk-move-off/pc-wrong/08-debrief.png`
+- **`sc-pk-move-off` · A · CRITICAL** — In the wrong lane the task chip carries a green tick for having moved off and settled into the right lane — awarded to a drive that was doing 59 km/h and performed no mirror check and no shoulder check. A skill that was never measured is ticked off as mastered.
+  «Потегли и се нареди в дясната лента»
+  `sc-pk-move-off/pc-wrong/04-t012s.png`
+- **`sc-vp-handbrake` · A · CRITICAL** — The wrong lane is the lesson's named failure — moving off with the handbrake still up — and it records 0 dangerous, 0 basic and 0 secondary errors, failing only because the route was not completed. Driving away on the handbrake costs the student nothing.
+  «0 наказателни точки … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-vp-handbrake/pc-wrong/08-debrief.png`
+- **`sc-vp-readiness` · A · CRITICAL** — Mid-drive the tutor raises a speeding card citing the law, but the debrief error table shows 0 dangerous / 0 basic / 0 secondary errors and 0 total points. A violation the sim announced out loud never reaches the scorecard.
+  «Превишена скорост — Движеше се над разрешената скорост … ЗДвП чл. 21, ал. 1»
+  `sc-vp-readiness/pc-wrong/04-t012s.png`
+- **`sc-vp-police-stop` · A · major** — The briefing demands a stop hard against the right edge exactly level with the officer and explicitly not out in the roadway. In the stopped frame the officer is still a block away near the horizon and the car is a full lane width from the kerb, yet the drive is credited ИЗДЪРЖАН with 3 stars and 0 errors. The tolerance accepts the very mistake the briefing names.
+  «4. Отдръпни се към десния край на лентата и спри плътно вдясно, точно при полицая — не насред платното.»
+  `sc-vp-police-stop/mobile-right/05-stopped.png`
+- **`sc-vp-readiness` · A · major** — The lesson's own subject — fastening the belt and releasing the handbrake — is never measured. Every error class reads 0 in all four lanes, and the only reason the wrong lane fails is that it did not finish the route.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-vp-readiness/pc-wrong/08-debrief.png`
+- **`sc-vp-stall` · A · major** — The wrong lane records 0 in all three error classes and fails only because the route was not finished. Neither stalling nor clutch abuse — the graded subject of the lesson — contributes a single point.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-vp-stall/pc-wrong/08-debrief.png`
+- **`sc-vp-telltale` · A · major** — The wrong lane is convicted for a collision rather than for ignoring the warning lamp, so the lesson's own competency contributes nothing to the verdict and a student who drives on with a red lamp but does not crash escapes unmarked.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка»
+  `sc-vp-telltale/pc-wrong/08-debrief.png`
+- **`sc-vp-telltale-red` · A · major** — The wrong lane is convicted for a collision, not for mis-triaging the lamp colour. A student who treats a red lamp as a yellow one and keeps driving without crashing would be recorded as faultless.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-vp-telltale-red/pc-wrong/08-debrief.png`
+- **`sc-vp-police-stop` · A · minor** — The wrong lane is convicted for causing a collision, not for disobeying the officer's stop signal. The conviction is correct in law but does not measure the skill this lesson teaches, so a student who ignores the officer without crashing would not be caught.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-vp-police-stop/pc-wrong/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-lanes2.ts` — 6 findings (5 critical, 1 major, 0 minor)
+
+- **`sc-ln-boulevard-discipline` · A · CRITICAL** — «Изпревари бавната кола през лявата лента» and «Прибери се вдясно и завърши в своята лента» — the entire lesson — never tick in any of the four legs. Both right legs finish with 0 наказателни точки and still НЕИЗДЪРЖАН: a flawless drive that is told it failed and shown no error to learn from.
+  «НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · mistakes=0 · – Изпревари бавната кола през лявата лента»
+  `sc-ln-boulevard-discipline/mobile-right/08-debrief.png`
+- **`sc-ov-being-overtaken` · A · CRITICAL** — The world contradicts the briefing. The briefing sets an out-of-town single-lane-each-way road at 90 with the student cruising near 70, but the correct drive tops out at 21 км/ч with 26 full stops and at t098s sits at 0 км/ч on an empty road with nothing behind and nothing ahead. There is no overtaking car to be passive about.
+  «Извънградски път, по една лента в посока, ограничение 90. Карай спокойно около 70 км/ч в своята лента.»
+  `sc-ov-being-overtaken/mobile-right/04-t098s.png`
+- **`sc-ov-crest-curve` · A · CRITICAL** — There is no crest. The briefing turns on the road hiding behind a slope, but the terrain is dead flat for the whole route — at t070s and t172s the road runs to a flat horizon with a distant mountain backdrop and the only geometry change is a gentle right bend with full sight lines. The blind section the lesson grades does not exist.
+  «напред пътят завива надясно и се скрива зад склона»
+  `sc-ov-crest-curve/mobile-right/04-t172s.png`
+- **`sc-ov-night-gap` · A · CRITICAL** — A lesson graded on judging distance by headlights has no lit lamps. At t054s the lead car shows no illuminated tail lamps (its red band is body trim, unchanged from the daylight scenarios), the parked queue is unlit, and every street lamp along the road is dark. The only light in the scene is the ego's own beam.
+  «Тъмно е и си извън града. Пред теб пълзи бавна кола на къси стопове, а далеч насреща светят фарове.»
+  `sc-ov-night-gap/mobile-right/04-t054s.png`
+- **`sc-ov-night-gap` · A · CRITICAL** — The objective «Изчакай зад бавната кола, докато първите фарове минат» is ticked at 1:52 on mobile-right and 1:35 on pc-right in drives where no headlights are visible anywhere in the sampled frames. The tick is handed out for a cue the student cannot see.
+  «✓ Изчакай зад бавната кола, докато първите фарове минат 1:52»
+  `sc-ov-night-gap/mobile-right/04-t054s.png`
+- **`sc-ov-crest-curve` · A · major** — The correct drive never exceeds 21 км/ч (15 on PC) in 210 s and comes to 27-28 full stops behind a truck that barely moves, so the straight the lesson depends on is never reached and no objective can fire.
+  `sc-ov-crest-curve/mobile-right/04-t070s.png`
+
+---
+
+## `platform/src/modules/sim/traffic/staged.ts` — 5 findings (5 critical, 0 major, 0 minor)
+
+- **`sc-ed-d2-priority-run` · A · CRITICAL** — A priority lesson with ZERO moving traffic. Not one other vehicle appears in any frame of any run, yet the coach orders 'сега пропусни движещите се по пътя с предимство' and the right drive burned 90 s of 'lawful waits' standing still for a car that never comes. The lesson's own event never happens.
+  «Знак Б2: пълното спиране е задължително — и е направено. Сега пропусни движещите се по пътя с предимство.»
+  `sc-ed-d2-priority-run/pc-right/04-t073s.png`
+- **`sc-jx-giveway-b1` · A · CRITICAL** — The lesson's own event never resolves. The correct drive spent 180 s of a 205 s lesson in lawful waits at the give-way line and at t108s the HUD is still showing ЗАДАЧА 1/3. The priority stream on the main road never clears, so the point of the lesson — that Б1 does not always mean stop — can never be demonstrated or graded.
+  «ЗАДАЧА 1/3 — Премини първия Б1 след оглед, без излишно спиране»
+  `sc-jx-giveway-b1/pc-right/04-t108s.png`
+- **`sc-lane-change` · A · CRITICAL** — The world does not match the briefing. Instruction 2 tells the student there is a car behind him in the left lane and to judge its speed; instruction 7 says the neighbouring car will only let him in if it can see him. The left lane is empty in every frame and the mirror shows an empty street.
+  «2. Провери лявото огледало: в лявата лента зад теб има кола — прецени скоростта ѝ.»
+  `sc-lane-change/pc-right/01-arrival.png`
+- **`sc-ln-decisive-change` · A · CRITICAL** — The event the whole lesson is built on does not happen on mobile. The briefing and the objective both turn on a car arriving in the left lane that you must let pass; at t123s and again at t208s the left lane is empty to the horizon and the only vehicles in the world are parked at the right kerb. The objective was nevertheless ticked at 2:12.
+  «Изчакай колата в съседната лента, вместо да се хвърлиш пред нея»
+  `sc-ln-decisive-change/mobile-right/04-t123s.png`
+- **`sc-merge-accel-lane` · A · CRITICAL** — There is no traffic on the motorway in either drive, so the lesson's own event never happens. At t208s in the right drive and t120s at 89 км/ч in the wrong drive the carriageway is empty to the horizon in both directions. The briefing asks the student to find the gap between the cars; there are no cars.
+  «гледай в лявото огледало: къде е пролуката между колите по магистралата и с каква скорост идват те»
+  `sc-merge-accel-lane/mobile-right/04-t208s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/advisor.ts` — 12 findings (4 critical, 5 major, 3 minor)
+
+- **`sc-crossing-dart` · A · CRITICAL** — THE CORRECT DRIVE IS CONVICTED. The student stopped at the crossing, the sim told him «Спрял си правилно», honoured an 8-second lawful wait, then WITHDREW the wait itself (log: 'the lawful wait was withdrawn after 8s — moving off'), and the instant he moved off it hit him with −10 «Непропускане на пешеходец», an опасна грешка. 04-t060s.png shows the penalty card at 3 км/ч on an empty road with no crossing and no pedestrian in frame. 08-debrief.png reads НЕИЗДЪРЖАН / 10 наказателни точки. The sim gave the go-ahead and then punished the student for taking it — the single most damaging thing a driving tutor can do.
+  «Непропускане на пешеходец — Премина през пешеходната пътека, докато на нея имаше пешеходец.»
+  `sc-crossing-dart/mobile-right/04-t060s.png`
+- **`sc-sig-controller-live` · A · CRITICAL** — The right drive was convicted. The RIGHT lane - driven by the harness following the sim's own live coaching, which twice declared a LAWFUL WAIT ('Чакаш правилно', 'Чакането Е маневрата') and held the car for 20 s - ends НЕИЗДЪРЖАН with a dangerous error. The coaching and the grader are wired to opposite rules, so the demonstration drive for this lesson fails the lesson.
+  «✗ Неизпълнение на сигнала на регулировчика −10 изпитни т. ОПАСНА ГРЕШКА · НАРЕДБА № 38 ПРИЛОЖЕНИЕ № 5, Т. 10, Б. „В“»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-signal-controller` · A · CRITICAL** — The coach teaches the opposite of the lesson, in the same frame. At t053s the officer's own in-world caption reads 'Предимството е ТВОЕ — дори на червено' while the HUD why-panel reads 'На червено се спира напълно ПРЕД линията — без изключения — и се потегля чак на зелено'. The briefing (point 2) states the officer outranks the lamp; the coach states there are no exceptions to the lamp. A student who obeys the coach breaks ЗДвП чл. 7. advisor.ts contains no reference to the officer at all - grep for 'регулировчик'/'controller' in that file returns nothing, so the red-light advice fires blind whenever a lamp is red.
+  «На червено се спира напълно ПРЕД линията — без изключения — и се потегля чак на зелено.»
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-sp-limit-end` · A · CRITICAL** — The briefing and the graded task chip give the student two different numbers for the same zone. Instruction 2 says the В26 sign is 40 and to enter the zone at 37-38 km/h; the chip that is actually graded says hold under 48 km/h. 48 is the engine's tolerance (min of cap and the street's posted 50) surfacing as a student-facing instruction, and it licenses driving 8 km/h over the sign the lesson exists to teach.
+  «Стигни кръстовището, още в зоната и под 40 км/ч — дръж под 48 км/ч»
+  `sc-sp-limit-end/pc-right/01-arrival.png`
+- **`sc-crossing-dart` · A · major** — The sim praises a stop it should have penalised. Briefing line 4 is «Спри напълно преди зебрата». 06-waited.png shows the car halted with its nose already over the first zebra stripes — the painted bars run out from under the bonnet — and the card on screen reads «Спрял си правилно» («Защо чакаш: пешеходец на пътеката»). Stopping ON the crossing is taught as correct.
+  «Спрял си правилно. При приближаване към пешеходна пътека си длъжен да пропуснеш стъпилите на нея»
+  `sc-crossing-dart/mobile-right/06-waited.png`
+- **`sc-sp-curve` · A · major** — Briefing and graded task disagree on the number that matters. Instruction 3 says shed speed to around 45–50 км/ч before the corner and the sign plate in the world reads 50; the graded ЗАДАЧА 2/3 chip says дръж под 60 км/ч. The chip is publishing the grader's tolerance ceiling as the student's target, so the lesson simultaneously teaches 50 and rewards 59. Same generator as the 57 and 38 figures in sc-speed-transition.
+  «Мини средата на завоя с препоръчителната скорост — дръж под 60 км/ч»
+  `sc-sp-curve/pc-right/04-t120s.png`
+- **`sc-sp-eco-coast` · A · major** — The graded task chip states a speed cap the briefing never mentions and cannot be derived from anything on screen: „дръж под 41 км/ч“. The instructions talk only about lifting off early and stopping smoothly before the line; 41 is an internal tolerance leaking into student-facing text as a hard number.
+  «Пусни газта отрано — стигни зоната пред линията вече намалил — дръж под 41 км/ч»
+  `sc-sp-eco-coast/pc-right/01-arrival.png`
+- **`sc-sp-harsh-brake` · A · major** — The briefing and the graded task ask for two different skills. Instruction 3 says brake gradually and evenly to a FULL STOP in the zone (до пълен покой в зоната). The graded task chip says pass THROUGH the control zone while staying under a speed cap. A student who does exactly what the briefing says — stops — is not doing what is being measured.
+  «Мини контролната зона с планирано, плавно спиране — дръж под 50 км/ч»
+  `sc-sp-harsh-brake/pc-right/01-arrival.png`
+- **`sc-speed-transition` · A · major** — The graded task publishes the TOLERANCE CEILING as if it were the target, and it contradicts the briefing on the same screen. ЗАДАЧА 1/3 says дръж под 57 км/ч while instruction 1 on the panel beside it says the limit is 50 км/ч. ЗАДАЧА 2/3 says дръж под 38 км/ч inside a posted 30 zone while instruction 3 says около 26–28 км/ч. A student reading the chip is told 56 in a 50 and 37 in a 30 are the goal. Same defect shape appears in sc-sp-curve.
+  «Измини подхода спокойно до знака за зоната — дръж под 57 км/ч»
+  `sc-speed-transition/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · D · minor** — The graded chip states „дръж под 140 км/ч“ while the briefing asks for about 110 km/h. The only number the student is held to on screen is the ceiling, never the floor the lesson is about — nothing in the HUD ever shows a minimum.
+  «Влез в ритъма на потока в дясната лента за движение — дръж под 140 км/ч»
+  `sc-mw-min-speed/pc-right/01-arrival.png`
+- **`sc-turn-left-oncoming` · F · minor** — The НАУЧИ card titled «Чакането Е маневрата» appears verbatim in this lesson, in sc-signal-response and in sc-junction-gap, each time with different body copy under the same heading. The same title means three different things depending on the lesson.
+  «Чакането Е маневрата»
+  `sc-turn-left-oncoming/pc-right/04-t043s.png`
+- **`sc-vu-cyclist-hook` · D · minor** — The graded chip appends „— дръж под 40 км/ч“ to a task about yielding to a cyclist. The briefing never gives a number for the approach; 40 appears only here, unexplained, and turns a judgement task into a speed-cap task.
+  «Приближи завоя с готовност да пропуснеш — дръж под 40 км/ч»
+  `sc-vu-cyclist-hook/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-pe2.ts` — 10 findings (4 critical, 5 major, 1 minor)
+
+- **`sc-pe-night-unlit` · A · CRITICAL** — The RIGHT (model) drive FAILS on mobile. The mobile-right debrief reads 20 наказателни точки / НЕИЗДЪРЖАН / 'Настъпи сблъсък' while the identical right drive on PC reads 0 точки / ИЗДЪРЖАН / 3 stars. The reference drive the student is told to copy crashes on a phone. Note also the internal contradiction inside that same card: the headline is 20 points but the red explanation frames it as 'ЕДНА опасна грешка: 10 изпитни т.'
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-pe-night-unlit/mobile-right/08-debrief.png`
+- **`sc-pe-night-unlit` · A · CRITICAL** — The WRONG drive is not convicted of the offence on mobile. mobile-wrong debrief: 0 наказателни точки, Опасни 0/0, Основни 0/0, Второстепенни 0/0 — the only reason given is 'Не всички задачи от маршрута бяха изпълнени'. The same wrong drive on PC correctly books a dangerous error 'Непропускане на пешеходец · -10 изпитни т.'. On a phone a student can drive through an occupied crossing and the debrief books nothing.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-pe-night-unlit/mobile-wrong/08-debrief.png`
+- **`sc-pe-zone-living` · A · CRITICAL** — The world tells the student the opposite of the lesson. This is a residential zone drill whose briefing says the limit falls to 20 km/h at the entrance — but the ONLY sign standing at that entrance is a round red 50 km/h plate, and the HUD limit chip reads '50 · РЕЖИМ Нормален ≤60 · знакът важи', i.e. the interface explicitly tells the student that the 50 sign is in force. There is no Д17 'Жилищна зона' sign anywhere in the scene. A student who obeys what he can see gets convicted.
+  «На входа на зоната — стеснението между жилищните блокове — ограничението пада на 20 км/ч.»
+  `sc-pe-zone-living/pc-right/01-arrival.png`
+- **`sc-pe-zone-living` · A · CRITICAL** — The mobile right drive dies on its feet. From t208s through 07-end the car sits at 0 km/h inside the 'Карай дотук' target ring with gear D and nothing changes; the debrief then reads 0 наказателни точки / НЕИЗДЪРЖАН / 'Урокът беше прекъснат преди края'. A 208-second model drive on a phone ends unfinished and uncredited.
+  «Урокът беше прекъснат преди края.»
+  `sc-pe-zone-living/mobile-right/07-end.png`
+- **`sc-pe-parked-row-scan` · A · major** — The event does not match its own briefing on two counts. The text and the toast promise a CHILD bursting out from between the parked cars on the driver's (right) side; what actually appears is an adult-height figure — same body as the adults in sc-pe-zone-living — standing at the LEFT edge of the zebra on the far side of the road, nowhere near the parked row. The whole point of the drill (you cannot see a small child behind a car roof) is not staged.
+  «Дете изскача между колите на пътеката! Спирачка, право напред, без завиване.»
+  `sc-pe-parked-row-scan/pc-right/06-waited.png`
+- **`sc-pe-parked-row-scan` · A · major** — The alarm fires before the actor exists. At 05-stopped the toast is already shouting 'Дете изскача между колите на пътеката!' while the crossing, the road and both verges are empty of people in that frame; the figure is only present later at 06-waited. The student is told to brake for something not yet in the picture.
+  «Дете изскача между колите на пътеката!»
+  `sc-pe-parked-row-scan/pc-right/05-stopped.png`
+- **`sc-pe-zone-living` · A · major** — Objective 2/5 'Спри пред хората на платното' is issued while there is nobody on the carriageway. At t090s and t095s and t100s the two pedestrians are standing on the far footway behind a railing; they only step onto the tarmac at t105s. The student is ordered to stop for people who are not there yet, then the world catches up.
+  «Спри пред хората на платното — дръж под 5 км/ч»
+  `sc-pe-zone-living/pc-right/04-t090s.png`
+- **`sc-pe-zone-living` · A · major** — The world is not a home zone. The briefing describes 'стеснението между жилищните блокове' — a narrowing between residential blocks — but the drive happens on a wide multi-lane boulevard with lane arrows, a painted give-way triangle, kerbside parking bays and office-scale towers. Nothing about the geometry signals the zone the rule depends on.
+  «На входа на зоната — стеснението между жилищните блокове»
+  `sc-pe-zone-living/pc-right/04-t151s.png`
+- **`sc-pe-zone-living` · A · major** — The coach line is out of step with the live objective. At t017s the task chip reads 'ЗАДАЧА 1/5 · Влез в жилищната зона с 20' while the coach caption underneath talks about LEAVING: 'Знак Д16 — краят на зоната. Излизането е включване в движението: нямаш никакво предимство.' It narrates the end of the zone before the student has entered it — and no Д16 sign exists in the scene either.
+  «Знак Д16 — краят на зоната. Излизането е включване в движението: нямаш никакво предимство.»
+  `sc-pe-zone-living/pc-wrong/04-t017s.png`
+- **`sc-pe-parked-row-scan` · A · minor** — Briefing step 1 grades a condition this run does not have and names a level the student is not in: it talks about switching dipped beams on 'в здрач и нощем (ниво 5)' inside a Ниво 1 run that takes place in flat daylight under a blue sky. It leaks the level ladder into the lesson text and gives a step the world cannot exercise.
+  «Преди да потеглиш провери светлините: в здрач и нощем (ниво 5) късите светлини се включват ПРЕДИ да ти потрябват»
+  `sc-pe-parked-row-scan/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/collision/probe.ts` — 8 findings (4 critical, 4 major, 0 minor)
+
+- **`sc-ed-d2-stop-address` · A · CRITICAL** — The right drive is convicted of 'Пътнотранспортно произшествие' (−10, опасна) while crawling at a top speed of 15 км/ч with 22 full stops. A collision fault at walking pace with nothing moving in the world is a false conviction, and it alone stamps НЕИЗДЪРЖАН.
+  «Пътнотранспортно произшествие −10 изпитни т. ОПАСНА ГРЕШКА»
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-hz-accident-scene` · F · CRITICAL** — The SAME scripted careful drive produces opposite verdicts on the two platforms: mobile reads ИЗДЪРЖАН, 0 наказателни точки, +150 XP with all three objectives ticked; desktop reads НЕИЗДЪРЖАН, 10 наказателни точки, +40 XP with one objective ticked and a collision. Whether a student passes depends on which device they used.
+  «0 наказателни точки · ИЗДЪРЖАН · +150 XP»
+  `sc-hz-accident-scene/mobile-right/08-debrief.png`
+- **`sc-hz-emergency-stop` · A · CRITICAL** — A PHANTOM COLLISION is charged against an empty road on three separate runs: pc-right at 11 км/ч (t087), pc-wrong at 53 км/ч (t011) and mobile-right at 5 км/ч (t101). In each frame the toast reads «ОПАСНА ГРЕШКА −10 изпитни т. · Пътнотранспортно произшествие · Настъпи сблъсък» while the windscreen shows a clear, empty carriageway with nothing within a hundred metres. This is the single 10-point fault that fails the whole exercise.
+  «ОПАСНА ГРЕШКА −10 изпитни т. Пътнотранспортно произшествие · Настъпи сблъсък.»
+  `sc-hz-emergency-stop/pc-right/04-t087s.png`
+- **`sc-signal-response` · F · CRITICAL** — Same lesson, same scripted correct drive, opposite verdicts by platform: pc-right returns 0 наказателни точки / ИЗДЪРЖАН / 3 stars, mobile-right returns 11 наказателни точки / НЕИЗДЪРЖАН with a collision. The verdict depends on the device.
+  «11 наказателни точки»
+  `sc-signal-response/mobile-right/08-debrief.png`
+- **`sc-fo-brakelight-chain` · A · major** — The debrief bills ONE crash 29 separate times: «Опасни грешки 29 · 290 точки», printed directly under its own red paragraph telling the student a collision is ONE dangerous fault worth 10 points and not a sum of many. The page contradicts itself inside a single viewport, and 290 is not a number the Наредба 38 sheet can produce. The collision probe re-fires every frame while bodies stay in contact.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни»
+  `sc-fo-brakelight-chain/pc-wrong/08-debrief.png`
+- **`sc-maneuver-3point` · G · major** — PC wrong drive: the car drives inside a building. The windscreen fills with flat interior wall geometry and the camera sits within the mesh while the −10 collision toast fires — the body stops the score but not the geometry.
+  «ОПАСНА ГРЕШКА −10 изпитни т. Пътнотранспортно произшествие»
+  `sc-maneuver-3point/pc-wrong/04-t027s.png`
+- **`sc-maneuver-uturn` · G · major** — The wrong drive ends up inside a building: at t027s the windscreen is filled with beige wall geometry seen from within the mesh, the camera clipping through the facade, while the collision toast fires. The car penetrates architecture instead of being stopped by it.
+  «−10 ИЗПИТНИ Т. Пътнотранспортно произшествие»
+  `sc-maneuver-uturn/mobile-wrong/04-t027s.png`
+- **`sc-turn-left-oncoming` · F · major** — Same lesson, same scripted correct drive, different convictions by platform: pc-right records 1 опасна грешка and 10 points, mobile-right records 0 mistakes and 0 points. Both still НЕИЗДЪРЖАН, so the student gets a fail either way but a different story about why.
+  «Опасни грешки (по 10 изпитни т.) 1»
+  `sc-turn-left-oncoming/pc-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/scene/scenarioSceneryProps.ts` — 7 findings (4 critical, 3 major, 0 minor)
+
+- **`sc-ed-poligon-chain` · A · CRITICAL** — The world does not match the briefing. Instruction 2 tells the student to pass the nest between the CONES and reverse into the centre of the bay; there are no cones, no bay, no markings and no gate anywhere in any frame of any run. The first objective is therefore unreachable, which is why every run scores 0/5.
+  «Първа маневра — перпендикулярно паркиране на заден. Подмини гнездото между конусите, спри, огледай се и влез на заден до центъра на мястото.»
+  `sc-ed-poligon-chain/pc-right/04-t112s.png`
+- **`sc-fo-brakelight-chain` · A · CRITICAL** — The lesson is «Стоповете два автомобила напред» and the briefing states a column of TWO cars is moving ahead in your lane. In every sampled frame on both platforms there is exactly ONE car ahead. The second car — the one whose brake lights the entire skill is about — is never in the world, so the skill cannot be practised or seen.
+  «Потегли спокойно — пред теб в твоята лента се движи колона от две коли.»
+  `sc-fo-brakelight-chain/pc-right/04-t143s.png`
+- **`sc-hazard-obstacle` · A · CRITICAL** — The «аварирал автомобил» never appears in the driving lane. Across t038, t076, t081, t087, t092, t097, t103 and t114 the lane ahead is empty; the only vehicles are a static kerb-side parked row well outside the lane. Decisive proof: the blue demonstrated-correct shadow line runs dead straight down the lane centre for the entire run — a lesson about easing around an object whose own demonstration never eases around anything.
+  `sc-hazard-obstacle/pc-right/04-t087s.png`
+- **`sc-pk-busstop-ban` · A · CRITICAL** — The world does not contain the landmark the lesson is entirely about. At t126s the coach says the carriageway zigzag starts HERE and that from here on it is the bus-stop zone — and there is no zigzag marking on the tarmac at all. The briefing's навес (shelter) is absent, and the bus that 'arrives in a minute' never appears. The zone exists only as a translucent teal/amber tint painted by the HUD, so the student is trained to read a coaching overlay instead of the street, and would have nothing to read in a real one.
+  «Зигзагът по платното започва тук: оттук нататък сме в зоната на спирката и престоят е забранен (чл. 98, ал. 1).»
+  `sc-pk-busstop-ban/pc-right/04-t126s.png`
+- **`sc-hz-brake-dont-swerve` · A · major** — There is no physical obstacle at the stop mark. The task «Спри преди препятствието — с пълна спирачка, В своята лента» is represented only by a flat orange ring painted on the tarmac, a cyan light beam and a «Спри тук» floating label. Nothing occupies the lane, so the full-force stop is a stop before an abstraction.
+  «Спри преди препятствието — с пълна спирачка, В своята лента»
+  `sc-hz-brake-dont-swerve/pc-right/04-t094s.png`
+- **`sc-merge-bus-pullout` · A · major** — The world contradicts the briefing about lanes. The briefing says the right lane is a bus lane you must not drive in; the street rendered is an ordinary two-lane road with a solid white edge line and an unbroken row of privately parked cars occupying the supposed bus lane. No bus-lane paint, no 'BUS' legend, no blue lane sign.
+  «Дясната лента е бус лента — в нея е спирката, и там не се кара.»
+  `sc-merge-bus-pullout/pc-right/05-stopped.png`
+- **`sc-park-night` · F · major** — The same 'parking-lot' archetype renders as two different products. sc-park-night has kerbs, lamp posts, power lines, a varied parked row and a lit road surface; sc-park-van, built from the same archetype, is bare asphalt on an infinite grass plane with a cuboid for a van. Also inconsistent between the two: the shadow/ghost car sits correctly out in the world here but is drawn inside the cockpit in sc-park-van's 05-stopped.
+  `sc-park-night/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/collision/index.ts` — 6 findings (4 critical, 2 major, 0 minor)
+
+- **`sc-ln-turn-lane-arrows` · C · CRITICAL** — The car drives into a building and stops inside it. At t039s the mobile-wrong windscreen is filled by the interior backfaces of a building wall with the ego embedded at 0 км/ч — and that is where the session ends. Static geometry has no collision response and no recovery.
+  `sc-ln-turn-lane-arrows/mobile-wrong/04-t039s.png`
+- **`sc-ov-abort` · C · CRITICAL** — There is no collision response. At t192s the ego is at 23 км/ч with the lead car's body filling the windscreen and the bonnet clipping through it — the two vehicles interpenetrate instead of colliding, which is how the run accumulated 42 separate «Пътнотранспортно произшествие» hits for one continuous contact.
+  `sc-ov-abort/mobile-wrong/04-t192s.png`
+- **`sc-ov-being-overtaken` · C · CRITICAL** — At t052s the mobile-wrong ego is embedded inside a building — the windscreen is filled with a tan wall and dark interior faces at 0 км/ч — and the session ends there five seconds later. Buildings have no collision response.
+  `sc-ov-being-overtaken/mobile-wrong/04-t052s.png`
+- **`sc-ov-return-gap` · C · CRITICAL** — At t118s the ego is at 28 км/ч with the lead car's rear panel filling the windscreen and no gap at all — the bodies interpenetrate. The mobile-wrong run banked 25 collisions and 252 penalty points out of this one continuous overlap.
+  `sc-ov-return-gap/mobile-wrong/04-t118s.png`
+- **`sc-ac-aquaplane` · G · major** — After the collision the camera ends up inside world geometry — the whole windscreen is a flat brown/black void with a single unshaped white light sphere floating in it, and the sim keeps running and grading for another frame set. On mobile the same crash leaves the driver staring at a wall with a bare glowing ball.
+  `sc-ac-aquaplane/mobile-wrong/04-t034s.png`
+- **`sc-ac-night-overdrive` · G · major** — The wrong drive leaves the carriageway and drives into a building at 95 км/ч; the camera ends up flush against/inside the facade so the entire windscreen is a beige wall with window rectangles, and the sim goes on grading from inside the wall. Nothing in the world stops the car reaching the facade.
+  `sc-ac-night-overdrive/pc-wrong/04-t039s.png`
+
+---
+
+## `platform/src/modules/sim/environment/weather.ts` — 6 findings (4 critical, 2 major, 0 minor)
+
+- **`sc-ac-ice` · F · CRITICAL** — CONSISTENCY: aquaplane, ice and bridge-ice render the identical stretch of street — same six-storey blocks, same tree line, same kerbside parked-car row, same dry grey asphalt, same daylight — for three lessons whose whole premise is three different road surfaces (standing water, black ice, frozen bridge deck). Nothing in the picture distinguishes torrential rain from a winter morning below zero.
+  `sc-ac-ice/pc-right/03-ready.png`
+- **`sc-ac-snow` · A · CRITICAL** — The briefing states the road is snow-covered and that snow holds about 40% of dry grip, but the road is bare grey asphalt with clean white lane markings, the pavements and rooftops are bare, and not one flake falls — at arrival and at t102s, on PC and on mobile alike. The student is being taught winter grip on a picture of a dry summer street.
+  «Знай, че снегът държи около 40% от сухото — спирачката спира 2,5 пъти по-дълго.»
+  `sc-ac-snow/mobile-right/04-t102s.png`
+- **`sc-ac-snow` · F · CRITICAL** — sc-ac-snow and sc-ac-fog render as the same weather. Put sc-ac-snow/pc-right/01-arrival.png beside sc-ac-fog/pc-right/01-arrival.png and the sky, the haze density, the asphalt and the light are indistinguishable — the snow preset appears to fall through to the fog preset. An environment/SnowFlakes.tsx exists in the tree and nothing from it reaches the screen.
+  `sc-ac-snow/pc-right/01-arrival.png`
+- **`sc-ac-truck-spray` · A · CRITICAL** — The water curtain the lesson is named after never exists. The truck is drawn — a small dark box in the middle distance — but there is no spray, no plume, no visibility loss behind it at any point from t011 to t209. Briefing items 3, 4 and 9 all describe driving into a wall of spray you cannot see through; the student sees clear air.
+  «Знай: гумите му вдигат пелена от пръски, в която не се вижда нищо.»
+  `sc-ac-truck-spray/pc-right/04-t204s.png`
+- **`sc-ac-bridge-ice` · A · major** — Briefing sets a winter morning around zero on a dry black street; the scene is high summer — full-leaf green trees, green verges, blue sky, warm sunlight on the facades, no frost anywhere. The А15 warning post IS placed correctly (visible far right in the mobile run), so the sign exists but the season it warns about does not.
+  «Потегли внимателно — зимна сутрин е около нулата, а улицата е суха и черна.»
+  `sc-ac-bridge-ice/mobile-right/04-t076s.png`
+- **`sc-ac-crosswind` · C · major** — A lesson built on constant steering correction gives the student nothing to correct with or against: the wheel shows no counter-steer at any point, there is no wind force visible in the car's attitude, and the briefing's «втора корекция» warning has no observable trigger. Nothing in the cockpit reports a lateral disturbance.
+  «Пази се от рязката „втора корекция“ — тя изхвърля колата към бордюра.»
+  `sc-ac-crosswind/pc-right/04-t121s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/progress.ts` — 26 findings (3 critical, 23 major, 0 minor)
+
+- **`sc-pk-move-off` · A · CRITICAL** — The mobile RIGHT drive is the only one of the four lanes to fail, with 0 penalty points, while both wrong lanes pass. On a phone the lesson punishes exactly the behaviour it teaches.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-pk-move-off/mobile-right/08-debrief.png`
+- **`sc-vp-handbrake` · A · CRITICAL** — The correct drive fails on mobile with 0 penalty points while passing on PC with +150 XP and 3 stars.
+  «НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-vp-handbrake/mobile-right/08-debrief.png`
+- **`sc-vp-readiness` · A · CRITICAL** — The RIGHT drive on mobile earns 0 penalty points yet is stamped НЕИЗДЪРЖАН, while the identical correct drive on PC is stamped ИЗДЪРЖАН with +150 XP and 3 stars. A student who does everything right fails on a phone and passes on a laptop.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-vp-readiness/mobile-right/08-debrief.png`
+- **`sc-crossing-bus-shadow` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-crossing-bus-shadow/pc-right/04-t001s.png`
+- **`sc-crossing-child-ball` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-crossing-child-ball/pc-right/04-t001s.png`
+- **`sc-crossing-white-cane` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-crossing-white-cane/pc-right/04-t001s.png`
+- **`sc-ln-boulevard-discipline` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-ln-boulevard-discipline/pc-right/04-t001s.png`
+- **`sc-ov-solid-return` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-ov-solid-return/pc-right/04-t001s.png`
+- **`sc-park-45-rev` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-park-45-rev/pc-right/04-t001s.png`
+- **`sc-park-left` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-park-left/pc-right/04-t001s.png`
+- **`sc-park-wall` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-park-wall/pc-right/04-t001s.png`
+- **`sc-park-zebra` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-park-zebra/pc-right/04-t001s.png`
+- **`sc-pe-jaywalker` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-pe-jaywalker/pc-right/04-t001s.png`
+- **`sc-pe-school-patrol` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-pe-school-patrol/pc-right/04-t001s.png`
+- **`sc-rb-busy-gap` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-rb-busy-gap/pc-right/04-t001s.png`
+- **`sc-rb-circulate-priority` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-rb-circulate-priority/pc-right/04-t001s.png`
+- **`sc-rb-lane-choice` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-rb-lane-choice/pc-right/04-t001s.png`
+- **`sc-rb-ped-exit` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-rb-ped-exit/pc-right/04-t001s.png`
+- **`sc-sig-controller-postures` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-sig-controller-postures/pc-right/04-t001s.png`
+- **`sc-signal-dead` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-signal-dead/pc-right/04-t001s.png`
+- **`sc-signal-hesitation` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-signal-hesitation/pc-right/04-t001s.png`
+- **`sc-speed-creep` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-speed-creep/pc-right/04-t001s.png`
+- **`sc-speed-dangerous` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-speed-dangerous/pc-right/04-t001s.png`
+- **`sc-speed-rain` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-speed-rain/pc-right/04-t001s.png`
+- **`sc-speed-zone` · F · major** — The same lesson renders and grades differently on the two platforms. The briefing is a blocking modal on mobile whose numbered list starts at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc that numbers 1–5; a perfect drive is worth +150 XP on mobile and +100 XP on pc; and across this chunk the same drive that passes on pc is repeatedly failed or force-closed on mobile.
+  «mobile: «Улицата е…» then «2.» — pc: «1. Улицата е…» then «2.»»
+  `sc-speed-zone/pc-right/04-t001s.png`
+- **`sc-vp-stall` · A · major** — The correct drive fails on mobile with 0 penalty points while the same correct drive passes on PC with +150 XP and 3 stars.
+  «НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-vp-stall/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/hud/SessionEndScreen.tsx` — 22 findings (3 critical, 14 major, 5 minor)
+
+- **`sc-ov-being-overtaken` · A · CRITICAL** — A verdict with no evidence behind it. The pc-wrong debrief prints 0 dangerous, 0 major and 0 minor errors, 0 total penalty points — and НЕИЗДЪРЖАН with 1 of 3 stars and +40 XP. The student is failed and rewarded on the same card with nothing to point at.
+  «0 наказателни точки … НЕИЗДЪРЖАН … +40 XP»
+  `sc-ov-being-overtaken/pc-wrong/08-debrief.png`
+- **`sc-ov-crest-curve` · G · CRITICAL** — Free observation across the whole chunk: 28 of 28 runs ended НЕИЗДЪРЖАН with 1 of 3 stars and ZERO commendations — including six runs with zero mistakes and zero penalty points. The end screen has no passing state in practice, so the grade carries no information at all.
+  «НЕИЗДЪРЖАН»
+  `sc-ov-crest-curve/mobile-right/04-t172s.png`
+- **`sc-sp-curve` · A · CRITICAL** — The right drive is never credited on either platform. PC and mobile both return 0 наказателни точки — a technically flawless drive — and both are stamped НЕИЗДЪРЖАН with one star because the run was cut short. A student who drives the corner perfectly is failed, which inverts the only signal the lesson gives them.
+  «0 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-sp-curve/mobile-right/08-debrief.png`
+- **`sc-follow-cutin` · A · major** — The mobile right drive never completes: 0 наказателни точки and НЕИЗДЪРЖАН with the lesson cut short at the 205 s cap.
+  «Урокът беше прекъснат преди края.»
+  `sc-follow-cutin/mobile-right/08-debrief.png`
+- **`sc-follow-distance` · A · major** — The mobile RIGHT drive never completes: 205 s of frames, the car sits at 0 km/h for long stretches, and the debrief reads 0 наказателни точки but НЕИЗДЪРЖАН because the lesson was cut short. A faultless learner is told he failed.
+  «Урокът беше прекъснат преди края.»
+  `sc-follow-distance/mobile-right/08-debrief.png`
+- **`sc-follow-rain-gap` · A · major** — The mobile right drive never finishes: 0 наказателни точки but НЕИЗДЪРЖАН because the lesson was cut short at the 205 s cap.
+  «Урокът беше прекъснат преди края.»
+  `sc-follow-rain-gap/mobile-right/08-debrief.png`
+- **`sc-follow-tailgater` · A · major** — The mobile right drive never completes: 0 наказателни точки and НЕИЗДЪРЖАН because the lesson was cut short at the 205 s cap.
+  «Урокът беше прекъснат преди края.»
+  `sc-follow-tailgater/mobile-right/08-debrief.png`
+- **`sc-junction-rhr` · A · major** — The pre-result self-assessment asks the student for «Цяло число от 0 до 30» penalty points, but the same engine hands out 394 in a sibling lesson in this chunk. The scale the student is asked to guess on and the scale the engine uses do not match.
+  «Цяло число от 0 до 30. Опасна грешка = 10 изпитни т., основна = 3 изпитни т., второстепенна = 1 изпитна т.»
+  `sc-junction-rhr/pc-right/07-end.png`
+- **`sc-lane-change` · D · major** — On the mobile debrief the score 0 is rendered in the danger red used for failing numbers. Zero penalty points is the best possible result; colouring it red teaches the opposite of what it means.
+  «0 наказателни точки»
+  `sc-lane-change/mobile-right/08-debrief.png`
+- **`sc-ln-turn-lane-arrows` · A · major** — The debrief awards «+40 XP» directly beneath НЕИЗДЪРЖАН and a collision conviction. A green reward chip under a failed, crash-ending run tells the student the drive was worth something it was not.
+  «+40 XP»
+  `sc-ln-turn-lane-arrows/mobile-right/08-debrief.png`
+- **`sc-ov-night-gap` · G · major** — Free observation: both correct drives finished with 0 mistakes and 0 penalty points and were still stamped НЕИЗДЪРЖАН with 1 of 3 stars and zero commendations.
+  «НЕИЗДЪРЖАН»
+  `sc-ov-night-gap/mobile-right/04-t054s.png`
+- **`sc-ov-oncoming-gap` · G · major** — Free observation: the pc-right drive finished with ZERO mistakes and ZERO penalty points and was still stamped НЕИЗДЪРЖАН with 1 of 3 stars and no commendation. A clean run and a 141-point run land on the same verdict badge, which destroys the meaning of the grade.
+  «НЕИЗДЪРЖАН»
+  `sc-ov-oncoming-gap/mobile-right/08-debrief.png`
+- **`sc-ov-return-gap` · G · major** — Free observation: mobile-right finished with 0 mistakes and 0 penalty points and was still stamped НЕИЗДЪРЖАН with 1 of 3 stars and zero commendations — identical to the 252-point wreck. A flawless drive gets the same badge as a demolition run.
+  «НЕИЗДЪРЖАН»
+  `sc-ov-return-gap/mobile-right/05-stopped.png`
+- **`sc-park-gap-long` · G · major** — The verdict banner reads „0 наказателни точки … НЕИЗДЪРЖАН“ in the sibling lessons and „10 наказателни точки … НЕИЗДЪРЖАН“ here, but in every case the number is coloured the same alarm red — including when it is zero. A student who drove clean sees a red 0 next to a red FAIL and has no way to read the two apart; the only distinguishing text is a single amber line below.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-park-gap-long/mobile-right/08-debrief.png`
+- **`sc-park-van` · G · major** — The run pays out +40 XP and a star rating on a session that scored НЕИЗДЪРЖАН with a dangerous error, zero commendations and zero completed tasks. Rewarding a collision run at the same headline size as the failure undercuts the verdict directly above it.
+  «НЕИЗДЪРЖАН +40 XP»
+  `sc-park-van/mobile-right/08-debrief.png`
+- **`sc-sp-harsh-brake` · D · major** — On PC the debrief page is cut off by the bottom of the play area. The Оценка на маневрата card is sliced through its body text mid-line and the remaining sections are unreachable in the captured state — the star rating is visible but the explanation of what earned it is not. Reproduces on all three tested lessons on PC.
+  «Не са наказателни точки по Наредба № 38 и не са»
+  `sc-sp-harsh-brake/pc-right/08-debrief.png`
+- **`sc-zebra-approach` · F · major** — The zero renders green here on PC and red on the mobile debrief of sc-lane-change — the same number, the same meaning, opposite colour codes between lessons.
+  «0 наказателни точки»
+  `sc-zebra-approach/pc-right/08-debrief.png`
+- **`sc-crossing-dart` · D · minor** — The debrief screen is clipped at the top edge: 08-debrief.png cuts the «Докосни „▾ Скрий разбора", за да пропуснеш разбора · Не показвай автоматично» row horizontally through the middle of its glyphs, so the control that dismisses the debrief is half a line of sliced letters. Identical on the wrong-drive debrief.
+  «Докосни „▾ Скрий разбора", за да пропуснеш разбора»
+  `sc-crossing-dart/mobile-right/08-debrief.png`
+- **`sc-ed-poligon-chain` · D · minor** — The mobile debrief is clipped at the top: the 'Скрий разбора' row is sliced through the middle by the viewport edge with no way to scroll up to it.
+  «Докосни „▾ Скрий разбора“, за да пропуснеш разбора»
+  `sc-ed-poligon-chain/mobile-wrong/08-debrief.png`
+- **`sc-follow-distance` · G · minor** — On PC the debrief's scroll container clips the 'Оценка на маневрата' card mid-sentence at the fold while roughly 200 px of empty page sits below the container, so the per-objective breakdown is never visible without hunting for a scrollbar.
+  «Точки за изпълнение — оценка на симулатора за качеството на маневрата, по 0–2 за всеки показател. Тук точките се ПЕЧЕЛЯТ (2 е най-доброто) — обратно на наказателните. Не са наказателни точки по Наредба № 38 и не са»
+  `sc-follow-distance/pc-right/08-debrief.png`
+- **`sc-rb-exit-signal` · D · minor** — On the debrief screen the header row is sliced in half by the top of the viewport — only the bottom halves of «Докосни „▾ Скрий разбора“, за да пропуснеш разбора» and of the «Не показвай автоматично» pill are painted. The very first thing the student sees after a failed run is a half-cut line.
+  «Докосни „▾ Скрий разбора“, за да пропуснеш разбора»
+  `sc-rb-exit-signal/mobile-right/08-debrief.png`
+- **`sc-signal-flashing` · D · minor** — The debrief header row is sliced in half by the top of the viewport on both drives — only the bottom halves of «Докосни „▾ Скрий разбора“…» and the «Не показвай автоматично» pill are painted.
+  «Докосни „▾ Скрий разбора“, за да пропуснеш разбора»
+  `sc-signal-flashing/mobile-wrong/08-debrief.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/touchHintLifetime.ts` — 14 findings (3 critical, 11 major, 0 minor)
+
+- **`sc-sp-curve` · D · CRITICAL** — On mobile the first-run touch hint is unbacked type printed straight across the interior rear-view mirror and it is still there at 07-end — present in every sampled frame from the start of the drive to the last. Its РАЗБРАХ pill is a translucent blue blob floating over a tree with no panel of its own. The mirror is unusable for the entire lesson. This is the defect touchHintLifetime.ts is written about; the frames say it is still reproducing, including in the wrong drive at 96 км/ч where the car was plainly moving.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-sp-curve/mobile-right/07-end.png`
+- **`sc-sp-harsh-brake` · A · CRITICAL** — On mobile the car never moves for the entire 3.5-minute session: cluster reads 0 км/ч with gear D at t=065s, t=208s and 07-end, and the scene is byte-identical between them. The in-drive menu meanwhile reports Задача 2/2 — the exact trap the audit brief warns about — while the debrief says the lesson was cut short with nothing scored. The first-run touch hint and its РАЗБРАХ pill are on screen for the whole session.
+  «Задача 2/2»
+  `sc-sp-harsh-brake/mobile-right/04-t065s.png`
+- **`sc-speed-transition` · A · CRITICAL** — The mobile right drive never gets underway. The cluster reads 0 км/ч at 07-end with the car parked mid-carriageway inside the 30 zone, and the debrief is НЕИЗДЪРЖАН with 0 наказателни точки and Урокът беше прекъснат преди края. The identical right drive on PC is ИЗДЪРЖАН +150 XP. The first-run touch hint and its РАЗБРАХ pill are still on screen at 07-end, which is the most likely input blocker.
+  «Урокът беше прекъснат преди края.»
+  `sc-speed-transition/mobile-right/07-end.png`
+- **`sc-ed-d2-priority-run` · D · major** — On mobile the first-run touch hint is still on screen 150 s into the drive, over the mirror, and its two lines overlap each other — the teal 'Спряла кола' line is printed through the white 'Ляв палец' line.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ed-d2-priority-run/mobile-right/04-t150s.png`
+- **`sc-ed-poligon-chain` · D · major** — On mobile the touch hint is still overlaying the mirror at 155 s with its two lines overprinting each other, and the «РАЗБРАХ» button floats over the world long after the harness reported clicking it.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-ed-poligon-chain/mobile-right/04-t155s.png`
+- **`sc-lane-change` · D · major** — On mobile the touch hint is still up at 112 s, painted over the rear-view mirror, with its white and teal lines overlapping each other — during a lesson that is entirely about checking that mirror.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-lane-change/mobile-right/04-t112s.png`
+- **`sc-ln-decisive-change` · D · major** — The mobile touch hint sits over the rear-view mirror and the right glance column for the entire 208 s drive — present unchanged at t123s and t208s and still up on the end frame.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-ln-decisive-change/mobile-right/04-t208s.png`
+- **`sc-ln-obstacle-meeting` · D · major** — The mobile touch hint never dismisses. The card Ляв палец — волан … with its own РАЗБРАХ button is still on screen at t028, t059, t080, t090 and at 05-stopped, sitting permanently over the rear-view mirror and the right glance column for the whole 126 s drive. The harness had to click its Разбрах at the end screen to get past it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ln-obstacle-meeting/mobile-right/05-stopped.png`
+- **`sc-maneuver-uturn` · D · major** — The mobile touch hint again never clears — still over the mirror and the right glance column at t070s and t081s, and on the stopped frame at the end of the manoeuvre.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-maneuver-uturn/mobile-right/04-t081s.png`
+- **`sc-merge-accel-lane` · D · major** — The mobile touch hint is still on screen at t087s, t120s and t208s, covering the rear-view mirror at the exact moment the briefing tells the student to check the left mirror for a gap.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-merge-accel-lane/mobile-right/04-t087s.png`
+- **`sc-pk-driveway` · D · major** — The touch teach overlay («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» plus a РАЗБРАХ button) is present in every mobile frame from t018s to the end and never dismisses. It sits exactly on top of the world label «Спри тук · спри — под 6 км/ч», so the one instruction the student must read is the one covered by the control.
+  «Спри тук · спри — под 6 км/ч»
+  `sc-pk-driveway/mobile-right/04-t018s.png`
+- **`sc-rx-unguarded` · D · major** — The РАЗБРАХ button and the persistent teach panel sit directly over the world instruction «Спри тук · спри — под 5 км/ч» at the approach to the crossing, so the word Спри is half hidden by a control at the exact moment the student needs to read it.
+  «Спри тук · спри — под 5 км/ч»
+  `sc-rx-unguarded/mobile-right/04-t078s.png`
+- **`sc-vp-readiness` · D · major** — The mobile control hint and its РАЗБРАХ button never dismiss. They are present in 03-ready and still present at t208s and in 07-end, permanently covering the right third of the windscreen and sitting on top of the rear-view mirror.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-vp-readiness/mobile-right/07-end.png`
+- **`sc-vu-emergency` · D · major** — Mobile: after the opening seconds every driving control disappears — the Л/З/Д gear pillars, КЛАКС, the ДЯСН/ЛЯВ indicator arrows and the КОЛАН warning are all gone from the mid-drive and 05-stopped frames, leaving МЕНЮ and an orphan „РАЗБРАХ“ pill floating over the sky with no card behind it.
+  «РАЗБРАХ»
+  `sc-vu-emergency/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-conditions.ts` — 11 findings (3 critical, 8 major, 0 minor)
+
+- **`sc-ac-crosswind` · A · CRITICAL** — The world does not contain what the briefing promises. There is no bridge and no exposed span in any captured frame — the route runs down a dense city street with buildings, trees and parked cars on both sides the whole way — and wind is never depicted in any form: no swaying trees, no drifting debris, no leaning vehicles, no lorry to be passed. Six of the eight instruction lines describe an event that never appears.
+  «Дръж лентата до края и очаквай нов порив край сграда, мост или камион.»
+  `sc-ac-crosswind/pc-right/01-arrival.png`
+- **`sc-ac-crosswind` · A · CRITICAL** — The route drives the student onto the pavement and the graders disagree about it. At t191s the PC right run sits at 0 км/ч fully off the carriageway, nose against a building with a lamp post directly ahead and the road curving away to the right; the mobile right run is in the identical position at t140s. PC scored this 0 наказателни точки, ИЗДЪРЖАН, 3/3 stars; mobile scored the same event as three road accidents and 30 points. Mounting the footway is either a dangerous error or it is nothing — it cannot be both.
+  `sc-ac-crosswind/pc-right/04-t191s.png`
+- **`sc-ac-ice` · A · CRITICAL** — „Лед по моста“ has no bridge and no ice. The briefing tells the student to slow to a crawl BEFORE the bridge, to know the bridge has no warm ground under it, and to stop behind the car stranded ON the bridge. Across 03-ready, t098 and mobile 05-stopped the road runs dead straight between buildings and parked cars to the horizon — no deck, no parapet, no abutment, no stranded vehicle, no frost, no black ice, and full-leaf green trees under a blue sky.
+  «Виж закъсалия автомобил на моста — подхлъзнал се е преди теб.»
+  `sc-ac-ice/pc-right/04-t098s.png`
+- **`sc-ac-aquaplane` · A · major** — Briefing calls it an extra-urban road with an out-of-town 90 sign; the world out the windscreen is a city boulevard lined with six-storey lit apartment blocks, street lighting and a kerbside row of parked cars. Briefing and world disagree about where the student is.
+  «Помни: знакът извън града е 90, но дъждът сваля разумната скорост.»
+  `sc-ac-aquaplane/pc-right/01-arrival.png`
+- **`sc-ac-crosswind` · A · major** — Briefing says slow to around 34 км/ч before the open section; the objective toast grades under 45 км/ч. Same briefing-versus-grader split as the other six lessons in this chunk.
+  «Мини открития участък със съобразена скорост — дръж под 45 км/ч»
+  `sc-ac-crosswind/pc-right/01-arrival.png`
+- **`sc-ac-fog` · A · major** — The coach narrates a thing that is not happening: the caption says the fog lamps are burning low under the blanket and making you visible, while the МЪГЛА telltale is dark and no fog beam exists in the scene. The virtual instructor is describing equipment the student never switched on.
+  «Фаровете за мъгла светят ниско под пелената — и те правят видим за другите.»
+  `sc-ac-fog/pc-right/04-t101s.png`
+- **`sc-ac-fog` · A · major** — Briefing says stabilise around 25 км/ч; the objective toast grades under 35 км/ч. Two different numbers for the same instruction, and instruction 5 then reasons from a third figure (50 m of visibility).
+  «Мини контролната зона със съобразена за мъглата скорост — дръж под 35 км/ч»
+  `sc-ac-fog/pc-right/01-arrival.png`
+- **`sc-ac-night-lights` · A · major** — Four different speed numbers for one rule: the briefing says под 50 км/ч, the world sign says 50, the mode chip says ≤60, and the live НАУЧИ card reveals the objective is actually graded at 55 км/ч. The briefing does not match what is graded.
+  «Задачата иска да си тук с не повече от 55 км/ч, а в момента караш 59 км/ч»
+  `sc-ac-night-lights/pc-wrong/04-t012s.png`
+- **`sc-ac-rain-lights` · A · major** — Briefing and grader disagree on the target speed: instruction 2 says тук около 38 км/ч while the live world label and the objective toast both grade at 47 км/ч, over a 50 sign, under a ≤60 mode chip.
+  «Потегли по правата улица със съобразена за дъжда скорост — тук около 38 км/ч.»
+  `sc-ac-rain-lights/pc-right/04-t090s.png`
+- **`sc-ac-snow` · A · major** — Briefing says stabilise around 22 км/ч; the objective toast grades under 30 км/ч.
+  «Приближи със зимна скорост — дръж под 30 км/ч»
+  `sc-ac-snow/pc-right/01-arrival.png`
+- **`sc-ac-wet-braking` · A · major** — Briefing and grader disagree again: instruction 1 says потегли с около 38 км/ч while the objective toast grades at дръж под 47 км/ч.
+  «Приближи със съобразена за дъжда скорост — дръж под 47 км/ч»
+  `sc-ac-wet-braking/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/scenarios/coach.ts` — 8 findings (3 critical, 5 major, 0 minor)
+
+- **`sc-ed-poligon-chain` · A · CRITICAL** — On the arrival frame, before the student has touched a control, the coach already congratulates him on a manoeuvre he has not made: 'Центрирано в мястото. Излез напред…'. The tutor narrates a completed parking that never happened.
+  «Центрирано в мястото. Излез напред и продължи по правата към втората станция.»
+  `sc-ed-poligon-chain/pc-right/01-arrival.png`
+- **`sc-follow-cutin` · A · CRITICAL** — The coach narrates the missing event as if it had happened: at t=34 s, while the task chip still reads 1/3 (settle BEFORE the cut-in) and no car has changed lane, the advisor congratulates the student on having rebuilt the two-second cushion behind the car that cut in.
+  «Възглавницата е възстановена — отново 2 секунди зад вклинилия се, без нито едно рязко движение.»
+  `sc-follow-cutin/pc-right/04-t034s.png`
+- **`sc-hz-breakdown-pulloff` · A · CRITICAL** — «Спри плътно вдясно в аварийната лента» is never completed in any of the four runs, yet the coach announces it as done: «Спряхме плътно вдясно в аварийната лента и гасим двигателя — потокът отляво остава чист» while the car is still rolling at 6 км/ч in the running lane with the engine on and no hard shoulder visible under it. The student is told they performed the manoeuvre the protocol says they did not.
+  «Спряхме плътно вдясно в аварийната лента и гасим двигателя — потокът отляво остава чист.»
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-hazard-obstacle` · A · major** — The instructor voice narrates an object that is not there, twice: at t076 «Напред, към бордюрната страна на лентата, стои аварирал автомобил — забелязваме го отдалеч» over a visibly empty road, and again at t103 while the task chip has already advanced to «Стигни края на отсечката». The coach line also lags the task state by a whole stage.
+  «Напред, към бордюрната страна на лентата, стои аварирал автомобил — забелязваме го отдалеч.»
+  `sc-hazard-obstacle/pc-right/04-t076s.png`
+- **`sc-hz-accident-scene` · A · major** — On the reckless run the coach announces a correct action the driver never performed: «Подминах сцената и платното пред мен е чисто — чак сега се връщам в средата на лентата», at 59 км/ч with no scene visible and none passed. The coach narrates the ideal drive regardless of what the student did.
+  «Подминах сцената и платното пред мен е чисто — чак сега се връщам в средата на лентата.»
+  `sc-hz-accident-scene/pc-wrong/04-t012s.png`
+- **`sc-lane-change` · A · major** — The coach caption contradicts the task chip. At the moment the chip reads ЗАДАЧА 2/2 'Премини в лявата лента', the caption below is still teaching step 1, 'Установи се в дясната лента с постоянна скорост'; on the wrong run the caption jumps to step 5 while the chip is still on 1/2.
+  «Установи се в дясната лента с постоянна скорост.»
+  `sc-lane-change/pc-right/04-t103s.png`
+- **`sc-merge-lane-end` · A · major** — The demonstration narration is out of phase with the world. At 01-arrival, with the car stationary at 0 км/ч and the student not yet driving, the caption already declares the merge finished. At t017s of the wrong run the same completed-merge line is on screen while the car is doing 59 км/ч in a straight line. A caption that says a manoeuvre succeeded when it has not happened teaches the wrong cue.
+  «Вписахме се в пролуката с едно движение — никой в лявата лента не спря и не отби заради нас. Мигачът се изключва.»
+  `sc-merge-lane-end/pc-right/01-arrival.png`
+- **`sc-zebra-approach` · A · major** — The demonstration caption on the arrival screen gives the answer away before the drive starts: it declares the crossing clear, when the whole lesson turns on a pedestrian stepping onto it. The student is told to pass calmly before he has looked.
+  «Пътеката е свободна — премини спокойно.»
+  `sc-zebra-approach/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/traffic/TrafficLayer.tsx` — 7 findings (3 critical, 3 major, 1 minor)
+
+- **`sc-crossing-dart` · A · CRITICAL** — THE LESSON'S OWN EVENT NEVER HAPPENS. Across all 20 mobile-right frames and all 6 mobile-wrong frames, no pedestrian ever steps onto the zebra. At 04-t028s the car is stopped at 0 км/ч with the crossing fully in view and completely empty; at 05-stopped and 06-waited the zebra fills the lower windscreen and is bare. The only human anywhere in the drive is a single distant figure standing on the far-left pavement in 04-t028s, ~40 m from the crossing and never moving. The staged darter (DART_PED / sc-drt-ped, 2.5 m/s, trigger 26 m) is clearly RUNNING — occupancy is asserted, the advisor fires, the penalty fires — but no body is drawn.
+  «Защо чакаш: пешеходец на пътеката»
+  `sc-crossing-dart/mobile-right/06-waited.png`
+- **`sc-hz-brake-dont-swerve` · A · CRITICAL** — The car in the adjacent lane — the sole reason the lesson says brake instead of swerve — is never in the world. At 05-stopped the coach says «Виж я колата отляво — мина си по своята лента, без изобщо да разбере. Ако бяхме свили, щяхме да сме В нея» while the left lane is visibly, completely empty, and the same is true at t094 where the coach describes it as level with the driver's door. The student is told to look at a car that is not there and to accept a rule whose evidence was never shown.
+  «Виж я колата отляво — мина си по своята лента, без изобщо да разбере. Ако бяхме свили, щяхме да сме В нея.»
+  `sc-hz-brake-dont-swerve/pc-right/05-stopped.png`
+- **`sc-hz-emergency-stop` · A · CRITICAL** — THE LESSON'S OWN EVENT NEVER HAPPENS. The briefing promises a ball rolling into the carriageway followed by a child, with about two seconds to react. Across every sampled frame of all four runs — pc-right t087/t093/t098, pc-wrong t011, mobile-right t101/t112 and 05-stopped — the road is completely empty. No ball, no child, nothing to brake for. An emergency-stop lesson in which nothing ever requires an emergency stop.
+  «Някъде напред топка ще изскочи на платното, а след нея — дете. От мига, в който го видиш, до спирането имаш около две секунди.»
+  `sc-hz-emergency-stop/mobile-right/05-stopped.png`
+- **`sc-fo-brakelight-chain` · A · major** — The single lead car never illuminates brake lights in any frame of either platform, including frames where the coach is telling the student to lift off the accelerator the moment the stops light up. The reaction cue the lesson grades does not exist visually.
+  «Светнат ли стоповете по-напред в колоната, вдигни крака от газта ВЕДНАГА»
+  `sc-fo-brakelight-chain/mobile-right/07-end.png`
+- **`sc-signal-controller` · B · major** — From the driving seat the officer's posture is unreadable - the one thing the lesson grades. Through the whole approach (t017s to t058s, i.e. the entire decision window) he renders as a featureless olive capsule with a bare head on a dark post: at 300-400% zoom on 04-t053s there are no arms visible at all, because in the side-profile pose the arms extend along the road axis and foreshorten to nothing from the approaching driver's viewpoint. The arms only become visible at t076s, after the car has already passed him and is looking sideways. The code comment in TrafficLayer.tsx claims 'BUILD 1.30 is free of the arm-legibility question'; the frames say it is not. All teaching load therefore falls on the floating text caption.
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-signal-controller` · D · major** — The teaching payload of the in-world caption is illegible at the distance where the decision is made. Only the headline word ('СПРИ' / 'МИНАВАШ ТИ') resolves during the approach; the five body lines that carry the actual rule are a low-resolution texture that blurs to unreadable mush even at 600% zoom (checked on the live sibling's 04-t012s). They only become readable once the car is nearly at the stop line - after the stop/go choice has been made.
+  «СПРИ»
+  `sc-sig-controller-live/mobile-right/04-t012s.png`
+- **`sc-signal-controller` · D · minor** — The officer's world caption panel overruns the HUD. At t076s the caption's bottom lines ('ППЗДвП сигнали на регулировчика; ЗДвП чл. 7') run straight through the 'МЕНЮ' button at top-left, so the button label is illegible against the green world text.
+  «ППЗДвП сигнали на регулировчика; ЗДвП чл. 7»
+  `sc-signal-controller/mobile-right/04-t076s.png`
+
+---
+
+## `platform/src/components/sim/cockpit/InstrumentCluster.tsx` — 6 findings (3 critical, 2 major, 1 minor)
+
+- **`sc-vp-handbrake` · A · CRITICAL** — The briefing tells the student that the red handbrake lamp must go out and that if it is still glowing the handbrake is not down — making the lamp the sole verification instrument for the lesson. No handbrake lamp is rendered on the cluster in any frame, on either platform, in either lane. The student is told to check an indicator that does not exist.
+  «Свети ли още — ръчната не е долу.»
+  `sc-vp-handbrake/mobile-right/04-t101s.png`
+- **`sc-vp-telltale` · A · CRITICAL** — The red engine-temperature lamp never appears. The instrument cluster shows only an unlabelled dial, a digital speed and a gear letter at every sampled moment on both mobile and PC — including after the task rail has already advanced to telling the student to stop AFTER the lamp. The cluster component does implement a telltale rail with lit tones and halos, so the lamp state is never being fed to it.
+  «Спри плътно вдясно след лампата — дръж под 4 км/ч»
+  `sc-vp-telltale/pc-right/04-t063s.png`
+- **`sc-vp-telltale-red` · A · CRITICAL** — The briefing states plainly that the colour of the lamp decides what the student does — yellow means carry on calmly to a garage, red means stop now — yet no lamp of any colour renders on the instrument cluster in any frame of any lane. The one discriminating cue the lesson is built on is absent, so the triage cannot be learned or practised.
+  «Движи се спокойно в дясната лента и поглеждай таблото — цветът на лампата решава какво правиш.»
+  `sc-vp-telltale-red/mobile-right/02-briefing.png`
+- **`sc-vp-handbrake` · C · major** — The РЪЧНА control glyph in the PC control strip looks identical in the right lane and in the wrong lane where the handbrake is up. Combined with the missing dashboard lamp, there is no indication anywhere in the cockpit of whether the handbrake is engaged.
+  «РЪЧНА»
+  `sc-vp-handbrake/pc-wrong/04-t012s.png`
+- **`sc-vp-readiness` · C · major** — The speedometer dial carries no numbers at all, only tick marks, and the needle moves barely a few degrees between 0 and 15 km/h. The analogue instrument conveys no speed information; only the digital readout does.
+  `sc-vp-readiness/mobile-right/04-t102s.png`
+- **`sc-follow-rain-gap` · F · minor** — The wipers telltale stays dark for the whole rain lesson while the dipped-beam telltale lights, so the cockpit contradicts a scenario whose first instruction is that it is raining.
+  «1. Включи късите светлини РЪЧНО — вали (чл. 70) — и потегли след предния.»
+  `sc-follow-rain-gap/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-merging.ts` — 5 findings (3 critical, 2 major, 0 minor)
+
+- **`sc-merge-bus-pullout` · A · CRITICAL** — The lesson's event never happens: there is no bus. The briefing places a scheduled bus standing at a stop about 130 m ahead that will pull out, and the task chip is 'Намали, за да пропуснеш потеглящия автобус — дръж под 35 км/ч'. Across arrival, ready, stopped, end and the menu frame no bus, no shelter and no stop marking appears; the only large vehicle in shot is a white box truck at a side junction.
+  «Напред, на около 130 метра, на спирката стои автобус от редовната линия.»
+  `sc-merge-bus-pullout/pc-right/07b-menu.png`
+- **`sc-merge-from-property` · A · CRITICAL** — The correct drive collides and fails despite having its pedestrian objective ticked green in the HUD moments earlier. pc-right: 10 наказателни точки, 1 опасна грешка, НЕИЗДЪРЖАН. The drive the student is told to copy hits the very pedestrian it stopped for.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т.»
+  `sc-merge-from-property/pc-right/08-debrief.png`
+- **`sc-merge-roadworks-shift` · A · CRITICAL** — The correct drive collides. pc-right ends with 20 наказателни точки, 2 опасни грешки and НЕИЗДЪРЖАН. The demonstration drive the student is told to copy fails the lesson it is demonstrating.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-merge-roadworks-shift/pc-right/08-debrief.png`
+- **`sc-merge-from-property` · A · major** — There is no petrol station. The briefing places the student at the exit of a бензиностанция facing a boulevard, with a pavement and a cycle lane in between; the world is a bare grey apron on an empty green plain with distant mountains — no pumps, no canopy, no shop, no forecourt, no boulevard, and the only other vehicle is a single translucent ghost car.
+  «Ти си на изхода на бензиностанцията, с лице към булеварда. Между теб и платното има тротоар и велоалея»
+  `sc-merge-from-property/mobile-right/05-stopped.png`
+- **`sc-merge-lane-end` · A · major** — The lesson's own event never happens: the lane does not end. Across the whole pc-right sequence (t001s→t161s) the carriageway keeps its width — no taper, no chevrons, no lane-ends sign, no merge arrow on the tarmac. At t120s the coach still narrates that the lane ends in about 180 m while the road ahead is unchanged and a «Карай дотук» waypoint hovers over it.
+  «Караме в дясната лента. Знакът и маркировката казват едно: тази лента свършва след около 180 метра.»
+  `sc-merge-lane-end/pc-right/04-t120s.png`
+
+---
+
+## `platform/src/modules/sim/rules/offences.ts` — 5 findings (3 critical, 2 major, 0 minor)
+
+- **`sc-roundabout-entry` · A · CRITICAL** — Mobile convicts the careful drive of 'Непропускане на пътно превозно средство с предимство' (−10, опасна) in a scene containing no other vehicle at all. The explanation itself references a junction without traffic lights, and it is cut off mid-word.
+  «Не пропусна превозно средство, което имаше предимство.»
+  `sc-roundabout-entry/mobile-right/04-t062s.png`
+- **`sc-signal-response` · A · CRITICAL** — A «Превишена скорост» fault card is on screen mid-drive at 59 км/ч against a posted 50 chip, yet the final tally for that same drive records 0 второстепенни грешки and 0 points. What the HUD convicts live never reaches the debrief.
+  «Превишена скорост — Движеше се над разрешената скорост. Ограничението е таван, не цел»
+  `sc-signal-response/mobile-wrong/04-t012s.png`
+- **`sc-zebra-approach` · A · CRITICAL** — The run convicts itself of the opposite of what it told the student. Mid-drive the sim shows 'Защо чакаш: пешеходец на пътеката — Спрял си правилно' while the car sits stopped at 0 км/ч short of the zebra; the debrief for that same run charges −10 for Непропускане на пешеходец and stamps НЕИЗДЪРЖАН. Nine full stops, 12 s of lawful waiting, top speed 22 км/ч.
+  «Защо чакаш: пешеходец на пътеката — Спрял си правилно.»
+  `sc-zebra-approach/mobile-right/06-waited.png`
+- **`sc-ed-d2-stop-address` · A · major** — A НАУЧИ card convicts the student of driving without a seatbelt mid-drive, but no seatbelt fault appears anywhere in the debrief's fault list. The toast accuses, the honest record forgets — and the КОЛАН telltale sits red for the whole drive with no penalty.
+  «Движение без предпазен колан — Движеше се без поставен колан.»
+  `sc-ed-d2-stop-address/pc-right/05-stopped.png`
+- **`sc-merge-accel-lane` · A · major** — The fault taxonomy is wrong for the context. A motorway-merge lesson convicts the student with Движение в обратна посока по еднопосочна улица — a one-way street offence — and repeats it as part of a 135-point, 23-fault stream in the wrong drive. Wrong-way on a motorway is a different article and a different lesson in law.
+  «135 наказателни точки»
+  `sc-merge-accel-lane/mobile-wrong/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/runtime/district.ts` — 5 findings (3 critical, 2 major, 0 minor)
+
+- **`sc-junction-gap` · A · CRITICAL** — At the point where objective 3 must be performed the world is gone: the Б2 STOP sign stands on a bare grey plane, the road surface, lane markings and stop line have vanished, the guidance ribbon terminates in mid-air, and the car sits at 0 км/ч. The final third of this lesson has no map under it.
+  «ЗАДАЧА 3/3 — Завий надясно и излез от кръстовището на изток»
+  `sc-junction-gap/pc-right/04-t206s.png`
+- **`sc-junction-rhr` · A · CRITICAL** — The world runs out. From ~t054s onward the car is on a featureless green/grey plane: no road, no lane markings, no kerbs, no buildings, only a distant hill silhouette. The car sits at 0 км/ч while the HUD still asks it to «Завий наляво и излез от кръстовището на запад». The route the lesson grades does not exist in the map.
+  «Завий наляво и излез от кръстовището на запад»
+  `sc-junction-rhr/pc-right/04-t107s.png`
+- **`sc-junction-rhr` · A · CRITICAL** — Same void on the wrong lane: at t070s the car is doing 28 км/ч across an empty plane with no road under it and no world content in any direction. This is where both drives lose the route and collide.
+  `sc-junction-rhr/pc-wrong/04-t070s.png`
+- **`sc-junction-scan` · A · major** — The world past the junction is a void: a flat grey/green plane with the guidance ribbon ending in mid-air, no road surface, no markings and no buildings, while the HUD still asks for a right turn onto a priority road.
+  «Премини стоп-линията след пълно спиране и оглеждане»
+  `sc-junction-scan/pc-right/04-t102s.png`
+- **`sc-junction-stop` · A · major** — Beyond the stop line the junction is a featureless grey/green apron: no lane markings, no crosswalk, no kerbs, no buildings, nothing to turn into. The briefing tells the student to turn right onto a priority road that is not drawn.
+  «Потегли и завий надясно, като се движиш плавно по пътя с предимство.»
+  `sc-junction-stop/pc-right/04-t120s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-roundabout.ts` — 4 findings (3 critical, 0 major, 1 minor)
+
+- **`sc-rb-busy-gap` · A · CRITICAL** — Only task 1 («Спри на линията за пропускане») ever ticks; the two tasks that ARE the lesson — entering the real gap and leaving at the second exit — never tick in any leg. mobile-right, the most careful drive of the four (15 full stops, 43 s of lawful waiting), scores the WORST of the four at 21 т. with three convictions including a collision.
+  «– Влез в истинската пролука и подмини първия изход · – Излез на втория изход»
+  `sc-rb-busy-gap/mobile-right/08-debrief.png`
+- **`sc-rb-circulate-priority` · A · CRITICAL** — All four legs score identically — НЕИЗДЪРЖАН, 10 т., «Пътнотранспортно произшествие», zero tasks ticked. The careful drive collides just like the reckless one; on mobile-right the car ends up parked ON THE GRASS of the central island. The lesson grades nothing.
+  «– Подмини източния изход, без да спираш в кръга · ✗ Пътнотранспортно произшествие −10 изпитни т.»
+  `sc-rb-circulate-priority/mobile-right/04-t081s.png`
+- **`sc-rb-lane-choice` · A · CRITICAL** — mobile-right — the careful drive — scores 33 т. with four convictions (two collisions, a failure to yield, a mirror-less lane change) while the 58 км/ч wrong drive scores 20 т. The careful student is punished harder than the reckless one, and neither ever reaches the third exit.
+  «НЕИЗДЪРЖАН · SCORE: 33 наказателни точки (mobile-right) vs 20 наказателни точки (mobile-wrong)»
+  `sc-rb-lane-choice/mobile-right/08-debrief.png`
+- **`sc-rb-exit-signal` · D · minor** — The briefing's numbered list starts at «2.». The opening sentence is styled as an unnumbered lead paragraph and the steps then run 2, 3, 4, 5 — a student reads it as 'step 1 is missing'.
+  «2. Влез в реален интервал след нея и се движи по кръга обратно на часовниковата стрелка, без мигач — още не излизаш.»
+  `sc-rb-exit-signal/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/runtime/surface.ts` — 3 findings (3 critical, 0 major, 0 minor)
+
+- **`sc-ac-truck-spray` · G · CRITICAL** — At t102 the mobile wrong drive is doing 145 км/ч across open green field with no road anywhere in frame — the car left the carriageway entirely and the sim keeps driving, keeps the 140 limit chip on screen and raises no off-road state. A large untextured translucent grey plane hangs in the sky above the field.
+  «РЕЖИМ Нормален ≤150 · знакът важи»
+  `sc-ac-truck-spray/mobile-wrong/04-t102s.png`
+- **`sc-rb-exit-signal` · A · CRITICAL** — The session ends with the car parked ON the roundabout's central grass island — the whole windscreen is grass, with the island's trees and the billboard behind — and NO off-road / kerb-mounting fault is ever raised. The debrief lists exactly two mistakes (failure to give way, collision) and nothing about leaving the carriageway. The car climbed the kerb with no resistance, no bump and no consequence: the rule engine grades geometry without consulting the drivable surface.
+  `sc-rb-exit-signal/mobile-right/07-end.png`
+- **`sc-signal-flashing` · A · CRITICAL** — A collision launches the braked ego from 0 to 44 км/ч onto the pavement and the sim never notices it left the road. At t072 a solid dark-blue car is jammed into the stationary ego's right flank; the audit log then records «the brake is held and the car went 0 -> 44 км/ч»; at t077 the ego is sitting on the footway beside a bench and a litter bin, and at 07-end it is wedged against a building facade. Across all of it the only faults raised are «Пътнотранспортно произшествие» — never mounting the kerb, never driving on the pavement, never striking street furniture.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние»
+  `sc-signal-flashing/mobile-right/04-t077s.png`
+
+---
+
+## `unknown` — 22 findings (2 critical, 19 major, 1 minor)
+
+- **`sc-park-night` · A · CRITICAL** — The car drove clean off the parking lot into unbounded grass and the lesson never noticed. At 04-t082s the whole windscreen is an empty field lit by the headlights, no road, no bays, no cars, 0 км/ч — and the run then continued for another 126 seconds with no off-route warning, no boundary, no nudge back and no HUD change. A student who wanders out of the world gets silence.
+  `sc-park-night/mobile-right/04-t082s.png`
+- **`sc-vu-emergency-junction` · A · CRITICAL** — The RIGHT (careful) drive is FAILED. Debrief reads 10 наказателни точки · НЕИЗДЪРЖАН · 1 опасна грешка «Настъпи сблъсък» — yet from t043s onward the windscreen shows the car alone on a bare untextured plane with no vehicle, kerb, pole or building anywhere in sight to collide with. Identical on mobile (10 т. · НЕИЗДЪРЖАН). A model drive that cannot pass its own lesson.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние, а не сбор от много дребни (Наредба № 38 приложение № 5, т. 10, б. „в“).»
+  `sc-vu-emergency-junction/pc-right/08-debrief.png`
+- **`sc-crossing-child-ball` · G · major** — The child-and-ball actors are two untextured primitives — a blue capsule and a red half-sphere — sitting on the kerb; nothing about them reads as a child chasing a ball until the run starts.
+  `sc-crossing-child-ball/mobile-right/04-t001s.png`
+- **`sc-crossing-dart` · C · major** — The brake input is dropped by the sim and the car ACCELERATES while the brake is held. The run log records it three separate times, twice around the crossing itself: 'the brake is held and the car went 12 -> 17 км/ч — the sim never got the key; re-asserting it' and again '15 -> 18 км/ч'. On a lesson whose whole point is an emergency stop, a brake that intermittently does nothing is the worst possible failure mode.
+  «the brake is held and the car went 12 -> 17 км/ч — the sim never got the key; re-asserting it.»
+  `sc-crossing-dart/mobile-right/log.txt`
+- **`sc-merge-bus-pullout` · G · major** — COULD_NOT_TEST for three of four combinations: mobile-right, mobile-wrong and pc-wrong all contain only run.log, which ends with the harness failing to sign in ('no session cookie after sign-in. Form said: … Грешен имейл или парола'). Harness credential failure, not a lesson defect — needs a re-drive.
+  «Грешен имейл или парола.»
+  `sc-merge-bus-pullout/pc-wrong/run.log`
+- **`sc-merge-motorway-exit` · G · major** — COULD_NOT_TEST for PC and for mobile-wrong: pc-wrong has no folder at all, pc-right contains a single 01-arrival.png that is a zero-byte file, and mobile-wrong died at harness sign-in. Only mobile-right could be judged — needs a re-drive.
+  `sc-merge-motorway-exit/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · B · major** — The motorway carries no visible traffic in the forward view at all — the briefing's „ритъмът на потока тук“ has no flow to set it. The only other vehicle referenced is the one behind, and that is announced by a text chip rather than seen.
+  «Установени 110 км/ч — далеч под тавана и точно в ритъма. Дясната лента е нашата.»
+  `sc-mw-min-speed/pc-wrong/04-t027s.png`
+- **`sc-pe-jaywalker` · G · major** — A large amorphous dark-grey polygon is painted on the tarmac mid-lane with no explanation — it reads as a rendering artefact rather than a patch or a shadow.
+  `sc-pe-jaywalker/mobile-right/04-t070s.png`
+- **`sc-pk-busstop-ban` · A · major** — wrongConvicted could not be established: pc-wrong, mobile-right and mobile-wrong all aborted at harness sign-in and produced only run.log. Nothing in this sweep proves a student who stops inside the bus-stop zone is penalised — the pass path is verified, the fail path is not.
+  «Грешен имейл или парола.»
+  `sc-pk-busstop-ban/pc-wrong/run.log`
+- **`sc-pk-crossing-ban` · G · major** — COULD_NOT_TEST: all four captured PNGs (mobile-right/01-arrival, mobile-wrong/01-arrival, pc-right/01-arrival, pc-right/03-ready) are 0-byte files and pc-wrong was never created. Route to the re-drive lane; no product conclusion can be drawn from this lesson in this sweep.
+  `sc-pk-crossing-ban/mobile-right/01-arrival.png`
+- **`sc-rb-busy-gap` · G · major** — The most careful drive of the four scores worst; combined with the permanent «Чакаш правилно» line this teaches a student that patience is punished.
+  `sc-rb-busy-gap/mobile-right/04-t001s.png`
+- **`sc-rx-unguarded` · C · major** — Brake input is dropped by the sim. The harness log records at t060s that the brake was held while the car accelerated from 15 to 20 км/ч and that the key never reached the simulator — on the approach to a level crossing. The 04-t060s frame for this moment is 0 bytes, so the evidence here is the log line, not a picture.
+  «the brake is held and the car went 15 -> 20 км/ч — the sim never got the key; re-asserting it.»
+  `sc-rx-unguarded/mobile-right/run.log`
+- **`sc-signal-controller` · D · major** — Three different speed limits on one screen with nothing reconciling them: the dashboard disc shows 50, the mode strip reads 'РЕЖИМ Нормален ≤60 · знакът важи' (the sign applies), and a world plaque at the junction reads 'Карай дотук / не по-бързо от 35 км/ч'. The strip says the sign governs, which would be 50, while the plaque demands 35 and the mode allows 60. A student cannot tell which number he is graded against.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-signal-controller/mobile-right/04-t022s.png`
+- **`sc-signal-controller` · C · major** — The sim drops held pedal input. The harness log records 're-asserted the brake 4x after the sim lost the key' during this run's live sibling and the same held-key loss pattern shows here as the car repeatedly creeps (0 → 4 → 11 → 0 → 12 км/ч) while the brake is supposed to be held at the stop line. A car that releases its own brake at a junction is not a car.
+  `sc-signal-controller/mobile-right/04-t027s.png`
+- **`sc-signal-controller` · G · major** — The wrong-drive lane never ran. sc-signal-controller/mobile-wrong holds only audit.log, which stops after the 01-arrival DOM dump - and there are no pc-right or pc-wrong folders at all for this lesson. Half the evidence this lesson needs (does the wrong drive get convicted?) does not exist, and neither PC platform was covered.
+  `sc-signal-controller/mobile-right/../mobile-wrong/audit.log`
+- **`sc-sp-eco-coast` · B · major** — The teach card tells the student to look for pedestrians while waiting at the red, but there is not a single pedestrian anywhere in the scene — a dense city boulevard with high-rise blocks on both sides, parked cars along both kerbs and completely empty pavements in every frame of both drives.
+  «къде са пешеходците»
+  `sc-sp-eco-coast/pc-right/06-waited.png`
+- **`sc-sp-limit-end` · B · major** — A city street lined with parked cars on the right kerb and railings on the left, and not one pedestrian on either pavement in 207 s of frames on either platform.
+  `sc-sp-limit-end/mobile-right/01-arrival.png`
+- **`sc-sp-wet-limit-plate` · B · major** — A dense city street with tower blocks on both sides, parked cars along the right kerb and railings on the left, and not one pedestrian in any frame — while the coaching card the student is shown talks about places where there are pedestrians.
+  `sc-sp-wet-limit-plate/mobile-right/01-arrival.png`
+- **`sc-vu-cyclist-hook` · G · major** — A huge translucent pale-teal arrow floats in mid-air above the road pointing up and to the LEFT, while the active task is „Завий надясно, след като велосипедистът е преминал“ and the blue shadow path continues straight ahead. Whatever it is meant to indicate, it points away from the manoeuvre being graded and dwarfs everything else in the windscreen.
+  «Завий надясно, след като велосипедистът е преминал»
+  `sc-vu-cyclist-hook/pc-right/04-t049s.png`
+- **`sc-vu-cyclist-hook` · B · major** — The junction the lesson turns at has parked cars, railings and low blocks — and no people at all apart from the single scripted cyclist. In a scenario built entirely around vulnerable road users, the pavements are empty in every frame.
+  `sc-vu-cyclist-hook/mobile-right/04-t061s.png`
+- **`sc-vu-emergency` · B · major** — A four-lane city boulevard with tower blocks both sides, two rows of parked cars and street trees — and not a single pedestrian on either pavement in any frame of either drive on either platform.
+  `sc-vu-emergency/mobile-right/04-t121s.png`
+- **`sc-ac-night-lights` · A · minor** — mobile-right could not complete the lesson: after 4:30, 27 full stops and a top speed of 20 км/ч the run had to be terminated through «Прекрати урока» with «Стигни края на отсечката» still unticked. The route does not finish inside the session budget on touch controls.
+  «Урокът беше прекъснат преди края.»
+  `sc-ac-night-lights/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/rules/catalog.ts` — 10 findings (2 critical, 6 major, 2 minor)
+
+- **`sc-follow-tailgater` · A · CRITICAL** — The wrong drive escapes entirely: 0 наказателни точки, 0 опасни, 0 основни, 0 второстепенни. The lesson's two authored mistakes — the punishing brake check at the tailgater and the guilty acceleration — produced no fault at all; the only reason the screen says НЕИЗДЪРЖАН is that not all route tasks were done. Driving at 59 km/h in a posted 50 zone drew a teach card and no penalty.
+  «0 наказателни точки … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-follow-tailgater/pc-wrong/08-debrief.png`
+- **`sc-rx-guarded` · A · CRITICAL** — The conviction teaches the wrong rule. In «Охраняем прелез с бариера» the dangerous-error card opens «Наруши желязното правило на жп прелеза. Пред прелез без бариери спираш напълно и се оглеждаш» — the no-barrier procedure, for a crossing that has a barrier. The student is corrected with a rule that does not govern what he just drove. (rules/catalog.ts already carries a comment about this exact frame and a RAIL_CROSSING_ACT_COPY split — verify the fix reaches this path rather than re-fixing.)
+  «Наруши желязното правило на жп прелеза. Пред прелез без бариери спираш напълно и се оглеждаш»
+  `sc-rx-guarded/pc-wrong/08-debrief.png`
+- **`sc-follow-distance` · A · major** — The seatbelt telltale sits in its warning state (amber КОЛАН icon on PC, red warning disc on mobile) for the whole drive at up to 44 km/h, no fault is ever raised for it, and the drive still passes with 0 наказателни точки and three stars. A Наредба 38 product teaches that driving unbelted is unremarkable.
+  «КОЛАН»
+  `sc-follow-distance/pc-wrong/04-t038s.png`
+- **`sc-junction-gap` · A · major** — The wrong drive ends with the car parked on the pavement, nosed into a building corner with a tree trunk through the windscreen view at 5 км/ч, and the only conviction offered is «Пътнотранспортно произшествие». Mounting the footway is not convicted at all, so a student who drives onto a pavement is told only that they hit something.
+  «Пътнотранспортно произшествие»
+  `sc-junction-gap/mobile-wrong/04-t100s.png`
+- **`sc-lane-change` · A · major** — Speeding goes unpunished here. The wrong run holds 59 км/ч past a 50 sign under a strip that says the sign wins, and the debrief records no speeding fault at all — while the same 59 км/ч in sc-zebra-approach and 49 км/ч in sc-ed-poligon-chain are both charged as faults.
+  «режим Нормален ≤60 · знакът важи»
+  `sc-lane-change/pc-wrong/04-t021s.png`
+- **`sc-pk-ban-stop` · A · major** — The WRONG lane is convicted for the wrong thing. Both platforms return 20 точки / НЕИЗДЪРЖАН with the sole explanation «Настъпи сблъсък» — a road-traffic accident. Nowhere on the debrief does the В27 stop appear, so a student who commits exactly the offence the lesson teaches, without crashing, is never told about it.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-pk-ban-stop/pc-wrong/08-debrief.png`
+- **`sc-rx-tram-left` · A · major** — A seatbelt fault is charged before the car has moved. At the 02-briefing sample the log records 0 км/ч — the previous sample was still in P at 0 км/ч — yet a +1 mistake card reads «Коланът не е поставен … Движеше се без поставен колан». The past tense accuses the student of something that has not happened, on a stationary car at the briefing screen.
+  «+1Коланът не е поставенДвижеше се без поставен колан.»
+  `sc-rx-tram-left/mobile-right/run.log`
+- **`sc-rx-unguarded` · A · major** — The debrief is a bare verdict. The only reason given for a 10-point dangerous error is «допусната е опасна грешка — директно неиздържан» — it never names which of the three level-crossing acts was committed, never quotes the rule and never says what to do instead. This is exactly the no-bare-verdict rule the project forbids.
+  «• допусната е опасна грешка — директно неиздържан»
+  `sc-rx-unguarded/mobile-right/08-debrief.png`
+- **`sc-ed-reverse-line` · F · minor** — Speeding is punished here and ignored elsewhere: ten −10 speeding faults in this lesson's wrong run, none at all in sc-lane-change's wrong run at the same 59 км/ч. The same offence draws a different price depending on the scenario.
+  «Превишаване с повече от 10 км/ч −10 изпитни т.»
+  `sc-ed-reverse-line/pc-wrong/08-debrief.png`
+- **`sc-junction-blind` · C · minor** — The seatbelt tell-tale (КОЛАН) is red/unfastened from arrival to the end of the drive on every frame, and no debrief in this lesson — or in any of the seven — ever charges a seatbelt fault. The grader never looks at the belt.
+  «КОЛАН»
+  `sc-junction-blind/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-sp.ts` — 9 findings (2 critical, 7 major, 0 minor)
+
+- **`sc-mw-discipline` · A · CRITICAL** — The WRONG drive (the lane-hog / crawl mistake this template ships two traces for) was graded with 0 errors in every class and awarded 3 stars on „Оценка на маневрата“. Neither NOT_KEEPING_RIGHT nor DRIVING_TOO_SLOW_FOR_MOTORWAY fired. The lesson grades only two geometric reachZones, so lane discipline and the speed floor — the entire subject of the lesson — are never measured.
+  «Опасни грешки (по 10 изпитни т.) 0 0»
+  `sc-mw-discipline/pc-wrong/08-debrief.png`
+- **`sc-speed-creep` · A · CRITICAL** — Neither right leg can finish: after 210 s of compliant driving only task 1 of 3 is ticked and the lesson has to be terminated by hand. A student who obeys the 30-zone can never reach «Стигни края на зоната» — the route is longer than the lesson's own time allows at the speed the lesson demands.
+  «the drive stopped after 211s without the session ending (its whole 210s budget)»
+  `sc-speed-creep/mobile-right/08-debrief.png`
+- **`sc-mw-discipline` · A · major** — World does not match the briefing. Instruction 1 states the carriageway is split by a crash barrier (мантинела); across 208 s of frames there is no barrier anywhere — the median is a bare grey gravel strip with grass either side.
+  «платното е разделено с мантинела»
+  `sc-mw-discipline/mobile-right/04-t208s.png`
+- **`sc-mw-discipline` · A · major** — The lesson's central concept is „скоростта на потока“ (the speed of the flow) but the motorway contains not one other vehicle in any frame of either drive, on either platform. There is no flow to match, so the student cannot see, judge or learn the thing being graded.
+  «на магистрала се кара със скоростта на потока»
+  `sc-mw-discipline/pc-right/04-t103s.png`
+- **`sc-sp-curve` · A · major** — The world contradicts the briefing at the start. Instruction 1 says you are setting off on the OUT-OF-TOWN road at 90 км/ч, but 01-arrival, 03-ready, 05-stopped and every frame up to about t=060s show a dense urban street: five-storey apartment blocks on both sides, street lighting, kerbs and pavements, and a continuous rank of parked cars. The out-of-town road only appears after the first minute.
+  «Потегли по извънградския път — тук ограничението е 90 км/ч и правата е свободна.»
+  `sc-sp-curve/pc-right/01-arrival.png`
+- **`sc-speed-dangerous` · A · major** — Identical compliant driving: pc-right ИЗДЪРЖАН 0 т. 3 stars, mobile-right НЕИЗДЪРЖАН, force-closed, 1 star. The lesson is passable on a laptop and not on a phone.
+  «the drive stopped after 210s without the session ending (its whole 210s budget)»
+  `sc-speed-dangerous/mobile-right/08-debrief.png`
+- **`sc-speed-rain` · A · major** — Same split as the rest of the SP family — pass on pc, force-closed incomplete on mobile, for the same compliant drive.
+  «the drive stopped after 210s without the session ending (its whole 210s budget)»
+  `sc-speed-rain/mobile-right/08-debrief.png`
+- **`sc-speed-transition` · B · major** — The briefing names the zone училище/жилищна (school/residential) but the world contains no school, no children, no pedestrians and no residential cue — the same generic office blocks, street lamps and rows of parked cars as every other lesson in this chunk. The student is asked to slow down for a reason that is not visible out the windscreen, which is exactly the judgement the lesson claims to teach.
+  «Напред следва знак за зона 30 (училище/жилищна).»
+  `sc-speed-transition/pc-right/04-t076s.png`
+- **`sc-speed-zone` · A · major** — Same split as the rest of the SP family — pass on pc, force-closed incomplete on mobile, for the same compliant drive.
+  «the drive stopped after 210s without the session ending (its whole 210s budget)»
+  `sc-speed-zone/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/components/sim/ShadowCar.tsx` — 8 findings (2 critical, 5 major, 1 minor)
+
+- **`sc-park-van` · C · CRITICAL** — A translucent blue ghost/shadow car is rendered at the camera position and fills the whole cockpit — it covers the dashboard, buries the steering wheel and washes out the instrument cluster, so speed and gear are read through a car body. The same ghost renders correctly out in the world in other frames, so it is being placed at the ego origin here.
+  `sc-park-van/mobile-right/05-stopped.png`
+- **`sc-rb-exit-signal` · A · CRITICAL** — The car the briefing promises — «в кръга има кола и тя е с предимство» — is never on screen as a real vehicle. In every mid-drive frame the only vehicle in the circle is the doc-76 ShadowCar ghost: a translucent blue shell (#3f8cff, opacity 0.45, kinematic trace playback, no physics) whose body shows the road, the lane markings and the green ribbon straight through it, with flat pink quads for brake lights. Then at t063 a SOLID dark-blue car that appears in no earlier frame is suddenly intersecting the ego's bonnet and the sim convicts «Непропускане на ППС с предимство» + collision. The student is asked to judge a gap against a hologram while the vehicle that actually scores them is invisible on the approach.
+  «Чакаш правилно — в кръга имат предимство. Гледай НАЛЯВО и тръгвай, когато можеш да влезеш»
+  `sc-rb-exit-signal/mobile-right/06-waited.png`
+- **`sc-follow-distance` · C · major** — The blue translucent shadow/ghost car renders through the player's own bonnet and dashboard, filling the lower centre of the windscreen and hiding the road surface immediately ahead. Present from the arrival frame onward on both platforms.
+  `sc-follow-distance/mobile-right/04-t077s.png`
+- **`sc-mw-emergency-lane` · C · major** — At t209s the translucent blue demonstration shadow car is rendered inside the player's own cockpit — its bonnet, screen and A-pillars are drawn over the dashboard and across the road ahead, so the instrument cluster is read through another car's body.
+  `sc-mw-emergency-lane/mobile-right/04-t209s.png`
+- **`sc-pe-zone-living` · G · major** — A giant pair of cartoon googly eyes (the 👀 emoji, rendered as a world-space quad) is floating on the face of an apartment block about three storeys up, mid-drive, roughly two metres across. It reads as a rendering bug, not as guidance. Source is the shadow car's glance marker being placed at the wrong depth/scale.
+  `sc-pe-zone-living/pc-wrong/04-t017s.png`
+- **`sc-signal-flashing` · B · major** — The vehicle ahead in the ego's own lane renders as a translucent blue shell — the blue route ribbon is visible straight through and over its body and the road shows through its flanks. It is the doc-76 ShadowCar ghost (#3f8cff at opacity 0.45) sharing the carriageway with solid NPC traffic (the dark-blue SUV, the white estate, the box truck) with no visual distinction beyond transparency, and no on-screen label saying it is a demonstration.
+  `sc-signal-flashing/mobile-right/04-t017s.png`
+- **`sc-zebra-approach` · D · major** — On mobile the demonstration ghost is drawn as a solid opaque blue car sitting on the zebra with a pedestrian present, and there is no legend on mobile explaining it — the PC legend 'синя — пътят на колата-сянка' is desktop-only. An unexplained car parked on the crossing during a give-way lesson.
+  «синя — пътят на колата-сянка»
+  `sc-zebra-approach/mobile-right/06-waited.png`
+- **`sc-jx-blocked-exit` · C · minor** — The demonstration shadow car is drawn opaque and enormous directly in front of the bonnet at the stop line, occluding the road, the stop line and the light, and the 'Кола отзад · 11 м' chip is stacked on top of it. From the driving seat the student cannot see the junction they are being asked to read.
+  «Кола отзад · 11 м»
+  `sc-jx-blocked-exit/mobile-right/06-waited.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-signals.ts` — 5 findings (2 critical, 1 major, 2 minor)
+
+- **`sc-signal-dead` · A · CRITICAL** — The guided line drives the car INTO A BUILDING: at 2:28 of mobile-right the camera is inside building geometry with the whole windscreen filled by an interior wall, and the drive continues from there. Both right legs collide twice; «Премини наляво, след като пропуснеш идващия отдясно» never ticks anywhere.
+  «Пътнотранспортно произшествие … ✗ Непропускане на пътно превозно средство с предимство»
+  `sc-signal-dead/mobile-right/04-t148s.png`
+- **`sc-signal-hesitation` · A · CRITICAL** — The wrong drive — 59 км/ч through the signalised junction, 0 full stops — is awarded 0 наказателни точки and NOT ONE mistake, on both platforms. It is stamped НЕИЗДЪРЖАН only because the tasks are unfinished, so the debrief tells the student nothing about what he actually did wrong. That is the bare verdict THEO-4 forbids.
+  «НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · mistakes=0 · top 59 км/ч»
+  `sc-signal-hesitation/mobile-wrong/08-debrief.png`
+- **`sc-signal-controller` · A · major** — The world contradicts the briefing's stated posture. The briefing asserts as present fact 'Той е с ГЪРДИ към теб. Това значи … ти спираш преди стоп-линията.' The officer holds the CHEST posture only on 01-arrival (callout 'СПРИ'); by 03-ready - before the student has moved - it has already flipped to 'МИНАВАШ ТИ' and stays there through t001s, t006s, t011s, t017s, t022s, t037s, t042s, t048s, t053s, t058s, t065s, t070s, t076s, 05-stopped and 06-waited. The chest phase the briefing describes never occurs during the drive, so the 'read the posture change' moment the lesson is built on happens off-screen.
+  «3. Той е с ГЪРДИ към теб. Това значи: минава напречното направление, а ти спираш преди стоп-линията.»
+  `sc-signal-controller/mobile-right/03-ready.png`
+- **`sc-signal-controller` · D · minor** — The briefing's numbered list starts at 2. The panel opens with an unnumbered lead paragraph and then runs '2.', '3.', '4.', '5.' - item 1 has lost its number, so the student reads five points labelled two to five.
+  «2. Запомни йерархията: сигналите на регулировчика са над светофара и над знаците.»
+  `sc-signal-controller/mobile-right/02-briefing.png`
+- **`sc-signal-flashing` · D · minor** — The briefing's numbered list starts at «2.» here too — the lead sentence is an unnumbered paragraph and the steps then run 2, 3, 4, 5. Same authoring pattern as the roundabout template, so it is systematic across scenario briefings.
+  «2. Мигащото жълто не е зелено: то значи „внимание, пропусни предимството“.»
+  `sc-signal-flashing/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/rules` — 5 findings (2 critical, 3 major, 0 minor)
+
+- **`sc-fo-motorway-gap` · A · CRITICAL** — The lesson is titled «Дистанция при 130» and its briefing teaches that at 130 км/ч the two-second rule means 72 metres. The graded drive runs the whole motorway section at 11-15 км/ч and is scored 0 mistakes. There is no minimum-speed rule and no objection to crawling on a motorway, so the one skill the lesson exists to teach is never measured and obstructing the carriageway is never named.
+  «На 130 км/ч изминаваш 36 метра всяка секунда: правилото за 2 секунди тук значи цели 72 метра дистанция.»
+  `sc-fo-motorway-gap/pc-right/04-t103s.png`
+- **`sc-hz-accident-scene` · A · CRITICAL** — THE WRONG DRIVE IS NOT CONVICTED OF ANYTHING. 59 км/ч in a posted 50 zone, past a crash scene with people in the road, produces 0 опасни, 0 основни, 0 второстепенни грешки and 0 наказателни точки on both platforms. The only reason given for failing is that route tasks were not finished. Speeding past a live accident scene costs nothing.
+  «Не всички задачи от маршрута бяха изпълнени.»
+  `sc-hz-accident-scene/pc-wrong/08-debrief.png`
+- **`sc-fo-motorway-gap` · F · major** — Speeding conviction is inconsistent between lessons in the same chunk. 59 км/ч in a 50 zone produces zero второстепенни грешки in sc-hazard-obstacle and sc-hz-accident-scene (and in sc-hazard-obstacle a live «Превишена скорост» card fires that the protocol then ignores), while 145 км/ч in a 140 zone produces four counts in sc-hz-breakdown-pulloff. The same offence is convicted in one lesson and invisible in another.
+  «Превишена скорост −1 изпитна т.»
+  `sc-hz-accident-scene/pc-wrong/08-debrief.png`
+- **`sc-hazard-obstacle` · A · major** — During the wrong drive a live НАУЧИ card fires — «Превишена скорост · Движеше се над разрешената скорост», citing ЗДвП чл. 21, ал. 1 — while the posted limit disc reads 50 and the speedo reads 59. The final protocol for that same drive records 0 второстепенни грешки and 0 points. The live coach convicts an offence the examiner's sheet then denies.
+  «Превишена скорост · Движеше се над разрешената скорост. Ограничението е таван, не цел»
+  `sc-hazard-obstacle/pc-wrong/04-t012s.png`
+- **`sc-hz-accident-scene` · A · major** — A НАУЧИ card convicts the student of «Спиране в забранена зона» under a В27 sign at the exact moment the car has stopped because a person is standing in its lane. Stopping for a pedestrian is taught as an offence. The card is also clipped mid-quotation of the sign's own wording.
+  «Спиране в забранена зона · Спря в участък, в който престоят е забранен — под знак В27 „Забранени са престоят и паркирането“»
+  `sc-hz-accident-scene/pc-right/04-t092s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-pe.ts` — 4 findings (2 critical, 2 major, 0 minor)
+
+- **`sc-crossing-dart` · A · CRITICAL** — BOTH GREEN TICKS HANDED TO THE RECKLESS DRIVE. The wrong-drive debrief credits ✓«Приближи пътеката с готовност за спиране» 0:31 and ✓«Премини пътеката, след като е свободна» 0:34 on a run with 0 full stops and a 59 км/ч top speed. The 'cross when clear' objective is authored as pure geometry — {kind:'reachZone', x:LANE_2, y:118, radiusM:12} — it never asks whether the crossing was clear, so it ticks for anyone who drives 38 m further up the road. This is exactly the class of defect the last commit was meant to have closed.
+  «✓ Премини пътеката, след като е свободна 0:34»
+  `sc-crossing-dart/mobile-wrong/08-debrief.png`
+- **`sc-pe-jaywalker` · A · CRITICAL** — The same correct drive passes on pc (ИЗДЪРЖАН, 0 т., both tasks ✓) and fails on a phone (НЕИЗДЪРЖАН, 10 т., «Преминаване на червен сигнал») with both tasks ticked and a commendation. Neither of the lesson's two briefed tasks mentions a signal; the student is failed for something the briefing never asked of him.
+  «10 наказателни точки … НЕИЗДЪРЖАН … ✗ Преминаване на червен сигнал −10 изпитни т.»
+  `sc-pe-jaywalker/mobile-right/08-debrief.png`
+- **`sc-crossing-dart` · A · major** — THE WORLD DOES NOT MATCH THE BRIEFING. Briefing line 2 promises «Ъгловият магазин вляво крие тротоара» — a corner shop on the left hiding the pavement, which is the entire premise of the PE-02 occluded dart-out. There is no such shop. 04-t013s and 04-t028s show the left approach as open ground with iron railings and a low box building set well back; the sightline to the crossing and to both pavements is unobstructed for the whole approach. The lesson teaches a hidden-hazard reflex in a scene with no hidden hazard.
+  «2. Ъгловият магазин вляво крие тротоара — не разчитай, че щом не виждаш никого, няма никой.»
+  `sc-crossing-dart/mobile-right/04-t028s.png`
+- **`sc-pe-jaywalker` · A · major** — The vehicle signal facing the player reads RED while the lesson («Пешеходец на червено») is about a pedestrian who crosses against HIS signal — i.e. the driver should have green. The world's signal phase contradicts the lesson's own premise.
+  «red aspect lit on both near-side heads while the car is credited «Премини пътеката след кръстовището»»
+  `sc-pe-jaywalker/mobile-right/04-t092s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-cockpit.ts` — 3 findings (2 critical, 1 major, 0 minor)
+
+- **`sc-pk-move-off` · A · CRITICAL** — The briefing opens by stating the car is parked on the verge and that moving off is a manoeuvre. The arrival frame is compositionally identical to sc-vp-readiness — same buildings, same 50 sign, same parked cars, same guide lines — with the car sitting in a normal traffic lane, not at a kerb. The world does not match its briefing.
+  «Колата е спряла на банкета. Потеглянето от място е маневра — започва с оглеждане.»
+  `sc-pk-move-off/mobile-right/01-arrival.png`
+- **`sc-vp-stall` · A · CRITICAL** — The entire briefing teaches manual-gearbox clutch technique — clutch fully down, engage first, ease to the bite point — but the car is an automatic. The cluster reads D, the gear selector offers only Л/З/Д, and the key help lists gears only as toward P and toward D. There is no clutch to press, so the lesson cannot be performed at all.
+  «2. Отпускай съединителя ПЛАВНО до точката на зацепване — усещаш как колата „поляга“ напред.»
+  `sc-vp-stall/pc-right/04-t012s.png`
+- **`sc-pk-move-off` · A · major** — The lesson starts with the seatbelt warning lit — the red КОЛАН badge is present on the arrival frame — although this briefing never mentions the belt. The unfastened-belt start state has been inherited from sc-vp-readiness and now contradicts the lesson it appears in.
+  «КОЛАН»
+  `sc-pk-move-off/mobile-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-rail.ts` — 3 findings (2 critical, 1 major, 0 minor)
+
+- **`sc-rx-barrier-drop` · A · CRITICAL** — The task chip contradicts the briefing on the same screen and teaches the dangerous version. The chip reads «Изчакай зад стоп-линията пред спускащата се бариера — дръж под 5 км/ч» while instruction 2 four centimetres away says «спри зад стоп-линията — не се гмуркай под нея». Waiting at a descending barrier is a full stop; a criterion of «hold under 5 км/ч» credits a rolling creep onto a crossing whose barrier is coming down — the exact act instruction 3 calls «не се промъквай».
+  «Изчакай зад стоп-линията пред спускащата се бариера — дръж под 5 км/ч»
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-rx-unguarded` · A · CRITICAL** — The lesson tells the student to drive onto an occupied level crossing. At t093s the task chip reads «Премини прелеза и стигни края на отсечката» while the train body still fills the right half of the windscreen with its wheel a car's width away, and the car is already on the sleepers at 16 км/ч. The objective advanced before the train cleared.
+  «Премини прелеза и стигни края на отсечката»
+  `sc-rx-unguarded/mobile-right/04-t093s.png`
+- **`sc-rx-unguarded` · A · major** — The car comes to a dead stop ON the rails at t099s — the sleeper boards run under the full width of the windscreen and the speedometer reads 0 км/ч — and nothing on screen reacts. No warning card, no red banner, no instruction to clear the track. The single most lethal state in the whole lesson passes in silence and is only mentioned after the fact, in the score.
+  `sc-rx-unguarded/mobile-right/04-t099s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-roundabout2.ts` — 3 findings (2 critical, 1 major, 0 minor)
+
+- **`sc-rb-ped-exit` · A · CRITICAL** — NOT ONE of the three tasks is ticked in ANY of the four legs. The careful drive (7 full stops, 2 lawful waits) is stamped НЕИЗДЪРЖАН 10 т. exactly like the 49 км/ч wrong drive — the lesson cannot be passed and cannot distinguish a good student from a bad one.
+  «– Подмини първия изход и остани в кръга · – Спри в джоба между кръга и пътеката · – Излез на северния изход»
+  `sc-rb-ped-exit/mobile-right/08-debrief.png`
+- **`sc-rb-ped-exit` · A · CRITICAL** — A stationary NPC car parked across the roundabout exit never moves, so the entry gate never opens; the coach card keeps saying «Стоиш вече 15 секунди и това е правилно» while the student can never proceed. The harness had to break the wait twice after 45 s.
+  «the lawful-wait line («Чакаш правилно») never went away in 45s — moving off, and this run's verdict is suspect»
+  `sc-rb-ped-exit/mobile-right/04-t054s.png`
+- **`sc-rb-ped-exit` · G · major** — No give-way markings, no roundabout sign and no lane arrows exist at the entry — the roundabout is a grass mound with shrubs and one building, and the pedestrian the lesson is named for is not visible at the moment the drive is held.
+  `sc-rb-ped-exit/mobile-right/04-t001s.png`
+
+---
+
+## `platform/src/app/(dashboard)/simulator/actions.ts` — 2 findings (2 critical, 0 major, 0 minor)
+
+- **`sc-follow-standstill` · G · CRITICAL** — The mobile right drive passed and the result was thrown away: a red banner across the foot of the debrief says the session was not saved (SAVE_FAILED) and the grade and the review exist only on that screen. A student's completed, passed lesson does not persist.
+  «Сесията не се записа (SAVE_FAILED) — оценката и разборът са верни, но остават само на този екран.»
+  `sc-follow-standstill/mobile-right/08-debrief.png`
+- **`sc-vp-telltale-red` · G · CRITICAL** — The mobile debrief carries a red failure banner telling the student the session was not written and that the passing result exists only on that screen. A correct, passing drive is silently discarded and the student's progress is lost.
+  «Сесията не се записа (SAVE_FAILED) — оценката и разборът са верни, но остават само на този екран.»
+  `sc-vp-telltale-red/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/runtime/worldRuntime.ts` — 2 findings (2 critical, 0 major, 0 minor)
+
+- **`sc-ln-turn-lane-arrows` · B · CRITICAL** — On PC at t064s the ego is driving across an enormous unmarked grey plaza with no lane lines, no kerbs, no pavements and buildings floating at the far edge. The 'boulevard' the briefing names has no road geometry at all in this stretch.
+  «Потегли по булеварда.»
+  `sc-ln-turn-lane-arrows/pc-right/04-t064s.png`
+- **`sc-ov-oncoming-gap` · A · CRITICAL** — The car can leave the road network entirely and keep driving. At t146s the WRONG drive is at 97 км/ч on a featureless grey ground plane with a building intersecting the terrain and no road, markings or boundary anywhere — no off-route stop, no reset, no penalty.
+  `sc-ov-oncoming-gap/mobile-wrong/04-t146s.png`
+
+---
+
+## `platform/src/modules/sim/hud/SimOverlay.tsx` — 60 findings (1 critical, 48 major, 11 minor)
+
+- **`sc-ov-lane-keeping` · D · CRITICAL** — On mobile the ИНСТРУКЦИИ overlay has NO panel background at all. The 'ИНСТРУКЦИИ' title is drawn over the demo picture-in-picture video, the body text runs straight over sky and buildings, item 2 fades out clipped mid-line, the '↓ ОЩЕ 18 РЕДА' hint sits on a building facade, and the ПРОЧЕТИ and РАЗБРАХ buttons are painted over a parked red car. The lesson's instructions are unreadable on a phone.
+  «Потегли и се установи в средата на своята лента — улицата напред НЕ е права: следва извивка надясно, после наляво.»
+  `sc-ov-lane-keeping/mobile-right/04-t152s.png`
+- **`sc-ac-ice` · D · major** — On mobile the ИНСТРУКЦИИ card has no panel of its own — it prints straight onto the world, its third line fades out half-drawn, and the visible text collides with the road sign standing at the same screen position. Below it sits „↓ ОЩЕ 24 РЕДА“ with ПРОЧЕТИ / РАЗБРАХ, i.e. 24 of the 26 briefing lines are hidden behind a control that overlaps the mirror.
+  «↓ ОЩЕ 24 РЕДА»
+  `sc-ac-ice/mobile-right/05-stopped.png`
+- **`sc-crossing-bus-shadow` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-crossing-bus-shadow/mobile-right/04-t001s.png`
+- **`sc-crossing-child-ball` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-crossing-child-ball/mobile-right/04-t001s.png`
+- **`sc-crossing-white-cane` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-crossing-white-cane/mobile-right/04-t001s.png`
+- **`sc-ed-d2-priority-run` · A · major** — Briefing does not match what is graded on PC: the desktop ИНСТРУКЦИИ panel stops at item 5 of 7. Items 6 and 7 — the oncoming-traffic left turn and the равнозначно кръстовище 'предимство на дясната' — are graded objectives 3 and 4 and the desktop student never sees their instructions. Mobile shows all 7.
+  «5. Преди левия завой към „Златовръх“ се престрой в лявата лента — първо огледало, после мигач, чак тогава маневрата.»
+  `sc-ed-d2-priority-run/pc-right/01-arrival.png`
+- **`sc-ed-d2-priority-run` · D · major** — The «Клавиши · за напреднали» help panel is expanded by default, covers the left third of the windscreen for the whole drive, and every line inside it is clipped mid-word by the panel edge.
+  «скорости: към Р / към»
+  `sc-ed-d2-priority-run/pc-right/01-arrival.png`
+- **`sc-fo-brakelight-chain` · F · major** — The two pedal controls render as labelled boxes «СПИРАЧКА S» and «ГАЗ W» in some frames of the run and as two blank grey rectangles with no glyph or label in others, within the same session. A control that silently loses its label is unusable.
+  «СПИРАЧКА S / ГАЗ W»
+  `sc-fo-brakelight-chain/pc-wrong/04-t047s.png`
+- **`sc-junction-rhr` · D · major** — Same mirror/task collision on mobile: the ЗАДАЧА 2/2 chip is printed over the mirror image at the top right, both unreadable.
+  «ЗАДАЧА 2/2»
+  `sc-junction-rhr/mobile-right/04-t049s.png`
+- **`sc-junction-scan` · D · major** — Two HUD elements collide: the coaching banner is drawn straight on top of the «огледай Q» look-around button, so the control the student is being told to use is unreadable underneath the sentence telling them to use it.
+  «Напред е знак Б2 „Спри!“ — спираш напълно и оглеждаш наляво-надясно-наляво.»
+  `sc-junction-scan/pc-right/04-t102s.png`
+- **`sc-junction-stop` · D · major** — World signs punch straight through the HUD. As the car passes the Б2 the full-size STOP octagon is drawn on top of the ЗАДАЧА chip and the rear-view mirror; the task text is unreadable behind it.
+  «Премини стоп-линията след пълно спиране»
+  `sc-junction-stop/pc-right/04-t120s.png`
+- **`sc-junction-stop` · D · major** — Same collision with the 40 km/h disc: at t206s the world sign is rendered at full size directly over the ЗАДАЧА 3/3 chip and over the toast beneath it, blanking both.
+  «Завий надясно и излез от кръстовището на изток»
+  `sc-junction-stop/pc-right/04-t206s.png`
+- **`sc-jx-blocked-exit` · D · major** — On mobile the 'Защо чакаш: червен сигнал' coach panel is clipped after four lines with a '↓ ОЩЕ 7 РЕДА' hint, and its two circular buttons 'ЗАЩО' and '✕' physically overlap each other and sit on top of a world traffic sign. The panel has no background, so its body text runs over the buildings.
+  «На червено се спира напълно ПРЕД линията — без»
+  `sc-jx-blocked-exit/mobile-right/06-waited.png`
+- **`sc-lane-change` · F · major** — The two platforms are different products during the drive: PC carries a persistent task chip, a seven-item instruction panel, a coach caption and a colour legend; mobile shows none of them — only a МЕНЮ circle — so the mobile student drives with no statement of the task on screen.
+  «МЕНЮ»
+  `sc-lane-change/mobile-right/04-t112s.png`
+- **`sc-ln-boulevard-discipline` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-ln-boulevard-discipline/mobile-right/04-t001s.png`
+- **`sc-merge-bus-pullout` · D · major** — Same top-right HUD pile-up as the other merge lessons: mirror widget, difficulty tabs and the ЗАДАЧА chip plus a duplicate copy of the task sentence all render on the same pixels, with the tab underline cutting through the task text.
+  «ЗАДАЧА 1/3 Намали, за да пропуснеш потеглящия автобус»
+  `sc-merge-bus-pullout/pc-right/01-arrival.png`
+- **`sc-merge-lane-end` · D · major** — PC HUD pile-up in the top-right corner: the rear-view mirror widget, the difficulty tabs (Начинаещ / Нормален / Напреднал), the ЗАДАЧА 1/2 chip and a second, duplicated copy of the same task sentence are all stacked on the same pixels. The task text is struck through by the mirror frame and the tab underline runs across the letters — the one line telling the student what to do is the least legible thing on screen.
+  «ЗАДАЧА 1/2 Влей се в оставащата лента преди края на своята»
+  `sc-merge-lane-end/pc-right/04-t120s.png`
+- **`sc-merge-lane-end` · D · major** — The PC ИНСТРУКЦИИ panel is cut off mid-sentence at item 6 with no scrollbar, no fade and no 'more' affordance. The final instruction — the one that explains why the merge is the student's responsibility — is unreadable.
+  «6. Влез в пролуката с едно плавно движение и изключи мигача. Твоята лента свърши — значи ти се»
+  `sc-merge-lane-end/pc-right/01-arrival.png`
+- **`sc-merge-lane-end` · D · major** — On mobile the ИНСТРУКЦИИ overlay never goes away. It is still parked over the top-right corner at t115s and t190s — mid-drive — covering the right mirror, the world 50 sign and part of the road, with ПРОЧЕТИ / РАЗБРАХ buttons floating over traffic and a '↓ ОЩЕ 29 РЕДА' counter.
+  «↓ ОЩЕ 29 РЕДА»
+  `sc-merge-lane-end/mobile-right/04-t115s.png`
+- **`sc-ov-keep-right` · D · major** — The keyboard cheat-sheet, the ЗАДАЧА chip, the duplicated coach bubble, the ИНСТРУКЦИИ panel and the demo caption are all on screen at once and between them cover roughly the entire right half and top-left quarter of the windscreen. The only clear glass is the strip directly ahead.
+  «Дръж дясната до края — висенето вляво без причина е грешка, която тече със секундите.»
+  `sc-ov-keep-right/pc-right/01-arrival.png`
+- **`sc-ov-solid-return` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-ov-solid-return/mobile-right/04-t001s.png`
+- **`sc-park-45-rev` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-park-45-rev/mobile-right/04-t001s.png`
+- **`sc-park-left` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-park-left/mobile-right/04-t001s.png`
+- **`sc-park-night` · G · major** — The settings sheet reports 'Задача 2/2' while the debrief credits neither task and scores НЕИЗДЪРЖАН. A student who checks the menu mid-lesson is told both route tasks are done when nothing has been ticked.
+  «Задача 2/2»
+  `sc-park-night/mobile-right/07b-menu.png`
+- **`sc-park-wall` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-park-wall/mobile-right/04-t001s.png`
+- **`sc-park-zebra` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-park-zebra/mobile-right/04-t001s.png`
+- **`sc-pe-jaywalker` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-pe-jaywalker/mobile-right/04-t070s.png`
+- **`sc-pe-night-unlit` · D · major** — The ИНСТРУКЦИИ card clips its last step mid-line in EVERY pc frame of the run. Step 6 renders as 'Огледай се и премини спокойно едва когато' with the following line sliced horizontally through the letterforms by the card's bottom edge. The final instruction of the lesson is never fully readable.
+  «6. Огледай се и премини спокойно едва когато пътеката е свободна.»
+  `sc-pe-night-unlit/pc-right/01-arrival.png`
+- **`sc-pe-school-patrol` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-pe-school-patrol/mobile-right/04-t001s.png`
+- **`sc-pe-zone-living` · D · major** — Same ИНСТРУКЦИИ clipping as sc-pe-night-unlit: step 6 renders as 'На изхода — устието към обикновената улица, със' and is sliced through the letterforms by the card's bottom edge in every pc frame.
+  «6. На изхода — устието към обикновената улица, със»
+  `sc-pe-zone-living/pc-right/04-t090s.png`
+- **`sc-pk-busstop-ban` · D · major** — The ЗАДАЧА chip, the difficulty tabs and a duplicated copy of the task sentence all render on top of the rear-view mirror, so the task text is crossed by the mirror frame and the tab underline throughout the drive.
+  «ЗАДАЧА 2/2 Спри на разрешеното място след зоната на спирката»
+  `sc-pk-busstop-ban/pc-right/04-t146s.png`
+- **`sc-rb-busy-gap` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-rb-busy-gap/mobile-right/04-t001s.png`
+- **`sc-rb-circulate-priority` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-rb-circulate-priority/mobile-right/04-t049s.png`
+- **`sc-rb-exit-signal` · D · major** — The top-right teaching card is clipped at BOTH ends on this viewport. Its title row is sliced by the top of the screen, and the last visible body line is cut horizontally through the middle of the glyphs — only the top halves of «там винаги е Б1 или Б2» render — before the «↓ ОЩЕ 9 РЕДА» affordance. Same defect on the violation card at t063 («↓ ОЩЕ 7 РЕДА», body sliced mid-letter). The card also has no scrim, so white text sits on bright sky.
+  «Защо чакаш: в кръга имат предимство»
+  `sc-rb-exit-signal/mobile-right/04-t035s.png`
+- **`sc-rb-exit-signal` · D · major** — A control collides with the one road sign the lesson is about: the «РАЗБРАХ» pill is drawn directly over the Б1 give-way triangle at the roundabout entry, covering the sign's left half exactly as the student approaches the give-way line.
+  «РАЗБРАХ»
+  `sc-rb-exit-signal/mobile-right/04-t029s.png`
+- **`sc-rb-lane-choice` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-rb-lane-choice/mobile-right/04-t043s.png`
+- **`sc-rb-ped-exit` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-rb-ped-exit/mobile-right/04-t001s.png`
+- **`sc-sig-controller-postures` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-sig-controller-postures/mobile-right/04-t064s.png`
+- **`sc-sig-controller-postures` · G · major** — The controller's speech billboard carries five lines of ~8 px text in three colours over a green panel — unreadable on a phone — and it states the answer («МИНАВАШ ТИ … Предимството е ТВОЕ — дори на червено») outright, which removes the reading-the-posture exercise the task asks for. The «Кола отзад · 6 м» chip sits dead centre of the windscreen on the vanishing point.
+  `sc-sig-controller-postures/mobile-right/04-t064s.png`
+- **`sc-signal-dead` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-signal-dead/mobile-right/04-t001s.png`
+- **`sc-signal-flashing` · D · major** — Same top-right card clipping as the roundabout lesson, in both drives. On 01-arrival the second briefing line «то значи Внимание, пропусни предимството» is sliced horizontally through the glyphs before «↓ ОЩЕ 17 РЕДА»; on the wrong drive's speeding card the body cuts mid-line before «↓ ОЩЕ 2 РЕДА»; on the right drive's violation card before «↓ ОЩЕ 7 РЕДА». Every teaching card the student meets is amputated.
+  «2. Мигащото жълто не е зелено:»
+  `sc-signal-flashing/mobile-right/01-arrival.png`
+- **`sc-signal-hesitation` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-signal-hesitation/mobile-right/04-t043s.png`
+- **`sc-signal-response` · D · major** — On mobile the fault card is drawn underneath the rear-view mirror panel, so the penalty badge strip that names the class and the point cost is hidden. The student sees an explanation with no idea what it cost.
+  «Превишена скорост»
+  `sc-signal-response/mobile-wrong/04-t012s.png`
+- **`sc-speed-creep` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-speed-creep/mobile-right/04-t001s.png`
+- **`sc-speed-dangerous` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-speed-dangerous/mobile-right/04-t001s.png`
+- **`sc-speed-rain` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-speed-rain/mobile-right/04-t001s.png`
+- **`sc-speed-zone` · D · major** — The teach card clips its body text THROUGH THE MIDDLE OF A LINE OF GLYPHS — the last visible row is sliced horizontally in half — and then offers «↓ ОЩЕ N РЕДА». It carries no panel of its own, so its first two lines render directly over the rear-view mirror image and the sky, and the «ЗАЩО»/«×» controls land on top of world geometry (traffic-light poles, vehicles, world signs).
+  «↓ ОЩЕ N РЕДА (with the row above it cut through the x-height)»
+  `sc-speed-zone/mobile-right/04-t001s.png`
+- **`sc-turn-left-oncoming` · D · major** — A world 40 km/h disc is rendered at full size on the boundary of the ИНСТРУКЦИИ panel, half on the world and half occluded by the panel, so neither the sign nor the instruction line beneath it reads cleanly.
+  `sc-turn-left-oncoming/pc-right/04-t095s.png`
+- **`sc-vu-emergency-junction` · D · major** — Four HUD layers pile into the same top-right corner of the PC play area and overprint each other: the rear-view mirror inset, the ЗАДАЧА 1/2 chip, a toast repeating the chip's string verbatim, and the ИНСТРУКЦИИ card. The chip's text is legible only in patches because the mirror image and the toast are drawn through it; the difficulty tabs (Начинаещ/Нормален/Напреднал) are also half-covered by the mirror.
+  «ЗАДАЧА 1/2 · Приближи кръстовището бавно и с готовност за спиране»
+  `sc-vu-emergency-junction/pc-right/01-arrival.png`
+- **`sc-ac-bridge-ice` · D · minor** — The PC ИНСТРУКЦИИ panel shows items 1–9 with item 9 half-clipped at the panel's bottom border and no visible affordance that a tenth line exists; the mobile briefing modal for the same lesson shows all ten. Item 10 („Чакай отсрещния устой: там свършва ледът“) is the one that tells the student when the hazard ends.
+  «10. Чакай отсрещния устой: там свършва ледът и чак там свършва мостът.»
+  `sc-ac-bridge-ice/pc-wrong/04-t027s.png`
+- **`sc-ac-night-lights` · D · minor** — The PC keyboard-help panel is set in a monospace face unlike every other panel in the app (ИНСТРУКЦИИ, debrief, menu all use the rounded sans), its last row wraps so that the gear letter «D» is orphaned onto its own line, «стрелки)» leaves a lone closing bracket, and the world's overhead power cables are drawn straight across the panel text.
+  «скорости: към P / към D»
+  `sc-ac-night-lights/pc-right/01-arrival.png`
+- **`sc-junction-left` · D · minor** — The '◀ огледай Q' mirror-glance chip is drawn inside the demo caption bubble 'Ляв мигач и плавно към стоп-линията.' — the two panels overlap and the caption's rounded border is clipped by the chip.
+  «◀ огледай Q»
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-merge-bus-pullout` · D · minor** — The PC ИНСТРУКЦИИ panel clips item 5 mid-word at the panel edge with no scroll affordance, exactly as in sc-merge-lane-end.
+  «5. Не форсирай покрай него „преди да е излязъл“.»
+  `sc-merge-bus-pullout/pc-right/01-arrival.png`
+- **`sc-merge-motorway-exit` · D · minor** — The mobile ИНСТРУКЦИИ overlay stays over the rear-view mirror during the drive showing '↓ ОЩЕ 39 РЕДА', with ПРОЧЕТИ / РАЗБРАХ buttons floating over the traffic in the right-hand lane.
+  «↓ ОЩЕ 39 РЕДА»
+  `sc-merge-motorway-exit/mobile-right/01-arrival.png`
+- **`sc-pe-night-unlit` · D · minor** — The world-space marker label 'Карай дотук / не по-бързо от 35 км/ч' sits underneath the ИНСТРУКЦИИ card and is sliced by it — a sign the student is being graded against is half-covered by a HUD panel.
+  «Карай дотук — не по-бързо от 35 км/ч»
+  `sc-pe-night-unlit/pc-right/05-stopped.png`
+- **`sc-pe-parked-row-scan` · D · minor** — The world-space marker 'Карай дотук — не по-бързо от 37 км/ч' is half-swallowed by the ИНСТРУКЦИИ card: only 'Карай доту' survives, the speed figure is behind the panel. On mobile the same label renders at about 14 px against a building facade of near-identical grey and is effectively illegible.
+  «Карай дотук — не по-бързо от 37 км/ч»
+  `sc-pe-parked-row-scan/pc-right/01-arrival.png`
+- **`sc-pk-busstop-ban` · D · minor** — The PC ИНСТРУКЦИИ panel clips item 6 at the panel edge with no scroll affordance — the item that gives the correct answer to the lesson's core question ('само за секунда').
+  «6. Задръж колата спряна — това е правилният отговор на „само за секунда“.»
+  `sc-pk-busstop-ban/pc-right/01-arrival.png`
+- **`sc-pk-smooth-stop` · D · minor** — An unlabelled circular glyph (a small white world/continents mark) floats at the bottom-right of the play area in every pc frame with no caption, no tooltip and no legend anywhere. It also overlaps the dashboard geometry and, in sc-pe-zone-living, lands on top of the penalty card's last line.
+  `sc-pk-smooth-stop/pc-right/04-t039s.png`
+- **`sc-vu-emergency-junction` · D · minor** — The ИНСТРУКЦИИ list loses its first number on mobile: step 1 renders as an unnumbered headline and the list then visibly starts at «2.», so a student reads a five-step procedure that begins at two. PC renders the same content correctly numbered 1..5.
+  «Тръгни по страничната улица към кръстовището и намали отрано — ще завиваш наляво. / 2. Огледай пресечните посоки…»
+  `sc-vu-emergency-junction/mobile-right/02-briefing.png`
+- **`sc-vu-pass-clearance` · F · minor** — CONSISTENCY — the ИНСТРУКЦИИ panel drops its first list number on mobile in this lesson too (headline, then «2.», «3.», «4.», «5.»), while PC numbers 1..5. Identical defect in both lessons of this chunk, so it is systematic in the briefing renderer rather than a per-scenario content typo.
+  «Потегли по правата улица и се установи на спокойна градска скорост. / 2. Пред теб, покрай десния бордюр, кара велосипедист.»
+  `sc-vu-pass-clearance/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/hud/ObjectiveBanner.tsx` — 36 findings (1 critical, 32 major, 3 minor)
+
+- **`sc-vu-emergency` · D · CRITICAL** — The HUD covers the exact thing the briefing tells the student to watch. Instruction 2 says to keep glancing at the rear-view mirror because the blue light shows there first — and on PC the objective banner is printed straight across the rear-view mirror, obscuring most of its glass from arrival onwards.
+  «Поглеждай периодично в огледалото за обратно виждане — синята лампа се вижда там, преди сирената да е оглушителна.»
+  `sc-vu-emergency/pc-right/01-arrival.png`
+- **`sc-ac-crosswind` · D · major** — Two HUD chips are printed on top of each other with no gap: the task chip and the route pill run together as one string, «Стигни края на отсечкатаСледвай синята линия», the pill's rounded border cuts through the chip text, and both sit over the minimap and the trees with no opaque plate behind them.
+  «Стигни края на отсечкатаСледвай синята линия»
+  `sc-ac-crosswind/pc-right/04-t191s.png`
+- **`sc-ac-highbeam-lead` · D · major** — The completed-objective chip on mobile has no background plate at all. The green ✓ is drawn over the minimap image, the white text «Следвай предната кола с / къси светлини» lies directly on the night city, and the ✕ floats detached far to the right over a building. Nothing bounds the panel.
+  «Следвай предната кола с къси светлини»
+  `sc-ac-highbeam-lead/mobile-right/04-t127s.png`
+- **`sc-ac-night-lights` · D · major** — Top-right corner is a three-way collision on PC: the ЗАДАЧИ 1/2 chip, the objective toast and the minimap all occupy the same box. The word ЗАДАЧИ is drawn over the minimap image and the toast overlaps the ИНСТРУКЦИИ panel below it. Present in every PC frame of this lesson from arrival onward.
+  «Мини контролната зона осветен — дръж под 50 км/ч»
+  `sc-ac-night-lights/pc-right/01-arrival.png`
+- **`sc-ac-rain-lights` · D · major** — The world label that carries the graded number is cut in half by a HUD panel: «Карай дотук / не по-бързо от 47 км/ч» has its second line sliced at «47 км/» by the left edge of the ИНСТРУКЦИИ panel, so the one figure the student is being scored against is unreadable.
+  «не по-бързо от 47 км/»
+  `sc-ac-rain-lights/pc-right/04-t090s.png`
+- **`sc-ed-d2-priority-run` · D · major** — Two HUD strings render on top of each other at top right: the task chip text and a second route-guidance string overlap letter-on-letter, and both are painted over the rear-view mirror image.
+  «Премини светофара и завий надясно»
+  `sc-ed-d2-priority-run/pc-right/04-t192s.png`
+- **`sc-ed-d2-stop-address` · D · major** — The task chip counts backwards. Mid-drive it reads ЗАДАЧА 2/3; on the frame captured after the drive loop — with two objectives already timestamped as done — it has reverted to ЗАДАЧА 1/3.
+  «ЗАДАЧА 1/3 Потегли от бордюра след пълния оглед»
+  `sc-ed-d2-stop-address/pc-right/05-stopped.png`
+- **`sc-ed-reverse-line` · D · major** — The in-drive ⚙ sheet reports 'Задача 2/3' while the debrief for the same run credits only one objective. The counter the student watches disagrees with the record that judges him.
+  «Задача 2/3»
+  `sc-ed-reverse-line/mobile-right/07b-menu.png`
+- **`sc-ed-reverse-line` · D · major** — Task chip and route-guidance string overprint each other at top right — the word 'линия' is stamped through the end of the chip sentence — and the pair covers the rear-view mirror.
+  «Дръж права линия по средата на заден ход»
+  `sc-ed-reverse-line/pc-right/04-t108s.png`
+- **`sc-follow-standstill` · D · major** — Two HUD labels are drawn on top of each other in the objective banner — the objective title and a second, different label overlap glyph-on-glyph and neither is readable.
+  «Спри зад колоната на разумно разстояние»
+  `sc-follow-standstill/pc-wrong/04-t053s.png`
+- **`sc-follow-tailgater` · D · major** — The lesson's second instruction is to look in the mirror, and the interior mirror is roughly 80% covered by the lesson's own chrome: the difficulty selector, the ЗАДАЧА banner and the duplicated objective box all draw over it. The rear car is only ever announced by a small 'Кола отзад · 9 м' chip that is itself replaced by the demonstration player once the drive starts.
+  «2. Погледни в огледалото: кола е залепена на метри зад теб.»
+  `sc-follow-tailgater/pc-right/01-arrival.png`
+- **`sc-hazard-obstacle` · F · major** — Two HUD strings are painted on top of one another in the task banner: «Задмини обекта, без да го закачиш» collides with a second string ending «…ината линия», rendering both illegible. The same banner collision recurs in sc-hz-brake-dont-swerve (pc-wrong t028) and sc-hz-breakdown-pulloff (pc-wrong t205), so it is a shared HUD layout defect, not a one-off.
+  «Задмини обекта, без да го закачиш»
+  `sc-hazard-obstacle/pc-right/04-t076s.png`
+- **`sc-hz-brake-dont-swerve` · D · major** — Task banner string collision: «Мини участъка с разрешена[та скорост]» is painted over a second string ending «…ната линия» at the same coordinates, leaving both unreadable. Same defect class as sc-hazard-obstacle t076 and sc-hz-breakdown-pulloff t205.
+  «Мини участъка с разрешената скорост»
+  `sc-hz-brake-dont-swerve/pc-wrong/04-t028s.png`
+- **`sc-hz-breakdown-pulloff` · D · major** — Three HUD strings stack on top of one another in the task banner and are all unreadable: the objective «Спри плътно вдясно в аварийната лента», a second string ending «…та линия», and the red alert «Контролна лампа: температура! Спри». The most urgent message in the lesson is the one buried under the other two.
+  «Контролна лампа: температура! Спри»
+  `sc-hz-breakdown-pulloff/pc-wrong/04-t205s.png`
+- **`sc-junction-blind` · D · major** — The 'ЗАДАЧА 1/2' objective chip has no background and is painted directly onto the 3D world AND onto the demo picture-in-picture panel behind it — white text over a pale building facade and a tree, illegible. The identical sentence is then repeated immediately below in the green coach bubble with a speed cap appended, so the same instruction occupies the screen twice.
+  «ЗАДАЧА 1/2 Приближи кръстовището бавно, с готовност за спиране»
+  `sc-junction-blind/pc-right/05-stopped.png`
+- **`sc-junction-rhr` · D · major** — The rear-view mirror render is drawn on top of the ЗАДАЧА chip: the task number and the first line of the task text sit behind the mirror image and are illegible. The «Начинаещ / Нормален / Напреднал» tabs are also half-buried under it.
+  «ЗАДАЧА 1/2»
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-jx-giveway-b1` · D · major** — The rear-view mirror render sits on top of the ЗАДАЧА 1/3 chip; the task number and the first words of the task are behind the mirror image. The mode tabs «Начинаещ / Нормален / Напреднал» are likewise half-occluded by it.
+  «ЗАДАЧА 1/3»
+  `sc-jx-giveway-b1/pc-right/01-arrival.png`
+- **`sc-lane-change` · D · major** — Task chip and route-guidance string overprint at top right: 'Установи се в дясната лента' has '…двай синята линия' stamped through its tail, both over the mirror image.
+  «Установи се в дясната лента»
+  `sc-lane-change/pc-wrong/04-t021s.png`
+- **`sc-ln-decisive-change` · D · major** — PC: the task chip paints two text runs on top of each other and the result is unreadable — the objective line and a stray fragment collide so the student reads Заеми лявата лента зад отминалата кола, в лния over средата Й.
+  «Заеми лявата лента зад отминалата кола, в лния / средата Й»
+  `sc-ln-decisive-change/pc-right/07-end.png`
+- **`sc-ln-obstacle-meeting` · D · major** — PC: the ЗАДАЧА 1/3 chip, the teach-moment card and the rear-view mirror inset all occupy the same rectangle top-right, and the objective text is painted twice over itself — Спри в своята лента пред препятствието appears once in the chip and again in the card directly beneath, both partly behind the mirror.
+  «ЗАДАЧА 1/3 Спри в своята лента пред препятствието — дръж под 6 км/ч»
+  `sc-ln-obstacle-meeting/pc-right/01-arrival.png`
+- **`sc-ln-turn-lane-arrows` · D · major** — On PC the ЗАДАЧА 1/3 line is drawn twice on top of itself at the top right — the task card and the toast collide into unreadable overlapping type — and the «ЗАДАЧА 1/3» header itself sits behind the 3D rear-view mirror.
+  «Заеми лявата лента със стрелка „само наляво“»
+  `sc-ln-turn-lane-arrows/pc-right/04-t064s.png`
+- **`sc-maneuver-3point` · D · major** — PC: the task chip is double-painted and garbled beyond reading — the objective line and a stray fragment overlap so the top of the play area reads Задача 2: обърни посоката на 180° в три over линия движения. The same defect shows on the Задача 1 chip in pc-wrong.
+  «Задача 2: обърни посоката на 180° в три линия движения»
+  `sc-maneuver-3point/pc-right/04-t039s.png`
+- **`sc-mw-discipline` · D · major** — PC: the objective is rendered twice at once — a monospace copy printed across the rear-view mirror (half hidden behind it) and a second copy in the callout box below. Both are visible in the same frame.
+  «Мини контролната зона в дясната лента за движение — дръж под 140 км/ч»
+  `sc-mw-discipline/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · A · major** — Instruction 3 tells the student to look in the rear-view mirror because the car behind is closing at motorway speed, and a „Кола отзад · 9 м“ chip confirms one exists — but the PC rear-view mirror is completely covered by the objective banner text, and the mobile mirror shows only empty road. The one vehicle the lesson depends on is never visible where the briefing sends the student to look.
+  «Погледни в огледалото за задно виждане. Колата зад теб се движи с магистрална скорост»
+  `sc-mw-min-speed/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · D · major** — PC: two different objective strings render on top of each other in the same frame — the completed-task tick line and the next task line collide over the mirror, producing overlapping glyph soup at the top right.
+  «Задръж лентата и ритъма през средата на участъка … Стигни края на участъка»
+  `sc-mw-min-speed/pc-wrong/04-t027s.png`
+- **`sc-ov-crest-curve` · D · major** — On PC the ЗАДАЧА 1/3 header is drawn behind the 3D rear-view mirror and the toast beneath repeats the same sentence, so the task appears twice and its label is unreadable.
+  «Изчакай зад камиона през целия сляп завой — дръж под 51 км/ч»
+  `sc-ov-crest-curve/pc-right/01-arrival.png`
+- **`sc-ov-lane-keeping` · G · major** — The ⚙ menu reports 'Задача 3/3' while the debrief for the same run shows only two of three objectives ticked and the third as a dash. The menu tells the student the lesson is complete; the debrief says it is not.
+  «Задача 3/3»
+  `sc-ov-lane-keeping/mobile-right/07b-menu.png`
+- **`sc-ov-oncoming-gap` · D · major** — On PC the ЗАДАЧА card text is drawn twice on top of itself — the task card line and the toast beneath it render the same sentence in the same place, and the «ЗАДАЧА 2/2» header sits behind the 3D rear-view mirror.
+  «Изпревари в големия прозорец и завърши в своята лента»
+  `sc-ov-oncoming-gap/pc-right/04-t171s.png`
+- **`sc-roundabout-entry` · D · major** — On PC the task chip text has a route-guidance progress bar and a second toast drawn straight through it, so 'Премини през кръговото и излез с десен мигач' is struck through by a horizontal rule and doubled underneath.
+  «Премини през кръговото и излез с десен мигач»
+  `sc-roundabout-entry/pc-right/04-t141s.png`
+- **`sc-sp-curve` · D · major** — On PC the ЗАДАЧА chip, the difficulty tabs and the advisor toast all stack on top of the rear-view mirror, and at t=206s a blue progress pill overprints the chip so it reads Мини средата на завоя с препоръчителната ЛИНИЯ — two unrelated strings collided into one nonsense sentence at the exact moment the student is meant to read the corner instruction.
+  «Мини средата на завоя с препоръчителната линия»
+  `sc-sp-curve/pc-right/04-t206s.png`
+- **`sc-sp-eco-coast` · D · major** — PC: the objective is printed twice in the same frame — once as monospace text laid over the rear-view mirror (clipped by the mirror body) and once in the callout beneath it. Both copies are on screen simultaneously at arrival and throughout the drive.
+  «ЗАДАЧА 1/3 Пусни газта отрано — стигни зоната пред линията вече намалил»
+  `sc-sp-eco-coast/pc-right/01-arrival.png`
+- **`sc-speed-transition` · D · major** — On PC the ЗАДАЧА chip, the green completion tick line and the difficulty tabs Начинаещ / Нормален / Напреднал are all drawn ON TOP of the interior rear-view mirror glass, and the advisor toast overlaps the same rectangle. In a driving trainer the mirror is instrument, not wallpaper — roughly two thirds of it is covered for the whole drive.
+  «Влез в зона 30 вече под ограничението»
+  `sc-speed-transition/pc-right/04-t139s.png`
+- **`sc-vu-emergency` · D · major** — Two HUD strings render on top of each other and become unreadable: the task line and a route-guidance line collide, producing „Продължи до края на отсечкатаай синята линия“ as one run-on string with overlapping glyphs. The same collision appears in the wrong run as „Отдръпни се вдясно и пропусни линейката линия“.
+  «Продължи до края на отсечкатаай синята линия»
+  `sc-vu-emergency/pc-right/04-t103s.png`
+- **`sc-ac-aquaplane` · D · minor** — The objective banner breaks the speed unit across two lines — „дръж под 63 км/“ then „ч“ on the next line. Present in every pc frame of this lesson.
+  «Намали под 60 ПРЕДИ водата — дръж под 63 км/ч»
+  `sc-ac-aquaplane/pc-right/01-arrival.png`
+- **`sc-follow-brake` · D · minor** — The objective chip overlaps the world waypoint label: the banner text and the in-world 'Карай дотук' marker draw over one another at the top right.
+  «Продължи след спирането до края на отсечката»
+  `sc-follow-brake/pc-wrong/04-t044s.png`
+- **`sc-follow-distance` · D · minor** — The objective chip prints its own title twice: once as the ЗАДАЧА line and again in a bordered box immediately beneath it, both partly behind the rear-view mirror.
+  «Следвай на съобразена дистанция»
+  `sc-follow-distance/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/LessonCard.tsx` — 12 findings (1 critical, 10 major, 1 minor)
+
+- **`sc-rx-unguarded` · D · CRITICAL** — On a phone the briefing is unreadable at arrival. The ИНСТРУКЦИИ panel is clipped by the top edge of the viewport, shows about four of its lines, fades out mid-sentence at «2. Намали отрано: на» and carries the counter «↓ ОЩЕ 16 РЕДА». Sixteen of twenty lines of the safety briefing for an unguarded level crossing are off screen.
+  «↓ ОЩЕ 16 РЕДА»
+  `sc-rx-unguarded/mobile-right/01-arrival.png`
+- **`sc-follow-distance` · D · major** — On mobile the collapsed instruction card slices its text horizontally through the middle of a line of glyphs and offers '↓ ОЩЕ 21 РЕДА' for a list of only 8 steps.
+  «↓ ОЩЕ 21 РЕДА»
+  `sc-follow-distance/mobile-right/01-arrival.png`
+- **`sc-follow-truck` · D · major** — On mobile the collapsed instruction card again slices its text through the middle of a glyph row and reports '↓ ОЩЕ 23 РЕДА' for an eight-step briefing.
+  «↓ ОЩЕ 23 РЕДА»
+  `sc-follow-truck/mobile-right/04-t046s.png`
+- **`sc-ln-obstacle-meeting` · D · major** — The full briefing overlay cuts its last line in half behind the Разбрах button — the top of line 6 is visible as sliced glyphs and there is no scrollbar or affordance telling the student more text exists. The peek card behind it advertises 36 more lines.
+  «↓ ОЩЕ 36 РЕДА»
+  `sc-ln-obstacle-meeting/mobile-right/02-briefing.png`
+- **`sc-merge-accel-lane` · D · major** — The briefing overlay clips its last line behind the Разбрах button — item 6 breaks at вече е аварийната and the rest is hidden with no scroll affordance, in a lesson where the hard-shoulder warning is the safety point.
+  «След края на лентата за ускоряване вдясно вече е аварийната»
+  `sc-merge-accel-lane/mobile-right/02-briefing.png`
+- **`sc-mv-uturn-ban` · D · major** — On mobile the briefing that carries the whole legal point is hidden: only four lines show and „↓ ОЩЕ 31 РЕДА“ conceals thirty-one more, including every step about where the ban ends. The panel then stays parked over the right third of the windscreen.
+  «↓ ОЩЕ 31 РЕДА»
+  `sc-mv-uturn-ban/mobile-right/02-briefing.png`
+- **`sc-pk-ban-stop` · D · major** — Same doubled task chip as sc-pk-driveway: «Спри на разрешеното място след зоната» is drawn over a second copy of itself at the top right, and the pair also overlaps the mirror thumbnail and the difficulty strip.
+  «Спри на разрешеното място след зоната — дръж под 6 км/ч»
+  `sc-pk-ban-stop/pc-wrong/04-t023s.png`
+- **`sc-pk-driveway` · D · major** — The ЗАДАЧА card renders twice on top of itself at the top right — «Задача 2: влез на заден ход в алеята и спри напълно» is printed over a second copy of the same string, leaving an unreadable smear. It also collides with the difficulty strip (Начинаещ/Нормален/Напреднал) and the mirror thumbnail.
+  «Задача 2: влез на заден ход в алеята и спри напълно»
+  `sc-pk-driveway/pc-right/04-t028s.png`
+- **`sc-pk-driveway` · D · major** — On mobile the dangerous-error card is clipped to three lines with «↓ ОЩЕ 6 РЕДА» — six of the nine lines that explain a 10-point dangerous error are hidden behind a scroll. The WHY of the worst thing that can happen in the lesson is the part that gets cut.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-pk-driveway/mobile-wrong/04-t017s.png`
+- **`sc-pk-stop-vs-park` · D · major** — Mobile instruction panel clips its own briefing. Only ~4 lines render, line 2 is cut mid-word behind a fade, and a „↓ ОЩЕ 23 РЕДА“ affordance hides the remaining 23 lines. The panel is still open and still clipped at 07-end, so it sat over the right third of the windscreen for the whole 206 s drive.
+  «↓ ОЩЕ 23 РЕДА»
+  `sc-pk-stop-vs-park/mobile-right/07-end.png`
+- **`sc-rx-barrier-drop` · D · major** — Same doubled ЗАДАЧА card as the other desktop lanes — «Изчакай зад стоп-линията пред спускащата се бариера» is drawn over a second copy of itself and over the mirror thumbnail and the Начинаещ/Нормален/Напреднал strip, all inside the top-right corner.
+  «ЗАДАЧА 1/2»
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-ln-obstacle-meeting` · D · minor** — PC: the ИНСТРУКЦИИ panel is truncated mid-sentence at item 5 with no scrollbar and no more-text affordance, so the student never sees items 6 and beyond that the mobile card counts.
+  «Чак когато насрещната лента е празна докрай: ляв мигач, оглед и една спокойна дъга покрай»
+  `sc-ln-obstacle-meeting/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/markings.ts` — 6 findings (1 critical, 5 major, 0 minor)
+
+- **`sc-ov-lane-keeping` · A · CRITICAL** — The lesson's reference marking does not exist. The road through the S-bend has no centre line and no lane lines — only white kerb edge lines — yet instruction 3 says 'не оставяй колата да „изплува“ навън към осевата линия', instruction 4 says 'не срязвай през осевата', and the conviction text says the car was 'близо до или върху маркировката'. The student is graded against paint that is not on the road.
+  «Движеше се трайно встрани от средата на лентата — близо до или върху маркировката.»
+  `sc-ov-lane-keeping/pc-right/01-arrival.png`
+- **`sc-junction-blind` · B · major** — The junction itself is a bare grey asphalt blob: no stop line, no lane markings, no pedestrian crossing, no kerb radius, and nothing at all on the far side. A learner arriving here cannot read where the junction begins or ends.
+  `sc-junction-blind/mobile-right/04-t065s.png`
+- **`sc-junction-left` · A · major** — The objective and the coach caption both name a stop line the world does not have. The task reads 'Премини стоп-линията след пълно спиране', the demo caption reads 'плавно към стоп-линията', and the world label reads 'Спри на стоп-линията' — but the carriageway at the Б2 sign carries only a kerb edge line. No stop line is painted anywhere in front of the sign.
+  «Ляв мигач и плавно към стоп-линията.»
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-jx-blocked-exit` · F · major** — This is the only lesson of the seven whose traffic light is present and cycles, and the only one whose junction has a painted stop line. sc-junction-blind, sc-junction-left and sc-jx-equal-left junctions have neither — the same road class renders three different ways across the set.
+  `sc-jx-blocked-exit/pc-right/05-stopped.png`
+- **`sc-ov-keep-right` · F · major** — This lesson's carriageway carries dashed lane lines; sc-ov-lane-keeping, its sibling in the same lane family, carries none at all. The green route ribbon marks the target path in the junction lessons but marks the wrong lane here.
+  `sc-ov-keep-right/mobile-right/04-t118s.png`
+- **`sc-ov-lane-keeping` · F · major** — Its sibling sc-ov-keep-right renders the same road class with dashed lane lines; this street has none. The two lane lessons teach opposite things about what a lane looks like.
+  `sc-ov-lane-keeping/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/ExamBriefingCard.tsx` — 5 findings (1 critical, 3 major, 1 minor)
+
+- **`sc-junction-gap` · D · CRITICAL** — On mobile the ИНСТРУКЦИИ card has no panel background at all: the briefing text is painted straight onto the street, fades out mid-word on its third line, and hides the rest behind a «↓ ОЩЕ 14 РЕДА» label. Fourteen of the lesson's instruction lines are invisible at the moment the student needs them.
+  «↓ ОЩЕ 14 РЕДА»
+  `sc-junction-gap/mobile-right/01-arrival.png`
+- **`sc-ed-d2-priority-run` · D · major** — Mobile briefing modal clips its last instruction: item 7 is cut mid-sentence and an eighth line is hidden behind the «Разбрах» button, with no scroll affordance. The clipped item is the equal-priority rule the lesson grades.
+  «7. Последното кръстовище е РАВНОЗНАЧНО — няма знаци и няма светофар. Пропусни колата, която идва»
+  `sc-ed-d2-priority-run/mobile-right/02-briefing.png`
+- **`sc-ed-d2-priority-run` · F · major** — Same lesson, two different products: mobile shows a full-screen briefing card (1034 chars) before the drive, desktop shows none at all (briefing chars: 0, no 02-briefing frame captured on PC in any of the seven lessons audited).
+  «briefing chars: 0»
+  `sc-ed-d2-priority-run/mobile-right/02-briefing.png`
+- **`sc-junction-rhr` · F · major** — The briefing renders differently on the two platforms: PC numbers all six steps 1.–6.; mobile drops the «1.» and promotes step one to a headline in a different weight and size, so the list reads as a heading plus five items.
+  «Тръгни по страничната улица към кръстовището — то е равнозначно: няма знаци, няма светофар.»
+  `sc-junction-rhr/mobile-right/02-briefing.png`
+- **`sc-pe-night-unlit` · F · minor** — Same briefing, two typographic treatments. On PC all six steps are numbered 1.–6. in the ИНСТРУКЦИИ list; on mobile step 1 is promoted to an unnumbered headline and the list then starts at '2.', so the phone reads as if a step is missing.
+  «2. Знакът разрешава 50, но ти виждаш докъдето стигат фаровете.»
+  `sc-pe-night-unlit/mobile-right/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/scene/lessonWorldRecipe.ts` — 5 findings (1 critical, 4 major, 0 minor)
+
+- **`sc-pk-driveway` · B · CRITICAL** — The car ends up INSIDE building geometry. At t028s the whole windscreen is a building facade at arm's length with the car still at 10 км/ч; at t045s the view is inside the structure with a flat grey floor plane and no exterior. Same on mobile at t054s. Either the building has no solid body or the lesson's route is laid across it.
+  `sc-pk-driveway/pc-right/04-t045s.png`
+- **`sc-junction-blind` · A · major** — World does not match the briefing. The briefing's whole premise is 'сграда на ъгъла закрива гледката надясно', but at the junction mouth (t065s, t076s) the corner is open field — flat green ground and a mountain haze band. The occluding building exists only on the approach street, not where the lesson needs it, so the blind corner the lesson is named after does not exist.
+  «Тръгни по страничната улица към равнозначното кръстовище — сграда на ъгъла закрива гледката надясно.»
+  `sc-junction-blind/mobile-right/04-t076s.png`
+- **`sc-junction-blind` · F · major** — The same world renders as a dense city on the approach street and as bare terrain 100 m later at the junction. Compare 05-stopped (buildings, parked cars, trees, railings both sides) with t065s (nothing but grass and haze) — same lesson, same minute.
+  `sc-junction-blind/mobile-right/04-t065s.png`
+- **`sc-junction-left` · B · major** — Beyond the priority road the world stops: flat green field and a mountain haze band, no far-side street, no buildings, no pavement. By t083s on mobile the ego is driving at 13 км/ч across a bare grey plane with nothing in view at all — it has left the authored world.
+  `sc-junction-left/mobile-right/04-t083s.png`
+- **`sc-ov-lane-keeping` · B · major** — The drive finishes parked on a grey slab in the middle of an empty green field with one tree and one building — off the authored street entirely, the same off-map failure seen in sc-junction-blind and sc-junction-left. Along the S-bend the left side is a fence and open field with no pavement.
+  `sc-ov-lane-keeping/mobile-right/07b-menu.png`
+
+---
+
+## `tools/mobile/lib/auth.mjs` — 5 findings (1 critical, 4 major, 0 minor)
+
+- **`sc-park-judge` · G · CRITICAL** — The PC lane crashed at sign-in with an unhandled throw before any frame: 'Error: [mobile-harness] no session cookie after sign-in. Form said: Имейл Парола Покажи Грешен имейл или парола. Влез' at tools/mobile/lib/auth.mjs:129, and pc-wrong was never attempted. The same refusal killed sc-crossing-dart's PC lane, so this is a sweep-wide credential or rate-limit failure, not a per-lesson one.
+  «Имейл Парола Покажи Грешен имейл или парола. Влез»
+  `sc-park-judge/pc-right/_run.log`
+- **`sc-crossing-dart` · G · major** — The PC lane never ran. sc-crossing-dart/pc-right holds a single 0-byte file named log-signin-refused-1.txt and pc-wrong is empty, so half this lesson's coverage does not exist. The sibling lesson's log gives the cause verbatim: the harness sign-in was refused with «Грешен имейл или парола».
+  «Грешен имейл или парола.»
+  `sc-crossing-dart/pc-right/log-signin-refused-1.txt`
+- **`sc-mv-uturn-ban` · G · major** — The mobile-wrong leg never ran: the harness could not sign in — „no session cookie after sign-in. Form said: … Грешен имейл или парола“ — so the folder holds only RUN.log. Same failure hit sc-pk-rail-ban/pc-wrong. Two of the 28 legs in this chunk were lost to a credentials failure, not to the product.
+  «no session cookie after sign-in. Form said: Имейл Парола Покажи Грешен имейл или парола. Влез»
+  `sc-mv-uturn-ban/mobile-wrong/RUN.log`
+- **`sc-rx-guarded` · G · major** — COULD_NOT_TEST for three of four lanes. sc-rx-guarded/pc-right produced no PNG at all and its run.log ends with the sign-in throwing «no session cookie after sign-in. Form said: … Грешен имейл или парола»; mobile-right and mobile-wrong wrote only 0-byte PNGs. The staging login rejected the harness mid-sweep and the disk filled — both need a re-drive, neither is a lesson defect.
+  «no session cookie after sign-in. Form said: Имейл Парола Покажи Грешен имейл или парола. Влез»
+  `sc-rx-guarded/pc-right/run.log`
+- **`sc-signal-response` · A · major** — pc-wrong lane COULD_NOT_TEST: the folder contains only drive.log and zero PNGs. Reason recorded in the log: the harness sign-in failed before the lesson loaded, with the login form returning wrong-credentials. Needs a re-drive.
+  «Грешен имейл или парола.»
+  `sc-signal-response/pc-wrong/drive.log`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-conditions2.ts` — 4 findings (1 critical, 3 major, 0 minor)
+
+- **`sc-ac-bridge-ice` · A · CRITICAL** — There is no bridge. The briefing spends five of its ten lines on it — the buildings end, the road runs over the ravine, the far abutment is where the ice ends. In t027, t076 and t152 the buildings never end: the road runs between apartment blocks and parked cars straight to the horizon, with no deck, no ravine, no abutment and no ice. Two of the three objectives are nevertheless ticked against those absent abutments.
+  «Погледни напред: сградите свършват и пътят тръгва над дерето — това е мост.»
+  `sc-ac-bridge-ice/pc-right/04-t152s.png`
+- **`sc-ac-night-overdrive` · A · major** — Briefing line 1 says there is not a single lamp on this road; the pc-right scene has a row of lamp posts down the left kerb, blocks of lit windows on both sides and a tall brightly-lit green structure ahead. The premise of the lesson — you can only see as far as your own headlights — is contradicted by the ambient light in the scene.
+  «Включи късите светлини — нощ е и по този път няма нито една лампа.»
+  `sc-ac-night-overdrive/pc-right/04-t130s.png`
+- **`sc-ac-truck-spray` · A · major** — Briefing calls it a motorway with a 140 limit; the world is a single carriageway with a dashed centre line, grass verges and low trees, no central reservation, no motorway signage and no gantries. Yet the rule engine convicts the wrong drive of Движение по аварийната лента and Движение в обратна посока по еднопосочна улица on this same stretch, so the road graph believes something the picture does not show.
+  «Помни: 140 е таван за сухо и чисто, а тук нито едното е вярно (чл. 20, ал. 2).»
+  `sc-ac-truck-spray/pc-wrong/04-t017s.png`
+- **`sc-ac-wind-truck-pass` · A · major** — No crosswind and, for long stretches, no truck. At mobile t034 (112 км/ч) and pc-wrong t039 (135 км/ч) the road ahead is completely empty — no truck, no other vehicle, nothing swaying, no dust, no wind cue of any kind. The whole lesson is the gust you take when you clear the truck's lee; there is no gust and nothing to clear.
+  «Очаквай удара в мига, в който носът ти излезе пред кабината.»
+  `sc-ac-wind-truck-pass/mobile-wrong/04-t034s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-parking2.ts` — 4 findings (1 critical, 3 major, 0 minor)
+
+- **`sc-mv-uturn-ban` · A · CRITICAL** — A flawless drive is failed. PC: 0 опасни, 0 основни, 0 второстепенни грешки, total 0 точки — and the verdict is НЕИЗДЪРЖАН with one star out of three, because „Не всички задачи от маршрута бяха изпълнени“. Mobile gives the same 0 точки / НЕИЗДЪРЖАН. There is no way for the student to distinguish a perfect drive from a failed one.
+  «Общо (допустими 9) 0 … НЕИЗДЪРЖАН … +40 XP»
+  `sc-mv-uturn-ban/pc-right/08-debrief.png`
+- **`sc-park-bay-exit-rev` · A · major** — The task chip instructs the student to align to a feature that is not rendered: „Задача 2: подравни се по алеята и напусни зоната напред — дръж под 25 км/ч“ over an empty grass plane. There is no alley, no kerb line and no zone boundary anywhere in the frame to align to.
+  «Задача 2: подравни се по алеята и напусни зоната напред — дръж под 25 км/ч»
+  `sc-park-bay-exit-rev/pc-wrong/04-t028s.png`
+- **`sc-pk-rail-ban` · A · major** — Task chips instruct the student about geometry that is absent. „Премини коловоза на едно движение, без да спираш върху релсите“ (t101s/t117s/t138s) and „Спри на разрешеното място далеч след прелеза“ (t176s) both name a crossing that never appears. The teach card even leans on the absence — „Табела няма — и точно затова мястото изглежда свободно“ — which is true of the sign but silently also true of the rails.
+  «Оттук нататък сме в зоната на прелеза (чл. 98). Табела няма — и точно затова мястото изглежда свободно.»
+  `sc-pk-rail-ban/pc-right/04-t128s.png`
+- **`sc-pk-stop-vs-park` · A · major** — On mobile the correct drive finishes with ZERO penalty points and is still stamped НЕИЗДЪРЖАН — the debrief reason is „Урокът беше прекъснат преди края“, i.e. the session clock ran out before the route tasks completed. The identical drive passes on PC, so the lesson's completability depends on platform speed, not on driving.
+  «0 наказателни точки … НЕИЗДЪРЖАН … Урокът беше прекъснат преди края.»
+  `sc-pk-stop-vs-park/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/lessons/specs.ts` — 4 findings (1 critical, 3 major, 0 minor)
+
+- **`sc-turn-left-oncoming` · A · CRITICAL** — The briefing does not match what is coached or what is in the world. All five briefing steps describe an unsignalised left turn where «Насрещните имат предимство» and the graded skill is counting a gap in SECONDS. In the world there is a traffic light showing red, and the coach card says the student is correctly waiting on red and should go on green. The skill the briefing names is never exercised.
+  «Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че кръстовището е свободно.»
+  `sc-turn-left-oncoming/pc-right/04-t043s.png`
+- **`sc-junction-gap` · F · major** — Identical route and objectives to sc-junction-stop and sc-junction-scan: same Б2 approach, same stop line, same third objective «Завий надясно и излез от кръстовището на изток», same two commendations. The three lessons differ only in one clause of objective 2.
+  «Завий надясно и излез от кръстовището на изток»
+  `sc-junction-gap/pc-right/04-t206s.png`
+- **`sc-junction-scan` · F · major** — sc-junction-scan, sc-junction-stop and sc-junction-gap are the same Б2 junction with the same approach, the same stop line and the identical third objective. Their objective 1 is word-for-word identical («Приближи знака Б2 с контролирана скорост») and only a clause of objective 2 differs. Three lesson names, one lesson.
+  «Завий надясно и излез от кръстовището на изток»
+  `sc-junction-scan/pc-right/04-t207s.png`
+- **`sc-junction-stop` · F · major** — This lesson, sc-junction-scan and sc-junction-gap are the same Б2 junction with near-identical objective wording and the identical third objective «Завий надясно и излез от кръстовището на изток». Three separately-named lessons render as one route.
+  «Завий надясно и излез от кръстовището на изток»
+  `sc-junction-stop/pc-right/04-t206s.png`
+
+---
+
+## `platform/src/components/sim/ScenarioObstacles.tsx` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-ln-obstacle-meeting` · A · CRITICAL** — The world does not match the briefing. The briefing says a PARKED ROW closes half your lane. What is actually in the road is a single large dark-blue box vehicle with a red band standing across the centre of the carriageway — at t106s it fills the entire windscreen and the car is jammed against it. The parked row exists separately, tucked against the right kerb.
+  «Напред в ТВОЯТА лента е паркиран ред — половината ти платно е затворено»
+  `sc-ln-obstacle-meeting/mobile-right/04-t106s.png`
+- **`sc-hz-brake-dont-swerve` · D · major** — When the reckless drive collides, the camera clips inside the struck geometry and the entire windscreen becomes a flat, untextured tan rectangle spanning the full view. There is no impact effect, no shake, no damage, no exterior cut — just a blank orange wall with the coach still talking over it. The same failure mode appears in sc-fo-brakelight-chain pc-wrong t047 as a flat blue slab.
+  `sc-hz-brake-dont-swerve/pc-wrong/04-t028s.png`
+- **`sc-merge-roadworks-shift` · A · major** — The briefing promises people working between the cones — which is the entire reason it tells you to switch on dipped beams — and no worker, works vehicle, barrier, beacon or advance warning board exists. The 'roadworks' is a bare line of loose cones on open tarmac.
+  «в ремонтен участък между конусите работят хора и те те виждат само осветен»
+  `sc-merge-roadworks-shift/mobile-wrong/07-end.png`
+
+---
+
+## `platform/src/modules/sim/collision` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-park-bay-exit-rev` · A · CRITICAL** — The correct drive is convicted of a collision with something that is not on screen. mobile-right ends НЕИЗДЪРЖАН / 20 наказателни точки with „Настъпи сблъсък“, while every frame of that run shows an empty field with no object within the horizon. A student would see a crash verdict for hitting nothing.
+  «20 наказателни точки … НЕИЗДЪРЖАН … Настъпи сблъсък.»
+  `sc-park-bay-exit-rev/mobile-right/08-debrief.png`
+- **`sc-follow-brake` · A · major** — The car leaves the carriageway and comes to rest inside a building: the windscreen is filled by one flat untextured beige wall from edge to edge, the car reads 0 km/h, and the session continues in that state. Static scenery does not stop the vehicle.
+  `sc-follow-brake/pc-wrong/04-t044s.png`
+- **`sc-follow-standstill` · A · major** — The car ends the wrong drive inside solid building geometry: from t=48 s to t=53 s the entire windscreen is one flat untextured tan surface with a vertical seam where two building faces meet, the car reads 0 km/h and the lesson keeps running.
+  «Намалява — намали и ти, без да чакаш да видиш защо.»
+  `sc-follow-standstill/pc-wrong/04-t053s.png`
+
+---
+
+## `platform/src/modules/sim/hud/PreDriveTutorial.tsx` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-junction-scan` · D · CRITICAL** — On mobile the touch tutorial card has no panel background at all: its text is painted directly over the rear-view mirror image and the sky, and its РАЗБРАХ button sits on top of the world's 40 km/h sign. The instruction that teaches the controls is the least readable thing on screen.
+  «Ляв палец — Волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-junction-scan/mobile-wrong/04-t102s.png`
+- **`sc-ac-truck-spray` · F · major** — CONSISTENCY: on mobile the pre-drive touch tutorial („Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.“ plus its РАЗБРАХ button) is still on screen at t034, t038, t101 and t102 — up to 100 seconds into the drive — in aquaplane, night-overdrive, truck-spray, bridge-ice and city-run. It is drawn onto the rear-view mirror glass, so the mirror is blocked for the entire session.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ed-d2-city-run/mobile-right/04-t101s.png`
+- **`sc-junction-blind` · D · major** — On mobile the first-touch coach tip never dismisses: 'Ляв палец — волан…' plus 'Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.' and its РАЗБРАХ button are still pinned top-right at 05-stopped and at t076s, un-panelled over the sky, and the РАЗБРАХ button sits directly on top of a round world traffic sign.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-junction-blind/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-flow.ts` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-roundabout-entry` · A · CRITICAL** — World does not match briefing: instruction 1 says slow before the знак 'Пропусни движението' and instruction 3 says stop at the line and let every circulating car through. No such sign, no give-way line and not one circulating vehicle exist in any frame, yet the PC right drive burned 90 s of lawful waiting for them.
+  «1. Приближи кръговото и намали преди знака „Пропусни движението“.»
+  `sc-roundabout-entry/pc-right/04-t068s.png`
+- **`sc-zebra-approach` · A · major** — The briefing and the graded goal disagree on the approach speed: instruction 1 says approach the crossing at under 40 км/ч, the task toast that is actually measured says hold under 45 км/ч.
+  «1. Потегли, движи се в своята лента и приближи пътеката с под 40 км/ч. … Приближи пътеката с готовност за спиране — дръж под 45 км/ч»
+  `sc-zebra-approach/pc-right/01-arrival.png`
+- **`sc-zebra-approach` · G · major** — Free observation: this lesson alone shows no briefing card on either platform (briefing chars 0 on all four runs, no 02-briefing frame captured for mobile either) while sibling lessons show 440-1057 characters on mobile. The student is dropped into the drive with only the in-world panel.
+  «briefing chars: 0»
+  `sc-zebra-approach/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-junctions3.ts` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-jx-equal-left` · A · CRITICAL** — The correct drive is convicted of 'Непропускане на пътно превозно средство с предимство' plus 'Пътнотранспортно произшествие' and a 0.0 m near miss at 0:35. The give-way event the lesson exists to teach ends in a crash even when driven to the briefing.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-jx-equal-left/mobile-right/08-debrief.png`
+- **`sc-jx-equal-left` · A · major** — The briefing states flatly that there are no signs at this junction, and the world contradicts it. Instruction 1 reads 'няма никакви знаци и никакъв светофар', yet a red-bordered round sign stands on the right-hand pole at the junction mouth and the cockpit repeater shows '40 · знакът важи'. The whole lesson turns on 'no signs, therefore the right-hand rule'.
+  «Огледай се: няма никакви знаци и никакъв светофар — четирите улици са равнозначни.»
+  `sc-jx-equal-left/pc-right/01-arrival.png`
+- **`sc-jx-equal-left` · B · major** — Instruction 1 also mentions rain ('Вали ли, включи първо късите светлини (чл. 70)') in a bright, dry, cloudless scene. The briefing describes weather the world does not have.
+  «Вали ли, включи първо късите светлини (чл. 70)»
+  `sc-jx-equal-left/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/vehicle` — 3 findings (1 critical, 2 major, 0 minor)
+
+- **`sc-hz-breakdown-pulloff` · A · CRITICAL** — The engine never actually fails. The car drives the full ~210 s in D with ДВИГАТЕЛ showing Вкл. and reaches 145 км/ч on the reckless run, so the breakdown the whole protocol lesson is built on does not occur and there is nothing to pull off the carriageway for.
+  «двигателят отказва»
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-ed-d2-priority-run` · C · major** — The car does not accelerate like a car. In 210 s of careful driving it never exceeds 16 км/ч on a 50 km/h boulevard and records 15 full stops; the reckless run holding the same throttle reaches 78 км/ч. Short throttle inputs produce almost no acceleration, which is why the route never finishes.
+  «drive: top 16 км/ч · 15 full stops»
+  `sc-ed-d2-priority-run/pc-right/04-t192s.png`
+- **`sc-lane-change` · C · major** — The careful drive stops 27 times in 210 s and never passes 16 км/ч on a 50 km/h boulevard, cycling 0 → 11 → 2 → 0 over and over. Brief throttle inputs produce almost no acceleration, which is why the lane change is never reached and the lesson always times out.
+  «drive: top 16 км/ч · 27 full stops»
+  `sc-lane-change/pc-right/04-t103s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/PlayAreaStyles.tsx` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-speed-transition` · D · CRITICAL** — On mobile the in-drive ИНСТРУКЦИИ card has NO panel behind it — the type is printed straight onto the sky and a building facade, across the interior rear-view mirror — and the body fades out mid-word after about three lines, replaced by ↓ ОЩЕ 14 РЕДА plus ПРОЧЕТИ / РАЗБРАХ pills that are unfilled translucent blobs over the world. Fourteen hidden lines of a teaching briefing is the whole lesson.
+  «↓ ОЩЕ 14 РЕДА»
+  `sc-speed-transition/mobile-right/07-end.png`
+- **`sc-sp-curve` · D · major** — On mobile the goal banner renders as grey ghost type with no panel behind it and is then overlapped by the РАЗБРАХ pill, which sits on top of the speed figure. The one number the banner exists to communicate is the one obscured.
+  «Карай дотук — не по-бързо от 90 км/ч»
+  `sc-sp-curve/mobile-wrong/04-t012s.png`
+
+---
+
+## `platform/src/modules/sim/engine/reverseAssist.ts` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-ed-reverse-line` · A · CRITICAL** — The gear indicator shows D while the task chip demands reverse and the toast says the car should be reversing. Either the sim never engages R or the objective was written for a gear the drive never enters — either way the student is graded on a manoeuvre that did not occur.
+  «Дръж права линия по средата на заден ход»
+  `sc-ed-reverse-line/pc-right/04-t108s.png`
+- **`sc-ed-poligon-chain` · A · major** — The toast orders 'Премести лоста на R' and shows a key chip, yet the gear indicator stays on D for the entire run and the reverse objectives never resolve — same missing-reverse defect as sc-ed-reverse-line, here across three of five objectives.
+  «Премести лоста на R и паркирай на заден ход в клетката»
+  `sc-ed-poligon-chain/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/observation.ts` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-vp-stall` · A · CRITICAL** — The tutor congratulates the student on holding the bite point and feeding the throttle — and prints the identical sentence in the WRONG lane, where the car is doing 59 km/h. It praises a clutch action that no control in the sim can perform, in a drive that was deliberately bad.
+  «Колата тръгна плавно — кракът задържа зацепването, газта пое двигателя.»
+  `sc-vp-stall/pc-wrong/04-t012s.png`
+- **`sc-vp-readiness` · A · major** — At the arrival frame the car is stationary at 0 km/h and has not moved, yet the tutor already asserts that the car is rolling freely and that the handbrake is therefore genuinely down. The sim narrates an observation the student has not made and the car has not produced.
+  «Колата се движи свободно, без съпротивление — ръчната наистина е долу.»
+  `sc-vp-readiness/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-signals2.ts` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-sig-controller-postures` · A · CRITICAL** — The wrong drive passes the traffic controller at 59 км/ч ignoring the posture entirely and collects 0 наказателни точки and 0 mistakes on both platforms. The one behaviour the lesson exists to punish — driving past a regulating officer without reading him — is not graded at all.
+  «НЕИЗДЪРЖАН · SCORE: 0 наказателни точки · mistakes=0 · top 59 км/ч»
+  `sc-sig-controller-postures/mobile-wrong/08-debrief.png`
+- **`sc-sig-controller-live` · A · major** — The world contradicts the briefing here too, in the mirror image of the sibling lesson. The briefing states the lamp works normally and an officer is standing at the junction; the officer's caption reads 'СПРИ' (chest/back to you, priority NOT yours) from 01-arrival through t012s while the junction's lamp for the approach shows GREEN. The student is given green plus a stop order and no on-screen reconciliation beyond a caption whose body copy is unreadable at that distance.
+  «Тръгни по булеварда на север — светофарът на кръстовището напред работи нормално, но на самото кръстовище стои РЕГУЛИРОВЧИК.»
+  `sc-sig-controller-live/mobile-right/04-t012s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-speed2.ts` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-sp-wet-limit-plate` · A · CRITICAL** — The world is DRY and sunny while the briefing insists it is raining. Instruction 1 tells the student to switch on dipped headlights because the surface is wet, instruction 3 says „Днес обаче вали и настилката е мокра“, instruction 4 asks for 38 km/h — and every frame of both drives on both platforms shows a dry grey road, a clear sky, no rain, no reflections, no spray, wipers off and headlights off. At Ниво 1 the template deliberately runs the street dry, but the instruction text is not rung-aware, so the student is told a condition that the world flatly contradicts.
+  «Днес обаче вали и настилката е мокра — затова табелата вече важи: твоят таван става 40 км/ч.»
+  `sc-sp-wet-limit-plate/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · F · major** — This motorway map renders identically to sc-mw-discipline's, yet the two briefings describe it differently: sc-mw-discipline says the carriageway is split by a crash barrier (мантинела), this one says by a dividing strip (разделителна ивица). The world shows a bare gravel strip, so one of the two briefings is wrong about the same piece of road.
+  «двете посоки са на отделни платна с разделителна ивица»
+  `sc-mw-min-speed/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/scene/guidanceRoute.ts` — 2 findings (1 critical, 1 major, 0 minor)
+
+- **`sc-ov-keep-right` · A · CRITICAL** — The on-road guidance points away from the objective. The green ribbon labelled 'зелена — маршрутът до целта' runs down the LEFT lane for the whole approach while the blue shadow-car ribbon runs in the far RIGHT lane and the sole task is 'Престрой се в дясната лента'. A student following the green line — which the legend calls the route to the goal — is being led into the exact lane the lesson tells them to leave.
+  «зелена — маршрутът до целта»
+  `sc-ov-keep-right/mobile-right/04-t118s.png`
+- **`sc-crossing-dart` · D · major** — The blue guidance ribbon runs UNBROKEN straight across the zebra. 06-waited.png shows the glowing blue dashed path laid over the crossing stripes it is supposed to stop short of; the repo carries scene/guidance-crossing-mute.test.ts, so muting the ribbon at a crossing is the stated intent and it is not happening here. The effect on a pedestrian-yield lesson is that the guidance is pointing the student straight over the paint he is being told to stop at.
+  `sc-crossing-dart/mobile-right/06-waited.png`
+
+---
+
+## `platform/public/world/ov-oneway-v1.json` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-ov-oneway` · B · CRITICAL** — Past the T-junction the world simply stops. The 'еднопосочна улица' the student is told to follow to its end is an unpainted grey apron that runs out into a flat green plane — no road, no kerb, no buildings, no traffic, no barrier. At t203s the car is sitting on grass with nothing in any direction, and the session ends there.
+  «5. Продължи по еднопосочната до края — движението по нея е само в разрешената посока.»
+  `sc-ov-oneway/mobile-right/04-t203s.png`
+
+---
+
+## `platform/src/modules/sim/collision/bodies.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-vu-cyclist-hook` · A · CRITICAL** — In both drives the car finishes INSIDE a building: the windscreen is filled edge to edge with a flat orange facade, tan window frames and a grey structural column at arm's length, with the car stationary at 0 km/h. The collision the debrief books is with architecture, not with the cyclist the lesson teaches — and the vehicle has clearly penetrated the wall rather than been stopped by it.
+  «Пътнотранспортно произшествие»
+  `sc-vu-cyclist-hook/mobile-right/04-t184s.png`
+
+---
+
+## `platform/src/modules/sim/hud/telltaleWarnings.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-hz-breakdown-pulloff` · A · CRITICAL** — The briefing's trigger event is the red OIL PRESSURE lamp lighting on the dashboard. What actually fires is a red banner reading «Контролна лампа: температура!» — the wrong warning entirely — and it is delivered as an HTML toast because the instrument cluster contains no warning lamps at all. The lesson's own cause and its symptom do not match.
+  «По време на движение на таблото светва червената лампа за налягане на маслото — двигателят отказва.»
+  `sc-hz-breakdown-pulloff/pc-wrong/04-t205s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/events.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-vp-stall` · A · CRITICAL** — The lesson is named for stalling and its briefing devotes a step to what to do if the engine stalls, but the engine never stalls in any sampled frame of any of the four lanes. The event the lesson exists to teach does not occur.
+  «4. Ако двигателят все пак загасне: спокойно — съединител докрай, запали отново и повтори процедурата.»
+  `sc-vp-stall/mobile-right/04-t029s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-junctions2.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-junction-blind` · A · CRITICAL** — The lesson's own CORRECT line is not survivable. The right drive is convicted of two dangerous errors — 'Непропускане на пътно превозно средство с предимство' and 'Пътнотранспортно произшествие' — 20 наказателни точки, НЕИЗДЪРЖАН, on BOTH platforms. A student who does exactly what the briefing says still crashes into the priority car.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка: 10 изпитни т. за самото деяние»
+  `sc-junction-blind/pc-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-merging2.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-merge-motorway-exit` · A · CRITICAL** — The world is not a motorway. The briefing puts the student in the left lane of a магистрала with an exit in about a kilometre and 500/300/100 countdown boards; what is rendered is an urban street with an iron pedestrian railing along the left pavement, kerbs, street lamps, overhead power cables, cypress trees and an unbroken row of parked cars along the right kerb. No hard shoulder, no crash barrier, no deceleration lane, no gantry, no countdown boards, no slip road anywhere in any frame.
+  «Тръгваш в ЛЯВАТА лента на магистралата — току-що си изпреварил. Изходът ти е след около километър и вдясно.»
+  `sc-merge-motorway-exit/mobile-right/07b-menu.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-pk.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-pk-driveway` · A · CRITICAL** — The RIGHT drive is convicted. pc-right debrief: 20 наказателни точки, НЕИЗДЪРЖАН, Опасни грешки 2. mobile-right: 10 точки, НЕИЗДЪРЖАН, Опасни грешки 1. A student who drives the model line is failed for a crash the lesson itself walked him into.
+  «20 наказателни точки · НЕИЗДЪРЖАН»
+  `sc-pk-driveway/pc-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/runtime/laneArrows.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-ln-turn-lane-arrows` · A · CRITICAL** — The world does not match the briefing. The entire lesson is about carriageway arrows splitting the directions, but the junction approach is a featureless grey slab: at the stop line there is not a single directional arrow, no lane divisions and no stop line painted. The student is told to read markings that are not there.
+  «Стрелките на платното разпределят посоките: дясна лента — само надясно, средна — само направо, лява — само наляво.»
+  `sc-ln-turn-lane-arrows/mobile-right/04-t096s.png`
+
+---
+
+## `platform/src/modules/sim/scenarios/event-library.json` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-merge-accel-lane` · A · CRITICAL** — The world is not the road in the briefing. The briefing describes a ramp, an acceleration lane starting to the right of the ramp top and lasting about 200 metres, and a motorway flow to slot into. The arrival frame shows a plain two-lane road with a 90 sign running through open grass fields with no ramp, no acceleration lane and no motorway in sight.
+  «От върха на рампата вдясно започва лентата за ускоряване. Тя е твоя за около 200 метра»
+  `sc-merge-accel-lane/mobile-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/scene/cabin.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-park-night` · A · CRITICAL** — The lesson's own headline act is already done for the student. Instruction 1 and the stated objective both order 'включи късите светлини ПРЕДИ да тръгнеш', but 01-arrival shows a full dipped-beam cone lighting the asphalt while the car is stationary at 0 км/ч, before any input. initialHeadlightsFor() returns 'low' for any ready-start night lesson unless its template id is in HEADLIGHT_DRILL_TEMPLATE_IDS — that set holds only sc-ac-night-lights, sc-ac-rain-lights and sc-ac-fog, so sc-park-night falls through. The first act cannot be performed, cannot be failed, and the authored mistake variant mistake-no-lights (HEADLIGHTS_OFF_AT_NIGHT) is unreachable at this rung.
+  «Включи късите светлини ПРЕДИ да тръгнеш — тъмно е и редът не е осветен.»
+  `sc-park-night/mobile-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/traces/scHzAccidentScene.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-hz-accident-scene` · A · CRITICAL** — The blue demonstrated-correct shadow line runs straight through a bystander standing in the driving lane. At t080 the figure stands squarely on the line; at t092 it fills the windscreen because the careful drive has driven into it, producing a ПТП of −10 and НЕИЗДЪРЖАН. The path the lesson tells the student to follow is the path that hits the person.
+  «Мини широко и бавно покрай хората и ламарините»
+  `sc-hz-accident-scene/pc-right/04-t092s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/network.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-ed-d2-city-run` · G · CRITICAL** — The route puts the car onto a pedestrian plaza. At pc t087 and mobile t101 the vehicle is stopped on a wide grey paved area with a planter and a kiosk directly in its path, grass to the right and the road behind it; the blue guidance line runs off to the left. This is where the wrong-way convictions come from and it is why the segment never reaches its second junction.
+  `sc-ed-d2-city-run/mobile-right/04-t101s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/railTrack.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-pk-rail-ban` · A · CRITICAL** — There is no level crossing in the world. Briefing step 3 states „Прелезът е охраняем (А34) и бариерата е вдигната“ and step 4 „Премини коловоза на едно движение. Върху релсите не се спира“; frames at t101s, t117s, t128s, t138s and t176s show an ordinary two-lane street with parked cars and no rails, no barrier, no А34 sign and no crossing surface. content/world/pk-rail-v1.json does carry a railCrossing zone (id pkr-z-railcrossing, signRef А34, guarded, fromM 200 toM 206) — the data is there and nothing draws it.
+  «Прелезът е охраняем (А34) и бариерата е вдигната — не си длъжен да спираш.»
+  `sc-pk-rail-ban/pc-right/04-t101s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/roundabout.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-roundabout-entry` · A · CRITICAL** — The car ends up driving on the central island. The whole windscreen is grass and a hedge at point-blank range while the coach calmly says to leave the roundabout with the right indicator. This is what earns the careful drive its −10 collision.
+  «Излез от кръговото с десен мигач»
+  `sc-roundabout-entry/pc-right/04-t141s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/zoneSigns.ts` — 1 finding (1 critical, 0 major, 0 minor)
+
+- **`sc-merge-accel-lane` · A · CRITICAL** — The route the lesson tells the student to take is signed no-entry. At t087s a red no-entry disc stands beside the slip road in the direction of travel, and the wrong drive is duly convicted of Движение в обратна посока по еднопосочна улица. The world signage contradicts the instruction the student is graded against.
+  «Движение в обратна посока по еднопосочна улица»
+  `sc-merge-accel-lane/mobile-right/04-t087s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/LessonPlayShell.tsx` — 71 findings (0 critical, 59 major, 12 minor)
+
+- **`sc-ac-crosswind` · D · major** — The mobile touch-hint overlay is plateless here too — «Ляв палец — волан…» and the cyan reverse line are drawn onto the sky and across the minimap, with РАЗБРАХ as a bare outline — and it is on screen at the exact moment the car has left the road, so the one frame that should explain the situation explains the thumb controls instead.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ac-crosswind/mobile-right/04-t140s.png`
+- **`sc-ac-rain-lights` · D · major** — The mobile in-drive ИНСТРУКЦИИ panel has no background plate and is truncated: the city buildings read straight through the white text, the minimap is drawn on top of the ИНСТРУКЦИИ header, the third line is half-cut and fading, and the panel admits «↓ ОЩЕ 12 РЕДА» while the student is driving.
+  «↓ ОЩЕ 12 РЕДА»
+  `sc-ac-rain-lights/mobile-right/04-t105s.png`
+- **`sc-ac-snow` · D · major** — On mobile the in-drive ИНСТРУКЦИИ panel is again plateless and truncated: the buildings show through the text, the minimap covers the panel header, the third line is cut in half and fading, and the panel reports «↓ ОЩЕ 15 РЕДА» of unseen briefing while the car is moving.
+  «↓ ОЩЕ 15 РЕДА»
+  `sc-ac-snow/mobile-right/04-t102s.png`
+- **`sc-ac-wet-braking` · D · major** — The mobile touch-hint overlay has no background plate: «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.» and the cyan reverse hint are drawn straight onto the buildings and across the minimap, and the РАЗБРАХ button is a bare outline over the sky. Same defect in sc-ac-crosswind and sc-ac-highbeam-lead mobile runs.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-ac-wet-braking/mobile-right/04-t183s.png`
+- **`sc-junction-blind` · D · major** — The 'Клавиши · за напреднали' keyboard cheat-sheet is expanded by default and has no panel background: the road, sky and power lines show straight through the key list, and it covers the whole top-left quarter of the windscreen for the entire drive.
+  «Клавиши · за напреднали»
+  `sc-junction-blind/pc-right/05-stopped.png`
+- **`sc-jx-blocked-exit` · D · major** — ИНСТРУКЦИИ item 5 is truncated mid-sentence — '…премини кръстовището на едно движение до края на' — and the glyph bottoms of that last line are themselves clipped by the panel edge. This is the step that tells the student when it is finally safe to go.
+  «Щом светне зелено и отсрещната страна е наистина празна, тръгни без бавене и премини кръстовището на едно движение до края на»
+  `sc-jx-blocked-exit/pc-right/05-stopped.png`
+- **`sc-jx-priority-confidence` · D · major** — ИНСТРУКЦИИ item 4 is truncated mid-sentence and ends on a dangling em-dash: 'Спреш ли без причина на предимство, ударът отзад е твой проблем —'. There is no item 5 and no scroll affordance; the panel simply cuts the teaching point off.
+  «Спреш ли без причина на предимство, ударът отзад е твой проблем —»
+  `sc-jx-priority-confidence/pc-right/05-stopped.png`
+- **`sc-ln-decisive-change` · D · major** — Mobile arrival: the same collision as every other lesson — ИНСТРУКЦИИ card plus ПРОЧЕТИ / РАЗБРАХ buttons stacked on top of Л ЛЯВО, З ЗАДН and Д ДЯСН, with a 27-line briefing counter squeezed between them.
+  «↓ ОЩЕ 27 РЕДА»
+  `sc-ln-decisive-change/mobile-right/01-arrival.png`
+- **`sc-ln-obstacle-meeting` · D · major** — Mobile arrival: the ИНСТРУКЦИИ peek card and its ПРОЧЕТИ / РАЗБРАХ buttons are drawn on top of the right-hand glance column (Л ЛЯВО, З ЗАДН, Д ДЯСН) and over the rear-view mirror inset. The Д ДЯСН control sits directly under the РАЗБРАХ button and cannot be pressed.
+  «ПРОЧЕТИ · РАЗБРАХ · Д ДЯСН»
+  `sc-ln-obstacle-meeting/mobile-right/01-arrival.png`
+- **`sc-ln-obstacle-meeting` · D · major** — PC: the Клавиши · за напреднали help panel overflows its own box — скорости: към P / към wraps and the trailing D is printed outside the panel border, straight onto the 3D scene, as are parts of кормуване (или стрелки).
+  «скорости: към P / към D»
+  `sc-ln-obstacle-meeting/pc-right/01-arrival.png`
+- **`sc-ln-turn-lane-arrows` · D · major** — The PC ИНСТРУКЦИИ panel clips its last item mid-sentence at the panel edge with no scrollbar or overflow affordance — item 6 ends at «като се установиш в средата на своята» and the rest is unreachable.
+  «6. Премини на зелено и завий наляво в западната улица, като се установиш в средата на своята»
+  `sc-ln-turn-lane-arrows/pc-right/01-arrival.png`
+- **`sc-ln-turn-lane-arrows` · A · major** — Mobile briefing loses step 1 here too — the opening sentence is a heading and the list starts at «2. Маршрутът ти е НАЛЯВО.»
+  «2. Маршрутът ти е НАЛЯВО. Ти си в дясната лента — нейната стрелка не води натам.»
+  `sc-ln-turn-lane-arrows/mobile-right/02-briefing.png`
+- **`sc-maneuver-3point` · D · major** — HUD collides with a world sign: the 40 speed-limit sign on the right kerb is cut in half by the screen edge and is drawn interleaved with the rear-view mirror inset and the touch-hint card, so the sign face, the mirror frame and the hint text overlap in the same pixels.
+  `sc-maneuver-3point/mobile-right/05-stopped.png`
+- **`sc-maneuver-uturn` · D · major** — The world 40 sign, the rear-view mirror inset and the touch-hint card are drawn through one another top-right: the sign pole crosses the hint text and the sign disc sits half over the mirror frame. This is a HUD control colliding with a world sign in the plainest form.
+  `sc-maneuver-uturn/mobile-right/05-stopped.png`
+- **`sc-merge-accel-lane` · D · major** — Mobile arrival: a translucent grey slab behind the right glance column runs the full height of the screen and over the КЛАКС control on the left, and the ПРОЧЕТИ / РАЗБРАХ buttons of the briefing card sit directly on the Д ДЯСН glance button. The briefing counter reads 32 more lines.
+  «↓ ОЩЕ 32 РЕДА»
+  `sc-merge-accel-lane/mobile-right/01-arrival.png`
+- **`sc-merge-from-property` · D · major** — The НАУЧИ teach card is truncated mid-sentence. On PC it stops at 'Задачата иска да си тук с не повече' with nothing after it; on mobile it fades out at '…затова още не' with a '↓ ОЩЕ 7 РЕДА' counter. The explanation of why the student was marked down is cut off exactly where the reason would be.
+  «Стигна точката, но твърде бързо — Задачата иска да си тук с не повече»
+  `sc-merge-from-property/pc-right/05-stopped.png`
+- **`sc-merge-motorway-exit` · D · major** — The mobile briefing modal clips item 7 behind the 'Разбрах' button with no scrollbar — and the clipped sentence is the safety-critical one about stopping and reversing on a motorway.
+  «7. Ако изпуснеш изхода — караш до следващия. По автомагистрала спирането и движението назад са»
+  `sc-merge-motorway-exit/mobile-right/02-briefing.png`
+- **`sc-merge-roadworks-shift` · D · major** — The mobile briefing modal clips its own content: item 6 is sliced by the 'Разбрах' button, a half-height row of glyphs bleeding out from underneath it, and there is no scrollbar or 'more' indicator. The student cannot read the last instruction before being asked to confirm they understood.
+  «5. Подай ляв мигач, провери огледалото И мъртвата зона през рамо — и чак тогава завърти волана.»
+  `sc-merge-roadworks-shift/mobile-wrong/02-briefing.png`
+- **`sc-mv-uturn-ban` · D · major** — Task chip destroyed by an overlapping pill. At t032s the ЗАДАЧА 1/2 line „Подмини забраненото място и стигни до разрешения отвор“ has a blue pill ending „…та линия“ drawn straight through it, so the operative instruction is unreadable at exactly the moment the student needs it.
+  «Подмини забраненото място и стигни до разрешения отвор»
+  `sc-mv-uturn-ban/pc-wrong/04-t032s.png`
+- **`sc-mw-discipline` · D · major** — Mobile: the ИНСТРУКЦИИ card is anchored at the very top of the screen behind the rear-view mirror. Its heading is sliced off by the viewport edge, the mirror sits on top of the first line, and the body fades out mid-word under a „↓ ОЩЕ 15 РЕДА“ marker. The ПРОЧЕТИ / РАЗБРАХ buttons sit directly on top of the world's 140 speed sign.
+  «↓ ОЩЕ 15 РЕДА»
+  `sc-mw-discipline/mobile-right/01-arrival.png`
+- **`sc-mw-discipline` · D · major** — Mobile: an orphaned „РАЗБРАХ“ pill floats over the sky for the entire 208 s drive with no card attached to it — every mid-drive frame from t001 to t208 and the 07-end frame still shows it.
+  «РАЗБРАХ»
+  `sc-mw-discipline/mobile-right/04-t123s.png`
+- **`sc-ov-abort` · A · major** — Same lost step 1 in the mobile briefing: the opening sentence is a heading and the numbered list begins at «2.».
+  «2. Излез за изпреварване: разстоянието изглежда достатъчно.»
+  `sc-ov-abort/mobile-right/02-briefing.png`
+- **`sc-ov-being-overtaken` · A · major** — Mobile briefing loses step 1 again — the opening line is a heading and the list starts at «2. Погледни в огледалото».
+  «2. Погледни в огледалото: колата зад теб се приближава и излиза наляво»
+  `sc-ov-being-overtaken/mobile-right/02-briefing.png`
+- **`sc-ov-crest-curve` · D · major** — The mobile briefing modal clips its final item in half horizontally — item 6 is sliced across the middle of the glyphs by the Разбрах button with no scroll — so the sentence that tells the student a refused overtake is NOT a failed lesson is unreadable.
+  «6. А ако правата не ти покаже такъв участък — остани зад камиона до края. Това НЕ е провален урок: чл. 42»
+  `sc-ov-crest-curve/mobile-right/02-briefing.png`
+- **`sc-ov-crest-curve` · A · major** — Mobile briefing loses step 1 here too — the opening paragraph is an unnumbered heading and the list starts at «2. Отдалеч се появява знак В24».
+  «2. Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40»
+  `sc-ov-crest-curve/mobile-right/02-briefing.png`
+- **`sc-ov-crest-curve` · D · major** — The PC ИНСТРУКЦИИ panel cuts off after item 4 with no scrollbar — items 5 and 6, which carry the whole decision rule (wait for the straight, overtake only with a clear stretch), are simply not shown.
+  «4. Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона»
+  `sc-ov-crest-curve/pc-right/01-arrival.png`
+- **`sc-ov-crossing-overtake` · D · major** — On PC the task text is printed twice on top of itself — once as the ЗАДАЧА 2/2 header written across the rear-view mirror panel and again as a toast pill immediately beneath it, and the ИНСТРУКЦИИ panel then covers the right third of the windscreen including the mirror.
+  «ЗАДАЧА 2/2 Мини пътеката, без да изпреварваш, и продължи»
+  `sc-ov-crossing-overtake/pc-right/04-t160s.png`
+- **`sc-ov-crossing-overtake` · D · major** — On PC the ДЕМОНСТРАЦИЯ player bar is laid across the instrument cluster during the live drive — the speedometer reads through the transport controls, and the keyboard-help panel top-left is clipped mid-phrase ('скорости: към Р / към' then nothing).
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:22 / 0:43»
+  `sc-ov-crossing-overtake/pc-right/04-t160s.png`
+- **`sc-ov-night-gap` · A · major** — Mobile briefing loses step 1 again and additionally claims «↓ ОЩЕ 25 РЕДА» on the collapsed card while cutting the visible line in half.
+  «2. Зад движещата се пред теб кола карай на КЪСИ светлини —»
+  `sc-ov-night-gap/mobile-right/01-arrival.png`
+- **`sc-ov-oncoming-gap` · A · major** — The mobile briefing loses its first step. The panel prints the opening sentence as an unnumbered heading and then starts the list at «2.», so the student sees steps 2-5 and no step 1. The same scenario on PC renders 1-5 correctly.
+  «2. Остани зад бавната кола с равномерна дистанция: осевата е прекъсната, но лентата отсреща е ЗАЕТА.»
+  `sc-ov-oncoming-gap/mobile-right/02-briefing.png`
+- **`sc-ov-oncoming-gap` · D · major** — On the arrival screen the collapsed instruction panel overlaps the gear column (Л / З / Д), the КОЛАН telltale and the speed sign, its text is sliced mid-line, and it claims «↓ ОЩЕ 17 РЕДА» when the expanded card holds four numbered steps.
+  «↓ ОЩЕ 17 РЕДА»
+  `sc-ov-oncoming-gap/mobile-right/01-arrival.png`
+- **`sc-ov-return-gap` · A · major** — Mobile briefing drops step 1 again — the opening line is an unnumbered heading and the list starts at «2. Огледало, мигач наляво…».
+  «2. Огледало, мигач наляво и излез решително — подмини бавната кола без бавене.»
+  `sc-ov-return-gap/mobile-right/02-briefing.png`
+- **`sc-park-gap-long` · D · major** — A world label collides with the HUD: the word „Паркирай“ is drawn in large unplated white type directly behind the task card at t189s, so the two strings overlap and neither is cleanly readable. In the sibling lesson the same marker is a small grey plate, so this is a layering bug rather than a style choice.
+  «Остави лоста на D — влез напред в клетката и спри напълно»
+  `sc-park-gap-long/pc-right/04-t189s.png`
+- **`sc-park-gap-short` · D · major** — The instruction that carries the manoeuvre is drawn on top of the demonstration thumbnail and is illegible: the ЗАДАЧА 2/2 chip „влез на заден ход в късото място и спри напълно“ sits over video pixels, then the different string „Премести лоста на R и паркирай на заден ход в клетката“ is shown in a card below with a stray „E“ key badge floating under it.
+  «Премести лоста на R и паркирай на заден ход в клетката»
+  `sc-park-gap-short/pc-right/04-t178s.png`
+- **`sc-pk-ban-stop` · D · major** — On desktop the ОПАСНА ГРЕШКА card is cut off by the bottom edge of the simulator viewport in mid-sentence — the last visible words are «В симулатора продължаваме, за да се» and the rest of the explanation, plus any button, is below the clip. The student is shown half a sentence about a 10-point dangerous error.
+  «ОПАСНА ГРЕШКА −10 изпитни т. Пътнотранспортно произшествие»
+  `sc-pk-ban-stop/pc-wrong/04-t023s.png`
+- **`sc-pk-double-park` · D · major** — Four PC HUD layers stack on the same corner: the demonstration thumbnail, an illegible ЗАДАЧА 1/2 chip drawn on top of it, the same sentence repeated verbatim in a card below, and the „Начинаещ / Нормален / Напреднал“ tabs floating over the sky with no backing plate. The chip that tells the student what to do is the one rendered unreadable.
+  «Подмини цялата паркирана редица, без да спираш до нея»
+  `sc-pk-double-park/pc-right/04-t058s.png`
+- **`sc-pk-double-park` · D · major** — On PC the „Демонстрация — следвай сянката“ scrubber is open by default and sits across the bottom centre of the view, covering the instrument cluster: the speed readout „10 км/ч D“ is drawn on top of the scrub bar, and the wheel rim is behind the transport buttons. The primary instrument is obstructed by a video control.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:11 / 0:41»
+  `sc-pk-double-park/pc-right/04-t058s.png`
+- **`sc-pk-stop-vs-park` · D · major** — PC task chip collides with itself. The ЗАДАЧА 1/3 chip text is drawn over the demonstration thumbnail AND has a blue pill („под В28 — плътна линия“) rendered straight on top of the same words, so two strings occupy the same pixels; the identical sentence is then repeated a second time in a card directly below.
+  «Спри за слизане на пътник под В28 престоят е разрешен»
+  `sc-pk-stop-vs-park/pc-wrong/04-t033s.png`
+- **`sc-signal-controller` · D · major** — The touch-teach modal keeps coming back mid-drive and tells a landscape screen to rotate. It is up over the windscreen at 03-ready, t001s, t006s, t011s, t017s, t022s, t032s and again at 05-stopped, despite the harness dismissing it twice with 'Разбрах'. Its headline is 'Завърти телефона хоризонтално' on a 2556x1179 viewport that is already landscape - a false instruction the student cannot satisfy.
+  «Завърти телефона хоризонтално»
+  `sc-signal-controller/mobile-right/05-stopped.png`
+- **`sc-signal-controller` · D · major** — A HUD control sits on top of a world signal head. At t053s the why-panel's round '✕' close button is positioned exactly over the far traffic light; its green lens shows through the button's translucent disc. The adjacent 'ЗАЩО' button's circle overlaps the '✕' circle, and the word ЗАЩО is partly covered. In a signals lesson the student's close button is hiding the signal.
+  «ЗАЩО»
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-sp-curve` · D · major** — On PC the in-drive menu never opens. 07b-menu.png is captured at the same step that produces a full settings sheet on mobile, but on PC it is the ordinary drive view with no menu, no overlay and no scrim — the frame is indistinguishable from a mid-drive sample. Either the PC menu affordance is missing or its trigger is dead.
+  `sc-sp-curve/pc-right/07b-menu.png`
+- **`sc-sp-eco-coast` · D · major** — The teaching card „Чакането Е маневрата“ is cut off by the bottom edge of the play area mid-sentence — the last visible line is sliced through the letterforms, and the sentence that tells the student what to look for while waiting never finishes on screen. This is the one card in the lesson that carries the actual instruction-zero explanation.
+  «Използвай ги: виж кой стои насреща, кой ще завива и къде са пешеходците.»
+  `sc-sp-eco-coast/pc-right/04-t050s.png`
+- **`sc-sp-eco-coast` · D · major** — Mobile: the ИНСТРУКЦИИ sheet opens as a slab that covers the entire windscreen — the red light the briefing says is „вижда се от далеч“ is completely hidden behind it while the student reads about it.
+  «светофарът напред свети червено и се вижда от далеч»
+  `sc-sp-eco-coast/mobile-right/02-briefing.png`
+- **`sc-sp-limit-end` · D · major** — The violation card that explains the dangerous error is cut off by the bottom of the play area mid-sentence, and it simultaneously covers the ГАЗ and СПИРАЧКА pedal controls and the wiper icon in the right-hand column. The one card that carries the „why“ is the one that cannot be read to the end.
+  «Караше с повече от 10 км/ч над ограничението. На практическия изпит това е опасна грешка и означава директно неиздържан изпит.»
+  `sc-sp-limit-end/pc-wrong/04-t017s.png`
+- **`sc-sp-limit-end` · D · major** — Mobile: the ИНСТРUКЦИИ card hides 23 of its lines behind a fade with a „↓ ОЩЕ 23 РЕДА“ marker while its heading is clipped by the top of the screen and the rear-view mirror overlaps its first line. A six-step briefing is delivered three lines at a time.
+  «↓ ОЩЕ 23 РЕДА»
+  `sc-sp-limit-end/mobile-right/01-arrival.png`
+- **`sc-sp-wet-limit-plate` · D · major** — The bottom strip shows the limit chip 50 next to „РЕЖИМ Нормален ≤60“, so the on-screen ceiling the student is measured against is 60 — 20 km/h above the 40 the briefing insists on. That gap is exactly why 59 km/h scored nothing.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-sp-wet-limit-plate/pc-wrong/04-t012s.png`
+- **`sc-sp-wet-limit-plate` · D · major** — PC: the ИНСТРУКЦИИ panel itself is cut off — instruction 6 is sliced in half by the panel's own bottom edge and cannot be read, so the last step of a six-step briefing is unreachable. Mobile hides 27 lines behind a „↓ ОЩЕ 27 РЕДА“ fade.
+  «6. Задръж мокрия таван до края на отсечката»
+  `sc-sp-wet-limit-plate/pc-right/01-arrival.png`
+- **`sc-sp-wet-limit-plate` · D · major** — The НАУЧИ coaching card is clipped by the bottom of the play area mid-sentence and simultaneously overlaps the wiper icon in the right-hand control column. The explanation that is the entire point of the card is cut off.
+  «особено там, където има пешеходци»
+  `sc-sp-wet-limit-plate/pc-wrong/04-t012s.png`
+- **`sc-vp-readiness` · D · major** — On PC the keyboard-help panel overflows its own box: the engine line is cut at the panel edge and the gear line wraps so that the D lands alone on the next row.
+  «двигател: старт / стоп · скорости: към P / към D»
+  `sc-vp-readiness/pc-right/01-arrival.png`
+- **`sc-vp-stall` · D · major** — Three different speed targets are on screen simultaneously: the road sign says 50, the HUD mode chip says 60, and the teach card says no more than 55. The student has no way to know which number is being graded.
+  «Задачата иска да си тук с не повече от 55 км/ч, а в момента караш 59 км/ч»
+  `sc-vp-stall/pc-wrong/04-t012s.png`
+- **`sc-vp-telltale-red` · D · major** — The save-failure banner is painted across the very bottom of the viewport where it overlaps the map attribution line and runs to both edges without margin, so the most important message on the screen looks like a rendering artefact.
+  «Сесията не се записа (SAVE_FAILED) … © OpenStreetMap contributors»
+  `sc-vp-telltale-red/mobile-right/08-debrief.png`
+- **`sc-vu-cyclist-hook` · D · major** — Mobile: on the collision card the „ЗАЩО“ pill and the „×“ close pill physically overlap — their circular outlines intersect — so the button that opens the explanation and the button that dismisses it share pixels. The card body is also cut off mid-word under a „↓ ОЩЕ 6 РЕДА“ marker and its heading is clipped by the top of the screen behind the mirror.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-vu-cyclist-hook/mobile-right/04-t184s.png`
+- **`sc-vu-emergency` · D · major** — The НАУЧИ card „Стигна точката, но твърде бързо“ is cut off by the bottom of the play area mid-sentence, so the correction it offers ends unfinished, and it simultaneously overlaps the wiper icon in the right-hand control column.
+  «Ако я подминеш с тази скорост, задачата остава»
+  `sc-vu-emergency/pc-wrong/04-t017s.png`
+- **`sc-vu-emergency` · E · major** — The briefing builds the whole lesson on a siren („преди сирената да е оглушителна“) and there is no audio anywhere in the product: no volume control, no mute, no audio indicator on either platform. The cue the student is told to rely on before the siren does not exist either, so neither half of the warning is deliverable.
+  «преди сирената да е оглушителна»
+  `sc-vu-emergency/pc-right/01-arrival.png`
+- **`sc-vu-emergency` · F · major** — Across all seven lessons the mobile briefing is a clipped card that hides 6 to 27 lines behind a „↓ ОЩЕ N РЕДА“ fade under the rear-view mirror, while PC shows the whole numbered list in a persistent side panel. The same briefing is a full document on one platform and a three-line teaser on the other.
+  «↓ ОЩЕ N РЕДА»
+  `sc-vu-emergency/pc-right/01-arrival.png`
+- **`sc-vu-emergency-junction` · D · major** — The debrief card is clipped by the play-area viewport with no visible scroll affordance. On PC the protocol table is cut immediately below «Общо (допустими 9)», so the per-objective list — the only honest statement of what was and was not credited — is off-screen; on mobile only the header block fits and the class table is cut mid-row. The screen that is supposed to teach the student why they failed shows them a number and stops.
+  «Общо (допустими 9) 1 10»
+  `sc-vu-emergency-junction/pc-right/08-debrief.png`
+- **`sc-vu-emergency-junction` · E · major** — No evidence of audio anywhere, and no way to control it. чл. 91 turns on a vehicle giving BOTH a light and a SOUND signal, yet the siren exists only as a written subtitle line, and the in-lesson ⚙ sheet offers Съветник / Задача / Качество / Въпроси / Карта with no volume, mute or sound entry at all. A lesson whose legal trigger is a sound ships with the sound absent and unmentionable.
+  «Приближаваме кръстовището — и в далечината вие сирена.»
+  `sc-vu-emergency-junction/mobile-right/07b-menu.png`
+- **`sc-vu-pass-clearance` · D · major** — Same debrief clipping as the other lesson: the PC result card is cut mid-sentence inside «Оценка на маневрата» at the bottom of the play area with no scrollbar, and the mobile capture shows only the header. The star rating is visible but the sentence explaining what the stars measure is severed, and the per-objective breakdown is unreachable.
+  «Точки за изпълнение — оценка на симулатора за качеството на маневрата, по 0–2 за всеки показател. Тук точките се ПЕЧЕЛЯТ (2 е най-доброто) — обратно на наказателните. Не са наказателни точки по Наредба № 38 и не са»
+  `sc-vu-pass-clearance/pc-right/08-debrief.png`
+- **`sc-vu-pass-clearance` · E · major** — CONSISTENCY with the other lesson — again no audio evidence of any kind and no audio control: no volume, mute or sound entry in the in-lesson menu, and every cue (engine, indicator, the cyclist's presence) is delivered as text. For an overtake lesson where the taught skill includes not startling a rider, silence is a content gap, not just a polish one.
+  `sc-vu-pass-clearance/mobile-right/04-t102s.png`
+- **`sc-ac-night-lights` · D · minor** — The mobile briefing modal renders item 1 as an unnumbered headline, so the numbered list visibly starts at «2.» and the student sees a list running 2-3-4-5 with no 1. Same defect in sc-ac-fog and sc-ac-rain-lights mobile briefings.
+  «Включи късите светлини още със запалването на двигателя — тъмно е.»
+  `sc-ac-night-lights/mobile-right/02-briefing.png`
+- **`sc-crossing-dart` · G · minor** — The «Завърти телефона хоризонтално» (rotate your phone to landscape) teach card fires at 04-t066s — 66 seconds INTO the drive, on a viewport that is already 2556×1179 landscape. It also steals a modal layer mid-drive: the frame at t066 shows the car at 20 км/ч with the card up, and the harness had to drain it with «Разбрах».
+  «Завърти телефона хоризонтално»
+  `sc-crossing-dart/mobile-right/04-t013s.png`
+- **`sc-ln-obstacle-meeting` · D · minor** — PC: the ДЕМОНСТРАЦИЯ deck overlaps the instrument cluster — the digital speed and gear readout 11 км/ч D is drawn straddling the demo bar and the dashboard, and the teach-moment card bottom-right is clipped mid-line by the play-area edge.
+  «Задачата иска да си тук с не повече от 6 км/ч, а в момента караш 11 км/ч»
+  `sc-ln-obstacle-meeting/pc-right/04-t066s.png`
+- **`sc-mw-discipline` · D · minor** — The bottom HUD strip shows the posted-limit chip 140 next to „РЕЖИМ Нормален ≤150“ — a second, HIGHER, unexplained number sitting beside the legal limit. Nothing on screen says what ≤150 is or why it exceeds the sign the student must obey.
+  «РЕЖИМ Нормален ≤150 · знакът важи»
+  `sc-mw-discipline/mobile-right/04-t038s.png`
+- **`sc-mw-discipline` · E · minor** — No evidence of audio anywhere: no volume or mute control, no audio indicator, no engine/wind cue reflected in any UI, on either platform, in any of the 100+ frames of this lesson.
+  `sc-mw-discipline/pc-right/01-arrival.png`
+- **`sc-mw-min-speed` · E · minor** — No evidence of audio on either platform: no mute, no volume, no indicator. On a lesson whose whole cue set is „the car behind is closing“, there is no sound to warn of it.
+  `sc-mw-min-speed/pc-right/01-arrival.png`
+- **`sc-rb-exit-signal` · D · minor** — The briefing card overflows the bottom of the viewport — its rounded bottom border is cut off by the screen edge and runs under the status bar, so the panel reads as chopped.
+  «Разбрах»
+  `sc-rb-exit-signal/mobile-right/02-briefing.png`
+- **`sc-sp-eco-coast` · E · minor** — No evidence of audio: no volume or mute control anywhere in the shell, no audio indicator, nothing in the ⚙/menu row. A lesson built on engine braking („двигателят спира по-плавно от спирачката“) gives the student no engine note at all to hear.
+  «двигателят спира по-плавно от спирачката»
+  `sc-sp-eco-coast/pc-right/01-arrival.png`
+- **`sc-sp-limit-end` · D · minor** — The bottom strip shows the limit chip 40 (correct, the В26 zone) beside „РЕЖИМ Нормален ≤60“ — a second unexplained number 20 km/h above the sign the student is being graded against.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-sp-limit-end/pc-right/04-t104s.png`
+- **`sc-sp-limit-end` · E · minor** — No evidence of audio: no volume control, no mute, no audio state indicator on either platform in any frame.
+  `sc-sp-limit-end/pc-right/01-arrival.png`
+- **`sc-sp-wet-limit-plate` · E · minor** — No evidence of audio: no mute, no volume, no indicator, and no rain sound could exist anyway since there is no rain. The cockpit has a ЧИСТАЧКИ (wipers) control that stays off through a lesson the briefing says takes place in the rain.
+  «ЧИСТАЧКИ»
+  `sc-sp-wet-limit-plate/pc-right/01-arrival.png`
+- **`sc-vu-cyclist-hook` · E · minor** — No evidence of audio on either platform in any frame — no mute, no volume, no indicator, and no audible cue for a cyclist arriving in the blind spot, which is exactly the cue this lesson is about.
+  «погледни през дясното рамо в мъртвата зона»
+  `sc-vu-cyclist-hook/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/components/sim/RouteGuidance.tsx` — 23 findings (0 critical, 15 major, 8 minor)
+
+- **`sc-crossing-dart` · D · major** — A FAKE ROAD SIGN CONTRADICTS THE HUD. A green shop-awning-style board on the right-hand building reads «Карай дотук / не по-бързо от 45 км/ч» — an instruction dressed as world signage. It is not a legal Bulgarian sign of any kind, and it puts a third speed number on screen at the same time as the HUD's red-circle 50 chip and the mode strip's «Нормален ≤60». A learner being trained to read real signs is shown 45, 50 and 60 simultaneously with no explanation of which governs.
+  «Карай дотук · не по-бързо от 45 км/ч»
+  `sc-crossing-dart/mobile-right/05-stopped.png`
+- **`sc-junction-blind` · D · major** — A huge white chevron '◀' floats in the middle of the sky above the road, roughly two car-lengths tall and detached from the carriageway, with no label or legend. It appears in every mid-drive frame of this lesson and in sc-jx-equal-left too.
+  `sc-junction-blind/mobile-right/04-t065s.png`
+- **`sc-jx-equal-left` · D · major** — A vertical cyan beam of light rises out of the middle of the carriageway into the sky at the junction, with no legend anywhere. Next to it the giant white '◀' chevron floats in mid-air. Two unexplained symbols dominating the view a learner is supposed to be reading for traffic.
+  `sc-jx-equal-left/mobile-right/04-t039s.png`
+- **`sc-ln-obstacle-meeting` · A · major** — Two contradictory speed rules are posted at the same waypoint. The world label reads Карай дотук · не по-бързо от 35 км, another world label at the same spot reads Спри тук · спри — под 6 км/ч, and the coach card scolds the driver for being at 14 км/ч because the task wants no more than 6. Three numbers, one point.
+  «Стигна точката, но твърде бързо — Задачата иска да си тук с не повече от 6 км/ч, а в момента караш 14 км/ч»
+  `sc-ln-obstacle-meeting/mobile-right/04-t080s.png`
+- **`sc-ln-obstacle-meeting` · D · major** — The two glowing road ribbons are explained on PC by a legend (синя — пътят на колата-сянка / зелена — маршрутът до целта) but that legend does not exist anywhere on mobile. A phone student sees a green and a blue river of light on the tarmac with nothing telling him which to follow.
+  «синя — пътят на колата-сянка · зелена — маршрутът до целта»
+  `sc-ln-obstacle-meeting/mobile-right/01-arrival.png`
+- **`sc-maneuver-uturn` · A · major** — The guide ribbon does not describe the manoeuvre being taught. The briefing asks for one smooth arc across the opposing lanes; the blue shadow-car path runs dead straight through the green target ellipse and off to the horizon, so a student following the blue line never turns at all.
+  «завърти волана наляво и опиши ЕДНА плавна дъга през насрещните ленти»
+  `sc-maneuver-uturn/mobile-right/05-stopped.png`
+- **`sc-merge-from-property` · D · major** — A world STOP (Б2) sign is rendered at enormous scale in the top-right corner, clipped by the viewport edge, drawn straight over the rear-view mirror widget and through the task chip text. The sign the lesson is about is the thing that destroys the HUD.
+  «Знак Б2: пълното спиране е задължително — и е направено.»
+  `sc-merge-from-property/pc-right/05-stopped.png`
+- **`sc-merge-from-property` · D · major** — On mobile the world waypoint label 'СПРИ ТУК — под 5 км/ч' is rendered as a ghost billboard so large it smears across the whole right half of the screen behind the HUD, half-legible, overlapping the 20 speed-limit sign which is itself sliced by the viewport edge.
+  «СПРИ ТУК — под 5 км/ч»
+  `sc-merge-from-property/mobile-right/05-stopped.png`
+- **`sc-ov-ban-overtake` · D · major** — The world-space waypoint label 'Карай дотук — не по-бързо от XX км/ч' has its speed number covered by the РАЗБРАХ pill, so the only piece of information the label carries is the piece that is hidden.
+  «Карай дотук не по-бързо от … км/ч»
+  `sc-ov-ban-overtake/mobile-right/04-t141s.png`
+- **`sc-ov-solid-line` · D · major** — The green route ribbon is laid directly along the М1 осева line for the whole of the ban span, so the marking the entire lesson is about survives only as a white sliver bleeding out from under the glow. A student told 'дръж средата на лентата спрямо непрекъснатата линия' is looking at a guidance overlay, not at the line.
+  «2. Напред осевата линия става непрекъсната (М1) — оттам нататък тя не се застъпва и не се пресича.»
+  `sc-ov-solid-line/pc-right/04-t118s.png`
+- **`sc-park-night` · D · major** — The second route label is unreadable. 'Паркирай тук' renders as huge pale-grey text floating in the night sky, clipped by the top edge of the screen and drawn behind the HUD, while 'Спри тук' in the very same lesson renders as a legible dark chip on a post. The one label that names the destination is the one the student cannot read.
+  «Паркирай тук»
+  `sc-park-night/mobile-right/04-t208s.png`
+- **`sc-park-night` · D · major** — The 'Спри тук' chip carries a second line stating the speed condition, and it renders at roughly six pixels tall — an unreadable grey smear under the title. The condition it hides ('под 6 км/ч') is the exact tolerance the first graded task measures.
+  «Спри тук»
+  `sc-park-night/mobile-right/04-t034s.png`
+- **`sc-pk-busstop-ban` · D · major** — A world 50 speed-limit sign is rendered at enormous scale in the top-right corner, sliced by the viewport edge and drawn over the difficulty tabs and the rear-view mirror widget. Same defect class as the giant Б2 in sc-merge-from-property: world sign geometry colliding with the HUD controls.
+  `sc-pk-busstop-ban/pc-right/05-stopped.png`
+- **`sc-rb-exit-signal` · A · major** — Two different speed ceilings for the same instruction, seconds apart. The advisor card at t045 says «дръж под 35 км/ч»; the in-world route marker standing in the same scene says «не по-бързо от 30 км/ч». The HUD limit disc meanwhile shows 40 and the status bar «Нормален ≤50». Four numbers, no way for a student to know which one is graded.
+  «Подмини първите два изхода и остани в кръга — дръж под 35 км/ч»
+  `sc-rb-exit-signal/mobile-right/04-t045s.png`
+- **`sc-signal-flashing` · D · major** — Three different speed ceilings are legible in a single frame: the in-world route marker over the carriageway says «не по-бързо от 30 км/ч», the HUD limit disc says 50, and the status bar says «Нормален ≤60». Nothing indicates which one is graded, and the 30 is the one painted largest in the driver's forward view.
+  «Карай дотук · не по-бързо от 30 км/ч»
+  `sc-signal-flashing/mobile-right/04-t028s.png`
+- **`sc-follow-standstill` · D · minor** — The in-world stop marker is clipped by the instructions panel: its second line, the one carrying the actual criterion, is sliced off at the panel's left edge.
+  «Спри тук · спри — под 6 км»
+  `sc-follow-standstill/pc-right/04-t156s.png`
+- **`sc-follow-tailgater` · D · minor** — The in-world waypoint label is clipped by the instructions panel: the criterion line under 'Карай дотук' is sliced off at the panel edge.
+  «Карай дотук · не по-бързо от 41 км/ч»
+  `sc-follow-tailgater/pc-right/04-t098s.png`
+- **`sc-follow-truck` · D · minor** — The in-world waypoint label is clipped by the instructions panel, which is why it reads as a truncated word rather than 'Карай дотук' in most frames.
+  «Карай дотук»
+  `sc-follow-truck/pc-wrong/04-t055s.png`
+- **`sc-ln-obstacle-meeting` · D · minor** — The world label Карай дотук clips its own unit: the second line reads не по-бързо от 35 км with the /ч cut off by the label plate.
+  «не по-бързо от 35 км»
+  `sc-ln-obstacle-meeting/mobile-right/04-t080s.png`
+- **`sc-maneuver-3point` · D · minor** — The Спри тук world marker is drawn behind the building facade and the mirror inset at very low contrast; its second line спри — под 6 км/ч is illegible at phone size and the whole plate is partly hidden by the 40 sign.
+  «Спри тук · спри — под 6 км/ч»
+  `sc-maneuver-3point/mobile-right/05-stopped.png`
+- **`sc-maneuver-uturn` · D · minor** — The Спри тук world plate is drawn over a building facade in near-matching grey; its second line спри — под 6 км/ч is unreadable at phone size and is further cut by the touch-hint card.
+  «Спри тук · спри — под 6 км/ч»
+  `sc-maneuver-uturn/mobile-right/05-stopped.png`
+- **`sc-vu-emergency-junction` · D · minor** — The world-anchored waypoint label «Карай дотук / не по-бързо от 30 км/ч» ignores depth and scale clamping. At t038s on mobile its subtitle line has blown up to roughly five times its normal size, runs off the right edge of the screen, prints across a building facade and collides with the РАЗБРАХ button and the mirror; at other moments the same label draws in front of buildings it should be behind.
+  «не по-бързо от 30 км/ч»
+  `sc-vu-emergency-junction/mobile-right/04-t038s.png`
+- **`sc-vu-pass-clearance` · D · minor** — The world-anchored «Карай дотук» label renders in front of geometry that should occlude it: at t102s and t196s on mobile it prints over building facades several blocks away and is then half-hidden behind the РАЗБРАХ button, so the one cue telling the student where to stop is both depth-wrong and partially covered.
+  «Карай дотук»
+  `sc-vu-pass-clearance/mobile-right/04-t196s.png`
+
+---
+
+## `platform/src/modules/sim/scene/lessonSpeedContract.ts` — 22 findings (0 critical, 22 major, 0 minor)
+
+- **`sc-crossing-bus-shadow` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-crossing-bus-shadow/mobile-right/05-stopped.png`
+- **`sc-crossing-child-ball` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-crossing-child-ball/mobile-right/05-stopped.png`
+- **`sc-crossing-white-cane` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-crossing-white-cane/mobile-right/05-stopped.png`
+- **`sc-ln-boulevard-discipline` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-ln-boulevard-discipline/mobile-right/05-stopped.png`
+- **`sc-ov-solid-return` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-ov-solid-return/mobile-right/05-stopped.png`
+- **`sc-park-45-rev` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-park-45-rev/mobile-right/05-stopped.png`
+- **`sc-park-left` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-park-left/mobile-right/05-stopped.png`
+- **`sc-park-wall` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-park-wall/mobile-right/05-stopped.png`
+- **`sc-park-zebra` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-park-zebra/mobile-right/05-stopped.png`
+- **`sc-pe-jaywalker` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-pe-jaywalker/mobile-right/05-stopped.png`
+- **`sc-pe-school-patrol` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-pe-school-patrol/mobile-right/05-stopped.png`
+- **`sc-rb-busy-gap` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-rb-busy-gap/mobile-right/05-stopped.png`
+- **`sc-rb-circulate-priority` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-rb-circulate-priority/mobile-right/05-stopped.png`
+- **`sc-rb-lane-choice` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-rb-lane-choice/mobile-right/05-stopped.png`
+- **`sc-rb-ped-exit` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-rb-ped-exit/mobile-right/05-stopped.png`
+- **`sc-sig-controller-postures` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-sig-controller-postures/mobile-right/05-stopped.png`
+- **`sc-signal-dead` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-signal-dead/mobile-right/05-stopped.png`
+- **`sc-signal-hesitation` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-signal-hesitation/mobile-right/05-stopped.png`
+- **`sc-speed-creep` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-speed-creep/mobile-right/05-stopped.png`
+- **`sc-speed-dangerous` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-speed-dangerous/mobile-right/05-stopped.png`
+- **`sc-speed-rain` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-speed-rain/mobile-right/05-stopped.png`
+- **`sc-speed-zone` · D · major** — Three different speed numbers are on screen at once and none explains the others: the round red limit sign in the HUD strip (e.g. 40), the mode text next to it («РЕЖИМ Нормален ≤50 · знакът важи»), and a floating world billboard «Карай дотук — не по-бързо от 37 км/ч». A student cannot tell which number he is being graded against.
+  «РЕЖИМ Нормален ≤50 · знакът важи / не по-бързо от 37 км/ч»
+  `sc-speed-zone/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/hud/FaultCard.tsx` — 13 findings (0 critical, 13 major, 0 minor)
+
+- **`sc-ac-aquaplane` · D · major** — The fault card that explains the dangerous error is truncated mid-sentence at the card's bottom edge with no ellipsis, no scrollbar and no expand control — the student sees „…цялата десетка е цената на самото деяние — не сбор от“ and the sentence stops. The same truncation appears in the teaching card at t018 („…и — затова още не се отчита. Намали“).
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от»
+  `sc-ac-aquaplane/pc-wrong/04-t034s.png`
+- **`sc-ac-highbeam-lead` · D · major** — The mistake card is cut off mid-explanation while the student is still driving. On PC the card ends at «прекратена.» and the following row is sliced to half a glyph height, and the round mirror button is painted on top of the card's lower right corner. On mobile the same card shows «↓ ОЩЕ 6 РЕДА» with the sentence broken at «цената на самото».
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-ac-highbeam-lead/pc-wrong/04-t018s.png`
+- **`sc-ac-night-overdrive` · D · major** — The ВТОРОСТЕПЕННА „Превишена скорост“ card is cut off after one and a half lines at the card edge — „Ограничението е таван, не“ — and the objective toast behind it is printed over a second toast, producing overlapping glyphs at top-right.
+  «Движеше се над разрешената скорост. Ограничението е таван, не»
+  `sc-ac-night-overdrive/pc-wrong/04-t039s.png`
+- **`sc-ac-wind-truck-pass` · D · major** — On mobile the fault card has no background panel at all: „Движение в лявата лента без причина“ and its explanation print directly onto the sky and across the rear-view mirror, the third line fades out mid-word, and the ЗАЩО and ✕ controls render as floating circles over the world. „↓ ОЩЕ 5 РЕДА“ hides the rest.
+  «Дълго време се движеше в лявата лента, без да изпреварваш. Извън»
+  `sc-ac-wind-truck-pass/mobile-wrong/04-t034s.png`
+- **`sc-ed-d2-stop-address` · D · major** — The НАУЧИ explanation panel is cut off at the bottom of the viewport mid-sentence, and a cockpit control icon bleeds through it from behind.
+  «удря арматурата със сила колкото падане от третия етаж»
+  `sc-ed-d2-stop-address/pc-right/05-stopped.png`
+- **`sc-follow-distance` · D · major** — The fault explanation card is cut off by the bottom edge of the play area mid-sentence, so the 'why' the whole product is built on is unreadable at the moment it matters.
+  «Дръж поне 2 секунди дистанция — при внезапно спиране това е разликата между спокойно спиране и удар отзад. При дъжд и»
+  `sc-follow-distance/pc-wrong/04-t017s.png`
+- **`sc-hz-emergency-stop` · D · major** — On mobile the collision fault card is truncated mid-sentence and offers «↓ ОЩЕ 6 РЕДА» to reveal six more lines, while sitting directly on top of the rear-view mirror and pushing its ЗАЩО and ✕ buttons over the world. The most serious verdict in the exam sheet is delivered as a clipped fragment over the one instrument the student is told to check.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-hz-emergency-stop/mobile-right/04-t101s.png`
+- **`sc-junction-rhr` · D · major** — Violation toast is cut off mid-sentence at the panel edge with no scroll affordance visible: «...не сбор от натрупани дребни пропуски. В». Doc-64 requirement-zero says every decision must be explained; here the explanation is amputated.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски. В»
+  `sc-junction-rhr/pc-wrong/04-t070s.png`
+- **`sc-ov-abort` · D · major** — The stacked violation card shows a «+1» pile badge and still truncates its body at «↓ ОЩЕ 6 РЕДА», so two queued explanations are collapsed into one clipped paragraph the learner must dig for.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-ov-abort/mobile-wrong/04-t089s.png`
+- **`sc-ov-night-gap` · D · major** — The teach card sits over the rear-view mirror all night as well, and the violation card that replaces it truncates at «↓ ОЩЕ 6 РЕДА» with its ЗАЩО button over the traffic.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-ov-night-gap/mobile-wrong/04-t044s.png`
+- **`sc-ov-oncoming-gap` · D · major** — The mobile violation card truncates the instructor's explanation mid-word behind a fade and a «↓ ОЩЕ 6 РЕДА» badge, and its ЗАЩО / ✕ buttons are drawn on top of the world traffic and the «Карай дотук» waypoint label. A bare-verdict-with-hidden-reason is exactly what requirement-zero forbids.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-ov-oncoming-gap/mobile-wrong/04-t027s.png`
+- **`sc-ov-return-gap` · D · major** — The violation card again cuts the instructor's reason mid-sentence behind «↓ ОЩЕ 6 РЕДА» and drops its ЗАЩО button on top of a parked car in the world.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-ov-return-gap/mobile-wrong/04-t118s.png`
+- **`sc-roundabout-entry` · D · major** — The mobile fault card overflows badly: the header '−10 ИЗПИТНИ Т.' is clipped at the right edge, the body text is cut mid-sentence and overprints the '↓ ОЩЕ 7 РЕДА' row below it, and the ЗАЩО / ✕ buttons render as washed-out translucent circles half off the panel.
+  «↓ ОЩЕ 7 РЕДА»
+  `sc-roundabout-entry/mobile-right/04-t062s.png`
+
+---
+
+## `platform/src/modules/sim/hud/HudToasts.tsx` — 9 findings (0 critical, 5 major, 4 minor)
+
+- **`sc-ac-aquaplane` · D · major** — Two live overlays print on top of each other at top-right: the objective toast „Намали под 60 ПРЕДИ водата“ and the route toast „Следвай синята линия“ render in the same box, letters over letters, and both sit on top of the rear-view mirror widget.
+  «Намали под 60 ПРЕДИ водатаСледвай синята линия»
+  `sc-ac-aquaplane/pc-wrong/04-t034s.png`
+- **`sc-ac-wind-truck-pass` · D · major** — The task chip and the objective toast print on top of each other at top-right: „Върни се в дясната лента и стигни края на отсечката“ appears twice, the second copy in blue overlapping the first, producing unreadable composited glyphs across the mirror.
+  «Върни се в дясната лента и стигни края на отсечката»
+  `sc-ac-wind-truck-pass/pc-wrong/04-t039s.png`
+- **`sc-junction-stop` · D · major** — A «Превишена скорост» secondary-fault card with a ЗДвП чл. 21, ал. 1 citation is on screen while the speedometer reads 33 км/ч against a posted 40 chip and a ≤60 mode cap. Either the toast outlives its cause with no timestamp shown, or the conviction is wrong; from the frame a student cannot tell which.
+  «Превишена скорост — Движеше се над разрешената скорост.»
+  `sc-junction-stop/pc-wrong/04-t099s.png`
+- **`sc-merge-roadworks-shift` · D · major** — On mobile the coach text is drawn straight onto the rear-view mirror widget and over the world 50 sign at the right edge, in two different colours, so mirror image, sign and instruction all occupy the same pixels.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка. Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-merge-roadworks-shift/mobile-right/05-stopped.png`
+- **`sc-pe-zone-living` · D · major** — The penalty card is cut off mid-sentence. 'ОПАСНА ГРЕШКА · -10 изпитни т. / Непропускане на пешеходец / Премина през пешеходната пътека, докато на нея имаше пешеходец. Длъжен си да пропуснеш стъпилите…' is sliced horizontally by the container edge, and the unlabelled circular map glyph sits on top of the last visible line. The explanation of the gravest error in the lesson is the text that gets truncated.
+  «Премина през пешеходната пътека, докато на нея имаше пешеходец. Длъжен си да пропуснеш стъпилите»
+  `sc-pe-zone-living/pc-wrong/04-t017s.png`
+- **`sc-ac-snow` · D · minor** — The objective toast wraps so that the unit splits across lines — «30 км/» ends the first line and a lone «ч» is orphaned on the second — the ✕ button sits on top of the text block, and the toast has no opaque plate so the building and the minimap read straight through it.
+  «Приближи със зимна скорост — дръж под 30 км/ч»
+  `sc-ac-snow/pc-right/01-arrival.png`
+- **`sc-merge-from-property` · D · minor** — The coach card states a live speed that the instrument contradicts in the same frame: the card says the student is currently doing 16 км/ч while the speedometer directly below reads 0 км/ч.
+  «Задачата иска да си тук с не повече от 5 км/ч, а в момента караш 16 км/ч — затова още не»
+  `sc-merge-from-property/mobile-right/05-stopped.png`
+- **`sc-pe-zone-living` · D · minor** — The objective toast breaks a unit across lines — 'Влез в жилищната зона с 20 — дръж под 25 км/' with a lone 'ч' on the next line at the card's edge — and the toast card overlaps the ИНСТРУКЦИИ card beneath it, so at t090s '…дръж под 5 км/ч' is partly hidden by the instructions panel.
+  «Влез в жилищната зона с 20 — дръж под 25 км/ч»
+  `sc-pe-zone-living/pc-right/01-arrival.png`
+- **`sc-zebra-approach` · D · minor** — An unexplained '+2' badge sits alone at the top right of the mobile HUD with no label, no unit and no legend anywhere on screen.
+  «+2»
+  `sc-zebra-approach/mobile-right/06-waited.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/TeachMomentOverlay.tsx` — 8 findings (0 critical, 8 major, 0 minor)
+
+- **`sc-junction-gap` · D · major** — The НАУЧИ card is cut off mid-sentence at the panel edge — «Тези секунди не се броят в ориентировъчното време на урока, така че изчакай спокойно да» — and there is no visible affordance to read the rest.
+  «така че изчакай спокойно да»
+  `sc-junction-gap/pc-right/04-t206s.png`
+- **`sc-park-van` · D · major** — The violation card clips its text through the MIDDLE of a glyph line, not at a line boundary — the fourth line is sliced horizontally through the letter bodies and then '↓ ОЩЕ 6 РЕДА' is printed below it. The card also overprints the rear-view mirror.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото»
+  `sc-park-van/mobile-wrong/04-t018s.png`
+- **`sc-pe-parked-row-scan` · D · major** — The teaching card is cut off mid-word. 'НАУЧИ / Пропусна пешеходеца — Изчака 3 с и потегли — без отчетено нарушение спрямо пешеходец. Това е грешката с най-тежка цена в целия списък, и ти я избегна по правилния…' is sliced horizontally by the card's bottom edge, and the tail of the sentence — the part that says WHY it was right — is unreachable. This is exactly the 'no bare verdicts' rule failing at the render layer.
+  «Изчака 3 с и потегли — без отчетено нарушение спрямо пешеходец. Това е грешката с най-тежка цена в целия списък, и ти я избегна по правилния»
+  `sc-pe-parked-row-scan/pc-right/04-t039s.png`
+- **`sc-rb-exit-signal` · D · major** — The pre-drive teach overlay loses its entire first line off the top of the screen. The heading «Завърти телефона хоризонтално» is present in the DOM but nothing of it is painted; the visible text starts mid-instruction at «Ляв палец — волан», with no panel behind it (teal text directly over a lit building) and the «РАЗБРАХ» button floating detached 200 px below.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-rb-exit-signal/mobile-right/03-ready.png`
+- **`sc-signal-flashing` · D · major** — The teach overlay's teal text is drawn straight across the world placard: «натисни пак надолу — минава на заден ход» runs through the second and third lines of the «МИГАЩО ЖЪЛТО» sign, leaving both unreadable. This is HUD copy colliding with the one piece of in-world signage that carries the lesson's rule.
+  «МИГАЩО ЖЪЛТО · Светофарът не регулира — внимание · Пропусни идващите ОТДЯСНО»
+  `sc-signal-flashing/mobile-right/04-t028s.png`
+- **`sc-signal-response` · D · major** — The НАУЧИ teaching card is cut off mid-sentence by the bottom of its own panel with no scroll or expand affordance: «10 секунди на червено са просто цикълът на светофара, не грешка —» and then nothing. The explanation the lesson exists to deliver is truncated.
+  «Чакането Е маневрата — 10 секунди на червено са просто цикълът на светофара, не грешка —»
+  `sc-signal-response/pc-right/04-t044s.png`
+- **`sc-vu-emergency-junction` · D · major** — On mobile the persistent coach tip is drawn directly on top of the rear-view mirror inset, hiding the one instrument this lesson tells the student to use. At t007s and t017s the mirror glass is ~70% covered by two lines of white and two lines of teal text. Whatever the mirror is meant to show at those exact moments, the student cannot see it.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-vu-emergency-junction/mobile-right/04-t017s.png`
+- **`sc-vu-pass-clearance` · D · major** — On mobile the «РАЗБРАХ» acknowledgement button and its tip never dismiss — present at t012s and still present at t196s, i.e. for the entire ~200 s run. It floats over the road and over the rear-view mirror, so the lesson permanently looks like it is blocked on an unacknowledged dialog, and the button is a live tap target sitting where the student's thumb steers.
+  «РАЗБРАХ»
+  `sc-vu-pass-clearance/mobile-right/04-t196s.png`
+
+---
+
+## `platform/src/modules/sim/hud/notifyColumn.ts` — 7 findings (0 critical, 7 major, 0 minor)
+
+- **`sc-crossing-dart` · D · major** — The instruction card sits on top of the right-hand control column. In 01-arrival.png the panel covers «Л ЛЯВО», «З ЗАДН» and «Д ДЯСН», and the «ПРОЧЕТИ»/«РАЗБРАХ» buttons sit directly over the red ⚠ КОЛАН control — the seatbelt button is half under the РАЗБРАХ button. The player cannot reach a control the HUD is telling him about.
+  «ПРОЧЕТИ · РАЗБРАХ · ⚠ КОЛАН»
+  `sc-crossing-dart/mobile-right/01-arrival.png`
+- **`sc-ed-d2-stop-address` · D · major** — Task chip text collides with a second HUD string at top right — 'Приближи избраното място с намалена скорост' has another sentence printed through it — and the pair sits on top of the rear-view mirror.
+  «Приближи избраното място с намалена скорост»
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-sp-curve` · D · major** — The mobile violation card is cut off mid-word with eight further lines hidden behind ↓ ОЩЕ 8 РЕДА. The visible text ends at В завоя гумите — the student sees the -3 изпитни т. penalty and the offence name but the physics explanation stops in the middle of a clause. A bare verdict with a hidden explanation is exactly what the theory requirement-zero rule forbids.
+  «Влезе в обозначения завой със скорост над препоръчителната от табелата. В завоя гумите»
+  `sc-sp-curve/mobile-wrong/04-t129s.png`
+- **`sc-sp-curve` · D · major** — A Превишена скорост card is displayed while the cluster reads 18 км/ч under a posted 90 limit. The car had been at 96 км/ч six seconds earlier in the open field, so the card is reporting a past moment, but nothing on screen says so — no timestamp, no speed-at-offence, no marker. The student is shown a speeding accusation next to a speedometer reading 18.
+  «Превишена скорост — Движеше се над разрешената скорост. Ограничението е таван, не цел»
+  `sc-sp-curve/mobile-wrong/04-t030s.png`
+- **`sc-sp-harsh-brake` · D · major** — The PC НАУЧИ teaching card in the bottom-right is clipped by its own container mid-sentence and overlaps the СПИРАЧКА and ГАЗ buttons. The visible text stops at Задачата иска да си тук с не повече — the correction the card exists to deliver is cut off, and the card sits on top of the two controls the student needs to act on it.
+  «Стигна точката, но твърде бързо»
+  `sc-sp-harsh-brake/pc-wrong/04-t017s.png`
+- **`sc-speed-transition` · D · major** — The mobile violation card is truncated mid-sentence with the rest hidden behind ↓ ОЩЕ 3 РЕДА. The visible text stops at На практическия изпит това е — the student is shown the penalty (-10 изпитни т.) but the explanation is cut off. This directly defeats the no-bare-verdict rule (doc 64 THEO-4). The ЗАЩО and × controls beside it are unfilled circles drawn on the world.
+  «Караше с повече от 10 км/ч над ограничението. На практическия изпит това е»
+  `sc-speed-transition/mobile-wrong/04-t018s.png`
+- **`sc-zebra-approach` · D · major** — On mobile the ИНСТРУКЦИИ panel shows two and a half lines and hides the rest behind '↓ ОЩЕ 15 РЕДА'; the half-line at the cut is rendered at 50% opacity straight through the pedestrian-crossing sign behind it. Instruction 3 — the stop rule the lesson grades — is the line being cut.
+  «↓ ОЩЕ 15 РЕДА»
+  `sc-zebra-approach/mobile-right/04-t087s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/AdvisorCard.tsx` — 6 findings (0 critical, 5 major, 1 minor)
+
+- **`sc-pe-night-unlit` · D · major** — On mobile the advisor card hides most of itself mid-drive: it cuts off at 'ориентировъчното време на' and offers '↓ ОЩЕ 6 РЕДА' — six of its lines are behind a scroll the driver cannot use while driving. The card is also translucent, so the mini-map video behind it shows through the text.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-pe-night-unlit/mobile-right/04-t038s.png`
+- **`sc-pk-move-off` · D · major** — The speeding teach card is clipped by the right edge of the viewport, cutting off the end of its explanation and truncating the legal-citation chip that grounds it.
+  «особено там, където има пешеходци. · ЗДвП чл. 21, ал. 1»
+  `sc-pk-move-off/pc-wrong/04-t012s.png`
+- **`sc-vp-handbrake` · D · major** — The teach card is clipped at its lower boundary, cutting the sentence off mid-word so the student never sees the consequence being explained.
+  «Ако я подминеш с тази скорост, задачата остава неизпъл…»
+  `sc-vp-handbrake/pc-wrong/04-t012s.png`
+- **`sc-vp-police-stop` · D · major** — The dangerous-error card header is clipped at the right edge so the penalty unit is cut off, and the close button overlaps the truncated text.
+  «ОПАСНА ГРЕШКА -10 изпитни т…»
+  `sc-vp-police-stop/pc-wrong/04-t034s.png`
+- **`sc-vp-stall` · D · major** — The teach card runs off the right edge of the viewport; its final line is clipped and it overlaps the control glyph in the bottom-right corner.
+  «но урокът продължава и разборът я показва»
+  `sc-vp-stall/pc-wrong/04-t012s.png`
+- **`sc-follow-distance` · A · minor** — The advisor bubble quotes a speed the car is not doing: it reasons about 26 km/h while the speedometer reads 0 km/h and the car is stationary.
+  «На 26 км/ч тези двайсетина метра са близо 3 секунди — има време за реакция.»
+  `sc-follow-distance/pc-right/04-t180s.png`
+
+---
+
+## `platform/src/modules/sim/hud/overlayQueue.ts` — 5 findings (0 critical, 4 major, 1 minor)
+
+- **`sc-hz-accident-scene` · D · major** — On mobile three things render at the same screen point: the «Карай дотук / не по-бързо от 40 км/ч» world label, the real В27 no-stopping road sign on its pole, and the РАЗБРАХ button of the touch hint. The button covers the sign the lesson's own step 3 tells the student to read.
+  «Тук има знак В27 — престоят е забранен през зоната на сцената.»
+  `sc-hz-accident-scene/mobile-right/04-t067s.png`
+- **`sc-pk-move-off` · D · major** — The in-world target label and its speed qualifier are overlapped and cut in half by the ИНСТРУКЦИИ panel, so the student cannot read the speed limit attached to the target they are being sent to.
+  «Карай дот… не по-бързо от 50»
+  `sc-pk-move-off/pc-wrong/04-t012s.png`
+- **`sc-vp-police-stop` · D · major** — A stray overlapping chip renders the word линия across the end of the task text in the task rail, producing an unexplained fragment sitting on top of the instruction the student is meant to follow.
+  «Приближи полицая с контролирана скорост линия»
+  `sc-vp-police-stop/pc-wrong/04-t034s.png`
+- **`sc-vp-readiness` · D · major** — The PC task text renders twice — once in the ЗАДАЧА 1/2 header chip and again in a separate boxed line immediately below it — and both sit on top of the rear-view mirror, hiding what is behind the car.
+  «Мини контролната зона с готов кокпит — дръж под 50 км/ч»
+  `sc-vp-readiness/pc-right/01-arrival.png`
+- **`sc-ed-reverse-line` · D · minor** — With the settings sheet open and the rest of the HUD dimmed, the 'Следвай синята линия' pill stays at full brightness outside the overlay, so a modal that should own the screen does not.
+  «Следвай синята линия»
+  `sc-ed-reverse-line/mobile-right/07b-menu.png`
+
+---
+
+## `platform/src/modules/sim/world/components/worldLabel.ts` — 5 findings (0 critical, 3 major, 2 minor)
+
+- **`sc-junction-left` · D · major** — The world label 'Спри на стоп-линията' is drawn BEHIND the stop sign — the sign face and pole punch a hole through the middle of the sentence — and its right end is cut off by the ИНСТРУКЦИИ panel. The single most important instruction on screen is unreadable.
+  «Спри на стоп-лини[cut]»
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-jx-equal-left` · D · major** — The world plaque 'Карай дотук / не по-бързо от 27 км/ч' hangs unanchored in the sky above the junction and its second line is rendered at roughly 6 px — a grey blur. The mobile РАЗБРАХ button sits on top of a world traffic sign at the same time.
+  «Карай дотук — не по-бързо от 27 км/ч»
+  `sc-jx-equal-left/mobile-right/04-t039s.png`
+- **`sc-zebra-approach` · D · major** — A world-space coach label collides with a real road sign: 'Карай докрай' is drawn half behind the А18 pedestrian-crossing triangle and half behind the ПРОЧЕТИ button, so both the instruction and the sign are unreadable at the moment the student needs the sign.
+  «Карай докрай»
+  `sc-zebra-approach/mobile-right/04-t098s.png`
+- **`sc-junction-blind` · D · minor** — World-anchored guidance plaques render at sub-pixel size and are unreadable — the 'Край детур' plaque hovering over the road at 05-stopped is a grey smear about 6 px tall.
+  `sc-junction-blind/mobile-right/05-stopped.png`
+- **`sc-jx-blocked-exit` · D · minor** — The world plaque 'Спри тук / спри — под 5 км/ч' hovers unanchored over the junction and its second line renders as an illegible blur at roughly 5 px. An unexplained '+2' badge also appears top-right on mobile with no label.
+  «Спри тук»
+  `sc-jx-blocked-exit/pc-right/05-stopped.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/MistakeConsequenceOverlay.tsx` — 4 findings (0 critical, 2 major, 2 minor)
+
+- **`sc-junction-gap` · D · major** — The collision card on mobile is truncated after three lines with «↓ ОЩЕ 6 РЕДА» and its top strip is tucked behind the rear-view mirror, so the class label and the point cost are partly hidden while six lines of the explanation are collapsed.
+  «Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото»
+  `sc-junction-gap/mobile-wrong/04-t100s.png`
+- **`sc-turn-left-oncoming` · D · major** — The collision fault card is truncated mid-sentence at the panel edge: «В симулатора продължаваме, за да се учиш, но сесията се оценява като» and it stops. The consequence framing is cut exactly where it becomes informative.
+  «В симулатора продължаваме, за да се учиш, но сесията се оценява като»
+  `sc-turn-left-oncoming/pc-wrong/04-t028s.png`
+- **`sc-park-bay-exit-rev` · D · minor** — The -10 consequence toast is clipped by the viewport edge: „Превишаване с повече от 10 км/ч“ then the body stops at „Караше с повече от 10 км/ч над“ with the rest cut off. Every explanation this run produced was truncated.
+  «ОПАСНА ГРЕШКА -10 изпитни т. Превишаване с повече от 10 км/ч»
+  `sc-park-bay-exit-rev/pc-wrong/04-t028s.png`
+- **`sc-pk-stop-vs-park` · D · minor** — The ОПАСНА ГРЕШКА consequence toast is clipped by the bottom edge of the sim viewport — the explanation stops mid-sentence at „Настъпи сблъсък. Това е ЕДНА опасна“. Doc 64 THEO-4 requires every verdict to be explained; here the explanation is physically cut off.
+  «ОПАСНА ГРЕШКА -10 изпитни т. Пътнотранспортно произшествие»
+  `sc-pk-stop-vs-park/pc-wrong/04-t033s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/TraceTimeline.tsx` — 4 findings (0 critical, 4 major, 0 minor)
+
+- **`sc-follow-brake` · D · major** — The demonstration player and the advanced-keys panel cover the lower-left and upper-left of the drive view for the entire lesson, with the keys panel's own text clipped.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:23 / 0:47»
+  `sc-follow-brake/pc-right/01-arrival.png`
+- **`sc-follow-cutin` · D · major** — The demonstration player and the advanced-keys panel occupy the left half of the drive view — exactly the lane the first instruction tells the student to watch. The staged car sits at the panels' edge for the whole lesson, half behind chrome.
+  «1. Потегли по булеварда в дясната лента и наблюдавай колата отляво.»
+  `sc-follow-cutin/pc-right/04-t087s.png`
+- **`sc-follow-distance` · D · major** — On PC the 'ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА' player is pinned over the lower-left quadrant of the drive view for the entire lesson and keeps looping (timecode advances then resets), so a moving video plays over the carriageway while the student drives.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:33 / 0:49»
+  `sc-follow-distance/pc-right/04-t047s.png`
+- **`sc-ov-oncoming-gap` · D · major** — On PC the demonstration player bar covers the left half of the instrument binnacle and the top of the steering wheel for the whole session — including after the clip has finished (0:33 / 0:33) — so the speedometer dial is unreadable behind it.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-ov-oncoming-gap/pc-right/04-t060s.png`
+
+---
+
+## `platform/src/components/sim/CameraRig.tsx` — 3 findings (0 critical, 3 major, 0 minor)
+
+- **`sc-jx-equal-left` · G · major** — At the end of the wrong drive the camera is inside solid geometry: the whole windscreen is a flat untextured beige plane with a black void beside it, and the only readable element is the 'Сесията завърши — първо се самооцени' banner. The last thing the student sees is the inside of a wall.
+  «Сесията завърши — първо се самооцени»
+  `sc-jx-equal-left/mobile-wrong/07-end.png`
+- **`sc-mw-emergency-lane` · D · major** — CROSS-LESSON, every mobile frame of all seven: the rear-view mirror is a black panel floating detached in the sky above the windscreen header, skewed off-axis, clipped by the top edge of the screen, and the coach text ('Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.') is printed straight across its glass. Both the mirror and the text are unreadable.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-ov-oneway/mobile-right/04-t101s.png`
+- **`sc-turn-left-oncoming` · B · major** — On collision the camera penetrates the struck vehicle: the entire windscreen becomes a flat untextured orange surface with no crash geometry, no deformation, no impact framing. The student sees the single most important moment of the lesson as a blank orange wall.
+  «Пътнотранспортно произшествие»
+  `sc-turn-left-oncoming/pc-wrong/04-t028s.png`
+
+---
+
+## `platform/src/modules/sim/cockpit/clusterLayout.ts` — 3 findings (0 critical, 2 major, 1 minor)
+
+- **`sc-park-gap-long` · C · major** — Briefing steps 4–5 require a mirror check, a right-shoulder look, a right indicator and dipped headlights. The mobile cockpit exposes none of them: no indicator telltale, no lights telltale, no shoulder view, one floating mirror rectangle. On PC the lights/indicator row exists as bottom-bar buttons (СВЕТЛИНИ, МЪГЛА, ЧИСТАЧКИ) but nothing in the cluster confirms their state.
+  «Провери огледалото, погледни през дясното рамо и подай десен мигач.»
+  `sc-park-gap-long/mobile-right/02-briefing.png`
+- **`sc-park-gap-short` · C · major** — A reversing lesson with no reversing aids. Briefing steps 6–8 require mirrors, an over-shoulder look and full lock („волана ДОКРАЙ надясно“, „в късо място половин волан не стига“), but the cockpit shows no steering-angle indication — the wheel rim marker is centred in every sampled frame including the reverse frames — no rear camera, no proximity cue and no visible mirror content.
+  «В късо място ъгълът трябва да е точен от първия път — докрай надясно.»
+  `sc-park-gap-short/pc-right/04-t205s.png`
+- **`sc-pk-stop-vs-park` · C · minor** — The instrument cluster carries no turn-signal telltale in any sampled frame, even though briefing step 6 orders „Подай десен мигач и паркирай плътно вдясно“. The student is graded on indicating and gets no cockpit confirmation that the indicator is on. The cluster also has no tachometer, fuel gauge or odometer — one analogue dial, a digital км/ч and a gear letter.
+  «Подай десен мигач и паркирай плътно вдясно на свободното място.»
+  `sc-pk-stop-vs-park/mobile-right/04-t134s.png`
+
+---
+
+## `platform/src/components/sim/HeroCarBody.tsx` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-mw-emergency-lane` · C · major** — CROSS-LESSON, seen in all seven: the steering wheel never rotates. The red index band on the rim sits at exactly the same clock position in every frame of every lesson, including through the 90° right turn at the sc-ov-oneway T-junction. A driving simulator gives the learner no steering feedback at all from the one control he is supposed to be learning.
+  `sc-ov-oneway/mobile-right/04-t117s.png`
+- **`sc-zebra-approach` · C · major** — The car's own blue bodywork draws over the cockpit interior: on the ready frame and on high-speed frames the dashboard, the steering wheel and the instrument binnacle vanish behind a sky-reflecting blue panel that fills the lower third of the view.
+  `sc-zebra-approach/pc-right/03-ready.png`
+
+---
+
+## `platform/src/components/sim/vitok/MirrorRig.tsx` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-park-van` · C · major** — The interior rear-view mirror floats detached in open sky. There is no headliner, no windscreen top rail and no A-pillar top on the right, so the mirror hangs unattached above the glass — and the instruction/teach text is printed straight over its glass, making both unreadable. Mirror use is instruction 4 and 5 of this very lesson.
+  «4. Включи на задна — огледала, после през рамо.»
+  `sc-park-van/mobile-right/02-briefing.png`
+- **`sc-vu-pass-clearance` · C · major** — The left wing mirror is a solid matte-black lump with a single flat grey-blue quad standing in for glass — it reflects nothing at all, in any frame. Briefing step 3 is «Огледало, мигач наляво и се отмести осезаемо наляво», so the lesson instructs a check the cockpit physically cannot render. Only the centre rear-view inset works.
+  «Огледало, мигач наляво и се отмести осезаемо наляво — целта е поне метър и половина въздух между теб и колелото.»
+  `C:/Users/Ljh/AppData/Local/Temp/claude/E--AI-driver/8942546c-780e-450f-ae95-3aa94e28222a/scratchpad/mirror-left.png`
+
+---
+
+## `platform/src/modules/sim/cockpit/index.ts` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-ac-wind-truck-pass` · B · major** — A large untextured translucent grey quad hangs across the upper half of the view, starting at the A-pillar and extending far into the sky over the fields — the windscreen glass plane is not clipped to the screen aperture. Same artifact in truck-spray mobile and city-run mobile, so it is not scenario-specific.
+  `sc-ac-wind-truck-pass/mobile-wrong/04-t034s.png`
+- **`sc-vu-cyclist-hook` · F · major** — Instruction 2 tells the student to check the right-hand mirror before turning, but the cockpit renders no right door mirror in the forward view — only a left one at the far left of the windscreen. The lesson asks for a control the cockpit does not show.
+  «Още преди завой провери дясното огледало»
+  `sc-vu-cyclist-hook/pc-right/01-arrival.png`
+
+---
+
+## `platform/src/modules/sim/engine/reverseView.ts` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-ed-reverse-line` · C · major** — For a manoeuvre graded on looking over the shoulder there is no reverse camera, no over-the-shoulder view and no rear proximity read-out on screen; the only mirror is the interior one, and the instruction explicitly forbids relying on it.
+  «обърни се и гледай през рамо назад, не разчитай само на огледалото (чл. 40).»
+  `sc-ed-reverse-line/pc-right/04-t108s.png`
+- **`sc-park-bay-exit-rev` · C · major** — The briefing's whole method is mirror and shoulder work — „Двете огледала, после поглед през ДЯСНОТО рамо и през задното стъкло“ — but the cockpit offers a single floating rear mirror showing the same empty sky, no usable door mirrors, and no over-shoulder view control anywhere in the mobile control set (МЕНЮ / ИЗГЛЕД / ПАУЗА / КЛАКС / Л-З-Д / КОЛАН). The lesson cannot be performed as taught.
+  «Двете огледала, после поглед през ДЯСНОТО рамо и през задното стъкло.»
+  `sc-park-bay-exit-rev/mobile-right/03-ready.png`
+
+---
+
+## `platform/src/modules/sim/hud/StatusDashboard.tsx` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-merge-motorway-exit` · A · major** — A 140 km/h motorway limit is applied to that city street — the HUD chip reads 140 with 'РЕЖИМ Нормален ≤150 · знакът важи' while the windscreen shows pavements, pedestrian railings and parked cars. The lesson teaches a learner that 140 (and a 150 mode cap) is the number that applies on a road with kerbside parking.
+  «РЕЖИМ Нормален ≤150 · знакът важи»
+  `sc-merge-motorway-exit/mobile-right/01-arrival.png`
+- **`sc-merge-roadworks-shift` · A · major** — The briefing states the temporary limit in the works is 30 and that temporary signing overrides permanent signing — and the HUD in the very same frame shows the permanent 50 plate and the line 'РЕЖИМ Нормален ≤60 · знакът важи'. The student is told the number that applies is 30 while the only two numbers on screen are 50 and 60.
+  «2. Временната сигнализация отменя постоянната. Каквото пише на нея — това важи: тук ограничението в участъка е 30, а не 50.»
+  `sc-merge-roadworks-shift/mobile-wrong/02-briefing.png`
+
+---
+
+## `platform/src/modules/sim/hud/tapActivation.ts` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-fo-motorway-gap` · D · major** — On mobile the persistent touch hint «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка. / Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.» plus its РАЗБРАХ button covers the rear-view mirror in EVERY mobile frame and never dismisses, in a lesson family whose briefings repeatedly instruct the student to check that mirror before a manoeuvre.
+  «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.»
+  `sc-fo-motorway-gap/mobile-wrong/04-t087s.png`
+- **`sc-hz-emergency-stop` · F · major** — The mobile touch hint «Ляв палец — волан…» renders identically and persistently over the rear-view mirror in this lesson, sc-fo-motorway-gap, sc-fo-brakelight-chain and sc-hz-accident-scene — every mobile run in the chunk. It never dismisses within the run, so on mobile the mirror is permanently unavailable across the whole lesson set.
+  «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.»
+  `sc-hz-emergency-stop/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/orchestrator/contact.ts` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-ov-crossing-overtake` · F · major** — The same careful drive passes on PC (0 т., ★★★, +100 XP) and fails on mobile (30 т., three Пътнотранспортно произшествие, 1 star). Same lesson, same script, opposite verdict depending on the device.
+  «30 наказателни точки … НЕИЗДЪРЖАН»
+  `sc-ov-crossing-overtake/mobile-right/08-debrief.png`
+- **`sc-ov-narrow` · C · major** — On contact the ego penetrates the other vehicle instead of being stopped by it: the whole windscreen fills with the inside of a grey box crossed by a red band, with the camera clearly inside the other body. Both the right and the wrong drive end in the same interpenetrated state.
+  «Пътнотранспортно произшествие — Настъпи сблъсък.»
+  `sc-ov-narrow/mobile-wrong/04-t017s.png`
+
+---
+
+## `platform/src/modules/sim/traffic/index.ts` — 2 findings (0 critical, 2 major, 0 minor)
+
+- **`sc-ac-truck-spray` · A · major** — The truck is stationary and unreachable. At t011, t102 and t204 (3.5 minutes apart) it occupies the identical screen position and size, sitting astride the centre line rather than in the right lane the briefing places it in. The student can never close on it, which is why both objectives never fire in any run.
+  «Виж камиона пред теб в дясната лента — магистралата е с ограничение 140.»
+  `sc-ac-truck-spray/pc-right/04-t102s.png`
+- **`sc-ed-d2-city-run` · B · major** — An exam segment on a named Sofia boulevard with zero pedestrians, zero moving traffic and zero cross traffic — the junction at 06-waited has working red and green heads and nothing at all passing through it. Briefing line 1 tells the student that on this boulevard the pedestrians and the drivers all read his headlights and indicators; there is nobody there to read them.
+  «на булевард с колони и пешеходци всички те четат по фаровете и габаритите»
+  `sc-ed-d2-city-run/pc-right/06-waited.png`
+
+---
+
+## `platform/src/modules/sim/world/components/signFaces.ts` — 2 findings (0 critical, 1 major, 1 minor)
+
+- **`sc-ed-poligon-chain` · B · major** — A large blank grey triangular sign stands on a pole beside the road: no red border, no glyph, no meaning. The same untextured triangle appears in sc-zebra-approach, so it is an asset that fails to resolve rather than a one-off.
+  `sc-ed-poligon-chain/pc-right/04-t112s.png`
+- **`sc-zebra-approach` · B · minor** — A blank grey triangle on a pole stands at the left kerb — no border, no symbol — a few metres from a correctly rendered А18 pedestrian sign on the other side. The same failed sign asset seen in sc-ed-poligon-chain.
+  `sc-zebra-approach/mobile-right/04-t087s.png`
+
+---
+
+## `platform/public/world/mw-v1.json` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-mw-emergency-lane` · B · major** — 2600 m of motorway carrying exactly one vehicle — the staged broken-down car. No other traffic in either direction across 67 mobile and 74 pc frames, no median barrier between the carriageways, no motorway sign, no gantry, no distance boards. It does not read as a магистрала.
+  «Потегли по магистралата и се установи в дясната лента за движение — около 100–110 км/ч.»
+  `sc-mw-emergency-lane/mobile-right/01-arrival.png`
+
+---
+
+## `platform/public/world/ov-crossing-v1.json` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-ov-crossing-overtake` · A · major** — No pedestrian ever appears at the crossing in any of the four runs. The zebra is painted and the lead car does stop at it, but the briefing's whole teaching point — 'ако предният намалява до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата му' — has nobody behind the car to be hidden. The student is taught to infer a person who does not exist.
+  «4. Ако предният намалява до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата му.»
+  `sc-ov-crossing-overtake/mobile-right/04-t164s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/briefingOverflow.test.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-vp-readiness` · D · major** — The inline briefing panel truncates mid-word and advertises 13 further lines, but the full briefing modal contains only 5 numbered items. The count is wrong and the cut text is unreadable.
+  «част от процедура… ↓ ОЩЕ 13 РЕДА»
+  `sc-vp-readiness/mobile-right/01-arrival.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/CalibrationGate.tsx` — 1 finding (0 critical, 0 major, 1 minor)
+
+- **`sc-speed-transition` · D · minor** — The post-drive self-assessment screen asks the student to state what result they expect, then offers no way to answer — the only control on the card is Пропусни и покажи резултата. Either the answer controls fail to mount or the copy is written for controls that do not exist.
+  «Само секунда — преди да ти покажем резултата, искаме първо ти да кажеш какъв мислиш, че е.»
+  `sc-speed-transition/pc-wrong/04-t024s.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/GlanceEdgePings.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-maneuver-3point` · D · major** — An unexplained cartoon pair of eyes hangs in mid-air over the middle of the carriageway, roughly two storeys up, with no label, no legend and no connection to any object. On mobile there is no legend surface at all to decode it.
+  `sc-maneuver-3point/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/components/sim/lesson-ui/HudCloseButton.tsx` — 1 finding (0 critical, 0 major, 1 minor)
+
+- **`sc-follow-cutin` · D · minor** — On mobile the teach card's close control renders as a stray white rectangle beside the ✕ glyph, reading as a missing-glyph box rather than a button.
+  «ЗАЩО»
+  `sc-follow-cutin/mobile-wrong/04-t017s.png`
+
+---
+
+## `platform/src/components/sim/VehicleRig.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-maneuver-3point` · C · major** — The steering wheel does not turn. The rim marker sits at top-dead-centre in every captured frame of this lesson and of sc-maneuver-uturn, including frames where the car is visibly mid-rotation and the coach caption is telling the driver волан докрай наляво / докрай надясно. A steering lesson with a static wheel teaches nothing about hand position or lock.
+  «Второ движение: задна предавка, волан докрай надясно»
+  `sc-maneuver-3point/mobile-right/04-t043s.png`
+
+---
+
+## `platform/src/modules/sim/environment` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-follow-rain-gap` · A · major** — The world does not match its own briefing. The instructions lean on a wet carriageway that swallows light and on spray around the car, and the road renders exactly as it does in the dry lessons: same dry asphalt shading, no specular wetness, no puddles, no spray off the lead car, no droplets or streaks on the glass. Rain is conveyed only by a light haze and sparse white specks.
+  «5. Не карай „както при сухо“ — на мокро спирачният път е около половина по-дълъг.»
+  `sc-follow-rain-gap/mobile-right/04-t049s.png`
+
+---
+
+## `platform/src/modules/sim/environment/SimEnvironment.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-maneuver-uturn` · B · major** — The lesson is staged at the edge of the world. Through the whole manoeuvre the left half of the windscreen is a flat empty plane running to a bare horizon with a painted mountain strip — the boulevard the briefing calls широк булевард has nothing on one side of it at all.
+  «Тук платното е широко»
+  `sc-maneuver-uturn/mobile-right/04-t070s.png`
+
+---
+
+## `platform/src/modules/sim/environment/WindshieldDroplets.tsx` — 1 finding (0 critical, 0 major, 1 minor)
+
+- **`sc-ac-rain-lights` · B · minor** — Rain particles are drawn inside the cabin. On PC the same round droplets that fill the sky also pepper the dashboard, the steering wheel boss and the area around the cockpit control labels — one sits directly beside СВЕТЛИНИ and another below КОЛАН. The precipitation layer is not clipped to the glass.
+  `sc-ac-rain-lights/pc-right/04-t090s.png`
+
+---
+
+## `platform/src/modules/sim/hud/overheadHint.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-junction-stop` · D · major** — The world-anchored instruction label at the stop line is clipped by the ИНСТРУКЦИИ panel to «Спри на сто» — the student is shown a truncated command at the exact moment the command matters.
+  «Спри на сто»
+  `sc-junction-stop/pc-right/04-t060s.png`
+
+---
+
+## `platform/src/modules/sim/hud/RearProximityCue.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-follow-tailgater` · A · major** — The tailgater is invisible for the whole drive. Once the demonstration player takes over the corner where the 'Кола отзад' chip lived, there is no cue at all that a car is glued to the bumper — not in the mirror (covered), not in the cockpit, not on the HUD — in the one lesson that is entirely about a car behind you.
+  «Лепка отзад. Не наказвай със спирачка — вдигни газта и увеличи дистанцията НАПРЕД.»
+  `sc-follow-tailgater/pc-right/04-t098s.png`
+
+---
+
+## `platform/src/modules/sim/hud/SpeedCard.tsx` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-park-bay-exit-rev` · D · major** — The HUD shows two conflicting speed limits side by side with no resolution: a red 20 roundel immediately followed by „РЕЖИМ Нормален ≤50 · знакът важи“. The wrong run was then docked -10 for „Превишаване с повече от 10 км/ч“, so the student is being graded against one of two numbers the HUD refuses to disambiguate.
+  «20 | РЕЖИМ Нормален ≤50 · знакът важи»
+  `sc-park-bay-exit-rev/pc-wrong/04-t028s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/progression.ts` — 1 finding (0 critical, 0 major, 1 minor)
+
+- **`sc-pk-ban-stop` · F · minor** — Identical outcome, different reward: the same 0 наказателни точки / ИЗДЪРЖАН result pays +150 XP on mobile and +100 XP on desktop for the same lesson at the same difficulty.
+  «+150 XP»
+  `sc-pk-ban-stop/mobile-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/compile.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-crossing-dart` · D · major** — The Level-1 translucent blue shadow car (compile.ts shadowCar:true) drives up and STANDS ON THE ZEBRA at 04-t033s and 04-t039s — occupying precisely the square metre the missing pedestrian should occupy — while the advisor card reads «пешеходецът на пътеката минава пръв». The only object on the crossing is a car. A student is being told a pedestrian is there and shown a car; the two readings are irreconcilable.
+  «Чакаш правилно — пешеходецът на пътеката минава пръв. Изчакай да освободи платното; не минавай зад гърба му.»
+  `sc-crossing-dart/mobile-right/04-t039s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-exam.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-ed-d2-stop-address` · A · major** — Four different speed numbers are on screen at once and the student cannot tell which is graded: the instruction panel says take a calm 45 км/ч, the task toast says hold under 37 км/ч, the world sign says 50, and the mode strip says ≤80 on a street the instructions call residential.
+  «Приближи избраното място с намалена скорост — дръж под 37 км/ч»
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-hazards.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-hazard-obstacle` · A · major** — The objective «Задмини обекта, без да го закачиш» is authored as a pure reachZone at x=4.06, y=178, radius 12 m with no contact test of any kind, so it ticks on arrival whether or not anything was touched — and there is nothing to touch. The engine grades geometry and never consults the world it is describing.
+  «Задмини обекта, без да го закачиш»
+  `sc-hazard-obstacle/pc-right/04-t092s.png`
+
+---
+
+## `platform/src/modules/sim/lessons/scenario/templates-junctions4.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-jx-blocked-exit` · A · major** — The hazard the lesson is named after is not in the world. The briefing describes a queue standing a metre past the far mouth with no half-car of room ('колоната след него стои и опашката ѝ е спряла на метър след отсрещното устие'), but the carriageway beyond the junction is clear for at least 100 m — the cars in view are parked at the near kerb, not queued across the exit.
+  «колоната след него стои и опашката ѝ е спряла на метър след отсрещното устие»
+  `sc-jx-blocked-exit/pc-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/orchestrator/runners.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-junction-left` · F · major** — Same lesson, opposite outcome by platform: pc-right finished with 0 penalty points and two commendations; mobile-right finished with 40 points and two collisions plus two 'Непропускане на предимство' convictions. Whether a student passes depends on which device they hold.
+  `sc-junction-left/pc-right/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/rules/summary.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-follow-cutin` · A · major** — The mobile wrong drive is not convicted of anything: 0 наказателни точки, 0 опасни, 0 основни, despite doing 59 km/h in a posted 50 zone and drawing a 'Превишена скорост' teach card on screen. The only mark against it is that not all route tasks were done.
+  «0 наказателни точки … Не всички задачи от маршрута бяха изпълнени.»
+  `sc-follow-cutin/mobile-wrong/08-debrief.png`
+
+---
+
+## `platform/src/modules/sim/scene/obstacleSpec.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-pk-smooth-stop` · B · major** — The obstacle the whole drill depends on is a blank white box. The 'спрял автомобил' stopped in the live lane has no rear lamps, no brake lights, no hazard lights, no number plate and no reflectors — just a white cuboid with a black bumper. A student cannot learn to read a stopped vehicle from a body with no signals on it.
+  «Напред в лентата е спрял автомобил.»
+  `sc-pk-smooth-stop/pc-right/04-t049s.png`
+
+---
+
+## `platform/src/modules/sim/scene/ribbonStrip.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-rb-exit-signal` · B · major** — The guidance ribbons are drawn without depth test against vehicles: the blue ribbon paints straight over the lower body of the car ahead and the green ribbon runs across its rear panel at full brightness, so at a glance there is no car there at all. In a lesson whose whole task is 'see the car in the circle and yield', the guidance layer erases the car.
+  `sc-rb-exit-signal/mobile-right/06-waited.png`
+
+---
+
+## `platform/src/modules/sim/traces/scMergeLaneEnd.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-merge-lane-end` · A · major** — The reference 'right' drive crawls at 9–11 км/ч for 160 seconds on a 50 km/h street and finishes stopped against a building facade, off the carriageway, with a parked car beside it. Nothing about that drive demonstrates a zip merge.
+  `sc-merge-lane-end/pc-right/04-t161s.png`
+
+---
+
+## `platform/src/modules/sim/traces/scMergeMotorwayExit.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-merge-motorway-exit` · C · major** — At 05-stopped the car sits at 2 км/ч with a lamp post / tree trunk filling the centre of the windscreen, off the carriageway on the pavement side. On a lesson about holding motorway pace, the vehicle never exceeds walking speed in any captured frame.
+  `sc-merge-motorway-exit/mobile-right/05-stopped.png`
+
+---
+
+## `platform/src/modules/sim/traffic` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-follow-cutin` · A · major** — On the mobile wrong run the staged cutter is absent altogether: at 59 km/h the boulevard ahead is completely empty, no car in the player's lane and none in the left lane, in a lesson that exists only because a car is supposed to be there.
+  «Превишена скорост»
+  `sc-follow-cutin/mobile-wrong/04-t017s.png`
+
+---
+
+## `platform/src/modules/sim/traffic/controllerGestures.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-signal-controller` · A · major** — Caption and model disagree about the arms. The caption for the side-profile posture reads 'Виждаш го СТРАНИЧНО, ръцете долу' and briefing point 5 says 'отпусне ръце' (arms lowered) - but the rendered officer at t076s holds BOTH arms straight out horizontally (controllerGestures.ts poseBg vs TrafficLayer.tsx OFC_ARM_OUT_RAD = 1.47, 'both arms out sideways'). The mesh is the legally correct posture; the two texts describe a different one. A student told to look for lowered arms will see raised ones.
+  «Виждаш го СТРАНИЧНО, ръцете долу»
+  `sc-signal-controller/mobile-right/04-t076s.png`
+
+---
+
+## `platform/src/modules/sim/traffic/oncoming.test.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-turn-left-oncoming` · A · major** — The lesson's own event is missing at the decision point: in the sampled frames at the junction mouth the opposing lane is completely empty — there is no oncoming vehicle to judge a gap against, in a lesson whose entire subject is judging a gap against oncoming traffic.
+  «Насрещните имат предимство. Прецени интервала в СЕКУНДИ»
+  `sc-turn-left-oncoming/pc-right/04-t095s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders` — 1 finding (0 critical, 0 major, 1 minor)
+
+- **`sc-signal-flashing` · B · minor** — A street pole passes clean through the box truck stopped in the junction — the pole is drawn over the truck's box, its red lamp bar and its bumper, and terminates exactly at the truck's ground line, i.e. the pole's base and the truck occupy the same spot. The truck itself is an untextured grey box with two tiny black cube wheels.
+  `sc-signal-flashing/mobile-right/04-t066s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/props.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-sp-harsh-brake` · A · major** — The world does not match the briefing. Instruction 2 promises a bus stop with a shelter visible from far off, calls it your stop, and promises a glowing road marker showing exactly where to halt. Across every sampled frame of both PC drives there is no shelter, no bus-stop sign, no bus-stop road marking and no glowing halt marker — only the generic Карай дотук waypoint used by every other lesson. The landmark the whole exercise is aimed at does not exist.
+  «Напред ВДЯСНО, до тротоара, има автобусна спирка — навесът се вижда отдалеч. Това е твоята спирка: там слизаш. Светещият маркер на пътя показва точно къде да спреш.»
+  `sc-sp-harsh-brake/pc-right/04-t073s.png`
+
+---
+
+## `platform/src/modules/sim/world/builders/waterDecals.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-ac-aquaplane` · A · major** — The lesson's own hazard is invisible. Briefing item 3 promises the low section is covered in standing water; across 01-arrival, t103, t146, t183, 05-stopped and 07-end the carriageway is uniformly dry grey asphalt — no puddle, no water sheet, no spray, no wet reflection. The waterPatch exists only as physics (grip 0.15 above 65 км/ч); nothing is drawn.
+  «Гледай напред — в ниското платното е покрито със стояща вода.»
+  `sc-ac-aquaplane/pc-right/04-t146s.png`
+
+---
+
+## `platform/src/modules/sim/world/components/cityModels.ts` — 1 finding (0 critical, 1 major, 0 minor)
+
+- **`sc-ac-highbeam-lead` · B · major** — At point-blank range the lead vehicle falls apart: it renders as a featureless black slab with a flat dark-red bar and a large white sphere clipping straight through the bodywork. The mesh is unusable at the exact distance the lesson forces the student to look at it.
+  `sc-ac-highbeam-lead/mobile-right/04-t098s.png`
+
+---
+
+# THE UNPOLISHED FINDINGS, GROUPED BY THEME
+
+**512 findings, 123 major and 376 minor. The founder rules on these, so every one carries
+its frame and he can open it.** Grouped by what a person would *see*, not by which file is guilty —
+because the question these answer is "would you ship this?", and that is answered with eyes.
+
+**How the grouping was made, so it can be checked:** a deterministic classifier (`themes.js`) reads
+each finding's text; part `E` and any mention of audio go to U12 first, then the theme patterns are
+tried in the order printed below, and anything matching none falls back to the part it was judged
+under. No finding was placed by hand and none was left out.
+
+| theme | findings | major |
+|---|---:|---:|
+| U1 · A city with no people in it | 110 | 71 |
+| U12 · Audio: nothing judgeable, and no control anywhere | 99 | 9 |
+| U3 · Weather, light and surfaces drawn as decals | 84 | 16 |
+| U5 · A cockpit that is decoration | 57 | 9 |
+| U6 · Text laid on glass with no plate behind it | 53 | 4 |
+| U4 · A world built from boxes | 37 | 8 |
+| U14 · Free observation — found by looking, filed by nobody | 35 | 0 |
+| U10 · Two platforms, two products | 14 | 1 |
+| U9 · Instruments and labels that say the wrong thing | 11 | 3 |
+| U7 · Cards and decks that never leave the glass | 6 | 1 |
+| U8 · The mobile briefing that starts at «2.» | 3 | 0 |
+| U2 · One street, relabelled — every lesson on the same road | 2 | 1 |
+| U13 · Teaching and scoring polish | 1 | 0 |
+| **total** | **512** | **123** |
+
+---
+
+## U1 — A city with no people in it · 110 findings (71 major, 39 minor)
+
+- **`sc-ac-crosswind` · B · major** — Same empty city as the night lessons in broad daylight: not one pedestrian on any pavement, not one moving vehicle, buildings as untextured boxes with painted-on windows, trees as low-poly blobs and a single soft disc for every shadow. A bright daytime frame makes the emptiness far more obvious than the night ones do.
+  `sc-ac-crosswind/mobile-right/04-t140s.png`
+- **`sc-ac-ice` · B · major** — A city street with three tower blocks, a full kerbside row of parked cars and not one pedestrian, not one moving vehicle, not one lit shop. The only motion in the scene is the player's own car.
+  `sc-ac-ice/pc-right/03-ready.png`
+- **`sc-ac-night-lights` · B · major** — A night city street with zero people on it. No pedestrians anywhere in any frame, no moving traffic at all (every other vehicle is a static parked row), the street lamps cast no pool on the tarmac and the glowing building windows illuminate nothing around them. The only true light source in the scene is the guide ribbon.
+  `sc-ac-night-lights/pc-right/04-t063s.png`
+- **`sc-crossing-dart` · B · major** — THE CITY IS DEAD. Across 26 frames of a two-lane city street lined with shops, offices, a bus stop and a boulevard, there is exactly one pedestrian (a static distant figure at the far left of 04-t028s) and one vehicle (a dark car parked at the extreme left edge of 01-arrival). Every pavement, shopfront, bench and bus stop is deserted for the entire run. In a lesson about pedestrians appearing unexpectedly, an empty city removes the very context that makes the lesson believable.
+  `sc-crossing-dart/mobile-right/04-t028s.png`
+- **`sc-crossing-dart` · B · major** — THE WORLD ENDS IN MID-AIR. By 04-t071s and 07-end the buildings simply stop: the right-hand pavement, kerb and street furniture terminate at a hard edge and beyond it is bare grey-green ground running unbroken to a flat horizon with a low mountain band. The last 15 seconds of the lesson are driven off the edge of the map, and that is where the session ends.
+  `sc-crossing-dart/mobile-right/07-end.png`
+- **`sc-crossing-dart` · C · major** — Mirrors are effectively absent. A left door mirror housing is visible at the bottom-left of every frame but its glass never shows anything — it is an opaque dark shape. There is no interior rear-view mirror anywhere in the windscreen view in any of the 26 frames. A student being trained to brake hard for a pedestrian is given no way to check what is behind him before he does it.
+  `sc-crossing-dart/mobile-right/01-arrival.png`
+- **`sc-ed-d2-priority-run` · B · major** — Does not read as a real street: no moving cars, no pedestrians, empty pavements, no shadows on the asphalt, low-poly cone trees and flat-lit box buildings. A whole Sofia boulevard with nobody on it.
+  `sc-ed-d2-priority-run/pc-right/04-t073s.png`
+- **`sc-ed-d2-stop-address` · B · major** — Residential Lozenets with nobody living in it: no pedestrians on either pavement, no moving traffic, identical parked boxes, no shadows, no litter, no life. The lesson is about choosing a legal place to stop among real street users and there are none.
+  `sc-ed-d2-stop-address/pc-right/05-stopped.png`
+- **`sc-ed-poligon-chain` · B · major** — Out the windscreen there is no training ground at all — a strip of asphalt, a line of identical parked boxes, flat grass to the horizon and two distant blocks. No cones, no gates, no line marking, no other learner car, no instructor, nobody.
+  `sc-ed-poligon-chain/mobile-right/04-t155s.png`
+- **`sc-ed-reverse-line` · B · major** — Empty street again: parked boxes at the kerb, one white van, no moving traffic, no people on the pavements, and on mobile the buildings give way to bare green field on both sides. Nothing to reverse safely past.
+  `sc-ed-reverse-line/pc-right/01-arrival.png`
+- **`sc-fo-brakelight-chain` · B · major** — A city street with buildings, trees, power lines and a kerb-side row of parked cars, and not one pedestrian on any pavement in any frame on either platform. Nothing in the scene moves except the single lead car. An empty city reads as a diorama, not a street.
+  `sc-fo-brakelight-chain/mobile-right/07-end.png`
+- **`sc-follow-brake` · B · major** — Empty city again: no pedestrians, no cyclists, no cross traffic. The only moving object in the whole 420 m street is the single staged lead car; everything else is a parked prop.
+  `sc-follow-brake/pc-wrong/04-t028s.png`
+- **`sc-follow-cutin` · B · major** — A four-lane city boulevard with zero pedestrians and zero moving traffic other than the one staged car; both nearside lanes are lined with the same repeated parked meshes.
+  `sc-follow-cutin/pc-right/04-t130s.png`
+- **`sc-follow-distance` · B · major** — Not one pedestrian anywhere. A 360 m city boulevard with pavements, railings, street lamps, benches and parked cars on both sides and zero people, in every frame of the lesson on both platforms.
+  `sc-follow-distance/mobile-right/01-arrival.png`
+- **`sc-follow-rain-gap` · B · major** — A rainy city street with no pedestrians, no umbrellas, no wet reflections in the buildings and no standing water; the only weather cue is a flat grey sky.
+  `sc-follow-rain-gap/mobile-right/04-t049s.png`
+- **`sc-follow-standstill` · B · major** — No pedestrians and no life of any kind on a residential street where a queue of traffic is meant to be standing; the pavements, benches and railings are bare in every frame.
+  `sc-follow-standstill/pc-wrong/04-t032s.png`
+- **`sc-follow-tailgater` · B · major** — Empty boulevard again: no pedestrians, no cyclists, no oncoming or cross traffic; the only living element is the unseen car behind.
+  `sc-follow-tailgater/pc-wrong/04-t017s.png`
+- **`sc-follow-truck` · B · major** — The камион is an untextured white rectangular prism on four black stubs — no cab, no doors, no mudguards, no number plate, no rear lamps beyond one dark red bar, no company markings. The lesson's whole argument is what a tall vehicle hides from you, and the object making that argument reads as a placeholder crate.
+  «3. Помни: зад висок камион не виждаш нито пешеходци, нито спрели коли, нито защо спира.»
+  `sc-follow-truck/mobile-right/04-t046s.png`
+- **`sc-follow-truck` · B · major** — No pedestrians anywhere, in a lesson whose stated reason for keeping back is that you cannot see the pedestrians the truck hides.
+  `sc-follow-truck/mobile-right/04-t046s.png`
+- **`sc-hz-emergency-stop` · B · major** — A city street with buildings, trees and kerb-side parked cars and not a single pedestrian on any pavement, in a lesson whose entire subject is a child running out. A dark elliptical smudge sits on the road surface ahead of the car with no object above it to cast it.
+  `sc-hz-emergency-stop/mobile-right/05-stopped.png`
+- **`sc-junction-blind` · B · major** — Not one pedestrian anywhere. The approach street has buildings, parked cars, trees, lamp posts, power lines and railings — and completely empty pavements, with no moving background traffic except the single scripted car. A city street with nobody in it.
+  `sc-junction-blind/mobile-right/05-stopped.png`
+- **`sc-junction-gap` · B · major** — Buildings, trees, railings, street lights, a long row of parked cars and a lit shopfront — and not one pedestrian anywhere, on the pavement the wrong drive ends up parked on.
+  `sc-junction-gap/mobile-wrong/04-t100s.png`
+- **`sc-junction-left` · B · major** — No pedestrians on any pavement, and the priority road carries no traffic other than the scripted actor and the translucent demo shadow car. The junction reads as a film set with the extras missing.
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-junction-rhr` · B · major** — A city boulevard with buildings, trees, street lights, overhead cables and two rows of parked cars — and not one pedestrian on any pavement, in any frame of any lane of this lesson. The street reads as a model, not a city.
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-junction-scan` · B · major** — Buildings, railings, a parked bus, trees and a queue of parked cars along the main road — and no pedestrians anywhere, in a lesson whose subject is looking carefully before pulling out.
+  `sc-junction-scan/pc-right/04-t207s.png`
+- **`sc-junction-stop` · B · major** — Dense parked cars, railings, trees, a bus and a lit office block — and zero pedestrians on any pavement in any sampled frame, including at a signposted junction where a crossing would be.
+  `sc-junction-stop/pc-right/04-t206s.png`
+- **`sc-jx-blocked-exit` · B · major** — Good dense boulevard — traffic lights, buildings both sides, trees, parked cars in colour — but again zero pedestrians on any pavement and no building shadows on the road. The one street furniture element that would sell a city, people, is absent.
+  `sc-jx-blocked-exit/mobile-right/05-stopped.png`
+- **`sc-jx-equal-left` · B · major** — This is the best-built world of the seven — buildings on all four corners, trees, parked cars, a bus in the distance — and there is still not a single pedestrian on any pavement, no shadows cast by the buildings onto the road, and a flat grey blob decal on the tarmac that reads as a texture artefact rather than a shadow.
+  `sc-jx-equal-left/mobile-right/04-t039s.png`
+- **`sc-jx-giveway-b1` · B · major** — Two junctions worth of city — blocks, trees, overhead cables, a long line of parked cars — with no pedestrians at either junction and no cyclists, in a lesson explicitly about looking before you go.
+  `sc-jx-giveway-b1/pc-right/01-arrival.png`
+- **`sc-jx-priority-confidence` · B · major** — Long straight boulevard with buildings, trees and rows of parked cars on both sides — and no pedestrians at all, no shadows on the carriageway, and no moving traffic besides the single waiting car at the side street.
+  `sc-jx-priority-confidence/pc-right/05-stopped.png`
+- **`sc-lane-change` · B · major** — A six-lane city boulevard with not one moving vehicle and not one pedestrian; the only cars are an unbroken row of identical parked boxes at the right kerb. Flat light, no cast shadows, untextured facades.
+  `sc-lane-change/pc-right/01-arrival.png`
+- **`sc-ln-decisive-change` · B · major** — Three and a half minutes of city boulevard with no pedestrian, no cyclist, no bus, no moving car in either direction — only rows of parked models. The buildings are flat boxes with painted-on window rectangles and the same tree model repeats down both pavements.
+  `sc-ln-decisive-change/mobile-right/04-t208s.png`
+- **`sc-ln-obstacle-meeting` · B · major** — Not a single pedestrian anywhere. Every frame of a dense city street — pavements, benches, shopfronts, a park railing — is completely lifeless. The only moving thing in the world is the obstacle vehicle and one oncoming van.
+  `sc-ln-obstacle-meeting/mobile-right/04-t028s.png`
+- **`sc-ln-turn-lane-arrows` · B · major** — A city boulevard with tower blocks on both sides and not one pedestrian on any pavement, no crossings, no bus stops, no street furniture and no moving traffic beyond a single distant car. The pavements are bare grey.
+  `sc-ln-turn-lane-arrows/mobile-right/04-t096s.png`
+- **`sc-maneuver-3point` · B · major** — Empty pavements throughout, and the demo shadow car is rendered as a translucent glowing blue vehicle with pink tail-light quads standing in the live carriageway — on mobile with no legend it reads as a real car parked in the road.
+  `sc-maneuver-3point/mobile-right/05-stopped.png`
+- **`sc-maneuver-uturn` · B · major** — No pedestrian, no cyclist and no moving vehicle appear at any point, although the briefing explicitly makes the manoeuvre conditional on the street being clear of both cars and pedestrians — so the safety check it teaches can never be exercised.
+  «обръщането се прекъсва, ако се появи кола или пешеходец»
+  `sc-maneuver-uturn/mobile-right/04-t081s.png`
+- **`sc-merge-bus-pullout` · B · major** — Empty pavements in a city street, no waiting passengers at the stop the lesson is named after, no shelter, no timetable pole; buildings are untextured boxes and cast no shadows on the carriageway.
+  `sc-merge-bus-pullout/pc-right/01-arrival.png`
+- **`sc-merge-from-property` · B · major** — The pedestrian — the only living thing in the lesson — is an untextured mannequin: sphere head, capsule torso, two stick legs, no arms, no face, no clothing detail, sliding rather than walking. The pavement and cycle lane read as a black-and-white chequerboard rather than as Bulgarian street surfaces.
+  `sc-merge-from-property/pc-right/05-stopped.png`
+- **`sc-merge-motorway-exit` · B · major** — No traffic to merge with and no life: the 'motorway' has one static queue of parked vehicles on the shoulder, no moving cars, no lorries, no pedestrians, flat lighting and no shadows.
+  `sc-merge-motorway-exit/mobile-right/07b-menu.png`
+- **`sc-merge-roadworks-shift` · B · major** — Same empty city as the other merge lessons: no pedestrians on the pavements, flat untextured blocks, no shadows, no life. The cones themselves are clean, identical, unlit and unweighted — no bases, no reflective banding catching light, no dirt.
+  `sc-merge-roadworks-shift/mobile-wrong/07-end.png`
+- **`sc-ov-ban-overtake` · B · major** — Boulevard, buildings, dozens of parked cars, zero pedestrians across 47 frames.
+  `sc-ov-ban-overtake/mobile-right/04-t056s.png`
+- **`sc-ov-bus-lane` · B · major** — 500 m of city boulevard, no pedestrians at all.
+  `sc-ov-bus-lane/mobile-right/01-arrival.png`
+- **`sc-ov-crossing-overtake` · B · major** — A four-lane city boulevard with a signalled pedestrian crossing and not one person on either pavement across 38 frames. The zebra exists purely as paint.
+  `sc-ov-crossing-overtake/mobile-right/01-arrival.png`
+- **`sc-ov-keep-right` · B · major** — On the left there is no pavement at all — the carriageway ends at a low fence and open green field running to a mountain haze band. The right side has parked cars, trees and a building, and no pedestrians anywhere. Half of this 'street' is countryside.
+  `sc-ov-keep-right/mobile-right/04-t118s.png`
+- **`sc-ov-lane-keeping` · B · major** — No pedestrians anywhere, no shadows cast onto the carriageway, and the only life is a row of static parked cars. The bend that the whole lesson is built on is surrounded by nothing.
+  `sc-ov-lane-keeping/mobile-right/04-t152s.png`
+- **`sc-ov-narrow` · B · major** — Dense city blocks on both sides, lit windows, railings, street furniture — zero pedestrians in any frame.
+  `sc-ov-narrow/mobile-right/01-arrival.png`
+- **`sc-ov-oneway` · B · major** — A city street with pavements, railings, street lamps, tram wires and forty parked cars — and not one pedestrian in any of the 45 frames. The pavements are empty for the whole drive.
+  `sc-ov-oneway/mobile-right/04-t028s.png`
+- **`sc-ov-solid-line` · B · major** — 340 m of city street, buildings, railings, parked rows — no pedestrians in any of the 71 mobile or 81 pc frames.
+  `sc-ov-solid-line/mobile-right/04-t092s.png`
+- **`sc-park-night` · B · major** — The night look is the best thing in this chunk — real headlight cone, stars, thin cloud, a kerb, power lines, lamp posts, and a parked row with genuine colour and body-shape variety (red, white, green, tan, a high-sided white van). What is missing is life: no pedestrian, no moving car, no lit window near the row, no dog, no cyclist, and every lamp post is dark. A residential street at night with nobody in it.
+  `sc-park-night/mobile-right/04-t034s.png`
+- **`sc-park-van` · B · major** — The world evaporates about 40 m in. By 04-t028s and 04-t044s the entire scene is one strip of asphalt on an infinite flat green plane — no buildings, no kerbs, no pavements, no lot boundary, no street furniture, and a hard seam where the sky band meets the ground. The lesson's own teach text sets it 'в паркинги на магазини и в жилищни комплекси'.
+  «В паркинги на магазини и в жилищни комплекси»
+  `sc-park-van/mobile-right/04-t044s.png`
+- **`sc-park-van` · B · major** — Not one pedestrian, cyclist, moving vehicle, bin, bench, shopfront or lit window anywhere in either run. The pavement by the buildings at 01-arrival is bare, and the parked row is three body shells repeated at even spacing, several sitting half on the grass beyond the kerb. A shop car park with zero people reads as a test track.
+  `sc-park-van/mobile-right/01-arrival.png`
+- **`sc-pe-night-unlit` · B · major** — A night city with nobody in it. Across the whole run the only human is the one scripted pedestrian on the zebra; every pavement, doorway and bus area is empty, no other vehicle moves except one oncoming car, and the buildings are flat boxes with pasted window rectangles that cast no shadows.
+  `sc-pe-night-unlit/pc-right/04-t063s.png`
+- **`sc-pe-zone-living` · B · major** — The two pedestrians the whole lesson turns on are the same model twice — identical build, identical red jacket, identical blue trousers, walking in step. The kerbside parked cars are low-poly bodies whose wheels hang detached below the arches with daylight between tyre and bodywork, and nothing in the scene casts a shadow.
+  `sc-pe-zone-living/pc-right/04-t105s.png`
+- **`sc-pk-busstop-ban` · B · major** — Nobody is waiting at the bus stop. Empty pavements the whole length of the street, untextured block buildings with painted-on windows, no shadows on the carriageway, no shelter, no timetable, no litter — the only variety is the row of parked cars reused from the merge lessons.
+  `sc-pk-busstop-ban/pc-right/01-arrival.png`
+- **`sc-pk-move-off` · B · major** — No pedestrians anywhere on a city boulevard, in a lesson whose entire point is that something might be coming up behind you. The emptiness also removes the reason the blind-spot check matters.
+  `sc-pk-move-off/pc-wrong/04-t012s.png`
+- **`sc-rb-exit-signal` · B · major** — Not one pedestrian anywhere in the lesson. The scene has pavements, a bench, metal railings, street lamps and a solid row of parked cars — every prop that implies people — and zero people in any of the 21 frames. A city boulevard at midday with nobody on it.
+  `sc-rb-exit-signal/mobile-right/01-arrival.png`
+- **`sc-sig-controller-live` · B · major** — Empty pavements again - across 01-arrival, 03-ready, 04-t001s, 04-t007s and 04-t012s of a daylight city boulevard there is not a single pedestrian, cyclist or moving figure other than the officer, despite railings, a bus shelter and two full rows of parked cars.
+  `sc-sig-controller-live/mobile-right/01-arrival.png`
+- **`sc-signal-controller` · B · major** — Not one pedestrian anywhere. Across all 20 readable frames of a city boulevard - with kerbs, pedestrian railings, a bus shelter, street furniture and parked cars on both sides - the pavements are completely empty. The only human figure in the entire lesson is the traffic officer.
+  `sc-signal-controller/mobile-right/01-arrival.png`
+- **`sc-signal-flashing` · B · major** — A dense city boulevard with a bus shelter, benches, litter bins, railings, street trees and moving traffic — and not one pedestrian in any of the 57 frames across both drives. The bus shelter has nobody waiting at it. Empty pavements are the loudest thing out of the windscreen.
+  `sc-signal-flashing/mobile-right/05-stopped.png`
+- **`sc-signal-flashing` · B · major** — Two teaching objects stand in the street pretending to be street furniture: a speech-bubble placard on a pole reading «МИГАЩО ЖЪЛТО / Светофарът не регулира — внимание / Пропусни идващите ОТДЯСНО / ЗДвП чл. 46» at the junction, and a dark HUD-styled card «Карай дотук / не по-бързо от 30 км/ч» floating at eye height over the carriageway. Plus a teal light column rising out of the road into the sky as a waypoint beacon. None of these exist on a real street, and they occupy the exact sightline where a student should be reading the real signal.
+  «МИГАЩО ЖЪЛТО · Пропусни идващите ОТДЯСНО»
+  `sc-signal-flashing/mobile-wrong/04-t007s.png`
+- **`sc-signal-response` · B · major** — A signalised city boulevard with lit office blocks, trees, parked cars, street furniture and a stopped bus — and no pedestrians at the crossing or on any pavement. At a light-controlled junction the absence is at its most conspicuous.
+  `sc-signal-response/pc-right/06-waited.png`
+- **`sc-sp-curve` · B · major** — The out-of-town half of the route is an empty green plane with a handful of identical low-poly trees standing on nothing and a flat painted mountain band on the horizon — no fields, fences, verges, hedges, farm buildings, oncoming traffic or any other life. The urban half has full pavements and not one pedestrian. Neither half reads as a real place.
+  `sc-sp-curve/mobile-right/07-end.png`
+- **`sc-sp-harsh-brake` · B · major** — A dense city street — five-storey blocks on both sides, full pavements, a continuous rank of parked cars — with zero pedestrians in any frame of any drive. The briefing's own moral (rushing surprises the people behind you) has no people anywhere to make it real. Empty pavements in a city is the finding.
+  `sc-sp-harsh-brake/pc-right/04-t027s.png`
+- **`sc-speed-transition` · B · major** — Out the windscreen it reads as a model, not a street: full pavements on both sides and not one pedestrian in any frame of any of the four drives; identical low-poly trees at even spacing; every parked car nose-to-tail in one unbroken rank; flat noon lighting with almost no cast shadows; window glass is a repeating tan-and-black checker on every block.
+  `sc-speed-transition/pc-right/04-t076s.png`
+- **`sc-turn-left-oncoming` · B · major** — This is the richest street in the chunk — multi-storey blocks both sides, railings, trees, a bus, two rows of parked cars — and there is still not a single pedestrian anywhere in it.
+  `sc-turn-left-oncoming/pc-right/04-t168s.png`
+- **`sc-vp-handbrake` · B · major** — Empty pavements on a city street across the entire drive.
+  `sc-vp-handbrake/pc-wrong/04-t012s.png`
+- **`sc-vp-readiness` · B · major** — Dense city boulevard lined with offices and parked cars, and not one pedestrian on either pavement at any point in the drive. The street reads as a model, not a city.
+  `sc-vp-readiness/mobile-right/04-t208s.png`
+- **`sc-vp-telltale` · B · major** — Empty pavements throughout, which matters here because the briefing justifies not stopping abruptly by reference to other road users who are nowhere to be seen.
+  `sc-vp-telltale/mobile-right/04-t044s.png`
+- **`sc-vp-telltale-red` · B · major** — Empty pavements throughout, which undercuts briefing step 5 — that an abrupt stop in the lane surprises the people behind you — since there is no traffic or pedestrian life to be surprised.
+  `sc-vp-telltale-red/mobile-right/04-t097s.png`
+- **`sc-vu-emergency-junction` · B · major** — The city stretch (t001–t038) has zero pedestrians on any pavement, zero cyclists and no moving cross traffic other than the blue ghost car. Every kerbside car is one of about four low-poly bodies repeated down the street, each with a flat dark blob for a shadow and no directional cast on the road. It reads as a diorama, not a street.
+  `sc-vu-emergency-junction/mobile-right/04-t028s.png`
+- **`sc-vu-pass-clearance` · B · major** — A dense six-storey city boulevard with lit windows, street trees and both kerbs full of parked cars contains no pedestrians, no cyclists and no moving traffic other than the ghost. Across ~40 frames exactly one distant figure is arguably visible. Empty pavements in a city centre at what the lighting says is late afternoon.
+  `sc-vu-pass-clearance/mobile-wrong/04-t018s.png`
+- **`sc-ac-fog` · B · minor** — Instruction 7 promises a stopped car or a pedestrian will loom out of the blanket. Across every captured frame of both fog runs nothing ever emerges — no pedestrian appears anywhere in the lesson and the only vehicles are the static parked rows.
+  «Очаквай спрял автомобил или пешеходец да „изплува“ от пелената.»
+  `sc-ac-fog/pc-right/04-t101s.png`
+- **`sc-crossing-bus-shadow` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-crossing-bus-shadow/mobile-right/01-arrival.png`
+- **`sc-crossing-child-ball` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-crossing-child-ball/mobile-right/01-arrival.png`
+- **`sc-crossing-white-cane` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-crossing-white-cane/mobile-right/01-arrival.png`
+- **`sc-ln-boulevard-discipline` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-ln-boulevard-discipline/mobile-right/01-arrival.png`
+- **`sc-merge-motorway-exit` · G · minor** — 'Карай дотук' and 'Следвай синята линия' are rendered as chrome-framed 3-D billboards standing inside the scene rather than as HUD, so they occlude the road and the parked traffic and read as if they were real street furniture.
+  «Следвай синята линия»
+  `sc-merge-motorway-exit/mobile-right/07b-menu.png`
+- **`sc-mv-uturn-ban` · B · minor** — The boulevard is the best-dressed street in this chunk — parked rows, poplars, overhead lines, a red car and a distant skyline — and still has not one pedestrian, one moving vehicle in the opposite carriageway, or one cast shadow. Lighting is flat overcast with no sun direction.
+  `sc-mv-uturn-ban/mobile-right/02-briefing.png`
+- **`sc-ov-abort` · B · minor** — No pedestrians, no cyclists, no moving life of any kind on either the city or the rural half; parked cars are frozen and evenly spaced, and the pavements beside the tower blocks at arrival are empty.
+  `sc-ov-abort/pc-right/01-arrival.png`
+- **`sc-ov-being-overtaken` · B · minor** — Empty world again: no pedestrians, no cyclists, a static evenly-spaced parked queue along the right and no cast shadows anywhere on the carriageway.
+  `sc-ov-being-overtaken/mobile-right/04-t098s.png`
+- **`sc-ov-crest-curve` · B · minor** — The В24 and А1 signs ARE placed — three sign faces are visible on the right at t070s — but they sit small, distant and visually buried in the parked-car queue rather than commanding the approach the way roadside signs do. No pedestrians or life anywhere on the route.
+  `sc-ov-crest-curve/mobile-right/04-t070s.png`
+- **`sc-ov-night-gap` · B · minor** — The night sky carries a scattering of identical round white blobs as stars and the horizon keeps a daylight-blue band; no pedestrians, no lit windows in motion, nothing alive.
+  `sc-ov-night-gap/mobile-right/01-arrival.png`
+- **`sc-ov-oncoming-gap` · B · minor** — The world is lifeless: not one pedestrian or cyclist anywhere along the route, the right verge carries an unbroken evenly-spaced queue of parked cars for the whole kilometre, and neither trees, poles nor vehicles cast a shadow on the carriageway — only a soft blob under each car.
+  `sc-ov-oncoming-gap/mobile-right/04-t051s.png`
+- **`sc-ov-return-gap` · B · minor** — Empty world: no pedestrians, no cyclists, no oncoming movement in frame, an endless line of frozen parked cars along the right shoulder and no cast shadows on the carriageway.
+  `sc-ov-return-gap/mobile-right/05-stopped.png`
+- **`sc-ov-solid-return` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-ov-solid-return/mobile-right/01-arrival.png`
+- **`sc-park-45-rev` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-park-45-rev/mobile-right/01-arrival.png`
+- **`sc-park-left` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-park-left/mobile-right/01-arrival.png`
+- **`sc-park-wall` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-park-wall/mobile-right/01-arrival.png`
+- **`sc-park-zebra` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-park-zebra/mobile-right/01-arrival.png`
+- **`sc-pe-jaywalker` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-pe-jaywalker/mobile-right/01-arrival.png`
+- **`sc-pe-school-patrol` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-pe-school-patrol/mobile-right/01-arrival.png`
+- **`sc-pk-ban-stop` · B · minor** — The briefing calls it «улицата» but the world is a rural dual carriageway: grass to the horizon on both sides, distant mountains, one office block far ahead, and the whole parked row standing on grass rather than in bays. Zero pedestrians in all 91 frames of this lesson.
+  «Потегли по улицата — задачата е да спреш за кратко, но само където е позволено.»
+  `sc-pk-ban-stop/pc-right/01-arrival.png`
+- **`sc-pk-double-park` · B · minor** — Both pavements of a fully parked-up inner-city street are completely empty — no pedestrians, no bins, no bollards, no doorways. The street is dressed with 30+ parked cars and zero people, which is the one combination that cannot happen in a real city.
+  `sc-pk-double-park/mobile-right/04-t102s.png`
+- **`sc-pk-driveway` · B · minor** — Not one pedestrian anywhere in the lesson, on either platform, in any frame — a city street with buildings, shops and a parked row and nobody on the pavement. The parked cars sit in an unbroken bumper-to-bumper wall, several of them on grass rather than a bay.
+  `sc-pk-driveway/mobile-right/04-t018s.png`
+- **`sc-pk-smooth-stop` · B · minor** — Empty street. Not one person on any pavement for the whole run, no moving traffic apart from the single stopped van and the translucent shadow car, no shadows cast by buildings, cars or trees, and a large dark blotch decal on the tarmac at the stop point that reads as a texture artefact rather than a stain.
+  `sc-pk-smooth-stop/mobile-right/05-stopped.png`
+- **`sc-pk-stop-vs-park` · B · minor** — A Sofia boulevard with essentially no life: across ~200 s of city driving I counted one pedestrian figure (t060s, far pavement). Buildings are untextured grey/beige boxes with painted window grids, trees are low-poly cones, no cast shadows on the carriageway, no shopfronts, no street furniture beyond lamp posts.
+  `sc-pk-stop-vs-park/mobile-right/04-t060s.png`
+- **`sc-rb-busy-gap` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-rb-busy-gap/mobile-right/01-arrival.png`
+- **`sc-rb-circulate-priority` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-rb-circulate-priority/mobile-right/01-arrival.png`
+- **`sc-rb-exit-signal` · G · minor** — An in-world dark card reading «Карай дотук / не по-бързо от 30 км/ч» sits beyond the roundabout island, styled exactly like a HUD panel (dark rounded rect, white bold title, teal caption) and illegible at every distance it appears in — it is only readable in 07-end when the car is already parked on the grass. It is neither street furniture nor screen UI.
+  «Карай дотук · не по-бързо от 30 км/ч»
+  `sc-rb-exit-signal/mobile-right/07-end.png`
+- **`sc-rb-lane-choice` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-rb-lane-choice/mobile-right/01-arrival.png`
+- **`sc-rb-ped-exit` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-rb-ped-exit/mobile-right/01-arrival.png`
+- **`sc-rx-unguarded` · B · minor** — No pedestrians anywhere, at a level crossing beside a five-storey office block; the right verge is a single unbroken bumper-to-bumper row of parked cars stretching to the horizon, several sitting on grass; lighting is flat with no cast shadows on the road.
+  `sc-rx-unguarded/mobile-right/04-t104s.png`
+- **`sc-sig-controller-postures` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-sig-controller-postures/mobile-right/01-arrival.png`
+- **`sc-signal-controller` · B · minor** — The world is lit but lifeless: flat overcast key light, almost no cast shadows on the carriageway, untextured single-colour building facades with windows as flat emissive squares, and low-poly cone trees. The only material variation in the whole street is the parked-car paint.
+  `sc-signal-controller/mobile-right/01-arrival.png`
+- **`sc-signal-dead` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-signal-dead/mobile-right/01-arrival.png`
+- **`sc-signal-hesitation` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-signal-hesitation/mobile-right/01-arrival.png`
+- **`sc-speed-creep` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-speed-creep/mobile-right/01-arrival.png`
+- **`sc-speed-dangerous` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-speed-dangerous/mobile-right/01-arrival.png`
+- **`sc-speed-rain` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-speed-rain/mobile-right/01-arrival.png`
+- **`sc-speed-zone` · B · minor** — The street does not read as a city. Buildings are untextured boxes with a randomised checkerboard of window quads, no doors, no ground floors, no signage and no roof detail; the pavements carry no people other than the one scripted actor, no parked cars, no bins, poles, kiosks or street furniture; nothing casts a shadow onto the carriageway and the tarmac has no wear, patching or joints. Window quads are emissive (lit as if at dusk) under a bright daytime sky.
+  `sc-speed-zone/mobile-right/01-arrival.png`
+
+---
+
+## U12 — Audio: nothing judgeable, and no control anywhere · 99 findings (9 major, 90 minor)
+
+- **`sc-ac-ice` · E · major** — AUDIO: no evidence of any audio anywhere in 28 folders. There is no volume or mute control in the PC top bar (Съветник / Въпроси / Известия / Прекрати урока / Цял екран), none in the mobile ⚙ МЕНЮ sheet (Съветник, Въпроси, Задача, Карта, Качество, Прекрати урока), no audio telltale on the cockpit strip, no captions toggle, and the full 20-entry keyboard list contains no horn key and no volume key. Every warning in these lessons is delivered as text only.
+  «Съветник вкл. · Въпроси Понякога · Задача 2/4 · Карта изкл. · Качество Авто · Ниско»
+  `sc-ed-d2-city-run/mobile-right/07b-menu.png`
+- **`sc-ed-d2-priority-run` · E · major** — No evidence of audio anywhere: no volume, mute, sound or voice control in the top bar, in the cockpit strip, or in the mobile ⚙ sheet, and no audio string in the whole DOM dump of the run. A driving simulator with no engine, indicator or warning sound.
+  `sc-ed-d2-priority-run/pc-right/01-arrival.png`
+- **`sc-ed-d2-stop-address` · E · major** — No audio evidence: no sound control in the header, the cockpit strip or the settings sheet, and no audio-related string in the run's DOM capture.
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-ed-poligon-chain` · E · major** — No audio evidence anywhere in the run — no reversing tone, no cone-strike sound, no control for sound in any surface captured.
+  `sc-ed-poligon-chain/pc-right/01-arrival.png`
+- **`sc-ed-reverse-line` · E · major** — No audio evidence: the mobile ⚙ sheet lists Съветник, Въпроси, Задача, Карта, Качество and nothing about sound; no reversing beeper, no engine note, no control for any of it.
+  `sc-ed-reverse-line/mobile-right/07b-menu.png`
+- **`sc-follow-distance` · E · major** — No evidence of audio anywhere in the lesson chrome on either platform: no volume, mute or sound-cue control in the top bar, the cockpit, the pause menu strip or the debrief. Engine, tyre and impact sound cannot be confirmed to exist from any frame.
+  «Съветник вкл. · Изкл. · Понякога · Често · Известия нормално»
+  `sc-follow-distance/pc-right/01-arrival.png`
+- **`sc-lane-change` · E · major** — No audio evidence: no indicator tick, no engine note, no blind-spot warning, and no sound control on either platform, in a lesson built on the indicator.
+  `sc-lane-change/pc-right/01-arrival.png`
+- **`sc-roundabout-entry` · E · major** — No audio evidence: no control, no indicator sound cue in a lesson whose sixth instruction is entirely about using the indicator, and nothing marking the collision.
+  `sc-roundabout-entry/pc-right/04-t068s.png`
+- **`sc-zebra-approach` · E · major** — No audio evidence: no horn, no footstep, no warning tone and no sound control on either platform, in a lesson whose real-world cue is often hearing a pedestrian before seeing one.
+  `sc-zebra-approach/pc-right/01-arrival.png`
+- **`sc-ac-night-lights` · E · minor** — No evidence of audio anywhere, and no audio affordance to look for: there is no speaker, volume or mute control in the PC top bar (Съветник / Известия / Прекрати урока / Цял екран) nor in the mobile ⚙ sheet. Stills cannot prove silence, but a driving trainer with no volume control in its UI is a gap worth the founder's ruling.
+  `sc-ac-night-lights/mobile-right/07b-menu.png`
+- **`sc-ac-night-overdrive` · G · minor** — FREE OBSERVATION: the pedagogy in the text layer is genuinely good where it survives — the demo captions explain the mechanism rather than the verdict („Водата свърши. Напред е аварирал автомобил — вдигаме газта отрано: мокрият спирачен път е ~1,4 пъти по-дълъг“, „Докато сме до камиона, сме в неговия завет — вятърът мълчи“), and the fault explanations cite Наредба № 38 and ЗДвП correctly. The failure in this chunk is not the writing, it is that the world and the grading do not back the writing up.
+  «Докато сме до камиона, сме в неговия завет — вятърът мълчи. Точно затова следващата секунда е коварна.»
+  `sc-ac-wind-truck-pass/pc-right/04-t096s.png`
+- **`sc-crossing-bus-shadow` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-crossing-bus-shadow/mobile-right/03-ready.png`
+- **`sc-crossing-child-ball` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-crossing-child-ball/mobile-right/03-ready.png`
+- **`sc-crossing-dart` · E · minor** — AUDIO: no evidence of any, stated explicitly. Across all 26 frames there is no speaker icon, no mute or volume control, no audio-playing indicator, and no caption or subtitle line anywhere in the HUD. Every advisor line, penalty and praise is delivered as a silent text card. The repo does carry scene/simAudio.ts and scene/audioPrompt.ts, so audio exists somewhere in the codebase — nothing in these frames evidences it reaching the player.
+  `sc-crossing-dart/mobile-right/04-t039s.png`
+- **`sc-crossing-white-cane` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-crossing-white-cane/mobile-right/03-ready.png`
+- **`sc-fo-brakelight-chain` · E · minor** — No audio evidence anywhere in the frames: no volume or mute control, no sound telltale, no caption of any sound, and the ABS/engine/brake cues the briefings describe have no visual stand-in. Cannot be judged further from stills.
+  `sc-fo-brakelight-chain/pc-right/01-arrival.png`
+- **`sc-fo-motorway-gap` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound indicator, no caption of engine, wind or tyre noise at 130 км/ч. Cannot be judged further from stills.
+  `sc-fo-motorway-gap/pc-right/04-t103s.png`
+- **`sc-hazard-obstacle` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound telltale, no caption. Cannot be judged further from stills.
+  `sc-hazard-obstacle/pc-right/01-arrival.png`
+- **`sc-hz-accident-scene` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound telltale, no caption — in a scene the briefing describes as having an ambulance approaching from behind, which would be an audible cue in reality.
+  «Линейка отзад — дръж вдясно и я пусни.»
+  `sc-hz-accident-scene/pc-right/04-t092s.png`
+- **`sc-hz-brake-dont-swerve` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound telltale, no caption. Cannot be judged further from stills.
+  `sc-hz-brake-dont-swerve/pc-right/04-t094s.png`
+- **`sc-hz-breakdown-pulloff` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound telltale, no caption — and a failing engine is above all an audible event. Cannot be judged further from stills.
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-hz-emergency-stop` · E · minor** — No audio evidence in any frame: no volume or mute control, no sound telltale, no caption of tyre squeal, ABS pulsing or impact. Cannot be judged further from stills.
+  `sc-hz-emergency-stop/mobile-right/04-t112s.png`
+- **`sc-junction-blind` · E · minor** — No evidence of audio in any frame: no volume or mute control in the PC top bar or the mobile ⚙ sheet, no sound indicator, no caption for any audio cue. A horn control (⊙Клакс) exists on mobile, so audio presumably exists in code, but nothing in this sweep confirms it plays or that a deaf student is given a visual equivalent.
+  `sc-junction-blind/pc-right/01-arrival.png`
+- **`sc-junction-gap` · E · minor** — No evidence of audio, with one hint against it: the mobile HUD has a КЛАКС horn button but there is no volume, mute or audio-state indicator anywhere to tell the student whether pressing it makes a sound.
+  «КЛАКС»
+  `sc-junction-gap/mobile-right/01-arrival.png`
+- **`sc-junction-left` · E · minor** — No audio evidence: no volume/mute control, no sound indicator, no visual caption for any audio cue in any frame of this lesson.
+  `sc-junction-left/pc-right/01-arrival.png`
+- **`sc-junction-rhr` · E · minor** — No evidence of audio anywhere in this lesson: no volume slider, no mute control, no speaker glyph, no captions toggle in the top bar or the cockpit strip, and no audio state shown on the demonstration film transport.
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-junction-scan` · E · minor** — No evidence of audio: no control, no indicator, no caption affordance in any frame of any lane.
+  `sc-junction-scan/pc-right/04-t102s.png`
+- **`sc-junction-stop` · E · minor** — No evidence of audio: nothing in any frame indicates sound — no mute, no volume, no speaker icon, no audio-cue markers on the coaching banners, even though the coaching text is written as spoken instruction.
+  `sc-junction-stop/pc-right/01-arrival.png`
+- **`sc-jx-blocked-exit` · E · minor** — No audio evidence in any frame: no volume/mute control, no sound indicator, no caption for any audio cue — notable in the one lesson where a signal change is the trigger.
+  `sc-jx-blocked-exit/mobile-right/06-waited.png`
+- **`sc-jx-equal-left` · E · minor** — No audio evidence in any frame: no volume/mute control, no sound indicator, no caption for any audio cue.
+  `sc-jx-equal-left/mobile-right/05-stopped.png`
+- **`sc-jx-giveway-b1` · E · minor** — No evidence of audio in any frame of this lesson: no control, no indicator, no caption toggle.
+  `sc-jx-giveway-b1/pc-right/01-arrival.png`
+- **`sc-jx-priority-confidence` · E · minor** — No audio evidence in any frame of this lesson: no volume/mute control, no sound indicator, no caption for any audio cue.
+  `sc-jx-priority-confidence/pc-right/05-stopped.png`
+- **`sc-ln-boulevard-discipline` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-ln-boulevard-discipline/mobile-right/03-ready.png`
+- **`sc-ln-turn-lane-arrows` · E · minor** — No audio evidence in any frame of this lesson and no sound control in either HUD.
+  `sc-ln-turn-lane-arrows/mobile-right/04-t096s.png`
+- **`sc-merge-accel-lane` · E · minor** — No audio evidence and no audio affordance. Across every captured frame of all five testable lessons on both platforms there is no speaker icon, no mute or volume control, no captions toggle and no audio indicator anywhere in the HUD — mobile offers only МЕНЮ / ИЗГЛЕД / ПАУЗА, PC only Съветник, Известия, Прекрати урока and Цял екран. Whether the simulator makes any sound cannot be judged from stills, and a deaf or muted student is given no visible fallback.
+  `sc-merge-accel-lane/mobile-right/01-arrival.png`
+- **`sc-merge-bus-pullout` · E · minor** — No evidence of audio: no volume or mute control in the toolbar, and a lesson built around a bus pulling out — the classic audio cue — is delivered entirely as captions.
+  `sc-merge-bus-pullout/pc-right/01-arrival.png`
+- **`sc-merge-from-property` · E · minor** — No evidence of audio. No mute or volume control on either platform; a lesson whose whole point is a pedestrian you might not see is delivered without a single sound cue.
+  `sc-merge-from-property/mobile-right/05-stopped.png`
+- **`sc-merge-lane-end` · E · minor** — No evidence of audio anywhere. There is no volume, mute or subtitle control in either the PC toolbar or the mobile МЕНЮ sheet, and every coach line, warning and teach-moment is delivered as on-screen text only. A driving lesson with no engine note, no indicator tick and no spoken instructor is a silent lesson.
+  `sc-merge-lane-end/pc-right/01-arrival.png`
+- **`sc-merge-motorway-exit` · E · minor** — No evidence of audio: the mobile МЕНЮ sheet exposes Съветник, Задача, Карта, Качество and Прекрати урока, and no sound control at all.
+  `sc-merge-motorway-exit/mobile-right/07b-menu.png`
+- **`sc-merge-roadworks-shift` · E · minor** — No evidence of audio: no mute/volume control in the mobile МЕНЮ sheet or the PC toolbar, and the roadworks — the one place a learner would expect warning-beacon or works noise — is silent text only.
+  `sc-merge-roadworks-shift/mobile-right/05-stopped.png`
+- **`sc-mv-uturn-ban` · E · minor** — No evidence of audio in any frame of any leg — no cue, no control, no indicator tick for a lesson whose steps require signalling.
+  `sc-mv-uturn-ban/pc-right/04-t038s.png`
+- **`sc-mw-emergency-lane` · E · minor** — AUDIO: stated explicitly — there is no evidence of audio anywhere in this chunk. No volume or mute control on the mobile HUD, no subtitle or caption track, no audio-cue indicator in any of the ~600 frames. The only candidate affordance is a single unlabelled white glyph in a circle at the bottom-right of the PC play area, which carries no tooltip text in any frame.
+  `sc-ov-solid-line/pc-right/04-t118s.png`
+- **`sc-ov-abort` · E · minor** — No audio evidence of any kind in this lesson's frames and no sound control in the HUD on either platform.
+  `sc-ov-abort/pc-right/01-arrival.png`
+- **`sc-ov-being-overtaken` · E · minor** — No audio evidence in any frame of this lesson and no sound control in either HUD.
+  `sc-ov-being-overtaken/mobile-right/04-t098s.png`
+- **`sc-ov-crest-curve` · E · minor** — No audio evidence in any frame of this lesson and no sound control in either HUD.
+  `sc-ov-crest-curve/mobile-right/04-t070s.png`
+- **`sc-ov-keep-right` · E · minor** — No audio evidence in any frame: no volume/mute control, no sound indicator, no caption for any audio cue.
+  `sc-ov-keep-right/pc-right/05-stopped.png`
+- **`sc-ov-lane-keeping` · E · minor** — The mobile ⚙ sheet was captured open and contains Съветник, Въпроси, Задача, Карта, Качество, Прекрати урока and Всички уроци — and no audio setting of any kind. No volume, no mute, no subtitle toggle anywhere in the product surface this sweep saw.
+  «Съветник вкл. · Въпроси Понякога · Задача 3/3 · Карта изкл. · Качество Авто · Ниско»
+  `sc-ov-lane-keeping/mobile-right/07b-menu.png`
+- **`sc-ov-night-gap` · E · minor** — No audio evidence in any frame of this lesson and no sound control in either HUD.
+  `sc-ov-night-gap/mobile-right/04-t054s.png`
+- **`sc-ov-oncoming-gap` · E · minor** — No audio evidence and no audio affordance. The ⚙ sheet has rows for Съветник, Задача, Качество, Въпроси, Карта and Прекрати урока but no volume or mute row, and the «звукът е част от урока» chip the code ships never appears in any frame of this lesson.
+  `sc-ov-oncoming-gap/mobile-right/07b-menu.png`
+- **`sc-ov-return-gap` · E · minor** — No audio evidence in any frame and no sound control in the HUD.
+  `sc-ov-return-gap/mobile-right/05-stopped.png`
+- **`sc-ov-solid-return` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-ov-solid-return/mobile-right/03-ready.png`
+- **`sc-park-45-rev` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-park-45-rev/mobile-right/03-ready.png`
+- **`sc-park-bay-exit-rev` · E · minor** — No evidence of audio. A reversing lesson that hinges on „спри при всяко движение зад теб“ has no reversing tone, no parking-sensor cue and no audio control in any frame.
+  `sc-park-bay-exit-rev/mobile-right/02-briefing.png`
+- **`sc-park-gap-long` · E · minor** — No evidence of audio anywhere in the lesson, and the mobile ⚙ sheet confirms there is no sound setting to find: it lists only Съветник, Задача, Качество, Въпроси, Карта, Прекрати урока, Всички уроци.
+  «Съветник вкл. · Задача 2/2 · Качество Авто · Ниско»
+  `sc-park-gap-long/mobile-right/07b-menu.png`
+- **`sc-park-gap-short` · E · minor** — No evidence of audio — no reverse tone, no kerb scrape, no proximity beep, no audio control, in a lesson entirely about a tight low-speed manoeuvre where hearing is a real cue.
+  `sc-park-gap-short/mobile-right/02-briefing.png`
+- **`sc-park-left` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-park-left/mobile-right/03-ready.png`
+- **`sc-park-night` · E · minor** — Explicitly: no evidence of audio in any of the 47 frames. No speaker or mute glyph, no volume row in the settings sheet, no captions. In a lesson whose second instruction is that headlights exist so others perceive you, nothing perceptual reaches the student except pixels.
+  `sc-park-night/mobile-right/07b-menu.png`
+- **`sc-park-van` · E · minor** — No evidence of audio anywhere in the run — no speaker or mute glyph in the HUD, no volume row in the settings sheet, no caption or subtitle rail, and no visual cue accompanying the collision event. Stating it explicitly as required: nothing in these frames shows the lesson has sound, and nothing lets a student turn it down.
+  `sc-park-van/mobile-right/07-end.png`
+- **`sc-park-wall` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-park-wall/mobile-right/03-ready.png`
+- **`sc-park-zebra` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-park-zebra/mobile-right/03-ready.png`
+- **`sc-pe-jaywalker` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-pe-jaywalker/mobile-right/03-ready.png`
+- **`sc-pe-night-unlit` · E · minor** — No audio evidence and no audio affordance. Not one frame in either band shows a volume, mute or caption control anywhere in the HUD or the ⚙ row, so a student cannot tell whether the lesson speaks, nor silence it. (platform/src/modules/sim/scene/simAudio.ts and audioPrompt.ts exist in the tree, so the channel may work — but nothing on screen says so.)
+  `sc-pe-night-unlit/pc-right/01-arrival.png`
+- **`sc-pe-parked-row-scan` · E · minor** — No audio evidence: no volume, mute or caption control anywhere in either band in any frame of this lesson.
+  `sc-pe-parked-row-scan/pc-right/01-arrival.png`
+- **`sc-pe-school-patrol` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-pe-school-patrol/mobile-right/03-ready.png`
+- **`sc-pe-zone-living` · E · minor** — No audio evidence: no volume, mute or caption control appears anywhere in either band, in any frame of this lesson.
+  `sc-pe-zone-living/pc-right/01-arrival.png`
+- **`sc-pk-ban-stop` · E · minor** — No evidence of audio: no mute or volume affordance, no speaker glyph, no caption track, no audio-cue marker on any frame in any of the four lanes.
+  `sc-pk-ban-stop/pc-right/01-arrival.png`
+- **`sc-pk-busstop-ban` · E · minor** — No evidence of audio anywhere in the run: no volume or mute control in the toolbar, no audio-related setting, and every one of the eight coach lines is text-only.
+  `sc-pk-busstop-ban/pc-right/01-arrival.png`
+- **`sc-pk-double-park` · E · minor** — No evidence of audio. Nothing in any frame — no mute control, no sound icon, no audio row in the settings sheet — indicates the oncoming car, the passing row or the engine make any sound.
+  `sc-pk-double-park/pc-right/04-t058s.png`
+- **`sc-pk-driveway` · E · minor** — No evidence of audio anywhere in this lesson: no volume or mute control in the HUD, no speaker glyph, no caption or subtitle line, and no audio-cue indicator on any of the 54 frames across the four lanes. A reversing lesson with no reversing tone and no collision sound cue.
+  `sc-pk-driveway/pc-right/01-arrival.png`
+- **`sc-pk-rail-ban` · E · minor** — No evidence of audio. A guarded level crossing has a bell; nothing in any frame suggests sound exists, and there is no audio control on either platform.
+  `sc-pk-rail-ban/pc-right/04-t117s.png`
+- **`sc-pk-smooth-stop` · E · minor** — No audio evidence: no volume, mute or caption control anywhere in either band in any frame of this lesson.
+  `sc-pk-smooth-stop/pc-right/01-arrival.png`
+- **`sc-pk-stop-vs-park` · E · minor** — No evidence of audio anywhere. No volume/mute control, no sound icon, no audio state in the HUD on either platform, and the mobile ⚙/МЕНЮ sheet lists only Съветник, Задача, Качество, Въпроси, Карта — no sound row. A driving simulator that teaches engine load and gap judgement is running silent as far as any frame shows.
+  «Съветник вкл. · Задача 2/2 · Качество Авто · Ниско · Въпроси Понякога · Карта изкл.»
+  `sc-park-gap-long/mobile-right/07b-menu.png`
+- **`sc-rb-busy-gap` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-rb-busy-gap/mobile-right/03-ready.png`
+- **`sc-rb-circulate-priority` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-rb-circulate-priority/mobile-right/03-ready.png`
+- **`sc-rb-exit-signal` · E · minor** — No evidence of audio in any frame: no mute/volume control, no speaker glyph, no captioned sound cue, no audio state in the HUD. The only audio-adjacent affordance is the «⊙ КЛАКС» horn button. (Audio code does exist in the tree — scene/simAudio.ts, scene/audioPrompt.ts, components/sim/AudioLessonPrompt.tsx — so this is 'invisible', not necessarily 'absent'; still frames give a student no way to know sound is on.)
+  «⊙Клакс»
+  `sc-rb-exit-signal/mobile-right/01-arrival.png`
+- **`sc-rb-lane-choice` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-rb-lane-choice/mobile-right/03-ready.png`
+- **`sc-rb-ped-exit` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-rb-ped-exit/mobile-right/03-ready.png`
+- **`sc-rx-barrier-drop` · E · minor** — No evidence of audio on the one readable frame — no bell glyph, no volume or mute affordance, no caption line — in a lesson whose entire trigger is a barrier warning that in life is announced by sound before it is seen.
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-rx-guarded` · E · minor** — No evidence of audio: a guarded crossing whose barrier drops has no bell, no warning-tone indicator, no mute control and no caption line on the one debrief frame or in the DOM dump.
+  `sc-rx-guarded/pc-wrong/08-debrief.png`
+- **`sc-rx-tram-island` · G · minor** — Nothing further to report for parts B, C, D, E, F or G — stated explicitly: there is no image evidence of any kind for this lesson in sweep161, so no visual, cockpit, HUD, audio or consistency judgement was possible.
+  `sc-rx-tram-island/mobile-wrong/run.log`
+- **`sc-rx-tram-left` · E · minor** — No evidence of audio — nothing in the captured DOM mentions sound, a tram bell, a mute control or a caption track. Recorded explicitly rather than left blank.
+  `sc-rx-tram-left/mobile-right/run.log`
+- **`sc-rx-unguarded` · E · minor** — No evidence of audio, and this is the lesson where it costs most: an unguarded crossing with a train arriving has no bell glyph, no horn control, no volume affordance and no caption line in any frame. The briefing tells the student to look both ways but the sim gives him nothing to listen to.
+  `sc-rx-unguarded/mobile-right/04-t088s.png`
+- **`sc-sig-controller-live` · E · minor** — AUDIO: no evidence of any, stated explicitly. No volume/mute control, no speaker glyph, no caption line and no audio event in the run log across the five readable frames or the full DOM dump.
+  `sc-sig-controller-live/mobile-right/01-arrival.png`
+- **`sc-sig-controller-live` · F · minor** — The same officer caption renders in two different chrome styles between the sibling lessons: a red-bordered dark panel for 'СПРИ' and a green-bordered dark panel for 'МИНАВАШ ТИ', but the headline colour and the body-line colours also swap roles (green body text on the go panel, orange/white mixed on the stop panel), so the colour is doing two jobs - posture identity and line emphasis - at once.
+  `sc-sig-controller-live/mobile-right/04-t012s.png`
+- **`sc-sig-controller-postures` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-sig-controller-postures/mobile-right/03-ready.png`
+- **`sc-signal-controller` · D · minor** — Typeface split with no rule behind it: the instruction panel, the teach card and the why-panel body are set in a Bulgarian-form italic (correct localised Cyrillic), while every HUD control, the mode strip and the officer's world caption use an upright grotesque. The two faces sit within a few pixels of each other at the top-right of the screen.
+  `sc-signal-controller/mobile-right/02-briefing.png`
+- **`sc-signal-controller` · E · minor** — AUDIO: no evidence of any. Stated explicitly - across 20 frames there is no volume control, no mute button, no speaker glyph, no audio-related caption and no subtitle line anywhere in the HUD, and the harness logs no audio event. A lesson that turns on a whistle-blowing traffic officer has nothing audible attached to him.
+  `sc-signal-controller/mobile-right/01-arrival.png`
+- **`sc-signal-dead` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-signal-dead/mobile-right/03-ready.png`
+- **`sc-signal-flashing` · E · minor** — No evidence of audio in any frame of either drive — no mute or volume control, no speaker glyph, no caption for a sound cue, nothing in the HUD indicating audio state. Same as the roundabout lesson.
+  `sc-signal-flashing/mobile-right/01-arrival.png`
+- **`sc-signal-hesitation` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-signal-hesitation/mobile-right/03-ready.png`
+- **`sc-signal-response` · E · minor** — No evidence of audio: no mute, volume or speaker control on either platform, and no audible-cue indicator on the signal change — the only signal-change feedback is visual.
+  `sc-signal-response/pc-right/04-t082s.png`
+- **`sc-sp-harsh-brake` · G · minor** — Grammar error in a teaching caption shown mid-drive: има място да реагира should be има място да реагират, agreeing with the plural движещите се зад теб. The caption is one of the lesson's core explanations, so the error is on the screen the student is meant to learn from.
+  «Плавно и предвидимо: движещите се зад теб видят стоповете навреме и има място да реагира.»
+  `sc-sp-harsh-brake/pc-right/04-t100s.png`
+- **`sc-sp-harsh-brake` · E · minor** — No evidence of audio. The mobile menu sheet opened cleanly and lists Съветник, Въпроси, Задача, Карта, Качество, Прекрати урока, Всички уроци — and no sound, volume or mute control of any kind. Stated explicitly rather than left as nothing.
+  `sc-sp-harsh-brake/mobile-right/07b-menu.png`
+- **`sc-speed-creep` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-speed-creep/mobile-right/03-ready.png`
+- **`sc-speed-dangerous` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-speed-dangerous/mobile-right/03-ready.png`
+- **`sc-speed-rain` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-speed-rain/mobile-right/03-ready.png`
+- **`sc-speed-transition` · E · minor** — No evidence of audio anywhere. No speaker, volume or mute control in the PC top toolbar (Съветник / ВЪПРОСИ / Известия нормално / Прекрати урока / Цял екран) and none in the mobile menu sheet (Съветник · Въпроси · Задача · Карта · Качество · Прекрати урока). Stated explicitly because the sweep is stills-only: absence of a control is evidence, absence of sound is not.
+  `sc-speed-transition/pc-right/01-arrival.png`
+- **`sc-speed-zone` · E · minor** — No audio evidence is obtainable from frames, and this is stated explicitly rather than scored blank. The code carries a full procedural WebAudio stack (platform/src/modules/sim/scene/simAudio.ts: engine, tyre, wind, brake hiss, city bed, NPC hum, rain and wiper, two-tone siren, indicator tick, collision thump, belt click) gated behind a user-gesture unlock. What the frames DO show is that on mobile there is no visible volume/mute affordance anywhere on the driving surface — the only chrome is «МЕНЮ» — while pc carries a speaker control in the cockpit control row.
+  `sc-speed-zone/mobile-right/03-ready.png`
+- **`sc-turn-left-oncoming` · E · minor** — No evidence of audio in any frame of any lane of this lesson: no control, no indicator, no caption toggle.
+  `sc-turn-left-oncoming/pc-right/01-arrival.png`
+
+---
+
+## U3 — Weather, light and surfaces drawn as decals · 84 findings (16 major, 66 minor)
+
+- **`sc-roundabout-entry` · B · CRITICAL** — Out the windscreen there is simply no junction: the asphalt stops, a mown green mound with three shrubs takes its place, and blocks of flats sit behind it. Nothing about the view says roundabout to a learner.
+  `sc-roundabout-entry/pc-right/04-t068s.png`
+- **`sc-ac-aquaplane` · B · major** — A lesson whose first line is „вали от часове“ shows no rain on the glass, no wiper sweep, no wet-road specular, no tyre spray from the parked traffic — only small white particles floating in front of the camera. The ЧИСТАЧКИ control is never lit in any frame.
+  «Включи късите светлини и потегли с около 70 км/ч — вали от часове.»
+  `sc-ac-aquaplane/pc-right/07-end.png`
+- **`sc-ac-highbeam-lead` · B · major** — The lead car has no lit tail lamps at night — just a flat painted red band — in a lesson whose whole subject is what you can and cannot see behind another car after dark. Its wheels are thin beige rectangles, it sits on a soft round blob shadow, and the ego beam is painted on the tarmac without brightening the car's rear panel.
+  `sc-ac-highbeam-lead/mobile-right/04-t127s.png`
+- **`sc-ac-rain-lights` · B · major** — Nothing about the road says wet. The asphalt is the same flat dry grey as the dry lessons — no sheen, no reflections of the building windows, no standing water, no spray from the parked cars, no darkened kerb line. The only rain cue is the particle layer.
+  `sc-ac-rain-lights/pc-right/01-arrival.png`
+- **`sc-ac-wet-braking` · B · major** — A lesson called «Спирачен път на мокро» over dry-looking road. The asphalt has no sheen, no reflections, no puddles and no darkening, and the parked cars throw no spray. Nothing in the picture would make a student expect a 1.4x braking distance.
+  `sc-ac-wet-braking/pc-right/01-arrival.png`
+- **`sc-ac-wind-truck-pass` · A · major** — A run that is НЕИЗДЪРЖАН with a dangerous error and 38 penalty points still awards +40 XP, the same badge shown on the 0-point truck-spray run. XP is decoupled from the verdict, so the reward line reads the same whether the student drove cleanly or crashed.
+  «+40 XP»
+  `sc-ac-wind-truck-pass/pc-wrong/08-debrief.png`
+- **`sc-ed-d2-city-run` · D · major** — The mobile debrief is set at a scale where the title alone wraps to two lines and the score glyph is roughly a fifth of the screen height, so a phone shows only the headline number and the verdict pill — the error breakdown, the star rating and the whole instructor discussion are all below the fold with no summary above it.
+  «80 наказателни точки»
+  `sc-ed-d2-city-run/mobile-right/08-debrief.png`
+- **`sc-hazard-obstacle` · B · major** — The tall block closing the end of the street is a random checkerboard of lit and unlit window squares with no floor lines, no entrance and no roof detail; at t114 it fills the centre of the windscreen and reads as a broken texture rather than a building. The same block recurs in the mobile frames of sc-hz-emergency-stop, which shares this district. Pavements throughout are empty of people.
+  `sc-hazard-obstacle/pc-right/04-t114s.png`
+- **`sc-hz-brake-dont-swerve` · B · major** — The briefing calls this a one-way street with two lanes in the same direction, and the world gives no cue of that: no one-way sign, no directional arrows on the tarmac, no traffic in the left lane and a centre marking that reads exactly like an ordinary two-way carriageway. A student cannot tell from the windscreen that swerving left means entering a second lane rather than the oncoming one.
+  «Еднопосочна улица с две ленти, ограничение 50.»
+  `sc-hz-brake-dont-swerve/pc-right/04-t094s.png`
+- **`sc-ln-obstacle-meeting` · B · major** — The world ends in a void in plain sight of the driver. Past the right-hand building line the city stops and a flat untextured grey plane runs to a bare hazy horizon, visible through the gap between blocks.
+  `sc-ln-obstacle-meeting/mobile-right/05-stopped.png`
+- **`sc-merge-accel-lane` · B · major** — The motorway environment is a bare green plane with one five-storey office block dropped in a field beside the carriageway and three lollipop trees. No crash barrier, no gantry, no signage, no lighting columns, no other vehicle — nothing that reads as a motorway.
+  `sc-merge-accel-lane/mobile-right/04-t208s.png`
+- **`sc-merge-lane-end` · B · major** — The street does not read as a lived-in city. Pavements are empty of people at arrival, buildings are untextured grey boxes with painted-on window rectangles, there are no shadows cast by the blocks onto the road, no shopfronts, no bins, no signage, no bus, no cyclists. The only variety is a row of parked cars.
+  `sc-merge-lane-end/pc-right/01-arrival.png`
+- **`sc-park-van` · B · major** — The бус — the entire subject of the lesson — is an untextured dark cuboid with a small block stuck on one corner. No wheels, no windows, no doors, no mirrors, no plate. The student is told to read how far it overhangs its own lines and where its bulk kills the mirror, off a shape with no readable features.
+  «3. Знай: гнездото е до бус, а бусът краде сантиметри и цялата видимост зад себе си.»
+  `sc-park-van/mobile-right/04-t060s.png`
+- **`sc-rb-exit-signal` · C · major** — Mirrors: the rear-view mirror renders a live reflection, but the left door mirror is an unlit black lozenge with no glass surface and no reflection, and no right door mirror is visible in the driver's field of view at all. The lesson's own coaching is «Гледай НАЛЯВО» — there is nothing to look into.
+  «Гледай НАЛЯВО»
+  `sc-rb-exit-signal/mobile-right/06-waited.png`
+- **`sc-signal-controller` · C · major** — No mirror shows anything. The left door mirror is modelled as a solid black housing with no glass and no reflection (350% zoom on 04-t053s); there is no interior rear-view mirror in frame. All rearward awareness is delivered instead as a text chip, 'Кола отзад · 13 м' - so the mirror-check habit the lesson should build cannot be practised.
+  «Кола отзад · 13 м»
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-speed-transition` · F · major** — Same lesson, same right drive, opposite verdicts by platform: PC returns ИЗДЪРЖАН with +150 XP and three stars, mobile returns НЕИЗДЪРЖАН with 0 points and Урокът беше прекъснат преди края. A student who trains on a phone cannot pass a lesson a desktop student passes.
+  «НЕИЗДЪРЖАН»
+  `sc-speed-transition/mobile-right/08-debrief.png`
+- **`sc-zebra-approach` · B · major** — The best-populated world of the seven — a real zebra, parked cars, one or two walking figures — and still the pavements of a city boulevard are essentially empty, the light is flat with no cast shadows and the buildings are untextured boxes with painted-on windows.
+  `sc-zebra-approach/mobile-right/06-waited.png`
+- **`sc-ac-aquaplane` · C · minor** — The КОЛАН telltale shows the red unbelted pictogram for the whole drive in this lesson (and in night-overdrive and truck-spray) while it is amber/belted in ice and wind-truck-pass. Nothing warns the student and no fault is ever raised for it in the debrief.
+  «КОЛАН»
+  `sc-ac-aquaplane/pc-right/01-arrival.png`
+- **`sc-ac-fog` · B · minor** — The fog does not touch the guide ribbons: the blue and green route ribbons stay fully saturated all the way to the vanishing point while the buildings dissolve, so the brightest and sharpest thing in a low-visibility lesson is the aid that is meant to fade with everything else. The parked cars also stay crisp at distances where the architecture has gone.
+  `sc-ac-fog/pc-right/01-arrival.png`
+- **`sc-ac-night-lights` · B · minor** — The demonstration shadow car renders as a large translucent blue car sitting on top of the player's own bonnet and filling the lane, hiding the road it is supposed to be demonstrating. Same overlap in sc-ac-rain-lights/pc-right/04-t090s.png and sc-ac-snow/mobile-right/04-t102s.png.
+  `sc-ac-night-lights/pc-right/04-t116s.png`
+- **`sc-ac-night-overdrive` · B · minor** — The dipped-beam pool is a hard-edged flat trapezoid painted on the tarmac with no falloff and no beam cut-off shape, so the one thing this lesson is about — how far your headlights actually reach — reads as a decal rather than light.
+  `sc-ac-night-overdrive/mobile-wrong/04-t038s.png`
+- **`sc-ac-rain-lights` · F · minor** — The same rain renders as two different things: round white blobs on PC (which also leak into the cabin) versus sparse thin diagonal streaks on mobile that do not touch the cabin. One weather effect, two looks.
+  `sc-ac-rain-lights/mobile-right/04-t105s.png`
+- **`sc-crossing-bus-shadow` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-crossing-bus-shadow/mobile-right/03-ready.png`
+- **`sc-crossing-child-ball` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-crossing-child-ball/mobile-right/03-ready.png`
+- **`sc-crossing-dart` · B · minor** — Materials and lighting read as a greybox. Buildings are untextured boxes carrying a repeating checkerboard of identical cream/black window quads; the same three low-poly tree blobs repeat down both sides; the road is flat grey with no wear, patches, kerb dirt or drain covers; and no building casts a shadow onto the road at any point in the drive — the only shadow in any frame is a soft blob under the car. The sky is a plain gradient with two static cloud smears.
+  `sc-crossing-dart/mobile-right/04-t013s.png`
+- **`sc-crossing-dart` · G · minor** — An unexplained teal light-shaft stands in the sky at the vanishing point in every approach frame (01-arrival through 06-waited) and disappears once the crossing is behind. Nothing on screen names it, no legend explains it, and it is drawn in the same teal as the guidance ribbon and the «ЗАЩО» ring — a learner has no way to know whether it is a goal marker, a hazard, or scenery.
+  `sc-crossing-dart/mobile-right/01-arrival.png`
+- **`sc-crossing-white-cane` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-crossing-white-cane/mobile-right/03-ready.png`
+- **`sc-ed-d2-city-run` · G · minor** — FREE OBSERVATION: the run logs record repeated login failures against the staging tunnel — five consecutive failed attempts for bridge-ice mobile-wrong, all returning „Грешен имейл или парола“ for credentials that then worked. If that is rate-limiting or a session race it will hit real students on the same login form, not just the harness.
+  «Имейл Парола Покажи Грешен имейл или парола. Влез»
+  `sc-ac-bridge-ice/mobile-wrong/08-debrief.png`
+- **`sc-ed-d2-priority-run` · B · minor** — A flat white quadrilateral lies across the asphalt to the left of the guide line — an unaligned road-marking decal floating over the surface rather than painted on a lane.
+  `sc-ed-d2-priority-run/pc-right/04-t073s.png`
+- **`sc-ed-d2-stop-address` · D · minor** — A world-space coach label 'Карай докрай / не по-бързо от 37 км/ч' floats in mid-air over the buildings with no panel behind it, and at distance it shrinks into the facade texture and becomes unreadable.
+  «Карай докрай»
+  `sc-ed-d2-stop-address/pc-right/05-stopped.png`
+- **`sc-fo-motorway-gap` · G · minor** — On mobile a hard-edged translucent grey wedge crosses the left half of the windscreen with a straight diagonal boundary. It is presumably glass tint, but with a sharp edge and no gradient it reads as a rendering artefact laid over the world. The sky also carries a visible horizontal seam near the horizon band.
+  `sc-fo-motorway-gap/mobile-wrong/04-t087s.png`
+- **`sc-follow-brake` · G · minor** — A drive with zero faults scores one star out of three on 'Оценка на маневрата' with no visible reason on the frame, while the identically faultless follow-distance run scored three.
+  «Оценка на маневрата»
+  `sc-follow-brake/pc-right/08-debrief.png`
+- **`sc-hazard-obstacle` · C · minor** — The cockpit offers ДВИГАТЕЛ, КОЛАН, СВЕТЛИНИ, МЪГЛА, ЧИСТАЧКИ, РЪЧНА and АВАР. controls but the instrument binnacle itself is a single unnumbered dial with a digital speed and a gear letter. Three unlabelled dark rectangles occupy the top-right of the windscreen as mirrors, and the left door mirror is a black blob showing no reflection.
+  `sc-hazard-obstacle/pc-right/01-arrival.png`
+- **`sc-hazard-obstacle` · G · minor** — The «Карай дотук» world label floats over the pavement beyond the kerb with no backing plate and no leader line to the point it names, and a glowing cyan vertical beam rises from the road at the vanishing point with nothing to explain it. On the mobile briefing frame the same beam is visible through the dialog as a bright column in the sky.
+  «Карай дотук»
+  `sc-hazard-obstacle/pc-right/04-t114s.png`
+- **`sc-hz-brake-dont-swerve` · G · minor** — The «Спри тук» world marker carries a second sub-label that is clipped behind the ИНСТРУКЦИИ panel, leaving a fragment reading «…при … под 6 км/ч» hanging in the sky. The world label and the panel are drawn in the same screen region with no collision avoidance.
+  «Спри тук»
+  `sc-hz-brake-dont-swerve/pc-right/04-t094s.png`
+- **`sc-jx-giveway-b1` · C · minor** — The car creeps at 10 км/ч with plausible coast and brake, but with a 15 км/ч top speed across 205 s the drive never demonstrates acceleration at all, so nothing about the powertrain feel can be judged from this lesson.
+  «10 км/ч»
+  `sc-jx-giveway-b1/pc-right/04-t108s.png`
+- **`sc-ln-boulevard-discipline` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-ln-boulevard-discipline/mobile-right/03-ready.png`
+- **`sc-ln-decisive-change` · G · minor** — The briefing spends its opening paragraph on rain and darkness — включи късите светлини, на мокър булевард тъмната кола — in a world that is permanently dry, sunlit and mid-afternoon. The same dead clause appears in obstacle-meeting, uturn and merge, so students learn to skip the first paragraph of every lesson.
+  «Вали ли, включи късите светлини преди това (чл. 70)»
+  `sc-ln-decisive-change/mobile-right/02-briefing.png`
+- **`sc-ln-turn-lane-arrows` · D · minor** — The PC keyboard-help panel renders low-contrast grey type over the bright sky and the road, so «всичко в кабината се прави с мишката / кормуване (или стрелки)» is barely legible and overlaps the carriageway.
+  «Клавиши · за напреднали»
+  `sc-ln-turn-lane-arrows/pc-right/01-arrival.png`
+- **`sc-merge-accel-lane` · G · minor** — The wrong drive accumulates 135 наказателни точки across 23 faults, mostly the same lane-change fault repeated. A protocol that long is a fault stream, not a debrief — the student cannot tell which mistake mattered.
+  «135 наказателни точки»
+  `sc-merge-accel-lane/mobile-wrong/08-debrief.png`
+- **`sc-merge-from-property` · G · minor** — The guidance system draws three separate coaching overlays on the ground at once — a green route band, a blue shadow-car trail and a large teal target ring — plus a floating white arrow in mid-air. At the decision point they overlap the zebra markings so completely that the actual road surface the student is meant to read is hidden under them.
+  `sc-merge-from-property/mobile-right/05-stopped.png`
+- **`sc-mw-discipline` · B · minor** — Out the windscreen the motorway is bare: flat green fields to the horizon, a grey rubble median, about eight identical low-poly conifers, one sign, no gantries, no bridges, no lighting columns, no armco, no other traffic. There is no shadow cast by anything except a soft blob under the car.
+  `sc-mw-discipline/mobile-right/04-t208s.png`
+- **`sc-ov-oncoming-gap` · F · minor** — PC carries a legend for the guidance ribbons («синя — пътят на колата-сянка / зелена — маршрутът до целта»); mobile carries none. On the phone the green ribbon, the teal ring around the lead car and the vertical cyan beam are never explained — only the blue line gets a passing toast.
+  «Следвай синята линия»
+  `sc-ov-oncoming-gap/mobile-right/07b-menu.png`
+- **`sc-ov-oncoming-gap` · C · minor** — A hard-edged translucent grey quad is stamped across the left of the windscreen in every mobile frame as a glare/reflection; it has straight polygon edges and does not move with the sun, so it reads as a rendering artefact rather than glass.
+  `sc-ov-oncoming-gap/mobile-right/04-t013s.png`
+- **`sc-ov-solid-return` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-ov-solid-return/mobile-right/03-ready.png`
+- **`sc-park-45-rev` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-park-45-rev/mobile-right/03-ready.png`
+- **`sc-park-left` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-park-left/mobile-right/03-ready.png`
+- **`sc-park-wall` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-park-wall/mobile-right/03-ready.png`
+- **`sc-park-zebra` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-park-zebra/mobile-right/03-ready.png`
+- **`sc-pe-jaywalker` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-pe-jaywalker/mobile-right/03-ready.png`
+- **`sc-pe-school-patrol` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-pe-school-patrol/mobile-right/03-ready.png`
+- **`sc-pe-zone-living` · F · minor** — The same cockpit control carries two different labels between lessons: it reads 'КЪСИ' in sc-pe-night-unlit and 'СВЕТЛИНИ' in this lesson, sc-pe-parked-row-scan and sc-pk-smooth-stop. A student learning the dipped-beam control by its caption meets a different word each drive.
+  «СВЕТЛИНИ»
+  `sc-pe-zone-living/pc-right/01-arrival.png`
+- **`sc-pk-rail-ban` · D · minor** — The shadow-car overlay renders as a large translucent electric-blue slab that fills most of the lane and washes out the road ahead at t176s, competing with the blue route ribbon already painted on the same tarmac — two blue guidance layers on top of each other.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-pk-rail-ban/pc-right/04-t176s.png`
+- **`sc-pk-smooth-stop` · C · minor** — The car itself feels right — the needle tracks the digital readout (0 km/h low-left, 12, 59 rotated up), it accelerates, coasts and brakes smoothly, and gear D shows correctly. What lets the cabin down is the fittings: the dial face has ticks but no numerals, the wheel rim hides the lower half of the dial, and the driver's door mirror is a small untextured grey stub with no reflected image while the whole lower-left of the cabin renders as an unlit black mass.
+  «0 км/ч»
+  `sc-pk-smooth-stop/mobile-right/05-stopped.png`
+- **`sc-pk-smooth-stop` · G · minor** — Briefing step 1 hedges on weather this run does not have — 'Ако вали, включи късите светлини — мократа настилка удължава спирачния път близо двойно' — in a clear, sunny scene. It is harmless as a conditional, but it is the third of these four lessons whose step 1 describes conditions the world never produces.
+  «Ако вали, включи късите светлини — мократа настилка удължава спирачния път близо двойно.»
+  `sc-pk-smooth-stop/pc-right/01-arrival.png`
+- **`sc-pk-stop-vs-park` · B · minor** — The two route guides are neon strips painted on the tarmac — a glowing mint-green ribbon and a pulsing electric-blue dotted line — bright enough to out-read the actual lane markings. It reads as an arcade racing line, not as a street.
+  `sc-pk-stop-vs-park/mobile-right/04-t134s.png`
+- **`sc-pk-stop-vs-park` · C · minor** — The mobile rear-view mirror is a black rectangle floating free in the sky above the windscreen frame, not attached to any roof or header rail, and it overlaps the instruction panel. The left door mirror is a featureless black blob that never shows a reflection.
+  `sc-pk-stop-vs-park/mobile-right/04-t060s.png`
+- **`sc-rb-busy-gap` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-rb-busy-gap/mobile-right/03-ready.png`
+- **`sc-rb-circulate-priority` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-rb-circulate-priority/mobile-right/03-ready.png`
+- **`sc-rb-exit-signal` · B · minor** — The world reads as placeholder blockwork: identical untextured box buildings with a repeating window grid, trees as single green blobs, a roundabout island that is a bare grass mound, parked cars packed bumper-to-bumper with no gaps and no variation in spacing, and a visible hard edge where the ground plane ends at the horizon.
+  `sc-rb-exit-signal/mobile-right/04-t013s.png`
+- **`sc-rb-lane-choice` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-rb-lane-choice/mobile-right/03-ready.png`
+- **`sc-rb-ped-exit` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-rb-ped-exit/mobile-right/03-ready.png`
+- **`sc-rx-guarded` · G · minor** — The debrief page renders a three-star row («★★★») for «Оценка на маневрата» on a run the same page marks НЕИЗДЪРЖАН with a dangerous error; the machine summary for the same run says 1 от 3 звезди. Whatever the fill states are, three gold-looking stars beside a red fail badge reads as a pass at a glance. (Star row is below the fold of the captured frame — evidence is the log's DOM dump.)
+  «Оценка на маневрата оценка на симулатора — не е закон ★★★»
+  `sc-rx-guarded/pc-wrong/run.log`
+- **`sc-rx-unguarded` · B · minor** — The rails are effectively invisible on the approach. At t078s, with the crossing perhaps thirty metres ahead and the Andreevski krast already in view, the road surface shows no track at all — dark grey sleepers on grey asphalt with no ballast, no rail shine and no white crossing markings. They only resolve at about ten metres (t083s).
+  `sc-rx-unguarded/mobile-right/04-t078s.png`
+- **`sc-rx-unguarded` · B · minor** — The train is a flat untextured teal slab with a single yellow stripe — no windows, no couplings, no visible bogies where it meets the road, no ballast beneath and no motion blur or dust. At t088s it fills the entire windscreen as a wall, which reads as a scenery error rather than a train.
+  `sc-rx-unguarded/mobile-right/04-t088s.png`
+- **`sc-rx-unguarded` · G · minor** — Free observation: the mobile DOM carries the nag «Завърти телефона хоризонтално» in every sampled frame of the drive per run.log, on a device already in landscape (2556x1179), so the rotate prompt never clears. The task chip also reads card=-/- for most of the drive — for long stretches the student has no visible current task at all.
+  «Завърти телефона хоризонтално»
+  `sc-rx-unguarded/mobile-right/run.log`
+- **`sc-sig-controller-live` · D · minor** — The lesson time benchmark reads as a rebuke rather than instruction: 'Ориентировъчно време — 111 с при ориентир 55 с (16 с чакане на предимство не се броят)'. The drive took double the benchmark because the sim itself twice ordered it to wait, and the waiting deduction (16 s) does not cover the 20 s the sim's own lawful-wait cards demanded.
+  «111 с при ориентир 55 с (16 с чакане на предимство не се броят — изчакването е част от задачата)»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-sig-controller-live` · G · minor** — FREE OBSERVATION, non-empty: the lesson is titled 'Регулировчикът бие светофара · Ниво 1 — Пълна помощ' - level 1, full assistance - and at that level the scaffolding is a floating billboard above the officer that states the answer outright ('Предимството е ТВОЕ — дори на червено'). With the answer printed in the sky, nothing in this lesson requires reading the officer at all; the level-1 aid removes the exact perception the north-star test cares about. Worth a founder ruling on whether level 1 should print the verdict or only the cue.
+  «Регулировчикът бие светофара · Ниво 1 — Пълна помощ · резултат»
+  `sc-sig-controller-live/mobile-right/run.log`
+- **`sc-sig-controller-postures` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-sig-controller-postures/mobile-right/03-ready.png`
+- **`sc-signal-controller` · D · minor** — Two guidance ribbons run down the road in different colours - a green one on the left lane line and a blue one down the lane centre - with no legend explaining the difference between them. Both glow through the tarmac and neither is mentioned in the briefing.
+  `sc-signal-controller/mobile-right/01-arrival.png`
+- **`sc-signal-dead` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-signal-dead/mobile-right/03-ready.png`
+- **`sc-signal-flashing` · C · minor** — Signal-head modelling: the lamps are protruding spheres that bulge out of the housing rather than flush lenses, and the unlit green lens reads as a dark green ball that at small sizes can be mistaken for a dim green aspect in a lesson whose entire point is «мигащото жълто не е зелено».
+  «Мигащото жълто не е зелено»
+  `sc-signal-flashing/mobile-right/04-t045s.png`
+- **`sc-signal-hesitation` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-signal-hesitation/mobile-right/03-ready.png`
+- **`sc-sp-curve` · D · minor** — The mobile ЗАЩО and × controls on violation cards are unfilled translucent circles drawn directly on trees, cars and sky with no panel or scrim — at t=129s the × is barely distinguishable from the tree behind it. On PC the same controls are solid panel buttons. Nothing marks ЗАЩО as tappable rather than decorative.
+  «ЗАЩО»
+  `sc-sp-curve/mobile-wrong/04-t030s.png`
+- **`sc-sp-eco-coast` · B · minor** — Every building window is emissive orange as if lit at night, while the sky and road are flat mid-day overcast with no sun direction and no building shadows on the carriageway. The result reads as a lighting mismatch rather than a time of day.
+  `sc-sp-eco-coast/mobile-right/02-briefing.png`
+- **`sc-sp-harsh-brake` · C · minor** — Cockpit and feel. The cluster is legible and honest (analogue needle plus digital км/ч plus gear plus the red limit disc), and the car does accelerate and coast plausibly on PC. But the steering wheel rim never visibly rotates through the curve or the stop, there is no rev counter, no brake or throttle pedal feedback, and the two side mirrors are black shapes with no reflection at all — only the interior mirror renders a scene.
+  `sc-sp-harsh-brake/pc-right/04-t043s.png`
+- **`sc-sp-limit-end` · B · minor** — A wall object on the right of the street renders as a flat pixelated brown-and-tan checker block that reads as a missing or placeholder texture rather than a building or hoarding.
+  `sc-sp-limit-end/mobile-right/01-arrival.png`
+- **`sc-speed-creep` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-speed-creep/mobile-right/03-ready.png`
+- **`sc-speed-dangerous` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-speed-dangerous/mobile-right/03-ready.png`
+- **`sc-speed-rain` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-speed-rain/mobile-right/03-ready.png`
+- **`sc-speed-zone` · C · minor** — The cockpit is a single analogue dial plus a digital км/ч and gear letter — no tachometer, fuel, temperature or odometer; the wheel does not visibly rotate with steering input in the frames; only the interior rear-view mirror is modelled and it floats detached from any A-pillar or roofline, high in the sky band. Acceleration, coasting and braking themselves read plausibly: the digital speed climbs and falls smoothly and the needle tracks it.
+  `sc-speed-zone/mobile-right/03-ready.png`
+- **`sc-vu-emergency-junction` · D · minor** — The «Клавиши · за напреднали» help panel paints unstyled monospace text straight onto the windscreen with only a faint outline and no solid backing, so the key list sits on top of the road surface and collides with the «Демонстрация» button and the route legend beneath it.
+  «всичко в кабината се прави с мишката»
+  `sc-vu-emergency-junction/pc-right/01-arrival.png`
+- **`sc-vu-pass-clearance` · B · minor** — Materials and lighting read as placeholder: every facade is the same window grid at two tints, the same four car bodies repeat down both kerbs in flat primary colours, trees are two-cone lollipops, and nothing casts a directional shadow onto the road — cars sit on soft blobs while the sun direction implied by the lit windows is ignored.
+  `sc-vu-pass-clearance/mobile-right/04-t102s.png`
+- **`sc-speed-rain` · G · info** — Nothing beyond the shared findings — rain is present as a condition flag but no rain, spray or wiper motion is discernible in the frames.
+  `sc-speed-rain/mobile-right/04-t001s.png`
+
+---
+
+## U5 — A cockpit that is decoration · 57 findings (9 major, 48 minor)
+
+- **`sc-ac-aquaplane` · D · major** — The ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА player (scrubber, 0.25×/0.5×/1×, Участък) sits permanently over the instrument binnacle and clips the left edge of the speedometer during live driving; the demo keeps playing while the student drives.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-ac-aquaplane/pc-right/05-stopped.png`
+- **`sc-fo-brakelight-chain` · G · major** — The «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА» video player, with its scrubber and 0.25x/0.5x/1x speed chips, sits on top of the cockpit for the entire drive and covers the left half of the dashboard and the steering column. It plays and loops while the student drives.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-fo-brakelight-chain/pc-right/04-t143s.png`
+- **`sc-follow-distance` · C · major** — The door mirrors are unreflective black blocks — they show nothing at all. The only working mirror is the interior one, and that is the one the HUD covers.
+  `sc-follow-distance/mobile-right/04-t077s.png`
+- **`sc-hz-breakdown-pulloff` · C · major** — The instrument cluster carries no telltales whatsoever — no oil pressure, no temperature, no battery, no hazard-light tell — in the one lesson of the chunk whose entire premise is reading a dashboard warning lamp and whose protocol continues into hazard lights, vest and warning triangle. The AVAR. control exists on the console but has no corresponding indication in the binnacle.
+  `sc-hz-breakdown-pulloff/pc-wrong/04-t205s.png`
+- **`sc-hz-emergency-stop` · C · major** — The lesson teaches full-force braking with ABS — the pedal will vibrate and knock under your foot — and the cockpit provides no ABS telltale, no brake-force indication, no pedal travel display and no deceleration cue of any kind. The one sensation the lesson is built around has no representation in the car.
+  `sc-hz-emergency-stop/mobile-right/04-t112s.png`
+- **`sc-rb-exit-signal` · C · major** — The instrument cluster is one unnumbered dial plus a digital readout. The speedo has tick marks and NO numerals at all, its needle rests below the lowest tick, and there is no tachometer, no fuel gauge, no temperature gauge, no odometer and no indicator/telltale lamps in the binnacle. For a product whose subject is learning to read a car, the dashboard teaches nothing.
+  «11 км/ч D»
+  `sc-rb-exit-signal/mobile-right/04-t029s.png`
+- **`sc-rb-exit-signal` · D · major** — Two near-identical ЛЯВ/ДЯСН control pairs sit on opposite screen edges: turn indicators «⇦ ЛЯВ / ⇨ ДЯСН» on the left rail, mirror views «Л ЛЯВО / З ЗАДН / Д ДЯСН» on the right rail. Same words, different jobs, no grouping or iconography to separate them.
+  «⇦Ляв ⇨Дясн ⊙Клакс ⚠Колан ДДясн ЗЗадн ЛЛяво»
+  `sc-rb-exit-signal/mobile-right/01-arrival.png`
+- **`sc-signal-controller` · C · major** — The instrument cluster is decorative. The speedometer face has no legible numerals - the tick labels render as blurred smudges at 400% zoom - so the analogue dial conveys nothing and only the digital '15 км/ч' readout is usable. The steering-wheel rim also cuts across the lower third of the dial in every frame.
+  `sc-signal-controller/mobile-right/04-t001s.png`
+- **`sc-sp-curve` · G · major** — Free observation. The ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА playback bar is present in every single PC frame of the drive, covers the steering wheel and the left half of the instrument cluster, and loops forever — the counter runs 0:23, 0:34, 0:10, 0:48, 0:10, 0:48 across the session and never stops or hands over to the student. In a Ниво 1 Пълна помощ lesson the demo should play once and then get out of the way.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:48 / 0:48»
+  `sc-sp-curve/pc-right/04-t060s.png`
+- **`sc-ac-aquaplane` · C · minor** — COCKPIT: the car reads as a car — the needle tracks the digital readout, D/P gear state is shown, the wheel rim turns, all three mirrors are modelled and the speed traces in the frame series (0→93→0 over 34 s in the wrong run, 28 separate full stops in the right run) show real acceleration, braking and coasting rather than teleporting. The instruments themselves are legible on both platforms. No defect found in C beyond the seatbelt telltale and the demo player covering the binnacle, both filed separately.
+  `sc-ac-aquaplane/pc-right/04-t183s.png`
+- **`sc-ac-ice` · D · minor** — Both objective toasts fire at once and stack over the rear-view mirror: „Намали до пълзене ПРЕДИ моста“ is drawn across the mirror glass while „Спри свръхплавно на позицията зад закъсалия — дръж под 6 км/ч“ overlaps it from below, so the mirror is unusable while either is up.
+  «Спри свръхплавно на позицията зад закъсалия — дръж под 6 км/ч»
+  `sc-ac-ice/pc-right/04-t098s.png`
+- **`sc-ac-night-lights` · C · minor** — No rear-view mirror and no door mirrors are rendered in the default cockpit view on either platform; mirrors exist only as hold-keys Q/E/F on PC and not at all on mobile. The instrument binnacle is one dial plus a digital readout — no tachometer, fuel or temperature.
+  `sc-ac-night-lights/pc-right/04-t063s.png`
+- **`sc-crossing-dart` · C · minor** — The instrument cluster is one dial and nothing else. The analog gauge carries tick marks but NO printed numerals, so it reads as decoration; there is no tachometer, fuel gauge, temperature gauge, odometer or telltale row. The gauge's left third is permanently hidden behind the steering-wheel rim in every frame. Credit where due: the needle does track speed correctly (rest at 0 км/ч in 01-arrival, ~10 o'clock at 51/59 км/ч in the wrong drive).
+  «16 км/ч D»
+  `sc-crossing-dart/mobile-right/04-t033s.png`
+- **`sc-ed-d2-stop-address` · C · minor** — Instruments read correctly (3 км/ч, gear D, analogue needle tracking the digits) and the mirror renders live, but the wheel never visibly turns between frames and there is no rev counter, so the cockpit gives no feel for engine load.
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-ed-poligon-chain` · C · minor** — Cockpit reads correctly (4 км/ч, needle tracking, mirror live) but for a three-manoeuvre polygon test there is no steering-angle indicator and the wheel rim barely rotates between frames, so the student cannot judge lock.
+  `sc-ed-poligon-chain/pc-right/04-t112s.png`
+- **`sc-fo-brakelight-chain` · C · minor** — The analogue needle in the cluster sits at the same low rest angle at 0, 9 and 11 км/ч while only the digital number changes, so the dial reads as decoration rather than an instrument. There is no tachometer, fuel or temperature gauge of any kind.
+  `sc-fo-brakelight-chain/pc-right/04-t143s.png`
+- **`sc-fo-motorway-gap` · C · minor** — The cluster is one unnumbered dial plus a digital speed and a gear letter. No tachometer, no fuel, no temperature, no odometer, no telltales — on a lesson set at 130-140 км/ч where engine load and gear would be the whole feel of the car.
+  `sc-fo-motorway-gap/pc-right/04-t103s.png`
+- **`sc-hz-accident-scene` · C · minor** — The steering wheel stays centred through the whole wide pass the lesson is named for, and at 15 км/ч closing on a stationary person there is no brake dive, nose dip or any other cue in the cockpit that the car is decelerating. The cluster again offers only a dial and a digital number.
+  `sc-hz-accident-scene/pc-right/04-t080s.png`
+- **`sc-hz-brake-dont-swerve` · C · minor** — The steering wheel sits at the same centred rest angle in every frame of the run, including the frames where the ribbon shows the car easing across the lane, and there is no ABS or brake telltale for a lesson built entirely on a full-force stop.
+  `sc-hz-brake-dont-swerve/pc-right/05-stopped.png`
+- **`sc-hz-breakdown-pulloff` · F · minor** — This lesson shares district mw-v1 with sc-fo-motorway-gap and renders the same near-empty motorway, but the two lessons post different limit discs (140 in both cockpits) against different briefed cruise speeds (130 versus 90-95 км/ч) with no visible sign or gantry in the world to justify either. The speed context is carried only by HUD chrome, never by the road.
+  «РЕЖИМ Нормален ≤150 · знакът важи»
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-junction-blind` · C · minor** — The instrument cluster is live (the needle rotates with the digital readout) but the dial carries no numerals at all, there is no tachometer, fuel gauge, odometer or turn-signal tell-tale in the binnacle, and the steering-wheel rim covers the bottom third of the dial. A student cannot learn to read a speedometer from it.
+  `sc-junction-blind/pc-right/01-arrival.png`
+- **`sc-junction-blind` · D · minor** — The demonstration scrubber panel is drawn on top of the cockpit: it overlaps the steering wheel, clips the left edge of the instrument cluster and covers the interior mirror. It stays there for the whole drive.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-junction-blind/pc-right/01-arrival.png`
+- **`sc-junction-gap` · C · minor** — The mobile cockpit shows the wheel, a left wing mirror and a cluster with needle plus digital readout, and the car brakes and creeps convincingly; but the needle barely leaves its rest position between 0 and 34 км/ч, so the dial gives almost no usable speed feel.
+  «0 км/ч»
+  `sc-junction-gap/mobile-right/01-arrival.png`
+- **`sc-junction-left` · C · minor** — Mirrors are hold-to-glance behind Л/З/Д (Q/F/E), so no frame in this sweep shows a mirror image and mirror fidelity is untested here; the cluster otherwise behaves (0 км/ч at the stop line, needle at rest, gear D). The correct drive never exceeds 15 км/ч over four minutes on a 40 road, which does not read as a car being driven — though that may be the probe rather than the sim.
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-junction-rhr` · C · minor** — The analogue dial in the instrument cluster carries tick marks but no numerals at all; the only readable speed is the digital figure beside it, so the dial is decoration rather than an instrument.
+  «4 км/ч»
+  `sc-junction-rhr/pc-right/04-t054s.png`
+- **`sc-junction-scan` · C · minor** — The car creeps at 13 км/ч with correct coast-and-brake behaviour, but the only mirror the driver has is the detached rectangular rear-view panel floating clear of the windscreen frame at the top right; there is no visible right-hand wing mirror at all in the PC cockpit.
+  `sc-junction-scan/pc-right/04-t207s.png`
+- **`sc-junction-scan` · G · minor** — Free observation: the briefing here is the best-written text in the chunk — step 5 explains the difference between «Убедих се» and «погледнах натам» — and it is exactly the sort of copy that deserves not to be covered by a mirror, a film and a keyboard panel.
+  «„Убедих се“ значи видях я и я пропуснах, не „погледнах натам“.»
+  `sc-junction-scan/pc-right/04-t207s.png`
+- **`sc-junction-stop` · C · minor** — The rear-proximity chip «Кола отзад · 2 м» is placed over the steering-wheel rim rather than in a mirror or an edge band, so a rear hazard is announced in the middle of the driver's hands.
+  «Кола отзад · 6 м»
+  `sc-junction-stop/pc-right/06-waited.png`
+- **`sc-jx-equal-left` · C · minor** — Cluster reads correctly (11 км/ч moving, 0 км/ч stopped, gear D) and the needle tracks it, so the car brakes and coasts plausibly; but the dial is still unnumbered and the 'Кола отзад · 13 м' chip is parked dead centre over the top edge of the instrument binnacle.
+  «Кола отзад · 13 м»
+  `sc-jx-equal-left/mobile-right/04-t039s.png`
+- **`sc-jx-priority-confidence` · C · minor** — Cluster is live and gear reads D, but the amber 'Кола отзад · 6 м' tailgater chip is drawn inside the cockpit on top of the steering wheel and the interior mirror — the exact place a driver would look to check the car behind is covered by the warning about the car behind.
+  «Кола отзад · 6 м»
+  `sc-jx-priority-confidence/pc-right/05-stopped.png`
+- **`sc-lane-change` · G · minor** — Free observation: the КОЛАН telltale glows red for the entire drive in every run of this lesson and no seatbelt fault is ever recorded, so the cockpit's only red warning light means nothing.
+  «КОЛАН»
+  `sc-lane-change/pc-wrong/04-t021s.png`
+- **`sc-merge-bus-pullout` · C · minor** — The car pulls away and holds 7–8 км/ч; over the whole captured run it never behaves like a car in traffic — no acceleration to town speed, no coasting, no braking event.
+  `sc-merge-bus-pullout/pc-right/07-end.png`
+- **`sc-merge-lane-end` · D · minor** — Two different speed numbers sit side by side at the bottom of the cockpit with no explanation: a red 50 sign glyph and the text 'РЕЖИМ Нормален ≤60 · знакът важи'. A learner cannot tell whether 50 or 60 is the number they are graded against.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-merge-lane-end/mobile-right/01-arrival.png`
+- **`sc-merge-lane-end` · C · minor** — The instrument cluster is a digital number plus a gear letter; the analogue dial beside it keeps its needle pinned at the same low-left angle whether the car reads 0 км/ч or 19 км/ч, so the only moving instrument in the cockpit does not move. No tachometer, no fuel, no odometer.
+  `sc-merge-lane-end/mobile-right/04-t115s.png`
+- **`sc-mv-uturn-ban` · C · minor** — Acceleration reads plausibly (0 → 59 км/ч on the wrong run, held at ~50 on the right run) and the speedo needle tracks the digits, but the cluster still offers no indicator telltale for briefing step 3 „Включи ляв мигач и премини във вътрешната лента“, and the wheel rim marker never leaves centre in any sampled frame.
+  «Огледай се, включи ляв мигач и премини във вътрешната лента, до осевата.»
+  `sc-mv-uturn-ban/pc-wrong/04-t032s.png`
+- **`sc-mv-uturn-ban` · F · minor** — The mid-drive teach card renders here as a dark plate with monospace text („От 220-ия метър маркировката се прекъсва…“) but in sc-park-gap-long the same component renders with a different corner radius and a wider plate, and on mobile the equivalent card is a cyan-on-black tooltip attached to the mirror. Three treatments of one component across the chunk.
+  «От 220-ия метър маркировката се прекъсва — забраната свършва. Оглеждаме се и минаваме във вътрешната лента.»
+  `sc-mv-uturn-ban/pc-right/04-t038s.png`
+- **`sc-mw-discipline` · G · minor** — PC: the „ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА“ transport bar with its scrubber, 0.25×/0.5×/1× chips and loop button is laid straight across the instrument cluster, covering the left half of the speedometer dial for the whole drive.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-mw-discipline/pc-right/04-t103s.png`
+- **`sc-mw-emergency-lane` · C · minor** — CROSS-LESSON: the cluster's only analogue dial carries no numerals, no unit, no redline and no label, and its right half is hidden behind the digital speed panel. Its needle does not track the digital number (6 км/ч sits further round the dial than 22 км/ч; 133 км/ч sits at the same angle as 22) — it is presumably a rev counter, but nothing on screen says so, so the learner cannot read it as anything.
+  «133 км/ч D»
+  `sc-mw-emergency-lane/mobile-wrong/04-t039s.png`
+- **`sc-ov-keep-right` · C · minor** — Cluster is live and the needle tracks (verified 0 км/ч vs 18 км/ч on consecutive frames), so acceleration reads plausibly, but the credited run peaked at 15 км/ч with 27 full stops over 225 s on a 50 road — the car never behaves like a car on a boulevard. The dial remains unnumbered.
+  `sc-ov-keep-right/mobile-right/04-t118s.png`
+- **`sc-ov-lane-keeping` · C · minor** — Cluster live, gear D, needle tracking — but the credited runs crawl the whole S-bend at ≤19 км/ч on a 50 road for nearly five minutes, so nothing in these frames demonstrates how the car behaves at a realistic cornering speed, which is the entire subject of the lesson.
+  `sc-ov-lane-keeping/mobile-right/04-t152s.png`
+- **`sc-ov-lane-keeping` · D · minor** — Three typefaces are on screen simultaneously: the app's rounded Cyrillic face in the sidebar and debrief, a monospace face in the in-world HUD chips and coach bubbles, and a pixel/bitmap face with a slashed zero in the instrument cluster. Nothing signals that they are the same product.
+  `sc-ov-lane-keeping/pc-right/01-arrival.png`
+- **`sc-ov-night-gap` · F · minor** — The cockpit interior, the guidance ribbons and the parked-car queue are pixel-identical to the daylight overtaking lessons with only a darkening filter over them — the night reads as the same scene dimmed rather than a different time of day.
+  `sc-ov-night-gap/mobile-right/04-t054s.png`
+- **`sc-park-van` · D · minor** — HUD pills collide with world signage: the 'ПРОЧЕТИ' / 'РАЗБРАХ' buttons sit on top of the parked-car row and immediately beside the world 20 km/h sign, and at 05-stopped the same sign is half-behind the floating mirror and clipped by the right screen edge.
+  «РАЗБРАХ»
+  `sc-park-van/mobile-right/05-stopped.png`
+- **`sc-park-van` · C · minor** — The analogue speedometer is decorative. It carries no numerals and the needle sits in almost the same place at 0, 11 and 18 km/h; every readable speed comes from the digital figure beside it. The car itself does accelerate and coast plausibly (0→17→4→9 km/h across the early frames), so the physics is fine and only the instrument is not.
+  «18 км/ч»
+  `sc-park-van/mobile-right/04-t028s.png`
+- **`sc-pe-night-unlit` · D · minor** — The ДЕМОНСТРАЦИЯ transport bar is parked on top of the instrument cluster on PC, covering the left half of the speedometer dial for the entire run.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-pe-night-unlit/pc-right/04-t043s.png`
+- **`sc-pe-night-unlit` · C · minor** — The speedometer face carries tick marks but no numerals, so the analogue dial cannot be read at all; only the digital '0 км/ч' readout is usable. The needle does track speed correctly (0 → lower-left, 59 → upper-left), and the car visibly accelerates and coasts, so the physics read fine.
+  «12 км/ч»
+  `sc-pe-night-unlit/pc-right/04-t043s.png`
+- **`sc-pk-busstop-ban` · C · minor** — The car holds 11 км/ч for most of the run and drops to 6 км/ч for the stop; there is no acceleration phase, no coasting and no perceptible brake pitch, so the drive never feels like a car — and the analogue dial needle never moves off its rest angle.
+  `sc-pk-busstop-ban/pc-right/04-t146s.png`
+- **`sc-pk-double-park` · C · minor** — Speed builds and decays plausibly (0 → 10 → 3 km/h across the row) and the D/P gear letter tracks, but the cockpit still shows no rev counter, no indicator telltale and no brake-light feedback; the wheel rim marker sits dead centre in every mobile frame sampled, including while threading the single-car gap.
+  `sc-pk-double-park/mobile-right/04-t102s.png`
+- **`sc-pk-driveway` · C · minor** — The КОЛАН (seatbelt) telltale on the desktop dash goes red part-way through the drive with nothing on screen saying why or what to press; the speedometer needle also barely moves while the digital readout swings 0–11 км/ч, so the analogue dial and the digits disagree.
+  `sc-pk-driveway/pc-right/04-t028s.png`
+- **`sc-pk-driveway` · G · minor** — A run that ends НЕИЗДЪРЖАН with two dangerous errors still pays +40 XP, and the ДЕМОНСТРАЦИЯ scrub bar (ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА, 0:17 / 0:21) sits permanently across the left half of the dashboard, hiding the tachometer area during the drive it is supposed to be teaching.
+  «+40 XP»
+  `sc-pk-driveway/pc-right/04-t045s.png`
+- **`sc-pk-rail-ban` · C · minor** — Speed behaviour is credible (0 → 11 → 12 км/ч crawl through the ban zone) but there is no rail-specific cockpit feedback of any kind: no crossing telltale, no barrier state, no indicator lamp for briefing step 6's „подай десен мигач“.
+  `sc-pk-rail-ban/pc-right/04-t138s.png`
+- **`sc-pk-smooth-stop` · D · minor** — The cockpit control strip overflows its own width on desktop and needs ◀ ▶ carousel arrows: 'АВАР.' sits hard against the clipped right edge and the ГАЗ / СПИРАЧКА key hints that are visible on 01-arrival have vanished by t039s. The strip is also drawn semi-transparent over the 3D dashboard, so its captions sit on top of dashboard geometry.
+  «АВАР.»
+  `sc-pk-smooth-stop/pc-right/04-t039s.png`
+- **`sc-rb-exit-signal` · C · minor** — The car does behave like a car in the speed trace — it accelerates smoothly, coasts and brakes (0→21→3→13→8 км/ч over the first 30 s) — but there is no visible pitch under braking, no body roll in the roundabout, no steering-wheel rotation matching the turn (the rim stays level in every frame), and no brake or reverse lamp feedback from inside.
+  `sc-rb-exit-signal/mobile-right/04-t013s.png`
+- **`sc-turn-left-oncoming` · C · minor** — The car reads as a car in the ordinary case — it coasts, brakes and creeps at 11 км/ч with the wheel turned — but there is no visible indicator telltale anywhere in the cluster even though the briefing's step 2 is «пусни ляв мигач», so the student cannot confirm the indicator they were told to use.
+  «Пусни ляв мигач отрано и намали — завоят наляво се готви, не се импровизира.»
+  `sc-turn-left-oncoming/pc-right/04-t168s.png`
+- **`sc-vu-emergency` · G · minor** — The green „route to target“ stripe and the blue „shadow car path“ stripe are painted in different lanes — the green runs along the far left of the carriageway while the blue runs in the right-hand lane the student is told to hold. Two glowing guides pointing at two different lanes is a needless split of attention.
+  «синя — пътят на колата-сянка · зелена — маршрутът до целта»
+  `sc-vu-emergency/mobile-right/05-stopped.png`
+- **`sc-vu-emergency-junction` · C · minor** — The instrument cluster is a single dial carrying tick marks and no numerals whatsoever, plus a digital readout and a gear letter — no tachometer, fuel or temperature — floating as a flat rectangular panel above the column rather than sitting in a binnacle. Credit where due: the needle does track speed correctly (verified at 0, 7 and 59 км/ч crops) and the car accelerates, coasts and brakes plausibly.
+  `C:/Users/Ljh/AppData/Local/Temp/claude/E--AI-driver/8942546c-780e-450f-ae95-3aa94e28222a/scratchpad/cluster-59.png`
+- **`sc-vu-pass-clearance` · D · minor** — The task string is rendered twice, stacked, in the same corner: once as the ЗАДАЧА chip and again verbatim inside a teal-outlined toast directly beneath it, both drawn over the rear-view mirror inset, each with its own ✕ button. Two dismiss controls for one message.
+  «Продължи до края на отсечката»
+  `C:/Users/Ljh/AppData/Local/Temp/claude/E--AI-driver/8942546c-780e-450f-ae95-3aa94e28222a/scratchpad/pc-mirror-chip.png`
+
+---
+
+## U6 — Text laid on glass with no plate behind it · 53 findings (4 major, 49 minor)
+
+- **`sc-ov-oneway` · D · major** — The ПРОЧЕТИ and РАЗБРАХ pills are drawn exactly on top of the 50 km/h sign standing in the world at the arrival frame — the one sign the bottom bar tells the student to obey ('знакът важи') is the one the HUD covers.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-ov-oneway/mobile-right/01-arrival.png`
+- **`sc-sig-controller-live` · D · major** — The opening briefing peek shows three lines of a 962-character text and hides the rest behind '↓ ОЩЕ 35 РЕДА'. Thirty-five hidden lines is not a peek, it is the whole lesson.
+  «↓ ОЩЕ 35 РЕДА»
+  `sc-sig-controller-live/mobile-right/01-arrival.png`
+- **`sc-signal-controller` · D · major** — An unexplained transparent blue car sits in the driving lane just short of the stop line from t022s through 06-waited and never moves. Nothing in the HUD, the briefing or any legend says what it is. It is directly between the driver and the officer, so it partly occludes the thing the lesson is about.
+  `sc-signal-controller/mobile-right/06-waited.png`
+- **`sc-signal-controller` · D · major** — The why-panel truncates exactly when there is time to read it. At t053s the car is stationary at 0 км/ч with the handbrake of a red phase and the panel shows four lines plus '↓ ОЩЕ 13 РЕДА'; at t058s '↓ ОЩЕ 8 РЕДА'; at t076s '↓ ОЩЕ 6 РЕДА'; the opening briefing peek says '↓ ОЩЕ 34 РЕДА'. The one moment the student has nothing else to do is the moment the explanation is hidden behind a tap.
+  «↓ ОЩЕ 13 РЕДА»
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-ac-aquaplane` · D · minor** — The mobile briefing modal promotes item 1 to an unnumbered headline and then starts the visible list at „2.“, so the phone reader sees a list that begins at two. PC shows the same content correctly numbered 1–8.
+  «2. Помни: знакът извън града е 90, но дъждът сваля разумната скорост.»
+  `sc-ac-aquaplane/mobile-wrong/02-briefing.png`
+- **`sc-ac-rain-lights` · D · minor** — The in-world «Карай дотук» plate is set so small on mobile that its second line is illegible at native resolution, and it is placed where a parked van cuts across it.
+  «Карай дотук»
+  `sc-ac-rain-lights/mobile-right/04-t105s.png`
+- **`sc-crossing-bus-shadow` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-crossing-bus-shadow/mobile-right/08-debrief.png`
+- **`sc-crossing-child-ball` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-crossing-child-ball/mobile-right/08-debrief.png`
+- **`sc-crossing-white-cane` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-crossing-white-cane/mobile-right/08-debrief.png`
+- **`sc-ed-d2-city-run` · D · minor** — On mobile the current task counter („Задача 2/4“) lives only inside the ⚙ МЕНЮ sheet — it is nowhere on the driving HUD, so a phone student cannot see which task he is on without pausing.
+  «Задача 2/4»
+  `sc-ed-d2-city-run/mobile-right/07b-menu.png`
+- **`sc-follow-tailgater` · G · minor** — The teach card explains the failure to reach a task by speed, in a clear and well-written way, but it is the same 'НАУЧИ' surface as the fault cards and uses the same colours, so a student cannot tell from the card whether he has been penalised or merely coached.
+  «Стигна точката, но твърде бързо — Задачата иска да си тук с не повече от 41 км/ч, а в момента караш 59 км/ч — затова още не се отчита.»
+  `sc-follow-tailgater/pc-wrong/04-t017s.png`
+- **`sc-hazard-obstacle` · D · minor** — On desktop the debrief content pane is clipped to roughly 640 px of a 900 px viewport with its own inner scrollbar, leaving a dead black band across the bottom fifth of the page. The «Оценка на маневрата» card is cut mid-sentence at the clip line on every debrief frame in this chunk.
+  «Не са наказателни точки по Наредба № 38 и не са»
+  `sc-hazard-obstacle/pc-right/08-debrief.png`
+- **`sc-hz-accident-scene` · G · minor** — A large dark polygon and a detached wheel-shaped blob intersect the lower-left windscreen on the reckless run with no object they belong to, and the ИНСТРУКЦИИ panel truncates step 4 mid-word at «Някой може да пристъпи към платното; краком».
+  «Някой може да пристъпи към платното; краком»
+  `sc-hz-accident-scene/pc-wrong/04-t012s.png`
+- **`sc-hz-breakdown-pulloff` · G · minor** — The ИНСТРУКЦИИ panel truncates step 5 mid-word at «…изчакване зад мантинелата и обаждане», cutting off the emergency protocol — hazard lights, vest before you get out, triangle at 100 m, wait behind the barrier — which is the substance the lesson title («протоколът») promises.
+  «Оттук нататък протоколът е пеша: аварийни светлини, жилетка ПРЕДИ да слезеш, триъгълник на 100 м зад колата, изчакване зад мантинелата и обаждане»
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-hz-emergency-stop` · D · minor** — The desktop ИНСТРУКЦИИ panel clips step 4 mid-sentence at «…това е ABS, който работи. НЕ» with no scrollbar, fade or more-affordance. The cut-off half is the instruction on what NOT to do during the emergency stop.
+  «Педалът ще вибрира и ще пука под крака ти — това е ABS, който работи. НЕ»
+  `sc-hz-emergency-stop/pc-right/04-t098s.png`
+- **`sc-junction-blind` · D · minor** — The briefing modal renders step 1 as an unnumbered lede paragraph and then steps 2–5 as a numbered list, so the student sees a numbered list that visibly starts at '2.'
+  «2. Намали много отрано и пусни ляв мигач»
+  `sc-junction-blind/mobile-right/02-briefing.png`
+- **`sc-junction-rhr` · G · minor** — The debrief card is taller than the fixed-height play area and is clipped at the bottom mid-row, while roughly 200 px of dead black page sits unused below the container.
+  «Второстепенни грешки (по 1 изпитна т.)»
+  `sc-junction-rhr/pc-right/08-debrief.png`
+- **`sc-jx-priority-confidence` · G · minor** — The headline '0 наказателни точки' is rendered GREEN on the passed run and RED on the failed run — the same number, the perfect score, in the fail colour, with no legend. And the mobile debrief page is clipped at the top: the 'Докосни „▾ Скрий разбора“…' row is cut off above the viewport edge.
+  «0 наказателни точки»
+  `sc-jx-priority-confidence/mobile-wrong/08-debrief.png`
+- **`sc-ln-boulevard-discipline` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-ln-boulevard-discipline/mobile-right/08-debrief.png`
+- **`sc-ln-obstacle-meeting` · G · minor** — The briefing is 36 further lines long behind a ОЩЕ 36 РЕДА counter, delivered before a seventeen-year-old is allowed to touch the controls. Nothing in the lesson enforces or rewards having read it.
+  «↓ ОЩЕ 36 РЕДА»
+  `sc-ln-obstacle-meeting/mobile-right/01-arrival.png`
+- **`sc-merge-lane-end` · G · minor** — The mobile debrief opens scrolled past its own header: the row 'Докосни „▾ Скрий разбора“, за да пропуснеш разбора' and the 'Не показвай автоматично' pill are sliced in half by the top edge of the viewport, so the control that skips the debrief is unreadable and only half-tappable.
+  «Докосни „▾ Скрий разбора“, за да пропуснеш разбора»
+  `sc-merge-lane-end/mobile-right/08-debrief.png`
+- **`sc-ov-night-gap` · D · minor** — At night the teal guidance ring around the lead car blooms into a large glowing pool that washes across the whole carriageway and the verge, drowning the darkness the lesson depends on.
+  `sc-ov-night-gap/mobile-wrong/04-t044s.png`
+- **`sc-ov-oncoming-gap` · D · minor** — Three different speed numbers compete on one screen: the red 90 sign chip, «РЕЖИМ Нормален ≤100» beside it, and the world waypoint reading «не по-бързо от 50 км/ч». Nothing tells the learner which one is binding.
+  «Карай дотук · не по-бързо от 50 км/ч»
+  `sc-ov-oncoming-gap/pc-right/04-t060s.png`
+- **`sc-ov-solid-line` · G · minor** — One thing that works well and should be protected: when the wrong drive reaches the waypoint too fast the coach says exactly why, with both numbers — 'Задачата иска да си тук с не повече от 55 км/ч, а в момента караш 59 км/ч — затова още не се отчита. Намали СЕГА'. That is the virtual-instructor standard; almost nothing else in this chunk reaches it.
+  «Стигна точката, но твърде бързо — Задачата иска да си тук с не повече от 55 км/ч, а в момента караш 59 км/ч»
+  `sc-ov-solid-line/mobile-wrong/04-t022s.png`
+- **`sc-ov-solid-return` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-ov-solid-return/mobile-right/08-debrief.png`
+- **`sc-park-45-rev` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-park-45-rev/mobile-right/08-debrief.png`
+- **`sc-park-left` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-park-left/mobile-right/08-debrief.png`
+- **`sc-park-night` · D · minor** — Same counter defect as sc-park-van with a different number: '↓ ОЩЕ 19 РЕДА' on a briefing of eight steps, and the numbered list again starts at '2.' because step 1 has been promoted to the headline.
+  «↓ ОЩЕ 19 РЕДА»
+  `sc-park-night/mobile-right/01-arrival.png`
+- **`sc-park-van` · D · minor** — The collapsed instruction card offers '↓ ОЩЕ 17 РЕДА' for a briefing that has eight numbered steps. The number counts wrapped text rows, not instructions, so it promises seventeen more things when there are seven.
+  «↓ ОЩЕ 17 РЕДА»
+  `sc-park-van/mobile-right/01-arrival.png`
+- **`sc-park-van` · D · minor** — The briefing list starts at '2.' — step 1 is promoted to an unnumbered headline, so the numbered list visibly begins mid-sequence and looks like a missing first item.
+  «2. Дръж около метър и половина странично от реда.»
+  `sc-park-van/mobile-right/02-briefing.png`
+- **`sc-park-wall` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-park-wall/mobile-right/08-debrief.png`
+- **`sc-park-zebra` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-park-zebra/mobile-right/08-debrief.png`
+- **`sc-pe-jaywalker` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-pe-jaywalker/mobile-right/08-debrief.png`
+- **`sc-pe-night-unlit` · D · minor** — The task chip and the toast directly beneath it print the identical sentence, stacked, in two different type sizes — 'ЗАДАЧА 1/3 Приближи неосветената пътека със скорост за видимостта' above 'Приближи неосветената пътека със скорост за видимостта — дръж под 35 км/ч'. The chip is also partly covered by the toast card.
+  «ЗАДАЧА 1/3 Приближи неосветената пътека със скорост за видимостта»
+  `sc-pe-night-unlit/pc-right/01-arrival.png`
+- **`sc-pe-parked-row-scan` · D · minor** — Same mobile advisor-card truncation as sc-pe-night-unlit — the card cuts at 'ориентировъчното време на' and offers '↓ ОЩЕ 6 РЕДА', with the mini-map video bleeding through the translucent text. It is the same card and the same failure in two different lessons.
+  «↓ ОЩЕ 6 РЕДА»
+  `sc-pe-parked-row-scan/mobile-right/04-t039s.png`
+- **`sc-pe-school-patrol` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-pe-school-patrol/mobile-right/08-debrief.png`
+- **`sc-pk-driveway` · D · minor** — The «Клавиши · за напреднали» panel on desktop has no background fill — overhead power lines and a lamp post read straight through its text, and the last row orphans the letter D onto a line of its own («скорости: към P / към / D»).
+  «скорости: към P / към D»
+  `sc-pk-driveway/pc-right/01-arrival.png`
+- **`sc-pk-move-off` · D · minor** — The inline briefing panel promises 12 further lines for a briefing that contains 5 numbered items, and cuts its second item mid-word.
+  «↓ ОЩЕ 12 РЕДА»
+  `sc-pk-move-off/mobile-right/01-arrival.png`
+- **`sc-pk-stop-vs-park` · D · minor** — Two typefaces inside one panel: the first paragraph of ИНСТРУКЦИИ renders in the monospace HUD face, lines 2+ render in the rounded script face used by the debrief. The same split shows in the mid-drive teach cards (mono heading, script body).
+  «Потегли по улицата. С теб пътува приятел, който слиза тук — а после трябва да оставиш колата някъде и ти.»
+  `sc-pk-stop-vs-park/mobile-right/01-arrival.png`
+- **`sc-pk-stop-vs-park` · F · minor** — The same briefing component renders two different ways inside one lesson: on mobile 02-briefing it is a full-width modal with a single blue „Разбрах“ button and all lines visible, but on 01-arrival and 07-end it is a small clipped top-right card with „ПРОЧЕТИ / РАЗБРАХ“ and 23 hidden lines. Same content, two layouts, same session.
+  `sc-pk-stop-vs-park/mobile-right/01-arrival.png`
+- **`sc-rb-busy-gap` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-rb-busy-gap/mobile-right/08-debrief.png`
+- **`sc-rb-circulate-priority` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-rb-circulate-priority/mobile-right/08-debrief.png`
+- **`sc-rb-lane-choice` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-rb-lane-choice/mobile-right/08-debrief.png`
+- **`sc-rb-ped-exit` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-rb-ped-exit/mobile-right/08-debrief.png`
+- **`sc-rx-barrier-drop` · D · minor** — Same transparent «Клавиши · за напреднали» panel as the other desktop lanes — overhead cables and a lamp post read through the key legends — and the ДЕМОНСТРАЦИЯ scrub bar (0:22 / 1:24) covers the left half of the dashboard from the first frame.
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-sig-controller-postures` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-sig-controller-postures/mobile-right/08-debrief.png`
+- **`sc-signal-dead` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-signal-dead/mobile-right/08-debrief.png`
+- **`sc-signal-hesitation` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-signal-hesitation/mobile-right/08-debrief.png`
+- **`sc-speed-creep` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-speed-creep/mobile-right/08-debrief.png`
+- **`sc-speed-dangerous` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-speed-dangerous/mobile-right/08-debrief.png`
+- **`sc-speed-rain` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-speed-rain/mobile-right/08-debrief.png`
+- **`sc-speed-zone` · D · minor** — Typeface soup and unexplained symbols: the task chip and «МЕНЮ» are set in a monospace face, the teach-card body in a rounded humanist, the cluster in a condensed sans and the world billboards in a fourth; the blue and green guidance ribbons painted on the road have a legend on pc («синя — пътят на колата-сянка, зелена — маршрутът до целта») and NO legend at all on mobile; a tall green light column stands over the goal with nothing naming it. The debrief's top row («Докосни „▾ Скрий разбора“…») is clipped by the viewport edge on every mobile debrief.
+  `sc-speed-zone/mobile-right/08-debrief.png`
+- **`sc-vp-telltale` · D · minor** — The task instruction asks the student to hold under 4 km/h, an oddly precise near-stationary figure presented without explanation of why 4 is the threshold.
+  «дръж под 4 км/ч»
+  `sc-vp-telltale/pc-right/04-t063s.png`
+
+---
+
+## U4 — A world built from boxes · 37 findings (8 major, 29 minor)
+
+- **`sc-ac-aquaplane` · D · major** — The „Клавиши · за напреднали“ shortcut panel is expanded by default on PC and stays open for the entire drive, covering roughly a fifth of the windscreen top-left including the left mirror area. Its low-contrast blue-on-scene text is unreadable over the road and buildings.
+  «Клавиши · за напреднали»
+  `sc-ac-aquaplane/pc-right/04-t103s.png`
+- **`sc-fo-motorway-gap` · B · major** — A motorway containing exactly one other vehicle for the entire run: no gantries, no direction signs, no crash barrier, no distance markers, no second carriageway, no ambient traffic. The verge is flat green with a handful of identical low-poly trees. Nothing about it reads as a Bulgarian motorway.
+  `sc-fo-motorway-gap/mobile-wrong/04-t087s.png`
+- **`sc-hz-accident-scene` · B · major** — The bystanders at the crash scene are featureless capsules — a plain coloured cylinder for the body and a bare beige sphere for the head, with no arms, legs, face or pose. At t092 one fills the whole windscreen at that fidelity. The briefing also promises «смачкани коли» while the bodies present read as intact saloons parked slightly askew, and no ambulance appears despite the coach announcing one behind.
+  «Напред вдясно има прясна катастрофа — смачкани коли и хора около тях, изял е половината от твоята лента.»
+  `sc-hz-accident-scene/pc-right/04-t092s.png`
+- **`sc-hz-breakdown-pulloff` · B · major** — The motorway is completely empty for the whole run — no other vehicle at any point on either platform — while the coach refers to «потокът отляво остава чист», traffic that never exists. There is also no visible hard shoulder marking at the point the lesson asks the student to cross into one.
+  «потокът отляво остава чист»
+  `sc-hz-breakdown-pulloff/pc-right/04-t124s.png`
+- **`sc-mw-emergency-lane` · G · major** — FREE OBSERVATION, PC layout: at the arrival frame the play area is roughly half covered by chrome — keyboard-help panel (its text clipped mid-line, with a stray orphan '0' on its own row), ИНСТРУКЦИИ panel over the right third, the duplicated ЗАДАЧА chip written across the mirror, a subtitle box over the bonnet, the ДЕМОНСТРАЦИЯ transport bar across the instrument cluster, and a stack of empty grey СПИРАЧКА/ГАЗ boxes floating over the bottom-right of the cockpit next to a large black void where the passenger side should be.
+  «Клавиши · за напреднали … скорости: към Р / към»
+  `sc-ov-oneway/pc-right/01-arrival.png`
+- **`sc-pe-parked-row-scan` · B · major** — The demo 'shadow' car is a large translucent blue vehicle that the camera drives straight through: at t050s it fills the whole lower half of the windscreen as a blue glassy mass, and on mobile at t039s it is parked squarely on the zebra crossing the student is being graded against. Its tail lamps also render magenta-pink rather than red.
+  `sc-pe-parked-row-scan/mobile-right/04-t039s.png`
+- **`sc-vp-police-stop` · B · major** — A large warning billboard hovers unsupported above the carriageway with a speech-bubble tail pointing down at the officer. Its body text is a blur of coloured lines at any distance a driver would read it from, so it adds visual noise without communicating anything.
+  «ВНИМАНИЕ»
+  `sc-vp-police-stop/mobile-right/04-t071s.png`
+- **`sc-vp-police-stop` · B · major** — The officer is the only human being in the entire city. Every other pavement across the whole drive is empty, which makes him read as a game token rather than a person standing in traffic.
+  `sc-vp-police-stop/mobile-right/04-t071s.png`
+- **`sc-ac-bridge-ice` · D · minor** — The green route ribbon („зелена — маршрутът до целта“) is painted along the left kerb outside the driving lane while the blue shadow line runs down the right lane, so the two guidance rails point at different parts of the road.
+  «зелена — маршрутът до целта»
+  `sc-ac-bridge-ice/mobile-right/04-t076s.png`
+- **`sc-ac-wet-braking` · D · minor** — The in-world «Спри тук / спре — под 6 км/ч» plate on mobile is rendered at a fraction of the size of every other piece of type on screen and is placed against a building facade, so the stopping instruction is the least legible text in the frame.
+  «Спри тук»
+  `sc-ac-wet-braking/mobile-right/04-t183s.png`
+- **`sc-ed-d2-priority-run` · G · minor** — On mobile a lamp post and a tree trunk stand at the very lip of the carriageway and the tree fills the driver's forward view; beside them a bare green field runs to the horizon where the district should be.
+  `sc-ed-d2-priority-run/mobile-right/04-t150s.png`
+- **`sc-ed-d2-stop-address` · G · minor** — Free observation: the mode strip claims 'режим Нормален ≤80 · знакът важи' on a street the briefing describes as residential with a 50 limit. Telling a learner the cap is 80 there teaches the wrong instinct even though the sign is said to win.
+  «режим Нормален ≤80 · знакът важи»
+  `sc-ed-d2-stop-address/pc-right/04-t129s.png`
+- **`sc-ed-poligon-chain` · G · minor** — Free observation: a lesson called 'Полигонът на един дъх' runs on a public street with a 30 sign and a ≤50 mode cap. A polygon has no speed limit signs; the framing tells the student he is somewhere he is not.
+  «РЕЖИМ Нормален ≤50 · знакът важи»
+  `sc-ed-poligon-chain/mobile-right/04-t155s.png`
+- **`sc-follow-distance` · B · minor** — The kerbside is the same handful of low-poly car meshes repeated nose to tail down the whole street; buildings are flat prisms with painted-on window grids and no doors, signage or ground-floor detail.
+  `sc-follow-distance/pc-right/04-t047s.png`
+- **`sc-junction-blind` · G · minor** — The ЗАДАЧА chip and the demonstration picture-in-picture claim the same top-right rectangle, so live white task text is rendered over a moving video of a street. On the PC debrief the result card is clipped by its fixed-height container mid-table with a large empty black area below it.
+  «Общо (допустими 9)»
+  `sc-junction-blind/pc-right/08-debrief.png`
+- **`sc-junction-rhr` · B · minor** — The 40 km/h speed-limit disc at the arrival point is half-swallowed by a tree canopy — the sign geometry and the foliage geometry interpenetrate.
+  `sc-junction-rhr/pc-right/01-arrival.png`
+- **`sc-junction-stop` · G · minor** — Free observation: the cockpit speed chip reads «РЕЖИМ Нормален ≤60 · знакът важи» in this lesson but «≤50» in sc-junction-rhr, with no explanation of what changes the cap between two Ниво 1 lessons on similar streets.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-junction-stop/pc-right/01-arrival.png`
+- **`sc-jx-blocked-exit` · G · minor** — The pre-result 'Позна ли се?' self-assessment appears before the debrief with an unlabelled empty number box, and it sits alone on an otherwise blank page with a very large black void beneath it on a 1440x900 desktop.
+  «Позна ли се?»
+  `sc-jx-blocked-exit/pc-right/07-end.png`
+- **`sc-ov-abort` · F · minor** — sc-ov-abort opens on a stretch visually identical to sc-ov-oncoming-gap and sc-ov-return-gap — same buildings, same road, same parked queue in the same positions. Three different lessons do not read as three different places.
+  `sc-ov-abort/pc-right/01-arrival.png`
+- **`sc-ov-narrow` · B · minor** — The briefing calls the street 'тясна и двупосочна' but the world shows a wide, generously marked two-lane road; the narrowing exists only because a row of parked cars is standing in the right lane. Nothing about the street reads as narrow.
+  «Улицата е тясна и двупосочна. Напред паркиран ред заема твоята лента»
+  `sc-ov-narrow/mobile-right/01-arrival.png`
+- **`sc-ov-oneway` · A · minor** — The one-way street itself carries a blue square with an up arrow (Г1 'движение само направо'). The Д1 'Еднопосочен път' sign that the lesson is named after is never shown anywhere, so the student never sees the sign he must recognise on a real street.
+  «Еднопосочна улица · Ниво 1 — Пълна помощ»
+  `sc-ov-oneway/mobile-right/04-t122s.png`
+- **`sc-ov-return-gap` · F · minor** — Identical stretch of road, identical parked queue and identical building at arrival as sc-ov-abort and sc-ov-oncoming-gap; only the briefing text distinguishes the three lessons.
+  `sc-ov-return-gap/mobile-right/02-briefing.png`
+- **`sc-park-bay-exit-rev` · F · minor** — This lesson's mobile speed roundel reads 20 while the street lessons in the same chunk read 50, yet the mode strip in both cases says „Нормален ≤50“ / „≤60“ — the pair of numbers changes meaning between lessons with no visual cue that it has.
+  «20 | РЕЖИМ Нормален ≤50 · знакът важи»
+  `sc-park-bay-exit-rev/mobile-right/04-t027s.png`
+- **`sc-pe-night-unlit` · D · minor** — The 'Клавиши · за напреднали' key-help panel sits over the windscreen for the whole drive at ~20% of the play area, is translucent so the street shows through its text, its content wraps badly ('скорости: към P / към' then a lone 'D' on the next line), and its 'Всички клавиши (+11)' row overlaps the route-colour legend beneath it.
+  «скорости: към P / към D»
+  `sc-pe-night-unlit/pc-right/04-t022s.png`
+- **`sc-pe-parked-row-scan` · B · minor** — The parked row that gives the lesson its name is a handful of low-poly bodies repeated down the kerb, each with wheels floating clear of the arches, and every pavement in the shot is empty of people. The street behind is a flat wall of boxes with pasted window rectangles and no cast shadows.
+  `sc-pe-parked-row-scan/pc-right/05-stopped.png`
+- **`sc-pk-busstop-ban` · F · minor** — XP is inconsistent with the verdict across the chunk: a passed run here awards +150 XP, while five failed runs elsewhere (lane-end, roadworks-shift, from-property) each award +40 XP on a card stamped НЕИЗДЪРЖАН, and the aborted bus-pullout and motorway-exit runs award no XP badge at all. Three different XP behaviours for the same failure state.
+  «+150 XP»
+  `sc-pk-busstop-ban/pc-right/08-debrief.png`
+- **`sc-pk-double-park` · D · minor** — The „Клавиши · за напреднали“ keyboard-help panel is expanded by default over the top-left quarter of the windscreen for the entire drive, semi-transparent so the buildings show through the letters and neither the text nor the street is cleanly legible.
+  «Клавиши · за напреднали»
+  `sc-pk-double-park/pc-right/04-t100s.png`
+- **`sc-pk-stop-vs-park` · G · minor** — 01-arrival is captured over an unloaded world — flat olive ground plane and haze, no street, no buildings — while the briefing card and all cockpit controls are already drawn on top. A first-time student's very first frame of the product is an empty field.
+  `sc-pk-stop-vs-park/mobile-right/01-arrival.png`
+- **`sc-rb-exit-signal` · D · minor** — Three typefaces on one screen with no system: a wide monospace for the overlay cards and buttons («ИНСТРУКЦИИ», «ПРОЧЕТИ», «↓ ОЩЕ 24 РЕДА»), a Bulgarian-italic humanist for briefing and debrief body copy, and a plain proportional sans for the status bar. The «⚠ КОЛАН» seatbelt disc is also parked on top of the parked-car row rather than in a control zone.
+  «РЕЖИМ Нормален ≤50 · знакът важи»
+  `sc-rb-exit-signal/mobile-right/01-arrival.png`
+- **`sc-rb-exit-signal` · F · minor** — Consistency against sc-signal-flashing: identical HUD chrome, identical teach overlay, identical clipping defect, identical translucent ghost vehicle and teal waypoint beacon — good. What differs is the world density: this roundabout district is bare grass, box blocks and static parked rows, while the flashing-amber boulevard has bins, benches, a bus shelter, railings, trees and moving traffic. The same city renders as two different production standards.
+  `sc-rb-exit-signal/mobile-right/04-t045s.png`
+- **`sc-roundabout-entry` · C · minor** — Instruments behave (12 км/ч on mobile, needle tracking, gear D) but the car climbs a kerb onto a grass island with no jolt, no tyre change, no loss of grip and no telltale — nothing in the cockpit registers leaving the road.
+  `sc-roundabout-entry/mobile-right/04-t062s.png`
+- **`sc-rx-barrier-drop` · B · minor** — The barrier and the А34 sign are so far off — beyond a five-storey block, past a dozen parked cars and half-lost in the haze — that at arrival neither is identifiable as level-crossing furniture without zooming. The crossing the lesson is named after is not legible from the driving position at the start.
+  `sc-rx-barrier-drop/pc-right/01-arrival.png`
+- **`sc-signal-controller` · B · minor** — The officer has no legs. Below the torso he is a single dark cylinder, so at approach distance he reads as a bollard or a parking post rather than a person - which is exactly how he looks in the frames where the student is meant to spot him.
+  `sc-signal-controller/mobile-right/04-t053s.png`
+- **`sc-signal-response` · C · minor** — The lead car ahead shows brake lights while stopped at the red and the ego car coasts and stops smoothly, so the vehicle feel reads correctly; but the signal head itself is a small dark box with a single lit lens and no housing detail, hood or backboard, so at distance the colour is the only cue.
+  `sc-signal-response/pc-right/06-waited.png`
+- **`sc-sp-curve` · G · minor** — Free observation, in the lesson's favour: ADR-001 is respected — every vehicle in every frame is a generic unbranded low-poly shape with no badge, grille or model geometry that could be read as a real marque, and the map credit line © OpenStreetMap contributors is present on both platforms. Also noted: the cockpit limit chip correctly switches from white to amber when the car is over the posted limit (mobile-wrong t=024s), which is a genuinely good touch.
+  `sc-sp-curve/mobile-wrong/04-t024s.png`
+- **`sc-sp-eco-coast` · D · minor** — PC: the „Клавиши · за напреднали“ helper panel is a low-contrast monospace block sitting directly on the 3D world; its lines wrap badly („скорости: към P / към D“ breaks after „към“) and the world's buildings show straight through the text.
+  «скорости: към P / към D»
+  `sc-sp-eco-coast/pc-right/01-arrival.png`
+- **`sc-speed-transition` · G · minor** — Free observation. The PC Клавиши · за напреднали help panel is a near-transparent overlay whose text lands directly on lit building facades — on several frames the glyphs are half-erased and the last line wraps to a stranded lone D. It is docked open for the entire drive with no visible way to collapse it.
+  «скорости: към Р / към»
+  `sc-speed-transition/pc-right/01-arrival.png`
+
+---
+
+## U14 — Free observation — found by looking, filed by nobody · 35 findings (0 major, 24 minor)
+
+- **`sc-ac-crosswind` · G · minor** — Nothing else to add for this lesson beyond the parts above — stated explicitly rather than left blank. The one genuinely good thing worth protecting across all seven: the debrief's separation of наказателни точки по Наредба № 38 from the simulator's own 0-2 «Оценка на маневрата» stars, with the plain-language warning that the two scales run in opposite directions, is clear and honest and should survive any rework.
+  «оценка на симулатора — не е закон»
+  `sc-ac-crosswind/pc-right/08-debrief.png`
+- **`sc-ac-night-lights` · G · minor** — The 07-end self-estimate gate («Позна ли се?» — predict your own penalty points before seeing the protocol) is the strongest teaching idea in the whole flow, but it is wasted here: both the right and the wrong run score exactly 0 наказателни точки, so the student who answers 0 is told they were right after driving the entire lesson unlit.
+  «Позна ли се?»
+  `sc-ac-night-lights/pc-right/07-end.png`
+- **`sc-ed-reverse-line` · G · minor** — Free observation: the debrief tells the interrupted wrong run 'Урокът беше прекъснат преди края' in the same yellow tone used for encouragement, directly above a 100-point failure. Tone and verdict pull in opposite directions.
+  «Урокът беше прекъснат преди края.»
+  `sc-ed-reverse-line/pc-wrong/08-debrief.png`
+- **`sc-follow-cutin` · G · minor** — This lesson pays +150 XP, half again what the other following lessons pay, for the run in which nothing happened.
+  «+150 XP»
+  `sc-follow-cutin/pc-right/08-debrief.png`
+- **`sc-follow-distance` · G · minor** — A drive that ends in НЕИЗДЪРЖАН with four dangerous errors and a crash still hands out +40 XP with the same visual weight as the pass reward.
+  «+40 XP»
+  `sc-follow-distance/pc-wrong/08-debrief.png`
+- **`sc-hz-emergency-stop` · G · minor** — The briefing insists the drive be stabilised at 50 км/ч, and the assisted level caps the car at 15-22 км/ч for the whole exercise while the objective «Мини участъка с разрешената скорост» ticks anyway. Nothing tells the student that the speed the briefing asked for was never reached.
+  «Потегли и се стабилизирай на 50 км/ч — днес не се учим да караме бавно „за всеки случай“, а да спираме, когато потрябва.»
+  `sc-hz-emergency-stop/pc-right/04-t093s.png`
+- **`sc-junction-gap` · G · minor** — Free observation: the capture step named 07b-menu records the ordinary drive view with no menu open, so the one frame meant to prove the in-drive menu works proves nothing. Worth checking whether the menu opens at all on PC.
+  `sc-junction-gap/pc-right/07b-menu.png`
+- **`sc-junction-left` · G · minor** — The demonstration shadow car renders as a solid, saturated blue vehicle sitting in the live carriageway. A beginner has no way to tell it from real traffic — it is the thing you are told to follow, drawn like the thing you must not hit.
+  «синя — пътят на колата-сянка»
+  `sc-junction-left/pc-right/06-waited.png`
+- **`sc-jx-giveway-b1` · G · minor** — Free observation, positive: the Б1 give-way triangle is genuinely placed in the world and legible at the second junction, and the briefing correctly distinguishes Б1 from Б2 in step 2 («Б1 не е „Спри!“»). The content is right; only the grading and the traffic release are not.
+  «Пътят с предимство е чист — минаваш плавно, БЕЗ да спираш. Б1 не е „Спри!“.»
+  `sc-jx-giveway-b1/pc-right/04-t108s.png`
+- **`sc-merge-roadworks-shift` · G · minor** — At the end frame the green route band peels off the carriageway to the left of the cone taper and runs onto the blue-tinted verge, so the guidance line points off the road at the exact moment the student is meant to merge.
+  `sc-merge-roadworks-shift/mobile-wrong/07-end.png`
+- **`sc-mw-min-speed` · G · minor** — The run folder carries two sign-in refusal logs (log-signin-refused-1.txt, log-signin-refused-2.txt) alongside the successful attempt, so the harness needed three tries to get into the lesson.
+  `sc-mw-min-speed/mobile-right/log-signin-refused-1.txt`
+- **`sc-ov-being-overtaken` · G · minor** — Free observation: the pre-result calibration gate «Позна ли се?» asks the student to predict their own penalty points before the protocol — a genuinely good instructional idea that is undermined here, because the answer it grades against is a fabricated fail with no findings behind it.
+  «Преди да видиш протокола: колко наказателни точки мислиш, че направи в това каране?»
+  `sc-ov-being-overtaken/pc-wrong/07-end.png`
+- **`sc-ov-keep-right` · G · minor** — Both PC folders carry a 'log-signin-refused-1.txt' alongside the normal log, meaning the harness hit a refused sign-in before this lesson recorded — worth checking that the captured session is the one intended. Otherwise nothing further beyond what is listed above.
+  `sc-ov-keep-right/pc-right/07-end.png`
+- **`sc-park-van` · G · minor** — The debrief reports 'Ориентировъчно време — 96 с — в ориентира от 100 с' as a satisfied benchmark on a run that never entered the bay at all. A time-within-par line on an unattempted manoeuvre reads as partial credit for something that did not happen.
+  «Ориентировъчно време — 96 с — в ориентира от 100 с.»
+  `sc-park-van/mobile-right/08-debrief.png`
+- **`sc-pe-night-unlit` · G · minor** — The debrief opens scrolled to the top and the per-objective checklist — the one place that would say WHICH task was ticked — is below the fold in every captured frame; the visible card is cut mid-sentence at 'Не са наказателни точки по Наредба № 38 и не са'. Anyone auditing credit has to take the ИЗДЪРЖАН badge on trust.
+  «оценка на симулатора — не е закон»
+  `sc-pe-night-unlit/pc-right/08-debrief.png`
+- **`sc-pe-parked-row-scan` · G · minor** — Nothing else of note beyond the items above — the route ribbon, the target ring and the task chip all behaved coherently through this run, and the drive genuinely ended on task completion rather than on a timer.
+  `sc-pe-parked-row-scan/pc-right/07-end.png`
+- **`sc-pk-ban-stop` · G · minor** — Free observation: the В27 sign is rendered correctly (blue disc, red rim, red saltire) and stands on the correct side, so the world does match the briefing here — this is the one lesson in the chunk where sign, briefing and credit line up. Worth protecting as the reference implementation.
+  `sc-pk-ban-stop/pc-right/04-t012s.png`
+- **`sc-rb-exit-signal` · G · minor** — A run that scores 20 penalty points, two dangerous errors and an automatic fail still awards «+40 XP» — the identical XP the clean-but-incomplete run in the other lesson receives. The reward signal carries no information about the drive.
+  «+40 XP»
+  `sc-rb-exit-signal/mobile-right/08-debrief.png`
+- **`sc-roundabout-entry` · G · minor** — Free observation: the pre-debrief 'Позна ли се?' self-prediction gate is genuinely good teaching — it asks the student to guess his own penalty points before the protocol appears — and it is the one screen in this chunk that is clean, well spaced and free of collisions.
+  «Позна ли се?»
+  `sc-roundabout-entry/pc-right/07-end.png`
+- **`sc-rx-barrier-drop` · G · minor** — Free observation: the mobile-wrong log shows the briefing text was delivered as one unbroken run-on string with the numbered steps glued to the end of sentence one («…всеки момент може да тръгне надолу.2. Намали отрано.»), so on a phone the list loses its first line break before it is even scrolled.
+  «Бариерата е вдигната, но всеки момент може да тръгне надолу.2. Намали отрано.»
+  `sc-rx-barrier-drop/mobile-wrong/run.log`
+- **`sc-rx-tram-left` · G · minor** — Free observation from the log: the speed-limit badge reads 50 at 01-arrival and 40 at 02-briefing with the car stationary at 0 км/ч in both — the posted limit changes between two frames in which nothing moved.
+  «P0км/ч50 … D0км/ч40РежимНормален ≤60· знакът важи»
+  `sc-rx-tram-left/mobile-right/run.log`
+- **`sc-signal-flashing` · G · minor** — Free observation. What genuinely works and should be protected: the amber lamp really flashes (lit at t001, whole head dark at t002, all four approaches equipped); the give-way-to-the-right traffic really arrives; the world matches the briefing; the law citations are specific and correct in form; the lawful-wait coaching is excellent writing. What is off-book: both drives award an identical «+40 XP» regardless of a 0-point or 40-point outcome; the end-of-session flow costs two extra taps («Резултат» then a calibration gate «Пропусни») before the verdict; and the wrong drive's end frame shows the car still doing 59 км/ч when the session simply stops, which reads as the app giving up rather than the lesson concluding.
+  «Сесията завърши — първо се самооцени»
+  `sc-signal-flashing/mobile-wrong/07-end.png`
+- **`sc-signal-response` · G · minor** — Free observation: this is the only lane in the whole chunk that produced a green ИЗДЪРЖАН badge and a +100 XP award; every other correct drive in the chunk got +40 XP or none. Whatever this lesson does differently is the working reference for the other six.
+  «+100 XP»
+  `sc-signal-response/pc-right/08-debrief.png`
+- **`sc-vu-pass-clearance` · G · minor** — FREE OBSERVATION — the 'careful' reference drive holds 7–11 км/ч for over three minutes on a road posted 50 and is awarded ★★★. Combined with the finding above, both extremes of the speed envelope pass this lesson with a perfect score; there is no speed at which the student is told they were wrong.
+  `sc-vu-pass-clearance/mobile-right/04-t102s.png`
+- **`sc-ln-boulevard-discipline` · G · info** — Nothing beyond the shared findings.
+  `sc-ln-boulevard-discipline/mobile-right/04-t001s.png`
+- **`sc-ov-solid-return` · G · info** — Nothing beyond the shared findings.
+  `sc-ov-solid-return/mobile-right/04-t001s.png`
+- **`sc-park-left` · G · info** — Nothing beyond the shared findings.
+  `sc-park-left/mobile-right/04-t001s.png`
+- **`sc-park-wall` · G · info** — Nothing beyond the shared findings.
+  `sc-park-wall/mobile-right/04-t001s.png`
+- **`sc-park-zebra` · G · info** — Nothing beyond the shared findings.
+  `sc-park-zebra/mobile-right/04-t001s.png`
+- **`sc-pe-school-patrol` · G · info** — Nothing beyond the shared findings — this is the one lesson in the chunk that credits the right drive and convicts the wrong one on both platforms, and it is worth protecting as the reference the broken ones should be measured against.
+  `sc-pe-school-patrol/mobile-right/04-t001s.png`
+- **`sc-rb-lane-choice` · G · info** — Nothing beyond the shared findings and the inverted right/wrong scoring already filed under A.
+  `sc-rb-lane-choice/mobile-right/04-t043s.png`
+- **`sc-signal-hesitation` · G · info** — Nothing beyond the shared findings.
+  `sc-signal-hesitation/mobile-right/04-t043s.png`
+- **`sc-speed-creep` · G · info** — Nothing beyond the shared findings.
+  `sc-speed-creep/mobile-right/04-t001s.png`
+- **`sc-speed-dangerous` · G · info** — Nothing beyond the shared findings.
+  `sc-speed-dangerous/mobile-right/04-t001s.png`
+- **`sc-speed-zone` · G · info** — Nothing beyond the shared findings.
+  `sc-speed-zone/mobile-right/04-t001s.png`
+
+---
+
+## U10 — Two platforms, two products · 14 findings (1 major, 13 minor)
+
+- **`sc-sp-harsh-brake` · F · major** — Same lesson, same right drive, opposite verdicts by platform: PC ИЗДЪРЖАН +100 XP three stars, mobile НЕИЗДЪРЖАН 0 points one star. Pairs with the identical split on sc-speed-transition — the mobile right drive fails in all three tested lessons.
+  «Урокът беше прекъснат преди края.»
+  `sc-sp-harsh-brake/mobile-right/08-debrief.png`
+- **`sc-crossing-dart` · F · minor** — The notify card renders in four different skins inside one drive: a plain dark panel with a cyan title and no buttons (04-t013s), a card with a green ✓ and a small ✕ (04-t071s), a red-bordered card with two large round «ЗАЩО»/«✕» buttons (04-t060s), and a teal-ringed «ЗАЩО»/«✕» pair (06-waited). Button diameters, border weights, title sizes and the position of the close control all differ between them. The card's own text also spills over a black world billboard behind it, so panel and card read as one object.
+  «⚠ −10 ИЗПИТНИ Т. +1»
+  `sc-crossing-dart/mobile-right/04-t060s.png`
+- **`sc-hz-brake-dont-swerve` · F · minor** — The briefing text differs between the two runs of the same lesson at the same level: 1218 characters on the careful run and 1163 on the reckless run. Two students at Ниво 1 do not read the same instructions.
+  `sc-hz-brake-dont-swerve/mobile-wrong/02-briefing.png`
+- **`sc-ln-obstacle-meeting` · F · minor** — The same sentence is set in two different typefaces on two surfaces of the same lesson: the in-world ИНСТРУКЦИИ peek card uses an upright monospaced Cyrillic, the full-screen briefing overlay uses a Bulgarian-cursive face where д renders as g, п as n and и as u. Side by side they read as two different products.
+  «Hanpeg в ТВОЯТА лента е napkupaн peg»
+  `sc-ln-obstacle-meeting/mobile-right/02-briefing.png`
+- **`sc-merge-accel-lane` · F · minor** — The end-of-session flow differs by platform for the same lesson: mobile shows Сесията завърши — първо се самооцени with a Резултат button then a calibration gate, PC drops straight into Позна ли се? with Да, издържах / Не, неиздържан. Same lesson, two different ceremonies, so instructions written for one platform mislead on the other.
+  «Позна ли се?»
+  `sc-ln-obstacle-meeting/pc-right/01-arrival.png`
+- **`sc-park-gap-long` · F · minor** — The debrief's penalty figure is rendered in the script face at 4x body size on mobile but in a tighter sans on PC, and the mobile debrief always opens scrolled so that its top row („Докосни ‚Скрий разбора‘…“) is half cut by the viewport edge. Both platforms show the same verdict in visibly different type.
+  «90 наказателни точки»
+  `sc-park-gap-long/mobile-wrong/08-debrief.png`
+- **`sc-park-gap-short` · F · minor** — The world marker renders as „Паркирай тук“ in a small grey plate here but as unplated giant white type in sc-park-gap-long; the mobile speed roundel reads 20 in both, while the strip reads „≤50“ — the same three components differ between two lessons that are meant to be a matched pair (short gap vs long gap).
+  «Паркирай тук»
+  `sc-park-gap-short/pc-right/04-t178s.png`
+- **`sc-pk-ban-stop` · F · minor** — The briefing is a blocking full-screen modal with a Разбрах button on mobile but a small always-open side card on desktop, and no pc lane in this chunk ever produced a 02-briefing frame at all. Same lesson, two different first impressions.
+  `sc-pk-ban-stop/mobile-right/02-briefing.png`
+- **`sc-pk-double-park` · F · minor** — The debrief verdict pill is the only element that changes typeface between platforms' states: the pass number renders green sans on mobile and the same number renders in the script face on PC, and the mobile debrief crops its own header („Докосни ‚Скрий разбора‘“ row half cut at the top of the viewport) while PC does not.
+  `sc-pk-double-park/mobile-right/08-debrief.png`
+- **`sc-signal-flashing` · F · minor** — Against sc-rb-exit-signal: chrome, teach overlay, clipping defect, ghost vehicle, waypoint card and teal beacon all render identically — consistency is good. The divergence is the HUD limit disc, which silently switches from 50 to 40 mid-drive at t077 with no sign in view and the status bar still reading «≤60»; the roundabout lesson holds 40/≤50 throughout. A limit that changes without a sign teaches the wrong reflex.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-signal-flashing/mobile-right/04-t077s.png`
+- **`sc-sp-curve` · F · minor** — The briefing renders as two different things on two platforms: on PC a docked opaque ИНСТРУКЦИИ panel numbered 1.–5., on mobile a modal whose first item is promoted to an unnumbered headline so the visible list starts at 2. Same content, two typographic systems, and the mobile one silently loses its item number.
+  «2. Напред следва знак А1 „Опасен завой надясно“ с табела „50“»
+  `sc-sp-curve/mobile-right/02-briefing.png`
+- **`sc-speed-transition` · F · minor** — The briefing list is numbered 1.–5. on PC but on mobile item 1 is promoted to an unnumbered headline and the list then starts at 2., so the mobile student reads a list that begins at two.
+  «2. Напред следва знак за зона 30»
+  `sc-speed-transition/mobile-right/07-end.png`
+- **`sc-vp-readiness` · F · minor** — Seatbelt state is drawn as a red warning triangle badge floating in the world on mobile, but as an amber glyph in a flat control strip on PC. Same state, two unrelated visual languages.
+  «КОЛАН»
+  `sc-vp-readiness/pc-right/04-t098s.png`
+- **`sc-vu-emergency-junction` · G · minor** — FREE OBSERVATION — the 07b-menu capture differs by platform: on mobile it opens a real sheet (Съветник / Задача 2/2 / Качество Авто·Ниско / Въпроси / Карта / Прекрати урока), on PC the same step captured the plain driving view with nothing open, because PC has no equivalent sheet and scatters those controls across the top bar instead. Two different mental models of 'the lesson menu' for the same lesson.
+  `sc-vu-emergency-junction/pc-right/07b-menu.png`
+
+---
+
+## U9 — Instruments and labels that say the wrong thing · 11 findings (3 major, 8 minor)
+
+- **`sc-crossing-dart` · F · major** — The whole labelled control ring present at arrival — ⇦ЛЯВ, ⇨ДЯСН, ⊙КЛАКС, ⚠КОЛАН, Л/З/Д and ИЗГЛЕД/ПАУЗА — is gone from every single driving frame from 04-t013s onward; only «МЕНЮ» survives. If this is an auto-hide it is undocumented, and it means the indicators and horn vanish exactly when a student would need to signal before pulling away from the crossing.
+  «ИзгледПауза⇦Ляв⇨Дясн⊙Клакс⚠КоланДДяснЗЗаднЛЛяво»
+  `sc-crossing-dart/mobile-right/04-t028s.png`
+- **`sc-crossing-dart` · G · major** — +40 XP is awarded identically on the failed careful drive and on the failed reckless drive. The reward channel and the verdict channel disagree: the card says НЕИЗДЪРЖАН and hands out the same XP as a pass would, so the only number that moves between a good run and a dangerous run is nothing at all.
+  «НЕИЗДЪРЖАН · +40 XP»
+  `sc-crossing-dart/mobile-right/08-debrief.png`
+- **`sc-ov-bus-lane` · B · major** — The bus lane is drawn as nothing but a solid white seam. There is no BUS legend painted on the surface, no Д22/Д23 bus-lane sign, no bus stop, and no bus anywhere in 47 frames — so nothing in the world tells the student that this particular solid line means a bus lane rather than an ordinary lane divider.
+  «напред тя става бус лента, отделена с плътна линия»
+  `sc-ov-bus-lane/mobile-right/04-t102s.png`
+- **`sc-hz-brake-dont-swerve` · D · minor** — The task counter regresses: the chip reads ЗАДАЧА 2/2 «Спри преди препятствието» at t094 and then reads ЗАДАЧА 1/2 «Мини участъка с разрешената скорост» on the later 05-stopped frame of the same run.
+  «ЗАДАЧА 1/2 Мини участъка с разрешената скорост»
+  `sc-hz-brake-dont-swerve/pc-right/05-stopped.png`
+- **`sc-mw-emergency-lane` · D · minor** — The briefing asks for 100–110 км/ч while the HUD's posted-sign chip reads 140 and the mode label reads ≤150 — three different numbers describing the same road, with no line explaining which one is the rule.
+  «140 РЕЖИМ Нормален ≤150 · знакът важи»
+  `sc-mw-emergency-lane/mobile-right/02-briefing.png`
+- **`sc-ov-abort` · G · minor** — Free observation: the coaching toast prescribes an oddly precise «дръж под 55 км/ч» while the sign chip says 90 and the mode chip says ≤100 — a third number with no explanation of where it comes from.
+  «Прекъсни маневрата и се прибери зад бавната кола — дръж под 55 км/ч»
+  `sc-ov-abort/pc-right/01-arrival.png`
+- **`sc-ov-crest-curve` · D · minor** — The coaching toast reads «дръж под 51 км/ч» — a computed number surfaced raw to a 17-year-old, alongside a 90 sign and a ≤100 mode chip.
+  «дръж под 51 км/ч»
+  `sc-ov-crest-curve/pc-right/01-arrival.png`
+- **`sc-pk-ban-stop` · D · minor** — The world guidance label «Карай дотук» floats in mid-air over the verge with no post, plate or anchor, at a size that reads as a distant billboard rather than a lesson marker.
+  «Карай дотук»
+  `sc-pk-ban-stop/pc-right/04-t028s.png`
+- **`sc-pk-rail-ban` · F · minor** — The floating world label renders as „Карай докрай“ in a grey plate here and at sc-park-gap-short as „Паркирай тук“ in the same plate, but in sc-park-gap-long the equivalent word „Паркирай“ renders as huge unplated white type drawn behind the task card — the same world-marker component with three different visual weights.
+  «Карай докрай»
+  `sc-pk-rail-ban/pc-right/04-t117s.png`
+- **`sc-signal-flashing` · D · minor** — A large unexplained ring is painted across the junction — green in the correct drive at t028, orange in the wrong drive at t007 while the car is speeding. It is clearly a compliance-zone indicator but it looks like road marking, no legend anywhere explains it, and its colour change is the only feedback that the approach has gone wrong.
+  `sc-signal-flashing/mobile-wrong/04-t007s.png`
+- **`sc-vp-readiness` · D · minor** — The HUD mode chip announces a 60 km/h ceiling directly beside a 50 km/h road sign. The trailing qualifier resolves it, but the largest number on the chip is the wrong one.
+  «РЕЖИМ Нормален ≤60 · знакът важи»
+  `sc-vp-readiness/mobile-right/01-arrival.png`
+
+---
+
+## U7 — Cards and decks that never leave the glass · 6 findings (1 major, 5 minor)
+
+- **`sc-junction-rhr` · D · major** — The «Демонстрация — следвай сянката» film auto-plays and keeps playing for the entire drive, occupying the bottom-left quadrant of the play area over the bonnet, the A-pillar and the left half of the wheel, with a transport bar and speed buttons on top of it.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА»
+  `sc-junction-rhr/pc-right/03-ready.png`
+- **`sc-merge-bus-pullout` · G · minor** — The demonstration clip runs on the session clock: at 05-stopped the scrubber reads 0:41 / 0:44 while the speedometer still reads 0 км/ч, so three quarters of a minute of the lesson has been consumed before the student has moved, on a run that then reports being cut short.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:41 / 0:44»
+  `sc-merge-bus-pullout/pc-right/05-stopped.png`
+- **`sc-pk-busstop-ban` · G · minor** — The demonstration scrubber runs backwards mid-drive: it reads 0:23/0:29 at arrival, 0:27/0:29 at t050s, then 0:06/0:29 at t088s, 0:15/0:29 at t126s and 0:06/0:29 again at t146s. The 'follow the shadow' clip is silently restarting behind the student while they drive.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:06 / 0:29»
+  `sc-pk-busstop-ban/pc-right/04-t088s.png`
+- **`sc-turn-left-oncoming` · G · minor** — Free observation: the demonstration film runs 0:41 while the drive it is meant to shadow lasts 206 s, and the transport bar keeps looping through it during the drive, so the shadow the student is told to follow finishes five times over before the lesson does.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:37 / 0:41»
+  `sc-turn-left-oncoming/pc-right/04-t168s.png`
+- **`sc-vp-stall` · G · minor** — The shadow-demonstration player clock advances roughly 6 seconds across 98 seconds of real driving time, so the scrubber and its 0:35 duration are meaningless as progress feedback. Positive note for the same lesson: the wrong-lane teach card is genuinely explanatory — it states the required speed, the current speed, why the task has not yet registered, and what happens if the student drives on — which is the standard the other lessons should meet.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:12 / 0:35»
+  `sc-vp-stall/pc-right/04-t012s.png`
+- **`sc-vu-emergency-junction` · D · minor** — The «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА» timer runs backwards and loops while the drive continues: 0:23 at arrival, 0:12 at t022s, 0:03 at t060s, 0:00 at t103s, 0:19 at t168s, all of 0:46. The progress bar therefore tells the student nothing about where they are in the demonstration.
+  «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА 0:00 / 0:46»
+  `sc-vu-emergency-junction/pc-right/04-t103s.png`
+
+---
+
+## U8 — The mobile briefing that starts at «2.» · 3 findings (0 major, 3 minor)
+
+- **`sc-hazard-obstacle` · D · minor** — The mobile briefing's numbered list starts at «2.». Item 1 is rendered as an unnumbered headline paragraph in a larger face while items 2-5 carry numerals in body face, so the student reads a five-step procedure that appears to begin at step two.
+  «2. Забележи го отрано и намали — плавно, а не в последния момент.»
+  `sc-hazard-obstacle/mobile-right/02-briefing.png`
+- **`sc-merge-lane-end` · D · minor** — Briefing numbering is inconsistent between platforms. PC renders items 1.–6.; the mobile modal drops the '1.' and promotes item one to an unnumbered lead paragraph, so the list starts at '2.' and reads like a missing step.
+  «Тръгваш в дясната лента на еднопосочна улица. … 2. Забележи края на лентата РАНО.»
+  `sc-merge-lane-end/mobile-wrong/02-briefing.png`
+- **`sc-ov-oneway` · D · minor** — The briefing's numbered list visibly starts at '2.' — item 1 has been promoted to the headline but the numbering was not renumbered, so every lesson opens with a list that appears to be missing its first step.
+  «2. Чети платното отдалеч: стрелките „само надясно“ в твоята лента казват, че напречната улица се движи само на изток.»
+  `sc-ov-oneway/mobile-right/02-briefing.png`
+
+---
+
+## U2 — One street, relabelled — every lesson on the same road · 2 findings (1 major, 1 minor)
+
+- **`sc-merge-lane-end` · F · major** — Four of the seven lessons in this chunk (sc-merge-lane-end, sc-merge-roadworks-shift, sc-merge-bus-pullout, sc-pk-busstop-ban) open on what is visually the identical street: same grey blocks, same cypress trees, same railing, same row of parked cars in the same order, same 50 sign in the same place. Nothing distinguishes a lane-end lesson from a bus-stop lesson out the windscreen.
+  `sc-merge-bus-pullout/pc-right/01-arrival.png`
+- **`sc-maneuver-3point` · F · minor** — The three-point-turn is staged on the identical street as sc-ln-obstacle-meeting — same building blocks in the same order, same red parked car on the right, same 40 sign in the same spot, same Спри тук plate. Two supposedly different lessons look like the same drive.
+  `sc-maneuver-3point/mobile-right/01-arrival.png`
+
+---
+
+## U13 — Teaching and scoring polish · 1 finding (0 major, 1 minor)
+
+- **`sc-ed-d2-city-run` · A · minor** — The one thing that works cleanly: the traffic light changes, the red is held for 17 seconds and the coach confirms it in plain language before the student moves off. This is the model the other objectives in this chunk should follow.
+  «Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че кръстовището е свободно.»
+  `sc-ed-d2-city-run/pc-right/06-waited.png`
+
+---
+
+# WHAT THIS FILE NEEDS NEXT
+
+1. **Re-judge the 17 lessons in group 1 above.** Their frames are on disk, four lanes and four
+   debriefs each. No driving, no harness, no VPS — a reader and 1,701 PNGs. This is the single
+   cheapest coverage gain available and it converts 17 `COULD_NOT_TEST` rows into verdicts.
+2. **Judge the 5 lesson folders nobody opened** — `sc-park-45`, `sc-park-narrow`, `sc-park-parallel`, `sc-park-parallel-exit`, `sc-park-perp-forward`.
+   Complete frame sets, zero records.
+3. **Re-drive the 7 dead lessons** — the zero-byte captures. Fix the harness lane first; a re-drive
+   that produces zero-byte PNGs again costs a day and returns nothing.
+4. **Start the repair at the top of the file ranking, not the top of the count.** `platform/src/modules/sim/rules/engine.ts`
+   carries 41 criticals; that is where a student is most likely to be told they were perfect when
+   they were not. The five lanes after it — `modules/sim/lessons/objectives.ts` (32) · `components/sim/TouchControls.tsx` (22) · `modules/sim/lessons/finish.ts` (13) · `modules/sim/lessons/debrief.ts` (10) · `tools/mobile/lesson-audit.mjs` (10) —
+   carry 87 more between them.
+5. **The 56 lessons that convict the wrong drive for the wrong reason are the product's central
+   defect**, not a long tail. They look like working lessons from the outside — a pass, a fail, a
+   score — and they teach the wrong lesson to the student who most needs the right one.
+
+---
+
+# THE OPEN LIST — closing the first repair wave, 2026-08-18
+
+> **This section is hand-maintained, and it has to be said out loud** because the header of this
+> file says the file is generated from the corpus. It is — everything above this line is. Nothing
+> below it can be: it is about *code that was written after the corpus was frozen*, and the corpus
+> knows nothing about it. There is also no `build.js` in the tree, so the reproduce-byte-for-byte
+> claim above is currently **unverifiable** — the generator was never committed. Both facts are
+> listed as open items below rather than quietly left for the next reader to trip over.
+>
+> **Provenance is marked on every row.** `[gated]` = I ran it. `[adversarial]` = a reviewer whose
+> only job was to break the fix measured it and it survived the attempt to refute it; I did not
+> re-run their instrument. `[frame]` = read off a PNG.
+
+## 0 · The gate, exactly as it stands
+
+Run from a clean checkout of the working tree on 2026-08-18, **each command's own exit code read
+directly and never through a pipe** — `| tail` reports the *pipe's* status and has already once
+reported a red suite in this project as `EXIT:0`:
+
+| gate | first pass | after this pass |
+|---|---|---|
+| `npx tsc --noEmit` | exit 0 | **exit 0** |
+| `npx vitest run --maxWorkers=2` | 840 files · 13 031 tests · **3 files / 4 tests red** | 840 files · **13 034 tests · 2 files / 2 tests red**, and both are the content-signature item in §6 |
+| `node platform/scripts/validate-content.mjs` | exit 0 | **exit 0** — 1 089 questions, 16/16 topics, 0 blocking answer-leak scopes |
+
+`vitest` therefore still exits **1**, on purpose: the two remaining reds are §6 and must not be
+muted. Everything else in the suite is green, including the three tests this pass added.
+
+The one repaired here was `src/modules/sim/hud/__tests__/session-end-numbers.test.tsx`, and it is
+worth a paragraph because it is the shape of failure this wave is most exposed to. Two lanes landed
+in the same 24 hours: one taught `SessionEndScreen` to reconcile «Това е ЕДНА опасна грешка: 10» with
+a protocol table reading «2 20», and the other taught `scoring.ts` that Наредба № 38 чл. 48 ал. 3
+**closes the ledger** at the first ПТП. The screen lane's fixture was two collisions — which is what
+`sc-vu-cyclist-hook/pc-wrong` actually did — and after the scoring lane those two bill as **one**.
+The fixture is now `RED_LIGHT_CROSSED` + ПТП, which is the shape that still reaches «2 20» (a red
+light is опасна and does NOT terminate), and the old event list is pinned in its own test so it
+cannot come back silently. **Neither lane was wrong; nothing checked them against each other.**
+
+## 1 · What the wave actually covered — and what "covered" does not mean
+
+138 suspect files carry the 1 012 BROKEN findings above. This wave's diff touches **30** of them.
+
+| | files | BROKEN findings in those files | of which critical |
+|---|---:|---:|---:|
+| touched by this wave | 30 | 623 | 216 |
+| **not touched at all** | **108** | **389** | **102** |
+
+**Touching a file is not closing its findings**, and the 623 must not be read as 623 closed. Each
+lane closed the specific rows it names in its own source comments; the rest of each file's bucket is
+untouched. There is no per-finding closure ledger in this programme yet, and building one is the
+single largest piece of missing bookkeeping — see item 8.
+
+The 108 untouched files, ranked by criticals, start:
+`lessons/scenario/templates-pe2.ts` (4c) · `collision/probe.ts` (4c) · `collision/index.ts` (4c) ·
+`environment/weather.ts` (4c) · `lessons/scenario/progress.ts` (3c/26 findings — the largest
+untouched bucket) · `lessons/scenario/templates-conditions.ts` (3c) · `scenarios/coach.ts` (3c) ·
+`traffic/TrafficLayer.tsx` (3c) · `cockpit/InstrumentCluster.tsx` (3c) ·
+`lessons/scenario/templates-merging.ts` (3c) · `rules/offences.ts` (3c) · `runtime/district.ts` (3c) ·
+`lessons/scenario/templates-roundabout.ts` (3c) · `runtime/surface.ts` (3c/3 — every finding in it is
+critical). **Not one of these was opened in this wave.**
+
+## 2 · Regressions this wave introduces, verified, and NOT closed
+
+These are new. They did not exist before the diff and they are open now.
+
+**R1 · `finish.ts` — the widened annulus can stop a lesson from ever ending.** `[adversarial]`
+`normalizeOutside` now pushes every "outside" departure circle to `armWithinM + 8 m`, and its
+docstring claims *"no drive that ends today stops ending"*. Driven through the real engine
+(`applyTick` / `createLessonSession`) on `sc-sig-green-wave@L1` with the chain stalled at objective
+0, a car that comes to rest **42 m or 45 m past node3** is `completed` at t = 97 s on the shipped
+build and **never ends** with the fix — 173 s of ticks, `phase=driving`. Widening the departure
+circle grows the no-escape disc from 40 m to 48 m *in every direction*; the claim is true of a car
+that is moving and false of a car that has stopped. This matters because *"the lesson would not end,
+the harness had to press «Прекрати урока»"* is the sweep's single most common ending — **13 of the 22
+findings in that band** — so the fix adds a new 8 m-deep instance of the class it was written
+against. **Open decision, not a code fix:** the terminal rescue needs a dwell for a *stationary* car
+inside the band, which is a design question this lane did not own.
+
+**R2 · `finish.ts` — the defect being fixed is not reachable without reversing.** `[adversarial]`
+Same engine, shipped code: hesitating **41 m short** of the junction on the approach never ends
+(approach distance is monotonic), and stopping legally **on the paint** never ends. Only *stop at the
+paint, then reverse 13.3 m* reaches the harm, and the new test encodes that as an instantaneous
+backward jump at `speedKmh: 0` — a tick stream no vehicle produces. The fix also does not remove the
+class, it raises the bar to ~20 m of reverse. **The census claim is also wrong**: the docstring says
+only the 5 green-wave rungs move; **ten** rungs move (`sc-rb-ped-exit@L1-L5` moves too).
+
+**R3 · `staged.ts` — FIXED IN THIS PASS, recorded because it was shipped-and-green for a day.**
+`[gated]` The FR-B5-EXIT retirement run consulted `closesOnAmbient` and nothing else, while the
+player guard works by lowering `target`, which the retirement branch does not read. Measured with
+the player 20 m past the path end and `playerGuard` defaulted: **closest approach to the PLAYER
+0.000 m at 10 m/s**, against 4.667 m for an ambient body in identical geometry — a correct student,
+stopped where the drill told him to stop, driven into and billed COLLISION −10 опасна. Closed here
+by `closesOnPlayer` in `platform/src/modules/sim/traffic/staged.ts`, with both directions asserted in
+`staged-exit-run.test.ts` (the clamp, and that `playerGuard: false` actors still make contact).
+Mutation-checked: disabling the guard turns the new test red at `0.000 m`. **The lesson generalises
+and is open**: that test file's own describe block is titled *"not a licence to drive through
+anything"* and only ever put an *ambient* car in the way.
+
+**R4 · `buildWorldGeometry.ts` — `d2-v1` still inherits the city's L7 bay.** `[adversarial]` The new
+`defaultParkingBays` tests membership by *bounds*, and `L7_PARKING_BAY` (681.26, −199.54) is inside
+`d2-v1`'s bounds — so that district still paints 3 quads of a bay it does not own, on a district
+whose own curriculum set is empty. The docstring's premise (*"A District document carries no
+lesson-district id"*) is false: `meta.district` is `"studentski-grad"` / `"lozenets"`, which is an
+exact decidable test in this layer. `specs.ts:965` states the requirement as law: *the default MUST
+stay district-v1-only*.
+
+**R5 · `tools/mobile/lesson-audit.mjs` — the new 3-consecutive-loss breaker destroys evidence.**
+`[adversarial]` Replayed over all 653 lane folders, the policy aborts lanes that would otherwise have
+produced frames — including a verdict frame. The module underneath it (`tools/mobile/lib/frames.mjs`)
+is sound (18 mutations, 16 red, no inert behaviour) and the zero-byte/truncation detection is real
+and needed; **the breaker's policy is the open part**, not the detector.
+
+**R6 · `objectives.ts` — the approach cap fix is far weaker than its docstring.** `[adversarial]`
+`REACH_ZONE_CAP_SLACK_KMH` can only bite between the capsule's rear edge and the acceptance disc,
+which is exactly `REACH_ZONE_GRACE_M` = 5 m at every radius and every rung, because the engine
+advances `currentIndex` on completion and never re-steps. Over 40 physically honest accelerating
+drives at the audited arrival speeds the fix changes **nothing**, and an acceleration sweep flips a
+verdict only at a ≥ 4 m/s² and only for caps 40 and 46. `sc-hz-breakdown-pulloff` (cap 130) still
+ticks at **145.1 км/ч**, the exact audited number, at every acceleration up to 12 m/s². The five
+drills the constant's own table names are therefore **not closed**; the fix is real on the arrival
+frame and inert on the approach the docstring describes.
+
+**R7 · `rubric.ts` — the economy fix cannot change a star, anywhere.** `[adversarial]` A/B over every
+template × rung × detail shape (95 160 cells): **1 020 deltas, 0 star-deltas**, because
+`!settled ⇒ !completedAll` and the existing cap already floors those runs at one star. It is a
+copy fix and should be described as one; the write-up frames it as a full 2/2 being withdrawn.
+
+**R8 · WATCH — `LANE_TRUE_RADIUS_M` is the one change class in this wave that can refuse a correct
+drive by construction.** `[adversarial]` Ten lane/overtaking objectives moved from 4–6 m acceptance
+discs to `2.7 m` (compiled 4.05 / 3.38 / 2.70 / 2.70 / 2.70 by rung), so that «излез в лявата лента»
+can only be claimed from inside that lane. The arithmetic is real — `ov-oncoming-v1` gives an 8.12 m
+lane pitch, and the widest compiled radius 4.05 sits under the 4.0625 half-pitch — and every recorded
+shadow tape completes at every rung, `passed=true, score=0`. **But a shadow tape is an ideal line.**
+Nothing in this wave measures a *human* who completes the overtake 2 m off lane centre at L3–L5,
+where the disc is 2.7 m. This is not a defect; it is the row to check first if students start
+reporting «направих го и не ми се призна».
+
+## 2b · Residuals the lanes named themselves, and which are therefore open
+
+Each of these is written into the source comment of the fix that created it. They are collected here
+so they exist somewhere a reader of *this* file can find them.
+
+- **`objectives.ts` `stepPassSignal`** — the Б2 stop memory is scoped to the APPROACH, not to the
+  last six seconds, so a stop made early on the approach and gone stale by the rule engine's
+  `stopRecencySec` (6) still certifies the objective while the engine convicts
+  `STOP_SIGN_NO_FULL_STOP`. Fixing it needs a stop-TIME in `ObjectiveEvalState` (`lessons/types.ts`).
+- **`objectives.ts` `stepThreePointTurn`** — a car that enters the corridor ALREADY facing back
+  (driving in from the far end) still counts as one movement and can still take a 2/2 economy row.
+  Same blocker: the entry heading is not in the eval state.
+- **`finish.ts` header, P1 + P2** — the crash pin is voided twice over and neither is this lane's
+  file. **P1:** `engine.ts` re-arms on every graded collision and that re-arm sets
+  `stillSinceSec: null`, while `rules/engine.ts` reopens a COLLISION every 2 m of travel — measured
+  **65 collisions in a single 177 s drive** — so the ten-second clock is reset by the very condition
+  it is timing. **P2:** the standstill test reads `tick.speedKmh > FINISH_STANDSTILL_KMH` unsigned,
+  alone in the module, so a student reversing out of what he hit at −20 км/ч is counted as standing
+  still and banks dwell toward having his lesson closed for him.
+- **`lessons/finish.ts` FR-B5-JAM** — the crash pin is still frozen by B15's lawful-wait freeze; the
+  one-condition exemption lives in `engine.ts`.
+- **Whole-catalogue** — `sc-mw-min-speed`-class runs still finish `НЕИЗДЪРЖАН` with **0 fault
+  points** when the route runs out. `[frame]` `sc-mw-min-speed/pc-right/08-debrief.png`: «0
+  наказателни точки» · НЕИЗДЪРЖАН · «Урокът беше прекъснат преди края.» · 1 star. That is a grading
+  question in `lessons/finish.ts` / `scenario/progress.ts` and **nothing in this wave touches it** —
+  and `progress.ts` is the largest untouched bucket in item 1 (26 findings).
+
+## 3 · Tests that guard nothing (verified, still open)
+
+Every row here is a test that is **green whether or not the behaviour it names exists**.
+
+1. **The touch-axis watchdog's runtime caller is grep-coverage only.** `[gated + adversarial]`
+   `platform/src/components/sim/touchPadRelease.test.tsx:425–426` assert
+   `expect(CODE).toContain("reconcileHeldAxes(touch, steerPad, drivePad)")` and
+   `toContain("AXIS_RECONCILE_MS")` against comment-stripped source. Deleting the `useEffect` that
+   actually runs the reconciliation and replacing it with `if (Number.NaN > 0) { …same text… }`
+   leaves the **entire suite green**. The pure function `reconcileHeldAxes` *is* genuinely covered in
+   both directions (3 reds for a no-op body, 2 for an unconditional release); the wiring is not.
+2. **`AXIS_RECONCILE_MS` is unpinned.** `[adversarial]` 250 ms → 3 600 000 ms: all green.
+3. **The watchdog's `if (!visible) return;` guard is unpinned.** `[adversarial]` Deleting it: all green.
+4. **The controls-legend auto-collapse interval body is unpinned.** `[adversarial]` Five mutations of
+   the leaf predicate each go red, but inserting `if (Date.now() > 0) return;` as the first line of
+   the interval body — every grepped string intact, the collapse permanently dead — is **green 10/10**.
+5. **`staged-exit-run.test.ts` claimed more than it tested** — closed in this pass, see R3.
+6. **Numbers the prose argues hardest for are the ones the tests do not hold.** `[adversarial]` In
+   `templates-following.ts`: `maxSpeedKmh 32 → 26` green, `1 → 3` green,
+   `acceptBeforeMarkM −2.9 → −0.01` green (anything in ≈(−3.6, 0) passes), truck → van green (no
+   height is ever proven).
+7. **`approach-cap-contract.test.ts` proves the rule on 3-tick fixtures**, not on drives, which is
+   why R6 above is invisible to it.
+8. **`debrief.ts`'s `coachedMistakes` filter is logic-correct and dead in production.**
+   `[adversarial]` `actions.ts:187` still passes only `microQuiz` / `priorBestScore` /
+   `conceptTitles`, so the filter has no live caller. Mutation-red, production-inert.
+
+## 4 · Lessons still untested, and why — nothing here has moved
+
+The four groups in «WHAT COULD NOT BE TESTED, AND WHY» are **unchanged by this wave**. No lesson was
+re-judged and no lesson was re-driven; what changed is that a re-drive can now *detect* its own
+failure (`tools/mobile/lib/frames.mjs` — zero-byte and truncated-PNG detection, 17/17 green,
+harness exits 3 with `phase: "signin-refused"` instead of writing stubs).
+
+| group | count | why it is still open |
+|---|---:|---|
+| **1 — judged before their frames were written** | **17** | Frames are on disk *now*, 4 lanes + 4 debriefs each. Needs a **reader**, not a harness. Cheapest coverage in the programme and nobody has spent it. |
+| **2 — genuinely produced nothing** | **7** | `sc-park-double` · `sc-park-judge` · `sc-pk-crossing-ban` · `sc-rx-barrier-drop` · `sc-rx-queue-clear` · `sc-rx-tram-island` · `sc-rx-tram-left`. Needs a **re-drive**. The harness lane is now instrumented for it — but see R5: the breaker can abort a lane that would have produced frames. |
+| **3 — never opened by anyone** | **5** | `sc-park-45` · `sc-park-narrow` · `sc-park-parallel` · `sc-park-parallel-exit` · `sc-park-perp-forward`. Complete frame sets, zero records. Still zero records. |
+| **4 — judged on fewer than 4 lanes** | **18** | Verdicts stand, coverage does not. **Nine** of them were judged on a **single** lane: `sc-merge-bus-pullout` · `sc-merge-motorway-exit` · `sc-park-night` · `sc-pk-busstop-ban` · `sc-rb-exit-signal` · `sc-rx-guarded` · `sc-rx-unguarded` · `sc-sig-controller-live` · `sc-signal-controller`. A one-lane verdict cannot answer question 2 against question 3 — it saw either the right drive or the wrong one, never both. |
+
+And the residual under all four: **the ten devrig findings are NOT fixed and the lane says so
+itself.** `[gated]` `tools/mobile/lesson-audit.mjs:837` is still `const CRUISE_KMH = 12`, `:857`
+`ROLL_DISTANCE_M = 15`, `:859` `STOP_MS = 3000` — a roll-15 m/stop-3 s phase machine driving a
+motorway lesson whose briefing asks for 110–130 км/ч. That is the `0 → 11 → 2 → 0` signature in the
+frames, and it means **every motorway and speed lesson in the sweep was judged from a drive the
+harness could not perform**. `driveScript.ts` was repaired (18/18 mutations red); the harness
+constants that actually drive the sweep were not.
+
+## 5 · Evidence-integrity items opened by this wave
+
+- **`.gitignore` now ignores `.audit-frames/`.** Correct for repo size, and it means **the entire
+  evidence corpus for this document — 16 272 readable frames and 24 JSONL files — exists on one
+  7 200 rpm HDD and nowhere else.** Every «A finding without a frame is not a finding» row above is
+  one disk failure from being unverifiable. No backup path is defined.
+- **This file claims to be generated and its generator is not in the tree.** No `build.js` exists
+  under `.audit-frames/` or anywhere else, so the byte-for-byte reproduction claim in the header
+  cannot be exercised. Either commit the generator or downgrade the claim.
+- **There is no per-finding closure ledger.** 1 012 BROKEN rows and no field on any of them that
+  says *closed by*, so "how much of the sweep is repaired" is currently answerable only as
+  "30 of 138 files were touched" — which is item 1, and which is not the same question.
+
+## 6 · Known-red, NOT a blocker, and needing a signature no agent may give
+
+Two suite failures stand and are **deliberately not repaired here**, because repairing them would
+mean an agent signing content that only a human may sign:
+
+| red | what it is |
+|---|---|
+| `src/modules/exam/__tests__/content-bank.test.ts` › *has no dark, threadbare or under-represented topic* | **`ptp-i-parva-pomosht` is 31/64 approved against a 50 % floor.** The remaining items need human review before they may be dealt to a student — and the validator's own line is the reason it matters: *"human-approved (signed, hash matches): 0 of 1089 — this is the only tier a student may be dealt as authoritative"*, while 796 unsigned "approved" rows are dealt today. |
+| `src/modules/lesson/__tests__/compose.test.ts` › *gives every lesson at least one quiz beat* | **`l-accidents-first-aid` has no quiz beat.** Authoring one is content work on the first-aid module, which is exactly the topic above. |
+
+Both are content-signature items. They are red on purpose and they should stay red until a human
+signs, rather than be muted.
+
+## 7 · Housekeeping left in the tree (named, not deleted)
+
+Deleted in this pass: six probe PNGs under `tools/clips/headless/.park10/` (`BEFORE-*`, `AFTER-*`,
+`ZOOM-*` — the world-geometry before/after shots) and the whole of `tools/clips/headless/.zebra/`.
+Two **tracked** reference frames that a probe had deleted —
+`tools/clips/headless/.park10/sc-park-gap-short-cockpit.png` and `-overhead.png` — were **restored**;
+they are committed corpus and no lane's report claims them.
+
+Left in place, because they belong to other sessions and deleting a build dir out from under a
+running one is worse than naming it: **23 gitignored `platform/tsconfig.next-*.json` stubs** (35
+bytes each, 2026-08-11 → 08-17) and **three stale scratch dist dirs** —
+`platform/.next-rig` (08-11), `platform/.next-w2inset` (08-16), `platform/.next-simoverlay` (08-17).
+`platform/AGENTS.md` is explicit that these inject phantom `tsc` errors and that each runs
+0.2–1.1 GB on a box the founder's own notes call chronically squeezed. They should go.
+

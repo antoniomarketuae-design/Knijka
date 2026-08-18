@@ -216,6 +216,52 @@ function adoptable(
   return pad.claim(e.pointerId);
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE INVARIANT THE FOUR RELEASE EDGES ARE ONLY AN IMPLEMENTATION OF:
+ * AN AXIS IS HELD ONLY WHILE ITS PAD OWNS A FINGER.
+ *
+ * Every writer of the touch axes in this component sits behind pad ownership
+ * — `steerApply`/`driveApply` run only for the owning pointer or an
+ * `adoptable()` one, `onSteerEnd`/`onDriveEnd` only for the owner. So the
+ * invariant holds BY CONSTRUCTION, and it holds only as long as every browser
+ * edge that ends a gesture is wired to one of those two enders. That is four
+ * edges (up, cancel, lost capture, hide) maintained by hand at two call sites,
+ * and this file's own history is what happens when a hand-maintained release
+ * covers two of the four: doc 91 §C1, „the two halves of «let go of
+ * everything» were written in two different vocabularies".
+ *
+ * So the invariant is also CHECKED, on a low-Hz clock of its own, and the
+ * check is deliberately one-directional. It can only ever RELEASE a touch
+ * axis — which hands that axis back to the keyboard and the gamepad — and it
+ * cannot do that to an axis a finger is actually holding, because a held axis
+ * is a pad with a `pointerId`. It cannot fabricate an input; it can only stop
+ * this overlay from vetoing one. That asymmetry is the whole reason a
+ * watchdog is admissible here at all.
+ *
+ * Pure and DOM-free so the sequence that strands an axis is three lines of a
+ * unit test rather than a phone, a thumb and a browser bug.
+ */
+export function reconcileHeldAxes(
+  touch: Pick<TouchInputSource, "releaseSteer" | "releaseThrottle" | "releaseBrake">,
+  steerPad: Pick<PadPointer, "pointerId">,
+  drivePad: Pick<PadPointer, "pointerId">,
+): void {
+  if (steerPad.pointerId === null) touch.releaseSteer();
+  if (drivePad.pointerId === null) {
+    touch.releaseThrottle();
+    touch.releaseBrake();
+  }
+}
+
+/** How often the invariant above is re-checked (ms). It is the cabin poll's
+ *  cadence because that is already the slowest thing on this screen and four
+ *  method calls on a free pad cost nothing — but it is its OWN constant and
+ *  its own effect, because this number is a stuck-pedal window and not a UI
+ *  refresh rate, and a future „the cabin poll got cheaper at 1 Hz" must not
+ *  silently make it four times longer. */
+const AXIS_RECONCILE_MS = 250;
+
 /** Driving keys whose use hides the overlay on hybrid (touch+keyboard)
  *  devices — a laptop student driving on WASD keeps a clean screen. */
 const KEYBOARD_DRIVE_CODES = new Set([
@@ -229,6 +275,83 @@ const KEYBOARD_DRIVE_CODES = new Set([
   "ArrowRight",
   "Space",
 ]);
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE DEVICE TEST THE TAKEOVER NEVER HAD — 2026-08-17, PART A/C/D.
+ *
+ * The set above is an INFERENCE: „a drive key arrived, therefore this student
+ * has a keyboard, therefore the glass controls are clutter." On a laptop that
+ * is right. On a phone it is unfalsifiable and its failure is total, because
+ * `visible` gates the ENTIRE overlay — both indicators, all three mirror
+ * glances, the horn, the belt and the ⚙ dock — and the only route back is a
+ * `pointerdown` whose `pointerType` is exactly "touch". A keyboard-driven
+ * session never produces one, and neither does switch control, a stylus, or a
+ * screen reader's activation.
+ *
+ * MEASURED ON THE DEPLOYED BUILD, WebKit, iPhone 16 landscape with real insets,
+ * sc-ac-night-lights@L1, 2026-08-17 — one `KeyW` and nothing else:
+ *
+ *   before   7 stations · left ⇦Ляв ⇨Дясн ⊙Клакс · right ⚠Колан ДДясн ЗЗадн ЛЛяво
+ *   after    0 stations
+ *
+ * Three catalogue rows are that one line: sc-rb-exit-signal grades «Излез на
+ * третия изход с включен десен мигач» while the indicator is off the screen,
+ * sc-sig-controller-live loses signalling AND all three glances for 128 s, and
+ * sc-ln-turn-lane-arrows grades a lane change whose own briefing says
+ * „огледало, мигач, после маневра". All three are GRADED acts performed with a
+ * control the student cannot see.
+ *
+ * SO THE INFERENCE GETS THE PREMISE IT WAS ALWAYS MISSING: a keyboard is only
+ * plausible where a desktop-class pointer is. `(any-pointer: fine)` is true of
+ * every mouse, trackpad and stylus the browser can see — a laptop, a 2-in-1, an
+ * iPad with a Magic Keyboard — and false of a phone. It is also the vocabulary
+ * this codebase already uses for this exact question: `hasTouchScreen()`
+ * (modules/sim/engine/capabilities.ts) decides whether this overlay is mounted
+ * at all by asking `(any-pointer: coarse)`, so the mount gate and the takeover
+ * gate now read the SAME property off the same device instead of one of them
+ * guessing from a keystroke.
+ *
+ * WHICH ALSO BOUNDS THE CHANGE: a desktop with no touchscreen never mounts this
+ * component, so the takeover only ever ran on touch-capable machines. After
+ * this, a 2-in-1 or a keyboard-attached tablet still loses the overlay on WASD
+ * — the case the feature was written for — and only the coarse-pointer-only
+ * device keeps its controls. Measured on the same run:
+ *
+ *   any-pointer: fine   false      pointer: fine     false
+ *   any-pointer: coarse true       pointer: coarse   true
+ *   any-hover:   hover  false      navigator.maxTouchPoints  0
+ *
+ * `maxTouchPoints` is in that list because it was the obvious discriminator and
+ * the measurement REFUTED it: this WebKit profile reports 0 with touch
+ * emulation on, so a `maxTouchPoints > 0` guard would have shipped green and
+ * changed nothing on his phone.
+ *
+ * IT IS READ PER KEYSTROKE, not once at mount: a Bluetooth mouse paired
+ * mid-lesson must start hiding the overlay, and one media-query match on a
+ * keydown is free.
+ *
+ * AND THE ABSENT-API DEFAULT IS „KEEP THE CONTROLS". Without `matchMedia` we
+ * cannot tell the two devices apart, and the two mistakes are not symmetric:
+ * an unwanted overlay on a laptop is clutter over a screen that still has a
+ * keyboard, while a stripped overlay on a phone is a lesson with no inputs at
+ * all. The cheap failure is the one we take.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function keyboardTakeoverAllowed(
+  matchMediaFn: ((query: string) => { matches: boolean }) | undefined = typeof window ===
+  "undefined"
+    ? undefined
+    : window.matchMedia?.bind(window),
+): boolean {
+  try {
+    return matchMediaFn?.("(any-pointer: fine)").matches ?? false;
+  } catch {
+    // A browser that throws on an unknown feature query is a browser that
+    // cannot answer the question — same default, same reason.
+    return false;
+  }
+}
 
 /** Cabin poll cadence (ms) — button active-states only, far below frame rate. */
 const CABIN_POLL_MS = 250;
@@ -545,8 +668,10 @@ const ROW_H = rem(TOUCH_MIN_PX);
  *
  * The flanks now carry ONLY the controls whose meaning is a side of the car:
  *
- *   LEFT  (steering thumb)  ⇦ ЛЯВ, ⇨ ДЯСЕН — BOTH indicators.
- *   RIGHT (throttle thumb)  Д ДЯСНО, З ЗАДНО, Л ЛЯВО — all three mirrors.
+ *   LEFT  (steering thumb)  ⇦ ЛЯВ, ⇨ ДЯСЕН — BOTH indicators; the horn; and,
+ *                           since 2026-08-17, the ⚙ dock at the top station.
+ *   RIGHT (throttle thumb)  Д ДЯСНО, З ЗАДНО, Л ЛЯВО — all three mirrors, over
+ *                           the belt's own station.
  *
  * THE INDICATORS ARE ON THE LEFT ON A FOUNDER RULING, and the reason is the
  * exam: «Мигач надясно» used to sit on the RIGHT arc, so signalling right — a
@@ -561,9 +686,56 @@ const ROW_H = rem(TOUCH_MIN_PX);
  * EVERYTHING ELSE LEFT THE FLANKS ALTOGETHER — pause, horn, the ⚙ sheet, and
  * the camera that used to be buried two taps inside it — for the TOP RAIL,
  * where no thumb rests (§H, and the reference's own «PAUSE»/«VIEW» corner).
+ *
+ * ── AND THE FOURTH LEFT STATION — 2026-08-17, PART C ────────────────────────
+ *
+ * THE ⚙ DOCK IS NOT A CONTROL THAT SHARES A BOX ANY MORE. It used to be the
+ * second face of right station 0 — «the belt while the belt is off» — and the
+ * argument for that (written out at the station itself) was about ORDER: every
+ * control inside the dock comes after the belt in `procedures/steps.ts`, so
+ * nothing is reachable-only-if. The order argument is still true. It was
+ * answering the wrong question.
+ *
+ * MEASURED ON THE DEPLOYED BUILD, WebKit, iPhone 16 landscape with real insets,
+ * sc-ac-night-lights@L1, belt off (`wave12-flanks.mjs`, 2026-08-17):
+ *
+ *   right flank bottom→top   ⚠Колан  ДДясн  ЗЗадн  ЛЛяво
+ *   ⚙ dock                   NOT ON THE SCREEN
+ *
+ * and the dock is the ONLY door to «СВЕТЛ/КЪСИ/ДЪЛГИ», «МЪГЛА», «ЧИСТ»,
+ * «ДВИГ», «РЪЧНА» and the gear lever. So on a phone, for as long as the belt
+ * is off, this car has no lights, no wipers, no fog lamps, no engine switch and
+ * no gearbox — and four lessons open by telling the student to use them:
+ *
+ *   sc-ac-night-lights  «Включи късите светлини още със запалването…»
+ *   sc-ac-rain-lights   «Включи късите светлини — вали… „чистачки → светлини"»
+ *   sc-ac-highbeam-lead «Мини на дълги чак когато няма… кола»
+ *   sc-ac-fog           «Включи късите светлини и фаровете за мъгла…»
+ *
+ * The catalogue sweep opened 24 mobile frames across those four and the sheet
+ * appeared in NONE of them. A control that exists only after an unrelated
+ * control has been used is, for the student reading instruction 1, a control
+ * that does not exist.
+ *
+ * WHY THE DOCK MOVED AND NOT THE BELT. The belt's station is load-bearing
+ * OUTSIDE this file: `PlayAreaStyles.tsx` pins its fill, hairline and pulse to
+ * `[data-arc="0"][data-arc-side="right"] button[aria-label="Закопчай…"]` —
+ * yesterday's answer to „«КОЛАН» is the least visible thing on screen". Moving
+ * the belt would have deleted that silently from a file this change does not
+ * own. So the belt keeps its box, its selector and its rect, and the dock takes
+ * a station of its own.
+ *
+ * WHY THE LEFT FLANK, AND WHY THE TOP OF IT. The band arithmetic is sized by
+ * the BUSIER flank (`ARC_STATIONS` is a max), so a fourth left station changes
+ * no clearance anywhere: the left band hangs off `STEER_PAD_H` (136) and the
+ * right off `DRIVE_PAD_H` (152), so four left stations top out 16 px BELOW the
+ * four right ones that every sweep already clears. And the top station is where
+ * this file already puts the least time-critical control — the horn's own
+ * reason for being there. You set the lights before you move; you do not reach
+ * for the gearbox in an emergency.
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export const ARC_STATIONS_LEFT = 3;
+export const ARC_STATIONS_LEFT = 4;
 export const ARC_STATIONS_RIGHT = 4;
 
 /** How many stations one flank carries. */
@@ -705,6 +877,85 @@ const FLANK_LANE_PORTRAIT_PX = 0;
  *  notifyColumn.ts) so the two spellings cannot drift; this file DECLARES it,
  *  and `touchArc.test.ts` asserts the declaration and the reader agree. */
 export const FLANK_LANE_VAR_NAME = "--sim-flank-lane";
+/** …and the same lane as a length this file can write into its own `calc()`s.
+ *  0 upright, 60 px sideways — the orientation split lives in
+ *  `TOUCH_BAND_CSS_VARS` and nowhere else. */
+const FLANK_LANE = `var(${FLANK_LANE_VAR_NAME}, ${rem(FLANK_LANE_PORTRAIT_PX)})`;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * «МЕНЮ» IS THE THIRD SURFACE IN THE LEFT LANE, AND IT WAS THE ONE NOBODY
+ * GAVE THE LANE TO — 2026-08-18.
+ *
+ * The block at `FLANK_LANE_PX` names the two surfaces that would otherwise
+ * reach into the steering band's lane and says they are given offsets that end
+ * before it starts: the ⚙ sheet and the notification column. There is a THIRD,
+ * and it is not in this file — `LessonPlayShell`'s «МЕНЮ» button, which is
+ * shell chrome in another tree and was therefore never counted.
+ *
+ * IT DID NOT MATTER UNTIL THE BAND GREW A FOURTH STATION. The ⚙ dock took left
+ * station 3 on 2026-08-17, and the clearance argument written for it compared
+ * the LEFT band to the RIGHT band — „four left stations top out 16 px BELOW the
+ * four right ones that every sweep already clears" — which is true, and is an
+ * argument about the wrong neighbour. Nothing checked what sits ABOVE the left
+ * column. Resolved through the shipped `arcStationRectPx(3, "left", stage)`
+ * against this button's own box:
+ *
+ *   iphone16-landscape           dock [67,60,44,44]  menu [67,8,48,44]   +8 px
+ *   small-landscape 780×360      dock [ 8,48,44,44]  menu [ 8,8,48,44]   −4 px
+ *   galaxy-gesturebar-landscape  dock [ 8,24,44,44]  menu [ 8,8,48,44]  −28 px
+ *
+ * 28 of 44 px — 64 % of the dock — under a `z-20` shell button on the Samsung
+ * profile, i.e. 34.6 % of the Bulgarian fleet, and the four lessons the dock
+ * was moved for (sc-ac-night-lights, -rain-lights, -highbeam-lead, -fog) are
+ * exactly the ones that open by asking for what is behind it.
+ *
+ * WHY THE MENU YIELDS AND NOT THE DOCK. It cannot be bought with height: the
+ * left lane runs from this button's bottom edge (52 px) to the steering pad's
+ * top, which is 148 px on a 360-tall stage with a gesture bar — three stations,
+ * not four. So one of the two leaves the lane, and the menu is the only
+ * candidate that costs nothing: it is a PAUSED-STATE object (pause, quality,
+ * quit, „← Всички уроци" — see its own `onOpenChange` note), while the dock is
+ * the sole door to the lights, wipers, fog lamps, engine and gearbox and has to
+ * exist unconditionally while the car moves. Moving the dock back to the top
+ * rail would also undo a MEASURED improvement — the reach table at the ⚙ row
+ * below records «Кола» going from 110.7 mm to 27 mm when it left the rail.
+ *
+ * SO THE MENU PAYS THE SAME LANE THE COLUMN PAYS, and by the same mechanism:
+ * a variable, read by an INLINE style, because that is the only form that
+ * crosses the cascade (the block at `FLANK_LANE_PORTRAIT_PX` records the deploy
+ * this cost). Sideways the button starts at 60 px and the lane is disjoint from
+ * it with 8 px to spare; upright the variable is 0 and the corner is exactly
+ * where it has always been — upright the dock lands at y 374 and there was
+ * never a conflict to pay for.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+/** The «МЕНЮ» button's own box, px — `h-11 min-w-11 px-2`, measured 47.6 × 44
+ *  on the deployed build and rounded up to the 48 the rail already reserves. */
+export const PLAY_MENU_W_PX = 48;
+/** The gutter between «МЕНЮ» and whatever stands next to it, px. */
+const PLAY_MENU_GUTTER_PX = 8;
+/** The button's offset from the stage's own top-left corner, px (before the
+ *  safe-area inset and before the lane). `0.5rem`, as authored in the shell. */
+const PLAY_MENU_EDGE_PX = 8;
+/** Where the shell must put «МЕНЮ» — the ONE definition, imported by
+ *  LessonPlayShell so the button and this file's arithmetic cannot drift. */
+export const PLAY_MENU_LEFT_CSS = `calc(${rem(PLAY_MENU_EDGE_PX)} + ${INSET_L} + ${FLANK_LANE})`;
+export const PLAY_MENU_TOP_CSS = `calc(${rem(PLAY_MENU_EDGE_PX)} + env(safe-area-inset-top, 0px))`;
+
+/** …and the same button resolved, so the ladder sweep can hold it against the
+ *  band. `insetTop` is the DEVICE's inset: the app ships an opaque status bar,
+ *  so a real phone reports 0 here — the profiles carry it anyway (devices.mjs),
+ *  and a rect that survives it is a rect that survives `black-translucent`. */
+export function playMenuRectPx(stage: StageBox): StageRect {
+  const lane = isPortrait(stage) ? FLANK_LANE_PORTRAIT_PX : FLANK_LANE_PX;
+  return {
+    x: PLAY_MENU_EDGE_PX + (stage.insetLeft ?? 0) + lane,
+    y: PLAY_MENU_EDGE_PX + (stage.insetTop ?? 0),
+    w: PLAY_MENU_W_PX,
+    h: TOUCH_MIN_PX,
+  };
+}
 /**
  * THE RISE — AND WHAT IT MEANS SINCE THE BAND REPLACED THE ARC. READ THIS
  * BEFORE USING IT FOR ANYTHING; THE NAME IS OLDER THAN THE THING.
@@ -1215,8 +1466,18 @@ export function touchControlsFloorCss(heightToken = "100%"): string {
    column is past 0.60 of the width and the whole control band is at the floor.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/** Where the rail starts — past the shell's «Меню» button. */
-export const TOP_RAIL_LEFT_CSS = `calc(0.5rem + 3.5rem + ${INSET_L})`;
+/** Where the rail starts — past the shell's «Меню» button.
+ *
+ *  DERIVED FROM THAT BUTTON'S OWN BOX SINCE 2026-08-18, and it used to be the
+ *  literal `0.5rem + 3.5rem`. The block above moved «МЕНЮ» out of the steering
+ *  band's lane, and this file's own promise about the rail is „One rail, one
+ *  clearance; if the menu word ever grows, both move together" — a promise a
+ *  second copy of the number cannot keep. `PLAY_MENU_LEFT_CSS` already carries
+ *  the inset and the lane, so the rail follows the button wherever it goes and
+ *  `topRailBandPx` resolves the identical sum. */
+export const TOP_RAIL_LEFT_CSS = `calc(${PLAY_MENU_LEFT_CSS} + ${rem(
+  PLAY_MENU_W_PX + PLAY_MENU_GUTTER_PX,
+)})`;
 /** …and where it must stop: the notification column's own gutter. */
 export const TOP_RAIL_RIGHT_CSS = `calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} + 0.5rem)`;
 export const TOP_RAIL_TOP_CSS = NOTIFY_COLUMN_TOP_CSS_COMPACT;
@@ -1254,7 +1515,8 @@ export function topRailBandPx(stage: StageBox): {
   w: number;
   columnLeftPx: number;
 } {
-  const x = 8 + 56 + (stage.insetLeft ?? 0);
+  const menu = playMenuRectPx(stage);
+  const x = menu.x + menu.w + PLAY_MENU_GUTTER_PX;
   const columnLeftPx =
     stage.width -
     NOTIFY_COLUMN_GUTTER_PX -
@@ -1524,11 +1786,16 @@ export function TouchControls({
   onSelectDifficulty,
 }: TouchControlsProps) {
   // Hybrid devices: recent keyboard use hides the overlay; a screen touch
-  // brings it back. Touch-only devices simply never see driving keys.
+  // brings it back. „Touch-only devices simply never see driving keys" is what
+  // this comment used to claim on its own, and the measurement above is what it
+  // is worth — a phone that receives one keydown from ANY source loses every
+  // control it has, permanently. `keyboardTakeoverAllowed()` is the premise.
   const [keyboardActive, setKeyboardActive] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (KEYBOARD_DRIVE_CODES.has(e.code)) setKeyboardActive(true);
+      if (!KEYBOARD_DRIVE_CODES.has(e.code)) return;
+      if (!keyboardTakeoverAllowed()) return;
+      setKeyboardActive(true);
     };
     const onPointer = (e: PointerEvent) => {
       if (e.pointerType === "touch") setKeyboardActive(false);
@@ -1602,6 +1869,21 @@ export function TouchControls({
     () => () => releaseTouchControls(touch, steerPad, drivePad),
     [touch, steerPad, drivePad],
   );
+
+  // …AND THE SAME PROMISE CHECKED RATHER THAN ASSUMED — the block at
+  // `reconcileHeldAxes` has the argument, including why a watchdog is allowed
+  // to exist here when it would not be anywhere else on this screen. Only
+  // while `visible`: an inert overlay has already been through the effect
+  // above and its pads are `pointer-events: none`, so no gesture can start
+  // and no axis can be stranded while it is down.
+  useEffect(() => {
+    if (!visible) return;
+    const id = window.setInterval(
+      () => reconcileHeldAxes(touch, steerPad, drivePad),
+      AXIS_RECONCILE_MS,
+    );
+    return () => window.clearInterval(id);
+  }, [visible, touch, steerPad, drivePad]);
 
   const [sheetOpen, setSheetOpen] = useState(false);
   const [snap, setSnap] = useState<CabinSnap | null>(null);
@@ -1874,6 +2156,51 @@ export function TouchControls({
     [driveApply, driveBegin, drivePad, visible],
   );
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * THE FOURTH RELEASE EDGE, AND WHY THE PEDALS ARE THE ONE CONTROL THAT
+   * CANNOT DO WITHOUT IT — 2026-08-18, sweep161 part F.
+   *
+   * `useHoldButton` at the foot of this file wires FOUR ways a press can end
+   * — „up, cancel, lost capture, unmount" — and says why in one line: „A horn
+   * latched down by a lost pointer event is a car sounding through a quiz."
+   * These two pads, which are the steering wheel and BOTH PEDALS, wired two.
+   * `lostpointercapture` was not among them, and neither was the invariant it
+   * belongs to (the poll below).
+   *
+   * WHY IT IS WORSE HERE THAN ON THE HORN. `TouchInputSource.mergeInto` is a
+   * PRIORITY REPLACE and not a max (engine/touch.ts: „while a finger owns an
+   * axis, its value REPLACES that axis outright"). So a pad that keeps
+   * `brakeActive` after its finger is gone does not merely fail to brake — it
+   * OVERWRITES the keyboard∪gamepad result for that axis on every `read()`,
+   * for the rest of the session. A held brake key stops reaching the car, and
+   * a stale positive throttle makes the car speed up while it is held.
+   *
+   * WHICH IS THE SHAPE THE CATALOGUE SWEEP REPORTS, WORD FOR WORD:
+   *
+   *   !! the brake is held and the car went 7 -> 10 км/ч — the sim never got
+   *      the key; re-asserting it.
+   *
+   * Counted over the whole of `.audit-frames/sweep161`: 218 firings, and the
+   * platform split is 73 of 195 mobile legs against 1 of 189 PC legs.
+   *
+   * HONESTY ABOUT WHAT THIS DOES AND DOES NOT EXPLAIN. Those runs were
+   * captured BEFORE `keyboardTakeoverAllowed()` (the block above): the first
+   * `KeyW` hid this whole overlay, the `!visible` effect released every axis,
+   * and the frames prove it — `sweep161/sc-crossing-child-ball/mobile-right/
+   * 05-stopped.png` shows «МЕНЮ» alone where the strip was. An overlay that
+   * has released everything cannot have been the veto path in those runs, so
+   * this is NOT a retro-diagnosis of them; their cause is upstream of this
+   * file and is written up in the report.
+   *
+   * What the takeover fix DID do is make this overlay live on a phone for the
+   * whole drive for the first time. Until 2026-08-17 a stray drive key was
+   * also, accidentally, the thing that swept a stranded axis away every few
+   * seconds. That crutch is gone. A stranded axis is now permanent, and the
+   * two edges that can strand one — a capture lost without an up, and any
+   * release path a future edit forgets — are closed here and below.
+   * ═══════════════════════════════════════════════════════════════════════
+   */
   const onDriveEnd = useCallback(
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!drivePad.release(e.pointerId)) return;
@@ -1952,6 +2279,10 @@ export function TouchControls({
         onPointerMove={onSteerMove}
         onPointerUp={onSteerEnd}
         onPointerCancel={onSteerEnd}
+        // The fourth edge — see the block at `onDriveEnd`. `onSteerEnd` is
+        // idempotent (`steerPad.release()` answers false the second time), so
+        // the `up → lostpointercapture` pair costs one refused release.
+        onLostPointerCapture={onSteerEnd}
         className={`${visible ? "pointer-events-auto" : "pointer-events-none"} absolute touch-none`}
         style={{
           left: 0,
@@ -1999,6 +2330,8 @@ export function TouchControls({
         onPointerMove={onDriveMove}
         onPointerUp={onDriveEnd}
         onPointerCancel={onDriveEnd}
+        // The fourth edge — see the block at `onDriveEnd`.
+        onLostPointerCapture={onDriveEnd}
         className={`${visible ? "pointer-events-auto" : "pointer-events-none"} absolute touch-none`}
         style={{
           right: 0,
@@ -2095,12 +2428,19 @@ export function TouchControls({
           time-critical: the camera and the pause. They stay. The other three
           went to the flanks, under the thumb that is already there —
 
-            «Клаксон» → left arc, top station    109.6 mm → 45 mm (portrait)
+            «Клаксон» → left arc, station 2      109.6 mm → 45 mm (portrait)
             «Кола» ⚙  → right arc, station 0     110.7 mm → 27 mm
             «Колан»   → the same station's face  101.6 mm → 27 mm
 
           — and with five boxes gone from this strip, the horizontal band a
-          horizontal panel could land on stopped existing. */}
+          horizontal panel could land on stopped existing.
+
+          THE ⚙ ROW ABOVE IS HISTORY AS OF 2026-08-17: sharing that one box is
+          what took the dock off the screen entirely whenever the belt was off,
+          so «Кола» is now the LEFT arc's own top station and «Колан» keeps
+          right station 0 alone. The full measurement is at `ARC_STATIONS_LEFT`.
+          Both are still on a flank under a thumb, which is what this table was
+          about; the dock trades one station of reach for existing at all. */}
       <div
         data-hud="top-rail"
         role="toolbar"
@@ -2179,37 +2519,67 @@ export function TouchControls({
         </GlyphHoldButton>
       </ArcStation>
 
+      {/* ══ THE ⚙ DOCK, AND IT IS ON THE SCREEN UNCONDITIONALLY ═════════════
+          Doc 91 §I, PART C of the 2026-08-17 catalogue sweep. The whole
+          argument — what was measured, why the dock moved rather than the
+          belt, and why this is the top station — is at `ARC_STATIONS_LEFT`.
+
+          The one thing to keep in mind while editing here: this button is the
+          ONLY door to the lights, the wipers, the fog lamps, the engine, the
+          handbrake and the gear lever. Anything that can make it conditional —
+          a state, a tier, a lesson flag — takes those seven controls with it,
+          and the four lessons named at `ARC_STATIONS_LEFT` become unplayable
+          again. `touchDock.test.tsx` fails on any such condition. */}
+      <ArcStation index={3} padH={STEER_PAD_H} side="left">
+        <GlyphButton
+          labelBg="Контроли на автомобила"
+          captionBg="Кола"
+          active={sheetOpen}
+          onClick={() => setSheetOpen((o) => !o)}
+        >
+          ⚙
+        </GlyphButton>
+      </ArcStation>
+
       {/* ══ RIGHT FLANK ═ THE DOCK, THEN THE THREE GRADED MIRROR GLANCES ═════
           Lifting off the throttle to check a mirror is what a driver does, so
           the interaction cost teaches the right habit instead of fighting it.
           Words again: «Л З Д» is three letters a 17-year-old has no way to
           decode, and these are scored A2 steps.
 
-          ══ STATION 0 — THE NEAREST BOX ON THE SCREEN — IS THE ⚙ DOCK, AND
-             WHILE THE BELT IS OFF IT *IS* THE BELT. ═══════════════════════════
+          ══ STATION 0 — THE NEAREST BOX ON THE SCREEN — IS THE BELT ══════════
 
-          That one move is the largest measured win in this wave. «Закопчай
-          предпазния колан» was 70.4 mm away sideways and 101.6 mm upright, in a
-          rail no thumb reaches — and it was buried by the expanded instruction
-          panel on 6 of 6 profiles, so the card telling a student to fasten the
-          belt was standing on the button that fastens it. Here it is ~25 mm, it
-          is the only red thing on the screen, and fastening it hands the same
-          box straight back to the ⚙ dock. A control that exists exactly when it
-          is needed and vanishes when it is not.
+          That one move is the largest measured win in the 2026-08-12 wave.
+          «Закопчай предпазния колан» was 70.4 mm away sideways and 101.6 mm
+          upright, in a rail no thumb reaches — and it was buried by the
+          expanded instruction panel on 6 of 6 profiles, so the card telling a
+          student to fasten the belt was standing on the button that fastens it.
+          Here it is ~25 mm and it is the only red thing on the screen.
 
-          ONE BOX, TWO JOBS — AND THE ORDER THAT MAKES IT SAFE IS THE PRODUCT'S
-          OWN. While the belt is off this station does not open the dock, so the
-          question is whether anything inside the dock is ever asked for first.
-          It is not: `procedures/steps.ts` fixes the canonical sequence as seat →
+          IT NO LONGER SHARES THE BOX WITH THE ⚙ DOCK — 2026-08-17, PART C. The
+          dock is left station 3 now and is on the screen unconditionally; the
+          measurement that forced the split, and the reason the DOCK moved
+          rather than the belt (`PlayAreaStyles.tsx` pins the belt's fill,
+          hairline and pulse to `[data-arc="0"][data-arc-side="right"]`, and
+          this change does not own that file), are both at `ARC_STATIONS_LEFT`.
+          The note that used to be here argued the sharing was safe because
+          `procedures/steps.ts` puts the belt before every dock control — seat →
           mirrors → surroundings → BELT → dashboard → lights → engine → brake →
-          gear → handbrake, so every dock control (ДВИГ, ◄P/D►, РЪЧНА) comes
-          after the belt. Nothing is reachable-only-if is dead-locked.
+          gear → handbrake. That is still true. It is an answer about ORDER, and
+          the defect was about EXISTENCE.
 
-          Lowest = the dock, then the right mirror (nearest that thumb), the
+          SO THIS STATION IS EMPTY ONCE THE BELT IS ON, and the ghost behind it
+          is still drawn for four stations: the band's silhouette must not
+          change height under a thumb the instant the student buckles up —
+          „elements moving" is the founder's own complaint — and the three
+          mirrors are indexed from the BOTTOM, so they hold their rects either
+          way.
+
+          Lowest = the belt, then the right mirror (nearest that thumb), the
           rear, and the left at the top. */}
       <FlankGhost side="right" padH={DRIVE_PAD_H} stations={ARC_STATIONS_RIGHT} />
-      <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
-        {snap !== null && !snap.seatbeltOn ? (
+      {snap !== null && !snap.seatbeltOn ? (
+        <ArcStation index={0} padH={DRIVE_PAD_H} side="right">
           <GlyphButton
             labelBg="Закопчай предпазния колан"
             captionBg="Колан"
@@ -2219,17 +2589,8 @@ export function TouchControls({
           >
             ⚠
           </GlyphButton>
-        ) : (
-          <GlyphButton
-            labelBg="Контроли на автомобила"
-            captionBg="Кола"
-            active={sheetOpen}
-            onClick={() => setSheetOpen((o) => !o)}
-          >
-            ⚙
-          </GlyphButton>
-        )}
-      </ArcStation>
+        </ArcStation>
+      ) : null}
       <ArcStation index={1} padH={DRIVE_PAD_H} side="right">
         <GlyphButton
           labelBg="Поглед в дясното огледало"

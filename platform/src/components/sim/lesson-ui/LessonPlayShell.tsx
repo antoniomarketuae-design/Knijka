@@ -177,7 +177,16 @@ import {
 // The top of the whole thumb-control band, as a CSS length. Doc 91 §I10: the
 // minimap column stands on THIS and not on `--sim-hud-floor` (the instrument
 // band, 48 px), which is what put the map under the throttle thumb.
-import { TOUCH_CONTROLS_FLOOR, touchControlsFloorCss } from "../TouchControls";
+// …and «МЕНЮ»'s own corner, which is NOT a literal here any more (2026-08-18):
+// the steering band's fourth station lands in this button's lane on every
+// 360-tall landscape profile, so the offset that keeps them disjoint is stated
+// once, beside the band it has to clear. See TouchControls' PLAY_MENU_LEFT_CSS.
+import {
+  PLAY_MENU_LEFT_CSS,
+  PLAY_MENU_TOP_CSS,
+  TOUCH_CONTROLS_FLOOR,
+  touchControlsFloorCss,
+} from "../TouchControls";
 import {
   COMPACT_DASH_HEIGHT_PX,
   isCompactViewport,
@@ -959,6 +968,144 @@ function QuizFrequencySelector({
 }
 
 /**
+ * HOW MANY OF THESE ROWS ARE BELOW THE FOLD — pure arithmetic, like
+ * `playArea.ts`: the card measures, this decides.
+ *
+ * It is a function and not four lines inside a `useEffect` for one reason —
+ * jsdom has no layout, so every offset it could read is 0, and a counter tested
+ * through the DOM would pass whatever it did. The geometry comes from the
+ * browser; the RULE is testable here with real numbers.
+ *
+ * @param rows  each row's `offsetTop` and `offsetHeight`, in list coordinates.
+ * @param scrollTop / clientHeight  the list's own scroll viewport.
+ *
+ * A row counts when its BOTTOM is past the fold — that is, when it cannot be
+ * read to the end without scrolling. A half-visible step IS counted, and
+ * deliberately: on the frame this fix was built from, step 9 was sliced through
+ * its x-height and step 10 was absent, and «↓ още 2» is the true statement
+ * there. Counting only fully-hidden rows would have said «още 1» while the
+ * student was staring at the severed half of a sentence — the original defect
+ * with a number next to it.
+ *
+ * The 1 px slack is for fractional line boxes — at a `leading-tight` 11 px face
+ * the bottoms land on .5 px, and an exact `>` reported a phantom extra step on
+ * every second resize.
+ */
+export function rowsBelowFold(
+  rows: ReadonlyArray<{ top: number; height: number }>,
+  scrollTop: number,
+  clientHeight: number,
+): number {
+  // The rows must be in the LIST's own scroll coordinates. `listRowsInScrollCoords`
+  // is the only supported way to produce them — see the defect at its header.
+  // A list that has not been laid out yet (clientHeight 0) is not a list that
+  // is overflowing — it is one nothing is known about, and guessing „everything
+  // is hidden" would flash «още 10» on every mount.
+  if (clientHeight <= 0) return 0;
+  const fold = scrollTop + clientHeight;
+  return rows.filter((r) => r.top + r.height > fold + 1).length;
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE ROWS HAVE TO BE IN THE LIST'S COORDINATES — 2026-08-18.
+ *
+ * `rowsBelowFold` was fed `li.offsetTop`, against `scrollTop` and
+ * `clientHeight` read off the `<ol>`. Those are two different origins.
+ *
+ * `offsetTop` is measured from the element's OFFSET PARENT, and the `<ol>` is
+ * not one: it is statically positioned, so the walk continues up to the
+ * BriefingCard root — an element with `backdrop-blur`, which both engines treat
+ * as an offset parent. So every row arrived carrying the card's own header band
+ * on top of it: `py-1.5` (6 px) + the «ИНСТРУКЦИИ» / ✕ row + the list's `mt-1`
+ * (4 px) ≈ 25 px at the shipped classes, against a 30 px step.
+ *
+ * WHAT THAT DOES, AND IT IS NOT A ROUNDING. The offset is added to every row's
+ * top and to nothing else, so the fold appears ~25 px earlier than it is:
+ *
+ *   · on the frame this row was built from (sc-ac-bridge-ice, ten steps, fold
+ *     at 250) the counter said «↓ още 3» where two steps are hidden;
+ *   · and on a briefing that FITS — the state the sibling test calls „the
+ *     affordance is not permanent chrome" — the true count is 0 while this
+ *     returns the number of rows whose bottom lies within 25 px of the end,
+ *     i.e. ONE, on every briefing in the catalogue. The badge the sweep filed
+ *     twice for covering the sentence it was counting was therefore on the
+ *     whole time, and the test that guards against exactly that passed, because
+ *     it tests the RULE with numbers the component never actually hands it.
+ *
+ * So the reading stops depending on what an offset parent happens to be.
+ * `getBoundingClientRect` is in viewport coordinates for both the rows and the
+ * list, so their difference is the row's offset inside the list's viewport, and
+ * `+ scrollTop` puts it back into the scroll content the fold is measured in.
+ * Pure, and therefore held by a test rather than by this paragraph.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function listRowsInScrollCoords(
+  listTop: number,
+  scrollTop: number,
+  rowRects: ReadonlyArray<{ top: number; height: number }>,
+): Array<{ top: number; height: number }> {
+  return rowRects.map((r) => ({ top: r.top - listTop + scrollTop, height: r.height }));
+}
+
+/**
+ * THE ADVISOR MAY NOT RE-READ THE TASK CHIP ALOUD — 2026-08-17.
+ *
+ * The same rule `hud/overlayQueue.ts` states for the briefing card („THE CARD
+ * MAY NEVER PRINT THE SAME SENTENCE TWICE"), applied to the other pair that
+ * was doing it. The sweep filed it five times — vp-telltale-red, ac-highbeam-
+ * lead, ac-fog, ov-solid-line, rx-barrier-drop — and the frames are identical
+ * in shape. Read off `sc-ac-bridge-ice/pc-right/01-arrival.png`, the two cards
+ * are 30 px apart in the same column:
+ *
+ *   ObjectiveBanner  «ЗАДАЧА 1/3  Вдигни крака от газта ПРЕДИ близките устой»
+ *   AdvisorCard      «Вдигни крака от газта ПРЕДИ близките устой — дръж под
+ *                     35 км/ч»
+ *
+ * WHY IT IS A RENDER BUG AND NOT A CONTENT BUG. `advisor.ts` is right to build
+ * the sentence it builds: `advisorPromptForObjective` is a PURE function with
+ * one job — say what to do now — and for a `reachZone` the answer genuinely is
+ * the objective plus its cap (and for a capless one it is the objective,
+ * verbatim: `{ textBg: titleBg }`). It has no idea a banner is already printing
+ * the title 30 px above. Only the shell knows both, so only the shell can
+ * decide, and it decides here rather than in JSX so a test can hold it.
+ *
+ * WHAT SURVIVES THE TRIM IS THE PART THAT WAS NEW. The cap is the coachable
+ * half — it is the number the student is being graded against and it appears
+ * nowhere else on the glass — so the card keeps it and drops the echo. When
+ * nothing is left, there is no card: a panel whose entire content is a sentence
+ * already on screen is not a quieter duplicate, it is a duplicate.
+ *
+ * Returns null → render no advisor card at all.
+ */
+export function advisorEchoTrim(
+  promptTextBg: string,
+  objectiveTitleBg: string | null,
+): string | null {
+  const prompt = promptTextBg.trim().replace(/\s+/g, " ");
+  if (prompt === "") return null;
+  const title = (objectiveTitleBg ?? "").trim().replace(/\s+/g, " ");
+  // No objective on the banner → nothing is being echoed, so nothing is trimmed.
+  if (title === "" || !prompt.startsWith(title)) return promptTextBg;
+  const rest = prompt.slice(title.length);
+  // ── THE PREFIX MUST END ON A BOUNDARY, AND THIS COST A SHIPPED FRAGMENT ───
+  //
+  // Caught by `briefingOverflow.test.tsx` before it left the branch, on the
+  // pair («Спринтирай до края», «Спри»): a bare `startsWith` is true there, and
+  // the card rendered «нтирай до края» — a sentence cut through a word, in the
+  // instructor's voice, which is a worse defect than the duplicate this
+  // function exists to remove. An echo is the WHOLE title followed by the end
+  // of the string or by a separator; anything else is a different sentence that
+  // merely begins with the same letters.
+  if (rest !== "" && !/^[\s—–·,:;.!?-]/.test(rest)) return promptTextBg;
+  // The separator `advisor.ts` writes is " — " (U+2014). The others are here
+  // because a prefix match that leaves punctuation stranded («— дръж под…»
+  // with the dash still attached) reads as a fragment too.
+  const trimmed = rest.replace(/^[\s—–·,:;.!?-]+/, "");
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
  * THE BRIEFING CARD — `LessonSpec.briefingBg`, on the glass.
  *
  * The numbered steps every scenario template authors. They were compiled away
@@ -983,6 +1130,71 @@ export function BriefingCard({
   steps: ReadonlyArray<{ n: number; textBg: string }>;
   onClose: () => void;
 }) {
+  // ── HOW MANY STEPS ARE BELOW THE FOLD RIGHT NOW ────────────────────────────
+  //
+  // Not decoration, and not a duplicate of the scrollbar: the sweep's finding
+  // on `sc-ac-bridge-ice/pc-right` is „no scrollbar, no «още», no affordance of
+  // any kind" — the panel printed steps 1–8, sliced 9 through its x-height and
+  // never mentioned 10, which is the step that says where the ice ends. A
+  // scroll container that overflows in silence is indistinguishable from a
+  // finished list, and the student has no reason to reach for a wheel.
+  //
+  // Counted in STEPS rather than lines: a step is the unit the briefing is
+  // authored in and the unit the student is looking for. The count is read off
+  // real layout (`offsetTop + offsetHeight` against the viewport of the list),
+  // so it cannot drift from what is actually painted the way a character
+  // estimate does.
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const [below, setBelow] = useState(0);
+  const measure = useCallback(() => {
+    const ol = listRef.current;
+    if (ol === null) return;
+    // MEASURED AGAINST THE LIST AND NOT AGAINST WHATEVER `offsetParent` IS.
+    // This read `li.offsetTop`, which is relative to the nearest positioned
+    // ancestor — never the `<ol>` (static), always the card root (backdrop-blur
+    // makes it one in both engines). The full derivation and what the wrong
+    // number actually said is at `listRowsInScrollCoords`.
+    const listTop = ol.getBoundingClientRect().top;
+    setBelow(
+      rowsBelowFold(
+        listRowsInScrollCoords(
+          listTop,
+          ol.scrollTop,
+          Array.from(ol.children).map((li) => {
+            const r = (li as HTMLElement).getBoundingClientRect();
+            return { top: r.top, height: r.height };
+          }),
+        ),
+        ol.scrollTop,
+        ol.clientHeight,
+      ),
+    );
+  }, []);
+  useEffect(() => {
+    const ol = listRef.current;
+    if (ol === null) return;
+    // The column's height changes when a toast arrives or the advisor card
+    // dismisses — the fold moves without the list being touched, so observing
+    // the element is the only reading that stays true.
+    //
+    // AND THE FIRST COUNT COMES FROM THE OBSERVER TOO, not from a `measure()`
+    // call in this effect's body. `ResizeObserver` fires once on `observe()`
+    // with the element's current box, so the mount reading and every later one
+    // travel the same path — and the effect subscribes to an external system
+    // instead of setting state synchronously, which is the shape
+    // `react-hooks/set-state-in-effect` is asking for and one fewer cascading
+    // render on a shell that already re-renders every 150 ms.
+    if (typeof ResizeObserver === "undefined") {
+      // No observer (jsdom, ancient Safari): count once and accept that a
+      // later resize will not be noticed. A stale count is still better than
+      // the silence this row exists to end.
+      measure();
+      return;
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(ol);
+    return () => ro.disconnect();
+  }, [measure, steps]);
   return (
     // NOT `hud-ghost`, deliberately, and this is the one place in this wave
     // where the UNPANEL sweep is declined. Rendered ghosted at 1280×800 the
@@ -994,9 +1206,13 @@ export function BriefingCard({
     // readable ground and it is at the EDGE, which is what he asked for.
     <div
       aria-label="Инструкции за упражнението"
-      className="pointer-events-auto w-full min-w-0 rounded-2xl border border-border bg-background/85 px-3 py-1.5 backdrop-blur"
+      // `flex min-h-0 flex-col` is the whole of the truncation fix — see the
+      // <ol> below. Without `min-h-0` this card is a flex item with the default
+      // `min-height: auto`, which means it REFUSES to shrink, and the column's
+      // `overflow-hidden` then cuts it wherever it happens to end.
+      className="pointer-events-auto flex w-full min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-background/85 px-3 py-1.5 backdrop-blur"
     >
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
         {/* A6, 2026-08-04. This control existed — it just could not be hit. It
             was `px-1.5 text-xs` with no height of its own: a ~24 × 18 px target
@@ -1006,11 +1222,48 @@ export function BriefingCard({
             rect it does not paint. */}
         <HudCloseButton onClick={onClose} labelBg="Скрий инструкциите" />
       </div>
-      {/* Capped and scrollable: a five-step briefing on a 390 px-tall landscape
-          window is tall enough to reach the instrument band, and a card that
-          runs into the dashboard is the stacked-panel bug the overlay budget
-          exists to end (hud/overlayQueue.ts). It scrolls instead. */}
-      <ol className="mt-1 flex max-h-[28vh] flex-col gap-0.5 overflow-y-auto">
+      {/* ── THE LIST TAKES THE HEIGHT THE COLUMN ACTUALLY HAS ────────────────
+          A five-step briefing on a 390 px-tall landscape window is tall enough
+          to reach the instrument band, and a card that runs into the dashboard
+          is the stacked-panel bug the overlay budget exists to end
+          (hud/overlayQueue.ts). So it scrolls — that part was always right.
+
+          WHAT WAS WRONG WAS THE CAP, AND IT WAS WRONG BY 92 px. This was
+          `max-h-[28vh]`: twenty-eight per cent of the WINDOW, inside a column
+          whose height comes from the STAGE. Measured on the shipped desktop
+          layout (1440 × 900, `?chrome=dashboard`, the frame this fix was
+          reproduced on — sc-ac-bridge-ice/pc-right/01-arrival.png):
+
+            window                 900 px  →  28vh = 252 px   ← what the list took
+            stage (16:9 letterbox) 648 px
+            column top             52 px   (NOTIFY_COLUMN_TOP_CSS_ROOMY)
+            column maxHeight       648 − 108 − 56 = 484 px
+            column left for list   484 − 52 (banner) − 28 (header) ≈ 344 px
+
+          So the list stopped 92 px short of the room it had been given, on a
+          panel that was already truncating: ten authored steps rendered as
+          „1–8, half of 9, and no 10" while ~4 lines of column sat empty under
+          it. A viewport-relative cap inside a stage-relative box is not a
+          conservative choice, it is an unrelated number.
+
+          `min-h-0` + no cap hands the decision to the flex box that actually
+          knows: the list grows to its content, and when the column runs out —
+          because a teach toast arrived, or the deck opened and took 6.75rem of
+          the corridor (PlayAreaStyles' deck-reserve rule) — it is the LIST that
+          gives way and scrolls, not the card that gets guillotined.
+
+          AND THE YIELD ORDER IS NOT AN ACCIDENT EITHER. This card is the only
+          child of the column carrying `min-h-0`, so under the flex algorithm it
+          is the only one that CAN shrink: the objective banner and the toast
+          stack keep the default `min-height: auto` and hold their size. That is
+          the right priority and it is the reason no `shrink-0` is written on
+          them — a graded fault, or the task itself, must never be the thing
+          that yields to a briefing the student has already read. ────────────*/}
+      <ol
+        ref={listRef}
+        onScroll={measure}
+        className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto"
+      >
         {steps.map((s) => (
           <li
             key={s.n}
@@ -1021,6 +1274,19 @@ export function BriefingCard({
           </li>
         ))}
       </ol>
+      {/* The affordance, and it is OUTSIDE the scroll area on purpose: the
+          phone's «↓ ОЩЕ 7 РЕДА» counter was filed twice in the same sweep for
+          covering the sentence it was counting. This row occupies its own
+          12 px of the card and hides nothing. It exists only while something is
+          genuinely below the fold, so a briefing that fits carries no chrome. */}
+      {below > 0 ? (
+        <p
+          aria-live="polite"
+          className="mt-0.5 shrink-0 text-[9px] font-black uppercase tracking-wider text-muted"
+        >
+          ↓ още {below} {below === 1 ? "стъпка" : "стъпки"}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1191,8 +1457,25 @@ function PlayMenu({
       data-hud="play-menu"
       className="pointer-events-none absolute z-20 flex flex-col items-start gap-1.5"
       style={{
-        left: "calc(0.5rem + env(safe-area-inset-left, 0px))",
-        top: "calc(0.5rem + env(safe-area-inset-top, 0px))",
+        // ── THIS BUTTON PAYS THE STEERING BAND'S LANE — 2026-08-18 ──────────
+        //
+        // It used to read `calc(0.5rem + env(safe-area-inset-left, 0px))`, i.e.
+        // the same 8 px the flank's own stations start at, and for as long as
+        // the left band carried three stations that cost nothing. The ⚙ dock
+        // took a fourth on 2026-08-17 and this button landed ON it: 28 of its
+        // 44 px on the Samsung gesture-bar landscape profile, 4 px on the
+        // 780×360 Android, and this element is `z-20`, so `elementFromPoint` at
+        // the dock's centre answers «Меню». The measurement, the profiles and
+        // the reason the MENU is the one that moves are at PLAY_MENU_LEFT_CSS.
+        //
+        // The lane is a VARIABLE and it is read HERE, in an inline style, on
+        // purpose: an inline style outranks every selector in every stylesheet,
+        // so a media query in PlayAreaStyles could not have moved this box no
+        // matter how it was written — the same cascade that cost the flank
+        // wave a deploy. Upright the variable is 0 and this is byte-for-byte
+        // the corner it has always been in.
+        left: PLAY_MENU_LEFT_CSS,
+        top: PLAY_MENU_TOP_CSS,
         maxHeight: "calc(100% - 1rem)",
       }}
     >
@@ -1723,6 +2006,22 @@ export function LessonPlayShell({
   // explain anything to me again". Cleared on every retry with the rest of the
   // per-run state (`sceneEpoch`), so a fresh run always starts advised.
   const [advisorDismissed, setAdvisorDismissed] = useState<string | null>(null);
+
+  // What the advisor card has left to say once the objective banner's own
+  // sentence is taken out of it — `advisorEchoTrim`, above, which is where the
+  // reasoning and the measured frame live. `null` means „nothing but the echo",
+  // and the card then does not render at all.
+  //
+  // Memoised on the two strings it reads rather than computed in the JSX: this
+  // shell re-renders on a 150 ms HUD poll for the whole drive, and the prompt
+  // changes only when the objective does.
+  const advisorTextBg = useMemo(
+    () =>
+      snap.advisorPrompt === null
+        ? null
+        : advisorEchoTrim(snap.advisorPrompt.textBg, snap.objectiveTitle),
+    [snap.advisorPrompt, snap.objectiveTitle],
+  );
 
   // Armed cabin faults, sampled at the status bar's own cadence. Only the
   // ARMED SET matters, so the key comparison keeps this from re-rendering the
@@ -3519,8 +3818,25 @@ export function LessonPlayShell({
             column clear of the chase view's rear-view window during a glance
             (rows B74/B76). ══════════════════════════════════════════════════ */}
         <div
+          // `min-h-0`: the column is itself a flex item in nothing, but every
+          // CHILD of it is one, and a flex item's default `min-height: auto`
+          // means it will not shrink below its content. That is what turned
+          // „anything longer scrolls inside its own card" (below) into a lie —
+          // the cards could not shrink, so `overflow-hidden` cut them instead,
+          // and the sweep filed the same slice-through-the-x-height four times
+          // (bridge-ice steps 9–10, turn-lane-arrows rule 6, obstacle-meeting
+          // step 6, and the «НАУЧИ» toast on ov-narrow). The scroll now happens
+          // where the comment always claimed it did.
+          //
+          // THIS COMMENT SITS ABOVE `data-hud` AND NOT UNDER IT, ON PURPOSE.
+          // `thumb-band-clearance.test.ts` (N4) reads 260 characters forward
+          // from the `data-hud="notify-column"` anchor to check this column is
+          // still `z-30` — the number its own `z-index: 40` rule is beating.
+          // Nine lines of prose between the anchor and the class list pushed
+          // `z-30` out of that window and turned a live guard red. The guard is
+          // right and the comment moved.
           data-hud="notify-column"
-          className={`pointer-events-none absolute z-30 flex flex-col items-stretch gap-1.5 overflow-hidden ${
+          className={`pointer-events-none absolute z-30 flex min-h-0 flex-col items-stretch gap-1.5 overflow-hidden ${
             compact ? "hidden" : ""
           }`}
           style={{
@@ -3572,9 +3888,16 @@ export function LessonPlayShell({
           activeQuiz === null &&
           teachQueue.length === 0 &&
           snap.advisorPrompt !== null &&
+          // …and it has something the banner above it is not already saying.
+          advisorTextBg !== null &&
           snap.advisorPrompt.textBg !== advisorDismissed ? (
             <AdvisorCard
-              prompt={snap.advisorPrompt}
+              // The TRIMMED sentence; `keys` and everything else ride along
+              // untouched. Dismissal is still keyed on the ORIGINAL text (see
+              // `onDismiss`) — that string is the prompt's identity, and keying
+              // it on the trimmed half would make two different objectives that
+              // share a cap look like the same already-dismissed card.
+              prompt={{ ...snap.advisorPrompt, textBg: advisorTextBg }}
               // A6: the mouse-sized ✕. Scoped to this prompt — see
               // `advisorDismissed`.
               onDismiss={() => setAdvisorDismissed(snap.advisorPrompt?.textBg ?? null)}

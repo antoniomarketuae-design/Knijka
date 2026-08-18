@@ -55,6 +55,59 @@
  * orientations, not inferred.
  */
 
+/**
+ * THE FIVE ROWS — 2026-08-18, sweep 161. „A green tick for a skill it never
+ * measured" (commit cdb2f71) was a catalogue-wide class; this is its parking
+ * chapter, found by driving all ten drills on two platforms and reading the
+ * debriefs rather than the source.
+ *
+ * WHAT A `reachZone` TICK CAN PROVE. `stepReachZone(params, prev, tick)` sees
+ * `tick.position` and `tick.speedKmh` and nothing else — no ObjectiveContext,
+ * no control state, no zone membership, no heading. So it can certify „the car
+ * was near this coordinate, at rest" and NOT: which lamps are on, whether a
+ * чл. 98 span was stopped in, whether the driver measured a gap by eye,
+ * whether the car is parallel to the aisle — and, on a HALT gate, not even
+ * that the space has been driven past. That last one is the counter-intuitive
+ * half and it is arithmetic, not opinion: a cap at or below
+ * REACH_ZONE_HALT_CAP_KMH (8) unlocks the approach capsule, whose rear edge
+ * sits `radiusM + REACH_ZONE_GRACE_M` BEHIND the mark. Every Задача 1 in this
+ * file caps at 6 on radius 4–5, so the capsule reaches 9–10 m back at L3 and
+ * 11–12.5 m at L1 (the ladder widens the radius, not the grace). Eight of the
+ * ten set their pose NORTH of their own target bay, and on all eight the
+ * capsule's rear edge lands SOUTH of that bay's north edge at every rung —
+ * §4 of parking3-claim-gates.test.ts re-derives the eight every build.
+ *
+ * The five titles that claimed more than that, and where each duty went:
+ *
+ *   sc-pgl-assess  «…и премери дължината му»  → the halt. Measuring stays in
+ *                  briefing 1–3 and the teach card.
+ *   sc-p45r-setup  «подмини мястото и спри успоредно…» → the halt. Heading and
+ *                  „подмини" are both outside the disc (bay rect y ∈ [−2.72,
+ *                  +2.72]; capsule rear edge y = −4.0 at L3, −6.5 at L1).
+ *   sc-pzb-setup   «подмини забраната…» → the halt. The зона is the rule
+ *                  engine's (ILLEGAL_STOP_IN_BAN_ZONE) and the capsule reached
+ *                  INTO it at L1 — the row's own comment carries the numbers.
+ *   sc-pgj-assess  «…и го премери» → the halt. The refusal is proven by
+ *                  Задача 2 landing 11 m up the row, which IS measured.
+ *   sc-park-night  `objectiveBg` sold the lamps as the first half of Задача 1.
+ *                  They are a fault (HEADLIGHTS_OFF_AT_NIGHT, основна), never
+ *                  a tick, and the sentence now says which.
+ *
+ * NOT ONE `params` VALUE CHANGED. `done` is bit-identical for every drive that
+ * was passing before, so no recording is re-cut and no student loses credit he
+ * had — the sentences were wrong, and a sentence is what the student obeys.
+ *
+ * THE HALF THIS LANE COULD NOT FIX, pinned so it is not mistaken for closed.
+ * The backward halt grace is `objectives.ts`'s, and no authored value can clip
+ * it: `acceptBeforeMarkM` cuts the FAR side of the mark only, and shrinking
+ * `radiusM` runs into WIDEN-ONLY (params.ts) and cannot touch L1 anyway. A
+ * setup pose is not a stop line — stopping short of it is a DIFFERENT
+ * manoeuvre, not the same one done earlier — so the capsule needs either a
+ * mirror parameter or clipping against the district's `noStopping` spans.
+ * Written up in the sweep-161 report; not authored here, because guessing a
+ * semantic for an existing field is how the next false certificate is issued.
+ */
+
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 
@@ -290,9 +343,13 @@ export const SC_PARK_GAP_SHORT: ScenarioSpec = {
     },
     {
       // L5 „Усложнени": същото късо място, но мокро и на тъмно — и с по-строг
-      // допуск. Задължението за светлините е записано в инструкция 1 по-долу
-      // чрез условието на нивото (doc 86 L10 — нощна степен не таксува
-      // задължение, което урокът не е казал).
+      // допуск. Задължението за светлините е записано в инструкция 10 —
+      // ПОСЛЕДНАТА (doc 86 L10 — нощна степен не таксува задължение, което
+      // урокът не е казал). Номерът се разминаваше с една стъпка, останал от
+      // пренаписването на брифинга; L10 се проверява по СЪДЪРЖАНИЕ, не по
+      // номер (lane15 §5 чете compileScenario().briefingBg), затова номерът
+      // тук е само ориентир — но грешният ориентир е покана да се изтрие
+      // грешната стъпка.
       level: 5,
       conditions: { weather: "rain", night: true },
       physics: { wetGrip: true },
@@ -314,7 +371,7 @@ export const SC_PARK_GAP_LONG: ScenarioSpec = {
   tagsBg: ["паркиране", "успоредно", "преден ход", "дълго място", "преценка"],
   titleBg: "Дълго място край бордюра — влизане напред",
   objectiveBg:
-    "Две задачи, в този ред: първо спри срещу мястото и премери дължината му с поглед — над две дължини на колата означава, че заден ход изобщо не е нужен; после влез напред с една плавна дъга и се изправи плътно до бордюра.",
+    "Две задачи, в този ред: първо спри срещу мястото, защото дължината се мери с поглед от покой — над две дължини на колата означава, че заден ход изобщо не е нужен; после влез напред с една плавна дъга и се изправи плътно до бордюра.",
   archetypeIds: ["PK-01"],
   conceptIds: ["c-maneuver-principles", "c-stop-parking-definitions", "c-safety-space"],
   map: {
@@ -356,7 +413,12 @@ export const SC_PARK_GAP_LONG: ScenarioSpec = {
   success: [
     {
       id: "sc-pgl-assess",
-      titleBg: "Задача 1: спри срещу мястото и премери дължината му",
+      // CLAIM GATE (see THE FIVE ROWS at the top of this file). It read
+      // „спри срещу мястото и премери дължината му“ — a disc cannot see a
+      // measurement taken by eye, so the tick certified it for arriving. The
+      // measuring stays where it is teachable and unfaked: briefing steps 1–3
+      // and the teach card. The title now names only the halt the gate reads.
+      titleBg: "Задача 1: спри срещу свободното място",
       // The assess halt IS the turn-in pose (traces/scParkDepth GL_ASSESS_*):
       // a separate „reposition" leg of 30 cm is a pivot, not a manoeuvre.
       params: { kind: "reachZone", x: 3.5, y: -8.37, radiusM: 5, maxSpeedKmh: 6 },
@@ -419,7 +481,8 @@ export const SC_PARK_GAP_LONG: ScenarioSpec = {
     },
     {
       // L5: същото място в мъгла — преценката на дължина по поглед е точно
-      // това, което мъглата отнема. Задължението за фаровете е в инструкция 3.
+      // това, което мъглата отнема. Задължението за фаровете е в инструкция 5
+      // („Включи и късите светлини, ако е тъмно или вали."); беше записано 3.
       level: 5,
       conditions: { weather: "fog" },
       toleranceScale: 0.85,
@@ -464,8 +527,18 @@ export const SC_PARK_VAN: ScenarioSpec = {
     // The offset is an instruction of its own and now reads as one.
     // 75 ch
     { n: 1, textBg: "Подмини гнездото и спри — под 6 км/ч — щом задната ти броня подмине съседа." },
-    // 46 ch
-    { n: 2, textBg: "Дръж около метър и половина странично от реда." },
+    // THE ACT THE SHADOW PERFORMS AND NO STEP USED TO STATE (sweep 161).
+    // Step 2 read „Дръж около метър и половина странично от реда." — a state,
+    // with no WHEN. The recorded correct drive leaves the curb lane at
+    // y = −18 (traces/scParkDepth `easeTo`), i.e. BEFORE the bay row starts at
+    // y = −7.65, because the swing room for a 90° reverse is bought from the
+    // middle of the aisle and nowhere else. Measured on lot-van-v1: the drawn
+    // curb-lane centre is x = 4.06 and the row's own occupied bays reach out
+    // to x = 2.53, so a student who holds that lane down the row has 0 m of
+    // it left — the four mobile/pc legs of sweep 161 all ended on „Настъпи
+    // сблъсък“. The metre-and-a-half is kept; it now has a moment.
+    // 70 ch
+    { n: 2, textBg: "Излез в средата на алеята преди реда — около метър и половина от него." },
     // 80 ch
     { n: 3, textBg: "Знай: гнездото е до бус, а бусът краде сантиметри и цялата видимост зад себе си." },
     // 44 ch
@@ -566,7 +639,7 @@ export const SC_PARK_45_REV: ScenarioSpec = {
   tagsBg: ["паркиране", "косо място", "заден ход", "45 градуса"],
   titleBg: "Косо място на заден ход",
   objectiveBg:
-    "Две задачи, в този ред: първо подмини косото място и спри успоредно на алеята; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе.",
+    "Две задачи, в този ред: първо спри в изходната позиция край косия ред, подминал мястото и успоредно на алеята; после влез на заден ход с точно 45° завъртане — устата на това място гледа назад и напред просто няма как да се влезе.",
   archetypeIds: ["PK-02"],
   conceptIds: ["c-reversing", "c-maneuver-principles", "c-mirrors-blind-spots"],
   map: {
@@ -589,25 +662,43 @@ export const SC_PARK_45_REV: ScenarioSpec = {
     // the lamp condition. The reason survives; it just no longer comes first.
     // 65 ch
     { n: 1, textBg: "Подмини мястото и спри успоредно на алеята — под 6 км/ч, в покой." },
+    // THE ACT THE SHADOW PERFORMS AND NO STEP USED TO STATE (sweep 161), the
+    // sibling of sc-park-van step 2 — and this drill had it NOWHERE. The
+    // recorded correct drive is on x = 0.9 from y = −18 up; on lot-45rev-v1
+    // the 135° echelon row reaches out to x = 2.53, which is inside the drawn
+    // curb lane the car spawns in (centre x = 4.06). Every leg of sweep 161
+    // that held that lane hit a parked car — mobile-right three times, 30 т.
+    // 69 ch
+    { n: 2, textBg: "Излез в средата на алеята преди реда — замахът назад се купува оттам." },
     // 66 ch
-    { n: 2, textBg: "Погледни накъде гледат линиите: устата се отваря НАЗАД спрямо теб." },
+    { n: 3, textBg: "Погледни накъде гледат линиите: устата се отваря НАЗАД спрямо теб." },
     // 70 ch
-    { n: 3, textBg: "Знай: такъв ред се взима само на заден ход и се напуска с лице напред." },
+    { n: 4, textBg: "Знай: такъв ред се взима само на заден ход и се напуска с лице напред." },
     // 44 ch
-    { n: 4, textBg: "Включи на задна — огледала, после през рамо." },
+    { n: 5, textBg: "Включи на задна — огледала, после през рамо." },
     // 43 ch
-    { n: 5, textBg: "Завърти надясно, но само до 45°, не докрай." },
+    { n: 6, textBg: "Завърти надясно, но само до 45°, не докрай." },
     // 68 ch
-    { n: 6, textBg: "Изправи волана, щом колата легне по линиите, и влез право до дъното." },
+    { n: 7, textBg: "Изправи волана, щом колата легне по линиите, и влез право до дъното." },
     // 79 ch
-    { n: 7, textBg: "Спри в очертанията — предницата гледа към алеята и на тръгване виждаш кой идва." },
+    { n: 8, textBg: "Спри в очертанията — предницата гледа към алеята и на тръгване виждаш кой идва." },
     // 61 ch
-    { n: 8, textBg: "Включи късите светлини ПРЕДИ маневрата, ако е тъмно или вали." },
+    { n: 9, textBg: "Включи късите светлини ПРЕДИ маневрата, ако е тъмно или вали." },
   ],
   success: [
     {
       id: "sc-p45r-setup",
-      titleBg: "Задача 1: подмини мястото и спри успоредно на алеята",
+      // CLAIM GATE. It read „подмини мястото и спри успоредно на алеята“ and
+      // claimed two things the disc cannot resolve. HEADING: ReachZoneParams
+      // has no heading field, so a car standing across the aisle at 0 км/ч
+      // ticked „успоредно“. PASSED-THE-SPACE: this is a halt demand (cap 6 ≤
+      // REACH_ZONE_HALT_CAP_KMH), so its grace capsule reaches radius +
+      // REACH_ZONE_GRACE_M = 10 m BACK down the approach — from the mark at
+      // y = 6.0 that is y = −4.0 at L3 and y = −6.5 at L1, while the target
+      // bay rect only spans y ∈ [−2.72, +2.72]. A car halted level with, or
+      // south of, the space was credited with having driven past it — the
+      // exact pose mistake-nose-in convicts one screen down.
+      titleBg: "Задача 1: спри в изходната позиция край косия ред",
       params: { kind: "reachZone", x: 0.9, y: 6.0, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
@@ -818,7 +909,7 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
   tagsBg: ["паркиране", "пешеходна пътека", "чл. 98", "знак В27", "избор на място"],
   titleBg: "Паркиране до пешеходна пътека",
   objectiveBg:
-    "Две задачи, в този ред: първо подмини забранената зона около пътеката, без да спираш в нея, и спри в изходната позиция до първото разрешено място; после паркирай на заден ход в него.",
+    "Две задачи, в този ред: първо спри в изходната позиция до първото РАЗРЕШЕНО място — то е чак след забранената зона около пътеката, а спиране в самата зона се наказва отделно; после паркирай на заден ход в него.",
   archetypeIds: ["PK-01", "PK-06"],
   conceptIds: ["c-parking-prohibitions", "c-reversing", "c-pedestrian-rights-duties"],
   map: {
@@ -862,7 +953,20 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
   success: [
     {
       id: "sc-pzb-setup",
-      titleBg: "Задача 1: подмини забраната и спри до първото разрешено място",
+      // CLAIM GATE, and the worst row in the file: it read „подмини забраната
+      // и спри до първото разрешено място“ while the disc cannot see the ban
+      // at all — and its own halt-grace capsule reaches INTO it. Measured
+      // against the committed district: lot-zebra-v1's `noStopping` zone
+      // lotzb-z-zebra runs fromM 22 → toM 38 of lotzb-e-aisle, which starts at
+      // y = −30, i.e. the чл. 98 span is y ∈ [−8, +8]. The capsule's rear edge
+      // is mark − (radius + REACH_ZONE_GRACE_M) = 18 − 10 = +8.0 at L3 and
+      // 18 − 12.5 = +5.5 at L1 — so at the guided rung a student parked INSIDE
+      // the banned span was handed a green „подмини забраната“ by the task
+      // list while the rule engine billed him ILLEGAL_STOP_IN_BAN_ZONE for the
+      // same act (doc 87 B58: the product must not certify the offence it
+      // bills). The duty is not lost — it is the зона's, mistake-park-after's
+      // and instruction 1's. What is lost is the false certificate.
+      titleBg: "Задача 1: спри до първото разрешено място след пътеката",
       params: { kind: "reachZone", x: 4.0, y: 18.0, radiusM: 5, maxSpeedKmh: 6 },
     },
     {
@@ -928,7 +1032,7 @@ export const SC_PARK_ZEBRA: ScenarioSpec = {
     {
       // L5: същата пътека в дъжд и на тъмно — точно условията, в които
       // закритият пешеходец става непоправим. Задължението за светлините е
-      // записано в инструкция 5.
+      // записано в инструкция 8 — последната; беше записано 5.
       level: 5,
       conditions: { weather: "rain", night: true },
       physics: { wetGrip: true },
@@ -1074,7 +1178,7 @@ export const SC_PARK_NIGHT: ScenarioSpec = {
   tagsBg: ["паркиране", "нощем", "светлини", "успоредно", "заден ход"],
   titleBg: "Нощно паркиране край неосветен ред",
   objectiveBg:
-    "Две задачи, в този ред: първо включи късите светлини и спри в изходната позиция до предната кола — нощем светлините са първото действие, не последното; после влез на заден ход, като мериш разстоянията по огледала, а не по усет.",
+    "Две задачи, в този ред: първо спри в изходната позиция до предната кола; после влез на заден ход, като мериш разстоянията по огледала, а не по усет. Светлините не са една от двете задачи — те са задължение през целия урок и карането без тях се наказва като основна грешка (ЗДвП чл. 70).",
   archetypeIds: ["PK-01"],
   conceptIds: ["c-reversing", "c-night-visibility", "c-lights-overview"],
   map: {
@@ -1116,6 +1220,16 @@ export const SC_PARK_NIGHT: ScenarioSpec = {
   success: [
     {
       id: "sc-pnt-setup",
+      // CLAIM GATE. This TITLE was already honest; `objectiveBg` was not — it
+      // read „първо включи късите светлини и спри в изходната позиция“, i.e.
+      // it sold the lamps as the first half of Задача 1. No ObjectiveParams
+      // variant reads a control state (ReachZone/PassSignal/DriveDistance/
+      // Maneuver), and `stepReachZone` gets only position and speed, so no
+      // authored value could ever have ticked that half. The duty is real and
+      // is enforced ELSEWHERE, which is why the sentence now says so: the
+      // compiled environment arms HEADLIGHTS_OFF_AT_NIGHT with no config gate
+      // (lane11-data-truth), the template's own mistake-no-lights demo cites
+      // that code, and briefing step 1 states the act before the wheels turn.
       titleBg: "Задача 1: спри в изходната позиция до предната кола",
       params: { kind: "reachZone", x: 4.0, y: 19.3, radiusM: 5, maxSpeedKmh: 6 },
     },
@@ -1331,7 +1445,7 @@ export const SC_PARK_JUDGE: ScenarioSpec = {
   tagsBg: ["паркиране", "преценка", "успоредно", "късо място", "решение"],
   titleBg: "Прецени мястото: късо и достатъчно",
   objectiveBg:
-    "Две задачи, в този ред: първо спри срещу първото свободно място и го премери с поглед — то е по-късо от колата плюс метър и не се взима; после паркирай на заден ход във ВТОРОТО, което е близо десет метра.",
+    "Две задачи, в този ред: първо спри срещу първото свободно място, защото оттам се мери с поглед — то е по-късо от колата плюс метър и не се взима; после паркирай на заден ход във ВТОРОТО, което е близо десет метра.",
   archetypeIds: ["PK-01"],
   conceptIds: ["c-maneuver-principles", "c-safety-space", "c-reversing"],
   map: {
@@ -1377,7 +1491,12 @@ export const SC_PARK_JUDGE: ScenarioSpec = {
   success: [
     {
       id: "sc-pgj-assess",
-      titleBg: "Задача 1: спри срещу късото място и го премери",
+      // CLAIM GATE. „…и го премери“ is a judgement, and the tick is a disc:
+      // the drill's whole subject — that the short slot is REFUSED — is proven
+      // by Задача 2 landing in the SECOND bay 11 m up the row, not by this
+      // halt. So this title names the halt and the refusal keeps its own
+      // objective, which is the honest division of the two.
+      titleBg: "Задача 1: спри срещу късото място",
       // Beside the 4.3 m slot (traces/scParkDepth GJ_ASSESS_X / GJ_SHORT_Y):
       // the halt IS the act — the decision is taken here or it is taken with a
       // bumper. r 4 excludes the second slot, 11 m further up the row.
@@ -1445,7 +1564,8 @@ export const SC_PARK_JUDGE: ScenarioSpec = {
     },
     {
       // L5: същата преценка нощем, когато и двете места изглеждат еднакви.
-      // Задължението за светлините е записано в инструкция 5.
+      // Задължението за светлините е записано в инструкция 9 — последната;
+      // беше записано 5.
       level: 5,
       conditions: { night: true },
       toleranceScale: 0.85,

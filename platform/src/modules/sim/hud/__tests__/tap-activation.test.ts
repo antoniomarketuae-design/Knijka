@@ -722,8 +722,17 @@ describe("the second-finger census of the compact driving surface", () => {
    *    a student raises WHILE DRIVING, so it was the expensive half of this
    *    debt. What is left: the tier pill segments (`display:none` on every
    *    compact stage since J-WAVE-3, so not a phone control at all), two roomy
-   *    collapsibles, and the first-run touch hint's «Разбрах» — which is a
-   *    compact control and is now the single honest residue.
+   *    collapsibles, and — until 2026-08-17 — the first-run touch hint's
+   *    «Разбрах». THAT ONE IS NOW FIXED and the row below comes down 2 → 3
+   *    pointer paths accordingly. The catalogue sweep priced it: the hint is a
+   *    GHOST surface (bare type on the world) whose only exit was that button,
+   *    so on sc-park-night it printed across ~70 % of the interior rear-view
+   *    mirror — in the lesson whose briefing grades mirror use — for 43 of 43
+   *    driving frames, 3 min 39 s, and the student could not clear it without
+   *    lifting the thumb off the pedal. Same fix as «Продължи», same reason.
+   *    What is left is the tier pill segments (`display:none` on every compact
+   *    stage since J-WAVE-3, so not a phone control at all) and the two roomy
+   *    collapsibles — none of them a compact control.
    *
    * NOT IN THIS LIST, and each for a checked reason rather than an oversight:
    * `HudToasts` (roomy only — `LessonPlayShell:3031` renders it under
@@ -735,7 +744,8 @@ describe("the second-finger census of the compact driving surface", () => {
    */
   const UNCOVERED = [
     { rel: "modules/sim/hud/PreDriveChecklist.tsx", buttons: 8, pointer: 0 },
-    { rel: "components/sim/LessonScene.tsx", buttons: 6, pointer: 2 },
+    // 2 → 3 on 2026-08-17: the first-run touch hint's «Разбрах» (see above).
+    { rel: "components/sim/LessonScene.tsx", buttons: 6, pointer: 3 },
   ];
   for (const row of UNCOVERED) {
     it(`${row.rel} — ${row.buttons - row.pointer} controls still onClick-only, and no more`, () => {

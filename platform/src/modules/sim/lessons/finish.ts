@@ -72,6 +72,20 @@
  *  clamp entirely — by then every earlier leg is already complete, so there is
  *  no leg left for the finish to swallow.
  *
+ * ---------------------------------------------------------------------------
+ * 2026-08-18 — B1's SHAPE HAD A HOLE IN IT (sweep161, the 174-scenario audit).
+ * B1 gave the maneuver anchors an "outside" face and got the two circles right
+ * for both of them. The `passSignal` anchor, written to the same shape, ships
+ * ONE radius and let `normalizeOutside` default the arming circle to it — so
+ * its band is zero wide and „left the junction" means „one pose sample further
+ * out than the sample that armed it". Five rungs measured (see
+ * FINISH_OUTSIDE_ANNULUS_M), and on all five the junction's own graded stop
+ * line falls INSIDE the arming circle, so the gate is armed by stopping
+ * legally and tripped by hesitating a metre outside it — at a GREEN light,
+ * where B15's freeze withholds nothing. The floor now lives in
+ * `normalizeOutside`, where it is a property of the shape and not of any one
+ * anchor.
+ *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
  */
@@ -188,10 +202,63 @@ export const FINISH_BAY_STUCK_S = 25;
 export const FINISH_LEAVE_S = 20;
 
 /**
- * Margin added to a turn corridor's circumradius before "away" counts, m.
- * Shuffling at the corner of the box must never read as leaving it.
+ * THE ANNULUS — the band between "you have been here" and "you have left", m.
+ *
+ * Every "outside" gate has two circles: `armWithinM`, which records that the
+ * car reached the work site, and `radiusM`, past which it has left. The band
+ * between them is NEITHER, and it is what makes the gate mean anything:
+ * shuffling at the corner of a turn box, hovering at the mouth of a junction
+ * or being nudged back a metre in a queue must never read as a departure.
+ * Collapse the band to nothing and "left" degrades into "one frame further out
+ * than the frame that armed it", which one pose sample can satisfy without the
+ * car going anywhere.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-18 — GENERALISED FROM THE TURN BOX, because a gate shipped without a
+ * band. This constant used to be `FINISH_CORRIDOR_MARGIN_M`, added to a
+ * `threePointTurn` corridor's circumradius and used nowhere else; the
+ * roundabout got its band for free (`enterRadiusM` < `exitRadiusM`) and the
+ * `passSignal` anchor got none at all — it published a single radius, so
+ * `normalizeOutside` defaulted `armWithinM` to that same number and the two
+ * circles coincided.
+ *
+ * MEASURED over the compiled catalogue (808 rungs, all 167 templates × their
+ * authored levels): of the 108 "outside" zones `routeFinishZone` and
+ * `terminalRescueZone` hand out, exactly FIVE had a zero-width band —
+ * `sc-sig-green-wave` L1–L5, radius 40 m, arm 40 m, the only `passSignal`
+ * TERMINAL in the catalogue.
+ *
+ * WHY THAT IS REACHABLE RATHER THAN THEORETICAL. A signalized approach's
+ * graded line is derived at the JUNCTION MOUTH, and with the 2.5× road scale
+ * those mouths land 17–43 m from the node (runtime/stoplines.ts; the shipped
+ * micro-districts measure 27.7 m, JUNCTION_STOP_LINE_M). Every value in that
+ * band is INSIDE a 40 m arming circle — so on this lesson a car stopped
+ * legally AT THE PAINT is what arms the gate, and a car that then holds a few
+ * metres further back — 41 m from the node, one metre into "left the
+ * junction", still short of the line it has not crossed — spends
+ * FINISH_LEAVE_S there and the drive is declared finished with the third lamp
+ * never passed. The lesson is a GREEN wave, so the lamp the student is
+ * hesitating at is green, B15's lawful-wait freeze withholds nothing, and the
+ * gate spends every one of those twenty seconds. That is precisely the harm
+ * the `passSignal` anchor's own comment calls „the worst failure this module
+ * can produce".
+ *
+ * The floor is applied in `normalizeOutside`, so it is a property of the SHAPE
+ * rather than of any one anchor — the next authored maneuver cannot reinvent
+ * the defect. It widens the departure circle rather than narrowing the arming
+ * one, which is the only safe direction: narrowing the arm would stop drives
+ * ARMING and could withhold an ending, while widening the departure can only
+ * ask a car that is genuinely leaving to travel eight more metres (~1 s at
+ * drill speed). The roundabout (26 → 45 m, band 19 m) and the turn box (band
+ * ≥ this margin by construction) are unchanged, bit for bit.
+ *
+ * WHY EIGHT. It is the number the turn box already carried for exactly this
+ * job, and it is one lane pitch — 8.125 m, LANE_WIDTH_M × the 2.5×
+ * perceptual exaggeration, the same pitch FINISH_LANE_FLOOR_M is derived from
+ * — rounded down: a car that has genuinely left a work site is at least a lane
+ * clear of it, and a car being shuffled about at its edge is not.
  */
-export const FINISH_CORRIDOR_MARGIN_M = 8;
+export const FINISH_OUTSIDE_ANNULUS_M = 8;
 
 // ---------------------------------------------------------------------------
 // FR-B5-JAM (doc 87, 2026-08-05) — THE CRASH PIN
@@ -259,6 +326,42 @@ export const CRASH_PIN_RADIUS_M = 6;
  * the likeliest place to have one — and 12 → 26 m widens the band it can
  * happen in. The fix is one condition in `engine.ts` (exempt the crash pin from
  * the freeze), which is another lane's file.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-17 — TWO MORE, MEASURED, AND THE FIRST ONE VOIDS THE PIN OUTRIGHT.
+ * Driven on staging with the shipped harness (`tools/mobile/lesson-audit.mjs`,
+ * sc-follow-distance · mobile · wrong). Recorded here because the pin's
+ * EVIDENCE MODEL is specified in this file; both defects are in `engine.ts`'s
+ * fold of it, so neither is this lane's to close either.
+ *
+ *  P1 — THE RE-ARM WIPES THE CLOCK, so the pin cannot fire in the one case it
+ *  was written for. `engine.ts` re-arms on every graded collision
+ *  („the pose that matters is the LAST one") and that re-arm sets
+ *  `stillSinceSec: null`. But a collision is NOT a one-shot event against a
+ *  thing you stay in contact with: `rules/engine.ts` reopens one every
+ *  COLLISION_REOPEN_TRAVEL_M = 2 m of travel since the last report. So a car in
+ *  sustained contact emits a fresh COLLISION every 2 m — MEASURED at 65 of them
+ *  in a single 177 s drive, i.e. ~130 m spent pushing the thing it hit — and
+ *  each one resets the ten-second clock that was supposed to end the drive.
+ *  The dwell can only ever accumulate for a car that travels LESS than 2 m in
+ *  CRASH_PIN_STUCK_S, which is the one pin that would also have satisfied the
+ *  speed test anyway. Grinding forward against an obstacle — the founder's
+ *  „held at full throttle" — defeats the pin twice over and always has.
+ *  The fix is to re-arm the POSE without clearing `stillSinceSec` (the pose is
+ *  what „did not leave the spot" is measured from; the clock is what „has not
+ *  moved" is measured with, and a re-report is not evidence of movement — the
+ *  `awayM > CRASH_PIN_RADIUS_M` test already carries that).
+ *
+ *  P2 — THE STANDSTILL TEST IS UNSIGNED, alone in this module. `engine.ts`
+ *  reads `tick.speedKmh > FINISH_STANDSTILL_KMH`; every other speed test on
+ *  this side of the wall compares the MAGNITUDE — `stepYieldWait` and
+ *  `stepFinishGate`, the latter carrying the reason in as many words
+ *  („Reverse reads negative — compare the magnitude"). Reverse reads negative,
+ *  so a student backing out of what he hit at −20 km/h scores −20 > 1 = false
+ *  and is counted as STANDING STILL, banking dwell toward having his lesson
+ *  closed for him. He is saved only once he clears CRASH_PIN_RADIUS_M, so the
+ *  exposure is the first 6 m of the one manoeuvre this gate's own comment
+ *  promises never to punish („drove away — not stuck, and never closed down").
  */
 export const CRASH_PIN_STUCK_S = 10;
 
@@ -335,10 +438,19 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
       // every light shows red 26 s of every 50 s, so re-approaching and
       // waiting one out always works (objectives.ts stepPassSignal), and a
       // rescue would close the lesson during the retry it prescribes.
+      //
+      // ARMED BY THE OBJECTIVE'S OWN ACCEPTANCE RING, and left one annulus
+      // beyond it. Naming `armWithinM` here is not decoration: this anchor
+      // published one radius and let `normalizeOutside` default the arm to it,
+      // which collapsed the band (see FINISH_OUTSIDE_ANNULUS_M for the five
+      // rungs that measured). The arm is the objective's own statement of
+      // „the car was at this junction"; the departure circle is that plus the
+      // band, and `normalizeOutside` is what guarantees the second one.
       return {
         x: params.x,
         y: params.y,
         radiusM: params.radiusM,
+        armWithinM: params.radiusM,
         dwellSec: FINISH_LEAVE_S,
         mode: "outside",
         terminalRescue: params.requireRedMet !== true,
@@ -388,7 +500,7 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
             x: corridor.x,
             y: corridor.y,
             radiusM:
-              Math.hypot(corridor.halfWidthM, corridor.halfLengthM) + FINISH_CORRIDOR_MARGIN_M,
+              Math.hypot(corridor.halfWidthM, corridor.halfLengthM) + FINISH_OUTSIDE_ANNULUS_M,
             armWithinM: Math.min(corridor.halfWidthM, corridor.halfLengthM),
             dwellSec: FINISH_LEAVE_S,
             mode: "outside",
@@ -405,10 +517,23 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
   }
 }
 
-/** Clamp an "outside" anchor's arming radius into its own zone. */
+/**
+ * Give an "outside" anchor its two circles, and guarantee the band between
+ * them. The arm is clamped into the zone (you cannot be asked to reach further
+ * out than the place you are leaving), and the departure circle is then pushed
+ * out until at least FINISH_OUTSIDE_ANNULUS_M separates the two — see that
+ * constant for the five rungs that shipped with the circles coincident and
+ * what a car standing at a green light one metre outside them cost.
+ *
+ * Both operations are one-way and in the safe direction: the arm can only
+ * shrink to the zone it belongs to, and the region can only grow, so no drive
+ * that ends today stops ending — a car that has genuinely left the work site
+ * simply travels the band before it counts.
+ */
 function normalizeOutside(zone: RouteFinishZone): RouteFinishZone {
   const armWithinM = Math.min(zone.armWithinM ?? zone.radiusM, zone.radiusM);
-  return { ...zone, armWithinM };
+  const radiusM = Math.max(zone.radiusM, armWithinM + FINISH_OUTSIDE_ANNULUS_M);
+  return { ...zone, armWithinM, radiusM };
 }
 
 function dist(a: Point, b: Point): number {

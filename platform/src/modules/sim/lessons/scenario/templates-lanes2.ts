@@ -206,6 +206,23 @@ export const SC_LN_TURN_LANE_ARROWS: ScenarioSpec = {
 // conditions.night is set on the TEMPLATE (every rung is dark — the drill has
 // no daytime meaning); L5 adds drizzle as a RENDER/conditions axis only: no
 // `physics`, so the dry-tuned ghost envelope stands (ADR-006 stage 4a).
+//
+// SWEEP 161 — THE PREMISE IS NOT ON SCREEN, AND NO TEMPLATE CAN PUT IT THERE.
+// The world goes dark and the ego's own beam is drawn, but NOTHING ELSE IS LIT:
+// on .audit-frames/sweep161/sc-ov-night-gap/mobile-right/04-t054s.png the lead
+// car 16 m ahead shows no illuminated tail lamps (the red band across its back
+// is body trim — the identical band it wears in the daylight scenarios), the
+// parked queue on the shoulder is unlit, and every street lamp along the road
+// is dark. A drill whose whole subject is „преценка по фаровете" is therefore
+// asking the student to read a cue the renderer never draws.
+// THIS FILE CANNOT REPAIR IT: `StagedActorPathSpec` (contracts.ts) carries
+// pathNodes / hold / speeds / offset / colour / profile / indicator and no
+// lighting channel at all, so no scenario spec can ask an actor for lamps —
+// exactly the shape of the gap the `indicator` field was added to close for
+// чл. 43б. The repair is in the traffic fleet's night rig (tail + head lamp
+// emissives driven off the same isNight the tick already carries) and in the
+// world builder's street-lamp props; it is written up in the sweep-161 report.
+// What this file OWNS is not certifying the missing cue — see sc-ovn-wait.
 // ---------------------------------------------------------------------------
 
 /** ov-oncoming-v1 own (northbound) lane center / road length — pinned by value
@@ -320,10 +337,46 @@ export const SC_OV_NIGHT_GAP: ScenarioSpec = {
   success: [
     {
       id: "sc-ovn-wait",
-      titleBg: "Изчакай зад бавната кола, докато първите фарове минат",
-      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the own-lane
-      // center while the trap car is still inbound — the patience IS the drill.
-      params: { kind: "reachZone", x: OVN_OWN, y: 150, radiusM: 4, maxSpeedKmh: 45 },
+      // SWEEP 161 — THE TICK THAT WENT TO THE DRIVER WHO DID NOT WAIT.
+      //
+      // This row shipped as „Изчакай зад бавната кола, докато първите фарове
+      // минат" on a mark at (4.06, 150) r4. Two separate things were wrong with
+      // that, and the audit caught both from one frame
+      // (.audit-frames/sweep161/sc-ov-night-gap/mobile-right/04-t054s.png):
+      //
+      //   1. THE CUE IS NOT THERE. Nothing on this road is lit at night — the
+      //      lead shows no tail lamps, the oncoming cars no headlights, the
+      //      street lamps no emissive. `StagedActorPathSpec` (contracts.ts) has
+      //      no lighting field at all, so no template can ask for one; the
+      //      repair is in the traffic fleet's night rig, not here. A title may
+      //      not certify a cue the world does not render.
+      //
+      //   2. THE ORDER IS NOT MEASURED EITHER. `stepReachZone` reads position
+      //      and speed and nothing else — no clock, no actor. At y = 150 the
+      //      trap car (instant model y = 310 − 12·t) is long gone: it crosses
+      //      150 at t ≈ 13.3 s and the shadow arrives at t = 17.1 s, so the
+      //      shadow's tick was TRUE by luck, not by test. And the demo that
+      //      refused to wait — mistake-far-headlights, which pulls out into the
+      //      ~2.3 s window and is convicted of OVERTAKE_INSUFFICIENT_GAP —
+      //      swept within 1.68 m of that same mark on its way home and was
+      //      credited with the patience it had just failed, at EVERY rung.
+      //
+      // THE REPAIR IS THE MARK, NOT THE SENTENCE ALONE. y = 124 is the point of
+      // the counter-demo's DEEPEST excursion: it is 6.56 m off the own-lane
+      // centre there (measured across its committed samples; the plateau runs
+      // y ∈ [121, 126]), against 1.68 m at the old y = 150. Authored r2.7 →
+      // 4.05 at the widest rung (L1 ×1.5), so the gate refuses that drive with
+      // 2.5 m to spare on every rung while the shadow sweeps it at 0.00 m and
+      // 33.9 km/h. r ≤ 2.7 is also what makes the title's lane claim true at
+      // L1 (4.05 ≤ the 4.0625 m half-pitch), so this row does not join the
+      // LANE_CLAIM_BACKLOG of objective-title-truth-lanes-following2-rail2.
+      //
+      // And the title now says only the two things the evaluator reads. The
+      // WAIT itself is taught where it can be told honestly — instruction 4 and
+      // the „далечни фарове" card — which is the doc 86 D3 ruling: make it true
+      // where a field proves it, make it honest where none can.
+      titleBg: "Дръж своята лента под 45 км/ч",
+      params: { kind: "reachZone", x: OVN_OWN, y: 124, radiusM: 2.7, maxSpeedKmh: 45 },
     },
     {
       id: "sc-ovn-finish",
@@ -547,13 +600,35 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
       // perfectly lawful 80 failed a gate whose title only said „не ускорявай".
       // A speed contract the student cannot see is not a lesson, it is a trap;
       // the number now lives in the title and in instruction 4.
-      titleBg: "Не ускорявай, докато те изпреварват — задръж под 75 км/ч",
-      // THE speed-band gate. y = 380 is the ALONGSIDE point, measured not
-      // guessed: the overtaker resolves passAheadM at t ≈ 28.1 with the shadow
-      // at y ≈ 459, and closes the 42 m from −12 m at ~6.9 m/s, so actorAheadM
-      // ≈ 0 lands at y ≈ 380. maxSpeedKmh 75 is the ceiling a holder/easer
-      // clears (the shadow is at 65.1 here) and a throttler cannot (the mistake
-      // demo is at 99.4 here) — the чл. 42, ал. 2 duty, graded where it bites.
+      //
+      // SWEEP 161 — «ДОКАТО ТЕ ИЗПРЕВАРВАТ» WAS A COINCIDENCE, NOT A TEST, and
+      // it is struck from the title for the doc 86 D3 reason: the evaluator
+      // reads position and speed, so the one thing this gate cannot know is
+      // whether anybody is beside you when you cross it. The overtaker's whole
+      // script is a CLOCK, not a place — RearTailgaterRunner arms on
+      // releaseGapM (20 m) of separation, closes to the followBehindM (12 m)
+      // station, then waits a flat pressureSec (5 s) before it commits — so the
+      // alongside point is a TIME after the player's launch and its POSITION is
+      // that time times the player's own speed. y = 380 is where it landed for
+      // ONE drive, the shadow's ~65 km/h; a slower student is alongside far
+      // short of the mark and then collects the tick on an empty road minutes
+      // later. The audit watched the extreme of that:
+      // .audit-frames/sweep161/sc-ov-being-overtaken/mobile-right/04-t018s.png
+      // has the HUD chip «Кола отзад · 13 м» while the speedometer reads 0 —
+      // the pressure clock ran, and the pass fired, against a car standing
+      // still. THE GATE ITSELF IS KEPT AS IT IS: the 75 km/h ceiling is real
+      // work — the accelerating demo is at 99.4 km/h here and is refused —
+      // and binding an objective to an actor needs an objective KIND that does
+      // not exist (ObjectiveParams carries no stagedEventId outside
+      // emergencyStop). Only the sentence that outran the measurement moved.
+      titleBg: "Не ускорявай — задръж под 75 км/ч",
+      // THE speed-band gate. y = 380 is the ALONGSIDE point for the shadow,
+      // measured not guessed: the overtaker resolves passAheadM at t ≈ 28.1
+      // with the shadow at y ≈ 459, and closes the 42 m from −12 m at ~6.9 m/s,
+      // so actorAheadM ≈ 0 lands at y ≈ 380. maxSpeedKmh 75 is the ceiling a
+      // holder/easer clears (the shadow is at 65.1 here) and a throttler cannot
+      // (the mistake demo is at 99.4 here) — the чл. 42, ал. 2 duty, graded
+      // where it bites for that drive.
       // radius 6 < the 8.125 m lane pitch: it also fails from the oncoming bank.
       params: { kind: "reachZone", x: OVN_OWN, y: 380, radiusM: 6, maxSpeedKmh: 75 },
     },
@@ -620,6 +695,24 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
 // decision, geometry we can actually build. Every line of copy below is
 // curve-based — nothing claims a slope the map does not have.
 //
+// SWEEP 161 — THE RULE ABOVE HAD LEAKED IN TWO PLACES, and the leak is the
+// whole of that audit's «There is no crest» row (frame
+// .audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png, and
+// 04-t070s.png 102 s earlier: the road runs to a FLAT horizon against a distant
+// mountain backdrop at both ends of the route — the only geometry change on
+// ov-crest-v1 is the 135 m / 90° bend, exactly as gen_ov_crest.mjs builds it).
+// Two student-facing sentences still narrated terrain:
+//   · instruction n2 — „напред пътят завива надясно и се скрива зад склона";
+//   · the blind-pass card — „зад склона на завоя пътят продължава".
+// Both now name what actually hides the road here — the arc itself and the
+// sight line that ends on it. The LAW's own frame is untouched and stays
+// general on purpose (titleBg „преди било и завой", objectiveBg „преди връх на
+// изкачване или сляп завой", teach.whenBg's list): чл. 43 covers both cases and
+// a student must carry the rule to a crest he will meet on a real road. The
+// boundary this file now holds is narrow and checkable — copy that describes
+// THIS road may not claim a slope; copy that states the rule may name one.
+// `lanes2-sweep161.test.ts` §1 pins exactly that split.
+//
 // WHY THE MISTAKES GRADE WHAT THEY GRADE. The В24 span is authored, posted and
 // on the tick (tick.noOvertakeZone — the district battery pins all three), and
 // yet OVERTAKING_IN_BAN_ZONE CANNOT fire here, by construction: the detector
@@ -675,6 +768,16 @@ const OVCC_EXIT_ONCOMING_Y = 379.06;
  *     FOLLOWING_TOO_CLOSE can never leak into a demo about anything else.
  * Its slam tier is authored out of reach (the OVN/OVB mold): this is
  * deterministic moving traffic, not a braking drill.
+ *
+ * SWEEP 161 — and the same floor is missing here as on LNBD_CRAWLER (see its
+ * doc, which carries the full write-up): maxMatchSpeedMps is a CEILING, so a
+ * student who crawls gets a truck that crawls with him. The audit's correct
+ * drive topped out at 21 km/h and stopped 27 times, and at t 172 s the 57 km/h
+ * truck is standing 40 m ahead on a flat, empty road
+ * (.audit-frames/sweep161/sc-ov-crest-curve/mobile-right/04-t172s.png): the
+ * 450 m straight the second and third gates live on is then never reached, and
+ * all three objectives stay dark. Not authorable from a template — the field
+ * `BrakingLeadCarSpec` would need is a minimum pace, and it does not exist.
  */
 const OVCC_LEAD_TRUCK: BrakingLeadCarSpec = {
   id: "sc-ovcc-lead",
@@ -783,7 +886,10 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
     // Ledger L10: the L5 rung compiles rain and HEADLIGHTS_OFF_IN_RAIN grades
     // unconditionally (ЗДвП чл. 70).
     { n: 1, textBg: "Извънградски път, по една лента в посока, ограничение 90. Пред теб пълзи бавен камион и ти се иска да го подминеш. Вали ли, включи късите светлини още сега (чл. 70) — в закрит завой те не са, за да виждаш ти, а за да те види насрещният секунда по-рано." },
-    { n: 2, textBg: "Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40 — напред пътят завива надясно и се скрива зад склона." },
+    // SWEEP 161: this line used to end „…и се скрива зад склона". There is no
+    // slope on ov-crest-v1 (see the header) — what hides the road is the arc,
+    // so that is what the sentence names now.
+    { n: 2, textBg: "Отдалеч се появява знак В24 „Забранено е изпреварването“, а след него знак А1 с табела 40 — напред пътят завива надясно и погледът ти свършва в дъгата." },
     { n: 3, textBg: "Не започвай нищо. Забраната важи от знака, а не от завоя: маневра, започната „на ръба“, ЗАВЪРШВА вътре в слепия участък." },
     { n: 4, textBg: "Свали скоростта още на правата — в дъгата дръж около 40 и остани зад камиона, дори да ти се струва, че насреща е чисто. Празното платно, което виждаш, свършва там, където свършва и погледът ти." },
     { n: 5, textBg: "Изчакай завоя да те изведе на дългата права. Чак когато видиш свободен насрещен участък за ЦЯЛАТА маневра: огледало, ляв мигач, решително изпреварване." },
@@ -842,7 +948,7 @@ export const SC_OV_CREST_CURVE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ov-crest-curve/mistake-blind-pass.trace.json" },
       titleBg: "Изпреварване в слепия завой",
       whatWentWrongBg:
-        "„Камионът пълзи, а насреща е чисто“ — и колата излезе в дъгата. Само че „чисто“ там значи единствено „не виждам“: зад склона на завоя пътят продължава, а по него идва кола. Тя се появи, когато маневрата вече беше започнала — измереният прозорец се оказа секунди, а не метри. Точно това забранява чл. 43: не се изпреварва при ограничена видимост, независимо колко бавен е предният и колко празно изглежда платното. Знакът В24 стои 90 метра преди завоя именно защото решението се взема ТАМ, не в дъгата.",
+        "„Камионът пълзи, а насреща е чисто“ — и колата излезе в дъгата. Само че „чисто“ там значи единствено „не виждам“: зад вътрешната страна на завоя пътят продължава, а по него идва кола. Тя се появи, когато маневрата вече беше започнала — измереният прозорец се оказа секунди, а не метри. Точно това забранява чл. 43: не се изпреварва при ограничена видимост, независимо колко бавен е предният и колко празно изглежда платното. Знакът В24 стои 90 метра преди завоя именно защото решението се взема ТАМ, не в дъгата.",
       codeRefs: ["OVERTAKE_INSUFFICIENT_GAP"],
     },
     {
@@ -1238,6 +1344,25 @@ const LNBD_LIMIT = 40;
  *     45 m followGapM barely closes across the whole demo: at 6.1 m/s the
  *     follow band is 0.7 × 1.8 s × 6.1 ≈ 7.7 m of bumpers, and the gap never
  *     goes near it. FOLLOWING_TOO_CLOSE cannot leak into a demo about mirrors.
+ *
+ * SWEEP 161 — THE CEILING HAS NO FLOOR, AND THAT IS WHY THE DRILL CAN BECOME
+ * UNWINNABLE. `matchPlayer` (runners.ts BrakingLeadCarRunner.commandPace) holds
+ * the station at the PLAYER'S speed, capped at maxMatchSpeedMps and floored at
+ * nothing. So instruction 2's «бавна кола с около 20 км/ч» is only true above
+ * 20 km/h: at or below it the crawler mirrors the student, sits 45 m ahead
+ * forever, and the overtake this template exists for cannot be performed at
+ * all. The audit drove exactly that student — top 17 km/h, 13 full stops
+ * (.audit-frames/sweep161/sc-ln-boulevard-discipline/mobile-right/run.log) —
+ * and both remaining gates stayed dark in all four legs; the same picture is on
+ * the crest sibling's frame, where a 57 km/h truck stands still 40 m ahead of a
+ * stopped ego (…/sc-ov-crest-curve/mobile-right/04-t172s.png).
+ * NOT AUTHORABLE HERE: `BrakingLeadCarSpec` has no minimum-pace field, and the
+ * alternative it does have — paceMode "scheduledCruise" — is the opposite
+ * failure (the crawler simply drives away and the student meets an empty
+ * boulevard, which this file's own bot-completion gate calls the drill
+ * inverting into its own mistake demo). The fix is a `minMatchSpeedMps` floor
+ * on the matchPlayer command; it belongs to runners.ts / contracts.ts and is
+ * written up in the sweep-161 report rather than guessed at from here.
  */
 const LNBD_CRAWLER: BrakingLeadCarSpec = {
   id: "sc-lnbd-crawler",

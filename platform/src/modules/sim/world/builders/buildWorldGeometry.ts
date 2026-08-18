@@ -4,6 +4,7 @@
  * no DOM: runs identically in the browser and in vitest/node.
  */
 
+import { scenarioBaysOf, type ParkingBaySpec } from "../../contracts";
 import { LESSON_PARKING_BAYS } from "../../lessons/specs";
 import { SIGN_KINDS } from "../types";
 import type {
@@ -30,6 +31,111 @@ import { buildTerrain } from "./terrain";
 import { buildWaterDecals } from "./waterDecals";
 
 export const DEFAULT_SEED = 1337;
+
+/**
+ * THE BAY SET A DISTRICT PAINTS WHEN THE CALLER SAYS NOTHING.
+ *
+ * The default used to be `LESSON_PARKING_BAYS` flat, and that list is the CITY
+ * district's alone (specs.ts collects the bays of lessons whose district is
+ * DEFAULT_DISTRICT_ID). Built bare, EVERY map therefore got the city's L7 rect:
+ * on lot-perp-v1 — bounds x ∈ [-28, 11.03] — the markings mesh reached
+ * x = 685.0, i.e. 674 m past the far edge of that world, and `stats.parkingBays`
+ * read 1 on all 90 scenario districts. A bay billed to a district that has none,
+ * while the five bays lot-perp-v1 DOES author in `meta.scenario.bays` were
+ * painted only if a caller happened to hand them back in (sweep161
+ * sc-park-bay-exit-rev: „content/world/lot-perp-v1.json does carry five bays …
+ * so the data exists and the renderer is not drawing it").
+ *
+ * A District document carries no lesson-district id — `meta.district` is
+ * "studentski-grad" while the lessons key on the file id "district-v1" — so
+ * membership is tested where it IS decidable in this layer: a bay rect outside
+ * the district's own bounds cannot be paint on that district's ground. The city
+ * keeps its L7 bay; nobody else inherits it, and every district's own authored
+ * lot is drawn because it is the map's data, not the curriculum's.
+ *
+ * A caller that passes `parkingBays` still wins outright, `[]` included — the
+ * option's "pass [] for a bare build" contract is untouched, so the drill mount
+ * (lessonWorldRecipe, which already unions both sources) builds byte-identically.
+ */
+function defaultParkingBays(district: District): readonly ParkingBaySpec[] {
+  const b = district.meta.boundsLocalMeters;
+  return [
+    ...LESSON_PARKING_BAYS.filter(
+      (p) => p.x >= b.minX && p.x <= b.maxX && p.y >= b.minY && p.y <= b.maxY,
+    ),
+    ...scenarioBaysOf(district).map(({ x, y, headingDeg, widthM, lengthM }) => ({
+      x,
+      y,
+      headingDeg,
+      widthM,
+      lengthM,
+    })),
+  ];
+}
+
+/**
+ * THE LOT'S GROUND — the apron a `scenario-lot` map never had.
+ *
+ * Ground-use zoning (terrain.ts) decides paved-vs-grass by proximity to a
+ * BUILDING footprint, and a parking lot has no building: a lot district is one
+ * 160 m road, one kiosk and five bay rects in `meta.scenario.bays`. Measured on
+ * lot-gap-short-v1 before this pass, `terrainPaved` spanned district y ∈
+ * [-177.5, -25.0] — it stopped 25 m SHORT of the bays at y ∈ [-14.05, +14.05],
+ * so the bays, the parked cars and the entire manoeuvre were painted on a lawn.
+ * That is the sweep161 verdict on three drills at once: „the manoeuvre is
+ * performed in a void" (sc-park-gap-short), „nothing to be parallel to"
+ * (sc-park-gap-long), „an unbroken grass plane with nothing on it"
+ * (sc-park-bay-exit-rev, whose car starts IN a bay at x = 5.03 facing east with
+ * 3 m of carriageway left in front of it and nothing but grass after).
+ *
+ * So the bay band's own rect goes into the zoning pass as one apron footprint
+ * and the lot becomes the concrete terrain.ts's `paved` mesh is documented for
+ * („concrete courtyards / parking"). No new constant: the pass pads whatever it
+ * is given by TERRAIN_PAVE_NEAR_BUILDING_M (20 m), which on lot-gap-short-v1
+ * carries the paving from y = -34.05 to +34.05 — joining the kiosk's apron at
+ * y = -25 into one continuous surface from the approach through the lot.
+ *
+ * STRICTLY ADDITIVE, twice over:
+ *  - `scenario-lot` is the only mapKind gated in (14 of 105 committed maps).
+ *    pk-double-v1 and vu-door-v1 also carry `meta.scenario.bays`, but their
+ *    bays are KERBSIDE on a street — asphalt, not a courtyard — and they stay
+ *    grass-or-whatever-the-buildings-say exactly as before;
+ *  - the apron is fed to the terrain call ONLY. `buildProps` keeps the authored
+ *    building AABBs it always had, so not one tree, lamp, pole or railing moves.
+ */
+function lotApronFootprint(district: District): [number, number, number, number] | null {
+  // DistrictMeta is an open record, so the kind arrives typed `unknown`; the
+  // typeof is what lets the literal comparison through (zoneSigns.ts pattern).
+  const mapKind = district.meta.mapKind;
+  if (typeof mapKind !== "string" || mapKind !== "scenario-lot") return null;
+  const bays = scenarioBaysOf(district);
+  if (bays.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const bay of bays) {
+    // The bay's four corners, in markings.paintParkingBay's axes exactly
+    // (dir = [sin h, cos h]; right = perpRight(dir) = [dir.y, -dir.x]) so a 45°
+    // bay contributes its diagonal and not its width.
+    const h = (bay.headingDeg * Math.PI) / 180;
+    const dx = Math.sin(h);
+    const dy = Math.cos(h);
+    const halfL = bay.lengthM / 2;
+    const halfW = bay.widthM / 2;
+    for (const sl of [-1, 1]) {
+      for (const sw of [-1, 1]) {
+        const x = bay.x + sl * halfL * dx + sw * halfW * dy;
+        const y = bay.y + sl * halfL * dy - sw * halfW * dx;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+  return [minX, minY, maxX, maxY];
+}
 
 export function buildWorldGeometry(
   district: District,
@@ -78,12 +184,13 @@ export function buildWorldGeometry(
   });
   // Lesson-authored painted bays (L7) by default — the same curriculum-drives-
   // the-world pattern as the L2 stop-sign placement. Pass [] for a bare build.
+  // The default is district-scoped since sweep161; see `defaultParkingBays`.
   const markings = buildMarkings(
     district,
     network,
     props.stopSignApproaches,
     props.giveWayApproaches,
-    options.parkingBays ?? LESSON_PARKING_BAYS,
+    options.parkingBays ?? defaultParkingBays(district),
   );
   // The roundabout pass proper: the kerbed central island (kerb + rim into the
   // SIDEWALK mesh, so the kerb also becomes a collider a car cannot cross; the
@@ -113,7 +220,16 @@ export function buildWorldGeometry(
   const decals = buildRoadDecals(network, options.seed ?? DEFAULT_SEED, markings.markings);
   // Terrain resolution is fixed in the pure layer; the renderer decimates by
   // quality via the `terrainSegments` option of its own rebuild if needed.
-  const terrain = buildTerrain(district, network, buildings.aabbs, 112);
+  // The ground-use zoning list is the building AABBs PLUS the parking-lot
+  // apron, so a lot is not a lawn — see `lotApronFootprint`. `null` (and so a
+  // byte-identical call) on every district that is not a `scenario-lot`.
+  const lotApron = lotApronFootprint(district);
+  const terrain = buildTerrain(
+    district,
+    network,
+    lotApron ? [...buildings.aabbs, lotApron] : buildings.aabbs,
+    112,
+  );
 
   const b = district.meta.boundsLocalMeters;
   const spanX = b.maxX - b.minX + 2 * TERRAIN_MARGIN_M;

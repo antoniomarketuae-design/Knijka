@@ -205,7 +205,17 @@ export interface DriveScriptState {
   readonly log: readonly DriveStepLogEntry[];
 }
 
+/**
+ * Arm a script. THROWS on a step the rig cannot honour — see
+ * `validateDriveSteps`. `?script=` is already screened by `parseDriveScript`,
+ * but `window.__driveRig.run([…])` is not, and a headless tool that hands over
+ * a hand-built array (tools/clips/headless/drive-rig.mjs does exactly that, via
+ * `JSON.parse` of its own `--script`) has no other way to be told that the
+ * drive it is about to photograph is not the drive it asked for.
+ */
 export function createDriveScript(steps: readonly DriveStep[], tSec = 0): DriveScriptState {
+  const problem = validateDriveSteps(steps);
+  if (problem !== null) throw new RangeError(`drive script refused — ${problem}`);
   return {
     steps,
     index: 0,
@@ -292,6 +302,13 @@ export function stepDriveScript(
     // note. `holdBrake` opts into the continuous hold a real student applies.
     if (step.holdBrake === true) {
       brake = 1;
+      // Hand over with the ON phase ALREADY SPENT, so that if a pulsed step
+      // follows this one its very first frame LIFTS. Left at (phase 0, pedal
+      // down) the pulse restarts under a pedal that never came up — the same
+      // fusion the note above measured across a handover, except here the ON
+      // phase it fuses with is the whole hold-brake step.
+      standstillPhaseS = STANDSTILL_BRAKE_ON_S;
+      standstillBraking = true;
     } else {
       standstillPhaseS = state.standstillPhaseS + dt;
       standstillBraking = state.standstillBraking;
@@ -361,7 +378,20 @@ export function stepDriveScript(
       index,
       stepStartedAtSec: sample.t,
       lastT: sample.t,
-      integral: 0,
+      // CARRIED, for exactly the reason the duty cycle below is carried: the
+      // throttle it takes to hold 50 km/h is a property of A CAR AT 50 KM/H,
+      // not of the step that happens to be running. Dumping it at every
+      // handover made a cruise expressed as many short steps a DIFFERENT DRIVE
+      // from the same cruise expressed as one — and many short steps is the
+      // normal shape here, because the rig shoots a frame on every handover.
+      // Measured on the test plant, 50 km/h asked for as twenty 2 s legs sagged
+      // to 46.7 km/h (worst deviation 3.27) and covered 488.9 m in 41 s, against
+      // 49.5 km/h (0.55) and 506.8 m for one 40 s step: 3.5 % of the lesson's
+      // road missing, on an instrument whose whole claim is that it drives what
+      // the script says. A stale demand cannot outlive a step that asks for
+      // LESS — the brake branch and the standstill branch both zero it on the
+      // first frame they run.
+      integral,
       stoppedForSec: 0,
       // NOT reset — see the STANDSTILL_BRAKE_ON_S note. Restarting the pulse
       // here without lifting the pedal fuses two ON phases into one hold long
@@ -380,19 +410,90 @@ export function stepDriveScript(
 // URL / JSON parsing
 // ---------------------------------------------------------------------------
 
+/** A `{x,y}` whose coordinates are real numbers — `NaN`/`Infinity` are not points. */
 const isPoint = (v: unknown): v is WorldPoint =>
   typeof v === "object" &&
   v !== null &&
-  typeof (v as WorldPoint).x === "number" &&
-  typeof (v as WorldPoint).y === "number";
+  Number.isFinite((v as WorldPoint).x) &&
+  Number.isFinite((v as WorldPoint).y);
+
+/**
+ * THE RANGE EACH NUMERIC FIELD MUST LIE IN — because `typeof v === "number"`
+ * is not a range check, and every field below has a value that passes it and
+ * turns the drive into a DIFFERENT DRIVE, silently:
+ *
+ *   forSec: 1e999    JSON.parse yields Infinity. `elapsed >= Infinity` is never
+ *                    true, so the step never ends and the car just runs out of
+ *                    route — which in a debrief is indistinguishable from a
+ *                    student who never finished the lesson („Урокът беше
+ *                    прекъснат преди края", sweep161).
+ *   decelMs2: 0      sqrt(2·0·d) is 0 at EVERY distance, so a `stopAt` step
+ *                    targets a standstill from the first metre: the car brakes
+ *                    to rest and pulses there until the 90 s timeout.
+ *   decelMs2: -1     sqrt of a negative is NaN ⇒ the target is NaN ⇒ BOTH pedal
+ *                    comparisons are false ⇒ the command is throttle 0 / brake 0
+ *                    for the whole step. A car that never sustains a speed and
+ *                    never touches a pedal.
+ *   speedKmh: -5     `Math.max(0, …)` in targetSpeedMs turns it into a wait.
+ *   withinM: 0       the arrival ring becomes a point the car cannot occupy, so
+ *                    the positional terminator can never fire.
+ *
+ * `minExclusive` marks the fields where the low boundary is itself one of those
+ * broken drives rather than merely an odd one. The ceilings are unit-slip
+ * catchers — `forSec` given in MILLISECONDS is the mistake they exist for.
+ */
+const NUMERIC_RANGE: Record<string, { min: number; max: number; minExclusive?: boolean }> = {
+  speedKmh: { min: 0, max: 400 },
+  withinM: { min: 0, max: 500, minExclusive: true },
+  decelMs2: { min: 0, max: 20, minExclusive: true },
+  steer: { min: -1, max: 1 },
+  forSec: { min: 0, max: 3600, minExclusive: true },
+  timeoutSec: { min: 0, max: 3600, minExclusive: true },
+};
+
+/**
+ * The first thing wrong with `steps`, in words, or null if nothing is.
+ *
+ * One gate, LOUD on both sides: `parseDriveScript` turns a problem into null
+ * (the dev route already reports that on screen) and `createDriveScript` throws
+ * (a `window.__driveRig.run([…])` caller has no other channel). Neither one
+ * substitutes a default, because quietly driving a DIFFERENT script than the
+ * one asked for is the exact failure this whole instrument exists to end.
+ */
+export function validateDriveSteps(steps: unknown): string | null {
+  if (!Array.isArray(steps)) return "script is not an array";
+  for (let i = 0; i < steps.length; i++) {
+    const item: unknown = steps[i];
+    if (typeof item !== "object" || item === null) return `step ${i} is not an object`;
+    const o = item as Record<string, unknown>;
+    if (o.speedKmh === undefined) return `step ${i}: speedKmh is required`;
+    for (const field of Object.keys(NUMERIC_RANGE)) {
+      const v = o[field];
+      if (v === undefined) continue;
+      const r = NUMERIC_RANGE[field]!;
+      if (typeof v !== "number" || !Number.isFinite(v)) return `step ${i}: ${field} is not a finite number`;
+      if (v < r.min || v > r.max || (r.minExclusive === true && v === r.min)) {
+        return `step ${i}: ${field}=${v} is outside ${r.minExclusive === true ? "(" : "["}${r.min}, ${r.max}]`;
+      }
+    }
+    if (o.stopAt !== undefined && !isPoint(o.stopAt)) return `step ${i}: stopAt is not a finite {x,y}`;
+    if (o.untilNear !== undefined && !isPoint(o.untilNear)) return `step ${i}: untilNear is not a finite {x,y}`;
+    if (o.label !== undefined && typeof o.label !== "string") return `step ${i}: label is not a string`;
+    if (o.holdBrake !== undefined && typeof o.holdBrake !== "boolean") return `step ${i}: holdBrake is not a boolean`;
+    if (o.keys !== undefined && (!Array.isArray(o.keys) || !o.keys.every((k) => typeof k === "string"))) {
+      return `step ${i}: keys is not an array of key codes`;
+    }
+  }
+  return null;
+}
 
 /**
  * Parse a `?script=` payload (URL-decoded JSON array of DriveStep) into steps.
  *
  * Deliberately strict and silent-free: an unparseable or malformed script
- * returns null and the caller reports it, because a rig that quietly drives a
- * DIFFERENT script than the one asked for is exactly the failure this whole
- * instrument exists to end.
+ * returns null and the caller reports it. Unknown KEYS are dropped (they cannot
+ * change the drive); a known key with a value the rig cannot honour is refused,
+ * because that one can.
  */
 export function parseDriveScript(raw: string): DriveStep[] | null {
   let parsed: unknown;
@@ -401,13 +502,11 @@ export function parseDriveScript(raw: string): DriveStep[] | null {
   } catch {
     return null;
   }
-  if (!Array.isArray(parsed)) return null;
+  if (validateDriveSteps(parsed) !== null) return null;
   const out: DriveStep[] = [];
-  for (const item of parsed) {
-    if (typeof item !== "object" || item === null) return null;
+  for (const item of parsed as unknown[]) {
     const o = item as Record<string, unknown>;
-    if (typeof o.speedKmh !== "number" || !Number.isFinite(o.speedKmh)) return null;
-    const step: DriveStep = { speedKmh: o.speedKmh };
+    const step: DriveStep = { speedKmh: o.speedKmh as number };
     if (typeof o.label === "string") step.label = o.label;
     if (isPoint(o.stopAt)) step.stopAt = { x: o.stopAt.x, y: o.stopAt.y };
     if (isPoint(o.untilNear)) step.untilNear = { x: o.untilNear.x, y: o.untilNear.y };
@@ -416,6 +515,11 @@ export function parseDriveScript(raw: string): DriveStep[] | null {
     if (typeof o.steer === "number") step.steer = o.steer;
     if (typeof o.forSec === "number") step.forSec = o.forSec;
     if (typeof o.timeoutSec === "number") step.timeoutSec = o.timeoutSec;
+    // `holdBrake` was documented on DriveStep and driven by `run([…])` from the
+    // day the pulse got its opt-out, and this parser never read it — so every
+    // `?script=` asking for the continuous hold a student applies at a Б2 line
+    // was answered with the PULSE instead, with nothing on screen to say so.
+    if (typeof o.holdBrake === "boolean") step.holdBrake = o.holdBrake;
     if (Array.isArray(o.keys) && o.keys.every((k) => typeof k === "string")) {
       step.keys = o.keys as string[];
     }

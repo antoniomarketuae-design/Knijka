@@ -92,29 +92,34 @@ describe("heldSceneryFor — per-template dressing", () => {
     // Pinned BY VALUE from the trace harnesses (hazardObstacleRects /
     // wetVanObstacle / snowVanObstacle / hzAccidentObstacles — not on the
     // public barrel, hence the literal re-pins here).
-    const wrecks: Array<[string, Array<[number, number, number]>]> = [
-      ["sc-hazard-obstacle@L1", [[5.5, 130, 0]]],
-      ["sc-ac-wet-braking@L1", [[4.06, 310, 0]]],
-      ["sc-ac-snow@L1", [[4.06, 310, 0]]],
+    // `extra` = bodies with no rect twin: pure dressing this table chose (doc
+    // 88's crash tableau), which must still be visual-only but is pinned to
+    // nothing. The RECT-BACKED poses stay first and stay exact, so a dressing
+    // body can never quietly displace one.
+    const wrecks: Array<[string, Array<[number, number, number]>, number]> = [
+      ["sc-hazard-obstacle@L1", [[5.5, 130, 0]], 0],
+      ["sc-ac-wet-braking@L1", [[4.06, 310, 0]], 0],
+      ["sc-ac-snow@L1", [[4.06, 310, 0]], 0],
       [
         "sc-hz-accident-scene@L1",
         [
           [7.0, 150, 20],
           [7.2, 162, -15],
         ],
+        1, // the broadside car — scenery-held-conflicts.test.ts measures it
       ],
       // scReels.ts accidentMistake(): the parked car hit-and-fled at the
       // authored COLLISION point (~5.7, 148) — bodied at the collision spot.
-      ["sc-accident-own-conduct@L1", [[6.4, 149, 0]]],
+      ["sc-accident-own-conduct@L1", [[6.4, 149, 0]], 0],
     ];
-    for (const [lessonId, poses] of wrecks) {
+    for (const [lessonId, poses, extra] of wrecks) {
       const held = heldSceneryFor(lessonId, {});
-      expect(held.length, lessonId).toBe(poses.length);
-      for (let i = 0; i < poses.length; i++) {
+      expect(held.length, lessonId).toBe(poses.length + extra);
+      for (let i = 0; i < held.length; i++) {
         const o = held[i];
         expect(o.kind, lessonId).toBe("vehicle");
         if (o.kind !== "vehicle") continue;
-        expect([o.x, o.y, o.headingDeg], lessonId).toEqual(poses[i]);
+        if (i < poses.length) expect([o.x, o.y, o.headingDeg], lessonId).toEqual(poses[i]);
         expect(o.visual, lessonId).toBe(true);
       }
     }

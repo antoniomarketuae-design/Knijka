@@ -198,18 +198,68 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
     { n: 5, textBg: "Не залепвай, за да „не те засичат“ — по-бързо значи по-голяма дистанция." },
     // 51 ch
     { n: 6, textBg: "Задръж съобразената дистанция до края на отсечката." },
-    // 70 ch
-    { n: 7, textBg: "Включи късите светлини в дъжд (чл. 70): мокрото платно гълта светлина." },
+    // SWEEP 161 — A RAIN STEP IN A SCENARIO AUTHORED DRY. This step read
+    // «Включи късите светлини в дъжд (чл. 70): мокрото платно гълта светлина.»
+    // and was photographed on the L1 briefing card over a dry road in bright
+    // daylight (mobile-right/02-briefing.png): `conditions.weather` is "dry" at
+    // every rung the student can reach, so the step ordered an act the world
+    // gave him no occasion for and spent one of eight lines doing it.
+    //
+    // THE CAUSE WAS THE RUNG BELOW IT, NOT THE LINE. The lamp duty is real —
+    // but only on the rain rung, and this template's L5 was the bare
+    // `{ level: 5, conditions: { weather: "rain" } }`: rain with no grip, no
+    // complication card and therefore no instructor line naming светлини. That
+    // is exactly the hole `l5Wet()` exists to fill (complications.ts: every
+    // recipe whose environment sets rain NAMES светлини in its `coachBg`, and
+    // `level-complication.test.ts` fails the build if it does not), so the
+    // duty moves to the rung where it becomes gradeable and this step goes
+    // back to the drill's own dry subject — the gap somebody else takes.
+    // 75 ch — «Вдигни», not «Изостани»: the card's ACT_FIRST verb list
+    // (briefing-card-budget.test.ts) is the vocabulary the compact card was
+    // measured against, and a step that opens outside it reads as a condition.
+    { n: 7, textBg: "Вдигни крак отново, ако някой се вклини пред теб — не връщай метрите с газ." },
     // 60 ch
     { n: 8, textBg: "Помни: предният те чете само по фаровете ти в огледалото си." },
   ],
   success: [
     {
       id: "sc-fd-follow",
-      titleBg: "Следвай на съобразена дистанция",
-      // A plain reach-zone mid-street: the calm shadow drive passes it; the
-      // grading of the gap itself is the rule engine's job (FOLLOWING_TOO_CLOSE).
-      params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10 },
+      /**
+       * TITLE-TRUTH + THE MISSING CAP (sweep 161, the D3 census this file was
+       * left out of — templates-following2.ts `sc-fbc-read` carries the same
+       * repair with its full reasoning).
+       *
+       * This read «Следвай на съобразена ДИСТАНЦИЯ» over a BARE reachZone: no
+       * cap, no gap term, nothing but a coordinate. Photographed convicting and
+       * crediting the same driver in the same drive — pc-wrong/04-t038s.png has
+       * the chip already advanced to «ЗАДАЧА 2/2» (i.e. this objective ticked)
+       * while «Пътнотранспортно произшествие · ОПАСНА ГРЕШКА −10» is on screen,
+       * after «Несъобразена дистанция» fired at t = 17 s. A student saw a green
+       * tick for the exact skill he had just failed.
+       *
+       * WHY NOT A GAP PARAM. `stepReachZone(params, prev, tick)` never reads a
+       * gap, and the `minLeadGapM`/`minLeadGapSec` gate built for this very
+       * family was dropped after two adversarial passes (cdb2f71): a flat metre
+       * floor sat above the product's own taught two seconds and its any-frame
+       * latch certified a whole tailgating pass off one qualifying frame. A
+       * false refusal teaches as hard as a false certificate. So the title says
+       * only what the gate can see — and the gate is given something to see.
+       *
+       * WHAT IT SEES, MEASURED on the three committed recordings at this circle
+       * (y = 175 ± 10): the shadow holds 25.9 км/ч for all 56 of its in-zone
+       * frames, and BOTH mistake demos hold 47.9 км/ч for all 30 of theirs. The
+       * cap 32 is therefore not decoration: it is the first thing in this drill
+       * that refuses the two recorded tailgaters, and it clears the shadow by
+       * 6.1 км/ч. Posted here is 50, so the ladder's flat 5 км/ч speedometer
+       * grace compiles it to 37 at L1 / 34.5 at L2, still under the sign (B58)
+       * — which is why the title prints NO number: a title claiming «под 32»
+       * over a gate that accepts 37 is the same defect one decimal smaller.
+       *
+       * The distance is not lost, it is billed where it always was: both
+       * mistake demos cite FOLLOWING_TOO_CLOSE and instructions 1–4 teach it.
+       */
+      titleBg: "Следвай предната кола спокойно",
+      params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10, maxSpeedKmh: 32 },
     },
     {
       id: "sc-fd-finish",
@@ -249,7 +299,13 @@ export const SC_FOLLOW_DISTANCE: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
-      { level: 5, conditions: { weather: "rain" } }, // L5: мокра дистанция — the 2 s rule wants 3
+    // L5 «Усложнени» — was a bare `{ level: 5, conditions: { weather: "rain" } }`:
+    // rain on the picture, dry tyres under the car, and NO complication card,
+    // so the lamp duty had nowhere to be stated and ended up in the dry base
+    // briefing instead (see instruction 7). `l5Wet()` is the same rain plus the
+    // grip that goes with it plus the instructor's line that names светлини and
+    // чистачки — the delta and its explanation authored together.
+    l5Wet(),
   ],
   staged: [FD_LEAD_CAR],
   conditions: { weather: "dry" },
@@ -316,7 +372,39 @@ const FB_LEAD_CAR: BrakingLeadCarSpec = {
   slamAt: { x: 4.06, y: 230 }, // the staged brake-slam point, mid-street
   slamRadiusM: 3,
   slamDecelMps2: 6.5, // a hard emergency slam
-  minSlamSpeedKmh: 25, // the ~40 km/h cruise clears it — the slam fires
+  /**
+   * SWEEP 161 — THE DRILL'S OWN EVENT WAS GATED BEHIND A SPEED THE CAUTIOUS
+   * LEARNER NEVER REACHES, AND 25 WAS THAT SPEED.
+   *
+   * The runner fires on `reachedSlamPoint && (speedKmh >= minSlamSpeedKmh ||
+   * playerGap <= proximityFallbackM)` (runners.ts). Photographed on the careful
+   * drive of this very lesson: pc-right ran 11 км/ч from t = 1 s to the 205 s
+   * harness cap, the lead sat ~40 m ahead still rolling, and the brake-slam
+   * NEVER FIRED — «Внезапно спиране на предния» presented no sudden stop, the
+   * skill it names was never exercised, and the drive simply ran out of clock
+   * (pc-right/04-t205s.png). The lesson is authored for the beginner rung; the
+   * beginner is exactly the driver 25 км/ч locks out.
+   *
+   * 8 IS THE PRODUCT'S OWN LINE FOR „THIS CAR IS STOPPED" — `objectives.ts`
+   * REACH_ZONE_HALT_CAP_KMH, the cap under which a waypoint stops being a flow
+   * envelope and becomes «спри тук». Below it there is no drive to interrupt
+   * and a slam is noise; above it there is, and the lesson is the same lesson
+   * at a lower speed — this lead is `matchPlayer`, so it paces at the student's
+   * own pace and a slam from 11 км/ч is a car in front stopping in front of
+   * him, which is the entire subject. The gap is not the limiting factor at any
+   * of these speeds: `followGapM` 29 of centres = 24.9 m of bumpers, which at
+   * 11 км/ч (3.05 m/s) is 8.2 s of headway against a 6.5 m/s² slam.
+   *
+   * TRACE-NEUTRAL, AND CHECKED RATHER THAN ASSUMED. Measured on all three
+   * committed recordings (traces/scFollowBrake.ts): each clears 8 км/ч at
+   * t = 1.0 s (y = 16.2) and 25 км/ч at t = 3.1 s (y = 26.1), while the lead
+   * only reaches y = 230 once the player is at ~y = 201, doing 39.9. So the
+   * BINDING condition in that conjunction is `reachedSlamPoint` on every one of
+   * them, and moving the other side of the `||` between 8 and 25 changes
+   * nothing they do; `fo-follow-brake-traces.test.ts` re-asserts the recordings
+   * byte-for-byte.
+   */
+  minSlamSpeedKmh: 8,
   proximityFallbackM: 0.5,
   triggersHazard: false,
   resumeAfterSec: 3,
@@ -374,12 +462,39 @@ export const SC_FOLLOW_BRAKE: ScenarioSpec = {
   success: [
     {
       id: "sc-fb-approach",
-      titleBg: "Следвай спокойно преди спирането",
+      /**
+       * TITLE-TRUTH (sweep 161). «Следвай СПОКОЙНО преди спирането» over a bare
+       * reachZone at y = 120 — no cap, no gap term. Photographed ticked on the
+       * WRONG drive (pc-wrong/04-t028s.png: the chip reads «ЗАДАЧА 2/2» with
+       * four dangerous errors already on the sheet, the collision among them),
+       * because both mistake demos take the same lawful 40 км/ч line past this
+       * circle and only diverge 110 m later at the slam.
+       *
+       * AND A CAP CANNOT RESCUE IT HERE, which is why this row is a rename and
+       * `sc-fd-follow` next door is not. Instruction 1 orders «около 40 км/ч»
+       * and the street is posted 50; measured at this circle, the shadow holds
+       * 39.9 км/ч for all 44 of its in-zone frames and so do both mistakes. Any
+       * cap that clears the drill's own instructed pace is ≥ 40, compiles to
+       * ≥ 45 at L1, prints «не по-бързо от 45» on the gate bar of a 50 street —
+       * and still refuses nobody. A number that refuses nobody is not a check;
+       * it is a second false certificate wearing a decimal.
+       *
+       * So the claim goes and the place stays. The following distance keeps its
+       * grader — instruction 1 teaches the two seconds and FOLLOWING_TOO_CLOSE
+       * bills it — and the STOP this drill is actually about is graded by the
+       * staged encounter (`sc-fb-lead`, minSlamSpeedKmh above), which the two
+       * COLLISION demos fail on the spot.
+       */
+      titleBg: "Стигни ориентира преди спирането",
       params: { kind: "reachZone", x: LANE_X, y: 120, radiusM: 12 },
     },
     {
       id: "sc-fb-finish",
-      titleBg: "Продължи след спирането до края на отсечката",
+      // «Продължи СЛЕД СПИРАНЕТО до края» asserted the stop happened; the gate
+      // is a plain arrival at y = 390 and never asked. Same census row, one
+      // objective later — trimmed to what it measures, matching every other
+      // finish gate in this file. Nothing about `done` moves: params untouched.
+      titleBg: "Стигни края на отсечката",
       params: { kind: "reachZone", x: LANE_X, y: 390, radiusM: 12 },
     },
   ],
@@ -505,11 +620,13 @@ const FS_LEAD_CAR: BrakingLeadCarSpec = {
  * the word „колона" was a claim the world did not keep. A queue of one is a
  * parked car.
  *
- * Two more standing vehicles ahead of the tail, at the 7 m centres a real
- * stopped queue keeps (≈ 3 m of clear tarmac between bumpers). `armDistM: 3`
- * means they would only begin to pace on bumper contact, i.e. never — so the
- * column the tail rolls up to is a fixed, fully deterministic backdrop and the
- * graded standstill gap is still measured against the tail's y = 290 rest pose.
+ * Two more standing vehicles ahead of the tail, spaced so a real stopped queue's
+ * ≈ 3 m of clear tarmac sits between every pair of bumpers (the centres follow
+ * from the bodies — see the sweep-161 block below, which re-spaced them when
+ * they stopped being two more cars). `armDistM: 3` means they would only begin
+ * to pace on bumper contact, i.e. never — so the column the tail rolls up to is
+ * a fixed, fully deterministic backdrop and the graded standstill gap is still
+ * measured against the tail's y = 290 rest pose.
  *
  * FR-51 note, because this comment used to say the opposite: these two are
  * mounted through `LevelSpec.stagedAdd` and are STILL invisible to the trace
@@ -517,16 +634,58 @@ const FS_LEAD_CAR: BrakingLeadCarSpec = {
  * longer byte-identical to their old selves — `spec.staged`'s own member, the
  * tail, is the thing that changed, so all three were re-recorded with the
  * approach they now depict.
+ *
+ * SWEEP 161 — THE COLUMN WAS STAGED AND COULD NOT BE SEEN, WHICH IS THE SAME
+ * DEFECT B70 FIXED, ONE LAYER DOWN.
+ *
+ * The audit photographed the drill twice — pc-right/05-stopped.png and again at
+ * t = 156 s, 25 m from the tail — and read the same thing off both: „the
+ * player's lane holds a single vehicle roughly 40 m ahead, with nothing behind
+ * it". The two props were there. They were behind the tail's roofline.
+ *
+ * THE ARITHMETIC, because „it looks empty" is not a bug report. Three 1.45 m
+ * cars nose-to-tail on ONE straight lane, seen from a cockpit eye ~1.2 m up,
+ * with the tail at rest at y = 290 and the student stopped at y = 281 — 25 m of
+ * eye-to-roof. The sight line over the tail's roof climbs 0.25/25 = 0.010 m per
+ * metre, so at the second car (y = 297, 32 m out) it is already at 1.52 m and at
+ * the third (y = 304) at 1.59 m. Both roofs are 1.45 m. **Every car behind the
+ * first was fully occluded, at every distance the drill is driven from** — the
+ * lesson said «колона», the world staged a колона, and the cockpit rendered one
+ * car. A lateral stagger cannot fix it either: 0.45 m of offset at 32 m is
+ * 0.35° of sliver against the tail's own 2.1° silhouette.
+ *
+ * HEIGHT IS THE ONLY AXIS THAT CLEARS THE ROOFLINE, so the column is now what a
+ * real stopped urban queue is — mixed: a panel van (the kargo_v rig, 5.2 m by
+ * the length table) and behind it the box truck this catalogue already renders
+ * for FO-06, whose own spec block records it as 7.5 × 2.4 × **3.1 m**. Against
+ * the 1.59 m sight line computed above, that box stands 1.5 m clear at y = 307
+ * — not a sliver, a silhouette. The van's rig height is a GLB this lane did not
+ * measure, so it is not being claimed here; it is the truck that carries the
+ * proof, and the van is the middle depth cue between them.
+ *
+ * Nothing about the grading moves — they are still props at `armDistM: 3` (arm
+ * only on bumper contact, i.e. never), the graded standstill gap is still
+ * measured against the TAIL's y = 290 rest pose, and `staged` — the only field
+ * the trace recorder reads — is untouched.
+ *
+ * RE-SPACED FOR THE NEW LENGTHS, keeping the ≈ 3 m of clear tarmac a stopped
+ * queue holds: tail (4.1 m) at 290 → van at 298 is 8 − 2.05 − 2.6 = 3.35 m of
+ * clear air; van → truck at 307 is 9 − 2.6 − 3.75 = 2.65 m. Leaving them at the
+ * old 7 m centres would have put 0.65 m between the van and the truck.
  */
-const FS_QUEUE_AHEAD: BrakingLeadCarSpec[] = [297, 304].map((y, i) => ({
+const FS_QUEUE_AHEAD: BrakingLeadCarSpec[] = [
+  { offsetM: 298, profile: "van" as const },
+  { offsetM: 307, profile: "truck" as const },
+].map(({ offsetM, profile }, i) => ({
   id: `sc-fs-queue-${i + 1}`,
   kind: "brakingLeadCar",
   actor: {
     pathNodes: ["fo-n-start", "fo-n-end"],
-    hold: { nodeIndex: 0, offsetM: y },
+    hold: { nodeIndex: 0, offsetM },
     cruiseSpeedMps: 8,
     extraRightOffsetM: 0,
     colorIndex: 3 + i,
+    profile, // the roofline that makes the column a column — see the block above
   },
   followGapM: 14,
   maxMatchSpeedMps: 12,
@@ -594,9 +753,82 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     {
       id: "sc-fs-stopped",
       titleBg: "Спри зад колоната на разумно разстояние",
-      // The shadow rests ~4 m behind the stationary lead (lead at y = 290,
-      // shadow at ~y = 281); a low speed cap makes reaching it AT REST the drill.
-      params: { kind: "reachZone", x: LANE_X, y: 281, radiusM: 8, maxSpeedKmh: 6 },
+      /**
+       * SWEEP 161 — «СПРИ … НА РАЗУМНО РАЗСТОЯНИЕ» AND THE GATE MEASURED
+       * NEITHER WORD. This is the D3 census arm, and unlike its five siblings
+       * in this file the claim here IS expressible, because this lead has a
+       * deterministic resting place: `FS_LEAD_CAR`'s last `paceProfile` leg
+       * parks it at y = 290.0 and every graded number on this drill hangs off
+       * that metre. It simply was not being asked.
+       *
+       * MEASURED, by replaying the three committed recordings through
+       * `stepObjective` on the compiled params (the probe is now
+       * `__tests__/following-claim-gates.test.ts`). At `maxSpeedKmh: 6`:
+       *
+       *   drive                 ticked at   doing      distance to the queue
+       *   shadow-correct        y = 273.0   6.0 км/ч   17 m — still rolling
+       *   mistake-bumper-kiss   y = 278.4   6.0 км/ч   ticked, then hit 1.24 m
+       *   mistake-creep-up      y = 273.0   6.0 км/ч   ticked, then crept in
+       *
+       * All three. „Спри" ticked green at 6 км/ч seventeen metres short of a
+       * queue nobody had stopped behind yet — because `capMet` asks
+       * `speedKmh <= cap` and a car rolling AT the cap satisfies it, and
+       * `reached` latches off the authored disc's near edge (y = 281 − 8).
+       * Rolling through at exactly the cap is not stopping, and the drill's own
+       * `mistake-bumper-kiss` — whose copy reads «под метър и половина
+       * разстояние» — was carrying the green tick for it.
+       *
+       * TWO CHANGES, ONE PER WORD OF THE TITLE.
+       *  · «СПРИ» ⇒ `maxSpeedKmh: 1` = `STOPPED_SPEED_KMH` (objectives.ts), the
+       *    product's own standstill line — the same number `halted` is tested
+       *    against one branch away, so the word in the title now means exactly
+       *    what the evaluator already means by „stopped". Still ≤
+       *    REACH_ZONE_HALT_CAP_KMH, so it is still a HALT DEMAND: the grace
+       *    capsule keeps crediting a student who comes to rest SHORT of the
+       *    mark, at every rung, and the ladder never widens it (widenSpeedCap
+       *    returns early under the halt cap — compiled 1 at L1 through L5).
+       *    NOT the catalogue's other halt convention (cdb2f71 gave `sc-edpr-b2`
+       *    a 3), because 3 is the defect one decimal smaller: this row's whole
+       *    finding is that a car rolling AT the cap was credited with stopping,
+       *    and 6 was refusing nobody for exactly that reason. The hero does not
+       *    idle-creep (vehicle/difficulty.ts's „creep" is a throttle ceiling,
+       *    not a torque), and all three recordings sit at 0.0 км/ч at rest, so
+       *    1 is reachable by lifting off as well as by braking.
+       *    NOTE for the guidance lane: `RouteGuidance.capLineBg` will render
+       *    this as «спри — под 1 км/ч». Correct, and clumsier than it needs to
+       *    be — a cap equal to the standstill constant could read «спри
+       *    напълно». That string is not this lane's file.
+       *  · «НА РАЗУМНО РАЗСТОЯНИЕ» ⇒ `acceptBeforeMarkM: -2.9`. The radius-8
+       *    disc accepted out to y = 289 while the lead's REAR BUMPER is at
+       *    290 − 2.05 = 287.95 — it reached 1.05 m past the car it claims to
+       *    measure against. The taught gap is «около два метра» of bumpers, so
+       *    the closest lawful rest pose is 290 − 2.05 − 2.05 − 2.0 = 283.9 and
+       *    the mark sits 2.9 m short of it ⇒ −2.9 (NEGATIVE per B18/FR-24: the
+       *    paint is AHEAD of the mark). Alone this parameter changes nothing —
+       *    the latch fires on the way in, long before the far side matters —
+       *    which is exactly why the cap has to come with it.
+       *
+       * RE-MEASURED with both in place, at every rung L1–L5:
+       *   shadow-correct       ✓ done at y = 280.95, AT REST, 4.9 m of bumpers
+       *                          behind the tail — the pose the copy describes
+       *   mistake-bumper-kiss  ✗ REFUSED: it never drops under 6 км/ч until it
+       *                          is at rest at y = 284.66, which is past the
+       *                          2 m boundary. The tick it used to get is gone.
+       *   mistake-creep-up     ✓ done at y = 280.95 — and rightly: it DID stop
+       *                          at the reasonable distance and held it 2.5 s.
+       *                          Its fault is the creep afterwards, a latched
+       *                          waypoint cannot un-tick, and it does not have
+       *                          to: STANDSTILL_GAP_TOO_CLOSE bills that creep
+       *                          at y = 284.7 and the debrief says so.
+       */
+      params: {
+        kind: "reachZone",
+        x: LANE_X,
+        y: 281,
+        radiusM: 8,
+        maxSpeedKmh: 1,
+        acceptBeforeMarkM: -2.9,
+      },
     },
   ],
   // FR-51: the approach is a following exercise now, not 235 m at 30 km/h down
@@ -794,9 +1026,29 @@ export const SC_FOLLOW_RAIN_GAP: ScenarioSpec = {
   success: [
     {
       id: "sc-fr-follow",
-      titleBg: "Следвай с увеличена за дъжда дистанция",
-      // Cap 30 km/h keeps the calm wet-prudent approach; the gap grading is the
-      // rule engine's job (FOLLOWING_TOO_CLOSE_FOR_RAIN).
+      /**
+       * TITLE-TRUTH (sweep 161; the D3 census, same repair as `sc-fd-follow`).
+       * This read «Следвай с увеличена за дъжда ДИСТАНЦИЯ» and the old comment
+       * next to it said the split out loud — „the gap grading is the rule
+       * engine's job". The HUD then printed the actual criterion underneath the
+       * claim: pc-right/01-arrival.png shows the objective card reading
+       * «Следвай с увеличена за дъжда дистанция — ДРЪЖ ПОД 35 КМ/Ч». A title
+       * naming a distance over a criterion that is a speedometer reading is the
+       * defect in one screenshot: two cars cross this circle at the same 30
+       * км/ч, one at four seconds of headway and one at one, and both tick.
+       *
+       * So the title now claims only the calm the cap can prove. Measured at
+       * this circle (y = 175 ± 10) on the committed recordings: the shadow holds
+       * 24.9 км/ч for all 58 of its in-zone frames; `mistake-dry-habit` holds
+       * 39.9 and `mistake-gap-melts` 38.5–39.9 for all 36 of theirs, so the cap
+       * refuses both. No number in the title, deliberately — 30 authored is 35
+       * on the L1 card (the ladder's 5 км/ч grace, bounded by the posted 50).
+       *
+       * The rain distance keeps its grader: this drill opts the
+       * FOLLOWING_TOO_CLOSE_FOR_RAIN detector in (`ruleConfig` below), both
+       * mistake demos cite it, and instruction 2 teaches the three seconds.
+       */
+      titleBg: "Следвай спокойно в дъжда",
       params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
@@ -1001,8 +1253,11 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     // 241-character step 1. The lamp clause keeps its place (rain is authored on
     // the template) but loses the 130-character explanation of itself, which is
     // now the last step — after the acts, where a reason belongs.
-    // 73 ch
-    { n: 1, textBg: "Потегли спокойно зад камиона и включи късите светлини, ако вали (чл. 70)." },
+    // SWEEP 161 — the conditional lamp clause goes with step 8's spray cloud
+    // (see there): this template is authored dry at every rung the student can
+    // reach, and the rain rung now carries its own lamp line through `l5Wet()`.
+    // 75 ch
+    { n: 1, textBg: "Потегли спокойно зад камиона и остави разстояние, от което го виждаш целия." },
     // 69 ch
     { n: 2, textBg: "Дръж поне 3 секунди до камиона — брой „едно-и-две-и-три“ по ориентир." },
     // 84 ch
@@ -1015,15 +1270,43 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     { n: 6, textBg: "Не се доближавай, „за да виждаш“ — колкото по-близо си, толкова ПО-МАЛКО виждаш." },
     // 50 ch
     { n: 7, textBg: "Задръж увеличената дистанция до края на отсечката." },
-    // 77 ch
-    { n: 8, textBg: "Помни: в облака пръски габаритите ти са единственото, което те показва отзад." },
+    // SWEEP 161 — CONDITIONS THE DRY SCENARIO DOES NOT HAVE. This step read
+    // «Помни: в облака пръски габаритите ти са единственото, което те показва
+    // отзад.» and was photographed on the L1 briefing over a dry road in bright
+    // daylight (pc-right/01-arrival.png). There is no spray cloud: `conditions.
+    // weather` is "dry" here and at L1–L4, and the step spent one of eight
+    // lines describing weather the student was not in. Same cause as
+    // sc-follow-distance step 7 — a rain rung with no complication card to put
+    // the lamp duty on, now fixed at the rung (see `levels` below).
+    //
+    // What replaces it is the dry drill's own unteachable half: a student who
+    // cannot see past the box also cannot be seen by the driver of it, and the
+    // mirror test is the one rule that makes that checkable from the cockpit.
+    // 70 ch
+    { n: 8, textBg: "Помни: не виждаш ли огледалата на камиона, и шофьорът му не вижда теб." },
   ],
   success: [
     {
       id: "sc-ft-follow",
-      titleBg: "Следвай камиона с увеличена дистанция",
-      // Cap 30 km/h keeps the calm blocked-vision approach; the gap grading
-      // itself is the rule engine's job (FOLLOWING_TOO_CLOSE).
+      /**
+       * TITLE-TRUTH (sweep 161; the D3 census — `sc-fd-follow` carries the full
+       * reasoning). «Следвай камиона с увеличена ДИСТАНЦИЯ» over a place and a
+       * speed cap, and the HUD printed the split for the auditor to photograph:
+       * pc-wrong/04-t018s.png reads «Следвай камиона с увеличена дистанция —
+       * ДРЪЖ ПОД 35 КМ/Ч». Nothing measured the gap to the truck, which the
+       * objectiveBg one screen earlier calls the entire skill.
+       *
+       * Measured at this circle (y = 175 ± 10): the shadow holds 20.8 км/ч for
+       * all 70 of its in-zone frames; BOTH mistake demos hold 47.9 for all 30 of
+       * theirs, so the cap refuses both. 30 authored compiles to 35 at L1 — the
+       * number the card prints, and the reason the title prints none.
+       *
+       * The gap keeps its grader, and on this drill it needed one more thing to
+       * be able to fire at all: `ruleConfig.followMinSpeedKmh` 10 below, without
+       * which FOLLOWING_TOO_CLOSE was structurally silent at this lead's own
+       * authored pace. Both mistake demos cite it; instruction 2 teaches it.
+       */
+      titleBg: "Следвай камиона спокойно",
       params: { kind: "reachZone", x: LANE_X, y: 175, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
@@ -1094,7 +1377,13 @@ export const SC_FOLLOW_TRUCK: ScenarioSpec = {
     { level: 2 },
     { level: 3 },
     { level: 4, vehicleStart: "cold" },
-      { level: 5, conditions: { weather: "rain" } }, // L5: камион + дъжд — spray-blind following
+    // L5 «Усложнени» — камион + дъжд, the spray-blind rung. Was a bare
+    // `{ level: 5, conditions: { weather: "rain" } }`: rain on the picture, dry
+    // tyres under the car and no complication card, so the lamp duty it implies
+    // had nowhere to be said and had been written into the DRY base briefing
+    // instead (old steps 1 and 8). `l5Wet()` carries rain + wetGrip + the
+    // instructor's line that names светлини and чистачки.
+    l5Wet(),
   ],
   staged: [FT_LEAD_TRUCK, FT_ONCOMING],
   conditions: { weather: "dry" },
@@ -1140,7 +1429,44 @@ const FC_CUTTER: CutInLeadCarSpec = {
   maxMatchSpeedMps: 15,
   cutAt: { x: 4.0625, y: 150 }, // on the ACTOR's (left-lane) path, mid-street
   cutRadiusM: 4,
-  minCutSpeedKmh: 25, // the ~40 km/h approach clears it — the cut fires
+  /**
+   * SWEEP 161 — THE CUT-IN NEVER HAPPENED, AND THE DRILL AWARDED THREE STARS
+   * FOR IT. Photographed across the whole 189 s right drive: the staged car
+   * held station in the LEFT lane at the same screen position at t = 34, 87,
+   * 130 and 189 s and never moved across (pc-right/04-t189s.png). The runner
+   * fires on `(distToCut <= cutRadiusM || actorPastCutM > 0) && speedKmh >=
+   * minCutSpeedKmh` (runners.ts); that drive ran 6–12 км/ч and 25 locked it out
+   * of its own lesson.
+   *
+   * WHY 15 AND NOT 5. This floor is not a formality — below some speed the cut
+   * is not a THEFT and staging it would teach a fiction. The manoeuvre lands the
+   * actor `paceAheadM` 12 m of centres ahead = 7.9 m of bumpers, and 7.9 m IS
+   * the taught two seconds at exactly 3.95 m/s = **14.2 км/ч**. Under that, the
+   * cut-in leaves the student MORE than the cushion the lesson says was stolen,
+   * the teach card would name a theft the geometry did not commit, and the
+   * remedy («вдигни крак и остави дистанцията да се отвори») would be performed
+   * by arithmetic rather than by him. 15 is the smallest whole number above
+   * that line — so the gate now refuses only drives the encounter cannot be
+   * honest about, instead of refusing two thirds of the beginners.
+   *
+   * WHAT THIS DOES NOT FIX, and must not be mistaken for fixing: the 6–12 км/ч
+   * drive is still refused the event, and it was still credited ИЗДЪРЖАН with
+   * three stars and +150 XP off three position gates. The runner ALREADY
+   * reports that honestly — it resolves `notEncountered` once the player is 70 m
+   * past the cut point (CUTIN_MISSED_PAST_M) — but no objective kind in
+   * `lessons/objectives.ts` can consume a staged outcome other than
+   * `emergencyStop`'s `stoppedInTime`, so the report has nowhere to land. The
+   * credit half of this row is handled below (`sc-fc-rebuild`) as far as a
+   * title can handle it, and named in the lane report as the objective-kind
+   * change it actually needs.
+   *
+   * TRACE-NEUTRAL, measured on all three committed recordings: each clears
+   * 25 км/ч at t = 3.1 s (y = 26.1) and is doing 29.1 / 39.9 / 44.2 км/ч when
+   * the actor reaches its cut point at y = 150. The binding condition on every
+   * recording is the geometry, not this number, so moving it between 15 and 25
+   * changes nothing they do.
+   */
+  minCutSpeedKmh: 15,
   cutShiftM: CUT_LANE_SHIFT, // one lane RIGHT — into the player's lane
   cutRampSec: 1.5,
   cutSpeedMps: 11, // ~40 km/h locked cruise — the player's lift re-opens the gap
@@ -1190,10 +1516,28 @@ export const SC_FOLLOW_CUTIN: ScenarioSpec = {
     },
     {
       id: "sc-fc-rebuild",
-      titleBg: "Възстанови дистанцията след вклиняването",
-      // The shadow passes here mid-rebuild at ~28 km/h — the lifted-throttle
-      // posture; the gap grading itself is the rule engine's job
-      // (FOLLOWING_TOO_CLOSE + the recovery-rate innocence guard).
+      /**
+       * TITLE-TRUTH (sweep 161) — and this is the row the whole census exists
+       * for, because one frame contains both halves of it. pc-wrong/04-t017s.png
+       * carries a GREEN TICK against «Възстанови дистанцията след вклиняването»
+       * at the same instant the engine's own teach card, three centimetres
+       * below it, reads «Дистанция в момента: 0,0 с (0 м) — дръж поне 2 с.»
+       * The tick is a position gate with a speed cap; the number beside it is
+       * the truth, and they were both on screen, disagreeing.
+       *
+       * `stepReachZone` cannot see a gap and the `minLeadGapM` gate built for
+       * this family was dropped for producing false refusals (cdb2f71), so the
+       * claim goes and the cap keeps what it can prove. Measured at this circle
+       * (y = 235 ± 10): the shadow holds 28.0 км/ч for all 52 of its in-zone
+       * frames — the lifted-throttle posture — while `mistake-hold-gap` holds
+       * 39.9 and `mistake-squeeze` 40.1 for all 36 of theirs, so the cap 34
+       * refuses both recorded ways of keeping the stolen cushion.
+       *
+       * The rebuild keeps its grader: both mistake demos cite
+       * FOLLOWING_TOO_CLOSE, the runtime's recovery-rate guard keeps the honest
+       * lift innocent while the gap re-opens, and instructions 3–5 teach it.
+       */
+      titleBg: "Продължи спокойно след вклиняването",
       params: { kind: "reachZone", x: CUT_RIGHT, y: 235, radiusM: 10, maxSpeedKmh: 34 },
     },
     {
@@ -1365,9 +1709,29 @@ export const SC_FOLLOW_TAILGATER: ScenarioSpec = {
   success: [
     {
       id: "sc-ftg-ease",
-      titleBg: "Успокой темпото и увеличи дистанцията напред",
-      // The shadow passes here mid-ease (~28 km/h) with the front gap visibly
-      // growing — the taught response as a completion posture.
+      /**
+       * TITLE-TRUTH (sweep 161). «Успокой темпото И УВЕЛИЧИ ДИСТАНЦИЯТА НАПРЕД»
+       * over a place and a speed cap — photographed as the card
+       * «Успокой темпото и увеличи дистанцията напред — дръж под 41 км/ч»
+       * (pc-right/01-arrival.png). The forward gap it names was never measured
+       * and neither was any easing of the pressure from behind.
+       *
+       * HALF THIS TITLE WAS ALWAYS TRUE, so only the other half goes. A cap IS
+       * a pace measurement, and on this drill it is the taught response itself:
+       * `FTG_LEAD` cruises a constant 11.5 m/s = 41.4 км/ч, so a student held
+       * under 36 is by construction one whose FRONT gap is opening. Measured at
+       * this circle (y = 200 ± 10): the shadow holds 28.0 км/ч for all 51 of its
+       * in-zone frames; `mistake-speed-up` holds 57.9 for all 25 of its and is
+       * refused. (`mistake-brake-check` is not — it stands still in the zone, at
+       * 0–33.4 км/ч over 118 frames; its fault is HARSH_BRAKING_NO_CAUSE and the
+       * rule engine bills it. A cap cannot see a brake check and this title no
+       * longer implies one is being watched.)
+       *
+       * The forward distance keeps its teaching in instructions 4–5 and its
+       * evidence on the leadGap telemetry; what it does not keep is a green tick
+       * that certified it.
+       */
+      titleBg: "Успокой темпото",
       params: { kind: "reachZone", x: CUT_RIGHT, y: 200, radiusM: 10, maxSpeedKmh: 36 },
     },
     {

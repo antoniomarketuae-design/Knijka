@@ -3,7 +3,10 @@ import {
   hasWhy,
   isAmbientOverlay,
   overlayCentreBand,
+  overlayHoldsDrive,
   overlayPriority,
+  overlayQueueMaySpeak,
+  overlaySilencesQueue,
   peekWithinBudget,
   rectClearsCentreBand,
   rectViewportFraction,
@@ -12,6 +15,9 @@ import {
   OVERLAY_CENTRE_BAND,
   OVERLAY_PEEK_HEIGHT_PX,
   OVERLAY_PEEK_MAX_FRACTION,
+  OVERLAY_SCREEN_OWNERS,
+  type OverlayScreenOwner,
+  type OverlaySelection,
   type SimOverlayItem,
   type SimOverlayKind,
 } from "../overlayQueue";
@@ -205,5 +211,161 @@ describe("the budget — 12 % of the viewport, and never the road", () => {
     // screen and its measurement from quietly disagreeing.
     expect(OVERLAY_PEEK_MAX_FRACTION).toBe(0.12);
     expect(OVERLAY_CENTRE_BAND).toEqual({ x0: 0.16, x1: 0.84, y0: 0.2, y1: 0.74 });
+  });
+});
+
+/**
+ * =============================================================================
+ * RULE 4 — „NOTHING ARRIVES FULL-BLEED ON ITS OWN" — 2026-08-17.
+ *
+ * Every assertion below is one of two frames off the deployed build, taken with
+ * the shipped harness (`tools/mobile/lesson-audit.mjs`, WebKit, real insets,
+ * iPhone 16 landscape 852 × 393):
+ *
+ *   sc-hz-breakdown-pulloff / mobile / right — 07b-menu.png
+ *     «Меню на урока» open, the cluster reading «0 км/ч D» (so the car IS
+ *     frozen), and «Контролна лампа: температура! / Спри спокойно вдясно»
+ *     painted live over the undimmed road beside it.
+ *
+ *   sc-ac-rain-lights / mobile / right — the harness's own state line
+ *     [01-arrival]  0 км/ч  card=warning/peek
+ *     …i.e. at arrival the card on the glass is the telltale, not the briefing
+ *     that ships `blocking: true`, so the drive is not held and «Разбрах» is
+ *     nowhere.
+ * =============================================================================
+ */
+
+const BRIEFING: SimOverlayItem = {
+  id: "briefing",
+  kind: "hint",
+  tone: "neutral",
+  chipBg: "Инструкции",
+  lineBg: "Включи късите светлини — вали, макар да е ден.",
+  detailBg: "2. Потегли по правата улица със съобразена за дъжда скорост.",
+  blocking: true,
+  ackLabelBg: "Разбрах",
+};
+
+const TELLTALE: SimOverlayItem = {
+  id: "warn:temp",
+  kind: "warning",
+  tone: "danger",
+  lineBg: "Контролна лампа: температура! Спри спокойно вдясно",
+  detailBg: "Прегрятият двигател спира да е двигател.",
+};
+
+describe("the screen has ONE owner — 07b-menu.png, as data", () => {
+  it("says nothing while «Меню на урока» is up", () => {
+    // THE FRAME. Before this rule existed the selector had no way to be told,
+    // so it returned the telltale and the shell painted it over the sheet.
+    const withMenu = selectOverlay([TELLTALE], { screenOwners: ["playMenu"] });
+    expect(withMenu.active).toBeNull();
+    expect(withMenu.queued).toBe(0);
+    expect(withMenu.waiting).toHaveLength(0);
+  });
+
+  it("silences the queue for a quiz and for a consequence card in EVERY mode", () => {
+    // `pauseModalUp` guarded the consequence card with `mistakeMode`, so
+    // outside the sandbox it froze the car and let the queue keep talking.
+    // There is no mode here to get wrong: a surface that owns the screen owns
+    // it in every mode.
+    expect(selectOverlay([TELLTALE], { screenOwners: ["quiz"] }).active).toBeNull();
+    expect(selectOverlay([TELLTALE], { screenOwners: ["consequence"] }).active).toBeNull();
+  });
+
+  it("and OTHERWISE speaks exactly as it always did — both directions", () => {
+    // The other half of the crime. A gate that blanked the queue whenever
+    // anything was open would be the same defect pointing the other way: the
+    // road would go quiet during an ordinary drive.
+    expect(selectOverlay([TELLTALE]).active?.id).toBe("warn:temp");
+    expect(selectOverlay([TELLTALE], { screenOwners: [] }).active?.id).toBe("warn:temp");
+  });
+
+  it("does NOT silence itself for its own read sheet", () => {
+    // «ПРОЧЕТИ» / «ЗАЩО» / «СПИСЪК» open the detail of the item the queue
+    // selected. Blanking the queue there would delete the card the sheet
+    // belongs to — and with it the «Разбрах» that closes it, which is the
+    // 4-pixel dead end `noDismiss` was written for, rebuilt in a new place.
+    expect(selectOverlay([TELLTALE], { screenOwners: ["readSheet"] }).active?.id).toBe(
+      "warn:temp",
+    );
+    expect(overlayQueueMaySpeak(["readSheet"])).toBe(true);
+    expect(overlaySilencesQueue("readSheet")).toBe(false);
+  });
+
+  it("keeps the census exhaustive and keyed to itself", () => {
+    // `tsc` already refuses a union member with no row; this catches the other
+    // way a table rots — a row filed under the wrong key.
+    for (const [key, spec] of Object.entries(OVERLAY_SCREEN_OWNERS)) {
+      expect(spec.id).toBe(key);
+      expect(spec.ownerFile.length).toBeGreaterThan(0);
+    }
+    // Exactly one of the four is the overlay layer itself. If a second ever
+    // claims to be, the frame above comes back.
+    expect(
+      Object.values(OVERLAY_SCREEN_OWNERS).filter((s) => s.isQueueSurface).map((s) => s.id),
+    ).toEqual(["readSheet"]);
+  });
+
+  it("cannot let the two halves diverge again — every subset of the census", () => {
+    // THE SHAPE OF THE 2026-08-17 DEFECT, made unrepresentable: `paused` had
+    // six disjuncts and `pauseModalUp` had two, and nothing compared them.
+    // Both answers now come off this one table, so the invariant holds over
+    // all 2^4 combinations rather than over the four someone thought of.
+    const all: OverlayScreenOwner[] = ["quiz", "consequence", "playMenu", "readSheet"];
+    const quiet: OverlaySelection = { active: null, queued: 0, waiting: [], held: false };
+    for (let mask = 0; mask < 1 << all.length; mask += 1) {
+      const owners = all.filter((_, i) => (mask & (1 << i)) !== 0);
+      if (!overlayQueueMaySpeak(owners)) {
+        // You may never take the screen from the queue without stopping the car.
+        expect(overlayHoldsDrive(owners, quiet), `owners=${owners.join("+")}`).toBe(true);
+      }
+      if (owners.length > 0) {
+        // …and you may never stop the car with a surface of your own and leave
+        // the queue talking over it. That direction is the frame.
+        expect(overlayHoldsDrive(owners, quiet), `owners=${owners.join("+")}`).toBe(true);
+        expect(overlayQueueMaySpeak(owners)).toBe(
+          owners.every((o) => !overlaySilencesQueue(o)),
+        );
+      }
+    }
+    expect(overlayQueueMaySpeak([])).toBe(true);
+    expect(overlayHoldsDrive([], quiet)).toBe(false);
+  });
+});
+
+describe("`blocking` finally means something — [01-arrival] card=warning/peek", () => {
+  it("holds the drive for a blocking item that LOST the priority contest", () => {
+    // The measurement, as data: warning (70) outranks the briefing (hint, 60),
+    // so the telltale is what the student sees. That part is deliberately
+    // unchanged — a safety telltale is not something to demote. What changed is
+    // that the selection now ALSO reports that a blocking item is outstanding,
+    // so the car can be frozen and the briefing is still there, unacknowledged,
+    // when the telltale's TTL lapses.
+    const s = selectOverlay([TELLTALE, BRIEFING]);
+    expect(s.active?.kind).toBe("warning");
+    expect(s.held).toBe(true);
+    expect(overlayHoldsDrive([], s)).toBe(true);
+  });
+
+  it("does NOT hold the drive when nothing is blocking — the other direction", () => {
+    // A `held` that erred towards true would freeze a car that should be
+    // moving, and the positive control in tools/mobile/lesson-audit.mjs would
+    // read 0 км/ч for the whole drive: the same crime, opposite sign.
+    expect(selectOverlay([TELLTALE]).held).toBe(false);
+    expect(selectOverlay([item("task"), item("advisor"), item("praise")]).held).toBe(false);
+    expect(selectOverlay([]).held).toBe(false);
+    expect(overlayHoldsDrive([], selectOverlay([TELLTALE]))).toBe(false);
+  });
+
+  it("still reports `held` while a menu is covering the blocking item", () => {
+    // The two rules meeting. The menu takes the glass, so nothing is painted —
+    // but the briefing has still not been acknowledged, and a car that starts
+    // rolling the instant a menu opens over its unread instruction is the
+    // 13-second frame from sc-vp-stall all over again.
+    const s = selectOverlay([BRIEFING], { screenOwners: ["playMenu"] });
+    expect(s.active).toBeNull();
+    expect(s.held).toBe(true);
+    expect(overlayHoldsDrive(["playMenu"], s)).toBe(true);
   });
 });

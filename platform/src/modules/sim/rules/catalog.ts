@@ -995,11 +995,37 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // mandatory stop, entry while barred, coming to rest ON the tracks.
     // Deliberately NOT terminateSession — the catalog invariant keeps
     // COLLISION the only terminating code (the sim continues for learning).
+    //
+    // ONE CODE IS FINE; ONE *STRING* WAS NOT (catalogue sweep, 2026-08-16).
+    // The sweep drove both shipped rail lessons and photographed the same
+    // defect from two sides. `sc-rx-guarded/pc-wrong/08-debrief.png`: a lesson
+    // whose title, briefing and objectives are all «Охраняем прелез с бариера»
+    // convicted with a card that OPENED „Пред прелез БЕЗ бариери спираш
+    // напълно…" — the student was taught a rule that does not govern the
+    // crossing he had just driven through. `sc-rx-unguarded/mobile-right/
+    // 08-debrief.png`: a drive with 23 full stops and a ✓ on «Спри напълно на
+    // стоп-линията преди релсите» was convicted for resting ON the rails and
+    // read the same opening sentence — the copy described the OPPOSITE of what
+    // it had done, and nowhere on either screen did it say which of the three
+    // acts it had actually committed.
+    //
+    // The three acts already travel apart: `engine.ts` stamps every event with
+    // `detail` ("no-stop" | "entered-barred" | "stopped-on-track"), so the
+    // discriminator was on the wire and only the copy was pooled. The split
+    // lives in RAIL_CROSSING_ACT_COPY below and is applied by `makeViolation`,
+    // NOT at the call sites: the copy then follows the code by construction,
+    // for the procedures machine and any future producer too.
+    //
+    // THIS STRING IS NOW THE CONTROL-NEUTRAL ONE — the JUNCTION_SCAN_INCOMPLETE
+    // discipline exactly (see its note): it is read BY CODE, with no event in
+    // hand (tutor/retrieval, lesson/resolve, clipPlanBuilder), so it must be
+    // true of all three acts and may assert none of them. It teaches the three
+    // rules as rules; the per-act copy says which one was broken.
     severityClass: "opasna",
     points: SEVERITY_POINTS.opasna,
     titleBg: "Нарушение на правилата за жп прелез",
     explanationBg:
-      "Наруши желязното правило на жп прелеза. Пред прелез без бариери спираш напълно и се оглеждаш в двете посоки — ти си бариерата. При спуснати или спускащи се бариери и мигаща червена светлина не навлизаш, каквото и да ти се струва. И никога не спирай върху самите релси: влакът не може нито да спре, нито да те заобиколи.",
+      "Наруши правилата за преминаване през железопътен прелез — най-опасното кръстовище на пътя, защото едната страна не може нито да спре, нито да завие. Правилата са три и всяко е купено с животи: пред прелез БЕЗ бариери спирането е задължително и се оглеждаш по линията в двете посоки — ти си бариерата; при спуснати, спускащи се или вдигащи се бариери и при мигаща червена светлина не се навлиза, независимо колко празен изглежда коловозът; и не се тръгва през прелеза, ако не си сигурен, че ще излезеш от другата страна, без да спираш върху релсите.",
     correctiveBg:
       "Пред прелез: намали отрано. Без бариери — спри напълно преди релсите, огледай наляво и надясно по линията и премини решително, без да спираш върху коловоза. С бариери — изчакай зад стоп-линията, докато се вдигнат напълно, и премини едва когато прелезът е чист.",
     // THE RANGE BECAME THREE NAMED ALINEAS, 2026-08-09. „чл. 51–53" resolves to
@@ -1307,6 +1333,83 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
 };
 
 // ---------------------------------------------------------------------------
+// Per-ACT copy (the one code that grades three different acts)
+// ---------------------------------------------------------------------------
+
+/**
+ * RAIL_CROSSING_VIOLATION's three graded acts, keyed by the `detail` string
+ * `engine.ts` already stamps on every event it emits. See the catalogue row
+ * above for what the sweep photographed; this is the half that answers „кое от
+ * трите направих".
+ *
+ * WHY IT LIVES HERE AND NOT IN engine.ts. Its sibling split, JUNCTION_SCAN_COPY,
+ * sits in engine.ts because ITS discriminator (which control the student
+ * crossed) exists only inside the reducer — there is no channel on the event
+ * that carries it. This one is the opposite case: `detail` is a shipped,
+ * machine-readable field, asserted by `rail-crossing-detectors.test.ts` on all
+ * three arms, so the mapping is pure catalogue data and `makeViolation` can do
+ * it for every producer at once. A call-site override would have to be
+ * remembered three times in the reducer and again by procedures/machine.ts.
+ *
+ * `lawRef` SPLITS WITH THE COPY, and that is this file's whole point (see the
+ * header: the slot answers WHAT RULE DID I BREAK). The row's own citation names
+ * all three articles because it is read by code with no event in hand; an event
+ * knows the act, so its chip names the ONE article the act breaks — retrieved
+ * verbatim from `content/law/acts/zdvp.json`:
+ *   чл. 51, ал. 3  „Спирането на пътните превозни средства е задължително пред
+ *                  железопътен прелез, който няма бариери."
+ *   чл. 52         „На участниците в движението е забранено да преминават през
+ *                  железопътен прелез: 1. при спуснати, започнали да се спускат
+ *                  или да се вдигат бариери… 2. при мигаща червена светлина…"
+ *   чл. 53, ал. 2  „…не трябва да започва преминаването…, ако не е предварително
+ *                  убеден, че няма да се наложи спиране върху релсите…"
+ * `severityClass`, `points` and `terminateSession` stay catalogue-owned and are
+ * NOT reachable from here — all three acts are the same опасна 10.
+ *
+ * NO DISTANCE IS QUOTED, for the same reason the row says so: чл. 51, ал. 4 does
+ * give 2 m / 1 m, the detector measures neither, and this is the exact place an
+ * earlier wave invented a „50 метра". `correctiveBg` also stays pooled — it is
+ * read BY CODE at display time (SessionEndScreen, attemptReel, tutor/retrieval),
+ * has no per-event channel, and already walks all three branches.
+ */
+export const RAIL_CROSSING_ACT_COPY: Record<
+  "no-stop" | "entered-barred" | "stopped-on-track",
+  { titleBg: string; explanationBg: string; lawRef: string }
+> = {
+  "no-stop": {
+    titleBg: "Влизане на прелез без бариери без пълно спиране",
+    explanationBg:
+      "Навлезе върху релсите на прелез БЕЗ бариери, без да спреш напълно преди тях. Там няма кой да те спре — бариерата си ти: спираш докрай, сваляш звука, оглеждаш линията наляво и надясно и чак тогава минаваш решително. Влакът не може нито да спре навреме, нито да те заобиколи.",
+    lawRef: "ЗДвП чл. 51, ал. 3",
+  },
+  "entered-barred": {
+    titleBg: "Влизане на прелез при спусната бариера",
+    explanationBg:
+      "Навлезе на прелеза, докато бариерата беше спусната или се спускаше. Бариерата не се заобикаля и не се „изпреварва“ — тя тръгва надолу, защото влакът вече е потеглил към прелеза, а между сигнала и влака няма резерв за още една кола. Изчакваш зад стоп-линията, докато се вдигне напълно.",
+    lawRef: "ЗДвП чл. 52",
+  },
+  "stopped-on-track": {
+    titleBg: "Спиране върху железопътните релси",
+    explanationBg:
+      "Спря и остана върху самите релси. Спирането преди прелеза е правилно; спирането ВЪРХУ него е най-опасното място на целия път. Затова прелезът се пресича само когато отсрещната страна е свободна и има къде да излезеш — не се тръгва „ще се придвижа с колоната“. Случи ли се наистина: излизаш от колата и се махаш от линията.",
+    lawRef: "ЗДвП чл. 53, ал. 2",
+  },
+};
+
+/** The per-act copy for an event, or `null` when the code pools one string. */
+function actCopy(
+  code: ViolationCode,
+  detail: string | undefined,
+): { titleBg: string; explanationBg: string; lawRef: string } | null {
+  if (code !== "RAIL_CROSSING_VIOLATION" || detail === undefined) return null;
+  return (
+    (RAIL_CROSSING_ACT_COPY as Record<string, { titleBg: string; explanationBg: string; lawRef: string }>)[
+      detail
+    ] ?? null
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Event constructors (shared by engine.ts and procedures/machine.ts)
 // ---------------------------------------------------------------------------
 
@@ -1316,15 +1419,20 @@ export function makeViolation(
   overrides?: Partial<Pick<ViolationEvent, "titleBg" | "explanationBg" | "detail">>,
 ): ViolationEvent {
   const spec = VIOLATIONS[code];
+  // An UNRECOGNISED detail falls back to the pooled row rather than to silence:
+  // a card that teaches all three rules is worse than one that teaches the act,
+  // and better than one that teaches the wrong act. An explicit override still
+  // wins over both (JUNCTION_SCAN_COPY rides that same channel).
+  const act = actCopy(code, overrides?.detail);
   const event: ViolationEvent = {
     kind: "violation",
     code,
     t,
     severityClass: spec.severityClass,
     points: spec.points,
-    titleBg: overrides?.titleBg ?? spec.titleBg,
-    explanationBg: overrides?.explanationBg ?? spec.explanationBg,
-    lawRef: spec.lawRef,
+    titleBg: overrides?.titleBg ?? act?.titleBg ?? spec.titleBg,
+    explanationBg: overrides?.explanationBg ?? act?.explanationBg ?? spec.explanationBg,
+    lawRef: act?.lawRef ?? spec.lawRef,
   };
   if (spec.conceptId !== undefined) event.conceptId = spec.conceptId;
   if (spec.terminateSession) event.terminateSession = true;

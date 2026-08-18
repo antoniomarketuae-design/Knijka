@@ -906,7 +906,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vu-emergency",
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-vu-emergency/mistake-block.trace.json",
-    "faultTimeSec": 13.6,
+    "faultTimeSec": 15.85,
     "requiredActors": [
       {
         "kind": "emergency",

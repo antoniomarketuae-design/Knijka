@@ -5,7 +5,9 @@
  *
  *  - placement  ← the parkInBay ObjectiveDetail (A10): alignment
  *                 centered/acceptable/sloppy + centre/heading offsets;
- *  - economy    ← the same detail's bay-entry `attempts` counter;
+ *  - economy    ← the same detail's bay-entry `attempts` counter (a count
+ *                 that is still running can convict but not praise — see the
+ *                 settled test there);
  *  - observation← authored glance moments vs the observed set (the S1 trace
  *                 recorder feeds it; until then the component reports
  *                 measured: false and stays OUT of the star math);
@@ -17,7 +19,9 @@
  *  - each MEASURED component scores 0..2 points; ratio = earned / (2 × n);
  *    ratio >= 0.90 → 3★, >= 0.50 → 2★, else 1★;
  *  - no measured components → stars from official cleanliness alone
- *    (completed + 0 penalty points = 3★, completed = 2★);
+ *    (completed + 0 penalty points = 3★, completed = 2★) — see the OPEN
+ *    ITEM recorded at that branch: sweep161 caught it printing ★★★ over a
+ *    drive nothing had measured;
  *  - caps (quality never outranks legality): any penalty point → max 2★;
  *    a dangerous/terminated summary, an aborted session or unfinished
  *    objectives → 1★.
@@ -36,9 +40,19 @@ import type {
 const STARS_3_MIN_RATIO = 0.9;
 const STARS_2_MIN_RATIO = 0.5;
 
-function parkDetailOf(result: LessonResult, objectiveId: string): Extract<ObjectiveDetail, { kind: "parkInBay" }> | null {
+/**
+ * The parkInBay measurement channel, WITH the objective's own `done` flag —
+ * the economy component needs to know whether the count it is reading has
+ * stopped running (see the settled/provisional test there).
+ */
+interface ParkChannel {
+  detail: Extract<ObjectiveDetail, { kind: "parkInBay" }>;
+  done: boolean;
+}
+
+function parkChannelOf(result: LessonResult, objectiveId: string): ParkChannel | null {
   for (const o of result.objectives) {
-    if (o.id === objectiveId && o.detail?.kind === "parkInBay") return o.detail;
+    if (o.id === objectiveId && o.detail?.kind === "parkInBay") return { detail: o.detail, done: o.done };
   }
   return null;
 }
@@ -63,7 +77,7 @@ export function scoreRubric(
 
   // -- Placement accuracy (bay centering + heading, A10 detail channel).
   if (rubric.placement) {
-    const d = parkDetailOf(result, rubric.placement.objectiveId);
+    const d = parkChannelOf(result, rubric.placement.objectiveId)?.detail ?? null;
     if (d && d.alignment !== null) {
       const points = d.alignment === "centered" ? 2 : d.alignment === "acceptable" ? 1 : 0;
       earned += points;
@@ -98,26 +112,48 @@ export function scoreRubric(
   // -- Maneuver economy (bay-entry attempts; direction-change counting rides
   //    the S1 trace channel later — attempts are the honest signal today).
   if (rubric.economy) {
-    const d = parkDetailOf(result, rubric.economy.objectiveId);
+    const park = parkChannelOf(result, rubric.economy.objectiveId);
+    const d = park?.detail ?? null;
     // The economy channel rides EITHER the parkInBay bay-entry attempts OR the
     // threePointTurn direction-change movements (a clean turn = 3 movements).
     const turn = d ? null : turnDetailOf(result, rubric.economy.objectiveId);
-    if (d && d.attempts > 0) {
+    // A bay-entry count is FINAL only once the maneuver came to rest in the
+    // outline (`alignment` is set at exactly `inBay && stopped` —
+    // objectives.ts stepParkInBay) or the objective completed. Before that it
+    // can still grow, so it supports the grade it can no longer escape and no
+    // better one. „Твърде много корекции" stays a conviction — more attempts
+    // cannot make it untrue — but „Паркира от първи опит — чиста маневра" over
+    // a car that crossed the outline once and then hit the van is praise for a
+    // park that never happened. Same fold as the star branch at the bottom of
+    // this file: a credit is owed evidence, and a count still running is not
+    // evidence yet.
+    const settled = park !== null && (park.done || park.detail.alignment !== null);
+    if (d !== null && d.attempts > 0) {
       const points = d.attempts <= rubric.economy.attemptsFor3Stars ? 2 : d.attempts <= rubric.economy.attemptsFor2Stars ? 1 : 0;
-      earned += points;
-      measuredCount += 1;
-      breakdownBg.push({
-        id: "economy",
-        labelBg: "Икономичност на маневрата",
-        detailBg:
-          points === 2
-            ? `Паркира от ${d.attempts === 1 ? "първи опит" : `${d.attempts} опита`} — чиста маневра.`
-            : points === 1
-              ? `${d.attempts} опита — приемливо, целта е от първия.`
-              : `${d.attempts} опита — твърде много корекции; подмини по-широко и започни отново.`,
-        points: points as 0 | 1 | 2,
-        measured: true,
-      });
+      if (points > 0 && !settled) {
+        breakdownBg.push({
+          id: "economy",
+          labelBg: "Икономичност на маневрата",
+          detailBg: `${d.attempts === 1 ? "Един опит" : `${d.attempts} опита`} досега — маневрата не спря в очертанията, затова икономичността не се оценява.`,
+          points: null,
+          measured: false,
+        });
+      } else {
+        earned += points;
+        measuredCount += 1;
+        breakdownBg.push({
+          id: "economy",
+          labelBg: "Икономичност на маневрата",
+          detailBg:
+            points === 2
+              ? `Паркира от ${d.attempts === 1 ? "първи опит" : `${d.attempts} опита`} — чиста маневра.`
+              : points === 1
+                ? `${d.attempts} опита — приемливо, целта е от първия.`
+                : `${d.attempts} опита — твърде много корекции; подмини по-широко и започни отново.`,
+          points: points as 0 | 1 | 2,
+          measured: true,
+        });
+      }
     } else if (turn && turn.movements > 0) {
       const points = turn.movements <= rubric.economy.attemptsFor3Stars ? 2 : turn.movements <= rubric.economy.attemptsFor2Stars ? 1 : 0;
       earned += points;
@@ -148,11 +184,17 @@ export function scoreRubric(
   // -- Observation completeness (glances vs authored required moments).
   if (rubric.observation) {
     const required = rubric.observation.moments;
-    if (observation) {
+    // Zero authored moments used to read `ratio = 1` → a full 2/2 handed to
+    // every driver alive for a check nobody wrote, AND a measured component,
+    // which by itself carries the fold to 3★. `validate.ts:261` rejects an
+    // empty `moments` at authoring time, so no shipped template reaches here —
+    // but `scoreRubric` is also called on a runtime-merged rubric in
+    // `simulator/actions.ts`, where that gate has already run and passed on a
+    // different object. A component with nothing to look for measures nothing.
+    if (observation && required.length > 0) {
       const observed = new Set(observation.observedMomentIds);
       const covered = required.filter((m) => observed.has(m.id)).length;
-      const ratio = required.length > 0 ? covered / required.length : 1;
-      const points = ratio >= 1 ? 2 : ratio >= 0.5 ? 1 : 0;
+      const points = covered >= required.length ? 2 : covered / required.length >= 0.5 ? 1 : 0;
       earned += points;
       measuredCount += 1;
       breakdownBg.push({
@@ -217,6 +259,33 @@ export function scoreRubric(
     const ratio = earned / (2 * measuredCount);
     stars = ratio >= STARS_3_MIN_RATIO ? 3 : ratio >= STARS_2_MIN_RATIO ? 2 : 1;
   } else {
+    // OPEN ITEM — NOT FIXED HERE, AND DELIBERATELY SO. Nothing about the
+    // maneuver was measured, so this line restates the exam sheet and the end
+    // screen prints the restatement under „Оценка на маневрата" — quality of
+    // execution — where a reader takes it for a second, independent opinion.
+    // It is not one. It is the first one said twice, and it says „excellent"
+    // on the strength of nobody having looked.
+    //
+    // MEASURED · sweep161. Six of the seven cockpit scenarios author a
+    // `parTimeSec`-only rubric (doc 86 D7 counts 128 of 154 catalog-wide), so
+    // `measuredCount` is 0 on every run of them. EVERY ИЗДЪРЖАН lane printed
+    // „3 от 3 звезди" — including `sc-pk-move-off/pc-wrong`, the lane the
+    // harness drives WRONG on purpose: `04-t012s.png` has the tutor's
+    // „Превишена скорост · ЗДвП чл. 21, ал. 1" card up at 59 км/ч in a 50
+    // zone, and `08-debrief.png` carries three filled gold stars beside it.
+    // `sc-park-van/mobile-right/08-debrief.png` is the same fold from the
+    // other side: all three components print „не се измерва" and the card
+    // still shows a star row.
+    //
+    // WHY THE LINE STILL READS THIS WAY. „Full stars from cleanliness" is a
+    // stated contract, not an oversight: ~141 assertions across the
+    // bot-completion suites encode it, 72 of them in tests NAMED „earns full
+    // stars from cleanliness", and `s-w5-bot-completion.test.ts:771` argues
+    // it on purpose for corridor drills. Changing what the star scale means
+    // is an ADR (CLAUDE.md: strategy changes get one first), not a one-file
+    // edit — and a lane that owns this file alone cannot land it without
+    // leaving those suites red. The evidence is parked here so the decision
+    // is made with it rather than without it.
     stars = result.completedAll && result.score === 0 ? 3 : result.completedAll ? 2 : 1;
   }
   // Caps: quality never outranks legality.

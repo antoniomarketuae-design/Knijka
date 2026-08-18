@@ -86,6 +86,40 @@ const OVB_LEFT = 4.06;
 const OVB_BAN_FROM = 90;
 const OVB_BAN_TO = 210;
 
+/**
+ * THE LANE-TRUE RADIUS, and why every gate below that names a lane is 2.7.
+ *
+ * Lane pitch is 8.125 m on every district in this file, so a disc centred on a
+ * lane centre leaves that lane at 4.0625 m. The L1/L2 ladder MULTIPLIES the
+ * authored radius (scenario/params.ts widenRadius, ×1.5 at L1), so the number
+ * that has to fit inside half a pitch is the WIDEST compiled one, not the
+ * authored one: 2.7 × 1.5 = 4.05, which is the largest authored radius whose
+ * every rung still proves „this lane and not the next one".
+ *
+ * SWEEP 161 IS WHAT MADE THIS URGENT, and it caught the arithmetic in the
+ * reassuring direction on live L1 sessions, twice:
+ *
+ *  · sc-ovr-pass — «Изпревари бавната кола в насрещната лента» — was a r5 disc
+ *    on the committed-pass line x = −2.5, i.e. 7.50 at L1, reaching x = +5.00.
+ *    The OWN lane centre is +4.06. The pc-right run of 2026-08-16 crawled the
+ *    whole 210 s in its own lane — top speed 15 км/ч, 27 full stops, never once
+ *    across the centre line — and was ticked «✓ Изпревари бавната кола в
+ *    насрещната лента 2:49». It overtook nothing. All four runs of that lesson
+ *    were credited with the overtake.
+ *  · sc-mwe-pass — «Подмини авариралата кола в лентата за движение» — was a r6
+ *    disc on the cruise lane, i.e. 9.00 at L1, and the EMERGENCY lane centre is
+ *    8.13 m away. A student undertaking the stalled car down the shoulder — the
+ *    one act the lesson exists to forbid — satisfied the gate that says he did
+ *    it „в лентата за движение".
+ *
+ * A radius is the only field a `reachZone` has that can express „which lane",
+ * so a lane claim is exactly as true as this number and no truer. The rows are
+ * tracked in objective-title-truth-lanes-following2-rail2.test.ts §5, which is
+ * an equality against a shrink-only backlog: fixing one means deleting its line
+ * there, and a new lane-claiming row wider than this cannot be added at all.
+ */
+const LANE_TRUE_RADIUS_M = 2.7;
+
 // ---------------------------------------------------------------------------
 // 1. sc-ov-keep-right — „Дръж вдясно" (OV-11 + OV-02) on ov-keepright-v1
 //    (360 m 2+2 boulevard, limit 50)
@@ -794,9 +828,34 @@ export const SC_OV_BAN_OVERTAKE: ScenarioSpec = {
       params: { kind: "reachZone", x: OVB_RIGHT, y: 190, radiusM: 4, maxSpeedKmh: 35 },
     },
     {
+      // SWEEP 161 / finding «Изпревари след зоната … never ticks on either
+      // platform»: the row below USED to be the whole overtake — one disc on
+      // the RIGHT lane at y = 370, i.e. the place a student reaches by simply
+      // following the lead car to the end of the road. The word «Изпревари»
+      // was carried by nothing. This gate is what carries it now: the LEFT
+      // lane, at y = 275, i.e. 65 m PAST the end of the В24 span (OVB_BAN_TO
+      // = 210), so the chain reads „right lane inside the ban → left lane
+      // after it → right lane home" and the sentence is the geometry.
+      //
+      // MEASURED through the production evaluator on the committed recordings:
+      //   shadow-correct           10 frames inside at L3 (closest 0.19 m) ✓
+      //   mistake-overtake-in-zone  refused — closest 8.13 m (it is at
+      //                             x = 12.19 here: it passed INSIDE the ban
+      //                             and was already home by y = 275)
+      //   mistake-early-jump        refused — closest 8.13 m, same reason
+      // Both demos still grade OVERTAKING_IN_BAN_ZONE; what they no longer do
+      // is collect the tick for the lawful pass they never made.
+      id: "sc-ovb-pass",
+      titleBg: "Изпревари чак СЛЕД зоната — излез в лявата лента",
+      params: { kind: "reachZone", x: OVB_LEFT, y: 275, radiusM: LANE_TRUE_RADIUS_M },
+    },
+    {
       id: "sc-ovb-finish",
-      titleBg: "Изпревари след зоната и завърши в дясната лента",
-      params: { kind: "reachZone", x: OVB_RIGHT, y: 370, radiusM: 5 },
+      // r5 → 2.7 (LANE_TRUE_RADIUS_M): «в дясната лента» was creditable at L1
+      // from x = 4.69, i.e. 3.44 m inside the LEFT lane, on a 8.125 m pitch.
+      // The shadow sits at x = 12.19 dead centre and keeps 62 frames inside.
+      titleBg: "Прибери се и завърши в дясната лента",
+      params: { kind: "reachZone", x: OVB_RIGHT, y: 370, radiusM: LANE_TRUE_RADIUS_M },
     },
   ],
   rubric: { parTimeSec: 80 },
@@ -990,10 +1049,15 @@ export const SC_OV_BUS_LANE: ScenarioSpec = {
     {
       id: "sc-ovbus-general",
       titleBg: "Пътувай в общата лента през участъка",
-      // Radius 4 < the 8.125 m lane pitch: satisfiable ONLY from the LEFT
-      // (general) lane center, deep inside the BUS span — the lane choice IS
-      // the drill.
-      params: { kind: "reachZone", x: OVBUS_LEFT, y: 210, radiusM: 4, maxSpeedKmh: 55 },
+      // „Radius 4 < the 8.125 m lane pitch" was the AUTHORED number and the
+      // ladder multiplies it: at L1 the disc is 6.00 and reaches x = 10.06,
+      // which is 1.94 m INSIDE the bus lane (its boundary is x = 8.125). A car
+      // straddling the BUS paint was creditable with «пътувай в общата лента»
+      // on the aided rung, where the beginners are. 2.7 (LANE_TRUE_RADIUS_M)
+      // keeps every rung inside the general lane: L1 4.05 → x ∈ [0.01, 8.11].
+      // Shadow: 11 frames inside at L3, closest 0.05 m. Both bus-lane demos sit
+      // at x = 12.19 and are refused at every rung, as they were before.
+      params: { kind: "reachZone", x: OVBUS_LEFT, y: 210, radiusM: LANE_TRUE_RADIUS_M, maxSpeedKmh: 55 },
     },
     {
       id: "sc-ovbus-finish",
@@ -1176,12 +1240,39 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
   success: [
     {
       id: "sc-mwe-pass",
-      titleBg: "Подмини авариралата кола в лентата за движение",
+      titleBg: "Подмини авариралата кола в лентата за движение — под 110 км/ч",
       // Just past the breakdown scene (MWE_BREAKDOWN stands at y = 780 on the
       // emergency lane, x = 8.13 — live since ledger T15, and the recorder's
-      // rect twin sits on the same coordinate): radius 6 pins the CRUISE lane —
-      // a car riding the emergency lane misses it.
-      params: { kind: "reachZone", x: MW_X_CRUISE, y: 830, radiusM: 6 },
+      // rect twin sits on the same coordinate).
+      //
+      // „RADIUS 6 PINS THE CRUISE LANE — A CAR RIDING THE EMERGENCY LANE MISSES
+      // IT" IS WHAT THIS COMMENT USED TO SAY, AND IT WAS FALSE ON THE RUNG THE
+      // SWEEP RAN. The ladder multiplies the authored radius, so L1 compiled to
+      // 9.00 and the disc reached x = ±9.00 — past the emergency-lane centre at
+      // +8.13 AND past the overtaking-lane centre at −8.12. Measured, on a
+      // synthetic drive holding x = 8.13 (the shoulder) through y = 830:
+      //     OLD r9.00 (L1)  done = true   ← the undertake certified as „в
+      //                                     лентата за движение"
+      //     NEW r4.05 (L1)  done = false
+      // 2.7 authored (LANE_TRUE_RADIUS_M) is the largest number whose widest
+      // rung, 4.05, still sits inside the 4.0625 m half-pitch. The shadow runs
+      // x = 0.00 exactly and keeps 4 frames inside at L3, 6 at L1.
+      //
+      // AND THE CAP, which is the other half of the same finding. This gate
+      // carried NO speed demand, so sweep 161's reckless run — 139 км/ч, one
+      // lane, never lifted — collected both tasks in 58 s and a three-star
+      // ИЗДЪРЖАН, while the careful run got neither. Instruction 1 asks for
+      // 100–110 км/ч and instruction 3 asks for a pass „без да докосваш
+      // аварийната"; a gate that authorised 139 taught the opposite of both,
+      // fifty metres past a stalled car with people around it. This is the
+      // LEDGER T18 remedy (sc-ovc-approach's cap 55 → 30) applied to the row
+      // that needed it next, and like T18 the number is PUBLISHED in the title
+      // so the demand is readable before it is enforced.
+      // Measured at the mark: shadow 95.0 км/ч, mistake-undertake 76.8,
+      // mistake-shoulder-cruise 76.7 — 15 км/ч of headroom on the tightest
+      // rung, and `done` is unchanged for all three (a cap can only ever
+      // refuse; objectives.ts proves that monotonicity).
+      params: { kind: "reachZone", x: MW_X_CRUISE, y: 830, radiusM: LANE_TRUE_RADIUS_M, maxSpeedKmh: 110 },
     },
     {
       id: "sc-mwe-finish",
@@ -1243,6 +1334,12 @@ export const SC_MW_EMERGENCY_LANE: ScenarioSpec = {
 
 /** ov-oncoming-v1 lane centers (meta.scenario — the L7 copy truth). */
 const OVG_OWN = 4.06;
+/** ov-oncoming-v1 ONCOMING lane center (meta.scenario.laneCenterOncomingM) —
+ *  the anchor every „you were out there" gate of the corridor family sits on.
+ *  The recorded pass line is x = −2.5 (1.56 m short of the centre, on our side
+ *  of the oncoming lane), so a LANE_TRUE_RADIUS_M disc centred here contains
+ *  the whole oncoming lane at L1 and still never touches our own paint. */
+const OVG_ONCOMING = -4.06;
 /** ov-oncoming-v1 road length (meta.scenario.params). */
 const OVG_LENGTH = 900;
 
@@ -1349,9 +1446,59 @@ export const SC_OV_ONCOMING_GAP: ScenarioSpec = {
       params: { kind: "reachZone", x: OVG_OWN, y: 150, radiusM: 4, maxSpeedKmh: 45 },
     },
     {
+      // SWEEP 161, finding «credit is INVERTED»: the two rows of this lesson
+      // used to be «изчакай» (own lane, y 150) and «Изпревари в големия
+      // прозорец и завърши в своята лента» (own lane, y 540) — and NOTHING
+      // between them ever left the lane. The mobile-wrong run — 14 collisions,
+      // 141 наказателни точки, straight down its own lane at 90 км/ч — was
+      // ticked «✓ Изпревари в големия прозорец и завърши в своята лента 2:31»,
+      // while the careful run was not. The word «изпревари» was carried by a
+      // coordinate 390 m up the road that a non-overtaker reaches anyway.
+      //
+      // This gate is the overtake, expressed in the only field a reachZone has:
+      // the ONCOMING lane, mid-corridor. The chain is sequential (objectives.ts
+      // — only the active one advances), so completing it after `sc-ovg-wait`
+      // and before `sc-ovg-finish` is a there-and-back that a lane-holder
+      // cannot fake.
+      //
+      // WHAT THE TITLE STILL DOES NOT SAY, deliberately: «в големия прозорец».
+      // The oncoming window is a time-to-contact against three staged cars and
+      // `stepReachZone` sees no actor at all, so the clause is struck rather
+      // than gated (the cdb2f71 give-way remedy). The duty is not lost — both
+      // counter-demos cite OVERTAKE_INSUFFICIENT_GAP and the runtime's corridor
+      // adjudicator convicts a pull-out into a closing window on the live run.
+      //
+      // MEASURED on the committed recordings, production evaluator:
+      //   shadow-correct     5 frames inside at L3 / 9 at L1 (closest 1.57 m) ✓
+      //   mistake-tight-gap  refused — closest 8.12 m (it is back at x = 4.06
+      //                      and stopped by y = 290: its pull-out was 100 m
+      //                      earlier, into car 0's ~3.5 s gap)
+      //   mistake-overstay   completes (it DID take the big window; its fault
+      //                      is the dawdle, and the rules bill it)
+      //
+      // THIS MAKES THE OVERTAKE REQUIRED to finish this drill. That is a change
+      // of substance and is the intended one: doc-72 OV-05 is „изпреварване при
+      // достатъчен прозорец", the briefing's step 4 orders the manoeuvre, and
+      // the map stages a window ≥ 8 s wide for it. It is NOT the B8 case
+      // (lane11-data-truth „no lesson is completable only by overtaking"),
+      // whose two rows — sc-ov-crest-curve and sc-ov-solid-return — are drills
+      // where DECLINING to overtake is the correct answer and must therefore
+      // pass. Here declining is not an answer; it is not doing the exercise.
+      id: "sc-ovg-pass",
+      titleBg: "Излез в насрещната лента за изпреварването",
+      params: { kind: "reachZone", x: OVG_ONCOMING, y: 290, radiusM: LANE_TRUE_RADIUS_M },
+    },
+    {
       id: "sc-ovg-finish",
-      titleBg: "Изпревари в големия прозорец и завърши в своята лента",
-      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+      // r5 → 2.7 (LANE_TRUE_RADIUS_M). «в своята лента» on a r5 disc compiled
+      // to 7.50 at L1, whose edge is x = −3.44 — 3.44 m INTO the oncoming lane,
+      // i.e. the gate that says „back in your own lane" accepted a car still
+      // astride the centre line. This is the identical mark and the identical
+      // sizing `sc-ovr-finish` already carries one lesson down; the two rows
+      // are now the same number for the same reason. Shadow: 10 frames inside
+      // at L3, closest 0.17 m.
+      titleBg: "Прибери се и завърши в своята лента",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: LANE_TRUE_RADIUS_M },
     },
   ],
   rubric: { parTimeSec: 75 },
@@ -1462,16 +1609,69 @@ export const SC_OV_ABORT: ScenarioSpec = {
   ],
   success: [
     {
+      // SWEEP 161, finding «credit is inverted again»: the pc-wrong run — 46
+      // наказателни точки, 4 collisions, a 0.3 m near-miss — was the ONLY run
+      // of four in which this lesson's finishing objective ticked, and BOTH
+      // careful drives were told they had not finished. The deeper half is
+      // upstream of that: «Прекъсни маневрата» was a bare disc in the OWN lane
+      // at y = 250, so a car that never began a manoeuvre was congratulated for
+      // interrupting one. You cannot abort something you never started, and a
+      // single circle cannot tell the two apart.
+      //
+      // A CHAIN CAN. This gate is the PULL-OUT — the oncoming lane at y = 200,
+      // where the shadow's first (aborted) attempt lives — and the objectives
+      // are strictly sequential, so `sc-ova-abort` below now means „was out
+      // there, and came back", which is exactly what its sentence claims.
+      //
+      // MEASURED on the committed recordings, production evaluator:
+      //   shadow-correct     6 frames inside at L3 / 9 at L1 (closest 1.57 m) ✓
+      //   mistake-push-on    completes (it pulls out too — its fault is
+      //                      REFUSING to abort, and OVERTAKE_INSUFFICIENT_GAP
+      //                      bills it)
+      //   mistake-head-on    completes, same reason, plus COLLISION
+      // The demos completing this row is the point: the fault they exist to
+      // teach is what happens AFTER the pull-out, and it is `sc-ova-abort`
+      // that they now fail — measured below.
+      id: "sc-ova-pullout",
+      titleBg: "Излез за изпреварване в насрещната лента",
+      params: { kind: "reachZone", x: OVG_ONCOMING, y: 200, radiusM: LANE_TRUE_RADIUS_M },
+    },
+    {
       id: "sc-ova-abort",
       titleBg: "Прекъсни маневрата и се прибери зад бавната кола",
-      // Radius 4 pins the OWN lane center just past the abort tuck-back, at
-      // post-abort speed — reachable cleanly only by a driver who tucked back.
-      params: { kind: "reachZone", x: OVG_OWN, y: 250, radiusM: 4, maxSpeedKmh: 50 },
+      // r4 → 2.7 (LANE_TRUE_RADIUS_M). „Radius 4 pins the OWN lane center …
+      // reachable cleanly only by a driver who tucked back" was the authored
+      // intent and the ladder undid it: L1 compiled to 6.00, whose edge is
+      // x = −1.94, so a car still straddling the centre line — the very pose
+      // this row exists to say the student left — was credited with having
+      // tucked back. At 2.7 the widest rung is 4.05 → x ∈ [0.01, 8.11], our own
+      // lane and nothing else.
+      // Shadow: closest 0.02 m. Both counter-demos are now refused at EVERY
+      // rung (closest 5.62 m / 6.57 m — they are out in the oncoming lane at
+      // y = 250 because they never aborted); under the old r4 `mistake-push-on`
+      // completed this row at L1, which is a drive convicted of pushing on
+      // being ticked for breaking off.
+      params: { kind: "reachZone", x: OVG_OWN, y: 250, radiusM: LANE_TRUE_RADIUS_M, maxSpeedKmh: 50 },
     },
     {
       id: "sc-ova-finish",
-      titleBg: "Довърши изпреварването на чист път и завърши",
-      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: 5 },
+      // TITLE-TRUTH. «Довърши изпреварването на чист път» claimed two things no
+      // field on a SimTick carries — that a second overtake happened after the
+      // abort, and that the road was clear when it did. The chain proves
+      // neither: between `sc-ova-abort` (own lane, y 250) and this mark (own
+      // lane, y 540) a car that simply drove on satisfies both. The clause goes
+      // (cdb2f71's give-way remedy); what stays is the part the disc does
+      // prove, and the radius that makes it true — r5 compiled to 7.50 at L1,
+      // reaching 3.44 m into the oncoming lane. Shadow: 10 frames inside at L3,
+      // closest 0.22 m.
+      //
+      // The abort discipline itself is NOT left ungraded: the two counter-demos
+      // cite OVERTAKE_INSUFFICIENT_GAP (and COLLISION), the runtime's corridor
+      // adjudicator convicts pushing on against a closing window on the live
+      // session, and an aborted overtake never convicts — which is this
+      // lesson's whole thesis and is proved in s7-ov-corridor-bot-completion.
+      titleBg: "Завърши отсечката в своята лента",
+      params: { kind: "reachZone", x: OVG_OWN, y: 540, radiusM: LANE_TRUE_RADIUS_M },
     },
   ],
   rubric: { parTimeSec: 85 },
@@ -1561,9 +1761,35 @@ export const SC_OV_RETURN_GAP: ScenarioSpec = {
     {
       id: "sc-ovr-pass",
       titleBg: "Изпревари бавната кола в насрещната лента",
-      // Radius 5 on the committed-pass line (x = −2.5): satisfiable only by a
-      // genuine pass through the oncoming lane — the overtake IS the setup.
-      params: { kind: "reachZone", x: -2.5, y: 250, radiusM: 5 },
+      // „RADIUS 5 ON THE COMMITTED-PASS LINE (x = −2.5): SATISFIABLE ONLY BY A
+      // GENUINE PASS THROUGH THE ONCOMING LANE" — that was this row's authored
+      // claim, and sweep 161 caught it being false on the rung beginners drive.
+      // The ladder multiplies: L1 compiled to 7.50 around x = −2.5, so the disc
+      // reached x = +5.00 and swallowed the OWN lane centre at +4.06. The
+      // 2026-08-16 pc-right run held its own lane for the entire 210 s — top
+      // speed 15 км/ч, 27 full stops, never across the centre line — and was
+      // ticked «✓ Изпревари бавната кола в насрещната лента 2:49». So were the
+      // other three runs, including a reckless one that ploughed the lead car.
+      //
+      // TWO NUMBERS FIX IT, and both are read off the district rather than
+      // chosen: the mark moves onto the ONCOMING LANE CENTRE (OVG_ONCOMING,
+      // meta.scenario.laneCenterOncomingM) and the radius becomes the
+      // lane-true one, so the widest compiled disc is x ∈ [−8.11, −0.01] —
+      // the oncoming lane exactly, never our own paint at any rung.
+      // Measured, production evaluator, synthetic own-lane-only drive
+      // (x = 4.06 throughout):
+      //     OLD  L1 r7.50 @ x −2.5   done = true    ← the sweep's false tick
+      //     OLD  L2 r6.25 @ x −2.5   done = false
+      //     NEW  L1 r4.05 @ x −4.06  done = false
+      // and on the committed recordings:
+      //     shadow-correct   5 frames inside at L3 / 9 at L1 (closest 1.58 m,
+      //                      the pass line sits 1.56 m off the lane centre) ✓
+      //     mistake-early-cut / mistake-fast-cut  refused (closest 5.22 /
+      //                      8.13 m — both are already back on our side by
+      //                      y = 250, which is the fault they demonstrate);
+      //                      under the old disc `mistake-fast-cut` completed
+      //                      this row at L1 from x = 4.06, its own lane.
+      params: { kind: "reachZone", x: OVG_ONCOMING, y: 250, radiusM: LANE_TRUE_RADIUS_M },
     },
     {
       id: "sc-ovr-finish",
@@ -1608,14 +1834,14 @@ export const SC_OV_RETURN_GAP: ScenarioSpec = {
       // y = 410, i.e. 130–140 m short of this mark), so nothing regresses in
       // either direction.
       //
-      // WHY ONLY THIS ROW AND NOT ITS TWO NEIGHBOURS. `sc-ovg-finish` and
-      // `sc-ova-finish` sit on the SAME mark of the same map at the same r5 and
-      // make the same claim («…и завърши в своята лента»), and they are two of
-      // the 26 rows the lane-claim census found across these families. Sizing
-      // twenty-six radii against twenty-six committed recordings is its own
-      // wave; the list is machine-checked and shrink-only in
-      // __tests__/objective-title-truth-lanes-following2-rail2.test.ts, so it
-      // cannot grow while it waits.
+      // ITS TWO NEIGHBOURS HAVE NOW FOLLOWED (sweep 161). `sc-ovg-finish` and
+      // `sc-ova-finish` sat on the SAME mark of the same map at the same r5 and
+      // made the same claim («…в своята лента»); this wave sized both to the
+      // same 2.7 (LANE_TRUE_RADIUS_M) against their own committed recordings,
+      // so the three rows are one number for one reason. The remaining rows of
+      // the 26-row lane-claim census stay machine-checked and shrink-only in
+      // __tests__/objective-title-truth-lanes-following2-rail2.test.ts, so the
+      // list cannot grow while the rest wait.
       // ── OPEN, MEASURED, AND DELIBERATELY NOT CHANGED TONIGHT ───────────────
       //
       // Shrinking r fixed the false CERTIFICATE and introduced a small false
