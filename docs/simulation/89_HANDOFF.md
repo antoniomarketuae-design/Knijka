@@ -291,3 +291,69 @@ measured: **O2** eight gates certifying another road user's behaviour a disc
 cannot witness · **O3** three lamp gates where the night/lamp channel reaches
 neither grader · **O5** five crossing gates capping above чл. 119's 30 км/ч.
 Four are typed `KNOWN_OPEN` arrays whose staleness is self-asserting.
+
+---
+
+## 10 · WHERE THIS IS GOING — read before you decide anything
+
+Everything above is tactics. This is the part that tells you when to stop, and
+what to refuse.
+
+### The product
+
+**Книжка.AI** — a Bulgarian driving academy for 17–18-year-olds. Two halves that
+must eventually be one: a **theory** side (1,089 questions, official exam format —
+45 questions / 97 points / ≥87 to pass / 40 minutes / 1-2-3 weights) and a
+**browser simulator** (161 lessons on real Sofia street topology). B2C, Bulgaria
+first, EUR only.
+
+### The test every decision passes or fails
+
+From `CLAUDE.md`, founder-ratified, and it is not decoration:
+
+> **Does this produce safer, more competent real drivers?**
+
+And its sharpest corollary, **THEO-4 requirement zero**: the product is a *virtual
+driving instructor that explains every decision*. **No bare correct/wrong verdicts,
+anywhere, ever.**
+
+That is why this entire audit exists. A lesson that hands out a green tick for a
+skill it never measured is not a cosmetic bug — it teaches a seventeen-year-old
+that something they did wrong was right, and then puts them on a real road. The
+founder's own complaint is the mirror image: he signalled a roundabout exit
+correctly and the engine failed him. **Both directions are the same crime.** When
+you are choosing between a fix that is convenient and one that is true, that is
+the tiebreak.
+
+### What "done" means, at three scales
+
+1. **This audit** — the open list in `88_LESSON_AUDIT.md` is empty, and
+   `sc-zebra-approach` still passes both directions on both platforms. 1,012
+   findings standing, 85 files never opened. **You are perhaps a third of the way.**
+2. **The simulator** — every one of the 161 lessons can be passed by driving it
+   correctly and fails you when you drive it badly, on a phone and on a PC. Today
+   eleven lessons cannot be passed by anyone, and two cannot fail anyone.
+3. **The product** — a 17-year-old can learn the theory, practise the exam in its
+   real format, and drive the lessons, and comes out a safer driver than the
+   textbook alone would produce. See `docs/00_PRODUCT_MAP.md` (injected on every
+   session start) for the full component checklist and status; it is the net that
+   catches forgotten pieces.
+
+### What you may not decide alone
+
+- **Content signatures.** 0 of 1,089 questions are human-signed while 796 marked
+  "approved" are served today. Only the founder signs content. Never flip a
+  `status` field to make a gate go green.
+- **The 512 UNPOLISHED findings** — empty pavements, repeated buildings, flat sky.
+  His taste, his call. Ledger them with frames; do not spend a wave on them.
+- **Strategy and architecture** — `CLAUDE.md`: changes there get an **ADR first**.
+  ADR-001 fictional vehicles, ADR-002 the AI never free-recalls Bulgarian law
+  (retrieval + citation only), ADR-005 browser-first.
+
+### And when he switches back
+
+He alternates between two accounts. **Write a dated recap to
+`~/.claude/recaps/AI driver/` before the hand-back**, the same way this one was
+written — the hook injects the newest one automatically, and it is the only thing
+that carries your reasoning across. Commit and push everything first: the working
+tree does not travel, git does.
