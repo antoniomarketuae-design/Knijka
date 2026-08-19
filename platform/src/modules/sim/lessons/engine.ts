@@ -61,7 +61,9 @@ import {
   createFinishGate,
   routeEndMark,
   routeFinishZone,
+  offNetworkEndingCopy,
   routeRunOutArrived,
+  stepOffNetwork,
   stepFinishGate,
   stepYieldWait,
   terminalRescueZone,
@@ -987,6 +989,32 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       }
     }
   }
+  /**
+   * O22/O29 — THE CAR IS NO LONGER IN THE AUTHORED WORLD.
+   *
+   * Folded before the finish gates on purpose: this ending is not anchored on
+   * route geometry, so no gate's arming state is involved, and a car off the
+   * network cannot be reasoned about by anything that measures distance to a
+   * zone. Written back unconditionally, like `crashPin`, because it must be
+   * able to return to absent — every frame back on a road resets it, and two
+   * separate excursions are two recoveries the student DROVE back from rather
+   * than one long strand.
+   *
+   * `stepOffNetwork` shipped built and tested and folded by NOTHING, because
+   * the lane that wrote it owned `finish.ts` and this file was not its to
+   * touch. That is the same routing debt that produced the straddle regression
+   * one round earlier; this is the edit that spends it.
+   */
+  const offNet = stepOffNetwork(prev.offNetworkSinceSec, tick, posedAtSec !== undefined);
+  if (phase === "driving" && prev.phase === "driving" && offNet.ended) {
+    phase = "completed";
+    endedAtSec = tick.t;
+    // THEO-4: never a bare verdict, and never borrowed copy. Both endings this
+    // file could already speak say «край на маршрута», which is exactly what
+    // has NOT happened here — telling a student he reached the end of a route
+    // he drove off is the false sentence this ending exists to avoid.
+    hudEvents.push(offNetworkEndingCopy(examMode));
+  }
   if (
     phase === "driving" &&
     prev.phase === "driving" &&
@@ -1073,6 +1101,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // student reversed out and drove away), which the additive spread above
       // cannot express over `...prev` — so it is written unconditionally.
       crashPin,
+      // Same reason, same shape: every frame back on a road must clear it, and
+      // `...prev` cannot express a field returning to null.
+      offNetworkSinceSec: offNet.sinceSec,
       ...(mistakeHitAt !== undefined ? { mistakeExperienceHitAtSec: mistakeHitAt } : {}),
     },
     hudEvents,

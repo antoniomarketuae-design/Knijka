@@ -290,22 +290,28 @@ describe("the ending says WHY, in the instructor's voice", () => {
 });
 
 // ---------------------------------------------------------------------------
-// STILL OPEN — the arm is in a file this lane does not own
+// THE ARM LANDED — this block was written as its own tripwire and has now fired
 // ---------------------------------------------------------------------------
 
-describe("THE ARM IS STILL MISSING (delete this block when it lands)", () => {
-  it("a shipped lesson driven off the map does NOT end today", () => {
+describe("the arm is folded, and a car off the authored world ends", () => {
+  it("a shipped lesson driven off the map ENDS, with its own sentence", () => {
     // Driven through the real `applyTick` on the real compiled lesson, so this is
     // a statement about the product and not about a stub. `sc-junction-blind@L1`
     // is the scenario the O22 row was filed against; its ticks report
     // `edgeId: null` from the first frame and it drives for 300 s — four times
     // OFF_NETWORK_STUCK_S — with the fold available and nothing calling it.
     //
-    // WHEN `lessons/engine.ts` FOLDS `stepOffNetwork` (the arm is written out
-    // verbatim at the end of finish.ts's O22 block), this expectation inverts:
-    // `phase` becomes "completed" at ≈ 75 s and the pushed HUD event must equal
-    // `offNetworkEndingCopy(false)`. Failing here is the correct outcome then —
-    // it is the signal that the routed change landed, not a regression.
+    // THIS TEST WAS WRITTEN INVERTED, ON PURPOSE, AND THEN FIRED. It shipped
+    // asserting that the drive does NOT end, because `stepOffNetwork` was built,
+    // tested and folded by nothing — the lane that wrote it owned finish.ts and
+    // `lessons/engine.ts` was not its to touch. Its own instruction was that
+    // failing here would be the signal the routed change had landed rather than
+    // a regression. It failed on 2026-08-19 and this is the inversion.
+    //
+    // That is the whole shape of the routing debt this programme kept paying:
+    // fifteen of twenty-six open rows were "one edit in a file this lane does
+    // not own", and a lane can only ever NAME those. A test that convicts its
+    // own missing arm is the cheapest way to make sure the naming is not lost.
     const template = SCENARIO_TEMPLATES.find((t) => t.id === "sc-junction-blind");
     expect(template, "sc-junction-blind must still be in the catalogue").toBeDefined();
     const lesson = compileScenario(template!, 1);
@@ -324,8 +330,43 @@ describe("THE ARM IS STILL MISSING (delete this block when it lands)", () => {
         break;
       }
     }
-    expect(endedAtSec, "if this is non-null the arm has landed — invert this test").toBeNull();
-    expect(state.phase).toBe("driving");
+    // OFF_NETWORK_STUCK_S is 75 s and the clock starts on the first frame with
+    // no road under a moving car, so the ending lands just after it — and well
+    // inside the 300 s this rig drives, which is four times the bar.
+    expect(endedAtSec, "the arm is folded — this must now end").not.toBeNull();
+    expect(endedAtSec!).toBeGreaterThanOrEqual(OFF_NETWORK_STUCK_S);
+    expect(endedAtSec!).toBeLessThan(OFF_NETWORK_STUCK_S + 5);
+    expect(state.phase).toBe("completed");
+  });
+
+  it("it does NOT borrow either existing ending's sentence", () => {
+    // THEO-4, and the reason this ending needed copy of its own rather than a
+    // reused string: both endings this engine could already speak say «край на
+    // маршрута», and telling a student he reached the end of a route he drove
+    // OFF is precisely the false sentence. Read off the pushed HUD event, not
+    // off the copy helper — the helper being right proves nothing about what
+    // the engine actually pushed.
+    const template = SCENARIO_TEMPLATES.find((t) => t.id === "sc-junction-blind")!;
+    const lesson = compileScenario(template, 1);
+    let state = createLessonSession(lesson);
+    let pushed: { titleBg?: string; explanationBg?: string } | null = null;
+    for (let t = 0; t <= 300; t = Number((t + DT).toFixed(6))) {
+      const step = applyTick(
+        state,
+        makeTick({ t, speedKmh: 11, gear: 1, edgeId: null, position: { x: 400, y: 400 + t } }),
+      );
+      state = step.state;
+      const lessonEvent = step.hudEvents.find(
+        (e) => e.kind === "lesson" && String(e.titleBg ?? "").includes("извън пътя"),
+      );
+      if (lessonEvent) pushed = lessonEvent as { titleBg?: string; explanationBg?: string };
+      if (state.phase !== "driving") break;
+    }
+    expect(pushed, "the ending must announce itself").not.toBeNull();
+    expect(pushed!.titleBg).toBe(offNetworkEndingCopy(false).titleBg);
+    expect(pushed!.explanationBg).toBe(offNetworkEndingCopy(false).explanationBg);
+    expect(pushed!.titleBg).not.toContain("край на маршрута");
+    expect(pushed!.explanationBg).not.toContain("край на маршрута");
   });
 
   it("THE POSITIVE CONTROL: the same rig DOES end a drive an existing gate can see", () => {

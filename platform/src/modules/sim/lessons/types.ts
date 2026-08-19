@@ -1083,6 +1083,25 @@ export interface LessonSessionState {
     stillSinceSec: number | null;
   };
   /**
+   * O22 — session time the current OFF-NETWORK run began (`finish.ts`
+   * `stepOffNetwork`), or null while the car is on a road the world authored.
+   *
+   * Fourteen drives in the sweep could not be ended by anything at all. The
+   * class that survived measurement is a car NO LONGER IN THE AUTHORED WORLD —
+   * `sc-junction-blind/pc-right/04-t090s.png` is a featureless green plane at
+   * 0 км/ч with the task chip still reading «ЗАДАЧА 2/2 · Завий наляво». No
+   * standstill bar can reach it, because those drives oscillate rather than
+   * stand still, and no duration cap may be added instead: that would end
+   * drives on a timer regardless of what the student is doing, which is a false
+   * refusal manufactured to answer a missing ending.
+   *
+   * A primitive rather than an object so `finish.ts` need not be imported here.
+   * Absent on every session that predates it, and `stepOffNetwork` treats an
+   * absent `edgeId` as innocent — only an explicit null is the runtime SAYING
+   * there is no road here — so no recorded trace or hand-built tick can trip it.
+   */
+  offNetworkSinceSec?: number | null;
+  /**
    * THE RUN-OUT (additive, 2026-08-16) — the drive between finishing the last
    * task and reaching the end of the route.
    *
