@@ -583,6 +583,51 @@ const SNOW_LIGHTS_COPY = {
     "Валеше сняг, а караше без къси светлини. Снегът е намалена видимост точно както дъждът и мъглата: платното още се вижда, но сивата кола в бялото се губи и насрещният те забелязва секунди по-късно, отколкото ти се струва. При намалена видимост колата се движи с включени къси светлини — не толкова за да виждаш, колкото за да те виждат.",
 } as const;
 
+/**
+ * WHICH low-beam duty is live — night, rain or snowfall — or null when the
+ * conditions demand no lamps at all.
+ *
+ * O35, AND WHY THIS IS A FUNCTION RATHER THAN THREE INLINE CONDITIONS. The
+ * same hole was found twice by two audit rounds from two sides, because the
+ * duty had two independent derivations and no owner:
+ *   · round 6 (O28) found the GRADER had no snow arm — a lesson ordering
+ *     «включи късите светлини» that the engine could not check;
+ *   · round 8 (O35) found the DASHBOARD had no lights row for it either —
+ *     `LessonScene.tsx` publishes `headlightsRequired = isNight || rain`, and
+ *     `compile.ts` makes the weathers EXCLUSIVE (rain/fog/snow are three
+ *     separate booleans), so no snow drive can ever satisfy that bit.
+ * A student handed a dark car on `sc-ac-snow`, shown nothing, and then billed
+ * for it is the founder's own roundabout complaint wearing a different coat.
+ *
+ * So the precedence lives HERE, once, and `hud/telltaleWarnings.ts` imports it
+ * instead of restating it: what the telltale SHOWS and what the engine GRADES
+ * now come from one place, and a drift needs an edit to this function rather
+ * than an unnoticed disagreement between two files.
+ *
+ * The order is the order the three arms below fire in, and each exclusion
+ * answers a double bill rather than tidiness: night carries no exclusion and is
+ * the основна row; rain is guarded `!isNight`; snow is guarded `!rain &&
+ * !isNight` and reuses the rain row's CODE (with SNOW_LIGHTS_COPY) because чл.
+ * 70, ал. 1 is one duty. A snowy night bills the night row once — here and in
+ * the HUD alike.
+ *
+ * `rules/__tests__/low-beam-duty-one-source.test.ts` drives all sixteen
+ * (night, rain, snow, fog) combinations through BOTH consumers and fails if
+ * they ever disagree.
+ */
+export type LowBeamDuty = "night" | "rain" | "snow" | null;
+
+export function lowBeamDuty(c: {
+  isNight?: boolean;
+  rain?: boolean;
+  snow?: boolean;
+}): LowBeamDuty {
+  if (c.isNight === true) return "night";
+  if (c.rain === true) return "rain";
+  if (c.snow === true) return "snow";
+  return null;
+}
+
 export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngineState {
   return {
     config: { ...DEFAULT_RULE_CONFIG, ...config },
@@ -1302,10 +1347,17 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   if (stepEpisode(s.handbrake, tick.handbrakeOn && moving, !tick.handbrakeOn, t, cfg.handbrakeSustainSec)) {
     events.push(makeViolation("HANDBRAKE_LEFT_ON", t));
   }
+  // The one derivation of the low-beam duty (see `lowBeamDuty`): the three arms
+  // below — night here, rain and snowfall further down — read it instead of
+  // each restating the precedence, and the HUD's lights row reads the same
+  // function. Byte-identical to the three inline conditions it replaced:
+  // "night" IS `isNight`, "rain" IS `rain && !isNight`, "snow" IS
+  // `snow && !rain && !isNight`.
+  const lampDuty = lowBeamDuty(tick);
   if (
     stepEpisode(
       s.headlights,
-      tick.isNight && tick.headlights === "off" && moving,
+      lampDuty === "night" && tick.headlights === "off" && moving,
       !tick.isNight || tick.headlights !== "off",
       t,
       cfg.headlightsSustainSec,
@@ -1516,7 +1568,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   }
 
   // Lights in rain (daytime — night is covered by HEADLIGHTS_OFF_AT_NIGHT).
-  const rainNoLights = raining && !tick.isNight && tick.headlights === "off" && moving;
+  const rainNoLights = lampDuty === "rain" && tick.headlights === "off" && moving;
   if (
     stepEpisode(s.rainLights, rainNoLights, !raining || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
   ) {
@@ -1554,7 +1606,10 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // objective-side lamp gate made the order refusable; this makes it teachable,
   // because a refused gate with no card is the bare verdict THEO-4 forbids.
   //
-  // THE THREE EXCLUSIONS, each answering a false-positive rather than tidiness:
+  // THE THREE EXCLUSIONS, each answering a false-positive rather than tidiness.
+  // The first two are now spelled `lampDuty === "snow"` (O35 moved the
+  // precedence into `lowBeamDuty` so the HUD could read the same one); they are
+  // the same two conditions, unchanged in meaning:
   //  - `!tick.isNight` — verbatim the rain arm's own reason: night is covered by
   //    HEADLIGHTS_OFF_AT_NIGHT (основна), and sc-ac-snow's L5 rung IS a night
   //    rung (`l5Night()`), so without this the winter lesson's hardest level
@@ -1567,7 +1622,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   //    night/rain/fog and NOT for snow, so sc-ac-snow IS handed over dark) must
   //    have the same seconds to reach L that the rain drill gets. No new config
   //    knob: one reduced-visibility duty, one grace.
-  const snowNoLights = snowy && !raining && !tick.isNight && tick.headlights === "off" && moving;
+  const snowNoLights = lampDuty === "snow" && tick.headlights === "off" && moving;
   if (
     stepEpisode(s.snowLights, snowNoLights, !snowy || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
   ) {

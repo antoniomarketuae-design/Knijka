@@ -39,6 +39,7 @@ import {
   censusLines,
   formatBlock,
   runWorldReferentGate,
+  worldFactsFor,
   type CodeViolation,
   type FaultCode,
   type GateResult,
@@ -81,6 +82,84 @@ const BLOCKS = Number(process.env.WORLD_REFERENT_GATE_BLOCKS ?? 14);
 const RESULT: GateResult = runWorldReferentGate();
 
 const keyOf = (v: CodeViolation) => `${v.scenarioId}@L${v.level}|${v.code}`;
+
+// ---------------------------------------------------------------------------
+// O42 — the independent measurement behind the SPEED_TOO_FAST_FOR_CURVE budget
+// ---------------------------------------------------------------------------
+
+/** A post is "on" an edge when it projects within this of the centreline —
+ *  referents.ts uses the same 20 m for the same question. */
+const POST_ON_EDGE_M = 20;
+/** Two edges are ONE road for a warning's purposes when the heading break
+ *  across their join is inside this; zoneSigns.ts places against the same
+ *  number (UPSTREAM_HEADING_BREAK_DEG) and measured 0.0° at the mw-exit gore. */
+const UPSTREAM_BREAK_DEG = 20;
+
+/**
+ * How far BEFORE a hazard span its warning post stands — measured along the
+ * road the DRIVER drives, which is the question „warned in advance" means and
+ * the question `REFERENT_RULES.SPEED_TOO_FAST_FOR_CURVE` does not ask (O42).
+ *
+ * Derived here from the BUILT world (`worldFactsFor` — the same signs and the
+ * same index the gate reads), deliberately independently of both other
+ * instruments in the tree, so an agreement between them is evidence:
+ *   · zoneSigns.ts `warningStation` PLACES against this rule;
+ *   · builders/__tests__/hazard-warning-advance.test.ts `advanceM` measures it
+ *     from the authored district files through `buildZoneSigns`;
+ *   · this reads it back off the built geometry.
+ * All three say 61.0 m for mw-exit-v1's А1, on `mwx-e-nb-decel`.
+ */
+function drivenPathAdvanceM(
+  districtId: string,
+  zoneId: string,
+): { leadM: number; hostEdgeId: string; postAtM: number } | null {
+  const w = worldFactsFor(districtId);
+  const zone = (w.district.zones ?? []).find((z) => z.id === zoneId);
+  if (!zone) return null;
+  const own = w.index.edgeRtById(zone.edgeId);
+  if (!own) return null;
+  const posts = w.signs.filter((s) => s.kind === "curve" || s.kind === "slippery");
+  const headX = own.pts[0]!;
+  const headY = own.pts[1]!;
+  const headTanX = own.pts[2]! - headX;
+  const headTanY = own.pts[3]! - headY;
+  let best: { leadM: number; hostEdgeId: string; postAtM: number } | null = null;
+  for (const rt of w.index.edges) {
+    const isOwn = rt.edge.id === zone.edgeId;
+    if (!isOwn) {
+      // A candidate approach must FLOW INTO the hazard edge's head (the join is
+      // inside its own drawn cross-section) and must CONTINUE rather than turn.
+      const n = rt.pts.length;
+      const ex = rt.pts[n - 2]!;
+      const ey = rt.pts[n - 1]!;
+      if (Math.hypot(ex - headX, ey - headY) > rt.halfWidthM) continue;
+      let d =
+        ((Math.atan2(headTanY, headTanX) - Math.atan2(ey - rt.pts[n - 3]!, ex - rt.pts[n - 4]!)) *
+          180) /
+        Math.PI;
+      while (d > 180) d -= 360;
+      while (d <= -180) d += 360;
+      if (Math.abs(d) > UPSTREAM_BREAK_DEG) continue;
+    }
+    for (const p of posts) {
+      const hit = w.index.projectOnEdge(rt.idx, p.at.x, p.at.y, {
+        edgeIdx: -1,
+        distM: Infinity,
+        sM: 0,
+        latSignedM: 0,
+        tanX: 0,
+        tanY: 1,
+        outsideM: Infinity,
+      });
+      if (hit.distM > POST_ON_EDGE_M) continue;
+      const leadM = isOwn ? zone.fromM - hit.sM : rt.totalLen - hit.sM + zone.fromM;
+      if (!best || leadM > best.leadM) {
+        best = { leadM, hostEdgeId: rt.edge.id, postAtM: hit.sM };
+      }
+    }
+  }
+  return best;
+}
 
 function wrap(s: string, width: number): string[] {
   const words = s.split(/\s+/);
@@ -313,6 +392,25 @@ function report(): string {
   for (const [code, b] of budgeted.sort((a, b) => b[1].rungs - a[1].rungs)) {
     push(`    ${code.padEnd(28)} ${`${b.scenarios}/${b.rungs}`.padStart(8)}  ${b.ledger} · ${b.owner}`);
   }
+  // O42 — the one budgeted code whose fault is in the PREDICATE, printed here
+  // because `rule.fixIn` (referents.ts, not this lane's file) still routes
+  // every reader to a builder that was fixed on 2026-08-19, which is where
+  // several rounds of „move the sign" work went. Prints only while the dispute
+  // exists, so it disappears with the entry.
+  if (allow.falsehoodBudget.SPEED_TOO_FAST_FOR_CURVE) {
+    push(
+      "  ! SPEED_TOO_FAST_FOR_CURVE: its fixIn still names world/builders/zoneSigns.ts:129. That",
+    );
+    push(
+      "    is DONE — the А1 stands 61.0 m before the arc on mwx-e-nb-decel (s=219.0 of 280), and",
+    );
+    push(
+      "    the fault left is the predicate: it projects posts onto the zone's OWN edge only, and",
+    );
+    push(
+      "    mwx-z-ramp-curve starts at fromM 0, so `fromM - sM` is <= 0 for every placement there.",
+    );
+  }
   push(
     `  allowlisted ${allow.allowlist.length}   newly-passing allowlist entries ` +
       `${allow.allowlist.filter((a) => !RESULT.violations.some((v) => keyOf(v) === `${a.scenario}@L${a.rung}|${a.code}`)).length}`,
@@ -490,6 +588,81 @@ describe("scenario-world-referent gate", () => {
       ).toBe(true);
     }
     expect(drift).toEqual([]);
+  });
+
+  /**
+   * O42 — THE CURVE BUDGET IS A DISPUTE WITH THE PREDICATE, NOT A DEFECT IN THE
+   * WORLD, AND IT MUST DRAIN FROM BOTH ENDS.
+   *
+   * A budget entry says „this code convicts on a world that lacks the referent,
+   * and we accept that for now". This one does not: the referent IS there and
+   * `checkSPEED_TOO_FAST_FOR_CURVE` cannot see it. Measured 2026-08-19 over all
+   * 167 scenarios / 808 rungs:
+   *
+   *   · the four red rungs are ONE scenario, sc-merge-motorway-exit L1–L4, and
+   *     all four report the same sentence — „curve post is not on the zone's own
+   *     edge". They are the EDGE-LOCAL branch: the А1 stands 61.0 m before the
+   *     arc on `mwx-e-nb-decel`, the deceleration lane the driver arrives down,
+   *     which is where a motorway exit is signed in life; the rule projects
+   *     candidates onto `mwx-e-ramp` alone and drops it at 20 m.
+   *   · behind that sits a second, LATENT bug and it is why „move the sign"
+   *     could never work: the rule's arithmetic is `fromM - sM`, and
+   *     mwx-z-ramp-curve has `fromM = 0`, so ANY post that did project onto the
+   *     ramp would score `lead <= 0 < 40`. The zone is unsatisfiable from every
+   *     placement in the plane. (Corpus-wide the code is NOT unsatisfiable — it
+   *     returns ok on 10 rungs, sp-curve-v1 and ov-crest-v1 at 60.0 m each — so
+   *     nothing that counts per-CODE would ever have found this.)
+   *   · replacing the check with the driven-path measurement below and
+   *     re-running the whole gate: SPEED_TOO_FAST_FOR_CURVE 1/4 → 0/0, total
+   *     falsehoods 33 → 29, and NO new falsehood anywhere. The counter-direction
+   *     was measured too, because a predicate that credits everybody is the same
+   *     crime pointing the other way: with the demand raised to 70 m it convicts
+   *     3/14, and with the А1 removed from the build it convicts 3/14 — 14 being
+   *     every rung that actually routes over a curveAdvisory span.
+   *
+   * So the entry cannot be deleted here (deleting it while the predicate stands
+   * turns the gate red for everyone), and it must not be allowed to sit and
+   * silently absorb a REAL falsehood later. This test is the receipt: it pins
+   * the world as correct and the gate as wrong, and it goes red the moment
+   * either half moves — including the wrong fix, which is moving the sign back
+   * onto the ramp to satisfy the broken arithmetic.
+   *
+   * WHEN referents.ts LEARNS TO FOLLOW THE JOIN: delete this test AND the
+   * falsehoodBudget entry in the same commit. Neither survives alone.
+   */
+  it("O42: the curve budget is the predicate's fault — the world is measured right", () => {
+    const budget = allow.falsehoodBudget.SPEED_TOO_FAST_FOR_CURVE;
+    if (!budget) return; // the entry is gone: the predicate was fixed, and so was this.
+
+    // HALF 1 — THE WORLD. The А1 stands a full advance before the arc, on the
+    // carriageway the driver is on. If this number falls, a sign moved.
+    const adv = drivenPathAdvanceM("mw-exit-v1", "mwx-z-ramp-curve");
+    expect(adv, "mw-exit-v1 has no curve warning at all").not.toBeNull();
+    expect(adv!.hostEdgeId).toBe("mwx-e-nb-decel");
+    expect(adv!.postAtM).toBeCloseTo(219.0, 1);
+    expect(
+      adv!.leadM,
+      "the А1 no longer stands 61.0 m before the ramp arc — a lane moved the post",
+    ).toBeCloseTo(61.0, 1);
+    expect(adv!.leadM).toBeGreaterThanOrEqual(40);
+
+    // HALF 2 — THE GATE, disagreeing, in the words of the bug.
+    const rows = RESULT.violations.filter(
+      (v) => v.code === "SPEED_TOO_FAST_FOR_CURVE" && v.band === "falsehood",
+    );
+    expect(
+      rows.map((r) => `${r.scenarioId}@L${r.level}`),
+      "the curve falsehoods changed — if they are GONE the predicate was fixed: " +
+        "delete this test and the falsehoodBudget entry together",
+    ).toEqual([
+      "sc-merge-motorway-exit@L1",
+      "sc-merge-motorway-exit@L2",
+      "sc-merge-motorway-exit@L3",
+      "sc-merge-motorway-exit@L4",
+    ]);
+    expect([...new Set(rows.map((r) => r.worldHas))]).toEqual([
+      "curve post is not on the zone's own edge",
+    ]);
   });
 
   it("the allowlist drains itself: an entry that starts passing fails the gate", () => {

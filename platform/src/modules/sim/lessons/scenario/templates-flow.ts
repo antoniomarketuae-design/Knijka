@@ -222,6 +222,19 @@ export const SC_ZEBRA_APPROACH: ScenarioSpec = {
     // (complications.ts „По тъмно“), so the duty is on the LINE exactly when it
     // arises, and this pair is the crossing-specific half the complication has
     // no way to say. Ledger L10 (ЗДвП чл. 70) stays satisfied either way.
+    // AND THE NUMBER ON THE LINE IS THE ONE THE CARD NOW SPEAKS — sweep 161,
+    // 2026-08-19. `pc-right/01-arrival.png` shows this step reading „под 40
+    // км/ч" beside a task card reading «— дръж под 45 км/ч»: the L1 ladder's
+    // grace had gone onto the glass as an instruction. advisor.ts's authored-cap
+    // source closed that, and `__tests__/flow-sweep161-truth.test.ts` §2 now
+    // pins the pair — all five rungs print 40 and this step says 40 — so the
+    // two can never drift apart again unnoticed.
+    // WHAT IS STILL OPEN, and is a NAMED DEBT rather than a silent edit: 40 is
+    // above `DEFAULT_RULE_CONFIG.crossingApproachMaxKmh` (30), the threshold
+    // `rules/engine.ts` bills PEDESTRIAN_CROSSING_TOO_FAST at once the crossing
+    // is occupied — which, after the triggerEtaSec sync above, it always is by
+    // the time the car is here. The debt, its measurement and the two files
+    // that must move with it are in §2 of the same gate.
     // 66 ch
     { n: 1, textBg: "Потегли, движи се в своята лента и приближи пътеката с под 40 км/ч." },
     // 46 ch
@@ -243,11 +256,89 @@ export const SC_ZEBRA_APPROACH: ScenarioSpec = {
       titleBg: "Приближи пътеката с готовност за спиране",
       // The pre-crossing checkpoint 12 m before zb-x-1: reaching it at a
       // speed that still allows a full stop is the PE-01 skill itself.
+      //
+      // 40 IS A NAMED DEBT, NOT A SETTLED NUMBER — sweep 161, 2026-08-19, and
+      // it is written down here because the wave that found it also found why
+      // it cannot be spent from this file alone.
+      //
+      // THE DEBT. `rules/engine.ts` bills PEDESTRIAN_CROSSING_TOO_FAST above
+      // `crossingApproachMaxKmh` (rules/types.ts = 30) the moment the crossing
+      // is occupied, and after the triggerEtaSec sync above it always is by the
+      // time the car is here. So this gate certifies a band — 30…40, and 30…45
+      // once the L1 ladder widens it — that the same drill convicts inside. The
+      // identical row is closed one family over (`sc-drt-approach` at 30) and
+      // five more are carried as named debts in `pe-sweep161-truth.test.ts`
+      // §2 for exactly this reason; this is the flow file's row.
+      //
+      // WHAT WAS MEASURED, so the next lane starts from numbers and not from
+      // scratch. Peak |speed| inside the authored r 10 disc, off the committed
+      // recordings driven through the production session:
+      //   shadow-correct       27.9 км/ч   passes at 30 with 2.1 км/ч to spare
+      //                                    BEFORE the evaluator's 5 км/ч slack
+      //   mistake-not-yielded  27.9 км/ч   passes at 30 too — correct: its
+      //                                    fault is the crossing, not the
+      //                                    approach
+      //   mistake-too-fast     44.9 км/ч   TICKS THIS ROW AT 30 EXACTLY AS AT
+      //                                    40. Moving the cap changes no
+      //                                    verdict on any committed drive.
+      // The reason the last line is not a typo: the demo arrives at 44.9,
+      // spends the latch (REACH_ZONE_CAP_SLACK_KMH), then brakes to rest INSIDE
+      // the disc and re-earns it. That re-earn is deliberate and documented at
+      // `objectives.ts REACH_ZONE_CAP_SLACK_KMH` („IT CANNOT TRAP ANYONE"), and
+      // it is why this drill's own mistake card has to say «Дори спирането след
+      // това да успее, самото приближаване без готовност е опасната грешка»:
+      // the disc grades an ARRIVAL, the offence is an APPROACH, and
+      // `ReachZoneParams` carries no field with which a template can ask for
+      // the second. GAINING THAT OBSERVATION is `lessons/objectives.ts`'s and
+      // nothing this file can author closes it.
+      //
+      // WHY IT WAS NOT SIMPLY MOVED. 40 → 30 was applied, measured green, and
+      // then REVERTED: it turns five assertions red in two files this lane does
+      // not own, both of which use this exact row as their fixture —
+      //   lessons/__tests__/advisor-authored-cap.test.ts:325,326,348,361,362
+      //     („sc-za-approach is the case where the two numbers actually differ
+      //      (40 authored, 45 graded)" — 4 tests)
+      //   scenario/__tests__/briefing-card-budget.test.ts:167  (`toBe(40)`)
+      // Every one is a stale literal and not a broken property: all five
+      // invariants survive the move. But the gain here is only in the SENTENCE
+      // — no drive changes verdict — and buying it with red in two concurrent
+      // lanes' files is the trade this round exists to stop making. §2 of
+      // `__tests__/flow-sweep161-truth.test.ts` holds the debt so it cannot be
+      // forgotten, and turns red the day it is paid.
+      //
+      // WHAT IS CLOSED MEANWHILE is the half the sweep actually photographed:
+      // the card no longer prints the ladder's grace at the student. All five
+      // rungs speak 40 — instruction 1's own number — instead of 45 at L1.
       params: { kind: "reachZone", x: LANE_2, y: 78, radiusM: 10, maxSpeedKmh: 40 },
     },
     {
       id: "sc-za-clear",
-      titleBg: "Премини пътеката, след като е свободна",
+      // WAS «Премини пътеката, СЛЕД КАТО е свободна» — a certificate no disc
+      // can sign, and this row is one of the seven the catalogue rule's own
+      // vocabulary let through: `ACTOR_CLAIM`
+      // (lessons/__tests__/stop-claim-gates.test.ts) carries «когато е
+      // свободна», the flow/PE families write «след като е свободна», and the
+      // alternation never met them. templates-pe.ts closed its six in that
+      // wave and named the gap; this is the flow row that stayed.
+      //
+      // MEASURED, not argued — the committed «Непропускане на пешеходец» demo
+      // driven through the production session at L1 and L3:
+      //     ✓ Премини пътеката, след като е свободна   0:14  /  0:15
+      //     ✗ PEDESTRIAN_NOT_YIELDED                   −10, опасна
+      // The tick and the conviction are the same drive, and the tick is the
+      // one a seventeen-year-old reads as „I did that part right". He drove
+      // over the crossing at a steady 27.9 км/ч with the woman still on the
+      // carriageway; nothing in `stepReachZone`'s (params, prev, tick) could
+      // have known, because no field of SimTick carries where she was.
+      //
+      // The remedy is the one commit cdb2f71 established and templates-pe.ts
+      // reused verbatim, down to the sentence: THE TITLE SAYS WHAT THE DISC
+      // MEASURES and the duty keeps its grader in the rule engine. `params` is
+      // untouched, so `done` is bit-identical on every committed drive and no
+      // THEO-4 card is owed for a changed verdict — only the claim shrank to
+      // what was witnessed. Instruction 5 still teaches the real duty, and
+      // PEDESTRIAN_NOT_YIELDED still bills it.
+      titleBg: "Подмини пътеката и продължи по улицата",
       params: { kind: "reachZone", x: LANE_2, y: 130, radiusM: 12 },
     },
   ],
@@ -410,8 +501,39 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
     { n: 1, textBg: "Приближи кръговото и намали преди знака „Пропусни движението“." },
     // 53 ch
     { n: 2, textBg: "Гледай наляво — движещите се в кръга имат предимство." },
-    // 60 ch
-    { n: 3, textBg: "Спри на линията и пропусни всяка кола, която вече е в кръга." },
+    // THE STOP IS NOW CONDITIONAL, BECAUSE THE SIGN IS Б1 AND NOT Б2 —
+    // sweep 161, `sc-roundabout-entry/pc-right/01-arrival.png`. Step 3 read
+    // «Спри на линията и пропусни всяка кола, която вече е в кръга»: an
+    // unconditional halt, on an approach where no map this product can build
+    // will ever carry the sign that demands one.
+    //
+    // Asked of the world rather than of taste. `builders/network.ts`
+    // `junctionPriorityControls` short-circuits on a roundabout node —
+    // „if (!a.roundabout && a.incoming) out.set(a.edgeId, 'giveWay')" — and
+    // returns before the rank test that is the only path to "stopSign". So a
+    // roundabout arm CANNOT wear a Б2, by construction, on any of the districts
+    // in `content/world`; the four posts rb-mini-v1 builds are Б1 + Г12, and
+    // the frame shows the inverted red triangle where the copy said „спри".
+    //
+    // The law the same product already teaches, one file over
+    // (templates-junctions2.ts `SC_JUNCTION_GAP.teach.whenBg`, verbatim):
+    // „разликата е само че при Б1 не си длъжен да спреш, а при Б2 си." And
+    // this template's own barge-entry card has said the conditional form all
+    // along — „дори това да значи пълно спиране на входа". Two of the three
+    // surfaces were right and the graded lesson's instruction was the wrong
+    // one, which is the direction that reaches the student first.
+    //
+    // Nothing is loosened: the YIELD is verbatim and still graded by the
+    // roundabout tracker (FAILED_TO_YIELD on the barge demo), and
+    // `sc-rb-approach` never measured a stop — it is a ≤ 25 км/ч disc cut at
+    // the paint by `acceptBeforeMarkM`, which a full stop and a lawful roll
+    // both satisfy. What goes is a duty the exam does not impose and this
+    // engine cannot bill: an unnecessary halt at a clear give-way line is
+    // marked against a candidate in the real Наредба № 38 drive, so teaching it
+    // as a rule is the founder's complaint one step upstream — the card would
+    // have cost him points no simulator was ever going to warn him about.
+    // 79 ch
+    { n: 3, textBg: "Пропусни всяка кола, която вече е в кръга — спри на линията, ако няма пролука." },
     // 66 ch
     { n: 4, textBg: "Влез плавно в подходящ интервал, обратно на часовниковата стрелка." },
     // 57 ch
@@ -502,7 +624,7 @@ export const SC_ROUNDABOUT_ENTRY: ScenarioSpec = {
   ],
   teach: {
     whenBg:
-      "На всяко кръгово кръстовище — от малките квартални кръгчета до големите булевардни. Правилото е едно: движещите се в кръга са с предимство, влизащият изчаква интервал.",
+      "На всяко кръгово кръстовище — от малките квартални кръгчета до големите булевардни. Правилото е едно: движещите се в кръга са с предимство, влизащият изчаква интервал. На входа стои Б1 „Пропусни движението“, а не Б2 „Спри!“ — затова пълно спиране се изисква само когато няма интервал; спреш ли без причина на празен вход, това е грешка на самия изпит.",
     whyBg:
       "Предимството в кръга не идва от отделен член „за кръговите“ — такъв в ЗДвП няма. Идва от знака на входа: Б3 „Път с предимство“ не може да се поставя на входовете на кръгово кръстовище (Наредба № РД-02-21-1/23.11.2023 за пътните знаци), затова там стои Б1 или Б2, ти си на пътя без предимство и пропускаш движещите се в кръга (ЗДвП чл. 50, ал. 1). Това е и цялата безопасност на кръговото: то е по-безопасно от обикновеното кръстовище само докато редът на пропускане се спазва — влизане „на инат“ пред кола в кръга е сред най-честите причини за странични удари. А мигачът на изхода (чл. 28, ал. 1, т. 2) е това, което позволява на чакащите по входовете изобщо да потеглят.",
     // NUMBERLESS on the наредба, on purpose (the rule `clearanceCitations.ts`

@@ -11,6 +11,11 @@
  * animation that drifts out of phase with the in-car cluster.
  */
 
+// TYPE-ONLY, and deliberately: `telltaleWarnings.ts` imports `DashboardStatus`
+// from here, so a value import would be a cycle. `import type` is erased, so
+// the two files can name each other's shapes without one existing at runtime.
+import type { TelltaleConditions } from "./telltaleWarnings";
+
 export type DashboardHeadlights = "off" | "low" | "high";
 export type DashboardIndicator = "off" | "left" | "right";
 
@@ -39,6 +44,24 @@ export interface DashboardStatus {
   headlightsRequired: boolean;
   /** …and the fog-lamp twin (чл. 74 — significantly reduced visibility). */
   fogLightsRequired: boolean;
+  /**
+   * THE FOUR FLAGS THEMSELVES, so the lights row stops being a single bit.
+   *
+   * `headlightsRequired` above is that bit, and it was written `isNight || rain`
+   * — which could never see SNOW, because compile makes the three weathers
+   * EXCLUSIVE (a snow lesson has rain === false and fog === false). So a lesson
+   * whose instruction is «включи късите светлини» had no lights row on the
+   * dashboard at all, and the same hole was found twice from two directions: in
+   * the GRADER (O28, round 6, which had no snow lamp detector) and here in the
+   * DISPLAY (O35, round 8). A channel with no single owner drifts on both sides.
+   *
+   * Carrying the conditions rather than the conclusion is what stops the third
+   * drift: `telltaleWarnings.headlightDutyCode` derives the duty AND its
+   * citation from these, off the same precedence `reduceTick` grades on.
+   * Optional so no legacy or headless mount breaks — absent falls back to the
+   * single bit, which is still wrong in snow and is why nothing may rely on it.
+   */
+  conditions?: TelltaleConditions;
   /**
    * THE DIFFICULTY TIER'S SPEED CEILING (km/h), or null when the tier has none
    * („Напреднал"). 2026-08-11, the „silent refusal" sweep.

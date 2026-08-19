@@ -2196,7 +2196,8 @@ export function LessonPlayShell({
   useEffect(() => {
     if (!compact) return;
     const id = window.setInterval(() => {
-      const next = armedTelltaleWarnings(dashboardStatusRef.current ?? createDashboardStatus());
+      const st = dashboardStatusRef.current ?? createDashboardStatus();
+      const next = armedTelltaleWarnings(st);
       setWarnings((prev) =>
         telltaleWarningsKey(prev) === telltaleWarningsKey(next) ? prev : next,
       );

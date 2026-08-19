@@ -138,9 +138,6 @@ export {
 export {
   actorObb,
   headingOfDir,
-  npcShellObb,
-  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   PEDESTRIAN_BODY_RADIUS_M,
   playerObb,
   PLAYER_HALF_LENGTH_M,

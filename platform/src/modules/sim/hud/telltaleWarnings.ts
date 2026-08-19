@@ -67,6 +67,23 @@
  *    citation. `lawRef` happens to coincide (both чл. 70, ал. 1); nothing else
  *    does.
  *
+ * 2026-08-19, LATER THE SAME DAY (O35, round 8 — the same hole found from the
+ * DISPLAY side by a different lane). Two things changed here:
+ *
+ *  · THE PRECEDENCE IS NO LONGER COPIED. `headlightDutyCode` now calls
+ *    `rules/engine.ts lowBeamDuty`, the function the three grading arms
+ *    themselves read. „Mirrors the engine" was a promise no test could keep;
+ *    calling it is a promise the type system keeps. `rules/__tests__/
+ *    low-beam-duty-one-source.test.ts` drives all sixteen (night, rain, snow,
+ *    fog) combinations through the GRADER and through this module and fails on
+ *    any disagreement, in either direction.
+ *  · WHAT DID NOT CHANGE, MEASURED RATHER THAN ASSUMED: both live call sites
+ *    still call `armedTelltaleWarnings(s)` with no conditions —
+ *    `TelltaleEdgePings.tsx:61` and `LessonPlayShell.tsx:2199`, read on this
+ *    date — so on `sc-ac-snow` the engine convicts a dark car and this channel
+ *    is STILL SILENT in the product. The legacy bit cannot see snow no matter
+ *    what this file does: it arrives already flattened.
+ *
  * THE FIX IS TO STOP TAKING THE VERDICT AND START TAKING THE CONDITIONS.
  * `headlightsRequired` is one boolean standing for three different offences, so
  * no amount of care downstream can recover which one is true. `TelltaleConditions`
@@ -90,6 +107,7 @@
  *   arrives the legacy block is what has to be deleted rather than discovered.
  */
 
+import { lowBeamDuty } from "../rules/engine";
 import type { DashboardStatus } from "./dashboardStatus";
 
 export type TelltaleWarningId = "belt" | "handbrake" | "lights" | "fog" | "hazards";
@@ -143,22 +161,28 @@ export interface TelltaleConditions {
 }
 
 /**
- * WHICH low-beam offence is live, in the engine's own precedence — or null when
- * the conditions demand no lights at all.
+ * WHICH low-beam offence is live — or null when the conditions demand no lights
+ * at all.
  *
- * Read straight off `rules/engine.ts`: the night arm carries no exclusion and
- * fires first; the rain arm is guarded `!tick.isNight`; the snow arm is guarded
- * `!raining && !tick.isNight` and deliberately REUSES the rain row's code (with
- * SNOW_LIGHTS_COPY) rather than adding a second one for the same rule. So the
- * order below is the engine's order, and a snowy night bills the night row once
- * — here as there.
+ * NOT „read off the engine" any more, which is what this used to say and what
+ * let the drift happen twice: it CALLS the engine's own `lowBeamDuty`, so the
+ * precedence has one home (`rules/engine.ts`) and this function only maps a
+ * duty onto the catalog row that states it. Night is the основна row; rain and
+ * SNOWFALL share the второстепенна one, because чл. 70, ал. 1 is a single duty
+ * and the engine bills them through the same code (with SNOW_LIGHTS_COPY on the
+ * card). A snowy night therefore bills the night row once — here as there.
+ *
+ * Imported from `../rules/engine` directly rather than through `../rules`: the
+ * barrel is not this lane's file, and `procedures/machine.ts` → `rules/catalog`
+ * is the same shape of import inside modules/sim. Re-exporting it from the
+ * barrel later changes neither call site.
  */
 export function headlightDutyCode(
   c: TelltaleConditions,
 ): "HEADLIGHTS_OFF_AT_NIGHT" | "HEADLIGHTS_OFF_IN_RAIN" | null {
-  if (c.isNight) return "HEADLIGHTS_OFF_AT_NIGHT";
-  if (c.rain || c.snow) return "HEADLIGHTS_OFF_IN_RAIN";
-  return null;
+  const duty = lowBeamDuty(c);
+  if (duty === null) return null;
+  return duty === "night" ? "HEADLIGHTS_OFF_AT_NIGHT" : "HEADLIGHTS_OFF_IN_RAIN";
 }
 
 /** Speed (km/h) above which the car counts as moving — the rule engine's own
@@ -181,7 +205,18 @@ const HAZARDS_CRUISE_KMH = 25;
  */
 export function armedTelltaleWarnings(
   s: DashboardStatus,
-  conditions?: TelltaleConditions,
+  // DEFAULTS TO THE ONES ON THE STATUS, so a caller cannot get this wrong by
+  // omission. The first cut of the snow fix made both live call sites pass
+  // `s.conditions` explicitly, and a mutation proved that arrangement worthless:
+  // reverting either call site left the suite GREEN, because the tests supplied
+  // the conditions themselves and never exercised the wiring. That is the same
+  // "inert on the live channel" shape this audit has now found four times — a
+  // derivation that is correct and reaches nobody.
+  //
+  // The conditions ride on the status because every caller already holds one.
+  // An explicit argument still wins, for tests that want to drive a case the
+  // status does not carry.
+  conditions: TelltaleConditions | undefined = s.conditions,
 ): TelltaleWarning[] {
   const speed = Math.abs(s.speedKmh);
   const moving = speed >= MOVING_KMH;

@@ -124,6 +124,30 @@ export function buildLessonWorldCore(lesson: LessonSpec, raw: unknown): LessonWo
       ]
     : [];
   const gripPatches = resolveSurfaceGripPatches(district);
+  // THE ONE VALUE HERE THAT CAN FAIL SILENTLY (2026-08-19). The consumer is
+  // `spawnPose` (LessonScene.tsx:398):
+  // `spawnPoints.find(s => s.id === lesson.spawn.pointId)` with
+  // `p?.x ?? explicit?.x ?? 0` after it. So a lesson whose `pointId` is not in
+  // the district it loads raises nothing — it is a car placed at district
+  // ORIGIN facing north, which on every scenario junction map is the middle of
+  // the junction, and every objective after that is graded against a route the
+  // student never joined. That is the shape of the four world findings routed
+  // to this file („the world does not match the briefing", „it has left the
+  // authored world"), reached from the other end. One renamed spawn point in a
+  // generator is enough.
+  //
+  // THE `?? []` IS NOT PART OF IT, and that half was written as a hazard and
+  // then disproved: `createWorldRuntime` above runs `parseDistrict`, which
+  // throws `district: missing spawnPoints[]` (runtime/district.ts:361) before
+  // this line is reached. The array is guaranteed by the schema; only the
+  // NAMED-BUT-ABSENT id falls through. Both halves are pinned in
+  // `__tests__/lesson-world-spawn-resolution.test.ts`.
+  //
+  // MEASURED before it was called a hazard, over every playable spec —
+  // LESSONS + POLIGON_LESSONS + EXAM_LESSON plus all 167 scenario templates at
+  // every authored rung, 819 lessons: 0 unresolved. It is latent, not live,
+  // and that test carries its own positive control — a census that silently
+  // stopped finding lessons would report exactly this same 0.
   const spawnPoints = (raw as { spawnPoints?: SpawnPointLike[] }).spawnPoints ?? [];
   return {
     runtime,

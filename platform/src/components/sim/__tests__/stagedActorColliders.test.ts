@@ -59,8 +59,6 @@ import { READY_DRIVELINE } from "@/modules/sim/vehicle/driveline";
 import { createHeadlessChassis, IDLE_INPUT, VehicleSim } from "@/modules/sim/vehicle";
 import {
   actorObb,
-  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   PEDESTRIAN_BODY_RADIUS_M,
 } from "@/modules/sim/collision";
 import {
@@ -74,11 +72,17 @@ import {
 const DRIVE = { ...READY_DRIVELINE };
 /** The shell's half-height — presentation-only, mirrored from the component. */
 const SHELL_HALF_H = 0.7;
-/** The retired one-size shell: the mutation every drive below is run against. */
-const ONE_SIZE = {
-  halfWidthM: NPC_VEHICLE_SHELL_HALF_WIDTH_M,
-  halfLengthM: NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-};
+/**
+ * THE RETIRED ONE-SIZE SHELL: the mutation every drive below is run against.
+ *
+ * A LOCAL LITERAL, not an import, and that is the point. These two numbers
+ * shipped as `NPC_VEHICLE_SHELL_HALF_*_M` in `collision/bodies.ts` and were
+ * deleted with the naming lane, because a constant describing a body the
+ * product no longer builds is precisely what the next resize leaves behind —
+ * twice now. A retired size belongs in the test that disproves it and nowhere
+ * else.
+ */
+const ONE_SIZE = { halfWidthM: 0.92, halfLengthM: 2.1 } as const;
 
 beforeAll(async () => {
   await RAPIER.init();
@@ -113,10 +117,10 @@ describe("the shell is sized from the same source as the grading box", () => {
     const truck = npcShellHalfExtents("truck");
     const tram = npcShellHalfExtents("tram");
     const bike = npcShellHalfExtents("cyclist");
-    expect(truck.halfLengthM - NPC_VEHICLE_SHELL_HALF_LENGTH_M).toBeCloseTo(1.65, 6);
-    expect(tram.halfLengthM - NPC_VEHICLE_SHELL_HALF_LENGTH_M).toBeCloseTo(4.9, 6);
-    expect(NPC_VEHICLE_SHELL_HALF_LENGTH_M - bike.halfLengthM).toBeCloseTo(1.2, 6);
-    expect(NPC_VEHICLE_SHELL_HALF_WIDTH_M - bike.halfWidthM).toBeCloseTo(0.69, 6);
+    expect(truck.halfLengthM - ONE_SIZE.halfLengthM).toBeCloseTo(1.65, 6);
+    expect(tram.halfLengthM - ONE_SIZE.halfLengthM).toBeCloseTo(4.9, 6);
+    expect(ONE_SIZE.halfLengthM - bike.halfLengthM).toBeCloseTo(1.2, 6);
+    expect(ONE_SIZE.halfWidthM - bike.halfWidthM).toBeCloseTo(0.69, 6);
   });
 });
 
@@ -420,7 +424,7 @@ describe("…and he is NOT stopped by air", () => {
     // 0.85); the one-size shell demanded 1.77 m.
     const bike = npcShellHalfExtents("cyclist");
     expect(bike.halfWidthM + T.CHASSIS_HALF_EXTENTS.x).toBeLessThan(1.2);
-    expect(NPC_VEHICLE_SHELL_HALF_WIDTH_M + T.CHASSIS_HALF_EXTENTS.x).toBeGreaterThan(1.2);
+    expect(ONE_SIZE.halfWidthM + T.CHASSIS_HALF_EXTENTS.x).toBeGreaterThan(1.2);
 
     const shipped = driveInto({
       profile: "cyclist",

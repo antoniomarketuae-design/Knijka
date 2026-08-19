@@ -92,10 +92,8 @@ import {
 // director's contact sentinel grades with, so the two live reporters can never
 // disagree about what the player is inside of. See the block above ReadyScene.
 import {
+  actorObb,
   isContact,
-  npcShellObb,
-  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   obbDiscSeparationM,
   obbSeparationM,
   PEDESTRIAN_BODY_RADIUS_M,
@@ -147,6 +145,7 @@ import {
   createTrafficSystem,
   TrafficLayer,
   type TrafficDistrict,
+  type VehicleProfile,
 } from "@/modules/sim/traffic";
 import {
   buildPoligonGhostDemo,
@@ -779,10 +778,9 @@ export default function LessonScene(props: LessonSceneProps) {
 // DIFFERENT SOURCE than the collider that reported the contact. A naming
 // function was written as if it were a detection function.
 //
-// MEASURED (collision/bodies.ts `npcShellObb` carries the full table). Every
-// `traffic.vehicles` entry, whatever its profile, is followed by ONE kinematic
-// shell of 0.92 × 2.10 m — NpcColliders sizes colliders once and never per
-// model. Against the player's 0.85 × 2.02 chassis:
+// MEASURED, at the time. Every `traffic.vehicles` entry, whatever its profile,
+// was followed by ONE kinematic shell of 0.92 × 2.10 m — NpcColliders sized
+// colliders once and never per model. Against the player's 0.85 × 2.02 chassis:
 //
 //   body            grading box was     rapier fires at   grading fired at
 //   staged car      actorObb "car"        4.12 m rear        4.07 m  (−0.05)
@@ -791,7 +789,7 @@ export default function LessonScene(props: LessonSceneProps) {
 //   kargo_v obstacle  shell box           5.37 m rear        4.12 m  (−0.57)
 //   tram            actorObb "tram"       4.12 m rear        9.02 m  (+4.90)
 //
-// A CYCLIST COULD THEREFORE NEVER BE NAMED. Its shell is 2.10 m long and its
+// A CYCLIST COULD THEREFORE NEVER BE NAMED. Its shell was 2.10 m long and its
 // grading box 0.90 m, so naming it needed 1.20 m of penetration PAST the
 // collider's own face — and the solver's whole job is to keep the chassis out
 // of that shell, so the required pose is not reachable. Same for the child
@@ -805,13 +803,13 @@ export default function LessonScene(props: LessonSceneProps) {
 // laid at the start of essentially every contact.
 //
 // THE FIX, in the two halves the two residues need:
-//  (a) SIZE EVERY CANDIDATE FROM THE COLLIDER, not from the fleet profile.
-//      Agents get `npcShellObb` (the shell rapier binds); pedestrians keep the
-//      disc, which already matched exactly (PEDESTRIAN_BODY_RADIUS_M 0.3 ===
-//      NpcColliders PED_CAPSULE_RADIUS); scenario obstacles read the per-model
-//      tight cuboid ScenarioObstacles measures off the loaded rig and now
-//      publishes (`ObstacleColliderFootprint`), because no static table can
-//      state a GLB's extents. All three disagreements go to ZERO.
+//  (a) SIZE EVERY CANDIDATE FROM THE COLLIDER. Agents get the shell rapier
+//      binds; pedestrians keep the disc, which already matched exactly
+//      (PEDESTRIAN_BODY_RADIUS_M 0.3 === NpcColliders PED_CAPSULE_RADIUS);
+//      scenario obstacles read the per-model tight cuboid ScenarioObstacles
+//      measures off the loaded rig and now publishes
+//      (`ObstacleColliderFootprint`), because no static table can state a GLB's
+//      extents. All three disagreements go to ZERO.
 //  (b) …and because ONE disagreement survives (a) — the pose read here is a
 //      render frame behind the physics step, priced above at 0.21 m at 46 км/ч
 //      and 60 fps, i.e. 0.85 m for two bodies closing at that speed on the
@@ -834,6 +832,37 @@ export default function LessonScene(props: LessonSceneProps) {
 // it properly needs the shell tag's `npcId` routed out of
 // `VehicleRig.onCollisionEnter` and reconciled against the sentinel's
 // `actorId`, which is the same fix the ambient residue has always needed.
+//
+// ── 2026-08-19 · …AND THEN THE COLLIDER MOVED AND THIS DID NOT ─────────────
+//
+// Half (a) above was implemented as `npcShellObb(pose)` — the 0.92 × 2.10
+// constants, which were then a true statement about the shell. The SAME DAY,
+// audit O31 gave staged actors real colliders sized per profile
+// (`NpcColliders.npcShellHalfExtents` → `actorObb`), which is right and is why
+// a truck now stops the player instead of being driven through. The naming side
+// stayed on the constants, and the identical defect came back pointing the
+// other way — the THIRD time this project has shipped it.
+//
+// MEASURED at the rear enter edge, against the 0.90 m reach below:
+//
+//   profile   collider halfL   fires at   2.10-box touches at    gap   named?
+//   car            2.05           4.07           4.12          −0.05   yes
+//   truck          3.75           5.77           4.12           1.65   NO
+//   tram           7.00           9.02           4.12           4.90   NO
+//   train         17.20          19.22           4.12          15.10   NO
+//
+// So a student who rear-ended the staged truck in „Зад камион", or the 14 m
+// tram in `sc-rx-tram-left`, was billed for an accident with NO BODY NAMED —
+// and TWO tram bodies touched in one pass billed ONE «ПТП» instead of two,
+// because an anonymous report keys on `kind:vehicle` and both fell under one
+// latch. The per-body episode round 4 built was silently undone for every body
+// larger than a hatchback.
+//
+// THE PHYSICS BODY AND THE GRADING BODY ARE NOW ONE FACT, NOT TWO: both sides
+// call `actorObb(pose, profile)`, `npcShellObb` and the two constants are
+// deleted, and the cast already carried the `profile` this needs. There is no
+// second function left for a rig resize to leave behind — which is the only
+// form of this fix that has not already failed twice.
 // ───────────────────────────────────────────────────────────────────────────
 
 /** The three collision categories a body can be named for (`staticObject` is
@@ -853,14 +882,19 @@ export interface LiveContactBody {
 /** The slice of the director's `ContactCastMember` this file reads (structural
  *  — the orchestrator keeps its own type).
  *
- *  `profile` is DELIBERATELY NOT READ. The cast carries it and the sentinel
- *  uses it, correctly: the sentinel is a geometric detector and wants the body's
- *  real size. This file is a naming function for a contact rapier declared, and
- *  rapier's body is the shell — see `npcShellObb` and the block above. */
+ *  `profile` IS READ, and the comment here used to say the opposite — „the
+ *  sentinel is a geometric detector and wants the body's real size; this file
+ *  wants the shell". That was two answers to one question, and the second one
+ *  went stale within the day. The shell IS the profile box now (NpcColliders
+ *  sizes it through `actorObb`), so both readers want the same thing and the
+ *  cast is the one place that holds it. Absent = "car", exactly as every other
+ *  reader of that table treats an ambient agent. */
 interface StagedContactBody {
   readonly actorId: string;
   readonly withWhat: NamedContactKind;
   readonly body: "box" | "disc";
+  /** Fleet profile that sizes the box (absent = car). Unused for discs. */
+  readonly profile?: VehicleProfile;
 }
 
 /**
@@ -876,18 +910,22 @@ interface StagedContactBody {
  *
  * `footprints` ARE THE COLLIDERS THEMSELVES — the per-model tight cuboids
  * ScenarioObstacles measures off each loaded rig and publishes upward. They
- * matter because the models differ from the canonical shell by more than
- * rounding: `kargo_v`, a hittable obstacle in the shipped reversing bay,
- * measures halfLength 2.67 against the shell's 2.10, so a shell-sized box
- * reports 0.57 m of clear air on the frame rapier declares the crash, and every
- * one of those opening frames arrives ANONYMOUS — which is the stepping stone
- * that then absorbs the next named body. `box_truck` is 1.65 m out, past any
- * reach it would be safe to grant, so the reach cannot be the answer here.
+ * matter because the models differ from one another by more than rounding:
+ * `kargo_v`, a hittable obstacle in the shipped reversing bay, measures
+ * halfLength 2.67 against a hatchback's 2.05, and a `box_truck` would be 3.75.
  *
- * Absent (or missing for an index) the shell is the fallback. That is the
- * pre-load window only: the colliders below are mounted by the same component
- * that publishes here, so until it has loaded there is no obstacle body for
- * rapier to report at all.
+ * NO FOOTPRINT ⇒ NO CANDIDATE, and that is a refusal rather than an oversight.
+ * This used to fall back to a car-sized box, which is the exact shape of the
+ * defect the rest of this block is about: a guess is wrong in one of two ways
+ * and there is no third. Guess too small for a `box_truck` (1.65 m out, past
+ * any reach it is safe to grant) and every frame of that crash is anonymous;
+ * guess too large and the phantom overlaps the player, trips the
+ * two-candidates refusal, and steals the name of a body that really was hit.
+ * There is also nothing to lose by refusing: `footprints` is derived from the
+ * very `resolved` array ScenarioObstacles mounts its `CuboidCollider` from, so
+ * an obstacle with no published footprint has no collider either and cannot be
+ * the body rapier reported. The index still counts it, so the surviving ids
+ * stay aligned with the shell tags the renderer writes.
  */
 export function hittableObstacleBodies(
   obstacles: readonly ScenarioObstacleSpec[],
@@ -900,6 +938,7 @@ export function hittableObstacleBodies(
     const i = index++;
     if (o.visual === true) continue;
     const fp = footprints.find((f) => f.index === i);
+    if (fp === undefined) continue;
     out.push({
       id: `obstacle:${i}`,
       withWhat: "vehicle",
@@ -907,8 +946,8 @@ export function hittableObstacleBodies(
         x: o.x,
         y: o.y,
         headingDeg: o.headingDeg,
-        halfLengthM: fp?.halfLengthM ?? NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-        halfWidthM: fp?.halfWidthM ?? NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+        halfLengthM: fp.halfLengthM,
+        halfWidthM: fp.halfWidthM,
       },
     });
   }
@@ -939,11 +978,14 @@ export function liveContactBodies(
             withWhat: m.withWhat,
             disc: { x: pose.x, y: pose.y, radiusM: PEDESTRIAN_BODY_RADIUS_M },
           }
-        : // …the SHELL, not the fleet profile: this is the body rapier bound to
-          // the agent and therefore the body it reported. `actorObb(pose,
-          // profile)` here is what made a cyclist unnameable — 0.90 m of
-          // grading box behind a 2.10 m collider.
-          { id: m.actorId, withWhat: m.withWhat, box: npcShellObb(pose) },
+        : // …the actor's OWN profile box, which IS the shell rapier bound to it
+          // (NpcColliders sizes the collider through this same `actorObb` call
+          // and pushes it through `setHalfExtents` on rebind). One function, one
+          // source: a rig resize moves the collider and this box together, and
+          // there is no constant in between for it to leave behind. Reading a
+          // fixed 0.92 × 2.10 here is what made a truck, a tram and a train
+          // unnameable — see the round-8 block above.
+          { id: m.actorId, withWhat: m.withWhat, box: actorObb(pose, m.profile) },
     );
   }
   return out;
@@ -973,9 +1015,10 @@ export const NAMING_REACH_M = 0.9;
  * Name the body a live contact was with, or `undefined` when naming would be a
  * guess — UNIQUE or nothing (see the block above for every refusal).
  *
- * The candidate boxes are the COLLIDERS rapier reports through, not the fleet
- * profiles: shells for agents, the published tight cuboid for a scenario
- * obstacle, the capsule radius for a walker. Two bands follow from that:
+ * The candidate boxes are the COLLIDERS rapier reports through: the profile
+ * shell for an agent (one `actorObb` call, the same one NpcColliders sizes the
+ * body with), the published tight cuboid for a scenario obstacle, the capsule
+ * radius for a walker. Two bands follow from that:
  *
  *   · OVERLAP (separation ≤ 0) — the shipped rule, verbatim. One overlapping
  *     body of the reported kind is the name; two at once is a coin toss and a
@@ -2870,6 +2913,16 @@ function RuntimeDriver({
       // so an edge ping can only ever name a real, gradeable fault.
       dash.headlightsRequired = isNight || rain;
       dash.fogLightsRequired = fog;
+      // …AND THE FLAGS THEMSELVES, because the bit above cannot see SNOW.
+      // Compile makes the three weathers exclusive, so a snow lesson has
+      // rain === false and fog === false, and `isNight || rain` is therefore
+      // FALSE on a lesson whose own instruction is «включи късите светлини» —
+      // no lights row on the dashboard at all. The grader had the identical
+      // hole (O28) and it was found from that side a round earlier: one channel,
+      // no owner, two drifts. `armedTelltaleWarnings` derives the duty and its
+      // citation from these four, off the precedence `reduceTick` grades on,
+      // rather than from a conclusion this file reached on its own.
+      dash.conditions = { isNight, rain, fog, snow };
       // The tier's ceiling and whose it is. Constant between tier clicks, so
       // writing it every frame costs one assignment and removes the only other
       // option — a second subscription — from a file that already has enough.

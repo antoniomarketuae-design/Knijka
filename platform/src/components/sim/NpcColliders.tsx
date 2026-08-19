@@ -124,16 +124,22 @@ const PED_SHELL_RADIUS_M = 70;
 // Cost: one `actorObb` call + one `setHalfExtents` per REBIND, not per frame.
 // A shell that keeps its agent (the common case) re-sizes nothing.
 //
-// ROUTED, NOT MINE: `collision/bodies.ts` `npcShellObb` still answers "how big
-// is the collider that just fired?" with the retired 0.92 × 2.10 constants, and
-// `LessonScene.tsx:946` names live contacts with it. After this change that
-// function IS `actorObb`, and its one call site already holds the profile it
-// needs (`ContactCastMember.profile`), so the follow-up is
-// `npcShellObb(pose)` → `actorObb(pose, m.profile)` in those two files. Until
-// it lands, a truck/tram/train/van contact reports ANONYMOUS rather than named
-// — the direction that file itself documents as innocent (an unnamed report is
-// what shipped before naming existed); nothing about the BILL changes, because
-// the sentinel's own per-body key is unaffected.
+// THE FOLLOW-UP THIS ROUTED, AND WHY IT WAS NOT OPTIONAL. This block shipped
+// saying `collision/bodies.ts` `npcShellObb` still answered "how big is the
+// collider that just fired?" with the retired 0.92 × 2.10 constants, and that
+// until it was moved a truck/tram/train contact would report ANONYMOUS rather
+// than named — "nothing about the BILL changes, because the sentinel's own
+// per-body key is unaffected". THE SECOND HALF OF THAT WAS WRONG. The rapier
+// channel and the sentinel are two reporters on one wire, and the rule engine
+// keys an episode on `actorId` when it has one and on `kind:<withWhat>` when it
+// does not — so anonymous reports from every large body fell under ONE latch,
+// and two tram bodies touched in one pass billed ONE «ПТП» instead of two. A
+// missing name is not free; it merges victims.
+//
+// It has landed: `npcShellObb` and both constants are DELETED, and
+// `LessonScene.liveContactBodies` sizes its candidates with
+// `actorObb(pose, m.profile)` — literally the call below. One function, one
+// source, nothing left in between for the next resize to leave behind.
 const VEH_HALF_H = 0.7; // box spans 0..1.4 m above the tarmac
 // Height stays one number on purpose: contact here is a GROUND-PLANE fact (the
 // player's chassis box spans ~0.15–0.85 m above the tarmac at every pose), so

@@ -524,7 +524,39 @@ export const LESSONS: readonly LessonSpec[] = [
     objectives: [
       {
         id: "l6-night-route",
-        titleBg: "Измини нощния маршрут със светлини",
+        // TITLE-TRUTH (2026-08-19). It read «Измини нощния маршрут СЪС
+        // СВЕТЛИНИ» on a `driveDistance` gate, and `stepObjective`'s
+        // driveDistance arm (objectives.ts:1251) sums position deltas and reads
+        // NOTHING else — not `tick.headlights`, not `tick.isNight`. So the one
+        // lesson in the whole curriculum whose subject IS the light switch
+        // ticked «със светлини» green for a student who drove all 400 m of it
+        // dark. That is the same crime as the five drills objectives.ts §
+        // ReachZoneLampDemand lists from the sweep — «Мини контролната зона
+        // осветен» ✓ over a dim СВЕТЛИНИ telltale — and it is the shape the
+        // audit routed here from `sc-turn-left-oncoming` (a banner naming a
+        // skill nothing in the drive exercises).
+        //
+        // The banner now promises only the metres the gate counts. `params` are
+        // untouched and `done` is bit-identical, so no drive changes verdict and
+        // no trace is re-recorded: what changes is what a tick ASSERTS. The
+        // lights duty is taught in `descriptionBg` above («Кратки светлини…»)
+        // and belongs to the rule engine's HEADLIGHTS_OFF_AT_NIGHT next door.
+        //
+        // ROUTED, NOT FIXED HERE, and both halves are named in the lane report:
+        // (1) the title-derived demand that made this structural for reachZone
+        // (`deriveLampDemand`) reaches no other kind, and extending it to
+        // driveDistance is objectives.ts's, not ours; (2) that rule engine
+        // channel was measured SILENT on a night drive (objectives.ts:649), so
+        // until it is fixed L6 grades the lamps nowhere. Silence is worse than
+        // nothing said — it is not worse than a certificate that is false.
+        //
+        // `l5-build-speed` («Набери скорост по правата», also driveDistance)
+        // was read the same way and deliberately left: its lesson-mate
+        // `l5-emergency-stop` is stimulus-locked at minSlamSpeedKmh 25, so a
+        // student who crawls the 120 m is refused by the next gate in the SAME
+        // lesson. L6 had no such second gate — that is the difference, and it
+        // is a measurement rather than a preference.
+        titleBg: "Измини нощния маршрут — 400 метра",
         kind: "driveDistance",
         params: { meters: 400 },
       },

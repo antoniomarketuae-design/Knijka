@@ -86,6 +86,35 @@
  * reverse one press later. That is the founder's ruling working as ruled: on a
  * real automatic, selecting R and standing on the accelerator does exactly this.
  *
+ * ===========================================================================
+ * 2026-08-19 — NO SWEEP FRAME IS EVIDENCE ABOUT THIS FILE. Read this before
+ * acting on any audit finding routed here.
+ * ===========================================================================
+ * Doc 88's sweep routed two findings at this machine — sc-ed-reverse-line and
+ * sc-ed-poligon-chain, „the gear indicator shows D while the task chip demands
+ * reverse" — and both rest on drives that COULD NOT ENTER REVERSE by
+ * construction. `tools/mobile/lesson-audit.mjs` sends exactly three keys in
+ * its whole run: KeyW, KeyS and Escape. There is no `[` / `]`, no touch gear
+ * sheet, no cockpit lever; and its `brake(on, kmh)` helper (:983-991) returns
+ * early for ANY press at kmh ≤ 1 — which is precisely the standstill press
+ * LAW 1 requires, and 1 ≥ REVERSE_ASSIST_STANDSTILL_KMH, so the refused band
+ * covers this machine's whole standstill window with nothing left over.
+ *
+ * That refusal is correct and must not be deleted: the gesture it blocks is
+ * the one that drove a car backwards into traffic at 16.8 км/ч. What is
+ * missing from the harness is a DELIBERATE reverse gesture beside it — stop,
+ * lift for > REVERSE_ASSIST_LIFT_S, press — issued only where the lesson asks
+ * for R. Until it exists, every reverse drill in the sweep is unmeasured
+ * rather than broken, and the four parking-depth rows nobody could pass are
+ * unexplained rather than explained by this file.
+ *
+ * All of it is asserted, against the harness file itself, in
+ * `__tests__/reverseAssist-audit-harness.test.ts` — including the mutation
+ * that shows the same frames DO reach R once the standstill press is allowed
+ * through, so the claim is about the instrument and not about a dead machine.
+ * The day the harness gains a gear key or loosens the guard, that file fails
+ * and the two findings become admissible again.
+ *
  * Pure state machine — no DOM, no React, fully unit-testable in Node. The
  * live-scene glue (LessonScene's RuntimeDriver) feeds it one frame of
  * FUNCTIONAL pedal state per render frame and executes emitted commands

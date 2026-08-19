@@ -27,13 +27,12 @@ import {
 import { CHASSIS_HALF_EXTENTS } from "../../vehicle/tuning";
 import {
   actorObb,
-  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   PEDESTRIAN_BODY_RADIUS_M,
   playerObb,
   PLAYER_HALF_LENGTH_M,
   PLAYER_HALF_WIDTH_M,
 } from "../bodies";
+import * as bodiesBarrel from "../bodies";
 
 describe("the player box IS the rapier chassis collider", () => {
   it("takes both half-extents from vehicle/tuning, not a second opinion", () => {
@@ -51,24 +50,37 @@ describe("the player box IS the rapier chassis collider", () => {
 });
 
 describe("the NPC car box agrees with the body that actually collides", () => {
-  it("the shell the orchestrator grades is the shell rapier binds", () => {
-    // NpcColliders imports these two — the constant lives here so the physics
-    // body and the grading body can never drift into two different cars.
-    expect(NPC_VEHICLE_SHELL_HALF_WIDTH_M).toBe(0.92);
-    expect(NPC_VEHICLE_SHELL_HALF_LENGTH_M).toBe(2.1);
+  it("the pedestrian disc IS the capsule radius NpcColliders mounts", () => {
     expect(PEDESTRIAN_BODY_RADIUS_M).toBe(0.3);
   });
 
-  it("the 'car' profile matches that shell to within 10 cm", () => {
-    expect(VEHICLE_PROFILE_WIDTH_M.car).toBe(NPC_VEHICLE_SHELL_HALF_WIDTH_M * 2);
-    // 4.1 (the grading length authority) vs 4.2 (the shell): 10 cm apart.
-    expect(Math.abs(VEHICLE_PROFILE_LENGTH_M.car - NPC_VEHICLE_SHELL_HALF_LENGTH_M * 2)).toBeCloseTo(
-      0.1,
-      6,
+  /**
+   * THE STRUCTURAL HALF OF „ONE FACT, NOT TWO", and the only assertion in this
+   * file that guards a defect rather than a number.
+   *
+   * This module used to export a SECOND body builder, `npcShellObb`, plus
+   * NPC_VEHICLE_SHELL_HALF_WIDTH_M / _LENGTH_M (0.92 × 2.10), for the question
+   * „how big is the collider that just fired?". Twice it drifted out of step
+   * with the collider — round 3 in the direction that made a cyclist
+   * unnameable, round 8 in the direction that made a truck, a tram and a train
+   * unnameable — and each time the rule „the physics body and the grading body
+   * must be one fact" was re-asserted in a comment and then broken again by a
+   * resize somewhere else.
+   *
+   * A comment cannot hold that. This can: there must be exactly ONE function in
+   * this module that answers „how big is a traffic body", and it must take the
+   * profile. Adding a second one fails here, by name, before it can go stale.
+   */
+  it("exports ONE body builder for traffic bodies — a second one is the defect", () => {
+    const bodyBuilders = Object.keys(bodiesBarrel).filter(
+      (k) => k.endsWith("Obb") && k !== "playerObb",
     );
+    expect(bodyBuilders).toEqual(["actorObb"]);
+    // …and no retired shell constant may come back alongside it.
+    expect(Object.keys(bodiesBarrel).filter((k) => k.includes("SHELL"))).toEqual([]);
   });
 
-  it("the measured GLB fleet brackets it (1.78–1.83 m of body across the kit)", () => {
+  it("the measured GLB fleet brackets the car profile (1.78–1.83 m across the kit)", () => {
     // Measured off the shipped kit's own POSITION accessors, body node, wheels
     // excluded: vela_h3 1.78, arden_x 1.82, corva_s 1.83, kargo_v 1.98.
     expect(VEHICLE_PROFILE_WIDTH_M.car).toBeGreaterThanOrEqual(1.78);
