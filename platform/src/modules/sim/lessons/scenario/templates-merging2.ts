@@ -153,10 +153,36 @@ export const SC_MERGE_MOTORWAY_EXIT: ScenarioSpec = {
   instructionsBg: [
     { n: 1, textBg: "Тръгваш в ЛЯВАТА лента на магистралата — току-що си изпреварил. Изходът ти е след около километър и вдясно." },
     { n: 2, textBg: "Престрой се вдясно НАВРЕМЕ: ляво огледало, десен мигач, поглед през рамо — и чак тогава воланът. Изходът се подготвя километър преди табелата, не на самата гърловина." },
-    { n: 3, textBg: "Указателните табели броят метрите до изхода (500 – 300 – 100 м). Дръж темпото на потока по дясната лента за движение — тук още НЕ се намалява." },
+    // THE COUNTDOWN BOARDS THAT DO NOT EXIST (sweep161, sc-merge-motorway-exit
+    // — „no gantry, no countdown boards, no slip road anywhere in any frame").
+    // MEASURED through buildWorldGeometry(mw-exit-v1), signs by kind:
+    //   { limit140: 3, noEntry: 3, curve: 1 }
+    // There is no distance-board SignKind at all (world/types.ts), so the
+    // 500–300–100 m sequence could not be placed on any map in the catalogue.
+    // Worse than decoration: the line told the student to TIME his lane change
+    // off boards he would spend the whole approach looking for.
+    //
+    // What mw-exit-v1 really gives him is the DECEL LANE OPENING — authored at
+    // y = 520 (`decelLaneFromY`), 280 m long, and drawn — so the cue moves to
+    // the thing he can actually see. The duty (be right, at flow speed, before
+    // the mouth) is unchanged.
+    // Routed: a `distanceBoard` SignKind + the district span it reads
+    // (world/types.ts + zoneSigns.ts) — not this lane's files.
+    { n: 3, textBg: "Гледай вдясно за мястото, където лентата за намаляване се отваря — то е твоят брояч. Дръж темпото на потока по дясната лента за движение; тук още НЕ се намалява." },
     { n: 4, textBg: "Там, където лентата за намаляване се отваря вдясно, дай десен мигач, огледай се и влез в нея с темпото, с което си карал." },
     { n: 5, textBg: "Цялото намаляване става В лентата за намаляване — тя е точно за това. Спирачка на платното означава изненада за движещия се плътно зад теб със 130." },
-    { n: 6, textBg: "На гърловината вече си със скоростта на рампата. Знакът А1 с табела „60“ не е пожелание: рампата е завой, а сцеплението не се дели между спиране и завиване." },
+    // THE А1 IS BUILT; THE „60" PLATE IS NOT. The census above shows
+    // { curve: 1 } — zoneSigns.ts posts the А1 for the `curveAdvisory` zone —
+    // but its В26 advisory plate is deliberately withheld here: the ramp
+    // curve's span starts at metre 0 of its own edge and
+    // CURVE_PLATE_MIN_ROOM_M (= HAZARD_WARNING_AHEAD_M + 3 = 63) has nowhere
+    // to stand it, so mw-exit-v1's ramp is named in that builder as one of the
+    // three curves that „stay А1-only". Naming a number the post does not
+    // carry is the same defect as naming a post that is not there, so the
+    // number moves into the sentence as the RAMP's own limit — which is what
+    // `meta.scenario.params.advisoryKmh: 60` authors and what the runtime
+    // grades through tick.curveAdvisoryKmh.
+    { n: 6, textBg: "На гърловината вече си със скоростта на рампата. Знакът А1 не е пожелание, а рампата се минава с около 60: тя е завой, а сцеплението не се дели между спиране и завиване." },
     { n: 7, textBg: "Ако изпуснеш изхода — караш до следващия. По автомагистрала спирането и движението назад са забранени (чл. 58); връщането по аварийната лента убива." },
   ],
   success: [

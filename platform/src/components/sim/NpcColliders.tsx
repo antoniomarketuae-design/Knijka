@@ -67,13 +67,10 @@ import {
   selectNearest,
   stepNearMiss,
   type TrafficSystem,
+  type VehicleProfile,
 } from "@/modules/sim/traffic";
 import { CHASSIS_HALF_EXTENTS } from "@/modules/sim/vehicle";
-import {
-  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
-  PEDESTRIAN_BODY_RADIUS_M,
-} from "@/modules/sim/collision";
+import { actorObb, PEDESTRIAN_BODY_RADIUS_M } from "@/modules/sim/collision";
 
 // --- Shell-pool budget (doc 68 A11). Keep these small and fixed: every shell
 // is a rapier body for the WHOLE session; the pool IS the perf contract.
@@ -85,17 +82,63 @@ const REASSIGN_INTERVAL_SEC = 0.5;
 const VEHICLE_SHELL_RADIUS_M = 130;
 const PED_SHELL_RADIUS_M = 70;
 
-// --- Shell geometry (one size fits the whole GLB fleet — colliders are sized
-// once; per-model fitting would force collider swaps on rebind).
+// --- Shell geometry.
 //
-// The ground-plane extents are OWNED BY sim/collision, not by this component:
-// the orchestrator grades contact with exact box geometry on the same numbers,
-// and a physics body that disagreed with the grading body would re-open the
-// false-verdict gap from the other side. Height is presentation-only and stays
-// here.
-const VEH_HALF_W = NPC_VEHICLE_SHELL_HALF_WIDTH_M; // 0.92 → ~1.84 m wide
+// ── 2026-08-19 · THE SHELL WAS ONE SIZE AND THE FLEET IS NOT (audit O31) ───
+//
+// This block used to read "one size fits the whole GLB fleet — colliders are
+// sized once; per-model fitting would force collider swaps on rebind", and
+// bound a 0.92 × 2.10 m cuboid to every `traffic.vehicles` entry whatever it
+// was. The fleet the student SEES is `traffic/types` VEHICLE_PROFILE_*_M, and
+// the two disagree in BOTH directions. The three ★ rows below were DRIVEN —
+// real rapier + the real VehicleSim into a kinematic shell, at 30–50 км/ч
+// (`stagedActorColliders.test.ts`, which re-drives them on every run); the
+// rest are the same overhang plus the ~0.15 m of solver overlap those three
+// measured, and are marked as the arithmetic they are:
+//
+//   profile      real half-L   shell was   the player's nose ended up
+// ★ car               2.05        2.10      0.15 m into the shell — right
+//   van               2.60        2.10      0.65 m inside the visible van
+//   emergency         2.80        2.10      0.85 m inside
+// ★ truck             3.75        2.10      1.80 m INSIDE THE VISIBLE TRUCK
+// ★ tram              7.00        2.10      4.99 m inside
+//   train            17.20        2.10     15.25 m inside
+//
+// …and the mirror image, which is the founder's own complaint pointing the
+// other way. The cyclist proxy is a 0.23 × 0.90 m bicycle wearing a
+// 0.92 × 2.10 m box, so passing one needed 1.77 m of lateral centre-to-centre
+// where the bicycle itself needs 1.08 m. DRIVEN on the same harness: a player
+// passing a staged cyclist at 1.00 m and at 1.40 m of real clearance was
+// STOPPED DEAD by air (he travelled 35.9 m / 36.0 m and halted; only 1.80 m
+// of offset got him through). The committed drive uses 1.20 m — 12 cm CLEAR
+// of the bicycle's own 1.08 m, and 57 cm inside the box that shipped. Being
+// stopped like that fires VehicleRig's onCollisionEnter, so the student is
+// billed «сблъсък» with a cyclist he never touched.
+//
+// THE FIX IS TO STOP HAVING TWO SOURCES. The half-extents are now read off
+// `actorObb` — the SAME function the director's ContactSentinel grades with —
+// per bound agent, at rebind (≤ 2 Hz per shell), through
+// `collider.setHalfExtents`. The physics body and the graded body are one
+// fact, and a rig resize moves both at once.
+//
+// Cost: one `actorObb` call + one `setHalfExtents` per REBIND, not per frame.
+// A shell that keeps its agent (the common case) re-sizes nothing.
+//
+// ROUTED, NOT MINE: `collision/bodies.ts` `npcShellObb` still answers "how big
+// is the collider that just fired?" with the retired 0.92 × 2.10 constants, and
+// `LessonScene.tsx:946` names live contacts with it. After this change that
+// function IS `actorObb`, and its one call site already holds the profile it
+// needs (`ContactCastMember.profile`), so the follow-up is
+// `npcShellObb(pose)` → `actorObb(pose, m.profile)` in those two files. Until
+// it lands, a truck/tram/train/van contact reports ANONYMOUS rather than named
+// — the direction that file itself documents as innocent (an unnamed report is
+// what shipped before naming existed); nothing about the BILL changes, because
+// the sentinel's own per-body key is unaffected.
 const VEH_HALF_H = 0.7; // box spans 0..1.4 m above the tarmac
-const VEH_HALF_L = NPC_VEHICLE_SHELL_HALF_LENGTH_M; // 2.1 → ~4.2 m long
+// Height stays one number on purpose: contact here is a GROUND-PLANE fact (the
+// player's chassis box spans ~0.15–0.85 m above the tarmac at every pose), so
+// 1.4 m of shell covers it for a bicycle and for a train alike. Making it
+// profile-tall would change nothing a student can reach.
 const PED_CAPSULE_HALF_HEIGHT = 0.55;
 const PED_CAPSULE_RADIUS = PEDESTRIAN_BODY_RADIUS_M; // 0.3 — capsule spans 0..1.7 m
 const VEH_CENTER_Y = VEH_HALF_H;
@@ -104,10 +147,45 @@ const PED_CENTER_Y = PED_CAPSULE_HALF_HEIGHT + PED_CAPSULE_RADIUS;
  *  plane, so a parked shell can never be touched. */
 const PARK_Y = -120;
 
+/** Pose the sizing probe is taken at — only the extents are read back, so the
+ *  position and heading are arbitrary and constant (allocation-free intent:
+ *  one frozen literal, not a per-call object). */
+const SIZING_POSE = { x: 0, y: 0, dirX: 0, dirY: 1 } as const;
+
+/**
+ * THE SHELL'S GROUND-PLANE HALF-EXTENTS FOR ONE AGENT — read off `actorObb`,
+ * the very function the director's ContactSentinel grades contact with.
+ *
+ * Not a parallel table and deliberately not a copy of one: a second table is
+ * how the 0.92 × 2.10 constants outlived the fleet in the first place. If a
+ * rig is resized, `traffic/types` VEHICLE_PROFILE_*_M moves, `actorObb` moves,
+ * and the rapier body moves with them on the next rebind.
+ *
+ * `undefined` profile = "car", exactly as every other reader of that table
+ * treats an ambient agent (ambient states never publish `profile`).
+ */
+export function npcShellHalfExtents(profile: VehicleProfile | undefined): {
+  halfWidthM: number;
+  halfLengthM: number;
+} {
+  const box = actorObb(SIZING_POSE, profile);
+  return { halfWidthM: box.halfWidthM, halfLengthM: box.halfLengthM };
+}
+
+/** Car-sized shell — the declarative mount size and the near-miss envelope.
+ *  Every shell is re-fitted to its agent on its first rebind, so this is only
+ *  ever the size of a shell that is parked at PARK_Y and bound to nobody. */
+const CAR_SHELL = npcShellHalfExtents(undefined);
+
 // --- Near-miss body envelopes (meters). Player from the chassis collider;
-// NPC vehicles match the shell; pedestrians ~capsule radius + a margin.
-const NEAR_MISS_VEH_HALF_W = VEH_HALF_W;
-const NEAR_MISS_VEH_HALF_L = VEH_HALF_L;
+// NPC vehicles at the CAR envelope; pedestrians ~capsule radius + a margin.
+// One envelope for the whole array by design: `stepNearMiss` is a session
+// STAT (contracts NearMissStats), never a ViolationCode, and it sweeps all
+// ~50 agents with one number. It is NOT the contact body — that is the shell
+// above, which is now per-profile — and this file does not widen a stat into
+// a grading channel on the way past.
+const NEAR_MISS_VEH_HALF_W = CAR_SHELL.halfWidthM;
+const NEAR_MISS_VEH_HALF_L = CAR_SHELL.halfLengthM;
 const NEAR_MISS_PED_ENVELOPE = 0.35;
 
 /** Mutable collision tag on each shell body — VehicleRig reads it through
@@ -118,6 +196,50 @@ export interface NpcColliderUserData {
   kind: "vehicle" | "pedestrian" | "cyclist";
   /** Bound TrafficVehicleState/TrafficPedestrianState id, or -1 dormant. */
   npcId: number;
+}
+
+/**
+ * The two methods a shell body has to have for `fitVehicleShell` — declared
+ * structurally rather than as `RapierRigidBody` because `@react-three/rapier`
+ * carries its OWN nested `@dimforge/rapier3d-compat`, so the two copies' class
+ * types are not assignable to each other (they differ on a private field). A
+ * headless harness holding the top-level rapier could therefore never call
+ * this function, and a fix nobody can drive is a fix nobody can check.
+ */
+interface ShellBody {
+  numColliders(): number;
+  collider(i: number): { setHalfExtents(v: { x: number; y: number; z: number }): void };
+}
+
+/**
+ * Re-fit shell `body`'s cuboid to `profile` and return the half-length it now
+ * carries (−1 when there is no cuboid to fit — a body mid-mount).
+ *
+ * `setHalfExtents` is a no-op on a non-cuboid shape by rapier's own contract,
+ * and these bodies carry exactly one `<CuboidCollider>`, so the guard is the
+ * mount race and nothing else. `scratch` is the caller's per-system vector —
+ * the frame loop allocates nothing.
+ *
+ * EXPORTED FOR THE TEST TO CALL FOR REAL, not for convenience. The whole fix
+ * rests on rapier honouring a live shape swap on a kinematic body: if
+ * `setHalfExtents` were inert, a test that merely built its own correctly
+ * sized collider would still be green while every browser kept the car box.
+ * `stagedActorColliders.test.ts` drives the player into a shell created
+ * car-sized and re-fitted through THIS function, so the swap is measured
+ * rather than assumed.
+ */
+export function fitVehicleShell(
+  body: ShellBody,
+  profile: VehicleProfile | undefined,
+  scratch: { x: number; y: number; z: number },
+): number {
+  if (body.numColliders() < 1) return -1;
+  const half = npcShellHalfExtents(profile);
+  scratch.x = half.halfWidthM;
+  scratch.y = VEH_HALF_H;
+  scratch.z = half.halfLengthM;
+  body.collider(0).setHalfExtents(scratch);
+  return half.halfLengthM;
 }
 
 /** Narrowing reader for collision handlers (unknown -> tag or null). */
@@ -188,6 +310,16 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
       },
       pos: { x: 0, y: PARK_Y, z: 0 },
       rot: { x: 0, y: 0, z: 0, w: 1 },
+      // Shell re-fitting state. `vehFitBody` is an IDENTITY witness, not a
+      // convenience: a remount hands this loop brand-new car-sized colliders
+      // while `vehBound` still says "already bound", and a truck wearing a car
+      // box is the exact defect this block exists to end. Comparing the body
+      // the fit was applied to (and the size it produced) re-fits through a
+      // remount, an HMR swap and StrictMode's double-mount alike, for two
+      // scalar compares per shell per frame and no allocation.
+      vehFitBody: new Array<RapierRigidBody | null>(VEHICLE_SHELL_COUNT).fill(null),
+      vehFitHalfL: new Float64Array(VEHICLE_SHELL_COUNT).fill(-1),
+      half: { x: 0, y: VEH_HALF_H, z: 0 },
     }),
     [traffic],
   );
@@ -287,6 +419,16 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
         continue;
       }
       const v = traffic.vehicles[idx];
+      // THE SHELL IS THIS AGENT'S OWN BODY, not the fleet average. Re-fitted
+      // when the binding changes, when the collider itself is new (remount),
+      // or when the size it should carry has moved — never otherwise, so a
+      // shell that keeps its agent costs one float compare per frame.
+      const wantHalfL = actorObb(SIZING_POSE, v.profile).halfLengthM;
+      if (rebound || pools.vehFitBody[k] !== body || pools.vehFitHalfL[k] !== wantHalfL) {
+        const fitted = fitVehicleShell(body, v.profile, pools.half);
+        pools.vehFitBody[k] = fitted < 0 ? null : body;
+        pools.vehFitHalfL[k] = fitted;
+      }
       const yaw = Math.atan2(v.dirX, -v.dirY);
       pos.x = v.x;
       pos.y = VEH_CENTER_Y;
@@ -377,8 +519,14 @@ export function NpcColliders({ traffic, sampleRef, paused, onNearMiss }: NpcColl
           position={[k * 12, PARK_Y, 0]}
           userData={tag}
         >
+          {/* Mount size = the car profile. Every shell is re-fitted to its
+              own agent on the frame it binds one (see the frame loop), so
+              this is only ever the size of a shell parked at PARK_Y with no
+              agent — and it is a real size rather than a placeholder so a
+              first frame that lands before the first rebind is a car, not a
+              point. */}
           <CuboidCollider
-            args={[VEH_HALF_W, VEH_HALF_H, VEH_HALF_L]}
+            args={[CAR_SHELL.halfWidthM, VEH_HALF_H, CAR_SHELL.halfLengthM]}
             friction={0.5}
             restitution={0.05}
           />

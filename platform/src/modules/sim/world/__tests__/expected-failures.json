@@ -49,6 +49,17 @@
     "    whose staged hazard exists precisely so the student must STOP, measured by a sweep that",
     "    models only the speed half of obeying (referents.ts checkS5 states that caveat itself).",
     "    Lowering the cap made the lesson slower and stricter, not less survivable.",
+    "  · T14 4 -> 0 (2026-08-19, never-edited-world-builders lane; wave-0 was 10, so nothing is owed",
+    "    in `raised`). T14 counts a hazard warning standing AT the hazard instead of before it. Over",
+    "    all nine curveAdvisory/waterPatch/icePatch zones in the corpus, six always got their full",
+    "    60 m; the other three could not, and zoneSigns.ts clamped them onto the hazard: d2-v1 6.0 m,",
+    "    district-v1's e892658655.0 and mw-exit-v1's ramp -1.0 m each — a sign whose whole content is",
+    "    „ahead\" pointing at „here\". zoneSigns.ts now walks to the road the driver ARRIVES DOWN when",
+    "    the zone's own edge cannot hold the advance, and refuses to post at all when even that fails.",
+    "    d2-v1 6.0 -> 53.8 m, mw-exit -1.0 -> 61.0 m, district-v1's fromM-0 curve posts nothing (the",
+    "    road turns 47.4° into it, so there is no approach to borrow). The six untouched placements are",
+    "    byte-identical. What SURVIVES is counted elsewhere and named there, not dropped: see the",
+    "    SPEED_TOO_FAST_FOR_CURVE budget entry below.",
     "  · T8 / B4 — both were counts of a FEATURE (capped reachZones). T8 now counts caps the marker",
     "    still does not state; B4 probes the evaluator once, because one stateless stepReachZone",
     "    broke all of them at once and one latch repaired all of them at once. T8raw / B4raw keep",
@@ -94,7 +105,7 @@
     "T8": 0,
     "T8raw": 195,
     "T13": 0,
-    "T14": 4,
+    "T14": 0,
     "L2": 0,
     "L3": 5,
     "L10": 0,
@@ -127,8 +138,8 @@
       "scenarios": 1,
       "rungs": 4,
       "ledger": "T14",
-      "owner": "Lane 3 — world/builders/zoneSigns.ts",
-      "reason": "sc-merge-motorway-exit: the А1 post on mw-exit-v1 stands 1.0 m PAST the arc it warns about instead of 40 m before it, so the warning arrives after the car is already in the curve. T14 fell 10 -> 4 scenarios; this is the one that still convicts rather than merely misinforming."
+      "owner": "referents.ts (the predicate) + mw-exit-v1.json / gen_mw_exit.mjs (the В26-60 plate)",
+      "reason": "REWRITTEN 2026-08-19, never-edited-world-builders lane. The old text — „the А1 post on mw-exit-v1 stands 1.0 m PAST the arc\" — is fixed and no longer the cause. zoneSigns.ts now posts that А1 61.0 m before the arc, on mwx-e-nb-decel at s=219 of 280, which is where a motorway exit is signed in life; measured, and T14 fell 4 -> 0 in the same pass. TWO things keep the code red, and NEITHER is in zoneSigns.ts. (a) THE PREDICATE IS EDGE-LOCAL: checkSPEED_TOO_FAST_FOR_CURVE projects candidate posts onto the ZONE'S OWN edge and drops anything more than 20 m off it, so an А1 on the approach is invisible to it and it now reports „curve post is not on the zone's own edge\". Worse, its arithmetic makes this zone unsatisfiable from any sign placement whatever: bestLead = fromM - sM with fromM = 0 and sM >= 0, so bestLead <= 0 < 40 for every post that could ever project onto mwx-e-ramp. Following the geometric predecessor (the same join zoneSigns.ts now measures: the ramp head sits 8.13 m from the decel lane's end, inside that edge's 16.19 m half width, 0.0° of heading break) is the fix. (b) THE NUMBER IS STILL NOWHERE: the engine grades tick.curveAdvisoryKmh = 60 while the В26-60 plate is refused, because posting a 60 face on a 140 km/h carriageway is doc 86 T4's headline lie re-created by a warning sign — T4 is 0 and must stay 0. The honest fix for (b) is upstream of both files: give mwx-e-ramp a lead-in so its arc starts >= 63 m in (CURVE_PLATE_MIN_ROOM_M), which also makes (a) moot."
     }
   },
   "allowlist": []

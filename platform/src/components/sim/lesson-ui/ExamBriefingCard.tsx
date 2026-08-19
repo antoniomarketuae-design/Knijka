@@ -17,11 +17,17 @@
  */
 
 import { useState } from "react";
+import { PRE_DRIVE_STEP_ORDER } from "@/modules/sim/procedures";
 import {
   EXAM_PASS_RULE_BG,
   EXAM_POINTS_SHORT_NOTE_BG,
   EXAM_SCALE_SOURCE_BG,
+  EXAM_TERMINATION_CITATION_BG,
+  EXAM_TERMINATION_RULE_BG,
   examPointsForClassBg,
+  examPointsWordBg,
+  PASS_MAX_OSNOVNI_POINTS,
+  PASS_MAX_TOTAL_POINTS,
 } from "@/modules/sim/rules";
 
 export function ExamBriefingCard({
@@ -121,10 +127,22 @@ export function ExamBriefingCard({
             <h3 className="text-xs font-black uppercase tracking-wide text-muted">
               Как започва
             </h3>
+            {/* The step count is DERIVED, not typed. `PRE_DRIVE_STEP_ORDER` is
+                the same array the in-drive checklist counts against
+                (`hud/PreDriveChecklist.tsx` renders `{done}/{ORDER.length}`), so
+                the number promised here and the number on the checklist cannot
+                drift apart — a 14th step would move both or neither. The old
+                literal „13" was a second copy with nothing pinning it.
+
+                CHECKED, NOT ASSUMED: „строг ред … се отбелязва в протокола" is
+                true of the exam specifically — `examBank.ts` sets
+                `preDriveMode: "assess"`, which is the mode that bills
+                PREDRIVE_WRONG_ORDER; ordinary lessons run "instruction" and
+                coach instead of charging. */}
             <p className="mt-1">
               Колата е студена: изпитът започва с пълната подготовка преди потегляне
-              (13-те стъпки) в <strong>строг ред</strong> — всяка разместена или пропусната
-              стъпка се отбелязва в протокола.
+              ({PRE_DRIVE_STEP_ORDER.length}-те стъпки) в <strong>строг ред</strong> —
+              всяка разместена или пропусната стъпка се отбелязва в протокола.
             </p>
           </div>
 
@@ -148,18 +166,116 @@ export function ExamBriefingCard({
             </p>
           </div>
 
+          {/* ═════════════════════════════════════════════════════════════════
+              TWO DIFFERENT FACTS, AND THIS CARD USED TO PRINT THEM AS ONE.
+
+              WHAT WAS HERE, VERBATIM, under a single heading „Кога се
+              прекратява": „опасна грешка — незабавно; пътнотранспортно
+              произшествие — незабавно; повече от 9 наказателни точки общо;
+              повече от 6 наказателни точки от основни грешки."
+
+              Three of those four are false, and the one real terminator was
+              missing. This is not a wording preference — the engine that grades
+              the drive says so in its own header (`rules/scoring.ts`): „Наредба
+              № 38, чл. 48, ал. 3 … ends a practical exam in exactly two cases:
+              повторна намеса на комисията, and допускане на ПТП. It is NOT
+              „any опасна" … a red light or a missed Б2 costs 10, and 10 > 9
+              makes the exam НЕИЗДЪРЖАН by приложение № 5, т. 11, but the
+              candidate keeps driving and the examiner keeps ticking."
+
+                · «опасна грешка — незабавно» is the exact sentence `n38.ts`
+                  records the product once shipped and then withdrew as wrong.
+                  It survived here because THIS FILE WAS NEVER OPENED in that
+                  pass (0 commits since the sweep baseline `ec1f56f`), so the
+                  correction landed in the catalogue and left the briefing that
+                  sets the student's expectations still teaching the old rule.
+                · The 9 and the 6 are приложение № 5, т. 11 — a PASS rule. They
+                  decide whether the exam is издържан, they never stop the car.
+                  Filing them under „прекратява" is the same category error as
+                  conflating наказателни with контролни точки, which is the one
+                  misreading this whole vocabulary exists to prevent.
+                · повторна намеса на комисията — one of the act's own two — was
+                  not on the list at all.
+
+              WHY IT MATTERS MORE THAN THE WORDING. A student briefed that one
+              опасна ends the exam and then billed 10 points while the drive
+              continues has been taught that the engine is broken. The founder's
+              own complaint is the mirror of it: a rule stated one way and
+              applied another. Both directions teach the same wrong thing.
+
+              The two headings below are the two facts, each quoting its own
+              provision through the shared constants rather than a hand-typed
+              copy — `scales.ts` names hand-typing as how the over-claim reached
+              four surfaces in the first place.
+
+              ROUTING NOTE, NOT FIXED HERE: `modules/sim/lessons/examBank.ts`
+              lines 191-193 build every variant's `descriptionBg` ending
+              „…опасна грешка, произшествие или превишени лимити прекратяват
+              изпита." That string is passed straight into this card as
+              `variantDescriptionBg` and renders ~40 px above this block, so the
+              withdrawn claim is still on this screen once. That file belongs to
+              another lane.
+              ═════════════════════════════════════════════════════════════ */}
           <div className="rounded-xl border border-danger/40 p-3">
             <h3 className="text-xs font-black uppercase tracking-wide text-danger">
-              Кога се прекратява
+              Кога изпитващият спира изпита
             </h3>
             <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-5">
-              <li>опасна грешка — незабавно;</li>
-              <li>пътнотранспортно произшествие — незабавно;</li>
-              <li>повече от 9 наказателни точки общо;</li>
-              <li>повече от 6 наказателни точки от основни грешки.</li>
+              <li>повторна намеса на комисията в управлението;</li>
+              <li>допускане на пътнотранспортно произшествие.</li>
             </ul>
+            <p className="mt-1.5">
+              Само тези две. И двете са един и същ момент по същество: колата вече не е
+              под твое сигурно управление, затова изпитващият поема. Всяка друга грешка —
+              включително опасна — се записва и{" "}
+              <strong>карането продължава</strong>.
+            </p>
+            {/* The act's own sentence, verbatim, so the „only two" above has a
+                source on screen instead of asking to be believed. */}
+            <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
+              {EXAM_TERMINATION_CITATION_BG}: „{EXAM_TERMINATION_RULE_BG}“
+            </p>
             <p className="mt-1.5 text-xs text-muted">
-              Прекратен или прекъснат изпит не се продължава — започва се нов опит.
+              Прекратен или прекъснат изпит не се продължава — започва се нов опит. В
+              симулатора не спираме колата: возенето върви нататък, за да се учиш, но
+              сесията се оценява като прекратена.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-border p-3">
+            <h3 className="text-xs font-black uppercase tracking-wide text-muted">
+              Кога изпитът е неиздържан
+            </h3>
+            {/* `examPointsWordBg` RETURNS THE NUMBER TOO — „9 наказателни
+                точки", not „наказателни точки". Prefixing the constant as well
+                rendered «повече от 9 9 наказателни точки», and the four
+                assertions guarding this block were all green while it did:
+                every one of them asked `toContain("9")`, which a doubled 9
+                satisfies twice over. It was caught by printing the card and
+                reading it, and the regression assertion is now a NEGATIVE one
+                („не 9 9"), because that is the only shape that fails.
+
+                THIS COMMENT LIVES OUTSIDE THE <p> FOR A SECOND REASON FOUND THE
+                SAME WAY. Inside, between two lines of prose, a JSX expression
+                container splits one text child into two and the newline that
+                would have joined them as a space is dropped: the card rendered
+                «…оценката накрая.Неиздържан е при…». Also caught by reading the
+                render, not by any assertion — a missing space is invisible to
+                every `toContain` in the suite. */}
+            <p className="mt-1">
+              Друг въпрос, друг момент: това не спира карането, а решава оценката накрая.
+              Неиздържан е при повече от <strong>{examPointsWordBg(PASS_MAX_TOTAL_POINTS)}</strong>{" "}
+              общо или повече от{" "}
+              <strong>{examPointsWordBg(PASS_MAX_OSNOVNI_POINTS)}</strong> от основни грешки.
+            </p>
+            {/* THE ARITHMETIC SAID OUT LOUD, because it is the thing that makes
+                the two headings click together: една опасна е 10, а таванът е 9.
+                Written as the sum rather than asserted, and both numbers are the
+                same constants the scorer uses. */}
+            <p className="mt-1.5 text-xs leading-relaxed text-muted">
+              Затова една-единствена опасна грешка стига: {examPointsForClassBg("opasna")}{" "}
+              са повече от допустимите {PASS_MAX_TOTAL_POINTS}. Изпитът е загубен още там —
+              но пак караш до края на маршрута, а изпитващият пак пише.
             </p>
           </div>
 

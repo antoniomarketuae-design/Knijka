@@ -47,19 +47,68 @@ export function parkingObservationFromTrace(
     .filter((e) => e.kind.startsWith("glance-"))
     .map((e) => e.tSec);
 
-  const covered = (fromSec: number, toSec: number): boolean =>
-    glances.some((t) => t >= fromSec && t <= toSec);
+  // ONE GLANCE MAY SATISFY ONLY ONE MOMENT (doc 76 §6 honesty rule).
+  //
+  // The windows above OVERLAP by construction: the last moment's window is
+  // [reverseEnd − 5, ∞) and every middle moment's is [reverseStart, reverseEnd],
+  // so the final five seconds of the reverse phase lie in both. The previous
+  // loop tested each moment against the whole glance list independently, and a
+  // single glance one second before the car stopped therefore credited the
+  // middle moment AND the final check — «наблюдение 2/3» off one look.
+  //
+  // That is reachable on every template that ships this channel: eleven parking
+  // drills author three moments each (obs-before-reverse, obs-during-reverse /
+  // obs-van-side / obs-opposite-row, obs-final-check), and the middle one names
+  // a DIFFERENT thing to look at from the last. Crediting both from one glance
+  // is a rubric star for an observation the student never made — the same crime
+  // as a green tick for a skill nothing measured, on the surface the debrief
+  // reads its stars off.
+  //
+  // So glances are CONSUMED: a moment takes a glance and no other moment may
+  // count it again. n moments now require n distinct glances.
+  //
+  // WHICH moment gets a contested glance decides what the DEBRIEF PRINTS, so it
+  // is not a tie-break — it is the whole answer. The assignment runs LAST MOMENT
+  // FIRST, each taking the LATEST unspent glance inside its own window. A single
+  // look one second before the car stops is then credited as the pre-stop check
+  // it obviously was, and the during-reverse moment goes unticked. Assigning
+  // forward instead (earliest moment, earliest glance) produces the same COUNT
+  // and the wrong NAME: it prints „Оглед по време на движението назад ✓" and
+  // refuses „Последна проверка преди спиране" to a student who made exactly the
+  // final check — a false refusal and a false certificate in one row.
+  //
+  // Later moments having first claim can never starve an earlier one of a
+  // credit it would otherwise have had: the windows run in time order, so a
+  // glance a later moment can take is one an earlier moment's window either
+  // also contains (same count either way) or does not reach at all.
+  //
+  // The other direction is preserved deliberately — a student who really does
+  // look three times still scores 3/3, and no window was narrowed, so no glance
+  // that used to count stops counting on its own account.
+  const spent = new Set<number>();
+  const takeLatestGlance = (fromSec: number, toSec: number): boolean => {
+    for (let g = glances.length - 1; g >= 0; g--) {
+      if (spent.has(g)) continue;
+      if (glances[g] >= fromSec && glances[g] <= toSec) {
+        spent.add(g);
+        return true;
+      }
+    }
+    return false;
+  };
 
-  const observed: string[] = [];
-  for (let i = 0; i < moments.length; i++) {
+  const filled = new Array<boolean>(moments.length).fill(false);
+  for (let i = moments.length - 1; i >= 0; i--) {
     const isFirst = i === 0;
     const isLast = i === moments.length - 1 && moments.length >= 2;
-    const ok = isFirst
-      ? covered(reverseStart - BEFORE_WINDOW_SEC, reverseStart + BEGIN_GRACE_SEC)
+    filled[i] = isFirst
+      ? takeLatestGlance(reverseStart - BEFORE_WINDOW_SEC, reverseStart + BEGIN_GRACE_SEC)
       : isLast
-        ? covered(reverseEnd - FINAL_WINDOW_SEC, Number.POSITIVE_INFINITY)
-        : covered(reverseStart, reverseEnd);
-    if (ok) observed.push(moments[i].id);
+        ? takeLatestGlance(reverseEnd - FINAL_WINDOW_SEC, Number.POSITIVE_INFINITY)
+        : takeLatestGlance(reverseStart, reverseEnd);
   }
+  // Reported in AUTHORED order — the rubric renders the moment titles in the
+  // order the template wrote them, and `glances` is already sorted by tSec.
+  const observed = moments.filter((_, i) => filled[i]).map((m) => m.id);
   return { observedMomentIds: observed };
 }

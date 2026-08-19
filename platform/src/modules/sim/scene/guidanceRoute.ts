@@ -296,9 +296,12 @@ export interface GuidancePointGoal {
 
 export type GuidanceGoal = GuidancePointGoal | { kind: "ahead"; meters: number };
 
-/** All path derivation needs — the marker vocabulary is irrelevant to routing. */
+/** All path derivation needs — the marker vocabulary is irrelevant to routing,
+ *  EXCEPT for `shape`, which says whether the coordinates were authored or
+ *  derived from the driver's own pose. Lane alignment may only follow the
+ *  former; see `alignRawToGoalLane`. `GuidancePointGoal` satisfies this. */
 export type RouteTarget =
-  | { kind: "point"; x: number; y: number }
+  | { kind: "point"; x: number; y: number; shape?: MarkerShape }
   | { kind: "ahead"; meters: number };
 
 /**
@@ -1404,6 +1407,167 @@ function nearestOnRaw(raw: RawRoute, x: number, y: number): { s: number; latM: n
   return { s: bestS, latM: bestD };
 }
 
+// ---------------------------------------------------------------------------
+// LANE ALIGNMENT (sweep 161, `sc-ov-keep-right/mobile-right/04-t118s.png`).
+//
+// THE FRAME. The green ribbon — the one the legend calls «зелена — маршрутът
+// до целта» — runs down the LEFT lane for the whole approach while the blue
+// shadow-car ribbon runs in the far RIGHT lane, and the lesson's only task is
+// «Престрой се в дясната лента». A student following the line labelled „the
+// route to the goal" is led into the exact lane the lesson orders him out of.
+//
+// THE CAUSE, measured on the shipped district. `ov-keepright-v1` is ONE edge,
+// (0,0)→(0,360): the whole 2+2 boulevard is a single centreline at x = 0. The
+// objective is authored at x = 12.19 (`KR_RIGHT`, templates-lanes.ts:64) and
+// `snapToRoad` returns `{ edgeIdx, sM, distM }` — it measures the lateral
+// offset and then nothing downstream reads it. `shortestPathRaw` emits pure
+// centreline geometry, so the derived route ran x = 0.00 at EVERY sample and
+// ended 12.19 m — one and a half lane pitches — from the lane it was pointing
+// at. The ribbon for a right-lane goal was byte-identical to the ribbon for a
+// left-lane goal on the same edge: lane was not merely wrong, it was
+// inexpressible.
+//
+// THE FIX is the one this file already applies to the stop-line GATE, which
+// is anchored on the same centreline and is „slid sideways by the driver's own
+// measured offset — bounded" (GATE_LATERAL_MAX_M). The ribbon now gets the
+// same treatment at its goal end, and for the same reason.
+//
+// THE THREE BOUNDS, each answering a way this could lie instead:
+//  - CONFINED TO THE FINAL LEG. The shift is applied along the local normal,
+//    so carrying it back through a junction would hold the ribbon 12 m to the
+//    right of whatever road it is on — off the carriageway of any side street
+//    it crossed. It therefore eases in after the last junction before the
+//    goal, never across one.
+//  - BOUNDED BY THE WIDEST REAL CARRIAGEWAY. An objective further out than
+//    LANE_ALIGN_MAX_M is not in a lane: `parkInBay` bays and driveway targets
+//    sit off the road by design, and the marker is what shows those. Beyond
+//    the bound the route is left exactly as it was — the ribbon stays on the
+//    tarmac and does not drive the student into a kerb.
+//  - EASED, NOT SNAPPED. A step change would read as a swerve. It ramps in
+//    over LANE_ALIGN_RAMP_M and decays again past the goal so the look-ahead
+//    legs rejoin the centreline they were derived on.
+// ---------------------------------------------------------------------------
+
+/** Lateral offsets past this are not lane choice — they are off-road targets
+ *  (parking bays, driveways). Two lane pitches covers a 3-lanes-each-way
+ *  carriageway measured from its centreline; `ov-keepright-v1`'s outer lane
+ *  sits at 1.5 pitches (12.19 m of a measured 8.125 m pitch). */
+export const LANE_ALIGN_MAX_M = LANE_WIDTH_M * 2;
+/** Below this the goal is already on the centreline — junction nodes, and the
+ *  10 of 11 `passSignal` targets authored at (0,0). Leave them untouched. */
+export const LANE_ALIGN_MIN_M = 0.35;
+/** Ease-in / ease-out distance for the shift, m. Longer than a lane change so
+ *  the ribbon reads as „move over and stay there", not as a late swerve. */
+export const LANE_ALIGN_RAMP_M = 40;
+
+/**
+ * Slide the route sideways into the goal's own lane over the final leg.
+ * Mutates `raw.points` in place and returns the signed offset applied (0 when
+ * the goal is on the centreline or too far off-road to be a lane).
+ */
+function alignRawToGoalLane(
+  raw: RawRoute,
+  goalX: number,
+  goalY: number,
+  splitIdx?: number,
+): { offset: number; splitIdx: number | undefined } {
+  if (raw.points.length < 2) return { offset: 0, splitIdx };
+  // A shortest path over a single edge comes back as TWO points, and
+  // densification happens later in finalizeRoute — so a ramp applied to the
+  // raw polyline would be stretched across the whole leg by the straight-line
+  // interpolation that follows. Subdivide first (joint indices remapped), so
+  // LANE_ALIGN_RAMP_M means metres rather than "the whole route".
+  const newSplitIdx = subdivideRaw(raw, DENSIFY_STEP_M, splitIdx);
+  const pts = raw.points;
+
+  // Arclength of every sample, and of the goal's projection onto the route.
+  const s: number[] = new Array(pts.length);
+  s[0] = 0;
+  for (let i = 1; i < pts.length; i++) {
+    s[i] = s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  }
+  const hit = nearestOnRaw(raw, goalX, goalY);
+  if (hit.latM < LANE_ALIGN_MIN_M || hit.latM > LANE_ALIGN_MAX_M) {
+    return { offset: 0, splitIdx: newSplitIdx };
+  }
+
+  // The sample the goal projects onto, and the local tangent there.
+  let gi = 0;
+  for (let i = 1; i < pts.length; i++) if (Math.abs(s[i] - hit.s) < Math.abs(s[gi] - hit.s)) gi = i;
+  const ta = pts[Math.max(0, gi - 1)];
+  const tb = pts[Math.min(pts.length - 1, gi + 1)];
+  const tlen = Math.hypot(tb[0] - ta[0], tb[1] - ta[1]);
+  if (tlen < EPS) return { offset: 0, splitIdx: newSplitIdx };
+  const tx = (tb[0] - ta[0]) / tlen;
+  const ty = (tb[1] - ta[1]) / tlen;
+  // Signed offset along the route's right normal (x east, y north).
+  const nx = ty;
+  const ny = -tx;
+  const offset = (goalX - pts[gi][0]) * nx + (goalY - pts[gi][1]) * ny;
+  if (Math.abs(offset) < LANE_ALIGN_MIN_M) return { offset: 0, splitIdx: newSplitIdx };
+
+  // The leg the shift may live on: after the last junction before the goal.
+  let legStartS = 0;
+  for (const j of raw.jointIdx) {
+    if (j < pts.length && s[j] < hit.s - EPS && s[j] > legStartS) legStartS = s[j];
+  }
+  const rampIn = Math.min(LANE_ALIGN_RAMP_M, Math.max(EPS, hit.s - legStartS));
+
+  // Normals come from a SNAPSHOT: writing pts[i] and then reading pts[i-1] as
+  // a neighbour would feed each shift into the next point's tangent and bend
+  // the ribbon progressively off the road.
+  const src = pts.map((p) => [p[0], p[1]] as [number, number]);
+  for (let i = 0; i < pts.length; i++) {
+    let w: number;
+    if (s[i] <= legStartS) w = 0;
+    else if (s[i] < hit.s) w = Math.min(1, (s[i] - legStartS) / rampIn);
+    else w = Math.max(0, 1 - (s[i] - hit.s) / LANE_ALIGN_RAMP_M);
+    if (w <= 0) continue;
+    // Local normal, so the shift follows the road rather than a fixed compass
+    // direction — the same reason the gate bar uses the edge's own tangent.
+    const a = src[Math.max(0, i - 1)];
+    const b = src[Math.min(src.length - 1, i + 1)];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < EPS) continue;
+    pts[i] = [
+      src[i][0] + ((b[1] - a[1]) / len) * offset * w,
+      src[i][1] + (-(b[0] - a[0]) / len) * offset * w,
+    ];
+  }
+  return { offset, splitIdx: newSplitIdx };
+}
+
+/**
+ * Split every segment longer than `stepM`. `jointIdx` AND the caller's
+ * `splitIdx` are indices into `points`, so both are remapped — the active
+ * waypoint's arclength is measured from `splitIdx` in finalizeRoute, and
+ * leaving it pointing at the pre-subdivision slot moved the reported `goalS`
+ * (caught by guidance-geometry's sc-junction-stop look-ahead assertion).
+ * In place; the route is at most ROUTE_MAX_SAMPLES long.
+ */
+function subdivideRaw(raw: RawRoute, stepM: number, splitIdx?: number): number | undefined {
+  const out: [number, number][] = [];
+  const remap = new Map<number, number>();
+  for (let i = 0; i < raw.points.length; i++) {
+    remap.set(i, out.length);
+    out.push(raw.points[i]);
+    if (i === raw.points.length - 1) break;
+    const a = raw.points[i];
+    const b = raw.points[i + 1];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const n = Math.floor(len / stepM);
+    for (let k = 1; k <= n; k++) {
+      const t = (k * stepM) / len;
+      if (t >= 1 - EPS) break;
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]);
+    }
+    if (out.length > ROUTE_MAX_SAMPLES * 2) break; // paranoia: never unbounded
+  }
+  raw.points = out;
+  raw.jointIdx = raw.jointIdx.map((j) => remap.get(j) ?? j).filter((j) => j < out.length);
+  return splitIdx === undefined ? undefined : (remap.get(splitIdx) ?? splitIdx);
+}
+
 /** Does the route turn ≥ TURN_MIN_RAD at a junction PAST `splitIdx` — i.e. is
  *  the next turn already announced beyond the active waypoint? */
 function hasTurnBeyond(raw: RawRoute, splitIdx: number): boolean {
@@ -1650,6 +1814,19 @@ export function deriveGuidanceRoute(
     acc = joined.raw;
     from = next;
     if (hasTurnBeyond(acc, splitIdx)) break;
+  }
+  // The ribbon must arrive in the lane the objective is in — see the block at
+  // `alignRawToGoalLane`. Applied AFTER the look-ahead legs so the decay past
+  // the goal eases those back onto the centreline they were derived on.
+  // AUTHORED targets only. A `gate` goal's coordinates are not a lane the
+  // lesson chose — they are the graded stop line slid sideways by the DRIVER'S
+  // OWN measured offset (GATE_LATERAL_MAX_M above). Aligning the ribbon to
+  // that would point it wherever the student already is, which on a keep-right
+  // drill means endorsing the lane he was told to leave: guidance following
+  // instead of leading, the same defect inverted. A `zone` goal's coordinates
+  // are authored by the template, so they are the lane it means.
+  if (goal.kind === "point" && goal.shape?.kind !== "gate") {
+    splitIdx = alignRawToGoalLane(acc, goal.x, goal.y, splitIdx).splitIdx;
   }
   return finalizeRoute(acc, splitIdx);
 }

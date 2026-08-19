@@ -196,7 +196,28 @@ export const SC_JX_EQUAL_LEFT: ScenarioSpec = {
     {
       n: 1,
       textBg:
-        "Тръгни по южната улица към кръстовището. Огледай се: няма никакви знаци и никакъв светофар — четирите улици са равнозначни. Вали ли, включи първо късите светлини (чл. 70): на равнозначно кръстовище всеки решава по това КОГО вижда, а мокрото платно гълта тъмната кола без светлини секунди преди да излезе отдясно.",
+        // „НЯМА НИКАКВИ ЗНАЦИ" WAS FALSE, AND THE MAP IS WHAT MAKES IT FALSE
+        // (sweep161, sc-jx-equal-left/pc-right/01-arrival.png: a red-bordered
+        // round plate on the right-hand pole at the junction mouth, and the
+        // cockpit repeater reading „40 · знакът важи").
+        //
+        // MEASURED through buildWorldGeometry(jx-equal-v1), signs by kind:
+        //   { limit40: 8 }
+        // — eight of them, one per approach, derived from the district's own
+        // `params.maxKmh: 40`, and NOTHING else: zero giveWay, zero stop, zero
+        // priorityRoad, zero trafficLights. So the sentence was wrong about
+        // signs in general and right about the only signs that decide this
+        // lesson. It is now narrowed to exactly that, which is also the
+        // sharper teaching: „равнозначно" is defined by the ABSENCE OF
+        // PRIORITY signalling, not by an empty street — a 40 plate changes no
+        // one's priority, and a student who thinks any sign cancels чл. 50,
+        // ал. 3 has learned the wrong rule.
+        //
+        // The rain clause stays CONDITIONAL („Вали ли…") because the ladder
+        // really does rain at L5 (`levels` below) and really is dry at L1–L4;
+        // an „if" is true on both, which is the same discipline applied to
+        // sc-sp-wet-limit-plate in templates-speed2.ts.
+        "Тръгни по южната улица към кръстовището. Огледай се: няма нито знак за предимство, нито светофар — само ограничението 40. Четирите улици са равнозначни. Вали ли, включи първо късите светлини (чл. 70): на равнозначно кръстовище всеки решава по това КОГО вижда, а мокрото платно гълта тъмната кола без светлини секунди преди да излезе отдясно.",
     },
     {
       n: 2,

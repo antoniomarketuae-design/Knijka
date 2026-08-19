@@ -15,6 +15,7 @@
 // one code path, so the procedure observer cannot tell them apart (doc 69).
 
 import { DrivelineState, type VehicleStartState } from "@/modules/sim/vehicle";
+import { SCENARIO_TEMPLATES, scenarioById } from "@/modules/sim/lessons";
 
 export type IndicatorSetting = "off" | "left" | "right";
 export type HeadlightSetting = "off" | "low" | "high";
@@ -62,22 +63,126 @@ export const GLANCE_REFRESH_S = 1.0;
 // when the compiled environment carries night, rain or fog AND the lesson
 // spawns `ready`, the low beams start ON.
 //
-// THE THREE EXCEPTIONS, and why they are named rather than derived: for
-// `sc-ac-night-lights`, `sc-ac-rain-lights` and `sc-ac-fog` the SUBJECT of the
-// lesson is reaching for the switch. Pre-arming those would delete the drill —
-// the same reasoning that keeps `preDriveMode: "assess"` on a cold start.
-// A fourth, structural exception is any lesson that actually runs the 13-step
+// THE EXCEPTION: a lesson whose SUBJECT is reaching for the switch. Pre-arming
+// one of those deletes the drill — the same reasoning that keeps
+// `preDriveMode: "assess"` on a cold start. Which lessons those are is DERIVED
+// from their own authored briefing; see the block below for why it used to be
+// a hand-typed list of three and what that cost.
+// A second, structural exception is any lesson that actually runs the 13-step
 // pre-drive procedure, because `headlights-on` is a coached/graded step there
 // (procedures/steps.ts) and a pre-lit car would auto-satisfy it.
 // ---------------------------------------------------------------------------
 
-/** Scenario template ids whose whole subject is switching the lamps ON — they
- *  must be handed over dark or there is no lesson left (doc 86 L10). */
-export const HEADLIGHT_DRILL_TEMPLATE_IDS: ReadonlySet<string> = new Set([
-  "sc-ac-night-lights",
-  "sc-ac-rain-lights",
-  "sc-ac-fog",
-]);
+// THE EXCEPTION WAS A HAND-LIST, AND THAT WAS THE DEFECT (sweep 161,
+// `sc-park-night/mobile-right/01-arrival.png`). The frame shows the car at
+// 0 км/ч, before any input, with a full dipped-beam cone on the asphalt —
+// while briefing step 1 orders «Включи късите светлини ПРЕДИ да тръгнеш» and
+// the template authors a `mistake-no-lights` variant citing
+// HEADLIGHTS_OFF_AT_NIGHT. The lesson's headline act was already done for the
+// student: it could not be performed, could not be failed, and the authored
+// mistake demo had nothing left to demonstrate.
+//
+// `sc-park-night` was not forgotten by accident — a set of three literal ids
+// cannot track 154 templates' authored text, and it fails OPEN (hands the car
+// over lit), so every miss is a green tick for an act nobody measured. Worse,
+// the sweep test derived its expectation from the SAME constant: it excluded
+// the set from its offender scan and then iterated the set. A tautology
+// cannot report a missing member, which is why this sat still for seven
+// rounds while the coverage counts looked clean.
+//
+// SO THE LIST IS GONE AND THE RULE IS DERIVED, from one invariant:
+//
+//   THE HAND-OVER STATE MUST NOT FALSIFY THE LESSON'S OWN LAMP SENTENCE.
+//
+// The catalogue already draws that line itself, in two authoring conventions
+// this file now simply obeys:
+//   - «Включи късите светлини …» — an ORDER. The car must start DARK, or the
+//     order is pre-performed. 12 templates.
+//   - «Провери, че късите светлини са включени» — a VERIFY. The car must
+//     start LIT, or the sentence is a false claim about the cockpit — the
+//     exact doc-86 L10 defect. 4 templates (sc-crossing-rain-sprint,
+//     sc-pe-night-unlit, sc-ln-obstacle-meeting, sc-pe-parked-row-scan).
+// A CONDITIONAL step («Ако е тъмно, включи…», «Вали ли, включи…») is the
+// template hedging about a rung the level-ladder complication created; the
+// lamp is not that lesson's subject, so those keep the doc-86 default. 42
+// templates, and reading them as orders is what would re-open L10 at scale.
+//
+// The derivation is calibrated by agreeing with the humans where they looked:
+// it reproduces all three hand-listed ids and then finds the nine they missed.
+// `spawnHeadlights.test.ts` pins the whole partition by name, so authored text
+// that drifts out of one class fails a test that says which template moved.
+
+/** Lamp nouns. «фаров» also catches «фаровете за мъгла» (sc-ac-fog). */
+const LAMP_NOUN_RE = /(светлин|фаров)/iu;
+/** …but the HAZARDS are a different switch on a different stalk. Without this,
+ *  `sc-accident-own-conduct`'s «Включи аварийни светлини, обезопаси мястото»
+ *  reads as a headlight order. It has no night/rain/fog rung so the verdict
+ *  never reached the cabin, which is precisely why it would have gone unseen. */
+const HAZARD_LAMP_RE = /аварийн/iu;
+/** The imperative to switch them on. NOTE: `\b` is ASCII-only and never
+ *  matches a Cyrillic boundary — a first cut of this predicate used it,
+ *  matched nothing, and read as a clean catalogue. Unicode boundaries only.
+ *  «включи» is not a substring of «изключи» or «включени», but IS a prefix of
+ *  «включително», which the trailing guard excludes. */
+const SWITCH_ON_RE = /(?:^|[^\p{L}])(включи|запали)(?![\p{L}])/iu;
+/** Hedges that make the imperative contingent on a complication's weather. */
+const CONDITIONAL_RE =
+  /(?:^|[^\p{L}])(ако|щом|вали\s+ли|по\s+тъмно|в\s+дъжд|вечер|или\s+вали|ниво\s+5|в\s+гараж)(?![\p{L}])/iu;
+
+/** Clause split. The hedge binds to its own clause: «Влез в паркинга … Ако е
+ *  тъмно, включи късите светлини: линиите …» is conditional, while
+ *  «Включи къси светлини — в дъжд са задължителни» is a flat order whose
+ *  second clause merely explains. Reading either whole step as one string
+ *  misclassifies both. */
+function lampClauses(text: string): string[] {
+  return text
+    .split(/[.!?:;]\s+|\s[—–-]\s/u)
+    .filter((c) => LAMP_NOUN_RE.test(c) && !HAZARD_LAMP_RE.test(c));
+}
+
+/**
+ * Does this lesson's own authored briefing ORDER the student to switch the
+ * headlights on, unconditionally? Pure over the authored step texts — no
+ * catalogue, no DOM — so it is unit-testable by mutation on the sentences
+ * themselves.
+ */
+export function briefingOrdersLampsOn(instructionTexts: readonly string[]): boolean {
+  for (const text of instructionTexts) {
+    for (const clause of lampClauses(text)) {
+      if (SWITCH_ON_RE.test(clause) && !CONDITIONAL_RE.test(clause)) return true;
+    }
+  }
+  return false;
+}
+
+/** Memoised so the catalogue scan runs once per template, not per spawn. */
+const drillCache = new Map<string, boolean>();
+
+/**
+ * True when switching the lamps ON is an act THIS lesson asks for — read off
+ * the template's hand-authored `instructionsBg`, which is the only place the
+ * duty is ever stated to the student. Unknown ids (curriculum lessons, tests)
+ * are not drills: they keep the doc-86 default.
+ */
+export function isHeadlightDrillLesson(lessonId: string): boolean {
+  const templateId = templateIdOfLessonId(lessonId);
+  const hit = drillCache.get(templateId);
+  if (hit !== undefined) return hit;
+  // `parseScenarioLessonId` rejects a bare template id, so resolve by template.
+  const spec = scenarioById(templateId);
+  const drill =
+    spec !== undefined && briefingOrdersLampsOn(spec.instructionsBg.map((s) => s.textBg));
+  drillCache.set(templateId, drill);
+  return drill;
+}
+
+/** Kept as an EXPORT because the sweep test enumerates it, but it is now
+ *  derived from the authored text rather than typed by hand — the whole point
+ *  of the change above. Lazily built: module-init order must not depend on the
+ *  catalogue having finished loading. */
+export function headlightDrillTemplateIds(): ReadonlySet<string> {
+  return new Set(SCENARIO_TEMPLATES.filter((s) => isHeadlightDrillLesson(s.id)).map((s) => s.id));
+}
 
 /** The inputs the spawn-lamp decision reads. Deliberately primitives: this is
  *  a pure rule, unit-tested without a DOM or a compiled lesson. */
@@ -94,6 +199,10 @@ export interface SpawnHeadlightContext {
   preDrive: boolean;
   /** Compiled lesson id, e.g. `sc-ac-fog@L2`, or the raw template id. */
   lessonId: string;
+  /** Override for the "is the switch itself the lesson?" question. Omitted in
+   *  production — it is derived from `lessonId` via the authored briefing.
+   *  Present so the pure rule can still be exercised without the catalogue. */
+  lampDrill?: boolean;
 }
 
 /** The template id inside a compiled scenario lesson id (`sc-x@L2` → `sc-x`). */
@@ -105,13 +214,14 @@ export function templateIdOfLessonId(lessonId: string): string {
 /**
  * The headlight setting a lesson's car should be handed over in.
  * `"low"` only when the conditions demand lights AND the car is handed over
- * ready AND the lesson is not itself about the switch. Everything else is
- * `"off"` — byte-identical to the pre-doc-86 behaviour.
+ * ready AND the lesson's own briefing does not ORDER the student to switch
+ * them on. Everything else is `"off"`.
  */
 export function initialHeadlightsFor(ctx: SpawnHeadlightContext): HeadlightSetting {
   if (ctx.vehicleStart !== "ready") return "off"; // a cold start is a pre-drive
   if (ctx.preDrive) return "off"; // `headlights-on` is a graded step there
-  if (HEADLIGHT_DRILL_TEMPLATE_IDS.has(templateIdOfLessonId(ctx.lessonId))) return "off";
+  // The lesson's own briefing orders the act → it must be the student's to do.
+  if (ctx.lampDrill ?? isHeadlightDrillLesson(ctx.lessonId)) return "off";
   return ctx.night || ctx.rain || ctx.fog ? "low" : "off";
 }
 

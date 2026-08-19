@@ -130,7 +130,19 @@ export const SC_AC_NIGHT_OVERDRIVE: ScenarioSpec = {
     // sc-ac-fog: the order keeps a step of its own so it stays one identifiable
     // row for the imperative sweep.
     // 66 ch
-    { n: 1, textBg: "Включи късите светлини — нощ е и по този път няма нито една лампа." },
+    // THE LAMPS THE BRIEFING DENIED (sweep161, sc-ac-night-overdrive/pc-right/
+    // 04-t130s.png: a row of posts down the left kerb, lit windows both sides).
+    // The line read „нощ е и по този път няма нито една лампа" — and the
+    // district is what puts them there: ov-oncoming-v1's only edge is
+    // `class: "tertiary"`, which is a member of ARTERIAL_CLASSES
+    // (world/builders/constants.ts), and props.ts builds streetlights and
+    // street trees from exactly that set. The template could not have denied
+    // them without changing the map's road class, which is not this file.
+    //
+    // Nothing about the LESSON needs the denial. „Отвъд снопа пътят е черен" is
+    // the real AC-01 premise, it is true with lamps or without, and it keeps
+    // the graded act (чл. 70 dipped beams → HEADLIGHTS_OFF_AT_NIGHT) first.
+    { n: 1, textBg: "Включи късите светлини — нощ е и отвъд снопа им пътят е черен." },
     // 40 ch
     { n: 2, textBg: "Потегли и се стабилизирай около 50 км/ч." },
     // 63 ch
@@ -152,10 +164,32 @@ export const SC_AC_NIGHT_OVERDRIVE: ScenarioSpec = {
     {
       id: "sc-acno-adapted",
       titleBg: "Мини неосветения участък със съобразена за видимостта скорост",
-      // Cap 58 sits just under the authored night envelope (0.65 × 90 = 58.5):
-      // the ~50 km/h drive satisfies it, while the „по знака" 90 cannot pass
-      // this gate at all without first slowing into the beam's band.
-      params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, maxSpeedKmh: 58 },
+      // THE GATE CREDITED THE OFFENCE THE LESSON IS ABOUT (doc 87 B58, the
+      // founder's own words: „a student who obeys the number the world shows
+      // him commits the mistake the world is grading").
+      //
+      // The cap was 58, chosen to sit just under the night envelope
+      // (0.65 × 90 = 58.5). But an authored cap is not what the student is
+      // shown: `RouteGuidance` prints the COMPILED cap on the gate bar across
+      // the lane, and the L1 ladder adds SPEED_CAP_GRACE_KMH_PER_TOLERANCE ×
+      // 0.5 = 5 (params.ts) — bounded only by the posted limit, which here is
+      // 90. Measured through compileScenario, this gate's cap by rung was
+      //   L1 63 · L2 60.5 · L3–L5 58
+      // against a briefing that ORDERS «стабилизирай около 50 км/ч» (step 2)
+      // and whose step 5 is literally «над ~60 изпреварваш фаровете». So at
+      // Ниво 1 — the beginner rung — the bar in the world read 63: above the
+      // lesson's own taught threshold AND above the 58.5 envelope the rule
+      // engine bills SPEED_TOO_FAST_FOR_CONDITIONS from. The objective handed
+      // out a tick at a speed the detector was convicting in the same second.
+      //
+      // Authoring the cap at the number the briefing orders puts every rung
+      // inside both:  L1 55 · L2 52.5 · L3–L5 50 — under 58.5 and under ~60
+      // everywhere, with the ladder's standing 5 km/h of beginner forgiveness
+      // (the same absolute slack `speedingGraceMaxKmh` gives every driver)
+      // intact. The shadow rides ~50 and still passes at all five rungs; that
+      // is asserted, not assumed — a tightened gate that failed the lesson's
+      // own model line would be the founder's roundabout complaint again.
+      params: { kind: "reachZone", x: LANE_X, y: 250, radiusM: 12, maxSpeedKmh: 50 },
     },
     {
       id: "sc-acno-mark",
@@ -526,8 +560,36 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
   family: "conditions",
   tagsBg: ["условия", "лед", "зимни условия", "мостове", "съобразена скорост", "предвиждане"],
   titleBg: "Мостът замръзва пръв",
+  // THE BRIDGE THAT IS NOT THERE (sweep161, sc-ac-bridge-ice/pc-right/
+  // 04-t152s.png, 04-t076s.png, 04-t027s.png — every sampled frame of the
+  // CORRECT drive). The copy used to point at it: „сградите свършват и пътят
+  // тръгва над дерето", „знака А15 на устоя", and both graded gates were TITLED
+  // against abutments — «ПРЕДИ близкия устой», «Стигни отсрещния устой». The
+  // buildings never end; the street runs between apartment blocks to the
+  // horizon.
+  //
+  // MEASURED, not assumed: ac-bridge-v1 carries ONE zone —
+  // { kind: "icePatch", fromM: 250, toM: 340, signRef: "А15",
+  //   patchGripFactor: 0.15 } — and nothing else. There is no deck, no ravine
+  // and no abutment anywhere in the document, and `DistrictZoneKind`
+  // (world/types.ts) has no member that could carry one, so no map in the
+  // catalogue could have made those four sentences true. The same shape as the
+  // мантинела struck out of sc-mw-discipline (__tests__/sp-world-claims.test.ts).
+  //
+  // WHAT IS REAL, AND IS NOW WHAT THE LESSON POINTS AT. The ice is physically
+  // real (grip 0.15 over 90 m) and INVISIBLE by design — waterDecals.ts renders
+  // nothing for an icePatch, „black ice you cannot see IS the lesson". And the
+  // А15 „Опасност от хлъзгане" post IS built, 60 m ahead of the span
+  // (zoneSigns.ts ZONE_SIGN_KIND.icePatch → "slippery", HAZARD_WARNING_AHEAD_M
+  // = 60). So the only cue this world gives is the SIGN, and reading the sign
+  // rather than the scenery is a strictly better version of the same skill —
+  // the AC-08 „антиципация" arm is anticipation from a warning, not from a
+  // silhouette. The bridge doctrine itself is untouched: it stays in `teach`,
+  // where it is a statement about the RULE and true on every map.
+  //
+  // The claim gate is __tests__/lane-world-claims.test.ts §1/§3.
   objectiveBg:
-    "При температури около нулата настилката на моста заледява преди пътя: вдигни крака от газта ПРЕДИ моста, мини съоръжението с равна скорост и прав волан, и дай газ чак след отсрещния устой.",
+    "При температури около нулата настилката заледява там, където няма топла земя отдолу: вдигни крака от газта ОЩЕ преди знака А15, мини цялата хлъзгава отсечка с равна скорост и прав волан, и дай газ чак когато е зад теб.",
   archetypeIds: ["AC-08"],
   conceptIds: [
     "c-winter-ice",
@@ -556,13 +618,27 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     // 74 ch
     { n: 2, textBg: "Включи късите светлини по тъмно (чл. 70): черният лед блести само осветен." },
     // 75 ch
-    { n: 3, textBg: "Погледни напред: сградите свършват и пътят тръгва над дерето — това е мост." },
+    // Was „Погледни напред: сградите свършват и пътят тръгва над дерето — това
+    // е мост." The buildings never end (frame 04-t152s). What the world DOES
+    // show is a dry black surface all the way out — which is what black ice
+    // looks like, and is therefore the honest version of the same warning.
+    { n: 3, textBg: "Гледай платното напред: сухо и черно докрай — точно така изглежда ледът." },
     // 75 ch
-    { n: 4, textBg: "Знай: мостът няма топла земя отдолу и замръзва пръв, докато улицата е суха." },
+    // The RULE, not this street — „мост, надлез, сянка" is doctrine and stays
+    // true on every map, the same reason sp-world-claims.test.ts exempts
+    // `teach.*`. Only the DEICTIC form („ето мост", „отсрещния устой") claims
+    // geometry, and only that form is gated.
+    { n: 4, textBg: "Знай: където няма топла земя отдолу — мост, надлез, сянка — заледява пръв." },
     // 72 ch
-    { n: 5, textBg: "Прочети знака А15 „Опасност от хлъзгане“ на устоя — тук той не е украса." },
+    // Was „…на устоя". The А15 post IS built — zoneSigns.ts maps icePatch →
+    // "slippery" and stands it HAZARD_WARNING_AHEAD_M = 60 m before the first
+    // icy metre. The abutment it was hung on never existed.
+    { n: 5, textBg: "Прочети знака А15 „Опасност от хлъзгане“ — тук той не е украса, а заглавие." },
     // 65 ch
-    { n: 6, textBg: "Смъкни до около 25 км/ч ОЩЕ на сухия асфалт, преди близкия устой." },
+    // Was „…преди близкия устой". The 60 m between the А15 post and metre 250
+    // is the room the gate below asks the student to spend slowing down — and
+    // it is the one landmark this world actually gives him.
+    { n: 6, textBg: "Смъкни до около 25 км/ч ОЩЕ на сухия асфалт, докато знакът е пред теб." },
     // 65 ch
     { n: 7, textBg: "Мини целия мост с равна газ и прав волан, без нито една корекция." },
     // 80 ch
@@ -570,12 +646,20 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     // 66 ch
     { n: 9, textBg: "Не бързай да даваш газ — ускорението е също толкова рязка команда." },
     // 66 ch
-    { n: 10, textBg: "Чакай отсрещния устой: там свършва ледът и чак там свършва мостът." },
+    // Was „Чакай отсрещния устой: там свършва ледът и чак там свършва мостът."
+    // The span is 90 m long (250→340) and its end is not marked by anything the
+    // student can see — which is the point, and is now what the line says.
+    { n: 10, textBg: "Брой метрите: хлъзгавото е около 90 и краят му не е обозначен с нищо." },
   ],
   success: [
     {
       id: "sc-acbi-before",
-      titleBg: "Вдигни крака от газта ПРЕДИ близкия устой",
+      // Was «…ПРЕДИ близкия устой». The gate anchor is y = 235 — 15 m before
+      // the icePatch's first metre (250) and 45 m PAST the А15 post (190). It
+      // never measured an abutment; it measured „slow on the dry, before the
+      // ice", and it now says so. A banner may refuse only for something it
+      // named (the Round-5 lamp-banner law, __tests__/conditions-lamp-gates).
+      titleBg: "Вдигни крака от газта ПРЕДИ хлъзгавата отсечка",
       // THE WHOLE TEMPLATE, in one gate. Cap 30 must be met 15 m BEFORE the
       // deck starts (250), i.e. on dry asphalt — the only surface where slowing
       // down still works. A driver who plans to brake „on the bridge" fails
@@ -584,7 +668,9 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     },
     {
       id: "sc-acbi-deck",
-      titleBg: "Стигни отсрещния устой все още бавно — без газ по моста",
+      // Was «Стигни отсрещния устой все още бавно — без газ по моста». Anchor
+      // y = 335, radius 5, wholly inside the ice span [330, 340].
+      titleBg: "Стигни края на хлъзгавото все още бавно — без газ по него",
       // The anti-cheat on gate 1: cap 30 again at the FAR abutment (340). You
       // cannot satisfy both by dipping under 30 for one tick and flooring it —
       // the 90 m between them must be driven at the crawl, which is exactly the
@@ -595,7 +681,9 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
     },
     {
       id: "sc-acbi-past",
-      titleBg: "Ускори чак на сухото, след съоръжението",
+      // Was «Ускори чак на сухото, след съоръжението». Anchor y = 440 — 100 m
+      // past the last icy metre, on the surface the district really has.
+      titleBg: "Ускори чак на сухото, след хлъзгавия участък",
       // No cap: past the far abutment the dry street is back and normal speed
       // is not just allowed, it is correct. The gate exists to prove the drill
       // ends on the far side — the bridge is crossed, not stopped on.
@@ -612,14 +700,14 @@ export const SC_AC_BRIDGE_ICE: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-road-speed.trace.json" },
       titleBg: "Мостът с пътна скорост — задницата тръгва",
       whatWentWrongBg:
-        "Колата влезе на моста с разрешените 50 — „нали е в ограничението, пътят е сух“. Само че сухата беше улицата, не съоръжението: на първите метри лед задницата тръгна настрани и колата се понесе към парапета, олюлявайки се през половината платно. Никой не я е карал в тези секунди — воланът върху 15% сцепление не води, а моли. Ограничението е таван за платно в добро състояние; чл. 20, ал. 2 връзва скоростта със СЪСТОЯНИЕТО на пътя, а на мост в мразовита сутрин състоянието е лед, докато не се докаже обратното. Решението е взето 200 метра по-рано или изобщо не е взето.",
+        "Колата влезе в хлъзгавия участък с разрешените 50 — „нали е в ограничението, пътят е сух“. Само че сухо беше зад теб, не под теб: на първите метри лед задницата тръгна настрани и колата се понесе към банкета, олюлявайки се през половината платно. Никой не я е карал в тези секунди — воланът върху 15% сцепление не води, а моли. Ограничението е таван за платно в добро състояние; чл. 20, ал. 2 връзва скоростта със СЪСТОЯНИЕТО на пътя, а в мразовита сутрин състоянието е лед, докато не се докаже обратното. Решението е взето 200 метра по-рано или изобщо не е взето.",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
       traceRef: { path: "content/traces/sc-ac-bridge-ice/mistake-brake-on-deck.trace.json" },
       titleBg: "Спирачка ВЪРХУ леда",
       whatWentWrongBg:
-        "Този водач поне разбра, че мостът е лед — но разбра го със закъснение от 90 метра и натисна спирачката ВЪРХУ съоръжението. При 15% сцепление педалът не спира колата, а само ѝ отнема посоката: за 40 метра с натисната докрай спирачка скоростта падна от 50 на 42 км/ч — на сух асфалт същата спирачка щеше да е спряла колата в 24 метра. Вместо това колата се понесе по инерцията си и намери единственото нещо, което на един мост е винаги там — парапета. Забележи какво НЕ се случи: няма рязко спиране, защото рязко спиране на лед е физически невъзможно. Точно затова намаляването не е реакция, а предвиждане — то се прави преди устоя, на чист асфалт (чл. 20, ал. 2).",
+        "Този водач поне разбра, че отсечката е лед — но разбра го със закъснение от 90 метра и натисна спирачката ВЪРХУ самия лед. При 15% сцепление педалът не спира колата, а само ѝ отнема посоката: за 40 метра с натисната докрай спирачка скоростта падна от 50 на 42 км/ч — на сух асфалт същата спирачка щеше да е спряла колата в 24 метра. Вместо това колата се понесе по инерцията си и намери единственото нещо, което на такъв път е винаги там — банкета. Забележи какво НЕ се случи: няма рязко спиране, защото рязко спиране на лед е физически невъзможно. Точно затова намаляването не е реакция, а предвиждане — то се прави преди леда, на чист асфалт (чл. 20, ал. 2).",
       codeRefs: ["COLLISION"],
     },
   ],
@@ -830,7 +918,30 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   success: [
     {
       id: "sc-acw-pass",
-      titleBg: "Изпревари камиона със съобразена скорост, без да излизаш от лентата",
+      // THE BANNER NOW NAMES WHAT THE GATE MEASURES (sweep161: mobile-wrong/
+      // 04-t034s.png at 112 км/ч and pc-wrong/04-t039s.png at 135 км/ч — road
+      // ahead completely empty, no truck anywhere). It used to read «Изпревари
+      // камиона със съобразена скорост, без да излизаш от лентата», and the
+      // gate under it is a bare `reachZone`: arrive within 12 m of
+      // (−8.12, 340) at ≤ 100 км/ч. It cannot see a truck, cannot see whether
+      // one was passed, and cannot see the lane you left — and this file's own
+      // ACTS_WIND_TRUCK header already says the pass „is not completed in world
+      // space" because cutInLeadCar only paces. Above `maxMatchSpeedMps` = 33
+      // (118.8 км/ч) the rig cannot even keep station, which is exactly why the
+      // 135 км/ч frame shows bare tarmac.
+      //
+      // So the tick stops promising the overtake and promises the two things a
+      // capped zone in the overtaking lane really does prove: that the student
+      // is IN the overtaking lane at the cab line, and that he is there under
+      // the prudent-wind ceiling this drill teaches. The lane discipline
+      // through the gust is still graded — by POOR_LANE_KEEPING, live, on the
+      // real crosswind force (`physics.crosswind`) — and the overtaking
+      // NARRATIVE is still taught by the instructions and the shadow.
+      //
+      // Routed, not silently dropped: an actor that actually falls behind
+      // (a hold-only or plain slow-cruiser lead) is contracts.ts + a runner —
+      // NOT this lane's files. Until it exists no gate here may say «изпревари».
+      titleBg: "Излез в лявата лента до кабината със съобразена за вятъра скорост",
       // The pass point in the overtaking lane, at the cab line where the gust
       // lands. Cap 100 is the prudent-wind band this drill teaches (the shadow
       // rides ~70): both mistakes carry the pass off — the excursion demo
@@ -853,9 +964,9 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
   mistakes: [
     {
       traceRef: { path: "content/traces/sc-ac-wind-truck-pass/mistake-blown-out.trace.json" },
-      titleBg: "Изненадан от порива — към мантинелата",
+      titleBg: "Изненадан от порива — към разделителната ивица",
       whatWentWrongBg:
-        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. В мига, в който носът мина пред кабината, заветът изчезна и поривът блъсна колата към мантинелата — тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
+        "Колата излезе да изпреварва с отпусната ръка и с пътна скорост. В мига, в който носът мина пред кабината, заветът изчезна и поривът блъсна колата към разделителната ивица — тя се понесе през половин лента, докато водачът реагира. На открито място, а и при излизане от завета на камион, скоростта се смъква ПРЕДИ порива, а воланът се държи здраво с двете ръце (чл. 20, ал. 2).",
       codeRefs: ["POOR_LANE_KEEPING"],
     },
     {
@@ -870,10 +981,10 @@ export const SC_AC_WIND_TRUCK_PASS: ScenarioSpec = {
     whenBg:
       "Винаги когато изпреварваш висок автомобил — камион, автобус, бус — при силен страничен вятър, най-често на магистрала и по откритите извънградски пътища. Разпознава се предварително: ветропоказателят или клоните се навеждат в една посока, а самата кола „плава“ при поривите. Докато си в завета на камиона вятърът мълчи — но точно затова ударът при излизане е двоен.",
     whyBg:
-      "Камионът е стена, която спира вятъра — докато си зад него и до него, си в неговия завет и поривът не те бута. В секундата, в която носът ти излезе пред кабината, тази стена изчезва и целият вятър те удря наведнъж, странично. При висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася — или към мантинелата отляво, или обратно към камиона отдясно. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
+      "Камионът е стена, която спира вятъра — докато си зад него и до него, си в неговия завет и поривът не те бута. В секундата, в която носът ти излезе пред кабината, тази стена изчезва и целият вятър те удря наведнъж, странично. При висока скорост изминаваш повече метри, докато реагираш, и дрейфът те изнася — или към разделителната ивица отляво, или обратно към камиона отдясно. Още по-опасен е рефлексът „рязко срещу вятъра“: отслабне ли поривът, рязко завъртеният волан сам изхвърля колата на другата страна — вторият замах е убиецът при вятър. Затова законът връзва скоростта с атмосферните условия (чл. 20, ал. 2): преди такова изпреварване се намалява, воланът се държи здраво с двете ръце, а поривите се посрещат с меки, постоянни корекции.",
     lawRef: "ЗДвП чл. 20, ал. 2",
     examinerBg:
-      "Изпитващият следи контрола на волана при вятър и при изпреварване на високи превозни средства: очаква по-ниска скорост преди маневрата, стабилна лента през целия участък и спокойни, постоянни корекции. Лъкатушенето в лентата е грешка, а изхвърлянето към мантинелата или към изпреварвания камион — тежка: две ръце на волана и смъкната скорост.",
+      "Изпитващият следи контрола на волана при вятър и при изпреварване на високи превозни средства: очаква по-ниска скорост преди маневрата, стабилна лента през целия участък и спокойни, постоянни корекции. Лъкатушенето в лентата е грешка, а изхвърлянето към разделителната ивица или към изпреварвания камион — тежка: две ръце на волана и смъкната скорост.",
   },
   levels: [
     { level: 1 },

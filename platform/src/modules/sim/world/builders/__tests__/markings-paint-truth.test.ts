@@ -308,6 +308,7 @@ import {
   MARKED_CLASSES,
   EDGE_LINE_CLASSES,
   paintsZebra,
+  livingZoneCarriageway,
 } from "../constants";
 import {
   add,
@@ -322,7 +323,23 @@ import {
   trimPolyline,
   type Vec2,
 } from "../math2d";
-import { buildMarkings, type MarkingBuildResult } from "../markings";
+import {
+  buildCrossingFurniture,
+  buildMarkings,
+  crossingIslandHalfWidthM,
+  type MarkingBuildResult,
+} from "../markings";
+import { MeshAccumulator } from "../mesh";
+// §d/§e drive the REAL grader and the REAL reducer against this file's painter
+// (O32). Same module (`sim`), so these are intra-module imports, and nothing
+// below mutates them — the point is that a re-derivation cannot catch a defect
+// whose whole shape is „the grader asks a different question".
+import { DistrictIndex } from "../../../runtime/spatial";
+import type { District as RuntimeDistrict } from "../../../runtime/district";
+import { CrossingZoneTracker } from "../../../runtime/zones";
+import type { SimTickEvent } from "../../../rules/types";
+import { createRuleEngine, reduceTick } from "../../../rules/engine";
+import { tick } from "../../../rules/__tests__/fixtures";
 import {
   analyzeNetwork,
   junctionPriorityControls,
@@ -3628,7 +3645,15 @@ describe("every quad these 91 districts paint is a quad they were authored to pa
 function skewedCrossingDistrict(skewDeg: number): District {
   return assertDistrict({
     format: "district-v1",
-    meta: { district: "skew", label: "skew", attribution: { text: "test fixture" } },
+    // `boundsLocalMeters` is read by no painter — it is here because §e builds
+    // a `DistrictIndex`, which derives its uniform-grid origin and column count
+    // from these four numbers (runtime/district.ts).
+    meta: {
+      district: "skew",
+      label: "skew",
+      attribution: { text: "test fixture" },
+      boundsLocalMeters: { minX: -60, minY: -60, maxX: 60, maxY: 180 },
+    },
     roads: {
       nodes: [
         { id: "skew-a", x: 0, y: 0 },
@@ -3845,31 +3870,73 @@ function crossingVertexCount(district: District, net: RoadNetwork): number {
   return (b.length - a.length) / 3;
 }
 
+/** The width at which the UNCLAMPED painter's last bar disappeared, measured
+ *  2026-08-19 by the sweep below before the O32 clamp landed: paint survived to
+ *  13.0 m and was gone from 13.5 m, because the floored bar count puts the
+ *  outermost bar at ±7.0 m rather than at the kerb. Written down as a NUMBER,
+ *  not re-derived from the painter's own arithmetic, so §a's self-check cannot
+ *  drift with the thing it is checking. */
+const ISLAND_WIDTH_THAT_ONCE_ERASED_THE_ZEBRA_M = 13.5;
+
 describe("zebraCrossings counts the paint, not the visit", () => {
-  it("§a at every island width, the count equals whether the crossing painted", () => {
-    const rows: Array<{ widthM: number; vertices: number; counted: number }> = [];
+  it("§a no island width erases the пешеходна пътека (O32)", () => {
+    const rows: Array<{
+      widthM: number;
+      vertices: number;
+      counted: number;
+      clampedHalfW: number;
+      nearestPaintM: number;
+    }> = [];
     // 0…20 m in 0.5 m steps. The street is 16.25 m wide, so the top of the
     // range is a kerb wider than the carriageway — absurd as a road and exactly
-    // what a generator bug writes. Measured 2026-08-19: paint survives to
-    // 13.0 m and is gone from 13.5 m, because the floored bar count puts the
-    // outermost bar at ±7.0 m rather than at the kerb.
+    // what a generator bug writes, since `assertDistrict` validates nothing
+    // about `island.widthM`.
     for (let half = 0; half <= 40; half++) {
       const widthM = half / 2;
       const district = islandCrossingDistrict(widthM);
       const net = analyzeNetwork(district);
+      const vertices = crossingVertexCount(district, net);
+      // The road runs +y from (0,0), so a vertex's x IS its offset across the
+      // carriageway, and the nearest |x| is the innermost bar's near corner.
+      const nearestPaintM =
+        vertices > 0 ? Math.min(...crossingPaint(district, net).map((p) => Math.abs(p[0]))) : NaN;
       rows.push({
         widthM,
-        vertices: crossingVertexCount(district, net),
+        vertices,
         counted: buildMarkings(district, net, new Set(), new Set(), []).zebraCrossings,
+        clampedHalfW: crossingIslandHalfWidthM(widthM / 2, net.edgeById.get("skew-e")!.halfWidth, 0),
+        nearestPaintM,
       });
     }
-    // The sweep is only worth reading if it CONTAINS both answers: a range that
-    // painted every time (or never) would satisfy the loop below trivially.
-    expect(rows.some((r) => r.vertices > 0)).toBe(true);
-    expect(rows.some((r) => r.vertices === 0)).toBe(true);
+    // SELF-CHECK, and this is the whole reason the sweep is a sweep: it must
+    // reach PAST the width that used to erase the crossing, or every row below
+    // is an easy one and the loop proves nothing. Before the clamp this file
+    // asserted the opposite — `rows.some((r) => r.vertices === 0)` — because a
+    // zero was reachable; that assertion is what fails on the fixed painter,
+    // which is the mutation proof that the two states are distinguishable.
+    expect(rows.some((r) => r.widthM >= ISLAND_WIDTH_THAT_ONCE_ERASED_THE_ZEBRA_M)).toBe(true);
+    // …and the clamp must actually BITE somewhere in the range, and NOT bite
+    // everywhere: a clamp that fired on the 2.0 m shipped islands would be the
+    // false-refusal direction, silently shrinking three authored kerbs.
+    expect(rows.some((r) => r.clampedHalfW < r.widthM / 2 - 1e-6)).toBe(true);
+    expect(rows.some((r) => r.widthM > 0 && r.clampedHalfW === r.widthM / 2)).toBe(true);
+
     for (const r of rows) {
-      expect(r.counted, `island ${r.widthM} m painted ${r.vertices} vertices`).toBe(
-        r.vertices > 0 ? 1 : 0,
+      // THE INVARIANT O32 BUYS: paint exists at every authorable width, so the
+      // grader — which arms off `paintsZebra`, i.e. off `kind`, and cannot see
+      // bars — never convicts чл. 119 at a пътека the world did not draw.
+      expect(r.vertices, `island ${r.widthM} m painted no bars`).toBeGreaterThan(0);
+      expect(r.counted, `island ${r.widthM} m painted ${r.vertices} vertices`).toBe(1);
+      // AND THE KERB NEVER COVERS THE PAINT — the half that made "clamp the
+      // bars alone" unsafe. The road runs +y from (0,0), so a vertex's x IS its
+      // offset across the carriageway; the near corner of the innermost bar
+      // must sit outside the island the prism is raised from, which is the same
+      // clamped number `buildCrossingFurniture` reads.
+      if (r.widthM === 0) continue;
+      const v = crossingPaint(islandCrossingDistrict(r.widthM), analyzeNetwork(islandCrossingDistrict(r.widthM)));
+      const worst = Math.min(...v.map((p) => Math.abs(p[0])));
+      expect(worst, `island ${r.widthM} m: paint ${worst.toFixed(3)} m from centreline`).toBeGreaterThanOrEqual(
+        r.clampedHalfW - 1e-9,
       );
     }
   });
@@ -3928,6 +3995,155 @@ describe("zebraCrossings counts the paint, not the visit", () => {
     expect(files.length).toBeGreaterThanOrEqual(105);
     expect(zebras).toBeGreaterThanOrEqual(20);
     expect(islands).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // §d / §e — THE GRADER AGAINST THE PAINTER (O32)
+  // -------------------------------------------------------------------------
+  //
+  // Everything above this line grades the PAINTER against itself: §c even says
+  // so, re-deriving eligibility "deliberately not the painter's own answer".
+  // That is a re-derivation of the same predicate, and a re-derivation cannot
+  // catch the defect O32 is about, because the defect is that the GRADER asks a
+  // DIFFERENT question. `runtime/zones.CrossingZoneTracker` arms off
+  // `gradesCrossingDuty` → `paintsZebra`, which reads `kind`; the painter's bars
+  // answer to `kind` AND the refuge island AND the host-edge projection. Two
+  // predicates over different evidence, agreeing on the committed corpus by
+  // luck rather than by construction.
+  //
+  // So these two run the REAL tracker, and §e runs the real reducer behind it.
+  // MEASURED before the fix, on the §7 fixture with `island.widthM = 14`: 0
+  // marking vertices, 1 armed zone, and PEDESTRIAN_CROSSING_TOO_FAST — a
+  // 10-point опасна under чл. 119 at a пешеходна пътека the world never drew.
+
+  /**
+   * The runtime's `District` and the world parser's `District` are the same
+   * document under two type names: `runtime/district.ts` narrows `edge.class`
+   * to `RoadClass` where `world/types.ts` keeps it `string` (the parser has to
+   * accept whatever the JSON carries; `assertDistrict` is the seam guard that
+   * makes them agree at runtime). The runtime side is the NARROWER one, so this
+   * is a widening the compiler cannot see through, not a lie about shape —
+   * `runtime/__tests__/lane-paint-referent.test.ts` bridges it the same way.
+   */
+  const asRuntime = (d: District): RuntimeDistrict => d as unknown as RuntimeDistrict;
+
+  /** Every crossing id the GRADER arms, obtained by DRIVING the tracker rather
+   *  than by reading its privates: park the car on each crossing point, on that
+   *  crossing's own host edge, and collect the zones that report entry. */
+  function armedCrossingIds(district: District, index: DistrictIndex): Set<string> {
+    const tracker = new CrossingZoneTracker(asRuntime(district), index);
+    const out = new Set<string>();
+    for (const c of district.crossings) {
+      const host = c.edgeId ? index.edgeRtById(c.edgeId) : null;
+      const evs: SimTickEvent[] = [];
+      tracker.update(c.x, c.y, 0, host ? host.idx : -1, () => false, evs);
+      for (const e of evs) if (e.kind === "crossingZoneEntered") out.add(e.crossingId);
+    }
+    return out;
+  }
+
+  /** Every crossing id the PAINTER actually drew bars for — one build per
+   *  crossing, so a district's total cannot hide which one it came from. */
+  function paintedCrossingIds(district: District, net: RoadNetwork): Set<string> {
+    const out = new Set<string>();
+    for (const c of district.crossings) {
+      const one = { ...district, crossings: [c] };
+      if (buildMarkings(one, net, new Set(), new Set(), []).zebraCrossings > 0) out.add(c.id);
+    }
+    return out;
+  }
+
+  it("§d over the whole corpus, GRADED === PAINTED ∪ жилищна зона", { timeout: 180_000 }, () => {
+    const files = fs.readdirSync(WORLD_DIR!).filter((f) => f.endsWith(".json"));
+    let armed = 0;
+    let painted = 0;
+    let livingZone = 0;
+    for (const f of files) {
+      const district = load(f.replace(/\.json$/, ""));
+      if (district.crossings.length === 0) continue;
+      const net = analyzeNetwork(district);
+      const index = new DistrictIndex(asRuntime(district));
+      const edgeById = new Map(district.roads.edges.map((e) => [e.id, e]));
+      const paintedIds = paintedCrossingIds(district, net);
+      // The ONE lawful graded-without-paint case: чл. 61–62 gives pedestrians
+      // the whole carriageway in a жилищна зона, so the referent is the STREET.
+      // A zebra painted there would teach the opposite of the law.
+      const zoneIds = new Set(
+        district.crossings
+          .filter((c) => {
+            const host = c.edgeId ? edgeById.get(c.edgeId) : undefined;
+            return !paintsZebra(c) && host !== undefined && livingZoneCarriageway(host);
+          })
+          .map((c) => c.id),
+      );
+      const expected = [...new Set([...paintedIds, ...zoneIds])].sort();
+      const actual = [...armedCrossingIds(district, index)].sort();
+      // BOTH DIRECTIONS IN ONE EQUALITY, which is the point:
+      //  ⊆ — nothing is graded that the world did not draw (the FALSE FAILURE,
+      //      the founder's own roundabout complaint pointed at a zebra);
+      //  ⊇ — nothing the world DID draw escapes grading (the FALSE CERTIFICATE:
+      //      «Непропускане на пешеходец» is one of the two faults the reference
+      //      lesson exists to teach, and deleting it is the same crime).
+      expect(actual, f).toEqual(expected);
+      armed += actual.length;
+      painted += paintedIds.size;
+      livingZone += zoneIds.size;
+    }
+    // Measured 2026-08-19 across 105 districts / 128 authored crossings. Pinned
+    // so the corpus cannot shrink to one with no zebras, under which the
+    // equality above is satisfied by two empty sets.
+    expect(files.length).toBeGreaterThanOrEqual(105);
+    expect(painted).toBeGreaterThanOrEqual(100);
+    expect(livingZone).toBe(1);
+    expect(armed).toBe(painted + livingZone);
+  });
+
+  it("§e the island that once erased the crossing now paints, and the kerb stays off the paint", () => {
+    // The fixture drive, end to end through the three layers that disagreed.
+    // 14 m of kerb on a 16.25 m street: absurd as a road, one number in a map
+    // generator, and before O32 it produced a conviction with no пътека at all.
+    const district = islandCrossingDistrict(14);
+    const net = analyzeNetwork(district);
+    const index = new DistrictIndex(asRuntime(district));
+
+    // 1. THE PAINTER now draws the crossing (it drew 0 vertices before).
+    const bars = crossingPaint(district, net);
+    expect(bars.length).toBeGreaterThan(0);
+
+    // 2. THE GRADER arms it — unchanged, and it must stay that way: standing
+    //    the duty down here is the false-certificate direction.
+    expect([...armedCrossingIds(district, index)]).toEqual(["skew-c"]);
+
+    // 3. THE REDUCER still bills чл. 119 — and now the conviction is backed by
+    //    paint the student could see. Same drive as before the fix; the only
+    //    thing that changed is that the пешеходна пътека exists.
+    const host = index.edgeRtById("skew-e")!;
+    const tracker = new CrossingZoneTracker(asRuntime(district), index);
+    let state = createRuleEngine();
+    const codes: string[] = [];
+    for (let i = 0; i <= 12; i++) {
+      const y = 20 + i * 2.5;
+      const evs: SimTickEvent[] = [];
+      tracker.update(0, y, 0, host.idx, () => true, evs);
+      const r = reduceTick(state, tick(i * 0.5, { speedKmh: 50, position: { x: 0, y }, events: evs }));
+      state = r.state;
+      for (const e of r.events) codes.push(e.code);
+    }
+    expect(codes).toContain("PEDESTRIAN_CROSSING_TOO_FAST");
+
+    // 4. THE KERB IS OFF THE PAINT. `buildCrossingFurniture` raises its prism
+    //    from the SAME clamp, so the island shrank with the gap instead of
+    //    being drawn over the bars — the half that made "clamp the bars alone"
+    //    unsafe. Sidewalk-mesh x is district x (mesh.toWorld is [x, h, −y]).
+    const sidewalks = new MeshAccumulator();
+    buildCrossingFurniture(district, net, { sidewalks, markings: new MeshAccumulator() });
+    const kerbHalfW = Math.max(...[...sidewalks.positionsView].filter((_, i) => i % 3 === 0).map(Math.abs));
+    const clamped = crossingIslandHalfWidthM(7, net.edgeById.get("skew-e")!.halfWidth, 0);
+    expect(kerbHalfW).toBeCloseTo(clamped, 6);
+    const nearestBar = Math.min(...bars.map((p) => Math.abs(p[0])));
+    expect(nearestBar).toBeGreaterThanOrEqual(kerbHalfW - 1e-9);
+    // …and the clamp really shrank it: 7 m was asked for, well under 7 given.
+    expect(clamped).toBeLessThan(7);
   });
 });
 

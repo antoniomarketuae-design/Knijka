@@ -1857,7 +1857,50 @@ export const UNPANEL_CSS = `
             the information: a progress bar with no fill is not a progress bar,
             and the tier picker's lit pill is the answer to „which tier am I
             on" (the reference has a filled green „BEST" chip for the same
-            reason). ──────────────────────────────────────────────────────── */
+            reason).
+
+            ── AND SINCE 2026-08-19 IT IS ALSO THE ONLY THING HOLDING THE PEEK
+               CARD'S GROUND UP. This is a note about a dependency, not a change
+               of behaviour: the two ":not()" clauses below are exactly as they
+               shipped. What changed is what rests on them.
+
+            Three of this sweep's criticals were the SAME sentence, filed from
+            three lessons: „the ИНСТРУКЦИИ card has NO panel background at all
+            … the briefing text is painted straight onto the street"
+            (sc-junction-gap/mobile-right/01-arrival.png,
+            sc-speed-transition/mobile-right/07-end.png) and „the ИНСТРУКЦИИ
+            panel … fades out mid-sentence … ↓ ОЩЕ 16 РЕДА"
+            (sc-rx-unguarded/mobile-right/01-arrival.png). LOOKED AT, all three:
+            the dark rectangle behind the first three or four lines is not the
+            card's panel — it is the interior rear-view mirror the card happens
+            to sit over. Below the mirror's bottom edge the type continues onto
+            sky and facade with nothing behind it.
+
+            "SimOverlay.tsx" closed them by giving the card a shade: a child
+            <div> at z-index -1 carrying "data-hud-ink=""". THAT ATTRIBUTE IS
+            THE WHOLE FIX. The shade is a "div" inside a ".hud-ghost", so
+            without the two ":not()" clauses below it matches this sweep's
+            second selector and is handed "background-image: none !important" —
+            the shade paints nothing, and the three frames come back exactly as
+            filed. SimOverlay says so at its own site („the shade is stripped by
+            the stylesheet and this whole fix is a no-op").
+
+            THE CONTRACT HAD ONE GUARDED HALF AND ONE UNGUARDED ONE. Two suites
+            assert the COMPONENT still emits the attribute
+            ("unpanel.test.ts" on the ack chip, "sim-overlay-scrim.test.ts" on
+            the shade). NOTHING asserted this stylesheet still honours it, and
+            this is a CSS rule inside a template literal — the one thing in this
+            app that can rot into a no-op „without a single type error, a single
+            failing render or a single changed pixel in a test" (the note above
+            GHOST_SURFACES, written after the tier picker's fill survived a
+            whole unpanel pass). Deleting ":not([data-hud-ink])" from the line
+            below leaves tsc silent, leaves both of those suites green, and puts
+            the three criticals back on the phone.
+
+            "unpanelInkExemption.test.ts" now holds this half, and holds it by
+            APPLYING the selector rather than matching its text, so a rewrite
+            that keeps the characters and loses the meaning still fails.
+            ──────────────────────────────────────────────────────────────── */
       [data-sim-stage] ${GHOST},
       [data-sim-stage] ${GHOST} :is(div, span, button, kbd, p, li, a, section):not([data-hud-ink]):not([data-hud-ink] *):not([aria-pressed="true"]) {
         background-color: transparent !important;

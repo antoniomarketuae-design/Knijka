@@ -543,6 +543,23 @@ function paintParkingBay(acc: MeshAccumulator, bay: ParkingBaySpec): number {
  *  cannot hang the build (see paintZebra). */
 const ZEBRA_MAX_SKEW_DEG = 60;
 
+/**
+ * Margin the island clamp keeps below the outermost bar's own offset, so the
+ * „does a bar survive" test is decided by geometry rather than by the last bit
+ * of a double: the loop skips a bar when `|off| < islandHalfW + stripe/2`, and
+ * the round trip `(maxOff − stripe/2) + stripe/2` is not algebraically
+ * guaranteed to land back on or below `maxOff`.
+ *
+ * NOT LOAD-BEARING, and said out loud rather than implied by its existence:
+ * setting this to 0 leaves all 67 assertions in markings-paint-truth.test.ts
+ * green, and a 37,760-case sweep (halfWidth 1…60 m × 8 skews) found the round
+ * trip never exceeding `maxOff` at all. It is kept because it is free and the
+ * hazard is real in principle — not because a failing case exists. 1 nm is
+ * invisible in a world measured in metres and seven orders of magnitude above
+ * the ~1e-16 m rounding the offsets actually carry.
+ */
+const ISLAND_PAINT_EPS_M = 1e-9;
+
 /** Rotate a unit direction by `deg` (positive = toward the road's right). */
 function rotate(d: Vec2, deg: number): Vec2 {
   if (deg === 0) return d;
@@ -553,11 +570,94 @@ function rotate(d: Vec2, deg: number): Vec2 {
 }
 
 /**
+ * The lattice of bar offsets `paintZebra` walks, extracted so the ISLAND CLAMP
+ * below and the loop it protects cannot drift apart. `maxOff` is the outermost
+ * bar's distance from the centreline — the number that decides whether a refuge
+ * island leaves any paint at all.
+ */
+function zebraBarLattice(
+  halfWidth: number,
+  skewDeg: number,
+): { skew: number; step: number; count: number; start: number; maxOff: number } {
+  const skew = Math.max(-ZEBRA_MAX_SKEW_DEG, Math.min(ZEBRA_MAX_SKEW_DEG, skewDeg));
+  const step = ZEBRA_STRIPE_ACROSS_M + ZEBRA_GAP_M;
+  const span = (halfWidth * 2 - 0.5) / Math.cos((skew * Math.PI) / 180);
+  const count = Math.max(2, Math.floor(span / step));
+  const start = -((count - 1) * step) / 2;
+  // `maxOff` is taken from the LOOP'S OWN arithmetic at both ends rather than
+  // from the algebraic `((count−1)·step)/2`, because the loop evaluates
+  // `start + i·step` and `-(X/2) + X` is not guaranteed bit-identical to `X/2`.
+  // HONESTLY MEASURED, so nobody reads this as a bug that was observed: across
+  // 37,760 (halfWidth 1…60 m × 8 skews incl. ±90) the two forms agreed
+  // EXACTLY, every time. The min-form is kept because it is free and is the
+  // only one provably ≤ both endpoints — not because a case was found.
+  return {
+    skew,
+    step,
+    count,
+    start,
+    maxOff: Math.min(Math.abs(start), Math.abs(start + (count - 1) * step)),
+  };
+}
+
+/**
+ * The refuge-island half-width the world may actually BUILD at this crossing —
+ * THE ONE NUMBER the bars and the kerb both read (O32).
+ *
+ * WHAT WAS WRONG. `runtime/zones.ts` grades a crossing off `gradesCrossingDuty`
+ * → `paintsZebra`, which reads the crossing's `kind` and KNOWS NOTHING ABOUT
+ * BARS. The painter's bar loop, meanwhile, refuses every bar that would land on
+ * the island — so a wide enough kerb deletes the whole пешеходна пътека while
+ * the grader goes on believing there is one. MEASURED end to end 2026-08-19 on
+ * the §7 fixture (16.25 m residential street, `kind: "marked"`): at
+ * `island.widthM = 14` the crossing adds 0 marking vertices, `zebraCrossings`
+ * is 0 — AND `CrossingZoneTracker` still builds its zone, and `reduceTick`
+ * still bills the 10-point опасна PEDESTRIAN_CROSSING_TOO_FAST. A seventeen-
+ * year-old convicted under чл. 119 at paint the world never drew is the
+ * founder's own roundabout complaint pointed at a zebra: a FALSE FAILURE.
+ *
+ * WHY CLAMP RATHER THAN REFUSE. Refusing (dropping the duty where no bar lands)
+ * is the false-certificate direction of the same crime — «Непропускане на
+ * пешеходец» is one of the two faults the reference lesson exists to teach, and
+ * a guard that answers „no zebra here" hands out a green tick for a skill the
+ * lesson never measured. Clamping is also the doctrine this file already
+ * settled for `skewDeg` one screen up: nothing validates authored furniture
+ * (`assertDistrict` is the cheap seam guard, not a schema validator), so the
+ * painter owns the domain and must keep painting inside it.
+ *
+ * THE BOUND. A bar at offset `off` survives iff `|off| >= islandHalfW +
+ * ZEBRA_STRIPE_ACROSS_M/2`, so the outermost pair survives exactly up to
+ * `maxOff − ZEBRA_STRIPE_ACROSS_M/2`. Derived from the lattice rather than from
+ * the carriageway, because the floored bar count quantises the outermost bar
+ * well inside the kerb: on the 16.25 m two-lane street the 11 bars reach
+ * ±7.0 m, so the bound is 6.6 m — not the 7.5 m a „halfWidth − stripe" guess
+ * gives, which would still paint nothing. `count` is floored at 2, so `maxOff`
+ * is never below `step/2 = 0.7` and the bound is never below 0.3 m.
+ *
+ * CHANGES NO MAP THAT EXISTS. All three authored islands in content/world
+ * (pe-bus 2.0 m, pe-cane 2.2 m, pe-slow 2.4 m — halves 1.0/1.1/1.2) sit far
+ * under 6.6 m, so every committed marking buffer is byte-identical.
+ */
+export function crossingIslandHalfWidthM(
+  requestedHalfWidthM: number,
+  carriagewayHalfWidthM: number,
+  skewDeg: number,
+): number {
+  if (!(requestedHalfWidthM > 0)) return 0;
+  const { maxOff } = zebraBarLattice(carriagewayHalfWidthM, skewDeg);
+  // The epsilon is belt over braces and is measured not to bite — see its own
+  // docstring rather than reading its presence as evidence of a failing case.
+  const bound = maxOff - ZEBRA_STRIPE_ACROSS_M / 2 - ISLAND_PAINT_EPS_M;
+  return Math.min(requestedHalfWidthM, Math.max(0, bound));
+}
+
+/**
  * Zebra crossing: longitudinal bars across the full road width.
  *
  * doc 87 B50/B53/B54 — the bars now answer to the crossing's FURNITURE:
  *  - `islandHalfW` opens the gap a central refuge stands in (bars that would
- *    be painted ON the island are refused, not drawn under a kerb);
+ *    be painted ON the island are refused, not drawn under a kerb) — CLAMPED
+ *    by `crossingIslandHalfWidthM` so the gap can never eat the last bar;
  *  - `skewDeg` rotates the whole crossing off perpendicular (an ANGLED
  *    crossing), layout axis and bar axis together, with the span widened by
  *    1/cos so the paint still reaches both kerbs;
@@ -582,15 +682,21 @@ function paintZebra(
   // would grade a пешеходна пътека the world never drew — this file's whole
   // complaint family, pointed the other way. MAX keeps the widening at 2×,
   // past which a „bar" is longer than two carriageways and is not a crossing.
-  const skew = Math.max(-ZEBRA_MAX_SKEW_DEG, Math.min(ZEBRA_MAX_SKEW_DEG, furniture.skewDeg ?? 0));
-  const islandHalfW = furniture.islandHalfW ?? 0;
+  const { skew, step, count, start } = zebraBarLattice(halfWidth, furniture.skewDeg ?? 0);
+  // THE CLAMP, not the raw authored half-width (O32). Unclamped, a kerb wide
+  // enough to swallow the outermost bar deletes the whole пешеходна пътека
+  // while `runtime/zones` — which grades off `paintsZebra`, i.e. off `kind` —
+  // goes on convicting чл. 119 at it. `buildCrossingFurniture` raises its prism
+  // from the SAME call, so the kerb shrinks with the gap and no bar is ever
+  // painted under it. See `crossingIslandHalfWidthM` for the measurement.
+  const islandHalfW = crossingIslandHalfWidthM(
+    furniture.islandHalfW ?? 0,
+    halfWidth,
+    furniture.skewDeg ?? 0,
+  );
   const stagger = furniture.staggerM ?? 0;
   const barDir = rotate(roadDir, skew);
   const r = perpRight(barDir);
-  const step = ZEBRA_STRIPE_ACROSS_M + ZEBRA_GAP_M;
-  const span = (halfWidth * 2 - 0.5) / Math.cos((skew * Math.PI) / 180);
-  const count = Math.max(2, Math.floor(span / step));
-  const start = -((count - 1) * step) / 2;
   let painted = 0;
   for (let i = 0; i < count; i++) {
     const off = start + i * step;
@@ -1011,41 +1117,40 @@ export function buildMarkings(
     // „the lesson names a marking the world does not have" — is exactly what
     // this number would have had to stay silent about.
     //
-    // paintZebra returns 0 on one reachable input, and it is authorable today:
-    // the refuge island swallows every bar. `count` is floored at 2 and only the
-    // island `continue` can skip one, so painted === 0 ⇔ islandHalfW +
-    // ZEBRA_STRIPE_ACROSS_M/2 clears the OUTERMOST bar offset, which the floored
-    // bar count quantises well below the kerb line: on the 16.25 m two-lane
-    // street the 11 bars reach ±7.0 m, so the paint is gone from widthM > 13.2
-    // — MEASURED at 13.5 m, the first swallowed row of §a's 0.5 m sweep, not
-    // derived from the 15.0 m the naive „2·halfWidth − 1.3" gives. Nothing
-    // validates `island.widthM` — assertDistrict is the cheap seam guard, not a
-    // schema validator — so a map generator can write it, and the kerb prism
-    // `buildCrossingFurniture` raises from the SAME raw widthM is not clamped
-    // either. That is the case: a kerb across the whole carriageway and no
-    // пешеходна пътека on it, reported as one painted zebra.
+    // THE ISLAND ZERO IS NOW UNREACHABLE (O32, 2026-08-19), and this line is
+    // what proves it rather than what works around it. `count` is floored at 2
+    // and only the island `continue` can skip a bar, so `bars === 0` required an
+    // `islandHalfW` past the OUTERMOST bar offset — reachable in one authored
+    // number, because `assertDistrict` is the cheap seam guard, not a schema
+    // validator. `crossingIslandHalfWidthM` now clamps that half-width below the
+    // outermost bar, and `buildCrossingFurniture` raises its prism from the SAME
+    // call, so the kerb shrinks with the gap instead of covering paint.
     //
-    // NOT fixed by clamping the island instead, which was the tempting half:
-    // the furniture prism reads the raw width, so bars forced back onto the road
-    // would be painted UNDER the kerb — the exact thing the islandHalfW skip
-    // exists to prevent (see paintZebra's header).
+    // WHAT IT COST BEFORE, measured end to end on the §7 fixture (16.25 m
+    // residential street, `kind: "marked"`, `island.widthM = 14`): the crossing
+    // added 0 marking vertices — and `CrossingZoneTracker` still built its zone,
+    // and `reduceTick` still billed the 10-point опасна
+    // PEDESTRIAN_CROSSING_TOO_FAST. чл. 119 at a пешеходна пътека the world
+    // never drew: the founder's own roundabout complaint pointed at a zebra.
+    // `runtime/zones` grades off `gradesCrossingDuty` → `paintsZebra`, which
+    // reads `kind` and knows nothing about bars, so the painter is the only
+    // side that could close it without loosening a duty — and loosening it
+    // would delete «Непропускане на пешеходец», the false-certificate direction
+    // of the same crime.
     //
-    // NOT ROUTED HERE, and worth saying out loud rather than leaving implied:
-    // when paint is 0 the GRADER still convicts, because `gradesCrossingDuty`
-    // (constants.ts) answers off `paintsZebra`, which reads the crossing's
-    // `kind` and knows nothing about bars. A student billed чл. 119 at a
-    // пешеходна пътека the world never drew is a FALSE FAILURE — the founder's
-    // own roundabout complaint, pointed at a zebra. That fix belongs in
-    // constants.ts / runtime/zones.ts, not in the painter; this counter is what
-    // makes the condition visible at all.
+    // The guard stays, and stays load-bearing in the other direction: it is what
+    // keeps `zebraCrossings` — the number ~70 district batteries read as „this
+    // world has N зебри" — a count of PAINT rather than of visits, so it can
+    // still fall if any future furniture field learns to swallow a bar.
+    // markings-paint-truth.test.ts §7a sweeps every island width and fails both
+    // if this becomes `zebraCrossings++` and if the clamp is removed; §7d drives
+    // the grader against the painter and fails if they ever disagree again.
     //
     // MEASURED on the committed corpus: three crossings in 105 districts author
     // an island at all — pe-bus 2.0 m, pe-cane 2.2 m, pe-slow 2.4 m, every one
     // on a ~16.25 m street (rx-tram-island-v1's „island" is a tram platform, not
-    // a crossing refuge) — so all three still paint and no district battery's
-    // expected number moves. The guard is not defensive decoration:
-    // markings-paint-truth.test.ts §7 builds the width that makes it fire, and
-    // §7a fails if this line becomes `zebraCrossings++` again.
+    // a crossing refuge) — all three sit far under the 6.6 m bound, so no
+    // marking or sidewalk buffer moves a byte and no battery's number changes.
     if (bars > 0) zebraCrossings++;
   }
 
@@ -1288,10 +1393,17 @@ export function buildCrossingFurniture(
     const proj = projectOntoPolyline(eb.edge.geometry as Vec2[], [crossing.x, crossing.y]);
     if (proj.distance > 25) continue; // same data-glitch guard as the zebra
     if (island && island.widthM > 0) {
+      // THE SAME CLAMP THE BARS READ (O32) — one call, two consumers, so the
+      // kerb can never be wider than the gap the zebra left for it. Reading the
+      // raw `island.widthM` here was the half of the defect that made clamping
+      // the bars alone unsafe: paint forced back onto the road would be drawn
+      // UNDER the prism, which is the very thing paintZebra's island skip
+      // exists to prevent. All three shipped islands are far inside the bound,
+      // so every committed sidewalk and marking buffer is byte-identical.
       const ring = islandRing(
         proj.point,
         proj.tangent,
-        island.widthM / 2,
+        crossingIslandHalfWidthM(island.widthM / 2, eb.halfWidth, crossing.skewDeg ?? 0),
         Math.max(1, island.approachM),
         Math.max(1, island.departM),
       );

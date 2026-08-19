@@ -453,12 +453,42 @@ export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
+    // THE BRIEFING THAT WAS TRUE ON THREE RUNGS OUT OF FIVE (sweep161,
+    // sc-sp-wet-limit-plate/pc-right/01-arrival.png and every frame of both
+    // drives on both platforms: dry grey road, clear sky, wipers off).
+    //
+    // The template ALTERNATES its ladder on purpose — L1–L2 dry, L3–L5 rain +
+    // wetGrip (see `levels` below) — and the contrast IS the lesson. But
+    // `LevelSpec` (types.ts) has no instruction override: `toleranceScale`,
+    // `aids`, `traffic`, `conditions`, `physics`, `vehicleStart`, `examMode`,
+    // `stagedAdd`, `rubric`, `ruleConfig`, `complication` — and nothing else.
+    // So `instructionsBg` is ONE text shipped to all five rungs, and it flatly
+    // asserted „Днес обаче вали и настилката е мокра" to a Ниво-1 student
+    // looking at a dry street, then ordered him to 38 км/ч on it.
+    //
+    // BOTH DIRECTIONS WERE WRONG. A student who obeys the text on L1 drives 38
+    // where 50 is lawful and correct — a lesson teaching him to misread a
+    // sleeping plate. A student who reads the ROAD on L1 and holds 50 is
+    // contradicting his own briefing while doing exactly the right thing.
+    //
+    // THE FIX IS TO STOP TELLING HIM THE WEATHER AND MAKE HIM READ IT — which
+    // is the skill the plate exists to teach and which the old text did his
+    // homework on. Every line below is true on a dry rung AND on a wet one, so
+    // the ladder's contrast is finally carried by the copy instead of being
+    // contradicted by it. Nothing is weakened: the wet ceiling is graded by
+    // SPEED_TOO_FAST_FOR_CONDITIONS exactly as before, and on the dry rungs
+    // SPEEDING_OVER_LIMIT still holds the base 50.
+    //
+    // A rung-aware `instructionsBg` would be the stronger fix and is ROUTED,
+    // not taken here: it is a `LevelSpec` key + a compileScenario merge, i.e.
+    // types.ts and compile.ts, which this lane does not own.
+    // Gate: __tests__/lane-world-claims.test.ts §4.
     { n: 1, textBg: "Потегли по улицата. Основното ограничение е 50 км/ч, а под знака виси допълнителна табела „при мокра настилка — 40“. Щом настилката е мокра, включи и късите светлини (чл. 70) — същият дъжд, който сваля тавана до 40, сваля и видимостта, а дневните светлини оставят задните ти габарити тъмни." },
     { n: 2, textBg: "На сухо табелата спи: важи основното ограничение и 50 км/ч е напълно законно." },
-    { n: 3, textBg: "Днес обаче вали и настилката е мокра — затова табелата вече важи: твоят таван става 40 км/ч." },
-    { n: 4, textBg: "Влез в зоната на табелата вече около 38 км/ч и задръж под 40 по цялата отсечка — без да чакаш някой да ти го каже." },
+    { n: 3, textBg: "Затова първо погледни настилката, не текста: мокра ли е, табелата важи и таванът ти става 40 км/ч; суха ли е, тя мълчи." },
+    { n: 4, textBg: "Мокро ли е, влез в зоната на табелата вече около 38 км/ч и задръж под 40 по цялата отсечка — без да чакаш някой да ти го каже." },
     { n: 5, textBg: "На мокър път спирачният път е около 1,4 пъти по-дълъг; съобразената скорост връща разстоянието и времето за реакция." },
-    { n: 6, textBg: "Задръж мокрия таван до края на отсечката." },
+    { n: 6, textBg: "Задръж тавана, който настилката ти е дала, до края на отсечката." },
   ],
   success: [
     {

@@ -108,10 +108,55 @@ const RAIL_FURNITURE: ReadonlySet<SignKind> = new Set<SignKind>([
  * the corpus: district-v1 ×2, d2-v1, mw-exit-v1's ramp) has none: the plate
  * clamps to metre 1, which is inside the junction mouth beside a DIFFERENT
  * road with a different limit — the exact T4 failure mode, re-created by a
- * warning sign. Those curves stay А1-only until a cross-edge warning pass
- * exists (the А1 itself clamps, which is weak but never states a wrong number).
+ * warning sign. Those curves stay А1-only: a NUMBER stated on the wrong road is
+ * a lie the upstream pass below cannot make safe, while a bare А1 is not.
+ *
+ * (This block used to end „the А1 itself clamps, which is weak but never states
+ * a wrong number". Measured over all nine hazard-warning zones in the corpus,
+ * that was false. A warning sign's whole content IS its position, and on the
+ * two zones with fromM = 0 the clamp put the А1 1.0 m PAST the arc it warns
+ * about — district-v1's e892658655.0 and mw-exit-v1's ramp. The world-referent
+ * gate reads exactly that number back: „curve post stands -1.0 m before the
+ * arc". Six of the nine get the full 60 m on their own edge and never entered
+ * this branch; d2-v1's got 6.0 m. See UPSTREAM_* below for what now happens to
+ * the three short ones.)
  */
 const CURVE_PLATE_MIN_ROOM_M = HAZARD_WARNING_AHEAD_M + 3;
+
+/**
+ * THE UPSTREAM WARNING PASS — the „cross-edge warning pass" the block above
+ * said did not exist yet.
+ *
+ * A hazard whose span starts at metre 0 of its own edge has no road of its own
+ * to be warned on, and `placeAt`'s clamp then manufactures a warning INSIDE the
+ * hazard. But the driver is not teleported to that edge: they arrive down a
+ * carriageway that ends where this one begins, and that carriageway is where a
+ * Bulgarian А1/А15 actually stands. mw-exit-v1 is the plain case — the exit
+ * ramp's arc starts at the gore, so the 60 m of advance the sign needs is on
+ * the DECELERATION LANE, which is exactly where a real motorway exit posts it.
+ *
+ * What makes a candidate a predecessor is measured, not assumed, and all three
+ * conditions must hold — a warning posted on a road the driver may not be about
+ * to take is a new lie, not a fix:
+ *
+ *  1. it FLOWS INTO the hazard edge's head: the candidate's geometry-forward
+ *     END lands there (the zone maps are authored driving from -> to);
+ *  2. the join is inside the candidate's OWN drawn cross-section, i.e. the
+ *     hazard edge begins on the asphalt the driver is already on. mw-exit's
+ *     ramp head (8.13, 800) sits 8.13 m from the decel lane's end (0, 800),
+ *     inside that edge's 16.19 m half width — a gore, not a separate road.
+ *     A shared node (distance 0) is the ordinary case;
+ *  3. the road visibly CONTINUES: the heading break across the join is within
+ *     UPSTREAM_HEADING_BREAK_DEG. Measured: mw-exit 0.0°, d2-v1 3.5° — both
+ *     continuations; district-v1's e892658655.0 47.4° and its other curve's
+ *     fork 86.3°/90.9° — those are turns, and they keep the clamp;
+ *  4. exactly ONE candidate qualifies. Two would mean the sign cannot say
+ *     which approach it governs.
+ *
+ * A zone that already has its own room never reaches here, so every one of the
+ * six 60 m placements in the corpus is byte-identical.
+ */
+const UPSTREAM_HEADING_BREAK_DEG = 20;
 
 /** Marking-only / physics-only kinds place no post. */
 const ZONE_SIGN_KIND: Partial<Record<DistrictZoneKind, SignKind>> = {
@@ -134,6 +179,64 @@ const HAZARD_WARNING_AHEAD_OF: Partial<Record<DistrictZoneKind, number>> = {
   icePatch: HAZARD_WARNING_AHEAD_M,
   curveAdvisory: HAZARD_WARNING_AHEAD_M,
 };
+
+/** The edge a post actually stands on, with its measured length cached. */
+interface PostHost {
+  edgeId: string;
+  g: Vec2[];
+  total: number;
+}
+
+/** Signed heading difference in degrees, wrapped to (-180, 180]. */
+function headingBreakDeg(a: Vec2, b: Vec2): number {
+  let d = ((Math.atan2(b[1], b[0]) - Math.atan2(a[1], a[0])) * 180) / Math.PI;
+  while (d > 180) d -= 360;
+  while (d <= -180) d += 360;
+  return d;
+}
+
+/**
+ * The edge and arclength a hazard warning should stand at, given how far ahead
+ * of the span it belongs (see UPSTREAM_HEADING_BREAK_DEG for the four
+ * conditions and the measurements behind them).
+ *
+ * Returns the zone's own edge whenever that edge can hold the whole advance —
+ * the ordinary case, and the only one before this pass existed.
+ */
+function warningStation(
+  own: PostHost,
+  fromM: number,
+  aheadM: number,
+  network: RoadNetwork,
+): { host: PostHost; s: number } {
+  const onOwn = fromM - aheadM;
+  if (aheadM <= 0 || onOwn >= 1) return { host: own, s: onOwn };
+
+  // How much advance the own edge cannot give. `placeAt` clamps to metre 1, so
+  // metre 1 — not metre 0 — is the earliest station it can reach.
+  const deficit = aheadM - (fromM - 1);
+  const head = own.g[0]!;
+  const headTangent: Vec2 = [own.g[1]![0] - head[0], own.g[1]![1] - head[1]];
+
+  let found: { host: PostHost; s: number } | null = null;
+  for (const eb of network.edges) {
+    if (eb.edge.id === own.edgeId) continue;
+    const cg = eb.edge.geometry as Vec2[];
+    if (cg.length < 2) continue;
+    const end = cg[cg.length - 1]!;
+    // (1) + (2): it flows into the head, and the join is inside its own asphalt.
+    if (Math.hypot(end[0] - head[0], end[1] - head[1]) > eb.halfWidth) continue;
+    const endTangent: Vec2 = [end[0] - cg[cg.length - 2]![0], end[1] - cg[cg.length - 2]![1]];
+    // (3): the road continues rather than turning.
+    if (Math.abs(headingBreakDeg(endTangent, headTangent)) > UPSTREAM_HEADING_BREAK_DEG) continue;
+    // (4): ambiguity is a refusal, not a coin toss.
+    if (found) return { host: own, s: onOwn };
+    const total = polylineLength(cg);
+    if (total <= 2) continue;
+    found = { host: { edgeId: eb.edge.id, g: cg, total }, s: total - deficit };
+  }
+  return found ?? { host: own, s: onOwn };
+}
 
 /**
  * One post per matching zone span (rail spans place two or three). Output
@@ -189,14 +292,17 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
     const total = polylineLength(g);
     if (total <= 2) continue;
 
+    const ownHost: PostHost = { edgeId: zone.edgeId, g, total };
+
     const placeAt = (
       s: number,
       kind: SignKind,
       lateralExtraM = 0,
       extra: { speedKmh?: number } = {},
+      host: PostHost = ownHost,
     ) => {
-      let clamped = Math.min(Math.max(s, 1), total - 1);
-      let p = groundPoint(zone.edgeId, clamped, lateralExtraM)!;
+      let clamped = Math.min(Math.max(s, 1), host.total - 1);
+      let p = groundPoint(host.edgeId, clamped, lateralExtraM)!;
       if (!RAIL_FURNITURE.has(kind)) {
         // Step a free post back along the road until it is its own object.
         let guard = 0;
@@ -205,12 +311,12 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
           guard < 8
         ) {
           clamped = Math.max(1, clamped - ZONE_POST_NUDGE_STEP_M);
-          p = groundPoint(zone.edgeId, clamped, lateralExtraM)!;
+          p = groundPoint(host.edgeId, clamped, lateralExtraM)!;
           guard++;
         }
         occupied.push(p);
       }
-      const { tangent } = pointAlong(g, clamped);
+      const { tangent } = pointAlong(host.g, clamped);
       out.push({
         kind,
         position: toWorld(p[0], p[1], ROAD_Y),
@@ -234,9 +340,26 @@ export function buildZoneSigns(district: District, network: RoadNetwork): SignPl
     if (kind) {
       // A PROHIBITION starts where it starts (В24/В27 mark the first metre of
       // the ban); a WARNING has to arrive in advance of the hazard or it
-      // teaches nothing (doc 86 T14).
+      // teaches nothing (doc 86 T14) — and when its own edge cannot give that
+      // advance, the advance is on the road the driver arrives down, not on a
+      // metre inside the hazard (warningStation).
       const ahead = HAZARD_WARNING_AHEAD_OF[zone.kind] ?? 0;
-      placeAt(zone.fromM - ahead, kind);
+      const station = warningStation(ownHost, zone.fromM, ahead, network);
+      // …and when even that cannot put the sign BEFORE the hazard's first metre,
+      // post nothing. `placeAt` clamps to metre 1, so a span starting at metre 0
+      // or 1 of its own edge gets a warning standing AT or PAST the thing it
+      // warns about — a sign whose only content is „ahead" pointing at „here".
+      // The corpus case left after the upstream pass is district-v1's
+      // e892658655.0 (fromM 0, and the road turns 47.4° into it, so there is no
+      // approach to borrow): it used to place an А1 1.0 m INSIDE the arc.
+      // Refusing is the same answer roundabout.ts gives a ring whose middle is
+      // not empty — a pretty lie is not an improvement on a missing sign.
+      // A station on a PREDECESSOR edge is upstream by construction; only a
+      // station clamped onto the zone's own edge can land inside the span, and
+      // only when the span itself starts at metre 0 or 1.
+      const clampedOntoTheHazard =
+        ahead > 0 && station.host.edgeId === zone.edgeId && zone.fromM <= 1;
+      if (!clampedOntoTheHazard) placeAt(station.s, kind, 0, {}, station.host);
       // В24: restate the ban deep in the span so it stays in the fault
       // sightline (doc 66 R2). One repeat, kept clear of the span end.
       if (zone.kind === "noOvertaking") {

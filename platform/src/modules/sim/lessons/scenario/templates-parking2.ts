@@ -1140,13 +1140,13 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     "обратен завой",
     "забрана",
     "плътна осева",
-    "знак В23",
+    "плътна осева М1",
     "широк булевард",
     "изпитни упражнения",
   ],
   titleBg: "Къде обратният завой е забранен",
   objectiveBg:
-    "Разчети мястото: плътна осева и знак значат НЕ — продължи до разрешения участък и обърни там с пълен оглед.",
+    "Разчети мястото: плътната осева значи НЕ — продължи до разрешения участък, където тя се прекъсва, и обърни там с пълен оглед.",
   archetypeIds: ["OV-17", "PK-12"],
   conceptIds: [
     "c-u-turn",
@@ -1166,15 +1166,33 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
+    // THE В23 THAT IS DECLARED AND NEVER BUILT (sweep161 sc-mv-uturn-ban).
+    // MEASURED: mv-uturn-v1's `meta.scenario.uturnBanSign` really does author
+    // { signRef: "В23", atY: 40, spanY: 40→220, graded: false } — and
+    // `grep -rn uturnBanSign src/` returns NOTHING outside tests. The only
+    // builder that posts signs from map data is world/builders/zoneSigns.ts and
+    // it reads `district.zones`; this district's single zone is
+    // { kind: "solidCenterLine", signRef: "М1" }, which `ZONE_SIGN_KIND` does
+    // not list because it is marking-only. So no post ever stands at y = 40.
+    //
+    // WHAT IS REAL IS THE LINE. markings.ts draws the М1 solid centre line over
+    // 40→220 m, the student can see it, and the `graded: false` on the sign
+    // says out loud that the ban is enforced off the MARKING, not off a post.
+    // The lesson is unchanged in substance — „плътна осева значи НЕ" is the
+    // whole чл. 63 skill — it simply stops asking him to read furniture that
+    // is not there.
+    //
+    // Routed: zoneSigns.ts should post `meta.scenario.uturnBanSign` (world
+    // lane). On the day it does, this copy earns the sign back.
     {
       n: 1,
       textBg:
-        "Тръгни по булеварда в дясната лента. Още от 40-ия метър осевата линия е ПЛЪТНА и е поставен знак В23 „Забранено е завиването в обратна посока“.",
+        "Тръгни по булеварда в дясната лента. Още от 40-ия метър осевата линия е ПЛЪТНА — а плътната осева сама по себе си забранява обратния завой.",
     },
     {
       n: 2,
       textBg:
-        "На 130-ия метър платното е широко и празно — изглежда идеално за обръщане. Не е: плътната осева не се пресича, а знакът е още в сила. Подмини го.",
+        "На 130-ия метър платното е широко и празно — изглежда идеално за обръщане. Не е: плътната осева не се пресича, а тя е още под теб. Подмини я.",
     },
     {
       n: 3,
@@ -1237,7 +1255,7 @@ export const SC_MV_UTURN_BAN: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-mv-uturn-ban/mistake-cross-solid.trace.json" },
       titleBg: "Обръщане през плътната линия",
       whatWentWrongBg:
-        "Мястото беше широко и празно — и точно затова изглеждаше разрешено. Не беше: осевата линия е непрекъсната (М1) и знакът В23 е в сила, а непрекъснатата осева не се пресича по никаква причина, включително за обръщане. Широчината на платното не отменя маркировката — тя само те кара да мислиш, че ще успееш.",
+        "Мястото беше широко и празно — и точно затова изглеждаше разрешено. Не беше: осевата линия е непрекъсната (М1), а непрекъснатата осева не се пресича по никаква причина, включително за обръщане. Широчината на платното не отменя маркировката — тя само те кара да мислиш, че ще успееш.",
       codeRefs: ["CROSSED_SOLID_LINE"],
     },
     {

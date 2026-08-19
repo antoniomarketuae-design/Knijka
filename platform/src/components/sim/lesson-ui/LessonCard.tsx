@@ -6,7 +6,8 @@
  * quick-start accent treatment ("Свободно каране").
  */
 
-import { pointsBg } from "@/modules/sim/rules";
+import { PRE_DRIVE_STEP_ORDER } from "@/modules/sim/procedures";
+import { PASS_MAX_TOTAL_POINTS, pointsBg } from "@/modules/sim/rules";
 import type { LessonEntryView } from "./types";
 
 export function LessonCard({
@@ -70,8 +71,19 @@ export function LessonCard({
           </div>
         ) : null}
         {lesson.preDrive ? (
-          <div>
-            <dd className="font-semibold">+ подготовка (13 стъпки)</dd>
+          /* A <dd> needs a <dt>: a definition list with a value and no term is
+             read out by a screen reader as a bare number with nothing naming
+             it, and this is the only row on the card that had one. The count
+             itself is DERIVED — `PRE_DRIVE_STEP_ORDER` is the same array the
+             in-drive checklist counts against (`hud/PreDriveChecklist.tsx`
+             renders `{done}/{ORDER.length}`), so this card and that checklist
+             cannot print two different numbers for one procedure. It was the
+             literal „13". */
+          <div className="flex items-baseline gap-1">
+            <dt className="font-semibold">+ подготовка:</dt>
+            <dd className="font-black tabular-nums text-foreground">
+              {PRE_DRIVE_STEP_ORDER.length} стъпки
+            </dd>
           </div>
         ) : null}
         {attempts > 0 ? (
@@ -80,6 +92,18 @@ export function LessonCard({
             <dd className="font-black tabular-nums text-foreground">
               {/* „т. наказание" said the direction and still not the scale. */}
               {bestScore === null ? "—" : pointsBg("exam", bestScore)}
+              {/* …AND STILL NOT THE CEILING. `bestScore` is PENALTY points, so
+                  „Най-добър: 12 изпитни т." is a card calling a FAILED drive the
+                  student's best one, with nothing on screen from which to work
+                  out that 9 is the cap. The house rule for a surface with no
+                  room for the т. 11 quote is `scales.ts`' own: „surfaces without
+                  room say „допустими 9" next to the total, where the scale is
+                  already named." This is that surface; it was the one that had
+                  neither. Derived from the scorer's own constant, so the ceiling
+                  quoted here and the ceiling `isPassing` applies are one value. */}
+              <span className="ml-1 font-semibold text-muted">
+                (допустими {PASS_MAX_TOTAL_POINTS})
+              </span>
             </dd>
           </div>
         ) : null}
