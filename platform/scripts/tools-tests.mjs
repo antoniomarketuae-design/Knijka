@@ -89,19 +89,68 @@
 //     would clear and which text cannot reach.
 // Neither subsumes the other. THAT is what makes two acts two.
 //
+// AND THAT WAS STILL ONLY ONE KEY. Both of the checks above are about
+// `include`. `test: { … }` is an object with eighty-odd other keys available to
+// it, and vitest decides what it collects from several of them. MEASURED
+// 2026-08-19 by mutation, `include: [...VITEST_INCLUDE]` left untouched and one
+// key added beside it:
+//   · `exclude: [… , "../tools/mobile/settle.test.mjs"]` — `npx vitest list
+//     --filesOnly` fell from 892 files to 891, and asking vitest for
+//     settle.test.mjs by name printed NOTHING and exited 0.
+//   · `dir: "src"` — `npx vitest list --filesOnly` returned 0 files.
+// Under both, the pre-fix `auditConfigWiring()` returned `[]` — its import
+// check and its one spread count both pass, because neither key touches
+// either — so this gate printed "partition OK … none orphaned" and exited 0.
+// The same defect, one key over in the same literal, failing in the same
+// reassuring direction.
+//
+// THE TWO KEYS DIVERGE AT THE VITEST GATE, and the difference is worth knowing
+// before trusting either half alone. Under `exclude` the vitest gate ran and
+// its deep-equality on `test.include` PASSED, because `include` had not
+// changed — a clean green over a file it no longer collected. Under `dir` the
+// vitest gate could not run at all: it printed "No test files found, exiting
+// with code 1", having deselected its own gate. Loud, but not an assertion. Add
+// `passWithNoTests: true` beside it and that exit code becomes 0 — measured —
+// at which point THIS script is the only half left that can speak. That is the
+// argument for two runners rather than one, restated at the key level.
+//
+// SO THE OBJECT IS CLOSED BY EXHAUSTION RATHER THAN BY NAMING KEYS. Pinning
+// `exclude` too would have left `dir`, and pinning `dir` would have left
+// `projects`, and the next vitest release adds keys nobody here has read. The
+// config may set the keys VITEST_ROOT_KEYS and VITEST_TEST_KEYS vouch for and
+// no others; each entry carries the reason it cannot deselect a test file, and
+// an unlisted key is refused by name in both gates. `auditConfigKeys()` reads
+// the key structure as text HERE; the vitest gate reads `Object.keys()` off the
+// resolved config object, which is the half text cannot do — a key that arrives
+// by spread, by `mergeConfig`, or under a computed name is a value, not a
+// token. Both go red for every mutation above; the mutations are in the suite.
+//
 // WHAT THE PRECONDITION COSTS, because a gate nobody can afford gets deleted,
 // and because the figure that used to stand in for it was assembled from parts.
-// MEASURED 2026-08-19 on this box's 7200 rpm HDD, 910 test files over 709
-// directories, `auditOwnership()` end to end:
-//   · 459 ms, median of five warm calls in one process
-//   · 566 ms as the FIRST call of a fresh process (median of three)
-//   · of which the walk is 91 ms, the vitest glob 45 ms, and
-//     `auditVitestConfig()` 0.50 ms — the rest is reading and classifying 910
-//     files, which is where a whole-repo audit's money goes
+// MEASURED 2026-08-19 on this box's 7200 rpm HDD, `auditOwnership()` end to end,
+// three fresh processes of four calls each:
+//   · 495 ms warm (medians 475 / 495 / 508), 913 test files
+//   · of which the walk is ~90 ms, the vitest glob ~46 ms, and
+//     `auditVitestConfig()` 0.66 ms — 0.35 ms of that is the new key scan. The
+//     rest is reading and classifying 913 files, which is where a whole-repo
+//     audit's money goes.
+//   · importing this module is 7 ms warm, 260 ms cold.
 // It was 297 ms warm before `stripComments` became a character scanner. That
-// +162 ms is the price of not refusing a correct config, and it was paid on
+// +200 ms is the price of not refusing a correct config, and it was paid on
 // purpose: a chunked scanner recovers most of it and is harder to be sure of,
 // and this runs once before a gate that takes 128 s.
+//
+// THE COLD FIRST CALL IS NOT A NUMBER, and the line that used to give one
+// ("566 ms as the FIRST call of a fresh process") was measuring the OS file
+// cache rather than this code. Across seven fresh processes measured the same
+// afternoon it was 558 ms, 568 ms, 1.0 s, 1.4 s, 13.1 s and 48.0 s — the spread
+// is seven other agents hitting the same spindle, not variance in the audit.
+// Quote the warm figure; the cold one is disk, and it is somebody else's disk.
+//
+// AND DO NOT QUOTE THE FILE COUNT AS A CONSTANT. It was 911 at the start of the
+// session these numbers were taken in and 913 by the end, because other lanes
+// were adding test files while the measurements ran. The gate asserts a floor
+// (`rows.length > 800`), never an equality, for exactly that reason.
 //
 // The numbers that used to stand here (101 ms walk + 139 ms classify, on
 // `collectTestFiles`) described two of the four phases and never the glob or
@@ -165,6 +214,57 @@ export const VITEST_INCLUDE = [
  * the vitest gate and would drag Vite into this script if done here.
  */
 export const VITEST_DEFAULT_EXCLUDE = ["**/node_modules/**", "**/.git/**"];
+
+/**
+ * THE REST OF THE SAME OBJECT LITERAL — and why this is an ALLOWLIST rather
+ * than a list of the keys known to be dangerous.
+ *
+ * Pinning `include` closed one axis and left every other key in `test: { … }`
+ * open. MEASURED 2026-08-19 by mutation, with `include: [...VITEST_INCLUDE]`
+ * left completely untouched and ONE key added beside it:
+ *   · `exclude: [...defaultExclude, "../tools/mobile/settle.test.mjs"]` —
+ *     `npx vitest list --filesOnly` fell from 892 files to 891, and asking
+ *     vitest for settle.test.mjs by name printed NOTHING and exited 0.
+ *   · `dir: "src"` — `npx vitest list --filesOnly` returned 0 files.
+ * Under both, `auditConfigWiring()` returned `[]`, this gate printed
+ * "partition OK … none orphaned" and exited 0, and the vitest gate's
+ * deep-equality on `test.include` passed — because `include` had not changed.
+ * That is the defect this file was rewritten to close, reproduced one key over
+ * in the same literal, and failing in the same reassuring direction.
+ *
+ * vitest 4.1.10's InlineConfig has 80-odd keys (`dist/chunks/reporters.d.*.d.ts`,
+ * `interface InlineConfig`). A DENYLIST of the ones that can deselect a file
+ * would have to be right about all 80, and right again after every vitest
+ * upgrade — the standing bet that has now lost here twice. So the rule is
+ * inverted: the config may set these keys and no others, and each entry carries
+ * the reason it cannot remove a test file from the run.
+ *
+ * AN UNLISTED KEY IS REFUSED, NOT GUESSED AT. That refusal is not the
+ * false-failure class this repo keeps paying for. It is accurate — the gate
+ * genuinely cannot certify the partition for an option it has never read — it
+ * names the key, and the remedy is one line: if the key cannot deselect a test
+ * file, add it here with its reason; if it can, the partition audit stopped
+ * being true the moment it landed, which is the thing worth being stopped for.
+ */
+export const VITEST_ROOT_KEYS = {
+  test: "the vitest options object; its own keys are audited against VITEST_TEST_KEYS",
+  resolve:
+    "Vite module resolution (the `@` alias). It rewrites import specifiers INSIDE a " +
+    "file that was already collected; it cannot add or remove one from the collection.",
+};
+
+export const VITEST_TEST_KEYS = {
+  include:
+    "THE file-selection key, and the only one permitted to be — pinned to VITEST_INCLUDE " +
+    "by the spread check here and by deep-equality on the resolved value in the vitest gate",
+  environment:
+    "the globals a collected file runs against. It is one value for every file: " +
+    "`environmentMatchGlobs`, which could once vary it per path, is gone in vitest 4. " +
+    "It cannot deselect a file.",
+  coverage:
+    "v8 instrumentation of SOURCE files. Its own include/exclude/thresholds decide what is " +
+    "REPORTED, and its thresholds can fail the run loudly; none of them decide what is COLLECTED.",
+};
 
 /** Any file either runner could plausibly be expected to run. */
 const TEST_FILE_RE = /\.(test|spec)\.(m|c)?(t|j)sx?$/;
@@ -285,10 +385,16 @@ const stripComments = (src) => {
  */
 export function declaredRunner(file) {
   const src = stripComments(fs.readFileSync(file, "utf8"));
-  if (/\bfrom\s+["']vitest["']/.test(src) || /\bimport\s*\(\s*["']vitest["']/.test(src)) {
+  if (
+    /\bfrom\s+["']vitest["']/.test(src) ||
+    /\bimport\s*\(\s*["']vitest["']/.test(src)
+  ) {
     return "vitest";
   }
-  if (/\bfrom\s+["']node:test["']/.test(src) || /\brequire\(\s*["']node:test["']\s*\)/.test(src)) {
+  if (
+    /\bfrom\s+["']node:test["']/.test(src) ||
+    /\brequire\(\s*["']node:test["']\s*\)/.test(src)
+  ) {
     return "node";
   }
   return null;
@@ -346,9 +452,25 @@ export function collectToolTests() {
  * matcher: a second-best matcher that disagrees with the real one produces a
  * partition audit that passes while the partition is broken, which is worse
  * than no audit, because it is an audit somebody trusts.
+ *
+ * THE PARAMETERS EXIST TO DEMONSTRATE THE DEFECT, not to configure the audit.
+ * Called with no arguments — which is how `auditOwnership()` and both gates
+ * call it — it globs exactly what the config is allowed to hand vitest, so the
+ * defaults ARE the audited configuration. The overrides let a test glob what a
+ * MUTATED config would hand it and compare the two sets, which turns "an
+ * `exclude` beside the spread removes settle.test.mjs" from a sentence in a
+ * comment into a number the suite recomputes. They are deliberately not read
+ * from anywhere: an override that quietly became the default would make every
+ * verdict a statement about a list nothing consults, which is the exact shape
+ * of the bug this file has now closed twice.
  */
-export function vitestWouldRun() {
+export function vitestWouldRun({
+  include = VITEST_INCLUDE,
+  exclude = VITEST_DEFAULT_EXCLUDE,
+  cwd = null,
+} = {}) {
   const { platform } = paths();
+  const root = cwd ?? platform;
   const req = createRequire(import.meta.url);
   let globSync;
   try {
@@ -362,12 +484,12 @@ export function vitestWouldRun() {
     );
   }
   return new Set(
-    globSync(VITEST_INCLUDE, {
+    globSync(include, {
       dot: true,
-      cwd: platform,
-      ignore: VITEST_DEFAULT_EXCLUDE,
+      cwd: root,
+      ignore: exclude,
       expandDirectories: false,
-    }).map((f) => slash(path.resolve(platform, f))),
+    }).map((f) => slash(path.resolve(root, f))),
   );
 }
 
@@ -378,10 +500,173 @@ export function vitestConfigPath() {
   return path.join(paths().platform, VITEST_CONFIG_FILE);
 }
 
+/**
+ * A filler that cannot occur in the source being scanned, standing in for the
+ * contents of a string literal. Lengths are preserved so that every offset in
+ * the masked copy is still an offset into the original.
+ */
+const MASK = "\u0001";
+
+/**
+ * String literal CONTENTS blanked; the quotes, the newlines and the length kept.
+ *
+ * `stripComments` deletes prose about code. This deletes the INSIDE of strings,
+ * for the opposite reason: the structural walk below counts braces, brackets and
+ * commas to find out which keys sit at the top level of an object literal, and
+ * this config is full of strings that contain all three — `"src/**\/*.test.{ts,tsx}"`
+ * alone carries a brace, a comma and a closing brace. Counting those would put
+ * the walk at a depth it is not at and hide every key after them.
+ *
+ * The quote characters survive so a QUOTED key (`"exclude": [...]`) is still
+ * visible as a key; the name is then read back out of the unmasked original at
+ * the same offsets, which is the whole reason lengths are preserved.
+ */
+const maskStringContents = (code) => {
+  let out = "";
+  let quote = null;
+
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    if (!quote) {
+      if (c === '"' || c === "'" || c === "`") quote = c;
+      out += c;
+      continue;
+    }
+    if (c === "\\") {
+      // The escape and the character it escapes both vanish, so an escaped
+      // quote cannot be mistaken for the end of the string.
+      out += MASK;
+      if (i + 1 < code.length) {
+        out += code[i + 1] === "\n" ? "\n" : MASK;
+        i++;
+      }
+      continue;
+    }
+    if (c === quote) {
+      out += c;
+      quote = null;
+      continue;
+    }
+    if (c === "\n") {
+      out += "\n";
+      if (quote !== "`") quote = null; // same one-line bound as stripComments
+      continue;
+    }
+    out += MASK;
+  }
+
+  return out;
+};
+
+// A key position holds an identifier, or a quoted name whose contents are now
+// MASK. The escape below IS MASK; `objectLiteralKeys reads a QUOTED key` in
+// scripts/__tests__/test-ownership.test.mjs is what fails if the two drift.
+const KEY_TOKEN_RE = /^(?:(["'`])([\u0001]*)\1|([A-Za-z_$][\w$]*))/;
+
+/**
+ * The keys written at depth 1 of the object literal whose `{` sits at `open`,
+ * with the offset each one's value starts at.
+ *
+ * Depth 1 is the point. A flat search for `exclude:` in this config matches the
+ * COVERAGE exclude — a key that is correct, has been there since the coverage
+ * gate landed, and decides what is reported rather than what is collected. A
+ * scanner that refused the config over it would be a false refusal on day one,
+ * and this repo has already shipped one of those from a scan that could not
+ * tell nesting from text (`stripComments`, whose docstring carries the story).
+ *
+ * `unreadable` is not the same as "no keys": a spread or a computed key means
+ * the set of keys is decided by something text cannot evaluate, and that is a
+ * finding rather than a clean result. Returning it as a separate list keeps the
+ * caller from reading an empty `keys` as "nothing to worry about".
+ */
+const objectLiteralKeys = (masked, original, open) => {
+  const keys = [];
+  const unreadable = [];
+  let depth = 1;
+  let expectKey = true;
+  let i = open + 1;
+
+  const skipSpace = (j) => {
+    while (j < masked.length && /\s/.test(masked[j])) j++;
+    return j;
+  };
+
+  while (i < masked.length) {
+    const c = masked[i];
+
+    if (/\s/.test(c)) {
+      i++;
+      continue;
+    }
+
+    if (depth === 1 && expectKey && c !== "}") {
+      expectKey = false;
+      if (masked.startsWith("...", i)) {
+        unreadable.push(
+          "a spread (`...`), which can inject any key — text cannot see which",
+        );
+        i += 3;
+        continue;
+      }
+      const token = KEY_TOKEN_RE.exec(masked.slice(i));
+      if (token && token[3] !== undefined) {
+        // A bare identifier: `test: {…}`, or the shorthand `test,`.
+        const after = skipSpace(i + token[0].length);
+        keys.push({
+          name: token[3],
+          valueStart: masked[after] === ":" ? skipSpace(after + 1) : null,
+        });
+        i += token[0].length;
+        continue;
+      }
+      if (token) {
+        // A quoted key. The name is masked here; read it from the original.
+        const after = skipSpace(i + token[0].length);
+        keys.push({
+          name: original.slice(i + 1, i + 1 + token[2].length),
+          valueStart: masked[after] === ":" ? skipSpace(after + 1) : null,
+        });
+        i += token[0].length;
+        continue;
+      }
+      if (c === "[") {
+        unreadable.push(
+          "a computed key (`[expr]:`) — text cannot see which key it names",
+        );
+        // fall through so the bracket still counts toward depth
+      } else {
+        unreadable.push(`something that is not a readable key at offset ${i}`);
+      }
+    }
+
+    if (c === "{" || c === "[" || c === "(") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}" || c === "]" || c === ")") {
+      depth--;
+      if (depth === 0) return { keys, unreadable, closed: true };
+      i++;
+      continue;
+    }
+    if (c === "," && depth === 1) {
+      expectKey = true;
+      i++;
+      continue;
+    }
+    i++;
+  }
+
+  unreadable.push("the object literal is never closed");
+  return { keys, unreadable, closed: false };
+};
+
 /** The config still delegates to VITEST_INCLUDE: import present, spread present, once. */
 const CONFIG_IMPORT_RE =
   /import\s*\{[^}]*\bVITEST_INCLUDE\b[^}]*\}\s*from\s*["']\.\/scripts\/tools-tests\.mjs["']/;
-const CONFIG_SPREAD_RE = /\binclude\s*:\s*\[\s*\.\.\.\s*VITEST_INCLUDE\s*,?\s*\]/g;
+const CONFIG_SPREAD_RE =
+  /\binclude\s*:\s*\[\s*\.\.\.\s*VITEST_INCLUDE\s*,?\s*\]/g;
 
 /**
  * THE OTHER HALF OF THE PARTITION, checked as TEXT because it cannot be checked
@@ -431,6 +716,86 @@ export function auditConfigWiring(src) {
       `${VITEST_CONFIG_FILE} spells \`include: [...VITEST_INCLUDE]\` ${spreads.length} time(s), ` +
         `expected exactly 1 — a literal list there is invisible to this runner, and an extra ` +
         `pattern beside the spread is a file this audit clears while vitest alone decides its fate`,
+    );
+  }
+
+  problems.push(...auditConfigKeys(code));
+  return problems;
+}
+
+/**
+ * EVERY OTHER KEY IN THE SAME OBJECT LITERAL, checked against the allowlist.
+ *
+ * The two checks above pin `include`. They say nothing whatever about the key
+ * beside it, and `exclude` and `dir` were each measured on 2026-08-19 removing
+ * files from vitest's collection while both gates printed green — see
+ * VITEST_TEST_KEYS for the numbers. Pinning one more key by name would have
+ * reproduced the same defect a third time, one key further along, so the
+ * partition is closed by exhaustion instead: the config may set the keys the
+ * allowlist vouches for and nothing else.
+ *
+ * `src` must already have had its comments stripped by the caller.
+ */
+export function auditConfigKeys(code) {
+  const problems = [];
+  const masked = maskStringContents(code);
+
+  const call = /\bdefineConfig\s*\(\s*\{/.exec(masked);
+  if (!call) {
+    return [
+      `${VITEST_CONFIG_FILE} does not hand a plain object literal to defineConfig({ … }) — ` +
+        `this gate reads the config as text and cannot tell which keys a computed, merged or ` +
+        `function-returned config sets, so it cannot certify that only \`include\` selects files`,
+    ];
+  }
+
+  const report = (where, found, allowed) => {
+    for (const note of found.unreadable) {
+      problems.push(
+        `${VITEST_CONFIG_FILE} builds ${where} with ${note}, so this gate cannot enumerate ` +
+          `its keys — and a key it cannot see is a key that can deselect a test file unseen`,
+      );
+    }
+    for (const { name } of found.keys) {
+      // `Object.hasOwn`, never `name in allowed`. `in` walks the prototype
+      // chain, so `constructor`, `toString`, `valueOf` and `hasOwnProperty`
+      // would every one of them read as vouched-for keys nobody ever vouched
+      // for — an allowlist with four free passes in it, granted by the language
+      // rather than by anyone's judgement.
+      if (Object.hasOwn(allowed, name)) continue;
+      problems.push(
+        `${VITEST_CONFIG_FILE} sets \`${name}\` in ${where}, which is not vouched for — ` +
+          `vitest decides what it collects from more keys than \`include\` (\`exclude\` and ` +
+          `\`dir\` were each measured dropping files while both gates stayed green). If ` +
+          `${name} cannot remove a test file from the run, add it to ${
+            allowed === VITEST_TEST_KEYS
+              ? "VITEST_TEST_KEYS"
+              : "VITEST_ROOT_KEYS"
+          } in scripts/tools-tests.mjs with the one-line reason; if it can, this audit is no ` +
+          `longer true and the fix is to take the key back out`,
+      );
+    }
+  };
+
+  const root = objectLiteralKeys(masked, code, call.index + call[0].length - 1);
+  report("the top-level config object", root, VITEST_ROOT_KEYS);
+
+  const test = root.keys.find((k) => k.name === "test");
+  if (!test) {
+    problems.push(
+      `${VITEST_CONFIG_FILE} has no \`test\` key — the vitest gate's options are somewhere ` +
+        `this gate cannot read them`,
+    );
+  } else if (test.valueStart === null || masked[test.valueStart] !== "{") {
+    problems.push(
+      `${VITEST_CONFIG_FILE} sets \`test\` to something other than an object literal, so its ` +
+        `file-selection keys cannot be enumerated from text`,
+    );
+  } else {
+    report(
+      "`test`",
+      objectLiteralKeys(masked, code, test.valueStart),
+      VITEST_TEST_KEYS,
     );
   }
 
@@ -491,23 +856,50 @@ export function auditOwnership() {
   const walked = collectTestFiles(repo).map(slash);
   const files = [...new Set([...walked, ...vitestSet])].sort();
 
-  const rows = files.map((file) => {
-    const declared = declaredRunner(file);
+  const vanished = [];
+  const rows = [];
+  for (const file of files) {
+    let declared;
+    try {
+      declared = declaredRunner(file);
+    } catch (error) {
+      // A file that no longer exists is not a partition finding. The walk and
+      // the read are separate passes, and on this box seven other agents edit
+      // the tree while the gate runs: measured 2026-08-19, `auditOwnership()`
+      // died with ENOENT on src/modules/sim/lessons/__tests__/zz-probe-census
+      // .test.ts, a scratch file another lane created and deleted between the
+      // two. That is a FALSE REFUSAL — it reds the whole tools/ gate, with a
+      // stack trace, over a partition that is fine.
+      //
+      // ENOENT ONLY, and the file is re-checked rather than assumed gone. A
+      // bare catch here would swallow a permission error or a bad read and
+      // report a clean partition over files it never managed to open, which is
+      // the failure this whole script exists to refuse.
+      if (error.code !== "ENOENT" || fs.existsSync(file)) throw error;
+      vanished.push(slash(path.relative(repo, file)));
+      continue;
+    }
     const underTools = file.startsWith(slash(tools) + "/");
     // The node gate's real filter, quoted rather than described: `main()` runs
     // exactly the tools/ files whose declared runner is node.
-    const nodeRuns = underTools && file.endsWith(".test.mjs") && declared === "node";
+    const nodeRuns =
+      underTools && file.endsWith(".test.mjs") && declared === "node";
     const vitestRuns = vitestSet.has(file);
-    return {
+    rows.push({
       file: slash(path.relative(repo, file)),
       declared,
       vitestRuns,
       nodeRuns,
       problem: classify({ declared, vitestRuns, nodeRuns }),
-    };
-  });
+    });
+  }
 
-  return { rows, problems: rows.filter((r) => r.problem !== null) };
+  // `vanished` is returned rather than discarded. Dropping a file from the
+  // audit is exactly the move this gate refuses everywhere else, so the count
+  // is carried out to the caller and printed — a partition reported over 40
+  // fewer files than the walk found is a fact the reader needs, not an
+  // implementation detail.
+  return { rows, problems: rows.filter((r) => r.problem !== null), vanished };
 }
 
 /** Print the audit; return true when the partition is total and disjoint. */
@@ -531,7 +923,13 @@ function reportAudit() {
     return false;
   }
 
-  const { rows, problems } = auditOwnership();
+  const { rows, problems, vanished } = auditOwnership();
+  if (vanished.length > 0) {
+    console.warn(
+      `[tools-tests] ${vanished.length} file(s) disappeared between the walk and the read and ` +
+        `are NOT in the partition below — ${vanished.join(", ")}`,
+    );
+  }
   if (problems.length > 0) {
     console.error(
       `[tools-tests] RUNNER PARTITION BROKEN — ${problems.length} of ${rows.length} test file(s) ` +
@@ -592,7 +990,10 @@ function main(argv) {
   );
 
   if (result.error) {
-    console.error("[tools-tests] failed to launch node --test:", result.error.message);
+    console.error(
+      "[tools-tests] failed to launch node --test:",
+      result.error.message,
+    );
     return 1;
   }
   return result.status ?? 1;
@@ -600,6 +1001,9 @@ function main(argv) {
 
 // Importable: vitest.config.ts reads VITEST_INCLUDE from here and the vitest
 // gate imports the audit. Neither may launch a test run as a side effect.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   process.exit(main(process.argv.slice(2)));
 }

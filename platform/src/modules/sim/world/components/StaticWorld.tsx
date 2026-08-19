@@ -18,7 +18,12 @@ import { useEffect, useMemo } from "react";
 import { useThree } from "@react-three/fiber";
 import type * as THREE from "three";
 import { Color } from "three";
-import { useWetness, wetnessToRoadParams } from "@/modules/sim/environment";
+import {
+  useWetness,
+  useSnowIntensity,
+  wetnessToRoadParams,
+  roadSurfaceToParams,
+} from "@/modules/sim/environment";
 import type { WorldGeometry } from "../types";
 import {
   makeAsphaltTexture,
@@ -275,9 +280,19 @@ export function StaticWorld({
   // not a mirror. Dry scenes stay byte-identical (wetness 0 → the authored
   // 1.0 roughness AND the authored 1.5 env response, untouched).
   const wetness = useWetness();
+  // SNOW IS THE SECOND THING THAT LIES ON A ROAD, and until 2026-08-19 this
+  // file could not see it: `wetnessToRoadParams` took rain only, so no amount
+  // of snow moved the asphalt by one shade — sc-ac-snow rendered clean grey
+  // tarmac while the rule engine graded it at 40% grip. A student was shown a
+  // dry road and marked on a slippery one.
+  const snow = useSnowIntensity();
   const wet = useMemo(
-    () => wetnessToRoadParams(wetness, { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 }),
-    [wetness],
+    () =>
+      roadSurfaceToParams(
+        { wet: wetness, snow },
+        { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 },
+      ),
+    [wetness, snow],
   );
   // ROAD_ALBEDO_TINT (doc 82 V5) multiplies the wetness darken rather than
   // replacing it: the wet response, its ordering against the decals and the
@@ -291,8 +306,12 @@ export function StaticWorld({
   // glossier wet floor — oil/tar stains go reflective FIRST in rain (the
   // ordering survives the retune: 0.45 < 0.5).
   const decalWet = useMemo(
-    () => wetnessToRoadParams(wetness, { dryRoughness: 0.95, wetRoughness: 0.45, wetDarken: 0.6 }),
-    [wetness],
+    () =>
+      roadSurfaceToParams(
+        { wet: wetness, snow },
+        { dryRoughness: 0.95, wetRoughness: 0.45, wetDarken: 0.6 },
+      ),
+    [wetness, snow],
   );
   // Decals carry the road's albedo tint too — they are wear ON the asphalt,
   // and left at full value they would read as marks painted BRIGHTER than the
@@ -309,6 +328,15 @@ export function StaticWorld({
   // discipline in exactly those conditions. dryRoughness is the shipped
   // authored 0.85 and darken lands at 1.0, so every DRY scene is
   // byte-identical to before this change.
+  //
+  // PAINT DELIBERATELY DOES NOT TAKE THE SNOW TERM, and this is the one place
+  // in this block where that is a decision rather than an omission. Snow
+  // BRIGHTENS what it covers; the road above now brightens with it. Brightening
+  // the markings by the same factor would close the contrast between them and
+  // land white-on-white — and «не спирай върху маркировката», stop lines and
+  // lane discipline are all graded off markings the student has to be able to
+  // SEE. Real snow covers paint rather than tinting it, so the honest model is
+  // occlusion, which is asset work, not a factor here.
   const paintWet = useMemo(
     () => wetnessToRoadParams(wetness, { dryRoughness: 0.85, wetRoughness: 0.4, wetDarken: 0.78 }),
     [wetness],

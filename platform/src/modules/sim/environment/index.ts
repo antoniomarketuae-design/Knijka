@@ -138,6 +138,12 @@ export {
   getFogIntensity,
   getSnowIntensity,
   wetnessToRoadParams,
+  // The road mapping that bears SNOW as well as rain. `wetnessToRoadParams` is
+  // now its `snow: 0` case, so every dry and rain scene is bit-identical — but
+  // a helper missing from this barrel does not exist under doc 05, and that is
+  // precisely how the snow term sat in the tree for a day moving no pixel while
+  // sc-ac-snow rendered clean grey asphalt at 40% grip.
+  roadSurfaceToParams,
   resetWeather,
   setWeatherTarget,
   // The scene-boundary primer. It was added for the two dev capture routes and
@@ -148,4 +154,4 @@ export {
   primeWeather,
   stepWeather,
 } from "./weather";
-export type { RoadWetnessParams } from "./weather";
+export type { RoadWetnessParams, RoadSurfaceState } from "./weather";

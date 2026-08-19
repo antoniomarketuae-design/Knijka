@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { treeIdentity } from "./target.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(HERE, "..", "..", "..");
@@ -59,6 +60,38 @@ function politeDatabaseUrl() {
     ? url.replace(/connection_limit=\d+/, "connection_limit=2")
     : `${url}${url.includes("?") ? "&" : "?"}connection_limit=2`;
   return { DATABASE_URL: polite };
+}
+
+/**
+ * STAMP THE BUILD SO THE SERVER CAN SAY WHAT IT IS.
+ *
+ * `/api/health` reports `process.env.NEXT_PUBLIC_COMMIT_SHA || "unknown"`, and
+ * its own header says «"unknown" locally is expected, not an error». For a
+ * DEPLOY that is true. For an AUDIT it is fatal: frames that cannot name their
+ * build are not evidence, and `lesson-audit.mjs` now refuses to drive a server
+ * that answers "unknown" (tools/mobile/lib/target.mjs carries the measurement —
+ * the hardcoded staging tunnel it used to default to answers exactly that).
+ *
+ * So every server this module starts is stamped with the HEAD it was started
+ * from. MEASURED 2026-08-19: `next dev --port 3000` spawned with the variable
+ * set answered `{"commit":"c72bcc27cd90cb0ff810eeee113c2e86c2b792ea", …}` — the
+ * value survives into the route, so the harness can verify it.
+ *
+ * IT ALSO PROVES WE ARE TALKING TO OUR OWN PROCESS. `ensureServer` reuses
+ * anything already answering on the port, including a server another lane left
+ * running at an older commit. A stale one now reports a sha that does not match
+ * this tree and the harness refuses it, instead of driving it and reporting the
+ * result as a fact about code that was never loaded.
+ *
+ * A caller's own NEXT_PUBLIC_COMMIT_SHA wins — that is the deliberate "drive a
+ * named build" case, and this must not overwrite an answer somebody gave on
+ * purpose. Silent when git is unavailable: the refusal belongs in the harness,
+ * where it can be reported, not in a helper that spawns servers for five tools.
+ */
+function buildStampEnv() {
+  if (process.env.NEXT_PUBLIC_COMMIT_SHA) return {};
+  const { head } = treeIdentity(REPO);
+  return head ? { NEXT_PUBLIC_COMMIT_SHA: head } : {};
 }
 
 /**
@@ -122,6 +155,7 @@ export async function ensureServer({ port = DEFAULT_PORT, quiet = false, timeout
         ...process.env,
         KNIJKA_DIST_DIR: DIST_DIR,
         NODE_ENV: "development",
+        ...buildStampEnv(),
         ...politeDatabaseUrl(),
       },
       stdio: ["ignore", fd, fd],

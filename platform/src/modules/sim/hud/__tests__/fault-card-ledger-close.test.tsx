@@ -1,5 +1,20 @@
 /**
- * ONE SCREEN, ONE NUMBER — the card and the debrief on a closed exam sheet.
+ * ONE CARD, ONE NUMBER — the fault row on a closed exam sheet.
+ *
+ * ── 2026-08-19 · WHAT THIS FILE DOES NOT PROVE, AND THE MEASUREMENT THAT SAID
+ * SO. The header below argues from ONE SCREEN and every case in it renders the
+ * CARD ALONE. That gap was real, not rhetorical: `FaultCard` gained
+ * `examBilled` and this file went green, while `SessionEndScreen.tsx` — the
+ * only surface in the product that mounts the list — never passed the prop, and
+ * the prop DEFAULTS TO BILLED on purpose. So the screen went on printing the
+ * catalogue base on every row for another day. Rendered on 2026-08-19, the
+ * squeeze below produced «−10 изпитни т.» TWICE on one screen whose table read
+ * 10 and whose debrief read «без допълнителни точки». The screen-level proof
+ * lives in `session-end-ledger-close.test.tsx`, which mounts
+ * `SessionEndScreen` with a real `buildDebrief` and sums the marks off the
+ * markup. THIS file is still worth its run — it is where the card's own
+ * wording and its default are pinned — but it is the unit half. Do not read a
+ * green here as a claim about a screen.
  *
  * `SessionEndScreen.tsx` renders the FaultCard list (line 1211) and
  * `debriefText` (line 1290) on the SAME screen. Наредба № 38, чл. 48, ал. 3

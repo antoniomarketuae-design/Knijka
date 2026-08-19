@@ -4,9 +4,11 @@
  * THE CLASS. An objective title is a certificate: the banner says «Спри
  * напълно на стоп-линията» and the student who sees ЗАДАЧА ✓ believes a
  * simulator watched him do exactly that. `stepReachZone` is handed
- * (params, prev, tick) and nothing else, so the only things it can ever
- * witness are A PLACE and A SPEED — `maxSpeedKmh` (with the FR-24
- * `acceptBeforeMarkM` cut deciding where credit ends) and the geometry. Any
+ * (params, prev, tick) and nothing else, so what it can witness is bounded by
+ * that tick: A PLACE and A SPEED — `maxSpeedKmh` with the FR-24
+ * `acceptBeforeMarkM` cut deciding where credit ends — and, since 2026-08-19,
+ * the two Car-OWN cockpit states the tick has always carried and nothing asked
+ * for: the lamps and the direction of travel (`ReachZoneWitnessDemands`). Any
  * word in a title that promises more than that is a certificate nobody signed.
  *
  * WHAT THIS FILE WOULD HAVE CAUGHT. Two shipped rows said «спри» and did not
@@ -48,11 +50,15 @@
  *   sc-pzl-exit · sc-mfp-walk-yield · sc-jay-clear — the same shape, unaudited
  *
  * A SECOND class the sweep found, with only three rows in the whole catalogue:
- * a title that certifies THE CAR'S OWN LAMPS. See LAMP_CLAIM below — including
- * why the repair is NOT a lamp gate in `stepReachZone`.
+ * a title that certifies THE CAR'S OWN LAMPS. That one is CLOSED (2026-08-19) —
+ * see LAMP_CLAIM below for what the closure was and why the reason recorded
+ * against it, which named it unclosable, was wrong. The ACTOR class is not, and
+ * its list is untouched: no field of `SimTick` carries another road user's
+ * conduct into this evaluator, so those eight rows still need the retitle their
+ * entries name, in six template files this lane does not own.
  *
- * Neither list is a permission. Each row is a named debt with an owner, and
- * deleting an entry without moving its template turns this file red.
+ * The remaining list is not a permission. Each row is a named debt with an
+ * owner, and deleting an entry without moving its template turns this file red.
  */
 
 import { readFileSync } from "node:fs";
@@ -61,7 +67,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_RULE_CONFIG } from "../../rules";
 import { recordScEdD2PriorityRunDrive } from "../../traces/scEdD2PriorityRun";
 import { applyTick, buildLessonResult, createLessonSession } from "../engine";
-import { REACH_ZONE_HALT_CAP_KMH } from "../objectives";
+import { parseObjectiveParams, REACH_ZONE_HALT_CAP_KMH } from "../objectives";
 import { compileScenario } from "../scenario/compile";
 import { SCENARIO_TEMPLATES } from "../scenario/templates";
 import type { ScenarioSpec } from "../scenario/types";
@@ -297,39 +303,65 @@ const ACTOR_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: strin
   ];
 
 /**
- * Claims about THE CAR'S OWN LAMPS. Unlike the actor class this one is not
- * structurally unwitnessable — `SimTick` carries `headlights`, `fogLightsOn`,
- * `isNight`, `rain`, `fog` and `stepReachZone` is handed the whole tick — but
- * `ReachZoneParams` has no field with which a template can DEMAND a lamp, so
- * every one of these rows is graded on place and speed alone.
+ * Claims about THE CAR'S OWN LAMPS — CLOSED 2026-08-19, and the entry that
+ * stood here is kept as a correction rather than deleted, because the reason it
+ * gave was wrong and the wrongness is the lesson.
  *
- * AND THE CAUSE IS UPSTREAM OF THE OBJECTIVE, which is why the repair is not a
- * lamp gate in `stepReachZone`. On `sc-ac-night-lights/pc-right` the sweep
- * recorded «✓ Мини контролната зона осветен 1:56», ИЗДЪРЖАН, 0 наказателни
- * точки, with the СВЕТЛИНИ telltale dim and no beam pool on the road in any of
- * t011/t063/t116/t183 — and the string «Движение нощем без светлини» appears
- * ZERO times in that run's log. The rule engine owns HEADLIGHTS_OFF_AT_NIGHT
- * (основна) and did not fire it either, so the lamp/night channel is not
- * reaching EITHER grader. A gate in this evaluator would read the same blind
- * channel and change nothing.
+ * WHAT IT SAID. „The cause is upstream of the objective … on
+ * `sc-ac-night-lights/pc-right` the sweep recorded «✓ Мини контролната зона
+ * осветен 1:56», ИЗДЪРЖАН, 0 наказателни точки, with the СВЕТЛИНИ telltale dim
+ * … and HEADLIGHTS_OFF_AT_NIGHT fired ZERO times, so the lamp/night channel is
+ * not reaching EITHER grader. A gate in this evaluator would read the same
+ * blind channel and change nothing." Doc 88 §2.6 carried it as O3, one of three
+ * classes declared unclosable, sixteen lessons between them.
+ *
+ * WHY IT WAS WRONG. It reasoned about THIS file from the SILENCE OF ANOTHER
+ * ONE. Read out of the tree instead, the channel is whole and every hop is a
+ * line of shipped code: `cabin.cycleHeadlights` → `VehicleSample.headlights`
+ * → `worldRuntime.ts:1886` → `SimTick.headlights`, which is a REQUIRED field
+ * of the contract that `stepObjective` has been handed on every frame since the
+ * contract existed. The rule engine's silence is a defect in the rule engine.
+ *
+ * WHAT CLOSED IT. `objectives.ts` now carries `ReachZoneWitnessDemands` —
+ * `requireLamps` (and `requireGear`), authored by a template or, when only the
+ * BANNER promises the lamp, derived from the banner, so the gate cannot certify
+ * less than the certificate the student is shown. The three rows below are
+ * measured, both directions, against the committed shadow recordings at every
+ * authored rung: `__tests__/reach-zone-witness.test.ts`.
+ *
+ * The matcher stays here as the CATALOGUE guard — its job is now to prove that
+ * every lamp promise in the library is bound to a demand, which is asserted in
+ * the witness file over `parseObjectiveParams`' own output.
  */
 const LAMP_CLAIM = /осветен(?!ия|ата|ото)|къси светлини|дълги светлини|с фарове/iu;
 
-const LAMP_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: string; why: string }> = [
+/**
+ * Claims about WHERE THE STUDENT WAS LOOKING — «прочети регулировчика». Unlike
+ * the lamp class this one really is outside the tick: a disc knows a place and
+ * a speed and, since 2026-08-19, two cockpit switches; it has no channel for a
+ * driver's attention, and the mirror-glance channel that exists elsewhere is
+ * the rule engine's (TURN_WITHOUT_OBSERVATION) and grades mirrors, not officers.
+ *
+ * The remedy is the one commit cdb2f71 established for the junctions3/rail
+ * rows: the title says what the disc measures («Приближи бавно до
+ * регулировчика»), the duty keeps its grader — here the SIBLING objective of
+ * the same lesson, a passSignal with `requireRedMet` that completes only on a
+ * crossing the officer permitted and bills CONTROLLER_SIGNAL_VIOLATED
+ * otherwise. Not one param changes. `templates-signals2.ts` — a file this lane
+ * does not own.
+ */
+const READ_CLAIM = /прочети\s+(?:позата\s+на\s+)?регулировчика/iu;
+
+const READ_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: string; why: string }> = [
   {
-    specId: "sc-ac-night-lights",
-    objectiveId: "sc-acn-lit",
-    why: "«Мини контролната зона осветен» on a cap of 55 alone. Cause: the night/lamp channel (runtime → SimTick.isNight/headlights) — HEADLIGHTS_OFF_AT_NIGHT was silent on the same drive.",
+    specId: "sc-sig-controller-live",
+    objectiveId: "sc-sctl-read",
+    why: "sweep161 pc/mobile-right run.log: «✓ Приближи бавно и прочети регулировчика, не лампата 1:16» beside its own evidence line «Изчака червения сигнал и потегли на зелено» and a −10 «Неизпълнение на сигнала на регулировчика». The cap of 20 grades «бавно»; nothing grades «не лампата». templates-signals2.ts.",
   },
   {
-    specId: "sc-ac-rain-lights",
-    objectiveId: "sc-acr-lit",
-    why: "«Мини контролната зона осветен и съобразен» on a cap of 47; both СВЕТЛИНИ and ЧИСТАЧКИ dim for the whole run and HEADLIGHTS_OFF_IN_RAIN silent. Same channel.",
-  },
-  {
-    specId: "sc-ac-highbeam-lead",
-    objectiveId: "sc-ahl-follow",
-    why: "«Следвай предната кола с къси светлини» on a cap of 50; sweep161 mobile-wrong earned it at 1:11 on a run with 18 collisions and 180 penalty points. Beam discipline has no grader at all — there is no long-beam telltale in any captured frame.",
+    specId: "sc-sig-controller-postures",
+    objectiveId: "sc-sctp-read",
+    why: "Found by this rule, not by the sweep: «Приближи бавно и прочети позата на регулировчика» is the same sentence one lesson over, on the same shape of gate (radius 8, cap 30) — and its own source comment says the quiet part, „slow enough to have actually LOOKED at the officer, not read a (dark) lamp\": slow enough is not looked. templates-signals2.ts.",
   },
 ];
 
@@ -451,36 +483,69 @@ describe("no reachZone in the catalog certifies what its evaluator cannot see", 
     expect(LAMP_CLAIM.test("Приближи неосветената пътека със скорост за видимостта")).toBe(false);
   });
 
-  it("every lamp claim in the catalog is a NAMED debt, and every named debt still real", () => {
-    const open = new Set(LAMP_CLAIM_KNOWN_OPEN.map((k) => `${k.specId}/${k.objectiveId}`));
+  it("every lamp claim in the catalog is now BOUND to a demand the evaluator grades", () => {
+    // WAS „every lamp claim is a NAMED debt" over LAMP_CLAIM_KNOWN_OPEN, plus a
+    // second assertion that no reachZone param COULD demand a lamp — the
+    // routing that made the debt permanent. Both are replaced by the thing they
+    // were waiting for: the demand exists, and every claim carries one.
     const claiming = zones.filter((z) => LAMP_CLAIM.test(z.titleBg));
-    const offenders = claiming
-      .filter((z) => !open.has(`${z.specId}/${z.objectiveId}`))
-      .map((z) => `${z.specId}/${z.objectiveId} — "${z.titleBg}"`);
-    expect(offenders, "a gate promises a lamp state nothing asks for").toEqual([]);
+    expect(claiming.length, "the matcher stopped matching — see the teeth test above").toBe(3);
+    const unbound = claiming
+      .filter((z) => {
+        const authored = SCENARIO_TEMPLATES.find((s) => s.id === z.specId)!.success.find(
+          (o) => o.id === z.objectiveId,
+        )!;
+        // `ScenarioObjective` keeps `kind` inside `params`; the contract type
+        // the parser takes carries it alongside (the shape compileScenario
+        // emits), so it is lifted here exactly as every other caller does.
+        const p = parseObjectiveParams({
+          id: authored.id,
+          titleBg: authored.titleBg,
+          kind: "reachZone",
+          params: authored.params as unknown as Record<string, unknown>,
+        }) as { requireLamps?: string };
+        return p.requireLamps === undefined;
+      })
+      .map((z) => `${z.specId}/${z.objectiveId} — "${z.titleBg}" promises a lamp nothing asks for`);
+    expect(unbound).toEqual([]);
+  });
+
+  it("the READ rule has teeth — reading the officer, not merely arriving slowly", () => {
+    // A THIRD class, sweep 161 finding on `sc-sig-controller-live` (part A,
+    // CRITICAL): «✓ Приближи бавно и прочети регулировчика, не лампата 1:16» on
+    // a drive whose own recorded evidence line reads «Изчака червения сигнал и
+    // потегли на зелено» — i.e. it read the LAMP — and whose mistake row is
+    // «Неизпълнение на сигнала на регулировчика», −10, НЕИЗДЪРЖАН. The gate
+    // carries a cap of 20 and an FR-24 cut, so the «бавно» half is real; the
+    // «прочети … не лампата» half is a disposition of the eyes, and a disc has
+    // none. The matcher must not sweep in the two rows that DO grade the
+    // officer — both are passSignal gates with `requireRedMet`, and the
+    // controller channel is what completes them (see templates-signals2.ts).
+    expect(READ_CLAIM.test("Приближи бавно и прочети регулировчика, не лампата")).toBe(true);
+    expect(READ_CLAIM.test("Приближи бавно и прочети позата на регулировчика")).toBe(true);
+    expect(READ_CLAIM.test("Премини кръстовището след разрешение от регулировчика")).toBe(false);
+    expect(
+      READ_CLAIM.test(
+        "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
+      ),
+    ).toBe(false);
+    expect(READ_CLAIM.test("Приближи кръстовището с регулировчика с готовност за спиране")).toBe(
+      false,
+    );
+  });
+
+  it("every READ claim is a NAMED debt, and every named debt still real", () => {
+    const open = new Set(READ_CLAIM_KNOWN_OPEN.map((k) => `${k.specId}/${k.objectiveId}`));
+    const claiming = zones.filter((z) => READ_CLAIM.test(z.titleBg));
+    expect(
+      claiming.filter((z) => !open.has(`${z.specId}/${z.objectiveId}`)).map((z) => `${z.specId}/${z.objectiveId} — "${z.titleBg}"`),
+      "a gate certifies where the student was LOOKING",
+    ).toEqual([]);
     const seen = new Set(claiming.map((z) => `${z.specId}/${z.objectiveId}`));
     expect(
-      LAMP_CLAIM_KNOWN_OPEN.filter((k) => !seen.has(`${k.specId}/${k.objectiveId}`)).map(
+      READ_CLAIM_KNOWN_OPEN.filter((k) => !seen.has(`${k.specId}/${k.objectiveId}`)).map(
         (k) => `${k.specId}/${k.objectiveId} is fixed or gone — delete its entry`,
       ),
     ).toEqual([]);
-  });
-
-  it("no reachZone param can demand a lamp today — the debts above have nowhere to go yet", () => {
-    // The load-bearing half of the routing. If `ReachZoneParams` ever grows a
-    // lamp demand, this assertion is the one that goes red and sends someone
-    // back to LAMP_CLAIM_KNOWN_OPEN to spend it.
-    const lampish = zones.filter((z) => LAMP_CLAIM.test(z.titleBg));
-    expect(lampish.length).toBeGreaterThan(0);
-    for (const z of lampish) {
-      const authored = SCENARIO_TEMPLATES.find((s) => s.id === z.specId)!.success.find(
-        (o) => o.id === z.objectiveId,
-      )!;
-      expect(Object.keys(authored.params).sort()).toEqual(
-        Object.keys(authored.params)
-          .filter((k) => !/light|lamp|beam|headlight|fog/i.test(k))
-          .sort(),
-      );
-    }
   });
 });

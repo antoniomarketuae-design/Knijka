@@ -24,7 +24,12 @@
  *  · NEVER /dev/drive-rig, NEVER localhost. Both 404 in production and three
  *    earlier sweeps "verified" a page no student can open.
  *  · THE BUILD IS RECORDED WITH THE RUN. A proof phase once graded a build whose
- *    fixes had never been deployed.
+ *    fixes had never been deployed. THIS BULLET WAS PROSE ONLY UNTIL 2026-08-19
+ *    — nothing in this file did it, while line 189 defaulted KNIJKA_BASE to a
+ *    hardcoded staging tunnel, so an unset variable silently drove SOMEBODY
+ *    ELSE'S BUILD and returned EXIT_JUDGEABLE. Measured that day: the literal
+ *    URL still answers 200 and reports `"commit":"unknown"`. There is now a
+ *    refusal in front of the browser (`lib/target.mjs`, exits 5 and 6).
  *  · A FRAME IS A FILE THAT DECODES, NOT A FILE THAT EXISTS. `.catch(() => {})`
  *    around a screenshot lost 333 frames and 54 whole lanes while every log
  *    stayed green — see the 2026-08-18 section below.
@@ -163,10 +168,14 @@
  * judged. Non-zero = it cannot, and re-driving it is the only honest response:
  *   0 judgeable · 1 frames/log lost · 2 never dispatched (bad usage)
  *   3 sign-in refused · 4 the harness crashed (`why` is in the status file)
+ *   5 no KNIJKA_BASE — never dispatched, no directory, like 2
+ *   6 the target cannot be identified (down, unstamped, or a different build)
  * A lesson that fails its own drive still exits 0: that is a finding, not a
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // ── THE ENGINES ARE LOADED IN open(), NOT HERE ─────────────────────────────
 // A static `import … from "./lib/pw.mjs"` is evaluated before the FIRST LINE of
@@ -184,10 +193,18 @@ import { newDeviceContext } from "./lib/insets.mjs";
 import { DEVICES } from "./lib/devices.mjs";
 import { signIn } from "./lib/auth.mjs";
 import { captureFrame, createFrameLedger } from "./lib/frames.mjs";
+// Cheap by design — node:child_process and node:crypto, no browser — so unlike
+// pw.mjs it can be imported up here where `resolveBase()` needs it, which is
+// before the output directory exists.
+import { attestTarget, describeTarget, resolveBase, treeIdentity } from "./lib/target.mjs";
+
+/** The tree whose build this run must be measuring. Derived from this file's
+ *  own location, never from cwd: the sweep invokes lanes from platform/, from
+ *  the repo root and from a scratch directory, and a cwd-relative answer would
+ *  make the build stamp depend on who called. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const [OUT, SCENARIO, PLATFORM = "mobile", MODE = "right"] = process.argv.slice(2);
-export const BASE =
-  process.env.KNIJKA_BASE ?? "https://icon-undertaken-earliest-zope.trycloudflare.com";
 
 // ── WHAT EACH EXIT CODE MEANS, IN ONE PLACE ────────────────────────────────
 //
@@ -202,6 +219,8 @@ const EXIT_EVIDENCE_INCOMPLETE = 1; //  it drove, but frames and/or the log were
 const EXIT_USAGE = 2; //  nothing was dispatched; no output directory was even made
 const EXIT_SIGNIN_REFUSED = 3; //  the lane never reached the lesson
 const EXIT_CRASHED = 4; //  the harness itself died — see `phase`/`why` in the status file
+const EXIT_TARGET_UNSET = 5; //  KNIJKA_BASE was not set — nothing was dispatched, as with 2
+const EXIT_TARGET_UNVERIFIED = 6; //  a target was named and it cannot say which build it is
 
 // A missing argument used to produce frames at `undefined/01-arrival.png` and a
 // run that looked like every other. Refuse before the browser costs anything —
@@ -213,6 +232,31 @@ if (!OUT || !SCENARIO) {
   );
   process.exit(EXIT_USAGE);
 }
+
+// ── AND A MISSING TARGET IS A MISSING ARGUMENT, NOT A DEFAULT ──────────────
+//
+// This line used to be
+//     export const BASE = process.env.KNIJKA_BASE ?? "https://<a tunnel>.trycloudflare.com";
+// and that `??` is the single worst line this harness has ever contained. An
+// unset variable did not error: it silently pointed 644 drives at STAGING, over
+// a quick-tunnel hostname baked into source, and returned EXIT_JUDGEABLE with
+// real frames and a real verdict for a build nobody had asked about. MEASURED
+// 2026-08-19, that literal URL still answers — 200 in 961 ms — reporting
+// `"commit":"unknown"`, so it is a live trap rather than a dead one.
+//
+// It refuses HERE, in the same place and for the same reason as a missing
+// argument: before `mkdirSync`, so a lane dispatched without a target leaves NO
+// directory and cannot be mistaken for one that ran. lib/target.mjs carries the
+// measurement and the two ways to set it.
+let BASE_RESOLVED;
+try {
+  BASE_RESOLVED = resolveBase();
+} catch (error) {
+  console.error(`[lesson-audit] ${error.message}`);
+  process.exit(EXIT_TARGET_UNSET);
+}
+export const BASE = BASE_RESOLVED;
+
 mkdirSync(OUT, { recursive: true });
 
 const log = [];
@@ -444,6 +488,53 @@ async function open() {
   const { context } = await newDeviceContext(b, DEVICES["iphone16-landscape"], { motion: "allow" });
   return { browser: b, context };
 }
+
+// ── WHAT AM I MEASURING? ASKED BEFORE A BROWSER COSTS ANYTHING ─────────────
+//
+// THE HEADER OF THIS FILE HAS CLAIMED «THE BUILD IS RECORDED WITH THE RUN»
+// SINCE IT WAS WRITTEN, and until 2026-08-19 no code did it. That is the same
+// shape as every other defect in here — a property asserted in prose by the
+// person who most wanted it to be true — and it is the shape the refuter that
+// opened this lane went looking for.
+//
+// The probe is cheap (one GET) and it runs BEFORE `open()`, which loads ~500 MB
+// of playwright: a whole sweep pointed at the wrong host now dies in a second
+// per lane instead of after a browser, a sign-in and a drive. It doubles as the
+// warm-up — the first GET compiles `proxy` and the route, which was MEASURED at
+// 258.8 s on a cold `next dev` here, and paying that outside the drive is
+// strictly better than paying it inside one.
+//
+// IT REFUSES ON FOUR STATES AND CREDITS ONE. Unreachable, unstamped
+// (`commit: "unknown"` — what the live tunnel answers today), mismatched, and
+// "there is nothing to check it against" all exit EXIT_TARGET_UNVERIFIED. Only
+// a server that NAMES a build equal to the one under test is driven.
+//
+// Unlike the missing-argument refusals above, this one DOES leave a directory
+// and a status file. It has to: "this lane refused because the target could not
+// name its build" is a fact a re-drive queue must be able to read off the disk,
+// and an empty folder means «never dispatched» in this sweep's vocabulary.
+saveStatus({ phase: "identifying-target" });
+const tree = treeIdentity(REPO_ROOT);
+const target = await attestTarget({ base: BASE, tree, note });
+note(`TARGET: ${describeTarget(target)}`);
+if (target.dirty) {
+  // Not a refusal. A fix lane's entire job is to drive an uncommitted fix, and
+  // refusing a dirty tree would be a false failure aimed at exactly the work
+  // this harness exists to verify. It is SAID OUT LOUD instead, because "HEAD
+  // c72bcc2" alone would be a half-truth about what these pixels photographed.
+  note(
+    `  the tree is NOT clean — ${target.dirtyCount} path(s) differ from HEAD, so these frames photographed ` +
+      `HEAD ${String(target.head).slice(0, 12)} PLUS worktree ${target.worktree}: ${target.dirtyPaths.join(", ")}`,
+  );
+}
+if (!target.attested) {
+  loud(`THIS RUN CANNOT SAY WHAT IT WOULD BE PHOTOGRAPHING (${target.kind}) — ${target.why}`);
+  loud(`nothing was driven. Any finding attributed to this lane would be about an unknown build.`);
+  saveStatus({ phase: "target-unverified", target, why: target.why, exit: EXIT_TARGET_UNVERIFIED });
+  try { writeFileSync(`${OUT}/_audit-transcript.log`, `${log.join("\n")}\n`); } catch { /* the disk is gone */ }
+  process.exit(EXIT_TARGET_UNVERIFIED);
+}
+saveStatus({ phase: "target-attested", target });
 
 const { browser, context } = await open();
 const page = await context.newPage();
@@ -1690,11 +1781,39 @@ if (!hasVerdict) {
 note(`  ended naturally: ${endedNaturally}${endedNaturally ? "" : `  (forced via «${forcedBy ?? "nothing"}» — itself a finding)`}`);
 
 note(`\n--- MACHINE SUMMARY (${SCENARIO}/${PLATFORM}/${MODE}) ---`);
+// THE BUILD STAMP OUTRANKS EVEN THE FRAME LEDGER, so it goes above it. How
+// many pixels exist is the second question; WHAT THEY ARE OF is the first, and
+// the sweep this replaces could not answer it at all — an unset KNIJKA_BASE
+// pointed every lane at staging and the summary read exactly like a lane that
+// had photographed this tree.
+note(`target: ${describeTarget(target)}`);
+// AND THE TREE IS RE-READ AT THE END, because seven lanes edit this repo
+// concurrently and `next dev` hot-reloads underneath a drive. A run whose
+// source moved between the first frame and the last is not attributable to
+// either state, and a re-drive lane crediting a closure off one would be
+// issuing a certificate for a build that never existed as a whole.
+//
+// IT IS RECORDED, NOT MADE FATAL, and the line between those is deliberate:
+// the exit code is about whether the EVIDENCE is complete (see the block at the
+// bottom), and these frames are real and whole. What changed is what they can
+// be attributed to, which is a judgement for the reader, so the reader is
+// handed both digests rather than a verdict.
+const treeAfter = treeIdentity(REPO_ROOT);
+const treeMoved = treeAfter.head !== target.head || treeAfter.worktree !== target.worktree;
+if (treeMoved) {
+  loud(
+    `THE SOURCE TREE MOVED DURING THIS DRIVE — started at HEAD ${String(target.head).slice(0, 12)}/` +
+      `${target.worktree ?? "clean"}, ended at HEAD ${String(treeAfter.head).slice(0, 12)}/` +
+      `${treeAfter.worktree ?? "clean"}. The frames are whole, but they span two states of the code and ` +
+      `must NOT be used to certify a closure. Re-drive on a still tree for that.`,
+  );
+}
 // THE FRAME LEDGER GOES IN THE SUMMARY, not only in the loud lines above, and
-// it goes in FIRST. Every judgement below this point was made from pixels, so a
-// reader has to know how many of those pixels exist before reading a word of it
-// — the sweep it replaces produced folders whose 08-debrief.png was 0 bytes and
-// whose summary read exactly like a lesson that had been photographed.
+// it goes in FIRST among the drive's own numbers. Every judgement below this
+// point was made from pixels, so a reader has to know how many of those pixels
+// exist before reading a word of it — the sweep it replaces produced folders
+// whose 08-debrief.png was 0 bytes and whose summary read exactly like a lesson
+// that had been photographed.
 note(
   `frames: ${frames.written} captured · ${frames.lost} LOST` +
     (frames.cameraStopped ? ` · camera stopped (${frames.cameraStopped})` : "") +
@@ -1743,6 +1862,44 @@ note(`DEBRIEF TEXT >>> ${debrief.body.slice(0, 1800)}`);
 // Making them exit non-zero would send a re-drive lane after 137 healthy runs
 // and bury the 54 that actually lost their evidence. A false failure and a
 // false pass are the same crime.
+//
+// ── AND THE PROCESS EXIT CODE IS NOT AUTHORITATIVE ONCE A BROWSER HAS RUN ──
+//
+// `_audit-status.json`.exit IS. Found 2026-08-19 while adding the target check,
+// by reading the sweep's own ledger:
+//
+//     .audit-frames/sweep161/progress.txt  ->  28 exit=0 · 4 exit=127 · 2 exit=1
+//
+// 127 is not one of the codes above and never has been. One of the four,
+// sc-ov-narrow/mobile-wrong, still holds a COMPLETE log.txt — full MACHINE
+// SUMMARY, verdict «10 ИЗПИТНИ Т. Неиздържан», the collision convicted, the
+// objectives listed. The lane FINISHED and was judgeable; the process then
+// aborted on the way out. Reproduced on this box, node v24.18.0 / Windows:
+//
+//     const r = await fetch(url); await r.text(); process.exit(6);
+//     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+//       file src\win\async.c, line 94        -> EXIT=127
+//
+// i.e. a native abort during handle teardown, after a SUCCESSFUL global fetch
+// (auth.mjs warms /login from node before every sign-in). A failed fetch does
+// not trigger it, which is exactly why every existing test of these exit codes
+// passed: they all use a host that does not resolve.
+//
+// THE DANGER IS THE USUAL ONE, POINTING THE OTHER WAY. A dispatcher reading
+// exit codes sees an undocumented non-zero and either re-drives four healthy
+// lanes or, worse, discards them — and one of the four carried a real finding:
+// a collision, НЕИЗДЪРЖАН, ten penalty points. Throwing that away because the
+// runtime tripped over its own sockets is a false failure of the kind that
+// leaves a defect in the product.
+//
+// It is NOT fixed here, because nothing in this file causes it and the two
+// remedies that work — `process.exitCode` with no `exit()`, or not using global
+// fetch — belong to the sign-in path (lib/auth.mjs `warmFromNode`) and to the
+// dispatcher. `lib/target.mjs` takes the second of them for its OWN refusals,
+// which is why exits 5 and 6 are safe. What this file can do is say so, and
+// keep writing the truth into the status file, which no abort can rewrite:
+// READ `exit` OUT OF `_audit-status.json`, and treat a process code that
+// disagrees with it as evidence about node, not about the lesson.
 const exit = frames.lost || stdoutBroken ? EXIT_EVIDENCE_INCOMPLETE : EXIT_JUDGEABLE;
 if (stdoutBroken) {
   // The one recovery attempt for a transcript that never reached run.log. It
@@ -1762,6 +1919,12 @@ saveStatus({
   verdict: facts.verdict ?? null,
   score: facts.score ?? null,
   reachedVerdictCard: reached,
+  // Both ends of the build stamp, so the folder answers "what did these pixels
+  // photograph?" without anybody re-deriving it. `target` was written at
+  // `target-attested` and is carried forward by `status`; this adds the second
+  // reading and the comparison.
+  targetAtEnd: { head: treeAfter.head, worktree: treeAfter.worktree, dirtyCount: treeAfter.dirtyCount },
+  treeMovedDuringRun: treeMoved,
   exit,
 });
 note(

@@ -5760,7 +5760,7 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and three fix rounds, 2026-08-19
+# THE OPEN LIST — after three repair waves and four fix rounds, 2026-08-19
 
 > **This section is hand-maintained, and it has to be said out loud** because everything above this
 > line is a tally of the frozen corpus and nothing below it can be: it is about *code written after
@@ -5772,6 +5772,13 @@ under. No finding was placed by hand and none was left out.
 > severity split (`161 SUMMARY · 512 UNPOLISHED · 1 COULD_NOT_TEST`; BROKEN = 318 critical · 613
 > major · 81 minor). **What did NOT reproduce was §2.2's coverage arithmetic**, which was a hand-sum
 > over an incomplete file list; it is corrected there and in §1, and the three rows now sum to 138.
+> **Re-run a third time on 2026-08-19 for round 4 by an independent reader** (all 24 files parsed,
+> 1,712 records, the re-drive supersession applied to 22 scenarios / 26 records): **1,712 · 26 · 1,686
+> · 161 SUMMARY · 1,012 BROKEN (318 critical · 613 major · 81 minor) · 512 UNPOLISHED · 1
+> COULD_NOT_TEST · 138 suspect files · 161 lessons** — every figure identical. The corpus is frozen
+> and three independent readers now agree on it. **What did NOT reproduce this time was §1's
+> never-landed-lane block**, which printed two different measures as one and stated a critical total
+> smaller than the two rows listed beneath it; it is corrected in §1.
 >
 > **Provenance is marked on every row.** `[gated]` = I ran the command and read its own exit code.
 > `[corpus]` = computed over the 24 JSONL files today. `[adversarial]` = a reviewer whose only job
@@ -5786,25 +5793,149 @@ under. No finding was placed by hand and none was left out.
 
 ## 0 · The gate, exactly as it stands
 
-Run over the whole tree on **2026-08-19**, at commit `e9bf33c` **plus the uncommitted round-3 working
+Run over the whole tree on **2026-08-19**, at commit `c72bcc2` **plus the uncommitted round-4 working
 tree** (8 concurrent fix lanes; nothing was committed), **each command's own exit code read directly
 and never through a pipe** — `| tail` reports the *pipe's* status and has already once reported a red
 suite in this project as `EXIT:0`. The vitest run below was redirected to a file, not piped, and its
-`$?` read from the same shell. `[gated]`
+`$?` read from the same shell. **The trap fired again this round, in a new place.** The vitest run was
+backgrounded, and the harness's own completion notice announced *"exit code 0"* — that is the
+**wrapper's** status, not vitest's. Vitest's `$?` was echoed into the output file at the moment it
+exited and read back from there: it is **1**. A backgrounded gate reports two exit codes and only one
+of them is the gate's. `[gated]`
 
 | gate | result | exit |
 |---|---|---|
-| `npx tsc --noEmit` | clean | **0** |
-| `npx vitest run --maxWorkers=2` | **890 files** — 885 passed · **4 failed** · 1 skipped · **13,933 tests** — 13,759 passed · **4 failed** · 170 skipped · 379.8 s | **1** |
+| `npx tsc --noEmit` | **4 errors, not one of them in this repository's source.** All four are syntax errors inside `platform/.next-harness/dev/types/routes.d.ts`, a **gitignored Next build artifact**. Source is clean — proven, not asserted: §0.4.1 | **1** raw · **0** source |
+| `npx vitest run --maxWorkers=2` | **893 files** — 889 passed · **3 failed** · 1 skipped · **14,006 tests** — 13,833 passed · **3 failed** · 170 skipped · 368.8 s | **1** |
 | `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking** | **0** |
+| `node platform/scripts/tools-tests.mjs --audit-only` — the runner partition, run **in addition** to the three | **partition OK: 913 test files, 893 vitest / 20 node:test, none shared, none orphaned**; `vitest.config.ts` still spreads `VITEST_INCLUDE` | **0** |
 
-**`vitest` exits 1 on FOUR tests, and only two of them are the ones that need a signature no agent may
+**`vitest` exits 1 on THREE tests, and two of them are the ones that need a signature no agent may
 give** (§8): `exam/__tests__/content-bank.test.ts` (`ptp-i-parva-pomosht` 31/64 = 48 % against a 50 %
 floor) and `lesson/__tests__/compose.test.ts` (`l-accidents-first-aid` carries no quiz beat). **Both
 were checked as still RED, deliberately.** A green there would not be good news — it would mean a
 content `status` field had been flipped to clear a gate, and this check is written that way on purpose.
 
-**The other two are new, and both are one lane's cross-lane collision — see §0.3.**
+**The third is new, it is NOT a cross-lane collision, and the lane that shipped it declared it red
+before it shipped — see §0.4.**
+
+### 0.4 — Round 4: no collision, one declared-red guard, and a gate poisoned from outside the repo
+
+**8 concurrent lanes, 18 files touched, 4 of them new test files — and the delta against the
+`c72bcc2` baseline is +1 failure, which is not a collision.** `[gated]`
+
+| | baseline `c72bcc2` | round 4 (working tree) | delta |
+|---|---:|---:|---:|
+| test **files** | 890 †       | **893** | **+3** |
+| tests **failed** | 2 †        | **3** | **+1** |
+| tests skipped | 170 †        | 170 | 0 |
+| tests passed | *not measured* | **13,833** | — |
+| `tsc` errors in source | 0 †   | **0** | 0 |
+| content-validation blocking | 0 † | **0** | 0 |
+
+† **The baseline column was not re-run for this gate, and is marked so rather than implied.** The
+round-4 column is measured — one `vitest` run, its own `$?`. The baseline figures are the round-4
+brief's stated starting point (`tsc` 0 · content 0 · vitest 2 failed) plus the file count derived
+from it: 893 collected today minus the 3 test files this round adds = 890, which agrees with §0.3's
+independently measured 890 at `e9bf33c`+round-3, and `2f68ab5`/`c72bcc2` added no test file. **The
+passed-test count is simply left blank**: 13,833 − 61 would have looked like a measurement and would
+have been arithmetic on a number nobody ran. A delta is only worth printing when both ends of it
+were measured, and only three of these five rows have both.
+
+**The one new failure is class (b) — a real defect a new test correctly caught — and it is the
+cleanest example of that class the programme has produced.** It is *not* class (a): the signature of
+a collision is *a test failing in a file no lane owned*, and this test fails in
+`environment/__tests__/weather.test.ts`, which the weather lane owns and edited in the same change.
+It is *not* class (c) either — a lane shipping a test file it never ran — because the lane ran it,
+recorded the result, and **wrote the expected red into the file before shipping**:
+
+> *“It is RED until the two-file routing lands; that is the guard working, not the guard broken.”*
+
+| failing test | owned by | verdict |
+|---|---|---|
+| `environment/__tests__/weather.test.ts` — *“THE GUARD: the snow-bearing mapping is reachable AND actually read”*, expected `reachable=false readsSnowChannel=false passesLiveSnow=false` to be `reachable=true readsSnowChannel=true passesLiveSnow=true` | **the weather lane** (same change) | **(b) real, open defect — must not be cleared by weakening it** |
+
+**The defect it convicts was verified independently of the test, by reading the three files.**
+`[read]` `weather.ts:584` exports `roadSurfaceToParams`, the road mapping that finally bears a snow
+term; `environment/index.ts` exports `wetnessToRoadParams` and **not** `roadSurfaceToParams`; and
+`world/components/StaticWorld.tsx:21` imports `{ useWetness, wetnessToRoadParams }` and calls the
+rain-only mapping at **:279, :294 and :313**. The snow term is real, tested and reasoned — and it
+**changes not one pixel of the snow lesson the audit filed as critical.** By doc 05, a helper missing
+from the barrel does not exist. This is the half-routed state, and the lane's own header says why it
+is the dangerous one: *“it reads like a fix.”*
+
+**This is the second half-routed fix found in one round, and the other was found by the lane that had
+caused it.** The `SessionEndScreen` lane discovered that round 3's `FaultCard` fix went green at the
+unit level while the only surface that mounts the list never passed the prop — *“the prop DEFAULTS TO
+BILLED on purpose. So the screen went on printing the catalogue base on every row for another day”* —
+and shipped `session-end-ledger-close.test.tsx` to pin it at the screen level. **Two lanes, one
+shape: a fix that is complete in its own file and inert in the product.** That shape has now produced
+a critical-severity miss in two consecutive rounds and deserves its own line in the review checklist,
+because what it looks like from inside the owning file is a passing test.
+
+#### 0.4.1 — The `tsc` red is not this repository's, and `exclude` cannot stop it
+
+`tsc --noEmit` exits **1** on four syntax errors, all in
+`platform/.next-harness/dev/types/routes.d.ts`. **No lane touched it, no commit contains it, and it
+is gitignored** (`platform/.gitignore:9`, `.next-*/`). It is a **torn write**: 154 lines against the
+live `.next/dev/types/routes.d.ts`'s 136, with `interface` truncated to `erface` **twice** — a longer
+old file partially overwritten by a shorter new one while a harness dev server was running. Its mtime
+falls **inside** this gate's own `tsc` invocation.
+
+**Proven environmental, not asserted.** `[gated]` `platform/next-env.d.ts` — itself gitignored
+(`platform/.gitignore:52`) and rewritten by Next on every dev run — carries
+`import "./.next-harness/dev/types/routes.d.ts";`. With that one line commented out and **nothing
+else changed**, `npx tsc --noEmit` prints **no errors and exits 0**. The file was then restored from a
+backup and verified byte-identical with `diff`.
+
+**The part worth keeping: `tsconfig.exclude` gives no protection here, and the config looks as though
+it does.** `tsconfig.json` excludes `.next-*`, and that exclusion is real but irrelevant — `exclude`
+filters which files the *wildcard include* patterns collect, and never which files are reachable by
+**import**. `tsc --explainFiles` names the route in one line:
+
+```
+.next-harness/dev/types/routes.d.ts
+  Imported via "./.next-harness/dev/types/routes.d.ts" from file 'next-env.d.ts'
+```
+
+So **any agent who starts a Next dev server with a custom `distDir` silently repoints the type gate at
+that dir for every later session**, and a half-written artifact there fails `tsc` for work that has
+nothing to do with it. Four such dist dirs now exist (§9). This is a standing hazard on this box
+rather than a round-4 event, and it is why the gate table reports `tsc` as **1 raw / 0 source**
+instead of quietly picking one of the two.
+
+**The file count is evidence, and the round-4 brief's file-count premise was two rounds stale.**
+`[gated]` The brief predicted **878 → 881** on the strength of the orphaned-runners lane getting three
+never-executed `tools/` files collected. That arithmetic was already retired in §0.3: those three —
+`tools/mobile/{ladder,selectors,settle}.test.mjs` — were un-orphaned in **round 2** (`e9bf33c`), and
+the tree has gated at 888, 889 and 890 files since. **878 has not been this suite's file count for
+three rounds**, so “still reads 878” could not have been evidence of anything this round. The real
+accounting for round 4's +3:
+
+| source | files | note |
+|---|---:|---|
+| `hud/__tests__/session-end-ledger-close.test.tsx` | +1 | the screen-level pin described above — 31 `expect(`s |
+| `lessons/__tests__/finish-work-site-band.test.ts` | +1 | the `finish.ts` lane — 36 `expect(`s |
+| `lessons/__tests__/reach-zone-witness.test.ts` | +1 | the `objectives.ts` lane — 60 `expect(`s across 33 blocks |
+| `tools/mobile/lib/__tests__/target.test.mjs` | **+0 to vitest** | 89 assertions, and it declares **`node:test`** — so it is the **node** gate's file, and that gate went 19 → 20. The partition audit confirms it: *“913 test files, 893 vitest / 20 node:test, none shared, none orphaned”* |
+| **total** | **890 → 893** | 913 across both runners |
+
+**The orphaned-runners lane added zero failures this round, because its work landed two rounds ago.**
+All three formerly-orphaned files are collected and green. What the brief anticipated as this round's
+legitimate new red had already been paid for in round 2, where `ladder.test.mjs` was red on its first
+ever execution and was fixed there (§0.1.1). **A brief that predicts a number is only useful if the
+number is re-derived before it is used as evidence** — this one would have convicted a lane that had
+done nothing wrong.
+
+**No assertion was weakened to reach this number**, which is the other way a +1 could have been
+bought. `[gated]` Every changed test file gained assertions against `HEAD`: `test-ownership.test.mjs`
+48 → 99 (23 → 46 blocks), `tools/mobile/__tests__/lesson-audit.test.mjs` 33 → 77 (10 → 18),
+`weather.test.ts` 97 → 113 (31 → 34), `markings-paint-truth.test.ts` 225 → 243,
+`stop-claim-gates.test.ts` 36 → 42 (15 → 16). `fault-card-ledger-close.test.tsx` holds at 26/5 and its
+diff is **documentation only** — the header retreating from a screen-level claim it could not support.
+The single `.skip` in any changed or new test file is
+`tools/mobile/__tests__/lesson-audit.test.mjs:364`, `t.skip("no playwright browser on this machine")` —
+a runtime capability guard, not a muted assertion.
 
 ### 0.3 — Round 3: the collision that DID happen, and it is one lane
 
@@ -6038,7 +6169,8 @@ Three repair waves and three fix rounds have now edited **57** of the 138.
 | round 2 · red-clearing (commit `7a0ab52`) | 3 | 7 | 4 |
 | round 2 · collision episode (commit `4dd1850`) | 6 | 123 | 60 |
 | round 2 · the 8 lanes (commit `e9bf33c`) | 7 | 149 | 30 |
-| round 3 · the 8 lanes (**working tree, UNCOMMITTED**) | 3 | 17 | 2 |
+| round 3 · the 8 lanes (commit `2f68ab5`) | 3 | 17 | 2 |
+| round 4 · the 8 lanes (**working tree, UNCOMMITTED**) | **0 net-new** | 0 | 0 |
 | **union — ever opened (a real file, really edited)** | **57** | **698** | **286** |
 | **never opened at all** | **74** | **278** | **26** |
 | **names no file — unopenable as filed** | **7** | **36** | **6** |
@@ -6064,6 +6196,14 @@ Two errors were compounding, and both are corrected here:
 **Round 3 opened three files** — `hud/FaultCard.tsx` (13/0c), `components/ScenarioObstacles.tsx`
 (3/1c) and `collision/bodies.ts` (1/1c). The other five lanes worked in files already opened.
 
+**Round 4 opened NO new file, and that is the wrong axis to judge it on.** `[corpus]` Its five
+corpus-known files — `lessons/objectives.ts` (51/32c), `lessons/finish.ts` (22/13c),
+`tools/mobile/lesson-audit.mjs` (13/10c), `hud/SessionEndScreen.tsx` (22/3c) and
+`environment/weather.ts` (6/4c) — carry **114 findings, 62 critical between them**, and every one of
+the five had been *edited* by an earlier wave. What round 4 did was land the two **lanes** that had
+never run, which is a different thing from opening a file and is the distinction the next block
+exists to keep straight.
+
 Wave 3 was the first wave to move coverage materially: it opened **22 files the corpus knows about
 that no earlier wave had touched — 140 findings, 55 critical.** Against waves 1–2, which between them
 had opened 31 files, that was the single largest jump the programme had made. **Round 2 added 6 more
@@ -6081,18 +6221,38 @@ holds one lane per suspect file carrying a critical finding — 83 of them. Befo
 | `world/builders/network.ts` | 1 | 1 | `7a0ab52` — **the file §0.2 records the wave-3 gate dying inside** |
 | `traces/scHzAccidentScene.ts` | 1 | 1 | `7a0ab52` + `4dd1850` |
 
-**30 of the 83 critical lanes still have never landed**, carrying **78 findings, 31 critical**. The
-two deepest are unchanged and are the programme's largest single omission:
+**CORRECTED 2026-08-19 (round 4) — this block was two measures printed as one, and it did not add
+up.** It read *“30 of the 83 critical lanes still have never landed, carrying 78 findings, 31
+critical”* and then listed `objectives.ts` (51/32) and `finish.ts` (22/13) as its two deepest members.
+**Those two rows alone carry 45 criticals against a stated total of 31**, which is impossible, and
+neither file was ever a member of that 30: both had been edited by waves 1–2, as the paragraph
+underneath said in as many words. The 30/78/31 figure counts **files never edited**; the two rows
+beneath it count **lanes never run**. Both measures are worth having and they are now kept apart.
 
-| lane that has still never landed | BROKEN | critical |
-|---|---:|---:|
-| `lessons/objectives.ts` | 51 | 32 |
-| `lessons/finish.ts` | 22 | 13 |
+**Measure 1 — critical lanes whose FILE has never been edited.** `[corpus]` **29 of the 83**,
+carrying **76 findings, 30 critical**. Round 4 did not move this number, because all five of its
+corpus files were already open. The deepest that remain: `modules/sim/rules` (5/2c — names no file,
+§1 row 3), `lesson-ui/LessonCard.tsx` (12/1c), `lesson-ui/ExamBriefingCard.tsx` (5/1c),
+`scene/lessonWorldRecipe.ts` (5/1c), `lessons/specs.ts` (4/1c).
 
-`objectives.ts` and `finish.ts` are *opened* files (waves 1–2 edited both, and §2.1 C1/C2/C7 land in
-them) whose wave-3 lane — the one aimed at the remaining 73 findings and 45 criticals between them —
-never ran, and round 2 did not run it either. **Coverage of 59 files is not progress toward 138 at a
-constant rate: the 79 that remain are the ones nobody has looked at five passes running.**
+**Measure 2 — critical lanes that have never RUN, whatever the file's edit history.** This is where
+round 4 spent itself, and it closed the programme's largest single omission:
+
+| the two deepest lanes that had never run | BROKEN | critical | round 4 |
+|---|---:|---:|---|
+| `lessons/objectives.ts` | 51 | 32 | **LANDED** — working tree, + `reach-zone-witness.test.ts` (60 `expect(`s) |
+| `lessons/finish.ts` | 22 | 13 | **LANDED** — working tree, + `finish-work-site-band.test.ts` (36 `expect(`s) |
+
+Between them **73 findings and 45 criticals** finally had a lane pointed at them — the pair that
+waves 1–3 and rounds 2–3 all failed to run. `objectives.ts` is *the file where a green tick is
+minted*, so its 32 criticals are the product's core failure mode stated once: a student certified for
+a skill nobody measured. **Landing a lane is not closing its findings** (§2.6 O20–O23 record what
+these two could not reach), but it is the first time either has been attempted.
+
+**Coverage of 57 files is still not progress toward 138 at a constant rate: the 74 never opened are
+the ones nobody has looked at six passes running**, and they are now the *shallow* end — 278
+findings but only 26 critical, against 698/286 in the 57 that have been opened. The depth is where
+the programme has been; the breadth is what is left.
 
 **Touching a file is not closing its findings**, and 625 must never be read as 625 closed. Each lane
 closed the specific rows it names in its own source comments; the rest of each file's bucket is
@@ -6240,7 +6400,8 @@ of prose arguing it — and does not do what the prose says.
 ### 2.6 — What the lanes reported they could not close, and why
 
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
-of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's.** Four of wave 3's are
+of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's;
+O20–O26 are round 4's.** Four of wave 3's are
 *structured*: a lane declared a typed `KNOWN_OPEN` array so that a row silently disappearing turns its
 own staleness test red — the closest thing the programme has to the `closedBy` field §7 keeps asking
 for, pointed backwards. **Never add a row to one for a finding you could have fixed** is the rule each
@@ -6277,6 +6438,36 @@ and is, on the evidence, the dominant failure mode of single-file lane ownership
 | O18 | **Six sweep-161 findings were routed to `collision/index.ts` and it can answer none of them** | verbatim: *"WHAT THIS MODULE DOES NOT DO, because six sweep161 findings were routed here for it and it cannot answer any of them (recorded so the next wave routes them to a file that can): · NO CONTACT RESPONSE. Nothing here moves a body."* A routing error in the corpus, not a repair failure — but **six findings are parked against a file that structurally cannot close them** | `collision/index.ts:73–80` |
 | O19 | **NPC traffic still walks at a fifth of the ego car's pace below 10 fps** — O13, carried unchanged | verbatim, still in the tree: *"NOT FIXED HERE, and not this lane's file: `traffic/system.ts` clamps its own step at MAX_DT_SEC = 0.1, so NPC cars and staged pedestrians still walk at a fifth of the ego car's pace on a sub-10-fps frame."* | `components/sim/LessonScene.tsx:3013` → `traffic/system.ts` |
 
+**Round 4's rows, O20–O26.** `[read]` Same rule: each was written into the tree by the lane that
+could not close it, and read out of the file named today. **Six of the seven are again “one edit in a
+file this lane does not own”** — the shape that has now produced **fifteen of the twenty-six rows in
+this table** and is, on the evidence of four rounds, the dominant failure mode of single-file lane
+ownership. It is no longer a per-round observation; it is the programme's structural cost, and the
+remedy is a lane whose `owns` list is the *fix*, not the file.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O20 | **Two adverse-conditions gates certify lamps their banner never names** — `sc-ac-fog/sc-acf-zone` and `sc-ac-snow/sc-acs-approach`. Both photographed with the telltales dim throughout and the gate ticked 3/3 | verbatim: *“ROUTED, NOT CLOSED — two rows of the same class this file cannot reach … Both are `templates-conditions.ts`, which this lane does not own: · `sc-ac-fog/sc-acf-zone` … Instruction 1 makes BOTH the dipped beams and the fog lamps a precondition of moving off … and the sweep photographed both telltales dim from arrival through t101s with the gate ticked at 1:56 and 3/3 stars. The banner names only a speed, so no derivation can bind it: add `requireLamps: "fog"` to that objective's params. · `sc-ac-snow/sc-acs-approach` — «Приближи със зимна скорост», same shape, СВЕТЛИНИ dim throughout: add `requireLamps: "low"`. Both are one key in one object.”* | `lessons/__tests__/reach-zone-witness.test.ts:591–604` → `templates-conditions.ts` |
+| O21 | **Two gates certify that the student read the OFFICER rather than the lamp, and nothing grades the distinction** — `sc-sig-controller-live/sc-sctl-read` and `sc-sig-controller-postures/sc-sctp-read` | verbatim: *“«✓ Приближи бавно и прочети регулировчика, не лампата 1:16» beside its own evidence line … and a −10 «Неизпълнение на сигнала на регулировчика». **The cap of 20 grades «бавно»; nothing grades «не лампата».**”* and, on the second, *“its own source comment says the quiet part, „slow enough to have actually LOOKED at the officer, not read a (dark) lamp" — **slow enough is not looked**.”* Both `templates-signals2.ts` | `lessons/__tests__/stop-claim-gates.test.ts` `READ_CLAIM_KNOWN_OPEN` |
+| O22 | **Eleven stranded lanes cannot be ended from this module at all.** Every stranded drive in the sweep oscillates 0–20 км/ч, so no standstill bar at any duration is ever met | verbatim: *“A GLOBAL IDLE bound would close none of them … What ends those drives is a SESSION-level budget or an off-network test (`SimTick.edgeId === null` is the existing channel for „off-road/unknown"), and both need an arm in `engine.ts`, which is not this lane's file. Adding an unmeasured duration cap here instead would end drives on a timer regardless of what the student is doing — **a false refusal manufactured to answer a missing ending, which is the trade this module exists to refuse.**”* | `lessons/finish.ts:104–112` → `rules/engine.ts` |
+| O23 | **The roundabout finish hands back up to 5 m of ring to “no automatic ending”** | verbatim: *“Closing it properly needs the zone to CARRY its work-site bound (a `RouteFinishZone` field, i.e. `lessons/types.ts`), which is not this lane's file; **routed rather than guessed at**.”* The lane states the cost rather than hiding it: a widening of a hole B1 already rules open, not a new class | `lessons/finish.ts:1252–1262` → `lessons/types.ts` |
+| O24 | **THE SNOW ROAD MAPPING IS BUILT AND NOTHING READS IT** — and this is the round's one new gate failure (§0.4), red on purpose | verbatim: *“IT CHANGES NO PIXEL UNTIL ITS READER PASSES THE VALUE, and that reader is not this lane's file. **So this finding is NOT closed** — and the state in between is the dangerous one, because it reads like a fix. Measured 2026-08-19: `index.ts` exports `wetnessToRoadParams` … and NOT `roadSurfaceToParams`; `StaticWorld.tsx` imports `{ useWetness, wetnessToRoadParams }` and calls the rain-only mapping at :279, :294 and :313. **By §4's own rule that is a DEAD API** — no author reaches it, no reader calls it — and by doc 05 it does not exist at all.”* | `environment/weather.ts:79–96` → `environment/index.ts` + `world/components/StaticWorld.tsx` |
+| O25 | **A node runtime abort can discard four healthy audit lanes, one of which carried a real finding** | verbatim: *“It is NOT fixed here, because nothing in this file causes it and the two remedies that work — `process.exitCode` with no `exit()`, or not using global fetch — belong to the sign-in path (`lib/auth.mjs` `warmFromNode`) and to the dispatcher … What this file can do is say so, and keep writing the truth into the status file, which no abort can rewrite: **READ `exit` OUT OF `_audit-status.json`, and treat a process code that disagrees with it as evidence about node, not about the lesson.**”* | `tools/mobile/lesson-audit.mjs:1885–1902` → `tools/mobile/lib/auth.mjs` + the dispatcher |
+| O26 | **Neither half of the runner partition can see the command line** — a `--exclude` or `--dir` at invocation would deselect files with no gate able to look | verbatim: *“NEITHER HALF SEES THE COMMAND LINE. Both read the config file; a `--exclude` or `--dir` passed at invocation would deselect files without either gate having anything to look at. **Checked rather than assumed**: `.github/workflows/ci.yml` runs the bare `npx vitest run` and `npm run test:tools`, no selection flags on either, so **nothing today exploits it**. That file is not this lane's to change — if a flag is ever added there, this comment is the reason it needs a check of its own.”* | `platform/scripts/__tests__/test-ownership.test.mjs:98–104` → `.github/workflows/ci.yml` |
+
+**O20 and O21 are the same class as O2/O3, found in a file that had never been opened** — a gate
+certifying something no disc can witness. The `objectives.ts` lane was briefed to *judge that claim
+yourself; do not inherit it*, and it did: rather than accept “unclosable”, it made the demand
+structural — the gate derives what it must measure from the banner the student reads, so **a promise
+cannot be written that nothing enforces** — and then filed only the two rows that derivation
+genuinely cannot bind, because their banners name a speed while their briefings name the lamps.
+That is the difference between a `KNOWN_OPEN` row used as a debt and one used as a permission.
+
+**And every round-4 lane filed at least one row.** After §0.3 recorded that the round-3 lane with the
+widest blast radius filed nothing at all, this round has no silent lane — six lanes filed seven rows,
+and the two that filed none (`SessionEndScreen`, the partition lane's node half) each shipped a test
+that pins what they could not fix. That is the pattern to keep.
+
 **And two round-3 lanes reported nothing they could not close.** Lane 4 (`repeat-key`) and lane 5
 (`FaultCard`) filed no open row — and lane 4 is the one that broke two test files it did not own
 (§0.3). **A lane reporting no residue is not evidence of none**; in this round it was the lane with
@@ -6286,12 +6477,19 @@ the widest blast radius and the quietest report.
 tick a student is shown for a skill the product never measured. That is the same shape as the
 document's opening warning (*passing 2 while failing 3*), now with names.
 
-**And the 30 critical lanes that have still never run reported nothing at all.** Their 78 findings,
-31 critical, have neither a fix nor a reason: absence of a report there means the agent was killed or
-never launched, not that the finding was examined and left. **Round 2 added three reasons and closed
-none of the ten wave-3 rows; round 3 added six more and closed one of its own (O14), which was a hole
-in round 2's fix rather than a corpus finding** — O1–O10 stand exactly as written, and O11/O13 are
-carried forward as O16/O19.
+**And the critical lanes that have still never run reported nothing at all.** Their findings have
+neither a fix nor a reason: absence of a report there means the agent was killed or never launched,
+not that the finding was examined and left. **Round 2 added three reasons and closed none of the ten
+wave-3 rows; round 3 added six more and closed one of its own (O14), which was a hole in round 2's
+fix rather than a corpus finding; round 4 added seven and closed none of the nineteen before it** —
+O1–O10 stand exactly as written, O11/O13 are carried forward as O16/O19, and O16 (weather leaking on
+the live path) is now joined by O24 in the same file, which is the second time `weather.ts` has
+shipped a mechanism whose reader lives elsewhere.
+
+**Nineteen rows became twenty-six and not one older row closed.** That is the honest reading of four
+rounds: the programme is very good at *finding and naming* what a lane cannot reach, and has not yet
+built the thing that spends those rows — a lane scoped to a fix that crosses two files. Fifteen of
+the twenty-six are one edit each in a named file at a named line.
 
 ## 3 · Wave 2, lane by lane — what survived refutation and what did not
 
@@ -6503,13 +6701,24 @@ rather than be muted.
 
 ## 9 · Housekeeping still in the tree — re-verified 2026-08-19
 
-`[gated]` Unchanged across five passes, so it is a standing item rather than a note, and **all of it
+`[gated]` Unchanged across six passes, so it is a standing item rather than a note, and **all of it
 was re-verified present on 2026-08-19**: **23 gitignored `platform/tsconfig.next-*.json` stubs**
-(35 bytes each) and **three stale scratch dist dirs** — `platform/.next-rig` ·
-`platform/.next-w2inset` · `platform/.next-simoverlay`. `platform/AGENTS.md` is explicit that these
-inject phantom `tsc` errors and that each dist dir runs 0.2–1.1 GB on a box the founder's own notes
-call chronically squeezed. They belong to other sessions, which is why they have not been deleted
-from under a running one — but they are still here.
+(35 bytes each, counted and measured today) and — **now four** — stale scratch dist dirs:
+`platform/.next-rig` · `platform/.next-w2inset` · `platform/.next-simoverlay` · **`platform/.next-harness`
+(new, created 2026-08-19 07:27)**. `platform/AGENTS.md` is explicit that these inject phantom `tsc`
+errors and that each dist dir runs 0.2–1.1 GB on a box the founder's own notes call chronically
+squeezed. They belong to other sessions, which is why they have not been deleted from under a running
+one — but they are still here.
+
+**AGENTS.md's warning stopped being theoretical this round, and the mechanism is worse than “phantom
+errors”.** `[gated]` `.next-harness` is what made `tsc --noEmit` exit **1** in §0's gate table, on
+four syntax errors in a half-written `routes.d.ts` inside it. The reason it can reach the type gate
+at all is that **`tsconfig.json`'s `exclude: [".next-*"]` does not and cannot stop it**: Next rewrites
+the gitignored `platform/next-env.d.ts` to `import "./.next-harness/dev/types/routes.d.ts";`, and
+`exclude` filters wildcard *include* matching, never reachability by import. Full proof and the
+`--explainFiles` output are in §0.4.1. **This raises the item from housekeeping to a gate hazard**:
+any session that runs a dev server with a custom `distDir` poisons `tsc` for every session after it,
+and the failure names files no one has touched.
 
 **CLOSED — the committed debug dump is gone.** `world/builders/__tests__/_scratch.test.ts` (42 lines,
 `expect(1).toBe(1)`, writing a marking-quad census to a hard-coded absolute path inside one session's
@@ -6529,13 +6738,13 @@ own notes call it chronically squeezed, two extra checkouts of this repo are wor
 `git worktree prune` after confirming both sessions are dead.
 
 **The rest of the residue sweep is clean, and it was run wide.** `[gated]` Re-run 2026-08-19 after
-round 3:
+round 4, over the whole tree and not only the changed files:
 
 | swept for | result |
 |---|---|
-| files whose own header says *"TEMPORARY — delete after reading"* | **0.** The only hit repo-wide is `scripts/tools-tests.mjs:158`, which *cites* the five-file incident as the reason its ownership audit exists — a reference, not residue |
+| files whose own header says *"TEMPORARY — delete after reading"* | **0.** Two hits repo-wide and both are *citations* of the five-file incident, not residue: `scripts/tools-tests.mjs:383` (the reason its ownership audit exists) and this document's own §9. Checked by reading both, not by matching the pattern |
 | test files under `platform/src` with no `expect(` | **0** |
 | test files anywhere in the repo, tracked **or** untracked, with no `expect(` and no `assert` | **0** |
 | `.skip` / `.only` / `.todo` / `xit` / `xdescribe` in any changed or new test file | **0** |
-| untracked files after round 3 | **1, and it is a real test file** — `hud/__tests__/fault-card-ledger-close.test.tsx`, 24 `expect(`s, the FaultCard lane's pin for the closed-exam-sheet defect. No stray probes, no scratch files, no `zz-*` |
+| untracked files after round 4 | **5, and every one is real** — four test files (`hud/__tests__/session-end-ledger-close.test.tsx` 31 `expect(`s · `lessons/__tests__/finish-work-site-band.test.ts` 36 · `lessons/__tests__/reach-zone-witness.test.ts` 60 across 33 blocks · `tools/mobile/lib/__tests__/target.test.mjs` 89 assertions) and one real module they test (`tools/mobile/lib/target.mjs`). No stray probes, no scratch files, no `zz-*` |
 | `*probe*` / `*scratch*` / `zz-*` under version control | all resolve to **real modules or real gitignored working directories** — `collision/probe.ts` (the swept-contact memory, with its own 209-line test), `environment/PerfProbe.tsx`, `runtime/__tests__/b15-roundabout-wait.probe.test.ts`, the `tools/clips/headless/*probe*.mjs` render rigs, and everything under `scratchpad/` and `tools/mobile/.out/`, both of which `.gitignore` already covers. **No exceptions left** — `scratch-gate.txt` was the last one and it is deleted |

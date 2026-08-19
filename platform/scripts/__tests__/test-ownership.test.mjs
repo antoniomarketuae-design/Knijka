@@ -46,6 +46,63 @@
 // spread or retyped. Neither check subsumes the other, which is what makes two
 // acts two.
 //
+// AND THAT FIX THEN REPRODUCED THE DEFECT ONE KEY OVER, WHICH IS WHY THE
+// ALLOWLIST BLOCKS BELOW EXIST. Everything above is about `include`. Nothing
+// above has any opinion about the key written NEXT to it, and `test: { … }`
+// accepts eighty-odd keys of which several decide what vitest collects.
+// MEASURED 2026-08-19, `include: [...VITEST_INCLUDE]` untouched, one key added
+// beside it in platform/vitest.config.ts:
+//   · `exclude: [… , "../tools/mobile/settle.test.mjs"]` — `npx vitest list
+//     --filesOnly` went 892 → 891, and asking vitest for settle.test.mjs by
+//     name printed NOTHING and exited 0.
+//   · `dir: "src"` — `npx vitest list --filesOnly` returned 0 files.
+// Both gates green through both: `auditConfigWiring()` returned `[]`, the node
+// gate printed "partition OK … none orphaned", and the deep-equality two
+// paragraphs up passed, because `include` had not changed. Three lanes running,
+// three orphan classes, one unchanged shape — a property proved on the axis
+// somebody had just been looking at and asserted on the others.
+//
+// THE PARTITION IS THEREFORE CLOSED BY EXHAUSTION, NOT BY NAMING KEYS. Pinning
+// `exclude` would have left `dir`; pinning `dir` would have left `projects`;
+// the next vitest minor adds keys nobody here has read. The config may set only
+// the keys VITEST_ROOT_KEYS and VITEST_TEST_KEYS vouch for, each with the
+// recorded reason it cannot deselect a file, and an unlisted key is refused BY
+// NAME in both runners. The split holds here too: the node gate reads the key
+// structure out of the source text, this file reads `Object.keys()` off the
+// object vitest actually resolved — so a key arriving by spread, by
+// `mergeConfig`, or under a computed name is caught as a value where no text
+// scan could see it, and a `defineConfig` this scanner cannot parse is caught
+// as text where the value would look perfectly ordinary.
+//
+// AND HERE IS THE LIMIT OF THIS HALF, stated rather than left to be discovered
+// by whoever next builds on it. Both mutations were run against the REAL config
+// and both gates were watched:
+//   · `exclude` — the node gate exited 1 naming `exclude`, and this file went
+//     red on the value assertion, 17 tests failing. Two independent refusals.
+//   · `dir: "src"` — the node gate exited 1 naming `dir`. This file did NOT go
+//     red on an assertion. It could not: vitest printed "No test files found,
+//     exiting with code 1" and never collected this file, because `dir` had
+//     removed the gate from its own gate. Still a hard red, but a red no
+//     assertion here produced.
+// A key that deselects THIS file silences every check in it, which is the
+// green-by-absence shape the whole file is about, one level up. That is why the
+// node gate is not a convenience copy: it is the only half that can speak when
+// vitest has been configured not to find this file. It is also why
+// `passWithNoTests` is refused. MEASURED on the real config the same day:
+// `dir: "src"` plus `passWithNoTests: true` turns that loud "No test files
+// found, exiting with code 1" into "No test files found, exiting with code 0" —
+// the vitest gate passes having run nothing at all, and `node
+// scripts/tools-tests.mjs --audit-only` exits 1 naming BOTH keys. Two keys, and
+// the node gate is the only half left standing.
+//
+// NEITHER HALF SEES THE COMMAND LINE. Both read the config file; a `--exclude`
+// or `--dir` passed at invocation would deselect files without either gate
+// having anything to look at. Checked rather than assumed: .github/workflows/
+// ci.yml runs the bare `npx vitest run` and `npm run test:tools`, no selection
+// flags on either, so nothing today exploits it. That file is not this lane's
+// to change — if a flag is ever added there, this comment is the reason it
+// needs a check of its own.
+//
 // THE PREDICTOR CHECKS ITSELF. The audit predicts vitest's file set with
 // vitest's own glob engine and options rather than a hand-rolled matcher, and
 // the first test below feeds it the one case verified beyond argument: THIS
@@ -54,11 +111,11 @@
 // changed default, a different hoisted copy of tinyglobby — that is where it
 // fails, rather than quietly reporting a clean partition it did not measure.
 // -----------------------------------------------------------------------------
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import fs, { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { configDefaults } from "vitest/config";
 
 import {
@@ -66,9 +123,12 @@ import {
   auditOwnership,
   classify,
   declaredRunner,
+  paths,
   VITEST_CONFIG_FILE,
   VITEST_DEFAULT_EXCLUDE,
   VITEST_INCLUDE,
+  VITEST_ROOT_KEYS,
+  VITEST_TEST_KEYS,
   vitestConfigPath,
   vitestWouldRun,
 } from "../tools-tests.mjs";
@@ -76,7 +136,44 @@ import {
 // decide this file would run. src/coverage-thresholds.test.ts is the precedent.
 import vitestConfig from "../../vitest.config";
 
-const SELF = fileURLToPath(import.meta.url).split("\\").join("/");
+const SELF = fileURLToPath(import.meta.url)
+  .split("\\")
+  .join("/");
+
+/**
+ * The whole-repo audit, computed ONCE for the five tests that read it.
+ *
+ * It walks 913 files across 709 directories and reads every one. Measured
+ * 2026-08-19: 495 ms warm, but the first call in a fresh process is bounded by
+ * the OS file cache on this box's 7200 rpm HDD and ranged from 558 ms to 48 s
+ * across seven runs with seven other agents in the tree. Five independent calls
+ * multiplied that by five for no new information — the audit is a pure read of
+ * a tree no test here mutates.
+ */
+let auditMemo = null;
+const audit = () => (auditMemo ??= auditOwnership());
+
+/**
+ * The timeout for anything that walks or globs the repository.
+ *
+ * vitest's default is 5 s, and on 2026-08-19 `leaves no test file unowned…`
+ * took 77 s and failed on it — a FALSE FAILURE, red for the state of the disk
+ * rather than the state of the partition, and the fastest way to get a gate
+ * deleted or wrapped in `--retry`. Nothing here is loosened: the assertions are
+ * unchanged and still fail on a real orphan in milliseconds. Only the patience
+ * is sized from the measurement above, with headroom over the worst cold run.
+ */
+const DISK_BOUND_MS = 120_000;
+
+// Pay the cold walk and the cold glob ONCE, here, where the budget is stated,
+// rather than in whichever test happened to run first — which is how a suite
+// ends up with one arbitrarily slow test and seven fast ones, and how the
+// 77-second failure above landed on the partition assertion rather than on the
+// disk that actually caused it.
+beforeAll(() => {
+  audit();
+  vitestWouldRun();
+}, DISK_BOUND_MS);
 
 describe("the predictor is checked against a file known to be running", () => {
   it("predicts THIS file, which vitest demonstrably collected", () => {
@@ -104,7 +201,7 @@ describe("the predictor is checked against a file known to be running", () => {
 
 describe("the partition over the whole repository", () => {
   it("leaves no test file unowned, shared, or claimed by the wrong runner", () => {
-    const { rows, problems } = auditOwnership();
+    const { rows, problems } = audit();
     expect(
       problems.map((p) => `${p.file} — ${p.problem}`),
       "a test file is not run by exactly one runner",
@@ -118,10 +215,13 @@ describe("the partition over the whole repository", () => {
   it("pins the three files that were orphaned, by name", () => {
     // The named regression. Drop any one of these from VITEST_INCLUDE and this
     // goes red naming it, in the same commit rather than at the next audit.
-    const { rows } = auditOwnership();
+    const { rows } = audit();
     for (const name of ["ladder", "selectors", "settle"]) {
       const row = rows.find((r) => r.file === `tools/mobile/${name}.test.mjs`);
-      expect(row, `tools/mobile/${name}.test.mjs is not in the audit at all`).toBeDefined();
+      expect(
+        row,
+        `tools/mobile/${name}.test.mjs is not in the audit at all`,
+      ).toBeDefined();
       expect(row.declared).toBe("vitest");
       expect(row.vitestRuns).toBe(true);
       expect(row.nodeRuns).toBe(false);
@@ -134,10 +234,19 @@ describe("the partition over the whole repository", () => {
     // node:test files, and vitest reported "No test suite found" as two hard
     // failures in every gate. Fixing the orphans by widening the glob again
     // would trade a silent failure for a loud one, not fix anything.
-    const { rows } = auditOwnership();
-    for (const name of ["navigation", "ready", "frames", "insets", "deck-captions"]) {
+    const { rows } = audit();
+    for (const name of [
+      "navigation",
+      "ready",
+      "frames",
+      "insets",
+      "deck-captions",
+    ]) {
       const row = rows.find((r) => r.file === `tools/mobile/${name}.test.mjs`);
-      expect(row, `tools/mobile/${name}.test.mjs is not in the audit at all`).toBeDefined();
+      expect(
+        row,
+        `tools/mobile/${name}.test.mjs is not in the audit at all`,
+      ).toBeDefined();
       expect(row.declared).toBe("node");
       expect(row.vitestRuns).toBe(false);
       expect(row.nodeRuns).toBe(true);
@@ -145,8 +254,10 @@ describe("the partition over the whole repository", () => {
   });
 
   it("collects this gate itself — a gate outside its own audit is not a gate", () => {
-    const { rows } = auditOwnership();
-    const self = rows.find((r) => r.file === "platform/scripts/__tests__/test-ownership.test.mjs");
+    const { rows } = audit();
+    const self = rows.find(
+      (r) => r.file === "platform/scripts/__tests__/test-ownership.test.mjs",
+    );
     expect(self).toBeDefined();
     expect(self.problem).toBeNull();
     expect(VITEST_INCLUDE).toContain("scripts/__tests__/**/*.test.mjs");
@@ -183,10 +294,218 @@ describe("the config still delegates to VITEST_INCLUDE — the half text cannot 
   });
 });
 
+describe("a file that disappears mid-audit is counted, not crashed on and not hidden", () => {
+  /**
+   * The race, driven at the read rather than simulated.
+   *
+   * NOT HYPOTHETICAL. On 2026-08-19 `auditOwnership()` died with an unhandled
+   * ENOENT on src/modules/sim/lessons/__tests__/zz-probe-census.test.ts — a
+   * scratch file another lane created and deleted between this audit's walk and
+   * its read. The whole tools/ gate went red, with a stack trace, over a
+   * partition that was perfectly fine: a false refusal, on a box where seven
+   * agents share the tree.
+   */
+  const VICTIM = "tools/mobile/settle.test.mjs";
+  const isVictim = (p) => String(p).split("\\").join("/").endsWith(VICTIM);
+  const withFs = (readFileSync_, existsSync_, fn) => {
+    const read = fs.readFileSync;
+    const exists = fs.existsSync;
+    fs.readFileSync = readFileSync_(read);
+    fs.existsSync = existsSync_(exists);
+    try {
+      return fn();
+    } finally {
+      fs.readFileSync = read;
+      fs.existsSync = exists;
+    }
+  };
+  const enoent = (p) =>
+    Object.assign(new Error(`ENOENT: no such file, open ${p}`), {
+      code: "ENOENT",
+    });
+
+  it(
+    "drops it from the rows, names it in `vanished`, and calls it no finding",
+    { timeout: DISK_BOUND_MS },
+    () => {
+      const result = withFs(
+        (read) => (p, o) =>
+          isVictim(p)
+            ? (() => {
+                throw enoent(p);
+              })()
+            : read(p, o),
+        (exists) => (p) => (isVictim(p) ? false : exists(p)),
+        () => auditOwnership(),
+      );
+      expect(result.vanished).toEqual([VICTIM]);
+      expect(result.problems).toEqual([]);
+      expect(result.rows.some((r) => r.file === VICTIM)).toBe(false);
+    },
+  );
+
+  it(
+    "still THROWS when the file is right there — the swallow-everything version",
+    { timeout: DISK_BOUND_MS },
+    () => {
+      // The direction that matters more. A bare `catch { return null }` here
+      // would report a clean partition over every file it failed to open, which
+      // is this script's own failure mode wearing a helpful face. ENOENT is
+      // only forgiven when the file is genuinely gone, re-checked on the spot.
+      expect(() =>
+        withFs(
+          (read) => (p, o) =>
+            isVictim(p)
+              ? (() => {
+                  throw enoent(p);
+                })()
+              : read(p, o),
+          (exists) => exists, // …but the file still exists
+          () => auditOwnership(),
+        ),
+      ).toThrow(/ENOENT/);
+    },
+  );
+
+  it(
+    "still THROWS on a read error that is not ENOENT at all",
+    { timeout: DISK_BOUND_MS },
+    () => {
+      expect(() =>
+        withFs(
+          (read) => (p, o) =>
+            isVictim(p)
+              ? (() => {
+                  throw Object.assign(new Error("EACCES"), { code: "EACCES" });
+                })()
+              : read(p, o),
+          (exists) => () => false,
+          () => auditOwnership(),
+        ),
+      ).toThrow(/EACCES/);
+    },
+  );
+});
+
+describe("no OTHER key in that literal can deselect a file — the value half", () => {
+  // `Object.hasOwn`, never `k in allowed` — the same note sits at the matching
+  // check in tools-tests.mjs. `in` walks the prototype chain, so `constructor`,
+  // `toString`, `valueOf` and `hasOwnProperty` would all read as vouched for:
+  // an allowlist with four free passes granted by the language rather than by
+  // anyone's judgement. The test below drives exactly that.
+  const unvouched = (obj, allowed) =>
+    Object.keys(obj).filter((k) => !Object.hasOwn(allowed, k));
+
+  it("the resolved config sets only vouched-for keys at the top level", () => {
+    // `Object.keys` of the object vitest resolved, not tokens in a file. A key
+    // that arrived by spread or under a computed name is here and is nowhere in
+    // the source text.
+    expect(unvouched(vitestConfig, VITEST_ROOT_KEYS)).toEqual([]);
+  });
+
+  it("…and only vouched-for keys inside `test`", () => {
+    expect(unvouched(vitestConfig.test, VITEST_TEST_KEYS)).toEqual([]);
+  });
+
+  it("is not vacuous — the object it checks is the one that carries `include`", () => {
+    // An allowlist check over an empty object passes. This is the guard against
+    // reading a green tick off a config this test never actually reached.
+    expect(Object.keys(vitestConfig.test)).toContain("include");
+    expect(Object.keys(VITEST_TEST_KEYS)).toContain("include");
+  });
+
+  it("catches a key present only as a VALUE — the half no text scan can reach", () => {
+    // THE MUTATION. `...spread` is the shape the node gate can only report as
+    // "unreadable"; here the injected key is an ordinary own property, so it is
+    // named. Nothing about this passes before the check exists.
+    const merged = { ...vitestConfig.test, exclude: ["**/node_modules/**"] };
+    expect(unvouched(merged, VITEST_TEST_KEYS)).toEqual(["exclude"]);
+    const computed = { ...vitestConfig.test, ["d" + "ir"]: "src" };
+    expect(unvouched(computed, VITEST_TEST_KEYS)).toEqual(["dir"]);
+  });
+
+  it("does not vouch for a key just because Object.prototype has one by that name", () => {
+    // Under `k in allowed` — the shape this was written as first — every one of
+    // these passes silently, because `"constructor" in {}` is true. Four keys
+    // waved through by the language, in a list whose entire job is that nothing
+    // gets waved through. Not exploitable via a real vitest option today; the
+    // point is that the check is exact rather than nearly exact.
+    for (const inherited of [
+      "constructor",
+      "toString",
+      "valueOf",
+      "hasOwnProperty",
+    ]) {
+      expect(
+        inherited in VITEST_TEST_KEYS,
+        `${inherited} is reachable via the prototype`,
+      ).toBe(true);
+      expect(unvouched({ [inherited]: 1 }, VITEST_TEST_KEYS)).toEqual([
+        inherited,
+      ]);
+    }
+  });
+
+  it("every vouched-for key records WHY it cannot deselect a file", () => {
+    // The allowlist is only as good as the reasoning in it. An entry added to
+    // make a build green, with an empty or placeholder reason, is the next
+    // "silencing it takes two deliberate acts" — a sentence nobody tested.
+    for (const [key, reason] of Object.entries({
+      ...VITEST_ROOT_KEYS,
+      ...VITEST_TEST_KEYS,
+    })) {
+      expect(reason, `${key} has no recorded reason`).toBeTypeOf("string");
+      expect(
+        reason.length,
+        `${key}'s reason is too short to be one`,
+      ).toBeGreaterThan(40);
+    }
+  });
+});
+
+describe("the keys are dangerous for a measured reason, not a supposed one", () => {
+  // These do not test the guard. They test the PREMISE the guard rests on —
+  // that these keys really can remove a file — because a guard against a
+  // hazard that does not exist is how a lane reports a fix and changes nothing.
+  it(
+    "`exclude` beside an untouched `include` removes a file, and exactly one",
+    { timeout: DISK_BOUND_MS },
+    () => {
+      const base = vitestWouldRun();
+      const dropped = vitestWouldRun({
+        exclude: [...VITEST_DEFAULT_EXCLUDE, "../tools/mobile/settle.test.mjs"],
+      });
+      const gone = [...base].filter((f) => !dropped.has(f));
+      expect(gone.map((f) => f.split("/").slice(-3).join("/"))).toEqual([
+        "tools/mobile/settle.test.mjs",
+      ]);
+      // …and settle.test.mjs is a file the partition audit swears is covered.
+      const { rows } = audit();
+      const row = rows.find((r) => r.file === "tools/mobile/settle.test.mjs");
+      expect(row.vitestRuns).toBe(true);
+      expect(row.problem).toBeNull();
+    },
+  );
+
+  it(
+    "`dir`/`root` — moving the base directory takes every out-of-tree file with it",
+    { timeout: DISK_BOUND_MS },
+    () => {
+      // `dir: "src"` measured against the real vitest on 2026-08-19: 0 files
+      // collected, down from 892. The glob reproduces it, which is the check that
+      // the prediction and the runner still agree about what a base directory is.
+      const narrowed = vitestWouldRun({ cwd: join(paths().platform, "src") });
+      expect(narrowed.size).toBe(0);
+      expect(vitestWouldRun().size).toBeGreaterThan(800);
+    },
+  );
+});
+
 describe("auditConfigWiring — the node gate's text scan, driven from here", () => {
   const CONFIG_SRC = readFileSync(vitestConfigPath(), "utf8");
   const SPREAD = "include: [...VITEST_INCLUDE],";
   const IMPORT = 'import { VITEST_INCLUDE } from "./scripts/tools-tests.mjs";';
+  const TOP_LEVEL = "export default defineConfig({";
 
   /**
    * Mutate the REAL config source, not a synthetic stand-in.
@@ -200,7 +519,10 @@ describe("auditConfigWiring — the node gate's text scan, driven from here", ()
    * file.
    */
   const mutate = (from, to) => {
-    expect(CONFIG_SRC.split(from).length - 1, `anchor is not unique: ${from}`).toBe(1);
+    expect(
+      CONFIG_SRC.split(from).length - 1,
+      `anchor is not unique: ${from}`,
+    ).toBe(1);
     const out = CONFIG_SRC.replace(from, to);
     expect(out, "the mutation changed nothing").not.toBe(CONFIG_SRC);
     return out;
@@ -215,7 +537,10 @@ describe("auditConfigWiring — the node gate's text scan, driven from here", ()
 
   it("refuses a config that inlines the patterns instead of spreading them", () => {
     const problems = auditConfigWiring(
-      mutate(SPREAD, 'include: ["src/**/*.test.{ts,tsx}", "scripts/__tests__/**/*.test.mjs"],'),
+      mutate(
+        SPREAD,
+        'include: ["src/**/*.test.{ts,tsx}", "scripts/__tests__/**/*.test.mjs"],',
+      ),
     );
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/0 time\(s\), expected exactly 1/);
@@ -227,7 +552,10 @@ describe("auditConfigWiring — the node gate's text scan, driven from here", ()
     // runs, so the audit reports an orphan that is not one — a FALSE FAILURE,
     // and the founder's own complaint is a false failure.
     const problems = auditConfigWiring(
-      mutate(SPREAD, 'include: [...VITEST_INCLUDE, "../tools/mobile/ready.test.mjs"],'),
+      mutate(
+        SPREAD,
+        'include: [...VITEST_INCLUDE, "../tools/mobile/ready.test.mjs"],',
+      ),
     );
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/0 time\(s\)/);
@@ -248,7 +576,10 @@ describe("auditConfigWiring — the node gate's text scan, driven from here", ()
     // said so on the day the mutation above went green in both gates. Prose is
     // not a gate; a scanner that counts prose is not a gate either.
     const problems = auditConfigWiring(
-      mutate(SPREAD, '// include: [...VITEST_INCLUDE]\n    include: ["src/**/*.test.{ts,tsx}"],'),
+      mutate(
+        SPREAD,
+        '// include: [...VITEST_INCLUDE]\n    include: ["src/**/*.test.{ts,tsx}"],',
+      ),
     );
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/0 time\(s\)/);
@@ -256,7 +587,129 @@ describe("auditConfigWiring — the node gate's text scan, driven from here", ()
 
   it("names the config it scanned, so a rename cannot leave it scanning nothing", () => {
     expect(VITEST_CONFIG_FILE).toBe("vitest.config.ts");
-    expect(vitestConfigPath().split("\\").join("/")).toMatch(/\/platform\/vitest\.config\.ts$/);
+    expect(vitestConfigPath().split("\\").join("/")).toMatch(
+      /\/platform\/vitest\.config\.ts$/,
+    );
+  });
+
+  // ── the key beside the spread, mutation by mutation ──────────────────────
+  //
+  // Each of these leaves `include: [...VITEST_INCLUDE]` completely alone. That
+  // is the point: every one of them passed both gates before this block
+  // existed, and `exclude` and `dir` were measured actually removing files.
+
+  it("refuses `exclude` written beside an untouched spread", () => {
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    exclude: ["**/x/**"],`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `exclude` in `test`/);
+  });
+
+  it("refuses `dir`, which collapsed collection to 0 files when it was measured", () => {
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    dir: "src",`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `dir` in `test`/);
+  });
+
+  it("refuses `projects`, which supersedes the root include entirely", () => {
+    const problems = auditConfigWiring(
+      mutate(
+        SPREAD,
+        `${SPREAD}\n    projects: [{ test: { include: ["src/**"] } }],`,
+      ),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `projects` in `test`/);
+  });
+
+  it("refuses a key it has simply never heard of, rather than assuming it is safe", () => {
+    // THE WHOLE REASON THIS IS AN ALLOWLIST. `passWithNoTests` turns "no files
+    // matched" from a hard failure into a green run — the single most direct
+    // way to make an empty partition look like a clean one — and no denylist
+    // written before today would have contained it.
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    passWithNoTests: true,`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `passWithNoTests` in `test`/);
+  });
+
+  it("objectLiteralKeys reads a QUOTED key — a name in quotes is still a name", () => {
+    // Not decoration. The scanner blanks the INSIDE of every string so that a
+    // glob's braces and commas cannot throw off the depth count, and a quoted
+    // key is a string. If the mask and KEY_TOKEN_RE in tools-tests.mjs ever
+    // drift apart, `"exclude": […]` becomes invisible and this is what says so.
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    "exclude": ["**/x/**"],`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `exclude` in `test`/);
+  });
+
+  it("refuses a key named after an Object.prototype member — the text half", () => {
+    // The same free-pass hole as the value half, on the other instrument.
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    toString: null,`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `toString` in `test`/);
+  });
+
+  it("refuses top-level keys too — `root` moves the base every include resolves from", () => {
+    const problems = auditConfigWiring(
+      mutate(TOP_LEVEL, `${TOP_LEVEL}\n  root: "./src",`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/sets `root` in the top-level config object/);
+  });
+
+  it("refuses `plugins`, because a plugin's config hook can set any of the above", () => {
+    const problems = auditConfigWiring(
+      mutate(TOP_LEVEL, `${TOP_LEVEL}\n  plugins: [dropSome()],`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(
+      /sets `plugins` in the top-level config object/,
+    );
+  });
+
+  it("reports a spread as UNREADABLE rather than clearing the keys it can see", () => {
+    // The honest answer when text cannot enumerate: not "no bad keys found".
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    ...extraOptions,`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/a spread/);
+  });
+
+  it("reports a computed key as UNREADABLE — a concatenation names nothing to text", () => {
+    const problems = auditConfigWiring(
+      mutate(SPREAD, `${SPREAD}\n    ["ex" + "clude"]: ["x"],`),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/a computed key/);
+  });
+
+  it("refuses a config it cannot parse at all rather than reporting it clean", () => {
+    const problems = auditConfigWiring(
+      mutate(TOP_LEVEL, "export default defineConfig(() => ({"),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/does not hand a plain object literal/);
+  });
+
+  it("does NOT refuse the coverage `exclude` — depth is the whole difference", () => {
+    // THE FALSE REFUSAL THIS WOULD HAVE SHIPPED. platform/vitest.config.ts has
+    // carried `exclude:` inside `coverage` since the coverage gate landed. It
+    // is correct, it decides what is REPORTED, and a flat text search for
+    // "exclude:" would red a correct config on day one — the same shape as the
+    // stripComments false refusal that this repo caught only by luck.
+    expect(CONFIG_SRC).toMatch(/coverage:\s*\{/);
+    expect(CONFIG_SRC.split(/\bexclude:/).length - 1).toBeGreaterThanOrEqual(1);
+    expect(auditConfigWiring(CONFIG_SRC)).toEqual([]);
   });
 });
 
@@ -331,13 +784,19 @@ describe("declaredRunner reads code, not prose about code", () => {
   };
 
   it("reads a vitest import", () => {
-    expect(withFile('import { it } from "vitest";\nit("x", () => {});\n', declaredRunner)).toBe(
-      "vitest",
-    );
+    expect(
+      withFile(
+        'import { it } from "vitest";\nit("x", () => {});\n',
+        declaredRunner,
+      ),
+    ).toBe("vitest");
   });
 
   it("reads a node:test import", () => {
-    const src = ['import test from "node' + ':test";', 'test("x", () => {});'].join("\n");
+    const src = [
+      'import test from "node' + ':test";',
+      'test("x", () => {});',
+    ].join("\n");
     expect(withFile(src, declaredRunner)).toBe("node");
   });
 
@@ -348,7 +807,7 @@ describe("declaredRunner reads code, not prose about code", () => {
     // landed fix as missing. A comment cannot decide which runner owns a file.
     const src = [
       '// This file used to say: import test from "node' + ':test";',
-      "/* and this block mentions vitest, from \"vitest\", in passing */",
+      '/* and this block mentions vitest, from "vitest", in passing */',
       "export const nothing = 1;",
     ].join("\n");
     expect(withFile(src, declaredRunner)).toBeNull();
@@ -363,7 +822,8 @@ describe("declaredRunner reads code, not prose about code", () => {
     // dodge this with a `[^:]` lookbehind hack; it now knows what a string is,
     // and this stays here because the hack going away must not take the
     // behaviour with it.
-    const src = 'const doc = "https://example.test/x"; import { it } from "vitest";';
+    const src =
+      'const doc = "https://example.test/x"; import { it } from "vitest";';
     expect(withFile(src, declaredRunner)).toBe("vitest");
   });
 

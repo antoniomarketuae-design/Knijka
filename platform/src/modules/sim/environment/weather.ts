@@ -52,10 +52,15 @@
 //    THE HAZE HALF IS NOT FIXABLE FROM THIS FILE — the store already holds
 //    four separate, correctly-ramped channels and hands snow and fog to the
 //    same readers, saturated at 1 in both lessons. The differentiation lives
-//    in `presets.ts` (snowWeather #e8ebef/0.012 vs fogWeather #c9cdd2/0.022 —
-//    one is a paler grey at HALF the density of the other, and less haze
-//    reveals more dark asphalt, which is the whole of the 3% and its wrong
-//    sign), `SimEnvironment.tsx` (the `scratch.fogGoal` blend, the
+//    in `presets.ts` — DAY, the preset those frames were shot under:
+//    snowWeather #e8ebef/0.012 against fogWeather #c9cdd2/0.020, a paler grey
+//    at 0.6× the density, and the same ratio at dusk (0.013/0.022) and night
+//    (0.015/0.024). Re-measured 2026-08-19: this note used to cite „0.022 …
+//    HALF", which paired the DAY snow density against the DUSK fog one — a
+//    stated measurement that did not reproduce, in a file whose whole
+//    discipline is that its numbers do. Less haze reveals more dark asphalt,
+//    which is the whole of the 3% and its wrong sign. Also
+//    `SimEnvironment.tsx` (the `scratch.fogGoal` blend, the
 //    `fogObj.density` damp and the SNOW_*_DIM / FOG_*_DIM constants) and
 //    `SkyDome.tsx` (SNOW_SKY_WASH 0.75 vs FOG_SKY_WASH 0.85).
 //
@@ -81,7 +86,27 @@
 //    every dry and rain scene is bit-identical.
 //
 //    IT CHANGES NO PIXEL UNTIL ITS READER PASSES THE VALUE, and that reader is
-//    not this lane's file. Both halves of the routing, exactly:
+//    not this lane's file. So this finding is NOT closed — and the state in
+//    between is the dangerous one, because it reads like a fix. Measured
+//    2026-08-19: `index.ts` exports `wetnessToRoadParams` and the type
+//    `RoadWetnessParams`, and NOT `roadSurfaceToParams`; `StaticWorld.tsx`
+//    imports `{ useWetness, wetnessToRoadParams }` and calls the rain-only
+//    mapping at :279, :294 and :313. By §4's own rule that is a DEAD API —
+//    no author reaches it, no reader calls it — and by doc 05 it does not
+//    exist at all.
+//
+//    THE ASSERTION THAT EXISTED TO CATCH EXACTLY THIS WAS DELETED BY THE
+//    CHANGE THAT CAUSED IT. The old test „carries no snow/ice term" carried
+//    the docblock „a snow term added here must arrive together with its
+//    StaticWorld reader, or this assertion is the thing that goes red". Its
+//    body never implemented that promise (it compared f(0) with f(0) and
+//    could not go red for any implementation), and the lane that shipped the
+//    snow term removed it and replaced it with an assertion that the road
+//    rendered under full snow EQUALS the dry road — the defect asserted as
+//    correct. The test file now carries the guard that promise describes,
+//    over the two files below; it is RED until both land, on purpose.
+//
+//    Both halves of the routing, exactly:
 //      · `environment/index.ts` — add `roadSurfaceToParams` (and the type
 //        `RoadSurfaceState`) to the barrel beside `wetnessToRoadParams`. Doc
 //        05: StaticWorld imports from `@/modules/sim/environment`, so a
@@ -114,18 +139,24 @@
 //    `environment.{rain,fog,snow}` → setWeatherTarget → these channels. What
 //    the car DOES comes from `LessonSpec.physics.{wetGrip,snowGrip}` →
 //    VehicleRig `gripFactor`, an independent authored field that LessonScene
-//    documents as „never derived from environment.rain/snow". Census over the
-//    shipped templates: 47 lessons tagged `weather: "rain"`, 15 with
-//    `physics: { wetGrip: true }` — so 32 lessons render a soaked road and
-//    brake on dry grip; and the ice pair renders a dry summer street and runs
-//    ICE_PATCH_GRIP_FACTOR 0.15. The rule engine grades off the PICTURE
-//    (`tick.rain/fog/snow` → conditionSpeed*Factor, and
+//    documents as „never derived from environment.rain/snow". Census
+//    RE-MEASURED 2026-08-19 over `lessons/scenario/templates-*.ts` with
+//    comments stripped, because the „47 / 15" this note used to give did not
+//    reproduce and called its unit „lessons": 45 authorings of
+//    `weather: "rain"` against 14 of `physics: { wetGrip: true }` — so ~31
+//    render a soaked road and brake on dry grip. The unit is TEMPLATE
+//    AUTHORINGS, not lessons: each expands to variants, so the per-lesson
+//    figure is larger and only the compiled corpus can give it; the gap is
+//    the point, not its third digit. And the ice pair renders a dry summer
+//    street and runs ICE_PATCH_GRIP_FACTOR 0.15. The rule engine grades off
+//    the PICTURE (`tick.rain/fog/snow` → conditionSpeed*Factor, and
 //    FOLLOWING_TOO_CLOSE_FOR_RAIN, whose stated justification is „in rain the
-//    braking distance grows ~1.5×" — true only in the 15). Reconciling those
+//    braking distance grows ~1.5×" — true only in the 14). Reconciling those
 //    two authored fields is a templates/compile change, not a store change,
 //    and it must not be done by deriving grip from the weather tag: the
-//    shadow traces of those 32 lessons were recorded at dry decel, so flipping
-//    them to wet grip would fail students against a ghost they cannot match.
+//    shadow traces of the render-only-rain lessons were recorded at dry
+//    decel, so flipping them to wet grip would fail students against a ghost
+//    they cannot match.
 //
 // 3b. TWO CORRECTIONS TO 3, BOTH READ OUT OF THE CODE RATHER THAN INFERRED.
 //    · SEEN AND GRADED DO COME FROM ONE SOURCE. `lesson.environment.{rain,
@@ -493,17 +524,26 @@ export interface RoadSurfaceState {
  *    map under the same preset — snow rendering 2.6% and 8.8% DARKER than
  *    fog. Anything ≤ 1 keeps that wrong way round.
  *  · Bounded ABOVE by the lane markings. StaticWorld tints the road
- *    `darken × ROAD_ALBEDO_TINT` (0.72) over a mid-grey asphalt map, and
- *    paints the markings at #e9e7df — far brighter. Snow that buried them
- *    would be photographically truer and pedagogically a trap: the rule
- *    engine grades lane keeping and stop lines off those markings, so a
- *    picture that removes them fails students on a skill it just took away.
- *    This is a DUSTED road, deliberately, not a buried one — 1.8 lifts the
- *    asphalt roughly two thirds of the way toward the paint and leaves it
- *    clearly the darker of the two.
- *  · Also below the composer's bloom threshold (0.9) on the brightest asphalt
- *    texel, so med/high quality does not smear the carriageway into a sheet
- *    the way the round-2 wet retune did (StaticWorld's R5 comment).
+ *    `darken × ROAD_ALBEDO_TINT (0.72) × asphaltMapTexel` and paints the
+ *    markings at #e9e7df × 1.0 ≈ 0.91. Snow that buried them would be
+ *    photographically truer and pedagogically a trap: the rule engine grades
+ *    lane keeping and stop lines off those markings, so a picture that
+ *    removes them fails students on a skill it just took away. This is a
+ *    DUSTED road, deliberately, not a buried one.
+ *
+ *    EVERY NUMBER PAST THIS POINT DEPENDS ON `asphaltMapTexel`, AND NOTHING
+ *    HERE CAN READ IT — the asphalt is a photo loaded at runtime. Worked
+ *    through 2026-08-19 so the R0 look knows what it is checking: the road
+ *    reaches the paint at `1.8 × 0.72 × t ≥ 0.91`, i.e. `t ≥ 0.70`, and it
+ *    reaches the composer's bloom threshold (0.9, med/high) at the same `t`.
+ *    A mid-grey map (t ≈ 0.45) lands the snowed road at ≈ 0.58 — clearly
+ *    below the paint, no bloom, and about two fifths of the way from the dry
+ *    road to the markings. This note used to assert „roughly two thirds" and
+ *    „below the bloom threshold" as if computed; they hold for a brighter map
+ *    (t ≈ 0.55) and not for a darker one, which is exactly why the R0 look is
+ *    the check and this arithmetic is only the thing it is looking for.
+ *    Neither the round-2 wet retune's white-sheet failure nor this one can be
+ *    ruled out from a unit test (StaticWorld's R5 comment).
  *
  * R0: `/dev/scene-still` on a `weather: "snow"` lesson, beside the same map
  * dry — the road must read paler than the concrete pavement, and the lane

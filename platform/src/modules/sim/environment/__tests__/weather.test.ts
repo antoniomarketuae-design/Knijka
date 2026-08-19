@@ -1,6 +1,10 @@
+import { existsSync, readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it } from "vitest";
 // The namespace import is not decoration: the PRIME_DT_SEC guard below
-// reflects over it to prove that no ramp rate escaped WEATHER_RATES.
+// reflects over it to prove that no ramp rate escaped WEATHER_RATES, and the
+// routing guard at the foot of this file asks it whether the snow-bearing
+// road mapping exists at all before it demands that mapping be routed.
 import * as weatherModule from "../weather";
 import {
   FOG_IN_PER_SEC,
@@ -398,6 +402,22 @@ describe("wetnessToRoadParams", () => {
 // red for any implementation of anything, including the fixed one — a test
 // that pins a defect has to be written so that REMOVING the defect breaks it,
 // and that one stayed green either way.
+//
+// THAT CRITIQUE WAS RIGHT ABOUT THE BODY AND WRONG ABOUT THE ASSERTION, and
+// the difference is what this file got wrong on the way through. The deleted
+// test carried a docblock: „a snow term added here must arrive together with
+// its StaticWorld reader, or this assertion is the thing that goes red." That
+// is a SPECIFICATION, and it is the correct one — the failure mode it names
+// is the one that then happened. Its body simply never implemented it. So the
+// lane that shipped the snow term met a guard whose stated purpose was to
+// catch precisely that shipment, found the body toothless, and deleted the
+// specification along with it — then replaced it with an assertion that the
+// road under full snow equals the dry road. A guard deleted by the very change
+// it existed to catch, and a defect written down as the expected result.
+//
+// The specification is restored at the foot of this file, with the body it
+// always needed. It is RED until the two-file routing lands; that is the guard
+// working, not the guard broken.
 // ---------------------------------------------------------------------------
 
 /**
@@ -533,32 +553,322 @@ describe("roadSurfaceToParams: the road can finally tell snow from dry", () => {
   });
 
   it("SNOW_ROAD_BRIGHTEN stays inside the bounds its reasoning gives it", () => {
-    // Below 1 keeps the measured wrong way round. At or above 2 the road
-    // overtakes its own lane markings — and the rule engine grades lane
-    // keeping and stop lines off exactly those markings, so a picture that
-    // buries them fails students on a skill it just took away. That is the
-    // same crime as the green tick for an unmeasured skill, pointing the
-    // other way. The number between them is REASONED, not measured: it must
-    // still be looked at (see the constant's R0 recipe) before it ships.
+    // Below 1 keeps the measured wrong way round — that half is hard, and it
+    // is what the audit's L 82.6 / 84.8 pair convicts.
+    //
+    // THE UPPER HALF IS A MARGIN, NOT A CROSSING POINT, and this comment used
+    // to state it as one („at or above 2 the road overtakes its own lane
+    // markings"). Worked through 2026-08-19: StaticWorld tints the road
+    // `darken × ROAD_ALBEDO_TINT (0.72) × asphaltMapTexel` and paints the
+    // markings at #e9e7df × 1.0 ≈ 0.91, so the crossing sits at
+    // `asphaltMapTexel ≈ 0.91 / (2 × 0.72) ≈ 0.63` — a value that depends
+    // entirely on the asphalt PHOTO, which is loaded at runtime and which no
+    // node test can read a texel of. So 2 is a reasoned ceiling with the
+    // markings on the far side of it, not a computed threshold, and saying
+    // otherwise was a number asserted rather than measured.
+    //
+    // Why the ceiling matters at all: the rule engine grades lane keeping and
+    // stop lines off exactly those markings, so a picture that buries them
+    // fails students on a skill it just took away — the same crime as the
+    // green tick for an unmeasured skill, pointing the other way. The number
+    // between the two bounds is REASONED and the R0 look is still owed (see
+    // the constant's own recipe in weather.ts).
     expect(SNOW_ROAD_BRIGHTEN).toBeGreaterThan(1);
     expect(SNOW_ROAD_BRIGHTEN).toBeLessThan(2);
   });
 
-  it("the store hands it a snow-bearing input: getSnowIntensity is the reader's argument", () => {
-    // The seam this fix is routed across. StaticWorld reads `useWetness()`
-    // today; the one-line change is to read `useSnowIntensity()` beside it and
-    // pass both. Proven here end to end — a snow lesson, primed the way
-    // SimEnvironment primes it, produces a road that is not the dry road.
+  it("the store's own primed snow value moves the SHIPPED road call site", () => {
+    // The seam this fix is routed across, driven with the store's real values
+    // rather than with literals: a snow lesson primed exactly the way
+    // SimEnvironment primes it, through StaticWorld's OWN road opts bag
+    // (:279), must not land on the dry road.
+    //
+    // WHAT THIS TEST USED TO ALSO ASSERT, AND WHY IT IS GONE:
+    //   expect(wetnessToRoadParams(getWetness())).toEqual(
+    //     roadSurfaceToParams({ wet: 0, snow: 0 }));
+    // getWetness() is 0 in a snow scene, so that compared f(0) with f(0) —
+    // un-failable, the exact crime the block docblock above convicts the
+    // DELETED assertion of, committed again three lines under the conviction.
+    // Worse than useless: by naming the left-hand side „as rendered today" and
+    // asserting it EQUALS the dry road, it wrote the defect down as the
+    // expected result. The failable claim about routing cannot be made from
+    // inside this module at all — it is made at the foot of this file, against
+    // the barrel and the reader.
+    const roadOpts = { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 };
     resetWeather();
     primeWeather(false, false, true);
     expect(getSnowIntensity()).toBe(1);
     expect(getWetness()).toBe(0);
-    const asRenderedToday = wetnessToRoadParams(getWetness());
-    const asRenderedOnceRouted = roadSurfaceToParams({
-      wet: getWetness(),
-      snow: getSnowIntensity(),
-    });
-    expect(asRenderedToday).toEqual(roadSurfaceToParams({ wet: 0, snow: 0 }));
-    expect(asRenderedOnceRouted).not.toEqual(asRenderedToday);
+    const fromStore = roadSurfaceToParams(
+      { wet: getWetness(), snow: getSnowIntensity() },
+      roadOpts,
+    );
+    // Mutation that reddens this: SNOW_ROAD_BRIGHTEN → 1 (then darken ties the
+    // dry road) — the whole-fix deletion. Verified by running it.
+    expect(fromStore).not.toEqual(wetnessToRoadParams(getWetness(), roadOpts));
+    expect(fromStore.darken).toBeGreaterThan(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE RESTORED GUARD — a snow term in this module must arrive WITH its reader
+//
+// This is the specification the deleted „carries no snow/ice term" assertion
+// stated in its docblock and never implemented. Restated so it can go red:
+//
+//   IF `weather.ts` exposes a snow-bearing road mapping, THEN that mapping
+//   must be REACHABLE (doc 05: StaticWorld may only import from the module
+//   barrel, so a helper missing from `index.ts` does not exist) and it must be
+//   READ — fed a live snow value by the road material.
+//
+// Anything short of both is the half-routed state, and the half-routed state
+// is the dangerous one because it reads like a fix: `roadSurfaceToParams` has
+// tests, a constant with a reasoning block and a name in the header, and it
+// changes NOT ONE PIXEL of the snow lesson the audit filed as critical. The
+// finding stays open while looking closed — the same shape as a green tick for
+// a skill nobody measured.
+//
+// WHY THIS PROBE READS SOURCE. There is no behavioural seam available: this
+// suite runs `environment: "node"` with no DOM, StaticWorld is an R3F
+// component, and the barrel pulls SimEnvironment → @react-three/fiber, so
+// neither can be imported here. Reading the two files as TEXT is the only
+// instrument left, and this project's rule about instruments applies to it —
+// the SELF-CHECK below runs the probe against hand-written samples of every
+// shape (routed, not routed, routed-only-in-a-comment, and wired through to a
+// dead `snow: 0`) and fails if the probe misses any of them.
+//
+// The probe errs toward RED by construction: a correct routing written in some
+// shape it does not recognise — a hoisted surface variable instead of the
+// inline object literal StaticWorld's three call sites all use — reports NOT
+// routed. If that happens, RE-POINT this probe at the new shape. Do not delete
+// it. Deleting it is how this guard was lost the first time.
+//
+// This module reaching into `world/` is a test reading a file, not an import:
+// no module boundary is crossed at runtime, and the boundary is what is being
+// asserted.
+// ---------------------------------------------------------------------------
+
+/**
+ * Source with comments removed. Both files DISCUSS this routing in prose —
+ * `weather.ts`'s header spells the two-file change out line by line, and the
+ * barrel carries its own note about the boundary rule — so a probe that did
+ * not strip comments would report the work done the moment somebody wrote it
+ * down. That is the reassuring-direction lie; COMMENTED_ONLY below catches it.
+ */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+/**
+ * Read a source file with line endings normalised. Both routed files are CRLF
+ * on this checkout (measured 2026-08-19: index.ts 151 CRLF / 0 bare LF,
+ * StaticWorld.tsx 669 / 0). The probe's own regexes are newline-agnostic, but
+ * the clearability patch below anchors on whole lines, and an anchor written
+ * with `\n` silently missed on the first run — a probe that reports „not
+ * routed" because of a carriage return is a probe that convicts the wrong
+ * thing. Normalising here beats encoding one checkout's line endings.
+ */
+function readSource(path: string): string {
+  return readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+}
+
+interface RoutingReport {
+  /** Reachable: named in the module barrel, so StaticWorld can import it. */
+  reachable: boolean;
+  /** The reader takes the store's snow channel at all. */
+  readsSnowChannel: boolean;
+  /** …and passes it LIVE into the snow-bearing mapping (`snow: 0` is not). */
+  passesLiveSnow: boolean;
+}
+
+function routingOf(barrelSrc: string, readerSrc: string): RoutingReport {
+  const barrel = stripComments(barrelSrc);
+  const reader = stripComments(readerSrc);
+  // The first object literal of every `roadSurfaceToParams({ … }, …)` call.
+  const surfaces = [...reader.matchAll(/roadSurfaceToParams\s*\(\s*\{([^}]*)\}/g)];
+  const passesLiveSnow = surfaces.some(([, arg]) => {
+    const bound = /\bsnow\b\s*(?::\s*([^,}]+))?/.exec(arg);
+    if (!bound) return false;
+    // `{ wet, snow }` shorthand binds the identifier — that is live.
+    const value = (bound[1] ?? "snow").trim();
+    return !/^(?:0(?:\.0*)?|false)$/.test(value);
+  });
+  return {
+    reachable: /\broadSurfaceToParams\b/.test(barrel),
+    readsSnowChannel: /\b(?:useSnowIntensity|getSnowIntensity)\b/.test(reader),
+    passesLiveSnow,
+  };
+}
+
+const fmtRouting = (r: RoutingReport): string =>
+  `reachable=${r.reachable} readsSnowChannel=${r.readsSnowChannel} passesLiveSnow=${r.passesLiveSnow}`;
+
+describe("the snow term and its reader ship together", () => {
+  // Hand-written, each verified by eye against the real file it imitates.
+  const BARREL_WITHOUT = [
+    `export { useWetness, useSnowIntensity, wetnessToRoadParams } from "./weather";`,
+    `export type { RoadWetnessParams } from "./weather";`,
+  ].join("\n");
+  const BARREL_COMMENTED_ONLY = [
+    `// add roadSurfaceToParams to this barrel beside wetnessToRoadParams — doc 05`,
+    `export { useWetness, useSnowIntensity, wetnessToRoadParams } from "./weather";`,
+  ].join("\n");
+  const BARREL_WITH = [
+    `export { useWetness, useSnowIntensity, roadSurfaceToParams, wetnessToRoadParams } from "./weather";`,
+    `export type { RoadSurfaceState, RoadWetnessParams } from "./weather";`,
+  ].join("\n");
+
+  const READER_TODAY = [
+    `import { useWetness, wetnessToRoadParams } from "@/modules/sim/environment";`,
+    `const wetness = useWetness();`,
+    `const wet = useMemo(() => wetnessToRoadParams(wetness, { dryRoughness: 1.0 }), [wetness]);`,
+  ].join("\n");
+  const READER_DEAD_SNOW = [
+    `import { useSnowIntensity, useWetness, roadSurfaceToParams } from "@/modules/sim/environment";`,
+    `const wetness = useWetness();`,
+    `const snow = useSnowIntensity();`,
+    `const wet = useMemo(() => roadSurfaceToParams({ wet: wetness, snow: 0 }, { dryRoughness: 1.0 }), [wetness, snow]);`,
+  ].join("\n");
+  const READER_ROUTED = [
+    `import { useSnowIntensity, useWetness, roadSurfaceToParams } from "@/modules/sim/environment";`,
+    `const wetness = useWetness();`,
+    `const snow = useSnowIntensity();`,
+    `const wet = useMemo(() => roadSurfaceToParams({ wet: wetness, snow }, { dryRoughness: 1.0 }), [wetness, snow]);`,
+  ].join("\n");
+
+  it("SELF-CHECK: the probe convicts every shape of the half-routed state", () => {
+    // A probe is worth nothing until it has been shown to go red. Every line
+    // here is a case this lane's rules name, and every one of them would be a
+    // silent pass for a lazier predicate.
+    const cases: ReadonlyArray<readonly [string, string, string, string]> = [
+      [
+        "SHIPPED TODAY — term exists, barrel hides it, reader never asks",
+        BARREL_WITHOUT,
+        READER_TODAY,
+        "reachable=false readsSnowChannel=false passesLiveSnow=false",
+      ],
+      [
+        "ROUTING WRITTEN DOWN IN A COMMENT IS NOT ROUTING",
+        BARREL_COMMENTED_ONLY,
+        READER_TODAY,
+        "reachable=false readsSnowChannel=false passesLiveSnow=false",
+      ],
+      [
+        "BARREL ONLY — exported, and still nobody reads it",
+        BARREL_WITH,
+        READER_TODAY,
+        "reachable=true readsSnowChannel=false passesLiveSnow=false",
+      ],
+      [
+        "DEAD ROUTING — every wire in place and `snow: 0` at the end of it",
+        BARREL_WITH,
+        READER_DEAD_SNOW,
+        "reachable=true readsSnowChannel=true passesLiveSnow=false",
+      ],
+      [
+        "ROUTED — the corrected behaviour this guard must NOT fail",
+        BARREL_WITH,
+        READER_ROUTED,
+        "reachable=true readsSnowChannel=true passesLiveSnow=true",
+      ],
+    ];
+    for (const [label, barrel, reader, expected] of cases) {
+      expect(`${label} → ${fmtRouting(routingOf(barrel, reader))}`).toBe(`${label} → ${expected}`);
+    }
+  });
+
+  it("THE GUARD: the snow-bearing mapping is reachable AND actually read", () => {
+    const barrelPath = fileURLToPath(new URL("../index.ts", import.meta.url));
+    const readerPath = fileURLToPath(
+      new URL("../../world/components/StaticWorld.tsx", import.meta.url),
+    );
+    // A rename must RE-POINT this guard, not silently disarm it.
+    expect(`barrel exists: ${existsSync(barrelPath)}`).toBe("barrel exists: true");
+    expect(`reader exists: ${existsSync(readerPath)}`).toBe("reader exists: true");
+
+    // The premise. The guard only makes a demand if this module actually
+    // exposes a snow-bearing mapping: delete `roadSurfaceToParams` from
+    // weather.ts and the demand goes with it. That is the other honest way to
+    // leave this file, and it is what „a snow term added here must arrive
+    // together with its reader" means read in the other direction.
+    const snowTermExists = typeof weatherModule.roadSurfaceToParams === "function";
+    if (!snowTermExists) return;
+
+    const report = routingOf(readSource(barrelPath), readSource(readerPath));
+    // MEASURED 2026-08-19, before this guard was written: `index.ts` exports
+    // `wetnessToRoadParams` and the type `RoadWetnessParams`, and NOT
+    // `roadSurfaceToParams`; `StaticWorld.tsx` imports `{ useWetness,
+    // wetnessToRoadParams }` and calls the rain-only mapping at :279, :294 and
+    // :313. So this assertion is RED on the tree that shipped the snow term.
+    // That is the conviction. It clears when weather.ts's header note 2 is
+    // carried out in those two files — neither of them this lane's to touch.
+    expect(fmtRouting(report)).toBe("reachable=true readsSnowChannel=true passesLiveSnow=true");
+  });
+
+  it("THE GUARD CONVICTS: removing any leg of the routing turns it red", () => {
+    // THE ROUTING HAS LANDED, so the question this test asks has changed.
+    //
+    // It used to simulate applying the prescribed patch, because the guard was
+    // RED and a check that convicts everything convicts nothing: a restored
+    // assertion that ALSO fails on the corrected behaviour is a permanent red,
+    // and a permanent red gets deleted — which is how this guard was lost the
+    // first time. That simulation has now served its purpose and cannot be
+    // kept: it anchored on the exact import line the real change rewrote, so
+    // it began reporting its own patch as inapplicable. (It said so plainly
+    // rather than silently passing — "name the drift instead" — which is the
+    // only reason this was a two-minute edit and not an afternoon.)
+    //
+    // The stronger claim, available only now that the real files carry the
+    // routing, is the mutation in the other direction: take each leg OUT of
+    // the REAL sources in memory and watch that axis go false. A simulation
+    // proves the predicate is satisfiable; this proves the predicate is
+    // load-bearing on the files that actually ship.
+    const barrelPath = fileURLToPath(new URL("../index.ts", import.meta.url));
+    const readerPath = fileURLToPath(
+      new URL("../../world/components/StaticWorld.tsx", import.meta.url),
+    );
+    const barrelSrc = readSource(barrelPath);
+    const readerSrc = readSource(readerPath);
+
+    // Baseline: the shipping tree satisfies every axis. If this fails, the
+    // routing has been undone and the primary assertion above is the report.
+    expect(fmtRouting(routingOf(barrelSrc, readerSrc))).toBe(
+      "reachable=true readsSnowChannel=true passesLiveSnow=true",
+    );
+
+    const cut = (src: string, from: RegExp | string, to: string, label: string): string => {
+      const out = src.replace(from, to);
+      // A mutation that does not apply would leave the source untouched and the
+      // axis green, and this test would pass having proved nothing at all.
+      expect(`${label} applied: ${out !== src}`).toBe(`${label} applied: true`);
+      return out;
+    };
+
+    // 1 · Drop it from the barrel — doc 05 says a helper that is not exported
+    //     does not exist, however live the call site looks.
+    expect(
+      fmtRouting(
+        routingOf(cut(barrelSrc, /\broadSurfaceToParams\b/g, "wetnessToRoadParams", "barrel"), readerSrc),
+      ),
+    ).toBe("reachable=false readsSnowChannel=true passesLiveSnow=true");
+
+    // 2 · Stop reading the snow channel — the mapping is reachable and called,
+    //     and there is simply no snow to hand it.
+    expect(
+      fmtRouting(
+        routingOf(
+          barrelSrc,
+          cut(readerSrc, /\buseSnowIntensity\b/g, "useWetness", "reader-channel"),
+        ),
+      ),
+    ).toBe("reachable=true readsSnowChannel=false passesLiveSnow=true");
+
+    // 3 · Pass a dead zero — the shape of the half-routed state that shipped,
+    //     and the one that reads most like a fix.
+    expect(
+      fmtRouting(
+        routingOf(barrelSrc, cut(readerSrc, /\{ wet: wetness, snow \}/g, "{ wet: wetness, snow: 0 }", "reader-value")),
+      ),
+    ).toBe("reachable=true readsSnowChannel=true passesLiveSnow=false");
   });
 });

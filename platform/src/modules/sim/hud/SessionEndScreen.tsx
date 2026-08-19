@@ -77,6 +77,7 @@ import {
   SEVERITY_POINTS,
   VIOLATIONS,
   billRoadConsequences,
+  ledgerBilling,
   pointsBg,
   pointsEachBg,
   pointsOutOfBg,
@@ -678,6 +679,28 @@ export function SessionEndScreen({
     () => billRoadConsequences(summary.mistakes),
     [summary.mistakes],
   );
+  /**
+   * …AND THE SAME QUESTION FOR THE OTHER SCALE: which rows the ИЗПИТЕН ЛИСТ
+   * charged. Наредба № 38, чл. 48, ал. 3 closes the sheet at the first
+   * terminating опасна, so a fault after it is taught and not scored, and
+   * `rules/scoring.ts ledgerBilling` is the per-row answer `accumulateScore`
+   * itself folds — the totals in the table above and the marks on the rows
+   * below therefore cannot drift apart by construction.
+   *
+   * MEASURED 2026-08-19, on this screen, before this line existed. `FaultCard`
+   * learned the closure on 2026-08-18 but reads it from a prop that DEFAULTS TO
+   * BILLED (deliberately: an unwired card must overstate a penalty, never hide
+   * one), and this render site never passed it — so the fix sat in a component
+   * nothing mounts directly while the screen went on printing the catalogue
+   * base. The sc-hz-accident-scene squeeze (a car struck at 13.13 s, a bystander
+   * at 13.43 s) rendered «−10 изпитни т.» on BOTH rows — Σ 20 — above a table
+   * reading 10 and a debrief reading «без допълнителни точки — изпитът вече
+   * беше прекратен» about that very row. Three surfaces, one drive, two numbers.
+   * `__tests__/session-end-ledger-close.test.tsx` renders THIS screen and sums
+   * the marks off the markup, because a test that renders the card alone earns
+   * the green the same way it was earned the first time.
+   */
+  const examBilling = useMemo(() => ledgerBilling(summary.mistakes), [summary.mistakes]);
   const markers = useMemo(
     () => [
       ...mistakeMarkers,
@@ -1213,6 +1236,7 @@ export function SessionEndScreen({
                     correctiveBg={correctiveFor(m.code)}
                     atBg={clock(m.t)}
                     billing={roadBilling[i]}
+                    examBilled={examBilling[i]}
                   />
                 </li>
               );

@@ -98,13 +98,29 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       if (!num(p.x) || !num(p.y) || !num(p.radiusM) || p.radiusM <= 0) {
         throw new ObjectiveSpecError(objective.id, "reachZone needs x, y, radiusM > 0");
       }
-      const out: ReachZoneParams = {
+      const out: WitnessedReachZoneParams = {
         kind: "reachZone",
         x: p.x,
         y: p.y,
         radiusM: p.radiusM,
       };
       if (num(p.maxSpeedKmh)) out.maxSpeedKmh = p.maxSpeedKmh;
+      // THE ARRIVAL CONTRACT'S TWO STATE DEMANDS (see the block comment on
+      // `WitnessedReachZoneParams`). AUTHORED WINS, TITLE FILLS IN: a template
+      // that states the demand outright gets exactly what it asked for; one
+      // that only PROMISES it in the banner gets the promise enforced, because
+      // the banner is the certificate the student reads and the gate may not
+      // certify less than the banner says.
+      const lamps =
+        p.requireLamps === undefined
+          ? deriveLampDemand(objective.titleBg)
+          : parseLampDemand(objective, p.requireLamps);
+      if (lamps !== undefined) out.requireLamps = lamps;
+      const gear =
+        p.requireGear === undefined
+          ? deriveGearDemand(objective.titleBg)
+          : parseGearDemand(objective, p.requireGear);
+      if (gear !== undefined) out.requireGear = gear;
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
       // acceptance disc — a cut deeper than the radius leaves nowhere legal to
@@ -273,10 +289,15 @@ export function createEvalState(params: ObjectiveParams): ObjectiveEvalState {
       return {
         type: "reachZone",
         reached: false,
-        // An uncapped zone has no speed half to satisfy — start it met so the
-        // fold below stays one expression and an uncapped zone behaves
-        // EXACTLY as it did before B4 (done ⇔ inside the authored radius).
-        capMet: params.maxSpeedKmh === undefined,
+        // A zone that demands NOTHING has no arrival contract to satisfy —
+        // start it met so the fold below stays one expression and a demandless
+        // waypoint behaves EXACTLY as it did before B4 (done ⇔ inside the
+        // authored radius). `capMet` now carries the WHOLE arrival contract —
+        // speed cap, lamps, direction — because `ObjectiveEvalState` lives in
+        // lessons/types.ts and this lane may not add a field to it; the three
+        // are latched and spent together, which is also what an arrival
+        // contract means (see `stepReachZone`).
+        capMet: !hasArrivalDemand(params),
         overCapNoted: false,
         approachFrom: null,
         prevPos: null,
@@ -570,6 +591,204 @@ export const REACH_ZONE_HALT_CAP_KMH = 8;
  * ways out a student who never met the cap has always had.
  */
 export const REACH_ZONE_CAP_SLACK_KMH = 5;
+
+/**
+ * THE ARRIVAL CONTRACT GAINS THE TWO THINGS A DISC WAS NEVER ASKED FOR — sweep
+ * 161, 2026-08-19: the state of the car's OWN LAMPS, and the DIRECTION it is
+ * travelling in.
+ *
+ * WHAT WAS BROKEN. `stepReachZone` is handed (params, prev, tick) and grades a
+ * PLACE and a SPEED, and `ReachZoneParams` has no field with which a template
+ * can demand anything else — so a title that promises more than that is a
+ * certificate nobody signed. Five shipped drills, both platforms, all from the
+ * same sweep, every one a green tick for the lesson's own subject:
+ *
+ *   drill / gate                          the banner said        what ticked
+ *   sc-ac-night-lights/sc-acn-lit         «…зона осветен»        СВЕТЛИНИ dim in
+ *                                                                t011/t063/t116/t183,
+ *                                                                ИЗДЪРЖАН, 0 т.
+ *   sc-ac-rain-lights/sc-acr-lit          «…осветен и съобразен» СВЕТЛИНИ + ЧИСТАЧКИ
+ *                                                                dim all run, 3/3 ★
+ *   sc-ac-highbeam-lead/sc-ahl-follow     «…с къси светлини»     mobile-WRONG ticked
+ *                                                                it at 1:11 on a run
+ *                                                                with 18 collisions
+ *   sc-ed-reverse-line/sc-edrl-reverse-mid «…по средата на       the WRONG run ticked
+ *                                          заден ход»            it at 0:59 driving
+ *                                                                FORWARD in D at 60
+ *   sc-park-bay-exit-rev/sc-pbe-out       «излез … на заден ход» graded on place + a
+ *                                                                cap of 8 alone
+ *
+ * `sc-ac-night-lights/pc-right/04-t116s.png` is the whole class in one frame:
+ * the ✓ «Мини контролната зона осветен» over a dim СВЕТЛИНИ telltale and a road
+ * with no headlight pool on it, in the lesson whose entire subject is reaching
+ * for that switch.
+ *
+ * THE CHANNEL WAS NEVER BLIND, and that claim is the reason this went unfixed.
+ * Doc 88 §2.6 O3 recorded the class as unclosable — „the night/lamp channel
+ * reaches NEITHER grader, so a lamp gate in `stepReachZone` would read the same
+ * blind channel and change nothing" — reasoning from the rule engine's silence
+ * (`HEADLIGHTS_OFF_AT_NIGHT` fired zero times on the same drive). READ OUT OF
+ * THE TREE INSTEAD OF INFERRED, the path is whole and every hop is a line:
+ *
+ *   cabin.ts `cycleHeadlights` / TouchControls' СВЕТЛ cell
+ *     → scene/vehicleSample.ts  VehicleSample.headlights
+ *     → runtime/worldRuntime.ts:1886  `headlights: v.headlights`
+ *     → SimTick.headlights ────────────────┐
+ *   LessonScene.tsx:1111 `timeOfDay === "night"`  → :3163 runtime.sample(…, isNight, …)
+ *     → SimTick.isNight ───────────────────┴──→ stepObjective(params, prev, TICK)
+ *
+ * `SimTick.headlights` is a REQUIRED field of the contract, not an optional
+ * one — every caller must fill it — and this evaluator has been handed it on
+ * every frame since the contract existed. The rule engine's silence is a
+ * separate defect in a separate file; it is not evidence about this one, and
+ * treating it as evidence is what left five green ticks standing for a year.
+ *
+ * WHY THE TITLE MAY FILL THE DEMAND IN. The alternative — an authored-only
+ * param — closes nothing today, because the fix would then live in six template
+ * files this lane does not own, which is the shape doc 88 §2.6 says produced
+ * nine of its nineteen unclosed rows. Deriving the demand from `titleBg` makes
+ * the invariant structural instead: THE GATE MEASURES WHAT THE BANNER PROMISES,
+ * and a promise cannot be written that nothing enforces. An explicit param
+ * still wins, which is how the two rows this cannot reach are meant to be
+ * spent (`sc-ac-fog`, `sc-ac-snow` — their banners name a SPEED and their
+ * briefings name the lamps, so only an authored `requireLamps` can bind them).
+ *
+ * IT CANNOT TRAP ANYONE, and that is the half that was checked before the half
+ * that refuses. The switch is reachable on both platforms — `KeyL` /
+ * `CABIN_KEYS.headlights` on desktop, the always-mounted СВЕТЛ and МЪГЛА cells
+ * of the TouchControls flank strip on mobile — and the latch is not a one-shot:
+ * lighting up at the mark earns it on the next frame, exactly as braking to a
+ * cap re-earns that one. A student is never asked to have done something he can
+ * no longer do.
+ *
+ * WHAT IS DELIBERATELY NOT HERE. Nothing infers the demand from the WEATHER.
+ * `tick.isNight || tick.rain || tick.fog` is the LAW's trigger (ЗДвП чл. 70,
+ * 71) and the rule engine already grades it there; hanging it on every
+ * reachZone would refuse «Стигни края на отсечката» to a car that did reach the
+ * end, which is a lie about geometry to punish an offence that already has a
+ * grader. A place gate grades place; this adds only what the gate's own title
+ * put its name to.
+ */
+export type ReachZoneLampDemand = "lit" | "low" | "high" | "fog";
+/** The only direction demand a disc can witness: the car went through BACKWARDS. */
+export type ReachZoneGearDemand = "reverse";
+
+/**
+ * The two demands `ReachZoneParams` could not express.
+ *
+ * DECLARED HERE, NOT IN `lessons/types.ts`, and that is a routing note rather
+ * than a preference: `ReachZoneParams` lives in another lane's file, and this
+ * is the same copy law `PARK_CAR_HALF_LENGTH_M` above states — the extension is
+ * additive and optional, so `ReachZoneParams` is assignable to it and every
+ * existing caller compiles untouched. WHEN A LANE OWNS `lessons/types.ts`, fold
+ * these two optional fields into `ReachZoneParams` itself and delete this
+ * intersection; `reach-zone-witness.test.ts` pins the behaviour either way.
+ */
+export interface ReachZoneWitnessDemands {
+  /** The lamps the gate's own banner promises. Absent = the gate promises none. */
+  requireLamps?: ReachZoneLampDemand;
+  /** The travel direction the gate's own banner promises. Absent = any. */
+  requireGear?: ReachZoneGearDemand;
+}
+
+export type WitnessedReachZoneParams = ReachZoneParams & ReachZoneWitnessDemands;
+
+/**
+ * THE BANNER'S OWN WORDS, and the boundaries are spelled out in Unicode classes
+ * because JS `\b` is ASCII-only — which matters here more than anywhere: three
+ * shipped rows describe an unlit PLACE with the same six letters that name a lit
+ * CAR, and a place is exactly what a disc can be drawn around.
+ *
+ *   «Мини контролната зона осветен»                     ← the car   → demand
+ *   «Мини неосветения участък със съобразена…скорост»   ← the road  → none
+ *   «Спри на позицията, в рамките на осветеното»        ← the road  → none
+ *   «Приближи неосветената пътека със скорост…»         ← the road  → none
+ *
+ * The lookbehind kills «неосветен…», the lookahead kills every attributive
+ * ending («-ия/-ата/-ото/-о»), and what survives is the predicate adjective —
+ * „go through it LIT". Both halves are pinned by `reach-zone-witness.test.ts`
+ * against these four exact strings, so a matcher that quietly stopped matching
+ * (the instrument bug this programme has shipped four times) fails the build
+ * instead of silently emptying the census.
+ *
+ * ORDER IS SIGNIFICANT — the specific beams before the generic „lit", and the
+ * fog lamps before both, since «фарове за мъгла» contains «фарове».
+ */
+const LAMP_TITLE_FOG = /фаров(?:е|ете) за мъгла/iu;
+const LAMP_TITLE_LOW = /къси светлини/iu;
+const LAMP_TITLE_HIGH = /дълги светлини/iu;
+const LAMP_TITLE_LIT = /(?<![\p{L}])осветен(?![\p{L}])/u;
+
+/**
+ * «НА заден ход» is the act; «ЗА заден ход» is the reason — one letter, and the
+ * difference between a gate the car reaches backwards and one it reaches
+ * forwards in order to START reversing. `sc-edpc-setup` is the second kind
+ * («Заеми изходната позиция ЗА заден ход по права», a radius-3 mark at 6 км/ч
+ * the car noses into facing forward), so demanding reverse there would refuse a
+ * correct drive — the failure the founder ranks worst — and the exclusion below
+ * is what stops it. Both strings are pinned in the teeth test.
+ */
+const GEAR_TITLE_REVERSE = /(?<![\p{L}])на заден ход(?![\p{L}])/u;
+const GEAR_TITLE_REVERSE_PURPOSE = /за заден ход/u;
+
+/** The banner's lamp promise, or undefined when it makes none. */
+export function deriveLampDemand(titleBg: string): ReachZoneLampDemand | undefined {
+  if (LAMP_TITLE_FOG.test(titleBg)) return "fog";
+  if (LAMP_TITLE_LOW.test(titleBg)) return "low";
+  if (LAMP_TITLE_HIGH.test(titleBg)) return "high";
+  if (LAMP_TITLE_LIT.test(titleBg)) return "lit";
+  return undefined;
+}
+
+/** The banner's direction promise, or undefined when it makes none. */
+export function deriveGearDemand(titleBg: string): ReachZoneGearDemand | undefined {
+  if (GEAR_TITLE_REVERSE_PURPOSE.test(titleBg)) return undefined;
+  return GEAR_TITLE_REVERSE.test(titleBg) ? "reverse" : undefined;
+}
+
+function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
+  if (v === "lit" || v === "low" || v === "high" || v === "fog") return v;
+  throw new ObjectiveSpecError(
+    objective.id,
+    'reachZone requireLamps must be "lit" | "low" | "high" | "fog"',
+  );
+}
+
+function parseGearDemand(objective: LessonObjective, v: unknown): ReachZoneGearDemand {
+  if (v === "reverse") return v;
+  throw new ObjectiveSpecError(objective.id, 'reachZone requireGear must be "reverse"');
+}
+
+/**
+ * Is the lamp demand honoured on THIS frame? „fog" is the чл. 74 pairing — the
+ * fog lamps are an ADDITION to the dipped beams, never a substitute for them,
+ * so it asks for both. `fogLightsOn` is optional on the contract and absent
+ * means unknown; unknown is treated as OFF here (the demand is only ever
+ * derived from a banner that names the fog lamps outright, so the caller that
+ * omits the channel is a hand-built tick, not a drive).
+ */
+function lampDemandMet(demand: ReachZoneLampDemand, tick: SimTick): boolean {
+  const lit = tick.headlights === "low" || tick.headlights === "high";
+  switch (demand) {
+    case "lit":
+      return lit;
+    case "low":
+      return tick.headlights === "low";
+    case "high":
+      return tick.headlights === "high";
+    case "fog":
+      return lit && tick.fogLightsOn === true;
+  }
+}
+
+/** True when the demands a reachZone makes are met by the whole zone contract. */
+function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
+  return (
+    params.maxSpeedKmh !== undefined ||
+    params.requireLamps !== undefined ||
+    params.requireGear !== undefined
+  );
+}
 
 /**
  * Default centring tolerance at rest, m — the authored CENTRING bar, and since
@@ -946,7 +1165,7 @@ export function stepObjective(
  * contract, and the silence is the part that has to go.
  */
 function stepReachZone(
-  params: ReachZoneParams,
+  params: WitnessedReachZoneParams,
   prev: ObjectiveEvalState,
   tick: SimTick,
 ): ObjectiveStepResult {
@@ -956,7 +1175,7 @@ function stepReachZone(
       : {
           type: "reachZone",
           reached: false,
-          capMet: params.maxSpeedKmh === undefined,
+          capMet: !hasArrivalDemand(params),
           overCapNoted: false,
           approachFrom: null,
           prevPos: null,
@@ -1164,10 +1383,56 @@ function stepReachZone(
   // acceleration run and arrived 11–19 км/ч over it with a green tick.
   const capSpent =
     cap !== undefined && onApproachSide && speedKmh > cap + REACH_ZONE_CAP_SLACK_KMH;
-  const capMet =
-    cap === undefined
-      ? true
-      : (st.capMet && !capSpent) || (speedKmh <= cap && (inAcceptance || graceArmed));
+
+  // ── THE STATE HALF OF THE ARRIVAL CONTRACT (2026-08-19) ──────────────────
+  // See `ReachZoneWitnessDemands` above for the five drills and the frame.
+  //
+  // WITNESSED ON THE SWEPT FACE, WHICH THE SPEED HALF IS NOT, and the asymmetry
+  // is the same one „A WAYPOINT IS CROSSED, NOT SAMPLED" states: a SEGMENT says
+  // where the car went and nothing about how fast it was at each point of it,
+  // so speed may only ever be read at the tick's own position. Lamps and gear
+  // are not integrated over the segment — they are DISCRETE latched cockpit
+  // states, and the tick that swept the disc carries the state the car held
+  // while sweeping it. Reading them off the swept face is what keeps a
+  // low-frame-rate device from refusing a correct drive that no sample landed
+  // inside (71 of the catalogue's 1,720 reachZone gates are narrower than one
+  // 50 км/ч tick), and refusing a correct drive is the failure the founder
+  // ranks worst.
+  const lampDemand = params.requireLamps;
+  const gearDemand = params.requireGear;
+  const atMark = sweptAcceptance || graceArmed;
+  const lampOk = lampDemand === undefined || lampDemandMet(lampDemand, tick);
+  // Signed on purpose: `speedKmh` above is the ABSOLUTE speed (the C1 fix —
+  // a reversing car read as at-rest and a park was credited before it stopped),
+  // so the direction has to come from the selector the student actually moved
+  // (A1: `contractGear` reports R only when R was engaged). „Went through
+  // backwards" therefore means IN REVERSE AND MOVING — a car standing in R has
+  // not yet done anything, and a car rolling back in D is not reversing.
+  const reversing = tick.gear < 0 && speedKmh > STOPPED_SPEED_KMH;
+  const goingForward = tick.gear >= 0 && speedKmh > STOPPED_SPEED_KMH;
+  const gearOk = gearDemand === undefined || reversing;
+  // EARNED WIDE, SPENT NARROW — the same direction the whole file spends its
+  // slack in. The gear latch is spent only by actually TRAVELLING FORWARD
+  // through the authored disc (not by a standstill, not by a shunt out in the
+  // grace capsule), because a reverse manoeuvre legitimately pauses and a
+  // pause must never withdraw a credit already performed.
+  const lampSpent = lampDemand !== undefined && atMark && !lampOk;
+  const gearSpent = gearDemand !== undefined && inAcceptance && goingForward;
+
+  // ONE LATCH FOR THE WHOLE CONTRACT, because `ObjectiveEvalState.reachZone`
+  // belongs to lessons/types.ts and this lane may not add a field to it — and
+  // because an arrival contract is one thing: the speed, the lamps and the
+  // direction are what the banner asks for AT THE MARK, so they are earned
+  // together on one frame and any of them thrown away spends the latch. A zone
+  // that demands only a cap is bit-identical to shipped (the two state arms
+  // collapse to `true`/`false`), which `objectives.test.ts` sweeps.
+  const contractEarned =
+    (cap === undefined || (speedKmh <= cap && (inAcceptance || graceArmed))) &&
+    (lampDemand === undefined || (lampOk && atMark)) &&
+    (gearDemand === undefined || (gearOk && atMark));
+  const capMet = !hasArrivalDemand(params)
+    ? true
+    : (st.capMet && !(capSpent || lampSpent || gearSpent)) || contractEarned;
   const done = reached && capMet;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.

@@ -195,15 +195,30 @@
  *
  * ── AND THE TITLE, WHICH OVER-CLAIMED ──────────────────────────────────────
  * §5's block was called „every quad the world paints is a quad the world was
- * authored to paint". It grades 1,603 of the corpus's 10,798 marking quads —
- * 14.8%, one in seven — because 55 of the 105 districts carry paint the
- * catalogue cannot yet name. It is now titled for the 50 districts it does
- * grade, the 55 are attributed one by one to the gate that stops them, and both
- * numbers are a test rather than a sentence.
+ * authored to paint". It grades
+ * 1,599 of the corpus's 10,690 marking quads — 14.96%, one in 6.7 — because 55
+ * of the 105 districts carry paint the catalogue cannot yet name. It is now
+ * titled for the 50 districts it does grade, the 55 are attributed one by one
+ * to the gate that stops them, and every number in that sentence is a test
+ * rather than a claim — including the sentence itself, which „the catalogue's
+ * reach is measured, not claimed in a comment" GENERATES from the mesh and
+ * requires to appear verbatim both here and on `censusCorpus`.
+ *
+ * ── AND THAT SHARE WAS WRONG, IN THIS FILE'S OWN SUBJECT ───────────────────
+ * It read 14.8% for a wave, under a test titled „measured, not claimed in a
+ * comment", because it was measured off the wrong thing: `markingQuads` is a
+ * BOOKING counter, not a quad count. This file proves that twice and then did
+ * not use it — §4 pins `triangles === 2·markingQuads − giveWayTriangles` and
+ * §5 pins `census.quads === markingQuads − giveWayTriangles`, both of which
+ * say a give-way TRIANGLE is booked in `markingQuads` while occupying one
+ * triangle and not two. The corpus carries 108 of them (four inside the domain,
+ * all on jxg-giveway-v1), so the denominator was over-booked by 108 and the
+ * reach was reported a tenth of a point low. Measured off the MESH — the same
+ * `readQuads` every other claim here rests on — it is 1,599 / 10,690.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { assertDistrict, type District } from "../../types";
 import {
   DASH_GAP_M,
@@ -1965,14 +1980,17 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * result rather than the source is what stops the domain from drifting when a
  * map grows a feature: the district simply leaves the domain and says so.
  *
- * 50 districts of 105 — and 1,603 marking quads of the corpus's 10,798, which
- * is 14.8% and is the number that matters, because a district is not a unit of
- * paint. This block was titled „every quad the world paints is a quad the world
- * was authored to paint" while it graded one quad in seven. It is now titled
- * what it does, and the fraction is MEASURED — „the catalogue's reach is
- * measured, not claimed in a comment", below — so the title cannot drift back
- * into a claim: extend the catalogue and that test fails until these numbers
- * are corrected.
+ * 50 districts of 105 — and
+ * 1,599 of the corpus's 10,690 marking quads — 14.96%, which is the number that
+ * matters, because a district is not a unit of paint. This block was titled
+ * „every quad the world paints is a quad the world was authored to paint" while
+ * it graded one quad in 6.7. It is now titled what it does, and the fraction is
+ * MEASURED OFF THE MESH — „the catalogue's reach is measured, not claimed in a
+ * comment", below — so the title cannot drift back into a claim: extend the
+ * catalogue and that test fails until these numbers are corrected, here and in
+ * the file header both. It is read off the mesh and not off `markingQuads`
+ * because `markingQuads` books each give-way triangle as a quad; taking the
+ * share off the counter reported 14.8% for a true 14.96%.
  *
  * The other 55 are excluded by paint this catalogue cannot yet name, and by
  * NOTHING about whether their paint is right. Measured today, each district
@@ -2038,6 +2056,39 @@ function censusDomain(): Array<{ id: string; built: Built }> {
 }
 
 describe("every quad these 50 districts paint is a quad they were authored to paint", () => {
+  /**
+   * The corpus, built ONCE for the whole block.
+   *
+   * `censusCorpus` already memoises, so no assertion here ever rebuilt a
+   * district that another had already built — measured, 156 `build()` calls
+   * over 105 DISTINCT districts across the entire file, and of the seven
+   * assertions below that walk the domain the first costs 227 ms and the rest
+   * 55/33/93/88/58/0 ms, i.e. everything after the first is a cache read.
+   * What the memo could not decide is WHICH test pays, and the answer was
+   * „whichever one happens to run first" — which left a 105-district corpus
+   * build inside some unrelated assertion's 5 s default timeout.
+   *
+   * That is not hypothetical. On this box — 7200 rpm HDD, 16 GB, other work
+   * running — that first call was measured at 19.4 s, 40.9 s and 65.8 s on
+   * three separate runs, against 0.23 s on a run where the page cache still
+   * held the corpus. A 280× spread, and all of it disk: only 80 ms of the
+   * file's 607 ms of build time is analyzeNetwork + buildMarkings, the other
+   * 527 ms is `load()` reading and parsing JSON. Hoisting it here gives that
+   * cost one explicit budget and leaves every `it` below on the 5 s default,
+   * where 5 s is still a real ceiling on that assertion's OWN work.
+   *
+   * The budget is generous and it is still finite, which is the point: the
+   * failure a timeout exists to catch here is UNBOUNDED — §6 documents an
+   * unclamped zebra widening that asks for ~1.9e17 bars and never returns —
+   * so 180 s catches that exactly as well as 5 s did, while 5 s also caught a
+   * cold disk and called it a defect. A suite that goes red on a cold cache
+   * teaches everyone to re-run until it is green, which is how a real red
+   * gets ignored.
+   */
+  beforeAll(() => {
+    censusCorpus();
+  }, 180_000);
+
   const BATTERY = [OV_LANE, OV_KEEPRIGHT, TJ_EMERGE, TJ_OCCLUDED, JX_EQUAL, SX, JXG];
   /** The five with no edge any test here names — where the phantom lived. */
   const UNNAMED: Array<[string, number]> = [
@@ -2511,27 +2562,109 @@ describe("every quad these 50 districts paint is a quad they were authored to pa
   });
 
   it("the catalogue's reach is measured, not claimed in a comment", () => {
-    // This block was titled „every quad the world paints…" while it graded
-    // 1,603 of the corpus's 10,798 marking quads — one in seven. The title now
-    // says 50 districts, and this test is what keeps that honest: the reach is
-    // counted, and every district outside it is outside for a NAMED reason, so
-    // no map can drift out of the census quietly. Extend the catalogue and this
-    // fails until the numbers above are corrected — which is the point.
+    // This block was titled „every quad the world paints…" while it graded one
+    // district's paint in seven. The title now says 50 districts, and this test
+    // is what keeps that honest: the reach is counted, and every district
+    // outside it is outside for a NAMED reason, so no map can drift out of the
+    // census quietly. Extend the catalogue and this fails until the numbers
+    // above are corrected — which is the point.
+    //
+    // AND THE COUNT USED TO BE TAKEN OFF THE WRONG NUMBER, under this exact
+    // title. `markingQuads` is what the painter BOOKED, and this file pins
+    // twice over that a booking is not a quad: §4 pins
+    // `triangles === 2·markingQuads − giveWayTriangles` and the per-district
+    // test above pins `census.quads === markingQuads − giveWayTriangles`. Both
+    // say the same thing — a give-way М7 triangle is booked in `markingQuads`
+    // and occupies ONE triangle, not two — and the corpus carries 108 of them.
+    // So both totals are stated below, the booking and the mesh, and the share
+    // is taken off the mesh: 1,599 / 10,690 = 14.96%, not the 14.8% a share of
+    // the bookings reported.
     const corpus = censusCorpus();
     const domain = censusDomain();
-    const quads = (rows: Array<{ built: Built }>): number =>
+    /** What the painter BOOKED — one per rectangle, and one per М7 triangle. */
+    const booked = (rows: Array<{ built: Built }>): number =>
       rows.reduce((n, d) => n + d.built.markings.markingQuads, 0);
-    expect({ districts: corpus.length, quads: quads(corpus) }).toEqual({
-      districts: 105,
-      quads: 10798,
-    });
-    expect({ districts: domain.length, quads: quads(domain) }).toEqual({
-      districts: 50,
-      quads: 1603,
-    });
-    // …14.8% of the paint a student can drive past. Stated as a number so the
-    // header cannot round it up in prose.
-    expect(((quads(domain) / quads(corpus)) * 100).toFixed(1)).toBe("14.8");
+    /** How many of those bookings are triangles. */
+    const bookedTriangles = (rows: Array<{ built: Built }>): number =>
+      rows.reduce((n, d) => n + d.built.markings.giveWayTriangles, 0);
+    /** What the MESH holds, walked out of the index buffer by the reader every
+     *  other claim in this file rests on. Not a restatement of the counter: the
+     *  two are proved equal below, over all 105, which is the first time the 55
+     *  districts OUTSIDE the domain have had their geometry counted at all. */
+    const meshQuads = (rows: Array<{ built: Built }>): number =>
+      rows.reduce(
+        (n, d) =>
+          n +
+          readQuads(d.built.markings.markings.indicesView, d.built.markings.markings.positionsView)
+            .length,
+        0,
+      );
+    expect({
+      districts: corpus.length,
+      booked: booked(corpus),
+      triangles: bookedTriangles(corpus),
+    }).toEqual({ districts: 105, booked: 10798, triangles: 108 });
+    expect({
+      districts: domain.length,
+      booked: booked(domain),
+      triangles: bookedTriangles(domain),
+    }).toEqual({ districts: 50, booked: 1603, triangles: 4 });
+    // The mesh, and the booking it is supposed to equal. 85% of the denominator
+    // below sits in the 55 excluded districts, whose index buffers nothing else
+    // here reads: until this line the reach — the one number that says how much
+    // of the world this file actually grades — rested on a counter no assertion
+    // had ever checked against the geometry for four districts in five.
+    const corpusMesh = meshQuads(corpus);
+    const domainMesh = meshQuads(domain);
+    expect(corpusMesh).toBe(booked(corpus) - bookedTriangles(corpus)); // 10,690
+    expect(domainMesh).toBe(booked(domain) - bookedTriangles(domain)); //  1,599
+    const share = ((domainMesh / corpusMesh) * 100).toFixed(2);
+    expect(share).toBe("14.96");
+    // „NOT CLAIMED IN A COMMENT" IS NOW ITSELF A CHECK. The line this replaces
+    // — `expect(share.toFixed(1)).toBe("14.8")` — could not fail: with both
+    // totals pinned exactly two lines above it, the ratio was arithmetic, and
+    // no state of the world reddened the share without reddening a total first.
+    // It was a restatement wearing an assertion's clothes, and it restated a
+    // WRONG number for a wave without ever being able to say so.
+    //
+    // What a share assertion CAN guard, and what this test's title promises, is
+    // the prose: a comment is the one part of a test file that nothing else can
+    // falsify, and this file shipped a header whose arithmetic was wrong. So the
+    // sentence is GENERATED from the measurement and required to appear, word
+    // for word, at both places that state the reach — the file header and
+    // `censusCorpus`'s doc block. Edit either one and this goes red; extend the
+    // catalogue and it stays red until both are corrected.
+    const group = (v: number): string => v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+    const claim = `${group(domainMesh)} of the corpus's ${group(corpusMesh)} marking quads — ${share}%`;
+    const self = fs.readFileSync(path.join(__dirname, "markings-paint-truth.test.ts"), "utf8");
+    expect(self.split(claim).length - 1, claim).toBe(2);
+    // …and no OTHER denominator is stated anywhere in the file's prose, so a
+    // stale copy of this sentence cannot survive elsewhere in the header.
+    expect([...self.matchAll(/of the corpus's ([\d,]+) marking quads/g)].map((m) => m[1])).toEqual([
+      group(corpusMesh),
+      group(corpusMesh),
+    ]);
+
+    // AND THE MESH READING IS A SECOND INSTRUMENT, not the counter in a hat —
+    // proved by construction, on an EXCLUDED district, because those are the
+    // ones no other assertion in this file reads. Splice one quad's six indices
+    // out of its index buffer, the surgery a builder regression performs, and
+    // the mesh total moves while `markingQuads` does not: that is the whole
+    // difference between the two readings, and it is why the equality asserted
+    // above is capable of failing. `whole.length` is asserted first, so the
+    // construction cannot pass by measuring an empty mesh.
+    const outside = corpus.find((d) => d.outside !== null)!;
+    const mesh = outside.built.markings.markings;
+    const whole = readQuads(mesh.indicesView, mesh.positionsView);
+    expect(whole.length, outside.id).toBeGreaterThan(0);
+    const idx = [...mesh.indicesView];
+    idx.splice(whole[0]!.idx0, 6);
+    expect(readQuads(idx, mesh.positionsView).length, outside.id).toBe(whole.length - 1);
+    // …and the counter is untouched by that surgery. This is the pair the old
+    // share could not tell apart: 10,690 − 1 ≠ 10,690 is what convicts it, and
+    // 10,798 stays 10,798 throughout.
+    expect(outside.built.markings.markingQuads).toBe(booked([outside]));
+
     // Every excluded district, attributed to the first gate that stops it —
     // the tally the doc comment on `censusCorpus` carries, asserted rather than
     // asserted-in-a-comment. 45 of the 55 are zones and zebras: that is the
@@ -2763,7 +2896,16 @@ describe("assertDistrict checks what District declares", () => {
   // engine for a manoeuvre he performed correctly, and credited by one for a
   // skill it never measured, and this file exists because of both.
 
-  it("every committed district still passes — the false-refusal direction", () => {
+  // 180 s, not the 5 s default, for the same reason §5 hoists its census: the
+  // whole cost of these two is reading district JSON off disk for the first
+  // time in the process, and on this box that is 0.07 s when the page cache
+  // holds it and tens of seconds when it does not. Measured on the pair below,
+  // one run each: 0.12 s and 0.59 s warm, 53.8 s COLD for the byte-for-byte
+  // one, which blew the 5 s default and failed a corpus that was perfectly
+  // fine. Neither number is a budget for computation — there is none here —
+  // and a guard that hangs still hangs unboundedly, so a finite ceiling this
+  // wide loses nothing a timeout was ever able to catch.
+  it("every committed district still passes — the false-refusal direction", { timeout: 180_000 }, () => {
     // Making a guard stricter is only safe if the real corpus is proved
     // against it. It is: all of content/world/*.json already carry all four
     // arrays, so nothing on disk changes hands.
@@ -2776,7 +2918,7 @@ describe("assertDistrict checks what District declares", () => {
     }
   });
 
-  it("…and so does the copy the BROWSER fetches, byte for byte", () => {
+  it("…and so does the copy the BROWSER fetches, byte for byte", { timeout: 180_000 }, () => {
     // Every other assertion in this file reads content/world. A STUDENT reads
     // platform/public/world — `runtime/district.ts` fetches `/world/<id>.json`
     // — and the two being the same bytes is a build convention, not a law. A
@@ -2788,6 +2930,15 @@ describe("assertDistrict checks what District declares", () => {
     // and §7's guard speak for the browser. If a generator ever writes one and
     // not the other, this says so by name rather than letting a lesson grade a
     // world nobody checked.
+    //
+    // It is also the only test in src/modules/sim/world that opens
+    // platform/public/world at all, so its 105 reads are ALWAYS cold there,
+    // however warm content/world is by the time it runs — which is why this
+    // one test was the whole of this file's cost in that suite, and why it was
+    // the one that went red at 5 s while everything around it passed. The read
+    // is the price of proving what a student actually downloads, and nothing
+    // cheaper proves it: sizes can match while bytes do not, and only one of
+    // the two copies is the one that gets driven.
     expect(PUBLIC_WORLD_DIR).toBeTruthy();
     const src = fs.readdirSync(WORLD_DIR!).filter((f) => f.endsWith(".json")).sort();
     const pub = fs.readdirSync(PUBLIC_WORLD_DIR!).filter((f) => f.endsWith(".json")).sort();
