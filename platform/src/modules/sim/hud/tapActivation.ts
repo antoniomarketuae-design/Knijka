@@ -85,6 +85,45 @@
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ─────────────────────────────────────────────────────────────────────────────
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠ THE TWO SWEEP-161 FINDINGS ROUTED AT THIS FILE ARE ABOUT WHERE THE TOUCH
+ *   HINT IS DRAWN, AND THIS FILE DRAWS NOTHING. Checked 2026-08-19; recorded
+ *   rather than silently declined.
+ *
+ * BOTH FRAMES, opened (`sc-fo-motorway-gap/mobile-wrong/04-t087s.png` and
+ * `sc-hz-emergency-stop/mobile-right/05-stopped.png`, iPhone 16 landscape):
+ * «Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка. / Спряла кола:
+ * пусни палеца и натисни пак надолу — минава на заден ход.» is printed straight
+ * across the interior rear-view mirror, with «РАЗБРАХ» under it — in a lesson
+ * family whose briefings repeatedly tell the student to check that mirror. The
+ * reading is right and the routing is not. This module is pure pointer
+ * arithmetic and four handlers; it has no JSX, no CSS, no coordinates of its
+ * own, and cannot place anything anywhere. §2.6 O34's class again.
+ *
+ * THE THREE FILES THAT CAN ANSWER IT, and the state of each as read today:
+ *
+ *   WHEN it leaves — `components/sim/lesson-ui/touchHintLifetime.ts`. Already
+ *     answered, and it answers the findings' actual claim („never dismisses",
+ *     „permanently unavailable across the whole lesson"): `touchHintStandsDown`
+ *     drops the card the first time the car passes 5 км/ч, and both frames show
+ *     a MOVING car — 17 км/ч in `sc-fo-motorway-gap`. **On the shipped tree
+ *     those two frames no longer reproduce**; they were photographed at the
+ *     sweep baseline, before that exit landed. The residue that rule leaves is
+ *     the 11 mobile runs in the sweep that never once read above the floor, for
+ *     which `touchHintOutstayed` is written but, per that file's own ⚠, is not
+ *     yet spent by `LessonScene`.
+ *   WHICH CORNER — `hud/notifyColumn.ts`, in that file's words: „whether the
+ *     top-right corridor lands on the rear-view mirror is that file's
+ *     question." Answered there and now adopted: see the mirror-lane block.
+ *   WHETHER «РАЗБРАХ» CAN BE PRESSED AT ALL — this file, and that half is the
+ *     one this file really did own. It is the census entry above („the
+ *     first-run touch hint's «Разбрах»"), and it is closed.
+ *
+ * So: not closed here, not closable here, and not open on the shipped tree for
+ * the reason the first bullet gives. What is left of them belongs to the two
+ * files named, and neither is this lane's.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
  * `__tests__/tap-activation.test.ts` sweeps all three layers in the node
  * environment — no DOM, no browser, no emulator (same device as
  * `hudPreferences.ts`: a rule only a browser can check is a rule nobody

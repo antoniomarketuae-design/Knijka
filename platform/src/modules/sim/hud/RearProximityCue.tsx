@@ -19,6 +19,41 @@
  * Placement: bottom-center at the shell's above-dashboard line (6.75rem —
  * the Minimap/legend row), clear of the minimap (right-3), the ribbon legend
  * (left-3), the touch sliders (edges) and the StatusDashboard itself.
+ *
+ * ── THE ONE SURFACE THAT LIST FORGOT: THE DEMONSTRATION PLAYER ─────────────
+ *
+ * sweep161, `sc-follow-tailgater/pc-right/04-t098s.png`: *„The tailgater is
+ * invisible for the whole drive. Once the demonstration player takes over the
+ * corner where the 'Кола отзад' chip lived, there is no cue at all that a car
+ * is glued to the bumper — not in the mirror (covered), not in the cockpit,
+ * not on the HUD — in the one lesson that is entirely about a car behind
+ * you."*
+ *
+ * The enumeration above is the defect. It names four neighbours and clears all
+ * four; the „ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА" transport was never added to it,
+ * and it is the widest thing on the bottom edge. MEASURED off that frame
+ * (1440×900 PC, play area 265…1430 × 110…750): the player panel occupies
+ * 107–213 px above the play area's floor and this badge sits at 6.75rem =
+ * 108 px — the two overlap at the player's own bottom edge, and the badge is
+ * `z-10` under it.
+ *
+ * WHY IT LANDS HARDEST HERE. The chip is legible on lessons without a shadow
+ * — it is photographed intact on `sc-signal-controller/mobile-right` reading
+ * «Кола отзад · 11 м» — and the transport is up for the whole drive on exactly
+ * the shadow-following family, which is the family whose subject is the car
+ * behind you. So the badge disappears precisely where it is the lesson.
+ *
+ * NOT FIXED HERE, AND THE REASON IS NOT TIMIDITY. This component cannot see
+ * the transport: it takes a traffic source and a pose ref, and nothing else.
+ * Moving the default band would relocate a placement that is verified good on
+ * every lesson without a shadow, to fix the ones with; adding a prop nobody
+ * passes would repeat the `DebriefContext.coachedMistakes` mistake this same
+ * sweep found (a channel built, tested and never fed). The shell owns the
+ * answer — `components/sim/lesson-ui/LessonPlayShell.tsx` knows when the
+ * transport is mounted, and `PlayAreaStyles.tsx` is the established way to say
+ * so without drilling a prop through the 3D tree (its own „compact stage"
+ * rules key off the shell's data attributes for exactly this reason). Routed
+ * there: the badge needs to lift above 213 px while the transport is up.
  */
 
 import { useEffect, useState, type RefObject } from "react";

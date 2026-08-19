@@ -50,6 +50,49 @@ const STEP_EPSILON_SEC = 0.05;
 /** Painted width of one tick's hit slot, px — `w-5` compact, `w-6` roomy. */
 const TICK_WIDTH_PX = { compact: 20, roomy: 24 } as const;
 
+/**
+ * THE ROOMY CAPTION CARD'S OWN BOX, px — the two numbers its classes resolve
+ * to, named so the dead-air arithmetic below is checkable rather than asserted.
+ *
+ * `px-3.5 py-2` + a 1 px border on both edges = 18 px of chrome; `text-sm` is
+ * Tailwind's 14 px on a 20 px line box. Nothing here is a preference: change a
+ * class above and these change with it, which is why they sit next to it.
+ */
+const ROOMY_CAPTION_CARD_CHROME_PX = 18;
+const ROOMY_CAPTION_LINE_PX = 20;
+
+/**
+ * How much EMPTY BOX stands between an `lines`-line caption and the deck panel
+ * that owns it, on a roomy stage — i.e. how far the sentence floats free of the
+ * only thing on the stage that says who is speaking it.
+ *
+ * `sc-follow-distance/pc-right/04-t180s.png` is 80 px of this at two lines, and
+ * that gap is why a sweep judge filed the demonstration's narration as „the
+ * advisor bubble" and routed it at `AdvisorCard.tsx`. The card is bottom-
+ * aligned now, so this is 0 at every length the bank contains — but the
+ * function stays because the box is FIXED, so the question „how much of it is
+ * nothing?" is the one that has to keep being answerable.
+ */
+export function captionDeadAirPx(
+  lines: number,
+  boxPx: number = DECK_ROOMY_CAPTION_HEIGHT_PX,
+): number {
+  const card = ROOMY_CAPTION_CARD_CHROME_PX + Math.max(0, lines) * ROOMY_CAPTION_LINE_PX;
+  return Math.max(0, boxPx - card);
+}
+
+/**
+ * WHO IS SPEAKING THE CAPTION — the deck's own title, reused rather than
+ * re-worded so a rename cannot leave the visible heading and the announced
+ * attribution saying different things about the same trace.
+ */
+export function captionSpeakerBg(
+  trace: Pick<ScenarioTrace, "meta">,
+  titleBg?: string,
+): string {
+  return titleBg ?? KIND_TITLE_BG[trace.meta.kind];
+}
+
 function fmt(t: number): string {
   const s = Math.max(0, Math.floor(t));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -632,7 +675,73 @@ export function TraceTimeline({
         // caption is 104. The caption is the piece that may give — it already
         // scrolls — so the row it is above never gets pushed onto the thumb
         // controls.
-        className="w-full min-h-0 overflow-y-auto overscroll-contain"
+        //
+        // ── AND ON A ROOMY STAGE IT SITS ON THE DECK INSTEAD OF FLOATING OVER
+        //    THE ROAD ABOVE IT — sweep 161, and the evidence is a misrouting.
+        //
+        // `sc-follow-distance/pc-right/04-t180s.png` was filed as „THE ADVISOR
+        // BUBBLE quotes a speed the car is not doing: it reasons about 26 km/h
+        // while the speedometer reads 0 km/h and the car is stationary", and
+        // routed at `AdvisorCard.tsx`. It is not the advisor. It is THIS box,
+        // carrying `scFollowDistance.ts`'s annotation «На 26 км/ч тези
+        // двайсетина метра са близо 3 секунди — има време за реакция» — the
+        // demonstration narrating the SHADOW car. A judge reading the frame
+        // took it for the instructor speaking about the student's own drive,
+        // and there is nothing in the frame that could have told them
+        // otherwise, because the card was standing alone on the carriageway.
+        //
+        // WHY IT STOOD ALONE, AS ARITHMETIC (`captionDeadAirPx` below, and the
+        // constants are the shipped ones). The box is a FIXED
+        // DECK_ROOMY_CAPTION_HEIGHT_PX = 138 and its content was start-aligned,
+        // so a two-line caption — ROOMY_CAPTION_CARD_CHROME_PX 18 of chrome
+        // plus 2 × ROOMY_CAPTION_LINE_PX 20 = 58 — left EIGHTY pixels of
+        // transparent air between itself and the deck panel that owns it. Read
+        // off that PNG: card 402…447, deck panel top 540, i.e. 93 px of nothing
+        // (the box's own 6 px gap included). At that distance the two are not
+        // one object, and the only thing on the whole stage that says whose
+        // driving the sentence describes is the panel's own «ДЕМОНСТРАЦИЯ —
+        // СЛЕДВАЙ СЯНКАТА» heading, which was on the far side of that gap.
+        //
+        // WHY IT MATTERS MORE THAN A LAYOUT NIT (THEO-4, and the north star):
+        // following distance is the one lesson in the catalogue whose whole
+        // subject is that the SAME twenty metres is a different amount of time
+        // at a different speed. A seventeen-year-old who reads „на 26 км/ч …
+        // близо 3 секунди" as a statement about the car they are sitting in has
+        // been taught that twenty metres IS three seconds, and that is the
+        // exact misconception the lesson exists to remove.
+        //
+        // THE FIX IS THE CARD'S `mt-auto` BELOW, and it costs nothing: no
+        // height, no width, not one character of the 1 811-caption bank, so
+        // `tools/mobile/deck-captions.mjs` still reports 0 / 1811 in a box that
+        // is still exactly 138 px and a deck whose controls still never move.
+        // A caption that grows now grows UPWARD into the empty half of the box
+        // — the same direction the portrait phone already chose, and for the
+        // same reason.
+        //
+        // AN AUTO MARGIN ON THE CARD, AND THE TWO THINGS IT IS NOT.
+        //
+        // NOT `justify-content: flex-end`: on a scroll container that aligns to
+        // the end, content that overflows does so past the START edge and
+        // cannot be scrolled back to. This box's overflow is a safety net (the
+        // lint says the bank fits inside it), and a safety net that eats the
+        // first line of the sentence is worse than the gap it replaced. An auto
+        // margin cannot do that — auto margins absorb only POSITIVE free space
+        // and resolve to 0 when there is none, so an overflowing caption lays
+        // out exactly as it shipped and scrolls exactly as it shipped.
+        //
+        // NOT A SPACER SIBLING either, and this one was written, tested and
+        // then binned: `tools/mobile/deck-captions.mjs` — the gate that says
+        // 0 / 1811 — finds the card with `box.firstElementChild`, so an empty
+        // growing div in front of it would have handed the lint a 0 px box to
+        // measure and every caption in the bank would have „fitted". That is
+        // this project's own signature failure (every „0 defects" report here
+        // was an instrument bug, and all of them lied in the reassuring
+        // direction), committed by the fix for a defect rather than by the
+        // defect. `deckCaptionVoice.test.tsx` now pins the card as the box's
+        // first element child so the seam cannot be taken away again.
+        className={`w-full min-h-0 overflow-y-auto overscroll-contain ${
+          touch ? "" : "flex flex-col"
+        }`}
         // ── TWO PROPERTIES, NOT ONE — 2026-08-11, the caption row.
         //
         // A FIXED height is what keeps the deck's own toggle still while the
@@ -661,10 +770,22 @@ export function TraceTimeline({
         {active?.textBg ? (
           touch ? (
             <div className="rounded-xl border border-border bg-background/85 px-2.5 py-1.5 text-center text-[12px] font-medium leading-4 backdrop-blur">
+              <span className="sr-only">{captionSpeakerBg(trace, titleBg)}: </span>
               {active.textBg}
             </div>
           ) : (
-            <div className="mx-auto max-w-md rounded-xl border border-border bg-background/85 px-3.5 py-2 text-center text-sm font-medium backdrop-blur">
+            // `mt-auto` — the dead air, taken by the card's own margin rather
+            // than by a sibling, so this stays the box's FIRST ELEMENT CHILD
+            // and the caption lint goes on measuring the caption. See the block
+            // above the `className` for the 80 px and the frame it was read off.
+            <div className="mx-auto mt-auto max-w-md rounded-xl border border-border bg-background/85 px-3.5 py-2 text-center text-sm font-medium backdrop-blur">
+              {/* WHOSE DRIVING THIS SENTENCE DESCRIBES, for anyone who cannot
+                  see that the card is now sitting on the transport. Zero layout
+                  cost by construction (`sr-only` is a 1 px absolute clip), so it
+                  cannot cost the bank a line. The SIGHTED half of the
+                  attribution is the adjacency itself — the heading two rows down
+                  reads «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА». */}
+              <span className="sr-only">{captionSpeakerBg(trace, titleBg)}: </span>
               {active.textBg}
             </div>
           )

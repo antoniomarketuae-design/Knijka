@@ -89,7 +89,44 @@ export const CONTROLLER_BUBBLES: readonly ControllerBubbleCopy[] = [
   {
     posture: "sideProfile",
     headlineBg: "МИНАВАШ ТИ",
-    poseBg: "Виждаш го СТРАНИЧНО, ръцете долу",
+    /**
+     * THE ARMS THE CAPTION NAMED WERE NEVER THE ARMS ON SCREEN (sweep161,
+     * `sc-signal-controller/mobile-right/04-t076s.png`).
+     *
+     * This line shipped as „Виждаш го СТРАНИЧНО, ръцете долу". Cropped at 2×
+     * out of that frame the officer holds BOTH arms straight out horizontally,
+     * and he has to: `TrafficLayer.officerArmTarget` sets
+     * `lat = ±OFC_ARM_OUT_RAD` (1.47 rad) for every posture that is not
+     * „внимание", and `OFC_ARM_FWD_RAD` (0.44) was added by FR-OFC-ARMS
+     * precisely so those arms have a silhouette when the driver sees the
+     * PROFILE — i.e. the engine spent a fix making the arms visible in exactly
+     * the pose whose caption told the student they would be down.
+     *
+     * THE MESH IS RIGHT AND THE COPY WAS WRONG, which is why the repair is
+     * here and not in the renderer. ППЗДвП, retrieved verbatim in
+     * `templates-signals.ts`: „ръка или ръце, протегнати хоризонтално встрани
+     * — след като е подал този сигнал, регулировчикът МОЖЕ да свали ръката или
+     * ръцете си". Extended is the signal; lowered is a permitted follow-on.
+     * A caption may name either, but it may not name the one the frame is not
+     * showing.
+     *
+     * SO WHY DOES THE NEW LINE NOT SAY „ръцете настрани" EITHER? Because the
+     * arms are not the discriminator, and naming them would hand the student
+     * the wrong cue in the more dangerous direction. `officerArmTarget` does
+     * not take a posture — the SAME officer with the SAME arms out is
+     * „минавай" for the drivers at his shoulders and „спри" for the drivers at
+     * his chest and back. A student who learns „arms out = go" reads the halt
+     * posture as permission, which is `mistake-barge-chest`. The law puts it
+     * on the shoulder, not the limb — „за водачите, които се намират срещу
+     * лявото или дясното рамо" — so the line names the shoulder and keeps the
+     * СТРАНИЧНО / анфас pairing with `chestOrBack`'s pose line, which is the
+     * contrast the drill is actually built on.
+     *
+     * 37 characters against the 40-char billboard cap.
+     * `controller-bubble.test.ts` drives `officerArmTarget` and fails this
+     * caption if it ever describes an arm state the renderer does not hold.
+     */
+    poseBg: "Виждаш го СТРАНИЧНО — срещу рамото му",
     goBg: "Минава: ти и цялата твоя посока",
     stopBg: "Спира: напречното направление",
     priorityBg: "Предимството е ТВОЕ — дори на червено",

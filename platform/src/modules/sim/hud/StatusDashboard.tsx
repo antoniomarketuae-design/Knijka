@@ -66,6 +66,7 @@
  */
 
 import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { readSpeedContract } from "../scene/lessonSpeedContract";
 import { governorIsEasing } from "../vehicle";
 import { STALL_RESTART_LABEL_BG, type HintInput } from "./controlPhrases";
 import {
@@ -365,6 +366,7 @@ export function GovernorCapMark({
   tierBg,
   speedKmh,
   limitKmh,
+  taskCapKmh,
   size,
 }: {
   capKmh: number | null;
@@ -377,6 +379,36 @@ export function GovernorCapMark({
    * about what the law says on this road.
    */
   limitKmh: number;
+  /**
+   * ── THE THIRD NUMBER — sweep 161, 22 rows, and the row this bar owns ──────
+   *
+   * This objective's own demand (`reachZone.maxSpeedKmh`) — the number
+   * `RouteGuidance.capLineBg` paints across the lane as «Карай дотук — не
+   * по-бързо от 40 км/ч», and the number the student is actually GRADED on
+   * whenever it is stricter than the sign.
+   *
+   * `scene/lessonSpeedContract.ts` wrote the resolution for all three numbers
+   * and could not spend it: „the three surfaces that must adopt it are
+   * `hud/StatusDashboard.tsx` (`GovernorCapMark`), `components/sim/
+   * RouteGuidance.tsx` (`capLineBg`) and `components/sim/LessonScene.tsx` …
+   * none of which this lane owns … Until they do, the glass is unchanged and
+   * the 22 rows stand." This is the first of the three to adopt it.
+   *
+   * READ OFF A FRAME, not inferred (`sc-zebra-approach/mobile-right/
+   * 04-t087s.png`, iPhone 16 landscape): the instruction line says «приближи
+   * пътеката с под 40 км/ч», the В26 disc says **50**, this mark said
+   * **«РЕЖИМ Нормален ≤60 · знакът важи»**. Three numbers, ascending, and the
+   * one the student is billed against is the smallest and the only one with
+   * nothing beside it saying so. The same reading is in `sc-crossing-dart/
+   * mobile-right/01-arrival.png` (50 · ≤60) and `sc-sp-curve/mobile-wrong/
+   * 04-t030s.png` (90 · ≤100).
+   *
+   * OPTIONAL, and the absent case is the shipped one until the shell threads
+   * it: `undefined` reproduces the old two-number reading byte for byte, so no
+   * legacy or headless mount changes. See the ⚠ block on `StatusDashboard`'s
+   * own prop for what still has to happen upstream.
+   */
+  taskCapKmh?: number;
   /** Type scale: the phone readout runs one step below the roomy bar. */
   size: "compact" | "roomy";
 }) {
@@ -386,13 +418,48 @@ export function GovernorCapMark({
   const cap = Math.round(capKmh);
   const easing = governorIsEasing(capKmh, speedKmh);
   const nameBg = tierBg.trim() === "" ? "Режимът" : tierBg;
+  /**
+   * ONE RESOLUTION, ASKED FOR RATHER THAN RE-DERIVED.
+   *
+   * `overLimit` used to be `cap > Math.round(limitKmh)` written out here, and
+   * `SpeedContractReading.modeAboveLaw` is the same inequality written out
+   * there — with a docstring saying it „Mirrors `GovernorCapMark`'s own
+   * `overLimit` (rounded compare) so the mark and this cannot disagree." That
+   * is a hand-kept copy, i.e. exactly the arrangement the census block in
+   * `overlayQueue.ts` and the weather-vocabulary drift in `dashboardStatus.ts`
+   * were both burned by: two places that must agree, and nothing that makes
+   * them. Now there is one place, and this file has no inequality left to
+   * drift.
+   */
+  const reading = readSpeedContract({
+    postedKmh: limitKmh,
+    taskCapKmh,
+    modeCapKmh: capKmh,
+  });
   // The sign clause renders only when the ceiling sits ABOVE the posted limit
   // — the founder's 60-against-50. When the governor is at or under the sign,
   // obeying it cannot break the law and there is nothing to disclaim.
-  const overLimit = cap > Math.round(limitKmh);
-  const explainBg = easing
-    ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно. Това е таван на РЕЖИМА, не разрешение: важи знакът до скоростта.`
-    : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя — знакът до скоростта е ограничението.`;
+  const overLimit = reading.modeAboveLaw;
+  /**
+   * …AND THE CASE THE BAR HAD NO WORDS FOR: THE DRILL IS STRICTER THAN THE LAW.
+   *
+   * Rendered only when the TASK binds, because that is the only reading where
+   * obeying every number the student can see still fails him. When the sign is
+   * the stricter of the two, `знакът важи` above already says everything and a
+   * second clause would be the permanent furniture this mark refuses to carry.
+   *
+   * B58's rule is inherited whole rather than re-stated: a task cap ABOVE the
+   * street's own limit is grading slack, never an instruction, and
+   * `readSpeedContract` never makes it `binding` — so 32 catalogue gates
+   * authored above their street print nothing here, and cannot.
+   */
+  const taskBinds = reading.binding === "task" && reading.bindingKmh !== undefined;
+  const bindingKmh = taskBinds ? Math.round(reading.bindingKmh as number) : null;
+  const explainBg = `${
+    easing
+      ? `Режимът „${nameBg}“ те ограничава на ${cap} км/ч — газта не отива по-нагоре, колата е наред. Смени режима горе вдясно. Това е таван на РЕЖИМА, не разрешение: важи знакът до скоростта.`
+      : `Режимът „${nameBg}“ пуска най-много ${cap} км/ч. Това е таван на РЕЖИМА, не на пътя — знакът до скоростта е ограничението.`
+  }${reading.lineBg === "" ? "" : ` ${reading.lineBg}`}`;
   return (
     <span
       data-hud="governor-cap"
@@ -423,6 +490,22 @@ export function GovernorCapMark({
           · знакът важи
         </span>
       ) : null}
+      {/* THE NUMBER THE STUDENT IS ACTUALLY BILLED AGAINST, when it is neither
+          of the two already on this bar.
+          It is amber type and nothing else: a red annulus around a numeral IS
+          В26, and that shape belongs to the law alone. The mark above is held
+          to the same ban by `governor-cap.test.ts`, which greps this slice for
+          the two tokens that would build one — so this comment names neither,
+          and that is why it is phrased the long way round. */}
+      {bindingKmh === null ? null : (
+        <span
+          data-hud="governor-task-binds"
+          className="font-bold"
+          style={{ color: "var(--warning)", opacity: 1 }}
+        >
+          · задачата иска ≤{bindingKmh}
+        </span>
+      )}
     </span>
   );
 }
@@ -430,12 +513,32 @@ export function GovernorCapMark({
 export function StatusDashboard({
   statusRef,
   limitKmh,
+  taskCapKmh,
   rejectFlashKey = 0,
   compact = false,
   input = "keyboard",
 }: {
   /** Scene-written per-frame status (see dashboardStatus.ts header). */
   statusRef: RefObject<DashboardStatus>;
+  /**
+   * ⚠ THE OBJECTIVE'S OWN SPEED DEMAND (km/h) — DECLARED HERE, NOT YET THREADED.
+   *
+   * Forwarded verbatim to both `GovernorCapMark`s, which is where the whole
+   * argument lives; see that prop's docstring for the frames.
+   *
+   * WHAT SHIPS TODAY: `LessonPlayShell.tsx` mounts this bar twice (~line 4489
+   * compact, ~4501 roomy) with `limitKmh={snap.limitKmh}` and nothing else, so
+   * this arrives `undefined` and `readSpeedContract` reduces to the two-number
+   * reading the bar has always printed. Nothing on the glass moves until that
+   * shell passes the gate's cap — one prop at each of those two mounts, from
+   * the same `reachZone.maxSpeedKmh` `RouteGuidance.capLineBg` already reads.
+   * **That file is not this lane's**, so the change is published, asserted and
+   * routed rather than claimed: `governor-cap.test.ts`'s „the shell has not
+   * threaded the task cap yet" block asserts the CURRENT mounts, so it goes
+   * red the moment the thread lands and whoever lands it updates it in the
+   * same commit — the `touchHintLifetime.ts` ⚠ discipline, same shape.
+   */
+  taskCapKmh?: number;
   /** Current legal limit (tick-derived, the shell's 150 ms snapshot). */
   limitKmh: number;
   /** Increments on every REJECTED shift — the gear letter flashes red once
@@ -458,8 +561,51 @@ export function StatusDashboard({
 }) {
   const [snap, setSnap] = useState<DashboardStatus>(createDashboardStatus);
 
-  // Low-Hz mirror of the frame-rate ref (TraceTimeline/cluster poll grammar):
-  // copy only when the rendered hash actually changed.
+  /**
+   * Low-Hz mirror of the frame-rate ref (TraceTimeline/cluster poll grammar):
+   * copy only when the rendered hash actually changed.
+   *
+   * ── „THE HASH CONTAINS THE SPEED, SO IT COMMITS ON EVERY FRAME" — MEASURED,
+   *    AND THE CHARGE AS FILED IS REFUTED (2026-08-19) ─────────────────────────
+   *
+   * The standing note against this file said the poll „commits on every frame
+   * while the car is moving — a performance row that also means the dashboard
+   * re-renders constantly during exactly the moments the student is being
+   * graded." Two of its three clauses are wrong and the third is real but is
+   * not a defect in `dashboardHash`.
+   *
+   *   NOT every frame. The interval is `DASHBOARD_POLL_MS` = 100, and the hash
+   *     pre-rounds through `displaySpeedKmh`, so the ceiling is 10 commits/s
+   *     and only while the INTEGER km/h changes — not 60.
+   *   NOT a stale field. `{speed}` is genuinely rendered, seven lines below, in
+   *     both variants. A hash blind to it would freeze the digit.
+   *   THE RATIO IS REAL. Over a 0 → 55 км/ч ramp sampled at this interval
+   *     (11 s at 5 км/ч/s, 111 samples) the speed segment takes **56 distinct
+   *     values** while everything the bar DRAWS from the speed — `speedTone`'s
+   *     three bands × `governorIsEasing`'s one bit — takes **3**. That is
+   *     **18.7 whole-bar commits per distinct appearance**: every telltale
+   *     cell, the gear cell and both `GovernorCapMark`s re-render to move a
+   *     number by one.
+   *
+   * AND IN THE COCKPIT CAMERA THE NUMBER IS NOT EVEN VISIBLE. `PlayAreaStyles`
+   * folds `[data-hud="speed-block"]` with `display: none` under
+   * `html[data-sim-camera="cockpit"]` — the camera every lesson opens in, and
+   * the one all 16,649 sweep frames were shot in. So in the ordinary case the
+   * 18.7× buys a digit nobody can see.
+   *
+   * WHY IT IS NOT FIXED HERE, stated rather than left as a silent trade. The
+   * two candidate fixes are both out of this lane or already refused:
+   *   (a) coarsen `dashboardHash` to the DERIVED pair — one line, but the pair
+   *       needs `limitKmh`, which `dashboardHash(s)` is not given, so it is a
+   *       signature change in `hud/dashboardStatus.ts`, **not this lane's**;
+   *   (b) gate the poll on the live camera — refused at the site of the fold
+   *       itself, in those words: „CSS and not a prop because the camera lives
+   *       in a per-frame ref inside the scene — a React state for it would be a
+   *       60 Hz re-render of the HUD to answer a question that changes when
+   *       somebody presses C."
+   * ROUTED, not dropped: (a), to `dashboardStatus.ts`, with the 56-vs-3 number
+   * above as the acceptance measurement.
+   */
   useEffect(() => {
     const id = window.setInterval(() => {
       const s = statusRef.current;
@@ -555,6 +701,7 @@ export function StatusDashboard({
           tierBg={snap.governorTierBg}
           speedKmh={snap.speedKmh}
           limitKmh={limitKmh}
+          taskCapKmh={taskCapKmh}
           size="compact"
         />
       </div>
@@ -662,6 +809,7 @@ export function StatusDashboard({
           tierBg={snap.governorTierBg}
           speedKmh={snap.speedKmh}
           limitKmh={limitKmh}
+          taskCapKmh={taskCapKmh}
           size="roomy"
         />
       </div>

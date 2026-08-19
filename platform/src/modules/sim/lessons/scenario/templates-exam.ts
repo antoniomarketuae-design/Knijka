@@ -663,6 +663,33 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
       segmentM: 256,
       segmentRoad: "Незабравка",
       blockM: 375,
+      // THE SIGN CLAMP IS INERT ON THIS DRILL, AND THE ONE-LINE FIX IS BLOCKED
+      // IN ANOTHER LANE'S FILE (sweep161,
+      // `sc-ed-d2-stop-address/pc-right/04-t129s.png`; left undone 2026-08-20).
+      //
+      // `compile.ts` reads the street's limit from exactly one place —
+      // `spec.map.params.maxspeedKmh` — and this block has none, so
+      // `LessonSpec.postedLimitKmh` compiles to `undefined` and B58's „a gate
+      // label may never exceed the sign" has nothing to clamp against, on the
+      // very lesson the audit photographed for carrying four speeds at once.
+      // The prose has known the number all along: the docblock above says
+      // „limit 50" and briefing step 3 says „ограничението е 50".
+      //
+      // READ OFF THE DISTRICT, NOT OFF THE PROSE — the drill's block is
+      // `e76856228.0` in `d2-v1.json`: 375 m, residential, lanes 2,
+      // `maxspeed 50` (source „default"), the same edge `blockM: 375` names.
+      // (Other Незабравка edges in the cut carry 40 by tag; none is this block.)
+      //
+      // ADDING `maxspeedKmh: 50` HERE WAS TRIED AND MEASURED. No gate moves:
+      // the ladder's caps are 37 / 34.5 / 32 / 32 with a halt gate of 3, all
+      // far below 50, so `widenSpeedCap`'s clamp never bites and every compiled
+      // objective stays byte-identical. Eleven of the twelve assertions in
+      // `scenario/__tests__/b58-gate-never-over-posted.test.ts` stay green —
+      // including `unreadableCards` and the invariant itself. The twelfth is a
+      // census that must be RESTATED, not relaxed: the survey grows from 502
+      // cards to 510, because this template's two capped objectives across four
+      // rungs finally enter it. That file belongs to another lane, so the
+      // change is left here rather than made half-way. Apply both together.
     },
     districtId: "d2-v1",
   },
@@ -686,10 +713,33 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
       textBg:
         "Потеглянето от място е маневра (чл. 25): преди колелата да се завъртят трябва да си сигурен, че не пресичаш пътя на никого зад теб.",
     },
+    // FOUR SPEEDS ON ONE SCREEN (sweep161,
+    // `sc-ed-d2-stop-address/pc-right/04-t129s.png`): *„the instruction panel
+    // says take a calm 45 км/ч, the task toast says hold under 37 км/ч, the
+    // world sign says 50, and the mode strip says ≤80 on a street the
+    // instructions call residential."*
+    //
+    // The 37 was the grader's tolerance speaking in its own voice and it is
+    // already gone — the authored-cap wave gave `advisor.ts` the template's own
+    // figure, and this drill's card now reads „дръж под 32 км/ч" on every rung
+    // (compiled and measured: gates 37 / 34.5 / 32 / 32, spoken 32 throughout).
+    //
+    // WHAT THAT FIX COULD NOT DO IS SEQUENCE THE NUMBERS, and that is this
+    // file's job. 45 and 32 are not rivals — one is the middle of the block and
+    // the other is the approach — but nothing said so, and a student who holds
+    // the briefing's 45 into the zone fails a gate whose figure appears only on
+    // a transient chip. That is requirement zero's bare verdict (doc 64
+    // THEO-4) and the founder's own roundabout complaint pointing the other
+    // way. Steps 3 and 6 now name WHICH number is graded and WHEN each applies.
+    //
+    // Deliberately without printing the approach figure here: it is generated
+    // per rung from `sc-edsa-planned-approach`, and a numeral hard-coded in the
+    // briefing would be a second copy of it, free to drift, on the one drill
+    // whose whole finding is numbers that disagree.
     {
       n: 3,
       textBg:
-        "Излез в лентата и набери спокойни 45 км/ч. Улицата е жилищна, ограничението е 50 — карай под него, без да пълзиш.",
+        "Излез в лентата и набери спокойни 45 км/ч — това е скоростта за СРЕДАТА на блока, не за последните метри. Улицата е жилищна, ограничението е 50 — карай под него, без да пълзиш.",
     },
     {
       n: 4,
@@ -704,7 +754,7 @@ export const SC_ED_D2_STOP_ADDRESS: ScenarioSpec = {
     {
       n: 6,
       textBg:
-        "Планирай спирането отрано: огледало, десен мигач, плавно намаляване и спиране плътно вдясно до бордюра. Ако трябва да набиеш спирачките, за да уловиш мястото — мястото не е удобно.",
+        "Планирай спирането отрано: огледало, десен мигач, плавно намаляване и спиране плътно вдясно до бордюра. Числото в задачата на екрана е онова, по което те оценяват при приближаването — не скоростта от точка 3. Ако трябва да набиеш спирачките, за да уловиш мястото — мястото не е удобно.",
     },
     { n: 7, textBg: "Спри напълно, задръж колата и остави мигача изключен, когато си спрял." },
   ],

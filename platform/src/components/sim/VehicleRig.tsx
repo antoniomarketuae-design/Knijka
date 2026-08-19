@@ -114,6 +114,47 @@ const SINGLE_BEAM_SCALE = 1.6;
 const RAIN_DAY_BEAM_SCALE = 0.45;
 
 // ---------------------------------------------------------------------------
+// WINDSHIELD TINT PANE — its two ends are the cockpit-camera contract's own
+// landmarks, so the glass and the camera that frames it cannot drift apart.
+// The long argument (and the sweep-161 measurement that forced this) is at the
+// mesh itself, further down; only the arithmetic lives here.
+//
+// vehicle/cockpit-camera-contract.test.ts LANDMARKS, chassis-local:
+//   glassBase „windshield tint-plane base"  (y 0.436, z 0.920)
+//   header    „v2 glass-top / header-strip front edge" (y 0.850, z 0.160)
+// Kept as literals rather than imported: the contract file is a TEST, and a
+// component must not import from one. `__tests__/windshieldPane.test.ts`
+// reconstructs the pane's two ends from the constants the MESH renders with
+// and checks them against those landmarks — so the duplication cannot rot
+// without a red test, and the check is on the rendered geometry rather than on
+// this comment.
+const WINDSHIELD_BASE_Y = 0.436;
+const WINDSHIELD_BASE_Z = 0.92;
+const WINDSHIELD_TOP_Y = 0.85;
+const WINDSHIELD_TOP_Z = 0.16;
+/** Pane centre (chassis-local) and its length/rake, derived — never typed. A
+ *  planeGeometry lies in local XY, so rotating about X by `rake` sends local
+ *  +Y to (0, cos, sin): base → top is Δy up and Δz BACK, hence the atan2. */
+export const WINDSHIELD_CENTRE_Y = (WINDSHIELD_BASE_Y + WINDSHIELD_TOP_Y) / 2;
+export const WINDSHIELD_CENTRE_Z = (WINDSHIELD_BASE_Z + WINDSHIELD_TOP_Z) / 2;
+export const WINDSHIELD_LENGTH_M = Math.hypot(
+  WINDSHIELD_TOP_Y - WINDSHIELD_BASE_Y,
+  WINDSHIELD_TOP_Z - WINDSHIELD_BASE_Z,
+);
+export const WINDSHIELD_RAKE_RAD = Math.atan2(
+  WINDSHIELD_TOP_Z - WINDSHIELD_BASE_Z,
+  WINDSHIELD_TOP_Y - WINDSHIELD_BASE_Y,
+);
+/**
+ * Pane width (m). UNCHANGED at 1.5 and deliberately so: the sweep's own words
+ * are that the quad starts „at the A-pillar", i.e. the side edge already dies
+ * on the pillar and reads as part of it — it was only the TOP edge that ran
+ * out into open sky. Widening this would push the edge outboard of the pillar
+ * into the door glass for no defect anybody has photographed.
+ */
+export const WINDSHIELD_WIDTH_M = 1.5;
+
+// ---------------------------------------------------------------------------
 // WIPERS (founder review doc 62 #24: "the wiper button does nothing visible").
 // Two blade meshes riding the chassis at the windshield plane's pose, so BOTH
 // views see them: the cockpit looks through the glass at them, the chase view
@@ -180,10 +221,23 @@ const WIPER_PERIOD_S = 1.3;
 const WIPER_PARK_RAD = Math.PI / 2;
 /** Blade angle at the top of the sweep (just past vertical, driver side). */
 const WIPER_TOP_RAD = -0.2;
-/** Blade pivot height in the windshield plane's local frame (m) — REF 8: low
- *  enough that the parked blade lies ON the cowl sightline instead of above
- *  it. Below the plane's own −0.275 bottom edge on purpose: wipers park on the
- *  cowl, under the glass, not on it. */
+/**
+ * The wiper frame, chassis-local. This USED to be „the same pose as the
+ * windshield pane" and it is not any more: the pane was extended up to the
+ * `header` landmark (see WINDSHIELD_* above), while REF 8 tuned the park angle
+ * and the R0 round-3 by-eye verification against THIS origin and rake. Moving
+ * the wipers with the glass would silently undo a park that was photographed
+ * hidden behind the cowl, so the two poses are now separate and named.
+ */
+export const WIPER_FRAME_Y = 0.66;
+export const WIPER_FRAME_Z = 0.76;
+export const WIPER_FRAME_RAKE_RAD = -0.62;
+/** Blade pivot height in the WIPER frame (m) — REF 8: low enough that the
+ *  parked blade lies ON the cowl sightline instead of above it. Below the
+ *  −0.275 that was the old pane's bottom edge, on purpose: wipers park on the
+ *  cowl, under the glass, not on it. (That −0.275 is now a historical
+ *  reference point, not a live edge — the pane's base sits at chassis
+ *  y 0.436 / z 0.920 either way, which is the number REF 8 actually meant.) */
 const WIPER_PIVOT_Y = -0.322;
 /** Return-to-park rate when switched off mid-stroke (sweep fraction /s). */
 const WIPER_PARK_RETURN_PER_S = 1.4;
@@ -684,15 +738,61 @@ export function VehicleRig({
             through the A3 interior's windshield opening (the interior GLB has
             frame/pillars but no glass surface, and the exterior's opaque glass
             hides in cockpit view — this plane is the only "glass" the driver
-            looks through). Refit to the GLB aperture: cowl ~y0.5/z0.9 up to
-            the header ~y0.85/z0.55. depthWrite off so it never occludes the
-            world; INTERIOR_LAYER so the A4 mirror cameras never see it. */}
+            looks through). depthWrite off so it never occludes the world;
+            INTERIOR_LAYER so the A4 mirror cameras never see it.
+
+            THE PANE NOW REACHES THE HEADER, AND THAT IS THE WHOLE FIX (sweep
+            161, sc-ac-wind-truck-pass/mobile-wrong/04-t034s.png and the same
+            artifact in truck-spray + city-run): „a large untextured
+            translucent grey quad hangs across the upper half of the view …
+            extending far into the sky over the fields".
+
+            It was this pane, and the old comment named the reason without
+            noticing it: it claimed a refit „cowl ~y0.5/z0.9 up to the header
+            ~y0.85/z0.55", but the header is at z 0.16, not 0.55. The pane
+            stopped 0.44 m of chassis-z SHORT of the rail it is supposed to die
+            behind, so its top edge ended in mid-air over the bonnet and drew a
+            hard tint step across open sky.
+
+            MEASURED, not reasoned. Projecting the old corners through the
+            shipped cockpit camera (the composition
+            vehicle/cockpit-camera-contract.test.ts pins) put the top edge at
+            frame height fy 0.889 at the iPhone-16 landscape aspect; scanning
+            that frame's own sky for the luminance step finds it at y 132 of
+            1179, i.e. fy 0.888. Three decimals, and it is present on EVERY
+            aspect (fy 0.819 at 16:9, 0.787 at 1.6) — never a phone-only bug.
+            (At 112 km/h the speed-widen carries it to fy 0.845; measured 0.845.)
+
+            The two ends are the cockpit contract's OWN landmarks, so the pane
+            can no longer disagree with the camera that frames it:
+              glassBase (y 0.436, z 0.920) → header (y 0.850, z 0.160)
+            which is centre (0, 0.643, 0.540), length 0.8654 m, rake −1.0724 rad.
+            The top edge then projects to fy 1.085 on the phone (off-frame, no
+            edge at all) and to the header landmark itself at 16:9/1.6, where
+            the rail's own opaque geometry covers it.
+
+            COST: the same one draw call and the same material. The tinted area
+            grows by the sky band between fy 0.889 and the header — pixels that
+            were previously UNtinted although the driver is looking through
+            glass at them. Over sky (L≈192) the wash takes them to L≈172, the
+            same wash the rest of the aperture already carries.
+
+            ONE CONSEQUENCE, recorded because it is a real cost and it has an
+            owner elsewhere: the interior mirror node sits at chassis y 0.908,
+            i.e. ABOVE this glass's own top edge (y 0.850), so the sightline to
+            it now crosses the pane at z 0.199 and the mirror picks up the same
+            14 % wash. That is a symptom of the B58 mirror-station raise having
+            lifted the mirror out through the header — the same root as the
+            sweep's „the interior rear-view mirror floats detached in open sky"
+            (sc-park-van). It disappears by itself the moment the mirror is
+            lowered back under the glass line; do NOT re-shorten this pane to
+            hide it, which is how the sky edge comes back. */}
         <mesh
-          position={[0, 0.66, 0.76]}
-          rotation={[-0.62, 0, 0]}
+          position={[0, WINDSHIELD_CENTRE_Y, WINDSHIELD_CENTRE_Z]}
+          rotation={[WINDSHIELD_RAKE_RAD, 0, 0]}
           onUpdate={(m) => m.layers.set(INTERIOR_LAYER)}
         >
-          <planeGeometry args={[1.5, 0.55]} />
+          <planeGeometry args={[WINDSHIELD_WIDTH_M, WINDSHIELD_LENGTH_M]} />
           <meshStandardMaterial
             color="#243040"
             transparent
@@ -704,9 +804,14 @@ export function VehicleRig({
           />
         </mesh>
 
-        {/* Wiper blades (doc 62 #24) — in the windshield plane's own frame
-            (same pose as the glass above, nudged 20 mm along its +Z, i.e.
-            OUTSIDE the glass, where a wiper lives), parked on the cowl line
+        {/* Wiper blades (doc 62 #24) — in the windshield plane's ORIGINAL frame.
+            It used to be literally the same pose as the glass above; since the
+            glass was extended to the header they are separate poses, and this
+            one is the one that must not move: REF 8 tuned the park angle
+            against THIS origin and rake, and the R0 round-3 verification
+            photographed the parked blades hidden by the cowl from it. Nudged
+            20 mm along its +Z, i.e. OUTSIDE the glass, where a wiper lives;
+            parked on the cowl line
             (REF 8) and swept by useFrame while the wipers run. Chassis-
             mounted, so the chase view sees them on the car and the cockpit
             sees them through the glass. Default layer 0: the A4 mirror cameras
@@ -737,7 +842,10 @@ export function VehicleRig({
             #24 ("the wiper button does nothing visible") stays fixed. PIVOTS,
             REACH, WIPER_PARK_RAD, WIPER_TOP_RAD, the period and the phase are
             all untouched. */}
-        <group position={[0, 0.66, 0.76]} rotation={[-0.62, 0, 0]}>
+        <group
+          position={[0, WIPER_FRAME_Y, WIPER_FRAME_Z]}
+          rotation={[WIPER_FRAME_RAKE_RAD, 0, 0]}
+        >
           <group
             ref={wiperLRef}
             position={[0.3, WIPER_PIVOT_Y, 0.02]}

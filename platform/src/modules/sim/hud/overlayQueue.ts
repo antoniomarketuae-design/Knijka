@@ -243,8 +243,118 @@ export interface SimOverlayItem {
   noDismiss?: boolean;
   /** The caller renders extra React inside the opened sheet (checklist, result). */
   hasRichDetail?: boolean;
+  /**
+   * ── WHEN THIS ITEM WAS RAISED (ms, `performance.now()`/`Date.now()` domain) ──
+   *   sweep 161 · §2.6 O33, filed by the toast-moment lane against a gap it
+   *   could not reach into this file.
+   *
+   * THE FRAME (`sc-sp-curve/mobile-wrong/04-t030s.png`, iPhone 16 landscape,
+   * opened before this field was added): a card reading «Превишена скорост —
+   * Движеше се над разрешената скорост…» stands at the top right while the
+   * cluster under it reads **18 км/ч** and the В26 disc beside it reads **90**.
+   * The car had been at 96 км/ч six seconds earlier in the open field, so the
+   * card is telling the truth about a moment that is gone — and nothing on the
+   * glass says which moment. A seventeen-year-old reads an accusation of
+   * speeding next to a speedometer showing 18 and a sign showing 90, and the
+   * only conclusion available to him is that the grader is broken.
+   * `sc-merge-from-property/mobile-right/05-stopped.png` is the same reading.
+   *
+   * WHY THE ROOMY LEG IS ALREADY FIXED AND THE PHONE IS NOT. `hud/HudToasts.tsx`
+   * stamps `raisedAtMs` on every toast and prints «сега» / «преди 8 с» on the
+   * card's last row. On a phone the shell does not render `HudToasts` at all —
+   * it re-maps each toast into a `SimOverlayItem` — and **this shape carried no
+   * moment**, so the stamp was dropped at the boundary. O33's own words: „so
+   * that whoever adds the field to `SimOverlayItem` is told this file wants
+   * it." This is that field, with the same name as the toast's so the two
+   * cannot be mapped across by accident.
+   *
+   * OPTIONAL, and absent means „no moment" rather than „now" — the same
+   * direction `HudToasts` chose and for the same reason it gives: an unstamped
+   * card must print no age at all rather than invent one. A card that says
+   * «сега» about a fault from six seconds ago is the defect above wearing the
+   * costume of the fix.
+   *
+   * ⚠ NOT YET SPENT ON THE GLASS. The two edits that spend it are both outside
+   * this lane and both are named so neither can be lost: the shell's re-map
+   * (`components/sim/lesson-ui/LessonPlayShell.tsx`, the `...(!ended` block —
+   * add `raisedAtMs: t.raisedAtMs`) and the phone card's last row
+   * (`hud/SimOverlay.tsx` — render `overlayMomentBg(item, now)`).
+   * `hud-toast-moment.test.tsx`'s „THE PHONE IS NOT COVERED" block asserts
+   * `expect(mapped).not.toContain("raisedAtMs")` against the CURRENT shell, so
+   * it goes red the moment the first of those lands — deliberately, and
+   * whoever lands it inverts that assertion in the same commit.
+   */
+  raisedAtMs?: number;
   /** Called when the student acknowledges/dismisses. Ignored by the pure selector. */
   onAck?: () => void;
+}
+
+/**
+ * Which kinds carry a moment — `HudToasts.toastCarriesAge`, in this file's
+ * vocabulary, so the phone and the roomy leg cannot decide differently about
+ * the same event.
+ *
+ * `violation` and `hint` are that function's `"violation"` and `"lesson"` (the
+ * mapping is written into `SimOverlayKind`'s own doc comment: „Control feedback
+ * / practice nudge (HUD "lesson" toast)"). `teach` is deliberately NOT here,
+ * for the reason `toastCarriesAge` gives about its own exclusions: a teach
+ * moment freezes the drive at the instant it fires, so there is no elapsed time
+ * for the student to be wrong about. `praise`, `task`, `advisor`, `predrive`,
+ * `legend`, `warning` and `end` state no verdict about a past moment.
+ */
+const CARRIES_MOMENT: ReadonlySet<SimOverlayKind> = new Set<SimOverlayKind>([
+  "violation",
+  "hint",
+]);
+
+export function overlayCarriesMoment(kind: SimOverlayKind): boolean {
+  return CARRIES_MOMENT.has(kind);
+}
+
+/** The «сега» band, ms — `HudToasts.TOAST_AGE_NOW_MAX_MS`, copied by value. */
+export const OVERLAY_MOMENT_NOW_MAX_MS = 2000;
+
+/**
+ * THE MOMENT, IN THE CARD'S OWN WORDS — the phone's half of the toast stamp.
+ *
+ * Deliberately here and not in `SimOverlay.tsx`: it is a pure string function
+ * over two numbers, and this project's node-environment vitest can drive it
+ * without R3F, so the rule is checkable where the render is not. Same argument
+ * `touchHintLifetime.ts` and `sessionClock.ts` both make for sitting where they
+ * sit.
+ *
+ * IT IS `toastAgeBg` TO THE CHARACTER, and that is the requirement rather than
+ * a nicety. The two legs describe the SAME event on the same drive — the phone
+ * one because the shell re-maps a toast into a `SimOverlayItem`, the desktop one
+ * because it renders the toast directly — so a rounding difference here would
+ * mean one device saying «преди 8 с» and the other «преди 7 с» about one fault.
+ * That is the shape of drift this module was burned by twice already (the two
+ * hand-kept screen-owner lists above; `dashboardStatus`' two weather
+ * vocabularies), so the bands are copied by value — importing a `.tsx` client
+ * component into this pure leaf would drag React into the selector — and
+ * `overlay-queue-moment.test.ts` re-reads `HudToasts.tsx`'s own literals on
+ * every run and fails if either side moves:
+ *
+ *   < 2 s        «сега»
+ *   ≥ 2 s        «преди N с», N = `Math.round(ms / 1000)`  ← ROUND, not floor
+ *   clock back   «сега», not a negative and not a future age
+ *
+ * THE ONE THING IT ADDS is the answer `toastAgeBg` cannot express, because its
+ * `raisedAtMs` is a required number and this one's is optional: **no stamp at
+ * all → `null`, print nothing.** That is the state every item ships in today,
+ * and the direction matters — inventing «сега» for an unstamped card would date
+ * a fault that may be a minute old, which is `sc-sp-curve/mobile-wrong/
+ * 04-t030s.png` again wearing the costume of its own fix.
+ */
+export function overlayMomentBg(
+  item: Pick<SimOverlayItem, "raisedAtMs">,
+  nowMs: number,
+): string | null {
+  const raised = item.raisedAtMs;
+  if (typeof raised !== "number" || !Number.isFinite(raised)) return null;
+  const ms = nowMs - raised;
+  if (!Number.isFinite(ms) || ms < OVERLAY_MOMENT_NOW_MAX_MS) return "сега";
+  return `преди ${Math.round(ms / 1000)} с`;
 }
 
 /**
@@ -310,6 +420,103 @@ export function hasWhy(item: SimOverlayItem): boolean {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   …AND `hasWhy` ANSWERS A NARROWER QUESTION THAN IT IS READ AS ANSWERING.
+   Sweep 161, four frames of one shape, 2026-08-19.
+
+   `hasWhy` measures ONE thing: is there an authored explanation on the object.
+   It is read as measuring „can the student read the explanation", and those
+   came apart the moment the peek acquired a fold. Every frame below returns
+   `hasWhy === true`:
+
+     sc-zebra-approach/mobile-right/04-t087s     ↓ ОЩЕ 15 РЕДА
+     sc-crossing-dart/mobile-right/01-arrival    ↓ ОЩЕ 15 РЕДА
+     sc-sp-curve/mobile-wrong/04-t129s           ↓ ОЩЕ 8 РЕДА
+     sc-speed-transition/mobile-wrong/04-t018s   ↓ ОЩЕ 3 РЕДА
+     sc-merge-motorway-exit/mobile-right/01-arrival  ↓ ОЩЕ 39 РЕДА
+
+   THE ZEBRA FRAME IS THE ONE THAT SETTLES IT, because there the folded line is
+   the graded one. Opened at 852 × 393: the peek prints the whole first line,
+   then step 2 in grey, then **half of step 3 at ~50 % opacity, straight across
+   the face of the pedestrian-crossing sign it is about**, then the counter.
+   Step 3 is the stop rule — the thing this lesson bills. A student can be
+   convicted of breaking a rule the card cut in half, and every THEO-4
+   instrument in the tree said the card was fine.
+
+   That is the failure mode the audit rules name first: an instrument that lies
+   in the REASSURING direction. `hasWhy` is not wrong — it is narrow, and the
+   repair is a second predicate that answers the wider question, not a quieter
+   `hasWhy`. Both are kept, and `requiresWhy` still gates both, so nothing that
+   was exempt becomes graded by accident.
+
+   WHAT THIS FILE CAN AND CANNOT SEE. It cannot measure pixels: the peek's
+   height is `notifyColumnMaxHeightCss` and the wrap is the browser's, and
+   `SimOverlay.foldLinesBelow` already owns the measured half. What it CAN see
+   is the ratio the fold is being asked to absorb, which is a property of the
+   ITEM and belongs with the item. 39 hidden lines behind a 2.5-line peek is not
+   a fold; it is a document with a sentence on top of it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * How many lines of `detailBg` a peek must be able to show before the WHY
+ * counts as reachable ON THE GLASS rather than merely present in the object.
+ *
+ * NOT a reading-speed number and not a layout number — a RATIO floor, and it is
+ * set from the frames rather than chosen. The four cut frames above hide 3, 8,
+ * 15, 15 and 39 lines behind a peek showing between one and three; the shipped
+ * budget at 852 × 393 is 161 px of column, and after the mirror lane
+ * (`NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN`, adopted by `SimOverlay` in a later
+ * round) it is 95.8 px — about five of the peek's eleven landscape lines gone,
+ * which makes every number above WORSE, not better. So the floor is stated as
+ * „the majority of the explanation, or all of it", i.e. the fold may hide less
+ * than it shows.
+ *
+ * A CARD THAT FAILS THIS IS NOT BROKEN COPY — it is copy on the wrong surface.
+ * The remedy is never to delete the explanation: it is that the peek prints a
+ * SUMMARY it can finish and the sheet holds the rest, which is the arrangement
+ * `briefingLineBg` / `briefingBodyBg` below already impose on the briefing and
+ * which nothing imposes on a violation card.
+ */
+export const WHY_REACHABLE_MIN_VISIBLE_FRACTION = 0.5;
+
+/**
+ * Is this item's explanation reachable on the glass, given how many lines the
+ * peek can actually print?
+ *
+ * `visibleLines` is what the surface reports — `SimOverlay.foldLinesBelow`'s
+ * complement — and `detailLines` is what the item needs. Passed in rather than
+ * derived here for the reason at the top of the block: this file may not guess
+ * at a wrap.
+ *
+ * BOTH DIRECTIONS ARE LOAD-BEARING AND BOTH ARE PROVED IN THE TEST.
+ *   false when a real explanation is mostly folded — the five frames above.
+ *   TRUE when the item has no WHY to owe (`requiresWhy` is false: praise, a
+ *     task line, the ribbon legend), because a predicate that failed those
+ *     would flag every clean frame in the catalogue and be switched off within
+ *     a round. That is the false-refusal half, and it costs exactly as much as
+ *     the false pass: an alarm that fires on everything is an alarm nobody
+ *     reads, and the graded step goes back behind the fold unnoticed.
+ *   TRUE when nothing is folded at all (`visibleLines >= detailLines`),
+ *     whatever the fraction.
+ *
+ * An unreadable count is FALSE — not true. A surface that cannot say how much
+ * it is showing has not shown that the explanation arrived, and the direction
+ * that costs a student is the one that assumes it did.
+ */
+export function whyIsReachable(
+  item: SimOverlayItem,
+  lines: { visibleLines: number; detailLines: number },
+): boolean {
+  if (!requiresWhy(item.kind)) return true;
+  if (!hasWhy(item)) return false;
+  const { visibleLines, detailLines } = lines;
+  if (!Number.isFinite(visibleLines) || !Number.isFinite(detailLines)) return false;
+  if (visibleLines < 0 || detailLines < 0) return false;
+  // Nothing authored to fold, or nothing folded: the sentence arrived whole.
+  if (detailLines === 0 || visibleLines >= detailLines) return true;
+  return visibleLines >= detailLines * WHY_REACHABLE_MIN_VISIBLE_FRACTION;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    THE BRIEFING'S TWO HALVES — AND WHY THEY LIVE HERE AND NOT IN THE SHELL.
 
    FOUNDER, 2026-08-14, frames from both orientations: „there are TWO copies of
@@ -368,6 +575,70 @@ export function briefingBodyBg(steps: readonly BriefingStepBg[]): string | null 
     .slice(1)
     .map((s) => `${s.n}. ${s.textBg}`)
     .join("\n");
+}
+
+/**
+ * …AND THE RULE ABOVE IS STATED FOR EVERY CARD AND ENFORCED FOR ONE.
+ * Sweep 161, 2026-08-19.
+ *
+ * „THE CARD MAY NEVER PRINT THE SAME SENTENCE TWICE" is written six lines up
+ * as a rule about cards. What actually guards it is `briefing-no-echo.test.ts`
+ * driving the two functions above — i.e. the BRIEFING, one producer, one kind.
+ * A rule with one enforced instance is a convention, and the frames found the
+ * next producer immediately.
+ *
+ * `sc-vp-readiness/pc-right/01-arrival.png`, 1440 × 900, opened:
+ *
+ *   chip   «ЗАДАЧА 1/2 · Мини контролната зона с готов кокпит»
+ *   box    «Мини контролната зона с готов кокпит — дръж под 50 км/ч»
+ *
+ * One sentence, printed twice in two registers, the second a superstring of the
+ * first — and both laid over the interior rear-view mirror, so the echo is
+ * costing the student the glass twice over. `sc-park-bay-exit-rev/pc-wrong/
+ * 04-t028s.png` is the same pair for «Задача 2: подравни се по алеята…».
+ *
+ * WHAT THIS PREDICATE CAN AND CANNOT REACH. It judges ONE item — does its
+ * `detailBg` open by repeating its own `lineBg` — which is the shape the
+ * briefing had and the shape any future single card can have. The frame above
+ * is the CROSS-PRODUCER case: the chip is the queue's `task` item and the box
+ * is `ObjectiveBanner`'s own text, two surfaces neither of which can see the
+ * other. That half is not closable from a pure predicate over one item and is
+ * ROUTED, not dropped: the two producers must be handed one string, which is a
+ * change in `components/sim/lesson-ui/LessonPlayShell.tsx` (where both are
+ * mounted) — **not this lane's file**. This predicate is what that change would
+ * then be checkable against.
+ *
+ * NORMALISATION IS DELIBERATELY MINIMAL — case and surrounding whitespace only.
+ * Bulgarian punctuation carries meaning here („— дръж под 50 км/ч" is the
+ * qualifier that makes the second string worth printing at all), and this file
+ * has enough hand-kept near-copies of other people's rules already.
+ *
+ * ⚠ THE PREFIX MATCH NEEDS A WORD BOUNDARY, and the first draft of this
+ * function did not have one. Written as a bare `startsWith`, it answered TRUE
+ * for lineBg «Спри» against detailBg «Спринтирай към целта» — a genuine
+ * elaboration flagged as an echo, i.e. this predicate producing the exact
+ * false-refusal it exists to prevent, and it would have deleted teaching the
+ * moment anything acted on it. It was caught by mutating the function and
+ * finding that NOTHING went red, which is this programme's rule doing its job
+ * on the code that was written to serve it: a test that passes equally before
+ * and after guards nothing. The boundary is asserted in both directions in
+ * `overlay-queue-moment.test.ts`.
+ */
+export function itemEchoesLine(item: Pick<SimOverlayItem, "lineBg" | "detailBg">): boolean {
+  const line = item.lineBg.trim().toLocaleLowerCase("bg");
+  const detail = (item.detailBg ?? "").trim().toLocaleLowerCase("bg");
+  if (line === "" || detail === "") return false;
+  // The briefing's own shape: the body opens with „1. " + the line, or with the
+  // line bare. Both are the same defect — the reader sees the sentence twice
+  // before anything new arrives.
+  const stripped = detail.replace(/^\d+\.\s*/, "");
+  if (stripped === line) return true;
+  if (!stripped.startsWith(line)) return false;
+  // …and the repeat must END where the line ends. Otherwise «Спри» matches
+  // «Спринтирай», and a longer word that merely begins with the line is called
+  // a duplicate of it.
+  const next = stripped.charAt(line.length);
+  return !/[\p{L}\p{N}]/u.test(next);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

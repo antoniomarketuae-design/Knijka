@@ -97,6 +97,36 @@ export function buildSessionSummary(events: ReadonlyArray<ScorableEvent>): Sessi
   // /05) and changes what the theory side is told, so it is the lead's call
   // and not a severity edit's side effect. Written here rather than filed
   // elsewhere because THIS loop is where the signal is dropped.
+  //
+  // ── 2026-08-20: THE CHANNEL WAS BUILT, AND NOTHING EVER FED IT ──
+  //
+  // sweep161 photographed the consequence a second time —
+  // `sc-follow-cutin/mobile-wrong/08-debrief.png`: *„0 наказателни точки, 0
+  // опасни, 0 основни, despite doing 59 km/h in a posted 50 zone and drawing a
+  // 'Превишена скорост' teach card on screen. The only mark against it is that
+  // not all route tasks were done."* The finding was filed against THIS file.
+  //
+  // It is not this file. `buildSessionSummary` is a reducer over scored events
+  // and 0 is the honest total of what it was handed. The half that is missing
+  // is downstream, and it has already been written: `lessons/debrief.ts`
+  // carries `DebriefContext.coachedMistakes`, filters it against the ledger so
+  // a charged code cannot be filed under „не влизат в точките", and prints the
+  // section — its own docstring cites the identical defect on
+  // `sc-signal-flashing · mobile · wrong` (59 against a 50 badge, debrief said
+  // „чисто каране без нито едно нарушение").
+  //
+  // AND NO PRODUCTION CALLER PASSES IT. Grepped across `src/`, the only places
+  // that supply `coachedMistakes` are two test files that hand it to themselves.
+  // The authoritative server debrief —
+  // `app/(dashboard)/simulator/actions.ts`, the `buildDebrief(lesson, result,
+  // {...})` call — passes `microQuiz`, `priorBestScore` and `conceptTitles` and
+  // stops there, and the client fallback in
+  // `components/sim/lesson-ui/LessonPlayShell.tsx` calls `buildDebrief(lesson,
+  // result)` with no context at all, while holding the teach queue itself
+  // (`setTeachQueue`, same file). So the feature is green in CI and absent on
+  // the glass, which is why two sweeps in a row photographed it as fixed code.
+  // Routed there: the queue has to ride the session payload to the server, or
+  // the fallback has to pass its own. Nothing in `rules/` can do it.
   const conceptIds: string[] = [];
   for (const m of mistakes) {
     if (m.conceptId !== undefined && !conceptIds.includes(m.conceptId)) {

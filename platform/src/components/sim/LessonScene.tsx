@@ -123,6 +123,10 @@ import {
 // a line to it.
 import { CameraAidHint } from "@/modules/sim/hud/CameraAidHint";
 import { cameraAidHintEligible } from "@/modules/sim/hud/overheadHint";
+// The per-frame dashboard write, extracted out of this file so a unit test can
+// drive it (O35, 2026-08-19 — see the useFrame block). Same barrel reasoning as
+// the two lines above.
+import { writeDashboardStatus } from "@/modules/sim/hud/dashboardStatus";
 import {
   SimEnvironment,
   WindshieldDroplets,
@@ -2865,6 +2869,24 @@ function RuntimeDriver({
   // shell's dashboardStatusRef is pointed at it — see the useFrame block).
   const dashScratchRef = useRef<DashboardStatus | null>(null);
 
+  // ONE weather/time object, read by BOTH channels this component drives: the
+  // dashboard publication in the useFrame block below, and `runtime.sample`
+  // further down, which is what the RULE ENGINE grades. They used to name the
+  // four flags separately, and that is how the SAME hole got dug twice — O28 in
+  // the grader (no snow arm on the low-beam duty) and O35 here in the display
+  // (`isNight || rain`, which compile makes blind to snow). A flag can no longer
+  // reach one side and miss the other, because there is only one side.
+  //
+  // It is also the only per-frame allocation this block ever had: the old
+  // `dash.conditions = { isNight, rain, fog, snow }` built a fresh object 60
+  // times a second inside a channel whose header promises zero allocation.
+  // These four are LESSON-STATIC props, so the memo rebuilds when the lesson
+  // does and never during a drive.
+  const conditions = useMemo(
+    () => ({ isNight, rain, fog, snow }),
+    [isNight, rain, fog, snow],
+  );
+
   // A2 observer state: the signal tracker + polled-edge baseline reset on
   // every RISING edge of driveLocked (lesson start AND retry), re-baselined
   // to the cabin's CURRENT state so a car left belted/running by a previous
@@ -2885,50 +2907,37 @@ function RuntimeDriver({
     // frame — including the live blink-lamp levels off CabinControls' 600 ms
     // clock, so the DOM bar flashes in phase with the 3D cluster — then
     // publish it by pointing the shell's ref at it (the hazardActiveRef write
-    // grammar). Zero allocation after the first frame. Runs BEFORE the paused
-    // early-out: cabin keys still work during a pause and the dashboard must
-    // mirror them.
+    // grammar). Zero allocation. Runs BEFORE the paused early-out: cabin keys
+    // still work during a pause and the dashboard must mirror them.
+    //
+    // THE FIELD WRITES THEMSELVES LIVE IN `hud/dashboardStatus.ts` — 2026-08-19.
+    // They were inlined here, and being inlined in a `.tsx` scene is why the
+    // O35 fix was unprovable: reverting this block's one weather line to
+    // `undefined` left 1,982 tests across 118 files green and `tsc` at 0,
+    // because no unit test can mount a component that needs an R3F canvas and
+    // a wasm physics world (the vitest environment here is `node`, no DOM).
+    // `hud/__tests__/dashboard-publication.test.ts` now drives the extracted
+    // function directly, and `conditions` is a REQUIRED parameter of it, so
+    // dropping the hand-over below is a compile error rather than a silent
+    // winter lesson with no lights row.
+    //
+    // Imported from `@/modules/sim/hud/dashboardStatus` rather than the hud
+    // barrel for the same reason the D11 imports above are — the barrel is
+    // another lane's file this wave. Re-exporting it there later changes
+    // nothing here.
     const dashCabin = cabinRef.current;
     if (dashboardStatusRef && dashCabin) {
-      const dash = (dashScratchRef.current ??= createDashboardStatus());
-      const dl = dashCabin.driveline;
-      dash.leftLampLit =
-        (dashCabin.blinkOn && dashCabin.indicator === "left") || dashCabin.hazardBlinkOn;
-      dash.rightLampLit =
-        (dashCabin.blinkOn && dashCabin.indicator === "right") || dashCabin.hazardBlinkOn;
-      dash.indicator = dashCabin.indicator;
-      dash.hazardsOn = dl.hazardsOn;
-      dash.engineOn = dl.engineOn;
-      dash.stalled = dl.stalled;
-      dash.gearLabel = dl.gearLabel;
-      dash.parkingBrakeOn = dl.parkingBrakeOn;
-      dash.seatbeltOn = dashCabin.seatbeltOn;
-      dash.headlights = dashCabin.headlights;
-      dash.fogLightsOn = dl.fogLightsOn;
-      dash.wipersOn = dl.wipersOn;
-      dash.speedKmh = sampleRef.current.speedKmh;
-      // Founder 2026-07-28 (chase-view telltales): whether the CONDITIONS
-      // demand the lamps, mirrored from the same weather/time flags the rule
-      // engine grades on (HEADLIGHTS_OFF_AT_NIGHT / _IN_RAIN, чл. 74 fog) —
-      // so an edge ping can only ever name a real, gradeable fault.
-      dash.headlightsRequired = isNight || rain;
-      dash.fogLightsRequired = fog;
-      // …AND THE FLAGS THEMSELVES, because the bit above cannot see SNOW.
-      // Compile makes the three weathers exclusive, so a snow lesson has
-      // rain === false and fog === false, and `isNight || rain` is therefore
-      // FALSE on a lesson whose own instruction is «включи късите светлини» —
-      // no lights row on the dashboard at all. The grader had the identical
-      // hole (O28) and it was found from that side a round earlier: one channel,
-      // no owner, two drifts. `armedTelltaleWarnings` derives the duty and its
-      // citation from these four, off the precedence `reduceTick` grades on,
-      // rather than from a conclusion this file reached on its own.
-      dash.conditions = { isNight, rain, fog, snow };
-      // The tier's ceiling and whose it is. Constant between tier clicks, so
-      // writing it every frame costs one assignment and removes the only other
-      // option — a second subscription — from a file that already has enough.
-      dash.governorCapKmh = tierCapKmh;
-      dash.governorTierBg = tierNameBg;
-      dashboardStatusRef.current = dash;
+      // The scene hands over the facts it owns and concludes nothing: which
+      // duty the weather creates, and which law states it, is derived once —
+      // downstream, off the same precedence `reduceTick` grades on.
+      dashboardStatusRef.current = writeDashboardStatus(
+        (dashScratchRef.current ??= createDashboardStatus()),
+        dashCabin,
+        sampleRef.current.speedKmh,
+        conditions,
+        tierCapKmh,
+        tierNameBg,
+      );
     }
 
     if (paused) return;
@@ -3228,7 +3237,19 @@ function RuntimeDriver({
       if (d < sirenM) sirenM = d;
     }
     audioRef.current?.setEnvironment({ rain, nearestNpcM: leadGap, sirenM });
-    const tick = runtime.sample(sample, tRef.current, isNight, rain, leadGap, fog, snow);
+    // Weather/time read off the SAME object the dashboard publishes (see the
+    // `conditions` memo). That is the point of the memo: the grader and the
+    // display cannot disagree about whether it is snowing, which is the one
+    // thing they have already disagreed about twice (O28, O35).
+    const tick = runtime.sample(
+      sample,
+      tRef.current,
+      conditions.isNight,
+      conditions.rain,
+      leadGap,
+      conditions.fog,
+      conditions.snow,
+    );
 
     // A8: the scenario director steps AFTER traffic.update + runtime.sample —
     // it watches the player, commands staged actors (effective next frame)

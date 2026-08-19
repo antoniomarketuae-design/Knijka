@@ -65,7 +65,44 @@ export const SC_HAZARD_OBSTACLE: ScenarioSpec = {
     },
     {
       id: "sc-obs-cleared",
-      titleBg: "Задмини обекта, без да го закачиш",
+      /**
+       * THE TITLE PROMISED A TEST THAT DOES NOT EXIST (sweep161,
+       * `sc-hazard-obstacle/pc-right/04-t092s.png`).
+       *
+       * It read „Задмини обекта, БЕЗ ДА ГО ЗАКАЧИШ" over a bare `reachZone` —
+       * a circle at (4.06, 178) r 12 with no contact term of any kind. The
+       * auditor's words: *„it ticks on arrival whether or not anything was
+       * touched … The engine grades geometry and never consults the world it
+       * is describing."*
+       *
+       * HALF OF THAT FINDING IS WRONG AND THE HALF THAT IS RIGHT IS WORSE THAN
+       * IT SOUNDS. „and there is nothing to touch" is refuted by the frames:
+       * at t060s the stalled white car stands in the lane with the shadow
+       * easing past it, so the obstacle is there and contact does grade —
+       * `COLLISION`, опасна, 10 т. But `COLLISION` is `terminateSession`, and
+       * terminating ends the SHEET, not the drive (Наредба № 38 чл. 48 — later
+       * faults are shown and taught, billed at nothing). The car keeps rolling.
+       * So the student who clips the obstacle's corner drives the remaining
+       * 48 m, and this objective goes green under a sentence saying he did it
+       * WITHOUT touching it, on the same screen as the collision he caused.
+       * A tick for a skill nothing measured is the crime this audit exists for,
+       * and it does not stop being one because another detector caught the act.
+       *
+       * SO THE TITLE NOW CLAIMS EXACTLY WHAT THE ZONE MEASURES: he got past and
+       * kept going. The „без да го закачиш" teaching is not lost — it is where
+       * it is actually enforced: instruction 5, the objectiveBg, the examiner
+       * line, and both authored mistake demos, all of which cite `COLLISION`.
+       *
+       * WHAT WOULD BE BETTER, AND WHY IT IS NOT DONE HERE. A real gate — „no
+       * contact event since this objective armed" — needs a new term on
+       * `ReachZoneParams` plus the evaluator that reads it (`lessons/types.ts`,
+       * `lessons/objectives.ts`, the evaluator), none of which is this file.
+       * Routed. Until it exists, an honest title beats a flattering one:
+       * `__tests__/hazard-obstacle-claims.test.ts` now forbids ANY objective in
+       * this family from claiming a contact property, so the sentence cannot
+       * come back without the gate arriving with it.
+       */
+      titleBg: "Задмини обекта и продължи напред",
       // Past the obstacle (y = 130), back in the lane center.
       params: { kind: "reachZone", x: LANE_X, y: 178, radiusM: 12 },
     },

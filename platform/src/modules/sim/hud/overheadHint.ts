@@ -28,6 +28,25 @@
  *
  * Pure: no DOM, no three, no React. The chip that renders it is
  * `CameraAidHint.tsx`; the states below are unit-tested.
+ *
+ * ── NOT THE LABEL IN `sc-junction-stop/pc-right/04-t060s.png` ───────────────
+ *
+ * sweep161 filed *„The world-anchored instruction label at the stop line is
+ * clipped by the ИНСТРУКЦИИ panel to «Спри на сто» — the student is shown a
+ * truncated command at the exact moment the command matters"* against this
+ * file, presumably on the name. „Overhead" here means the TOP-DOWN CAMERA, and
+ * this module is a four-state timer that decides whether to whisper „press G";
+ * it owns no text, no anchor and no z-order, and it cannot run on that lesson
+ * at all — `cameraAidHintEligible` requires a `parkInBay`/`threePointTurn`
+ * objective and `sc-junction-stop` has neither.
+ *
+ * The label in that frame is the guidance route's own: the string is authored
+ * in `scene/guidanceRoute.ts` («Спри на стоп-линията», the `halt` branch) and
+ * painted by `components/sim/RouteGuidance.tsx`. And it is not truncated — it
+ * is OCCLUDED: the full sentence is laid out in the world and the ИНСТРУКЦИИ
+ * panel is drawn over its right-hand half, which is a placement question
+ * between the world label and the panel's reserved column, not a string-length
+ * one. Routed to those two.
  */
 
 import type { LessonSpec } from "../contracts";

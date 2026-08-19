@@ -239,7 +239,35 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
     {
       n: 2,
       textBg:
-        "Погледни ОТВЪД кръстовището, не към лампата: колоната след него стои и опашката ѝ е спряла на метър след отсрещното устие. Между устието и нейната броня няма и половин кола — място за теб там няма.",
+        // THE COPY PROMISED A COLUMN AND THE WORLD STAGES ONE CAR (sweep161,
+        // `sc-jx-blocked-exit/pc-right/05-stopped.png`): *„The briefing
+        // describes a queue standing a metre past the far mouth … but the
+        // carriageway beyond the junction is clear."*
+        //
+        // The line read „КОЛОНАТА след него стои и ОПАШКАТА Ѝ е спряла на
+        // метър след отсрещното устие". `staged` carries exactly one actor,
+        // `JXB_QUEUE_TAIL` at y = 31, and that is not an oversight — the
+        // HONEST LIMIT block above `JXB_QUEUE_TAIL_Y` works out that on a
+        // 2.5×-perceptual map with a 54 m junction square NO single queue car
+        // can be both past the mouth and leave a follower straddling the cross
+        // carriageway, and settles for „a car stopped dead inside the
+        // intersection with no exit in front of it: чл. 47's actual offence".
+        // The geometry was reasoned honestly and the sentence describing it was
+        // never brought back in line — it still sends the student looking for a
+        // queue and a tail, and one stopped car is what he finds.
+        //
+        // So the line now names the car that is there. The teaching does not
+        // weaken: what makes entering an offence is the missing half-car of
+        // room past the mouth, which is measured (1.83 m, computed above) and
+        // is what the sentence points at. The objective title and both mistake
+        // debriefs said „колоната" about the same single actor and now say
+        // „колата" too. What deliberately still says „колона" is the copy about
+        // the world BEYOND this drill — the objectiveBg's general rule and
+        // `teach.whenBg`'s час-пик description — because those are claims about
+        // Sofia, not about what is staged 59 m ahead.
+        // `__tests__/blocked-exit-world-truth.test.ts` fails the day the
+        // drive-referring copy describes more traffic than `staged` provides.
+        "Погледни ОТВЪД кръстовището, не към лампата: колата пред теб е спряла на метър след отсрещното устие и не мърда. Между устието и нейната броня няма и половин кола — място за теб там няма.",
     },
     {
       n: 3,
@@ -249,7 +277,7 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
     {
       n: 4,
       textBg:
-        "Ще изтърпиш цяло зелено, жълто и цяло червено. Колоната ще се отлепи някъде по средата на червеното — това още не е твоят момент: изходът е свободен, но сигналът не е твой.",
+        "Ще изтърпиш цяло зелено, жълто и цяло червено. Колата ще се отлепи някъде по средата на червеното — това още не е твоят момент: изходът е свободен, но сигналът не е твой.",
     },
     {
       n: 5,
@@ -292,7 +320,7 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
     },
     {
       id: "sc-jxb-cross",
-      titleBg: "Влез в кръстовището едва след като колоната се е отлепила",
+      titleBg: "Влез в кръстовището едва след като колата се е отлепила",
       // Twelve meters past the queue tail's rest pose: reachable only once the
       // tail has actually rolled away — the „свободен изход" made graded.
       params: { kind: "reachZone", x: JX_LANE, y: JXB_QUEUE_TAIL_Y + 12, radiusM: 6 },
@@ -318,14 +346,14 @@ export const SC_JX_BLOCKED_EXIT: ScenarioSpec = {
       traceRef: { path: "content/traces/sc-jx-blocked-exit/mistake-enter-full-box.trace.json" },
       titleBg: "Влизане на зелено в пълно кръстовище",
       whatWentWrongBg:
-        "Светофарът светеше зелено и колата влезе — макар отвъд кръстовището да нямаше и половин кола свободно място. Резултатът е на сантиметри от бронята на колоната, с цялото тяло СПРЯЛО ВЪТРЕ в кръстовището и само нос в отсрещното устие. Оттук нататък не можеш напред и не можеш назад — а след секунди напречното направление получава зелено и трябва да пресече точно през мястото, на което си застанал. Никой не минава, докато колоната пред теб не тръгне, и целият цикъл изчиства нула коли. Зеленото значи „премини, АКО изходът е свободен“, а не „тръгвай“: мястото се проверява ОТВЪД кръстовището, преди да пуснеш спирачката (чл. 47).",
+        "Светофарът светеше зелено и колата влезе — макар отвъд кръстовището да нямаше и половин кола свободно място. Резултатът е на сантиметри от бронята ѝ, с цялото тяло СПРЯЛО ВЪТРЕ в кръстовището и само нос в отсрещното устие. Оттук нататък не можеш напред и не можеш назад — а след секунди напречното направление получава зелено и трябва да пресече точно през мястото, на което си застанал. Никой не минава, докато колата пред теб не тръгне, и целият цикъл изчиства нула коли. Зеленото значи „премини, АКО изходът е свободен“, а не „тръгвай“: мястото се проверява ОТВЪД кръстовището, преди да пуснеш спирачката (чл. 47).",
       codeRefs: ["STANDSTILL_GAP_TOO_CLOSE"],
     },
     {
       traceRef: { path: "content/traces/sc-jx-blocked-exit/mistake-impatient-red.trace.json" },
       titleBg: "Нетърпеливо тръгване на новото червено",
       whatWentWrongBg:
-        "Изчакването беше правилно — цяло зелено пред заета отсрещна страна. После колоната се отлепи и кракът тръгна с нея… но светофарът вече беше червен. Свободният изход не е сигнал: той решава дали МОЖЕШ да преминеш, а лампата решава дали ТИ Е РЕД. Тук двете се разминаха с петнайсет секунди и колата влезе на червено — точно когато напречното направление получава своето зелено. Изтърпи цялото червено: следващото зелено е след секунди и този път ще е и с изход (ППЗДвП — светлинните сигнали).",
+        "Изчакването беше правилно — цяло зелено пред заета отсрещна страна. После колата се отлепи и кракът тръгна с нея… но светофарът вече беше червен. Свободният изход не е сигнал: той решава дали МОЖЕШ да преминеш, а лампата решава дали ТИ Е РЕД. Тук двете се разминаха с петнайсет секунди и колата влезе на червено — точно когато напречното направление получава своето зелено. Изтърпи цялото червено: следващото зелено е след секунди и този път ще е и с изход (ППЗДвП — светлинните сигнали).",
       codeRefs: ["RED_LIGHT_CROSSED"],
     },
   ],

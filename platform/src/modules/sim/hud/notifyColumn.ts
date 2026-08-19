@@ -340,6 +340,43 @@ export function rectClearsMirrorBand(
    swap at all, because every surface that reads the roomy top is a
    right-column surface, so that constant carries the lane directly.
 
+   ✅ THE SWAP LANDED — verified 2026-08-19, and this paragraph is corrected in
+   place rather than left reading as a description of what ships. `SimOverlay`
+   now writes `top: NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,` (and carries it into
+   the column's `max-height` argument), pinned from two directions by
+   `sim-overlay-mirror-lane.test.ts` — which asserts BOTH that the new constant
+   is present and that `top: NOTIFY_COLUMN_TOP_CSS_COMPACT` is absent, so a
+   revert cannot be quiet — and by `hud-off-the-road.test.ts`. The remaining
+   `NOTIFY_COLUMN_TOP_CSS_COMPACT` readers are the ones this block says should
+   keep it: `TouchControls.TOP_RAIL_TOP_CSS` and the demonstration deck.
+
+   ⚠ AND THE PRICE IT PAID IS NOW PHOTOGRAPHED, which the paragraph below
+   predicted in the abstract and nobody had measured against the catalogue. The
+   trade — „about five of the peek's eleven visible lines … the words are not
+   deleted, they join the fold that already prints «↓ още N реда»" — is real,
+   and the sweep shows what the fold was ALREADY holding before those five
+   lines joined it (852 × 393, all mobile, all read off the frames):
+
+     sc-merge-motorway-exit/mobile-right/01-arrival   ↓ ОЩЕ 39 РЕДА
+     sc-zebra-approach/mobile-right/04-t087s          ↓ ОЩЕ 15 РЕДА
+     sc-crossing-dart/mobile-right/01-arrival         ↓ ОЩЕ 15 РЕДА
+     sc-sp-curve/mobile-wrong/04-t129s                ↓ ОЩЕ  8 РЕДА
+     sc-speed-transition/mobile-wrong/04-t018s        ↓ ОЩЕ  3 РЕДА
+
+   In the zebra frame the line at the cut — rendered half-height at ~50 %
+   opacity, across the face of the pedestrian-crossing sign it is about — is
+   instruction 3, the stop rule the lesson GRADES. The mirror lane makes that
+   frame worse: 161 px of column becomes 95.8, so the cut moves UP.
+
+   THIS IS NOT AN ARGUMENT FOR GIVING THE MIRROR BACK. Both surfaces are
+   load-bearing and the two rows are not each other's price — the fold is deep
+   because a violation card is handed a whole briefing to print in a peek, not
+   because the column is 65 px shorter. The row that closes it is on the ITEM,
+   and it is now stated where an item can be judged: `overlayQueue.whyIsReachable`
+   („the fold may hide less than it shows"), with `SimOverlay.foldLinesBelow`
+   owning the measured half. Recorded here so the next reader of this trade is
+   handed the five numbers instead of re-deriving them from the catalogue.
+
    WHAT THE COMPACT SWAP COSTS, STATED BEFORE IT IS MADE, at 852 × 393:
      top 8 → 73.2 · the `min()` of the two budgets goes 161 → 95.8 px
    and at 780 × 360:
@@ -445,8 +482,8 @@ export const NOTIFY_COLUMN_RIGHT_CSS = `calc(${rem(
 )} + env(safe-area-inset-right, 0px))`;
 
 /**
- * THE PHONE LAYOUT'S TOP-LEFT CORNER DATUM — and, until the two swaps named
- * above land, also where the compact column starts.
+ * THE PHONE LAYOUT'S TOP-LEFT CORNER DATUM — and NOT the compact column's top.
+ * (It was both until the swap landed; see the ✅ note above.)
  *
  * It sits at the very top because the tier picker — the only other thing in
  * that corner — is already stood down while the overlay layer speaks
@@ -503,14 +540,17 @@ export const NOTIFY_COLUMN_TOP_CSS_ROOMY = `calc(max(3.25rem, ${
 /**
  * THE COMPACT COLUMN'S OWN TOP — the datum above plus the mirror's lane.
  *
- * Published rather than applied, for the ownership reason the block beside
- * `rectClearsMirrorBand` states: the two declarations that would read it are
- * an inline style in `SimOverlay` and a `max-height` argument in
- * `PlayAreaStyles`, and the datum itself may not move because the top rail and
- * the open deck stand on it. `notify-column-mirror.test.ts` asserts that this
- * constant clears the mirror on every sideways phone in the ladder and that
- * the datum still does not, so the swap cannot land half-done or be undone
- * quietly.
+ * ✅ APPLIED (verified 2026-08-19). `SimOverlay` writes it as the compact
+ * column's inline `top` and carries it into that column's `max-height`; the
+ * datum above stays where it is because the top rail and the open deck stand
+ * on it, which was always the reason the two constants are separate.
+ * `notify-column-mirror.test.ts` asserts that this constant clears the mirror
+ * on every sideways phone in the ladder and that the datum still does not, and
+ * `sim-overlay-mirror-lane.test.ts` asserts the adoption from both sides — the
+ * new name present AND the old one absent — so the swap cannot be undone
+ * quietly. (This docstring read „Published rather than applied" for one round
+ * after it stopped being true; a comment that describes a shipped state must be
+ * re-read against the tree, not inherited.)
  */
 export const NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN = `calc(max(0.5rem, ${
   MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE * 100
@@ -568,6 +608,39 @@ export function notifyColumnTopPx(
  * longer the whole control band's floor, because the lanes are disjoint. Net at
  * 852 × 393: 240 × 128 = 30 720 px² → 180 × 192 = 34 560, and the LEFT edge does
  * not move, so `notifyColumnLeftFraction`'s 0.60 rule reads what it read before.
+ *
+ * ── AND THE SWEEP RE-FILED THE DEFECT THIS LANE ALREADY CLOSED. REFUTED ON
+ *    ITS OWN FRAME, 2026-08-19 ─────────────────────────────────────────────
+ *
+ * The filing (`sc-crossing-dart/mobile-right/01-arrival.png`, major): „The
+ * instruction card sits on top of the right-hand control column … the panel
+ * covers «Л ЛЯВО», «З ЗАДН» and «Д ДЯСН», and the «ПРОЧЕТИ»/«РАЗБРАХ» buttons
+ * sit directly over the red ⚠ КОЛАН control — the seatbelt button is half under
+ * the РАЗБРАХ button. The player cannot reach a control the HUD is telling him
+ * about."
+ *
+ * The frame was opened and the corner cropped at 1.6× before anything was
+ * changed here. It does not show that, and the two halves fail separately:
+ *
+ *   THE BUTTONS. «РАЗБРАХ» ends at x ≈ 720 CSS and its baseline row ends at
+ *     y ≈ 164; the ⚠ КОЛАН disc begins at x ≈ 744 and y ≈ 179. Disjoint on
+ *     BOTH axes — ~24 px of horizontal clearance and ~15 px of vertical — so
+ *     „half under" is not a near miss, it is the opposite reading. Nothing on
+ *     the card can take that thumb.
+ *   THE PANEL. What covers Л/З/Д is not the card. It is the flank BAND's own
+ *     translucent backdrop — the 44 px column of stations this block is about —
+ *     and it is present on the LEFT edge of the same frame too, behind
+ *     «КЛАКС / ДЯСН / ЛЯВ», where no notification column exists at all. The
+ *     card's right edge stops ≈ 40 px short of it, which is this lane's 8 px
+ *     gutter plus the notch inset doing exactly what they were added for.
+ *
+ * So the flank lane holds, and the finding is a re-reading of the fix. It is
+ * written down instead of quietly dropped because the SAME frame carries a real
+ * defect the filing did not name — the card is cut mid-instruction with
+ * «↓ ОЩЕ 15 РЕДА» under it — and a lane that had merely closed this row would
+ * have banked a green tick and walked past it. That one is live and is routed:
+ * see the fold measurements in the mirror-lane block above and
+ * `overlayQueue.whyIsReachable`.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 export const FLANK_LANE_VAR = "var(--sim-flank-lane, 0px)";

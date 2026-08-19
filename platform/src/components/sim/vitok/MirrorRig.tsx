@@ -46,6 +46,19 @@
 //   both outside the picture — so free-running door passes spend the tier-low
 //   budget on quads nobody can see. The full argument, and the cadence tables,
 //   are in `scene/vitok/mirrorAttention.ts`.
+//
+//   2026-08-19 — THE SAME GATE IS NOW ON THE GLASS, and that closes the
+//   residual mirrorAttention's header recorded rather than rushed. A gate on
+//   the PASS alone still left the last rendered image in the door target
+//   between the priming pass and the first glance, i.e. a crisp reflection of
+//   the SPAWN MOMENT held for the whole lesson — which is what sweep 161 shot
+//   in sc-vu-pass-clearance, and worse than the „no reflection" it was filed
+//   as. A stale mirror reads as a live one and tells the learner the lane
+//   beside him is clear. So an unattended door target is BLANKED to its own
+//   authored glass colour, and the doors' two priming passes per scene are
+//   dropped — they only ever wrote a picture nobody was allowed to trust.
+//   Cost: two fewer 160×96 passes per scene, one 160×96 clear per glance
+//   transition, nothing in the steady state, and not one pass added anywhere.
 //   REDUCED SCENE per pass: a PER-INSTANCE cull (mirrorInstanceCull.ts) drops
 //   every InstancedMesh with no instance inside the mirror's own cone — the
 //   thing three cannot do, and the only cut that was ever big here: 97.3 % of
@@ -86,6 +99,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
+  Color,
   FogExp2,
   HalfFloatType,
   MeshBasicMaterial,
@@ -94,6 +108,7 @@ import {
   WebGLRenderTarget,
   type Mesh,
   type Object3D,
+  type WebGLRenderer,
 } from "three";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
 import { COCKPIT_EYE } from "@/modules/sim/vehicle";
@@ -102,6 +117,7 @@ import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
 import {
   MIRROR_BIT,
+  mirrorIsAttended,
   mirrorKindsFor,
   selectMirrorPass,
   type MirrorKind,
@@ -378,19 +394,121 @@ const MIRROR_FOG_MIN_DENSITY = 1.5 / MIRROR_FAR;
 // §I21 rationale for the low rear's interval 8, and the measurement behind the
 // door gate, are both recorded there.
 
+/**
+ * Should this mirror's glass be showing LIVE WORLD at the end of this frame?
+ * (Whether a PASS runs is `selectMirrorPass`'s question and a budget one; this
+ * is the honesty question, and they are not the same. A `false` here means the
+ * target is blanked to the authored glass colour — see `clearMirrorToInert`.)
+ *
+ * Pure and allocation-free so the rule is testable without a GPU, and called
+ * from both places the frame loop decides it — the blanking sweep and the
+ * post-pass promotion — so the two can never drift.
+ *
+ *  · rear   — always. It is in the picture at the driving pose, it is the
+ *             tailgater instrument (doc 62 #44), and its phase-0 cadence
+ *             primes it on frame 0, so it is never showing an empty buffer.
+ *  · a door — only while ATTENDED, and only from the first pass that ran while
+ *             it was. `wasLive` carries it across the frames between passes;
+ *             losing attention blanks it again, which is what stops a
+ *             spawn-moment reflection outliving the glance that produced it.
+ */
+export function mirrorGlassIsLive(
+  kind: MirrorKind,
+  wasLive: boolean,
+  attended: boolean,
+  passedThisFrame: boolean,
+): boolean {
+  if (kind === "rear") return true;
+  if (!attended) return false;
+  return wasLive || passedThisFrame;
+}
+
+/**
+ * Which targets to arm for a PRIMING pass — the rear and nothing else.
+ *
+ * A priming pass exists so a glass can never show an uninitialised buffer, and
+ * the doors no longer need one: the blanking sweep clears an unattended door
+ * on its first frame, so its buffer is defined from the start and defined
+ * HONESTLY. Priming them instead wrote a real reflection of the spawn moment
+ * and then left it there — which is the defect this lane removed, so keeping
+ * the priming would have been keeping the defect.
+ */
+export function initialPrimeMask(kinds: readonly MirrorKind[]): number {
+  let mask = 0;
+  for (const kind of kinds) if (kind === "rear") mask |= MIRROR_BIT.rear;
+  return mask;
+}
+
 interface MirrorRigEntry {
   kind: MirrorKind;
   mesh: Mesh;
   target: WebGLRenderTarget;
   camera: PerspectiveCamera;
   material: MeshBasicMaterial;
+  /** The authored dark-gloss glass colour, read off the GLB's own material —
+   *  what this glass looks like when it is NOT being looked through. */
+  inertColor: Color;
+}
+
+/** Fallback for a GLB material with no `color` (none ship that way today). */
+const INERT_GLASS_FALLBACK = 0x0a0c10;
+
+/**
+ * The authored glass colour, read ONCE off the material the GLB shipped, so
+ * „inert" is literally the dark gloss the asset authors chose rather than a
+ * second opinion about it. Read-only — the material itself is untouched.
+ */
+function authoredGlassColor(mesh: Mesh): Color {
+  const first = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const authored = (first as { color?: Color } | undefined)?.color;
+  return authored ? authored.clone() : new Color(INERT_GLASS_FALLBACK);
+}
+
+/** Scratch for the renderer's clear colour, so the swap below never allocates. */
+const CLEAR_COLOR_SCRATCH = new Color();
+
+/**
+ * Blank a mirror target to its inert glass colour.
+ *
+ * WHY A CLEAR AND NOT A MATERIAL SWAP. The obvious way to make an unattended
+ * door mirror honest is to put the authored material back on the quad — but
+ * the authored glass is a MeshStandardMaterial and the RTT one is
+ * MeshBasicMaterial, so swapping them at every glance changes the mesh's
+ * shader PROGRAM twice per glance, on the tier the founder has already called
+ * „brutally low". This is a 160×96 clear on the transition only, it keeps one
+ * program for the life of the scene, and it lands the same picture.
+ *
+ * Restores the renderer's render target and clear colour: the composer owns
+ * both, and doc 82 §3.2 is the standing reminder of what leaving renderer
+ * state modified costs here.
+ */
+function clearMirrorToInert(
+  gl: WebGLRenderer,
+  target: WebGLRenderTarget,
+  color: Color,
+): void {
+  const prevTarget = gl.getRenderTarget();
+  const prevColor = gl.getClearColor(CLEAR_COLOR_SCRATCH).clone();
+  const prevAlpha = gl.getClearAlpha();
+  gl.setRenderTarget(target);
+  gl.setClearColor(color, 1);
+  gl.clear(true, true, false);
+  gl.setClearColor(prevColor, prevAlpha);
+  gl.setRenderTarget(prevTarget);
 }
 
 /**
  * Mounts the mirror cameras into the chassis-local tree and drives the
  * round-robin RTT passes from useFrame (manual gl.render before the main
- * pass, so the glass shows this frame's world). Inactive tiers/mirrors keep
- * the authored dark-gloss glass material — the "static dark glass" look.
+ * pass, so the glass shows this frame's world).
+ *
+ * THE GLASS ONLY SHOWS WORLD WHILE IT IS TELLING THE TRUTH ABOUT IT. The rear
+ * always does. A DOOR mirror shows world from the first pass that runs while
+ * the driver is looking through it, and is blanked to its own authored glass
+ * colour when the glance ends — so the unattended state reads honestly as „not
+ * being looked through" instead of as a crisp, frozen reflection of the spawn
+ * moment. The argument and its cost are at the blanking sweep in the frame
+ * loop.
  */
 export function MirrorRig({
   mirrors,
@@ -463,16 +581,26 @@ export function MirrorRig({
       camera.rotation.set(def.pitch, def.yaw, 0);
       // Default layer-0 mask = world only; the cabin is on INTERIOR_LAYER.
       const material = new MeshBasicMaterial({ map: target.texture, toneMapped: false });
-      return [{ kind, mesh, target, camera, material }];
+      // Read BEFORE the effect below swaps `material` off the mesh.
+      const inertColor = authoredGlassColor(mesh);
+      return [{ kind, mesh, target, camera, material, inertColor }];
     });
     // `mirrors` is a new object per GLB (re)clone; preset is mount-constant.
   }, [mirrors, preset]);
+
+  /** Which door targets currently hold LIVE content (MIRROR_BIT). */
+  const liveRef = useRef(0);
+  /** Which door targets have already been cleared to the inert glass colour,
+   *  so the clear happens on the transition and not every frame. */
+  const inertRef = useRef(0);
 
   // Swap the RTT material onto the glass and lift the quad clear of its
   // authored casing (see MIRROR_DEFS / REF 8); restore the authored material,
   // position AND scale, and dispose everything we created, when the rig (or
   // the GLB) goes away.
   useEffect(() => {
+    liveRef.current = 0;
+    inertRef.current = 0;
     const restores = entries.map((e) => {
       const previous = e.mesh.material;
       const previousPosition = new Vector3().copy(e.mesh.position);
@@ -505,6 +633,8 @@ export function MirrorRig({
     });
     return () => {
       for (const restore of restores) restore();
+      liveRef.current = 0;
+      inertRef.current = 0;
       for (const e of entries) {
         e.target.dispose();
         e.material.dispose();
@@ -515,17 +645,23 @@ export function MirrorRig({
   const frameRef = useRef(0);
   /**
    * Which targets have never been rendered, as a bitmask (see
-   * mirrorAttention.MIRROR_BIT). The RTT material is swapped onto the glass on
-   * mount, so a door target that has never had a pass would show an
-   * uninitialised buffer — a black quad — for the whole of the student's first
-   * glance, which is precisely the defect this lane is closing. Every mirror
-   * therefore gets one unconditional pass on its own phase, and only then does
-   * the attention rule take over. Re-armed with `entries` because a GLB
-   * re-clone builds new targets.
+   * mirrorAttention.MIRROR_BIT) — a mirror whose bit is set is eligible on its
+   * own phase regardless of attention, so its glass can never show an
+   * uninitialised buffer.
+   *
+   * ONLY THE REAR IS ARMED NOW, and dropping the doors from it is half of the
+   * stale-reflection fix below. Priming a door bought nothing once the glass
+   * stopped wearing the live texture before an attended pass: the primed image
+   * was never on screen, and it was the thing that made the door mirror lie —
+   * the buffer it left behind was the SPAWN MOMENT, held for the whole lesson.
+   * Two 160×96 reduced-scene passes per scene stop being submitted; the first
+   * attended pass writes the buffer that is actually shown, in the same frame
+   * the glass goes live. Re-armed with `entries` because a GLB re-clone builds
+   * new targets.
    */
   const unprimedRef = useRef(0);
   useEffect(() => {
-    unprimedRef.current = entries.reduce((m, e) => m | MIRROR_BIT[e.kind], 0);
+    unprimedRef.current = initialPrimeMask(entries.map((e) => e.kind));
   }, [entries]);
   // The SkyDome mesh, resolved lazily by name (it mounts in a sibling tree,
   // possibly after us) and re-resolved if the environment remounts.
@@ -534,18 +670,68 @@ export function MirrorRig({
   useFrame(() => {
     if (!active || entries.length === 0) return;
     const frame = frameRef.current++;
-    // WHICH mirror (cadence + „is he looking through it") is decided by
-    // `selectMirrorPass`; phases are disjoint, so it can only ever name one.
     // The cabin is read here rather than subscribed to: `glanceMirror` and
     // `glanceStrength()` are plain reads off the live CabinControls, and
-    // `getCabinLook()` is a module read by design (see cabinLookStore).
+    // `getCabinLook()` is a module read by design (see cabinLookStore). Read
+    // ONCE per frame — the attention sweep below and `selectMirrorPass` must
+    // answer the same question from the same values or they can disagree
+    // about whether a door mirror is being looked through.
     const cabin = cabinRef?.current ?? null;
+    const glanceMirror = cabin?.glanceMirror ?? null;
+    const glanceStrength = cabin?.glanceStrength() ?? 0;
+    const lookPose = getCabinLook();
+
+    // ── HONEST WHEN UNATTENDED (sweep 161, sc-vu-pass-clearance) ────────────
+    // „The left wing mirror is a solid matte-black lump with a single flat
+    // grey-blue quad standing in for glass — it reflects nothing at all, in
+    // any frame", against a briefing whose step 3 is «Огледало, мигач наляво
+    // и се отмести осезаемо наляво».
+    //
+    // The judge could not have seen otherwise: `tools/mobile/lesson-audit.mjs`
+    // emits exactly three keys over the whole catalogue — Escape, KeyW, KeyS —
+    // and never presses Л/З/Д or a mirror hotspot, so no door mirror in the
+    // corpus was ever looked through. What the frames caught is therefore the
+    // UNATTENDED state, and that state was worse than the judge's words: the
+    // glass carried the PRIMING pass — a crisp reflection of the spawn moment,
+    // frozen for the rest of the lesson. `mirrorAttention.ts`'s header named
+    // this residual on 2026-08-15, decided the answer belonged on the glass
+    // and not on the render budget, and recorded it rather than rushing it.
+    // This is that fix; the note lives in that file because the DECISION does,
+    // and the glass has always belonged to this rig.
+    //
+    // A mirror that lies about what is beside you is worse for a learner than
+    // glass that is visibly not being looked through — and „~47 % of the left
+    // mirror's width is on screen at the `forward` pose" (cabinLook) means he
+    // really is being shown it. So an unattended door mirror is BLANKED to its
+    // own authored glass colour, and only a pass that runs while he is looking
+    // through it puts world back in it. `glanceStrength > 0` holds through the
+    // ease-out, so it never goes blank under a moving eye.
+    //
+    // COST: no pass is added anywhere. One 160×96 clear on each transition
+    // (about two per glance), nothing at all in the steady state, and the
+    // doors' two priming passes per scene are no longer submitted — so the
+    // budget this rig defends comes out ahead, not behind.
+    for (const e of entries) {
+      if (e.kind === "rear") continue;
+      const bit = MIRROR_BIT[e.kind];
+      const wasLive = (liveRef.current & bit) !== 0;
+      const attended = mirrorIsAttended(e.kind, glanceMirror, glanceStrength, lookPose);
+      if (mirrorGlassIsLive(e.kind, wasLive, attended, false)) continue;
+      liveRef.current &= ~bit;
+      // Already blank — the steady unattended state costs nothing at all.
+      if ((inertRef.current & bit) !== 0) continue;
+      clearMirrorToInert(gl, e.target, e.inertColor);
+      inertRef.current |= bit;
+    }
+
+    // WHICH mirror (cadence + „is he looking through it") is decided by
+    // `selectMirrorPass`; phases are disjoint, so it can only ever name one.
     const kind = selectMirrorPass(
       frame,
       preset,
-      cabin?.glanceMirror ?? null,
-      cabin?.glanceStrength() ?? 0,
-      getCabinLook(),
+      glanceMirror,
+      glanceStrength,
+      lookPose,
       unprimedRef.current,
     );
     if (kind === null) return;
@@ -594,6 +780,24 @@ export function MirrorRig({
       // NEVER conditional: a throw inside the pass must not leave half the
       // world invisible in the driver's own view.
       cull.restore();
+    }
+
+    // …and only NOW does a door mirror count as showing live world: after a
+    // pass that ran while the driver was looking through it. AFTER the try, so
+    // a throwing pass never marks a half-written target live; and gated on
+    // attention again because `selectMirrorPass` also fires for a PRIMING
+    // pass, which by definition happens while nobody is looking.
+    const passedBit = MIRROR_BIT[kind];
+    if (
+      mirrorGlassIsLive(
+        kind,
+        (liveRef.current & passedBit) !== 0,
+        mirrorIsAttended(kind, glanceMirror, glanceStrength, lookPose),
+        true,
+      )
+    ) {
+      liveRef.current |= passedBit;
+      inertRef.current &= ~passedBit;
     }
   });
 

@@ -30,7 +30,9 @@ import {
   BUBBLE_PAD_X,
   BUBBLE_TEX_H,
   BUBBLE_TEX_W,
+  OFC_ARM_OUT_RAD,
   drawControllerBubble,
+  officerArmTarget,
 } from "../TrafficLayer";
 
 describe("controller bubble copy (B42)", () => {
@@ -122,6 +124,109 @@ describe("controller bubble copy (B42)", () => {
   it("the три headlines are distinct verdicts, not the same word", () => {
     const set = new Set(CONTROLLER_BUBBLES.map((b) => b.headlineBg));
     expect(set.size).toBe(CONTROLLER_BUBBLES.length);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE CAPTION AGAINST THE MESH (sweep161,
+// `sc-signal-controller/mobile-right/04-t076s.png`).
+//
+// The side-profile caption shipped as „Виждаш го СТРАНИЧНО, ръцете долу" while
+// the officer in that frame holds both arms straight out horizontally. Every
+// test above passes on that string: they check length, language, prefixes and
+// ink width, and NONE of them has ever looked at the figure the card is stuck
+// to. The copy and the renderer could say opposite things forever.
+//
+// So this drives the renderer's own `officerArmTarget` and asks the only
+// question that matters — is the arm state this sentence names the arm state
+// the student is looking at. It is deliberately a NEGATIVE test (the caption
+// may say nothing about arms, as today's does; it may not say the wrong
+// thing), because naming the arms at all is a teaching mistake in its own
+// right: `officerArmTarget` takes no posture, so both arms are out for the
+// permitting AND the prohibiting reading, and the discriminator is which side
+// of him you stand on.
+// ---------------------------------------------------------------------------
+
+// NO `\b` IN THESE. The first draft used one and the non-vacuity case below
+// caught it on the very first run: JavaScript's `\b` is defined against ASCII
+// `\w`, so between „ръцете" and the following space there is no word boundary
+// at all and the detector silently matched nothing — a probe that reports
+// „no caption describes the wrong arms" about a caption that does. Word order
+// is allowed both ways („ръцете отпуснати" / „отпуснати ръце") with a 12-char
+// leash so the two halves have to be in the same clause.
+const ARMS = "ръ(?:ка|ката|це|цете)";
+const DOWN = "(?:надолу|долу|отпуснат|спуснат|свален)";
+const OUT = "(?:настрани|встрани|хоризонтално)";
+/** Copy that claims the arms are DOWN. */
+const SAYS_ARMS_DOWN = new RegExp(`${ARMS}[^.]{0,12}?${DOWN}|${DOWN}[^.]{0,12}?${ARMS}`);
+/** Copy that claims the arms are OUT sideways. */
+const SAYS_ARMS_OUT = new RegExp(`${ARMS}[^.]{0,12}?${OUT}|${OUT}[^.]{0,12}?${ARMS}`);
+
+describe("the pose caption matches the arms the renderer holds", () => {
+  /** What the figure is actually doing, read off the shipped pose function. */
+  function armsOut(attention: boolean): boolean {
+    const left = { lat: 0, sag: 0 };
+    const right = { lat: 0, sag: 0 };
+    officerArmTarget(attention, 0, left);
+    officerArmTarget(attention, 1, right);
+    // „Out" means a real lateral swing on BOTH arms — the ±OFC_ARM_OUT_RAD
+    // case. The attention pose sets lat = 0 and raises one arm sagittally.
+    return Math.abs(left.lat) > 0.35 && Math.abs(right.lat) > 0.35;
+  }
+
+  it("NON-VACUITY: the regexes catch the exact strings that were photographed", () => {
+    // The probe rule of this audit — a detector is worthless until it is shown
+    // failing the case a human already confirmed by eye. These two are the
+    // shipped caption (frame 04-t076s) and the authored long form it mirrors
+    // (`CONTROLLER_GESTURES[0].poseBg`), both of which describe lowered arms.
+    expect("Виждаш го СТРАНИЧНО, ръцете долу").toMatch(SAYS_ARMS_DOWN);
+    expect("Страничен профил към теб, ръцете отпуснати надолу").toMatch(SAYS_ARMS_DOWN);
+    expect("Виждаш го СТРАНИЧНО — ръцете настрани").toMatch(SAYS_ARMS_OUT);
+    // …and do not fire on copy that stays off the subject, or the test would
+    // be unsatisfiable rather than true.
+    expect("Виждаш го СТРАНИЧНО — срещу рамото му").not.toMatch(SAYS_ARMS_DOWN);
+    expect("Виждаш го СТРАНИЧНО — срещу рамото му").not.toMatch(SAYS_ARMS_OUT);
+  });
+
+  it("the renderer really does hold both arms out on the two body-facing postures", () => {
+    // The premise of the assertion below. If a later change drops the lateral
+    // swing this flips, and the caption requirement below flips with it.
+    expect(OFC_ARM_OUT_RAD).toBeGreaterThan(0.35);
+    expect(armsOut(false), "both arms out sideways when not signalling внимание").toBe(true);
+    expect(armsOut(true), "внимание is one arm UP, not both out").toBe(false);
+  });
+
+  it("no caption describes an arm state the mesh is not in", () => {
+    // sideProfile and chestOrBack are the two the driver reads off the body;
+    // armRaised is the внимание pose. Index order is pinned above.
+    const bodyFacing = [
+      CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE],
+      CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK],
+    ];
+    for (const b of bodyFacing) {
+      if (armsOut(false)) {
+        expect(b.poseBg, `${b.posture}: the mesh holds the arms OUT`).not.toMatch(SAYS_ARMS_DOWN);
+      } else {
+        expect(b.poseBg, `${b.posture}: the mesh holds the arms DOWN`).not.toMatch(SAYS_ARMS_OUT);
+      }
+    }
+    // The внимание pose has lat = 0 — nothing is out sideways there.
+    expect(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].poseBg).not.toMatch(SAYS_ARMS_OUT);
+  });
+
+  it("the arms are NOT offered as the thing that tells the two apart", () => {
+    // The failure this is really guarding: `officerArmTarget` is posture-blind,
+    // so „arms out = минавай" would grade the halt posture as permission —
+    // authored as the опасна грешка `mistake-barge-chest`. Whatever the pose
+    // lines say, they must differ on the BODY, not on the limbs.
+    const side = CONTROLLER_BUBBLES[BUBBLE_SIDE_PROFILE].poseBg;
+    const chest = CONTROLLER_BUBBLES[BUBBLE_CHEST_OR_BACK].poseBg;
+    expect(side, "side profile must name the side you are on").toMatch(
+      /СТРАНИЧНО|профил|рамо/,
+    );
+    expect(chest, "the halt pose must name the chest or the back").toMatch(/ГЪРДИ|ГРЪБ/);
+    // Neither may lean on an arm word to carry the difference.
+    expect(SAYS_ARMS_OUT.test(side) && SAYS_ARMS_OUT.test(chest)).toBe(false);
   });
 });
 

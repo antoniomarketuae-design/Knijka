@@ -34,6 +34,50 @@
  * one speaks normally. „Съветник: изкл." is still there for „stop advising me
  * altogether" — one control per intention, and neither one impersonating the
  * other.
+ *
+ * ── SWEEP 161: THE ONE AUTHORED SENTENCE STILL SET IN THE TELEMETRY FACE ─────
+ *
+ * `PlayAreaStyles`' UNPANEL register pins `font-family: var(--font-mono)` on
+ * every `.hud-ghost` — this card carries that class — and then hands the
+ * READING face back to prose with one rule, whose own header states the
+ * grammar and the reason:
+ *
+ *   „NUMBERS AND LABELS IN THE TELEMETRY FACE, SENTENCES IN THE READING FACE …
+ *    JetBrains Mono sets about 24 characters per line in the 216 px toast
+ *    content box against about 35 in the body face, i.e. the same explanation
+ *    grows from four lines to six on the founder's phone. A look is not worth
+ *    costing a student the rule they just broke. The split falls out of the
+ *    existing markup with nothing to maintain: every instrument value in this
+ *    HUD is a span/div/kbd and EVERY AUTHORED SENTENCE IS A <p>."
+ *
+ * The prompt was a `<span>`. It is the instructor's sentence — `advisor.ts`
+ * authors it, ADR-002 forbids the model free-forming it, and THEO-4 makes it
+ * the mid-drive half of „explain every decision" — so it was the one authored
+ * sentence in the whole ghost register still being laid out as telemetry, and
+ * the contract that says otherwise was a paragraph with nothing enforcing it.
+ *
+ * SEEN, then measured. `sc-pk-move-off/pc-wrong/04-t012s.png` photographs this
+ * card carrying «Стигни края на отсечката» in JetBrains Mono in the right-edge
+ * column, two cards above `SimOverlay`'s mistake card whose body — same column,
+ * same register, same drive — is in the reading face, because that one is a
+ * `<p>`. Measured over the 24 authored texts in `advisor.ts` that can reach
+ * this card — the pre-drive imperatives, the literal objective prompts and the
+ * five yield cards — using the stylesheet's own 24-vs-35 chars per 216 px,
+ * scaled to each column:
+ *
+ *   roomy, 240 px column → 216 px box   73 mono lines vs 52 sans (+40 %),
+ *                                       18 of 24 cost a whole extra line
+ *   phone, 141 px column → 117 px box  133 mono lines vs 93 sans (+43 %),
+ *                                       23 of 24 do, the worst by five
+ *
+ * 24 is a FLOOR and not the corpus: `advisorPromptForObjective` also puts each
+ * lesson's own objective `titleBg` on this card, and those are authored in the
+ * scenario bank rather than here. Every one of them pays the same rate.
+ *
+ * The column is height-capped and folds what does not fit (`notifyColumn.ts`),
+ * so those lines are not free space — they are the difference between the
+ * sentence being on screen and being behind a «↓ ОЩЕ N РЕДА» badge the driver
+ * cannot open at 50 км/ч. `advisorFace.test.tsx` holds the rule from both ends.
  */
 
 import { IconBook } from "@/components/icons";
@@ -65,9 +109,14 @@ export function AdvisorCard({
           <HudCloseButton onClick={onDismiss} labelBg="Скрий съвета" />
         ) : null}
       </span>
-      <span className="break-words text-[11px] font-bold leading-tight text-foreground">
+      {/* A `<p>`, and that element name is the whole fix — see the header. It is
+          the token `PlayAreaStyles`' „sentences in the reading face" rule
+          selects on; as a `<span>` this sentence inherited the telemetry face
+          and cost 45 % more lines in a column that folds. Every class is
+          unchanged, so nothing else about it moves. */}
+      <p className="break-words text-[11px] font-bold leading-tight text-foreground">
         {prompt.textBg}
-      </span>
+      </p>
       {prompt.keys.length > 0 ? (
         <span className="flex flex-wrap items-center gap-1">
           {prompt.keys.map((k) => (

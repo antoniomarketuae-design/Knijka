@@ -103,3 +103,62 @@ describe("buildSessionSummary", () => {
     expect(summary.terminated).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE BOUNDARY THIS FILE MUST NOT BE "FIXED" ACROSS (sweep161,
+// `sc-follow-cutin/mobile-wrong/08-debrief.png`).
+//
+// The audit filed a debrief reading „0 наказателни точки · 0 опасни · 0
+// основни" on a drive that did 59 in a posted 50 and drew a «Превишена
+// скорост» card, suspect-file `rules/summary.ts`. The card was a TEACH moment
+// — first-encounter policy, `teach-first-then-grade` — so it never entered the
+// scored stream, and 0 is the honest total of what this reducer was handed.
+//
+// The pull that creates is obvious and wrong: make the number stop lying by
+// folding teach moments into `mistakes`. That charges a seventeen-year-old for
+// a rule nobody has taught him yet, which is the exact trust failure A12 exists
+// to prevent — a false certificate repaired with a false conviction. The
+// truthful repair is downstream, on the debrief's own unscored channel
+// (`lessons/debrief.ts DebriefContext.coachedMistakes`), which is written and
+// tested and which no production caller feeds; see the ruling in summary.ts.
+//
+// So these pin the contract in BOTH directions: everything scored is counted,
+// and nothing unscored is — including the specific code that was photographed.
+// ---------------------------------------------------------------------------
+describe("the scored/taught boundary", () => {
+  it("a drive whose ONLY fault was taught summarises to a clean sheet", () => {
+    // What the reducer sees when the engine routed the speeding to the teach
+    // arm: literally nothing. The debrief cannot learn about it from here, and
+    // that is the fact the caller has to make up for.
+    const summary = buildSessionSummary([]);
+    expect(summary.score.totalPoints).toBe(0);
+    expect(summary.mistakes).toEqual([]);
+    expect(summary.conceptIds).toEqual([]);
+    expect(summary.passed).toBe(true);
+  });
+
+  it("NON-VACUITY: the same code, once SCORED, is counted in full", () => {
+    // The other direction — without this the test above is satisfied by a
+    // reducer that counts nothing at all.
+    const summary = buildSessionSummary([makeViolation("SPEEDING_OVER_LIMIT", 12)]);
+    expect(summary.mistakes.map((m) => m.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(summary.score.totalPoints).toBeGreaterThan(0);
+    expect(summary.conceptIds).toEqual(["c-speed-limits"]);
+  });
+
+  it("every scored violation reaches the score — the reducer drops nothing", () => {
+    // The guard against closing the finding by filtering here instead. If a
+    // „teach-like" exclusion is ever added to this loop, a charged code stops
+    // being charged and the sheet under-reports a real fault.
+    const events: ScorableEvent[] = [
+      makeViolation("SPEEDING_OVER_LIMIT", 5),
+      makeViolation("TURN_WITHOUT_INDICATOR", 9),
+      makeViolation("RED_LIGHT_CROSSED", 14),
+    ];
+    const summary = buildSessionSummary(events);
+    expect(summary.mistakes).toHaveLength(3);
+    expect(summary.score.totalPoints).toBe(
+      events.reduce((n, e) => n + (e.kind === "violation" ? e.points : 0), 0),
+    );
+  });
+});

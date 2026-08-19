@@ -36,6 +36,25 @@
  * target; these cards are not buttons, so the control has to LOOK like one or
  * the mouse user is back where he started. It is the reference's „small
  * translucent chip", at 18 px.
+ *
+ * ── NOT THE ✕ IN `sc-follow-cutin/mobile-wrong/04-t017s.png` ────────────────
+ *
+ * sweep161 filed *„On mobile the teach card's close control renders as a stray
+ * white rectangle beside the ✕ glyph, reading as a missing-glyph box rather
+ * than a button"* against this file. Cropped at 600 % with point sampling, the
+ * control in that frame is a ~44 px circle with an accent-tinted ring and a
+ * stroked ✕ — and this component renders an 18 px circle with `border-border`
+ * and a TEXT „✕" span. They are two different controls, and the discriminator
+ * is in the markup rather than in the eye: the photographed one is
+ * `hud/SimOverlay.tsx`'s teach-card dismiss chip (`h-11 w-11`, its border and
+ * fill both `color-mix(in srgb, ${color} …)` off the card's tone, glyph from
+ * `DismissGlyph`). This component is used by `AdvisorCard` and by the
+ * instructions panel in `LessonPlayShell`, neither of which is the card in the
+ * frame — that card is „Превишена скорост", a teach moment, which only the
+ * overlay renders.
+ *
+ * Routed to `modules/sim/hud/SimOverlay.tsx`. Left here because this is where
+ * the next reader of that finding will arrive.
  */
 
 export function HudCloseButton({

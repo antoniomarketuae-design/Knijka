@@ -22,6 +22,45 @@
  * consistent with the top-down ruling (LessonScene `topdownInCycle`). Grading
  * never reads the camera. The one hard gate is the PRE-DRIVE gate: a held
  * brake there is a procedure step, not a reverse.
+ *
+ * ── WHY SWEEP 161 FILED TWO „THERE IS NO SHOULDER CHECK" DEFECTS HERE, AND
+ *    WHAT HAS TO CHANGE BEFORE THEY CAN BE RE-FILED (2026-08-19) ────────────
+ *
+ * Two standing BROKEN findings name this file:
+ *   sc-park-bay-exit-rev/mobile-right/03-ready.png — „no over-shoulder view
+ *     control anywhere in the mobile control set … the lesson cannot be
+ *     performed as taught" («Двете огледала, после поглед през ДЯСНОТО рамо и
+ *     през задното стъкло»);
+ *   sc-ed-reverse-line/pc-right/04-t108s.png — „no reverse camera, no
+ *     over-the-shoulder view and no rear proximity read-out on screen"
+ *     («обърни се и гледай през рамо назад … чл. 40»).
+ *
+ * NEITHER IS REPRODUCIBLE FROM THOSE FRAMES, and the reason is measurable
+ * rather than arguable. `reverseViewTarget` returns 1 only on selector R, and
+ * across the WHOLE catalogue sweep — 653 drives, 161 lessons, both platforms —
+ * the only negative speed any run log ever printed is the harness's own −1
+ * sentinel at `07-end`/`08-debrief`. Not one drive went backwards; the two
+ * reversing lessons above logged 0…55 km/h and their reverse objectives
+ * („Дръж права линия по средата на заден ход", „Спри след 25 метра заден ход")
+ * never ticked on the DEBRIEF. `tools/mobile/lesson-audit.mjs` emits exactly
+ * three keys — Escape, KeyW, KeyS — and never presses Л/З/Д either, so the
+ * glance path into `glanceHeld` was never exercised on any frame in the corpus.
+ *
+ * So the swing this module decides was rendered in ZERO of the 16,649 frames
+ * the judges read. What they photographed is the forward view of a car that
+ * never selected R — which looks identical whether this feature works or does
+ * not exist, and that is precisely why a fix written against those frames
+ * would be a guess.
+ *
+ * The half of the complaint that survives without any of this is a CONTROL-SET
+ * fact and it does not live here: Л/З/Д are the three MIRROR glances (Q/E/F),
+ * so a student who wants to look over his shoulder on demand has no button for
+ * it — the shoulder check is automatic-on-R only, and «през задното стъкло» is
+ * deliberately not offered (see COCKPIT_SHOULDER_YAW's second reason). Route
+ * that to the control set, not to this decision module.
+ *
+ * TO RE-OPEN EITHER FINDING: drive a lesson whose logged speed actually goes
+ * negative, and read the frames from that. Nothing else settles it.
  */
 
 import type { SelectorPosition } from "../vehicle";

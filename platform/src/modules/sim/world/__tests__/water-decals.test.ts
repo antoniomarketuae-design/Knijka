@@ -248,6 +248,62 @@ describe("water decals on the shipped surface maps", () => {
     }
   });
 
+  // -------------------------------------------------------------------------
+  // sweep161 filed sc-ac-aquaplane as „nothing is drawn", suspect-file
+  // builders/waterDecals.ts. Nothing above could settle that: the test over
+  // this map checked the sheet lands inside |x| ≤ LANE_WIDTH_M and inside the
+  // z span, which is a BOUND, not a footprint — a sheet half the width, or one
+  // shifted into the oncoming lane, or one that missed the grip patch by 10 m,
+  // passes it just as happily. So the two questions the finding actually asks
+  // — is there water where the physics bites, and is it where the CAR drives —
+  // were both unasked. They are asked here, against the resolver and the
+  // spawns rather than against constants copied from them.
+  //
+  // Answer, for the record: yes to both. The sheet is 15.75 m × 40 m over a
+  // grip rect of 16.25 m × 40 m and both ac-aqua spawns sit at x = 4.06, well
+  // inside it. The invisibility is in the water MATERIAL (StaticWorld.tsx),
+  // not in this geometry — see the module header of builders/waterDecals.ts.
+  // -------------------------------------------------------------------------
+  it("ac-aqua-v1: the sheet covers the grip patch AND the driving line", () => {
+    const district = loadDistrict("ac-aqua-v1");
+    const world = buildWorldGeometry(district, { seed: 7 });
+    const rects = resolveSurfaceGripPatches(district);
+    expect(rects).toHaveLength(1);
+    const rect = rects[0]!;
+
+    const pos = world.waterDecals.positions;
+    expect(pos.length).toBeGreaterThan(0);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (let i = 0; i < pos.length; i += 3) {
+      minX = Math.min(minX, pos[i]!);
+      maxX = Math.max(maxX, pos[i]!);
+      minZ = Math.min(minZ, pos[i + 2]!);
+      maxZ = Math.max(maxZ, pos[i + 2]!);
+    }
+
+    // District y maps to world −z; the rect is centre + half-extent.
+    expect(-maxZ).toBeCloseTo(rect.y - rect.halfLengthM, 4);
+    expect(-minZ).toBeCloseTo(rect.y + rect.halfLengthM, 4);
+    // Across the road the sheet is the grip rect minus the authored inset on
+    // each side — EXACTLY, so a builder that quietly narrows the sheet (a
+    // parking band that should not apply, a miter bug, a halved half-width)
+    // stops being invisible to the suite.
+    expect(minX).toBeCloseTo(rect.x - rect.halfWidthM + WATER_DECAL_EDGE_INSET_M, 4);
+    expect(maxX).toBeCloseTo(rect.x + rect.halfWidthM - WATER_DECAL_EDGE_INSET_M, 4);
+
+    // THE HAZARD MUST BE UNDER THE WHEELS, not merely on the map. Every spawn
+    // on this district is on the graded line, so each must fall inside the
+    // painted sheet across the road — with a car's half-track to spare, or a
+    // student straddles the edge of the thing the lesson is about.
+    const HALF_TRACK_M = 0.8;
+    const spawns = district.spawnPoints ?? [];
+    expect(spawns.length).toBeGreaterThan(0);
+    for (const s of spawns) {
+      expect(s.x - HALF_TRACK_M, `spawn ${s.id} is left of the sheet`).toBeGreaterThan(minX);
+      expect(s.x + HALF_TRACK_M, `spawn ${s.id} is right of the sheet`).toBeLessThan(maxX);
+    }
+  });
+
   it("ac-ice-v1: zero sheets — the ice map builds with NO water geometry", () => {
     const world = buildWorldGeometry(loadDistrict("ac-ice-v1"), { seed: 7 });
     expect(world.stats.waterDecals).toBe(0);

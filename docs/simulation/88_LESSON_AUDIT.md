@@ -5760,7 +5760,41 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and nine fix rounds, 2026-08-19
+# THE OPEN LIST — after three repair waves and ten fix rounds, 2026-08-20
+
+> **ROUND-10 GATE, 2026-08-20 — the corpus reproduced a NINTH time, and the coverage union takes its
+> largest single step of the programme while the never-opened CRITICAL row does not move at all.**
+> `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the header's rule:
+> **1,712 · 26 · 1,686 · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major · 81 minor) · 512
+> `UNPOLISHED` · 1 `COULD_NOT_TEST` · 138 suspect files · 161 lessons.** Ninth reader, ninth identical
+> tally. The instruction one block down still stands: **stop re-deriving the corpus.**
+>
+> **COVERAGE: 89 → 110 opened · 41 → 20 never opened · 8 unopenable as filed.** `110 + 20 + 8 = 138` ·
+> `950 + 25 + 37 = 1,012` · `304 + 7 + 7 = 318`. Twenty-one new files, 34 findings — **and 0 criticals.**
+> The never-opened critical row is **7 → 7**, unchanged, and those seven are the same seven §2.2 named
+> by name last round. Rounds 8 and 9 took that row 25 → 11 → 7 by aiming at it; round 10 was aimed at
+> the major/minor bulk and moved it not at all. Both numbers are given because *21 new files* is the
+> one a summary will quote and *0 criticals* is the one that matters.
+>
+> **STANDING `BROKEN` IS UNCHANGED AT 1,012 AND §2.1 STILL HAS SEVEN ROWS.** Round 10 shipped thirteen
+> new test files and 155 new assertions, all green, but nothing in it was put through the refutation
+> standard §2.1 requires, so nothing was added there. **Work landed; the closed count did not move.**
+>
+> **OWNED IS NOT OPENED, AND THIS ROUND IS THE CLEANEST PROOF THE PROGRAMME HAS PRODUCED.** The seven
+> round-10 lanes were handed 34 corpus files between them. **Thirteen were never edited** —
+> `lesson-ui/GlanceEdgePings.tsx`, `components/sim/HeroCarBody.tsx`, `cockpit/index.ts`,
+> `world/components/cityModels.ts`, `scene/obstacleSpec.ts`, `scene/ribbonStrip.ts`,
+> `traces/scMergeLaneEnd.ts`, `traces/scMergeMotorwayExit.ts`, `traffic/index.ts`,
+> `lessons/progression.ts`, `lesson-ui/briefingOverflow.test.tsx`, `public/world/ov-crossing-v1.json`
+> and `public/world/mw-v1.json`. They are **exactly** the thirteen this gate's reader still lists as
+> never opened. Had coverage been computed from the lane manifests instead of from `git diff`, the
+> never-opened row would read **7 files, not 20**, and 13 files / 34 findings would have been recorded
+> as covered with not one byte changed. **A file a lane was handed and never edited reads exactly like
+> one that was worked on, in every artefact except the diff.** Compute coverage from edits. Only edits.
+>
+> **THE FOURTH GATE IS GREEN AND WAS RUN AS A GATE.** `tools-tests.mjs` exit 0, read from `$?`, not
+> from a wrapper. `tsc --noEmit` exit 0. `validate-content.mjs` exit 0. `vitest run` exit 1 on **three**
+> files — the two known-red plus one cross-lane collision, all three dissected in §4.
 
 > **Re-run an EIGHTH time on 2026-08-19 for the round-9 gate, by an eighth independent reader**: all
 > 24 JSONL files parsed, the re-drive supersession applied to 22 scenarios / 26 records, and the result
@@ -6547,8 +6581,46 @@ separates them:
 
 **Nothing in this session was committed.** The doc edit below is the only working-tree change.
 
-## 1 · The coverage arithmetic — 89 of 138 files, and touching is not closing
+> **SUPERSEDED BY THE ROUND-10 GATE, 2026-08-20.** That sentence was true of round 9 and is not true
+> now. `HEAD` is **`4afa999`**, and the working tree carries **29 modified files and 13 new test
+> files** from seven concurrent round-10 lanes, none of it committed. Gate results, working tree, exit
+> codes from `$?`: `tsc` **0** · `vitest` **1** (3 files: the 2 known-red plus the O49 collision) ·
+> `validate-content.mjs` **0** · `tools-tests.mjs` **0**. Details in §4.
 
+## 1 · The coverage arithmetic — 110 of 138 files, and touching is not closing
+
+> **ROUND 10, 2026-08-20 — the corpus reproduced for the NINTH time; the union takes its largest step
+> and buys no criticals with it.** `[corpus]` 24 files, supersession by the header's rule: **1,712 ·
+> 26 · 1,686 · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major · 81 minor) · 512 `UNPOLISHED`
+> · 1 `COULD_NOT_TEST` · 138 suspect files · 161 lessons.** Ninth reader, ninth identical result.
+>
+> | row | files | findings | critical |
+> |---|---:|---:|---:|
+> | ever opened | **110** | 950 | 304 |
+> | never opened | **20** | 25 | 7 |
+> | unopenable as filed | **8** | 37 | 7 |
+> | | **138** | **1,012** | **318** |
+>
+> **21 NEW FILES, 34 FINDINGS, 0 CRITICALS.** The largest file movement in the programme and the only
+> large one that leaves the never-opened critical row exactly where it found it: **7 → 7**, the same
+> seven files §2.2 already lists by name. Rounds 8 and 9 were aimed at that row and took it 25 → 11 →
+> 7; round 10 was aimed at the last of the major/minor bulk. Nothing here contradicts round 9 — it is
+> what happens when a round spends itself on breadth.
+>
+> **BOTH DEFINITIONAL TRAPS THE PREVIOUS TWO ROUNDS RECORDED WERE HONOURED, NOT REDISCOVERED.** The
+> reader uses `statSync(...).isFile()` — so the six directory-shaped entries (`…/rules`,
+> `…/collision`, `…/vehicle`, `…/world/builders`, `…/environment`, `…/traffic`) stay in *unopenable*
+> and the row reproduces at 8 / 37 / 7c rather than silently shedding 6 / 14 / 4c into *never opened*.
+> And it does not trim the `git status --porcelain` blob before splitting; it **asserts
+> `components/sim/LessonScene.tsx` is present in the touched set and exits non-zero if it is not**,
+> which is the guard §1 asked for two rounds ago and round 9 first installed.
+>
+> **THE UNION WAS BUILT FROM `git diff ec1f56f..HEAD` PLUS THE WORKING TREE — NOT FROM THE LANE
+> MANIFESTS — AND THE DIFFERENCE IS 13 FILES.** See the OPEN LIST header: the seven round-10 lanes
+> owned 34 corpus files and left 13 of them untouched, and those 13 are precisely the ones this row
+> still counts as never opened. **Owned is not opened.** A manifest-derived union would have reported
+> 7 never-opened files this round and been wrong by 34 findings.
+>
 > **ROUND 9, 2026-08-19 — the corpus reproduced for the EIGHTH time, and the never-opened criticals
 > nearly halve again.** `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the
 > header's rule: **1,712 records · 26 superseded (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012
@@ -6914,7 +6986,31 @@ This is the entire list. Seven rows against 1,012.
 
 **C7 closes an 8 m band, not the defect class.** See §4 N3.
 
-### 2.2 — Class A · Never opened: 41 files, 59 findings, 7 critical
+### 2.2 — Class A · Never opened: 20 files, 25 findings, 7 critical
+
+> **UPDATED 2026-08-20 (round-10 gate): 41 → 20 files, 59 → 25 findings, and 7 → 7 critical.** Round 10
+> opened twenty-one of them and **not one carried a critical**. This row's bulk has now essentially been
+> spent; what is left of it is 20 files carrying 25 findings, 18 of the 20 carrying one finding each.
+>
+> **THE SEVEN CRITICALS ARE THE SAME SEVEN, WORD FOR WORD, AS LAST ROUND**: `hud/PreDriveTutorial.tsx`
+> 3/1c, `scenarios/event-library.json` 1/1c, `world/builders/railTrack.ts` 1/1c,
+> `lessons/scenario/templates-pk.ts` 1/1c, `world/builders/roundabout.ts` 1/1c,
+> `lessons/scenario/templates-junctions2.ts` 1/1c and `public/world/ov-oneway-v1.json` 1/1c. Two of the
+> seven (`railTrack.ts`, `roundabout.ts`) were **refuted on evidence** by a round-9 lane and are settled
+> without being edited — §0.9.1 has both measurements — so of the 7 standing criticals here, **2 are
+> answered and 5 have still never been looked at.** That count has not moved in two rounds.
+>
+> **THIRTEEN OF THE TWENTY WERE ASSIGNED TO A ROUND-10 LANE AND NEVER EDITED.** `GlanceEdgePings.tsx`,
+> `HeroCarBody.tsx`, `cockpit/index.ts`, `cityModels.ts`, `obstacleSpec.ts`, `ribbonStrip.ts`,
+> `scMergeLaneEnd.ts`, `scMergeMotorwayExit.ts`, `traffic/index.ts`, `progression.ts`,
+> `briefingOverflow.test.tsx`, `ov-crossing-v1.json`, `mw-v1.json`. Not one lane recorded a reason for
+> leaving them, the way round 9's lane recorded refutations for `railTrack.ts` and `roundabout.ts`.
+> **An unexplained non-edit and a refutation are indistinguishable in every artefact except the lane's
+> own prose, and thirteen files here have no prose.** They are the next round's cheapest work: all
+> thirteen are already scoped, already routed, and carry 34 findings between them.
+>
+> **`public/world/ov-oneway-v1.json` and `scenarios/event-library.json` remain data, not code**, have
+> sat in this row since wave 1, and have still never been assigned to anyone. Third round running.
 
 > **UPDATED 2026-08-19 (round-9 gate): 45 → 41 files, 73 → 59 findings, and 11 → 7 critical.** Round 9
 > opened **four** of them, and every one carried a critical — they are the four heaviest of the eleven
@@ -7379,6 +7475,95 @@ is the first round in which it produced *every* row rather than most of them.
 | O41 | **The wet-plate speed drill did the student's homework for him** — the instructions announced the weather instead of making him read it, which is the one skill the plate exists to teach, and contradicted the ladder's own dry/wet contrast | *"A rung-aware `instructionsBg` would be the stronger fix and is ROUTED, not taken here: it is a `LevelSpec` key + a compileScenario merge, i.e. types.ts and compile.ts, which this lane does not own."* | `templates-speed2.ts:1448–1450` → `lessons/scenario/types.ts` + `compile.ts` |
 | O42 | **`mwx-e-ramp` is unsatisfiable from any sign placement whatever, and the В26-60 plate is still refused.** The lane moved the А1 from 1.0 m PAST the arc to 61.0 m before it and drove `T14` 4 → 0, then found the remaining red is in two files it does not own — and that the predicate's own arithmetic makes the zone impossible | *"TWO things keep the code red, and NEITHER is in zoneSigns.ts. (a) THE PREDICATE IS EDGE-LOCAL: `checkSPEED_TOO_FAST_FOR_CURVE` projects candidate posts onto the ZONE'S OWN edge and drops anything more than 20 m off it… Worse, its arithmetic makes this zone unsatisfiable from any sign placement whatever: `bestLead = fromM - sM` with `fromM = 0` and `sM >= 0`, so `bestLead <= 0 < 40` for every post that could ever project onto `mwx-e-ramp`. (b) THE NUMBER IS STILL NOWHERE: the engine grades `tick.curveAdvisoryKmh = 60` while the В26-60 plate is refused, because posting a 60 face on a 140 km/h carriageway is doc 86 T4's headline lie re-created by a warning sign — T4 is 0 and must stay 0."* | `world/__tests__/expected-failures.json` → `rules/referents.ts` + `mw-exit-v1.json` / `gen_mw_exit.mjs` |
 
+### Round 10 — six rows, five of them routed at a file the lane did not own
+
+Every row below is a **verbatim** quotation of the lane's own reason, taken from the shipped source
+rather than from a lane report, so each is checkable at the path given. Round 10 filed no closure it
+could defend to §2.1's standard; what it filed is six statements of what it could not reach.
+
+**O49 — `world/referents.ts` · the `lightsTelltale` evidence channel certifies itself, and the gate
+that says so is RED right now.** `[gated]` The scene-publish lane moved `dash.headlightsRequired` out
+of `LessonScene.tsx` into `hud/dashboardStatus.ts`, and `world/__tests__/referent-evidence-reachable.test.ts`
+went red on four referents. The lane wrote, at `dashboardStatus.ts`:
+
+> *"⚠ MOVING THIS LINE OFF `LessonScene.tsx` TURNED A GATE RED, AND THE GATE IS RIGHT. …
+> `referents.ts lightsTelltale` lists `headlightsRequired` with LessonScene.tsx / TelltaleEdgePings.tsx
+> / StatusDashboard.tsx. It only ever passed because THIS ASSIGNMENT lived in the scene — a WRITE being
+> read as proof that a student can see the field. Nothing renders `headlightsRequired`; nothing ever
+> did. Measured: with HEAD's scene the gate is 10/10 green, with the extraction it fails on this symbol
+> alone. The repair is in `world/referents.ts` (not this lane): point `lightsTelltale` at what the
+> student actually perceives — the row `armedTelltaleWarnings` raises and the lamp on the bar — and read
+> `DashboardStatus.conditions`, not this bit. Do NOT re-introduce the identifier into a component to
+> quiet the grep; that is the false certificate this whole audit exists to remove."*
+
+**This is the third consecutive round in which a note's own hedge turned out to be the defect**, and
+the sharpest of the three: the gate did not break, it **stopped being fooled**. `HEADLIGHTS_OFF_AT_NIGHT`,
+`HEADLIGHTS_OFF_IN_RAIN`, `FOG_LIGHTS_OFF_IN_FOG` and `HIGH_BEAM_NOT_DIPPED` have been convicting
+students on evidence no student can see, for as long as the channel has existed. See §4 N-R10.
+
+**O50 — `lessons/scenario/templates-exam.ts` · a one-line data fix is correct, measured, and withheld
+because landing it alone would leave a census stale.**
+
+> *"ADDING `maxspeedKmh: 50` HERE WAS TRIED AND MEASURED. No gate moves … Eleven of the twelve
+> assertions in `scenario/__tests__/b58-gate-never-over-posted.test.ts` stay green … The twelfth is a
+> census that must be RESTATED, not relaxed: the survey grows from 502 cards to 510 … That file belongs
+> to another lane, so the change is left here rather than made half-way. Apply both together."*
+
+**O51 — `components/sim/lesson-ui/LessonPlayShell.tsx` · the objective's own speed cap is published on
+`StatusDashboard` and nothing on the glass moves until the shell passes it.**
+
+> *"⚠ THE OBJECTIVE'S OWN SPEED DEMAND (km/h) — DECLARED HERE, NOT YET THREADED. … `LessonPlayShell.tsx`
+> mounts this bar twice (~line 4489 compact, ~4501 roomy) with `limitKmh={snap.limitKmh}` and nothing
+> else, so this arrives `undefined` … **That file is not this lane's**, so the change is published,
+> asserted and routed rather than claimed."*
+
+The tripwire it promises is real and **it goes red the moment the thread lands** — but it is not where
+the comment says it is. See §7 B-R10.
+
+**O52 — `hud/dashboardStatus.ts` · `dashboardHash` re-commits the whole bar 18.7× per visible change,
+for a digit the cockpit camera hides.**
+
+> *"WHY IT IS NOT FIXED HERE, stated rather than left as a silent trade. The two candidate fixes are
+> both out of this lane or already refused: (a) coarsen `dashboardHash` to the DERIVED pair — one line,
+> but the pair needs `limitKmh`, which `dashboardHash(s)` is not given, so it is a signature change in
+> `hud/dashboardStatus.ts`, **not this lane's**; (b) gate the poll on the live camera — refused at the
+> site of the fold itself … ROUTED, not dropped: (a), to `dashboardStatus.ts`, with the 56-vs-3 number
+> above as the acceptance measurement."*
+
+**O53 — `lesson-ui/LessonPlayShell.tsx` + `PlayAreaStyles.tsx` · the rear-proximity badge is hidden by
+the shadow transport on exactly the family of lessons whose subject is the car behind you.**
+
+> *"NOT FIXED HERE, AND THE REASON IS NOT TIMIDITY. This component cannot see the transport … adding a
+> prop nobody passes would repeat the `DebriefContext.coachedMistakes` mistake this same sweep found (a
+> channel built, tested and never fed). The shell owns the answer … Routed there: the badge needs to
+> lift above 213 px while the transport is up."*
+
+**O54 — `lesson-ui/LessonPlayShell.tsx` · two producers print one instruction twice and neither can see
+the other.**
+
+> *"That half is not closable from a pure predicate over one item and is ROUTED, not dropped: the two
+> producers must be handed one string, which is a change in `components/sim/lesson-ui/LessonPlayShell.tsx`
+> (where both are mounted) — **not this lane's file**. This predicate is what that change would then be
+> checkable against."*
+
+The same lane also filed the phone half of the toast-moment stamp — *"⚠ NOT YET SPENT ON THE GLASS. The
+two edits that spend it are both outside this lane"* (`LessonPlayShell.tsx`'s re-map and
+`hud/SimOverlay.tsx`'s last row) — and `hud/tapActivation.ts` closed its own third and routed the other
+two: *"So: not closed here, not closable here, and not open on the shipped tree for the reason the first
+bullet gives."*
+
+**FIVE OF THE SIX ROWS ROUTE TO TWO FILES.** `LessonPlayShell.tsx` is named by O51, O53 and O54 and by
+the toast-moment note; `dashboardStatus.ts` by O52 and O49's repair. **`LessonPlayShell.tsx` is now the
+single heaviest routing debt in this document and no round has ever been aimed at it.** It is the
+obvious lane for round 11, and it would spend four rows at once.
+
+**ONE NON-CLOSURE IS A CORRECTION AGAINST A FINDING, NOT A ROUTE.** `hud/SpeedCard.tsx` was handed a
+finding it could not have caused: *"⚠ THIS COMPONENT IS NOT MOUNTED ANYWHERE … there is no `<SpeedCard`
+in the tree. It survives only as a named export from `hud/index.ts`, i.e. as a public API with no
+consumer. … This is §2.6 O34's class — „a component none of its files renders" — and it is recorded
+here rather than closed here so the count is not spent on a file that could not have caused it."*
+That is the second §2.6 O34-class misrouting found by a lane rather than by a gate.
+
 ### Round 9 — one row closed, one row that looks closed and is not, and six new rows
 
 **O36 IS CLOSED, AND CLOSING IT REFUTED ITS OWN LAST SENTENCE.** Round 8 filed O36 with the reassurance
@@ -7522,6 +7707,42 @@ independent structural mutations. §8 and §9 do not guard the tightening direct
 
 ## 4 · Regressions and new defects — carried and new
 
+### The round-10 gate — three red test files, and only one of them is news
+
+`[gated]` `tsc --noEmit` **0** · `validate-content.mjs` **0** · `tools-tests.mjs` **0** ·
+`vitest run --maxWorkers=2` **1**. 945 files collected, 14,814 tests, **3 failed**. All four exit codes
+read from `$?`.
+
+**THE TWO KNOWN-RED FILES ARE STILL RED AND — THIS IS THE PART THAT MUST BE CHECKED, NOT ASSUMED —
+BOTH ACTUALLY RAN.** `exam/__tests__/content-bank.test.ts` collected **13 tests, 1 failed**, printing
+the full 16-topic supply table and failing on `REVIEW_DEBT: ptp-i-parva-pomosht: only 31/64 (48%)
+approved`. `lesson/__tests__/compose.test.ts` collected **15 tests, 1 failed**, on
+`['l-accidents-first-aid']` having no quiz beat. Real tables, real ids, real counts — not the
+absent-file reading a damaged `node_modules` once produced, where an alarm keyed on *"are those two
+still red?"* answers **yes** about a file that never loaded. **Neither is green**, so no content
+`status` field was flipped to buy a green gate.
+
+**N-R10 — `world/__tests__/referent-evidence-reachable.test.ts` is the third failure, and it is a
+CROSS-LANE COLLISION that exposes a real defect rather than causing one.** The test file is **clean** —
+no round-10 lane owned or edited it. It went red because the scene-publish lane moved
+`dash.headlightsRequired` from `LessonScene.tsx:2914` into `hud/dashboardStatus.ts`, and the literal
+symbol `headlightsRequired` now appears in **none** of the three components
+`referents.ts lightsTelltale` names as `renderedBy`. Measured at `HEAD`: `LessonScene.tsx` = 1
+occurrence, `TelltaleEdgePings.tsx` = 0, `StatusDashboard.tsx` = 0 — so the channel was passing on a
+**single write statement**, never on anything rendered. Four referents fail:
+`HEADLIGHTS_OFF_AT_NIGHT`, `HEADLIGHTS_OFF_IN_RAIN`, `FOG_LIGHTS_OFF_IN_FOG`, `HIGH_BEAM_NOT_DIPPED`.
+
+**Classification, because the three categories look identical from a failure list.** Not a lane's own
+new test catching its own defect; not a test file shipped and never run. It is a collision — **and the
+correct response is to fix `world/referents.ts`, not to re-introduce the identifier into a component**,
+which would quiet the grep and restore the false certificate. Filed as O49 in §2.6; the lane that
+caused it wrote the repair instructions before it walked away.
+
+**NOTHING ELSE MOVED.** No test file under `platform/src` lacks an `expect(` (939 checked). No
+untracked probe, scratch or `zz-` residue: the 13 untracked files are all test files, all in
+`__tests__/`, and running the 13 alone gives **13 passed / 155 tests passed / 0 skipped** — so no lane
+shipped a test file it never ran.
+
 ### Carried from the previous pass
 
 | | status today |
@@ -7649,6 +7870,30 @@ Every row is a test that is **green whether or not the behaviour it names exists
 
 ## 7 · Evidence integrity and bookkeeping
 
+- **B-R10 — a routing note names the wrong test file, and the tripwire it promises is real.**
+  `hud/StatusDashboard.tsx`'s `taskCapKmh` docstring routes the shell edit with *"`governor-cap.test.ts`'s
+  „the shell has not threaded the task cap yet" block asserts the CURRENT mounts, so it goes red the
+  moment the thread lands."* `[gated]` `hud/__tests__/governor-cap.test.ts` is **unmodified this round
+  and contains no `taskCapKmh`, no „task cap" and no „threaded"**. The block exists — in
+  `hud/__tests__/governor-speed-contract.test.ts:218`, *"…and the shell has not threaded it yet, which
+  is stated rather than implied"* — and it does exactly what is claimed: it reads `LessonPlayShell.tsx`,
+  finds both `<StatusDashboard …/>` mounts and asserts `expect(mount).not.toContain("taskCapKmh")`, so
+  it inverts the instant O51 lands. **The mechanism is sound and the address is wrong.** Whoever lands
+  O51 will grep the named file, find nothing, and reasonably conclude no tripwire was left. Fix the
+  citation; do not weaken the test.
+- **The source-text assertions in `governor-speed-contract.test.ts` were checked against this repo's own
+  ban and pass it.** The repo has been burned by tests asserting over comment-stripped source (§2.1 C5;
+  eight such tests once left 867 green against dead code), and round 10's own lane brief forbade the
+  pattern outright for proving publication. Here it is used only to pin **cross-file routing state**,
+  which is the established `touchHintLifetime.ts` ⚠ discipline, and the one count that could be spoofed
+  by a comment was verified: both `taskCapKmh={taskCapKmh}` occurrences in `StatusDashboard.tsx`
+  (lines 704, 812) are live JSX, neither is inside a docstring. The publication proof itself went the
+  other way — `hud/__tests__/dashboard-publication.test.ts` drives the extracted function directly and
+  `conditions` is a **required parameter**, so dropping the scene's hand-over is a compile error rather
+  than a silent winter lesson with no lights row. That is what the brief asked for.
+- **The coverage union was rebuilt from `git diff`, and the manifest would have lied by 13 files.** See
+  §1 and §2.2. Recorded here because it is a bookkeeping rule, not a finding: **a lane manifest records
+  intent, a diff records work, and only the second is evidence.**
 - **The generator claim in the header is repaired, not satisfied.** `[gated]` `find . -name build.js`
   outside `node_modules` returns **nothing**; there is no generator in the tree and there never was
   one committed. The header now states the **recomputation rule** instead — re-read the 24 JSONL

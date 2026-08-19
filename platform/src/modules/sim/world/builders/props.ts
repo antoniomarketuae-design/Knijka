@@ -1794,6 +1794,39 @@ export function buildProps(
   // frontage the stop belongs to, and dropping it would trade one missing
   // object for another. What changes is that the driver now has something at
   // the kerb to read.
+  //
+  // — AND HE STILL CANNOT READ IT. THIS PASS IS NOT THE REMAINING DEFECT
+  //   (sweep161, `sc-sp-harsh-brake/pc-right/04-t073s.png`, 2026-08-20).
+  //
+  // The finding: *„Instruction 2 promises a bus stop with a shelter visible
+  // from far off … Across every sampled frame of both PC drives there is no
+  // shelter"*, suspect-file this module. Measured instead of argued — running
+  // this builder over the shipped `sp-creep-v1` emits
+  //
+  //     busStops 1 · world (14.275, 0.14, −180) · yaw −π/2
+  //
+  // i.e. one shelter on the right-hand pavement at district y = 180, which is
+  // the centre of the graded stop zone `sc-shb-stop` (LANE_X, 180, r 12). It
+  // is drawn, too: at 900 % on that same frame the canopy roof and its legs
+  // are there, behind the parked cars, in the same blue-grey as the parked
+  // cars. `__tests__/b64-authored-bus-stop.test.ts` already pins all of that.
+  //
+  // WHAT ACTUALLY HIDES IT IS THE KERB PARKING, and that is
+  // `traffic/TrafficLayer.tsx`: an unbroken row of parked cars runs along the
+  // right kerb straight through the stop. That file already knows how to leave
+  // a gap — `PARK_LEGAL_CLEAR_M`, the zebra clearance and
+  // `PARK_JUNCTION_CLEAR_M` — it simply has no case for a bus stop. ЗДвП
+  // чл. 98 forbids stopping and parking at one, so the row is not only
+  // occluding the landmark the drill aims at, it is demonstrating an offence
+  // to a seventeen-year-old as ordinary street furniture. Routed there; a
+  // clearance around every `world.busStops` transform is the fix, and it makes
+  // the shelter visible as a side effect of being correct.
+  //
+  // (The finding's other half — „no glowing halt marker … only the generic
+  // Карай дотук waypoint" — the frame refutes. The zone marker and its
+  // „не по-бързо от 50 км/ч" chip are both on screen at t073s, and
+  // instruction 2 promises „светещият маркер на пътя", which is what that is.
+  // Nothing here owes a bespoke one.)
   for (const b of district.buildings) {
     if (b.kind !== "busStop" || b.footprint.length < 3) continue;
     let cx = 0;

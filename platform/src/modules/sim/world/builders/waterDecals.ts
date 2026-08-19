@@ -24,6 +24,40 @@
  * Validity gate MIRRORS resolveSurfaceGripPatches (runtime/surface.ts): a
  * span the physics drops (bad range, missing/malformed patchGripFactor or
  * aquaplaneAboveKmh, unknown edge) must not paint a puddle that doesn't bite.
+ *
+ * ---------------------------------------------------------------------------
+ * IF YOU ARRIVED HERE BECAUSE THE WATER IS INVISIBLE IN A FRAME: IT IS NOT
+ * THIS FILE. Read this before opening the builder (sweep161, 2026-08-20).
+ *
+ * `sc-ac-aquaplane` was filed as „the lesson's own hazard is invisible …
+ * the waterPatch exists only as physics; NOTHING IS DRAWN", suspect-file this
+ * module. The second half of that sentence is false, and it was measured, not
+ * argued: running this builder over the SHIPPED `ac-aqua-v1` document emits
+ *
+ *   1 quad · x ∈ [−7.875, +7.875] m · district y ∈ [240, 280]
+ *
+ * against a physics rect of x 0 ± 8.125, y 260 ± 20 (`resolveSurfaceGripPatches`
+ * on the same document) — i.e. the sheet is 40 m long, 15.75 m wide, sits
+ * squarely under the driving line (both `ac-aqua` spawns are x = 4.06) and
+ * covers the grip patch to within the authored 0.25 m edge inset. The
+ * „shipped surface maps" battery in `__tests__/water-decals.test.ts` pins that
+ * footprint against BOTH the physics resolver and the driving line, so the
+ * claim above is checkable rather than a comment.
+ *
+ * WHAT IS ACTUALLY WRONG IS THE MATERIAL, and it is in
+ * `world/components/StaticWorld.tsx` — the `geometries.waterDecals` mesh:
+ * `color 0x0d141b`, `opacity 0.4`, `roughness 0.12`, `metalness 0.55`,
+ * `envMapIntensity={ROAD_ENV_INTENSITY}`. Every one of those numbers is a DRY
+ * -asphalt tuning, and standing water is only ever shown on a soaked road: a
+ * few lines above it in the same component the rain response darkens the
+ * asphalt albedo to 0.6× and drops its roughness 1.0 → 0.5. A dark translucent
+ * gloss laid over an already dark, already glossy surface has almost no
+ * contrast left to spend, which is what the frames show — over 40 sampled
+ * `pc-right` frames the largest luminance step anywhere on the carriageway is
+ * a fixed-screen-row fog gradient, and no band tracks the world.
+ *
+ * The geometry cannot fix that; only the shading can. Routed there.
+ * ---------------------------------------------------------------------------
  */
 
 import type { District } from "../types";

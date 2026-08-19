@@ -920,12 +920,47 @@ export const EVIDENCE_CHANNELS: Readonly<Record<EvidenceId, EvidenceChannel>> = 
     studentSees:
       "„Светлините не са включени“ on the screen rail with the key that fixes it, " +
       "plus the lit/unlit lamp on the instrument bar",
-    renderedBy: [
-      "components/sim/LessonScene.tsx",
-      "modules/sim/hud/TelltaleEdgePings.tsx",
-      "modules/sim/hud/StatusDashboard.tsx",
-    ],
-    symbols: ["headlightsRequired", "armedTelltaleWarnings", "headlights"],
+    // THIS ROW WAS PASSING ON A GREP THAT PROVED NOTHING, 2026-08-19.
+    //
+    // `headlightsRequired` was matched in `LessonScene.tsx` — where it appeared
+    // exactly once, as a WRITE (`dash.headlightsRequired = isNight || rain`),
+    // never as anything rendered. `TelltaleEdgePings.tsx` and
+    // `StatusDashboard.tsx` did not mention it at all. So the reachability check
+    // was satisfied by an assignment statement in a file that never showed the
+    // student anything, on four codes at once.
+    //
+    // Moving the publication into `writeDashboardStatus` turned this red, which
+    // is the gate WORKING rather than breaking — and the repair is not to put
+    // the identifier back into a component to quiet the grep. It is to name the
+    // chain that actually carries the duty to the screen:
+    //   dashboardStatus.writeDashboardStatus publishes the four conditions →
+    //   telltaleWarnings.armedTelltaleWarnings derives the row and its code →
+    //   TelltaleEdgePings renders it on the rail, StatusDashboard shows the lamp.
+    // `headlightsRequired` is deliberately NOT in `symbols` any more: it is the
+    // legacy single bit that could not see snow, and a referent must not be
+    // provable by the very field the defect was made of.
+    // …and the FIRST repair attempt named `writeDashboardStatus`, which this
+    // test rejected in exactly the right words: "a referent that accepts
+    // writeDashboardStatus as proof is certifying itself … repoint the referent
+    // at something the student can actually perceive." A publisher is not
+    // perception. What the student perceives is the SENTENCE on the rail, so
+    // that sentence is the evidence — it cannot be satisfied by an assignment,
+    // and it goes red the moment the row stops being authored.
+    // ONLY .tsx MAY APPEAR HERE, and the test says why in its own refusal: "a
+    // rendering surface is a component. A .ts module can be read by nothing but
+    // a test and still look like plumbing — that is exactly how
+    // ScenarioSpec.instructionsBg passed for three months." So the derivation's
+    // own file cannot stand as evidence however correct it is, and the two
+    // components below are the whole of what a student can perceive.
+    renderedBy: ["modules/sim/hud/TelltaleEdgePings.tsx", "modules/sim/hud/StatusDashboard.tsx"],
+    // TWO SYMBOLS, NOT THREE, AND THAT IS A STRENGTHENING. The third used to be
+    // `headlightsRequired`, matched in `LessonScene.tsx` on a single ASSIGNMENT
+    // that rendered nothing — a referent proving itself with a write statement.
+    // What remains is what the student actually meets: the warning rows
+    // `TelltaleEdgePings` renders from `armedTelltaleWarnings`, and the lamp
+    // `StatusDashboard` shows. Both go red if either surface stops rendering,
+    // and neither can be satisfied by plumbing.
+    symbols: ["armedTelltaleWarnings", "headlights"],
   },
 };
 

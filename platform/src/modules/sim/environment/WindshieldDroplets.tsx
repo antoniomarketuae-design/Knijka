@@ -1,9 +1,64 @@
 "use client";
 
 // Subtle windshield droplet overlay for the cockpit camera. A single
-// fullscreen triangle drawn last (renderOrder 999, no depth test) with a
-// procedural two-scale droplet field; each drop appears, sits, and evaporates
-// on its own phase so the glass feels alive without animated trails.
+// fullscreen triangle drawn last (renderOrder 999) with a procedural two-scale
+// droplet field; each drop appears, sits, and evaporates on its own phase so
+// the glass feels alive without animated trails.
+//
+// ═══════════════════════════════════════════════════════════════════════════
+// THE DROPLETS WERE INSIDE THE CABIN — sweep 161, sc-ac-rain-lights.
+//
+// „Rain particles are drawn inside the cabin. On PC the same round droplets
+//  that fill the sky also pepper the dashboard, the steering wheel boss and
+//  the area around the cockpit control labels — one sits directly beside
+//  СВЕТЛИНИ and another below КОЛАН. The precipitation layer is not clipped
+//  to the glass."
+//
+// Opened at 1440 × 900 (.audit-frames/sweep161/sc-ac-rain-lights/pc-right/
+// 04-t090s.png) and cropped to the instrument binnacle, it is all of that and
+// one thing the finding did not record: a droplet sits ON THE SPEEDOMETER
+// DIAL FACE, and another on the wheel rim. This is a rain lesson whose task
+// line is „дръж под 47 км/ч" — the layer was putting specks over the exact
+// readout the objective is graded from. Filed `minor`; it is not.
+//
+// THE CAUSE WAS ONE FLAG. The sheet is a clip-space fullscreen triangle, and
+// it shipped `depthTest: false` — so it composited over every pixel of the
+// frame, cabin included. (Turning the flag on alone would have changed
+// nothing: the vertex shader emitted `gl_Position.z = 0.0`, which under this
+// scene's projection is 0.2 m from the eye — nearer than any part of the car,
+// so the sheet still wins every comparison. The DEPTH is the fix; the flag is
+// only what lets it be read.)
+//
+// WHERE THE SHEET NOW SITS, and why a flat depth is enough. The cockpit
+// camera is rigidly mounted, so the cabin occupies a fixed band of view-space
+// distance. Measured from the shipped constants — COCKPIT_EYE (0.24, 0.71,
+// −0.255) against the windshield plane VehicleRig rakes through the A3
+// aperture (centre 0, 0.66, 0.76 · rotX −0.62 · 1.5 × 0.55 m) and the door
+// mirror housings (±0.905, 0.455, 0.592):
+//
+//     wheel rim / cluster    ≈ 0.5 – 0.7 m
+//     glass header edge      ≈ 0.905 m
+//     glass cowl edge        ≈ 1.230 m
+//     LEFT mirror housing    ≈ 1.447 m   ← the FARTHEST thing in the cabin
+//     ─────────────────────────────────────────────────────────────────────
+//     nearest tarmac the driver can see over the cowl   ≈ 4.537 m
+//
+// Everything the student must not see droplets on is nearer than 1.447 m;
+// everything seen THROUGH the glass is farther than 4.537 m. That gap is wide
+// and it does not move, so the sheet does not need to be the glass — it only
+// needs to sit inside the gap, and then the depth buffer does the clipping
+// exactly, per pixel, for free. GLASS_SHEET_DISTANCE_M is the geometric
+// midpoint of the two bounds (max log-margin: 1.73× clear of the mirror,
+// 1.81× clear of the tarmac).
+//
+// WHAT A FLAT SHEET COSTS, stated rather than discovered later: world geometry
+// closer than GLASS_SHEET_DISTANCE_M loses its droplets — i.e. a bumper under
+// ~2.5 m from the driver's eye, which is a collision, not a following
+// distance. The alternative (per-pixel depth of the real raked plane) buys
+// that back for a `gl_FragDepth` write on every pixel of a fullscreen pass,
+// which kills early-Z on exactly the 4 GB phones doc 82 §2.3 is written for.
+// Not worth it for a case the student only reaches by crashing.
+// ═══════════════════════════════════════════════════════════════════════════
 //
 // The integrator mounts this inside the Canvas ONLY while the cockpit view is
 // active. Intensity follows the shared weather channel by default (droplets
@@ -25,11 +80,49 @@ import { getRainIntensity, getWetness, useRainIntensity, useWetness } from "./we
 /** Fullscreen triangle in clip space (vertex shader passes it through). */
 const TRIANGLE_POSITIONS = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
 
+/**
+ * View-space distance the droplet sheet is depth-tested at, metres.
+ *
+ * The geometric midpoint of the two measured bounds in the header block —
+ * √(1.447 × 4.537) = 2.56 — rounded to the 10 cm the source measurements are
+ * good to. Farther than every part of the cabin, nearer than anything the
+ * driver sees through the glass.
+ */
+export const GLASS_SHEET_DISTANCE_M = 2.5;
+
+/**
+ * NDC depth of a view-space distance under this scene's projection — pure, so
+ * the ordering the fix depends on is held by a test and not by the paragraph
+ * above (`__tests__/windshieldDroplets.test.ts`).
+ *
+ * Standard, non-reversed, non-logarithmic perspective depth. Both hold here
+ * and neither is incidental: the Canvas passes no `logarithmicDepthBuffer`,
+ * and three r185 leaves `reversedDepthBuffer` off unless asked. If either ever
+ * changes, this mapping inverts or curves and the sheet lands in the wrong
+ * place — which is why the test pins the two plane endpoints exactly.
+ *
+ * THE CLAMP IS NOT DEFENSIVE DECORATION. An unclamped distance beyond `far`
+ * returns ndc > 1, and a clip-space triangle outside [−1, 1] is DEPTH-CLIPPED
+ * — the whole rain layer would vanish silently, which is this fix failing in
+ * the reassuring direction. The distance is pulled just inside the frustum
+ * instead, so a misconfigured camera costs a wrong-looking sheet, never an
+ * absent one.
+ */
+export function ndcDepthForDistance(distanceM: number, near: number, far: number): number {
+  if (!Number.isFinite(near) || !Number.isFinite(far) || !(far > near) || !(near > 0)) return 0;
+  const d = Number.isFinite(distanceM)
+    ? Math.min(Math.max(distanceM, near * 1.001), far * 0.999)
+    : near * 1.001;
+  return (far + near) / (far - near) - (2 * far * near) / ((far - near) * d);
+}
+
 const VERTEX = /* glsl */ `
+uniform float uDepthNdc;
 varying vec2 vUv;
 void main() {
   vUv = position.xy * 0.5 + 0.5;
-  gl_Position = vec4(position.xy, 0.0, 1.0);
+  // The z that makes the cabin occlude the rain. See GLASS_SHEET_DISTANCE_M.
+  gl_Position = vec4(position.xy, uDepthNdc, 1.0);
 }
 `;
 
@@ -109,9 +202,12 @@ export function WindshieldDroplets({
           uTime: { value: 0 },
           uAspect: { value: 1 },
           uWipeLevel: { value: 0 },
+          uDepthNdc: { value: 0 },
         },
         transparent: true,
-        depthTest: false,
+        // ON, so the cabin can occlude the rain — see the header block. Still
+        // no depth WRITE: the sheet must not stop anything drawn after it.
+        depthTest: true,
         depthWrite: false,
         toneMapped: false,
       },
@@ -127,6 +223,15 @@ export function WindshieldDroplets({
     material.uniforms.uIntensity.value =
       intensity ?? Math.max(getRainIntensity(), getWetness() * 0.3);
     material.uniforms.uWipeLevel.value = wiperRef?.current?.clearing ?? 0;
+    // Read per frame rather than once: the cockpit rig mutates the shared
+    // camera's fov every frame, and a lesson that switches view swaps which
+    // camera this is. near/far are what the mapping needs and they are cheap.
+    const cam = state.camera as { near?: number; far?: number };
+    material.uniforms.uDepthNdc.value = ndcDepthForDistance(
+      GLASS_SHEET_DISTANCE_M,
+      cam.near ?? 0.1,
+      cam.far ?? 900,
+    );
   });
 
   // Rain visuals are med+ (matching the streaks); skip entirely when dry.

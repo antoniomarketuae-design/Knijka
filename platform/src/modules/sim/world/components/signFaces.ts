@@ -84,22 +84,68 @@ async function loadFaceSvg(art: SignFaceArt): Promise<string | null> {
   return pending;
 }
 
+/** One `<text>…</text>` whose content holds no markup — the shape the numeral
+ *  swap can act on. Global so the count can be taken; `matchAll`/`replace` both
+ *  work from a fresh internal clone, so no `lastIndex` state leaks between
+ *  calls. Content with a nested `<tspan>` does not match at all, which is the
+ *  honest outcome: a numeral this code cannot read is a numeral it must not
+ *  claim to have written. */
+const NUMERAL_TEXT_NODE = /(<text\b[^>]*>)([^<]*)(<\/text>)/g;
+
 /**
- * Swap the first `<text>` element's content — the numeral on В26 / В33. The
- * source files ship with "60" in them (they are the generic plate); the swap
- * is verified, and a miss returns null instead of rendering the source's own
- * number on a road that does not carry it.
+ * Swap the numeral on В26 / В33. The source files ship with "60" in them (they
+ * are the generic plate); the swap is verified, and a miss returns null instead
+ * of rendering the source's own number on a road that does not carry it.
+ *
+ * WHY THE VERIFICATION IS READ BACK OUT OF THE ELEMENT. The check here used to
+ * be `swapped.includes(">" + numeral + "<")`, which is satisfied by the
+ * substitution's OWN output — so it could only ever fail when the regex matched
+ * nothing, and had no teeth at all against a match that landed on the wrong
+ * element. Measured 2026-08-19 against that code: a face carrying a units
+ * legend before its numeral
+ *
+ *     <text class="legend">km/h</text><text class="numeral">60</text>
+ *
+ * returned a CERTIFIED face whose legend read „30" and whose plate still read
+ * „60" — on a road the reducer grades at 30. That is doc 86 T4 restaged inside
+ * the very function written to close it, so the swap now demands exactly ONE
+ * swappable `<text>`, demands that it currently hold a bare number, and
+ * re-reads that element afterwards. Two `<text>` nodes means this code cannot
+ * tell which one carries the limit — and a face it cannot read is a KIND it
+ * drops, never one it guesses at. Both shipped faces (v26, v33) carry exactly
+ * one; the guard is on the next copy.
  */
 function withNumeral(svg: string, numeral: number): string | null {
-  const swapped = svg.replace(/(<text\b[^>]*>)([^<]*)(<\/text>)/, `$1${numeral}$3`);
-  return swapped.includes(`>${numeral}<`) ? swapped : null;
+  const before = [...svg.matchAll(NUMERAL_TEXT_NODE)];
+  if (before.length !== 1) return null;
+  if (!/^\s*\d+\s*$/.test(before[0]![2]!)) return null;
+  const swapped = svg.replace(NUMERAL_TEXT_NODE, `$1${numeral}$3`);
+  const after = [...swapped.matchAll(NUMERAL_TEXT_NODE)];
+  return after.length === 1 && after[0]![2] === String(numeral) ? swapped : null;
 }
 
 /** Give the root <svg> an intrinsic pixel size so every browser rasterises it
- *  at full resolution (a viewBox-only SVG has no intrinsic size in Firefox). */
+ *  at full resolution (a viewBox-only SVG has no intrinsic size in Firefox).
+ *
+ *  Any width/height already on the root is REMOVED first. Appending a second
+ *  copy of an attribute makes the document unparseable, `<img>` then fails to
+ *  decode it, the face comes back null and the caller drops the whole KIND —
+ *  i.e. a lesson that narrates a sign the world never builds (the O39/O40
+ *  shape). All seven shipped faces are viewBox-only today, so this guards the
+ *  next byte-copy out of content/signs/svg, not a live break. */
 function withIntrinsicSize(svg: string, px: number): string {
-  return svg.replace(/<svg\b/, `<svg width="${px}" height="${px}"`);
+  return svg.replace(/<svg\b[^>]*>/, (rootTag) =>
+    rootTag
+      .replace(/\s+(?:width|height)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+      .replace(/<svg\b/, `<svg width="${px}" height="${px}"`),
+  );
 }
+
+/** Test seam for the two pure string passes above (doc 86 T4's honesty rule is
+ *  a property of these, and vitest runs with `environment: "node"` — there is
+ *  no canvas here, so the rasteriser itself stays unreachable from a test).
+ *  Not part of the module's render-time API; nothing in src/ imports it. */
+export const __signFaceInternals = { withNumeral, withIntrinsicSize };
 
 async function rasterise(svg: string): Promise<THREE.CanvasTexture | null> {
   const blob = new Blob([withIntrinsicSize(svg, FACE_PX)], { type: "image/svg+xml" });

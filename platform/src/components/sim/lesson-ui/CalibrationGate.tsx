@@ -74,6 +74,80 @@ const VERDICT_TONE: Record<CalibrationVerdict, string> = {
 };
 
 /**
+ * The two things the student is asked for, in one place.
+ *
+ * EXTRACTED (sweep161, `sc-speed-transition/pc-wrong/04-t024s.png`) so the
+ * waiting card can show the REAL question instead of describing one. See
+ * `CalibrationPendingCard`. Rendering the same markup twice is what makes the
+ * preview honest — a second, hand-written „looks like the form" block would
+ * drift away from the form within one edit.
+ */
+function CalibrationFields({
+  points,
+  onPoints,
+  pass,
+  onPass,
+  disabled = false,
+}: {
+  points: string;
+  onPoints: (v: string) => void;
+  pass: boolean | null;
+  onPass: (v: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <>
+      <label className="flex flex-col gap-1.5">
+        <span className="text-xs font-extrabold">Моите наказателни точки</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={MAX_PREDICTED_POINTS}
+          step={1}
+          value={points}
+          disabled={disabled}
+          onChange={(e) => onPoints(e.target.value)}
+          // A number this large is a fat finger, not a belief — say so before
+          // the server refuses it.
+          aria-describedby="sim-calibration-hint"
+          className="w-32 rounded-xl border border-border bg-surface-2/50 px-3 py-2 font-mono text-lg font-black tabular-nums disabled:opacity-50"
+        />
+        <span id="sim-calibration-hint" className="text-[11px] text-muted">
+          Цяло число от 0 до {MAX_PREDICTED_POINTS}. Опасна грешка ={" "}
+          {examPointsForClassBg("opasna")}, основна = {examPointsForClassBg("osnovna")},
+          второстепенна = {examPointsForClassBg("vtorostepenna")} ({EXAM_SCALE_SOURCE_BG}).
+        </span>
+      </label>
+
+      <fieldset className="flex flex-col gap-1.5" disabled={disabled}>
+        <legend className="text-xs font-extrabold">Издържах ли?</legend>
+        <div className="flex gap-2">
+          {[
+            { value: true, labelBg: "Да, издържах" },
+            { value: false, labelBg: "Не, неиздържан" },
+          ].map((opt) => (
+            <button
+              key={String(opt.value)}
+              type="button"
+              aria-pressed={pass === opt.value}
+              onClick={() => onPass(opt.value)}
+              className={
+                (pass === opt.value
+                  ? "btn-primary px-4 py-2 text-sm"
+                  : "btn-ghost px-4 py-2 text-sm") + " disabled:opacity-50"
+              }
+            >
+              {opt.labelBg}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+    </>
+  );
+}
+
+/**
  * What stands in front of the result screen while the save is still in flight.
  *
  * The end screen mounts the instant the drive ends, but the number the gate is
@@ -84,8 +158,35 @@ const VERDICT_TONE: Record<CalibrationVerdict, string> = {
  * It carries its own escape hatch for the same reason the gate does: a hung
  * request must not cost the student their debrief. Skipping here skips the
  * gate for good — the answer would arrive already read.
+ *
+ * THE CARD USED TO BE A SENTENCE AND A SKIP BUTTON, AND IT READ AS BROKEN
+ * (sweep161, `sc-speed-transition/pc-wrong/04-t024s.png`): *„The post-drive
+ * self-assessment screen asks the student to state what result they expect,
+ * then offers no way to answer — the only control on the card is Пропусни и
+ * покажи резултата."* The frame is exactly that — the body copy
+ * („искаме първо ти да кажеш какъв мислиш, че е") is a request in the present
+ * tense, and the one thing you could press skipped the mechanic entirely.
+ *
+ * THE COPY WAS NOT THE MISTAKE — the ABSENCE was. `CALIBRATION_PENDING_BODY_BG`
+ * carries a deliberate note that it must not read as „Зареждане…", because the
+ * pause is the mechanic starting rather than a spinner. That intent is right
+ * and is kept. What it could not do on its own was show that something is
+ * still coming: `aria-busy` was the only signal on the card and `aria-busy` is
+ * invisible, so a sighted student got a static card that asked a question and
+ * offered no way to answer it. Two things fix that without turning it into a
+ * loading screen:
+ *
+ *  - the REAL fields render here, disabled — the student reads the question
+ *    they are about to answer instead of a description of it, and „disabled"
+ *    is the affordance that says not yet rather than never;
+ *  - a moving indicator gives `aria-busy` a visible counterpart, so the pause
+ *    is legibly a pause.
+ *
+ * The escape hatch keeps its own line and its old label; a student who does not
+ * want to wait still leaves in one press.
  */
 export function CalibrationPendingCard({ onSkip }: { onSkip: () => void }) {
+  const noop = (): void => undefined;
   return (
     <section
       aria-labelledby="sim-calibration-title"
@@ -101,6 +202,28 @@ export function CalibrationPendingCard({ onSkip }: { onSkip: () => void }) {
         </h2>
       </div>
       <p className="text-sm leading-relaxed text-muted">{CALIBRATION_PENDING_BODY_BG}</p>
+
+      {/* The question itself, inert until the protocol lands. */}
+      <CalibrationFields points="" onPoints={noop} pass={null} onPass={noop} disabled />
+
+      {/* The visible half of aria-busy. Three dots on a stagger — enough to
+          say „still working", not enough to read as a progress bar for
+          something the student is waiting on. */}
+      <div className="flex items-center gap-3">
+        <span aria-hidden className="flex gap-1">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-muted"
+              style={{ animationDelay: `${i * 160}ms` }}
+            />
+          ))}
+        </span>
+        <span className="text-[11px] font-semibold text-muted">
+          Въпросът се отключва, щом протоколът е готов.
+        </span>
+      </div>
+
       <div>
         <button type="button" className="btn-ghost text-sm" onClick={onSkip}>
           Пропусни и покажи резултата
@@ -248,51 +371,9 @@ export function CalibrationGate({
         </p>
       </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-xs font-extrabold">Моите наказателни точки</span>
-        <input
-          type="number"
-          inputMode="numeric"
-          min={0}
-          max={MAX_PREDICTED_POINTS}
-          step={1}
-          value={points}
-          onChange={(e) => setPoints(e.target.value)}
-          // A number this large is a fat finger, not a belief — say so before
-          // the server refuses it.
-          aria-describedby="sim-calibration-hint"
-          className="w-32 rounded-xl border border-border bg-surface-2/50 px-3 py-2 font-mono text-lg font-black tabular-nums"
-        />
-        <span id="sim-calibration-hint" className="text-[11px] text-muted">
-          Цяло число от 0 до {MAX_PREDICTED_POINTS}. Опасна грешка ={" "}
-          {examPointsForClassBg("opasna")}, основна = {examPointsForClassBg("osnovna")},
-          второстепенна = {examPointsForClassBg("vtorostepenna")} ({EXAM_SCALE_SOURCE_BG}).
-        </span>
-      </label>
-
-      <fieldset className="flex flex-col gap-1.5">
-        <legend className="text-xs font-extrabold">Издържах ли?</legend>
-        <div className="flex gap-2">
-          {[
-            { value: true, labelBg: "Да, издържах" },
-            { value: false, labelBg: "Не, неиздържан" },
-          ].map((opt) => (
-            <button
-              key={String(opt.value)}
-              type="button"
-              aria-pressed={pass === opt.value}
-              onClick={() => setPass(opt.value)}
-              className={
-                pass === opt.value
-                  ? "btn-primary px-4 py-2 text-sm"
-                  : "btn-ghost px-4 py-2 text-sm"
-              }
-            >
-              {opt.labelBg}
-            </button>
-          ))}
-        </div>
-      </fieldset>
+      {/* Shared with CalibrationPendingCard, which renders these disabled so
+          the waiting student sees the question rather than a promise of it. */}
+      <CalibrationFields points={points} onPoints={setPoints} pass={pass} onPass={setPass} />
 
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className="btn-primary" disabled={!ready} onClick={submit}>
