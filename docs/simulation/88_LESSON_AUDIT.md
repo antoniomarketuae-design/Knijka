@@ -5760,7 +5760,7 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and two fix rounds, 2026-08-19
+# THE OPEN LIST — after three repair waves and three fix rounds, 2026-08-19
 
 > **This section is hand-maintained, and it has to be said out loud** because everything above this
 > line is a tally of the frozen corpus and nothing below it can be: it is about *code written after
@@ -5768,7 +5768,10 @@ under. No finding was placed by hand and none was left out.
 > claim was repaired on 2026-08-18 for the same reason — it promised a `build.js` that has never
 > existed in this tree — and what replaced it is the recomputation rule, which was re-run today and
 > reproduces **1,686 standing records · 1,012 `BROKEN` · 318 of them critical · 138 suspect files**
-> exactly.
+> exactly — re-run again on 2026-08-19 for round 3, same four numbers, plus the full bucket and
+> severity split (`161 SUMMARY · 512 UNPOLISHED · 1 COULD_NOT_TEST`; BROKEN = 318 critical · 613
+> major · 81 minor). **What did NOT reproduce was §2.2's coverage arithmetic**, which was a hand-sum
+> over an incomplete file list; it is corrected there and in §1, and the three rows now sum to 138.
 >
 > **Provenance is marked on every row.** `[gated]` = I ran the command and read its own exit code.
 > `[corpus]` = computed over the 24 JSONL files today. `[adversarial]` = a reviewer whose only job
@@ -5783,7 +5786,7 @@ under. No finding was placed by hand and none was left out.
 
 ## 0 · The gate, exactly as it stands
 
-Run over the whole tree on **2026-08-19**, at commit `4dd1850` **plus the uncommitted round-2 working
+Run over the whole tree on **2026-08-19**, at commit `e9bf33c` **plus the uncommitted round-3 working
 tree** (8 concurrent fix lanes; nothing was committed), **each command's own exit code read directly
 and never through a pipe** — `| tail` reports the *pipe's* status and has already once reported a red
 suite in this project as `EXIT:0`. The vitest run below was redirected to a file, not piped, and its
@@ -5792,15 +5795,74 @@ suite in this project as `EXIT:0`. The vitest run below was redirected to a file
 | gate | result | exit |
 |---|---|---|
 | `npx tsc --noEmit` | clean | **0** |
-| `npx vitest run --maxWorkers=2` | **888 files** — 885 passed · **2 failed** · 1 skipped · **13,865 tests** — 13,693 passed · **2 failed** · 170 skipped · 371.3 s | **1** |
+| `npx vitest run --maxWorkers=2` | **890 files** — 885 passed · **4 failed** · 1 skipped · **13,933 tests** — 13,759 passed · **4 failed** · 170 skipped · 379.8 s | **1** |
 | `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking** | **0** |
-| `node platform/scripts/tools-tests.mjs --audit-only` *(new this round)* | partition OK — 907 test files, 888 vitest / 19 node:test, **none shared, none orphaned** | **0** |
 
-**`vitest` exits 1, and both failures are the two that need a signature no agent may give** (§8):
-`exam/__tests__/content-bank.test.ts` (`ptp-i-parva-pomosht` 31/64 = 48 % against a 50 % floor) and
-`lesson/__tests__/compose.test.ts` (`l-accidents-first-aid` carries no quiz beat). **Both were checked
-as still RED, deliberately.** A green there would not be good news — it would mean a content `status`
-field had been flipped to clear a gate, and this check is written that way on purpose.
+**`vitest` exits 1 on FOUR tests, and only two of them are the ones that need a signature no agent may
+give** (§8): `exam/__tests__/content-bank.test.ts` (`ptp-i-parva-pomosht` 31/64 = 48 % against a 50 %
+floor) and `lesson/__tests__/compose.test.ts` (`l-accidents-first-aid` carries no quiz beat). **Both
+were checked as still RED, deliberately.** A green there would not be good news — it would mean a
+content `status` field had been flipped to clear a gate, and this check is written that way on purpose.
+
+**The other two are new, and both are one lane's cross-lane collision — see §0.3.**
+
+### 0.3 — Round 3: the collision that DID happen, and it is one lane
+
+**8 concurrent lanes, 20 files touched, 1 of them a new test file — and the delta against the
+`e9bf33c` baseline is +2 failures.** `[gated]`
+
+| | baseline `e9bf33c` | round 3 (working tree) | delta |
+|---|---:|---:|---:|
+| test **files** | 889 | **890** | **+1** |
+| tests passed | 13,698 | 13,759 | **+61** |
+| tests **failed** | 2 | **4** | **+2** |
+| `tsc` errors | 0 | 0 | 0 |
+| content-validation blocking | 0 | 0 | 0 |
+
+**Both new failures are class (a) — a collision, whose signature is *a test failing in a file no lane
+owned*.** Neither file appears in any of the eight lanes' `owns` list in
+`.audit-frames/lanes-round3.json`, and neither was edited by this round in either direction:
+
+| failing test | owned by | broken by |
+|---|---|---|
+| `sim/lessons/__tests__/teach-escalation.test.ts` — *"same-tick cluster: every first-encounter moment emits"*, `expected [ … ] to have a length of 2 but got 3` | **no lane** | lane 4 `repeat-means-the-same-mistake` (`scenarios/mapping.ts` + `scenarios/coach.ts`) |
+| `sim/lessons/scenario/__tests__/s-w1-bot-completion.test.ts` — *"counter-proof: the late two-lane swerve reaches the lane, but grades the reposition"*, `expected true to be false` | **no lane** | the same lane |
+
+**Causation was proved in both directions, not inferred.** `[gated]` With only `coach.ts` and
+`mapping.ts` reverted to `e9bf33c` and every other round-3 change left in place, both files are
+**green — 2 files, 58 tests, 0 failed**. Restoring the two files returns both to red at the same two
+assertions. Nothing else in the round-3 tree contributes.
+
+**The mechanism, and why the new behaviour is right and the old tests are wrong.** Lane 4 moved the
+repeat-ladder key off the **scenario id** and onto a new **repeat family** (`repeatFamilyForCode`),
+because the scenario table is many-to-one and was therefore billing «ПОВТОРНА ГРЕШКА ×1.5» for the
+*second distinct fault* taught by one mini-lesson. Both broken tests encode the **old** semantics as
+their premise, in as many words:
+
+- `teach-escalation.test.ts:110` — *"the second ev-lane-change hit is already a repeat → graded, not
+  taught"*. `LANE_CHANGE_WITHOUT_INDICATOR` and `LANE_CHANGE_WITHOUT_MIRROR_CHECK` are now separate
+  families — which `mapping.ts` argues for explicitly (*"the signal and the look are two duties"*) —
+  so all three moments teach and `r.taught` is 3, not 2.
+- `s-w1-bot-completion.test.ts:428` — *"Both codes map to the same „ev-lane-change" encounter key, so
+  the FIRST teaches… and every further fault of that same encounter SCORES"*. With the pooling gone
+  the reposition is no longer escalated and the drill now passes.
+
+**This is the aggravating detail: lane 4 measured this exact drive and did not run the test that pins
+it.** Its own `mapping.ts` header lists the blast radius drive by drive, including
+*"`sc-ln-turn-lane-arrows` late-two-lanes (9 → 6 official, 13.5 → 6 training)"* — the very case
+`s-w1-bot-completion.test.ts` asserts. The census was done; the grep for downstream consumers was not.
+**Neither failure is a defect in the new code, and neither may be closed by weakening an assertion:**
+both tests must be re-premised on the repeat family, by the lane that owns the change.
+
+**The orphaned-runners lane delivered, and the file count is not the one the brief predicted.**
+`[gated]` `npx vitest list` collects **890** files, and all five `tools/` files are among them —
+`tools/assets/publicBudget.test.mjs`, `tools/mobile/budget.test.mjs`, and the three that no runner had
+executed: **`tools/mobile/ladder.test.mjs`, `tools/mobile/selectors.test.mjs`,
+`tools/mobile/settle.test.mjs`**. All three are **green**, and none of the four failures is in them.
+The 878 → 881 arithmetic in the round-3 brief was one round stale: those three were un-orphaned in
+**round 2** (`e9bf33c`, which gated at 889 files), where `ladder.test.mjs` was red on its first ever
+execution and was fixed there. Round 3's partition lane did something different and narrower — it
+closed the hole by which that fix could be silently reverted (see §2.6 O14).
 
 ### 0.1 — Round 2: the cross-lane collision that did not happen
 
@@ -5959,14 +6021,14 @@ separates them:
 
 **Nothing in this session was committed.** The doc edit below is the only working-tree change.
 
-## 1 · The coverage arithmetic — 59 of 138 files, and touching is not closing
+## 1 · The coverage arithmetic — 57 of 138 files, and touching is not closing
 
 `[corpus]` Re-run today over all 24 JSONL files by the header's rule — read every record, then drop
 every record whose `scenario` was re-driven in `chunk-redrive.jsonl` except the re-drive's own rows.
 **The corpus is frozen and did not move, and the reader reproduces it exactly: 1,712 records · 26
 superseded (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major ·
 81 minor) · 512 `UNPOLISHED` · 1 `COULD_NOT_TEST`**, over **138 suspect files** and **161 lessons**.
-Three repair waves and two fix rounds have now edited **59** of the 138.
+Three repair waves and three fix rounds have now edited **57** of the 138.
 
 | | files | BROKEN findings in them | of which critical |
 |---|---:|---:|---:|
@@ -5975,9 +6037,32 @@ Three repair waves and two fix rounds have now edited **59** of the 138.
 | wave 3 (commit `2f5ce8f`) | 44 | 581 | 225 |
 | round 2 · red-clearing (commit `7a0ab52`) | 3 | 7 | 4 |
 | round 2 · collision episode (commit `4dd1850`) | 6 | 123 | 60 |
-| round 2 · the 8 lanes (**working tree, UNCOMMITTED**) | 7 | 149 | 30 |
-| **union — ever opened** | **59** | **789** | **285** |
-| **never opened at all** | **79** | **223** | **33** |
+| round 2 · the 8 lanes (commit `e9bf33c`) | 7 | 149 | 30 |
+| round 3 · the 8 lanes (**working tree, UNCOMMITTED**) | 3 | 17 | 2 |
+| **union — ever opened (a real file, really edited)** | **57** | **698** | **286** |
+| **never opened at all** | **74** | **278** | **26** |
+| **names no file — unopenable as filed** | **7** | **36** | **6** |
+
+**THE THREE ROWS NOW SUM.** `57 + 74 + 7 = 138` files · `698 + 278 + 36 = 1,012` findings ·
+`286 + 26 + 6 = 318` critical. **The previous version of this table did not sum and was wrong in the
+reassuring direction**, which is the direction every instrument bug in this project has failed in.
+Two errors were compounding, and both are corrected here:
+
+1. **Six entries in the corpus name a MODULE, not a file** — `modules/sim/rules` (5/2c),
+   `modules/sim/collision` (3/1c), `modules/sim/vehicle` (3/1c), `modules/sim/environment` (1),
+   `modules/sim/traffic` (1), `modules/sim/world/builders` (1) — plus the literal `unknown` (22/2c).
+   **A finding that never named a file cannot be closed by editing a sibling inside the directory**,
+   so these 7 entries and their 36 findings are now counted in their own row instead of being silently
+   credited to whichever wave happened to touch something under the same path. That is what moved the
+   "ever opened" count *down* from 59 to 57 while the programme moved *forward*.
+2. **§2.2's finding totals were hand-summed and undercounted by 55.** The per-file rows were right;
+   the list they were summed from was **missing six never-opened files entirely** — including
+   **`components/sim/lesson-ui/LessonPlayShell.tsx`, which carries 71 BROKEN findings and is the
+   single largest file in the whole corpus.** It is present in the grouped ledger at line 3510 and in
+   the top-of-file ranking, and absent from the never-opened list it belongs to. See §2.2.
+
+**Round 3 opened three files** — `hud/FaultCard.tsx` (13/0c), `components/ScenarioObstacles.tsx`
+(3/1c) and `collision/bodies.ts` (1/1c). The other five lanes worked in files already opened.
 
 Wave 3 was the first wave to move coverage materially: it opened **22 files the corpus knows about
 that no earlier wave had touched — 140 findings, 55 critical.** Against waves 1–2, which between them
@@ -6039,50 +6124,75 @@ This is the entire list. Seven rows against 1,012.
 
 **C7 closes an 8 m band, not the defect class.** See §4 N3.
 
-### 2.2 — Class A · Never opened: 79 files, 223 findings, 33 critical
+### 2.2 — Class A · Never opened: 74 files, 278 findings, 26 critical
 
-`[corpus]` Recomputed 2026-08-19 over all 24 JSONL files against the union of waves 1–3 and both
-round-2 commits **and the uncommitted round-2 working tree**. Nobody has edited these files in any
-pass. Every finding in them is open, and the reason is the same for all 223: **no one looked.** Paths
+> **CORRECTED 2026-08-19 (round 3).** This section previously read *"79 files, 223 findings, 33
+> critical"*. The file count was right for its day; **the finding total was a hand-sum over an
+> incomplete list and undercounted by 55**, and the critical count credited to this class 7 entries
+> that name no file. Both are fixed below and both now reconcile against §1. The six files the old
+> list omitted are marked **`[+]`** — one of them, `LessonPlayShell.tsx`, carries **71 findings and is
+> the largest file in the entire corpus.** It was in the grouped ledger and in the top-of-file ranking
+> the whole time; it was simply never carried into the queue that decides what gets repaired.
+
+`[corpus]` Recomputed 2026-08-19 over all 24 JSONL files against the union of waves 1–3 and all three
+fix rounds **including the uncommitted round-3 working tree**. Nobody has edited these files in any
+pass. Every finding in them is open, and the reason is the same for all 278: **no one looked.** Paths
 are shortened against `platform/src/modules/sim/` and `platform/src/components/sim/`; the format is
 `file  findings/critical`.
 
-**With criticals (31 files, 100 findings, 33 critical) — this is the repair queue:**
+**With criticals (26 files, 65 findings, 26 critical) — this is the repair queue:**
 
-`unknown` 22/2c · `rules` (module-level) 5/2c · `components/lesson-ui/LessonCard.tsx` 12/1c ·
-`components/lesson-ui/ExamBriefingCard.tsx` 5/1c · `scene/lessonWorldRecipe.ts` 5/1c ·
-`lessons/scenario/templates-parking2.ts` 4/1c · `lessons/scenario/templates-conditions2.ts` 4/1c ·
-`lessons/specs.ts` 4/1c · `components/ScenarioObstacles.tsx` 3/1c · `collision` (module-level) 3/1c ·
-`hud/PreDriveTutorial.tsx` 3/1c · `vehicle` 3/1c · `lessons/scenario/templates-flow.ts` 3/1c ·
-`lessons/scenario/templates-junctions3.ts` 3/1c · `lessons/scenario/observation.ts` 2/1c ·
-`components/lesson-ui/PlayAreaStyles.tsx` 2/1c · `lessons/scenario/templates-speed2.ts` 2/1c ·
-`engine/reverseAssist.ts` 2/1c · `lessons/scenario/events.ts` 1/1c · `scenarios/event-library.json` 1/1c ·
-`world/builders/zoneSigns.ts` 1/1c · `lessons/scenario/templates-merging2.ts` 1/1c ·
-`world/builders/railTrack.ts` 1/1c · `scene/cabin.ts` 1/1c · `lessons/scenario/templates-pk.ts` 1/1c ·
-`collision/bodies.ts` 1/1c · `world/builders/roundabout.ts` 1/1c · `hud/telltaleWarnings.ts` 1/1c ·
-`lessons/scenario/templates-junctions2.ts` 1/1c · `platform/public/world/ov-oneway-v1.json` 1/1c ·
+`components/lesson-ui/LessonCard.tsx` 12/1c · `components/lesson-ui/ExamBriefingCard.tsx` 5/1c ·
+`scene/lessonWorldRecipe.ts` 5/1c · `lessons/scenario/templates-conditions2.ts` 4/1c ·
+`lessons/scenario/templates-parking2.ts` 4/1c · `lessons/specs.ts` 4/1c ·
+`hud/PreDriveTutorial.tsx` 3/1c · `lessons/scenario/templates-flow.ts` 3/1c ·
+`lessons/scenario/templates-junctions3.ts` 3/1c · `components/lesson-ui/PlayAreaStyles.tsx` 2/1c ·
+`engine/reverseAssist.ts` 2/1c · `lessons/scenario/observation.ts` 2/1c ·
+`lessons/scenario/templates-speed2.ts` 2/1c · **`[+]` `scene/guidanceRoute.ts` 2/1c** ·
+`platform/public/world/ov-oneway-v1.json` 1/1c · `hud/telltaleWarnings.ts` 1/1c ·
+`lessons/scenario/events.ts` 1/1c · `lessons/scenario/templates-junctions2.ts` 1/1c ·
+`lessons/scenario/templates-merging2.ts` 1/1c · `lessons/scenario/templates-pk.ts` 1/1c ·
+`scenarios/event-library.json` 1/1c · `scene/cabin.ts` 1/1c · `world/builders/railTrack.ts` 1/1c ·
+`world/builders/roundabout.ts` 1/1c · `world/builders/zoneSigns.ts` 1/1c ·
 **`runtime/laneArrows.ts` 1/1c**
 
-**No criticals (48 files, 123 findings):**
+**Left this list in round 3:** `components/ScenarioObstacles.tsx` (3/1c) and `collision/bodies.ts`
+(1/1c) — both opened by the live-contact-naming lane. **Left it as filed rather than as fixed:**
+`unknown` (22/2c), `rules` (5/2c), `collision` (3/1c) and `vehicle` (3/1c) moved to the *names no
+file* row in §1; nobody has addressed them and no edit to a sibling can.
 
-`scene/lessonSpeedContract.ts` 22 · `hud/FaultCard.tsx` 13 · `hud/HudToasts.tsx` 9 ·
-`components/lesson-ui/TeachMomentOverlay.tsx` 8 · `components/lesson-ui/AdvisorCard.tsx` 6 ·
+**No criticals (48 files, 213 findings):**
+
+**`[+]` `components/lesson-ui/LessonPlayShell.tsx` 71** · **`[+]` `components/RouteGuidance.tsx` 23** ·
+`scene/lessonSpeedContract.ts` 22 · `hud/HudToasts.tsx` 9 ·
+`components/lesson-ui/TeachMomentOverlay.tsx` 8 · **`[+]` `hud/notifyColumn.ts` 7** ·
+`components/lesson-ui/AdvisorCard.tsx` 6 · **`[+]` `hud/overlayQueue.ts` 5** ·
 `world/components/worldLabel.ts` 5 · `components/lesson-ui/MistakeConsequenceOverlay.tsx` 4 ·
 `components/lesson-ui/TraceTimeline.tsx` 4 · `cockpit/clusterLayout.ts` 3 · `components/CameraRig.tsx` 3 ·
 `hud/StatusDashboard.tsx` 2 · `engine/reverseView.ts` 2 · `components/vitok/MirrorRig.tsx` 2 ·
 `traffic/index.ts` 2 · `cockpit/index.ts` 2 · `world/components/signFaces.ts` 2 ·
-`components/HeroCarBody.tsx` 2 · `hud/tapActivation.ts` 2 · and 30 files carrying one finding each —
+`components/HeroCarBody.tsx` 2 · `hud/tapActivation.ts` 2 · and 27 files carrying one finding each —
 `environment/WindshieldDroplets.tsx` · `world/components/cityModels.ts` ·
 `components/lesson-ui/GlanceEdgePings.tsx` · `components/VehicleRig.tsx` ·
-**`environment/SimEnvironment.tsx`** · `traces/scMergeLaneEnd.ts` · `traces/scMergeMotorwayExit.ts` ·
+`traces/scMergeLaneEnd.ts` · `traces/scMergeMotorwayExit.ts` ·
 `hud/SpeedCard.tsx` · `lessons/scenario/compile.ts` · `scene/obstacleSpec.ts` · `lessons/progression.ts` ·
-`scene/ribbonStrip.ts` · `world/builders` · `traffic/controllerGestures.ts` ·
+`scene/ribbonStrip.ts` · `traffic/controllerGestures.ts` ·
 `world/builders/waterDecals.ts` · `components/lesson-ui/CalibrationGate.tsx` · `world/builders/props.ts` ·
-`lessons/scenario/templates-exam.ts` · `environment` · `rules/summary.ts` · `traffic` ·
+`lessons/scenario/templates-exam.ts` · `rules/summary.ts` ·
 `components/lesson-ui/HudCloseButton.tsx` · `hud/RearProximityCue.tsx` ·
 `lessons/scenario/templates-hazards.ts` · `hud/overheadHint.ts` · `traffic/oncoming.test.ts` ·
 **`orchestrator/runners.ts`** · `lessons/scenario/templates-junctions4.ts` ·
+**`[+]` `components/lesson-ui/briefingOverflow.test.tsx`** ·
 `platform/public/world/ov-crossing-v1.json` · `platform/public/world/mw-v1.json`
+
+**`LessonPlayShell.tsx` is now the single largest untouched liability in the programme** — 71 findings
+(59 major, 12 minor), no criticals, and **never opened in six passes**. Its absence from this list is
+why §2.3's "the great majority" was over-optimistic: the shell that hosts every lesson UI has never
+been read against the sweep that filed 71 complaints about it.
+
+**`environment/SimEnvironment.tsx` has left this list** — round 2 opened it to export and call
+`primeWeather`. The weather lane's routed half (§2.6 O11) is therefore now a Class B row, not a Class
+A one: the file has been opened and the finding is still not addressed on the live path.
 
 **What moved off this list in round 2, and what did not.** Six files left it: `environment/weather.ts`
 (6/4c), `collision/index.ts` (6/4c), `scenarios/coach.ts` (8/3c), `world/builders/network.ts` (1/1c),
@@ -6096,10 +6206,11 @@ lifting out, because a reader will otherwise scan past them:
 - **`orchestrator/runners.ts`** — one finding, no criticals, and still where the *only* fix for the
   регулировчик lesson family has to land (§3 lane D). Named as untouched two passes ago. **Still
   untouched, five passes in.**
-- **`environment/SimEnvironment.tsx`** — one finding, no criticals, never opened, and it is now also
-  the file the weather lane explicitly routed its unclosed half into (§2.6 O11). A file with one
-  corpus finding is not a low-value file when a lane has named a specific line in it as the fix it
-  could not make.
+- **`environment/SimEnvironment.tsx`** — one finding, no criticals, and named here two passes running
+  as the file the weather lane routed its unclosed half into (§2.6 O11). **Round 2 opened it** — it
+  now primes the weather on mount and ramps on later changes, and `primeWeather` is exported from
+  `environment/index.ts`. The row it was named for is *not* closed by that (O11 still stands, see
+  §2.6 O16), but the callout that it had never been touched is discharged.
 
 ### 2.3 — Class B · File opened, finding not addressed: the great majority of the 765
 
@@ -6129,7 +6240,7 @@ of prose arguing it — and does not do what the prose says.
 ### 2.6 — What the lanes reported they could not close, and why
 
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
-of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's.** Four of wave 3's are
+of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's.** Four of wave 3's are
 *structured*: a lane declared a typed `KNOWN_OPEN` array so that a row silently disappearing turns its
 own staleness test red — the closest thing the programme has to the `closedBy` field §7 keeps asking
 for, pointed backwards. **Never add a row to one for a finding you could have fixed** is the rule each
@@ -6152,6 +6263,25 @@ file the lane did not own.** Each names that file and line.
 | O12 | The **ledger-billing filter is duplicated** rather than shared. The server debrief was re-instating faults Наредба № 38, чл. 48, ал. 3 had closed over and then escalating them, printing a «повторна грешка ×1.5» and a «Тренировъчен резултат: 25 наказателни т.» that existed on no other surface. The lane fixed it in both places instead of one | verbatim: *"The filter lives twice, here and in engine.ts, because neither file may import the other; the single home for it is `escalation.ts` and moving it there is a change to a file this lane does not own."* | `lessons/wire.ts:630` → `rules/escalation.ts` |
 | O13 | **NPC cars and staged pedestrians still walk at a fifth of the ego car's pace below 10 fps.** The lane replaced the lesson clock so the ego car's two-second duties are two seconds of the world it is driving in, but the traffic system keeps its own clamp | verbatim: *"NOT FIXED HERE, and not this lane's file: `traffic/system.ts` clamps its own step at MAX_DT_SEC = 0.1, so NPC cars and staged pedestrians still walk at a fifth of the ego car's pace on a sub-10-fps frame."* | `components/sim/LessonScene.tsx:2865` → `traffic/system.ts` |
 
+**Round 3's rows, O14–O19.** `[read]` Same rule: each was written into the tree by the lane that could
+not close it, and read out of the file named today. **Five of the six are again „one edit in a file
+this lane does not own"** — the shape that has now produced nine of the nineteen rows in this table
+and is, on the evidence, the dominant failure mode of single-file lane ownership.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O14 | **The runner partition can still go blind on one edit** — the audit globs the `VITEST_INCLUDE` constant, and nothing checked that `vitest.config.ts` still spreads it | verbatim, and it is a *measurement of the previous round's fix being defeatable*: *"Replace `include: [...VITEST_INCLUDE]` in platform/vitest.config.ts with the four literal patterns it held before the orphan fix — one edit, one file … `npx vitest list --filesOnly ../tools/mobile/{settle,ladder,selectors}.test.mjs` printed NOTHING and exited 0. The three files were orphaned again, with the fix that un-orphaned them still sitting in VITEST_INCLUDE below … Both gates green, 33 test blocks and 88 assertions dark."* **Now closed in two places** (`auditConfigWiring()` text-scan + `test-ownership.test.mjs` resolved-value deep-equal), because *"Neither subsumes the other. THAT is what makes two acts two."* | `platform/scripts/tools-tests.mjs:62–90` |
+| O15 | **The paint census speaks for one district in seven** | verbatim: *"It grades 1,603 of the corpus's 10,798 marking quads — **14.8%, one in seven** — because **55 of the 105 districts carry paint the catalogue cannot yet name.** It is now titled for the 50 districts it does grade, the 55 are attributed one by one to the gate that stops them, and both numbers are a test rather than a sentence."* The over-claiming title was retired; the coverage gap was not closed | `world/builders/__tests__/markings-paint-truth.test.ts:196–203` |
+| O16 | **Weather still leaks between lessons on the LIVE path** — O11, carried | the lane's own routed-out note is still in the file, and although round 2 *did* wire `primeWeather` into `SimEnvironment`'s mount effect, the comment recording the debt was not retired with it. **This row needs a re-drive to settle, not an edit**: the code says fixed, the comment says open, and no frame has been captured since | `environment/weather.ts:318–322` |
+| O17 | **The collision margin is overstated at its origin** | verbatim: *"NOT FIXED HERE, ROUTED: probe.ts's own doc-comment on `SWEEP_FRAME_TRAVEL_M` still says „the margin over reality is the same ~45 %" and is the ORIGIN of the figure. That file belongs to another lane this wave; the correction is one sentence at probe.ts:105–109."* The lane pinned the real margin (12× overstated) in its own file and left the source of the wrong number standing | `collision/index.ts:67–70` → `collision/probe.ts:105` |
+| O18 | **Six sweep-161 findings were routed to `collision/index.ts` and it can answer none of them** | verbatim: *"WHAT THIS MODULE DOES NOT DO, because six sweep161 findings were routed here for it and it cannot answer any of them (recorded so the next wave routes them to a file that can): · NO CONTACT RESPONSE. Nothing here moves a body."* A routing error in the corpus, not a repair failure — but **six findings are parked against a file that structurally cannot close them** | `collision/index.ts:73–80` |
+| O19 | **NPC traffic still walks at a fifth of the ego car's pace below 10 fps** — O13, carried unchanged | verbatim, still in the tree: *"NOT FIXED HERE, and not this lane's file: `traffic/system.ts` clamps its own step at MAX_DT_SEC = 0.1, so NPC cars and staged pedestrians still walk at a fifth of the ego car's pace on a sub-10-fps frame."* | `components/sim/LessonScene.tsx:3013` → `traffic/system.ts` |
+
+**And two round-3 lanes reported nothing they could not close.** Lane 4 (`repeat-key`) and lane 5
+(`FaultCard`) filed no open row — and lane 4 is the one that broke two test files it did not own
+(§0.3). **A lane reporting no residue is not evidence of none**; in this round it was the lane with
+the widest blast radius and the quietest report.
+
 **O2, O3 and O5 are classes, not instances — 16 lessons between them** — and every one is a green
 tick a student is shown for a skill the product never measured. That is the same shape as the
 document's opening warning (*passing 2 while failing 3*), now with names.
@@ -6159,7 +6289,9 @@ document's opening warning (*passing 2 while failing 3*), now with names.
 **And the 30 critical lanes that have still never run reported nothing at all.** Their 78 findings,
 31 critical, have neither a fix nor a reason: absence of a report there means the agent was killed or
 never launched, not that the finding was examined and left. **Round 2 added three reasons and closed
-none of the ten wave-3 rows** — O1–O10 stand exactly as written.
+none of the ten wave-3 rows; round 3 added six more and closed one of its own (O14), which was a hole
+in round 2's fix rather than a corpus finding** — O1–O10 stand exactly as written, and O11/O13 are
+carried forward as O16/O19.
 
 ## 3 · Wave 2, lane by lane — what survived refutation and what did not
 
@@ -6383,16 +6515,21 @@ from under a running one — but they are still here.
 `expect(1).toBe(1)`, writing a marking-quad census to a hard-coded absolute path inside one session's
 scratchpad) landed in `2f5ce8f` and was **deleted in `7062f9b`**. `[gated]` Verified absent today.
 
-**NEW, and it is committed rather than ignored: `platform/scratch-gate.txt`.** `[read]` 694 bytes,
-29 lines, committed on 2026-07-31 in `1376e7f` — *"wip: mid-flight snapshot of the finish-the-list
-wave — **SAFETY COMMIT, NOT GATED**"*. It is a console dump of a gate run: a `== FALSEHOOD BUDGET ==`
-block naming six scenarios under `WRONG_WAY`, and a `== CENSUS ==` block of T1/T2/T3/T4raw/T8raw/L2/L3
-counts. **Nothing in the tree reads it** — `grep -rn "scratch-gate"` over `platform/`, `tools/` and
-`docs/` returns nothing — so it is neither an input nor an output of any gate, it is one session's
-terminal scrollback with a filename. Its numbers are three weeks old and no longer reproducible: the
-run that produced them is not recorded anywhere. It should be deleted, not refreshed.
+**CLOSED — `platform/scratch-gate.txt` is gone.** The committed console dump (694 bytes, 29 lines,
+landed 2026-07-31 in `1376e7f` under *"SAFETY COMMIT, NOT GATED"*, read by nothing in the tree) was
+**deleted in `e9bf33c`**. `[gated]` Verified absent today.
 
-**The rest of the residue sweep is clean, and it was run wide.** `[gated]` 2026-08-19:
+**NEW — two stale agent worktrees are still registered.** `[gated]` `git worktree list` returns three
+entries, and two of them are not this one: `.claude/worktrees/heuristic-wozniak-87cbdc` (detached at
+`f588594`) and `.claude/worktrees/xenodochial-blackburn-dfd31f` (on `claude/unruffled-cohen-f9eb0f`,
+at `8442b91`). Both carry full checkouts — the second still holds `PerfProbe.tsx`, `gpu-probe.mjs`,
+`probe-frame.mjs` and two committed PNGs under `tools/clips/headless/`. They belong to other sessions,
+like the dist dirs above, so they have not been pruned from under a running one; but on a box whose
+own notes call it chronically squeezed, two extra checkouts of this repo are worth naming.
+`git worktree prune` after confirming both sessions are dead.
+
+**The rest of the residue sweep is clean, and it was run wide.** `[gated]` Re-run 2026-08-19 after
+round 3:
 
 | swept for | result |
 |---|---|
@@ -6400,5 +6537,5 @@ run that produced them is not recorded anywhere. It should be deleted, not refre
 | test files under `platform/src` with no `expect(` | **0** |
 | test files anywhere in the repo, tracked **or** untracked, with no `expect(` and no `assert` | **0** |
 | `.skip` / `.only` / `.todo` / `xit` / `xdescribe` in any changed or new test file | **0** |
-| untracked files after round 2 | **7, all of them real test files** — 6 under `platform/src`, plus `platform/scripts/__tests__/test-ownership.test.mjs`. No stray probes, no scratch files, no `zz-*` |
-| `*probe*` / `*scratch*` / `zz-*` under version control | all resolve to **real modules or real gitignored working directories** — `collision/probe.ts` (the swept-contact memory, with its own 209-line test), `environment/PerfProbe.tsx`, `runtime/__tests__/b15-roundabout-wait.probe.test.ts`, the `tools/clips/headless/*probe*.mjs` render rigs, and everything under `scratchpad/` and `tools/mobile/.out/`, both of which `.gitignore` already covers. **The one exception is `platform/scratch-gate.txt` above.** |
+| untracked files after round 3 | **1, and it is a real test file** — `hud/__tests__/fault-card-ledger-close.test.tsx`, 24 `expect(`s, the FaultCard lane's pin for the closed-exam-sheet defect. No stray probes, no scratch files, no `zz-*` |
+| `*probe*` / `*scratch*` / `zz-*` under version control | all resolve to **real modules or real gitignored working directories** — `collision/probe.ts` (the swept-contact memory, with its own 209-line test), `environment/PerfProbe.tsx`, `runtime/__tests__/b15-roundabout-wait.probe.test.ts`, the `tools/clips/headless/*probe*.mjs` render rigs, and everything under `scratchpad/` and `tools/mobile/.out/`, both of which `.gitignore` already covers. **No exceptions left** — `scratch-gate.txt` was the last one and it is deleted |

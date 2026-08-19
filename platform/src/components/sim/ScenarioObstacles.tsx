@@ -135,6 +135,39 @@ export interface CuboidDims {
 }
 
 /**
+ * ONE HITTABLE OBSTACLE'S REAL GROUND FOOTPRINT, published upward.
+ *
+ * The colliders below are PER-MODEL TIGHT CUBOIDS measured off the loaded rig
+ * (`vehicleColliderDims(rig.halfWidth, rig.halfLength, …)`), and no static
+ * table can state them: a GLB's extents are known only after it loads. The
+ * live-contact NAMING side (LessonScene) has to test the body rapier actually
+ * reported, so it cannot size these from a constant and guess — it reads them
+ * from here.
+ *
+ * MEASURED, and the reason this channel exists rather than a constant: the
+ * canonical NPC shell is 0.92 × 2.10 m, while `kargo_v` — a SHIPPED, hittable
+ * obstacle (scenarioSceneryProps.ts, the reversing bay) — measures 1.98 × 5.34
+ * as a body, i.e. halfLength 2.67. That is 0.57 m of collider the shell box
+ * does not cover, so a zero-tolerance naming test against a shell-sized box
+ * cannot resolve a contact with it at the enter edge. `box_truck` would be
+ * 1.65 m (every box_truck placement is `visual: true` today, so it mounts no
+ * collider — but nothing in the spec prevents a hittable one).
+ */
+export interface ObstacleColliderFootprint {
+  /**
+   * Index over the VEHICLE-FILTERED obstacle list — the same index
+   * `SCENARIO_OBSTACLE_NPC_ID_BASE + i` is built from, and the same one
+   * LessonScene's `obstacle:i` ids carry. `visual` placements are counted but
+   * never published (they mount no body).
+   */
+  readonly index: number;
+  /** Collider half-extent across the body, m. */
+  readonly halfWidthM: number;
+  /** Collider half-extent along the body, m. */
+  readonly halfLengthM: number;
+}
+
+/**
  * Tight vehicle cuboid from a rig's MEASURED extents (geometry is authored
  * ground-relative, so the roof line is the bbox top).
  */
@@ -174,6 +207,9 @@ const WALL_DEFAULT_THICKNESS_M = 0.3;
 // ---------------------------------------------------------------------------
 // Internals
 // ---------------------------------------------------------------------------
+
+/** Stable identity — a fresh `[]` each render would loop the publish effect. */
+const EMPTY_FOOTPRINTS: readonly ObstacleColliderFootprint[] = [];
 
 const UP = new Vector3(0, 1, 0);
 const AXIS_X = new Vector3(1, 0, 0); // wheel spin axis (GLB wheels are X-axial)
@@ -223,9 +259,21 @@ export interface ScenarioObstaclesProps {
   obstacles: readonly ScenarioObstacleSpec[];
   /** Hero-paint tier passthrough (LessonScene passes level === "high"). */
   clearcoat?: boolean;
+  /**
+   * The hittable vehicles' REAL collider footprints, once the rigs are loaded
+   * — see `ObstacleColliderFootprint`. Called on mount and whenever the
+   * resolved list changes; called with `[]` when there are no vehicles at all,
+   * so a stale list can never outlive its scene. Omit and nothing is
+   * published (every non-naming caller).
+   */
+  onColliderFootprints?: (footprints: readonly ObstacleColliderFootprint[]) => void;
 }
 
-export function ScenarioObstacles({ obstacles, clearcoat = true }: ScenarioObstaclesProps) {
+export function ScenarioObstacles({
+  obstacles,
+  clearcoat = true,
+  onColliderFootprints,
+}: ScenarioObstaclesProps) {
   const vehicles = useMemo(
     () => obstacles.filter((o): o is ScenarioVehicleObstacle => o.kind === "vehicle"),
     [obstacles],
@@ -253,10 +301,21 @@ export function ScenarioObstacles({ obstacles, clearcoat = true }: ScenarioObsta
     [obstacles],
   );
 
+  // No vehicles = no hittable obstacle bodies. Say so out loud rather than
+  // leaving whatever the previous scene published standing.
+  const noVehicles = vehicles.length === 0;
+  useEffect(() => {
+    if (noVehicles) onColliderFootprints?.(EMPTY_FOOTPRINTS);
+  }, [noVehicles, onColliderFootprints]);
+
   return (
     <group name="scenario-obstacles">
       {vehicles.length > 0 ? (
-        <ObstacleVehicles vehicles={vehicles} clearcoat={clearcoat} />
+        <ObstacleVehicles
+          vehicles={vehicles}
+          clearcoat={clearcoat}
+          onColliderFootprints={onColliderFootprints}
+        />
       ) : null}
       {cones.length > 0 ? <PropInstances kind="cone" placements={cones} /> : null}
       {poles.length > 0 ? <PropInstances kind="pole" placements={poles} /> : null}
@@ -273,9 +332,11 @@ export function ScenarioObstacles({ obstacles, clearcoat = true }: ScenarioObsta
 function ObstacleVehicles({
   vehicles,
   clearcoat,
+  onColliderFootprints,
 }: {
   vehicles: ScenarioVehicleObstacle[];
   clearcoat: boolean;
+  onColliderFootprints?: (footprints: readonly ObstacleColliderFootprint[]) => void;
 }) {
   const gltfs = useGLTF(FLEET_URLS, DRACO_DECODER_PATH) as unknown as Array<{
     scene: AnyObject3D;
@@ -323,6 +384,23 @@ function ObstacleVehicles({
       }),
     [fleet, resolvedBase],
   );
+
+  // …and hand those same half-extents to the naming side, which has to test
+  // the body rapier reported and cannot read a rig. Derived from `resolved`,
+  // so the published number is literally the one the CuboidCollider below is
+  // given — not a second measurement that could drift from it.
+  const footprints = useMemo<readonly ObstacleColliderFootprint[]>(
+    () =>
+      resolved.flatMap((r, index) =>
+        r.spec.visual
+          ? []
+          : [{ index, halfWidthM: r.dims.half.x, halfLengthM: r.dims.half.z }],
+      ),
+    [resolved],
+  );
+  useEffect(() => {
+    onColliderFootprints?.(footprints);
+  }, [footprints, onColliderFootprints]);
 
   const blobTex = useMemo(() => makeBlobTexture(), []);
   useEffect(() => () => blobTex.dispose(), [blobTex]);

@@ -42,9 +42,32 @@
  * `SWEEP_CHUNK_TRAVEL_M` / `SWEEP_FRAME_TRAVEL_M` are re-exported for the same
  * reason: `SWEEP_FRAME_TRAVEL_M` (60 m) is the threshold above which even the
  * probe DISCARDS the interval, and the module that owns the clock — the
- * orchestrator's director — is the only one that can violate it and, until it
- * could see the number, the only one that could not check. The margin it has
- * to keep is stated and tested in `__tests__/index.test.ts`.
+ * orchestrator's director — is the one that can violate it. It still does not
+ * read either number: checked 2026-08-19, NOTHING outside this directory
+ * imports `SWEEP_FRAME_TRAVEL_M`, `SWEEP_CHUNK_TRAVEL_M` or `SWEEP_TELEPORT_M`.
+ * The budget is therefore held by `__tests__/index.test.ts` alone, and that
+ * sentence used to read „the only one that could not check", which described an
+ * intention rather than the tree.
+ *
+ * THE MARGIN IS 3.8 %, NOT THE ~45 % probe.ts's `SWEEP_FRAME_TRAVEL_M` doc and
+ * that test both stated. 45 % counts only the TRANSLATION half of the
+ * expression the probe actually compares against the threshold:
+ * `relativeTravelM` is centre displacement PLUS the arc each body's far corner
+ * sweeps while rotating, and that second term is capped at 180° per body, i.e.
+ * π × hypot(halfLengthM, halfWidthM) — 6.885 m for the player before the other
+ * body is counted at all. Measured 2026-08-19 over every (profile × its own
+ * fastest authored `cruiseSpeedMps`) pair the bank can stage, the worst is the
+ * TRAM at 57.810 m against the 60 m threshold; the player-versus-car pair the
+ * head-on above is driven on is 55.333 m. That test derives both ends of the
+ * sum from the files that own them — `PHYSICS_MAX_FRAME_DT` out of
+ * lesson-ui/sessionClock.ts and the speeds out of the scenario bank — so the
+ * guard now moves when the clock or the content moves. A margin overstated
+ * twelvefold is worse than none, because the next reader budgets against it.
+ *
+ * NOT FIXED HERE, ROUTED: probe.ts's own doc-comment on `SWEEP_FRAME_TRAVEL_M`
+ * still says „the margin over reality is the same ~45 %" and is the ORIGIN of
+ * the figure. That file belongs to another lane this wave; the correction is
+ * one sentence at probe.ts:105–109.
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS MODULE DOES NOT DO, because six sweep161 findings were routed here
@@ -97,6 +120,7 @@ export {
 export {
   actorObb,
   headingOfDir,
+  npcShellObb,
   NPC_VEHICLE_SHELL_HALF_LENGTH_M,
   NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   PEDESTRIAN_BODY_RADIUS_M,

@@ -14,7 +14,9 @@
  * floor). See `policyForViolation` in policy.ts. основна/опасна unchanged.
  *
  * What a "repeat" IS lives in `encounterKey` below — the same mistake made
- * again, which is not the same thing as a second event carrying the same code.
+ * again, which is neither "a second event carrying the same code" nor "a
+ * second event under the same mini-lesson". Those are three different
+ * questions and this module answers all three separately.
  *
  * Pure + deterministic: the caller owns the per-session encounter counts.
  */
@@ -22,7 +24,7 @@
 import { actCopy } from "../rules";
 import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
-import { scenarioForCode } from "./mapping";
+import { repeatFamilyForCode, scenarioForCode } from "./mapping";
 import { policyForViolation, resolveEncounter } from "./policy";
 import type { EncounterMode, ViolationSeverity } from "./policy";
 
@@ -87,29 +89,45 @@ export interface CoachDecision {
  * WHAT COUNTS AS A REPEAT — the encounter key, and the whole escalation ladder
  * hangs off it (`prior` → policy.ts `gradeMultiplier`).
  *
- * A repeat is THE SAME MISTAKE MADE AGAIN. Two codes that share a scenario are
- * that same mistake at two degrees — SPEEDING_OVER_LIMIT and SPEEDING_DANGEROUS
- * are both `ev-speed-limit` — which is why the scenario, not the code, is the
- * key. But two codes are not the only way one key can cover two DIFFERENT
- * mistakes. The catalogue splits two codes into distinct ACTS carried on
- * `detail`: COLLISION by the body struck (vehicle / pedestrian / cyclist /
- * staticObject) and RAIL_CROSSING_VIOLATION by the act (no-stop /
+ * A repeat is THE SAME MISTAKE MADE AGAIN, and the identity of a mistake has
+ * two parts: the FAMILY (mapping.ts `repeatFamilyForCode` — the code itself,
+ * unless the catalogue grades one error at two bars, as it does for the two
+ * speeding codes and the three lead-gap codes) and, where the catalogue
+ * declares them, the ACT. The catalogue splits two codes into distinct acts
+ * carried on `detail`: COLLISION by the body struck (vehicle / pedestrian /
+ * cyclist / staticObject) and RAIL_CROSSING_VIOLATION by the act (no-stop /
  * entered-barred / stopped-on-track). Each act has its own authored title and
  * explanation precisely because it is a different mistake, not a second helping
  * of the first.
  *
- * MEASURED 2026-08-18, `sc-hz-accident-scene`: a wrecked car struck at t=13.13
- * and a bystander at t=13.43 — one crash, one act of driving, two victims. Both
- * keyed under `ev-collision`, so the second was the "second encounter" and the
- * pedestrian was priced ×1.5; the student read «повторна грешка ×1.5» for a
- * mistake they made once. `lessons/engine.ts buildLessonResult` later stopped
- * that ONE number reaching the screen, by folding only the rows the closed
- * ledger actually charged — but that is the LEDGER's filter, not this ladder's,
- * and it only reaches faults that follow a closure. `RAIL_CROSSING_VIOLATION`
- * is опасна and deliberately NOT terminating (catalog.ts), so nothing closes
- * its ledger: entering a barred crossing and then coming to rest on the tracks
- * bills both rows, and the second still reads as the first one repeated. The
- * false «повторна» is decided HERE, so it is corrected here.
+ * WHAT THIS KEY IS NOT: the scenario id. That is the answer to a different
+ * question — which mini-lesson teaches this — and it is many-to-one, so using
+ * it here made every fault a repeat of any other fault the same lesson covers.
+ *
+ * MEASURED 2026-08-18, `sc-zebra-approach` driven wrong at 59 км/ч, the
+ * reference lesson of the whole audit: «Твърде бързо приближаване към
+ * пешеходна пътека» (опасна, 10 т.) and then «Непропускане на пешеходец»
+ * (опасна, 10 т.) — two different faults, both mapped to
+ * `ev-ped-crossing-marked`. The second landed on the first's counter and the
+ * debrief read «ПОВТОРНА ГРЕШКА ×1.5» and «Тренировъчен резултат: 25
+ * наказателни т.» against an official 20. The student was told he had repeated
+ * a mistake he made once. Censused over `.audit-frames/sweep161`: 23 of the
+ * 348 drives that reached a debrief carry two or more DISTINCT faults under
+ * one scenario id and are repriced by this key. Replayed over the 298 recorded
+ * drives in `content/traces`, 3 change — all of them the same way, and none of
+ * them losing an escalation it had earned (mapping.ts records the numbers).
+ *
+ * MEASURED 2026-08-18, `sc-hz-accident-scene`, the same crime in the collision
+ * path and the reason the act half of the key exists: a wrecked car struck at
+ * t=13.13 and a bystander at t=13.43 — one crash, one act of driving, two
+ * victims, both keyed under `ev-collision`, the pedestrian priced ×1.5.
+ * `lessons/engine.ts buildLessonResult` later stopped that ONE number reaching
+ * the screen, by folding only the rows the closed ledger actually charged — but
+ * that is the LEDGER's filter, not this ladder's, and it only reaches faults
+ * that follow a closure. `RAIL_CROSSING_VIOLATION` is опасна and deliberately
+ * NOT terminating (catalog.ts), so nothing closes its ledger: entering a barred
+ * crossing and then coming to rest on the tracks bills both rows. The false
+ * «повторна» is decided HERE, so it is corrected here.
  *
  * THE OTHER DIRECTION IS WHY THIS ASKS THE CATALOGUE AND NOT THE FIELD.
  * `detail` is not always an act: SPEEDING_OVER_LIMIT stamps the measured speed
@@ -120,9 +138,20 @@ export interface CoachDecision {
  * conviction. `actCopy` is non-null for exactly the details the catalogue
  * declares acts, and it is the same predicate the debrief already groups its
  * rows by (rules/index.ts), so the two surfaces cannot drift apart.
+ *
+ * THE RETURN VALUE IS A COUNTER KEY AND NOTHING ELSE. It used to double as the
+ * scenario-event id handed to `resolveEncounter`, which looks a `policyDefault`
+ * up by it — so an act-carrying key like `ev-collision#vehicle` resolved to no
+ * event and silently dropped that scenario's policy (`ev-collision` is
+ * `learn-only` in event-library.json). Nothing reached it, because both
+ * act-carrying codes are опасна and `policyForViolation` always overrode them
+ * — but an основна act-carrying code would have flipped a learn-only scenario
+ * into a grading one with no diff to show for it. `coachStep` now resolves the
+ * policy itself and hands `resolveEncounter` a real event id; this key is no
+ * longer looked up anywhere.
  */
-function encounterKey(v: CoachInput, scenarioId: string | null): string {
-  const base = scenarioId ?? v.code;
+function encounterKey(v: CoachInput): string {
+  const base = repeatFamilyForCode(v.code);
   // The cast is safe by construction: a code outside the per-act tables misses
   // the lookup and returns null, which is the pooled (no-act) answer anyway.
   const isAct = actCopy(v.code as ViolationCode, v.detail) !== null;
@@ -135,10 +164,36 @@ export function coachStep(
   v: CoachInput,
   opts?: CoachOptions,
 ): { decision: CoachDecision; encounters: Record<string, number> } {
+  // THREE KEYS, ON PURPOSE, and the third one is the whole lesson of this file.
+  //
+  //   scenarioId  „which mini-lesson teaches this" — rides out on the decision.
+  //   teachKey    „have I already taught you about this SITUATION" — counted per
+  //               TOPIC, so a drive gets ONE free lesson per topic, not one per
+  //               code. Drives `mode`.
+  //   repeatKey   „have you made THIS MISTAKE before" — counted per code (plus
+  //               act, where the catalogue declares acts). Drives the ×1.5/×2
+  //               ladder, and nothing else.
+  //
+  // These were ONE value until 2026-08-19, and collapsing them is wrong in both
+  // directions — the project shipped each in turn. Keyed by TOPIC, two DIFFERENT
+  // faults counted as repeats of each other (the reference lesson billed 25
+  // against an official 20 and told the student he repeated a mistake he made
+  // once). Keyed by CODE, every distinct fault drew its own free lesson and
+  // `sc-ln-turn-lane-arrows` with a late two-lane swerve — unsignalled AND
+  // unobserved — went from FAILED to PASSED. Separating them is what satisfies
+  // both, and a false certificate is the graver of the two to leave standing.
+  //
+  // `graded:` counts GRADINGS rather than occurrences, so the ladder needs no
+  // offset: a mistake that was taught the first time never incremented it.
   const scenarioId = scenarioForCode(v.code);
-  const key = encounterKey(v, scenarioId);
-  const prior = encounters[key] ?? 0;
-  const nextEncounters = { ...encounters, [key]: prior + 1 };
+  const repeatKey = encounterKey(v);
+  const teachKey = `teach:${scenarioId ?? repeatKey}`;
+  const seenKey = `seen:${repeatKey}`;
+  const gradedKey = `graded:${repeatKey}`;
+  const prior = encounters[teachKey] ?? 0;
+  const seen = encounters[seenKey] ?? 0;
+  const priorGraded = encounters[gradedKey] ?? 0;
+  const nextEncounters = { ...encounters, [teachKey]: prior + 1, [seenKey]: seen + 1 };
 
   // A13 exam mode — unconditional always-grade at official base points. Even
   // learn-only-mapped codes grade: if the rule engine emitted a violation, an
@@ -164,11 +219,25 @@ export function coachStep(
   // learn-only policy for every code — the same suppression channel
   // learn-only-mapped scenarios always used, applied session-wide.
   const mappedPolicy = scenarioId ? getScenarioEvent(scenarioId)?.policyDefault : undefined;
+  // THE POLICY IS DECIDED HERE, NOT INSIDE `resolveEncounter`. That function
+  // falls back to `getScenarioEvent(eventId)?.policyDefault` when handed no
+  // override, and the id it used to be handed was the ENCOUNTER KEY — which no
+  // longer resembles an event id at all, and already did not whenever an act
+  // suffix was appended. Folding `mappedPolicy` in explicitly makes the
+  // fallback dead weight rather than a trap: byte-identical answers today
+  // (`policyForViolation` returns undefined exactly where the mapping was
+  // meant to decide), and the scenario's own default can no longer be lost by
+  // the shape of a counter key. The event id is still passed truthfully, for
+  // the `eventId` that comes back on the outcome.
   const override =
     opts?.learnOnly === true
       ? "learn-only"
-      : policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy);
-  const outcome = resolveEncounter(key, prior, override);
+      : (policyForViolation(v.severityClass, v.terminateSession === true, mappedPolicy) ??
+        mappedPolicy);
+  const outcome = resolveEncounter(scenarioId ?? v.code, prior, override, {
+    occurrences: seen,
+    gradings: priorGraded,
+  });
   return {
     decision: {
       code: v.code,
@@ -178,7 +247,11 @@ export function coachStep(
       showLesson: outcome.showLesson,
       penaltyMultiplier: outcome.penaltyMultiplier,
     },
-    encounters: nextEncounters,
+    // The ladder counts GRADINGS, so this increments only when one happened.
+    encounters:
+      outcome.mode === "grade"
+        ? { ...nextEncounters, [gradedKey]: priorGraded + 1 }
+        : nextEncounters,
   };
 }
 

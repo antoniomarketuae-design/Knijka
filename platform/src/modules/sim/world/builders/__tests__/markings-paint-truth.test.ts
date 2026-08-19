@@ -143,6 +143,63 @@
  * reports 12 failed / 39 passed, and the two districts the mutation spares are
  * the two that stay green. §4's identity is silent on it in both — the mutation
  * books every quad it draws, and BOOKING IS NOT PAINT TRUTH.
+ *
+ * ── AND THE FIFTH: THE RIGHT SHAPE IN THE WRONG PLACE ──────────────────────
+ * That census closed the SHAPE axis across 50 districts and left the PLACE axis
+ * wide open. Every classification it made was a shape test plus a band — right
+ * length, right stroke, within half a lane of the boundary — and half a lane is
+ * 4.06 m. The same phantom wearing the RIGHT shape walked straight through it,
+ * and so did the one regression this file has ever caught in markings.ts. Three
+ * forgeries, each RUN against the file as it stood, each silent, each now red:
+ *
+ *   every dash TURNED 10° across the road, on the five districts no test names
+ *   an edge of
+ *       was: `paintFindings` [] on all five. Same length, same stroke, same
+ *            centroid, same count, same booking — 0.685 m of corner standing
+ *            out of the lane it divides, on every dash of every arm
+ *       now: RED on all 50 domain districts, each naming the boundary, the
+ *            worst corner and the budget its own bend allows
+ *   every dash SHOVED 0.5 m sideways off its boundary
+ *       was: [] again — it is still inside the band that files it, and the band
+ *            has to be that wide so a nudged dash is convicted BY NAME instead
+ *            of vanishing into `offences`
+ *       now: RED on all 50
+ *   every dash in the whole domain RE-LAID at the OLD fixed-pitch stations —
+ *   the defect that shipped: 11.27 m of unpainted осева at jx-equal-v1's four
+ *   junction mouths, 0.28 m at sx-v1's, same class, same junction, phase luck
+ *       was: 50 districts silent, 0 convicted. It fits the SAME n dashes, so no
+ *            count moves, no booking moves, and §2 sees it only on the six
+ *            edges it names by id
+ *       now: RED on every district whose stations actually move, each naming
+ *            the dash, where it stands and where the rhythm puts it
+ *
+ * Reproduce any of the three from `turnDashes`, `shiftDashes` and
+ * `fixedPitchRelay`; §5 carries all three as tests over the whole domain.
+ *
+ * ── AND ONE EMITTER THAT COULD BE DELETED IN SILENCE ───────────────────────
+ * `paintFindings`' М1 strip-count line was live code with no test: commenting
+ * it out left 51/51 GREEN. It now has both directions — a strip spliced out of
+ * ov-lane-v1's mesh reports „ov-ln-street: 79 М1 edge-line strips, not 80", and
+ * a strip SLID one metre along its own rail (same width, same offset, same
+ * count) is convicted by the rectangle licence while the per-edge band rule,
+ * asserted in the same test, still files it as perfectly good paint.
+ *
+ * Two false-refusals were found while wiring that up, and fixed at their sites:
+ * the per-boundary dash count was taken from the CENTRELINE's length for every
+ * boundary, and an offset line on a bend is not the same length (two corpus
+ * edges disagree by a whole dash; none in the domain, so the count was right by
+ * luck); and a strip was matched on `|across − 0.300 m| < 1 mm` when a strip's
+ * own width is 0.300 · miter — 76 of ov-lane-v1's 80 strips are wider than
+ * 0.300 m, and a sharper joint than anything in this corpus would have had a
+ * real edge line convicted as unauthored paint.
+ *
+ * ── AND THE TITLE, WHICH OVER-CLAIMED ──────────────────────────────────────
+ * §5's block was called „every quad the world paints is a quad the world was
+ * authored to paint". It grades 1,603 of the corpus's 10,798 marking quads —
+ * 14.8%, one in seven — because 55 of the 105 districts carry paint the
+ * catalogue cannot yet name. It is now titled for the 50 districts it does
+ * grade, the 55 are attributed one by one to the gate that stops them, and both
+ * numbers are a test rather than a sentence.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -165,6 +222,7 @@ import {
   add,
   mul,
   norm,
+  offsetPolyline,
   perpRight,
   pointAlong,
   polylineLength,
@@ -462,19 +520,31 @@ function resolveOwned(
   mine: EdgeFrame,
   p: Vec2,
 ): { s: number; t: number } | null {
+  const owner = ownerOf(frames, p);
+  return owner && owner.id === mine.id ? { s: owner.s, t: owner.t } : null;
+}
+
+/**
+ * The edge nearest `p`, and `p` in THAT edge's frame — the one question
+ * `resolveOwned` was asking F times over to answer once.
+ *
+ * Same answer, same tie-break (first edge in network order), one pass. The
+ * district census asks it of four corners per quad and then compares the four
+ * answers; asking „does edge f own this point?" of every f in turn cost
+ * O(4·F²) frame projections per quad for a fact each corner already knows.
+ */
+function ownerOf(frames: EdgeFrame[], p: Vec2): { id: string; s: number; t: number } | null {
   let best = Infinity;
-  let owner: string | null = null;
-  let here: { s: number; t: number } | null = null;
+  let out: { id: string; s: number; t: number } | null = null;
   for (const f of frames) {
     const r = frameOn(f, p[0], p[1]);
     if (!r) continue;
     if (r.d < best) {
       best = r.d;
-      owner = f.id;
+      out = { id: f.id, s: r.s, t: r.t };
     }
-    if (f.id === mine.id) here = { s: r.s, t: r.t };
   }
-  return owner === mine.id ? here : null;
+  return out;
 }
 
 /**
@@ -708,6 +778,60 @@ function fixedPitchDashCount(total: number): number {
   let n = 0;
   for (let s = DASH_GAP_M / 2; s + DASH_LENGTH_M < total; s += DASH_LENGTH_M + DASH_GAP_M) n++;
   return n;
+}
+
+/**
+ * WHERE those dashes stand — `dashStations`' fitted walk, restated longhand.
+ *
+ * The COUNT above is what §2 and §5 have always asserted, and a count cannot
+ * see the one real defect this file ever found in markings.ts: the old walk
+ * anchored at gapLen/2 from the near end and paid ALL its slack out at the far
+ * end, which on a junction-trimmed arm is the junction mouth — 11.27 m of
+ * unpainted осева on jx-equal-v1's four arms, 0.28 m on sx-v1's north arm, same
+ * class, same junction, pure phase luck. The fitted walk fits the SAME n
+ * dashes, so reverting it changes no count anywhere; §2 catches it only on the
+ * six edges it names by id, and re-laying every dash in the whole 50-district
+ * domain at the old fixed-pitch stations was measured GREEN on this file —
+ * 50 districts silent, 0 convicted — before this function existed.
+ *
+ * Written out rather than imported for the reason everything here is: a check
+ * that asks `dashStations` where it put the dashes agrees with it by
+ * construction. Restated, a change to the rhythm has to be made in two places
+ * or it fails.
+ */
+function fittedDashStations(total: number): number[] {
+  const n = fixedPitchDashCount(total);
+  if (n === 0) return [];
+  if (n === 1) return [total / 2]; // one dash has no rhythm to fit — centre it
+  const margin = DASH_GAP_M / 2;
+  const gap = (total - 2 * margin - n * DASH_LENGTH_M) / (n - 1);
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) out.push(margin + i * (DASH_LENGTH_M + gap) + DASH_LENGTH_M / 2);
+  return out;
+}
+
+/**
+ * How far a quad's furthest CORNER stands from a POLYLINE, m — `cornerSpread`
+ * generalised off the edge frame.
+ *
+ * `cornerSpread` reads `tLo`/`tHi`, which are offsets in the EDGE's frame, and
+ * compares them to a boundary's nominal offset. That is exact on the осева
+ * (offset 0 IS the edge) and only approximate on a divider: `offsetPolyline`
+ * scales its offset by the joint miter, so a divider LANE_WIDTH_M out from a
+ * bend does not sit at t = LANE_WIDTH_M there, and a check written that way
+ * would have to carry a fudge factor big enough to hide the defect it hunts.
+ *
+ * Measured against the boundary's OWN painted line there is no fudge at all:
+ * across the 50-district domain the worst corner of the worst of 1,265 dashes
+ * stands at exactly 1.0000× its budget — half a stroke on a straight run, half
+ * a stroke plus the chord's sagitta on a bend — and a dash turned 10° stands at
+ * 0.685 m against a 0.302 m budget. Tight enough that the epsilon matters, and
+ * the epsilon is 1 µm.
+ */
+function cornerOffsetFrom(corners: readonly Vec2[], line: Vec2[]): number {
+  let worst = 0;
+  for (const c of corners) worst = Math.max(worst, projectOntoPolyline(line, c).distance);
+  return worst;
 }
 
 // Districts behind the six findings, by the lesson that named them.
@@ -1084,6 +1208,66 @@ function turnDashes(quads: readonly MeshQuad[], deg: number): MeshQuad[] {
   });
 }
 
+/** Is this quad a lane dash? 5.000 m long at one of the two lane strokes —
+ *  never an М1 strip, whose 0.300 m width no dash carries. */
+function isDashQuad(q: MeshQuad): boolean {
+  const along = Math.hypot(q.corners[3][0] - q.corners[0][0], q.corners[3][1] - q.corners[0][1]);
+  if (Math.abs(along - DASH_LENGTH_M) >= 1e-3) return false;
+  const across = Math.hypot(q.corners[1][0] - q.corners[0][0], q.corners[1][1] - q.corners[0][1]);
+  return (
+    Math.abs(across - DASH_WIDTH_M) < 1e-9 || Math.abs(across - CENTER_LINE_WIDTH_M) < 1e-9
+  );
+}
+
+/**
+ * Every DASH quad in `quads`, moved `dt` metres ACROSS its own axis — the
+ * mesh-level twin of a lane-line loop that offsets by `off + dt`.
+ *
+ * The lateral forgery `turnDashes` cannot make: a turned dash still averages
+ * back onto its boundary, a shoved one does not, and the census filed both
+ * under the boundary they belong to and said nothing about either.
+ */
+function shiftDashes(quads: readonly MeshQuad[], dt: number): MeshQuad[] {
+  return quads.map((q) => {
+    if (!isDashQuad(q)) return q;
+    const p = perpRight(norm(sub(q.corners[3], q.corners[0])));
+    return {
+      corners: q.corners.map((c) => add(c, mul(p, dt))) as [Vec2, Vec2, Vec2, Vec2],
+      idx0: q.idx0,
+    };
+  });
+}
+
+/**
+ * A district's mesh with every lane dash RE-LAID at the old fixed-pitch
+ * stations — the mesh-level twin of reverting `dashStations` to the walk it
+ * replaced.
+ *
+ * The old walk started each dash at gapLen/2 from the near end and stepped
+ * dashLen + gapLen, spending nothing on the far end. It fits the same n dashes
+ * as the fitted rhythm by construction (that is `fixedPitchDashCount`), so the
+ * quad count, the booking and every per-boundary total are untouched and only
+ * the STATIONS move — which is exactly why nothing in this file could see it
+ * outside the six edges §2 names.
+ */
+function fixedPitchRelay(built: Built): MeshQuad[] {
+  const real = readQuads(
+    built.markings.markings.indicesView,
+    built.markings.markings.positionsView,
+  );
+  const out = real.filter((q) => !isDashQuad(q));
+  for (const { id, line } of markedEdges(built)) {
+    for (const b of boundaryFrames(built, id, line)) {
+      const total = polylineLength(b.line);
+      for (let s = DASH_GAP_M / 2; s + DASH_LENGTH_M < total; s += DASH_LENGTH_M + DASH_GAP_M) {
+        const f = pointAlong(b.line, s + DASH_LENGTH_M / 2);
+        out.push(paintQuadTwin(f.point, f.tangent, DASH_LENGTH_M / 2, b.stroke / 2));
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * One extra rectangle on an edge's drawn line, `alongM` × `acrossM`, centred
  * `s` along that line and `t` beside it — the mesh-level twin of one extra
@@ -1368,6 +1552,117 @@ function markedEdges(built: Built): Array<{ id: string; line: Vec2[] }> {
   return out;
 }
 
+/**
+ * One authored lane boundary WITH THE LINE ITS DASHES ARE PAINTED ON — the
+ * place half of the licence.
+ *
+ * `authoredBoundaries` gives the offsets, which is what the census classified
+ * on and all it classified on: a quad of the right length at the right stroke
+ * anywhere within half a lane of the offset counted as that boundary's dash.
+ * That band is 4.06 m wide, and inside it a dash may be turned across the road,
+ * shoved a metre into the oncoming lane, or re-spaced to the old broken rhythm
+ * without the census saying a word. All three were run against this file before
+ * this interface existed and all three were silent on all 50 districts.
+ *
+ * So the boundary carries its own painted line — `offsetPolyline(drawn, off)`,
+ * the exact argument `paintDashedLine` receives — and with it the two things a
+ * dash on that line has to satisfy:
+ *  · `budget`: the most a straight 5 m dash's far corner may stand off it,
+ *    `dashChordOffsetM` + half its own stroke, per `cornerOffsetFrom`;
+ *  · `stations`: where each dash's centre must be, `fittedDashStations` of the
+ *    OFFSET line's own length.
+ *
+ * That last word is the second correction here. The dash count used to be taken
+ * from the CENTRELINE's length for every boundary, and an offset line on a bend
+ * is not the same length: `d2-v1/e29435479.0` at −12.19 m runs 72.13 m against
+ * its centreline's 75.04 m (6 dashes vs 5) and `district-v1/e904964434.0` at
+ * −4.06 m runs 87.08 m against 86.47 m (7 vs 6). Neither is in the census
+ * domain — the count was right on all 107 boundaries it grades, and is now
+ * right for the reason rather than by luck.
+ */
+interface BoundaryFrame {
+  off: number;
+  /** `offsetPolyline(drawn, off)` — the line the painter walks. */
+  line: Vec2[];
+  stroke: number;
+  budget: number;
+  stations: number[];
+}
+
+function boundaryFrames(built: Built, edgeId: string, drawn: Vec2[]): BoundaryFrame[] {
+  return authoredBoundaries(built, edgeId).map((off) => {
+    const line = off === 0 ? drawn : offsetPolyline(drawn, off);
+    const stroke = dashStrokeAt(built, edgeId, off);
+    return {
+      off,
+      line,
+      stroke,
+      budget: dashChordOffsetM(line) + stroke / 2,
+      stations: fittedDashStations(polylineLength(line)),
+    };
+  });
+}
+
+/**
+ * One М1 edge-line strip the painter is authorised to lay, as the exact segment
+ * of road it must cover.
+ *
+ * `paintSolidLine` sweeps a ribbon between consecutive vertices of the offset
+ * line — corners `inner[i-1], outer[i-1], outer[i], inner[i]`, where the two
+ * rails are that line offset by ∓ half the stroke — so a strip's licence is the
+ * whole rectangle, written the painter's own way, and matching needs no
+ * tolerance argument at all. Measured over the domain: all 284 strips match a
+ * distinct licence to 0.000e+0 m, none unmatched, none doubled, none unused.
+ *
+ * The census used to file a strip by shape and a lateral band of ±0.15 m, which
+ * says nothing about where along the road it lies: slide one strip a metre down
+ * its own rail and `across` is unchanged, `t` is unchanged, the count is
+ * unchanged, and the district reports clean.
+ *
+ * And the shape half was itself a false-refusal waiting to happen. It asked
+ * `|across − EDGE_LINE_WIDTH_M| < 1 mm`, but a strip's own width is
+ * `EDGE_LINE_WIDTH_M · miter` at its joints — `offsetPolyline` divides by
+ * cos(half turn), clamped at 2.5× — so 76 of ov-lane-v1's 80 perfectly good
+ * strips are WIDER than 0.300 m, and on a sharper joint than anything in this
+ * corpus a real strip would have been convicted of being unlicensed paint. The
+ * licence carries the miter because it is built by the same call, so the
+ * question „how wide may a strip be here" is not asked and cannot be answered
+ * wrongly.
+ */
+interface StripLicence {
+  corners: [Vec2, Vec2, Vec2, Vec2];
+  /** „М1@ov-ln-street+ seg 17" — what a failure has to name to be actionable. */
+  what: string;
+}
+
+function edgeLineLicences(built: Built, edgeId: string, drawn: Vec2[]): StripLicence[] {
+  if (!paintsEdgeLines(built, edgeId)) return [];
+  const off = edgeLineOffset(built, edgeId);
+  const out: StripLicence[] = [];
+  for (const side of [-1, 1] as const) {
+    const rail = offsetPolyline(drawn, side * off);
+    const inner = offsetPolyline(rail, -EDGE_LINE_WIDTH_M / 2);
+    const outer = offsetPolyline(rail, EDGE_LINE_WIDTH_M / 2);
+    for (let i = 1; i < rail.length; i++) {
+      out.push({
+        corners: [inner[i - 1]!, outer[i - 1]!, outer[i]!, inner[i]!],
+        what: `М1@${edgeId}${side > 0 ? "+" : "-"} seg ${i}`,
+      });
+    }
+  }
+  return out;
+}
+
+/** Does this quad cover exactly the rectangle `L` licenses? */
+function coversLicence(q: MeshQuad, L: StripLicence): boolean {
+  for (let i = 0; i < 4; i++) {
+    const a = q.corners[i]!;
+    const b = L.corners[i]!;
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-9) return false;
+  }
+  return true;
+}
+
 /** A quad no licence covers, described well enough to find it on the road. */
 interface PaintOffence {
   /** The edge whose frame owns it, or null when NO edge's frame does. */
@@ -1379,12 +1674,20 @@ interface PaintOffence {
   why: string;
 }
 
+/** One dash the census filed under a boundary, with WHERE it actually is. */
+interface DashSighting {
+  /** Its centre's arclength along that boundary's own painted line, m. */
+  s: number;
+  /** Its furthest corner's distance from that line, m — `cornerOffsetFrom`. */
+  corner: number;
+}
+
 interface DistrictPaintCensus {
   /** Quads read out of the mesh — triangles are not quads and are excluded. */
   quads: number;
-  /** edgeId → boundary offset → dashes found there. */
-  dashes: Map<string, Map<number, number>>;
-  /** edgeId → М1 edge-line strips found on it. */
+  /** edgeId → boundary offset → the dashes found there, each with its place. */
+  dashes: Map<string, Map<number, DashSighting[]>>;
+  /** edgeId → М1 edge-line strips matching one of that edge's rail licences. */
   strips: Map<string, number>;
   licences: StopLineLicence[];
   /** How many quads matched each licence, in `licences` order. */
@@ -1419,13 +1722,31 @@ interface DistrictPaintCensus {
  * So: no edge is named. The census walks the MESH, and every quad must be one
  * of exactly three authored things —
  *   · a DASH on a boundary `authoredBoundaries` derives, at the stroke T16
- *     gives that boundary, within half a lane of it;
- *   · a solid М1 EDGE-LINE strip, EDGE_LINE_WIDTH_M across, within its own
- *     half-stroke of ±`edgeLineOffset`, on a class that carries one;
+ *     gives that boundary, within half a lane of it — and then recorded WHERE
+ *     on that boundary's own line it stands (`DashSighting`), which is what
+ *     `paintFindings` grades;
+ *   · a solid М1 EDGE-LINE strip covering one `edgeLineLicences` vertex pair;
  *   · an М7 quad matching a `stopLineLicences` entry to the micrometre.
  * — and anything else is an offence, INCLUDING a quad no edge's frame will own
  * (`quadsOnEdge` silently drops those; a census that drops what it cannot
  * explain is not a census).
+ *
+ * THE SHAPE AXIS AND THE PLACE AXIS ARE DIFFERENT AXES, and this function used
+ * to close only the first. Every classification above was a shape test plus a
+ * band: right length, right stroke, within half a lane. Half a lane is 4.06 m.
+ * Three forgeries were run against the finished census and all three were
+ * silent on every district it grades:
+ *   · every dash on jx-equal-v1, sx-v1, tj-emerge-v1, tj-occluded-v1 and
+ *     jxg-giveway-v1 TURNED 10° across the road — findings [] on all five;
+ *   · every dash SHOVED 0.5 m sideways off its boundary — findings [] again;
+ *   · every dash in the whole 50-district domain RE-LAID at the old
+ *     fixed-pitch stations, the one regression this file has ever caught in
+ *     markings.ts — 50 silent, 0 convicted.
+ * The first two are the phantom this lane was opened by, wearing the right
+ * shape; the third is a defect that shipped once already. A boundary now
+ * carries the line its dashes must stand on and the stations they must stand
+ * at (`BoundaryFrame`), a strip carries the segment it must cover
+ * (`StripLicence`), and both are graded in `paintFindings`.
  *
  * Ownership is per-QUAD and unanimous: all four corners must resolve to the
  * same edge. A quad straddling two edges is not that edge's paint and is not
@@ -1438,11 +1759,15 @@ function districtCensus(built: Built, quads?: MeshQuad[]): DistrictPaintCensus {
   const licences = stopLineLicences(built);
   const used = new Array<number>(licences.length).fill(0);
   const marked = new Map(markedEdges(built).map((e) => [e.id, e]));
-  const dashes = new Map<string, Map<number, number>>();
+  const dashes = new Map<string, Map<number, DashSighting[]>>();
   const strips = new Map<string, number>();
-  for (const id of marked.keys()) {
-    dashes.set(id, new Map(authoredBoundaries(built, id).map((b) => [b, 0])));
+  /** Each marked edge's boundary lines and rail licences, built once. */
+  const places = new Map<string, { bounds: BoundaryFrame[]; rails: StripLicence[] }>();
+  for (const [id, e] of marked) {
+    const bounds = boundaryFrames(built, id, e.line);
+    dashes.set(id, new Map(bounds.map((b) => [b.off, [] as DashSighting[]])));
     strips.set(id, 0);
+    places.set(id, { bounds, rails: edgeLineLicences(built, id, e.line) });
   }
   const offences: PaintOffence[] = [];
 
@@ -1468,13 +1793,12 @@ function districtCensus(built: Built, quads?: MeshQuad[]): DistrictPaintCensus {
       continue;
     }
 
-    // 2 — otherwise it is one edge's paint, or it is nobody's.
-    let ownerId: string | null = null;
-    for (const f of frames) {
-      if (q.corners.some((p) => resolveOwned(frames, f, p) === null)) continue;
-      ownerId = f.id;
-      break;
-    }
+    // 2 — otherwise it is one edge's paint, or it is nobody's. Each corner's
+    // owner is the edge nearest IT; unanimity makes the quad that edge's.
+    const owners = q.corners.map((p) => ownerOf(frames, p));
+    const first = owners[0];
+    const ownerId =
+      first && owners.every((o) => o !== null && o.id === first.id) ? first.id : null;
     if (ownerId === null) {
       offences.push({ edgeId: null, along, across, t: NaN, why: "no edge owns all four corners" });
       continue;
@@ -1485,25 +1809,44 @@ function districtCensus(built: Built, quads?: MeshQuad[]): DistrictPaintCensus {
       offences.push({ edgeId: ownerId, along, across, t, why: "paint on an unmarked edge" });
       continue;
     }
-    if (
-      paintsEdgeLines(built, ownerId) &&
-      Math.abs(across - EDGE_LINE_WIDTH_M) < 1e-3 &&
-      Math.abs(Math.abs(t) - edgeLineOffset(built, ownerId)) < EDGE_LINE_WIDTH_M / 2
-    ) {
+    const place = places.get(ownerId)!;
+    // A strip is licensed by the RECTANGLE it covers, not by a shape and a
+    // lateral band, so a strip slid a metre along its own rail — same width,
+    // same offset, same count — is convicted where the band could not see it
+    // move.
+    //
+    // Asked BEFORE the dash test and not after: a strip's own width is
+    // EDGE_LINE_WIDTH_M · miter, so a joint with miter 1.25 draws a strip
+    // 0.375 m wide — the осева's stroke exactly — and a 5.000 m segment there
+    // would be filed as a centre-line dash by a reader that asked the dash
+    // question first. Nothing in this corpus does that today; the order costs
+    // nothing and the trap is closed rather than noted.
+    if (place.rails.some((L) => coversLicence(q, L))) {
       strips.set(ownerId, strips.get(ownerId)! + 1);
       continue;
     }
-    const home = authoredBoundaries(built, ownerId).find(
+    const home = place.bounds.find(
       (b) =>
         Math.abs(along - DASH_LENGTH_M) < 1e-3 &&
-        Math.abs(across - dashStrokeAt(built, ownerId!, b)) < 1e-9 &&
-        Math.abs(t - b) < LANE_WIDTH_M / 2,
+        Math.abs(across - b.stroke) < 1e-9 &&
+        Math.abs(t - b.off) < LANE_WIDTH_M / 2,
     );
     if (home === undefined) {
       offences.push({ edgeId: ownerId, along, across, t, why: "no licence for this paint" });
       continue;
     }
-    dashes.get(ownerId)!.set(home, dashes.get(ownerId)!.get(home)! + 1);
+    // Filed under the boundary — and then MEASURED against it. The band above
+    // is 4.06 m wide on purpose (a dash nudged off its line must land in a
+    // boundary's bucket and be convicted there by name, not vanish into
+    // `offences` where the diagnosis is vaguer); these two numbers are what
+    // convict it.
+    dashes
+      .get(ownerId)!
+      .get(home.off)!
+      .push({
+        s: projectOntoPolyline(home.line, centre).s,
+        corner: cornerOffsetFrom(q.corners, home.line),
+      });
   }
   return { quads: src.length, dashes, strips, licences, used, offences };
 }
@@ -1521,9 +1864,26 @@ function districtCensus(built: Built, quads?: MeshQuad[]): DistrictPaintCensus {
  * reason a phantom-hunting census cannot be written as a phantom-hunting census
  * alone: „no unauthored paint" answered on its own is one loosened threshold
  * away from acquitting everything, so every authored thing is COUNTED too —
- * dashes against the fixed-pitch walk, strips against the drawn line's own
- * segment count, and each М7 licence against exactly one quad. Paint that
- * vanishes is as loud here as paint that appears.
+ * dashes against the fixed-pitch walk, strips against their own rail licences,
+ * and each М7 licence against exactly one quad. Paint that vanishes is as loud
+ * here as paint that appears.
+ *
+ * And on THREE axes rather than one, which is what this lane added. A count
+ * answers „is the right amount of paint here"; it cannot answer „is it in the
+ * right place", and the census that only counted was measured silent on every
+ * dash in the domain turned 10°, on every dash shoved 0.5 m sideways, and on
+ * the whole domain re-laid at the old broken rhythm. Each boundary is now
+ * graded on:
+ *   COUNT ..... `fittedDashStations`' length — one finding, as before;
+ *   STATION ... each dash's arclength on that boundary's own line, against the
+ *               walk. Reported only when the count agrees, because when it does
+ *               not the count line already names the defect and every station
+ *               after the hole is a consequence of it, not a second fact;
+ *   LATERAL ... each dash's furthest corner off that line, against the sagitta
+ *               its own bend forces plus half its own stroke.
+ * Strips are graded on the segment each one covers (`edgeLineLicences`) and
+ * counted off the same list. The two of those that fire on real paint today:
+ * none, on any of the 105 districts.
  */
 function paintFindings(built: Built, census = districtCensus(built)): string[] {
   const out: string[] = [];
@@ -1538,14 +1898,49 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
     );
   }
   for (const { id, line } of markedEdges(built)) {
-    const want = fixedPitchDashCount(polylineLength(line));
-    for (const [off, n] of census.dashes.get(id)!) {
-      if (n !== want) out.push(`${id}: boundary at ${off.toFixed(2)} m carries ${n} dashes, not ${want}`);
+    for (const b of boundaryFrames(built, id, line)) {
+      const seen = census.dashes.get(id)!.get(b.off)!;
+      const where = `${id}: boundary at ${b.off.toFixed(2)} m`;
+      if (seen.length !== b.stations.length) {
+        out.push(`${where} carries ${seen.length} dashes, not ${b.stations.length}`);
+      } else {
+        // The PLACE axis, and the reason a count is not enough: the fitted
+        // rhythm fits the SAME n dashes the old fixed-pitch walk did, so
+        // reverting it moves every dash on every arm and changes no count
+        // anywhere. Reported once per boundary — a slipped rhythm moves the
+        // whole line, and 23 copies of one fact is not 23 findings.
+        const stations = seen.map((d) => d.s).sort((x, y) => x - y);
+        for (let i = 0; i < stations.length; i++) {
+          if (Math.abs(stations[i]! - b.stations[i]!) > 1e-6) {
+            out.push(
+              `${where} has dash ${i + 1} at s = ${stations[i]!.toFixed(3)} m, not the ` +
+                `${b.stations[i]!.toFixed(3)} m the rhythm fits`,
+            );
+            break;
+          }
+        }
+      }
+      // …and the LATERAL half of place, which no count and no station can see:
+      // a dash turned across the road keeps its length, its stroke, its
+      // centroid and its station, and stands 0.685 m into the lane it divides
+      // at 10°. Budget = the chord's sagitta on this boundary's own line plus
+      // half the dash's stroke, +1 µm — measured tight, worst real dash in the
+      // domain sits at exactly 1.0000× it.
+      const strays = seen.filter((d) => d.corner > b.budget + 1e-6);
+      if (strays.length) {
+        const worst = Math.max(...strays.map((d) => d.corner));
+        out.push(
+          `${where} has ${strays.length} of ${seen.length} dashes off it, worst corner ` +
+            `${worst.toFixed(3)} m against the ${b.budget.toFixed(3)} m it allows`,
+        );
+      }
     }
     // One strip per geometry segment per side — `paintSolidLine` walks the
     // offset polyline and emits a quad between consecutive vertices, so a
-    // 41-vertex S-curve draws 40 a side and a single straight draws 1.
-    const wantStrips = paintsEdgeLines(built, id) ? 2 * (line.length - 1) : 0;
+    // 41-vertex S-curve draws 40 a side and a single straight draws 1. Counted
+    // off the licences rather than off `line.length` so the count and the place
+    // check cannot disagree about how many segments there are.
+    const wantStrips = edgeLineLicences(built, id, line).length;
     if (census.strips.get(id) !== wantStrips) {
       out.push(`${id}: ${census.strips.get(id)} М1 edge-line strips, not ${wantStrips}`);
     }
@@ -1570,39 +1965,79 @@ function paintFindings(built: Built, census = districtCensus(built)): string[] {
  * result rather than the source is what stops the domain from drifting when a
  * map grows a feature: the district simply leaves the domain and says so.
  *
- * 50 of 105 today. The other 55 are excluded by paint this catalogue cannot yet
- * name — 21 by zones, 20 by zebras, 5 by painted „30"/„20" numerals, 3 by lane
- * arrows, 4 by roundabout edges (several for more than one reason) — and NOT by
- * anything about whether their paint is right. That is the honest limit of this
- * lane: a phantom laid only on `d2-v1` or on a zebra map is still invisible, and
- * closing that needs the catalogue extended to zebra bars, zone solids, arrow
- * glyphs and the seven-segment numerals. Named here so the next wave can route
- * it rather than rediscover it.
+ * 50 districts of 105 — and 1,603 marking quads of the corpus's 10,798, which
+ * is 14.8% and is the number that matters, because a district is not a unit of
+ * paint. This block was titled „every quad the world paints is a quad the world
+ * was authored to paint" while it graded one quad in seven. It is now titled
+ * what it does, and the fraction is MEASURED — „the catalogue's reach is
+ * measured, not claimed in a comment", below — so the title cannot drift back
+ * into a claim: extend the catalogue and that test fails until these numbers
+ * are corrected.
  *
- * The gate is itself guarded below: a change that quietly emptied the domain
- * would make every claim in §5 vacuous, so the domain's size and its membership
- * are asserted.
+ * The other 55 are excluded by paint this catalogue cannot yet name, and by
+ * NOTHING about whether their paint is right. Measured today, each district
+ * attributed to the first gate that stops it — the order the code below asks in:
+ *   20  a zebra crossing        (paintZebra's bars, islands, staggers, skews)
+ *    3  lane-intent arrows      (paintLaneArrows' glyphs)
+ *    5  a painted „30"/„20"     (paintSpeedGlyphs' seven-segment numerals)
+ *   25  an authored zone        (zone solids both ADD paint and SUPPRESS dashes,
+ *                                so a zoned edge's dash count is not the
+ *                                fixed-pitch walk's and its stations are not
+ *                                the fitted walk's)
+ *    2  a roundabout edge
+ *    0  a parking bay
+ * That is the honest limit of this lane: a phantom laid only on `d2-v1` or on a
+ * zebra map is still invisible, and closing it needs the catalogue extended to
+ * zebra bars, zone solids, arrow glyphs and the numerals — in that order, since
+ * zones and zebras are 45 of the 55. Named here, and asserted below, so the next
+ * wave can route it rather than rediscover it.
+ *
+ * The gate is read off the painter's OWN counters, not off the JSON: asking the
+ * result rather than the source is what stops the domain from drifting when a
+ * map grows a feature — the district simply leaves the domain and says so. And
+ * the gate is itself guarded: a change that quietly emptied the domain would
+ * make every claim in §5 vacuous, so the domain's size, its membership and its
+ * share of the corpus's paint are all asserted.
  */
-const censusDomain = (() => {
-  let cache: Array<{ id: string; built: Built }> | null = null;
-  return (): Array<{ id: string; built: Built }> => {
+type CensusExclusion = "zebra" | "parkingBay" | "laneArrow" | "speedGlyph" | "zone" | "roundabout";
+
+/** Every district in the corpus, built once, each tagged with what (if anything)
+ *  puts it outside the catalogue's reach. */
+const censusCorpus = (() => {
+  let cache: Array<{ id: string; built: Built; outside: CensusExclusion | null }> | null = null;
+  return (): Array<{ id: string; built: Built; outside: CensusExclusion | null }> => {
     if (cache) return cache;
-    const out: Array<{ id: string; built: Built }> = [];
+    const out: Array<{ id: string; built: Built; outside: CensusExclusion | null }> = [];
     for (const f of fs.readdirSync(WORLD_DIR!).filter((n) => n.endsWith(".json"))) {
       const id = f.replace(/\.json$/, "");
       const built = build(id);
       const m = built.markings;
-      if (m.zebraCrossings || m.parkingBays || m.laneArrowQuads || m.speedGlyphQuads) continue;
-      if ((built.district.zones ?? []).length) continue;
-      if (built.net.roundaboutEdgeIds.size) continue;
-      out.push({ id, built });
+      const outside: CensusExclusion | null = m.zebraCrossings
+        ? "zebra"
+        : m.parkingBays
+          ? "parkingBay"
+          : m.laneArrowQuads
+            ? "laneArrow"
+            : m.speedGlyphQuads
+              ? "speedGlyph"
+              : (built.district.zones ?? []).length
+                ? "zone"
+                : built.net.roundaboutEdgeIds.size
+                  ? "roundabout"
+                  : null;
+      out.push({ id, built, outside });
     }
     cache = out;
     return out;
   };
 })();
 
-describe("every quad the world paints is a quad the world was authored to paint", () => {
+/** The districts whose ENTIRE paint the catalogue can account for. */
+function censusDomain(): Array<{ id: string; built: Built }> {
+  return censusCorpus().filter((d) => d.outside === null);
+}
+
+describe("every quad these 50 districts paint is a quad they were authored to paint", () => {
   const BATTERY = [OV_LANE, OV_KEEPRIGHT, TJ_EMERGE, TJ_OCCLUDED, JX_EQUAL, SX, JXG];
   /** The five with no edge any test here names — where the phantom lived. */
   const UNNAMED: Array<[string, number]> = [
@@ -1622,7 +2057,7 @@ describe("every quad the world paints is a quad the world was authored to paint"
       const census = districtCensus(built);
       expect(census.quads, id).toBe(built.markings.markingQuads - built.markings.giveWayTriangles);
       expect(census.quads, id).toBeGreaterThan(0);
-      expect([...census.dashes.values()].some((m) => [...m.values()].some((n) => n > 0)), id).toBe(
+      expect([...census.dashes.values()].some((m) => [...m.values()].some((d) => d.length > 0)), id).toBe(
         true,
       );
     });
@@ -1756,7 +2191,7 @@ describe("every quad the world paints is a quad the world was authored to paint"
     const census = districtCensus(built, [...real, extra]);
     // Classified as authored — no offence at all…
     expect(census.offences).toEqual([]);
-    expect(census.dashes.get("jx-e-s")!.get(0)).toBe(9);
+    expect(census.dashes.get("jx-e-s")!.get(0)!.length).toBe(9);
     // …and convicted anyway, twice over: once because a mesh grew a quad the
     // booking did not, and once by the count that is the subject here.
     expect(paintFindings(built, census)).toEqual([
@@ -1813,7 +2248,7 @@ describe("every quad the world paints is a quad the world was authored to paint"
 
     const census = districtCensus(built, holed);
     expect(census.offences).toEqual([]); // nothing unauthored was ADDED
-    expect(census.dashes.get("ov-ln-street")!.get(0)).toBe(22);
+    expect(census.dashes.get("ov-ln-street")!.get(0)!.length).toBe(22);
     expect(paintFindings(built, census)).toEqual([
       "mesh holds 102 quads, markingQuads books 103",
       "ov-ln-street: boundary at 0.00 m carries 22 dashes, not 23",
@@ -1898,6 +2333,215 @@ describe("every quad the world paints is a quad the world was authored to paint"
     expect(without.length).toBe(real.length - 1);
     const findings = paintFindings(built, districtCensus(built, without));
     expect(findings).toContain(`${licences[0]!.what}: 0 quads painted for it, not 1`);
+  });
+
+  // ── THE PLACE AXIS ────────────────────────────────────────────────────────
+  // The four below are one argument in four forgeries: a quad can be the right
+  // SHAPE and still be wrong. Each was run against this file as it stood before
+  // this lane — the census that counted — and each was measured SILENT on every
+  // district it grades; each is now convicted on every district that carries a
+  // dash at all. They are asserted the same way every mutation in §3 is: the
+  // reader that could not see it is shown still not seeing it, in the same test.
+
+  it("convicts a dash TURNED across the road — on every district, not two named edges", () => {
+    // §3 already convicts this on ov-lane-v1, because §1 measures that edge's
+    // corners by name. Nothing measured corners anywhere else: turn every dash
+    // on jx-equal-v1, sx-v1, tj-emerge-v1, tj-occluded-v1 and jxg-giveway-v1
+    // ten degrees across the road and `paintFindings` returned [] on all five.
+    // A dash at 10° stands 0.685 m out of the line it divides — on the road
+    // that is a lane boundary pointing the driver into the oncoming lane.
+    let probed = 0;
+    let convicted = 0;
+    for (const { id, built } of censusDomain()) {
+      const real = readQuads(
+        built.markings.markings.indicesView,
+        built.markings.markings.positionsView,
+      );
+      const turned = turnDashes(real, 10);
+      const census = districtCensus(built, turned);
+      const dashes = [...census.dashes.values()].reduce(
+        (n, m) => n + [...m.values()].reduce((k, d) => k + d.length, 0),
+        0,
+      );
+      if (dashes === 0) continue; // nothing to turn — evidence of nothing
+      probed++;
+      // …still classified, still counted, still booked: every reading the
+      // census had before this lane is undisturbed by the mutation.
+      expect(census.offences, id).toEqual([]);
+      expect(census.quads, id).toBe(readQuads(
+        built.markings.markings.indicesView,
+        built.markings.markings.positionsView,
+      ).length);
+      const findings = paintFindings(built, census);
+      expect(findings.length, id).toBeGreaterThan(0);
+      // …and every one of them is the corner reading, not a count that moved.
+      for (const f of findings) expect(f, id).toMatch(/dashes off it, worst corner/);
+      convicted++;
+    }
+    expect(probed).toBeGreaterThan(40);
+    expect(convicted).toBe(probed);
+  });
+
+  it("convicts a dash SHOVED 0.5 m off its boundary, inside the band that files it", () => {
+    // The lateral forgery the band cannot refuse by construction: the band is
+    // half a lane — 4.06 m — and it has to be, so that a nudged dash is
+    // convicted BY NAME on its own boundary instead of vanishing into
+    // `offences`. Half a metre is well inside it, and half a metre of осева is
+    // a centre line laid into the oncoming lane.
+    let probed = 0;
+    let convicted = 0;
+    for (const { id, built } of censusDomain()) {
+      const real = readQuads(
+        built.markings.markings.indicesView,
+        built.markings.markings.positionsView,
+      );
+      const shoved = shiftDashes(real, 0.5);
+      const census = districtCensus(built, shoved);
+      const filed = [...census.dashes.values()].reduce(
+        (n, m) => n + [...m.values()].reduce((k, d) => k + d.length, 0),
+        0,
+      );
+      if (filed === 0) continue;
+      probed++;
+      // Filed under their own boundaries exactly as before — no offence, no
+      // count moved, so the census as it stood had nothing to say…
+      expect(census.offences, id).toEqual([]);
+      const lateral = paintFindings(built, census).filter((f) =>
+        /dashes off it, worst corner/.test(f),
+      );
+      expect(lateral.length, id).toBeGreaterThan(0);
+      convicted++;
+    }
+    expect(probed).toBeGreaterThan(40);
+    expect(convicted).toBe(probed);
+  });
+
+  it("convicts the OLD fixed-pitch rhythm — the one regression this file ever caught", () => {
+    // The defect that shipped. The old walk anchored at gapLen/2 from the near
+    // end and paid all its slack out at the far end, which on a junction-trimmed
+    // arm is the junction mouth: jx-equal-v1's four arms and tj-occluded-v1's
+    // stem stopped 11.27 m short of their own mouth, sx-v1's north arm 0.28 m —
+    // same class, same junction, pure phase luck.
+    //
+    // It fits the SAME n dashes, so no count anywhere moves and `markingQuads`
+    // is unchanged. §2 catches it on the six edges it names by id and on
+    // nothing else: re-laid across the whole domain, this file reported 50
+    // districts silent and 0 convicted.
+    let probed = 0;
+    let convicted = 0;
+    for (const { id, built } of censusDomain()) {
+      const relaid = fixedPitchRelay(built);
+      const census = districtCensus(built, relaid);
+      // Does the old rhythm actually differ here? On a run whose slack happens
+      // to be zero the two walks coincide, and a district that was never moved
+      // is evidence of nothing — counting it as a pass is how a mutation test
+      // decays into a test of nothing.
+      let moved = false;
+      for (const { id: eid, line } of markedEdges(built)) {
+        for (const b of boundaryFrames(built, eid, line)) {
+          const seen = census.dashes.get(eid)!.get(b.off)!.map((d) => d.s).sort((x, y) => x - y);
+          if (seen.length !== b.stations.length) continue;
+          if (seen.some((s, i) => Math.abs(s - b.stations[i]!) > 1e-6)) moved = true;
+        }
+      }
+      if (!moved) continue;
+      probed++;
+      // Every count is still right, nothing is unlicensed, the booking is
+      // untouched — the mutation is invisible to all three…
+      expect(census.offences, id).toEqual([]);
+      expect(census.quads, id).toBe(readQuads(
+        built.markings.markings.indicesView,
+        built.markings.markings.positionsView,
+      ).length);
+      const findings = paintFindings(built, census);
+      expect(findings.length, id).toBeGreaterThan(0);
+      // …and every finding is a STATION, named with the metre it should be at.
+      for (const f of findings) expect(f, id).toMatch(/has dash \d+ at s = .* the rhythm fits/);
+      convicted++;
+    }
+    expect(probed).toBeGreaterThan(40);
+    expect(convicted).toBe(probed);
+  });
+
+  it("convicts an М1 edge-line strip that is missing, and one slid along its own rail", () => {
+    // THE DEAD EMITTER. `paintFindings`' strip line could be deleted outright
+    // and this file stayed 51/51 GREEN — measured by deleting it. It is not
+    // dead code (splice a strip quad out and it says so), it simply had no test,
+    // which is the same thing as far as the next regression is concerned.
+    //
+    // A · the strip that is NOT there. ov-lane-v1's S-curve draws 40 strips a
+    // side; drop one and the М1 edge line has a 7 m hole in it, on the lesson
+    // whose critical finding was „no paint on this road".
+    const built = build(OV_LANE);
+    const mesh = built.markings.markings;
+    const real = readQuads(mesh.indicesView, mesh.positionsView);
+    const strips = real.filter((q) => !isDashQuad(q));
+    expect(strips.length).toBe(80);
+    const holed = real.filter((q) => q !== strips[17]);
+    expect(paintFindings(built, districtCensus(built, holed))).toEqual([
+      "mesh holds 102 quads, markingQuads books 103",
+      "ov-ln-street: 79 М1 edge-line strips, not 80",
+    ]);
+
+    // B · the strip that is there and in the WRONG PLACE — the half a count
+    // cannot reach. Slide the same strip a metre along its own rail instead of
+    // deleting it: its width is unchanged, its lateral offset moves by the
+    // sagitta of one metre of a 45 m bend, and there are still 80 of them. The
+    // shape-and-band rule the PER-EDGE census still uses files it as a
+    // perfectly good edge line — asserted here, so „this is a new check" is
+    // itself a check — while the rectangle licence convicts it.
+    const dir = norm(sub(strips[17]!.corners[3], strips[17]!.corners[0]));
+    const slid: MeshQuad = {
+      corners: strips[17]!.corners.map((c) => add(c, mul(dir, 1))) as [Vec2, Vec2, Vec2, Vec2],
+      idx0: strips[17]!.idx0,
+    };
+    const mutated = [...holed, slid];
+    const perEdge = censusOnEdge(built, "ov-ln-street", [0], mutated);
+    expect(perEdge.edgeLines.length).toBe(80);
+    expect(perEdge.other).toEqual([]);
+    // The district census, which asks WHICH RECTANGLE OF ROAD it covers.
+    const census = districtCensus(built, mutated);
+    expect(census.offences.length).toBe(1);
+    expect(census.offences[0]!.why).toBe("no licence for this paint");
+    expect(census.offences[0]!.edgeId).toBe("ov-ln-street");
+    const findings = paintFindings(built, census);
+    expect(findings.length).toBe(2);
+    expect(findings[0]).toMatch(/^no licence for this paint: .* on ov-ln-street at t = /);
+    expect(findings[1]).toBe("ov-ln-street: 79 М1 edge-line strips, not 80");
+  });
+
+  it("the catalogue's reach is measured, not claimed in a comment", () => {
+    // This block was titled „every quad the world paints…" while it graded
+    // 1,603 of the corpus's 10,798 marking quads — one in seven. The title now
+    // says 50 districts, and this test is what keeps that honest: the reach is
+    // counted, and every district outside it is outside for a NAMED reason, so
+    // no map can drift out of the census quietly. Extend the catalogue and this
+    // fails until the numbers above are corrected — which is the point.
+    const corpus = censusCorpus();
+    const domain = censusDomain();
+    const quads = (rows: Array<{ built: Built }>): number =>
+      rows.reduce((n, d) => n + d.built.markings.markingQuads, 0);
+    expect({ districts: corpus.length, quads: quads(corpus) }).toEqual({
+      districts: 105,
+      quads: 10798,
+    });
+    expect({ districts: domain.length, quads: quads(domain) }).toEqual({
+      districts: 50,
+      quads: 1603,
+    });
+    // …14.8% of the paint a student can drive past. Stated as a number so the
+    // header cannot round it up in prose.
+    expect(((quads(domain) / quads(corpus)) * 100).toFixed(1)).toBe("14.8");
+    // Every excluded district, attributed to the first gate that stops it —
+    // the tally the doc comment on `censusCorpus` carries, asserted rather than
+    // asserted-in-a-comment. 45 of the 55 are zones and zebras: that is the
+    // order the next wave should extend the catalogue in.
+    const tally: Record<string, number> = { in: 0 };
+    for (const d of corpus) {
+      const key = d.outside ?? "in";
+      tally[key] = (tally[key] ?? 0) + 1;
+    }
+    expect(tally).toEqual({ in: 50, zebra: 20, laneArrow: 3, speedGlyph: 5, zone: 25, roundabout: 2 });
   });
 
   it("convicts paint whose corners straddle two edges", () => {

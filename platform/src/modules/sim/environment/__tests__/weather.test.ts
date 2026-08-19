@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
+// The namespace import is not decoration: the PRIME_DT_SEC guard below
+// reflects over it to prove that no ramp rate escaped WEATHER_RATES.
+import * as weatherModule from "../weather";
 import {
   FOG_IN_PER_SEC,
   PRIME_DT_SEC,
   RAIN_IN_PER_SEC,
   SNOW_IN_PER_SEC,
+  SNOW_ROAD_BRIGHTEN,
+  WEATHER_RATES,
   WETNESS_IN_PER_SEC,
   WETNESS_OUT_PER_SEC,
   getFogIntensity,
@@ -12,6 +17,7 @@ import {
   getWetness,
   primeWeather,
   resetWeather,
+  roadSurfaceToParams,
   setWeatherTarget,
   stepWeather,
   wetnessToRoadParams,
@@ -235,11 +241,27 @@ describe("primeWeather: settle on frame 1", () => {
     expect(channels()).toEqual({ wetness: 0, rain: 0, fog: 0, snow: 1 });
   });
 
-  it("PRIME_DT_SEC outruns the slowest ramp in the store", () => {
-    // The single step is only exact because it is longer than every rate's
-    // full traverse; the slowest is WETNESS_OUT_PER_SEC at 12 s. Shortening
-    // PRIME_DT_SEC below that leaves a primed dry-after-rain scene damp.
-    expect(PRIME_DT_SEC).toBeGreaterThan(1 / WETNESS_OUT_PER_SEC);
+  it("PRIME_DT_SEC outruns EVERY rate, and no rate escapes the registry", () => {
+    // THE SELF-CHECK COMES FIRST, because the loop under it is only worth
+    // anything if WEATHER_RATES really lists every rate. The guard this
+    // replaces named WETNESS_OUT_PER_SEC as „the slowest" in a comment — true
+    // when written, and silently false the day anyone adds a slower channel,
+    // at which point primed scenes would open partway through their ramp with
+    // nothing going red. Reflecting over the module's own exports makes the
+    // omission itself the failure.
+    const exportedRates = Object.keys(weatherModule).filter((k) => k.endsWith("_PER_SEC"));
+    expect(exportedRates.length).toBeGreaterThan(0);
+    expect(new Set(exportedRates)).toEqual(new Set(Object.keys(WEATHER_RATES)));
+    for (const [name, rate] of Object.entries(WEATHER_RATES)) {
+      expect(`${name}:${PRIME_DT_SEC > 1 / rate}`).toBe(`${name}:true`);
+    }
+    // And the margin is not cosmetic: `approach` clamps at the target, so ONE
+    // full traverse looks sufficient — but (1/12)*12 === 0.9999999999999999,
+    // so a step of exactly 12 s leaves wetness at ~1.1e-16. That residue
+    // quantizes to 0, so the React hooks never see it, while getWetness() —
+    // what the per-frame road material reads — stays non-zero and a primed
+    // dry scene renders imperceptibly damp forever. `toBe(0)` is deliberate
+    // over `toBeCloseTo`: it is the residue that is being excluded.
     setWeatherTarget(true, false, false);
     stepWeather(999);
     primeWeather(false, false, false);
@@ -264,6 +286,69 @@ describe("primeWeather: settle on frame 1", () => {
     setWeatherTarget(false, false, false);
     run(1);
     expect(getSnowIntensity()).toBeGreaterThan(0.5);
+  });
+
+  // -------------------------------------------------------------------------
+  // WHAT THE STUDENT SEES ON FRAME 1 IS WHAT THE ENGINE GRADES ON FRAME 1
+  //
+  // The lane's whole tiebreak in one assertion. `lesson.environment.{rain,fog,
+  // snow}` feeds two consumers: this store (through SimEnvironment) and the
+  // tick the rule engine grades on (`tick.rain/fog/snow` →
+  // conditionSpeed*Factor). The tick's flags are BOOLEANS and true from t=0.
+  // This store's are ramps from 0 that outlive a scene. Every second those two
+  // disagree, the engine is holding the student to a snowy street's speed
+  // envelope over a picture of a clear one — a false failure — or grading a
+  // wet lesson dry because the previous lesson's rain has not drained.
+  //
+  // The two loops are the two directions the lane rules demand, and neither
+  // alone is sufficient: „arrives full" alone is satisfied by a store that
+  // snaps and can never ramp; „leaves nothing behind" alone is satisfied by a
+  // store that renders no weather at all.
+  // -------------------------------------------------------------------------
+  const EIGHT: ReadonlyArray<[boolean, boolean, boolean]> = [
+    [false, false, false],
+    [true, false, false],
+    [false, true, false],
+    [false, false, true],
+    [true, true, false],
+    [true, false, true],
+    [false, true, true],
+    [true, true, true],
+  ];
+  const asGraded = (rain: boolean, fog: boolean, snow: boolean) => ({
+    wetness: rain ? 1 : 0,
+    rain: rain ? 1 : 0,
+    fog: fog ? 1 : 0,
+    snow: snow ? 1 : 0,
+  });
+
+  it("ARRIVES FULL: every authored combination renders at its graded strength on frame 1", () => {
+    for (const [rain, fog, snow] of EIGHT) {
+      resetWeather();
+      primeWeather(rain, fog, snow);
+      expect({ combo: [rain, fog, snow], ch: channels() }).toEqual({
+        combo: [rain, fog, snow],
+        ch: asGraded(rain, fog, snow),
+      });
+    }
+  });
+
+  it("LEAVES NOTHING BEHIND: no ordered pair of lessons leaks weather across the boundary", () => {
+    // No resetWeather between them — that is the point. The store is a module
+    // singleton and the live path never resets it; the second lesson's first
+    // frame has to be its own weather with the first lesson's still standing.
+    for (const prev of EIGHT) {
+      for (const next of EIGHT) {
+        resetWeather();
+        primeWeather(...prev);
+        primeWeather(...next);
+        expect({ prev, next, ch: channels() }).toEqual({
+          prev,
+          next,
+          ch: asGraded(...next),
+        });
+      }
+    }
   });
 });
 
@@ -295,23 +380,185 @@ describe("wetnessToRoadParams", () => {
     expect(p.darken).toBeCloseTo(0.5, 5);
   });
 
-  // THE ROAD HAS ONE SURFACE INPUT AND ONLY RAIN WRITES IT (sweep161, part A
-  // on sc-ac-snow: „the road is bare grey asphalt … the student is being
-  // taught winter grip on a picture of a dry summer street"). This is the
-  // only road-material mapping in the codebase — StaticWorld drives asphalt,
-  // decals and paint through it — and its single argument is the RAIN
-  // wetness. Snow and ice therefore cannot change the road at all. Pinned so
-  // the gap is a stated fact rather than an omission: a snow term added here
-  // must arrive together with its StaticWorld reader, or this assertion is
-  // the thing that goes red.
-  it("carries no snow/ice term: a snow-covered road is indistinguishable from a dry one", () => {
+});
+
+// ---------------------------------------------------------------------------
+// roadSurfaceToParams — sc-ac-snow part A, the half that lives in this file
+//
+// „The briefing states the road is snow-covered … but the road is bare grey
+// asphalt with clean white lane markings … The student is being taught winter
+// grip on a picture of a dry summer street." (critical; confirmed by eye on
+// sweep161/sc-ac-snow/pc-right/03-ready.png beside sc-ac-fog's — same asphalt,
+// same haze, same light.)
+//
+// The assertion this block replaces was
+// `expect(wetnessToRoadParams(getWetness())).toEqual(wetnessToRoadParams(0))`
+// under the title „carries no snow/ice term". getWetness() is 0 in a snow
+// scene, so it compared f(0) with f(0): UN-FAILABLE. It could not have gone
+// red for any implementation of anything, including the fixed one — a test
+// that pins a defect has to be written so that REMOVING the defect breaks it,
+// and that one stayed green either way.
+// ---------------------------------------------------------------------------
+
+/**
+ * The mapping EXACTLY as it shipped before the snow term, inlined on purpose.
+ * The back-compatibility claim is „no dry and no rain lesson moved a pixel",
+ * and comparing the new function against itself would be circular — it can
+ * only be proved against the old arithmetic.
+ */
+function shippedRainOnlyParams(
+  w: number,
+  opts?: { dryRoughness?: number; wetRoughness?: number; wetDarken?: number },
+) {
+  const dryRoughness = opts?.dryRoughness ?? 0.92;
+  const wetRoughness = opts?.wetRoughness ?? 0.42;
+  const wetDarken = opts?.wetDarken ?? 0.62;
+  const t = w < 0 ? 0 : w > 1 ? 1 : w;
+  return {
+    roughness: dryRoughness + (wetRoughness - dryRoughness) * t,
+    darken: 1 + (wetDarken - 1) * t,
+  };
+}
+
+/** The three opts bags StaticWorld actually ships (road, decals, paint), plus
+ *  the bare defaults. Byte-identity is claimed for the CALL SITES, so it is
+ *  tested at them and not at some tidier invented set. */
+const SHIPPED_OPTS = [
+  undefined,
+  { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 },
+  { dryRoughness: 0.95, wetRoughness: 0.45, wetDarken: 0.6 },
+  { dryRoughness: 0.85, wetRoughness: 0.4, wetDarken: 0.78 },
+] as const;
+
+describe("roadSurfaceToParams: the road can finally tell snow from dry", () => {
+  it("DIRECTION 1 — a snow-covered road does NOT render as a dry one", () => {
+    const dry = roadSurfaceToParams({ wet: 0, snow: 0 });
+    const snowy = roadSurfaceToParams({ wet: 0, snow: 1 });
+    expect(snowy).not.toEqual(dry);
+    // Specifically: it BRIGHTENS. The audit measured sc-ac-snow's carriageway
+    // at mean sRGB L 82.6 near / 135.5 far against sc-ac-fog's 84.8 / 148.6 —
+    // snow rendering DARKER than fog, the wrong way round for a street with
+    // snow lying on it. `darken` is a multiply on the road albedo, so the fix
+    // is the one channel in RoadWetnessParams that may exceed 1.
+    expect(snowy.darken).toBeGreaterThan(1);
+    expect(snowy.darken).toBe(SNOW_ROAD_BRIGHTEN);
+  });
+
+  it("DIRECTION 2 — snow costs every dry and rain lesson exactly nothing", () => {
+    // The false-certificate mirror. A snow term that also nudged the 46 rain
+    // lessons and every dry one would be „fixed the picture" bought with a
+    // silent retune of scenes whose look was measured and signed off (the R5
+    // wet-gloss round, doc 66). Byte-identical means byte-identical: `toBe`
+    // on each number, over the shipped call sites, across the whole range
+    // plus the out-of-range values the clamp has to absorb.
+    const sweep = [-1, -0.001, 0, 0.01, 0.25, 0.5, 0.75, 0.99, 1, 1.001, 2];
+    for (const opts of SHIPPED_OPTS) {
+      for (const w of sweep) {
+        const expected = shippedRainOnlyParams(w, opts);
+        const viaSurface = roadSurfaceToParams({ wet: w, snow: 0 }, opts);
+        const viaLegacy = wetnessToRoadParams(w, opts);
+        expect(`${w}/${viaSurface.roughness}`).toBe(`${w}/${expected.roughness}`);
+        expect(`${w}/${viaSurface.darken}`).toBe(`${w}/${expected.darken}`);
+        expect(`${w}/${viaLegacy.roughness}`).toBe(`${w}/${expected.roughness}`);
+        expect(`${w}/${viaLegacy.darken}`).toBe(`${w}/${expected.darken}`);
+      }
+    }
+  });
+
+  it("the three surfaces are ORDERED and SEPARATED: wet < dry < snow", () => {
+    // This assertion was first written as `snowy.darken > soaked.darken`, and
+    // the mutation run caught it: a dry road (1) is already brighter than a
+    // wet one (0.6), so it stayed green with the snow term deleted outright
+    // AND with SNOW_ROAD_BRIGHTEN set to 0.9. It asserted its title and
+    // guarded nothing. Two things were wrong with it, and both are fixed here.
+    //
+    // First, the chain has to include DRY — „not darker than wet" is trivially
+    // true of a road that ignores snow completely.
+    //
+    // Second, strict-greater is the wrong test for this defect. The audit did
+    // not measure „snow looks wrong"; it measured snow and fog landing within
+    // a few percent of each other on every channel — two conditions a student
+    // cannot tell apart. A chain that held by 1e-16 would satisfy the letter
+    // of the claim and still render one single street. So each step has to
+    // clear a margin a person can see: 0.15 on an albedo multiply is ~15%,
+    // five times the ~3% the audit called indistinguishable.
+    const MIN_SEPARATION = 0.15;
+    for (const opts of SHIPPED_OPTS) {
+      const soaked = roadSurfaceToParams({ wet: 1, snow: 0 }, opts);
+      const dry = roadSurfaceToParams({ wet: 0, snow: 0 }, opts);
+      const snowy = roadSurfaceToParams({ wet: 0, snow: 1 }, opts);
+      expect(dry.darken - soaked.darken).toBeGreaterThan(MIN_SEPARATION);
+      expect(snowy.darken - dry.darken).toBeGreaterThan(MIN_SEPARATION);
+    }
+  });
+
+  it("snow UN-glosses: it lands on top of the water, and returns the road to matte", () => {
+    // Ordering claim — snow is the last thing to reach the surface, so at
+    // full cover the wet gloss underneath must be gone entirely, not averaged
+    // with it. A slush road that stayed mirror-glossy would read as rain.
+    const opts = { dryRoughness: 1.0, wetRoughness: 0.5, wetDarken: 0.6 };
+    const soaked = roadSurfaceToParams({ wet: 1, snow: 0 }, opts);
+    const snowOverSoaked = roadSurfaceToParams({ wet: 1, snow: 1 }, opts);
+    const snowOverDry = roadSurfaceToParams({ wet: 0, snow: 1 }, opts);
+    expect(soaked.roughness).toBe(0.5);
+    // Roughness lands exactly; darken carries a 1-ulp residue from the nested
+    // lerp (1.8000000000000003 vs 1.8), so it is compared to 12 places rather
+    // than pretended to be exact. The residue is ~2e-16 and the defect this
+    // guards against — water surviving under full snow — is worth 1.2, six
+    // orders of magnitude clear of the tolerance. Byte-exactness is claimed
+    // and tested only where it is load-bearing, at `snow: 0`.
+    expect(snowOverSoaked.roughness).toBe(snowOverDry.roughness);
+    expect(snowOverSoaked.darken).toBeCloseTo(snowOverDry.darken, 12);
+    // Default snowRoughness is the CALLER's dryRoughness, so each of the three
+    // StaticWorld surfaces keeps its own character under snow rather than
+    // collapsing onto a number invented in this file.
+    expect(roadSurfaceToParams({ wet: 1, snow: 1 }, SHIPPED_OPTS[3]).roughness).toBe(0.85);
+    // …and an explicit override still wins.
+    expect(
+      roadSurfaceToParams({ wet: 0, snow: 1 }, { ...opts, snowRoughness: 0.7 }).roughness,
+    ).toBe(0.7);
+  });
+
+  it("clamps snow like it clamps wetness, and interpolates monotonically", () => {
+    expect(roadSurfaceToParams({ wet: 0, snow: -1 })).toEqual(
+      roadSurfaceToParams({ wet: 0, snow: 0 }),
+    );
+    expect(roadSurfaceToParams({ wet: 0, snow: 2 })).toEqual(
+      roadSurfaceToParams({ wet: 0, snow: 1 }),
+    );
+    const light = roadSurfaceToParams({ wet: 0, snow: 0.25 });
+    const heavy = roadSurfaceToParams({ wet: 0, snow: 0.75 });
+    expect(light.darken).toBeGreaterThan(1);
+    expect(heavy.darken).toBeGreaterThan(light.darken);
+  });
+
+  it("SNOW_ROAD_BRIGHTEN stays inside the bounds its reasoning gives it", () => {
+    // Below 1 keeps the measured wrong way round. At or above 2 the road
+    // overtakes its own lane markings — and the rule engine grades lane
+    // keeping and stop lines off exactly those markings, so a picture that
+    // buries them fails students on a skill it just took away. That is the
+    // same crime as the green tick for an unmeasured skill, pointing the
+    // other way. The number between them is REASONED, not measured: it must
+    // still be looked at (see the constant's R0 recipe) before it ships.
+    expect(SNOW_ROAD_BRIGHTEN).toBeGreaterThan(1);
+    expect(SNOW_ROAD_BRIGHTEN).toBeLessThan(2);
+  });
+
+  it("the store hands it a snow-bearing input: getSnowIntensity is the reader's argument", () => {
+    // The seam this fix is routed across. StaticWorld reads `useWetness()`
+    // today; the one-line change is to read `useSnowIntensity()` beside it and
+    // pass both. Proven here end to end — a snow lesson, primed the way
+    // SimEnvironment primes it, produces a road that is not the dry road.
     resetWeather();
-    setWeatherTarget(false, false, true);
-    stepWeather(999);
+    primeWeather(false, false, true);
     expect(getSnowIntensity()).toBe(1);
-    // Full snowfall, and the number StaticWorld feeds the road material is
-    // still the dry one.
     expect(getWetness()).toBe(0);
-    expect(wetnessToRoadParams(getWetness())).toEqual(wetnessToRoadParams(0));
+    const asRenderedToday = wetnessToRoadParams(getWetness());
+    const asRenderedOnceRouted = roadSurfaceToParams({
+      wet: getWetness(),
+      snow: getSnowIntensity(),
+    });
+    expect(asRenderedToday).toEqual(roadSurfaceToParams({ wet: 0, snow: 0 }));
+    expect(asRenderedOnceRouted).not.toEqual(asRenderedToday);
   });
 });

@@ -472,19 +472,32 @@ export function foldMaskCss(
      sc-ov-lane-keeping  04-t152s     L50 0.405  L90 0.467  max 0.543
        brightest pixel across all four: rgb(204, 205, 206)
 
-   WCAG contrast of this card's three inks — as the UNPANEL register restates
-   them INSIDE a ghost, not the app-theme values — against that facade:
+   WCAG contrast of every ink this card paints, against that facade — and the
+   values are the ones that RESOLVE ON THE SHIPPED PAGE, which is where the
+   first version of this block was wrong (2026-08-19, second pass). Two inks
+   are re-pinned by the UNPANEL register inside a ghost; the other five are the
+   CLUSTER palette, because `/lesson/[lessonId]` renders under the (dashboard)
+   layout's `data-surface="cluster"` — so `--accent` on this card is #48a9ff
+   and NOT the app theme's #3fa1ff, and it is not the quiet one either:
 
                                               vs L90 0.518   vs the pixel
-     --foreground #f2f6fc  the line              1.70 : 1      1.47 : 1
-     --muted      #c3cfe2  the authored WHY      1.17 : 1      1.01 : 1
-     --accent     #3fa1ff  chip · «↓ още N реда»
-                           · «Прочети» · «Разбрах»1.47 : 1      1.70 : 1
+     --foreground #f2f6fc  row 2, the line       1.70 : 1      1.47 : 1
+                           and «Разбрах»
+     --muted      #c3cfe2  row 2b, the WHY       1.17 : 1      1.01 : 1
+                           and the ✕ chip
+     the card's own `color` = TONE_COLOR[tone] — the tone glyph, the «−N т.»
+     chip, «↓ още N реда», the «ЗАЩО» label and both chip tints:
+     --accent     #48a9ff  neutral               1.35 : 1      1.57 : 1
+     --accent-2   #17e1c4  teach                 1.11 : 1      1.05 : 1
+     --warning    #ffc24b  warn                  1.15 : 1      1.01 : 1
+     --danger     #ff6a58  danger                1.52 : 1      1.77 : 1
+     --success    #3ee095  good                  1.08 : 1      1.07 : 1
 
-   1.01 : 1 is not „low contrast". `--muted` has luminance 0.6172 and that
-   facade pixel has 0.6096: the authored WHY and the wall behind it are THE
-   SAME COLOUR, to a hundredth. The frame agrees — in 06-waited the whole
-   explanation is pale grey type on pale grey masonry.
+   1.01 : 1 is not „low contrast". `--warning` has luminance 0.6035 and `--muted`
+   0.6172 against that facade pixel's 0.6096: the authored WHY, the «−N т.» chip
+   of every second-degree violation and the wall behind them are THE SAME
+   COLOUR, to a hundredth. The frame agrees — in 06-waited the whole explanation
+   is pale grey type on pale grey masonry.
 
    SO THE CARD GETS A GROUND — AND NOT A PANEL, WHICH IS THE WHOLE DIFFICULTY.
    The 2026-08-03 ruling that took the box off this element was about a shape:
@@ -500,17 +513,33 @@ export function foldMaskCss(
    QUIETEST ink on the card clears AA against the BRIGHTEST world the sweep
    actually put under it — rgb(204, 205, 206), which is the global maximum over
    the world band beside and below the card across all four filed frames.
-   Composited, the ground becomes rgb(46, 50, 57), L = 0.0313, and the three
-   inks land at 11.90 : 1, 8.20 : 1 and 4.77 : 1. The accent, at 10 px, binds.
+   Composited, the ground becomes rgb(46, 50, 57), L = 0.0316 rounded, and the
+   seven inks land at
 
-   0.78 WAS THE FIRST ANSWER AND IT WAS WRONG BY 0.0016. It puts the accent at
-   4.5016 : 1 — over the floor, and by less than the compositor's own grain: a
-   browser stores the composited ground as 8-bit integers, and one unit either
-   way moves the ratio further than that margin. A number that clears a
-   threshold by less than the arithmetic's own rounding has not cleared it.
-   0.80 holds at 4.75 : 1 with the ground rounded, which is the form the pixel
-   actually takes, and `sim-overlay-scrim.test.ts` asserts the ROUNDED case.
-   (0.75 gives the accent 4.09, 0.73 gives it 3.91.)
+     --foreground 11.87   --muted 8.18   --warning 8.01   --accent-2 7.73
+     --success     7.54   --accent 5.15  --danger 4.57  ← THE ONE THAT BINDS
+
+   AND THE INK THAT BINDS IS `--danger`, WHICH IS THE WHOLE POINT. It is not an
+   exotic tone: `LessonPlayShell` gives it to every ГРУБА violation, so the card
+   that binds this arithmetic is the card that tells a seventeen-year-old he has
+   just made a serious mistake, and its «−N т.» chip is the quietest ink on it.
+   The first version of this block drove the alpha off `--accent #3fa1ff` — a
+   token this surface does not even resolve to — and was 0.58 of a ratio too
+   generous.
+
+   0.78 WAS THE FIRST ANSWER AND IT WAS WRONG TWICE OVER. Against the app
+   theme's accent it cleared AA by 0.0016, which is less than the compositor's
+   own grain (a browser stores the composited ground as 8-bit integers, and one
+   unit either way moves this ratio by 0.066). Against the ink that ACTUALLY
+   binds it does not clear AA at all: `--danger` on the 0.78 ground is 4.31 : 1.
+   The bare threshold is α ≈ 0.7925; 0.795 gives 4.5029, over the floor by 0.003
+   — a twentieth of one 8-bit step, i.e. a margin the arithmetic cannot see.
+   0.80 gives 4.5692 with the ground rounded, which is the form the pixel
+   actually takes: 1.04 steps of real slack, and the first two-decimal alpha
+   that has any. `sim-overlay-scrim.test.ts` asserts the ROUNDED case and
+   derives BOTH the binding ink and that step from the shipped palette, so a
+   token edit re-picks them instead of leaving this paragraph to rot again.
+   (0.75 puts `--danger` at 3.93 and 0.73 at 3.75.)
 
    AND IT MUST NOT BECOME A CURTAIN — the same test, from the other side. „An
    instruction he can read but which hides the hazard it is about is a different
@@ -538,10 +567,48 @@ export const PEEK_SCRIM_ALPHA = 0.8;
  * overhang, so no glyph is ever standing on a partial ground.
  *
  * The left ramp is the long one because that is the side that faces the road;
- * top/right/bottom face the stage's own edge and the instrument band, where a
+ * right and bottom face the stage's own edge and the instrument band, where a
  * shorter ramp is invisible anyway.
+ *
+ * ── AND THE TOP RAMP IS 0, BECAUSE ABOVE THIS CARD IS AN INSTRUMENT.
+ *    2026-08-19, second pass. It was 12, and 12 was a gutter that is not ours.
+ *
+ * `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN` puts the column's top EXACTLY on the
+ * interior mirror's lane — `max(0.5rem, 16.6% + 0.5rem)` and the lane is
+ * `16.6% + 8px`, the same number, so the slack is zero on all three sideways
+ * profiles (852 × 393 → 73.238 px, 780 × 360 → 67.755, 780 × 340 → 64.440).
+ * A top overhang is therefore not „a ramp over the stage's edge", it is shade
+ * on the mirror: at 12 px it spent all 8 px of the gutter
+ * `NOTIFY_COLUMN_MIRROR_GUTTER_PX` owns and then 4 px of the mirror's own
+ * projected box, at up to alpha 0.27 where the two meet. „The mirror does not
+ * move, the HUD does" (PlayAreaStyles B74/B76) is the ruling, and the shade is
+ * part of what the HUD paints — `sim-overlay-mirror-lane.test.ts` now judges
+ * THIS rect and not merely the column's, which is how the 12 survived.
+ *
+ * SO THE FLAT CORE STARTS AT THE CARD'S OWN TOP EDGE, and the cost is a hard
+ * edge on the one side that has no room for a ramp. It is bounded and it was
+ * looked at: the BACKGROUND gradient is unchanged, so that edge is a line whose
+ * ends dissolve over the last 26 px on the left and 12 px on the right — a
+ * horizontal stroke with no corners, not the rounded strip the 2026-08-03
+ * ruling removed. It has no border, no radius and no blur, and the same test
+ * file still asserts all three.
+ *
+ * THE TWO ANSWERS THAT LOOK CHEAPER AND ARE NOT, both measured:
+ *   · MOVE THE COLUMN DOWN 12 px so the ramp gets its own room. The rich
+ *     violation card does not lay out at the column's ceiling — it lays out at
+ *     `CHROME_PX` 86 + this window's own 2.375 rem floor = ~124 px against a
+ *     95.76 px cap, i.e. it already paints past it — so the 12 px lands on the
+ *     card's FLOOR, not on its top: 73.24 + 124 = 0.502 of a 393 px stage
+ *     today, 0.533 after the move, against a hazard band that starts at 0.53
+ *     (`HAZARD_BAND_TOP_FRACTION`). Trading a 4 px shade on the mirror for a
+ *     card in the hazard band is the 2026-08-17 half-landed swap again.
+ *   · RAMP INSIDE THE CARD instead of above it. `CARD_CLASS` has no padding;
+ *     row 1's tone glyph and «−N т.» chip start at y = 0. A glyph standing on
+ *     a partial ground is the defect this shade exists to close, not a milder
+ *     version of it: half-way up the ramp the ground is rgb(125, 127, 132) and
+ *     `--danger` reads 1.42 : 1 on it — the filed frame, with an extra step.
  */
-export const PEEK_SCRIM_FEATHER_PX = { top: 12, right: 12, bottom: 16, left: 26 } as const;
+export const PEEK_SCRIM_FEATHER_PX = { top: 0, right: 12, bottom: 16, left: 26 } as const;
 
 const SCRIM_RGB_CSS = PEEK_SCRIM_RGB.join(", ");
 
@@ -1215,8 +1282,18 @@ export function SimOverlay({
   const cardBody = (
     <>
       {/* ── THE GROUND, 2026-08-19. The block at `peekScrimBackgroundCss` has
-             the four sampled frames, the three contrast ratios it replaces
-             (1.70 / 1.28 / 1.46 : 1) and the arithmetic that picks 0.78.
+             the four sampled frames, the seven inks it replaces (1.01 : 1 at
+             the flattest — `--warning` on a render-white facade — and 1.77 : 1
+             at the best) and the arithmetic that picks 0.80 off `--danger`,
+             which is the ink that binds and the tone of every груба violation.
+
+             THE NUMBERS IN THIS PARAGRAPH USED TO BE THREE OTHER ONES, and
+             they were wrong in the reassuring direction: they were measured on
+             the APP theme's `--accent`, and this surface is
+             `data-surface="cluster"`. `sim-overlay-scrim.test.ts` now reads the
+             palette out of `globals.css` and the ghost pins out of
+             `PlayAreaStyles.tsx` rather than restating them, so the next token
+             edit fails a test instead of rotting a comment.
 
              `data-hud-ink` IS LOAD-BEARING AND IS NOT DECORATION. The UNPANEL
              sweep's second selector is
@@ -1366,12 +1443,19 @@ export function SimOverlay({
              target this file has already spent two rows removing.
              `aria-hidden`: assistive technology reads the whole body out of the
              DOM regardless of what is scrolled into view, so announcing a fold
-             to a screen reader would describe a problem it does not have. */}
+             to a screen reader would describe a problem it does not have.
+             ── AND IT IS AT FULL OPACITY, 2026-08-19. It carried `opacity-90`,
+             which is a tenth nobody can see and which cost the only thing on
+             this card that says the explanation continues: it inherits the
+             card's `color`, and on a ГРУБА violation that is `--danger`, so
+             0.9 of it over the shade below reads 3.97 : 1 — under AA, on the
+             label that tells a student there is more of the reason he was
+             marked down. Full strength it is 4.57 : 1, the same as the chip. */}
       {peekFold.lines > 0 ? (
         <span
           data-sim-overlay-fold=""
           aria-hidden
-          className="mt-0.5 shrink-0 self-end text-[10px] font-black uppercase leading-none tracking-wider opacity-90"
+          className="mt-0.5 shrink-0 self-end text-[10px] font-black uppercase leading-none tracking-wider"
         >
           ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
         </span>

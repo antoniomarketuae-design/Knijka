@@ -92,8 +92,8 @@ import {
 // director's contact sentinel grades with, so the two live reporters can never
 // disagree about what the player is inside of. See the block above ReadyScene.
 import {
-  actorObb,
   isContact,
+  npcShellObb,
   NPC_VEHICLE_SHELL_HALF_LENGTH_M,
   NPC_VEHICLE_SHELL_HALF_WIDTH_M,
   obbDiscSeparationM,
@@ -147,7 +147,6 @@ import {
   createTrafficSystem,
   TrafficLayer,
   type TrafficDistrict,
-  type VehicleProfile,
 } from "@/modules/sim/traffic";
 import {
   buildPoligonGhostDemo,
@@ -202,7 +201,11 @@ import {
   type LessonWorldCore,
 } from "@/modules/sim/scene/lessonWorldRecipe";
 import { RouteGuidance } from "./RouteGuidance";
-import { ScenarioObstacles, type ScenarioObstacleSpec } from "./ScenarioObstacles";
+import {
+  ScenarioObstacles,
+  type ObstacleColliderFootprint,
+  type ScenarioObstacleSpec,
+} from "./ScenarioObstacles";
 import { ShadowCar } from "./ShadowCar";
 // [glance-pings] the look-left/right teaching overlay (see the wiring block).
 import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings";
@@ -767,6 +770,70 @@ export default function LessonScene(props: LessonSceneProps) {
 //    step. At 46 км/ч that is at most 0.21 m of staleness against touch windows
 //    metres wide, and a stale pose can only cost a NAME (→ unnamed → the
 //    shipped behaviour), never invent a contact.
+//
+// ── 2026-08-19 · THE CHANNEL COULD NOT NAME A BODY IT HIT ──────────────────
+//
+// All of the above shipped INERT, for a reason no test could see: the block
+// asked whether the player OVERLAPS a candidate, using `isContact` — tolerance
+// exactly ZERO, the sentinel's own ruling — against a grading box sized from a
+// DIFFERENT SOURCE than the collider that reported the contact. A naming
+// function was written as if it were a detection function.
+//
+// MEASURED (collision/bodies.ts `npcShellObb` carries the full table). Every
+// `traffic.vehicles` entry, whatever its profile, is followed by ONE kinematic
+// shell of 0.92 × 2.10 m — NpcColliders sizes colliders once and never per
+// model. Against the player's 0.85 × 2.02 chassis:
+//
+//   body            grading box was     rapier fires at   grading fired at
+//   staged car      actorObb "car"        4.12 m rear        4.07 m  (−0.05)
+//   cyclist proxy   actorObb "cyclist"    4.12 m rear        2.92 m  (−1.20)
+//   cyclist proxy   ,, flank              1.77 m             1.08 m  (−0.69)
+//   kargo_v obstacle  shell box           5.37 m rear        4.12 m  (−0.57)
+//   tram            actorObb "tram"       4.12 m rear        9.02 m  (+4.90)
+//
+// A CYCLIST COULD THEREFORE NEVER BE NAMED. Its shell is 2.10 m long and its
+// grading box 0.90 m, so naming it needed 1.20 m of penetration PAST the
+// collider's own face — and the solver's whole job is to keep the chassis out
+// of that shell, so the required pose is not reachable. Same for the child
+// cyclist (1.35 m) and, from the other end, the tram, whose oversized box
+// makes phantom candidates that trip the two-candidates refusal.
+//
+// And the deferral this file offered — "with no anonymous vehicle report in
+// the live stream there is no stepping stone to lay" — was FALSE. The first
+// report of a rear-end contact is resolved AT THE ENTER EDGE, where a box that
+// is even 5 cm short has not touched yet, so an anonymous stepping stone was
+// laid at the start of essentially every contact.
+//
+// THE FIX, in the two halves the two residues need:
+//  (a) SIZE EVERY CANDIDATE FROM THE COLLIDER, not from the fleet profile.
+//      Agents get `npcShellObb` (the shell rapier binds); pedestrians keep the
+//      disc, which already matched exactly (PEDESTRIAN_BODY_RADIUS_M 0.3 ===
+//      NpcColliders PED_CAPSULE_RADIUS); scenario obstacles read the per-model
+//      tight cuboid ScenarioObstacles measures off the loaded rig and now
+//      publishes (`ObstacleColliderFootprint`), because no static table can
+//      state a GLB's extents. All three disagreements go to ZERO.
+//  (b) …and because ONE disagreement survives (a) — the pose read here is a
+//      render frame behind the physics step, priced above at 0.21 m at 46 км/ч
+//      and 60 fps, i.e. 0.85 m for two bodies closing at that speed on the
+//      30 fps mobile floor — resolve within a REACH rather than on overlap.
+//
+// WHY A TOLERANCE IS SAFE HERE AND WRONG IN `isContact`. This function never
+// runs unless rapier has already declared a contact, so no value of the reach
+// can invent one: it decides WHICH body, never WHETHER. `isContact` decides
+// whether, and there a tolerance is a band of clear air billed as a crash —
+// the founder's own false-failure complaint. Same number, opposite meaning.
+//
+// A THIRD RESIDUE, WHICH THE REACH WIDENS AND WHICH IS STATED RATHER THAN
+// HIDDEN. The ambient-agent case above (a body no list here covers) used to
+// borrow a covered body's name only while the player OVERLAPPED that covered
+// body; it can now do so while merely within the reach of one. The window grew
+// by 0.9 m, and what it costs is the same thing it cost before — one report
+// joining the wrong episode, i.e. a possible UNDER-bill. It is bounded by the
+// geometry: a staged body within 0.9 m of the chassis at the instant an ambient
+// car is struck is a body the chassis is very nearly inside of already. Closing
+// it properly needs the shell tag's `npcId` routed out of
+// `VehicleRig.onCollisionEnter` and reconciled against the sentinel's
+// `actorId`, which is the same fix the ambient residue has always needed.
 // ───────────────────────────────────────────────────────────────────────────
 
 /** The three collision categories a body can be named for (`staticObject` is
@@ -784,12 +851,16 @@ export interface LiveContactBody {
 }
 
 /** The slice of the director's `ContactCastMember` this file reads (structural
- *  — the orchestrator keeps its own type). */
+ *  — the orchestrator keeps its own type).
+ *
+ *  `profile` is DELIBERATELY NOT READ. The cast carries it and the sentinel
+ *  uses it, correctly: the sentinel is a geometric detector and wants the body's
+ *  real size. This file is a naming function for a contact rapier declared, and
+ *  rapier's body is the shell — see `npcShellObb` and the block above. */
 interface StagedContactBody {
   readonly actorId: string;
   readonly withWhat: NamedContactKind;
   readonly body: "box" | "disc";
-  readonly profile?: VehicleProfile;
 }
 
 /**
@@ -803,13 +874,24 @@ interface StagedContactBody {
  * ids line up with the shell tags ScenarioObstacles writes
  * (`SCENARIO_OBSTACLE_NPC_ID_BASE + i` over the same vehicle-filtered list).
  *
- * The box is the sim module's canonical NPC vehicle body, not the per-model
- * tight cuboid the renderer fits: this function only NAMES a contact rapier has
- * already declared, and a few centimetres of disagreement can only cost a name
- * (→ unnamed → today's behaviour), never invent a contact.
+ * `footprints` ARE THE COLLIDERS THEMSELVES — the per-model tight cuboids
+ * ScenarioObstacles measures off each loaded rig and publishes upward. They
+ * matter because the models differ from the canonical shell by more than
+ * rounding: `kargo_v`, a hittable obstacle in the shipped reversing bay,
+ * measures halfLength 2.67 against the shell's 2.10, so a shell-sized box
+ * reports 0.57 m of clear air on the frame rapier declares the crash, and every
+ * one of those opening frames arrives ANONYMOUS — which is the stepping stone
+ * that then absorbs the next named body. `box_truck` is 1.65 m out, past any
+ * reach it would be safe to grant, so the reach cannot be the answer here.
+ *
+ * Absent (or missing for an index) the shell is the fallback. That is the
+ * pre-load window only: the colliders below are mounted by the same component
+ * that publishes here, so until it has loaded there is no obstacle body for
+ * rapier to report at all.
  */
 export function hittableObstacleBodies(
   obstacles: readonly ScenarioObstacleSpec[],
+  footprints: readonly ObstacleColliderFootprint[] = [],
 ): LiveContactBody[] {
   const out: LiveContactBody[] = [];
   let index = 0;
@@ -817,6 +899,7 @@ export function hittableObstacleBodies(
     if (o.kind !== "vehicle") continue;
     const i = index++;
     if (o.visual === true) continue;
+    const fp = footprints.find((f) => f.index === i);
     out.push({
       id: `obstacle:${i}`,
       withWhat: "vehicle",
@@ -824,8 +907,8 @@ export function hittableObstacleBodies(
         x: o.x,
         y: o.y,
         headingDeg: o.headingDeg,
-        halfLengthM: NPC_VEHICLE_SHELL_HALF_LENGTH_M,
-        halfWidthM: NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+        halfLengthM: fp?.halfLengthM ?? NPC_VEHICLE_SHELL_HALF_LENGTH_M,
+        halfWidthM: fp?.halfWidthM ?? NPC_VEHICLE_SHELL_HALF_WIDTH_M,
       },
     });
   }
@@ -856,16 +939,55 @@ export function liveContactBodies(
             withWhat: m.withWhat,
             disc: { x: pose.x, y: pose.y, radiusM: PEDESTRIAN_BODY_RADIUS_M },
           }
-        : { id: m.actorId, withWhat: m.withWhat, box: actorObb(pose, m.profile) },
+        : // …the SHELL, not the fleet profile: this is the body rapier bound to
+          // the agent and therefore the body it reported. `actorObb(pose,
+          // profile)` here is what made a cyclist unnameable — 0.90 m of
+          // grading box behind a 2.10 m collider.
+          { id: m.actorId, withWhat: m.withWhat, box: npcShellObb(pose) },
     );
   }
   return out;
 }
 
 /**
+ * How far OUTSIDE a candidate's collider box a rapier contact may still be
+ * resolved onto it, m.
+ *
+ * DERIVED, not chosen. After the candidate boxes are sized from the colliders
+ * themselves, ONE disagreement survives and it is an instrument gap, not a
+ * geometry gap: the pose tested here is `VehicleSample`, which the rig writes
+ * once per RENDER frame, while rapier's contact fires inside the PHYSICS step.
+ * This file already prices that at 0.21 m for a 46 км/ч closing at 60 fps; the
+ * mobile floor the audit measured is 30 fps (×2) and two bodies closing at
+ * 46 км/ч each doubles it again — 0.85 m. Rounded up: 0.90.
+ *
+ * IT CANNOT INVENT A CRASH. Nothing calls this except a contact rapier has
+ * already declared; the reach decides WHICH body, never WHETHER — which is why
+ * the identical number inside `isContact` would be a defect and here is not.
+ * Its failure mode is `undefined` (a staler pose than the reach covers), which
+ * is byte-identically what shipped.
+ */
+export const NAMING_REACH_M = 0.9;
+
+/**
  * Name the body a live contact was with, or `undefined` when naming would be a
- * guess. Exact overlap on the SAME sim/collision geometry the sentinel grades
- * with — UNIQUE or nothing (see the block above for all three refusals).
+ * guess — UNIQUE or nothing (see the block above for every refusal).
+ *
+ * The candidate boxes are the COLLIDERS rapier reports through, not the fleet
+ * profiles: shells for agents, the published tight cuboid for a scenario
+ * obstacle, the capsule radius for a walker. Two bands follow from that:
+ *
+ *   · OVERLAP (separation ≤ 0) — the shipped rule, verbatim. One overlapping
+ *     body of the reported kind is the name; two at once is a coin toss and a
+ *     name that flickers during ONE contact bills it twice, so refuse.
+ *   · THE REACH — no candidate overlaps, because the pose is a render frame
+ *     behind the step that fired. The nearest body within `NAMING_REACH_M` is
+ *     the name, and only if it is alone in that band: two candidates inside a
+ *     window this coarse are not distinguishable by it.
+ *
+ * The bands are ordered, not merged: a body the player is genuinely inside of
+ * always wins over one merely within reach, so nothing that resolves today
+ * resolves differently.
  */
 export function nameLiveContact(
   withWhat: CollisionWithWhat,
@@ -873,20 +995,33 @@ export function nameLiveContact(
   bodies: readonly LiveContactBody[],
 ): string | undefined {
   if (withWhat === "staticObject") return undefined;
-  let named: string | undefined;
+  let overlapped: string | undefined;
+  let overlapCount = 0;
+  // Nearest candidate strictly outside its box but inside the reach, and how
+  // many share that band (the reach's own coin-toss guard).
+  let nearestId: string | undefined;
+  let nearestSepM = Infinity;
+  let withinReach = 0;
   for (const b of bodies) {
     if (b.withWhat !== withWhat) continue;
     const sepM =
       b.disc !== undefined
         ? obbDiscSeparationM(player, b.disc.x, b.disc.y, b.disc.radiusM)
         : obbSeparationM(player, b.box as Obb2D);
-    if (!isContact(sepM)) continue;
-    // A second candidate: the car is inside two bodies of the same kind at
-    // once and a name would be a coin toss. Refuse — see the block above.
-    if (named !== undefined) return undefined;
-    named = b.id;
+    if (isContact(sepM)) {
+      overlapCount++;
+      overlapped = b.id;
+      continue;
+    }
+    if (sepM > NAMING_REACH_M) continue;
+    withinReach++;
+    if (sepM < nearestSepM) {
+      nearestSepM = sepM;
+      nearestId = b.id;
+    }
   }
-  return named;
+  if (overlapCount > 0) return overlapCount === 1 ? overlapped : undefined;
+  return withinReach === 1 ? nearestId : undefined;
 }
 
 function ReadyScene({
@@ -1441,10 +1576,19 @@ function ReadyScene({
     [runtime],
   );
 
-  // The hittable obstacle bodies never move — resolve them once per lesson.
-  const obstacleBodies = useMemo(
-    () => hittableObstacleBodies(built.scenarioObstacles),
-    [built.scenarioObstacles],
+  // The hittable obstacle bodies never move, but their SIZES are not known
+  // until the rigs load: each obstacle's collider is a per-model tight cuboid
+  // measured off the GLB, and ScenarioObstacles publishes those extents here as
+  // it mounts them. A ref rather than state — this feeds a rapier callback, not
+  // a render, and re-rendering the whole scene when a footprint arrives would
+  // buy nothing. Empty until the models resolve, which is also exactly when
+  // there is no obstacle collider for rapier to report.
+  const obstacleFootprintsRef = useRef<readonly ObstacleColliderFootprint[]>([]);
+  const handleObstacleFootprints = useCallback(
+    (footprints: readonly ObstacleColliderFootprint[]) => {
+      obstacleFootprintsRef.current = footprints;
+    },
+    [],
   );
 
   // A real impact (VehicleRig gates by relative speed) → queue a collision for
@@ -1470,12 +1614,15 @@ function ReadyScene({
           liveContactBodies(
             directorContactCast(director),
             (actorId) => traffic.staged(actorId),
-            obstacleBodies,
+            // Built per contact, not per lesson: the footprints arrive with the
+            // rigs. A real contact is rare (NpcColliders' own reasoning for its
+            // near-miss emitters) and the frame loop never reaches this.
+            hittableObstacleBodies(built.scenarioObstacles, obstacleFootprintsRef.current),
           ),
         ),
       );
     },
-    [runtime, director, traffic, obstacleBodies],
+    [runtime, director, traffic, built.scenarioObstacles],
   );
 
   return (
@@ -1653,6 +1800,7 @@ function ReadyScene({
                 <ScenarioObstacles
                   obstacles={built.scenarioObstacles}
                   clearcoat={level === "high"}
+                  onColliderFootprints={handleObstacleFootprints}
                 />
               </Suspense>
             ) : null}

@@ -30,6 +30,22 @@
  * lengths this component actually writes resolve to boxes the module's own
  * predicates accept — and that the pre-fix lengths, and the half-landed pair,
  * are rejected by the same predicates.
+ *
+ * ── AND IT JUDGED THE COLUMN WHILE THE CARD PAINTED PAST IT — 2026-08-19.
+ *
+ * Everything above was true of `[data-hud="notify-column"]`'s own box, and for
+ * two days that box was not the whole of what this HUD put on the mirror. The
+ * ground added on 2026-08-19 (`peekScrimBackgroundCss`) is an absolutely
+ * positioned child inset by NEGATIVE `PEEK_SCRIM_FEATHER_PX`, i.e. it hangs
+ * OUTSIDE the card on all four sides — and the column's top has zero slack
+ * against the lane by construction, so every one of those top pixels was shade
+ * on the interior mirror. The rect being judged cleared the band; the thing
+ * being painted did not.
+ *
+ * That is this project's standing failure mode — a measurement that is right
+ * about the wrong rectangle, lying in the reassuring direction — so the SHADE
+ * is now a rect this file judges, and the 12 px overhang that shipped is kept
+ * as the mutation that proves the check can fail.
  */
 
 import { readFileSync } from "node:fs";
@@ -37,6 +53,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   notifyColumnMaxHeightPx,
+  notifyColumnMirrorLanePx,
   notifyColumnTopPx,
   rectClearsMirrorBand,
   HAZARD_BAND_TOP_FRACTION,
@@ -45,7 +62,7 @@ import {
   NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
 } from "../notifyColumn";
 import { OVERLAY_PEEK_HEIGHT_PX } from "../overlayQueue";
-import { SIM_OVERLAY_COLUMN_FLOOR_CSS } from "../SimOverlay";
+import { PEEK_SCRIM_FEATHER_PX, SIM_OVERLAY_COLUMN_FLOOR_CSS } from "../SimOverlay";
 import {
   notifyColumnFloorCss,
   notifyColumnFloorPx,
@@ -65,6 +82,22 @@ const PHONES = [
 
 /** Where the column's left edge lands: right gutter + notch + flank lane. */
 const columnX = (stage: { width: number }): number => stage.width - 131 - 180;
+
+/**
+ * …and where the SHADE behind the card lands, which is a different rectangle.
+ *
+ * `SimOverlay` renders it `position: absolute` with each inset written as
+ * `-PEEK_SCRIM_FEATHER_PX.<side>`, inside a card that is the column's only
+ * child and carries no padding or margin of its own — so the card's top edge
+ * IS the column's top, and the shade's is that minus the top feather. Both of
+ * those premises are asserted below rather than assumed, because a rect derived
+ * from a layout nobody checked is the instrument bug this block was added for.
+ */
+const scrimRect = (stage: { width: number; height: number }) => ({
+  x: columnX(stage) - PEEK_SCRIM_FEATHER_PX.left,
+  y: notifyColumnTopPx(stage, true) - PEEK_SCRIM_FEATHER_PX.top,
+  width: 180 + PEEK_SCRIM_FEATHER_PX.left + PEEK_SCRIM_FEATHER_PX.right,
+});
 
 describe("the inline declaration is the one the module published for it", () => {
   it("writes the COLUMN's top, never the corner datum", () => {
@@ -187,5 +220,91 @@ describe("what the pair resolves to, and what each half alone would do", () => {
     expect(
       notifyColumnMaxHeightPx(340, notifyColumnFloorPx(PHONES[2]), notifyColumnTopPx(PHONES[2], true)),
     ).toBeCloseTo(81.76, 1);
+  });
+});
+
+describe("the SHADE is judged too, and it is not the column's rectangle", () => {
+  it("the two premises the shade's rect is derived from", () => {
+    // 1. THE INSETS ARE THE CONSTANT, NEGATED. If a later edit types a number
+    //    here, `scrimRect` above stops describing the shipped element and this
+    //    whole block becomes a measurement of a fiction.
+    for (const side of ["top", "right", "bottom", "left"] as const) {
+      expect(CODE, `${side} inset`).toContain(
+        `${side}: \`\${-PEEK_SCRIM_FEATHER_PX.${side}}px\``,
+      );
+    }
+    // 2. THE CARD'S TOP EDGE IS THE COLUMN'S TOP. The column is a bare
+    //    `flex flex-col items-end` with the card as its only child, so any
+    //    padding or margin on `CARD_CLASS` would put the shade somewhere else
+    //    again — lower, i.e. in the direction that would make this pass while
+    //    the pixels moved.
+    const cls = /const CARD_CLASS =\s*\n?\s*"([^"]*)"/.exec(CODE)?.[1];
+    expect(cls, "CARD_CLASS moved — re-anchor this test").toBeDefined();
+    expect(cls).not.toMatch(/(^|\s)(p|px|py|pt|pb|pl|pr|m|mx|my|mt|mb|ml|mr)-/);
+  });
+
+  it("clears the mirror band on all three sideways phones", () => {
+    for (const p of PHONES) {
+      expect(rectClearsMirrorBand(scrimRect(p), p, true), `${p.id}`).toBe(true);
+    }
+  });
+
+  it("REJECTS the 12 px top feather that shipped with the ground", () => {
+    // THE MUTATION, kept as an assertion. `PEEK_SCRIM_FEATHER_PX.top` was 12 on
+    // the first pass, and the column's top has ZERO slack against the lane —
+    // `max(0.5rem, 16.6% + 0.5rem)` against a lane of `16.6% + 8px` is the same
+    // number on every profile in the ladder — so those 12 px were 8 px of the
+    // gutter `NOTIFY_COLUMN_MIRROR_GUTTER_PX` owns and then 4 px of the
+    // mirror's own projected box. Nothing in this file could see it, because
+    // every rect it judged was the COLUMN's.
+    for (const p of PHONES) {
+      expect(notifyColumnTopPx(p, true), `${p.id}: slack appeared`).toBeCloseTo(
+        notifyColumnMirrorLanePx(p, true),
+        6,
+      );
+      expect(
+        rectClearsMirrorBand({ ...scrimRect(p), y: notifyColumnTopPx(p, true) - 12 }, p, true),
+        `${p.id}: a 12 px overhang is somehow off the mirror?`,
+      ).toBe(false);
+    }
+  });
+
+  it("…and one pixel of overhang, so the pass above is not slack", () => {
+    // A check that clears by a margin cannot tell „fixed" from „nearly". This
+    // is the same assertion at the resolution the geometry actually has.
+    for (const p of PHONES) {
+      expect(
+        rectClearsMirrorBand({ ...scrimRect(p), y: scrimRect(p).y - 1 }, p, true),
+        `${p.id}`,
+      ).toBe(false);
+    }
+  });
+
+  it("the column's own rect would have said „clear“ the whole time", () => {
+    // The instrument bug, stated as a number so the lesson is not just prose:
+    // with the 12 px feather the column passed and the shade failed, on every
+    // profile. A file that judged only the first was reporting a fix it had
+    // not measured.
+    for (const p of PHONES) {
+      const column = { x: columnX(p), y: notifyColumnTopPx(p, true), width: 180 };
+      expect(rectClearsMirrorBand(column, p, true), `${p.id}: column`).toBe(true);
+      expect(
+        rectClearsMirrorBand({ ...scrimRect(p), y: column.y - 12 }, p, true),
+        `${p.id}: shade`,
+      ).toBe(false);
+    }
+  });
+
+  it("still fails when the x-arm is the reason, not the y-arm", () => {
+    // `rectClearsMirrorBand` has a horizontal escape: a box entirely LEFT of
+    // 0.573 of the stage is cleared whatever its y. The shade widens the column
+    // by 26 px on the left, so this pins that it is nowhere near that escape —
+    // otherwise the four assertions above could go green for a reason that has
+    // nothing to do with the mirror.
+    for (const p of PHONES) {
+      const r = scrimRect(p);
+      expect(r.x + r.width, `${p.id}`).toBeGreaterThan(p.width * 0.573);
+      expect(rectClearsMirrorBand({ ...r, y: 0 }, p, true), `${p.id}: y ignored?`).toBe(false);
+    }
   });
 });

@@ -95,6 +95,7 @@ export function resolveEncounter(
   eventId: string,
   priorEncounters: number,
   policyOverride?: GradingPolicy,
+  sameMistake?: { occurrences: number; gradings: number },
 ): ScenarioOutcome {
   const policy =
     policyOverride ?? getScenarioEvent(eventId)?.policyDefault ?? "teach-first-then-grade";
@@ -104,14 +105,57 @@ export function resolveEncounter(
     return { eventId, policy, mode: "learn", penaltyMultiplier: 0, showLesson: true };
   }
 
+  /**
+   * TWO QUESTIONS, TWO COUNTERS — and they were one number until 2026-08-19.
+   *
+   *   `prior`  answers „have I already TAUGHT you about this situation", and it
+   *            is counted per TOPIC. One free lesson per topic per drive.
+   *   `graded` answers „have you made THIS MISTAKE before", and it is counted
+   *            per code (plus act, where the catalogue declares acts). It is
+   *            the only thing the ×1.5/×2 ladder may read.
+   *
+   * Folding them together is wrong in BOTH directions, and this project shipped
+   * each one:
+   *
+   *   · one counter keyed by TOPIC called two DIFFERENT faults a repeat of each
+   *     other — the reference lesson's own wrong drive told the student he had
+   *     repeated a mistake he made once, and billed 25 against an official 20;
+   *   · one counter keyed by CODE handed every distinct fault its own free
+   *     lesson — `sc-ln-turn-lane-arrows` driven with a late two-lane swerve,
+   *     unsignalled AND unobserved, went from FAILED to PASSED, because the
+   *     second fault was a first encounter of its own code and so was taught
+   *     rather than graded. A false certificate is the graver of the two.
+   *
+   * THE TWO BRANCHES SUBTRACT DIFFERENTLY, and that asymmetry is deliberate and
+   * pre-dates the split — it is about WHO GRANTED THE FREEBIE:
+   *
+   *   always-grade  grades from the very first encounter, so this policy never
+   *                 granted one, and every prior occurrence of the same mistake
+   *                 escalates — including one an EARLIER, gentler policy taught.
+   *                 That is the case „sped, was taught, then sped dangerously":
+   *                 the warning was spent, and the harder offence is priced ×1.5.
+   *   teach-first   granted exactly one freebie, so the ladder counts GRADINGS.
+   *                 A mistake whose topic was already taught by a DIFFERENT code
+   *                 gets no freebie of its own and its first grading is at BASE —
+   *                 which the old single-counter could not express.
+   *
+   * Absent (every caller that does not track the mistake) both fall back to the
+   * old derivation off `prior`, so those callers are byte-identical.
+   */
+  const occurrences = Math.max(0, Math.floor(sameMistake?.occurrences ?? prior));
+  const gradings = Math.max(0, Math.floor(sameMistake?.gradings ?? prior - 1));
+
   if (policy === "always-grade") {
-    // Graded from the first encounter; still show the lesson the first time.
     return {
       eventId,
       policy,
       mode: "grade",
-      penaltyMultiplier: gradeMultiplier(prior),
-      showLesson: prior === 0,
+      penaltyMultiplier: gradeMultiplier(occurrences),
+      // The card is shown the first time THIS MISTAKE appears, not the first
+      // time its topic does: the catalogue authors a separate explanation per
+      // act precisely because it says something the other act's did not. A
+      // pedestrian struck after a car must not arrive silently behind it.
+      showLesson: occurrences === 0,
     };
   }
 
@@ -119,12 +163,12 @@ export function resolveEncounter(
   if (prior === 0) {
     return { eventId, policy, mode: "teach", penaltyMultiplier: 0, showLesson: true };
   }
-  // prior >= 1 → graded; the first graded pass (prior === 1) is at BASE.
+  // prior >= 1 → graded; the first grading of THIS mistake is at BASE.
   return {
     eventId,
     policy,
     mode: "grade",
-    penaltyMultiplier: gradeMultiplier(prior - 1),
+    penaltyMultiplier: gradeMultiplier(gradings),
     showLesson: false,
   };
 }

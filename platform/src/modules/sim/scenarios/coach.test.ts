@@ -1,7 +1,30 @@
 import { describe, expect, it } from "vitest";
 import { COLLISION_CONTACT_COPY, VIOLATIONS, actCopy } from "../rules";
-import { coachSession, coachStep } from "./coach";
-import { scenarioForCode } from "./mapping";
+import type { ViolationSeverity } from "./policy";
+import { coachSession, coachStep, type CoachInput } from "./coach";
+import { repeatFamilyForCode, scenarioForCode } from "./mapping";
+
+/** One coach input at the code's OWN catalogue severity — no invented numbers. */
+function asDriven(code: string, detail?: string): CoachInput {
+  const spec = VIOLATIONS[code as keyof typeof VIOLATIONS];
+  const v: CoachInput = { code, severityClass: spec.severityClass as ViolationSeverity };
+  if (spec.terminateSession === true) v.terminateSession = true;
+  if (detail !== undefined) v.detail = detail;
+  return v;
+}
+
+/** Every mapped code, grouped by the scenario event that teaches it. */
+function codesByScenario(): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const code of Object.keys(VIOLATIONS)) {
+    const ev = scenarioForCode(code);
+    if (ev === null) continue;
+    const list = out.get(ev);
+    if (list) list.push(code);
+    else out.set(ev, [code]);
+  }
+  return out;
+}
 
 describe("catalog → scenario mapping", () => {
   it("maps driving codes to scenario events", () => {
@@ -9,6 +32,43 @@ describe("catalog → scenario mapping", () => {
     expect(scenarioForCode("RED_LIGHT_CROSSED")).toBe("ev-junction-signalized");
     expect(scenarioForCode("POOR_LANE_KEEPING")).toBe("ev-lane-discipline");
     expect(scenarioForCode("PREDRIVE_STEP_SKIPPED")).toBeNull();
+  });
+
+  it("the lesson map is many-to-one — which is why it cannot answer „is this a repeat“", () => {
+    // The premise of the whole split, asserted rather than assumed: if this
+    // ever became one-to-one, `CODE_TO_REPEAT_FAMILY` would be dead weight and
+    // somebody should be told. Measured 2026-08-19: 8 events carry more than
+    // one code, and 25 of the 37 mapped codes live in one of them.
+    const buckets = codesByScenario();
+    const shared = [...buckets.values()].filter((codes) => codes.length > 1);
+    expect(shared.length).toBeGreaterThanOrEqual(8);
+    expect(shared.flat().length).toBeGreaterThanOrEqual(25);
+  });
+
+  it("a repeat family never spans two lessons", () => {
+    // The invariant that keeps the two tables honest in the other direction:
+    // pooling says „this is the same fault", and the same fault cannot be
+    // taught by two different mini-lessons. A family row added across
+    // scenarios would silently make one lesson's fault a repeat of another's.
+    const byFamily = new Map<string, Set<string | null>>();
+    for (const code of Object.keys(VIOLATIONS)) {
+      const fam = repeatFamilyForCode(code);
+      const set = byFamily.get(fam) ?? new Set<string | null>();
+      set.add(scenarioForCode(code));
+      byFamily.set(fam, set);
+    }
+    for (const [fam, scenarios] of byFamily) {
+      expect(scenarios.size, `family ${fam} spans ${[...scenarios].join(" + ")}`).toBe(1);
+    }
+  });
+
+  it("every code has a family, and it is the code itself unless declared otherwise", () => {
+    expect(repeatFamilyForCode("PEDESTRIAN_NOT_YIELDED")).toBe("PEDESTRIAN_NOT_YIELDED");
+    expect(repeatFamilyForCode("HANDBRAKE_LEFT_ON")).toBe("HANDBRAKE_LEFT_ON");
+    expect(repeatFamilyForCode("SPEEDING_OVER_LIMIT")).toBe(repeatFamilyForCode("SPEEDING_DANGEROUS"));
+    expect(repeatFamilyForCode("FOLLOWING_TOO_CLOSE")).toBe(
+      repeatFamilyForCode("FOLLOWING_TOO_CLOSE_FOR_RAIN"),
+    );
   });
 });
 
@@ -24,15 +84,22 @@ describe("teach-first-then-grade coach", () => {
     expect(seq[2]).toMatchObject({ mode: "grade", scored: true });
   });
 
-  it("keys encounters by scenario, so both speeding codes share a counter", () => {
+  it("keys encounters by fault family, so both speeding codes share a counter", () => {
     // First minor speeding teaches; a later dangerous speeding still grades
-    // (safety floor) and belongs to the same ev-speed-limit scenario.
+    // (safety floor) and is the SAME fault one bar higher — mapping.ts
+    // `CODE_TO_REPEAT_FAMILY`, not the ev-speed-limit lesson they share.
     const seq = coachSession([
       { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna" },
       { code: "SPEEDING_DANGEROUS", severityClass: "opasna" },
     ]);
     expect(seq[0].mode).toBe("teach");
     expect(seq[1]).toMatchObject({ mode: "grade", scored: true }); // опасна always grades
+    // The shared counter, stated where it can actually fail: the dangerous
+    // overspeed lands on the taught encounter's counter and is priced ×1.5.
+    // Unpool the pair and it becomes a first encounter at ×1.0 — handing back
+    // an escalation the driver earned by speeding, being taught, and then
+    // speeding harder. That is the false-acquittal direction of this fix.
+    expect(seq[1].penaltyMultiplier).toBe(1.5);
   });
 
   it("always grades dangerous mistakes from the first encounter (safety floor)", () => {
@@ -83,6 +150,182 @@ describe("teach-first-then-grade coach", () => {
     ]);
     expect(seq[0]).toMatchObject({ scenarioId: null, mode: "teach", scored: false });
     expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+  });
+});
+
+describe("what counts as a repeat — the fault, not the lesson that teaches it", () => {
+  it("THE REFERENCE DRIVE: the zebra's two faults are not repeats of each other", () => {
+    // MEASURED 2026-08-18, `sc-zebra-approach` driven wrong at 59 км/ч — the
+    // lesson the whole audit uses as ground truth. The debrief printed
+    // «Твърде бързо приближаване към пешеходна пътека» (опасна, 10 т.) and
+    // «Непропускане на пешеходец» (опасна, 10 т.) — two different faults, both
+    // taught by `ev-ped-crossing-marked` — and priced the second «ПОВТОРНА
+    // ГРЕШКА ×1.5», «Тренировъчен резултат: 25 наказателни т.» against an
+    // official 20. Approaching too fast and failing to give way are different
+    // mistakes: you can approach slowly and still not yield.
+    const seq = coachSession([
+      asDriven("PEDESTRIAN_CROSSING_TOO_FAST"),
+      asDriven("PEDESTRIAN_NOT_YIELDED"),
+    ]);
+    expect(seq[0]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    // Both still point at the marked-crossing lesson — the scenario is the
+    // right key for WHICH lesson, and that half must not move.
+    expect(seq[0].scenarioId).toBe("ev-ped-crossing-marked");
+    expect(seq[1].scenarioId).toBe("ev-ped-crossing-marked");
+  });
+
+  it("…and the same zebra fault twice IS a repeat", () => {
+    // The false-acquittal direction on the same lesson: splitting by fault
+    // must not become a way for a driver to never escalate.
+    const seq = coachSession([
+      asDriven("PEDESTRIAN_NOT_YIELDED"),
+      asDriven("PEDESTRIAN_NOT_YIELDED"),
+      asDriven("PEDESTRIAN_NOT_YIELDED"),
+    ]);
+    expect(seq.map((d) => d.penaltyMultiplier)).toEqual([1, 1.5, 2]);
+  });
+
+  it("one unannounced lane change: the topic teaches ONCE, and neither fault is a repeat of the other", () => {
+    // MEASURED 2026-08-19 through the full lesson pipeline,
+    // `sc-ln-turn-lane-arrows` L3 / „mistake-late-two-lanes": the indicator and
+    // the mirror fault fire on the SAME TICK (t=8.23) at the first boundary and
+    // again at the second (t=9.72).
+    //
+    // THIS ROW HAS BEEN WRONG IN BOTH DIRECTIONS AND THE HISTORY IS THE POINT.
+    //
+    //   Originally, one counter keyed by TOPIC: the mirror fault was graded on
+    //   the first tick as a REPEAT OF THE INDICATOR FAULT, and the second pair
+    //   escalated ×1.5/×2.0 — official 9, training 13.5. The student was told he
+    //   had repeated a mistake he had not made. FALSE CONVICTION.
+    //
+    //   Then one counter keyed by CODE: both faults taught at the first
+    //   boundary, both at ×1.0 at the second — official 6 against an allowance
+    //   of 9, so the drive PASSED. A late two-lane swerve, unsignalled AND
+    //   unobserved, certified. FALSE CERTIFICATE, and the graver of the two.
+    //
+    // Two counters answer both. The TOPIC grants one lesson per drive; the
+    // LADDER counts only this exact fault. So the signal fault is taught, the
+    // mirror fault grades at BASE (the topic's lesson is spent, but its own
+    // ladder is at zero — it is NOT a repeat), and the second mirror fault is
+    // the only thing on this drive that escalates, because it is the only
+    // mistake genuinely made twice after being graded.
+    const seq = coachSession([
+      asDriven("LANE_CHANGE_WITHOUT_INDICATOR"),
+      asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"),
+      asDriven("LANE_CHANGE_WITHOUT_INDICATOR"),
+      asDriven("LANE_CHANGE_WITHOUT_MIRROR_CHECK"),
+    ]);
+    expect(seq[0]).toMatchObject({ mode: "teach", scored: false });
+    expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    expect(seq[2]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    expect(seq[3]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1.5 });
+    // THE FALSE-CERTIFICATE GUARD, stated as a count so it cannot be satisfied
+    // by relabelling: three of the four faults must cost points. Hand the teach
+    // budget back to each code and this drops to two, which is the drive that
+    // passed.
+    expect(seq.filter((d) => d.scored)).toHaveLength(3);
+    // THE FALSE-CONVICTION GUARD, the other direction: no fault is priced as a
+    // repeat of a DIFFERENT fault. Only the mistake made twice escalates.
+    expect(seq.filter((d) => d.penaltyMultiplier > 1)).toHaveLength(1);
+  });
+
+  it("SWEEP: no code is ever a repeat of a DIFFERENT code that shares its lesson", () => {
+    // The class-level guard, and the reason this is not a one-row fix. Every
+    // ordered pair of distinct codes under one scenario event, minus the pairs
+    // the catalogue declares one fault at two bars.
+    //
+    // WHAT MUST BE IDENTICAL IS THE PRICE, NOT THE WHOLE DECISION. `b` after `a`
+    // legitimately differs from `b` alone in ONE field: `mode`, because `a`
+    // already spent the topic's single lesson. That is the teach budget doing
+    // its job. What may never differ is the LADDER — `b` must be priced as a
+    // first offence of `b`, never as a second helping of `a`. Asserting the
+    // whole object conflated the two and would force the teach budget back to
+    // per-code, which is the drive that passed while unsignalled and unobserved.
+    let pairs = 0;
+    for (const [ev, codes] of codesByScenario()) {
+      for (const a of codes) {
+        for (const b of codes) {
+          if (a === b || repeatFamilyForCode(a) === repeatFamilyForCode(b)) continue;
+          pairs++;
+          const after = coachSession([asDriven(a), asDriven(b)])[1];
+          const alone = coachStep({}, asDriven(b)).decision;
+          // THE ANTI-REPEAT PROPERTY, stated so it cannot be confused with the
+          // teach budget. `b` has never been graded, so whatever it costs must
+          // be a FIRST offence: 0 if the topic still had its lesson to give, or
+          // BASE (×1.0) if `a` spent it. An escalated 1.5 or 2.0 here is the
+          // false conviction — `b` inheriting `a`'s ladder — and is the only
+          // value this loop exists to catch.
+          expect(
+            after.penaltyMultiplier,
+            `${b} after ${a} (both ${ev}) must not be priced as a repeat`,
+          ).toBeLessThanOrEqual(1);
+          // Cross-check against the fresh decision wherever the mode agrees, so
+          // the bound above cannot be satisfied by a mode that never grades.
+          if (after.mode === alone.mode) {
+            expect(after.penaltyMultiplier).toBe(alone.penaltyMultiplier);
+          }
+          // …and it stays the same fault, with the same lesson attached.
+          expect(after.code).toBe(alone.code);
+          expect(after.scenarioId).toBe(alone.scenarioId);
+          // The ONE permitted difference, pinned so it cannot widen unnoticed:
+          // when the two decisions differ at all, it is `mode`/`scored` only,
+          // and only ever in the direction of grading MORE.
+          if (after.mode !== alone.mode) {
+            expect(alone.mode, `${b} after ${a}: only a spent teach may differ`).toBe("teach");
+            expect(after.mode).toBe("grade");
+          }
+        }
+      }
+    }
+    // Guards the sweep itself: a mapping table that lost its collisions, or a
+    // family table that swallowed them all, would make this loop vacuous.
+    expect(pairs, "the sweep checked no pairs at all").toBeGreaterThanOrEqual(40);
+  });
+
+  it("SWEEP: the other direction — every mapped code repeated IS a repeat", () => {
+    // The false-acquittal half of the same sweep. Splitting the key must never
+    // become „nothing ever escalates": each code, twice, must move up the
+    // ladder — grading where it taught, or escalating where it already graded.
+    let checked = 0;
+    for (const codes of codesByScenario().values()) {
+      for (const code of codes) {
+        const seq = coachSession([asDriven(code), asDriven(code)]);
+        expect(seq[1].mode, `${code} repeated must grade`).toBe("grade");
+        expect(seq[1].scored, `${code} repeated must score`).toBe(true);
+        if (seq[0].mode === "grade") {
+          // Already graded first time (опасна floor) → the repeat escalates.
+          expect(seq[1].penaltyMultiplier, `${code} repeated must escalate`).toBe(1.5);
+        }
+        checked++;
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(30);
+  });
+
+  it("an act-carrying code keeps its scenario's policy — the key is not an event id", () => {
+    // THE LATENT HOLE, made reachable on purpose. `encounterKey` returns a
+    // COUNTER key; it used to be handed to `resolveEncounter`, which looks a
+    // `policyDefault` up by it — so `ev-collision#vehicle` matched no event and
+    // silently dropped `ev-collision`'s "learn-only" default. Nothing reached
+    // it, because both act-carrying codes are опасна and `policyForViolation`
+    // always overrides them. Drive COLLISION at основна severity — the exact
+    // shape of the next act-carrying code somebody adds — and the drop becomes
+    // visible: at HEAD this teaches once and then GRADES; now it rides the
+    // scenario's learn-only channel and never scores.
+    expect(actCopy("COLLISION", "vehicle")).not.toBeNull();
+    const first = coachStep({}, { code: "COLLISION", severityClass: "osnovna", detail: "vehicle" });
+    expect(first.decision).toMatchObject({ mode: "learn", scored: false });
+    const second = coachStep(first.encounters, {
+      code: "COLLISION",
+      severityClass: "osnovna",
+      detail: "vehicle",
+    });
+    expect(second.decision).toMatchObject({ mode: "learn", scored: false });
+    // And the pooled (no-act) form of the same code answers identically — the
+    // act may move the counter, never the policy.
+    const pooled = coachStep({}, { code: "COLLISION", severityClass: "osnovna" });
+    expect(pooled.decision.mode).toBe("learn");
   });
 });
 

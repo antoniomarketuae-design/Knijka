@@ -39,6 +39,7 @@
  */
 
 import {
+  EXAM_TERMINATION_CITATION_BG,
   EXAM_VS_CONTROL_POINTS_BG,
   EXCESS_ROUNDING_NOTE_BG,
   controlPointsTightBg,
@@ -52,6 +53,7 @@ import {
   offenceCoversNoteBg,
   parseSpeedMeasurement,
   minusPointsBg,
+  pointsScaleLabelBg,
   pointsWordsBg,
   roadConsequenceFor,
   withEurBg,
@@ -98,6 +100,68 @@ function controlPointsBg(cp: ControlPointsFigure): string {
   if (cp.status === "not-listed") return `${pointsWordsBg("control", 0)} — не е в списъка`;
   return "контролни точки: не е установено";
 }
+
+// ---------------------------------------------------------------------------
+// The exam half, when the exam was already over
+// ---------------------------------------------------------------------------
+
+/**
+ * WHAT THIS ROW COST WHEN THE SHEET WAS ALREADY CLOSED — the ledger's answer,
+ * not the catalogue's.
+ *
+ * `event.points` is the CATALOGUE BASE: what a fault costs while the exam is
+ * still running. Наредба № 38, чл. 48, ал. 3 ends a practical exam at the first
+ * terminating опасна, and `rules/scoring.ts ledgerBilling` says PER ROW which
+ * faults were actually charged — the debrief has folded it since 2026-08-18
+ * (`lessons/debrief.ts:504`). This card did not, and `SessionEndScreen.tsx`
+ * renders the card list (line 1211) and `debriefText` (line 1290) ON ONE
+ * SCREEN, so the two halves of one screen quoted two different numbers for the
+ * same fault.
+ *
+ * MEASURED · the sc-hz-accident-scene squeeze, the drive
+ * `lessons/__tests__/debrief-collision-truth.test.ts` is built from: a wrecked
+ * car struck at 13.13 s and a bystander at 13.43 s. The ledger charges 10 and
+ * the debrief prints «Удар в пешеходец — опасна, без допълнителни точки —
+ * изпитът вече беше прекратен»; the card beside it printed «−10 изпитни т.» on
+ * that same row, so the screen carried 10 and 20 at once. The deployed build
+ * doing it with the protocol table as well:
+ * `.audit-frames/sweep161/sc-ac-aquaplane/pc-wrong/08-debrief.png` — «Опасни
+ * грешки 2 · 20» over one closed exam.
+ *
+ * NOT A ZERO, and that is the whole shape of it. „0 изпитни т." beside «Удар в
+ * пешеходец» reads as „this did not matter", which is the precise opposite of
+ * the lesson — so the row says WHY it is free, in the debrief's own words
+ * rather than a paraphrase of them. `__tests__/fault-card-ledger-close.test.tsx`
+ * re-reads those words out of a real `buildDebrief` instead of trusting this
+ * file: two surfaces on one screen that agree by accident stop agreeing the
+ * first time either is edited.
+ *
+ * THE SCALE IS NAMED, which is where this parted company with the debrief's
+ * wording on purpose. The debrief writes „без допълнителни точки" and gets away
+ * with it: it is one plain-text paragraph and the previous row it sits under
+ * has just said „наказателни т. по изпитния лист". This is a CARD, read on its
+ * own beside three other point systems, and an unqualified „точки" here is the
+ * founder's original misreading with the number removed —
+ * `rules/__tests__/point-scales.test.ts` refuses it in this directory and is
+ * right to. So the scale comes from the vocabulary rather than the keyboard,
+ * and the two surfaces are pinned to each other on the clause they DO share
+ * verbatim: «изпитът вече беше прекратен».
+ */
+const LEDGER_CLOSED_MARK_BG = `без допълнителни ${pointsScaleLabelBg("exam")}`;
+
+/**
+ * …and the reason, with the clause that closed the sheet. The last sentence is
+ * there because „no points" is the answer for ONE of the three systems: чл. 48,
+ * ал. 3 is a provision of the exam наредба and reaches the изпитен лист only.
+ * The road block below this one is unchanged on a closed ledger, and a student
+ * who reads the mark above and stops there has learned that crashing twice is
+ * free.
+ */
+const LEDGER_CLOSED_NOTE_BG =
+  "Изпитът вече беше прекратен, затова тази грешка се показва и се обяснява, " +
+  `но не добавя наказателни точки към изпитния лист (${EXAM_TERMINATION_CITATION_BG}). ` +
+  "Глобата и контролните точки са друга система — прекратяването на изпита " +
+  "не ги отменя.";
 
 // ---------------------------------------------------------------------------
 // The road half
@@ -443,9 +507,28 @@ export interface FaultCardProps {
    * out can never suppress a price.
    */
   billing?: OffenceBilling;
+  /**
+   * Did the EXAM LEDGER charge this row — `rules/scoring.ts ledgerBilling()`
+   * at this row's index, the same array `lessons/debrief.ts` folds.
+   *
+   * OMITTED = CHARGED, in the one direction that cannot manufacture a pass. A
+   * standalone card (the live overlay, the dev rigs, a test that renders one
+   * fault) has no session around it and is therefore the billed one, exactly
+   * like `billing` above; and a caller that forgets to wire this OVERSTATES a
+   * penalty rather than hiding one. Suppressing a charge that really happened
+   * is how a fail turns into a green tick, so the default may never be `false`
+   * — `__tests__/fault-card-ledger-close.test.tsx` pins both directions.
+   */
+  examBilled?: boolean;
 }
 
-export function FaultCard({ event, correctiveBg, atBg, billing }: FaultCardProps) {
+export function FaultCard({
+  event,
+  correctiveBg,
+  atBg,
+  billing,
+  examBilled = true,
+}: FaultCardProps) {
   const mark = examMarkFor(event.code);
   const covered = billing?.billed === false ? billing.coveredBy : null;
 
@@ -454,18 +537,39 @@ export function FaultCard({ event, correctiveBg, atBg, billing }: FaultCardProps
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-sm font-bold">{event.titleBg}</span>
         {/* THE QUALIFIER. „−10 т." is what the founder misread; the unit is
-            now on the number itself, not left to the reader. */}
-        <span
-          className="shrink-0 whitespace-nowrap text-xs font-black tabular-nums"
-          style={{ color: SEVERITY_TONE[event.severityClass] }}
-        >
-          {minusPointsBg("exam", event.points)}
-        </span>
+            now on the number itself, not left to the reader. And on a row the
+            ledger closed over there is no number to qualify — see
+            LEDGER_CLOSED_MARK_BG. It wraps rather than forcing the title into a
+            column: „без допълнителни изпитни точки" is 29 characters against
+            13 for „−10 изпитни т.", and `whitespace-nowrap` on that would
+            squeeze «Непропускане на пътно превозно средство с предимство» off
+            the row on a phone. */}
+        {examBilled ? (
+          <span
+            className="shrink-0 whitespace-nowrap text-xs font-black tabular-nums"
+            style={{ color: SEVERITY_TONE[event.severityClass] }}
+          >
+            {minusPointsBg("exam", event.points)}
+          </span>
+        ) : (
+          <span className="shrink-0 max-w-[11rem] text-right text-xs font-black text-muted">
+            {LEDGER_CLOSED_MARK_BG}
+          </span>
+        )}
       </div>
 
       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted">
         {mark.classBg} грешка · наказателни точки по изпитния лист · {mark.citationBg}
       </p>
+
+      {/* Directly under the mark it qualifies, because the two are one
+          statement and a reader who meets them apart reconciles them himself —
+          which is the reconciliation this lane exists to stop asking for. */}
+      {!examBilled ? (
+        <p className="rounded-md border border-border-strong bg-surface-2 p-1.5 text-[11px] font-semibold leading-relaxed">
+          {LEDGER_CLOSED_NOTE_BG}
+        </p>
+      ) : null}
 
       <p className="text-xs leading-relaxed text-muted">{event.explanationBg}</p>
 

@@ -45,26 +45,69 @@
 //    exists points the WRONG WAY for a snow-covered street. The audit's words
 //    for the same frames: „the snow preset appears to fall through to the fog
 //    preset", and „the road is bare grey asphalt … not one flake falls".
-//    NONE of that is fixable from this file: the store already holds four
-//    separate, correctly-ramped channels and hands snow and fog to the same
-//    readers. The differentiation lives in `presets.ts`
-//    (snowWeather #e8ebef/0.012 vs fogWeather #c9cdd2/0.022 — one is a paler
-//    grey at half the density of the other, which IS the 3%), `SkyDome.tsx`
-//    (SNOW_SKY_WASH 0.75 vs FOG_SKY_WASH 0.85), `SnowFlakes.tsx` (flake size
-//    and count — the mesh mounts and reads getSnowIntensity(), yet no flake is
-//    visible in any sweep161 frame) and `StaticWorld.tsx`, whose road material
-//    has no snow term at all (see 2).
+//    Confirmed by eye on the two `pc-right/03-ready.png` frames side by side:
+//    sky, haze, asphalt and light are indistinguishable, and no flake appears
+//    in either.
 //
-// 2. THERE IS EXACTLY ONE ROAD-SURFACE CHANNEL AND ONLY RAIN WRITES IT.
-//    `wetness` → `wetnessToRoadParams` is the only road-material mapping in
-//    the codebase (StaticWorld consumes it for asphalt, decals and paint).
-//    Snow has no surface term, ice has no channel at all — which is why
-//    sc-ac-snow renders clean grey asphalt while it is graded at 40% grip, and
-//    why sc-ac-ice and sc-ac-bridge-ice had to author `weather: "dry"` (the
-//    vocabulary is {dry|rain|fog|snow}, there is no cold/ice state to author)
-//    and therefore render high summer under a briefing that says „зимна
-//    сутрин е около нулата". Adding the channel here without a reader would
-//    change no pixel; the pair belongs in one wave with StaticWorld.
+//    THE HAZE HALF IS NOT FIXABLE FROM THIS FILE — the store already holds
+//    four separate, correctly-ramped channels and hands snow and fog to the
+//    same readers, saturated at 1 in both lessons. The differentiation lives
+//    in `presets.ts` (snowWeather #e8ebef/0.012 vs fogWeather #c9cdd2/0.022 —
+//    one is a paler grey at HALF the density of the other, and less haze
+//    reveals more dark asphalt, which is the whole of the 3% and its wrong
+//    sign), `SimEnvironment.tsx` (the `scratch.fogGoal` blend, the
+//    `fogObj.density` damp and the SNOW_*_DIM / FOG_*_DIM constants) and
+//    `SkyDome.tsx` (SNOW_SKY_WASH 0.75 vs FOG_SKY_WASH 0.85).
+//
+//    THE FLAKE HALF is `SnowFlakes.tsx`: the mesh mounts (SimEnvironment,
+//    gated on `snowVisible && qp.snowParticles > 0`) and reads
+//    getSnowIntensity() — which
+//    this store saturates at 1 — so the missing flakes are geometry, not
+//    signal. FLAKE_SIZE is 0.028 m in a box of AREA_HALF 20 m; a 2.8 cm quad
+//    at cockpit distance is sub-pixel. Note the arrival frames had a second,
+//    separate cause that IS now gone: before the scene-boundary primer the
+//    snow channel started at 0 and took ~6 s to saturate, so `01-arrival` and
+//    `03-ready` were always clear-weather frames whatever SnowFlakes did.
+//
+//    THE ROAD HALF is this file, and is fixed below — see 2.
+//
+// 2. THE ROAD-SURFACE MAPPING NOW BEARS SNOW; ITS READER DOES NOT PASS IT YET.
+//    `wetnessToRoadParams` is the only road-material mapping in the codebase
+//    (StaticWorld consumes it for asphalt, decals and paint) and its only
+//    input was RAIN wetness, so no amount of snow could move the road by one
+//    shade — sc-ac-snow renders clean grey asphalt while it is graded at 40%
+//    grip. `roadSurfaceToParams` (below) is that mapping with the snow term
+//    it was missing, and `wetnessToRoadParams` is now its `snow: 0` case, so
+//    every dry and rain scene is bit-identical.
+//
+//    IT CHANGES NO PIXEL UNTIL ITS READER PASSES THE VALUE, and that reader is
+//    not this lane's file. Both halves of the routing, exactly:
+//      · `environment/index.ts` — add `roadSurfaceToParams` (and the type
+//        `RoadSurfaceState`) to the barrel beside `wetnessToRoadParams`. Doc
+//        05: StaticWorld imports from `@/modules/sim/environment`, so a
+//        helper left out of the barrel does not exist. `useSnowIntensity` is
+//        ALREADY exported — nothing else is needed.
+//      · `world/components/StaticWorld.tsx:277-313` — take
+//        `const snow = useSnowIntensity();` beside the existing
+//        `const wetness = useWetness();`, add `snow` to the three `useMemo`
+//        dep arrays, and pass `{ wet: wetness, snow }` on the ROAD (:279) and
+//        DECAL (:294) calls. Leave the PAINT call (:313) on
+//        `wetnessToRoadParams` or pass `snowBrighten: 1`: brightening the
+//        markings buries them in the road, and the rule engine grades lane
+//        keeping and stop lines off exactly those markings.
+//
+// 2b. ICE STILL HAS NO CHANNEL, AND MUST NOT GET A ROAD-MATERIAL ONE.
+//    sc-ac-ice and sc-ac-bridge-ice author `weather: "dry"` (the vocabulary is
+//    {dry|rain|fog|snow}, there is no cold state to author) and render high
+//    summer under a briefing that says „зимна сутрин е около нулата" — full
+//    green trees, blue sky, warm facades, verified by eye on
+//    `sc-ac-bridge-ice/mobile-right/04-t076s.png` and
+//    `sc-ac-ice/pc-right/03-ready.png`. The fix is NOT to make the ice
+//    visible: black ice is invisible, and that is the lesson those two teach.
+//    What is missing is the SEASON, and none of it lives here — a `cold`/
+//    `winter` flag on `LessonSpec.environment` (contracts.ts) + compile.ts,
+//    a winter grade in `presets.ts` (low cold sun, no warm facade bounce),
+//    and bare trees / grey verges in the world module. Routed, not fixed.
 //
 // 3. THIS STORE HOLDS THE LOOK; NOTHING HOLDS THE GRIP, AND THE TWO ARE
 //    AUTHORED SEPARATELY. What the student SEES comes from
@@ -83,6 +126,54 @@
 //    and it must not be done by deriving grip from the weather tag: the
 //    shadow traces of those 32 lessons were recorded at dry decel, so flipping
 //    them to wet grip would fail students against a ghost they cannot match.
+//
+// 3b. TWO CORRECTIONS TO 3, BOTH READ OUT OF THE CODE RATHER THAN INFERRED.
+//    · SEEN AND GRADED DO COME FROM ONE SOURCE. `lesson.environment.{rain,
+//      fog,snow}` feeds BOTH this store (LessonScene's `<SimEnvironment rain
+//      fog snow>` props → setWeatherTarget) AND the tick the engine grades on
+//      (LessonScene's `runtime.sample(sample, t, isNight, rain, …, fog, snow)`
+//      → `tick.rain/fog/snow` → engine.ts `const raining = tick.rain === true`,
+//      the conditionSpeed*Factor site). One authored field, two
+//      consumers. The single place they COULD disagree was this store's own
+//      state, because it is a module singleton that ramps from 0 and outlives
+//      a scene: the engine's flag is true on frame 1 while the picture took
+//      4-6 s to arrive, and a dry lesson opened after a rain one was graded
+//      dry over a wet road for 12 s. That is what `primeWeather` closes.
+//    · THE 32 RENDER-ONLY-RAIN LESSONS ARE NOT SILENT. compile.ts'
+//      LADDER_COPY_ORDER carries a distinct rung for each case — „Мокър паваж"
+//      when rain AND wetGrip are both authored („настилката държи около 70%…"),
+//      and „В дъжд" when only the rain is („включи чистачките…", no grip
+//      claim). The student is told which one they are in. The genuinely
+//      unnarrated direction is the MIRROR: grip WITHOUT a picture. The ladder
+//      has a rung for that too („Настилката вече е истинска"), but it fires on
+//      `physics.wetGrip/snowGrip`, and the ice pair's 0.15 arrives as
+//      `built.gripPatches` from the DISTRICT's zone spans instead — so nothing
+//      tells the student the road changed, and nothing in the picture shows
+//      it. A car that slides on what looks like dry summer asphalt convicts
+//      the student of a mistake the scene never let them see coming. That is
+//      the founder's own false-failure complaint, and it is the sharpest
+//      unclosed thing behind sc-ac-ice / sc-ac-bridge-ice. Routed:
+//      compile.ts (a gripPatches rung) + the season work in 2b.
+//
+// 4. TWO FINDINGS ROUTED HERE HAVE NO CHANNEL IN THIS STORE AT ALL, AND ONE
+//    MUST NOT BE GIVEN ONE.
+//    · sc-ac-crosswind („the wheel shows no counter-steer at any point, there
+//      is no wind force visible in the car's attitude"). Wind is real in the
+//      physics — LessonScene passes VehicleRig's `windLateralN` /
+//      `windGustAmplitudeN` / `windGustPeriodSec` from `physics.crosswind` — and
+//      is rendered by nothing. A wind channel HERE would be a fifth 0..1
+//      number with no author (nothing writes `environment.wind`) and no
+//      reader, i.e. exactly the dead API this lane is meant not to add. The
+//      lesson needs the disturbance made VISIBLE where it already exists:
+//      steering-wheel counter-rotation and body attitude in VehicleRig /
+//      the cockpit rig, and only then a weather channel if the sky is
+//      supposed to show it too.
+//    · sc-ac-truck-spray („the water curtain the lesson is named after never
+//      exists"). Spray is emitted BY an NPC and occludes the air behind that
+//      one vehicle — it is not a scene-wide 0..1 like fog, and putting it in
+//      this store would make every driver in the lesson spray. Routed to the
+//      NPC/effects layer; the only correct claim on this store is that spray
+//      should ride the rain channel's intensity, not replace it.
 
 import { useSyncExternalStore } from "react";
 
@@ -103,10 +194,45 @@ export const FOG_OUT_PER_SEC = 1 / 6;
 export const SNOW_IN_PER_SEC = 1 / 6;
 /** Snow intensity decay rate (1/s → clears in ~8 s). */
 export const SNOW_OUT_PER_SEC = 1 / 8;
-/** dt handed to `primeWeather`'s single step: longer than the slowest ramp of
- *  all eight rates (WETNESS_OUT_PER_SEC, 12 s), so every channel lands exactly
- *  on its target rather than partway. */
-export const PRIME_DT_SEC = 20;
+
+/**
+ * EVERY ramp rate in this store, by name. `primeWeather`'s single step has to
+ * outrun the slowest of them, and the old spelling of that was a hand-written
+ * `PRIME_DT_SEC = 20` under a comment naming WETNESS_OUT_PER_SEC as the
+ * slowest — true when it was written, and silently false the moment anyone
+ * adds a slower channel. A number derived from the rates cannot go stale, and
+ * the test reflects over this module's exports to prove no rate escaped the
+ * registry (a rate added and not listed here fails that check, rather than
+ * quietly leaving primed scenes partway through their ramp).
+ */
+export const WEATHER_RATES = {
+  WETNESS_IN_PER_SEC,
+  WETNESS_OUT_PER_SEC,
+  RAIN_IN_PER_SEC,
+  RAIN_OUT_PER_SEC,
+  FOG_IN_PER_SEC,
+  FOG_OUT_PER_SEC,
+  SNOW_IN_PER_SEC,
+  SNOW_OUT_PER_SEC,
+} as const;
+
+/** Seconds the slowest channel needs to cross its full 0..1 range. */
+export const SLOWEST_TRAVERSE_SEC = Math.max(
+  ...Object.values(WEATHER_RATES).map((rate) => 1 / rate),
+);
+
+/**
+ * dt handed to `primeWeather`'s single step. Derived, with a ×2 margin, so
+ * that the priming contract survives the next channel.
+ *
+ * The margin is NOT decoration: `approach` clamps at the target, so exactly
+ * one traverse looks sufficient — but `(1 / 12) * 12 === 0.9999999999999999`,
+ * so a step of exactly 12 s leaves wetness at ~1.1e-16 instead of 0. That
+ * residue quantizes to 0 (the React hooks would never see it) while
+ * `getWetness()` — what the per-frame road material actually reads — returns
+ * a non-zero. A primed dry scene would render imperceptibly damp forever.
+ */
+export const PRIME_DT_SEC = 2 * SLOWEST_TRAVERSE_SEC;
 
 let wetness = 0;
 let wetnessTarget = 0;
@@ -125,6 +251,13 @@ function quantize(v: number): number {
 
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/** `a` at t=0, `b` at t=1. At t=0 this returns `a` EXACTLY (`a + 0`), which is
+ *  what makes the snow term below provably free for every dry and rain
+ *  scene — see the byte-identity test. */
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
 
 function approach(current: number, target: number, ratePerSec: number, dtSec: number): number {
@@ -312,25 +445,129 @@ export function useSnowIntensity(): number {
 export interface RoadWetnessParams {
   /** Assign to MeshStandardMaterial.roughness on road surfaces. */
   roughness: number;
-  /** Multiply the road's base color by this (wet asphalt darkens). */
+  /**
+   * Multiply the road's base color by this. Wet asphalt darkens (< 1); snow
+   * lying on it BRIGHTENS it (> 1) — the one channel in this pair that can
+   * point either way, and the reason a snow-covered street stopped having to
+   * render as bare grey.
+   */
   darken: number;
 }
 
 /**
- * Map a wetness value to standard-material params for road surfaces.
- * Dry: rough matte asphalt. Wet: darker + glossy so the sky/streetlights
- * smear into reflections. Pure — unit-tested.
+ * What is lying ON the road right now. Two independent 0..1 components,
+ * because they are two different materials with opposite optics: water
+ * darkens and glosses, snow brightens and mattes.
+ */
+export interface RoadSurfaceState {
+  /** Rain water on the road — the store's `wetness` channel (`getWetness`). */
+  wet: number;
+  /** Snow on the road — the store's `snowIntensity` channel
+   *  (`getSnowIntensity` / `useSnowIntensity`, both already exported from the
+   *  module barrel). */
+  snow: number;
+}
+
+/**
+ * How much a fully snow-covered road brightens its own albedo.
+ *
+ * THIS IS THE ONE NUMBER IN THIS FILE NO TEST CAN VALIDATE — it is REASONED,
+ * not measured, and R0 says look before shipping. The reasoning and the R0
+ * recipe, so the check is cheap:
+ *
+ *  · Bounded BELOW by 1: the audit measured sc-ac-snow's road at mean sRGB
+ *    L 82.6 near / 135.5 far against sc-ac-fog's L 84.8 / 148.6 on the same
+ *    map under the same preset — snow rendering 2.6% and 8.8% DARKER than
+ *    fog. Anything ≤ 1 keeps that wrong way round.
+ *  · Bounded ABOVE by the lane markings. StaticWorld tints the road
+ *    `darken × ROAD_ALBEDO_TINT` (0.72) over a mid-grey asphalt map, and
+ *    paints the markings at #e9e7df — far brighter. Snow that buried them
+ *    would be photographically truer and pedagogically a trap: the rule
+ *    engine grades lane keeping and stop lines off those markings, so a
+ *    picture that removes them fails students on a skill it just took away.
+ *    This is a DUSTED road, deliberately, not a buried one — 1.8 lifts the
+ *    asphalt roughly two thirds of the way toward the paint and leaves it
+ *    clearly the darker of the two.
+ *  · Also below the composer's bloom threshold (0.9) on the brightest asphalt
+ *    texel, so med/high quality does not smear the carriageway into a sheet
+ *    the way the round-2 wet retune did (StaticWorld's R5 comment).
+ *
+ * R0: `/dev/scene-still` on a `weather: "snow"` lesson, beside the same map
+ * dry — the road must read paler than the concrete pavement, and the lane
+ * markings must still be the brightest thing in the carriageway.
+ */
+export const SNOW_ROAD_BRIGHTEN = 1.8;
+
+/**
+ * Map what is lying on the road to standard-material params for road surfaces.
+ * Dry: rough matte asphalt. Wet: darker + glossy so the sky/streetlights smear
+ * into reflections. Snow: brighter and back to matte. Pure — unit-tested.
+ *
+ * WHY THIS EXISTS (sweep161, sc-ac-snow part A, critical: „the road is bare
+ * grey asphalt with clean white lane markings … the student is being taught
+ * winter grip on a picture of a dry summer street"). This is the ONLY
+ * road-material mapping in the codebase — StaticWorld drives asphalt, decals
+ * and paint through it — and until now its only input was RAIN wetness, so no
+ * amount of snow could move the road by one shade. The previous lane read
+ * that correctly and then concluded the fix was world-module asset work
+ * („white ground cover … snow textures / meshes on the road", SnowFlakes.tsx
+ * header). It is not: the albedo multiply the wet road already rides is
+ * enough, costs no texture, no plane above the road and no z-fighting with
+ * the raised markings — which is precisely why that plane was rejected.
+ *
+ * ORDERING: water first, then snow ON TOP of it. Snow is the last thing to
+ * land on the surface, so it wins — the same „the denser bank wins" discipline
+ * SimEnvironment uses when it blends the rain haze, then snow, then fog.
+ *
+ * NO ICE TERM, AND THAT IS THE POINT. sc-ac-ice and sc-ac-bridge-ice are also
+ * routed to this file, and the tempting read of them is „the road should look
+ * icy". It must not. Black ice is invisible — that is the whole lesson
+ * (bridge-ice briefing item 2: „Прочети знака А15 … той не е украса", item 3:
+ * „откритите участъци замръзват първи"). A road material that revealed ice
+ * would teach a seventeen-year-old that they can see it, which is a false
+ * certificate for a skill nobody has. What those two lessons are missing is
+ * the SEASON — see the header note, routed out.
+ */
+export function roadSurfaceToParams(
+  surface: RoadSurfaceState,
+  opts?: {
+    dryRoughness?: number;
+    wetRoughness?: number;
+    wetDarken?: number;
+    snowRoughness?: number;
+    snowBrighten?: number;
+  },
+): RoadWetnessParams {
+  const dryRoughness = opts?.dryRoughness ?? 0.92;
+  const wetRoughness = opts?.wetRoughness ?? 0.42;
+  const wetDarken = opts?.wetDarken ?? 0.62;
+  // Snow does not gloss the road, it UN-glosses it: fresh snow is the mattest
+  // surface a street ever has. Defaulting to the caller's own dryRoughness
+  // means a snowed-over wet road returns to the roughness that caller
+  // authored for dry, rather than to a number invented in this file — and it
+  // is the reason each of StaticWorld's three call sites (road 1.0, decals
+  // 0.95, paint 0.85) keeps its own character under snow.
+  const snowRoughness = opts?.snowRoughness ?? dryRoughness;
+  const snowBrighten = opts?.snowBrighten ?? SNOW_ROAD_BRIGHTEN;
+  const w = clamp01(surface.wet);
+  const s = clamp01(surface.snow);
+  return {
+    roughness: lerp(lerp(dryRoughness, wetRoughness, w), snowRoughness, s),
+    darken: lerp(lerp(1, wetDarken, w), snowBrighten, s),
+  };
+}
+
+/**
+ * The rain-only case of `roadSurfaceToParams`, kept because it is the shipped
+ * signature: StaticWorld's three call sites and the module barrel both spell
+ * it this way, and at `snow: 0` the lerp above returns its first argument
+ * EXACTLY (`a + (b - a) * 0`), so every dry and every rain scene is
+ * bit-identical to before the snow term existed. That identity is pinned by
+ * test, over the three shipped opts bags, rather than asserted here.
  */
 export function wetnessToRoadParams(
   w: number,
   opts?: { dryRoughness?: number; wetRoughness?: number; wetDarken?: number },
 ): RoadWetnessParams {
-  const dryRoughness = opts?.dryRoughness ?? 0.92;
-  const wetRoughness = opts?.wetRoughness ?? 0.42;
-  const wetDarken = opts?.wetDarken ?? 0.62;
-  const t = clamp01(w);
-  return {
-    roughness: dryRoughness + (wetRoughness - dryRoughness) * t,
-    darken: 1 + (wetDarken - 1) * t,
-  };
+  return roadSurfaceToParams({ wet: w, snow: 0 }, opts);
 }

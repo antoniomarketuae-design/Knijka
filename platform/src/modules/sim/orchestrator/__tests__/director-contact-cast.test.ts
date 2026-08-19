@@ -65,7 +65,29 @@ const LEAD: StagedEventSpec = {
 } as unknown as StagedEventSpec;
 
 describe("directorContactCast", () => {
-  it("returns the very cast the sentinel sweeps — not a re-derivation", () => {
+  // A TITLE CORRECTED, 2026-08-19, because it asserted something the test did
+  // not test. It read „returns the very cast the sentinel sweeps — NOT a
+  // re-derivation", and both the director's comment and the lane that wired
+  // this called that IDENTITY load-bearing — yet every assertion compared
+  // `.map(m => m.actorId)` BY VALUE, so mutating the getter to
+  // `return this.cast.slice()` — a literal re-derivation — left all three
+  // green.
+  //
+  // …AND THE FIRST REPAIR REACHED FOR WAS ALSO WRONG, which is worth writing
+  // down because the same trap is one line away. `createScenarioDirector`
+  // snapshots the cast into the WeakMap ONCE
+  // (`castByDirector.set(director, director.contactCast)`), so every later call
+  // returns that one snapshot whatever the getter did to produce it. MEASURED:
+  // mutating the getter to `this.cast.slice()` AND to `this.cast.map(m =>
+  // ({ ...m }))` both leave this file green even with the identity assertions
+  // below in place. The getter's identity is UNOBSERVABLE through this seam —
+  // and harmless for the same reason, since the snapshot is taken before any
+  // sweep. So no title here may claim it.
+  //
+  // What IS observable is the ACCESSOR, which is the seam LessonScene calls on
+  // every contact: ONE cast, handed back unchanged. Mutating
+  // `directorContactCast` to re-derive per call fails the assertions below.
+  it("hands back ONE declared cast — same members on every call, and after reset", () => {
     const director = createScenarioDirector([LEAD], new StillPort(), { seed: 5 });
     const cast = directorContactCast(director);
     // The runner is the single source; a second walk over the specs could
@@ -73,6 +95,18 @@ describe("directorContactCast", () => {
     const fromRunner = createRunner(LEAD, null).contactCast;
     expect(cast.map((m) => m.actorId)).toEqual(fromRunner.map((m) => m.actorId));
     expect(cast.length).toBeGreaterThan(0);
+    // IDENTITY, which is what the old title claimed and no assertion checked.
+    // Scoped to what the seam can actually witness: the accessor. A
+    // `directorContactCast` that rebuilt its answer per call would hand the
+    // naming side a fresh object on every contact, and „the same cast" would be
+    // a claim about nothing.
+    const again = directorContactCast(director);
+    expect(again).toBe(cast);
+    for (let i = 0; i < cast.length; i++) expect(again[i]).toBe(cast[i]);
+    director.reset();
+    const afterReset = directorContactCast(director);
+    expect(afterReset).toBe(cast);
+    for (let i = 0; i < cast.length; i++) expect(afterReset[i]).toBe(cast[i]);
     // The bodies carry what the physics side needs to place them: a category
     // and a shape. Without these the naming side cannot test overlap at all.
     for (const m of cast) {

@@ -19,8 +19,32 @@
 //
 // A test nobody runs and a test that asserts nothing are the same defect: a
 // green light with nothing behind it. This file and `--audit-only` in
-// tools-tests.mjs are the two independent places that now refuse it, one in
-// each runner, so it takes two deliberate acts to go blind again.
+// tools-tests.mjs are the two independent places that refuse it, one in each
+// runner.
+//
+// THE SENTENCE THAT USED TO FINISH THAT PARAGRAPH WAS FALSE, and it was false
+// for the same reason the sentence it replaced in settle.test.mjs was false —
+// it described a property nobody had tried to break. It said "so it takes two
+// deliberate acts to go blind again". MEASURED 2026-08-19 BY MUTATION: put the
+// four literal patterns back into `include:` in platform/vitest.config.ts, so
+// that the config no longer spreads VITEST_INCLUDE, and
+//   · asking vitest for ladder/selectors/settle by name — `npx vitest list
+//     --filesOnly ../tools/mobile/settle.test.mjs …` — printed NOTHING, exit 0,
+//   · `node scripts/tools-tests.mjs --audit-only` printed "partition OK … none
+//     orphaned" and exited 0,
+//   · this file passed all 20 of its tests, none of which looked at the config.
+// One edit, one file, and neither runner noticed — because `vitestWouldRun()`
+// globs the CONSTANT, and nothing anywhere asserted that the config still used
+// it. The audit was auditing a list that had stopped deciding anything.
+//
+// SO THE DELEGATION IS NOW CHECKED IN BOTH RUNNERS, by two checks that see
+// different things. tools-tests.mjs scans the config as TEXT, because plain
+// node cannot load a .ts file, and requires the literal
+// `include: [...VITEST_INCLUDE]`. This file imports the REAL config — the same
+// module vitest itself loaded to decide what to run — and deep-compares the
+// resolved value. Text cannot see a value; a value cannot see whether it was
+// spread or retyped. Neither check subsumes the other, which is what makes two
+// acts two.
 //
 // THE PREDICTOR CHECKS ITSELF. The audit predicts vitest's file set with
 // vitest's own glob engine and options rather than a hand-rolled matcher, and
@@ -30,7 +54,7 @@
 // changed default, a different hoisted copy of tinyglobby — that is where it
 // fails, rather than quietly reporting a clean partition it did not measure.
 // -----------------------------------------------------------------------------
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,13 +62,19 @@ import { describe, expect, it } from "vitest";
 import { configDefaults } from "vitest/config";
 
 import {
+  auditConfigWiring,
   auditOwnership,
   classify,
   declaredRunner,
+  VITEST_CONFIG_FILE,
   VITEST_DEFAULT_EXCLUDE,
   VITEST_INCLUDE,
+  vitestConfigPath,
   vitestWouldRun,
 } from "../tools-tests.mjs";
+// The real config object, resolved by Vite exactly as vitest resolved it to
+// decide this file would run. src/coverage-thresholds.test.ts is the precedent.
+import vitestConfig from "../../vitest.config";
 
 const SELF = fileURLToPath(import.meta.url).split("\\").join("/");
 
@@ -120,6 +150,113 @@ describe("the partition over the whole repository", () => {
     expect(self).toBeDefined();
     expect(self.problem).toBeNull();
     expect(VITEST_INCLUDE).toContain("scripts/__tests__/**/*.test.mjs");
+  });
+});
+
+describe("the config still delegates to VITEST_INCLUDE — the half text cannot check", () => {
+  it("the include vitest actually resolved IS VITEST_INCLUDE, entry for entry", () => {
+    // THE ASSERTION THE WHOLE AUDIT RESTS ON AND DID NOT HAVE. Everything in
+    // the describe blocks above reasons about VITEST_INCLUDE; none of it is
+    // worth anything unless VITEST_INCLUDE is what the config hands vitest.
+    // `vitestConfig` here is the module vitest loaded to decide that this file
+    // would run at all, so a disagreement is between the constant and reality,
+    // not between two opinions.
+    expect(vitestConfig.test?.include).toEqual([...VITEST_INCLUDE]);
+  });
+
+  it("catches an include that no longer spreads the constant — the one-edit mutation", () => {
+    // The exact mutation measured on 2026-08-19: the four literal patterns the
+    // config held before the orphan fix. Deep-equality catches it here even
+    // though the node gate's text scan is what names it there.
+    const narrowed = [
+      "src/**/*.test.{ts,tsx}",
+      "scripts/__tests__/**/*.test.mjs",
+      "../tools/assets/**/*.test.mjs",
+      "../tools/mobile/budget.test.mjs",
+    ];
+    expect(narrowed).not.toEqual([...VITEST_INCLUDE]);
+    // …and the three orphans are exactly what the difference consists of.
+    for (const name of ["ladder", "selectors", "settle"]) {
+      expect(VITEST_INCLUDE).toContain(`../tools/mobile/${name}.test.mjs`);
+      expect(narrowed).not.toContain(`../tools/mobile/${name}.test.mjs`);
+    }
+  });
+});
+
+describe("auditConfigWiring — the node gate's text scan, driven from here", () => {
+  const CONFIG_SRC = readFileSync(vitestConfigPath(), "utf8");
+  const SPREAD = "include: [...VITEST_INCLUDE],";
+  const IMPORT = 'import { VITEST_INCLUDE } from "./scripts/tools-tests.mjs";';
+
+  /**
+   * Mutate the REAL config source, not a synthetic stand-in.
+   *
+   * A synthetic sample would omit the two things that make this file hard to
+   * scan — a second `include:` key under `coverage`, and glob strings holding a
+   * doubled star — and a scanner proven only against the easy shape is a
+   * scanner proven against nothing. The uniqueness check is not decoration: a
+   * mutation helper whose anchor silently matches nothing returns the original
+   * source, and every assertion below would then pass by testing the unmutated
+   * file.
+   */
+  const mutate = (from, to) => {
+    expect(CONFIG_SRC.split(from).length - 1, `anchor is not unique: ${from}`).toBe(1);
+    const out = CONFIG_SRC.replace(from, to);
+    expect(out, "the mutation changed nothing").not.toBe(CONFIG_SRC);
+    return out;
+  };
+
+  it("clears the real config — the case verified by eye, and by this run existing", () => {
+    // The self-check. This scan runs as a hard precondition of the node gate,
+    // so a false REFUSAL here would block every tools/ test in CI — which is
+    // how the stripComments defect was found rather than shipped.
+    expect(auditConfigWiring(CONFIG_SRC)).toEqual([]);
+  });
+
+  it("refuses a config that inlines the patterns instead of spreading them", () => {
+    const problems = auditConfigWiring(
+      mutate(SPREAD, 'include: ["src/**/*.test.{ts,tsx}", "scripts/__tests__/**/*.test.mjs"],'),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/0 time\(s\), expected exactly 1/);
+  });
+
+  it("refuses a pattern smuggled in BESIDE the spread — invisible to the node gate", () => {
+    // The quieter half of the same defect. Adding a pattern here rather than to
+    // VITEST_INCLUDE gives vitest a file the ownership audit believes nobody
+    // runs, so the audit reports an orphan that is not one — a FALSE FAILURE,
+    // and the founder's own complaint is a false failure.
+    const problems = auditConfigWiring(
+      mutate(SPREAD, 'include: [...VITEST_INCLUDE, "../tools/mobile/ready.test.mjs"],'),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/0 time\(s\)/);
+  });
+
+  it("refuses a locally-defined VITEST_INCLUDE that shadows the shared one", () => {
+    // The spread survives and resolves — to a list this repo's node gate has
+    // never seen. Only the import check can tell the difference.
+    const problems = auditConfigWiring(
+      mutate(IMPORT, 'const VITEST_INCLUDE = ["src/**/*.test.{ts,tsx}"];'),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/does not import VITEST_INCLUDE/);
+  });
+
+  it("is not satisfied by the rule written as a COMMENT above a config that breaks it", () => {
+    // The config's own header already says "Do not inline a pattern here". It
+    // said so on the day the mutation above went green in both gates. Prose is
+    // not a gate; a scanner that counts prose is not a gate either.
+    const problems = auditConfigWiring(
+      mutate(SPREAD, '// include: [...VITEST_INCLUDE]\n    include: ["src/**/*.test.{ts,tsx}"],'),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/0 time\(s\)/);
+  });
+
+  it("names the config it scanned, so a rename cannot leave it scanning nothing", () => {
+    expect(VITEST_CONFIG_FILE).toBe("vitest.config.ts");
+    expect(vitestConfigPath().split("\\").join("/")).toMatch(/\/platform\/vitest\.config\.ts$/);
   });
 });
 
@@ -222,9 +359,49 @@ describe("declaredRunner reads code, not prose about code", () => {
   });
 
   it("does not mistake a URL for a comment and delete half the file", () => {
-    // The `[^:]` guard in the comment stripper. Without it, `https://x` eats
-    // the rest of the line and can take the import with it.
+    // `https://x` inside a string is not a line comment. The stripper used to
+    // dodge this with a `[^:]` lookbehind hack; it now knows what a string is,
+    // and this stays here because the hack going away must not take the
+    // behaviour with it.
     const src = 'const doc = "https://example.test/x"; import { it } from "vitest";';
     expect(withFile(src, declaredRunner)).toBe("vitest");
+  });
+
+  it("does not mistake a GLOB for a block comment and delete the rest of the file", () => {
+    // NOT HYPOTHETICAL, AND NOT FOUND BY READING. The old stripper opened a
+    // block comment on the slash-star inside any doubled-star glob and closed
+    // it at the next star-slash — which the NEXT glob supplies. Everything
+    // between vanished, imports included.
+    //
+    // It surfaced on 2026-08-19 when the new config scan refused
+    // platform/vitest.config.ts, a file that was CORRECT: its
+    // "src/modules/payments/" coverage key opened the comment and the coverage
+    // include glob closed it, forty lines and one `include: [...VITEST_INCLUDE]`
+    // later. A false refusal, caught only because the first thing the new check
+    // did was run against a file already known to be right.
+    //
+    // Under the old stripper this source classifies as null; under the new one
+    // it is what it plainly is. All 910 test files in the repo were classified
+    // with both implementations and agreed, so this is the one shape that moved.
+    const src = [
+      'const a = "src/modules/payments/**";',
+      'import { it } from "vitest";',
+      'const b = "src/modules/**/*.ts";',
+      'it("x", () => {});',
+    ].join("\n");
+    expect(withFile(src, declaredRunner)).toBe("vitest");
+  });
+
+  it("still strips a real block comment that happens to sit between globs", () => {
+    // The other direction, because a stripper that stopped stripping would
+    // also make the test above pass. A genuine block comment claiming an
+    // import must still not count as one.
+    const src = [
+      'const a = "src/**";',
+      '/* this block says: import { it } from "vitest"; and it is still prose */',
+      'const b = "y/**/z";',
+      "export const nothing = 1;",
+    ].join("\n");
+    expect(withFile(src, declaredRunner)).toBeNull();
   });
 });

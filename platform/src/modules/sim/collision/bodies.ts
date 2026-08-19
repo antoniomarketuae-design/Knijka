@@ -102,3 +102,57 @@ export function actorObb(pose: ActorPose, profile?: VehicleProfile): Obb2D {
     halfWidthM: vehicleHalfWidthM(profile),
   };
 }
+
+/**
+ * The box RAPIER ACTUALLY BINDS to a traffic agent at a pose — the kinematic
+ * NPC shell, at every profile.
+ *
+ * WHY THIS EXISTS SEPARATELY FROM `actorObb`. The two are answers to two
+ * different questions and the difference is measurable:
+ *
+ *   · `actorObb` answers "how big is this body?" — the fleet profile, which is
+ *     what a GEOMETRIC DETECTOR wants (the director's ContactSentinel, which
+ *     adjudicates contact on its own and owes nothing to rapier);
+ *   · this answers "how big is the collider that just fired?" — and every
+ *     `traffic.vehicles` entry, whatever its profile, is followed by ONE
+ *     kinematic cuboid of 0.92 × 2.10 m (NpcColliders: "one size fits the
+ *     whole GLB fleet — colliders are sized once; per-model fitting would
+ *     force collider swaps on rebind"). A NAMING function, handed a contact
+ *     rapier has already declared, must ask the second question.
+ *
+ * MEASURED disagreement between the two, player half-length 2.02 / half-width
+ * 0.85 against the shell's 2.10 / 0.92, at the rear enter edge (centre
+ * separation 4.12 m) and the flank enter edge (1.77 m):
+ *
+ *   profile        halfL   halfW   rear deficit   flank deficit
+ *   car             2.05    0.920      0.050          0.000
+ *   van             2.60    0.990     −0.500         −0.070
+ *   truck           3.75    1.200     −1.650         −0.280
+ *   tram            7.00    1.150     −4.900         −0.230
+ *   train          17.20    1.950    −15.100         −1.030
+ *   cyclist         0.90    0.230      1.200          0.690   ← never nameable
+ *   childCyclist    0.75    0.166      1.350          0.754   ← never nameable
+ *
+ * A POSITIVE deficit is the fatal one: rapier fires while the profile box
+ * still reports metres of clear air, so a zero-tolerance naming test can never
+ * resolve that body and the report stays anonymous forever. The cyclist proxy
+ * is a `traffic.vehicles` entry tagged "cyclist" by
+ * `TrafficSystem.vehicleCollisionKind`, so it is shell-bound like every other
+ * agent while `actorObb(pose, "cyclist")` is a 0.46 × 1.80 m bicycle: 1.20 m
+ * short longitudinally, 0.69 m laterally, and the physics solver keeps the
+ * player's chassis OUT of the shell, so the 1.20 m of penetration the profile
+ * box needs is not reachable at all. A NEGATIVE deficit is the mirror image —
+ * a 14 m tram box overlapping the player 4.9 m before its collider does, which
+ * makes a naming test see phantom candidates.
+ *
+ * Both directions vanish when the naming side is sized from the collider.
+ */
+export function npcShellObb(pose: ActorPose): Obb2D {
+  return {
+    x: pose.x,
+    y: pose.y,
+    headingDeg: headingOfDir(pose.dirX, pose.dirY),
+    halfLengthM: NPC_VEHICLE_SHELL_HALF_LENGTH_M,
+    halfWidthM: NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+  };
+}
