@@ -1048,6 +1048,89 @@ export function listRowsInScrollCoords(
   return rowRects.map((r) => ({ top: r.top - listTop + scrollTop, height: r.height }));
 }
 
+/** The 3.5 rem the notification column keeps clear ABOVE the instrument band,
+ *  so the last card in it never sits on the band's own top edge. */
+const NOTIFY_COLUMN_BAND_GUTTER_PX = 56;
+
+/**
+ * How tall the right-edge notification column may be, given where it starts.
+ *
+ * The arithmetic behind the right-edge column's `max-height`, pulled out of the
+ * style object because a `calc()` string cannot be asserted about.
+ *
+ * ⚠ THE COLUMN'S OWN `data-hud` NAME MAY NOT BE WRITTEN IN THIS COMMENT, and
+ * the first draft of it was: `thumb-band-clearance.test.ts` (N4) finds that
+ * name with `indexOf` and reads 260 characters forward looking for the stacking
+ * order, so a paragraph up here that merely QUOTES it becomes the anchor. The
+ * first draft turned N4 red; a draft that ALSO quoted what N4 searches for
+ * would have turned it green while the real declaration went unguarded, which
+ * is the worse of the two. The same rule is written beside the JSX, and
+ * `shellClipAffordances.test.ts` now checks that the anchor is inside the
+ * component rather than in a module-level paragraph.
+ *
+ * See the block at that declaration for the measurement; the short version is
+ * that `max-height` counts from the element's TOP, so a cap written as
+ * „the stage minus the band" only stops above the band for a column anchored
+ * at 0 — and this one is anchored at the interior mirror's lane.
+ *
+ * @param stageHeightPx  the `[data-sim-stage]` box the column is positioned in
+ * @param columnTopPx    the resolved `top` — 164 px on the 1165 × 650 stage
+ */
+export function notifyColumnCapPx(stageHeightPx: number, columnTopPx: number): number {
+  return Math.max(
+    0,
+    stageHeightPx - columnTopPx - ROOMY_HUD_FLOOR_PX - NOTIFY_COLUMN_BAND_GUTTER_PX,
+  );
+}
+
+/**
+ * Sub-pixel slack for `scrollRemainingPx`, px. Fractional line boxes stack, so
+ * a scroller the student HAS read to the end reports 1–3 px left over on both
+ * engines; 4 px is past that and still well under one 11 px line, which is the
+ * smallest thing that could be a lost sentence.
+ */
+export const SCROLL_REMAINING_SLACK_PX = 4;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DEBRIEF SCROLLED IN SILENCE — sweep 161, sc-vu-emergency-junction and
+ * sc-vu-pass-clearance, both platforms.
+ *
+ * «The debrief card is clipped by the play-area viewport with no visible
+ * scroll affordance. On PC the protocol table is cut immediately below «Общо
+ * (допустими 9)», so the per-objective list — the only honest statement of
+ * what was and was not credited — is off-screen.» And on the other lesson the
+ * sentence explaining what the stars measure is severed mid-word.
+ *
+ * THIS IS THE ONE SURFACE WHERE CREDIT IS READ. The task chip goes 2/2 → null
+ * on session end whether or not anything ticked; the toast is gone in eight
+ * seconds. The debrief is the statement of record, and a student who does not
+ * know it continues below the fold has been shown a number and nothing else —
+ * which is the bare verdict doc 64 THEO-4 forbids, on the screen that matters
+ * most.
+ *
+ * WHY A SCROLLBAR IS NOT THE ANSWER ON ITS OWN. `OVERLAY_SCRIM_CLASS` has
+ * carried `overflow-y-auto` since §I20 and carried it on the frames above, so
+ * the content was always REACHABLE. What it was not is ANNOUNCED: WebKit — the
+ * founder's engine — paints an overlay bar that exists only during a scroll,
+ * and the sweep's own harness runs Chromium with `--hide-scrollbars`, so
+ * neither the student nor the instrument could see one. A measured sentence is
+ * true on every engine and in every screenshot.
+ *
+ * Same shape as `rowsBelowFold`: `clientHeight <= 0` is „not laid out yet",
+ * not „everything is hidden" — otherwise the pill flashes on every mount.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function scrollRemainingPx(
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  if (clientHeight <= 0) return 0;
+  const left = scrollHeight - clientHeight - scrollTop;
+  return left <= SCROLL_REMAINING_SLACK_PX ? 0 : Math.round(left);
+}
+
 /**
  * THE ADVISOR MAY NOT RE-READ THE TASK CHIP ALOUD — 2026-08-17.
  *
@@ -1259,10 +1342,34 @@ export function BriefingCard({
           the right priority and it is the reason no `shrink-0` is written on
           them — a graded fault, or the task itself, must never be the thing
           that yields to a briefing the student has already read. ────────────*/}
+      {/* ── …AND THE SCROLLER IS PAINTED, NOT JUST PRESENT ───────────────────
+          The sweep filed this panel five times in words that all name the same
+          missing thing — «no scrollbar or overflow affordance» (turn-lane-
+          arrows), «no item 5 and no scroll affordance» (jx-priority-
+          confidence), «cuts off after item 4 with no scrollbar» (ov-crest-
+          curve), and twice more on jx-blocked-exit and sp-wet-limit-plate.
+          The «↓ още N стъпки» row below answers the „did I know something was
+          hidden" half; this answers „is there anything to grab".
+
+          `overflow-y-auto` alone does not paint one here. Chromium's default
+          classic bar is 15 px — 5 % of a 320 px column — and WebKit's is an
+          OVERLAY bar that exists only during a scroll, which is the engine the
+          founder is actually on. `scrollbar-width: thin` + an explicit
+          `scrollbar-color` is what the two other HUD scrollers in this product
+          already use for exactly this reason (`LessonScene.tsx`'s key table,
+          `PreDriveChecklist.tsx`'s step list) and it costs 6 px, not 15.
+
+          NOTE ON THE FRAMES: they were driven at 7e2fd21, where this list still
+          carried `max-h-[28vh]` and no counter at all — `sc-ov-crest-curve/
+          pc-right/01-arrival.png` is that cap exactly (a 900 px window → 252 px
+          of list → four of six steps, ending on the card's own rounded border
+          with ~100 px of column unused below it). ec1f56f removed the cap and
+          added the counter. This is the third piece, and the one none of the
+          five findings would have been satisfied without. ──────────────────*/}
       <ol
         ref={listRef}
         onScroll={measure}
-        className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto"
+        className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
       >
         {steps.map((s) => (
           <li
@@ -3166,6 +3273,52 @@ export function LessonPlayShell({
   };
   const debriefOpen = shouldShowDebrief(debriefVisibility);
   const endBarVisible = shouldShowEndBar(debriefVisibility);
+
+  // -- THE DEBRIEF SAYS WHEN IT CONTINUES BELOW THE FOLD -----------------------
+  //
+  // The measuring half of `scrollRemainingPx` (see its header for the two
+  // frames and why a scrollbar could not have answered them). The scroller is
+  // the §I20 scrim itself, so this reads the element the browser is actually
+  // clipping against rather than any card inside it.
+  const endScrollRef = useRef<HTMLDivElement | null>(null);
+  // The MEASUREMENT is in px and the STATE is a boolean, deliberately. This
+  // handler runs on every scroll event, and the number changes on every one of
+  // them — storing it would re-render the whole shell per event, on a phone,
+  // for a pill whose text never changes. React bails out on an identical
+  // value, so a boolean re-renders exactly twice per debrief: when the fold
+  // appears and when the student reaches the end.
+  const [endHasMore, setEndHasMore] = useState(false);
+  const measureEndScroll = useCallback(() => {
+    const el = endScrollRef.current;
+    if (el === null) return;
+    setEndHasMore(scrollRemainingPx(el.scrollTop, el.clientHeight, el.scrollHeight) > 0);
+  }, []);
+  useEffect(() => {
+    if (!debriefOpen) return;
+    const el = endScrollRef.current;
+    if (el === null) return;
+    if (typeof ResizeObserver === "undefined") {
+      // jsdom / ancient Safari: one reading, and a later growth goes unnoticed.
+      // A stale sentence still beats the silence this exists to end.
+      measureEndScroll();
+      return;
+    }
+    const ro = new ResizeObserver(measureEndScroll);
+    ro.observe(el);
+    // ── AND THE CONTENT, NOT ONLY THE BOX ────────────────────────────
+    // The trap `BriefingCard`'s observer sits one step away from: a
+    // ResizeObserver on a scroller fires for changes to the SCROLLER's size,
+    // never to what is inside it. This debrief grows twice AFTER it opens and
+    // neither growth touches the scrim's box — the I1 calibration gate resolves
+    // and releases the whole result, and `finishLessonAction` returns and adds
+    // the concepts row and the XP line. Observing the scrim alone would have
+    // measured the card as it was before the two things a student most wants to
+    // read arrived. `firstElementChild` is the `max-w-2xl` column, i.e. the
+    // whole of the content.
+    const content = el.firstElementChild;
+    if (content !== null) ro.observe(content);
+    return () => ro.disconnect();
+  }, [debriefOpen, measureEndScroll]);
   const skipDebrief = useCallback(() => {
     setEndExpanded(false);
     setEndSkipped(true);
@@ -3559,6 +3712,42 @@ export function LessonPlayShell({
               )}
             </>
           ) : null}
+          {/* ── «КАЧЕСТВО» — THE ONE ROW THE PHONE HAD AND THE DESKTOP DID NOT
+              — sweep 161, sc-sp-curve/pc: „On PC the in-drive menu never opens.
+              07b-menu.png is captured at the same step that produces a full
+              settings sheet on mobile, but on PC it is the ordinary drive
+              frame."
+
+              HALF OF THAT IS BY DESIGN AND HALF WAS A HOLE. There is no «МЕНЮ»
+              on a roomy screen on purpose — every row of the compact sheet is
+              already a button on this bar, which is what the micro-menu block
+              says in as many words. Checked row by row against the sheet:
+              «Съветник», «Въпроси», «Известия», «Прекрати», «Цял екран» are all
+              here, and «Карта» is the chip on the minimap column below. One was
+              not: `nextQualitySelection` had exactly one call site in this file
+              and it was inside the compact-only items array, so a desktop
+              student whose frame rate collapsed had no route to the setting at
+              all — which is the founder's own sentence about why the row exists
+              („if the frame rate is bad he still has to leave the session to
+              change anything"), left true on the platform he reported it from.
+
+              Same cycler, same labels, same THEO-4 second line — the trade is
+              in `title` here rather than under the label, because a top bar has
+              no room for a second row and a setting that changes the experience
+              without saying what it costs is the bare verdict requirement zero
+              forbids. Present during the exam for the reason the sheet's row
+              is: nothing here changes what is scored. */}
+          {!ended && onQualityChange ? (
+            <button
+              type="button"
+              className="btn-ghost px-3 py-1.5 text-xs"
+              onClick={() => onQualityChange(nextQualitySelection(qualitySelection))}
+              title={qualityTradeBg(qualitySelection, quality) ?? undefined}
+              aria-label={qualityAriaLabelBg(qualitySelection, quality) ?? undefined}
+            >
+              Качество: {qualityValueBg(qualitySelection, quality)}
+            </button>
+          ) : null}
           {/* QW1: fullscreen toggle — the same control exits (Esc works too).
               Hidden where the API does not exist: a button that cannot do its
               one job is worse than no button, and the CSS immersive layout has
@@ -3846,7 +4035,46 @@ export function LessonPlayShell({
             // Never past the instrument band: a column that runs to the floor
             // is a sidebar, and a sidebar is the web page this HUD stopped
             // being. Anything longer scrolls inside its own card.
-            maxHeight: `calc(100% - ${ROOMY_HUD_FLOOR_PX}px - 3.5rem)`,
+            //
+            // ══ …AND THE CAP HAS TO SUBTRACT THE COLUMN'S OWN TOP ═══════════════
+            //
+            // `max-height` is measured from the element's top edge, so
+            // `100% - floor - gutter` only means „stops above the band" for a
+            // column that starts at 0. This one starts at `top`, and on
+            // 2026-08-17 that top moved: `NOTIFY_COLUMN_TOP_CSS_ROOMY` stopped
+            // being 3.25 rem and became the interior mirror's lane
+            // (`max(3.25rem, 24% + 0.5rem)`), which is 164 px on the stage the
+            // sweep drove. The cap did not follow it, so the sentence three
+            // lines above became false by exactly that 164.
+            //
+            // MEASURED, Chromium, a 1165 × 650 stage — the `?chrome=dashboard`
+            // box at the sweep's 1440 × 900 window:
+            //
+            //   top        164.00        (the number notifyColumn.ts records
+            //                             from both engines, so the reading is
+            //                             of the shipped CSS and not of a
+            //                             lookalike)
+            //   shipped    height 486 → bottom 650  = the stage's own floor,
+            //              i.e. 108 px INSIDE the instrument band, over the
+            //              pedal column and the wiper/lights icons
+            //   this cap   height 322 → bottom 486  = 100% − 108 − 3.5rem,
+            //              which is what the comment always claimed
+            //
+            // It is latent rather than photographed — the sweep's frames were
+            // driven at the 52 px top, where 52 + 486 = 538 landed just above
+            // the band, and `sc-sp-limit-end/pc-wrong/04-t017s.png` shows the
+            // ОПАСНА ГРЕШКА card guillotined on exactly that 538. With the top
+            // at 164 the same content is 112 px further down and the clip edge
+            // is inside the controls. Fixing the cap is what keeps the
+            // guillotine (which is a separate defect, routed below) from
+            // happening ON TOP of the pedals.
+            //
+            // Nested `calc()` is valid CSS Values 3 and resolves in both
+            // engines — a dropped `calc()` would leave the box at `auto`
+            // height, which is the whole stage, so the failure mode of getting
+            // this wrong is the bug it fixes. `notifyColumnCapPx` below is the
+            // arithmetic, held by a test that watches both directions.
+            maxHeight: `calc(100% - ${NOTIFY_COLUMN_TOP_CSS_ROOMY} - ${ROOMY_HUD_FLOOR_PX}px - ${NOTIFY_COLUMN_BAND_GUTTER_PX}px)`,
           }}
         >
           {mistakeMode ? (
@@ -4378,8 +4606,15 @@ export function LessonPlayShell({
             // whole of what that costs.
             data-hud="end-screen"
             data-hud-keep=""
+            ref={endScrollRef}
+            onScroll={measureEndScroll}
             // §I20: opaque scrim, no backdrop-filter — see OVERLAY_SCRIM_CLASS.
-            className={`absolute inset-0 z-40 ${OVERLAY_SCRIM_CLASS}`}
+            // The scrollbar pair is the desktop half of `scrollRemainingPx`'s
+            // defect: `overflow-y-auto` is already in the scrim constant, but
+            // Chromium's 15 px classic bar is 2 % of this box and WebKit paints
+            // none at rest. Same two declarations the product's other two HUD
+            // scrollers carry.
+            className={`absolute inset-0 z-40 ${OVERLAY_SCRIM_CLASS} [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]`}
           >
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {/* A2: the compact close control USED to be here, unconditional,
@@ -4514,6 +4749,31 @@ export function LessonPlayShell({
                 autoOpen={endAutoOpen}
                 onAutoOpenChange={!resultHeld ? setEndAutoOpenPersisted : null}
               />
+              {/* ── «ПРОДЪЛЖАВА ПО-ДОЛУ» ─────────────────────────
+                  The sentence `scrollRemainingPx` measures. `sticky bottom-0`
+                  keeps it on the last visible row of the scroller as the
+                  student reads down, and it disappears the moment there is
+                  nothing left — an affordance that is always on is chrome, and
+                  this same sweep filed the phone's «↓ ОЩЕ N РЕДА» badge twice
+                  for sitting on the sentence it was counting.
+
+                  It says WHAT is below, not just that something is: on both
+                  filed frames the hidden part is the per-objective breakdown —
+                  the only place the student can see which skills were credited
+                  and which were not — so naming it is the difference between a
+                  scroll hint and a reason to scroll.
+
+                  `pointer-events-none` so it can never take a tap meant for the
+                  CTA it is floating over; the scroll it asks for works on the
+                  scrim regardless. */}
+              {endHasMore ? (
+                <p
+                  aria-live="polite"
+                  className="pointer-events-none sticky bottom-0 z-10 self-center rounded-full border border-border bg-background/95 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-muted"
+                >
+                  ↓ Разборът продължава — превърти за оценката по задачи
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -4584,14 +4844,56 @@ export function LessonPlayShell({
       {/* Footer: save state + ODbL attribution (required — district meta).
           Hidden while fullscreen (immersive chrome-free layout, QW1) UNLESS a
           save failed — that warning must never be suppressed. Attribution
-          remains visible in every letterboxed state around the session. */}
+          remains visible in every letterboxed state around the session.
+
+          ══ …AND THE ONE STATE THAT SUPPRESSION EXCEPTION CREATES WAS NEVER
+             LAID OUT — sweep 161, sc-vp-telltale-red/mobile-right/08-debrief ══
+
+          THE FRAME: «Сесията не се записа (SAVE_FAILED) — оценката и разборът
+          са верни…» painted as bare 12 px type on the last row of pixels of a
+          2556 × 1179 iPhone landscape screen, running edge to edge with the
+          attribution «© OpenStreetMap contributors» crushed against its right
+          end on the SAME line. The sweep's word for it is the right one: „the
+          most important message on the screen looks like a rendering
+          artefact".
+
+          IT IS NOT A STYLING TASTE, IT IS THE EXCEPTION'S OWN GEOMETRY. In
+          immersive+compact the shell root is `fixed … overflow-hidden` with NO
+          padding at all — deliberately, because „eight pixels of page gutter on
+          each side of a driving simulator is eight pixels of road" — and this
+          row is its last flex child. Every other consumer of that root either
+          lives inside the stage or draws its own plate; this row was written
+          for the letterboxed desktop layout, where the dashboard's own padding
+          was doing the work, and then made to appear in a layout that has none.
+          So it inherits zero gutter, zero safe area (`viewport-fit=cover`
+          ships, so on a landscape iPhone the bottom inset is real), and shares
+          its line with the attribution because `flex-wrap` had no reason to
+          break.
+
+          Three things, each answering one clause of the finding: the row takes
+          real insets while immersive; the warning takes `basis-full` so the
+          attribution can never sit on its line again; and it gets a bordered
+          plate, because a sentence that says the student's drive was not saved
+          may not be the only thing on this screen with no box around it. */}
       <div
-        className={`flex flex-wrap items-center gap-3 text-xs text-muted ${
+        className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted ${
           immersive && !(ended && saveResult && !saveResult.ok) ? "hidden" : ""
         }`}
+        style={
+          immersive
+            ? {
+                paddingLeft: "calc(0.75rem + env(safe-area-inset-left, 0px))",
+                paddingRight: "calc(0.75rem + env(safe-area-inset-right, 0px))",
+                paddingBottom: "calc(0.375rem + env(safe-area-inset-bottom, 0px))",
+              }
+            : undefined
+        }
       >
         {ended && saveResult && !saveResult.ok ? (
-          <span className="font-semibold text-warning">
+          <span
+            role="status"
+            className="basis-full rounded-xl border border-warning/60 bg-background/95 px-3 py-2 font-semibold text-warning"
+          >
             {saveResult.code === "NOT_SIGNED_IN"
               ? // B39: this used to be a redirect, so the student never read a
                 // sentence — the drive screen simply became /login and the

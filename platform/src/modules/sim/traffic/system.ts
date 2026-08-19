@@ -1,14 +1,22 @@
 /**
  * TrafficSystem — owns all agents and advances them in ONE per-frame update.
  *
- * Update order inside a frame: pedestrians first (vehicles then react to
- * fresh crossing occupancy), then vehicles in fixed index order. Pedestrian
- * gap checks read vehicle poses from the previous frame — one frame of
- * staleness is invisible at 60 Hz and keeps the pass order simple.
+ * Update order inside a sub-step: pedestrians first (vehicles then react to
+ * fresh crossing occupancy), then vehicles in fixed index order, then staged
+ * actors. Pedestrian gap checks read vehicle poses from the previous sub-step
+ * — one step of staleness is invisible at 60 Hz and keeps the pass order
+ * simple.
+ *
+ * A frame longer than `MAX_SUBSTEP_SEC` runs that order several times rather
+ * than once with a longer `dt`: the world owes the car a whole frame of time
+ * and every body owes the collision clamps a short step. See
+ * `MAX_FRAME_DT_SEC` for the fifth-pace defect this closes and the numbers
+ * behind it.
  *
  * Determinism: (seed, district, config, dt sequence) fully determine the
  * playback. All randomness is drawn at init or from per-agent streams; the
- * update path allocates nothing and iterates in fixed order.
+ * update path allocates nothing and iterates in fixed order — the sub-step
+ * loop adds no allocation and `trafficSubStepPlan` is pure.
  */
 
 import { LANE_WIDTH_M } from "../world/builders/constants";
@@ -63,7 +71,97 @@ import {
   type VehicleProfile,
 } from "./types";
 
-const MAX_DT_SEC = 0.1;
+/**
+ * THE LARGEST STEP THE TRAFFIC INTEGRATOR IS EVER HANDED, s.
+ *
+ * This number is unchanged, and that is the point: nothing in `vehicles.ts`,
+ * `pedestrians.ts` or `staged.ts` ever sees an interval bigger than the one it
+ * has always seen. What changed is what happens to the REST of a longer frame —
+ * see `MAX_FRAME_DT_SEC` and `update()`.
+ */
+const MAX_SUBSTEP_SEC = 0.1;
+/**
+ * THE MOST WORLD TIME ONE FRAME MAY CARRY, s — the ego car's own ceiling.
+ *
+ * `@react-three/rapier` discards everything past half a second before its
+ * accumulator sees it (`clamp(dt, 0, 0.5)`), and since 2026-08-16 the lesson
+ * clock advances by exactly that much (`lesson-ui/sessionClock.ts`
+ * `PHYSICS_MAX_FRAME_DT`). Traffic must use the SAME ceiling or the two clocks
+ * diverge again on the longest frames — `__tests__/substep.test.ts` reads the
+ * literal out of that file so the pair cannot drift apart behind this one's
+ * back, exactly as `sessionClock.test.ts` reads rapier's out of node_modules.
+ *
+ * MEASURED 2026-08-19 against the pre-fix build itself — `git show HEAD:` of
+ * this file imported beside the new one — real district, seed 7, 20 s of
+ * warm-up, then ONE frame (`__tests__/substep.test.ts` reproduces the run):
+ *
+ *   one update(0.5)   pre-fix   8.825 m of ambient travel, timeSec +0.1000
+ *                     post-fix 44.109 m,                   timeSec +0.5000
+ *                                                                    4.998×
+ *
+ * and on the pre-fix build `update(0.5)` was BIT-IDENTICAL to `update(0.1)`:
+ * the old ceiling did not slow the world down, it threw the other 0.4 s away.
+ * Meanwhile the car driving through that world gained the full 0.5 s. So below
+ * 10 fps every yield, every gap judgement and every «пропусни пешеходеца» was
+ * graded against a world running at a fifth of the student's own car.
+ *
+ * WHAT THAT COSTS A STUDENT, measured (same test): a staged pedestrian released
+ * to cross 50 m ahead of a player at 50 km/h is 4.50 m along their path — well
+ * onto the roadway span (1.2–18.3 m) — when the player's bumper reaches the
+ * crossing at 60, 30 and 10 fps. At 2 fps they are 1.00 m along it, still on
+ * the kerb, and `pedestrianOnCrossing("x1")` answers FALSE. The crossing reads
+ * clear. Both crimes at once: the student who correctly stops is graded against
+ * an empty road, and the student who drives straight through is not marked for
+ * it.
+ *
+ * SUB-10-FPS IS NOT EXOTIC HERE, IT IS THE PHONE (docs/simulation/91_MOBILE_AUDIT):
+ * §G5 the first six seconds of every session at phone dimensions run 1.2 fps,
+ * 0.4 fps, 10.9 fps with individual frames of 3,218 ms and 4,234 ms (shader
+ * compile + texture upload); §G1 tier medium p95 frame 250 ms, worst frame
+ * 3.35 s; §G3 tier low under a 4× CPU throttle 7.4 fps / 116.6 ms p50.
+ *
+ * NOT A NEW TUNNELLING SURFACE. The frame is SUBDIVIDED, never widened: a
+ * 0.5 s frame is five 0.1 s steps, so the largest interval any body integrates
+ * is the one that shipped. Raising this clamp instead is the fix that was
+ * refused — `__tests__/substep.test.ts` runs that mutation and shows what it
+ * loses.
+ */
+export const MAX_FRAME_DT_SEC = 0.5;
+export const TRAFFIC_MAX_SUBSTEP_SEC = MAX_SUBSTEP_SEC;
+
+/** How one render frame of `dtSec` is cut up for the traffic integrator. */
+export interface TrafficStepPlan {
+  /** Number of sub-steps to run (0 = refuse the frame). */
+  steps: number;
+  /** Length of each sub-step, s. Always `<= MAX_SUBSTEP_SEC`. */
+  dt: number;
+}
+
+/**
+ * Cut a frame into sub-steps — a pure function so the arithmetic can be
+ * asserted without spinning up a district (the shape `sessionClockAdvance` and
+ * `qualityChoice` already establish: the decision is a tested function, not an
+ * expression at a call site where nothing can check it).
+ *
+ * Three properties, all asserted in `__tests__/substep.test.ts`:
+ *
+ *  1. `steps * dt === frameDt` EXACTLY — no time is thrown away, which is the
+ *     whole finding. Equal sub-steps rather than „0.1 until the remainder"
+ *     because a trailing sliver is a second, differently-sized integration.
+ *  2. `dt <= MAX_SUBSTEP_SEC` ALWAYS — no body is ever integrated over a
+ *     longer interval than the one that shipped, so the tunnelling surface is
+ *     unchanged by construction rather than by measurement.
+ *  3. `dtSec <= MAX_SUBSTEP_SEC` ⇒ `{ steps: 1, dt: dtSec }` — the argument is
+ *     passed through untouched, so above 10 fps every call is the call that
+ *     was there before, in the order it was in.
+ */
+export function trafficSubStepPlan(dtSec: number): TrafficStepPlan {
+  if (!(dtSec > 0)) return { steps: 0, dt: 0 };
+  const frameDt = dtSec > MAX_FRAME_DT_SEC ? MAX_FRAME_DT_SEC : dtSec;
+  const steps = frameDt > MAX_SUBSTEP_SEC ? Math.ceil(frameDt / MAX_SUBSTEP_SEC) : 1;
+  return { steps, dt: frameDt / steps };
+}
+
 const VEHICLE_COLOR_VARIANTS = 4;
 const PED_COLOR_VARIANTS = 4;
 /** A vehicle counts as "ahead in my path" within this lateral corridor, meters.
@@ -353,16 +451,46 @@ class TrafficSystemImpl implements TrafficSystem {
     };
   }
 
+  /**
+   * Advance the whole world by `dtSec`, in sub-steps of at most
+   * `MAX_SUBSTEP_SEC`.
+   *
+   * `!(dtSec > 0)` catches zero, negatives AND NaN in one predicate — the same
+   * three cases, with the same answers, the old `dt` expression produced
+   * (`NaN > 0.1` is false, so `dt` was NaN, so `!(dt > 0)` returned). It is
+   * also `sessionClockAdvance`'s NaN ruling: a NaN clock stops the world
+   * silently and forever, so refusing the frame is the honest match.
+   *
+   * BIT-IDENTICAL BELOW 10 FPS. At `dtSec <= MAX_SUBSTEP_SEC` this is one step
+   * of exactly `dtSec` — same call, same argument, same order — so every test
+   * that drives at 1/60 or 1/20 sees the byte it always saw. Above it the
+   * steps are EQUAL (`dtSec / n`), not "0.1 until the remainder": a trailing
+   * sliver step is a second, differently-sized integration nobody measured.
+   *
+   * Cost: at most five sub-steps, because `MAX_FRAME_DT_SEC / MAX_SUBSTEP_SEC`
+   * is five. That bound matters on exactly the frames this fix is for — a
+   * phone already 3 s behind must not be handed thirty times the traffic work
+   * to catch up, which is how a stall becomes a spiral. MEASURED on this box,
+   * real district, 2,000 warmed frames each:
+   *
+   *   population      update(1/60)   update(0.1)   update(0.5)
+   *   10 cars  8 peds     10.7 µs        5.7 µs       22.9 µs
+   *   24 cars 20 peds     16.8 µs       21.4 µs       62.9 µs
+   *
+   * The worst row is 63 µs of work inside a frame that is, by definition,
+   * 500,000 µs long — 0.013 % of it, and 42 µs more than the truncated version
+   * it replaces. The spiral is not reachable from here; the frame's own cost is
+   * three.js and the render graph (docs/simulation/91_MOBILE_AUDIT §G2: our own
+   * app code is 2–5 % of CPU self time, rapier 0.2–0.5 %).
+   */
   update(dtSec: number, ctx: TrafficUpdateContext): void {
-    const dt = dtSec > MAX_DT_SEC ? MAX_DT_SEC : dtSec;
-    if (!(dt > 0)) return;
-    this.timeSec += dt;
+    const { steps, dt } = trafficSubStepPlan(dtSec);
+    if (steps === 0) return;
 
     const vEnv = this.vehicleEnv;
     const pEnv = this.pedestrianEnv;
     vEnv.signalPhase = ctx.signalPhase;
     pEnv.signalPhase = ctx.signalPhase;
-    vEnv.timeSec = this.timeSec;
     if (ctx.playerPos) {
       vEnv.hasPlayer = true;
       pEnv.hasPlayer = true;
@@ -386,26 +514,38 @@ class TrafficSystemImpl implements TrafficSystem {
       pEnv.hasPlayer = false;
     }
 
-    for (let i = 0; i < this.pedestrianAgents.length; i++) {
-      updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
-    }
-    for (let i = 0; i < this.vehicleAgents.length; i++) {
-      updateVehicle(this.vehicleAgents[i], dt, vEnv);
-    }
-
-    // Staged actors last: they read the freshest player pose and publish into
-    // the same state arrays; ambient agents never read them (documented v1
-    // limitation — see staged.ts header).
     const sEnv = this.stagedEnv;
     sEnv.hasPlayer = vEnv.hasPlayer;
     sEnv.playerX = vEnv.playerX;
     sEnv.playerY = vEnv.playerY;
     sEnv.playerSpeedMps = vEnv.playerSpeedMps;
-    for (let i = 0; i < this.stagedVehicles.length; i++) {
-      updateStagedVehicle(this.stagedVehicles[i], dt, sEnv);
-    }
-    for (let i = 0; i < this.stagedPeds.length; i++) {
-      updateStagedPedestrian(this.stagedPeds[i], dt, sEnv);
+
+    // The player pose above is set ONCE per frame and every sub-step reads the
+    // same one: the caller sampled the car once and there is no intermediate
+    // pose to interpolate from. That is the one-frame staleness the header
+    // already documents, and it is unchanged — sub-stepping does not make it
+    // worse, and the hard anti-overlap clamps in vehicles.ts / staged.ts
+    // re-read the AGENT's own fresh pose on every sub-step, so the „never clip
+    // the player" guarantee is re-asserted five times a frame instead of once.
+    //
+    // Staged actors last within each sub-step: they read the freshest player
+    // pose and publish into the same state arrays; ambient agents never read
+    // them (documented v1 limitation — see staged.ts header).
+    for (let k = 0; k < steps; k++) {
+      this.timeSec += dt;
+      vEnv.timeSec = this.timeSec;
+      for (let i = 0; i < this.pedestrianAgents.length; i++) {
+        updatePedestrian(this.pedestrianAgents[i], dt, pEnv);
+      }
+      for (let i = 0; i < this.vehicleAgents.length; i++) {
+        updateVehicle(this.vehicleAgents[i], dt, vEnv);
+      }
+      for (let i = 0; i < this.stagedVehicles.length; i++) {
+        updateStagedVehicle(this.stagedVehicles[i], dt, sEnv);
+      }
+      for (let i = 0; i < this.stagedPeds.length; i++) {
+        updateStagedPedestrian(this.stagedPeds[i], dt, sEnv);
+      }
     }
   }
 

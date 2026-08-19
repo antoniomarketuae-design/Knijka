@@ -61,6 +61,14 @@
  * 82.8 m/s closing means every frame above 7 fps and at 50 km/h street speeds
  * every frame above about 2 — takes the identical code path and returns the
  * identical number, bit for bit, that it always did.
+ *
+ * THOSE TWO FRAME RATES ARE FLOORS, NOT THRESHOLDS, and for the reason the
+ * `SWEEP_FRAME_TRAVEL_M` note below is about: they convert 12 m at closing
+ * speed and ignore the ROTATION term `relativeTravelM` adds on top, so a
+ * spinning body crosses 12 m of relative travel at a higher frame rate than
+ * either number suggests. Nothing above is wrong — subdivision is what happens
+ * past the line, and it returns the same answer more expensively — but do not
+ * read „7 fps" as the rate at which the cheap path stops being taken.
  */
 
 import {
@@ -104,9 +112,33 @@ export const SWEEP_CHUNK_TRAVEL_M = SWEEP_TELEPORT_M / 2;
  *
  * This is `SWEEP_TELEPORT_M` re-derived under the clock that ships today and
  * nothing more: 12 m answered a 0.1 s director tick, the tick is now capped at
- * rapier's 0.5 s, 12 × (0.5 / 0.1) = 60. The physical worst case it has to
- * cover is 82.8 m/s × 0.5 s = 41.4 m, so the margin over reality is the same
- * ~45 % the 12 was chosen with. Nothing a real frame can produce reaches it.
+ * rapier's 0.5 s, 12 × (0.5 / 0.1) = 60.
+ *
+ * HOW MUCH ROOM THAT LEAVES — stated HERE and nowhere else, because it used to
+ * be stated in two files and the two disagreed. This comment read „the physical
+ * worst case it has to cover is 82.8 m/s × 0.5 s = 41.4 m, so the margin over
+ * reality is the same ~45 % the 12 was chosen with", and 41.4 m is not the
+ * quantity `sweepChunks` compares against this constant. `relativeTravelM`,
+ * thirty lines below, adds to that translation a ROTATION term PER BODY —
+ * headingSpanDeg × DEG × hypot(halfLengthM, halfWidthM) — and headingSpanDeg is
+ * a shortest arc, so it saturates at 180° and the term is bounded exactly by
+ * π × hypot(half-extents): 6.885 m for the player before the other body is
+ * counted at all, 22.286 m for a tram.
+ *
+ * MEASURED 2026-08-19 over every (fleet profile × its own fastest authored
+ * `cruiseSpeedMps`) pair the scenario bank can stage, the binding case is the
+ * TRAM at 57.810 m against this 60 — a true margin of 3.8 %, where the
+ * translation-only arithmetic said 45 %. The overstatement was twelvefold, and
+ * a margin overstated twelvefold is worse than none, because the next reader
+ * budgets against it: a tram authored at 12 m/s (43 km/h, an ordinary number)
+ * already lands on 58.81 m and eats the rest.
+ *
+ * `__tests__/index.test.ts` recomputes that figure on every run from the files
+ * that own its two live inputs — `PHYSICS_MAX_FRAME_DT` out of
+ * lesson-ui/sessionClock.ts and the speeds out of the scenario bank — and pins
+ * the sentence above against the result, so the number cannot go stale behind
+ * the clock or the content; the same test forbids the barrel to publish a
+ * second one. Agreement is by construction, not by remembering to edit both.
  */
 export const SWEEP_FRAME_TRAVEL_M = SWEEP_TELEPORT_M * 5;
 

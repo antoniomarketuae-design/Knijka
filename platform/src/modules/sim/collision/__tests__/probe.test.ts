@@ -234,9 +234,18 @@ describe("ContactProbe — memory it must not pretend to have", () => {
     // because a step-capped chunk makes the sampling coarsen with the frame
     // rate again — the exact dependence subdivision exists to remove:
     expect(SWEEP_CHUNK_TRAVEL_M / SWEEP_RESOLUTION_M).toBeLessThanOrEqual(SWEEP_MAX_STEPS);
-    // The outer cap must cover everything one frame can physically produce:
-    // 46.8 m/s player terminal + 36 m/s fastest authored actor = 82.8 m/s of
-    // closing speed, over rapier's 0.5 s per-frame ceiling.
+    // The outer cap must clear the TRANSLATION half of what one frame can
+    // produce: 46.8 m/s player terminal + 36 m/s fastest authored actor =
+    // 82.8 m/s of closing speed, over rapier's 0.5 s per-frame ceiling.
+    //
+    // THAT HALF IS NOT THE BUDGET, and reading 60 − 41.4 as the headroom is
+    // exactly the mistake `SWEEP_FRAME_TRAVEL_M`'s doc-comment used to make:
+    // `relativeTravelM` adds a rotation term per body, and the real worst frame
+    // is 57.810 m, not 41.4. The floor below is a crude one written from
+    // literals; the guard that actually holds the budget derives BOTH ends from
+    // the files that own them (the clock and the scenario bank) and is in
+    // `__tests__/index.test.ts`, which also pins the stated margin. Do not
+    // treat this line as that guard.
     expect(SWEEP_FRAME_TRAVEL_M).toBeGreaterThanOrEqual((46.8 + 36) * 0.5);
   });
 });

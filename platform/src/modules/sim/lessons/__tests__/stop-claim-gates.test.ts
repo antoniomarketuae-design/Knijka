@@ -336,34 +336,43 @@ const ACTOR_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: strin
 const LAMP_CLAIM = /осветен(?!ия|ата|ото)|къси светлини|дълги светлини|с фарове/iu;
 
 /**
- * Claims about WHERE THE STUDENT WAS LOOKING — «прочети регулировчика». Unlike
- * the lamp class this one really is outside the tick: a disc knows a place and
- * a speed and, since 2026-08-19, two cockpit switches; it has no channel for a
- * driver's attention, and the mirror-glance channel that exists elsewhere is
- * the rule engine's (TURN_WITHOUT_OBSERVATION) and grades mirrors, not officers.
+ * Claims about WHERE THE STUDENT WAS LOOKING — «прочети регулировчика».
+ * CLOSED 2026-08-19 (doc 88 O21), and the two entries that stood here are gone
+ * because the two banners are.
  *
- * The remedy is the one commit cdb2f71 established for the junctions3/rail
- * rows: the title says what the disc measures («Приближи бавно до
- * регулировчика»), the duty keeps its grader — here the SIBLING objective of
- * the same lesson, a passSignal with `requireRedMet` that completes only on a
- * crossing the officer permitted and bills CONTROLLER_SIGNAL_VIOLATED
- * otherwise. Not one param changes. `templates-signals2.ts` — a file this lane
- * does not own.
+ * THE CLASS REALLY IS OUTSIDE THE TICK, and that part of the entry was right: a
+ * disc knows a place and a speed and, since 2026-08-19, two cockpit switches; it
+ * has no channel for a driver's attention, and the mirror-glance channel that
+ * exists elsewhere is the rule engine's (TURN_WITHOUT_OBSERVATION) and grades
+ * mirrors, not officers. So the remedy was the one commit cdb2f71 established
+ * for the junctions3/rail rows: the title says what the disc measures
+ * («Приближи бавно до стоп-линията»), and the duty keeps its grader.
+ *
+ * WHERE THE ENTRY WAS WRONG, and it is the same wrongness as the lamp entry
+ * above — a grader asserted in prose by the person who most wanted it to exist.
+ * It said the duty keeps its grader „here the SIBLING objective of the same
+ * lesson, a passSignal with `requireRedMet`". That is true of ONE of the two:
+ *
+ *   · sc-sig-controller-live — yes. `sc-sctl-cross` is a passSignal with
+ *     `requireRedMet`, and measured on the template's own recordings it refuses
+ *     BOTH mistake drives (both cross on `controller: "halt"`).
+ *   · sc-sig-controller-postures — NO. Its «Премини кръстовището, когато позата
+ *     разреши посоката ти» was a bare reachZone 45 m north of the junction, and
+ *     measured on its own recordings it completed at 25.68 s on
+ *     `mistake-barge-chest` and 34.20 s on `mistake-start-on-raised-arm` — the
+ *     two drives that bill the 10-point опасна. Moving the read claim onto that
+ *     gate would have moved it onto nothing.
+ *
+ * So the claim was moved AND the gate was given the observation: `objectives.ts`
+ * now resolves `requireControllerProceed` from a banner that says the officer
+ * released the crossing, and reads `stopLineCrossed.controller` — the same field
+ * `requireRedMet` reads. It closes `sc-signal-controller/sc-sctrl-cross` in
+ * `templates-signals.ts` with it. Measurements, both directions, every rung:
+ * `scenario/__tests__/controller-claim-gates.test.ts`.
  */
 const READ_CLAIM = /прочети\s+(?:позата\s+на\s+)?регулировчика/iu;
 
-const READ_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: string; why: string }> = [
-  {
-    specId: "sc-sig-controller-live",
-    objectiveId: "sc-sctl-read",
-    why: "sweep161 pc/mobile-right run.log: «✓ Приближи бавно и прочети регулировчика, не лампата 1:16» beside its own evidence line «Изчака червения сигнал и потегли на зелено» and a −10 «Неизпълнение на сигнала на регулировчика». The cap of 20 grades «бавно»; nothing grades «не лампата». templates-signals2.ts.",
-  },
-  {
-    specId: "sc-sig-controller-postures",
-    objectiveId: "sc-sctp-read",
-    why: "Found by this rule, not by the sweep: «Приближи бавно и прочети позата на регулировчика» is the same sentence one lesson over, on the same shape of gate (radius 8, cap 30) — and its own source comment says the quiet part, „slow enough to have actually LOOKED at the officer, not read a (dark) lamp\": slow enough is not looked. templates-signals2.ts.",
-  },
-];
+const READ_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: string; why: string }> = [];
 
 describe("the touched templates claim only what their gates measure", () => {
   const zones = reachZones(SCENARIO_TEMPLATES.filter((s) => TOUCHED.has(s.id)));
@@ -489,7 +498,13 @@ describe("no reachZone in the catalog certifies what its evaluator cannot see", 
     // routing that made the debt permanent. Both are replaced by the thing they
     // were waiting for: the demand exists, and every claim carries one.
     const claiming = zones.filter((z) => LAMP_CLAIM.test(z.titleBg));
-    expect(claiming.length, "the matcher stopped matching — see the teeth test above").toBe(3);
+    // 3 → 5 on 2026-08-19 (doc 88 O20): `sc-ac-fog/sc-acf-adapted` and
+    // `sc-ac-snow/sc-acs-approach` now NAME the lamps their briefings order, so
+    // they are lamp claims — and, by the rule below, lamp claims bound to a
+    // demand. The count is asserted so a matcher that quietly stopped matching
+    // cannot make the rule vacuous, which is the instrument bug this programme
+    // has shipped four times.
+    expect(claiming.length, "the matcher stopped matching — see the teeth test above").toBe(5);
     const unbound = claiming
       .filter((z) => {
         const authored = SCENARIO_TEMPLATES.find((s) => s.id === z.specId)!.success.find(

@@ -713,10 +713,48 @@ export const SC_AC_FOG: ScenarioSpec = {
   success: [
     {
       id: "sc-acf-adapted",
-      titleBg: "Мини контролната зона със съобразена за мъглата скорост",
+      titleBg: "Мини контролната зона с къси светлини, фарове за мъгла и съобразена скорост",
       // Cap 30 km/h IS the fog conditions envelope (0.6 × 50): the adapted
       // ~25 km/h drive satisfies it; a dry-habit 38 km/h simply cannot
       // complete the objective without slowing into the envelope.
+      //
+      // ── AND THE LAMPS ARE HALF THE LESSON, so they are half the gate ──────
+      // Sweep 161 photographed both telltales DIM from arrival through t101s
+      // with this gate ticked at 1:56 and 3/3 stars, on the drill whose own
+      // title is „Мъгла" and whose instruction 1 makes both lamps a
+      // precondition of moving off. MEASURED THROUGH THE PRODUCTION EVALUATOR
+      // on this template's OWN shipped recordings (the probe in
+      // `conditions-lamp-gates.test.ts` is the same run, kept):
+      //
+      //   drive                    cockpit          sc-acf-adapted, before
+      //   shadow-correct           low + fog ON     ✓ @23.9 s
+      //   mistake-no-fog-lights    low + fog OFF    ✓ @23.9 s   ← the demo whose
+      //                                                          whole subject is
+      //                                                          the unlit lamp
+      //   shadow, lamps forced off off + fog OFF    ✓ @23.9 s
+      //
+      // i.e. the gate could not tell the correct drive from the counter-example
+      // this lesson ships to teach against, to the tenth of a second.
+      //
+      // THE FIX IS THE BANNER, and that is a routing fact rather than a style
+      // choice. `objectives.ts` reads the lamp demand off `titleBg`
+      // (`deriveLampDemand`) precisely so it can bind gates in template files
+      // its own lane does not own; the AUTHORED alternative — a `requireLamps`
+      // key in these params — does not typecheck, because
+      // `ScenarioObjectiveSpec.params` is the real `ObjectiveParams` union and
+      // `ReachZoneParams` lives in `lessons/types.ts`, another lane's file. (The
+      // routing note that opened this row asked for the authored key; it was
+      // never compilable. Whoever folds `ReachZoneWitnessDemands` into
+      // `ReachZoneParams` should add `requireLamps: "fog"` here as the belt to
+      // this brace.)
+      //
+      // So the title does both jobs, which is the stronger invariant anyway: the
+      // banner is the only thing the student reads while the task sits unticked,
+      // so the gate may refuse only for something the banner named. „fog" is the
+      // чл. 74 pairing and asks for BOTH the dipped beams and the fog lamps —
+      // exactly what this banner and instruction 1 promise.
+      // `conditions-lamp-gates.test.ts` pins title → demand, so a copy edit that
+      // drops the lamps from the words fails the build instead of the student.
       params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 10, maxSpeedKmh: 30 },
     },
     {
@@ -851,10 +889,32 @@ export const SC_AC_SNOW: ScenarioSpec = {
   success: [
     {
       id: "sc-acs-approach",
-      titleBg: "Приближи със зимна скорост",
+      titleBg: "Приближи с къси светлини и зимна скорост",
       // Cap 25 km/h IS the snow conditions envelope (0.5 × 50): the adapted
       // ~22 km/h drive satisfies it; the dry-habit 40 km/h cannot pass here
       // without slowing into the winter band.
+      //
+      // ── THE ONE LAMP DUTY NOTHING ELSE IN THE PRODUCT GRADES ─────────────
+      // Sweep 161 photographed СВЕТЛИНИ dim throughout with this gate ticked,
+      // and re-measured through the production evaluator the gate completes at
+      // 21.6 s on the shadow's own path with the lamps forced OFF — the same
+      // tenth of a second as the correct drive.
+      //
+      // WHY IT MATTERS MORE HERE THAN IN FOG. The rule engine has a lamp
+      // detector for rain (HEADLIGHTS_OFF_IN_RAIN) and one for fog
+      // (FOG_LIGHTS_OFF_IN_FOG); it has NONE for snow — `rules/engine.ts` arms
+      // the rain arm on `raining` and the fog arm on `tick.fog`, and neither
+      // reads `tick.snow`. So on this drill, instruction 1 („Включи късите
+      // светлини") was an order the whole product never checked in any channel:
+      // no violation, no card, and a green tick over an unlit car. The missing
+      // detector is routed to the rules lane; this gate is what makes the order
+      // real today, and the banner now names it so the refusal is legible.
+      //
+      // DEMANDED THROUGH THE BANNER — see the twin note on `sc-acf-adapted` for
+      // why the authored `requireLamps` key does not typecheck from a template.
+      // «къси светлини» resolves to the "low" demand in `deriveLampDemand`, and
+      // `conditions-lamp-gates.test.ts` fails the build if the words and the
+      // demand ever come apart.
       params: { kind: "reachZone", x: LANE_X, y: 150, radiusM: 12, maxSpeedKmh: 25 },
     },
     {

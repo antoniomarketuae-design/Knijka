@@ -51,6 +51,7 @@
 // 300,000" becomes an assertion rather than a claim.
 // -----------------------------------------------------------------------------
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -78,9 +79,44 @@ const {
   signInRetryPlan,
 } = await import("../auth.mjs");
 
-const BASE = "https://sweep.test";
+// ── THE NETWORK IS REAL HERE, ON LOOPBACK ────────────────────────────────────
+//
+// These tests used to replace `globalThis.fetch`. They cannot any more, and
+// should not: O25 is a defect OF THE TRANSPORT — a successful global fetch can
+// abort node during handle teardown and replace the process's exit code with
+// 127 — so auth.mjs moved to `node:http`, and a test that swaps the transport
+// out for a function would be testing the one thing that is not shipped. The
+// stub also hid the failure by construction: every case it replayed either
+// threw or answered from memory, and the abort needs a socket that succeeded.
+//
+// So: one loopback server for the file, scripted per test through
+// `sessionHandler`, plus a port nothing listens on for the offline cases
+// (`http://127.0.0.1:9`, the same address navigation.test.mjs uses). It costs
+// milliseconds and it exercises the bytes.
+const DEAD = "http://127.0.0.1:9";
+let sessionHandler = () => ({ status: 500, body: "" });
+const server = createServer((req, res) => {
+  if ((req.url ?? "").startsWith("/api/auth/session")) {
+    const { status = 200, body = "", headers } = sessionHandler(req) ?? {};
+    res.writeHead(status, headers ?? { "content-type": "application/json" });
+    res.end(body);
+    return;
+  }
+  // Everything else is a page being warmed. `warmFromNode` reads it to the end
+  // and keeps none of it; the body is here so that the read is a real read.
+  res.writeHead(200, { "content-type": "text/html" });
+  res.end("<html><body>warm</body></html>");
+});
+const LIVE = await new Promise((resolve) => {
+  server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${server.address().port}`));
+});
+// Unref'd so a forgotten close cannot hang the runner — the loop must not be
+// held open by the fixture.
+server.unref();
+
+const BASE = LIVE;
 const CREDS = { email: "founder@knijka.ai", password: "Knijka2026!" };
-const SESSION_COOKIE = { name: "authjs.session-token", value: "a-real-one", domain: "sweep.test", path: "/" };
+const SESSION_COOKIE = { name: "authjs.session-token", value: "a-real-one", domain: "127.0.0.1", path: "/" };
 
 // ── the exact bytes the server sends ─────────────────────────────────────────
 // `tooManyRequestsResponse` (platform/src/modules/security/request.ts) — status,
@@ -198,17 +234,20 @@ async function withVirtualClock(state, fn) {
   }
 }
 
-/** `warmFromNode` and `liveSessionEmail` both use global fetch. */
-function stubFetch(handler) {
-  const real = globalThis.fetch;
-  globalThis.fetch = handler;
+/**
+ * Script the loopback server's /api/auth/session for one test, and put it back.
+ * Same shape `stubFetch` had, so every assertion below is unchanged — only the
+ * thing being scripted moved from a function to a socket.
+ */
+function serveSession(handler) {
+  const previous = sessionHandler;
+  sessionHandler = handler;
   return () => {
-    globalThis.fetch = real;
+    sessionHandler = previous;
   };
 }
-const DEAD_FETCH = async () => {
-  throw new Error("offline in tests");
-};
+/** No session behind this cookie, whatever the cookie is. */
+const NO_SESSION = () => ({ status: 500, body: "" });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. THE CLASSIFIER — the whole fix rests on telling these two apart, and the
@@ -278,7 +317,7 @@ test("a rate-limited sign-in is waited out and the next attempt succeeds", async
     { ...RATE_LIMITED },
     { ...ACCEPTED, setsCookie: true },
   ]);
-  const restore = stubFetch(DEAD_FETCH);
+  const restore = serveSession(NO_SESSION);
   try {
     await withVirtualClock(state, () => signIn(page, CREDS, BASE));
   } finally {
@@ -302,7 +341,7 @@ test("a rate-limited sign-in is waited out and the next attempt succeeds", async
 
 test("a genuinely wrong password fails on the FIRST submit, fast, and says why", async () => {
   const { page, state } = fakePage([{ ...REJECTED }]);
-  const restore = stubFetch(DEAD_FETCH);
+  const restore = serveSession(NO_SESSION);
   let error;
   try {
     await withVirtualClock(state, () => signIn(page, CREDS, BASE)).catch((e) => {
@@ -333,7 +372,7 @@ test("a genuinely wrong password fails on the FIRST submit, fast, and says why",
 
 test("a rate limit that never lifts gives up with the CAUSE, not with 'wrong password'", async () => {
   const { page, state } = fakePage([{ ...RATE_LIMITED }]);
-  const restore = stubFetch(DEAD_FETCH);
+  const restore = serveSession(NO_SESSION);
   let error;
   try {
     await withVirtualClock(state, () => signIn(page, CREDS, BASE)).catch((e) => {
@@ -356,7 +395,7 @@ test("a rate limit that never lifts gives up with the CAUSE, not with 'wrong pas
 test("a cached session whose e-mail the server confirms is reused, and skips the form", async () => {
   writeCache(CREDS.email, [SESSION_COOKIE]);
   const { page, state } = fakePage([{ ...ACCEPTED, setsCookie: true }]);
-  const restore = stubFetch(sessionServing(CREDS.email));
+  const restore = serveSession(sessionServing(CREDS.email));
   try {
     await signIn(page, CREDS, BASE);
   } finally {
@@ -370,7 +409,7 @@ test("a cached session whose e-mail the server confirms is reused, and skips the
 test("a cached session belonging to SOMEBODY ELSE is refused and the form is driven", async () => {
   writeCache(CREDS.email, [SESSION_COOKIE]);
   const { page, state } = fakePage([{ ...ACCEPTED, setsCookie: true }]);
-  const restore = stubFetch(sessionServing("someone.else@knijka.ai"));
+  const restore = serveSession(sessionServing("someone.else@knijka.ai"));
   try {
     await withVirtualClock(state, () => signIn(page, CREDS, BASE));
   } finally {
@@ -385,7 +424,7 @@ test("a cached session belonging to SOMEBODY ELSE is refused and the form is dri
 test("no live session behind the cached cookie means no reuse", async () => {
   writeCache(CREDS.email, [SESSION_COOKIE]);
   const { page } = fakePage([]);
-  const restore = stubFetch(async () => new Response("null", { headers: { "content-type": "application/json" } }));
+  const restore = serveSession(() => ({ status: 200, body: "null" }));
   try {
     assert.equal(await reuseCachedSession(page, CREDS, BASE), false);
   } finally {
@@ -393,20 +432,63 @@ test("no live session behind the cached cookie means no reuse", async () => {
   }
 });
 
+// ── THE STATUS CHECK, ASSERTED WHERE IT CAN ACTUALLY FAIL ────────────────────
+// The first version of the list below refused a 304 and a 302 with EMPTY
+// bodies, and the mutation run showed the whole status check could then be
+// DELETED with this test still green: an empty body fails to parse and returns
+// null anyway, so every case was being decided by JSON.parse rather than by the
+// rule under test. A non-2xx must be refused BECAUSE IT IS A NON-2XX, so each
+// of those cases now carries a perfectly well-formed session for the real
+// address — which is the only shape that can tell the two rules apart.
+const BELIEVABLE = JSON.stringify({ user: { email: "founder@knijka.ai" }, expires: "2099-01-01" });
+
 test("liveSessionEmail returns null on every doubtful answer, never a guess", async () => {
   const cases = [
-    ["a 500", async () => new Response("", { status: 500 })],
-    ["a non-JSON body", async () => new Response("<html>", { status: 200 })],
-    ["a session with no user", async () => new Response(JSON.stringify({ expires: "x" }), { status: 200 })],
-    ["a thrown fetch", DEAD_FETCH],
+    ["a 500", () => ({ status: 500, body: "" })],
+    ["a non-JSON body", () => ({ status: 200, body: "<html>" })],
+    ["a session with no user", () => ({ status: 200, body: JSON.stringify({ expires: "x" }) })],
+    ["a 500 carrying a session-shaped body", () => ({ status: 500, body: BELIEVABLE })],
+    ["a 304 carrying a session-shaped body", () => ({ status: 304, body: BELIEVABLE })],
+    ["a 302 to /login carrying one too", () => ({ status: 302, body: BELIEVABLE, headers: { location: "/login" } })],
+    // 429 is not hypothetical here: this harness exists because the login
+    // budget answers 429, and `tooManyRequestsResponse` returns JSON.
+    ["a 429 from the rate limiter", () => ({ status: 429, body: BELIEVABLE })],
   ];
   for (const [what, handler] of cases) {
-    const restore = stubFetch(handler);
+    const restore = serveSession(handler);
     try {
       assert.equal(await liveSessionEmail(BASE, "authjs.session-token=x"), null, what);
     } finally {
       restore();
     }
+  }
+  // And a refused connection, which is the whole of the "server is not there"
+  // class now that there is no fetch to throw on command.
+  assert.equal(await liveSessionEmail(DEAD, "authjs.session-token=x"), null, "a refused connection");
+});
+
+test("liveSessionEmail is bounded by its own timeout, not by the server's patience", async () => {
+  // THE FAILURE THIS FORBIDS is the one `httpGet` was written around: node's
+  // `timeout` option is an INACTIVITY timer, so a server that sends headers and
+  // then falls silent resets it for ever. The old code used
+  // `AbortSignal.timeout`, which is total; this asserts the replacement is too.
+  const restore = serveSession(() => null); // handler returns nothing: never responds
+  const silent = createServer(() => {
+    /* accept the socket and answer nothing, ever */
+  });
+  const url = await new Promise((resolve) => {
+    silent.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${silent.address().port}`));
+  });
+  silent.unref();
+  const started = Date.now();
+  try {
+    assert.equal(await liveSessionEmail(url, "authjs.session-token=x", 400), null);
+    const spent = Date.now() - started;
+    assert.ok(spent >= 300, `gave up in ${spent}ms — that is not the timeout doing it`);
+    assert.ok(spent < 5_000, `waited ${spent}ms on a 400ms budget`);
+  } finally {
+    restore();
+    silent.close();
   }
 });
 
@@ -422,13 +504,9 @@ function writeCache(email, cookies) {
 
 /** A /api/auth/session that reports the given signed-in address. */
 function sessionServing(email) {
-  return async (url) => {
-    if (String(url).includes("/api/auth/session")) {
-      return new Response(JSON.stringify({ user: { email }, expires: "2099-01-01" }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-    throw new Error("offline in tests");
-  };
+  return () => ({
+    status: 200,
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ user: { email }, expires: "2099-01-01" }),
+  });
 }

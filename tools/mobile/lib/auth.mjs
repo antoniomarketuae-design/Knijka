@@ -76,9 +76,29 @@
 //      NOT the hand-minted JWT the paragraph above rejects: it is a cookie a
 //      real form sign-in produced, and it is used only after the server hands
 //      back a live session whose e-mail matches the one we were asked for.
+//
+// ── AND THIS FILE'S HTTP IS NOT GLOBAL `fetch`, BECAUSE OF O25 ───────────────
+//
+// Four lanes of sweep161 exited 127 — a code this harness has never returned —
+// and every one of them had FINISHED: `sc-ov-narrow/mobile-wrong` holds a whole
+// MACHINE SUMMARY, «10 наказателни точки», НЕИЗДЪРЖАН, the collision convicted,
+// 29 frames on disk. Counted from the sweep's own ledger:
+//
+//   .audit-frames/sweep161/progress.txt  ->  28 exit=0 · 4 exit=127 · 2 exit=1
+//
+// A dispatcher reading those codes re-drives or discards four healthy lanes and
+// one real finding goes with them. That is a FALSE FAILURE, and it is the same
+// crime as a false pass: the evidence exists, was photographed, and gets thrown
+// away because the runtime tripped over its own sockets on the way out.
+//
+// The abort is node's, not ours, and `httpGet` below carries the measurement.
+// The sign-in path is where global `fetch` entered this process — `warmFromNode`
+// warms /login and every retried route from node — so this is where it leaves.
 // -----------------------------------------------------------------------------
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -110,6 +130,104 @@ export const NAV_BUDGET_MS = Number(process.env.KNIJKA_NAV_BUDGET_MS || 600_000)
 
 /** The two POST paths `rateLimitForRequest` budgets as "login". */
 const SIGNIN_POST_PATHS = ["/api/auth/callback/", "/api/auth/signin"];
+
+/**
+ * ONE GET ON `node:http`, AND DELIBERATELY NOT ON GLOBAL `fetch`.
+ *
+ * THE MEASUREMENT THAT DECIDED THIS, reproduced on this box on 2026-08-19,
+ * node v24.18.0 / Windows 10, against a loopback server answering 2 MiB:
+ *
+ *     const r = await fetch(url, { signal: AbortSignal.timeout(30000),
+ *                                  redirect: "manual" });
+ *     await r.arrayBuffer();
+ *     process.exit(6);
+ *
+ *     Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+ *       file src\win\async.c, line 94        -> 25 trials out of 25
+ *
+ * A SUCCESSFUL global fetch leaves an undici client whose async handle is
+ * mid-teardown, and the process aborts on top of it — so the exit code the
+ * caller chose is gone. WHAT THE ABORT IS CALLED depends on the reader:
+ * 3221226505 (0xC0000409, Windows fail-fast) to `child_process.execFile` and to
+ * cmd, and 127 to Git Bash — which is what dispatched sweep161 and therefore
+ * what its `progress.txt` recorded. Variants measured the same afternoon, same
+ * server, 15–25 trials each:
+ *
+ *   · a 2-byte body instead of 2 MiB            -> 6, 25/25. The race needs a
+ *     response big enough to still be tearing down. This is why the harness saw
+ *     it on real pages and never in a unit test.
+ *   · a FAILED fetch (host does not resolve)    -> 6. Every existing test of
+ *     this harness's exit codes uses an unresolvable host, which is exactly why
+ *     none of them ever caught it.
+ *   · a fetch whose body is NEVER READ          -> 6, 12/12; and 12/12 again
+ *     with `res.body.cancel()`. THE BODY MUST BE DRAINED for the race to
+ *     exist, which is what routes this fix to THIS function and not to
+ *     `lib/server.mjs`'s liveness probe, which reads only the status line.
+ *   · ≥100 ms between the fetch and the exit    -> 6, 8/8. It is a race, not a
+ *     poisoned process — which is why sweep161 lost 4 lanes of 34 and not all
+ *     of them, and why it cannot be relied on to show up on demand.
+ *   · `process.exitCode` with no `exit()`       -> 6, 15/15, in 277 ms
+ *   · node:http with `agent: false`             -> 6, 15/15, in 166 ms
+ *
+ * The last is the only remedy that survives a caller that DOES call `exit()`,
+ * and it also removes any dependence on the global dispatcher's keep-alive pool
+ * — which is shared with whatever else the process has fetched, so a fix that
+ * only changed this file's exit would still be at the mercy of another
+ * module's socket. `lib/target.mjs` reached the same conclusion for its own
+ * refusals; this is the same decision at the other end of the same process.
+ *
+ * ONE DRAINING `fetch` IS STILL IN THE HARNESS AND IS NOT IN THIS FILE:
+ * `lib/measure.mjs` `warmRoutes()` does `await res.arrayBuffer()` once per
+ * route, and `cli.mjs` runs it. That is why cli.mjs also stopped calling
+ * `process.exit()` — the two remedies are belt and braces, and the transport
+ * half for measure.mjs belongs to whoever owns that file.
+ *
+ * `maxBytes: 0` drains and discards, which is what a warm wants: the body is
+ * read to the end (that is what forces the compile) and never accumulated.
+ *
+ * @returns {Promise<{status:number,bytes:number,body:string}>}
+ */
+export function httpGet(url, { headers = {}, timeoutMs = 30_000, maxBytes = 0 } = {}) {
+  return new Promise((resolve, reject) => {
+    const href = String(url);
+    const client = href.startsWith("https:") ? https : http;
+    let bytes = 0;
+    let body = "";
+
+    // `signal: AbortSignal.timeout(…)`, WHICH IS THE SAME DEADLINE THE `fetch`
+    // HERE USED TO CARRY — kept deliberately, and not only because
+    // settle.test.mjs reads this file for it. That deadline is TOTAL. node's own
+    // `timeout` request option is an INACTIVITY timer, so a server that dribbles
+    // one byte a second resets it for ever, and the failure this guards is
+    // exactly that shape: MEASURED 2026-08-05, Turbopack ran a filesystem cache
+    // compaction for 7.0 minutes, the dev server stopped answering mid-response,
+    // and a warm with no deadline sat on the connection until the run was killed
+    // at 15.5 minutes having printed nothing. Swapping the transport must not
+    // quietly swap the timeout semantics with it; lib/__tests__/exit-integrity
+    // asserts both halves against a real trickling socket.
+    //
+    // No redirect following, exactly like the `redirect: "manual"` it replaces:
+    // a 302 to /login is an ANSWER about this route, not a reason to go and
+    // measure another one.
+    const req = client.get(
+      href,
+      { agent: false, headers, signal: AbortSignal.timeout(timeoutMs) },
+      (res) => {
+        if (maxBytes > 0) res.setEncoding("utf8");
+        res.on("data", (chunk) => {
+          bytes += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+          if (maxBytes > 0 && body.length < maxBytes) body += chunk;
+        });
+        res.on("end", () => resolve({ status: res.statusCode ?? 0, bytes, body }));
+        // Attached, not decorative: an unhandled 'error' on a stream ends the
+        // process, and an abort mid-body emits one here as well as on the
+        // request. The promise is already settled by then and ignores the second.
+        res.on("error", reject);
+      },
+    );
+    req.on("error", reject);
+  });
+}
 
 /** What the SERVER said about a sign-in — never what the form rendered. */
 export const SIGNIN_OK = "ok";
@@ -357,16 +475,21 @@ export function sessionCachePath(baseUrl, email) {
  * lower-cased e-mail of a LIVE session, or null. Null on anything doubtful —
  * an expired cookie, a 500, a body that is not the shape we expect — because
  * the fallback is a real sign-in, i.e. the safe direction.
+ *
+ * `httpGet`, not global fetch — see its header. 64 KiB is a generous cap for a
+ * body whose whole content is one e-mail address and an expiry; past that it is
+ * a tunnel error page, and reading it whole would turn a probe into a download.
  */
 export async function liveSessionEmail(baseUrl, cookieHeader, timeoutMs = 30_000) {
   try {
-    const res = await fetch(new URL("/api/auth/session", baseUrl), {
+    const res = await httpGet(new URL("/api/auth/session", baseUrl).toString(), {
       headers: { cookie: cookieHeader },
-      redirect: "manual",
-      signal: AbortSignal.timeout(timeoutMs),
+      timeoutMs,
+      maxBytes: 64 * 1024,
     });
-    if (!res.ok) return null;
-    const json = await res.json().catch(() => null);
+    // `res.ok` in fetch terms, restated: 200–299 and nothing else.
+    if (res.status < 200 || res.status >= 300) return null;
+    const json = JSON.parse(res.body);
     const email = json?.user?.email;
     return typeof email === "string" && email.trim() ? email.trim().toLowerCase() : null;
   } catch {
@@ -654,19 +777,23 @@ async function gotoQuiesced(page, target, attempts = 3, deadline = Infinity) {
  * `await` with nothing to wake it, and a probe that hangs in silence looks
  * exactly like a probe doing slow work. Generous — a genuinely cold route on a
  * mechanical disk is minutes — but finite.
+ *
+ * AND ON `node:http`, WHICH IS THE O25 FIX. This is the one call that put
+ * global fetch into every lane process — it runs before every sign-in and again
+ * on every navigation retry — and a successful one can abort node on the way
+ * out with exit 127 (see `httpGet`). Exported so a test can drive the real
+ * thing rather than a stand-in: the defect lives in the transport, so a test
+ * that swaps the transport tests nothing.
  */
 export const WARM_TIMEOUT_MS = Number(process.env.KNIJKA_WARM_TIMEOUT_MS || 420_000);
-async function warmFromNode(page, target, deadline = Infinity) {
+export async function warmFromNode(page, target, deadline = Infinity) {
   try {
     const cookies = await page.context().cookies();
     const cookie = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
     const budget = Math.max(1_000, Math.min(WARM_TIMEOUT_MS, deadline - Date.now()));
-    const res = await fetch(target, {
-      headers: { cookie },
-      redirect: "manual",
-      signal: AbortSignal.timeout(budget),
-    });
-    await res.arrayBuffer();
+    // maxBytes 0: read the body to the end and keep none of it. Reading it IS
+    // the warm; keeping a compiled page in memory is just a leak.
+    await httpGet(target, { headers: { cookie }, timeoutMs: budget, maxBytes: 0 });
   } catch {
     /* the retry will surface the problem with a better message */
   }

@@ -22,7 +22,6 @@ import {
   buildSessionSummary,
   COMMENDATIONS,
   VIOLATIONS,
-  ledgerBilling,
   makeCommendation,
   makeViolation,
   type CommendationCode,
@@ -36,7 +35,8 @@ import { MAX_STORED_EVENTS, MAX_STORED_SAMPLES } from "../traces/compact";
 import { parseScenarioTrace } from "../traces/parse";
 import type { ScenarioTrace } from "../traces/types";
 import {
-  applyEscalations,
+  escalationQueue,
+  foldTrainingScore,
   isEscalationMultiplier,
   type PenaltyEscalation,
 } from "./escalation";
@@ -162,15 +162,14 @@ export function serializeRuleEvents(
   escalations: ReadonlyArray<PenaltyEscalation> = [],
   positions: ReadonlyArray<EventPosition> = [],
 ): WireRuleEvent[] {
-  // (code, t) → pending multipliers, consumed once each (mirrors escalation.ts).
-  const pending = new Map<string, number[]>();
-  for (const esc of escalations) {
-    const key = `${esc.code}@${esc.t}`;
-    const list = pending.get(key);
-    if (list) list.push(esc.multiplier);
-    else pending.set(key, [esc.multiplier]);
-  }
+  // (code, t) → pending multipliers, consumed once each. Borrowed from
+  // escalation.ts rather than mirrored: this used to be a third hand-written
+  // copy of the same queue, and the point of this lane is that copies drift.
+  const takeMultiplier = escalationQueue(escalations);
   // A15: (kind, code, t) → pending positions, consumed once each (same scheme).
+  // Left inline: different key space (kind is part of it) and a different
+  // payload, so sharing would mean genericising a helper whose whole value is
+  // that it says one thing.
   const pendingPos = new Map<string, Array<{ x: number; y: number }>>();
   for (const p of positions) {
     const key = `${p.kind}:${p.code}@${p.t}`;
@@ -182,8 +181,8 @@ export function serializeRuleEvents(
     const wire: WireRuleEvent = { kind: e.kind, code: e.code, t: e.t };
     if (e.kind === "violation") {
       if (e.detail !== undefined) wire.detail = e.detail;
-      const multiplier = pending.get(`${e.code}@${e.t}`)?.shift();
-      if (multiplier !== undefined && multiplier > 1) wire.penaltyMultiplier = multiplier;
+      const multiplier = takeMultiplier(e.code, e.t);
+      if (multiplier > 1) wire.penaltyMultiplier = multiplier;
     }
     const pos = pendingPos.get(`${e.kind}:${e.code}@${e.t}`)?.shift();
     if (pos !== undefined) {
@@ -600,40 +599,22 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     }
   }
   /**
-   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — the identical filter
-   * `engine.ts buildLessonResult` applies, for the identical reason, and the
-   * two must agree because THIS one is the copy the student reads.
+   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — one function, called from
+   * here and from `engine.ts buildLessonResult`, and it is the same call
+   * because the two must never again be able to differ.
    *
    * `LessonPlayShell.tsx:2683` renders `saveResult.debriefText` whenever the
    * save succeeds and falls back to the client's own text only when it fails,
-   * so a divergence here is not a second opinion — it is the opinion. Measured
-   * 2026-08-19 on `sc-hz-accident-scene` L3 (a wrecked car at t = 13.13, a
-   * bystander at t = 13.43), the same drive engine.ts was repaired for:
-   *
-   *   CLIENT  score=10  effective=10  escalations=[]
-   *   SERVER  score=10  effective=25  escalations=[COLLISION @13.43 ×1.5]
-   *
-   * and the server's text — the one that shipped — carried «Удар в пешеходец …
-   * без допълнителни точки … — повторна грешка ×1.5» (a row saying both halves
-   * of a contradiction in one sentence) plus a «Тренировъчен резултат: 25
-   * наказателни т.» that exists on no other surface. The 25 was also what
-   * `actions.ts` persisted, so session-history's „официален vs тренировъчен"
-   * badge repeated it for as long as the row lived.
-   *
-   * Handed the whole list, `applyEscalations` re-instates every fault Наредба
-   * № 38, чл. 48, ал. 3 closed over and then escalates them; filtering the
-   * MISTAKES fixes the total and the false «повторна грешка» at once, because
-   * escalation.ts pairs its records to events by (code, t) — a row that is not
-   * folded cannot carry its record either. A genuine repeat (two red lights,
-   * nothing terminating) is untouched: nothing closes that ledger.
-   *
-   * The filter lives twice, here and in engine.ts, because neither file may
-   * import the other; the single home for it is `escalation.ts` and moving it
-   * there is a change to a file this lane does not own.
+   * so a divergence here is not a second opinion — it is the opinion. The
+   * filter used to be written out in both files (neither may import the other,
+   * and `escalation.ts` did not yet host it); they were repaired in separate
+   * lanes, and the window between those lanes is what shipped «Тренировъчен
+   * резултат: 25 наказателни т.» beside an official 10. escalation.ts's header
+   * carries that drive, the re-measurement, and why comparing the two debrief
+   * TEXTS is not enough to catch the next one.
    */
-  const billed = ledgerBilling(summary.mistakes);
-  const { effectiveTotalPoints, escalated } = applyEscalations(
-    summary.mistakes.filter((_, i) => billed[i]),
+  const { effectiveTotalPoints, escalated } = foldTrainingScore(
+    summary.mistakes,
     escalations,
   );
 

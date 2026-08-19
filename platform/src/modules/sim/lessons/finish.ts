@@ -111,6 +111,70 @@
  * is doing — a false refusal manufactured to answer a missing ending, which is
  * the trade this module exists to refuse.
  *
+ * ---------------------------------------------------------------------------
+ * 2026-08-19, LATER — THE ROW ABOVE IS RIGHT TO REFUSE AND ITS EVIDENCE IS TOO
+ * WEAK TO BUILD ON. Re-measured before anything was changed, because a lane
+ * that inherits a premise it did not check fixes nothing and reports that it
+ * did. Two of the three drives it names are not this module's defect.
+ *
+ *  · THE SWEEP'S DRIVER CANNOT MEET ANY BAR IN THIS FILE. `lesson-audit.mjs` is
+ *    a roll-then-stop phase machine: CRUISE_KMH 12 (:1109), ROLL_DISTANCE_M 15
+ *    (:1129), STOP_MS 3000 (:1130), inside a 210 s wall-clock DRIVE_BUDGET_MS
+ *    (:1074). Its stops are three seconds. Every standstill face here is 12 s
+ *    (FINISH_STUCK_S), 25 s (bay) or 75 s (stranded), so NO drive it produces
+ *    can ever trip one — not because the gate is missing but because the driver
+ *    never stands still. Doc 88 §5 says the same of its speed.
+ *  · AND ITS BUDGET IS SHORTER THAN SOME ROUTES ARE LONG. `sc-merge-accel-lane`
+ *    is 930 m of route; at 12 км/ч that is ≥ 279 s of MOTION before its 24–26
+ *    stops are paid for, against 210 s of budget. Its `pc-right` run.log spends
+ *    the whole budget and reports „the drive stopped after 211 s without the
+ *    session ending" at a top speed of 15 км/ч — it covered less than half the
+ *    road. Nothing was stranded; the lesson was never driven to its end.
+ *  · MEASURED OVER THE WHOLE SWEEP rather than over the three named lanes: of
+ *    166 scenarios carrying a machine summary, EIGHT had no lane end by itself
+ *    (`sc-ed-reverse-line`, `sc-merge-accel-lane`, `sc-merge-bus-pullout`,
+ *    `sc-merge-motorway-exit`, `sc-ov-crest-curve`, `sc-park-gap-long`,
+ *    `sc-park-parallel`, `sc-park-zebra`) and 56 more ended on some lanes and
+ *    not others. Three of the eight end on a BAY, whose only escape is 25 s
+ *    motionless in it — which is a bar a bot that stops for three seconds and
+ *    cannot park will never meet on any build. „ended: false" in that corpus is
+ *    therefore not by itself evidence that a lesson has no ending, and the
+ *    eleven-lesson framing rests on it.
+ *
+ * WHAT SURVIVES THE RE-MEASUREMENT, and it is one class rather than eleven
+ * lessons: A CAR THAT IS NO LONGER IN THE AUTHORED WORLD. `sc-junction-blind`
+ * pc-right leaves it after the impact — `04-t090s.png` is a featureless green
+ * plane, no road, no kerb, no buildings — and the session runs 146 s more with
+ * the task chip still asking for a left turn out of a junction that is nowhere
+ * on the screen. No gate in this file can see that, and none is defective for
+ * failing to: every one is anchored on route geometry the car is no longer
+ * near, and the crash pin is DISARMED by driving away from the impact, which is
+ * exactly what driving off the map does. That drive would not have ended at any
+ * duration, on any budget, however it was driven.
+ *
+ * WHAT WOULD CLOSE IT, AND WHY IT IS NOT ARMED HERE. The evidence is
+ * `SimTick.edgeId === null` held continuously — the runtime's own statement
+ * that the locator found no centreline within OFF_ROAD_DISTANCE_M = 30 m
+ * (runtime/locator.ts; `worldRuntime.sample` publishes it on every real tick,
+ * and `undefined` — a hand-built tick, a recorded trace — must stay innocent).
+ * Never a speed test, for the reason the row above gives. Two things have to be
+ * true before it may ship, and neither is this lane's to do:
+ *   1. THE ARM IS IN `lessons/engine.ts`. Both gates in this file are folded
+ *      there and the session ends there; that file is owned by another lane in
+ *      this same wave, so it was routed rather than edited.
+ *   2. IT MUST BRING ITS OWN SENTENCE. Both endings engine.ts can currently
+ *      speak say «край на маршрута» — true of every gate here and FALSE of a
+ *      car that drove off the map halfway through one. Ending a drive with the
+ *      wrong reason is a bare verdict wearing a sentence, which THEO-4 forbids
+ *      as squarely as it forbids «Урокът беше прекъснат преди края» with no
+ *      reason at all. The fold and its copy belong in the same file.
+ * The false-refusal case to measure FIRST, because it is the one that would
+ * hurt: a student who is legitimately off the carriageway. The authored targets
+ * are safe — the deepest parking bay in the lot districts sits 6.3 m from the
+ * nearest centreline (`lot-gap-long-v1`), well inside 30 m — but that is a
+ * measurement of where lessons SEND him, not of where drives GO, and the second
+ * is the one an off-network bar has to survive.
+ *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
  */
@@ -274,8 +338,23 @@ export const FINISH_LEAVE_S = 20;
  * one, which is the only safe direction: narrowing the arm would stop drives
  * ARMING and could withhold an ending, while widening the departure can only
  * ask a car that is genuinely leaving to travel eight more metres (~1 s at
- * drill speed). The roundabout (26 → 45 m, band 19 m) and the turn box (band
- * ≥ this margin by construction) are unchanged, bit for bit.
+ * drill speed).
+ *
+ * 2026-08-19 — THE CENSUS SENTENCE THAT CLOSED THAT PARAGRAPH WAS WRONG, and
+ * doc 88 R2 has carried it open across two waves („nobody corrected the
+ * census"). It read „the roundabout (26 → 45 m, band 19 m) and the turn box
+ * (band ≥ this margin by construction) are unchanged, bit for bit". The turn
+ * box is indeed unchanged by construction. The roundabout is NOT — a ring
+ * whose AUTHORED band is narrower than one margin is widened like anything
+ * else, and one is. Re-measured over the compiled catalogue: TEN zones move
+ * under this floor, not five.
+ *      sc-sig-green-wave  L1–L5  passSignal  arm 40 · radius 40 → 48 (band 0 → 8)
+ *      sc-rb-ped-exit     L1–L5  roundabout  arm 29 · radius 34 → 37 (band 5 → 8)
+ * The FIVE above is still right about what IT claims — five zones shipped with
+ * a ZERO-width band and all five are `sc-sig-green-wave`. What was wrong is
+ * the claim that nothing else moved, and `sc-rb-ped-exit` is a lesson where
+ * the student stops for a pedestrian ON THE EXIT, i.e. inside the three metres
+ * this floor added.
  *
  * WHY EIGHT. It is the number the turn box already carried for exactly this
  * job, and it is one lane pitch — 8.125 m, LANE_WIDTH_M × the 2.5×
@@ -560,11 +639,21 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
       // rungs that measured). The arm is the objective's own statement of
       // „the car was at this junction"; the departure circle is that plus the
       // band, and `normalizeOutside` is what guarantees the second one.
+      //
+      // O23 — and the WORK SITE is that same ring. A junction is the only one
+      // of the three outside shapes with no authored extent in its params: the
+      // node is a point, the mouths are derived per node at runtime
+      // (runtime/stoplines.ts, 17–43 m out), and this anchor has no district
+      // in hand. The acceptance ring is the best statement available of „the
+      // car was at this junction", which is exactly what the arm already says
+      // — so stating it keeps C7's 41–47 m closure BIT-IDENTICAL while making
+      // the claim explicit instead of inferred.
       return {
         x: params.x,
         y: params.y,
         radiusM: params.radiusM,
         armWithinM: params.radiusM,
+        workSiteRadiusM: params.radiusM,
         dwellSec: FINISH_LEAVE_S,
         mode: "outside",
         terminalRescue: params.requireRedMet !== true,
@@ -594,11 +683,23 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
           // Armed by entering (`enterRadiusM`, the objective's own threshold),
           // tripped by being clear of `exitRadiusM` for FINISH_LEAVE_S. A car
           // circulating, hesitating or stopped on the ring can never trip it.
+          //
+          // O23 — THE WORK SITE IS THE ARMING CIRCLE, and saying so is the
+          // whole fix. `enterRadiusM` is a circle CONTAINING the ring (the
+          // shipped rb-mini ring is r 18 inside a 24 m arm), so everything
+          // past it is approach road rather than work — and a car resting on
+          // approach road is the case B15's lawful wait covers for 180 s and
+          // then hands over. Until this field the inner edge was INFERRED as
+          // `radiusM − FINISH_OUTSIDE_ANNULUS_M`, which is further out than
+          // the arm on every ring whose authored band exceeds one margin: 48
+          // of 58 zones, up to 5.0 m (`sc-rb-lane-choice`, enter 33 / exit
+          // 46), and every metre of it had NO ending at any duration.
           return {
             x: params.x,
             y: params.y,
             radiusM: params.exitRadiusM,
             armWithinM: params.enterRadiusM,
+            workSiteRadiusM: params.enterRadiusM,
             dwellSec: FINISH_LEAVE_S,
             mode: "outside",
             terminalRescue: true,
@@ -609,13 +710,23 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
           // turn completed or turn abandoned. Circumradius so leaving in ANY
           // direction counts, plus a margin so a shunt at the box corner does
           // not read as departure.
+          //
+          // O23 — and the two circles are the ONLY pair in the module where
+          // the arm is smaller than the work site, which is why the work site
+          // has to be stated. The arm is the INSCRIBED circle (conservative
+          // evidence that the car was genuinely in the box); the box's outer
+          // bound is the CIRCUMradius, up to 10.0 m further out
+          // (`sc-mv-uturn-ban`, corridor 30 × 40 m: arm 15, circum 25). The
+          // ring between them is authored corridor, and reading it as margin
+          // is what closed a lesson on a student paused inside the box.
           const { corridor } = params;
+          const circumM = Math.hypot(corridor.halfWidthM, corridor.halfLengthM);
           return {
             x: corridor.x,
             y: corridor.y,
-            radiusM:
-              Math.hypot(corridor.halfWidthM, corridor.halfLengthM) + FINISH_OUTSIDE_ANNULUS_M,
+            radiusM: circumM + FINISH_OUTSIDE_ANNULUS_M,
             armWithinM: Math.min(corridor.halfWidthM, corridor.halfLengthM),
+            workSiteRadiusM: circumM,
             dwellSec: FINISH_LEAVE_S,
             mode: "outside",
             terminalRescue: true,
@@ -653,6 +764,15 @@ function finishAnchor(params: ObjectiveParams, forRescue = false): RouteFinishZo
 function normalizeOutside(zone: RouteFinishZone): RouteFinishZone {
   const armWithinM = Math.min(zone.armWithinM ?? zone.radiusM, zone.radiusM);
   const radiusM = Math.max(zone.radiusM, armWithinM + FINISH_OUTSIDE_ANNULUS_M);
+  // O23 NOTE, so the next reader does not add it back. A second floor was
+  // written here — `radiusM ≥ workSiteRadiusM + margin` — and then removed,
+  // because no input can reach it: every anchor states a work site at or
+  // inside its own arm except the turn box, which authors `radiusM` as
+  // circum + margin and therefore clears it by construction. A guarantee
+  // nothing can exercise is not guarded by anything and quietly rots. The
+  // invariants it was meant to protect are enforced where the band is READ
+  // instead (`strandedBeyondM`'s clamp), which no caller can bypass and which
+  // a hand-built zone CAN reach — and does, by test.
   return { ...zone, armWithinM, radiusM };
 }
 
@@ -1237,32 +1357,74 @@ export function createFinishGate(): FinishGateState {
  * waypoint and ended a drive. `armWithinM` keeps its job (you cannot leave
  * somewhere you never reached, and the inscribed circle is the right
  * CONSERVATIVE evidence that a car was genuinely in the box). The band's inner
- * edge becomes its own statement: THE BAND IS THE MARGIN, AND NEVER MORE THAN
- * ONE MARGIN DEEP INTO THE REGION.
+ * edge becomes its own statement.
  *
  * CENSUS over the compiled catalogue (808 rungs; the 108 "outside" zones
  * `routeFinishZone` + `terminalRescueZone` hand out):
  *      passSignal        10 zones,  0 changed — C7's 41–47 m closure is
  *                                   BIT-IDENTICAL (arm 40, radius 48,
  *                                   48 − 8 = 40). It is not being undone.
- *      threePointTurn    40 zones, 40 changed, inner edge +6.4 m worst
- *                                   (8 → 14.422) — the defect above.
+ *      threePointTurn    40 zones, 40 changed, inner edge +10.0 m worst
+ *                                   (`sc-mv-uturn-ban`, corridor 30 × 40 m:
+ *                                   arm 15 → circum 25) — the defect above.
  *      roundabout        58 zones, 48 changed, inner edge +5.0 m worst.
  *
- * WHAT THE ROUNDABOUT ROW COSTS, stated rather than hidden. A ring whose
- * authored band is wider than one margin hands (enterRadiusM, radiusM − 8]
- * back to „no automatic ending" — up to 5 m. That is a widening of a hole B1
- * already rules open (the arming circle's interior never had an ending
- * either), not a new class, and it is the one region a car cannot rest in
- * unnoticed: `yieldReasonAt` case 5 returns `roundaboutEntry` for exactly
- * `d ∈ (enterRadiusM, enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M]`, so a car
- * stopped there is inside B15's freeze and was never spending this bar for its
- * first YIELD_WAIT_MAX_S anyway. Closing it properly needs the zone to CARRY
- * its work-site bound (a `RouteFinishZone` field, i.e. `lessons/types.ts`),
- * which is not this lane's file; routed rather than guessed at.
+ * (The turn-box row read „+6.4 m worst (8 → 14.422)" until 2026-08-19. That is
+ * `sc-maneuver-3point`, the drill the two refuting poses came from — not the
+ * worst rung in the catalogue. Re-measured over all 40 zones the worst is
+ * +10.0 m, and it is written here as a number that was counted rather than the
+ * one that happened to be in hand. Doc 88 R2 stands open against this file for
+ * exactly that failure mode in the constant above; see it.)
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-19, O23 — AND THE INFERENCE ITSELF WAS THE REMAINING HOLE.
+ *
+ * „Never more than one margin deep into the region" is a BOUND on the work
+ * site, not a statement of it, and using a bound where a fact belongs costs
+ * exactly where the two differ: a `roundabout`'s authored band (enterRadiusM,
+ * exitRadiusM] is wider than one margin on 48 of its 58 zones, so the inferred
+ * inner edge `radiusM − 8` sat OUTSIDE the arm and handed (enterRadiusM,
+ * radiusM − 8] — up to 5.0 m, `sc-rb-lane-choice` L1–L5 at enter 33 / exit 46
+ * — back to no automatic ending at all. A car resting there is in neither
+ * state: not in the region, so the departure dwell never runs; not in the
+ * band, so the stranded face never runs. Its drive could not be closed by
+ * anything in this module at any duration. All four roundabout lessons in the
+ * sweep161 audit are among the drives that had to be ended with «Прекрати
+ * урока».
+ *
+ * The zone now CARRIES its work-site bound (`RouteFinishZone.workSiteRadiusM`,
+ * stated by each anchor, floored in `normalizeOutside`), and this function
+ * reads it instead of inferring. The inference remains as the fallback for a
+ * zone that does not carry one, so every hand-built zone and every recorded
+ * session is bit-identical.
+ *
+ * WHAT CLOSING IT COSTS A STUDENT WHO IS STILL DRIVING — nothing, and that is
+ * measured rather than argued. The reclaimed sliver is approach road short of
+ * a ring the route has not finished, which is precisely `yieldReasonAt` case
+ * 5's window: `d ∈ (enterRadiusM, enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M]`
+ * returns `roundaboutEntry`, and over the compiled catalogue ZERO of the 58
+ * ring zones have a departure circle outside that window — so every metre of
+ * every ring band is inside B15's freeze. A student waiting for a gap is
+ * therefore held for YIELD_WAIT_MAX_S (180 s) before this bar may start at
+ * all, and the drive ends at 180 + 75 = 255 s of unbroken standstill instead
+ * of never. The founder's own wait was 40 s.
+ *
+ * STILL OPEN, and B1's ruling rather than this function's doing: the work
+ * site's INTERIOR has no automatic ending. It costs nothing on a ring (24 m
+ * the student is working) or a turn box (the corridor he is turning in), and
+ * on `sc-sig-green-wave` it is a 40 m disc, because `passSignal` has no
+ * authored extent to state — see FINISH_OUTSIDE_STUCK_S.
  */
 export function strandedBeyondM(zone: RouteFinishZone): number {
-  return Math.max(zone.armWithinM ?? zone.radiusM, zone.radiusM - FINISH_OUTSIDE_ANNULUS_M);
+  const armWithinM = zone.armWithinM ?? zone.radiusM;
+  const inner =
+    zone.workSiteRadiusM ??
+    Math.max(armWithinM, zone.radiusM - FINISH_OUTSIDE_ANNULUS_M);
+  // Clamped in both directions, so a stated work site cannot break either
+  // invariant this band rests on: never inside the arming circle (B1 — the
+  // interior of the work never ends a drive), never outside the departure one
+  // (a band wider than the region would delete the stranded face entirely).
+  return Math.min(Math.max(inner, armWithinM), zone.radiusM);
 }
 
 /**
@@ -1291,8 +1453,11 @@ export function strandedBeyondM(zone: RouteFinishZone): number {
  * instead of `zone.dwellSec`; see that constant for the audit the bar is
  * measured from. Motion in the band still qualifies for nothing at all — every
  * shuffle, hover and queue-nudge the band exists for is unaffected — and the
- * arming circle's interior is untouched, so B1's „standing still in the middle
- * of the work can never end a drive" holds exactly as written.
+ * WORK SITE's interior is untouched, so B1's „standing still in the middle of
+ * the work can never end a drive" holds exactly as written. (That sentence
+ * used to say „the arming circle's interior", which doc 88 §4 N3 refuted for
+ * the turn box, whose arm is inside its own corridor. `strandedBeyondM` is the
+ * bound now and the zone states it — O23.)
  */
 export function stepFinishGate(
   prev: FinishGateState,
@@ -1320,25 +1485,39 @@ export function stepFinishGate(
   // margin is the one case with nowhere to go. `strandedBeyondM` is where the
   // work site stops; see it for why that is not `armWithinM`.
   //
-  // The two dwells are geometrically exclusive, so one `insideSinceSec` times
-  // both and the threshold is read off THIS frame's pose. They are adjacent at
-  // `radiusM`, so a clock could in principle be carried across it — but only
-  // by a car that crosses the whole band without once exceeding
-  // FINISH_STANDSTILL_KMH (≥ 29 s of continuous sub-1-km/h creep over the
-  // 8 m), which is one unbroken standstill by any reading and would have spent
-  // this bar where it stood. Any real crossing spends a frame in the band
-  // MOVING, which qualifies for neither and clears the count.
+  // The two dwells are geometrically exclusive but ADJACENT at `radiusM`, and
+  // one clock times both — so the FACE the clock belongs to is remembered
+  // (`dwellFace`) and a change of face restarts it. Until 2026-08-19 it did
+  // not: the sentence here read „a clock could in principle be carried across
+  // it, but only by a car that crosses the whole band without once exceeding
+  // FINISH_STANDSTILL_KMH … and would have spent this bar where it stood",
+  // and both halves of that are wrong. A car does not have to CROSS the band
+  // to carry the clock — it only has to have stood in it and then leave, and
+  // it has not spent this bar, because the bar it was spending is 75 s while
+  // the one it arrives with is 20. Concretely: stand still just inside the
+  // departure circle for FINISH_LEAVE_S, then drive out, and the drive ends on
+  // the frame the circle is crossed rather than FINISH_LEAVE_S after it — the
+  // twenty seconds B1 gives a student to notice an unsignalled roundabout exit
+  // and swing back in, spent before he leaves. Doc 88 §4 N3 carried this as
+  // „one class of drive ending 20 s early" with the replay not in hand; it is
+  // the class, and `dwellFace` is what removes it. See types.ts for why the
+  // fix is a label rather than a second clock (B15's freeze clears exactly one
+  // field, and a second clock would escape it).
   const stranded =
     outsideMode &&
     armed &&
     !inRegion &&
     d > strandedBeyondM(zone) &&
     Math.abs(tick.speedKmh) <= FINISH_STANDSTILL_KMH;
-  const dwellSec = inRegion ? zone.dwellSec : FINISH_OUTSIDE_STUCK_S;
 
   if (!inRegion && !stranded) {
-    // Outside the finish region: clears any partial dwell, and may arm.
-    return armed === prev.armed && prev.insideSinceSec === null
+    // Outside the finish region entirely — moving, or beyond both faces. Clears
+    // the running visit AND both accumulators: this is the pose that says the
+    // student is driving again, and neither bar should remember anything.
+    return armed === prev.armed &&
+      prev.insideSinceSec === null &&
+      !prev.regionDwellSec &&
+      !prev.strandedDwellSec
       ? prev
       : { armed, insideSinceSec: null, reachedAtSec: null };
   }
@@ -1353,11 +1532,43 @@ export function stepFinishGate(
       : { armed, insideSinceSec: null, reachedAtSec: null };
   }
 
-  const since = prev.insideSinceSec ?? tick.t;
-  if (tick.t - since >= dwellSec) {
-    return { armed, insideSinceSec: since, reachedAtSec: tick.t };
+  const dwellFace: "region" | "stranded" = inRegion ? "region" : "stranded";
+  const dwellSec = inRegion ? zone.dwellSec : FINISH_OUTSIDE_STUCK_S;
+
+  // TWO ACCUMULATORS, ONE RUNNING VISIT. Each face banks the seconds actually
+  // spent on it; `insideSinceSec` times only the visit in progress. A face
+  // change BANKS the visit that just ended and starts the other face's visit at
+  // this frame — so a car straddling the departure circle accumulates on both
+  // and reaches a bar, instead of resetting the single clock forever, and a car
+  // that leaves a face and returns much later resumes from what it earned
+  // rather than from the wall clock. See types.ts for the pose that measured it.
+  const sameFace = prev.dwellFace === dwellFace;
+  const runningSince = sameFace ? prev.insideSinceSec : null;
+  const closedVisit =
+    !sameFace && prev.insideSinceSec !== null ? Math.max(0, tick.t - prev.insideSinceSec) : 0;
+  const bankedRegion = (prev.regionDwellSec ?? 0) + (dwellFace === "stranded" ? closedVisit : 0);
+  const bankedStranded = (prev.strandedDwellSec ?? 0) + (dwellFace === "region" ? closedVisit : 0);
+  const bankedHere = dwellFace === "region" ? bankedRegion : bankedStranded;
+
+  const since = runningSince ?? tick.t;
+  const elapsedHere = bankedHere + (tick.t - since);
+  const next = {
+    armed,
+    insideSinceSec: since,
+    dwellFace,
+    regionDwellSec: bankedRegion,
+    strandedDwellSec: bankedStranded,
+  };
+  if (elapsedHere >= dwellSec) {
+    return { ...next, reachedAtSec: tick.t };
   }
-  return prev.insideSinceSec === since && prev.armed === armed
+  // Identity when genuinely nothing moved, so the caller's `=== prev` checks
+  // still short-circuit on the common frame.
+  return sameFace &&
+    runningSince !== null &&
+    prev.armed === armed &&
+    (prev.regionDwellSec ?? 0) === bankedRegion &&
+    (prev.strandedDwellSec ?? 0) === bankedStranded
     ? prev
-    : { armed, insideSinceSec: since, reachedAtSec: null };
+    : { ...next, reachedAtSec: null };
 }

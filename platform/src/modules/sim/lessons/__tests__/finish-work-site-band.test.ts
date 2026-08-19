@@ -45,6 +45,7 @@ import {
   terminalRescueZone,
   yieldReasonAt,
   YIELD_ROUNDABOUT_APPROACH_M,
+  YIELD_WAIT_MAX_S,
 } from "../finish";
 import { parseObjectiveParams } from "../objectives";
 import { compileScenario } from "../scenario/compile";
@@ -165,6 +166,83 @@ function driveIntoBoxThenRest(
   const restStartedAtSec = t;
   for (let s = 0; s < restSec; s += DT) {
     ticks.push(makeTick({ t, speedKmh: 0, position: hold }));
+    t += DT;
+  }
+
+  let state = createLessonSession(lesson);
+  for (const tick of ticks) {
+    state = applyTick(state, tick).state;
+    if (state.phase !== "driving") break;
+  }
+  return {
+    ended: state.phase !== "driving",
+    endedAtSec: state.endedAtSec ?? null,
+    restStartedAtSec,
+  };
+}
+
+/**
+ * The same drive, shaped for a RING: in past `enterRadiusM` (the arming
+ * evidence — you cannot leave a roundabout you never reached), back out to
+ * `hold`, then `restSec` there.
+ *
+ * `restKmh` is what makes this prove both directions with one helper: 0 is a
+ * car that has stopped, and anything above FINISH_STANDSTILL_KMH is a student
+ * still driving — the pose is identical and only the evidence differs, which
+ * is exactly the distinction the stranded face rests on. The creep is given a
+ * real displacement rather than a speed reading alone, so the tick is not a
+ * car claiming 4 км/ч while parked.
+ */
+function driveIntoRingThenRest(
+  r: Rung,
+  ring: { x: number; y: number; enterRadiusM: number; exitRadiusM: number },
+  hold: { x: number; y: number },
+  restSec: number,
+  restKmh = 0,
+): { ended: boolean; endedAtSec: number | null; restStartedAtSec: number } {
+  const template = SCENARIO_TEMPLATES.find((t) => t.id === r.id)!;
+  const lesson = compileScenario(template, r.level);
+  const DT = 0.25;
+  const ticks: SimTick[] = [];
+  let t = 0;
+
+  // Approach along −y from well outside the ring to one metre inside the
+  // arming circle, which is the minimum evidence the gate asks for.
+  const armPose = { x: ring.x, y: ring.y - (ring.enterRadiusM - 1) };
+  const from = { x: ring.x, y: ring.y - (ring.exitRadiusM + 40) };
+  for (let s = 0; s <= 1; s += DT / 8) {
+    ticks.push(
+      makeTick({
+        t,
+        speedKmh: 5,
+        position: { x: from.x + (armPose.x - from.x) * s, y: from.y + (armPose.y - from.y) * s },
+      }),
+    );
+    t += DT;
+  }
+  // Back out to the hold pose.
+  for (let s = 0; s <= 1; s += DT / 4) {
+    ticks.push(
+      makeTick({
+        t,
+        speedKmh: 5,
+        position: { x: armPose.x + (hold.x - armPose.x) * s, y: armPose.y + (hold.y - armPose.y) * s },
+      }),
+    );
+    t += DT;
+  }
+  const restStartedAtSec = t;
+  // Rest — or creep, which is the same place at a different speed. The creep
+  // shuffles ±0.5 m along the approach so it never leaves the band.
+  for (let s = 0; s < restSec; s += DT) {
+    const wobble = restKmh > 0 ? Math.sin(s * 0.6) * 0.5 : 0;
+    ticks.push(
+      makeTick({
+        t,
+        speedKmh: restKmh,
+        position: { x: hold.x, y: hold.y - wobble },
+      }),
+    );
     t += DT;
   }
 
@@ -327,20 +405,35 @@ describe("no pose inside an authored work site can ever be in the band", () => {
     expect(checked).toBeGreaterThanOrEqual(40);
   });
 
-  it("the band is never wider than the margin, and never narrower than nothing", () => {
+  it("the band starts at the STATED work site, is never narrower than nothing, and never reaches inside the arm", () => {
     let checked = 0;
+    let stated = 0;
     for (const r of RUNGS) {
       for (const z of outsideZones(r)) {
         checked++;
+        const arm = z.armWithinM ?? z.radiusM;
         const inner = strandedBeyondM(z);
-        // Never deeper into the region than one margin…
-        expect(z.radiusM - inner).toBeLessThanOrEqual(FINISH_OUTSIDE_ANNULUS_M + 1e-9);
-        // …and never inside the arming circle, which is B1's untouched ground.
-        expect(inner).toBeGreaterThanOrEqual(z.armWithinM ?? z.radiusM);
+        // Never inside the arming circle, which is B1's untouched ground.
+        expect(inner).toBeGreaterThanOrEqual(arm);
         // A zero-width band would make „left" mean one pose sample further out.
         expect(z.radiusM - inner).toBeGreaterThan(0);
+        // O23 — where the band starts is now READ OFF THE ZONE, not inferred
+        // from `radiusM − FINISH_OUTSIDE_ANNULUS_M`. That inference was a
+        // BOUND on the work site and it cost exactly where the two differ: a
+        // ring's authored band is wider than one margin, so the bound sat
+        // outside the arm and handed the difference back to no ending at all.
+        // Asserting the identity is what stops the bound coming back — it is
+        // false for every ring the moment the fallback is used again.
+        if (z.workSiteRadiusM !== undefined) {
+          stated++;
+          expect(inner).toBe(Math.max(z.workSiteRadiusM, arm));
+        }
       }
     }
+    // Every "outside" zone the module hands out states its work site. If a new
+    // anchor ships without one it falls back to the inference this row exists
+    // to have replaced, and this count — not a silent pass — is what says so.
+    expect(stated).toBe(checked);
     // THE COVERAGE SELF-CHECK. 108 is the measured population of "outside"
     // zones over the compiled catalogue (58 roundabout + 40 turn box + 10
     // passSignal). If a template that produces one stops compiling, this drops
@@ -360,34 +453,110 @@ describe("no pose inside an authored work site can ever be in the band", () => {
 // WHAT IT COSTS, PROVED RATHER THAN ASSERTED
 // ---------------------------------------------------------------------------
 
-describe("the roundabout hand-back is inside B15's freeze", () => {
-  it("a ring's handed-back sliver is a pose the lawful wait already covers", () => {
-    // A ring whose authored band is wider than one margin gives
-    // (enterRadiusM, radiusM − 8] back to „no automatic ending". The claim in
-    // `strandedBeyondM`'s docstring is that this is not a place a car rests
-    // unnoticed, because B15 already reads a standstill there as a lawful wait
-    // to enter — so it was never spending the 75 s bar there in the first
-    // place. Proved on the shipped drill instead of asserted.
-    const r = rung("sc-roundabout-entry", 1);
-    const ring = terminalOf(r);
-    if (ring.kind !== "completeManeuver" || ring.maneuver !== "roundabout") {
-      throw new Error("sc-roundabout-entry no longer ends on a ring");
+describe("O23 — the ring approach no longer has a region with no ending", () => {
+  /** The ring a rung ends on, or a thrown explanation. */
+  function ringOf(r: Rung): { x: number; y: number; enterRadiusM: number; exitRadiusM: number } {
+    const p = terminalOf(r);
+    if (p.kind !== "completeManeuver" || p.maneuver !== "roundabout") {
+      throw new Error(`${r.id}@L${r.level} no longer ends on a ring`);
     }
-    const z = outsideZones(r)[0];
-    const arm = z.armWithinM ?? z.radiusM;
-    const inner = strandedBeyondM(z);
-    expect(inner).toBeGreaterThan(arm); // there IS a hand-back on this drill
+    return { x: p.x, y: p.y, enterRadiusM: p.enterRadiusM, exitRadiusM: p.exitRadiusM };
+  }
 
-    // Every metre of it, sampled: B15 must call it a lawful wait to enter.
-    for (let d = arm + 0.25; d <= inner; d += 0.25) {
-      const reason = yieldReasonAt(
-        makeTick({ t: 0, speedKmh: 0, position: { x: ring.x + d, y: ring.y } }),
-        { params: r.params, currentIndex: r.params.length - 1 },
-        [],
-      );
-      expect(reason).toBe("roundaboutEntry");
+  it("every ring band now starts at enterRadiusM — the handed-back sliver is gone", () => {
+    // BEFORE O23 the inner edge was `max(arm, radiusM − 8)`, which on 48 of the
+    // 58 ring zones sat OUTSIDE the arm and left (enterRadiusM, radiusM − 8] —
+    // up to 5.0 m on `sc-rb-lane-choice` (enter 33 / exit 46) — in neither
+    // state: not in the region, so the departure dwell never ran; not in the
+    // band, so the stranded face never ran. A car resting there could not be
+    // closed by anything in this module at any duration.
+    let rings = 0;
+    let wouldHaveBeenHandedBack = 0;
+    for (const r of RUNGS) {
+      const p = terminalOf(r);
+      if (p.kind !== "completeManeuver" || p.maneuver !== "roundabout") continue;
+      for (const z of outsideZones(r)) {
+        rings++;
+        expect(strandedBeyondM(z)).toBe(p.enterRadiusM);
+        if (p.enterRadiusM < z.radiusM - FINISH_OUTSIDE_ANNULUS_M) wouldHaveBeenHandedBack++;
+      }
     }
-    // And the reason's own window is what makes that true, not luck.
-    expect(inner).toBeLessThanOrEqual(ring.enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M);
+    expect(rings).toBe(58);
+    // The measured population of the defect, so „0 rings changed" cannot be
+    // reported by a census that quietly stopped finding any.
+    expect(wouldHaveBeenHandedBack).toBe(48);
+  });
+
+  it("…and every metre of every ring band is still inside B15's freeze", () => {
+    // THE FALSE-REFUSAL DIRECTION, and it is the one that decides whether the
+    // row above may ship. What the ring band now contains is a car stopped on
+    // the approach to a roundabout it has not finished — which is the founder's
+    // own B15 complaint verbatim. It may only be closed after the lawful wait
+    // has been honoured in full, so EVERY pose in EVERY ring's band has to be a
+    // pose `yieldReasonAt` calls `roundaboutEntry`. Sampled over the catalogue
+    // rather than argued from one drill.
+    let sampled = 0;
+    for (const r of RUNGS) {
+      const p = terminalOf(r);
+      if (p.kind !== "completeManeuver" || p.maneuver !== "roundabout") continue;
+      const ring = ringOf(r);
+      for (const z of outsideZones(r)) {
+        // The whole band, not just its inner edge: the departure circle itself
+        // must be inside `enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M`.
+        expect(z.radiusM).toBeLessThanOrEqual(ring.enterRadiusM + YIELD_ROUNDABOUT_APPROACH_M);
+        for (let d = strandedBeyondM(z) + 0.25; d <= z.radiusM; d += 0.5) {
+          sampled++;
+          const reason = yieldReasonAt(
+            makeTick({ t: 0, speedKmh: 0, position: { x: ring.x + d, y: ring.y } }),
+            { params: r.params, currentIndex: r.params.length - 1 },
+            [],
+          );
+          expect(reason).toBe("roundaboutEntry");
+        }
+      }
+    }
+    // A self-check on the instrument: a loop that sampled nothing would pass
+    // every assertion inside it, which is exactly how this project's „0
+    // defects" reports were produced.
+    expect(sampled).toBeGreaterThan(500);
+  });
+
+  it("a car dead still in the reclaimed sliver ENDS — after the lawful wait is honoured in full", () => {
+    // Direction one, driven through the real engine on the shipped drill.
+    const r = rung("sc-roundabout-entry", 1);
+    const ring = ringOf(r);
+    const z = outsideZones(r)[0];
+    // A pose that used to be in NEITHER state: past the arm, short of the old
+    // inferred inner edge. If the sliver ever closes on this drill the setup
+    // asserts rather than silently testing an ordinary band pose.
+    const oldInner = Math.max(ring.enterRadiusM, z.radiusM - FINISH_OUTSIDE_ANNULUS_M);
+    expect(oldInner).toBeGreaterThan(ring.enterRadiusM);
+    const dM = (ring.enterRadiusM + oldInner) / 2;
+    const hold = { x: ring.x, y: ring.y - dM };
+
+    const out = driveIntoRingThenRest(r, ring, hold, 300);
+    expect(out.ended).toBe(true);
+    // YIELD_WAIT_MAX_S of lawful wait first — the standstill is evidence of
+    // nothing while the road is what is holding him — and only then the 75 s
+    // stranded bar. Never earlier: that is the founder's forty seconds.
+    const spent = out.endedAtSec! - out.restStartedAtSec;
+    expect(spent).toBeGreaterThanOrEqual(YIELD_WAIT_MAX_S + FINISH_OUTSIDE_STUCK_S - 2);
+    expect(spent).toBeLessThanOrEqual(YIELD_WAIT_MAX_S + FINISH_OUTSIDE_STUCK_S + 2);
+  });
+
+  it("…and a student still creeping through the same sliver is never ended on", () => {
+    // Direction two. The same 300 s at the same place, but he is DRIVING —
+    // slowly, the way a beginner edges toward a ring he cannot read yet. The
+    // stranded face demands a full standstill and this is not one, so nothing
+    // may close the lesson under him however long he takes.
+    const r = rung("sc-roundabout-entry", 1);
+    const ring = ringOf(r);
+    const z = outsideZones(r)[0];
+    const oldInner = Math.max(ring.enterRadiusM, z.radiusM - FINISH_OUTSIDE_ANNULUS_M);
+    const dM = (ring.enterRadiusM + oldInner) / 2;
+
+    const out = driveIntoRingThenRest(r, ring, { x: ring.x, y: ring.y - dM }, 300, 4);
+    expect(out.ended).toBe(false);
+    expect(out.endedAtSec).toBeNull();
   });
 });

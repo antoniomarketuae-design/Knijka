@@ -14,6 +14,8 @@
 // -----------------------------------------------------------------------------
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { treeIdentity } from "./target.mjs";
@@ -100,18 +102,71 @@ function buildStampEnv() {
  * healthy server dead, the harness then tried to start a second one, and the
  * whole sweep died on `EADDRINUSE ::1:3460`. A liveness check that is stricter
  * than the thing it is checking is just a random number generator.
+ *
+ * AND ON `node:http`, WHICH IS NOT THE O25 FIX AND MUST NOT BE SOLD AS ONE.
+ *
+ * O25 is the abort that turned four finished audit lanes into exit 127. It
+ * needs a global fetch whose body is READ TO THE END; the remedy therefore
+ * belongs to `lib/auth.mjs` `warmFromNode`, which reads one, and its header
+ * carries the measurement. This function never read a body — `res.status > 0`
+ * is the whole test — and the first draft of this comment claimed it was a
+ * trigger anyway. MEASURED 2026-08-19 on the same fixture that aborts 25 times
+ * out of 25 when drained:
+ *
+ *   fetch(url) then process.exit(6), body never read   -> 6, 12 trials of 12
+ *   the same with `await res.body.cancel()`            -> 6, 12 of 12
+ *   the same with `await res.arrayBuffer()`            -> ABORT, 12 of 12
+ *
+ * So this is a CONSISTENCY change, not a repair, and the honest reasons for it
+ * are small and measured: 30 probes against a 2 MiB page cost 147 ms and
+ * +8.9 MiB rss through undici against 90 ms and +3.2 MiB here, because an
+ * un-drained fetch leaves the response pending in a pool this module has no
+ * other use for. `lib/target.mjs` and `lib/auth.mjs` already do their HTTP this
+ * way; one module left on undici is one place for the next person to copy from.
+ *
+ * THE REAL EXPOSURE IN THIS PROCESS IS NOT HERE. `lib/measure.mjs`
+ * `warmRoutes()` does `await res.arrayBuffer()` on global fetch, once per
+ * route, and `cli.mjs` runs it — so the abort is reachable from the mobile
+ * sweep. That is why cli.mjs stopped calling `process.exit()`; the transport
+ * half for measure.mjs belongs to whoever owns that file.
+ *
+ * HEADERS ARE THE ANSWER; THE BODY IS NOT ASKED FOR. `res.status > 0` was the
+ * old test and it stays the test — a 302 to /login is a server that is up. The
+ * request is destroyed as soon as the status line arrives, so a dev server's
+ * HTML is neither transferred nor waited for, once per second for the whole of
+ * a five-minute cold start.
  */
 async function isUp(url, timeoutMs = 15_000) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: controller.signal, redirect: "manual" });
-    return res.status > 0;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
+  return new Promise((resolve) => {
+    let settled = false;
+    let req = null;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve(value);
+    };
+    const timer = setTimeout(() => {
+      req?.destroy();
+      finish(false);
+    }, timeoutMs);
+    try {
+      const client = url.startsWith("https:") ? https : http;
+      req = client.get(url, { agent: false }, (res) => {
+        // Attached before the destroy below: tearing down a live response emits
+        // an error on it, and an unhandled 'error' on a stream ends the process
+        // — the same class of death `lesson-audit.mjs` immunised stdout against.
+        res.on("error", () => finish(false));
+        const status = res.statusCode ?? 0;
+        res.resume();
+        req.destroy();
+        finish(status > 0);
+      });
+      req.on("error", () => finish(false));
+    } catch {
+      finish(false); // a malformed URL is not a live server
+    }
+  });
 }
 
 /**

@@ -3010,11 +3010,26 @@ function RuntimeDriver({
     // its test re-reads rapier's literal out of node_modules so the two cannot
     // drift apart again.
     //
-    // NOT FIXED HERE, and not this lane's file: `traffic/system.ts` clamps its
-    // own step at MAX_DT_SEC = 0.1, so NPC cars and staged pedestrians still
-    // walk at a fifth of the ego car's pace on a sub-10-fps frame. `dt` is
-    // handed to `traffic.update()` below unchanged in effect (it re-clamps to
-    // the same 0.1 it used to receive), so nothing there moves either way.
+    // AND THE WORLD NOW KEEPS UP — O13/O19, closed 2026-08-19 in
+    // `traffic/system.ts`. That row read „NOT FIXED HERE" through two rounds:
+    // traffic clamped its own step at MAX_DT_SEC = 0.1, so the `dt` handed to
+    // `traffic.update()` below was truncated and NPC cars and staged
+    // pedestrians walked at a FIFTH of this car's pace on a sub-10-fps frame.
+    // MEASURED on the real district at seed 7, one 0.5 s frame: 8.825 m of
+    // ambient travel against 44.109 m for the same half-second at 60 Hz, and
+    // `update(0.5)` was bit-identical to `update(0.1)` — the ceiling was not
+    // slowing the world, it was discarding 0.4 s of it while this line handed
+    // the car all 0.5. `traffic.update()` now SUBDIVIDES the frame into five
+    // 0.1 s steps instead of truncating it, so no body integrates over a longer
+    // interval than it ever did and the world the car is graded against is the
+    // world the car is driving in. Above 10 fps that path is byte-for-byte the
+    // one that shipped (traffic/__tests__/substep.test.ts pins the pre-fix
+    // playback as a golden).
+    //
+    // STILL SPLIT, and not this lane's file: `VehicleRig`'s
+    // `cabin.update(delta, …)` runs the blink/wiper/stall timers on the raw,
+    // unclamped delta — so on a 3.57 s frame the indicator still blinks seven
+    // times what the clock says.
     const dt = sessionClockAdvance(delta);
     tRef.current += dt;
     const sample = sampleRef.current;

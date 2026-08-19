@@ -605,11 +605,33 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
   success: [
     {
       id: "sc-sctl-read",
-      titleBg: "Приближи бавно и прочети регулировчика, не лампата",
-      // Stem lane center, 6 m short of the 27.725 m stop line: the drive must be
-      // slow enough here to have actually LOOKED at the officer.
+      titleBg: "Приближи бавно до регулировчика",
+      // Stem lane center, 6 m short of the 27.725 m stop line.
       // FR-24: „6 m short" is the MARK; the L1 ladder widens radius 7 → 10.5,
       // so the disc reached 4.22 m past the line. The cut ends it at the paint.
+      //
+      // ── THE HALF OF THE OLD BANNER NOTHING COULD SEE, AND WHERE IT WENT ───
+      // This read «Приближи бавно и прочети регулировчика, НЕ ЛАМПАТА», and the
+      // comment under it said the drive „must be slow enough here to have
+      // actually LOOKED at the officer" — but slow enough is not looked. There
+      // is no gaze channel toward a world actor anywhere in the cockpit
+      // contract: `SimTick` carries the car's own state, and the only look it
+      // knows about is `mirrorGlance`, which is a mirror and not a man. So the
+      // cap of 20 graded «бавно» and NOTHING graded «не лампата».
+      //
+      // MEASURED, through the production evaluator on this template's own three
+      // recordings: the gate completed at 11.0 s on ALL THREE — including
+      // `mistake-wait-for-green`, which is the drive that reads the lamp instead
+      // of the officer and is shipped here as the counter-example, and
+      // `mistake-refuse-then-creep`. Identical to the tenth of a second.
+      //
+      // THE CLAIM IS NOT DELETED, IT IS MOVED TO THE GATE THAT ENFORCES IT.
+      // «прочети регулировчика, не лампата» is the act `sc-sctl-cross` below
+      // grades and can only be completed by: `requireRedMet` is satisfied here
+      // ONLY by a forbidding lamp crossed on the officer's `proceed` (ЗДвП
+      // чл. 7), and the same probe measures it refusing both mistake drives. The
+      // teaching itself is instruction 3, unchanged. What this banner promises
+      // now is exactly what this disc witnesses: this place, approached slowly.
       params: {
         kind: "reachZone",
         x: SX_LANE,
@@ -632,6 +654,18 @@ export const SC_SIG_CONTROLLER_LIVE: ScenarioSpec = {
       // waits for „his" green never satisfies it either — by then the officer
       // has turned his chest to this approach, and crossing on controller
       // "halt" bills CONTROLLER_SIGNAL_VIOLATED, the same 10 points.
+      //
+      // AND THE OFFICER STAYS IN `sc-sctl-read`'s BANNER FOR A REASON THAT IS
+      // NOT COPY. `advisor.ts` stands the generic «Чакаш правилно на червено …
+      // Тръгваш на зелено» card down at exactly the junctions „where the AUTHOR
+      // put the officer in the title" (`titleNamesController`) — a fix landed
+      // after the harness held that card for 20 s, went on the green it
+      // promised, and finished НЕИЗДЪРЖАН with this template's own −10. The
+      // first cut of the O21 retitle read «Приближи бавно до стоп-линията» and
+      // re-armed the lamp card; `advisor-sweep161.test.ts` caught it. Naming him
+      // as a LANDMARK claims nothing a disc cannot witness — «до регулировчика»
+      // is a place — while «прочети регулировчика» claimed a disposition of the
+      // eyes. Keep the word.
       //
       // AND THE DEBRIEF MUST SAY SO. Because this branch is the template's only
       // completion path, whatever the session screen prints for a met red here
@@ -907,15 +941,68 @@ export const SC_SIG_CONTROLLER_POSTURES: ScenarioSpec = {
   success: [
     {
       id: "sc-sctp-read",
-      titleBg: "Приближи бавно и прочети позата на регулировчика",
-      // Stem lane center, before the 27.7 m stop line: slow enough to have
-      // actually LOOKED at the officer, not read a (dark) lamp.
+      titleBg: "Приближи бавно до регулировчика",
+      // Stem lane center, before the 27.7 m stop line.
+      //
+      // ── SLOW ENOUGH IS NOT LOOKED (the twin of the note on `sc-sctl-read`) ─
+      // This read «Приближи бавно и прочети ПОЗАТА на регулировчика» over a bare
+      // disc and a 30 км/ч cap, and the comment that stood here said the quiet
+      // part out loud: „slow enough to have actually LOOKED at the officer, not
+      // read a (dark) lamp". Nothing in the cockpit contract can witness a look
+      // at a world actor, so the cap graded «бавно» and the certificate for
+      // «прочети позата» was signed by nobody. MEASURED through the production
+      // evaluator: 10.4 s on BOTH mistake recordings — the barge past his chest
+      // and the false start on the raised arm — the two drives that exist here
+      // precisely to show the posture being misread.
+      //
+      // THE CLAIM MOVED DOWN ONE ROW, to the gate that now reads the officer's
+      // own answer off the tick (`sc-sctp-cross`). The teaching is instructions
+      // 2–5, unchanged; this banner promises only the place and the speed the
+      // disc can witness — «до регулировчика» is a PLACE, and it also keeps the
+      // word `advisor.ts` looks for (see the twin note on `sc-sctl-read`).
       params: { kind: "reachZone", x: SX_LANE, y: -42, radiusM: 8, maxSpeedKmh: 30 },
     },
     {
       id: "sc-sctp-cross",
       titleBg: "Премини кръстовището, когато позата разреши посоката ти",
       // North-arm northbound lane center, past the 40 m junction area.
+      //
+      // ── THE GATE THAT CERTIFIED OBEDIENCE ON THE DISOBEDIENT DRIVE ────────
+      // This was the bare disc alone, so «когато позата разреши посоката ти»
+      // was written over a place 45 m north of the junction and nothing else.
+      // MEASURED through the production evaluator on this template's own
+      // recordings, before the demand:
+      //
+      //   drive                        stopLineCrossed carried   this gate
+      //   shadow-correct               trafficLight/red/proceed   ✓ @46.8 s
+      //   mistake-barge-chest          trafficLight/green/halt    ✓ @25.7 s
+      //   mistake-start-on-raised-arm  trafficLight/yellow/halt   ✓ @34.2 s
+      //
+      // Both mistake drives bill CONTROLLER_SIGNAL_VIOLATED — the 10-point
+      // опасна this whole template exists to forbid — and both collected a
+      // written certificate that the posture had released them.
+      //
+      // WHAT GRADES IT NOW: `objectives.ts` reads this banner's own claim — the
+      // officer (or his posture) GRANTING the crossing — and turns it into the
+      // `requireControllerProceed` demand, which reads
+      // `stopLineCrossed.controller`. rules/types.ts documents that field as
+      // „the EFFECTIVE signal … overrides `lightState` ENTIRELY (ЗДвП чл. 7)" —
+      // the officer's own answer for this approach, not the dark lamp and not
+      // the rule engine's verdict about it. The demand rides the TITLE because
+      // an authored key does not typecheck from a template (`ReachZoneParams`
+      // lives in lessons/types.ts, another lane's file — the same routing note
+      // as `sc-acf-adapted` in templates-conditions.ts).
+      //
+      // DELIBERATELY NOT `requireRedMet`, which is what the sibling
+      // `sc-sig-controller-live` uses: that signature reads a FORBIDDING LAMP
+      // plus the permission, and here the lamps are загаснал by design. The
+      // runtime still reports the invisible cluster's underlying phase in
+      // `lightState` (worldRuntime `fireLine`: it emits `lightStateOf(line)`
+      // beside the permission, and the reducer „grades ONLY the permission"), so
+      // the „red" measured on the correct drive is the hidden cycle showing
+      // through — an accident of the timetable, and it would print the debrief
+      // sentence «Изчака червения сигнал и потегли на зелено» about a drill with
+      // no lamp to wait for. This gate reads the man.
       params: { kind: "reachZone", x: SX_LANE, y: 45, radiusM: 9 },
     },
   ],

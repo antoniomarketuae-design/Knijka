@@ -31,7 +31,6 @@ import {
   buildSessionSummary,
   createRuleEngine,
   isScorableEvent,
-  ledgerBilling,
   reduceTick,
   type RuleEngineConfig,
   type RuleEvent,
@@ -52,7 +51,7 @@ import {
   type ObjectiveContext,
 } from "./objectives";
 import { stepYieldVoice } from "./advisor";
-import { applyEscalations, type PenaltyEscalation } from "./escalation";
+import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
 import {
   CRASH_PIN_RADIUS_M,
@@ -872,11 +871,37 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // ends — the dwell restarts from the first frame he is free to move
       // again. Without that drop, freezing would merely defer the same 20 s
       // verdict to the instant the gap appeared.
-      if (finishGate?.insideSinceSec != null) {
-        finishGate = { ...finishGate, insideSinceSec: null };
+      // BOTH ACCUMULATORS TOO, not just the running visit. Each finish face
+      // banks the seconds spent on it (types.ts FinishGateState), and a lawful
+      // wait must be spendable on neither — clearing only `insideSinceSec`
+      // would leave the banked seconds behind and let the freeze be defeated by
+      // waiting in two instalments. This is the one line the lane that built
+      // the accumulators could not reach: it owned finish.ts and types.ts, and
+      // the freeze lives here, so it shipped a single clock with a hole rather
+      // than a second field that would escape this drop.
+      if (
+        finishGate?.insideSinceSec != null ||
+        finishGate?.regionDwellSec ||
+        finishGate?.strandedDwellSec
+      ) {
+        finishGate = {
+          ...finishGate,
+          insideSinceSec: null,
+          regionDwellSec: 0,
+          strandedDwellSec: 0,
+        };
       }
-      if (finishRescueGate?.insideSinceSec != null) {
-        finishRescueGate = { ...finishRescueGate, insideSinceSec: null };
+      if (
+        finishRescueGate?.insideSinceSec != null ||
+        finishRescueGate?.regionDwellSec ||
+        finishRescueGate?.strandedDwellSec
+      ) {
+        finishRescueGate = {
+          ...finishRescueGate,
+          insideSinceSec: null,
+          regionDwellSec: 0,
+          strandedDwellSec: 0,
+        };
       }
     } else {
       // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
@@ -1152,29 +1177,16 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
    * official verdict below stays on official base points (see escalation.ts's
    * header for the rationale).
    *
-   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — the training total is a
-   * WEIGHTING of the exam's arithmetic, not a second arithmetic. Handed the
-   * whole mistake list it silently re-instates every fault Наредба № 38,
-   * чл. 48, ал. 3 closed over, and then escalates them.
-   *
-   * MEASURED 2026-08-18, `sc-hz-accident-scene` L3: a wrecked car struck at
-   * t = 13.13 and a bystander at t = 13.43. The exam ended at the first —
-   * `score` 10, `unscoredAfterClose` 1. This call, over both rows, returned 25:
-   * the free row's ten points came back, and the coach had additionally graded
-   * it a REPEAT (×1.5) because it saw a second event with the same code. Two
-   * victims in one crash are not a repeat of anything; the student read
-   * «повторна грешка ×1.5» and «Тренировъчен резултат: 25 наказателни т.»
-   * beside an official 10, three numbers for one drive.
-   *
-   * Filtering the MISTAKES fixes both halves at once, because escalation.ts
-   * pairs its records to events by (code, t): a row that is not folded cannot
-   * carry its record either, so the false «повторна грешка» disappears with the
-   * false total. A genuine repeat — two red lights, no termination — is
-   * untouched: nothing closes that ledger, so every row is still billed.
+   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — and that filter is NOT
+   * applied here. `foldTrainingScore` applies it, `wire.ts gradeFinishWire`
+   * calls the same function, and that is the entire fix: this file and that one
+   * each owned a copy, they were repaired in separate lanes, and in between
+   * them the server's sheet — the one the student reads — printed a
+   * «Тренировъчен резултат» the client never computed. escalation.ts's header
+   * carries the drive and the numbers.
    */
-  const billed = ledgerBilling(summary.mistakes);
-  const { effectiveTotalPoints, escalated } = applyEscalations(
-    summary.mistakes.filter((_, i) => billed[i]),
+  const { effectiveTotalPoints, escalated } = foldTrainingScore(
+    summary.mistakes,
     state.penaltyEscalations,
   );
 

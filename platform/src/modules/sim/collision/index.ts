@@ -49,30 +49,38 @@
  * sentence used to read „the only one that could not check", which described an
  * intention rather than the tree.
  *
- * THE MARGIN IS 3.8 %, NOT THE ~45 % probe.ts's `SWEEP_FRAME_TRAVEL_M` doc and
- * that test both stated. 45 % counts only the TRANSLATION half of the
- * expression the probe actually compares against the threshold:
- * `relativeTravelM` is centre displacement PLUS the arc each body's far corner
- * sweeps while rotating, and that second term is capped at 180° per body, i.e.
- * π × hypot(halfLengthM, halfWidthM) — 6.885 m for the player before the other
- * body is counted at all. Measured 2026-08-19 over every (profile × its own
- * fastest authored `cruiseSpeedMps`) pair the bank can stage, the worst is the
- * TRAM at 57.810 m against the 60 m threshold; the player-versus-car pair the
- * head-on above is driven on is 55.333 m. That test derives both ends of the
- * sum from the files that own them — `PHYSICS_MAX_FRAME_DT` out of
- * lesson-ui/sessionClock.ts and the speeds out of the scenario bank — so the
- * guard now moves when the clock or the content moves. A margin overstated
- * twelvefold is worse than none, because the next reader budgets against it.
- *
- * NOT FIXED HERE, ROUTED: probe.ts's own doc-comment on `SWEEP_FRAME_TRAVEL_M`
- * still says „the margin over reality is the same ~45 %" and is the ORIGIN of
- * the figure. That file belongs to another lane this wave; the correction is
- * one sentence at probe.ts:105–109.
+ * HOW MUCH ROOM THAT 60 m LEAVES IS NOT STATED HERE, DELIBERATELY. It was, and
+ * for a day this file and probe.ts published two DIFFERENT margins for one
+ * constant: this one measured against what `relativeTravelM` actually sums,
+ * probe.ts's — the ORIGIN of the figure — inherited from an arithmetic that
+ * counted only the translation half and overstated the room twelvefold. The
+ * correction had been applied to the file that noticed rather than to the file
+ * the number came from, and two doc-comments that agree only because someone
+ * edited both disagree again on the next edit. So the figure now lives ONCE,
+ * at the constant's own declaration in probe.ts, where `__tests__/index.test.ts`
+ * recomputes it from `PHYSICS_MAX_FRAME_DT` (lesson-ui/sessionClock.ts) and the
+ * scenario bank's authored speeds and pins that sentence against the result.
+ * The same test fails if this file grows a competing number. Read it there —
+ * it is far tighter than the 60 makes it look, and the reason it is worth a
+ * gate is that the next reader budgets against whichever figure they meet
+ * first.
  *
  * ---------------------------------------------------------------------------
  * WHAT THIS MODULE DOES NOT DO, because six sweep161 findings were routed here
- * for it and it cannot answer any of them (recorded so the next wave routes
- * them to a file that can):
+ * for it and it cannot answer any of them.
+ *
+ * THEY ARE NOW RE-ROUTED, with the proof for each, in
+ * `.audit-frames/routing-collision.json` — nine rows, because reading the
+ * corpus for the six turned up three more parked on the string
+ * „platform/src/modules/sim/collision", a DIRECTORY with no filename, which is
+ * a second way to be invisible to a wave that groups findings by file. The
+ * refutation that applies to all nine is one grep: this directory imports
+ * neither three nor @react-three/rapier nor react, and the barrel below
+ * exports only constants, functions that return a number or a boolean, three
+ * body builders and one pose-memory class. Nothing here can create a body,
+ * move one, draw one or end a lesson. Keep that true — it is what makes this
+ * module testable without a browser, and it is also the reason a finding about
+ * a body that did not stop can never be closed by editing it:
  *
  *   · NO CONTACT RESPONSE. Nothing here moves a body. Adjudication says "these
  *     two boxes overlap by 1.77 m"; keeping them out of each other is rapier's
@@ -92,10 +100,20 @@
  *     mobile-wrong t052s at 0 km/h with the windscreen full of interior
  *     backfaces; sc-ac-night-overdrive pc-wrong t039s flush inside a facade at
  *     95 km/h; sc-ac-aquaplane mobile-wrong t034s inside world geometry after
- *     the crash, still grading): the building colliders are hollow full-height
- *     wall quads (sim/world/builders/buildings.ts `buildOne` — one quad per
- *     footprint edge, no floor, no cap), so once a body is inside there is no
- *     face left to push it out and no second event to report it.
+ *     the crash, still grading). Verified while re-routing them, and stated as
+ *     what was READ rather than as a diagnosis: `buildOne`
+ *     (sim/world/builders/buildings.ts) writes to its collider accumulator at
+ *     lines 212-216 and nowhere else in the file — one full-height quad per
+ *     footprint edge, no floor triangle, no roof cap — and WorldColliders
+ *     merges the lot into ONE TrimeshCollider. Why a car reaches the far side
+ *     of that surface is the open question, and the sharpest frame is
+ *     sc-ac-night-overdrive's: the speedometer still reads 95 км/ч with the
+ *     windscreen full of facade, which is not a body that was stopped and
+ *     re-accelerated. Both buildings.ts and terminus.ts state in their own
+ *     headers that such a mass „cannot be driven through".
+ *   · NO FINISH RULE EITHER, and that half is lessons/finish.ts's — nothing
+ *     ends a lesson whose car has come to rest inside the scenery, the same
+ *     gap already on the books at sc-park-night.
  *   · NO ACCIDENT COUNT. "How many accidents is this" is the rule engine's
  *     question (`collisionSeparationSec`, and the per-body episode landing in
  *     runtime/worldRuntime.ts). This module reports geometry per frame; a

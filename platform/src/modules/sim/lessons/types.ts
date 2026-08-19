@@ -321,6 +321,36 @@ export interface RouteFinishZone {
    */
   armWithinM?: number;
   /**
+   * "outside" zones only (O23, 2026-08-19) — the outer bound of the AUTHORED
+   * WORK SITE, m: where the work stops and the margin begins.
+   *
+   * WHY THE ZONE HAS TO CARRY THIS RATHER THAN HAVE IT INFERRED. The band
+   * between „you were here" (`armWithinM`) and „you have left" (`radiusM`) has
+   * a standstill face — a car that stops in a margin has no exit, so
+   * finish.ts's FINISH_OUTSIDE_STUCK_S closes the drive there. That face may
+   * never reach into the work site itself (B1: standing still in the middle of
+   * the work can never end a drive), so it needs to know where the work site
+   * ENDS — and `armWithinM` is not that number for either of the two shapes
+   * that get it wrong, in OPPOSITE directions:
+   *
+   *   · a `threePointTurn` arms on the circle INSCRIBED in its corridor, which
+   *     is SMALLER than the box. Reading the arm as the work site put poses
+   *     strictly inside the authored corridor into the „margin" and closed the
+   *     lesson on a student pausing inside the box he was told to turn in
+   *     (doc 88 §4 N3, two measured poses).
+   *   · a `roundabout` arms on `enterRadiusM` and departs at `exitRadiusM`,
+   *     an AUTHORED band that is wider than one margin on 48 of the 58 ring
+   *     zones in the catalogue. Inferring the inner edge as
+   *     `radiusM − FINISH_OUTSIDE_ANNULUS_M` handed the difference — up to
+   *     5.0 m (`sc-rb-lane-choice`, enter 33 / exit 46) — back to NO AUTOMATIC
+   *     ENDING: a car resting there is neither in the region nor in the band,
+   *     so no gate in the module could ever close its drive.
+   *
+   * Absent = infer it, exactly as before (finish.ts `strandedBeyondM`), so a
+   * hand-built zone and every recorded session behave bit-identically.
+   */
+  workSiteRadiusM?: number;
+  /**
    * May this zone be consulted while the chain is ALREADY ON the terminal
    * objective (the B2 rescue)? False for anchors where being inside the zone
    * is the normal, correct state of a student still working: a parking bay
@@ -441,6 +471,68 @@ export interface FinishGateState {
   armed: boolean;
   /** Start of the current continuous stay inside the zone; null = outside. */
   insideSinceSec: number | null;
+  /**
+   * WHICH FACE the clock above is currently timing (2026-08-19). "outside"
+   * zones have two qualifying states with two different bars, and
+   * `insideSinceSec` times both:
+   *   · "region"   — away from the work site, counting `zone.dwellSec`
+   *                  (FINISH_LEAVE_S) toward „this drive has left";
+   *   · "stranded" — at a standstill in the BAND, counting
+   *                  FINISH_OUTSIDE_STUCK_S toward „this drive has nowhere
+   *                  left to go".
+   *
+   * WHY IT IS REMEMBERED RATHER THAN INFERRED. The two states are
+   * geometrically exclusive but ADJACENT at `radiusM`, and until this field
+   * the clock was silently carried across that boundary. A car that stood
+   * still in the band for ≥ FINISH_LEAVE_S and then drove out arrived in the
+   * region with its departure dwell already spent, so the drive ended on the
+   * very frame it crossed the departure circle instead of FINISH_LEAVE_S
+   * later. Those twenty seconds are not slack: they are the room B1
+   * deliberately gives a student who leaves a roundabout without signalling to
+   * realise it and swing back in, and closing the lesson under him is the
+   * false refusal this module exists to refuse. Doc 88 §4 N3's third bullet
+   * („one class of drive ending 20 s early") is this field.
+   *
+   * IT WAS ONCE A LABEL ON `insideSinceSec` RATHER THAN A SECOND CLOCK, and
+   * that choice had a hole big enough to matter. The reasoning was sound as far
+   * as it went — B15's freeze cleared `insideSinceSec` alone, so a second
+   * stored clock would have escaped the freeze and banked a lawful wait toward
+   * the stranded bar, which is precisely what B15 forbids. What it could not
+   * do was reach `lessons/engine.ts` to clear a second field, so it took the
+   * design the routing allowed.
+   *
+   * THE COST, measured: the two faces are ADJACENT at `radiusM`, so a car whose
+   * distance STRADDLES the departure circle changes face on every crossing and
+   * restarts the only clock there is. At 0.9 км/ч — a standstill by this
+   * module's own `FINISH_STANDSTILL_KMH` — a ±1.2 m rock with a period under
+   * 20 s accumulates NEITHER bar and the drive NEVER ENDS. An idling automatic
+   * nudged on and off the brake near the circle does it. The pre-fix build
+   * ended that same pose at +200.25 s: a lane whose entire subject is drives
+   * nobody can end opened a new one.
+   *
+   * SO EACH FACE NOW CARRIES ITS OWN ACCUMULATED DWELL, and the freeze clears
+   * both (`lessons/engine.ts`). Accumulated rather than a start-timestamp on
+   * purpose, because timestamps are wrong in the other direction: a car that
+   * stands in the region for 19 s, leaves for a minute and returns for one
+   * frame must not read 80 s of dwell. Only seconds actually spent on a face
+   * count toward that face's bar. The straddling car now accumulates on both
+   * and ends; the leave-and-return car does not end early. `dwellFace` stays as
+   * the label of the face the pose is on THIS frame — it no longer decides
+   * whether a clock survives.
+   */
+  dwellFace?: "region" | "stranded";
+  /**
+   * Seconds already banked on the REGION face across earlier visits, plus the
+   * same for the STRANDED face. `insideSinceSec` times the CURRENT visit to
+   * whichever face `dwellFace` names; these hold what previous visits earned.
+   * Both are cleared by B15's freeze together with `insideSinceSec`, so a
+   * lawful wait can never be banked toward either bar.
+   *
+   * Absent = zero. An in-flight session predating these fields simply starts
+   * both accumulators empty, which is the generous direction.
+   */
+  regionDwellSec?: number;
+  strandedDwellSec?: number;
   /** Session time the finish tripped; null = the end is still ahead. */
   reachedAtSec: number | null;
 }

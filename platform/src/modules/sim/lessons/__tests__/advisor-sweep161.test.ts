@@ -574,11 +574,20 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
     );
   });
 
-  it("…and on its approach objective too — read the officer, not the lamp", () => {
+  it("…and on its approach objective too — the objective's own words, not the lamp's", () => {
+    // The banner was «Приближи бавно и прочети регулировчика, не лампата» until
+    // 2026-08-19 (doc 88 O21): nothing in the cockpit contract can witness a
+    // look at a world actor, so the gate certified a read it never measured and
+    // the claim moved to `sc-sctl-cross`, which grades it. The OFFICER stayed in
+    // the words, and this test is why — the first cut of that retitle read
+    // «Приближи бавно до стоп-линията» and this assertion went red with the
+    // generic lamp card back in place, «…Тръгваш на зелено», on the junction
+    // where the lamp decides nothing. `titleNamesController` is a substring
+    // test, so the displacement is only ever as strong as the banner.
     const s = waitingSession("sc-sig-controller-live", "sc-sctl-read", "redLight");
-    expect(advisorPromptForSession(s)?.textBg).toBe(
-      "Приближи бавно и прочети регулировчика, не лампата",
-    );
+    const p = advisorPromptForSession(s);
+    expect(p?.textBg).not.toContain("Тръгваш на зелено");
+    expect(p?.textBg).toBe("Приближи бавно до регулировчика");
   });
 
   // --- the opposite direction --------------------------------------------

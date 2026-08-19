@@ -121,6 +121,25 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
           ? deriveGearDemand(objective.titleBg)
           : parseGearDemand(objective, p.requireGear);
       if (gear !== undefined) out.requireGear = gear;
+      // THE OFFICER'S PERMISSION, same law: authored wins, the title fills in.
+      // An AUTHORED key that cannot be honoured throws (the author asked for it
+      // in so many words); a DERIVED one that cannot be honoured is dropped and
+      // the build-time gate names the row — the same asymmetry
+      // `acceptBeforeMarkM` above states, and for the same reason: a bad
+      // authoring must fall back to shipped behaviour rather than brick a lesson
+      // for a student, while `controller-claim-gates.test.ts` fails the build.
+      if (p.requireControllerProceed !== undefined) {
+        // `out`, not `p` — the conflict is with the demands this parse RESOLVED
+        // (a title-derived `requireLamps` collides exactly as an authored one
+        // does), which the raw param record cannot see.
+        out.requireControllerProceed = parseControllerDemand(
+          objective,
+          p.requireControllerProceed,
+          out,
+        );
+      } else if (deriveControllerDemand(objective.titleBg) && !hasAtMarkDemand(out)) {
+        out.requireControllerProceed = true;
+      }
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
       // acceptance disc — a cut deeper than the radius leaves nowhere legal to
@@ -674,14 +693,14 @@ export type ReachZoneLampDemand = "lit" | "low" | "high" | "fog";
 export type ReachZoneGearDemand = "reverse";
 
 /**
- * The two demands `ReachZoneParams` could not express.
+ * The demands `ReachZoneParams` could not express.
  *
  * DECLARED HERE, NOT IN `lessons/types.ts`, and that is a routing note rather
  * than a preference: `ReachZoneParams` lives in another lane's file, and this
  * is the same copy law `PARK_CAR_HALF_LENGTH_M` above states — the extension is
  * additive and optional, so `ReachZoneParams` is assignable to it and every
  * existing caller compiles untouched. WHEN A LANE OWNS `lessons/types.ts`, fold
- * these two optional fields into `ReachZoneParams` itself and delete this
+ * these optional fields into `ReachZoneParams` itself and delete this
  * intersection; `reach-zone-witness.test.ts` pins the behaviour either way.
  */
 export interface ReachZoneWitnessDemands {
@@ -689,6 +708,43 @@ export interface ReachZoneWitnessDemands {
   requireLamps?: ReachZoneLampDemand;
   /** The travel direction the gate's own banner promises. Absent = any. */
   requireGear?: ReachZoneGearDemand;
+  /**
+   * THE OFFICER'S PERMISSION, for a gate whose banner promises it — the third
+   * demand, and the only one that is not a state AT the mark (2026-08-19).
+   *
+   * WHAT WAS BROKEN, measured through the production evaluator on the shipped
+   * recordings of `sc-sig-controller-postures` (the drive-through-the-officer
+   * demos this template ships as its own counter-examples):
+   *
+   *   drive                        stopLineCrossed carried   sc-sctp-cross
+   *   shadow-correct               trafficLight/red/proceed   ✓ @46.8 s
+   *   mistake-barge-chest          trafficLight/green/halt    ✓ @25.7 s
+   *   mistake-start-on-raised-arm  trafficLight/yellow/halt   ✓ @34.2 s
+   *
+   * The banner is «Премини кръстовището, когато позата разреши посоката ти» and
+   * the gate was a bare disc 45 m north of the junction, so the two drives that
+   * bill CONTROLLER_SIGNAL_VIOLATED — the 10-point опасна this whole template
+   * exists to forbid — collected a written certificate that the posture had
+   * released them. Its sibling `sc-sig-controller-live` was never in this state:
+   * `sc-sctl-cross` is a `passSignal` whose `requireRedMet` reads the same
+   * `controller` field, and the same probe measures it refusing both of ITS
+   * mistake drives. The postures template simply had no gate that read it.
+   *
+   * THE CHANNEL WAS ALREADY ON THE TICK. `SimTickEvent.stopLineCrossed.
+   * controller` is documented in rules/types.ts as „the EFFECTIVE signal …
+   * overrides `lightState` ENTIRELY (ЗДвП чл. 7)", and the table above is that
+   * field read straight off the recordings — not inferred from the rule
+   * engine's verdict, which is a different module's opinion about the same
+   * frames.
+   *
+   * EARNED BY THE EVENT, SPENT BY THE EVENT, so no new eval-state field is
+   * needed: the permission is observed on the frame the line is crossed, and
+   * `capMet` carries it from there. Crossing again on „proceed" after a halted
+   * crossing earns it back — a student who barges and comes round is not
+   * trapped, which is the half that had to be checked before the half that
+   * refuses.
+   */
+  requireControllerProceed?: boolean;
 }
 
 export type WitnessedReachZoneParams = ReachZoneParams & ReachZoneWitnessDemands;
@@ -746,6 +802,43 @@ export function deriveGearDemand(titleBg: string): ReachZoneGearDemand | undefin
   return GEAR_TITLE_REVERSE.test(titleBg) ? "reverse" : undefined;
 }
 
+/**
+ * THE OFFICER LET ME THROUGH — the banner claim, and it is a claim about ANOTHER
+ * PERSON'S decision, which is why it needs its own matcher rather than riding
+ * the permission verb.
+ *
+ * CENSUSED OVER THE WHOLE CATALOGUE (395 objectives, 357 of them reachZone,
+ * 2026-08-19) rather than guessed, because the risk here is a false REFUSAL —
+ * a gate that demands a stop-line crossing on a lesson that has no stop line
+ * can never be completed by anybody. The two populations the matcher has to
+ * separate are both real and both shipped:
+ *
+ *   4 titles name the регулировчик or his поза
+ *     ✓ «Премини кръстовището, когато позата разреши посоката ти»   sc-sctp-cross
+ *     ✓ «Премини кръстовището след разрешение от регулировчика»     sc-sctrl-cross
+ *     ✓ «Премини стоп-линията ПО РАЗРЕШЕНИЕ на регулировчика …»     sc-sctl-cross
+ *     ✗ «Приближи кръстовището с регулировчика с готовност за спиране»
+ *        — he is a LANDMARK here and the promise is the driver's own readiness;
+ *          demanding a permitted crossing of an APPROACH gate would refuse every
+ *          correct drive, which is the failure the founder ranks worst.
+ *   23 titles carry a permission verb and name nobody
+ *     «Мини участъка с РАЗРЕШЕНАТА скорост» · «Спри на РАЗРЕШЕНОТО място» ·
+ *     «Приближи завоя с готовност да ПРОПУСНЕШ» … — the road's permission, not a
+ *     person's. None of them may acquire this demand and none of them matches.
+ *
+ * So the matcher asks for the two together: the OFFICER (or his posture) AND a
+ * grant of permission. `deriveLampDemand`'s own teeth test is the model, and
+ * `controller-claim-gates.test.ts` pins all four strings above so a matcher that
+ * quietly stopped matching fails the build rather than emptying the gate.
+ */
+const CONTROLLER_TITLE_PERMISSION =
+  /разрешение (?:от|на) регулировчика|(?:позата|регулировчикът)[^.,;]{0,24}разреш/iu;
+
+/** True when the banner says the officer released this crossing. */
+export function deriveControllerDemand(titleBg: string): boolean {
+  return CONTROLLER_TITLE_PERMISSION.test(titleBg);
+}
+
 function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
   if (v === "lit" || v === "low" || v === "high" || v === "fog") return v;
   throw new ObjectiveSpecError(
@@ -757,6 +850,49 @@ function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampD
 function parseGearDemand(objective: LessonObjective, v: unknown): ReachZoneGearDemand {
   if (v === "reverse") return v;
   throw new ObjectiveSpecError(objective.id, 'reachZone requireGear must be "reverse"');
+}
+
+/**
+ * ONE LATCH CANNOT HOLD TWO INDEPENDENTLY-EARNED HALVES, and this throws rather
+ * than quietly producing a gate nobody can complete.
+ *
+ * `ObjectiveEvalState.reachZone` (lessons/types.ts, another lane's file) has
+ * exactly one contract bit, `capMet`, so `contractEarned` is a conjunction
+ * evaluated on ONE frame. The cap/lamp/gear arms are all states AT the mark and
+ * therefore coincide there; the officer's permission is observed at the STOP
+ * LINE, tens of seconds and tens of metres earlier. Author both on one zone and
+ * the conjunction can never be true on any single frame — the gate would be
+ * unreachable at run time, silently, which is the founder's worst failure mode
+ * wearing the opposite mask.
+ *
+ * FAILING HERE IS THE POINT: `parseObjectiveParams` runs at compile/session
+ * start, and every template in the catalogue is parsed by the catalogue-
+ * integrity sweep, so the combination cannot reach a student. THE FIX WHEN IT IS
+ * WANTED is one boolean in `ObjectiveEvalState.reachZone` (`crossingPermitted`),
+ * at which point this guard and the single-frame conjunction both go away.
+ */
+function hasAtMarkDemand(p: WitnessedReachZoneParams): boolean {
+  return (
+    p.maxSpeedKmh !== undefined || p.requireLamps !== undefined || p.requireGear !== undefined
+  );
+}
+
+function parseControllerDemand(
+  objective: LessonObjective,
+  v: unknown,
+  p: WitnessedReachZoneParams,
+): true {
+  if (v !== true) {
+    throw new ObjectiveSpecError(objective.id, "reachZone requireControllerProceed must be true");
+  }
+  if (hasAtMarkDemand(p)) {
+    throw new ObjectiveSpecError(
+      objective.id,
+      "reachZone requireControllerProceed cannot share a zone with maxSpeedKmh / requireLamps / " +
+        "requireGear — one capMet latch, two moments (see parseControllerDemand)",
+    );
+  }
+  return true;
 }
 
 /**
@@ -781,12 +917,32 @@ function lampDemandMet(demand: ReachZoneLampDemand, tick: SimTick): boolean {
   }
 }
 
+/**
+ * Did THIS frame's events carry the officer's answer for the crossing, and
+ * which one? `controller` is optional by the SimTick contract and absent on
+ * every junction without an officer, so a tick that cannot answer leaves the
+ * demand exactly where it was — the byte-identity law every additive channel in
+ * this file is held to.
+ */
+function controllerVerdictHere(tick: SimTick): "proceed" | "halt" | null {
+  let verdict: "proceed" | "halt" | null = null;
+  for (const e of tick.events) {
+    if (e.kind !== "stopLineCrossed" || e.controller === undefined) continue;
+    // A halt seen anywhere in the frame wins: the frame in which a student both
+    // obeyed and disobeyed is not a frame in which he obeyed.
+    if (e.controller === "halt") return "halt";
+    verdict = "proceed";
+  }
+  return verdict;
+}
+
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
   return (
     params.maxSpeedKmh !== undefined ||
     params.requireLamps !== undefined ||
-    params.requireGear !== undefined
+    params.requireGear !== undefined ||
+    params.requireControllerProceed === true
   );
 }
 
@@ -1419,6 +1575,16 @@ function stepReachZone(
   const lampSpent = lampDemand !== undefined && atMark && !lampOk;
   const gearSpent = gearDemand !== undefined && inAcceptance && goingForward;
 
+  // ── THE JOURNEY HALF: the officer's permission (see requireControllerProceed)
+  // Read ANYWHERE on the way to the mark rather than at it, because that is
+  // where the stop line is. `parseControllerDemand` refuses to let this share a
+  // zone with the three at-mark demands, so the single-frame conjunction below
+  // stays honest: on such a zone the other three arms are vacuous and this one
+  // alone decides.
+  const controllerDemand = params.requireControllerProceed === true;
+  const controllerHere = controllerDemand ? controllerVerdictHere(tick) : null;
+  const controllerSpent = controllerHere === "halt";
+
   // ONE LATCH FOR THE WHOLE CONTRACT, because `ObjectiveEvalState.reachZone`
   // belongs to lessons/types.ts and this lane may not add a field to it — and
   // because an arrival contract is one thing: the speed, the lamps and the
@@ -1429,10 +1595,11 @@ function stepReachZone(
   const contractEarned =
     (cap === undefined || (speedKmh <= cap && (inAcceptance || graceArmed))) &&
     (lampDemand === undefined || (lampOk && atMark)) &&
-    (gearDemand === undefined || (gearOk && atMark));
+    (gearDemand === undefined || (gearOk && atMark)) &&
+    (!controllerDemand || controllerHere === "proceed");
   const capMet = !hasArrivalDemand(params)
     ? true
-    : (st.capMet && !(capSpent || lampSpent || gearSpent)) || contractEarned;
+    : (st.capMet && !(capSpent || lampSpent || gearSpent || controllerSpent)) || contractEarned;
   const done = reached && capMet;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.

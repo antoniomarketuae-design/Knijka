@@ -35,6 +35,9 @@
  * head-on must ALWAYS read as one, at every tick the clock can hand over.
  */
 
+import fs from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { PHYSICS_MAX_FRAME_DT } from "@/components/sim/lesson-ui/sessionClock";
@@ -310,6 +313,47 @@ describe("sim/collision barrel — the sweep budget against the clock that ships
     // A chunk must stay under obb.ts's own per-call cap or every subdivided
     // chunk would be rejected as a teleport by the call it is handed to.
     expect(barrel.SWEEP_CHUNK_TRAVEL_M).toBeLessThan(barrel.SWEEP_TELEPORT_M);
+  });
+
+  it("keeps the margin a ONE-FILE fact — pinned at its origin, absent from the barrel", () => {
+    // WHY A TEST READS PROSE. For a day the margin was published TWICE for one
+    // constant: 3.8 % in index.ts and „~45 %" at `SWEEP_FRAME_TRAVEL_M`'s own
+    // declaration in probe.ts, which is where the figure came from. The
+    // correction had gone to the file that noticed rather than to the origin,
+    // and nothing could fail: a doc-comment has no failure mode, which is
+    // failure (1) at the top of this file wearing different clothes. Editing
+    // both files agrees only until the next edit. These two reads are the
+    // cheapest thing that CAN fail — the first pins the surviving sentence to
+    // the number this test just derived from the clock and the bank, the
+    // second keeps the barrel from growing a rival to it.
+    const dir = path.resolve(__dirname, "..");
+    const ceilings = [...BANK.fastestByProfile.entries()].map(([profile, mps]) => ({
+      profile,
+      ceilingM: frameTravelCeilingM(profile, mps),
+    }));
+    const worst = ceilings.reduce((a, b) => (b.ceilingM > a.ceilingM ? b : a));
+    const marginPct = (barrel.SWEEP_FRAME_TRAVEL_M / worst.ceilingM - 1) * 100;
+
+    const stated = /true margin of ([\d.]+) %/.exec(
+      fs.readFileSync(path.join(dir, "probe.ts"), "utf8"),
+    );
+    // A regex that quietly matches nothing is the instrument bug this project
+    // keeps catching, and it always fails in the reassuring direction — so a
+    // missing sentence is a RED here, not a skipped assertion.
+    expect(stated, 'probe.ts must state it as "a true margin of N %"').not.toBeNull();
+    expect(
+      Number(stated![1]),
+      `probe.ts states ${stated![1]} %; measured here ${marginPct.toFixed(2)} % on the ${
+        worst.profile
+      } row`,
+    ).toBeCloseTo(marginPct, 1);
+
+    // The barrel may describe the budget in words — it must not put a FIGURE on
+    // it, or the divergence re-opens from the other side.
+    expect(
+      /margin[\s\S]{0,60}?\d[\d.]*\s*%/.exec(fs.readFileSync(path.join(dir, "index.ts"), "utf8")),
+      "index.ts must point at probe.ts for the margin, never restate a number",
+    ).toBeNull();
   });
 
   it("reports the worst-case head-on at the worst-case tick, through the barrel", () => {

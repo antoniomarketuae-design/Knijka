@@ -397,9 +397,22 @@ const CATALOGUE: Row[] = SCENARIO_TEMPLATES.flatMap((spec) =>
  * this list, and an empty list fails the build instead of passing silently.
  */
 const WITNESSED: ReadonlyArray<{ id: string; lamps?: string; gear?: string }> = [
+  // THE TWO ROWS THE ROUTING NOTE AT THE FOOT OF THIS FILE NAMED — closed
+  // 2026-08-19 (doc 88 O20), and NOT the way the note said. It asked for an
+  // authored `requireLamps` key in each objective's params; that key does not
+  // compile from a template, because `ScenarioObjectiveSpec.params` is the real
+  // `ObjectiveParams` union and `ReachZoneParams` lives in lessons/types.ts. The
+  // banners were made to name the lamps their own briefings order instead, which
+  // is the stronger invariant anyway — a gate may refuse only for something the
+  // student was told. Both directions are measured on the templates' own
+  // recordings in `scenario/__tests__/conditions-lamp-gates.test.ts`; the row
+  // that matters most is sc-ac-fog's own «Без фарове за мъгла» demo, which used
+  // to collect this tick at the same 23.9 s as the correct drive.
+  { id: "sc-ac-fog/sc-acf-adapted", lamps: "fog" },
   { id: "sc-ac-highbeam-lead/sc-ahl-follow", lamps: "low" },
   { id: "sc-ac-night-lights/sc-acn-lit", lamps: "lit" },
   { id: "sc-ac-rain-lights/sc-acr-lit", lamps: "lit" },
+  { id: "sc-ac-snow/sc-acs-approach", lamps: "low" },
   // FOUND BY THE CENSUS, NOT BY THE SWEEP — `sc-ed-poligon-chain/sc-pgc-rev-mid`
   // is `sc-edrl-reverse-mid` again, word for word and shape for shape (a bare
   // radius-2 lateral band, no cap, mid-reverse), on a template the 51 routed
@@ -588,20 +601,42 @@ describe("the shipped demonstrations still pass their own gates", () => {
 });
 
 /**
- * ROUTED, NOT CLOSED — two rows of the same class this file cannot reach, named
- * so the next wave can spend them in one line each. Both are `templates-
- * conditions.ts`, which this lane does not own:
+ * CLOSED 2026-08-19 (doc 88 O20) — the note that stood here is kept as a
+ * correction, because two of the three things it said were wrong and the
+ * wrongness is the lesson for the next routed row.
  *
- *   · `sc-ac-fog/sc-acf-zone` — «Мини контролната зона със съобразена за
- *     мъглата скорост». Instruction 1 makes BOTH the dipped beams and the fog
- *     lamps a precondition of moving off («Включи късите светлини и фаровете за
- *     мъгла (клавиш V) преди да потеглиш»), and the sweep photographed both
- *     telltales dim from arrival through t101s with the gate ticked at 1:56 and
- *     3/3 stars. The banner names only a speed, so no derivation can bind it:
- *     add `requireLamps: "fog"` to that objective's params.
- *   · `sc-ac-snow/sc-acs-approach` — «Приближи със зимна скорост», same shape,
- *     СВЕТЛИНИ dim throughout: add `requireLamps: "low"`.
+ * WHAT IT SAID. Two rows of the same class in `templates-conditions.ts`:
+ * «Мини контролната зона със съобразена за мъглата скорост» (whose briefing
+ * orders both lamps, and whose telltales the sweep photographed dim from
+ * arrival through t101s with the gate ticked at 1:56, 3/3 stars) and «Приближи
+ * със зимна скорост» (СВЕТЛИНИ dim throughout). „Both are one key in one
+ * object" — `requireLamps: "fog"` and `requireLamps: "low"` in each objective's
+ * params.
  *
- * Both are one key in one object, and the census above turns each into a green
- * row the moment it lands — `WITNESSED` is what has to be updated with it.
+ * WHERE IT WAS WRONG.
+ *  1. THE OBJECTIVE ID. The fog gate is `sc-acf-adapted`; there is no
+ *     `sc-acf-zone` in the catalogue. A lane that had gone looking for the id
+ *     it was handed would have found nothing and reported the row absent.
+ *  2. THE KEY DOES NOT COMPILE. `ScenarioObjectiveSpec.params` is the real
+ *     `ObjectiveParams` union and `ReachZoneParams` lives in `lessons/types.ts`,
+ *     so `requireLamps` on a template is a TS2353 — the „one key in one object"
+ *     was never available from where it was routed to. `ReachZoneWitnessDemands`
+ *     is an intersection this file's own module declares; it widens the PARSER,
+ *     not the authoring surface.
+ *
+ * WHAT WAS RIGHT, and it is the part that mattered: both gates certified lamps
+ * nothing measured, and re-measuring said so louder than the note did — sc-ac-
+ * fog's own shipped counter-example, the drive titled „Без фарове за мъгла",
+ * collected the tick at 23.93 s against the correct drive's 23.92 s and
+ * finished ИЗДЪРЖАН.
+ *
+ * HOW THEY CLOSED. Their banners now name the lamps their own briefings order,
+ * so `deriveLampDemand` binds them — the same route the five rows above took,
+ * and the stronger invariant besides (a gate may refuse only for something the
+ * banner said). `scenario/__tests__/conditions-lamp-gates.test.ts` carries the
+ * drives, both directions, and the build-time law that a lamp ORDER must be
+ * graded by a gate or by the weather's own detector — which is how the sharper
+ * half of the snow row was found: `rules/engine.ts` arms a lamp detector for
+ * rain and one for fog and NONE for snow, so on sc-ac-snow the order was
+ * checked by nothing in the entire product. That missing detector is routed.
  */
