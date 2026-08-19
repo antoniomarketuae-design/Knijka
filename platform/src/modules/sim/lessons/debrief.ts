@@ -146,6 +146,22 @@ interface MistakeGroup {
   /** Session times of this group's events — pairs it to its escalation records. */
   times: number[];
   /**
+   * …and the subset of those times the LEDGER CHARGED, which is the only subset
+   * an escalation note may be read off. A multiplier weights a price; a row
+   * whose price Наредба № 38, чл. 48, ал. 3 already withheld has no price to
+   * weight, and saying it earned one is a sentence that contradicts its own
+   * first half. Measured 2026-08-19 on the SERVER debrief of
+   * `sc-hz-accident-scene` L3 — the copy the student actually reads
+   * (`LessonPlayShell.tsx:2683`): «Удар в пешеходец — опасна, без допълнителни
+   * точки — изпитът вече беше прекратен … — повторна грешка ×1.5».
+   *
+   * FINER THAN A `billedCount > 0` GUARD, and deliberately: a group can hold
+   * one charged row and one closed-over row, and keying on the count alone
+   * would let the closed row's multiplier print on the charged one's line.
+   * Empty here = no note, which is that guard as a special case.
+   */
+  billedTimes: number[];
+  /**
    * The speeding measurement of the WORST event in the group, when the code
    * carries one (`rules/consequences.ts encodeSpeedMeasurement`). Grouping
    * collapses „×3" into one line, so the line has to pick a speed — and the
@@ -446,10 +462,13 @@ export function buildDebrief(
     let anyBlank = false;
     /** Codes whose road half has already been printed on an earlier act row. */
     const roadSaidForCode = new Set<string>();
-    for (const g of groups.slice(0, MAX_MISTAKE_LINES)) {
+    const shown = selectShownGroups(groups);
+    for (const g of shown) {
       const times = g.count > 1 ? ` ×${g.count}` : "";
       let escMult: number | undefined;
-      for (const tAt of g.times) {
+      // OVER THE BILLED TIMES ONLY — see MistakeGroup.billedTimes for the
+      // sentence this refuses to print.
+      for (const tAt of g.billedTimes) {
         const m = escalationAt.get(`${g.code}@${tAt}`);
         if (m !== undefined && (escMult === undefined || m > escMult)) escMult = m;
       }
@@ -544,8 +563,8 @@ export function buildDebrief(
         "  → За останалите от изброените нарушения санкцията на пътя още не е извлечена дословно от закона, затова тук няма сума. По-добре празно, отколкото сгрешено число.",
       );
     }
-    if (groups.length > MAX_MISTAKE_LINES) {
-      mistakeBlock.push(`• …и още ${groups.length - MAX_MISTAKE_LINES} вида нарушения — виж пълния списък в резултата.`);
+    if (groups.length > shown.length) {
+      mistakeBlock.push(`• …и още ${groups.length - shown.length} вида нарушения — виж пълния списък в резултата.`);
     }
     /**
      * THE RECONCILIATION, SAID OUT LOUD. `unscoredAfterClose` has existed since
@@ -567,9 +586,66 @@ export function buildDebrief(
           `караме за упражнение — на истински изпит дотук щеше да е свършило.`,
       );
     }
-    if (result.effectiveScore > result.score) {
+    /**
+     * THE TRAINING TOTAL IS THIS SHEET'S OWN ARITHMETIC, not a number handed in.
+     *
+     * `result.effectiveScore` is built twice — `engine.ts buildLessonResult` for
+     * the client, `wire.ts gradeFinishWire` for the server — and for eight
+     * months only one of them filtered out the rows the ledger closed over. The
+     * server's copy is the one `LessonPlayShell.tsx:2683` renders, so what
+     * shipped on `sc-hz-accident-scene` L3 was «Тренировъчен резултат: 25
+     * наказателни т.» printed directly beneath two rows reading 10 and «без
+     * допълнителни точки» — a figure the student could not reach from anything
+     * above it, and which appeared on no other surface.
+     *
+     * Both builders are correct as of this lane. Re-deriving anyway is not
+     * belt-and-braces about them: it is what makes the number CHECKABLE. Σ over
+     * the rows this block priced, each weighted by the multiplier this block
+     * printed — so the line can never again disagree with the list it closes.
+     * NOT a loosening: the figure still comes from the coach's recorded
+     * multipliers and a drive with no genuine repeat still prints nothing.
+     *
+     * CONSUMED, NOT MAXED — and this cost a regression to learn. The first
+     * version of this re-derivation weighted each row with `escalationAt`, the
+     * max-per-(code, t) map built above for the ROW NOTE. `applyEscalations`
+     * (escalation.ts) does something different: it queues the records per
+     * (code, t) and `shift()`s one per matching event, so a record is spent
+     * once. The two agree until TWO BILLED ROWS SHARE A (code, t), which is
+     * reachable through the ordinary tick path — two occupied `crossingPassed`
+     * events in one tick. Measured, three PEDESTRIAN_NOT_YIELDED at t = 6, 40,
+     * 40 against records [×1.5@40, ×2@40]:
+     *
+     *   applyEscalations  10 + 15 + 20 = 45   ← both builders, and the row
+     *                                            `actions.ts:335` persists and
+     *                                            `session-history.tsx` badges
+     *   max map           10 + 20 + 20 = 50   ← printed to the student
+     *
+     * 50 appeared on no other surface and could not be reached from the rows
+     * above it — which is, word for word, the complaint the paragraph above
+     * raises about the shipped 25. A sheet that re-derives has to re-derive the
+     * SAME arithmetic, so this walks its own queue exactly as escalation.ts
+     * does. The row note keeps the max map: it chooses which multiplier to NAME
+     * on a row, and never sums.
+     */
+    const trainingPending = new Map<string, number[]>();
+    for (const esc of result.escalations) {
+      const key = `${esc.code}@${esc.t}`;
+      const list = trainingPending.get(key);
+      if (list) list.push(esc.multiplier);
+      else trainingPending.set(key, [esc.multiplier]);
+    }
+    let trainingTotal = 0;
+    summary.mistakes.forEach((m, i) => {
+      // Shift for EVERY mistake, billed or not, so the queue is consumed in the
+      // same order applyEscalations consumes it — an unbilled row still spends
+      // the record that named it. Only billed rows reach the sum.
+      const multiplier = trainingPending.get(`${m.code}@${m.t}`)?.shift() ?? 1;
+      if (!ledgerBilled[i]) return;
+      trainingTotal += m.points * multiplier;
+    });
+    if (trainingTotal > result.score) {
       mistakeBlock.push(
-        `• Тренировъчен резултат: ${pts(result.effectiveScore)} — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${pts(result.score)}`,
+        `• Тренировъчен резултат: ${pts(trainingTotal)} — повторените грешки тежат повече (×1.5/×2.0). Официалният резултат остава ${pts(result.score)}`,
       );
     }
   }
@@ -1065,6 +1141,7 @@ function groupMistakes(
       g.billedCount += billed[i] === true ? 1 : 0;
       g.totalPoints += paid;
       g.times.push(m.t);
+      if (billed[i] === true) g.billedTimes.push(m.t);
       const here = excessOf(m.detail);
       const best = excessOf(g.worstSpeedDetail);
       if (here !== null && (best === null || here > best)) g.worstSpeedDetail = m.detail;
@@ -1083,6 +1160,7 @@ function groupMistakes(
         actKey,
         actExplanationBg: act?.explanationBg,
         times: [m.t],
+        billedTimes: billed[i] === true ? [m.t] : [],
         worstSpeedDetail: excessOf(m.detail) === null ? undefined : m.detail,
       });
     }
@@ -1096,4 +1174,57 @@ function groupMistakes(
     // already ended. Ties inside a class fall back to how many rows there were.
     return paid !== 0 ? paid : b.count - a.count;
   });
+}
+
+/**
+ * WHICH GROUPS THE SHEET PRINTS — the cap, with the one class it may not spend
+ * itself on.
+ *
+ * MEASURED 2026-08-19, and it is the cost of the fix directly above. Four
+ * charged опасни (непропускане, пешеходец, обратна посока, червено) and then
+ * the crash: a wrecked car at t = 13.13 and the bystander at 13.43. Under the
+ * blind-sum grouping this file used to do, COLLISION was ONE group worth 20 and
+ * sorted first, so the crash was the sheet's opening line. Pricing it honestly
+ * — 10 for the car, 0 for the man the closure covered — dropped both rows below
+ * four ties at 10 and the sheet became:
+ *
+ *   • Непропускане на пътно превозно средство с предимство …
+ *   • Непропускане на пешеходец …
+ *   • Движение в обратна посока по еднопосочна улица …
+ *   • Преминаване на червен сигнал …
+ *   • …и още 2 вида нарушения — виж пълния списък в резултата.
+ *
+ * «Удар в пешеходец»: absent. «Удар в друго превозно средство»: absent. The
+ * honest build was MORE SILENT about the man in the road than the broken one,
+ * on the only surface that carries the corrective, the law and «Какво стана».
+ *
+ * WHY EXEMPTION AND NOT RE-ORDERING. Re-ordering cannot reach this: every row
+ * here is опасна and every one is a catalog 10, so sorting by severity, by
+ * shown points or by billed points leaves six exact ties and the crash still
+ * lands wherever insertion order puts it — last, because it happened last. And
+ * the demotion is not an accident of one drive: the closure zeroes precisely
+ * the rows that FOLLOW the gravest event, so a price-ordered sheet will
+ * systematically bury the worst thing that happened whenever it happened late.
+ * The rule has to be about the CLASS, not the number.
+ *
+ * The class is `terminatesExam` — the catalogue's own flag (`rules/scales.ts`
+ * examMarkFor, Наредба № 38 чл. 48, ал. 3), which today is COLLISION alone. Not
+ * hardcoded to that code: a fault grave enough to end an exam is grave enough
+ * to be on the sheet that explains the exam, and a future terminating code
+ * inherits the guarantee without anyone remembering to come back here.
+ *
+ * The cap stretches rather than evicts when the exempt rows alone exceed it —
+ * four bodies struck is four rows, because dropping one of them is the defect
+ * this function exists to prevent. Display order is untouched: the survivors
+ * are printed in the sort's own order, so the sheet still reads „подредени по
+ * тежест".
+ */
+function selectShownGroups(groups: ReadonlyArray<MistakeGroup>): MistakeGroup[] {
+  const endsTheExam = (g: MistakeGroup): boolean =>
+    codeIsKnown(g.code) && examMarkFor(g.code as ViolationCode).terminatesExam;
+  const exempt = groups.filter(endsTheExam);
+  const rest = groups.filter((g) => !endsTheExam(g));
+  const slots = Math.max(0, MAX_MISTAKE_LINES - exempt.length);
+  const keep = new Set<MistakeGroup>([...exempt, ...rest.slice(0, slots)]);
+  return groups.filter((g) => keep.has(g));
 }

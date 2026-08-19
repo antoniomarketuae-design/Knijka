@@ -316,13 +316,35 @@ describe("the wiring — both windows read the measured mask, and the counter re
     // The regression this catches is one character of an edit away: pasting the
     // literal gradient back into either style object restores the slice on
     // twenty-three lessons and changes nothing a pure test can see.
-    const windows = CODE.split("WebkitMaskImage:").slice(1);
-    expect(windows).toHaveLength(2);
-    for (const decl of windows) {
-      const head = decl.slice(0, 120);
-      expect(head).toMatch(/(peekFold|sheetFold)\.maskCss/);
-      expect(head).not.toContain("calc(100% -");
-    }
+    //
+    // RE-ANCHORED 2026-08-19. This used to be „there are exactly two masked
+    // elements in this file", which stopped being true the moment the card got
+    // its ground: `peekScrimMaskCss()` is a THIRD mask, and it is a shade's
+    // vertical feather, not a text window's cut. A bare count would have failed
+    // on a correct change — and the lazy repair (`toHaveLength(3)`) would have
+    // left the third declaration unchecked, which is a hole exactly the size of
+    // the defect this file was written for. So the declarations are PARTITIONED
+    // instead: every mask in the file must be one of the two known kinds, and
+    // the fold windows must still be two.
+    //
+    // EACH DECLARATION IS ITS OWN LINE AND NOTHING MORE. The first attempt read
+    // a 120-character window after the property name, and a mutation walked
+    // straight through it: replacing the shade's mask with a literal still
+    // passed, because the window reached the `maskImage: peekScrimMaskCss()` on
+    // the NEXT line and classified the literal by its neighbour. In the
+    // reassuring direction, as always.
+    const decls = CODE.split("WebkitMaskImage:")
+      .slice(1)
+      .map((d) => d.slice(0, d.indexOf("\n")).trim().replace(/,$/, ""));
+    expect(decls.every((d) => d.length > 0)).toBe(true);
+    const folds = decls.filter((d) => /^(peekFold|sheetFold)\.maskCss$/.test(d));
+    const scrims = decls.filter((d) => /^peekScrimMaskCss\(\)$/.test(d));
+    // Nothing unaccounted for: a fourth masked element has to be classified
+    // here before this file will go green again.
+    expect(folds.length + scrims.length).toBe(decls.length);
+    expect(folds).toHaveLength(2);
+    expect(scrims).toHaveLength(1);
+    for (const decl of folds) expect(decl).not.toContain("calc(100% -");
     expect(CODE).toContain("maskImage: peekFold.maskCss");
     expect(CODE).toContain("maskImage: sheetFold.maskCss");
   });

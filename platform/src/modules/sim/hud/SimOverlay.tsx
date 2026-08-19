@@ -439,6 +439,148 @@ export function foldMaskCss(
   );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CARD HAD NO GROUND, AND ON A BRIGHT WORLD THAT IS 1.3 : 1 — 2026-08-19.
+
+   THE ONE CRITICAL FINDING ROUTED TO THIS FILE, verbatim
+   (sc-ov-lane-keeping/mobile-right/04-t152s.png):
+
+     „On mobile the ИНСТРУКЦИИ overlay has NO panel background at all. The
+      'ИНСТРУКЦИИ' title is drawn over the demo picture-in-picture video, the
+      body text runs straight over sky and buildings … The lesson's
+      instructions are unreadable on a phone."
+
+   and the same clause is the second half of the sentence filed against
+   twenty-three further lessons: „It carries no panel of its own, so its first
+   two lines render directly over the rear-view mirror image and the sky, and
+   the «ЗАЩО»/«×» controls land on top of world geometry."
+
+   THE HALO WAS THE ANSWER AND THE HALO DOES NOT REACH. `PlayAreaStyles`'
+   UNPANEL register replaced every fill on this layer with a two-stop black
+   text-shadow („HOW CONTRAST SURVIVES WITHOUT A BOX"), which holds on tarmac —
+   the register was measured against a road. This card is pinned to the TOP of
+   the frame, where the world is sky, render-white facades and a lit mirror.
+
+   MEASURED OFF THE FILED FRAMES, at device resolution (2556 × 1179 = iPhone 16
+   landscape 852 × 393 at dpr 3). The sample is a 55 × 130 CSS-px block of world
+   taken IMMEDIATELY LEFT OF THE CARD'S OWN BOX, on the same rows — same
+   material, and not one glyph or halo pixel of the card's own inside it:
+
+     sc-jx-blocked-exit  06-waited    L50 0.351  L90 0.518  max 0.610
+     sc-rb-exit-signal   04-t035s     L50 0.332  L90 0.523  max 0.604
+     sc-merge-lane-end   04-t115s     L50 0.273  L90 0.507  max 0.589
+     sc-ov-lane-keeping  04-t152s     L50 0.405  L90 0.467  max 0.543
+       brightest pixel across all four: rgb(204, 205, 206)
+
+   WCAG contrast of this card's three inks — as the UNPANEL register restates
+   them INSIDE a ghost, not the app-theme values — against that facade:
+
+                                              vs L90 0.518   vs the pixel
+     --foreground #f2f6fc  the line              1.70 : 1      1.47 : 1
+     --muted      #c3cfe2  the authored WHY      1.17 : 1      1.01 : 1
+     --accent     #3fa1ff  chip · «↓ още N реда»
+                           · «Прочети» · «Разбрах»1.47 : 1      1.70 : 1
+
+   1.01 : 1 is not „low contrast". `--muted` has luminance 0.6172 and that
+   facade pixel has 0.6096: the authored WHY and the wall behind it are THE
+   SAME COLOUR, to a hundredth. The frame agrees — in 06-waited the whole
+   explanation is pale grey type on pale grey masonry.
+
+   SO THE CARD GETS A GROUND — AND NOT A PANEL, WHICH IS THE WHOLE DIFFICULTY.
+   The 2026-08-03 ruling that took the box off this element was about a shape:
+   „a full-width rounded strip ending in a SOLID BRAND-BLUE «Разбрах» button.
+   THAT IS A COOKIE BANNER." A shape has a border, a radius and an edge. This
+   has none of the three: no border, no radius, no blur, no backdrop-filter,
+   and every one of its four sides ramps to alpha 0 OUTSIDE the card's own box,
+   so there is no edge anywhere for the eye to read as furniture. It is a shade
+   on the glass, which is what a sun-visor band is, and it claims not one pixel
+   the card was not already standing on.
+
+   WHY 0.80 AND NOT A NUMBER THAT LOOKED RIGHT. It is the alpha at which the
+   QUIETEST ink on the card clears AA against the BRIGHTEST world the sweep
+   actually put under it — rgb(204, 205, 206), which is the global maximum over
+   the world band beside and below the card across all four filed frames.
+   Composited, the ground becomes rgb(46, 50, 57), L = 0.0313, and the three
+   inks land at 11.90 : 1, 8.20 : 1 and 4.77 : 1. The accent, at 10 px, binds.
+
+   0.78 WAS THE FIRST ANSWER AND IT WAS WRONG BY 0.0016. It puts the accent at
+   4.5016 : 1 — over the floor, and by less than the compositor's own grain: a
+   browser stores the composited ground as 8-bit integers, and one unit either
+   way moves the ratio further than that margin. A number that clears a
+   threshold by less than the arithmetic's own rounding has not cleared it.
+   0.80 holds at 4.75 : 1 with the ground rounded, which is the form the pixel
+   actually takes, and `sim-overlay-scrim.test.ts` asserts the ROUNDED case.
+   (0.75 gives the accent 4.09, 0.73 gives it 3.91.)
+
+   AND IT MUST NOT BECOME A CURTAIN — the same test, from the other side. „An
+   instruction he can read but which hides the hazard it is about is a different
+   failure" is the founder's own note on this card. The world's own contrast in
+   this corner — the dark bonnet rgb(70, 78, 92) against the lit facade — is
+   5.27 : 1 bare and 1.37 : 1 under the shade: dimmed, and still plainly two
+   different things. At 0.90 it would be 1.13 and at 1.00 exactly 1.00, one flat
+   rectangle, which is the panel this may not become. The feathers are also the
+   only place the shade may exist outside the card's box, and they are capped.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The shade's colour. Near-black rather than pure, so it reads as glass. */
+export const PEEK_SCRIM_RGB = [6, 11, 20] as const;
+
+/**
+ * Alpha across the card's OWN box — flat, not a ramp, because every one of the
+ * three inks sits somewhere inside it and the binding one has little slack.
+ */
+export const PEEK_SCRIM_ALPHA = 0.8;
+
+/**
+ * How far the shade bleeds past the card on each side, and — the same numbers —
+ * how long each ramp to alpha 0 is. Feather === bleed is what keeps the flat
+ * core exactly coincident with the card's box: the ramps live entirely in the
+ * overhang, so no glyph is ever standing on a partial ground.
+ *
+ * The left ramp is the long one because that is the side that faces the road;
+ * top/right/bottom face the stage's own edge and the instrument band, where a
+ * shorter ramp is invisible anyway.
+ */
+export const PEEK_SCRIM_FEATHER_PX = { top: 12, right: 12, bottom: 16, left: 26 } as const;
+
+const SCRIM_RGB_CSS = PEEK_SCRIM_RGB.join(", ");
+
+/**
+ * The shade itself: dense over the card, zero at both horizontal ends.
+ *
+ * Stops are in PX and not per cent, deliberately. The column is 180 px wide
+ * sideways and up to 240 px upright (`notifyColumn.ts`), and a percentage ramp
+ * would be a different number of pixels on each — i.e. the flat core would stop
+ * lining up with the card's box on one of the two orientations, which is the
+ * silent half-fix this file has already shipped once (the `@media` override the
+ * cascade discarded).
+ */
+export function peekScrimBackgroundCss(
+  feather: { left: number; right: number } = PEEK_SCRIM_FEATHER_PX,
+  alpha: number = PEEK_SCRIM_ALPHA,
+): string {
+  const ink = (a: number) => `rgba(${SCRIM_RGB_CSS}, ${a})`;
+  return (
+    `linear-gradient(to left, ${ink(0)} 0px, ${ink(alpha)} ${feather.right}px, ` +
+    `${ink(alpha)} calc(100% - ${feather.left}px), ${ink(0)} 100%)`
+  );
+}
+
+/**
+ * …and the vertical feather, as a mask over that gradient rather than a second
+ * background layer, because two background layers do not intersect — they
+ * stack, and a stack of two ramps is opaque wherever EITHER is opaque, which
+ * puts a hard edge back on the two sides this is here to remove.
+ */
+export function peekScrimMaskCss(
+  feather: { top: number; bottom: number } = PEEK_SCRIM_FEATHER_PX,
+): string {
+  return (
+    `linear-gradient(to bottom, transparent 0px, #000 ${feather.top}px, ` +
+    `#000 calc(100% - ${feather.bottom}px), transparent 100%)`
+  );
+}
+
 /**
  * The counter, wired to a scroll window.
  *
@@ -921,8 +1063,29 @@ export function SimOverlay({
   // describing the STRIP. So the box went instead of the words: no border, no
   // radius to outline — a coloured tone glyph, a coloured chip and a line of
   // type on the road.
+  //
+  // `relative isolate` is all 2026-08-19 added to this list, and neither is a
+  // box: `relative` makes the card the containing block for the shade behind it
+  // and `isolate` makes it the shade's STACKING CONTEXT. Still no border, no
+  // radius — `unpanel.test.ts` reads this literal and asserts both absences,
+  // which is why the shade is a child element and not a `background` on the row.
+  //
+  // ── `isolate` IS NOT TIDINESS. IT WAS CAUGHT BY LOOKING. ──────────────────
+  // The shade is `z-index: -1`, and a negative z-index does not stop at its
+  // parent — it climbs to the nearest ancestor that HAS a stacking context and
+  // paints at the bottom of that one. Rendered in WebKit (the sweep's engine)
+  // over a patch of the very facade the critical finding was filed on, the
+  // first attempt at this fix produced a screenshot IDENTICAL to the defect:
+  // the card's only positioned ancestors were `z-index: auto`, so the shade
+  // sank past the backdrop entirely and painted nothing. Every unit assertion
+  // in `sim-overlay-scrim.test.ts` was green while it did.
+  //
+  // The column below happens to carry `z-30`, which would have hidden this on
+  // the shipped page and left a fix that works by coincidence — one edit to the
+  // column's z-index away from silently reverting to 1.01 : 1. `isolate` puts
+  // the floor inside the card, where it cannot be taken away from a distance.
   const CARD_CLASS =
-    "hud-ghost sim-overlay-in pointer-events-auto touch-manipulation flex w-full min-w-0 min-h-0 flex-col items-stretch gap-0.5 text-left";
+    "hud-ghost sim-overlay-in relative isolate pointer-events-auto touch-manipulation flex w-full min-w-0 min-h-0 flex-col items-stretch gap-0.5 text-left";
 
   /* ══════════════════════════════════════════════════════════════════════════
      THE TEXT WINDOW — 2026-08-14. WHY THE LETTERS WERE CUT THROUGH THE WAIST.
@@ -1051,6 +1214,49 @@ export function SimOverlay({
 
   const cardBody = (
     <>
+      {/* ── THE GROUND, 2026-08-19. The block at `peekScrimBackgroundCss` has
+             the four sampled frames, the three contrast ratios it replaces
+             (1.70 / 1.28 / 1.46 : 1) and the arithmetic that picks 0.78.
+
+             `data-hud-ink` IS LOAD-BEARING AND IS NOT DECORATION. The UNPANEL
+             sweep's second selector is
+               [data-sim-stage] :is(.hud-ghost, …) :is(div, …):not([data-hud-ink])
+             with `background-image: none !important`, so without this attribute
+             the shade is stripped by the stylesheet and this whole fix is a
+             diff that changes no pixel — which is exactly how the tier picker's
+             filled segment survived a whole unpanel pass. The FIRST selector in
+             that same rule is the ghost itself, unqualified, which is why the
+             shade is a child element rather than a `background` on the row.
+
+             `z-index: -1` and not a `::before`: the rows above are ordinary
+             in-flow content, and in-flow content paints BEFORE positioned
+             descendants — an absolutely positioned sibling at `auto` would land
+             on top of the words it exists to make readable.
+
+             `aria-hidden` + `pointer-events: none`: it is a shade. It must not
+             be announced and it must not eat the tap that dismisses the card
+             (the whole card is a `<button>` in the plain-line shape). */}
+      <div
+        data-sim-overlay-scrim=""
+        data-hud-ink=""
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: `${-PEEK_SCRIM_FEATHER_PX.top}px`,
+          right: `${-PEEK_SCRIM_FEATHER_PX.right}px`,
+          bottom: `${-PEEK_SCRIM_FEATHER_PX.bottom}px`,
+          left: `${-PEEK_SCRIM_FEATHER_PX.left}px`,
+          zIndex: -1,
+          pointerEvents: "none",
+          backgroundImage: peekScrimBackgroundCss(),
+          // Both spellings, as the text window two rows down already does:
+          // `mask-image` is unprefixed in current WebKit and prefixed in the
+          // versions still on phones in this market.
+          WebkitMaskImage: peekScrimMaskCss(),
+          maskImage: peekScrimMaskCss(),
+        }}
+      />
+
       {/* Row 1 — the tone glyph, the chip, the „+N" badge and (when the whole
           card is the dismiss button) the ✕ that says so. `shrink-0`: this row
           is 18 px of label and it is never what gives when the column is

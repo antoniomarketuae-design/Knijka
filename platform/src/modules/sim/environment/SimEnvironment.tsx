@@ -66,6 +66,7 @@ import { noteRenderedFrame, useQuality } from "./qualityStore";
 import { TONE_MAPPING_THREE } from "./toneMapping";
 import {
   setWeatherTarget,
+  primeWeather,
   stepWeather,
   getFogIntensity,
   getRainIntensity,
@@ -187,8 +188,27 @@ export function SimEnvironment({
   }, [gl, qp.shadows]);
 
   // Weather targets follow the rain/fog/snow props; the store ramps toward them.
+  //
+  // EXCEPT AT THE SCENE BOUNDARY, which is what this ref is for. The weather
+  // store is module-level and outlives any one scene, so a lesson that opens
+  // while the previous one's rain is still ramping down inherits it: the drive
+  // begins CLEAR on a wet lesson, or wet on a clear one, and the ramp hides the
+  // seam by making it look deliberate. `primeWeather` sets the target and takes
+  // one step longer than the slowest traverse, so the first frame of a lesson
+  // renders the weather that lesson authored — carrying a channel DOWN from a
+  // previous scene exactly as precisely as it carries one up.
+  //
+  // Only the FIRST run primes. Every later prop change still ramps, because a
+  // mid-drive weather change is a real transition the student should see happen
+  // rather than a cut. Priming those too would snap the sky.
+  const weatherPrimed = useRef(false);
   useEffect(() => {
-    setWeatherTarget(rain, fog, snow);
+    if (weatherPrimed.current) {
+      setWeatherTarget(rain, fog, snow);
+      return;
+    }
+    weatherPrimed.current = true;
+    primeWeather(rain, fog, snow);
   }, [rain, fog, snow]);
 
   // Streaks stay mounted while the rain intensity fades out after rain stops

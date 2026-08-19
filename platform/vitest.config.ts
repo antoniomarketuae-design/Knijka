@@ -1,6 +1,19 @@
 import path from "node:path";
 import { defineConfig } from "vitest/config";
 
+// The include list lives in scripts/tools-tests.mjs, NOT here. It has to be
+// readable by both runners: this file is TypeScript loaded by Vite, and the
+// node:test gate is plain node with no transpiler, so a list written here is a
+// list the other gate cannot check. Keeping it there is what lets
+// `auditOwnership()` compare "the runner a test file imports" against "the
+// runner that will actually collect it" and fail when they disagree — the
+// property the tools/ gate has claimed in its header since it was written and
+// did not have until 2026-08-19, when three files in tools/mobile turned out to
+// be filtered out of node --test and matched by no vitest glob: 33 test blocks
+// and 88 assertions, green because nothing ran them. That module's header
+// carries the measurement.
+import { VITEST_INCLUDE } from "./scripts/tools-tests.mjs";
+
 /**
  * The commercial path — the code that takes money, grants access and proves a
  * student sat a legally-shaped exam. Audit M-30 found test mass inverted
@@ -46,30 +59,11 @@ const COMMERCIAL_PATH_THRESHOLDS = {
 
 export default defineConfig({
   test: {
-    // `.tsx` is included deliberately (audit L-6): the previous `*.test.ts`
-    // glob would have silently ignored a future component test rather than
-    // failing loudly, which is the worst way for a test file to be wrong.
-    //
-    // The second glob reaches OUT of platform/ on purpose (audit M-29): the
-    // public/ size ceiling is enforced by tools/assets/publicBudget.test.mjs,
-    // and it has to run in the gate everything else runs in, or it is not a
-    // ceiling — it is a suggestion nobody executes.
-    // The third entry reaches out of platform/ for the same reason the second
-    // one does: tools/mobile/budget.test.mjs is the mobile SCREEN BUDGET, and a
-    // budget nobody's build enforces is a suggestion. It names ONE FILE because
-    // most tools/ tests are node:test files (scripts/tools-tests.mjs owns
-    // those) and vitest cannot run them.
-    //
-    // It used to say `../tools/mobile/**/*.test.mjs`, which contradicted that
-    // sentence: the moment the probe rewrite added navigation.test.mjs and
-    // ready.test.mjs — both node:test, both green under `node --test` — vitest
-    // globbed them and reported "No test suite found" as two hard failures in
-    // every gate. The comment was right and the glob was wrong.
-    include: [
-      "src/**/*.test.{ts,tsx}",
-      "../tools/assets/**/*.test.mjs",
-      "../tools/mobile/budget.test.mjs",
-    ],
+    // Every entry, and the reasoning behind each one, is documented at
+    // VITEST_INCLUDE in scripts/tools-tests.mjs. Do not inline a pattern here:
+    // a pattern written here is invisible to the node:test gate, and the
+    // partition audit that runs in both gates would stop covering it.
+    include: [...VITEST_INCLUDE],
     environment: "node",
     coverage: {
       provider: "v8",

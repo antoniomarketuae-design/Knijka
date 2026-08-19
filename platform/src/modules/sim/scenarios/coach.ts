@@ -13,9 +13,14 @@
  * scenario were ever marked "always-grade" (a 1-point slip is never a safety
  * floor). See `policyForViolation` in policy.ts. основна/опасна unchanged.
  *
+ * What a "repeat" IS lives in `encounterKey` below — the same mistake made
+ * again, which is not the same thing as a second event carrying the same code.
+ *
  * Pure + deterministic: the caller owns the per-session encounter counts.
  */
 
+import { actCopy } from "../rules";
+import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
 import { scenarioForCode } from "./mapping";
 import { policyForViolation, resolveEncounter } from "./policy";
@@ -27,6 +32,14 @@ export interface CoachInput {
   code: string;
   severityClass: Severity;
   terminateSession?: boolean;
+  /**
+   * The event's machine-readable act discriminator (`ViolationEvent.detail`,
+   * rules/types.ts), passed straight through from the rule engine. Read ONLY
+   * by `encounterKey` below, and only where the CATALOGUE declares it an act —
+   * see that function for why the field is never trusted on its own. Absent
+   * (every caller that does not stamp one) → the key is what it always was.
+   */
+  detail?: string;
 }
 
 /**
@@ -70,6 +83,52 @@ export interface CoachDecision {
   penaltyMultiplier: number;
 }
 
+/**
+ * WHAT COUNTS AS A REPEAT — the encounter key, and the whole escalation ladder
+ * hangs off it (`prior` → policy.ts `gradeMultiplier`).
+ *
+ * A repeat is THE SAME MISTAKE MADE AGAIN. Two codes that share a scenario are
+ * that same mistake at two degrees — SPEEDING_OVER_LIMIT and SPEEDING_DANGEROUS
+ * are both `ev-speed-limit` — which is why the scenario, not the code, is the
+ * key. But two codes are not the only way one key can cover two DIFFERENT
+ * mistakes. The catalogue splits two codes into distinct ACTS carried on
+ * `detail`: COLLISION by the body struck (vehicle / pedestrian / cyclist /
+ * staticObject) and RAIL_CROSSING_VIOLATION by the act (no-stop /
+ * entered-barred / stopped-on-track). Each act has its own authored title and
+ * explanation precisely because it is a different mistake, not a second helping
+ * of the first.
+ *
+ * MEASURED 2026-08-18, `sc-hz-accident-scene`: a wrecked car struck at t=13.13
+ * and a bystander at t=13.43 — one crash, one act of driving, two victims. Both
+ * keyed under `ev-collision`, so the second was the "second encounter" and the
+ * pedestrian was priced ×1.5; the student read «повторна грешка ×1.5» for a
+ * mistake they made once. `lessons/engine.ts buildLessonResult` later stopped
+ * that ONE number reaching the screen, by folding only the rows the closed
+ * ledger actually charged — but that is the LEDGER's filter, not this ladder's,
+ * and it only reaches faults that follow a closure. `RAIL_CROSSING_VIOLATION`
+ * is опасна and deliberately NOT terminating (catalog.ts), so nothing closes
+ * its ledger: entering a barred crossing and then coming to rest on the tracks
+ * bills both rows, and the second still reads as the first one repeated. The
+ * false «повторна» is decided HERE, so it is corrected here.
+ *
+ * THE OTHER DIRECTION IS WHY THIS ASKS THE CATALOGUE AND NOT THE FIELD.
+ * `detail` is not always an act: SPEEDING_OVER_LIMIT stamps the measured speed
+ * on it (rules/engine.ts `speedDetail`) and a priority fault stamps the
+ * situation. Keying on the field itself would give every speeding its own
+ * counter, the ladder would never fire, and a driver who sped five times would
+ * be taught five times and graded never — a false acquittal in place of a false
+ * conviction. `actCopy` is non-null for exactly the details the catalogue
+ * declares acts, and it is the same predicate the debrief already groups its
+ * rows by (rules/index.ts), so the two surfaces cannot drift apart.
+ */
+function encounterKey(v: CoachInput, scenarioId: string | null): string {
+  const base = scenarioId ?? v.code;
+  // The cast is safe by construction: a code outside the per-act tables misses
+  // the lookup and returns null, which is the pooled (no-act) answer anyway.
+  const isAct = actCopy(v.code as ViolationCode, v.detail) !== null;
+  return isAct ? `${base}#${v.detail}` : base;
+}
+
 /** Decide one violation and return the updated encounter counts. */
 export function coachStep(
   encounters: Readonly<Record<string, number>>,
@@ -77,7 +136,7 @@ export function coachStep(
   opts?: CoachOptions,
 ): { decision: CoachDecision; encounters: Record<string, number> } {
   const scenarioId = scenarioForCode(v.code);
-  const key = scenarioId ?? v.code;
+  const key = encounterKey(v, scenarioId);
   const prior = encounters[key] ?? 0;
   const nextEncounters = { ...encounters, [key]: prior + 1 };
 

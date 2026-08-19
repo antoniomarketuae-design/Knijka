@@ -168,6 +168,46 @@ class ScenarioDirectorImpl implements ScenarioDirector {
       outcome: r.outcome,
     }));
   }
+
+  /** The cast the sentinel sweeps, readable — `directorContactCast`'s source.
+   *  Handed over as the SAME array rather than re-derived: a second walk over
+   *  the runners could drift, and two names for one body double-bill a single
+   *  crash. */
+  get contactCast(): readonly ContactCastMember[] {
+    return this.cast;
+  }
+}
+
+/**
+ * THE SESSION'S CONTACT CAST, readable from outside — ONE VOCABULARY FOR TWO
+ * LIVE REPORTERS.
+ *
+ * A browser drive has two reporters pointed at the same bodies: this
+ * director's sentinel, which names every staged body it is inside of
+ * (`ContactCastMember.actorId`), and the rapier contact handler, which reaches
+ * the runtime through `LessonScene`. If those two invent DIFFERENT names for
+ * one body the rule engine sees two episodes and bills one crash twice —
+ * exactly the catastrophe the per-body key was introduced to end. So the
+ * physics side does not invent a name at all: it reads the cast the sentinel
+ * itself watches and reuses that id verbatim.
+ *
+ * A WeakMap rather than a member on `ScenarioDirector`: the interface is the
+ * orchestrator's published seam (orchestrator/types.ts) and a naming detail of
+ * the live physics wiring has no business widening it. Keyed on the returned
+ * director, so it cannot outlive the session it describes.
+ *
+ * Empty array for a director this module did not build (fakes in tests) —
+ * an unknown director names nothing, which is the innocent direction: the
+ * physics reporter falls back to its per-category behaviour (A12).
+ */
+const castByDirector = new WeakMap<ScenarioDirector, readonly ContactCastMember[]>();
+const NO_CAST: readonly ContactCastMember[] = [];
+
+/** The cast `director`'s sentinel sweeps every frame — see `castByDirector`. */
+export function directorContactCast(
+  director: ScenarioDirector | null,
+): readonly ContactCastMember[] {
+  return (director !== null && castByDirector.get(director)) || NO_CAST;
 }
 
 /**
@@ -181,5 +221,7 @@ export function createScenarioDirector(
   traffic: StagedTrafficPort,
   opts: ScenarioDirectorOptions,
 ): ScenarioDirector {
-  return new ScenarioDirectorImpl(events, traffic, opts);
+  const director = new ScenarioDirectorImpl(events, traffic, opts);
+  castByDirector.set(director, director.contactCast);
+  return director;
 }

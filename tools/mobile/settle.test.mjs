@@ -3,12 +3,24 @@
 //
 //   npx vitest run ../tools/mobile/settle.test.mjs   (from platform/)
 //
-// This is a VITEST file on purpose. platform/vitest.config.ts already globs
+// This is a VITEST file on purpose: the runner is part of whether a test is
+// load-bearing, and the last three defects in this instrument were all found by
+// hand because nothing in any gate could see them.
+//
+// THE SENTENCE THAT USED TO BE HERE WAS WRONG, AND IT COST THIS FILE ITS WHOLE
+// PURPOSE. It said "platform/vitest.config.ts already globs
 // `../tools/mobile/**/*.test.mjs`, so a vitest test here runs in the same gate
-// everything else runs in; a node:test file in this directory is claimed by
-// that glob too and cannot run under it. The runner is part of whether a test
-// is load-bearing, and the last three defects in this instrument were all found
-// by hand because nothing in any gate could see them.
+// everything else runs in". That glob was removed — correctly, because it was
+// also swallowing the node:test files in this directory and hard-failing on
+// them — and this file was named by nothing that replaced it. MEASURED
+// 2026-08-19: `npx vitest list --filesOnly` returned 878 files and none of them
+// was this one; asking vitest for it by name printed nothing and exited 0.
+// Every assertion below had been green by absence since that narrowing.
+//
+// It is named explicitly now, in `VITEST_INCLUDE` in
+// platform/scripts/tools-tests.mjs, and both gates fail if it stops being named
+// there (platform/scripts/__tests__/test-ownership.test.mjs). A comment is not
+// a gate; that is the whole lesson, and this header was the proof.
 //
 // WHAT IS BEING PINNED, and why each one is here:
 //

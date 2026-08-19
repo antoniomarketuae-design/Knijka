@@ -84,9 +84,25 @@ import {
 } from "@/modules/sim/lessons";
 import {
   createScenarioDirector,
+  directorContactCast,
   lessonSeed,
   type ScenarioDirector,
 } from "@/modules/sim/orchestrator";
+// Exact body geometry for naming a live contact — the SAME module the
+// director's contact sentinel grades with, so the two live reporters can never
+// disagree about what the player is inside of. See the block above ReadyScene.
+import {
+  actorObb,
+  isContact,
+  NPC_VEHICLE_SHELL_HALF_LENGTH_M,
+  NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+  obbDiscSeparationM,
+  obbSeparationM,
+  PEDESTRIAN_BODY_RADIUS_M,
+  playerObb,
+  type ActorPose,
+  type Obb2D,
+} from "@/modules/sim/collision";
 import {
   createPreDriveSignalTracker,
   observeControlSignal,
@@ -127,7 +143,12 @@ import {
   type WorldGeometry,
 } from "@/modules/sim/world";
 import { createWorldRuntime, type SurfaceGripPatch } from "@/modules/sim/runtime";
-import { createTrafficSystem, TrafficLayer, type TrafficDistrict } from "@/modules/sim/traffic";
+import {
+  createTrafficSystem,
+  TrafficLayer,
+  type TrafficDistrict,
+  type VehicleProfile,
+} from "@/modules/sim/traffic";
 import {
   buildPoligonGhostDemo,
   createTraceClock,
@@ -685,6 +706,189 @@ export default function LessonScene(props: LessonSceneProps) {
   );
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// THE NAME OF THE BODY THE PHYSICS LAYER JUST HIT
+//
+// The rule engine collapses a contact STREAM into accidents, and since
+// 2026-08-18 it does that per BODY rather than per body-KIND — because a
+// per-kind latch gives the second of two victims away free. That fix arrived
+// INERT ON THE CHANNEL A STUDENT ACTUALLY DRIVES: the rapier contact handler
+// reached `runtime.pushCollision(withWhat)` with no id at all, so every live
+// contact was anonymous and the per-body key had nothing to key on.
+//
+// MEASURED on the shipped reducer (fixtures at 45.9 км/ч, «Пътнотранспортно
+// произшествие» rows counted off the debrief):
+//
+//   two ANONYMOUS vehicle reports 1.0 s apart ……………… 1 bill  ← the defect
+//   the same two, NAMED wreck-a / wreck-b ………………………… 2 bills
+//   thirteen NAMED reports on ONE body over 6 s ……………… 1 bill ← one accident
+//   a clean drive …………………………………………………………………………… 0
+//
+// So the whole of the live fix is: NAME THE BODY. Both halves of the contract
+// stay load-bearing — one contact with one body bills once however long the
+// shunt lasts, two separate victims bill twice.
+//
+// AND THE NAME MUST BE THE SENTINEL'S NAME, NOT A NEW ONE. A browser drive has
+// TWO reporters pointed at the same bodies: the director's ContactSentinel,
+// which names every staged body it is inside of, and this handler. Measured on
+// the same reducer, two DIFFERENT names for one body bill TWICE — so minting an
+// independent id here (the shell tag's numeric `npcId`, say) would charge one
+// crash as two, which is the 130-точки catastrophe the per-body key was written
+// to end. Hence `directorContactCast`: the staged bodies below are the sentinel's
+// own cast, resolved through the traffic port, carrying its own `actorId`.
+//
+// WHAT AN UNNAMED REPORT MEANS HERE, and why the refusals are refusals:
+//  · `staticObject` — walls, kerbs, world meshes. No identity exists for these
+//    anywhere in the product, so there is nothing to name. They keep the
+//    per-category latch, which is what holds the wall-scrape and guardrail pins
+//    at one bill for one scrape;
+//  · TWO candidate bodies of the reported kind overlapping at once — a car
+//    wedged between two others. Naming one of them would be a guess, and a
+//    guess that flickers between two names during ONE contact bills it twice.
+//    Refusing falls back byte-identically to today's behaviour, which errs
+//    toward one bill (A12);
+//  · a body no list here covers — an AMBIENT traffic agent. An ambient agent
+//    and a staged one are both `traffic.vehicles` entries and this file cannot
+//    tell them apart through the traffic module's public API, so a name minted
+//    for an ambient agent could collide with the sentinel's name for a staged
+//    one and double-bill a single crash. Unnamed is the innocent direction and
+//    is exactly what shipped before. See the report: routing the shell tag's
+//    `npcId` out of `VehicleRig.onCollisionEnter` closes it, but ONLY together
+//    with reconciling that id against the sentinel's `actorId`.
+//
+// TWO RESIDUES, STATED RATHER THAN HIDDEN, and neither is a regression on what
+// shipped:
+//  · a contact with an UNCOVERED body (an ambient car) while the player also
+//    overlaps a COVERED one (a pile-up) is named for the covered body and
+//    merges into its episode. It merged before too — an anonymous report is a
+//    continuation of ANY open episode of its kind — so the bill is the same;
+//  · the pose read here is the shared `VehicleSample`, which the rig writes
+//    once per render frame, while rapier's contact fires inside the physics
+//    step. At 46 км/ч that is at most 0.21 m of staleness against touch windows
+//    metres wide, and a stale pose can only cost a NAME (→ unnamed → the
+//    shipped behaviour), never invent a contact.
+// ───────────────────────────────────────────────────────────────────────────
+
+/** The three collision categories a body can be named for (`staticObject` is
+ *  by definition nameless — see the block above). */
+type NamedContactKind = "vehicle" | "pedestrian" | "cyclist";
+
+/** One rapier-tagged body this contact could have been with. Vehicles and the
+ *  cyclist proxy are BOXES; a pedestrian is a DISC (no body heading) — the
+ *  sim/collision split, reused rather than re-derived. */
+export interface LiveContactBody {
+  readonly id: string;
+  readonly withWhat: NamedContactKind;
+  readonly box?: Obb2D;
+  readonly disc?: { readonly x: number; readonly y: number; readonly radiusM: number };
+}
+
+/** The slice of the director's `ContactCastMember` this file reads (structural
+ *  — the orchestrator keeps its own type). */
+interface StagedContactBody {
+  readonly actorId: string;
+  readonly withWhat: NamedContactKind;
+  readonly body: "box" | "disc";
+  readonly profile?: VehicleProfile;
+}
+
+/**
+ * The HITTABLE scenario obstacle vehicles, as bodies — built once per lesson
+ * (they never move).
+ *
+ * `visual: true` renders through the same instanced pass but mounts NO
+ * collider (ScenarioObstacles' own convention: a purely visual body must not
+ * add a crash surface the grading never authored), so it can never be the body
+ * rapier reported and is not a candidate. The index still counts it, so these
+ * ids line up with the shell tags ScenarioObstacles writes
+ * (`SCENARIO_OBSTACLE_NPC_ID_BASE + i` over the same vehicle-filtered list).
+ *
+ * The box is the sim module's canonical NPC vehicle body, not the per-model
+ * tight cuboid the renderer fits: this function only NAMES a contact rapier has
+ * already declared, and a few centimetres of disagreement can only cost a name
+ * (→ unnamed → today's behaviour), never invent a contact.
+ */
+export function hittableObstacleBodies(
+  obstacles: readonly ScenarioObstacleSpec[],
+): LiveContactBody[] {
+  const out: LiveContactBody[] = [];
+  let index = 0;
+  for (const o of obstacles) {
+    if (o.kind !== "vehicle") continue;
+    const i = index++;
+    if (o.visual === true) continue;
+    out.push({
+      id: `obstacle:${i}`,
+      withWhat: "vehicle",
+      box: {
+        x: o.x,
+        y: o.y,
+        headingDeg: o.headingDeg,
+        halfLengthM: NPC_VEHICLE_SHELL_HALF_LENGTH_M,
+        halfWidthM: NPC_VEHICLE_SHELL_HALF_WIDTH_M,
+      },
+    });
+  }
+  return out;
+}
+
+/**
+ * Every body the live contact could have been with, at this instant: the
+ * director's staged cast at its live poses, plus the static obstacle list.
+ * Allocates — a real contact is rare (the same reasoning NpcColliders' near-miss
+ * emitters carry), and the frame loop never calls this.
+ */
+export function liveContactBodies(
+  cast: readonly StagedContactBody[],
+  stagedPose: (actorId: string) => ActorPose | null,
+  obstacles: readonly LiveContactBody[],
+): LiveContactBody[] {
+  const out: LiveContactBody[] = obstacles.slice();
+  for (const m of cast) {
+    const pose = stagedPose(m.actorId);
+    // No body in the world = nothing to have been inside of (the sentinel's
+    // own rule for a missing actor).
+    if (pose === null) continue;
+    out.push(
+      m.body === "disc"
+        ? {
+            id: m.actorId,
+            withWhat: m.withWhat,
+            disc: { x: pose.x, y: pose.y, radiusM: PEDESTRIAN_BODY_RADIUS_M },
+          }
+        : { id: m.actorId, withWhat: m.withWhat, box: actorObb(pose, m.profile) },
+    );
+  }
+  return out;
+}
+
+/**
+ * Name the body a live contact was with, or `undefined` when naming would be a
+ * guess. Exact overlap on the SAME sim/collision geometry the sentinel grades
+ * with — UNIQUE or nothing (see the block above for all three refusals).
+ */
+export function nameLiveContact(
+  withWhat: CollisionWithWhat,
+  player: Obb2D,
+  bodies: readonly LiveContactBody[],
+): string | undefined {
+  if (withWhat === "staticObject") return undefined;
+  let named: string | undefined;
+  for (const b of bodies) {
+    if (b.withWhat !== withWhat) continue;
+    const sepM =
+      b.disc !== undefined
+        ? obbDiscSeparationM(player, b.disc.x, b.disc.y, b.disc.radiusM)
+        : obbSeparationM(player, b.box as Obb2D);
+    if (!isContact(sepM)) continue;
+    // A second candidate: the car is inside two bodies of the same kind at
+    // once and a name would be a coin toss. Refuse — see the block above.
+    if (named !== undefined) return undefined;
+    named = b.id;
+  }
+  return named;
+}
+
 function ReadyScene({
   lesson,
   quality,
@@ -1237,15 +1441,41 @@ function ReadyScene({
     [runtime],
   );
 
+  // The hittable obstacle bodies never move — resolve them once per lesson.
+  const obstacleBodies = useMemo(
+    () => hittableObstacleBodies(built.scenarioObstacles),
+    [built.scenarioObstacles],
+  );
+
   // A real impact (VehicleRig gates by relative speed) → queue a collision for
   // the rule engine, which grades it опасна and terminates the session. A11:
   // `withWhat` now reflects what was actually hit — NPC shells classify as
   // vehicle/pedestrian/cyclist; untagged world geometry stays staticObject.
+  //
+  // …AND WHICH BODY, which is the half that was missing and the half the
+  // engine's per-body episode key keys on: two different bodies struck inside
+  // `collisionSeparationSec` billed ONE accident while every live report
+  // arrived anonymous. `nameLiveContact` resolves it off the same
+  // sim/collision geometry the director's sentinel grades with, using the
+  // sentinel's OWN cast ids — see the block above ReadyScene for the
+  // measurements, and for what an unnamed report means.
   const handleCollision = useCallback(
     (_impactKmh: number, withWhat: CollisionWithWhat) => {
-      runtime.pushCollision(withWhat);
+      const sample = sampleRef.current;
+      runtime.pushCollision(
+        withWhat,
+        nameLiveContact(
+          withWhat,
+          playerObb(sample.position.x, sample.position.y, sample.headingDeg),
+          liveContactBodies(
+            directorContactCast(director),
+            (actorId) => traffic.staged(actorId),
+            obstacleBodies,
+          ),
+        ),
+      );
     },
-    [runtime],
+    [runtime, director, traffic, obstacleBodies],
   );
 
   return (

@@ -22,6 +22,7 @@ import {
   buildSessionSummary,
   COMMENDATIONS,
   VIOLATIONS,
+  ledgerBilling,
   makeCommendation,
   makeViolation,
   type CommendationCode,
@@ -598,7 +599,43 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
       escalations.push({ code: e.code, t: e.t, multiplier: e.penaltyMultiplier });
     }
   }
-  const { effectiveTotalPoints, escalated } = applyEscalations(summary.mistakes, escalations);
+  /**
+   * OVER THE ROWS THE LEDGER CHARGED, AND NO OTHERS — the identical filter
+   * `engine.ts buildLessonResult` applies, for the identical reason, and the
+   * two must agree because THIS one is the copy the student reads.
+   *
+   * `LessonPlayShell.tsx:2683` renders `saveResult.debriefText` whenever the
+   * save succeeds and falls back to the client's own text only when it fails,
+   * so a divergence here is not a second opinion — it is the opinion. Measured
+   * 2026-08-19 on `sc-hz-accident-scene` L3 (a wrecked car at t = 13.13, a
+   * bystander at t = 13.43), the same drive engine.ts was repaired for:
+   *
+   *   CLIENT  score=10  effective=10  escalations=[]
+   *   SERVER  score=10  effective=25  escalations=[COLLISION @13.43 ×1.5]
+   *
+   * and the server's text — the one that shipped — carried «Удар в пешеходец …
+   * без допълнителни точки … — повторна грешка ×1.5» (a row saying both halves
+   * of a contradiction in one sentence) plus a «Тренировъчен резултат: 25
+   * наказателни т.» that exists on no other surface. The 25 was also what
+   * `actions.ts` persisted, so session-history's „официален vs тренировъчен"
+   * badge repeated it for as long as the row lived.
+   *
+   * Handed the whole list, `applyEscalations` re-instates every fault Наредба
+   * № 38, чл. 48, ал. 3 closed over and then escalates them; filtering the
+   * MISTAKES fixes the total and the false «повторна грешка» at once, because
+   * escalation.ts pairs its records to events by (code, t) — a row that is not
+   * folded cannot carry its record either. A genuine repeat (two red lights,
+   * nothing terminating) is untouched: nothing closes that ledger.
+   *
+   * The filter lives twice, here and in engine.ts, because neither file may
+   * import the other; the single home for it is `escalation.ts` and moving it
+   * there is a change to a file this lane does not own.
+   */
+  const billed = ledgerBilling(summary.mistakes);
+  const { effectiveTotalPoints, escalated } = applyEscalations(
+    summary.mistakes.filter((_, i) => billed[i]),
+    escalations,
+  );
 
   // A13: for examMode specs the termination record is REDERIVED here from
   // the rebuilt catalog events — never read from the client (the same pure

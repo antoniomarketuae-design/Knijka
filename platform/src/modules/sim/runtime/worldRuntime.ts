@@ -11,7 +11,8 @@
  *   3. tick = runtime.sample(v, tSec, night)→ authoritative SimTick
  *   4. reduceTick(ruleState, tick)          → violations / commendations
  * `pushCollision` may be called by physics contact handlers at any point
- * before sample(); the events drain into the next tick, in push order.
+ * before sample(); the events drain into the next tick, in push order, each
+ * carrying the body id its reporter supplied (see `QueuedContact`).
  *
  * Event order within one tick: collisions, mirrorGlance, stopLineCrossed,
  * turnStarted, crossing-zone events.
@@ -487,6 +488,32 @@ export function isWrongWay(
 
 type CollisionWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 
+/**
+ * ONE QUEUED CONTACT REPORT — the category AND, when the reporter knows it,
+ * the BODY.
+ *
+ * `bodyId` is the whole reason this is a record rather than a bare string.
+ * The queue used to carry only the category, so every contact that arrived
+ * through the live physics channel reached the rule engine anonymous, and the
+ * engine's per-body episode key had nothing to key on: it fell back to a
+ * per-KIND latch and two different bodies struck inside
+ * `collisionSeparationSec` billed once. MEASURED on the shipped reducer
+ * (fixtures at 45.9 км/ч, `COLLISION` rows counted off the debrief):
+ *
+ *   two ANONYMOUS vehicle reports 1.0 s apart …… 1 bill   ← the defect
+ *   the same two, NAMED wreck-a / wreck-b …………… 2 bills
+ *   thirteen NAMED reports on ONE body over 6 s … 1 bill  ← still one accident
+ *   a clean drive ………………………………………………………………… 0
+ *
+ * `undefined` therefore means «this reporter cannot name what it hit», not
+ * «nothing was named»: it keeps the per-category behaviour byte-identically,
+ * which errs toward ONE bill (A12) rather than toward a false second.
+ */
+interface QueuedContact {
+  readonly withWhat: CollisionWith;
+  readonly bodyId: string | undefined;
+}
+
 /** Is there a conflicting (crossing/oncoming) moving vehicle near (x,y)? */
 export type JunctionConflictQuery = (
   x: number,
@@ -682,8 +709,18 @@ export interface DistrictWorldRuntime extends WorldRuntime {
    *  cyclist proxies excluded at the source). Default: none — the tracker
    *  stays structurally silent. */
   setOvertakenQuery(fn: CyclistQuery | null): void;
-  /** Physics layer reports a contact; drained into the next sample(). */
-  pushCollision(withWhat: CollisionWith): void;
+  /**
+   * Physics layer reports a contact; drained into the next sample().
+   *
+   * `bodyId` NAMES the body that was struck and travels through to the tick
+   * event's `actorId`, which is what the rule engine keys its contact episode
+   * on. Supply it whenever the caller can resolve WHICH body this was — two
+   * different bodies struck seconds apart must bill two accidents, and without
+   * a name they bill one (see `QueuedContact` for the measurement). Omit it
+   * only when no identity exists (world geometry) or when naming would be a
+   * guess; the per-category fallback is unchanged and errs innocent.
+   */
+  pushCollision(withWhat: CollisionWith, bodyId?: string): void;
   /** Phase a driver approaching `signalNodeId` on `bearingDeg` sees (renderer helper). */
   signalPhaseForApproach(signalNodeId: string, bearingDeg: number): SignalPhase;
   /**
@@ -765,7 +802,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
   }
 
   const lineLastFired = new Float64Array(stopLines.all.length).fill(-Infinity);
-  const collisionQueue: CollisionWith[] = [];
+  const collisionQueue: QueuedContact[] = [];
   let pedQuery: PedestrianQuery = () => false;
   let conflictQuery: JunctionConflictQuery = () => false;
   let oncomingQuery: OncomingQuery = () => false;
@@ -1255,8 +1292,18 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // timestamp, and the reducer bills them once. What the founder's nine
       // came from was the reducer's old 3 s rate limit re-billing a contact
       // that kept being re-reported over half a minute.
+      //
+      // The name travels with the report. An UNNAMED contact still emits the
+      // exact pre-`bodyId` event shape — the key is omitted rather than set to
+      // undefined — so every `toEqual` in the suite, and the engine's
+      // per-category fallback, see byte-identical input.
       while (collisionQueue.length > 0) {
-        events.push({ kind: "collision", withWhat: collisionQueue.shift() as CollisionWith });
+        const c = collisionQueue.shift() as QueuedContact;
+        events.push(
+          c.bodyId === undefined
+            ? { kind: "collision", withWhat: c.withWhat }
+            : { kind: "collision", withWhat: c.withWhat, actorId: c.bodyId },
+        );
       }
 
       // 2. Mirror glance passthrough (input layer sets it on the glance frame).
@@ -2483,8 +2530,8 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       return uncontrolledJunctions;
     },
 
-    pushCollision(withWhat: CollisionWith): void {
-      collisionQueue.push(withWhat);
+    pushCollision(withWhat: CollisionWith, bodyId?: string): void {
+      collisionQueue.push({ withWhat, bodyId });
     },
 
     debugStopLines(): readonly StopLine[] {

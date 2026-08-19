@@ -465,6 +465,13 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         code: e.code,
         severityClass: e.severityClass,
         terminateSession: e.terminateSession,
+        // THE FIELD `coach.ts` WAS GIVEN AND NEVER FED. `encounterKey` reads
+        // `detail` so that two DIFFERENT victims of one crash stop counting as
+        // a repeat of each other — but this literal is the production caller,
+        // and without this line the whole mechanism is a comment. Measured
+        // before adding it: the canonical wrong drive still printed «повторна
+        // грешка ×1.5» for a mistake made once.
+        detail: e.detail,
       },
       coachOpts,
     );

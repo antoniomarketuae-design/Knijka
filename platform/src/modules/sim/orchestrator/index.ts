@@ -18,7 +18,7 @@
  * Pure TypeScript — no React/three/Rapier (vitest-safe).
  */
 
-export { createScenarioDirector, hashSeed, lessonSeed } from "./director";
+export { createScenarioDirector, directorContactCast, hashSeed, lessonSeed } from "./director";
 export { BRAKE_ONSET_THRESHOLD } from "./runners";
 export type {
   DirectorInput,

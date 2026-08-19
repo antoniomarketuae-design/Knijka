@@ -140,6 +140,12 @@ export {
   wetnessToRoadParams,
   resetWeather,
   setWeatherTarget,
+  // The scene-boundary primer. It was added for the two dev capture routes and
+  // then left out of this barrel, so neither could reach it: doc 05 says
+  // modules talk only through `index.ts`, and CaptureScene/SceneStillScene both
+  // import from here. A helper the boundary rule makes unreachable is a helper
+  // that does not exist.
+  primeWeather,
   stepWeather,
 } from "./weather";
 export type { RoadWetnessParams } from "./weather";

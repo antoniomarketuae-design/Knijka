@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { VIOLATIONS } from "../rules";
+import { COLLISION_CONTACT_COPY, VIOLATIONS, actCopy } from "../rules";
 import { coachSession, coachStep } from "./coach";
 import { scenarioForCode } from "./mapping";
 
@@ -83,6 +83,122 @@ describe("teach-first-then-grade coach", () => {
     ]);
     expect(seq[0]).toMatchObject({ scenarioId: null, mode: "teach", scored: false });
     expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+  });
+});
+
+describe("what counts as a repeat — the act, not just the code", () => {
+  const RAIL_ACTS = ["no-stop", "entered-barred", "stopped-on-track"] as const;
+
+  it("SELF-CHECK: the act names this file hardcodes are still acts in the catalogue", () => {
+    // Without this, renaming an act in catalog.ts would turn every assertion
+    // below into a test of the pooled (no-act) path — it would go on passing
+    // while measuring nothing. Named details must be non-null; an invented one
+    // must be null, or `actCopy` is not the discriminator this suite thinks.
+    for (const act of RAIL_ACTS) {
+      expect(actCopy("RAIL_CROSSING_VIOLATION", act), `${act} must be a catalogue act`).not.toBeNull();
+    }
+    for (const body of Object.keys(COLLISION_CONTACT_COPY)) {
+      expect(actCopy("COLLISION", body), `${body} must be a catalogue act`).not.toBeNull();
+    }
+    expect(actCopy("COLLISION", "not-a-body")).toBeNull();
+    expect(actCopy("SPEEDING_OVER_LIMIT", "62 в 50")).toBeNull();
+  });
+
+  it("two victims in one crash are not a repeat of anything", () => {
+    // sc-hz-accident-scene, 2026-08-18: a wrecked car at t=13.13 and a
+    // bystander at t=13.43. One act of driving, two struck bodies — the
+    // second must be priced as a first encounter, not «повторна грешка ×1.5».
+    const seq = coachSession([
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true, detail: "vehicle" },
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true, detail: "pedestrian" },
+    ]);
+    expect(seq[0]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    expect(seq[1]).toMatchObject({ mode: "grade", scored: true, penaltyMultiplier: 1 });
+    // And the pedestrian act carries its own lesson rather than arriving
+    // silently behind the vehicle's — the per-body copy exists to say
+    // something the first row did not (catalog.ts COLLISION_CONTACT_COPY).
+    expect(seq[1].showLesson).toBe(true);
+  });
+
+  it("the SAME body struck twice IS a repeat — the ladder still fires", () => {
+    // The false-acquittal direction. Splitting by act must not become a way
+    // for a driver to never escalate: hit two cars, and the second is a
+    // repeat of the first.
+    const seq = coachSession([
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true, detail: "vehicle" },
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true, detail: "vehicle" },
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true, detail: "vehicle" },
+    ]);
+    expect(seq[1].penaltyMultiplier).toBe(1.5);
+    expect(seq[2].penaltyMultiplier).toBe(2);
+  });
+
+  it("three rail acts are three mistakes, not one repeated three times", () => {
+    // RAIL_CROSSING_VIOLATION is опасна and deliberately NOT terminating, so
+    // no ledger closure hides this downstream: all three rows bill, and any
+    // multiplier here reaches the debrief as «повторна грешка».
+    const seq = coachSession(
+      RAIL_ACTS.map((detail) => ({
+        code: "RAIL_CROSSING_VIOLATION",
+        severityClass: "opasna" as const,
+        detail,
+      })),
+    );
+    for (const [i, d] of seq.entries()) {
+      expect(d.penaltyMultiplier, `${RAIL_ACTS[i]} is its own mistake`).toBe(1);
+    }
+  });
+
+  it("the same rail act twice IS a repeat", () => {
+    const seq = coachSession([
+      { code: "RAIL_CROSSING_VIOLATION", severityClass: "opasna", detail: "entered-barred" },
+      { code: "RAIL_CROSSING_VIOLATION", severityClass: "opasna", detail: "entered-barred" },
+    ]);
+    expect(seq[1].penaltyMultiplier).toBe(1.5);
+  });
+
+  it("a detail that is NOT an act never splits the counter — speeding still escalates", () => {
+    // SPEEDING_OVER_LIMIT stamps the measured speed on `detail`, so it differs
+    // on every event. Keying on the field rather than on the catalogue would
+    // give each one a fresh counter: taught five times, graded never.
+    const seq = coachSession([
+      { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna", detail: "62 в 50" },
+      { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna", detail: "71 в 50" },
+      { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna", detail: "80 в 50" },
+      { code: "SPEEDING_DANGEROUS", severityClass: "opasna", detail: "96 в 50" },
+    ]);
+    expect(seq[0]).toMatchObject({ mode: "teach", penaltyMultiplier: 0 });
+    expect(seq[1]).toMatchObject({ mode: "grade", penaltyMultiplier: 1 });
+    expect(seq[2]).toMatchObject({ mode: "grade", penaltyMultiplier: 1.5 });
+    // Still the same scenario counter across the two speeding codes.
+    expect(seq[3]).toMatchObject({ mode: "grade", penaltyMultiplier: 2 });
+  });
+
+  it("every struck body in the catalogue gets its own counter", () => {
+    // The sweep: if a fifth body kind lands in COLLISION_CONTACT_COPY, this is
+    // what guarantees it is not billed as a repeat of the four before it.
+    const bodies = Object.keys(COLLISION_CONTACT_COPY);
+    expect(bodies.length).toBeGreaterThanOrEqual(4);
+    const seq = coachSession(
+      bodies.map((detail) => ({
+        code: "COLLISION",
+        severityClass: "opasna" as const,
+        terminateSession: true,
+        detail,
+      })),
+    );
+    for (const [i, d] of seq.entries()) {
+      expect(d.penaltyMultiplier, `${bodies[i]} is its own mistake`).toBe(1);
+    }
+  });
+
+  it("an absent detail behaves exactly as before (every caller that stamps none)", () => {
+    const seq = coachSession([
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true },
+      { code: "COLLISION", severityClass: "opasna", terminateSession: true },
+    ]);
+    expect(seq[0].penaltyMultiplier).toBe(1);
+    expect(seq[1].penaltyMultiplier).toBe(1.5);
   });
 });
 
