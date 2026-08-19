@@ -51,10 +51,18 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROOMY_HUD_FLOOR_PX } from "../immersive";
 import {
+  LEGEND_ANNOUNCE_MS,
   notifyColumnCapPx,
+  notifyColumnCutPx,
   SCROLL_REMAINING_SLACK_PX,
   scrollRemainingPx,
+  TASK_ANNOUNCE_MS,
 } from "../LessonPlayShell";
+import {
+  overlayPriority,
+  selectOverlay,
+  type SimOverlayItem,
+} from "@/modules/sim/hud";
 
 const SHELL = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
 
@@ -364,10 +372,19 @@ describe("the ИНСТРУКЦИИ list can be seen to be scrollable", () => {
     // …and the second one is on the ROOMY bar, i.e. before the stage box —
     // the compact sheet's items array is built above it, the bar renders under
     // `{compact ? null : (`.
-    const bar = CODE.slice(
-      CODE.indexOf("{compact ? null : (\r\n      <div className=\"flex flex-wrap items-center gap-3\">"),
-      CODE.indexOf('data-sim-stage=""'),
-    );
+    // ── THE ANCHOR MAY NOT DEPEND ON THE CHECKOUT'S LINE ENDINGS.
+    // This searched for `{compact ? null : (\r\n      <div …`, i.e. a literal
+    // CRLF, and this repository stores LF with `core.autocrlf=true`: the working
+    // copy is CRLF on a stock Windows checkout and LF the moment any tool
+    // rewrites the file — and LF everywhere on Linux, which is where CI runs. A
+    // -1 from `indexOf` then makes `slice` return the WHOLE FILE from 0, so the
+    // case stayed green for the wrong reason on one platform and reported an
+    // empty slice on the other. Matched on the newline instead of on a
+    // particular spelling of it.
+    const barOpen =
+      /\{compact \? null : \(\s*<div className="flex flex-wrap items-center gap-3">/.exec(CODE);
+    expect(barOpen, "the roomy top bar's opening conditional").not.toBeNull();
+    const bar = CODE.slice(barOpen!.index, CODE.indexOf('data-sim-stage=""'));
     expect(bar.length).toBeGreaterThan(0);
     expect(bar).toContain("nextQualitySelection(qualitySelection)");
 
@@ -403,5 +420,212 @@ describe("the ИНСТРУКЦИИ list can be seen to be scrollable", () => {
       const src = readFileSync(resolve(__dirname, p), "utf8");
       expect(src, p).toContain("[scrollbar-width:thin]");
     }
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   5 · THE LAST CARD IN THE COLUMN WAS GUILLOTINED, AND THE CAP'S OWN COMMENT
+       SAID SO — „a separate defect, routed below" that nothing routed.
+
+   Seven BROKEN findings, roomy leg, all one sentence: the card that explains a
+   graded fault is cut off by the bottom of the play area mid-sentence.
+   sc-pk-ban-stop/pc-wrong/04-t023s («shown half a sentence about a 10-point
+   dangerous error»), sc-sp-limit-end/pc-wrong/04-t017s — VERIFIED BY EYE, the
+   last visible line is «означава директно неиздържан» with the glyph tops of
+   «изпит» sliced through, on a −10 ОПАСНА ГРЕШКА — plus sc-sp-eco-coast,
+   sc-sp-wet-limit-plate, sc-vu-emergency, sc-merge-from-property and
+   sc-ln-obstacle-meeting.
+   ────────────────────────────────────────────────────────────────────────── */
+
+describe("notifyColumnCutPx · what the column takes out of the graded fault", () => {
+  /** The sweep's own roomy stage: 1165 × 650, column top 164 (the number
+   *  notifyColumn.ts records from both engines) ⇒ cap 322. */
+  const CAP = notifyColumnCapPx(650, 164);
+  /** ObjectiveBanner, measured on the shipped desktop layout. */
+  const BANNER_PX = 52;
+  /** One fault card. Doc 86 L14's own number, and `visibleToasts` shows TWO. */
+  const CARD_PX = 240;
+  /** The column's `gap-1.5`. */
+  const GAP_PX = 6;
+
+  it("THE FRAME, AS ARITHMETIC: 222 px of the second fault card, on the ordinary state", () => {
+    expect(CAP).toBe(322);
+    // Banner + two cards + two gaps, against the cap. Not an edge case: two
+    // cards is what the queue shows when two things went wrong.
+    const cut = notifyColumnCutPx(CAP, BANNER_PX, 2 * CARD_PX, 2 * GAP_PX);
+    expect(cut).toBe(222);
+    // 222 of the second card's 240 — 92 % of it — so eighteen pixels survive:
+    // its «ОПАСНА ГРЕШКА / −10 изпитни т.» header row and nothing under it. That
+    // is exactly the shape every one of the seven findings describes, and it is
+    // the worst possible shape: a verdict with its reason cut off is the bare
+    // verdict doc 64 THEO-4 forbids, delivered by a layout.
+    expect(cut / CARD_PX).toBeGreaterThan(0.9);
+    expect(CARD_PX - cut).toBe(18);
+  });
+
+  it("…and it is not a cap that cuts a column with room — the other direction", () => {
+    // ONE card, the same stage: nothing is taken. A function that reported a cut
+    // here would make the affordance permanent chrome, which is the defect the
+    // briefing's own counter was reworked to avoid.
+    expect(notifyColumnCutPx(CAP, BANNER_PX, CARD_PX, GAP_PX)).toBe(0);
+    // …and a stage with no room at all does not report a negative cut.
+    expect(notifyColumnCutPx(0, BANNER_PX, CARD_PX, GAP_PX)).toBeGreaterThan(0);
+    expect(notifyColumnCutPx(1000, BANNER_PX, 2 * CARD_PX, 2 * GAP_PX)).toBe(0);
+  });
+
+  it("THE WIRING: the toast stack scrolls instead, with a bar and a counted row", () => {
+    const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
+    const decls = scroller.slice(0, scroller.indexOf("<HudToasts"));
+    // It can shrink at all…
+    expect(decls).toContain("min-h-0");
+    // …it scrolls rather than being clipped…
+    expect(decls).toContain("overflow-y-auto");
+    // …and the bar is PAINTED, because WebKit's overlay bar exists only during a
+    // scroll and the harness runs Chromium with `--hide-scrollbars`. The same
+    // pair the briefing card and the two precedent scrollers carry.
+    expect(decls).toContain("scrollbar-width:thin");
+    expect(decls).toContain("scrollbar-color");
+    // The measured sentence, OUTSIDE the scroller and conditional on there
+    // really being something below the fold.
+    const after = scroller.slice(scroller.indexOf("</div>"));
+    expect(after).toContain("toastsBelowFold > 0");
+    expect(after).toContain("↓ още {toastsBelowFold}");
+    expect(after).toContain("shrink-0");
+  });
+
+  it("…and the YIELD ORDER the briefing card argued for still holds", () => {
+    // „A graded fault, or the task itself, must never be the thing that yields
+    // to a briefing the student has already read." Giving the toast stack
+    // `min-h-0` at the default shrink factor would have broken exactly that —
+    // flexbox distributes a deficit in proportion to (base × factor), so a
+    // 490 px stack at 1 would absorb 68 % of the FIRST pixel of pressure while
+    // the briefing was still full height.
+    const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
+    const decls = scroller.slice(0, scroller.indexOf("<HudToasts"));
+    const factor = /\[flex-shrink:([\d.]+)\]/.exec(decls);
+    expect(factor, "the shrink weight is written, not defaulted").not.toBeNull();
+    const w = Number(factor![1]);
+    expect(w).toBeGreaterThan(0); // 0 would mean it never yields, so never scrolls
+    expect(w).toBeLessThan(1); // …and 1 would put it ahead of the briefing
+    // The arithmetic, at the shipped sizes: the briefing takes ≥90 % of the
+    // deficit the two of them share, i.e. nine pixels of briefing for every one
+    // of fault, until the briefing freezes at zero and the rest comes here.
+    const briefingShare = 230 * 1;
+    const stackShare = 490 * w;
+    expect(briefingShare / (briefingShare + stackShare)).toBeGreaterThan(0.9);
+    // And the briefing is still the child that CAN empty: its `min-h-0` is the
+    // one the yield order is built on.
+    expect(CODE).toContain("flex w-full min-h-0 min-w-0 flex-col");
+  });
+
+  it("the counter is measured off what HudToasts paints, not off a guessed shape", () => {
+    // `rowsBelowFold` counts CARDS, and the cards are the children of the box
+    // HudToasts owns. Reading the scroller's own children would count ONE row
+    // (the wrapper) forever, which is the reassuring direction.
+    expect(CODE).toContain("el.querySelector('[data-hud=\"toasts\"]')");
+    expect(CODE).toContain("rowsBelowFold(");
+    expect(CODE).toContain("listRowsInScrollCoords(");
+    // THE OBSERVER WATCHES THE CONTENT TOO. A ResizeObserver on a scroller never
+    // fires for what is inside it, and the thing that changes here IS what is
+    // inside it — a second fault arriving.
+    const eff = CODE.slice(CODE.indexOf("const ro = new ResizeObserver(measureToastFold)"));
+    expect(eff.slice(0, eff.indexOf("}, ["))).toContain("ro.observe(stack)");
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   6 · THE RIBBON LEGEND HAD NEVER BEEN ON A PHONE
+
+   sc-ln-obstacle-meeting/mobile-right/01-arrival: «the two glowing road ribbons
+   are explained on PC by a legend … but that legend does not exist anywhere on
+   mobile. A phone student sees a green and a blue river of light on the tarmac
+   with nothing telling him which to follow.»
+
+   And two more on the same layer, both about what the legend never named at all:
+   sc-junction-blind/mobile-right/04-t065s («a huge white chevron «◀» … with no
+   label or legend») and sc-jx-equal-left/mobile-right/04-t039s («a vertical cyan
+   beam of light rises out of the middle of the carriageway … with no legend
+   anywhere»).
+   ────────────────────────────────────────────────────────────────────────── */
+
+describe("the legend is said on the one frame a priority-10 line can be heard", () => {
+  const legendItem: SimOverlayItem = {
+    id: "legend",
+    kind: "legend",
+    tone: "neutral",
+    lineBg: "Зелената линия, стрелката и светлинният стълб …",
+  };
+
+  it("THE CAUSE, as the queue's own arithmetic: it lost to everything, always", () => {
+    // `legend` is the lowest of the ten kinds, and the window used to start at
+    // `sceneEpoch` — the frame the scene mounts, on which the BRIEFING is up and
+    // blocking. There is no ordering in which a phone student saw this line.
+    expect(overlayPriority("legend")).toBeLessThan(overlayPriority("hint"));
+    expect(overlayPriority("legend")).toBeLessThan(overlayPriority("predrive"));
+    expect(overlayPriority("legend")).toBeLessThan(overlayPriority("task"));
+
+    const briefing: SimOverlayItem = {
+      id: "briefing",
+      kind: "hint",
+      tone: "neutral",
+      lineBg: "…",
+      blocking: true,
+    };
+    expect(selectOverlay([briefing, legendItem]).active?.id).toBe("briefing");
+    const task: SimOverlayItem = { id: "task", kind: "task", tone: "neutral", lineBg: "…" };
+    expect(selectOverlay([task, legendItem]).active?.id).toBe("task");
+
+    // …and even after the briefing is acknowledged, the task line covers 7 000
+    // of the legend's own 8 000 ms when both are measured from the same instant.
+    // One second, at the back of a ten-deep queue, is not „said once".
+    expect(LEGEND_ANNOUNCE_MS - TASK_ANNOUNCE_MS).toBeLessThan(2000);
+  });
+
+  it("THE WIRING: the window opens on the first quiet frame, never at the mount", () => {
+    // The mutation that broke the first draft of this case: keying the window on
+    // `sceneEpoch` again passes any check that merely looks for a `legend`
+    // candidate. So the CONDITION is the assertion.
+    const cond = CODE.slice(
+      CODE.indexOf("const legendQueueSilent ="),
+      CODE.indexOf("const legendArmedEpochRef"),
+    );
+    expect(cond).toContain("!briefingOpen");
+    expect(cond).toContain('snap.phase === "driving"');
+    expect(cond).toContain("!taskFresh");
+    expect(cond).toContain("teachQueue.length === 0");
+    expect(cond).toContain("toasts.length === 0");
+    // …and the key is that condition and nothing else. `legend:${sceneEpoch}`
+    // unconditionally is the shipped bug; a `useRef` latch read at render time is
+    // what `react-hooks/refs` refuses. Both are excluded by naming the whole
+    // expression.
+    expect(CODE).toContain("const legendKey = legendQueueSilent ? `legend:${sceneEpoch}` : null;");
+    expect(CODE).not.toContain("legendArmedEpochRef");
+  });
+
+  it("…and it names the arrow and the beam, on both platforms, on every rung", () => {
+    // The guidance layer mounts on `objectives.length > 0` and nothing else
+    // (LessonScene), so gating the legend on the SHADOW CAR's aids left the
+    // teal ribbon, the chevron and the 11 m shaft unnamed on every rung where
+    // the aids are withdrawn — L3, L4 and the exam.
+    expect(CODE).toContain("const guidanceShown = lesson.objectives.length > 0;");
+    expect(CODE).toContain("const legendApplies = compact && !ended && guidanceShown;");
+    expect(CODE).toContain("{!compact && !ended && guidanceShown ? (");
+    // The blue row is the one that really does depend on the aids, and it is the
+    // only one that does.
+    const panel = CODE.slice(CODE.indexOf('data-hud="ribbon-legend"'));
+    const rows = panel.slice(0, panel.indexOf("Minimap"));
+    expect(rows).toContain("{shadowRibbonShown ? (");
+    expect(rows).toContain("синя — пътят на колата-сянка");
+    expect(rows).toContain("зелена — маршрутът до целта");
+    // THE THIRD ROW IS THE FINDING — it must name BOTH unexplained objects.
+    expect(rows).toMatch(/стрелка[^<]*стълб/);
+    // …and the compact line has to carry the same two nouns, or the phone is
+    // still the platform where they go unnamed.
+    const line = CODE.slice(CODE.indexOf('id: "legend"'));
+    const compactLine = line.slice(0, line.indexOf("];"));
+    expect(compactLine).toContain("стрелката");
+    expect(compactLine).toContain("стълб");
+    // It degrades honestly: with no shadow ribbon the sentence may not claim one.
+    expect(compactLine).toContain("shadowRibbonShown ?");
   });
 });

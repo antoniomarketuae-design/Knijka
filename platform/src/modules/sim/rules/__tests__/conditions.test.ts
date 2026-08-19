@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codes, drive, tick } from "./fixtures";
+import { codes, cruise, drive, tick } from "./fixtures";
 
 // limit 50 · rain factor 0.85 → conditionLimit 42.5 · sustain 3 s.
 describe("speed-for-conditions detector", () => {
@@ -102,13 +102,133 @@ describe("speed-for-conditions detector — SNOW", () => {
     expect(codes(drive(ticks).events)).not.toContain("SPEED_TOO_FAST_FOR_CONDITIONS");
   });
 
-  it("snow does NOT arm the fog-lamp or rain-lights duties (no lamp duty on snow)", () => {
+  // O28 — THIS ASSERTION USED TO READ „snow does NOT arm the fog-lamp or
+  // rain-lights duties (no lamp duty on snow)" AND IT CERTIFIED A HOLE. Half of
+  // it was right and stays: снеговалеж does not demand FOG lamps, because
+  // чл. 74, ал. 1 is a permission with a ceiling („може да се използват само
+  // при значително намалена видимост…"), not a duty. The other half asserted
+  // that snow demands no LOW BEAMS either, which чл. 70, ал. 1 contradicts in
+  // as many words — its condition is намалена видимост and it names no
+  // weather. So the low-beam half is now the opposite assertion, and it is
+  // what `snowLights` grades.
+  it("snow does NOT arm the FOG-LAMP duty (чл. 74 permits fog lamps, never requires them)", () => {
     const ticks = [0, 1, 2, 3, 4].map((t) =>
-      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off", fogLightsOn: false }),
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "low", fogLightsOn: false }),
+    );
+    expect(codes(drive(ticks).events)).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+  });
+});
+
+// snowfall + no low beam · sustain = rainLightsSustainSec 3 s (O28, чл. 70 ал. 1).
+//
+// THE TWO DIRECTIONS THE LANE OWES, on the one lesson that compiles snow
+// (`sc-ac-snow`, whose instruction 1 is «Включи късите светлини и потегли
+// меко»): an unlit winter drive must CONVICT, and a lit one must be credited
+// and convicted of nothing the new arm touches.
+describe("lights-in-snow detector (O28)", () => {
+  it("CONVICTS an unlit daytime snowfall drive", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" }),
+    );
+    expect(codes(drive(ticks).events)).toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+
+  it("CREDITS the lit winter drive — the taught drive takes no violation at all", () => {
+    // 22 km/h is under the 25 km/h snow envelope and the lamps are on: the
+    // whole event list must be violation-free, not merely lamp-free. A missing
+    // credit is the founder's own complaint pointing the other way.
+    const ticks = [0, 1, 2, 3, 4, 5, 6].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "low" }),
+    );
+    const violations = drive(ticks).events.filter((e) => e.kind === "violation");
+    expect(violations).toEqual([]);
+  });
+
+  it("prints SNOW copy on the card, never the catalogue's «в дъжд» title", () => {
+    // The reuse of the rain row's CODE is only honest if the card the student
+    // reads names the weather he was actually driving in — the founder's Б1/Б2
+    // defect, which is why `makeViolation`'s override channel exists.
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" }),
+    );
+    const card = drive(ticks).events.find((e) => e.code === "HEADLIGHTS_OFF_IN_RAIN");
+    expect(card?.titleBg).toContain("снеговалеж");
+    expect(card?.titleBg).not.toContain("дъжд");
+    expect(card?.explanationBg).toContain("сняг");
+    expect(card?.explanationBg).not.toContain("Валеше, а");
+  });
+
+  it("keeps the catalogue's severity, points and чл. 70 citation (one duty, one row)", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) =>
+      tick(t, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" }),
+    );
+    const card = drive(ticks)
+      .events.filter((e) => e.kind === "violation")
+      .find((e) => e.code === "HEADLIGHTS_OFF_IN_RAIN");
+    expect(card?.severityClass).toBe("vtorostepenna");
+    expect(card?.points).toBe(1);
+    expect(card?.lawRef).toContain("чл. 70");
+  });
+
+  it("does not fire at the same lamp state without snow (armed exclusively by tick.snow)", () => {
+    const ticks = [0, 1, 2, 3, 4].map((t) => tick(t, { speedKmh: 22, headlights: "off" }));
+    expect(codes(drive(ticks).events)).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+
+  it("does not fire while standing still in the snow (grace to reach the L key)", () => {
+    // sc-ac-snow is handed over DARK — `scene/cabin.ts initialHeadlightsFor`
+    // pre-arms the lamps for night/rain/fog and not for snow — so the seconds
+    // before the student reaches the switch may not be a fault.
+    const ticks = [0, 1, 2, 3, 4].map((t) => tick(t, { speedKmh: 0, snow: true, headlights: "off" }));
+    expect(codes(drive(ticks).events)).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+
+  it("does not fire on a lamp fumble corrected inside the 3 s sustain", () => {
+    const ticks = [
+      tick(0, { speedKmh: 22, snow: true, headlights: "low" }),
+      tick(1, { speedKmh: 22, snow: true, headlights: "off" }),
+      tick(2, { speedKmh: 22, snow: true, headlights: "low" }),
+      tick(3, { speedKmh: 22, snow: true, headlights: "low" }),
+      tick(4, { speedKmh: 22, snow: true, headlights: "low" }),
+    ];
+    expect(codes(drive(ticks).events)).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+
+  it("bills a NIGHT snowfall once, as the основна night fault — never twice", () => {
+    // sc-ac-snow's L5 rung IS a night rung (`l5Night()`), so this is the
+    // shipped composition, not a hypothetical: one dark car, one bill.
+    const ticks = [0, 1, 2, 3, 4, 5].map((t) =>
+      tick(t, { speedKmh: 22, snow: true, isNight: true, headlights: "off" }),
     );
     const got = codes(drive(ticks).events);
-    expect(got).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
+    expect(got).toContain("HEADLIGHTS_OFF_AT_NIGHT");
     expect(got).not.toContain("HEADLIGHTS_OFF_IN_RAIN");
+  });
+
+  it("bills a RAINY snowfall once, and the rain arm owns the card", () => {
+    const ticks = [0, 1, 2, 3, 4, 5].map((t) =>
+      tick(t, { speedKmh: 20, snow: true, rain: true, headlights: "off" }),
+    );
+    const lampCards = drive(ticks).events.filter((e) => e.code === "HEADLIGHTS_OFF_IN_RAIN");
+    expect(lampCards).toHaveLength(1);
+    expect(lampCards[0]?.titleBg).toContain("дъжд");
+  });
+
+  it("suppresses CLEAN_DRIVING while the unlit snow episode is still open", () => {
+    // 61 ticks at 22 km/h ≈ 372 m — well past the 250 m commendation distance.
+    // Without `s.snowLights` in the ongoing-violation list the drive banks a
+    // commendation while its own violation stands open, which is credit read
+    // off the debrief for a fault never corrected.
+    const ticks = cruise(0, 60, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" });
+    const got = codes(drive(ticks).events);
+    expect(got).toContain("HEADLIGHTS_OFF_IN_RAIN");
+    expect(got).not.toContain("CLEAN_DRIVING");
+  });
+
+  it("re-arms only on a genuine correction, so one uncorrected omission bills once", () => {
+    const ticks = cruise(0, 30, { speedKmh: 22, maxSpeedKmh: 50, snow: true, headlights: "off" });
+    const n = codes(drive(ticks).events).filter((c) => c === "HEADLIGHTS_OFF_IN_RAIN").length;
+    expect(n).toBe(1);
   });
 });
 

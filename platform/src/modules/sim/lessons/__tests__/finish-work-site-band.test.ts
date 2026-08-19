@@ -450,6 +450,152 @@ describe("no pose inside an authored work site can ever be in the band", () => {
 });
 
 // ---------------------------------------------------------------------------
+// THE WIDTH BOUND — the assertion this file lost, restored as a BOUND
+// ---------------------------------------------------------------------------
+
+/**
+ * Is this zone's band wider than one margin without having paid for the excess?
+ * A sentence naming where, or null.
+ *
+ * WHY THERE IS A BOUND AT ALL. This file used to carry
+ * `expect(z.radiusM - inner).toBeLessThanOrEqual(FINISH_OUTSIDE_ANNULUS_M)` —
+ * „the band is never wider than one margin" — and O23 made it false: a ring's
+ * band is its AUTHORED (enterRadiusM, exitRadiusM], 13 m on `sc-rb-lane-choice`
+ * and 10 m on four more drills. What replaced it was per-shape VALUE IDENTITY
+ * (`inner === max(workSiteRadiusM, arm)`), which is a true statement about where
+ * the band STARTS and says nothing whatever about where it ends — so a FOURTH
+ * "outside" shape could ship with a 40 m band and pass every other row here.
+ *
+ * WHAT BOUNDS IT INSTEAD. A car stopped in the band has its lesson closed at
+ * FINISH_OUTSIDE_STUCK_S, so every metre of band is ground where standing still
+ * ends a drive. One margin is the width this module draws around a work site on
+ * its own account; beyond that the ground has to be PAID FOR, and the module's
+ * own statement of „he is allowed to be stopped here" is B15's lawful wait.
+ * Hence:
+ *
+ *      the band is never wider than one margin,
+ *      UNLESS every pose in it is inside a B15 freeze window.
+ *
+ * MEASURED 2026-08-19 over the 108 compiled "outside" zones: 48 exceed one
+ * margin, all 48 are rings, and every pose of every one is inside
+ * `roundaboutEntry`'s window; the other 60 are exactly one margin wide (40 turn
+ * boxes, 10 `passSignal`, 10 ring zones on `sc-rb-ped-exit`) and are never
+ * sampled. The ceiling this leaves a ring is YIELD_ROUNDABOUT_APPROACH_M — grown
+ * on `sc-roundabout-entry` a band of 20.0 m passes and 20.5 m does not. So the
+ * ring's 13 m is admitted and a 40 m band is convicted on any shape.
+ */
+function unpaidBandWidth(z: RouteFinishZone, params: readonly ObjectiveParams[]): string | null {
+  const inner = strandedBeyondM(z);
+  const bandM = z.radiusM - inner;
+  if (bandM <= FINISH_OUTSIDE_ANNULUS_M + 1e-9) return null;
+  for (let d = inner + 0.25; d <= z.radiusM + 1e-9; d += 0.5) {
+    const reason = yieldReasonAt(
+      makeTick({ t: 0, speedKmh: 0, position: { x: z.x + d, y: z.y } }),
+      { params, currentIndex: params.length - 1 },
+      [],
+    );
+    if (reason === null) {
+      return `band ${bandM.toFixed(2)} m > one margin, and d = ${d.toFixed(2)} m is inside no lawful wait`;
+    }
+  }
+  return null;
+}
+
+describe("the band's WIDTH is bounded, not merely its inner edge", () => {
+  it("every outside zone in the catalogue: one margin, or ground B15 covers", () => {
+    let checked = 0;
+    let wide = 0;
+    const unpaid: string[] = [];
+    for (const r of RUNGS) {
+      for (const z of outsideZones(r)) {
+        checked++;
+        if (z.radiusM - strandedBeyondM(z) > FINISH_OUTSIDE_ANNULUS_M + 1e-9) wide++;
+        const why = unpaidBandWidth(z, r.params);
+        if (why !== null) unpaid.push(`${r.id}@L${r.level}: ${why}`);
+      }
+    }
+    expect(unpaid).toEqual([]);
+    expect(checked).toBe(108);
+    // The measured population of the EXCEPTION. Without this the row above would
+    // also pass if every band collapsed to one margin — i.e. if the ring's
+    // authored band were quietly inferred away again, which is the O23 defect.
+    expect(wide).toBe(48);
+  });
+
+  it("A FOURTH SHAPE WITH A 40 m BAND GOES RED — on a box and on a ring alike", () => {
+    // The mutation that proves the row above is real. Both hypotheticals are a
+    // shipped zone with its departure circle pushed 40 m past its stated work
+    // site, which is exactly how a new anchor would ship an unbounded band: they
+    // satisfy the per-shape identity row this file replaced the old bound with,
+    // and they are convicted here.
+    for (const [id, level] of [
+      ["sc-maneuver-3point", 1],
+      ["sc-roundabout-entry", 1],
+    ] as const) {
+      const r = rung(id, level);
+      const real = outsideZones(r)[0];
+      const hypothetical: RouteFinishZone = {
+        ...real,
+        radiusM: strandedBeyondM(real) + 40,
+      };
+      const arm = hypothetical.armWithinM ?? hypothetical.radiusM;
+      // The identity row passes it, which is the reason a width bound is needed.
+      expect(strandedBeyondM(hypothetical)).toBe(
+        Math.max(hypothetical.workSiteRadiusM ?? arm, arm),
+      );
+      expect(hypothetical.radiusM - strandedBeyondM(hypothetical)).toBe(40);
+      // And the width bound does not.
+      expect(unpaidBandWidth(hypothetical, r.params)).toMatch(/^band 40\.00 m > one margin/);
+      // …while the real zone it was built from is clean, so the predicate is not
+      // simply convicting everything it is handed.
+      expect(unpaidBandWidth(real, r.params)).toBeNull();
+    }
+  });
+
+  it("the bound's edge on a ring is YIELD_ROUNDABOUT_APPROACH_M, to the half metre", () => {
+    // Neither vacuous nor unbounded, stated as the two adjacent widths rather
+    // than as a claim: the widest band the lawful wait can pay for is exactly one
+    // approach, and the first half-metre past it is unpaid.
+    const r = rung("sc-roundabout-entry", 1);
+    const z = outsideZones(r)[0];
+    const inner = strandedBeyondM(z);
+    const at = (bandM: number): string | null =>
+      unpaidBandWidth({ ...z, radiusM: inner + bandM }, r.params);
+    expect(at(YIELD_ROUNDABOUT_APPROACH_M)).toBeNull();
+    expect(at(YIELD_ROUNDABOUT_APPROACH_M + 0.5)).not.toBeNull();
+    // The widest band the catalogue actually ships, well inside that ceiling.
+    expect(at(13)).toBeNull();
+  });
+
+  it("…and BOTH branches of the bound are carrying real zones", () => {
+    // A disjunction whose second branch is never used is a bound that could be
+    // written more simply; one whose FIRST branch is never used does not
+    // constrain the shapes it was written for. Each is load-bearing, and this row
+    // says so instead of leaving the reader to infer it.
+    const box = rung("sc-maneuver-3point", 1);
+    const bz = outsideZones(box)[0];
+    const midBandM = (strandedBeyondM(bz) + bz.radiusM) / 2;
+    // The turn box sits on branch ONE: exactly one margin wide, and inside no
+    // lawful wait anywhere — drop the width branch and all 40 turn-box zones and
+    // all 10 passSignal zones are convicted.
+    expect(bz.radiusM - strandedBeyondM(bz)).toBe(FINISH_OUTSIDE_ANNULUS_M);
+    expect(
+      yieldReasonAt(
+        makeTick({ t: 0, speedKmh: 0, position: { x: bz.x + midBandM, y: bz.y } }),
+        { params: box.params, currentIndex: box.params.length - 1 },
+        [],
+      ),
+    ).toBeNull();
+    // The ring sits on branch TWO: wider than one margin — drop the freeze branch
+    // and the 48 wide ring zones are convicted, which is precisely why the
+    // universal „never wider than one margin" had to go in the first place.
+    const ring = rung("sc-rb-lane-choice", 1);
+    const rz = outsideZones(ring)[0];
+    expect(rz.radiusM - strandedBeyondM(rz)).toBeGreaterThan(FINISH_OUTSIDE_ANNULUS_M);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // WHAT IT COSTS, PROVED RATHER THAN ASSERTED
 // ---------------------------------------------------------------------------
 

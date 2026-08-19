@@ -65,6 +65,15 @@
  * conditionSpeedSnowFactor 0.5) and the wet-grip physics opt-in
  * (physics.snowGrip → SNOW_GRIP_FACTOR 0.4 → ~2.5× braking distance). Black
  * ice (~0.1–0.2 grip, the AC-08 invisible-hazard CUE) stays Phase-4.
+ *
+ * O28, 2026-08-19 — AND THE SNOW UNLOCK NOW HAS A LAMP CHANNEL TOO. It shipped
+ * without one: the rain arm of `rules/engine.ts` reads `raining` and the fog arm
+ * reads `tick.fog`, so `weather: "snow"` (which compile.ts keeps EXCLUSIVE of
+ * both) reached no lamp detector in any form. `sc-ac-snow` instruction 1 reads
+ * «Включи късите светлини…» and nothing in the product could check it. The
+ * `snowLights` arm grades it against чл. 70, ал. 1 (намалена видимост — the
+ * article names no weather), on the rain row's второстепенна code with SNOWFALL
+ * card copy; see the detector and `SNOW_LIGHTS_COPY` in engine.ts.
  */
 
 /**
@@ -894,21 +903,30 @@ export const SC_AC_SNOW: ScenarioSpec = {
       // ~22 km/h drive satisfies it; the dry-habit 40 km/h cannot pass here
       // without slowing into the winter band.
       //
-      // ── THE ONE LAMP DUTY NOTHING ELSE IN THE PRODUCT GRADES ─────────────
+      // ── THE LAMP DUTY, NOW GRADED IN BOTH CHANNELS ───────────────────────
       // Sweep 161 photographed СВЕТЛИНИ dim throughout with this gate ticked,
       // and re-measured through the production evaluator the gate completes at
       // 21.6 s on the shadow's own path with the lamps forced OFF — the same
       // tenth of a second as the correct drive.
       //
-      // WHY IT MATTERS MORE HERE THAN IN FOG. The rule engine has a lamp
+      // WHY IT MATTERED MORE HERE THAN IN FOG. The rule engine had a lamp
       // detector for rain (HEADLIGHTS_OFF_IN_RAIN) and one for fog
-      // (FOG_LIGHTS_OFF_IN_FOG); it has NONE for snow — `rules/engine.ts` arms
-      // the rain arm on `raining` and the fog arm on `tick.fog`, and neither
-      // reads `tick.snow`. So on this drill, instruction 1 („Включи късите
-      // светлини") was an order the whole product never checked in any channel:
-      // no violation, no card, and a green tick over an unlit car. The missing
-      // detector is routed to the rules lane; this gate is what makes the order
-      // real today, and the banner now names it so the refusal is legible.
+      // (FOG_LIGHTS_OFF_IN_FOG) and NONE for snow — the rain arm reads
+      // `raining`, the fog arm reads `tick.fog`, and neither read `tick.snow`.
+      // So on this drill, instruction 1 („Включи късите светлини") was an order
+      // the whole product never checked in any channel: no violation, no card,
+      // and a green tick over an unlit car.
+      //
+      // O28 (2026-08-19) CLOSED THE GRADER HALF: `engine.ts`'s `snowLights` arm
+      // now bills the omission against чл. 70, ал. 1 with SNOWFALL card copy.
+      // BOTH halves are needed and neither is redundant — this gate REFUSES the
+      // objective (no credit for a skill the drive did not show) while the
+      // violation EXPLAINS it (THEO-4: a refused gate with no card is the bare
+      // verdict the requirement forbids). MEASURED on the real drive: the
+      // recorded shadow script with its `headlights` step flipped to "off"
+      // grades exactly one violation, «Движение в снеговалеж без светлини» at
+      // t = 3.63 s (1 pt, ЗДвП чл. 70, ал. 1); lit, it grades zero and earns
+      // CLEAN_DRIVING.
       //
       // DEMANDED THROUGH THE BANNER — see the twin note on `sc-acf-adapted` for
       // why the authored `requireLamps` key does not typecheck from a template.

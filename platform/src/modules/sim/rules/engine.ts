@@ -205,6 +205,13 @@ export interface RuleEngineState {
   rainLights: EpisodeState;
   /** Driving in FOG without front fog lamps (AC-03, чл. 74). */
   fogLights: EpisodeState;
+  /**
+   * Driving in SNOWFALL without low beams (AC-08, чл. 70, ал. 1) — the third
+   * arm of the same duty `rainLights` carries, on the third weather flag.
+   * See the detector for why it is a separate episode rather than a widened
+   * `raining` term, and O28 for how long the product had none.
+   */
+  snowLights: EpisodeState;
   following: EpisodeState;
   wrongWay: EpisodeState;
   keepRight: EpisodeState;
@@ -533,6 +540,49 @@ const JUNCTION_SCAN_COPY = {
   },
 } as const;
 
+/**
+ * O28 — SNOWFALL copy for the low-beam duty the `snowLights` detector grades.
+ *
+ * WHY IT RIDES AN EXISTING CODE. The duty is ONE duty. Retrieved from the
+ * ingested act (content/law/acts/zdvp.json, чл. 70, ал. 1), verbatim: „При
+ * движение през нощта И ПРИ НАМАЛЕНА ВИДИМОСТ моторните превозни средства…
+ * трябва да бъдат с включени къси или дълги светлини…" — the article's
+ * operative condition is намалена видимост, and it names no weather at all.
+ * Снеговалеж is one of the conditions the same act lists as producing it
+ * (чл. 74, ал. 1: „…значително намалена видимост поради мъгла, СНЕГОВАЛЕЖ,
+ * дъжд или други подобни условия"). So snow is not a second law, it is the
+ * third weather flag under one law — and HEADLIGHTS_OFF_IN_RAIN is already
+ * that law's второстепенна row, cited to чл. 70, ал. 1 and classified Н38
+ * б. „б". A new code would duplicate the row, not the rule.
+ *
+ * THE CODE IS AN IDENTIFIER; THE CARD IS THE PRODUCT. The catalogue carries one
+ * title per code and that title says „в дъжд", so the founder's Б1/Б2 defect
+ * would repeat verbatim: a card reading «Движение в дъжд без светлини» over a
+ * snow frame. These overrides ride `makeViolation`'s existing
+ * `titleBg`/`explanationBg` channel — the same channel and the same reason as
+ * JUNCTION_SCAN_COPY above. No new event field, no severity or points change.
+ *
+ * `correctiveBg` HAS NO PER-EVENT CHANNEL (read from the catalogue BY CODE at
+ * display time — see the JUNCTION_SCAN_COPY note). The catalogue's is „тръгнат
+ * ли чистачките, светват и късите светлини". MEASURED before reusing it rather
+ * than assumed: the snow preset is a SNOWFALL veil, not dry packed snow —
+ * `environment/presets.ts snowWeather` is authored at density 0.012 (~40 %
+ * transmittance at 80 m) and `SnowFlakes` fall through it, so the wipers are
+ * running and the corrective lands on target. It is the only student-facing
+ * string this reuse does not get to restate; `n38.ts`'s rationale mentions rain
+ * but reaches no surface (`examMarkFor` publishes clause + quote only).
+ *
+ * ROUTED, NOT SILENTLY ACCEPTED: renaming the code to something
+ * condition-neutral (HEADLIGHTS_OFF_IN_LOW_VISIBILITY) is the honest end state
+ * and touches rules/types.ts + catalog.ts + n38.ts + consequences.ts +
+ * scenarios/mapping.ts + world/referents.ts, none of which is this lane's.
+ */
+const SNOW_LIGHTS_COPY = {
+  titleBg: "Движение в снеговалеж без светлини",
+  explanationBg:
+    "Валеше сняг, а караше без къси светлини. Снегът е намалена видимост точно както дъждът и мъглата: платното още се вижда, но сивата кола в бялото се губи и насрещният те забелязва секунди по-късно, отколкото ти се струва. При намалена видимост колата се движи с включени къси светлини — не толкова за да виждаш, колкото за да те виждат.",
+} as const;
+
 export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngineState {
   return {
     config: { ...DEFAULT_RULE_CONFIG, ...config },
@@ -559,6 +609,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     conditionsSpeed: { ...IDLE_EPISODE },
     rainLights: { ...IDLE_EPISODE },
     fogLights: { ...IDLE_EPISODE },
+    snowLights: { ...IDLE_EPISODE },
     following: { ...IDLE_EPISODE },
     wrongWay: { ...IDLE_EPISODE },
     keepRight: { ...IDLE_EPISODE },
@@ -612,6 +663,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     conditionsSpeed: { ...s.conditionsSpeed },
     rainLights: { ...s.rainLights },
     fogLights: { ...s.fogLights },
+    snowLights: { ...s.snowLights },
     following: { ...s.following },
     wrongWay: { ...s.wrongWay },
     keepRight: { ...s.keepRight },
@@ -1485,6 +1537,43 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     events.push(makeViolation("FOG_LIGHTS_OFF_IN_FOG", t));
   }
 
+  // Lights in SNOWFALL (O28, чл. 70, ал. 1 — the third arm of the low-beam
+  // duty; see SNOW_LIGHTS_COPY for the retrieved article and why it reuses the
+  // rain row's code rather than adding a second one for the same rule).
+  //
+  // WHAT WAS MEASURED, 2026-08-19. The rain arm above reads `raining`, the fog
+  // arm reads `tick.fog`, and NEITHER reads `tick.snow` — so `sc-ac-snow`, the
+  // only lesson in the catalogue that compiles `weather: "snow"` (and compile.ts
+  // makes the weathers EXCLUSIVE: rain/fog/snow are three separate booleans, so
+  // tick.rain and tick.fog are both false there), had no lamp channel in any
+  // form. Not a dead detector nothing armed — `grep -rn SNOW rules/` found no
+  // episode, no code and no config: the channel did not exist. Its instruction 1
+  // reads «Включи късите светлини и потегли меко» — an order the grader could
+  // not check — and `__tests__/conditions.test.ts` carried an assertion titled
+  // „no lamp duty on snow" that certified the hole as intended. Round 5's
+  // objective-side lamp gate made the order refusable; this makes it teachable,
+  // because a refused gate with no card is the bare verdict THEO-4 forbids.
+  //
+  // THE THREE EXCLUSIONS, each answering a false-positive rather than tidiness:
+  //  - `!tick.isNight` — verbatim the rain arm's own reason: night is covered by
+  //    HEADLIGHTS_OFF_AT_NIGHT (основна), and sc-ac-snow's L5 rung IS a night
+  //    rung (`l5Night()`), so without this the winter lesson's hardest level
+  //    would bill one dark car twice.
+  //  - `!raining` — a rainy snowfall is one omission of one switch. The rain arm
+  //    fires there and its copy is true, so this arm stays silent: the same
+  //    one-bill-per-act discipline the conditions factor gets from MIN.
+  //  - `moving` + the shared `rainLightsSustainSec` grace — a car handed over
+  //    dark (`scene/cabin.ts initialHeadlightsFor` returns "low" for
+  //    night/rain/fog and NOT for snow, so sc-ac-snow IS handed over dark) must
+  //    have the same seconds to reach L that the rain drill gets. No new config
+  //    knob: one reduced-visibility duty, one grace.
+  const snowNoLights = snowy && !raining && !tick.isNight && tick.headlights === "off" && moving;
+  if (
+    stepEpisode(s.snowLights, snowNoLights, !snowy || tick.headlights !== "off", t, cfg.rainLightsSustainSec)
+  ) {
+    events.push(makeViolation("HEADLIGHTS_OFF_IN_RAIN", t, SNOW_LIGHTS_COPY));
+  }
+
   // Following distance (2-second rule) — only above stop-and-go speed, when a
   // lead vehicle is actually in the tick's gap channel, only below the grace
   // ratio of the taught 2-second target, and never while the gap is already
@@ -2151,6 +2240,10 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     s.conditionsSpeed,
     s.rainLights,
     s.fogLights,
+    // O28: without this row a snow drive that is STILL unlit keeps banking
+    // CLEAN_DRIVING metres while its own violation stands open — the reassuring
+    // direction again, and a commendation is credit read off the debrief.
+    s.snowLights,
     s.following,
     s.wrongWay,
     s.keepRight,

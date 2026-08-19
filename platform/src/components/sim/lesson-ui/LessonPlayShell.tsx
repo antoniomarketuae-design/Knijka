@@ -593,7 +593,7 @@ function readStoredMinimapOn(): boolean {
 // marker — LessonScene RouteGuidance), so a banner restating it forever is
 // furniture. It speaks when the objective changes and retires; „Задача" in the
 // micro menu brings it back on demand, for free, whenever the student wants it.
-const TASK_ANNOUNCE_MS = 7000;
+export const TASK_ANNOUNCE_MS = 7000;
 /** The advisor's next-action prompt — long enough to read and act on. */
 const ADVISOR_ANNOUNCE_MS = 6000;
 /** „✓ Задача 2 изпълнена" — a beat of praise, not a panel. */
@@ -603,7 +603,7 @@ const PRAISE_ANNOUNCE_MS = 2600;
  *  „only makes the user nervous"). */
 const WARNING_ANNOUNCE_MS = 5000;
 /** The two-ribbon colour legend: said once at the start of a guided rung. */
-const LEGEND_ANNOUNCE_MS = 8000;
+export const LEGEND_ANNOUNCE_MS = 8000;
 
 /**
  * Is `key` still within its announcement window?
@@ -1081,6 +1081,65 @@ export function notifyColumnCapPx(stageHeightPx: number, columnTopPx: number): n
     0,
     stageHeightPx - columnTopPx - ROOMY_HUD_FLOOR_PX - NOTIFY_COLUMN_BAND_GUTTER_PX,
   );
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * HOW MANY PIXELS OF THE GRADED FAULT THE COLUMN CUTS — „the separate defect,
+ * routed below" that the cap's own comment names and nothing ever routed.
+ *
+ * SEVEN BROKEN FINDINGS, ONE SENTENCE. sweep 161, roomy leg, every one of them
+ * about the LAST card in the notification column:
+ *
+ *   sc-pk-ban-stop/pc-wrong/04-t023s   — «the ОПАСНА ГРЕШКА card is cut off by
+ *     the bottom edge of the simulator viewport IN MID-SENTENCE … The student is
+ *     shown half a sentence about a 10-point dangerous error.»
+ *   sc-sp-limit-end/pc-wrong/04-t017s  — «the violation card that explains the
+ *     dangerous error is cut off … The one card that carries the „why" is the
+ *     one that cannot be read to the end.» (Verified by eye: the last visible
+ *     line is «означава директно неиздържан» with the glyph tops of «изпит»
+ *     sliced through, on a −10 ОПАСНА ГРЕШКА.)
+ *   plus sc-sp-eco-coast, sc-sp-wet-limit-plate, sc-vu-emergency,
+ *   sc-merge-from-property and sc-ln-obstacle-meeting, in the same words.
+ *
+ * THE MECHANISM IS FLEXBOX, AND IT IS DELIBERATE UP TO THE LAST STEP. The
+ * column is `overflow-hidden` under `notifyColumnCapPx`. Of its children only
+ * `BriefingCard` carries `min-h-0`, so it is the only one that CAN shrink — and
+ * that yield order is correct and argued for at the card („a graded fault, or the
+ * task itself, must never be the thing that yields to a briefing the student has
+ * already read"). What was never written is what happens AFTER the briefing has
+ * given up everything it has: flexbox freezes every remaining item at its content
+ * height, the column overflows, and `overflow-hidden` takes the difference out of
+ * the LAST child — the toast stack. Silently. Mid-word.
+ *
+ * MEASURED ON THE SWEEP'S OWN STAGE (1165 × 650 at 1440 × 900 `?chrome=dashboard`,
+ * column top 164 ⇒ cap 322): objective banner 52 + two 240 px fault cards +
+ * 2 × 6 px of `gap-1.5` = 544, against 322. **222 px cut** — the whole of the
+ * second card and a third of the first. `visibleToasts` shows two cards by
+ * design (one in „по-тихи известия"), so this is not an edge case, it is the
+ * ordinary state of a lesson where two things went wrong.
+ *
+ * THE FIX IS NOT „SHOW FEWER CARDS" — dropping a graded fault to make the box
+ * fit is the false certificate this audit exists to find. The toast stack becomes
+ * the column's LAST-RESORT yielder: it scrolls, with the painted bar the product's
+ * other three HUD scrollers use and a counted „↓ още N" row outside it, so nothing
+ * is ever cut and nothing is ever hidden in silence. This function is the
+ * measurement, kept as arithmetic so the test can watch both directions.
+ *
+ * @param capPx           `notifyColumnCapPx` for the stage
+ * @param unshrinkablePx  the children that keep `min-height: auto` — the
+ *                        objective banner and the advisor card
+ * @param toastStackPx    natural height of the toast stack
+ * @param gapsPx          the column's own `gap-1.5` between the children present
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function notifyColumnCutPx(
+  capPx: number,
+  unshrinkablePx: number,
+  toastStackPx: number,
+  gapsPx: number,
+): number {
+  return Math.max(0, unshrinkablePx + toastStackPx + gapsPx - capPx);
 }
 
 /**
@@ -2923,12 +2982,90 @@ export function LessonPlayShell({
     compact && !ended && warnings.length > 0 ? `warn:${telltaleWarningsKey(warnings)}` : null;
   const warningFresh = useFreshKey(warningKey, WARNING_ANNOUNCE_MS);
 
-  const legendApplies =
-    compact &&
-    !ended &&
-    (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
-    lesson.objectives.length > 0;
-  const legendKey = legendApplies ? `legend:${sceneEpoch}` : null;
+  /**
+   * ── WHAT THE LEGEND HAS TO NAME, AND WHY ITS OLD GATE WAS THE WRONG ONE ────
+   *
+   * Two more sweep-161 findings on the same layer, both on the phone:
+   *
+   *   `sc-junction-blind/mobile-right/04-t065s.png` — „a huge white chevron «◀»
+   *     floats in the middle of the sky above the road … with no label or
+   *     legend. It appears in every mid-drive frame of this lesson and in
+   *     sc-jx-equal-left too."
+   *   `sc-jx-equal-left/mobile-right/04-t039s.png` — „a vertical cyan beam of
+   *     light rises out of the middle of the carriageway into the sky at the
+   *     junction, with no legend anywhere. Next to it the giant white «◀»
+   *     chevron floats in mid-air. Two unexplained symbols dominating the view a
+   *     learner is supposed to be reading for traffic."
+   *
+   * The chevron and the beam are RouteGuidance's turn arrow and objective
+   * marker, and `LessonScene` mounts that layer on `objectives.length > 0` and
+   * nothing else. The legend was gated on `aids.shadowCar || aids.pathRibbon`,
+   * which is the gate for the BLUE shadow ribbon — so on any rung where the
+   * aids are withdrawn (L3/L4, and the exam), the teal ribbon, the floating
+   * arrow and the eleven-metre beam were all on the glass with nothing naming
+   * them, on BOTH platforms. The blue row still needs the aids; nothing else
+   * does.
+   */
+  const shadowRibbonShown =
+    lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true;
+  const guidanceShown = lesson.objectives.length > 0;
+  const legendApplies = compact && !ended && guidanceShown;
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE LEGEND HAD NEVER BEEN ON A PHONE — sweep 161, sc-ln-obstacle-meeting.
+   *
+   * «The two glowing road ribbons are explained on PC by a legend (синя — пътят
+   * на колата-сянка / зелена — маршрутът до целта) but that legend does not
+   * exist anywhere on mobile. A phone student sees a green and a blue river of
+   * light on the tarmac with nothing telling him which to follow.»
+   *
+   * The reviewer is right, and the panel below says why in as many words: „ROOMY
+   * ONLY: compact says this once, as a line, at the start of the rung (the
+   * `legend` overlay candidate)". The candidate exists. It had simply never won.
+   *
+   * THE ARITHMETIC, off `overlayQueue.ts`'s own table: `legend` is priority 10,
+   * the lowest of ten kinds, and `LEGEND_ANNOUNCE_MS` is 8 000 ms measured from
+   * `sceneEpoch` — i.e. from the frame the scene mounts. On that frame the
+   * BRIEFING is up (`hint`, priority 60) and it is `blocking`, so it stays until
+   * «Разбрах»; the pre-drive checklist behind it is `predrive`, priority 40, and
+   * it stays until the thirteenth step; and the task line that follows is
+   * `task`, priority 20, fresh for 7 000 of the legend's own 8 000 ms. There is
+   * no order of events in which a phone student sees this line. Not „rarely" —
+   * never, on any lesson, at any tier.
+   *
+   * So the window may not start at the mount. It starts on the first frame the
+   * queue is otherwise SILENT — nothing blocking, nothing fresh, no teach
+   * moment, no toast — which is the only moment a priority-10 line was ever
+   * going to be heard, and is also exactly when the two ribbons are the loudest
+   * unexplained thing on the glass. `useFreshKey` then does the rest: the key
+   * goes non-null on that frame, it gets its 8 000 ms, and it does not re-open
+   * for a key that has not changed.
+   *
+   * IT CAN COME BACK ONCE, AND THAT IS THE CHOICE, not an oversight. If a fault
+   * card arrives at second three the key goes null, the timer is cleared, and the
+   * next silent stretch opens the window again. A latch would have made it „said
+   * once" literally — and „once" would then mean „three seconds, interrupted, and
+   * never again", on the one sentence that says what the two rivers of light on
+   * the road are. Re-opening costs a `legend`-priority line that yields to
+   * everything, and it requires a full noisy→silent transition to happen at all.
+   * (It is also the shape that keeps this out of a `useRef` read during render,
+   * which `react-hooks/refs` is right to refuse: a latch read at render time is a
+   * value React is not tracking, on a surface that repaints every 150 ms.)
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  const legendQueueSilent =
+    legendApplies &&
+    !briefingOpen &&
+    snap.phase === "driving" &&
+    !taskFresh &&
+    !advisorFresh &&
+    !warningFresh &&
+    !praiseFresh &&
+    teachQueue.length === 0 &&
+    toasts.length === 0 &&
+    activeQuiz === null &&
+    consequence === null;
+  const legendKey = legendQueueSilent ? `legend:${sceneEpoch}` : null;
   const legendFresh = useFreshKey(legendKey, LEGEND_ANNOUNCE_MS);
 
   // A micro-quiz and the THEO-3 consequence card are INTERACTIVE PAUSES: they
@@ -3232,13 +3369,20 @@ export function LessonPlayShell({
               }
             : null,
 
-        // 8. Which coloured line is which — said once, at the start.
+        // 8. Which coloured line is which, and what the arrow and the beam of
+        //    light are — said once, on the first quiet frame (see `legendKey`).
         legendFresh
           ? {
               id: "legend",
               kind: "legend" as const,
               tone: "neutral" as const,
-              lineBg: "Синя линия — колата-сянка · зелена — маршрутът до целта",
+              // „целта", never „точката": `rules/__tests__/point-scales.test.ts`
+              // is right to refuse the second one — a bare „точка" on a driving
+              // surface reads as КОНТРОЛНИ точки, the licence budget, which is
+              // the one misreading this whole vocabulary exists to prevent.
+              lineBg: `${
+                shadowRibbonShown ? "Синя линия — колата-сянка · зелена" : "Зелената линия"
+              }, стрелката и светлинният стълб — маршрутът и целта, до която караш`,
             }
           : null,
       ];
@@ -3319,6 +3463,66 @@ export function LessonPlayShell({
     if (content !== null) ro.observe(content);
     return () => ro.disconnect();
   }, [debriefOpen, measureEndScroll]);
+  // -- …AND THE TOAST STACK SAYS THE SAME THING ---------------------------------
+  //
+  // The affordance half of `notifyColumnCutPx`. Counted in CARDS rather than
+  // pixels, for the reason `BriefingCard` counts steps: a card is the unit the
+  // student is looking for, and „one more fault is down there" is a sentence,
+  // where „82 px remain" is not.
+  //
+  // The rows are read off `[data-hud="toasts"]`'s children — `HudToasts` owns
+  // that box, so this measures what is actually painted rather than a shape
+  // guessed at from here. The two helpers are the ones the briefing already
+  // uses, including `listRowsInScrollCoords`, which exists because
+  // `li.offsetTop` is measured against the nearest POSITIONED ancestor and this
+  // scroller is not one.
+  const toastScrollRef = useRef<HTMLDivElement | null>(null);
+  const [toastsBelowFold, setToastsBelowFold] = useState(0);
+  const measureToastFold = useCallback(() => {
+    const el = toastScrollRef.current;
+    if (el === null) return;
+    const stack = el.querySelector('[data-hud="toasts"]');
+    if (stack === null) {
+      setToastsBelowFold(0);
+      return;
+    }
+    const listTop = el.getBoundingClientRect().top;
+    setToastsBelowFold(
+      rowsBelowFold(
+        listRowsInScrollCoords(
+          listTop,
+          el.scrollTop,
+          Array.from(stack.children).map((card) => {
+            const r = (card as HTMLElement).getBoundingClientRect();
+            return { top: r.top, height: r.height };
+          }),
+        ),
+        el.scrollTop,
+        el.clientHeight,
+      ),
+    );
+  }, []);
+  useEffect(() => {
+    const el = toastScrollRef.current;
+    if (el === null) return;
+    if (typeof ResizeObserver === "undefined") {
+      measureToastFold();
+      return;
+    }
+    const ro = new ResizeObserver(measureToastFold);
+    ro.observe(el);
+    // THE BOX AND THE CONTENT, both — the same trap the debrief's observer
+    // names. This scroller's own height changes when the briefing yields, and
+    // its CONTENT changes when a second fault arrives; only one of those two
+    // resizes the scroller.
+    const stack = el.querySelector('[data-hud="toasts"]');
+    if (stack !== null) ro.observe(stack);
+    return () => ro.disconnect();
+    // `toasts` is in the deps because a new card mounts a new `[data-hud=…]`
+    // box: `HudToasts` returns null with nothing to show, so the element the
+    // observer needs does not exist until the first fault.
+  }, [measureToastFold, toasts, toastsQuiet, compact]);
+
   const skipDebrief = useCallback(() => {
     setEndExpanded(false);
     setEndSkipped(true);
@@ -4156,12 +4360,67 @@ export function LessonPlayShell({
               in every mode — that is the whole product (THEO-4), and it is
               praise, never teaching, that quiet mode drops. */}
           {compact ? null : (
-            <HudToasts
-              toasts={toasts}
-              quiet={toastsQuiet}
-              onDismiss={dismiss}
-              onDismissAll={clear}
-            />
+            <>
+              {/* ── THE LAST-RESORT YIELDER, AND IT SCROLLS RATHER THAN BEING
+                  CUT — `notifyColumnCutPx` carries the seven findings and the
+                  222 px it measured on the sweep's own stage.
+
+                  `min-h-0` is what lets this box shrink at all; `[flex-shrink:0.05]`
+                  is what keeps the YIELD ORDER the briefing card argues for.
+                  Flexbox distributes a deficit in proportion to (base size ×
+                  shrink factor), so with the briefing at the default 1 on ~230 px
+                  and this stack at 0.05 on ~490 px the briefing absorbs 90 % of the
+                  first pixel of pressure — nine pixels of briefing for every one of
+                  fault — and only once the briefing has frozen at zero does the
+                  remainder come here. A graded fault still never yields to a
+                  briefing; it simply stops being guillotined once there is nothing
+                  else left to give.
+
+                  AND THE ARBITRARY PROPERTY WAS VERIFIED TO COMPILE, not assumed
+                  to: a Tailwind class that the scanner declines to emit would
+                  leave a green wiring test over CSS that never shipped, which is
+                  this project's signature failure. Compiled with the repo's own
+                  tailwindcss v4.3.3 against a fixture holding this exact class
+                  and the output carries `.\[flex-shrink\:0\.05\] { flex-shrink:
+                  0.05 }`. (The fixture was scratch and is not in the tree.)
+
+                  `pointer-events-none` does not make the scroller unreachable: it
+                  suppresses hit-testing on THIS box, while the cards inside are
+                  `pointer-events-auto`, and wheel scrolling chains up the
+                  containing-block chain regardless. This is the roomy leg only
+                  (`compact` hides the whole column), so the input is a mouse
+                  wheel. ─────────────────────────────────────────────────────*/}
+              <div
+                ref={toastScrollRef}
+                onScroll={measureToastFold}
+                data-hud-toast-scroller=""
+                className="pointer-events-none flex min-h-0 flex-col overflow-y-auto [flex-shrink:0.05] [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
+              >
+                <HudToasts
+                  toasts={toasts}
+                  quiet={toastsQuiet}
+                  onDismiss={dismiss}
+                  onDismissAll={clear}
+                />
+              </div>
+              {/* OUTSIDE the scroller, `shrink-0`, and it exists only while
+                  something really is below the fold — the same three properties
+                  the briefing's counter has, and for the same reason: a counter
+                  that covers the sentence it is counting was filed twice in this
+                  sweep. WebKit's overlay bar exists only during a scroll and the
+                  harness runs Chromium with `--hide-scrollbars`, so a measured
+                  sentence is the only affordance both the student and the
+                  instrument can see. */}
+              {toastsBelowFold > 0 ? (
+                <p
+                  aria-live="polite"
+                  className="shrink-0 text-right text-[9px] font-black uppercase tracking-wider text-warning"
+                >
+                  ↓ още {toastsBelowFold}{" "}
+                  {toastsBelowFold === 1 ? "известие" : "известия"}
+                </p>
+              ) : null}
+            </>
           )}
         </div>
 
@@ -4260,10 +4519,9 @@ export function LessonPlayShell({
         {/* ROOMY ONLY: compact says this once, as a line, at the start of the
             rung (the `legend` overlay candidate) instead of parking a panel on
             the left rail for the whole drive. */}
-        {!compact &&
-        !ended &&
-        (lesson.aids?.shadowCar === true || lesson.aids?.pathRibbon === true) &&
-        lesson.objectives.length > 0 ? (
+        {/* …AND ITS GATE IS THE GUIDANCE LAYER'S GATE, not the shadow car's —
+            see `shadowRibbonShown` above for the two frames that forced it. */}
+        {!compact && !ended && guidanceShown ? (
           <div
             // NAMED, 2026-08-10, and the naming is the finding. This legend
             // stands on the same floor and the same 0.75 rem left gutter as the
@@ -4286,15 +4544,17 @@ export function LessonPlayShell({
                 inside a ghost, and these two swatches ARE the information —
                 the legend says „the BLUE line is the shadow car", so a
                 colourless swatch turns the whole legend into a riddle. */}
-            <span>
-              <span
-                aria-hidden
-                data-hud-ink=""
-                className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
-                style={{ background: "#3f8cff" }}
-              />
-              синя — пътят на колата-сянка
-            </span>
+            {shadowRibbonShown ? (
+              <span>
+                <span
+                  aria-hidden
+                  data-hud-ink=""
+                  className="mr-1 inline-block h-1.5 w-3.5 rounded-full align-middle"
+                  style={{ background: "#3f8cff" }}
+                />
+                синя — пътят на колата-сянка
+              </span>
+            ) : null}
             <span>
               <span
                 aria-hidden
@@ -4303,6 +4563,23 @@ export function LessonPlayShell({
                 style={{ background: "var(--accent-2)" }}
               />
               зелена — маршрутът до целта
+            </span>
+            {/* THE THIRD ROW IS THE FINDING. The arrow and the marker shaft were
+                never named anywhere, on either platform — a learner reading the
+                junction for traffic had a floating chevron and an eleven-metre
+                beam of light in his forward view and no sentence about either.
+                They are the SAME teal as the route on purpose, so the swatch is
+                the glyph rather than a colour chip. */}
+            <span>
+              <span
+                aria-hidden
+                data-hud-ink=""
+                className="mr-1 inline-block w-3.5 text-center align-middle text-[10px] leading-none"
+                style={{ color: "var(--accent-2)" }}
+              >
+                ◤
+              </span>
+              стрелка и стълб светлина — завоят и целта по маршрута
             </span>
           </div>
         ) : null}

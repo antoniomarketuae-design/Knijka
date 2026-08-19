@@ -9,6 +9,34 @@
  *   is LANE_SWITCH_DEADBAND_M past the lane boundary.
  * - > OFF_ROAD_DISTANCE_M (30 m) from every centerline ⇒ edgeId null.
  *
+ * THAT LAST LINE IS THE WHOLE OFF-ROAD CONTRACT AND ITS MARGIN IS 0.645 m
+ * (O22, measured 2026-08-19 — `__tests__/off-network-headroom.test.ts` pins it).
+ * `edgeId === null` is the runtime's only statement of „this car is nowhere",
+ * and it is consumed as one: the C1 lane basis, the finish module's off-network
+ * ending, the HUD locate. It reads like a generous threshold — 30 m is nearly
+ * four lane pitches at the 2.5× perceptual scale — and over the shipped world it
+ * is not. Swept the FULL drivable half-width (travel lanes AND the kerbside
+ * parking band) of every drawn ribbon on all 105 districts, 96,908 poses:
+ *      travel-lane centre     worst 20.313 m   (district-v1, 6-lane arterial)
+ *      parking-band centre    worst 29.355 m   (district-v1 e672186635.0,
+ *                                              бул. Свети Климент Охридски,
+ *                                              5 lanes + 4 m kerb band)
+ *      ribbon edge            worst 28.607 m
+ *      248 authored spawns    worst 20.310 m   (ln-arrows-v1/ln-spawn-south)
+ * Zero of the 96,908 read off-road — the contract holds today — but a car parked
+ * legally at that kerb is 0.645 m from being declared out of the world, and
+ * `ln-arrows-v1` is 1.625 m behind it.
+ *
+ * WHAT GOES QUIET THE MOMENT THE FIX DOES GO NULL, because it is more than one
+ * field (`worldRuntime.sample`, the `edgeRt === null` branch): `laneCount` drops
+ * to 1, `maxSpeedKmh` falls back to the district default, `wrongWay` is forced
+ * false, the М10 lane arrow is not resolved, and no authored ban / paint / rail
+ * / curve span is consulted at all. So an arterial authored one metre wider than
+ * бул. Свети Климент Охридски would silently disable lane grading on its own
+ * kerb band rather than fail anything. The ratchet exists for that, and the
+ * threshold itself is deliberately NOT touched here: it lives in `spatial.ts`
+ * and moving it would move grading on every district at once.
+ *
  * Lane model (until wave-2 lane topology, doc 17 §7): lanes are procedural
  * bands of LANE_WIDTH_M around the OSM centerline. Oneway edges center the
  * full bank on the polyline; two-way edges put `lanesPerDir` lanes on each

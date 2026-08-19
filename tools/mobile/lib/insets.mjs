@@ -87,16 +87,91 @@ import { contextOptions } from "./devices.mjs";
 
 export const ROTATIONS = ["symmetric", "left", "right"];
 
+const SIDES = ["top", "right", "bottom", "left"];
+
+/**
+ * A PROFILE THAT DOES NOT DECLARE ITS SAFE AREA IS REFUSED, BY NAME —
+ * 2026-08-19.
+ *
+ * The door below checked its OPTIONS and never the PROFILE it was handed.
+ * `device.safeArea` went straight into `sa.left`, so:
+ *   * a profile with no `safeArea` at all died with `TypeError: Cannot read
+ *     properties of undefined (reading 'left')` — a crash that names no cause
+ *     and reads like a harness bug rather than a missing measurement;
+ *   * a profile carrying `safeArea: {}` did NOT die. It substituted the string
+ *     `undefinedpx` into every declaration, which the CSSOM DROPS SILENTLY —
+ *     i.e. the page lays out with LESS padding than any phone has, the exact
+ *     notchless layout this file exists to end, arriving THROUGH the door
+ *     instead of round it.
+ *
+ * It matters now because a profile no longer always comes from `DEVICES`. Four
+ * probes in this directory legitimately derive one locally — three desktop rows
+ * (deck-captions, wave5-card-text, wave5-landscape-burial) and, since today,
+ * `zoom-follows-window.mjs`, which measures the founder's iPhone 16 PRO at
+ * 402x874, a viewport the ladder still does not carry. Deriving is fine.
+ * Forgetting the notch has to be an ERROR, not a zero.
+ *
+ * AND ZERO IS NOT MISSING. That distinction is the whole check. Both Android
+ * rows declare `{0,0,0,0}` on purpose and devices.mjs argues for them at length
+ * — they are the control that proves the emulation is doing something on the
+ * other rows — and a desktop profile's zeros are simply true. A check that
+ * rejected zeros would be a false refusal aimed at the most honest rows in the
+ * set. So the requirement is four FINITE NUMBERS, any of which may be 0.
+ *
+ * @param {unknown} device
+ */
+function assertProfile(device) {
+  if (!device || typeof device !== "object") {
+    throw new Error(
+      `[mobile-harness] insetsFor(device) got ${JSON.stringify(device)} — no device profile. ` +
+        `Profiles come from lib/devices.mjs; a probe that derives one locally still has to declare ` +
+        `every field this reads.`,
+    );
+  }
+  const id = device.id ? String(device.id) : "<profile with no id>";
+  const sa = device.safeArea;
+  if (!sa || typeof sa !== "object") {
+    throw new Error(
+      `[mobile-harness] device profile "${id}" declares no safeArea. A profile that does not model ` +
+        `the cutout is not modelling the device. Zero IS allowed — both Android rows and the desktop ` +
+        `rows are 0/0/0/0 on purpose — but it must be written down. ABSENT is not a measurement.`,
+    );
+  }
+  const missing = SIDES.filter((side) => !Number.isFinite(sa[side]));
+  if (missing.length > 0) {
+    throw new Error(
+      `[mobile-harness] device profile "${id}" has no finite safeArea.${missing.join("/")} ` +
+        `(${missing.map((side) => `${side}=${JSON.stringify(sa[side])}`).join(", ")}). Every side is ` +
+        `required because a missing one is substituted into the page as the literal "undefinedpx", ` +
+        `which the CSSOM drops without an error — so the declaration disappears and the run measures ` +
+        `a layout with LESS padding than any real device has.`,
+    );
+  }
+  if (device.orientation !== "portrait" && device.orientation !== "landscape") {
+    throw new Error(
+      `[mobile-harness] device profile "${id}" has orientation ${JSON.stringify(device.orientation)} — ` +
+        `must be "portrait" or "landscape". This one fails SILENTLY if it is not checked: \`rotation\` ` +
+        `is only honoured when the orientation reads "landscape", so a typo hands back the SYMMETRIC ` +
+        `insets, the banner prints no rotation, and the run answers a different question than the one ` +
+        `it was asked.`,
+    );
+  }
+}
+
 /**
  * The insets to emulate for a profile.
  *
  * `none` is the OLD behaviour — every historical number in this repo was taken
- * this way — and it is kept only so a run can reproduce one deliberately.
+ * this way — and it is kept only so a run can reproduce one deliberately. The
+ * profile is validated FIRST and in both modes: a malformed profile is
+ * malformed whichever insets you asked for, and validating only in "real" mode
+ * would make `insets: "none"` a way to smuggle one past the check.
  *
  * @param {{id:string,safeArea:{top:number,right:number,bottom:number,left:number},orientation:string}} device
  * @param {{mode?: "real"|"none", rotation?: "symmetric"|"left"|"right"}} [options]
  */
 export function insetsFor(device, options = {}) {
+  assertProfile(device);
   const mode = options.mode ?? "real";
   const rotation = options.rotation ?? "symmetric";
   if (mode !== "real" && mode !== "none") {

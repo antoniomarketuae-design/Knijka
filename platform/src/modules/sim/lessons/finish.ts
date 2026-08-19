@@ -152,28 +152,29 @@
  * exactly what driving off the map does. That drive would not have ended at any
  * duration, on any budget, however it was driven.
  *
- * WHAT WOULD CLOSE IT, AND WHY IT IS NOT ARMED HERE. The evidence is
- * `SimTick.edgeId === null` held continuously — the runtime's own statement
- * that the locator found no centreline within OFF_ROAD_DISTANCE_M = 30 m
- * (runtime/locator.ts; `worldRuntime.sample` publishes it on every real tick,
- * and `undefined` — a hand-built tick, a recorded trace — must stay innocent).
- * Never a speed test, for the reason the row above gives. Two things have to be
- * true before it may ship, and neither is this lane's to do:
- *   1. THE ARM IS IN `lessons/engine.ts`. Both gates in this file are folded
- *      there and the session ends there; that file is owned by another lane in
- *      this same wave, so it was routed rather than edited.
- *   2. IT MUST BRING ITS OWN SENTENCE. Both endings engine.ts can currently
- *      speak say «край на маршрута» — true of every gate here and FALSE of a
- *      car that drove off the map halfway through one. Ending a drive with the
- *      wrong reason is a bare verdict wearing a sentence, which THEO-4 forbids
- *      as squarely as it forbids «Урокът беше прекъснат преди края» with no
- *      reason at all. The fold and its copy belong in the same file.
- * The false-refusal case to measure FIRST, because it is the one that would
- * hurt: a student who is legitimately off the carriageway. The authored targets
- * are safe — the deepest parking bay in the lot districts sits 6.3 m from the
- * nearest centreline (`lot-gap-long-v1`), well inside 30 m — but that is a
- * measurement of where lessons SEND him, not of where drives GO, and the second
- * is the one an off-network bar has to survive.
+ * WHAT WOULD CLOSE IT — BOTH HALVES NOW EXIST HERE, AND THE ARM STILL DOES NOT.
+ * The evidence is `SimTick.edgeId === null` held continuously — the runtime's
+ * own statement that the locator found no centreline within
+ * OFF_ROAD_DISTANCE_M = 30 m (runtime/locator.ts; `worldRuntime.sample`
+ * publishes it on every real tick, and `undefined` — a hand-built tick, a
+ * recorded trace — must stay innocent). Never a speed test, for the reason the
+ * row above gives. The two conditions that paragraph set have been met in this
+ * file: the fold is `stepOffNetwork` and the sentence is
+ * `offNetworkEndingCopy`, both measured and both tested in both directions
+ * (`__tests__/off-network-ending.test.ts`). What is still outstanding is the one
+ * thing that was never this file's to do — the ARM, which is three lines in
+ * `lessons/engine.ts` plus one primitive field in `lessons/types.ts`, written
+ * out verbatim at the end of the O22 block below. Until that lands, a car off
+ * the map still cannot be ended on; nothing in this file's behaviour has
+ * changed.
+ *
+ * The false-refusal case the row said to measure FIRST has been measured, and
+ * the margin is far thinner than „the authored targets are safe" suggested. That
+ * sentence („the deepest parking bay in the lot districts sits 6.3 m from the
+ * nearest centreline") described where lessons SEND a student. Where a car can
+ * legally BE is 29.355 m — the kerbside parking band of `district-v1`'s
+ * five-lane boulevard — leaving 0.645 m of headroom on a 30 m threshold. That
+ * number, not the 6.3 m one, is what sets OFF_NETWORK_STUCK_S.
  *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
@@ -552,6 +553,240 @@ export const CRASH_PIN_RADIUS_M = 6;
  *  promises never to punish („drove away — not stuck, and never closed down").
  */
 export const CRASH_PIN_STUCK_S = 10;
+
+// ---------------------------------------------------------------------------
+// O22 (2026-08-19) — THE CAR THAT IS NO LONGER IN THE AUTHORED WORLD
+// ---------------------------------------------------------------------------
+//
+// THE ONE CLASS THAT SURVIVED THE RE-MEASUREMENT. The header block above
+// („WHAT THIS MODULE CANNOT END") refused a duration cap and was right to. It
+// also named the survivor and left it open: a car off the road network has NO
+// gate in this file that can see it, because every gate here is anchored on
+// route geometry the car is no longer near, and the crash pin is DISARMED by
+// travelling away from the impact — which is exactly what being launched off
+// the map does.
+//
+// THE CENSUS, RE-RUN over EVERY log convention in the sweep rather than the two
+// the row was filed against (`run.log`, `log.txt`, `RUN.log`, `audit.log`,
+// `harness.log`, `drive.log`, `_run.log`): 166 scenario directories, 653 lane
+// directories, 544 lanes carrying a machine summary, 145 scenarios with at
+// least one. FOURTEEN scenarios had no lane end at all; 68 more ended on some
+// lanes and not others. The fourteen: sc-ed-reverse-line,
+// sc-hz-breakdown-pulloff, sc-junction-blind, sc-junction-gap, sc-junction-left,
+// sc-merge-accel-lane, sc-merge-bus-pullout, sc-merge-motorway-exit,
+// sc-ov-crest-curve, sc-ov-lane-keeping, sc-park-gap-long, sc-park-parallel,
+// sc-park-zebra, sc-vu-emergency-junction. (The earlier count of EIGHT read the
+// directory count as the summary count and dropped six, the junction family and
+// the row's own exhibit among them. It is fourteen, and that is MORE than the
+// figure the audit was quoting, not fewer.)
+//
+// ALL FOURTEEN CARRY `inside` ZONES — eleven terminal `reachZone`, three
+// terminal `parkInBay`, measured by compiling every rung of all fourteen. So
+// `workSiteRadiusM` and `strandedBeyondM`, which are consulted only for
+// `mode: "outside"`, cannot help ANY of them, and O23's ring work (48 of 58
+// ring zones moved) touched none of them by construction.
+//
+// AND „FOURTEEN DRIVES THAT CANNOT BE ENDED" IS STILL TOO STRONG — the last
+// frame of each was read BY EYE rather than derived, and they are at least four
+// different things:
+//   · OFF THE AUTHORED WORLD — `sc-junction-blind` pc/right t090s+t208s,
+//     `sc-junction-left` pc/right t208s, `sc-vu-emergency-junction` pc/right
+//     t205s: a featureless green plane, no road, no kerb, no buildings, with the
+//     task chip still asking for a turn out of a junction that is nowhere on
+//     screen. THIS class, and only this one, is what has no ending.
+//   · LAWFULLY WAITING — `sc-junction-gap` pc/right t206s is stopped at its own
+//     Б2 line at 0 км/ч with «Чакането Е маневрата» on screen. B15's freeze is
+//     holding that drive open ON PURPOSE. Ending it would be the founder's own
+//     complaint.
+//   · THE HARNESS BUDGET, not the gate — `sc-merge-accel-lane` pc/right t210s is
+//     on the motorway ramp at 6 км/ч, `sc-ov-lane-keeping` pc/right t210s is on
+//     its street at 1 км/ч. 930 m of route against a 210 s budget at CRUISE_KMH
+//     12; the lesson was never driven to its end.
+//   · THE PAGE ITSELF FELL OVER — `sc-park-parallel` pc/right t207s is the
+//     «Нещо се обърка» error card, and it is the one lane in the whole sweep
+//     whose summary records no `forcedBy` at all. Nothing about endings.
+//
+// SO THIS FOLD ANSWERS THE FIRST BULLET AND NOTHING ELSE. It is deliberately
+// not a duration cap, not a speed test and not a standstill test:
+// `sc-vu-emergency-junction` is off the world at 11 км/ч in gear D, so any bar
+// that required the car to be stopped would miss the very frame it was written
+// for.
+//
+// THE EVIDENCE is `SimTick.edgeId === null` held continuously — the runtime's
+// own statement that the locator found no centreline within
+// OFF_ROAD_DISTANCE_M = 30 m (runtime/locator.ts). `undefined` must stay
+// innocent: a hand-built tick and a recorded trace do not report the channel at
+// all, and reading „absent" as „nowhere" would end every replay.
+//
+// AND THE CHANNEL IS TIGHTER THAN THE ROW ASSUMED — MEASURED, because arming an
+// ending on a signal nobody had measured is how this programme has shipped four
+// instrument bugs. Swept the FULL drivable half-width (travel lanes AND the
+// kerbside parking band) of every drawn ribbon on all 105 shipped districts,
+// 96,908 poses: ZERO read off-network, and the worst is 29.355 m — the centre of
+// the kerbside parking band of `district-v1`'s five-lane бул. Свети Климент
+// Охридски at (467.8, −169.8). That leaves **0.645 m** between a car parked
+// legally at that kerb and the runtime declaring it no longer in the world.
+// (`ln-arrows-v1` is second at 28.375 m; all 248 authored spawn points are
+// inside 20.310 m.) The measurement is pinned by
+// `runtime/__tests__/off-network-headroom.test.ts` so the next authored arterial
+// cannot widen past it in silence — see that file for what else goes quiet when
+// a fix goes null.
+// ---------------------------------------------------------------------------
+
+/**
+ * Continuous seconds off the road network before the drive is closed, s.
+ *
+ * FORCED FROM BOTH SIDES, which is the only thing that makes it a derivation
+ * rather than a round number wearing one.
+ *
+ * FROM BELOW — the false refusal, and it is the whole reason this is not five
+ * seconds. The measurement above says the exposure is a 0.645 m band past the
+ * outermost LEGAL pose on one district: to spend this bar a car has to stay
+ * within two thirds of a metre of a boulevard's outer kerb line, without once
+ * coming back inside 29.355 m of any centreline, for the whole duration. The
+ * bar therefore has to exceed the longest state a real audited drive is known
+ * to have come back from, and this module has already measured that number for
+ * FINISH_OUTSIDE_STUCK_S: over the sweep161 corpus (332 lanes, 7,398 speed
+ * samples at a 5.2 s cadence) the longest pause a drive RESUMED from was 69 s
+ * sampled, 74.2 s true, ⇒ 75. Reusing it rather than inventing a second number
+ * is deliberate: it is the same claim („past this, the car is not coming back")
+ * measured on the same corpus, and two different numbers for one claim rot
+ * apart.
+ *
+ * FROM ABOVE — it has to actually CLOSE the exhibit, or it is a constant that
+ * only looks safe. `sc-junction-blind` pc/right leaves the authored world
+ * between t = 63 s (04-t063s.png: still on its street) and t = 74 s
+ * (04-t074s.png: the plane, 10 км/ч, the −10 card up) and the session then runs
+ * to t = 209 s — at least 135 s off the world, and at most 146 s at the frame
+ * cadence. Seventy-five seconds fires at t ≈ 139–149 s, sixty to seventy
+ * seconds before the harness gave up and pressed «Прекрати урока». A bar of 150
+ * would not have fired inside that drive at all.
+ *
+ * NO SPEED TEST AND NO LAWFUL-WAIT FREEZE, and both omissions are load-bearing.
+ * The speed test is out because the third confirmed frame is off the world at
+ * 11 км/ч. The freeze (B15) is out because it exists to stop a STANDSTILL being
+ * read as evidence, and there is no standstill in this evidence — and because
+ * every clause of `yieldReasonAt` is unreachable here anyway: cases 1–3 need
+ * `nextStopLineM`, which the runtime publishes only from a resolved edge; case 5
+ * needs the car within one approach of a ring the route has not finished, which
+ * a car 30 m from every centreline is not. Adding the freeze „for symmetry"
+ * would hand an off-map drive a 180 s reprieve for a wait it is not having.
+ */
+export const OFF_NETWORK_STUCK_S = 75;
+
+/** One frame of the off-network fold. */
+export interface OffNetworkFold {
+  /**
+   * Session time the CURRENT continuous off-network run began, or null when the
+   * car is on the network / the tick does not report the channel. Carry this
+   * one number in session state and hand it back next frame.
+   */
+  sinceSec: number | null;
+  /** The bar was met ON THIS FRAME — end the drive, with `offNetworkEndingCopy`. */
+  ended: boolean;
+}
+
+/**
+ * Advance the off-network fold by one frame. Pure and deterministic like every
+ * other fold here: no clock, no randomness, same input ⇒ same output.
+ *
+ * `posed` is the caller's frame-zero pose guard (engine.ts `posedAtSec !==
+ * undefined`) and it is a PARAMETER rather than the caller's business on
+ * purpose: the scene ticks the session with a placeholder pose at the district
+ * ORIGIN before the chassis publishes (scene/vehicleSample.ts), and a drive that
+ * has not begun cannot have left anywhere. B-NEW-1 is the standing proof of what
+ * happens when a gate reads that pose — one placeholder frame armed the
+ * roundabout finish and ended untouched sessions at ~40 s. Requiring it here
+ * means the arm cannot forget it.
+ *
+ * THE CLOCK RESETS on every frame the car is back on the network, and it never
+ * banks in instalments — deliberately the opposite of `stepFinishGate`'s two
+ * accumulators. There, two visits to the same face are one car sitting in one
+ * place; here, two separate excursions are two recoveries the student DROVE
+ * back from, and adding them together would close a lesson on a driver who
+ * returned to the road twice.
+ */
+export function stepOffNetwork(
+  prevSinceSec: number | null | undefined,
+  tick: SimTick,
+  posed: boolean,
+): OffNetworkFold {
+  // Absent channel = innocent. A hand-built tick, a recorded trace and every
+  // legacy engine omit `edgeId`; only an explicit null is the runtime SAYING
+  // there is no road here.
+  if (!posed || tick.edgeId !== null) return { sinceSec: null, ended: false };
+
+  const prev = prevSinceSec ?? null;
+  // A non-monotonic frame (a seek, a resumed tab handing back an older stamp)
+  // restarts the run rather than producing a negative elapsed.
+  const sinceSec = prev !== null && tick.t >= prev ? prev : tick.t;
+  return { sinceSec, ended: tick.t - sinceSec >= OFF_NETWORK_STUCK_S };
+}
+
+/**
+ * WHAT THE STUDENT IS TOLD — and this half is not decoration, it is the reason
+ * the previous lane routed the ending instead of shipping it.
+ *
+ * Both endings `engine.ts` can currently speak say «край на маршрута», which is
+ * true of every gate in this file and FALSE of a car that drove off the map
+ * halfway through one. THEO-4 (doc 64, founder-ratified) forbids a bare verdict,
+ * and «Урокът беше прекъснат преди края» with no reason IS a bare verdict —
+ * but so is a sentence that gives the WRONG reason, which is a bare verdict
+ * wearing a costume. So the fold that ends the drive owns the words that
+ * explain it.
+ *
+ * Kept inside the violation catalogue's own length band (median 186 chars, max
+ * 319) like the other two endings: this is a HUD toast on a 390 px phone, and
+ * the detail belongs in the debrief that opens a second later. It claims
+ * nothing the debrief does not deliver — the unfinished tasks and the mistakes,
+ * both of which `buildLessonResult` already prints.
+ */
+export function offNetworkEndingCopy(examMode: boolean): {
+  kind: "lesson";
+  titleBg: string;
+  explanationBg: string;
+} {
+  return {
+    kind: "lesson",
+    titleBg: examMode ? "Край на изпита — колата е извън пътя" : "Край на урока — колата е извън пътя",
+    explanationBg: examMode
+      ? "Колата вече не е на нито една улица от маршрута и остава извън пътната мрежа повече от минута, затова изпитът приключва тук. Част от задачите останаха неизпълнени и изпитът не е издържан — разборът показва всяка от тях и всяка допусната грешка."
+      : "Колата вече не е на нито една улица от урока и остава извън пътната мрежа повече от минута — няма маршрут, по който да продължи. Затова урокът приключва тук, вместо да те държи блокиран. Разборът показва всяка неизпълнена задача и всяка допусната грешка.",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// THE ARM IS NOT IN THIS FILE, and here is exactly what it is.
+//
+// `lessons/engine.ts` is where every gate in this module is folded and where
+// the session's `phase` is set; it is owned by another lane, so this was routed
+// rather than edited — the same call the previous pass made, for the same
+// reason, and now with the fold and the copy already written so the routed
+// change is small enough to audit at a glance:
+//
+//   1. `lessons/types.ts` — one primitive field on LessonSessionState:
+//          /** O22: session time the current off-network run began (finish.ts). */
+//          offNetworkSinceSec?: number | null;
+//      A number rather than an object, so nothing here has to be imported there.
+//
+//   2. `lessons/engine.ts` — folded on every driving frame, BEFORE the finish
+//      gates (it is not anchored on route geometry, so no gate's arming state is
+//      involved), and written back unconditionally like `crashPin` because it
+//      must be able to go back to absent:
+//          const offNet = stepOffNetwork(prev.offNetworkSinceSec, tick, posedAtSec !== undefined);
+//          if (phase === "driving" && prev.phase === "driving" && offNet.ended) {
+//            phase = "completed";
+//            endedAtSec = tick.t;
+//            hudEvents.push(offNetworkEndingCopy(examMode));
+//          }
+//      …and `offNetworkSinceSec: offNet.sinceSec` in the returned state.
+//
+// It grades nothing, exactly like the rest of this file: no ScorableEvent is
+// emitted, suppressed or reweighted, the unreached objectives stay honestly
+// unreached, and `buildLessonResult` reports finished-and-not-passed. What it
+// must NOT do is borrow either existing ending's copy — that is the whole point
+// of `offNetworkEndingCopy`.
+// ---------------------------------------------------------------------------
 
 interface Point {
   x: number;

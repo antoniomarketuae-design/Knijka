@@ -149,6 +149,46 @@ const ARROW_BEFORE_JUNCTION_M = 20;
 /** Only show the arrow once its junction is inside the guidance horizon. */
 const ARROW_VISIBLE_AHEAD_M = 140;
 
+/**
+ * THE TURN CHEVRON WAS WHITE, AND WHITE IS NOT ONE OF THIS PRODUCT'S COLOURS.
+ *
+ * Sweep 161, two findings, one word in both: *„a huge WHITE chevron «◀» floats
+ * in the middle of the sky above the road … with no label or legend"*
+ * (`sc-junction-blind/mobile-right/04-t065s.png`, and again beside the marker
+ * shaft on `sc-jx-equal-left/mobile-right/04-t039s.png`).
+ *
+ * MEASURED OFF THAT FIRST FRAME, raw pixels, no interpretation: the chevron is
+ * **rgb(255, 255, 255)** — all three channels clipped — at 815,308 / 830,290 /
+ * 800,320, against a sky of rgb(156, 163, 170) 270 px to its right. Nowhere in
+ * this file is the arrow white: it is authored `--accent-2` (#17e1c4), the
+ * ribbon's own colour, and that is the whole of the defect. The one cue whose
+ * job is „the route turns here, and it is the SAME route as the green line on
+ * the road" had lost every pixel of its identity to the blend mode, and what a
+ * learner is left looking for is an unexplained white blob over the junction.
+ *
+ * THE BLEND MODE IS THE CAUSE, and this file has already made the argument
+ * twice — for the acceptance ring („additive on a mid-grey sunlit road drives
+ * the annulus to a flat clipped teal") and for the sign post („an additive one
+ * glows into the road behind it"). The arrow was the last additive surface left,
+ * and it is the only one that hangs against the SKY, the brightest backdrop in
+ * the scene. Additive means dst + src·α, and a `DoubleSide` extrusion puts at
+ * least the front cap and the back cap on every view ray, with the side walls
+ * added near the silhouette. Against rgb(156,163,170) the green and blue
+ * channels clip on the FIRST layer; red keeps accumulating with each further one
+ * until it clips too, and once all three are at 255 the object has no colour
+ * left to be the route's. Clipping is not „bright" — it is the loss of the hue,
+ * and the hue was the whole message.
+ *
+ * NormalBlending at the same opacity is α·src + (1−α)·dst, which CONVERGES on
+ * the arrow's own colour instead of running away from it: ≈ rgb(40, 224, 195)
+ * over that measured sky at two layers, and no closer to white at six —
+ * unmistakably the ribbon's teal, still the loudest thing in the upper half of
+ * the frame, and no longer able to clip whatever it is drawn over.
+ * `routeGuidanceSignLegibility.test.ts` computes both composites from the
+ * exported opacity and reds if the additive one comes back.
+ */
+export const ARROW_OPACITY = 0.8;
+
 const PILLAR_HEIGHT = 11;
 const PILLAR_RADIUS = 1.0;
 
@@ -170,6 +210,122 @@ const LABEL_WIDTH_M = MARKER_SIGN_PANEL_W_M;
 const LABEL_HEIGHT_M = MARKER_SIGN_PANEL_H_M;
 const LABEL_PX_W = 480;
 const LABEL_PX_H = 160;
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE SECOND LINE IS THE GRADED ONE, AND IT WAS THE SMALL ONE.
+ *
+ * Sweep 161, two findings on the same object:
+ *
+ *   `sc-park-night/mobile-right/04-t034s.png` — „the «Спри тук» chip carries a
+ *     second line stating the speed condition, and it renders at roughly six
+ *     pixels tall — an unreadable grey smear under the title. The condition it
+ *     hides («под 6 км/ч») is the exact tolerance the first graded task
+ *     measures."
+ *   `sc-ln-obstacle-meeting/mobile-right/04-t080s.png` — „the world label
+ *     «Карай дотук» clips its own unit: the second line reads «не по-бързо от
+ *     35 км» with the «/ч» cut off."
+ *
+ * THE SECOND ONE IS NOT A CLIP. `fillText`'s `maxWidth` CONDENSES, it never
+ * cuts, and 22 glyphs of «не по-бързо от 35 км/ч» at 400-weight 36 px need
+ * ~396 px of the 440 px it is given — nothing was ever clipped. What the
+ * reviewer read as a missing «/ч» is the last two glyphs of a line too small to
+ * resolve going first. Both findings are ONE defect and it is a SIZE defect.
+ *
+ * MEASURED, and the arithmetic is the reason this is not a matter of taste. The
+ * cap line's em box is `LABEL_CAP_PX / LABEL_PX_H × MARKER_SIGN_PANEL_H_M` of
+ * world height; on the audit's own primary profile (`iphone16-landscape` —
+ * 852 × 393 CSS px, DPR 3, which is the 2556 × 1179 the frames are) the cockpit
+ * camera runs vFOV 39.3° at that aspect (`cockpitVFovForAspect`, hFOV-locked),
+ * so `capLineCssPxAt` below is the whole conversion. At the shipped 36 px the
+ * cap line was:
+ *
+ *     68.3 m (the first metre the sign is drawn)   3.0 CSS px
+ *     45 m   (the middle of the band, full alpha)  4.6 CSS px
+ *     21.0 m (the last metre before it leaves)     9.9 CSS px
+ *
+ * — i.e. the number a seventeen-year-old is GRADED against was printed at an em
+ * box of three to ten CSS pixels, and its x-height at less than half of that.
+ * The alpha fence next door (MIN_LEGIBLE_SIGN_ALPHA) passed every one of those
+ * distances, because contrast is not size: an instrument that measures one and
+ * reports on the other is the reassuring kind of wrong this project keeps
+ * finding.
+ *
+ * TWO CHANGES, and neither of them is „make the font bigger" on its own,
+ * because the panel is 1.67 m tall by contract (`guidanceRoute.ts`) and 3 CSS
+ * px cannot be multiplied into 9 by typography alone:
+ *
+ *   1. THE EMPHASIS SWAPS. «Карай дотук» is redundant — the ribbon, the gate
+ *      bar across the lane, the acceptance ring and the ground pool all say
+ *      „here" far louder than a word can; the NUMBER is the only thing on the
+ *      chip that is not said anywhere else in the world. So the cap takes the
+ *      dominant size and the title the subordinate one, which is also how a
+ *      real В14 communicates (a numeral, no words). It buys the cap +33 % and
+ *      it buys the long titles too: «Спри на линията за пропускане» is 28
+ *      glyphs and was already being condensed to 58 % of its natural width by
+ *      `maxWidth` at 54 px — at 40 px that is 79 %.
+ *   2. THE CAP LINE IS GATED ON ITS OWN LEGIBLE SIZE, exactly as the panel is
+ *      gated on its own legible alpha. Outside `MIN_LEGIBLE_CAP_CSS_PX` the
+ *      chip is drawn WITHOUT its second line instead of with a smear where a
+ *      graded number should be. The sign's own band does not move — shortening
+ *      it to 21→30.7 m would fail the ≥3 s-at-the-posted-limit floor that
+ *      `guidance-marker-sign.test.ts` and the legibility suite both hold it to,
+ *      and „fix the ghost by never drawing the sign" is the crime those tests
+ *      exist to refuse.
+ *
+ * AND NOTHING IS LOST WHILE THE CAP IS OFF: the objective banner carries the
+ * same contract in HUD type the whole time («… — дръж под 48 км/ч», photographed
+ * on `sc-sp-limit-end/pc-right/04-t017s.png`). The chip stops claiming to have
+ * told the student a number it could not show them; it does not become the only
+ * place the number was.
+ *
+ * WHY CSS px AND NOT DEVICE px: CSS px is the unit the rest of this product's
+ * type is authored in, so the floor can be the smallest size the HUD itself
+ * ever asks a student to read (`text-[9px]`) instead of a number from a paper.
+ * It is also the OPTIMISTIC bound — the WebGL canvas may render at a DPR below
+ * the window's, and every pixel it gives up comes out of this line.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const LABEL_TITLE_PX = 40;
+export const LABEL_CAP_PX = 48;
+/**
+ * Canvas baselines for the two lines, in the same 480 × 160 space, with
+ * `textBaseline: "middle"` — so the title's ink is 32…72 and the cap's is
+ * 88…136 inside a plate whose interior is 6…154. 26 px of air above, 16 px
+ * between the lines, 18 px below.
+ *
+ * The cap also goes from 400 to 600 WEIGHT here, and that is part of the same
+ * measurement rather than a taste: this glyph is minified by 4–10× at the
+ * distances the panel is drawn at, `CanvasTexture` generates mipmaps and
+ * `LinearMipmapLinear` averages a 400-weight hairline into its own background
+ * before the halo can save it. A 600 stroke is what survives the mip chain, and
+ * it is the weight the title has always carried for exactly this reason.
+ */
+const LABEL_TITLE_BASELINE_PX = 52;
+const LABEL_CAP_BASELINE_PX = 112;
+
+/** The smallest type this product ever asks a student to read is `text-[9px]`
+ *  (the briefing card's own fold counter). A number the engine GRADES may not
+ *  be printed smaller than the chrome that counts hidden list rows. */
+export const MIN_LEGIBLE_CAP_CSS_PX = 9;
+
+/**
+ * On-screen height of the cap line's em box, in CSS px, at an eye distance.
+ *
+ * Pure, and it takes the live camera and canvas rather than a device profile:
+ * the shell runs an hFOV-locked vFOV that changes with the window shape, so a
+ * baked-in 39.3° would be a fourth instrument measuring the wrong phone.
+ *
+ * @param distM          eye → panel, m
+ * @param viewportCssH   the canvas's CSS height (R3F `state.size.height`)
+ * @param vFovDeg        the camera's vertical FOV in degrees (three's `fov`)
+ */
+export function capLineCssPxAt(distM: number, viewportCssH: number, vFovDeg: number): number {
+  if (!(distM > 0) || !(viewportCssH > 0) || !(vFovDeg > 0) || vFovDeg >= 180) return 0;
+  const worldH = (LABEL_CAP_PX / LABEL_PX_H) * LABEL_HEIGHT_M;
+  const frameH = 2 * distM * Math.tan((vFovDeg * Math.PI) / 360);
+  return (worldH / frameH) * viewportCssH;
+}
 /** The panel's LOWER EDGE is where the post has to end, so it is derived here
  *  rather than authored — the two can then never drift apart. */
 const POST_TOP_Y = MARKER_SIGN_PANEL_Y - LABEL_HEIGHT_M / 2;
@@ -582,6 +738,9 @@ export function capLineBg(goal: GuidancePointGoal, postedKmh?: number): string {
 export function makeLabelTexture(
   goal: GuidancePointGoal | null,
   postedKmh?: number,
+  /** `false` builds the TITLE-ONLY plate — the one the sign wears outside
+   *  MIN_LEGIBLE_CAP_CSS_PX. See the LABEL_CAP_PX block. */
+  withCap = true,
 ): THREE.CanvasTexture | null {
   if (!goal || !goal.marker || typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
@@ -589,7 +748,7 @@ export function makeLabelTexture(
   canvas.height = LABEL_PX_H;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  const cap = capLineBg(goal, postedKmh);
+  const cap = withCap ? capLineBg(goal, postedKmh) : "";
   ctx.clearRect(0, 0, LABEL_PX_W, LABEL_PX_H);
   // Near-opaque, not 0.72. The panel's job is to be the GROUND its own text
   // stands on; at 0.72 the world's value came through it and the glyphs were
@@ -621,20 +780,23 @@ export function makeLabelTexture(
   ctx.lineJoin = "round";
   ctx.miterLimit = 2;
   const halo = "rgba(2, 10, 12, 0.9)";
-  const titleY = cap ? 60 : LABEL_PX_H / 2;
-  ctx.font = "600 54px system-ui, sans-serif";
+  // The TITLE is the subordinate line now — see the LABEL_CAP_PX block for the
+  // three CSS-pixel readings that moved it. With no cap to sit above it, it
+  // takes the plate's centre exactly as it always did.
+  const titleY = cap ? LABEL_TITLE_BASELINE_PX : LABEL_PX_H / 2;
+  ctx.font = `600 ${LABEL_TITLE_PX}px system-ui, sans-serif`;
   ctx.strokeStyle = halo;
   ctx.lineWidth = 9;
   ctx.strokeText(goal.labelBg, LABEL_PX_W / 2, titleY, LABEL_PX_W - 40);
   ctx.fillStyle = rgb(SIGN_TITLE_RGB);
   ctx.fillText(goal.labelBg, LABEL_PX_W / 2, titleY, LABEL_PX_W - 40);
   if (cap) {
-    ctx.font = "400 36px system-ui, sans-serif";
+    ctx.font = `600 ${LABEL_CAP_PX}px system-ui, sans-serif`;
     ctx.strokeStyle = halo;
-    ctx.lineWidth = 7;
-    ctx.strokeText(cap, LABEL_PX_W / 2, 118, LABEL_PX_W - 40);
+    ctx.lineWidth = 8;
+    ctx.strokeText(cap, LABEL_PX_W / 2, LABEL_CAP_BASELINE_PX, LABEL_PX_W - 40);
     ctx.fillStyle = rgb(SIGN_CAP_RGB);
-    ctx.fillText(cap, LABEL_PX_W / 2, 118, LABEL_PX_W - 40);
+    ctx.fillText(cap, LABEL_PX_W / 2, LABEL_CAP_BASELINE_PX, LABEL_PX_W - 40);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
@@ -743,6 +905,24 @@ export function RouteGuidance({
     [pointGoal, postedAtGoal],
   );
   useEffect(() => () => labelTexture?.dispose(), [labelTexture]);
+  /**
+   * THE SAME PLATE WITHOUT ITS SECOND LINE — built once per objective beside
+   * the full one, never per frame. `useFrame` swaps `material.map` between the
+   * two at MIN_LEGIBLE_CAP_CSS_PX, which keeps the module's „no allocation
+   * after mount" contract: two canvases per objective change, zero per tick.
+   *
+   * `null` whenever the full plate is `null` (no marker, no DOM) and whenever
+   * the goal has no cap at all — the two textures are then identical and the
+   * swap has nothing to do, so the second one is not built.
+   */
+  const labelTextureNoCap = useMemo(
+    () =>
+      pointGoal && pointGoal.marker && capLineBg(pointGoal, postedAtGoal) !== ""
+        ? makeLabelTexture(pointGoal, postedAtGoal, false)
+        : null,
+    [pointGoal, postedAtGoal],
+  );
+  useEffect(() => () => labelTextureNoCap?.dispose(), [labelTextureNoCap]);
 
   // --- Ribbon: preallocated triangle strip (2 verts per route sample),
   // built by the shared ribbonStrip helper (identical layout as always). ---
@@ -905,7 +1085,21 @@ export function RouteGuidance({
       gate.visible = gateShape !== null;
       if (gateShape) gate.rotation.y = Math.atan2(gateShape.dirY, gateShape.dirX);
     }
-    if (labelRef.current) labelRef.current.visible = labelTexture !== null;
+    const labelSeed = labelRef.current;
+    if (labelSeed) {
+      labelSeed.visible = labelTexture !== null;
+      // SEEDED WITH THE FULL PLATE, not the title-only one. The eye distance is
+      // not known until the first frame subscriber runs, and a fresh objective
+      // is almost always far away — but a chip that arrives WITHOUT its number
+      // and grows one is the wrong way round to be wrong: the seed is the
+      // complete statement, and the gate below takes the line away on the frame
+      // it can prove it cannot be read.
+      const seedMat = labelSeed.material as THREE.MeshBasicMaterial;
+      if (seedMat.map !== labelTexture) {
+        seedMat.map = labelTexture;
+        seedMat.needsUpdate = true;
+      }
+    }
     // The sign steps off the carriageway onto the kerb side of the approach.
     // Marker space has no yaw of its own, and district (x, y) maps to three
     // (x, ·, −y), so a district offset is applied straight to the group.
@@ -933,6 +1127,7 @@ export function RouteGuidance({
     ringRadii,
     gateShape,
     labelTexture,
+    labelTextureNoCap,
     accent,
     spawnStart,
     sampleRef,
@@ -983,13 +1178,31 @@ export function RouteGuidance({
         // the eye is actually reading.
         const dx = state.camera.position.x - (marker.position.x + sign.position.x);
         const dz = state.camera.position.z - (marker.position.z + sign.position.z);
-        const alpha = signPanelAlpha(Math.hypot(dx, dz));
+        const eyeDistM = Math.hypot(dx, dz);
+        const alpha = signPanelAlpha(eyeDistM);
         // Shown or gone, never a veil: below the floor the whole sign leaves —
         // panel AND post — instead of hanging over the road at an alpha its own
         // text cannot be told from its own plate at.
         sign.visible = alpha > 0;
         lm.opacity = alpha;
         if (postMatRef.current) postMatRef.current.opacity = alpha * 0.85;
+        // …AND THE SECOND LINE IS GATED ON ITS OWN SIZE, which is the half the
+        // alpha fence is blind to. `state.size.height` is the canvas in CSS px
+        // and `state.camera.fov` is the live hFOV-locked vertical FOV, so this
+        // reads the window the student actually has rather than a profile.
+        // Non-perspective cameras (the top-down orthographic view) report no
+        // usable `fov`; `capLineCssPxAt` returns 0 for those, and 0 < the floor,
+        // so the chip drops to its title — which is the right answer there too,
+        // because a plan view is not where a speed contract is read.
+        if (labelTextureNoCap !== null) {
+          const cam = state.camera as THREE.Camera & { fov?: number };
+          const capPx = capLineCssPxAt(eyeDistM, state.size.height, cam.fov ?? 0);
+          const want = capPx >= MIN_LEGIBLE_CAP_CSS_PX ? labelTexture : labelTextureNoCap;
+          if (lm.map !== want) {
+            lm.map = want;
+            lm.needsUpdate = true;
+          }
+        }
       }
       if (sample && goalNow.maxSpeedKmh !== undefined) {
         const dx = sample.position.x - goalNow.x;
@@ -1067,12 +1280,14 @@ export function RouteGuidance({
       </mesh>
       <mesh ref={arrowRef} renderOrder={21}>
         <extrudeGeometry args={arrowGeoArgs} />
+        {/* NormalBlending, not Additive — see ARROW_OPACITY for the two frames
+            and the rgb(255,255,255) that was measured on them. */}
         <meshBasicMaterial
           color={accent}
           transparent
-          opacity={0.8}
+          opacity={ARROW_OPACITY}
           depthWrite={false}
-          blending={THREE.AdditiveBlending}
+          blending={THREE.NormalBlending}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -1172,8 +1387,12 @@ export function RouteGuidance({
           </mesh>
           <mesh ref={labelRef} position={[0, MARKER_SIGN_PANEL_Y, 0]} renderOrder={22}>
             <planeGeometry args={[LABEL_WIDTH_M, LABEL_HEIGHT_M]} />
+            {/* `map` is MUTATED (the cap-line size gate swaps the plate for its
+                title-only twin), so by this module's pattern note it is
+                deliberately NOT declared here — the layout effect seeds it
+                before paint and useFrame owns it after that. A declared prop
+                would let a parent re-render put the unreadable plate back. */}
             <meshBasicMaterial
-              map={labelTexture}
               transparent
               opacity={0.95}
               depthWrite={false}

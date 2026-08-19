@@ -41,11 +41,15 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  ARROW_OPACITY,
+  LABEL_CAP_PX,
+  MIN_LEGIBLE_CAP_CSS_PX,
   MIN_LEGIBLE_SIGN_ALPHA,
   SIGN_CAP_RGB,
   SIGN_PLATE_ALPHA,
   SIGN_PLATE_RGB,
   SIGN_TITLE_RGB,
+  capLineCssPxAt,
   signPanelAlpha,
 } from "./RouteGuidance";
 import {
@@ -54,6 +58,12 @@ import {
   MARKER_SIGN_NEAR_END_M,
   markerSignOpacity,
 } from "@/modules/sim/scene/guidanceRoute";
+import { cockpitVFovForAspect } from "@/modules/sim/vehicle/tuning";
+
+/** The component's own source — the size gate and the chevron's blend mode are
+ *  both single declarations no jsdom render can reach (there is no WebGL and no
+ *  2D canvas here), so they are read the way the plate's fill already is. */
+const src2 = readFileSync(path.resolve(__dirname, "./RouteGuidance.tsx"), "utf8");
 
 type RGB = readonly [number, number, number];
 
@@ -265,8 +275,237 @@ describe("the canvas actually paints what the floor was computed from", () => {
   });
 
   it("gates the panel on signPanelAlpha and takes the post with it", () => {
-    expect(src).toContain("const alpha = signPanelAlpha(Math.hypot(dx, dz));");
+    expect(src).toContain("const alpha = signPanelAlpha(eyeDistM);");
     expect(src).toContain("sign.visible = alpha > 0;");
     expect(src).toContain("postMatRef.current.opacity = alpha * 0.85");
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND CONTRAST IS NOT SIZE. THE FENCE ABOVE PASSED WHILE THE GRADED NUMBER
+   WAS THREE PIXELS TALL.
+
+   Sweep 161 filed the same object twice more, and neither finding is about ink:
+
+     `sc-park-night/mobile-right/04-t034s.png` — «the «Спри тук» chip carries a
+       second line stating the speed condition, and it renders at roughly six
+       pixels tall — an unreadable grey smear under the title. The condition it
+       hides («под 6 км/ч») is the exact tolerance the first graded task
+       measures.»
+     `sc-ln-obstacle-meeting/mobile-right/04-t080s.png` — «the world label
+       «Карай дотук» clips its own unit: the second line reads «не по-бързо от
+       35 км» with the «/ч» cut off.»
+
+   The second is the first wearing a hat: `fillText`'s `maxWidth` condenses and
+   never cuts, so nothing was clipped — the trailing glyphs of a line below the
+   resolution of the screen are simply the ones that vanish first.
+
+   This block is the SIZE fence, in the same shape as the alpha one: derived from
+   the component's own exported type sizes and from the audit's own primary
+   device, so a font change re-derives it instead of restating a number. It also
+   fences the same opposite crime — „solve it by never printing the number" —
+   because the number is a graded contract and a gate that hides it is the false
+   certificate pointing the other way.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * The audit's own primary profile, `tools/mobile/lib/devices.mjs`
+ * `iphone16-landscape`: 852 × 393 CSS px at DPR 3 — which is the 2556 × 1179 of
+ * every `mobile-*` frame in the sweep. CSS px, not device px, because the rest
+ * of this product's type is authored in CSS px and because a canvas rendering
+ * below the window's DPR only ever makes this line smaller.
+ */
+const AUDIT_CSS_H = 393;
+const AUDIT_CSS_W = 852;
+/** The live cockpit vFOV at that aspect — hFOV-locked, so it is derived and not
+ *  a fourth instrument measuring the wrong phone. ≈ 39.26°. */
+const AUDIT_VFOV_DEG = cockpitVFovForAspect(AUDIT_CSS_W / AUDIT_CSS_H);
+
+/** What the canvas actually drew when the sweep photographed those two frames. */
+const SHIPPED_CAP_PX = 36;
+
+/** The band the panel is drawn in at all, from the alpha fence above. */
+function drawnBand(): { first: number; last: number } {
+  let first = Number.POSITIVE_INFINITY;
+  let last = 0;
+  for (let d = 0; d <= 200; d += 0.02) {
+    if (signPanelAlpha(d) > 0) {
+      first = Math.min(first, d);
+      last = Math.max(last, d);
+    }
+  }
+  return { first, last };
+}
+
+/** Metres of the drawn band over which a cap line of `capPx` clears the floor. */
+function legibleCapMetres(capPx: number): number {
+  const scale = capPx / LABEL_CAP_PX;
+  let m = 0;
+  for (let d = 0; d <= 200; d += 0.02) {
+    if (signPanelAlpha(d) <= 0) continue;
+    if (capLineCssPxAt(d, AUDIT_CSS_H, AUDIT_VFOV_DEG) * scale >= MIN_LEGIBLE_CAP_CSS_PX) m += 0.02;
+  }
+  return m;
+}
+
+describe("the graded number is legible where it is printed, or it is not printed", () => {
+  it("THE FRAME, AS ARITHMETIC: the shipped 36 px was 3 CSS px at the far end of its own band", () => {
+    const { first, last } = drawnBand();
+    // The alpha fence's own window, to the centimetre: 21.0 → 68.3 m.
+    expect(first).toBeCloseTo(21.0, 1);
+    expect(last).toBeCloseTo(68.3, 1);
+
+    const atShipped = (d: number) =>
+      capLineCssPxAt(d, AUDIT_CSS_H, AUDIT_VFOV_DEG) * (SHIPPED_CAP_PX / LABEL_CAP_PX);
+    // The three readings in the LABEL_CAP_PX block, reproduced from the shipped
+    // numbers rather than quoted: an em box of 3.0 / 4.6 / 9.9 CSS px.
+    expect(atShipped(last)).toBeCloseTo(3.0, 1);
+    expect(atShipped(45)).toBeCloseTo(4.6, 1);
+    expect(atShipped(first)).toBeCloseTo(9.9, 1);
+
+    // …and the alpha fence was green on every one of them. That is the whole
+    // reason this block exists: an instrument that measures contrast cannot see
+    // a number printed at three pixels.
+    for (const d of [last, 45, first]) expect(signPanelAlpha(d)).toBeGreaterThan(0);
+  });
+
+  it("the floor is the smallest type this product ships, not a number from a paper", () => {
+    // `text-[9px]` is the briefing card's own fold counter — the smallest thing
+    // the HUD asks a student to read. A number the engine GRADES may not be
+    // printed smaller than the chrome that counts hidden list rows.
+    // And the swap has to be worth something ON ITS OWN, or it is decoration:
+    // 36 → 48 px more than quadruples the road over which the number can be
+    // read (2.0 m → 9.7 m of the same 47 m band).
+    const shipped = legibleCapMetres(SHIPPED_CAP_PX);
+    const now = legibleCapMetres(LABEL_CAP_PX);
+    expect(shipped).toBeCloseTo(2.0, 1);
+    expect(now).toBeCloseTo(9.7, 1);
+    expect(now / shipped).toBeGreaterThan(4);
+
+    // ── AND THE FLOOR IS TIED TO THE TWO FRAMES, NOT TO A PREFERENCE ────────
+    // The cheap way to make this whole block green is to drop the floor until
+    // the shipped size passes, which would change nothing on the glass. So: at
+    // the far end of the band — the pose `04-t034s` and `04-t080s` both catch
+    // the chip in — the number has to be REFUSED at the new size too, and the
+    // shipped size has to be refused over essentially the whole band.
+    const { first, last } = drawnBand();
+    expect(capLineCssPxAt(last, AUDIT_CSS_H, AUDIT_VFOV_DEG)).toBeLessThan(
+      MIN_LEGIBLE_CAP_CSS_PX,
+    );
+    expect(shipped / (last - first)).toBeLessThan(0.05);
+
+    // Last, and only after the two above have done the work: the floor IS the
+    // `text-[9px]` the HUD's own fold counter is set in.
+    expect(MIN_LEGIBLE_CAP_CSS_PX).toBe(9);
+  });
+
+  it("…and the OTHER direction: the chip still says WHERE over the whole band", () => {
+    // The crime here is „gate the cap line, and while you are at it stop drawing
+    // the sign". The sign's own band may not move — the alpha suite holds it to
+    // ≥3 s of road at the posted 50 km/h, and this asserts the gate did not
+    // quietly spend that. The TITLE is unconditional: outside the size floor the
+    // chip is a title-only plate, never an empty one.
+    const { first, last } = drawnBand();
+    expect(last - first).toBeGreaterThanOrEqual(3 * (50 / 3.6));
+    // The title-only plate is built from the same function with the cap
+    // suppressed, so „drawn without the number" cannot silently become „not
+    // drawn": `withCap` is the ONLY thing that changes.
+    expect(src2).toContain("const cap = withCap ? capLineBg(goal, postedKmh) : \"\";");
+    expect(src2).toContain("makeLabelTexture(pointGoal, postedAtGoal, false)");
+  });
+
+  it("the gate reads the LIVE window, not a device profile", () => {
+    // Four probes in this project have been fooled by a baked-in device. The
+    // cockpit vFOV is hFOV-locked (`cockpitVFovForAspect`), so it changes with
+    // the window shape; a constant here would be the fifth.
+    expect(src2).toContain("capLineCssPxAt(eyeDistM, state.size.height, cam.fov ?? 0)");
+    expect(src2).toContain("capPx >= MIN_LEGIBLE_CAP_CSS_PX ? labelTexture : labelTextureNoCap");
+    // A camera with no `fov` (the top-down orthographic view) must resolve to
+    // „not legible" rather than to NaN — 0 is below any floor.
+    expect(capLineCssPxAt(30, AUDIT_CSS_H, 0)).toBe(0);
+    expect(capLineCssPxAt(0, AUDIT_CSS_H, AUDIT_VFOV_DEG)).toBe(0);
+    expect(capLineCssPxAt(30, 0, AUDIT_VFOV_DEG)).toBe(0);
+    // Monotone in distance, or the swap would chatter at the boundary.
+    for (let d = 5; d < 100; d += 1) {
+      expect(capLineCssPxAt(d + 1, AUDIT_CSS_H, AUDIT_VFOV_DEG)).toBeLessThan(
+        capLineCssPxAt(d, AUDIT_CSS_H, AUDIT_VFOV_DEG),
+      );
+    }
+  });
+
+  it("the swap costs no per-frame allocation — both plates are built per objective", () => {
+    // The module's whole perf contract. A texture built inside `useFrame` would
+    // be a new canvas every tick on the surface that is up for the entire drive.
+    const frameBody = src2.slice(src2.indexOf("useFrame((state) => {"));
+    expect(frameBody).not.toContain("makeLabelTexture(");
+    expect(frameBody).not.toContain("document.createElement");
+  });
+});
+
+describe("the turn chevron is the route's colour, not white", () => {
+  /**
+   * MEASURED, `sc-junction-blind/mobile-right/04-t065s.png`, raw pixels: the
+   * chevron is rgb(255,255,255) at 815,308 / 830,290 / 800,320 and the sky
+   * 270 px to its right is rgb(156,163,170). The same white blob stands beside
+   * the marker shaft on `sc-jx-equal-left/mobile-right/04-t039s.png`.
+   */
+  const MEASURED_SKY: RGB = [156, 163, 170];
+  /** The authored `--accent-2` (globals.css) — the ribbon's own colour. Used as
+   *  the source here, which is the CONSERVATIVE choice: the tone map only ever
+   *  lowers what the fragment emits, so the real accumulation clips sooner. */
+  const ACCENT_2: RGB = [23, 225, 196];
+
+  /** `n` additive layers of `src` at `alpha` over `bg`, in the 8-bit output
+   *  space the blend stage actually works in. The extrusion is `DoubleSide`, so
+   *  a view ray crosses at least the front and back caps. */
+  function additive(src: RGB, alpha: number, bg: RGB, n: number): RGB {
+    return [0, 1, 2].map((i) => Math.min(255, bg[i]! + n * alpha * src[i]!)) as unknown as RGB;
+  }
+  function normal(src: RGB, alpha: number, bg: RGB, n: number): RGB {
+    let out: RGB = bg;
+    for (let k = 0; k < n; k += 1) {
+      out = [0, 1, 2].map((i) => alpha * src[i]! + (1 - alpha) * out[i]!) as unknown as RGB;
+    }
+    return out;
+  }
+  const spread = (c: RGB) => Math.max(...c) - Math.min(...c);
+  const clipped = (c: RGB) => c.filter((v) => v >= 254.5).length;
+
+  it("additive loses the hue, and loses MORE of it the more geometry there is", () => {
+    for (const [, bg] of [...BACKDROPS, ["measured sky", MEASURED_SKY] as const]) {
+      // One layer already blows two channels; by the sixth the arrow IS white,
+      // which is the word both findings used.
+      expect(clipped(additive(ACCENT_2, ARROW_OPACITY, bg, 1))).toBeGreaterThanOrEqual(2);
+      expect(clipped(additive(ACCENT_2, ARROW_OPACITY, bg, 6))).toBe(3);
+      expect(spread(additive(ACCENT_2, ARROW_OPACITY, bg, 6))).toBe(0);
+      // Monotone toward white: every extra layer takes chroma away.
+      expect(spread(additive(ACCENT_2, ARROW_OPACITY, bg, 4))).toBeLessThan(
+        spread(additive(ACCENT_2, ARROW_OPACITY, bg, 1)),
+      );
+    }
+  });
+
+  it("normal blending cannot clip and cannot drift off the accent, at any layer count", () => {
+    for (const [, bg] of [...BACKDROPS, ["measured sky", MEASURED_SKY] as const]) {
+      for (const n of [1, 2, 4, 6]) {
+        const c = normal(ACCENT_2, ARROW_OPACITY, bg, n);
+        expect(clipped(c)).toBe(0);
+        // Still unmistakably teal — the ribbon's own chroma, not a white blob.
+        expect(spread(c)).toBeGreaterThan(150);
+      }
+      // …and it CONVERGES on the accent instead of running away from it, which
+      // is the property that makes the arrow readable as „the same route".
+      const far = normal(ACCENT_2, ARROW_OPACITY, bg, 6);
+      for (const i of [0, 1, 2]) expect(Math.abs(far[i]! - ACCENT_2[i]!)).toBeLessThan(2);
+    }
+  });
+
+  it("THE WIRING: the shipped arrow declares NormalBlending at ARROW_OPACITY", () => {
+    const arrow = src2.slice(src2.indexOf("<mesh ref={arrowRef}"));
+    const material = arrow.slice(0, arrow.indexOf("</mesh>"));
+    expect(material).toContain("blending={THREE.NormalBlending}");
+    expect(material).not.toContain("AdditiveBlending");
+    expect(material).toContain("opacity={ARROW_OPACITY}");
+    expect(material).toContain("color={accent}");
   });
 });

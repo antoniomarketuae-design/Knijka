@@ -5760,7 +5760,7 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and five fix rounds, 2026-08-19
+# THE OPEN LIST — after three repair waves and six fix rounds, 2026-08-19
 
 > **This section is hand-maintained, and it has to be said out loud** because everything above this
 > line is a tally of the frozen corpus and nothing below it can be: it is about *code written after
@@ -5794,6 +5794,22 @@ under. No finding was placed by hand and none was left out.
 > *summed by hand* are not. That is now a pattern rather than an incident, and it is the argument for
 > the generator this document has been asking for since §7.
 >
+> **Re-run a FIFTH time on 2026-08-19 for the round-6 gate, by a fifth independent reader**: the same
+> **1,712 · 26 · 1,686 · 161 SUMMARY · 1,012 BROKEN (318 critical · 613 major · 81 minor) · 512
+> UNPOLISHED · 1 COULD_NOT_TEST · 138 suspect files · 161 lessons**, and additionally the supersession
+> split itself — the 26 dropped records are **22 `SUMMARY` + 4 `BROKEN`** — and the seven unopenable
+> entries to the row (`unknown` 22/2c · `rules` 5/2c · `collision` 3/1c · `vehicle` 3/1c ·
+> `world/builders` 1/0c · `environment` 1/0c · `traffic` 1/0c = 36/6c). **Five readers now agree and
+> the corpus has never moved.** §1's coverage union also reproduced this time — **63 / 68 / 7**,
+> unchanged, because round 6 opened no new corpus file. **What did NOT reproduce was one row inside
+> §1's table**: `round 2 · the 8 lanes (e9bf33c)` publishes `7 | 149 | 30` and recomputes to
+> **`8 | 150 | 30`** — `environment/SimEnvironment.tsx` (1 finding, 0 critical) is in that commit's
+> diff and was missing from the row. The union is unaffected, because that file is opened by another
+> round as well. It is corrected in §1. **Four consecutive rounds now: the computed tally is exact and
+> a hand-summed row is wrong — and note that this row was NOT among the five the round-5 gate
+> validated, which is precisely why it survived.** Spot-checking the rows that were already right
+> cannot find the rows that are wrong.
+>
 > **Provenance is marked on every row.** `[gated]` = I ran the command and read its own exit code.
 > `[corpus]` = computed over the 24 JSONL files today. `[adversarial]` = a reviewer whose only job
 > was to break a fix measured it; where their measurement survives my re-reading of the code it is
@@ -5807,30 +5823,112 @@ under. No finding was placed by hand and none was left out.
 
 ## 0 · The gate, exactly as it stands
 
-Run over the whole tree on **2026-08-19**, at commit `ed2dd6f` **plus the uncommitted round-5 working
+Run over the whole tree on **2026-08-19**, at commit `8a9a9a9` **plus the uncommitted round-6 working
 tree** (8 concurrent fix lanes; nothing was committed), **each command's own exit code read directly
 and never through a pipe** — `| tail` reports the *pipe's* status and has already once reported a red
 suite in this project as `EXIT:0`. Every run below was redirected to a file, never piped, with `$?`
-echoed in the same shell immediately after. Neither run was backgrounded this round, which is the trap
-§0.4 recorded. `[gated]`
+echoed in the same shell immediately after. Nothing was backgrounded, which is the trap §0.4 recorded.
+`[gated]`
 
 | gate | result | exit |
 |---|---|---|
-| `npx tsc --noEmit` | **clean — no output at all.** §0.4's four errors were syntax errors inside `platform/.next-harness/dev/types/routes.d.ts`, a gitignored Next build artifact; the artifact is gone and the raw exit code is now 0 as well as the source verdict | **0** |
-| `npx vitest run --maxWorkers=2` | **899 files** — 896 passed · **2 failed** · 1 skipped · **14,123 tests** — 13,951 passed · **2 failed** · 170 skipped · 369.3 s | **1** |
+| `npx tsc --noEmit` | **clean — no output at all** | **0** |
+| `npx vitest run --maxWorkers=2` | **902 files** — 899 passed · **2 failed** · 1 skipped · **14,193 tests** — 14,021 passed · **2 failed** · 170 skipped · 375.7 s | **1** |
 | `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking** | **0** |
-| `node platform/scripts/tools-tests.mjs` — the runner partition **and** the node:test half, run in full **in addition** to the three | **partition OK: 921 test files, 899 vitest / 22 node:test, none shared, none orphaned**; `vitest.config.ts` still spreads `VITEST_INCLUDE`. Then **387 tests, 386 pass, 1 fail** | **1** |
+| `node platform/scripts/tools-tests.mjs` — the runner partition **and** the node:test half, run in full **in addition** to the three | **partition OK: 924 test files, 902 vitest / 22 node:test, none shared, none orphaned**; `vitest.config.ts` still spreads `VITEST_INCLUDE`. Then **390 tests, 390 pass, 0 fail** | **0** |
 
 **`vitest` exits 1 on exactly TWO tests, and they are the two that need a signature no agent may
 give** (§8): `exam/__tests__/content-bank.test.ts` (`ptp-i-parva-pomosht` 31/64 = 48 % against a 50 %
 floor) and `lesson/__tests__/compose.test.ts` (`l-accidents-first-aid` carries no quiz beat). **Both
-were checked as still RED, deliberately.** A green there would not be good news — it would mean a
-content `status` field had been flipped to clear a gate, and this check is written that way on purpose.
-**Round 4's third failure is gone**, closed by the commit that landed it (`ed2dd6f`, O24).
+were checked as still RED, deliberately, and both were checked to have RUN** — see §0.6.1, where they
+were red for the wrong reason for an entire gate run. A green there would not be good news — it would
+mean a content `status` field had been flipped to clear a gate, and this check is written that way on
+purpose.
 
-**THE FOURTH GATE IS THE ONE THAT IS RED, AND IT IS NOT IN THE BRIEF'S LIST OF THREE — see §0.5.**
-`node scripts/tools-tests.mjs` is the repo's SECOND test runner, and running only the three named gates
-cannot see it. Its one failure is **pre-existing at `ed2dd6f`** and no round-5 lane caused it.
+**THE FOURTH GATE IS GREEN FOR THE FIRST TIME.** `node scripts/tools-tests.mjs` — the repo's SECOND
+test runner, invisible to the brief's list of three — was **1 fail** at `ed2dd6f` and at `8a9a9a9`, and
+round 6 closed it. That failure was §0.5's class (b): `insets.test.mjs:140` convicting
+`zoom-follows-window.mjs` of opening a browser context without the notch. All three files in that
+episode are in the round-6 working tree and the gate now reports **390 / 390**.
+
+### 0.6 — Round 6: zero collisions, zero regressions, the fourth gate green — and a gate run that was RED for 54 files before a single lane was read
+
+**8 concurrent lanes, 13 files modified and 3 new test files — and the delta against `8a9a9a9` on the
+three named gates is ZERO, with the fourth gate moving from red to green.** `[gated]`
+
+| | baseline `8a9a9a9` | round 6 (working tree) | delta |
+|---|---:|---:|---:|
+| vitest test **files** | **899** | **902** | **+3** |
+| node:test **files** (second runner) | **22** | **22** | **0** |
+| vitest tests **failed** | 2 | **2** | **0** |
+| vitest tests **passed** | 13,951 | **14,021** | +70 |
+| vitest tests skipped | 170 | 170 | 0 |
+| `tsc` errors | 0 | **0** | 0 |
+| content-validation blocking | 0 | **0** | 0 |
+| tools-gate failures | **1** | **0** | **−1** |
+
+**No failure in this round is class (a), a cross-lane collision.** The signature of a collision is a
+test failing in a file no lane owned, and after the toolchain was repaired (§0.6.1) **there is no
+failing file outside the two content rows at all**. Nor is anything class (c) — a lane shipping a test
+file it never ran: the three new test files carry **57, 38 and 13** `expect(`s across 13, 14 and 4 test
+blocks, all green, and a repo-wide sweep again found **zero** test files under `platform/src` with no
+`expect(` in them.
+
+**The +3 is not what the brief predicted, and the brief was repeating a stale number §0.5 had already
+corrected.** The round-6 brief again stated a baseline of **878** files and predicted **881** if „the
+orphaned-runners lane" delivered. As §0.5 records, **878 is `scripts/tools-tests.mjs`'s own header
+figure measured at `85ca415`**, and **the orphaned-runners fix landed in `ed2dd6f`, two rounds ago**.
+`../tools/mobile/{ladder,selectors,settle}.test.mjs` are in `VITEST_INCLUDE` at HEAD, were collected
+this round and **passed — 3 files, 37 tests, 0 failures**. There was no orphaned-runners lane in round
+6 to deliver anything. The real baseline is **899 at `8a9a9a9`**, the real count is **902**, and the +3
+is three new test files from the finish/off-network lanes. **Had the 878/881 prediction been used as
+the gate, a clean round would have read as a +21 catastrophe — the second consecutive round in which a
+stale baseline pointed the alarm at a correct result.** A baseline is a measurement at a commit; it
+must be re-measured at the commit under test, not quoted.
+
+#### 0.6.1 — The gate was red on 54 files, and not one of them was a lane's fault
+
+**The first run of this gate reported `tsc` EXIT:1 and vitest EXIT:1 with 54 failed test files.** That
+is exactly the shape the brief warned about — a wall of failures in files no lane owned — and it was
+**entirely an artefact of a damaged `node_modules`**, not of any code in the tree. It is recorded here
+because a gate agent that reported those 54 as findings would have manufactured 54 false collisions,
+and because the failure was *silent in the reassuring direction* in one particular way: the two content
+rows that MUST be red were red, so the headline verdict looked correct.
+
+What was actually wrong, measured:
+
+* `platform/node_modules/.bin` was **empty — 0 entries** — while 534 packages sat unpacked beside it,
+  and `node_modules/.package-lock.json` was **absent**. The install had been partially materialised.
+* `npx tsc --noEmit` therefore did not run the project's TypeScript. npm resolved the name off the
+  registry instead and **downloaded `tsc@2.0.4`**, an unrelated abandoned package, which printed *"This
+  is not the tsc command you are looking for"* and exited 1. `npx vitest` printed *"'vitest' is not
+  recognized as an internal or external command"*.
+* Run through the real binaries (`node node_modules/typescript/bin/tsc`), `tsc` reported **23 errors,
+  every one of them `TS2307 Cannot find module`** — `@dimforge/rapier3d-compat`, `@dimforge/rapier3d`,
+  `@anthropic-ai/sdk` — plus 3 `TS7006` cascading off them. **Zero were type errors in lane code.**
+* **8 of 41 declared dependencies were missing outright**, and transitive packages with them
+  (`@babel/runtime`, `@img/colour`).
+* All 54 vitest failures were **collection errors, not assertion failures**: 0 tests failed, because
+  the files never imported. 7 died on `@dimforge/rapier3d-compat`, 5 on `@anthropic-ai/sdk`, 1 on
+  `@babel/runtime/helpers/extends` (via `@react-three/drei`), 1 on `@img/colour` (via `sharp`), and the
+  remaining 40 on the same four causes reached through their own import chains.
+
+**The trap: `content-bank.test.ts` and `compose.test.ts` were both in the 54.** They are the two files
+the brief names as legitimately red, and a gate that only checks *"are those two red?"* would have
+answered **yes** and passed the round — while 52 other files silently ran nothing. They were not red;
+they were **absent**. `content-bank.test.ts` in isolation died on `Cannot find package
+'@anthropic-ai/sdk' imported from src/modules/tutor/model.ts` and executed **no tests at all**.
+**„Red" and „did not run" print differently only if you read the test count, and the brief's alarm is
+written on the assumption that a named failure is a real one.**
+
+Every one of the 8 missing packages was **already in `package-lock.json`**, so `npm install` restored
+the tree from the committed lock without resolving anything new: the lockfile came back **byte-identical
+except for CRLF normalisation — `git diff --numstat` reported 0 added and 0 removed lines** — and was
+restored to HEAD regardless. `node_modules` is gitignored, so the repair dirtied nothing. After it:
+`.bin` holds 96 shims, all 41 declared deps are present, `tsc` exits **0**, and vitest returns to
+**902 files / 2 failures**. **The three gate commands as written in the brief are correct only when the
+toolchain is intact; they cannot detect that it is not, and they fail in a way that looks exactly like
+a bad round.**
 
 ### 0.5 — Round 5: zero collisions, zero regressions, six older open rows closed, and a red gate the brief did not name
 
@@ -6235,7 +6333,19 @@ except the re-drive's own rows.
 superseded (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major ·
 81 minor) · 512 `UNPOLISHED` · 1 `COULD_NOT_TEST`**, over **138 suspect files** and **161 lessons**.
 Also reproduced to the row: **5 records naming no frame**, and **the top 18 lanes carrying 365 of the
-1,012 and 201 of the 318**. Three repair waves and four fix rounds have now edited **63** of the 138.
+1,012 and 201 of the 318**. Three repair waves and five fix rounds have now edited **63** of the 138.
+
+**ROUND 6 OPENED NO NEW FILE EITHER — the union is unchanged at 63/68/7 for the second round running.**
+Its five corpus files were all already open, and they are the heaviest set any single round has been
+pointed at except round 5's: `lesson-ui/LessonPlayShell.tsx` (71/0c), `rules/engine.ts` (**65/41c** —
+the largest critical bucket in the corpus), `components/sim/RouteGuidance.tsx` (23/0c),
+`lessons/finish.ts` (22/13c) and `lessons/scenario/templates-conditions.ts` (11/3c) — **192 findings,
+57 critical**. Six of its sixteen working-tree paths are in no corpus file at all
+(`runtime/locator.ts`, three `tools/mobile` files and the test files), which is the mobile-insets lane
+closing §0.5's class (b) defect and the off-network lane building the arm §2.6 O29 routes out.
+**Two consecutive rounds opening no new file is the coverage story of this programme**: 68 files
+carrying 169 findings and 25 criticals have now been named as never opened for six rounds running, and
+the queue keeps returning to files that are already open.
 
 **CORRECTED 2026-08-19 (round-5 gate) — the union row was 57 and it was wrong in the reassuring
 direction, which is the direction this document keeps having to correct.** The coverage split is the
@@ -6260,13 +6370,22 @@ coverage count.** §2.2's own numbers are corrected in place.
 | wave 3 (commit `2f5ce8f`) | 44 | 581 | 225 |
 | round 2 · red-clearing (commit `7a0ab52`) | 3 | 7 | 4 |
 | round 2 · collision episode (commit `4dd1850`) | 6 | 123 | 60 |
-| round 2 · the 8 lanes (commit `e9bf33c`) | 7 | 149 | 30 |
+| round 2 · the 8 lanes (commit `e9bf33c`) | 8 ‖ | 150 ‖ | 30 |
 | round 3 · the 8 lanes (commit `2f68ab5`) | 8 | 137 | 20 |
 | round 4 · the 8 lanes (commit `ed2dd6f`) | 5 | 114 | 62 |
-| round 5 · the 8 fix-scoped lanes (**working tree, UNCOMMITTED**) | 9 | 216 | 64 |
+| round 5 · the 8 fix-scoped lanes (commit `8a9a9a9`) | 9 | 216 | 64 |
+| round 6 · the 8 lanes (**working tree, UNCOMMITTED**) | 5 | 192 | 57 |
 | **union — ever opened (a real file, really edited)** | **63** | **807** | **287** |
 | **never opened at all** | **68** | **169** | **25** |
 | **names no file — unopenable as filed** | **7** | **36** | **6** |
+
+‖ **CORRECTED 2026-08-19 (round-6 gate): the round-2 eight-lane row read `7 | 149 | 30` and recomputes
+to `8 | 150 | 30`.** `environment/SimEnvironment.tsx` (1 finding, 0 critical) is in
+`git diff --name-only e9bf33c~1 e9bf33c` and was missing from the row. **The union is unaffected** —
+that file is opened by another round as well, so 63/807/287 stands. Note *which* row this was: the
+round-5 gate validated its recomputation against five rows it found already correct
+(30/623/216 · 5/174/109 · 44/581/225 · 3/7/4 · 6/123/60) — **and this row was not one of them.**
+Checking the rows that agree cannot find the rows that do not.
 
 **EVERY ROW IS NOW ONE MEASURE — "corpus files this commit touched"** — recomputed mechanically
 2026-08-19. The round-3 and round-4 rows previously read `3` and `0 net-new`: those were *newly
@@ -6528,7 +6647,7 @@ of prose arguing it — and does not do what the prose says.
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
 of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's;
 O20–O26 are round 4's; O27–O28 are round 5's — the round that also CLOSED six older rows, the first to
-close any.** Four of wave 3's are
+close any — and O29–O30 are round 6's, which closed O28 one round after it was filed.** Four of wave 3's are
 *structured*: a lane declared a typed `KNOWN_OPEN` array so that a row silently disappearing turns its
 own staleness test red — the closest thing the programme has to the `closedBy` field §7 keeps asking
 for, pointed backwards. **Never add a row to one for a finding you could have fixed** is the rule each
@@ -6683,6 +6802,43 @@ O15/O18/O26 round 3's, O22 round 4's — narrowed above — and O27/O28 are new.
 holds and now has its counter-example: fifteen of the twenty-six were one edit in a file the lane did
 not own, and the round that scoped lanes to a FIX instead of a FILE closed six of them in one pass.
 That is the shape the remaining eighteen should be spent in.**
+
+**Round 6's own rows, O29–O30 — and O28 closed the round after it was filed.** `[read]` Both new rows
+were written into the tree by the lane that could not close them and read out of the file named today.
+
+**O28 IS CLOSED.** `rules/engine.ts` now arms the third lamp detector: a `snowLights` episode
+(`+93` lines in that file, `+124` in `rules/__tests__/conditions.test.ts`) with `SNOW_LIGHTS_COPY`
+titled «Движение в снеговалеж без светлини», carrying the retrieved article **чл. 70, ал. 1** and its
+reasoning for treating snow as the third weather flag under one law rather than a second law — and,
+per ADR-002, the article is quoted from retrieval, not recalled. The measurement the lane recorded
+before reusing the rain copy is in the header: the snow preset is a *snowfall veil* authored at density
+0.012 (~40 % transmittance at 80 m), not dry packed snow, so reduced visibility is the honest basis.
+**This is the second consecutive round to close a row filed by the round before it**, and it closes the
+half O28 explicitly routed rather than a half the lane chose for itself.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O29 | **The off-network ending is BUILT and nothing folds it.** `stepOffNetwork` exists and is tested, but a shipped lesson driven off the authored world still does not end: `sc-junction-blind@L1` reports `edgeId: null` from the first frame and drives for **300 s — four times `OFF_NETWORK_STUCK_S`** — with the fold available and nothing calling it. This is O22's channel, now half-built | verbatim: *“STILL OPEN — the arm is in a file this lane does not own … WHEN `lessons/engine.ts` FOLDS `stepOffNetwork` (the arm is written out verbatim at the end of finish.ts's O22 block), this expectation inverts: `phase` becomes \"completed\" at ≈ 75 s and the pushed HUD event must equal `offNetworkEndingCopy(false)`. Failing here is the correct outcome then — it is the signal that the routed change landed, not a regression.”* | `lessons/__tests__/off-network-ending.test.ts:293` → `lessons/engine.ts` |
+| O30 | **A published mobile verdict of „0 off-screen" was measured on a phone with no notch, and the stale reading is quoted where this lane cannot reach it.** The horizontal half of the founder's both-edges finding survives untouched; the vertical half does not, because `verdict.off` counts the top and bottom edges too and the bottom was measured with 34 px of home indicator missing from `<body>` and from every `env(safe-area-inset-bottom)` the HUD authors — `--sim-touch-floor` among them, in exactly the band the driving controls live in | verbatim: *“The stale reading is quoted in a file this lane does not own — `platform/src/components/sim/lesson-ui/shellViewportContract.test.ts:86-91` — and in the commit message of `7e2fd21`, which is immutable. Both say \"0 off-screen\" without saying on which axes.”* | `tools/mobile/zoom-follows-window.mjs:58` → `lesson-ui/shellViewportContract.test.ts:86–91` |
+
+**O29 is the clearest statement yet of what the routing debt costs.** The ending exists, the copy
+exists, the tests exist, the arm is written out verbatim in the file that needs it — and a student
+driving off the map still gets no ending, because the one line that folds it is in another lane's file.
+**O22 was filed in round 4 against `rules/engine.ts`; round 6 built everything around it and could
+still not close it.** A row can be worked twice and stay open when the boundary, not the difficulty, is
+what blocks it.
+
+**O30 is a residue row of a different kind: a measurement that is still quoted after being refuted.**
+The lane could correct its own instrument but not the two places the old number is published, one of
+which is a commit message and cannot be corrected at all. **Where a wrong measurement has been
+published, closing the finding means retracting the publication, and only one of those two is
+reachable by code.**
+
+**Twenty-eight rows became thirty, and seven of the twenty-eight have closed.** Of the twenty-three
+still open: O1–O10 (wave 3) stand exactly as written and have now survived six rounds; O12 and O16 are
+round 2's, O15/O18/O26 round 3's, O22 round 4's, O27 round 5's, and O29/O30 are new. **Seventeen of the
+thirty were one edit in a file the lane did not own** — and O29 shows the debt compounding rather than
+clearing: it is O22 again, one layer further built.
 
 ## 3 · Wave 2, lane by lane — what survived refutation and what did not
 
@@ -6925,6 +7081,38 @@ mid-write, naming files nobody touched, and this is the second consecutive round
 `tsc` result was decided by an artifact outside the repository. The remedy is unchanged and is one line:
 that import is in a **gitignored, Next-generated** file, so the fix belongs in whichever session owns
 `.next-harness`, not in a source edit here.
+
+**THE ROUND-6 GATE ADDS A THIRD HAZARD OF THE SAME FAMILY, AND IT IS THE WORST ONE YET: the
+`node_modules` tree itself.** `[gated]` `platform/node_modules/.bin` was **empty**,
+`node_modules/.package-lock.json` **absent**, and **8 of 41 declared dependencies missing**, so
+`npx tsc` fetched an unrelated `tsc@2.0.4` off the registry and 54 test files failed to import. Full
+measurement in §0.6.1. It belongs beside `.next-harness` because it is the same class — **a gate whose
+verdict is decided by state outside the repository, failing in a way that is indistinguishable from a
+bad round** — and it is worse in one specific respect: `.next-harness` makes `tsc` red on files nobody
+touched, which reads as strange; a broken install makes *test files* red, which reads as **cross-lane
+collisions**, the exact thing a round-6 gate is convened to look for. The repair is
+`npm install` from the committed lock (the lock already contained all 8; it came back byte-identical
+bar CRLF). **The standing remedy is to check the toolchain before believing the gate**: an empty
+`.bin`, or `npx` announcing it will *install* a tool the repo already depends on, invalidates the run.
+
+**Residue sweep, round 6 — clean under `platform/src`, with two standing exceptions.** `[gated]`
+`git status` shows **3 untracked files, all substantial test files** (57/38/13 `expect(`s), no probe or
+scratch files. **Zero** test files under `platform/src` lack assertions. Two tracked items match the
+residue pattern and are named rather than removed, because neither is this gate's to delete:
+
+* `modules/sim/runtime/__tests__/b15-roundabout-wait.probe.test.ts` — its own header reads *"B15 PROBE
+  — NOT A GATE. Throwaway measuring rig … **Delete once the row is decided**."* It is collected and run
+  by the vitest gate every round. The row it was built to decide is B15 in doc 87; **it is the one file
+  in the suite that says it should not be in the suite.**
+* `tools/clips/headless/gpu_probe_gpu.png` and `probe_start.png` — committed binary probe output, the
+  same class as the `_scratch.test.ts` dump closed above. `.classroom-shots/` holds a further **15
+  committed PNGs**. None is read by any test.
+
+Also present and NOT residue, recorded so a future sweep does not re-flag them: `scratchpad/` and
+`tools/mobile/.out/` are gitignored working dirs, and **two stale git worktrees** live under
+`.claude/worktrees/` (`heuristic-wozniak-87cbdc` at `f588594`, `xenodochial-blackburn-dfd31f` at
+`8442b91`) — full repo copies belonging to other sessions, which is why they are named rather than
+pruned.
 
 **CLOSED — the committed debug dump is gone.** `world/builders/__tests__/_scratch.test.ts` (42 lines,
 `expect(1).toBe(1)`, writing a marking-quad census to a hard-coded absolute path inside one session's
