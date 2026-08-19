@@ -315,10 +315,23 @@ export function setWeatherTarget(rain: boolean, fog: boolean, snow: boolean): vo
  * is this function, and the reason it exists belongs next to the state it
  * primes rather than in two dev routes.
  *
- * ROUTED OUT, NOT FIXED HERE: the LIVE path still opens clear and still leaks,
- * because the scene boundary is SimEnvironment's mount effect — one line,
- * `primeWeather` instead of `setWeatherTarget`, in a file this lane does not
- * own (`SimEnvironment.tsx:191`).
+ * THE LIVE PATH NOW USES IT — 2026-08-19, and the route was traced end to end
+ * rather than assumed, because the debt note this replaces was read past twice.
+ * `SimEnvironment` primes on its FIRST effect run and ramps on every later
+ * `[rain, fog, snow]` change: a mid-drive weather change is a transition the
+ * student should watch happen, only the scene boundary is a cut.
+ *
+ * That boundary is real, which was the open question. `LessonScene` mounts
+ * `<SimEnvironment>` with no key of its own, but `LessonPlayShell` renders
+ * `<SceneSlot key={sceneEpoch}>` and its owner keys the SHELL on the lesson id.
+ * So a different lesson remounts the whole subtree, and «Повтори» bumps
+ * `sceneEpoch` to remount it again — the prime fires on both, which is exactly
+ * the pair of moments a previous scene's rain could otherwise ramp into.
+ *
+ * `environment/index.ts` exports this too. It did not until the same day, and
+ * doc 05's module boundary meant the two dev capture routes that exist to use
+ * it could not reach it: a helper the boundary rule hides is a helper that does
+ * not exist.
  */
 export function primeWeather(rain: boolean, fog: boolean, snow: boolean): void {
   setWeatherTarget(rain, fog, snow);
