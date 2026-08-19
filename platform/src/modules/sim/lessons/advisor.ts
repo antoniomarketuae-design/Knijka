@@ -19,7 +19,7 @@
  * part of the car (unlike the status dashboard, which stays up on exams).
  */
 
-import type { HudEvent, LessonSpec } from "../contracts";
+import type { HudEvent, LessonObjective, LessonSpec } from "../contracts";
 import {
   PRE_DRIVE_STEP_CONTROLS,
   PRE_DRIVE_STEP_ORDER,
@@ -27,6 +27,12 @@ import {
 } from "../procedures";
 import { VIOLATIONS, type SimTick, type ViolationCode } from "../rules";
 import { parseScenarioLessonId } from "./scenario";
+// Deep, not through the `./scenario` barrel: the barrel line belongs in
+// scenario/index.ts, a file this lane does not own. The value import above
+// already pulls that graph in, so this adds no edge — and importing the key
+// rather than mirroring it as a literal means the writer and the reader cannot
+// drift into 499 silently silent cards.
+import { AUTHORED_MAX_SPEED_PARAM_KEY } from "./scenario/compile";
 import type {
   LessonSessionState,
   ObjectiveEvalState,
@@ -192,11 +198,20 @@ function titleCapKmh(titleBg: string): number | undefined {
  * i.e. the author's gate plus the rung's grace (`scenario/params.ts`
  * widenSpeedCap). 95 printed a FRACTION of a km/h — «дръж под 54.5 км/ч» — a
  * speedometer cannot show it and no instructor says it, which is the tolerance
- * signing its own name. After this gate 494 cards say the sentence without a
- * number and 459 still carry one; every one of the 95 fractions is gone.
+ * signing its own name. Every one of the 95 fractions is gone.
+ *
+ * THE CENSUS LINE THAT USED TO STAND HERE WAS WRONG, and nothing checked it.
+ * It read „After this gate 494 cards say the sentence without a number and 459
+ * still carry one". Re-measured at the head of this wave: **499 silent, 454
+ * numbered**. The 953 reconciles either way, which is exactly why the split
+ * could rot unnoticed — `advisor-sweep161.test.ts` asserted only `> 900` and
+ * `> 400`, so five cards could move between the halves and the suite would not
+ * blink. A stated measurement that nothing asserts is how three of these went
+ * stale in this file alone; every number below is pinned, card for card, in
+ * `__tests__/advisor-authored-cap.test.ts`.
  *
  * So the test stops being „how big may the number be" and becomes „whose number
- * is it". Exactly three sources qualify:
+ * is it". Four sources qualify:
  *
  *  1. THE HALT BAND. At or below ADVISOR_HALT_CAP_KMH `widenSpeedCap` returns
  *     early and adds nothing, so a „под 6 км/ч" IS the author's own figure and
@@ -216,11 +231,58 @@ function titleCapKmh(titleBg: string): number | undefined {
  *     about this zone: sc-sp-curve's street is 90 and the A1 plate recommends
  *     50, so „under 90" would have licensed the card's 60 through a curve the
  *     lesson exists to slow him down for.
+ *  4. THE AUTHOR'S OWN CAP, before the ladder touched it — the source the three
+ *     above could not see, and the one that ends the silence. See below.
  *
- * With none of the three the number is the grader's tolerance and nothing else,
- * and the card falls back to the objective's own authored title — the fallback
- * this module already uses everywhere else. It is not a silent card: the
- * sentence the author wrote stays, only the invented figure goes.
+ * ── 4. AND THE SILENCE THAT WAS LEFT, WHICH IS THE SAME CRIME ──
+ *
+ * Returning `undefined` was never neutral. THE GATE KEPT GRADING. Of the 953
+ * capped cards, 644 sit above the halt band and **499 of those said no number
+ * at all while being graded on one**. Measured across every surface the student
+ * can see — the objective's own title, every step of the compiled briefing, and
+ * the street's posted limit:
+ *
+ *   169  cards had NO speed number on any of the three, and a gate anyway
+ *   116  more showed only numbers ABOVE their gate, so the student who obeyed
+ *        the strictest figure he was given still failed
+ *
+ * The exhibit is the reference lesson: `sc-zebra-approach@L1 / sc-za-approach`
+ * reads «Приближи пътеката с готовност за спиране», names no speed, and grades
+ * at 45. The sharp end of the 116 is `sc-crossing-child-ball@L1`, whose briefing
+ * says «под 40 км/ч» over a gate of 37. That is the founder's own complaint
+ * standing one street over — he signalled a roundabout exit correctly and the
+ * engine failed him — and THEO-4 requirement zero names it: a grade against an
+ * unstated threshold is a bare verdict, which this product may never hand a
+ * seventeen-year-old.
+ *
+ * WHAT WAS NOT AVAILABLE was closing it by dropping the cap. Speed is the single
+ * most-graded thing in the Bulgarian practical exam; a cap that stops grading is
+ * a lesson that stops teaching. Nor could the gate simply be tightened onto the
+ * author's figure — that moves 192 graded gates and their committed traces,
+ * which is a decision and not a bug fix (the same line B58 drew at its own 32).
+ *
+ * So the card says the AUTHOR'S cap: `scenario/compile.ts` now carries the
+ * template's own `maxSpeedKmh` — the value BEFORE `widenSpeedCap` folded the
+ * rung's grace in — on the compiled objective, and this function takes it as a
+ * fourth source. It is the halt band's argument generalised: source 1 is
+ * trusted precisely because widenSpeedCap adds nothing at or below 8, so the
+ * figure is the author's. Above 8 the author's figure still exists; until now
+ * it was simply thrown away at compile time, and „the grader's tolerance" was
+ * blamed for a number that had an innocent twin.
+ *
+ * MEASURED, over every compiled rung of every template, after the change:
+ *
+ *   953 of 953  capped cards speak a number (was 454; +499, all of them the
+ *               cards that had been silent)
+ *     0         cards change a number they were already speaking — in every
+ *               one of the 145 above-halt cards that already spoke, the title
+ *               or the sign was already at or under the author's cap, so this
+ *               source only ever fills a hole
+ *     0         fractions, 0 spoken figures above their own gate
+ *
+ * That last pair is the invariant this whole block exists for and it is now
+ * total rather than partial: EVERY capped objective states the number it is
+ * graded on, and the number it states can never fail the student who obeys it.
  *
  * The `Math.min` at the end is the half that must not be dropped. Where the
  * visible number is LOOSER than the gate (an authored „под 90 км/ч" over a gate
@@ -231,6 +293,7 @@ function spokenCapKmh(
   capKmh: number,
   titleBg: string,
   postedLimitKmh?: number,
+  authoredCapKmh?: number,
 ): number | undefined {
   if (capKmh <= ADVISOR_HALT_CAP_KMH) return capKmh;
   const authored = titleCapKmh(titleBg);
@@ -241,10 +304,21 @@ function spokenCapKmh(
     postedLimitKmh < capKmh
       ? postedLimitKmh
       : undefined;
-  if (authored === undefined && posted === undefined) return undefined;
+  // Source 4. Guarded like the sign: a non-finite or non-positive value is not
+  // a speed, and the `Math.min` below would take a bad one as the strictest.
+  const own =
+    authoredCapKmh !== undefined && Number.isFinite(authoredCapKmh) && authoredCapKmh > 0
+      ? authoredCapKmh
+      : undefined;
+  // Still possible, and deliberately: a lesson compiled outside the scenario
+  // pipeline (curriculum specs, the exam bank, a test double) carries no
+  // authored cap, and there this function behaves exactly as it did — the
+  // graceful-degradation half of the `postedLimitKmh` precedent.
+  if (authored === undefined && posted === undefined && own === undefined) return undefined;
   const visible = Math.min(
     authored ?? Number.POSITIVE_INFINITY,
     posted ?? Number.POSITIVE_INFINITY,
+    own ?? Number.POSITIVE_INFINITY,
   );
   return Math.min(visible, capKmh);
 }
@@ -284,20 +358,27 @@ function titleNamesController(titleBg: string): boolean {
  * it) sharpens phase-dependent maneuvers — currently the roundabout, whose
  * exit-indicator hint only makes sense once the ring has been entered.
  * `postedLimitKmh` is the street's own limit — see shownCapKmh (B58).
+ * `authoredCapKmh` is the template's own `maxSpeedKmh` before the rung's grace
+ * was folded in — source 4 on spokenCapKmh, and the reason no capped card is
+ * silent any more. It cannot ride on `params`: those arrive through
+ * `parseObjectiveParams`, whose whitelist drops it (which is exactly what keeps
+ * it out of grading), so it comes down its own argument like the sign does.
  */
 export function advisorPromptForObjective(
   titleBg: string,
   params: ObjectiveParams,
   evalState?: ObjectiveEvalState,
   postedLimitKmh?: number,
+  authoredCapKmh?: number,
 ): AdvisorPrompt {
   switch (params.kind) {
     case "reachZone": {
       // Speed-capped zones: the cap is the coachable part (approach discipline).
       if (params.maxSpeedKmh === undefined) return { textBg: titleBg, keys: [] };
-      // One sentence, one number, and it belongs to the sign, the author or
-      // the halt band — never to the grader's tolerance alone (spokenCapKmh).
-      const shown = spokenCapKmh(params.maxSpeedKmh, titleBg, postedLimitKmh);
+      // One sentence, one number, and it belongs to the sign, the author's
+      // title, the halt band or the author's own cap — never to the grader's
+      // tolerance alone (spokenCapKmh).
+      const shown = spokenCapKmh(params.maxSpeedKmh, titleBg, postedLimitKmh, authoredCapKmh);
       if (shown === undefined) return { textBg: titleBg, keys: [] };
       return { textBg: `${titleBg} — дръж под ${shown} км/ч`, keys: [] };
     }
@@ -413,12 +494,28 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     if (!lampOutranked) return yieldWaitAdvisorPrompt(waiting.reason);
   }
 
+  // The author's own cap comes off the RAW compiled objective, not off
+  // `active.params` — `parseObjectiveParams` built those from a whitelist and
+  // dropped the key on the way, which is the property that keeps a coaching
+  // number out of the grader. `active.spec` is the objective as compiled, so
+  // the sentence and the gate read the same single authored source.
   return advisorPromptForObjective(
     active.spec.titleBg,
     active.params,
     s.evalStates[s.currentObjectiveIndex],
     s.lesson.postedLimitKmh,
+    authoredCapOf(active.spec),
   );
+}
+
+/**
+ * The template's own `maxSpeedKmh` off a compiled objective, or undefined for a
+ * lesson that was never compiled by `scenario/compile.ts` (curriculum specs,
+ * the exam bank, a hand-built test double) — see AUTHORED_MAX_SPEED_PARAM_KEY.
+ */
+function authoredCapOf(spec: LessonObjective): number | undefined {
+  const v = spec.params[AUTHORED_MAX_SPEED_PARAM_KEY];
+  return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
 // ---------------------------------------------------------------------------

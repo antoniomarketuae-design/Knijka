@@ -395,6 +395,29 @@ export interface StagedEnv {
 
 const samp = { x: 0, y: 0, dirX: 0, dirY: 0, segHint: 0 };
 
+/**
+ * Hold arcs onto the path. BOTH bounds are load-bearing and NEITHER is
+ * exercised by the shipped catalogue — measured 2026-08-19, 113 hold-carrying
+ * actors reachable from SCENARIO_TEMPLATES + EXAM_SHELLS, staged against their
+ * own districts: 0 high-clamped, 0 low-clamped. An adversarial re-read found
+ * the ceiling inert (remove it → 57 files / 549 tests of traffic + orchestrator
+ * still green) and the floor caught only by one test six hundred files away
+ * (signals-sweep161.test.ts:234). That is a difference in luck, not in kind.
+ *
+ * Kept, because `sampleLane` (graph.ts) clamps the segment INDEX and not the
+ * interpolant: off either end it evaluates t outside [0,1] and returns a point
+ * marching away down the final segment forever. An actor whose authored hold
+ * misses its path therefore gets a plausible pose in the terrain — no NaN, no
+ * error — the encounter the lesson is built around never happens, and the
+ * student is handed a green tick for a skill nothing measured. Clamped, he
+ * stands at the end of his own road where the reachability battery can still
+ * see him; refusing him outright would delete the encounter instead.
+ *
+ * Pinned by __tests__/staged-hold-clamp.test.ts, which fails on the removal of
+ * either bound AND on a clamp that moves an interior hold — and whose §2 sweeps
+ * the catalogue so the day an authored hold does fall outside its path it is
+ * named rather than quietly parked at the end of the road.
+ */
 function clampArc(path: StagedPath, s: number): number {
   return s < 0 ? 0 : s > path.length ? path.length : s;
 }

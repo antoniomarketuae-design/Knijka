@@ -39,7 +39,10 @@
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
+import { collectProps, mountHook } from "./hookHarness";
+import { SimOverlay } from "../SimOverlay";
 import {
   foldLinesBelow,
   FOLD_FALLBACK_LEADING_PX,
@@ -216,5 +219,253 @@ describe("the sheet carries the affordances the peek has had since 2026-08-14", 
     const controls = peek.indexOf("cardIsDismissButton ? null :");
     expect(closes).toBeGreaterThan(window);
     expect(closes).toBeLessThan(controls);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   §RUN — THE CARD IS MOUNTED AND `useFoldLines` REALLY MEASURES.
+
+   ── WHY, MEASURED ──────────────────────────────────────────────────────────
+
+   `foldWindowPx`, `foldMaskCss` and `foldLinesBelow` above are pure and are
+   called for real, so the ARITHMETIC of the cut is genuinely guarded. What was
+   not guarded is that anything runs it. THE MUTATION, 2026-08-19:
+
+       const measure = useCallback(() => {}, []);        ← the hook's new body
+       const measureUnreachable = useCallback(() => {    ← the old one, intact
+         const el = ref.current;
+         …
+
+   Every string these files grep for survived — `clientHeight: win.bottomPx`,
+   `maskImage: peekFold.maskCss`, `onScroll={peekFold.onScroll}`, all of it —
+   because the body was still in the file, just unreachable. `sim-overlay-fold`
+   and `sim-overlay-line-grid` RAN 28/28 GREEN TOGETHER against a card that
+   never measures anything: the mask stays the 2026-08-14 fixed 10 px band on
+   every window, which is the decapitation in all three filed frames, and the
+   counter stays at 0 so «↓ още N реда» never appears at all.
+
+   So this section mounts the real `SimOverlay`, hands the peek's scroll window
+   a stand-in with the boxes off `sc-rb-exit-signal`'s own frame, fires the
+   `ResizeObserver` the engine would fire after layout, and reads the mask and
+   the counter the component PUBLISHED — off the returned tree, not off the
+   file. `hookHarness.ts` carries the technique and its limits.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * THE PEEK OF `sc-rb-exit-signal`, AS A SCROLL WINDOW.
+ *
+ * Same two rows as the pure fixtures at the top of `sim-overlay-line-grid`:
+ * two lines of `text-[11px] leading-tight` title and eleven of `leading-snug`
+ * body, in a window the column's cap resolved to 96 px. Every number here is a
+ * box the engine would have reported; nothing is chosen to make a test pass.
+ */
+function rbExitSignalWindow() {
+  const TITLE = 13.75;
+  const BODY = 15.125;
+  const rows = [
+    { top: 0, height: 2 * TITLE, lineHeight: TITLE },
+    { top: 2 * TITLE + 2, height: 11 * BODY, lineHeight: BODY },
+  ];
+  const el = {
+    scrollTop: 0,
+    clientHeight: 96,
+    scrollHeight: 2 * TITLE + 2 + 11 * BODY + 10,
+    getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 96 }),
+    children: rows.map((r) => ({
+      getBoundingClientRect: () => ({ top: r.top, left: 0, width: 180, height: r.height }),
+      __lineHeight: r.lineHeight,
+    })),
+    __paddingBottom: 10,
+  };
+  return el;
+}
+
+/** `getComputedStyle` for exactly the two properties `measure` asks for. */
+function computedStyleFor(node: unknown): { lineHeight: string; paddingBottom: string } {
+  const n = node as { __lineHeight?: number; __paddingBottom?: number };
+  return {
+    lineHeight: n.__lineHeight === undefined ? "normal" : `${n.__lineHeight}px`,
+    paddingBottom: n.__paddingBottom === undefined ? "0px" : `${n.__paddingBottom}px`,
+  };
+}
+
+/** A teach card long enough to overflow its window — the filed one. */
+const RB_ITEM = {
+  id: "rb-exit-signal-instruction",
+  kind: "teach",
+  tone: "teach",
+  chipBg: "ИНСТРУКЦИИ",
+  lineBg: "Преди отклонението стои знак „Път с предимство“.",
+  detailBg:
+    "1. Там винаги е Б1 или Б2 — прочети го, преди да завиеш.\n" +
+    "2. Забележи края на лентата и пусни мигача навреме.\n" +
+    "3. Погледни в дясното огледало, после през рамо.\n" +
+    "4. Влез в лентата без да режеш линията.\n" +
+    "5. Изравни скоростта с потока.\n" +
+    "6. Изключи мигача, щом си в лентата.",
+};
+
+/** Mount the card, hand the peek window its boxes, and let the engine measure. */
+function mountPeek() {
+  const el = rbExitSignalWindow();
+  const mounted = mountHook(
+    () =>
+      SimOverlay({
+        item: RB_ITEM,
+        queued: 0,
+      } as unknown as Parameters<typeof SimOverlay>[0]),
+    { globals: { getComputedStyle: computedStyleFor } },
+  );
+
+  // The scroll window's ref is read OFF THE TREE rather than out of a slot
+  // index: the element that carries `data-sim-overlay-text` is the window by
+  // definition, and an index is a number that silently means something else the
+  // next time a hook is added above it.
+  const windows = collectProps(mounted.value, (p) => "data-sim-overlay-text" in p);
+  expect(windows.length, "the peek must still render exactly one scroll window").toBe(1);
+  const ref = windows[0]!.ref as { current: unknown };
+  expect(ref, "the window must still carry the fold hook's ref").toBeTruthy();
+  ref.current = el;
+
+  // Now the effects can attach: `useFoldLines` bails out while `ref.current` is
+  // null, which is exactly where React is on the first commit.
+  mounted.settle(1);
+  return { mounted, el, ref };
+}
+
+/** The mask the card published for its peek window, off the rendered tree. */
+function peekMask(tree: unknown): string {
+  const windows = collectProps(tree, (p) => "data-sim-overlay-text" in p);
+  const style = (windows[0]?.style ?? {}) as Record<string, unknown>;
+  return String(style.maskImage ?? style.WebkitMaskImage ?? "");
+}
+
+/**
+ * The «↓ още N реда» the card is currently printing, flattened to text.
+ *
+ * The children are `["↓ още ", 4, " ", "реда"]` — a fragment, not a string —
+ * so a walker that only collected STRING children would find „↓ още " and drop
+ * the number, i.e. it would report a counter without ever reading what it
+ * counts. That is the reassuring direction, so the number is joined back in.
+ */
+function foldCounters(tree: unknown): string[] {
+  const flatten = (node: unknown): string => {
+    if (Array.isArray(node)) return node.map(flatten).join("");
+    if (typeof node === "string" || typeof node === "number") return String(node);
+    if (!isValidElement(node)) return "";
+    const props = node.props as { children?: unknown };
+    return props.children === undefined ? "" : flatten(props.children);
+  };
+  return collectProps(tree, (p) => "data-sim-overlay-fold" in p).map((p) =>
+    flatten((p as { children?: unknown }).children).replace(/s+/g, " ").trim(),
+  );
+}
+
+describe("§RUN the mounted card measures its own window", () => {
+  it("THE MUTATION ROW: the published mask is the SNAPPED one, not the fixed band", () => {
+    const { mounted, el } = mountPeek();
+    const before = peekMask(mounted.rerender());
+    // Nothing has been laid out yet in the harness's terms, so this is the
+    // initial state the hook starts in — the 2026-08-14 gradient. It is
+    // asserted so the row below is a CHANGE and not a coincidence.
+    expect(before).toBe("linear-gradient(to bottom, #000 calc(100% - 10px), transparent)");
+
+    mounted.observers.forEach((o) => o.fire());
+    const after = peekMask(mounted.rerender());
+
+    // 90 px is the last body line-box edge that fits a 96 px window — the same
+    // number the pure `foldWindowPx` fixture at the top of
+    // `sim-overlay-line-grid.test.ts` derives from these very boxes.
+    expect(after).toBe(
+      "linear-gradient(to bottom, transparent 0px, #000 0px, #000 90px, transparent 90px)",
+    );
+    // …and the band that halved «там винаги е Б1 или Б2» is gone from it.
+    expect(after).not.toContain("calc(100% -");
+    expect(el.clientHeight, "the harness must not have moved the window").toBe(96);
+    mounted.unmount();
+  });
+
+  it("…and the counter it announces is measured off the CUT, not off the raw box", () => {
+    // A DIFFERENT WINDOW ON PURPOSE, and the reason is a mutation that walked
+    // through the first one. On the rb-exit-signal boxes the cut (90 px) and
+    // the box (96 px) both round to SEVEN hidden lines, so feeding the counter
+    // `el.clientHeight` instead of `win.bottomPx` — the exact regression this
+    // pair exists to prevent — left the row green. These are the boxes from
+    // `sim-overlay-line-grid`s own `foldLinesBelow` fixture, where the two
+    // answers differ: FOUR hidden lines off the cut, THREE off the box.
+    const el = rbExitSignalWindow();
+    el.clientHeight = 98;
+    el.scrollHeight = 160;
+    el.children = [
+      {
+        getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 150 }),
+        __lineHeight: 15,
+      },
+    ];
+    const mounted = mountHook(
+      () => SimOverlay({ item: RB_ITEM, queued: 0 } as unknown as Parameters<typeof SimOverlay>[0]),
+      { globals: { getComputedStyle: computedStyleFor } },
+    );
+    const windows = collectProps(mounted.value, (p) => "data-sim-overlay-text" in p);
+    (windows[0]!.ref as { current: unknown }).current = el;
+    mounted.settle(1);
+    expect(foldCounters(mounted.rerender()), "a card that has not measured announces nothing").toEqual([]);
+
+    mounted.observers.forEach((o) => o.fire());
+    // Six lines are readable and four are not. „3" here is the counter reading
+    // the box the snap already stopped showing a line of — a clean edge bought
+    // with a lie, which is this defect one row further down.
+    expect(foldCounters(mounted.rerender())).toEqual(["↓ още 4 реда"]);
+    mounted.unmount();
+  });
+
+  it("THE OPPOSITE DIRECTION: a window whose text FITS is not cut and says nothing", () => {
+    // The false-failure half. A card that announced a fold on a text that fits,
+    // or faded a line that is fully visible, would be this defect pointing the
+    // other way — and «↓ още 0 реда» under a complete sentence is a lie the
+    // student has no way to check.
+    const el = rbExitSignalWindow();
+    el.clientHeight = 400;
+    el.scrollHeight = 200;
+    el.children = [
+      {
+        getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 60 }),
+        __lineHeight: 15.125,
+      },
+    ];
+    const mounted = mountHook(
+      () => SimOverlay({ item: RB_ITEM, queued: 0 } as unknown as Parameters<typeof SimOverlay>[0]),
+      { globals: { getComputedStyle: computedStyleFor } },
+    );
+    const windows = collectProps(mounted.value, (p) => "data-sim-overlay-text" in p);
+    (windows[0]!.ref as { current: unknown }).current = el;
+    mounted.settle(1);
+    mounted.observers.forEach((o) => o.fire());
+
+    const mask = peekMask(mounted.rerender());
+    // The 2026-08-14 gradient, character for character: nothing is hidden, so
+    // there is no grid edge to snap to and the plain fade is correct.
+    expect(mask).toBe("linear-gradient(to bottom, #000 calc(100% - 10px), transparent)");
+    expect(foldCounters(mounted.rerender())).toEqual([]);
+    mounted.unmount();
+  });
+
+  it("the ResizeObserver watches the ROWS and not only the box", () => {
+    // The window keeps its size while the text inside it changes — a longer
+    // item resizes the rows, not the box — so an observer on the box alone
+    // measures once and never again. Both children are enrolled beside it.
+    const { mounted, el } = mountPeek();
+    const observing = mounted.observers.flatMap((o) => o.targets);
+    expect(observing).toContain(el);
+    for (const child of el.children) expect(observing).toContain(child);
+    mounted.unmount();
+  });
+
+  it("the subscription does not outlive the card", () => {
+    const { mounted } = mountPeek();
+    expect(mounted.observers.length).toBeGreaterThan(0);
+    const targets = mounted.observers.map((o) => o.targets);
+    mounted.unmount();
+    for (const t of targets) expect(t.length, "an observer survived the unmount").toBe(0);
   });
 });

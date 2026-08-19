@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { lessonById } from "@/modules/sim/lessons";
+import { collectProps, mountHook } from "@/modules/sim/hud/__tests__/hookHarness";
+import { LessonPlayShell } from "./LessonPlayShell";
 
 /**
  * =============================================================================
@@ -83,12 +86,56 @@ describe("§I7 the published viewport height is measured whenever the shell owns
  * viewport. Under site zoom that box is wider than the window, so both ends
  * hang off the screen.
  *
- * MEASURED, same rig, both builds — Chromium, 402×874 (his actual phone, which
- * the device ladder never had), page scale 1.15, authenticated /simulator:
- *   pre-fix   shell 402 px wide inside a 350 px window → 7 HUD nodes off-screen
- *             («Колан», «Дясн», «Задн», «Ляво» — the whole right rail — plus
- *             the instruction body and «Разбрах»), cut by 33–40 px
- *   post-fix  shell 349 px → 0 off-screen
+ * ⚠ THE NUMBERS THAT USED TO STAND HERE WERE MEASURED ON A PHONE NOBODY OWNS,
+ *   AND ARE REPLACED BELOW (O30, 2026-08-19).
+ *
+ * The rig that produced them — `tools/mobile/zoom-follows-window.mjs` — opened
+ * its own `browser.newContext({ viewport: {402, 874}, … })` instead of going
+ * through `lib/insets.mjs`'s `newDeviceContext`. A bare Playwright context has
+ * no safe-area emulation, so `env(safe-area-inset-*)` resolved to 0 and the app
+ * laid out with no camera housing and no home indicator. `insets.test.mjs:140`
+ * („newDeviceContext is the one door") had convicted that line since the day it
+ * was added; the gate that runs it is a FOURTH runner nobody was invoking.
+ * The rig is fixed. The reading it produced was still quoted here, and a
+ * corrected instrument that leaves its old readings standing has fixed nothing.
+ *
+ * RE-MEASURED 2026-08-19 on the profile that has a notch — same rig, now
+ * through the one door; Chromium (CDP is the only API that can express the
+ * gesture), iPhone 16 Pro portrait 402×874, insets REAL t59 r0 b34 l0,
+ * `KNIJKA_BASE`/base = http://localhost:3460, a harness `next dev` serving THIS
+ * TREE at 7404468 (`/api/health` commit-stamped and checked — the hardcoded
+ * staging tunnel reports `commit: "unknown"` and measures somebody else's
+ * build), authenticated /simulator?scenario=sc-zebra-approach&level=1.
+ *
+ * BOTH CONTROLS PASSED BEFORE A NUMBER WAS READ, which is the whole reason
+ * these are quotable at all:
+ *   inset control     58 CSS + 85 inline declarations rewritten over 50 passes,
+ *                     <body> padded l0 r0 b34 — i.e. the notch really is on
+ *   positive control  visualViewport.scale 1 → 1.15, window 402×874 → 350×760
+ *
+ *   post-fix (this tree)  shell 349×760 in a 350×760 window
+ *                         → 0 HUD text nodes off-screen: horizontal 0, vertical 0
+ *   pre-fix   (the same tree with the three lines below reverted to the layout
+ *              viewport — `...(false ? { left, top, width } : null)`)
+ *                         shell 402×760 in the same 350×760 window
+ *                         → 8 off-screen, all horizontal, cut 40–43 px:
+ *                           «Колан», «Огледало» ×3 (the whole right rail), the
+ *                           instruction line, step 2, «↓ още 23 реда», «Разбрах»
+ *
+ * AND THE FRAME WAS LOOKED AT, both legs, because „0 off-screen" on a page with
+ * no HUD on it is this project's signature instrument bug: the post-fix frame
+ * shows a mounted cockpit with МЕНЮ/ИЗГЛЕД/ПАУЗА, both flanks, the instruction
+ * card and the cluster — about fifteen text nodes for the 0 to be a count OF.
+ *
+ * WHAT MOVED AGAINST THE STALE READING, and both moved in the REASSURING
+ * direction, which is the direction this project's instruments always fail in:
+ * 7 nodes → 8, and „cut by 33–40 px" → 40–43 px. The width axis is unaffected
+ * by the substitution (left/right insets are 0 in portrait), so the delta is
+ * the ladder's own context — locale, colour scheme, an explicit motion mode —
+ * arriving with the door. The VERTICAL half is the half that was never a claim
+ * at all: the old „0 off-screen" summed all four edges with 34 px of home
+ * indicator missing from every `env(safe-area-inset-bottom)` the HUD authors.
+ * It is now measured and it is 0.
  *
  * Note the fix is NOT pinch suppression: §I6 already stops a pinch on the
  * driving canvas, and the rig's positive control proved it does. Safari stores
@@ -324,5 +371,178 @@ describe("§W3 the lesson menu stops the car too", () => {
     const menu = SHELL.slice(SHELL.indexOf("function PlayMenu("));
     expect(menu.slice(0, 2600)).toMatch(/useEffect\(\(\) => \{\s*onOpenChange\?\.\(open\);\s*\}, \[open, onOpenChange\]\)/);
     expect(menu.slice(0, 2600)).toMatch(/useEffect\(\(\) => \(\) => onOpenChange\?\.\(false\), \[onOpenChange\]\)/);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   §RUN — THE SHELL IS MOUNTED AND ITS EFFECTS ARE RUN.
+
+   ── WHY THIS SECTION EXISTS, MEASURED ───────────────────────────────────────
+
+   Everything above this line is a source pin, and on 2026-08-19 the whole file
+   was proved to guard nothing by running it against its own defect restored.
+   THE MUTATION, which leaves every string above intact character for character:
+
+       function useVisualViewportBox(active: boolean): VisualViewportBox | null {
+         const [box, setBox] = useState<VisualViewportBox | null>(null);
+         useEffect(() => {
+           if (!active) return;
+    +      if (1 > 0) return;            ← the hook now publishes nothing, ever
+
+   `useVisualViewportBox(immersive || isFullscreen)` still reads exactly as §I7
+   demands; ``left: `${viewportBox.left}px` `` is still in the style object; the
+   `vv?.addEventListener("scroll", read)` line is still there to be grepped.
+   THE FILE RAN 24/24 GREEN.
+
+   AND THE SAME DEFECT WAS THEN DRIVEN ON A PHONE, because a vitest verdict is
+   not the product. Reverting the three inline axes to the layout viewport
+   (`...(false ? { left, top, width } : null)`) and re-running
+   `tools/mobile/zoom-follows-window.mjs` against this tree on localhost:3460 put
+   EIGHT HUD text nodes off the visible window at page scale 1.15 — «Колан», all
+   three «Огледало» of the right rail, the instruction line, step 2, «↓ още 23
+   реда» and «Разбрах», cut by 40–43 px. That is the founder's own photograph,
+   reproduced, while this file stayed green.
+
+   So the source pins keep their job — they are the cheap net that catches a
+   plausible-looking edit in a diff — and the rows below add the one thing they
+   cannot do, which is EXECUTE. The shell is called with a real dispatcher
+   (`hookHarness.ts`, the technique `touchPadRelease.test.tsx` §7 proved), so
+   `useVisualViewportBox` runs, its listeners register on a recording
+   `visualViewport`, and the style object the shell hands its root is read off
+   the returned tree rather than off the file.
+
+   WHAT THIS CANNOT DO, stated so nobody reads more into it: there is no layout
+   engine here. These rows prove the shell PUBLISHES the window it measured;
+   only the probe above proves that the published box keeps the rails on screen.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** A `visualViewport` that records who subscribed to it, and can be moved. */
+function recordingViewport(box: { width: number; height: number; left: number; top: number }) {
+  const listeners: Array<{ type: string; fn: () => void }> = [];
+  return {
+    width: box.width,
+    height: box.height,
+    offsetLeft: box.left,
+    offsetTop: box.top,
+    scale: 1,
+    listeners,
+    addEventListener(type: string, fn: () => void) {
+      listeners.push({ type, fn });
+    },
+    removeEventListener(type: string, fn: () => void) {
+      const at = listeners.findIndex((l) => l.type === type && l.fn === fn);
+      if (at >= 0) listeners.splice(at, 1);
+    },
+    /** What the engine does when the student pinches or pans. */
+    moveTo(next: Partial<{ width: number; height: number; left: number; top: number }>) {
+      if (next.width !== undefined) this.width = next.width;
+      if (next.height !== undefined) this.height = next.height;
+      if (next.left !== undefined) this.offsetLeft = next.left;
+      if (next.top !== undefined) this.offsetTop = next.top;
+      for (const l of [...listeners]) l.fn();
+    },
+  };
+}
+
+/** Mount the shell with the window a zoomed phone reports. */
+function mountShell(vv: ReturnType<typeof recordingViewport> | null) {
+  return mountHook(
+    () =>
+      LessonPlayShell({
+        lesson: lessonById("l0-free-drive")!,
+        quality: "auto",
+        nextLesson: null,
+        onExitToSelect: () => undefined,
+        onStartLesson: () => undefined,
+      } as unknown as Parameters<typeof LessonPlayShell>[0]),
+    { window: { visualViewport: vv, innerWidth: 402, innerHeight: 874 } },
+  );
+}
+
+/** The style object the shell hands its own root, read off the returned tree. */
+function shellRootStyle(tree: unknown): Record<string, unknown> {
+  const roots = collectProps(tree, (p) => "data-sim-shell" in p);
+  expect(roots.length, "the shell must still render exactly one `data-sim-shell` root").toBe(1);
+  return (roots[0]!.style ?? {}) as Record<string, unknown>;
+}
+
+describe("§RUN the mounted shell really measures the window and publishes it", () => {
+  it("THE MUTATION ROW: left/top/width/height come from the VISIBLE window", () => {
+    // The founder's zoom, as the probe measured it: a 402x874 phone whose
+    // visual viewport is 350x760 once Safari's «AA» is one notch up. The
+    // fractional pixels are deliberate — §I7's own comment says sizes floor and
+    // offsets round, and a whole-pixel fixture could not tell the two apart.
+    const vv = recordingViewport({ width: 350.6, height: 760.4, left: 12.4, top: 3.6 });
+    const m = mountShell(vv);
+    const style = shellRootStyle(m.settle());
+
+    expect(style.width, "the shell took the LAYOUT width — the founder's picture").toBe("350px");
+    expect(style.height).toBe("760px");
+    expect(style.left).toBe("12px");
+    expect(style.top).toBe("4px");
+    m.unmount();
+  });
+
+  it("THE OTHER DIRECTION: with no visualViewport it falls back and publishes NO nonsense", () => {
+    // An engine without the API — and the same branch a server render takes.
+    // The measured contract is that it falls back to the WINDOW's own numbers,
+    // not that it publishes nothing: `window.innerWidth/innerHeight` at 0,0.
+    // What it must never do is publish `NaNpx`, which would put the rails off
+    // the screen of every browser that never had the defect. A false failure is
+    // as bad as a false certificate, so this row asserts the fallback rather
+    // than forbidding it.
+    const m = mountShell(null);
+    const style = shellRootStyle(m.settle());
+    expect(style.width).toBe("402px");
+    expect(style.height).toBe("874px");
+    expect(style.left).toBe("0px");
+    expect(style.top).toBe("0px");
+    for (const [axis, v] of Object.entries(style)) {
+      if (typeof v === "string") expect(v, `${axis} is not a number`).not.toContain("NaN");
+    }
+    m.unmount();
+  });
+
+  it("it tracks PANNING, not only zooming — it subscribes to `scroll` as well", () => {
+    // offsetLeft/offsetTop change on `scroll`, never on `resize`. Losing this
+    // subscription leaves the shell the right SIZE in the wrong PLACE, which
+    // still puts the left rail off the screen.
+    //
+    // The subscription is asserted by KIND and not by count: two independent
+    // hooks watch `resize` on this object (the box and the compact decision),
+    // and a count would turn a correct second reader into a red test about
+    // nothing — the „exact-line assertion" trap thumb-band-clearance names.
+    const vv = recordingViewport({ width: 350, height: 760, left: 0, top: 0 });
+    const m = mountShell(vv);
+    m.settle();
+    expect(vv.listeners.some((l) => l.type === "scroll"), "nothing watches panning").toBe(true);
+    expect(vv.listeners.some((l) => l.type === "resize")).toBe(true);
+
+    vv.moveTo({ left: 145, top: 20 });
+    const style = shellRootStyle(m.settle());
+    expect(style.left, "a pan moved the window and the shell stayed behind").toBe("145px");
+    expect(style.top).toBe("20px");
+    m.unmount();
+  });
+
+  it("…and a re-zoom moves the size axes with it", () => {
+    const vv = recordingViewport({ width: 402, height: 874, left: 0, top: 0 });
+    const m = mountShell(vv);
+    expect(shellRootStyle(m.settle()).width).toBe("402px");
+
+    vv.moveTo({ width: 350, height: 760 });
+    const zoomed = shellRootStyle(m.settle());
+    expect(zoomed.width).toBe("350px");
+    expect(zoomed.height).toBe("760px");
+    m.unmount();
+  });
+
+  it("it unsubscribes on unmount — no listener outlives the lesson", () => {
+    const vv = recordingViewport({ width: 350, height: 760, left: 0, top: 0 });
+    const m = mountShell(vv);
+    m.settle();
+    expect(vv.listeners.length, "nothing subscribed — the mount is not exercising it").toBeGreaterThan(0);
+    m.unmount();
+    expect(vv.listeners.length, "a shell that leaks these leaks one per lesson").toBe(0);
   });
 });

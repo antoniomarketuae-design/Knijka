@@ -311,6 +311,25 @@ describe("foldMaskCss — a hard edge on the grid, or the old band when there is
   });
 });
 
+/*
+ * ── ⚠ WHAT THE BLOCK BELOW CAN AND CANNOT SEE (2026-08-19) ──────────────────
+ *
+ * Everything above this line calls `foldWindowPx`, `foldMaskCss` and
+ * `foldLinesBelow` for real, so the ARITHMETIC of the cut is guarded. The block
+ * below is SOURCE TEXT, and on 2026-08-19 it was proved to guard nothing:
+ * replacing `useFoldLines`s `measure` with `useCallback(() => {}, [])` while
+ * leaving the whole original body in the file under another name kept every
+ * string it greps for — and this file plus `sim-overlay-fold.test.ts` ran
+ * 28/28 GREEN against a card that never measures anything.
+ *
+ * The executable half now lives in `sim-overlay-fold.test.ts` §RUN, which
+ * mounts the real `SimOverlay`, hands the peek window the boxes off
+ * `sc-rb-exit-signal`s own frame and fires the `ResizeObserver`. That same
+ * mutation is RED there. These rows are kept because they are still the cheap
+ * net that catches a plausible-looking literal pasted back into a style object
+ * in a diff — but they are a net, not the measurement, and a future reader
+ * should not read them as one.
+ */
 describe("the wiring — both windows read the measured mask, and the counter reads the cut", () => {
   it("neither window hardcodes the fixed band any more", () => {
     // The regression this catches is one character of an edit away: pasting the

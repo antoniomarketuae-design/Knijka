@@ -52,6 +52,18 @@ import {
 export interface HudToast {
   id: number;
   event: HudEvent;
+  /**
+   * WHEN THIS CARD WAS RAISED — `Date.now()` at `push`, see `stampToasts`.
+   *
+   * OPTIONAL, AND ABSENT MEANS „NO CLAIM". `app/dev/popup-rig` builds
+   * `HudToast` literals by hand and a required field would only teach it to
+   * invent a moment; an unstamped card prints no age at all, which is the
+   * founder's standing ruling in `FaultCard`'s header — an honest blank beats a
+   * guess — and is the one direction that cannot put a false anchor on a
+   * verdict. Everything the student actually drives goes through
+   * `useHudToastQueue`, which always stamps.
+   */
+  raisedAtMs?: number;
 }
 
 /** Short-lived praise ("Браво") — no body text to read. */
@@ -71,6 +83,105 @@ function ttlFor(event: HudEvent): number {
   return event.kind === "violation" || event.kind === "lesson"
     ? TEACHING_TOAST_TTL_MS
     : TOAST_TTL_MS;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE CARD SAYS WHAT, AND FOR EIGHT SECONDS IT DID NOT SAY WHEN.
+
+   MEASURED, deployed build, Chromium 1440 × 900 —
+   `.audit-frames/sweep161/sc-junction-stop/pc-wrong/04-t099s.png`. This
+   component's own violation card, fully painted, nothing clipped:
+
+     ВТОРОСТЕПЕННА                                     −1 изпитна т.  ✕
+     Превишена скорост
+     Движеше се над разрешената скорост. Ограничението е таван, не цел …
+     ЗДвП чл. 21, ал. 1
+
+   …and the cluster 40 px below it reads **33 км/ч**, under a posted 40 chip and
+   a ≤60 mode cap. The catalogue's sentence is honest — «Движеше се» is a past
+   tense — but the CARD carries no moment, so from that frame a student cannot
+   tell a record of something eight seconds ago from an accusation about the 33
+   he is doing now. The auditor could not either, and wrote so: „Either the toast
+   outlives its cause with no timestamp shown, or the conviction is wrong; from
+   the frame a student cannot tell which."
+
+   BOTH READINGS ARE THE CRIME THIS PROJECT EXISTS TO STOP. If it is live, the
+   engine has failed a student who is inside the limit — the founder's own
+   roundabout complaint, a FALSE FAILURE. If it is a record, the card taught him
+   that 33 under 40 is speeding. The card cannot choose between them, so it must
+   stop being ambiguous.
+
+     `sc-sp-curve/mobile-wrong/04-t030s.png` is the same shape with the gap
+     opened wider: «Превишена скорост» beside a cluster reading 18 under a
+     posted 90, the offence six seconds and a whole open field earlier.
+
+   AND THE DEBRIEF ALREADY DOES IT. `FaultCard` — the same fault, the same
+   wording, three minutes later — ends every row with «в 1:39» (`atBg`). So one
+   surface of this product anchors the fault in time and the other did not: the
+   glass said one thing and the debrief another about one event, which is this
+   lane's whole subject.
+
+   WHY RELATIVE AND NOT THE SESSION CLOCK. This column has no session clock and
+   may not invent one — `HudEvent` (contracts.ts) carries no `t`, and a
+   plausible-looking «в 1:39» composed here would be a fabricated figure on a
+   verdict. What the column DOES own is the moment it raised the card, and that
+   moment is measured on exactly the clock that will remove it again: the TTL
+   above is a `window.setTimeout`, i.e. wall time, and it keeps running while a
+   teach moment freezes the drive. So the age and the card's own lifetime are
+   read off one clock and cannot disagree — a card that says «преди 8 с» is a
+   card about to expire, and that is true by construction rather than by tuning.
+
+   THE SLOT IS ALWAYS PAINTED, «сега» first. An age that appears a second or two
+   in would move every card below it on a column the founder has already been
+   moved by („elements moving when popups appear"), and a card whose anchor is
+   sometimes missing teaches the student to stop looking for it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Below this the card is not a record of anything, it is the present, and
+ * «преди 2 с» would be a worse answer than «сега». 2 000 and not 1 500 so that
+ * the first figure ever printed is 2 — `Math.round` at a 1 500 boundary skips
+ * «преди 1 с» entirely, and a scale whose first step is missing reads as a bug.
+ */
+export const TOAST_AGE_NOW_MAX_MS = 2000;
+
+/** How often the printed age is refreshed while a teaching card is up, ms. */
+export const TOAST_AGE_TICK_MS = 1000;
+
+/**
+ * „сега" / „преди 8 с" — the card's own moment, in the card's own words.
+ *
+ * A clock that has gone backwards (`nowMs < raisedAtMs` — a system-time change
+ * mid-drive) yields «сега» rather than a negative or a future age: the anchor
+ * may be uninformative, never wrong.
+ */
+export function toastAgeBg(raisedAtMs: number, nowMs: number): string {
+  const ms = nowMs - raisedAtMs;
+  if (!Number.isFinite(ms) || ms < TOAST_AGE_NOW_MAX_MS) return "сега";
+  return `преди ${Math.round(ms / 1000)} с`;
+}
+
+/**
+ * Which kinds carry an age. The two TEACHING kinds — a graded violation and a
+ * «Научи» card — because those are the ones that state a verdict about a moment
+ * that has passed. „Браво" is a 4 s pat on the back with no explanation and no
+ * moment to be wrong about, and dating it would only spend a line.
+ */
+export function toastCarriesAge(kind: HudEvent["kind"]): boolean {
+  return kind === "violation" || kind === "lesson";
+}
+
+/**
+ * The ONE place a `HudToast` is built, so the stamp cannot be forgotten on some
+ * future second path. Pure, and therefore assertable without a DOM —
+ * `__tests__/hud-toast-moment.test.tsx` runs it rather than trusting `push`.
+ */
+export function stampToasts(
+  events: ReadonlyArray<HudEvent>,
+  firstId: number,
+  raisedAtMs: number,
+): HudToast[] {
+  return events.map((event, i) => ({ id: firstId + i, event, raisedAtMs }));
 }
 
 export function useHudToastQueue(): {
@@ -93,7 +204,11 @@ export function useHudToastQueue(): {
 
   const push = useCallback((events: ReadonlyArray<HudEvent>, ttlMs?: number) => {
     if (events.length === 0) return;
-    const added: HudToast[] = events.map((event) => ({ id: nextId.current++, event }));
+    // The stamp is taken ONCE for the batch: a tick that raises two faults
+    // raised them in the same frame, and two ages a millisecond apart on one
+    // screen would be a distinction the engine cannot actually make.
+    const added = stampToasts(events, nextId.current, Date.now());
+    nextId.current += events.length;
     setToasts((prev) => [...added.reverse(), ...prev].slice(0, MAX_QUEUED));
     for (const toast of added) {
       const timer = window.setTimeout(() => {
@@ -177,6 +292,43 @@ function ToastShell({
   );
 }
 
+/**
+ * The card's last row: the law chip and the moment, on one line.
+ *
+ * HERE AND NOT IN THE HEADER, measured rather than preferred. The header row
+ * already carries «ОПАСНА ГРЕШКА» (≈86 px at these classes), «−10 изпитни т.»
+ * (≈92) and the ✕ inside a 224 px content box; «преди 8 с» is another ≈47 and
+ * the row overflows by about 25 px, which on this card means the severity word
+ * gets an ellipsis. Trading a legible class for a legible age is not a trade —
+ * the class is also carried by the left rule's colour and by the mark's colour,
+ * so it survives being small, while the moment exists nowhere else on the glass.
+ *
+ * `flex-wrap` and not `truncate`: a citation is THEO-4's evidence and may not be
+ * shortened to make room for the thing standing next to it. A long ЗДвП ref
+ * takes a second line, which costs 10 px on the card at the TOP of a column
+ * whose newest card is the top one — so what moves is the older cards below it,
+ * never the one being read.
+ *
+ * The age renders whether or not there is a `lawRef`: an anchor that only
+ * appears on cited faults would be missing from exactly the rows that have the
+ * least other evidence.
+ */
+function ToastFooter({ lawRef, ageBg }: { lawRef: string | undefined; ageBg: string | null }) {
+  if (lawRef === undefined && ageBg === null) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {lawRef !== undefined ? (
+        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
+          {lawRef}
+        </span>
+      ) : null}
+      {ageBg !== null ? (
+        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-muted">{ageBg}</span>
+      ) : null}
+    </div>
+  );
+}
+
 /** The ✕ hint in the card's header row — it must LOOK dismissible. */
 function DismissGlyph({ show }: { show: boolean }) {
   if (!show) return null;
@@ -189,9 +341,12 @@ function DismissGlyph({ show }: { show: boolean }) {
 
 function ToastCard({
   event,
+  ageBg,
   onDismiss,
 }: {
   event: HudEvent;
+  /** „сега" / „преди 8 с", or null when this card carries no moment. */
+  ageBg: string | null;
   onDismiss: (() => void) | null;
 }) {
   if (event.kind === "violation") {
@@ -222,11 +377,7 @@ function ToastCard({
             our moat is the law-cited explanation at the moment of learning.
             Quiet mode NEVER removes this; it removes praise. */}
         <p className="mt-1 text-xs leading-snug text-muted">{event.explanationBg}</p>
-        {event.lawRef ? (
-          <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
-            {event.lawRef}
-          </span>
-        ) : null}
+        <ToastFooter lawRef={event.lawRef} ageBg={ageBg} />
       </ToastShell>
     );
   }
@@ -263,11 +414,13 @@ function ToastCard({
         </div>
         <p className="mt-1 text-sm font-bold leading-snug text-foreground">{event.titleBg}</p>
         <p className="mt-1 text-xs leading-snug text-muted">{event.explanationBg}</p>
-        {event.lawRef ? (
-          <span className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold text-muted">
-            {event.lawRef}
-          </span>
-        ) : null}
+        {/* A «Научи» card is where the sweep found a live-tense sentence outliving
+            its own truth: `sc-merge-from-property/mobile-right/05-stopped.png`
+            reads «…а в момента караш 16 км/ч» with the cluster below it at 0.
+            The sentence is composed in `lessons/engine.ts` and is that file's to
+            fix; the moment is this card's, and with it on the glass the claim is
+            at least dated instead of asserted about a present that has moved. */}
+        <ToastFooter lawRef={event.lawRef} ageBg={ageBg} />
       </ToastShell>
     );
   }
@@ -292,6 +445,25 @@ export function HudToasts({
   onDismissAll?: () => void;
 }) {
   const shown = visibleToasts(toasts, quiet);
+
+  // ── THE AGE HAS TO MOVE, OR IT IS NOT AN AGE ─────────────────────────────
+  // Hooks before the early return below, which is why `shown` is computed
+  // first and the `null` is returned after them.
+  //
+  // The interval exists only while a card that PRINTS an age is up: praise and
+  // an empty column cost nothing, and the longest this can run is the 8 s
+  // teaching TTL. `Date.now()` and not a counter, so a tab that was
+  // backgrounded (WebKit throttles timers hard on a phone) comes back with the
+  // true age rather than with the number of ticks it was awake for.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const ticking = shown.some((t) => toastCarriesAge(t.event.kind) && t.raisedAtMs !== undefined);
+  useEffect(() => {
+    if (!ticking) return;
+    setNowMs(Date.now());
+    const timer = window.setInterval(() => setNowMs(Date.now()), TOAST_AGE_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [ticking]);
+
   if (shown.length === 0) return null;
   return (
     // The WRAPPER stays inert so the column never eats a click meant for the
@@ -305,6 +477,11 @@ export function HudToasts({
         <ToastCard
           key={t.id}
           event={t.event}
+          ageBg={
+            t.raisedAtMs !== undefined && toastCarriesAge(t.event.kind)
+              ? toastAgeBg(t.raisedAtMs, nowMs)
+              : null
+          }
           onDismiss={onDismiss ? () => onDismiss(t.id) : null}
         />
       ))}

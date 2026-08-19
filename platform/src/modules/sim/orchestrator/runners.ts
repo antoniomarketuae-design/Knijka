@@ -2755,7 +2755,101 @@ const CONTROLLER_HOLD_ZONE_M = 12;
 /** A line event farther than lineDistM + this from the junction is some
  *  other junction's line, m (the amberDilemma ownership window). */
 const CONTROLLER_LINE_OWN_M = 60;
+/**
+ * The car counts as UNDER WAY at/above this, km/h — the frame the officer's
+ * timetable is counted from. See the block below.
+ *
+ * Not a new number: it is `DEFAULT_RULE_CONFIG.movingSpeedKmh` (`rules/types
+ * .ts:1299`), the threshold `rules/engine.ts` uses to decide whether the driver
+ * is under way at all, and therefore the line past which every duty of a driver
+ * in motion begins to be graded. Copied by value rather than imported, the way
+ * this file already keeps its own `axisOfBearing` rather than reaching into
+ * `runtime/geometry` — `__tests__/traffic-controller.test.ts` re-reads the
+ * config's literal on every run so the two cannot drift apart in silence.
+ */
+const CONTROLLER_DRIVE_START_KMH = 5;
 
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE OFFICER'S TIMETABLE IS COUNTED FROM THE DRIVE, NOT FROM SCENE MOUNT.
+ * (Sweep 161 · doc 88 §3 lane D · the routed prescription in
+ * `lessons/scenario/__tests__/signals2-controller-clock.test.ts`.)
+ *
+ * THE DEFECT, MEASURED. `ScenarioDirectorImpl` stages every runner in its
+ * CONSTRUCTOR, so `stage()` posted the schedule at scene mount — and the clock
+ * `SignalController.controllerPermission` compares `flipAtSec` against advances
+ * on every unpaused frame from then on, through the arrival card, the briefing,
+ * the touch hint and the 51-second L1 demonstration that auto-plays before the
+ * student touches the throttle. `paused` does not cover the briefing card.
+ * Sweep 161's own desktop frames time that dead stretch at **36 s** (the ghost
+ * demo transport reads 0:37 / 0:51 in `04-t001s.png` of BOTH
+ * sc-sig-controller-postures/pc-right and /pc-wrong). The authored flips are 30
+ * and 26 seconds. So the single authored flip had already fired before the
+ * first metre, and it fired in whichever direction the schedule happened to
+ * point:
+ *
+ *   sc-sig-controller-postures  halts the player's own axis first. Post-flip
+ *                               every crossing carries "proceed", so
+ *                               CONTROLLER_SIGNAL_VIOLATED — the only code the
+ *                               template can produce — was UNREACHABLE. The
+ *                               sweep photographed the wrong drive taking the
+ *                               junction at 59 км/ч for 0 наказателни точки and
+ *                               0 mistakes on both platforms, and the careful
+ *                               drive getting the identical verdict. A GREEN
+ *                               TICK FOR A SKILL NOTHING MEASURED.
+ *   sc-sig-controller-live      halts the CROSS axis first, so the mirror: the
+ *                               permitted window burned during the briefing and
+ *                               a CORRECT careful drive arrived after the flip
+ *                               and was billed 10 т. опасна, НЕИЗДЪРЖАН. A
+ *                               STUDENT FAILED BY A CLOCK, which is the
+ *                               founder's own complaint in different clothes.
+ *
+ * Same cause, both directions, which is why neither could be answered by moving
+ * a constant: the reckless crossing tracks the dead time one-for-one (§3 of the
+ * clock battery measures it at 60 s ± 1 s), so no authored `flipAtSec` separates
+ * a student who skipped the demo from one who watched it.
+ *
+ * THE FIX. `stage()` posts the HALT ALONE — no flip — so the opening posture
+ * stands for as long as the student reads, however long that is. On the first
+ * `step()` frame the car is genuinely under way the runner latches that instant
+ * as the timetable's zero and re-posts the schedule with the flip rebased onto
+ * it. From then on the runner's own `flipped` and the runtime's
+ * `controllerPermission` are the SAME absolute instant compared against the same
+ * clock, so the label and the grade cannot disagree — and `figureState`, which
+ * the officer's bubble renders off the same posted schedule, cannot disagree
+ * with either.
+ *
+ * THE LAMP OFFSET MOVES WITH IT, AND THAT PAIRING IS THE WHOLE LESSON. Both
+ * templates refuse `signalPlan` on purpose and say why in the tree —
+ * *"the lamps here are pinned at session start by the staged event's
+ * signalOffsetSec 45, synchronized with the controller's SESSION-TIME timetable
+ * (flipAtSec 30) — an approach-relative rebase would desync the
+ * misleading-green window from the permission flip and break the hierarchy
+ * lesson"*. That objection is correct, and it is an objection to rebasing ONE
+ * dial. This runner owns BOTH, so it moves both onto the same zero and the
+ * authored synchronisation is preserved exactly. (Sweep 161 photographed the
+ * desync the un-rebased pair produced: on `sc-sig-controller-live` the officer
+ * captions «СПРИ» while the approach lamp shows GREEN, in a drill whose briefing
+ * is «червената лампа».) The lamp phase is `phaseTimingInCycle(tSec + offset)`,
+ * so the drive-relative pin is `signalOffsetSec − startedAtSec`;
+ * `setClusterOffset` normalises it back into the cycle.
+ *
+ * WHY IT IS NOT A TIMER, A DISTANCE OR A PROXIMITY DISC. The defect is „world
+ * clock burns before the first metre", so the cure is the first metre and
+ * nothing else. A proximity pin (`armSignalPlan`'s shape, written for the same
+ * founder bug on the LAMPS in July — *"wall-clock phases made the arrival phase
+ * arbitrary after a 20–40 s pre-drive"*) would additionally decide WHERE the
+ * timetable starts, which is an authoring decision these templates already made
+ * when they set `flipAtSec` against a spawn 77 m short of the paint.
+ *
+ * AT ZERO DEAD TIME THIS CHANGES NOTHING, WHICH IS THE POINT. The committed
+ * traces open the throttle immediately, so `startedAtSec` lands within a frame
+ * or two of 0 and the rebase resolves to the authored constant. That is what
+ * lets the whole controller trace corpus keep its exact codes and times while
+ * the 36-second student stops being graded on a different lesson than the
+ * 0-second one.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 export class TrafficControllerRunner implements EventRunner {
   phase: StagedEventPhase = "idle";
   outcome: StagedEventOutcome | null = null;
@@ -2763,6 +2857,13 @@ export class TrafficControllerRunner implements EventRunner {
   contacted = false;
 
   private sawHold = false;
+  /**
+   * Session time of the first frame the car was under way — the officer's
+   * timetable's zero — or null while it has not moved yet. Null means NO FLIP
+   * IS POSTED anywhere: the opening posture holds, in the world and in this
+   * runner's own attribution, for as long as the student is still reading.
+   */
+  private startedAtSec: number | null = null;
 
   constructor(
     readonly spec: TrafficControllerSpec,
@@ -2810,21 +2911,37 @@ export class TrafficControllerRunner implements EventRunner {
     } else {
       traffic.stagedCommand(s.id, { type: "reset" });
     }
-    // Arm the signal mechanics — session-start dials, re-applied per attempt
-    // exactly like the director's signalOffsets. No jitter draw: everything
-    // about the controller is authored (deterministic per (seed, offsets)).
-    if (this.signals !== null) {
-      if (s.signalOffsetSec !== undefined) {
-        this.signals.setSignalClusterOffset(s.signalNodeId, s.signalOffsetSec);
-      }
-      this.signals.setSignalClusterController?.(s.signalNodeId, {
-        haltedGroup: s.haltedGroup,
-        ...(s.flipAtSec !== undefined ? { flipAtSec: s.flipAtSec } : {}),
-      });
-    }
+    // Arm the signal mechanics — re-applied per attempt exactly like the
+    // director's signalOffsets. No jitter draw: everything about the controller
+    // is authored (deterministic per (seed, offsets)).
+    //
+    // THE HALT ALONE. `flipAtSec` is deliberately NOT posted here: staging runs
+    // in the director's constructor, i.e. at scene mount, and a flip posted then
+    // fires on the briefing rather than on the drive (see the block above). It
+    // is posted on the first moving frame, rebased, by `armTimetable`.
+    this.postSchedule(s.signalOffsetSec, undefined);
     this.phase = "armed";
     this.outcome = null;
     this.sawHold = false;
+    this.startedAtSec = null;
+  }
+
+  /**
+   * Write both dials at once — the lamp pin and the controller schedule — so
+   * the pair the templates authored as synchronized can only ever be written
+   * synchronized. `offsetSec`/`flipAtSec` are ABSOLUTE session times already
+   * rebased by the caller; `undefined` means „leave the lamps alone" and „no
+   * flip is scheduled" respectively.
+   */
+  private postSchedule(offsetSec: number | undefined, flipAtSec: number | undefined): void {
+    if (this.signals === null) return;
+    if (offsetSec !== undefined) {
+      this.signals.setSignalClusterOffset(this.spec.signalNodeId, offsetSec);
+    }
+    this.signals.setSignalClusterController?.(this.spec.signalNodeId, {
+      haltedGroup: this.spec.haltedGroup,
+      ...(flipAtSec !== undefined ? { flipAtSec } : {}),
+    });
   }
 
   step(_traffic: StagedTrafficPort, input: DirectorInput, _out: SimTickEvent[]): StagedEventOutcome | null {
@@ -2832,18 +2949,41 @@ export class TrafficControllerRunner implements EventRunner {
     if (this.phase === "resolved") return null;
     const d = dist(input.x, input.y, s.junction.x, s.junction.y);
 
+    // THE TIMETABLE'S ZERO — the first frame the car is genuinely under way.
+    // Latched once (`startedAtSec` is only cleared by `stage()`, i.e. by a fresh
+    // attempt), so a student who stops dead at the line cannot restart the
+    // officer's schedule by moving off again. `Math.abs`, because reversing is
+    // driving: the live channel hands the director a SIGNED speed, negative in
+    // reverse, while the trace recorder hands it an unsigned one.
+    if (this.startedAtSec === null && Math.abs(input.speedKmh) >= CONTROLLER_DRIVE_START_KMH) {
+      this.startedAtSec = input.tSec;
+      this.postSchedule(
+        s.signalOffsetSec === undefined ? undefined : s.signalOffsetSec - input.tSec,
+        s.flipAtSec === undefined ? undefined : input.tSec + s.flipAtSec,
+      );
+    }
+
     // Holding at the line while the player's OWN approach is HALTED (authored
-    // schedule — a pure function of session time, same truth the runtime
-    // reads): latches the "waited for the controller" credit. The player's
-    // axis comes from their heading; the controller halts `haltedGroup` from
-    // session start and, at flipAtSec, moves the halt to the OTHER axis
-    // (mirrors SignalController.controllerPermission). The former code assumed
-    // haltedGroup WAS the player's axis (halted ⟺ before the flip), which
-    // mislabels the outcome for any INVERTED schedule — sc-sig-controller-live
-    // halts "ew" while the player approaches on "ns", so the player is PERMITTED
-    // before the flip and HALTED after, the exact opposite of that assumption.
+    // schedule — a pure function of DRIVE time, the same truth now posted to
+    // the runtime): latches the "waited for the controller" credit. The player's
+    // axis comes from their heading; the controller halts `haltedGroup` from the
+    // drive's first metre and, `flipAtSec` later, moves the halt to the OTHER
+    // axis (mirrors SignalController.controllerPermission over the rebased
+    // schedule this runner posted). The former code assumed haltedGroup WAS the
+    // player's axis (halted ⟺ before the flip), which mislabels the outcome for
+    // any INVERTED schedule — sc-sig-controller-live halts "ew" while the player
+    // approaches on "ns", so the player is PERMITTED before the flip and HALTED
+    // after, the exact opposite of that assumption.
+    //
+    // Before the car has moved there is no flip anywhere: `flipAt` is null here
+    // and no `flipAtSec` is posted to the runtime, so both read the opening
+    // posture and the officer stands still while the student reads.
     const playerAxis = axisOfBearing(input.headingDeg);
-    const flipped = s.flipAtSec !== undefined && input.tSec >= s.flipAtSec;
+    const flipAt =
+      this.startedAtSec === null || s.flipAtSec === undefined
+        ? null
+        : this.startedAtSec + s.flipAtSec;
+    const flipped = flipAt !== null && input.tSec >= flipAt;
     const haltedAxis = flipped ? (s.haltedGroup === "ns" ? "ew" : "ns") : s.haltedGroup;
     const halted = playerAxis === haltedAxis;
     if (

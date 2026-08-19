@@ -19,6 +19,38 @@
  * live Rapier path would have caught it in a browser; the TRACE channel, which
  * is what renders those demos to students, never runs Rapier.
  *
+ * ⚠ THAT LAST CLAUSE IS FALSE, AND SWEEP 161 PHOTOGRAPHED IT (2026-08-19).
+ * „The live Rapier path would have caught it in a browser" was the reason this
+ * sentinel was scoped to the trace channel's problem alone. It does not hold
+ * for STAGED actors, and the evidence is a frame rather than an argument:
+ * `.audit-frames/sweep161/sc-ov-narrow/mobile-wrong/04-t017s.png` is the live
+ * app on an iPhone 16, and the whole windscreen is the grey INSIDE of the
+ * oncoming car with its red flank band running across it — the camera is
+ * bodily within the other vehicle, at 0 км/ч, while the toast bills
+ * «Пътнотранспортно произшествие». Both the right and the wrong drive end in
+ * the same interpenetrated state.
+ *
+ * THE MECHANISM, READ RATHER THAN GUESSED. `components/sim/NpcColliders.tsx`
+ * is the whole of „hittable traffic", and it pools its kinematic bodies over
+ * `traffic.vehicles` — the AMBIENT fleet — at :179, :216, :250, :289 and :349.
+ * Staged actors are a different collection entirely (`TrafficSystem.staged(id)`
+ * / `TrafficSystemStats`, `traffic/types.ts:757` beside `vehicles` at :649), and
+ * nothing in that file ever reads it. So every actor a runner stages — the
+ * oncoming car here, the braking lead, the cut-in truck, the officer — carries
+ * NO rapier collider in the browser, and the player drives through all of them.
+ *
+ * WHAT THAT CHANGES HERE: nothing about this file's behaviour, and everything
+ * about why it exists. This sentinel is not a trace-channel backstop that the
+ * browser happens to duplicate — it is the ONLY thing in either channel that
+ * notices a staged body being occupied. The overlap it reports is real overlap
+ * on both platforms.
+ *
+ * NOT FIXED HERE, AND IT CANNOT BE: a sentinel reports, it does not move
+ * bodies — the same boundary `collision/index.ts:73–80` states for itself
+ * («NO CONTACT RESPONSE. Nothing here moves a body.»). Giving staged actors a
+ * body is one loop over the staged cast in `components/sim/NpcColliders.tsx`,
+ * which is not this lane's file. ROUTED, with the frame above as its evidence.
+ *
  * ---------------------------------------------------------------------------
  * B84 — AND THE SECOND TIME, THE WATCH NEVER ARMED AT ALL (2026-08-10).
  *

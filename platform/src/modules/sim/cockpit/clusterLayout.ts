@@ -327,6 +327,154 @@ export function lampSlotX(i: number): number {
 }
 
 // ---------------------------------------------------------------------------
+// R3 — WHAT THE STEERING WHEEL ACTUALLY COVERS, AS DATA
+// ---------------------------------------------------------------------------
+//
+// R1 opened with „the rim + column shroud hide everything below roughly
+// y = −20" and every element below has been placed against that sentence. A
+// sentence cannot be checked, and three CRITICAL catalogue rows turned on
+// exactly this question — sc-vp-telltale, sc-vp-handbrake and sc-vp-telltale-red
+// all report „no lamp of any colour renders in any frame". They are right about
+// the frame. The lamps ARE fed and the painter DOES paint them
+// (InstrumentCluster.tsx, which measured the silhouette off the shipped frame
+// and wrote it down in a comment its own consumer cannot read).
+//
+// So the measurement moves HERE, where the positions it judges already live —
+// one table, now four readers. Nothing about the geometry changes; what changes
+// is that „is this element behind the wheel?" is a function instead of a claim.
+//
+// PROVENANCE, because a silhouette measured on one frame is not a universal
+// constant: read off `.audit-frames/sweep161/sc-vp-readiness/mobile-right/
+// 04-t102s.png` (2556×1179, the phone-class landscape the founder reviews on),
+// where the face plate lands at x 866…1352 / y 860…1049 px — 0.949 px per
+// design unit across and 0.738 down, the dash tilt foreshortening the vertical.
+// These are the lowest design-y still VISIBLE at each sampled column. The PC
+// window projects the same wheel slightly differently (its frame shows a ~8 px
+// slit between rim and shroud that mobile does not), so this table is the
+// MOBILE case — which is the strict one, and the one he reviews on.
+
+/** One measured column of the wheel/shroud silhouette. */
+export interface FaceSilhouetteSample {
+  /** Design-unit x across the face. */
+  readonly x: number;
+  /** Lowest design-unit y still visible at that column. */
+  readonly floorY: number;
+}
+
+/** The wheel's upper silhouette, left to right. The +41 at x −9 is the wheel
+ *  BOSS, which is why the centre column is the worst place on the face. */
+export const FACE_WHEEL_SILHOUETTE: readonly FaceSilhouetteSample[] = [
+  { x: -220, floorY: -45 },
+  { x: -115, floorY: -16 },
+  { x: -9, floorY: 41 },
+  { x: 107, floorY: -48 },
+  { x: 233, floorY: -119 },
+] as const;
+
+/**
+ * Lowest visible y at design-x, linearly interpolated between samples and held
+ * flat outside them.
+ *
+ * HELD FLAT, NOT EXTRAPOLATED: past x −220 the plate runs out at −256 and past
+ * +233 at +256, and a linear run-off would invent a silhouette in the corners
+ * where the bezel is. Holding the end sample is the conservative reading — it
+ * neither claims extra occlusion nor extra clearance.
+ */
+export function faceVisibleFloorY(x: number): number {
+  const s = FACE_WHEEL_SILHOUETTE;
+  if (!Number.isFinite(x)) return s[0]!.floorY;
+  if (x <= s[0]!.x) return s[0]!.floorY;
+  const last = s[s.length - 1]!;
+  if (x >= last.x) return last.floorY;
+  for (let i = 1; i < s.length; i++) {
+    const b = s[i]!;
+    if (x <= b.x) {
+      const a = s[i - 1]!;
+      const t = (x - a.x) / (b.x - a.x);
+      return a.floorY + t * (b.floorY - a.floorY);
+    }
+  }
+  return last.floorY;
+}
+
+/** An axis-aligned element on the face, in design units. */
+export interface FaceRect {
+  readonly cx: number;
+  readonly cy: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * The HIGHEST floor anywhere under `rect` — i.e. the worst column it spans.
+ *
+ * SPAN, NOT CENTRE, and this is the whole point of the function. A centre-only
+ * test is the exact shape of the bug this project has already shipped once (a
+ * per-vertex bound replaced by a centroid one, which cannot fail): the boss
+ * peaks at x −9, so an element centred at x −60 with its right edge at −9 is
+ * half behind the wheel while its centre column is clear. Because the
+ * silhouette is piecewise linear, the maximum is attained at an endpoint or at
+ * a knot — so the exact answer needs no sampling.
+ */
+export function faceWorstFloorY(rect: FaceRect): number {
+  const left = rect.cx - rect.w / 2;
+  const right = rect.cx + rect.w / 2;
+  let worst = Math.max(faceVisibleFloorY(left), faceVisibleFloorY(right));
+  for (const s of FACE_WHEEL_SILHOUETTE) {
+    if (s.x > left && s.x < right) worst = Math.max(worst, s.floorY);
+  }
+  return worst;
+}
+
+/**
+ * The fraction of `rect`'s height the driver can actually see (0 = wholly
+ * behind the wheel, 1 = wholly clear). Fractional rather than boolean because
+ * the frames are fractional: the telltale rail is not absent, it is a sliver,
+ * and „the top 20 % of a lamp" is a different engineering problem from „no
+ * lamp" even though the founder reads both as nothing.
+ */
+export function faceVisibleFraction(rect: FaceRect): number {
+  if (!(rect.h > 0)) return 0;
+  const bottom = rect.cy - rect.h / 2;
+  const top = rect.cy + rect.h / 2;
+  const floor = faceWorstFloorY(rect);
+  if (floor <= bottom) return 1;
+  if (floor >= top) return 0;
+  return (top - floor) / rect.h;
+}
+
+/** Wholly clear of the wheel — the only state in which a value can be READ
+ *  rather than guessed at from a sliver. */
+export function faceElementIsVisible(rect: FaceRect): boolean {
+  return faceVisibleFraction(rect) >= 1;
+}
+
+/**
+ * The INK box inside a character CELL, which is what the driver's eye is
+ * actually looking for.
+ *
+ * „A QUAD IS NOT A GLYPH, and forgetting that is a repeat offence in this
+ * file" — the R2 note says so about size, and it is just as true about
+ * occlusion. The speed digits' 96-unit cells reach down to y 28, which is
+ * BEHIND the boss (floor +41 at x −9); their 54 units of ink stop at y 49 and
+ * clear it. Judging the cell would report the one readout the founder has
+ * always been able to read as hidden, which is the false-refusal direction.
+ */
+export function faceInkRect(cell: FaceRect): FaceRect {
+  return {
+    cx: cell.cx,
+    cy: cell.cy,
+    w: cell.w * CHAR_INK_W_FRACTION,
+    h: cell.h * CHAR_INK_H_FRACTION,
+  };
+}
+
+/** The telltale rail's slot i as a face rect (glyph cell, not halo). */
+export function lampGlyphRect(i: number): FaceRect {
+  return { cx: lampSlotX(i), cy: LAMP_CY, w: LAMP_CELL, h: LAMP_CELL };
+}
+
+// ---------------------------------------------------------------------------
 // Hairlines — the other half of doc 83's elevation grammar
 // ---------------------------------------------------------------------------
 

@@ -233,10 +233,26 @@ function drive(
 }
 
 // ---------------------------------------------------------------------------
-// §1 — THE DEFECT: the verdict is decided by the briefing's length
+// §1 — INVERTED 2026-08-19: the verdict is the driver's again
+//
+// This section reproduced the defect through the production stack: the SAME
+// 59 км/ч drive was convicted with no dead time and ACQUITTED after the
+// measured 36 s of briefing, because the single authored flip fired while the
+// demonstration was still playing and moved the halt onto the cross axis. The
+// verdict was a fact about how long the student watched a video.
+//
+// The instruction at the top of this file was that §1 "must be INVERTED (not
+// deleted) when the runner fix lands: the whole point of the fix is that 36 s
+// of briefing stops changing the grade." orchestrator/runners.ts now rebases
+// the controller schedule onto the drive start, so it has landed — and these
+// rows assert the cure on the exact drives that used to prove the disease.
+//
+// Kept rather than replaced, because a defect that can no longer be reproduced
+// is the only proof a fix is real, and the reckless drive at the measured
+// briefing length is the input this whole file was written around.
 // ---------------------------------------------------------------------------
 
-describe("§1 sc-sig-controller-postures — the acquittal is the clock's, not the driver's", () => {
+describe("§1 sc-sig-controller-postures — the verdict is the driver's, at any briefing length", () => {
   const shipped = SC_SIG_CONTROLLER_POSTURES_EVENT;
 
   it("the mechanic itself works: with no dead time the 59 км/ч drive is convicted 10 т.", () => {
@@ -250,37 +266,66 @@ describe("§1 sc-sig-controller-postures — the acquittal is the clock's, not t
     expect(out.passed).toBe(false);
   });
 
-  it("THE FINDING: with the measured 36 s of briefing the SAME drive bills nothing", () => {
+  it("CURED: with the measured 36 s of briefing the SAME drive is convicted, as at 0 s", () => {
+    // WAS: controller "proceed", sessionCodes [], score 0 — a 59 км/ч run over a
+    // red light in front of a регулировчик, innocent on every axis the lesson
+    // had, purely because the demonstration played for 36 s first.
     const out = drive(recklessScript(MEASURED_PRE_DRIVE_SEC), shipped);
     expect(out.crossings).toHaveLength(1);
-    // The single authored flip fired while the demonstration was playing, so
-    // the halt now sits on the cross axis and this approach is permitted.
-    expect(out.crossings[0].controller).toBe("proceed");
-    expect(out.crossings[0].tSec).toBeGreaterThan(shipped.flipAtSec!);
-    // …and the officer's permission OUTRANKS the lamp, which the runtime is
-    // reporting as red at that instant — so a 59 км/ч run over a red light in
-    // front of a регулировчик is innocent on every axis the lesson has.
-    expect(out.crossings[0].lamp).toBe("red");
-    expect(out.sessionCodes).toEqual([]);
-    // «0 наказателни точки · mistakes=0 · top 59 км/ч», reproduced headlessly.
-    expect(out.score).toBe(0);
+    // The schedule is rebased onto the drive start, so the officer is still
+    // chest-on when this approach arrives — exactly as at zero dead time.
+    expect(out.crossings[0].controller).toBe("halt");
+    expect(out.sessionCodes).toEqual(["CONTROLLER_SIGNAL_VIOLATED"]);
+    expect(out.score).toBe(10);
+    expect(out.passed).toBe(false);
   });
 
-  it("…and it is not a rung effect: L3 acquits the same drive on the same clock", () => {
-    expect(drive(recklessScript(MEASURED_PRE_DRIVE_SEC), shipped, 3).sessionCodes).toEqual([]);
+  it("the two dead times now give the SAME verdict — which is the whole claim", () => {
+    // Stated as an equality rather than two absolute expectations, so it cannot
+    // be satisfied by both drives being wrong in the same direction: the
+    // zero-dead-time row above independently pins conviction at 10 точки.
+    const cold = drive(recklessScript(0), shipped);
+    const briefed = drive(recklessScript(MEASURED_PRE_DRIVE_SEC), shipped);
+    expect(briefed.sessionCodes).toEqual(cold.sessionCodes);
+    expect(briefed.score).toBe(cold.score);
+    expect(briefed.crossings[0].controller).toBe(cold.crossings[0].controller);
+  });
+
+  it("…and it was never a rung effect: L3 convicts at both dead times too", () => {
+    // WAS: L3 acquitted the briefed drive ([]) while convicting the cold one —
+    // the asymmetry that proved the CLOCK, not the rung, decided the verdict.
+    expect(drive(recklessScript(MEASURED_PRE_DRIVE_SEC), shipped, 3).sessionCodes).toEqual([
+      "CONTROLLER_SIGNAL_VIOLATED",
+    ]);
     expect(drive(recklessScript(0), shipped, 3).sessionCodes).toEqual([
       "CONTROLLER_SIGNAL_VIOLATED",
     ]);
   });
 
-  it("the careful drive gets the same permission — so the pass is as hollow as the acquittal", () => {
+  it("CURED: the careful and reckless drives are now told APART, at the measured briefing", () => {
+    // WAS the sharpest row in the file: both drives got controller "proceed"
+    // and the same empty verdict — "two opposite drives, one verdict: nobody
+    // read anything and nobody was measured reading anything." A pass as hollow
+    // as the acquittal beside it, which is a green tick for a skill nothing
+    // measured — the exact class this whole audit exists to remove.
     const careful = drive(carefulScript(MEASURED_PRE_DRIVE_SEC), shipped);
     const reckless = drive(recklessScript(MEASURED_PRE_DRIVE_SEC), shipped);
+    // And the two drives now see DIFFERENT officers, which is a sharper
+    // statement of the cure than "both are convicted": the reckless drive
+    // arrives while he is still chest-on and goes anyway; the careful drive
+    // WAITS HIM OUT and crosses on the side-on profile. Before the rebase both
+    // read "proceed" — the flip had already fired during the briefing, so
+    // neither drive was ever measured against a halt at all.
+    expect(reckless.crossings[0].controller).toBe("halt");
     expect(careful.crossings[0].controller).toBe("proceed");
-    expect(reckless.crossings[0].controller).toBe("proceed");
-    // Two opposite drives, one verdict: nobody read anything and nobody was
-    // measured reading anything.
-    expect(careful.sessionCodes).toEqual(reckless.sessionCodes);
+    // …and so the two drives part company, which is the entire point.
+    expect(reckless.sessionCodes).toEqual(["CONTROLLER_SIGNAL_VIOLATED"]);
+    expect(careful.sessionCodes).toEqual([]);
+    expect(careful.sessionCodes).not.toEqual(reckless.sessionCodes);
+    // The careful drive is credited rather than merely un-convicted: a fix that
+    // simply convicted everybody would satisfy the line above.
+    expect(careful.score).toBe(0);
+    expect(reckless.score).toBe(10);
   });
 });
 
@@ -289,9 +334,23 @@ describe("§1 sc-sig-controller-postures — the acquittal is the clock's, not t
 // ---------------------------------------------------------------------------
 
 describe("§2 the flip rebased onto the drive start — convicts the reckless, passes the careful", () => {
+  // THE REBASE MOVED OUT OF THIS FILE, 2026-08-19. §2 used to hand the recorder
+  // a HAND-REBASED spec — `rebased(dead)`, i.e. flipAtSec + dead — because that
+  // was the only way to express the cure without touching an engine file, and
+  // the section says so: "No engine file is touched to prove it."
+  //
+  // orchestrator/runners.ts now performs exactly that arithmetic at run time.
+  // Passing the hand-rebased spec as well applied it TWICE, landing the flip at
+  // 30 + 2 x dead, and the signature was exact: every dead-time-0 row passed and
+  // only 12/36/60 s failed. So these rows now hand over the SHIPPED spec, which
+  // is what production uses, and the drive is the only thing carrying the dead
+  // time. That makes §2 a stronger claim than it was — it proves the cure on the
+  // authored catalogue rather than on a fixture that pre-applies it.
+  const shippedSpec = SC_SIG_CONTROLLER_POSTURES_EVENT;
+
   for (const dead of DEAD_TIMES_SEC) {
     it(`dead time ${dead} s: the 59 км/ч drive IS convicted (10 т., опасна)`, () => {
-      const out = drive(recklessScript(dead), rebased(dead));
+      const out = drive(recklessScript(dead), shippedSpec);
       expect(out.crossings).toHaveLength(1);
       expect(out.crossings[0].controller).toBe("halt");
       expect(out.sessionCodes).toEqual(["CONTROLLER_SIGNAL_VIOLATED"]);
@@ -300,7 +359,7 @@ describe("§2 the flip rebased onto the drive start — convicts the reckless, p
     });
 
     it(`dead time ${dead} s: the careful drive still passes, with ZERO violations`, () => {
-      const out = drive(carefulScript(dead), rebased(dead));
+      const out = drive(carefulScript(dead), shippedSpec);
       expect(out.crossings).toHaveLength(1);
       // It read the „стоп" posture, waited it out, and crossed on the profile.
       expect(out.crossings[0].controller).toBe("proceed");
@@ -311,8 +370,14 @@ describe("§2 the flip rebased onto the drive start — convicts the reckless, p
     });
   }
 
-  it("the cure changes the clock and nothing else: at dead time 0 it IS the shipped spec", () => {
-    expect(rebased(0)).toEqual(SC_SIG_CONTROLLER_POSTURES_EVENT);
+  it("the runner's rebase IS the arithmetic this file used to do by hand", () => {
+    // `rebased` is kept as the statement of what the cure is, and pinned against
+    // the runner rather than deleted: if the two ever disagree, the section's
+    // premise has moved and these rows stop meaning what they say.
+    expect(rebased(0)).toEqual(shippedSpec);
+    for (const dead of DEAD_TIMES_SEC) {
+      expect(rebased(dead).flipAtSec).toBe(shippedSpec.flipAtSec! + dead);
+    }
   });
 });
 

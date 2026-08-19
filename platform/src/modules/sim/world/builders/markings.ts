@@ -995,12 +995,58 @@ export function buildMarkings(
     if (!eb) continue;
     const proj = projectOntoPolyline(eb.edge.geometry as Vec2[], [crossing.x, crossing.y]);
     if (proj.distance > 25) continue; // data glitch guard
-    markingQuads += paintZebra(acc, proj.point, proj.tangent, eb.halfWidth, {
+    const bars = paintZebra(acc, proj.point, proj.tangent, eb.halfWidth, {
       islandHalfW: crossing.island ? crossing.island.widthM / 2 : 0,
       skewDeg: crossing.skewDeg ?? 0,
       staggerM: crossing.staggerM ?? 0,
     });
-    zebraCrossings++;
+    markingQuads += bars;
+    // COUNT THE PAINT, NOT THE VISIT. This read `zebraCrossings++`, one line
+    // below a `markingQuads +=` that was already spending paintZebra's RETURN
+    // VALUE — so the same call answered two questions and only one of them was
+    // listened to. `WorldStats.zebraCrossings` is the number ~70 district
+    // batteries read as „this world has N зебри"; incremented per crossing
+    // VISITED it is a counter THAT CANNOT FALL WHEN THE PAINT DISAPPEARS, which
+    // is the one event it exists to report. The audit's own complaint family —
+    // „the lesson names a marking the world does not have" — is exactly what
+    // this number would have had to stay silent about.
+    //
+    // paintZebra returns 0 on one reachable input, and it is authorable today:
+    // the refuge island swallows every bar. `count` is floored at 2 and only the
+    // island `continue` can skip one, so painted === 0 ⇔ islandHalfW +
+    // ZEBRA_STRIPE_ACROSS_M/2 clears the OUTERMOST bar offset, which the floored
+    // bar count quantises well below the kerb line: on the 16.25 m two-lane
+    // street the 11 bars reach ±7.0 m, so the paint is gone from widthM > 13.2
+    // — MEASURED at 13.5 m, the first swallowed row of §a's 0.5 m sweep, not
+    // derived from the 15.0 m the naive „2·halfWidth − 1.3" gives. Nothing
+    // validates `island.widthM` — assertDistrict is the cheap seam guard, not a
+    // schema validator — so a map generator can write it, and the kerb prism
+    // `buildCrossingFurniture` raises from the SAME raw widthM is not clamped
+    // either. That is the case: a kerb across the whole carriageway and no
+    // пешеходна пътека on it, reported as one painted zebra.
+    //
+    // NOT fixed by clamping the island instead, which was the tempting half:
+    // the furniture prism reads the raw width, so bars forced back onto the road
+    // would be painted UNDER the kerb — the exact thing the islandHalfW skip
+    // exists to prevent (see paintZebra's header).
+    //
+    // NOT ROUTED HERE, and worth saying out loud rather than leaving implied:
+    // when paint is 0 the GRADER still convicts, because `gradesCrossingDuty`
+    // (constants.ts) answers off `paintsZebra`, which reads the crossing's
+    // `kind` and knows nothing about bars. A student billed чл. 119 at a
+    // пешеходна пътека the world never drew is a FALSE FAILURE — the founder's
+    // own roundabout complaint, pointed at a zebra. That fix belongs in
+    // constants.ts / runtime/zones.ts, not in the painter; this counter is what
+    // makes the condition visible at all.
+    //
+    // MEASURED on the committed corpus: three crossings in 105 districts author
+    // an island at all — pe-bus 2.0 m, pe-cane 2.2 m, pe-slow 2.4 m, every one
+    // on a ~16.25 m street (rx-tram-island-v1's „island" is a tram platform, not
+    // a crossing refuge) — so all three still paint and no district battery's
+    // expected number moves. The guard is not defensive decoration:
+    // markings-paint-truth.test.ts §7 builds the width that makes it fire, and
+    // §7a fails if this line becomes `zebraCrossings++` again.
+    if (bars > 0) zebraCrossings++;
   }
 
   // -- parking bays (lesson-authored, doc 68 A5) -------------------------------

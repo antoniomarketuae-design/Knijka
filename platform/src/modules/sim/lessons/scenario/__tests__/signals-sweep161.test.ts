@@ -515,22 +515,27 @@ describe("§4 sc-signal-controller — the officer's flip is spent before the dr
     expect(out.score).toBe(10);
   });
 
-  it("THE FINDING: with the measured 36 s of briefing the SAME drive is innocent", () => {
-    // «by 03-ready — before the student has moved — it has already flipped to
-    // МИНАВАШ ТИ», mobile-right. The bubble TrafficLayer paints comes off the
-    // same schedule `controllerPermission` grades with, so the caption and the
-    // acquittal are one fact: instruction 3 («Той е с ГЪРДИ към теб») is
-    // describing a phase that ended during the briefing.
+  it("CURED: with the measured 36 s of briefing the SAME drive is convicted", () => {
+    // WAS THE FINDING, and it read: «by 03-ready — before the student has moved
+    // — it has already flipped to МИНАВАШ ТИ», mobile-right. The bubble
+    // TrafficLayer paints comes off the same schedule `controllerPermission`
+    // grades with, so the caption and the acquittal were one fact: instruction 3
+    // («Той е с ГЪРДИ към теб») was describing a phase that ended during the
+    // briefing, and a 59 км/ч run past the officer billed nothing.
+    //
+    // `orchestrator/runners.ts` now rebases the schedule onto the DRIVE start,
+    // so the briefing's length no longer decides the verdict. Inverted here
+    // rather than deleted: a defect that can no longer be reproduced is the only
+    // proof the fix is real, and this row owns the measured 36 s.
     const out = drive(
       SC_SIGNAL_CONTROLLER,
       withDeadTime(MEASURED_PRE_DRIVE_SEC, recklessScript([[LANE, 60]])),
       [shipped],
     );
     expect(out.crossings).toHaveLength(1);
-    expect(out.crossings[0].controller).toBe("proceed");
-    expect(out.crossings[0].tSec).toBeGreaterThan(shipped.flipAtSec!);
-    expect(out.sessionCodes).toEqual([]);
-    expect(out.score).toBe(0);
+    expect(out.crossings[0].controller).toBe("halt");
+    expect(out.sessionCodes).toEqual(["CONTROLLER_SIGNAL_VIOLATED"]);
+    expect(out.score).toBe(10);
   });
 
   it("the fix is a clock, not a constant — rebasing the flip onto the drive restores both verdicts", () => {

@@ -380,6 +380,55 @@ export function complicationBriefingText(
  */
 export const SCENARIO_LESSON_ORDER = 1000;
 
+/**
+ * THE NUMBER THE STUDENT IS GRADED ON, KEPT SAYABLE — the compiled key that
+ * carries the TEMPLATE'S OWN `maxSpeedKmh` alongside the laddered gate.
+ *
+ * THE DEFECT IT CLOSES, measured over every compiled rung of every template
+ * (`__tests__/advisor-authored-cap.test.ts` pins every figure below):
+ *
+ *   953  reachZone cards compile with a speed cap
+ *   644  of them above the halt band (`REACH_ZONE_HALT_CAP_KMH` = 8)
+ *   499  of those 644 SAID NO NUMBER AT ALL — and were graded on one anyway
+ *   169  of the 499 had no number on ANY surface: not the objective title,
+ *        not one step of the briefing, not the street's posted limit
+ *   116  more were WORSE than silent: the strictest number any surface showed
+ *        was ABOVE the gate, so the student who obeyed the only figure he was
+ *        given failed a threshold nobody had told him about
+ *
+ * The exhibit is the reference lesson. `sc-zebra-approach@L1 / sc-za-approach`
+ * reads «Приближи пътеката с готовност за спиране», names no speed, and grades
+ * at 45. `sc-crossing-child-ball@L1` is the sharp end of the 116: its briefing
+ * says «под 40 км/ч» and its gate is 37. That is the founder's own complaint
+ * one street over — he signalled a roundabout exit correctly and was failed —
+ * and THEO-4 requirement zero calls a grade against an unstated threshold what
+ * it is: a bare verdict from a product whose whole job is explaining decisions.
+ *
+ * WHY A NEW KEY AND NOT A SMARTER ADVISOR. `serializeObjectiveParams` folds the
+ * rung's grace INTO `maxSpeedKmh` (`params.ts widenSpeedCap`), and the grace is
+ * not recoverable from the result: `toleranceScale` is a rung concept that never
+ * lands on the LessonSpec. So a card holding only the compiled number had two
+ * options and both were wrong — say it (sweep161's photographed «дръж под 54.5
+ * км/ч», the tolerance signing its own name) or say nothing (these 499). With
+ * the author's figure in hand there is a third, and it is the true one.
+ *
+ * WHAT IT MAY NEVER DO IS MOVE A GATE. `parseObjectiveParams` (objectives.ts)
+ * rebuilds `WitnessedReachZoneParams` from a whitelist and silently drops every
+ * key it does not name, so this value is unreachable from grading BY
+ * CONSTRUCTION — it is a coaching channel, exactly like `LessonSpec
+ * .postedLimitKmh` one level out. Measured on the same sweep: for all 644
+ * above-halt cards the authored cap is present, INTEGRAL (no «54.5»), and
+ * ≤ the compiled gate, so the sentence it produces can never coach a student
+ * into failing the task he is being coached through.
+ *
+ * Read by `advisor.ts spokenCapKmh`. That file imports this symbol from here
+ * rather than through `scenario/index.ts` — the barrel line belongs there and
+ * is named as routing debt in this wave's report — but it already takes a
+ * value import off the same barrel (`parseScenarioLessonId`), so the deep
+ * specifier adds no edge to the module graph that was not already paid for.
+ */
+export const AUTHORED_MAX_SPEED_PARAM_KEY = "authoredMaxSpeedKmh";
+
 // Re-exported for tooling/tests (the serializer itself lives in params.ts to
 // keep validate ↔ compile cycle-free).
 export { serializeObjectiveParams } from "./params";
@@ -1132,6 +1181,32 @@ export function compileScenario(
       widenBudget[i],
       postedLimitKmh,
     );
+    // THE AUTHOR'S OWN FIGURE, KEPT BESIDE THE LADDER'S — the field that ends
+    // „graded on a number nobody said" (see AUTHORED_MAX_SPEED_PARAM_KEY).
+    //
+    // `serializeObjectiveParams` writes ONE speed into the compiled objective:
+    // `maxSpeedKmh` after widenSpeedCap folded the rung's grace into it. From
+    // that single number nothing downstream can tell the author's 40 from the
+    // ladder's 45 — the grace is not invertible here, because `toleranceScale`
+    // is a rung concept that never reaches the lesson. That is why the advisor
+    // could only ever choose between saying the tolerance (sweep161's defect:
+    // «дръж под 54.5 км/ч») and saying nothing at all, and it chose nothing on
+    // 499 of the 953 capped cards while the gate went on grading every one.
+    //
+    // MEASURED over every compiled rung of every template (the census is
+    // pinned in `advisor-authored-cap.test.ts`): 953 capped reachZone cards,
+    // 644 of them above the halt band, and for ALL 644 the authored cap is
+    // present, integral, and ≤ the compiled gate. So carrying it makes „the
+    // card names a number the student is held to" total rather than partial.
+    //
+    // IT CANNOT REACH THE GRADER. `parseObjectiveParams` (objectives.ts)
+    // builds `WitnessedReachZoneParams` from a whitelist and drops every key
+    // it does not name, so this is a COACHING channel by construction — the
+    // same shape as the `postedLimitKmh` above, one level in. The gate stays
+    // exactly what widenSpeedCap made it; only the sentence changes.
+    if (kind === "reachZone" && o.params.kind === "reachZone" && o.params.maxSpeedKmh !== undefined) {
+      params[AUTHORED_MAX_SPEED_PARAM_KEY] = o.params.maxSpeedKmh;
+    }
     return { id: o.id, titleBg: o.titleBg, kind, params };
   });
 

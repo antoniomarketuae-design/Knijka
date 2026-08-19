@@ -34,6 +34,10 @@ import {
   type SeverityClass,
 } from "@/modules/sim/rules";
 import { OVERLAY_SCRIM_CLASS } from "./playArea";
+// The fold instrument lives in `TeachMomentOverlay` — see its header for why
+// it is there and not imported from `LessonPlayShell` (the shell imports both
+// of these cards, so that edge would close a cycle).
+import { FoldContinuesLine, HUD_SCROLLER_CLASS, useFoldWatch } from "./TeachMomentOverlay";
 
 const MistakeMedia = dynamic(() => import("@/components/theory/MistakeMedia"), {
   ssr: false,
@@ -135,6 +139,7 @@ export function MistakeConsequenceOverlay({
   // catalogue's own flag rather than inferred from the class, which is exactly
   // the inference the old framing string made and got wrong.
   const terminatesExam = gravest?.spec.terminateSession === true;
+  const fold = useFoldWatch();
 
   return (
     <div
@@ -144,9 +149,23 @@ export function MistakeConsequenceOverlay({
       aria-modal="true"
       aria-labelledby="mistake-consequence-title"
     >
-      <section className="card my-auto flex w-full max-w-3xl flex-col gap-4 p-5 sm:p-6">
-        {/* Header — the mistake happened (or is being demonstrated) */}
-        <div className="flex items-center gap-3">
+      {/* BOUNDED — 2026-08-19, and this card had none of it.
+          Three columns of defence its sibling `TeachMomentOverlay` grew in
+          July and this one never did: a height bound, a reading region that
+          scrolls, and an action that cannot leave the fold. It is the TALLER
+          of the two (`max-w-3xl`, two columns, a lazy media block and eight
+          paragraphs) and it is the one that renders on a PHONE — the shell
+          gates the teach card behind `!compact` and gates this behind nothing
+          — so on a 393 px-tall landscape stage the whole of «Сега опитай
+          правилно →», the point of THEO-3 mistake mode, was below a fold
+          nothing announced. `max-h-full` resolves against the scrim's content
+          box (`absolute inset-0`, definite height), so the card now clips
+          against itself and only the middle moves. */}
+      <section className="card my-auto flex max-h-full w-full min-h-0 max-w-3xl flex-col gap-4 p-5 sm:p-6">
+        {/* Header — the mistake happened (or is being demonstrated). PINNED:
+            the severity class and the point cost are the verdict, and THEO-4
+            forbids a verdict the student can scroll away from its reason. */}
+        <div className="flex shrink-0 items-center gap-3">
           <span
             aria-hidden
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-danger/15 text-danger"
@@ -170,60 +189,81 @@ export function MistakeConsequenceOverlay({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* The stored teaching copy + the citation + the severity framing */}
-          <div className="min-w-0">
-            <h3 className="text-base font-extrabold leading-snug">{demo.titleBg}</h3>
-            {/* STORED what-went-wrong text (ADR-002). */}
-            <p className="mt-2 text-sm leading-relaxed text-foreground">
-              {demo.whatWentWrongBg}
-            </p>
-            {/* The rule and the mark are two different citations. The chip used
-                to carry only the rule, next to a point figure it does not set. */}
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {lawRef ? (
-                <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
-                  правило: {lawRef}
-                </span>
-              ) : null}
-              {points !== undefined ? (
-                <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
-                  оценка: {examMarkCitationBg(severity)}
-                </span>
-              ) : null}
+        {/* THE READING REGION — everything that explains, and the only part
+            that moves. One element child (the grid), because `useFoldWatch`
+            observes `firstElementChild`: this card GROWS after it mounts, when
+            the lazy `MistakeMedia` clip replaces its 144 px placeholder, and a
+            fold measured before that arrives is stale in the reassuring
+            direction. */}
+        <div
+          ref={fold.scrollRef}
+          onScroll={fold.measure}
+          className={`flex min-h-0 shrink flex-col ${HUD_SCROLLER_CLASS}`}
+        >
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* The stored teaching copy + the citation + the severity framing */}
+            <div className="min-w-0">
+              <h3 className="text-base font-extrabold leading-snug">{demo.titleBg}</h3>
+              {/* STORED what-went-wrong text (ADR-002). */}
+              <p className="mt-2 text-sm leading-relaxed text-foreground">
+                {demo.whatWentWrongBg}
+              </p>
+              {/* The rule and the mark are two different citations. The chip used
+                  to carry only the rule, next to a point figure it does not set. */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {lawRef ? (
+                  <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                    правило: {lawRef}
+                  </span>
+                ) : null}
+                {points !== undefined ? (
+                  <span className="inline-block rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-bold text-muted">
+                    оценка: {examMarkCitationBg(severity)}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3">
+                <p className="text-sm leading-relaxed">{CONSEQUENCE_FRAMING_BG[severity]}</p>
+                {/* THEO-4: the exam does not merely end — it ends by a named
+                    article, and only for this one fault. */}
+                {terminatesExam ? (
+                  <p className="mt-1.5 text-sm font-semibold leading-relaxed">
+                    {COLLISION_TERMINATION_SHORT_BG}
+                  </p>
+                ) : null}
+                {points !== undefined ? (
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                    {EXAM_POINTS_SHORT_NOTE_BG}
+                  </p>
+                ) : null}
+              </div>
             </div>
-            <div className="mt-3 rounded-xl border border-danger/40 bg-danger/10 p-3">
-              <p className="text-sm leading-relaxed">{CONSEQUENCE_FRAMING_BG[severity]}</p>
-              {/* THEO-4: the exam does not merely end — it ends by a named
-                  article, and only for this one fault. */}
-              {terminatesExam ? (
-                <p className="mt-1.5 text-sm font-semibold leading-relaxed">
-                  {COLLISION_TERMINATION_SHORT_BG}
-                </p>
-              ) : null}
-              {points !== undefined ? (
-                <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                  {EXAM_POINTS_SHORT_NOTE_BG}
-                </p>
-              ) : null}
+
+            {/* The consequence visual: the recorded replay of this same
+                mistake (MistakeMedia — real-engine clip if produced, the
+                Stage 1 2D canvas otherwise; lazy either way). */}
+            <div className="min-w-0">
+              <p className="hud-label">Погледни отстрани</p>
+              <MistakeMedia
+                tracePath={traceUrlForRepoPath(demo.traceRef.path)}
+                districtId={districtId}
+                className="mt-1.5"
+              />
             </div>
           </div>
 
-          {/* The consequence visual: the recorded replay of this same
-              mistake (MistakeMedia — real-engine clip if produced, the
-              Stage 1 2D canvas otherwise; lazy either way). */}
-          <div className="min-w-0">
-            <p className="hud-label">Погледни отстрани</p>
-            <MistakeMedia
-              tracePath={traceUrlForRepoPath(demo.traceRef.path)}
-              districtId={districtId}
-              className="mt-1.5"
-            />
-          </div>
+          {/* It names WHAT is below rather than that something is: on this
+              card the hidden tail is the stored what-went-wrong copy and the
+              severity framing — the only two things here that explain. */}
+          {fold.hasMore ? (
+            <FoldContinuesLine>↓ Разборът продължава — превърти за обяснението</FoldContinuesLine>
+          ) : null}
         </div>
 
-        {/* The retry — the whole point: same rung, this time graded. */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* The retry — the whole point: same rung, this time graded. `shrink-0`
+            in a bounded column, so it is on screen from the first frame of the
+            pause instead of behind a scroll the student was never told about. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
           {onRetryCorrect !== null ? (
             <button type="button" onClick={onRetryCorrect} className="btn-accent">
               Сега опитай правилно

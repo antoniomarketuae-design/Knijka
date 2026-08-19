@@ -3791,7 +3791,148 @@ describe("paintZebra survives an out-of-domain skew", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. assertDistrict guards every field District declares required
+// 7. `zebraCrossings` counts the PAINT, not the visit
+// ---------------------------------------------------------------------------
+//
+// The skew tests above already say it in a comment — „buildMarkings increments
+// it per crossing it VISITS, whatever paintZebra then returns" — and a defect
+// named in a comment is a defect nobody has to fix. `WorldStats.zebraCrossings`
+// is what ~70 district batteries read as „this world has N зебри"; incremented
+// per visit it is A NUMBER THAT CANNOT FALL WHEN THE PAINT DISAPPEARS, i.e. it
+// is silent about the one event it exists to report, and the audit's own
+// complaint family is „the lesson names a marking the world does not have".
+//
+// The reachable zero is the refuge ISLAND. `count` is floored at 2 and only the
+// island `continue` can skip a bar, so paint vanishes exactly when the kerb is
+// wide enough to swallow the outermost bar — and nothing validates
+// `island.widthM` (assertDistrict is the cheap seam guard, not a schema
+// validator), while `buildCrossingFurniture` raises its prism from the same
+// unclamped number. A map generator can therefore lay a kerb across the whole
+// carriageway, paint no пешеходна пътека on it, and be booked for one zebra.
+//
+// §a sweeps the width so the claim is made at EVERY value rather than at two
+// hand-picked ones: the count must equal „did this crossing add vertices", and
+// the sweep self-checks that it contains both outcomes, so it cannot pass by
+// containing only easy rows. It fails under `zebraCrossings++` (the wide rows
+// book a zebra with no paint) AND under a guard that refuses everybody (the
+// narrow rows lose theirs) — the two directions this programme keeps confusing.
+
+/** The §6 fixture, unskewed, with a central refuge island of the given FULL
+ *  width. `approachM`/`departM` are the shipped shape (pe-cane's 20/6) and are
+ *  read only by `buildCrossingFurniture`, never by the painter. */
+function islandCrossingDistrict(widthM: number): District {
+  const base = skewedCrossingDistrict(0);
+  const c = base.crossings[0]!;
+  return assertDistrict({
+    ...base,
+    crossings: [{ ...c, island: { widthM, approachM: 20, departM: 6 } }],
+  });
+}
+
+/**
+ * How many vertices the CROSSING adds — `crossingPaint`'s reader without its
+ * „and there must be some" precondition, because zero is the answer under test.
+ * The prefix identity is still asserted: a crossing must not move one vertex of
+ * the carriageway's own paint, which is what makes „everything past `a.length`"
+ * the crossing's own and not an artefact of paint order.
+ */
+function crossingVertexCount(district: District, net: RoadNetwork): number {
+  const bare = buildMarkings({ ...district, crossings: [] }, net, new Set(), new Set(), []);
+  const full = buildMarkings(district, net, new Set(), new Set(), []);
+  const a = bare.markings.positionsView;
+  const b = full.markings.positionsView;
+  expect(Array.from(b.slice(0, a.length))).toEqual(Array.from(a));
+  return (b.length - a.length) / 3;
+}
+
+describe("zebraCrossings counts the paint, not the visit", () => {
+  it("§a at every island width, the count equals whether the crossing painted", () => {
+    const rows: Array<{ widthM: number; vertices: number; counted: number }> = [];
+    // 0…20 m in 0.5 m steps. The street is 16.25 m wide, so the top of the
+    // range is a kerb wider than the carriageway — absurd as a road and exactly
+    // what a generator bug writes. Measured 2026-08-19: paint survives to
+    // 13.0 m and is gone from 13.5 m, because the floored bar count puts the
+    // outermost bar at ±7.0 m rather than at the kerb.
+    for (let half = 0; half <= 40; half++) {
+      const widthM = half / 2;
+      const district = islandCrossingDistrict(widthM);
+      const net = analyzeNetwork(district);
+      rows.push({
+        widthM,
+        vertices: crossingVertexCount(district, net),
+        counted: buildMarkings(district, net, new Set(), new Set(), []).zebraCrossings,
+      });
+    }
+    // The sweep is only worth reading if it CONTAINS both answers: a range that
+    // painted every time (or never) would satisfy the loop below trivially.
+    expect(rows.some((r) => r.vertices > 0)).toBe(true);
+    expect(rows.some((r) => r.vertices === 0)).toBe(true);
+    for (const r of rows) {
+      expect(r.counted, `island ${r.widthM} m painted ${r.vertices} vertices`).toBe(
+        r.vertices > 0 ? 1 : 0,
+      );
+    }
+  });
+
+  it("§b the three shipped islands still paint, still count, and leave a real gap", () => {
+    // The false-refusal direction. pe-bus 2.0, pe-cane 2.2, pe-slow 2.4 — every
+    // island in content/world. A guard that answered „no zebra" here would
+    // delete three пешеходни пътеки from three pedestrian lessons.
+    for (const widthM of [2.0, 2.2, 2.4]) {
+      const district = islandCrossingDistrict(widthM);
+      const net = analyzeNetwork(district);
+      const m = buildMarkings(district, net, new Set(), new Set(), []);
+      expect(m.zebraCrossings, `${widthM} m`).toBe(1);
+      // …and the count is not right for the wrong reason: the road runs +y from
+      // (0,0), so a vertex's x IS its offset across the carriageway. Bars stand
+      // on BOTH halves, and none is painted over the kerb — the quad's near
+      // corner sits at |off| − ZEBRA_STRIPE_ACROSS_M/2 ≥ islandHalfW.
+      const v = crossingPaint(district, net);
+      const halfW = widthM / 2;
+      expect(v.some((p) => p[0] < -halfW), `${widthM} m: no bar left of the island`).toBe(true);
+      expect(v.some((p) => p[0] > halfW), `${widthM} m: no bar right of the island`).toBe(true);
+      const worst = Math.min(...v.map((p) => Math.abs(p[0])));
+      expect(worst, `${widthM} m: paint ${worst.toFixed(3)} m from the centreline`).toBeGreaterThan(
+        halfW - 1e-9,
+      );
+    }
+  });
+
+  it("§c no committed district names a zebra the painter drops", () => {
+    // What the counter is FOR, run over the corpus: every crossing that clears
+    // the loop's data guards must contribute paint. The eligibility half is
+    // re-derived here from the district alone — cheap, and deliberately not the
+    // painter's own answer, or this would be `x === x`.
+    const files = fs.readdirSync(WORLD_DIR!).filter((f) => f.endsWith(".json"));
+    let zebras = 0;
+    let islands = 0;
+    for (const f of files) {
+      const district = load(f.replace(/\.json$/, ""));
+      const net = analyzeNetwork(district);
+      let eligible = 0;
+      for (const c of district.crossings) {
+        if (!c.edgeId) continue;
+        if (!paintsZebra(c)) continue;
+        const eb = net.edgeById.get(c.edgeId);
+        if (!eb) continue;
+        if (projectOntoPolyline(eb.edge.geometry as Vec2[], [c.x, c.y]).distance > 25) continue;
+        eligible++;
+        if (c.island && c.island.widthM > 0) islands++;
+      }
+      const m = buildMarkings(district, net, new Set(), new Set(), []);
+      expect(m.zebraCrossings, f).toBe(eligible);
+      zebras += eligible;
+    }
+    // Measured 2026-08-19, and asserted so the corpus cannot silently shrink to
+    // a set with no zebras and no islands, under which the loop above is vacuous.
+    expect(files.length).toBeGreaterThanOrEqual(105);
+    expect(zebras).toBeGreaterThanOrEqual(20);
+    expect(islands).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8. assertDistrict guards every field District declares required
 // ---------------------------------------------------------------------------
 
 describe("assertDistrict checks what District declares", () => {

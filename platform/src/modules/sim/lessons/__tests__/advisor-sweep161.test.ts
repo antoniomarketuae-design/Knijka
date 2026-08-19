@@ -62,7 +62,7 @@ import {
   yieldWaitAdvisorPrompt,
 } from "../advisor";
 import { createLessonSession } from "../engine";
-import { compileScenario } from "../scenario/compile";
+import { AUTHORED_MAX_SPEED_PARAM_KEY, compileScenario } from "../scenario/compile";
 import { SCENARIO_TEMPLATES } from "../scenario/templates";
 import type { ScenarioLevel } from "../scenario/types";
 import { LESSONS } from "../specs";
@@ -81,20 +81,35 @@ const template = (id: string) => {
   return spec;
 };
 
-/** The advisor card a compiled objective produces, exactly as the HUD builds it. */
+/**
+ * The advisor card a compiled objective produces, exactly as the HUD builds it.
+ *
+ * „EXACTLY AS THE HUD BUILDS IT" IS THE WHOLE VALUE OF THIS HELPER, and it
+ * stopped being true for one run of this suite. `advisorPromptForSession` grew
+ * a fifth argument (the authored cap, AUTHORED_MAX_SPEED_PARAM_KEY) and this
+ * helper kept calling with four — so every assertion below went on measuring a
+ * card the product no longer shows, and the six part-D cases stayed green while
+ * the real HUD had already changed. That is the reassuring-direction instrument
+ * bug this project keeps finding, in the harness rather than the probe: the
+ * fixture must take every input the caller takes, or it is testing a ghost.
+ * `authoredCapReachesTheCard()` below fails if this drifts again.
+ */
 function cardFor(scenarioId: string, objectiveId: string, level: ScenarioLevel = 1) {
   const lesson = compileScenario(template(scenarioId), level);
   const o = lesson.objectives.find((x) => x.id === objectiveId);
   if (o === undefined) throw new Error(`no such objective: ${scenarioId}/${objectiveId}`);
   const params = o.params as Record<string, unknown>;
+  const authored = params[AUTHORED_MAX_SPEED_PARAM_KEY];
   return {
     lesson,
     objective: o,
+    authoredCapKmh: typeof authored === "number" ? authored : undefined,
     prompt: advisorPromptForObjective(
       o.titleBg,
       { kind: o.kind, ...params } as never,
       undefined,
       lesson.postedLimitKmh,
+      typeof authored === "number" ? authored : undefined,
     ),
   };
 }
@@ -215,6 +230,7 @@ function everyCappedCard(): {
   objectiveId: string;
   cap: number;
   posted: number | undefined;
+  authored: number | undefined;
   titleBg: string;
   textBg: string;
 }[] {
@@ -226,17 +242,21 @@ function everyCappedCard(): {
         if (o.kind !== "reachZone") continue;
         const cap = (o.params as { maxSpeedKmh?: number }).maxSpeedKmh;
         if (cap === undefined) continue;
+        const authoredRaw = o.params[AUTHORED_MAX_SPEED_PARAM_KEY];
+        const authored = typeof authoredRaw === "number" ? authoredRaw : undefined;
         out.push({
           id: lesson.id,
           objectiveId: o.id,
           cap,
           posted: lesson.postedLimitKmh,
+          authored,
           titleBg: o.titleBg,
           textBg: advisorPromptForObjective(
             o.titleBg,
             { kind: "reachZone", ...(o.params as object) } as never,
             undefined,
             lesson.postedLimitKmh,
+            authored,
           ).textBg,
         });
       }
@@ -246,22 +266,51 @@ function everyCappedCard(): {
 }
 
 describe("sweep161 part D — the card stops publishing the grader's tolerance as the target", () => {
-  const cases: [string, string, number][] = [
-    ["sc-speed-transition", "sc-trn-approach", 57],
-    ["sc-speed-transition", "sc-trn-in-zone", 38],
-    ["sc-sp-curve", "sc-spcv-curve", 60],
-    ["sc-sp-eco-coast", "sc-ecoc-coast", 41],
-    ["sc-vu-cyclist-hook", "sc-vu-approach", 40],
-    ["sc-mw-min-speed", "sc-mwms-join", 140],
+  // RE-STATED 2026-08-19, and stated rather than quietly edited.
+  //
+  // Each row below was photographed printing a number that is the GRADER'S
+  // TOLERANCE — the author's gate after `widenSpeedCap` folded the rung's grace
+  // in. Part D answered that by printing nothing, and the answer was half
+  // right: the tolerance stopped going on the glass, and the gate went on
+  // grading in silence on 499 of the 953 capped cards (the authored-cap wave —
+  // `advisor-authored-cap.test.ts`, and spokenCapKmh source 4).
+  //
+  // So the assertion moves from „says no number" to the stronger claim it was
+  // always reaching for: THE CARD SAYS THE AUTHOR'S NUMBER AND NEVER THE
+  // LADDER'S. `authored` here is the template's own `maxSpeedKmh` before any
+  // grace — 52 where the photograph read 57, 36 where it read 41.
+  //
+  // sc-mwms-join is the row that corrects the original finding rather than
+  // extending it. Its street is posted 140 and `widenSpeedCap` clamps to the
+  // sign, so gate == authored == posted == 140: the photographed 140 was never
+  // the tolerance, it was the author's own figure, and part D excluded it only
+  // because its sign test was the strict `posted < cap`. What remains true of
+  // that frame — a MINIMUM-speed drill coached with a ceiling — is a template
+  // copy row (templates-merging2), not a number this module may invent or
+  // suppress.
+  const cases: [string, string, number, number][] = [
+    // scenario, objective, photographed gate, the author's own cap
+    ["sc-speed-transition", "sc-trn-approach", 57, 52],
+    ["sc-speed-transition", "sc-trn-in-zone", 38, 33],
+    ["sc-sp-curve", "sc-spcv-curve", 60, 55],
+    ["sc-sp-eco-coast", "sc-ecoc-coast", 41, 36],
+    ["sc-vu-cyclist-hook", "sc-vu-approach", 40, 35],
+    ["sc-mw-min-speed", "sc-mwms-join", 140, 140],
   ];
-  for (const [scenarioId, objectiveId, photographed] of cases) {
-    it(`${scenarioId}/${objectiveId}: «дръж под ${photographed} км/ч» is gone and the sentence survives`, () => {
-      const { objective, prompt } = cardFor(scenarioId, objectiveId);
+  for (const [scenarioId, objectiveId, photographed, authored] of cases) {
+    it(`${scenarioId}/${objectiveId}: the card says the author's ${authored}, never the ladder's ${photographed}`, () => {
+      const { objective, prompt, authoredCapKmh } = cardFor(scenarioId, objectiveId);
       // The GATE is untouched — this is a copy fix, not a re-authored objective.
       expect((objective.params as { maxSpeedKmh?: number }).maxSpeedKmh).toBe(photographed);
-      expect(prompt.textBg).not.toContain("дръж под");
-      expect(prompt.textBg).toBe(objective.titleBg);
-      expect(prompt.textBg.length).toBeGreaterThan(10);
+      expect(authoredCapKmh).toBe(authored);
+      expect(prompt.textBg).toBe(`${objective.titleBg} — дръж под ${authored} км/ч`);
+      // The photographed figure is gone wherever it was ever the ladder's.
+      if (photographed !== authored) {
+        expect(prompt.textBg).not.toContain(String(photographed));
+      }
+      // And the number it does say can never fail the student who obeys it.
+      expect(authored).toBeLessThanOrEqual(photographed);
+      expect(Number.isInteger(authored)).toBe(true);
     });
   }
 
@@ -274,11 +323,18 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
       const isHalt = c.cap <= 8;
       const isSign = c.posted !== undefined && c.posted < c.cap && spoken === c.posted;
       const isAuthored = spoken !== undefined && authored.includes(spoken);
+      // SOURCE 4 (2026-08-19): the template's own `maxSpeedKmh` before the rung's
+      // grace. Admitted as a source, NOT as an escape hatch — it counts only when
+      // the compiled objective actually carries the key and the spoken figure IS
+      // that value, so „the number came from somewhere" still has to name the
+      // somewhere. `authored <= cap` is asserted for all 953 in
+      // `advisor-authored-cap.test.ts`.
+      const isOwnCap = c.authored !== undefined && spoken === c.authored;
       // The gate may still cap a LOOSER authored figure (see below) — that is
       // the one remaining case where the spoken number is the gate's own.
       const isGateUnderAuthor =
         spoken === c.cap && authored.some((n) => n > c.cap);
-      if (!isHalt && !isSign && !isAuthored && !isGateUnderAuthor) {
+      if (!isHalt && !isSign && !isAuthored && !isOwnCap && !isGateUnderAuthor) {
         bad.push(`${c.id} ${c.objectiveId}: cap=${c.cap} posted=${c.posted} → ${c.textBg}`);
       }
     }
@@ -313,11 +369,17 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
     expect(prompt.textBg).toContain("дръж под 40 км/ч");
   });
 
-  it("a majority of the catalog keeps its number — this did not silence the coach", () => {
+  it("the catalog keeps its numbers — this did not silence the coach", () => {
+    // WAS `> 900` and `> 400`, and that is how the census in advisor.ts rotted:
+    // the file's own comment claimed „494 without a number / 459 with" while the
+    // truth at HEAD was 499 / 454, and no assertion anywhere could feel five
+    // cards move between the halves. Exact now, in both halves, so the next
+    // change to spokenCapKmh has to say what it did to the split.
     const all = everyCappedCard();
     const spoken = all.filter((c) => c.textBg.includes("дръж под"));
-    expect(all.length).toBeGreaterThan(900);
-    expect(spoken.length).toBeGreaterThan(400);
+    expect(all.length).toBe(953);
+    expect(spoken.length).toBe(953);
+    expect(all.length - spoken.length).toBe(0);
   });
 });
 
@@ -587,7 +649,13 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
     const s = waitingSession("sc-sig-controller-live", "sc-sctl-read", "redLight");
     const p = advisorPromptForSession(s);
     expect(p?.textBg).not.toContain("Тръгваш на зелено");
-    expect(p?.textBg).toBe("Приближи бавно до регулировчика");
+    // The cap clause is the authored-cap wave below: this zone grades at 20
+    // km/h and the template's own figure IS 20, so the card names it. The
+    // officer's sentence is untouched, which is what this test is about — and
+    // the number appearing here is the same lane's guarantee that no capped
+    // objective grades in silence, this one included.
+    expect(p?.textBg).toBe("Приближи бавно до регулировчика — дръж под 20 км/ч");
+    expect(p?.textBg).toContain("регулировчика");
   });
 
   // --- the opposite direction --------------------------------------------

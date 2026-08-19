@@ -44,6 +44,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
+        "authoredMaxSpeedKmh": 6,
         "maxSpeedKmh": 6,
         "radiusM": 7.5,
         "x": 0.9,
@@ -137,6 +138,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
+        "authoredMaxSpeedKmh": 6,
         "maxSpeedKmh": 6,
         "radiusM": 6.25,
         "x": 0.9,
@@ -228,6 +230,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
+        "authoredMaxSpeedKmh": 6,
         "maxSpeedKmh": 6,
         "radiusM": 5,
         "x": 0.9,
@@ -324,6 +327,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
+        "authoredMaxSpeedKmh": 6,
         "maxSpeedKmh": 6,
         "radiusM": 5,
         "x": 0.9,
@@ -423,6 +427,7 @@ exports[`compileScenario — sc-park-perp-rev > golden compile snapshot per leve
       "id": "sc-ppr-position",
       "kind": "reachZone",
       "params": {
+        "authoredMaxSpeedKmh": 6,
         "maxSpeedKmh": 6,
         "radiusM": 5,
         "x": 0.9,

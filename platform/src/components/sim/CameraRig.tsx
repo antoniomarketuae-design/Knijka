@@ -35,6 +35,7 @@ import {
   COCKPIT_PITCH_GAIN,
   COCKPIT_LOOK_INTO_TURN,
   COCKPIT_LEAN_DAMPING,
+  COCKPIT_HFOV_RAD,
   ESTIMATE_WHEELBASE,
   STEER_MAX_ANGLE,
   type VehicleSim,
@@ -56,7 +57,11 @@ import {
 } from "@/modules/sim/engine";
 import type { CabinControls, MirrorGlanceKind } from "@/modules/sim/scene/cabin";
 import { SKY_DOME_NAME } from "@/modules/sim/environment";
-import { CABIN_LOOK_POSES } from "@/modules/sim/scene/vitok/cabinLook";
+import {
+  CABIN_LOOK_POSES,
+  hotspotScreenRect,
+  type CabinLookPoseId,
+} from "@/modules/sim/scene/vitok/cabinLook";
 import { getCabinLook, resetCabinLook } from "@/modules/sim/scene/vitok/cabinLookStore";
 import { renderMirrorPass } from "@/modules/sim/scene/vitok/mirrorPass";
 import { cullInstancedForMirror } from "@/modules/sim/scene/vitok/mirrorInstanceCull";
@@ -326,6 +331,104 @@ const REAR_VIEW_BEZEL_COLOR = 0x0a0c0f;
  * gates its GROUP on `cockpitView`).
  */
 const COCKPIT_HUD_LAYER = 2;
+
+// ---------------------------------------------------------------------------
+// THE COCKPIT'S OWN MIRROR EDGE — the half of B74 that was never published.
+//
+// B74 taught the DOM where the mirror is so the top rail can step below it, and
+// the block at the bottom of the frame loop does exactly that — for the CHASE
+// window. In the cockpit the branch runs `publishRearView(null, 0, 0)`, i.e. it
+// tells the shell there is NO mirror, because the chase QUAD is not the cockpit
+// mirror. But there IS one: the physical GLB interior glass MirrorRig feeds,
+// hanging off the header in the top of the frame. The DOM was never told.
+//
+// MEASURED off the frames the catalogue cites, not argued from the layout:
+//   `sc-ov-oneway/mobile-right/04-t101s.png` (2556×1179, dpr 3 → 852×393 CSS,
+//   aspect 2.168) — the mirror housing occupies the top-right of the frame with
+//   its top edge CUT by the canvas edge, and `[data-hud="touch-hint"]`
+//   («Ляв палец — волан. Десен палец — нагоре газ, надолу спирачка.») is
+//   printed straight across its glass. Both are then unreadable.
+//   `sc-jx-equal-left/mobile-wrong/07-end.png` — same mirror, same overlap,
+//   this time under «Сесията завърши — първо се самооцени».
+//   `sc-park-bay-exit-rev/mobile-right/03-ready.png` — same again, and that
+//   lesson's whole method is „Двете огледала, после поглед през ДЯСНОТО рамо".
+//
+// WHY THE EQUIVALENT ASPECT AND NOT `cam.aspect`. `projectCockpitPoint` derives
+// its vertical half-angle as `cockpitVFovForAspect(aspect)`, which is the
+// AUTHORED fov — it knows nothing of the speed-widen this rig applies
+// (FOV_WIDEN_COCKPIT, up to +5° on a 39° base at his aspect: 13 %). Feeding the
+// raw aspect would report the mirror's lower edge ~4 % of viewport height too
+// HIGH at speed, i.e. err in the direction that leaves the glass covered — the
+// reassuring direction, which is the one this project has been burned by. So
+// the live fov is inverted back through the same formula and the projection is
+// asked the question in the units it actually answers. Head lean, roll and
+// look-into-turn are left out: they are sub-degree and they are centred, where
+// the widen is neither.
+//
+// NOT A MIGRATION. This composes `hotspotScreenRect`, which already owns the
+// cockpit projection; when `scene/vitok/cabinLook.ts` is next opened this
+// belongs beside it as `interiorMirrorBottomFraction`, exactly as worldLabel.ts
+// records for the B42 bubble's painter.
+// ---------------------------------------------------------------------------
+
+/** The interior mirror's raycast proxy — the node whose glass the student sees
+ *  (hotspots.ts: chassis (0, 0.908, 0.50), the B58 mirror-station position). */
+const COCKPIT_MIRROR_HOTSPOT = "hotspot_mirror_rear" as const;
+
+/**
+ * How far down the viewport the cockpit interior mirror's LOWER edge sits, as a
+ * fraction of viewport height — the same quantity `rearViewBottomFraction`
+ * returns for the chase window, so the shell reads one number either way.
+ *
+ * Returns 0 — "there is no mirror edge on this screen" — when the proxy is
+ * behind the lens, when the glass has left the frame entirely, or when the
+ * answer is not a finite number. 0 is what the chase branch publishes for "no
+ * mirror" and it makes `--sim-mirror-h` be REMOVED rather than set to a lie.
+ *
+ * Exported for the gate, on worldLabel.ts's rule: the projection is the thing
+ * that can be wrong, so the projection is the thing a test has to hold. Driving
+ * it through a mounted rig would need a WebGL context and would test three's
+ * matrix stack instead of this decision.
+ */
+export function cockpitMirrorBottomFraction(poseId: CabinLookPoseId, vFovDeg: number): number {
+  if (!Number.isFinite(vFovDeg) || vFovDeg <= 0) return 0;
+  // Invert cockpitVFovForAspect: the aspect at which the authored formula would
+  // have produced the fov the camera is ACTUALLY carrying this frame.
+  const equivalentAspect = Math.tan(COCKPIT_HFOV_RAD / 2) / Math.tan((vFovDeg * Math.PI) / 360);
+  const rect = hotspotScreenRect(COCKPIT_MIRROR_HOTSPOT, poseId, equivalentAspect);
+  if (rect === null || !Number.isFinite(rect.bottom)) return 0;
+  // Off the bottom of the canvas is not an edge the rail can step below, and a
+  // mirror whose lower edge is above the top edge is not on screen at all.
+  if (rect.bottom <= 0 || rect.bottom >= 1) return 0;
+  return rect.bottom;
+}
+
+/**
+ * The whole "what does the shell get told about the mirror" decision for the
+ * frames in which no CHASE window is drawn, in CSS px from the top of the play
+ * area — the units `publishRearView` takes.
+ *
+ * It is a function rather than an expression inside the branch because the
+ * branch is 1,200 lines into a `useFrame` that needs a WebGL context, and the
+ * defect being fixed was a MISSING CASE in exactly this decision. A case
+ * analysis that cannot be enumerated in a test is how the cockpit came to
+ * publish „there is no mirror" for eleven months of frames.
+ *
+ *  · cockpit  — the GLB interior glass is in the top of the picture, so its
+ *               lower edge is published and the rail can step below it.
+ *  · chase    — never reaches here; the quad branch publishes its own edge.
+ *  · topdown  — no cabin in frame. There is no mirror, and saying so is true.
+ */
+export function idleMirrorEdgePx(
+  mode: CameraMode,
+  poseId: CabinLookPoseId,
+  vFovDeg: number,
+  viewportHeightPx: number,
+): number {
+  if (mode !== "cockpit") return 0;
+  if (!Number.isFinite(viewportHeightPx) || viewportHeightPx <= 0) return 0;
+  return cockpitMirrorBottomFraction(poseId, vFovDeg) * viewportHeightPx;
+}
 
 /**
  * Chase / cockpit camera driving the default R3F camera, plus the per-frame
@@ -1060,7 +1163,13 @@ export function CameraRig({
       rv.glass.visible = false;
       rv.bezel.visible = false;
       rearViewFrameRef.current = 0;
-      publishRearView(null, 0, 0);
+      // No chase QUAD here — but in the cockpit there is still a mirror on
+      // screen (the GLB interior glass), and the shell has no other way to
+      // learn where its lower edge is. Publishing it is the B74 contract
+      // applied to the POV the student actually drives in; see
+      // `cockpitMirrorBottomFraction` for the frames and the fov inversion.
+      // Top-down has no cabin in frame, so it keeps publishing "no mirror".
+      publishRearView(null, idleMirrorEdgePx(mode, getCabinLook(), cam.fov, state.size.height), 0);
     } else {
       // Smoothstepped with the same envelope the head turn uses, so the window
       // opens and closes on exactly the glance's rhythm. `env` is 0 for the

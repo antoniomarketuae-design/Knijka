@@ -88,7 +88,120 @@ export const WORLD_LABEL_PAD_X = 44;
  */
 export const WORLD_LABEL_MIN_FONT_SCALE = 0.62;
 
+/**
+ * The four authored line sizes, in texture px. Extracted from the painter so
+ * the sizes and the legibility instrument below read from ONE table — the
+ * cluster's „one table, three readers" rule, and the reason the dial numerals
+ * could ship at a third of their reviewed size without anything noticing.
+ */
+export const WORLD_LABEL_LINE_PX = {
+  headline: 100,
+  line1: 50,
+  line2: 54,
+  lawRef: 38,
+} as const;
+
 const FONT = '"Segoe UI", system-ui, "Noto Sans", sans-serif';
+
+// ---------------------------------------------------------------------------
+// R1 — HOW BIG THIS CARD ACTUALLY IS ON THE SCREEN IT IS READ FROM
+// ---------------------------------------------------------------------------
+//
+// „THE SIZING RULE IS THE POINT", says the header, and the point it makes is
+// that the caption must be readable „from the distance at which the student can
+// still act on it — not only from the stop line, where the decision has already
+// been made". That is a testable claim expressed in texture pixels, which are
+// not a size — the exact mistake clusterLayout.ts records in its R2 block, and
+// the reason its dial numerals shipped at half the legibility floor.
+//
+// So the same arithmetic is done here. Nothing below changes what is painted;
+// it makes the claim measurable, and the measurement is recorded at the site.
+//
+// WHAT IT SAYS, on the founder's handset (2556×1179 at dpr 3 → 852×393 CSS,
+// vFOV 39.25° from cockpitVFovForAspect), at the reference distance where the
+// apparent size is at its plateau — i.e. the size the card holds across the
+// whole approach:
+//
+//     headline (100 px)   10.2 CSS px      floor 10.5      UNDER
+//     line2    (54 px)     5.5 CSS px                      UNDER
+//     line1    (50 px)     5.1 CSS px                      UNDER
+//     lawRef   (38 px)     3.9 CSS px                      UNDER, by 2.7×
+//
+// and those numbers are OPTIMISTIC: they treat the whole em as ink, where the
+// cap height of this font is nearer 0.7 of it. Realistically the law line lands
+// at ~2.7 CSS px. The catalogue rows read exactly this back out of the frames —
+// „a grey smear about 6 px tall", „an illegible blur at roughly 5 px".
+//
+// WHY THE SIZING RULE CANNOT FIX IT, and this is arithmetic rather than taste.
+// Apparent size is at its MINIMUM at exactly WORLD_LABEL_REF_DIST_M (closer, the
+// card is unscaled and grows as you approach; further, the scale cancels the
+// distance until the ceiling). Lifting the smallest line to the floor needs the
+// reference distance cut by 2.7×, to 6.6 m — and then holding the card out to
+// the 45 m its own drill card asks for needs WORLD_LABEL_MAX_SCALE ≈ 6.8, i.e.
+// a plane 23 m wide hanging over a junction. There is no value of these two
+// constants that both fits in the world and clears the floor.
+//
+// SO THE ANSWER IS NOT TO HIDE IT. A caption that vanishes is a false refusal —
+// the student loses the explanation AND the citation, and doc 64's
+// requirement-zero says a bare verdict is never acceptable. The answer is fewer
+// and bigger lines on the mounts that cannot resolve four, which is the same
+// verdict `dialNumeralsLegibleAt` reached and the same one the founder accepted
+// there. That is a COPY decision, not a painter one, so it is measured here and
+// routed rather than guessed at in this lane.
+
+/**
+ * Glance floor in CSS px of ink — the same 20-arcminute derivation as
+ * clusterLayout's GLANCE_FLOOR_CSS_PX (20′ at 300 mm on a 460 ppi handset at
+ * dpr 3), restated rather than imported: `sim/world` and `sim/cockpit` are
+ * separate modules and doc 05 forbids reaching into another module's internals.
+ * If one of the two ever moves, they must move together.
+ */
+export const WORLD_LABEL_GLANCE_FLOOR_CSS_PX = 10.5;
+
+/** The billboard scale the caller applies at `distM` (WorldProps' own clamp —
+ *  stated here so the instrument and the renderer cannot disagree). */
+export function worldLabelScaleAt(distM: number): number {
+  if (!Number.isFinite(distM) || distM <= 0) return 1;
+  return Math.min(WORLD_LABEL_MAX_SCALE, Math.max(1, distM / WORLD_LABEL_REF_DIST_M));
+}
+
+/** A texture-px line size as a height in world metres on the unscaled card. */
+export function worldLabelInkMetres(linePx: number): number {
+  return (linePx / WORLD_LABEL_TEX_H) * WORLD_LABEL_H_M;
+}
+
+/**
+ * On-screen height of a line, in CSS px, for a viewport `viewportHeightCssPx`
+ * tall with vertical FOV `vFovRad`, at `distM` metres.
+ *
+ * Treats the em as ink (see the block above): the answer is an OVER-estimate,
+ * so a value under the floor is conclusive and a value over it is not a
+ * guarantee. That asymmetry is deliberate — every „0 defects" report in this
+ * project came from an instrument that erred the other way.
+ */
+export function worldLabelApparentCssPx(
+  linePx: number,
+  distM: number,
+  viewportHeightCssPx: number,
+  vFovRad: number,
+): number {
+  if (!(distM > 0) || !(viewportHeightCssPx > 0) || !(vFovRad > 0)) return 0;
+  const metres = worldLabelInkMetres(linePx) * worldLabelScaleAt(distM);
+  return (viewportHeightCssPx * metres) / (2 * distM * Math.tan(vFovRad / 2));
+}
+
+/** True when a line clears the glance floor — measured, never assumed. */
+export function worldLabelLineIsLegible(
+  linePx: number,
+  distM: number,
+  viewportHeightCssPx: number,
+  vFovRad: number,
+): boolean {
+  return (
+    worldLabelApparentCssPx(linePx, distM, viewportHeightCssPx, vFovRad) >=
+    WORLD_LABEL_GLANCE_FLOOR_CSS_PX
+  );
+}
 
 /** Paint one centred line, shrunk to fit inside the card. */
 function labelLine(
@@ -153,11 +266,11 @@ export function drawWorldLabel(c: HTMLCanvasElement, copy: WorldLabelCopy): void
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
   g.fillStyle = copy.accent;
-  labelLine(g, copy.headlineBg, 700, 100, 118, W);
+  labelLine(g, copy.headlineBg, 700, WORLD_LABEL_LINE_PX.headline, 118, W);
   g.fillStyle = "#dbe5f2";
-  labelLine(g, copy.line1Bg, 600, 50, 208, W);
+  labelLine(g, copy.line1Bg, 600, WORLD_LABEL_LINE_PX.line1, 208, W);
   g.fillStyle = "#ffd9a8";
-  labelLine(g, copy.line2Bg, 700, 54, 290, W);
+  labelLine(g, copy.line2Bg, 700, WORLD_LABEL_LINE_PX.line2, 290, W);
   g.fillStyle = "#8ea3bd";
-  labelLine(g, copy.lawRef, 500, 38, 368, W);
+  labelLine(g, copy.lawRef, 500, WORLD_LABEL_LINE_PX.lawRef, 368, W);
 }
