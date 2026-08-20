@@ -11,6 +11,43 @@
  *
  * Rendering, colliders and the contact-grading constants stay with the
  * component that owns them (components/sim/ScenarioObstacles.tsx).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * „THE STOPPED CAR HAS NO LAMPS" — WHY, EXACTLY, AND WHY NOT HERE — 2026-08-20.
+ *
+ *   sc-pk-smooth-stop/pc-right/04-t049s.png, routed to this file:
+ *   „The obstacle the whole drill depends on is a blank white box. The 'спрял
+ *    автомобил' stopped in the live lane has no rear lamps, no brake lights, no
+ *    hazard lights, no number plate and no reflectors … A student cannot learn
+ *    to read a stopped vehicle from a body with no signals on it."
+ *
+ * THE FRAME IS RIGHT. An 8× crop of it shows a flat grey cuboid with one black
+ * bumper band and nothing else — no lens, no lamp, no plate. The drill's own
+ * instruction 2 is «Напред в лентата е спрял автомобил», and its whole taught
+ * act is reading that body and stopping short of it.
+ *
+ * THE CAUSE IS ONE LINE, AND IT IS IN `traffic/vehicleFleet.ts`:
+ *     const SKIP_BODY_MATERIALS = new Set(["headlight", "taillight"]);
+ * The GLB's lamp primitives are DROPPED from the merged body at fleet-build
+ * time — deliberately, because `TrafficLayer` re-adds them as dynamic emissive
+ * overlays for MOVING traffic, night-gated on its own `night` flag. A held
+ * scenario obstacle never goes through that path: `scenarioSceneryProps.ts`
+ * places this van (`kargo_v`, `visual: true`) and `ScenarioObstacles.tsx`
+ * instances the merged body. Merged body minus lamp prims, plus no overlay,
+ * equals the box in the frame. So the fix is a lamp pass for held bodies, in
+ * `components/sim/ScenarioObstacles.tsx` (+ the rig's `lampY`, which
+ * `vehicleFleet.ts` already keeps for exactly this kind of placement).
+ *
+ * THIS FILE'S SHARE, STATED AND DELIBERATELY NOT TAKEN. `ScenarioVehicleObstacle`
+ * below has no way to say WHICH lamps a held body shows — no `lamps: "hazard" |
+ * "brake" | "none"`. That is a real gap and it is this file's gap: a car
+ * stopped in a live lane should be showing hazards, and today no drill can ask
+ * for it. It is left unwritten ON PURPOSE. A field no renderer reads is a
+ * schema that lies — an author would set it, the frame would not change, and
+ * the next sweep would file the same finding against a spec that now claims to
+ * support lamps. The field and the render pass must land in the SAME change.
+ * Route them together.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 // ---------------------------------------------------------------------------

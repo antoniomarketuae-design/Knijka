@@ -13,6 +13,61 @@
  *      (once at setup) so SimTick crossing events see real pedestrians.
  * `<TrafficLayer system={...} runtime={...} playerRef={...} />` can run
  * step 2 itself when you don't need explicit ordering.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TWO SWEEP-161 FINDINGS WERE ROUTED TO THIS BARREL. IT IS A BARREL — 2026-08-20.
+ *
+ * There is no logic below this comment: every line is a re-export. Neither
+ * finding can be answered by editing this file, and both were opened, driven
+ * back to the frames, and given an owner rather than dropped.
+ *
+ * ── 1 · sc-ac-truck-spray/pc-right/04-t102s.png — REFUTED ON THE FRAMES ─────
+ *   „The truck is stationary and unreachable. At t011, t102 and t204 (3.5
+ *    minutes apart) it occupies the identical screen position and size, sitting
+ *    astride the centre line rather than in the right lane … which is why both
+ *    objectives never fire in any run."
+ *
+ *   THE TRUCK MOVED; THE WORLD PROVES IT. Between 04-t011s and 04-t204s the
+ *   background changes completely — bare motorway becomes buildings, poles and
+ *   the green route-end marker — so the ego covered ground (≈370 m at the
+ *   sampled speeds). The truck stayed the same size THROUGH that, which is what
+ *   a lead vehicle matching your speed looks like, not a parked one. And it is
+ *   authored to do exactly that: `SC_AC_TRUCK_SPRAY.staged` is a `cutInLeadCar`
+ *   with `hold: { offsetM: 79 }` and `maxMatchSpeedMps: 33`, whose own comment
+ *   says „pinning the gap so the lesson isolates one variable".
+ *
+ *   NOR IS IT ASTRIDE THE CENTRE LINE. On 04-t011s the dashed lane divider runs
+ *   to the truck's LEFT and the solid edge line plus hard shoulder to its
+ *   RIGHT: it is in the right-hand lane the briefing places it in, with the ego
+ *   behind it in the same lane.
+ *
+ *   WHY THE OBJECTIVES NEVER FIRED is a fact about the instrument, not the
+ *   lesson: they are reachZones at y = 450 and y = 860, and the sweep's „right"
+ *   drive is a closed-loop control law holding `CRUISE_KMH = 12`
+ *   (`tools/mobile/lesson-audit.mjs`). 15 км/ч top, 28 full stops, 209 s — it
+ *   physically could not reach y = 450. See the corpus measurement recorded in
+ *   `traces/scMergeLaneEnd.ts`.
+ *
+ * ── 2 · sc-ed-d2-city-run/pc-right/06-waited.png — REAL, AND NOT HERE ───────
+ *   „zero pedestrians, zero moving traffic and zero cross traffic … Briefing
+ *    line 1 tells the student that on this boulevard the pedestrians and the
+ *    drivers all read his headlights and indicators; there is nobody there."
+ *
+ *   Confirmed on the frame: a working red/green junction on бул. „Драган
+ *   Цанков" with nothing at all passing through it. The emptiness is DECIDED,
+ *   and not here:
+ *     · `lessons/scenario/compile.ts` — `SCENARIO_DEFAULT_TRAFFIC` is
+ *       `{ vehicleCount: 0, pedestrianCount: 0 }`, and
+ *       `SCENARIO_FAMILY_TRAFFIC_BASELINE` lifts only `junction` and `signals`.
+ *       This lesson's family is `exam-drills`, which is in neither, and that
+ *       file's own comment pins `pedestrianCount` at 0 for EVERY family.
+ *     · `lessons/scenario/templates-exam.ts` — sc-ed-d2-city-run authors
+ *       `traffic: { vehicleCount: 8, pedestrianCount: 4 }` on its L5 rung ONLY.
+ *       The sweep drove „Ниво 1", where the count is 0.
+ *   So the same lesson one rung up has the boulevard the copy describes. The
+ *   fix is a rung/family authoring decision in those two files; this module
+ *   renders whatever count it is handed.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 export { createTrafficSystem } from "./system";

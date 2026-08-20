@@ -51,6 +51,52 @@
  *  - nothing brakes harder than the recorder's default 4.6 m/s², which is under
  *    harshBrakeDecelMps2 (7): the ease that lets the through car by can never
  *    read as a causeless slam.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * „THE REFERENCE DRIVE CRAWLS AT 9–11 КМ/Ч" — THAT IS THE HARNESS, NOT THIS
+ * FILE, AND THE PROOF IS 102 LESSONS WIDE — 2026-08-20.
+ *
+ *   sc-merge-lane-end/pc-right/04-t161s.png, routed here:
+ *   „The reference 'right' drive crawls at 9–11 км/ч for 160 seconds on a
+ *    50 km/h street and finishes stopped against a building facade, off the
+ *    carriageway, with a parked car beside it. Nothing about that drive
+ *    demonstrates a zip merge."
+ *
+ * THE FRAME REFUTES IT WITH ITS OWN CLOCK. Bottom-left of that screenshot the
+ * demo transport reads **0:13 / 0:30**, and the annotation on the glass is step
+ * 5 of `scMergeLaneEndShadowScript` («В огледалото: кола в лявата лента, почти
+ * наравно с нас…»). The authored drive is 30 seconds long and was playing
+ * correctly at the moment of the complaint. The car crawling for 160 s is the
+ * EGO — the audit harness's own car, which is not this file's output.
+ *
+ * WHY IT CRAWLED, in one constant: `tools/mobile/lesson-audit.mjs` drives
+ * „right" as a closed-loop control law holding `CRUISE_KMH = 12` with a
+ * stop-and-look cadence. Its per-frame speeds in this run are 14, 0, 11, 2, 0,
+ * 10, 11, 0 … — the law, not the lesson.
+ *
+ * THE CONTROL IS IN THE SAME LESSON, ON THE SAME BUILD. Four runs exist for
+ * sc-merge-lane-end and they split by MODE, not by platform:
+ *     mobile-right  top 25 км/ч · 22 full stops
+ *     pc-right      top 15 км/ч · 21 full stops
+ *     mobile-wrong  top 59 км/ч ·  0 full stops
+ *     pc-wrong      top 59 км/ч ·  0 full stops
+ * Same world, same physics, same car. Only the input script differs: „wrong"
+ * holds the throttle, „right" taps it.
+ *
+ * AND IT IS THE WHOLE SWEEP, NOT THIS LESSON. Over the 102 lessons that have
+ * both PC runs, mean top speed is **15.2 км/ч right against 59.5 км/ч wrong**;
+ * **96 of 102** right drives never exceeded 20 км/ч, against 5 of 102 wrong
+ * drives. So any finding phrased „the right drive never reached X", „the
+ * objective never fired", „the vehicle never exceeds walking speed" is at least
+ * partly a reading of `CRUISE_KMH`. That is the reassuring-direction instrument
+ * bug's mirror image — an instrument that convicts — and it is worth exactly as
+ * much scepticism.
+ *
+ * WHAT THE AUTHORED DRIVE ACTUALLY DOES is pinned by the gate rather than by
+ * this paragraph: `__tests__/sc-merge-lane-end-traces.test.ts` now asserts the
+ * shadow's speed envelope and where it comes to rest, precisely so this claim
+ * cannot be re-filed against a file that never made it.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type { StagedEventSpec } from "../contracts";

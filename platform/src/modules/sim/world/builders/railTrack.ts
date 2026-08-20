@@ -30,6 +30,64 @@
  * position is world space via toWorld (x, h, -y). `along` = the edge tangent
  * (travel), `across` = perpRight(along) (right of travel — the crossing runs
  * this way).
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * SWEEP-161 FINDING (sc-pk-rail-ban, pc-right, CRITICAL) — REFUTED IN ITS
+ * LITERAL CLAIM, WITH A REAL CAUSE FOUND DOWNSTREAM. Recorded HERE, in the file
+ * the finding was routed to, because the previous round's refutation was
+ * written into a NEW test file and this module was left looking untouched — so
+ * the next reader opened it cold for the eleventh time.
+ *
+ * THE CLAIM: „There is no level crossing in the world … no rails, no barrier,
+ * no А34 sign and no crossing surface. content/world/pk-rail-v1.json does carry
+ * a railCrossing zone — the data is there and NOTHING DRAWS IT."
+ *
+ * The last clause is false, and it is false by MUTATION, not by reading:
+ * inserting `continue` at the top of the railCrossing loop below turns 8 tests
+ * red across `__tests__/pk-rail-crossing-drawn.test.ts` and
+ * `__tests__/rail-crossing-every-district.test.ts`. Measured on the shipped
+ * pk-rail-v1 (`pkr-e-street`, a 400 m street; band [200, 206] m):
+ *
+ *     halfWidth 8.125 → deck half 7.875 m, full deck width 15.75 m
+ *     11 deck quads (1 ballast band + 10 sleeper ties at 1.5 m across)
+ *      6 rail quads (2 rails × top + 2 sides), gauge 3.5875 m along travel
+ *     stats.railTrackQuads = 17, and it reaches `world.railTracks.deck`
+ *
+ * The А34 / crossbuck / barrier furniture is placed too (zoneSigns.ts, at 150 /
+ * 195 / 197 m). So the geometry exists, is proportionate, and is rendered.
+ *
+ * WHAT IS ACTUALLY WRONG, AND IT IS NOT IN THIS FILE. The deck is drawn UNDER
+ * the guidance ribbon, and nothing takes the ribbon off it:
+ *
+ *     ROAD_Y            0.020
+ *     MARKING_Y         0.032
+ *     RAIL_BALLAST_Y    0.036   ← ballast band
+ *     RAIL_SLEEPER_Y    0.042   ← sleeper ties
+ *     RIBBON_Y          0.045   ← guidance route ribbon, blended ADDITIVELY
+ *     RAIL_HEAD_Y       0.092   ← only the two rail crowns clear it
+ *
+ * `scene/guidanceRoute.ts::crossingMuteSpans` already exists precisely because
+ * an additive ribbon washes out dark paint beneath it — it mutes the ribbon
+ * over painted ZEBRAS (`district.crossings`) and over STOP LINES, and both
+ * mutes have their own regression tests. It does NOT mute over `railCrossing`
+ * ZONES: a census of `src/modules/sim/scene/` returns ZERO occurrences of
+ * "railCrossing". So the darkest, most identifying part of the crossing — the
+ * ballast and the ties — is additively lightened in exactly the lane the
+ * student is looking down, by the same mechanism that was already fixed twice
+ * for other paint. That is a one-line class of fix in a file this lane does not
+ * own; it is ROUTED, not touched: `platform/src/modules/sim/scene/guidanceRoute.ts`
+ * (`crossingMuteSpans`, which should take `district.zones` of kind
+ * "railCrossing" as a third mute source, spanning [fromM, toM]).
+ *
+ * WHAT IS STILL OPEN, STATED PLAINLY RATHER THAN CLOSED BY ASSERTION: whether,
+ * with the ribbon muted, the deck READS from the driver's seat. The sweep
+ * cannot answer it — its frames are ~5.1 s apart and the car was doing 12 км/ч
+ * (3.3 m/s) at the band, i.e. ~17 m of ground per sample against a 6 m band, so
+ * a clean pass-over falls BETWEEN two samples more often than not. No pc-right
+ * frame in `.audit-frames/sweep161/sc-pk-rail-ban/` catches the car on the
+ * band. Answering it needs a seat-height still at a known arclength, not
+ * another sweep.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 import { PERCEPTUAL_ROAD_SCALE } from "../../contracts";

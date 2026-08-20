@@ -64,6 +64,49 @@
  *    who never taps play, whose poster 404s, or whose connection dies mid-clip
  *    gets the diagram and the complete WHY / HOW / ЗАПОМНИ — the video is an
  *    upgrade to the lesson, never a precondition for it.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THREE SWEEP-161 FINDINGS WERE ROUTED HERE. ALL THREE ARE SOMEONE ELSE'S,
+ * AND THIS PARAGRAPH IS WHY — 2026-08-20.
+ *
+ * Written down because a lane that reads a finding, decides there is nothing to
+ * do and moves on leaves a file indistinguishable from one nobody opened. This
+ * one was opened. The three, verbatim from the ledger:
+ *
+ *   · sc-junction-scan/mobile-wrong/04-t102s.png  (CRITICAL)
+ *     „the touch tutorial card has no panel background at all: its text is
+ *      painted directly over the rear-view mirror image and the sky, and its
+ *      РАЗБРАХ button sits on top of the world's 40 km/h sign."
+ *   · sc-ed-d2-city-run/mobile-right/04-t101s.png
+ *     „the pre-drive touch tutorial … is still on screen at t034, t038, t101
+ *      and t102 … drawn onto the rear-view mirror glass."
+ *   · sc-junction-blind/mobile-right/05-stopped.png
+ *     „the first-touch coach tip never dismisses … still pinned top-right."
+ *
+ * ALL THREE QUOTE THE SAME SENTENCE — «Ляв палец — волан. Десен палец — нагоре
+ * газ, надолу спирачка.» — AND THIS FILE HAS NEVER CONTAINED IT. It is
+ * `[data-hud="touch-hint"]` in `components/sim/LessonScene.tsx` (the <p> at the
+ * card's own comment about portrait wrapping), with its lifetime in
+ * `lesson-ui/touchHintLifetime.ts` and its activation in `hud/tapActivation.ts`.
+ * That card is the phone's THUMB-LAYOUT hint; this file is the pre-drive
+ * CHECKLIST tutorial — an illustrated WHY/HOW/ЗАПОМНИ card with a law citation
+ * and a «Продължи», which appears on none of the three frames.
+ *
+ * AND IT CANNOT HAVE BEEN ON THOSE FRAMES EVEN IF IT WANTED TO: every frame
+ * named is an `sc-` scenario rung, and `lessons/scenario/compile.ts` sets
+ * `preDrive: false` for every compiled scenario („Maneuver drills start at the
+ * skill; the curriculum owns the ritual"), so this component does not mount in
+ * a scenario run at all.
+ *
+ * VERIFIED BOTH WAYS BEFORE DECLINING, because a false refusal costs what a
+ * false certificate costs: the frames were opened, not just the JSON. On
+ * sc-junction-scan/mobile-wrong/04-t102s the card is un-panelled type over the
+ * mirror casing with «РАЗБРАХ» over the round 40 sign — the finding is REAL and
+ * severe. It is simply not here. Route: `components/sim/LessonScene.tsx`
+ * (the panel/ink half — the card is on `GHOST_SURFACES`, which is why its
+ * background never reaches the screen) and `lesson-ui/touchHintLifetime.ts`
+ * (the never-dismisses half).
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

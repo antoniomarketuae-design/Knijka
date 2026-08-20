@@ -200,6 +200,34 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
 // on tj-occluded-v1
 // ---------------------------------------------------------------------------
 
+/*
+ * SWEEP 161 — «THE LESSON'S OWN CORRECT LINE IS NOT SURVIVABLE»: REFUTED.
+ *
+ * The sweep filed one BROKEN critical here: „the right drive is convicted of
+ * two dangerous errors — «Непропускане на ППС с предимство» and «ПТП» — 20
+ * наказателни точки, НЕИЗДЪРЖАН, on BOTH platforms. A student who does exactly
+ * what the briefing says still crashes into the priority car."
+ * (`sweep161/sc-junction-blind/pc-right/08-debrief.png`.)
+ *
+ * The debrief is real. The drive behind it is not the briefing's line. This
+ * drill's second objective is a LEFT turn out of the south stem — instruction
+ * 5 «завий наляво и продължи на запад», disc `sc-jblind-cross` at (−50, 4.06)
+ * on the west arm — and `tools/mobile/lesson-audit.mjs`'s `right` mode has no
+ * steering input at all: its whole keyboard vocabulary is KeyW / KeyS /
+ * Escape. So it went north through an equal junction it never yielded at, and
+ * `04-t209s.png` shows where it stopped — 3 км/ч, gear D, standing in an empty
+ * green field off the network, task 2/2 still asking for the left turn.
+ *
+ * MEASURED rather than argued, in `__tests__/pk-junctions2-sweep161-truth.test
+ * .ts` §2: the committed shadow driven through the production session
+ * (compileScenario → createLessonSession → applyTick every frame) completes
+ * both objectives with ZERO violations and ИЗДЪРЖАН on all five rungs, while
+ * the harness's own law re-authored in the recorder's vocabulary earns
+ * objective 1 and cannot reach objective 2's disc. The counter-proof rides the
+ * same pipeline: mistake-barge still grades FAILED_TO_YIELD and mistake-no-look
+ * still grades COLLISION, so the pass is not a suite that stopped grading.
+ */
+
 /**
  * The staged conflict: a car crosses the equal T-junction from the player's
  * RIGHT (east → west), timed by the priorityFromRight runner against the

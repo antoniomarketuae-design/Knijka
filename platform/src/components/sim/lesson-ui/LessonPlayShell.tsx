@@ -656,9 +656,93 @@ interface HudSnapshot {
   preDriveNextStepId: PreDriveStepId | null;
   /** „Съветник": the next expected action (pure advisor.ts derivation). */
   advisorPrompt: AdvisorPrompt | null;
+  /** The drill's own speed ceiling for the ACTIVE objective, in km/h, as the
+   *  student has been told it — see `taskCapKmhFromPrompt`. `undefined` when
+   *  the objective carries no cap, or when nothing is being said (exam mode,
+   *  a lawful wait), and the bar then prints the two-number reading it always
+   *  printed. */
+  taskCapKmh: number | undefined;
   vehicle: { x: number; y: number; headingDeg: number } | null;
   /** A13: live official tally (exam sessions only, null otherwise). */
   examTally: { totalPoints: number; osnovniPoints: number; opasniCount: number } | null;
+}
+
+/**
+ * ── O51 · THE DRILL'S OWN CEILING, AND WHOSE NUMBER THE BAR MAY PRINT ──────
+ *
+ * `hud/StatusDashboard.tsx` published `taskCapKmh` and routed the thread here:
+ * *„LessonPlayShell.tsx mounts this bar twice … with `limitKmh={snap.limitKmh}`
+ * and nothing else, so this arrives `undefined` … one prop at each of those two
+ * mounts, from the same `reachZone.maxSpeedKmh` `RouteGuidance.capLineBg`
+ * already reads."* This is that thread, and it does NOT pass
+ * `params.maxSpeedKmh`, for a reason that was measured rather than argued.
+ *
+ * THE FRAME O51 WAS FILED ON (`sc-zebra-approach/mobile-right/04-t087s.png`):
+ * the instruction says «под 40 км/ч», the В26 disc says 50, the bar said
+ * «РЕЖИМ Нормален ≤60 · знакът важи». Three numbers, ascending, and the one the
+ * student is billed against is the smallest and the only one with nothing
+ * beside it saying so. `sc-vp-stall/pc-wrong/04-t012s.png` is the same reading
+ * one lesson over — *„Three different speed targets are on screen … The student
+ * has no way to know which number is being graded."*
+ *
+ * SO A FOURTH NUMBER WOULD HAVE BEEN THE DEFECT, NOT THE FIX. `maxSpeedKmh` on
+ * a compiled objective is the GRADER'S TOLERANCE — the author's figure after
+ * `scenario/params.ts widenSpeedCap` folded the rung's grace in — and
+ * `lessons/advisor.ts spokenCapKmh` exists precisely because that figure may
+ * not be spoken to a student. MEASURED over every compiled rung of every
+ * template, on this date, by driving `advisorPromptForObjective` and comparing
+ * its sentence against `Math.min(maxSpeedKmh, postedLimitKmh)`:
+ *
+ *   953  capped reachZone objectives in the catalogue
+ *   597  where the raw gate and the spoken number agree
+ *   144  where the gate is at or above the street's own limit, so the bar stays
+ *        silent either way (B58 slack — never printed, doc 87)
+ *   212  where the RAW gate is HIGHER than the sentence the student is reading,
+ *        by up to 8 km/h — sc-zebra-approach@L1 is bar 45 against card 40, the
+ *        very lesson the row was filed on
+ *     0  where the raw gate is lower
+ *
+ * Threading the raw number would therefore have put «Задачата иска ≤45» on the
+ * glass beside a card reading «дръж под 40 км/ч» on a quarter of the catalogue:
+ * one more unexplained ceiling on the surface whose finding IS unexplained
+ * ceilings.
+ *
+ * WHAT IS THREADED INSTEAD is the number the advisor is speaking right now, so
+ * the bar and the card cannot disagree by construction — the bar prints what
+ * the card prints, or nothing. Both directions hold and both were measured:
+ * the spoken figure is never above the gate (`spokenCapKmh` ends on
+ * `Math.min(visible, capKmh)`, and 0 of 953 disagree), so a student who obeys
+ * the bar can never be refused by the gate; and it is never below what he was
+ * told, so the bar cannot invent a stricter demand than the lesson made.
+ *
+ * WHY IT IS READ OFF THE SENTENCE. `spokenCapKmh` is module-private in
+ * `lessons/advisor.ts` and its fourth source — the template's own pre-grace
+ * `maxSpeedKmh` — rides on `AUTHORED_MAX_SPEED_PARAM_KEY`, which
+ * `parseObjectiveParams` deliberately drops and `@/modules/sim/lessons` does
+ * not export. The advisor's own sentence is the only public carrier of the
+ * resolved figure, and its shape is already pinned card-for-card across all 953
+ * by `lessons/__tests__/advisor-authored-cap.test.ts`. `__tests__/taskCapThread.test.ts`
+ * drives the real catalogue through this function and fails if either the
+ * wording or the resolution moves — so the coupling is loud rather than silent.
+ * ⚠ ROUTED, so this can stop being a read of prose: export `spokenCapKmh` (or a
+ * `advisorCapKmh(session)`) from `lessons/advisor.ts` and call it here instead.
+ *
+ * THE TAIL, not „a number somewhere". The objective title may itself carry
+ * «км/ч» — 40 of 1 575 do (`ObjectiveBanner`'s own census) — and on
+ * «Подмини авариралата кола в лентата за движение — под 110 км/ч» a reader that
+ * took the first figure would publish the title's number as the gate's.
+ */
+export function taskCapKmhFromPrompt(prompt: AdvisorPrompt | null): number | undefined {
+  if (prompt === null) return undefined;
+  // The exact tail `advisorPromptForObjective` writes for a capped reachZone:
+  // `${titleBg} — дръж под ${shown} км/ч`, and nothing else in the advisor's
+  // vocabulary ends this way. `[.,]` because Bulgarian copy uses the comma
+  // decimal; no shipped card is fractional today (the advisor's own census
+  // records 0 of 953) and this is here so one would not be silently dropped.
+  const m = /дръж под (\d+(?:[.,]\d+)?) км\/ч$/u.exec(prompt.textBg.trim());
+  if (m === null) return undefined;
+  const n = Number(m[1].replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 function snapshotOf(
@@ -671,6 +755,9 @@ function snapshotOf(
       ? s.objectives[s.currentObjectiveIndex]
       : null;
   const preDrive = s.preDrive;
+  // Derived once: the card and the bar are then two renderings of one string,
+  // which is the whole of O51 (see `taskCapKmhFromPrompt`).
+  const advisorPrompt = advisorPromptForSession(s);
   return {
     phase: s.phase,
     driveLocked: isDriveLocked(s),
@@ -694,7 +781,8 @@ function snapshotOf(
       s.phase === "preDrive" && preDrive
         ? PRE_DRIVE_STEP_ORDER.find((id) => !preDrive.completedStepIds.includes(id)) ?? null
         : null,
-    advisorPrompt: advisorPromptForSession(s),
+    advisorPrompt,
+    taskCapKmh: taskCapKmhFromPrompt(advisorPrompt),
     vehicle: lastTick
       ? {
           x: lastTick.position.x,
@@ -1245,6 +1333,46 @@ export function advisorEchoTrim(
   // with the dash still attached) reads as a fragment too.
   const trimmed = rest.replace(/^[\s—–·,:;.!?-]+/, "");
   return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * ── O54 · WHICH OF THE TWO QUEUE ROWS OWNS THE OBJECTIVE'S SENTENCE ────────
+ *
+ * `advisorEchoTrim` above settled the ROOMY pair (banner keeps the sentence,
+ * the advisor card keeps what was new). This settles the same question for the
+ * phone, where there is no banner and the queue is the only voice — see the
+ * `advisorCoachesTask` block in the component for the frames and for what the
+ * old arrangement actually cost.
+ *
+ * IT IS A FUNCTION AND NOT THREE LINES IN THE RENDER, for the reason
+ * `advisorEchoTrim` gives one screen up: „only the shell knows both, so only the
+ * shell can decide, and it decides here rather than in JSX so a test can hold
+ * it." A source-text assertion over a JSX ternary is the shape this repo has
+ * been burned by (§2.1 C5 — eight tests asserting over comment-stripped source,
+ * and killing the code they guarded left 867 green). `__tests__/queueTaskEcho.test.ts`
+ * drives THIS function.
+ *
+ * `promptTextBg` is null when the advisor has nothing to say OR is not allowed
+ * to (off, exam, sandbox, ended) — the caller applies that gate, because it is
+ * the same gate the roomy card is mounted behind and there must not be two
+ * readings of it.
+ */
+export function foldAdvisorIntoTask(
+  promptTextBg: string | null,
+  objectiveTitleBg: string | null,
+): { advisorSpeaks: boolean; taskDetailBg: string | null } {
+  if (promptTextBg === null) return { advisorSpeaks: false, taskDetailBg: null };
+  const trimmed = advisorEchoTrim(promptTextBg, objectiveTitleBg);
+  // `advisorEchoTrim` returns the prompt UNCHANGED when the banner's sentence
+  // is not in it, so identity is exactly „this is a different sentence" — and
+  // then the advisor keeps its own row, at its own priority. A wait, a
+  // roundabout phase and a pre-drive step all land here.
+  if (trimmed === promptTextBg) return { advisorSpeaks: true, taskDetailBg: null };
+  // Otherwise the sentence is the task's. The advisor does not get a row at all
+  // (not built — not built and out-ranked, not built and hidden), and whatever
+  // survived the title being stripped off rides with the task as its detail.
+  // `null` here is the pure-duplicate case: there was nothing but the echo.
+  return { advisorSpeaks: false, taskDetailBg: trimmed };
 }
 
 /**
@@ -2965,9 +3093,64 @@ export function LessonPlayShell({
   // The task line, as the student would say it: what to do, and where in the
   // route. `taskPing` is the micro-menu recall.
   const taskLineBg = mistakeMode ? lesson.descriptionBg : snap.objectiveTitle;
+
+  /**
+   * ── O54 · TWO PRODUCERS, ONE INSTRUCTION — THE PHONE HALF ─────────────────
+   *
+   * `hud/overlayQueue.ts` closed the one-item half with `itemEchoesLine` and
+   * routed the cross-producer half here: *„the two producers must be handed one
+   * string, which is a change in `LessonPlayShell.tsx` (where both are mounted)
+   * … This predicate is what that change would then be checkable against."*
+   *
+   * THE ROOMY HALF WAS ALREADY OWNED and is not this. `ObjectiveBanner` keeps
+   * the sentence and `advisorEchoTrim` (above) leaves the advisor card only the
+   * half that was new — landed 2026-08-17, which is why the two frames the note
+   * cites (`sc-vp-readiness/pc-right/01-arrival.png`,
+   * `sc-park-bay-exit-rev/pc-wrong/04-t028s.png`) show a duplicate the shipped
+   * tree no longer prints. On a roomy stage there is no queue at all to collide
+   * with it either: `overlayCandidates` below is `[]` whenever `!compact`.
+   *
+   * THE PHONE HALF IS REAL AND IT IS WORSE THAN A DUPLICATE. There is no banner
+   * on compact — the column is `hidden` — so the queue is the only voice, and it
+   * offered the same sentence from two rows: row 6 `advisor`
+   * («Мини контролната зона с готов кокпит — дръж под 50 км/ч») and row 7 `task`
+   * («Мини контролната зона с готов кокпит», with the «Задача 1/2» chip).
+   * `PRIORITY` has advisor 30 over task 20 and BOTH are `AMBIENT`, so the queue
+   * did not print the sentence twice — it printed the advisor's copy, silently
+   * dropped the task's, and counted nothing in the „+N" badge. The student on a
+   * phone therefore lost the chip that says WHICH of the objectives he is on,
+   * for the whole of every capped rung, to a row that was saying the same words.
+   *
+   * SO ONE PRODUCER OWNS IT, AND THE OTHER'S COPY IS DELETED RATHER THAN HIDDEN.
+   * The objective's sentence belongs to the `task` item, which is the row that
+   * carries the counter; the advisor's remainder rides with it as `detailBg`,
+   * where `SimOverlay` prints it inline under the line (THEO-4 row 2b). The
+   * `advisor` row is not emitted for a prompt that is the task's own sentence —
+   * not suppressed at the render, not re-ranked: it is not built. A prompt that
+   * says something else (a lawful wait, a roundabout phase, a pre-drive step) is
+   * untouched and still outranks the task, which is the whole reason its
+   * priority is 30.
+   *
+   * `itemEchoesLine(taskItem)` is the predicate the note left for this, and it
+   * is false by construction here: the line is the title, the detail is what
+   * survived the title being stripped off. `__tests__/queueTaskEcho.test.ts`
+   * drives it in both directions.
+   */
+  const advisorFold = foldAdvisorIntoTask(
+    // The SAME gate the roomy `AdvisorCard` is mounted behind. A student who
+    // turned «Съветник» off, an exam candidate and the THEO-3 sandbox must not
+    // have coaching arrive on the task row by the side door.
+    advisorOn && !examMode && !mistakeMode && !ended ? (snap.advisorPrompt?.textBg ?? null) : null,
+    snap.objectiveTitle,
+  );
+  const taskDetailBg = advisorFold.taskDetailBg;
   const taskKey =
     compact && !ended && taskLineBg !== null && taskLineBg !== ""
-      ? `task:${snap.objectiveIndex}/${snap.objectiveTotal}:${taskLineBg}:${taskPing}`
+      ? // The detail is IN the key: when the coaching changes under an unchanged
+        // objective (a wait ends, a phase turns over) the card that carries it
+        // must re-announce, or the advisor's own row would have to come back to
+        // say it — which is the second producer growing back.
+        `task:${snap.objectiveIndex}/${snap.objectiveTotal}:${taskLineBg}:${taskDetailBg ?? ""}:${taskPing}`
       : null;
   const taskFresh = useFreshKey(taskKey, TASK_ANNOUNCE_MS);
 
@@ -3161,6 +3344,30 @@ export function LessonPlayShell({
         // 3. Graded mistakes, coached hints and praise — the toast column,
         //    single file. Newest first (the queue unshifts), so the priority
         //    tie-break inside selectOverlay keeps the most recent one talking.
+        //
+        //    ── §2.6 O33 · THE MOMENT SURVIVES THIS BOUNDARY NOW ──────────────
+        //
+        //    `HudToasts` stamps `raisedAtMs` on every toast and prints «сега» /
+        //    «преди 8 с» on the card's last row. On a phone the shell does not
+        //    render `HudToasts` at all — it re-maps each toast into a
+        //    `SimOverlayItem`, and the stamp was dropped right here. The frame
+        //    (`sc-sp-curve/mobile-wrong/04-t030s.png`, iPhone 16 landscape): a
+        //    card reading «Превишена скорост» over a cluster showing 18 км/ч
+        //    beside a В26 disc reading 90. The card is telling the truth about a
+        //    moment six seconds gone and nothing on the glass says which moment,
+        //    so the only conclusion available to a seventeen-year-old is that
+        //    the grader is broken. `overlayQueue.ts` added the field and named
+        //    this line: „add `raisedAtMs: t.raisedAtMs`".
+        //
+        //    ⚠ THE GLASS DOES NOT MOVE UNTIL `hud/SimOverlay.tsx` RENDERS IT —
+        //    one row, `overlayMomentBg(item, now)`, the other half of the pair
+        //    O33 named and NOT this lane's file. This is the half that was
+        //    routed here; it is landed rather than held so that half is one line
+        //    against a field that is already fed, and `hud-toast-moment.test.tsx`
+        //    is updated in the same commit to say exactly which half is live.
+        //    Only `violation` and `hint` are stamped — `overlayCarriesMoment`
+        //    is the authority on which kinds carry one, and a commendation does
+        //    not (an unstamped card must print no age rather than invent one).
         ...(!ended
           ? toasts.map((t): SimOverlayItem | null => {
               if (t.event.kind === "violation") {
@@ -3172,6 +3379,7 @@ export function LessonPlayShell({
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
                   lawRef: t.event.lawRef ?? null,
+                  raisedAtMs: t.raisedAtMs,
                 };
               }
               if (t.event.kind === "lesson") {
@@ -3182,6 +3390,7 @@ export function LessonPlayShell({
                   lineBg: t.event.titleBg,
                   detailBg: t.event.explanationBg,
                   lawRef: t.event.lawRef ?? null,
+                  raisedAtMs: t.raisedAtMs,
                 };
               }
               if (t.event.kind === "commendation") {
@@ -3338,7 +3547,12 @@ export function LessonPlayShell({
           : null,
 
         // 6. „Съветник" — the next expected action, when it changes.
-        advisorFresh && snap.advisorPrompt !== null
+        //    O54: …and never the TASK'S OWN SENTENCE. `advisorSpeaks` is false
+        //    exactly when this row would repeat the line row 7 carries, and the
+        //    coaching has already been handed to that row as its detail. The row
+        //    is not built, rather than built and out-ranked or built and hidden
+        //    — see `foldAdvisorIntoTask`.
+        advisorFresh && snap.advisorPrompt !== null && advisorFold.advisorSpeaks
           ? {
               id: `advisor:${snap.advisorPrompt.textBg}`,
               kind: "advisor" as const,
@@ -3367,6 +3581,12 @@ export function LessonPlayShell({
                   ? "Преживей грешката"
                   : `Задача ${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}/${snap.objectiveTotal}`,
                 lineBg: taskLineBg,
+                // O54: the advisor's half, on the row that carries the counter.
+                // `itemEchoesLine` over this pair must stay false — the line is
+                // the title and the detail is what is left once the title has
+                // been stripped off it (`advisorEchoTrim`), so the two cannot be
+                // the same sentence unless somebody re-attaches the prefix.
+                detailBg: taskDetailBg,
               }
             : null,
 
@@ -4489,6 +4709,11 @@ export function LessonPlayShell({
               <StatusDashboard
                 statusRef={dashboardStatusRef}
                 limitKmh={snap.limitKmh}
+                // O51: the drill's own ceiling, as the student was told it.
+                // `readSpeedContract` decides which of the three binds; this
+                // mount only says which number the task is asking for. See
+                // `taskCapKmhFromPrompt` for why it is not `maxSpeedKmh`.
+                taskCapKmh={snap.taskCapKmh}
                 rejectFlashKey={gearRejectFlash}
                 compact
                 // The stall telltale's accessible name was „рестартирай
@@ -4501,6 +4726,9 @@ export function LessonPlayShell({
               <StatusDashboard
                 statusRef={dashboardStatusRef}
                 limitKmh={snap.limitKmh}
+                // O51 — the roomy twin of the compact mount above. Both, or the
+                // phone and the desktop grade against different visible numbers.
+                taskCapKmh={snap.taskCapKmh}
                 rejectFlashKey={gearRejectFlash}
                 input={hintInput}
               />

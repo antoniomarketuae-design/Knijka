@@ -521,22 +521,32 @@ export function StatusDashboard({
   /** Scene-written per-frame status (see dashboardStatus.ts header). */
   statusRef: RefObject<DashboardStatus>;
   /**
-   * ⚠ THE OBJECTIVE'S OWN SPEED DEMAND (km/h) — DECLARED HERE, NOT YET THREADED.
+   * THE OBJECTIVE'S OWN SPEED DEMAND (km/h) — DECLARED HERE, THREADED SINCE
+   * ROUND 11 (O51).
    *
    * Forwarded verbatim to both `GovernorCapMark`s, which is where the whole
    * argument lives; see that prop's docstring for the frames.
    *
-   * WHAT SHIPS TODAY: `LessonPlayShell.tsx` mounts this bar twice (~line 4489
-   * compact, ~4501 roomy) with `limitKmh={snap.limitKmh}` and nothing else, so
-   * this arrives `undefined` and `readSpeedContract` reduces to the two-number
-   * reading the bar has always printed. Nothing on the glass moves until that
-   * shell passes the gate's cap — one prop at each of those two mounts, from
-   * the same `reachZone.maxSpeedKmh` `RouteGuidance.capLineBg` already reads.
-   * **That file is not this lane's**, so the change is published, asserted and
-   * routed rather than claimed: `governor-cap.test.ts`'s „the shell has not
-   * threaded the task cap yet" block asserts the CURRENT mounts, so it goes
-   * red the moment the thread lands and whoever lands it updates it in the
-   * same commit — the `touchHintLifetime.ts` ⚠ discipline, same shape.
+   * WHAT SHIPS: `LessonPlayShell.tsx` mounts this bar twice — compact and roomy
+   * — and both now pass `taskCapKmh={snap.taskCapKmh}`. `undefined` is still the
+   * shipped case for an uncapped objective, an exam session and every headless
+   * or legacy mount, and there `readSpeedContract` reduces to the two-number
+   * reading the bar has always printed.
+   *
+   * IT IS NOT `reachZone.maxSpeedKmh` AND THAT IS DELIBERATE. The shell
+   * publishes the figure the advisor is SPEAKING, not the widened gate: measured
+   * over the shipped catalogue, the raw gate sits above the sentence the student
+   * is reading on 212 of 953 capped cards (sc-zebra-approach@L1 — the frame this
+   * row was filed on — is gate 45 against card 40), so passing it would have put
+   * a fourth unexplained ceiling on the bar. The derivation, the census and the
+   * ⚠ that routes `spokenCapKmh` out of `lessons/advisor.ts` are all at
+   * `taskCapKmhFromPrompt` in `LessonPlayShell.tsx`.
+   *
+   * ⚠ CITATION REPAIRED (§7 B-R10): this block used to route the tripwire to
+   * `governor-cap.test.ts`, which never contained it. The block was — and the
+   * inverted version still is — in `__tests__/governor-speed-contract.test.ts`,
+   * and the measurement it points at is
+   * `components/sim/lesson-ui/__tests__/taskCapThread.test.ts`.
    */
   taskCapKmh?: number;
   /** Current legal limit (tick-derived, the shell's 150 ms snapshot). */

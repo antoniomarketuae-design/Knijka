@@ -215,16 +215,38 @@ describe("nothing the mark already promised was spent to buy this", () => {
   });
 });
 
-describe("…and the shell has not threaded it yet, which is stated rather than implied", () => {
-  it("both mounts still pass only the posted limit", () => {
+describe("…and the shell HAS now threaded it — O51, round 11", () => {
+  it("both mounts publish the snapshot's task cap", () => {
     /**
-     * The `touchHintLifetime.ts` ⚠ discipline: the rule lives here, the edit
-     * that spends it lives in a file this lane does not own, and the assertion
-     * is written against the CURRENT call so it goes red the moment that edit
-     * lands. Whoever lands it inverts this block in the same commit and the
-     * third number is live on the glass.
+     * ── THIS BLOCK INVERTED, WHICH IS WHAT IT WAS FOR ─────────────────────────
      *
-     * A row parked in prose is a row nobody can find again; this one fails.
+     * It used to read `expect(mount).not.toContain("taskCapKmh")` under the
+     * heading „the shell has not threaded it yet". The `touchHintLifetime.ts` ⚠
+     * discipline: the rule lives here, the edit that spends it lives in a file
+     * this lane did not own, and the assertion was written against the CURRENT
+     * call so it went red the moment that edit landed. It did, and it is
+     * inverted here rather than deleted.
+     *
+     * WHAT THE SHELL PUBLISHES IS NOT `reachZone.maxSpeedKmh`, and the reason is
+     * measured rather than argued — see `taskCapKmhFromPrompt`'s docstring in
+     * `LessonPlayShell.tsx`. Short form: on 212 of the catalogue's 953 capped
+     * cards the raw gate sits ABOVE the sentence the student is reading (up to
+     * 8 km/h; sc-zebra-approach@L1 is gate 45 against card 40), so publishing it
+     * would have put a fourth unexplained ceiling on the one surface whose whole
+     * finding is unexplained ceilings. The shell publishes the figure the
+     * advisor is speaking, which is ≤ the gate on all 953.
+     *
+     * THE MEASUREMENT LIVES WHERE IT CAN BE RUN, not here: this block pins
+     * cross-file ROUTING STATE (the §7 B-R10 usage), and
+     * `components/sim/lesson-ui/__tests__/taskCapThread.test.ts` drives the real
+     * catalogue through the shell's own reader and renders `GovernorCapMark` on
+     * both sides of the boundary.
+     *
+     * ⚠ THE WINDOW IS THE SELF-CHECK. `[\s\S]{0,900}?` is lazy up to the first
+     * `/>`, so a mount that outgrows it stops matching and the length assertion
+     * below fails — which is exactly how this block first went red (the compact
+     * mount grew past 600 characters of comment). It cannot silently match
+     * fewer mounts than exist.
      */
     const shell = fs
       .readFileSync(
@@ -239,12 +261,13 @@ describe("…and the shell has not threaded it yet, which is stated rather than 
         "utf8",
       )
       .replace(/\r\n/g, "\n");
-    const mounts = [...shell.matchAll(/<StatusDashboard[\s\S]{0,600}?\/>/g)].map((m) => m[0]);
+    const mounts = [...shell.matchAll(/<StatusDashboard[\s\S]{0,900}?\/>/g)].map((m) => m[0]);
     expect(mounts).toHaveLength(2);
     for (const mount of mounts) {
       expect(mount).toContain("limitKmh={snap.limitKmh}");
-      // ← this is the line that inverts when the gate's cap is threaded.
-      expect(mount).not.toContain("taskCapKmh");
+      // ← the line that inverted. Both mounts, or the phone and the desktop
+      //   grade against different visible numbers.
+      expect(mount).toContain("taskCapKmh={snap.taskCapKmh}");
     }
   });
 });

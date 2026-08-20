@@ -23,6 +23,36 @@
  * Loading model mirrors treeModels.ts: a reference-counted module cache that
  * loads + bakes once, shares the results across every instanced mesh, and
  * disposes them (geometry + material) when the last consumer unmounts.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * SWEEP-161 FINDING (sc-ac-highbeam-lead, mobile-right, major) — MIS-ROUTED TO
+ * THIS FILE. Recorded here so the next reader does not re-open it to find out.
+ *
+ * THE CLAIM: „At point-blank range the LEAD VEHICLE falls apart: it renders as
+ * a featureless black slab with a flat dark-red bar and a large white sphere
+ * clipping straight through the bodywork."
+ *
+ * The frame (`.audit-frames/sweep161/sc-ac-highbeam-lead/mobile-right/
+ * 04-t098s.png`) shows exactly that, and it is a real defect — but it cannot
+ * live here. This module loads the DISTRICT BUILDING KIT only: `t_*.glb`
+ * towers and `pav_*.glb` retail pavilions under `public/sim/city-v3`, listed by
+ * `CITY_MODELS` (builders/cityBuildings.ts) and consumed by CityBuildings. It
+ * has no vehicle path — no traffic mesh, no lamp geometry, no actor of any
+ * kind passes through `buildAssets`/`bakeTowerGroups` — so no edit to this file
+ * can change how a lead car draws.
+ *
+ * WHERE IT COULD OWN: the moving-actor renderer and the fleet's body spec —
+ *   · platform/src/modules/sim/traffic/TrafficLayer.tsx — builds every actor
+ *     mesh; it is also the only place a bare white SPHERE is authored near an
+ *     actor (`SphereGeometry`: the pedestrian head at r = 0.135 m, and the
+ *     hazard ball at HAZARD_BALL_RADIUS_M — the latter is #ff4b1f orange, so
+ *     the WHITE sphere in the frame is the better first suspect as a
+ *     pedestrian part drawn at an actor's origin rather than at its joint;
+ *   · platform/src/modules/sim/traffic/vehicleFleet.ts — the body dimensions
+ *     the „black slab" would be built from.
+ * The dark-red bar is consistent with a tail-light strip, i.e. the car mesh is
+ * present and it is the DETAIL that is missing at close range, not the actor.
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 import { useEffect, useState } from "react";

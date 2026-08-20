@@ -41,6 +41,55 @@
  *
  * Pure data + typed-array meshes — no three.js, no React, so the node suite
  * asserts the shipped geometry directly.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * SWEEP-161 FINDING (sc-roundabout-entry, pc-right, CRITICAL) — REFUTED, AND
+ * THE EARLIER REFUTATION'S REASON CORRECTED. Recorded HERE rather than only in
+ * `__tests__/island-wall-is-a-collider.test.ts`, because a refutation filed
+ * somewhere else leaves this file reading as never-opened, which is why it has
+ * now been picked up eleven times.
+ *
+ * THE CLAIM: „The car ends up driving on the central island … This is what
+ * earns the careful drive its −10 collision", filed `rightCredited: NO`,
+ * `wrongConvicted: YES`, `endedBecause: route ended on the island`.
+ *
+ * ROUND 9 ANSWERED: the debrief bills a collision — the island STOPPED the car.
+ * True, and mutation-proven: dropping `ISLAND_WALL_RISE_M` from 0.45 to 0.02
+ * turns 5 of the 7 island-collider tests red. The wall is a closed, indexed,
+ * wheel-height-clearing collider on every ring district.
+ *
+ * BUT THAT ANSWERS A QUESTION THE FINDING DID NOT ASK. „The debrief was honest
+ * about the collision" and „the careful drive was failed unfairly" are
+ * different claims, and only the second one is a FALSE REFUSAL — the thing this
+ * project treats as equal in gravity to a false certificate. So it was measured
+ * directly, at the instrument:
+ *
+ *     THE SWEEP'S DRIVER CANNOT STEER. The entire actuation of
+ *     tools/mobile/lesson-audit.mjs is `page.keyboard.down/up("KeyW")` and
+ *     `…("KeyS")` plus one `press("Escape")`. A census of that harness for
+ *     KeyA / KeyD / ArrowLeft / ArrowRight / any steer token returns ZERO.
+ *
+ * A car that can only accelerate and brake leaves the south arm and travels in
+ * a straight line into the central island — which is exactly the frame. So the
+ * „careful drive" was never careful: it drove straight at the island because it
+ * was physically incapable of turning, and the −10 is CORRECT. There is no
+ * false refusal here, and the island must not be softened to make this drive
+ * pass. Both directions therefore hold: the wall stops a car that should be
+ * stopped (mutation above), and the drive that was stopped deserved it (census
+ * above). The founder's own B16 register entry is the same signature recorded
+ * from the other side — „due north with no steering at all".
+ *
+ * The signature is family-wide and file-independent, which is what rules this
+ * module out as the cause: all SIX roundabout drills across three template
+ * files collided on every leg, while only 24 of 98 pc-right legs collided
+ * sweep-wide.
+ *
+ * ROUTED, NOT TOUCHED — the finding belongs to the harness, not to this
+ * builder: `tools/mobile/lesson-audit.mjs` (no lateral input; every roundabout,
+ * every T-junction and every turn-based lesson in the corpus is ungradeable
+ * until it can steer, and their „collision"/„drove off the map" verdicts should
+ * be read as INSTRUMENT OUTPUT until it can).
+ * ───────────────────────────────────────────────────────────────────────────
  */
 
 import type { District, DistrictEdge } from "../types";

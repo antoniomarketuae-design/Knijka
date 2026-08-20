@@ -374,3 +374,77 @@ describe("mw-v1 through the traffic lane graph + system", () => {
     expect(traffic.leadGapMeters(X_CRUISE, 15, 0)).toBe(Infinity);
   });
 });
+
+/**
+ * SWEEP-161 FINDING (sc-mw-emergency-lane, mobile-right, major) — the district
+ * half REFUTED, the rest ROUTED. Recorded here because `public/world/mw-v1.json`
+ * is JSON and generated (`meta.generator = tools/maps/gen_motorway.mjs`), so it
+ * can carry neither a comment nor a surviving hand-edit.
+ *
+ * THE CLAIM: „2600 m of motorway carrying exactly one vehicle … No other
+ * traffic in either direction across 67 mobile and 74 pc frames, no median
+ * barrier between the carriageways, no motorway sign, no gantry, no distance
+ * boards. It does not read as a магистрала.", filed with
+ * `endedBecause: wrong drive ticked both tasks in 58 s`.
+ *
+ * 1. THE „WRONG DRIVE PASSED" HALF IS AN INSTRUMENT ARTEFACT, NOT A FALSE
+ *    CERTIFICATE — and this matters, because reporting a grading bug that is
+ *    not there is the same crime as missing one. `tools/mobile/lesson-audit.mjs`
+ *    defines wrong mode, in its own words, as „one act: hold the throttle and
+ *    never touch the brake", and a census of that harness for KeyA / KeyD /
+ *    ArrowLeft / ArrowRight returns ZERO — it has no lateral control at all.
+ *    The offence this lesson grades is LATERAL: leave the travel lane
+ *    (X_CRUISE = 0) for the emergency lane (X_EMERG = 8.13). The wrong drive
+ *    spawns at `mw-spawn-approach` x = 0 — already in the correct lane — and
+ *    cannot leave it. Its own frame at t033s reads 135 км/ч against a posted
+ *    140 / HUD ≤150, i.e. legal, in the right lane, passing the broken-down car
+ *    in its own lane, which is what instruction 3 actually asks for. The
+ *    debrief's „0 наказателни точки · ИЗДЪРЖАН" is an HONEST verdict on what
+ *    that car did. What is worthless is the wrong COLUMN for this lesson: it
+ *    cannot commit the offence, so it certifies nothing either way.
+ *
+ *    That the grading itself works is asserted above, not assumed: „the
+ *    sustained emergency-lane cruise grades exactly EMERGENCY_LANE_DRIVING".
+ *    Mutation-checked — emptying `zones` in mw-v1.json turns 5 tests in this
+ *    file red, that conviction among them, so the verdict is carried by the
+ *    authored `emergencyLane` spans and by nothing else.
+ *
+ * 2. THE WORLD-DRESSING HALF CANNOT BE AUTHORED IN THIS FILE. `DistrictZoneKind`
+ *    is exactly {noStopping, noParking, noOvertaking, solidCenterLine, busLane,
+ *    railCrossing, curveAdvisory, emergencyLane, waterPatch, icePatch} and
+ *    `SignKind` carries no Д5 „магистрала" — there is no median-barrier, gantry
+ *    or distance-board kind to author, and traffic density is a RUNTIME config
+ *    (`createTrafficSystem({vehicleCount})`, 0 here by design and asserted
+ *    legal above), not district data. Adding any of them is a schema + builder
+ *    + runtime change:
+ *      · platform/src/modules/sim/world/types.ts (DistrictZoneKind / SignKind)
+ *      · platform/src/modules/sim/world/builders/zoneSigns.ts (post it)
+ *      · platform/src/modules/sim/traffic/system.ts (populate the carriageways)
+ *    None of those is this lane's file, and none of them is mw-v1.json.
+ *
+ * WHAT THIS BLOCK PINS is the half the finding got wrong about the map itself:
+ * that it „does not read as a магистрала" because the carriageways are not
+ * there. They are — both of them, full length, divided.
+ */
+describe("mw-v1: the divided carriageway the finding says is missing", () => {
+  it("authors BOTH carriageways over the full 2600 m, separated by a real median gap", () => {
+    const district = assertDistrict(loadRaw("mw-v1"));
+    const nodes = new Map(district.roads.nodes.map((n) => [n.id, n]));
+    // Northbound runs 0 → 2600 at x = 0; southbound runs 2600 → 0 beside it.
+    expect([nodes.get("mw-n-nb-start")!.x, nodes.get("mw-n-nb-start")!.y]).toEqual([0, 0]);
+    expect([nodes.get("mw-n-nb-end")!.x, nodes.get("mw-n-nb-end")!.y]).toEqual([0, LENGTH_M]);
+    const sbX = nodes.get("mw-n-sb-start")!.x;
+    expect(nodes.get("mw-n-sb-start")!.y).toBe(LENGTH_M);
+    expect(nodes.get("mw-n-sb-end")!.y).toBe(0);
+    // The two banks are genuinely apart — wider than the 3-lane bank itself, so
+    // this is a divided road and not two edges drawn on top of each other.
+    expect(Math.abs(sbX)).toBeGreaterThan(Math.abs(X_EMERG) + Math.abs(X_LEFT));
+    // Both carry the emergency-lane ban for their whole length.
+    const spans = (district.zones ?? []).filter((z) => z.kind === "emergencyLane");
+    expect(spans.map((z) => z.edgeId).sort()).toEqual(["mw-e-nb", "mw-e-sb"]);
+    for (const z of spans) {
+      expect(z.fromM).toBe(0);
+      expect(z.toM).toBe(LENGTH_M);
+    }
+  });
+});

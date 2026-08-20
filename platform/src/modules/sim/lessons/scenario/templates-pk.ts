@@ -178,6 +178,54 @@ export const SC_PK_SMOOTH_STOP: ScenarioSpec = {
 // sc-park-perp-rev mold with the driveway's own WALLS as the collision hazard.
 // ---------------------------------------------------------------------------
 
+/*
+ * SWEEP 161 — THE FINDING IS REFUTED, AND THE WALLS ABOVE ARE A LIE. Both
+ * halves are measured in `__tests__/pk-junctions2-sweep161-truth.test.ts`.
+ *
+ * 1. THE FINDING (BROKEN, critical): „the RIGHT drive is convicted — 20
+ *    наказателни точки, НЕИЗДЪРЖАН, Опасни грешки 2. A student who drives the
+ *    model line is failed for a crash the lesson itself walked him into"
+ *    (`sweep161/sc-pk-driveway/pc-right/08-debrief.png`).
+ *
+ *    That drive was never the model line. Task 2's own chip reads «Премести
+ *    лоста на R и паркирай на заден ход» (`04-t056s.png`) and the cluster reads
+ *    D in every frame; `tools/mobile/lesson-audit.mjs`'s `right` mode is a
+ *    forward-only control law whose entire keyboard vocabulary is KeyW / KeyS /
+ *    Escape — it cannot select reverse. §1a drives the committed shadow through
+ *    the production session and gets zero violations, both tasks ticked and
+ *    ИЗДЪРЖАН on all five rungs; the same pipeline still convicts both mistake
+ *    demos with COLLISION. The harness's law, re-authored in the recorder's
+ *    vocabulary, earns task 1 and leaves `sc-pkd-park` undone — which is
+ *    exactly the right column the sweep photographed.
+ *
+ * 2. WHAT WAS UNDERNEATH IT, AND IS REAL. This drill promises walls in six
+ *    places — the objective («влез на заден ход МЕЖДУ СТЕНИТЕ … без да ги
+ *    докоснеш»), instruction 4, instruction 1's night clause, both mistake
+ *    debriefs, the teach card — and the header line directly above calls them
+ *    „the collision hazard". THE STUDENT'S WORLD HAS NONE OF THEM. The north
+ *    fence and the back wall live only in `traces/scPkDriveway.ts
+ *    drivewayObstacles()`, which is handed to `recordScriptedDrive` and
+ *    therefore grades the two committed DEMO recordings and nothing else.
+ *    `scene/lessonWorldRecipe.ts` builds the live scene from the district plus
+ *    `scenarioSceneryProps.ts heldSceneryFor`, and this template is in neither:
+ *    HELD_SCENERY has no `sc-pk-driveway` key, and `pk-drive-v1.json` holds one
+ *    body, `pkd-b-garage`, 1.5 m east of the bay and (per
+ *    `scene/__tests__/lesson-world-bay-clearance.test.ts`) with no solid
+ *    collider anyway. So the drill measures „at rest in the rect, aligned, via
+ *    reverse" and TELLS the student it measured „without touching the walls" —
+ *    a green tick for the one skill a reverse-into-a-gap exists to teach.
+ *
+ *    NOT FIXABLE FROM HERE, and deliberately not papered over by deleting the
+ *    promise: §1b fails if the copy stops billing the walls, so the debt cannot
+ *    be settled by making the lesson quieter. `sc-park-wall` is the precedent
+ *    done right (a `kind: "wall"` HELD_SCENERY body with a real cuboid collider,
+ *    paired value-for-value with its headless twin); this template has the twin
+ *    and not the body. The two entries owed to
+ *    `scene/scenarioSceneryProps.ts` are pinned by value in §1c, which is
+ *    written as a QUARANTINE — it FAILS the day the bodies land, so the
+ *    exemption must be deleted rather than silently inherited.
+ */
+
 /** The driveway bay (content/world/pk-drive-v1.json east kerb at y = 45) —
  *  copied by VALUE (the lesson-specs law; the trace-gate battery asserts it
  *  matches traces/scPkDriveway.ts PK_DRIVE_TARGET_BAY value-for-value). */

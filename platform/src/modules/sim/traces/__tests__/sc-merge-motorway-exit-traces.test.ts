@@ -128,6 +128,37 @@ describe("sc-merge-motorway-exit — the shadow gate (doc 76 §5)", () => {
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * „THE VEHICLE NEVER EXCEEDS WALKING SPEED IN ANY CAPTURED FRAME."
+   *
+   *   sc-merge-motorway-exit/mobile-right/05-stopped.png → scMergeMotorwayExit.ts.
+   *   That run's own summary says `top 22 км/ч · 25 full stops · forcedBy:
+   *   Прекрати урока` — it is the audit harness's ego at `CRUISE_KMH = 12`
+   *   (tools/mobile/lesson-audit.mjs), and the frames kept for it are the
+   *   standstills. The authored drive is the opposite of walking pace, and this
+   *   case says so in numbers so the claim cannot land here again.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("holds MOTORWAY pace, not walking pace — the whole drive, in one reading", () => {
+    const s = shadow.trace.samples;
+    // The authored cruise is 130; the recorder ramps toward it at 2.2 m/s².
+    expect(Math.max(...s.map((x) => x.speedKmh))).toBeGreaterThan(128);
+    // And it is not one peak on an otherwise slow drive: the exit is taken at
+    // the advisory 60, so most of the run sits above it and NONE of it crawls.
+    const atPace = s.filter((x) => x.speedKmh > 55).length;
+    expect(atPace / s.length).toBeGreaterThan(0.6);
+    // Nothing between the launch and the ramp's tail is ever at walking pace —
+    // the drill is „hold the flow and shed it in the lane", never „stop on a
+    // motorway". The window excludes the two ends the script authors at rest:
+    // the standstill start (135 m of a 2.2 m/s² launch puts y = 150 at ~87 км/ч)
+    // and the halt at the ramp end past the arc.
+    const underWay = s.filter((x) => x.y > 150 && x.y < RAMP_ARC_END_Y);
+    expect(underWay.length).toBeGreaterThan(0);
+    // The slowest it ever gets in there is the ramp's own advisory.
+    expect(Math.min(...underWay.map((x) => x.speedKmh))).toBeGreaterThan(50);
+  });
+
   it("uses the taught observation pair before BOTH moves: a right mirror glance AND a right signal before the wheel", () => {
     const kinds = shadow.trace.events.map((e) => e.kind);
     expect(kinds.filter((k) => k === "glance-right").length).toBeGreaterThanOrEqual(2);

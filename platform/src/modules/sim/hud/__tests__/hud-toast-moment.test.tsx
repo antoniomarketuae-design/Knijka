@@ -271,22 +271,37 @@ describe("THE SURFACE THAT MOUNTS IT — the half this directory has got wrong b
     expect(MOUNT.test(regressed)).toBe(false);
   });
 
-  it("THE PHONE IS NOT COVERED, and that is recorded rather than implied", () => {
+  it("THE PHONE IS HALF COVERED, and WHICH half is recorded rather than implied", () => {
     // `compact ? null : <HudToasts …>` — the roomy leg only. On a phone the
-    // shell re-maps every toast into a `SimOverlayItem` for `SimOverlay`
-    // (`id`, `kind`, `tone`, `chipBg`, `lineBg`, `detailBg`, `lawRef`), and that
-    // shape carries no moment, so `sc-sp-curve/mobile-wrong/04-t030s.png` and
-    // `sc-merge-from-property/mobile-right/05-stopped.png` are NOT closed by
-    // this row. Asserted so the gap cannot be mistaken for a fix, and so that
-    // whoever adds the field to `SimOverlayItem` is told this file wants it.
+    // shell re-maps every toast into a `SimOverlayItem` for `SimOverlay`, and
+    // that shape used to carry no moment, so the stamp was dropped at this
+    // boundary and `sc-sp-curve/mobile-wrong/04-t030s.png` /
+    // `sc-merge-from-property/mobile-right/05-stopped.png` stood open.
+    //
+    // ── INVERTED, ROUND 11 (O33's first half) ────────────────────────────
+    // `SimOverlayItem.raisedAtMs` exists and the shell's re-map now feeds it —
+    // this block's `not.toContain` went red on that edit, exactly as the field's
+    // own ⚠ promised, and it is inverted here rather than deleted.
+    //
+    // ⚠ THE GLASS HAS NOT MOVED YET, and saying so is the whole point of this
+    // block. The second half is `hud/SimOverlay.tsx`'s last row —
+    // `overlayMomentBg(item, now)` — which nothing calls today, so a phone card
+    // still prints no age. The field is FED and UNREAD, which is a half-state
+    // and is recorded as one: the frames above are NOT closed, and whoever
+    // renders that row closes them and inverts the second assertion below.
     const shell = readFileSync(
       resolve(__dirname, "../../../../components/sim/lesson-ui/LessonPlayShell.tsx"),
       "utf8",
     );
     expect(shell).toMatch(/compact \? null : \(/);
-    const mapped = shell.slice(shell.indexOf("...(!ended"), shell.indexOf("...(!ended") + 1400);
+    const mapped = shell.slice(shell.indexOf("...(!ended"), shell.indexOf("...(!ended") + 2600);
     expect(mapped).toContain('kind: "violation"');
-    expect(mapped).not.toContain("raisedAtMs");
+    // The producer side: both kinds that carry a moment are stamped.
+    expect(mapped.match(/raisedAtMs: t\.raisedAtMs,/g) ?? []).toHaveLength(2);
+    // …and the consumer side is still absent. ← this is the line that inverts
+    // when the phone card finally prints the age.
+    const overlay = readFileSync(resolve(__dirname, "../SimOverlay.tsx"), "utf8");
+    expect(overlay).not.toContain("overlayMomentBg");
   });
 });
 

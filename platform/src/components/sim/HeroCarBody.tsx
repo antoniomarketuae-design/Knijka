@@ -45,6 +45,63 @@
  * Auto-fits to the physics chassis: uniform scale so the model width matches the
  * collider, and a Y offset so the wheels sit on the ground. `HERO_YAW` flips the
  * facing if it renders backward.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * TWO SWEEP-161 FINDINGS WERE ROUTED HERE. BOTH ARE ABOUT THINGS THIS FILE
+ * HIDES OR DOES NOT OWN — 2026-08-20. Opened, frames read, owners named.
+ *
+ * THE ONE LINE THAT DECIDES BOTH is `<group visible={!cockpitView}>` at the
+ * bottom of this component. `cockpitView` is `CockpitInteractionContext.enabled`
+ * = LessonScene's `cockpit` camera flag. Every frame in the sweep is a cockpit
+ * frame. In those frames this entire component renders nothing.
+ *
+ * ── 1 · sc-zebra-approach/pc-right/03-ready.png — REFUTED, AND ALREADY FIXED ─
+ *   „The car's own blue bodywork draws over the cockpit interior: … the
+ *    dashboard, the steering wheel and the instrument binnacle vanish behind a
+ *    sky-reflecting blue panel that fills the lower third of the view."
+ *
+ *   The blue panel is the DEMONSTRATION GHOST, not this shell. Read the frame
+ *   sequence rather than the one frame: at 01-arrival and at 04-t034s the
+ *   dashboard, rim and cluster are all normal; only 03-ready is blue, and
+ *   03-ready is the frame where the demo player reads 0:00 / 0:32 — the lap
+ *   restart, when the ghost respawns AT the ego and the camera is inside it.
+ *   `ShadowCar.tsx` says so in its own words („the ghost is allowed to occupy
+ *   the viewer") and answers it with `ghostProximityFade` — nothing drawn
+ *   inside GHOST_FADE_HIDE_M = 2.4 m — citing sc-zebra-approach by name. That
+ *   landed after the sweep baseline, so the frame is pre-fix.
+ *
+ * ── 2 · sc-mw-emergency-lane + „all seven" — REAL, AND NOT THIS FILE ────────
+ *   „CROSS-LESSON: the steering wheel never rotates. The red index band on the
+ *    rim sits at exactly the same clock position in every frame of every lesson,
+ *    including through the 90° right turn at the sc-ov-oneway T-junction."
+ *
+ *   This file rigs the four ROAD wheels of the exterior shell (`wheel_FL` …
+ *   `wheel_RR`, steer on the front pair) and that shell is hidden in cockpit
+ *   view. The rim in those frames is the `steering_wheel` node of the cabin
+ *   GLB, driven one file over at `components/sim/vitok/VitokCockpit.tsx`
+ *   (`wheelNode.rotation.y = -sim.steerRad * WHEEL_VISUAL_RATIO`). That is
+ *   where this belongs.
+ *
+ *   MEASURED BEFORE HANDING IT ON, so the next lane starts with a number
+ *   instead of an impression. A detector for the rim's warm index band
+ *   (r > 70, r−b > 28, r−g > 18) inside a 460 × 190 px window over the rim,
+ *   self-checked by sliding the window 40 px and requiring the reported
+ *   displacement to be 40.0:
+ *     4,438 in-drive mobile frames, 142 lessons — band x mean 127.65, sd 5.92.
+ *     Extremes: 117.8 and 190.7. The 190.7 (sc-crossing-rain-sprint) was opened
+ *     by eye: wet lighting warms the whole rim so more of it passes the colour
+ *     test — the mark itself has not moved. A rim turned by any useful angle
+ *     would leave that window entirely (the rim's on-screen radius is ~350 px).
+ *
+ *   AND THE HONEST LIMIT, because refusing to state it would be the same crime
+ *   pointing the other way: these frames CANNOT tell „the rim ignores steer"
+ *   from „the harness never steered". The sweep's „right" drives hold
+ *   `CRUISE_KMH = 12` with a stop-and-look cadence, and on sc-ov-oneway the ego
+ *   oscillates 0–18 км/ч for 200 s and never leaves the junction — the 90° turn
+ *   the finding names is never taken. Whoever picks this up must first produce
+ *   one frame with a known non-zero `sim.steerRad`. Certifying a wheel that
+ *   works, or condemning one that does, both fail the same student.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useContext, useEffect, useMemo, useRef, type RefObject } from "react";

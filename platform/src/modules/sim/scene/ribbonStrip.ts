@@ -9,6 +9,46 @@
  * fillRibbon — its behavior (and tests) must not change. Shaders stay with
  * their owners: A7 keeps its head-fade chevron shader, ShadowCar has a
  * whole-path variant.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * „THE RIBBON ERASES THE CAR" — REFUTED, WITH PIXELS — 2026-08-20.
+ *
+ *   sc-rb-exit-signal/mobile-right/06-waited.png, routed to this file:
+ *   „The guidance ribbons are drawn without depth test against vehicles: the
+ *    blue ribbon paints straight over the lower body of the car ahead and the
+ *    green ribbon runs across its rear panel at full brightness, so at a glance
+ *    there is no car there at all."
+ *
+ * THE RIBBON IS BEHIND THE CAR. THE CAR IS SEE-THROUGH. The vehicle on that
+ * frame is the demonstration GHOST — `ShadowCar`'s shell at GHOST_OPACITY with
+ * `depthWrite = false` and both faces drawn — so everything further down the
+ * road composites through it, ribbons included.
+ *
+ * MEASURED ON THE FRAME, NOT EYEBALLED. The grass/road horizon passes BEHIND
+ * the ghost's body. Sampling mean RGB across a 150 px span of the body and, as
+ * a control, a 40 px span of bare road beside it (rows 540 → 560):
+ *
+ *              G−B outside the body          G−B through the body
+ *   y = 547     +38.5  (grass)                −21.7
+ *   y = 553     + 2.6  (road)                 −32.7
+ *   Δ           −35.9                         −11.0
+ *
+ * The body's own colour follows what is behind it, at ~31 % transmission. A
+ * surface that is occluding cannot do that. The same reading holds all the way
+ * to y = 559 (G−B −44.1) as more road comes in behind it.
+ *
+ * AND THIS FILE COULD NOT CAUSE IT EITHER WAY. `writeRibbonStrip` writes
+ * positions, arclength, side and a draw range. It sets no material, no
+ * `depthTest`, no `depthWrite`, no `renderOrder` — depth state belongs to the
+ * shader owners named three paragraphs up. A genuine ribbon-over-vehicle bug
+ * would be fixed in `components/sim/RouteGuidance.tsx` or `ShadowCar.tsx`.
+ *
+ * WHAT IS REAL in that frame is the complaint underneath the diagnosis — „at a
+ * glance there is no car there" — and `ShadowCar.tsx` already owns it: its
+ * „THE FOOTPRINT HALO — which of these cars is the hologram?" block cites this
+ * exact frame and adds the tinted footprint ellipse. Post-baseline, so the
+ * frame is pre-fix. Nothing to do here.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import * as THREE from "three";

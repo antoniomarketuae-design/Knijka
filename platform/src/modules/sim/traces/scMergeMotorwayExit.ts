@@ -49,6 +49,42 @@
  *    window at R 250 < the 8° trigger), so the authored ramp speeds record
  *    faithfully. The generator asserts the honesty ceiling instead: the guilty
  *    85 sits under the √(2.4 · 250) ≈ 88.2 km/h comfort cap of the bend.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * „NEVER EXCEEDS WALKING SPEED" — SAME HARNESS, SAME CONSTANT — 2026-08-20.
+ *
+ *   sc-merge-motorway-exit/mobile-right/05-stopped.png, routed here:
+ *   „At 05-stopped the car sits at 2 км/ч with a lamp post / tree trunk filling
+ *    the centre of the windscreen, off the carriageway on the pavement side. On
+ *    a lesson about holding motorway pace, the vehicle never exceeds walking
+ *    speed in any captured frame."
+ *
+ * THE CAR IN THAT FRAME IS THE HARNESS'S EGO, NOT THIS FILE'S SHADOW. The run's
+ * own machine summary reads `top 22 км/ч · 25 full stops · forcedBy: Прекрати
+ * урока` on a district posted АМ 140 — and the frames retained for it are the
+ * arrival/ready/stopped set, i.e. exactly the standstills. The sweep's „right"
+ * mode is a closed-loop law holding `CRUISE_KMH = 12`
+ * (`tools/mobile/lesson-audit.mjs`); across the 102 lessons with both PC runs
+ * the mean top speed is 15.2 км/ч right against 59.5 км/ч wrong, with 96 of 102
+ * right drives never passing 20 км/ч. The full measurement, and the four
+ * same-lesson runs that isolate the input script as the only variable, are
+ * recorded in `scMergeLaneEnd.ts`.
+ *
+ * WHAT THIS FILE AUTHORS is the opposite of walking pace: `CRUISE_KMH = 130`
+ * held from the spawn through the taper, the deceleration lane entered with the
+ * flow speed intact, then 130 → `ADVISORY_KMH = 60` shed INSIDE the lane and
+ * the R 250 bend ridden at its advisory. The gate
+ * (`__tests__/sc-merge-motorway-exit-traces.test.ts`) now pins that envelope,
+ * so „never exceeds walking speed" cannot be re-filed against this file.
+ *
+ * NOT DISMISSED, ROUTED: an audit „right" drive that tops 22 км/ч on a motorway
+ * and has to be force-ended is a real problem — with the instrument. It belongs
+ * to `tools/mobile/lesson-audit.mjs`, whose own comments show the constant was
+ * chosen to survive a slow box (a 12 км/ч cruise is under every advisor cap and
+ * under `crossingApproachMaxKmh`). It is honest on a 50 км/ч street and
+ * meaningless on a 140 км/ч one; a per-lesson cruise derived from the posted
+ * limit is the shape of the fix.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import type { StagedEventSpec } from "../contracts";

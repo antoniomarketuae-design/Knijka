@@ -252,3 +252,108 @@ describe("ov-oneway-v1 through the traffic lane graph + system", () => {
     expect(traffic.leadGapMeters(X_STEM, 15, 0)).toBe(Infinity);
   });
 });
+
+/**
+ * SWEEP-161 FINDING (sc-ov-oneway, mobile-right, CRITICAL) — REFUTED AS A
+ * DISTRICT DEFECT. Recorded in this battery because the file it was routed to,
+ * `public/world/ov-oneway-v1.json`, is JSON and cannot carry the reasoning, and
+ * because it is GENERATED (`meta.generator = tools/maps/gen_ov_oneway.mjs`), so
+ * a hand-edit there would be silently reverted by the next regeneration.
+ *
+ * THE CLAIM: „Past the T-junction the world simply stops. The «еднопосочна
+ * улица» the student is told to follow to its end is an unpainted grey apron
+ * that runs out into a flat green plane — no road, no kerb, no buildings, no
+ * traffic, no barrier. At t203s the car is sitting on grass with nothing in any
+ * direction."
+ *
+ * WHAT THE FRAMES ACTUALLY SHOW. At t143s the car is STOPPED (0 км/ч) on the
+ * junction apron at the top of the stem, pointed NORTH, looking out over open
+ * terrain; at t203s it is on grass with the district's buildings visible only
+ * in the mirror, behind it. It is north of the bar, not on it. The one-way
+ * street runs EAST–WEST; the student was told to turn onto it and drive it to
+ * its end, and never entered it.
+ *
+ * WHY IT NEVER ENTERED IT — MEASURED AT THE INSTRUMENT, NOT INFERRED. The
+ * sweep's driver cannot steer: the entire actuation of
+ * `tools/mobile/lesson-audit.mjs` is `page.keyboard.down/up("KeyW")` and
+ * `…("KeyS")` plus one `press("Escape")`, and a census of that harness for
+ * KeyA / KeyD / ArrowLeft / ArrowRight / any steer token returns ZERO. The
+ * spawn is `ov-ow-spawn-entry` at (4.06, 15) heading 0 — due north, 185 m of
+ * straight stem ahead of it. A car that can only accelerate and brake drives
+ * the stem, crosses the junction pad and leaves the authored extent
+ * (`meta.boundsLocalMeters.maxY` = 210.06). „Nothing in any direction" is what
+ * is north of a micro-map's north edge; it is not the one-way street.
+ *
+ * AND THE SIGNATURE IS FILE-INDEPENDENT, which is what rules the district out.
+ * Across the standing corpus, BROKEN findings whose verdict is some form of
+ * „drove off the map" cover SIX distinct scenarios — sc-junction-blind,
+ * sc-jx-equal-left, sc-ov-lane-keeping, sc-ov-oneway, sc-park-night,
+ * sc-vu-emergency-junction — routed to SIX different suspect files
+ * (lessons/finish.ts ×2, scene/lessonWorldRecipe.ts, templates-vru.ts,
+ * templates-lanes.ts, and this district). Every one of them is a lesson whose
+ * correct line requires a TURN. One symptom routed to six files is not six
+ * defects.
+ *
+ * ROUTED, NOT TOUCHED: `tools/mobile/lesson-audit.mjs` (no lateral input).
+ *
+ * THE ONE RESIDUAL, STATED RATHER THAN QUIETLY FIXED: nothing closes the top of
+ * the T. `builders/terminus.ts` builds a closing mass only at DEAD ENDS near
+ * the boundary, and `ov-ow-n-junction` is a degree-3 intersection, so it is not
+ * a candidate — a real T has a wall across the top and this one has open
+ * terrain. That is worth fixing, but the fix belongs to the GENERATOR
+ * (`tools/maps/gen_ov_oneway.mjs`, which would have to author the closing
+ * footprint) or to `terminus.ts`'s definition of an end — not to a hand-edit of
+ * generated JSON, and neither file is this lane's. It is reported, not touched.
+ *
+ * WHAT THIS BLOCK PINS is the half of the claim that is checkable here and was
+ * false: that the one-way street „runs out into a flat green plane". It does
+ * not — both arms are authored at full length and both build carriageway.
+ */
+describe("ov-oneway-v1: the one-way street the sweep never drove is really there", () => {
+  let district: District;
+  let world: WorldGeometry;
+
+  beforeAll(() => {
+    district = assertDistrict(loadRaw());
+    world = buildWorldGeometry(district, { seed: 7 });
+  });
+
+  it("authors both arms of the bar at their full ±140 m, meeting the stem at the T", () => {
+    const nodes = new Map(district.roads.nodes.map((n) => [n.id, n]));
+    const j = nodes.get("ov-ow-n-junction")!;
+    expect([j.x, j.y]).toEqual([0, 200]);
+    // The two arms reach the full authored half-length in BOTH directions —
+    // the street the briefing says to follow "до края" exists on both sides.
+    expect([nodes.get("ov-ow-n-east")!.x, nodes.get("ov-ow-n-east")!.y]).toEqual([140, 200]);
+    expect([nodes.get("ov-ow-n-west")!.x, nodes.get("ov-ow-n-west")!.y]).toEqual([-140, 200]);
+    // …and the stem is the 200 m the spawn drives north up.
+    expect([nodes.get("ov-ow-n-south")!.x, nodes.get("ov-ow-n-south")!.y]).toEqual([0, 0]);
+  });
+
+  it("the spawn faces due NORTH up the stem — a straight line leaves the map at the T", () => {
+    const spawn = district.spawnPoints.find((s) => s.id === "ov-ow-spawn-entry")!;
+    expect(spawn.heading).toBe(0); // north; no steering input can change this
+    expect(spawn.y).toBe(15);
+    // 185 m of stem, then the junction, then the north edge of the world 10 m on.
+    const maxY = district.meta.boundsLocalMeters.maxY;
+    expect(maxY).toBeGreaterThan(200);
+    expect(maxY).toBeLessThan(215);
+  });
+
+  it("the bar carries drawn carriageway across its whole length — not an apron that stops", () => {
+    // Sample the ROAD surface across the bar at 20 m intervals from the west
+    // tip to the east tip. If the street "ran out into a flat green plane",
+    // the far samples would have no road under them.
+    const road = world.roadSurface.positions;
+    const xsAtBar: number[] = [];
+    for (let i = 0; i + 2 < road.length; i += 3) {
+      const x = road[i]!;
+      const y = -road[i + 2]!; // world (x, h, -y) → district y
+      if (Math.abs(y - BAR_Y) <= 12) xsAtBar.push(x);
+    }
+    expect(xsAtBar.length).toBeGreaterThan(0);
+    // Road geometry reaches within 5 m of BOTH authored tips.
+    expect(Math.min(...xsAtBar)).toBeLessThanOrEqual(-135);
+    expect(Math.max(...xsAtBar)).toBeGreaterThanOrEqual(135);
+  });
+});

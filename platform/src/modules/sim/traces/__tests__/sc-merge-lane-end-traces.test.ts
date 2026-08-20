@@ -106,6 +106,42 @@ describe("sc-merge-lane-end — the shadow gate (doc 76 §5)", () => {
     for (const a of annotations) expect(a.textBg ?? "").toMatch(/[Ѐ-ӿ]/);
   });
 
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * THE SWEEP FILED THIS DRIVE AS A CRAWL. IT WAS LOOKING AT THE HARNESS.
+   *
+   *   sc-merge-lane-end/pc-right/04-t161s.png → scMergeLaneEnd.ts:
+   *   „The reference 'right' drive crawls at 9–11 км/ч for 160 seconds on a
+   *    50 km/h street and finishes stopped against a building facade, off the
+   *    carriageway, with a parked car beside it."
+   *
+   * The demo transport on that very screenshot reads 0:13 / 0:30 with this
+   * shadow's own step-5 annotation on the glass; the crawling car is the audit
+   * harness's ego, which holds `CRUISE_KMH = 12` by construction
+   * (tools/mobile/lesson-audit.mjs — see the file header for the 102-lesson
+   * measurement). This case exists so that claim cannot be filed against this
+   * trace a second time without the gate saying otherwise.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("is a 45 км/ч drive that ends ON the carriageway — not a 160 s crawl into a facade", () => {
+    const s = shadow.trace.samples;
+    // 1 · THE PACE. The script authors 45 → 30 → 35 → 45; the recorder ramps at
+    // 2.2 m/s², so the top lands a hair under the target rather than on it.
+    expect(Math.max(...s.map((x) => x.speedKmh))).toBeGreaterThan(44);
+    // …and it is not a crawl that happens to touch 45 once: most of the drive
+    // is above the harness's entire operating range.
+    const brisk = s.filter((x) => x.speedKmh > 30).length;
+    expect(brisk / s.length).toBeGreaterThan(0.5);
+    // 2 · THE LENGTH. Thirty-odd seconds, against the 160 s of frames.
+    expect(s[s.length - 1].tSec).toBeLessThan(45);
+    // 3 · WHERE IT STOPS. In the survivor lane, on the road, at the far end of
+    // the street (which runs to y = 280) — not off the carriageway.
+    const last = s[s.length - 1];
+    expect(Math.abs(last.x - X_THROUGH)).toBeLessThan(0.5);
+    expect(last.y).toBeGreaterThan(270);
+    expect(last.y).toBeLessThan(280);
+  });
+
   it("uses the taught observation pair: TWO left mirror glances AND a left signal before the wheel", () => {
     const kinds = shadow.trace.events.map((e) => e.kind);
     expect(kinds.filter((k) => k === "glance-left").length).toBeGreaterThanOrEqual(2);

@@ -238,6 +238,88 @@ describe("listRowsInScrollCoords · the rows arrive in the list's own frame", ()
 });
 
 /* ─────────────────────────────────────────────────────────────────────────────
+   1c · THE «13» THAT WAS FILED AT THIS FILE, AND WHY IT IS NOT THIS FILE'S
+   ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * DECLINED, WITH THE ARITHMETIC — sweep 161 chunk-0, routed here, 2026-08-20.
+ *
+ *   sc-vp-readiness/mobile-right/01-arrival.png
+ *   „The inline briefing panel truncates mid-word and advertises 13 further
+ *    lines, but the full briefing modal contains only 5 numbered items. The
+ *    count is wrong and the cut text is unreadable."   «част от процедура… ↓ ОЩЕ 13 РЕДА»
+ *
+ * THE COUNT IS NOT WRONG, AND THE NOUN IS THE WHOLE ANSWER. The badge on that
+ * frame says «РЕДА» — LINES. It compared 13 lines against 5 numbered ITEMS.
+ * Reproduced off the frame rather than argued: the peek's text column fits
+ * 27 characters (frame line 2, «предпазния колан — винаги,», is 26), and
+ * greedy-wrapping sc-vp-readiness's five authored steps at 27 gives 3/4/4/4/3
+ * = 18 lines. Five whole lines are on the glass. 18 − 5 = 13, which is the
+ * number printed, to the line.
+ *
+ * AND IT IS NOT THIS FILE'S COUNTER EITHER. `BriefingCard`'s says
+ * «↓ още N стъпка/стъпки» and counts `<li>` steps; the frame's says «реда» and
+ * is `foldLinesBelow` in `modules/sim/hud/SimOverlay.tsx`, feeding the notify
+ * column's peek (`hud/notifyColumn.ts`, «↓ още N реда» beside «ПРОЧЕТИ»).
+ * Two counters, two units, one glass — which is exactly how a lane reading the
+ * frame lands on the wrong file.
+ *
+ * THE OTHER HALF — „the cut text is unreadable" — was real and is already
+ * closed, ELSEWHERE and AFTER this sweep: `git show ec1f56f:…/SimOverlay.tsx`
+ * has no `foldWindowPx` at all, and the version that does masks the window to
+ * the LINE GRID at both ends with a hard edge, so a line is now whole or
+ * absent instead of inked to its waist. Nothing to do here.
+ *
+ * WHAT DOES BELONG HERE is the unit distinction itself, measured on the
+ * function this file actually guards, so the next reader of that frame does not
+ * have to re-derive it.
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+describe("rowsBelowFold counts the rows it is HANDED — the «13 реда» vs «5 стъпки» split", () => {
+  /** sc-vp-readiness as the peek laid it out: 27 chars per line at the notify
+   *  column's 14 px leading (SimOverlay FOLD_FALLBACK_LEADING_PX), the five
+   *  authored steps wrapping 3 / 4 / 4 / 4 / 3. */
+  const LEADING = 14;
+  const STEP_LINES = [3, 4, 4, 4, 3];
+  const TOTAL_LINES = STEP_LINES.reduce((a, b) => a + b, 0); // 18
+  /** Five whole lines were on the glass; the sixth was the one cut mid-word. */
+  const WINDOW_PX = 5 * LEADING;
+
+  it("in LINES it is 13 — the badge on the frame, to the line", () => {
+    const lineRows = Array.from({ length: TOTAL_LINES }, (_, i) => ({
+      top: i * LEADING,
+      height: LEADING,
+    }));
+    expect(TOTAL_LINES).toBe(18);
+    expect(rowsBelowFold(lineRows, 0, WINDOW_PX)).toBe(13);
+  });
+
+  it("in STEPS the SAME fold is 4 — so «5 items» never contradicted «13 lines»", () => {
+    // Each step is as tall as the lines it wrapped to; the tops accumulate.
+    let top = 0;
+    const stepRows = STEP_LINES.map((n) => {
+      const row = { top, height: n * LEADING };
+      top += row.height;
+      return row;
+    });
+    expect(stepRows).toHaveLength(5);
+    // Step 1 fits inside the window; steps 2–5 do not. Four, not thirteen, and
+    // not five — a counter that said «още 5 стъпки» here would be claiming the
+    // student had read none of it.
+    expect(rowsBelowFold(stepRows, 0, WINDOW_PX)).toBe(4);
+  });
+
+  it("…and the two agree the moment the units do: one line per step, 5 rows, 0 hidden", () => {
+    // THE DIRECTION THAT MATTERS. If `rowsBelowFold` ever started counting
+    // something other than what it was handed, the case above would still pass
+    // by coincidence — a five-row list that FITS must report nothing at all.
+    const oneLineEach = STEP_LINES.map((_, i) => ({ top: i * LEADING, height: LEADING }));
+    expect(rowsBelowFold(oneLineEach, 0, 5 * LEADING)).toBe(0);
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
    2 · THE ADVISOR SAYS ONLY WHAT THE BANNER IS NOT SAYING
    ────────────────────────────────────────────────────────────────────────── */
 

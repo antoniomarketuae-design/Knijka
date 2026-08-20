@@ -20,6 +20,43 @@
  * The „Съветник" setting is re-read on a low-Hz interval (same-tab
  * localStorage writes fire no storage event). Grading is never touched here —
  * this file only CONSUMES the graded glance channel.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE 👀 IN THE SKY IS NOT ONE OF THESE — sweep 161, routed here, 2026-08-20.
+ *
+ *   sc-maneuver-3point/mobile-right/05-stopped.png
+ *   „An unexplained cartoon pair of eyes hangs in mid-air over the middle of
+ *    the carriageway, roughly two storeys up, with no label, no legend and no
+ *    connection to any object. On mobile there is no legend surface at all to
+ *    decode it."
+ *
+ * EVERYTHING THIS FILE DRAWS IS DOM, PINNED TO THE SCREEN. `PingChip` is a
+ * `left-2` / `right-2` pill at the stage's vertical middle; the hold cluster is
+ * `absolute bottom-3 left-3`. Neither can be „in mid-air over the carriageway",
+ * because neither is in the 3D scene at all — and on the cited frame no ping
+ * chip is on screen, at either edge.
+ *
+ * WHAT IS IN THE SKY is `ShadowCar.tsx`'s glance sprite: an `emojiTexture("👀")`
+ * `<sprite>` inside the ghost's pose group, flashed for GLANCE_FLASH_S after a
+ * `glance-*` event in the replayed trace. That file already carries the same
+ * defect under its own header („THE GLANCE MARKER'S ANCHOR"), measured on
+ * sc-pe-zone-living, and answers it by dropping the quad to GLANCE_ICON_Y 1.46
+ * at GLANCE_ICON_SCALE 0.46 — 0.04 m of air above the ghost's 1.19 m roofline,
+ * inside `GLANCE_ANCHOR_MAX_GAP_M`. The second half („no legend on mobile") is
+ * answered in the same file by the footprint halo, whose comment cites the
+ * phone's missing «синя — пътят на колата-сянка» legend. Both landed after the
+ * sweep baseline, so the frame is pre-fix. Route: `components/sim/ShadowCar.tsx`.
+ *
+ * ── AND ONE FINDING FROM ANOTHER LANE THAT THIS FILE ANSWERS ───────────────
+ * sc-vu-cyclist-hook/pc-right/01-arrival.png was filed against
+ * `modules/sim/cockpit/index.ts` as „the lesson asks for a control the cockpit
+ * does not show" (instruction 2: «провери дясното огледало»). The Д button
+ * below — `mirror="right"`, the same graded `CabinControls.glanceStart` the E
+ * key drives — is rendered at the bottom-left of that exact frame. The right
+ * mirror is a head-turn pose by design (`scene/vitok/cabinLook.test.ts`: „the
+ * right door mirror is off the RIGHT of the driving frame"), and this cluster
+ * is the mouse route to it. See that file's header for the full decline.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";

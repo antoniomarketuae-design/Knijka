@@ -5760,7 +5760,81 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and ten fix rounds, 2026-08-20
+# THE OPEN LIST — after three repair waves and eleven fix rounds, 2026-08-20
+
+> **ROUND-11 GATE, 2026-08-20 — the never-opened row very nearly empties, and for the first time in
+> the programme EVERY file left in it carries a written reason.**
+> `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the header's rule:
+> **1,712 · 26 · 1,686 · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major · 81 minor) · 512
+> `UNPOLISHED` · 1 `COULD_NOT_TEST` · 138 suspect files · 161 lessons.** Tenth reader, tenth identical
+> tally. **Stop re-deriving the corpus** — this reader re-derived it only to earn the right to compute
+> against it, and everything below is the part that was actually at risk.
+>
+> **COVERAGE: 110 → 126 opened · 20 → 4 never opened · 8 unopenable as filed.** `126 + 4 + 8 = 138` ·
+> `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. Sixteen new files, 21 findings, **5 criticals** — and
+> the never-opened CRITICAL row moves for the first time since round 9: **7 → 2**.
+>
+> **THE COVERAGE JOIN WAS CONFIRMED BY REPRODUCTION, NOT BY AGREEMENT.** Before computing this round's
+> split the reader recomputed the previous one from `ec1f56f..HEAD` alone and printed **110 files / 950
+> findings / 304 critical · 20 / 25 / 7 · 8 / 37 / 7** — round 10's published figures to the digit,
+> from an independently written reader. Two methods, one answer, on the row that has been wrong four
+> times. The round-5/6/7 join bug is guarded rather than avoided: the reader asserts three sentinel
+> paths (one committed, one modified-uncommitted, one untracked) are in the edited set and exits
+> non-zero if any is missing.
+>
+> **⚠ THE IN-REPO DERIVATION UNDER-REPORTS THIS ROUND BY SIXTEEN FILES, AND IT IS NOT ITS FAULT.**
+> `tools/audit/never-edited.mjs` — committed one commit ago precisely so the derivation would stop
+> being lost — reads `git diff --name-only ${BASE}..HEAD`. **HEAD is not where this round's work is.**
+> The four lanes were told DO NOT COMMIT, so all 1,320 inserted lines sit in the working tree, and the
+> script therefore still lists `PreDriveTutorial.tsx`, `templates-pk.ts`, `railTrack.ts`,
+> `roundabout.ts` and twelve more as *never edited* while their diffs are on disk. Run against the
+> working tree it agrees exactly. **A tool written to defeat „owned is not opened" has its own version
+> of the same bug: committed is not edited.** It also prints `137` suspect files where the frozen
+> corpus says `138`, because it drops the `unknown` bucket from the per-file count — a deliberate
+> choice for its own question, and a wrong number for this one. Both are reader defects, not corpus
+> movement; the tally above is unchanged.
+>
+> **FOUR FILES REMAIN NEVER OPENED AND ALL FOUR ARE GENERATED JSON** — `scenarios/event-library.json`
+> (1/1c), `public/world/ov-oneway-v1.json` (1/1c), `public/world/ov-crossing-v1.json` (1/0c) and
+> `public/world/mw-v1.json` (1/0c). None was edited and **all four were right not to be**: each is
+> emitted by a generator (`gen_ov_oneway.mjs`, `gen_ov_crossing.mjs`, `gen_motorway.mjs`, a
+> question-analysis workflow), so it can carry neither a comment nor a hand-edit that survives the next
+> regeneration. Each lane instead wrote the reasoning into a sibling battery and routed the residue by
+> name — §2.6 O55–O58. **This is the exact thing round 10 was faulted for not doing**, and it is the
+> difference between a file nobody looked at and a file somebody adjudicated: the row is 4 files, and
+> zero of them are unexamined.
+>
+> **BOTH REMAINING NEVER-OPENED CRITICALS ARE REFUTED, SO THE „NEVER LOOKED AT" COUNT IS NOW ZERO.**
+> Round 9 left 5 of 7 criticals never looked at; this round closed that to **0** — `event-library.json`
+> was shown mis-routed *and* false on the frame (the arrival pose is 120 m short of the ramp top, and
+> `04-t087s.png` is the counter-frame), and `ov-oneway-v1.json` was shown to be a harness artefact (the
+> sweep driver has **zero** lateral input — a census of `lesson-audit.mjs` for KeyA/KeyD/Arrow returns
+> nothing — so a car that can only accelerate drove off the north edge of a micro-map it was never
+> steered into). The second refutation generalises: **one symptom routed to six files is not six
+> defects** — „drove off the map" covers six scenarios across six suspect files, every one a lesson
+> whose correct line requires a turn.
+>
+> **THE FOURTH GATE IS GREEN AND WAS RUN AS A GATE.** `tools-tests.mjs` exit **0**, read from `$?`,
+> 390 tests / 25 suites / 0 fail, and its partition audit reports **973 test files · 951 vitest · 22
+> node:test · none shared, none orphaned**. `tsc --noEmit` exit **0**, zero diagnostics.
+> `validate-content.mjs` exit **0**. `vitest run --maxWorkers=2` exit **1** on **exactly two** files —
+> `content-bank.test.ts` and `compose.test.ts`, the two known-red — and **both demonstrably RAN**
+> (13 tests/1 failed and 15 tests/1 failed respectively, with live assertion diffs; 951 files and
+> 14,871 tests collected, which is the vitest half of the partition to the file). **Zero cross-lane
+> collisions, zero new-test defects, zero shipped-but-unrun test files**: all six new batteries execute
+> (48 tests, 0 fail, 14–39 assertions each), and no test file under `platform/src` — 945 of them —
+> lacks an `expect(`. No `.skip`/`.only`/`.todo` was introduced and only two assertions were removed,
+> both **inversions** (`not.toContain` → `toContain`) written as inversions in the same edit.
+>
+> **AND ONE ROW WAS BRIEFED, OWNED, AND SILENTLY DROPPED.** The LessonPlayShell lane was handed O51,
+> O53 and O54 and owned both files O53 names. It closed **O51** (the cap is threaded to both mounts and
+> the tripwire inverted by measurement) and **O54** (both halves, including the phone half). **O53 —
+> the rear-proximity badge hidden by the shadow transport, on the family of lessons whose subject is
+> the car behind you — has no edit, no test and no sentence anywhere in the tree**, and
+> `PlayAreaStyles.tsx` was never opened at all. It is not refuted and not routed; it is simply absent.
+> **That is §2.2's complaint reproduced one level in**: last round thirteen *files* were owned and
+> untouched without prose, this round it is one *row*, in a lane that did everything else it was asked.
+> An unexplained non-closure inside a successful lane is harder to see than thirteen inside a bad one.
 
 > **ROUND-10 GATE, 2026-08-20 — the corpus reproduced a NINTH time, and the coverage union takes its
 > largest single step of the programme while the never-opened CRITICAL row does not move at all.**
@@ -6986,7 +7060,49 @@ This is the entire list. Seven rows against 1,012.
 
 **C7 closes an 8 m band, not the defect class.** See §4 N3.
 
-### 2.2 — Class A · Never opened: 20 files, 25 findings, 7 critical
+### 2.2 — Class A · Never opened: 4 files, 4 findings, 2 critical
+
+> **UPDATED 2026-08-20 (round-11 gate): 20 → 4 files, 25 → 4 findings, and 7 → 2 critical.** Round 11
+> opened sixteen of the twenty, including **all thirteen** the round-10 block below names as owned and
+> never edited. The row is now four entries carrying one finding each.
+>
+> **WHAT IS LEFT IS NOT A BACKLOG, IT IS A FILE FORMAT.** All four survivors are **generated JSON** —
+> `scenarios/event-library.json` 1/1c, `public/world/ov-oneway-v1.json` 1/1c,
+> `public/world/ov-crossing-v1.json` 1/0c, `public/world/mw-v1.json` 1/0c. Every one is emitted by a
+> generator (`gen_ov_oneway.mjs`, `gen_ov_crossing.mjs`, `gen_motorway.mjs`, and a question-analysis
+> workflow), so it can hold neither a comment explaining a decision nor a hand-edit that survives the
+> next regeneration. **A finding routed to generated JSON has nowhere to be answered**, which is the
+> mechanical reason — not neglect — that these four sat here through eleven rounds. Two of them had
+> never been assigned to anyone at all until this round.
+>
+> **AND ALL FOUR NOW CARRY A WRITTEN REASON, WHICH IS THE FIRST TIME THIS ROW HAS BEEN FULLY
+> ADJUDICATED.** Each lane put the reasoning in a sibling battery and routed the residue by name:
+> `world/__tests__/ov-oneway-district.test.ts`, `world/__tests__/mw-district.test.ts`,
+> `world/__tests__/ov-crossing-district.test.ts` (new — the file existed for no other purpose) and
+> `scenarios/__tests__/event-library-sweep161-routing.test.ts`. §2.6 O55–O58 carry them verbatim.
+> **The count of never-opened files that nobody has examined is now 0**, and that — not the 4 — is the
+> number this row exists to report. Round 9 left that count at 5; round 10 left it at 5.
+>
+> **BOTH REMAINING CRITICALS ARE REFUTED ON EVIDENCE, NEITHER BY EDITING THE FILE.**
+> `event-library.json` (`sc-merge-accel-lane`) was **mis-routed and false**: the library is a generated
+> coverage catalogue holding no geometry, no briefing and no district reference, and the arrival frame
+> the finding rests on was taken ~120 m short of the ramp top on a one-lane `secondary_link` posted at
+> 90 — the red 90 disc in the frame is correct — with `04-t087s.png` from the same drive showing the
+> multi-lane carriageway the briefing promises. `ov-oneway-v1.json` (`sc-ov-oneway`) is a **harness
+> artefact**: the sweep driver has no lateral control whatsoever (a census of `lesson-audit.mjs` for
+> KeyA / KeyD / ArrowLeft / ArrowRight returns **zero**), so a car spawned heading due north with 185 m
+> of straight stem ahead of it left the authored extent without ever entering the east–west one-way
+> street it was graded on. **Neither file was edited because there was nothing in either to fix** — the
+> same shape as round 9's `railTrack.ts` and `roundabout.ts`, both of which this round has since opened
+> anyway.
+>
+> **THE RESIDUE IS ROUTED, NOT CLOSED, AND IS OWED BY FOUR NAMED FILES**: `templates-lanes.ts` (a
+> staged pedestrian for the zebra the lesson teaches an inference about), `tools/maps/gen_ov_oneway.mjs`
+> or `builders/terminus.ts` (nothing closes the top of a degree-3 T), `tools/mobile/lesson-audit.mjs`
+> (no lateral input — which is upstream of at least six „drove off the map" findings), and the
+> `types.ts` / `zoneSigns.ts` / `traffic/system.ts` trio (no Д5, gantry, median-barrier or
+> distance-board kind exists to author). **None of that residue belongs in this row**, because none of
+> it is a file nobody opened.
 
 > **UPDATED 2026-08-20 (round-10 gate): 41 → 20 files, 59 → 25 findings, and 7 → 7 critical.** Round 10
 > opened twenty-one of them and **not one carried a critical**. This row's bulk has now essentially been
@@ -7215,7 +7331,30 @@ of prose arguing it — and does not do what the prose says.
 ### 2.6 — What the lanes reported they could not close, and why
 
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
-of the file named today. **O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's;
+of the file named today.
+
+**Round 11's rows, O55–O58 — and the one row that is NOT here, which is the point.** All four were
+written into sibling test batteries because every file they belong to is **generated JSON that cannot
+hold a comment**. Three of the four are refutations rather than repair failures, which makes round 11
+the round that adjudicated the whole never-opened row rather than shrinking it.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O55 | `sc-ov-crossing-overtake` — the briefing teaches an inference („ако предният намалява до пътеката, най-вероятно пропуска човек, когото ти не виждаш иззад колата му") and **no pedestrian ever appears at the crossing in any of the four runs**, so the payoff never arrives | **NOT refuted — real, and cannot be closed in the file it was routed to.** verbatim: *"A `District` document authors roads, intersections, crossings, roundabouts, buildings, spawnPoints and zones — there is no pedestrian, actor or staged-event field anywhere in the schema … Pedestrians on a scenario map are STAGED ACTORS owned by the lesson template."* Routed with the exact site: `sc-ov-crossing-overtake` declares `staged: [OVC_LEAD_CAR]` and needs a second actor masked by the lead car. *"the honest interim is to change the words rather than leave the student inferring a ghost"* | `world/__tests__/ov-crossing-district.test.ts:28` → `lessons/scenario/templates-lanes.ts` |
+| O56 | `sc-ov-oneway` — „Past the T-junction the world simply stops … no road, no kerb, no buildings, no traffic, no barrier" | **REFUTED as a district defect**, measured at the instrument: *"the entire actuation of `tools/mobile/lesson-audit.mjs` is `page.keyboard.down/up("KeyW")` and `…("KeyS")` plus one `press("Escape")`, and a census of that harness for KeyA / KeyD / ArrowLeft / ArrowRight / any steer token returns ZERO."* The car spawns heading due north with 185 m of stem and leaves `maxY` = 210.06 without ever entering the east–west street. *"One symptom routed to six files is not six defects."* **Residual stated rather than quietly fixed:** nothing closes the top of the T, and the fix belongs to the generator or to `terminus.ts`'s definition of an end | `world/__tests__/ov-oneway-district.test.ts` → `tools/mobile/lesson-audit.mjs`, `tools/maps/gen_ov_oneway.mjs` |
+| O57 | `sc-mw-emergency-lane` — „2600 m of motorway carrying exactly one vehicle … no median barrier, no motorway sign, no gantry, no distance boards. It does not read as a магистрала", filed with „wrong drive ticked both tasks in 58 s" | **Grading half refuted as an instrument artefact** — *"reporting a grading bug that is not there is the same crime as missing one"*: the offence is LATERAL, the wrong drive spawns already in the correct lane at x = 0 and has no lateral control, so *"it cannot commit the offence, so it certifies nothing either way."* **Dressing half not authorable here**: *"`DistrictZoneKind` is exactly {…} and `SignKind` carries no Д5 „магистрала" — there is no median-barrier, gantry or distance-board kind to author, and traffic density is a RUNTIME config … None of those is this lane's file, and none of them is mw-v1.json."* | `world/__tests__/mw-district.test.ts` → `world/types.ts`, `world/builders/zoneSigns.ts`, `traffic/system.ts` |
+| O58 | `sc-merge-accel-lane` (critical) — „The world is not the road in the briefing … a plain two-lane road with a 90 sign running through open grass fields with no ramp, no acceleration lane and no motorway in sight" | **MIS-ROUTED AND FALSE.** verbatim: *"`event-library.json` is the generated coverage catalogue … It holds no geometry, no briefing and no district reference … Nothing in it could have made a road appear or a briefing lie."* And: *"THE FRAME WAS THE RAMP"* — the arrival pose is ~120 m short of the ramp top on a one-lane `secondary_link` posted at 90, and `04-t087s.png` from the same drive shows the multi-lane carriageway. §2 keeps the library honest: its motorway event is still `status: "new"`, *"i.e. THE CATALOGUE NEVER CLAIMED THE ROAD EXISTED"*, with `ev-speed-limit` as a live positive control | `scenarios/__tests__/event-library-sweep161-routing.test.ts` → `lessons/scenario/templates-merging.ts`, `content/world/mw-entry-v1.json` |
+
+**AND THE ROW THAT IS MISSING: O53.** The round-11 LessonPlayShell lane was briefed on O51, O53 and
+O54 and **owned both files O53 names**. It closed O51 (cap threaded to both mounts, tripwire inverted
+by measurement) and O54 (both halves). **O53 — the rear-proximity badge hidden by the shadow transport
+— was neither fixed, refuted, routed nor mentioned**; `PlayAreaStyles.tsx` was never opened at all.
+It is the first row in this table's history to be dropped by a lane that succeeded at everything else
+it was given, which is precisely why it is recorded here: **a silent non-closure inside a good lane is
+less visible than thirteen inside a bad one**, and every artefact except this sentence reads as if the
+lane's brief was fully spent.
+
+**O1–O10 are wave 3's; O11–O13 are round 2's; O14–O19 are round 3's;
 O20–O26 are round 4's; O27–O28 are round 5's — the round that also CLOSED six older rows, the first to
 close any — O29–O30 are round 6's, which closed O28 one round after it was filed; O31–O34 are round
 7's; O35–O42 are round 8's, which closed O31 by refutation; and O43–O48 are round 9's, which closed
