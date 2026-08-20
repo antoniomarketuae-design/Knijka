@@ -672,6 +672,21 @@ class TrafficSystemImpl implements TrafficSystem {
    * of the sixteen bay-carrying districts sees PAINTED bays with no cars in
    * them — the district set would have warned about bodies that are not there,
    * and an empty replacement is the honest answer for that lesson.
+   *
+   * AND THE CALLER IS NOW TESTED, WHICH IT WAS NOT (2026-08-20). This method is
+   * the RECEIVER; whether anything calls it is a separate fact, and for a day
+   * it was an unmeasured one — a refuter deleted BOTH call sites from
+   * `components/sim/LessonScene.tsx` and 11,696 tests stayed green, because
+   * nothing in the repo renders that component and the test covering this array
+   * calls this setter itself. `components/sim/__tests__/rearStaticBodiesSeam
+   * .test.tsx` closes that by mounting the real scene and reading the
+   * publication off the rendered tree. A second scene that owns a traffic
+   * system needs its own such test: a receiver cannot tell whether it was fed.
+   *
+   * The `sixteen bay-carrying districts` above is also worth reading precisely
+   * — measured 2026-08-20, none of the 8 hand-authored `lessons/specs.LESSONS`
+   * loads one today, so that hazard is a guard against an authoring decision
+   * rather than a live defect in a shipped lesson.
    */
   setRearStaticBodies(bodies: readonly Obb2D[]): void {
     this.staticBodies = bodies;

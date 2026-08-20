@@ -29,6 +29,17 @@
  * §3 is the refusal that keeps it honest (what is deliberately not fed), and
  * §4 is the routed half — including a filed premise this file measured and
  * found false.
+ *
+ * WHAT THIS FILE CANNOT SEE, AND WHERE IT IS SEEN INSTEAD (added 2026-08-20).
+ * Every §2/§3/§4 number below is produced by `replay()`, which calls
+ * `traffic.setRearStaticBodies(bodies)` ITSELF. So this file exercises the
+ * RECIPE and the RECEIVER and never the DELIVERY — and a refuter proved the
+ * cost: with BOTH publishers deleted from `LessonScene.tsx`, every test here
+ * still passes, along with the other 11,696. `rearStaticBodiesSeam.test.tsx`
+ * beside this one closes that by mounting the real component and reading the
+ * publication off the rendered tree; it goes red for five separate mutations
+ * that leave this file green. Numbers below and numbers there are the same
+ * measurements from the two ends of one wire, and they must be kept equal.
  * =============================================================================
  */
 

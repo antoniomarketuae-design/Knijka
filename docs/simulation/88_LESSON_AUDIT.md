@@ -5760,7 +5760,69 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and fourteen fix rounds, 2026-08-20
+# THE OPEN LIST — after three repair waves and fifteen fix rounds, 2026-08-20
+
+> **ROUND-15 GATE, 2026-08-20 — THE ROUND THAT PROVED THE PREVIOUS ROUND'S FIX WAS NOT WIRED, AND THE
+> ENTIRE SUITE COULD NOT SEE IT.**
+> `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the header's rule:
+> **1,712 · 26 superseded (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical ·
+> 613 major · 81 minor) · 512 `UNPOLISHED` · 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.**
+> **Fourteenth reader, fourteenth identical tally.** Baseline **`2efa26d`, read from `git log`, not
+> taken from the brief** — and the brief's own baseline instruction was the right one to keep: HEAD had
+> moved two commits past the round-14 gate's `168be5f`.
+>
+> **THE BRIEF WAS STALE IN THE SAME PLACE FOR THE FIFTH CONSECUTIVE ROUND.** It stated the fourth gate
+> "was red at HEAD for the whole audit while briefs called the other three 'the gates'". **The warning
+> to run it is correct and worth carrying. The fact attached to it is not:** `node
+> platform/scripts/tools-tests.mjs` exits **0** with **390 tests · 25 suites · 0 fail**, and has not
+> been red since `1625325`, five rounds ago. Rounds 13 and 14 recorded this identical correction about
+> their own briefs. **Five rounds is no longer a stale number, it is a fixture of the brief**, and it is
+> the reason this document tells every reader to measure rather than quote.
+>
+> **ALL FOUR GATES RUN, EXIT CODES READ DIRECTLY FROM `$?` WITH NO PIPE IN THE WAY.** `tsc --noEmit`
+> **0** · `vitest run --maxWorkers=2` **1** · `validate-content.mjs` **0** · `tools-tests.mjs` **0**.
+> The vitest red is **exactly the two permitted rows and nothing else**, and — the check the brief
+> demands because a damaged `node_modules` once made them absent while 52 files collected nothing —
+> **both ACTUALLY RAN and neither is green**: `content-bank.test.ts` collected **13 tests, 1 failed**,
+> `compose.test.ts` collected **15 tests, 1 failed**, inside a full run of **955 files / 14,996 tests**.
+> `ptp-i-parva-pomosht` is still 31/64 approved and `l-accidents-first-aid` still has no quiz beat, so
+> no content status field was flipped to buy a green.
+>
+> **WHAT THIS ROUND FOUND IS THE MOST IMPORTANT KIND OF FINDING THIS AUDIT PRODUCES: a fix that was
+> real, tested, gated and committed — and NOT CONNECTED TO THE PRODUCT.** Round 14 closed O62 by
+> building `setRearStaticBodies` and the `LessonScene` call that feeds it, and it was right to insist
+> the receiver and the wiring land together. **But every number that justified it came from a test that
+> makes the call ITSELF.** An adversarial refuter deleted **BOTH publishers** from `LessonScene.tsx` and
+> **11,696 tests stayed green** — including the whole battery written to prove the fix. Nothing in the
+> repo renders `LessonScene`, so the wiring was invisible to the entire suite. **The recipe was tested,
+> the receiver was tested, and the DELIVERY was not.**
+>
+> **AND THE SEAM TEST WAS VERIFIED BY THIS GATE RATHER THAN BELIEVED.** `rearStaticBodiesSeam.test.tsx`
+> mounts the real `ReadyScene` through the project's existing no-DOM harness and picks the footprint
+> callback off the RENDERED tree by **component identity** (`type === ScenarioObstacles`), so a rename
+> or a decoy prop cannot satisfy it. **This gate re-ran mutation M3 itself** — both publishers
+> neutralised to `setRearStaticBodies([])`, which is the mutation no grep-based assertion would catch —
+> and observed **4 red in the seam file while the sibling `rearStaticBodies.test.ts` stayed 13/13
+> GREEN**, 21 tests across the two. That is the finding restated as a measurement: the old battery
+> cannot see the defect, the new one can. The tree was restored byte-for-byte afterwards.
+>
+> **COVERAGE: 126 opened · 4 never opened · 8 unopenable as filed — every cell identical to rounds 11,
+> 12, 13 and 14.** `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. The round edited
+> three product/test files and moved no cell, and the reason is now familiar: `LessonScene.tsx` (40
+> findings, 6 critical) was already open, and `traffic/system.ts` **carries no corpus entry at all**.
+> **Standing `BROKEN` remains 1,012 and this round did not move it either** — see §2.6 O64 and the note
+> below on why a seam test cannot close a row by itself.
+>
+> **ONE NEW ROW, O64, AND IT IS THE OTHER END OF THE SAME WIRE.** Nothing in the tree asserts that
+> `ScenarioObstacles` ever calls `onColliderFootprints`. Verified by this gate: the **only** file under
+> `platform/src` that mentions that prop is the new seam test, and `scenarioObstacles.test.ts` does not
+> mention it once. See §2.6.
+>
+> **RESIDUE SWEEP — CLEAN.** One untracked file, and it is the deliverable: `rearStaticBodiesSeam.test
+> .tsx` (27 `expect(` calls, runs, 8/8 green). **Zero** test files under `platform/src` with no
+> `expect(` in them, across **949** test files. No `zz-`/probe/scratch residue in the tree: `scratchpad/`
+> is `.gitignore:71` and `.claude/worktrees/` is in `.git/info/exclude`, and `git ls-files` returns 0
+> tracked paths under either.
 
 > **ROUND-14 GATE, 2026-08-20 — O61 AND O62 ARE BOTH CLOSED, AND THE ROUTED WIRING LANDED WITH ITS
 > RECEIVER, WHICH IS THE HALF ROUND 13 REFUSED TO SHIP ALONE.**
@@ -6912,6 +6974,46 @@ separates them:
 
 ## 1 · The coverage arithmetic — 126 of 138 files, and touching is not closing
 
+> **ROUND-15 GATE, 2026-08-20 — the corpus reproduced for the FOURTEENTH time, and the coverage row does
+> not move for the fifth round running.** `[corpus]` All 24 JSONL files parsed, the re-drive
+> supersession applied by the header's rule: **1,712 records · 26 superseded (22 lessons) · 1,686
+> standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major · 81 minor) · 512 `UNPOLISHED` ·
+> 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.** **HEAD read as `2efa26d` from `git log`** —
+> two commits past the round-14 gate's baseline, which is exactly why the baseline is measured.
+>
+> | row | files | findings | critical |
+> |---|---:|---:|---:|
+> | ever opened | **126** | 971 | 309 |
+> | never opened | **4** | 4 | 2 |
+> | unopenable as filed | **8** | 37 | 7 |
+> | | **138** | **1,012** | **318** |
+>
+> `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. **Identical to rounds 11, 12, 13
+> and 14 on every cell.** Of the three files this round touched, `LessonScene.tsx` (40 findings, 6
+> critical) was already in the ever-opened set, `rearStaticBodies.test.ts` is a test file and carries no
+> entry, and **`traffic/system.ts` carries no corpus entry at all** — the corpus filed its one traffic
+> row against the DIRECTORY `modules/sim/traffic`, an unopenable entry. Fifth round running that a lane
+> has changed real behaviour and bought zero cells.
+>
+> **AND THIS ROUND ADDS THE SHARPEST REASON YET THAT THE ROW IS A WEAK INSTRUMENT — sharper than round
+> 13's and round 14's, because it is not about routing.** Round 14 EDITED `LessonScene.tsx`, and that
+> edit is what the ever-opened row counts. **The edit did not work.** Both publishers it added could be
+> deleted with 11,696 tests green, because nothing in the repo renders the component. A file can be
+> opened, edited, tested, gated, committed and celebrated in this very table **while the wire it added
+> is cut**, and no cell in this row can tell. **Opened is not closed; edited is not delivered.** That is
+> the fourth member of a family this document has been building for six rounds: owned is not opened,
+> committed is not edited, nonexistent is not unopened — and now **wired is not tested.**
+>
+> **THE THREE INSTRUMENT TRAPS WERE ALL RE-HONOURED, NOT REDISCOVERED.** This gate's reader unions
+> `git diff ec1f56f..HEAD` with `git status --porcelain -uall` so this round's uncommitted work counts,
+> asserts `components/sim/LessonScene.tsx` is in the touched set and **exits non-zero if it is not**
+> (the round-9 join bug), and segregates non-existent paths into *unopenable as filed*. **The in-repo
+> `tools/audit/never-edited.mjs` was also run and still disagrees by design, not by error:** it prints
+> `4 files · 4 findings · 2 critical` never-edited and **1** unopenable, where this table says **8** —
+> it prefix-matches directory-shaped entries as existing, this table calls them unopenable via
+> `statSync().isFile()`. Both are defensible; the table is the published split. **Do not report the
+> tool's `unopenable` count as this row's.**
+
 > **ROUND-14 GATE, 2026-08-20 — the corpus reproduced for the THIRTEENTH time, and the coverage row does
 > not move for the fourth round running.** `[corpus]` All 24 JSONL files parsed, the re-drive
 > supersession applied by the header's rule: **1,712 records · 26 superseded (22 lessons) · 1,686
@@ -7422,6 +7524,16 @@ This is the entire list. Seven rows against 1,012.
 
 ### 2.2 — Class A · Never opened: 4 files, 4 findings, 2 critical
 
+> **RE-VERIFIED 2026-08-20 (round-15 gate): unchanged at 4 / 4 / 2 for the FIFTH round running.** The
+> same four generated JSON files — `modules/sim/scenarios/event-library.json` (1, critical),
+> `public/world/ov-oneway-v1.json` (1, critical), `public/world/ov-crossing-v1.json` (1) and
+> `public/world/mw-v1.json` (1). Round 15 touched none of them and was never aimed at them; it was a
+> seam-verification round on the parking family. **The count of never-opened files that nobody has
+> examined remains 0** — that is the number this row reports, and §2.6 O55–O58 still carry the four
+> written reasons. Both remaining criticals stay REFUTED on evidence rather than closed by an edit, and
+> the mechanical reason all four persist is unchanged and is not neglect: **a finding routed to
+> generated JSON has nowhere to be answered.**
+
 > **RE-VERIFIED 2026-08-20 (round-14 gate): unchanged at 4 / 4 / 2 for the FOURTH round running.** The
 > four survivors are the same four generated JSON files —
 > `modules/sim/scenarios/event-library.json` (1, critical), `public/world/ov-oneway-v1.json` (1,
@@ -7712,6 +7824,37 @@ of prose arguing it — and does not do what the prose says.
 
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
 of the file named today.
+
+**Round 15's row, O64 — and the round did not close a row, it proved the previous round's closure was
+not connected.** `[read]` Same rule as every block below: the row was written into the tree by the lane
+that could not close it, and read out of the file named today. **Round 15 filed exactly one new row, and
+it is the far end of the wire round 14 built.**
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O64 | **(new)** Nothing in the tree asserts that `ScenarioObstacles` ever calls `onColliderFootprints` — so the *upstream* half of the footprint channel is as untested as the downstream half was before this round | **REAL, verified by this gate, and explicitly out of the lane's file scope.** verbatim: *"WHAT IS STILL NOT PROVEN ANYWHERE, and it is the other side of this seam rather than this one: nothing in the repo asserts that `ScenarioObstacles` calls `onColliderFootprints` at all — `scenarioObstacles.test.ts` tests the helpers only. That belongs to that file's lane, not this one. It matters beyond the badge because `hittableObstacleBodies` REFUSES without these footprints, so wherever they truly never arrive, every obstacle contact is billed anonymous."* **CONFIRMED INDEPENDENTLY:** the only file under `platform/src` that mentions `onColliderFootprints` is the new seam test; `components/sim/scenarioObstacles.test.ts` does not mention it once. **The blast radius is larger than the badge** — an anonymous obstacle contact is a scoring defect, not a cosmetic one | `components/sim/LessonScene.tsx:1778–1782` → `components/sim/ScenarioObstacles.tsx` + `components/sim/scenarioObstacles.test.ts` |
+
+**WHAT ROUND 15 BOUGHT, AND WHY IT CLOSED NOTHING ON PURPOSE.** It added no product behaviour. It
+established that round 14's product behaviour **was never proven to reach a student**, and then proved
+it does. `rearStaticBodiesSeam.test.tsx` mounts the real `ReadyScene` and reads the publication off the
+rendered tree; the sibling battery that produced every number justifying O62 calls
+`setRearStaticBodies` inside its own `replay()` helper and therefore **exercises the recipe and the
+receiver and never the delivery.** With both publishers deleted from `LessonScene.tsx`, that sibling and
+**11,696 other tests stay green.**
+
+**THIS GATE RE-RAN THE MUTATION RATHER THAN READING THE CLAIM.** M3 — both publishers neutralised to
+`setRearStaticBodies([])`, the mutation that walks past any source-text assertion anyone would write —
+produced **4 red in the seam file and 13/13 GREEN in the sibling**, 21 tests across the two, and the
+tree was restored byte-for-byte. **A test file's header claiming it was mutation-proved is exactly the
+kind of claim this audit has learned to check**: §6 of this document exists because eight tests asserted
+against comment-stripped source text whose code could be killed with 867 tests still green.
+
+**AND THE ROUND CORRECTED TWO OF ITS OWN PREDECESSOR'S OVERSTATEMENTS, IN THE DIRECTION THAT COSTS.**
+The `setRearStaticBodies` header claimed sixteen bay-carrying districts were at risk from the empty
+replacement; measured 2026-08-20, **none of the 8 hand-authored `lessons/specs.LESSONS` loads one
+today**, so that hazard is a guard against a future authoring decision and not a live defect. Both
+corrections make the prose weaker and truer, which is the only direction a comment in this tree is
+allowed to move on its own.
 
 **Round 14's row, O63 — and O61 AND O62, BOTH CLOSED.** `[read]` Same rule as every block below: the
 row was written into the tree by the lane that could not close it, and read out of the file named

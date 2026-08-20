@@ -1144,7 +1144,36 @@ export function nameLiveContact(
   return withinReach === 1 ? nearestId : undefined;
 }
 
-function ReadyScene({
+/**
+ * THE SCENE ITSELF, EXPORTED — because a delivery nothing renders is a delivery
+ * nothing can see (O62, 2026-08-20).
+ *
+ * An adversarial refuter deleted BOTH publishers of `traffic.setRearStaticBodies`
+ * from this component — the mount effect and the line inside
+ * `handleObstacleFootprints` — and 11,696 tests stayed GREEN. Nothing in the
+ * repo renders this file, and `__tests__/rearStaticBodies.test.ts` calls the
+ * setter itself, so between them they exercise the RECIPE and the RECEIVER and
+ * never the SEAM. With the wiring gone `sc-park-van` falls from 242 finite rear
+ * reads across its three recorded drives to 141, and the van a student is
+ * reversing at goes invisible again — the exact defect O62 closed.
+ *
+ * A source-text assertion would not catch it. A substring catches DELETION and
+ * not NEUTRALISATION, and this audit has already watched a required field
+ * pinned with a constant (`advisorOn: true`) satisfy both `tsc` and the grep.
+ * The only instrument that cannot be walked past is one that RUNS the
+ * component, so `__tests__/rearStaticBodiesSeam.test.tsx` mounts this function
+ * through the harness `modules/sim/hud/__tests__/hookHarness` already provides,
+ * reads the footprint callback off the RENDERED TREE (matched by component
+ * IDENTITY, not by name or by source text), and measures what reaches
+ * `traffic.rearGapMeters` on the shipped traces. Deleting either publisher
+ * turns that file red; both mutations are recorded in its header.
+ *
+ * That is the only reason this export exists — `LessonScene` above is still the
+ * public component and the only thing any route mounts. It is a component, not
+ * an API: nothing outside the test may import it, and a second importer means
+ * the split this file has resisted has happened by accident.
+ */
+export function ReadyScene({
   lesson,
   quality,
   built,
@@ -1714,19 +1743,43 @@ function ReadyScene({
       // records) — 0.62 m the badge would otherwise report as clear air behind
       // a student who is reversing.
       //
-      // OBSERVED, AND STATED BECAUSE IT IS NOT FULLY EXPLAINED (2026-08-20).
-      // Instrumented and loaded live against a local server, the effect below
-      // fires on mount with the right bodies on every lesson tried; THIS
-      // callback did not fire within ~3 minutes on `/dev/ghost-demo` for either
-      // `sc-park-van` or `sc-park-bay-exit-rev`, though the fleet GLBs and the
-      // DRACO decoder all answered 200. It clearly DOES fire in a real lesson —
-      // the same drive that produced no log rendered the parked bodies and
-      // graded a named vehicle contact against their colliders — so this reads
-      // as a dev-route/Suspense timing artifact rather than a broken seam. It
-      // is written down because the OTHER consumer of these footprints,
-      // `hittableObstacleBodies`, REFUSES without them, so anywhere they truly
-      // never arrive every obstacle contact is anonymous. Nothing here depends
-      // on the answer: the effect below already published a correct set.
+      // THIS LINE IS UNDER TEST — `__tests__/rearStaticBodiesSeam.test.tsx`
+      // mounts this component, takes this very callback off the RENDERED TREE
+      // (`ScenarioObstacles.onColliderFootprints`, matched by component
+      // identity) and fires it. Deleting the line, or leaving it computing and
+      // not delivering, turns that file red at 73 vs 103 finite reads and
+      // 0.401 vs 0.271 m on `sc-park-van/shadow-correct` (M2 and M4 in its
+      // header). Before that file existed both publishers here could be DELETED
+      // with 11,696 tests green.
+      //
+      // ── THE OPEN QUESTION FROM 2026-08-20, NARROWED ────────────────────────
+      //
+      // What the previous round wrote down: instrumented live against a local
+      // server, the effect below fired on mount on every lesson tried, and THIS
+      // callback produced no log within ~3 minutes on `/dev/ghost-demo` for
+      // either `sc-park-van` or `sc-park-bay-exit-rev`, though the fleet GLBs
+      // and the DRACO decoder all answered 200.
+      //
+      // What is now established, by reading the publisher rather than by
+      // watching for it: `ScenarioObstacles` calls this from a bare
+      // `useEffect(() => { onColliderFootprints?.(footprints) }, [footprints,
+      // onColliderFootprints])` inside `ObstacleVehicles` — the SAME component
+      // that mounts the `CuboidCollider`s and the instanced rigs, derived from
+      // the same `resolved` array. There is no branch in which the parked cars
+      // render and this does not fire. So the non-observation is either an
+      // instrumentation artifact or the whole subtree never mounting, and those
+      // two are distinguishable BY EYE IN ONE FRAME: if it never mounted, the
+      // bay beside the student is EMPTY. The previous round recorded that the
+      // parked bodies rendered on the same drive that produced no log, which
+      // settles it as instrumentation.
+      //
+      // WHAT IS STILL NOT PROVEN ANYWHERE, and it is the other side of this
+      // seam rather than this one: nothing in the repo asserts that
+      // `ScenarioObstacles` calls `onColliderFootprints` at all —
+      // `scenarioObstacles.test.ts` tests the helpers only. That belongs to
+      // that file's lane, not this one. It matters beyond the badge because
+      // `hittableObstacleBodies` REFUSES without these footprints, so wherever
+      // they truly never arrive, every obstacle contact is billed anonymous.
       traffic.setRearStaticBodies(rearStaticBodiesFrom(built.scenarioObstacles, footprints));
     },
     [traffic, built.scenarioObstacles],
@@ -1738,13 +1791,27 @@ function ReadyScene({
   // Suspense-mounted and reports only after its GLBs resolve, and it is not
   // mounted at all when the list is empty — so between them the traffic system
   // would keep the district-derived default for the first seconds of every
-  // scenario lesson, and keep it FOREVER on a lesson that mounts nothing. That
-  // second case is the one that matters: `buildLessonWorldCore` builds
-  // obstacles only for a scenario lesson id, so a hand-authored lesson on one
-  // of the sixteen bay-carrying districts shows PAINTED bays with no cars in
-  // them, and the district default would warn about bodies that are not there.
-  // An empty publish is the honest answer for that lesson, and it must happen
-  // before the badge's first 200 ms poll.
+  // scenario lesson, and keep it FOREVER on a lesson that mounts nothing.
+  //
+  // THE SECOND CASE IS A GUARD, NOT A LIVE DEFECT, and the sentence here used
+  // to overstate it. `buildLessonWorldCore` builds obstacles only for a
+  // SCENARIO lesson id, so a hand-authored lesson on one of the bay-carrying
+  // districts would show PAINTED bays with no cars in them while the district
+  // default warned about bodies that are not there. MEASURED 2026-08-20: NONE
+  // of the 8 lessons in `lessons/specs.LESSONS` loads a `lot-*` district, so
+  // no shipped lesson is in that state today — it is one authoring decision
+  // away, which is the argument for the guard rather than for a bug report.
+  // `rearStaticBodiesSeam.test.tsx` §3 holds it by mounting this component for
+  // a lesson whose id the recipe does not recognise: no `ScenarioObstacles` in
+  // the tree at all, and `lot-narrow-v1`'s 66 district warnings become 0.
+  //
+  // THE FIRST CASE IS LIVE ON EVERY SCENARIO PARKING LESSON, and it is why the
+  // publish must happen before the badge's first 200 ms poll.
+  //
+  // THIS EFFECT IS UNDER TEST — same file, §1: deleting it drops
+  // `sc-park-van/shadow-correct` from 73 finite reads to 44 and
+  // `mistake-early-turn` from 169 to 97 (M1), and neutralising it to
+  // `setRearStaticBodies([])` drops both to 0 (M3).
   useEffect(() => {
     traffic.setRearStaticBodies(
       rearStaticBodiesFrom(built.scenarioObstacles, obstacleFootprintsRef.current),
