@@ -74,12 +74,34 @@ for (const j of broken) {
 }
 
 // --- what git says was touched ---------------------------------------------
+//
+// COMMITTED IS NOT EDITED — and this tool had that bug, which is the same shape
+// as the one it was written to defeat, one level over.
+//
+// It read `ec1f56f..HEAD` alone. Every lane in this programme is told DO NOT
+// COMMIT, so a round's entire output lives in the WORKING TREE until the
+// orchestrator gates and commits it. Round 11's gate caught the consequence:
+// this script listed sixteen files as "never edited" with their diffs on disk,
+// including four it had just handed to a lane that edited them. A tool that
+// answers "has anybody touched this?" by looking only at history answers a
+// different question than the one it prints.
+//
+// So: committed diffs, plus everything currently dirty.
 const edited = new Set(
   execFileSync("git", ["diff", "--name-only", `${BASE}..HEAD`], { cwd: REPO, encoding: "utf8" })
     .split("\n")
     .map((s) => s.trim())
     .filter(Boolean),
 );
+for (const line of execFileSync("git", ["status", "--porcelain", "-uall"], {
+  cwd: REPO,
+  encoding: "utf8",
+}).split("\n")) {
+  // `XY path` — and `R  old -> new`, where the new name is what exists now.
+  const p = line.slice(3).trim();
+  if (!p) continue;
+  edited.add(p.includes(" -> ") ? p.split(" -> ").pop().trim() : p);
+}
 // Directory-shaped entries are real in this corpus (`modules/sim/vehicle`), so a
 // prefix match counts — otherwise six of them read as never-opened forever.
 const isEdited = (f) => {
@@ -93,8 +115,14 @@ const untouched = [...per.values()]
   .sort((a, b) => b.critical - a.critical || b.total - a.total);
 
 const sum = (k) => untouched.reduce((n, e) => n + e[k], 0);
+// The frozen corpus has 138 suspect entries; `unknown` is one of them and is not
+// a file, so this per-file map holds 137. Printing 137 beside a document that
+// says 138 reads as a discrepancy in the corpus rather than a difference of
+// question, so say which is which.
+const unknownRows = broken.filter((j) => norm(j.suspectFile) === "unknown").length;
 console.log(
-  `suspect files with standing BROKEN : ${per.size}`,
+  `suspect files with standing BROKEN : ${per.size} ` +
+    `(+1 "unknown" bucket, ${unknownRows} findings, which is not a file — 138 entries in the ledger)`,
 );
 console.log(
   `NEVER EDITED since ${BASE} (${want}) : ${untouched.length} files · ${sum("total")} findings · ${sum("critical")} critical`,
