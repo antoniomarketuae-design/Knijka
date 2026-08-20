@@ -109,7 +109,35 @@ const isEdited = (f) => {
   return edited.has(clean) || [...edited].some((e) => e.startsWith(clean + "/"));
 };
 
+// NONEXISTENT IS NOT UNOPENED — the third variant of this tool's own bug.
+//
+// Owned is not opened (a lane was handed it and never edited it). Committed is
+// not edited (the diff is in the working tree). And now: a path that has never
+// been in the tree at all reads as one nobody CHOSE to open.
+// `lessons/scenario/events.ts` is the case — the corpus routed a finding to a
+// file that is not on disk, not in `git ls-files`, and returns nothing from
+// `git log --all`. Six consecutive gates counted it as a real never-opened file
+// and it inflated the critical count by one for eleven rounds.
+//
+// It belongs in "unopenable as filed", which is a routing defect to be fixed in
+// the corpus, not a file waiting for a lane.
+const tracked = new Set(
+  execFileSync("git", ["ls-files"], { cwd: REPO, encoding: "utf8" })
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+const existsInTree = (f) => {
+  const clean = f.replace(/\/$/, "");
+  if (tracked.has(clean)) return true;
+  // Directory-shaped entries are real in this corpus (`modules/sim/vehicle`).
+  if ([...tracked].some((t) => t.startsWith(clean + "/"))) return true;
+  return fs.existsSync(path.join(REPO, clean));
+};
+
+const unopenable = [...per.values()].filter((e) => !existsInTree(e.file));
 const untouched = [...per.values()]
+  .filter((e) => existsInTree(e.file))
   .filter((e) => !isEdited(e.file))
   .filter((e) => (want === "criticals" ? e.critical > 0 : want === "majors" ? e.critical === 0 : true))
   .sort((a, b) => b.critical - a.critical || b.total - a.total);
@@ -130,6 +158,18 @@ console.log(
 console.log("");
 for (const e of untouched) {
   console.log("   ", String(e.critical).padStart(2) + "c/" + String(e.total).padStart(3), e.file);
+}
+
+if (unopenable.length) {
+  console.log("");
+  console.log(
+    `UNOPENABLE AS FILED — ${unopenable.length} path(s) the corpus routed a finding to that are ` +
+      `not in the tree at all.\nThese are ROUTING defects, not work: no lane can ever open them, ` +
+      `and counting them as never-opened\ninflates the number for as long as nobody checks.`,
+  );
+  for (const e of unopenable) {
+    console.log("   ", String(e.critical) + "c/" + e.total, e.file);
+  }
 }
 
 if (jsonPath) {

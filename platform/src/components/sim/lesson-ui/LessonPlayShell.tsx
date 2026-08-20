@@ -633,7 +633,7 @@ const PRACTICE_HINT_IDLE_S = 20;
 /** How often the practice-idle watchdog checks (ms). */
 const PRACTICE_HINT_POLL_MS = 2000;
 
-interface HudSnapshot {
+export interface HudSnapshot {
   phase: LessonSessionState["phase"];
   /** QW10: pre-drive phase — the scene keeps the vehicle stationary. */
   driveLocked: boolean;
@@ -656,6 +656,10 @@ interface HudSnapshot {
   preDriveNextStepId: PreDriveStepId | null;
   /** „Съветник": the next expected action (pure advisor.ts derivation). */
   advisorPrompt: AdvisorPrompt | null;
+  /** Compiled id of the ACTIVE objective, null on the run-out. Carried only so
+   *  `heldTaskCapKmh` can tell „the same drill, a different sentence" from „a
+   *  different drill" — see `taskCapKmh` below. */
+  objectiveId: string | null;
   /** The drill's own speed ceiling for the ACTIVE objective, in km/h, as the
    *  student has been told it — see `taskCapKmhFromPrompt`. `undefined` when
    *  the objective carries no cap, or when nothing is being said (exam mode,
@@ -708,8 +712,9 @@ interface HudSnapshot {
  * ceilings.
  *
  * WHAT IS THREADED INSTEAD is the number the advisor is speaking right now, so
- * the bar and the card cannot disagree by construction — the bar prints what
- * the card prints, or nothing. Both directions hold and both were measured:
+ * the bar and the card cannot disagree by construction — the bar prints the
+ * figure out of the advisor's own sentence, or nothing. Both directions hold
+ * and both were measured:
  * the spoken figure is never above the gate (`spokenCapKmh` ends on
  * `Math.min(visible, capKmh)`, and 0 of 953 disagree), so a student who obeys
  * the bar can never be refused by the gate; and it is never below what he was
@@ -731,6 +736,44 @@ interface HudSnapshot {
  * «км/ч» — 40 of 1 575 do (`ObjectiveBanner`'s own census) — and on
  * «Подмини авариралата кола в лентата за движение — под 110 км/ч» a reader that
  * took the first figure would publish the title's number as the gate's.
+ *
+ * ── TWO RESIDUALS ON THIS ROW, BOTH RAISED AGAINST THE WORDING ABOVE, AND
+ *    WHAT WAS DONE ABOUT EACH (2026-08-20) ─────────────────────────────────
+ *
+ * (1) „THE BAR PRINTS WHAT THE CARD PRINTS" WAS THE WRONG SENTENCE, and the
+ *     row it describes is right. `taskCapKmh` is not gated on `advisorOn`,
+ *     `advisorDismissed`, `activeQuiz` or `teachQueue`, so with «Съветник»
+ *     switched off the roomy card prints nothing and the bar still prints
+ *     «задачата иска ≤40». THE CODE IS KEPT AND THE INVARIANT IS RESTATED:
+ *     the bar prints the figure out of THE SENTENCE THE ADVISOR IS SAYING, or
+ *     nothing — it is not gated on whether that sentence is on the glass.
+ *     Decided rather than defaulted, and here is the reason. «Съветник»'s own
+ *     control says what it governs: „показва следващото действие и клавиша за
+ *     него" — advice about WHAT TO DO NEXT. The drill's ceiling is not advice;
+ *     it is the figure the student is being billed against, and O51 was filed
+ *     precisely because it was on the glass unlabelled. Hiding it for everyone
+ *     who turns coaching off would re-create the filed defect for exactly the
+ *     students most likely to be driving unaided, and would fail one of them
+ *     for a number nothing on the screen ever named — a false refusal, which
+ *     this project weighs the same as a false certificate. The four unlisted
+ *     conditions are about the CARD'S OWN SLOT (a modal is over it, the trim
+ *     left it empty, this particular card was closed) and none of them is a
+ *     statement about what the drill demands. What must NOT happen is the bar
+ *     printing a number no sentence contains, and that is what the reader above
+ *     makes impossible.
+ *
+ * (2) THE NUMBER USED TO VANISH AT EVERY GIVE-WAY STOP. `advisorPromptForSession`
+ *     lets a live yield OUTRANK the objective (B15-VOICE, correctly: „what am I
+ *     supposed to be doing" has a different answer while standing still), and
+ *     the wait copy carries no cap tail — so the third number blinked out for
+ *     the length of every lawful stop and came back when the car moved off. On
+ *     the one surface whose finding was ALREADY „three unstable numbers", that
+ *     is a defect even though it needs a full standstill to see. Closed by
+ *     `heldTaskCapKmh` below: the ceiling is a property of the ACTIVE
+ *     OBJECTIVE, not of whatever the advisor happens to be saying this frame,
+ *     so it is held across a prompt that is not speaking about speed and
+ *     dropped the instant the objective changes. It is NOT recomputed from
+ *     `maxSpeedKmh` — that is the 212-card disagreement above.
  */
 export function taskCapKmhFromPrompt(prompt: AdvisorPrompt | null): number | undefined {
   if (prompt === null) return undefined;
@@ -745,10 +788,43 @@ export function taskCapKmhFromPrompt(prompt: AdvisorPrompt | null): number | und
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
-function snapshotOf(
+/**
+ * O51 residual (2) — THE CEILING BELONGS TO THE OBJECTIVE, NOT TO THE FRAME.
+ *
+ * `spoken` is what `taskCapKmhFromPrompt` recovered from the sentence the
+ * advisor is saying THIS poll. It is `undefined` for a whole family of prompts
+ * that are not about speed at all — above everything else the B15-VOICE wait
+ * («Изчакай колата отдясно — тя има предимство (чл. 50)»), which OUTRANKS the
+ * objective for as long as the student is lawfully standing still. The drill's
+ * demand has not changed while he waits; only the sentence has. So the last
+ * figure the objective spoke is held until the OBJECTIVE changes, and never
+ * across one.
+ *
+ * BOTH DIRECTIONS, because a hold is a memory and a stale memory prints a
+ * number for a drill that no longer asks for it:
+ *   · a fresh figure always wins outright — this never smooths a real change;
+ *   · a different objective drops it, even to `undefined` — the next rung's
+ *     silence is not the previous rung's ceiling;
+ *   · the run-out (`activeObjectiveId === null`, every objective done) drops it;
+ *   · and an objective that never spoke a cap never acquires one, because
+ *     there was nothing to remember in the first place.
+ */
+export function heldTaskCapKmh(
+  spoken: number | undefined,
+  activeObjectiveId: string | null,
+  prev: { objectiveId: string | null; taskCapKmh: number | undefined } | null,
+): number | undefined {
+  if (spoken !== undefined) return spoken;
+  if (activeObjectiveId === null || prev === null) return undefined;
+  return prev.objectiveId === activeObjectiveId ? prev.taskCapKmh : undefined;
+}
+
+export function snapshotOf(
   s: LessonSessionState,
   lastTick: SimTick | null,
   driveline: DrivelineSnapshot | null = null,
+  /** The snapshot this one replaces — `heldTaskCapKmh`'s only input. */
+  prev: HudSnapshot | null = null,
 ): HudSnapshot {
   const active =
     s.currentObjectiveIndex < s.objectives.length
@@ -782,7 +858,17 @@ function snapshotOf(
         ? PRE_DRIVE_STEP_ORDER.find((id) => !preDrive.completedStepIds.includes(id)) ?? null
         : null,
     advisorPrompt,
-    taskCapKmh: taskCapKmhFromPrompt(advisorPrompt),
+    objectiveId: active?.spec.id ?? null,
+    // O51: the sentence's own figure, held across a prompt that is not talking
+    // about speed (a lawful wait) and dropped at the objective boundary. The
+    // join itself is what a refuter neutralised with a single `undefined` while
+    // 1,036 tests stayed green — `__tests__/taskCapThread.test.ts` now drives a
+    // real compiled session through `snapshotOf` for exactly that reason.
+    taskCapKmh: heldTaskCapKmh(
+      taskCapKmhFromPrompt(advisorPrompt),
+      active?.spec.id ?? null,
+      prev,
+    ),
     vehicle: lastTick
       ? {
           x: lastTick.position.x,
@@ -1353,9 +1439,22 @@ export function advisorEchoTrim(
  * drives THIS function.
  *
  * `promptTextBg` is null when the advisor has nothing to say OR is not allowed
- * to (off, exam, sandbox, ended) — the caller applies that gate, because it is
- * the same gate the roomy card is mounted behind and there must not be two
- * readings of it.
+ * to. That gate is `advisorTaskFold` below, and this function does not apply
+ * it — the split is deliberate: the ECHO decision is about two strings and
+ * nothing else, and the permission decision is about the student's settings.
+ *
+ * ⚠ CORRECTION, 2026-08-20. This paragraph used to read „it is the same gate
+ * the roomy card is mounted behind". IT IS NOT, and the claim was measured
+ * before it was removed: the `AdvisorCard` mount below carries NINE conditions
+ * (`advisorOn`, `!examMode`, `!mistakeMode`, `!ended`, `activeQuiz === null`,
+ * `teachQueue.length === 0`, `advisorPrompt !== null`, `advisorTextBg !== null`,
+ * `textBg !== advisorDismissed`) and the fold uses the first four. The last five
+ * are all about the ROOMY CARD'S OWN SLOT — a modal is over it, the trim left it
+ * empty, the student closed this particular card — and none of them is a reason
+ * to withhold the coaching from the task row on a phone, which has no such slot
+ * and no such ✕. Two readings on purpose, then, and this is the note that says
+ * so; what must never be two readings is `advisorOn`/exam/sandbox/ended, and
+ * `advisorTaskFold` is the one place those four are read.
  */
 export function foldAdvisorIntoTask(
   promptTextBg: string | null,
@@ -1373,6 +1472,208 @@ export function foldAdvisorIntoTask(
   // survived the title being stripped off rides with the task as its detail.
   // `null` here is the pure-duplicate case: there was nothing but the echo.
   return { advisorSpeaks: false, taskDetailBg: trimmed };
+}
+
+/**
+ * ── O54 · THE GATE, WHICH USED TO LIVE IN A TERNARY NOBODY COULD TEST ──────
+ *
+ * WHAT IT DECIDES, and it is not what the comment it replaces said it decided.
+ * MEASURED on 2026-08-20 by reverting each half and reading what moved:
+ *
+ *   · the ADVISOR ROW (queue row 6) does not change. It is already gated on
+ *     `advisorFresh`, and `advisorKey` is null unless
+ *     `compact && advisorOn && !examMode && !mistakeMode && !ended`, so
+ *     `useFreshKey` returns false and the row was never built. Deleting these
+ *     four conditions moves nothing on that row, and a refuter who read the
+ *     comment as „this is what suppresses the compact advisor row" would be
+ *     reading a claim that was never true.
+ *   · the TASK ROW'S DETAIL does change, and that IS the side door the comment
+ *     names. `taskDetailBg` is the advisor's remainder printed under the task
+ *     line by `SimOverlay` (THEO-4 row 2b). Without this gate a student who
+ *     turned «Съветник» off still reads «дръж под 40 км/ч» under every task
+ *     line, on a control whose own tooltip promises to stop „следващото
+ *     действие и клавиша за него" — coaching arriving under a different roof.
+ *
+ * SO EACH OF THE FOUR, and what it is actually worth, because three of them
+ * would otherwise look like decoration:
+ *
+ *   advisorOn     LIVE. The only one a student can operate, and the only one
+ *                 with an observable effect today.
+ *   examMode      Belt-and-braces ACROSS A MODULE BOUNDARY.
+ *                 `advisorPromptForSession` already opens with
+ *                 `if (s.lesson.examMode === true) return null`, so the prompt
+ *                 is null on an exam and this changes nothing TODAY. It is kept
+ *                 because it is a candidate reading the answer key: the cost of
+ *                 the redundancy is one `&&`, and the cost of relying on
+ *                 another module's first line is a coached exam.
+ *   mistakeMode   LIVE, and it guards a real mismatch: in the THEO-3 sandbox
+ *                 `taskLineBg` is `lesson.descriptionBg`, while the fold trims
+ *                 against `snap.objectiveTitle`. Ungated, the detail would be
+ *                 the remainder of a DIFFERENT sentence from the one on the
+ *                 line above it — and `itemEchoesLine` cannot see that, because
+ *                 both halves would be honest strings that simply do not belong
+ *                 together. (`advisorTaskRows` re-states this as an invariant.)
+ *   ended         Redundant today by the same route as `examMode`: `taskKey` is
+ *                 null when `ended`, so row 7 is not built and there is nothing
+ *                 to carry a detail. Kept for the same reason.
+ *
+ * `__tests__/queueTaskEcho.test.ts` drives THIS function, one assertion per
+ * condition, each with the negative control that fails if the condition is
+ * simply always-false.
+ */
+export interface AdvisorTaskGate {
+  /** The session's own next-action prompt — `snap.advisorPrompt`. */
+  advisorPrompt: AdvisorPrompt | null;
+  /** What the banner/task line is already saying — `snap.objectiveTitle`. */
+  objectiveTitleBg: string | null;
+  /** «Съветник» вкл./изкл. */
+  advisorOn: boolean;
+  examMode: boolean;
+  /** THEO-3 „направи грешката" sandbox. */
+  mistakeMode: boolean;
+  ended: boolean;
+}
+
+export function advisorTaskFold(gate: AdvisorTaskGate): {
+  advisorSpeaks: boolean;
+  taskDetailBg: string | null;
+} {
+  const mayCoach =
+    gate.advisorOn && !gate.examMode && !gate.mistakeMode && !gate.ended;
+  return foldAdvisorIntoTask(
+    mayCoach ? (gate.advisorPrompt?.textBg ?? null) : null,
+    gate.objectiveTitleBg,
+  );
+}
+
+/**
+ * ── O54 · THE TWO QUEUE ROWS, BUILT WHERE A TEST CAN HOLD THEM ─────────────
+ *
+ * WHY THIS IS A FUNCTION AND NOT THE TERNARY IT REPLACES. The ternary was
+ * `advisorFresh && snap.advisorPrompt !== null && advisorFold.advisorSpeaks`
+ * inside the candidate array, and the only thing guarding it was a `toContain`
+ * over the component's source text. MEASURED on 2026-08-20, before this
+ * function existed: appending `|| true` to that expression left **all four**
+ * neighbouring suites green — including the block titled „the render is wired
+ * to `foldAdvisorIntoTask` and to nothing else" — because the required
+ * substring is still there with `|| true` after it. A grep catches DELETION and
+ * not NEUTRALISATION, and the neutralisation restores O54 exactly: the advisor
+ * row is rebuilt for the task's own sentence, out-ranks it 30 > 20 at equal
+ * AMBIENT rank, and the «Задача N/M» counter is dropped uncounted.
+ *
+ * So the decision moved out of JSX, which is this file's own standing answer
+ * (`advisorEchoTrim`: „only the shell knows both … and it decides here rather
+ * than in JSX so a test can hold it") and the shape that closed the same defect
+ * for `hud/dashboardStatus.ts` two rounds ago. What is left at the call site is
+ * a spread with no boolean in it.
+ *
+ * THE INVARIANT THE PAIR EXISTS FOR, and it is stronger than „no echo":
+ * `taskDetailBg` is the remainder of `lineBg`. `itemEchoesLine` can only see
+ * the case where the two are the SAME sentence; it cannot see the case where
+ * they are two DIFFERENT sentences (the mistake-mode mismatch named in
+ * `advisorTaskFold`). So the caller passes `objectiveTitleBg` to the fold and
+ * `taskLineBg` to this builder, and when they disagree the fold's gate has
+ * already made the detail null. Asserted from the outside in
+ * `__tests__/queueTaskEcho.test.ts` („the detail is a remainder of the line it
+ * is printed under").
+ */
+export interface AdvisorTaskRowsInput {
+  /** The answer from `advisorTaskFold` — not re-derived here. */
+  fold: { advisorSpeaks: boolean; taskDetailBg: string | null };
+  /** `useFreshKey(advisorKey)` — false whenever the advisor may not speak. */
+  advisorFresh: boolean;
+  advisorPrompt: AdvisorPrompt | null;
+  praiseFresh: boolean;
+  flash: ObjectiveFlash | null;
+  taskFresh: boolean;
+  /** `useFreshKey`'s key, reused as the item id so a change re-announces. */
+  taskKey: string | null;
+  taskLineBg: string | null;
+  objectiveIndex: number;
+  objectiveTotal: number;
+  mistakeMode: boolean;
+}
+
+/**
+ * THE TASK ROW'S ANNOUNCE KEY — and why the COACHING is part of it.
+ *
+ * `useFreshKey` re-announces when this string changes and only then. The detail
+ * is in it because a coaching change under an UNCHANGED objective (a wait ends,
+ * a roundabout phase turns over) would otherwise be printed silently into a
+ * card that is already past its TTL — and the only other producer that could
+ * say it is the advisor row O54 deleted. That is the second producer growing
+ * back, so the key is the thing that stops it.
+ *
+ * Extracted for the same reason as its two neighbours: what stood here was a
+ * template literal in the component, and the only assertion on it was a
+ * `toContain` over the file's own source text.
+ */
+export function taskAnnounceKey(input: {
+  compact: boolean;
+  ended: boolean;
+  taskLineBg: string | null;
+  objectiveIndex: number;
+  objectiveTotal: number;
+  taskDetailBg: string | null;
+  /** The micro-menu recall counter — a re-tap re-announces the same line. */
+  taskPing: number;
+}): string | null {
+  if (input.compact !== true || input.ended) return null;
+  if (input.taskLineBg === null || input.taskLineBg === "") return null;
+  return `task:${input.objectiveIndex}/${input.objectiveTotal}:${input.taskLineBg}:${input.taskDetailBg ?? ""}:${input.taskPing}`;
+}
+
+export function advisorTaskRows(
+  input: AdvisorTaskRowsInput,
+): [SimOverlayItem | null, SimOverlayItem | null] {
+  const { advisorPrompt } = input;
+  // 6. „Съветник" — the next expected action, when it changes.
+  //    O54: …and never the TASK'S OWN SENTENCE. `advisorSpeaks` is false
+  //    exactly when this row would repeat the line row 7 carries, and the
+  //    coaching has already been handed to that row as its detail. The row is
+  //    not built, rather than built and out-ranked or built and hidden — see
+  //    `foldAdvisorIntoTask`.
+  const advisorRow: SimOverlayItem | null =
+    input.advisorFresh && advisorPrompt !== null && input.fold.advisorSpeaks
+      ? {
+          id: `advisor:${advisorPrompt.textBg}`,
+          kind: "advisor",
+          tone: "neutral",
+          lineBg:
+            advisorPrompt.keys.length > 0
+              ? `${advisorPrompt.textBg} (${advisorPrompt.keys.join(" ")})`
+              : advisorPrompt.textBg,
+        }
+      : null;
+
+  // 7. The objective, announced and then retired to the micro menu.
+  const taskRow: SimOverlayItem | null =
+    input.praiseFresh && input.flash !== null
+      ? {
+          id: `praise:${input.flash.key}`,
+          kind: "praise",
+          tone: "good",
+          lineBg: input.flash.titleBg,
+        }
+      : input.taskFresh && input.taskLineBg !== null
+        ? {
+            id: input.taskKey ?? "task",
+            kind: "task",
+            tone: input.mistakeMode ? "danger" : "neutral",
+            chipBg: input.mistakeMode
+              ? "Преживей грешката"
+              : `Задача ${Math.min(input.objectiveIndex, Math.max(1, input.objectiveTotal))}/${input.objectiveTotal}`,
+            lineBg: input.taskLineBg,
+            // O54: the advisor's half, on the row that carries the counter.
+            // `itemEchoesLine` over this pair must stay false — the line is the
+            // title and the detail is what is left once the title has been
+            // stripped off it (`advisorEchoTrim`), so the two cannot be the same
+            // sentence unless somebody re-attaches the prefix.
+            detailBg: input.fold.taskDetailBg,
+          }
+        : null;
+
+  return [advisorRow, taskRow];
 }
 
 /**
@@ -2825,7 +3126,9 @@ export function LessonPlayShell({
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });
         }
       }
-      setSnap(snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current));
+      setSnap((prev) =>
+        snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current, prev),
+      );
     },
     [push, nowSec, finalize],
   );
@@ -2892,7 +3195,9 @@ export function LessonPlayShell({
   // -- HUD poll ------------------------------------------------------------------
   useEffect(() => {
     const id = window.setInterval(() => {
-      setSnap(snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current));
+      setSnap((prev) =>
+        snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current, prev),
+      );
     }, HUD_POLL_MS);
     return () => window.clearInterval(id);
   }, []);
@@ -2963,6 +3268,9 @@ export function LessonPlayShell({
     drivelineRef.current = null;
     dashboardStatusRef.current = createDashboardStatus();
     setMinimapFrame(null);
+    // A RESTART FORGETS: `prev` is deliberately not passed, so the held
+    // ceiling of the run that just ended cannot print over the first frames of
+    // the new one (see `heldTaskCapKmh`).
     setSnap(snapshotOf(sessionRef.current, null, null));
   };
 
@@ -3136,22 +3444,28 @@ export function LessonPlayShell({
    * survived the title being stripped off. `__tests__/queueTaskEcho.test.ts`
    * drives it in both directions.
    */
-  const advisorFold = foldAdvisorIntoTask(
-    // The SAME gate the roomy `AdvisorCard` is mounted behind. A student who
-    // turned «Съветник» off, an exam candidate and the THEO-3 sandbox must not
-    // have coaching arrive on the task row by the side door.
-    advisorOn && !examMode && !mistakeMode && !ended ? (snap.advisorPrompt?.textBg ?? null) : null,
-    snap.objectiveTitle,
-  );
+  // The gate and the fold, in `advisorTaskFold` — one place, and a pure one, so
+  // the four conditions can be driven one at a time. It is NOT the gate the
+  // roomy `AdvisorCard` is mounted behind (that one has nine); the correction
+  // and the per-condition measurement are at `advisorTaskFold`.
+  const advisorFold = advisorTaskFold({
+    advisorPrompt: snap.advisorPrompt,
+    objectiveTitleBg: snap.objectiveTitle,
+    advisorOn,
+    examMode,
+    mistakeMode,
+    ended,
+  });
   const taskDetailBg = advisorFold.taskDetailBg;
-  const taskKey =
-    compact && !ended && taskLineBg !== null && taskLineBg !== ""
-      ? // The detail is IN the key: when the coaching changes under an unchanged
-        // objective (a wait ends, a phase turns over) the card that carries it
-        // must re-announce, or the advisor's own row would have to come back to
-        // say it — which is the second producer growing back.
-        `task:${snap.objectiveIndex}/${snap.objectiveTotal}:${taskLineBg}:${taskDetailBg ?? ""}:${taskPing}`
-      : null;
+  const taskKey = taskAnnounceKey({
+    compact,
+    ended,
+    taskLineBg,
+    objectiveIndex: snap.objectiveIndex,
+    objectiveTotal: snap.objectiveTotal,
+    taskDetailBg,
+    taskPing,
+  });
   const taskFresh = useFreshKey(taskKey, TASK_ANNOUNCE_MS);
 
   const advisorVisible =
@@ -3546,49 +3860,25 @@ export function LessonPlayShell({
             }
           : null,
 
-        // 6. „Съветник" — the next expected action, when it changes.
-        //    O54: …and never the TASK'S OWN SENTENCE. `advisorSpeaks` is false
-        //    exactly when this row would repeat the line row 7 carries, and the
-        //    coaching has already been handed to that row as its detail. The row
-        //    is not built, rather than built and out-ranked or built and hidden
-        //    — see `foldAdvisorIntoTask`.
-        advisorFresh && snap.advisorPrompt !== null && advisorFold.advisorSpeaks
-          ? {
-              id: `advisor:${snap.advisorPrompt.textBg}`,
-              kind: "advisor" as const,
-              tone: "neutral" as const,
-              lineBg:
-                snap.advisorPrompt.keys.length > 0
-                  ? `${snap.advisorPrompt.textBg} (${snap.advisorPrompt.keys.join(" ")})`
-                  : snap.advisorPrompt.textBg,
-            }
-          : null,
-
-        // 7. The objective, announced and then retired to the micro menu.
-        praiseFresh && flash !== null
-          ? {
-              id: `praise:${flash.key}`,
-              kind: "praise" as const,
-              tone: "good" as const,
-              lineBg: flash.titleBg,
-            }
-          : taskFresh && taskLineBg !== null
-            ? {
-                id: taskKey ?? "task",
-                kind: "task" as const,
-                tone: mistakeMode ? ("danger" as const) : ("neutral" as const),
-                chipBg: mistakeMode
-                  ? "Преживей грешката"
-                  : `Задача ${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))}/${snap.objectiveTotal}`,
-                lineBg: taskLineBg,
-                // O54: the advisor's half, on the row that carries the counter.
-                // `itemEchoesLine` over this pair must stay false — the line is
-                // the title and the detail is what is left once the title has
-                // been stripped off it (`advisorEchoTrim`), so the two cannot be
-                // the same sentence unless somebody re-attaches the prefix.
-                detailBg: taskDetailBg,
-              }
-            : null,
+        // 6 + 7. „Съветник" and the objective — ONE decision, in
+        // `advisorTaskRows`, because which of the two owns the sentence is the
+        // whole of O54 and the pair cannot be decided a row at a time. Nothing
+        // boolean is left here on purpose: the ternary that used to stand in
+        // this slot could be neutralised with `|| true` and every suite stayed
+        // green (measured; see the function's header).
+        ...advisorTaskRows({
+          fold: advisorFold,
+          advisorFresh,
+          advisorPrompt: snap.advisorPrompt,
+          praiseFresh,
+          flash,
+          taskFresh,
+          taskKey,
+          taskLineBg,
+          objectiveIndex: snap.objectiveIndex,
+          objectiveTotal: snap.objectiveTotal,
+          mistakeMode,
+        }),
 
         // 8. Which coloured line is which, and what the arrow and the beam of
         //    light are — said once, on the first quiet frame (see `legendKey`).

@@ -34,11 +34,18 @@ import { describe, expect, it } from "vitest";
 import {
   SCENARIO_TEMPLATES,
   advisorPromptForObjective,
+  advisorPromptForSession,
   compileScenario,
+  createLessonSession,
+  createYieldWait,
   type ScenarioLevel,
 } from "@/modules/sim/lessons";
 import { GovernorCapMark } from "@/modules/sim/hud/StatusDashboard";
-import { taskCapKmhFromPrompt } from "../LessonPlayShell";
+import {
+  heldTaskCapKmh,
+  snapshotOf,
+  taskCapKmhFromPrompt,
+} from "../LessonPlayShell";
 
 /**
  * The template's own pre-grace figure, as `advisor.ts authoredCapOf` reads it.
@@ -271,5 +278,210 @@ describe("both mounts carry it — the routing state §7 B-R10 left a tripwire o
       expect(mount).toContain("limitKmh={snap.limitKmh}");
       expect(mount).toContain("taskCapKmh={snap.taskCapKmh}");
     }
+  });
+});
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * §2 — THE MIDDLE OF THE CHAIN, WHICH NOTHING WAS HOLDING
+ * (2026-08-20, opened by an adversarial refuter against the round above)
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * §1 tests BOTH ENDS of the O51 thread and neither of them is the join:
+ *
+ *   the reader   `taskCapKmhFromPrompt` over all 953 capped cards — driven
+ *   the prop     `taskCapKmh={snap.taskCapKmh}` at both mounts — grepped
+ *   the mark     `GovernorCapMark` with and without the figure — rendered
+ *
+ * THE JOIN IS `snapshotOf`, and it was module-private. MEASURED before this
+ * section was written: set
+ *
+ *     taskCapKmh: taskCapKmhFromPrompt(advisorPrompt)  →  taskCapKmh: undefined
+ *
+ * and **1,036 tests stayed green** while the third number went PERMANENTLY
+ * BLANK on every capped rung — every card in §1 still recovers its figure, both
+ * mounts still name the prop, and the mark still prints when handed one.
+ * TypeScript cannot help either: the field is `number | undefined`, so the
+ * mutation type-checks. `tsc --noEmit` exits 0 on it.
+ *
+ * So `snapshotOf` is exported now and driven with a REAL compiled session,
+ * which is the only reading that spans the whole chain: catalogue → engine →
+ * advisor → snapshot → the number the bar is handed.
+ */
+describe("MUTATION — the snapshot actually carries the number", () => {
+  /** A real session, on the rung O51 was filed on, in its driving phase. */
+  function zebraSession() {
+    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
+    expect(spec).toBeDefined();
+    // Scenario rungs author no pre-drive, so `createLessonSession` opens in
+    // `driving` — asserted rather than assumed, because a session parked in
+    // `preDrive` would publish the checklist's prompt and this whole block
+    // would be measuring the wrong sentence.
+    const session = createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
+    expect(session.phase).toBe("driving");
+    return session;
+  }
+
+  it("publishes the drill's spoken ceiling on a real driving session", () => {
+    const snap = snapshotOf(zebraSession(), null);
+    // 40 is the figure on the card in `sc-zebra-approach/mobile-right/04-t087s`.
+    // 45 is that rung's widened gate — the number this row deliberately does
+    // not publish (§1), and the number a „just use maxSpeedKmh" fix would.
+    expect(snap.taskCapKmh).toBe(40);
+    // …and it is the SAME string the advisor is speaking, not a second reading
+    // of the world: this is the „by construction" half of the invariant.
+    expect(snap.advisorPrompt?.textBg).toContain("дръж под 40 км/ч");
+    expect(snap.taskCapKmh).toBe(taskCapKmhFromPrompt(snap.advisorPrompt));
+  });
+
+  it("…and says nothing on a session whose active objective carries no cap", () => {
+    // The negative control for the assertion above — without it, „publishes 40"
+    // would pass on a snapshot that hard-codes 40. The second objective of the
+    // same lesson («Подмини пътеката и продължи по улицата») is uncapped.
+    const s = zebraSession();
+    const advanced = { ...s, currentObjectiveIndex: 1 };
+    expect(taskCapKmhFromPrompt(advisorPromptForSession(advanced))).toBeUndefined();
+    expect(snapshotOf(advanced, null).taskCapKmh).toBeUndefined();
+  });
+
+  it("an exam session publishes no drill ceiling at all", () => {
+    // `advisorPromptForSession` returns null on an exam, so the bar falls back
+    // to the two-number reading it always printed. Pinned from this side
+    // because it is the direction that would hand a candidate the answer.
+    const s = zebraSession();
+    const exam = { ...s, lesson: { ...s.lesson, examMode: true } };
+    expect(snapshotOf(exam, null).advisorPrompt).toBeNull();
+    expect(snapshotOf(exam, null).taskCapKmh).toBeUndefined();
+  });
+});
+
+/**
+ * ── §3 · RESIDUAL (2) — THE NUMBER USED TO BLINK OUT AT EVERY GIVE-WAY STOP ─
+ *
+ * `advisorPromptForSession` lets a LIVE YIELD outrank the objective (B15-VOICE,
+ * and correctly — while the student is lawfully standing still, „what am I
+ * supposed to be doing" has a different answer than the waypoint at the far end
+ * of the route). The wait copy carries no «дръж под N км/ч» tail, so with the
+ * cap read straight off the current sentence the third number vanished for the
+ * length of every lawful stop and returned when the car moved off.
+ *
+ * On the one surface whose ORIGINAL finding was „three different speed targets
+ * … no way to know which number is being graded", a number that comes and goes
+ * is the same defect in motion. `heldTaskCapKmh` closes it: the ceiling belongs
+ * to the OBJECTIVE, not to the frame.
+ *
+ * Both directions, because a hold is a memory and a stale memory prints a
+ * ceiling for a drill that no longer asks for it.
+ */
+describe("the ceiling belongs to the objective, not to the sentence of the moment", () => {
+  function zebraSession() {
+    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
+    return createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
+  }
+
+  /** The state a full standstill at a give-way produces (finish.ts stepYieldWait). */
+  const holdingAt = (reason: "pedestrian" | "giveWayLine") => ({
+    ...createYieldWait(),
+    holding: true,
+    sinceSec: 1,
+    reason,
+  });
+
+  it("the wait really does displace the cap sentence — the premise, measured", () => {
+    // Asserted rather than assumed: if this stopped being true the hold below
+    // would be dead code passing its own tests.
+    const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
+    const said = advisorPromptForSession(waiting);
+    expect(said).not.toBeNull();
+    expect(said?.textBg).not.toContain("км/ч");
+    expect(taskCapKmhFromPrompt(said)).toBeUndefined();
+  });
+
+  it("holds the drill's ceiling across the wait, on the real session", () => {
+    const driving = snapshotOf(zebraSession(), null);
+    expect(driving.taskCapKmh).toBe(40);
+    const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
+    // The poll that lands while he is stopped is handed the previous snapshot,
+    // exactly as `setSnap((prev) => snapshotOf(…, prev))` does it.
+    const held = snapshotOf(waiting, null, null, driving);
+    expect(held.advisorPrompt?.textBg).not.toContain("км/ч");
+    expect(held.taskCapKmh).toBe(40);
+  });
+
+  it("MUTATION — without the previous snapshot it blinks out, which is the defect", () => {
+    // The negative control, and it is the pre-fix behaviour verbatim: the same
+    // waiting session with nothing to remember publishes nothing.
+    const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
+    expect(snapshotOf(waiting, null, null, null).taskCapKmh).toBeUndefined();
+  });
+
+  it("and it is dropped at the objective boundary — never carried into the next drill", () => {
+    // The direction that matters more: a held number outliving its objective is
+    // a ceiling printed for a drill that never asked for it, which is a false
+    // refusal waiting to happen.
+    const s = zebraSession();
+    const first = snapshotOf(s, null);
+    expect(first.taskCapKmh).toBe(40);
+    const next = { ...s, currentObjectiveIndex: 1 };
+    expect(first.objectiveId).not.toBe(snapshotOf(next, null).objectiveId);
+    expect(snapshotOf(next, null, null, first).taskCapKmh).toBeUndefined();
+  });
+
+  it("a fresh figure always wins over a held one — this never smooths a real change", () => {
+    expect(heldTaskCapKmh(30, "obj-a", { objectiveId: "obj-a", taskCapKmh: 40 })).toBe(30);
+    expect(heldTaskCapKmh(30, "obj-a", { objectiveId: "obj-b", taskCapKmh: 40 })).toBe(30);
+  });
+
+  it("the run-out holds nothing, and an objective that never spoke acquires nothing", () => {
+    // Every objective done ⇒ no active id ⇒ nothing to attribute a ceiling to.
+    expect(heldTaskCapKmh(undefined, null, { objectiveId: "obj-a", taskCapKmh: 40 })).toBeUndefined();
+    // …and a drill that never named a number cannot inherit one from the frame
+    // before it, because there was nothing there to remember.
+    expect(heldTaskCapKmh(undefined, "obj-a", { objectiveId: "obj-a", taskCapKmh: undefined })).toBeUndefined();
+    expect(heldTaskCapKmh(undefined, "obj-a", null)).toBeUndefined();
+  });
+});
+
+/**
+ * ── §4 · RESIDUAL (1) — THE INVARIANT WAS WRONG, NOT THE ROW ───────────────
+ *
+ * „The bar prints what the CARD prints, or nothing" was the sentence, and it is
+ * false as written: `taskCapKmh` is not gated on `advisorOn`, `advisorDismissed`,
+ * `activeQuiz` or `teachQueue`, so with «Съветник» switched off the roomy
+ * `AdvisorCard` prints nothing and the bar still prints «задачата иска ≤40».
+ *
+ * THE ROW IS KEPT AND THE SENTENCE IS RESTATED — the reasoning is written at
+ * `taskCapKmhFromPrompt` and the short form is: «Съветник»'s own control
+ * promises to govern „следващото действие и клавиша за него", advice about what
+ * to do next; the drill's ceiling is not advice, it is the figure the student
+ * is billed against, and O51 was filed precisely because it was on the glass
+ * with nothing naming it. Withdrawing it from everyone who turns coaching off
+ * would re-file the finding against the students most likely to be driving
+ * unaided, and would fail one of them for a number no surface ever named.
+ *
+ * WHAT THE RESTATED INVARIANT FORBIDS, and this is the half that is testable:
+ * the bar may never print a figure that no sentence contains.
+ */
+describe("the bar prints the advisor's own figure, not a reading of its own", () => {
+  it("every capped card in the catalogue: the published figure IS in the sentence", () => {
+    // Re-driven here against the SNAPSHOT's rule rather than the reader alone,
+    // so this fails if the join ever starts deriving a number of its own.
+    const offenders = everyCappedCard().filter((c) => {
+      const shown = taskCapKmhFromPrompt(prompt(c.textBg));
+      return shown === undefined || !c.textBg.includes(`${shown} км/ч`);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it("…and the snapshot never invents one when the session says nothing", () => {
+    // The other half: a session with no prompt at all publishes no ceiling,
+    // whatever the objective's raw gate happens to be.
+    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
+    const s = createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
+    const exam = { ...s, lesson: { ...s.lesson, examMode: true } };
+    const capped = s.objectives[0].params as { maxSpeedKmh?: number };
+    // The gate is there — 45, the widened figure — and nothing publishes it.
+    expect(capped.maxSpeedKmh).toBeGreaterThan(0);
+    expect(snapshotOf(exam, null).taskCapKmh).toBeUndefined();
   });
 });

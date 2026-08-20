@@ -559,6 +559,91 @@ ${TOUCH_BAND_CSS_VARS}
         }
       }
 
+      /* ══════════════════════════════════════════════════════════════════
+         …AND THE LAST SURFACE STILL STANDING ON THE DEAD 108 px FLOOR —
+         2026-08-20, the row behind finding O53.
+
+         O53 CLAIMED the rear-proximity badge is „hidden by the shadow
+         transport". IT IS NOT, and the refutation is this file's own work:
+         the deck is overridden in all four states above and is centred in
+         none of them (roomy-collapsed and compact sit at the right edge,
+         roomy-open takes the LEFT corridor, compact raises its floor to
+         TOUCH_CONTROLS_FLOOR). Implementing O53 would have lifted a badge off
+         a floor that is correct on every roomy stage, to clear a panel that
+         left that corridor a fortnight earlier — a false refusal in layout
+         form. The real defect was underneath the claim and is two things.
+
+         THE FIRST WAS THAT WE COULD NOT REACH IT. „RearProximityCue“ carried
+         no „data-hud“, so this stylesheet contained ZERO rules able to match
+         it and every overlap probe in tools/mobile — all of which resolve an
+         owner with „closest([data-hud])“ — read straight through it and
+         reported it absent. THIRD TIME in this file's history: the shadow-line
+         ribbon legend (7 878 px², a total occlusion, invisible until
+         RIBBON_LEGEND_LANE_PX named it) and the objective banner (17 frames of
+         the 161-sweep, 4 698 px²) were the first two. It is named now.
+
+         THE SECOND IS THE FLOOR, and it is the same arithmetic the deck rule
+         above already ran for itself. 6.75 rem is ROOMY_HUD_FLOOR_PX — right
+         on a desktop, and untouched here. On a phone „TouchControls“ has the
+         WebKit measurement of a chip this size at this exact floor (iPhone 16
+         portrait 393 × 852): „at 108px … wheel 981px², throttle 363px²".
+         Recomputed from the pads' own exported geometry, stage 377 × 836 after
+         the shell's p-2, „touchControlsFloorPx“ is 382 px — so the badge
+         floated 274 px INSIDE the control band — and the clear corridor
+         between the two pads on that row is 66.94 px (59.68 on both 360-px
+         Androids). «Кола отзад · 12 м» is not 67 px wide, so no centred chip
+         fits there at any width. The deck and the minimap column were both
+         moved off this floor for exactly this reason; this badge, having no
+         name, was left on it.
+
+         THE OBVIOUS RULE IS WRITTEN OUT BELOW AND IS NOT SHIPPED, because it
+         was measured before it was believed and it CREATES the occlusion O53
+         falsely alleged:
+
+           [data-sim-compact="on"] [data-hud="rear-proximity"] {
+             bottom: ${"$"}{TOUCH_CONTROLS_FLOOR};
+           }
+
+         In compact LANDSCAPE it is clean — all three profiles put the chip in
+         the empty corridor between the pads, clear of the collapsed deck which
+         the max-height rule above has already sent to the LEFT gutter. In
+         compact PORTRAIT it is worse than what it replaces. The deck stands on
+         this exact floor there, and on a 393 px phone (stage 377, column
+         min(15rem, 36vw) = 141.48, gutter 12):
+
+           collapsed pill  stage x 223.5…365  vs badge x 121.5…255.5
+                           → 31.98 × 26.5 ≈ 848 px² under the badge
+           OPEN panel      left 12 / right 12 / width auto — the FULL stage
+                           width at the same floor, ~295 px tall. The badge is
+                           entirely inside it, later in DOM order, same z-10:
+                           the deck wins and the badge is gone.
+
+         That is one occlusion traded for another, which is the trade this file
+         already made once for the deck against the map toggle and rejected on
+         the re-measure („one dead control traded for another"). So the floor
+         is NOT changed here.
+
+         WHAT IT ACTUALLY NEEDS, stated so the next round can price it: at this
+         floor in compact portrait there is no free lane while a demonstration
+         is mounted, and the 66.94 px pad corridor cannot hold a 134 px chip at
+         the old floor either. Something has to give and it is not this
+         stylesheet's to give alone — either the DECK yields the band floor in
+         portrait (it is a transport; this is a live proximity warning, and the
+         arbitration grammar in this file says the newcomer and the weaker
+         claim yields), or the badge sheds its words on a phone and becomes the
+         glyph plus «2 м» (~60 px, which does fit the corridor) — a copy change
+         on a safety cue, so THEO-4 has an opinion and a human should have one
+         too. ROUTED, not dropped; the numbers above are the whole brief.
+
+         COMPACT PORTRAIT IS ALSO NOT THE ORIENTATION THIS PRODUCT DRIVES IN,
+         and that is why it is a route and not a stop-the-line: rank 2 of the
+         C1 ladder in this very file is «Завърти телефона хоризонтално», and
+         its own note reads „on a portrait phone NOTHING else is actionable
+         until it is done". All three LANDSCAPE profiles are clear at 108 px
+         today — the badge sits in the pad corridor (x 351…485 against a
+         corridor of 275…593 on an iPhone 16) and 61 px above the dash dock.
+         ══════════════════════════════════════════════════════════════════ */
+
       /* …and the column stops short of the deck rather than being painted over
          it. The reserve is the deck's own MEASURED open height plus a gutter
          (notifyColumn.ts). :has() so a screen with no demonstration — which is
