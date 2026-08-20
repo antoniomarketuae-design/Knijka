@@ -5760,7 +5760,82 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and thirteen fix rounds, 2026-08-20
+# THE OPEN LIST — after three repair waves and fourteen fix rounds, 2026-08-20
+
+> **ROUND-14 GATE, 2026-08-20 — O61 AND O62 ARE BOTH CLOSED, AND THE ROUTED WIRING LANDED WITH ITS
+> RECEIVER, WHICH IS THE HALF ROUND 13 REFUSED TO SHIP ALONE.**
+> `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the header's rule:
+> **1,712 · 26 superseded (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical ·
+> 613 major · 81 minor) · 512 `UNPOLISHED` · 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.**
+> **Thirteenth reader, thirteenth identical tally.** Baseline `168be5f`, **read from `git log`, not
+> taken from the brief.**
+>
+> **AND THE BRIEF WAS STALE IN THE SAME PLACE FOR THE FOURTH CONSECUTIVE ROUND.** It stated that the
+> fourth gate "was red at HEAD for the whole audit". **It is green, and it has not been red since
+> `1625325`, four rounds ago:** `node platform/scripts/tools-tests.mjs` exits 0 with **390 tests, 25
+> suites, 0 fail**. The warning to run it was still worth carrying; the fact attached to it was not.
+> Round 13 recorded this exact correction about round 13's brief, which is the whole reason this
+> document tells every reader to measure the baseline instead of quoting it.
+>
+> **COVERAGE: 126 opened · 4 never opened · 8 unopenable as filed — every cell identical to rounds 11,
+> 12 and 13.** `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. **The round edited
+> five product files and moved no coverage cell, and this time the reason is sharper than round 13's:
+> three of the five carry NO CORPUS ENTRY AT ALL** — `traffic/system.ts`, `traffic/types.ts` and
+> `hud/rearProximity.ts` are each 0 findings, because the corpus filed its one traffic row against the
+> DIRECTORY `modules/sim/traffic` (an unopenable entry) and never filed a row against the severity
+> module that O61 turned out to live in. The other two — `LessonScene.tsx` (40 findings, 6 critical) and
+> `RearProximityCue.tsx` (1) — were already in the ever-opened set. **A finding's suspect file and the
+> file that actually holds the defect are different facts, and the coverage row can only see the first.**
+>
+> **O61 IS CLOSED BY A SPLIT, NOT A DELETION.** The red band read `gapM < 4 && Math.abs(speedKmh) >= 5`,
+> defended as „a car parked on your bumper at a light is normal city life". That is true of a QUEUE and
+> false of the one manoeuvre the cue exists for: reversing into a bay runs at 2–4 km/h by definition, so
+> the situation with the least air behind the car was structurally forbidden from raising its voice.
+> **MEASURED before the change**, replaying `sc-park-narrow/shadow-correct` through the shipped
+> `rearGapMeters`: 66 of 805 samples raised, bottoming at **0.116 m of body-to-body air at −3.828 km/h**,
+> and the level over the whole drive was 739 × none + 66 × warn — **danger: 0 frames.** The fix separates
+> the two questions the one number was answering: distance decides RED, and `rearCueClosing` decides
+> whether red is RELEVANT — reversing at all, or moving at traffic speed either way. **MEASURED after,
+> over all 51 committed parking drives (36,367 samples, 17 lot districts):** red frames 82 → 2,399, every
+> new one a frame where the student is reversing toward something inside 4 m; **red while neither
+> reversing nor at traffic speed: 0**, so the stationary case the old gate protected is untouched by
+> measurement rather than by assertion; **slow reversing with ≥4 m of air: 555 samples, red = 0** — the
+> false-refusal direction, which is the one the old gate was accidentally right about.
+>
+> **O62 IS CLOSED, AND THE RECEIVER AND THE WIRING LANDED TOGETHER.** Round 13 declined to stub a setter
+> because *"an API with no caller is the „schema that lies""* — the O24 trap. Round 14 built both halves
+> in one change: `TrafficSystem.setRearStaticBodies(bodies: readonly Obb2D[])` and the `LessonScene` call
+> that fills it from `built.scenarioObstacles`, the very array `ScenarioObstacles` gives colliders to.
+> **The measurement that justified it is the sharpest number in this round**, taken on `sc-park-van` —
+> the drill whose whole subject is reversing beside a tall panel van: the badge was **not silent, it was
+> confidently wrong by a factor of nine.** It read **3.56 m of clear air with the van 0.40 m behind** on
+> the correct drive, because it was reporting the neighbouring bay cars and the held van was in no
+> district. *"A student reads „3 m" and keeps going."*
+>
+> **THE REPLACEMENT WAS PROVED LOSSLESS BEFORE IT WAS BELIEVED.** `setRearStaticBodies` REPLACES the
+> district-derived default rather than adding to it, which is the shape that silently drops bodies. §3 of
+> the new battery drives `sc-park-narrow` — a lesson that holds no scenery — through both sources and
+> requires them to read identically, and requires a lesson that mounts nothing to publish nothing (the
+> painted-bay phantom). **The published footprint also replaces the fleet-profile box**, which closes the
+> second half O62 was filed for from `traffic/system.ts`: for this van that is **0.62 m** of length the
+> approximation had wrong.
+>
+> **ONE NEW ROW, O63, AND IT IS A REFUSAL TO MAKE THE BADGE SAY SOMETHING FALSE.** The garage wall of
+> `sc-park-wall` is a body a student can hit and is deliberately NOT fed to the cue, because the badge's
+> only sentence names a car. See §2.6.
+>
+> **AND THE LANE REFUTED ONE OF ITS OWN FILED PREMISES.** „`mistake-into-wall` is silent for the entire
+> drive" is exactly true — 0 finite reads of 681 samples — and means nothing: **that drive never reverses
+> once.** The count was right and the inference drawn from it was wrong. See §2.6.
+>
+> **ALL FOUR GATES RUN.** `tsc --noEmit` 0 · `vitest run` 1 **with only the two signature-blocked files
+> failing and both proven to have loaded** (`content-bank.test.ts` collected 13 tests, `compose.test.ts`
+> collected 15; 954 files / 14,988 tests) · `validate-content.mjs` 0 · `tools-tests.mjs` 0. **No
+> cross-lane collision was possible and none occurred** — one lane ran. **No residue**: no untracked
+> probe/scratch/`zz-` file, and no test file under `platform/src` without an `expect(`. The ownership
+> partition is intact at **976 test files, 954 vitest / 22 node:test, none shared, none orphaned**, and
+> the vitest gate collected exactly the 954 the partition predicts — so **no lane shipped a test file
+> nothing ran**, the failure class that hid 33 test blocks and 88 assertions on 2026-08-19.
 
 > **ROUND-13 GATE, 2026-08-20 — O59 is CLOSED: the parking family gets a rear warning, and the fix was
 > checked against this project's own dead-API trap before it was believed.**
@@ -6837,6 +6912,40 @@ separates them:
 
 ## 1 · The coverage arithmetic — 126 of 138 files, and touching is not closing
 
+> **ROUND-14 GATE, 2026-08-20 — the corpus reproduced for the THIRTEENTH time, and the coverage row does
+> not move for the fourth round running.** `[corpus]` All 24 JSONL files parsed, the re-drive
+> supersession applied by the header's rule: **1,712 records · 26 superseded (22 lessons) · 1,686
+> standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical · 613 major · 81 minor) · 512 `UNPOLISHED` ·
+> 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.** **HEAD read as `168be5f` from `git log`.**
+>
+> | row | files | findings | critical |
+> |---|---:|---:|---:|
+> | ever opened | **126** | 971 | 309 |
+> | never opened | **4** | 4 | 2 |
+> | unopenable as filed | **8** | 37 | 7 |
+> | | **138** | **1,012** | **318** |
+>
+> `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. **Identical to rounds 11, 12 and 13
+> on every cell.**
+>
+> **AND THIS ROUND SHOWS WHY THE ROW IS A WEAK INSTRUMENT, MORE SHARPLY THAN ROUND 13 DID.** Round 14
+> edited five product files and bought zero cells — but not because they were all already open. **Three
+> of the five carry no corpus entry at all:** `traffic/system.ts` **0**, `traffic/types.ts` **0**,
+> `hud/rearProximity.ts` **0**. The corpus filed its one traffic row against the DIRECTORY
+> `modules/sim/traffic` (one of the eight unopenable entries) and filed *nothing whatever* against the
+> severity module where O61's defect actually lived — that row was filed against
+> `RearProximityCue.tsx`, the component that merely displays the level. **The suspect file a finding
+> names and the file that holds the defect are different facts, and this table can only ever see the
+> first.** Two rounds running, a lane has closed a real defect on the whole parking family and moved no
+> cell; that is what spending routing debt looks like from the ledger's side, and it means **the
+> coverage row must never be read as a measure of repair progress.**
+>
+> **OWNED IS STILL NOT OPENED, AND THE GAP IS MEASURABLE: 176 distinct files have been handed to a lane
+> across all 22 `lanes-*.json` manifests, and 148 of them were actually edited.** Eleven exist and were
+> never touched; seventeen name no real file. A file a lane was handed and never edited reads exactly
+> like one that was worked on unless you diff it, which is why every count in this section is computed
+> from `git diff ec1f56f HEAD` plus the dirty tree, never from lane ownership.
+
 > **ROUND-13 GATE, 2026-08-20 — the corpus reproduced for the TWELFTH time, and the coverage row again
 > does not move — correctly, because both lanes were re-work lanes.** `[corpus]` All 24 JSONL files
 > parsed, the re-drive supersession applied by the header's rule: **1,712 records · 26 superseded
@@ -7313,6 +7422,16 @@ This is the entire list. Seven rows against 1,012.
 
 ### 2.2 — Class A · Never opened: 4 files, 4 findings, 2 critical
 
+> **RE-VERIFIED 2026-08-20 (round-14 gate): unchanged at 4 / 4 / 2 for the FOURTH round running.** The
+> four survivors are the same four generated JSON files —
+> `modules/sim/scenarios/event-library.json` (1, critical), `public/world/ov-oneway-v1.json` (1,
+> critical), `public/world/ov-crossing-v1.json` (1) and `public/world/mw-v1.json` (1). Round 14 touched
+> none of them and was never aimed at them. **All four have been owned by a lane between four and eight
+> times over** — `event-library.json` and `ov-oneway-v1.json` appear in eight separate `lanes-*.json`
+> manifests each — **and are still unedited, which is the cleanest demonstration in this document that
+> ownership is not coverage.** §2.2's original point stands: what is left is not a backlog, it is a file
+> format.
+
 > **RE-VERIFIED 2026-08-20 (round-13 gate): unchanged at 4 / 4 / 2 for the third round running, and
 > one reader still disagrees.**
 > `tools/audit/never-edited.mjs` prints **three** never-edited criticals, the third being
@@ -7594,7 +7713,35 @@ of prose arguing it — and does not do what the prose says.
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
 of the file named today.
 
-**Round 13's rows, O61–O62 — and O59, WHICH IS CLOSED.** `[read]` Same rule as every block below:
+**Round 14's row, O63 — and O61 AND O62, BOTH CLOSED.** `[read]` Same rule as every block below: the
+row was written into the tree by the lane that could not close it, and read out of the file named
+today. **Round 14 was aimed at the two rows round 13 routed out, and hit both.** It filed exactly one
+new row, and that row is a refusal rather than a failure — the first time in this table that a lane
+declined to feed the cue a body it could already see.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O63 | **(new)** `sc-park-wall`'s garage end wall is a body the student can hit, mounts an exact cuboid collider, and is **deliberately excluded** from the rear-proximity source that O62 just wired up | **NOT a failure — a refusal, and the refusal is the finding.** verbatim: *"this badge's only sentence names a CAR, and „Кола отзад · 1 м" about a concrete wall is the badge stating something false, which is the failure the whole channel exists to avoid."* The remedy is priced and is explicitly **two things that must land together**: *"Feeding it needs a gap query carrying the body KIND plus a second, human-signed Bulgarian string; those must land together."* The exclusion is **pinned rather than left to comment** — §4 asserts `sc-park-wall` really does contain a `wall` obstacle and that `rearStaticBodiesFrom` returns exactly the 4 vehicle bodies and none of it, so a later tidy-up cannot quietly widen the filter. **This is a THEO-4 row as much as a code row**: the copy on a safety cue needs a human, which puts it in Class D | `components/sim/__tests__/rearStaticBodies.test.ts:299–313` → a kind-carrying gap query + signed copy |
+
+**AND THE LANE REFUTED A PREMISE IT HAD BEEN HANDED, WHICH IS THE SECOND TIME THIS HAS PAID.** O62 was
+filed partly on the observation that `sc-park-wall/mistake-into-wall` — „the recorded drive whose entire
+subject is reversing into that wall" — raises the badge on **0 of 681 samples.** The lane reproduced the
+count exactly and then showed the inference was worthless: *"REFUTED: „mistake-into-wall is silent for
+the entire drive" is true and means nothing"* — **that drive never reverses once.** Not „reverses
+slowly", not „reverses below the gate": there is not one negative sample in it. The manoeuvre is
+entirely forward and ends stopped against the wall, so a REAR cue was never the surface that could have
+warned about it. **The count was right, the drive name was suggestive, and the conclusion drawn from
+both was false** — the same shape as O53 and O58, and the third time a filed row has survived only until
+someone replayed the trace instead of reading its title.
+
+**WHAT ROUND 14 BOUGHT, STATED PLAINLY: it finished the chain O59 started, and the chain took three
+rounds.** Round 12 found the source was blind to parked cars (O59). Round 13 built the district half and
+measured two more gaps between the source and the pixel rather than declaring the badge fixed (O61,
+O62). Round 14 closed both and found one more thing that should not be closed (O63). **Every step of
+that was a lane refusing to let „the row I was given is closed" imply „the student is now warned"** —
+and the badge is, at last, honest on the parking family for cars, and silent by choice about walls.
+
+**Round 13's rows, O61–O62 — BOTH NOW CLOSED BY ROUND 14 — and O59, WHICH IS CLOSED.** `[read]` Same rule as every block below:
 each row was written into the tree by the lane that could not close it, and read out of the file named
 today. **O59 is the row round 12 routed out, and round 13 was aimed at it and hit it** — but closing
 the source defect exposed two more between the source and the pixel, and the lane measured both rather
@@ -7603,8 +7750,8 @@ than declaring the badge fixed.
 | # | finding the lane could not close | reason the lane gave | where |
 |---|---|---|---|
 | O59 | **CLOSED — not refuted, BUILT.** `traffic/system.ts` — on the whole parking family a reversing student got no rear warning at all, because the proximity source swept `this.vehicles` and a parked bay occupant is an `ObstacleRect2D` | **The two arrays are now one answer.** `occupiedBayBodies(district)` builds the static half at construction (`system.ts:325`) and `rearGapMeters` returns the nearer of the two — `moving < parked ? moving : parked` (`:648–651`) — so, in the lane's own frame, *"which array a body was put in is not a fact about the student's mirror."* The corridor is **exactly chassis-wide with no comfort margin**, and the lane states why that is the load-bearing half: *"Adding a margin is the wallpaper trap"* — a cue that fires when nothing is there is the false-refusal direction. Malformed bays are skipped rather than becoming *"a phantom car behind a student"*, and the source is deliberately the same array `lessonWorldRecipe.ts` filters to mount the hittable obstacles, *"so the cue can only ever warn about a body the scene also mounts"* | `traffic/system.ts:325, 648–651, 1147, 1213` · `traffic/__tests__/rear-static-gap.test.ts` |
-| O61 | **(new)** `hud/rearProximity.ts` — **the badge still cannot go RED during a parking manoeuvre**, which is the one manoeuvre O59 was closed for | **REAL, measured, and not in either file this lane owned.** verbatim: *"`rearProximity.ts` gates „danger" on `Math.abs(speedKmh) >= REAR_CUE_MOVING_KMH` (5). „A car parked on your bumper at a light is normal city life" is right for a queue and wrong for one you are reversing INTO: a parking manoeuvre runs at 2–4 km/h. MEASURED at sc-park-narrow's closest approach — **0.12 m of air at −3.83 km/h** — the badge shows AMBER. The `Math.abs` erases the sign, and closing on something behind you is the branch it throws away."* The fix is priced and bounded, including its own false-positive guard: *"a sign-aware band … and it must land with its own both-directions test so a car merely rolling backwards on a slope does not paint the screen."* | `hud/RearProximityCue.tsx:138–148` → `hud/rearProximity.ts` |
-| O62 | **(new)** HELD SCENERY is invisible to the proximity source — the van of `lot-van-v1` and the wall of `lot-wall-v1` are added by lesson id and are in no district | **REAL, and the receiver was DELIBERATELY NOT BUILT.** verbatim: *"`sc-park-wall/mistake-into-wall` — the recorded drive whose entire subject is reversing into that wall — raises the badge on **0 of 681 samples**."* The remedy is known and is one line elsewhere: *"`LessonScene` already holds both halves at once … handing that array to the traffic system closes this AND replaces the fleet-profile box `actorObb` approximates each occupant with. It is one wiring line in a file this lane does not own."* And the reason nothing was stubbed to receive it — **this project's own dead-API trap, refused in the direction that usually ships**: *"No setter was added here to receive it: an API with no caller is the „schema that lies" `scene/obstacleSpec.ts` warns about in its own header, and the receiver and the wiring must land together."* | `hud/RearProximityCue.tsx:150–162` + `traffic/system.ts:122–132` → `components/sim/LessonScene.tsx` |
+| O61 | **CLOSED BY ROUND 14 — the gate was SPLIT, not removed.** `hud/rearProximity.ts` — **the badge still cannot go RED during a parking manoeuvre**, which is the one manoeuvre O59 was closed for. *Round 14: distance decides RED, `rearCueClosing` decides whether red is RELEVANT (reversing at all, or moving at traffic speed either way). Over all 51 committed parking drives — 36,367 samples, 17 lot districts — red frames 82 → 2,399, every new one reversing toward something inside 4 m; **red while neither reversing nor at traffic speed: 0**, so the stationary case the old gate protected is untouched by measurement; **slow reversing with ≥4 m of air: 555 samples, red = 0**, the false-refusal direction the old gate was accidentally right about. All four pinned by mutation.* | **REAL, measured, and not in either file this lane owned.** verbatim: *"`rearProximity.ts` gates „danger" on `Math.abs(speedKmh) >= REAR_CUE_MOVING_KMH` (5). „A car parked on your bumper at a light is normal city life" is right for a queue and wrong for one you are reversing INTO: a parking manoeuvre runs at 2–4 km/h. MEASURED at sc-park-narrow's closest approach — **0.12 m of air at −3.83 km/h** — the badge shows AMBER. The `Math.abs` erases the sign, and closing on something behind you is the branch it throws away."* The fix is priced and bounded, including its own false-positive guard: *"a sign-aware band … and it must land with its own both-directions test so a car merely rolling backwards on a slope does not paint the screen."* | `hud/RearProximityCue.tsx:138–148` → `hud/rearProximity.ts` |
+| O62 | **CLOSED BY ROUND 14 — receiver and wiring landed together, exactly as this row demanded.** HELD SCENERY is invisible to the proximity source — the van of `lot-van-v1` and the wall of `lot-wall-v1` are added by lesson id and are in no district. *Round 14: `TrafficSystem.setRearStaticBodies(readonly Obb2D[])` plus the `LessonScene` call that fills it from `built.scenarioObstacles`. The number that justified it, on `sc-park-van`: the badge read **3.56 m of clear air with the van 0.40 m behind** — **not silent, wrong by a factor of nine**, because it was reporting the neighbouring bay cars. The replacement is proved LOSSLESS (§3 drives a scenery-free lesson through both sources and requires identical reads), and the published footprint also replaces the fleet-profile box — **0.62 m** of length for this van.* | **REAL, and the receiver was DELIBERATELY NOT BUILT.** verbatim: *"`sc-park-wall/mistake-into-wall` — the recorded drive whose entire subject is reversing into that wall — raises the badge on **0 of 681 samples**."* The remedy is known and is one line elsewhere: *"`LessonScene` already holds both halves at once … handing that array to the traffic system closes this AND replaces the fleet-profile box `actorObb` approximates each occupant with. It is one wiring line in a file this lane does not own."* And the reason nothing was stubbed to receive it — **this project's own dead-API trap, refused in the direction that usually ships**: *"No setter was added here to receive it: an API with no caller is the „schema that lies" `scene/obstacleSpec.ts` warns about in its own header, and the receiver and the wiring must land together."* | `hud/RearProximityCue.tsx:150–162` + `traffic/system.ts:122–132` → `components/sim/LessonScene.tsx` |
 
 **O62 WAS FILED TWICE FROM TWO FILES AND THAT IS EVIDENCE, NOT DUPLICATION.** `traffic/system.ts`
 reached the same wiring line from the other end, as a stated approximation rather than a gap: `actorObb`

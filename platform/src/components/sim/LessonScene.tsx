@@ -959,6 +959,79 @@ export function hittableObstacleBodies(
 }
 
 /**
+ * O62 — THE SAME MOUNTED BODIES, HANDED TO THE REAR-PROXIMITY CUE.
+ *
+ * `traffic.rearGapMeters` is what the PROX badge polls at 5 Hz, and its static
+ * half was built from the DISTRICT (`traffic/occupiedBayBodies` reads
+ * `meta.scenario.bays[].occupied`). The district is not the whole world. Held
+ * scenery — the panel van of `sc-park-van`, the garage wall of `sc-park-wall` —
+ * is added by lesson id in `scene/scenarioSceneryProps.heldSceneryFor`, lands
+ * in the very `built.scenarioObstacles` array two lines up, gets a real
+ * collider from `ScenarioObstacles`, and was invisible to the cue. This closes
+ * that by handing the traffic system what the scene actually mounted.
+ *
+ * MEASURED on the shipped traces of `sc-park-van` (lot-van-v1, one hittable
+ * `kargo_v` held at 5.03, −2.7), replaying each recorded drive through the
+ * source before and after: `shadow-correct` 44 → 73 finite reads and
+ * `mistake-early-turn` 97 → 169, and on EVERY one of those samples the held
+ * van is the NEAREST body behind the student — so it is not a nuance on top of
+ * the bays, it is the body the badge should have been reporting. The third
+ * drive, `mistake-blind-reverse`, stays at 0 before and after: its hazard is a
+ * pedestrian, and the rear channel must let the right instrument speak.
+ *
+ * WHAT IT DELIBERATELY DOES NOT FEED, because the badge can only say one
+ * sentence. The copy is „Кола отзад · X м" — *a car* behind — so a body that is
+ * not a car cannot be reported through it without the badge stating something
+ * false, which is the failure this whole channel exists to avoid. That
+ * excludes `kind: "wall"` (one in the product: `sc-park-wall`'s garage end
+ * wall), `kind: "prop"` cones and poles, and animals. Feeding walls needs a
+ * gap query that carries the body KIND and a second, human-signed Bulgarian
+ * string; both must land together — routed, not smuggled.
+ *
+ * AND THE WALL IS NOT THE URGENT HALF, which was worth measuring before
+ * assuming. `sc-park-wall/mistake-into-wall` was filed as „the badge is silent
+ * for the entire drive". It is — 0 finite reads of 681 samples — but the wall
+ * is never BEHIND the car on any of that lesson's three recorded drives (0
+ * samples in the rear corridor on all three). That drive is a FORWARD contact:
+ * the trace ends at +6 km/h with the debrief «Предницата опря в стената в края
+ * на реда». A rear cue that fired there would be reporting a body in front.
+ *
+ * WHY IT DOES NOT REFUSE ON A MISSING FOOTPRINT, where `hittableObstacleBodies`
+ * above does. That function names a body that was ALREADY hit, and a guessed
+ * box there steals the name of a real one — silence is the safe answer. This
+ * one warns BEFORE contact, where silence is the dangerous answer and reads to
+ * a student as „clear behind"; and the fallback is not a guess but exactly the
+ * fleet-profile box `occupiedBayBodies` has been shipping since O59. Footprints
+ * only exist once the GLBs resolve, so refusing would also make the badge dark
+ * for the first seconds of every scenario lesson and dark forever in any
+ * headless replay.
+ */
+export function rearStaticBodiesFrom(
+  obstacles: readonly ScenarioObstacleSpec[],
+  footprints: readonly ObstacleColliderFootprint[] = [],
+): Obb2D[] {
+  const out: Obb2D[] = [];
+  let index = 0;
+  for (const o of obstacles) {
+    if (o.kind !== "vehicle") continue;
+    // Index over the VEHICLE-FILTERED list, `visual` counted but skipped —
+    // ObstacleColliderFootprint's own convention, mirrored from the function
+    // above so the two never disagree about which obstacle `i` names.
+    const i = index++;
+    if (o.visual === true) continue;
+    const rad = (o.headingDeg * Math.PI) / 180;
+    const fp = footprints.find((f) => f.index === i);
+    const box = actorObb({ x: o.x, y: o.y, dirX: Math.sin(rad), dirY: Math.cos(rad) });
+    if (fp !== undefined) {
+      box.halfLengthM = fp.halfLengthM;
+      box.halfWidthM = fp.halfWidthM;
+    }
+    out.push(box);
+  }
+  return out;
+}
+
+/**
  * Every body the live contact could have been with, at this instant: the
  * director's staged cast at its live poses, plus the static obstacle list.
  * Allocates — a real contact is rare (the same reasoning NpcColliders' near-miss
@@ -1634,9 +1707,49 @@ function ReadyScene({
   const handleObstacleFootprints = useCallback(
     (footprints: readonly ObstacleColliderFootprint[]) => {
       obstacleFootprintsRef.current = footprints;
+      // O62: the rear cue's static bodies get RE-published here, because this
+      // is the moment their real extents stop being the fleet-profile guess.
+      // `kargo_v`, the held van of sc-park-van, measures halfLength 2.67
+      // against a hatchback's 2.05 (the figure `hittableObstacleBodies` above
+      // records) — 0.62 m the badge would otherwise report as clear air behind
+      // a student who is reversing.
+      //
+      // OBSERVED, AND STATED BECAUSE IT IS NOT FULLY EXPLAINED (2026-08-20).
+      // Instrumented and loaded live against a local server, the effect below
+      // fires on mount with the right bodies on every lesson tried; THIS
+      // callback did not fire within ~3 minutes on `/dev/ghost-demo` for either
+      // `sc-park-van` or `sc-park-bay-exit-rev`, though the fleet GLBs and the
+      // DRACO decoder all answered 200. It clearly DOES fire in a real lesson —
+      // the same drive that produced no log rendered the parked bodies and
+      // graded a named vehicle contact against their colliders — so this reads
+      // as a dev-route/Suspense timing artifact rather than a broken seam. It
+      // is written down because the OTHER consumer of these footprints,
+      // `hittableObstacleBodies`, REFUSES without them, so anywhere they truly
+      // never arrive every obstacle contact is anonymous. Nothing here depends
+      // on the answer: the effect below already published a correct set.
+      traffic.setRearStaticBodies(rearStaticBodiesFrom(built.scenarioObstacles, footprints));
     },
-    [],
+    [traffic, built.scenarioObstacles],
   );
+
+  // …and the same bodies published ONCE UP FRONT, from the spec alone.
+  //
+  // The callback above cannot be the only publisher: `ScenarioObstacles` is
+  // Suspense-mounted and reports only after its GLBs resolve, and it is not
+  // mounted at all when the list is empty — so between them the traffic system
+  // would keep the district-derived default for the first seconds of every
+  // scenario lesson, and keep it FOREVER on a lesson that mounts nothing. That
+  // second case is the one that matters: `buildLessonWorldCore` builds
+  // obstacles only for a scenario lesson id, so a hand-authored lesson on one
+  // of the sixteen bay-carrying districts shows PAINTED bays with no cars in
+  // them, and the district default would warn about bodies that are not there.
+  // An empty publish is the honest answer for that lesson, and it must happen
+  // before the badge's first 200 ms poll.
+  useEffect(() => {
+    traffic.setRearStaticBodies(
+      rearStaticBodiesFrom(built.scenarioObstacles, obstacleFootprintsRef.current),
+    );
+  }, [traffic, built.scenarioObstacles]);
 
   // A real impact (VehicleRig gates by relative speed) → queue a collision for
   // the rule engine, which grades it опасна and terminates the session. A11:

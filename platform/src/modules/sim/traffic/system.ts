@@ -313,12 +313,18 @@ class TrafficSystemImpl implements TrafficSystem {
   /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0). */
   private readonly cyclistStateIds = new Set<number>();
   /**
-   * O59: the district's OCCUPIED PARKING BAYS as body boxes — the static half
-   * of "what is behind me". Frozen at construction (bay occupancy is authored
-   * map data, nothing moves it) and read only by `rearGapMeters`, which is a
-   * HUD channel; no rule-engine query touches this array.
+   * O59/O62: the STATIC half of "what is behind me", as body boxes. Read only
+   * by `rearGapMeters`, which is a HUD channel; no rule-engine query touches
+   * this array.
+   *
+   * Seeded from the district's OCCUPIED PARKING BAYS (bay occupancy is
+   * authored map data, nothing moves it) so any consumer that never wires a
+   * scene — the clip-capture rig, the trace recorder — still gets O59's
+   * answer. A scene that KNOWS what it mounted replaces the whole array
+   * through `setRearStaticBodies`; see that method for why replace and not
+   * append.
    */
-  private readonly staticBodies: readonly Obb2D[];
+  private staticBodies: readonly Obb2D[];
 
   constructor(district: TrafficDistrict, cfg: TrafficConfig) {
     const rng = mulberry32(cfg.seed);
@@ -649,6 +655,26 @@ class TrafficSystemImpl implements TrafficSystem {
     const moving = rearGapFor(this.vehicles, px, py, headingDeg);
     const parked = rearStaticGapFor(this.staticBodies, px, py, headingDeg);
     return moving < parked ? moving : parked;
+  }
+
+  /**
+   * O62: hand the rear channel the bodies the SCENE actually mounted.
+   *
+   * REPLACES rather than appends, and that is the load-bearing half. The
+   * scene's list is a strict superset built from the same recipe the colliders
+   * come from (`scene/lessonWorldRecipe.buildLessonWorldCore`: the occupied
+   * bays PLUS `heldSceneryFor`), so appending would sweep every bay twice —
+   * once boxed from the district by `occupiedBayBodies` and once boxed from
+   * the rig the renderer measured — and „one body, two arrays, two answers" is
+   * the exact defect `collision/bodies.ts` records twice already. It also
+   * closes a hazard the district source cannot: `buildLessonWorldCore` mounts
+   * obstacles only for a SCENARIO lesson id, so a hand-authored lesson on one
+   * of the sixteen bay-carrying districts sees PAINTED bays with no cars in
+   * them — the district set would have warned about bodies that are not there,
+   * and an empty replacement is the honest answer for that lesson.
+   */
+  setRearStaticBodies(bodies: readonly Obb2D[]): void {
+    this.staticBodies = bodies;
   }
 
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean {
@@ -1132,17 +1158,17 @@ export const REAR_STATIC_REACH_M = 20;
  * Checked the same day: none of the sixteen district ids appears anywhere under
  * `modules/sim/lessons/` outside the scenario templates.
  *
- * STATED LIMIT, because it is the one number here that is an approximation.
- * `ScenarioObstacles` sizes each occupant's rapier cuboid from the GLB rig it
- * actually loads, and that measurement only exists in the browser after the
- * model resolves. `actorObb` sizes it from the fleet profile table — the same
- * table `collision/bodies.ts` grades every actor with — so a parked hatchback
- * is boxed a few centimetres long and a parked panel van a few centimetres
- * short. LessonScene already receives the exact extents (`ScenarioObstacles`
- * publishes `ObstacleColliderFootprint[]` upward for contact naming); handing
- * that array down to the traffic system would close the gap and would also
- * cover HELD SCENERY, which the district does not carry at all. That is one
- * wiring line in a file this lane does not own — routed, not smuggled.
+ * STATED LIMIT, AND IT IS NOW THE FALLBACK RATHER THAN THE ANSWER (O62,
+ * 2026-08-20). `ScenarioObstacles` sizes each occupant's rapier cuboid from the
+ * GLB rig it actually loads, and that measurement only exists in the browser
+ * after the model resolves. `actorObb` sizes it from the fleet profile table —
+ * the same table `collision/bodies.ts` grades every actor with — so a parked
+ * hatchback is boxed a few centimetres long and a parked panel van a good half
+ * metre short. `LessonScene.rearStaticBodiesFrom` now hands the real extents
+ * down through `setRearStaticBodies` as soon as the rigs report them, and the
+ * same wiring covers HELD SCENERY, which the district does not carry at all.
+ * What is left here is the pre-scene default: the honest answer for a consumer
+ * that never mounts a scene, and the first 200 ms of one that does.
  */
 export function occupiedBayBodies(district: TrafficDistrict): Obb2D[] {
   const bays = (

@@ -11,6 +11,7 @@
  * presentation layer maps (x, y) -> three.js (x, -z), y-up.
  */
 
+import type { Obb2D } from "../collision";
 import { PERCEPTUAL_ROAD_SCALE, type SignalPhase } from "../contracts";
 
 // ---------------------------------------------------------------------------
@@ -668,6 +669,16 @@ export interface TrafficSystem {
    * pose in district space; headingDeg 0 = north, clockwise.
    */
   rearGapMeters(px: number, py: number, headingDeg: number): number;
+  /**
+   * O62: hand `rearGapMeters` the STATIC bodies the scene actually mounted, as
+   * oriented boxes in district space — the held scenery and hittable obstacles
+   * `scene/lessonWorldRecipe` built and `components/sim/ScenarioObstacles`
+   * gave colliders to. REPLACES the district-derived default (the occupied
+   * parking bays) rather than adding to it; the reasoning is at the
+   * implementation. HUD-only, like `rearGapMeters` itself: no rule-engine
+   * detector reads these bodies and setting them changes no grading.
+   */
+  setRearStaticBodies(bodies: readonly Obb2D[]): void;
   /**
    * True when a moving vehicle is within `radiusM` of (x,y) on a CONFLICTING
    * path relative to `approachBearingDeg` (your approach direction at the

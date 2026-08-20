@@ -468,3 +468,83 @@ describe("a reversing student who is NOT close to anything is not warned", () =>
     expect(poll(asObstacle, REVERSING, null), "the SAME body as an obstacle").toBeNull();
   });
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// 4 · O61 · THE SEVERITY REACHES THE GLASS
+//
+// The three blocks above prove WHETHER the badge speaks. O61 is about what it
+// says, and that half had nothing at the surface: the level is a string in a
+// snapshot until `LEVEL_COLOR` turns it into a border and a text colour, and
+// nothing asserted that a „danger" cue paints differently from a „warn" one.
+// A fix that made `stepRearCue` return "danger" while the badge kept painting
+// `var(--warning)` would have been green everywhere — and it would have shipped
+// a student the same colour at 0.12 m as at 6 m, which IS the finding.
+// ───────────────────────────────────────────────────────────────────────────
+
+describe("O61 · the level a student is shown is the level that was computed", () => {
+  it("each level paints its own colour, and danger is the alarm colour", () => {
+    const info = badgeMarkup({ level: "info", meters: 11 });
+    const warn = badgeMarkup({ level: "warn", meters: 6 });
+    const danger = badgeMarkup({ level: "danger", meters: 0 });
+    // ANCHORED ON THE BORDER, not on the raw markup, and the difference is a
+    // measurement rather than a nicety: the icon's two TAILLIGHTS are
+    // `var(--danger)` at every non-neutral level, so a bare `toContain` is
+    // already true of an amber badge and would have passed the mutation below.
+    // Caught by running it.
+    //
+    // MUTATION: point LEVEL_COLOR.danger at var(--warning) — the exact shape of
+    // „the fix computed a level nothing painted" — and these two go red.
+    expect(danger).toContain("border-color:var(--danger)");
+    expect(warn).toContain("border-color:var(--warning)");
+    expect(warn).not.toContain("border-color:var(--danger)");
+    // …and the three are not the same string, which is the claim that matters
+    // to an eye: three levels, three surfaces.
+    expect(new Set([info, warn, danger]).size).toBe(3);
+    // The neutral band deliberately keeps the ordinary foreground for its TEXT
+    // (a grey chip is not an alarm), so it must not carry the alarm colour on
+    // its border either.
+    expect(info).toContain("border-color:var(--border-strong)");
+    expect(info).not.toContain("var(--danger)"); // neutral: not even the lamps
+  });
+
+  it("the taillights light up only once the badge is not neutral", () => {
+    // The icon's two lamps are the non-textual half of the severity, and they
+    // are what reads at a glance on a phone held at arm's length.
+    expect(badgeMarkup({ level: "info", meters: 11 })).not.toContain('fill="var(--danger)"');
+    expect(badgeMarkup({ level: "warn", meters: 6 })).toContain('fill="var(--danger)"');
+    expect(badgeMarkup({ level: "danger", meters: 0 })).toContain('fill="var(--danger)"');
+  });
+
+  it("END TO END: 0.12 m behind at parking speed reaches the glass as RED", () => {
+    // The measured pose of `sc-park-narrow/shadow-correct`'s closest approach,
+    // driven through the SAME seam the component polls — source → stepRearCue →
+    // markup. This is the row O61 was filed for, and before the fix the markup
+    // produced here carried `var(--warning)`.
+    const source: RearGapSource = {
+      // 0.1157 m of bumper gap: the body centre 4.2157 m back, less the 4.1 m
+      // `bumperSubtrahendM` eats.
+      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -4.2157 }], px, py, h),
+    };
+    const pose: RearCuePose = { position: { x: 0, y: 0 }, headingDeg: 0, speedKmh: -3.828 };
+    const cue = poll(source, pose, null);
+    expect(cue).not.toBeNull();
+    expect(cue!.level).toBe("danger");
+    expect(rearCueLabelBg(cue!)).toBe("Кола отзад · 0 м");
+    expect(badgeMarkup(cue!)).toContain("border-color:var(--danger)");
+
+    // BOTH DIRECTIONS AT THE SAME SEAM. The same 0.12 m with the car ROLLING
+    // FORWARD is amber, not red — the gap is not closing, and a badge that is
+    // red whenever it is up is wallpaper.
+    const forward = poll(source, { ...pose, speedKmh: 3.828 }, null);
+    expect(forward!.level).toBe("warn");
+    expect(badgeMarkup(forward!)).not.toContain("border-color:var(--danger)");
+    // …and so is reversing at the same speed with six metres of air.
+    const roomy: RearGapSource = {
+      rearGapMeters: (px, py, h) => rearGapFor([{ x: 0, y: -10.1 }], px, py, h),
+    };
+    const clear = poll(roomy, pose, null);
+    expect(clear!.level).toBe("warn");
+    expect(rearCueLabelBg(clear!)).toBe("Кола отзад · 6 м");
+    expect(badgeMarkup(clear!)).not.toContain("border-color:var(--danger)");
+  });
+});
