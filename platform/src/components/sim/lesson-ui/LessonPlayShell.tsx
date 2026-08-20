@@ -892,6 +892,38 @@ export function snapshotOf(
   };
 }
 
+/**
+ * ── THE POLL'S UPDATER, AND WHY IT IS A VALUE RATHER THAN A CLOSURE ────────
+ *
+ * `snapshotOf`'s fourth argument is the snapshot being replaced, and it is the
+ * only thing that carries the drill's ceiling across a lawful stop (see
+ * `heldTaskCapKmh`). It used to reach that argument through a closure written
+ * at each of the two poll sites — `setSnap((prev) => snapshotOf(…, prev))` —
+ * and a closure written inside a component is a thing no `node`-environment
+ * test can execute.
+ *
+ * MEASURED on 2026-08-20, on the tree as it stood, by an adversarial refuter
+ * and then again here before this function was written: rewrite BOTH sites as
+ * `setSnap(() => snapshotOf(…, null))` and `tsc --noEmit` exits 0 while
+ * `queueTaskEcho` + `taskCapThread` + `overlay-queue-moment` + `notify-column`
+ * stay green — 4 files, 88 tests — with the hold disabled and the blinking
+ * third number back on every give-way stop. Nothing was DELETED: the argument
+ * was PINNED to a constant, which satisfies both the type checker and any
+ * substring written over the source.
+ *
+ * So the updater is built HERE and handed to `setSnap` whole. There is no
+ * `(prev) =>` left at either site to neutralise, the thread is a pure function
+ * `__tests__/taskCapThread.test.ts` drives directly, and what the component
+ * passes is checked by that file's AST guard rather than by a `toContain`.
+ */
+export function hudPollUpdate(
+  s: LessonSessionState,
+  lastTick: SimTick | null,
+  driveline: DrivelineSnapshot | null,
+): (prev: HudSnapshot) => HudSnapshot {
+  return (prev) => snapshotOf(s, lastTick, driveline, prev);
+}
+
 const DEFAULT_QUIZ_FREQUENCY: QuizFrequency = "occasional";
 
 function isQuizFrequency(v: unknown): v is QuizFrequency {
@@ -1577,21 +1609,40 @@ export function advisorTaskFold(gate: AdvisorTaskGate): {
  * `__tests__/queueTaskEcho.test.ts` („the detail is a remainder of the line it
  * is printed under").
  */
+/**
+ * THE BINDING HALF — every field of it derived by `lessonQueueBinding` below,
+ * and NONE of it written at the call site.
+ *
+ * It was one interface with the freshness flags mixed in, and the render built
+ * the whole thing field by field. That is the shape the 2026-08-20 refuter went
+ * through: `fold: advisorFold` → `fold: { advisorSpeaks: true, … }` restores O54
+ * verbatim, type-checks, and matches every substring written over the source.
+ * The two halves are separated so the derived half can arrive as ONE value the
+ * component does not get to re-type.
+ */
 export interface AdvisorTaskRowsInput {
   /** The answer from `advisorTaskFold` — not re-derived here. */
   fold: { advisorSpeaks: boolean; taskDetailBg: string | null };
-  /** `useFreshKey(advisorKey)` — false whenever the advisor may not speak. */
-  advisorFresh: boolean;
   advisorPrompt: AdvisorPrompt | null;
-  praiseFresh: boolean;
-  flash: ObjectiveFlash | null;
-  taskFresh: boolean;
   /** `useFreshKey`'s key, reused as the item id so a change re-announces. */
   taskKey: string | null;
   taskLineBg: string | null;
   objectiveIndex: number;
   objectiveTotal: number;
   mistakeMode: boolean;
+}
+
+/**
+ * THE HOOK HALF — the four values that only exist once React has run, and the
+ * only thing the render still hands over itself. Each is a TTL/animation fact
+ * (`useFreshKey`, the praise flash), never a decision about who may coach.
+ */
+export interface AdvisorTaskFreshness {
+  /** `useFreshKey(advisorKey)` — false whenever the advisor may not speak. */
+  advisorFresh: boolean;
+  praiseFresh: boolean;
+  taskFresh: boolean;
+  flash: ObjectiveFlash | null;
 }
 
 /**
@@ -1625,6 +1676,7 @@ export function taskAnnounceKey(input: {
 
 export function advisorTaskRows(
   input: AdvisorTaskRowsInput,
+  fresh: AdvisorTaskFreshness,
 ): [SimOverlayItem | null, SimOverlayItem | null] {
   const { advisorPrompt } = input;
   // 6. „Съветник" — the next expected action, when it changes.
@@ -1634,7 +1686,7 @@ export function advisorTaskRows(
   //    not built, rather than built and out-ranked or built and hidden — see
   //    `foldAdvisorIntoTask`.
   const advisorRow: SimOverlayItem | null =
-    input.advisorFresh && advisorPrompt !== null && input.fold.advisorSpeaks
+    fresh.advisorFresh && advisorPrompt !== null && input.fold.advisorSpeaks
       ? {
           id: `advisor:${advisorPrompt.textBg}`,
           kind: "advisor",
@@ -1648,14 +1700,14 @@ export function advisorTaskRows(
 
   // 7. The objective, announced and then retired to the micro menu.
   const taskRow: SimOverlayItem | null =
-    input.praiseFresh && input.flash !== null
+    fresh.praiseFresh && fresh.flash !== null
       ? {
-          id: `praise:${input.flash.key}`,
+          id: `praise:${fresh.flash.key}`,
           kind: "praise",
           tone: "good",
-          lineBg: input.flash.titleBg,
+          lineBg: fresh.flash.titleBg,
         }
-      : input.taskFresh && input.taskLineBg !== null
+      : fresh.taskFresh && input.taskLineBg !== null
         ? {
             id: input.taskKey ?? "task",
             kind: "task",
@@ -1674,6 +1726,155 @@ export function advisorTaskRows(
         : null;
 
   return [advisorRow, taskRow];
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * O54/O51 · THE BOUNDARY A SUBSTRING CANNOT GUARD — THE ARGUMENT LIST ITSELF
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE ROUND BEFORE THIS ONE DID THE RECOMMENDED THING and it worked as far as
+ * it went: the decisions moved out of JSX into `advisorTaskFold`,
+ * `advisorTaskRows`, `taskAnnounceKey` and `heldTaskCapKmh`, and twelve
+ * mutations INSIDE those functions now go red — including partial deletions of
+ * the coaching gate one condition at a time.
+ *
+ * IT DID NOT CLOSE THE HOLE, IT MOVED IT ONE LINE UP. The neutralisation went
+ * into the ARGUMENT LIST at the call site, where the only guard was again three
+ * `toContain` substrings. An adversarial refuter measured EIGHT surviving
+ * mutations there; every one was re-measured here, on this tree, before a line
+ * of this function was written — each is `tsc --noEmit` clean AND leaves
+ * `queueTaskEcho` + `taskCapThread` + `overlay-queue-moment` + `notify-column`
+ * green at 4 files / 88 tests:
+ *
+ *   advisorOn,            → advisorOn: true,           the coaching gate, for the
+ *                                                      one condition with a live
+ *                                                      effect today
+ *   examMode,             → examMode: false,
+ *   mistakeMode,          → mistakeMode: false,
+ *   ended,                → ended: false,
+ *   objectiveTitleBg: snap.objectiveTitle,
+ *                         → objectiveTitleBg: null,    nothing to echo ⇒ the
+ *                                                      advisor keeps its row
+ *   taskDetailBg,         → taskDetailBg: null,        coaching changes stop
+ *                                                      re-announcing the card
+ *   fold: advisorFold,    → fold: { advisorSpeaks: true, … }   O54 verbatim
+ *   setSnap((prev) => …)  → setSnap(() => … null)      the held cap, at
+ *                                                      `hudPollUpdate` above
+ *
+ * WHY THE GUARD COULD NOT SEE THEM: you do not DROP the field, you PIN it. A
+ * required field supplied with a constant satisfies the type checker and
+ * satisfies the substring. „Dropping a field is a compile error" was true and
+ * was the wrong sentence.
+ *
+ * SO THE CALL-SITE BINDING IS A FUNCTION TOO. This is the shape that closed the
+ * identical hole for `hud/dashboardStatus.ts` (the write moved out of a
+ * `useFrame` nobody could execute, and `__tests__/dashboard-publication.test.ts`
+ * drives the same function the scene calls). Six of the eight mutations above
+ * now have NO call site to live at: `objectiveTitleBg`, `taskDetailBg`, `fold`,
+ * `taskLineBg`, `taskKey` and the four gate conditions are derived HERE, from
+ * one state object, and `__tests__/queueTaskEcho.test.ts` drives this function
+ * with snapshots taken off real compiled sessions.
+ *
+ * WHAT IS LEFT, STATED HONESTLY, because the last round's failure was a
+ * paragraph that claimed more than it held: what the component hands THIS
+ * function is still a written argument list, and no test running in a `node`
+ * environment can watch a React component execute — there is no DOM in this
+ * suite and `useFreshKey`/`useCompactHud` both resolve in effects, so an SSR
+ * pass never reaches the queue at all. That last hop is held by an AST guard in
+ * `__tests__/queueTaskEcho.test.ts` which parses this file and requires each
+ * property of these two calls to be EXACTLY the identifier it must be — so
+ * `advisorOn: true` and `advisorOn: advisorOn || true` are both rejected, where
+ * a substring accepted both. That guard self-checks by re-applying all eight
+ * mutations above to this file's own text and failing if any is accepted.
+ */
+export interface LessonQueueState {
+  /** The HUD snapshot this frame — `snapshotOf`'s output, nothing re-read. */
+  snap: HudSnapshot;
+  /** «Съветник» вкл./изкл. */
+  advisorOn: boolean;
+  examMode: boolean;
+  /** THEO-3 „направи грешката" sandbox. */
+  mistakeMode: boolean;
+  ended: boolean;
+  /** Phone-shaped viewport — there is no queue at all on a roomy stage. */
+  compact: boolean;
+  /** The micro-menu recall counter: a re-tap re-announces the same line. */
+  taskPing: number;
+  /** `lesson.descriptionBg` — the sandbox's own line, see `taskLineBg` below. */
+  lessonDescriptionBg: string;
+}
+
+export interface LessonQueueBinding {
+  /** The line the task row carries, and the micro-menu's recall row. */
+  taskLineBg: string | null;
+  fold: { advisorSpeaks: boolean; taskDetailBg: string | null };
+  taskKey: string | null;
+  advisorKey: string | null;
+  /** Everything `advisorTaskRows` needs that is not a React freshness fact. */
+  rows: AdvisorTaskRowsInput;
+}
+
+export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
+  // The task line, as the student would say it: what to do, and where in the
+  // route. In the THEO-3 sandbox it is the LESSON'S description and not the
+  // objective's title — which is the whole reason the fold's `mistakeMode`
+  // condition is load-bearing rather than decoration (`advisorTaskFold`): the
+  // detail would otherwise be the remainder of a different sentence from the
+  // one printed above it, and `itemEchoesLine` cannot see that.
+  const taskLineBg = s.mistakeMode ? s.lessonDescriptionBg : s.snap.objectiveTitle;
+
+  // The gate and the fold — one place, and a pure one, so the four conditions
+  // can be driven one at a time. It is NOT the gate the roomy `AdvisorCard` is
+  // mounted behind (that one has nine); the correction and the per-condition
+  // measurement are at `advisorTaskFold`.
+  const fold = advisorTaskFold({
+    advisorPrompt: s.snap.advisorPrompt,
+    objectiveTitleBg: s.snap.objectiveTitle,
+    advisorOn: s.advisorOn,
+    examMode: s.examMode,
+    mistakeMode: s.mistakeMode,
+    ended: s.ended,
+  });
+
+  const taskKey = taskAnnounceKey({
+    compact: s.compact,
+    ended: s.ended,
+    taskLineBg,
+    objectiveIndex: s.snap.objectiveIndex,
+    objectiveTotal: s.snap.objectiveTotal,
+    taskDetailBg: fold.taskDetailBg,
+    taskPing: s.taskPing,
+  });
+
+  // The compact advisor row's own key. It reads the SAME four conditions as the
+  // fold plus `compact` — which is why it is derived here beside it rather than
+  // in the render: two readings of one gate is the defect `advisorTaskFold`'s
+  // header spends a screen refusing, and a state object handed to one function
+  // cannot be pinned for one of them and not the other.
+  const advisorVisible =
+    s.compact &&
+    s.advisorOn &&
+    !s.examMode &&
+    !s.mistakeMode &&
+    !s.ended &&
+    s.snap.advisorPrompt !== null;
+
+  return {
+    taskLineBg,
+    fold,
+    taskKey,
+    advisorKey: advisorVisible ? `advisor:${s.snap.advisorPrompt?.textBg ?? ""}` : null,
+    rows: {
+      fold,
+      advisorPrompt: s.snap.advisorPrompt,
+      taskKey,
+      taskLineBg,
+      objectiveIndex: s.snap.objectiveIndex,
+      objectiveTotal: s.snap.objectiveTotal,
+      mistakeMode: s.mistakeMode,
+    },
+  };
 }
 
 /**
@@ -3126,9 +3327,7 @@ export function LessonPlayShell({
           setFlash({ titleBg: completed.titleBg, key: ++flashKey.current });
         }
       }
-      setSnap((prev) =>
-        snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current, prev),
-      );
+      setSnap(hudPollUpdate(sessionRef.current, lastTickRef.current, drivelineRef.current));
     },
     [push, nowSec, finalize],
   );
@@ -3195,9 +3394,7 @@ export function LessonPlayShell({
   // -- HUD poll ------------------------------------------------------------------
   useEffect(() => {
     const id = window.setInterval(() => {
-      setSnap((prev) =>
-        snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current, prev),
-      );
+      setSnap(hudPollUpdate(sessionRef.current, lastTickRef.current, drivelineRef.current));
     }, HUD_POLL_MS);
     return () => window.clearInterval(id);
   }, []);
@@ -3398,10 +3595,6 @@ export function LessonPlayShell({
   // at once.
   // ===========================================================================
 
-  // The task line, as the student would say it: what to do, and where in the
-  // route. `taskPing` is the micro-menu recall.
-  const taskLineBg = mistakeMode ? lesson.descriptionBg : snap.objectiveTitle;
-
   /**
    * ── O54 · TWO PRODUCERS, ONE INSTRUCTION — THE PHONE HALF ─────────────────
    *
@@ -3444,34 +3637,23 @@ export function LessonPlayShell({
    * survived the title being stripped off. `__tests__/queueTaskEcho.test.ts`
    * drives it in both directions.
    */
-  // The gate and the fold, in `advisorTaskFold` — one place, and a pure one, so
-  // the four conditions can be driven one at a time. It is NOT the gate the
-  // roomy `AdvisorCard` is mounted behind (that one has nine); the correction
-  // and the per-condition measurement are at `advisorTaskFold`.
-  const advisorFold = advisorTaskFold({
-    advisorPrompt: snap.advisorPrompt,
-    objectiveTitleBg: snap.objectiveTitle,
+  // THE WHOLE DECISION, INCLUDING THE ARGUMENT LISTS THAT FEED IT, is
+  // `lessonQueueBinding` — see its header for the eight mutations that lived in
+  // those argument lists and for what a `node`-environment suite can and cannot
+  // hold. Nothing below re-derives any of it: the render spends the binding.
+  const queue = lessonQueueBinding({
+    snap,
     advisorOn,
     examMode,
     mistakeMode,
     ended,
-  });
-  const taskDetailBg = advisorFold.taskDetailBg;
-  const taskKey = taskAnnounceKey({
     compact,
-    ended,
-    taskLineBg,
-    objectiveIndex: snap.objectiveIndex,
-    objectiveTotal: snap.objectiveTotal,
-    taskDetailBg,
     taskPing,
+    lessonDescriptionBg: lesson.descriptionBg,
   });
-  const taskFresh = useFreshKey(taskKey, TASK_ANNOUNCE_MS);
-
-  const advisorVisible =
-    compact && advisorOn && !examMode && !mistakeMode && !ended && snap.advisorPrompt !== null;
-  const advisorKey = advisorVisible ? `advisor:${snap.advisorPrompt?.textBg ?? ""}` : null;
-  const advisorFresh = useFreshKey(advisorKey, ADVISOR_ANNOUNCE_MS);
+  const taskLineBg = queue.taskLineBg;
+  const taskFresh = useFreshKey(queue.taskKey, TASK_ANNOUNCE_MS);
+  const advisorFresh = useFreshKey(queue.advisorKey, ADVISOR_ANNOUNCE_MS);
 
   const praiseKey = compact && flash !== null && !ended ? `praise:${flash.key}` : null;
   const praiseFresh = useFreshKey(praiseKey, PRAISE_ANNOUNCE_MS);
@@ -3866,19 +4048,7 @@ export function LessonPlayShell({
         // boolean is left here on purpose: the ternary that used to stand in
         // this slot could be neutralised with `|| true` and every suite stayed
         // green (measured; see the function's header).
-        ...advisorTaskRows({
-          fold: advisorFold,
-          advisorFresh,
-          advisorPrompt: snap.advisorPrompt,
-          praiseFresh,
-          flash,
-          taskFresh,
-          taskKey,
-          taskLineBg,
-          objectiveIndex: snap.objectiveIndex,
-          objectiveTotal: snap.objectiveTotal,
-          mistakeMode,
-        }),
+        ...advisorTaskRows(queue.rows, { advisorFresh, praiseFresh, taskFresh, flash }),
 
         // 8. Which coloured line is which, and what the arrow and the beam of
         //    light are — said once, on the first quiet frame (see `legendKey`).

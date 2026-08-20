@@ -19,6 +19,21 @@
  * loop adds no allocation and `trafficSubStepPlan` is pure.
  */
 
+import {
+  actorObb,
+  obbSeparationM,
+  playerObb,
+  // NOT this file's `PLAYER_HALF_LENGTH_M`, and the two are three centimetres
+  // apart on purpose. `./types` publishes 2.05 — half the 4.1 m FLEET car, the
+  // length every point-based gap query subtracts. `../collision` publishes
+  // `CHASSIS_HALF_EXTENTS.z` = 2.02, the rapier collider the student's car
+  // actually contacts the world with. The static rear sweep below measures
+  // body-to-body air, so it must use the body rapier moves; anything that
+  // subtracts a nominal fleet length keeps the other one.
+  PLAYER_HALF_LENGTH_M as PLAYER_CHASSIS_HALF_LENGTH_M,
+  PLAYER_HALF_WIDTH_M as PLAYER_CHASSIS_HALF_WIDTH_M,
+  type Obb2D,
+} from "../collision";
 import { LANE_WIDTH_M } from "../world/builders/constants";
 import { buildLaneGraph, type LaneGraph } from "./graph";
 import {
@@ -297,9 +312,17 @@ class TrafficSystemImpl implements TrafficSystem {
   private readonly stagedEnv: StagedEnv;
   /** A11: state ids of staged cyclist proxies (extraRightOffsetM > 0). */
   private readonly cyclistStateIds = new Set<number>();
+  /**
+   * O59: the district's OCCUPIED PARKING BAYS as body boxes — the static half
+   * of "what is behind me". Frozen at construction (bay occupancy is authored
+   * map data, nothing moves it) and read only by `rearGapMeters`, which is a
+   * HUD channel; no rule-engine query touches this array.
+   */
+  private readonly staticBodies: readonly Obb2D[];
 
   constructor(district: TrafficDistrict, cfg: TrafficConfig) {
     const rng = mulberry32(cfg.seed);
+    this.staticBodies = occupiedBayBodies(district);
     this.graph = buildLaneGraph(district, {
       laneWidthM: cfg.laneWidthM,
       excludedRoadClasses: cfg.excludedRoadClasses,
@@ -616,8 +639,16 @@ class TrafficSystemImpl implements TrafficSystem {
     return leadGapFor(this.vehicles, px, py, headingDeg);
   }
 
+  /**
+   * O59: ONE answer over BOTH kinds of body behind the player — the moving
+   * agents in `this.vehicles` (unchanged, `rearGapFor` is byte-identical) and
+   * the district's parked bay occupants. Which array a body was put in is not
+   * a fact about the student's mirror.
+   */
   rearGapMeters(px: number, py: number, headingDeg: number): number {
-    return rearGapFor(this.vehicles, px, py, headingDeg);
+    const moving = rearGapFor(this.vehicles, px, py, headingDeg);
+    const parked = rearStaticGapFor(this.staticBodies, px, py, headingDeg);
+    return moving < parked ? moving : parked;
   }
 
   conflictNear(x: number, y: number, radiusM: number, approachBearingDeg: number): boolean {
@@ -1019,6 +1050,192 @@ export function rearGapFor(
     if (lat > LEAD_CORRIDOR_M) continue; // not in my lane/path
     const gap = -fwd - bumperSubtrahendM(v.profile);
     if (gap < best) best = gap;
+  }
+  return best === Infinity ? Infinity : Math.max(0, best);
+}
+
+// ---------------------------------------------------------------------------
+// O59 — THE STATIC HALF OF "WHAT IS BEHIND ME"
+//
+// `rearGapFor` above sweeps `this.vehicles`, which holds exactly two kinds of
+// body: ambient agents seeded on the road graph, and `stage()`d actors. A
+// PARKED BAY OCCUPANT is neither. It is authored in the district
+// (`meta.scenario.bays[].occupied`), turned into a hittable
+// `ScenarioObstacleSpec` by `scene/lessonWorldRecipe.buildLessonWorldCore`, and
+// mounted by `components/sim/ScenarioObstacles` with its own cuboid collider.
+// It is a body the student can hit; it was not a body the rear cue could see.
+//
+// MEASURED BEFORE ANY OF THIS WAS WRITTEN, by replaying the SHIPPED traces of
+// the parking family through the pre-fix `rearGapMeters` (every recorded drive
+// under content/traces/sc-park-*, 51 traces, 36,367 samples across 11 lot
+// districts): FINITE READS = 0. Not "rarely", not "only on the hard rung" —
+// the entire parking family reversed with the rear channel reporting Infinity
+// from the first frame to the last, and `stepRearCue` maps Infinity to null in
+// every state. The one rear instrument a low-tier phone has was silent for the
+// whole of the only manoeuvre that is performed backwards, while
+// `sc-park-narrow` step 4 tells the student «следи двете съседни коли» — a cue
+// the world would not give him. Silence on the sole rear instrument reads as
+// "clear behind".
+//
+// THIS IS THE SAME SHAPE AS THE TWO DEFECTS `collision/bodies.ts` records: one
+// body, two arrays, two answers. The rule that came out of them is that the
+// physics body and the graded body are ONE FACT, so the sweep below does not
+// invent a second geometry. It builds each occupant with `actorObb` — the very
+// function that sizes the kinematic shell rapier binds — and measures with
+// `obbSeparationM`, the signed separation the contact grader itself reports.
+//
+// WHY IT IS NOT SIMPLY "PASS A SECOND ARRAY TO rearGapFor", which is what the
+// routing note in `hud/RearProximityCue.tsx` proposed and which was tried
+// first. `rearGapFor` is a POINT query with a road-scale corridor
+// (LEAD_CORRIDOR_M 4.0 m, half a perceptually-scaled lane) and one fleet-car
+// bumper subtrahend. A parking bay row is 2.5 m wide. Fed the four occupied
+// bays of lot-narrow-v1 at the pose the correct drive FINISHES on — the student
+// perfectly parked in bay 3, 0.73 m of air to each neighbour — that query
+// returns 0.04 m of "fwd" for both neighbours, inside a 4.0 m corridor, and
+// after the 4.1 m subtrahend clamps to **0**. The badge would have read
+// «Кола отзад · 0 м» at the moment the manoeuvre was done correctly. That is
+// the false-refusal direction, and a cue that fires while you are parked is
+// wallpaper for every case where it is real.
+// ---------------------------------------------------------------------------
+
+/**
+ * How far back the static rear sweep looks, m.
+ *
+ * Derived, not chosen: the ONE consumer of `rearGapMeters` is the PROX badge,
+ * which drops any read past its own `REAR_CUE_EXIT_M` (16 m, the outer band
+ * plus a metre of hysteresis — `hud/rearProximity.ts`). Past that distance a
+ * static body cannot become a displayed number, so reaching further only costs
+ * SAT tests. 20 m keeps four metres of headroom over the badge's own outer
+ * edge; `__tests__/rear-static-gap.test.ts` reads `REAR_CUE_EXIT_M` out of that
+ * file and fails if the pair ever crosses, the same way `substep.test.ts` reads
+ * the physics clamp out of `lesson-ui/sessionClock.ts`.
+ */
+export const REAR_STATIC_REACH_M = 20;
+
+/**
+ * The occupied parking bays a district authors, as BODY BOXES.
+ *
+ * `TrafficDistrict` types only the slice this module consumed before today, so
+ * the read is structural and every field is checked: a bay contributes a body
+ * only when it is flagged `occupied` AND its pose is finite. A malformed entry
+ * is skipped rather than turned into a phantom car behind a student.
+ *
+ * ONE SOURCE, DELIBERATELY. This is the same array
+ * `scene/lessonWorldRecipe.ts` filters (`scenarioBays.filter(b => b.occupied)`)
+ * to build the hittable `ScenarioObstacleSpec` list, so the cue can only ever
+ * warn about a body the scene also mounts. Census over `content/world`
+ * (2026-08-20): 16 districts author bays; the 14 `scenario-lot` maps carry 3–9
+ * occupants each, `pk-double-v1` 27 and `vu-door-v1` 10. That set matters
+ * because `buildLessonWorldCore` mounts the obstacles only for a SCENARIO
+ * lesson id, so a hand-authored lesson on one of these maps would see painted
+ * bays with no cars in them and a cue warning about bodies that are not there.
+ * Checked the same day: none of the sixteen district ids appears anywhere under
+ * `modules/sim/lessons/` outside the scenario templates.
+ *
+ * STATED LIMIT, because it is the one number here that is an approximation.
+ * `ScenarioObstacles` sizes each occupant's rapier cuboid from the GLB rig it
+ * actually loads, and that measurement only exists in the browser after the
+ * model resolves. `actorObb` sizes it from the fleet profile table — the same
+ * table `collision/bodies.ts` grades every actor with — so a parked hatchback
+ * is boxed a few centimetres long and a parked panel van a few centimetres
+ * short. LessonScene already receives the exact extents (`ScenarioObstacles`
+ * publishes `ObstacleColliderFootprint[]` upward for contact naming); handing
+ * that array down to the traffic system would close the gap and would also
+ * cover HELD SCENERY, which the district does not carry at all. That is one
+ * wiring line in a file this lane does not own — routed, not smuggled.
+ */
+export function occupiedBayBodies(district: TrafficDistrict): Obb2D[] {
+  const bays = (
+    district as {
+      meta?: {
+        scenario?: {
+          bays?: readonly { x: number; y: number; headingDeg: number; occupied?: boolean }[];
+        };
+      };
+    }
+  ).meta?.scenario?.bays;
+  if (!Array.isArray(bays)) return [];
+  const out: Obb2D[] = [];
+  for (const bay of bays) {
+    if (bay?.occupied !== true) continue;
+    if (!Number.isFinite(bay.x) || !Number.isFinite(bay.y) || !Number.isFinite(bay.headingDeg)) {
+      continue;
+    }
+    const rad = (bay.headingDeg * Math.PI) / 180;
+    // actorObb takes a travel DIRECTION (it is the staged-actor body builder);
+    // a parked car's "direction" is the heading it is standing on.
+    out.push(actorObb({ x: bay.x, y: bay.y, dirX: Math.sin(rad), dirY: Math.cos(rad) }));
+  }
+  return out;
+}
+
+/**
+ * Gap in metres from the player's own body to the nearest STATIC body behind
+ * it, or Infinity when nothing static is back there.
+ *
+ * The test is a REVERSE CORRIDOR: the box the student's car would sweep if it
+ * kept going straight back — same width as the chassis, starting at its rear
+ * face, `REAR_STATIC_REACH_M` long. A body counts when it INTRUDES into that
+ * corridor (exact rectangle-vs-rectangle SAT, `obbSeparationM <= 0`), and the
+ * number reported is then the signed separation between the two REAL bodies,
+ * clamped at 0 — never the corridor's.
+ *
+ * Both halves of that are load-bearing, and each was measured. They are NOT
+ * equally load-bearing, and the difference is stated because the first draft of
+ * this comment credited the wrong one and the mutation run caught it:
+ *
+ *  · THE CORRIDOR IS EXACTLY CHASSIS-WIDE — no comfort margin — AND THIS IS THE
+ *    HALF THAT KEEPS THE CUE HONEST. Adding a margin is the wallpaper trap and
+ *    it is not hypothetical: at +0.5 m the badge starts firing at 0.44–0.49 m on
+ *    the CORRECT drives of sc-park-night, sc-park-judge, sc-park-zebra and
+ *    sc-park-gap-long, all of them at 8–10 km/h FORWARD, i.e. while driving past
+ *    a legally parked row. At +1.0 m it fires on 248 of 361 poses driving the
+ *    lane of vu-door-v1 and 283 of 361 on pk-double-v1 — a permanent «Кола
+ *    отзад» over two lessons whose subject is something else entirely. At 0 m
+ *    both street rows fire ZERO times, and it is also this band, not the rear
+ *    face below, that keeps the badge silent on the pose sc-park-narrow's
+ *    correct drive finishes on (the 2.5 m neighbours are 0.73 m clear of the
+ *    chassis flanks).
+ *  · THE CORRIDOR STARTS AT THE REAR FACE, and that buys less than it looks
+ *    like it should — MEASURED against the same corridor started at the car's
+ *    CENTRE, over all 51 recorded parking drives: they disagree on 448 of
+ *    36,367 samples, in 10 drives, and every one of those poses is either at the
+ *    far reach edge or one where the two bodies are already INTERPENETRATING.
+ *    So what it actually says is the narrow thing: a body you are already
+ *    inside is not "a gap behind you" — that contact belongs to the collision
+ *    channel — and `REAR_STATIC_REACH_M` means twenty metres of road behind the
+ *    bumper rather than twenty from the middle of the car.
+ *
+ * Cost: two SAT evaluations per body, over ≤27 bodies, at the badge's 5 Hz.
+ * Allocation is two boxes per call (the player's and the corridor's) — the
+ * per-frame zero-allocation rule governs `update()`, and this is not on it.
+ */
+export function rearStaticGapFor(
+  bodies: readonly Obb2D[],
+  px: number,
+  py: number,
+  headingDeg: number,
+): number {
+  if (bodies.length === 0) return Infinity;
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad); // forward x (0° = north = +y)
+  const fy = Math.cos(rad); // forward y
+  const me = playerObb(px, py, headingDeg);
+  // The swept corridor: same heading and half-width as the chassis, its near
+  // face flush with the chassis's rear face, REAR_STATIC_REACH_M long.
+  const backM = PLAYER_CHASSIS_HALF_LENGTH_M + REAR_STATIC_REACH_M / 2;
+  const corridor: Obb2D = {
+    x: px - fx * backM,
+    y: py - fy * backM,
+    headingDeg,
+    halfLengthM: REAR_STATIC_REACH_M / 2,
+    halfWidthM: PLAYER_CHASSIS_HALF_WIDTH_M,
+  };
+  let best = Infinity;
+  for (const body of bodies) {
+    if (obbSeparationM(corridor, body) > 0) continue; // not in the path behind
+    const sep = obbSeparationM(me, body);
+    if (sep < best) best = sep;
   }
   return best === Infinity ? Infinity : Math.max(0, best);
 }

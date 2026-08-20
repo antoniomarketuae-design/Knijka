@@ -20,12 +20,20 @@
  * the first block below is that census, re-measured here rather than quoted, so
  * it fails if the catalogue moves under it.
  *
- * WHY EVERY ASSERTION IS RUN AND NOT GREPPED. The one grep in this file is the
- * two mounts, which is cross-file routing state and the established
- * `touchHintLifetime.ts` discipline (§7 B-R10 blessed exactly this usage for
- * exactly this pair). Everything that could be faked by a literal is driven:
- * the extractor over all 953 capped cards of the shipped catalogue, and the bar
- * itself rendered on both sides of the boundary.
+ * WHY EVERY ASSERTION IS RUN AND NOT GREPPED. Everything that could be faked by
+ * a literal is driven: the extractor over all 953 capped cards of the shipped
+ * catalogue, the snapshot join on a real compiled session, the poll's own
+ * updater, and the bar itself rendered on both sides of the boundary.
+ *
+ * ⚠ CORRECTION, 2026-08-20 (round 13). This paragraph used to end „the one grep
+ * in this file is the two mounts … §7 B-R10 blessed exactly this usage". The
+ * usage was blessed; the INSTRUMENT was a `matchAll` plus a `toContain`, and
+ * that is the shape an adversarial refuter walked through everywhere else in
+ * this lane. A prop is an argument list with angle brackets:
+ * `taskCapKmh={undefined && snap.taskCapKmh}` type-checks, blanks the ceiling on
+ * all 953 capped rungs, and CONTAINS the substring. The two mounts are read as
+ * TREES now (`callSiteShape.ts`), and the mutation above is applied to this
+ * file's own source and required to be rejected rather than described.
  */
 
 import { createElement } from "react";
@@ -42,10 +50,19 @@ import {
 } from "@/modules/sim/lessons";
 import { GovernorCapMark } from "@/modules/sim/hud/StatusDashboard";
 import {
+  advisorTaskFold,
   heldTaskCapKmh,
+  hudPollUpdate,
   snapshotOf,
   taskCapKmhFromPrompt,
 } from "../LessonPlayShell";
+// §5 additions — the mounts and the poll are read as trees, not as text. See
+// `callSiteShape.ts` for what that reader can and cannot see.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { jsxPropsOf } from "./callSiteShape";
+
+const SHELL_SRC = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
 
 /**
  * The template's own pre-grace figure, as `advisor.ts authoredCapOf` reads it.
@@ -130,6 +147,43 @@ function everyUncappedCard(): { titleBg: string; textBg: string }[] {
 }
 
 const prompt = (textBg: string) => ({ textBg, keys: [] as string[] });
+
+/**
+ * A real session, on the rung O51 was filed on, in its driving phase.
+ *
+ * Module scope on purpose: it stood twice, once per describe, and the two
+ * copies had drifted — one asserted the phase and one did not. A helper whose
+ * two copies disagree about what they are guaranteeing is how a block ends up
+ * measuring the wrong sentence and reporting the right one.
+ */
+function zebraSession() {
+  const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
+  expect(spec).toBeDefined();
+  // Scenario rungs author no pre-drive, so `createLessonSession` opens in
+  // `driving` — asserted rather than assumed, because a session parked in
+  // `preDrive` would publish the checklist's prompt and every block below
+  // would be measuring the wrong sentence.
+  const session = createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
+  expect(session.phase).toBe("driving");
+  return session;
+}
+
+/**
+ * The bar, rendered. The thread is worth nothing if `GovernorCapMark` prints
+ * the same markup either way, so it is driven on both sides of the boundary
+ * with a figure taken from a REAL catalogue card.
+ */
+const mark = (taskCapKmh: number | undefined) =>
+  renderToStaticMarkup(
+    createElement(GovernorCapMark, {
+      capKmh: 60,
+      limitKmh: 50,
+      taskCapKmh,
+      speedKmh: 20,
+      tierBg: "Нормален",
+      size: "compact" as const,
+    }),
+  );
 
 describe("the number the bar publishes is the number the student was told", () => {
   const capped = everyCappedCard();
@@ -232,18 +286,6 @@ describe("MEASURED ON THE GLASS — the bar moves because of this thread", () =>
    */
   const zebra = everyCappedCard().find((c) => c.lessonId.startsWith("sc-zebra-approach@L1"));
 
-  const mark = (taskCapKmh: number | undefined) =>
-    renderToStaticMarkup(
-      createElement(GovernorCapMark, {
-        capKmh: 60,
-        limitKmh: 50,
-        taskCapKmh,
-        speedKmh: 20,
-        tierBg: "Нормален",
-        size: "compact" as const,
-      }),
-    );
-
   it("prints the drill's ceiling once the shell publishes it, and not before", () => {
     expect(zebra).toBeDefined();
     const shown = taskCapKmhFromPrompt(prompt(zebra?.textBg ?? ""));
@@ -262,22 +304,46 @@ describe("MEASURED ON THE GLASS — the bar moves because of this thread", () =>
   });
 });
 
+/**
+ * ── BOTH MOUNTS CARRY IT — AND THE READING IS A PARSE, NOT A REGEX ─────────
+ *
+ * §7 B-R10 blessed a source assertion for exactly this pair (cross-file routing
+ * state, two mounts that must not drift). What it blessed was a `matchAll` over
+ * `<StatusDashboard …/>` and a `toContain` for each prop, and that is the shape
+ * the 2026-08-20 refuter walked through everywhere else in this lane: a prop is
+ * an argument list with angle brackets, and `taskCapKmh={undefined && snap.taskCapKmh}`
+ * type-checks, blanks the ceiling on all 953 capped rungs, and CONTAINS the
+ * substring. The regex had a second failure too — `[\s\S]{0,900}?` is a length
+ * guess, so a mount that grew past 900 characters would stop matching and the
+ * `toHaveLength(2)` would fail for a reason having nothing to do with the prop.
+ *
+ * So the mounts are read as trees (`callSiteShape.ts`), prop for prop, and the
+ * mutation is run below rather than described.
+ */
 describe("both mounts carry it — the routing state §7 B-R10 left a tripwire on", () => {
-  it("compact and roomy publish the same snapshot field", async () => {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const shell = fs
-      .readFileSync(
-        path.join(process.cwd(), "src", "components", "sim", "lesson-ui", "LessonPlayShell.tsx"),
-        "utf8",
-      )
-      .replace(/\r\n/g, "\n");
-    const mounts = [...shell.matchAll(/<StatusDashboard[\s\S]{0,900}?\/>/g)].map((m) => m[0]);
-    expect(mounts).toHaveLength(2);
-    for (const mount of mounts) {
-      expect(mount).toContain("limitKmh={snap.limitKmh}");
-      expect(mount).toContain("taskCapKmh={snap.taskCapKmh}");
+  const mounts = () => jsxPropsOf(SHELL_SRC, "StatusDashboard");
+
+  it("compact and roomy publish the same snapshot fields", () => {
+    expect(mounts()).toHaveLength(2);
+    for (const m of mounts()) {
+      expect(m.limitKmh).toBe("snap.limitKmh");
+      expect(m.taskCapKmh).toBe("snap.taskCapKmh");
     }
+  });
+
+  it("MUTATION — a prop that keeps the substring and drops the number is rejected", () => {
+    // The exact neutralisation the old `toContain` accepted, applied to the real
+    // file's own text. `not.toBe(SHELL_SRC)` first, so a mutation that silently
+    // failed to land cannot be reported as one the reader caught.
+    const mutated = SHELL_SRC.replace(
+      "taskCapKmh={snap.taskCapKmh}",
+      "taskCapKmh={undefined && snap.taskCapKmh}",
+    );
+    expect(mutated).not.toBe(SHELL_SRC);
+    expect(mutated).toContain("taskCapKmh={snap.taskCapKmh}");
+    const seen = jsxPropsOf(mutated, "StatusDashboard").map((m) => m.taskCapKmh);
+    expect(seen).toContain("undefined && snap.taskCapKmh");
+    expect(seen).not.toEqual(["snap.taskCapKmh", "snap.taskCapKmh"]);
   });
 });
 
@@ -309,19 +375,6 @@ describe("both mounts carry it — the routing state §7 B-R10 left a tripwire o
  * advisor → snapshot → the number the bar is handed.
  */
 describe("MUTATION — the snapshot actually carries the number", () => {
-  /** A real session, on the rung O51 was filed on, in its driving phase. */
-  function zebraSession() {
-    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
-    expect(spec).toBeDefined();
-    // Scenario rungs author no pre-drive, so `createLessonSession` opens in
-    // `driving` — asserted rather than assumed, because a session parked in
-    // `preDrive` would publish the checklist's prompt and this whole block
-    // would be measuring the wrong sentence.
-    const session = createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
-    expect(session.phase).toBe("driving");
-    return session;
-  }
-
   it("publishes the drill's spoken ceiling on a real driving session", () => {
     const snap = snapshotOf(zebraSession(), null);
     // 40 is the figure on the card in `sc-zebra-approach/mobile-right/04-t087s`.
@@ -374,11 +427,6 @@ describe("MUTATION — the snapshot actually carries the number", () => {
  * ceiling for a drill that no longer asks for it.
  */
 describe("the ceiling belongs to the objective, not to the sentence of the moment", () => {
-  function zebraSession() {
-    const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
-    return createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
-  }
-
   /** The state a full standstill at a give-way produces (finish.ts stepYieldWait). */
   const holdingAt = (reason: "pedestrian" | "giveWayLine") => ({
     ...createYieldWait(),
@@ -401,18 +449,43 @@ describe("the ceiling belongs to the objective, not to the sentence of the momen
     const driving = snapshotOf(zebraSession(), null);
     expect(driving.taskCapKmh).toBe(40);
     const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
-    // The poll that lands while he is stopped is handed the previous snapshot,
-    // exactly as `setSnap((prev) => snapshotOf(…, prev))` does it.
-    const held = snapshotOf(waiting, null, null, driving);
+    // THE POLL'S OWN UPDATER, not a re-statement of it. `hudPollUpdate` is the
+    // exact value the shell hands `setSnap` — see its header for why it is a
+    // value and not a closure, and for the measurement that made it one: the
+    // `prev` used to be a call-site argument, and a call-site argument can be
+    // pinned to `null` without dropping a field, tsc-clean, 4 suites green.
+    const held = hudPollUpdate(waiting, null, null)(driving);
     expect(held.advisorPrompt?.textBg).not.toContain("км/ч");
     expect(held.taskCapKmh).toBe(40);
   });
 
-  it("MUTATION — without the previous snapshot it blinks out, which is the defect", () => {
+  it("MUTATION — an updater that ignores its argument blinks the number out", () => {
     // The negative control, and it is the pre-fix behaviour verbatim: the same
-    // waiting session with nothing to remember publishes nothing.
+    // waiting session with nothing to remember publishes nothing. Written as
+    // the mutated updater rather than as a bare `snapshotOf(…, null)` so it is
+    // the SHAPE the refuter wrote — `setSnap(() => … null)` — that is shown to
+    // produce the defect.
     const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
-    expect(snapshotOf(waiting, null, null, null).taskCapKmh).toBeUndefined();
+    const driving = snapshotOf(zebraSession(), null);
+    const neutralised = () => snapshotOf(waiting, null, null, null);
+    expect(neutralised().taskCapKmh).toBeUndefined();
+    // …and the real updater, handed the same previous snapshot, does not.
+    expect(hudPollUpdate(waiting, null, null)(driving).taskCapKmh).toBe(40);
+  });
+
+  it("the updater is a plain function of its argument — no frame-to-frame state", () => {
+    // A hold implemented with a module-level `let` would pass every assertion
+    // above and leak the ceiling of one student's session into the next mount
+    // of the shell. Same inputs, same answer, in either order.
+    const driving = snapshotOf(zebraSession(), null);
+    const waiting = { ...zebraSession(), yieldWait: holdingAt("pedestrian") };
+    const update = hudPollUpdate(waiting, null, null);
+    expect(update(driving).taskCapKmh).toBe(40);
+    // An intervening poll on a DIFFERENT drill must not change what this one
+    // answers when it is handed the zebra snapshot again.
+    const other = { ...zebraSession(), currentObjectiveIndex: 1 };
+    hudPollUpdate(other, null, null)(driving);
+    expect(update(driving).taskCapKmh).toBe(40);
   });
 
   it("and it is dropped at the objective boundary — never carried into the next drill", () => {
@@ -471,6 +544,44 @@ describe("the bar prints the advisor's own figure, not a reading of its own", ()
       return shown === undefined || !c.textBg.includes(`${shown} км/ч`);
     });
     expect(offenders).toEqual([]);
+  });
+
+  it("DECIDED AND NOW PINNED — «Съветник» off: the card goes silent, the bar does not", () => {
+    // THE RESIDUAL THAT WAS RESTATED IN PROSE AND NEVER ASSERTED. A decision
+    // that lives only in a paragraph is a decision the next tidy-up reverses by
+    // accident — and „add the missing gate" reads like a tidy-up, because the
+    // two surfaces disagreeing looks like a bug until you read why.
+    //
+    // THE REASON, short form (long form at `taskCapKmhFromPrompt` residual 1):
+    // «Съветник»'s own control promises to govern „следващото действие и
+    // клавиша за него" — advice about what to do next. The drill's ceiling is
+    // not advice; it is the figure the student is BILLED against, and O51 was
+    // filed precisely because it sat on the glass with nothing naming it.
+    // Withdrawing it from everyone who turns coaching off would re-file that
+    // finding against the students most likely to be driving unaided, and would
+    // fail one of them for a number no surface ever named — a false refusal,
+    // which this project weighs the same as a false certificate.
+    const s = zebraSession();
+    const snap = snapshotOf(s, null);
+    const gate = {
+      advisorPrompt: snap.advisorPrompt,
+      objectiveTitleBg: snap.objectiveTitle,
+      examMode: false,
+      mistakeMode: false,
+      ended: false,
+    };
+    // THE CARD is gated — one reading, in `advisorTaskFold`, for both surfaces.
+    expect(advisorTaskFold({ ...gate, advisorOn: true }).taskDetailBg).toBe("дръж под 40 км/ч");
+    expect(advisorTaskFold({ ...gate, advisorOn: false }).taskDetailBg).toBeNull();
+    // THE BAR is not, and STRUCTURALLY cannot be: `snapshotOf` is handed the
+    // session and nothing else — there is no `advisorOn` in its signature to
+    // gate on. That is the invariant, stated as what is true.
+    expect(snap.taskCapKmh).toBe(40);
+    expect(mark(snap.taskCapKmh)).toContain("задачата иска ≤40");
+    // …and the half that IS forbidden, re-asserted here because it is the one
+    // the restatement must not have loosened: the bar may never print a figure
+    // no sentence contains.
+    expect(snap.advisorPrompt?.textBg).toContain(`${snap.taskCapKmh} км/ч`);
   });
 
   it("…and the snapshot never invents one when the session says nothing", () => {

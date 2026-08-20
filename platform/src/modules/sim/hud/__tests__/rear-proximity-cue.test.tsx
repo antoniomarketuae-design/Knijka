@@ -444,6 +444,17 @@ describe("a reversing student who is NOT close to anything is not warned", () =>
     // the routed fix lands in traffic/system.ts (the body simply moves into the
     // swept list and the first branch starts applying) instead of turning into
     // a red test about nothing.
+    //
+    // THE FIX LANDED (O59, 2026-08-20) and this test did not have to move,
+    // which is the whole point of writing it at the seam. `rearGapMeters` is
+    // now the nearer of the moving sweep and a static one over the district's
+    // occupied bays (`traffic/system.ts` `occupiedBayBodies` /
+    // `rearStaticGapFor`); the corpus measurement that convicted the source —
+    // 51 recorded parking drives, 36,367 samples, ZERO finite rear reads before
+    // it — and all four directions of the new behaviour are in
+    // `traffic/__tests__/rear-static-gap.test.ts`. What the two `RearGapSource`
+    // stubs below model is still exactly right: this component reports what its
+    // source reports, and the seam is what decides whether a student is warned.
     const NEIGHBOUR = { x: 0, y: -0.8 };
     const asVehicle: RearGapSource = {
       rearGapMeters: (px, py, h) => rearGapFor([NEIGHBOUR], px, py, h),

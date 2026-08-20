@@ -49,14 +49,31 @@ import {
   advisorTaskFold,
   advisorTaskRows,
   foldAdvisorIntoTask,
+  lessonQueueBinding,
+  snapshotOf,
   taskAnnounceKey,
+  type AdvisorTaskFreshness,
   type AdvisorTaskGate,
+  type LessonQueueState,
 } from "../LessonPlayShell";
 // §2 additions — the queue rows are rendered here, not described.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { selectOverlay, SimOverlay, type SimOverlayItem } from "@/modules/sim/hud";
-import { yieldWaitAdvisorPrompt, type AdvisorPrompt } from "@/modules/sim/lessons";
+import {
+  SCENARIO_TEMPLATES,
+  compileScenario,
+  createLessonSession,
+  createYieldWait,
+  yieldWaitAdvisorPrompt,
+  type AdvisorPrompt,
+  type ScenarioLevel,
+} from "@/modules/sim/lessons";
+// §3 additions — the last hop is parsed, not grepped. See `callSiteShape.ts`
+// for what that reader can and cannot see.
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { callSitesOf, pinProperty, replaceArgument } from "./callSiteShape";
 
 /**
  * The two rows, built by the SHELL'S OWN decision function.
@@ -246,26 +263,111 @@ describe("who is allowed to put coaching on the task row", () => {
   });
 });
 
+
 /**
- * ── §2.2 · THE PAIR, AND THEN THE GLASS ────────────────────────────────────
+ * ═══════════════════════════════════════════════════════════════════════════
+ * §3 — THE BOUNDARY THE LAST ROUND MOVED INSTEAD OF CLOSING
+ * (2026-08-20, round 13, opened by an adversarial refuter against §2)
+ * ═══════════════════════════════════════════════════════════════════════════
  *
- * `advisorTaskRows` is what the render spreads into its candidate array, so
- * these are the items `selectOverlay` ranks and `SimOverlay` paints. Both are
- * driven here — the decision AND the card — because the whole finding is about
- * which of two rows the student ends up reading.
+ * §2 above extracted the decisions and drove them, and that part worked: twelve
+ * mutations INSIDE `advisorTaskFold` / `advisorTaskRows` / `taskAnnounceKey`
+ * go red, including partial deletions of the coaching gate one condition at a
+ * time. IT LEFT THE ARGUMENT LIST. A refuter measured eight surviving mutations
+ * one line up, at the call site, where the only guard was three `toContain`
+ * substrings — and every one of the eight was RE-MEASURED on this tree before
+ * anything below was written, because a lane that inherits a wrong premise
+ * fixes nothing while reporting that it did. All eight reproduced exactly:
+ * `tsc --noEmit` clean, and `queueTaskEcho` + `taskCapThread` +
+ * `overlay-queue-moment` + `notify-column` green at 4 files / 88 tests.
+ *
+ *   advisorOn,   →  advisorOn: true,          the coaching gate, for the one
+ *                                             condition a student can operate
+ *   examMode,    →  examMode: false,
+ *   mistakeMode, →  mistakeMode: false,
+ *   ended,       →  ended: false,
+ *   objectiveTitleBg: snap.objectiveTitle,  →  objectiveTitleBg: null,
+ *   taskDetailBg,→  taskDetailBg: null,
+ *   fold: advisorFold,   →  fold: { advisorSpeaks: true, … }   O54 verbatim
+ *   setSnap((prev) => …) →  setSnap(() => … null)   the held cap (sibling file)
+ *
+ * WHY THE GUARD WAS BLIND: you do not DROP the field, you PIN it. A required
+ * field supplied with a constant satisfies `tsc` and satisfies the substring.
+ * §2's own text claimed the opposite („dropping a field is a compile error"),
+ * which was true and was the wrong sentence.
+ *
+ * WHAT CHANGED IN THE PRODUCT, so this is a fix and not a better description:
+ * the call-site BINDING is a function now. `lessonQueueBinding` takes the
+ * shell's state as ONE object and derives `taskLineBg`, the fold, the detail,
+ * the announce key, the advisor key and the whole `advisorTaskRows` input from
+ * it — so `objectiveTitleBg`, `taskDetailBg`, `fold`, `taskLineBg` and
+ * `taskKey` have no call site left to be pinned at, and the four gate
+ * conditions are read in exactly one place.
+ *
+ * EVERY BLOCK BELOW DRIVES `lessonQueueBinding` ITSELF, on snapshots taken off
+ * a REAL compiled session, so the pair asserted is the pair the render builds
+ * rather than a mirror of it. §2.3 used to re-implement the shell's two calls
+ * „argument for argument", which meant it verified the mirror; that helper is
+ * gone and the real function stands in its place.
  */
-const ROWS_BASE = {
+
+/**
+ * The rung O54 and O51 were both filed on, compiled from the shipped
+ * catalogue. Nothing about the sentences below is typed by hand: the title and
+ * the coaching come out of the real advisor, so a catalogue that moves under
+ * this file turns it red rather than leaving it asserting about strings that
+ * stopped existing.
+ */
+function zebraSession() {
+  const spec = SCENARIO_TEMPLATES.find((t) => t.id === "sc-zebra-approach");
+  expect(spec).toBeDefined();
+  const session = createLessonSession(compileScenario(spec!, 1 as ScenarioLevel));
+  // Scenario rungs author no pre-drive, so the session opens in `driving`.
+  // Asserted rather than assumed: a session parked in `preDrive` publishes the
+  // checklist's prompt and every block below would measure the wrong sentence.
+  expect(session.phase).toBe("driving");
+  return session;
+}
+
+/** The state a full standstill at a give-way produces (finish.ts stepYieldWait). */
+const holdingAt = (reason: "pedestrian" | "giveWayLine") => ({
+  ...createYieldWait(),
+  holding: true,
+  sinceSec: 1,
+  reason,
+});
+
+/** The THEO-3 sandbox's own line — `lesson.descriptionBg`, not the title. */
+const MISTAKE_DESCRIPTION = "Виж какво става, ако не отстъпиш на пешеходец";
+
+/** THE SHELL'S OWN STATE, as one object — `lessonQueueBinding`'s only input. */
+function state(over: Partial<LessonQueueState> = {}): LessonQueueState {
+  return {
+    snap: snapshotOf(zebraSession(), null),
+    advisorOn: true,
+    examMode: false,
+    mistakeMode: false,
+    ended: false,
+    compact: true,
+    taskPing: 0,
+    lessonDescriptionBg: MISTAKE_DESCRIPTION,
+    ...over,
+  };
+}
+
+/** The four React facts the render still hands over — TTLs, never permissions. */
+const FRESH: AdvisorTaskFreshness = {
   advisorFresh: true,
-  advisorPrompt: prompt(ZEBRA_PROMPT),
   praiseFresh: false,
-  flash: null,
   taskFresh: true,
-  taskKey: "task:1/2:x",
-  taskLineBg: ZEBRA_TITLE,
-  objectiveIndex: 1,
-  objectiveTotal: 2,
-  mistakeMode: false,
+  flash: null,
 };
+
+/** The render's own two lines: bind, then build the rows from the binding. */
+function shell(over: Partial<LessonQueueState> = {}, fresh: Partial<AdvisorTaskFreshness> = {}) {
+  const binding = lessonQueueBinding(state(over));
+  return { binding, rows: advisorTaskRows(binding.rows, { ...FRESH, ...fresh }) };
+}
 
 /** What the phone actually shows for a candidate pair: the winner and the count. */
 function glass(rows: (SimOverlayItem | null)[]) {
@@ -279,31 +381,46 @@ function glass(rows: (SimOverlayItem | null)[]) {
   };
 }
 
+/**
+ * ── §3.1 · THE REAL BINDING, ON THE REAL RUNG ──────────────────────────────
+ */
 describe("the phone reads the task row, with the counter and the coaching on it", () => {
-  it("MUTATION `|| true` — the advisor row is not built, and the counter survives", () => {
-    const rows = advisorTaskRows({ fold: advisorTaskFold(GATE_OPEN), ...ROWS_BASE });
+  it("the premise, measured: the catalogue really does hand these two one sentence", () => {
+    // Asserted rather than assumed. If the advisor stopped appending the cap to
+    // the objective's own title there would be no echo to resolve and every
+    // block below would be passing on a case the product no longer produces.
+    const { snap } = state();
+    expect(snap.objectiveTitle).not.toBeNull();
+    expect(snap.advisorPrompt?.textBg).toBe(`${snap.objectiveTitle} — дръж под 40 км/ч`);
+  });
+
+  it("the advisor row is not built, and the counter survives", () => {
+    const { binding, rows } = shell();
+    const title = state().snap.objectiveTitle!;
     // The row itself: not hidden, not out-ranked — absent.
     expect(rows[0]).toBeNull();
+    expect(binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
     const seen = glass(rows);
     expect(seen.kind).toBe("task");
     // The three things the student loses when the advisor row comes back.
     expect(seen.html).toContain("Задача 1/2");
-    expect(seen.html).toContain(ZEBRA_TITLE);
+    expect(seen.html).toContain(title);
     expect(seen.html).toContain("дръж под 40 км/ч");
   });
 
   it("…and the NEGATIVE CONTROL: the pair O54 was filed on drops the counter silently", () => {
-    // Hand-built, exactly what `|| true` on that condition produces: BOTH rows.
-    // This is the frame the finding describes, and it is here so the assertions
-    // above are known to be capable of failing.
+    // Hand-built, exactly what pinning `fold` to `{ advisorSpeaks: true }`
+    // produces: BOTH rows. This is the frame the finding describes, and it is
+    // here so the assertions above are known to be capable of failing.
+    const title = state().snap.objectiveTitle!;
     const defect = glass([
-      { id: "advisor:x", kind: "advisor", tone: "neutral", lineBg: ZEBRA_PROMPT },
+      { id: "advisor:x", kind: "advisor", tone: "neutral", lineBg: `${title} — дръж под 40 км/ч` },
       {
         id: "task:1/2:x",
         kind: "task",
         tone: "neutral",
         chipBg: "Задача 1/2",
-        lineBg: ZEBRA_TITLE,
+        lineBg: title,
         detailBg: "дръж под 40 км/ч",
       },
     ]);
@@ -315,58 +432,81 @@ describe("the phone reads the task row, with the counter and the coaching on it"
   });
 
   it("the advisor's own sentence DOES get the row, and then it is the one on the glass", () => {
-    const wait = yieldWaitAdvisorPrompt("pedestrian");
-    const rows = advisorTaskRows({
-      fold: advisorTaskFold({ ...GATE_OPEN, advisorPrompt: wait }),
-      ...ROWS_BASE,
-      advisorPrompt: wait,
-    });
+    // A REAL lawful wait, through the real advisor: `advisorPromptForSession`
+    // lets a live yield outrank the objective (B15-VOICE), so this is the
+    // false-refusal direction — closing the gate must not be achieved by
+    // silencing the advisor everywhere.
+    const waiting = snapshotOf({ ...zebraSession(), yieldWait: holdingAt("pedestrian") }, null);
+    expect(waiting.advisorPrompt?.textBg).not.toContain("км/ч");
+    const { binding, rows } = shell({ snap: waiting });
     expect(rows[0]).not.toBeNull();
+    expect(binding.fold.taskDetailBg).toBeNull();
     const seen = glass(rows);
     expect(seen.kind).toBe("advisor");
-    expect(seen.html).toContain(wait.textBg);
+    expect(seen.html).toContain(waiting.advisorPrompt!.textBg);
   });
 
   it("no advisor row survives the gate — even when the prompt is a different sentence", () => {
-    // The §2.1 gate, carried through to the item list: this is the assertion
-    // that fails if somebody re-opens the side door at the ROW builder instead.
-    const wait = yieldWaitAdvisorPrompt("pedestrian");
-    const rows = advisorTaskRows({
-      fold: advisorTaskFold({ ...GATE_OPEN, advisorPrompt: wait, advisorOn: false }),
-      ...ROWS_BASE,
-      advisorPrompt: wait,
-    });
+    // The §2.1 gate, carried through the REAL binding to the item list: this is
+    // the assertion that fails if `advisorOn` stops reaching the fold — which
+    // is the first of the eight, and the one with a live effect today.
+    const waiting = snapshotOf({ ...zebraSession(), yieldWait: holdingAt("pedestrian") }, null);
+    const { rows } = shell({ snap: waiting, advisorOn: false });
     expect(rows[0]).toBeNull();
     expect(rows[1]?.detailBg ?? null).toBeNull();
   });
 
   it("`advisorFresh` still silences the row on its own — the TTL is not bypassed", () => {
-    const wait = yieldWaitAdvisorPrompt("pedestrian");
-    const rows = advisorTaskRows({
-      fold: advisorTaskFold({ ...GATE_OPEN, advisorPrompt: wait }),
-      ...ROWS_BASE,
-      advisorPrompt: wait,
-      advisorFresh: false,
-    });
+    const waiting = snapshotOf({ ...zebraSession(), yieldWait: holdingAt("pedestrian") }, null);
+    const { rows } = shell({ snap: waiting }, { advisorFresh: false });
     expect(rows[0]).toBeNull();
   });
 
   it("praise takes the slot from the task, and takes the counter with it", () => {
     // Unchanged behaviour, pinned because the extraction moved it: a completed
     // objective's „Браво" owns row 7 while it is fresh.
-    const rows = advisorTaskRows({
-      fold: advisorTaskFold(GATE_OPEN),
-      ...ROWS_BASE,
-      praiseFresh: true,
-      flash: { titleBg: "Готово — пътеката е подмината", key: 3 },
-    });
+    const { rows } = shell(
+      {},
+      { praiseFresh: true, flash: { titleBg: "Готово — пътеката е подмината", key: 3 } },
+    );
     expect(rows[1]?.kind).toBe("praise");
     expect(rows[1]?.chipBg ?? null).toBeNull();
   });
 });
 
 /**
- * ── §2.3 · THE INVARIANT `itemEchoesLine` CANNOT SEE ───────────────────────
+ * ── §3.2 · EACH OF THE FOUR GATE CONDITIONS, THROUGH THE BINDING ───────────
+ *
+ * §2.1 drives `advisorTaskFold` directly, which proves the FUNCTION reads all
+ * four. This block proves the BINDING hands it all four — the difference the
+ * eight mutations lived in. The positive control is first, so „closing X yields
+ * null" cannot pass on a binding that always yields null.
+ */
+describe("the shell's own state reaches the gate, one condition at a time", () => {
+  const CLOSES: [string, Partial<LessonQueueState>][] = [
+    ["«Съветник» is switched off", { advisorOn: false }],
+    ["it is an exam", { examMode: true }],
+    ["it is the mistake sandbox", { mistakeMode: true }],
+    ["the session is over", { ended: true }],
+  ];
+
+  it("open: the coaching rides on the task row", () => {
+    const { binding } = shell();
+    expect(binding.fold.taskDetailBg).toBe("дръж под 40 км/ч");
+    expect(binding.fold.advisorSpeaks).toBe(false);
+  });
+
+  for (const [name, over] of CLOSES) {
+    it(`…and nothing arrives by the side door once ${name}`, () => {
+      const { binding } = shell(over);
+      expect(binding.fold.taskDetailBg).toBeNull();
+      expect(binding.fold.advisorSpeaks).toBe(false);
+    });
+  }
+});
+
+/**
+ * ── §3.3 · THE INVARIANT `itemEchoesLine` CANNOT SEE ───────────────────────
  *
  * `itemEchoesLine` catches „the detail IS the line". It cannot catch „the detail
  * is the remainder of a DIFFERENT line", because both halves are then honest
@@ -374,66 +514,42 @@ describe("the phone reads the task row, with the counter and the coaching on it"
  * place where the two disagree: in the THEO-3 sandbox `taskLineBg` is
  * `lesson.descriptionBg` while the fold trims against `snap.objectiveTitle`.
  *
- * This block mirrors the shell's OWN two calls, argument for argument, so the
- * pair asserted here is the pair the render builds.
+ * THIS BLOCK USED TO MIRROR THE SHELL'S TWO CALLS „argument for argument",
+ * including the `mistakeMode ? lesson.descriptionBg : objectiveTitleBg` line
+ * selection — so it verified THE MIRROR, NOT THE SHELL, and changing the
+ * shell's real argument left it green. That is how the eight survived. The
+ * mirror is deleted; the line selection is inside `lessonQueueBinding` now and
+ * this drives it.
  */
-function shellTaskRow(input: {
-  advisorPrompt: AdvisorPrompt | null;
-  objectiveTitleBg: string | null;
-  lessonDescriptionBg: string;
-  advisorOn?: boolean;
-  mistakeMode?: boolean;
-}) {
-  const mistakeMode = input.mistakeMode === true;
-  const fold = advisorTaskFold({
-    advisorPrompt: input.advisorPrompt,
-    objectiveTitleBg: input.objectiveTitleBg,
-    advisorOn: input.advisorOn ?? true,
-    examMode: false,
-    mistakeMode,
-    ended: false,
-  });
-  return advisorTaskRows({
-    fold,
-    ...ROWS_BASE,
-    advisorPrompt: input.advisorPrompt,
-    mistakeMode,
-    // The shell's own line: `mistakeMode ? lesson.descriptionBg : snap.objectiveTitle`.
-    taskLineBg: mistakeMode ? input.lessonDescriptionBg : input.objectiveTitleBg,
-  })[1];
-}
-
 describe("the detail is a remainder of the line it is printed under", () => {
-  const DESCRIPTION = "Виж какво става, ако не отстъпиш на пешеходец";
-
   it("holds on the ordinary rung", () => {
-    const row = shellTaskRow({
-      advisorPrompt: prompt(ZEBRA_PROMPT),
-      objectiveTitleBg: ZEBRA_TITLE,
-      lessonDescriptionBg: DESCRIPTION,
-    });
-    expect(row?.lineBg).toBe(ZEBRA_TITLE);
-    expect(`${row?.lineBg} — ${row?.detailBg}`).toBe(ZEBRA_PROMPT);
+    const title = state().snap.objectiveTitle!;
+    const { binding, rows } = shell();
+    const row = rows[1];
+    expect(binding.taskLineBg).toBe(title);
+    expect(row?.lineBg).toBe(title);
+    expect(`${row?.lineBg} — ${row?.detailBg}`).toBe(`${title} — дръж под 40 км/ч`);
     expect(itemEchoesLine(row!)).toBe(false);
   });
 
   it("…and in the mistake sandbox, where the two producers name different things", () => {
-    const row = shellTaskRow({
-      advisorPrompt: prompt(ZEBRA_PROMPT),
-      objectiveTitleBg: ZEBRA_TITLE,
-      lessonDescriptionBg: DESCRIPTION,
-      mistakeMode: true,
-    });
+    const { binding, rows } = shell({ mistakeMode: true });
+    const row = rows[1];
     // The line is the lesson's description; the coaching was trimmed against a
     // DIFFERENT sentence, so it must not be printed under this one.
-    expect(row?.lineBg).toBe(DESCRIPTION);
+    expect(binding.taskLineBg).toBe(MISTAKE_DESCRIPTION);
+    expect(row?.lineBg).toBe(MISTAKE_DESCRIPTION);
     expect(row?.detailBg ?? null).toBeNull();
     expect(itemEchoesLine(row!)).toBe(false);
+    // …and the chip changes with it, so the sandbox is never mistaken for a
+    // graded rung. Pinned here because `mistakeMode` reaches the ROW builder by
+    // a second route and pinning either one alone must not go unnoticed.
+    expect(row?.chipBg).toBe("Преживей грешката");
   });
 });
 
 /**
- * ── §2.4 · THE ANNOUNCE KEY, AND THE ONE GREP THIS FILE STILL KEEPS ────────
+ * ── §3.4 · THE ANNOUNCE KEY, DERIVED WHERE THE RENDER DERIVES IT ───────────
  */
 describe("a coaching change re-announces the card that carries it", () => {
   const base = {
@@ -466,63 +582,257 @@ describe("a coaching change re-announces the card that carries it", () => {
     expect(taskAnnounceKey({ ...base, taskLineBg: null })).toBeNull();
     expect(taskAnnounceKey({ ...base, taskLineBg: "" })).toBeNull();
   });
+
+  it("THE BINDING carries the detail INTO the key — the sixth mutation", () => {
+    // `taskDetailBg,` → `taskDetailBg: null,` at the old call site was
+    // TypeScript-clean and left four suites green. The field is derived inside
+    // `lessonQueueBinding` now, and this is the assertion that fails if the
+    // derivation stops feeding it: two states that differ ONLY in the coaching
+    // must produce two different keys.
+    const coached = lessonQueueBinding(state()).taskKey;
+    const silent = lessonQueueBinding(state({ advisorOn: false })).taskKey;
+    expect(coached).not.toBeNull();
+    expect(silent).not.toBeNull();
+    expect(coached).not.toBe(silent);
+    expect(coached).toContain("дръж под 40 км/ч");
+    expect(silent).not.toContain("дръж под 40 км/ч");
+  });
+
+  it("…and the recall counter and the roomy stage still reach it", () => {
+    expect(lessonQueueBinding(state()).taskKey).not.toBe(
+      lessonQueueBinding(state({ taskPing: 1 })).taskKey,
+    );
+    expect(lessonQueueBinding(state({ compact: false })).taskKey).toBeNull();
+    expect(lessonQueueBinding(state({ ended: true })).taskKey).toBeNull();
+  });
+
+  it("the advisor key is the same gate, so the two cannot disagree", () => {
+    // `advisorKey` used to be derived in the render, from the same four
+    // conditions the fold reads — two readings of one gate, which is the defect
+    // `advisorTaskFold`'s header spends a screen refusing. It is one reading now.
+    expect(lessonQueueBinding(state()).advisorKey).not.toBeNull();
+    const closed: Partial<LessonQueueState>[] = [
+      { advisorOn: false },
+      { examMode: true },
+      { mistakeMode: true },
+      { ended: true },
+      { compact: false },
+    ];
+    for (const over of closed) {
+      expect(lessonQueueBinding(state(over)).advisorKey, JSON.stringify(over)).toBeNull();
+    }
+  });
 });
 
-describe("the shell spends these three decisions and re-derives none of them", () => {
-  it("the render spreads the builder — the one thing a run cannot see", async () => {
-    // AN HONEST STATEMENT OF WHAT THIS ASSERTION IS WORTH: a grep catches
-    // DELETION and not NEUTRALISATION, which is the defect that opened §2. It
-    // is kept for the one thing no `node`-environment run can reach — whether
-    // the component still CALLS the functions above — and it is now three
-    // substrings instead of five, because everything else is driven.
-    //
-    // WHAT THIS DOES NOT COVER, AND THE PARAGRAPH THAT USED TO CLAIM IT DID.
-    //
-    // This block once read: "the call sites carry no boolean … there is no
-    // expression left in the JSX to append `|| true` to, and dropping a field
-    // from either object is a `tsc --noEmit` error rather than a silent
-    // `undefined` — both inputs are required-field interfaces."
-    //
-    // Half true, and misleading exactly where it mattered. YOU DO NOT DROP THE
-    // FIELD, YOU PIN IT. A refuter measured eight such mutations, all of them
-    // TypeScript-clean, all matching the three substrings below, and all leaving
-    // the FULL suite byte-identical to baseline — 14,911 tests, same 2 failures:
-    //
-    //   `advisorOn,` → `advisorOn: true,`   restores the coaching gate defect for
-    //       the one condition with a live effect today: a student who turned
-    //       «Съветник» OFF reads «дръж под 40 км/ч» under every task line.
-    //   `fold: advisorFold,` → `fold: { advisorSpeaks: true, … }`   restores O54
-    //       verbatim: the advisor row is rebuilt, out-ranks the task 30 > 20, and
-    //       the «Задача N/M» counter is dropped uncounted.
-    //   `setSnap((prev) => …)` → `setSnap(() => … null)`   disables the held cap
-    //       entirely and the blinking-number defect returns.
-    //
-    // So the extraction below hardened the INTERIOR — every decision is a pure
-    // function and twelve mutations inside them go red — and left the BOUNDARY
-    // exactly as weak as it found it. The neutralisation simply moved one line
-    // up, into the argument list, where the only guard is again a substring.
-    //
-    // A substring catches DELETION and not NEUTRALISATION. That sentence is the
-    // whole finding, and it survived being answered once already. Closing it
-    // needs the test to invoke the REAL call site rather than a helper that
-    // re-implements it — `shellTaskRow` below mirrors the shell's two calls
-    // argument for argument, which means it verifies the mirror, not the shell.
-    // Routed rather than papered over.
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const src = fs
-      .readFileSync(
-        path.join(process.cwd(), "src", "components", "sim", "lesson-ui", "LessonPlayShell.tsx"),
-        "utf8",
-      )
-      .replace(/\r\n/g, "\n")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/^\s*\/\/.*$/gm, "");
-    expect(src).toContain("const advisorFold = advisorTaskFold({");
-    expect(src).toContain("...advisorTaskRows({");
-    expect(src).toContain("const taskKey = taskAnnounceKey({");
-    // …and the old ternary is gone rather than merely shadowed: a copy left in
-    // the candidate array would out-rank the builder's `null` by being built.
-    expect(src).not.toContain("advisorFold.advisorSpeaks\n");
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * §3.5 — THE LAST HOP, PARSED RATHER THAN GREPPED
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * Everything above executes. What no `node`-environment test can execute is the
+ * component itself: there is no DOM in this suite, and `useFreshKey` and
+ * `useCompactHud` both resolve in effects, so even a `react-dom/server` pass
+ * over `LessonPlayShell` yields a ROOMY stage with `taskFresh === false` and
+ * never builds a queue row at all. That is the same residual
+ * `hud/__tests__/dashboard-publication.test.ts` records for the scene's
+ * publication, and it is why the argument list has to be held statically.
+ *
+ * IT IS NOT HELD WITH A SUBSTRING. `callSiteShape.ts` parses the file and
+ * reports, per call, the exact source text of every argument and of every
+ * property initializer, reporting a shorthand property as its own name. The
+ * expectations below are `toEqual` over that map, so a field ADDED, a field
+ * REMOVED and a field PINNED all fail — and `advisorOn: advisorOn || true`
+ * fails too, which is the shape that defeated round 11.
+ *
+ * AND THE READER SELF-CHECKS. §3.6 re-applies the mutations to this file's own
+ * text and requires each to be rejected. A probe that cannot fail on the case it
+ * was written for is a decoration, and four of them have shipped in this
+ * project — every one lying in the reassuring direction.
+ */
+const SHELL_SRC = readFileSync(resolve(__dirname, "../LessonPlayShell.tsx"), "utf8");
+
+/** The shell's state object, field for field. Shorthand ⇒ the name itself. */
+const BINDING_ARG: Record<string, string> = {
+  snap: "snap",
+  advisorOn: "advisorOn",
+  examMode: "examMode",
+  mistakeMode: "mistakeMode",
+  ended: "ended",
+  compact: "compact",
+  taskPing: "taskPing",
+  lessonDescriptionBg: "lesson.descriptionBg",
+};
+
+/** The four React facts, and nothing else may join them. */
+const FRESHNESS_ARG: Record<string, string> = {
+  advisorFresh: "advisorFresh",
+  praiseFresh: "praiseFresh",
+  taskFresh: "taskFresh",
+  flash: "flash",
+};
+
+/** A realistic neutralisation for each field — the constant a refuter would use. */
+const PIN: Record<string, string> = {
+  snap: "{ ...snap, advisorPrompt: null }",
+  advisorOn: "true",
+  examMode: "false",
+  mistakeMode: "false",
+  ended: "false",
+  compact: "true",
+  taskPing: "0",
+  lessonDescriptionBg: '""',
+  advisorFresh: "true",
+  praiseFresh: "false",
+  taskFresh: "true",
+  flash: "null",
+};
+
+const bindingArg = (src: string) =>
+  callSitesOf(src, ["lessonQueueBinding"])[0]?.objectArgs[0] ?? null;
+const rowsCall = (src: string) => callSitesOf(src, ["advisorTaskRows"])[0] ?? null;
+
+describe("the component hands the binding its own live state, and nothing else", () => {
+  it("one call, inside the shell, with exactly the shell's eight state values", () => {
+    const calls = callSitesOf(SHELL_SRC, ["lessonQueueBinding"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].enclosing).toBe("LessonPlayShell");
+    expect(calls[0].args).toHaveLength(1);
+    expect(calls[0].objectArgs[0]).toEqual(BINDING_ARG);
+  });
+
+  it("the rows are built from the binding's own object, plus four React facts", () => {
+    const calls = callSitesOf(SHELL_SRC, ["advisorTaskRows"]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].enclosing).toBe("LessonPlayShell");
+    // `fold: advisorFold` has no property to be pinned at any more: the whole
+    // first argument is the binding's own value.
+    expect(calls[0].args[0]).toBe("queue.rows");
+    expect(calls[0].objectArgs[0]).toBeNull();
+    expect(calls[0].objectArgs[1]).toEqual(FRESHNESS_ARG);
+  });
+
+  it("the gate and the key are read in ONE place, and it is not the component", () => {
+    // `objectiveTitleBg: null` and `taskDetailBg: null` are only writable inside
+    // `lessonQueueBinding` now, which §3.1–§3.4 drive. The component may not call
+    // either function itself, or there would be two readings of one gate again.
+    for (const fn of ["advisorTaskFold", "taskAnnounceKey"]) {
+      const calls = callSitesOf(SHELL_SRC, [fn]);
+      expect(
+        calls.map((c) => c.enclosing),
+        fn,
+      ).toEqual(["lessonQueueBinding"]);
+    }
+  });
+
+  it("the freshness keys are the binding's keys — the TTL cannot be re-derived", () => {
+    const keys = callSitesOf(SHELL_SRC, ["useFreshKey"]).map((c) => c.args.join(", "));
+    expect(keys).toContain("queue.taskKey, TASK_ANNOUNCE_MS");
+    expect(keys).toContain("queue.advisorKey, ADVISOR_ANNOUNCE_MS");
+  });
+
+  it("every `setSnap` either threads the previous snapshot or documents its refusal", () => {
+    // `setSnap((prev) => …)` → `setSnap(() => … null)` disabled the held cap and
+    // the blinking-number defect returned. There is no closure at either poll
+    // site now — `hudPollUpdate` is a value — and the only other call is the
+    // restart, which forgets ON PURPOSE (a run that just ended must not print
+    // its ceiling over the first frames of the next one).
+    const allowed = [
+      "hudPollUpdate(sessionRef.current, lastTickRef.current, drivelineRef.current)",
+      "snapshotOf(sessionRef.current, null, null)",
+    ];
+    const args = callSitesOf(SHELL_SRC, ["setSnap"]).map((c) => c.args.join(", "));
+    expect(args.length).toBeGreaterThan(0);
+    for (const a of args) expect(allowed, a).toContain(a);
+    // Both polls, not one: a fix applied to the interval and not to the tick
+    // handler leaves the number blinking on exactly the frames a student drives.
+    expect(args.filter((a) => a.startsWith("hudPollUpdate("))).toHaveLength(2);
+  });
+});
+
+/**
+ * ── §3.6 · THE READER, RUN AGAINST THE MUTATIONS IT EXISTS FOR ─────────────
+ *
+ * Every one of these is applied to the REAL file's text through the same tree,
+ * and each helper throws when the thing it was asked to mutate is not there —
+ * so a mutation that silently no-ops cannot be reported as „rejected". That is
+ * the failure mode of every „0 defects" instrument this project has built.
+ */
+describe("MUTATION — the reader rejects each pin the substring accepted", () => {
+  for (const field of Object.keys(BINDING_ARG)) {
+    it(`pinning \`${field}\` in the binding's argument list is rejected`, () => {
+      const mutated = pinProperty(SHELL_SRC, "lessonQueueBinding", 0, field, PIN[field]);
+      expect(mutated).not.toBe(SHELL_SRC);
+      expect(bindingArg(mutated)).not.toEqual(BINDING_ARG);
+      // …and it is THIS field that moved, not some neighbour: a reader that
+      // returned `null` for everything would pass the line above.
+      expect(bindingArg(mutated)?.[field]).toBe(PIN[field]);
+    });
+  }
+
+  for (const field of Object.keys(FRESHNESS_ARG)) {
+    it(`pinning \`${field}\` in the freshness argument is rejected`, () => {
+      const mutated = pinProperty(SHELL_SRC, "advisorTaskRows", 1, field, PIN[field]);
+      expect(mutated).not.toBe(SHELL_SRC);
+      expect(rowsCall(mutated)?.objectArgs[1]).not.toEqual(FRESHNESS_ARG);
+    });
+  }
+
+  it("`advisorOn: advisorOn || true` — the shape that defeated a `toContain`", () => {
+    // The round-11 neutralisation, re-aimed at the round-12 boundary. The
+    // substring `advisorOn,` is gone, but `advisorOn` is still there, so any
+    // guard written as „the file mentions advisorOn" accepts this.
+    const mutated = pinProperty(
+      SHELL_SRC,
+      "lessonQueueBinding",
+      0,
+      "advisorOn",
+      "advisorOn || true",
+    );
+    expect(mutated).toContain("advisorOn");
+    expect(bindingArg(mutated)).not.toEqual(BINDING_ARG);
+  });
+
+  it("`fold: { advisorSpeaks: true, … }` — O54 restored through a spread", () => {
+    // The first argument is the binding's own value, so the only way back in is
+    // to spread it and override. The reader reports the spread under a key no
+    // field can have, and the `toBe("queue.rows")` above fails outright.
+    const mutated = replaceArgument(
+      SHELL_SRC,
+      "advisorTaskRows",
+      0,
+      "{ ...queue.rows, fold: { advisorSpeaks: true, taskDetailBg: null } }",
+    );
+    expect(rowsCall(mutated)?.args[0]).not.toBe("queue.rows");
+    expect(rowsCall(mutated)?.objectArgs[0]).not.toBeNull();
+  });
+
+  it("`setSnap(() => … null)` — the held ceiling, disabled at the call site", () => {
+    const mutated = replaceArgument(
+      SHELL_SRC,
+      "setSnap",
+      0,
+      "() => snapshotOf(sessionRef.current, lastTickRef.current, drivelineRef.current, null)",
+    );
+    const args = callSitesOf(mutated, ["setSnap"]).map((c) => c.args.join(", "));
+    expect(args.filter((a) => a.startsWith("hudPollUpdate("))).toHaveLength(1);
+  });
+
+  it("…and deleting the binding call outright is caught too", () => {
+    // The one thing a `count` assertion can still see. Stated so the residual
+    // above is not mistaken for „this guard sees nothing".
+    const deleted = SHELL_SRC.replace("lessonQueueBinding({", "NOT_THE_BINDING({");
+    expect(deleted).not.toBe(SHELL_SRC);
+    expect(callSitesOf(deleted, ["lessonQueueBinding"])).toHaveLength(0);
+  });
+
+  it("SELF-CHECK — the helpers refuse to no-op", () => {
+    // The instrument bug this whole file exists to avoid: a mutation that never
+    // landed, reported as a mutation that was rejected.
+    expect(() => pinProperty(SHELL_SRC, "lessonQueueBinding", 0, "notAField", "true")).toThrow();
+    expect(() => pinProperty(SHELL_SRC, "noSuchCallee", 0, "snap", "true")).toThrow();
+    expect(() => replaceArgument(SHELL_SRC, "advisorTaskRows", 9, "x")).toThrow();
+    // …and the reader really does read THIS file, not an empty string.
+    expect(SHELL_SRC.length).toBeGreaterThan(100_000);
+    expect(bindingArg(SHELL_SRC)).toEqual(BINDING_ARG);
   });
 });

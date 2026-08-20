@@ -91,45 +91,75 @@
  * — the orientation this product drives in — are clear at 108 px today, which
  * is why this is a routed row and not a stop-the-line.
  *
- * ── AND THE HONESTY BOUNDARY THIS BADGE DOES NOT STATE ─────────────────────
+ * ── O59: THE COVERAGE CLAIM WAS FALSE ON A WHOLE FAMILY — CLOSED 2026-08-20 ─
  *
- * „The universal rear-awareness fallback" is a claim about COVERAGE, and it is
- * false on one whole family. `traffic.rearGapMeters` is
- * `rearGapFor(this.vehicles…)`, and `this.vehicles` holds exactly two things
- * (`traffic/system.ts`): ambient agents seeded on the road graph, and
- * `stage()`d actors — which resolve a lane-graph path and return null without
- * one. Parking-bay occupants are neither. They are the district's `occupancy`
- * rect plus `extraObstacles: ObstacleRect2D[]` („bodies the district's own
- * occupancy does not carry (van, wall)", `traces/scParkDepth.ts`), rendered by
- * `ScenarioObstacles` over `computeParkedCars`; and a parking lot carries no
- * road-graph traffic to seed ambient agents from either.
+ * WHAT THIS BLOCK USED TO SAY, and it was true. „The universal rear-awareness
+ * fallback" is a claim about COVERAGE. `traffic.rearGapMeters` was
+ * `rearGapFor(this.vehicles…)`, and `this.vehicles` holds exactly two things:
+ * ambient agents seeded on the road graph, and `stage()`d actors. A parking-bay
+ * occupant is neither — it is authored in the district
+ * (`meta.scenario.bays[].occupied`), turned into a hittable obstacle by
+ * `scene/lessonWorldRecipe.ts` and mounted with its own collider by
+ * `components/sim/ScenarioObstacles` — and a parking lot carries no road-graph
+ * traffic to seed ambient agents from either. So the badge was silent across
+ * the whole parking family while `sc-park-narrow` step 4 told the student
+ * „движи се назад съвсем бавно и следи двете съседни коли": the lesson naming
+ * a cue the world would not give him. The same student, the same metre of air,
+ * one warned and one not, decided purely by which array the body was put in.
  *
- * So across the whole parking family — `sc-park-narrow` reverses into a 2.5 m
- * pocket between two occupied bays, and its own step 4 reads „движи се назад
- * съвсем бавно и следи двете съседни коли" — `rearGapMeters` returns Infinity
- * for the entire manoeuvre, and Infinity means no badge, by the honesty
- * contract two paragraphs up. The only rear instrument a low-tier phone has is
- * silent exactly where reversing IS the lesson, and silence on the sole rear
- * instrument reads as „clear behind". That is a green tick for a skill nothing
- * measured, pointed at a seventeen-year-old who then reverses a real car.
+ * MEASURED BEFORE THE FIX, by replaying every committed drive of the family
+ * through the shipped query — 51 traces under `content/traces/sc-park-*`,
+ * 36,367 samples, 11 lot districts: FINITE READS = 0. Infinity from the first
+ * frame of every drive to the last, and `stepRearCue` maps Infinity to null in
+ * every state, so the sole rear instrument on a low-tier phone was dark for the
+ * whole of the only manoeuvre that is performed backwards.
  *
- * NOT FIXED HERE, AND THE ROUTING IS EXACT rather than a shrug. This component
- * renders what its source reports and has no second channel to consult; that
- * seam is proved in BOTH directions in `__tests__/rear-proximity-cue.test.tsx`
- * — a finite gap raises the badge, Infinity raises nothing from any state — so
- * the defect is provably the source's blindness and not this file's. Two files
- * this lane does not own have to move:
- *   · `modules/sim/traffic/system.ts` — `rearGapMeters` must sweep the static
- *     bodies (`computeParkedCars` / `ObstacleRect2D`) as well as
- *     `this.vehicles`. `rearGapFor` already takes a plain `{x, y, profile}[]`,
- *     so the query needs no new geometry, only a second array.
- *   · `modules/sim/hud/rearProximity.ts` — the red band is gated on
- *     `Math.abs(speedKmh) >= REAR_CUE_MOVING_KMH`, which erases the SIGN. „A
- *     car parked on your bumper at a light is normal city life" is right for a
- *     queue and wrong for one you are reversing INTO: a parking manoeuvre runs
- *     at 2–4 km/h, i.e. under the 5 km/h floor, so the one case that most
- *     needs red can never reach it. Closing on something BEHIND you is the
- *     negative branch, and it is the branch thrown away.
+ * FIXED IN `traffic/system.ts`, NOT HERE, and this component did not change:
+ * `occupiedBayBodies` builds each occupant with `actorObb` (the same function
+ * that sizes the kinematic shell rapier binds) and `rearStaticGapFor` measures
+ * it with `obbSeparationM` (the signed separation the contact grader itself
+ * reports), against the corridor the chassis would sweep going straight back.
+ * `rearGapMeters` is now the NEARER of that and the unchanged moving-vehicle
+ * sweep — one answer over both kinds of body. After it, on the same corpus:
+ *   · sc-park-narrow's CORRECT drive raises the badge at 2.34 m while reversing
+ *     at 3.83 km/h, bottoms at 0.12 m, and goes dark again once the car is
+ *     straight in the bay — no «Кола отзад · 0 м» on a finished manoeuvre;
+ *   · its WRONG drive, the one whose debrief says the rear quarter clipped the
+ *     neighbour, is warned at 3.51 m — 2.65 s and 2.82 m of reversing before
+ *     the bodies actually overlap;
+ *   · driving the lane past the 37 legally parked cars of vu-door-v1 and
+ *     pk-double-v1 raises the badge on 0 of 722 poses. A cue that fires always
+ *     is wallpaper, and that is the same crime pointing the other way.
+ * All four directions are pinned, by mutation, in
+ * `traffic/__tests__/rear-static-gap.test.ts`.
+ *
+ * ── WHAT IS STILL NOT COVERED, stated because silence here reads as „clear" ─
+ *
+ * ONE. THE RED BAND STILL CANNOT REACH A PARKING MANOEUVRE, and this is the
+ * sharper half of what is left. `rearProximity.ts` gates „danger" on
+ * `Math.abs(speedKmh) >= REAR_CUE_MOVING_KMH` (5). „A car parked on your bumper
+ * at a light is normal city life" is right for a queue and wrong for one you
+ * are reversing INTO: a parking manoeuvre runs at 2–4 km/h. MEASURED at
+ * sc-park-narrow's closest approach — 0.12 m of air at −3.83 km/h — the badge
+ * shows AMBER. The `Math.abs` erases the sign, and closing on something behind
+ * you is the branch it throws away. That file is not this lane's; the fix is a
+ * sign-aware band (reversing at any speed toward something inside
+ * REAR_CUE_DANGER_M is red), and it must land with its own both-directions test
+ * so a car merely rolling backwards on a slope does not paint the screen.
+ *
+ * TWO. HELD SCENERY IS STILL INVISIBLE TO THE SOURCE. The district carries bay
+ * occupancy; it does not carry the van of `lot-van-v1` or the wall of
+ * `lot-wall-v1`, which `scene/scenarioSceneryProps.heldSceneryFor(lesson.id,
+ * raw)` adds by lesson id. MEASURED: `sc-park-wall/mistake-into-wall` — the
+ * recorded drive whose entire subject is reversing into that wall — raises the
+ * badge on 0 of 681 samples. `LessonScene` already holds both halves at once
+ * (`built.scenarioObstacles`, and the exact collider extents `ScenarioObstacles`
+ * publishes upward as `ObstacleColliderFootprint[]` for contact naming); handing
+ * that array to the traffic system closes this AND replaces the fleet-profile
+ * box `actorObb` approximates each occupant with. It is one wiring line in a
+ * file this lane does not own. No setter was added here to receive it: an API
+ * with no caller is the „schema that lies" `scene/obstacleSpec.ts` warns about
+ * in its own header, and the receiver and the wiring must land together.
  */
 
 import { useEffect, useState, type RefObject } from "react";

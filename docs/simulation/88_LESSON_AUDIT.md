@@ -5760,7 +5760,62 @@ under. No finding was placed by hand and none was left out.
 
 ---
 
-# THE OPEN LIST — after three repair waves and twelve fix rounds, 2026-08-20
+# THE OPEN LIST — after three repair waves and thirteen fix rounds, 2026-08-20
+
+> **ROUND-13 GATE, 2026-08-20 — O59 is CLOSED: the parking family gets a rear warning, and the fix was
+> checked against this project's own dead-API trap before it was believed.**
+> `[corpus]` All 24 JSONL files parsed, the re-drive supersession applied by the header's rule:
+> **1,712 · 26 · 1,686 · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical) · 512 `UNPOLISHED` ·
+> 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.** Twelfth reader, twelfth identical tally.
+> Baseline `12381dc`, **measured from `git log` rather than taken from the brief — and the brief was
+> stale again in the same place**: it named the fourth gate as red at HEAD, which has not been true
+> since `1625325`, three rounds ago. Three consecutive briefs have now carried a number that was true
+> when it was written and false when it was read.
+>
+> **COVERAGE: 126 opened · 4 never opened · 8 unopenable as filed — every cell identical to rounds 11
+> and 12.** `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. Both lanes were re-work
+> lanes: `LessonPlayShell.tsx` (71 findings) and `RearProximityCue.tsx` (1) were already in the
+> ever-opened set, and **`traffic/system.ts` carries no corpus finding of its own** — the corpus filed
+> its traffic row against the directory `modules/sim/traffic`, one of the eight unopenable entries. So
+> **a round closed a real defect on the whole parking family and moved no coverage cell**, which is
+> what spending routing debt looks like from the ledger's side.
+>
+> **O59 IS CLOSED, AND IT IS WIRED.** The proximity source swept `this.vehicles` alone, so a parked bay
+> occupant — an `ObstacleRect2D` in a different array — was invisible, and the entire parking family
+> gave a reversing student no rear warning while `sc-park-narrow`'s own step 4 told him to watch the
+> two cars he was reversing between. `traffic/system.ts` now builds the static half at construction
+> (`this.staticBodies = occupiedBayBodies(district)`, :325) and `rearGapMeters` returns the nearer of
+> the two (`moving < parked ? moving : parked`, :648–651), so **which array a body was put in is no
+> longer a fact about the student's mirror.** This was verified as a LIVE PATH, not accepted as an
+> export: O24 is the standing lesson that a mapping nothing reads „reads like a fix" and is not one,
+> and the call chain was walked from the district through the constructor to the single consumer.
+>
+> **BUT THE BADGE STILL CANNOT GO RED IN A PARKING MANOEUVRE, AND THE LANE SAID SO — O61 AND O62.** The
+> lane that closed O59 measured two things its own files could not reach and routed both rather than
+> reaching across: `rearProximity.ts` gates „danger" on `Math.abs(speedKmh) >= 5`, and a parking
+> manoeuvre runs at 2–4 km/h, so at `sc-park-narrow`'s closest approach — **0.12 m of air at
+> −3.83 km/h** — the badge shows AMBER (O61); and the district carries bay occupancy but not held
+> scenery, so `sc-park-wall/mistake-into-wall`, the recorded drive whose entire subject is reversing
+> into that wall, **raises the badge on 0 of 681 samples** (O62). The lane explicitly declined to add a
+> receiver for the second: *"an API with no caller is the „schema that lies""* — the O24 trap, refused
+> in the direction that usually gets it shipped.
+>
+> **THE OTHER LANE CLOSED THE BOUNDARY A SUBSTRING COULD NOT GUARD.** Round 11's guard was three
+> `toContain` substrings over the call site, and a refuter had measured **eight surviving mutations**
+> there — every one `tsc`-clean, every one leaving the suite byte-identical — because you do not DROP a
+> field, you PIN it. The lane extracted the binding and holds the argument list with a parser
+> (`callSiteShape.ts`, `toEqual` over the per-argument source map), so **a field added, removed or
+> pinned all fail**, and §3.6 re-applies each mutation to the file's own text and requires rejection —
+> a self-check earned by the four decorative probes this project has already shipped. It also **pinned
+> the residual round 12 left in prose** rather than restating it again: the bar prints the drill's
+> ceiling with «Съветник» off and the card does not, and the invariant is now asserted on both surfaces
+> with the reason (withdrawing a billed figure from unaided students is a false refusal).
+>
+> **ALL FOUR GATES RUN, AND ALL THREE FAILURE CLASSES PREVIOUS ROUNDS PRODUCED ARE ABSENT** — see §0.
+> `tsc` 0, `vitest` 1 **with only the two signature-blocked files failing and both proven to have
+> RUN**, content 0, tools 0. **No cross-lane collision, no real defect caught by a new test, and no
+> lane that shipped a test file it never ran**, each checked per-file rather than inferred. Residue
+> sweep clean: the only untracked files are the two the lanes were meant to produce.
 
 > **ROUND-12 GATE, 2026-08-20 — the round that opened no new file, refuted the row round 11 dropped,
 > and found the real defect underneath it.**
@@ -6015,6 +6070,51 @@ under. No finding was placed by hand and none was left out.
 > and the one most likely to be lost in a summary.
 
 ## 0 · The gate, exactly as it stands
+
+> **ROUND-13 GATE, 2026-08-20 — all four gates run, and the fourth is now the fourth round running
+> green.** `[gated]` At commit `12381dc` **plus the uncommitted round-13 working tree** (2 concurrent
+> fix lanes; nothing was committed), **each command's own exit code read directly from `$?` in the same
+> shell, never piped and never from a background wrapper.** Every run was redirected to a file and `$?`
+> echoed immediately after.
+>
+> | gate | result | exit |
+> |---|---|---|
+> | `npx tsc --noEmit` | **clean — no output at all** | **0** |
+> | `npx vitest run --maxWorkers=2` | **953 files** — 950 passed · **2 failed** · 1 skipped · **14,966 tests** — 14,794 passed · **2 failed** · 170 skipped · 416.1 s | **1** |
+> | `node platform/scripts/validate-content.mjs` | 1,089 questions · 16/16 topics · 17 answer-leak scopes gated, **0 blocking**, 0 warning | **0** |
+> | `node platform/scripts/tools-tests.mjs` — the fourth gate, the one briefs keep omitting | **partition OK: 975 test files, 953 vitest / 22 node:test, none shared, none orphaned**; `vitest.config.ts` still spreads `VITEST_INCLUDE`. Then **390 tests, 390 pass, 0 fail** (25 suites) | **0** |
+>
+> **THE TWO FAILURES ARE THE SANCTIONED PAIR AND BOTH ARE PROVEN TO HAVE RUN.** The brief names the
+> exact trap: a damaged `node_modules` once made these two files ABSENT while 52 files collected
+> nothing, and an alarm keyed on „are those two still red?" answers **yes** to a file that never
+> loaded. So the collection counts were read, not the verdict: `content-bank.test.ts` reports
+> **13 tests | 1 failed** and `compose.test.ts` **15 tests | 1 failed** — both files loaded their full
+> suite and failed one assertion each. `REVIEW_DEBT: ptp-i-parva-pomosht: only 31/64 (48%) approved`
+> and `l-accidents-first-aid` has no quiz beat. **Neither is GREEN, so no content status field was
+> flipped.** 953 files and 14,966 tests collected is the opposite of the damaged-toolchain signature.
+>
+> **THE FILE AND TEST COUNTS MOVED BY EXACTLY WHAT THE LANES SHIPPED.** 952 → 953 vitest files
+> (`traffic/__tests__/rear-static-gap.test.ts`, the new one), 974 → 975 in the partition, and
+> 14,911 → 14,966 tests. `callSiteShape.ts` is correctly **not** counted: it is a parser helper, not a
+> test file. **A new test file that the partition cannot see is the `VITEST_INCLUDE` orphan defect
+> (O14), and the fourth gate is the instrument that would have caught it** — it reports none orphaned.
+>
+> **NO CROSS-LANE COLLISION, NO NEW DEFECT CAUGHT BY A NEW TEST, AND NO LANE THAT SHIPPED A TEST IT
+> NEVER RAN.** All three classes previous rounds produced were checked rather than assumed. There is no
+> failure outside the sanctioned pair to classify, so class (a) is empty by the run itself; for (c),
+> **all four test files the two lanes touched were re-run by name and are green** —
+> `queueTaskEcho.test.ts`, `taskCapThread.test.ts`, `rear-proximity-cue.test.tsx` and the new
+> `rear-static-gap.test.ts` — because „it is in the suite" and „it ran" are the two things this
+> programme has repeatedly found to differ.
+>
+> **RESIDUE SWEEP — CLEAN.** `git status -uall` carries exactly two untracked files, both lane
+> deliverables: `callSiteShape.ts` and `rear-static-gap.test.ts`. **No new `probe`/`scratch`/`zz-`
+> files.** (The `probe` names under `tools/` and `modules/sim/collision/probe.ts` are pre-existing and
+> tracked; `tools/mobile/.out/**` is generated output, not new residue.) **No test file under
+> `platform/src` is missing `expect(`** — swept across every `*.test.ts(x)`/`*.spec.ts(x)`, zero hits.
+> `callSiteShape.ts` has no `expect(` and is **not** a violation: it is a helper imported by two real
+> test files, the same class as the nine other non-`.test` files that live in `__tests__` directories
+> (`fixtures.ts`, `helpers.ts`, `hookHarness.ts`).
 
 > **ROUND-12 GATE, 2026-08-20 — all four gates run, and the fourth one is now the third round running
 > green.** `[gated]` At commit `edfaad6` **plus the uncommitted round-12 working tree** (2 concurrent
@@ -6737,6 +6837,43 @@ separates them:
 
 ## 1 · The coverage arithmetic — 126 of 138 files, and touching is not closing
 
+> **ROUND-13 GATE, 2026-08-20 — the corpus reproduced for the TWELFTH time, and the coverage row again
+> does not move — correctly, because both lanes were re-work lanes.** `[corpus]` All 24 JSONL files
+> parsed, the re-drive supersession applied by the header's rule: **1,712 records · 26 superseded
+> (22 lessons) · 1,686 standing · 161 `SUMMARY` · 1,012 `BROKEN` (318 critical) · 512 `UNPOLISHED` ·
+> 1 `COULD_NOT_TEST` · 138 suspect entries · 161 lessons.** Twelfth reader, twelfth identical tally.
+> **HEAD was read as `12381dc` from `git log`, not taken from the brief.**
+>
+> | row | files | findings | critical |
+> |---|---:|---:|---:|
+> | ever opened | **126** | 971 | 309 |
+> | never opened | **4** | 4 | 2 |
+> | unopenable as filed | **8** | 37 | 7 |
+> | | **138** | **1,012** | **318** |
+>
+> `126 + 4 + 8 = 138` · `971 + 4 + 37 = 1,012` · `309 + 2 + 7 = 318`. **Identical to rounds 11 and 12 on
+> every cell.** The three files this round touched were `LessonPlayShell.tsx` (71 findings, already
+> open), `RearProximityCue.tsx` (1/0c, already open) and `traffic/system.ts` — and **that last one is
+> in the corpus at no per-file entry at all.** The corpus filed its one traffic row against the
+> DIRECTORY `platform/src/modules/sim/traffic`, which `statSync().isFile()` keeps in *unopenable as
+> filed*. So the round closed a defect spanning the whole parking family and bought exactly zero
+> coverage cells, and both statements are true at once.
+>
+> **THE TWO READERS STILL DISAGREE BY ONE, AND THE IN-REPO ONE IS STILL THE ONE THAT IS WRONG.**
+> `tools/audit/never-edited.mjs` prints **2 files · 2 critical** never edited plus a separate
+> `UNOPENABLE AS FILED` line naming `lessons/scenario/events.ts` — it now segregates the nonexistent
+> path correctly (the fix from `dd6bdc1`), but it counts the six directory-shaped entries as EXISTING
+> via prefix-match, where this table counts them unopenable via `statSync().isFile()`. **Both answers
+> are defensible and they answer different questions**; the table above is the published split and the
+> tool is the working instrument. Run both, and do not report the tool's `unopenable` count as this
+> row's — it will read **1** where the ledger says **8**.
+>
+> **THE ROUND-9 JOIN BUG IS STILL GUARDED, NOT AVOIDED.** This reader asserts
+> `components/sim/LessonScene.tsx` is in the touched set and **exits non-zero if it is not**, and it
+> unions `git diff ec1f56f..HEAD` with `git status --porcelain -uall` so this round's uncommitted work
+> counts. **Owned is not opened; committed is not edited; nonexistent is not unopened.** All three
+> traps were honoured rather than rediscovered.
+
 > **ROUND-12 GATE, 2026-08-20 — the corpus reproduced for the ELEVENTH time, and the coverage row does
 > not move, which is the correct answer rather than a stalled one.** `[corpus]` All 24 JSONL files
 > parsed, the re-drive supersession applied by the header's rule: **1,712 records · 26 superseded
@@ -7176,7 +7313,8 @@ This is the entire list. Seven rows against 1,012.
 
 ### 2.2 — Class A · Never opened: 4 files, 4 findings, 2 critical
 
-> **RE-VERIFIED 2026-08-20 (round-12 gate): unchanged at 4 / 4 / 2, and one reader disagrees.**
+> **RE-VERIFIED 2026-08-20 (round-13 gate): unchanged at 4 / 4 / 2 for the third round running, and
+> one reader still disagrees.**
 > `tools/audit/never-edited.mjs` prints **three** never-edited criticals, the third being
 > `platform/src/modules/sim/lessons/scenario/events.ts` — **which does not exist on disk and is not in
 > `git ls-files`.** The corpus routed a finding to a path that was never in the tree. The tool never
@@ -7455,6 +7593,58 @@ of prose arguing it — and does not do what the prose says.
 
 `[read]` Every row below was written into the tree by the lane that failed to close it, and read out
 of the file named today.
+
+**Round 13's rows, O61–O62 — and O59, WHICH IS CLOSED.** `[read]` Same rule as every block below:
+each row was written into the tree by the lane that could not close it, and read out of the file named
+today. **O59 is the row round 12 routed out, and round 13 was aimed at it and hit it** — but closing
+the source defect exposed two more between the source and the pixel, and the lane measured both rather
+than declaring the badge fixed.
+
+| # | finding the lane could not close | reason the lane gave | where |
+|---|---|---|---|
+| O59 | **CLOSED — not refuted, BUILT.** `traffic/system.ts` — on the whole parking family a reversing student got no rear warning at all, because the proximity source swept `this.vehicles` and a parked bay occupant is an `ObstacleRect2D` | **The two arrays are now one answer.** `occupiedBayBodies(district)` builds the static half at construction (`system.ts:325`) and `rearGapMeters` returns the nearer of the two — `moving < parked ? moving : parked` (`:648–651`) — so, in the lane's own frame, *"which array a body was put in is not a fact about the student's mirror."* The corridor is **exactly chassis-wide with no comfort margin**, and the lane states why that is the load-bearing half: *"Adding a margin is the wallpaper trap"* — a cue that fires when nothing is there is the false-refusal direction. Malformed bays are skipped rather than becoming *"a phantom car behind a student"*, and the source is deliberately the same array `lessonWorldRecipe.ts` filters to mount the hittable obstacles, *"so the cue can only ever warn about a body the scene also mounts"* | `traffic/system.ts:325, 648–651, 1147, 1213` · `traffic/__tests__/rear-static-gap.test.ts` |
+| O61 | **(new)** `hud/rearProximity.ts` — **the badge still cannot go RED during a parking manoeuvre**, which is the one manoeuvre O59 was closed for | **REAL, measured, and not in either file this lane owned.** verbatim: *"`rearProximity.ts` gates „danger" on `Math.abs(speedKmh) >= REAR_CUE_MOVING_KMH` (5). „A car parked on your bumper at a light is normal city life" is right for a queue and wrong for one you are reversing INTO: a parking manoeuvre runs at 2–4 km/h. MEASURED at sc-park-narrow's closest approach — **0.12 m of air at −3.83 km/h** — the badge shows AMBER. The `Math.abs` erases the sign, and closing on something behind you is the branch it throws away."* The fix is priced and bounded, including its own false-positive guard: *"a sign-aware band … and it must land with its own both-directions test so a car merely rolling backwards on a slope does not paint the screen."* | `hud/RearProximityCue.tsx:138–148` → `hud/rearProximity.ts` |
+| O62 | **(new)** HELD SCENERY is invisible to the proximity source — the van of `lot-van-v1` and the wall of `lot-wall-v1` are added by lesson id and are in no district | **REAL, and the receiver was DELIBERATELY NOT BUILT.** verbatim: *"`sc-park-wall/mistake-into-wall` — the recorded drive whose entire subject is reversing into that wall — raises the badge on **0 of 681 samples**."* The remedy is known and is one line elsewhere: *"`LessonScene` already holds both halves at once … handing that array to the traffic system closes this AND replaces the fleet-profile box `actorObb` approximates each occupant with. It is one wiring line in a file this lane does not own."* And the reason nothing was stubbed to receive it — **this project's own dead-API trap, refused in the direction that usually ships**: *"No setter was added here to receive it: an API with no caller is the „schema that lies" `scene/obstacleSpec.ts` warns about in its own header, and the receiver and the wiring must land together."* | `hud/RearProximityCue.tsx:150–162` + `traffic/system.ts:122–132` → `components/sim/LessonScene.tsx` |
+
+**O62 WAS FILED TWICE FROM TWO FILES AND THAT IS EVIDENCE, NOT DUPLICATION.** `traffic/system.ts`
+reached the same wiring line from the other end, as a stated approximation rather than a gap: `actorObb`
+sizes each occupant from the fleet-profile table, so *"a parked hatchback is boxed a few centimetres
+long and a parked panel van a few centimetres short"*, and the exact extents already exist upward as
+`ObstacleColliderFootprint[]`. *"That is one wiring line in a file this lane does not own — routed, not
+smuggled."* **Two files, independently, name the same missing line for two different reasons** (held
+scenery, and exact extents); it should be closed once, and it closes both.
+
+**O59 IS THE THIRD ROW IN THIS TABLE TO BE SETTLED, AND THE FIRST SETTLED BY BUILDING.** `railTrack.ts`
+and `roundabout.ts` (round 9) were settled by refutation without an edit; O53 (round 12) was refuted and
+pinned. O59 was true, and the fix was **verified as a live path rather than accepted as an export** —
+the call chain walked from the district through the constructor to the single consumer, because O24 is
+the standing lesson that a mapping nothing reads *"reads like a fix"* and is not one. **The badge is
+still not fully honest on the parking family** (O61, O62), and the lane said so in its own header rather
+than letting „O59 closed" imply a working cue.
+
+**THE OTHER LANE CLOSED ITS ROW AND FILED NOTHING HERE, WHICH IS ALSO A RESULT.** The `call-site` lane
+was given the boundary a substring could not guard: round 11's three `toContain` assertions over the
+argument list, against which a refuter had measured **eight surviving mutations** — every one
+`tsc`-clean, every one leaving the full suite byte-identical — on the principle that *"you do not DROP
+the field, you PIN it."* The lane extracted the binding and now holds the call site with a parser:
+`callSiteShape.ts` reports the exact source text of every argument and property initializer, and the
+expectations are `toEqual` over that map, so **a field added, a field removed and a field pinned all
+fail** — including `advisorOn: advisorOn || true`, the shape that defeated round 11. §3.6 re-applies
+each mutation to the file's own text and requires it to be rejected, *"because a probe that cannot fail
+on the case it was written for is a decoration, and four of them have shipped in this project — every
+one lying in the reassuring direction."* Its one residual is **stated and structural rather than
+routed**: there is no DOM in this suite, so the component cannot be executed and the argument list has
+to be held statically — *"the same residual `hud/__tests__/dashboard-publication.test.ts` records for
+the scene's publication."*
+
+**AND IT PINNED THE RESIDUAL ROUND 12 LEFT IN PROSE.** `snap.taskCapKmh` has no `advisorOn` gate, so
+with «Съветник» off the card prints nothing and the bar still prints the drill's ceiling. Round 12's
+brief asked for it to be *"pinned or restated to what is true"*; it is now **asserted on both surfaces**
+with the reason attached — the ceiling is not advice, it is *"the figure the student is BILLED
+against"*, and withdrawing it from the students most likely to be driving unaided *"would fail one of
+them for a number no surface ever named — a false refusal, which this project weighs the same as a
+false certificate."* The lane's own justification for pinning it: *"A decision that lives only in a
+paragraph is a decision the next tidy-up reverses by accident."*
 
 **Round 12's rows, O59–O60 — and O53, THE ROW ROUND 11 DROPPED, NOW ADJUDICATED.** Round 11's §2.6
 closed with a complaint: O53 „was neither fixed, refuted, routed nor mentioned" by a lane that owned
