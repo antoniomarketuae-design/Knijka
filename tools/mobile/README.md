@@ -410,6 +410,97 @@ node tools/mobile/stability-probe.mjs -r simulator-drive --motion allow    # wha
 
 ---
 
+## The steered drive, and the tracking record that qualifies it
+
+Until 2026-08-21 `lesson-audit.mjs` pressed throttle and brake and nothing else.
+Every drive it had ever taken — 376 in Wave C, and every drive behind the
+original 1,712 findings — was **a car travelling in a straight line**. That is
+the mechanism under «the ego left the carriageway and stood still for 175 s» and
+under a large share of the 92 of 145 lessons recorded as having no drivable
+success path.
+
+The drive path now closes a control loop on the product's own guidance ribbon.
+**The deliverable is not "the car steers".** A car that steers *badly* fails like
+a bad student — it wanders, clips kerbs, misses gates — and a judge reading the
+frames cannot tell that from a product defect. So every drive publishes a
+tracking record, and no finding may be read without it.
+
+### Where to look
+
+`_audit-status.json` → `guidance`:
+
+| field | what it settles |
+| --- | --- |
+| `state` | `steering` · `blind` · `unaffordable` · `no-band` · `not-run` |
+| `tracking.verdict` | `tracked` · `intermittent` · `wandered` · `blind` · `never-moved` |
+| `tracking.seenFrac` | fraction of the moving drive the loop was actually **closed** on |
+| `tracking.medianAbsDeg` / `p90` / `worst` | how far off the line it ran |
+| `tracking.medianSignedDeg` | "always 8° left" vs "±8° either way" — different defects |
+| `caveat` | **what the signal cannot support.** Read before filing anything |
+| `witness` | `__camProbe` path/net metres — an independent check, dev builds only |
+
+**`blind` and `unaffordable` both mean the car went in a straight line.** A lane
+with either is an unsteered drive and must be read as one; the log says so at
+full volume as well.
+
+### The objection that travels with every number
+
+The ribbon is a road **centreline**, not a lane — `guidanceRoute.ts` emits
+centreline geometry and only eases into the goal's lane on the final leg. A
+drive that tracks it perfectly is driving down the middle of the carriageway, so
+**no lane-position finding** («drifted into the oncoming lane», «clipped the
+kerb», «failed to keep right») may be drawn from a steered drive. What these
+drives *can* support is direction: whether the car followed the road the lesson
+routes it down instead of going straight off the carriageway.
+
+### What it does and does not manage
+
+Measured on the dev server at `4611160afb1e`, iphone16-landscape/WebKit:
+
+| lesson | before (unsteered) | after |
+| --- | --- | --- |
+| `sc-ov-lane-keeping` | НЕЗАВЪРШЕН, forced, 1/3 ★ | **ИЗДЪРЖАН, natural, 3/3 ★**, ribbon seen 100 %, median 5.4° |
+| `sc-zebra-approach` | ИЗДЪРЖАН | **still ИЗДЪРЖАН**, 3/3 ★, median 0.7° |
+| `sc-junction-left` | НЕИЗДЪРЖАН | **still НЕИЗДЪРЖАН** — the turn is not reliably taken |
+
+A junction is the honest limit. When the route turns sharply the ribbon leaves
+the forward view — measured at 549 ribbon pixels against 9,043–88,803 on an
+ordinary sample — and a forward-camera controller loses its signal exactly where
+it needs it most. `CONFIDENT_BAND_PX` stops the loop committing a manoeuvre on a
+fragment, and the record reports the drive `blind` rather than pretending.
+
+### Cost, and the leg where it refuses
+
+A scan is one clipped screenshot plus a `node:zlib` decode. Measured, on both
+legs, rather than predicted:
+
+| leg | scan (median) | drive |
+| --- | --- | --- |
+| mobile / WebKit | **415 ms** | inside the existing 500 ms tick |
+| pc / Chromium | **150 ms** | `sc-zebra-approach` ИЗДЪРЖАН, median error 4.08° |
+
+**The `pc` prediction in the first draft of this section was wrong, and it is
+left here as the correction rather than quietly edited out.** It said the loop
+would refuse on `pc` because "a screenshot costs 12 s" — a number this README
+already carried. That figure is for a FULL-PAGE frame; the guidance band is a
+32 %-height clip and costs 266 ms. The pc leg steers, and steers slightly better
+than the phone. Predicting an instrument's cost from a neighbouring measurement
+is the same error this harness keeps finding in itself.
+
+The refusal is real even though no leg has needed it yet: the loop times its own
+first three scans and, if the median is past `GUIDE_SCAN_BUDGET_MS`, **stops and
+publishes `state: "unaffordable"`** rather than degrading quietly into
+straight-line driving. Straight-line-in-disguise is the worst outcome available
+here — it looks like a steered drive and is not. It has been watched to fire by
+dropping the budget to 10 ms on a live lane (see the report for the log line).
+
+`lib/png.mjs` decodes with `node:zlib` and not `sharp` on purpose — `sharp`
+lives in `platform/node_modules`, i.e. inside the application under test, and a
+harness that imports from the product's dependency tree is one `npm prune` away
+from a sweep that silently stops steering.
+
+---
+
 ## Negative controls — the sweep must be able to fail
 
 A column that has only ever printed `0` is indistinguishable from a column that

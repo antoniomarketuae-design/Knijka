@@ -577,10 +577,34 @@ describe("§5 the harness has a deliberate, gated, cluster-asserted route into R
 // as having no drivable success path.
 //
 // These assertions pin the CHANNEL and its accounting. They deliberately do
-// NOT pin a driving line: the scripted traces still do not steer, because how
-// a correct drive should steer is a design question owned by
-// `devrig/driveScript.ts`, and a drive that steers badly manufactures
-// confident wrong findings where one that cannot steer leaves honest silence.
+// NOT pin a driving line.
+//
+// THE CLAUSE THAT USED TO STAND HERE IS NO LONGER TRUE AND IS CORRECTED RATHER
+// THAN DELETED, because a stale premise left in a test header is how this
+// programme keeps inheriting claims nobody re-read. It said „the scripted
+// traces still do not steer, because how a correct drive should steer is a
+// design question owned by `devrig/driveScript.ts`". Two halves, and both have
+// been overtaken:
+//
+//   · THE TRACES DO STEER NOW, on MODE=«right» lanes. `tools/mobile/lib/
+//     guidance.mjs` closes a control loop on the product's own RouteGuidance
+//     ribbon and `lesson-audit.mjs` runs it from the `roll` phase. MEASURED
+//     2026-08-21 on sc-ov-lane-keeping/mobile/right: 68 scans, the ribbon in
+//     view on 58 of 68 moving samples, 27 wheel commands over 1,383 ms.
+//   · …BUT ONLY THERE. `phase = MODE === "right" ? "roll" : "flat"`, and the
+//     loop is called only under `if (phase === "roll")`, so EVERY MODE=«wrong»
+//     lane is still a car that cannot turn. Half of Wave C's 376 drives.
+//   · AND `devrig/driveScript.ts` NEVER OWNED THE ANSWER. `DriveStep.steer` is
+//     „Constant steer for the whole step" and is applied verbatim
+//     (`steer: step.steer ?? 0`); there is no lateral feedback term in the
+//     file. The dev rig holds a fixed lock, it does not follow a route.
+//
+// The rest of the old clause STANDS and is the reason these assertions stop at
+// the channel: a drive that steers badly manufactures confident wrong findings
+// where one that cannot steer leaves honest silence. That is why the record in
+// `_audit-status.json` → `guidance.tracking` exists, and why a reader must
+// take its verdict before believing anything else in that file about where the
+// car went.
 
 describe("§6 the harness has a steering channel, and says so on every lane", () => {
   it("sends the keys the product actually reads", () => {

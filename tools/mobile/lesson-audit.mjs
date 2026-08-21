@@ -193,6 +193,11 @@ import { newDeviceContext } from "./lib/insets.mjs";
 import { DEVICES } from "./lib/devices.mjs";
 import { signIn } from "./lib/auth.mjs";
 import { captureFrame, createFrameLedger } from "./lib/frames.mjs";
+// The steering control law and its record. Pure — no browser — so every clause
+// of it is exercised by __tests__/guidance.test.mjs without a sim; the page
+// side of it lives in `guideTick` below.
+import { decodePng } from "./lib/png.mjs";
+import { aimFrom, degPerPxAtCentre, scanBand, steerCommand, summariseTracking, TUNE } from "./lib/guidance.mjs";
 // Cheap by design — node:child_process and node:crypto, no browser — so unlike
 // pw.mjs it can be imported up here where `resolveBase()` needs it, which is
 // before the output directory exists.
@@ -1259,9 +1264,20 @@ const steering = {
   refusedBothAtOnce: 0,
   atStandstill: 0,
   releasedByPauseDrain: 0,
-  /** THE SCRIPTED TRACES DO NOT STEER. Stated as data, not only as prose, so a
-   *  consumer can filter on it instead of parsing a sentence. */
-  tracesSteer: false,
+  /**
+   * DOES THE DRIVE PATH STEER? Stated as data, not only as prose, so a consumer
+   * can filter on it instead of parsing a sentence.
+   *
+   * IT WAS A HARD `false` UNTIL 2026-08-21 AND THAT IS NOW A LIE THE FILE WOULD
+   * BE TELLING ABOUT ITSELF. The drive path closes a control loop on the
+   * product's guidance ribbon (`guideTick`), so the traces DO steer — but only
+   * where the loop can see and afford its signal, which is why this is written
+   * from what happened rather than declared. `guidance.state` says which, and
+   * `guidance.tracking.verdict` says how well; a lane that reads
+   * `tracesSteer: false` here drove in a straight line and one of those two
+   * fields names the reason.
+   */
+  tracesSteer: null,
   probe: null,
   /**
    * THE ONE FIELD AN ORDINARY DRIVE LANE CANNOT BE QUIET ABOUT — round 3.
@@ -2940,6 +2956,502 @@ saveStatus({ steering });
 //     eyes on the 3D scene. It is what makes the right drive right: the zebra's
 //     pedestrian is on the carriageway for ~11.6 s and no constant pause can be
 //     both long enough there and honest anywhere else.
+/* ═══════════════════════════════════════════════════════════════════════════
+ * THE STEERED DRIVE — the loop, its refusals, and the record it leaves
+ * ═══════════════════════════════════════════════════════════════════════════
+ *
+ * THE ROUND BEFORE THIS ONE PROVED THE WHEEL WORKS AND STILL DID NOT TURN IT.
+ * Every scripted trace pressed throttle and brake only, so all 376 Wave C
+ * drives — and every drive behind the original 1,712 findings — were a car
+ * travelling in a straight line. This is the loop that steers, and everything
+ * below it exists to stop it doing more damage than the silence it replaces.
+ *
+ * ── THE DANGER, WHICH IS LARGER THAN THE ONE IT REMOVES ────────────────────
+ *
+ * A DRIVE THAT STEERS BADLY IS WORSE THAN A DRIVE THAT CANNOT STEER. A car
+ * that cannot turn fails visibly and its failures are attributable to the
+ * instrument. A car that turns badly fails like a bad student — it wanders,
+ * clips kerbs, misses gates — and a judge reading the frames has no way to
+ * tell that from a product defect. So the deliverable here is not "the car
+ * steers". It is "the car steers AND every drive carries an honest measure of
+ * how well it tracked, so a finding can be qualified by it".
+ *
+ * That measure is `guidance.tracking` in `_audit-status.json`, and the three
+ * properties it has to keep are:
+ *
+ *   IT CANNOT BE QUIET. Every moving sample is recorded, including the ones
+ *   where nothing was seen. `seenFrac` is the fraction of the moving drive the
+ *   loop was actually closed on, and a drive under `MIN_SEEN_FRAC` is stamped
+ *   `verdict: "blind"` — which says in words that it was an unsteered drive.
+ *
+ *   IT CANNOT BE ZERO BY ACCIDENT. `aimFrom` returns `seen: false`, never a 0
+ *   error, when the ribbon is not there. A no-signal sample that averaged in
+ *   as 0 would make a blind drive read as a perfect one, and that is precisely
+ *   the reassuring-direction failure this whole programme is about.
+ *
+ *   IT CARRIES ITS OWN OBJECTION. `caveat` states, on every drive, that the
+ *   ribbon is a ROAD CENTRELINE and not a lane — so no lane-position finding
+ *   may be drawn from a drive steered by it. See lib/guidance.mjs for the
+ *   product's own words on that.
+ *
+ * ── WHY THE PIXELS, WHEN A CHEAPER SIGNAL EXISTS AND WAS MEASURED ──────────
+ *
+ * `window.__camProbe` publishes the chassis pose at frame rate for ~10 ms a
+ * read — thirty times cheaper than a screenshot. It is NOT used to steer, and
+ * the reason is a rule this round is bound by: it exists only in dev builds
+ * (`process.env.NODE_ENV !== "production"` in CameraRig.tsx), so a loop closed
+ * around it would be driving by something no student's build publishes, and
+ * could pass a lesson whose VISIBLE guidance is broken — hiding exactly the
+ * defect a student would hit. It is read as an independent WITNESS instead
+ * (`guidance.witness`), where being dev-only costs nothing, because a
+ * measurement of where the car went does not have to be a measurement a
+ * student could make.
+ */
+const guidance = {
+  /** what the loop closes around, named so a consumer never has to infer it */
+  signal: "RouteGuidance ghost ribbon (--accent-2 #17e1c4), read off the windscreen",
+  /** the loop RAN on this lane. Absent before 2026-08-21 and indistinguishable
+   *  from a lane whose loop had silently died. */
+  wired: true,
+  /** "steering" · "blind" · "unaffordable" · "no-band" · "not-run" */
+  state: "not-run",
+  why: "the drive has not started",
+  band: null,
+  degPerPx: null,
+  scans: 0,
+  scanCostMs: [],
+  /** every moving sample, seen or not — see "IT CANNOT BE QUIET" above */
+  samples: [],
+  commands: 0,
+  commandMs: 0,
+  tooSmall: 0,
+  errors: 0,
+  /** samples on which the wheel was LEFT DOWN across a scan (a confirmed turn) */
+  sustainHolds: 0,
+  /** …and the ones that hit SUSTAIN_MAX, i.e. were stopped by the guard */
+  sustainCapped: 0,
+  /** …and every time a sustained hold was let go. Published because a hold
+   *  that is never released is a car turning with nothing watching. */
+  sustainReleases: 0,
+  /** …of which were forced by the drive leaving the roll phase with the wheel
+   *  still down. Non-zero means the loop was holding a turn at the moment the
+   *  roll budget expired; see `guideLeaveRoll`. Zero on a lane that never
+   *  sustained is not evidence of anything. */
+  phaseExitReleases: 0,
+  /** sightings too thin to command a manoeuvre on — see CONFIDENT_BAND_PX */
+  thinSightings: 0,
+  tracking: null,
+  witness: null,
+  caveat: null,
+};
+let guideBandGeom = null;
+let guidePrevErrDeg = null;
+let guideSustainRun = 0;
+let guideSustainDir = 0;
+let guideHeldBySustain = false;
+const guideWitness = [];
+/**
+ * WHAT A SCAN IS ALLOWED TO COST, AND THE REFUSAL WHEN IT COSTS MORE.
+ *
+ * A screenshot was measured at ~360-790 ms on the mobile leg and 11,999 ms on
+ * the `pc` leg. At twelve seconds a frame a control law would correct the car
+ * once every twelve seconds, which is not a control law — it is a straight
+ * line with occasional flinches, and it would look exactly like a steered
+ * drive in the status file. So the cost is MEASURED on this lane, over the
+ * first few scans, and if the median is past this the loop stops, says
+ * `state: "unaffordable"`, and the drive continues UNSTEERED AND LABELLED.
+ */
+const GUIDE_SCAN_BUDGET_MS = 1500;
+const GUIDE_COST_SAMPLE = 3;
+
+/** The band of the windscreen the ribbon is looked for in, and the ruler. */
+async function guideBand() {
+  const g = await page
+    .evaluate(() => {
+      const shell = document.querySelector("[data-sim-shell]") ?? document.body;
+      let best = null;
+      for (const c of shell.querySelectorAll("canvas")) {
+        const r = c.getBoundingClientRect();
+        if (!best || r.width * r.height > best.w * best.h) best = { x: r.x, y: r.y, w: r.width, h: r.height };
+      }
+      return best ? { ...best, dpr: window.devicePixelRatio || 1 } : null;
+    })
+    .catch(() => null);
+  if (!g || g.w < 80 || g.h < 80) return null;
+  return {
+    // 40 % → 72 % of the canvas: below the horizon, above the bonnet and the
+    // dash. MEASURED by looking at the frames it produces, not reasoned about
+    // — `band-rest.png` from the survey shows the ribbon running the full
+    // width of this slice with the dashboard only intruding at the corner.
+    clip: {
+      x: Math.round(g.x),
+      y: Math.round(g.y + g.h * 0.40),
+      width: Math.round(g.w),
+      height: Math.round(g.h * 0.32),
+    },
+    canvas: g,
+    dpr: g.dpr,
+    degPerPx: degPerPxAtCentre(g.w * g.dpr),
+  };
+}
+
+/**
+ * The HUD rectangles this scan must ignore, in the band's own pixel space.
+ *
+ * NOT COSMETIC. The survey measured a 2,483-pixel blob at a fixed x that did
+ * not move while the car did 59 км/ч — page furniture being read as world. A
+ * controller steering toward a screen-fixed object drives in a circle, and its
+ * tracking record would call the circle competent.
+ */
+const guideMasks = (band) =>
+  page
+    .evaluate(
+      ({ bx, by, bw, bh, dpr }) => {
+        /* ── MASK WHAT PAINTS, NOT WHAT IS NAMED — MEASURED THE HARD WAY ────
+         *
+         * The first version masked the box of every `[data-hud]` element, and
+         * the first steered drive of sc-ov-lane-keeping came back
+         * `ribbon seen on 0/51 moving samples (0%)` on a lesson the survey had
+         * photographed with 10,431–12,637 ribbon pixels on the glass.
+         *
+         * THE CAUSE, off the census in the same run: `data-hud="touch-controls"`
+         * is `absolute inset-0` and measures 852 × 393 — the ENTIRE VIEWPORT.
+         * It is a transparent, `pointer-events-none` container for two thumb
+         * pads and it paints nothing at all. Masking its box masked the world.
+         *
+         * The refusal held, which is the only reason this is a footnote and
+         * not a wave of false findings: the lane said BLIND, said the drive was
+         * a straight line, and refused to publish an error number. A version
+         * that had averaged its blindness in as 0° would have certified this as
+         * the best-tracked drive in the sweep.
+         *
+         * So the predicate is STYLE-DERIVED, and it is `lib/probe.mjs`'s —
+         * the same "any pixel a UI element paints on is not free" rule the
+         * screen budget uses, including the translucent cases. An element masks
+         * its box only if it paints on it (background, backdrop-filter,
+         * box-shadow, border, outline), or is replaced content, or carries its
+         * own glyphs. A transparent wrapper masks nothing, at any size. */
+        const alpha = (c) => {
+          const m = /^rgba?\(([^)]+)\)/.exec(c || "");
+          if (!m) return 0;
+          const p = m[1].split(",").map((s) => Number.parseFloat(s));
+          return p.length < 4 ? 1 : p[3];
+        };
+        const REPLACED = new Set(["IMG", "SVG", "CANVAS", "VIDEO", "INPUT", "SELECT", "TEXTAREA", "PROGRESS", "METER"]);
+        const paints = (el, cs) => {
+          if (REPLACED.has(el.tagName)) return true;
+          if (alpha(cs.backgroundColor) > 0) return true;
+          if (cs.backgroundImage && cs.backgroundImage !== "none") return true;
+          if (cs.backdropFilter && cs.backdropFilter !== "none") return true;
+          if (cs.webkitBackdropFilter && cs.webkitBackdropFilter !== "none") return true;
+          if (cs.boxShadow && cs.boxShadow !== "none") return true;
+          for (const side of ["Top", "Right", "Bottom", "Left"]) {
+            const w = Number.parseFloat(cs[`border${side}Width`]);
+            const st = cs[`border${side}Style`];
+            if (w > 0 && st !== "none" && st !== "hidden" && alpha(cs[`border${side}Color`]) > 0) return true;
+          }
+          // Its OWN glyphs, not a descendant's — otherwise every wrapper up to
+          // <body> would claim the text inside it.
+          for (const n of el.childNodes) if (n.nodeType === 3 && n.textContent.trim()) return true;
+          return false;
+        };
+        const out = [];
+        const roots = document.querySelectorAll(
+          '[data-hud],[data-sim-overlay],[role="dialog"],[role="alertdialog"],[role="status"],[role="slider"]',
+        );
+        const seen = new Set();
+        for (const root of roots) {
+          for (const el of [root, ...root.querySelectorAll("*")]) {
+            if (seen.has(el)) continue;
+            seen.add(el);
+            const r = el.getBoundingClientRect();
+            if (r.width < 2 || r.height < 2) continue;
+            const cs = getComputedStyle(el);
+            if (cs.visibility === "hidden" || cs.display === "none" || Number(cs.opacity) === 0) continue;
+            if (!paints(el, cs)) continue;
+            const x = (r.x - bx) * dpr;
+            const y = (r.y - by) * dpr;
+            const w = r.width * dpr;
+            const h = r.height * dpr;
+            if (x + w <= 0 || y + h <= 0 || x >= bw || y >= bh) continue;
+            out.push({ x, y, w, h });
+          }
+        }
+        return out;
+      },
+      { bx: band.clip.x, by: band.clip.y, bw: band.clip.width * band.dpr, bh: band.clip.height * band.dpr, dpr: band.dpr },
+    )
+    .catch(() => []);
+
+/** The dev-only pose probe, read as a witness and never as a control input. */
+const guideWitnessRead = () =>
+  page
+    .evaluate(() => {
+      const p = window.__camProbe;
+      return p ? { x: p.chassisX, z: p.chassisZ, kmh: p.speedKmh } : null;
+    })
+    .catch(() => null);
+
+/**
+ * ONE TICK OF THE CONTROL LOOP.
+ *
+ * Records first, commands second, and records the not-commanding too. The
+ * order matters: an early `return` that skipped the sample is how a loop goes
+ * quiet, and a quiet loop is indistinguishable from one that was not needed.
+ */
+async function guideTick(kmh, tElapsedMs, dtMs) {
+  const tSec = Math.round(tElapsedMs / 1000);
+  /* ── AND THE POSE GOES ON THE SAMPLE, NOT ONLY INTO A SCALAR — 2026-08-22 ──
+   *
+   * THE TRACKING RECORD WAS NOT INDEPENDENT OF THE CONTROLLER, AND THAT IS THE
+   * ONE PROPERTY IT HAD TO HAVE. `errDeg` is computed from the SAME scan that
+   * drove the wheel, so any error in the pixel test — the objective pillar,
+   * the ground pool, the kerbside sign post and the turn chevron are all
+   * `--accent-2` too — moves the car AND the number that grades it in the same
+   * direction. A drive steering at a sign post reports a small error and is
+   * certified «tracked».
+   *
+   * The cure is already on disk and was thrown away every tick. Every scenario
+   * ships `content/traces/<id>/shadow-correct.trace.json` — 20 Hz `x,y,
+   * headingDeg` of a drive whose own validation rule is «must replay with ZERO
+   * violations» — in the same frame as `__camProbe` (district y = −world z).
+   * `guideWitness` sampled exactly that pose every tick and published only
+   * pathM/netM/straightness, so the per-tick positions never left the process
+   * and NO LATER READER COULD COMPUTE A CROSS-TRACK ERROR IN METRES from the
+   * artifacts. Carrying `wx/wz` on the sample costs two numbers a tick and
+   * makes every drive ever taken checkable, offline, against the product's own
+   * recorded correct line — by somebody who does not trust this loop. */
+  let witnessNow = null;
+  const push = (s) =>
+    guidance.samples.push({
+      tSec,
+      kmh,
+      dtMs,
+      wx: witnessNow ? Number(witnessNow.x.toFixed(2)) : null,
+      wz: witnessNow ? Number(witnessNow.z.toFixed(2)) : null,
+      ...s,
+    });
+  /* ── THE WITNESS IS READ FIRST, AND ON EVERY TICK, WHATEVER THE LOOP DOES ──
+   *
+   * It used to be read only on a tick that completed a scan, and the
+   * consequence was measured on the run that watched the cost refusal fire:
+   * a drive that travelled about 90 m published `witness path 3 m net 3 m`,
+   * because the loop stopped scanning after three samples and the witness
+   * stopped with it. A field that looks like a measurement of the drive and is
+   * actually a measurement of two ticks is worse than no field — and it read
+   * in the reassuring direction for anyone checking whether the car had moved.
+   *
+   * It is also exactly backwards. The witness costs ~10 ms and is INDEPENDENT
+   * of the control loop, so it is most valuable on the drives where the loop
+   * failed: „this drive did not steer" and „here is where it went anyway" are
+   * the two halves a judge needs together. */
+  {
+    const w = await guideWitnessRead();
+    if (w) { witnessNow = w; guideWitness.push({ tSec, ...w }); }
+  }
+  if (guidance.state === "unaffordable" || guidance.state === "no-band") {
+    push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: guidance.state });
+    return;
+  }
+  if (!(kmh >= TUNE.MIN_KMH)) {
+    // Not a moving sample — `summariseTracking` filters these out of every
+    // rate it computes, but it is still written down, because "the car was
+    // stopped" and "the loop skipped a tick" must not look the same.
+    if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
+    guideSustainRun = 0;
+    guideSustainDir = 0;
+    push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: `below ${TUNE.MIN_KMH} км/ч` });
+    return;
+  }
+  if (guideBandGeom === null) {
+    guideBandGeom = await guideBand();
+    if (guideBandGeom === null) {
+      guidance.state = "no-band";
+      guidance.why = "no canvas big enough to read a road band from — this drive cannot be steered and did not steer";
+      loud(guidance.why.toUpperCase());
+      push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: "no-band" });
+      return;
+    }
+    guidance.band = guideBandGeom.clip;
+    guidance.degPerPx = Number(guideBandGeom.degPerPx.toFixed(5));
+  }
+
+  const t0scan = Date.now();
+  let aim;
+  try {
+    const masks = await guideMasks(guideBandGeom);
+    const png = await page.screenshot({ clip: guideBandGeom.clip });
+    aim = aimFrom(scanBand(decodePng(png), masks));
+  } catch (error) {
+    guidance.errors += 1;
+    if (guideHeldBySustain) { await steer(null, kmh).catch(() => {}); guideHeldBySustain = false; guidance.sustainReleases += 1; }
+    guideSustainRun = 0;
+    guideSustainDir = 0;
+    push({ seen: false, errDeg: null, nearDeg: null, dir: null, holdMs: 0, why: `scan failed: ${String(error?.message ?? error).slice(0, 80)}` });
+    return;
+  }
+  const scanMs = Date.now() - t0scan;
+  guidance.scans += 1;
+  guidance.scanCostMs.push(scanMs);
+
+  // ── THE COST REFUSAL, MEASURED RATHER THAN ASSUMED ──────────────────────
+  if (guidance.scanCostMs.length === GUIDE_COST_SAMPLE) {
+    const med = [...guidance.scanCostMs].sort((a, b) => a - b)[GUIDE_COST_SAMPLE >> 1];
+    if (med > GUIDE_SCAN_BUDGET_MS) {
+      guidance.state = "unaffordable";
+      guidance.why =
+        `reading the ribbon costs ${med} ms a sample on this leg (budget ${GUIDE_SCAN_BUDGET_MS} ms), so a control loop ` +
+        "here would correct the car about once every " + (med / 1000).toFixed(1) + " s. THIS DRIVE DID NOT STEER — it is a " +
+        "straight-line drive and must be read as one.";
+      loud(`THE STEERING LOOP CANNOT AFFORD TO RUN ON THIS LEG — ${guidance.why}`);
+      await steerRelease();
+      guideHeldBySustain = false;
+      // …AND THE SAMPLE THAT TRIGGERED THE REFUSAL IS STILL WRITTEN DOWN. The
+      // first draft `return`ed above this line, so the one tick that decided
+      // the whole drive would not steer was the one tick missing from the
+      // record. Every other refusal in this loop records itself; a refusal that
+      // does not is the same silence in a smaller place.
+      push({ seen: aim.seen, errDeg: null, nearDeg: null, ribbonPx: aim.total, dir: null, holdMs: 0, sustain: false, scanMs, why: "unaffordable" });
+      return;
+    }
+  }
+
+  const errDeg = aim.seen ? aim.aimPx * guideBandGeom.degPerPx : null;
+  const nearDeg = aim.seen && aim.nearPx !== null ? aim.nearPx * guideBandGeom.degPerPx : null;
+
+  /* ── THE CALLER'S BOOK OF CONSECUTIVE AGREEMENT ────────────────────────────
+   * `steerCommand` is pure and cannot see history, so the run of same-sign
+   * large-error samples is counted here and handed to it. It is reset by
+   * ANYTHING that breaks the evidence: a small error, a sign change, a sample
+   * with no sighting at all. That reset is what makes „repeated" mean
+   * something — a run that survived a blind sample would be a run built partly
+   * out of not looking. */
+  if (errDeg !== null && Math.abs(errDeg) >= TUNE.SUSTAIN_DEG && Math.sign(errDeg) === guideSustainDir) {
+    guideSustainRun += 1;
+  } else if (errDeg !== null && Math.abs(errDeg) >= TUNE.SUSTAIN_DEG) {
+    guideSustainRun = 1;
+    guideSustainDir = Math.sign(errDeg);
+  } else {
+    guideSustainRun = 0;
+    guideSustainDir = 0;
+  }
+
+  const cmd = steerCommand({ errDeg, prevErrDeg: guidePrevErrDeg, kmh, sustainRun: guideSustainRun, confident: aim.confident === true });
+  if (aim.seen && !aim.confident) guidance.thinSightings += 1;
+  if (cmd.tooSmall) guidance.tooSmall += 1;
+
+  if (cmd.sustain) {
+    // THE WHEEL STAYS DOWN THROUGH THE NEXT SCAN. Only reachable after
+    // SUSTAIN_CONFIRM consecutive same-sign samples over SUSTAIN_DEG — see the
+    // measurement on sc-junction-left in lib/guidance.mjs. `steer` is
+    // idempotent on a direction already held, so this does not re-press.
+    await steer(cmd.dir, kmh);
+    guidance.sustainHolds += 1;
+    guideHeldBySustain = true;
+    if (guideSustainRun >= TUNE.SUSTAIN_CONFIRM + TUNE.SUSTAIN_MAX - 1) guidance.sustainCapped += 1;
+    if (guidance.state === "not-run" || guidance.state === "blind") {
+      guidance.state = "steering";
+      guidance.why = "the loop saw the ribbon and is holding a sustained turn";
+    }
+  } else if (cmd.dir !== null) {
+    // PULSE, THEN CENTRE. Outside a confirmed turn the wheel is never left
+    // over between samples: the rate limiter would keep winding it toward full
+    // lock across ticks, and one missed sample would leave the car turning
+    // with nothing watching.
+    // …AND THIS RELEASE IS BANKED LIKE EVERY OTHER — 2026-08-22, verifier.
+    // It was the ONE path that let a sustained hold go without incrementing
+    // `sustainReleases`, so a drive that ended every turn by pulsing out of it
+    // published `sustainHolds: 6, sustainReleases: 0` — a reader checking the
+    // two for balance would conclude six holds had leaked when none had. The
+    // field's own note says it counts „every time a sustained hold was let go";
+    // it has to be true on every branch or it is not a count of anything.
+    if (guideHeldBySustain) { await steer(null, kmh); guideHeldBySustain = false; guidance.sustainReleases += 1; }
+    await steer(cmd.dir, kmh);
+    await page.waitForTimeout(cmd.holdMs);
+    await steer(null, kmh);
+    guidance.commands += 1;
+    guidance.commandMs += cmd.holdMs;
+    if (guidance.state === "not-run" || guidance.state === "blind") {
+      guidance.state = "steering";
+      guidance.why = "the loop saw the ribbon and is commanding the wheel";
+    }
+  } else if (guideHeldBySustain) {
+    // THE RELEASE, AND IT IS UNCONDITIONAL. Every path that is not a sustain
+    // ends with the wheel centred — including a sample that saw nothing. A
+    // held key surviving a blind sample is a car turning with nothing watching,
+    // which is the failure mode this whole round exists to make impossible.
+    await steer(null, kmh);
+    guideHeldBySustain = false;
+    guidance.sustainReleases += 1;
+  }
+  if (guidance.state === "not-run" && aim.seen) {
+    guidance.state = "steering";
+    guidance.why = "the loop saw the ribbon; no correction was needed yet";
+  } else if (guidance.state === "not-run") {
+    // ── A LOOP THAT RAN AND SAW NOTHING IS NOT A LOOP THAT NEVER RAN ───────
+    // It said `state: "not-run", why: "the drive has not started"` for a
+    // whole 51-sample drive, and the loud line at the end quoted that sentence
+    // verbatim beside 231.8 m of measured travel — a status file describing a
+    // drive that had happened as one that had not begun. The state moves to
+    // `blind` on the FIRST scan that comes back empty; a later sighting
+    // promotes it to `steering`, so the field always names the last thing
+    // that actually happened.
+    guidance.state = "blind";
+    guidance.why =
+      `the loop ran and the guidance ribbon was not in the band (${aim.why}). Nothing is being steered toward, and ` +
+      "this drive is a straight line until that changes.";
+  }
+  guidePrevErrDeg = errDeg;
+  push({
+    seen: aim.seen,
+    errDeg: errDeg === null ? null : Number(errDeg.toFixed(2)),
+    nearDeg: nearDeg === null ? null : Number(nearDeg.toFixed(2)),
+    ribbonPx: aim.total,
+    confident: aim.confident === true,
+    source: aim.source,
+    dir: cmd.dir,
+    holdMs: cmd.holdMs,
+    sustain: cmd.sustain === true,
+    scanMs,
+    why: aim.seen ? cmd.why : aim.why,
+  });
+}
+
+/**
+ * LET GO OF THE WHEEL WHEN THE ROLL PHASE ENDS — 2026-08-22, verifier.
+ *
+ * THE DEFECT, READ OUT OF THE TICK LOOP AND TRUE AT THE BYTES THIS WAS WRITTEN
+ * AGAINST. `guideTick` is the ONLY caller of `steer()` on the drive path, and
+ * it runs ONLY under `if (phase === "roll")`. The sustained-turn branch is the
+ * one path that deliberately leaves a key DOWN across a scan — and eight lines
+ * after it returns, the same tick can transition to `phase = "stop"`. Nothing
+ * in the stop branch, the reverse branch or the reverse-arm gate touches the
+ * wheel, so a confirmed turn that lands on the last roll tick holds full lock
+ * through the whole stop phase (STOP_MS = 3 s plus the deceleration, minimum
+ * `MIN_PHASE_TICKS` ticks) with no scan watching and no sample recorded.
+ *
+ * That is precisely the state `guideTick`'s own comment says is impossible —
+ * „a car turning with nothing watching" — and it is worse in the reverse case,
+ * where the wheel would still be wound over as the car backs up.
+ *
+ * It is bounded by the sustain gate (two consecutive same-sign samples over
+ * SUSTAIN_DEG), so it needs a junction to fire — which is exactly the lane
+ * where a wrong extra half-second of lock decides the verdict.
+ *
+ * The release is banked and COUNTED, so „the loop let go because the phase
+ * ended" is a visible event and not an inference: `sustainReleases` rises and
+ * `phaseExitReleases` says how many of them were this.
+ */
+async function guideLeaveRoll() {
+  if (!guideHeldBySustain) return;
+  await steer(null).catch(() => {});
+  guideHeldBySustain = false;
+  guideSustainRun = 0;
+  guideSustainDir = 0;
+  guidance.sustainReleases += 1;
+  guidance.phaseExitReleases += 1;
+}
+
 const TICK_MS = 500;          // the control law's rate
 const FRAME_MS = 5000;        // the textual beat's cadence
 const EXPENSIVE_SHOT_MS = 20_000; // floor for the frame cadence when frames are dear
@@ -3326,7 +3838,7 @@ if (MODE !== "right") await throttle(true);
 
 // `reverse` from the first driving tick, not only at the end: a lane that dies
 // mid-manoeuvre must still be able to say whether it had reached R.
-saveStatus({ phase: "driving", reverse, steering });
+saveStatus({ phase: "driving", reverse, steering, guidance });
 let budgetMs = DRIVE_BUDGET_MS;
 let budgetSaid = false;
 const medianTick = () => {
@@ -3647,6 +4159,9 @@ while (!ended && Date.now() - t0 < budgetMs) {
         // metre is driven, so a reader can answer "did this drive ever enter
         // reverse?" from a picture instead of from a claim.
         await shot("05r-reverse-R");
+        // …AND BEFORE R, TOO. A wheel still wound over from a confirmed turn
+        // would reverse the car along a curve nothing is watching.
+        await guideLeaveRoll();
         phase = "reverse";
         phaseAt = Date.now();
         phaseTicks = 0;
@@ -3688,6 +4203,7 @@ while (!ended && Date.now() - t0 < budgetMs) {
               `the shutter. Believed, photographed as 05r-reverse-R-late, and the drive reverses.`,
           );
           await shot("05r-reverse-R-late");
+          await guideLeaveRoll();
           phase = "reverse";
           phaseAt = Date.now();
           phaseTicks = 0;
@@ -3747,10 +4263,20 @@ while (!ended && Date.now() - t0 < budgetMs) {
         await brake(p.kmh > CRUISE_KMH + BRAKE_CAP_OVER_KMH, p.kmh);
         await throttle(p.kmh >= 0 && p.kmh < CRUISE_KMH - 3);
       });
+      // ── AND THE WHEEL, ON THE SAME TICK AS THE PEDALS ────────────────────
+      // Only in the roll phase, and only forward: the stop phase is braking to
+      // a halt and the reverse phase runs a different control law entirely.
+      // `guideTick` is a no-op that RECORDS ITSELF whenever it cannot see, so
+      // a lane that stops steering never stops saying so.
+      await timed("guide", () => guideTick(p.kmh, now - t0, now - lastTickAt));
       drivingTicks++;
       phaseTicks++;
       rollM += (Math.max(0, p.kmh) / 3.6) * ((now - lastTickAt) / 1000);
       if ((rollM >= ROLL_DISTANCE_M || now - phaseAt >= ROLL_MS) && phaseTicks >= 1) {
+        // THE WHEEL COMES BACK TO CENTRE BEFORE THE PHASE DOES — see
+        // `guideLeaveRoll`. Nothing past this line ever scans again, so a
+        // sustained turn left down here turns the car for the whole stop.
+        await guideLeaveRoll();
         phase = "stop";
         phaseAt = now;
         phaseTicks = 0;
@@ -4834,21 +5360,149 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
  * between the objectives and the mistakes — because those two lists are exactly
  * what a reader is about to draw the wrong conclusion from.
  */
+/* ── AND HOW WELL IT TRACKED, WHICH IS THE HALF THAT QUALIFIES EVERYTHING ───
+ *
+ * A judge reading a failed objective below has to be able to answer ONE
+ * question without rerunning this drive: did the product refuse a competent
+ * drive, or did the harness drive badly? Everything in this block is that
+ * answer, and the caveat is part of it — a tracking number without the
+ * centreline objection beside it would licence exactly the lane-position
+ * findings this signal cannot support.
+ */
+{
+  guidance.tracking = summariseTracking(guidance.samples);
+  if (guideWitness.length >= 2) {
+    // The dev-only pose probe, folded to two numbers: how far the car actually
+    // travelled, and how far it ended from where it started. They differ
+    // whenever the car turned, and they are equal for a straight line — which
+    // makes this an independent check on the loop's own story, published by
+    // something the loop does not control.
+    let pathM = 0;
+    for (let i = 1; i < guideWitness.length; i++) {
+      pathM += Math.hypot(guideWitness[i].x - guideWitness[i - 1].x, guideWitness[i].z - guideWitness[i - 1].z);
+    }
+    const a = guideWitness[0];
+    const b = guideWitness[guideWitness.length - 1];
+    const netM = Math.hypot(b.x - a.x, b.z - a.z);
+    guidance.witness = {
+      source: "window.__camProbe (CameraRig.tsx, DEV BUILDS ONLY — absent from a production build)",
+      samples: guideWitness.length,
+      pathM: Number(pathM.toFixed(1)),
+      netM: Number(netM.toFixed(1)),
+      // 1.00 is a straight line. Below ~0.98 the car demonstrably turned.
+      straightness: pathM > 0.5 ? Number((netM / pathM).toFixed(3)) : null,
+      from: { x: Number(a.x.toFixed(2)), z: Number(a.z.toFixed(2)) },
+      to: { x: Number(b.x.toFixed(2)), z: Number(b.z.toFixed(2)) },
+      /* ── THE POSES THEMSELVES, AND WHY THREE NUMBERS WERE NOT ENOUGH ──────
+       *
+       * 2026-08-22, verifier. `pathM`/`netM`/`straightness` answer „did the
+       * car turn at all". They cannot answer the question this record exists
+       * for — WAS THE CAR ON THE LINE — and folding the poses away made that
+       * question permanently unanswerable from a finished lane.
+       *
+       * THE MEASUREMENT THAT IS MISSING, AND IT IS AVAILABLE FOR FREE. Every
+       * scenario ships `content/traces/<id>/shadow-correct.trace.json`, served
+       * at `/traces/<id>/…`, and its samples carry `x, y` in the SAME frame as
+       * this probe (`y = −chassisZ`, LessonScene.tsx:597). So the honest
+       * metric — cross-track distance IN METRES from the product's own
+       * recorded correct drive — is a join between that file and these rows,
+       * and it needs no rerun. `tracking.medianAbsDeg` is not that number: it
+       * is the CONTROL LAW'S OWN ERROR SIGNAL, a bearing to a look-ahead point
+       * on a CENTRELINE, which is non-zero on a curve for a perfectly-placed
+       * car and small for a car sitting metres off the line on a straight.
+       *
+       * MEASURED, on the very lane this round claims to have fixed: on
+       * `sc-ov-lane-keeping` frame `04-t001s.png` — the spawn, where the rig
+       * reports `laneOffsetM 0.0025` — the ribbon this loop steers at reads
+       * −7.91°, while the shadow car's own line reads +0.51°. The loop's zero
+       * is ~8° left of the product's demonstration of correct. Nothing in the
+       * old three numbers could have shown that.
+       *
+       * Decimated to keep a long lane's status file small; `everyNth` says by
+       * how much, so nobody mistakes the row count for the sample count. */
+      poses: (() => {
+        const step = Math.max(1, Math.ceil(guideWitness.length / 240));
+        const rows = [];
+        for (let i = 0; i < guideWitness.length; i += step) {
+          const w = guideWitness[i];
+          rows.push({ tSec: w.tSec, x: Number(w.x.toFixed(2)), z: Number(w.z.toFixed(2)), kmh: w.kmh });
+        }
+        return rows;
+      })(),
+      posesEveryNth: Math.max(1, Math.ceil(guideWitness.length / 240)),
+      frame: "x, z are __camProbe chassis world coordinates; the shipped shadow trace uses y = −z (LessonScene.tsx:597)",
+    };
+  }
+  guidance.caveat =
+    "THE SIGNAL IS A ROAD CENTRELINE, NOT A LANE. guidanceRoute.ts emits centreline geometry and only eases the ribbon " +
+    "into the goal's lane on the FINAL leg, so a drive that tracks it perfectly is driving down the middle of the " +
+    "carriageway. NO LANE-POSITION FINDING — «drifted into the oncoming lane», «clipped the kerb», «failed to keep " +
+    "right» — MAY BE DRAWN FROM THIS DRIVE. What it can support is direction: whether the car followed the road the " +
+    "lesson routes it down instead of travelling straight off the carriageway.";
+  const tr = guidance.tracking;
+  note(
+    `  TRACKING: ${tr.verdict.toUpperCase()} · ribbon seen on ${tr.seenSamples}/${tr.movingSamples} moving samples ` +
+      `(${(tr.seenFrac * 100).toFixed(0)}%)` +
+      (tr.medianAbsDeg === null
+        ? " · no error samples"
+        : ` · |err| median ${tr.medianAbsDeg}° p90 ${tr.p90AbsDeg}° worst ${tr.worstAbsDeg}° · signed median ${tr.medianSignedDeg}°` +
+          ` · off-line ${Math.round(tr.timeOffLineMs / 1000)}s of ${Math.round(tr.movingMs / 1000)}s`) +
+      ` · ${tr.commands} correction(s) / ${tr.commandMs} ms at the wheel · loop ${guidance.state.toUpperCase()}` +
+      (guidance.witness ? ` · witness path ${guidance.witness.pathM} m net ${guidance.witness.netM} m (straightness ${guidance.witness.straightness})` : ""),
+  );
+  note(`            ${tr.verdictWhy}`);
+  // THE VERDICT WORDS THAT INVALIDATE THE DRIVE SAY SO AT FULL VOLUME. „blind"
+  // and „unaffordable" both mean the car went in a straight line; a reader who
+  // skims must not be able to miss that, because a straight-line drive dressed
+  // as a steered one is the worst outcome this round can produce.
+  if (tr.verdict === "not-invoked" || tr.verdict === "speed-unreadable") {
+    // THE TWO VERDICTS THAT CARRY NO MEASUREMENT AT ALL WERE THE TWO THAT
+    // RAISED NO ALARM — 2026-08-22, verifier. Both were folded into a quiet
+    // „never-moved" before this, and neither reached `loud()`; a MODE=«wrong»
+    // lane (the loop is never invoked there) and a lane whose speed probe had
+    // died both printed a calm line and nothing else. An empty record must
+    // shout louder than a bad one, not less.
+    loud(`THIS DRIVE WAS NOT STEERED AND NOT MEASURED — ${tr.verdictWhy} Every objective below is evidence about an UNSTEERED car.`);
+  } else if (tr.verdict === "blind" || guidance.state === "unaffordable" || guidance.state === "no-band") {
+    loud(
+      `THIS DRIVE WAS NOT STEERED — ${guidance.state === "steering" ? tr.verdictWhy : guidance.why} ` +
+        "Every objective below, and every frame, is evidence about a car travelling in a straight line.",
+    );
+  } else if (tr.verdict === "wandered" || tr.verdict === "intermittent") {
+    loud(
+      `THIS DRIVE STEERED BADLY (${tr.verdict}) — ${tr.verdictWhy} A missed objective or a departure from the road on ` +
+        "this lane may be the harness's driving and not the product's. Qualify anything filed from it.",
+    );
+  }
+  note(`            CAVEAT: ${guidance.caveat}`);
+}
 {
   const uncredited = (facts.objectives ?? []).filter((o) => !o.done);
   steering.uncreditedObjectives = uncredited.length;
   steering.uncreditedTitles = uncredited.map((o) => o.titleBg);
+  // WRITTEN FROM WHAT HAPPENED, NEVER DECLARED — see the field's own note.
+  steering.tracesSteer = steering.everSteered;
   const chState = steering.channel.state;
   steering.note =
     (steering.everSteered
-      ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right).`
+      ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right) ` +
+        `under the guidance loop, and the tracking verdict on this drive is «${guidance.tracking?.verdict ?? "unsummarised"}». ` +
+        "READ `guidance.caveat` BEFORE FILING: the signal is a road CENTRELINE, so this drive supports findings about " +
+        "direction and none about lane position."
       : // THE KEYS ARE INTERPOLATED, NOT SPELLED OUT, and that is not tidiness.
         // The mutated proof run published `keys: {left: "KeyJ", right: "KeyL"}`
         // beside a sentence reading „the channel exists (KeyA/KeyD)" — a status
         // file contradicting itself in the reassuring direction, in the one
         // field a reader would quote.
-        `the scripted traces did not steer. The channel exists (${STEER_KEYS.left}/${STEER_KEYS.right}); how a correct drive ` +
-        "should steer is a design question owned by devrig/driveScript.ts and the scenario templates. " +
+        // …AND THE OLD SENTENCE HERE WAS RETIRED ON 2026-08-21 BY BEING
+        // ANSWERED. It read „how a correct drive should steer is a design
+        // question owned by devrig/driveScript.ts and the scenario templates",
+        // which was true while nothing on the drive path could turn. There is
+        // a control law now, so reaching this branch is no longer a DESIGN
+        // silence — it is a MEASURED FAILURE of that loop on this lane, and it
+        // must name which one instead of shrugging at a design question.
+        `the drive path did not steer on this lane: the guidance loop reports ${guidance.state.toUpperCase()} — ` +
+        `${guidance.why} The channel itself exists (${STEER_KEYS.left}/${STEER_KEYS.right}) and was tested separately. ` +
         // ONE LITERAL, NOT TWO. §6 greps this sentence out of the source, and
         // the first draft split it across a `+` — so the assertion went red
         // while the published sentence was word-for-word correct. A guard that
@@ -4860,7 +5514,14 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
     // BROKEN said exactly the same words as a lane whose channel was perfect.
     ` CHANNEL: ${chState.toUpperCase()} — ${steering.channel.why}.`;
   note(
-    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : "0 trace commands — the scripted traces do not steer"}` +
+    // „the scripted traces do not steer" WAS A CATEGORICAL CLAIM AND IT IS NO
+    // LONGER TRUE OF THE HARNESS — 2026-08-22, verifier. It printed on every
+    // lane that issued no command, including lanes where the loop RAN and
+    // simply could not see, so the one line a reader greps for still said the
+    // instrument was incapable when it was merely blind here. The MACHINE
+    // SUMMARY must state what happened ON THIS DRIVE and name the loop state
+    // that explains it; `guidance.state`/`tracking.verdict` carry the detail.
+    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : `0 trace commands — THIS DRIVE DID NOT STEER (guidance loop ${guidance.state.toUpperCase()})`}` +
       ` · channel ${steering.wired ? `WIRED (${STEER_KEYS.left}/${STEER_KEYS.right})` : "ABSENT"}` +
       ` · liveness ${chState.toUpperCase()}` +
       (steering.channel.legs.length
@@ -4994,6 +5655,13 @@ saveStatus({
   // drives, and that conflation is what hid a structural limitation for the
   // whole audit. `note` carries the sentence a consumer must not paraphrase.
   steering,
+  // …AND HOW WELL IT TRACKED THE LINE IT WAS FOLLOWING. `tracking.verdict` is
+  // the one field a judge must read before believing anything else in this
+  // file about where the car went: "blind" and "unaffordable" mean the car
+  // travelled in a straight line and this is an unsteered drive; "wandered"
+  // means the harness drove badly and its failures are not the product's.
+  // `caveat` states what the signal cannot support — read it before filing.
+  guidance,
   // …and where the rest of the debrief went. `sidecar` is the claim a reader
   // checks first: if it is false, the sections below the fold are gone.
   debrief: {
