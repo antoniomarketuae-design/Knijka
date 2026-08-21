@@ -58,6 +58,22 @@ if (fs.existsSync(VERDICTS)) {
 const VALID = ["CLOSED", "STILL", "REFUTED", "UNJUDGED"];
 const seen = new Map();
 const problems = [];
+
+/**
+ * Judge problems on the line that WINS, not on every line ever written.
+ *
+ * A corrected row supersedes the original — that is the whole point of
+ * `correctedBy` — so a damaged line that has since been re-cited is history,
+ * not an open defect. Checking every line meant two superseded rows stayed
+ * flagged after the re-cite had already fixed them, which trains a reader to
+ * ignore this report's output. Same resolution order as the poster: originals
+ * first, corrections last, last write wins.
+ */
+const effective = new Map();
+for (const r of rows) if (r.findingId && !r.correctedBy) effective.set(r.findingId, r);
+for (const r of rows) if (r.findingId && r.correctedBy) effective.set(r.findingId, r);
+const superseded = rows.filter((r) => r.findingId && effective.get(r.findingId) !== r).length;
+
 for (const r of rows) {
   if (!r.findingId) {
     problems.push("no findingId: " + JSON.stringify(r).slice(0, 110));
@@ -67,10 +83,24 @@ for (const r of rows) {
     problems.push("unknown findingId " + r.findingId);
     continue;
   }
+  // Record it for the coverage count, then skip the quality checks if a later
+  // line has replaced it.
+  if (effective.get(r.findingId) !== r) {
+    const e0 = seen.get(r.findingId) || [];
+    e0.push(r);
+    seen.set(r.findingId, e0);
+    continue;
+  }
   const v = String(r.verdict || "").toUpperCase();
   if (!VALID.includes(v)) problems.push(r.findingId + ": verdict " + JSON.stringify(r.verdict) + " is not one of " + VALID.join("/"));
-  if (["CLOSED", "REFUTED"].includes(v) && !(r.evidenceFrame && r.evidenceQuote)) {
-    problems.push(r.findingId + ": " + v + " with no " + (!r.evidenceFrame ? "evidenceFrame" : "evidenceQuote") + " — will be downgraded to UNJUDGED");
+  if (["CLOSED", "REFUTED"].includes(v)) {
+    // Presence is not resolution. Two CLOSED lines arrived with Windows paths
+    // mangled by JSON escaping — field present, file absent, check passed.
+    const tries = [r.evidenceFrame, String(r.evidenceFrame || "").split("\\").join("/")];
+    const found = tries.some((t) => { try { return t && fs.existsSync(t); } catch { return false; } });
+    if (!r.evidenceFrame) problems.push(r.findingId + ": " + v + " with no evidenceFrame — will be downgraded to UNJUDGED");
+    else if (!found) problems.push(r.findingId + ": " + v + " cites a frame that DOES NOT RESOLVE — " + JSON.stringify(String(r.evidenceFrame).slice(0, 80)));
+    if (!r.evidenceQuote) problems.push(r.findingId + ": " + v + " with no evidenceQuote — will be downgraded to UNJUDGED");
   }
   const e = seen.get(r.findingId) || [];
   e.push(r);
@@ -96,6 +126,7 @@ console.log("lessons touched    : " + touched.length + " of " + lessons.size);
 console.log("lessons incomplete : " + incomplete.length);
 const dupes = [...seen.entries()].filter(([, v]) => v.length > 1);
 console.log("findings with >1 line: " + dupes.length + "   (a verifier correction is expected to be one of these)");
+console.log("superseded lines     : " + superseded + "   (checked for coverage, not for quality — a later line replaced them)");
 
 if (malformed.length) {
   console.log("\nMALFORMED LINES — these were silently skipped by every reader:");

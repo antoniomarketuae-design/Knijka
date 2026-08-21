@@ -82,7 +82,29 @@ for (const r of rows) if (r.findingId && r.correctedBy) final.set(r.findingId, r
 const noId = rows.filter((r) => !r.findingId).length;
 const unknown = [...final.keys()].filter((k) => !byId.has(k));
 
-const evidenced = (r) => Boolean(r.evidenceFrame && r.evidenceQuote);
+/**
+ * A cited frame must RESOLVE, not merely be present as a field.
+ *
+ * Two CLOSED lines arrived with their Windows paths destroyed by JSON escaping:
+ * "E:\AI driver\...\04-t046s.png" became
+ * "E:AI driver.audit-frameswave-c\framessc-zebra-approach__mobile-right\u0004-t046s.png",
+ * because \A and \. collapsed and \04 became a control character. Both passed a
+ * presence check and neither points at a file. A closure whose evidence cannot
+ * be opened is not evidenced — it is a claim.
+ */
+const resolveFrame = (p) => {
+  if (!p) return null;
+  const tries = [p, String(p).split("\\").join("/"), String(p).split("/").join(path.sep)];
+  for (const t of tries) {
+    try {
+      if (fs.existsSync(t)) return t;
+    } catch {
+      /* an unopenable path is simply not a frame */
+    }
+  }
+  return null;
+};
+const evidenced = (r) => Boolean(resolveFrame(r.evidenceFrame) && r.evidenceQuote);
 const verdictOf = (r) => {
   let v = String(r.verdict || "").toUpperCase();
   if ((v === "CLOSED" || v === "REFUTED") && !evidenced(r)) v = "UNJUDGED";
@@ -111,13 +133,44 @@ const downgraded = [...final.entries()].filter(
 );
 
 // --- report ---------------------------------------------------------------------
-const head = (() => {
+/** HEAD right now — when the retirement was POSTED, not when it was measured. */
+const postedAt = (() => {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], { cwd: REPO, encoding: "utf8" }).trim();
   } catch {
     return "(unknown)";
   }
 })();
+
+/**
+ * The commit the DRIVES attested — read off the drive ledger, never off git.
+ *
+ * This used to stamp `git rev-parse HEAD` and print it as the commit the
+ * lessons were "re-driven on". By the time phase 3 runs, HEAD has moved on
+ * (tool fixes land between the drives and the posting), so the ledger stated a
+ * provenance that was simply false: it named 14f529a for drives measured at
+ * 70d8651. A record that misstates which build it measured is the one thing
+ * this whole wave exists to prevent, and it had it backwards in its own summary.
+ */
+const drivenAt = (() => {
+  const p = path.join(REPO, ".audit-frames", "wave-c", "wave-c-results.jsonl");
+  if (!fs.existsSync(p)) return "(drive ledger not found)";
+  const heads = new Set();
+  for (const l of fs.readFileSync(p, "utf8").split("\n")) {
+    if (!l.trim()) continue;
+    try {
+      const j = JSON.parse(l);
+      if (j.head) heads.add(String(j.head));
+    } catch {
+      /* a torn tail line does not change which build was measured */
+    }
+  }
+  if (heads.size === 1) return [...heads][0];
+  if (heads.size === 0) return "(no drives read)";
+  // More than one build in one corpus is not something to summarise away.
+  return "MIXED:" + [...heads].map((h) => h.slice(0, 12)).join("+");
+})();
+const head = drivenAt;
 
 console.log("corpus standing BROKEN : " + broken.length);
 console.log("verdict lines read     : " + rows.length + (noId ? "   (" + noId + " with NO findingId — unjoinable)" : ""));
@@ -189,7 +242,10 @@ const lines = retire.map((r) =>
     severity: r.finding.severity,
     verdict: r.verdict,
     closedBy: "wave-c",
-    at: head,
+    // Two different commits, and conflating them is how a record ends up
+    // claiming it measured a build it never saw.
+    drivenAt: drivenAt,
+    postedAt: postedAt,
     evidenceFrame: r.row.evidenceFrame,
     evidenceQuote: r.row.evidenceQuote,
     why: r.row.why,
@@ -206,7 +262,9 @@ if (fs.existsSync(LEDGER)) {
     "## Wave C verdicts — " + stamp.slice(0, 10),
     "",
     "Every lesson carrying a standing BROKEN finding was re-driven on a still tree at",
-    "`" + head.slice(0, 12) + "`, with the harness attesting the commit it measured, and each finding",
+    "`" + drivenAt.slice(0, 12) + "` — the commit the harness itself attested on every drive, not the" +
+      " commit HEAD happened to be on when these verdicts were posted (`" + postedAt.slice(0, 12) + "`)." +
+      " Each finding",
     "was adjudicated against its own re-drive by a judge and then attacked by an adversarial",
     "verifier. Retirement required a NEW frame and a quote from it; the tests passing was not",
     "accepted as evidence for any row.",

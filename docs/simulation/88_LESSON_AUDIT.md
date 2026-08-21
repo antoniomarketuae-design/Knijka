@@ -8875,3 +8875,25 @@ changed files:
 | untracked files after round 5 | **8, all test files, all real, all executed.** Counted with `git status -uall` — **the collapsed form reports fewer**, because two of the eight sit in previously-untracked directories (`tools/mobile/__tests__/`, `tools/mobile/lib/__tests__/`) that `git status` prints as a single directory entry. Six vitest: `lesson-ui/__tests__/shellClipAffordances.test.ts` 63 `expect(`s/19 blocks · `lessons/scenario/__tests__/controller-claim-gates.test.ts` 49/21 · `lessons/__tests__/one-home-training-fold.test.ts` 39/9 · `lessons/__tests__/finish-dwell-face.test.ts` 33/14 · `lessons/scenario/__tests__/conditions-lamp-gates.test.ts` 32/14 · `traffic/__tests__/substep.test.ts` 27/15. Two node:test: `tools/mobile/__tests__/lane-evidence.test.mjs` 46 assertions/10 blocks · `tools/mobile/lib/__tests__/exit-integrity.test.mjs` 32/10. **No stray probes, no scratch files, no `zz-*`, and no new non-test file at all** |
 | does each new test file actually RUN? | **yes, and it was checked per-file rather than inferred from a total.** The six vitest files were matched against `npx vitest list --filesOnly`; the two node:test files against the tools gate's own partition line (`22 node:test`, up from 20). **This is the check that catches class (c) — a lane shipping a test file it never ran — and nothing this round is class (c)** |
 | `*probe*` / `*scratch*` / `zz-*` under version control | all resolve to **real modules or real gitignored working directories** — `collision/probe.ts` (the swept-contact memory, with its own 209-line test), `environment/PerfProbe.tsx`, `runtime/__tests__/b15-roundabout-wait.probe.test.ts`, the `tools/clips/headless/*probe*.mjs` render rigs, and everything under `scratchpad/` and `tools/mobile/.out/`, both of which `.gitignore` already covers. **No exceptions left** — `scratch-gate.txt` was the last one and it is deleted |
+
+
+## Wave C verdicts — 2026-08-21
+
+Every lesson carrying a standing BROKEN finding was re-driven on a still tree at
+`70d8651bcf6e` — the commit the harness itself attested on every drive, not the commit HEAD happened to be on when these verdicts were posted (`14f529a68cc5`). Each finding
+was adjudicated against its own re-drive by a judge and then attacked by an adversarial
+verifier. Retirement required a NEW frame and a quote from it; the tests passing was not
+accepted as evidence for any row.
+
+| verdict | count |
+|---|---|
+| CLOSED (symptom gone, frame cited) | 358 |
+| REFUTED (finding was never true) | 17 |
+| STILL (symptom reproduces) | 560 |
+| UNJUDGED (re-drive did not exercise it) | 77 |
+
+**Open list: 1012 → 637.**
+
+Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
+its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
+a retirement is subtracted at read time so it can be reversed by deleting one file.

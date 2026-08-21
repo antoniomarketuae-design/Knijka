@@ -111,11 +111,25 @@ for (const e of perLesson.values()) {
   // 08-debrief.png exactly like the drives that did report a verdict.
   judgeable.push({
     ...e,
+    // ...AND THE FRAME'S EXISTENCE IS NOT THE ANSWER EITHER. The harness writes
+    // 08-debrief.png unconditionally, so the file is present on all 376 drives —
+    // but on two of them it photographs the LIVE COCKPIT with an unclicked
+    // РЕЗУЛТАТ button, not a verdict card. `_audit-status.json` carries
+    // `reachedVerdictCard`, which is the authoritative answer and was sitting
+    // beside the frames the whole time. A batch header that says "the debrief
+    // frame IS there, read it" about a cockpit screenshot sends a judge to read
+    // something that is not a debrief.
     legs: usable.map((l) => {
-      const reached = l.out && fs.existsSync(path.join(l.out, "08-debrief.png"));
-      if (!reached) return l.leg + " [NO DEBRIEF FRAME — closes nothing]";
+      let reached = false;
+      try {
+        const st = JSON.parse(fs.readFileSync(path.join(l.out, "_audit-status.json"), "utf8"));
+        reached = st.reachedVerdictCard === true;
+      } catch {
+        reached = Boolean(l.out && fs.existsSync(path.join(l.out, "08-debrief.png")));
+      }
+      if (!reached) return l.leg + " [NO VERDICT CARD REACHED — 08-debrief.png is the live cockpit; closes nothing]";
       if (l.verdict && l.verdict !== "(none)") return l.leg + " (" + l.verdict + ")";
-      return l.leg + " (НЕЗАВЪРШЕН — unfinished; the debrief frame IS there, read it)";
+      return l.leg + " (НЕЗАВЪРШЕН — unfinished; the debrief card IS there, read it)";
     }),
   });
 }

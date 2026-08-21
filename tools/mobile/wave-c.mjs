@@ -43,7 +43,7 @@
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -180,6 +180,20 @@ for (const p of planned) {
     },
   );
   const stdout = (res.stdout || "") + (res.stderr || "");
+
+  // KEEP THE TRANSCRIPT. This used to parse the harness output and throw it
+  // away, so Wave C produced 0 run logs where sweep161 produced 520 — and a
+  // verifier trying to settle whether a guard had fired found the tick report,
+  // the DOM listing and the whole drive trace simply gone. sweep161 findings
+  // can cite `run.log:120`; nothing from this wave could. The frames are the
+  // evidence, but the log is what says WHY the frames look like that.
+  try {
+    mkdirSync(outDir, { recursive: true });
+    writeFileSync(path.join(outDir, "run.log"), stdout);
+  } catch {
+    /* a drive that produced frames is not void because its log could not be written */
+  }
+
   const s = parseSummary(stdout);
   if (s.treeMoved) refused++;
   ran++;
