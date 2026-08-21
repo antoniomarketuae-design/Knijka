@@ -173,7 +173,7 @@
  * A lesson that fails its own drive still exits 0: that is a finding, not a
  * broken run, and conflating the two is how a re-drive lane wastes a day.
  */
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -642,21 +642,139 @@ const read = () =>
     // `textContent` reads no layout at all, and the rect already answers "is it
     // on the glass". The scan is also scoped to the play shell: the nav rail is
     // not the HUD and never was.
+    //
+    // ── AND WHAT IT DROPS IS NOW SAID OUT LOUD — 2026-08-21 ──────────────────
+    //
+    // THE CLAIM THAT SENT ME HERE, and it does not survive the measurement.
+    // A verifier reported that this `>4px` test blinds the census — that
+    // `[data-hud="objective-banner"]` is „0 × 0 while painting a legible task
+    // title", so the banner is missing from every log line this harness has
+    // ever written. MEASURED on the live rig 2026-08-21 (WebKit,
+    // iphone16-landscape, sc-junction-scan@L1, dev server 4611160afb1e), six
+    // samples across one drive, each one comparing THREE tests — the rect, an
+    // ancestor-chain walk for display/visibility/opacity, and the browser's own
+    // `Element.checkVisibility()`:
+    //
+    //   div[data-hud="objective-banner"]  0×0  rect=drop  chain=drop  checkVis=false
+    //   div[data-hud="notify-column"]     0×0  rect=drop  chain=drop  checkVis=false
+    //   [role=status] «Съветник»          0×0  rect=drop  chain=drop  checkVis=false
+    //   span[data-hud="speed-block"]      0×0  rect=drop  chain=drop  checkVis=false
+    //   div[data-hud="status-dashboard"] 325×24 all three KEEP
+    //
+    // All three agree, on every element, in every sample. And the frames say
+    // the same thing: `census2-4.png` has no task banner on the glass at all —
+    // the notify column is showing a fault card, and the «D 15 км/ч» a reader
+    // sees is the 3D CLUSTER inside the WebGL canvas, not this DOM readout
+    // (`PlayAreaStyles`: `html[data-sim-camera="cockpit"] [data-hud="speed-
+    // block"]` folds the DOM copy away precisely because the cabin already
+    // shows it). So the filter is not hiding a painted banner. The banner is
+    // NOT PAINTED, on the phone, in the cockpit camera, for most of a drive.
+    //
+    // WHICH IS THE MORE INTERESTING ANSWER, and the one this file was not
+    // giving: „the objective banner is in the DOM and is not on the glass" is a
+    // statement about the PRODUCT that no drive has ever recorded, and it was
+    // indistinguishable from „the harness did not look". A `continue` is a
+    // silence, and every instrument bug in this programme has hidden in one. So
+    // the drop is COUNTED and NAMED from here on: `strings` is what a reader of
+    // the frame can see, `unpainted` is what the DOM holds and the picture does
+    // not, and the two are printed on separate lines.
+    //
+    // The test itself moves off the bare rect and onto the ancestor chain,
+    // which is the reason rather than a proxy for it: a `display: contents`
+    // wrapper and a baseline-aligned inline box both report a degenerate rect
+    // while painting, and the census must not start lying the day one appears.
     const root = document.querySelector("[data-sim-shell]") ?? document.body;
-    const seen = new Set(), strings = [];
+    const painted = (el) => {
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        if (cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) return false;
+        if (cs.contentVisibility === "hidden") return false;
+      }
+      // …and it must occupy the glass somewhere. `getClientRects()` is the
+      // second question, not a repeat of the first: an inline box that reports
+      // an empty BORDER box still returns its line boxes here.
+      const r = el.getBoundingClientRect();
+      if (r.width >= 1 && r.height >= 1) return true;
+      for (const q of el.getClientRects()) if (q.width >= 1 && q.height >= 1) return true;
+      return false;
+    };
+    const seen = new Set(), strings = [], unpainted = [];
+    // ── A HANDLE IS NOT AN INSTANCE, AND THE COUNTS ARE NOT DECORATION ──────
+    //
+    // MEASURED on the live rig 2026-08-21 (WebKit, iphone16-landscape,
+    // sc-junction-scan@L1), same drive as the note above, second adversarial
+    // pass. The phone renders TWO `[data-hud="notify-column"]` elements:
+    //
+    //   div[notify-column] display:none  0×0        ← holds the objective
+    //                                                 banner and the advisor
+    //   div[notify-column] display:flex  180×95.8   ← «ИНСТРУКЦИИ …», ON SCREEN
+    //
+    // The line below said «✗ NOT ON THE GLASS — notify-column: …» while a
+    // second element carrying that exact handle was painted and in `strings`
+    // one line above it. A handle-level sentence about an instance-level fact,
+    // which is a false general claim in the direction that invents a product
+    // defect — the mirror of the drop it was written to end.
+    //
+    // AND THE SILENCE WAS ONLY MOVED, NOT ENDED. The same sample: 28 elements
+    // failed `painted`, 8 carried a `data-hud` and were named, and TWENTY had
+    // no handle and were dropped exactly as before — among them the ADVISOR
+    // CARD, `[role=status][aria-label="Съветник — следващо действие"]`, which
+    // is one of the two surfaces REVERSE_DEMAND_SEL reads. So the totals now
+    // travel with the list: a reader who is told "8" and not "28" is being
+    // told the census saw eight things, and it saw twenty-eight.
+    let unpaintedTotal = 0, unpaintedUnnamed = 0, unpaintedOverCap = 0;
     for (const el of root.querySelectorAll(
       "[data-hud],[role=alertdialog],[role=dialog],[role=status],h1,h2,h3,li,button,p",
     )) {
-      const r = el.getBoundingClientRect();
-      if (r.width < 4 || r.height < 4) continue;
       const t = norm(el.textContent);
       if (!t || t.length < 2 || seen.has(t)) continue;
+      if (!painted(el)) {
+        unpaintedTotal += 1;
+        // Only NAMED surfaces are worth a line — an unpainted `<p>` inside an
+        // unpainted card would print the same fact three times, and a reader
+        // who is told everything is told nothing. The ones dropped for want of
+        // a handle are COUNTED, because "not worth a line" and "not seen" were
+        // the same silence until this counter existed.
+        const hud = el.getAttribute("data-hud");
+        if (!hud) { unpaintedUnnamed += 1; continue; }
+        if (unpainted.length >= 8) { unpaintedOverCap += 1; continue; }
+        // The twin check is scoped to handles that are safe to interpolate —
+        // a `data-hud` value is authored, never user text, but a selector built
+        // from a string is a selector that can throw, and this runs at 2 Hz.
+        let twins = [el];
+        if (/^[A-Za-z0-9_-]+$/.test(hud)) twins = [...root.querySelectorAll(`[data-hud="${hud}"]`)];
+        const litTwin = twins.some((q) => q !== el && painted(q));
+        unpainted.push(
+          `${hud}${twins.length > 1 ? ` (${twins.length} elements carry this handle; ${litTwin ? "ANOTHER ONE IS PAINTED — this is about THIS copy, not the surface" : "none of them is painted"})` : ""}: ${t.slice(0, 80)}`,
+        );
+        continue;
+      }
       seen.add(t);
       strings.push(t.slice(0, 200));
       if (strings.length >= 26) break;
     }
     return {
       kmh: sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1,
+      // THE SELECTOR, ON EVERY NAMED FRAME. The dial cannot see direction —
+      // `displaySpeedKmh` is `Math.round(Math.abs(v))`, so a car reversing at
+      // 6 км/ч and a car creeping forward at 6 км/ч print the same number. The
+      // letter is the only thing on the glass that tells them apart, and for
+      // 376 drives no beat recorded it.
+      gear: [...(document.querySelector("[data-sim-shell]") ?? document.body)
+        .querySelectorAll('[aria-label^="Скоростен лост: "]')]
+        // NO VISIBILITY TEST AT ALL, and the reason is the opposite of the one
+        // that was written here first. This element is NOT „painted while
+        // reporting 0 × 0": measured 2026-08-21 it is 0 × 0 AND not painted AND
+        // not laid out, on every sample of a phone drive, because
+        // `PlayAreaStyles` folds `[data-hud="speed-block"]` away whenever the
+        // cockpit camera is live — the cabin's own 3D cluster is showing the
+        // letter instead, inside the canvas, where no selector can reach it.
+        // The ATTRIBUTE is still minted from `snap.gearLabel`, i.e. from
+        // `driveline.selector`, so it remains the driveline's truth; a
+        // visibility test here would answer „this car has no gear" about a car
+        // whose gear is legible in the photograph. Read the label, never the box.
+        .map((el) => el.getAttribute("aria-label").replace(/^Скоростен лост:\s*/, "").trim())
+        .filter((v, i, a) => v && a.indexOf(v) === i),
       overlay: card?.getAttribute("data-sim-overlay") ?? "-",
       state: card?.getAttribute("data-sim-overlay-state") ?? "-",
       // THE SESSION ENDED IS A STRUCTURE, NOT A WORD. Three surfaces are minted
@@ -671,16 +789,39 @@ const read = () =>
         document.querySelector('[data-hud="end-bar"]') !== null ||
         document.querySelector('[data-sim-overlay="end"]') !== null,
       strings,
+      unpainted,
+      unpaintedTotal,
+      unpaintedUnnamed,
+      unpaintedOverCap,
       // The ONE innerText of the pass, and the play shell rather than the whole
       // document — the debrief lives inside the shell, the nav rail never did.
       body: norm(root.innerText).slice(0, 3000),
     };
-  }).catch(() => ({ kmh: -1, overlay: "?", state: "?", end: false, strings: [], body: "" }));
+  }).catch(() => ({ kmh: -1, gear: [], overlay: "?", state: "?", end: false, strings: [], unpainted: [], unpaintedTotal: 0, unpaintedUnnamed: 0, unpaintedOverCap: 0, body: "" }));
 
 const beat = async (label, { withShot = true } = {}) => {
   const s = await timed("read", read);
-  note(`  [${label}] ${s.kmh} км/ч  card=${s.overlay}/${s.state}${s.end ? "  END-SURFACE" : ""}`);
+  note(`  [${label}] ${s.kmh} км/ч  gear=${s.gear.length ? s.gear.join("/") : "?"}  card=${s.overlay}/${s.state}${s.end ? "  END-SURFACE" : ""}`);
   s.strings.forEach((t) => note(`      · ${t}`));
+  // A DIFFERENT MARK FOR A DIFFERENT FACT. `·` is „a reader of this frame can
+  // see this"; `✗` is „the DOM holds this and the photograph does not". They
+  // were one silence until 2026-08-21 and they are opposite diagnoses: the
+  // second is a finding about the product's own layout, and every drive so far
+  // reported it as nothing at all.
+  (s.unpainted ?? []).forEach((t) => note(`      ✗ NOT ON THE GLASS — ${t}`));
+  // …AND HOW MANY WERE NOT WORTH A LINE. Measured 28 unpainted against the 8
+  // printed on one sc-junction-scan beat, so the list on its own understates
+  // the census by 20 — among them the ADVISOR CARD, which carries no
+  // `data-hud` and is one of the two surfaces the reverse gate reads. A
+  // truncated list that does not say it is truncated is the same silence one
+  // level down, and this programme has been burned by that shape before.
+  const notNamed = (s.unpaintedUnnamed ?? 0) + (s.unpaintedOverCap ?? 0);
+  if (notNamed > 0)
+    note(
+      `      ✗ …and ${notNamed} more held-but-not-painted element(s) were NOT named ` +
+        `(${s.unpaintedUnnamed ?? 0} carry no data-hud, ${s.unpaintedOverCap ?? 0} past the 8-line cap) — ` +
+        `${s.unpaintedTotal ?? 0} unpainted in total this beat.`,
+    );
   if (withShot) await shot(label);
   return s;
 };
@@ -992,6 +1133,1325 @@ const brake = async (on, kmh = null) => {
   holdS = on;
 };
 
+/* ===========================================================================
+ * THE STEERING CHANNEL — 2026-08-21. THE HARNESS HAD NEVER TURNED A WHEEL.
+ * ===========================================================================
+ *
+ * A KEYBOARD CENSUS OF THIS FILE RETURNED THREE KEYS: KeyW, KeyS, Escape. The
+ * product takes steering from KeyA/ArrowLeft and KeyD/ArrowRight
+ * (`engine/input.ts`: `const left = on("KeyA") || on("ArrowLeft")`), and there
+ * is no auto-steer, lane-assist or route-following anywhere under
+ * `platform/src/modules/sim` — the «Пълна помощ» aid rungs change coaching and
+ * pausing, never control. So every drive this audit has ever taken — all 376 of
+ * Wave C and every drive behind the original 1,712 findings — was a car that
+ * could accelerate and brake AND COULD NOT TURN.
+ *
+ * That is the mechanism behind «the ego left the carriageway at ~t030s and
+ * stood still for 175 s», behind «the correct drive drove into the parked car»,
+ * and behind a large share of the 92 of 145 lessons recorded as having no
+ * drivable success path.
+ *
+ * ── WHAT THIS BLOCK IS, AND WHAT IT DELIBERATELY IS NOT ────────────────────
+ *
+ * It is the CAPABILITY and its accounting. It is not a driving line. The
+ * scripted traces still do not steer, on purpose: how a correct drive should
+ * steer is a DESIGN question owned by `devrig/driveScript.ts` and the scenario
+ * templates, and a drive that steers BADLY is worse than one that cannot steer,
+ * because it manufactures confident wrong findings instead of honest silence.
+ * `steering.note` below says so on every lane so nobody reads „0 commands" as
+ * „steering was not needed".
+ *
+ * ── THE DISCIPLINE, AND EVERY RULE IN IT WAS MEASURED ──────────────────────
+ *
+ * The pedal helpers exist because a stray standstill brake press silently put a
+ * car into R and then reported a failed brake. Three ways a steering channel
+ * can tell the same kind of lie, and one guard each:
+ *
+ *  1. BOTH DIRECTIONS AT ONCE IS NOT STEERING, IT IS STRAIGHT AHEAD.
+ *     `input.ts` computes `out.steer = (left ? 1 : 0) - (right ? 1 : 0)`, so a
+ *     harness holding KeyA and KeyD together sends ZERO steer while believing
+ *     it is turning — the exact shape of the reverse bug, in the other control.
+ *     The channel therefore holds ONE direction at a time, by construction: the
+ *     opposite key is released before the new one goes down, and an attempt to
+ *     hold both is refused and counted.
+ *
+ *  2. A STEER AT A STANDSTILL MOVES THE CAMERA AND NOT THE CAR, AND IT MOVES IT
+ *     A LOT. MEASURED on the live rig 2026-08-21 (WebKit, iphone16-landscape,
+ *     sc-junction-scan@L1, dev server 4611160afb1e), car at 0 км/ч, the world
+ *     band photographed before / while held / after release:
+ *
+ *       control (no key)   HELD    0 px  0.0°   NET 0 px   ncc 0.968
+ *       KeyA held          HELD +156 px +5.4°   NET 0 px   ncc 0.990
+ *       KeyD held          HELD -151 px -5.2°   NET 0 px   ncc 0.996
+ *
+ *     Letting go puts the world back EXACTLY where it started, and holding the
+ *     key three times as long moves it exactly as far. That is not a car
+ *     turning — it is `CameraRig.tsx`'s `steerNorm * COCKPIT_LOOK_INTO_TURN`, a
+ *     head yaw that saturates and returns. The measured ±5.4°/−5.2° is the
+ *     product's own constant read off the pixels: `COCKPIT_LOOK_INTO_TURN` is
+ *     0.09 rad = 5.16°.
+ *
+ *     A harness that asserted „the world moved, so the steering works" would
+ *     have gone green on a car that never changed heading by one degree, which
+ *     is why the assertion below measures A→C and never A→B. Standstill steers
+ *     are counted separately and named in the log.
+ *
+ *  3. A HELD STEER KEY SURVIVES A PAUSE DRAIN. The drain releases both PEDALS
+ *     and resynchronises `holdW`/`holdS` because a key sent while a modal owns
+ *     focus never reaches the sim. A steer key left down there would keep the
+ *     wheel over for the rest of the drive with nothing tracking it, so it is
+ *     released and resynchronised in the same breath as the pedals.
+ */
+const STEER_KEYS = { left: "KeyA", right: "KeyD" };
+/**
+ * Below this the car does not answer the wheel — see measurement 2. The dial
+ * rounds `Math.abs(v)`, so a displayed 1 can be 1.4 км/ч; 2 is the first
+ * reading that cannot also be a standstill.
+ */
+const STEER_MIN_KMH = 2;
+/** Everything the run learned about steering, published on EVERY lane. */
+const steering = {
+  keys: STEER_KEYS,
+  /** the channel EXISTS in this build of the harness. Before 2026-08-21 there
+   *  was no such field and no such channel, and the two were indistinguishable
+   *  from the outside — which is how 376 drives were adjudicated. */
+  wired: true,
+  commands: 0,
+  heldMs: { left: 0, right: 0 },
+  everSteered: false,
+  refusedBothAtOnce: 0,
+  atStandstill: 0,
+  releasedByPauseDrain: 0,
+  /** THE SCRIPTED TRACES DO NOT STEER. Stated as data, not only as prose, so a
+   *  consumer can filter on it instead of parsing a sentence. */
+  tracesSteer: false,
+  probe: null,
+  note: null,
+};
+let steerHeld = null;
+let steerSince = null;
+/**
+ * Hold ONE steering direction, or `null` for straight ahead.
+ *
+ * `kmh` is optional and is only used to classify the command — this helper
+ * never refuses on speed, because a steer at rest is INERT rather than harmful
+ * (unlike a standstill brake press, which selects R). Refusing it would also
+ * make a future parking trace unable to pre-position the wheel. It is counted
+ * and named instead: `steering.atStandstill`.
+ */
+const steer = async (dir, kmh = null) => {
+  if (dir !== null && dir !== "left" && dir !== "right") {
+    steering.refusedBothAtOnce += 1;
+    return false;
+  }
+  if (dir === steerHeld) return true;
+  const now = Date.now();
+  if (steerHeld !== null) {
+    // ONE DIRECTION AT A TIME, ALWAYS — the release happens before the press,
+    // so there is no instant in which both keys are down and the car is being
+    // told to go straight while the harness believes it is turning.
+    await page.keyboard.up(STEER_KEYS[steerHeld]).catch(() => {});
+    if (steerSince !== null) steering.heldMs[steerHeld] += now - steerSince;
+    steerHeld = null;
+    steerSince = null;
+  }
+  if (dir !== null) {
+    await page.keyboard.down(STEER_KEYS[dir]).catch(() => {});
+    steerHeld = dir;
+    steerSince = Date.now();
+    steering.commands += 1;
+    steering.everSteered = true;
+    if (kmh !== null && kmh >= 0 && kmh < STEER_MIN_KMH) steering.atStandstill += 1;
+  }
+  return true;
+};
+/** Let go of whatever is held and bank the time. Used by the pause drain and at
+ *  the end of the drive — a key still down when the process exits is a key the
+ *  next reader cannot account for. */
+const steerRelease = async (why = null) => {
+  if (steerHeld === null) return;
+  if (why) steering.releasedByPauseDrain += 1;
+  await steer(null);
+};
+
+/* ===========================================================================
+ * THE STEERING POSITIVE CONTROL — `KNIJKA_STEER_PROOF=1`
+ * ===========================================================================
+ *
+ * „I sent KeyA" IS NOT EVIDENCE. It is the same sentence as „I sent the brake
+ * key", which this harness has already believed while a car drove backwards.
+ * The claim a steering channel has to earn is that THE CAR CHANGED HEADING, and
+ * the only instrument that can answer it on a real lesson page is the world
+ * itself: there is no heading in the DOM (the live HUD publishes speed, gear,
+ * limit, lamps and telltales and nothing about where the car is pointing), the
+ * minimap is only rendered on the debrief, and `window.__driveRig` — which does
+ * publish `headingDeg` — is /dev/drive-rig only and 404s in production, which
+ * this harness is forbidden to touch for exactly that reason.
+ *
+ * So the world is photographed and the photographs are measured.
+ *
+ * ── HOW, AND WHY IT IS THREE FRAMES AND NOT TWO ────────────────────────────
+ *
+ * ── WHAT IT MEASURED, THE DAY IT LANDED ────────────────────────────────────
+ *
+ * sc-junction-scan@L1, WebKit, iphone16-landscape, dev server 4611160afb1e.
+ * Every number is a device pixel of the world band and the angle beside it is
+ * that pixel count at ≈0.0347°/px:
+ *
+ * THREE CONSECUTIVE RUNS, and the spread across them is the reproducibility:
+ *
+ *   AT REST — the wheel moves the CAMERA and puts it back
+ *     rest-ctl    (no key)   HELD       0 px    0.0°   NET 0 px  ncc 0.965–0.971
+ *     rest-left   KeyA       HELD +156…+158 px +5.4°   NET 0 px  ncc 0.991–0.993
+ *     rest-right  KeyD       HELD -151…-152 px -5.3°   NET 0 px  ncc 0.994–0.996
+ *   — and ±5.3° is `COCKPIT_LOOK_INTO_TURN` read off the pixels: the constant
+ *     is 0.09 rad = 5.16°. The measurement chain agrees with the product's own
+ *     number to a quarter of a degree, which is the best evidence there is that
+ *     this probe is measuring what it says it is.
+ *
+ *   NUDGED — stopped, one 700 ms pull of throttle, stopped again
+ *     nudge-ctl  (no key)   NET   +9, +9, +15 px      +0.3…+0.5°
+ *     nudge-left  KeyA      NET +340, +308, +412 px  +11.8, +10.7, +14.3°   (ncc ≈0.81 against an unslid ≈0.27)
+ *     nudge-right KeyD      NET -291, -377, -380 px  -10.1, -13.1, -13.2°   (ncc ≈0.82 against an unslid ≈0.53)
+ *
+ * Signed the way physics requires — KeyA turns the car left, so the world moves
+ * RIGHT — thirty times the control, and it stays rotated after the key is
+ * released, which the camera does not.
+ *
+ * AND IT WAS WATCHED TO FAIL. With `STEER_KEYS` mutated to `KeyJ`/`KeyL`, two
+ * keys the product ignores, the same six legs read +7, +9, +15 px — the
+ * control's own noise — and exactly the two claims about KeyA/KeyD went red
+ * while the two control checks stayed green. An assertion nobody has seen fail
+ * is a decoration; this one has.
+ *
+ * ── WHAT IT WOULD TAKE TO MAKE THE TRACES STEER ────────────────────────────
+ *
+ * Not this file's call, and the numbers above are the input to whoever makes
+ * it. What a trace would steer AGAINST is the open question: the live HUD
+ * publishes no heading, no lateral offset and no distance-to-target, so a
+ * closed loop has nothing on the glass to close around. The three candidates,
+ * in the order a designer should try them:
+ *   1. `[data-hud="follow-hint"]` and the guidance ribbon the scene already
+ *      draws — the product's own „follow the blue line" is a driving line, and
+ *      a controller that tracked it would be steering the way the lesson
+ *      teaches rather than the way an audit invented.
+ *   2. The objective geometry the scenario already carries (`reachZone` x/y),
+ *      which is authored, exact, and needs no pixels — but is not published to
+ *      the page, so it would need a HUD handle or a data attribute to reach.
+ *   3. This probe's own correlation as a yaw sensor at ~0.5 Hz. It works, it is
+ *      measured, and it costs two screenshots a tick — far too slow for a
+ *      control law and fine for an assertion, which is why it is only used for
+ *      one here.
+ * Whatever it steers against, the acceptance test is the one thing this file
+ * can assert already: a correct drive must still finish with the debrief it
+ * finished with before, or the steering has changed what the audit measures.
+ *
+ * A band of the scene above the road is grabbed as a PNG, decoded BY THE PAGE
+ * (`createImageBitmap` + a 2D canvas — the WebGL canvas is not readable, it
+ * carries no `preserveDrawingBuffer`), reduced to grey, mean-subtracted, and
+ * cross-correlated against another band over horizontal shifts. The shift with
+ * the best normalised correlation is how far the world moved sideways, i.e. how
+ * far the view rotated.
+ *
+ * Each leg takes THREE frames:
+ *      A   before the key
+ *      B   with the key still HELD
+ *      C   after the key is released and the camera has settled
+ *
+ * and the answer is A→C, never A→B, because of measurement 2 in the block
+ * above: `CameraRig.tsx` yaws the head by `steerNorm * COCKPIT_LOOK_INTO_TURN`
+ * while the wheel is over, and that offset SATURATES AND RETURNS. At a
+ * standstill A→B reads ±166 px and A→C reads 0 px at ncc 0.999 — so an
+ * assertion written on A→B would have gone green on a car that never turned.
+ * That is the reassuring-direction trap this whole programme is about, and it
+ * was live in the first draft of this probe.
+ *
+ * ── AND A FLAT CORRELATION IS NOT A ZERO ───────────────────────────────────
+ *
+ * A scene that has changed too much to recognise produces a peak barely above
+ * its neighbours, and `argmax` still returns a number. Every leg therefore
+ * carries the peak AND the best score at least `PEAK_GUARD_PX` away from it; a
+ * leg whose peak does not clear its runner-up by `PEAK_MARGIN` is VOID, and a
+ * void leg is reported as void rather than folded into an average as a 0.
+ */
+const STEER_PROOF = process.env.KNIJKA_STEER_PROOF === "1";
+/**
+ * HOW LONG TO HOLD, AND WHY IT IS NOT LONGER — measured, twice.
+ *
+ * The first draft held 1500 ms and EVERY moving leg came back void:
+ *   move-left1   HELD  296px  NET  300px  ncc 0.1131   ← the scene is unrecognisable
+ *   move-right1  HELD -300px  NET -152px  ncc 0.38
+ * At 3 км/ч a 1.5 s hold turns the car ~15° on top of the camera's ~15°, and
+ * ~30° of a 71°-wide band is nearly half the picture replaced by scenery that
+ * was off-frame when the first photograph was taken. There is nothing left to
+ * correlate. A longer hold is a WEAKER measurement, which is the opposite of
+ * the intuition, and the void legs are the only reason that was visible.
+ *
+ * 900 ms turns ~9° ≈ 87 px of this band — comfortably over PROOF_MIN_PX and
+ * about an eighth of the width, so the overwhelming majority of the scene is
+ * still in both frames.
+ */
+const PROOF_HOLD_MS = 900;
+/** …and let the look-into-turn offset come all the way home before frame C.
+ *  Shorter than the hold's first draft for the same reason: every millisecond
+ *  here is forward translation that the correlation has to survive. */
+const PROOF_SETTLE_MS = 1000;
+/**
+ * Bounded by the template width below, not by taste: the search may not slide
+ * the template off the edge of the frame it is being matched into.
+ *
+ * AND THE UNIT IS A DEVICE PIXEL, WHICH COST A DRAFT TO NOTICE. Playwright
+ * screenshots at the context's `deviceScaleFactor` — 3 on `iphone16-landscape`
+ * — so a band clipped at 682 CSS px arrives as a 2046-px PNG and every shift
+ * this probe reports is three times the CSS number. At ±230 EVERY turn leg came
+ * back «the best match is at the search limit» while the two controls agreed to
+ * the pixel (+8 px, twice), which is what a search window three times too small
+ * looks like. The angle conversion had the same bug and it is the reason an
+ * earlier draft „measured" a 14.7° look-into-turn against a constant that caps
+ * it at 5.2°.
+ */
+const PROOF_MAX_SHIFT_PX = 600;
+/**
+ * BOTH PHOTOGRAPHS ARE TAKEN WITH THE CAR STOPPED — 2026-08-21, third draft.
+ *
+ * The second draft photographed a MOVING car and every leg came back void:
+ *   move-ctl1  NET  118px ncc 0.5021/0.4981   move-left1 NET -164px ncc 0.6377/0.6226
+ *   move-ctl2  NET  -16px ncc 0.9240/0.9077   move-left2 NET  100px ncc 0.6761/0.6597
+ * — the two LEFT legs disagreed on the SIGN, and a control leg that pressed
+ * nothing reported 118 px. That is not a noisy measurement, it is no
+ * measurement: three seconds of bracket at 3 км/ч is metres of forward
+ * translation plus whatever the ambient traffic did, and a rotation of 9° is a
+ * small term inside all of that.
+ *
+ * A turn is CHEAP IN METRES and that is what makes this tractable. The
+ * kinematic radius is L/tan δ ≈ 2.5 m / tan 35° ≈ 3.6 m, so 15° of heading
+ * costs under a metre of road. Stop the car, nudge it forward with the wheel
+ * over, stop it again, let go, and the two photographs differ by a rotation and
+ * about a metre — instead of by a rotation and four metres of a moving world.
+ *
+ * The control leg does the identical nudge with no key, so the metre of
+ * translation is in BOTH arms of the comparison and only the heading is not.
+ */
+const PROOF_NUDGE_MS = 700;
+/** ONE, AND THE COUNT CAME DOWN TWICE ON MEASUREMENTS.
+ *
+ *  Three nudges put two of six legs past the ±230 px search limit. Two got the
+ *  legs inside the window but left them at 100–230 px, and at that magnitude
+ *  the correlation itself gave way — a quarter of the band replaced by scenery
+ *  that was off-frame in the first photograph, and peaks of ncc 0.07, 0.10,
+ *  0.35 that mean nothing at all. A BIGGER TURN IS A WORSE MEASUREMENT, which
+ *  is exactly backwards from the intuition that keeps reaching for a longer
+ *  hold. One nudge turns ~6–9°, which is 60–90 px of this band: five to nine
+ *  times the noise floor and under a seventh of the picture. */
+const PROOF_NUDGES = 1;
+const PEAK_GUARD_PX = 25;
+const PEAK_MARGIN = 0.05;
+/** How far the world must move for a leg to count as a turn, and how far it may
+ *  move on a leg that pressed nothing. Both are read off the measurement in the
+ *  block above: the straight controls landed on 0 px and the smallest accepted
+ *  turn on 85 px, so 40 px sits between them with a factor of two on each side. */
+const PROOF_MIN_PX = 40;
+const PROOF_NOISE_PX = 40;
+
+/** The scene band, and the horizontal angle a pixel of it subtends. */
+async function proofBand() {
+  const g = await page
+    .evaluate(() => {
+      const shell = document.querySelector("[data-sim-shell]") ?? document.body;
+      let best = null;
+      for (const c of shell.querySelectorAll("canvas")) {
+        const r = c.getBoundingClientRect();
+        if (!best || r.width * r.height > best.w * best.h) {
+          best = { x: r.x, y: r.y, w: r.width, h: r.height };
+        }
+      }
+      // THE SCALE, TAKEN FROM THE PAGE AND NOT ASSUMED. Every shift this probe
+      // reports is in the PNG's pixels, and the PNG is `deviceScaleFactor`
+      // times the CSS box (3 on iphone16-landscape). Without this the angles
+      // come out three times too large — an earlier draft „measured" a 14.7°
+      // camera yaw against a product constant that caps it at 5.2°, and the
+      // arithmetic, not the sim, was the liar.
+      return best ? { ...best, dpr: window.devicePixelRatio || 1 } : null;
+    })
+    .catch(() => null);
+  if (!g || g.w < 40 || g.h < 40) return null;
+  return {
+    clip: {
+      x: Math.round(g.x + g.w * 0.1),
+      y: Math.round(g.y + g.h * 0.3),
+      width: Math.round(g.w * 0.8),
+      height: Math.round(g.h * 0.18),
+    },
+    canvas: g,
+    dpr: g.dpr,
+    // A pinhole at the centre of the cockpit's ~75.4° horizontal FOV
+    // (`vehicle/tuning.ts`: COCKPIT_HFOV_RAD ≈ 75.4°, held constant across
+    // window shapes), per DEVICE pixel. Quoted as „about": the projection is
+    // not a linear ruler and this understates angles away from the centre.
+    degPerPx: ((2 * Math.tan((75.4 * Math.PI) / 360)) / (g.w * g.dpr)) * (180 / Math.PI),
+  };
+}
+const proofGrab = async (band) => (await page.screenshot({ clip: band.clip })).toString("base64");
+
+/** Cross-correlate two PNG bands, in the page, and say how sure it is. */
+const proofShift = (a, c) =>
+  page
+    .evaluate(
+      async ({ a, c, maxShift, guard }) => {
+        const toGray = async (b64) => {
+          const bin = atob(b64);
+          const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+          const bmp = await createImageBitmap(new Blob([u8], { type: "image/png" }));
+          // NOT OffscreenCanvas — this browser is WebKit and does not have it;
+          // the first draft of this probe died on that line.
+          const cv = document.createElement("canvas");
+          cv.width = bmp.width;
+          cv.height = bmp.height;
+          const ctx = cv.getContext("2d");
+          ctx.drawImage(bmp, 0, 0);
+          const { data, width, height } = ctx.getImageData(0, 0, bmp.width, bmp.height);
+          const g = new Float32Array(width * height);
+          for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            g[p] = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          }
+          return { g, width, height };
+        };
+        const A = await toGray(a);
+        const C = await toGray(c);
+        if (A.width !== C.width || A.height !== C.height) return { error: "the two bands are different sizes" };
+        const { width: W, height: H } = A;
+        let identical = true;
+        for (let i = 0; i < A.g.length; i++) if (A.g[i] !== C.g[i]) { identical = false; break; }
+        /* ── A TEMPLATE, NOT AN OVERLAP — and this is the whole difference
+         * between a working measurement and six void legs.
+         *
+         * Comparing the two bands over their shared region shrinks that region
+         * by exactly the amount being measured, so the bigger the turn the less
+         * evidence there is for it, and past ~20 % of the width the correlation
+         * simply collapses (measured: ncc 0.11 on a leg that really did turn).
+         * Matching the CENTRAL HALF of the first frame into the whole of the
+         * second keeps the compared area constant at every shift — the score at
+         * ±170 px is computed over the same pixels as the score at 0. */
+        const tx0 = Math.floor(W * 0.32);
+        const tx1 = Math.ceil(W * 0.68);
+        const room = Math.min(tx0, W - tx1) - 1;
+        const span = Math.max(1, Math.min(maxShift, room));
+        // Proper zero-mean NCC: the mean of each window, not one mean for the
+        // whole frame. A global mean makes the score drift with the shift, and
+        // a score that drifts has a peak that is an artefact of the drift.
+        let mA = 0, nA = 0;
+        for (let y = 0; y < H; y += 2) {
+          const row = y * W;
+          for (let x = tx0; x < tx1; x += 2) { mA += A.g[row + x]; nA++; }
+        }
+        mA /= Math.max(1, nA);
+        const score = (s) => {
+          let mC = 0, n = 0;
+          for (let y = 0; y < H; y += 2) {
+            const row = y * W;
+            for (let x = tx0; x < tx1; x += 2) { mC += C.g[row + x + s]; n++; }
+          }
+          mC /= Math.max(1, n);
+          let num = 0, da = 0, dc = 0;
+          for (let y = 0; y < H; y += 2) {
+            const row = y * W;
+            for (let x = tx0; x < tx1; x += 2) {
+              const va = A.g[row + x] - mA, vc = C.g[row + x + s] - mC;
+              num += va * vc; da += va * va; dc += vc * vc;
+            }
+          }
+          return da > 0 && dc > 0 ? num / Math.sqrt(da * dc) : -2;
+        };
+        const all = [];
+        let best = { shift: 0, ncc: -2 };
+        let atZero = -2;
+        for (let s = -span; s <= span; s++) {
+          const ncc = score(s);
+          all.push([s, ncc]);
+          if (s === 0) atZero = ncc;
+          if (ncc > best.ncc) best = { shift: s, ncc };
+        }
+        // A peak sitting ON the search boundary is not a peak, it is the edge of
+        // the window: the true shift may be anywhere beyond it.
+        if (Math.abs(best.shift) >= span) {
+          return {
+            shift: best.shift,
+            ncc: Number(best.ncc.toFixed(4)),
+            runnerUp: Number(best.ncc.toFixed(4)),
+            atZero: Number(atZero.toFixed(4)),
+            span,
+            identical,
+            error: `the best match is at the ±${span}px search limit — the turn is larger than this band can measure`,
+          };
+        }
+        let runnerUp = -2;
+        for (const [s, ncc] of all) {
+          if (Math.abs(s - best.shift) >= guard && ncc > runnerUp) runnerUp = ncc;
+        }
+        return {
+          shift: best.shift,
+          ncc: Number(best.ncc.toFixed(4)),
+          runnerUp: Number(runnerUp.toFixed(4)),
+          // THE NUMBER THE VERDICT ACTUALLY RESTS ON — see the note on `sharp`
+          // below. „Does the second photograph match the first BETTER when slid
+          // than when not slid at all" is the question; this is the „not slid
+          // at all" half of it.
+          atZero: Number(atZero.toFixed(4)),
+          span,
+          identical,
+        };
+      },
+      { a, c, maxShift: PROOF_MAX_SHIFT_PX, guard: PEAK_GUARD_PX },
+    )
+    .catch((e) => ({ error: String(e?.message ?? e).split("\n")[0] }));
+
+/**
+ * PUT THE CAR BACK ON THE SPAWN MARK — 2026-08-21, fourth draft, and this is
+ * the change that turned the measurement from anecdote into evidence.
+ *
+ * WHAT THE THIRD DRAFT MEASURED. Six legs run one after another from wherever
+ * the last one finished:
+ *   nudge-ctl1  NET -215px  (a leg that PRESSED NOTHING, reporting 22° of turn)
+ *   nudge-ctl2  NET  -70px  ncc 0.5702 against an unslid 0.2557
+ *   nudge-right1        VOID: the best correlation is only 0.4275
+ * By leg four the car had nudged itself six metres into a junction, collected
+ * three teach cards and a fault, and the „scene" the correlation was comparing
+ * had nothing to do with the one it started from. A control that reports a
+ * bigger turn than the turn legs is not a noisy experiment, it is a broken one.
+ *
+ * The lesson always spawns at the same pose. So every leg gets its own spawn:
+ * reload, walk the ladder, and take frame A from the mark. The control leg and
+ * the two turn legs then differ in exactly one thing — the key — which is what
+ * a control is for.
+ *
+ * IT COSTS ~35 s A LEG, and it is only spent in the opt-in proof mode, which
+ * runs on one lane and drives no lesson.
+ */
+async function proofRespawn() {
+  await steer(null);
+  await throttle(false);
+  await page.goto(`${BASE}/simulator?scenario=${SCENARIO}&level=1`, {
+    waitUntil: "domcontentloaded",
+    timeout: 300_000,
+  }).catch(() => {});
+  await page.waitForTimeout(22_000);
+  // The ladder, in its cheapest form: the proof does not need the briefing, it
+  // needs a world that is running. Anything that says «Разбрах»/«Продължи» is
+  // pressed, then the pause drain takes whatever is left.
+  for (let i = 0; i < 10; i++) {
+    const pressed = await page
+      .evaluate(() => {
+        for (const el of document.querySelectorAll("button")) {
+          const t = (el.textContent || "").trim();
+          if (/^(Разбрах|РАЗБРАХ|Продължи|Затвори|Започни|Карай)/i.test(t)) { el.click(); return t; }
+        }
+        return null;
+      })
+      .catch(() => null);
+    if (!pressed) break;
+    await page.waitForTimeout(900);
+  }
+  await drainPause();
+  await page.waitForTimeout(1200);
+}
+
+/** Coast to a standstill. NEVER the brake: a brake press at rest is the gesture
+ *  that selects R (see brake()), and a probe that put the car in R would then
+ *  measure a car reversing into its own evidence. */
+async function proofRest() {
+  await throttle(false);
+  for (let i = 0; i < 22; i++) {
+    await drainPause();
+    const v = await speedNow();
+    if (v <= 0) return v;
+    await page.waitForTimeout(500);
+  }
+  return await speedNow();
+}
+
+/** One leg: rest, A, nudge with the wheel over, B, let go, rest, C.
+ *  `dir` null = the control, which does the identical nudge and presses no key. */
+async function proofLeg(band, name, dir, { nudge = true, respawn = false } = {}) {
+  if (respawn) await proofRespawn();
+  // A TEACH CARD FREEZES THE WORLD, AND A FROZEN WORLD IS NOT A STRAIGHT LINE.
+  // Measured on the first run of this probe: every leg came back
+  // `ncc 1 vs 0.7728`, i.e. two byte-identical bands, and the sharpness test
+  // was HAPPY with it — a peak of 1.0 clears its runner-up by 0.23. So a paused
+  // sim reported „0 px, and the measurement is sound", which is the exact
+  // reassuring-direction failure this probe was written to catch, inside the
+  // probe. Two answers: drain the pause before the bracket, and treat an
+  // identical pair as VOID rather than as a zero.
+  await drainPause();
+  await proofRest();
+  const v0 = await speedNow();
+  const A = await proofGrab(band);
+  // NUDGE, WITH THE WHEEL OVER. The throttle is pulsed rather than held so the
+  // car covers about a metre; the wheel is over for the whole of it and comes
+  // off before the coast-down, so the car does not keep turning while it stops.
+  await steer(dir, v0);
+  // ── HOW LONG THE WHEEL WAS ACTUALLY OVER, MEASURED — 2026-08-21, verifier ──
+  //
+  // The constants above (PROOF_HOLD_MS 900, PROOF_NUDGE_MS 700 + 200) are what
+  // this leg INTENDS to hold for. They are not what it holds for: frame B is
+  // grabbed with the key still down, and `proofGrab` is a real screenshot —
+  // this file's own header measures one at 200 ms on mobile and 11,999 ms on
+  // pc. MEASURED over two full proof runs, `steering.heldMs` came back 3,974 /
+  // 3,547 ms and 4,056 / 4,414 ms against a nominal 2,700 ms per direction, so
+  // every leg spends 30–60 % longer at the wheel than the comment claims, and
+  // the overrun is whatever the box was doing at the time. That is why the same
+  // probe measured a left turn at 225 px, at 470 px and past the ±600 px search
+  // limit on three legs of the same scenario. Recorded per leg so the next
+  // reader can see the dependence instead of assuming the constant.
+  const wheelDownAt = Date.now();
+  if (nudge) {
+    for (let i = 0; i < PROOF_NUDGES; i++) {
+      await throttle(true);
+      await page.waitForTimeout(PROOF_NUDGE_MS);
+      await throttle(false);
+      await page.waitForTimeout(200);
+    }
+  } else {
+    // THE CAMERA LEG. The wheel goes over and the car is never asked to move,
+    // so anything the world does here is `COCKPIT_LOOK_INTO_TURN` and nothing
+    // else. It is run FIRST, and its numbers are what stop the moving legs
+    // below from being read as „the world moved, therefore the car turned".
+    await page.waitForTimeout(PROOF_HOLD_MS);
+  }
+  const B = await proofGrab(band); // wheel still over: this frame carries the camera offset
+  await steer(null);
+  const wheelOverMs = dir === null ? 0 : Date.now() - wheelDownAt;
+  await throttle(false);
+  if (nudge) await proofRest();
+  await page.waitForTimeout(PROOF_SETTLE_MS);
+  const C = await proofGrab(band);
+  const v1 = await speedNow();
+  const held = await proofShift(A, B);
+  const net = await proofShift(A, C);
+  // THREE WAYS A LEG CAN FAIL TO BE A MEASUREMENT, and none of them is a zero:
+  // the read threw, the two bands are byte-identical (nothing rendered — a
+  // paused sim), or the correlation peak is too flat to name a shift.
+  /* ── WHAT MAKES A SHIFT A MEASUREMENT — third calibration, 2026-08-21 ─────
+   *
+   * The obvious test — „the peak must clear its runner-up" — was tried and it
+   * rejects almost everything, INCLUDING legs that plainly turned:
+   *   nudge-left2  229px  ncc 0.9277 vs runner-up 0.9273   → void
+   *   nudge-right2 192px  ncc 0.9467 vs runner-up 0.9465   → void
+   * Half this band is sky and tarmac, so sliding a recognised match by another
+   * 25 px barely changes the score. The correlation surface is SMOOTH near its
+   * peak, and smoothness is not ambiguity.
+   *
+   * The question that is actually being asked is not „where exactly is the
+   * peak" — it is „did the world move AT ALL". So the comparison is against
+   * SHIFT ZERO: a leg claims a turn only when the second photograph matches the
+   * first better SLID than UNSLID, by a clear margin. A leg whose peak sits
+   * within the noise band of zero needs no such justification, because it is
+   * not claiming anything.
+   *
+   * It also fixes the straight legs for free. A pure forward translation
+   * expands the scene about the vanishing point instead of sliding it, so
+   * `score(0)` is already the best score there is — and such a leg now reads
+   * „no turn" instead of „unmeasurable".
+   */
+  const voidWhy = (r) =>
+    r.error
+      ? r.error
+      : r.identical
+        ? "the two frames are byte-identical — the world did not render, so this leg measures a PAUSED SIM and not a heading"
+        : r.ncc < 0.5
+          ? `the best correlation is only ${r.ncc} — the scene changed too much to recognise`
+          : Math.abs(r.shift) <= PROOF_NOISE_PX
+            ? null
+            : r.ncc - r.atZero < PEAK_MARGIN
+              ? `sliding by ${r.shift}px (ncc ${r.ncc}) is no better than not sliding at all (ncc ${r.atZero}) — this is not a rotation`
+              : null;
+  const why = voidWhy(net);
+  const leg = {
+    name,
+    dir,
+    kmhBefore: v0,
+    kmhAfter: v1,
+    /** ACTUAL key-down time, not the constant this leg asked for — see above. */
+    wheelOverMs,
+    wheelOverNominalMs: dir === null ? 0 : nudge ? PROOF_NUDGES * (PROOF_NUDGE_MS + 200) : PROOF_HOLD_MS,
+    held,
+    net,
+    netIsSharp: why === null,
+    voidBecause: why,
+    netDeg: net.error ? null : Number((net.shift * band.degPerPx).toFixed(1)),
+    heldDeg: held.error ? null : Number((held.shift * band.degPerPx).toFixed(1)),
+  };
+  note(
+    `      ${name.padEnd(11)} ${String(dir ?? "straight").padEnd(8)} ${String(v0).padStart(3)}->${String(v1).padStart(3)} км/ч · ` +
+      `HELD ${held.error ? held.error : `${String(held.shift).padStart(4)}px ≈${String(leg.heldDeg).padStart(6)}°`} · ` +
+      `NET ${net.error ? net.error : `${String(net.shift).padStart(4)}px ≈${String(leg.netDeg).padStart(6)}° (ncc ${net.ncc}, unslid ${net.atZero})`}` +
+      `${why === null ? "" : `  ← VOID: ${why}`}`,
+  );
+  return leg;
+}
+
+const median = (xs) => {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[(s.length - 1) >> 1];
+};
+
+/**
+ * Run it, assert it, write it down. Returns the block that goes in
+ * `_audit-steering.json` and in `steering.probe`.
+ */
+async function steerProof() {
+  const band = await proofBand();
+  if (band === null) {
+    loud("the steering proof cannot run: there is no scene canvas to photograph.");
+    return { ran: false, why: "no scene canvas" };
+  }
+  note(
+    `  STEERING PROOF: band ${band.clip.width}×${band.clip.height} CSS px at ${band.clip.x},${band.clip.y} · dpr ${band.dpr} · ` +
+      `every px below is a DEVICE px ≈ ${band.degPerPx.toFixed(4)}° at the centre`,
+  );
+
+  // ── PART 1: THE CAMERA, NAMED BEFORE IT CAN BE MISTAKEN FOR THE CAR ──────
+  await throttle(false);
+  for (let i = 0; i < 25; i++) {
+    await drainPause();
+    if ((await speedNow()) <= 0) break;
+    await page.waitForTimeout(700);
+  }
+  note(`    at rest, WHEEL ONLY (the car is never asked to move — anything here is the CAMERA):`);
+  const rest = [];
+  for (const [n, d] of [["rest-ctl", null], ["rest-left", "left"], ["rest-right", "right"]]) {
+    rest.push(await proofLeg(band, n, d, { nudge: false }));
+  }
+
+  // ── PART 2: THE HEADING ─────────────────────────────────────────────────
+  note(`    and with a nudge — RESPAWNED, stopped, ${PROOF_NUDGES}×${PROOF_NUDGE_MS}ms of throttle, stopped again; only the key differs:`);
+  const move = [];
+  for (const [n, d] of [
+    ["nudge-ctl1", null],
+    ["nudge-left1", "left"],
+    ["nudge-right1", "right"],
+    ["nudge-ctl2", null],
+    ["nudge-left2", "left"],
+    ["nudge-right2", "right"],
+  ]) {
+    move.push(await proofLeg(band, n, d, { respawn: true }));
+  }
+  await steerRelease();
+  await throttle(false);
+
+  const sharpNet = (legs, dir) =>
+    legs.filter((l) => l.dir === dir && l.netIsSharp).map((l) => l.net.shift);
+  const restLeft = sharpNet(rest, "left");
+  const restRight = sharpNet(rest, "right");
+  const mLeft = median(sharpNet(move, "left"));
+  const mRight = median(sharpNet(move, "right"));
+  const mCtl = median(sharpNet(move, null));
+
+  const checks = [];
+  const check = (name, ok, said) => { checks.push({ name, ok, said }); return ok; };
+  // 1. THE CAMERA CHECK. At rest the wheel must move the world and put it back.
+  //    If this one ever FAILS the way round it cannot fail today — i.e. if a
+  //    standstill steer starts producing a lasting rotation — then either the
+  //    car pivots on the spot or this probe is measuring something else, and
+  //    the moving numbers below stop meaning what they say.
+  // ── …AND IT MAY NOT PASS ON HAVING SEEN NOTHING — 2026-08-21, verifier ────
+  //
+  // `[].every(...)` is `true`, and so was this check on a run where the wheel
+  // did nothing at a standstill at all. MEASURED, run B of two: rest-ctl HELD
+  // 0 px, rest-left HELD +14 px, rest-right HELD −5 px — no look-into-turn
+  // anywhere, i.e. the standstill legs observed NOTHING — and this check
+  // printed PASS on three NET zeros. An inert page, a swallowed keystroke and a
+  // sim that ignores input while a card is up all produce exactly that reading,
+  // and all three would be certified by it. (Run A, fifteen minutes earlier on
+  // the same build, read rest-right HELD −150 px ≈ −5.2°, which IS the product's
+  // COCKPIT_LOOK_INTO_TURN — so the offset is real and this probe sees it only
+  // sometimes.) The check now carries its own positive control: at least one
+  // standstill leg must have MOVED THE WORLD while the key was down before the
+  // fact that it came back can mean anything. With no such leg it is UNMEASURED,
+  // and unmeasured is not a pass.
+  const restHeldPeak = Math.max(
+    0,
+    ...rest.filter((l) => l.dir !== null && !l.held?.error).map((l) => Math.abs(l.held.shift)),
+  );
+  const restSaw = restHeldPeak >= PROOF_MIN_PX && restLeft.length + restRight.length > 0;
+  check(
+    "a standstill steer leaves the heading where it found it",
+    restSaw && [...restLeft, ...restRight].every((px) => Math.abs(px) <= PROOF_NOISE_PX),
+    restSaw
+      ? `rest NET: left ${restLeft.join(",") || "(void)"} px · right ${restRight.join(",") || "(void)"} px ` +
+        `(and the wheel DID move the world while held — peak ${restHeldPeak} px)`
+      : `UNMEASURED — no standstill leg moved the world while the key was down (peak HELD ${restHeldPeak} px < ${PROOF_MIN_PX} px), ` +
+        `so «it came back» is a statement about a wheel nothing answered. rest NET: left ${restLeft.join(",") || "(void)"} px · ` +
+        `right ${restRight.join(",") || "(void)"} px`,
+  );
+  // 2. THE CONTROL. A leg that pressed nothing must not report a turn — and a
+  //    control leg with NO sharp peak passes, which is not a loophole: a pure
+  //    forward translation has no unique horizontal shift (the scene expands
+  //    about the vanishing point instead of sliding), so a FLAT correlation is
+  //    the expected signature of driving straight. The asymmetry runs the safe
+  //    way — a flat TURN leg is void and proves nothing, a sharp STRAIGHT leg
+  //    fails this check.
+  check(
+    "a leg that presses nothing does not turn",
+    mCtl === null || Math.abs(mCtl) <= PROOF_NOISE_PX,
+    `straight NET median ${mCtl === null ? "(flat correlation — the signature of no rotation)" : `${mCtl} px`}`,
+  );
+  // 3. THE CLAIM ITSELF — signed, and in the direction physics requires: KeyA
+  //    turns the car LEFT, so the world must move RIGHT (a POSITIVE shift), and
+  //    KeyD the other way. A channel wired to the wrong key would still move
+  //    the world; only the SIGN catches that.
+  check(
+    "KeyA turns the car LEFT (the world moves right)",
+    mLeft !== null && mLeft >= PROOF_MIN_PX,
+    `left NET median ${mLeft === null ? "(no sharp measurement)" : `${mLeft} px ≈ ${(mLeft * band.degPerPx).toFixed(1)}°`}`,
+  );
+  check(
+    "KeyD turns the car RIGHT (the world moves left)",
+    mRight !== null && mRight <= -PROOF_MIN_PX,
+    `right NET median ${mRight === null ? "(no sharp measurement)" : `${mRight} px ≈ ${(mRight * band.degPerPx).toFixed(1)}°`}`,
+  );
+
+  const passed = checks.every((c) => c.ok);
+  for (const c of checks) note(`    ${c.ok ? "PASS" : "FAIL"}  ${c.name} — ${c.said}`);
+  if (!passed) {
+    loud(
+      `THE STEERING CHANNEL DID NOT PROVE ITSELF. ${checks.filter((c) => !c.ok).map((c) => c.name).join("; ")}. ` +
+        `Until this passes, nothing this harness does with KeyA/KeyD may be described as a turn.`,
+    );
+  } else {
+    note(`  STEERING PROVEN: the world rotates one way on KeyA and the other on KeyD, and stays rotated after the key is released.`);
+  }
+  return {
+    ran: true,
+    passed,
+    checks,
+    thresholds: { PROOF_MIN_PX, PROOF_NOISE_PX, PEAK_MARGIN, PEAK_GUARD_PX, STEER_MIN_KMH },
+    band: { ...band.clip, degPerPx: band.degPerPx },
+    rest,
+    move,
+    medians: { left: mLeft, right: mRight, straight: mCtl },
+  };
+}
+
+/* ===========================================================================
+ * THE REVERSE GESTURE — 2026-08-21
+ * ===========================================================================
+ *
+ * WHAT THE GUARD ABOVE COST, STATED FOR THE FIRST TIME. The refusal is right
+ * and it stays. But the gesture it refuses — stop, lift, press — is the ONLY
+ * route into R this harness has (engine/reverseAssist.ts; there is no `[`/`]`,
+ * no touch gear sheet, no cockpit lever here), so refusing it everywhere made
+ * the instrument STRUCTURALLY INCAPABLE of driving the reverse half of a
+ * manoeuvre. Nobody wrote that down, and the consequence was measured only
+ * after 376 drives had been adjudicated:
+ *
+ *   sc-park-45-rev, whose task 2 is literally «влез на заден ход по линиите»,
+ *   reads D in the cluster at EVERY sampled frame on BOTH platforms, through
+ *   05-stopped and 07-end. Every verdict ever recorded on a reversing lesson
+ *   describes the approach and nothing else — 19 lessons, 118 findings, 46 of
+ *   them critical, all of them about a manoeuvre that never happened.
+ *
+ * So the refusal keeps the STOP phase honest and this block gives the drive a
+ * DELIBERATE way to ask for reverse, which is exactly what the engine file's
+ * own 2026-08-19 note asks for: „stop, lift for > REVERSE_ASSIST_LIFT_S,
+ * press — issued only where the lesson asks for R".
+ *
+ * FOUR PROPERTIES, AND EACH ONE ANSWERS A WAY THIS COULD LIE:
+ *
+ *  1. IT IS ISSUED ONLY WHERE THE PRODUCT ASKS FOR R, and "asks" is read off
+ *     the product's own two mechanisms rather than off a scenario id — see
+ *     REVERSE_DEMAND_* below. A harness that shifted to R on every lesson
+ *     would be inventing a manoeuvre the exam never asked for, and would
+ *     convict correct lessons of a fault the driver caused.
+ *  2. IT ASSERTS THE TRANSITION BY READING THE CLUSTER before one metre is
+ *     driven. „I sent the keys" is not „the car is in R" — that confusion is
+ *     the whole of this task. The letter comes from StatusDashboard's own
+ *     `aria-label={`Скоростен лост: ${snap.gearLabel}`}`, the driveline truth.
+ *  3. IT DISARMS. The pedals SWAP in R (rule b): S accelerates backwards and W
+ *     brakes. A drive that ended still in R would hand the following stop
+ *     phase a control law whose every pedal means the opposite thing, and the
+ *     brake-at-rest guard above would then be guarding the wrong pedal.
+ *  4. IT SHOUTS AND IT RECORDS. `_audit-status.json` carries `reverse`, and a
+ *     lesson that demanded R and never got it is the loudest line in the run —
+ *     because a reversing lesson that silently never reversed is precisely the
+ *     failure that produced this block.
+ *
+ * AND THE SPEED READOUT CANNOT SEE DIRECTION. `displaySpeedKmh` is
+ * `Math.max(0, Math.round(Math.abs(v)))` (hud/dashboardStatus.ts) — the dial
+ * shows a reversing car a positive number. The gear letter is the ONLY
+ * direction evidence on the glass, which is why this block reads it and why
+ * every reverse frame it takes is named for what the cluster said.
+ */
+
+/** The product's own two ways of saying „this task needs R", and nothing else.
+ *
+ *  · `deriveGearDemand` (lessons/objectives.ts) turns a reachZone banner title
+ *    into a REVERSE demand with exactly this matcher — «НА заден ход» is the
+ *    act. Its companion exclusion is below, and it is not decoration:
+ *    «Заеми изходната позиция ЗА заден ход по права» (sc-edpc-setup) is a gate
+ *    the car noses into FACING FORWARD, and demanding R there would refuse a
+ *    correct drive, which is the failure the founder ranks worst.
+ *  · `advisorPromptForObjective` (lessons/advisor.ts) prints this exact stem
+ *    for a `parkInBay` whose entry is not "forward".
+ *
+ *  Two product mechanisms, zero lesson strings — the same rule LAWFUL_WAIT_RE
+ *  is written under. */
+const REVERSE_DEMAND_RE = /(?<![\p{L}])на заден ход(?![\p{L}])|Премести лоста на R/u;
+const REVERSE_DEMAND_PURPOSE_RE = /за заден ход/u;
+/**
+ * …AND A SEPARATE, LOOSER TEST FOR STAYING IN IT. Entering R is a decision the
+ * harness must never invent, so it is gated on the product's own demand above.
+ * Coming OUT of R in the middle of a manoeuvre needs no such licence — it needs
+ * only the absence of a reason to stay — and the strict matcher is too narrow
+ * for that job by the product's own authoring.
+ *
+ * MEASURED on sc-ed-reverse-line/mobile-right, which is why this exists. Its
+ * three gates are, in order:
+ *   1 «Потегли с оглед и заеми изходната позиция»          forward
+ *   2 «Дръж права линия по средата НА ЗАДЕН ХОД»           strict match → R
+ *   3 «Спри след 25 метра ЗАДЕН ХОД до бордюра»            NO «на» → no match
+ * Gate 3 is the end of the same 25 m reverse, and with only the strict test the
+ * drive shifted back to D between gates 2 and 3 and then drove FORWARD for the
+ * remaining 190 s of its budget — leaving the run one objective short of a
+ * completed lesson and the reverse half of gate 3 untested all over again.
+ *
+ * Two thresholds, therefore, and the asymmetry is deliberate: a false ENTRY
+ * invents a manoeuvre, a false EXIT abandons one. `REVERSE_MS` still bounds it,
+ * the cluster is still re-read every tick, and the disarm still runs. */
+const REVERSE_STAY_RE = /заден ход|назад/u;
+/** …read off the two surfaces that carry the CURRENT task and nothing else.
+ *  Scope is the whole point: sc-park-45-rev's task 1 («спри в изходната
+ *  позиция край косия ред») and task 2 («влез на заден ход по линиите») are
+ *  both in the debrief's objective list and both in the briefing sheet, so a
+ *  match against the shell's innerText would select R during the APPROACH —
+ *  and a car that reverses away from task 1 fails task 1. `ObjectiveBanner`
+ *  publishes only the live objective; `AdvisorCard` only the next action. */
+const REVERSE_DEMAND_SEL =
+  '[data-hud="objective-banner"], [role="status"][aria-label="Съветник — следващо действие"]';
+
+/** THE CLUSTER'S OWN LETTER — P · R · N · D · M2. Empty when no instrument is
+ *  on the glass at all, which is a different answer from "D" and is reported
+ *  as one. Every painted owner is read, not just the first: StatusDashboard
+ *  renders one of two layouts and the touch gear sheet renders a third cell,
+ *  and if they ever disagree the harness must say so rather than pick.
+ *
+ *  The handle is StatusDashboard's own `aria-label={`Скоростен лост:
+ *  ${snap.gearLabel}`}`, and `gearLabel` is `driveline.selector` verbatim
+ *  (vehicle/driveline.ts) — the DRIVELINE's truth, not a HUD's opinion of it.
+ *
+ *  ── AND THERE IS NO RECT TEST, BECAUSE THE FIRST VERSION HAD ONE ──────────
+ *
+ *  It filtered `r.width < 4 || r.height < 4`, copied from `read()`'s HUD scan,
+ *  and it reported «(no cluster)» for a whole 210 s drive. MEASURED on the
+ *  live rig (WebKit, iphone16-landscape, sc-ed-reverse-line@L1) by dumping the
+ *  element and its box together:
+ *
+ *    <span aria-label="Скоростен лост: D" …>D</span>        rect 0 × 0
+ *    <span aria-label="Скорост 0 километра в час" …>0</span> rect 0 × 0
+ *    parent [data-hud="status-dashboard"]                    rect 217 × 24
+ *
+ *  The letter is PAINTED and legible in the frame; it is the inline children of
+ *  the baseline-aligned dash row that report an empty box. The harness's own
+ *  speed probe has always been right about this by accident — it reads the
+ *  ATTRIBUTE and never measures anything — and a rect test would have made this
+ *  helper answer "the instrument cannot see the gear" about an instrument that
+ *  was on screen the whole time. That is the reassuring direction, so it is
+ *  gone: everything matching is read, and a DISAGREEMENT between two owners is
+ *  reported (`gearLine`) rather than silently resolved by picking one. */
+const GEAR_SEL = '[aria-label^="Скоростен лост: "]';
+const gear = () =>
+  page
+    .evaluate((sel) => {
+      const shell = document.querySelector("[data-sim-shell]") ?? document.body;
+      const seen = [];
+      for (const el of shell.querySelectorAll(sel)) {
+        const v = el.getAttribute("aria-label").replace(/^Скоростен лост:\s*/, "").trim();
+        if (v && !seen.includes(v)) seen.push(v);
+      }
+      return seen;
+    }, GEAR_SEL)
+    .catch(() => []);
+
+/** One string for the log, and it never hides a disagreement. */
+const gearLine = (g) => (g.length === 0 ? "(no cluster)" : g.join("/"));
+
+/** THE SPEED AND NOTHING ELSE. `read()` is an innerText scan measured at 2.0 s
+ *  on the `pc` leg, and the arming sequence has to re-check "is the car still
+ *  stopped?" three times per attempt — paying six seconds for three numbers
+ *  would make the lift itself the reason the car crept. One attribute read. */
+const speedNow = () =>
+  page
+    .evaluate(() => {
+      const sp = document.querySelector('[aria-label^="Скорост "]');
+      return sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1;
+    })
+    .catch(() => -1);
+
+/**
+ * IS THE SESSION OVER? — the third answer `speedNow()` can give.
+ *
+ * `-1` means the speed readout is NOT IN THE DOM, and after a session ends
+ * that is the ordinary case: the HUD unmounts with the scene. The first
+ * version of the disarm read `-1` as a speed and printed
+ *
+ *     !! the car would not come to rest in R (-1 км/ч on the reverse brake)
+ *
+ * on a drive that had just finished its reverse, completed every objective and
+ * passed the lesson ИЗДЪРЖАН / 3 stars. A false failure and a false pass are
+ * the same crime, and that one was pointed at the instrument's own new code.
+ * So "gone" is answered separately, from the same three end surfaces the drive
+ * loop already trusts.
+ */
+const endSurfaceUp = () =>
+  page
+    .evaluate(
+      () =>
+        document.querySelector('[data-hud="end-screen"]') !== null ||
+        document.querySelector('[data-hud="end-bar"]') !== null ||
+        document.querySelector('[data-sim-overlay="end"]') !== null,
+    )
+    .catch(() => false);
+
+/**
+ * THE PRESS brake() MAY NOT MAKE, kept in its own helper so the refusal above
+ * is never weakened to reach it. Same key, same belief flags — the ONLY
+ * difference is that this one is issued on purpose, at a standstill, by code
+ * that has already decided it wants the other direction.
+ *
+ * The literal key codes stay literal: `reverseAssist-audit-harness.test.ts` §1
+ * censuses this file's keyboard calls by regex to prove the harness has no
+ * hand-worked gear route, and a helper that actuated `page.keyboard[…](code)`
+ * from a variable would make that census silently stop seeing the keys.
+ */
+let standstillPresses = 0;
+const sChannel = async (on) => {
+  if (on === holdS) return;
+  await page.keyboard[on ? "down" : "up"]("KeyS").catch(() => {});
+  holdS = on;
+  if (on) standstillPresses += 1;
+};
+/** In R the two channels swap MEANING, never identity: `throttle()` is still
+ *  the W key, `sChannel()` is still the S key. What moves is which of them is
+ *  the accelerator — so in R, `throttle()` IS the brake. Named at the call
+ *  sites rather than aliased, so the code cannot drift from the car. */
+
+/** LAW 1's timings, taken from the machine and then doubled, because every
+ *  number here is a wall-clock wait on a box whose CDP round trip was measured
+ *  at 2.0 s median. REVERSE_ASSIST_LIFT_S is 0.25 and REVERSE_ASSIST_HOLD_S is
+ *  0.35 (engine/reverseAssist.ts); the keyboard ramp itself takes 0.2 s to
+ *  fall (input.ts BRAKE_RELEASE_S), so a lift shorter than ~0.5 s would be
+ *  measuring the ramp rather than the foot. */
+const REVERSE_LIFT_MS = 900;
+const REVERSE_HOLD_MS = 1100;
+/** Three, because the first press can be eaten by a teach card that arrived
+ *  between the probe and the press — the same way the drive loop loses keys
+ *  (`lostKeys`) — and a single attempt would file a live product as broken. */
+const REVERSE_ARM_ATTEMPTS = 3;
+/**
+ * …AND A FAILED BURST OF THREE IS NOT A VERDICT ON THE DRIVE — 2026-08-21.
+ *
+ * THE BUG THIS NUMBER EXISTS TO KILL. `reverse.failure` was written once and
+ * the arm gate required `reverse.failure === null`, so ONE bad burst latched
+ * the harness into „this car is in D" for the rest of the session. On
+ * sc-park-bay-exit-rev/mobile/right that latch was thrown by three attempts
+ * that had ALREADY SUCCEEDED — the car was in R and rolling backwards, the dial
+ * showed the |v| of it, and the code read the number as a forward creep — and
+ * the following ~190 s were graded under a forward control law with the pedals
+ * meaning the opposite of what the code believed. The frame taken to prove the
+ * refusal, `05r-reverse-REFUSED.png`, has R lit on the glass.
+ *
+ * So a burst now ends a BURST and nothing else. The gate re-opens whenever the
+ * product still wants R and the car is standing still, up to this many presses
+ * in total, and every failure is kept in `reverse.failures[]` rather than
+ * overwriting one field. Only a HARD BLOCK — two instruments disagreeing about
+ * the selector, or the session ending under the arm — stops it for good, and
+ * those set `reverse.blocked`, which is a different field with a different
+ * meaning and is stated as such in the status file.
+ *
+ * NINE, because the budget has to be bounded by something a reader can defend
+ * and the cost is measurable: one attempt is REVERSE_LIFT_MS + REVERSE_HOLD_MS
+ * of wall clock plus two cluster reads, i.e. ~2.0 s on `mobile` against a
+ * DRIVE_BUDGET_MS of 210 s. Three bursts is ~18 s, under 9 % of the drive, and
+ * a lesson that has refused nine deliberate presses is telling the truth.
+ */
+const REVERSE_ARM_BUDGET = 9;
+/**
+ * HOW FAST AND HOW LONG THE REVERSE LEG MAY RUN.
+ *
+ * 6 км/ч is the halt cap the parking drills themselves are written against
+ * (`reachZone … maxSpeedKmh: 6` on every setup gate in templates-parking3), so
+ * a car creeping back at or under it is doing what the lesson asked. It is
+ * also low enough that the actuation latency measured for CRUISE_KMH — up to
+ * ~4 s between deciding to lift and the key coming up — cannot turn a bay-
+ * depth manoeuvre into a collision the harness caused.
+ *
+ * 40 s, because the act is metres and not minutes: a 5 m bay at 6 км/ч
+ * (1.7 m/s) is ~3 s of travel, and 40 s survives a `pc` leg whose ticks cost
+ * 3.5 s apiece while still ending the leg long before the drive budget. The
+ * leg normally ends on the PRODUCT withdrawing the demand, which is the only
+ * end condition that means anything; the budget is the backstop that keeps a
+ * lesson which never withdraws it from eating the whole drive in R.
+ */
+const REVERSE_CRUISE_KMH = 6;
+const REVERSE_MS = 40_000;
+
+/** Everything the run learned about reverse, published in `_audit-status.json`
+ *  whether or not the lesson ever asked. `demanded: false` is a real answer and
+ *  a reader must be able to tell it from "the harness never looked". */
+const reverse = {
+  demanded: false,
+  demandedBy: null,
+  /** total deliberate presses spent across every burst — the budget's meter. */
+  attempted: 0,
+  /** how many bursts of REVERSE_ARM_ATTEMPTS have been spent. */
+  bursts: 0,
+  armed: false,
+  armedAtSec: null,
+  gearSeen: [],
+  reverseTicks: 0,
+  disarmed: null,
+  disarmNote: null,
+  /** EVERY reason a burst ended, in order. Not one latched field: a run that
+   *  failed twice and then succeeded has to be able to say so. */
+  failures: [],
+  /** THE ONLY LATCH LEFT, and it is for the two things a retry cannot mend:
+   *  two instruments disagreeing about the selector, and the session ending. */
+  blocked: null,
+  /** The last thing the cluster said when a burst ran out — kept separate from
+   *  `blocked` because it is an OBSERVATION and not a decision. */
+  lastCluster: null,
+  /** Session seconds at which R appeared without this drive arming it. `null`
+   *  is „it never did", and that is a different answer from „nobody looked" —
+   *  before 2026-08-21 no drive recorded the selector on any tick at all. */
+  unarmedRAt: null,
+};
+/** The one-line reason a reader wants, without pretending there was only one. */
+const reverseWhy = () =>
+  reverse.blocked ?? (reverse.failures.length ? reverse.failures[reverse.failures.length - 1] : null);
+
+/**
+ * STOP · LIFT · PRESS · READ THE CLUSTER. Returns true only when the letter on
+ * the glass says R — never when the keys merely went out.
+ */
+async function armReverse(kmhNow) {
+  if (kmhNow !== 0) return false; // caller's job; stated here so it cannot be assumed
+  reverse.bursts += 1;
+  /* ── ASK BEFORE PRESSING — 2026-08-21 ──────────────────────────────────────
+   *
+   * The cheapest of the three fixes this burst needed, and the one that makes
+   * the other two nearly unreachable: if the cluster ALREADY reads R, there is
+   * nothing to arm, and a press issued anyway is the gesture that walks the
+   * gate back up to D. The previous version opened with a lift-and-press and
+   * only looked afterwards, which is how a car that was already in R came to be
+   * reported as one that never reached it. One attribute read, ~50 ms. */
+  {
+    const g0 = await gear();
+    reverse.gearSeen.push(...g0.filter((x) => !reverse.gearSeen.includes(x)));
+    if (g0.length === 1 && g0[0] === "R") {
+      reverse.armed = true;
+      reverse.lastCluster = gearLine(g0);
+      note(`      REVERSE was ALREADY ARMED before this burst spent a press — the cluster reads «R».`);
+      return true;
+    }
+  }
+  for (let attempt = 1; attempt <= REVERSE_ARM_ATTEMPTS; attempt++) {
+    reverse.attempted += 1;
+    // Both pedals up. A held throttle vetoes the toggle outright
+    // (ReverseAssist.update: `throttlePedal > REVERSE_ASSIST_PEDAL_ON`), and a
+    // brake that was never lifted can never be armed.
+    await throttle(false);
+    await sChannel(false);
+    await page.waitForTimeout(REVERSE_LIFT_MS);
+    // …and the lift only counts AT A STANDSTILL, so re-read rather than trust
+    // the sample the caller took a round trip ago.
+    const still = await speedNow();
+    if (still < 0) {
+      // The readout is gone, not zero. Almost always the session ending
+      // underneath the arm; either way there is no car to shift — and unlike a
+      // burst that merely ran out, retrying this one cannot help, so it is the
+      // HARD BLOCK and it says so.
+      reverse.blocked = (await endSurfaceUp())
+        ? "the session ended before R could be armed"
+        : "the speed readout vanished before R could be armed";
+      reverse.failures.push(reverse.blocked);
+      note(`      (reverse arm ${attempt}/${REVERSE_ARM_ATTEMPTS}: ${reverse.blocked})`);
+      return false;
+    }
+    /* ── A «CREEP» AND A REVERSING CAR ARE THE SAME NUMBER ─────────────────
+     *
+     * ADDED 2026-08-21 BY THE ADVERSARIAL RE-VERIFICATION, AND IT IS THE SAME
+     * BLINDNESS THIS BLOCK'S OWN HEADER NAMES: `displaySpeedKmh` is
+     * `Math.abs(v)`, so «the car crept to 3 км/ч during the lift» is EQUALLY
+     * a car that the previous press already put into R and that is now rolling
+     * BACKWARDS. Skipping the attempt on that reading throws away the arm that
+     * had just succeeded.
+     *
+     * MEASURED, sc-park-bay-exit-rev/mobile/right, before this branch existed:
+     *   (reverse arm 1/3: the cluster still reads «D»)
+     *   (reverse arm 2/3: the car crept to 3 км/ч during the lift …)
+     *   (reverse arm 3/3: the car crept to 1 км/ч during the lift …)
+     *   !! THIS LESSON ASKED FOR REVERSE … AND THE CAR NEVER LEFT «R»
+     * — and then `[04-t015s] 0 км/ч gear=R`, and `05r-reverse-REFUSED.png`,
+     * the frame taken to PROVE the car never reached R, shows R lit on the
+     * glass. The refusal was false, `reverse.failure` latched, and the drive
+     * spent the next 190 s grading a car it believed was in D.
+     *
+     * So the dial does not get to end an attempt on its own: the CLUSTER is
+     * asked, exactly as every other decision in this block is. */
+    let g;
+    if (still !== 0) {
+      g = await gear();
+      reverse.gearSeen.push(...g.filter((x) => !reverse.gearSeen.includes(x)));
+      if (g.length !== 1 || g[0] !== "R") {
+        note(`      (reverse arm ${attempt}/${REVERSE_ARM_ATTEMPTS}: the car crept to ${still} км/ч during the lift and the cluster reads «${gearLine(g)}» — the press would not arm; re-stopping)`);
+        continue;
+      }
+      note(`      (the ${still} км/ч during the lift is the car ALREADY ROLLING BACKWARDS — the dial shows |v| and the cluster reads «R»)`);
+    } else {
+      await sChannel(true);
+      await page.waitForTimeout(REVERSE_HOLD_MS);
+      g = await gear();
+      reverse.gearSeen.push(...g.filter((x) => !reverse.gearSeen.includes(x)));
+    }
+    if (g.length > 1) {
+      loud(`two instruments disagree about the selector (${gearLine(g)}) — the harness will believe NEITHER.`);
+      reverse.blocked = `cluster disagreement (${gearLine(g)})`;
+      reverse.failures.push(reverse.blocked);
+      reverse.lastCluster = gearLine(g);
+      return false;
+    }
+    if (g[0] === "R") {
+      reverse.armed = true;
+      reverse.lastCluster = gearLine(g);
+      note(`      REVERSE ARMED on press ${reverse.attempted} (burst ${reverse.bursts}, attempt ${attempt}/${REVERSE_ARM_ATTEMPTS}): the cluster reads «R».`);
+      return true;
+    }
+    reverse.lastCluster = gearLine(g);
+    note(`      (reverse arm ${attempt}/${REVERSE_ARM_ATTEMPTS} of burst ${reverse.bursts}: the cluster still reads «${gearLine(g)}»)`);
+    // Leave the pedal DOWN between attempts and the next lift is what arms the
+    // next press — that is the gesture. Release it here so the loop's own
+    // `sChannel(false)` is a real edge rather than a no-op.
+    await sChannel(false);
+  }
+  /* THE BURST IS OVER — AND THAT IS NOT THE SAME SENTENCE AS «THE CAR IS IN D».
+   *
+   * Read the cluster ONE more time before saying anything. The last press of
+   * the burst is followed by REVERSE_HOLD_MS and a read, but the toggle is a
+   * state machine on the sim's own clock and the read can land in front of it;
+   * on the box this was measured on a CDP round trip is ~2 s and a tick is
+   * ~4 ms, so „the answer arrived late" is the ordinary case, not the exotic
+   * one. A late R is a SUCCESS, and the version that could not see one filed a
+   * reversing car as a refusal and then graded 190 s under the wrong law. */
+  const late = await gear();
+  reverse.gearSeen.push(...late.filter((x) => !reverse.gearSeen.includes(x)));
+  reverse.lastCluster = gearLine(late);
+  if (late.length === 1 && late[0] === "R") {
+    reverse.armed = true;
+    note(`      REVERSE ARMED LATE: the burst's presses all read «${gearLine(late)}» too early — the cluster reads «R» now.`);
+    return true;
+  }
+  reverse.failures.push(`burst ${reverse.bursts} spent ${REVERSE_ARM_ATTEMPTS} presses and the cluster reads «${gearLine(late)}»`);
+  return false;
+}
+
+/**
+ * BACK TO D — and the mirror image of the arm, because in R the functional
+ * brake is the W channel (rule b). It is not optional: leaving the session in
+ * R hands the stop phase a control law in which `brake()` is the accelerator.
+ */
+async function disarmReverse() {
+  // Stop first, on the pedal that brakes IN R.
+  await sChannel(false);
+  await throttle(true);
+  for (let i = 0; i < 8; i++) {
+    await page.waitForTimeout(600);
+    const v = await speedNow();
+    if (v === 0 || v < 0) break;
+  }
+  const rest = await speedNow();
+  if (rest < 0) {
+    // THREE STATES, NOT TWO — see endSurfaceUp(). There is no car left to take
+    // out of R, and on the happy path that is because the manoeuvre finished
+    // the lesson. `disarmed: null` says "never reached", which is the truth,
+    // and it is NOT a failure line when the session is simply over.
+    const over = await endSurfaceUp();
+    reverse.disarmed = null;
+    reverse.disarmNote = over
+      ? "not needed — the session ended while the car was still in R"
+      : "the speed readout vanished before the disarm could run";
+    await throttle(false);
+    if (over) note(`      (no disarm: ${reverse.disarmNote})`);
+    else loud(`the disarm could not run: ${reverse.disarmNote}. Any braking claim below is about an unknown pedal mapping.`);
+    return over;
+  }
+  if (rest !== 0) {
+    loud(`the car would not come to rest in R (${rest} км/ч on the reverse brake) — the disarm cannot even begin.`);
+    reverse.disarmed = false;
+    reverse.failures.push(`no rest in R (${rest} км/ч)`);
+    await throttle(false);
+    return false;
+  }
+  for (let attempt = 1; attempt <= REVERSE_ARM_ATTEMPTS; attempt++) {
+    await throttle(false); // lift the functional brake…
+    await page.waitForTimeout(REVERSE_LIFT_MS);
+    await throttle(true); // …and press it again: R → N → D
+    await page.waitForTimeout(REVERSE_HOLD_MS);
+    // AND LET GO AT ONCE. The flip is labelled "assist", so LAW 2 does NOT
+    // disown the held channel — in D that same W key is the accelerator again,
+    // and a hand still on it drives the car forward out of the bay it just
+    // parked in.
+    await throttle(false);
+    const g = await gear();
+    reverse.gearSeen.push(...g.filter((x) => !reverse.gearSeen.includes(x)));
+    reverse.lastCluster = gearLine(g);
+    /* ── THE DISARM MUST BE AS HARD TO CONVINCE AS THE ARM — 2026-08-21,
+     *    ADDED BY THE ADVERSARIAL RE-VERIFICATION OF THE UN-LATCH.
+     *
+     * This read `if (g[0] === "D")`, with no length test, while EVERY arm-side
+     * decision in this file carries one: `g0.length === 1 && g0[0] === "R"`,
+     * `late.length === 1 && late[0] === "R"`, `gNow.length === 1 && gNow[0] ===
+     * "R"`, and an explicit `g.length > 1` refusal in the middle of the burst
+     * that says the harness „will believe NEITHER". So a cluster reading
+     * «D/R» — two painted instruments disagreeing about the selector, the one
+     * shape armReverse treats as a HARD BLOCK — took the FIRST letter and
+     * declared `disarmed: true`.
+     *
+     * That is the asymmetry in the reassuring direction: the arm refuses an
+     * ambiguous cluster and the disarm accepts it, so the one field the stop
+     * phase depends on („are the pedals the right way round again?") was the
+     * one field allowed to be decided on evidence the rest of the file rejects.
+     * `disarmed: true` is what tells a judge the braking claims below are
+     * admissible.
+     *
+     * MEASURED, as the predicate rather than as a drive, because a disagreeing
+     * cluster cannot be induced from the outside: on ["D"] both the old and the
+     * new test say disarmed; on ["D","R"] the old says disarmed and the new
+     * does not; on [] both decline. See the note at `armReverse`'s own
+     * `g.length > 1` branch for why that third shape is a different answer. */
+    if (g.length > 1) {
+      loud(`two instruments disagree about the selector (${gearLine(g)}) during the disarm — the harness will believe NEITHER.`);
+      reverse.blocked = `cluster disagreement during disarm (${gearLine(g)})`;
+      reverse.failures.push(reverse.blocked);
+      reverse.disarmed = false;
+      await throttle(false);
+      return false;
+    }
+    if (g.length === 1 && g[0] === "D") {
+      reverse.disarmed = true;
+      note(`      REVERSE DISARMED on attempt ${attempt}: the cluster reads «D» again.`);
+      return true;
+    }
+    note(`      (disarm ${attempt}/${REVERSE_ARM_ATTEMPTS}: the cluster reads «${gearLine(g)}»)`);
+  }
+  reverse.disarmed = false;
+  loud(
+    `the drive could not get out of R — the cluster still reads «${gearLine(await gear())}». Every pedal in the stop ` +
+      `phase below therefore means the OPPOSITE of what the control law believes, and no braking claim from this run is admissible.`,
+  );
+  return false;
+}
+
 // POSITIVE CONTROL — the car must leave zero, or nothing after this is evidence.
 await throttle(true);
 await page.waitForTimeout(5000);
@@ -1184,7 +2644,7 @@ const PAUSE_VISIBLE =
 const probe = () =>
   page
     .evaluate(
-      ({ waitSrc, pauseSel }) => {
+      ({ waitSrc, pauseSel, revSrc, revPurposeSrc, revStaySrc, revSel, gearSel }) => {
         const sp = document.querySelector('[aria-label^="Скорост "]');
         const paused = [...document.querySelectorAll(pauseSel)].find((e) => {
           const r = e.getBoundingClientRect();
@@ -1214,11 +2674,70 @@ const probe = () =>
           // правилно…») and a lingering notice about a wait that already
           // happened («Чакането Е маневрата») mean opposite things.
           lawfulWait: (shell.innerText.match(new RegExp(waitSrc)) ?? [null])[0],
+          // ── DOES THE PRODUCT WANT R RIGHT NOW ────────────────────────────
+          // Folded into THIS evaluate rather than given its own, and that is
+          // not tidiness: a second round trip costs 2.0 s on the `pc` leg (the
+          // measured `evaluate` median there), which at 2 Hz is a third of
+          // every tick spent asking a question whose answer changes once a
+          // lesson. Two named surfaces, no innerText of the shell — see
+          // REVERSE_DEMAND_SEL for why the scope is the whole point.
+          reverseWant: (() => {
+            // NO RECT TEST — see the note on GEAR_SEL. Measured on the live
+            // rig, `[data-hud="objective-banner"]` reports a 0 × 0 box while
+            // holding «Задача 1/3 Потегли с оглед и заеми изходната позиция»
+            // and painting it legibly, so a `>4px` filter read every task
+            // title as absent and no lesson ever asked for reverse.
+            // `innerText` is itself the render test: it returns "" for a
+            // surface that is not being laid out.
+            let t = "";
+            for (const el of document.querySelectorAll(revSel)) {
+              t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
+            }
+            if (!t.trim()) return null;
+            const act = new RegExp(revSrc, "u");
+            const purpose = new RegExp(revPurposeSrc, "u");
+            // Purpose before act, exactly as `deriveGearDemand` orders them:
+            // «позиция ЗА заден ход» is a gate reached FACING FORWARD.
+            if (purpose.test(t) && !act.test(t)) return null;
+            const m = t.match(act);
+            return m ? m[0] : null;
+          })(),
+          /** The looser "is this still a reversing task?" test — see
+           *  REVERSE_STAY_RE. Only ever read while the drive is ALREADY in R. */
+          reverseStay: (() => {
+            let t = "";
+            for (const el of document.querySelectorAll(revSel)) {
+              t += `${(el.innerText || "").replace(/\s+/g, " ").trim()}\n`;
+            }
+            if (!t.trim()) return null;
+            if (new RegExp(revPurposeSrc, "u").test(t) && !new RegExp(revSrc, "u").test(t)) return null;
+            const m = t.match(new RegExp(revStaySrc, "u"));
+            return m ? m[0] : null;
+          })(),
+          // The selector letter, on the same trip. The drive loop needs it
+          // every tick once it is in R — a phase that cannot see the gear is
+          // the phase that produced this whole task.
+          gear: (() => {
+            const seen = [];
+            for (const el of shell.querySelectorAll(gearSel)) {
+              const v = el.getAttribute("aria-label").replace(/^Скоростен лост:\s*/, "").trim();
+              if (v && !seen.includes(v)) seen.push(v);
+            }
+            return seen;
+          })(),
         };
       },
-      { waitSrc: LAWFUL_WAIT_RE.source, pauseSel: PAUSE_SEL },
+      {
+        waitSrc: LAWFUL_WAIT_RE.source,
+        pauseSel: PAUSE_SEL,
+        revSrc: REVERSE_DEMAND_RE.source,
+        revPurposeSrc: REVERSE_DEMAND_PURPOSE_RE.source,
+        revStaySrc: REVERSE_STAY_RE.source,
+        revSel: REVERSE_DEMAND_SEL,
+        gearSel: GEAR_SEL,
+      },
     )
-    .catch(() => ({ kmh: -1, overlay: "?", pause: null, end: false, lawfulWait: null }));
+    .catch(() => ({ kmh: -1, overlay: "?", pause: null, end: false, lawfulWait: null, reverseWant: null, reverseStay: null, gear: [] }));
 
 /**
  * DRAIN THE QUEUE, DO NOT TAP ONCE.
@@ -1308,9 +2827,39 @@ let drivingTicks = 0;
 const tickMs = [];
 let shotStopped = false, shotWaited = false;
 
+/* ── THE STEERING PROOF RUNS INSTEAD OF THE DRIVE, NEVER BESIDE IT ──────────
+ *
+ * OPT-IN, AND IT EXITS. Turning the wheel in the middle of a scripted trace
+ * would put the car somewhere the trace never planned for, and a lane that
+ * steers badly manufactures confident wrong findings — which is worse than one
+ * that cannot steer at all, because the second at least leaves an honest
+ * silence. So `KNIJKA_STEER_PROOF=1` is a MODE: it proves the channel and ends
+ * the lane. Its frames and its `_audit-steering.json` certify the INSTRUMENT
+ * and say nothing about the lesson, and the status file says `phase:
+ * "steer-proof"` so nothing downstream can mistake it for a drive.
+ */
+if (STEER_PROOF) {
+  saveStatus({ phase: "steer-proof" });
+  steering.probe = await timed("steer", steerProof);
+  steering.note =
+    "this lane ran the STEERING PROOF and did not drive the lesson — no finding about the lesson may be drawn from it.";
+  try {
+    writeFileSync(`${OUT}/_audit-steering.json`, `${JSON.stringify({ scenario: SCENARIO, platform: PLATFORM, mode: MODE, steering }, null, 2)}\n`);
+  } catch (error) {
+    loud(`_audit-steering.json could not be written (${String(error?.message ?? error)}).`);
+  }
+  await shot("09-steer-proof");
+  saveStatus({ phase: "complete", steering, exit: steering.probe?.passed ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE });
+  note(`MACHINE SUMMARY: steer-proof ${steering.probe?.passed ? "PASSED" : "FAILED"} · see ${OUT}/_audit-steering.json`);
+  await browser.close().catch(() => {});
+  process.exit(steering.probe?.passed ? EXIT_JUDGEABLE : EXIT_EVIDENCE_INCOMPLETE);
+}
+
 if (MODE !== "right") await throttle(true);
 
-saveStatus({ phase: "driving" });
+// `reverse` from the first driving tick, not only at the end: a lane that dies
+// mid-manoeuvre must still be able to say whether it had reached R.
+saveStatus({ phase: "driving", reverse, steering });
 let budgetMs = DRIVE_BUDGET_MS;
 let budgetSaid = false;
 const medianTick = () => {
@@ -1367,6 +2916,15 @@ while (!ended && Date.now() - t0 < budgetMs) {
     await page.keyboard.up("KeyS").catch(() => {});
     holdW = false;
     holdS = false;
+    // …AND THE WHEEL, for the same reason and by the same argument. A steer key
+    // held across a drain is a key nothing is tracking: the modal ate the
+    // keyup, the sim keeps the wheel over, and the rest of the drive is a car
+    // turning with no record of why. Today this is always a no-op because the
+    // traces do not steer — it is here so that the day one does, the pedals and
+    // the wheel do not come out of a pause under different rules.
+    await steerRelease("pause drain");
+    await page.keyboard.up(STEER_KEYS.left).catch(() => {});
+    await page.keyboard.up(STEER_KEYS.right).catch(() => {});
     if (drained === 0) {
       // A LAYER THAT VANISHES BETWEEN THE PROBE AND THE DRAIN IS NOT A FAILURE,
       // AND THE FIRST VERSION OF THIS LINE TREATED IT AS ONE — SILENTLY. It was
@@ -1392,7 +2950,190 @@ while (!ended && Date.now() - t0 < budgetMs) {
   }
 
   const now = Date.now();
+  // THE CLUSTER IS RECORDED ON EVERY TICK, ON EVERY LESSON, IN BOTH MODES.
+  // It costs nothing (`probe` already reads it) and it is the answer to the
+  // question 376 drives could not answer: „what gear was this car in?" The
+  // sweep that produced this task had no record of the selector at all, so a
+  // reversing lesson that never reversed and one that reversed perfectly left
+  // identical evidence.
+  for (const g of p.gear) if (!reverse.gearSeen.includes(g)) reverse.gearSeen.push(g);
+  /* ── R WITHOUT ANYBODY ASKING FOR IT — 2026-08-21 ──────────────────────────
+   *
+   * FOUND BY THE NEW LOGGING, WHICH IS THE POINT OF THE NEW LOGGING. On a
+   * measured run of sc-park-bay-exit-rev the drive armed R, reversed, disarmed
+   * back to D at t021s — and `[04-t079s] 0 км/ч gear=R` fifty-eight seconds
+   * later, with no arm in between. The engine's own reverse assist had taken
+   * the gate on a pedal gesture the stop phase made, and from there the drive
+   * was grading a car in R under a control law that believes W is the
+   * accelerator and S is the brake, when in R they are the other way round.
+   * That is the historical defect the `brake()` refusal exists to prevent,
+   * arriving through a door the refusal does not cover.
+   *
+   * The harness cannot un-take that gate safely from inside the roll phase — a
+   * press at the wrong moment is what caused it — so it does the one thing that
+   * is always right: it SAYS SO, once, loudly, and records it. Silence here is
+   * what let 376 drives report a reversing car's speed as a forward creep.
+   */
+  /* `=== null`, NOT `!`. `unarmedRAt` is a SECOND COUNT — `Math.round((now -
+   * t0) / 1000)` — and on the first sampled tick that value is `0`, which is
+   * falsy. Written as `!reverse.unarmedRAt` the watchdog re-fires on every
+   * subsequent tick for the whole drive, and each firing takes a screenshot
+   * (measured at ~1.0 s median on this box) and rewrites the status file. The
+   * one case where the engine grabs the gate FASTEST is the one the guard
+   * failed to latch on. — adversarial re-verification, 2026-08-21 */
+  if (phase !== "reverse" && p.gear.includes("R") && reverse.unarmedRAt === null) {
+    reverse.unarmedRAt = Math.round((now - t0) / 1000);
+    /* …AND IT MUST NOT BLAME THE ENGINE FOR THE HARNESS'S OWN R.
+     *
+     * `disarmReverse()`'s return value is discarded at the reverse-phase exit
+     * below: the phase goes back to "roll" whether or not the car actually left
+     * R. When the disarm has just FAILED, the next tick lands here — and the
+     * line said „THIS DRIVE DID NOT PUT IT THERE … the engine's own reverse
+     * assist has taken the gate", which is exactly backwards. This drive put it
+     * there and could not take it out. The corruption downstream is identical,
+     * so the alarm stays; the ATTRIBUTION is now read off `reverse.disarmed`
+     * instead of assumed. — adversarial re-verification, 2026-08-21 */
+    const mine = reverse.disarmed === false;
+    loud(
+      mine
+        ? `THE CLUSTER STILL READS «R» AT t=${reverse.unarmedRAt}s AND IT WAS THIS DRIVE THAT PUT IT THERE — the disarm ` +
+            `reported failure and the phase went back to «${phase}» anyway. Every pedal from here means the OPPOSITE of what the ` +
+            `control law believes — the throttle brakes and the brake accelerates — so no braking or stopping claim after this ` +
+            `point is admissible.`
+        : `THE CLUSTER READS «R» AT t=${reverse.unarmedRAt}s AND THIS DRIVE DID NOT PUT IT THERE (phase «${phase}»). The engine's own ` +
+        `reverse assist has taken the gate. Every pedal from here means the OPPOSITE of what the control law believes — the ` +
+        `throttle brakes and the brake accelerates — so no braking or stopping claim after this point is admissible.`,
+    );
+    // The frame carries the diagnosis, not a guess about it — the same rule
+    // that renamed `05r-reverse-REFUSED` after it was found with R lit on it.
+    await shot(mine ? "05r-stuck-in-R" : "05r-unarmed-R");
+    saveStatus({ reverse });
+  }
   if (MODE === "right") {
+    // ── DOES THIS TASK WANT R? ────────────────────────────────────────────
+    //
+    // ASKED BEFORE THE PHASE BRANCH, not inside the stop phase, and the first
+    // draft had it inside — which is wrong for exactly the lessons this exists
+    // for. `sc-park-bay-exit-rev`'s TASK ONE is «излез от мястото на заден
+    // ход»: the car is parked nose-in and the demand is up from the first
+    // frame, so a check that only runs after a completed roll would drive the
+    // car FORWARD out of a bay whose only exit is backwards before it ever
+    // looked. The condition that matters is the car being stopped, and that
+    // can be true in any phase.
+    //
+    // `p.kmh === 0`, not `<= 1`: the machine's standstill test is |v| < 0.6
+    // (REVERSE_ASSIST_STANDSTILL_KMH) and the dial ROUNDS (`displaySpeedKmh`),
+    // so a displayed 1 can be 1.4 км/ч, where no press can arm. Reporting „R
+    // refused" about a car the engine can see moving would be a false finding
+    // about the product, which is the failure this programme ranks worst.
+    //
+    // A LAWFUL WAIT OUTRANKS IT. While the product declares that standing
+    // still IS the manoeuvre, shifting to R would be inventing a fault.
+    if (
+      phase !== "reverse" &&
+      p.kmh >= 0 &&
+      p.kmh <= 1 &&
+      p.lawfulWait === null &&
+      p.reverseWant !== null &&
+      !reverse.armed &&
+      // ── THE GATE DOES NOT LATCH — 2026-08-21 ──────────────────────────────
+      // It used to read `reverse.failure === null`, and `reverse.failure` was
+      // written by the FIRST burst that ran out of presses. So one burst — on
+      // sc-park-bay-exit-rev, a burst that had actually succeeded and been
+      // misread — closed this gate for the whole session and the drive graded
+      // ~190 s of a car in R as a car in D. Only a HARD block closes it now
+      // (`reverse.blocked`: the instruments disagree, or there is no session
+      // left), and the retries are bounded by a press budget rather than by a
+      // one-way flag, so a later successful arm is still believed.
+      reverse.blocked === null &&
+      reverse.attempted < REVERSE_ARM_BUDGET
+    ) {
+      if (!reverse.demanded) {
+        reverse.demanded = true;
+        reverse.demandedBy = p.reverseWant;
+        note(`      THE TASK ASKS FOR REVERSE («${p.reverseWant}») — the cluster reads «${gearLine(p.gear)}». Arming R.`);
+      }
+      if (p.kmh !== 0) {
+        note(`      (holding for a true standstill before arming R — the dial reads ${p.kmh} км/ч, which rounds from as much as 1.4)`);
+        await throttle(false);
+      } else if (await timed("reverse", () => armReverse(p.kmh))) {
+        reverse.armedAtSec = Math.round((now - t0) / 1000);
+        // THE PROOF FRAME. Named for what the cluster said, taken BEFORE one
+        // metre is driven, so a reader can answer "did this drive ever enter
+        // reverse?" from a picture instead of from a claim.
+        await shot("05r-reverse-R");
+        phase = "reverse";
+        phaseAt = Date.now();
+        phaseTicks = 0;
+        restLogged = false;
+        saveStatus({ reverse });
+        tickMs.push(Date.now() - tickStart);
+        lastTickAt = Date.now();
+        continue;
+      } else {
+        /* ── THE FRAME IS NAMED FOR WHAT THE GLASS SAYS — 2026-08-21 ─────────
+         *
+         * `05r-reverse-REFUSED.png` was taken to PROVE the car never reached R.
+         * The verifier opened the one from sc-park-bay-exit-rev/mobile/right
+         * and R IS LIT ON IT. A frame whose filename contradicts its own pixels
+         * is worse than no frame: it is a judge's shortcut pointing the wrong
+         * way, and the whole point of photographing the cluster was that the
+         * picture would outrank the claim.
+         *
+         * So the cluster is read ONE more time, immediately before the shutter,
+         * and it decides the name:
+         *   · «R» on the glass  -> this was never a refusal. The frame is
+         *     `05r-reverse-R-late`, the drive enters the reverse phase, and the
+         *     harness says so instead of arguing with the photograph.
+         *   · anything else     -> `05r-reverse-REFUSED-<letter>`, so the file
+         *     name carries the evidence rather than a verdict about it, and a
+         *     reader can tell «REFUSED-D» from «REFUSED-(no cluster)» without
+         *     opening either.
+         * (`armReverse` now catches the late R itself; this is the second net,
+         * because the arm and the shutter are two round trips apart and the
+         * failure being guarded is exactly a state that arrives between them.) */
+        const gNow = await gear();
+        reverse.gearSeen.push(...gNow.filter((x) => !reverse.gearSeen.includes(x)));
+        const g = gearLine(gNow);
+        if (gNow.length === 1 && gNow[0] === "R") {
+          reverse.armed = true;
+          reverse.armedAtSec = Math.round((now - t0) / 1000);
+          note(
+            `      THE BURST REPORTED NO «R» AND THE CLUSTER READS «R» — the toggle landed between the last press and ` +
+              `the shutter. Believed, photographed as 05r-reverse-R-late, and the drive reverses.`,
+          );
+          await shot("05r-reverse-R-late");
+          phase = "reverse";
+          phaseAt = Date.now();
+          phaseTicks = 0;
+          restLogged = false;
+          saveStatus({ reverse });
+          tickMs.push(Date.now() - tickStart);
+          lastTickAt = Date.now();
+          continue;
+        }
+        // Not a verdict on the session — a verdict on THIS burst. The gate
+        // above will spend another one if the product still wants R.
+        const spent = `${reverse.attempted}/${REVERSE_ARM_BUDGET} deliberate press(es) over ${reverse.bursts} burst(s)`;
+        note(
+          `      (reverse burst ${reverse.bursts} ended with the cluster reading «${g}» after ${spent}` +
+            `${reverse.attempted < REVERSE_ARM_BUDGET ? " — the gate stays OPEN and will try again at the next standstill)" : " — the press budget is spent)"}`,
+        );
+        if (reverse.attempted >= REVERSE_ARM_BUDGET || reverse.blocked !== null) {
+          loud(
+            `THIS LESSON ASKED FOR REVERSE («${reverse.demandedBy}») AND THE CLUSTER NEVER READ «R» — ${reverseWhy() ?? `it reads «${g}»`}. ` +
+              `Everything below describes the APPROACH ONLY; no finding about the reversing half of this manoeuvre may be ` +
+              `drawn from this run, in either direction.`,
+          );
+          // The letter goes in the FILE NAME. `(no cluster)` is a legal answer
+          // and a different one from `D`; both are stripped to something a file
+          // system will take without losing which of the two it was.
+          await shot(`05r-reverse-REFUSED-${g.replace(/[^\p{L}\p{N}]+/gu, "-")}`);
+          dumpCensus(await census(), `reverse was demanded and could not be armed (cluster «${g}»)`);
+        }
+        saveStatus({ reverse });
+      }
+    }
     // ACT FIRST, DECIDE AFTERWARDS — AND THAT ORDER IS THE WHOLE FIX.
     //
     // The first version asked `now - phaseAt >= ROLL_MS` BEFORE driving, and
@@ -1488,6 +3229,67 @@ while (!ended && Date.now() - t0 < budgetMs) {
         phaseAt = now;
         phaseTicks = 0;
       }
+    } else if (phase === "reverse") {
+      // ── THE REVERSE HALF OF THE MANOEUVRE ────────────────────────────────
+      //
+      // EVERY PEDAL MEANS THE OTHER THING HERE (rule b, engine/reverseAssist):
+      // S is the reverse ACCELERATOR and W is the BRAKE. So the phase reads
+      // like the roll phase with the two channels exchanged — and it re-reads
+      // the CLUSTER every tick rather than remembering that it shifted, because
+      // „I sent the keys once" is the belief this whole task exists to kill.
+      phaseTicks++;
+      reverse.reverseTicks++;
+      for (const g of p.gear) if (!reverse.gearSeen.includes(g)) reverse.gearSeen.push(g);
+      if (p.gear.length && !p.gear.includes("R")) {
+        // The pause drain lifts BOTH pedals at whatever speed the car is at
+        // (see the drain block above), and in R the lifted pedal is the
+        // functional BRAKE — so a teach card at a standstill leaves exactly
+        // the gesture that walks the gate back up to D. Losing R silently
+        // would put a forward-driving car under a reverse control law.
+        loud(`THE SELECTOR LEFT R MID-MANOEUVRE — the cluster now reads «${gearLine(p.gear)}». The reverse leg ends here and what follows is not reversing.`);
+        reverse.failures.push(`lost R mid-manoeuvre (${gearLine(p.gear)})`);
+        // …AND `armed` GOES BACK TO FALSE, so the gate above can put the car
+        // back in R if the task still wants it. Leaving it true would let the
+        // rest of a reversing lesson run forward under a flag that says it is
+        // reversing — the same conflation the whole block is about, arriving
+        // from the other side.
+        reverse.armed = false;
+        await sChannel(false);
+        await throttle(false);
+        phase = "roll";
+        phaseAt = now;
+        phaseTicks = 0;
+        saveStatus({ reverse });
+      } else if (p.reverseStay === null || now - phaseAt >= REVERSE_MS) {
+        note(
+          `      the reverse leg ends after ${Math.round((now - phaseAt) / 1000)}s — ` +
+            (p.reverseStay === null
+              ? "the task no longer mentions reversing at all."
+              : `its ${REVERSE_MS / 1000}s budget is spent.`),
+        );
+        await shot("05r-reverse-end");
+        await timed("reverse", disarmReverse);
+        saveStatus({ reverse });
+        phase = "roll";
+        phaseAt = Date.now();
+        phaseTicks = 0;
+        restLogged = false;
+        lastTickAt = Date.now();
+      } else {
+        // The cap is pressed ONLY while the car is genuinely moving, for the
+        // exact reason brake() refuses a standstill press in D: at rest in R,
+        // a fresh press of the functional brake is the gesture that selects D.
+        await timed("pedals", async () => {
+          if (p.kmh > REVERSE_CRUISE_KMH + BRAKE_CAP_OVER_KMH && p.kmh > 1) {
+            await throttle(true); // the functional BRAKE in R
+            await sChannel(false);
+          } else {
+            await throttle(false);
+            await sChannel(true); // the functional THROTTLE in R
+          }
+        });
+        drivingTicks++;
+      }
     }
   }
 
@@ -1544,6 +3346,45 @@ note(
     (refusedReversePress ? ` · refused ${refusedReversePress} standstill brake press${refusedReversePress === 1 ? "" : "es"} (would have selected R)` : "") +
     (lostKeys ? ` · re-asserted the brake ${lostKeys}× after the sim lost the key` : ""),
 );
+// ── WHAT HAPPENED TO REVERSE, ON EVERY LANE ────────────────────────────────
+//
+// PRINTED WHETHER OR NOT THE LESSON ASKED, and that is the point: „this lesson
+// never wanted R" and „this lesson wanted R and never got it" were the SAME
+// silence for 376 drives, and the silence read as the first one. It is one
+// line either way, and a reader never has to infer which.
+{
+  reverse.deliberatePresses = standstillPresses;
+  const g = gearLine(reverse.gearSeen);
+  if (!reverse.demanded) {
+    note(`  REVERSE: not demanded by this lesson at any sampled tick · cluster only ever read ${g}`);
+  } else if (reverse.armed) {
+    note(
+      `  REVERSE: DEMANDED («${reverse.demandedBy}») and ARMED at t=${reverse.armedAtSec}s after ` +
+        `${reverse.attempted}/${REVERSE_ARM_BUDGET} deliberate press(es) over ${reverse.bursts} burst(s) · ` +
+        `${reverse.reverseTicks} tick(s) driven in R · ` +
+        `disarmed: ${reverse.disarmed === null ? (reverse.disarmNote ?? "not reached") : reverse.disarmed} · ` +
+        `cluster read ${g}`,
+    );
+    // EVERY burst that failed BEFORE the one that worked, listed. A run that
+    // succeeded on the third burst and a run that succeeded on the first are
+    // different runs, and the old single `failure` field could only say
+    // „something went wrong at some point", which reads as neither.
+    for (const f of reverse.failures) note(`      · on the way there: ${f}`);
+  } else {
+    note(
+      `  REVERSE: DEMANDED («${reverse.demandedBy}») and NEVER ARMED · ` +
+        `${reverse.attempted}/${REVERSE_ARM_BUDGET} press(es) over ${reverse.bursts} burst(s) · ` +
+        `${reverse.blocked ? `BLOCKED: ${reverse.blocked}` : (reverseWhy() ?? "no reason recorded")} · cluster read ${g}`,
+    );
+    for (const f of reverse.failures) note(`      · ${f}`);
+  }
+}
+if (reverse.demanded && !reverse.armed) {
+  loud(
+    `THIS RUN NEVER REVERSED ON A LESSON THAT ASKED FOR REVERSE. Read the "reverse" block in _audit-status.json before judging ` +
+      `anything below: the manoeuvre was not performed, so it was neither passed nor failed.`,
+  );
+}
 // THE HARNESS'S OWN COST, STATED. A tick is one pass of the control law; when
 // the box is loaded it stretches, and a stretched tick is how the duty cycle
 // silently collapsed on `pc`. Reported so a sweep that starts producing
@@ -1742,9 +3583,29 @@ const facts = await page
     if (verdictSection) {
       for (const p of verdictSection.querySelectorAll("p, span")) {
         const s = t(p);
-        // «Неиздържан» contains «издържан», so the exact-match form is the only
-        // one that cannot answer the wrong question.
-        if (/^(не)?издържан$/i.test(s)) { verdict = s.toUpperCase(); break; }
+        // ── THREE STATES, NOT TWO — 2026-08-21 ────────────────────────────
+        //
+        // `SessionVerdict` (hud/SessionEndScreen.tsx) has been three-way since
+        // the day «Неиздържан» stopped being printed over a clean изпитен
+        // лист: `passed` · `failed` · `unfinished`, and
+        // SESSION_VERDICT_LABEL_BG spells the third one «Незавършен». This
+        // matcher knew two of them, so every unfinished drive was recorded as
+        // `verdict: null` and printed «VERDICT: (none)».
+        //
+        // MEASURED OVER WAVE C: 0 of 376 drives lacked a debrief frame and 112
+        // of them ended «Незавършен» — with a penalty-class table, a star
+        // rating and `unfinishedVerdictNoteBg`'s own sentence under the badge.
+        // So «(none)» was not a missing verdict. It was the harness failing to
+        // read a word that was on the glass, in the direction that makes a
+        // product look untested rather than tested-and-unfinished.
+        //
+        // «(none)» KEEPS ITS MEANING: no verdict SURFACE at all. The two must
+        // stay distinguishable, because one of them is a finding about this
+        // instrument and the other is a finding about the lesson.
+        //
+        // Exact match, as before: «Неиздържан» contains «издържан», so a
+        // substring test cannot answer the right question.
+        if (/^(издържан|неиздържан|незавършен)$/i.test(s)) { verdict = s.toUpperCase(); break; }
       }
     }
     const scoreText = t(verdictSection);
@@ -1765,17 +3626,528 @@ const facts = await page
       commendations: rows("Похвали"),
       nearMisses: rows("Разминавания на косъм"),
       debriefText: t(document.querySelector('section[aria-label="Разбор"]')).slice(0, 900),
+      // Which of the two silences this is. `null` + no section = there was no
+      // verdict surface at all; `null` + a section = the surface mounted and
+      // carries no pill, which is a finding about the PRODUCT. They were one
+      // «(none)» until 2026-08-21 and they are opposite diagnoses.
+      verdictSurface: verdictSection === null ? "absent" : verdict === null ? "no-pill" : "pill",
     };
   })
   .catch((e) => ({ error: String(e?.message || e) }));
 
+/* ===========================================================================
+ * THE DEBRIEF IS A PAGE, AND 08-debrief.png WAS A WINDOW ONTO IT — 2026-08-21
+ * ===========================================================================
+ *
+ * MEASURED ACROSS WAVE C: 08-debrief.png is a VIEWPORT shot and it stops at the
+ * error-class table. «Задачи от маршрута», «Грешки», «Похвали» and «Разбор от
+ * инструктора» are below the fold, and no DOM text was persisted anywhere — so
+ * a large share of that wave's 77 UNJUDGED findings sit on sections that were
+ * never photographed and never written down. Nothing about them was judgeable
+ * in EITHER direction.
+ *
+ * AND THE FOLD MOVES WITH THE CONTENT, which is worse than a fixed crop. A
+ * short instructor paragraph lets the frame reach «Оценка на маневрата ★★★»; a
+ * long one stops it three rows earlier. What got captured therefore varies per
+ * drive, and no reader can tell from the picture which case they are holding.
+ *
+ * THREE RECOVERIES, because they fail differently and a reader needs at least
+ * one to survive:
+ *   1. `_audit-debrief.json` — the facts, UNTRUNCATED, straight out of the six
+ *      handles SessionEndScreen writes. Text cannot be cropped, weighs a few
+ *      KB, and answers "was objective X credited" as a boolean rather than as
+ *      an inference from pixels. This is the one that must never be missing.
+ *   2. THE FOLD, STATED. For every named section: its box, and WHICH frame
+ *      contains it. A reader who wants the picture is told which file to open
+ *      instead of guessing, and a section that no frame contains says so.
+ *   3. THE FRAMES THEMSELVES — the surface is scrolled and photographed page
+ *      by page (`08-debrief-p1..pN`). `08-debrief.png` is left exactly as it
+ *      was so every existing reader and every Wave C comparison still works.
+ *
+ * WHY NOT `fullPage: true` ALONE. The result screen is not always the document
+ * scroller — on the phone shell it lives inside a fixed, `overflow-y: auto`
+ * play shell, and a full-page screenshot of a document that does not scroll is
+ * byte-for-byte the viewport shot that started this. So the scroller is FOUND
+ * (walk up from the result section to the first ancestor that actually
+ * overflows) and reported by name, and `fullPage` is used only when the answer
+ * is the document itself.
+ */
+const DEBRIEF_SECTIONS = [
+  'section[aria-labelledby="sim-result-title"]',
+  'section[aria-label="Оценка на маневрата"]',
+  // A15's mistake MAP — «Къде се случи». SessionEndScreen renders eight
+  // sections and this list was written with seven; the missing one is the
+  // panel that answers WHERE, which is the whole point of a wrong-lane drive.
+  // MEASURED on sc-junction-scan/mobile/wrong: it occupies the entirety of
+  // 08-debrief-p4.png and appeared in neither the fold report nor the dump, so
+  // the one sidecar field a reader was told to trust did not mention it.
+  'section[aria-label="Карта на грешките"]',
+  'section[aria-label="Задачи от маршрута"]',
+  'section[aria-label="Грешки"]',
+  'section[aria-label="Похвали"]',
+  'section[aria-label="Разминавания на косъм"]',
+  'section[aria-label="Разбор"]',
+];
+/** THE PAGE CAP IS NO LONGER A NUMBER SOMEBODY CHOSE — 2026-08-21.
+ *
+ *  WHAT IT WAS: `DEBRIEF_MAX_PAGES = 6`, carrying two reasons, BOTH FALSE, and
+ *  both measured false the day they were checked.
+ *
+ *  Reason one was cost — "frames are 200 ms on `mobile` and were measured at
+ *  11,999 ms on `pc`; six pages is ~72 s in the worst case". Re-measured from
+ *  the harness's own TICK COST line over two full drives of sc-junction-scan:
+ *      mobile  screenshot ×41  med 915 ms  max 1,540 ms
+ *      pc      screenshot ×41  med 337 ms  max   898 ms
+ *  The two legs are the other way round and the pc figure is ~35× smaller. Six
+ *  pages costs ~8 s on mobile and ~4 s on pc, not 72. The number was defended
+ *  by a budget that did not exist.
+ *
+ *  Reason two was coverage — "covers every debrief measured so far". The same
+ *  two drives:
+ *      mobile  28,207 px of content in a  393 px window →  87 uniform pages
+ *      pc      35,877 px of content in a  655 px window →  63 uniform pages
+ *  Six uniform frames photograph 7 % and 11 % of those surfaces, and «Разбор»
+ *  — the instructor debrief, requirement-zero per doc 64 THEO-4 — sits at
+ *  25,688 px and 33,358 px, i.e. NO FRAME OF IT EXISTED on either leg. The
+ *  wrong-lane drive is the case where the debrief matters most and it was the
+ *  case the cap failed hardest.
+ *
+ *  WHAT IT IS NOW: the grid is not uniform. A uniform grid over a 28,000 px
+ *  card is the wrong instrument — 87 frames of mostly-fault-rows to reach one
+ *  paragraph — so the frames are ANCHORED ON THE PRODUCT'S OWN SECTIONS: one
+ *  scroll position per present section in DEBRIEF_SECTIONS, plus the top of the
+ *  card, deduplicated when two land within an overlap of each other. The cap is
+ *  therefore DERIVED — it is `DEBRIEF_SECTIONS.length + 1`, i.e. it comes from
+ *  how many named surfaces SessionEndScreen renders — and it cannot silently
+ *  fail to cover a section again, because a section IS a frame.
+ *
+ *  AND THE COST IS STILL BOUNDED, which is the constraint nobody had written
+ *  down: E: is a 7200 rpm HDD, a debrief frame measured 50–240 KB, and ENOSPC
+ *  has already killed one sweep mid-drive (see the 2026-08-18 section above).
+ *  Nine anchored frames is ≤ 2.2 MB and ≤ 14 s per lane against the six
+ *  uniform ones' ≤ 1.4 MB and ≤ 9 s — a third more disk to go from „«Разбор»
+ *  has no frame on either leg" to „every section that fits the window has one".
+ *  87 frames × 644 lanes never was the alternative. */
+const DEBRIEF_MAX_PAGES = DEBRIEF_SECTIONS.length + 1;
+/** Rows must not fall down a seam between two frames.
+ *
+ *  WHAT THIS NUMBER ACTUALLY GUARANTEES, stated because it is smaller than it
+ *  looks: with `step = pageH − overlap`, a section lands whole inside SOME
+ *  frame only if its height ≤ overlap. At 80 px that is one row. Every section
+ *  taller than 80 px is at the mercy of where its top happens to fall, which is
+ *  why `fold[]` has to compute containment over the whole interval instead of
+ *  assuming it. */
+const DEBRIEF_OVERLAP_PX = 80;
+
+/** Measure the surface: who scrolls, how tall, and where each section sits. */
+const debriefGeometry = () =>
+  page
+    .evaluate((sels) => {
+      const t = (el) => (el?.innerText || "").trim().replace(/\s+/g, " ");
+      const anchor =
+        document.querySelector('[data-hud="end-screen"]') ??
+        document.querySelector('section[aria-labelledby="sim-result-title"]');
+      if (!anchor) return { anchor: null };
+      const scrolls = (el) => {
+        if (!el) return false;
+        const s = getComputedStyle(el);
+        return /(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 8;
+      };
+      let scroller = null;
+      for (let el = anchor; el && el !== document.body; el = el.parentElement) {
+        if (scrolls(el)) { scroller = el; break; }
+      }
+      const docScrolls =
+        document.documentElement.scrollHeight > document.documentElement.clientHeight + 8;
+      const describe = (el) =>
+        el
+          ? {
+              tag: el.tagName.toLowerCase(),
+              hud: el.getAttribute?.("data-hud") ?? null,
+              cls: (el.className || "").toString().slice(0, 80),
+              scrollHeight: el.scrollHeight,
+              clientHeight: el.clientHeight,
+            }
+          : null;
+      const target = scroller ?? (docScrolls ? document.documentElement : null);
+      // Section boxes in the SCROLLER's own content coordinates, so „which
+      // page holds this row" is arithmetic rather than a second measurement.
+      const originTop = target
+        ? target === document.documentElement
+          ? 0
+          : target.getBoundingClientRect().top - target.scrollTop
+        : anchor.getBoundingClientRect().top;
+      const sections = sels.map((sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return { sel, present: false };
+        const r = el.getBoundingClientRect();
+        const top = target === document.documentElement ? r.top + window.scrollY : r.top - originTop;
+        return {
+          sel,
+          present: true,
+          top: Math.round(top),
+          height: Math.round(r.height),
+          chars: t(el).length,
+        };
+      });
+      return {
+        anchor: describe(anchor),
+        scroller: scroller ? describe(scroller) : docScrolls ? "document" : null,
+        viewportH: window.innerHeight,
+        contentH: target ? target.scrollHeight : anchor.getBoundingClientRect().height,
+        pageH: target ? target.clientHeight : window.innerHeight,
+        sections,
+      };
+    }, DEBRIEF_SECTIONS)
+    .catch((e) => ({ anchor: null, error: String(e?.message || e) }));
+
+/** The whole debrief, untruncated, out of the same six handles. */
+const debriefDump = () =>
+  page
+    .evaluate((sels) => {
+      const t = (el) => (el?.innerText || "").trim().replace(/\s+/g, " ");
+      const list = (sel) => [...document.querySelectorAll(`${sel} li`)].map((li) => t(li));
+      const out = {};
+      for (const sel of sels) {
+        const el = document.querySelector(sel);
+        out[sel] = el === null ? null : { text: t(el), items: list(sel) };
+      }
+      const objectives = [
+        ...document.querySelectorAll('section[aria-label="Задачи от маршрута"] li'),
+      ].map((li) => {
+        const glyph = t(li.querySelector("span"));
+        // The glyph is the credit. Recorded RAW beside the boolean so a reader
+        // who distrusts the mapping can check it without a re-drive.
+        return { glyph, done: glyph === "✓", titleBg: t(li).replace(/^[✓–-]\s*/, "") };
+      });
+      const stars = document.querySelector('[aria-label$="от 3 звезди"]');
+      return {
+        objectives,
+        stars: stars ? stars.getAttribute("aria-label") : null,
+        sections: out,
+      };
+    }, DEBRIEF_SECTIONS)
+    .catch((e) => ({ error: String(e?.message || e) }));
+
+/** Scroll the debrief and photograph it page by page. Returns the frames it
+ *  actually got — never the frames it meant to get. */
+async function captureDebriefPages(geo) {
+  const shots = [];
+  if (!geo || geo.anchor === null) return shots;
+  const pageH = Math.max(1, geo.pageH || geo.viewportH);
+  const maxTop = Math.max(0, geo.contentH - pageH);
+  /* ── THE GRID IS THE SECTION LIST, NOT AN ARITHMETIC SERIES ────────────────
+   *
+   * One stop at the TOP of the card — that is the frame every existing reader
+   * and every Wave C comparison expects `08-debrief-p1` to be — and then one
+   * stop per PRESENT section, aimed a hair above its first row so a heading is
+   * never sliced off by rounding. Two sections that land within an overlap of
+   * each other share a frame rather than spending two, because at that distance
+   * the second frame would be a near-duplicate of the first.
+   *
+   * A uniform grid over the measured 28,207 px card needed 87 frames to reach
+   * «Разбор» and took six. This takes at most one per section and reaches it on
+   * the first pass. */
+  const stops = [{ top: 0, anchoredOn: "the top of the result card" }];
+  for (const s of geo.sections ?? []) {
+    if (!s.present) continue;
+    const want = Math.max(0, Math.min(maxTop, s.top - 8));
+    const near = stops.find((q) => Math.abs(q.top - want) <= DEBRIEF_OVERLAP_PX);
+    if (near) { near.anchoredOn += ` + ${s.sel}`; continue; }
+    stops.push({ top: want, anchoredOn: s.sel });
+  }
+  stops.sort((a, b) => a.top - b.top);
+  const pages = Math.min(stops.length, DEBRIEF_MAX_PAGES);
+  if (stops.length > DEBRIEF_MAX_PAGES) {
+    // Only reachable if DEBRIEF_SECTIONS grows past its own derived cap, which
+    // is arithmetically impossible today — kept because a constant derived from
+    // a list is only as safe as the next edit to the list.
+    loud(
+      `the debrief needs ${stops.length} anchored frames and the cap is ${DEBRIEF_MAX_PAGES} — ` +
+        `the sections past frame ${DEBRIEF_MAX_PAGES} exist ONLY in _audit-debrief.json.`,
+    );
+  }
+  for (let i = 0; i < pages; i++) {
+    const y = stops[i].top;
+    await page
+      .evaluate(
+        ({ top, isDoc }) => {
+          if (isDoc) { window.scrollTo(0, top); return; }
+          const anchor =
+            document.querySelector('[data-hud="end-screen"]') ??
+            document.querySelector('section[aria-labelledby="sim-result-title"]');
+          for (let el = anchor; el && el !== document.body; el = el.parentElement) {
+            const s = getComputedStyle(el);
+            if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 8) {
+              el.scrollTop = top;
+              return;
+            }
+          }
+        },
+        { top: y, isDoc: geo.scroller === "document" || geo.scroller === null },
+      )
+      .catch(() => {});
+    await page.waitForTimeout(350);
+    // ── READ THE SCROLL BACK, DO NOT ASSUME IT — 2026-08-21, adversarial pass
+    //
+    // Every number in `fold[]` is derived from this position, so recording the
+    // REQUESTED offset makes the sidecar a statement about what the harness
+    // asked for, not about what the frame shows — and those separate the
+    // moment anything (a `scroll-behavior: smooth` on the scrim, a re-render
+    // that resets `scrollTop`, a shorter surface than `geo` measured) gets
+    // between the two. Silently, and in the reassuring direction: the sidecar
+    // would keep naming distinct pages while every frame photographed the top.
+    const achieved = await page
+      .evaluate(() => {
+        const anchor =
+          document.querySelector('[data-hud="end-screen"]') ??
+          document.querySelector('section[aria-labelledby="sim-result-title"]');
+        for (let el = anchor; el && el !== document.body; el = el.parentElement) {
+          const s = getComputedStyle(el);
+          if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight + 8) {
+            return Math.round(el.scrollTop);
+          }
+        }
+        return Math.round(window.scrollY);
+      })
+      .catch(() => null);
+    const at = achieved === null ? y : achieved;
+    if (achieved !== null && Math.abs(achieved - y) > 4) {
+      loud(
+        `08-debrief-p${i + 1} was asked for scrollTop ${y} and the surface is at ${achieved} — the frame is ` +
+          `photographed and reported AT ${achieved}. Two frames landing on the same offset means the page ` +
+          `grid is not advancing and those sections exist only in _audit-debrief.json.`,
+      );
+    }
+    const name = `08-debrief-p${i + 1}`;
+    if (await shot(name)) {
+      shots.push({
+        name,
+        scrollTop: at,
+        coversTo: at + pageH,
+        requestedScrollTop: y,
+        scrollVerified: achieved !== null,
+        // WHY THIS FRAME EXISTS. A uniform grid's frames answered "page 4 of
+        // 87"; these answer "this is the one aimed at «Разбор»", which is the
+        // question a reader of the fold report is actually asking.
+        anchoredOn: stops[i].anchoredOn,
+      });
+    }
+  }
+  // Put it back where a reader expects to find it.
+  await page
+    .evaluate(() => {
+      window.scrollTo(0, 0);
+      const anchor =
+        document.querySelector('[data-hud="end-screen"]') ??
+        document.querySelector('section[aria-labelledby="sim-result-title"]');
+      for (let el = anchor; el && el !== document.body; el = el.parentElement) {
+        const s = getComputedStyle(el);
+        if (/(auto|scroll)/.test(s.overflowY)) { el.scrollTop = 0; return; }
+      }
+    })
+    .catch(() => {});
+  return shots;
+}
+
+const geo = await timed("debrief", debriefGeometry);
+const debriefPages = await captureDebriefPages(geo);
+const dump = await timed("debrief", debriefDump);
+/** Which frame holds each section — the answer 08-debrief.png could not give.
+ *
+ * ── A SECTION IS AN INTERVAL, NOT A POINT — 2026-08-21, adversarial pass ────
+ *
+ * This map matched on `s.top` ALONE, so it answered "which frame contains the
+ * section's FIRST PIXEL ROW" while the field was named `inFrame` and the log
+ * line beside it said which file to open. On a long debrief those are not the
+ * same answer, and the difference runs the reassuring way — the reader is told
+ * a frame holds a section, opens it, and sees a heading with the body cut off.
+ *
+ * MEASURED on sc-junction-scan/mobile/wrong (43 mistakes, 27,093 px of content
+ * in a 393 px window), against the pixels of the frames it named:
+ *   «Задачи от маршрута» @1286 ×142  → named p4 (939–1332). p4 shows the
+ *                                      HEADING and not one objective row;
+ *                                      p5 (1252–1645) holds the section whole
+ *                                      and was not named.
+ *   «Грешки»             @1444 ×23114 → named p5 (1252–1645), i.e. 201 px of
+ *                                      23,114 — 0.9 % of the section.
+ *   verdict card         @115  ×521   → `aboveTheOriginalFold: true`, while
+ *                                      08-debrief.png (0–393) cuts it at the
+ *                                      «Урокът беше прекъснат…» line.
+ *
+ * So: containment is computed over the whole interval [top, top+height).
+ * `inFrame` now names only a frame that holds the section IN FULL, `inFrames`
+ * lists every frame that shows any part of it, and a section taller than the
+ * window says so rather than looking like a frame nobody took. Both fold
+ * booleans are kept and separated, because "starts on the first screen" and
+ * "fits on the first screen" are different claims and only one of them is what
+ * a reader of 08-debrief.png actually gets. */
+const originalFoldH = geo.pageH || geo.viewportH || 0;
+/** How much of [a, b) the frames actually show, as a UNION — 2026-08-21,
+ *  second adversarial pass.
+ *
+ *  «NO single frame holds it — spread across p5 + p6» reads as "those two hold
+ *  it between them", and MEASURED on sc-junction-scan/mobile/wrong it did not:
+ *  «Грешки» is 21,442 px and those two frames hold 385 px of it — 1.8 %.
+ *  «Разбор от инструктора», the requirement-zero section, is 2,301 px and its
+ *  one named frame holds 385 px — 16.7 %, and the product's own «↓ РАЗБОРЪТ
+ *  ПРОДЪЛЖАВА» ribbon is visible at the bottom of that very frame.
+ *
+ *  Naming frames is not the same claim as covering a section, and the first
+ *  was standing in for the second — in the reassuring direction, which is the
+ *  one this programme keeps binning fixes for. So the number is computed and
+ *  printed: a phrase can overstate, `385 px of 2301 (16.7 %)` cannot. */
+const coveredPx = (a, b, frames) => {
+  const iv = [];
+  for (const f of frames) {
+    const lo = Math.max(a, f.scrollTop);
+    const hi = Math.min(b, f.coversTo);
+    if (hi > lo) iv.push([lo, hi]);
+  }
+  iv.sort((x, y) => x[0] - y[0]);
+  let total = 0;
+  let end = -Infinity;
+  for (const [lo, hi] of iv) {
+    const from = Math.max(lo, end);
+    if (hi > from) { total += hi - from; end = hi; }
+  }
+  return total;
+};
+const foldReport = (geo.sections ?? []).map((s) => {
+  if (!s.present) return { ...s, inFrame: null, inFrames: [], wholeInAFrame: false };
+  const bottom = s.top + s.height;
+  // −4/+4 is the same rounding slack the scroll positions carry; it forgives a
+  // sub-pixel box, never a cut row.
+  const overlaps = debriefPages.filter((f) => bottom > f.scrollTop && s.top < f.coversTo);
+  const whole = debriefPages.find((f) => s.top >= f.scrollTop - 4 && bottom <= f.coversTo + 4);
+  const covered = coveredPx(s.top, bottom, debriefPages);
+  return {
+    ...s,
+    bottom,
+    tallerThanTheWindow: s.height > originalFoldH,
+    startsAboveTheOriginalFold: s.top < originalFoldH,
+    aboveTheOriginalFold: bottom <= originalFoldH,
+    inFrame: whole ? `${whole.name}.png` : null,
+    inFrames: overlaps.map((f) => `${f.name}.png`),
+    wholeInAFrame: whole !== undefined,
+    // The two numbers a reader needs before believing the file names above.
+    photographedPx: covered,
+    photographedPct: s.height > 0 ? Math.round((1000 * covered) / s.height) / 10 : null,
+  };
+});
+/** …AND THE SAME QUESTION ABOUT THE WHOLE SURFACE, WHICH NOTHING ASKED.
+ *
+ *  The anchored grid replaced a uniform one that "covered 7 %". Measured on the
+ *  same drive the anchored grid covers 2,078 of 25,421 px — 8.2 % — and the
+ *  last frame ends 2,134 px above the bottom of the card, so the CTA row
+ *  («Опитай пак», «Следващ урок», «Изход»), which is not a `<section>` and is
+ *  therefore in no anchor, is in no frame either and was in no report. The
+ *  scheme is still the right one — it is the only one that reached «Разбор» at
+ *  all — but its coverage is a measurement, so it is now stated. */
+const surfaceCoveredPx = coveredPx(0, geo.contentH ?? 0, debriefPages);
+const lastFrameEnd = debriefPages.reduce((m, f) => Math.max(m, f.coversTo), 0);
+const trailingUnphotographedPx = Math.max(0, (geo.contentH ?? 0) - lastFrameEnd);
+try {
+  writeFileSync(
+    `${OUT}/_audit-debrief.json`,
+    `${JSON.stringify(
+      {
+        scenario: SCENARIO,
+        platform: PLATFORM,
+        mode: MODE,
+        reachedVerdictCard: reached,
+        verdict: facts.verdict ?? null,
+        verdictSurface: facts.verdictSurface ?? null,
+        score: facts.score ?? null,
+        geometry: {
+          scroller: geo.scroller,
+          viewportH: geo.viewportH ?? null,
+          contentH: geo.contentH ?? null,
+          pageH: geo.pageH ?? null,
+          // What the frames actually hold, so a machine reader is not left to
+          // infer coverage from a filename list — the inference this instrument
+          // has twice got wrong in the flattering direction.
+          surfaceCoveredPx,
+          surfaceCoveredPct:
+            geo.contentH ? Math.round((1000 * surfaceCoveredPx) / geo.contentH) / 10 : null,
+          trailingUnphotographedPx,
+        },
+        frames: debriefPages,
+        fold: foldReport,
+        debrief: dump,
+      },
+      null,
+      2,
+    )}\n`,
+  );
+} catch (error) {
+  loud(`_audit-debrief.json could not be written (${String(error?.message ?? error)}) — the frames are all that is left of the debrief.`);
+}
+note(
+  `  DEBRIEF SURFACE: ${geo.anchor === null ? "NO result screen in the DOM" : `${geo.contentH}px of content in a ${geo.pageH}px window`}` +
+    ` · scroller ${typeof geo.scroller === "string" ? geo.scroller : geo.scroller ? `${geo.scroller.tag}${geo.scroller.hud ? `[${geo.scroller.hud}]` : ""}` : "none (it fits)"}` +
+    ` · ${debriefPages.length} page frame(s): ${debriefPages.map((f) => f.name).join(", ") || "-"}` +
+    (geo.anchor === null
+      ? ""
+      : ` · THE FRAMES HOLD ${surfaceCoveredPx}px OF ${geo.contentH}px (${
+          geo.contentH ? (Math.round((1000 * surfaceCoveredPx) / geo.contentH) / 10).toFixed(1) : "?"
+        }%)` +
+        (trailingUnphotographedPx > 0
+          ? `; the last frame ends ${trailingUnphotographedPx}px above the bottom of the card, and whatever is down there (the CTA row is not a <section>, so it is in no anchor) is in NO frame and in no line below`
+          : "")),
+);
+for (const s of foldReport) {
+  if (!s.present) { note(`     – ${s.sel} — NOT PRESENT`); continue; }
+  // The claim a reader acts on is "open THIS file", so it is stated first and
+  // it is only made when a frame holds the whole section. When none does, the
+  // frames that show ANY of it are named — and the MEASURED share they hold is
+  // printed beside them, because "spread across p5 + p6" reads as "those two
+  // have it between them" and on the drive that bought this line it was 1.8 %.
+  const where = s.inFrame
+    ? `whole in ${s.inFrame}`
+    : s.inFrames.length
+      ? `NO frame holds it whole — ${s.photographedPx}px of ${s.height}px (${s.photographedPct}%) is in ${s.inFrames.join(" + ")}, the rest exists ONLY in _audit-debrief.json${
+          s.tallerThanTheWindow ? ` (it cannot fit one ${originalFoldH}px window)` : ""
+        }`
+      : "NO page frame holds any of it — it exists only in _audit-debrief.json";
+  note(
+    `     · ${s.sel} @${s.top}–${s.bottom}px ×${s.height}px (${s.chars} chars) — ` +
+      `${s.aboveTheOriginalFold ? "inside" : s.startsAboveTheOriginalFold ? "CUT BY" : "BELOW"} 08-debrief.png · ${where}`,
+  );
+}
+
+/**
+ * WHY THERE IS NO VERDICT — AND THE THIRD ANSWER IS "THE INSTRUMENT DID NOT
+ * ASK", NOT "THE PRODUCT HAS NO PILL" — 2026-08-21 (verifier).
+ *
+ * `facts` is the result of ONE `evaluate` that has a `.catch` returning
+ * `{ error }` — no `verdict`, no `verdictSurface`, no anything. Every reader of
+ * `facts.verdictSurface` therefore has THREE inputs, not two: "absent",
+ * "no-pill", and `undefined` for a read that never happened.
+ *
+ * Written as a two-way test, `undefined` falls into the else — so a harness
+ * whose own debrief reader threw would print «the result screen mounted but
+ * carries NO verdict pill», i.e. file an instrument failure as a PRODUCT
+ * defect, in the direction that makes the instrument look like it worked. That
+ * is the exact failure mode this programme exists to catch, and it must not be
+ * introduced by the fix for the previous one.
+ */
+const verdictWhyNone =
+  facts.verdictSurface === "absent"
+    ? "no verdict surface in the DOM"
+    : facts.verdictSurface === "no-pill"
+      ? "the surface mounted and carries NO pill"
+      : `the debrief reader never answered — ${facts.error ?? "no verdictSurface was recorded"}`;
 const hasVerdict = reached && facts.verdict !== null;
 note(`  DEBRIEF REACHED: ${hasVerdict ? "yes" : "NO — this run cannot answer whether credit was given"}`);
 if (!hasVerdict) {
   loud(
-    reached
-      ? "the result screen mounted but carries NO verdict pill — read the census above before believing any number here."
-      : "the ladder never reached the result screen — every 'credited' claim from this run is worthless.",
+    !reached
+      ? "the ladder never reached the result screen — every 'credited' claim from this run is worthless."
+      : facts.verdictSurface == null
+        ? `the debrief reader never answered (${facts.error ?? "no verdictSurface was recorded"}) — this run says ` +
+          "NOTHING about whether a pill was on the glass, in either direction, and nothing here is a finding about the lesson."
+        : "the result screen mounted but carries NO verdict pill — read the census above before believing any number here.",
   );
 }
 note(`  ended naturally: ${endedNaturally}${endedNaturally ? "" : `  (forced via «${forcedBy ?? "nothing"}» — itself a finding)`}`);
@@ -1833,10 +4205,58 @@ note(`ladder: ${trail.length} action(s) over ${rungsUsed} step(s)${trail.length 
 note(`drive: top ${topSpeed} км/ч · ${stopsMade} full stops · ${waitsHonoured} lawful waits (${waitSeconds}s) · ${teachDrained} pause layers · final ${debrief.kmh} км/ч`);
 note(`briefing chars: ${briefing.length}`);
 if (facts.error) loud(`the debrief reader threw: ${facts.error}`);
-note(`VERDICT: ${facts.verdict ?? "(none)"} · SCORE: ${facts.score ?? "(none)"} наказателни точки · ${facts.stars ?? "no rubric stars"}`);
+// «(none)» NOW MEANS WHAT IT SAYS. Since the matcher learned «НЕЗАВЪРШЕН» the
+// only way to reach this branch is a result surface with no pill on it, no
+// surface at all, or a reader that threw — so the reason is printed beside the
+// word rather than left for a reader to assume. See `verdictWhyNone`: the third
+// case is the one a two-way test silently reports as the second.
+note(
+  `VERDICT: ${facts.verdict ?? `(none — ${verdictWhyNone})`}` +
+    ` · SCORE: ${facts.score ?? "(none)"} наказателни точки · ${facts.stars ?? "no rubric stars"}`,
+);
 note(`OBJECTIVES (${facts.objectives?.length ?? 0}):`);
 for (const o of facts.objectives ?? []) note(`   ${o.done ? "✓" : "–"} ${o.titleBg}`);
 if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives at all)");
+/* ── WHAT THIS DRIVE DID WITH THE WHEEL, ON EVERY LANE ──────────────────────
+ *
+ * PRINTED WHETHER OR NOT IT TURNED, and that is the entire point. For 376
+ * drives „this lesson never needed steering" and „this lesson needed it and the
+ * harness structurally could not" were the same thing: nothing. Nothing reads
+ * as the first one. It is one line either way now, and it is placed HERE —
+ * between the objectives and the mistakes — because those two lists are exactly
+ * what a reader is about to draw the wrong conclusion from.
+ */
+{
+  const uncredited = (facts.objectives ?? []).filter((o) => !o.done);
+  steering.uncreditedObjectives = uncredited.length;
+  steering.uncreditedTitles = uncredited.map((o) => o.titleBg);
+  steering.note = steering.everSteered
+    ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right).`
+    : "this drive never steered. The channel exists (KeyA/KeyD); the scripted traces do not use it, by design — how a correct " +
+      "drive should steer is a design question owned by devrig/driveScript.ts and the scenario templates. `everSteered: false` " +
+      "is therefore NOT a claim that steering was unnecessary.";
+  note(
+    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : "0 commands — this drive never turned the wheel"}` +
+      ` · channel ${steering.wired ? `WIRED (${STEER_KEYS.left}/${STEER_KEYS.right})` : "ABSENT"}` +
+      (steering.refusedBothAtOnce ? ` · refused ${steering.refusedBothAtOnce} both-at-once command(s)` : "") +
+      (steering.atStandstill ? ` · ${steering.atStandstill} issued below ${STEER_MIN_KMH} км/ч, where the wheel moves the CAMERA and not the car` : "") +
+      (steering.releasedByPauseDrain ? ` · released ${steering.releasedByPauseDrain}× by a pause drain` : ""),
+  );
+  // THE CONFLATION, KILLED WHERE IT ACTUALLY BITES. An uncredited objective on
+  // a drive that could not turn is not evidence about the lesson in either
+  // direction, and Wave C recorded 92 of 145 lessons as having „no drivable
+  // success path" on exactly this evidence.
+  if (!steering.everSteered && uncredited.length) {
+    loud(
+      `${uncredited.length} objective(s) went UNCREDITED on a drive that never turned the wheel. This instrument cannot tell ` +
+        `„the lesson has no drivable success path" from „this drive could not reach it": ${uncredited
+          .map((o) => `«${o.titleBg}»`)
+          .slice(0, 4)
+          .join(", ")}${uncredited.length > 4 ? ` …and ${uncredited.length - 4} more` : ""}. ` +
+        `Read the "steering" block in _audit-status.json before filing anything against these.`,
+    );
+  }
+}
 note(`MISTAKES (${facts.mistakes?.length ?? 0}):`);
 for (const m of facts.mistakes ?? []) note(`   ✗ ${m.slice(0, 240)}`);
 if (!(facts.mistakes ?? []).length) note("   (none convicted)");
@@ -1917,8 +4337,42 @@ saveStatus({
   endedNaturally,
   forcedBy,
   verdict: facts.verdict ?? null,
+  // Three verdicts and two silences, told apart at source. A consumer that
+  // sees `verdict: null` can now ask WHY without opening a picture.
+  verdictSurface: facts.verdictSurface ?? null,
   score: facts.score ?? null,
   reachedVerdictCard: reached,
+  // WHAT HAPPENED TO REVERSE — see the block beside `armReverse`. Always
+  // present, `demanded:false` included, because "this lesson never asked" and
+  // "this lesson asked and never got it" must never be the same silence again.
+  reverse,
+  // …AND WHAT IT DID WITH THE WHEEL. Always present, `everSteered: false`
+  // included, because „this lesson never needed to steer" and „this lesson
+  // needed to and the instrument could not" were the same silence for 376
+  // drives, and that conflation is what hid a structural limitation for the
+  // whole audit. `note` carries the sentence a consumer must not paraphrase.
+  steering,
+  // …and where the rest of the debrief went. `sidecar` is the claim a reader
+  // checks first: if it is false, the sections below the fold are gone.
+  debrief: {
+    sidecar: existsSync(`${OUT}/_audit-debrief.json`),
+    pageFrames: debriefPages.map((f) => f.name),
+    contentH: geo.contentH ?? null,
+    pageH: geo.pageH ?? null,
+    // Three buckets, because "not wholly inside 08-debrief.png" collapses two
+    // different things a reader has to act on differently: a section that
+    // starts on the first screen and is CUT (the reader thinks they have it),
+    // and one that starts past it (the reader knows they do not).
+    sectionsBelowTheFold: foldReport
+      .filter((s) => s.present && !s.startsAboveTheOriginalFold)
+      .map((s) => s.sel),
+    sectionsCutByTheFold: foldReport
+      .filter((s) => s.present && s.startsAboveTheOriginalFold && !s.aboveTheOriginalFold)
+      .map((s) => s.sel),
+    // The load-bearing one: sections no page frame photographed in full. If it
+    // is non-empty, those sections are TEXT ONLY, in `_audit-debrief.json`.
+    sectionsNoFrameHoldsWhole: foldReport.filter((s) => s.present && !s.wholeInAFrame).map((s) => s.sel),
+  },
   // Both ends of the build stamp, so the folder answers "what did these pixels
   // photograph?" without anybody re-deriving it. `target` was written at
   // `target-attested` and is carried forward by `status`; this adds the second

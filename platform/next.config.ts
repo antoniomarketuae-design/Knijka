@@ -252,8 +252,55 @@ if (laneTsconfig) {
   }
 }
 
+/**
+ * THE DEV-TOOLS INDICATOR IS OFF, AND IT IS OFF BECAUSE IT WAS IN THE EVIDENCE.
+ *
+ * This audit judges the product from its own photographs. `lesson-audit.mjs`
+ * drives 161 lessons against a `next dev` server and screenshots them, and a
+ * Wave C verifier measured Next's dev-tools badge sitting in EVERY mobile
+ * frame of that sweep. MEASURED HERE 2026-08-21 on the live harness rig
+ * (WebKit, iphone16-landscape, 852×393 CSS px), reading the badge's own
+ * bounding box out of the `<nextjs-portal>` shadow root:
+ *
+ *   [data-next-badge-root]  x=20 y=337 119×36   ← 14 % of the width, in the
+ *   [data-issues]           x=56 y=339  81×32     BOTTOM-LEFT CORNER
+ *   #next-logo              x=22 y=339  32×32
+ *   text: «1 Issue»
+ *
+ * It is not part of the product and it already MANUFACTURED A VERDICT: a
+ * finding was refuted on a reading of a corner the frame does not show, and
+ * that refutation was overturned when someone re-measured at the unoccluded
+ * right edge. Both directions are live — the badge can invent a defect (a
+ * panel that looks clipped) and it can hide one (a real clipped corner behind
+ * the pill).
+ *
+ * `devIndicators: false` is the v16 shape and the ONLY shape: `appIsrStatus`,
+ * `buildActivity` and `buildActivityPosition` were REMOVED in v16.0.0
+ * (node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/devIndicators.md,
+ * Version History), so anything written from memory of Next 14/15 is a config
+ * key this version ignores in silence.
+ *
+ * AND IT IS NOT SUFFICIENT ON ITS OWN — the doc says so in one line, «Next.js
+ * will still surface any compile or runtime errors that were encountered», and
+ * the compiled overlay agrees: in
+ * node_modules/next/dist/compiled/next-devtools/index.js the logo button is
+ * gated `!m.disableDevIndicator && jsx("button",{id:"next-logo"…})`, but the
+ * issues pill beside it is gated `(E || m.disableDevIndicator) && jsx("div",
+ * {"data-issues":true…})` — `disableDevIndicator` is on the PERMISSIVE side of
+ * that `||`, so turning the indicator off can only ever remove the logo, never
+ * the count. This flag therefore buys the smaller half of the fix; the half
+ * that actually guarantees a clean frame is the removal + assertion in
+ * tools/mobile/lib/frames.mjs, which runs immediately before every capture.
+ * Both are kept: config first so the thing is not painted at all in the
+ * ordinary case, the harness guard second because a capture may not depend on
+ * a config file it does not read.
+ *
+ * PRODUCTION IS UNAFFECTED — the whole dev-tools bundle only exists in `next
+ * dev`. This costs the running product nothing.
+ */
 const nextConfig: NextConfig = {
   distDir,
+  devIndicators: false,
   ...(laneTsconfig ? { typescript: { tsconfigPath: laneTsconfig } } : {}),
   async headers() {
     return [

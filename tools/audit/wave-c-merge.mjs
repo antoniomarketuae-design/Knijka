@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyLeg, LEG_STATES } from "./verdict-surface.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -146,17 +147,41 @@ fs.writeFileSync(
 
 const bad = merged.filter((r) => r.exit !== 0);
 const moved = merged.filter((r) => r.treeMoved);
-// A missing debrief is a missing FRAME, not a missing verdict string. The
-// harness reports `VERDICT: (none)` for a lesson that ends «НЕЗАВЪРШЕН»
-// (unfinished) because its extractor knows only ИЗДЪРЖАН and НЕИЗДЪРЖАН — and
-// those drives captured 08-debrief.png like every other. Counting them as
-// "no debrief" understated what was judgeable by about a fifth.
+// A missing debrief is a missing FRAME, not a missing verdict string.
 const noDebrief = merged.filter(
   (r) => r.exit === 0 && !fs.existsSync(path.join(r.out, "08-debrief.png")),
 );
-const unfinished = merged.filter(
-  (r) => r.exit === 0 && (!r.verdict || r.verdict === "(none)") && fs.existsSync(path.join(r.out, "08-debrief.png")),
-);
+
+// THE "unfinished" BUCKET WAS COMPENSATING FOR A BUG THAT NO LONGER EXISTS —
+// 2026-08-21.
+//
+// It counted `exit === 0 && (!verdict || verdict === "(none)") && the debrief
+// frame exists` and printed it as «НЕЗАВЪРШЕН — debrief IS present and
+// judgeable». That was true of the corpus it was written against, because the
+// harness's matcher could not read the word «Незавършен» and recorded it as
+// null. With the matcher fixed at source, a null verdict on a NEW drive means
+// one of: the surface mounted with no pill, there is no surface, or the reader
+// threw. The first two are PRODUCT DEFECTS and the third is an instrument
+// failure — and this bucket would have announced all three as "unfinished and
+// judgeable", which is the reassuring direction.
+//
+// It is now a breakdown by the lane's own `verdictSurface`, via the one ladder
+// in ./verdict-surface.mjs. The bucket that used to exist is `pre-matcher`, and
+// it means exactly what it says: on a drive made before that field existed,
+// «НЕЗАВЪРШЕН» and a pill-less card ARE the same silence, so the count is a
+// count of unknowns to re-drive, not of unfinished lessons.
+//
+// The 08-debrief.png existence test is gone from here too: the harness writes
+// that frame unconditionally, so it was true on all 376 drives of the standing
+// corpus and could not discriminate anything.
+const states = new Map();
+const stateRows = new Map();
+for (const r of merged.filter((r) => r.exit === 0 && !r.treeMoved)) {
+  const c = classifyLeg(r);
+  states.set(c.state, (states.get(c.state) ?? 0) + 1);
+  if (!stateRows.has(c.state)) stateRows.set(c.state, []);
+  stateRows.get(c.state).push(r);
+}
 const lessons = new Set(merged.map((r) => r.lesson));
 
 console.log("merged " + merged.length + " drive(s) into " + DEST);
@@ -166,7 +191,35 @@ console.log("  attested commit  : " + (heads[0] || "-").slice(0, 12));
 console.log("  non-zero exit    : " + bad.length + (bad.length ? "   <-- certify nothing" : ""));
 console.log("  treeMoved        : " + moved.length + (moved.length ? "   <-- certify nothing" : ""));
 console.log("  no debrief frame : " + noDebrief.length + "   (these close nothing)");
-console.log("  unfinished       : " + unfinished.length + "   (НЕЗАВЪРШЕН — debrief IS present and judgeable)");
+
+// One line per state that actually occurred, with WHO the state is about, so a
+// product defect can never again be totalled together with an instrument fault
+// or with an unfinished lesson.
+const WHAT = {
+  verdict: "a pill was read off the debrief — judgeable",
+  "not-reached": "the ladder never reached a verdict card — closes nothing",
+  "no-pill": "PRODUCT DEFECT: result screen mounted, NO verdict pill — file it",
+  "no-surface": "PRODUCT DEFECT: no result surface in the DOM — file it",
+  "reader-threw": "INSTRUMENT: the debrief reader threw — says nothing either way",
+  "pre-matcher": "UNKNOWN: drove before verdictSurface existed — «НЕЗАВЪРШЕН» and a pill-less card are indistinguishable here; re-drive",
+  "no-ledger": "INSTRUMENT: no readable _audit-status.json — certifies nothing",
+  disagreement: "INSTRUMENT: the row and the lane ledger disagree — certifies nothing",
+  "unknown-surface": "INSTRUMENT: unrecognised verdictSurface value",
+  died: "INSTRUMENT: the ledger records a phase other than «complete» — a fragment, not an answer",
+  "evidence-incomplete": "INSTRUMENT: the ledger's OWN exit is non-zero — the lane says its evidence is incomplete",
+};
+console.log("  verdict surface  : (certifiable drives only — exit 0 and a still tree)");
+for (const state of Object.keys(LEG_STATES)) {
+  const n = states.get(state) ?? 0;
+  if (!n) continue;
+  console.log("     " + String(n).padStart(4) + "  " + state.padEnd(16) + WHAT[state]);
+  // Name the product defects. A count of them is a number; a list of them is a
+  // work item, and these are the ones somebody has to open.
+  if (LEG_STATES[state].about === "product") {
+    for (const r of stateRows.get(state).slice(0, 12)) console.log("            " + r.lesson + " " + r.leg);
+    if (stateRows.get(state).length > 12) console.log("            ...and " + (stateRows.get(state).length - 12) + " more");
+  }
+}
 if (dupes.length) {
   console.log("  DUPLICATE keys   : " + dupes.length + "   <-- the halves were not disjoint");
   for (const d of [...new Set(dupes)].slice(0, 10)) console.log("     " + d);

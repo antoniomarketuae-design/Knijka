@@ -91,13 +91,33 @@ const unknown = [...final.keys()].filter((k) => !byId.has(k));
  * because \A and \. collapsed and \04 became a control character. Both passed a
  * presence check and neither points at a file. A closure whose evidence cannot
  * be opened is not evidenced — it is a claim.
+ *
+ * AND `existsSync` IS STILL A PRESENCE CHECK — 2026-08-21 (verifier).
+ *
+ * The version above resolved anything the filesystem admits to having, which is
+ * not the same question as "can a judge open this and see the quote". MEASURED
+ * against it: `E:/AI driver` — the repo root — resolved, so did
+ * `.audit-frames`, and so did a ZERO-BYTE .png. That last one is not
+ * hypothetical: 333 of the 27,832 PNGs under `.audit-frames/sweep161` and
+ * `.audit-frames/wave-c/frames` are 0 bytes right now, and one of the findings
+ * in this very corpus (sc-signal-controller:ba4a6215) is ABOUT that corruption —
+ * "12 of 29 PNGs are 0 bytes … including 06-waited, 07-end and 08-debrief, the
+ * only honest verdict surface". A closure citing one of those 333 was counted.
+ *
+ * So the test is now: a REGULAR FILE with bytes in it. Not `.png`, deliberately —
+ * sc-signal-controller:ba4a6215 is legitimately closed on `_audit-status.json`,
+ * and the question a gate should ask is whether the evidence can be opened, not
+ * what extension it wears.
  */
 const resolveFrame = (p) => {
   if (!p) return null;
   const tries = [p, String(p).split("\\").join("/"), String(p).split("/").join(path.sep)];
   for (const t of tries) {
     try {
-      if (fs.existsSync(t)) return t;
+      const st = fs.statSync(t);
+      // A directory "exists" and holds nothing a judge can read; an empty file
+      // opens to nothing. Both are the reassuring direction for this gate.
+      if (st.isFile() && st.size > 0) return t;
     } catch {
       /* an unopenable path is simply not a frame */
     }

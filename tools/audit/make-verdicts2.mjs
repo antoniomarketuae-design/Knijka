@@ -33,6 +33,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadStandingBroken } from "./finding-reader.mjs";
+import { classifyLeg, tallyStates } from "./verdict-surface.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const [outDir, perRaw, batchRaw] = process.argv.slice(2);
@@ -102,35 +103,29 @@ for (const e of perLesson.values()) {
     skipped.push({ ...e, why: "driven, but no leg is certifiable" });
     continue;
   }
-  // WHETHER A DEBRIEF WAS REACHED IS A QUESTION ABOUT THE FRAMES, NOT ABOUT THE
-  // VERDICT STRING. The harness's own extractor knows only ИЗДЪРЖАН and
-  // НЕИЗДЪРЖАН, so a lesson that ends «НЕЗАВЪРШЕН» — unfinished, no penalty
-  // points, one star, with a FULL instructor debrief attached — is recorded as
-  // `VERDICT: (none)`. Reading that as "no debrief" told judges to close nothing
-  // on roughly a fifth of all drives, every one of which had captured
-  // 08-debrief.png exactly like the drives that did report a verdict.
+  // WHY THIS IS NOT A TEST ON THE VERDICT STRING ANY MORE — 2026-08-21.
+  //
+  // It used to read: a verdict string means judge it; no verdict string means
+  // «НЕЗАВЪРШЕН — unfinished; the debrief card IS there, read it». That was a
+  // COMPENSATOR for a bug in the harness's matcher, which knew ИЗДЪРЖАН and
+  // НЕИЗДЪРЖАН and could not read the third word the product prints. With the
+  // matcher fixed at source, the branch survives with its cause removed: it now
+  // fires only when a drive has no readable pill for one of the reasons that
+  // are REAL PRODUCT DEFECTS — and tells a judge that defect is merely an
+  // unfinished lesson whose card they should go and read.
+  //
+  // The ladder is in ./verdict-surface.mjs so this file and wave-c-merge.mjs
+  // cannot drift apart, and it keys off `verdictSurface` in the lane's own
+  // ledger, with the ABSENT case (a drive made before that field existed —
+  // MEASURED: all 376 of the standing corpus) kept separate from every other
+  // silence, because on that harness «НЕЗАВЪРШЕН» and a missing pill were
+  // literally the same observation.
+  const classified = usable.map((l) => classifyLeg(l));
   judgeable.push({
     ...e,
-    // ...AND THE FRAME'S EXISTENCE IS NOT THE ANSWER EITHER. The harness writes
-    // 08-debrief.png unconditionally, so the file is present on all 376 drives —
-    // but on two of them it photographs the LIVE COCKPIT with an unclicked
-    // РЕЗУЛТАТ button, not a verdict card. `_audit-status.json` carries
-    // `reachedVerdictCard`, which is the authoritative answer and was sitting
-    // beside the frames the whole time. A batch header that says "the debrief
-    // frame IS there, read it" about a cockpit screenshot sends a judge to read
-    // something that is not a debrief.
-    legs: usable.map((l) => {
-      let reached = false;
-      try {
-        const st = JSON.parse(fs.readFileSync(path.join(l.out, "_audit-status.json"), "utf8"));
-        reached = st.reachedVerdictCard === true;
-      } catch {
-        reached = Boolean(l.out && fs.existsSync(path.join(l.out, "08-debrief.png")));
-      }
-      if (!reached) return l.leg + " [NO VERDICT CARD REACHED — 08-debrief.png is the live cockpit; closes nothing]";
-      if (l.verdict && l.verdict !== "(none)") return l.leg + " (" + l.verdict + ")";
-      return l.leg + " (НЕЗАВЪРШЕН — unfinished; the debrief card IS there, read it)";
-    }),
+    judgeableLegs: classified.filter((c) => c.judgeable).length,
+    states: classified.map((c) => c.state),
+    legs: classified.map((c) => c.label),
   });
 }
 
@@ -194,6 +189,32 @@ const HOW = [
   "OPEN BOTH. A verdict written without looking at the new frame is a guess, and this",
   "programme has had three findings survive only until somebody replayed the trace",
   "instead of reading its title.",
+  "",
+  "-- WHAT THE BRACKET AFTER A LEG MEANS --",
+  "`mobile-right (ИЗДЪРЖАН)` reached a verdict card and a pill was read off it.",
+  "A leg in [SQUARE BRACKETS] did not, and the bracket says why. NONE of them means",
+  "'the lesson is unfinished' — «НЕЗАВЪРШЕН» is itself a pill and prints like one:",
+  "",
+  "  [VERDICT UNREADABLE BY THIS DRIVE'S HARNESS]  the drive predates the",
+  "      three-verdict matcher, so «НЕЗАВЪРШЕН» and a result screen carrying NO",
+  "      pill were literally the same observation. UNKNOWN — not unfinished, not a",
+  "      defect. Judge what the frames and run.log DO show, and mark anything that",
+  "      turns on the verdict itself UNJUDGED; only a re-drive settles it.",
+  "  [PRODUCT DEFECT: no verdict pill]  the result screen mounted with no verdict",
+  "      on it. FILE that as a finding. It closes nothing.",
+  "  [PRODUCT DEFECT: no result surface]  the card was reached and there is no",
+  "      result section in the DOM at all. Also a finding, also closes nothing.",
+  "  [NO VERDICT CARD REACHED]  08-debrief.png is whatever was on the glass — on",
+  "      two drives in this corpus a live cockpit with an unclicked РЕЗУЛТАТ",
+  "      button. Do not read it as a debrief.",
+  "  [INSTRUMENT: the debrief reader threw] · [NO LEDGER] · [LEDGER DISAGREES WITH",
+  "      THE ROW] · [UNRECOGNISED verdictSurface] · [THE HARNESS DIED MID-LANE] ·",
+  "      [THE LANE ITSELF SAYS ITS EVIDENCE IS INCOMPLETE]  faults in THIS HARNESS.",
+  "      They say nothing about the lesson in either direction and certify nothing.",
+  "",
+  "Until 2026-08-21 every one of these printed as «НЕЗАВЪРШЕН — unfinished; the",
+  "debrief card IS there, read it», which sent judges to read a card that in some",
+  "cases has no verdict on it. If you hold an older batch file, regenerate it.",
 ].join("\n");
 
 const RULES = [
@@ -344,6 +365,27 @@ console.log("findings judged : " + judgeable.reduce((a, e) => a + e.total, 0) + 
 const sizes = judges.map((g) => g.total).sort((a, b) => a - b);
 if (sizes.length) {
   console.log("per-judge min/median/max findings: " + sizes[0] + " / " + sizes[sizes.length >> 1] + " / " + sizes[sizes.length - 1]);
+}
+
+// WHAT THE JUDGES ARE ACTUALLY HOLDING. Printed unconditionally, because the
+// number that matters is not "how many lessons went out" — it is how many of
+// them carry a leg with a verdict on it. A run that hands out 145 lessons of
+// which 55 have no readable verdict anywhere must not be summarised as 145
+// judged; that is the reassuring direction and it is how «(none)» got
+// compensated for in the first place.
+const tally = tallyStates(judgeable.flatMap((e) => e.states.map((s) => ({ state: s }))));
+const noVerdictLesson = judgeable.filter((e) => e.judgeableLegs === 0);
+console.log("");
+console.log("legs by state (certifiable legs only):");
+for (const [state, n] of tally) if (n) console.log("  " + state.padEnd(16) + String(n).padStart(5));
+console.log(
+  "lessons with NO leg carrying a verdict: " + noVerdictLesson.length + " of " + judgeable.length +
+    "   (" + noVerdictLesson.reduce((a, e) => a + e.total, 0) + " findings, " +
+    noVerdictLesson.reduce((a, e) => a + e.critical, 0) + " critical)",
+);
+if (noVerdictLesson.length) {
+  console.log("  Those findings are still worth judging off frames and run.log, but anything that");
+  console.log("  turns on the verdict itself is UNJUDGED until the lesson is re-driven.");
 }
 for (const w of written) {
   console.log("  " + w.file + "   " + w.judges + " judges, " + w.findings + " findings, " + w.critical + " critical");
