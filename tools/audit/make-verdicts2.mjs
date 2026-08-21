@@ -32,7 +32,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadStandingBroken } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 import { classifyLeg, tallyStates } from "./verdict-surface.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -81,7 +81,20 @@ for (const line of fs.readFileSync(resultsPath, "utf8").split("\n")) {
 }
 
 // --- what must be judged ------------------------------------------------------
-const broken = loadStandingBroken();
+//
+// THE **OPEN** LIST, NOT THE FILED CORPUS — 2026-08-21.
+//
+// This packed judges out of `loadStandingBroken()`, which is every finding ever
+// filed. Run again today that is 1,043 findings, 375 of which a wave has
+// already retired with a frame and a quote. Thirty judges would have been sent
+// to re-adjudicate work that was finished, and the cheapest verdict to write
+// about a symptom that is genuinely gone is CLOSED — so the round would have
+// produced a large, confident, entirely redundant pile of closures while the
+// 668 findings that are actually open got a proportionally smaller share of the
+// attention. Judging capacity is the scarce thing in this programme; spending
+// 36% of it on rows that had left the list is the reassuring direction.
+const counts = corpusCounts();
+const broken = counts.open;
 const perLesson = new Map();
 for (const j of broken) {
   const e = perLesson.get(j.scenario) || { lesson: j.scenario, total: 0, critical: 0 };
@@ -154,15 +167,24 @@ for (let i = 0; i < judges.length; i += BATCH) batches.push(judges.slice(i, i + 
 // Built as arrays of plain strings and embedded with JSON.stringify, so there is
 // no nested template literal anywhere. A stray backtick inside one terminated the
 // v1 generator's output, and it was caught only by dry-running the generator.
+// EVERY NUMBER IN THIS PREAMBLE IS COMPUTED, NOT TYPED. The version before this
+// one told judges the corpus was "1,012 BROKEN" and "has never moved off 1,012",
+// which had been false since Wave C retired 375 rows and since 31 new findings
+// were filed. A fact pinned into an instruction goes stale while the
+// instruction stays right, and a judge has no way to tell which half aged.
 const PREAMBLE = [
   "You are one judge in Wave C of the Knijka.AI simulator audit (repo E:\\AI driver).",
   "",
   "THE SITUATION. 161 driving lessons were driven right and wrong, on an iPhone and a",
-  "PC, and judged FROM THEIR OWN FRAMES. 1,012 BROKEN findings were filed. Fifteen",
-  "rounds of repair have since opened 126 of 138 suspect files and taken the",
-  "never-opened criticals from 25 to 2 — and the standing count has never moved off",
-  "1,012, because closing a finding needs proof that THAT FINDING is gone, and",
-  "file-level repair does not produce it.",
+  "PC, and judged FROM THEIR OWN FRAMES. " + counts.n.filed + " BROKEN findings have been filed",
+  "across the whole programme. " + counts.n.retired + " of them have since been RETIRED with a new",
+  "frame and a quote, which leaves " + counts.n.open + " OPEN (" + counts.n.critical + " critical) across " +
+    counts.n.lessons + " lessons and",
+  counts.n.files + " suspect files. Those " + counts.n.open + " are what you are judging; the retired ones are",
+  "finished and `finding-reader.mjs` will not print them unless you ask for --filed.",
+  "",
+  "Closing a finding needs proof that THAT FINDING is gone. File-level repair does not",
+  "produce it, which is why fifteen rounds of it never moved the count.",
   "",
   "Every lesson below has now been RE-DRIVEN on the repaired build, on a still tree,",
   "with the harness attesting the exact commit it measured. Your job is the",
@@ -359,6 +381,8 @@ batches.forEach((group, bi) => {
   });
 });
 
+console.log(openListLine(counts));
+console.log(workedLine("open", broken));
 console.log("judges          : " + judges.length + "   (target " + TARGET + " findings each)");
 console.log("batches         : " + batches.length + "   (" + BATCH + " judges each = " + BATCH * 2 + " agents per workflow)");
 console.log("findings judged : " + judgeable.reduce((a, e) => a + e.total, 0) + " of " + broken.length);

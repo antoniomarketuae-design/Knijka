@@ -1105,6 +1105,42 @@ const throttle = async (on) => {
 };
 let refusedReversePress = 0;
 /**
+ * EVERY S KEYDOWN THIS HARNESS MAKES, TIMED AND SPEED-STAMPED — 2026-08-21,
+ * round 3. WITHOUT THIS LIST THE UNARMED-R WATCHDOG CANNOT BE HONEST.
+ *
+ * `reverseAssist.ts` arms R on a brake press made at a standstill after a
+ * genuine lift. This harness presses the brake at every stop, and it CANNOT SEE
+ * WHEN ITS PRESS LANDED: `brake()` is gated on the speed the last probe read,
+ * the CDP round trip to the page was measured at ~2.0 s median on this box, and
+ * a car reading 2 км/ч when the gate opened can be at rest by the time the
+ * keydown reaches `input.ts`. So „the harness did not intend a standstill
+ * press" and „no standstill press happened" are DIFFERENT STATEMENTS, and only
+ * the first one is knowable from in here.
+ *
+ * The watchdog below therefore does not get to say who caused an unexplained R.
+ * It gets this list, and it says what it can and cannot tell from it.
+ */
+const sPresses = [];
+/**
+ * HOW OLD A PRESS MAY BE AND STILL BE A CANDIDATE FOR AN R — 2026-08-21,
+ * adversarial re-verification of the attribution.
+ *
+ * The hedge above is a LATENCY argument and a latency argument has a reach.
+ * `reverseAssist` emits its toggle at most REVERSE_ASSIST_HOLD_S (0.35 s) after
+ * the press lands, and the CDP round trip was measured at ~2.0 s median — so a
+ * press that could have armed THIS R is a press from the last couple of
+ * seconds. The first draft of the watchdog recited the latency sentence over a
+ * press of ANY age, including one made 170 s earlier at 45 км/ч, which the
+ * round trip does not reach: it asserted a mechanism nobody measured, which is
+ * the same fault this round exists to repair, one level down.
+ *
+ * 8 s, not 2.5, because the reach that matters is the reach of the SAMPLING:
+ * ticks are seconds apart and `now` is the tick that saw R, not the instant it
+ * appeared. Generous on purpose — being late to stop hedging is safe, being
+ * early is an accusation.
+ */
+const S_PRESS_NEAR_MS = 8000;
+/**
  * …AND THE RULE THAT A BRAKE PRESS AT A STANDSTILL IS A GEAR CHANGE LIVES
  * HERE, NOT AT THE CALL SITES.
  *
@@ -1129,6 +1165,7 @@ const brake = async (on, kmh = null) => {
     refusedReversePress += 1;
     return;
   }
+  if (on) sPresses.push({ at: Date.now(), kmhAtIssue: kmh, via: "brake" });
   await page.keyboard[on ? "down" : "up"]("KeyS").catch(() => {});
   holdS = on;
 };
@@ -1226,10 +1263,37 @@ const steering = {
    *  consumer can filter on it instead of parsing a sentence. */
   tracesSteer: false,
   probe: null,
+  /**
+   * THE ONE FIELD AN ORDINARY DRIVE LANE CANNOT BE QUIET ABOUT — round 3.
+   *
+   * `probe` above is filled only by `KNIJKA_STEER_PROOF=1`, which runs INSTEAD
+   * of the drive. So the channel was proven in a mode no wave runs and left
+   * unproven in the mode every wave uses: on a normal lane a channel that had
+   * been broken said NOTHING, which is the exact conflation — silence reading
+   * as „not needed" — that hid the missing wheel for 376 drives.
+   *
+   * `state` is one of three and is never absent:
+   *   "live"      the wheel was turned on THIS drive and the product answered
+   *   "dead"      the wheel was turned on THIS drive and NOTHING answered
+   *   "untested"  the wheel was never turned on this drive — and that is NOT
+   *               „steering was not needed"; `why` says what stopped it
+   */
+  channel: {
+    state: "untested",
+    why: "the check has not run yet",
+    legs: [],
+    attempts: 0,
+    costMs: 0,
+    /** Liveness's OWN books — never mixed into the trace's, see `steer()`. */
+    commands: 0,
+    heldMs: { left: 0, right: 0 },
+  },
   note: null,
 };
 let steerHeld = null;
 let steerSince = null;
+/** Which set of books the CURRENT hold belongs to — "trace" or "liveness". */
+let steerHeldBy = null;
 /**
  * Hold ONE steering direction, or `null` for straight ahead.
  *
@@ -1239,7 +1303,7 @@ let steerSince = null;
  * make a future parking trace unable to pre-position the wheel. It is counted
  * and named instead: `steering.atStandstill`.
  */
-const steer = async (dir, kmh = null) => {
+const steer = async (dir, kmh = null, by = "trace") => {
   if (dir !== null && dir !== "left" && dir !== "right") {
     steering.refusedBothAtOnce += 1;
     return false;
@@ -1251,17 +1315,41 @@ const steer = async (dir, kmh = null) => {
     // so there is no instant in which both keys are down and the car is being
     // told to go straight while the harness believes it is turning.
     await page.keyboard.up(STEER_KEYS[steerHeld]).catch(() => {});
-    if (steerSince !== null) steering.heldMs[steerHeld] += now - steerSince;
+    // …AND THE TIME IS BANKED TO WHOEVER PRESSED, NOT TO WHOEVER RELEASED.
+    // `steerHeldBy` is carried from the press for exactly this: the liveness
+    // check releases through `steer(null)`, and billing that release to the
+    // trace is how `heldMs.left: 1129` appears on a drive whose traces never
+    // touched the wheel.
+    if (steerSince !== null) (steerHeldBy === "trace" ? steering.heldMs : steering.channel.heldMs)[steerHeld] += now - steerSince;
     steerHeld = null;
     steerSince = null;
+    steerHeldBy = null;
   }
   if (dir !== null) {
     await page.keyboard.down(STEER_KEYS[dir]).catch(() => {});
     steerHeld = dir;
     steerSince = Date.now();
-    steering.commands += 1;
-    steering.everSteered = true;
-    if (kmh !== null && kmh >= 0 && kmh < STEER_MIN_KMH) steering.atStandstill += 1;
+    steerHeldBy = by;
+    /* ── WHO TURNED THE WHEEL IS NOT THE SAME QUESTION AS WHETHER IT TURNED ──
+     *
+     * TWO SETS OF BOOKS, AND THE SECOND SET EXISTS BECAUSE THE FIRST DRAFT KEPT
+     * ONE. `everSteered` is read downstream as „this DRIVE steered", and the
+     * loud line about uncredited objectives keys off it. The liveness check
+     * turns the wheel on every lane, at a standstill, with no pedal down — the
+     * car does not move a millimetre — so crediting it to the trace's counters
+     * would silently retire the very warning that says a drive could not turn.
+     * MEASURED on the first run that worked: the lane printed „0 trace
+     * commands" beside `commands: 2` and 1,129 ms at the wheel, which is a
+     * status file arguing with itself. Liveness keeps its own counters, under
+     * `steering.channel`, where every number means what it measures.
+     */
+    if (by === "trace") {
+      steering.commands += 1;
+      steering.everSteered = true;
+      if (kmh !== null && kmh >= 0 && kmh < STEER_MIN_KMH) steering.atStandstill += 1;
+    } else {
+      steering.channel.commands += 1;
+    }
   }
   return true;
 };
@@ -1935,6 +2023,268 @@ async function steerProof() {
 }
 
 /* ===========================================================================
+ * THE CHANNEL LIVENESS CHECK — 2026-08-21, ROUND 3
+ * ===========================================================================
+ *
+ * THE DEFECT THIS CLOSES, AND IT IS THE PROGRAMME'S OWN SHAPE ONE LEVEL UP.
+ * Round 2 built the steering channel and proved it with `KNIJKA_STEER_PROOF=1`
+ * — a mode that runs INSTEAD of the drive. So the capability was proven in a
+ * mode no wave runs, and on an ordinary drive lane A BROKEN CHANNEL SAID
+ * NOTHING AT ALL. That is precisely the conflation that hid the missing wheel
+ * for 376 drives and 1,712 findings: a capability that fails quietly is
+ * indistinguishable from a capability that was never needed.
+ *
+ * ── WHAT IT MEASURES, AND WHAT IT IS FORBIDDEN TO CLAIM ────────────────────
+ *
+ * IT MEASURES THE CAMERA. IT DOES NOT MEASURE A TURN. Read that twice, because
+ * round 2's own header calls the A→B camera measurement „the reassuring-
+ * direction trap this whole programme is about" — and it is, FOR A HEADING
+ * CLAIM. This check makes no heading claim. It asks the one question a drive
+ * lane can afford to ask 376 times:
+ *
+ *      DID THE KEYSTROKE REACH THE PRODUCT AT ALL?
+ *
+ * `CameraRig.tsx` yaws the head by `steerNorm * COCKPIT_LOOK_INTO_TURN`, where
+ * `steerNorm` is `VehicleSim.steer / STEER_MAX_ANGLE` — the DRIVELINE'S OWN
+ * WHEEL ANGLE, not the raw key. So a world that leans has carried the keystroke
+ * all the way through `input.ts` → `difficulty.ts` smoothing → `VehicleSim`'s
+ * steer integrator → the camera. A world that does not lean means the key went
+ * nowhere. Neither answer says anything about whether the CAR would have
+ * turned; only `steerProof()` may say that, and it costs ~35 s a leg.
+ *
+ * ── WHY IT IS FREE OF SIDE EFFECTS, WHICH IS THE WHOLE REASON IT CAN RUN ───
+ *
+ * It runs at the SPAWN MARK, before the drive loop, with the car at 0 км/ч and
+ * NO PEDAL DOWN. Round 2 measured this exact gesture: at rest, KeyA held moves
+ * the world +156 px and releasing it puts the world back EXACTLY where it was —
+ * NET 0 px at ncc 0.999. The car does not move. The trace that follows is the
+ * same trace it would have been, which is the constraint that rules out the
+ * other repair anyone would reach for: making the drive steer is a DESIGN
+ * question, and a drive that steers badly manufactures confident wrong findings
+ * where one that cannot steer leaves honest silence.
+ *
+ * ── AND IT IS CHEAP, BECAUSE IT HAS TO BE ──────────────────────────────────
+ *
+ * Two clipped grabs and one correlation per direction, once per lane, against a
+ * DRIVE_BUDGET_MS of 210 s. The measured cost is published per lane in
+ * `steering.channel.costMs` rather than asserted here — a constant in a comment
+ * is the kind of claim this programme keeps catching.
+ *
+ * ── THE FOUR HONEST WAYS IT CAN DECLINE TO ANSWER ──────────────────────────
+ *
+ * All four report "untested", never "dead", because a check that cannot run is
+ * not evidence that the channel is broken — that would be this programme's
+ * favourite bug pointed the other way:
+ *   · no scene canvas to photograph;
+ *   · the camera is not the cockpit (`html[data-sim-camera]`) — the look-into-
+ *     turn yaw lives in the cockpit branch of `CameraRig` and nowhere else, so
+ *     a chase camera would read „dead" on a perfectly live channel;
+ *   · the car is not at a true standstill, or a pedal is down — the gesture
+ *     would perturb the drive it is supposed to leave alone;
+ *   · the two bands come back byte-identical, i.e. the world did not render at
+ *     all (a paused sim), which round 2 measured reading as a confident zero.
+ */
+/** Long enough for `VehicleSim`'s steer integrator to reach the stop — round 2
+ *  measured the full ±5.16° at this hold, at rest, on this rig. */
+const LIVE_HOLD_MS = 900;
+/** …and long enough afterwards for the yaw to come home before the next leg,
+ *  so the second direction starts from centre and not from the first one's
+ *  offset. `COCKPIT_ROT_DAMPING` settles well inside this. */
+const LIVE_SETTLE_MS = 700;
+/**
+ * THE FLOOR, AND IT IS AN ANGLE — BECAUSE A PIXEL IS NOT A FIXED QUANTITY.
+ *
+ * WHAT ROUND 3 MEASURED, AND IT IS RIGHT AS FAR AS IT GOES. At rest, three
+ * runs: control (no key) HELD 0 px every time; KeyA HELD +156…+158 px; KeyD
+ * HELD −151…−152 px. So the live signal is ~155 px and the dead signal is 0 px,
+ * with nothing whatsoever in between, and 40 px — round 2's own
+ * `PROOF_NOISE_PX` — sat a factor of ~3.9 under the smallest live reading.
+ *
+ * EVERY ONE OF THOSE RUNS WAS `mobile`. All eleven lanes round 3 measured were
+ * iphone16-landscape and ten of them were the same scenario. The constant then
+ * went into an instrument that runs on 376 lanes, 196 of which are the pc leg.
+ *
+ * MEASURED ON THAT OTHER HALF, 2026-08-21, sc-junction-scan/pc/right against
+ * the same server, unmutated: the SAME gesture and the same product constant,
+ * and the world moved **+70 px / −69 px**. Nothing about the channel differs —
+ * both legs read 5.3°. The RULER differs: the pc leg is 1440×900 at
+ * deviceScaleFactor 1 with a 933 px band, the phone is 682 CSS px at dpr 3.
+ *
+ * So one number meant two thresholds. 40 px is 1.39° on the phone and 3.04° on
+ * the desktop — 59 % of the product's entire ±5.16° `COCKPIT_LOOK_INTO_TURN`.
+ * On 196 lanes the check was demanding that the world lean nearly all the way
+ * over before it would call the channel live, and anything that shaved the
+ * reading — a narrower canvas, a peak one bucket off — would have been
+ * convicted with the loud refusal that voids every position, lane and turning
+ * finding on the lane. A FALSE REFUSAL IS AS DAMAGING AS A FALSE CERTIFICATE,
+ * and this one would have been indistinguishable from the defect it hunts.
+ *
+ * The angle is the thing being measured and it does not move with the viewport,
+ * so the floor is stated in degrees. 1.4° is the mobile floor's own value to two
+ * figures — the phone behaves exactly as it did — and it is 27 % of the full
+ * lean, which is the factor of ~3.7 the original reasoning asked for, now on
+ * both platforms instead of one. — adversarial verification, 2026-08-21
+ */
+const LIVE_MIN_DEG = 1.4;
+/** The lean a LIVE channel produces, from the product's own constant
+ *  (`vehicle/tuning.ts` COCKPIT_LOOK_INTO_TURN = 0.09 rad). Verdicts quote the
+ *  pixel equivalent FOR THE BAND THEY ARE JUDGING, because "a live channel
+ *  measured ~155 px on this same gesture" is simply false on a pc lane, where
+ *  live was measured at 70. */
+const LIVE_FULL_DEG = (0.09 * 180) / Math.PI;
+const expectedLivePx = (band) => Math.round(LIVE_FULL_DEG / band.degPerPx);
+
+/**
+ * Hold one direction at the spawn mark and photograph what the world does.
+ * Returns a leg; `moved` is the only judgement it makes.
+ */
+async function livenessLeg(band, dir) {
+  const A = await proofGrab(band);
+  await steer(dir, 0, "liveness");
+  const down = Date.now();
+  await page.waitForTimeout(LIVE_HOLD_MS);
+  // FRAME B IS TAKEN WITH THE KEY STILL DOWN, ON PURPOSE AND AGAINST ROUND 2'S
+  // RULE, because this is the opposite question. Round 2 forbids A→B for a
+  // HEADING claim precisely because the offset it captures is the camera's; a
+  // liveness check wants exactly that offset and nothing else.
+  const B = await proofGrab(band);
+  const heldMs = Date.now() - down;
+  await steer(null, null, "liveness");
+  const shift = await proofShift(A, B);
+  const px = shift.error ? null : shift.shift;
+  return {
+    dir,
+    heldMs,
+    px,
+    deg: px === null ? null : Number((px * band.degPerPx).toFixed(1)),
+    ncc: shift.ncc ?? null,
+    atZero: shift.atZero ?? null,
+    identical: shift.identical ?? null,
+    error: shift.error ?? null,
+    // The sign is checked as well as the magnitude: KeyA leans the head LEFT so
+    // the band slides RIGHT (a positive shift). A channel cross-wired to the
+    // wrong key would move the world and fail here, which is the one thing a
+    // bare magnitude test cannot catch.
+    // The floor is applied to the ANGLE (see LIVE_MIN_DEG) and the sign to the
+    // pixels, which is the split that keeps this honest on both platforms.
+    moved:
+      px !== null &&
+      !shift.identical &&
+      Math.abs(px * band.degPerPx) >= LIVE_MIN_DEG &&
+      (dir === "left" ? px > 0 : px < 0),
+  };
+}
+
+/**
+ * The check, its three states, and its refusal. Called once, at the spawn mark.
+ * Returns nothing — everything it learns goes into `steering.channel`, which is
+ * published on every lane whatever happens here.
+ */
+async function steerLiveness() {
+  const ch = steering.channel;
+  ch.attempts += 1;
+  const startedAt = Date.now();
+  const settle = (state, why) => {
+    ch.state = state;
+    ch.why = why;
+    ch.costMs = Date.now() - startedAt;
+  };
+
+  const cam = await page
+    .evaluate(() => ({
+      camera: document.documentElement.getAttribute("data-sim-camera"),
+      kmh: (() => {
+        const sp = document.querySelector('[aria-label^="Скорост "]');
+        return sp ? Number((sp.getAttribute("aria-label").match(/Скорост (\d+)/) || [0, -1])[1]) : -1;
+      })(),
+    }))
+    .catch(() => null);
+  if (cam === null) return settle("untested", "the page could not be read at all");
+  ch.camera = cam.camera;
+  ch.kmhAtCheck = cam.kmh;
+  if (cam.camera !== "cockpit") {
+    return settle(
+      "untested",
+      `the camera is «${cam.camera ?? "(unset)"}», not «cockpit» — the look-into-turn yaw this check reads lives only in ` +
+        `CameraRig's cockpit branch, so a lean of 0 px here would mean nothing about the channel`,
+    );
+  }
+  if (cam.kmh !== 0 || holdW || holdS) {
+    return settle(
+      "untested",
+      `the car is not parked and idle (${cam.kmh} км/ч, throttle ${holdW ? "DOWN" : "up"}, brake ${holdS ? "DOWN" : "up"}) — ` +
+        `turning the wheel here would move the car and change the drive this lane is supposed to measure`,
+    );
+  }
+  const band = await proofBand();
+  if (band === null) return settle("untested", "there is no scene canvas to photograph");
+  ch.band = { ...band.clip, degPerPx: Number(band.degPerPx.toFixed(5)) };
+
+  // A GRAB THAT THROWS MUST NOT KILL THE DRIVE. `proofGrab` is a raw
+  // `page.screenshot` with no catch, and this harness lost 333 frames and 54
+  // whole lanes to screenshots that failed — which is exactly why `shot()`
+  // reads its files back. In the opt-in proof mode a throw here ended a lane
+  // that was only ever about the instrument. On the ordinary drive path it
+  // reaches the crash guard at the top of this file and ends a LESSON lane
+  // before it has driven a metre. An instrument check may report that it could
+  // not run; it may not take the drive with it.
+  try {
+    ch.legs.push(await livenessLeg(band, "left"));
+    await page.waitForTimeout(LIVE_SETTLE_MS);
+    ch.legs.push(await livenessLeg(band, "right"));
+  } catch (error) {
+    return settle(
+      "untested",
+      `the check itself failed after ${ch.legs.length} of 2 legs: ${String(error?.message ?? error).split("\n")[0]}`,
+    );
+  }
+
+  for (const l of ch.legs) {
+    note(
+      `      wheel ${String(l.dir).padEnd(5)} held ${String(l.heldMs).padStart(4)} ms · world ` +
+        `${l.error ? l.error : `${String(l.px).padStart(4)} px ≈${String(l.deg).padStart(6)}° (ncc ${l.ncc}, unslid ${l.atZero})`}` +
+        `${l.identical ? "  ← the two frames are byte-identical" : ""}`,
+    );
+  }
+
+  // A FROZEN WORLD IS NOT A DEAD CHANNEL. Round 2 measured a paused sim reading
+  // ncc 1.0 and PASSING a sharpness test: two byte-identical bands are a
+  // confident zero, and a confident zero here would convict a live channel.
+  if (ch.legs.some((l) => l.identical)) {
+    return settle("untested", "the two photographs are byte-identical — the world did not render, so this measures a PAUSED SIM and not a channel");
+  }
+  // …AND NEITHER IS ONE LEG THAT COULD NOT BE CORRELATED. This was `every`, so
+  // a SINGLE failed leg fell straight through to the only verdict left below,
+  // which is "dead" — an accusation that voids every position, lane and turning
+  // finding on the lane, reached on half the evidence. Worse, one of the errors
+  // it can fall through on is "the best match is at the ±600px search limit",
+  // which means the world moved MORE than the window could measure: the loudest
+  // possible sign of a LIVE channel, scored as a leg that did not move.
+  const failed = ch.legs.filter((l) => l.error !== null);
+  if (failed.length) {
+    return settle(
+      "untested",
+      `${failed.length === ch.legs.length ? "neither band" : `the ${failed[0].dir} band`} could be correlated ` +
+        `(${failed.map((l) => `${l.dir}: ${l.error}`).join("; ")}) — a leg that measured nothing is not a leg that measured zero`,
+    );
+  }
+  if (ch.legs.every((l) => l.moved)) {
+    return settle(
+      "live",
+      `the wheel went over and the world answered — ${ch.legs.map((l) => `${l.dir} ${l.px} px ≈${l.deg}°`).join(", ")}, ` +
+        `against a floor of ${LIVE_MIN_DEG}° (${Math.round(LIVE_MIN_DEG / band.degPerPx)} px in this lane's band; a full lean is ` +
+        `${LIVE_FULL_DEG.toFixed(1)}° ≈ ${expectedLivePx(band)} px here)`,
+    );
+  }
+  return settle(
+    "dead",
+    `${ch.legs.filter((l) => !l.moved).map((l) => `${l.dir} (${STEER_KEYS[l.dir]}) moved the world ${l.px} px ≈${l.deg}°`).join("; ")} ` +
+      `— the floor is ${LIVE_MIN_DEG}° (${Math.round(LIVE_MIN_DEG / band.degPerPx)} px in this lane's band) and a live channel ` +
+      `leans the full ${LIVE_FULL_DEG.toFixed(1)}° ≈ ${expectedLivePx(band)} px here`,
+  );
+}
+
+/* ===========================================================================
  * THE REVERSE GESTURE — 2026-08-21
  * ===========================================================================
  *
@@ -2127,6 +2477,19 @@ const endSurfaceUp = () =>
 let standstillPresses = 0;
 const sChannel = async (on) => {
   if (on === holdS) return;
+  /* Same list as `brake()`'s, and for the same reason: this one IS a deliberate
+   * standstill press, so an unexplained R that follows it has an explanation
+   * sitting right here and the watchdog must be able to find it.
+   *
+   * AND IT CARRIES NO SPEED FIELD, WHICH THE CENSUS CAUGHT AND WAS RIGHT TO.
+   * §5 greps this whole helper — body AND comments — for any mention of speed
+   * at all, because that is the guard that stops the deliberate press from
+   * quietly growing the refusal it exists to bypass. The first draft of this
+   * line carried a null speed field it never used and turned that guard off for
+   * nothing; the second draft explained itself and tripped the same wire from
+   * inside a comment. A press issued here is a standstill press by
+   * construction, so the reader is told exactly that and no number is kept. */
+  if (on) sPresses.push({ at: Date.now(), via: "sChannel" });
   await page.keyboard[on ? "down" : "up"]("KeyS").catch(() => {});
   holdS = on;
   if (on) standstillPresses += 1;
@@ -2225,6 +2588,15 @@ const reverse = {
    *  is „it never did", and that is a different answer from „nobody looked" —
    *  before 2026-08-21 no drive recorded the selector on any tick at all. */
   unarmedRAt: null,
+  /** WHO PUT IT THERE — and the honest answer is usually that nobody here can
+   *  say. One of "harness-disarm-failed" | "undetermined" | "no-harness-gesture",
+   *  or `null` while `unarmedRAt` is `null`. The first draft of this watchdog
+   *  had no such field because it had already decided: it printed „the engine's
+   *  own reverse assist has taken the gate" about a drive that presses the brake
+   *  at every stop. See the block at the watchdog for why that is unknowable. */
+  unarmedRWho: null,
+  /** What the attribution was read OFF, so a reader can disagree with it. */
+  unarmedREvidence: null,
 };
 /** The one-line reason a reader wants, without pretending there was only one. */
 const reverseWhy = () =>
@@ -2452,6 +2824,25 @@ async function disarmReverse() {
   return false;
 }
 
+/* ── AN ORDINARY LANE MAY NOT BE QUIET ABOUT A DEAD WHEEL — round 3 ─────────
+ *
+ * HERE — before the positive control, and NOT inside the drive loop — because
+ * this is the LAST INSTANT OF THE DRIVE AT WHICH THE CAR IS UNTOUCHED. The
+ * ladder is finished, the world is running, and no pedal has been pressed: the
+ * car is on the spawn mark at 0 км/ч. Turn the wheel here and, by round 2's own
+ * measurement, the world leans ~155 px and comes back to NET 0 px on release —
+ * the car does not move, and the drive that follows is the drive that would
+ * have happened anyway.
+ *
+ * Five seconds later the positive control has the throttle down and, in `right`
+ * mode, never lifts it again before the loop. That is what the first draft of
+ * this block measured, and it correctly refused: „the car is not parked and
+ * idle (15 км/ч, throttle DOWN)". A check that runs after this point either
+ * lies or stays silent, and this programme has no use for either.
+ */
+await timed("steer", steerLiveness);
+saveStatus({ steering });
+
 // POSITIVE CONTROL — the car must leave zero, or nothing after this is evidence.
 await throttle(true);
 await page.waitForTimeout(5000);
@@ -2461,6 +2852,58 @@ if (moved <= 0) {
   loud(`CAR DID NOT MOVE — every frame after this is a frozen world, not a drive.`);
   await beat("03b-frozen");
 }
+/* ── AND THE POSITIVE CONTROL GETS TO OVERRULE THE STEERING VERDICT ─────────
+ *
+ * A SIM THAT IS NOT RUNNING LOOKS EXACTLY LIKE A CHANNEL THAT IS NOT WIRED, and
+ * of the two the second is the accusation. `livenessLeg` already voids a pair of
+ * byte-identical bands, but a world with moving traffic and a frozen EGO is not
+ * byte-identical — it renders, it just does not drive — and that world would
+ * have read "dead" and blamed the wheel for it.
+ *
+ * The positive control is the discriminator and it runs five seconds later, so
+ * the verdict is revisited rather than asserted early. This can only ever move a
+ * lane from an accusation to „I do not know", which is the only direction a
+ * correction is allowed to run in here.
+ */
+if (moved <= 0 && steering.channel.state === "dead") {
+  steering.channel.overruledBy = "positive-control";
+  steering.channel.state = "untested";
+  steering.channel.why =
+    `the wheel moved the world less than ${LIVE_MIN_DEG}°, but the car ALSO did not leave 0 км/ч under 5 s of throttle — ` +
+    `so this measures a sim that is not running, and the channel is unjudged rather than dead`;
+}
+{
+  const ch = steering.channel;
+  if (ch.state === "live") {
+    note(`  STEER CHANNEL: LIVE — ${ch.why} · ${ch.costMs} ms`);
+  } else if (ch.state === "dead") {
+    /* ── THE REGISTER IS DELIBERATE ────────────────────────────────────────
+     * This is written in the same voice as «THE SOURCE TREE MOVED DURING THIS
+     * DRIVE», and for the same reason: both are statements that the drive which
+     * follows cannot support a whole CLASS of finding. A tree that moved cannot
+     * certify a closure; a wheel that is dead cannot support one word about
+     * position, lane, turning or manoeuvre. Anything less than a refusal here
+     * and the lane is back to the silence that cost 376 drives.
+     */
+    loud(
+      `THE STEERING CHANNEL IS DEAD ON THIS DRIVE — the wheel was turned at the spawn mark and the world did not answer. ` +
+        `${ch.why}. This car can accelerate and brake and cannot turn, so NO finding this lane produces about position, lane ` +
+        `keeping, turning, manoeuvring or „no drivable success path" is admissible: they describe the instrument. The frames ` +
+        `are real; what they are evidence OF is the harness. Re-drive on a harness whose channel reads LIVE.`,
+    );
+    await shot("03s-steer-DEAD");
+  } else {
+    // AND „UNTESTED" IS LOUD TOO, JUST NOT AS LOUD. It is the state in which
+    // the old conflation is still live on this lane — nobody knows whether the
+    // wheel works — and a reader who is not told that will read the drive as if
+    // somebody did.
+    loud(
+      `THE STEERING CHANNEL WAS NOT TESTED ON THIS DRIVE: ${ch.why}. This lane cannot tell „the wheel works" from „the wheel ` +
+        `is dead", so treat every position/lane/turning claim below as resting on an unverified instrument.`,
+    );
+  }
+}
+saveStatus({ steering });
 
 // ── THE DRIVE ──────────────────────────────────────────────────────────────
 //
@@ -2841,6 +3284,30 @@ let shotStopped = false, shotWaited = false;
 if (STEER_PROOF) {
   saveStatus({ phase: "steer-proof" });
   steering.probe = await timed("steer", steerProof);
+  // …AND THE LIVENESS FIELD SAYS WHY IT IS EMPTY, rather than keeping its
+  // initial „the check has not run yet". This lane never reached the drive
+  // path, so the drive-path check is not merely unrun — it is inapplicable, and
+  // the two are the kind of near-silence this file keeps finding bugs inside.
+  // …AND IT MAY ONLY SAY THAT IF IT IS TRUE. The drive-path check runs BEFORE
+  // this branch, on this path too, and round 3's own artifact proves it:
+  // `.audit-frames/r3/proof-check/_audit-status.json` carries two measured legs
+  // (+154 px and −152 px, `moved: true`) sitting directly under a `why` that
+  // reads "the drive-path liveness check never applied". That is a status file
+  // contradicting itself in the field a reader would quote, and the same
+  // overwrite would have erased a DEAD verdict exactly as happily. So a measured
+  // state stands and the sentence says what supersedes it; only a check that
+  // genuinely did not run gets to say it did not run.
+  //   — adversarial verification, 2026-08-21
+  if (steering.channel.legs.length === 0) {
+    steering.channel.state = "untested";
+    steering.channel.why =
+      "this lane ran the opt-in steering PROOF instead of a drive and the drive-path check did not run — read " +
+      "`steering.probe`, which is a stronger measurement and is what this mode exists to produce";
+  } else {
+    steering.channel.why +=
+      " — and this lane then ran the opt-in steering PROOF instead of a drive, so `steering.probe` supersedes the reading " +
+      "above: it is a stronger measurement and is what this mode exists to produce";
+  }
   steering.note =
     "this lane ran the STEERING PROOF and did not drive the lesson — no finding about the lesson may be drawn from it.";
   try {
@@ -2973,6 +3440,44 @@ while (!ended && Date.now() - t0 < budgetMs) {
    * press at the wrong moment is what caused it — so it does the one thing that
    * is always right: it SAYS SO, once, loudly, and records it. Silence here is
    * what let 376 drives report a reversing car's speed as a forward creep.
+   *
+   * ── AND THE PARAGRAPH ABOVE NAMES A CULPRIT IT CANNOT SEE — round 3 ───────
+   *
+   * „The engine's own reverse assist had taken the gate on a pedal gesture the
+   * stop phase made" is TWO claims welded together, and only one of them is
+   * observed. Observed: the cluster reads R and this drive did not deliberately
+   * arm it. NOT observed: whose gesture opened the gate. `reverseAssist.ts`
+   * arms R on a brake press at a standstill after a lift — and THIS HARNESS IS
+   * THE THING PRESSING THE BRAKE. It presses on every stop, it gates that press
+   * on the speed the LAST probe read, and the CDP round trip to the page was
+   * measured at ~2.0 s median on this box: a car reading 2 км/ч when `brake()`
+   * let the press through can be at rest by the time the keydown reaches
+   * `input.ts`. The refusal in `brake()` bounds the harness's INTENT. It cannot
+   * bound the harness's EFFECT, and nothing in this process can observe the
+   * speed at which a keystroke landed.
+   *
+   * So the sentence blamed the PRODUCT for something the HARNESS is at least as
+   * likely to have done — and a finding that names the wrong culprit is worse
+   * than no finding, because it sends a repair round at innocent code. This
+   * audit has already spent rounds that way.
+   *
+   * The alarm is unchanged: the downstream corruption is identical whoever
+   * caused it, and every pedal after this point means the opposite of what the
+   * control law believes. What changed is that the watchdog now reports what it
+   * SAW — this drive's own S presses, timed and speed-stamped, and whether a
+   * disarm failed — and, when those cannot settle it, SAYS IT CANNOT TELL
+   * instead of picking. Three attributions, and the middle one is the honest
+   * majority case:
+   *
+   *   "harness-disarm-failed"  this drive armed R and the disarm reported
+   *                            failure. Certain, and it is the harness.
+   *   "undetermined"           this drive pressed the S key before R appeared.
+   *                            The engine's assist may have taken the gate on
+   *                            its own, or on that press. Both fit the record.
+   *   "no-harness-gesture"     this drive had issued no S keydown at all. The
+   *                            harness has no candidate gesture to offer — which
+   *                            is still not a diagnosis of the engine, because
+   *                            this instrument cannot see inside it.
    */
   /* `=== null`, NOT `!`. `unarmedRAt` is a SECOND COUNT — `Math.round((now -
    * t0) / 1000)` — and on the first sampled tick that value is `0`, which is
@@ -2993,20 +3498,100 @@ while (!ended && Date.now() - t0 < budgetMs) {
      * there and could not take it out. The corruption downstream is identical,
      * so the alarm stays; the ATTRIBUTION is now read off `reverse.disarmed`
      * instead of assumed. — adversarial re-verification, 2026-08-21 */
-    const mine = reverse.disarmed === false;
+    const disarmFailed = reverse.disarmed === false;
+    /* THE EVIDENCE, GATHERED BEFORE THE SENTENCE IS WRITTEN. `sPresses` is
+     * every S keydown this process made, with the speed the gate saw when it
+     * let the press through — which is NOT the speed the press landed at, and
+     * that gap is the whole reason this attribution has to stay open. */
+    const last = sPresses.length ? sPresses[sPresses.length - 1] : null;
+    reverse.unarmedRWho = disarmFailed ? "harness-disarm-failed" : last === null ? "no-harness-gesture" : "undetermined";
+    reverse.unarmedREvidence = {
+      phase,
+      sPresses: sPresses.length,
+      lastSPressAtSec: last === null ? null : Math.round((last.at - t0) / 1000),
+      lastSPressSecondsBefore: last === null ? null : Number(((now - last.at) / 1000).toFixed(1)),
+      lastSPressKmhAtIssue: last?.kmhAtIssue ?? null,
+      lastSPressVia: last?.via ?? null,
+      lastSPressNear: last === null ? null : now - last.at <= S_PRESS_NEAR_MS,
+      refusedStandstillPresses: refusedReversePress,
+      deliberatePresses: standstillPresses,
+      disarmed: reverse.disarmed,
+      /* THE LETTER'S PROVENANCE, BECAUSE `includes("R")` HIDES A DISAGREEMENT.
+       * Three owners mint «Скоростен лост: X» (StatusDashboard ×2, the touch
+       * gear sheet), and a cluster reading «D/R» is the ONE shape armReverse
+       * and disarmReverse both refuse outright — „the harness will believe
+       * NEITHER". This watchdog does not get to be the one site that believes
+       * it silently, so the reading travels with the attribution. */
+      cluster: gearLine(p.gear),
+      clusterAmbiguous: p.gear.length > 1,
+    };
+    const ev = reverse.unarmedREvidence;
+    /* WHAT THE GATE SAW WHEN IT LET THAT PRESS THROUGH — AND `null` IS TWO
+     * DIFFERENT FACTS, WHICH THE FIRST DRAFT PRINTED AS ONE.
+     *
+     * `sChannel` keeps no speed because a press there IS a standstill press by
+     * construction. `brake()` keeps the probe's reading. But `brake(true)` with
+     * NO reading — a call site that forgot the argument, which is exactly the
+     * fourth-call-site case that helper's own comment says it exists to survive
+     * — also stores `null`, and the refusal could not judge it at all. Reading
+     * the null as „a deliberate standstill press" turns a harness DEFECT into a
+     * harness INTENTION in the one sentence a reader would quote. `via` is the
+     * discriminator and it was already in the record. */
+    const gateSaw =
+      ev.lastSPressVia === "sChannel"
+        ? "a deliberate standstill press (the reverse gesture — that helper keeps no speed and needs none)"
+        : ev.lastSPressKmhAtIssue === null
+          ? "NO READING AT ALL — that call site passed none, so the standstill refusal never judged it"
+          : `${ev.lastSPressKmhAtIssue} км/ч`;
+    /* AND WHETHER THE DRIVE ARMED R OF ITS OWN ACCORD IS READ, NOT ASSERTED.
+     * „This drive did not deliberately arm it" was printed unconditionally —
+     * including on the 19 reversing lanes, where `deliberatePresses` in the
+     * very block above says 8 and `lastSPressVia` says `sChannel`. The sentence
+     * contradicted its own evidence, in the direction that makes the instrument
+     * look innocent. */
+    const ownGesture =
+      standstillPresses > 0
+        ? `THIS DRIVE DID ARM R DELIBERATELY ON THIS LANE (${standstillPresses} press(es) of the reverse gesture` +
+          `${reverse.disarmed === true ? ", and the disarm then read «D» off the cluster" : ""}), and`
+        : "This drive made no deliberate arming press of its own, but";
+    /* The latency argument, only where the latency reaches. See S_PRESS_NEAR_MS. */
+    const fit = ev.lastSPressNear
+      ? `reverseAssist arms R on exactly that gesture at a standstill, and the speed a press was GATED on is not the speed it ` +
+        `LANDED at (~2.0 s of CDP latency on this box), so „the engine took the gate on its own" and „the engine took the gate ` +
+        `on this harness's press" both fit the record.`
+      : `That press is ${ev.lastSPressSecondsBefore}s old and the ~2.0 s CDP round trip does not reach it, so the latency ` +
+        `argument this watchdog would otherwise make DOES NOT APPLY here. That still convicts nobody: this harness samples ` +
+        `the selector seconds apart and cannot see inside reverseAssist, so what happened between two ticks is simply unrecorded.`;
+    const ambiguity = ev.clusterAmbiguous
+      ? ` AND THE CLUSTER ITSELF IS AMBIGUOUS («${ev.cluster}»): two owners of «Скоростен лост» disagree, which is the one ` +
+        `shape armReverse and disarmReverse both refuse to believe — so the R above is one instrument's word and not the ` +
+        `driveline's, and even „the car is in R" is unsettled here.`
+      : "";
+    const corruption =
+      `Every pedal from here means the OPPOSITE of what the control law believes — the throttle brakes and the brake ` +
+      `accelerates — so no braking or stopping claim after this point is admissible.${ambiguity}`;
     loud(
-      mine
+      disarmFailed
         ? `THE CLUSTER STILL READS «R» AT t=${reverse.unarmedRAt}s AND IT WAS THIS DRIVE THAT PUT IT THERE — the disarm ` +
-            `reported failure and the phase went back to «${phase}» anyway. Every pedal from here means the OPPOSITE of what the ` +
-            `control law believes — the throttle brakes and the brake accelerates — so no braking or stopping claim after this ` +
-            `point is admissible.`
-        : `THE CLUSTER READS «R» AT t=${reverse.unarmedRAt}s AND THIS DRIVE DID NOT PUT IT THERE (phase «${phase}»). The engine's own ` +
-        `reverse assist has taken the gate. Every pedal from here means the OPPOSITE of what the control law believes — the ` +
-        `throttle brakes and the brake accelerates — so no braking or stopping claim after this point is admissible.`,
+            `reported failure and the phase went back to «${phase}» anyway. ${corruption}`
+        : last === null
+          ? `THE CLUSTER READS «R» AT t=${reverse.unarmedRAt}s (phase «${phase}») AND THIS HARNESS HAS NO GESTURE TO OFFER FOR IT — ` +
+            `it has issued no S keydown at all on this drive. That is not a diagnosis of the engine: this instrument cannot see ` +
+            `inside reverseAssist and does not name a cause. ${corruption}`
+          : `THE CLUSTER READS «R» AT t=${reverse.unarmedRAt}s (phase «${phase}») AND THIS HARNESS CANNOT TELL WHO PUT IT THERE. ` +
+            `${ownGesture} it pressed S ${ev.sPresses}× — the last ${ev.lastSPressSecondsBefore}s ago ` +
+            `at t=${ev.lastSPressAtSec}s, via ${ev.lastSPressVia}, gated on ${gateSaw}. ` +
+            `${fit} Filing this against the product would be naming a culprit nobody ` +
+            `observed. ${corruption}`,
     );
     // The frame carries the diagnosis, not a guess about it — the same rule
     // that renamed `05r-reverse-REFUSED` after it was found with R lit on it.
-    await shot(mine ? "05r-stuck-in-R" : "05r-unarmed-R");
+    // Three attributions, three names: an "unarmed-R" frame that turned out to
+    // be the harness's own press is the mislabelled evidence this round exists
+    // to stop.
+    await shot(
+      disarmFailed ? "05r-stuck-in-R" : last === null ? "05r-R-no-harness-gesture" : "05r-R-attribution-UNDETERMINED",
+    );
     saveStatus({ reverse });
   }
   if (MODE === "right") {
@@ -3377,6 +3962,29 @@ note(
         `${reverse.blocked ? `BLOCKED: ${reverse.blocked}` : (reverseWhy() ?? "no reason recorded")} · cluster read ${g}`,
     );
     for (const f of reverse.failures) note(`      · ${f}`);
+  }
+  // AND WHAT THE WATCHDOG CONCLUDED, IN THE SUMMARY AND NOT ONLY IN A LOUD LINE
+  // 200 LINES ABOVE IT. A reader who scrolls to the MACHINE SUMMARY must not
+  // have to go looking for the one sentence that says every pedal after t=Ns
+  // meant the opposite thing — nor for the fact that nobody knows who caused it.
+  if (reverse.unarmedRAt !== null) {
+    const ev = reverse.unarmedREvidence ?? {};
+    note(
+      // THE CLUSTER IS QUOTED, NOT SUMMARISED AS «R». `includes("R")` fires on
+      // «D/R» too, and this line is the one a judge reads; printing a bare «R»
+      // over a disagreeing cluster is the same silence in miniature.
+      `  UNARMED R: the cluster read «${ev.cluster ?? "R"}»${ev.clusterAmbiguous ? " (TWO OWNERS DISAGREE)" : ""} at ` +
+        `t=${reverse.unarmedRAt}s in phase «${ev.phase}» · attribution ${reverse.unarmedRWho} · ` +
+        `this drive had made ${ev.sPresses ?? 0} S press(es)` +
+        (ev.deliberatePresses ? ` of which ${ev.deliberatePresses} were its OWN deliberate arming gesture` : "") +
+        (ev.lastSPressAtSec === null || ev.lastSPressAtSec === undefined
+          ? ""
+          : ` (last at t=${ev.lastSPressAtSec}s, ${ev.lastSPressSecondsBefore}s before${ev.lastSPressNear === false ? " — OUTSIDE the ~2 s latency window, so it is not a candidate for this R" : ""}, via ${ev.lastSPressVia}, gated on ${ev.lastSPressVia === "sChannel" ? "a deliberate standstill press" : ev.lastSPressKmhAtIssue === null ? "NO READING AT ALL" : `${ev.lastSPressKmhAtIssue} км/ч`})`) +
+        ` · refused ${ev.refusedStandstillPresses ?? 0} standstill press(es) · disarmed: ${ev.disarmed}` +
+        (reverse.unarmedRWho === "undetermined"
+          ? " — «undetermined» is the answer, not a gap in one: the harness presses the brake at every stop and cannot observe the speed its press landed at."
+          : ""),
+    );
   }
 }
 if (reverse.demanded && !reverse.armed) {
@@ -4230,14 +4838,34 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
   const uncredited = (facts.objectives ?? []).filter((o) => !o.done);
   steering.uncreditedObjectives = uncredited.length;
   steering.uncreditedTitles = uncredited.map((o) => o.titleBg);
-  steering.note = steering.everSteered
-    ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right).`
-    : "this drive never steered. The channel exists (KeyA/KeyD); the scripted traces do not use it, by design — how a correct " +
-      "drive should steer is a design question owned by devrig/driveScript.ts and the scenario templates. `everSteered: false` " +
-      "is therefore NOT a claim that steering was unnecessary.";
+  const chState = steering.channel.state;
+  steering.note =
+    (steering.everSteered
+      ? `this drive issued ${steering.commands} steering command(s) (${steering.heldMs.left} ms left, ${steering.heldMs.right} ms right).`
+      : // THE KEYS ARE INTERPOLATED, NOT SPELLED OUT, and that is not tidiness.
+        // The mutated proof run published `keys: {left: "KeyJ", right: "KeyL"}`
+        // beside a sentence reading „the channel exists (KeyA/KeyD)" — a status
+        // file contradicting itself in the reassuring direction, in the one
+        // field a reader would quote.
+        `the scripted traces did not steer. The channel exists (${STEER_KEYS.left}/${STEER_KEYS.right}); how a correct drive ` +
+        "should steer is a design question owned by devrig/driveScript.ts and the scenario templates. " +
+        // ONE LITERAL, NOT TWO. §6 greps this sentence out of the source, and
+        // the first draft split it across a `+` — so the assertion went red
+        // while the published sentence was word-for-word correct. A guard that
+        // breaks on reflow is a guard that gets deleted the next time it does.
+        "`everSteered: false` is therefore NOT a claim that steering was unnecessary.") +
+    // THE HALF THAT WAS MISSING, AND ITS ABSENCE WAS THE FINDING. Until round 3
+    // this sentence ended above, and „the traces do not steer" was the only
+    // thing a lane said about the wheel — so a lane whose channel had been
+    // BROKEN said exactly the same words as a lane whose channel was perfect.
+    ` CHANNEL: ${chState.toUpperCase()} — ${steering.channel.why}.`;
   note(
-    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : "0 commands — this drive never turned the wheel"}` +
+    `  STEERING: ${steering.everSteered ? `${steering.commands} command(s) · ${steering.heldMs.left} ms left / ${steering.heldMs.right} ms right` : "0 trace commands — the scripted traces do not steer"}` +
       ` · channel ${steering.wired ? `WIRED (${STEER_KEYS.left}/${STEER_KEYS.right})` : "ABSENT"}` +
+      ` · liveness ${chState.toUpperCase()}` +
+      (steering.channel.legs.length
+        ? ` (${steering.channel.legs.map((l) => `${l.dir} ${l.error ? "err" : `${l.px}px`}`).join(", ")}, ${steering.channel.costMs} ms)`
+        : "") +
       (steering.refusedBothAtOnce ? ` · refused ${steering.refusedBothAtOnce} both-at-once command(s)` : "") +
       (steering.atStandstill ? ` · ${steering.atStandstill} issued below ${STEER_MIN_KMH} км/ч, where the wheel moves the CAMERA and not the car` : "") +
       (steering.releasedByPauseDrain ? ` · released ${steering.releasedByPauseDrain}× by a pause drain` : ""),
@@ -4248,12 +4876,26 @@ if (!(facts.objectives ?? []).length) note("   (the debrief listed no objectives
   // success path" on exactly this evidence.
   if (!steering.everSteered && uncredited.length) {
     loud(
-      `${uncredited.length} objective(s) went UNCREDITED on a drive that never turned the wheel. This instrument cannot tell ` +
+      // "a drive that never turned the wheel" was true while nothing on the
+      // lane could turn it. Since the liveness check the wheel IS turned on
+      // every lane, and this sentence sat one clause away from the verdict
+      // saying so. Same repair as "0 trace commands": name WHOSE silence it is.
+      `${uncredited.length} objective(s) went UNCREDITED on a drive whose scripted traces never turned the wheel. This ` +
+        `instrument cannot tell ` +
         `„the lesson has no drivable success path" from „this drive could not reach it": ${uncredited
           .map((o) => `«${o.titleBg}»`)
           .slice(0, 4)
           .join(", ")}${uncredited.length > 4 ? ` …and ${uncredited.length - 4} more` : ""}. ` +
-        `Read the "steering" block in _audit-status.json before filing anything against these.`,
+        `Read the "steering" block in _audit-status.json before filing anything against these. ` +
+        // AND THE CHANNEL STATE TRAVELS WITH THE WARNING, because the two are
+        // different sentences: „the traces chose not to steer" leaves the
+        // lesson unjudged, and „the wheel is dead" also invalidates every
+        // position and lane claim the drive made on the way there.
+        (chState === "dead"
+          ? "AND THE CHANNEL ITSELF READ DEAD ON THIS LANE — the wheel could not have been turned even if a trace had asked."
+          : chState === "live"
+            ? "The channel itself read LIVE at the spawn mark, so this is the traces' silence and not a broken instrument."
+            : `The channel was never tested on this lane (${steering.channel.why}), so it is not even known which.`),
     );
   }
 }

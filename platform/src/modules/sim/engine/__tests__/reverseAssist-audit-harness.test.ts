@@ -412,6 +412,143 @@ describe("§5 the harness has a deliberate, gated, cluster-asserted route into R
     expect(dis![0]).toMatch(/reverse\.disarmed = true/);
   });
 
+  /* ── §5b — AND THE WATCHDOG MAY NOT NAME A CULPRIT IT CANNOT SEE ──────────
+   *
+   * Round 2 added a watchdog for „the cluster reads R and this drive did not
+   * arm it" and gave it a diagnosis: „The engine's own reverse assist has taken
+   * the gate." That sentence blames the PRODUCT for something the HARNESS is at
+   * least as likely to have done — `reverseAssist` arms R on a standstill brake
+   * press, this harness presses the brake at every stop, `brake()` gates that
+   * press on the speed the LAST probe read, and the CDP round trip was measured
+   * at ~2.0 s median, so a press let through at 2 км/ч can land at rest. The
+   * refusal bounds the harness's INTENT and cannot bound its EFFECT.
+   *
+   * A finding that names the wrong culprit is worse than no finding: it sends a
+   * repair round at innocent code. These assertions pin the three attributions
+   * and, more importantly, pin the fact that the middle one EXISTS — that the
+   * harness is allowed to say it cannot tell instead of picking.
+   *
+   * WATCHED TO FAIL, 2026-08-21, by forcing the trigger on an ORDINARY lane
+   * (sc-junction-scan/mobile/right, dev server 4611160afb1e) and varying only
+   * the evidence. Same code, three sentences, three frame names:
+   *   no S press yet     → "no-harness-gesture"  05r-R-no-harness-gesture.png
+   *   1 S press at 20 км/ч → "undetermined"      05r-R-attribution-UNDETERMINED.png
+   *   disarm reported false → "harness-disarm-failed"  05r-stuck-in-R.png
+   */
+  it("does not blame the engine for an R it cannot attribute", () => {
+    // The old unconditional diagnosis must be gone as an ASSERTION. The phrase
+    // may still appear in the prose that explains why it was wrong — what may
+    // not survive is a `loud()` that states it as the cause.
+    expect(SRC).not.toMatch(/AND THIS DRIVE DID NOT PUT IT THERE \(phase «\$\{phase\}»\)\. The engine's own/);
+    // Three attributions, and the honest majority case is the middle one.
+    expect(SRC).toMatch(/reverse\.unarmedRWho = disarmFailed \? "harness-disarm-failed" : last === null \? "no-harness-gesture" : "undetermined"/);
+    expect(SRC).toMatch(/THIS HARNESS CANNOT TELL WHO PUT IT THERE/);
+    expect(SRC).toMatch(/does not name a cause/);
+    // …and it is read off EVIDENCE, which is published so a reader can disagree.
+    expect(SRC).toMatch(/reverse\.unarmedREvidence = \{/);
+    expect(SRC).toMatch(/^\s*unarmedRWho: null,$/m);
+    expect(SRC).toMatch(/^\s*unarmedREvidence: null,$/m);
+  });
+
+  it("keeps the S presses that make that attribution possible", () => {
+    // Without this list the watchdog has nothing to be honest WITH: „the
+    // harness did not intend a standstill press" and „no standstill press
+    // happened" are different statements and only the first is knowable.
+    expect(SRC).toMatch(/const sPresses = \[\];/);
+    const brakeHelper = SRC.match(/const brake = async \(on, kmh = null\) => \{[\s\S]*?\n\};/);
+    expect(brakeHelper, "the brake helper is gone").not.toBeNull();
+    expect(brakeHelper![0]).toMatch(/sPresses\.push\(\{ at: Date\.now\(\), kmhAtIssue: kmh, via: "brake" \}\)/);
+    // The refusal it does NOT replace — intent is still bounded.
+    expect(brakeHelper![0]).toMatch(/refusedReversePress \+= 1/);
+    const sChannelHelper = SRC.match(/const sChannel = async \(on\) => \{[\s\S]*?\n\};/);
+    expect(sChannelHelper![0]).toMatch(/sPresses\.push\(/);
+  });
+
+  /* ── §5c — AND IT MAY NOT EXONERATE ITSELF EITHER ─────────────────────────
+   *
+   * ADVERSARIAL RE-VERIFICATION OF THE ATTRIBUTION, 2026-08-21. §5b stopped the
+   * watchdog naming the PRODUCT under uncertainty. It did not stop it making
+   * three other unobserved claims, all of them about the HARNESS and all of
+   * them in the direction that makes the instrument look clean — which is the
+   * same reassuring direction, pointed at the other party.
+   *
+   * REPRODUCED by executing the shipping watchdog block — sliced out of
+   * lesson-audit.mjs by brace-matching, not paraphrased — over a matrix of
+   * records. The three defects, each printed verbatim by the code as it stood:
+   *
+   *  1. „This drive did not deliberately arm it" was UNCONDITIONAL. On a
+   *     reversing lane the same block published `deliberatePresses: 8`,
+   *     `lastSPressVia: "sChannel"` and `disarmed: true` one line above it. The
+   *     sentence contradicted its own evidence, and it did so on exactly the 19
+   *     lanes where the harness is the likeliest cause.
+   *  2. `lastSPressKmhAtIssue === null` was rendered „a deliberate standstill
+   *     press". `null` is TWO facts: `sChannel` keeps no speed by construction,
+   *     and `brake(true)` with no argument keeps none because the refusal never
+   *     judged it. Reading the second as the first turns a harness DEFECT into a
+   *     harness INTENTION. `via` was already in the record; use it.
+   *  3. The „~2.0 s of CDP latency" hedge was recited over a press of ANY age —
+   *     measured printing it over one 170 s old, which the round trip does not
+   *     reach. Asserting a mechanism nobody measured is the fault one level
+   *     down, inside the repair for it.
+   *
+   * …and a fourth that is not a claim but a silence: `p.gear.includes("R")` has
+   * no length test, so a cluster reading «D/R» — the ONE shape armReverse and
+   * disarmReverse both refuse to believe — produced a full attribution with the
+   * disagreement nowhere in it. The alarm stays (an R may be real); what
+   * changed is that the reading now travels with it.
+   */
+  it("does not assert the drive was innocent of arming R either", () => {
+    // The unconditional exoneration is gone AS AN ASSERTION — same rule §5b
+    // set for the engine-blaming sentence: the phrase may survive in the prose
+    // that explains why it was wrong, never in the string that is published.
+    const published = SRC.match(/const ownGesture =[\s\S]*?await shot\(/);
+    expect(published, "the watchdog's loud() block is gone").not.toBeNull();
+    expect(published![0]).not.toMatch(/This drive did not deliberately arm it/);
+    // …and what replaced it is READ off the count the same block publishes,
+    // and the READING is what reaches the sentence. `> 0`, not `>= 0`: the
+    // always-true form would accuse the harness on every lane instead.
+    expect(SRC).toMatch(/standstillPresses > 0/);
+    expect(published![0]).toMatch(/\$\{ownGesture\} it pressed S/);
+    expect(SRC).toMatch(/THIS DRIVE DID ARM R DELIBERATELY ON THIS LANE/);
+    expect(SRC).toMatch(/This drive made no deliberate arming press of its own, but/);
+  });
+
+  it("tells a deliberate press from an ungated one by `via`, never by the null speed", () => {
+    // The conflation, verbatim, must not come back.
+    expect(SRC).not.toMatch(/lastSPressKmhAtIssue === null \? "a deliberate standstill press"/);
+    expect(SRC).toMatch(/ev\.lastSPressVia === "sChannel"/);
+    // …and the third fact has its own words instead of borrowing the first's.
+    expect(SRC).toMatch(/NO READING AT ALL/);
+    // THE DISCRIMINATOR MUST REACH THE SENTENCE, not merely be computed beside
+    // it — a value that is derived correctly and then not used is the shape the
+    // count-agreement battery caught passing its own tests.
+    const published = SRC.match(/const ownGesture =[\s\S]*?await shot\(/);
+    expect(published![0]).toMatch(/gated on \$\{gateSaw\}/);
+  });
+
+  it("recites the latency hedge only where the latency reaches", () => {
+    expect(SRC).toMatch(/const S_PRESS_NEAR_MS = \d+;/);
+    expect(SRC).toMatch(/lastSPressNear: last === null \? null : now - last\.at <= S_PRESS_NEAR_MS/);
+    // THE BRANCH ITSELF, and this line is why. The first draft of this test
+    // asserted only the field and the two strings — and `const fit = true`
+    // passed it, because both arms' words stay in the file while the code
+    // recites one of them unconditionally. Watched RED under exactly that
+    // mutation, 2026-08-21.
+    expect(SRC).toMatch(/const fit = ev\.lastSPressNear\b/);
+    // The hedge is now a branch, not a recital, and the other arm says so.
+    expect(SRC).toMatch(/DOES NOT APPLY here/);
+    expect(SRC).toMatch(/That still convicts nobody/);
+  });
+
+  it("carries the cluster reading, because includes(\"R\") hides a disagreement", () => {
+    expect(SRC).toMatch(/cluster: gearLine\(p\.gear\)/);
+    expect(SRC).toMatch(/clusterAmbiguous: p\.gear\.length > 1/);
+    expect(SRC).toMatch(/AND THE CLUSTER ITSELF IS AMBIGUOUS/);
+    expect(SRC).toMatch(/TWO OWNERS DISAGREE/);
+    // …and it reaches the loud line rather than sitting in the status file.
+    expect(SRC).toMatch(/point is admissible\.\$\{ambiguity\}/);
+  });
+
   it("shouts, and writes it down, when a reversing lesson never reversed", () => {
     // The silence that produced this whole task: „never asked" and „asked and
     // never got it" must not be the same absence of a line again.
@@ -455,7 +592,10 @@ describe("§6 the harness has a steering channel, and says so on every lane", ()
     // harness holding both believes it is turning while the car goes straight —
     // the reverse bug's exact shape, in the other control. The helper releases
     // the opposite key BEFORE pressing the new one.
-    const helper = SRC.match(/const steer = async \(dir, kmh = null\) => \{[\s\S]*?\n\};/);
+    // The signature grew a third argument on 2026-08-21 (`by`), which is the
+    // liveness check's way of keeping its commands out of the trace's books.
+    // The guard this test enforces is unchanged: release BEFORE press.
+    const helper = SRC.match(/const steer = async \(dir, kmh = null, by = "trace"\) => \{[\s\S]*?\n\};/);
     expect(helper, "the steering helper is gone").not.toBeNull();
     expect(helper![0]).toMatch(/await page\.keyboard\.up\(STEER_KEYS\[steerHeld\]\)/);
     expect(helper![0]).toMatch(/await page\.keyboard\.down\(STEER_KEYS\[dir\]\)/);
@@ -484,7 +624,17 @@ describe("§6 the harness has a steering channel, and says so on every lane", ()
     expect(SRC).toMatch(/is therefore NOT a claim that steering was unnecessary/);
     // …and the place it actually bites: an uncredited objective on a drive that
     // could not turn is not evidence about the lesson in either direction.
-    expect(SRC).toMatch(/objective\(s\) went UNCREDITED on a drive that never turned the wheel/);
+    //
+    // THE NOUN PHRASE MOVED ON 2026-08-21 AND THE GUARD GOT STRICTER, NOT
+    // LOOSER. It read „on a drive that never turned the wheel", which was true
+    // while nothing on the lane could turn it. The liveness check now turns the
+    // wheel at the spawn mark on EVERY lane and publishes `channel.commands: 2`
+    // — so that sentence had become a status file arguing with itself in the
+    // loudest line on the lane, the same defect as the „0 trace commands"
+    // beside `commands: 2` that round 3 fixed one line above it. Both halves
+    // are pinned: the sentence that must be there, and the one that must not.
+    expect(SRC).toMatch(/objective\(s\) went UNCREDITED on a drive whose scripted traces never turned the wheel/);
+    expect(SRC).not.toMatch(/went UNCREDITED on a drive that never turned the wheel/);
   });
 
   it("proves the channel by measuring a HEADING change, never a keystroke", () => {
@@ -501,6 +651,137 @@ describe("§6 the harness has a steering channel, and says so on every lane", ()
     // worse than one that cannot steer.
     expect(SRC).toMatch(/if \(STEER_PROOF\) \{/);
     expect(SRC).toMatch(/phase: "steer-proof"/);
+  });
+
+  /* ── AND THE PROOF ABOVE RUNS IN A MODE NO WAVE RUNS ──────────────────────
+   *
+   * THE DEFECT THESE ASSERTIONS CLOSE, and it is this programme's own shape one
+   * level up. `KNIJKA_STEER_PROOF=1` runs INSTEAD of the drive, so the channel
+   * was proven in a mode nobody dispatches during a wave and left UNPROVEN in
+   * the mode all 376 drives use — and on an ordinary lane a channel that had
+   * been broken said NOTHING AT ALL. A capability that fails quietly is
+   * indistinguishable from a capability that was never needed, which is the
+   * exact conflation that hid the missing wheel behind 1,712 findings.
+   *
+   * MEASURED ON ORDINARY LANES, 2026-08-21, sc-junction-scan/mobile/right
+   * against a dev server stamped 4611160afb1e — two runs differing only in
+   * `STEER_KEYS`:
+   *   KeyA/KeyD  left +154 px ≈ +5.3°   right −152 px ≈ −5.3°   → LIVE
+   *   KeyJ/KeyL  left    0 px ≈  0.0°   right    0 px ≈  0.0°   → DEAD, refused
+   * Reproduced to the pixel on a re-run (+154/−152) and on a second scenario
+   * (sc-park-bay-exit-rev: +151/−151). ±5.3° is the product's own
+   * COCKPIT_LOOK_INTO_TURN (0.09 rad = 5.16°) read off the photographs.
+   */
+  it("tests the channel on the ORDINARY drive path, not only in the opt-in mode", () => {
+    expect(SRC).toMatch(/async function steerLiveness\(\)/);
+    // Called on the drive path itself, and BEFORE the positive control — the
+    // last instant at which the car is on the spawn mark with no pedal down.
+    // A first draft called it after, measured „15 км/ч, throttle DOWN" and
+    // correctly refused to run at all.
+    const call = SRC.match(/await timed\("steer", steerLiveness\);[\s\S]{0,600}?POSITIVE CONTROL/);
+    expect(call, "the liveness check no longer runs before the positive control").not.toBeNull();
+    // It must NOT be gated on the proof mode.
+    expect(SRC).not.toMatch(/if \(STEER_PROOF\)[\s\S]{0,200}steerLiveness/);
+  });
+
+  it("publishes THREE states, and never a silence", () => {
+    // „steered and the world moved", „steered and NOTHING moved", and „never
+    // turned the wheel" were one absence. They are three values now.
+    expect(SRC).toMatch(/channel: \{\s*\n\s*state: "untested"/);
+    expect(SRC).toMatch(/settle\(\s*"live",/);
+    expect(SRC).toMatch(/settle\(\s*"dead",/);
+    expect(SRC).toMatch(/settle\(\s*"untested",/);
+    // …in the status file and in the log line, on every lane.
+    expect(SRC).toMatch(/liveness \$\{chState\.toUpperCase\(\)\}/);
+    expect(SRC).toMatch(/CHANNEL: \$\{chState\.toUpperCase\(\)\}/);
+  });
+
+  it("refuses in the same register as the tree-moved refusal when the wheel is dead", () => {
+    // A drive whose wheel is dead cannot support ANY finding about position,
+    // lane, turning or manoeuvre — the same shape as „the frames span two
+    // states of the code and must NOT be used to certify a closure".
+    expect(SRC).toMatch(/THE STEERING CHANNEL IS DEAD ON THIS DRIVE/);
+    expect(SRC).toMatch(/keeping, turning, manoeuvring or „no drivable success path" is admissible: they describe the instrument/);
+    expect(SRC).toMatch(/await shot\("03s-steer-DEAD"\)/);
+    // …and „untested" is loud too: it is the state in which nobody knows.
+    expect(SRC).toMatch(/THE STEERING CHANNEL WAS NOT TESTED ON THIS DRIVE/);
+  });
+
+  it("cannot report a frozen sim, or a non-cockpit camera, as a dead channel", () => {
+    // Every way of declining to answer reports "untested". A check that cannot
+    // run is not evidence that the channel is broken — that is this
+    // programme's favourite bug pointed the other way.
+    expect(SRC).toMatch(/ch\.legs\.some\(\(l\) => l\.identical\)/);
+    expect(SRC).toMatch(/cam\.camera !== "cockpit"/);
+    expect(SRC).toMatch(/moved <= 0 && steering\.channel\.state === "dead"/);
+    expect(SRC).toMatch(/overruledBy = "positive-control"/);
+  });
+
+  /* ── §6b — AND THE THREE WAYS IT COULD STILL CONVICT A LIVE CHANNEL ───────
+   *
+   * Round 3's liveness check came back PARTIAL on adversarial verification:
+   * every lane it was measured on was `mobile`, and three of its refusals could
+   * fire on a channel that was working perfectly. A false refusal is as
+   * damaging as a false certificate — it voids every position, lane and turning
+   * finding on the lane, which is the same silence the check exists to end,
+   * pointed the other way.
+   */
+  it("judges the LEAN, not the pixels, so the pc leg is held to the same test", () => {
+    /* MEASURED 2026-08-21, the same gesture on both legs of the sweep:
+     *   sc-junction-scan/mobile/right   +154 / −152 px   = ±5.3°
+     *   sc-junction-scan/pc/right        +70 /  −69 px   = ±5.3°
+     * Identical lean, different ruler — 682 CSS px at dpr 3 against 933 px at
+     * dpr 1. A floor of 40 DEVICE PIXELS therefore meant 1.39° on the phone and
+     * 3.04° on the desktop: 59 % of the product's whole ±5.16°
+     * COCKPIT_LOOK_INTO_TURN, demanded of 196 of the 376 lanes before the
+     * channel would be called live. The floor is an angle now, and the pixel
+     * figure a verdict quotes is computed for the band it is judging.
+     */
+    expect(SRC).toMatch(/const LIVE_MIN_DEG = /);
+    expect(SRC).toMatch(/Math\.abs\(px \* band\.degPerPx\) >= LIVE_MIN_DEG/);
+    // The old device-pixel floor may not come back, in the code or in a verdict.
+    expect(SRC).not.toMatch(/LIVE_MIN_PX/);
+    expect(SRC).not.toMatch(/a live channel measured ~155 px on this same gesture/);
+    // The sign test survives it: a cross-wired channel moves the world and must
+    // still fail, which is the one thing a bare magnitude test cannot catch.
+    expect(SRC).toMatch(/dir === "left" \? px > 0 : px < 0/);
+  });
+
+  it("does not convict on one leg, or die trying to photograph one", () => {
+    // `every` meant a SINGLE failed correlation fell through to "dead" — a
+    // conviction on half the evidence, and one of the errors it falls through
+    // on is „the best match is at the ±600px search limit", i.e. the world moved
+    // MORE than the window could measure. That is the loudest possible sign of a
+    // LIVE channel, scored as a leg that did not move.
+    expect(SRC).toMatch(/const failed = ch\.legs\.filter\(\(l\) => l\.error !== null\);/);
+    expect(SRC).not.toMatch(/ch\.legs\.every\(\(l\) => l\.error !== null\)/);
+    // …and `proofGrab` is a raw `page.screenshot`. On the opt-in proof path a
+    // throw ended a lane that was only about the instrument; on the ordinary
+    // drive path it reaches the crash guard and ends a LESSON lane before it has
+    // driven a metre.
+    expect(SRC).toMatch(/ch\.legs\.push\(await livenessLeg\(band, "left"\)\);/);
+    expect(SRC).toMatch(/the check itself failed after/);
+  });
+
+  it("does not report a check that ran as a check that never applied", () => {
+    /* `.audit-frames/r3/proof-check/_audit-status.json` — round 3's own artifact
+     * — carries two measured legs (+154 px and −152 px, `moved: true`) directly
+     * under a `why` reading „the drive-path liveness check never applied". The
+     * proof branch overwrote a real reading with a claim that no reading
+     * existed, and it would have erased a DEAD verdict exactly as happily. */
+    expect(SRC).toMatch(/if \(steering\.channel\.legs\.length === 0\) \{/);
+    expect(SRC).not.toMatch(/so the drive-path liveness check never applied/);
+    expect(SRC).toMatch(/supersedes the reading/);
+  });
+
+  it("keeps the liveness books separate from the trace's", () => {
+    // MEASURED: the first working run printed „0 trace commands" beside
+    // `commands: 2` and `heldMs.left: 1129` on a lane whose traces never
+    // touched the wheel — a status file arguing with itself, in the field a
+    // reader would quote. `everSteered` still means THE TRACE steered.
+    expect(SRC).toMatch(/if \(by === "trace"\) \{\s*\n\s*steering\.commands \+= 1;\s*\n\s*steering\.everSteered = true;/);
+    expect(SRC).toMatch(/steering\.channel\.commands \+= 1;/);
+    expect(SRC).toMatch(/steerHeldBy === "trace" \? steering\.heldMs : steering\.channel\.heldMs/);
   });
 });
 

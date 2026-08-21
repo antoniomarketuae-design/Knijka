@@ -8897,3 +8897,34 @@ accepted as evidence for any row.
 Retirements are recorded in `.audit-frames/wave-c/closures.jsonl`, one line per finding with
 its evidence. The findings corpus itself is untouched: it is this audit's primary record, and
 a retirement is subtracted at read time so it can be reversed by deleting one file.
+
+## The open list today — 2026-08-21, and how to recompute it
+
+**Do not quote any total above this line as current.** Every section over it is a dated
+snapshot of the corpus as it stood when that round ran, and they are kept as history. The
+newest of them, «Wave C verdicts», states `1012 → 637`; the corpus has since taken 31 more
+filed findings, so neither number is the open list any more.
+
+```
+OPEN-LIST  filed=1043 retired=375 open=668 critical=248 major=373 minor=47 files=118 lessons=139
+```
+
+That line is emitted by every tool in `tools/audit/` that reports a finding count, and
+`tools/audit/count-agreement.mjs` runs them all and **exits non-zero if any two disagree** —
+because on the day this section was written five of them answered the same question four
+different ways: 1,043 filed, 668 open, 1,038 from two private copies of the loader that
+predated the ADDITIVE clause and subtracted no closures, and 1,012 typed into the prose of
+every generated fix workflow, under a sentence telling each lane that if its count disagreed,
+its reader was wrong.
+
+| ask | run |
+|---|---|
+| the arithmetic | `node tools/audit/finding-reader.mjs --count` |
+| one lesson / one suspect file | `… finding-reader.mjs <lesson>` · `--file <path>` · `--unrouted` (OPEN only; add `--filed` for retired rows, each tagged with the verdict that retired it) |
+| coverage split | `node tools/audit/never-edited.mjs --all` |
+| do the counters agree? | `node tools/audit/count-agreement.mjs` |
+
+**This document is deliberately NOT wired into that check.** A ledger is a dated record and
+its old sections are supposed to be stale; a gate that went red every time the corpus moved
+would be a gate somebody deletes. The tools are the live answer, this section names them, and
+the numbers above it are history — which is the honest arrangement, not an omission.

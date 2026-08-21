@@ -11,6 +11,7 @@
 // evidence. The relationships below cannot be satisfied by a wrong loader.
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import {
   loadStandingBroken,
   loadClosures,
@@ -86,4 +87,49 @@ test("every standing finding carries the fields a judge is told to read", () => 
     (j) => !j.findingId || !j.severity || !j.what || !j.scenario,
   );
   assert.deepEqual(missing.map((j) => j.findingId ?? j.scenario), []);
+});
+
+test("every retirement carries a frame that RESOLVES and a quote — checked at READ time", () => {
+  // THE GAP THIS CLOSES, MEASURED 2026-08-21 by hand-retiring one real OPEN
+  // critical (sc-vp-readiness:a3bdda5c) with no evidenceFrame and no
+  // evidenceQuote: the open list fell 668 -> 667 and 248 -> 247 criticals, and
+  // NOTHING objected. finding-reader.test.mjs passed 6/6, count-agreement.test
+  // .mjs passed 7/7, count-agreement.mjs printed "AGREED — every counter
+  // reports the same open list", and verdict-coverage.mjs said nothing at all,
+  // because it audits wave-c/verdicts.jsonl and this row was never in it.
+  //
+  // The evidence rule WAS enforced — `evidenced()` in wave-c-post.mjs — but only
+  // on the WRITE path, and a rule enforced only where it is written is a rule
+  // about one tool rather than about the file. closures.jsonl is the thing that
+  // subtracts from the open list, so the assertion belongs on the READ path,
+  // where every consumer of loadClosures() is standing.
+  //
+  // "Resolves" is deliberately the test, not "is a .png": one legitimate
+  // retirement (sc-signal-controller:ba4a6215, a finding about frame-collection
+  // integrity) cites `_audit-status.json`, which is the right evidence for that
+  // claim. What must never pass is a field that names a file nobody can open —
+  // the sibling check in verdict-coverage.mjs exists because two CLOSED lines
+  // arrived with Windows paths mangled by JSON escaping: field present, file
+  // absent, check passed.
+  const retired = loadClosures();
+  assert.ok(retired.size > 0, "no retirements at all reads exactly like a clean sweep — that is the bug, not the pass");
+
+  const bad = [];
+  for (const [id, c] of retired) {
+    if (!c.evidenceFrame) {
+      bad.push(`${id}: retires a finding with NO evidenceFrame`);
+      continue;
+    }
+    const tries = [c.evidenceFrame, String(c.evidenceFrame).split("\\").join("/")];
+    const found = tries.some((t) => {
+      try {
+        return Boolean(t) && fs.existsSync(t);
+      } catch {
+        return false;
+      }
+    });
+    if (!found) bad.push(`${id}: evidenceFrame DOES NOT RESOLVE — ${JSON.stringify(String(c.evidenceFrame).slice(0, 80))}`);
+    if (!String(c.evidenceQuote ?? "").trim()) bad.push(`${id}: retires a finding with no evidenceQuote`);
+  }
+  assert.deepEqual(bad, [], "a retirement without readable evidence still subtracts from the open list");
 });

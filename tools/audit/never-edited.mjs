@@ -25,40 +25,45 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { corpusCounts, openListLine, workedLine, normFile as norm } from "./finding-reader.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.KNIJKA_AUDIT_BASE || "ec1f56f";
-const DIR = path.join(REPO, ".audit-frames", "findings");
 
 const argv = process.argv.slice(2);
 const want = argv.includes("--majors") ? "majors" : argv.includes("--all") ? "all" : "criticals";
 const jsonAt = argv.indexOf("--json");
 const jsonPath = jsonAt >= 0 ? argv[jsonAt + 1] : null;
 
-// --- the corpus, with the supersession rule doc 88 states -------------------
-const all = [];
-for (const f of fs.readdirSync(DIR)) {
-  if (!f.endsWith(".jsonl")) continue;
-  for (const line of fs.readFileSync(path.join(DIR, f), "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const j = JSON.parse(line);
-      j.__src = f;
-      all.push(j);
-    } catch {
-      /* a torn tail line is not a reason to abandon the file */
-    }
-  }
-}
-const key = (j) => j.lesson || j.lessonId || j.scenario || j.id || null;
-const redriven = new Set(
-  all.filter((j) => j.__src === "chunk-redrive.jsonl").map(key).filter(Boolean),
-);
-const standing = all.filter(
-  (j) => j.__src === "chunk-redrive.jsonl" || !(key(j) && redriven.has(key(j))),
-);
-const broken = standing.filter((j) => j.bucket === "BROKEN");
-const norm = (s) => String(s || "").replace(/\\/g, "/");
+/**
+ * THE CORPUS COMES FROM finding-reader.mjs, AND IT DID NOT USED TO — 2026-08-21.
+ *
+ * This file carried its own twelve-line copy of the loader and the supersession
+ * rule. It was written before the ADDITIVE clause existed and before closures
+ * were subtracted anywhere, and it was never updated for either, so it answered
+ * a question nobody had asked since:
+ *
+ *     1,038 BROKEN / 335 critical   this file, measured
+ *     1,043 BROKEN / 339 critical   the corpus as filed
+ *       668 BROKEN / 248 critical   the corpus as OPEN
+ *
+ * The 5-row gap is the same 5 rows (4 critical) the last supersession incident
+ * was about — the rule ate them here too, silently, for the same reason. The
+ * 375-row gap is every finding Wave C retired with a frame and a quote, which
+ * this tool went on counting as work waiting for a lane.
+ *
+ * A second implementation of a rule is a second place for the rule to be wrong,
+ * and a copy that is only ever read by one script drifts without anybody
+ * noticing. tools/audit/count-agreement.mjs now goes red if this file's numbers
+ * and finding-reader's stop matching.
+ *
+ * WHAT IS COUNTED IS THE **OPEN** LIST. "Never edited" is a statement about work
+ * outstanding, and a file whose only finding was closed with evidence is not
+ * work outstanding — it is done. Counting it kept retired rows on the ledger's
+ * never-opened line for as long as nobody re-derived them.
+ */
+const counts = corpusCounts();
+const broken = counts.open;
 
 const per = new Map();
 for (const j of broken) {
@@ -143,14 +148,16 @@ const untouched = [...per.values()]
   .sort((a, b) => b.critical - a.critical || b.total - a.total);
 
 const sum = (k) => untouched.reduce((n, e) => n + e[k], 0);
-// The frozen corpus has 138 suspect entries; `unknown` is one of them and is not
-// a file, so this per-file map holds 137. Printing 137 beside a document that
-// says 138 reads as a discrepancy in the corpus rather than a difference of
-// question, so say which is which.
+// `unknown` is a real bucket of findings that no wave could ever see, because
+// every wave grouped on suspectFile. It is not a file, so it is counted and
+// named separately rather than folded into the per-file total, where it would
+// read as a discrepancy in the corpus rather than a difference of question.
 const unknownRows = broken.filter((j) => norm(j.suspectFile) === "unknown").length;
+console.log(openListLine(counts));
+console.log(workedLine("open", broken));
 console.log(
-  `suspect files with standing BROKEN : ${per.size} ` +
-    `(+1 "unknown" bucket, ${unknownRows} findings, which is not a file — 138 entries in the ledger)`,
+  `suspect files with an OPEN finding : ${per.size} ` +
+    `(+1 "unknown" bucket, ${unknownRows} findings, which is not a file)`,
 );
 console.log(
   `NEVER EDITED since ${BASE} (${want}) : ${untouched.length} files · ${sum("total")} findings · ${sum("critical")} critical`,

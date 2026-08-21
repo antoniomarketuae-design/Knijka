@@ -12,13 +12,29 @@
  * A missing verdict is not a neutral absence. It leaves the finding OPEN while
  * looking, in every summary, like diligent restraint.
  *
+ * COVERAGE IS MEASURED OVER THE **OPEN** LIST — 2026-08-21.
+ *
+ * It used to be measured over the FILED corpus, which meant the denominator
+ * included every finding a previous wave had already retired with a frame and a
+ * quote: "findings covered : 1012 of 1043". Those 375 rows do not need a new
+ * verdict — they have one, and it is in closures.jsonl — so counting them made
+ * the percentage a statement about work that no longer exists. Worse in the
+ * direction that matters: the next wave, run against a fresh verdicts file,
+ * would have reported 375 findings as UNJUDGED and sent judges back to look at
+ * them, spending the round off the open list while the open list stood still.
+ *
+ * A verdict line citing an already-retired finding is still recognised and is
+ * still quality-checked — it is history, not an error — it just is not part of
+ * what this wave has left to do. `--filed` restores the old denominator.
+ *
  *   node tools/audit/verdict-coverage.mjs            all lessons
  *   node tools/audit/verdict-coverage.mjs --gaps     only what is missing
+ *   node tools/audit/verdict-coverage.mjs --filed    count retired findings too
  */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadStandingBroken } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -34,12 +50,18 @@ function findRepo() {
 const REPO = findRepo();
 const argv = process.argv.slice(2);
 const GAPS_ONLY = argv.includes("--gaps");
+const FILED = argv.includes("--filed");
 const VERDICTS =
   (argv.indexOf("--verdicts") >= 0 && argv[argv.indexOf("--verdicts") + 1]) ||
   path.join(REPO, ".audit-frames", "wave-c", "verdicts.jsonl");
 
-const broken = loadStandingBroken();
-const byId = new Map(broken.map((j) => [j.findingId, j]));
+const counts = corpusCounts();
+// The id map stays the FILED corpus on purpose: a verdict line citing a finding
+// a wave has since retired is history, not an invented id, and reporting it as
+// "unknown findingId" would be a false alarm that trains a reader to skip this
+// report's output. Only what is OWED changes with the scope.
+const byId = new Map(counts.filed.map((j) => [j.findingId, j]));
+const owed = FILED ? counts.filed : counts.open;
 
 const rows = [];
 const malformed = [];
@@ -109,7 +131,7 @@ for (const r of rows) {
 
 // --- per lesson ---------------------------------------------------------------
 const lessons = new Map();
-for (const j of broken) {
+for (const j of owed) {
   const e = lessons.get(j.scenario) || { lesson: j.scenario, expected: 0, got: 0, missing: [] };
   e.expected++;
   if (seen.has(j.findingId)) e.got++;
@@ -120,8 +142,20 @@ const all = [...lessons.values()].sort((a, b) => b.missing.length - a.missing.le
 const incomplete = all.filter((e) => e.missing.length);
 const touched = all.filter((e) => e.got > 0);
 
+// How many of the lines that DID land were about findings already retired —
+// real work, already banked, and not part of what this wave still owes.
+const onRetired = [...seen.keys()].filter((k) => counts.retiredIds.has(k)).length;
+const coveredOwed = owed.filter((j) => seen.has(j.findingId)).length;
+
+console.log(openListLine(counts));
+console.log(workedLine(FILED ? "filed" : "open", owed));
+console.log("scope              : " + (FILED ? "FILED — retired findings counted as owing a verdict" : "OPEN — " + counts.n.retired + " retired finding(s) excluded (pass --filed to include them)"));
 console.log("verdict lines read : " + rows.length + (malformed.length ? "   (" + malformed.length + " MALFORMED)" : ""));
-console.log("findings covered   : " + seen.size + " of " + broken.length + "   (" + Math.round((seen.size / broken.length) * 100) + "%)");
+console.log(
+  "findings covered   : " + coveredOwed + " of " + owed.length + "   (" +
+    (owed.length ? Math.round((coveredOwed / owed.length) * 100) : 100) + "%)" +
+    (!FILED && onRetired ? "   [+" + onRetired + " line(s) about findings already retired]" : ""),
+);
 console.log("lessons touched    : " + touched.length + " of " + lessons.size);
 console.log("lessons incomplete : " + incomplete.length);
 const dupes = [...seen.entries()].filter(([, v]) => v.length > 1);

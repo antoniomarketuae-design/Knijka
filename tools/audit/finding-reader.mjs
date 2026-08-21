@@ -15,9 +15,28 @@
  * already exists, so no corpus file is ever rewritten, and it is collision-free
  * across all 1,012 standing findings (verified: 1012 distinct, 0 collisions).
  *
+ * WHAT «OPEN» MEANS, AND WHY EVERY MODE DEFAULTS TO IT — 2026-08-21.
+ *
+ * A finding retired with evidence is NOT open. That sentence was true in
+ * `--count` and false everywhere else: `--all` and the per-lesson listing both
+ * printed the FILED corpus, so a judge handed a lesson was handed findings that
+ * a previous wave had already closed with a frame and a quote. Re-judging a
+ * retired row is not neutral — it is the reassuring direction twice over, since
+ * the cheapest verdict to write for something already fixed is CLOSED, and the
+ * open list never moves because the work was spent on rows that had left it.
+ *
+ * So OPEN is the default in every mode, `--filed` opts back into the full
+ * corpus, and the numbers are printed as one machine-readable stamp that every
+ * other counting tool in tools/audit must reproduce exactly — see
+ * `openListLine()` and tools/audit/count-agreement.mjs.
+ *
  *   node tools/audit/finding-reader.mjs <lesson-id>     one lesson, full detail
- *   node tools/audit/finding-reader.mjs --all           every id, one per line
+ *   node tools/audit/finding-reader.mjs --file <path>   one suspect file (what a fix lane owns)
+ *   node tools/audit/finding-reader.mjs --unrouted      the `suspectFile: "unknown"` bucket
+ *   node tools/audit/finding-reader.mjs --all           every OPEN id, one per line
  *   node tools/audit/finding-reader.mjs --count         the corpus arithmetic
+ *
+ * Add `--filed` to any of those to include findings a wave already retired.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -77,7 +96,7 @@ function loadAllRows() {
 const corpusKey = (j) => j.lesson || j.lessonId || j.scenario || j.id || null;
 
 /** The file whose rows replace older observations of the same lesson. */
-const SUPERSEDER = "chunk-redrive.jsonl";
+export const SUPERSEDER = "chunk-redrive.jsonl";
 
 /**
  * The original sweep161 chunks — the rows chunk-redrive.jsonl is entitled to
@@ -96,7 +115,7 @@ const BASE_SOURCE = /^chunk-\d+\.jsonl$/;
  * that forgetting to add a name here costs a printed warning instead of four
  * critical findings.
  */
-const ADDITIVE = new Set(["chunk-wavec-new.jsonl"]);
+export const ADDITIVE = new Set(["chunk-wavec-new.jsonl"]);
 
 /**
  * WHAT SUPERSESSION IS THROWING AWAY, PER FILE — 2026-08-21.
@@ -210,20 +229,68 @@ export function loadStandingBroken() {
  * read the file, so `--count` still printed 1,012 after 375 rows were retired.
  * A stated invariant nobody executes is just a comment.
  */
+/**
+ * A RETIREMENT WITHOUT EVIDENCE DOES NOT RETIRE ANYTHING — checked on the READ
+ * path, not only on the write path.
+ *
+ * wave-c-post.mjs already refuses to WRITE an unevidenced closure: CLOSED and
+ * REFUTED are downgraded to UNJUDGED unless they carry both an evidenceFrame
+ * that resolves and an evidenceQuote. But this reader honoured any line with a
+ * findingId, so a row arriving by ANY other route — a hand edit, a future tool,
+ * a merge, a bug — would silently shrink the open list with nothing behind it.
+ * The rule the ledger states is "retirement required a NEW frame and a quote
+ * from it"; a rule enforced at one end of a pipe is enforced nowhere.
+ *
+ * Presence is not resolution either: two closures were once credited on Windows
+ * paths destroyed by JSON escaping, which parsed fine and pointed at nothing.
+ *
+ * Rejections are RETURNED, never silently dropped — the whole failure mode this
+ * guards against is a number that moves with no visible reason.
+ */
 export function loadClosures() {
   const DIR = findCorpus();
   const p = path.join(path.dirname(DIR), "wave-c", "closures.jsonl");
   const out = new Map();
-  if (!fs.existsSync(p)) return out;
+  const rejected = [];
+  if (!fs.existsSync(p)) {
+    out.rejected = rejected;
+    return out;
+  }
+  const resolves = (f) => {
+    if (!f) return false;
+    for (const t of [f, String(f).split("\\").join("/")]) {
+      try {
+        if (fs.existsSync(t)) return true;
+      } catch {
+        /* an unopenable path is not a frame */
+      }
+    }
+    return false;
+  };
   for (const l of fs.readFileSync(p, "utf8").split("\n")) {
     if (!l.trim()) continue;
+    let j;
     try {
-      const j = JSON.parse(l);
-      if (j.findingId) out.set(j.findingId, j);
+      j = JSON.parse(l);
     } catch {
-      /* a torn tail line does not un-retire a finding */
+      rejected.push({ why: "unparseable line", text: l.slice(0, 80) });
+      continue;
     }
+    if (!j.findingId) {
+      rejected.push({ why: "no findingId", text: JSON.stringify(j).slice(0, 80) });
+      continue;
+    }
+    if (!j.evidenceQuote) {
+      rejected.push({ findingId: j.findingId, why: "no evidenceQuote" });
+      continue;
+    }
+    if (!resolves(j.evidenceFrame)) {
+      rejected.push({ findingId: j.findingId, why: "evidenceFrame does not resolve" });
+      continue;
+    }
+    out.set(j.findingId, j);
   }
+  out.rejected = rejected;
   return out;
 }
 
@@ -231,6 +298,103 @@ export function loadClosures() {
 export function loadOpenFindings() {
   const retired = loadClosures();
   return loadStandingBroken().filter((j) => !retired.has(j.findingId));
+}
+
+/** Suspect files are compared with forward slashes; `unknown` is a bucket, not a file. */
+export const normFile = (s) => String(s || "").split("\\").join("/");
+const realFiles = (rows) =>
+  new Set(rows.map((j) => normFile(j.suspectFile)).filter((f) => f && f !== "unknown"));
+
+/**
+ * THE ONE PLACE THE CORPUS ARITHMETIC IS DONE.
+ *
+ * Every number any tool in tools/audit prints about the size of this audit comes
+ * from here. That is not tidiness — it is the fix for a measured defect. On
+ * 2026-08-21 four different readers in this directory answered "how big is the
+ * corpus" with four different numbers, and none of them was wrong by accident:
+ *
+ *   1,043 / 339 critical   finding-reader --count   (filed; additive-aware)
+ *     668 / 248 critical   the actual OPEN list     (closures subtracted)
+ *   1,038 / 335 critical   never-edited.mjs and the reader make-wave.mjs
+ *                          EMBEDS into every generated fix workflow — its own
+ *                          copy of the supersession rule, without the ADDITIVE
+ *                          clause, so it ate the same 5 rows (4 critical) the
+ *                          last incident was about, and it subtracted no
+ *                          closures at all
+ *   1,012 / 318 critical   the prose in that same generated workflow, which
+ *                          told every lane "if your count disagrees, your
+ *                          reader is wrong, not the corpus"
+ *
+ * A lane reading the embedded snippet was therefore handed 370 rows — 87 of
+ * them critical — that a wave had already retired with a frame and a quote, and
+ * was told the number it computed was authoritative.
+ */
+export function corpusCounts() {
+  const filed = loadStandingBroken();
+  const retired = loadClosures();
+  const open = filed.filter((j) => !retired.has(j.findingId));
+  const sev = (rows, k) => rows.filter((j) => String(j.severity).toLowerCase() === k).length;
+  return {
+    filed,
+    open,
+    retiredIds: retired,
+    n: {
+      filed: filed.length,
+      retired: retired.size,
+      open: open.length,
+      critical: sev(open, "critical"),
+      major: sev(open, "major"),
+      minor: sev(open, "minor"),
+      files: realFiles(open).size,
+      lessons: new Set(open.map((j) => j.scenario)).size,
+    },
+  };
+}
+
+/**
+ * THE STAMP. One line, one format, emitted by every tool in tools/audit that
+ * reports a finding count — and checked for equality across all of them by
+ * tools/audit/count-agreement.mjs, which goes RED when any two disagree.
+ *
+ * WHY A LINE OF TEXT AND NOT JUST A SHARED IMPORT. A shared import makes the
+ * tools agree only for as long as they keep using it, and the way this
+ * directory drifted last time was precisely that two tools stopped: they grew
+ * private copies of the loader. A private copy still compiles, still runs, and
+ * still prints a plausible number. So agreement is verified from the OUTSIDE,
+ * on what each tool actually printed, by a checker that recomputes the
+ * arithmetic itself. A tool that prints no stamp at all fails the same check —
+ * silence is the shape every instrument bug in this programme has worn.
+ */
+export function openListLine(counts = corpusCounts()) {
+  const n = counts.n;
+  return (
+    "OPEN-LIST  filed=" + n.filed + " retired=" + n.retired + " open=" + n.open +
+    " critical=" + n.critical + " major=" + n.major + " minor=" + n.minor +
+    " files=" + n.files + " lessons=" + n.lessons
+  );
+}
+
+/**
+ * WHAT THIS TOOL ACTUALLY OPERATED ON — measured from the array it is holding.
+ *
+ * THE STAMP ALONE WAS NOT ENOUGH, AND THE MUTATION BATTERY IS WHAT SAID SO.
+ * With only `openListLine()` required, three of the seven damage cases stayed
+ * GREEN: change `const broken = counts.open` to `counts.filed` in never-
+ * edited.mjs, in wave-c-post.mjs or in make-verdicts2.mjs and the tool goes on
+ * printing a perfectly correct OPEN-LIST line — because that line is rendered
+ * from a shared helper — while doing all of its work on 1,043 rows instead of
+ * 668. The instrument reports the right number and behaves on the wrong one,
+ * which is this programme's signature failure wearing a badge that says it has
+ * been fixed.
+ *
+ * So the contract is two lines, and they answer different questions. OPEN-LIST
+ * says what the corpus IS. WORKED says what THIS RUN TOUCHED, and it is
+ * computed by counting the actual array, so it cannot be satisfied by importing
+ * anything. count-agreement.mjs requires both, and requires them to agree.
+ */
+export function workedLine(scope, rows) {
+  const crit = rows.filter((j) => String(j.severity).toLowerCase() === "critical").length;
+  return "WORKED  scope=" + scope + " n=" + rows.length + " critical=" + crit;
 }
 
 /**
@@ -243,22 +407,54 @@ export function loadOpenFindings() {
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMain) {
-  const arg = process.argv[2];
+  const argv = process.argv.slice(2);
+  const FILED = argv.includes("--filed");
+  const positional = argv.filter((a) => !a.startsWith("--"));
+  const arg = argv.find((a) => a.startsWith("--") && a !== "--filed") || positional[0];
   if (!arg) {
-    console.error("usage: finding-reader.mjs <lesson-id> | --all | --count");
+    console.error(
+      "usage: finding-reader.mjs <lesson-id> | --file <suspectFile> | --unrouted | --all | --count\n" +
+        "       add --filed to include findings a wave has already retired",
+    );
     process.exit(2);
   }
 
-  const broken = loadStandingBroken();
+  // An unrecognised flag used to fall through to the lesson branch and print
+  // «no standing BROKEN finding for lesson "--fied"» — which is the reassuring
+  // direction for a typo: it reads as a clean lesson.
+  const KNOWN = new Set(["--count", "--all", "--file", "--unrouted", "--filed"]);
+  const unknown = argv.filter((a) => a.startsWith("--") && !KNOWN.has(a));
+  if (unknown.length) {
+    console.error(
+      "unrecognised flag " + unknown.join(", ") + "\n" +
+        "known: " + [...KNOWN].join(" ") + "\n" +
+        "Refusing rather than ignoring — an ignored typo prints an empty list, and an empty\n" +
+        "list reads exactly like a clean one.",
+    );
+    process.exit(2);
+  }
+
+  const counts = corpusCounts();
+  const retired = counts.retiredIds;
+  const broken = counts.filed;
+  // OPEN is the default everywhere. A retired finding handed to a judge is work
+  // spent off the open list, and the cheapest verdict to write about something
+  // already fixed is CLOSED.
+  const rows = FILED ? counts.filed : counts.open;
+  const scopeNote = FILED
+    ? "# scope: FILED — includes " + retired.size + " finding(s) a wave already retired with evidence."
+    : "# scope: OPEN — " + retired.size + " retired finding(s) excluded. Pass --filed to see them.";
 
   if (arg === "--count") {
-    const retired = loadClosures();
-    const open = broken.filter((j) => !retired.has(j.findingId));
     const ids = new Set(broken.map((j) => j.findingId));
-    console.log("filed BROKEN    : " + broken.length + "   (the corpus, never rewritten)");
-    console.log("retired         : " + retired.size + "   (closures.jsonl, each with a frame and a quote)");
-    console.log("OPEN            : " + open.length);
-    console.log("lessons open    : " + new Set(open.map((j) => j.scenario)).size + " of " + new Set(broken.map((j) => j.scenario)).size);
+    console.log(openListLine(counts));
+    console.log(workedLine(FILED ? "filed" : "open", rows));
+    console.log("");
+    console.log("filed BROKEN    : " + counts.n.filed + "   (the corpus, never rewritten)");
+    console.log("retired         : " + counts.n.retired + "   (closures.jsonl, each with a frame and a quote)");
+    console.log("OPEN            : " + counts.n.open);
+    console.log("lessons open    : " + counts.n.lessons + " of " + new Set(broken.map((j) => j.scenario)).size);
+    console.log("suspect files   : " + counts.n.files + " still carrying an OPEN finding");
     console.log(
       "distinct ids    : " + ids.size + (ids.size === broken.length ? "  (collision-free)" : "  <-- COLLISIONS"),
     );
@@ -266,7 +462,7 @@ if (isMain) {
     console.log("severity        filed  retired    open");
     const sev = {};
     for (const j of broken) (sev[j.severity] = sev[j.severity] || { f: 0, o: 0 }).f++;
-    for (const j of open) sev[j.severity].o++;
+    for (const j of counts.open) sev[j.severity].o++;
     for (const k of ["critical", "major", "minor"]) {
       const s = sev[k];
       if (!s) continue;
@@ -311,22 +507,81 @@ if (isMain) {
       );
     }
   } else if (arg === "--all") {
-    for (const j of broken) {
+    console.log("# " + openListLine(counts));
+    console.log(scopeNote);
+    for (const j of rows) {
       console.log(j.findingId + "\t" + j.severity + "\t" + String(j.what).slice(0, 100).replace(/\s+/g, " "));
     }
   } else {
-    const mine = broken.filter((j) => j.scenario === arg);
+    /**
+     * THREE WAYS TO SELECT, ONE READER.
+     *
+     * `--file` and `--unrouted` exist because make-wave.mjs used to EMBED a
+     * twelve-line copy of the corpus loader in every generated fix workflow —
+     * its own supersession rule, no ADDITIVE clause, no closures subtraction —
+     * and told the lane that ran it "if your count disagrees, your reader is
+     * wrong, not the corpus". It disagreed by 370 rows, 87 of them critical.
+     * A second implementation of a rule is a second place for the rule to be
+     * wrong, and this one could not be tested because it only existed as text
+     * inside a generated file.
+     */
+    let mine, what;
+    if (arg === "--file") {
+      const want = normFile(argv[argv.indexOf("--file") + 1] || positional[0]);
+      if (!want) {
+        console.error("--file needs a suspectFile path, e.g. --file platform/src/modules/sim/hud/PlayArea.tsx");
+        process.exit(2);
+      }
+      what = "suspect file " + want;
+      mine = rows.filter((j) => normFile(j.suspectFile) === want);
+    } else if (arg === "--unrouted") {
+      what = 'the "unknown" suspectFile bucket';
+      mine = rows.filter((j) => normFile(j.suspectFile) === "unknown");
+    } else {
+      what = "lesson " + JSON.stringify(arg);
+      mine = rows.filter((j) => j.scenario === arg);
+    }
+
     if (!mine.length) {
-      console.error(
-        "no standing BROKEN finding for lesson " + JSON.stringify(arg) + ".\n" +
-          "That is a real answer, not an error — but check the spelling against --all before you\n" +
-          "conclude the lesson is clean, because an empty list reads exactly like a clean lesson.",
-      );
+      // AN EMPTY LIST HAS THREE CAUSES AND THEY ARE NOT THE SAME ANSWER.
+      // Cleared-by-a-wave, never-had-any and you-typed-it-wrong all print
+      // nothing, and this audit has already concluded "clean" from the third
+      // one. So say which it is, from the corpus, rather than making the reader
+      // guess from silence.
+      const filedHere = FILED
+        ? []
+        : counts.filed.filter((j) =>
+            arg === "--file"
+              ? normFile(j.suspectFile) === normFile(argv[argv.indexOf("--file") + 1] || positional[0])
+              : arg === "--unrouted"
+                ? normFile(j.suspectFile) === "unknown"
+                : j.scenario === arg,
+          );
+      if (filedHere.length) {
+        console.error(
+          "no OPEN finding for " + what + " — but " + filedHere.length +
+            (filedHere.length === 1 ? " was" : " were") + " filed and ALL of them\n" +
+            "have been retired with evidence by a wave. That is cleared, not clean-by-absence.\n" +
+            "Re-run with --filed to read them and their closures.",
+        );
+      } else {
+        console.error(
+          "no standing BROKEN finding for " + what + ".\n" +
+            "That is a real answer, not an error — but check the spelling against --all before you\n" +
+            "conclude it is clean, because an empty list reads exactly like a clean one.",
+        );
+      }
       process.exit(1);
     }
-    console.log("# " + mine.length + " standing BROKEN finding(s) for " + arg);
+    console.log("# " + mine.length + " BROKEN finding(s) for " + what);
+    console.log("# " + openListLine(counts));
+    console.log(scopeNote);
     console.log("# cite the findingId verbatim in every verdict line you write.\n");
     for (const j of mine) {
+      if (FILED && retired.has(j.findingId)) {
+        const c = retired.get(j.findingId);
+        console.log("RETIRED     : " + c.verdict + " by " + c.closedBy + " — this row is NOT on the open list");
+      }
       console.log("findingId   : " + j.findingId);
       console.log("severity    : " + j.severity + "   part " + j.part);
       console.log("what        : " + j.what);

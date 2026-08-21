@@ -22,6 +22,25 @@
  *     audit's primary record and a buggy rewrite of it is unrecoverable; a
  *     separate ledger is reversible by deleting one file.
  *
+ *  4. IT ADJUDICATES THE **OPEN** LIST, WHICH MAKES IT IDEMPOTENT — 2026-08-21.
+ *     This iterated `loadStandingBroken()`, every finding ever filed, and
+ *     computed the result as `filed - retired-this-run`. Both halves were
+ *     wrong once 375 rows were already retired, and they were wrong in the two
+ *     ways that do damage:
+ *
+ *       . RUNNING IT TWICE DUPLICATED THE LEDGER. Re-running `--apply` today
+ *         re-derived the same 375 retirements from the same verdict lines and
+ *         APPENDED them to closures.jsonl a second time. `loadClosures()` keys
+ *         by findingId so the open count would not have moved, but the file
+ *         that is the audit's only record of what was retired, and by what
+ *         evidence, would have carried each row twice with a fresh timestamp.
+ *       . IT PRINTED "open list : 1043 -> 668 (375 retired)" ON A RUN THAT
+ *         RETIRED NOTHING. Every number in that sentence was a re-statement of
+ *         work already banked, presented as this run's result.
+ *
+ *     Iterating the open list makes a second run report 0 CLOSED / 0 REFUTED
+ *     and refuse to apply, which is the truth: there was nothing left to do.
+ *
  *   node tools/audit/wave-c-post.mjs              report only (default)
  *   node tools/audit/wave-c-post.mjs --apply      write closures + ledger section
  *   node tools/audit/wave-c-post.mjs --next out.json   emit the next round's lanes
@@ -30,7 +49,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { loadStandingBroken } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -56,8 +75,16 @@ const CLOSURES = path.join(REPO, ".audit-frames", "wave-c", "closures.jsonl");
 const LEDGER = flag("--ledger", path.join(REPO, "docs", "simulation", "88_LESSON_AUDIT.md"));
 
 // --- the corpus ---------------------------------------------------------------
-const broken = loadStandingBroken();
-const byId = new Map(broken.map((j) => [j.findingId, j]));
+const counts = corpusCounts();
+// What is left to adjudicate. Rule 4 in the header: everything already retired
+// with evidence is banked, and re-deriving it is how the ledger gets written
+// twice.
+const broken = counts.open;
+// The id map stays the FILED corpus. A verdict line citing a finding a previous
+// wave retired is history, not an invented id, and the `--apply` refusal below
+// treats an unknown id as evidence that a judge mangled one — a false alarm
+// there blocks a legitimate posting run.
+const byId = new Map(counts.filed.map((j) => [j.findingId, j]));
 
 // --- the verdicts --------------------------------------------------------------
 const rows = [];
@@ -148,8 +175,9 @@ for (const j of broken) {
   else stillOpen.push({ ...j, why: v === "STILL" ? String(r.why || "still reproduces") : String(r.why || "not exercised by the re-drive") });
 }
 
+const openIds = new Set(broken.map((j) => j.findingId));
 const downgraded = [...final.entries()].filter(
-  ([k, r]) => byId.has(k) && ["CLOSED", "REFUTED"].includes(String(r.verdict || "").toUpperCase()) && !evidenced(r),
+  ([k, r]) => openIds.has(k) && ["CLOSED", "REFUTED"].includes(String(r.verdict || "").toUpperCase()) && !evidenced(r),
 );
 
 // --- report ---------------------------------------------------------------------
@@ -192,9 +220,22 @@ const drivenAt = (() => {
 })();
 const head = drivenAt;
 
-console.log("corpus standing BROKEN : " + broken.length);
+// Lines that ARE joinable but are about findings a previous wave already
+// retired. Counting them anywhere in this run's tally would re-report banked
+// work as this run's result — which is exactly what the sentence "open list :
+// 1043 -> 668 (375 retired)" was doing on a run that retired nothing.
+const onAlreadyRetired = [...final.keys()].filter((k) => byId.has(k) && !openIds.has(k)).length;
+
+console.log(openListLine(counts));
+console.log(workedLine("open", broken));
+console.log("corpus filed BROKEN    : " + counts.n.filed + "   (" + counts.n.retired + " already retired by an earlier run)");
+console.log("OPEN, i.e. adjudicated : " + broken.length);
 console.log("verdict lines read     : " + rows.length + (noId ? "   (" + noId + " with NO findingId — unjoinable)" : ""));
-console.log("distinct findings kept : " + final.size + (unknown.length ? "   (" + unknown.length + " cite an id not in the corpus)" : ""));
+console.log(
+  "distinct findings kept : " + final.size +
+    (onAlreadyRetired ? "   (" + onAlreadyRetired + " about findings ALREADY retired — history, not this run)" : "") +
+    (unknown.length ? "   (" + unknown.length + " cite an id not in the corpus)" : ""),
+);
 console.log("");
 console.log("  CLOSED   : " + tally.CLOSED);
 console.log("  REFUTED  : " + tally.REFUTED);
@@ -206,7 +247,12 @@ if (downgraded.length) {
   console.log("  They do not reduce the open list. This is the rule binding, not a bug.");
 }
 console.log("");
-console.log("open list : " + broken.length + " -> " + (broken.length - retire.length) + "   (" + retire.length + " retired)");
+console.log("open list : " + broken.length + " -> " + (broken.length - retire.length) + "   (" + retire.length + " retired by THIS run)");
+if (!retire.length) {
+  console.log("            Nothing new was retired. Every verdict line that could retire a finding");
+  console.log("            has already been posted — this run is a no-op, and that is the honest");
+  console.log("            answer rather than a re-statement of the last run's result.");
+}
 if (unknown.length) {
   console.log("\nids cited by a judge that are not in the corpus (first 10):");
   for (const u of unknown.slice(0, 10)) console.log("   " + u);
@@ -241,7 +287,24 @@ if (!has("--apply")) {
 }
 
 if (!retire.length) {
-  console.error("\nnothing to apply: no finding was both retired AND evidenced.");
+  console.error(
+    "\nnothing to apply: no OPEN finding was both retired AND evidenced.\n" +
+      "If this run followed a successful one, that is the correct answer and not an error to\n" +
+      "work around — the verdicts have already been posted and closures.jsonl already holds them.",
+  );
+  process.exit(1);
+}
+
+// A second belt on rule 4. If the open list is what we adjudicate, no retirement
+// can already be in closures.jsonl — but this is the file that cannot be
+// un-written, so the impossible case is checked rather than assumed.
+const dupes = retire.filter((r) => counts.retiredIds.has(r.finding.findingId));
+if (dupes.length) {
+  console.error(
+    "\nrefusing to apply: " + dupes.length + " retirement(s) are ALREADY in closures.jsonl.\n" +
+      "Appending them again would record the same closure twice with a fresh timestamp, in the\n" +
+      "one file that says what was retired and on what evidence. First: " + dupes[0].finding.findingId,
+  );
   process.exit(1);
 }
 if (unknown.length) {
@@ -296,7 +359,9 @@ if (fs.existsSync(LEDGER)) {
     "| STILL (symptom reproduces) | " + tally.STILL + " |",
     "| UNJUDGED (re-drive did not exercise it) | " + tally.UNJUDGED + " |",
     "",
-    "**Open list: " + broken.length + " → " + (broken.length - retire.length) + ".**" +
+    "**Open list: " + broken.length + " → " + (broken.length - retire.length) + "**, out of " +
+      counts.n.filed + " filed across the whole programme (" + counts.n.retired +
+      " were already retired before this run)." +
       (downgraded.length
         ? "  " + downgraded.length + " CLOSED/REFUTED line(s) arrived without a frame and quote and were downgraded to UNJUDGED — they did not reduce the count."
         : ""),
