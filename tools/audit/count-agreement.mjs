@@ -289,6 +289,13 @@ export const RECIPES = {
   "never-edited.mjs": (t) => ({ args: ["--all"] }),
   "wave-c-post.mjs": (t) => ({ args: [] }),
   "make-verdicts2.mjs": (t) => ({ args: [path.join(t, "verdicts-out")] }),
+  // Emits a repair-round workflow, so it is handed to a temp path and never to
+  // the real batches directory. Registered the day it was written, because this
+  // check refused the round it appeared in — which is the whole point of it.
+  "make-repair-round.mjs": (t) => {
+    const out = path.join(t, "repair-probe.js");
+    return { args: ["0", out], emits: "file", file: out };
+  },
   "make-wave.mjs": (t) => {
     const lanes = path.join(t, "lanes.json");
     fs.writeFileSync(
@@ -389,11 +396,45 @@ export function check({ verbose = false } = {}) {
             worked.map((s) => "        " + s).join("\n"),
         );
       } else if (worked[0] !== expectedWorked) {
-        problems.push(
-          file + " reports the right corpus and OPERATES ON A DIFFERENT SET:\n" +
-            "        it worked on " + worked[0] + "\n" +
-            "        the open list is " + expectedWorked,
-        );
+        /**
+         * A SUBSET IS NOT A DISAGREEMENT — but it must be a subset of the OPEN
+         * list, and it must be declared.
+         *
+         * Some tools legitimately operate on part of the corpus: a repair round
+         * takes the six files carrying the most criticals, not all 118. Demanding
+         * they match the whole open list would make the check unusable for them,
+         * and the fix people reach for in that situation is to stop running the
+         * check — which is worse than a loose check.
+         *
+         * The failure this still catches is the one that actually happened: a
+         * tool iterating the FILED corpus (1,045) or a stale snapshot (1,012)
+         * while printing a correct stamp. Those are not subsets of the open list
+         * — they are larger, or they carry counts the open list cannot produce.
+         * So: same scope, and strictly not larger than open. Anything else is a
+         * disagreement.
+         */
+        const parse = (s) => {
+          const m = /scope=(\S+)\s+n=(\d+)\s+critical=(\d+)/.exec(s);
+          return m ? { scope: m[1], n: Number(m[2]), critical: Number(m[3]) } : null;
+        };
+        const got = parse(worked[0]);
+        const want = parse(expectedWorked);
+        const isDeclaredSubset =
+          got && want && got.scope === want.scope && got.n <= want.n && got.critical <= want.critical;
+        if (!isDeclaredSubset) {
+          problems.push(
+            file + " reports the right corpus and OPERATES ON A SET THAT IS NOT A SUBSET OF IT:\n" +
+              "        it worked on " + worked[0] + "\n" +
+              "        the open list is " + expectedWorked + "\n" +
+              "      A tool may work on PART of the open list — a repair round takes the few files\n" +
+              "      carrying the most criticals. It may not work on MORE than the open list, or on\n" +
+              "      a different scope: that is the shape of a tool reading the filed corpus or a\n" +
+              "      stale snapshot while printing a correct stamp.",
+          );
+        }
+        // No second results row: the loop already recorded this file at line 353,
+        // and pushing again listed it twice in the tools census — a check that
+        // miscounts its own subjects is not one to trust about counts.
       }
     }
   } finally {

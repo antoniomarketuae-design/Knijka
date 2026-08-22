@@ -25,6 +25,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 import { classifyLeg, LEG_STATES } from "./verdict-surface.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -109,20 +110,81 @@ if (collisions.length) {
   process.exit(1);
 }
 
-// PASS 2 — now, and only now, move.
+
+// --- one BUILD only, which is not the same as one commit ----------------------
+/**
+ * THE RULE IS "ONE BUILD", AND THE COMMIT HASH IS ONLY A PROXY FOR IT.
+ *
+ * Pooling drives taken against different code into one verdict corpus is the
+ * error this guard exists to prevent, and it is a real one. But it used to
+ * compare commit hashes, and a commit can differ from another in ways the drive
+ * cannot possibly have seen: a change under tools/, or docs/, or a generator.
+ *
+ * It bit exactly that way. A 195-drive proof run attested dd4e5983f63f; four
+ * drives had to be re-taken afterwards and attested 641a4475c0ac, because a
+ * single file under tools/audit/ had been committed between them.
+ * `git diff --name-only dd4e598 641a447 -- platform/ content/` returns ZERO
+ * files: the two runs measured byte-identical product code. Refusing there
+ * would have meant re-driving 195 lessons — twelve hours — over a tools file,
+ * and the alternative of overriding the guard by hand would have set the
+ * precedent that this check is advisory.
+ *
+ * So the guard now asks the question it means: did the PRODUCT change between
+ * these commits? Only `platform/` and `content/` are served to a drive. If they
+ * are identical the pool is sound and the reasoning is printed, with every
+ * commit involved recorded on the merged rows so a later reader can re-check it
+ * rather than take this comment's word. If git cannot answer — a shallow clone,
+ * a missing object — it refuses, because an unverifiable claim is not a
+ * verified one.
+ */
+const heads = [...new Set(rows.map((r) => String(r.head)))];
+if (heads.length > 1) {
+  const sorted = [...heads].sort();
+  let productDiff = null;
+  try {
+    const out = execFileSync(
+      "git",
+      ["diff", "--name-only", sorted[0], sorted[sorted.length - 1], "--", "platform/", "content/"],
+      { cwd: findRepo(), encoding: "utf8" },
+    );
+    productDiff = out.split("\n").filter((l) => l.trim());
+  } catch {
+    productDiff = null;
+  }
+  if (productDiff === null || productDiff.length) {
+    console.error("REFUSING: the halves attest " + heads.length + " different commits:");
+    for (const h of heads) console.error("   " + h.slice(0, 12) + "  (" + rows.filter((r) => r.head === h).length + " drives)");
+    if (productDiff === null) {
+      console.error("and git could not be asked whether platform/ or content/ differ between them.");
+      console.error("An unverifiable claim of sameness is not a verified one.");
+    } else {
+      console.error("and " + productDiff.length + " file(s) under platform/ or content/ DIFFER:");
+      for (const f of productDiff.slice(0, 10)) console.error("   " + f);
+      console.error("They measured different code and must not be pooled into one verdict corpus.");
+    }
+    process.exit(1);
+  }
+  console.log("NOTE: " + heads.length + " commits are present, and the PRODUCT is identical across them.");
+  for (const h of heads) console.log("   " + h.slice(0, 12) + "  (" + rows.filter((r) => r.head === h).length + " drives)");
+  console.log("   git diff --name-only " + sorted[0].slice(0, 12) + " " + sorted[sorted.length - 1].slice(0, 12) +
+    " -- platform/ content/  ->  0 files");
+  console.log("   Pooled on that basis. Every row keeps its own `head`; `heads` lists them all.");
+}
+
+/**
+ * PASS 2 — MOVE, AND ONLY NOW.
+ *
+ * This used to sit ABOVE the build check, so a merge that refused on two commits
+ * had already relocated every frame directory before saying no. Watched happen:
+ * a refused merge reported "REFUSING" and left 195 frame dirs in the
+ * destination, and the next run reported "0 (moved)" because the move was
+ * already done. That is the same shape as the collision guard bug one level up —
+ * a check that runs after the act is a report, not a guard.
+ */
 for (const [to, from] of pending) {
   if (COPY) fs.cpSync(from, to, { recursive: true });
   else fs.renameSync(from, to);
   framesMoved++;
-}
-
-// --- one build only -----------------------------------------------------------
-const heads = [...new Set(rows.map((r) => String(r.head)))];
-if (heads.length > 1) {
-  console.error("REFUSING: the halves attest " + heads.length + " different commits:");
-  for (const h of heads) console.error("   " + h.slice(0, 12) + "  (" + rows.filter((r) => r.head === h).length + " drives)");
-  console.error("They measured different code and must not be pooled into one verdict corpus.");
-  process.exit(1);
 }
 
 // --- no drive lost to a duplicate key ------------------------------------------
