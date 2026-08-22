@@ -3,9 +3,9 @@
  * what the gate measures.
  *
  * Eleven BROKEN findings landed on `templates-conditions.ts`, three of them
- * critical, and they reduce to two rules. Both are asserted here over the whole
- * family rather than on the nine individual lessons, because every one of the
- * eleven was an instance of a rule nobody had written down.
+ * critical, and they reduce to three rules. All three are asserted here over
+ * the whole family rather than on the nine individual lessons, because every
+ * one of the eleven was an instance of a rule nobody had written down.
  *
  *   RULE 1 — THE NUMBER. „The briefing does not match what is graded."
  *     Six lessons briefed a target and were graded against a ceiling the
@@ -19,17 +19,60 @@
  *     on fo-follow-v1 — a dense city street with no `zones` array at all; and
  *     sc-ac-ice, titled „Лед по моста", narrated a bridge, an А15 plate and a
  *     car stranded on it, on ac-ice-v1 — a straight street whose document
- *     declares no bridge, no `signs` key, and whose stalled car is a recorder
- *     rect with no scenery-prop entry.
+ *     declares no bridge and whose stalled car is a recorder rect with no
+ *     scenery-prop entry.
+ *
+ *   RULE 3 — THE SAME QUESTION, PUT TO THE DISTRICT. Rule 2 is a list of nouns
+ *     NO map in the family can carry, so it is a ban: it cannot tell „this map
+ *     has one" from „no map has one", and it got a claim wrong in each
+ *     direction. It cleared `sc-ac-aquaplane`'s „на извънградския път" (the
+ *     document says extra-urban; the built world is a lit street) and it
+ *     forbade `sc-ac-ice` the А15 that its own map POSTS. Rule 3 asks
+ *     `buildWorldGeometry` — see the block above its section.
  *
  * EVERY ASSERTION BELOW IS PAIRED WITH THE STRING THAT SHIPPED, so none of them
  * can be vacuous: a rule is proved to have teeth by feeding it the exact copy
  * or the exact number the audit photographed and watching it be caught.
+ *
+ * WHAT THIS GATE CANNOT SEE, WRITTEN DOWN RATHER THAN IMPLIED — and it is the
+ * half the frames were actually shot of. Every rule here sweeps the
+ * `ScenarioSpec`: objective, numbered steps, gate titles, mistake debriefs.
+ * The DEMO CAPTION is not in the spec. It is a `kind: "annotation"` step in
+ * `sim/traces/scAc<Lesson>.ts`, baked into the committed
+ * `content/traces/<lesson>/<name>.trace.json`, and it
+ * renders as the big line over the windscreen under «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ
+ * СЯНКАТА» — which is where sweep161 photographed most of these findings. The
+ * briefings were cleaned; those captions were not, and they still carry the
+ * struck claims:
+ *
+ *   traces/scAcCrosswind.ts:68,71,94,106,123 — „Напред е открит участък —
+ *     МОСТЪТ, където страничният вятър духа силно отдясно" and four more
+ *     „открития участък" lines, on fo-follow-v1. Live on
+ *     `.audit-frames/proof/frames/sc-ac-crosswind__pc-right/04-t011s.png`
+ *     (2026-08-22), over six-storey blocks and parked cars on both verges.
+ *   traces/scAcIce.ts:104,132,143 — „знак А15 … ПРЕДИ МОСТА. Мостът замръзва
+ *     пръв", „мостът е заледен"; and :113 „Напред е закъсал автомобил", live on
+ *     `.audit-frames/proof/frames/sc-ac-ice__pc-right/01-arrival.png`.
+ *   traces/scAcAquaplane.ts:111 — „Пороен дъжд на ИЗВЪНГРАДСКИ ПЪТ", the same
+ *     locale claim RULE 3 just struck from the briefing.
+ *   traces/scAcFog.ts:58 — „Фаровете за мъгла светят ниско под пелената",
+ *     narrated while both cockpit telltales are dark
+ *     (`.audit-frames/sweep161/sc-ac-fog/pc-right/04-t101s.png`).
+ *
+ * Extending `driverCopy` over the trace annotations is the right shape and is
+ * NOT done here on purpose: those four files belong to another lane, the fix is
+ * a re-record (RECORD_TRACES=1) and not a string edit, and a gate that lands
+ * red is a gate the next lane deletes. Whoever owns that re-record should add
+ * the annotations to `driverCopy` in the same change — all three rules above
+ * then apply to them for free.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES_CONDITIONS } from "../templates-conditions";
 import { REACH_ZONE_HALT_CAP_KMH } from "../../objectives";
+import { assertDistrict, buildWorldGeometry } from "../../../world";
 import type { ScenarioSpec } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -95,6 +138,64 @@ function driverCopy(spec: ScenarioSpec): string[] {
     ...(spec.mistakes ?? []).flatMap((m) => [m.titleBg, m.whatWentWrongBg]),
   ];
 }
+
+// ---------------------------------------------------------------------------
+// The WORLD the family is actually staged on — built, not read
+// ---------------------------------------------------------------------------
+
+/**
+ * THE PRODUCTION BUILDER IS THE WITNESS, not the district document. That
+ * distinction is the whole reason RULE 3 exists and is not a spelling ban: the
+ * first sweep161 wave struck the А15 out of `sc-ac-ice` on the written premise
+ * that «„А15" lives only as `zones[0].signRef`, a data label nothing places or
+ * renders». `buildWorldGeometry` disagrees — `zoneSigns.ts` maps
+ * `icePatch`/`waterPatch` → `slippery` and posts the plate
+ * `HAZARD_WARNING_AHEAD_M` before the span — and the sibling lane had already
+ * measured the same thing for `ac-bridge-v1`
+ * (`lane-world-claims.test.ts` §5 keeps `sc-ac-bridge-ice` pointing at its
+ * А15). A rule written from a reading of the JSON deleted a cue the student
+ * can see out of the windscreen; a rule written from the builder cannot.
+ */
+const REPO_ROOT = path.join(process.cwd(), "..");
+
+const rawDistrict = (id: string): unknown =>
+  JSON.parse(
+    readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8"),
+  ) as unknown;
+
+interface WorldCensus {
+  /** Signs that actually get POSTED, folded by kind. */
+  signs: Readonly<Record<string, number>>;
+  /** Lamp columns `props.ts` plants along the edge — the furniture that makes a
+   *  road read as a lit street from the cockpit. */
+  streetlights: number;
+  /** Wire-carrying columns; they arrive with the lamps on a scenario map. */
+  utilityPoles: number;
+}
+
+const DISTRICT_IDS = [...new Set(SCENARIO_TEMPLATES_CONDITIONS.map((s) => s.map.districtId))].sort();
+
+const CENSUS = new Map<string, WorldCensus>(
+  DISTRICT_IDS.map((id) => {
+    const geometry = buildWorldGeometry(assertDistrict(rawDistrict(id)));
+    const signs: Record<string, number> = {};
+    for (const s of geometry.signs) signs[s.kind] = (signs[s.kind] ?? 0) + 1;
+    return [
+      id,
+      {
+        signs,
+        streetlights: geometry.streetlights.length,
+        utilityPoles: geometry.utilityPoles.length,
+      },
+    ];
+  }),
+);
+
+const censusOf = (districtId: string): WorldCensus => {
+  const c = CENSUS.get(districtId);
+  if (!c) throw new Error(`no census for ${districtId}`);
+  return c;
+};
 
 // ---------------------------------------------------------------------------
 // RULE 1a — a gate may not license the speed the street forbids
@@ -242,11 +343,14 @@ describe("sweep161 · a conditions briefing speaks the ceiling it is graded agai
  * against `content/world/*.json` when the wave was worked:
  *  - fo-follow-v1 (sc-ac-crosswind) has NO `zones` array — there is no exposed
  *    span, and the frames show unbroken six-storey blocks on both sides;
- *  - ac-ice-v1 (sc-ac-ice) declares no bridge geometry and has no `signs` key
- *    at all; „А15" exists only as `zones[0].signRef`, a data label nothing
- *    places.
+ *  - ac-ice-v1 (sc-ac-ice) declares no bridge geometry.
  * The bridge arm of AC-08 keeps its own lesson (sc-ac-bridge-ice on
  * ac-bridge-v1, templates-conditions2.ts), which is not swept here.
+ *
+ * THE А15 IS NOT IN THIS LIST AND MUST NOT BE PUT BACK IN IT. The first wave
+ * banned it here on a false premise (see the CENSUS block above); the plate is
+ * built on two of this family's five districts, so the honest question is „does
+ * THIS map post one", which is RULE 3's job, not a spelling ban's.
  */
 const ABSENT_IN_WORLD: ReadonlyArray<readonly [label: string, re: RegExp]> = [
   // The leading boundary is load-bearing, not tidiness: a bare /мост/ also
@@ -254,7 +358,22 @@ const ABSENT_IN_WORLD: ReadonlyArray<readonly [label: string, re: RegExp]> = [
   // It flagged five innocent rain/fog lines on the first run.
   ["a bridge", /(?<![\p{L}])мост/iu],
   ["an exposed span", /открит[\p{L}]*\s+участ[ъь]к/iu],
-  ["an А15 plate", /А15/u],
+  // A DIP IN THE CARRIAGEWAY — added by the verifier pass over the RULE 3
+  // wave, and it belongs in the BAN and not in RULE 3 because no district can
+  // answer for it: the corpus has no third coordinate to answer WITH.
+  // `roads.edges[].geometry` is a list of `[x, y]` pairs, the carriageway mesh
+  // is laid at the flat constant `ROAD_Y`, and `terrain.ts`'s `heightAt`
+  // returns a hard 0 within TERRAIN_FLAT_NEAR_ROAD_M of any edge — so a lesson
+  // that says „в ниското" is pointing at ground that cannot exist on ANY map,
+  // which is precisely the shape RULE 2 is for. It survived the wave that
+  // rewrote its own sentence because that wave was reading the clause for its
+  // LOCALE („извънградски път") and a dip is not a locale.
+  //
+  // The word is banned only as a SUBSTANTIVE („в ниското" — the low ground).
+  // The adjective is this family's most common word and must pass untouched:
+  // „по-ниска скорост", „ниските участъци" in teach, „светят ниско". Hence the
+  // lookarounds, and hence the innocents pinned in the mute-button test below.
+  ["a dip in the carriageway", /(?<![\p{L}])ниското(?![\p{L}])/iu],
 ];
 
 describe("sweep161 · the conditions drills narrate the world they are staged on", () => {
@@ -335,15 +454,50 @@ describe("sweep161 · the conditions drills narrate the world they are staged on
     for (const line of [
       "Следвай предната кола на дистанция и с КЪСИ светлини — таванът тук е 45.",
       "Спри плавно на маркираната позиция зад спрелия отпред автомобил.",
-      "Помни: знакът извън града е 90, но дъждът сваля разумната скорост.",
+      // The aquaplane's posted limit. Two `limit90` posts ARE built, the first
+      // 30 m past the spawn and legible in its own arrival frame. The line that
+      // stood here until this wave said „знакът ИЗВЪН ГРАДА е 90" — which
+      // ABSENT_IN_WORLD also spares, and which RULE 3 below is what catches.
+      "Помни: знакът тук разрешава 90, но дъждът сваля разумната скорост.",
       "Дръж лентата до края — поривите не спират, докато не свърши отсечката.",
       "Мини отсечката със съобразена за вятъра скорост",
       // The two innocents the first draft of the bridge pattern flagged.
       "Дръж късите включени, докато вали и видимостта е намалена.",
       "Гледай докъдето стига видимостта, не за маркировката в последния момент.",
+      // …and the three the dip pattern must spare. „ниско" as an ADJECTIVE is
+      // this family's ordinary vocabulary — a ban that ate these would be a
+      // ban on teaching slow, which is the one thing every drill here says.
+      "Прочети знака А15 напред — след него платното е покрито със стояща вода.",
+      "Фаровете за мъгла светят ниско, под пелената.",
+      "Карай с по-ниска скорост, отколкото знакът разрешава.",
     ]) {
       expect(ABSENT_IN_WORLD.some(([, re]) => re.test(line)), line).toBe(false);
     }
+  });
+
+  it("the dip rule has teeth — the line that shipped is caught, and it is gone", () => {
+    // VERIFIER PASS over the RULE 3 wave. sc-ac-aquaplane step 3 was rewritten
+    // by that wave to read its posted А15, and „в ниското" — a dip in the
+    // carriageway — rode through the rewrite untouched, in the same clause,
+    // student-facing in the ИНСТРУКЦИИ panel of
+    // `.audit-frames/proof/frames/sc-ac-aquaplane__pc-right/01-arrival.png`,
+    // over a road that runs dead level to the horizon in that same frame.
+    //
+    // It is a BAN and not a RULE 3 claim because the corpus cannot answer the
+    // question either way: districts carry `[x, y]` geometry, the carriageway
+    // is laid at the flat constant ROAD_Y, and terrain.ts flattens the ground
+    // to 0 near every edge. No map has low ground; none can grow any.
+    const SHIPPED = "Прочети знака А15 напред — след него в ниското платното е покрито със стояща вода.";
+    expect(ABSENT_IN_WORLD.some(([, re]) => re.test(SHIPPED))).toBe(true);
+    const all = SCENARIO_TEMPLATES_CONDITIONS.flatMap((s) => [s.titleBg, ...driverCopy(s)]);
+    expect(all).not.toContain(SHIPPED);
+    // …and the cue it was carrying was NOT taken away with the dip: the plate
+    // is still read, and WHY water collects low is still taught, in `teach`
+    // where it is knowledge about Bulgarian roads rather than about this map.
+    const aqua = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-aquaplane")!;
+    expect(aqua.instructionsBg.some((s) => /А15/u.test(s.textBg))).toBe(true);
+    expect(aqua.instructionsBg.some((s) => /стояща вода/iu.test(s.textBg))).toBe(true);
+    expect(aqua.teach.whenBg).toMatch(/ниските участъци/iu);
   });
 
   it("the two rewritten drills still TEACH their hazard (not gutted, retargeted)", () => {
@@ -361,5 +515,170 @@ describe("sweep161 · the conditions drills narrate the world they are staged on
     expect(iceCopy).toMatch(/прав волан/iu);
     expect(ice.titleBg).toBe("Черен лед");
     expect(ice.teach.whenBg).toMatch(/мост/iu);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RULE 3 — a claim about the world is a QUESTION PUT TO THE BUILT DISTRICT
+// ---------------------------------------------------------------------------
+
+/**
+ * RULE 2 is a list of nouns no district in this family can carry, so it is a
+ * ban and can only ever be right by luck. RULE 3 is the shape the sibling lane
+ * settled on (`lane-world-claims.test.ts`): the same sentence is legal on one
+ * map and refused on another, because the predicate asks `buildWorldGeometry`
+ * — the production pass — what this lesson's own district actually puts in
+ * front of the student.
+ *
+ * IT EXISTS BECAUSE THE BAN GOT ONE WRONG IN EACH DIRECTION.
+ *
+ *  · TOO LOOSE — `sc-ac-aquaplane` (sweep161, major, frame
+ *    `.audit-frames/sweep161/sc-ac-aquaplane/pc-right/01-arrival.png`, re-shot
+ *    unchanged in `.audit-frames/proof/frames/sc-ac-aquaplane__pc-right/`):
+ *    „Мини участъка със стояща вода НА ИЗВЪНГРАДСКИЯ ПЪТ" and „знакът ИЗВЪН
+ *    ГРАДА е 90", over a windscreen holding a lit six-storey block, a row of
+ *    lamp columns, wires and a kerbside line of parked cars. The district
+ *    document AGREES with the copy — `class: "unclassified"`, `maxspeed: 90`,
+ *    one authored building — and the document is not what the student sees:
+ *    `props.ts` dresses every scenario micro-map through `SCENARIO_LIT_CLASSES`,
+ *    and on ac-aqua-v1 that is 16 lamp columns and 15 wire poles over 520 m, a
+ *    lamp every ~32 m. Reading the JSON would have cleared this line; building
+ *    the world convicts it.
+ *
+ *  · TOO TIGHT — the А15. See the CENSUS block near the top of this file: the
+ *    plate is POSTED on ac-ice-v1 (y = 150, 60 m before the icePatch at 210)
+ *    and on ac-aqua-v1 (y = 180, before the waterPatch at 240), and the flat
+ *    /А15/ ban meant `sc-ac-ice` was forbidden to teach the one warning sign
+ *    standing on its own road — a fix that took something away. The line is
+ *    restored, and the rule now refuses it only where no plate is posted.
+ */
+
+interface WorldClaim {
+  /** What the sentence promises, in the word a briefing would use. */
+  noun: string;
+  /** How that promise is spelled in student-facing Bulgarian. */
+  re: RegExp;
+  /** Does the world this lesson LOADS actually carry it? */
+  carriedBy: (districtId: string) => boolean;
+  /** What would have to change for the promise to become true. */
+  how: string;
+}
+
+const LOCALE_CLAIM = "извън населено място (локацията на урока)";
+const A15_CLAIM = "знак А15 „Хлъзгав път“";
+
+const WORLD_CLAIMS: readonly WorldClaim[] = [
+  {
+    noun: LOCALE_CLAIM,
+    // „извън града" / „извънградски път" tell the student WHERE HE IS. Nothing
+    // in the cockpit can corroborate that except the absence of town: a road
+    // with lamp columns and wires down both verges reads as built-up whatever
+    // its `maxspeed` tag says. So the claim is carried only by an UNLIT road —
+    // and the day a genuinely rural district is generated (props.ts plants no
+    // column on it) this starts crediting it with no edit here.
+    re: /извън\s+града|извънградск/iu,
+    carriedBy: (id) => censusOf(id).streetlights === 0,
+    how: "a district whose built world has no streetlight columns (props.ts SCENARIO_LIT_CLASSES)",
+  },
+  {
+    noun: A15_CLAIM,
+    // Asked of the POSTED plate, never of `zones[].signRef`: the label in the
+    // document is not the post on the verge — `zoneSigns.ts` is what turns one
+    // into the other, and only for the zone kinds it maps.
+    re: /А15/u,
+    carriedBy: (id) => (censusOf(id).signs["slippery"] ?? 0) > 0,
+    how: 'a zone whose kind zoneSigns.ts maps to "slippery" (icePatch / waterPatch)',
+  },
+];
+
+describe("sweep161 · a conditions claim is answered by the district it is staged on", () => {
+  it("surveys the whole family's districts (a census over nothing proves nothing)", () => {
+    expect(DISTRICT_IDS.length).toBeGreaterThanOrEqual(5);
+    for (const id of DISTRICT_IDS) expect(censusOf(id)).toBeDefined();
+  });
+
+  it("no driver-facing line makes a claim its own district cannot answer for", () => {
+    const claims: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES_CONDITIONS) {
+      for (const line of driverCopy(spec)) {
+        for (const claim of WORLD_CLAIMS) {
+          if (claim.re.test(line) && !claim.carriedBy(spec.map.districtId)) {
+            claims.push(
+              `${spec.id} on ${spec.map.districtId} claims ${claim.noun}: «${line.slice(0, 64)}…» — needs ${claim.how}`,
+            );
+          }
+        }
+      }
+    }
+    expect(claims).toEqual([]);
+  });
+
+  // -- teeth ---------------------------------------------------------------
+  //
+  // Each claim is fed BOTH answers, so neutering a predicate to a constant
+  // fails here even though the sweep above would go on passing.
+
+  it("the locale rule has teeth — the aquaplane lines that shipped are caught", () => {
+    const SHIPPED = [
+      "Мини участъка със стояща вода на извънградския път: намали под 58 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
+      "Помни: знакът извън града е 90, но дъждът сваля разумната скорост.",
+    ];
+    const locale = WORLD_CLAIMS.find((c) => c.noun === LOCALE_CLAIM)!;
+    for (const line of SHIPPED) expect(locale.re.test(line), line).toBe(true);
+    // …on the map they shipped on, which is lit, so the claim is refused…
+    expect(locale.carriedBy("ac-aqua-v1")).toBe(false);
+    // …and neither line is still in the file.
+    const all = SCENARIO_TEMPLATES_CONDITIONS.flatMap((s) => driverCopy(s));
+    for (const line of SHIPPED) expect(all).not.toContain(line);
+    // The replacement says only what the posted plate says, and passes.
+    const kept = "Помни: знакът тук разрешава 90, но дъждът сваля разумната скорост.";
+    expect(locale.re.test(kept)).toBe(false);
+    expect(all).toContain(kept);
+  });
+
+  it("…and the lit-street measurement it rests on is the built world, not the tag", () => {
+    // The numbers that convict ac-aqua-v1. If props.ts ever stops dressing a
+    // scenario micro-map, THIS goes red first and tells the next lane the
+    // locale rule's premise has moved — instead of a sweep passing silently.
+    const aqua = censusOf("ac-aqua-v1");
+    expect(aqua.streetlights).toBe(16);
+    expect(aqua.utilityPoles).toBe(15);
+    // …and its own document says the opposite, which is exactly why the
+    // document may not be the witness.
+    const doc = rawDistrict("ac-aqua-v1") as {
+      roads: { edges: { class: string; maxspeed: number }[] };
+    };
+    expect(doc.roads.edges[0]!.class).toBe("unclassified");
+    expect(doc.roads.edges[0]!.maxspeed).toBe(90);
+    // Every district this family runs on is lit, so no lesson here may claim to
+    // be outside the built-up area today and the sweep above is not vacuous.
+    for (const id of DISTRICT_IDS) expect(censusOf(id).streetlights).toBeGreaterThan(0);
+  });
+
+  it("the А15 rule has teeth — posted on two maps, refused on the other three", () => {
+    const a15 = WORLD_CLAIMS.find((c) => c.noun === A15_CLAIM)!;
+    expect(a15.re.test("Прочети знака А15 напред: платното изглежда сухо.")).toBe(true);
+    // The two districts that post one (zoneSigns.ts icePatch/waterPatch →
+    // "slippery", HAZARD_WARNING_AHEAD_M ahead of the span).
+    expect(a15.carriedBy("ac-ice-v1")).toBe(true);
+    expect(a15.carriedBy("ac-aqua-v1")).toBe(true);
+    // …and the three that do not, so the same sentence is refused there.
+    for (const id of ["ac-rain-v1", "ac-night-v1", "fo-follow-v1"]) {
+      expect(censusOf(id).signs["slippery"] ?? 0, id).toBe(0);
+      expect(a15.carriedBy(id), id).toBe(false);
+    }
+  });
+
+  it("the drills that CAN read an А15 do read it — the cue is not deleted again", () => {
+    // The first wave struck „Прочети знака А15 „Опасност от хлъзгане" преди
+    // моста" out of sc-ac-ice for its BRIDGE and took the plate with it. Both
+    // maps that post one now name it in the briefing the student reads while he
+    // still has room to slow down.
+    for (const id of ["sc-ac-ice", "sc-ac-aquaplane"]) {
+      const spec = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === id)!;
+      expect((censusOf(spec.map.districtId).signs["slippery"] ?? 0) > 0, id).toBe(true);
+      const steps = spec.instructionsBg.map((s) => s.textBg);
+      expect(steps.some((t) => /А15/u.test(t)), id).toBe(true);
+    }
   });
 });

@@ -136,6 +136,32 @@
  * every step below is unchanged by this wave.
  */
 
+/**
+ * THE WORLD CLAIMS, ROUND TWO — 2026-08-22. The wave above rewrote the copy of
+ * sc-ac-crosswind and sc-ac-ice off their frames and installed the first
+ * world-truth gate. That gate is a LIST OF BANNED NOUNS, and a ban cannot tell
+ * „this map has none" from „no map has one". It was wrong in both directions,
+ * and both errors are closed here:
+ *
+ *   sc-ac-aquaplane — CLEARED WHAT WAS FALSE. „на извънградския път" / „знакът
+ *     ИЗВЪН ГРАДА е 90" passed every rule because ac-aqua-v1's document agrees
+ *     with them. The windscreen does not: `props.ts` lights every scenario
+ *     micro-map, so this „extra-urban road" carries 16 lamp columns and 15 wire
+ *     poles over 520 m. The copy now names the posted 90 instead, and the
+ *     out-of-town default moved into `teach.whenBg`.
+ *
+ *   sc-ac-ice — BANNED WHAT WAS TRUE. The А15 was struck from the briefing on
+ *     the written premise that nothing places it. `zoneSigns.ts` places it:
+ *     the plate stands at y = 150, 60 m before the ice. A drill about a hazard
+ *     that is invisible by definition had been forbidden to name the only
+ *     warning its road gives. Step 2 reads it again.
+ *
+ * The replacement gate (`conditions-sweep161-truth.test.ts` RULE 3) asks
+ * `buildWorldGeometry(assertDistrict(<district>.json))` per lesson, so the same
+ * sentence is legal on one map and refused on another, and a map that gains the
+ * feature starts crediting the claim with no edit in either file.
+ */
+
 import type { BrakingLeadCarSpec } from "../../contracts";
 import type { ScenarioSpec } from "./types";
 import { l5Night, l5Wet } from "./complications";
@@ -1201,14 +1227,39 @@ const AQUA_STOP_MARK_Y = 450;
  * (trace channel), not a live prop — the live student's graded skill is the
  * pre-water slow-down zone + the low-speed stop mark; the collision
  * consequence is demonstrated by the red ghosts.
+ *
+ * THE LOCALE — sweep161, major, and the one claim in this file the DOCUMENT
+ * would have cleared. The copy called this „извънградският път" and taught off
+ * „знакът ИЗВЪН ГРАДА е 90". ac-aqua-v1 agrees on paper (`class:
+ * "unclassified"`, `maxspeed: 90`, one authored building, meta label „Учебен
+ * извънграден път"), and the windscreen does not:
+ * `.audit-frames/sweep161/sc-ac-aquaplane/pc-right/01-arrival.png` — re-shot
+ * unchanged in `.audit-frames/proof/frames/sc-ac-aquaplane__pc-right/` — holds
+ * a lit six-storey block, a row of lamp columns with wires, and a kerbside line
+ * of parked cars. That is not dressing the district asked for: `props.ts`
+ * lights EVERY scenario micro-map through `SCENARIO_LIT_CLASSES`, and
+ * `buildWorldGeometry` returns 16 streetlights + 15 utility poles over these
+ * 520 m — a lamp every ~32 m. A student told he is out of town while looking
+ * down a lit street learns to stop believing the briefing, and „90 because we
+ * are outside the town" is keyed to a cue he cannot see.
+ *
+ * So the copy names the thing he CAN check — the posted 90, two of which are
+ * built (y = 45, 30 m past his spawn, and y = 506) — and the out-of-town
+ * default survives in `teach.whenBg` as knowledge about Bulgarian roads. Making
+ * the WORLD extra-urban (an unlit district, no kerbside row) is map work and is
+ * not this file's; `conditions-sweep161-truth.test.ts` RULE 3 will credit the
+ * claim the day such a district exists, with no edit here.
  */
 export const SC_AC_AQUAPLANE: ScenarioSpec = {
   id: "sc-ac-aquaplane",
   family: "conditions",
   tagsBg: ["условия", "дъжд", "аквапланинг", "стояща вода", "съобразена скорост"],
   titleBg: "Аквапланинг",
+  // „НА ИЗВЪНГРАДСКИЯ ПЪТ" struck — sweep161, and the world says otherwise; see
+  // the LOCALE note in the block above this template. What replaces it is the
+  // thing the student CAN check: the 90 posted 30 m past his own spawn.
   objectiveBg:
-    "Мини участъка със стояща вода на извънградския път: намали под 58 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
+    "Мини участъка със стояща вода по път с разрешени 90: намали под 58 км/ч ПРЕДИ водата, прекоси я с равна газ и прав волан и спри плавно на позицията зад авариралия автомобил — над ~65 км/ч гумите изплуват и нито спирачката, нито воланът работят.",
   archetypeIds: ["AC-07"],
   conceptIds: ["c-rain-aquaplaning", "c-speed-adaptation", "c-braking-distance"],
   map: {
@@ -1228,10 +1279,35 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
     // водата“ — was step 3, third clause. It is a step of its own now, 55 ch.
     // 66 ch
     { n: 1, textBg: "Включи късите светлини и потегли с около 70 км/ч — вали от часове." },
-    // 66 ch
-    { n: 2, textBg: "Помни: знакът извън града е 90, но дъждът сваля разумната скорост." },
-    // 61 ch
-    { n: 3, textBg: "Гледай напред — в ниското платното е покрито със стояща вода." },
+    // 66 ch — „знакът ИЗВЪН ГРАДА е 90" said where he was, and the windscreen
+    // said otherwise. „знакът ТУК" says the same law about the same plate and
+    // is checkable: two limit90 posts are built (y = 45 and y = 506), the first
+    // 30 m past the spawn and legible in the arrival frame. The out-of-town
+    // default itself is not lost — it moved to `teach.whenBg`, where it is
+    // knowledge about Bulgarian roads rather than a claim about this one.
+    { n: 2, textBg: "Помни: знакът тук разрешава 90, но дъждът сваля разумната скорост." },
+    // 72 ch — the А15 at y = 180 is POSTED (zoneSigns.ts waterPatch →
+    // "slippery", HAZARD_WARNING_AHEAD_M before the span at 240). „Гледай
+    // напред" pointed at water still 225 m away and nameable by nothing; the
+    // plate is the cue the road actually gives him first.
+    //
+    // „В НИСКОТО" IS STRUCK TOO, by the verifier pass over this wave, and it is
+    // the same defect one clause to the right of the one this wave came for.
+    // The line survived the rewrite because the wave was reading it for its
+    // LOCALE, and a dip is not a locale: there is no low ground on ac-aqua-v1
+    // and there is none on any district in the corpus. Roads carry no third
+    // coordinate at all — `roads.edges[].geometry` is `[x, y]` pairs, the
+    // carriageway mesh is laid at the flat constant `ROAD_Y`, and terrain.ts's
+    // `heightAt` returns a hard 0 inside TERRAIN_FLAT_NEAR_ROAD_M of any edge,
+    // so the ground beside the asphalt is flat too. A student reading „в
+    // ниското" down the dead-straight, dead-level street of his own arrival
+    // frame is being told to look for a dip that no map can hold. WHY water
+    // collects in low ground is not lost — it is in `teach.whenBg`
+    // („ниските участъци"), where it is knowledge about Bulgarian roads
+    // instead of a claim about this one, which is exactly where the locale
+    // sentence above went. RULE 2's ABSENT_IN_WORLD now bans the word, with
+    // teeth on this exact string.
+    { n: 3, textBg: "Прочети знака А15 напред — след него платното е покрито със стояща вода." },
     // 72 ch
     { n: 4, textBg: "Знай: над ~65 км/ч гумите „изплуват“ — воланът олеква и колата не слуша." },
     // 56 ch — 60 → 58, the number sc-acq-before actually grades. „под 60" was
@@ -1291,7 +1367,7 @@ export const SC_AC_AQUAPLANE: ScenarioSpec = {
   ],
   teach: {
     whenBg:
-      "При силен дъжд и навсякъде, където водата се събира: ниските участъци, коловозите на изтъркан асфалт, страничната лента до бордюра, локвите след буря. Правилото е желязно: видиш ли стояща вода — намали ПРЕДИ нея, под скоростта на изплуване (за обикновени гуми ~60–70 км/ч, по-малко при изтъркан протектор).",
+      "При силен дъжд и навсякъде, където водата се събира: ниските участъци, коловозите на изтъркан асфалт, страничната лента до бордюра, локвите след буря. Извън населено място знакът разрешава 90, а по автомагистрала още повече — но това е таван за сухо и ясно, не разрешение за дъжд. Правилото е желязно: видиш ли стояща вода — намали ПРЕДИ нея, под скоростта на изплуване (за обикновени гуми ~60–70 км/ч, по-малко при изтъркан протектор).",
     whyBg:
       "Протекторът е помпа: до определена скорост той изхвърля водата изпод гумата, над нея водният клин повдига колата и тя се носи по водата като шейна — нула спирачка, нула волан, нула сцепление. В аквапланинг НИЩО не помага: рязката спирачка и завъртеният волан само подготвят занасянето за мига, в който гумите отново докоснат асфалт. Затова цялото умение е превантивно — по-ниска скорост преди водата, равна газ и прав волан в нея (чл. 20, ал. 2).",
     lawRef: "ЗДвП чл. 20, ал. 2",
@@ -1336,12 +1412,28 @@ const ICE_STOP_MARK_Y = 280;
  * `.audit-frames/sweep161/sc-ac-ice/pc-right/04-t098s.png` (and 03-ready,
  * mobile 05-stopped) the world is ac-ice-v1: a dead-straight street running to
  * the horizon between buildings and parked cars. Checked in
- * `content/world/ac-ice-v1.json`, three of the four promises cannot be kept
- * from here at all — the document declares NO bridge geometry, `signs` is
- * absent entirely (the „А15" lives only as `zones[0].signRef`, a data label
- * nothing places or renders), and the stalled car is a RECORDER rect with no
- * entry in `scene/scenarioSceneryProps.ts`, so the live student drives past
- * empty asphalt where the briefing points.
+ * `content/world/ac-ice-v1.json`, the document declares NO bridge geometry,
+ * and the stalled car is a RECORDER rect with no entry in
+ * `scene/scenarioSceneryProps.ts`, so the live student drives past empty
+ * asphalt where the briefing points.
+ *
+ * BUT ONLY TWO OF THOSE THREE ARE MISSING, AND THE FIRST PASS AT THIS ROW GOT
+ * THE THIRD WRONG — recorded here because the correction is the whole reason
+ * the copy below changed twice. That pass wrote that „`signs` is absent
+ * entirely (the „А15" lives only as `zones[0].signRef`, a data label nothing
+ * places or renders)" and deleted the plate from the briefing on that basis.
+ * The document has no `signs` key, but the plate is not authored there: it is
+ * BUILT. `zoneSigns.ts` maps `icePatch` → `slippery` and posts it
+ * `HAZARD_WARNING_AHEAD_M` ahead of the span, and
+ * `buildWorldGeometry(assertDistrict(ac-ice-v1.json)).signs` returns
+ * `{ limit50: 2, slippery: 1 }` with the А15 standing at y = 150 — 60 m before
+ * the ice at 210, on the driver's right, at 1.5× scenario scale. (The sibling
+ * lane had already measured exactly this on ac-bridge-v1 and kept
+ * `sc-ac-bridge-ice` reading its А15; `lane-world-claims.test.ts` §5 pins it.)
+ * So the deletion removed a TRUE cue — the only warning this road gives — from
+ * a drill about a hazard that is invisible by definition. Step 2 reads it
+ * again, and `conditions-sweep161-truth.test.ts` RULE 3 now asks the BUILT
+ * district instead of banning the string, so neither mistake can recur.
  *
  * The bridge arm of AC-08 already has its own lesson — `sc-ac-bridge-ice`
  * („Мостът замръзва пръв", templates-conditions2.ts) on ac-bridge-v1, whose
@@ -1404,15 +1496,20 @@ export const SC_AC_ICE: ScenarioSpec = {
     // half explained bridge thermodynamics. The physics and the reason all
     // still ship — behind the act instead of in front of it.
     //
-    // Steps 1, 2, 4, 7 and 9 pointed at a bridge, an А15 plate and a stranded
-    // car, none of which ac-ice-v1 contains (the block above this template).
-    // They now point at the three things it DOES have: the clean approach
-    // asphalt, the invisible ice, and the marked stop position the guidance
-    // layer draws.
+    // Steps 1, 2, 4, 7 and 9 pointed at a bridge and a stranded car, neither of
+    // which ac-ice-v1 contains (the block above this template). They now point
+    // at what it DOES have: the clean approach asphalt, the posted А15, the
+    // invisible ice, and the marked stop position the guidance layer draws.
     // 64 ch — sc-aci-before grades 30; the target and the ceiling, together.
     { n: 1, textBg: "Намали до около 25 км/ч ОЩЕ на чистия асфалт — таванът тук е 30." },
-    // 74 ch
-    { n: 2, textBg: "Гледай напред: платното изглежда сухо, но нощта е била влажна и мразовита." },
+    // 85 ch — THE А15 IS BACK, and it was never the false half of the sentence
+    // it was struck from. „Прочети знака А15 „Опасност от хлъзгане" ПРЕДИ МОСТА"
+    // was deleted whole for its bridge; the plate itself is posted at y = 150,
+    // 60 m ahead of the icePatch at 210 (zoneSigns.ts icePatch → "slippery"),
+    // and deleting it left the drill teaching black ice while forbidden to name
+    // the one warning the road gives. „Гледай напред", which replaced it,
+    // pointed at ice that is by definition invisible.
+    { n: 2, textBg: "Прочети знака А15 напред: платното изглежда сухо, но нощта е била влажна и мразовита." },
     // 68 ch
     { n: 3, textBg: "Помни: откритите участъци замръзват първи при минус след влажна нощ." },
     // 73 ch

@@ -8,9 +8,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import * as weatherModule from "../weather";
 import {
   FOG_IN_PER_SEC,
+  FOG_OUT_PER_SEC,
   PRIME_DT_SEC,
   RAIN_IN_PER_SEC,
+  RAIN_OUT_PER_SEC,
+  SLOWEST_TRAVERSE_SEC,
   SNOW_IN_PER_SEC,
+  SNOW_OUT_PER_SEC,
   SNOW_ROAD_BRIGHTEN,
   WEATHER_RATES,
   WETNESS_IN_PER_SEC,
@@ -146,6 +150,99 @@ describe("weather channel", () => {
 });
 
 // ---------------------------------------------------------------------------
+// THE RAMP GRAMMAR — the eight rates state a weather ORDER, and five of them
+// were free to violate it
+//
+// MEASURED 2026-08-22 by mutating weather.ts one constant at a time and
+// running this file (30 mutants). Nine survived; five of them were ramp rates:
+// RAIN_OUT, FOG_IN, FOG_OUT, SNOW_IN and SNOW_OUT could each be set to any
+// value at all and every test here stayed green. The reason is structural
+// rather than careless — the per-channel ramp tests above assert that the
+// store ramps at whatever the constant SAYS (`toBeCloseTo(FOG_IN_PER_SEC)`),
+// which is a true and useful claim about the store and no claim at all about
+// the constant. So the header's weather grammar — „fog banks roll in, they
+// don't switch", „weather fronts arrive", „puddles outlive the shower",
+// „snow … slowest of the three channels" — was four hundred words of
+// justification with nothing underneath it, the exact shape this programme
+// keeps paying for.
+//
+// WHAT THE ORDER IS FOR, so the assertions are not arithmetic for its own
+// sake. These rates are what a TRANSITION looks like, and a transition is the
+// one moment the picture and the graded tick can disagree: `tick.rain/fog/snow`
+// are booleans, true on frame 1, while these channels ramp. `primeWeather`
+// removes that disagreement at a scene boundary; inside a scene the ramp is
+// the student's only cue that the conditions changed under them, and its SHAPE
+// is the teaching. Rain arrives like a switch because a shower does. Fog does
+// not, and a fog that snapped on would tell a seventeen-year-old that reduced
+// visibility announces itself. Snow is slower still, in both directions,
+// because a snow front neither arrives nor leaves in the time a shower does.
+//
+// WHAT THIS PINS AND WHAT IT DOES NOT — stated because the mutation run says
+// so, not to excuse the gap. These assertions fix each channel's PLACE in the
+// order; they do not fix any rate's absolute magnitude. SNOW_IN_PER_SEC set to
+// 1/9 or 1/90 is still the slowest and still passes. That is deliberate: no
+// evidence in this repo says snow must arrive in six seconds rather than nine,
+// and inventing a bound to redden a mutant is decoration. The magnitude is
+// bounded WHERE IT MATTERS instead — `SLOWEST_TRAVERSE_SEC` is derived from
+// this very registry, so a slower channel automatically lengthens
+// `PRIME_DT_SEC` and no scene can open partway through its ramp however slow
+// somebody makes it. That is what the derivation buys, and the test below is
+// what stops the derivation being spent.
+// ---------------------------------------------------------------------------
+
+describe("the ramp grammar the header states is the one the rates obey", () => {
+  it("PUDDLES OUTLIVE THE SHOWER: wetness drains slower than it soaks", () => {
+    // The one leg of the grammar that already had a guard (the asymmetry test
+    // above asserts it too); restated here so the whole order reads in one
+    // place and no leg can be dropped by deleting the block that owns it.
+    expect(WETNESS_OUT_PER_SEC).toBeLessThan(WETNESS_IN_PER_SEC);
+  });
+
+  it("RAIN IS A SWITCH, WETNESS IS A STATE: the rain channel leads in both directions", () => {
+    // „rainIntensity — how hard it is raining *right now* … Faster in/out than
+    // wetness." Clouds and streaks change with the shower; the road they
+    // soaked does not.
+    expect(RAIN_IN_PER_SEC).toBeGreaterThan(WETNESS_IN_PER_SEC);
+    expect(RAIN_OUT_PER_SEC).toBeGreaterThan(WETNESS_OUT_PER_SEC);
+  });
+
+  it("FOG BANKS ROLL IN, THEY DO NOT SWITCH: fog is slower than rain both ways", () => {
+    // Mutation that reddens this: RAIN_OUT_PER_SEC 1/3 → 1/9 (a survivor of
+    // the 2026-08-22 run) makes the rain clear slower than the fog lifts.
+    expect(FOG_IN_PER_SEC).toBeLessThan(RAIN_IN_PER_SEC);
+    expect(FOG_OUT_PER_SEC).toBeLessThan(RAIN_OUT_PER_SEC);
+  });
+
+  it("SNOW IS THE SLOWEST FRONT: it arrives after the fog and clears after it too", () => {
+    // Both survivors of the mutation run land here: FOG_IN 1/5 → 1/9 makes the
+    // fog arrive slower than the snow, and FOG_OUT 1/6 → 1/9 makes it lift
+    // slower than the snow clears. Either one inverts the header's «slowest of
+    // the three channels» while leaving every behavioural test green.
+    expect(SNOW_IN_PER_SEC).toBeLessThan(FOG_IN_PER_SEC);
+    expect(SNOW_OUT_PER_SEC).toBeLessThan(FOG_OUT_PER_SEC);
+  });
+
+  it("the order is TOTAL: snow ≤ fog ≤ rain on arrival, and the same on clearing", () => {
+    // The chain as one statement, so a future channel inserted in the middle
+    // has to declare where it sits rather than quietly straddling two rungs.
+    // Written as a formatted string on purpose: a bare `toBeLessThan` chain
+    // reports „expected 0.111 to be less than 0.2" and names neither constant.
+    const arriving = ["SNOW_IN", "FOG_IN", "RAIN_IN"] as const;
+    const clearing = ["SNOW_OUT", "FOG_OUT", "RAIN_OUT"] as const;
+    const rate = (n: string): number => WEATHER_RATES[`${n}_PER_SEC` as keyof typeof WEATHER_RATES];
+    for (const order of [arriving, clearing]) {
+      for (let i = 1; i < order.length; i++) {
+        const slower = order[i - 1];
+        const faster = order[i];
+        expect(`${slower} slower than ${faster}: ${rate(slower) < rate(faster)}`).toBe(
+          `${slower} slower than ${faster}: true`,
+        );
+      }
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // NO CHANNEL IS CLEARED BY A CALLER THAT DID NOT NAME IT
 //
 // The store is a module-level singleton with three writers. `fog` and `snow`
@@ -270,6 +367,43 @@ describe("primeWeather: settle on frame 1", () => {
     stepWeather(999);
     primeWeather(false, false, false);
     expect(channels()).toEqual({ wetness: 0, rain: 0, fog: 0, snow: 0 });
+  });
+
+  it("PRIME_DT_SEC IS DERIVED FROM THE RATES, not a literal that happens to be big enough", () => {
+    // THE MUTANT THIS EXISTS FOR, and it is the file's own history: replacing
+    // `2 * SLOWEST_TRAVERSE_SEC` with the hand-written `20` that used to stand
+    // here left every test in this file GREEN (mutation run, 2026-08-22). The
+    // store's header spends eight lines convicting exactly that spelling —
+    // „true when it was written, and silently false the moment anyone adds a
+    // slower channel" — and nothing underneath the prose could tell the two
+    // apart, because 20 outruns today's slowest traverse of 12 s and the
+    // assertions above only ask whether it outruns TODAY's.
+    //
+    // Both existing guards miss it for the same reason. `PRIME_DT_SEC > 1/rate`
+    // is satisfied by any literal above 12. The exact-landing check is
+    // satisfied by any literal far enough past 12 to swallow the float residue
+    // (a literal 20 leaves wetness at 0, not at 1.1e-16). So the only failable
+    // form of „derived" is the RATIO to the registry's own slowest traverse.
+    //
+    // NOT A CHANGE DETECTOR: any margin of two or more passes, so an author
+    // who deliberately widens it to 3× is not stopped.
+    //
+    // EXACTLY WHAT THIS CATCHES, verified by running each mutant rather than
+    // reasoned — the first draft of this comment claimed more than the
+    // assertion delivers, which is the same crime as the prose it replaces:
+    //   · `PRIME_DT_SEC = 20`  → RED (ratio 1.67). The historical literal.
+    //   · a slower channel added while PRIME_DT_SEC stays a literal → RED,
+    //     because SLOWEST_TRAVERSE_SEC rises underneath it. THIS is the
+    //     failure the derivation exists to prevent.
+    //   · `PRIME_DT_SEC = 1000` → GREEN, and honestly so: it is undocumented
+    //     but it is not wrong, and it only goes stale for a channel slower
+    //     than 500 s. Nothing here can tell a large literal from a derivation.
+    // The second assertion has the same shape and the same limit: it convicts
+    // a traverse that disagrees with the registry, and a literal `12` — today's
+    // max, written out — passes it. From node there is no way to ask whether an
+    // expression was derived; only whether it still agrees with its inputs.
+    expect(SLOWEST_TRAVERSE_SEC).toBe(Math.max(...Object.values(WEATHER_RATES).map((r) => 1 / r)));
+    expect(PRIME_DT_SEC / SLOWEST_TRAVERSE_SEC).toBeGreaterThanOrEqual(2);
   });
 
   it("does not inherit the PREVIOUS scene's weather (the cross-lesson leak)", () => {
@@ -416,8 +550,13 @@ describe("wetnessToRoadParams", () => {
 // it existed to catch, and a defect written down as the expected result.
 //
 // The specification is restored at the foot of this file, with the body it
-// always needed. It is RED until the two-file routing lands; that is the guard
-// working, not the guard broken.
+// always needed. It WAS red until the two-file routing landed (ed2dd6f); it
+// has been green since, and the mutation test beside the guard cuts each leg
+// back out of the real sources so that green is load-bearing rather than
+// vacuous. This sentence still read „It is RED until the two-file routing
+// lands" long after the routing shipped — the identical stale-note defect the
+// store's header note 2 convicts, sitting four hundred lines from the note
+// that convicts it. Corrected 2026-08-23 by the verifier.
 // ---------------------------------------------------------------------------
 
 /**
@@ -500,15 +639,54 @@ describe("roadSurfaceToParams: the road can finally tell snow from dry", () => {
     // a few percent of each other on every channel — two conditions a student
     // cannot tell apart. A chain that held by 1e-16 would satisfy the letter
     // of the claim and still render one single street. So each step has to
-    // clear a margin a person can see: 0.15 on an albedo multiply is ~15%,
-    // five times the ~3% the audit called indistinguishable.
-    const MIN_SEPARATION = 0.15;
+    // clear a margin a person can see.
+    //
+    // THE SNOW FLOOR WAS 0.15 AND ITS JUSTIFICATION DID NOT REPRODUCE. The
+    // sentence that stood here read „0.15 on an albedo multiply is ~15%, five
+    // times the ~3% the audit called indistinguishable". `darken` is not a
+    // screen percentage — it is a multiply into the road albedo, which is then
+    // tinted (ROAD_ALBEDO_TINT 0.72), lit, hazed and tone-mapped before a
+    // student sees it, and every one of those compresses it.
+    //
+    // MEASURED 2026-08-22 on the re-drive at HEAD, in the audit's own near-road
+    // rectangle (620,500 120×30) on the two lessons that share `ac-rain-v1` and
+    // the DAY preset, so the only difference is the weather:
+    //
+    //                  sweep161 (before the term)   rebase (after, 1.8 shipped)
+    //   sc-ac-snow     mean sRGB L 83.1              L 106.9
+    //   sc-ac-fog      L 85.3                        L 86.8    ← the control
+    //
+    // The full 0.8 multiply bought +28.6% on screen while the fog control drifted
+    // +1.8% across the same two builds, so the renderer compresses this
+    // multiply by roughly 2.8× in the near field. The old floor of 0.15
+    // therefore buys about 4.3% on screen — 1.4× the band the audit called
+    // indistinguishable, not five times it. It would have passed
+    // SNOW_ROAD_BRIGHTEN = 1.16, and the mutation run confirms it did.
+    //
+    // The floor is set to deliver what that sentence promised: 5 × 3% = 15% on
+    // screen, ÷ 2.8 ≈ 0.53 of `darken`, rounded to 0.5. Shipped 1.8 clears it
+    // with 60% to spare; 1.16 goes red. TWO HONEST LIMITS on that arithmetic:
+    // it comes from ONE rectangle (the one whose control drifted least), and
+    // the far field compresses harder still (the same pair of frames gives
+    // +11% at 830,395), so 0.5 is a NEAR-FIELD floor and the far field is
+    // weather.ts's haze problem, not this mapping's.
+    //
+    // THE WET FLOOR IS LEFT AT 0.15 AND IS NOT THE SAME NUMBER. ONE of the
+    // shipped opts bags separates dry from soaked by only 0.22 (wetDarken 0.78,
+    // the paint bag; the other three are 0.38, 0.40 and 0.40 — this line said
+    // „Two" until it was counted, 2026-08-23), so one shared constant cannot
+    // carry both: a 0.5 floor applied to the wet leg would redden the shipped
+    // paint bag on the spot. And the wet
+    // look was measured and signed off in the doc-66 R5 round, so raising its
+    // floor here would be retuning a scene by assertion.
+    const WET_MIN_SEPARATION = 0.15;
+    const SNOW_MIN_SEPARATION = 0.5;
     for (const opts of SHIPPED_OPTS) {
       const soaked = roadSurfaceToParams({ wet: 1, snow: 0 }, opts);
       const dry = roadSurfaceToParams({ wet: 0, snow: 0 }, opts);
       const snowy = roadSurfaceToParams({ wet: 0, snow: 1 }, opts);
-      expect(dry.darken - soaked.darken).toBeGreaterThan(MIN_SEPARATION);
-      expect(snowy.darken - dry.darken).toBeGreaterThan(MIN_SEPARATION);
+      expect(dry.darken - soaked.darken).toBeGreaterThan(WET_MIN_SEPARATION);
+      expect(snowy.darken - dry.darken).toBeGreaterThan(SNOW_MIN_SEPARATION);
     }
   });
 
@@ -795,13 +973,14 @@ describe("the snow term and its reader ship together", () => {
     if (!snowTermExists) return;
 
     const report = routingOf(readSource(barrelPath), readSource(readerPath));
-    // MEASURED 2026-08-19, before this guard was written: `index.ts` exports
-    // `wetnessToRoadParams` and the type `RoadWetnessParams`, and NOT
-    // `roadSurfaceToParams`; `StaticWorld.tsx` imports `{ useWetness,
-    // wetnessToRoadParams }` and calls the rain-only mapping at :279, :294 and
-    // :313. So this assertion is RED on the tree that shipped the snow term.
-    // That is the conviction. It clears when weather.ts's header note 2 is
-    // carried out in those two files — neither of them this lane's to touch.
+    // HISTORY, so the green below is read for what it is. When this guard was
+    // written (2026-08-19) it was RED: `index.ts` exported `wetnessToRoadParams`
+    // and the type `RoadWetnessParams` and NOT `roadSurfaceToParams`, and
+    // `StaticWorld.tsx` imported `{ useWetness, wetnessToRoadParams }` and
+    // called the rain-only mapping at :279, :294 and :313. Both files were
+    // routed in commit ed2dd6f and re-verified 2026-08-22, so this assertion
+    // has been GREEN since then and the test below proves that green is
+    // load-bearing by cutting each leg back out.
     expect(fmtRouting(report)).toBe("reachable=true readsSnowChannel=true passesLiveSnow=true");
   });
 

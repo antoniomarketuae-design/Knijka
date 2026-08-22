@@ -495,3 +495,286 @@ describe("sim/collision barrel — both directions of the verdict", () => {
     expect(swept).toBeGreaterThanOrEqual(-0.17 - 1e-9);
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE BOUNDARY — WALKED, NOT ASSERTED.
+//
+// Nine sweep161 rows (`.audit-frames/routing-collision.json`), six of them
+// filed against this barrel and four of those CRITICAL, are routed OUT of this
+// module on two sentences and nothing else:
+//
+//   1. „this directory imports neither three nor @react-three/rapier nor
+//      react" — so nothing here can create a rapier body, move one or draw one,
+//      and a row about a car that drove through a building or through the
+//      staged lead can never be closed by editing this module;
+//   2. „NOTHING outside this directory imports SWEEP_FRAME_TRAVEL_M,
+//      SWEEP_CHUNK_TRAVEL_M or SWEEP_TELEPORT_M", and no consumer reaches the
+//      bare `swept*` pair — which is what lets obb.ts keep a teleport fallback
+//      that would be a live footgun in a caller's hands.
+//
+// Both were TRUE when they were written, and both were verified by a human
+// running a grep and typing the date beside it. That is the failure mode this
+// file's own header calls „a hand-maintained export list has no failure mode",
+// and it had already begun: the consumer enumeration index.ts published as
+// „checked" named six files, and the tree has EIGHT non-test importers — it
+// was missing traffic/system.ts and traffic/types.ts, both of which import this
+// barrel today. Nothing was wrong with the CONCLUSION; the list it was drawn
+// from had gone stale, and the next reader who re-checks by walking that list
+// re-derives a wrong answer.
+//
+// So the walk lives here, where it can go red. THE ANTI-NEUTRALISATION HALF
+// matters as much as the walk: each guarded name is asserted to be a live
+// export of the barrel FIRST, because a rename would otherwise turn the guard
+// into a list of strings that match nothing and pass forever — the shape of
+// instrument bug this project keeps catching, always failing in the reassuring
+// direction.
+// ---------------------------------------------------------------------------
+
+/** platform/src — this file sits at src/modules/sim/collision/__tests__. */
+const SRC_ROOT = path.resolve(__dirname, "..", "..", "..", "..");
+const COLLISION_DIR = path.resolve(__dirname, "..");
+const BARREL_FILE = path.join(COLLISION_DIR, "index.ts");
+
+/** The module's own source files (its tests are not part of what it ships). */
+const COLLISION_SOURCES = ["index.ts", "obb.ts", "bodies.ts", "probe.ts"].map((f) =>
+  path.join(COLLISION_DIR, f),
+);
+
+/**
+ * Bare package specifiers that would make this module renderer-bound. `react`
+ * carries its own boundary (`react-dom`, `react/jsx-runtime`) because a module
+ * that pulls any of them can no longer be reasoned about — or tested — without
+ * a renderer, which is the property the whole routing rests on.
+ *
+ * `@dimforge/*` IS THE ONE THAT MATTERS MOST AND IT WAS MISSING until
+ * 2026-08-23. The routing sentence names „three, @react-three/rapier, react",
+ * but the CAPABILITY those four criticals are routed away from is „can create
+ * a rapier body, move one, draw one" — and the shortest path to it is the raw
+ * engine, `@dimforge/rapier3d` / `@dimforge/rapier3d-compat`, which is a real
+ * dependency of this app and is imported directly by the two files those rows
+ * were routed TO (NpcColliders.tsx, VehicleRig.tsx). A guard that lists the
+ * wrapper and not the engine would have called this module renderer-free with
+ * a live body-builder inside it.
+ */
+const BROWSER_PACKAGES =
+  /^(three|@react-three\/[\w-]+|@dimforge\/[\w-]+|react|react-dom)(\/|$)/;
+
+/** Names no file outside this directory may import from the barrel. */
+const GUARDED_EXPORTS = [
+  "sweptObbSeparationM",
+  "sweptObbDiscSeparationM",
+  "SWEEP_TELEPORT_M",
+  "SWEEP_CHUNK_TRAVEL_M",
+  "SWEEP_FRAME_TRAVEL_M",
+] as const;
+
+/**
+ * Source with comments removed, so `@react-three/rapier` NAMED IN A DOC-COMMENT
+ * — index.ts and probe.ts both discuss rapier's frame clamp at length — is not
+ * read as an import, and a commented-out import is not read as a live one.
+ */
+function codeOf(file: string): string {
+  return fs
+    .readFileSync(file, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join("\n");
+}
+
+/** Every `import … from "x"` / `export … from "x"`, as (clause, specifier). */
+function importsOf(file: string): Array<{ clause: string; spec: string }> {
+  const out: Array<{ clause: string; spec: string }> = [];
+  const re = /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s+from\s*["']([^"']+)["']/g;
+  const src = codeOf(file);
+  for (let m = re.exec(src); m !== null; m = re.exec(src)) {
+    out.push({ clause: m[1].replace(/\s+/g, " ").trim(), spec: m[2] });
+  }
+  return out;
+}
+
+/** A project-relative specifier resolved to a file on disk; null for a package. */
+function resolveSpec(fromFile: string, spec: string): string | null {
+  let base: string;
+  if (spec.startsWith("@/")) base = path.join(SRC_ROOT, spec.slice(2));
+  else if (spec.startsWith(".")) base = path.resolve(path.dirname(fromFile), spec);
+  else return null;
+  const candidates = [
+    `${base}.ts`,
+    `${base}.tsx`,
+    path.join(base, "index.ts"),
+    path.join(base, "index.tsx"),
+  ];
+  for (const c of candidates) if (fs.existsSync(c)) return c;
+  return null;
+}
+
+function tsFilesUnder(dir: string, out: string[] = []): string[] {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) tsFilesUnder(p, out);
+    else if (/\.tsx?$/.test(entry.name)) out.push(p);
+  }
+  return out;
+}
+
+/** The exported names one import clause reaches. `*` = the whole surface. */
+function namesOf(clause: string): string[] {
+  if (/^\*(\s+as\s|$)/.test(clause)) return ["*"];
+  const braces = /\{([\s\S]*)\}/.exec(clause);
+  if (braces === null) return [];
+  return braces[1]
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+    .map((s) => s.replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim());
+}
+
+const posix = (abs: string) => path.relative(SRC_ROOT, abs).split(path.sep).join("/");
+
+describe("sim/collision barrel — the boundary six sweep161 criticals were routed out on", () => {
+  it("is reachable with no renderer — no three / rapier / react in its import closure", () => {
+    // NOT a grep for the word: the two files that DISCUSS rapier's 0.5 s frame
+    // clamp in prose would both match one. Comments are stripped and only the
+    // specifier of a real import/export-from is read — and the walk is
+    // TRANSITIVE, because a helper that pulls three in on this module's behalf
+    // is the same defect with one file of distance.
+    const seen = new Set<string>();
+    const offenders: string[] = [];
+    const stack = [...COLLISION_SOURCES];
+    while (stack.length > 0) {
+      const file = stack.pop() as string;
+      if (seen.has(file)) continue;
+      seen.add(file);
+      for (const { spec } of importsOf(file)) {
+        if (BROWSER_PACKAGES.test(spec)) {
+          offenders.push(`${posix(file)} -> ${spec}`);
+          continue;
+        }
+        const resolved = resolveSpec(file, spec);
+        if (resolved !== null) stack.push(resolved);
+      }
+    }
+
+    // SELF-CHECK ON THE WALK, first. A resolver that quietly resolves nothing
+    // visits four files, finds no import at all and reports a clean module —
+    // the reassuring direction. The closure has to have LEFT the directory
+    // (bodies.ts reaches traffic/types and vehicle/tuning) before its silence
+    // about three/rapier/react means anything.
+    const walked = [...seen].map(posix);
+    for (const file of COLLISION_SOURCES) {
+      expect(walked, "every source file of the module is walked").toContain(posix(file));
+    }
+    expect(walked, "the walk leaves the directory").toContain("modules/sim/traffic/types.ts");
+    expect(walked, "the walk leaves the directory").toContain("modules/sim/vehicle/tuning.ts");
+    expect(walked.length, "import closure size").toBeGreaterThanOrEqual(8);
+
+    expect(offenders, "sim/collision must stay renderer-free").toEqual([]);
+  });
+
+  it("publishes only numbers and functions — nothing that can create, move or draw a body", () => {
+    // The other half of the same routing sentence. A rapier body, a mesh, a
+    // hook or a React component reaching this surface would make the module
+    // capable of the thing nine rows were routed away on, and it would arrive
+    // as a NEW export rather than as an edit to an old one — so the assertion
+    // is about the whole surface, not about a list of names.
+    const kinds = Object.entries(barrel as Record<string, unknown>).map(
+      ([name, value]) => `${name}:${typeof value}`,
+    );
+    expect(kinds.length, "runtime exports").toBeGreaterThanOrEqual(15);
+    expect(
+      kinds.filter((k) => !/:(number|function)$/.test(k)),
+      "sim/collision exports only constants, pure functions and ContactProbe",
+    ).toEqual([]);
+    // …and no exported function is a React component: a component is a function
+    // too, so `typeof` on its own would wave one straight through.
+    for (const [name, value] of Object.entries(barrel as Record<string, unknown>)) {
+      if (typeof value !== "function") continue;
+      expect(
+        (value as { $$typeof?: unknown }).$$typeof,
+        `${name} must not be a React element type`,
+      ).toBeUndefined();
+    }
+  });
+
+  it("keeps the swept primitives and the sweep budgets unreachable outside this directory", () => {
+    // ANTI-NEUTRALISATION, and it comes first: a guarded name that is no longer
+    // exported guards nothing, and a list of strings that matches nothing
+    // passes forever. Renaming any of these five is therefore a RED here, which
+    // is the moment to decide whether the new name needs the same protection.
+    for (const name of GUARDED_EXPORTS) {
+      expect(barrel, `${name} must exist for guarding it to mean anything`).toHaveProperty(name);
+    }
+
+    const consumers: Array<{ file: string; names: string[]; via: string }> = [];
+    for (const file of tsFilesUnder(SRC_ROOT)) {
+      if (file.startsWith(COLLISION_DIR + path.sep)) continue;
+      // CHEAP PRE-FILTER, and it is sound rather than a shortcut: every
+      // specifier that can resolve into this module names the DIRECTORY it lives
+      // in — "@/modules/sim/collision", "../collision", "./collision" — so a
+      // file whose text does not contain that word cannot import it. Only the
+      // raw read is paid for the rest of the tree, which matters because this
+      // walk reads several thousand files off a 7200 rpm disk and a five-second
+      // default turned a real assertion into a flaky one.
+      if (!fs.readFileSync(file, "utf8").includes("collision")) continue;
+      for (const { clause, spec } of importsOf(file)) {
+        const resolved = resolveSpec(file, spec);
+        // THE WHOLE DIRECTORY, NOT ONLY THE BARREL — and that was a live hole
+        // until 2026-08-23, not a hypothetical one. This read
+        // `!== BARREL_FILE`, so a file writing
+        //   import { SWEEP_TELEPORT_M, sweptObbSeparationM } from "../collision/obb";
+        // reached every guarded name WITHOUT touching index.ts and this test
+        // stayed green — the guard would have reported the boundary intact
+        // while it was being walked around, which is the reassuring direction
+        // again. Nothing else in the tree forbids a deep import into this
+        // module (docs/architecture/05 states the rule in prose only), so the
+        // one test that names these five constants is where it has to bite.
+        // Measured before tightening: 21 importers of this directory, ALL of
+        // them through the barrel, so this can only ever fire on a new one.
+        if (resolved === null || !resolved.startsWith(COLLISION_DIR + path.sep)) continue;
+        consumers.push({
+          file: posix(file),
+          names: namesOf(clause),
+          via: path.basename(resolved),
+        });
+      }
+    }
+
+    // SELF-CHECK ON THE WALK. An importer scan that finds nobody proves nobody
+    // imports the guarded names, vacuously — so the scan has to be shown
+    // working before its silence is read as evidence.
+    const allNames = consumers.flatMap((c) => c.names);
+    expect(consumers.length, "files importing this module").toBeGreaterThanOrEqual(15);
+    expect(allNames, "the clause parser reads real names").toEqual(
+      expect.arrayContaining([
+        "actorObb",
+        "obbSeparationM",
+        "playerObb",
+        "ContactProbe",
+        "isContact",
+      ]),
+    );
+
+    // A namespace import reaches EVERY export, the guarded ones included, and
+    // would make the claim unverifiable rather than false — so it is refused
+    // too, and the message says which file to un-widen.
+    expect(
+      consumers.filter((c) => c.names.includes("*")).map((c) => `${c.file} -> ${c.via}`),
+      "no file outside this directory may namespace-import this module — the barrel or any file in it",
+    ).toEqual([]);
+
+    const breaches = consumers.flatMap((c) =>
+      c.names
+        .filter((n) => (GUARDED_EXPORTS as readonly string[]).includes(n))
+        .map((n) => `${c.file}: ${n} (via ${c.via})`),
+    );
+    expect(
+      breaches,
+      "the bare swept pair keeps a teleport fallback ContactProbe removes; the three budgets are held by this test alone",
+    ).toEqual([]);
+    // The whole of platform/src is read off disk here. 60 s is not a licence to
+    // be slow — it is the margin between „the tree grew / the disk was busy"
+    // and a RED, because a tree-walk assertion that times out under load is one
+    // that gets deleted for being flaky rather than believed.
+  }, 60_000);
+});

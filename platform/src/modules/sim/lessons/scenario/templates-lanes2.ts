@@ -297,6 +297,18 @@ const OVN_LEAD_CAR: BrakingLeadCarSpec = {
  * gapsM[i−1] BEHIND the head along the SAME path (runners.ts), so a gap larger
  * than the head's 618 m hold would place car 1 off the path's start — the
  * ov-oncoming battery asserts exactly that (holdArc − gap ≥ 0).
+ *
+ * REBASE 2026-08-22 — THE HOLD IS ALSO A COPY CONTRACT, and it had no test.
+ * Instruction 1 promises «далеч насреща светят фарове» AT THE BRIEFING BEAT,
+ * and OncomingStreamRunner stages the whole column from frame one („the stream
+ * stands queued in the oncoming lane before it is released"), so the promise is
+ * true exactly while this hold sits far enough ahead of `ovg-spawn-start`
+ * (y 15) to read as „далеч" and near enough to be DRAWN. 900 − 618 ⇒ y 282, so
+ * the head is 267 m out — comfortably inside LessonScene's
+ * `maxDrawDistanceM={420}`, beyond which the fleet culls the agent and the
+ * cue stops existing however well it is authored. Push the head out for „more
+ * далеч" and the drill's whole premise becomes a sentence about an empty road;
+ * lanes2-rebase-actor-truth.test.ts §3a is the wall that catches it.
  */
 const OVN_STREAM: OncomingStreamSpec = {
   id: "sc-ovn-stream",
@@ -662,7 +674,44 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
     },
     {
       id: "sc-ovbo-finish",
-      titleBg: "Пусни го да се прибере и продължи в своята лента",
+      // REBASE 2026-08-22 — THE TICK THAT CERTIFIED A MANOEUVRE NOBODY EVER
+      // PERFORMED. This row shipped as «Пусни го да се прибере и продължи в
+      // своята лента» — „let him pull back in, and carry on in your own lane".
+      // The second clause is measurable and stays. THE FIRST ONE DESCRIBES AN
+      // ACT THIS WORLD CANNOT PERFORM, and that is not a reading of a frame,
+      // it is a reading of the runner:
+      //
+      //   `RearTailgaterRunner.step` (orchestrator/runners.ts) issues ONE
+      //   `laneShift` in its whole life — `{ toOffsetM: s.passShiftM }` at
+      //   pass time — and there is no second command anywhere in the class.
+      //   Resolution is `passCommanded && actorAheadM >= passAheadM`, which
+      //   fires while the actor is still at passShiftM. So the overtaker
+      //   leaves for the oncoming bank at −8.125 m and STAYS THERE for the
+      //   rest of the session, at its locked 25 m/s.
+      //
+      // A student who reads this title and looks up therefore watches a car
+      // finish an overtake by never coming back — on a 1+1 rural road at 90,
+      // which is the single most dangerous way to end one — while the lesson
+      // ticks him off for having let it happen properly. That inverts the
+      // north-star test: чл. 42's whole shape is that the manoeuvre is not
+      // over until the overtaker is home, and this row was teaching that it
+      // is over when he is past.
+      //
+      // THE REPAIR IS THE SENTENCE, NOT THE MARK. The mark is honest work —
+      // radius 6 < the 8.125 m lane pitch, so it is satisfiable only from the
+      // own lane and the drift demo fails it — and the drill's duty really is
+      // the passive one. So the title now names the DUTY (his corridor is not
+      // yours to narrow) and the thing the evaluator actually reads (you are
+      // on your own lane centre at the mark). What the overtaker does with the
+      // room is his business and is no longer claimed.
+      //
+      // The runner's missing return is NOT this file's to fix — it is a
+      // `laneShift` back to 0 once `actorAheadM >= passAheadM`, in
+      // RearTailgaterRunner, and twelve templates borrow that runner. Reported
+      // rather than guessed at; §2 of lanes2-rebase-actor-truth.test.ts holds
+      // the template end so no title here can re-acquire the claim while the
+      // runner still cannot back it.
+      titleBg: "Не му пречи — продължи спокойно в своята лента",
       params: { kind: "reachZone", x: OVN_OWN, y: 520, radiusM: 6 },
     },
   ],
@@ -762,6 +811,56 @@ export const SC_OV_BEING_OVERTAKEN: ScenarioSpec = {
 // carries speed in. ov-crest-districts.test.ts pins the negative so the day the
 // ban detector learns about 1+1 banks it fails loudly and this template gains
 // its code deliberately.
+//
+// REBASE 2026-08-22 — «FULL SIGHT LINES», AND THE NUMBER NOBODY HAD EVER TAKEN.
+// The steered re-drive left this row open, and the half of it that is not the
+// flat horizon is the sharp half: „the only geometry change is a gentle right
+// bend WITH FULL SIGHT LINES — the blind section the lesson grades does not
+// exist". Every graded word in this template — «сляп завой» in the patience
+// tick, «не виждаш края на маневрата си» in the teach card — rests on that
+// bend being blind, and NOTHING in the tree had ever checked it. It rests, in
+// fact, on ONE object: `ovc-b-slope`, an 18 × 18 m footprint 9 m tall, authored
+// inside the arc at (51.5…69.5, 305.5…323.5), i.e. r 92.6…118.0 m against the
+// own lane's 130.94 — a roadside mass, 8.9 m clear of the inner kerb.
+//
+// MEASURED off the committed district (sight line from the own lane to the
+// ONCOMING bank, first occlusion wins, sampled every 2 m —
+// lanes2-rebase-actor-truth.test.ts §2):
+//
+//        eye at        with ovc-b-slope        without it
+//        s = 150 (В24)      229 m                749 m
+//        s = 240 (arc in)   157 m                659 m
+//        s = 280 (worst)    141 m                619 m
+//
+// (VERIFIER 2026-08-23 corrected the right-hand column, which was written as a
+// flat 561 m on all three rows and reproduces under no sampling variant. The
+// true figure is worse for the block's absence, not better: without it the
+// sight line is not merely long, it runs CLEAR TO THE END OF THE ROAD — 749 /
+// 659 / 619 m is just 900 minus the eye's own s, so nothing else on this
+// district occludes anything. ovc-b-barn, the only other building, sits at
+// y 120–138 on the far verge and is BEHIND the eye at every one of these
+// stations. The block is not the main thing hiding this bend; it is the ONLY
+// thing. The left-hand column reproduced as measured, bar one 2 m sample.)
+//
+// So the ban IS justified and the copy IS true: 141–229 m of visible oncoming
+// road against the ~500 m a 90 km/h pass of a 57 km/h truck needs. And the
+// whole of that justification is one block that no test held in place — delete
+// it, shrink it under a car's height, or slide it off the chord and the same
+// road opens to more than half a kilometre while every sentence here goes on
+// preaching caution. §2 now holds it in BOTH directions, which is the actual
+// repair this row was owed.
+//
+// WHAT IS STILL OPEN AND IS NOT THIS FILE'S: the block does not appear in the
+// audit's frames. It IS built — `buildWorldGeometry(ov-crest-v1).stats
+// .buildings` is 2, `buildingWalls` carries 864 position floats and
+// `colliders.buildings` 288 — yet at t 206 s and t 210 s on
+// .audit-frames/rebase/frames/sc-ov-crest-curve__mobile-right the inside of
+// the bend shows verge, trees and a parked queue against an open horizon where
+// a 9 m mass ought to stand ~40 m off the nose at ~16° right. Same for
+// `ovc-b-barn` on the approach. Buildings render on wb-boulevard-v1, so this is
+// specific and reportable: the district's sight geometry exists in the data,
+// in the collider and in the grading, and the student cannot see it. That is
+// the scene layer's row, filed rather than guessed at from here.
 // ---------------------------------------------------------------------------
 
 /** ov-crest-v1 pins, denormalized from the committed map by value (the L7 copy

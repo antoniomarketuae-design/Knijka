@@ -32,22 +32,48 @@
  *
  * `ContactProbe` subdivides such an interval and returns the minimum over it,
  * so a head-on is a head-on at every tick. No consumer imports the bare swept
- * pair through this barrel today (checked: LessonScene, NpcColliders,
- * orchestrator/contact, traces/recorder, traces/scHzEmergencyStop,
- * world/referents); they stay exported because they are the primitive the
- * subdivision is built from. A caller holding two consecutive frames wants the
- * probe. A caller holding ONE pose — the traces channel, which replays a
- * scripted drive — wants `obbSeparationM`/`obbOverlap` and is not affected.
+ * pair through this barrel, and that is now WALKED rather than remembered:
+ * `__tests__/index.test.ts` parses every import in `platform/src`, resolves the
+ * ones that land anywhere in this DIRECTORY, and fails on any outside name
+ * reaching `sweptObbSeparationM`/`sweptObbDiscSeparationM` — or namespace-
+ * importing the module, which would reach them without naming them. IT SAID
+ * „this file" AND CHECKED ONLY THE BARREL until 2026-08-23, when a verifier
+ * wrote `import { SWEEP_TELEPORT_M } from "../collision/obb"` in a file
+ * outside the directory and the guard stayed GREEN: every guarded name was
+ * reachable one path segment past the barrel, and nothing else in the tree
+ * forbids a deep import. The walk now resolves to the directory, so the
+ * sentence above and the test below say the same thing. They stay exported
+ * because they are the primitive the subdivision is built from. A caller
+ * holding two consecutive frames wants the probe. A caller holding ONE pose —
+ * the traces channel, which replays a scripted drive — wants
+ * `obbSeparationM`/`obbOverlap` and is not affected.
+ *
+ * THIS SENTENCE USED TO CARRY THE LIST ITSELF («checked: LessonScene,
+ * NpcColliders, orchestrator/contact, traces/recorder, traces/scHzEmergencyStop,
+ * world/referents») and the list had already gone stale: the tree has EIGHT
+ * non-test importers of this barrel, not six — `traffic/system.ts` (which takes
+ * `PLAYER_HALF_LENGTH_M` under an alias, deliberately, and says why) and
+ * `traffic/types.ts` were both missing. The conclusion was never wrong; the
+ * evidence for it was, and the next reader re-checking by walking those six
+ * names would have re-derived a wrong answer from a right one. A hand-kept list
+ * has no failure mode — which is the same sentence this module already learned
+ * about hand-kept EXPORT lists, one paragraph up.
  *
  * `SWEEP_CHUNK_TRAVEL_M` / `SWEEP_FRAME_TRAVEL_M` are re-exported for the same
  * reason: `SWEEP_FRAME_TRAVEL_M` (60 m) is the threshold above which even the
  * probe DISCARDS the interval, and the module that owns the clock — the
  * orchestrator's director — is the one that can violate it. It still does not
- * read either number: checked 2026-08-19, NOTHING outside this directory
- * imports `SWEEP_FRAME_TRAVEL_M`, `SWEEP_CHUNK_TRAVEL_M` or `SWEEP_TELEPORT_M`.
- * The budget is therefore held by `__tests__/index.test.ts` alone, and that
- * sentence used to read „the only one that could not check", which described an
- * intention rather than the tree.
+ * read either number: NOTHING outside this directory imports
+ * `SWEEP_FRAME_TRAVEL_M`, `SWEEP_CHUNK_TRAVEL_M` or `SWEEP_TELEPORT_M`, and
+ * that is the same walk, in the same test, rather than a date typed beside a
+ * grep. The budget is therefore held by `__tests__/index.test.ts` alone, and
+ * that sentence used to read „the only one that could not check", which
+ * described an intention rather than the tree.
+ *
+ * The walk checks each guarded name is a LIVE EXPORT before it looks for
+ * importers, because a guard written as a list of strings stops guarding the
+ * moment one of them is renamed and then passes forever — a substring catches
+ * deletion, never neutralisation.
  *
  * HOW MUCH ROOM THAT 60 m LEAVES IS NOT STATED HERE, DELIBERATELY. It was, and
  * for a day this file and probe.ts published two DIFFERENT margins for one
@@ -74,13 +100,31 @@
  * corpus for the six turned up three more parked on the string
  * „platform/src/modules/sim/collision", a DIRECTORY with no filename, which is
  * a second way to be invisible to a wave that groups findings by file. The
- * refutation that applies to all nine is one grep: this directory imports
- * neither three nor @react-three/rapier nor react, and the barrel below
- * exports only constants, functions that return a number or a boolean, three
- * body builders and one pose-memory class. Nothing here can create a body,
- * move one, draw one or end a lesson. Keep that true — it is what makes this
- * module testable without a browser, and it is also the reason a finding about
- * a body that did not stop can never be closed by editing it:
+ * refutation that applies to all nine is that this directory imports neither
+ * three nor @react-three/rapier nor react nor the raw engine under them
+ * (`@dimforge/rapier3d`, `@dimforge/rapier3d-compat` — added to the guard
+ * 2026-08-23, because the capability these rows are routed away from is
+ * „can create a rapier body", and the raw engine grants it without the
+ * wrapper; it is what NpcColliders.tsx and VehicleRig.tsx, the two files the
+ * rows were routed TO, actually import) — TRANSITIVELY, its whole import
+ * closure is nine plain-TypeScript files — and that the barrel below exports
+ * only constants, functions that return a number or a boolean, three body
+ * builders and one pose-memory class. Nothing here can create a body, move
+ * one, draw one or end a lesson.
+ *
+ * THAT USED TO BE „one grep", AND A GREP IS WHY THIS PARAGRAPH IS WORTH
+ * READING TWICE. Four CRITICAL rows are routed out of this module on those two
+ * sentences, and until 2026-08-22 nothing could fail if either stopped being
+ * true: someone adding a rapier import here would not have broken a test, they
+ * would have broken a comment, and the refutation those four rows rest on would
+ * have quietly become false while every row stayed shut. Both sentences are now
+ * assertions in `__tests__/index.test.ts` — the closure is walked with comments
+ * stripped (this file and probe.ts both DISCUSS rapier at length, so a grep for
+ * the word answers wrong), and the export surface is checked by kind, so a mesh
+ * or a component would arrive as a red rather than as a new capability nobody
+ * noticed. Keep that true — it is what makes this module testable without a
+ * browser, and it is also the reason a finding about a body that did not stop
+ * can never be closed by editing it:
  *
  *   · NO CONTACT RESPONSE. Nothing here moves a body. Adjudication says "these
  *     two boxes overlap by 1.77 m"; keeping them out of each other is rapier's
@@ -90,6 +134,22 @@
  *     mobile-wrong t192s and sc-ov-return-gap mobile-wrong t118s show the ego
  *     inside the lead car's body; no signed separation this module can return
  *     changes that.
+ *
+ *     HALF OF BOTH ROWS HAS SINCE BEEN PAID, and the next reader should not
+ *     re-fix it: the „42 separate «Пътнотранспортно произшествие» for one
+ *     continuous contact" and the „25 collisions / 252 наказателни точки" those
+ *     two rows were filed on are the EPISODE LATCH, and rules/engine.ts now
+ *     answers it — `CONTACT_LEAD_GAP_M` (a second accident needs the bodies to
+ *     have been SEEN apart, not merely 2 m of path, because a shunt supplies
+ *     path) and `CONTACT_REVERSE_TRAVEL_M` (the same floor asked of the one
+ *     motion that can supply it, for the bodies the gap channel cannot speak
+ *     for). Read on 2026-08-22 and green: `rules/__tests__/
+ *     sweep161-fault-episodes.test.ts` + `contact-episode-per-body.test.ts`,
+ *     39 tests. What is still OPEN on those two rows is the physics half alone
+ *     — the ego passing through the staged lead — and it is the half that
+ *     decides what the student is taught: fixing only the latch turns 252
+ *     points into 10 and makes the lesson LOOK correct while the car still
+ *     drives through the body it is being taught to keep a gap from.
  *   · NO STATIC-WORLD BODY. bodies.ts sizes the player, the NPC vehicle shell
  *     and the pedestrian disc. There is no building, wall or kerb body, so the
  *     geometric sentinel (orchestrator/contact.ts) can only ever watch STAGED
@@ -111,6 +171,44 @@
  *     windscreen full of facade, which is not a body that was stopped and
  *     re-accelerated. Both buildings.ts and terminus.ts state in their own
  *     headers that such a mass „cannot be driven through".
+ *
+ *     ONE HYPOTHESIS IS NOW DEAD, MEASURED 2026-08-22 SO THE NEXT LANE DOES NOT
+ *     SPEND ITSELF ON IT. `routing-collision.json` asks, as its FIRST
+ *     measurement for the sc-ac-night-overdrive row, whether the terminus
+ *     closure contributes any collider index at all — „if the index count is
+ *     zero for the closure, the defect is upstream in terminus.ts/
+ *     buildWorldGeometry.ts rather than in the quad geometry". IT IS NOT ZERO.
+ *     Built headlessly through `buildWorldGeometry`, `ov-oncoming-v1` yields
+ *     ONE authored building plus FOUR terminus closure meshes and a building
+ *     collider of 40 triangles — 20 full-height quads, exactly 4 (the authored
+ *     block) + 16 (four closures × four edges) — whose vertices cluster at
+ *     district y ≈ 40…58 (the authored block the ego passes in the first
+ *     seconds) AND at y ≈ 918…938, the far end where the frame was taken. Wall
+ *     height runs 0 → 17.06 m. `ac-aqua-v1` and `ac-night-v1` measure the same
+ *     shape (40 tris, closures at y ≈ 538…558 / 378…398); `ln-arrows-v1` has
+ *     two blocks, eight closures and 80 tris. And the mass is MOUNTED: no
+ *     LESSON path passes `physics={false}`, so `DistrictWorld`'s `physics = true`
+ *     default mounts `WorldColliders` under every lesson. (That sentence read
+ *     „nothing passes `physics={false}`" until 2026-08-23, and one caller
+ *     does: `/dev/scene-still` (SceneStillScene.tsx:609), a still-frame
+ *     renderer with no car in it. The conclusion is untouched; the wording was
+ *     wider than the tree, which is the exact failure this header spends two
+ *     paragraphs on above.) The chassis `<RigidBody>` carries `ccd`
+ *     (VehicleRig.tsx) and is force-driven (vehicle/VehicleSim.ts —
+ *     `addForce`/`applyImpulseAtPoint`),
+ *     with `setTranslation` only on spawn and reset, so it is not a teleported
+ *     body that CCD would be unable to help.
+ *
+ *     So the wall exists, is full height, is in the physics world, and is at
+ *     the place the car went through. WHAT REMAINS is why a swept dynamic body
+ *     crosses it — and it is worth noticing that this is the SAME defect class
+ *     this module already fixed one layer up: the GRADER stopped tunnelling
+ *     when `ContactProbe` learned to subdivide a long interval, and the frames
+ *     say the PHYSICS has not. Measured on the tree of 2026-08-22, while
+ *     another lane had `buildWorldGeometry.ts` open on the terminus seam — so
+ *     re-measure before quoting the triangle counts, and treat the shape of the
+ *     answer (mass present, mounted, at the right place) as the load-bearing
+ *     half.
  *   · NO FINISH RULE EITHER, and that half is lessons/finish.ts's — nothing
  *     ends a lesson whose car has come to rest inside the scenery, the same
  *     gap already on the books at sc-park-night.

@@ -21,6 +21,48 @@
  * Pure + deterministic: the caller owns the per-session encounter counts.
  */
 
+/**
+ * THIS FILE EMITS NO TEXT, AND EIGHT AUDIT FINDINGS SAY OTHERWISE — 2026-08-23.
+ *
+ * The note is here because the corpus points a fixer HERE, so this is where the
+ * next one lands. `coachStep`/`coachSession` return {mode, scored, showLesson,
+ * penaltyMultiplier} and nothing else; measured on the comment-stripped source,
+ * the file holds ZERO Cyrillic characters and its only string literals are
+ * module specifiers, mode names and counter-key prefixes. It cannot be the
+ * source of a caption, so no repair to it can move any of these eight:
+ *
+ *   sc-merge-lane-end:16d2fa64      sc-ed-poligon-chain:746682ab
+ *   sc-zebra-approach:8dda834f      sc-lane-change:d59518f2
+ *   sc-follow-cutin:12458158        sc-hazard-obstacle:c6bc5131
+ *   sc-hz-accident-scene:9e19b858   sc-hz-breakdown-pulloff:b56c2554
+ *
+ * All eight quotes are `annotation.textBg` steps in the demonstration traces
+ * (`modules/sim/traces/sc*.ts`), rendered by the `data-hud="deck-caption"` box
+ * in `components/sim/lesson-ui/TraceTimeline.tsx`. Verified by opening all
+ * eight named frames: in every one the sentence sits directly above the panel
+ * headed «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА», on the DEMO's clock (0:23/2:44,
+ * 0:22/0:32, 0:02/0:34, 0:02/0:27, 0:28/0:40, 0:23/0:30, 0:20/0:28, 0:26/0:26)
+ * — not the student's. The lesson mounts that deck as the ratified L1 aid
+ * (`DEFAULT_LEVEL_AIDS[1].shadowCar`, compile.ts), so removing it is not the
+ * cure. This is the SAME misrouting TraceTimeline.tsx already records at its
+ * `captionDeadAirPx` block for `sc-follow-distance/pc-right/04-t180s.png`,
+ * which was filed against `AdvisorCard.tsx` and belonged to this box too.
+ *
+ * The owners are TraceTimeline.tsx (caption at rest), LessonScene.tsx +
+ * traces/types.ts (`createTraceClock` starts `playing: true`, so the demo has
+ * already run 23 s by the arrival frame) and ShadowCar.tsx (the playhead loops
+ * or parks, desynchronised from the student either way). Censused over the 503
+ * shipped trace JSONs (1,870 captions): 490 put their LAST caption exactly at
+ * the trace end and 495 within the 4 s linger window, and 42 captions are in
+ * the first-person completed voice — 16 of those a trace's final caption — so
+ * a parked playhead freezes «Спряхме плътно вдясно…» over a live drive.
+ * Anyone adding the VISIBLE speaker chip that would fix the attribution must
+ * put it outside the fixed 138 px caption box: `deckCaptionVoice.test.tsx`
+ * asserts the label is `sr-only` precisely because the tallest caption in the
+ * bank is six lines and a label row inside would clamp it. That assertion is
+ * argued; replace it deliberately or work around it, never delete it to pass.
+ */
+
 import { actCopy } from "../rules";
 import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
