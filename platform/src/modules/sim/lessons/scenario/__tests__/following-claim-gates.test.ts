@@ -845,3 +845,214 @@ describe("sc-follow-standstill: the queue's depth is proven, not asserted", () =
     expect(tail.actor.profile, "the graded lead is a plain car").toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 11. A harder rung may ADD to the world. It may never delete from it.
+//     (Round 2 — sc-follow-standstill:a9f2bb6b, the half nobody had driven)
+// ---------------------------------------------------------------------------
+
+/**
+ * THE FRAME SAID «one lead vehicle, nothing queued behind it». THE FIX B70
+ * SHIPPED WAS REAL — AND ONE RUNG OUT OF FIVE STILL LOOKED EXACTLY LIKE THE
+ * FRAME.
+ *
+ * `LevelSpec.stagedAdd` has no inheritance: `compileScenario` builds a rung's
+ * world as `[...spec.staged, ...rung.stagedAdd]`, reading ONLY that rung. The
+ * complication kit (`scenario/complications.ts`) authors a WHOLE LevelSpec, so
+ * `l5Wet()` written as a bare rung replaces the rung it stands in — and
+ * `sc-follow-standstill`, whose L1–L4 each carry `stagedAdd: FS_QUEUE_AHEAD`,
+ * compiled its L5 with the two column members gone:
+ *
+ *   L1 3 · L2 3 · L3 3 · L4 3 · **L5 1**
+ *
+ * Nothing goes red when that happens. The rung still compiles, the
+ * complication card is still correct (it adds weather and grip, and it says
+ * so), the graded numbers are all computed against the TAIL, and every
+ * existing assertion about the queue in this file reads `levels[0]` — which is
+ * exactly the rung that was still right. The only thing that changed was that
+ * a lesson called «Дистанция при спиране в КОЛОНА», whose instruction 4
+ * promises «там стои спряла колона», staged one car on the rung where the road
+ * is wet and the stopping distance is ~1.4× longer.
+ *
+ * SO THE ASSERTION IS NOT ABOUT THAT LINE. It is the invariant the line broke,
+ * swept over every authored rung of all seven templates: the set of staged
+ * actors may grow as the ladder climbs and may never shrink. A rung that is
+ * harder to FINISH because the world got emptier is not difficulty — it is the
+ * lesson quietly withdrawing its own subject.
+ *
+ * WATCHED RED: restoring the bare `l5Wet()` on `sc-follow-standstill` fails
+ * this with «sc-follow-standstill L4→L5 drops sc-fs-queue-1, sc-fs-queue-2».
+ */
+describe("a harder rung adds to the world and never deletes from it", () => {
+  /** The staged-actor ids the student actually meets on a compiled rung. */
+  function stagedIdsAt(spec: ScenarioSpec, level: 1 | 2 | 3 | 4 | 5): string[] {
+    const lesson = compileScenario(spec, level);
+    const staged = (lesson as unknown as { stagedEvents?: { id: string }[] }).stagedEvents ?? [];
+    return staged.map((s) => s.id).sort();
+  }
+
+  it("has rungs to sweep at all (a sweep over nothing proves nothing)", () => {
+    const rungs = SCENARIO_TEMPLATES_FOLLOWING.flatMap((s) => s.levels);
+    expect(SCENARIO_TEMPLATES_FOLLOWING.length).toBe(7);
+    expect(rungs.length, "authored rungs across the family").toBeGreaterThanOrEqual(30);
+    // …and at least one of them really does stage something per-rung, or the
+    // invariant below is vacuous on this file forever.
+    expect(
+      SCENARIO_TEMPLATES_FOLLOWING.some((s) => s.levels.some((l) => (l.stagedAdd ?? []).length > 0)),
+      "some rung in this family carries stagedAdd",
+    ).toBe(true);
+  });
+
+  it("no rung stages fewer actors than the rung below it", () => {
+    const dropped: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES_FOLLOWING) {
+      for (let i = 1; i < spec.levels.length; i++) {
+        const lo = spec.levels[i - 1].level;
+        const hi = spec.levels[i].level;
+        const below = stagedIdsAt(spec, lo);
+        const above = stagedIdsAt(spec, hi);
+        const gone = below.filter((id) => !above.includes(id));
+        if (gone.length > 0) dropped.push(`${spec.id} L${lo}→L${hi} drops ${gone.join(", ")}`);
+      }
+    }
+    expect(dropped, "rungs that delete a staged actor the rung below staged").toEqual([]);
+  });
+
+  it("sc-follow-standstill keeps a column at EVERY rung, not just the one L1 authors", () => {
+    // The named case, stated in the lesson's own terms so the reason survives
+    // a refactor of the sweep above: «колона» is the title, the objective and
+    // instruction 4, and a column is at minimum the tail plus one more.
+    //
+    // The GEOMETRY is compared too, not just the ids — §9 and §10 above prove
+    // the spacing and the roofline off `levels[0]`, so a rung that kept the
+    // names and moved the metres would satisfy every other assertion in this
+    // file while putting the column somewhere the student never looks.
+    const queueAt = (level: 1 | 2 | 3 | 4 | 5): string =>
+      (
+        (compileScenario(SC_FOLLOW_STANDSTILL, level) as unknown as {
+          stagedEvents?: { id: string; actor: { hold: { offsetM: number }; profile?: string } }[];
+        }).stagedEvents ?? []
+      )
+        .filter((s) => s.id.startsWith("sc-fs-queue-"))
+        .map((s) => `${s.id}@${s.actor.hold.offsetM}/${s.actor.profile ?? "car"}`)
+        .sort()
+        .join(" · ");
+
+    for (const level of [1, 2, 3, 4, 5] as const) {
+      const ids = stagedIdsAt(SC_FOLLOW_STANDSTILL, level);
+      expect(ids, `sc-follow-standstill L${level} stages the graded tail`).toContain("sc-fs-lead");
+      const queue = ids.filter((id) => id.startsWith("sc-fs-queue-"));
+      expect(
+        queue.length,
+        `sc-follow-standstill L${level} stages a column, not one car — got [${ids.join(", ")}]`,
+      ).toBeGreaterThanOrEqual(2);
+      expect(
+        queueAt(level),
+        `sc-follow-standstill L${level} parks the column where L1 parks it`,
+      ).toBe(queueAt(1));
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. THE EXPOSURE LEDGER — a pace cap has an upper edge and no lower one, so
+//     every «Следвай/Продължи … спокойно» gate in this family credits a car
+//     that has STOPPED. This is NOT a fix. It is the measurement that says
+//     what a fix would have to change, and where. (Round 2 — sc-follow-cutin
+//     :996fd693, which is not closed by anything in this file.)
+// ---------------------------------------------------------------------------
+
+/**
+ * THE FRAME. `sc-follow-cutin/pc-wrong/04-t017s.png` carries a green ✓ against
+ * «Продължи спокойно след вклиняването» while the speedometer reads **0 км/ч**,
+ * the lead car's brake bar is lit two metres from the bonnet, and the fault
+ * card beside it reads «ОПАСНА ГРЕШКА −10 изпитни т. · Удар в друго превозно
+ * средство … преди 3 с». The student is credited with continuing calmly three
+ * seconds after rear-ending the car he was told to follow.
+ *
+ * THE MECHANISM, read out of `lessons/objectives.ts` rather than guessed. The
+ * arrival contract is `speedKmh <= cap && (inAcceptance || graceArmed)`, and
+ * `capMet` is `(st.capMet && !spent) || contractEarned`. `capSpent` fires while
+ * the car is over `cap + REACH_ZONE_CAP_SLACK_KMH` on the approach — so the
+ * barge really does spend the latch — but the latch is then RE-EARNED the
+ * moment the car is slow enough inside the disc, and 0 км/ч is slow enough.
+ * There is no floor anywhere in `ReachZoneParams`; `minSpeedKmh` does not
+ * exist in `lessons/types.ts` at all.
+ *
+ * SO THIS FILE CANNOT FIX IT. Every remedy available to a TEMPLATE is a
+ * different sentence in the title, and the sweep in §1 already made these
+ * titles claim no more than a place and a pace. What is left is that the pace
+ * itself is only half-measured, and that lives one module up.
+ *
+ * WHAT WOULD FIX IT, stated so the next lane does not have to re-derive it:
+ * a `minSpeedKmh` on `ReachZoneParams`, ANDed into `contractEarned` and spent
+ * by the same `capSpent` rule, would let «Следвай … спокойно» mean „was
+ * following, calmly" instead of „was at most this fast, possibly because he
+ * had stopped". Four of the five rows below would then author one; the fifth
+ * (`sc-fs-stopped`) must not, because its cap IS the halt demand.
+ *
+ * THE LEDGER GOES RED WHEN THE EXPOSURE CLOSES, and that is the point: the day
+ * a floor lands and this family adopts it, this test fails and is deleted with
+ * the row it was standing in for. A silent exposure is how «0,0 с» ended up
+ * three centimetres under a green tick in the first place.
+ */
+describe("EXPOSURE (not a fix): a pace cap credits the car that stopped inside it", () => {
+  /** Enter the disc well over the cap, then come to rest in it — the frame. */
+  function bargesThenStops(spec: ScenarioSpec, objectiveId: string, cap: number): boolean {
+    const lesson = compileScenario(spec, 1);
+    const objective = lesson.objectives.find((o) => o.id === objectiveId)!;
+    const params = parseObjectiveParams(objective);
+    const zx = (params as unknown as { x: number }).x;
+    const zy = (params as unknown as { y: number }).y;
+    let state: ObjectiveEvalState = createEvalState(params);
+    let done = false;
+    let t = 0;
+    const feed = (y: number, speedKmh: number): void => {
+      t += 0.2;
+      const r = stepObjective(params, state, makeTick({ t, speedKmh, position: { x: zx, y } }));
+      state = r.evalState;
+      done = done || r.done;
+    };
+    for (let y = zy - 60; y < zy - 2; y += 2) feed(y, cap + 20); // the barge
+    for (let i = 0; i < 40; i++) feed(zy - 1, 0); // …and the crash-stop
+    return done;
+  }
+
+  it("every flow-capped following gate in the family does it — all five, measured", () => {
+    const credited: string[] = [];
+    const refused: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES_FOLLOWING) {
+      for (const o of compileScenario(spec, 1).objectives) {
+        const p = parseObjectiveParams(o) as unknown as { kind: string; maxSpeedKmh?: number };
+        if (p.kind !== "reachZone" || p.maxSpeedKmh === undefined) continue;
+        // A HALT demand is excluded on purpose and not for convenience: on
+        // `sc-fs-stopped` the cap IS «спри», so crediting the car at rest is
+        // the row working. Everything else here is a FLOW cap, where at rest
+        // is the one state the title cannot mean.
+        if (p.maxSpeedKmh <= REACH_ZONE_HALT_CAP_KMH) continue;
+        const row = `${spec.id}/${o.id} «${o.titleBg}» cap ${p.maxSpeedKmh}`;
+        (bargesThenStops(spec, o.id, p.maxSpeedKmh) ? credited : refused).push(row);
+      }
+    }
+    expect(credited.length + refused.length, "flow-capped gates in this family").toBe(5);
+    // If this ever fails with rows in `refused`, a speed FLOOR has landed:
+    // delete this whole section and author the floor on the rows that need it.
+    expect(
+      refused,
+      "a gate started refusing the stopped car — the floor has landed; retire this ledger",
+    ).toEqual([]);
+    expect(credited.length, "the exposure, measured").toBe(5);
+  });
+
+  it("…and the cut-in row is the one that was photographed doing it", () => {
+    const objective = compileScenario(SC_FOLLOW_CUTIN, 1).objectives.find(
+      (o) => o.id === "sc-fc-rebuild",
+    )!;
+    const cap = (parseObjectiveParams(objective) as unknown as { maxSpeedKmh: number }).maxSpeedKmh;
+    expect(cap).toBeGreaterThan(REACH_ZONE_HALT_CAP_KMH);
+    expect(
+      bargesThenStops(SC_FOLLOW_CUTIN, "sc-fc-rebuild", cap),
+      "pc-wrong/04-t017s.png: ✓ «Продължи спокойно след вклиняването» at 0 км/ч, 3 s after the collision",
+    ).toBe(true);
+  });
+});

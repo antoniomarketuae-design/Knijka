@@ -890,6 +890,38 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
   // B70: the rest of the column rides on every played rung (stagedAdd), so the
   // student meets a queue instead of one parked car, while `staged` — the only
   // field the trace recorder reads — stays exactly as recorded.
+  //
+  // ── ROUND 2 — THE RUNG THAT DELETED THE COLUMN B70 STAGED ────────────────
+  //
+  // `stagedAdd` is a PER-RUNG field with no inheritance (`compile.ts`: `const
+  // staged = [...(spec.staged ?? []), ...(rung.stagedAdd ?? [])]`), and the
+  // kit recipes author a whole LevelSpec. So writing `l5Wet()` here did not
+  // add rain to the rung below — it REPLACED it, and the two vehicles B70 put
+  // ahead of the tail went with it. Measured by compiling the template:
+  //
+  //   L1 3 actors  sc-fs-lead, sc-fs-queue-1, sc-fs-queue-2
+  //   L2 3 · L3 3 · L4 3        (the same three)
+  //   L5 1 actors  sc-fs-lead                       ← the колона is one car
+  //
+  // That is B70's own defect — „a queue of one is a parked car" — surviving on
+  // the rung where it costs the most. L5 is `l5Wet()`: rain, and wet grip at
+  // ~70% of dry, so the stopping distance the student must leave behind the
+  // column is about 1.4× the one he learned on L1–L4. The briefing does not
+  // move with the rung: step 4 still promises «там стои спряла колона и
+  // предният ще се нареди последен», and on the wet rung the world answered
+  // with one car and open road behind it. Every graded number is untouched by
+  // this — `sc-fs-stopped` measures the TAIL's y = 290 rest pose and the props
+  // are `armDistM: 3` scenery that can never arm — so what the rung was
+  // silently withholding was only the thing the lesson is named after.
+  //
+  // The `complication.adds` copy stays exactly right: `rungDeltaAuthored`
+  // records an "actor" addition only when the rung stages MORE than the one
+  // below (`sHi.length > sLo.length`), and 3 → 3 is not more. The rung still
+  // adds weather + grip, which is what `l5Wet()`'s card says it adds.
+  //
+  // Guarded by „a harder rung may add to the world, never delete from it" in
+  // `__tests__/following-claim-gates.test.ts`, which sweeps every authored
+  // rung of all seven templates rather than this one line.
   levels: [
     { level: 1, stagedAdd: FS_QUEUE_AHEAD },
     { level: 2, stagedAdd: FS_QUEUE_AHEAD },
@@ -897,7 +929,10 @@ export const SC_FOLLOW_STANDSTILL: ScenarioSpec = {
     { level: 4, vehicleStart: "cold", stagedAdd: FS_QUEUE_AHEAD },
     // L5 «Усложнени» — the complication kit (scenario/complications.ts):
     // the delta AND the instructor's line that explains it, authored together.
-    l5Wet(),
+    // The column is carried across explicitly: the kit authors a whole rung,
+    // so anything this template adds per-rung has to be re-stated here or the
+    // rung drops it (the block above).
+    { ...l5Wet(), stagedAdd: FS_QUEUE_AHEAD },
   ],
   staged: [FS_LEAD_CAR],
   /**

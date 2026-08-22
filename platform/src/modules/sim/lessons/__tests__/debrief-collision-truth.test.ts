@@ -142,8 +142,22 @@ describe("the numbers agree with the verdict", () => {
     // it is free instead of printing a bare zero next to «Удар в пешеходец».
     expect(text).toMatch(/10 наказателни т\. по изпитния лист/);
     expect(text).toMatch(/без допълнителни точки — изпитът вече беше прекратен/);
-    // …and the reconciliation is stated rather than left to the student.
-    expect(text).toMatch(/Само първата опасна грешка влиза в точките/);
+    // …and the reconciliation is stated rather than left to the student: the
+    // ACT that closed the exam, the article that closes one, and the price the
+    // closure withheld — so the verdict's «10» is checkable against the rows.
+    expect(text).toMatch(/Изпитът е прекратен при «Удар в друго превозно средство»/);
+    expect(text).toMatch(/чл\. 48, ал\. 3/);
+    expect(text).toMatch(/ДОЛНА ГРАНИЦА/);
+    expect(text).toMatch(/щеше да струва още 10 наказателни т\./);
+    /**
+     * AND NEVER AS A RULE OF ITS OWN. The sentence that used to stand here read
+     * «Само първата опасна грешка влиза в точките», which чл. 48, ал. 3 does not
+     * say — the drive directly below (two missed zebras, two опасни, both
+     * charged) is the counterexample, and a drive with dangerous errors BEFORE
+     * the crash had it contradicting the rows two lines above it. Pinned in
+     * `debrief-abort-and-closure-truth.test.ts`.
+     */
+    expect(text).not.toMatch(/Само първата опасна грешка влиза в точките/);
   });
 
   it("THE OTHER DIRECTION: with no closure, group points are still SUMMED", () => {
@@ -152,7 +166,8 @@ describe("the numbers agree with the verdict", () => {
       l0,
       driveResult(TWO_MISSED_ZEBRAS),
     ).text;
-    expect(text).not.toMatch(/Само първата опасна грешка влиза в точките/);
+    expect(text).not.toMatch(/Изпитът е прекратен при/);
+    expect(text).not.toMatch(/ДОЛНА ГРАНИЦА/);
     expect(text).toMatch(/×2 — опасна, 20 наказателни т/);
   });
 

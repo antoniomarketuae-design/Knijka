@@ -44,7 +44,13 @@ import type { TrafficDistrict } from "../../../traffic/types";
 import { createRuleEngine } from "../../../rules";
 import { createScenarioDirector } from "../../../orchestrator/director";
 import { DT, stepFrame, type Stack } from "../../../orchestrator/__tests__/helpers";
-import type { StagedEventSpec } from "../../../contracts";
+import type { CyclistRightHookSpec, StagedEventSpec } from "../../../contracts";
+import { recordScriptedDrive } from "../../../traces/recorder";
+import {
+  scVuPassMistakeFastCloseScript,
+  scVuPassMistakeSqueezeScript,
+  scVuPassShadowScript,
+} from "../../../traces/scVuPass";
 import {
   SC_VU_CYCLIST_HOOK,
   SC_VU_EMERGENCY,
@@ -101,6 +107,15 @@ interface Leg {
   actorAtCrossing: { x: number; y: number } | null;
   /** Closest the player and the actor ever came, m. */
   minGapM: number;
+  /**
+   * Closest they came WHILE THE ACTOR WAS AHEAD on the player's own axis, m.
+   * Only meaningful when the actor advances along that same axis (the two
+   * cyclist streets); Infinity on the crossing-EV legs, where "ahead" is not a
+   * one-axis question. This is the number sc-vu-pass-clearance:953fbed1 is
+   * about: on the shipped build the rider's closest approach was always from
+   * ASTERN, so `minGapM` was small while this stayed above 90 m.
+   */
+  minGapAheadM: number;
   /** Player axis value when the actor's axis passed `crossAt`. */
   playerWhenActorCrossed: number | null;
 }
@@ -124,6 +139,15 @@ function driveStraight(opts: {
   crossAt: number;
   /** Which coordinate of the ACTOR moves toward `crossAt` (may differ). */
   actorAxis?: "x" | "y";
+  /**
+   * The sweep's bot does not hold a speed — it drives and stops, 22–27 full
+   * stops in three minutes. `go`/`stop` seconds reproduce that duty cycle,
+   * which is the pace both open criticals on sc-vu-pass-clearance were
+   * photographed at. Omitted = hold `targetMps` throughout.
+   */
+  duty?: { goSec: number; stopSec: number };
+  /** Stop the leg early once the player's axis reaches this (the finish gate). */
+  stopAt?: number;
 }): Leg {
   const stack = makeStackFor(opts.districtId, opts.staged);
   const actorAxis = opts.actorAxis ?? opts.axis;
@@ -136,22 +160,32 @@ function driveStraight(opts: {
     commendations: [],
     actorAtCrossing: null,
     minGapM: Infinity,
+    minGapAheadM: Infinity,
     playerWhenActorCrossed: null,
   };
   for (let i = 0; i < Math.round(opts.seconds / DT); i++) {
-    v = Math.min(opts.targetMps, v + HERO_ACCEL_MPS2 * DT);
+    const t = i * DT;
+    const moving =
+      opts.duty === undefined ||
+      t % (opts.duty.goSec + opts.duty.stopSec) < opts.duty.goSec;
+    const want = moving ? opts.targetMps : 0;
+    v = want > v ? Math.min(want, v + HERO_ACCEL_MPS2 * DT) : Math.max(want, v - 4 * DT);
     const before = p;
     p += v * DT;
     const x = opts.axis === "x" ? p : opts.fixed;
     const y = opts.axis === "y" ? p : opts.fixed;
     stepFrame(
       stack,
-      { x, y, headingDeg: opts.headingDeg, speedKmh: v * 3.6, brakePedal: 0 },
+      { x, y, headingDeg: opts.headingDeg, speedKmh: v * 3.6, brakePedal: v < 0.1 ? 1 : 0 },
       { indicator: "off", mirrorGlance: null },
     );
     const a = stack.traffic.staged(opts.actorId);
     if (a) {
-      leg.minGapM = Math.min(leg.minGapM, Math.hypot(a.x - x, a.y - y));
+      const gap = Math.hypot(a.x - x, a.y - y);
+      leg.minGapM = Math.min(leg.minGapM, gap);
+      if (actorAxis === opts.axis && (actorAxis === "x" ? a.x : a.y) >= p) {
+        leg.minGapAheadM = Math.min(leg.minGapAheadM, gap);
+      }
       const ap = actorAxis === "x" ? a.x : a.y;
       // The player's crossing of the node — sampled once, on the frame it happens.
       if (!playerCrossed && before < opts.crossAt && p >= opts.crossAt) {
@@ -165,6 +199,7 @@ function driveStraight(opts: {
         leg.playerWhenActorCrossed = p;
       }
     }
+    if (opts.stopAt !== undefined && p >= opts.stopAt) break;
   }
   leg.violations = [
     ...new Set(stack.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code)),
@@ -255,7 +290,11 @@ describe("sc-vu-emergency-junction: the barge — TRIPWIRE: red is the goal", ()
 // 2. sc-vu-pass-clearance — the rider who leaves before the student arrives
 // ---------------------------------------------------------------------------
 
-const passLeg = (targetMps: number, seconds: number): Leg =>
+const passLeg = (
+  targetMps: number,
+  seconds: number,
+  duty?: { goSec: number; stopSec: number },
+): Leg =>
   driveStraight({
     districtId: "vu-pass-v1",
     staged: [...(SC_VU_PASS_CLEARANCE.staged ?? [])] as StagedEventSpec[],
@@ -267,6 +306,10 @@ const passLeg = (targetMps: number, seconds: number): Leg =>
     targetMps,
     seconds,
     crossAt: 360,
+    ...(duty ? { duty } : {}),
+    // sc-vup-finish is (4.06, 300) r9, so the lesson is over at y = 291 and
+    // nothing after it is evidence about what the student saw.
+    stopAt: 291,
   });
 
 describe("sc-vu-pass-clearance: the clearance lesson at a real city pace — must stay true", () => {
@@ -282,31 +325,139 @@ describe("sc-vu-pass-clearance: the clearance lesson at a real city pace — mus
   });
 });
 
-describe("sc-vu-pass-clearance: the hold that has never held — TRIPWIRE: red is the goal", () => {
-  it("releaseDistM is larger than the whole approach, so the rider rolls from the first frame", () => {
+/**
+ * THE TWO `it`s BELOW WERE THE TRIPWIRES FOR DEFECT 8 AND THEY WENT RED ON
+ * 2026-08-22, which is what they were for. Each is replaced by the assertion it
+ * named, plus the one it could not have named because the second critical
+ * (953fbed1) was filed after it was written.
+ */
+describe("sc-vu-pass-clearance: the hold that actually holds", () => {
+  it("releaseDistM is SHORTER than the whole approach, so the rider waits to be closed on", () => {
     const spec = SC_VU_PASS_CLEARANCE.staged![0] as {
       releaseDistM: number;
       junction: { x: number; y: number };
+      actor: { hold: { offsetM: number } };
     };
     // vup-spawn-start (4.06, 15) → vup-n-end (0, 360).
     const spawnToJunctionM = Math.hypot(4.06 - spec.junction.x, 15 - spec.junction.y);
     expect(spawnToJunctionM).toBeCloseTo(345.02, 1);
-    // RED IS THE GOAL: flip to `toBeLessThan(spawnToJunctionM)` with the repair
-    // (releaseDistM 295 + hold offsetM −230 — see DEFECT 8).
-    expect(spec.releaseDistM).toBeGreaterThan(spawnToJunctionM);
+    // The defect was `releaseDistM 360 > 345.02` — a trigger already satisfied
+    // on frame one, i.e. a field that described a hold this street never had.
+    expect(spec.releaseDistM).toBeLessThan(spawnToJunctionM);
+    // …and the release must still fire BEHIND the rider, or the "hold" would
+    // only end after the student had already gone past a standing bicycle.
+    const holdY = spec.junction.y + spec.actor.hold.offsetM; // 140
+    const releaseY = spec.junction.y - spec.releaseDistM; // 125
+    expect(releaseY).toBeLessThan(holdY);
+    // Worst case of the runner's ±5 m jitter still leaves him ahead.
+    expect(releaseY + 5).toBeLessThan(holdY);
   });
 
-  it("so a student below the rider's own speed never meets him — nothing is graded in either direction", () => {
-    // 40 s at the sweep's careful pace. The gap GROWS: the rider is doing
-    // 3.0 m/s and this car is doing 2.8. Zero violations AND zero commendations
-    // is the signature — the lesson is neither passed nor failed, it is absent.
-    // WHEN THE REPAIR LANDS this becomes: the rider is still at his hold pose
-    // when the student is 65 m short of him, i.e.
-    //     expect(leg.minGapM).toBeLessThan(95);
-    const leg = passLeg(CRAWL_MPS, 40);
-    expect(leg.violations).toEqual([]);
-    expect(leg.commendations).toEqual([]);
-    expect(leg.minGapM).toBeGreaterThan(90);
+  it("a student below the rider's own speed now MEETS him, and always with the rider ahead", () => {
+    // This is the pace the sweep actually drove — 22–27 full stops in three
+    // minutes — and the pace both open criticals were photographed at. On the
+    // shipped numbers this leg came back with minGapM > 90 and nothing graded
+    // in either direction: the lesson was neither passed nor failed, it was
+    // ABSENT. Now the rider is standing at the kerb when the student arrives.
+    const leg = passLeg(4.5, 180, { goSec: 4, stopSec: 4 });
+    expect(leg.minGapM).toBeLessThan(20);
+    // 953fbed1: the closest approach must happen with him IN FRONT. On the
+    // shipped numbers `minGapM` was 61.5 m and `minGapAheadM` 92.1 m — every
+    // close approach was from ASTERN, after FR-B5-RETURN rewound him behind a
+    // student he then overtook.
+    expect(leg.minGapAheadM).toBe(leg.minGapM);
+  });
+
+  it("and at the slowest pace the sweep ever drove, he is never once astern before the finish", () => {
+    // 11 км/ч with a 5-on/3-off duty cycle — slower than the rider's own
+    // 3.0 m/s, so the student cannot overtake him and must not be pretended to
+    // have. What he must NOT get is the rider arriving from behind him.
+    const leg = passLeg(CRAWL_MPS + 0.25, 200, { goSec: 5, stopSec: 3 });
+    expect(leg.minGapM).toBeLessThan(20);
+    expect(leg.minGapAheadM).toBe(leg.minGapM);
+    // He never overtakes at that pace, so nothing about the pass is claimed —
+    // and nothing is falsely convicted either (the tracker's own speed floor).
+    expect(leg.violations).not.toContain("VULNERABLE_PASS_TOO_CLOSE");
+  });
+});
+
+/**
+ * THE WINDOW THE REPAIR LIVES IN, MADE EXECUTABLE.
+ *
+ * DEFECT 8's old note concluded „the fix needs traces/scVuPass.ts retimed"
+ * from a SINGLE sampled rung (`releaseDistM 295`, which really does break the
+ * late-dive demo). The band was never scanned. It is scanned here, every run:
+ * the three committed scripts are replayed against the rider at each release
+ * distance the runner's ±5 m jitter can actually produce, and each must still
+ * grade EXACTLY the codeRefs its template row claims.
+ *
+ * This is the assertion that stops the repair rotting. A later hand nudging
+ * `releaseDistM` a few metres — 250 is measurably outside the window even
+ * though 245 and 255 are inside it — turns a mistake demo into a demo that
+ * convicts nothing, and the §5/§9 gate would only catch it at the shipped
+ * value, not at the jittered ones the student actually meets.
+ */
+describe("sc-vu-pass-clearance: the three committed demos survive the WHOLE jitter band", () => {
+  const passDistrict = loadDistrict("vu-pass-v1");
+  const DEMOS = [
+    { name: "shadow-correct", script: scVuPassShadowScript, expect: [] as string[] },
+    {
+      name: "mistake-squeeze",
+      script: scVuPassMistakeSqueezeScript,
+      expect: [...SC_VU_PASS_CLEARANCE.mistakes[0].codeRefs],
+    },
+    {
+      name: "mistake-fast-close",
+      script: scVuPassMistakeFastCloseScript,
+      expect: [...SC_VU_PASS_CLEARANCE.mistakes[1].codeRefs],
+    },
+  ] as const;
+
+  const shipped = SC_VU_PASS_CLEARANCE.staged![0] as CyclistRightHookSpec;
+  /** The runner draws `releaseDistM + (rng()*2−1)*5`, and the draw changes with
+   *  the retry count — so every metre of this band is a live configuration. */
+  const band = [
+    shipped.releaseDistM - 5,
+    shipped.releaseDistM - 2.5,
+    shipped.releaseDistM,
+    shipped.releaseDistM + 2.5,
+    shipped.releaseDistM + 5,
+  ];
+
+  for (const rung of band) {
+    for (const demo of DEMOS) {
+      it(`${demo.name} still grades exactly its codeRefs at releaseDistM ${rung}`, () => {
+        const staged = [
+          { ...shipped, releaseDistM: rung },
+        ] as unknown as StagedEventSpec[];
+        const drive = recordScriptedDrive(structuredClone(passDistrict), demo.script(), {
+          scenarioId: "sc-vu-pass-clearance",
+          kind: demo.name === "shadow-correct" ? "shadow" : "mistake",
+          seed: 7,
+          stagedEvents: staged,
+        });
+        const codes = [
+          ...new Set(drive.ruleEvents.filter((e) => e.kind === "violation").map((e) => e.code)),
+        ].sort();
+        expect(codes).toEqual([...demo.expect].sort());
+      });
+    }
+  }
+
+  it("the shadow keeps its commendation across the band", () => {
+    for (const rung of band) {
+      const staged = [{ ...shipped, releaseDistM: rung }] as unknown as StagedEventSpec[];
+      const drive = recordScriptedDrive(structuredClone(passDistrict), scVuPassShadowScript(), {
+        scenarioId: "sc-vu-pass-clearance",
+        kind: "shadow",
+        seed: 7,
+        stagedEvents: staged,
+      });
+      const codes = drive.ruleEvents
+        .filter((e) => e.kind === "commendation")
+        .map((e) => e.code);
+      expect(codes, `rung ${rung}`).toContain("YIELDED_TO_PRIORITY");
+    }
   });
 });
 
@@ -385,5 +536,89 @@ describe("sc-vu-emergency: the slow car that did nothing — TRIPWIRE: red is th
     const leg = emergencyLeg(CRAWL_MPS);
     expect(leg.commendations).toContain("YIELDED_TO_PRIORITY");
     expect(leg.violations).not.toContain("EMERGENCY_NOT_YIELDED");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. sc-vu-pass-clearance — what the DEFECT 8 repair did NOT buy
+//
+// Added 2026-08-22 by the adversarial verifier of that repair. Two properties
+// the repair's own note claims more broadly than it holds, measured through the
+// same production stack and the same finish-gate scoping the repair's tests
+// use. Both are GREEN today because both defects are live; each names the
+// assertion that replaces it. Neither reopens the two closed criticals — the
+// rider IS met in front on every pace probed, which is what those two were
+// about — and both are here so the residue cannot be re-discovered from
+// scratch by the next hand.
+// ---------------------------------------------------------------------------
+
+describe("sc-vu-pass-clearance: the astern approach the repair narrowed but did not end — TRIPWIRE: red is the goal", () => {
+  // The repair's own behaviour tests use stop-go 4/4 @16 and 5/3 @11, and on
+  // BOTH of those the drive is over before FR-B5-RETURN rewinds the rider. Two
+  // rungs further down the same duty cycle — still inside the sweep's „22–27
+  // full stops in three minutes", still stopping at the finish gate — the
+  // rewind fires with lesson left to run and the rider's CLOSEST approach is
+  // again from behind, which is 953fbed1's own sentence.
+  //
+  // WHEN traffic/staged.ts GROWS ITS PER-SPEC OPT-OUT (a `retire`/`noReturn`
+  // flag on StagedVehicleSpec, so a one-shot VRU is not recycled), each of
+  // these becomes:
+  //     expect(leg.minGapAheadM).toBe(leg.minGapM);
+  for (const [name, duty] of [
+    ["3/8", { goSec: 3, stopSec: 8 }],
+    ["2/6", { goSec: 2, stopSec: 6 }],
+  ] as const) {
+    it(`at stop-go ${name} @16 км/ч the closest the rider ever comes is still from ASTERN`, () => {
+      const leg = passLeg(4.5, 400, duty);
+      // He IS met in front first — the repair's whole point, and the half of
+      // this that must never regress.
+      expect(leg.minGapAheadM).toBeLessThan(20);
+      // …but the rewind then brings him back closer than he ever was ahead.
+      expect(leg.minGapM).toBeLessThan(leg.minGapAheadM);
+    });
+  }
+});
+
+describe("sc-vu-pass-clearance: the rider stands still while the copy says he rides — TRIPWIRE: red is the goal", () => {
+  // objectiveBg: „Покрай десния бордюр СЕ ДВИЖИ велосипедист"; instruction 2:
+  // „покрай десния бордюр КАРА велосипедист". The hold is 125 m up an open
+  // street in the windscreen, so the careful student watches a motionless
+  // bicycle for most of his approach. The shipped-before-2026-08-22 numbers had
+  // no standstill at all (and no encounter either — that was DEFECT 8).
+  //
+  // WHEN THE COPY OR THE RIG IS MADE HONEST (a briefing that says he is waiting
+  // at the kerb, or a hold that idles the rig instead of freezing it), this
+  // becomes a positive assertion about whichever of the two landed.
+  const heldSecondsAt = (targetMps: number, duty?: { goSec: number; stopSec: number }): number => {
+    // The release is a function of the DRIVER's y only (releaseDistM from
+    // vup-n-end), so the standstill is exactly how long the driver takes to
+    // reach y = 360 − releaseDistM from the spawn at y = 15, at this pace.
+    const spec = SC_VU_PASS_CLEARANCE.staged![0] as {
+      releaseDistM: number;
+      junction: { y: number };
+    };
+    const releaseY = spec.junction.y - spec.releaseDistM;
+    let v = 0;
+    let p = 15;
+    for (let i = 0; ; i++) {
+      const t = i * DT;
+      if (p >= releaseY) return t;
+      if (t > 600) return t; // never released at this pace
+      const moving = duty === undefined || t % (duty.goSec + duty.stopSec) < duty.goSec;
+      const want = moving ? targetMps : 0;
+      v = want > v ? Math.min(want, v + HERO_ACCEL_MPS2 * DT) : Math.max(want, v - 4 * DT);
+      p += v * DT;
+    }
+  };
+
+  it("the careful student watches a frozen bicycle for over a minute", () => {
+    // The pace the sweep photographed sc-vu-pass-clearance at.
+    expect(heldSecondsAt(4.5, { goSec: 4, stopSec: 6 })).toBeGreaterThan(60);
+    expect(heldSecondsAt(4.5, { goSec: 3, stopSec: 8 })).toBeGreaterThan(100);
+  });
+
+  it("…and a student at a normal city speed barely sees it, which is why it survived the repair's own grid", () => {
+    expect(heldSecondsAt(FLAT_OUT_MPS)).toBeLessThan(12);
+    expect(heldSecondsAt(8.3)).toBeLessThan(20);
   });
 });

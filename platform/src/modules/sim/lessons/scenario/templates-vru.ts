@@ -175,25 +175,33 @@
  * frame-by-frame through runtime → traffic → director → rules at the live hero
  * car's ramp (1.95 m/s²), against a CRAWL (10 км/ч — the sweep's careful bot,
  * 22–27 full stops in three minutes) and a FLAT-OUT (59 км/ч — the tier
- * governor's ceiling). NOT ONE of them can be closed inside this file. Two (5
- * and 7) are decided inside a runner this template only parameterises, and the
- * dial each one exposes is measurably the wrong lever. The other two (6 and 8)
- * ARE this file's numbers — and both are pinned by demo choreography in
- * traces/ + content/traces/ recorded against the very numbers that are wrong:
- * the corrected values were applied and measured here, and the §5/§9 gates
- * named exactly which demo each one broke. All four are replayed as
- * executable measurements in scenario/__tests__/vru-staged-encounter-reach
- * .test.ts, each pinned as a TRIPWIRE that goes red the day its repair lands
- * and names its own replacement assertion. The measurement, the ladder
- * and the coordinated change each one needs are written at its own site:
+ * governor's ceiling). Two (5 and 7) are decided inside a runner this template
+ * only parameterises, and the dial each one exposes is measurably the wrong
+ * lever. The other two (6 and 8) ARE this file's numbers. All four are replayed
+ * as executable measurements in scenario/__tests__/vru-staged-encounter-reach
+ * .test.ts — the three still open as TRIPWIRES that assert the DEFECT (green
+ * while it is live, red the day its repair lands, each naming its own
+ * replacement assertion in place). That convention is why a `describe(… —
+ * TRIPWIRE: red is the goal)` passing is not good news; do not "fix" one by
+ * deleting it. The measurement, the ladder and the change each one needs are
+ * written at its own site:
  *
  *  5. sc-vu-cyclist-hook hands the чл. 25 COMMENDATION to a car that never
- *     turned right at all — see VU_CYCLIST.
+ *     turned right at all — see VU_CYCLIST. STILL OPEN (runner).
  *  6. sc-vu-emergency-junction cannot CONVICT the barge its own two mistake
  *     demos are about — see VU_EV_CROSSING (with the arm/hold ladder).
+ *     STILL OPEN (needs traces/scVuEmergencyJunction.ts retimed + re-recorded).
  *  7. sc-vu-emergency commends a car that merely never got going — see
- *     EM_APPROACH.
+ *     EM_APPROACH. STILL OPEN (runner).
  *  8. sc-vu-pass-clearance's hold has never held — see VU_PASS_CYCLIST.
+ *     CLOSED 2026-08-22, and the sentence that used to stand here — „NOT ONE of
+ *     them can be closed inside this file" — was wrong about this one. It rested
+ *     on a single sampled rung (`releaseDistM 295`, which does break the
+ *     late-dive demo). Scanning the band instead of sampling it found a 20 m
+ *     window (225–245 at hold −220) where all three committed demos still grade
+ *     exactly their codeRefs and the recordings are byte-identical. Both open
+ *     criticals on that lesson were this one bug; the arithmetic, the probe grid
+ *     and the residue that is genuinely traffic/staged.ts's are at the site.
  *
  * AND THREE THAT ARE NOT THIS MODULE'S, recorded so the routing is not repeated:
  *  (a) tj-rhr-v1 has no north arm, so a student who does not turn left drives
@@ -1135,59 +1143,156 @@ const VUP_LANE_X = 4.06;
 const VUP_CYCLIST_X = 6.35;
 
 /**
- * The staged CYCLIST on vu-pass-v1: rides the east curb northbound the whole
- * street at a city-cyclist ~11 km/h. REUSED cyclistRightHook kind (NO new
- * actor type — the N8 mandate): the "junction" is the far end node the driver
- * never turns right at, so the runner contributes only the release
- * choreography + the collision(cyclist) contact channel; releaseDistM 360
- * exceeds the spawn's ~345 m node distance, so the cyclist cruises from the
- * first frame (no hold theater on an empty street). The GRADING is the
- * runtime's vulnerable-pass tracker.
+ * The staged CYCLIST on vu-pass-v1: rides the east curb northbound at a
+ * city-cyclist ~11 km/h. REUSED cyclistRightHook kind (NO new actor type — the
+ * N8 mandate): the "junction" is the far end node the driver never turns right
+ * at, so the runner contributes only the release choreography + the
+ * collision(cyclist) contact channel. The GRADING is the runtime's
+ * vulnerable-pass tracker.
  *
- * DEFECT 8 (2026-08-18) — THE HOLD HAS NEVER HELD, AND THAT SENTENCE ABOVE IS
- * THE BUG WRITTEN DOWN AS A DECISION. `releaseDistM` means „release when the
- * driver is this close to the path's far node"; the far node is (0, 360), the
- * spawn is (4.06, 15), i.e. 345.02 m away — so 360 is satisfied on the first
- * frame the car rolls, and the field describes a hold this street has never
- * had. The rider therefore starts running the moment the lesson does, from
- * 95 m ahead, at 3.0 m/s.
+ * DEFECT 8 (2026-08-18) — THE HOLD HAD NEVER HELD, AND THE FIELD DESCRIBED A
+ * HOLD THIS STREET HAD NEVER HAD. `releaseDistM` means „release when the driver
+ * is this close to the path's far node"; the far node is (0, 360) and the spawn
+ * is (4.06, 15), i.e. 345.02 m away — so the shipped 360 was satisfied on the
+ * first frame the car rolled. The rider ran the moment the lesson did, from
+ * 95 m ahead, at 3.0 m/s, and a driver slower than 3.0 m/s never closed: over
+ * 40 s at the sweep's careful pace the gap GREW from 95 m to 103 m and the
+ * drive came back with ZERO rule events and ZERO staged outcomes — the lesson's
+ * only actor and its only grader both silent. That is the ИЗДЪРЖАН · 0
+ * наказателни точки · ★★★ the sweep photographed on both careful legs, and it
+ * is what the two open criticals on this lesson are: „the cyclist never
+ * appears" (fc987070) is the symptom of NEVER MET.
  *
- * WHAT THAT COSTS, measured through the production stack:
- *   · a driver slower than 3.0 m/s (10.8 км/ч) NEVER closes. Over 40 s at the
- *     sweep's careful pace the gap GROWS from 95 m to 103 m; the drive comes
- *     back with ZERO rule events and ZERO staged outcomes — the lesson's only
- *     actor and its only grader are both silent. That is the ИЗДЪРЖАН · 0
- *     наказателни точки · ★★★ the sweep photographed on both careful legs.
- *   · the rider leaves the 360 m street at t ≈ 83 s after release, and from
- *     then on the street is empty while the task banner still names him.
- *   · the encounter therefore exists only for a driver who reaches ~45 км/ч
- *     promptly; at 15 км/ч it lands at y ≈ 353, seven metres from the end.
- *   The one frame in the whole sweep that contains the rider is
- *   sc-vu-pass-clearance/pc-wrong/04-t012s.png — a rider-sized rig at the kerb
- *   ~70 m out, gone again by t017. He is staged and he is drawn; he is simply
- *   never MET. (Re-checked 2026-08-18 against a fresh finding that reads „the
- *   cyclist never appears … there is no cyclist anywhere": enlarged, that frame
- *   carries the bicycle rig, rider and helmet at the kerb. „Never appears" is
- *   the symptom of „never met", and the cure is the coordinated retime below,
- *   not a second hunt for a render defect that is real only on the two
- *   EMERGENCY actors — see the header's third-read section.)
+ * AND THE SECOND CRITICAL IS THE SAME BUG'S SECOND HALF, WHICH THE OLD NOTE
+ * HERE DID NOT KNOW ABOUT (2026-08-22, measured). 953fbed1 read „the rider is
+ * real … he is never once in front of the car: the first sight of him anywhere
+ * is already in the mirror". Replayed through the production stack at the
+ * sweep's own stop-and-go pace, that is exactly what the shipped numbers
+ * produce, and the mechanism is `traffic/staged.ts` FR-B5-RETURN. Probe grid,
+ * a 360 m drive to the finish gate, shipped numbers:
  *
- * THE FIX AND WHY IT IS NOT APPLIED HERE. Hold him until the driver has closed,
- * and start him where he would have been at that instant so the recorded demos
- * meet him in the same place: `hold.offsetM −250 → −230` (y 110 → 130) with
- * `releaseDistM 360 → 295` (release as the driver reaches y ≈ 65). Applied and
- * measured: the rider now stands at the kerb until the driver is 65 m behind
- * him, the flat-out leg still convicts VULNERABLE_PASS_TOO_CLOSE, the shadow
- * gate stays green and the squeeze demo stays green — but the LATE-DIVE demo
- * goes red. Its dive is authored at y 130→140 in and 165→180 out, tuned to a
- * rider who has been rolling since t = 0; with the hold the pass happens ~12 m
- * earlier, on the wide line, and «Бързо изпреварване с късно отместване» comes
- * back convicting nothing. So this is a COORDINATED change and this file owns
- * only its third: move the dive in traces/scVuPass.ts to where the held rider
- * actually is, re-record with RECORD_TRACES=1, and only then move the numbers
- * below. (While in that file: its header still says the curb line is 6.6625 and
- * the clean line 4.46 m of centres — both stale since extraRightOffsetM went to
- * 2.29; the live values are 6.35 and 4.15.)
+ *   pace                closest while AHEAD   closest overall   first astern
+ *   stop-go 4/4 @16     92.1 m                61.5 m            t = 101 s
+ *   stop-go 5/3 @11     95.0 m                19.4 m            t = 101 s
+ *   stop-go 3/5 @25     92.4 m                 6.7 m            t = 101 s
+ *
+ * — the closest the rider ever comes IS from astern, and the t = 101 s in all
+ * three is one event: he reaches y = 360 at t ≈ 83 s, drives EXIT_CLEAR_M (70)
+ * past the end, and `canReturnToHold` then REWINDS him to his hold pose, which
+ * by then is 200 m BEHIND the student. Still under the „cruise" command he left
+ * with, he rides the street a second time and overtakes a student who is slower
+ * than he is. That is the rider in the mirror at t136/141/146/152/157/163/168 of
+ * .audit-frames/wave-c/frames/sc-vu-pass-clearance__pc-right.
+ *
+ * THE REPAIR, AND WHY IT IS THIS FILE'S AFTER ALL. The old note here said the
+ * cure was `hold −230 / releaseDistM 295` and that it could not be applied
+ * because the LATE-DIVE demo goes red. Both halves are measured facts — 295 is
+ * outside the demo-safe band — but „the fix needs traces/scVuPass.ts retimed"
+ * was a conclusion drawn from ONE sample. The band was never scanned. It is now
+ * (scenario/__tests__ replays the three authored scripts against each rung):
+ *
+ *   releaseDistM at hold −220:  225 ✓  230 ✓  235 ✓  240 ✓  245 ✓  250 ✗  255 ✓
+ *
+ * — a contiguous 20 m window in which all three committed demos still grade
+ * EXACTLY their codeRefs, and the recordings are byte-identical (the scripted
+ * ghost's poses do not depend on where the rider is, so `serializeScenarioTrace`
+ * is unchanged and the determinism gate never sees this edit). 235 is that
+ * window's centre, which matters because the runner jitters the release by
+ * ±5 m (`releaseDistM + (rng()*2−1)*5`) and the draw changes with the retry
+ * count — so the WHOLE reachable band has to be green, not one draw of it.
+ *
+ * So: `hold.offsetM −250 → −220` (the rider waits at y = 140 instead of y = 110)
+ * and `releaseDistM 360 → 235` (he sets off when the driver reaches y ≈ 125,
+ * ~15 m behind him). What that buys, same probe, same drives:
+ *
+ *   pace              closest while AHEAD   closest overall   first astern
+ *   50 km/h steady     2.3 m                 2.3 m            t = 13 s (passed)
+ *   30 km/h steady     2.3 m                 2.3 m            t = 18 s (passed)
+ *   20 km/h steady     2.3 m                 2.3 m            t = 25 s (passed)
+ *   stop-go 4/4 @16    6.8 m                 6.8 m            never
+ *   stop-go 5/3 @11    8.6 m                 8.6 m            never
+ *   stop-go 6/6 @16    7.1 m                 7.1 m            never
+ *
+ * — every pace now MEETS him, and on every pace in that table the close
+ * approach happens with him AHEAD.
+ *
+ * TWO THINGS THAT TABLE DOES NOT SAY, both measured on the shipped numbers by
+ * the adversarial verifier of this repair (2026-08-22), both pinned executably
+ * in the TRIPWIRE at the bottom of vru-staged-encounter-reach.test.ts:
+ *
+ *  (i) THE „AHEAD" PROPERTY HOLDS OVER A PACE BAND, NOT OVER ALL PACES — and
+ *      the six rows above are inside it. Extending the same probe down the duty
+ *      cycle, still stopping at the finish gate (y = 291), still inside the
+ *      sweep's own „22–27 full stops in three minutes":
+ *        stop-go 3/8 @16   closest AHEAD 7.9 m   closest overall 6.4 m
+ *        stop-go 2/6 @16   closest AHEAD 9.7 m   closest overall 6.5 m
+ *      — i.e. below roughly 1.5 m/s of made-good speed FR-B5-RETURN fires with
+ *      lesson still to run, and the rider's closest approach is once again from
+ *      ASTERN, which is 953fbed1's own sentence. This does NOT reopen the
+ *      critical: at those paces he is also met AHEAD at 6–10 m an entire minute
+ *      earlier, so „the first sight of him anywhere is already in the mirror" is
+ *      false on the repaired build at every pace probed. It is the residue
+ *      below, bounded. Whoever adds the StagedVehicleSpec opt-out closes it.
+ *      The lesson the old note taught applies to itself: a property measured on
+ *      a handful of sampled profiles is not a property of the band.
+ *
+ * (ii) THE RIDER NOW STANDS STILL, AND THE COPY SAYS HE IS RIDING. A hold is a
+ *      standing pose, and this one is 125 m up an open street in the student's
+ *      windscreen rather than off-scene the way FR-B5-RETURN's own note assumes
+ *      hold poses are („the one place on these maps that is off-scene by
+ *      construction"). Seconds the bicycle is motionless before release,
+ *      measured, same probe:
+ *        59 км/ч  ~8 s   ·  30 км/ч  ~14 s  ·  20 км/ч  22 s  ·  10 км/ч  42 s
+ *        stop-go 4/4 @16  59 s  ·  4/6 @16  73 s  ·  3/6 @16  93 s
+ *        stop-go 3/8 @16 113 s  ·  2/6 @16 154 s
+ *      Against objectiveBg „Покрай десния бордюр СЕ ДВИЖИ велосипедист" and
+ *      instruction 2 „покрай десния бордюр КАРА велосипедист", the careful
+ *      student — the one the sweep photographed — spends 40–75 % of the lesson
+ *      looking at a bicycle that is not moving, and the shipped build had no
+ *      standstill at all (the rider rolled from frame one; that was the bug,
+ *      but it was not THIS artefact). It is a straight trade, taken knowingly:
+ *      an encounter that happens against copy that is briefly wrong beats no
+ *      encounter at all, and a rider pushing off from the kerb 15 m ahead is a
+ *      real road event. It is written down because the next reader must not
+ *      have to re-measure it, and because the honest closes are elsewhere —
+ *      copy that says he is waiting at the kerb, or a hold that idles the rig
+ *      instead of freezing it. Neither is a number in this file.
+ *
+ * The steady drives are unchanged where it counts: the un-shifted lane-centre
+ * line still convicts VULNERABLE_PASS_TOO_CLOSE at 2.29 m of centres and the
+ * wide line still earns the commendation (that is VUP_CYCLIST_X's arithmetic,
+ * untouched here). A student below the rider's own 3.0 m/s no longer overtakes
+ * him — he trails him at 7–9 m, which is what those two speeds actually mean on
+ * a road, and which is the state instruction 2 («Не се залепяй зад него») is
+ * about.
+ *
+ * WHAT THIS DOES NOT FIX, stated so it is not mistaken for closed: FR-B5-RETURN
+ * itself. It is a global rewind with no per-spec opt-out, and on a long enough
+ * drive it will still recycle this rider — measured, at the very tail (t ≈ 159 s
+ * of a 169 s drive on the slowest profile), i.e. after the encounter has already
+ * happened rather than instead of it. Making it never fire from here would need
+ * the hold at y > 221 (RETURN_CLEAR_M is 70 and the finish gate is y = 300 r9),
+ * and a rider held that late is PAST the shadow demo's wide line (y 75→195, back
+ * in lane from y = 215) — so the CORRECT drive would be passing him at the lane
+ * centre. Measured, holds at y = 200 / 220 / 230 with a matched release:
+ *   y = 200 → shadow VULNERABLE_PASS_TOO_CLOSE
+ *   y = 220 → shadow VULNERABLE_PASS_TOO_CLOSE + FOLLOWING_TOO_CLOSE
+ *   y = 230 → the same pair
+ * — i.e. buying the rewind off costs the §5 gate and convicts the demonstration
+ * of doing it right. A `loop`/`retire`-style opt-out on StagedVehicleSpec is
+ * traffic/staged.ts's to add, not this file's to fake.
+ *
+ * AND ONE MAINTENANCE FLAG, CARRIED FORWARD (it was raised by the note this one
+ * replaced and must not be lost with it): the header of `traces/scVuPass.ts` —
+ * a file this lane does not own — describes a world that no longer exists, now
+ * in THREE places. It says the curb line is x = 6.6625 and the clean line
+ * 4.46 m of centres (stale since extraRightOffsetM went to 2.29; the live
+ * values are 6.35 and 4.15), and it says „Cyclist released at t = 0
+ * (releaseDistM exceeds the spawn distance) from y = 110 at 3 m/s", which this
+ * repair has just made false in every clause: he is released when the driver
+ * reaches y ≈ 125, from y = 140. The three recorded traces are unaffected —
+ * re-recorded and diffed byte-for-byte against the committed files — so this is
+ * a comment fix in someone else's file, not a re-record.
  */
 const VU_PASS_CYCLIST: CyclistRightHookSpec = {
   id: "sc-vup-cyclist",
@@ -1196,7 +1301,10 @@ const VU_PASS_CYCLIST: CyclistRightHookSpec = {
   junction: { nodeId: "vup-n-end", x: 0, y: 360 },
   actor: {
     pathNodes: ["vup-n-start", "vup-n-end"],
-    hold: { nodeIndex: 1, offsetM: -250 }, // y = 110 — ~95 m ahead of the spawn
+    // y = 140 — he WAITS at the kerb 125 m ahead of the spawn until the driver
+    // is ~15 m behind him, then rides. Was −250 (y = 110) with a release that
+    // fired on frame one; see DEFECT 8 above for the two criticals that bought.
+    hold: { nodeIndex: 1, offsetM: -220 },
     cruiseSpeedMps: 3.0,
     // The curb line (tags the proxy as a cyclist, A11). 2.6 → 2.29: see
     // VUP_CYCLIST_X for the band arithmetic this number decides — at 2.6 the
@@ -1207,7 +1315,13 @@ const VU_PASS_CYCLIST: CyclistRightHookSpec = {
     colorIndex: 1,
   },
   junctionNodeIndex: 1,
-  releaseDistM: 360,
+  // Release when the driver is 235 m from vup-n-end (0, 360) — i.e. at y ≈ 125,
+  // ~15 m short of the held rider. Was 360, which EXCEEDS the 345.02 m from the
+  // spawn to that node and therefore fired on frame one (DEFECT 8). 235 is the
+  // centre of the 225–245 window in which all three committed demos still grade
+  // exactly their codeRefs, which is what makes it survive the runner's ±5 m
+  // jitter on every retry draw.
+  releaseDistM: 235,
   dangerRadiusM: 9, // inert here — no right turn exists on this street
   conflictWindowM: 25,
 };

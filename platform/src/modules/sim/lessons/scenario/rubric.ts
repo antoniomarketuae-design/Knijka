@@ -10,8 +10,10 @@
  *                 BOTH channels a count that is still running can convict but
  *                 not praise — see the settled tests there;
  *  - observation← authored glance moments vs the observed set (the S1 trace
- *                 recorder feeds it; until then the component reports
- *                 measured: false and stays OUT of the star math);
+ *                 recorder feeds it, via `parkingObservationFromTrace`; when no
+ *                 glance record reaches this call the component reports
+ *                 measured: false, stays OUT of the star math, and SAYS SO on
+ *                 the card — see the row's own note);
  *  - par time   ← LessonResult.durationSec vs rubric.parTimeSec —
  *                 INFORMATIONAL ONLY, never affects stars (doc 76 §6: time
  *                 pressure is an L5 condition, not a rubric penalty).
@@ -86,6 +88,36 @@ const fmt1 = (v: number) => (Math.round(v * 10) / 10).toString().replace(".", ",
  * (.audit-frames/sweep161/sc-maneuver-uturn/mobile-right/08-debrief.png).
  */
 const movementsBg = (n: number) => (n === 1 ? "едно движение" : `${n} движения`);
+
+/**
+ * WHAT AN UNMEASURED ROW OWES THE STAR ROW ABOVE IT.
+ *
+ * MEASURED · sweep161 · `sc-park-van/mobile-right/08-debrief.png`: „Точност на
+ * позицията не се измерва · Икономичност на маневрата не се измерва ·
+ * Наблюдение не се измерва" — and, in the same card, a filled star row the
+ * harness read as „1 от 3 звезди". Three rows saying nothing was looked at,
+ * under a grade, with no sentence anywhere connecting the two. A reader takes
+ * the stars for a verdict on the manoeuvre; on that drive they are a verdict on
+ * the изпитен лист wearing the manoeuvre's label.
+ *
+ * The star NUMBER is not touched here (see the fold at the bottom of this file
+ * and the ADR it is waiting on). What changes is that a row which measured
+ * nothing now says so all the way through — reason, then consequence — instead
+ * of stopping at „няма измерване" and leaving the grade to be read as evidence.
+ * THEO-4: never a bare verdict; and never a bare NON-verdict either.
+ */
+const NOT_IN_STARS_BG = "Този показател не влиза в звездите горе.";
+
+/**
+ * The stronger sentence, for the case the criticals actually caught: NOTHING
+ * was measured, so the stars are the exam sheet said a second time under a
+ * heading that promises an independent opinion on execution. Say whose opinion
+ * it is, so a student stops reading „★★★" as „ти изкара маневрата отлично".
+ */
+const NO_QUALITY_MEASURED_BG =
+  "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
+  "звездите горе идват само от изпитния лист — наказателни точки и изпълнени задачи — " +
+  "а не от оценка на самото изпълнение.";
 
 export function scoreRubric(
   result: LessonResult,
@@ -282,16 +314,91 @@ export function scoreRubric(
         measured: true,
       });
     } else {
-      // The glance-trace channel lands with the S1 recorder; until then the
-      // component is honest about not measuring (never a silent 0).
+      // THE ONE ROW IN THE PRODUCT THAT GRADES MIRRORS AND THE SHOULDER CHECK,
+      // AND THE SENTENCE IT USED TO PRINT WHEN IT COULD NOT.
+      //
+      // „Все още не се измерва в този режим." was two things at once, and both
+      // were wrong by the time sweep161 photographed it. It was STALE — the
+      // glance channel is wired (LessonPlayShell.tsx `finalize` maps the
+      // recorded attempt through `parkingObservationFromTrace`, and the server
+      // path re-reads `wire.observedMomentIds` in simulator/actions.ts), so
+      // „още не" describes a gap that closed, and „в този режим" invites the
+      // student to believe some other mode does look. And it TAUGHT NOTHING:
+      // on the only card in the product that grades оглеждане, a student who
+      // moved off without a mirror or a shoulder check was handed a shrug.
+      //
+      // MEASURED · sweep161 · `sc-park-van/mobile-right/08-debrief.png` —
+      // „Наблюдение · Все още не се измерва в този режим" on a lesson whose own
+      // examiner note is „Изпитващият гледа наблюдението (двете огледала, рамо,
+      // и допълнителния поглед към закритата страна)"; and
+      // `sc-pk-move-off/pc-wrong/04-t012s.png`, where „Потегли и се нареди в
+      // дясната лента" is ticked green for a drive with no mirror check and no
+      // shoulder check in it.
+      //
+      // The row still reports measured:false and points:null — the „не се
+      // измерва" in the points column stays, because it is TRUE and hiding it
+      // would be the real damage. What it now adds is the reason, the drill
+      // itself (the authored moments, named — this is what a virtual instructor
+      // owes a student who cannot be graded on them yet), and the consequence
+      // for the grade, appended by the pass below.
+      //
+      // VERIFIER, ROUND 2 — THE OPENING CLAUSE WAS A REMARK ABOUT THE STUDENT.
+      //
+      // The note above promises this row now "gives the reason". The shipped
+      // string did not contain one. It opened «Оглеждането ти не стигна до
+      // оценката на това каране» — a sentence whose subject is ОГЛЕЖДАНЕТО ТИ,
+      // i.e. the student's looking, on a card where the only true statement is
+      // about the INSTRUMENT: no glance record reached this call.
+      //
+      // That is not a nicety. `parkingObservationFromTrace` (scenario/
+      // observation.ts) returns null unless the drive contains a reverse phase
+      // (`gear < 0`), and 12 of the 27 templates that author observation
+      // moments are not parking drills — so on those lessons this row is the
+      // permanent state, and a student who DID check both mirrors and his
+      // shoulder is told his looking „did not reach" the grade, with no reason
+      // offered and nothing to appeal to. A soft negative with no cause is
+      // still a verdict with no evidence, which is the defect this whole round
+      // exists to retire, and doc 64 THEO-4 forbids it by name.
+      //
+      // So the row now opens the way its two siblings do — «Няма измерване —»,
+      // the same construction placement and economy print — states WHY (the
+      // simulator did not register the glances), says outright that this is the
+      // record's limit and not a mark against him, and only then hands over the
+      // drill. Nothing the previous pass added is removed: the authored moment
+      // titles are still named, `measured:false` / `points:null` still stand,
+      // and the consequence clause is still appended by the pass below.
+      const namesBg = required.map((m) => m.titleBg).join(" · ");
       breakdownBg.push({
         id: "observation",
         labelBg: "Наблюдение",
-        detailBg: "Все още не се измерва в този режим.",
+        detailBg:
+          required.length === 0
+            ? "Този урок не е задал контролни погледи, затова няма какво да се измери тук."
+            : `Няма измерване — симулаторът не отчете погледите ти на това каране, ` +
+              `затова наблюдението не е оценено; това е ограничение на записа, а не ` +
+              `бележка към теб. Провери се сам по това, което изпитващият гледа тук: ` +
+              `${namesBg}.`,
         points: null,
         measured: false,
       });
     }
+  }
+
+  // -- Every row that measured nothing now says what that costs the grade.
+  //
+  // This runs HERE and not at each push because the answer depends on the whole
+  // card: a placement row that abstained while economy scored is one indicator
+  // missing from a real measurement, and says so; the same row on a drive where
+  // NOTHING scored is the card admitting the star row is not its own opinion.
+  // `measuredCount` is final at this point — only the three quality components
+  // increment it, and all three are behind us; par time never did and never
+  // will (doc 76 §6: time is informational, and the fold below ignores it).
+  //
+  // The par-time row is untouched by construction: it reports measured:true.
+  const nothingMeasured = measuredCount === 0;
+  for (const line of breakdownBg) {
+    if (line.measured) continue;
+    line.detailBg = `${line.detailBg} ${nothingMeasured ? NO_QUALITY_MEASURED_BG : NOT_IN_STARS_BG}`;
   }
 
   // -- Par time: informational line only (doc 76 §6).
@@ -360,6 +467,28 @@ export function scoreRubric(
     // edit — and a lane that owns this file alone cannot land it without
     // leaving those suites red. The evidence is parked here so the decision
     // is made with it rather than without it.
+    //
+    // WHAT DID CHANGE, AND THE HALF THAT COULD NOT. The number is untouched;
+    // the SILENCE around it is not. Every row that measured nothing now carries
+    // `NO_QUALITY_MEASURED_BG` — the card says the stars restate the изпитен
+    // лист rather than judging the manoeuvre — so `sc-park-van` (placement +
+    // economy + observation, all abstaining) and `sc-vp-handbrake`
+    // (observation) stop printing a grade with no sentence attached to it.
+    //
+    // THE OTHER HALF NEEDS ONE THING THIS FILE DOES NOT OWN. 128 of 154
+    // catalog rubrics (doc 86 D7) author NO quality component at all — six of
+    // my eight lessons are literally `rubric: { parTimeSec: 55 }` — so
+    // `breakdownBg` holds ONE row, „Ориентировъчно време", and there is nowhere
+    // to put the sentence. It cannot go on the par-time row:
+    // `lessons/__tests__/b15-lawful-wait.test.ts:331` pins that string with an
+    // exact `toBe` on exactly this rubric shape. It needs its own row, which
+    // needs one more member in `RubricBreakdownLine["id"]` (types.ts, a file no
+    // lane owns and this one may not edit) — after which
+    // `s-w5-bot-completion.test.ts:781`, an exact `toEqual(["observation",
+    // "parTime"])`, has to stay green: emit the row ONLY when no quality
+    // component is authored at all, which is precisely the case s-w5 is not.
+    // `sc-pk-move-off/pc-wrong` — ★★★ over a 59 км/ч speeding card — is that
+    // half, and it stays open.
     stars = result.completedAll && result.score === 0 ? 3 : result.completedAll ? 2 : 1;
   }
   // Caps: quality never outranks legality.

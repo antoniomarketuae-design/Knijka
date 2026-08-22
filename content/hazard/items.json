@@ -98,8 +98,8 @@
         "mistakeIndex": 1,
         "tracePath": "content/traces/sc-vu-pass-clearance/mistake-fast-close.trace.json"
       },
-      "clipStartSec": 6.08,
-      "faultSec": 14.08,
+      "clipStartSec": 5.52,
+      "faultSec": 13.52,
       "windowOpenSec": 4,
       "cutSec": 8,
       "difficulty": 2,

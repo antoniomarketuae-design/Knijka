@@ -394,6 +394,14 @@ describe("§3 every audited lesson is completable — its own shadow finishes ev
       [SC_OV_ABORT, "sc-ova-pullout", 4.06, 8],
       [SC_OV_RETURN_GAP, "sc-ovr-pass", 4.06, 8],
       [SC_OV_BAN_OVERTAKE, "sc-ovb-pass", 12.19, 8],
+      // The seventh, added by §4 below. It USED to be the exclusion — „not a
+      // lane-x case … pinned by the staged event rather than by a coordinate"
+      // — and that exclusion was the defect: a staged event pins nothing that
+      // `guidanceRoute.ts` can see, so the ribbon was drawn through the parked
+      // row. `sc-ovn-squeeze` is the coordinate that was missing, and it
+      // belongs in this census with its six siblings: the opposing lane centre
+      // is a full pitch (8.12 m) off the lane the student spawns in.
+      [SC_OV_NARROW, "sc-ovn-squeeze", 4.06, 8],
     ];
     for (const [spec, objectiveId, spawnLaneX, minOffsetM] of lateralDrills) {
       const p = compiledZone(spec, objectiveId, 1);
@@ -402,14 +410,164 @@ describe("§3 every audited lesson is completable — its own shadow finishes ev
         `${spec.id}/${objectiveId} no longer demands a lateral move`,
       ).toBeGreaterThanOrEqual(minOffsetM);
     }
-    // sc-ov-narrow is the seventh and is not a lane-x case: the parked row
-    // stands IN the player's lane over y ∈ [110, 145] (NARROW_MEETING props),
-    // so passing it is a swerve into the oncoming half and back. The drill is
-    // pinned by the staged event rather than by a coordinate.
+    // sc-ov-narrow needs BOTH halves. The parked row stands IN the player's
+    // lane over y ∈ [110, 145] (NARROW_MEETING props), so the drill is a swerve
+    // into the oncoming half and back — but the staging alone is not enough,
+    // and saying it was is what left this lesson's route aimed at the obstacle
+    // it stages (§4). The staging is still asserted here; the coordinate that
+    // makes it a route rather than a story is in the table above.
     const meeting = SC_OV_NARROW.staged?.find((s) => s.kind === "narrowMeeting");
     expect(meeting, "sc-ov-narrow lost its narrow meeting").toBeDefined();
     if (meeting?.kind !== "narrowMeeting") return;
     expect(meeting.obstructionSide).toBe("player");
     expect(meeting.props?.length ?? 0).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §4 sc-ov-narrow — THE ROUTE WENT THROUGH THE PARKED CARS
+// ---------------------------------------------------------------------------
+
+/**
+ * §3 above refuted three of the four „cannot be passed" findings and, in doing
+ * so, wrote down why it could not refute the fourth: „sc-ov-narrow … is not a
+ * lane-x case … the drill is pinned by the staged event rather than by a
+ * coordinate". That sentence is the defect. A staged event cannot pin a ROUTE.
+ *
+ * `scene/guidanceRoute.ts` draws the blue ribbon to the ACTIVE OBJECTIVE's mark
+ * — „shortest legal on-road path to the target" — and knows nothing of staged
+ * actors. The chain of this lesson was two marks, both on the player's own lane
+ * centre (4.06, 100) → (4.06, 200), and the parked row this very template
+ * stages stands at (4.06, 120) and (4.06, 135). The shortest legal path from
+ * the first mark to the second is the line x = 4.06, i.e. straight through both
+ * parked cars — and «Следвай синята линия» is what the student is told on every
+ * rung.
+ *
+ * Both halves are below. The first is the drive the old chain credited and the
+ * new one refuses; the second is the geometry that made the ribbon aim at the
+ * obstacle. Delete `sc-ovn-squeeze` and both go red.
+ */
+
+/** ov-narrow-v1 lateral truth (meta.scenario `laneCenterRightM` and its
+ *  mirror) and the parked row's own arc offsets, which on the (0,0) → (0,240)
+ *  edge ARE district y. */
+const NM_X_OWN = 4.06;
+const NM_X_ONCOMING = -4.06;
+const NM_PARKED: ReadonlyArray<readonly [number, number]> = [
+  [NM_X_OWN, 120],
+  [NM_X_OWN, 135],
+];
+/** Half a lane pitch: the clearance a leg of the route must keep from a parked
+ *  car for „drive along this line" not to mean „drive into that car". */
+const NM_CLEARANCE_M = 8.125 / 2;
+
+/** THE DRIVE THE OLD CHAIN CREDITED: hold the own lane centre from the
+ *  approach to the end — which is exactly what a car following a ribbon aimed
+ *  at (4.06, 200) does, and exactly what the 2026-08-22 steered re-drive did
+ *  before it hit the parked row. */
+const NM_OWN_LANE_ONLY = straightDrive(NM_X_OWN, 60, 215, 6);
+
+/** And the drive the lesson asks for: out into the opposing half at the
+ *  widening, past the parked row, back in afterwards — the shape the committed
+ *  shadow drives (x = −4.06 exactly over y ∈ [118.7, 137.2]). */
+const NM_SQUEEZE_PAST = pathDrive(
+  [
+    [NM_X_OWN, 60],
+    [NM_X_OWN, 104],
+    [NM_X_ONCOMING, 118],
+    [NM_X_ONCOMING, 138],
+    [NM_X_OWN, 155],
+    [NM_X_OWN, 215],
+  ],
+  6,
+);
+
+/** Distance from point p to segment ab — the ribbon leg's clearance. */
+function segDist(
+  a: readonly [number, number],
+  b: readonly [number, number],
+  p: readonly [number, number],
+): number {
+  const dx = b[0] - a[0];
+  const dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / len2));
+  return Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]);
+}
+
+describe("§4 sc-ov-narrow — the squeeze is a place on the map, not a story", () => {
+  it("FAILS ON THE OLD BEHAVIOUR: a car that never leaves its own lane completed the whole chain", () => {
+    // The old chain, reconstructed from the shipped rows: wait, then finish.
+    // Nothing between them, so holding x = 4.06 the whole way ticked both — the
+    // car drove into the parked row and was told it had passed the narrowing.
+    for (const level of rungs(SC_OV_NARROW)) {
+      expect(
+        completesOn(compiledZone(SC_OV_NARROW, "sc-ovn-wait", level), NM_OWN_LANE_ONLY),
+        `wait L${level}`,
+      ).toBe(true);
+      expect(
+        completesOn(compiledZone(SC_OV_NARROW, "sc-ovn-finish", level), NM_OWN_LANE_ONLY),
+        `finish L${level}`,
+      ).toBe(true);
+    }
+  });
+
+  it("the own-lane drive is refused by the squeeze row at EVERY rung, so the chain cannot be finished", () => {
+    for (const level of rungs(SC_OV_NARROW)) {
+      expect(
+        completesOn(compiledZone(SC_OV_NARROW, "sc-ovn-squeeze", level), NM_OWN_LANE_ONLY),
+        `own-lane hold L${level}`,
+      ).toBe(false);
+    }
+  });
+
+  it("…and the drive that actually squeezes past completes all three rows at every rung", () => {
+    for (const level of rungs(SC_OV_NARROW)) {
+      for (const row of SC_OV_NARROW.success) {
+        expect(
+          completesOn(compiledZone(SC_OV_NARROW, row.id, level), NM_SQUEEZE_PAST),
+          `${row.id} L${level}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("the squeeze row's widest rung never touches the player's own paint", () => {
+    // A lane claim is exactly as true as its radius (LANE_TRUE_RADIUS_M). The
+    // own lane spans x ∈ [0, 8.125]; the disc must stay entirely left of 0.
+    for (const level of rungs(SC_OV_NARROW)) {
+      const p = compiledZone(SC_OV_NARROW, "sc-ovn-squeeze", level);
+      expect(p.x + p.radiusM, `L${level} reaches own paint`).toBeLessThan(0);
+    }
+  });
+
+  it("EVERY LEG of the compiled route clears both parked cars by more than half a lane", () => {
+    // The causal half. With the squeeze row deleted the single leg
+    // (4.06, 100) → (4.06, 200) passes through both props at distance 0, and
+    // that is the line the student is told to follow.
+    for (const level of rungs(SC_OV_NARROW)) {
+      const marks = compileScenario(SC_OV_NARROW, level)
+        .objectives.map((o) => parseObjectiveParams(o))
+        .filter((p): p is ReachZoneParams => p.kind === "reachZone")
+        .map((p) => [p.x, p.y] as const);
+      expect(marks.length).toBeGreaterThanOrEqual(3);
+      for (let i = 0; i + 1 < marks.length; i++) {
+        for (const prop of NM_PARKED) {
+          expect(
+            segDist(marks[i], marks[i + 1], prop),
+            `L${level} leg ${i} passes through the parked car at y=${prop[1]}`,
+          ).toBeGreaterThan(NM_CLEARANCE_M);
+        }
+      }
+    }
+  });
+
+  it("and the parked row the route now avoids is the one the template still stages", () => {
+    // The coordinates above are not a second copy: they are read back off the
+    // staged props, so a future edit that moves the parked row moves this test.
+    const meeting = SC_OV_NARROW.staged?.find((s) => s.kind === "narrowMeeting");
+    expect(meeting?.kind).toBe("narrowMeeting");
+    if (meeting?.kind !== "narrowMeeting") return;
+    expect((meeting.props ?? []).map((p) => p.hold.offsetM)).toEqual(NM_PARKED.map((p) => p[1]));
   });
 });

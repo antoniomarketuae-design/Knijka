@@ -136,6 +136,61 @@ function driveBrake(opts: {
   );
 }
 
+/**
+ * THE SHAPE THE AUDIT ACTUALLY PHOTOGRAPHED — not a steady crawl, a STOP-START
+ * one (round 2).
+ *
+ * `driveBrake` above holds one pace all the way down the street, and that is
+ * not what the frames show. `sc-follow-brake/pc-right`'s own machine summary
+ * reads „top 28 км/ч · 26 full stops · 0 lawful waits", with the speedometer
+ * sampled at 3, 10, 0, 11, 0, 0, 10, 3, 0, 11, 3 км/ч across 206 s — a car
+ * that creeps a few metres, stops, creeps again. It matters because the arming
+ * condition reads the PLAYER'S SPEED at the moment the lead reaches its slam
+ * point (`speedKmh >= minSlamSpeedKmh || playerGap <= proximityFallbackM`), and
+ * a car that spends half its frames at 0 км/ч can be under any floor at exactly
+ * the wrong instant — the steady-11 arm cannot see that at all.
+ *
+ * `legM` metres of creep, then `pauseSec` on the brake, repeated to the end of
+ * the street.
+ */
+function driveBrakeStopStart(opts: {
+  kmh: number;
+  legM: number;
+  pauseSec: number;
+  minSlamSpeedKmh?: number;
+}): RecordedDrive {
+  const lead: BrakingLeadCarSpec = {
+    ...FB_LEAD,
+    ...(opts.minSlamSpeedKmh !== undefined ? { minSlamSpeedKmh: opts.minSlamSpeedKmh } : {}),
+  };
+  const steps: object[] = [];
+  let y = 15;
+  while (y < 400) {
+    const next = Math.min(400, y + opts.legM);
+    steps.push({
+      kind: "drive",
+      points: [
+        [BRAKE_LANE_X, y],
+        [BRAKE_LANE_X, next],
+      ],
+      targetKmh: opts.kmh,
+      stopAtEnd: true,
+    });
+    steps.push({ kind: "pause", sec: opts.pauseSec, brake: true });
+    y = next;
+  }
+  return recordScriptedDrive(
+    district(SC_FOLLOW_BRAKE.map.districtId),
+    { steps } as never,
+    {
+      scenarioId: SC_FOLLOW_BRAKE.id,
+      kind: "shadow",
+      stagedEvents: [lead as StagedEventSpec],
+      maxDurationSec: 600,
+    },
+  );
+}
+
 /** Drive ln-v1's right lane at a constant pace past the staged cut point. */
 function driveCutIn(opts: { kmh: number; minCutSpeedKmh?: number }): RecordedDrive {
   const cutter: CutInLeadCarSpec = {
@@ -214,6 +269,49 @@ describe("sc-follow-brake: the lesson's own event reaches the learner it is writ
     expect(outcome?.success).toBe(true);
     expect(outcome!.stopGapM!).toBeGreaterThan(10);
     expect(violationCodes(drive)).toEqual([]);
+  });
+
+  it("…and reaches the STOP-START crawl the audit photographed, not only a steady one", () => {
+    /**
+     * ROUND 2 — the finding was re-judged STILL on a re-drive of the REPAIRED
+     * build, and the reason given was that no outcome or teach card appeared
+     * „at any point in the slam window (t033–t049)". That window is the
+     * DEMONSTRATION's own loop (the ghost slams ~23 s into its 47 s tape and
+     * the caption replays every 48 s), not the student's drive: a car doing
+     * 11 км/ч needs 215 m ÷ 3.05 m/s ≈ 70 s just to reach y = 230, so nothing
+     * could have been there to see. The steady-11 arm above already says the
+     * event lands — but the photographed drive was not steady, so this arm
+     * drives the shape the frames actually show and puts the answer past
+     * argument.
+     *
+     * MEASURED HERE (12 m of creep at 11 км/ч, 2 s on the brake, repeated —
+     * 26 stops, the machine summary's own count):
+     *
+     *   minSlamSpeedKmh  8 → the encounter resolves at t ≈ 109 s, well inside
+     *                        the 206 s the auditor's clock ran, with 16.2 m of
+     *                        bumper gap still in hand
+     *   minSlamSpeedKmh 25 → NO outcome for the whole 206 s. That is the frame.
+     *
+     * The assertion is the CONTRAST, not the second: a floor of 8 gives this
+     * learner an event to see and a floor of 25 gives him an empty street.
+     */
+    const now = driveBrakeStopStart({ kmh: 11, legM: 12, pauseSec: 2 });
+    const outcome = only(now.outcomes);
+    expect(outcome, "the stop-start crawl must resolve the encounter").not.toBeNull();
+    expect(outcome!.eventId).toBe("sc-fb-lead");
+    // Inside the window the auditor's own camera was open — an event that
+    // resolves after the clock stops is an event the student never saw.
+    expect(outcome!.tSec, "resolves while the drive is still being watched").toBeLessThan(200);
+    expect(outcome!.tSec, "…and not instantly: the lead has a street to cover").toBeGreaterThan(30);
+
+    const before = driveBrakeStopStart({
+      kmh: 11,
+      legM: 12,
+      pauseSec: 2,
+      minSlamSpeedKmh: SHIPPED_BEFORE_SLAM_KMH,
+    });
+    expect(before.outcomes, "minSlamSpeedKmh 25 leaves the stop-start crawl unstaged").toEqual([]);
+    expect(before.trace.meta.durationSec, "…for the whole photographed drive").toBeGreaterThan(180);
   });
 
   it("…and the demos' own 40 км/ч approach is untouched by the change", () => {

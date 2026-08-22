@@ -628,6 +628,19 @@ export const SC_OV_CROSSING_OVERTAKE: ScenarioSpec = {
 //    ЗДвП narrow-passage priority: the side WITH the obstruction yields.
 // ---------------------------------------------------------------------------
 
+/** ov-narrow-v1 (240 m 1+1 two-way street): the two lane centres, pinned from
+ *  meta.scenario (`laneCenterRightM` 4.06; the opposing bank mirrors it — the
+ *  same ±half-pitch pair every 1+1 district in this file uses). The parked row
+ *  stands ON the first of them, which is why the second one is a place the
+ *  student has to drive and not just a number. */
+const NM_OWN = 4.06;
+const NM_ONCOMING = -4.06;
+/** The two held props' arc offsets along nm-n-start → nm-n-end. That edge runs
+ *  (0,0) → (0,240), so an arc metre IS a district y (the L7 copy law), and the
+ *  midpoint between the two parked cars is the middle of the squeeze. */
+const NM_PARKED_Y = [120, 135] as const;
+const NM_SQUEEZE_Y = (NM_PARKED_Y[0] + NM_PARKED_Y[1]) / 2; // 127.5
+
 /**
  * The staged narrow meeting: a parked row (two held props) blocks the player's
  * northbound lane through the mid-block section y ∈ [110, 145]; an oncoming car
@@ -656,8 +669,8 @@ const NARROW_MEETING: NarrowMeetingSpec = {
   transitSpeedMps: 6,
   props: [
     // Parked row in the PLAYER's (northbound) lane through the section.
-    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 120 } },
-    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: 135 } },
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: NM_PARKED_Y[0] } },
+    { pathNodes: ["nm-n-start", "nm-n-end"], hold: { nodeIndex: 0, offsetM: NM_PARKED_Y[1] } },
   ],
 };
 
@@ -687,7 +700,7 @@ export const SC_OV_NARROW: ScenarioSpec = {
     { n: 2, textBg: "Насреща идва кола. Препятствието е от ТВОЯТА страна, затова предимството е нейно — ти изчакваш." },
     { n: 3, textBg: "Спри на разширението преди стеснението, в своята лента, и пусни насрещния да премине." },
     { n: 4, textBg: "Не се вклинявай в насрещната лента, докато другата кола е още в стеснението — това е отнемане на предимство." },
-    { n: 5, textBg: "Щом пътят се освободи, промъкни се покрай паркираните коли и продължи." },
+    { n: 5, textBg: "Щом насрещният премине, излез в насрещната лента, промъкни се покрай паркираните коли и се прибери вдясно веднага след тях." },
   ],
   success: [
     {
@@ -701,12 +714,84 @@ export const SC_OV_NARROW: ScenarioSpec = {
       // The shipped shadow already comes to a full 0.00 km/h inside this zone
       // (content/traces/sc-ov-narrow/shadow-correct.trace.json — 317 samples in
       // radius, minimum 0.00), so the tightening costs no re-record.
-      params: { kind: "reachZone", x: 4.06, y: 100, radiusM: 10, maxSpeedKmh: 6 },
+      params: { kind: "reachZone", x: NM_OWN, y: 100, radiusM: 10, maxSpeedKmh: 6 },
+    },
+    {
+      // SWEEP 161, THE FOURTH «cannot be passed» AND THE ONLY ONE THAT WAS TRUE.
+      //
+      // The chain of this lesson used to be two marks — wait at (4.06, 100),
+      // finish at (4.06, 200) — BOTH on the player's own lane centre, with
+      // nothing between them. Its six siblings in this file all had the same
+      // defect and all had it repaired in the sweep's first pass: «изпревари»,
+      // «излез в лявата лента», «излез за изпреварване» were each given a gate
+      // in the LANE the manoeuvre uses. This lesson was left out, and
+      // lanes-sweep161-wave2 §3 wrote the exclusion down in as many words —
+      // „sc-ov-narrow … is not a lane-x case … the drill is pinned by the
+      // staged event rather than by a coordinate".
+      //
+      // A STAGED EVENT CANNOT PIN A ROUTE, and that is what turned an untidy
+      // objective list into an uncompletable lesson. `scene/guidanceRoute.ts`
+      // builds the blue ribbon from the ACTIVE OBJECTIVE's mark — „shortest
+      // legal on-road path to the target" — and it has no knowledge of staged
+      // actors. With the next mark at (4.06, 200) the shortest legal path from
+      // the widening is a straight line up x = 4.06 … which is the exact
+      // coordinate of both parked cars, at y = 120 and y = 135. The product
+      // drew a line through the obstacle it had just staged, and «Следвай
+      // синята линия» is instruction the student is given on every rung.
+      //
+      // That is what the frame shows. On the 2026-08-22 steered re-drive
+      // (.audit-frames/rebase/frames/sc-ov-narrow__mobile-right — TRACKED, 91%
+      // of moving samples on the ribbon, median error 0.9°, straightness 1.00,
+      // i.e. a car doing exactly what it was told) the debrief reads
+      // «✓ Спри и изчакай на разширението 1:12», «★ ✓ Правилно отстъпено
+      // предимство 1:25» — the yield the lesson exists to teach, performed and
+      // credited — and then «✗ Удар в друго превозно средство −10», task 2
+      // never ticked. The car obeyed the guidance and drove into the parked
+      // row. No lane-position claim is needed to say that, and none is made:
+      // the defect is that the ROUTE went there.
+      //
+      // THE MARK IS DERIVED, NOT CHOSEN. x is the opposing lane centre
+      // (NM_ONCOMING, meta.scenario's ±half-pitch pair) and y is the midpoint
+      // of the two parked cars' own arc offsets (NM_SQUEEZE_Y = 127.5), i.e.
+      // the middle of the gap the student is threading. Radius is the file's
+      // LANE_TRUE_RADIUS_M, so the widest compiled rung (4.05 at L1) reaches
+      // x = −0.01 and never touches the player's own paint: the row is
+      // satisfiable ONLY from the opposing half, which is the whole claim its
+      // title makes.
+      //
+      // MEASURED on the committed recordings (content/traces/sc-ov-narrow):
+      //   shadow-correct   sits at x = −4.06 EXACTLY over y ∈ [118.7, 137.2],
+      //                    so it crosses the disc dead centre at every rung;
+      //   mistake-barge / mistake-force  complete this row too, and that is
+      //                    correct — both DO make the squeeze; their fault is
+      //                    making it while the oncoming still holds priority,
+      //                    which FAILED_TO_YIELD bills and which the chain
+      //                    still separates, because neither of them reaches
+      //                    `sc-ovn-finish` (they stop at y = 140 / y = 142,
+      //                    60 m short of it).
+      //
+      // The radius ladder is unchanged for its two neighbours, computed not
+      // assumed: compile.ts `radiusWidenBudget` gives each row half the free
+      // gap to its neighbour — 7.99 m on the wait→squeeze side (28.67 m of
+      // centres less r10 less r2.7) and 29.13 m on squeeze→finish — and every
+      // one of those is above the standing REACH_ZONE_GRACE_M ceiling of 5,
+      // which is what actually binds and bound before. So `sc-ovn-wait` and
+      // `sc-ovn-finish` compile to exactly the radii they compiled to with two
+      // rows, and this row's own widest rung is its authored 2.7 × 1.5 = 4.05.
+      id: "sc-ovn-squeeze",
+      titleBg: "Промъкни се покрай паркираните коли в насрещната лента",
+      params: { kind: "reachZone", x: NM_ONCOMING, y: NM_SQUEEZE_Y, radiusM: LANE_TRUE_RADIUS_M },
     },
     {
       id: "sc-ovn-finish",
+      // TITLE LEFT ALONE ON PURPOSE. «Премини стеснението» is now carried by
+      // the row above plus the chain's own sequencing, so it is true; adding
+      // «в своята лента» here would be a lane claim this r12 disc cannot
+      // prove (the widest rung spans the whole carriageway), which is the
+      // exact class the lane-claim census (objective-title-truth-lanes-
+      // following2-rail2 §5) is a shrink-only backlog against.
       titleBg: "Премини стеснението и стигни края на отсечката",
-      params: { kind: "reachZone", x: 4.06, y: 200, radiusM: 12 },
+      params: { kind: "reachZone", x: NM_OWN, y: 200, radiusM: 12 },
     },
   ],
   rubric: { parTimeSec: 70 },

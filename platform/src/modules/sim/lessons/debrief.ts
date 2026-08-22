@@ -135,6 +135,21 @@ interface MistakeGroup {
   /** How many of `count` rows the ledger actually charged. */
   billedCount: number;
   /**
+   * …AND WHAT THE CLOSURE WITHHELD ON THIS GROUP — Σ `points` over its UNBILLED
+   * rows, the exact complement of `totalPoints`.
+   *
+   * It exists so the floor sentence at the foot of the block can be CHECKED.
+   * That sentence sums the withheld rows and prints one figure («…щеше да
+   * струва още 24 наказателни т.»), and the rows it sums each printed «без
+   * допълнителни точки» with no price of their own — so on the measured
+   * sc-mw-min-speed drive the reader was handed 24 and given 10 + nothing +
+   * nothing + nothing to reach it with. Derived here rather than as
+   * `points × (count − billedCount)`, because `points` is the FIRST event's
+   * price and a code whose rows can differ (a speeding band) would make that
+   * product a plausible wrong number.
+   */
+  withheldPoints: number;
+  /**
    * The ACT this group is, when its code grades more than one
    * (`rules/catalog.ts actCopy`): the struck body for COLLISION, the act for
    * RAIL_CROSSING_VIOLATION. Undefined for every code that pools one string.
@@ -255,8 +270,40 @@ export function buildDebrief(
     criteriaBroken.push(`${examPointsWordBg(summary.score.osnovniPoints)} от основни грешки (допустими 6)`);
   }
   if (result.aborted) {
+    /**
+     * …AND THE ABORT BRANCH IS THE THIRD ONE THE HOIST ABOVE HAD TO REACH.
+     *
+     * MEASURED · Wave C · `sc-mw-min-speed` · pc · right
+     * (`.audit-frames/wave-c/frames/sc-mw-min-speed__pc-right/`): the car hits
+     * another vehicle at t = 87 (04-t087s, «ОПАСНА ГРЕШКА −10 изпитни т. · Удар
+     * в друго превозно средство»), the run is stopped with „Прекрати урока", and
+     * the result screen reads «Урокът беше прекъснат преди края» over «10
+     * наказателни точки · НЕИЗДЪРЖАН». The debrief this file wrote for that
+     * drive opened, in full: «Прекъсна урока … преди края. Нищо страшно —
+     * запазихме наблюденията дотук, а маршрутът те чака отново.» A crash met
+     * with reassurance, and not one of the criteria named.
+     *
+     * The three criteria are MONOTONE — points only accumulate and an опасна is
+     * never un-committed — so „finishing the route would not have rescued this"
+     * is arithmetic here for the same reason it is arithmetic in the unfinished
+     * branch below, not a guess about a drive that did not happen. The gentle
+     * sentence is kept whole for the drive it was written for: a student who
+     * quits with a clean sheet is still met with «Нищо страшно».
+     */
+    const head = `Прекъсна урока „${lesson.titleBg}“ преди края.`;
+    // Agreeing, because one broken criterion is the common case and „всеки от
+    // тези критерии" about a single one is the „1 движения" defect again.
+    const eachOfThem =
+      criteriaBroken.length === 1
+        ? "Този критерий сам по себе си прави урока неиздържан"
+        : "Всеки от тези критерии сам по себе си прави урока неиздържан";
     lines.push(
-      `Прекъсна урока „${lesson.titleBg}“ преди края. Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака отново.`,
+      criteriaBroken.length === 0
+        ? `${head} Нищо страшно — запазихме наблюденията дотук, а маршрутът те чака отново.`
+        : `${head} Но прекъсването не изтрива изпитния лист — ${criteriaBroken.join("; ")}. ` +
+          `${eachOfThem} (Наредба № 38, приложение № 5, т. 11), така че довършването на маршрута ` +
+          `нямаше да го поправи. Запазихме наблюденията, а маршрутът те чака отново — започни от ` +
+          `грешките по-долу.`,
     );
   } else if (result.passed) {
     lines.push(
@@ -501,7 +548,13 @@ export function buildDebrief(
       const priced =
         g.billedCount > 0
           ? `${pts(g.totalPoints)} по изпитния лист${partial} (${basis})`
-          : `без допълнителни точки — изпитът вече беше прекратен (${basis})`;
+          : // …AND WHAT IT WOULD HAVE COST, because the block's own floor
+            // sentence below sums these rows into one figure and a Σ whose terms
+            // are invisible is the bare verdict again with a bigger number. The
+            // shared clause «изпитът вече беше прекратен» is untouched — two
+            // other surfaces are pinned to it verbatim (FaultCard.tsx).
+            `без допълнителни точки — изпитът вече беше прекратен, иначе щеше да ` +
+            `струва ${pts(g.withheldPoints)} (${basis})`;
       mistakeBlock.push(`• ${g.titleBg}${times} — ${g.severityLabel}, ${priced}${escNote}`);
       /**
        * WHAT WAS STRUCK, IN ITS OWN WORDS (THEO-4). `makeViolation` stamps the
@@ -580,11 +633,87 @@ export function buildDebrief(
         summary.score.unscoredAfterClose === 1
           ? "затова следващото нарушение се показва, но не добавя точки"
           : `затова следващите ${summary.score.unscoredAfterClose} нарушения се показват, но не добавят точки`;
-      mistakeBlock.push(
-        `• Само първата опасна грешка влиза в точките: изпитът се прекратява при нея ` +
-          `(Наредба № 38, чл. 48, ал. 3), ${rest}. Показани са, защото в симулатора продължихме да ` +
-          `караме за упражнение — на истински изпит дотук щеше да е свършило.`,
+      /**
+       * THE ACT THAT CLOSED IT, AND THE RULE THAT ACTUALLY CLOSES ONE.
+       *
+       * The sentence here read «Само първата опасна грешка влиза в точките:
+       * изпитът се прекратява при нея (Наредба № 38, чл. 48, ал. 3)» — and that
+       * is not what чл. 48, ал. 3 says. It ends a practical exam at ПТП and at
+       * повторна намеса на комисията, NOT at any опасна: `rules/scoring.ts`'
+       * header records that the product once told students every опасна
+       * „прекратява изпита на място" and that this was wrong, and
+       * `debrief-collision-truth.test.ts` drives the counterexample — two missed
+       * zebras, two опасни, both charged, nothing closed.
+       *
+       * IT ALSO CONTRADICTED THE ROWS DIRECTLY ABOVE IT. Two аварийна-лента
+       * опасни and then a crash bills all three, so the verdict says «допуснати
+       * са 3 опасни грешки … 30 наказателни точки» and this line said only the
+       * first one counted. Naming the closing ACT costs nothing — it is the
+       * earliest terminating опасна, the same pick `rules/scoring.ts
+       * ledgerCloseTime` makes — and it turns a false general rule into a true
+       * statement about this drive.
+       */
+      const closer = summary.mistakes.reduce<ViolationEvent | undefined>(
+        (best, m) =>
+          m.terminateSession === true && m.severityClass === "opasna" && (best === undefined || m.t < best.t)
+            ? m
+            : best,
+        undefined,
       );
+      const closedAt =
+        closer === undefined ? "деянието, което прекратява изпита" : `«${closer.titleBg}»`;
+      mistakeBlock.push(
+        `• Изпитът е прекратен при ${closedAt}: Наредба № 38, чл. 48, ал. 3 прекратява практическия ` +
+          `изпит при пътнотранспортно произшествие и при повторна намеса на комисията — не при всяка ` +
+          `опасна грешка (две опасни грешки без произшествие се броят и двете), ${rest}. Показани са, ` +
+          `защото в симулатора продължихме да караме за упражнение — на истински изпит дотук щеше да е ` +
+          `свършило.`,
+      );
+      /**
+       * THE ARITHMETIC THAT MAKES THE TABLE READABLE — the whole of finding
+       * `sc-mw-min-speed:ed5a5b84` in one sentence.
+       *
+       * On that drive the student was shown four fault cards after the crash,
+       * each announcing its own price — «−1 изпитна т.», «−3 изпитни т.», «−10
+       * изпитни т.» twice — and then a protocol table reading «Опасни 1 / 10 ·
+       * Основни 0 / 0 · Второстепенни 0 / 0 · Общо (допустими 9) 1 / 10».
+       * Twenty-four points of announced faults and a total of ten, with nothing
+       * anywhere on the screen reconciling the two. The audit read that as the
+       * scorer dropping bookings; the frames say the scorer was right and the
+       * PRODUCT never explained itself. A tally the student cannot derive from
+       * what he was shown is a bare verdict, which THEO-4 forbids.
+       *
+       * Σ over the rows THIS block priced at zero — the same discipline as the
+       * training total below. `pts` because a bare number beside a driving
+       * simulator reads as контролни точки.
+       *
+       * CHECKABLE ONLY BECAUSE THE ROWS NOW CARRY THEIR OWN PRICE. As first
+       * written this comment claimed the figure was checkable against the list
+       * above it, and it was not: every closed-over row read «без допълнителни
+       * точки» and named no number, so 24 stood over 10 + nothing + nothing +
+       * nothing. `MistakeGroup.withheldPoints` is what closed that, and the
+       * remainder is stated rather than hidden — a group the ledger charged in
+       * PART prints its charge and how many rows carried it but not the price
+       * of the rest, and a drive with more groups than `MAX_MISTAKE_LINES`
+       * folds the overflow into «…и още N вида нарушения». On both the sum here
+       * is still the true total, and still larger than what the visible rows
+       * name.
+       */
+      let withheldPoints = 0;
+      summary.mistakes.forEach((m, i) => {
+        if (!ledgerBilled[i]) withheldPoints += m.points;
+      });
+      if (withheldPoints > 0) {
+        mistakeBlock.push(
+          // Neuter singular throughout („това… щеше… не го чети"), because the
+          // count behind the figure is 1 on some drives and 4 on others and a
+          // sentence that agrees with neither is the „1 движения" defect again.
+          `  → Затова таблицата с точките е ДОЛНА ГРАНИЦА, а не брой на грешките: това, което се ` +
+            `показа след прекратяването, щеше да струва още ${pts(withheldPoints)}, ако изпитът още ` +
+            `вървеше. Изпитът свършва при произшествието — пътят не свършва, затова не го чети като ` +
+            `безплатно.`,
+        );
+      }
     }
     /**
      * THE TRAINING TOTAL IS THIS SHEET'S OWN ARITHMETIC, not a number handed in.
@@ -1134,12 +1263,14 @@ function groupMistakes(
     const act = codeIsKnown(m.code) ? actCopy(m.code as ViolationCode, m.detail) : null;
     const actKey = act === null ? undefined : m.detail;
     const paid = billed[i] === true ? m.points : 0;
+    const withheld = billed[i] === true ? 0 : m.points;
     const key = `${m.code}|${actKey ?? ""}`;
     const g = byAct.get(key);
     if (g) {
       g.count += 1;
       g.billedCount += billed[i] === true ? 1 : 0;
       g.totalPoints += paid;
+      g.withheldPoints += withheld;
       g.times.push(m.t);
       if (billed[i] === true) g.billedTimes.push(m.t);
       const here = excessOf(m.detail);
@@ -1157,6 +1288,7 @@ function groupMistakes(
         count: 1,
         billedCount: billed[i] === true ? 1 : 0,
         totalPoints: paid,
+        withheldPoints: withheld,
         actKey,
         actExplanationBg: act?.explanationBg,
         times: [m.t],

@@ -926,7 +926,7 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "templateId": "sc-vu-pass-clearance",
     "mistakeIndex": 1,
     "tracePath": "content/traces/sc-vu-pass-clearance/mistake-fast-close.trace.json",
-    "faultTimeSec": 14.08,
+    "faultTimeSec": 13.52,
     "requiredActors": [
       {
         "kind": "cyclist",

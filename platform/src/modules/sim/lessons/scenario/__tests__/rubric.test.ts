@@ -6,7 +6,22 @@ import { describe, expect, it } from "vitest";
 import { buildSessionSummary, makeViolation } from "../../../rules";
 import type { LessonResult, ObjectiveDetail } from "../../types";
 import { scoreRubric } from "../rubric";
+import { SC_VP_HANDBRAKE } from "../templates-cockpit2";
+import { SCENARIO_TEMPLATES_PARKING3 } from "../templates-parking3";
 import type { RubricSpec } from "../types";
+
+/**
+ * The two consequence clauses, DUPLICATED here on purpose rather than imported
+ * from rubric.ts: an assertion that reads the constant it is checking can only
+ * ever agree with itself. These are the strings a Bulgarian 17-year-old reads
+ * on the card, so they are pinned as literals and a change to the copy has to
+ * be made twice, deliberately, in two files.
+ */
+const NOT_IN_STARS = "Този показател не влиза в звездите горе.";
+const NO_QUALITY_MEASURED =
+  "Нито един показател за качеството на маневрата не бе измерен на това каране: " +
+  "звездите горе идват само от изпитния лист — наказателни точки и изпълнени задачи — " +
+  "а не от оценка на самото изпълнение.";
 
 const RUBRIC: RubricSpec = {
   placement: { objectiveId: "park" },
@@ -300,7 +315,7 @@ describe("scoreRubric", () => {
     const line = scoreRubric(neverReached, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
     expect(line.measured).toBe(false);
     expect(line.detailBg).not.toMatch(/очертания/);
-    expect(line.detailBg).toBe("Няма измерване — до тази маневра не се стигна.");
+    expect(line.detailBg).toBe(`Няма измерване — до тази маневра не се стигна. ${NO_QUALITY_MEASURED}`);
   });
 
   it("a turn that was entered but never turned says corridor, not outlines", () => {
@@ -308,7 +323,7 @@ describe("scoreRubric", () => {
     const line = scoreRubric(enteredOnly, TURN_RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
     expect(line.measured).toBe(false);
     expect(line.detailBg).not.toMatch(/очертания/);
-    expect(line.detailBg).toBe("Няма измерване — завоят не е направен в коридора.");
+    expect(line.detailBg).toBe(`Няма измерване — завоят не е направен в коридора. ${NO_QUALITY_MEASURED}`);
   });
 
   it("a PARK that never entered still hears about the outlines — the copy follows the channel", () => {
@@ -320,7 +335,7 @@ describe("scoreRubric", () => {
     );
     const line = scoreRubric(noEntry, RUBRIC).breakdownBg.find((l) => l.id === "economy")!;
     expect(line.measured).toBe(false);
-    expect(line.detailBg).toBe("Няма измерване — колата не е влизала в очертанията.");
+    expect(line.detailBg).toBe(`Няма измерване — колата не е влизала в очертанията. ${NO_QUALITY_MEASURED}`);
   });
 
   it("an observation component with no authored moments measures nothing", () => {
@@ -352,6 +367,149 @@ describe("scoreRubric", () => {
     const { breakdownBg } = scoreRubric(result, RUBRIC);
     expect(breakdownBg.find((l) => l.id === "placement")?.measured).toBe(false);
     expect(breakdownBg.find((l) => l.id === "economy")?.measured).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // A ROW THAT MEASURED NOTHING MUST SAY WHAT THAT COSTS THE STAR ROW.
+  //
+  // sweep161 · `sc-park-van/mobile-right/08-debrief.png` — „Точност на позицията
+  // не се измерва · Икономичност на маневрата не се измерва · Наблюдение не се
+  // измерва", and in the same card a star row the harness read as „1 от 3
+  // звезди". Three abstentions under a grade, with nothing joining them. The
+  // number is not this file's to move (see the fold's note and the ADR it waits
+  // on); the silence around it is.
+  // -------------------------------------------------------------------------
+  it("when NOTHING was measured every abstaining row says the stars are the exam sheet restated", () => {
+    // The sc-park-van shape: all three components authored, none of them able
+    // to fill — no glance record, and a maneuver that never reached the bay.
+    const nothing = makeResult(
+      { completedAll: false, passed: false },
+      parkDetail({ attempts: 0, inBay: false, alignment: null, centerOffsetM: null, headingOffsetDeg: null }),
+    );
+    const { breakdownBg } = scoreRubric(nothing, RUBRIC);
+    for (const id of ["placement", "economy", "observation"] as const) {
+      const line = breakdownBg.find((l) => l.id === id)!;
+      expect(line.measured, id).toBe(false);
+      expect(line.points, id).toBeNull(); // the „не се измерва" column is KEPT
+      expect(line.detailBg, id).toContain(NO_QUALITY_MEASURED);
+    }
+    // …and never the weaker sentence, which would understate it.
+    for (const id of ["placement", "economy", "observation"] as const) {
+      expect(breakdownBg.find((l) => l.id === id)!.detailBg, id).not.toContain(NOT_IN_STARS);
+    }
+  });
+
+  it("when something DID measure, an abstaining row says only that it is out of the fold", () => {
+    // The counter-direction: „nothing was measured" must not be printed on a
+    // card where placement and economy both scored. Here only наблюдение is
+    // missing, and the sentence has to be the smaller, true one.
+    const { breakdownBg, stars } = scoreRubric(makeResult(), RUBRIC);
+    const obs = breakdownBg.find((l) => l.id === "observation")!;
+    expect(obs.measured).toBe(false);
+    expect(obs.detailBg).toContain(NOT_IN_STARS);
+    expect(obs.detailBg).not.toContain(NO_QUALITY_MEASURED);
+    // The grade itself is untouched by any of this copy.
+    expect(stars).toBe(3);
+  });
+
+  it("a MEASURED row is never given either clause", () => {
+    // The blanket-append failure mode: „не влиза в звездите" printed under a
+    // row that scored 2/2 is a worse lie than the silence it replaced.
+    const { breakdownBg } = scoreRubric(makeResult(), RUBRIC, { observedMomentIds: ["m1", "m2"] });
+    for (const line of breakdownBg) {
+      if (!line.measured) continue;
+      expect(line.detailBg, line.id).not.toContain(NOT_IN_STARS);
+      expect(line.detailBg, line.id).not.toContain(NO_QUALITY_MEASURED);
+    }
+    // Par time reports measured:true and is informational — it must be spared.
+    const par = breakdownBg.find((l) => l.id === "parTime")!;
+    expect(par.detailBg).toBe("75 с — в ориентира от 90 с.");
+  });
+
+  // -------------------------------------------------------------------------
+  // THE ONLY ROW IN THE PRODUCT THAT GRADES MIRRORS AND THE SHOULDER CHECK.
+  //
+  // It used to print „Все още не се измерва в този режим." — stale (the glance
+  // channel IS wired: LessonPlayShell `finalize` → parkingObservationFromTrace,
+  // and simulator/actions.ts re-reads wire.observedMomentIds), misleading („в
+  // този режим" implies another mode looks), and empty of teaching on the one
+  // card where a student who moved off without a mirror needs some.
+  // -------------------------------------------------------------------------
+  it("the unmeasured observation row names the glances the examiner watches", () => {
+    const obs = scoreRubric(makeResult(), RUBRIC).breakdownBg.find((l) => l.id === "observation")!;
+    expect(obs.detailBg).not.toContain("Все още не се измерва в този режим");
+    expect(obs.detailBg).toContain("Огледала преди задна"); // RUBRIC moment m1
+    expect(obs.detailBg).toContain("Поглед през рамо"); // RUBRIC moment m2
+  });
+
+  it("the unmeasured observation row states a REASON and blames the record, not the student", () => {
+    // The row's own note promises „the reason"; the first version of this copy
+    // opened «Оглеждането ти не стигна до оценката на това каране» — subject:
+    // the student's looking — and gave no cause at all. On the twelve
+    // non-parking templates that author glance moments,
+    // `parkingObservationFromTrace` returns null forever (no reverse phase), so
+    // that sentence is what a student who checked both mirrors and his shoulder
+    // reads every single time. THEO-4: never a bare verdict, and a soft
+    // negative with no cause is one.
+    const obs = scoreRubric(makeResult(), RUBRIC).breakdownBg.find((l) => l.id === "observation")!;
+    // Opens like its two siblings, so the three rows read as one card.
+    expect(obs.detailBg.startsWith("Няма измерване — ")).toBe(true);
+    // The cause is named…
+    expect(obs.detailBg).toContain("симулаторът не отчете погледите ти");
+    // …and so is whose limitation it is — the record's, not the student's.
+    expect(obs.detailBg).toContain("ограничение на записа, а не бележка към теб");
+    // And it never says the student's looking fell short — the product cannot
+    // know that here.
+    expect(obs.detailBg).not.toContain("Оглеждането ти не стигна");
+    // The teaching the previous pass added is still there.
+    expect(obs.detailBg).toContain("Провери се сам");
+    expect(obs.measured).toBe(false);
+    expect(obs.points).toBeNull();
+  });
+
+  it("sc-vp-handbrake: the shipped rubric teaches its two moments when it cannot grade them", () => {
+    // The lesson behind sc-vp-handbrake:1f2f7463 — „потегляне с вдигната ръчна"
+    // — is the one cockpit scenario that authors an observation component, and
+    // its two moments are exactly what the student is failing to do.
+    const obs = scoreRubric(
+      makeResult({ completedAll: false, passed: false }),
+      SC_VP_HANDBRAKE.rubric!,
+    ).breakdownBg.find((l) => l.id === "observation")!;
+    expect(obs.measured).toBe(false);
+    expect(obs.detailBg).toContain("Поглед в огледалото, преди колата да тръгне");
+    expect(obs.detailBg).toContain("Поглед през ляво рамо в мъртвата зона");
+    expect(obs.detailBg).toContain(NO_QUALITY_MEASURED);
+  });
+
+  it("sc-park-van: the shipped rubric prints the provenance sentence on all three rows", () => {
+    // sc-park-van:3bf9c933, from the spec the frame was taken of.
+    const spec = SCENARIO_TEMPLATES_PARKING3.find((s) => s.id === "sc-park-van")!;
+    const { breakdownBg } = scoreRubric(
+      makeResult(
+        { completedAll: false, passed: false },
+        parkDetail({ attempts: 0, inBay: false, alignment: null, centerOffsetM: null, headingOffsetDeg: null }),
+      ),
+      spec.rubric!,
+    );
+    expect(breakdownBg.map((l) => l.id)).toEqual(["placement", "economy", "observation", "parTime"]);
+    for (const id of ["placement", "economy", "observation"] as const) {
+      expect(breakdownBg.find((l) => l.id === id)!.detailBg, id).toContain(NO_QUALITY_MEASURED);
+    }
+    expect(breakdownBg.find((l) => l.id === "observation")!.detailBg).toContain(
+      "Втори поглед към страната на буса",
+    );
+  });
+
+  it("an observation component with no authored moments is not told to check nothing", () => {
+    // The empty-moments arm must not print „Провери се сам по: " with an empty
+    // list after it — a sentence that reads as a bug to a 17-year-old.
+    const obs = scoreRubric(makeResult(), { observation: { moments: [] } }).breakdownBg.find(
+      (l) => l.id === "observation",
+    )!;
+    expect(obs.detailBg).not.toContain("Провери се сам");
+    expect(obs.detailBg).toBe(
+      `Този урок не е задал контролни погледи, затова няма какво да се измери тук. ${NO_QUALITY_MEASURED}`,
+    );
   });
 
   it("is pure: identical inputs → identical output", () => {
