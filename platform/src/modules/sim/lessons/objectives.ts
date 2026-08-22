@@ -1957,7 +1957,30 @@ function stepSmoothStop(
   }
 
   let done = false;
-  if (armed && tick.speedKmh <= STOPPED_SPEED_KMH) {
+  // …AND A SIGNED SPEED IS NOT A SPEED — the same sweep, the same law, the last
+  // evaluator in this file that had not been told (2026-08-22).
+  //
+  // `stepReachZone`, `stepPassSignal`, `stepParkInBay` and `stepThreePointTurn`
+  // all fold the sign before asking „is this car at rest" (`Math.abs`), because
+  // the driveline reports reverse as a NEGATIVE `speedKmh` — the C1 finding
+  // `stepParkInBay`'s own comment sets out at length. `stepSmoothStop` asked
+  // `tick.speedKmh <= 1`, which is true of EVERY reversing frame at any speed:
+  // −3, −12, −40 all satisfy it.
+  //
+  // WHAT THAT CREDITS. `l1-smooth-stop` objective 2 and its two siblings in
+  // `specs.ts` are «спри плавно» gates armed above 15–20 км/ч. A car that
+  // brakes, keeps rolling backwards down the camber and is sampled at −3 км/ч
+  // is handed the tick for a STOP IT NEVER MADE — and the window-anchored
+  // derivative does not catch it, because from −1.5 to −3.0 km/h over half a
+  // second is 0.08 m/s², a fortieth of the 3.5 cap. The student is told the
+  // stop was smooth while the car is still moving, in lesson one.
+  //
+  // IT CANNOT TRAP ANYONE: a car genuinely at rest reads |v| ≤ 1 under either
+  // sign convention, and the arming half is deliberately left SIGNED (an
+  // approach is a forward approach — a car reversing at 25 км/ч is not
+  // beginning a smooth stop). Every hand-built tick, every recorded trace and
+  // every forward drive evaluates bit-identically.
+  if (armed && Math.abs(tick.speedKmh) <= STOPPED_SPEED_KMH) {
     if (peakDecel <= maxDecelMs2) {
       done = true;
     } else {
@@ -2089,7 +2112,39 @@ function stepParkInBay(
   const attempts = prev.attempts + (inBay && !prev.inBay ? 1 : 0);
   const exitedBay = prev.inBay && !inBay;
   const nearBay = Math.hypot(relX, relY) <= PARK_MANEUVER_ZONE_M;
-  const usedReverse = (exitedBay ? false : prev.usedReverse) || (tick.gear < 0 && nearBay);
+  // A GEAR SELECTED IS NOT A MANOEUVRE PERFORMED — sweep 161, 2026-08-22.
+  //
+  // The reverse credit accrued from `tick.gear < 0` alone, with nothing said
+  // about MOTION, so the whole entry gate of «Задача 2: влез НА ЗАДЕН ХОД в
+  // алеята и спри напълно» was satisfied by *touching the selector* anywhere
+  // inside PARK_MANEUVER_ZONE_M (15 m) of the bay. The drive that follows can
+  // then be a plain forward nose-in: `entryOk` reads the latch, not the path,
+  // and `done` asks nothing else about direction. That is the D4 cheat path
+  // this evaluator's own header says it closed — closed for reverse banked
+  // ELSEWHERE (the 15 m zone), still open for reverse banked AT A STANDSTILL.
+  //
+  // THE LAW IS ALREADY WRITTEN IN THIS FILE, three hundred lines up, for the
+  // gate that grades the same act geometrically: „«Went through backwards»
+  // therefore means IN REVERSE AND MOVING — a car standing in R has not yet
+  // done anything, and a car rolling back in D is not reversing"
+  // (`stepReachZone`'s `reversing`). This is that sentence, applied in the
+  // evaluator the sentence was about.
+  //
+  // IT CANNOT TRAP ANYONE, and that is the half checked before the half that
+  // refuses: a reverse park MOVES BACKWARDS by definition — every committed
+  // shadow of the four depth drills carries 156–186 frames of negative speed —
+  // so nothing a correct drive does is withheld. What stops is a certificate
+  // for a manoeuvre whose only reverse was the lever.
+  //
+  // THE RESIDUAL, named rather than hidden: reverse performed while moving
+  // anywhere inside the 15 m zone still counts, so a genuine reverse shunt out
+  // on the aisle followed by a forward nose-in is credited. Binding the credit
+  // to the bay ENTRY itself (the `enteredForward` mould) is the tighter rule
+  // and it is the wrong one: a car that backs in, over-runs, and pulls forward
+  // ten centimetres to square up has entered FORWARD on its last transition,
+  // and refusing that park refuses the correction an instructor asks for.
+  const reversingNow = tick.gear < 0 && Math.abs(tick.speedKmh) > STOPPED_SPEED_KMH;
+  const usedReverse = (exitedBay ? false : prev.usedReverse) || (reversingNow && nearBay);
   // S2 forward-entry gate: latched on the outside → inside transition (the
   // gear that CARRIED the entry), cleared on exit — a reverse nose-out
   // followed by a forward re-entry re-earns it, symmetric with usedReverse.
@@ -2534,13 +2589,46 @@ function stepThreePointTurn(
   const entered = prev.entered || inCorridor;
 
   // Shunt counting: a genuine direction reversal (forward↔reverse) while moving,
-  // once the maneuver has begun. A stop does not change direction — only a sign
-  // flip is a shunt, so accel/decel ramps never inflate the count.
+  // inside the corridor. A stop does not change direction — only a sign flip is
+  // a shunt, so accel/decel ramps never inflate the count.
+  //
+  // A MANOEUVRE EVALUATOR MEASURES THE ATTEMPT, NOT THE SESSION — sweep 161,
+  // 2026-08-22, and it is the third face of the same law as the two fixes
+  // above: this file states a rule for one evaluator and does not apply it in
+  // the sibling that grades the same kind of act.
+  //
+  // WHAT WAS BROKEN. The count was gated on `entered`, which is MONOTONIC —
+  // once the car has touched the corridor it is true for the rest of the
+  // session — so every forward↔reverse flip anywhere in the district, for the
+  // remaining minutes of the lesson, kept incrementing it. Two consequences,
+  // and the second is a false conviction of a correct manoeuvre:
+  //
+  //  · a student who enters the box, thinks better of it, drives out, comes
+  //    back and executes a textbook three-movement turn is reported with every
+  //    shunt of the abandoned attempt still on the sheet. rubric.ts prices the
+  //    economy row off exactly this number (`turn.movements`, then
+  //    `<= attemptsFor3Stars`, which is 1 on both U-turn drills) and
+  //    SessionEndScreen prints it as the objective's evidence line, so the
+  //    clean retry is graded as the mess that preceded it;
+  //  · and the same drift runs the other way for anything the car does on the
+  //    road AFTER the turn — a reverse out of a parking bay two hundred metres
+  //    later is one more „движение" of a manoeuvre that finished long ago.
+  //
+  // `stepParkInBay` has had the right law since A10 — „leaving the bay starts a
+  // NEW attempt (counted, and reverse must be used again)". The corridor is the
+  // turn's bay; this is that law, in the turn.
+  //
+  // IT CANNOT REFUSE ANYBODY: `done` never reads `reversals`, so this changes
+  // only the NUMBER the debrief prints, and it only ever moves it toward the
+  // truth of the attempt being graded. The leniency it admits is named — a car
+  // whose CENTRE leaves the box mid-turn restarts its count — and the boxes are
+  // 16–30 m across against a 4 m car, so leaving one is a departure rather than
+  // a wobble.
   const stopped = Math.abs(tick.speedKmh) <= STOPPED_SPEED_KMH;
   const movingDir = stopped ? 0 : tick.gear < 0 ? -1 : 1;
-  let lastDir = prev.lastDir;
-  let reversals = prev.reversals;
-  if (entered && movingDir !== 0) {
+  let lastDir = inCorridor ? prev.lastDir : 0;
+  let reversals = inCorridor ? prev.reversals : 0;
+  if (inCorridor && movingDir !== 0) {
     if (lastDir !== 0 && movingDir !== lastDir) reversals += 1;
     lastDir = movingDir;
   }

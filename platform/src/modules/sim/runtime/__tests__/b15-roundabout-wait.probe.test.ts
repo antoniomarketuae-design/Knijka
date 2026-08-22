@@ -12,7 +12,8 @@
  * car actually was when it fired. Delete once the row is decided.
  */
 
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -29,8 +30,22 @@ import type { RuleEvent } from "../../rules";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
-const OUT =
-  "C:\\Users\\Ljh\\AppData\\Local\\Temp\\claude\\E--AI-driver\\8942546c-780e-450f-ae95-3aa94e28222a\\scratchpad\\b15\\probe.txt";
+/**
+ * WHERE THIS WRITES, AND WHY IT MOVED — 2026-08-22.
+ *
+ * This used to be an absolute path into one agent session's scratchpad:
+ * `…\Temp\claude\E--AI-driver\8942546c-780e-…\scratchpad\b15\probe.txt`, and the
+ * write happens at MODULE LOAD, so the file failed at import — not in a test —
+ * on any machine that was not that session, and on that machine the moment the
+ * session's temp directory was cleaned up. A committed test that depends on a
+ * dead session's temp directory is a landmine with a timer on it.
+ *
+ * It now writes under the OS temp directory and creates its own parent, so it
+ * works anywhere and owns nothing. The probe is still NOT A GATE — see the
+ * header — and it should still be deleted once register row B15 is decided.
+ */
+const OUT = path.join(os.tmpdir(), "knijka-b15-probe", "probe.txt");
+mkdirSync(path.dirname(OUT), { recursive: true });
 writeFileSync(OUT, "");
 const DT = 1 / 30;
 const X_LANE = 4.06;

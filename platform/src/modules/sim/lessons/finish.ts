@@ -176,6 +176,34 @@
  * five-lane boulevard — leaving 0.645 m of headroom on a 30 m threshold. That
  * number, not the 6.3 m one, is what sets OFF_NETWORK_STUCK_S.
  *
+ * ---------------------------------------------------------------------------
+ * 2026-08-22 — O30. EVERY ENDING AN ARRIVAL TERMINAL HAD WAS AN ARRIVAL, and
+ * the class that survived the re-measurement above was not the only one left.
+ * The 2026-08-19 row concluded that the stranded lanes were the harness's short
+ * budget, and for the ones it named that is right; it did not look at what
+ * happens to a car that DOES reach the end of the route and does not stop
+ * there. `routeFinishZone` asks for presence and the engine withholds it on the
+ * terminal objective; `terminalRescueZone` asks for a full standstill AT the
+ * mark. A car that drives THROUGH the mark and carries on satisfies neither —
+ * and on the 132 rungs whose terminal carries a SPEED CONTRACT it can no longer
+ * satisfy the objective either WHILE HE KEEPS GOING, because `stepReachZone`
+ * grades `done = reached && capMet` and one sweep of the disc over the cap
+ * spends `capMet`. Nothing in this module is anchored anywhere that car still
+ * is. It is NOT spent for good — see the O30 block for the drive that re-earns
+ * it, which is why the arm written out there may not land as first specified.
+ *
+ * `terminalDepartureZone` is that ending — B1's own sentence („the ending is
+ * not the island, it is having LEFT the island") pointed at a waypoint. See it
+ * for the shape, the census, the nine compact drills it is deliberately
+ * withheld from, why a bay never gets it, and why it is a THIRD zone rather
+ * than a second face on the rescue (the module carries two faces per zone and
+ * a terminal arrival needs three; the third needs one field this lane does not
+ * own). `__tests__/terminal-departure.test.ts` drives it on shipped lessons and
+ * ratchets the census; `routeDepartedEndingCopy` is the sentence it needs. The
+ * ARM is six lines in `engine.ts` plus one field in `types.ts`, written out
+ * verbatim beside the copy — until it lands nothing in this file's behaviour
+ * has changed.
+ *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
  */
@@ -788,6 +816,97 @@ export function offNetworkEndingCopy(examMode: boolean): {
 // of `offNetworkEndingCopy`.
 // ---------------------------------------------------------------------------
 
+/**
+ * WHAT THE STUDENT IS TOLD WHEN HE HAS DRIVEN PAST THE END OF THE ROUTE (O30).
+ *
+ * IT MAY NOT BORROW EITHER SENTENCE THE ENGINE CAN ALREADY SPEAK, and that is
+ * not tidiness. `engine.ts` picks between them on `stoppedStuck`, and both are
+ * false here: «Спря в края на маршрута» is false of a car that did not stop,
+ * and «Стигна края на маршрута, затова урокът приключва тук» reads as an
+ * arrival on a drive whose whole defect is that the arrival never happened.
+ * THEO-4 (doc 64, founder-ratified) counts a sentence that gives the WRONG
+ * reason as a bare verdict wearing a costume — the same argument
+ * `offNetworkEndingCopy` was written under, and the reason the fold that ends a
+ * drive owns the words that explain it.
+ *
+ * Kept inside the violation catalogue's own length band (median 186 chars, max
+ * 319) like the other endings: this is a HUD toast on a 390 px phone, and the
+ * detail belongs in the debrief a second later. It claims nothing the debrief
+ * does not deliver — the unfinished tasks and the mistakes, both of which
+ * `buildLessonResult` already prints.
+ */
+export function routeDepartedEndingCopy(examMode: boolean): {
+  kind: "lesson";
+  titleBg: string;
+  explanationBg: string;
+} {
+  return {
+    kind: "lesson",
+    titleBg: examMode ? "Край на изпита — мина покрай края" : "Край на урока — мина покрай края",
+    explanationBg: examMode
+      ? "Стигна мястото, където свършва изпитният маршрут, но задачата там не се отчете и колата продължи покрай него. Оттук нататък няма маршрут за каране, затова изпитът приключва — разборът показва какво остана неизпълнено и всяка допусната грешка."
+      : "Стигна мястото, където свършва маршрутът, но задачата там не се отчете и колата продължи покрай него. По-нататък няма какво да се кара, а задачата не се наваксва с продължаване — затова урокът приключва тук. Разборът показва какво точно остана неизпълнено и как се прави следващия път.",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// THE ARM IS NOT IN THIS FILE, and here is exactly what it is — verbatim, so
+// the routed edit is auditable at a glance. It is the same routing call the
+// O22 block above made, for the same reason (`engine.ts` and `types.ts` are
+// another lane's), and with the geometry, the census and the copy already
+// written and tested so what is left to land is mechanical.
+//
+//   1. `lessons/types.ts` — one field on LessonSessionState, beside the two
+//      gate states that are already there:
+//          /** O30: the departure gate on the terminal waypoint (finish.ts). */
+//          finishDepartureGate?: FinishGateState;
+//
+//   0. NOT AT FINISH_LEAVE_S, AND THIS IS THE PART THAT MUST BE RE-MEASURED
+//      BEFORE ANY OF IT LANDS. The dwell below is 20 s, and 20 s is shorter
+//      than the recovery the product allows today. Measured by stepping this
+//      zone's gate alongside `applyTick` on `sc-ac-aquaplane`@L1, on the
+//      overshoot-and-return drive recorded in the O30 block: the departure gate
+//      latches at t = 53.25 s and the student completes the lesson at
+//      t = 94.5 s. Landing the arm as written below would therefore END A
+//      LESSON 41.3 s BEFORE THE STUDENT FINISHED IT — and say «мина покрай
+//      края» to someone who was on his way back to the mark. That is refusing a
+//      correct drive, which objectives.ts calls the failure the founder ranks
+//      worst, and it is the opposite of the north star. Either the dwell is
+//      sized against real return manoeuvres, or the gate is withheld while the
+//      terminal objective is still re-earnable, or the copy stops implying the
+//      task is unrecoverable. None of those three is decided, so the arm is NOT
+//      ready to land and this block is a warning, not a work order.
+//
+//   2. `lessons/engine.ts` — stepped in the SAME `else` branch as the other
+//      two gates (so B15's freeze, which clears the partial dwell of every gate
+//      in the branch above it, covers this one too — a student stopped at a red
+//      just past the end of the route must not spend this dwell):
+//          const departure = terminalDepartureZone(params);
+//          if (departure !== null) {
+//            finishDepartureGate = stepFinishGate(
+//              finishDepartureGate ?? createFinishGate(), departure, tick);
+//          }
+//      …the same three-line freeze block the other two gates get, and then in
+//      the termination test:
+//          if (phase !== "completed" && finishDepartureGate?.reachedAtSec != null) {
+//            phase = "completed";
+//            endedAtSec = tick.t;
+//            hudEvents.push(routeDepartedEndingCopy(examMode));
+//          }
+//      …the `phase !== "completed"` guard is not decoration: the block above it
+//      already sets `phase` from `finishGate`/`stoppedStuck`, and without the
+//      guard a frame on which both latch pushes TWO ending toasts that
+//      contradict each other.
+//      …and `finishDepartureGate` in the returned state.
+//
+// It grades nothing, exactly like the rest of this file: no ScorableEvent is
+// emitted, suppressed or reweighted, the unreached objectives stay honestly
+// unreached, and `buildLessonResult` reports finished-and-not-passed. What it
+// must NOT do is fold this zone into `finishRescueGate` — the two zones are
+// different shapes on the same mark and one gate state cannot hold both, which
+// is the whole reason this is a third zone.
+// ---------------------------------------------------------------------------
+
 interface Point {
   x: number;
   y: number;
@@ -1094,11 +1213,123 @@ export function terminalRescueZone(
 ): RouteFinishZone | null {
   if (objectives.length < 1) return null;
 
-  const anchor = finishAnchor(objectives[objectives.length - 1], true);
+  const terminal = objectives[objectives.length - 1];
+  const anchor = finishAnchor(terminal, true);
   if (anchor === null || anchor.terminalRescue !== true) return null;
   if (anchor.mode === "outside") return normalizeOutside(anchor);
 
   return { ...anchor, radiusM: Math.max(anchor.radiusM, FINISH_LANE_FLOOR_M) };
+}
+
+// ---------------------------------------------------------------------------
+// O30 (2026-08-22) — THE END OF THE ROUTE IS BEHIND YOU AND THE DRIVE IS STILL
+// RUNNING.
+// ---------------------------------------------------------------------------
+//
+// EVERY ENDING AN ARRIVAL TERMINAL HAS IS AN ARRIVAL. `routeFinishZone` asks
+// for presence and the engine withholds it on the terminal objective („every
+// correct final approach would satisfy it"); `terminalRescueZone` asks for a
+// full standstill AT the mark. A car that drives THROUGH the mark and keeps
+// going satisfies neither — and on a terminal carrying a SPEED CONTRACT it can
+// no longer satisfy the OBJECTIVE either WHILE HE KEEPS GOING: `stepReachZone`
+// grades `done = reached && capMet`, so a car that swept the disc at 40 km/h
+// against a 6 km/h cap has latched `reached` and spent `capMet`. Nothing in
+// this module is anchored anywhere the car still is, and the drive runs until
+// somebody presses «Прекрати урока».
+//
+// CORRECTED 2026-08-22 BY THE VERIFIER, because the sentence this block first
+// carried — „spent `capMet` for good … a gate that driving on cannot re-earn"
+// — is FALSE, and a false root cause is how a lane ships the wrong fix.
+// `capMet` is `(st.capMet && !capSpent) || contractEarned` (objectives.ts
+// ~1600) and `contractEarned` re-earns it on any later frame inside the
+// acceptance disc at or under the cap. Driven end-to-end through `applyTick`
+// on the exhibit itself: 40 km/h straight through `sc-ac-aquaplane`@L1's
+// terminal, 200 m on, then back onto the mark under 6 km/h — 2/2 objectives
+// done, `phase === "completed"` at t = 94.5 s. The same drive on
+// `sc-ac-night-overdrive`@L1 also completes; `sc-ac-truck-spray` and
+// `sc-ac-wind-truck-pass` (uncapped r-17 terminals) complete on the straight
+// drive alone, without turning back at all. So the finding's „the pass path
+// exists in exactly one lesson out of seven" does not survive being driven.
+// WHAT IS TRUE is narrower and still worth an ending: a car that keeps going
+// FORWARD never ends, because no fold is anchored where it is.
+//
+// MEASURED over the compiled catalogue (808 rungs): 674 end on a `reachZone`
+// and 132 of those carry a speed contract — every «спри точно на позицията» /
+// «мини с намалена скорост» terminal in the product. Two are sweep161 exhibits
+// on this file, `sc-ac-aquaplane` and `sc-ac-night-overdrive` (both «Спри точно
+// на позицията…», the finding sc-ac-aquaplane:517af4c5 — „five of the seven
+// lessons cannot be finished by driving … the pass path exists in exactly one
+// lesson out of seven"). Both re-drove for 258 s WITH STEERING
+// (.audit-frames/rebase, commit 70bcd1b) with the terminal task unticked and no
+// ending offered.
+//
+// THE SHAPE IS B1's OWN SENTENCE POINTED AT A WAYPOINT — „the ending is not the
+// island, it is having LEFT the island". A car a lane clear of the end of the
+// route and still going is not going to complete a task that happens back
+// there, and the debrief is the better use of his time.
+//
+// WHY IT IS A THIRD ZONE AND NOT A SECOND FACE ON THE RESCUE. It was written
+// that way first and the module refused it, for a reason worth recording so the
+// next lane does not spend a round rediscovering it: `stepFinishGate` carries
+// exactly two faces per zone (the region, and the standstill band around it),
+// and a terminal ARRIVAL needs both a standstill AT the mark (B2, inside the
+// arming circle) and a departure BEYOND it. An "outside" zone cannot give the
+// first — `strandedBeyondM`'s clamp floors the band at `armWithinM`, which is
+// B1's ground and is pinned by `finish-work-site-band.test.ts` in three places.
+// Carrying both would need one more field on `FinishGateState` (types.ts) or
+// one more gate state in `engine.ts`, and neither file is this lane's. So the
+// zone is derived, measured and tested HERE, and the arm is six lines THERE,
+// written out verbatim below `routeDepartedEndingCopy`.
+//
+// WITHHELD ON A ROUTE TOO COMPACT TO MEAN IT, which is `routeFinishZone`'s
+// half-distance clamp pointed the other way. If a waypoint the route sends the
+// student to EARLIER lies inside the departure circle, then „you have left the
+// end of the route" and „you are back at the checkpoint before it" are the same
+// pose, and a manoeuvring drill retried from its own approach pose would be
+// closed mid-retry. Measured: 9 of the 674 rungs — `sc-park-parallel-exit`
+// L1–L5 (previous waypoint 12.77 m out) and `sc-ed-reverse-line` L1–L4
+// (10.00 m) — and both are exactly that shape. ZERO rungs have an earlier
+// waypoint inside the ARM, so no route can arm this from a leg of itself;
+// `__tests__/terminal-departure.test.ts` ratchets both counts.
+//
+// A BAY NEVER GETS IT, and its own anchor says why: beside a bay „being
+// present, slow and unfinished is what CORRECT driving looks like for the whole
+// minute before the park lands", and a park retried by pulling forward and
+// lining up again is a departure this face cannot tell from an abandonment.
+// A `passSignal`, a ring and a turn box never get it either — they already
+// depart, through `terminalRescueZone`'s own "outside" face.
+//
+// THE BAND IS EXACTLY ONE MARGIN (`workSiteRadiusM === armWithinM`), so every
+// invariant `finish-work-site-band.test.ts` states about an "outside" zone
+// holds here unchanged: the band never reaches inside the arm, it is never
+// zero-width, and it is never wider than FINISH_OUTSIDE_ANNULUS_M.
+export function terminalDepartureZone(
+  objectives: readonly ObjectiveParams[],
+): RouteFinishZone | null {
+  if (objectives.length < 1) return null;
+  const terminal = objectives[objectives.length - 1];
+  if (terminal.kind !== "reachZone") return null;
+
+  // The arm is the objective's own acceptance radius, floored to one lane —
+  // B3's floor, for B3's reason: a car one lane wide of the gate is where the
+  // taught mistake of `sc-ln-boulevard-discipline` puts it (8.13 m), and it has
+  // been at the end of the route just as surely as a car in the right lane.
+  const armWithinM = Math.max(terminal.radiusM, FINISH_LANE_FLOOR_M);
+  const radiusM = armWithinM + FINISH_OUTSIDE_ANNULUS_M;
+  for (let i = 0; i < objectives.length - 1; i++) {
+    const prev = targetPoint(objectives[i]);
+    if (prev !== null && dist(terminal, prev) <= radiusM) return null;
+  }
+  return normalizeOutside({
+    x: terminal.x,
+    y: terminal.y,
+    radiusM,
+    armWithinM,
+    workSiteRadiusM: armWithinM,
+    dwellSec: FINISH_LEAVE_S,
+    mode: "outside",
+    terminalRescue: true,
+  });
 }
 
 // ---------------------------------------------------------------------------

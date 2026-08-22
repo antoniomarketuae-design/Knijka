@@ -1,5 +1,14 @@
 import { chromium } from "./pw.mjs";
-const OUT = "C:/Users/Ljh/AppData/Local/Temp/claude/E--AI-driver/8942546c-780e-450f-ae95-3aa94e28222a/scratchpad";
+// KNIJKA_SHOT_OUT, else the OS temp dir. This was an absolute path into one
+// agent session's scratchpad, which stopped existing when that session's temp
+// directory was cleaned up — a committed script cannot depend on a dead
+// session's working directory. Its sibling b15-roundabout-wait.probe.test.ts
+// had the same path and failed at import for the same reason.
+import os from "node:os";
+import path from "node:path";
+import { mkdirSync } from "node:fs";
+const OUT = process.env.KNIJKA_SHOT_OUT || path.join(os.tmpdir(), "knijka-shots");
+mkdirSync(OUT, { recursive: true });
 const b = await chromium.launch({ headless: true });
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
 const p = await ctx.newPage();

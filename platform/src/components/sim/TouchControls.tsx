@@ -1701,6 +1701,155 @@ export function driveAxisLabelBg(
     : "Ход — нагоре газ, в средата спиране, надолу спирачка. На изпит заден ход се избира само с лоста в ⚙ (D → N → R).";
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   WHAT THE TWO PADS ANNOUNCE — AND WHY A PINNED `aria-valuenow` IS A DEFECT
+   AND NOT A MISSING NICETY. Catalogue row sc-zebra-approach:952e056d.
+
+   BOTH PADS ARE `role="slider"`, both declare `aria-valuemin={-100}` and
+   `aria-valuemax={100}`, and until this change both hardcoded
+   `aria-valuenow={0}` as a LITERAL. Nothing ever updated it, because the
+   gesture path deliberately writes through refs and DOM styles (no React state
+   at gesture rate — see the header's „Perf" note), and the accessible value was
+   never part of that path. So the WHEEL reported itself centred at full lock
+   and the DRIVETRAIN axis reported itself centred with the pedal on the floor,
+   in both directions, forever.
+
+   THAT IS WORSE THAN OMITTING THE ROLE, and the reason is specific rather than
+   pedantic: `valuemin`/`valuemax` are a PROMISE that the control has a readable
+   position. A student who cannot see the screen is told this pad is a slider
+   with a −100..100 range, asks it where it is, and is told „centre" whatever
+   their thumb is doing. They cannot discover the lie by exploring, because
+   every position they can reach answers the same. On a phone this pad is the
+   ONLY way to drive, and the audience is 17–18-year-olds.
+
+   THE SHAPE OF THE FIX, and each part of it is load-bearing:
+
+   · THE ANNOUNCED NUMBER IS DERIVED FROM THE COMMANDED ONE. `steerAxisAria`
+     takes the value that was just handed to `TouchInputSource.setSteer`, and
+     `driveAxisAria` takes the axis `driveAxisFromPadY` just returned — not the
+     pixel geometry, not a second copy of the curve. A recomputation is a second
+     source of truth and this file has been bitten by those (see the block above
+     `reverseGestureLive`). What the pad SAYS therefore cannot drift from what
+     the car DOES without the drive breaking first.
+
+   · IT IS WRITTEN IMPERATIVELY, next to the knob's `style.transform`, for the
+     same reason the transform is: a `setState` at gesture rate is a rendering
+     bug on this screen. React never re-applies a JSX attribute whose value did
+     not change between renders, so the constant `aria-valuenow={0}` in the
+     markup is the AT-REST truth (which it genuinely is) and the imperative
+     writes own the attribute from the first `pointerdown` onward.
+
+   · AND IT SAYS WHAT THE NUMBER MEANS. Doc 64 THEO-4: this product explains,
+     it does not merely report. „−100" is a verdict; «Волан докрай наляво —
+     пълен волан» is an instructor. `aria-valuetext` carries the sentence and
+     the number stays underneath it for anything that wants to compute.
+
+   · THE SWAP IS IN THE SENTENCE, NOT IN THE PAD. In R with the assist live the
+     two channels are exchanged downstream (`applyReversePedalRemap`), so „up"
+     is the brake and „down" is the reverse accelerator — the same fact
+     `driveAxisLabelBg` already carries. The pad's behaviour is untouched here
+     too; only the words know.
+
+   WHAT THIS DELIBERATELY DOES NOT DO: give the pads `tabIndex` and arrow-key
+   increments, which is the rest of a conforming slider. The arrows ARE the
+   steering keys (`engine/input.ts`: `on("KeyA") || on("ArrowLeft")`), so a
+   focusable pad that consumed them would fight the car for its own control.
+   Making the reported position TRUE is separable from that and is the half the
+   catalogue row is about; the other half needs a decision about the whole
+   screen's focus order and is not this change's to take.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** The two attributes a `role="slider"` owes its user, as one value. */
+export interface AxisAria {
+  /** −100..100, in the SCREEN's direction (see `steerAxisAria`). */
+  valueNow: number;
+  /** The same position as a sentence a person can act on. */
+  valueText: string;
+}
+
+/** Both pads at rest. Exported because the markup, the release edges and the
+ *  „a hide parks everything" path must all say the identical thing. */
+export const STEER_ARIA_CENTRE_TEXT = "Волан в центъра — колелата са прави.";
+export const DRIVE_ARIA_CENTRE_TEXT =
+  "Педалът е в средата — нито газ, нито спирачка; колата се движи по инерция.";
+
+/**
+ * The wheel's announced position, FROM THE VALUE THE CAR IS BEING STEERED ON.
+ *
+ * `steerValue` is `VehicleInput.steer` — engine convention, **+1 = LEFT**
+ * (`steerFromDrag` says so in its own last line). The slider's convention is
+ * the SCREEN's: dragging right raises the value, because that is what the thumb
+ * and the knob do and because a left-to-right slider that counts down as it
+ * moves right is a second thing to have to know. The sign is flipped exactly
+ * once, here, and the side is ALSO spelled out in words so nothing rests on a
+ * reader having internalised either convention.
+ */
+export function steerAxisAria(steerValue: number): AxisAria {
+  const valueNow = Math.round(-steerValue * 100);
+  if (valueNow === 0) return { valueNow: 0, valueText: STEER_ARIA_CENTRE_TEXT };
+  const side = valueNow > 0 ? "надясно" : "наляво";
+  const magnitude = Math.abs(valueNow);
+  return {
+    valueNow,
+    valueText:
+      magnitude >= 100
+        ? `Волан докрай ${side} — пълен волан.`
+        : `Волан ${magnitude}% ${side}.`,
+  };
+}
+
+/**
+ * The drivetrain axis's announced position, from the axis `driveAxisFromPadY`
+ * just returned: **positive = up = throttle, negative = down = brake**, which
+ * is already the screen's direction, so nothing is flipped.
+ *
+ * `reverseGesture` is `inReverse && reverseGestureLive(…)` — the one state in
+ * which the channels are swapped underneath the student (see the block above).
+ * A pad that announced «Газ 80%» while the car was braking would be the same
+ * defect this function exists to end, one mode over.
+ */
+export function driveAxisAria(axis: number, reverseGesture: boolean): AxisAria {
+  const valueNow = Math.round(axis * 100);
+  if (valueNow === 0) return { valueNow: 0, valueText: DRIVE_ARIA_CENTRE_TEXT };
+  const up = valueNow > 0;
+  const channel = reverseGesture ? (up ? "brake" : "reverse") : up ? "throttle" : "brake";
+  const name =
+    channel === "brake" ? "Спирачка" : channel === "throttle" ? "Газ" : "Заден ход";
+  const floored =
+    channel === "brake"
+      ? "аварийно спиране"
+      : channel === "throttle"
+        ? "газта е до дупка"
+        : "докрай назад";
+  const magnitude = Math.abs(valueNow);
+  return {
+    valueNow,
+    valueText:
+      magnitude >= 100 ? `${name} 100% — ${floored}.` : `${name} ${magnitude}%.`,
+  };
+}
+
+/** The narrowest thing this can be written to — a pad's own node, and in the
+ *  tests a recorder. Deliberately not `HTMLElement`: nothing here needs one. */
+export interface AxisAriaTarget {
+  setAttribute(name: string, value: string): void;
+}
+
+/**
+ * Publish a pad's position to the accessibility tree.
+ *
+ * Both attributes, always, from one call: `aria-valuenow` without
+ * `aria-valuetext` is a bare number and `aria-valuetext` without
+ * `aria-valuenow` leaves the range unreadable, and this file's own history
+ * (doc 91 §C1) is what happens when two halves of one statement are written at
+ * two call sites in two vocabularies.
+ */
+export function publishAxisAria(el: AxisAriaTarget | null | undefined, aria: AxisAria): void {
+  if (!el) return;
+  el.setAttribute("aria-valuenow", String(aria.valueNow));
+  el.setAttribute("aria-valuetext", aria.valueText);
+}
+
 /* ── THE TIER, AS A SHEET CELL ────────────────────────────────────────────────
    FOUR LETTERS, because a cell is 44 px and its type is 10 px — the same
    budget «СВЕТЛ» and «АВАР» already live on. The whole Bulgarian word is in
@@ -1852,9 +2001,36 @@ export function TouchControls({
   const steerKnobRef = useRef<HTMLDivElement | null>(null);
   const driveKnobRef = useRef<HTMLDivElement | null>(null);
 
-  /** Both knobs home. The ink must not go on claiming a throttle the hide just
-   *  released — the pad's node now SURVIVES the interruption (see the render
-   *  below), and its inline transform survives with it. */
+  /* ── THE PADS' OWN NODES, SEATED FROM `e.currentTarget` AND NOT FROM `ref=` ──
+     These carry the announced position (`publishAxisAria`), and they are taken
+     from the event rather than from a JSX `ref` on purpose: `e.currentTarget`
+     for a pad handler IS the element that carries `role="slider"`, so the node
+     the position is written to cannot be a different node from the one the
+     gesture arrived on. The identity is stable across a card — the whole point
+     of §I3 is that these nodes SURVIVE the interruption — so a ref seated once
+     stays correct for the session, and before the first press the markup's own
+     at-rest values are already the truth. */
+  const steerPadRef = useRef<AxisAriaTarget | null>(null);
+  const drivePadRef = useRef<AxisAriaTarget | null>(null);
+
+  /** True only in R with the assist live, i.e. exactly when „up" is the brake
+   *  and „down" is the reverse accelerator. Assigned during render (below,
+   *  beside `gestureLive`) and read by the gesture handlers, which must not be
+   *  rebuilt at gesture rate — the same idiom `useHoldButton` uses. */
+  const reverseGestureRef = useRef(false);
+
+  /** The drivetrain axis this pad last drove the pedals on, kept so the swap
+   *  below can re-announce the position WITHOUT inventing one. Written in
+   *  `driveApply` beside the pedals themselves, so it cannot be a second
+   *  reading of the geometry; cleared on the two edges that let the pad go. */
+  const driveAxisRef = useRef(0);
+
+  /** Both knobs home, AND both pads announcing centre. The ink must not go on
+   *  claiming a throttle the hide just released — the pad's node now SURVIVES
+   *  the interruption (see the render below), and its inline transform survives
+   *  with it. So does its `aria-valuenow`, which is ink for anyone who cannot
+   *  see the knob: a hide releases the axes, so the announced position has to
+   *  come home in the same call or the two disagree for the length of a card. */
   const parkKnobs = useCallback(() => {
     const steer = steerKnobRef.current;
     if (steer) {
@@ -1867,6 +2043,9 @@ export function TouchControls({
       drive.style.transform = "translateY(0px)";
       drive.style.borderColor = "var(--accent)";
     }
+    driveAxisRef.current = 0;
+    publishAxisAria(steerPadRef.current, steerAxisAria(0));
+    publishAxisAria(drivePadRef.current, driveAxisAria(0, reverseGestureRef.current));
   }, []);
 
   // ═══ ANY HIDE LETS GO OF EVERYTHING — THE AXES *AND* THE POINTERS ════════
@@ -2039,7 +2218,13 @@ export function TouchControls({
   const steerApply = useCallback(
     (clientX: number) => {
       const dx = clientX - steerStartX.current;
-      touch.setSteer(steerFromDrag(dx, TOUCH_STEER_RANGE_PX));
+      const steer = steerFromDrag(dx, TOUCH_STEER_RANGE_PX);
+      touch.setSteer(steer);
+      // THE ANNOUNCED POSITION COMES OFF THE SAME LOCAL THE CAR IS STEERED ON,
+      // one line down from `setSteer` — not off `dx`, which would be a second
+      // copy of the expo curve and free to drift. See the block at
+      // `steerAxisAria`.
+      publishAxisAria(steerPadRef.current, steerAxisAria(steer));
       const knob = steerKnobRef.current;
       if (knob) {
         const t = Math.max(
@@ -2072,6 +2257,7 @@ export function TouchControls({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!steerPad.claim(e.pointerId)) return; // one finger owns the wheel
       capturePointer(e.currentTarget, e.pointerId);
+      steerPadRef.current = e.currentTarget;
       steerBegin(e.clientX);
     },
     [steerBegin, steerPad],
@@ -2087,6 +2273,10 @@ export function TouchControls({
         // this gesture, and an uncaptured pointer that lifts elsewhere leaves
         // the wheel owned for the rest of the session.
         capturePointer(e.currentTarget, e.pointerId);
+        // …and seats the node the position is announced on, for the same
+        // reason: the adoption door is a full second entrance to the gesture,
+        // so everything the press door does it must do too.
+        steerPadRef.current = e.currentTarget;
         steerBegin(e.clientX);
       }
     },
@@ -2097,6 +2287,7 @@ export function TouchControls({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!steerPad.release(e.pointerId)) return;
       touch.releaseSteer(); // springs back: keyboard/gamepad regain the axis
+      publishAxisAria(steerPadRef.current, steerAxisAria(0));
       const knob = steerKnobRef.current;
       if (knob) {
         knob.style.transition = "transform 140ms ease-out";
@@ -2146,6 +2337,13 @@ export function TouchControls({
         touch.releaseThrottle();
         touch.releaseBrake();
       }
+      // Same discipline as the wheel: announced from the axis the pedals were
+      // just driven from, in every one of the three branches above, including
+      // the neutral band — which is a POSITION the thumb can hold and not an
+      // absence of one. `reverseGestureRef` is what stops the sentence naming
+      // the wrong channel in R (block at `driveAxisAria`).
+      driveAxisRef.current = axis;
+      publishAxisAria(drivePadRef.current, driveAxisAria(axis, reverseGestureRef.current));
       const knob = driveKnobRef.current;
       if (knob) {
         const t = Math.max(
@@ -2175,6 +2373,7 @@ export function TouchControls({
     (e: ReactPointerEvent<HTMLDivElement>) => {
       if (!drivePad.claim(e.pointerId)) return;
       capturePointer(e.currentTarget, e.pointerId);
+      drivePadRef.current = e.currentTarget;
       driveBegin(e.currentTarget, e.clientY);
     },
     [driveBegin, drivePad],
@@ -2190,6 +2389,7 @@ export function TouchControls({
         // it (the block at `adoptable()`, and the priority-replace note at
         // `onDriveEnd`).
         capturePointer(e.currentTarget, e.pointerId);
+        drivePadRef.current = e.currentTarget;
         driveBegin(e.currentTarget, e.clientY);
       }
     },
@@ -2286,6 +2486,8 @@ export function TouchControls({
       if (!drivePad.release(e.pointerId)) return;
       touch.releaseThrottle();
       touch.releaseBrake();
+      driveAxisRef.current = 0;
+      publishAxisAria(drivePadRef.current, driveAxisAria(0, reverseGestureRef.current));
       const knob = driveKnobRef.current;
       if (knob) {
         knob.style.transition = "transform 140ms ease-out, border-color 140ms linear";
@@ -2305,6 +2507,48 @@ export function TouchControls({
   // the truth rather than a guess.
   const transmission: TransmissionMode = snap?.transmission ?? "automatic";
   const gestureLive = reverseGestureLive(reverseAssistEnabled, transmission);
+  // The one state in which the drivetrain axis's two channels are exchanged
+  // underneath the student, published to the gesture handlers as a ref so they
+  // keep their identity — a `driveApply` rebuilt whenever the cabin poll sees a
+  // new selector letter is a callback churning at 4 Hz for a sentence.
+  const reverseGesture = inReverse && gestureLive;
+  reverseGestureRef.current = reverseGesture;
+
+  /* ── AND THE SWAP CAN ARRIVE UNDER A THUMB THAT IS ALREADY DOWN ───────────
+     The gesture handlers publish on pointer events, which is every position
+     change — but this mode change is not one. LAW 1 (`reverseAssist.ts`) is
+     „brake held at a standstill for REVERSE_ASSIST_HOLD_S toggles the direction
+     of travel": the flip D→R happens WITH THE PEDAL STILL HELD, so the finger
+     that caused it emits no `pointermove` and, on a thumb that does not wobble,
+     nothing would re-announce. The pad would go on saying «Спирачка 100% —
+     аварийно спиране» after „down" had stopped meaning brake — the same defect
+     the block at `steerAxisAria` is about, arriving through the one door a
+     gesture cannot close.
+
+     So the announcement follows the mode as well as the thumb. It re-publishes
+     ONLY while the pad owns a finger (`pointerId !== null`) and ONLY from the
+     axis `driveApply` last drove the pedals on — it never invents a position,
+     and with no finger down `onDriveEnd`/`parkKnobs` have already brought the
+     announced value home. The `aria-label` beside it has always updated on this
+     render; this is the other half of the same sentence.
+
+     TWO GUARDS, ONE INVARIANT, AND THAT IS ON PURPOSE. „No finger, no
+     announcement" is stated by the ownership check here AND by the release
+     edges clearing `driveAxisRef`. Either alone is sufficient today — measured
+     by mutation, removing one leaves the suite green — so this is redundancy,
+     not two thirds of a rule. It is kept because the failure it prevents is a
+     pad announcing a pedal nobody is pressing, and a future edit that forgets
+     the clear should meet a second wall rather than a student.
+
+     It reads `reverseGesture`, the const from THIS render, and not
+     `reverseGestureRef.current`. The two hold the same value the instant the
+     effect is scheduled, so no test can tell them apart — but the ref is
+     whatever the NEWEST render assigned, and an effect is entitled to describe
+     the render it belongs to. */
+  useEffect(() => {
+    if (drivePad.pointerId === null) return;
+    publishAxisAria(drivePadRef.current, driveAxisAria(driveAxisRef.current, reverseGesture));
+  }, [reverseGesture, drivePad]);
 
   return (
     /* ═══ HIDDEN MEANS INERT, NOT GONE — doc 91 §I3 ════════════════════════════
@@ -2354,7 +2598,16 @@ export function TouchControls({
         aria-label="Волан — плъзни наляво или надясно"
         aria-valuemin={-100}
         aria-valuemax={100}
+        // AT REST, AND ONLY AT REST — these two are the wheel's honest position
+        // before the first press and after every release, and React never
+        // re-applies a JSX attribute whose value did not change between
+        // renders, so from the first `pointerdown` they belong to
+        // `publishAxisAria` (block at `steerAxisAria`). They used to be the
+        // whole story, which is what the catalogue row is about: a literal
+        // `aria-valuenow={0}` under a declared −100..100 range told a student
+        // who cannot see the knob that the wheel was centred at full lock.
         aria-valuenow={0}
+        aria-valuetext={STEER_ARIA_CENTRE_TEXT}
         onPointerDown={onSteerDown}
         onPointerMove={onSteerMove}
         onPointerUp={onSteerEnd}
@@ -2405,7 +2658,21 @@ export function TouchControls({
         aria-label={driveAxisLabelBg(inReverse, gestureLive, transmission)}
         aria-valuemin={-100}
         aria-valuemax={100}
+        // THIS PAD IS VERTICAL AND `role="slider"` IS NOT — the role's default
+        // orientation is horizontal, so without this line the number published
+        // below is announced against the wrong axis: a student is told the
+        // control they are pushing UP for throttle runs left-to-right, and
+        // every AT that offers a slider a direction offers this one the two
+        // that do nothing. Same class of defect as the pinned `aria-valuenow`
+        // this block is about (sc-zebra-approach:952e056d) — an accessible
+        // description that contradicts the control — and the same one-line
+        // shape of fix. The WHEEL needs no counterpart: it is horizontal, which
+        // is what the role already assumes.
+        aria-orientation="vertical"
+        // At rest, and only at rest — see the wheel above. The centre sentence
+        // is mode-independent: with no pedal down, R and D feel the same.
         aria-valuenow={0}
+        aria-valuetext={DRIVE_ARIA_CENTRE_TEXT}
         onPointerDown={onDriveDown}
         onPointerMove={onDriveMove}
         onPointerUp={onDriveEnd}

@@ -97,6 +97,12 @@ interface ContactEpisode {
   /** `contactOdometerM` at that report — the baseline the 2 m floor measures from. */
   odoM: number;
   /**
+   * `contactReverseOdometerM` at that report — the baseline the BACKED-OUT test
+   * measures from, for the bodies the lead-gap channel cannot speak for. See
+   * `CONTACT_REVERSE_TRAVEL_M`.
+   */
+  reverseOdoM: number;
+  /**
    * The body's CATEGORY, carried so an ANONYMOUS report can be matched against
    * this episode. Without it a channel that cannot name what it hit would open
    * a second episode alongside a named one for the same body and bill the same
@@ -242,6 +248,31 @@ export interface RuleEngineState {
    */
   contactOdometerM: number;
   /**
+   * Path length driven IN REVERSE since the session began, metres — the same
+   * clamped integrator as `contactOdometerM`, accrued only on the frames the
+   * car was actually backing up. Half of the evidence a wall, a pedestrian or a
+   * cyclist can supply to this reducer; see `CONTACT_REVERSE_TRAVEL_M` for why
+   * forward path is not admissible.
+   */
+  contactReverseOdometerM: number;
+  /**
+   * ONE ACT, ONE BILL for the codes that ride REPORTED junction events — both
+   * odometer readings and the ROAD SEGMENT at the last bill of each act key
+   * (the ACT, plus whatever discriminator makes two of them genuinely different
+   * faults). See `ACT_REOPEN_TRAVEL_M` for the two conjuncts that hold the
+   * latch shut and `ACT_REVERSE_REOPEN_M` for the one motion that re-opens it
+   * on the very segment it was billed on. Absent key = never billed.
+   */
+  actBills: Record<
+    string,
+    { odoM: number; reverseOdoM: number; edgeId: string | null | undefined }
+  >;
+  /**
+   * THE PREVIOUS FRAME'S WORLD POSITION — the only evidence this reducer has
+   * that the WORLD moved the car rather than the driver. See `restagedJump`.
+   */
+  prevPosition: { x: number; y: number } | null;
+  /**
    * WHEN DAYLIGHT WAS LAST SEEN — the newest tick at which the vehicle ahead
    * was clear of the bumper (`CONTACT_LEAD_GAP_M`), or null if it never has
    * been. The third conjunct of "the bodies have come apart", and the only one
@@ -256,6 +287,16 @@ export interface RuleEngineState {
    * against and for the pedestrian it went on to acquit.
    */
   lastLeadApartAt: number | null;
+  /**
+   * WHEN THE ROAD AHEAD WAS LAST MEASURED CLEAR — the newest tick carrying an
+   * AFFIRMATIVE gap reading over `CONTACT_LEAD_GAP_M`. The stamp above treats
+   * an ABSENT channel as apart, which is right for the body that channel is
+   * about and catastrophic for every other one: while a car grinds along a wall
+   * there is no in-lane lead at all, so "unknown" is the permanent state, and
+   * reading it as daylight is what let one scrape bill thirteen times. Only the
+   * NON-vehicle branch of the `collision` case consults this one.
+   */
+  lastGapClearAt: number | null;
   /** Set once a collision occurs — the session grades as terminated. */
   terminated: boolean;
   /** Metres driven since the last violation — earns CLEAN_DRIVING commendations. */
@@ -474,6 +515,170 @@ const COLLISION_REOPEN_TRAVEL_M = 2;
 const CONTACT_LEAD_GAP_M = 0.5;
 
 /**
+ * HOW FAR THE CAR MUST HAVE BACKED OUT before it can have had a second accident
+ * with a body the lead-gap channel cannot speak for, metres.
+ *
+ * THE CONSTANT ABOVE PROVED THAT PATH IS NOT SEPARATION, AND THEN LEFT THREE
+ * QUARTERS OF THE CATALOGUE STILL MEASURING PATH. Its argument — „No distance
+ * can work, because the shunt supplies distance" — is about contact, not about
+ * cars, and is just as true of a wall. But the measurement that replaced the
+ * proxy, `tick.leadGapM`, is a statement about the IN-LANE VEHICLE AHEAD and
+ * about nothing else, so it was cited only by a `vehicle` episode and a wall, a
+ * pedestrian and a cyclist were sent back to „silence plus 2 m of path" — the
+ * rule that had just been shown false. Worse, they were sent back to a daylight
+ * latch that reads an ABSENT gap channel as apart, and „no in-lane lead" is the
+ * PERMANENT state of a car that is scraping a building.
+ *
+ * MEASURED THROUGH THIS REDUCER, 60 s of ONE unbroken contact at 12 км/ч with no
+ * gap channel, the reporter re-firing at the cadence a shell pool gives an
+ * ambient body:
+ *
+ *   reporter cadence   0.5 s    2 s     5 s    11 s
+ *   bills, before          1     31      13       6
+ *   bills, after           1      1       1       1
+ *
+ * — the same table `CONTACT_LEAD_GAP_M` printed for the shunt, on a wall
+ * instead of a truck, and the same device-dependence, because a cadence is a
+ * property of the PHONE. The frame is
+ * `.audit-frames/sweep161/sc-signal-flashing/mobile-right/04-t121s.png`:
+ * «Опасни грешки (по 10 изпитни т.) 4 40» on a drive where the ego was pushed
+ * onto the footway and ground along one facade, three of the four bills being
+ * the same car against the same wall at 0–12 км/ч — printed under the card's own
+ * sentence that the ten points are the price of ONE act. `sc-ov-oncoming-gap /
+ * mobile-wrong` printed fourteen of them, 141 точки.
+ *
+ * WHAT THE REDUCER CAN STILL HONESTLY CLAIM. Two things, and forward path is
+ * neither:
+ *  · the road ahead was MEASURED clear since the last report (`lastGapClearAt`
+ *    — the affirmative half of the same reading, with the „unknown counts as
+ *    apart" clause removed). A guardrail scraped down an OPEN road has that
+ *    reading and it says 40 m, so that drive still bills its second accident —
+ *    `engine.test.ts` „a guardrail scraped at speed…", the `parted` half;
+ *  · or the car went BACKWARDS. Forward path is exactly what a scrape and a
+ *    shunt manufacture — 2 m of it costs 0.6 s at 12 км/ч — while reversing out
+ *    is the shipped „hit, reverse out, hit again" case the floor above was
+ *    written to keep billing, and it is how a real second impact on the same
+ *    wall begins.
+ *
+ * THE RESIDUE, said out loud because it is a real loss: on a road with no gap
+ * channel at all, a driver who clips a bollard, drives on, and returns FORWARDS
+ * to clip the same ANONYMOUS body is now charged once. That errs innocent
+ * (A12), the direction this engine chooses when it cannot measure, and it is
+ * bounded — the reporters that know which body they touched stamp `actorId`, so
+ * two different walls are two keys and both still bill
+ * (`contact-episode-per-body.test.ts`).
+ *
+ * The number is `COLLISION_REOPEN_TRAVEL_M` itself, deliberately: this is not a
+ * second tolerance but the same floor, asked of the one motion that can supply
+ * it.
+ */
+const CONTACT_REVERSE_TRAVEL_M = COLLISION_REOPEN_TRAVEL_M;
+
+/**
+ * HOW FAR A CAR MUST DRIVE BEFORE THE SAME REPORTED JUNCTION ACT CAN BE A
+ * SECOND ACT, metres.
+ *
+ * ONE ACT, ONE BILL — the discipline the `collision` case spent three rewrites
+ * arriving at, applied to the OTHER codes that ride reported events. Its
+ * conclusion was general and was written down as such: „a contract cannot be the
+ * only defence, because the reducer is the one place that survives every
+ * reporter." `stopLineCrossed` and `prioritySituation` never had that defence at
+ * all — every report they carried was billed, unconditionally.
+ *
+ * MEASURED THROUGH THIS REDUCER — ONE Б2 line and ONE give-way conflict on ONE
+ * road segment, re-reported for 205 s while the car drives at 60 км/ч:
+ *
+ *   reporter cadence         0.25 s    1 s    4 s   15 s
+ *   «Неспиране на знак Б2»       821    206     52     14
+ *   «Непропускане на ППС»        821    206     52     14
+ *
+ * bills, after: 1 at every cadence. The photographed shape is
+ * `.audit-frames/wave-c/frames/sc-junction-scan__pc-wrong/08-debrief.png` —
+ * «376 наказателни точки · Общо (допустими 9) 60», with «Неспиране на знак Б2»
+ * and «Непълно оглеждане при знак Б2» FOURTEEN rows each, matching the 15 s
+ * column to the row — on `tj-stop-v1`, a district whose entire road network is
+ * four nodes, three edges and ONE intersection. Fourteen bills cannot be
+ * fourteen junctions on a map that has one.
+ *
+ * THE NUMBER, from the shipped world rather than from taste. Across all the
+ * districts in `content/world`, the edges joining one junction node to another
+ * measure 4.4 m at the shortest, 10.9 m at the tenth percentile and 48.0 m at
+ * the median: two controls closer together than about eleven metres are one
+ * junction the map has split into several OSM nodes, not two places a student
+ * can drive between. 20 m sits above every one of those artifact pairs and well
+ * under the median block, so the genuinely next junction bills on its own
+ * merits and a line swept again while the car is still in the mouth cannot.
+ *
+ * THE SECOND CONJUNCT, and why a distance alone was not enough. At 60 км/ч a
+ * 20 m floor is crossed in 1.2 s, so on its own it answers a car sitting at a
+ * mouth and almost nothing else — measured, the 205 s drive above still billed
+ * about 170 times on the distance floor alone. What the reducer also has is the
+ * ROAD SEGMENT (`SimTick.edgeId`, the same C1 basis the lane-change block
+ * already grades against), and a junction IS a node while an edge runs node to
+ * node: two controlled approaches are never on one edge by construction, so a
+ * report arriving off the SAME segment fix is the locator talking, not a second
+ * junction. A source that names no segment asserts nothing and is left to the
+ * distance floor, exactly as it grades today.
+ *
+ * …AND THE ONE DRIVE THAT SENTENCE IS FALSE FOR is a car that came BACK to the
+ * same arm, which is also "on the segment it was billed on". That is what
+ * `restagedJump` is for — see it.
+ *
+ * WHAT IT IS APPLIED TO, and the discipline behind the scope. THREE acts, and
+ * they are exactly the three the sweep photographed repeating: the Б2 verdict
+ * («stop-line» — the violation and the commendation share one key, being two
+ * outcomes of one act), the junction scan («junction-scan»), and the JUNCTION
+ * priority situations («priority|<situation>»). The signal verdicts and the
+ * four BODY-adjudicated manoeuvre situations are deliberately NOT latched, each
+ * for a reason written at its own call site — no frame shows either family
+ * repeating, and latching a code on suspicion deletes real convictions: it cost
+ * the shipped repeat-penalty escalation its second red, and `sc-vu-cyclist-group`
+ * four of its five riders.
+ *
+ * WHAT REMAINS OPEN, said out loud. This closes the reporter-cadence family
+ * outright. It cannot close a re-report whose lane fix has WANDERED onto
+ * another segment in between: that is the locator's half of the same defect,
+ * and it is reported rather than papered over with a floor big enough to hide
+ * it.
+ */
+const ACT_REOPEN_TRAVEL_M = 20;
+
+/**
+ * HOW FAR THE CAR MUST HAVE BACKED UP before it can be at the SAME junction
+ * control a second time, metres.
+ *
+ * THE ACT LATCH ABOVE HAD NO WAY BACK ON THE SEGMENT IT WAS BILLED ON, and the
+ * segment conjunct short-circuits the distance floor, so „you are still at the
+ * junction you were billed at" was an unbounded claim: measured through this
+ * reducer, a student who rolls through a Б2, reverses twenty-five metres back
+ * up the SAME arm and rolls through it again is billed ONCE for two offences —
+ * and, worse, one who reverses back and then does it PROPERLY, a full four-
+ * second stop at the line, collects NO «Правилно спиране» at all. The
+ * commendation and the violation share one act key on purpose (they are two
+ * outcomes of one act), so the key spent on the first pass silently swallows
+ * the second verdict whichever way it goes. A product that teaches a student
+ * to stop and then says nothing when he stops is the requirement-zero defect
+ * (doc 64 THEO-4) dressed as a scoring fix, and it lands on the whole
+ * reversing family, where backing up and re-approaching IS the exercise.
+ *
+ * The layer below already says so out loud: `worldRuntime`'s
+ * `STOP_LINE_REFIRE_SEC` is 5 s and its comment reads „a genuine re-approach
+ * takes longer anyway" — the reporter is BUILT to fire again on a real
+ * re-approach, and until this constant the reducer silently overruled it.
+ *
+ * WHY REVERSE, AND WHY THIS NUMBER. It is `CONTACT_REVERSE_TRAVEL_M`'s
+ * argument on a junction instead of a wall: forward path is exactly what a car
+ * sitting in a junction mouth manufactures (the 205 s drive in
+ * `ACT_REOPEN_TRAVEL_M` accrues 3.4 km of it without ever leaving the
+ * intersection), while reversing is the one motion a re-report cannot fake. The
+ * number is `ACT_REOPEN_TRAVEL_M` itself rather than the collision floor: 2 m
+ * of reverse is the jitter at a line that `STOP_LINE_REFIRE_SEC` exists to
+ * absorb, whereas twenty metres of it is a driver deliberately going back to
+ * try the approach again.
+ */
+const ACT_REVERSE_REOPEN_M = ACT_REOPEN_TRAVEL_M;
+
+/**
  * HOW LONG THE RIGHT WAY MUST BE HELD BEFORE A SECOND WRONG-WAY RUN, seconds.
  *
  * `WRONG_WAY` is a 10-point опасна riding a boolean the runtime computes from
@@ -661,7 +866,11 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     crossing: null,
     contactEpisodes: {},
     contactOdometerM: 0,
+    contactReverseOdometerM: 0,
+    actBills: {},
+    prevPosition: null,
     lastLeadApartAt: null,
+    lastGapClearAt: null,
     terminated: false,
     cleanDistanceM: 0,
     stall: { ...IDLE_EPISODE },
@@ -718,6 +927,9 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     // speedWindow's above). Missing this line is how a reducer that promises
     // not to mutate its input starts writing bills into the caller's state.
     contactEpisodes: { ...s.contactEpisodes },
+    // Same argument as contactEpisodes above: an entry is assigned whole at
+    // each bill and never mutated, so the copied record may share them.
+    actBills: { ...s.actBills },
     laneChange: { pending: s.laneChange.pending.map((p) => ({ ...p })), lastBasisChangeAt: s.laneChange.lastBasisChangeAt },
     stall: { ...s.stall },
     stopOvershoot: { ...s.stopOvershoot },
@@ -1115,7 +1327,14 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Monotone rather than reset-per-report: each episode subtracts its own
   // baseline, so scraping a wall cannot zero the distance the car has put
   // between itself and the car it hit a minute ago.
-  s.contactOdometerM += (Math.abs(speed) / 3.6) * Math.min(dt, 2);
+  const contactTravelM = (Math.abs(speed) / 3.6) * Math.min(dt, 2);
+  s.contactOdometerM += contactTravelM;
+  // …and the half of it driven BACKWARDS (CONTACT_REVERSE_TRAVEL_M). Both
+  // readings of "in reverse" are honoured because the channels disagree: the
+  // driveline hands the reducer a SIGNED speed, a replayed trace can carry an
+  // unsigned one alongside the selector. Either is evidence the car went away
+  // from what is in front of it; neither can be produced by a scrape.
+  if (speed < 0 || tick.gear < 0) s.contactReverseOdometerM += contactTravelM;
   // …and the daylight stamp that goes with it (CONTACT_LEAD_GAP_M). Accrued on
   // the same frames and for the same reason: a report arriving now is judged
   // against what was SEEN up to it, and the bodies are never apart on the frame
@@ -1123,8 +1342,16 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // infinite channel is already null here — unknown reads as apart, which is
   // what keeps every drive without a lead reading byte-identical.
   if (leadGapM === null || leadGapM >= CONTACT_LEAD_GAP_M) s.lastLeadApartAt = t;
+  // …and the same reading WITHOUT the "unknown counts as apart" clause, for the
+  // bodies the gap channel is not about (`lastGapClearAt`).
+  if (leadGapM !== null && leadGapM >= CONTACT_LEAD_GAP_M) s.lastGapClearAt = t;
 
   // -- 2. discrete zone / contact events
+  // ONE ACT, ONE BILL: a car the WORLD moved (a re-staged encounter) is at a
+  // junction it has not been graded at, whatever the odometer and the segment
+  // fix say — so the act latches are spent first (see `restagedJump`).
+  if (restagedJump(s.prevPosition, tick, dt, speed)) s.actBills = {};
+  s.prevPosition = { x: tick.position.x, y: tick.position.y };
   for (const e of tick.events) {
     handleTickEvent(s, e, tick, events);
   }
@@ -2340,6 +2567,92 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
 // Discrete event handlers
 // ---------------------------------------------------------------------------
 
+/**
+ * ONE ACT, ONE BILL (see `ACT_REOPEN_TRAVEL_M`).
+ *
+ * `event` is built by the caller either way — the catalogue lookups are pure —
+ * and reaches `out` only if this act has not already been billed. `actKey` is
+ * what the engine considers "the same act": not the code, but the ACT, plus
+ * whatever discriminator makes two of them genuinely different faults (which
+ * control was crossed, which situation was adjudicated). The Б2 verdict pair
+ * shares one key on purpose — a full stop and a failure to make one are two
+ * possible outcomes of a single act, never two acts.
+ */
+function billAct(
+  s: RuleEngineState,
+  tick: SimTick,
+  out: RuleEvent[],
+  actKey: string,
+  event: RuleEvent,
+): void {
+  const last = s.actBills[actKey];
+  if (last !== undefined) {
+    // THE CAR WENT BACK AND DID IT AGAIN — the one motion that re-opens an act
+    // on the segment it was billed on (see `ACT_REVERSE_REOPEN_M`). Asked
+    // FIRST, because both conjuncts below are true of exactly this drive and
+    // neither of them can see it.
+    if (s.contactReverseOdometerM - last.reverseOdoM < ACT_REVERSE_REOPEN_M) {
+      // Two conjuncts, each catching a different way one act arrives twice —
+      // the constant's comment carries the argument and the measured tables.
+      //
+      // `null` IS A SEGMENT ANSWER, NOT A MISSING ONE, and it is the strongest
+      // one there is: `locator.ts` sets it when the car is more than 30 m from
+      // every centerline, i.e. „this car is nowhere". A car that is nowhere is
+      // not at a junction at all, so a junction act reported off a null fix is
+      // never a second junction — which is why null matches null here rather
+      // than falling through to the distance floor, and why the floor may not
+      // be asked to save it: `sc-junction-gap / mobile-wrong` leaves the
+      // district at 58 км/ч and stays out for eighty seconds, so 20 m of path
+      // costs it 1.2 s. Only `undefined` — a source that names no segment at
+      // all: recorded traces, hand-built ticks, every pre-C1 engine — asserts
+      // nothing and leaves the distance floor in charge.
+      const sameEdge =
+        tick.edgeId !== undefined && last.edgeId !== undefined && tick.edgeId === last.edgeId;
+      if (sameEdge || s.contactOdometerM - last.odoM < ACT_REOPEN_TRAVEL_M) return;
+    }
+  }
+  s.actBills[actKey] = {
+    odoM: s.contactOdometerM,
+    reverseOdoM: s.contactReverseOdometerM,
+    edgeId: tick.edgeId,
+  };
+  out.push(event);
+}
+
+/**
+ * DID THE WORLD PUT THE CAR SOMEWHERE, rather than the driver drive it there?
+ *
+ * The act latch above holds „you are still at the junction you were billed at",
+ * and a session that RE-STAGES its encounter breaks that sentence in a way no
+ * amount of odometer or segment reasoning can see: the orchestrator resets the
+ * director and drops the driver 112 m back up the same approach arm, and the
+ * second run at that junction is a second encounter that must convict again
+ * (`orchestrator/__tests__/oncoming-left-turn.test.ts`, „re-stages
+ * deterministically on retry"). To this reducer that is one frame in which the
+ * car appears somewhere it could not possibly have driven to.
+ *
+ * So a displacement past the plausible envelope — twice the distance the
+ * reported speed could have covered in the reported interval, plus 5 m of slack
+ * for pose jitter and dropped frames — SPENDS every act latch, and the drive
+ * that follows is graded from scratch. Deliberately generous: a pause/resume
+ * jump is not a teleport (dt grows with it, so the envelope grows too), and the
+ * cost of a missed teleport is one suppressed bill while the cost of a false
+ * one is only that a genuine duplicate gets through.
+ *
+ * A source that reports no motion at all (every hand-built tick in the unit
+ * suites sits at the origin) never triggers it, so those drives are unchanged.
+ */
+function restagedJump(
+  prev: { x: number; y: number } | null,
+  tick: SimTick,
+  dt: number,
+  speedKmh: number,
+): boolean {
+  if (prev === null) return false;
+  const moved = Math.hypot(tick.position.x - prev.x, tick.position.y - prev.y);
+  return moved > (Math.abs(speedKmh) / 3.6) * Math.max(dt, 0) * 2 + 5;
+}
+
 function handleTickEvent(
   s: RuleEngineState,
   e: SimTickEvent,
@@ -2357,6 +2670,18 @@ function handleTickEvent(
         // регулировчика са над светофара): "halt" is the dedicated 10-point
         // опасна even on green lamps; "proceed" is innocent even on red.
         // Absent (every pre-JU-18 runtime) = the lamp grading, byte-identical.
+        // THE SIGNAL VERDICTS ARE DELIBERATELY *NOT* ACT-LATCHED (2026-08-22 —
+        // see `ACT_REOPEN_TRAVEL_M`). The one-act latch was written against a
+        // photographed defect, and the codes it was photographed on are the Б2
+        // verdict, the junction scan and the junction priority — every repeat
+        // row in the sweep is one of those three. No frame anywhere in the
+        // catalogue shows a signal verdict billed twice for one crossing, and
+        // suppressing on a code with no evidence of the fault is how a fix
+        // starts deleting real convictions: latched here, the shipped
+        // repeat-penalty escalation lost its second red entirely
+        // (`lessons/__tests__/teach-escalation.test.ts`, „always-grade (опасна)
+        // escalates from its second encounter"). If a runaway red is ever
+        // photographed, the latch is one call away and the key is "signal-line".
         if (e.controller !== undefined) {
           if (e.controller === "halt") out.push(makeViolation("CONTROLLER_SIGNAL_VIOLATED", t));
           break;
@@ -2410,7 +2735,8 @@ function handleTickEvent(
         // and it names Б1, not Б2. The catalogue string is control-neutral (see
         // its comment); this is the branch that puts the right sign on the card.
         if (scanIncomplete()) {
-          out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.giveWay));
+          const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.giveWay);
+          billAct(s, tick, out, "junction-scan", bill);
         }
         break;
       }
@@ -2419,13 +2745,18 @@ function handleTickEvent(
       // it is a DISTINCT fault (a rolling stop can also skip the scan).
       const last = s.stop.lastQualifyingStopAt;
       const stopped = last !== null && t - last <= cfg.stopRecencySec;
-      out.push(
+      billAct(
+        s,
+        tick,
+        out,
+        "stop-line",
         stopped
           ? makeCommendation("FULL_STOP_AT_STOP_SIGN", t)
           : makeViolation("STOP_SIGN_NO_FULL_STOP", t),
       );
       if (scanIncomplete()) {
-        out.push(makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.stop));
+        const bill = makeViolation("JUNCTION_SCAN_INCOMPLETE", t, JUNCTION_SCAN_COPY.stop);
+        billAct(s, tick, out, "junction-scan", bill);
       }
       break;
     }
@@ -2713,17 +3044,38 @@ function handleTickEvent(
       }
       // Empty candidate list = a body never touched before, which always bills.
       const cameApart = candidates.every((open) => {
-        // Daylight is the lead vehicle's alibi and only a vehicle may call it.
+        // «THE BODIES CAME APART» MUST BE MEASURED, AND WHICH MEASUREMENT
+        // EXISTS DEPENDS ON THE BODY (2026-08-22 — the wall the first half of
+        // this rule acquitted nothing of; see CONTACT_REVERSE_TRAVEL_M):
+        //  · a VEHICLE has the gap channel, so daylight is the lead's own
+        //    alibi, read as a latch because the gap is 0 at every impact by
+        //    definition — and an ABSENT channel counts as apart, which is what
+        //    keeps every drive without a gap reading byte-identical;
+        //  · a WALL, a PEDESTRIAN or a CYCLIST has no such channel, so it used
+        //    to fall back to forward path — the proxy CONTACT_LEAD_GAP_M had
+        //    just proved false — under a latch that read the absent channel as
+        //    daylight. It now needs one of the two things that ARE evidence:
+        //    the road ahead MEASURED clear since the last report, or the car
+        //    BACKED OUT.
+        // Neither branch can acquit a body never touched before: `candidates`
+        // is empty there and `every` is vacuously true.
         const daylight =
-          e.withWhat !== "vehicle" ||
-          (s.lastLeadApartAt !== null && s.lastLeadApartAt > open.at);
+          e.withWhat === "vehicle"
+            ? s.lastLeadApartAt !== null && s.lastLeadApartAt > open.at
+            : (s.lastGapClearAt !== null && s.lastGapClearAt > open.at) ||
+              s.contactReverseOdometerM - open.reverseOdoM >= CONTACT_REVERSE_TRAVEL_M;
         return (
           daylight &&
           t - open.at > cfg.collisionSeparationSec &&
           s.contactOdometerM - open.odoM >= COLLISION_REOPEN_TRAVEL_M
         );
       });
-      s.contactEpisodes[key] = { at: t, odoM: s.contactOdometerM, withWhat: e.withWhat };
+      s.contactEpisodes[key] = {
+        at: t,
+        odoM: s.contactOdometerM,
+        reverseOdoM: s.contactReverseOdometerM,
+        withWhat: e.withWhat,
+      };
       if (!cameApart) break;
       s.terminated = true;
       out.push(makeViolation("COLLISION", t, { detail: e.withWhat }));
@@ -2747,23 +3099,58 @@ function handleTickEvent(
       // the runtime's overtake-return adjudicator ("overtake-return") closes
       // the overtake's third act — the brake-forcing cut back in front of the
       // overtaken vehicle is the чл. 42 return duty, its own основна.
+      //
+      // ONE ACT, ONE BILL, BUT ONLY WHERE THE ACT IS A PLACE (2026-08-22; see
+      // `ACT_REOPEN_TRAVEL_M`). A JUNCTION priority conflict is a state the
+      // adjudicator resolves at a mouth, and every report of it used to be its
+      // own 10-point опасна: measured, one give-way conflict re-reported for
+      // 205 s billed 821 / 206 / 52 / 14 times at cadences of 0.25 / 1 / 4 /
+      // 15 s. So those situations are latched, keyed by the SITUATION — a
+      // give-way slip and a right-hand-rule slip at one mouth stay two faults
+      // with two lessons — and the violated/yielded pair shares the key,
+      // because yielding and failing to yield are two outcomes of one
+      // encounter with one junction.
+      //
+      // THE FOUR MANOEUVRE SITUATIONS ARE NOT LATCHED, and the reason is the
+      // whole justification of the floor: „you cannot reach a second CONTROL
+      // without driving the road between them" is a statement about places, and
+      // these four are adjudicated against a BODY. `sc-vu-cyclist-group` is the
+      // measurement — five cyclists passed lawfully inside one cluster earn
+      // five «Пропусна…» commendations, and a place-shaped latch collapsed them
+      // to one (`s-w4-bot-completion.test.ts`, „…and commends it FIVE times").
+      // Five riders are five acts however close together they are riding, and
+      // `prioritySituation` carries no body id for the reducer to key on — so
+      // it does not pretend to have one.
+      const MANOEUVRE_SITUATIONS = new Set([
+        "emergency",
+        "overtake-oncoming",
+        "overtake-return",
+        "vulnerable-pass",
+      ]);
+      const placeAct = MANOEUVRE_SITUATIONS.has(e.situation)
+        ? null
+        : `priority|${e.situation}`;
       if (e.violated) {
-        out.push(
-          makeViolation(
-            e.situation === "emergency"
-              ? "EMERGENCY_NOT_YIELDED"
-              : e.situation === "overtake-oncoming"
-                ? "OVERTAKE_INSUFFICIENT_GAP"
-                : e.situation === "overtake-return"
-                  ? "OVERTAKE_RETURN_TOO_EARLY"
-                  : e.situation === "vulnerable-pass"
-                    ? "VULNERABLE_PASS_TOO_CLOSE"
-                    : "FAILED_TO_YIELD",
-            t,
-            { detail: e.situation },
-          ),
+        const bill = makeViolation(
+          e.situation === "emergency"
+            ? "EMERGENCY_NOT_YIELDED"
+            : e.situation === "overtake-oncoming"
+              ? "OVERTAKE_INSUFFICIENT_GAP"
+              : e.situation === "overtake-return"
+                ? "OVERTAKE_RETURN_TOO_EARLY"
+                : e.situation === "vulnerable-pass"
+                  ? "VULNERABLE_PASS_TOO_CLOSE"
+                  : "FAILED_TO_YIELD",
+          t,
+          { detail: e.situation },
         );
-      } else if (e.yielded) out.push(makeCommendation("YIELDED_TO_PRIORITY", t));
+        if (placeAct === null) out.push(bill);
+        else billAct(s, tick, out, placeAct, bill);
+      } else if (e.yielded) {
+        const praise = makeCommendation("YIELDED_TO_PRIORITY", t);
+        if (placeAct === null) out.push(praise);
+        else billAct(s, tick, out, placeAct, praise);
+      }
       break;
     }
 

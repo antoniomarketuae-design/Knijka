@@ -124,19 +124,35 @@ interface FakeTimer {
   ms: number;
 }
 
-/** A pad's DOM node, as much of one as these handlers actually touch. */
+/** A pad's DOM node, as much of one as these handlers actually touch.
+ *
+ *  `setAttribute` joined the list on 2026-08-22, when the pads started
+ *  publishing their real position to the accessibility tree
+ *  (`publishAxisAria` — sc-zebra-approach:952e056d, and touchAxisAria.test.tsx
+ *  is where that behaviour is asserted). It is recorded rather than swallowed
+ *  so this double stays a RECORDER: a stub that silently ignored a call the
+ *  real node answers is how a test double drifts into lying about the product.
+ *  Nothing in this file asserts on `attrs`; nothing in this file is weakened by
+ *  it either. */
 interface FakePadEl {
   captured: number[];
+  attrs: Record<string, string>;
   setPointerCapture(pointerId: number): void;
+  setAttribute(name: string, value: string): void;
   getBoundingClientRect(): { top: number; height: number };
 }
 
 function fakePadEl(top = 100, height = 152): FakePadEl {
   const captured: number[] = [];
+  const attrs: Record<string, string> = {};
   return {
     captured,
+    attrs,
     setPointerCapture(pointerId: number) {
       captured.push(pointerId);
+    },
+    setAttribute(name: string, value: string) {
+      attrs[name] = value;
     },
     getBoundingClientRect: () => ({ top, height }),
   };

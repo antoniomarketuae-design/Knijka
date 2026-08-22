@@ -164,6 +164,126 @@
  * the moment one of them completes. Do not widen it to make a sweep go green.
  */
 
+/**
+ * THE ORDER OF THE FIRST STEP — 2026-08-22, the steered re-drive (commit
+ * 70bcd1b, `.audit-frames/rebase/frames/sc-park-*__*-right/`).
+ *
+ * WHAT THE RE-DRIVE CHANGED. Every earlier verdict on this file was written
+ * against a probe that could neither steer nor select R, and the two blocks
+ * above are the record of arguing with it. The rebase harness does both. On
+ * all nine parking-depth drills it drove, Задача 1 ticked and Задача 2 did
+ * not, and — this is the new fact — the contact code is now readable:
+ *
+ *   «Удар в ДРУГО ПРЕВОЗНО СРЕДСТВО»   45-rev, gap-short, gap-long, zebra,
+ *                                       night (mobile-right)
+ *   «Удар в НЕПОДВИЖНО ПРЕПЯТСТВИЕ»    van, wall (wall's is its own authored
+ *                                       garage wall, which is the drill)
+ *
+ * `COLLISION_CONTACT_COPY` (rules/catalog.ts) keys that word on the struck
+ * body, and `lessonWorldRecipe.ts` mounts every OCCUPIED bay as
+ * `kind: "vehicle"`. So five of these drives hit a PARKED CAR. The
+ * „it ran out of the world" reading in the block above is true of the
+ * unsteered sweep and is NOT the whole of this one.
+ *
+ * BUT THREE OF THOSE ROWS ARE NOT EVIDENCE, and the harness says so itself
+ * (adversarial verification, 2026-08-22). Its own `run.log` disqualifies a
+ * leg whose guidance ribbon was visible on under half the moving samples:
+ *
+ *   sc-park-van    mobile-right  ribbon 20/57 (35 %)  !! NOT STEERED
+ *   sc-park-night  mobile-right  ribbon 12/42 (29 %)  !! NOT STEERED
+ *   sc-park-left   mobile-right  ribbon 28/59 (48 %)  !! NOT STEERED
+ *
+ * — „for most of this drive the control loop was OPEN and the car was
+ * travelling in a straight line. Treat it as an unsteered drive." Every
+ * pc-right leg is `WANDERED` at |err| median ≈ 31°, and the same log forbids
+ * a lane-position finding drawn from any of them. So VAN's contact code is a
+ * fact about an unsteered car, and the „re-drive proves the family hits a
+ * parked car" claim rests on 45-rev / gap-short / gap-long / wall / zebra —
+ * which are `TRACKED`/`INTERMITTENT` at 78–92 % — and on nothing else.
+ * THE CORRIDOR NUMBERS BELOW DO NOT DEPEND ON ANY OF THIS: they are a static
+ * sweep of the district's own geometry and were re-derived independently.
+ *
+ * THE CORRIDOR, measured with the production geometry rather than a formula
+ * written for the occasion — `obbSeparationM` (collision/obb.ts) between the
+ * ego chassis (CHASSIS_HALF_EXTENTS 0.85 × 2.02) on the district's own spawn
+ * point (x = 4.06, heading 0) and the ARMED bodies `parkDepthObstacles` mounts,
+ * swept the length of every lot. Signed metres; negative means OVERLAP:
+ *
+ *   sc-park-van      −2.530      sc-park-gap-short  +0.470
+ *   sc-park-45-rev   −2.337      sc-park-gap-long   +0.470
+ *   sc-park-wall     −2.220      sc-park-zebra      +0.470
+ *   sc-park-double   −2.130      sc-park-night      +0.470
+ *                                sc-park-judge      +0.470
+ *                                sc-park-left       +5.990 (row on the WEST kerb)
+ *
+ * Four of the ten do not give the student a tight lane — they give him no
+ * lane. A car that holds the paint it spawns on is 2.1–2.5 m INSIDE a parked
+ * body before the free bay is beside it, and the lesson then bills the
+ * опасна грешка and prints НЕИЗДЪРЖАН. The world half of that is
+ * `gen_parking_lot.mjs` seating a 5 m bay depth inside an 8.125 m drawn lane;
+ * it is not authorable here and is reported, not patched.
+ *
+ * WHAT IS AUTHORABLE HERE IS THE ORDER, and it was wrong on all four. The
+ * claim-gates wave required each blocked drill to NAME the aisle position
+ * somewhere in its briefing, and all four did — van and 45-rev in step 2,
+ * wall and double as a trailing clause on the halt in step 1. „Somewhere" is
+ * the weak form of this rule and this file already knows why: the briefing
+ * budget block above records that on the deployed build a step-1 past ~96
+ * characters leaves ZERO characters of the rest of the briefing above the
+ * fold, measured on an iPhone 16 in both orientations. An act that keeps the
+ * student out of a parked car cannot be the act below the fold, and it cannot
+ * be the last five words of a sentence whose first words send him up the row.
+ *
+ * NAME THE SURFACE, because there are two and only one of them folds.
+ * The fold table is `SimOverlay`'s IN-DRIVE COMPACT CARD — one 8 rem scroll
+ * window, step 1 as `briefingLineBg`, steps 2..n as `briefingBodyBg`. The
+ * PRE-DRIVE «ИНСТРУКЦИИ» modal is a different surface and it paints every
+ * step: `.audit-frames/rebase/frames/sc-park-van__mobile-right/02-briefing.png`
+ * shows all eight of van's steps legible on an iPhone-width viewport, the
+ * old aisle instruction among them at position 2. So „the student was never
+ * shown it" is FALSE of the frame the finding was filed from; what is true,
+ * and is what this re-order buys, is that the act he must perform WHILE
+ * DRIVING now sits on the one row the card always paints.
+ *
+ * So on a drill whose spawn-lane clearance is NEGATIVE, the lane change is
+ * briefing step 1, it is stated as an act, and it carries its own reason —
+ * the row is in your lane (THEO-4: the instruction that prevents the fault
+ * says why, or the fault is taught by conviction). The halt keeps its wording
+ * and moves to step 2. Nothing else moved: no `params`, no bay, no tolerance,
+ * no rung. `parking3-success-path-and-corridor.test.ts` §2/§3 re-derives the
+ * blocked set from the districts every build and requires step 1 there, so a
+ * generator that later pushes a row into a parallel drill's lane makes that
+ * drill's briefing red instead of making a student crash.
+ *
+ * AND IT REACHES THREE RUNGS OF FIVE, NOT FIVE. On L4 and L5 `compileScenario`
+ * puts `complicationBriefingText` at `briefingBg[0]`, and on these four drills
+ * that string is 354–470 characters — past the last row of the fold table, so
+ * the body is ZERO and the aisle act is below the fold again, by a mechanism
+ * this file does not own. Measured on the compiled lesson:
+ *
+ *   L1 L2 L3   line 63–72 ch → budget 90, next step needs 59–85   VISIBLE
+ *   L4         line 445 ch   → budget 0                            BELOW FOLD
+ *   L5         line 354–470  → budget 0                            BELOW FOLD
+ *
+ * §3's second assertion says „the complication may precede it" and is honest
+ * about allowing exactly this; `briefing-card-budget.test.ts` already pins the
+ * compile.ts half as „THE HALF THIS LANE COULD NOT FIX". Do not read the
+ * re-order as reaching the student on every rung — it reaches him on L1–L3,
+ * which is where the guided drills live, and the L4/L5 half is routed.
+ *
+ * AND THE VERDICT THAT KEEPS COMING BACK IS FALSE, proved with the product's
+ * own reference drive rather than by argument. §1 of the same battery replays
+ * each drill's committed `shadow-correct.trace.json` — the blue ghost L1
+ * shows the student — through the PRODUCTION chain (`compileScenario` →
+ * `parseObjectiveParams` → `createEvalState` → `stepObjective`), sequentially,
+ * exactly as the session runs it. Both objectives complete on all ten drills
+ * at all five rungs, in 32.1–48.9 s against par times of 80–120 s. „No
+ * drivable success path", „passing is impossible", „0/4 … not teachable" are
+ * therefore claims about the DRIVER, not about these ten lessons. Do not
+ * answer them by widening a tolerance; §3 of the refutation battery already
+ * fails the moment a forward-only lane run completes a park.
+ */
+
 import type { ScenarioSpec } from "./types";
 import type { ParkingBaySpec } from "../../contracts";
 
@@ -579,34 +699,42 @@ export const SC_PARK_VAN: ScenarioSpec = {
   },
   start: { spawnPointId: "lotvn-spawn-approach", vehicleStart: "ready" },
   instructionsBg: [
+    // THE ACT THE SHADOW PERFORMS, AND IT IS THE FIRST ONE IN TIME (sweep 161,
+    // re-ordered 2026-08-22 — see THE ORDER OF THE FIRST STEP at the top of
+    // this file). It read „Дръж около метър и половина странично от реда." — a
+    // state with no WHEN — then became a step-2 act, and a step-2 act on this
+    // drill is an act the phone does not always paint. The recorded correct
+    // drive leaves the curb lane at y = −18 (traces/scParkDepth `easeTo`),
+    // BEFORE the bay row starts at y = −6.30, because the swing room for a 90°
+    // reverse is bought from the middle of the aisle and nowhere else.
+    // Measured on lot-van-v1 with the production collision geometry: the drawn
+    // curb-lane centre the district actually spawns on is x = 4.06, and the row's
+    // own armed bodies reach out to x = 2.78 (the kargo_v further still), so the
+    // deepest overlap along the aisle is 2.53 m. That is inside a parked vehicle.
+    // 63 ch — and it stays under 76, which is what buys step 2 the 90-character
+    // body row of the fold table (briefing-card-budget.test.ts FOLD_TABLE). At
+    // 86 ch it left 68, and the halt below needs 78. The act that prevents the
+    // collision cannot be bought by pushing the halt off the glass.
+    { n: 1, textBg: "Излез в средата на алеята преди реда — той стои в твоята лента." },
+    // 64 ch — the metre-and-a-half from the old step 2, with the reason it has.
+    { n: 2, textBg: "Дръж метър и половина от него — оттам се вижда и оттам се влиза." },
     // Step 2 was 162 characters: the halt, its trigger and the lateral offset.
-    // The offset is an instruction of its own and now reads as one.
+    // The offset is an instruction of its own and now reads as one — the halt
+    // keeps its wording, it is only no longer the first thing asked for.
     // 75 ch
-    { n: 1, textBg: "Подмини гнездото и спри — под 6 км/ч — щом задната ти броня подмине съседа." },
-    // THE ACT THE SHADOW PERFORMS AND NO STEP USED TO STATE (sweep 161).
-    // Step 2 read „Дръж около метър и половина странично от реда." — a state,
-    // with no WHEN. The recorded correct drive leaves the curb lane at
-    // y = −18 (traces/scParkDepth `easeTo`), i.e. BEFORE the bay row starts at
-    // y = −7.65, because the swing room for a 90° reverse is bought from the
-    // middle of the aisle and nowhere else. Measured on lot-van-v1: the drawn
-    // curb-lane centre is x = 4.06 and the row's own occupied bays reach out
-    // to x = 2.53, so a student who holds that lane down the row has 0 m of
-    // it left — the four mobile/pc legs of sweep 161 all ended on „Настъпи
-    // сблъсък“. The metre-and-a-half is kept; it now has a moment.
-    // 70 ch
-    { n: 2, textBg: "Излез в средата на алеята преди реда — около метър и половина от него." },
+    { n: 3, textBg: "Подмини гнездото и спри — под 6 км/ч — щом задната ти броня подмине съседа." },
     // 80 ch
-    { n: 3, textBg: "Знай: гнездото е до бус, а бусът краде сантиметри и цялата видимост зад себе си." },
+    { n: 4, textBg: "Знай: гнездото е до бус, а бусът краде сантиметри и цялата видимост зад себе си." },
     // 44 ch
-    { n: 4, textBg: "Включи на задна — огледала, после през рамо." },
+    { n: 5, textBg: "Включи на задна — огледала, после през рамо." },
     // 64 ch
-    { n: 5, textBg: "Гледай два пъти към страната на буса: там огледалото ти свършва." },
+    { n: 6, textBg: "Гледай два пъти към страната на буса: там огледалото ти свършва." },
     // 79 ch
-    { n: 6, textBg: "Влизай бавно и се центрирай ПО-ДАЛЕЧ от буса — той стои по-навън от линиите си." },
+    { n: 7, textBg: "Влизай бавно и се центрирай ПО-ДАЛЕЧ от буса — той стои по-навън от линиите си." },
     // 27 ch
-    { n: 7, textBg: "Спри напълно в очертанията." },
+    { n: 8, textBg: "Спри напълно в очертанията." },
     // 61 ch
-    { n: 8, textBg: "Включи късите светлини ПРЕДИ маневрата, ако е тъмно или вали." },
+    { n: 9, textBg: "Включи късите светлини ПРЕДИ маневрата, ако е тъмно или вали." },
   ],
   success: [
     {
@@ -714,18 +842,22 @@ export const SC_PARK_45_REV: ScenarioSpec = {
   },
   start: { spawnPointId: "lot45r-spawn-approach", vehicleStart: "ready" },
   instructionsBg: [
+    // THE ACT THE SHADOW PERFORMS AND NO STEP USED TO STATE (sweep 161), the
+    // sibling of sc-park-van step 1 — and this drill had it NOWHERE until the
+    // claim-gates wave, then had it as step 2. The recorded correct drive is on
+    // x = 1.05 from y = −18 up; on lot-45rev-v1 the 135° echelon row's armed
+    // body reaches out to x = 2.57, so it OVERLAPS the drawn curb lane the car
+    // spawns in (the district’s own spawn x = 4.06) by 2.34 m. The steered re-drive
+    // at commit 70bcd1b still ended «Удар в друго превозно средство −10 т.»
+    // (rebase/frames/sc-park-45-rev__mobile-right/04-t150s.png), which is what
+    // an act printed second buys on a phone.
+    // 69 ch (under 76 — see the fold note on sc-park-van step 1)
+    { n: 1, textBg: "Излез в средата на алеята преди реда — косите коли са в твоята лента." },
     // Step 5 was 174 characters: a halt, the reason the bay faces this way, and
     // the lamp condition. The reason survives; it just no longer comes first.
-    // 65 ch
-    { n: 1, textBg: "Подмини мястото и спри успоредно на алеята — под 6 км/ч, в покой." },
-    // THE ACT THE SHADOW PERFORMS AND NO STEP USED TO STATE (sweep 161), the
-    // sibling of sc-park-van step 2 — and this drill had it NOWHERE. The
-    // recorded correct drive is on x = 0.9 from y = −18 up; on lot-45rev-v1
-    // the 135° echelon row reaches out to x = 2.53, which is inside the drawn
-    // curb lane the car spawns in (centre x = 4.06). Every leg of sweep 161
-    // that held that lane hit a parked car — mobile-right three times, 30 т.
-    // 69 ch
-    { n: 2, textBg: "Излез в средата на алеята преди реда — замахът назад се купува оттам." },
+    // „замахът се купува оттам" moves onto the halt it belongs to.
+    // 82 ch
+    { n: 2, textBg: "Подмини мястото и спри успоредно на алеята — под 6 км/ч, в покой; замахът е оттам." },
     // 66 ch
     { n: 3, textBg: "Погледни накъде гледат линиите: устата се отваря НАЗАД спрямо теб." },
     // 70 ch
@@ -1129,23 +1261,30 @@ export const SC_PARK_WALL: ScenarioSpec = {
   },
   start: { spawnPointId: "lotwl-spawn-approach", vehicleStart: "ready" },
   instructionsBg: [
-    // Step 5 was 209 characters and ended on the lamp clause. Step 2's two
-    // instructions (stop early, hold the middle of the aisle) are one step
-    // because they are one position, and it is the graded one.
-    // 85 ch
-    { n: 1, textBg: "Спри РАНО — под 6 км/ч — щом бронята ти подмине последната кола, в средата на алеята." },
+    // Step 5 was 209 characters and ended on the lamp clause. „Stop early" and
+    // „hold the middle of the aisle" were then ONE step, because they are one
+    // position — but they are not one MOMENT, and the aisle half happens first
+    // and was written last, as a trailing subordinate clause. On lot-wall-v1
+    // the 90° row's armed body reaches out to x = 2.78 against a spawn x of
+    // 4.06: the row overlaps by 2.13 m and the garage wall by 2.22 m, so the
+    // aisle half is the half that decides whether there is a lesson at all.
+    // It is its own step now, and it is first.
+    // 65 ch (under 76 — see the fold note on sc-park-van step 1)
+    { n: 1, textBg: "Излез в средата на алеята преди реда — тези коли са в лентата ти." },
+    // 64 ch
+    { n: 2, textBg: "Спри РАНО — под 6 км/ч — щом бронята ти подмине последната кола." },
     // 65 ch
-    { n: 2, textBg: "Знай: свободно е само последното гнездо, а редът свършва в стена." },
+    { n: 3, textBg: "Знай: свободно е само последното гнездо, а редът свършва в стена." },
     // 52 ch
-    { n: 3, textBg: "Помни: мястото за замах зад реда тук просто го няма." },
+    { n: 4, textBg: "Помни: мястото за замах зад реда тук просто го няма." },
     // 71 ch
-    { n: 4, textBg: "Включи на задна — огледала, после през рамо; дясното сега мери стената." },
+    { n: 5, textBg: "Включи на задна — огледала, после през рамо; дясното сега мери стената." },
     // 71 ch
-    { n: 5, textBg: "Завърти докрай и влизай бавно — замахът е от алеята пред теб, не отзад." },
+    { n: 6, textBg: "Завърти докрай и влизай бавно — замахът е от алеята пред теб, не отзад." },
     // 74 ch
-    { n: 6, textBg: "Изправи волана, центрирай се и спри, без да си взел сантиметър от стената." },
+    { n: 7, textBg: "Изправи волана, центрирай се и спри, без да си взел сантиметър от стената." },
     // 80 ch
-    { n: 7, textBg: "Включи късите светлини в гараж и вечер — те са и осветление, и сигнал по алеята." },
+    { n: 8, textBg: "Включи късите светлини в гараж и вечер — те са и осветление, и сигнал по алеята." },
   ],
   success: [
     {
@@ -1396,23 +1535,31 @@ export const SC_PARK_DOUBLE: ScenarioSpec = {
   start: { spawnPointId: "lotdb-spawn-approach", vehicleStart: "ready" },
   instructionsBg: [
     // Step 5 was 211 characters and ended with the lamp clause; the correction
-    // rule inside it is an instruction and now stands as one.
-    // 66 ch
-    { n: 1, textBg: "Подмини гнездото и спри — под 6 км/ч — точно по средата на алеята." },
+    // rule inside it is an instruction and now stands as one. The aisle
+    // position was then a trailing clause on the halt („…и спри — под 6 км/ч —
+    // точно по средата на алеята"), i.e. the last five words of the first
+    // sentence. On lot-double-v1 BOTH rows are full and the east one's armed
+    // body reaches out to x = 2.78 against a spawn x of 4.06 —
+    // an overlap of 2.13 m before the west row is even considered. The
+    // position is the whole drill; it leads.
+    // 72 ch (under 76 — see the fold note on sc-park-van step 1)
+    { n: 1, textBg: "Излез точно по средата на алеята преди реда — и двата реда са в лентите." },
+    // 56 ch
+    { n: 2, textBg: "Подмини гнездото и спри — под 6 км/ч — точно по средата." },
     // 39 ch
-    { n: 2, textBg: "Помни: една педя вляво вече е чужд ред." },
+    { n: 3, textBg: "Помни: една педя вляво вече е чужд ред." },
     // 77 ch
-    { n: 3, textBg: "Знай: между двата пълни реда остават под шест метра — нито сантиметър повече." },
+    { n: 4, textBg: "Знай: между двата пълни реда остават под шест метра — нито сантиметър повече." },
     // 80 ch
-    { n: 4, textBg: "Включи на задна — огледала, после през рамо, и в двете посоки: и двете са заети." },
+    { n: 5, textBg: "Включи на задна — огледала, после през рамо, и в двете посоки: и двете са заети." },
     // 75 ch
-    { n: 5, textBg: "Прави целия замах назад: тръгнеш ли напред-наляво, вече си в отсрещния ред." },
+    { n: 6, textBg: "Прави целия замах назад: тръгнеш ли напред-наляво, вече си в отсрещния ред." },
     // 44 ch
-    { n: 6, textBg: "Изправи волана, центрирай се и спри напълно." },
+    { n: 7, textBg: "Изправи волана, центрирай се и спри напълно." },
     // 53 ch
-    { n: 7, textBg: "Коригирай НАПРЕД по дължината на алеята, не настрани." },
+    { n: 8, textBg: "Коригирай НАПРЕД по дължината на алеята, не настрани." },
     // 73 ch
-    { n: 8, textBg: "Включи вечер късите светлини — и за този, който идва насреща по коридора." },
+    { n: 9, textBg: "Включи вечер късите светлини — и за този, който идва насреща по коридора." },
   ],
   success: [
     {
