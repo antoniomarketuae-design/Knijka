@@ -32,28 +32,43 @@
  *     PEDESTRIAN_NOT_YIELDED) both collected «Спри в джоба между кръга и
  *     пътеката». Driven below, at L1.
  *
- * WHAT THIS FILE DOES NOT CLOSE, so its silence is deliberate. Sweep 161's
- * headline on this lesson — „not one of the three tasks is ticked in any of the
- * four legs; the careful drive is stamped НЕИЗДЪРЖАН 10 т. exactly like the
- * 49 км/ч one" — is not a template defect and no assertion here would move it:
- * the sweep's driver has no steering (`tools/mobile/lesson-audit.mjs` actuates
- * `KeyW` and `KeyS`, and a census of the file returns zero KeyA/KeyD/Arrow
- * tokens), so it leaves the south arm and drives onto the central island, which
- * is where mobile-right/04-t065s photographs it — grass filling the windscreen,
- * the coach card reading «Интервалът беше добър · Изчака 24 с и влезе», and the
- * collision billed five seconds later. Same signature on all three roundabout
- * template files. `s-w6-bot-completion.test.ts` is what says this drill grades:
- * the authored drive completes all three objectives with zero violations at 3★.
+ * SWEEP 161'S HEADLINE, and the half of it this file can now answer.
+ * „Not one of the three tasks is ticked in any of the four legs; the careful
+ * drive is stamped НЕИЗДЪРЖАН 10 т. exactly like the 49 км/ч one" is TWO
+ * claims, and they need different evidence.
+ *
+ * The first — that the legs failed — is the instrument. The sweep's driver had
+ * no steering (`tools/mobile/lesson-audit.mjs` actuated `KeyW` and `KeyS`
+ * only), and the 2026-08-22 re-drive with the wheel wired says the same thing
+ * with the excuse removed: both right legs still travelled in a straight line
+ * (witness path 68.9 m, net 68.6 m, straightness 0.996) across the ring band
+ * and into the central island's kerb, and stood there at 0 км/ч until the run
+ * ended. A car that never entered the roundabout performed none of these three
+ * acts, so no assertion here would move that leg.
+ *
+ * The second — „cannot be passed and cannot distinguish a good student from a
+ * bad one" — IS a claim about this template, and nothing proved it either way:
+ * `s-w6-bot-completion.test.ts` drives the authored shadow at L3 alone, while
+ * all four audited legs were L1. The suite at the bottom of this file closes
+ * it on every rung the ladder compiles.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { makeTick } from "../../__tests__/fixtures";
-import { applyTick, createLessonSession } from "../../engine";
+import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { REACH_ZONE_HALT_CAP_KMH } from "../../objectives";
 import type { LessonSpec } from "../../../contracts";
+import { recordScRbPedExitDrive } from "../../../traces/scRbPedExit";
 import { compileScenario } from "../compile";
+import { scoreRubric } from "../rubric";
 import { SC_RB_PED_EXIT } from "../templates-roundabout2";
 import type { ScenarioLevel } from "../types";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
 
 // ---------------------------------------------------------------------------
 // rb-ped-v1, by value — the same pins the template and
@@ -432,5 +447,97 @@ describe("the exit rung is untouched — its indicator claim is graded by stepRo
     // the ring-signal arm of `stepRoundabout` (objectives.ts B21-RB), which is
     // why it survives the D3 sweep untouched.
     expect(objective.titleBg).toContain("десен мигач");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. „The lesson cannot be passed" — driven, on EVERY rung
+// ---------------------------------------------------------------------------
+
+describe("the drill is winnable and discriminating on every rung the ladder compiles", () => {
+  /**
+   * The half of sweep 161's headline that IS about this template (see the file
+   * header). `s-w6-bot-completion.test.ts` proves the authored shadow completes
+   * at L3; the four audited legs were all L1, and the ladder rewrites both
+   * reachZone gates between those rungs — `sc-rbp-past-east` 4.06 → 6.09 m,
+   * `sc-rbp-pocket` 2.4 → 3.6 m, and the east cap 20 → 25 км/ч. So „passable"
+   * was an untested claim on four of the five rungs students can actually be
+   * given.
+   *
+   * Same production path as the bot-completion proof — the committed recording
+   * feeding `applyTick` frame by frame — run against every compiled rung.
+   */
+  const district = JSON.parse(
+    readFileSync(path.join(REPO_ROOT, "content", "world", "rb-ped-v1.json"), "utf-8"),
+  ) as unknown;
+
+  function driveShadow(level: ScenarioLevel) {
+    let session = createLessonSession(compileScenario(SC_RB_PED_EXIT, level));
+    recordScRbPedExitDrive(district, "shadow-correct", {
+      onTick: (tick) => {
+        session = applyTick(session, tick).state;
+      },
+    });
+    return { session, result: buildLessonResult(session) };
+  }
+
+  for (const level of LEVELS) {
+    it(`sc-rb-ped-exit @L${level}: the authored correct drive passes 3★ with all three ticked`, () => {
+      const { session, result } = driveShadow(level);
+      for (const id of ["sc-rbp-past-east", "sc-rbp-pocket", "sc-rbp-exit"]) {
+        expect(result.objectives.find((o) => o.id === id)!.done, `L${level}/${id}`).toBe(true);
+      }
+      expect(result.completedAll, `L${level}`).toBe(true);
+      expect(result.passed, `L${level}`).toBe(true);
+      expect(result.score, `L${level}`).toBe(0);
+      expect(session.events.filter((e) => e.kind === "violation"), `L${level}`).toEqual([]);
+      expect(scoreRubric(result, SC_RB_PED_EXIT.rubric!).stars, `L${level}`).toBe(3);
+    });
+  }
+
+  it("…and the sheet is not a rubber stamp: the SAME exit ticks signalled and not unsignalled", () => {
+    // The other half of „cannot distinguish a good student from a bad one",
+    // and it carries its own positive control on purpose: an assertion that
+    // only ever watches the stalk being ABSENT would pass just as happily on a
+    // chain that stalled two rungs earlier. One drive, one difference.
+    const EXIT: ReadonlyArray<readonly [number, number, number]> = [
+      [7.9, 18.0, 12],
+      [6.4, 20.7, 10],
+      [4.9, 23.7, 8],
+      [4.1, 27.0, 4],
+      [4.1, 27.0, 0],
+      [4.1, 27.0, 0],
+      [X_ARM_LANE, 31, 8],
+      [X_ARM_LANE, 36, 12],
+      [X_ARM_LANE, 44, 14],
+    ];
+    const run = (indicator: "right" | "off") => {
+      let s = createLessonSession(compileScenario(SC_RB_PED_EXIT, 3));
+      s = drive(s, [...APPROACH, ...stayOnRing(RING_R)]);
+      EXIT.forEach(([x, y, speedKmh], i) => {
+        s = applyTick(
+          s,
+          makeTick({ t: 200 + i, position: { x, y }, speedKmh, indicator }),
+        ).state;
+      });
+      return s;
+    };
+
+    const signalled = run("right");
+    expect(statusOf(signalled, "sc-rbp-past-east")).toBe("done");
+    expect(statusOf(signalled, "sc-rbp-pocket")).toBe("done");
+    expect(
+      statusOf(signalled, "sc-rbp-exit"),
+      "the taught exit — ring, pocket, wait, then away under a right stalk — must tick",
+    ).toBe("done");
+
+    const silent = run("off");
+    expect(statusOf(silent, "sc-rbp-past-east")).toBe("done");
+    expect(statusOf(silent, "sc-rbp-pocket")).toBe("done");
+    expect(
+      statusOf(silent, "sc-rbp-exit"),
+      "the ring was driven and the pocket was used, but the exit was never announced — " +
+        "«Излез на северния изход с включен десен мигач» may not tick for a silent departure",
+    ).not.toBe("done");
   });
 });

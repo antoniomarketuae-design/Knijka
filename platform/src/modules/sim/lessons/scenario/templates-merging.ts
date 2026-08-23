@@ -247,38 +247,110 @@ const LNM_END_Y = 280;
  * the scMergeAccelLane precedent), not a physical overlap.
  *
  * SWEEP 161 — „NEVER THROUGH THE PLAYER" WAS THE CLAIM THIS PARAGRAPH USED TO
- * MAKE, AND IT IS FALSE. It holds only while the student is still in the DYING
- * lane; the drill's own instruction 2 tells him to read the taper early and
- * instruction 5 to merge with one movement, and the moment he is in the through
- * lane the pass has nowhere to go but through him. The runner stages this actor
- * `playerGuard: false` (RearTailgaterRunner.stage, hard-coded — the spec has no
- * such field), so staged.ts step 2 — „never ram the player from behind" — is
- * skipped for it, and the on-path advance has no anti-overlap clamp against the
- * player at all (only against ambient bodies, step 3b).
+ * MAKE, AND IT IS FALSE. The runner stages this actor `playerGuard: false`
+ * (RearTailgaterRunner.stage, hard-coded — the spec has no such field), so
+ * staged.ts step 2 — „never ram the player from behind" — is skipped for it,
+ * and the on-path advance has no anti-overlap clamp against the player at all
+ * (only against ambient bodies, step 3b). A student in the through lane while
+ * the pass is running is a body the pass goes through.
  *
  * MEASURED on ln-merge-v1 through `createTrafficSystem` + the production
- * RearTailgaterRunner: a constant-speed drive up the curb lane that slides one
- * lane pitch left over 2 s starting at `mergeAt`, reporting the closest CENTRE
- * separation to the actor over the whole run (metres):
+ * RearTailgaterRunner: a constant-speed drive from the authored spawn (y = 12)
+ * up the curb lane that slides one lane pitch left over 2 s starting at
+ * `mergeAt`, reporting the closest CENTRE separation to the actor over the
+ * whole run (metres), and whether the runner's pass ever resolved:
  *
- *      mergeAt y=  30   60  100  140  180  234
- *      30 км/ч    0.04 0.04 0.04 7.19 8.12 8.12
- *      20 км/ч    0.03 0.03 8.12 8.12 8.12 8.12
- *      12 км/ч    0.13 1.71 8.12 8.12 8.12 8.12
+ *      mergeAt y=  30   60  100  140  180  234   pass on a drive that never merges
+ *      50 км/ч    9.26 9.26 9.26 9.26 9.26 9.26   NEVER resolves
+ *      40 км/ч    0.01 0.01 0.01 0.01 0.01 5.74   resolves
+ *      30 км/ч    0.04 0.04 0.04 7.19 8.12 8.12   resolves
+ *      20 км/ч    0.03 0.03 8.12 8.12 8.12 8.12   resolves
+ *      12 км/ч    0.13 1.71 8.12 8.12 2.99 8.12   resolves
  *
- * 8.12 is one lane pitch — the correct pass, alongside. 0.03–0.13 m is a dead
- * centre-on-centre overlap: the лепка drives through the body of a student who
- * did the taught thing early. hz-roadworks-v1 reproduces it on the same probe
+ * 8.12 is one lane pitch — the correct pass, alongside. 0.01–0.13 m is a dead
+ * centre-on-centre overlap. The 40 км/ч row is the one the earlier grid (12/20/
+ * 30 only) never reached and it is the worst: at the pace instruction 4 asks
+ * for, EVERY merge point up to and including the taper's start is an
+ * interpenetration. hz-roadworks-v1 reproduces the same shape on the same probe
  * (0.01–0.07 m for merges at y ≤ 120), which is the sweep's „the correct drive
  * collides" row on that template.
  *
- * NOT FIXABLE FROM THIS FILE, and not by `passShiftM` either: ln-merge-v1 has
- * exactly two lanes and the surviving one is where both cars have to be, so
- * there is no third lane to pass into (the mw-entry-v1 actor above CAN author
- * −8.125 precisely because that map has one). The honest fix is to let the pass
- * phase be player-guarded while the GLUED pose keeps its exemption — the
- * exemption exists so the лепка may sit sub-6 m BEHIND the student, which the
- * pass is not — i.e. orchestrator/runners.ts, not a number here.
+ * CORRECTED 2026-08-23 — „A STUDENT WHO DID THE TAUGHT THING EARLY" WAS WRITTEN
+ * HERE AND IS NOT WHAT THE GRID SHOWS. The rows above are a drive that holds one
+ * speed and never performs instruction 4 („Ако колата до теб е почти наравно —
+ * отпусни газта и я пусни да мине"). Re-measured with the lift performed —
+ * ease by 2 × `easeKmh` while the actor is abreast, resume once the runner
+ * reports it clear, then merge so the 2 s movement FINISHES on the drill's own
+ * `sc-mle-merge` waypoint — the tightest separation is **8.12 m at 12, 20, 30,
+ * 40 and 50 км/ч**: one exact lane pitch, at every pace. That much is true and
+ * is pinned in __tests__/merging-route-vs-staged.test.ts, which reddens if the
+ * waypoint moves into the pass window, if the actor is deleted, or if
+ * `passSpeedMps` rises above the posted limit.
+ *
+ * SCOPE RESTORED BY THE VERIFIER, SAME DAY — „THE DRILL IS CORRECTLY AUTHORED
+ * FOR THE STUDENT WHO OBEYS IT" STOOD HERE FOR ONE ROUND AND IS FALSE. It was
+ * read off a grid that varies ONE thing (the lift) while silently pinning
+ * another: every row of it merges at y = 236, the LAST metre before the taper
+ * ends. But instruction 2 is „Забележи края на лентата РАНО … колкото по-рано
+ * го видиш, толкова повече метри имаш, за да се впишеш спокойно — ВМЕСТО да се
+ * бориш за сантиметри на самия край." The drill's own words send the student to
+ * merge early; the grid never let him. Re-measured on the same probe with the
+ * lift PERFORMED and the merge point swept — closest centres, m:
+ *
+ *      merge finishes at y=  30   60  100  140  180  234
+ *      12 км/ч             0.17 8.12 8.12 8.12 8.12 8.12
+ *      20 км/ч             0.17 8.12 8.12 8.12 8.12 8.12
+ *      30 км/ч             0.11 0.11 8.12 8.12 8.12 8.12
+ *      40 км/ч             0.05 0.05 0.05 8.12 8.12 8.12
+ *      50 км/ч             0.03 0.03 0.03 0.03 5.08 8.12
+ *
+ * So the overlap does NOT belong only to „the driver who refuses the lift". At
+ * the posted 50 a student who eased exactly as instruction 4 asks is inside the
+ * лепка for every merge point up to y = 140 — the whole first half of the road,
+ * and 40 m of it before the taper has even begun. The ORIGINAL sentence in this
+ * block — „the лепка drives through the body of a student who did the taught
+ * thing early" — was right, and deleting it narrowed a true diagnosis into a
+ * false one. It is restored.
+ *
+ * What the lift grid DOES buy, and it is worth keeping: merging LATE (on the
+ * gate itself) is clean at every pace, so the two variables are separable —
+ * the lift is not what saves the student, the late merge is. A driver who
+ * neither lifts nor merges late earns this template's SECOND mistake card
+ * („Изтласкване на кола от съседната лента") and that conviction is deserved;
+ * its DELIVERY is still wrong either way, arriving as a 10-point «Удар в друго
+ * превозно средство» from a body that interpenetrated rather than the authored
+ * LANE_CHANGE_WITHOUT_MIRROR_CHECK. NOTE for whoever re-runs the probe: the
+ * suite's `lift` window is `aheadM ∈ (−20, 6)`, and this actor holds dormant at
+ * arc 8 — four metres BEHIND the spawn — so the ease fires on tick 1, at
+ * y ≈ 12, not „while the actor is abreast" as the helper's doc says. With a
+ * true abreast cue (±6 m, after release) the rows are unchanged at 12/20/30/40
+ * but at 50 the lift NEVER FIRES at all: the лепка glues at `followBehindM` 14
+ * and closes no further, so a limit-holding student gets no „почти наравно"
+ * moment to respond to. That is instruction 4 having no trigger, and it is a
+ * second reason the 50 км/ч row cannot be read as a clean pass.
+ *
+ * WHY 50 км/ч IS THE CLEAN ROW AND ALSO THE WORST ONE: `passSpeedMps` 13.9 IS
+ * the posted 50, so against a student who holds the limit the closing speed is
+ * zero and the pass NEVER resolves — the лепка simply rides beside him for the
+ * rest of the road (measured: phase stays „triggered" to y = 280). That is not
+ * a bug: it is what makes instruction 4 a manoeuvre instead of a courtesy, and
+ * the test asserts it in both directions. It is also why the audit's own right
+ * drive (top 56 км/ч, seven full stops, no lift logic) is performing mistake
+ * demo 2 rather than the taught drive — read its 0:53 «Удар» that way.
+ *
+ * NOT FIXABLE FROM THIS FILE, and not by `passShiftM` or `passSpeedMps` either:
+ * ln-merge-v1 has exactly two lanes and the surviving one is where both cars
+ * have to be, so there is no third lane to pass into (the mw-entry-v1 actor
+ * above CAN author −8.125 precisely because that map has one), and raising the
+ * pass speed was tried and reverted — `passSpeedMps` 22 was run as a mutation
+ * against the battery and it MAKES THINGS WORSE, not better: the rig then
+ * reaches the end of its polyline early enough to stand still in the through
+ * lane on the run-out, and a 12 км/ч student who merged correctly closes to
+ * 0.08 m of it on the way to `sc-mle-finish` (3 tests red). The honest
+ * fix is to let the pass phase be player-guarded while the GLUED pose keeps its
+ * exemption — the exemption exists so the лепка may sit sub-6 m BEHIND the
+ * student, which the pass is not — i.e. orchestrator/runners.ts, not a number
+ * here.
  */
 const LNM_THROUGH_CAR: RearTailgaterSpec = {
   id: "sc-mle-through-car",
@@ -699,13 +771,35 @@ const MGB_END_Y = 400;
  * The bus must never be one: it would arm the vulnerable-pass tracker and make
  * „минах покрай автобуса" grade as a cyclist offence.
  *
- * HONEST GAP (flagged — the whole family's discipline): TrafficVehicleState
- * carries NO indicator channel (traffic/types.ts), so the bus CANNOT show the
- * ляв мигач the law and the copy are about. The visible cue is the rig itself
- * rolling out of the bay; the card copy carries „подал ляв мигач", and nothing
- * grades off the missing lamp. Everything graded here is the player's own
- * channel: the ease gate at the pull-out, the gap he keeps afterwards, and the
- * contact he earns by forcing past.
+ * THE ЛЯВ МИГАЧ — CORRECTED 2026-08-23. This paragraph used to say
+ * „TrafficVehicleState carries NO indicator channel (traffic/types.ts), so the
+ * bus CANNOT show the ляв мигач the law and the copy are about." That is false
+ * twice over and it was routing the next wave at the wrong file:
+ *
+ *   • the channel exists END TO END — `VehicleIndicator` and
+ *     `TrafficVehicleState.indicator` (traffic/types.ts), the `setIndicator`
+ *     command, and the fleet renderer (ledger L6, founder items 43/44);
+ *   • and THIS runner already drives it: CutInLeadCarRunner lights the lamp
+ *     INDICATOR_LEAD_SEC of the actor's own travel before the cut. MEASURED on
+ *     mg-busstop-v1 through the production runner — the lamp comes on with the
+ *     player at y = 137.8 (5 км/ч) / 132.0 (12) / 118.3 (30), i.e. 4–24 m
+ *     before the glide starts at y ≈ 142. So «подаде ляв мигач и тръгне да
+ *     излиза» (instruction 3) is honoured on every taught drive.
+ *
+ * WHAT IS ACTUALLY MISSING is narrower and belongs to one function: the bus
+ * cannot signal while it is STILL STANDING at the стоянка, which is the order
+ * чл. 67 is written in („подал сигнал, ЧЕ ПОТЕГЛЯ") — the runner's lamp gate is
+ * `actor.speedMps > 0.5`, so the announcement and the movement arrive together.
+ * `StagedActorPathSpec.indicator` (contracts.ts) is exactly the resting-blinker
+ * field for this, and it is a NO-OP here: only `BrakingLeadCarRunner.stage()`
+ * re-issues it (runners.ts ~1213); `CutInLeadCarRunner.stage()` does not. THE
+ * ASK IS FOUR LINES in that stage(), after which `MGB_BUS.actor.indicator:
+ * "left"` makes the standing rig announce itself — do NOT author the field
+ * before then, because it type-checks and does nothing.
+ *
+ * Nothing grades off the lamp either way. Everything graded here is the
+ * player's own channel: the ease gate at the pull-out, the gap he keeps
+ * afterwards, and the contact he earns by forcing past.
  *
  * SWEEP 161 — THE BUS NEVER PULLED OUT, AND THE „НАМАЛИ" GATE WENT GREEN
  * ANYWAY. Photographed across the whole right drive on both surfaces: the coach
@@ -747,11 +841,25 @@ const MGB_END_Y = 400;
  * pace is a rubber band (matchPlayer gapM = paceAheadM), so a stopped player
  * parks the bus 30 m ahead of himself, short of `cutAt`, and no floor can fire
  * a geometry gate that never becomes true. That needs a release mode on
- * CutInLeadCarSpec, not a number here. Nor does it touch the OTHER half of the
- * sweep row: `sc-mgb-ease` is a plain reachZone and ticks green for a driver
- * the bus never pulled out in front of — no objective kind in lessons/
- * objectives.ts can consume a staged outcome except emergencyStop's, which is
- * the same open row templates-following.ts records against sc-fc-cutter.
+ * CutInLeadCarSpec, not a number here.
+ *
+ * THE OTHER HALF OF THE SWEEP ROW, MEASURED 2026-08-23 AND NARROWER THAN IT
+ * READ. `sc-mgb-ease` is a plain reachZone — no objective kind in
+ * lessons/objectives.ts can consume a staged outcome except emergencyStop's
+ * (`stagedEventId`), which is the same open row templates-following.ts records
+ * against sc-fc-cutter — so the tick cannot be made CONDITIONAL on the
+ * pull-out. What it can be, and now provably is, is GEOMETRICALLY LATE: the rig
+ * is fully across into the general lane with the player at
+ *
+ *     5 км/ч 145.4 · 8 147.4 · 12 150.1 · 15 152.2 · 18 154.2 · 25 158.8 · 30 161.9
+ *
+ * and the gate's disc does not open until y = 168 − 5 = 163. Every pace the
+ * gate's own 30 км/ч cap permits therefore earns the tick with the bus already
+ * in front of the windscreen; the tightest margin in the band is 1.1 m, at the
+ * 30 км/ч ceiling. __tests__/merging-route-vs-staged.test.ts pins it and
+ * reddens if the disc is pulled back toward the bay or `cutRampSec` is
+ * stretched. The residue is only the STOPPED player above, who reaches no gate
+ * at all.
  */
 const MGB_BUS: CutInLeadCarSpec = {
   id: "sc-mgb-bus",
@@ -1046,6 +1154,18 @@ const MFP_STREAM: OncomingStreamSpec = {
    * takes the merge gate off an empty road — ledger L8's defect on the give-way
    * half of this drill.
    *
+   * RE-MEASURED 2026-08-23 on the full taught exit (roll off, halt short of the
+   * тротоар, 9 s of walker, creep to the Б2, halt, turn north), through
+   * `createTrafficSystem` + the production OncomingStreamRunner with ambient
+   * zeroed: at **6, 8 and 12 км/ч the stream is never released at all** — all
+   * three cars still stand at y = −208 / −234 / −260 when the drive reaches
+   * y = 138 at the far end of the boulevard. The drill's own instruction 5
+   * («Изчакай да мине целият [поток] — пролуката, която ти трябва, е ЗАД
+   * последната кола») and its `sc-mfp-merged` gate are then graded against an
+   * empty road for every one of those paces, and the gates the template itself
+   * authors — a 5 км/ч cap at the тротоар and a 3 км/ч halt at the Б2 — are
+   * what put a careful student in that band.
+   *
    * WHY LOWERING IT IS NOT THE ANSWER, measured on the three committed
    * recordings: every one of them crosses 6 км/ч at t 0.75 s and 15 км/ч at
    * t 1.90 s, so a floor of 6 fires the column **1.15 s early** — and the
@@ -1055,6 +1175,31 @@ const MFP_STREAM: OncomingStreamSpec = {
    * `expected [] to deeply equal [ 'FAILED_TO_YIELD' ]`). The drill's own
    * mistake card would become a claim about an empty road — the same crime,
    * moved one demo over.
+   *
+   * THE ARITHMETIC, WRITTEN DOWN 2026-08-23 SO NOBODY RE-LITIGATES THE INTEGER.
+   * Replayed through `recordScMergeFromPropertyDrive` at the authored 15, the
+   * two windows the trace gate asserts are:
+   *
+   *     shadow      line 30.88  streamClear 25.22  margin **+5.67**  (gate: > 3)
+   *     „с мигача"  line 23.48  streamClear 25.22  margin **−1.73**  (gate: < −1)
+   *
+   * The binding wall is the demo's: **0.73 s of headroom**. Lowering the floor
+   * shifts `streamClear` earlier by exactly the release delta — 15→12 costs
+   * 0.40 s, 15→10 costs 0.65 s, 15→8 costs 0.90 s, 15→5 costs 1.25 s. So every
+   * floor low enough to matter (the taught exit crawls: 6, 8 and 12 км/ч were
+   * all measured as NEVER released) spends more than 0.73 s, and 10 leaves
+   * 0.08 s — a margin thinner than a re-record.
+   *
+   * AND THE COLUMN CANNOT BE GIVEN MORE TIME INSTEAD. `streamClear` is set by
+   * the LAST car, and the last car is pinned to the path start: the runner's
+   * stage guard requires `holdArc − gapsM[i] ≥ 0`, `gapsM` already reaches
+   * exactly `hold.offsetM` (52), and `hold.offsetM 0` is the collapse the
+   * founder review of 2026-07-27 removed. Raising `hold.offsetM` moves the HEAD
+   * north (less run-up, earlier arrival) while the tail stays at arc 0, so
+   * neither `count` nor `gapsM` buys a single second. `cruiseSpeedMps` 14 is the
+   * posted 50 and lowering it teaches that the boulevard crawls. There is no
+   * fourth dial: the release has to key on the player reaching the Б2, which is
+   * a field this contract does not have.
    *
    * WHAT IT ACTUALLY NEEDS, so the next wave routes it instead of re-tuning
    * this integer: an ARRIVAL-keyed release on OncomingStreamSpec /
@@ -1122,6 +1267,30 @@ const MFP_STREAM: OncomingStreamSpec = {
  * which is where every other template's visual-only dressing already lives.
  * Nothing about the GRADED geometry moves either way: the тротоар is the
  * district crossing and the Б2 is derived from the service/primary rank pair.
+ *
+ * SWEEP 161 — „THE CORRECT DRIVE COLLIDES AND FAILS", READ AGAINST THE STEERED
+ * RE-DRIVE (.audit-frames/rebase/frames/sc-merge-from-property__pc-right, 2026-
+ * 08-22). What that sheet actually says, so the next lane does not chase the
+ * wrong file:
+ *
+ *   ✓ «Спри пред тротоара и пропусни пешеходеца» 0:39   ✓ «Спри напълно на Б2»
+ *   1:29   ★ «Правилно пропускане на пешеходец» 1:27   ★ «Правилно спиране на
+ *   знак Б2» 1:30   ✗ FAILED_TO_YIELD 1:30   ✗ «Удар в НЕПОДВИЖНО препятствие»
+ *   2:39   — 20 наказателни т., НЕИЗДЪРЖАН, the last two objectives never
+ *   reached.
+ *
+ * THE CONTACT WAS WITH A STATIC OBJECT, not with the walker the finding names
+ * („hits the very pedestrian it stopped for"): the walker had cleared the
+ * carriageway 40 s earlier and both her commendation and her objective are on
+ * the same sheet. That drive's own instrument header reads «TRACKING: BLIND —
+ * ribbon seen on 25/74 moving samples (34 %) … treat it as an unsteered
+ * drive», i.e. it left the property in a straight line and never made the right
+ * turn the lesson routes; the static-object bill is the far kerb. Nothing here
+ * is authorable — but the FAILED_TO_YIELD at 1:30 is the product working: the
+ * derived Б2 grades `conflictNear` over PRIORITY_CONFLICT_RADIUS_M at the
+ * instant the line is crossed, and on a live boulevard the ambient flow is
+ * within 26 m of the node for most of a minute (the same sheet excludes 122 s
+ * as «чакане на предимство»).
  */
 export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
   id: "sc-merge-from-property",

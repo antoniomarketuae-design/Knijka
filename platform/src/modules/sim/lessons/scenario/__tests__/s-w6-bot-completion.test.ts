@@ -289,7 +289,11 @@ describe("wave-6 bot completion — sc-rb-ped-exit at L3", () => {
     // The trace gate proves the recorder's engine sees a clean drive; this
     // proves the student-facing session agrees, and that the pocket is a GATE
     // rather than narration. sc-rbp-pocket is a reachZone centred on the
-    // pocket's middle (4.06, 26) with radiusM 3.6 and maxSpeedKmh 6 — it cannot
+    // pocket's middle (4.06, 26) with an authored radiusM of 2.4 (it read 3.6
+    // when this comment was written; sweep 161 retuned it so the L1 ladder's
+    // ×1.5 lands back on 3.6 instead of spilling to 5.4 — see the row in
+    // templates-roundabout2.ts) plus acceptBeforeMarkM −4 and maxSpeedKmh 6 —
+    // it cannot
     // be satisfied from inside the ring band NOR from beyond the zebra, so the
     // only way this sheet reads „passed, 3★" is a car that actually stopped
     // between the circulatory carriageway and the paint.

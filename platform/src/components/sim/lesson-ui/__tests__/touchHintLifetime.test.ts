@@ -22,6 +22,8 @@ import {
   TOUCH_HINT_MAX_SHOWN_MS,
   TOUCH_HINT_MOVING_KMH,
   TOUCH_HINT_POLL_MS,
+  touchHintAccrue,
+  touchHintOnGlass,
   touchHintOutstayed,
   touchHintShouldHide,
   touchHintStandsDown,
@@ -250,6 +252,242 @@ describe("the two exits together — and the four corners between them", () => {
 });
 
 /**
+ * …AND THE CLOCK THAT FEEDS IT, WHICH USED TO RUN WHILE THE CARD WAS INVISIBLE.
+ *
+ * The ceiling above is a statement about a card a student is looking at. The
+ * increment this file used to prescribe — `shownMs += TOUCH_HINT_POLL_MS`, one
+ * per delivered tick — is a statement about an interval, and the two are not the
+ * same thing for ~18 seconds of every mobile lesson in the catalogue.
+ *
+ * MEASURED, not argued. `[data-hud="touch-hint"]` is MOUNTED from scene mount
+ * but `display: none` behind the shell's overlay ladder while the ИНСТРУКЦИИ
+ * line and then the briefing sheet speak (`PlayAreaStyles.tsx:1224`, and again
+ * at `:1536` for the ⚙ sheet). `showTouchHint` never changes through any of it,
+ * so the poll runs the whole time. Across the 174 mobile run.logs in
+ * `.audit-frames/proof/frames` + `.audit-frames/rebase/frames` — the sweeps that
+ * photograph the current build — `tools/mobile/lesson-audit.mjs` prints
+ *
+ *   ✗ NOT ON THE GLASS — touch-hint: Завърти телефона хоризонтално…
+ *
+ * in 174 of 174 runs, at exactly two frames each (348 total), and at NO other
+ * frame in any run: `01-arrival` and `02-briefing`, every time. The window,
+ * from those runs' own frame mtimes, 01-arrival → 03-ready:
+ *
+ *   min 17.1 s · p50 18.0 s · p90 19.6 s · max 21.8 s
+ *
+ * and that is a robot pressing «Разбрах» the instant the button exists, on a
+ * briefing whose fold reads «↓ ОЩЕ 20 РЕДА».
+ *
+ * Every row below fails on `shownMs += TOUCH_HINT_POLL_MS`. The direction that
+ * matters is the one that deletes teaching: a ceiling that has already spent
+ * 15 % of itself before the card's first visible frame, on a card whose third
+ * line is the only written statement of the reverse gesture.
+ */
+describe("the ceiling's clock counts time ON THE GLASS, not time in the DOM", () => {
+  it("a painted tick advances by exactly one poll", () => {
+    expect(touchHintAccrue(0, true)).toBe(TOUCH_HINT_POLL_MS);
+    expect(touchHintAccrue(4_200, true)).toBe(4_200 + TOUCH_HINT_POLL_MS);
+  });
+
+  it("AN UNPAINTED TICK ADVANCES NOTHING — this row IS the correction", () => {
+    // The whole content of this change is the second argument. If it is ever
+    // inlined back to `+=`, this is the row that says so.
+    expect(touchHintAccrue(0, false)).toBe(0);
+    expect(touchHintAccrue(4_200, false)).toBe(4_200);
+  });
+
+  it("the WHOLE measured briefing window leaves the clock at zero", () => {
+    // 21.8 s is the worst 01-arrival → 03-ready gap of the 174 mobile runs, i.e.
+    // the longest stretch the catalogue has ever photographed this card mounted
+    // and unpainted. Not one tick of it may reach the ceiling.
+    const WORST_UNPAINTED_MS = 21_800;
+    const ticks = WORST_UNPAINTED_MS / TOUCH_HINT_POLL_MS;
+    let shownMs = 0;
+    for (let i = 0; i < ticks; i += 1) shownMs = touchHintAccrue(shownMs, false);
+    expect(shownMs).toBe(0);
+    expect(touchHintOutstayed(shownMs)).toBe(false);
+    // …and what the old increment would have banked instead: 18 % of the
+    // ceiling, spent before the card's first visible frame.
+    expect(ticks * TOUCH_HINT_POLL_MS).toBeGreaterThan(
+      0.15 * TOUCH_HINT_MAX_SHOWN_MS,
+    );
+  });
+
+  it("…and the card still gets its ceiling IN FULL once it is painted", () => {
+    // The correction must not become a way for the ceiling never to fire. After
+    // the worst unpainted window, the two minutes still arrive — exactly on the
+    // 1200th painted tick and not on the 1199th.
+    let shownMs = 0;
+    for (let i = 0; i < 218; i += 1) shownMs = touchHintAccrue(shownMs, false);
+    const ticks = TOUCH_HINT_MAX_SHOWN_MS / TOUCH_HINT_POLL_MS;
+    for (let i = 0; i < ticks - 1; i += 1) shownMs = touchHintAccrue(shownMs, true);
+    expect(touchHintOutstayed(shownMs)).toBe(false);
+    shownMs = touchHintAccrue(shownMs, true);
+    expect(shownMs).toBe(TOUCH_HINT_MAX_SHOWN_MS);
+    expect(touchHintOutstayed(shownMs)).toBe(true);
+  });
+
+  it("a lesson that hides the card mid-drive does not bank that time either", () => {
+    // Rank 1 of the ladder is „the lesson talking" — a graded fault, a task, a
+    // teach card — and each one hides this card again while it speaks. DEDUCED
+    // from the cascade rule, not photographed: by the time a lesson talks the
+    // SPEED exit has taken the card away in 213 of 224 measured runs, so only
+    // the 11 that never move would sit through it — which is precisely the
+    // population this ceiling exists for. A drive spent alternating
+    // painted/unpainted reaches the ceiling in twice the painted time, never in
+    // the wall time.
+    let shownMs = 0;
+    for (let i = 0; i < 2_000; i += 1) shownMs = touchHintAccrue(shownMs, i % 2 === 0);
+    expect(shownMs).toBe(1_000 * TOUCH_HINT_POLL_MS);
+    expect(touchHintOutstayed(shownMs)).toBe(false);
+  });
+
+  it("a corrupted clock PROPAGATES rather than being silently repaired", () => {
+    // Same asymmetry as everywhere else in this pair: an unreadable accumulator
+    // can only leave the words up. A reset to 0 here would hide the corruption;
+    // `touchHintOutstayed` already reads NaN as „not outstayed".
+    expect(Number.isFinite(touchHintAccrue(Number.NaN, true))).toBe(false);
+    expect(touchHintOutstayed(touchHintAccrue(Number.NaN, true))).toBe(false);
+    expect(touchHintOutstayed(touchHintAccrue(Number.POSITIVE_INFINITY, true))).toBe(
+      false,
+    );
+  });
+});
+
+/**
+ * …AND „ON THE GLASS" IS THE HARNESS'S OWN QUESTION, ASKED OF THE PRODUCT.
+ *
+ * `touchHintOnGlass` is `painted()` from `tools/mobile/lesson-audit.mjs:692` —
+ * the instrument that photographed this defect and printed the 348 «NOT ON THE
+ * GLASS» lines. The product and the thing that judges the product must not hold
+ * two different opinions about whether a student can see a card.
+ *
+ * There is no DOM in this suite (`vitest.config.ts`: `environment: "node"`), so
+ * the rows below drive hand-built nodes. That is the honest shape of the test
+ * rather than a limitation: what is being checked is the DECISION — which
+ * combinations of computed style and geometry count as visible — and a decision
+ * is checkable without a browser. What it cannot check is that the scene passes
+ * the right element; the source-reading block after it is what covers that.
+ */
+type FakeStyle = Partial<
+  Record<"display" | "visibility" | "opacity" | "contentVisibility", string>
+>;
+type FakeRect = { width: number; height: number };
+
+/** One node of a fake ancestor chain, duck-typed to what `touchHintOnGlass` reads. */
+function fakeNode(style: FakeStyle, rects: FakeRect[] = [{ width: 180, height: 141 }]) {
+  const node = {
+    nodeType: 1,
+    __style: {
+      display: "flex",
+      visibility: "visible",
+      opacity: "1",
+      contentVisibility: "visible",
+      ...style,
+    },
+    parentElement: null as unknown,
+    ownerDocument: {
+      defaultView: {
+        getComputedStyle: (n: { __style: FakeStyle }) => n.__style,
+      },
+    },
+    getBoundingClientRect: () => rects[0] ?? { width: 0, height: 0 },
+    getClientRects: () => rects,
+  };
+  return node;
+}
+
+/** Chain them child-first: `chain(card, parent, grandparent)`. */
+function chain(...nodes: ReturnType<typeof fakeNode>[]): Element {
+  nodes.forEach((n, i) => {
+    n.parentElement = nodes[i + 1] ?? null;
+  });
+  return nodes[0] as unknown as Element;
+}
+
+describe("on the glass — the same predicate the audit judges the frame with", () => {
+  it("a painted card is on the glass", () => {
+    expect(touchHintOnGlass(chain(fakeNode({})))).toBe(true);
+  });
+
+  it("NO ELEMENT is not on the glass — the first tick after mount", () => {
+    // React has not attached the ref yet. „I cannot tell" must never accrue: an
+    // unknown is not evidence that the student is looking at the card.
+    expect(touchHintOnGlass(null)).toBe(false);
+    expect(touchHintOnGlass(undefined)).toBe(false);
+    const detached = fakeNode({});
+    (detached.ownerDocument as { defaultView: unknown }).defaultView = null;
+    expect(touchHintOnGlass(detached as unknown as Element)).toBe(false);
+  });
+
+  it("`display: none` on the CARD is off the glass — PlayAreaStyles:1224 and :1536", () => {
+    // The two shipped suppressions, verbatim in effect: the overlay ladder while
+    // the lesson is talking, and the ⚙ sheet while it is open.
+    expect(touchHintOnGlass(chain(fakeNode({ display: "none" })))).toBe(false);
+  });
+
+  it("`display: none` on an ANCESTOR is off the glass — the card's own style lies", () => {
+    // The case the walk exists for: the card still computes `display: flex` and
+    // nothing is on screen. A predicate that read only the card would accrue
+    // here, which is the direction that deletes teaching.
+    const card = fakeNode({}, [{ width: 0, height: 0 }]);
+    const layer = fakeNode({ display: "none" });
+    expect(touchHintOnGlass(chain(card, layer))).toBe(false);
+  });
+
+  it("`opacity: 0` on an ANCESTOR is off the glass — and opacity does not inherit", () => {
+    // `visibility` inherits, so the card reports a hidden parent's value itself.
+    // `opacity` does not, so this row is the one that would silently pass if the
+    // walk were dropped in favour of one `getComputedStyle` on the card.
+    const card = fakeNode({});
+    const layer = fakeNode({ opacity: "0" });
+    expect(touchHintOnGlass(chain(card, layer))).toBe(false);
+    // …and the inheriting one, from the card's own computed value.
+    expect(touchHintOnGlass(chain(fakeNode({ visibility: "hidden" })))).toBe(false);
+    expect(touchHintOnGlass(chain(fakeNode({ contentVisibility: "hidden" })))).toBe(
+      false,
+    );
+  });
+
+  it("a card CLIPPED TO NOTHING is off the glass, styles notwithstanding", () => {
+    // The corridor bounds this card with a `max-height` computed from the hazard
+    // band (`notifyColumn.ts`). A box crushed to zero by it is not teaching
+    // anybody anything, and the clock must not run on it.
+    expect(touchHintOnGlass(chain(fakeNode({}, [{ width: 0, height: 0 }])))).toBe(false);
+    expect(touchHintOnGlass(chain(fakeNode({}, [])))).toBe(false);
+    // …sub-pixel is the same answer. 1 px is the harness's floor and it is ours.
+    expect(touchHintOnGlass(chain(fakeNode({}, [{ width: 180, height: 0.4 }])))).toBe(
+      false,
+    );
+  });
+
+  it("a degenerate BORDER box still counts if a client rect paints", () => {
+    // Copied from the harness's own note, and the reason the rect test is two
+    // questions and not one: a `display: contents` wrapper and a baseline-aligned
+    // inline box both report an empty border box while painting.
+    const card = fakeNode({}, [
+      { width: 0, height: 0 },
+      { width: 180, height: 44 },
+    ]);
+    expect(touchHintOnGlass(chain(card))).toBe(true);
+  });
+
+  it("the instrument still asks it the same way — this may go red for a GOOD reason", () => {
+    // The two claims this file makes about another file, checked instead of
+    // trusted. `tools/` is the instrument and this lane may not edit it; if
+    // somebody legitimately changes how a drive decides „painted", this row is
+    // where the product finds out that its own copy has drifted.
+    const harness = readFileSync(
+      join(__dirname, "../../../../../../tools/mobile/lesson-audit.mjs"),
+      "utf8",
+    );
+    expect(harness).toContain("const painted = (el) => {");
+    expect(harness).toContain('cs.display === "none"');
+    expect(harness).toContain("el.getClientRects()");
+  });
+});
+
+/**
  * …AND THE WIRING, because a rule nobody bound is the bug `tapActivation.ts`
  * exists to fix. `LessonScene.tsx` cannot be imported into a Node test (R3F,
  * rapier wasm, the district loader), so it is read as source — the same device
@@ -268,6 +506,31 @@ describe("LessonScene binds both exits, and they are not the same exit", () => {
     // same commit that adds the accumulator.
     expect(SCENE).toContain("touchHintStandsDown(sampleRef.current.speedKmh)");
     expect(SCENE).toContain("TOUCH_HINT_POLL_MS");
+  });
+
+  it("the ceiling CANNOT land without the on-glass accumulator", () => {
+    // THE GUARD THIS LANE LEAVES BEHIND, because it may not make the edit
+    // itself. The ⚠ block in `touchHintLifetime.ts` used to prescribe
+    // `shownMs += TOUCH_HINT_POLL_MS`, and a scene that inlines that spends
+    // ~18 s of a 120 s ceiling on arrival and the briefing — before the card's
+    // first painted frame — on every mobile lesson in the catalogue.
+    //
+    // Green today because the scene reaches for none of it. It goes red the day
+    // somebody wires the ceiling the way this file used to describe, which is
+    // the only way that mistake can be caught: it produces no type error, no
+    // failing render, and a card that vanishes looks exactly like a card that
+    // worked.
+    const reachesForTheCeiling =
+      SCENE.includes("touchHintShouldHide") ||
+      SCENE.includes("touchHintOutstayed") ||
+      SCENE.includes("TOUCH_HINT_MAX_SHOWN_MS");
+    if (reachesForTheCeiling) {
+      expect(SCENE, "the ceiling needs a PAINTED clock").toContain("touchHintAccrue(");
+      expect(SCENE, "…fed by the card's own element").toContain("touchHintOnGlass(");
+    }
+    // …and the inlined increment is refused whether or not the rest is present.
+    expect(SCENE).not.toContain("+= TOUCH_HINT_POLL_MS");
+    expect(SCENE).not.toContain("+ TOUCH_HINT_POLL_MS");
   });
 
   it("…and it does NOT persist — only an acknowledged press may do that", () => {

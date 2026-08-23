@@ -86,7 +86,7 @@
  *   grep -rhoE --include=run.log --include=log.txt \
  *     '\[04-t[0-9]+s\] +-?[0-9]+ км/ч' .audit-frames/sweep161
  *
- * TWO HONEST QUALIFICATIONS, because the temptation here is to overclaim.
+ * THREE HONEST QUALIFICATIONS, because the temptation here is to overclaim.
  * FIRST, none of those 11 runs is a long drive: most ended within seconds and
  * one never rendered at all, so the ceiling below is not being sold as the fix
  * for a photographed three-minute lesson — the speed exit already is that.
@@ -96,6 +96,34 @@
  * briefing, finds the pads and fumbles; nothing in this sweep measures how long
  * THAT takes. So 15 s bounds when the speed exit fires for the harness, and
  * bounds nothing at all for a student.
+ *
+ * THIRD, AND IT IS THE ONE THAT UNDERCUTS THE COUNT ITSELF (added by the
+ * adversarial verifier, 2026-08-23). Sweep 161 was driven by a harness that
+ * could accelerate and brake and COULD NOT STEER. When steering was taught and
+ * the 92 worst lessons were re-driven, 13 of them turned out to be instrument
+ * artifacts. So „11 of 224 never move" is a measurement of that instrument as
+ * much as of the product, and it may not be quoted as a standing fact. On the
+ * two sweeps that photograph the CURRENT build with a steering harness — the
+ * same 174 mobile runs this file counts two sections down — every single run
+ * crosses 5 км/ч, and the photographed exemplar (sc-park-parallel-exit) is not
+ * in either sweep at all. That does not make the class empty. It makes its size
+ * on the current build UNMEASURED, which is a different sentence and the only
+ * one the tree supports.
+ *
+ * AND THE SAME 174 RUNS SAY THE PHOTOGRAPHED DEFECT IS ALREADY CLOSED ON THEM.
+ * Scanning each run log's PAINTED list (the «·» lines) for the card's own words
+ * («Ляв палец — волан…»): PAINTED at 03-ready in 174 of 174 runs, listed as NOT
+ * ON THE GLASS at 01-arrival and 02-briefing in 174 of 174, and present in no
+ * painted list from 04- onward in any run — 0 of 174. The speed exit, already
+ * shipped, takes it off the glass before the first sampled driving frame, and
+ * the mirror in those frames is clear. And the ON-GLASS window those runs leave
+ * is 12.2 s min · 13.5 p50 · 14.9 p90 · 18.1 MAX (03-ready → first 04 frame,
+ * same 174 runs, frame mtimes), so a 120 s ceiling could not have fired on ANY
+ * of them even if it were wired — it is 6.6× the longest painted window the
+ * catalogue currently produces. What is left for the ceiling is exactly the
+ * population that is no longer countable here, which is the honest reason it is
+ * still worth having and also the honest reason nobody should call wiring it
+ * urgent.
  *
  * ── THE SECOND EXIT: NOT A COUNTDOWN ON READING, A PROOF OF NON-IMMORTALITY ───
  *
@@ -111,7 +139,7 @@
  * The number is set far outside every reading argument on both sides:
  *
  *   vs. reading  the card is 130 characters of Bulgarian in landscape (61 + 69),
- *                and `hud/HudToasts.tsx:60` carries this product's own figure for
+ *                and `hud/HudToasts.tsx:72-73` carries this product's own figure for
  *                reading under driving load — „~15 chars/s", the one it spends on
  *                TEACHING_TOAST_TTL_MS = 8000. 130 ÷ 15 = 8.7 s, so two minutes
  *                is 13.8× the time this product itself budgets for these words.
@@ -133,27 +161,110 @@
  * teaching; under-counting only leaves a card up on a stationary picture a
  * little longer.
  *
+ * ── AND THE TICK THIS FILE USED TO PRESCRIBE COUNTED TIME THE CARD WAS NOT ON
+ *    THE GLASS. 174 OF 174 MOBILE DRIVES. ──────────────────────────────────────
+ *
+ * The paragraph above is right about the CLOCK and was wrong about the
+ * CONDITION. `shownMs += TOUCH_HINT_POLL_MS` — the increment this file
+ * prescribed until now — advances on every delivered tick, and the poll is born
+ * at scene mount, which is not the moment the card appears. The card is MOUNTED
+ * throughout `01-arrival` and `02-briefing` and PAINTED in neither, because the
+ * shell's own priority ladder hides it with `display: none` while the overlay
+ * column speaks:
+ *
+ *   PlayAreaStyles.tsx:1224  [data-sim-compact="on"][data-sim-overlay-active="on"]
+ *                            [data-hud="touch-hint"] { display: none }
+ *                            — rank 1 is „the lesson talking": a graded fault, a
+ *                            task, a teach card, and the ИНСТРУКЦИИ line that
+ *                            every lesson opens with.
+ *   PlayAreaStyles.tsx:1536  html[data-sim-car-sheet="open"] [data-hud="touch-hint"]
+ *                            { display: none } — the ⚙ sheet is modal and wins.
+ *
+ * `showTouchHint` stays true through all of it (the ladder is a cascade rule,
+ * not a state change), so the interval keeps firing and the old increment kept
+ * counting. THE MEASUREMENT, from the sweeps that photograph the current build
+ * (`.audit-frames/proof/frames` + `.audit-frames/rebase/frames`, 174 mobile
+ * run.logs, 2026-08-22). `tools/mobile/lesson-audit.mjs` prints, per frame, what
+ * the DOM holds and the picture does not — its `painted()` at :692 walks the
+ * ancestor chain for display/visibility/opacity/content-visibility and then
+ * demands a ≥1 px box:
+ *
+ *   ✗ NOT ON THE GLASS — touch-hint: Завърти телефона хоризонтално…
+ *
+ *   174 / 174 runs carry that line, at exactly two frames each — 348 in total,
+ *   every one of them `01-arrival` or `02-briefing` and none anywhere else.
+ *   Reproduce (written without a glob, because a star-slash would close this
+ *   block comment):
+ *     grep -rah --include=run.log 'NOT ON THE GLASS — touch-hint' \
+ *       .audit-frames/proof/frames .audit-frames/rebase/frames
+ *   …and to see that it is two frames per run and which two:
+ *     awk '/^  \[[0-9]/{lbl=$1} /NOT ON THE GLASS — touch-hint/{print lbl}' \
+ *       .audit-frames/proof/frames/sc-rx-unguarded__mobile-right/run.log
+ *
+ *   And the WINDOW, from the frame mtimes of those same 174 runs, 01-arrival →
+ *   03-ready: min 17.1 s · p50 18.0 s · p90 19.6 s · max 21.8 s. That is a ROBOT
+ *   that presses «Разбрах» the instant the button exists, on a briefing whose own
+ *   fold reads «↓ ОЩЕ 20 РЕДА». A seventeen-year-old reading it is not measured
+ *   here and is not faster.
+ *
+ * So the old increment spent ~18 s of a 120 s ceiling — 15 % of it — before the
+ * card had been on screen for one frame, on every mobile lesson in the
+ * catalogue.
+ *
+ * ONE THING IS MEASURED AND THE OTHER IS ONLY DEDUCED, AND THE TWO ARE NOT
+ * WORTH CONFLATING. The arrival/briefing window is photographed 348 times. The
+ * mid-drive case — rank 1 is „the lesson talking", so every graded fault, task
+ * and teach card hides this card again while it speaks — follows from the same
+ * cascade rule but appears in no frame, for a reason that is itself the good
+ * news: by the time a lesson talks, the SPEED exit has already taken the card
+ * away in 213 of 224 measured runs. It is the 11 that never move, the ones this
+ * ceiling exists for, that would sit through both.
+ *
+ * That is the crime this file names two paragraphs down, arriving from the
+ * direction nobody was watching: not „the card was never read" but „the clock
+ * that decides it was furniture ran while it was invisible". A ceiling that
+ * fires on a card the student was never shown deletes the teaching outright.
+ *
+ * THE FIX IS THE CONDITION, NOT THE NUMBER — `touchHintAccrue(shownMs, onGlass)`
+ * below advances by one poll only when the card is actually painted, and the
+ * bounds the ceiling was derived against stay exactly what they were, because
+ * they were always about time IN FRONT OF A READER. And the unknown case fails
+ * the way everything in this file fails: a scene that cannot tell whether the
+ * card is on the glass does not accrue, so the ceiling arrives late or never
+ * rather than early. Late costs a card on a stationary picture. Early costs a
+ * lesson.
+ *
  * ⚠ THE CEILING IS NOT WIRED YET, AND THIS PARAGRAPH IS HERE SO NOBODY READS THE
  *   ONE ABOVE AS A DESCRIPTION OF WHAT SHIPS. As of this commit `LessonScene`
  *   still calls `touchHintStandsDown(sampleRef.current.speedKmh)` — the speed
- *   exit alone. The rule, its bounds and its proof live here; the three-line
- *   change that spends them lives in a file this lane does not own:
+ *   exit alone. The rule, its bounds and its proof live here; the change that
+ *   spends them lives in a file this lane does not own:
  *
+ *     const hintRef = useRef<HTMLDivElement | null>(null);   // + on the card
+ *     …
  *     useEffect(() => {
  *       if (!showTouchHint) return;
  *       let shownMs = 0;                                   // + the clock
  *       const id = window.setInterval(() => {
- *         shownMs += TOUCH_HINT_POLL_MS;                   // + one tick
+ *         shownMs = touchHintAccrue(                       // + one PAINTED tick
+ *           shownMs,
+ *           touchHintOnGlass(hintRef.current),
+ *         );
  *         if (touchHintShouldHide(sampleRef.current.speedKmh, shownMs))
  *           setShowTouchHint(false);                       // + both exits
  *       }, TOUCH_HINT_POLL_MS);
  *       return () => window.clearInterval(id);
  *     }, [showTouchHint]);
  *
- *   `__tests__/touchHintLifetime.test.ts`'s binding block asserts the CURRENT
- *   call, so it goes red the moment that edit lands — deliberately. Whoever
- *   makes it updates that assertion to `touchHintShouldHide(sampleRef.current
- *   .speedKmh, shownMs)` in the same commit, and the ceiling is live.
+ *   `touchHintAccrue` is not optional sugar and `shownMs += TOUCH_HINT_POLL_MS`
+ *   is not an acceptable inlining of it: the whole content of this correction is
+ *   the second argument. `__tests__/touchHintLifetime.test.ts` reads
+ *   `LessonScene.tsx` as source and FAILS on a scene that reaches for the
+ *   ceiling without the on-glass accumulator, so the half-wired version cannot
+ *   land quietly. That block also asserts the CURRENT call, so it goes red the
+ *   moment the edit lands — deliberately. Whoever makes it updates that
+ *   assertion to `touchHintShouldHide(sampleRef.current.speedKmh, shownMs)` in
+ *   the same commit, and the ceiling is live.
  *
  * ── THE HALF THAT IS EASY TO GET WRONG: AN AUTO-EXIT MUST NOT DELETE THE
  *    TEACHING ──────────────────────────────────────────────────────────────
@@ -174,8 +285,11 @@
  *   2 min up   the same non-persisting hide, so that a car which never moves
  *              cannot make the card immortal. Same storage rule for the same
  *              reason: a clock running out is not a student saying he read it.
- *              (Awaiting the call-site change flagged above; the rule is here,
- *              the scene does not spend it yet.)
+ *              And the two minutes are two minutes ON THE GLASS — arrival, the
+ *              briefing and every teach card that outranks this one are time the
+ *              card was `display: none`, and time a card was not shown is not
+ *              time it was ignored. (Awaiting the call-site change flagged
+ *              above; the rule is here, the scene does not spend it yet.)
  *
  * The two automatic ones can only ever get the words out of the way. Neither can
  * decide, on the student's behalf, that they were read.
@@ -227,7 +341,7 @@
  * `modules/sim/rules/types.ts`, the threshold `rules/engine.ts` uses to decide
  * whether the driver is under way at all —
  *
- *   const moving = speed > cfg.movingSpeedKmh;        // rules/engine.ts:1228
+ *   const moving = speed > cfg.movingSpeedKmh;        // rules/engine.ts:1607
  *
  * — and therefore the exact line past which the belt, the lights and every
  * other duty of a driver in motion begin to be graded. Copied by value rather
@@ -238,12 +352,22 @@
 export const TOUCH_HINT_MOVING_KMH = 5;
 
 /**
- * How often the scene checks (ms) while the hint is up — and only while it is
- * up. One property read off the per-frame vehicle sample, ten times a second,
- * for the few seconds between the briefing and the car rolling; zero cost for
- * the rest of the session and zero on every device that never shows the hint.
- * Deliberately a poll and not a per-frame hook: this decides when a piece of
- * type disappears, and it must not add a line to the frame loop that grades.
+ * How often the scene checks (ms) while the hint is MOUNTED — and only while it
+ * is mounted. Zero cost for the rest of the session and zero on every device
+ * that never shows the hint. Deliberately a poll and not a per-frame hook: this
+ * decides when a piece of type disappears, and it must not add a line to the
+ * frame loop that grades.
+ *
+ * WHAT ONE TICK COSTS, STATED HONESTLY BECAUSE IT GREW. It used to be one
+ * property read off the vehicle sample. It is now that plus one
+ * `touchHintOnGlass()` — a short ancestor walk of `getComputedStyle` and one
+ * `getClientRects()` on a single element, i.e. one forced style/layout flush per
+ * tick. The window that costs is measured, not guessed: the card is mounted for
+ * the 17.1–21.8 s of arrival + briefing (174 mobile runs, above) and then for
+ * the 1–15 s until the car rolls, after which the effect tears the interval
+ * down. ~200–400 flushes of a DOM that is not being mutated, none of them
+ * inside the render loop, in exchange for a ceiling that cannot fire on a card
+ * nobody was shown.
  */
 export const TOUCH_HINT_POLL_MS = 100;
 
@@ -283,7 +407,7 @@ export function touchHintStandsDown(speedKmh: number): boolean {
  * under „A PROOF OF NON-IMMORTALITY"):
  *
  *   read time  130 landscape characters ÷ 15 chars/s — the product's own
- *              reading-speed figure, `hud/HudToasts.tsx:60`, the one it already
+ *              reading-speed figure, `hud/HudToasts.tsx:72-73`, the one it already
  *              spends on TEACHING_TOAST_TTL_MS — is 8.7 s. Two minutes is 13.8×
  *              that, so this cannot be mistaken for a reading countdown.
  *   worst move over the 213 mobile runs in sweep 161 that ever cross 5 км/ч, the
@@ -300,22 +424,113 @@ export const TOUCH_HINT_MAX_SHOWN_MS = 120_000;
 /**
  * Has the card been on screen so long that it is furniture rather than a hint?
  *
- * `shownMs` is ACCUMULATED POLL TIME, not wall-clock: the scene adds
- * `TOUCH_HINT_POLL_MS` per delivered tick, so time spent in a backgrounded tab —
- * where the interval is throttled to roughly 1 Hz — counts at roughly a tenth of
- * its real length, and the words survive a screen nobody was watching. The error
- * this design admits is „the card stayed up longer than 45 s on a picture that
- * was not moving"; the error it refuses is „the card vanished while the student
- * was elsewhere".
+ * `shownMs` is ACCUMULATED ON-GLASS POLL TIME. Two words are load-bearing and
+ * each one is a separate refusal.
+ *
+ * POLL, not wall-clock: the scene accrues per DELIVERED tick, so time spent in a
+ * backgrounded tab — where the interval is throttled toward 1 Hz — counts at
+ * roughly a tenth of its real length, and the words survive a screen nobody was
+ * watching.
+ *
+ * ON-GLASS, not mounted: `touchHintAccrue` advances only on ticks where the card
+ * is actually painted. Every mobile lesson in the catalogue mounts this card
+ * ~18 s before it is visible (arrival + briefing, `display: none` behind the
+ * overlay ladder — the measurement is in the header), and every teach card
+ * mid-drive hides it again. Counting that time would have made the ceiling fire
+ * on a card the student had never been shown.
+ *
+ * The error this design admits is „the card stayed up longer than two minutes of
+ * wall-clock on a picture that was not moving"; the error it refuses is „the
+ * card vanished while the student was elsewhere, or before he had seen it".
  *
  * A CLOCK THAT CANNOT BE READ IS FALSE, exactly as an unreadable speed is. NaN
- * and ±Infinity are not evidence that 45 s have passed, and the same rule holds
- * for both inputs of this pair: a broken number may leave the teaching on the
- * screen, and may never take it off.
+ * and ±Infinity are not evidence that two minutes have passed, and the same rule
+ * holds for both inputs of this pair: a broken number may leave the teaching on
+ * the screen, and may never take it off.
  */
 export function touchHintOutstayed(shownMs: number): boolean {
   if (!Number.isFinite(shownMs)) return false;
   return shownMs >= TOUCH_HINT_MAX_SHOWN_MS;
+}
+
+/**
+ * Is the card ACTUALLY ON THE GLASS this tick — painted, not merely mounted?
+ *
+ * The predicate is deliberately the audit harness's, near enough verbatim:
+ * `painted()` in `tools/mobile/lesson-audit.mjs:692`, which is the instrument
+ * that photographed this defect and prints «✗ NOT ON THE GLASS — touch-hint» for
+ * the 348 frames the header counts. The product and the thing that judges the
+ * product should not hold two different opinions about whether a student can see
+ * a card.
+ *
+ * WHY THE ANCESTOR WALK. The two shipped suppressions
+ * (`PlayAreaStyles.tsx:1224` and `:1536`) both hit the card's own element, so
+ * its own computed `display` would answer today. The walk is here for the case
+ * that is one commit away and would fail silently: a hidden PARENT — the HUD
+ * layer, the play area, a `hidden` attribute on the stage — leaves the card's
+ * own `display` reading `flex` while nothing is on screen. `visibility`
+ * inherits, so a child reports it; `opacity` does NOT, which is exactly why
+ * reading only the card would over-count in the direction that deletes teaching.
+ *
+ * WHY THE RECT IS A SECOND QUESTION AND NOT A REPEAT. Copied from the harness's
+ * own note: a `display: contents` wrapper and a baseline-aligned inline box both
+ * report a degenerate border box while painting, so the fallback across
+ * `getClientRects()` has to stay. A card clipped to nothing by the corridor's
+ * `max-height` — the exact failure `PlayAreaStyles` fixed by giving the words
+ * their own scroller — is not on the glass either, and this is what notices.
+ *
+ * NO DOM IS FALSE. A null ref (the first tick after mount, before React
+ * attaches), a document with no view (SSR, a detached node) — none of these is
+ * evidence that a student is looking at the card, and the whole asymmetry of
+ * this file is that an unreadable input may leave teaching up and may never take
+ * it down.
+ */
+export function touchHintOnGlass(el: Element | null | undefined): boolean {
+  if (!el) return false;
+  const view = el.ownerDocument?.defaultView;
+  if (!view) return false;
+  for (
+    let n: Element | null = el;
+    n && n.nodeType === 1;
+    n = n.parentElement
+  ) {
+    const cs = view.getComputedStyle(n);
+    if (!cs) return false;
+    if (cs.display === "none" || cs.visibility === "hidden") return false;
+    if (Number(cs.opacity) === 0) return false;
+    if (cs.contentVisibility === "hidden") return false;
+  }
+  const r = el.getBoundingClientRect();
+  if (r.width >= 1 && r.height >= 1) return true;
+  for (const q of el.getClientRects()) if (q.width >= 1 && q.height >= 1) return true;
+  return false;
+}
+
+/**
+ * One tick of the ceiling's clock. THE SECOND ARGUMENT IS THE WHOLE POINT.
+ *
+ * `shownMs += TOUCH_HINT_POLL_MS` is what this file used to prescribe and it is
+ * wrong in the one direction that costs a lesson: the interval is born with the
+ * scene, and the card spends the first 17.1–21.8 s of every mobile lesson
+ * mounted and `display: none` behind the briefing (174 of 174 drives — the
+ * header carries the count, the frames and the reproduction). Time a card was
+ * not shown is not time it was ignored.
+ *
+ * So the clock advances on PAINTED ticks only, and a tick that cannot be judged
+ * — `onGlass` false because the ref is null, the document detached, the answer
+ * unknown — advances nothing. Both non-advancing cases push the ceiling LATER,
+ * which is the failure that leaves a card on a stationary picture; the failure
+ * it refuses is a ceiling arriving EARLY, which deletes the only place the thumb
+ * layout and the reverse gesture are written down.
+ *
+ * A non-finite `shownMs` propagates rather than being repaired. `touchHintOutstayed`
+ * already reads an unreadable clock as „not outstayed", so a corrupted
+ * accumulator can only ever leave the words up — never remove them — and a
+ * silent reset to 0 here would hide the corruption instead of failing safe.
+ */
+export function touchHintAccrue(shownMs: number, onGlass: boolean): number {
+  if (!onGlass) return shownMs;
+  return shownMs + TOUCH_HINT_POLL_MS;
 }
 
 /**
@@ -330,6 +545,10 @@ export function touchHintOutstayed(shownMs: number): boolean {
  *
  * Neither writes `sim.touchHintSeen`. Both are „hide for this drive"; only
  * «РАЗБРАХ» is „and never again".
+ *
+ * `shownMs` MUST come from `touchHintAccrue`, not from a `+=` at the call site.
+ * The two differ by ~18 s on every mobile lesson in the catalogue, in the
+ * direction that fires the ceiling on a card the student never saw.
  */
 export function touchHintShouldHide(speedKmh: number, shownMs: number): boolean {
   return touchHintStandsDown(speedKmh) || touchHintOutstayed(shownMs);

@@ -217,6 +217,100 @@ export const SC_SIGNAL_DEAD_CONFLICT: PriorityFromRightSpec = {
   witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
+/**
+ * ═══ THE CAR THAT IS THERE FOR THE DRIVER WHO DOES NOT SLOW DOWN ═══
+ * Sweep 161, `sc-signal-dead` / `sc-signal-flashing`, both critical, both
+ * `wrongConvicted=NO`. The record, quoted from
+ * `.audit-frames/sweep161/sc-signal-flashing/mobile-wrong/audit.log` — the
+ * MACHINE SUMMARY, not the viewport shot beside it:
+ *
+ *     drive: top 59 км/ч · 0 full stops · 0 lawful waits (0s)
+ *     VERDICT: НЕИЗДЪРЖАН · SCORE: 0 наказателни точки
+ *     MISTAKES (0): (none convicted)
+ *     INSTRUCTOR DEBRIEF >>> „Какво се получи добре: чисто каране без нито
+ *     едно нарушение — задръж това ниво."
+ *
+ * A drive that held the throttle through a flashing amber and never stopped
+ * once was told to keep it up. `sc-signal-dead`'s wrong legs are the same hole
+ * wearing a different result: they DO collect 20 т., but both tens are
+ * «Пътнотранспортно произшествие» — the give-way code the drill exists to teach
+ * is absent from every leg on both platforms.
+ *
+ * WHY IT ACQUITTED HIM, MEASURED — not the coach, not the debrief: THE
+ * ENCOUNTER WAS NOT THERE. Driving the reckless script through the production
+ * recorder + a real lesson session (the `signals-sweep161.test.ts` pipeline),
+ * sweeping only the approach speed, on the SHIPPED single-car staging:
+ *
+ *     approach   sc-signal-flashing        sc-signal-dead (left turn)
+ *     ────────   ──────────────────        ──────────────────────────
+ *      59 км/ч   nothing staged resolves   nothing staged resolves
+ *      50 км/ч   nothing                   nothing
+ *      40 км/ч   nothing                   outcome „clear"
+ *      30 км/ч   FAILED_TO_YIELD 10 т.     outcome „clear"
+ *      20 км/ч   FAILED_TO_YIELD 10 т.     FAILED_TO_YIELD + COLLISION 20 т.
+ *
+ * The conflict exists ONLY for a student who is already doing the taught thing.
+ * The arithmetic behind that table is the runner's, and it is not a tune this
+ * file can reach: `PriorityFromRightRunner` may not release the car until the
+ * player is `PRIORITY_COMMIT_PLAYER_M` = 22 m from his own line, and its
+ * approach sync is capped at `PRIORITY_SYNC_MAX_MPS` = 11.5 m/s. From the hold
+ * at −95/−90 m the car needs ≈ 12 s to reach the node; a player who does not
+ * lift covers the whole 105 m from `sx-spawn-south` in ≈ 8.5 s. It cannot get
+ * there. The single staged car is choreographed to ONE pace — the 20–22 км/ч
+ * of the committed demos — and is empty at every faster one.
+ *
+ * WHY NOT SIMPLY MOVE THE SHIPPED CAR. Measured, all three knobs this file
+ * owns, same pipeline: raising `armDistM` 70 → 105, or pulling the hold in to
+ * −50 or nearer, DOES convict the 59 км/ч barge — and in every such variant the
+ * careful drive LOSES «Правилно отстъпено предимство» (the runtime's own
+ * `YIELDED_TO_PRIORITY`), because the car is then released early enough to
+ * clear the box before the student who stopped for it gets there. Raising
+ * `cruiseSpeedMps` 8 → 13 changes nothing at all: the release, not the speed,
+ * is the bottleneck. Buying the conviction by deleting the commendation the
+ * correct student earns is not a fix.
+ *
+ * SO: A SECOND CAR, and the precedent is the founder's own (doc 87 B23,
+ * `SC_JUNCTION_RHR_CONFLICT_2`) — *„should there be at least 1 more that we
+ * have to wait"*. This one is his sentence read from the other end: not a
+ * follower for the student who pulls out too early, but a LEADER near enough to
+ * the box to still be in it when someone arrives at speed. Same path, same
+ * lane, same `witnessArm`, same `leadSec`; only the hold differs.
+ *
+ * WHERE IT STANDS, and the window is bounded at BOTH ends by measurement:
+ *   · no nearer than its own paint — the derived east stop line is 27.73 m from
+ *     the node on every sx* map (`meta.scenario.derived.stopLineFromNodeM`), and
+ *     a car held inside that is a car parked in the junction mouth;
+ *   · no further than ≈ 48 m — at −50 the 59 км/ч barge is „clear" again on
+ *     sxd-v1, i.e. the hole reopens.
+ *   −46 m sits inside that window on both maps (sxd-v1's east arm is 150 m,
+ *   sxf-v1's 90 m, and `sx-spawn-east` stands at 135 / 75, so the pose is
+ *   plainly on the carriageway).
+ *
+ * WHAT IT COSTS, measured before it was written — the careful drive, stopping
+ * short of the paint and waiting 4 / 8 / 12 s (the committed shadow waits 8):
+ * zero violations, zero points, BOTH objectives, and `YIELDED_TO_PRIORITY`
+ * still credited, now against two resolved yields instead of one. Nothing is
+ * taken away; a second thing to wait for is added.
+ *
+ * WHY `stagedAdd` AND NOT `staged` — the B23 rule, verbatim: the three
+ * committed recordings of each template are cut from `spec.staged`
+ * (traces/scSignals.ts reads it directly), and their whole value is being
+ * byte-stable demonstrations of ONE adjudicated conflict each. On the rungs the
+ * follower reaches every LIVE attempt and re-cuts nothing.
+ */
+export const SC_SIGNAL_DEAD_CONFLICT_2: PriorityFromRightSpec = {
+  ...SC_SIGNAL_DEAD_CONFLICT,
+  id: "sc-sdead-conflict-2",
+  actor: {
+    ...SC_SIGNAL_DEAD_CONFLICT.actor,
+    // 46 m east of the node — 18.3 m back of its own 27.73 m stop line, so it
+    // reads as a car approaching the crossing rather than sitting in it.
+    hold: { nodeIndex: 1, offsetM: -46 },
+    // Told apart from the lead car in a frame and in a replay (B23's reason).
+    colorIndex: 2,
+  },
+};
+
 export const SC_SIGNAL_DEAD: ScenarioSpec = {
   id: "sc-signal-dead",
   family: "signals",
@@ -266,7 +360,16 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
       textBg:
         "Огледай се: първо наляво, после НАДЯСНО. Кола отдясно има предимство — спри преди кръстовището и я изчакай да премине изцяло.",
     },
-    { n: 5, textBg: "Щом пътят е чист, завий наляво и продължи на запад." },
+    // THEO-4 for the second staged car (see SC_SIGNAL_DEAD_CONFLICT_2): a drill
+    // that adds a car and then convicts you for it without saying so is a bare
+    // verdict. Wording deliberately mirrors sc-junction-rhr's step 5, because
+    // it is the same rule being taught on a second street.
+    {
+      n: 5,
+      textBg:
+        "Не тръгвай в мига, в който първата кола отмине — погледни пак надясно: зад нея може да идва втора. Чакаш, докато пътят е чист.",
+    },
+    { n: 6, textBg: "Щом пътят е чист, завий наляво и продължи на запад." },
   ],
   success: [
     {
@@ -321,16 +424,21 @@ export const SC_SIGNAL_DEAD: ScenarioSpec = {
       "Загасналият светофар е класически капан: водачите приемат, че „все още имат зелено“, и навлизат без да пропуснат. Точно затова там стават тежки странични сблъсъци. Който намали и потърси идващия отдясно, връща сигурността, която светофарът е спрял да дава.",
     lawRef: "ЗДвП чл. 50",
     examinerBg:
-      "Изпитващият гледа: осезаемо намаляване пред неработещия светофар, оглеждане наляво и надясно и реално пропускане на идващия отдясно, преди навлизане. Преминаване през угаснал светофар без пропускане е опасна грешка.",
+      "Изпитващият гледа: осезаемо намаляване пред неработещия светофар, оглеждане наляво и надясно и реално пропускане на идващия отдясно, преди навлизане. Преминаване през угаснал светофар без пропускане е опасна грешка. Пропускането важи за всяка кола отдясно, не само за първата — затова се гледа и повторното оглеждане, преди да потеглиш.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    // The second crossing car rides EVERY rung — B23's reason, and here it is
+    // the stronger one: the student this drill acquitted was the one who never
+    // slowed down, and „the junction is empty if you are quick enough" is the
+    // exact opposite of what «пропусни идващия отдясно» has to teach. A rung
+    // that deletes it deletes the only conviction a barge can earn on this map.
+    { level: 1, stagedAdd: [SC_SIGNAL_DEAD_CONFLICT_2] },
+    { level: 2, stagedAdd: [SC_SIGNAL_DEAD_CONFLICT_2] },
+    { level: 3, stagedAdd: [SC_SIGNAL_DEAD_CONFLICT_2] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [SC_SIGNAL_DEAD_CONFLICT_2] },
     // L5 «Усложнени» — the complication kit (scenario/complications.ts):
     // the delta AND the instructor's line that explains it, authored together.
-    l5BusyStreet(),
+    { ...l5BusyStreet(), stagedAdd: [SC_SIGNAL_DEAD_CONFLICT_2] },
   ],
   staged: [SC_SIGNAL_DEAD_CONFLICT],
   // The LIVE half of the recorder's dial (doc 62 S1 #17 — the drill showed a
@@ -424,6 +532,32 @@ export const SC_SIGNAL_FLASHING_CONFLICT: PriorityFromRightSpec = {
   witnessArm: { etaSec: 8, nearLineM: 6 },
 };
 
+/**
+ * The same second car, for the same measured reason — see the long note on
+ * `SC_SIGNAL_DEAD_CONFLICT_2`, which carries the sweep table for BOTH drills.
+ *
+ * On sxf-v1 the hole was even wider: the shipped single-car staging resolves
+ * NOTHING at 40 км/ч and above, so `mobile-wrong`'s 59 км/ч run past a flashing
+ * amber collected the whole of «0 наказателни точки … чисто каране без нито
+ * едно нарушение». With this car at −46 m the same drive is billed
+ * FAILED_TO_YIELD (10 т.) and the careful drive keeps its commendation.
+ *
+ * −46 IS INSIDE THE ARM, DELIBERATELY. sxf-v1's east arm is 90 m and
+ * `SC_SIGNAL_FLASHING_CONFLICT`'s own hold (−90) is already pinned to arc 0 by
+ * `clampArc` — the note above says so at length. 46 is 44 m short of that end,
+ * so this car is staged by arithmetic and not by clamp, 18.3 m back of its own
+ * 27.73 m stop line and 29 m short of `sx-spawn-east` at x = 75.
+ */
+export const SC_SIGNAL_FLASHING_CONFLICT_2: PriorityFromRightSpec = {
+  ...SC_SIGNAL_FLASHING_CONFLICT,
+  id: "sc-sflash-conflict-2",
+  actor: {
+    ...SC_SIGNAL_FLASHING_CONFLICT.actor,
+    hold: { nodeIndex: 1, offsetM: -46 },
+    colorIndex: 2,
+  },
+};
+
 export const SC_SIGNAL_FLASHING: ScenarioSpec = {
   id: "sc-signal-flashing",
   family: "signals",
@@ -470,7 +604,14 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
       textBg:
         "Огледай наляво и НАДЯСНО. Кола отдясно има предимство — спри и я изчакай да премине изцяло, преди да продължиш.",
     },
-    { n: 5, textBg: "Когато пътят е чист, премини правó напред и продължи на север." },
+    // THEO-4 for SC_SIGNAL_FLASHING_CONFLICT_2 — same sentence as the
+    // dead-signal drill, because it is the same duty.
+    {
+      n: 5,
+      textBg:
+        "Не тръгвай в мига, в който първата кола отмине — погледни пак надясно: зад нея може да идва втора. Чакаш, докато пътят е чист.",
+    },
+    { n: 6, textBg: "Когато пътят е чист, премини правó напред и продължи на север." },
   ],
   success: [
     {
@@ -518,16 +659,17 @@ export const SC_SIGNAL_FLASHING: ScenarioSpec = {
       "Мигащото жълто често се приема погрешно за „почти зелено“ и водачите влизат с инерция. Затова там се случват страничните сблъсъци — точно когато никой не очаква да отстъпи. Повишеното внимание и пропускането на идващия отдясно превръщат капана в безопасно преминаване.",
     lawRef: "ППЗДвП светлинни сигнали за регулиране на движението",
     examinerBg:
-      "Изпитващият гледа: намаляване и готовност за спиране при мигащо жълто, оглеждане наляво-надясно и реално пропускане на идващия отдясно. Преминаване с непроменена скорост, все едно е зелено, е опасна грешка.",
+      "Изпитващият гледа: намаляване и готовност за спиране при мигащо жълто, оглеждане наляво-надясно и реално пропускане на идващия отдясно. Преминаване с непроменена скорост, все едно е зелено, е опасна грешка. Пропускането важи за всяка кола отдясно, не само за първата — затова се гледа и повторното оглеждане, преди да потеглиш.",
   },
   levels: [
-    { level: 1 },
-    { level: 2 },
-    { level: 3 },
-    { level: 4, vehicleStart: "cold" },
+    // Every rung — see SC_SIGNAL_DEAD's ladder for the reason.
+    { level: 1, stagedAdd: [SC_SIGNAL_FLASHING_CONFLICT_2] },
+    { level: 2, stagedAdd: [SC_SIGNAL_FLASHING_CONFLICT_2] },
+    { level: 3, stagedAdd: [SC_SIGNAL_FLASHING_CONFLICT_2] },
+    { level: 4, vehicleStart: "cold", stagedAdd: [SC_SIGNAL_FLASHING_CONFLICT_2] },
     // L5 «Усложнени» — the complication kit (scenario/complications.ts):
     // the delta AND the instructor's line that explains it, authored together.
-    l5BusyStreet(),
+    { ...l5BusyStreet(), stagedAdd: [SC_SIGNAL_FLASHING_CONFLICT_2] },
   ],
   staged: [SC_SIGNAL_FLASHING_CONFLICT],
   // The LIVE half of the recorder's dial (doc 62 S1 #18 — no yellow blink in

@@ -225,8 +225,19 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     { n: 1, textBg: "Потегли по улицата — напред има неохраняем жп прелез (знак А35 и Андреевски кръст), без бариери и без светлини." },
     { n: 2, textBg: "Намали отрано: на неохраняем прелез ТИ си бариерата — никой друг няма да спре влака." },
     { n: 3, textBg: "Спри напълно на стоп-линията преди релсите — колелата неподвижни, не „почти спрях“." },
-    { n: 4, textBg: "Огледай се в двете посоки по линията — наляво и надясно, докъдето стига погледът." },
-    { n: 5, textBg: "Премини решително и без колебание — върху релсите не се спира никога — и продължи до края." },
+    // STEP 4 USED TO END AT «докъдето стига погледът» AND STEP 5 BEGAN «Премини
+    // решително» — look, then go, with nothing in between. On a drill that
+    // STAGES A 34.4 m CONSIST. See RXU_TRAIN_HOLD_M and
+    // `rail-cross-when-clear.test.ts` §1: the ritual this ladder asks for puts
+    // the bonnet on the band at t ≈ 8.9–11.9 s after the train's release ring,
+    // and the consist covers that exact strip of rail from 8.70 to 11.74 s. The
+    // instruction to look was never joined to an instruction to ACT on what was
+    // seen, so a student who performed the drill perfectly was told to cross
+    // into a moving train (sweep 161 04-t088s → 04-t093s). Requirement zero
+    // (doc 64 THEO-4): the decision the looking is FOR is now stated, and the
+    // order to cross is conditional on the answer.
+    { n: 4, textBg: "Огледай се в двете посоки по линията. Идва ли влак — оставаш зад стоп-линията, докато не отмине ИЗЦЯЛО." },
+    { n: 5, textBg: "Чак когато линията е чиста, премини решително — върху релсите не се спира никога — и продължи до края." },
   ],
   success: [
     {
@@ -246,7 +257,41 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     },
     {
       id: "sc-rxu-finish",
-      titleBg: "Премини прелеза и стигни края на отсечката",
+      // WAS «Премини прелеза и стигни края на отсечката» — an ORDER TO ENTER,
+      // and the banner that carries it is promoted the instant the standstill
+      // disc above trips. sweep 161 `sc-rx-unguarded/mobile-right`: 04-t088s
+      // shows the car at 0 км/ч on the СТОП line with «✓ Спри напълно…» and a
+      // train filling the windscreen; 04-t093s, five seconds later, shows this
+      // banner over the sleepers with the consist's wheel a car's width away.
+      // The steered re-drive prints the same beat in words
+      // (`.audit-frames/rebase/frames/sc-rx-unguarded__mobile-right/run.log`,
+      // 04-t073s ✓ → 04-t078s «Задача 2/2 Премини прелеза…» → 04-t089s −10
+      // «Спиране върху железопътните релси»).
+      //
+      // WHY THE REMEDY IS TO STOP ORDERING RATHER THAN TO ADD «когато е чисто»
+      // — ON THIS MAP, AND THE REASON HAS BEEN CORRECTED (verifier 2026-08-23).
+      // What stood here was „`SimTick` has no field for either", and that is
+      // FALSE and must not be reused: `SimTick` declares `railBarred`
+      // (rules/types.ts) and `stepReachZone(params, prev, tick: SimTick)` is
+      // handed the whole tick — `lessons/engine.ts` calls `stepObjective(
+      // current.params, before, tick, ctx)` with the same object the rule
+      // engine grades. (This family has been wrong in exactly this direction
+      // before: doc 88 §2.6 O3 recorded the lamp channel as unreachable, and
+      // `objectives.ts` „THE CHANNEL WAS NEVER BLIND" is the correction.)
+      // WHAT IS TRUE IS NARROWER, AND IT IS ENOUGH FOR THIS ROW: an UNGUARDED
+      // span never sets `railGuarded`/`railBarred` at all (world/__tests__/
+      // rail-districts.test.ts, „an unguarded span never sets railGuarded /
+      // railBarred"), and the TrainPassRunner emits ZERO events by construction
+      // (orchestrator/runners.ts, „the train runs its line to the far side; no
+      // events emitted"). On rx-unguarded-v1 there is genuinely nothing on the
+      // tick to read, so a conditional
+      // title would be a ✓ certifying a condition nobody measured, which is the
+      // certificate `rail-stop-gate-truth.test.ts` §2b retired «след вдигането»
+      // for. A banner that can only prove ARRIVAL may only claim arrival; the
+      // disc is unchanged and `done` is bit-identical. The order to cross moves
+      // to instruction 4–5, where it can carry its condition, and the duty
+      // keeps its grader in the rule engine's rail arms.
+      titleBg: "Стигни края на отсечката отвъд прелеза",
       params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
     },
   ],
@@ -275,10 +320,10 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
     whenBg:
       "На всеки неохраняем жп прелез — знак А35 „Железопътен прелез без бариери“ и Андреевският кръст. Най-често по селски и второстепенни пътища, точно където видимостта е лоша и никой не очаква влак.",
     whyBg:
-      "Катастрофите на прелез са редки, но почти винаги смъртоносни — влакът не може да спре (спирачният му път е над километър) и не може да завие. На неохраняемия прелез никой не пази вместо теб: пълното спиране и двойното оглеждане са единствената бариера, а решителното преминаване гарантира, че няма да останеш върху релсите.",
+      "Катастрофите на прелез са редки, но почти винаги смъртоносни — влакът не може да спре (спирачният му път е над километър) и не може да завие. На неохраняемия прелез никой не пази вместо теб: пълното спиране и двойното оглеждане са единствената бариера. Оглеждането обаче струва нещо само ако действаш според видяното: видиш ли влак, изчакваш зад стоп-линията, докато отмине ИЗЦЯЛО, и чак тогава преминаваш решително — така няма да останеш върху релсите.",
     lawRef: "ЗДвП чл. 51–53",
     examinerBg:
-      "Изпитващият следи ритуала на прелеза: навременно намаляване, ПЪЛНО спиране преди релсите, оглеждане в двете посоки и решително преминаване без спиране върху коловоза. Преминаване без спиране или спиране върху релсите е опасна грешка от прекратяващия клас.",
+      "Изпитващият следи ритуала на прелеза: навременно намаляване, ПЪЛНО спиране преди релсите, оглеждане в двете посоки, изчакване на приближаващ влак до пълното му отминаване и решително преминаване без спиране върху коловоза. Преминаване без спиране, навлизане пред идващ влак или спиране върху релсите е опасна грешка от прекратяващия клас.",
   },
   levels: [
     { level: 1 },
@@ -367,7 +412,38 @@ export const SC_RX_GUARDED: ScenarioSpec = {
       // billed RAIL_CROSSING_VIOLATION "entered-barred" for crossing while the
       // arm was down ([0, 40) of 90 s). Params untouched — `done` is
       // bit-identical; the lift keeps its grader in the rule engine.
-      titleBg: "Премини прелеза и стигни края на отсечката",
+      //
+      // …AND THE SAME ROW AGAIN, ONE ROUND LATER: „say less" was right about
+      // the CLAIM and left the IMPERATIVE standing, and the imperative is the
+      // half the frames caught. `.audit-frames/wave-c/frames/
+      // sc-rx-guarded__pc-right/04-t076s.png` carries the coach line
+      // «Бариерите са вдигнати напълно… премини решително» over a red-and-white
+      // boom lying across the carriageway, and this banner is what the student
+      // is holding six seconds before the −10 «Влизане на прелез при спусната
+      // бариера» at 04-t082s. The steered re-drive banks «✓ Изчакай зад
+      // стоп-линията пред бариерата» at 1:50 and is billed the barred entry at
+      // 1:56 — the product ordered the crossing while its own arm was down. A
+      // disc that can only prove ARRIVAL now claims only arrival, and the order
+      // (with its condition, «Едва след ПЪЛНОТО вдигане…») stays at
+      // instruction 4, where it is a sentence rather than a certificate.
+      //
+      // AND ON THIS MAP THE RETITLE IS ONLY HALF — THE DEBT, NAMED (verifier
+      // 2026-08-23). Unlike rx-unguarded-v1, a GUARDED span HAS the channel:
+      // `worldRuntime` sets `tick.railBarred` from this template's own
+      // timetable, and that is the very field `rules/engine.ts` bills the −10
+      // «Влизане на прелез при спусната бариера» off — the card in the frame.
+      // The evaluator already owns the shape to spend it: `lessons/objectives
+      // .ts` `ReachZoneWitnessDemands.requireControllerProceed` landed
+      // 2026-08-19 as „the third demand, and the only one that is not a state
+      // AT the mark", for the identical defect on sc-sig-controller-postures
+      // («Премини кръстовището, когато позата разреши посоката ти» ticking on
+      // the two drives billed CONTROLLER_SIGNAL_VIOLATED). So this disc CAN be
+      // taught to refuse while the arm is down — and until it is, this drill's
+      // own two ❌ demos still complete it at 33.4 s and 46.9 s on drives
+      // convicted of entering barred. OWNER: `lessons/objectives.ts` (a
+      // `requireRailClear` demand reading `tick.railBarred`), not this file,
+      // which may only stop the banner from ORDERING what it cannot see.
+      titleBg: "Стигни края на отсечката отвъд прелеза",
       params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
     },
   ],
@@ -515,7 +591,15 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
       // (sc-rxtl-turn, sc-rxti-clear) and once next door (templates-rail2
       // sc-rxq-cross). The disc proves arrival at the far end of the section;
       // that is now all it says. Params untouched — `done` is bit-identical.
-      titleBg: "Премини прелеза и стигни края на отсечката",
+      // The IMPERATIVE went the same way one round later (see sc-rxg-finish):
+      // this banner is promoted by a standstill disc that cannot see the arm,
+      // so on the drill whose whole subject is an arm coming DOWN it could be
+      // published mid-descent. It names the destination now; the order to cross
+      // lives at instruction 4 with «Едва след ПЪЛНОТО вдигане…» attached.
+      // rx-drop-v1 is a GUARDED span, so `tick.railBarred` is live here too and
+      // the same unpaid half applies — see sc-rxg-finish for the demand this
+      // gate is owed and who owns it.
+      titleBg: "Стигни края на отсечката отвъд прелеза",
       params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
     },
   ],

@@ -69,6 +69,13 @@ const REPAIRED = new Set([
   "platform/src/modules/sim/runtime/district.ts",
   "platform/src/modules/sim/lessons/scenario/templates-roundabout.ts",
   "platform/src/modules/sim/traffic/staged.ts",
+  // round 5
+  "platform/src/modules/sim/runtime/surface.ts",
+  "platform/src/modules/sim/rules/catalog.ts",
+  "platform/src/modules/sim/hud/SessionEndScreen.tsx",
+  "platform/src/modules/sim/rules/scoring.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-sp.ts",
+  "platform/src/modules/sim/rules",
 ]);
 
 const open = loadOpenFindings();
