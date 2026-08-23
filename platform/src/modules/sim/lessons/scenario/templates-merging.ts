@@ -848,18 +848,26 @@ const MGB_END_Y = 400;
  * lessons/objectives.ts can consume a staged outcome except emergencyStop's
  * (`stagedEventId`), which is the same open row templates-following.ts records
  * against sc-fc-cutter — so the tick cannot be made CONDITIONAL on the
- * pull-out. What it can be, and now provably is, is GEOMETRICALLY LATE: the rig
- * is fully across into the general lane with the player at
+ * pull-out. What it can be is GEOMETRICALLY LATE: the rig is fully across into
+ * the general lane with the player at
  *
- *     5 км/ч 145.4 · 8 147.4 · 12 150.1 · 15 152.2 · 18 154.2 · 25 158.8 · 30 161.9
+ *     5 км/ч 145.4 ·  8 147.4 · 12 150.1 · 15 152.2 · 18 154.2 · 25 158.8
+ *    28 160.7 · 30 161.9 · 32 163.4 · 32.5 164.0 · 35 166.0 · 38 169.5 · 40 172.4
  *
- * and the gate's disc does not open until y = 168 − 5 = 163. Every pace the
- * gate's own 30 км/ч cap permits therefore earns the tick with the bus already
- * in front of the windscreen; the tightest margin in the band is 1.1 m, at the
- * 30 км/ч ceiling. __tests__/merging-route-vs-staged.test.ts pins it and
- * reddens if the disc is pulled back toward the bay or `cutRampSec` is
- * stretched. The residue is only the STOPPED player above, who reaches no gate
- * at all.
+ * THE LADDER ABOVE 30 IS NOT ACADEMIC, and reading it as such is what left this
+ * row open for a round. The four rows past the authored cap are the ones the
+ * COMPILED gate admits: the L1 rung widens `maxSpeedKmh` 30 → 35 and prints it
+ * in the world («дръж под 35 км/ч» on the gate bar, photographed), and it
+ * widens the radius too, so the disc opened EARLIER on exactly the rung whose
+ * cap opens it LATER. Measured on `compileScenario`, at the shipped y 168 /
+ * radius 5 the disc opened at y 160.5 (L1) / 161.75 (L2) / 163.0 (L3-5) while
+ * the rig finished crossing at 166.0 / 164.0 / 161.9 — i.e. both aided rungs
+ * could issue the чл. 67 certificate BEFORE the bus was in the lane, by up to
+ * 5.5 m. `sc-mgb-ease` below is now at y 178 radius 4 and every rung clears by
+ * ≥ 6 m; __tests__/merging-compiled-gate-truth.test.ts checks the COMPILED gate
+ * at every rung the template ships, and __tests__/merging-route-vs-staged
+ * .test.ts still checks the authored one. The residue is only the STOPPED
+ * player above, who reaches no gate at all.
  */
 const MGB_BUS: CutInLeadCarSpec = {
   id: "sc-mgb-bus",
@@ -917,6 +925,39 @@ const MGB_BUS: CutInLeadCarSpec = {
  *   - FOLLOWING_TOO_CLOSE, from the gap he keeps once the bus is in front (the
  *     shipped cut-in pipeline, with its followRecoveryRateMps guard keeping the
  *     honest ease innocent).
+ *
+ * SWEEP 161, THE HALF THIS FILE CANNOT REACH — „THERE IS NO BUS AND THERE IS NO
+ * СПИРКА", and it is worth being exact about what the auditor saw, because the
+ * row reads as one defect and is two. The rig IS staged and IS on screen:
+ * zoomed out of pc-right/03-ready.png it is a small WHITE BOX 125 m up the бус
+ * лента, indistinguishable at that distance from the parked cars beside it —
+ * which is why the sheet records «the only large vehicle in shot is a white box
+ * truck». So:
+ *
+ *   1. THE RIG IS NOT A BUS. `VehicleProfile` (traffic/types.ts) has car, van,
+ *      truck, emergency, tram, train, cyclist, childCyclist, animal — and no
+ *      BUS. `profile: "truck"` below is the largest body that exists, chosen
+ *      for that reason and labelled as a proxy; the clip plan even names it
+ *      «Камион, който се вклинява отпред». A drill whose whole legal content is
+ *      „автобус ОТ РЕДОВНА ЛИНИЯ" (чл. 67 applies to nothing else) cannot teach
+ *      recognition from a box van. THE ASK is a `"bus"` member of
+ *      `VehicleProfile` + its rig in the fleet builder (~12 m, city livery,
+ *      ADR-001 fictional) + its row in VEHICLE_PROFILE_LENGTH_M /
+ *      VEHICLE_PROFILE_WIDTH_M; one word changes here once it exists. Nothing
+ *      about grading moves: the profile is data + presentation only.
+ *   2. THERE IS NO СПИРКА TO STAND AT. mg-busstop-v1 carries the bay ONLY as
+ *      `meta.scenario.busBayY` (130…176) — no shelter, no М-marking, no pole,
+ *      and its one `zones` entry is the full-length busLane. Nothing downstream
+ *      has a stop to draw, so instruction 2's «на спирката стои автобус» points
+ *      at bare tarmac. THE ASK is tools/maps/gen_mg_busstop.mjs (plus the two
+ *      committed copies it writes) or `HELD_SCENERY["sc-merge-bus-pullout"]` in
+ *      scene/scenarioSceneryProps.ts, exactly the seam sc-merge-from-property
+ *      records for its бензиностанция.
+ *
+ * Both are OUTSIDE this file and neither moves a graded metre. What WAS inside
+ * it — the floor that kept the rig in the бус лента at every taught pace, and
+ * the compiled gate that certified the yield before the rig had moved — is
+ * fixed above and below, with the geometry re-measured at every rung.
  */
 export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
   id: "sc-merge-bus-pullout",
@@ -952,12 +993,110 @@ export const SC_MERGE_BUS_PULLOUT: ScenarioSpec = {
     {
       id: "sc-mgb-ease",
       titleBg: "Намали, за да пропуснеш потеглящия автобус",
-      // THE чл. 67 CONTRACT, made graded. Radius 5 < the 8.125 m lane pitch, so
-      // it is satisfiable ONLY from the general lane; maxSpeedKmh 30 is what
-      // „намали и при необходимост спри" means in numbers on a 50 street. The
-      // forcing-past demo passes this y at ~48 and misses it outright — and
-      // objectives advance sequentially, so its run stops here.
-      params: { kind: "reachZone", x: MGB_X_GENERAL, y: 168, radiusM: 5, maxSpeedKmh: 30 },
+      // THE чл. 67 CONTRACT, made graded. maxSpeedKmh 30 is what „намали и при
+      // необходимост спри" means in numbers on a 50 street. The forcing-past
+      // demo passes this y at ~48 and misses it outright — and objectives
+      // advance sequentially, so its run stops here.
+      //
+      // MOVED 168 → 178 AND NARROWED 5 → 4, 2026-08-23, because the geometry
+      // guarantee this gate hangs on was proved against the AUTHORED numbers
+      // and shipped as the COMPILED ones. The ladder is not cosmetic here —
+      // this is the gate AS IT SHIPPED, at y 168 with the authored radius 5:
+      //
+      //     rung   radius        cap        disc opened at  rig fully in lane
+      //     L1     5 → 7.5     30 → 35        y 160.5           y 166.0
+      //     L2     5 → 6.25    30 → 32.5      y 161.75          y 164.0
+      //     L3-5   5           30             y 163.0           y 161.9
+      //
+      // (radii from `compileScenario`; the right-hand column re-measured on
+      // mg-busstop-v1 through `createTrafficSystem` + the production
+      // CutInLeadCarRunner at the rung's own compiled cap — the ladder in the
+      // MGB_BUS block above, extended to 32 → 163.4 and 35 → 166.0.)
+      //
+      // So on BOTH aided rungs — including L1, the rung the audit photographed
+      // («Ниво 1 — Пълна помощ») and the rung a beginner starts on — the tick
+      // «Намали, за да пропуснеш потеглящия автобус» was earnable up to 5.5 m
+      // BEFORE the bus had finished coming out of the бус лента. The world even
+      // prints the pace that does it: the L1 gate bar reads «дръж под 35 км/ч»
+      // (photographed, .audit-frames/sweep161/sc-merge-bus-pullout/pc-right/
+      // 05-stopped.png), and 35 км/ч is exactly the row with the worst margin.
+      // That is doc 87 B58's class — a student who obeys the number the world
+      // shows him collects a certificate for an event that has not happened.
+      //
+      // WHY y = 178. The binding rung is L1: the rig is fully across at y 166.0
+      // at that rung's 35 км/ч cap, and one player-car length (4.1 m — the
+      // fleet length in traffic/types.ts) past it is 170.1, so the disc's near
+      // edge must sit at or beyond that. It now does, at every rung — measured
+      // on the COMPILED gates, which is the whole lesson of this row:
+      //
+      //     rung   radius   cap    disc opens at   rig in lane   margin
+      //     L1     4 → 6     35       y 172.0        y 166.0      +6.0 m
+      //     L2     4 → 5     32.5     y 173.0        y 164.0      +9.0 m
+      //     L3-5   4         30       y 174.0        y 161.9     +12.1 m
+      //
+      // WHAT THAT TABLE DOES AND DOES NOT BUY — the adversarial re-measurement
+      // of this very fix, 2026-08-24, written here so the row is not closed on
+      // the strength of the three lines above. Every «rig in lane» number in
+      // this file, including the ones the shipped guarantee is derived from, is
+      // measured on a CONSTANT-SPEED approach. The rig is not on a clock: it is
+      // rubber-banded to the player (`matchPlayer`, paceAheadM 30), its cut
+      // fires when IT passes y 176, and the glide then takes `cutRampSec` 2.5 s
+      // — during which the player travels at whatever pace he is holding. So
+      // «when is the bus in your lane» is a function of the player's whole
+      // speed history, not of one number, and the constant-speed family is the
+      // one where the two effects cancel. Driven through the same production
+      // stack (CutInLeadCarRunner + parseObjectiveParams/stepObjective) on the
+      // drive this drill's own instruction 4 teaches — hold the posted 50, then
+      // ease to the gate's printed cap when the rig lights its blinker:
+      //
+      //     rung  ease            tick at   rig in lane   margin
+      //     L1    50→35 @2.5 m/s²  y 172.2     y 172.9     −0.7 m
+      //     L1    50→35 @1.5 m/s²  y 172.3     y 175.2     −2.9 m
+      //     L1    50→35 @1.0 m/s²  y 174.2     y 178.1     −3.9 m
+      //     L2    50→32.5 @1.5     y 173.1     y 174.1     −0.9 m
+      //
+      // i.e. on the two AIDED rungs the чл. 67 tick can still precede the
+      // pull-out by up to ~4 m. That is an order of magnitude better than what
+      // shipped (the same four rows at y 168 / radius 5 read −12.3, −14.6,
+      // −13.0 and −11.1 m) and the constant-speed family is genuinely closed —
+      // but the row is NOT «every rung clears by ≥ 6 m», and it may not be
+      // retired on that sentence.
+      //
+      // AND IT CANNOT BE CLOSED FROM HERE. The far side is pinned at y 185.98
+      // (see below) and the near side has to clear y 178.1 + 4.1 = 182.2 on the
+      // worst taught ease, so with the L1 widening (×1.5) the disc would have to
+      // satisfy y − 1.5r ≥ 182.2 AND y + 1.5r < 185.98 — r < 0.63, a gate no
+      // 30 Hz tick can sweep reliably. The lever this actually needs is the one
+      // the MGB_BUS block above already names as missing: an objective that can
+      // read a staged OUTCOME (or an arrival-keyed release on the cut), which
+      // lessons/objectives.ts cannot express today. Next lane: route it there,
+      // do not re-tune this integer.
+      //
+      // WHY radius 4 AND NOT 5, which is the FAR side of the same disc and was
+      // measured on the committed recording: `mistake-force-past.trace.json`
+      // ends its run STANDING at y = 185.98 (0 км/ч, after the contact). A
+      // stopped car satisfies any speed cap, so if that pose falls inside the
+      // disc the forcing-past demo — the one card whose whole point is that it
+      // reaches no gate — collects the чл. 67 tick after the crash. At radius 5
+      // the L1 disc reaches y = 185.5 and clears it by 0.48 m; at radius 4 the
+      // compiled L1 disc reaches 184.0 and clears it by 1.98 m (L2 by 2.98,
+      // L3-5 by 3.98). 4 is also the largest AUTHORED radius that clears the
+      // бус лента: its near edge is 12.1875 − 4.0625 = 8.125 from the
+      // centreline and this disc is centred at 4.0625, so an authored radius
+      // ≥ 4.0625 reaches into it (the shipped 5 reached 0.94 m in).
+      //
+      // SAID EXACTLY, because the compiled radius is the one the student meets
+      // and this file's whole thesis is that the two are different: the LADDER
+      // still reaches into the бус лента — L1's compiled 6 by 1.94 m and L2's
+      // 5 by 0.94 m (the old authored 5 reached 3.44 m in at L1). A student who
+      // wrongly drives the бус лента, which instruction 1 tells him not to, can
+      // therefore still satisfy «намали» from inside it on the two aided rungs.
+      // Making that claim true at EVERY rung needs an authored radius ≤ 2.70
+      // (2.70 × 1.5 = 4.06), which is a separate measured change — it moves the
+      // near edge and would have to be re-derived against both tables above.
+      // What is pinned in __tests__/merging-compiled-gate-truth.test.ts is the
+      // AUTHORED half, and the suite says so in the test's own name.
+      params: { kind: "reachZone", x: MGB_X_GENERAL, y: 178, radiusM: 4, maxSpeedKmh: 30 },
     },
     {
       id: "sc-mgb-behind-bus",
@@ -1285,12 +1424,37 @@ const MFP_STREAM: OncomingStreamSpec = {
  * the same sheet. That drive's own instrument header reads «TRACKING: BLIND —
  * ribbon seen on 25/74 moving samples (34 %) … treat it as an unsteered
  * drive», i.e. it left the property in a straight line and never made the right
- * turn the lesson routes; the static-object bill is the far kerb. Nothing here
- * is authorable — but the FAILED_TO_YIELD at 1:30 is the product working: the
- * derived Б2 grades `conflictNear` over PRIORITY_CONFLICT_RADIUS_M at the
+ * turn the lesson routes; the static-object bill is the far kerb. That contact
+ * is not authorable — but the FAILED_TO_YIELD at 1:30 is the product working:
+ * the derived Б2 grades `conflictNear` over PRIORITY_CONFLICT_RADIUS_M at the
  * instant the line is crossed, and on a live boulevard the ambient flow is
  * within 26 m of the node for most of a minute (the same sheet excludes 122 s
  * as «чакане на предимство»).
+ *
+ * „NOTHING HERE IS AUTHORABLE" STOOD IN THAT PARAGRAPH FOR A ROUND AND WAS
+ * WRONG — it was read off ONE surface. The finding's first clause («its
+ * pedestrian objective ticked green in the HUD moments earlier») is a claim
+ * about the ROUTE TASK, and the pc sheet above cannot test it because that
+ * drive genuinely yielded (the ★ at 1:27 says so). THE MOBILE SHEET CAN, and
+ * it says the opposite thing on the same run: «✓ Спри пред тротоара и пропусни
+ * пешеходеца 0:16» alongside «✗ Непропускане на пешеходец −10 изпитни т.
+ * ОПАСНА ГРЕШКА» and «! пешеходец — на 0.0 м 0:06», with NO pedestrian
+ * commendation (.audit-frames/sweep161/sc-merge-from-property/mobile-right/
+ * run.log). One act, two channels, opposite verdicts — and the green tick is
+ * the one printed on the student's HUD while the walker is at the bonnet
+ * (pc-right/05-stopped.png shows exactly that pose: the car at rest, the
+ * зебра under the nose, the walker on the paint, «✅ Спри пред тротоара и
+ * пропусни пешеходеца» in the corner).
+ *
+ * THE CAUSE WAS THE GATE'S OWN GEOMETRY and it is fixed below on
+ * `sc-mfp-walk-yield`: the тротоар is 6 m deep and the acceptance disc reached
+ * 2.5–3.75 m INTO it, so «спри ПРЕД тротоара» was earnable from on top of the
+ * pavement — and, because `reached` latches on the swept disc while the speed
+ * cap can be met on any later frame, earnable AFTER driving through the walker.
+ * `acceptBeforeMarkM` now ends the acceptance at the paint at every rung. What
+ * that does NOT fix, stated so it is not claimed: the walker duty itself is
+ * still graded only by the rule engine, and the unsteered contact above is
+ * still the harness.
  */
 export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
   id: "sc-merge-from-property",
@@ -1337,12 +1501,97 @@ export const SC_MERGE_FROM_PROPERTY: ScenarioSpec = {
     {
       id: "sc-mfp-walk-yield",
       titleBg: "Спри пред тротоара и пропусни пешеходеца",
-      // THE чл. 25, ал. 2 CONTRACT, made graded. Pinned 3.5 m before the band
-      // on the exit lane, capped at 5 km/h: satisfiable ONLY by a car that
-      // actually came to rest short of the pavement. The walk-through demo
-      // passes this x at 25 km/h and misses it outright — and objectives
-      // advance sequentially, so its run stops here.
-      params: { kind: "reachZone", x: 37.5, y: MFP_Y_EXIT, radiusM: 3, maxSpeedKmh: 5 },
+      // THE чл. 25, ал. 2 CONTRACT, made graded. Pinned on the exit lane and
+      // capped at 5 km/h: satisfiable ONLY by a car that actually came to rest
+      // short of the pavement. The walk-through demo passes this x at 25 km/h
+      // and misses it outright — and objectives advance sequentially, so its
+      // run stops here.
+      //
+      // SWEEP 161 — «СПРИ ПРЕД ТРОТОАРА» WAS EARNABLE FROM ON TOP OF IT, and
+      // that is the audit's own row: mobile-right ticks «✓ Спри пред тротоара и
+      // пропусни пешеходеца 0:16» on the SAME sheet that convicts
+      // «Непропускане на пешеходец −10 изпитни т. ОПАСНА ГРЕШКА» and logs a
+      // near miss «пешеходец — на 0.0 м 0:06» (.audit-frames/sweep161/
+      // sc-merge-from-property/mobile-right/run.log). Two channels, opposite
+      // verdicts, one act — and the route task is the one the student reads.
+      //
+      // THE ARITHMETIC, because "3.5 m before the band" (what this comment used
+      // to say) measured to the band's CENTRE and the pavement is 6 m deep:
+      // `mgp-x-walk` sits at x = 34 and the тротоар is painted
+      // ZEBRA_LENGTH_M = 6.0 m along the road axis (world/builders/constants
+      // .ts), so the band runs x ∈ [31, 37] and its NEAR edge — the one
+      // instruction 2 means by «спри ПРЕД тротоара, не върху него» — is x = 37.
+      // The bare disc reaches:
+      //
+      //     authored radius 3  →  x ≥ 34.5   (2.5 m INSIDE the band)
+      //     L2 ladder    3.75  →  x ≥ 33.75
+      //     L1 ladder    4.25  →  x ≥ 33.25  (3.75 m in — at the far kerb)
+      //
+      // …so a car that crept onto the pavement and stopped there was told it
+      // had stopped in front of it, and a car that drove THROUGH the walker and
+      // then crawled to a halt collected the same tick (`reached` latches on
+      // the swept disc and `capMet` can be earned on any later frame inside it).
+      //
+      // acceptBeforeMarkM ENDS THE ACCEPTANCE AT THE PAINT, exactly as
+      // `sc-mfp-stop-line` below already does at its Б2: signed −(37.5 − 37.0),
+      // i.e. the mark stands 0.5 m in front of the band's near edge and credit
+      // stops there. The ladder carries the flag through untouched (params.ts),
+      // so the pavement is outside the acceptance at EVERY rung — L1 included,
+      // which is the rung the audit photographed and the rung a 17-year-old
+      // starts on.
+      //
+      // AND IT REFUSES NOBODY WHO DRIVES IT RIGHT — measured on the committed
+      // recording rather than argued: `shadow-correct.trace.json` decelerates
+      // 40.51 → 37.54 and comes to REST at x = 37.54, which is 0.54 m on the
+      // approach side of the new boundary; it first crosses the 5 km/h cap at
+      // x = 37.70, also inside. Both the halt-grace capsule and the plain disc
+      // still credit it. A boundary any tighter than the paint (e.g. one that
+      // demanded the car's NOSE clear of the band, x ≥ 39.05) would fail the
+      // very drive the lesson tells the student to copy — that was measured
+      // too, and is why the cut is at the paint and not at the bumper.
+      //
+      // WHAT THAT SENTENCE COSTS, RECORDED SO THE ROW IS NOT RETIRED ON IT
+      // (verifier, 2026-08-24). This gate reads the vehicle CENTRE — the
+      // chassis half-length is 2.02 m (collision/bodies.ts PLAYER_HALF_LENGTH_M;
+      // rules/types.ts calls the overhang «≈2.15 m» at stopOvershootCenterM), so
+      // a boundary at centre x = 37.0 admits a BONNET 2 m onto the тротоар. The
+      // shadow is exactly that car: resting centre x 37.54 ⇒ nose x ≈ 35.5,
+      // 1.5 m over the band the title says to stop in FRONT of. So the frame
+      // this row was filed from — pc-right/05-stopped.png, walker on the paint,
+      // ✅ in the corner — is a pose this fix still credits; what it now refuses
+      // is the mobile sheet's tick, the one earned AFTER driving through the
+      // walker. Half the row, and the honest half to claim.
+      //
+      // THE LEVER IS IN THIS FILE; THE BLOCKER IS NOT. `acceptBeforeMarkM:
+      // +1.55` (= −(37.5 − 39.05)) is the bumper-true boundary and parses fine —
+      // it fails only because `shadow-correct.trace.json` halts where it halts,
+      // and fitting the rule to the recording is backwards. The order is:
+      // re-record the shadow to stop at centre ≥ 39.05 (nose clear of x = 37),
+      // re-check `mistake-signal-and-go` (same halt, x 37.54), THEN move this
+      // number and the ladder rows in merging-compiled-gate-truth.test.ts.
+      // Until that happens the assertion «the taught halt at x 37.54 is still
+      // credited» is pinning a pose instruction 2 forbids.
+      //
+      // AND THE TWO-CHANNEL CONTRADICTION IS NARROWED, NOT REMOVED. This gate
+      // has no pedestrian channel at all — it certifies POSITION and SPEED, and
+      // its title promises «…И ПРОПУСНИ ПЕШЕХОДЕЦА», which it cannot measure
+      // (doc 86 D3). Driven through parseObjectiveParams/stepObjective at L1,
+      // L3 and L5: halt at x 41.5 / 40 / 38.5 / 37.54, stand two seconds, then
+      // drive straight over the band at 20 км/ч — the tick is earned at the
+      // halt and SURVIVES the crossing, at every rung. So the sheet can still
+      // print «✓ Спри пред тротоара и пропусни пешеходеца» beside «✗
+      // Непропускане на пешеходец»; what this fix removes is only the case
+      // where the tick is earned FROM ON the pavement or after it. Closing the
+      // rest means either a `stagedEventId`-style outcome arm on reachZone (the
+      // same missing lever MGB_BUS names) or a title this gate can keep.
+      params: {
+        kind: "reachZone",
+        x: 37.5,
+        y: MFP_Y_EXIT,
+        radiusM: 3,
+        maxSpeedKmh: 5,
+        acceptBeforeMarkM: -0.5,
+      },
     },
     {
       id: "sc-mfp-stop-line",

@@ -155,11 +155,29 @@
  *
  * IT IS THE POLL'S OWN CLOCK, NOT THE WALL'S, AND THAT DIRECTION IS DELIBERATE.
  * The scene must accumulate `TOUCH_HINT_POLL_MS` per DELIVERED tick rather than
- * read `Date.now()`, so that a backgrounded tab (where browsers throttle
- * intervals toward 1 Hz) or a paused lesson accumulates SLOWER than the wall and
- * the words outlive a screen nobody was looking at. Over-counting would delete
- * teaching; under-counting only leaves a card up on a stationary picture a
- * little longer.
+ * read `Date.now()`: a throttled interval accumulates SLOWER than the wall, and
+ * over-counting would delete teaching while under-counting only leaves a card up
+ * on a stationary picture a little longer.
+ *
+ * ⚠ THIS PARAGRAPH USED TO NAME TWO CASES IT DOES NOT COVER, AND BOTH ARE
+ *   CORRECTED RATHER THAN QUIETLY DROPPED, because a false reassurance in a file
+ *   this long is worse than no sentence at all.
+ *
+ *   „a backgrounded tab … accumulates SLOWER"  TRUE AND NOT ENOUGH. A tenth of
+ *      the rate still reaches 120 s after twenty minutes in a pocket, and no
+ *      sweep in this repo has ever backgrounded a tab to check the tenth. That
+ *      case is now answered where it belongs — `touchHintOnGlass` refuses a
+ *      document whose `visibilityState` is `"hidden"`, so the rate is zero
+ *      rather than merely assumed low.
+ *   „or a paused lesson"                        SIMPLY WRONG, and it was never
+ *      checked. `menuPaused` pauses PHYSICS (`LessonScene.tsx`,
+ *      `physicsPaused={paused || menuPaused}`); it does not touch the interval,
+ *      and the pause scrim is `z-20 bg-background` under a card that is `z-30`,
+ *      so the card stays painted and the clock would run at full wall rate. That
+ *      is left ALONE on purpose: on a pause screen this card is the most legible
+ *      it ever is — opaque backdrop, nothing moving — so time there really is
+ *      time in front of a reader. What was wrong was the reason given, not the
+ *      behaviour.
  *
  * ── AND THE TICK THIS FILE USED TO PRESCRIBE COUNTED TIME THE CARD WAS NOT ON
  *    THE GLASS. 174 OF 174 MOBILE DRIVES. ──────────────────────────────────────
@@ -301,27 +319,96 @@
  * PlayAreaStyles.tsx` from `modules/sim/hud/notifyColumn.ts`, and whether the
  * top-right corridor lands on the rear-view mirror is that file's question.
  *
+ * AND THAT QUESTION IS STILL PHOTOGRAPHED, SO IT IS RECORDED HERE RATHER THAN
+ * LEFT AS A HYPOTHETICAL. On the current build the card's remaining life is the
+ * `03-ready` window, measured over the 122 mobile runs of `.audit-frames/proof2`
+ * from their own frame mtimes (03-ready → first 04 frame): min 12.6 s · p50
+ * 13.9 · p90 15.1 · max 17.2. And on
+ * `proof2/frames/sc-rx-unguarded__mobile-right/03-ready.png` and
+ * `…/sc-maneuver-uturn__mobile-right/03-ready.png` it spends that window printed
+ * across the INTERIOR REAR-VIEW MIRROR, which is the surface sc-park-night's row
+ * was about and the one a student is meant to use in exactly this window, before
+ * moving off. The lifetime cannot answer it: this is the card at its shortest
+ * and at a standstill, which is the state the whole file argues FOR. Only the
+ * corner can, and the corner is `notifyColumn.ts`'s.
+ *
+ * AND THE MIRROR IS NOT THE ONLY OCCLUDER THE TWO MAJOR ROWS NAME. Both are
+ * recorded here rather than left in a closure note, because a row whose
+ * touch-hint half is closed reads like a closed row. Each of the two concedes
+ * that half in its own words — the card really does clear — and then names a
+ * DIFFERENT surface still covering the thing its lesson grades. Neither is this
+ * file's, and neither is `notifyColumn.ts`'s either:
+ *
+ *   sc-maneuver-uturn  the route pill «Следвай синята линия» is printed THROUGH
+ *                      «Л ОГЛЕДАЛО» — the left-mirror glance label, on the one
+ *                      manoeuvre graded on mirror glances. Still true on the
+ *                      current build: open
+ *                      `proof2/frames/sc-maneuver-uturn__mobile-right/04-t072s.png`
+ *                      and the pill's rounded right border cuts the «Л» while
+ *                      «линия» overprints «ОГЛЕДАЛО». The touch hint is long
+ *                      gone from that frame; only the occluder changed. The
+ *                      row's own scope line: the pill's placement.
+ *   sc-rx-unguarded    the WORLD label «Спри тук · спри — под 5 км/ч» at the
+ *                      approach is still half hidden — no longer by «РАЗБРАХ»
+ *                      and the teach panel, which did leave, but behind the
+ *                      Андреевски кръст sign and its mast, drawn across the
+ *                      plate. The row's own scope line: world-label placement,
+ *                      not the HUD corridor.
+ *
+ * Recorded by the adversarial verifier, 2026-08-24, from the rows' own „why"
+ * text and — for the uturn one — from the frame above, opened rather than
+ * quoted. A lifetime rule cannot move either of them; naming them is the only
+ * thing this file can honestly do with them.
+ *
  * AND IT IS NOT AN INPUT BLOCKER — THE CHARGE SHOULD BE DROPPED, NOT INHERITED.
  * Sweep 161 filed its two CRITICAL rows (sc-sp-harsh-brake, sc-speed-transition)
  * against this file on the theory that the card was „the most likely input
- * blocker" for a car that would not move. Two things refute it, and both are
- * checkable:
+ * blocker" for a car that would not move. THREE things refute it, and every one
+ * was opened rather than taken from the paragraph this one replaces:
  *
  *   the source   the card's container is `pointer-events-none` (`LessonScene
  *                .tsx`, `[data-hud="touch-hint"]`) and the only element on it
  *                that takes a pointer is the «РАЗБРАХ» pill — one 44 px control
  *                in the top-right corridor, nowhere near the thumb pads. A card
  *                that cannot receive a touch cannot swallow one.
- *   the frames   the premise was wrong anyway. Both cars moved. sc-sp-harsh-
- *                brake/mobile-right reads 20 км/ч at 04-t001s (and 12, 13, 18
- *                at t028/t059/t092); sc-speed-transition/mobile-right reads
- *                19 км/ч at 04-t002s. The finding generalised from three late
- *                frames that happened to read 0. Under the speed exit both
- *                cards are gone inside two seconds.
+ *   the frames   the premise was wrong anyway. Both cars moved, on the very
+ *                drives that filed the rows. `sweep161/sc-sp-harsh-brake/mobile-
+ *                right/04-t001s.png` reads 20 км/ч with the selector in D;
+ *                `sweep161/sc-speed-transition/mobile-right/04-t002s.png` reads
+ *                19 км/ч. Both were read off the cluster in the picture. The
+ *                findings generalised from later frames that happened to read 0
+ *                — a saw-tooth is not a stationary car.
+ *   the pill on  AND ONE OF THE TWO ROWS IDENTIFIED THE WRONG CARD. sc-speed-
+ *   the cited    transition cites `07-end` for „the first-run touch hint and its
+ *   frame        РАЗБРАХ pill are still on screen". Open it: the surface on that
+ *                frame is the BRIEFING — «ИНСТРУКЦИИ · Потегли по правата улица
+ *                … ↓ ОЩЕ 14 РЕДА», with «ПРОЧЕТИ» beside «РАЗБРАХ». This card's
+ *                own words are nowhere on it, and they could not be: the overlay
+ *                ladder (`PlayAreaStyles.tsx:1224`) sets `display: none` on
+ *                `[data-hud="touch-hint"]` precisely WHILE that line speaks. Two
+ *                different surfaces share one Bulgarian word for „got it", and
+ *                the row was written from the word.
+ *
+ * AND THE CURRENT BUILD SETTLES IT. `.audit-frames/proof2` (2026-08-23, the
+ * steered harness, HEAD 769bfd4): both lessons' mobile-right drives move from
+ * their first sampled frame — 13 and 19 км/ч at 04-t002s — and sc-sp-harsh-brake
+ * comes back ИЗДЪРЖАН. NOT AN ALL-CLEAR FOR THE LESSON: sc-speed-transition is
+ * still НЕЗАВЪРШЕН on that same build. Its car moves and this card is off the
+ * glass throughout, so whatever ends it early is somebody else's row — which is
+ * the whole point of the three refutations above, not a mitigation of them.
+ * Across ALL 122 mobile runs in that sweep the card's own words are painted at
+ * `03-ready` and at no other frame, 122 of 122; the speed exit takes it off the
+ * glass before the first driving frame everywhere.
+ *   Reproduce (the glob has no trailing slash on purpose: a star followed by a
+ *   slash would close this block comment):
+ *     for d in .audit-frames/proof2/frames/*mobile*; do awk '/^  \[[0-9]/{l=$1}
+ *       /· Ляв палец — волан/{print l}' "$d/run.log"; done | sort | uniq -c
  *
  * Whatever stops those two lessons finishing lives in the touch input path
- * (`TouchControls.tsx`) or the drive gate. It is not this card, and a lifetime
- * rule is not where it will be found.
+ * (`TouchControls.tsx`), the drive gate, or — on the sc-speed-transition frame
+ * above — in whatever left the briefing overlay standing with 14 unread lines at
+ * `07-end`, which is the overlay queue's question and not this card's. It is not
+ * this card, and a lifetime rule is not where it will be found.
  *
  * WHY THE FILE SITS HERE. Same reason as `sessionClock.ts` next door, in the
  * same words: importing `LessonScene.tsx` into a Node test drags in R3F, rapier
@@ -427,17 +514,18 @@ export const TOUCH_HINT_MAX_SHOWN_MS = 120_000;
  * `shownMs` is ACCUMULATED ON-GLASS POLL TIME. Two words are load-bearing and
  * each one is a separate refusal.
  *
- * POLL, not wall-clock: the scene accrues per DELIVERED tick, so time spent in a
- * backgrounded tab — where the interval is throttled toward 1 Hz — counts at
- * roughly a tenth of its real length, and the words survive a screen nobody was
- * watching.
+ * POLL, not wall-clock: the scene accrues per DELIVERED tick rather than reading
+ * `Date.now()`, so an interval the browser throttles cannot bank time it did not
+ * deliver.
  *
  * ON-GLASS, not mounted: `touchHintAccrue` advances only on ticks where the card
  * is actually painted. Every mobile lesson in the catalogue mounts this card
  * ~18 s before it is visible (arrival + briefing, `display: none` behind the
  * overlay ladder — the measurement is in the header), and every teach card
  * mid-drive hides it again. Counting that time would have made the ceiling fire
- * on a card the student had never been shown.
+ * on a card the student had never been shown. The same predicate is what refuses
+ * a backgrounded tab outright: throttling made that case slow, `visibilityState`
+ * makes it zero, and the difference is twenty minutes of pocket against never.
  *
  * The error this design admits is „the card stayed up longer than two minutes of
  * wall-clock on a picture that was not moving"; the error it refuses is „the
@@ -463,6 +551,34 @@ export function touchHintOutstayed(shownMs: number): boolean {
  * product should not hold two different opinions about whether a student can see
  * a card.
  *
+ * …WITH EXACTLY ONE DELIBERATE DIVERGENCE, AND IT IS NAMED HERE SO THE SENTENCE
+ * ABOVE STAYS TRUE. A HIDDEN DOCUMENT IS NOT GLASS. The harness photographs a
+ * foregrounded page and has no reason to ask; a phone does. When the student
+ * takes a call, switches app, or the screen locks, `visibilityState` goes
+ * `"hidden"` while every question `painted()` asks keeps answering YES — the
+ * computed styles are untouched and `getBoundingClientRect()` still returns the
+ * card's real box. So the harness's predicate, imported verbatim, would have
+ * counted a phone in a pocket as time in front of a reader, which is this file's
+ * one forbidden direction: a ceiling that fires on a card the student was never
+ * shown deletes the teaching outright.
+ *
+ * THE MITIGATION THE HEADER USED TO RELY ON IS A RATE, NOT A STOP, AND THE
+ * ARITHMETIC IS THE WHOLE ARGUMENT. „A backgrounded tab accumulates SLOWER than
+ * the wall" was the answer this file gave, and slower is not never: take the
+ * throttle at its most generous commonly-quoted figure, 1 Hz, and the 1 200
+ * ticks of `TOUCH_HINT_MAX_SHOWN_MS` still arrive after twenty minutes of a
+ * phone in a pocket. Nothing in this repo has ever measured what any engine
+ * actually does to this interval — no sweep backgrounds a tab — so the old
+ * sentence was a claim about a browser, made without a measurement, standing in
+ * for a claim about a student. This one needs neither: a document that says it
+ * is hidden is telling us the student is not there.
+ *
+ * AN ENGINE THAT CANNOT ANSWER FALLS THROUGH TO THE PAINT QUESTIONS, which is
+ * exactly the answer it gives today, so this can only ever take ticks AWAY from
+ * the ceiling and never add one. Only the literal string `"hidden"` refuses;
+ * `undefined` (a non-DOM document object, an engine without the API) is not read
+ * as evidence of anything.
+ *
  * WHY THE ANCESTOR WALK. The two shipped suppressions
  * (`PlayAreaStyles.tsx:1224` and `:1536`) both hit the card's own element, so
  * its own computed `display` would answer today. The walk is here for the case
@@ -487,8 +603,13 @@ export function touchHintOutstayed(shownMs: number): boolean {
  */
 export function touchHintOnGlass(el: Element | null | undefined): boolean {
   if (!el) return false;
-  const view = el.ownerDocument?.defaultView;
+  const doc = el.ownerDocument;
+  const view = doc?.defaultView;
   if (!view) return false;
+  // The one question the harness does not ask, because a harness is never
+  // backgrounded and a phone always is. Styles and rects survive an app switch
+  // intact, so without this the clock runs on a screen nobody is holding.
+  if (doc.visibilityState === "hidden") return false;
   for (
     let n: Element | null = el;
     n && n.nodeType === 1;

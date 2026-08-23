@@ -113,8 +113,20 @@
  *    give-way transverse across the mouth. Its last clause — „the pedestrian
  *    the lesson is named for is not visible" — is true of those frames for a
  *    trivial reason (the car never reached the ring, so she was never
- *    released), but chasing it is what found the one defect this round DID fix:
+ *    released), but chasing it is what found the defect this shelf DID fix:
  *    see RB_PED_CROSSER's `triggerEtaSec` note.
+ *
+ * AND THE SAME CLAUSE, CHASED ONE ROUND FURTHER, 2026-08-23. „She was never
+ * released" turned out to be true of a real student too, not only of a harness
+ * that never arrived. The release for anyone under `minTriggerSpeedKmh` is the
+ * PRODUCT `floor × triggerEtaSec` metres, and at 8 × 10.0 that was 22.2 m — so
+ * a student who idles up the exit spoke in D, with no throttle at all, reached
+ * the pocket after she had crossed and stepped up, was credited «Спри в джоба»,
+ * passed at 3★, and was told nothing, because nothing had happened. Both dials
+ * are now sized against the gate the drill credits rather than inherited (10.0 m
+ * for both walkers), which puts the whole creep band inside the covered range;
+ * roundabout2-encounter-clock.test.ts §7 drives it at 2.6 / 3.0 / 4.0 км/ч and
+ * is red on the shipped values. Each spec records its own arithmetic.
  *
  * Content provenance (doc 76 §9 stage 0 — original items, never listovki):
  * q-predimstvo-032 (завиваш надясно; пешеходец на пътеката на улицата, в която
@@ -288,35 +300,92 @@ const RB_PED_CIRCULATING: RoundaboutEntrySpec = {
  * her"). That sentence was false, and false in the reassuring direction.
  *
  * Below the floor `dartFloorReleaseM` evaluates the horizon at the FLOOR speed
- * rather than at the player's, so under 8 km/h the release is a FIXED 22.2 m
- * radius again and the metres-versus-clock arithmetic simply restarts with a
- * bigger number. Driven against the real runner and the committed district, at
- * rest inside the compiled L1 pocket, she is still on the carriageway down to
- * roughly:
+ * rather than at the player's, so the release becomes a FIXED radius again and
+ * the metres-versus-clock arithmetic restarts with a bigger number. At the
+ * shipped floor of 8 km/h that radius was 2.222 × 10 = 22.2 m, and driven
+ * against the real runner and the committed district — at rest inside the
+ * compiled L1 pocket — she was still on the carriageway only down to roughly:
  *     · 3.4 km/h at the pocket's ring-side edge (y 22.4, 8.62 m from the paint)
  *     · 4.3 km/h at its centre                  (y 26.0, 5.70 m)
  *     · 5.2 km/h at its zebra-side edge         (y 29.6, 4.08 m)
- * and below that she has finished and stepped up before he comes to rest — the
- * founder's photograph again, one gear slower. The car's own creep in D is
- * 2.6-3.3 km/h (scripts/sim-harness.mjs, „Creep hold 3 km/h"), i.e. INSIDE that
- * hole and reachable with no throttle at all. So this dial narrows the defect
- * from „every careful student" to „a student slower than 3.5-5.2 km/h,"
- * depending where in the pocket he stops; it does not delete it.
+ * and below that she had finished and stepped up before he came to rest — the
+ * founder's photograph again, one gear slower.
  *
- * AND NO VALUE OF THIS FIELD CAN, which is why the row is filed rather than
- * re-tuned. The two walls close on each other: keeping the committed recordings
- * byte-identical needs the crossover 30/eta × 3.6 to stay under the 12 km/h
- * ring pace, i.e. eta > 9.0 s, which forces the below-floor radius to
- * 2.222 × eta ≥ 20 m — and a LARGER radius releases her EARLIER, the wrong
- * direction for a crawler. The remainder is an orchestrator/runners.ts row, not
- * an authoring one: the below-floor branch needs a radius tied to the hazard's
- * own walk (or to the gate the drill credits) instead of to the speed floor.
+ * THAT HOLE IS NOT A CORNER CASE, and the product says so itself: `vehicle/
+ * difficulty.ts` holds the beginner throttle ceiling in full below
+ * `CREEP_CAP_FULL_KMH` = 4 km/h and fades it out by 12, i.e. 0-4 км/ч is the
+ * band the sim's own vehicle model calls a CREEP — the speed a student reaches
+ * by taking his foot off everything and letting the automatic idle him forward.
+ * The whole of it sat inside the hole, on the one approach whose briefing
+ * spends two sentences telling him to slow down and whose HUD prints
+ * «задачата иска ≤20» across the lane.
  *
- * The claims above are measured in roundabout2-encounter-clock.test.ts, and the
- * driven proof comes from the shared encounter battery, whose ETA-SYNC suite
- * enumerates exactly the specs that author this field. Both probe the crawl at
- * `minTriggerSpeedKmh × 0.8` = 6.4 km/h, which sits INSIDE the covered band —
- * that is why neither of them shows the residue described above.
+ * ── AND THE FLOOR IS THE OTHER HALF OF THE DIAL (2026-08-23) ─────────────────
+ *
+ * The paragraph above used to end „AND NO VALUE OF THIS FIELD CAN [close it],
+ * which is why the row is filed rather than re-tuned", and it argued the walls
+ * correctly for `triggerEtaSec` ALONE: the crossover 30/eta × 3.6 must stay
+ * under the 12 km/h ring pace to keep the recordings byte-identical, so
+ * eta > 9.0 s, so the below-floor radius ≥ 2.222 × 9 = 20 m — and a LARGER
+ * radius releases her EARLIER, the wrong direction for a crawler.
+ *
+ * What that argument never examined is the 2.222, which is
+ * `minTriggerSpeedKmh` in m/s. The below-floor radius is a PRODUCT of the two
+ * authored fields, and 22.2 m was nobody's decision — it fell out of a floor
+ * chosen against the ring pace multiplied by a horizon chosen against the
+ * carriageway. Size it deliberately and the hole closes from this file:
+ *
+ *   floor 3.6 km/h × 10.0 s = EXACTLY 10.0 m of below-floor release radius.
+ *
+ * 10 m is the smallest radius that still covers the gate this drill credits.
+ * The far edge of the compiled pocket is 9.30 m from the paint at L1 (8.70 at
+ * L2, 8.10 at L3-L5), and a student halted anywhere inside that disc must have
+ * somebody to wait for, so the radius may not go under it; every metre above it
+ * is a metre of head start she does not need. 10.0 leaves 0.70 m of margin and
+ * nothing else. Measured at the worst credited stop — the zebra-side edge of
+ * the L1 disc, y 29.6, where he travels furthest from the release radius before
+ * coming to rest — she is now on the carriageway down to 2.11 km/h instead of
+ * 5.19 (1.97 at L2, 1.82 at L3-L5): the whole throttle-free creep band is
+ * inside the covered range, with 2.8 s to spare at its 2.6 km/h bottom.
+ *
+ * WHAT LOWERING THE FLOOR DOES NOT DO, checked in both directions:
+ *   · it cannot move a committed recording. Branch 1 of the release ANDs
+ *     `speedKmh >= minTriggerSpeedKmh`, so LOWERING it can only ever admit
+ *     drives that were previously excluded — and the shadow and both mistake
+ *     demos are at ring pace (12 km/h) when they first come inside the 30 m
+ *     gate, above the old floor and the new one alike. Branch 2's radius
+ *     shrinks 22.2 → 10.0, which can only release LATER, and no recording
+ *     reaches the crossing under 8 km/h. The trace gate proves it.
+ *   · it does not weaken the „nothing steps out in front of a parked car"
+ *     property the contract names: that is the 10 m radius, and the give-way
+ *     line this drill starts from is 66 m from this crossing (the ring's south
+ *     mouth alone is 48), and the spawn 123.
+ *   · it takes nothing from the fast half of the band. At and above the
+ *     10.8 km/h crossover the authored 30 m still fires, unchanged.
+ *
+ * WHAT IT COSTS. Between 3.6 and 8 km/h she is now released on the player's own
+ * speed (branch 1) instead of on the flat 22.2 m — later, and proportionally,
+ * which is the whole point of the field. And a student who comes to rest
+ * BETWEEN 10 m and 22.2 m of the paint — i.e. stopped in the ring band, the
+ * fault instruction 4 exists to name — no longer gets her released while he
+ * sits there. He gets her the moment he moves on into the pocket, which is
+ * where the lesson wanted the encounter in the first place.
+ *
+ * WHAT IS STILL NOT CLOSED, stated because the first draft of the note above
+ * over-claimed and that is how the residue survived a round. `dartFloorReleaseM`
+ * is still speed-BLIND below the floor: a fixed radius, so the covered range
+ * still has a bottom (2.11 km/h here) rather than none. That bottom is now
+ * under the whole 0-4 км/ч band the vehicle model calls a creep, so it is no
+ * longer reachable by driving carefully — but the general row is
+ * unchanged and remains an orchestrator/runners.ts one: the below-floor branch
+ * wants a radius tied to the hazard's own walk, not to the speed floor.
+ *
+ * The claims above are measured in roundabout2-encounter-clock.test.ts §7,
+ * driven through the real `PedestrianDartOutRunner` against the real committed
+ * district at 2.6 / 3.0 / 4.0 km/h — all three of which are RED on the shipped
+ * floor of 8. The shared encounter battery still probes at
+ * `minTriggerSpeedKmh × 0.8`, which is why it never showed this: that formula
+ * follows the floor down and can never sit outside the covered band.
  */
 const RB_PED_CROSSER: PedestrianDartOutSpec = {
   id: "sc-rbp-crosser",
@@ -330,7 +399,13 @@ const RB_PED_CROSSER: PedestrianDartOutSpec = {
   roadFromM: ROAD_FROM_M,
   roadToM: ROAD_TO_M,
   triggerDistM: 30,
-  minTriggerSpeedKmh: 8, // ring pace is ~12 km/h — a 10 km/h floor would misfire
+  // The floor is HALF the below-floor release radius (see the note above):
+  // 3.6 km/h = 1.0 m/s exactly, so radius = 1.0 × triggerEtaSec = 10.0 m —
+  // 0.70 m outside the widest compiled pocket gate and not a metre more. It
+  // must stay under the ~12 km/h ring pace (a floor above it would misfire on
+  // the taught drive) and above 3.35 km/h (below that the radius stops
+  // covering the L1 pocket and a credited stop can meet nobody).
+  minTriggerSpeedKmh: 3.6,
   triggerEtaSec: 10.0,
 };
 
@@ -355,28 +430,64 @@ const RB_PED_CROSSER: PedestrianDartOutSpec = {
  *    reaches the player's lane FIRST, ~9.6 s after the walker's release.
  *
  * SHE NEEDS HER OWN CLOCK, and it is not the walker's. `triggerEtaSec` is
- * inherited by the spread above, and the walker's 10.0 s would leave her with
- * no clock at all on the half of the band the field exists for. `triggerDistM`
- * is the OUTER bound (runners.ts ANDs it), so a horizon whose floor-speed
- * radius — 2.222 × 10 = 22.2 m — overshoots her own 18 m gate collapses
- * straight
- * back onto those raw 18 m for every student under the floor: a FIXED distance,
- * speed-blind, which is the sc-zebra-approach defect verbatim. The dial would
- * be decoration on the ONE rung whose whole subject is a second person he did
- * not see. That is the wall `roundabout2-encounter-clock.test.ts` calls „the
- * clock is not INERT", and it is what picks her value — not a claim about
- * arrival times, which at 6.4 km/h she would survive either way.
+ * inherited by the spread above, and the horizon is a distance ONLY once it is
+ * multiplied by a speed — hers is 2.1 m/s against the walker's 1.2, so the same
+ * seconds buy a different picture. On the walker's 10.0 s she is
+ * 2.1 × 10 = 21.0 m along her walk when the car reaches the paint, against a
+ * roadway that ENDS at `roadToM` 17.85: she has stepped up onto the far
+ * pavement and the crossing reads clear, which is the sc-zebra-approach defect
+ * verbatim — a dial that is present, documented, and delivers an empty zebra.
+ * That is the wall `roundabout2-encounter-clock.test.ts` §3 measures, and it is
+ * what picks her value.
+ *
+ * (Until 2026-08-23 this paragraph argued from a different wall — that the
+ * walker's floor-speed radius, then 2.222 × 10 = 22.2 m, overshot her own 18 m
+ * `triggerDistM` and collapsed the dial back onto raw metres. True at the time
+ * and false now: the walker's floor is 3.6 km/h, so her inherited radius would
+ * be 10.0 m, well inside 18. Both walls picked 6.0 s; only the one above still
+ * stands, and a note that keeps a retired argument is a note that will be
+ * trusted for the wrong reason.)
  *
  * 6.0 s puts her crossover at 18 / 6 = 10.8 km/h — the same speed as the
  * walker's, so both stay purely additive above the taught ring pace and both
- * bind together below it — and her below-floor release radius at 13.3 m, inside
- * her 18 m gate and still clear of the pocket gate's 9.30 m far edge. At the
- * paint she is 2.1 × 6 = 12.6 m along her walk, x = +2.87: in the student's own
- * lane, like the walker, but arriving there sooner. The residue described in
- * RB_PED_CROSSER's note applies to her too, one band tighter: driven at rest in
- * the compiled L1 pocket she is on the carriageway down to ~2.2 km/h at the
- * ring-side edge, but only ~3.7 km/h at its centre and ~5.2 km/h at its
- * zebra-side edge.
+ * bind together below it. At the paint she is 2.1 × 6 = 12.6 m along her walk,
+ * x = +2.87: in the student's own lane, like the walker, but arriving there
+ * sooner.
+ *
+ * AND SHE NEEDS HER OWN FLOOR TOO, for the same reason and by the same
+ * arithmetic. `minTriggerSpeedKmh` is spread in from the walker, and the
+ * below-floor release radius is `max(DART_CREEP_RELEASE_M, floor × eta)`: the
+ * walker's 3.6 km/h against her SHORTER 6.0 s horizon gives a PRODUCT of 6.0 m,
+ * which the runner's 8 m creep backstop then clamps UP to 8.0 — still INSIDE
+ * the 9.30 m far edge of the compiled L1 pocket, so a student halted at the
+ * ring end of the pocket would wait for a sprinter who never starts. (Corrected
+ * 2026-08-24: the clamp is `Math.max(DART_CREEP_RELEASE_M, …)` in runners.ts,
+ * so 8.0 m is the number the runner uses, not the bare 6.0 m product an earlier
+ * draft of this paragraph asserted. The conclusion is unchanged — both are
+ * under 9.30 — but a note that states a radius the code does not use is a note
+ * the next round will re-derive from and get wrong.)  6.0 km/h × 6.0 s puts her
+ * back on the same deliberately-sized 10.0 m radius the walker uses, still well
+ * inside her own 18 m outer gate, so the dial is not decoration on the one rung
+ * whose whole subject is a second person he did not see.
+ *
+ * AND THE TRADE IS REAL, so it is stated rather than implied: on the inherited
+ * floor her clamped 8.0 m radius would cover a LOWER creep band than her own
+ * 10.0 m does (~2.75 km/h at L1 against 3.70), because a nearer release is a
+ * later one. What it would NOT cover is the far end of the pocket the drill
+ * credits — 9.30 m — so the student who does exactly what «Спри в джоба» asks,
+ * at its ring-side edge, would meet nobody at all. A gate the drill credits may
+ * not be a gate the hazard skips; that is the wall, and it costs the bottom
+ * ~0.95 km/h of her band to honour it.
+ *
+ * WHAT THAT BUYS AND WHAT IT DOES NOT. She is quick — clear of the carriageway
+ * 17.85 / 2.1 = 8.5 s after release against the walker's 14.9 — so the crawl
+ * band she covers is necessarily narrower: driven at rest at the pocket's
+ * zebra-side edge she is on the carriageway down to ~3.7 km/h (was ~5.2 on the
+ * inherited floor). Below that the L5 student meets the WALKER instead, who is
+ * staged at every rung and covered to 2.11 km/h — so he never arrives at a bare
+ * zebra, he only loses the second-person twist. That is the honest claim, it is
+ * the one roundabout2-encounter-clock.test.ts §7 asserts, and 9.30 m is the
+ * wall that stops the radius going lower to close the rest.
  *
  * Physics stays dry (ADR-006 opt-in discipline): the authored ghost envelope is
  * dry-tuned, and `conditions.weather` dresses the scene without re-tuning it.
@@ -386,6 +497,11 @@ const RB_PED_CROSSER_SPRINT: PedestrianDartOutSpec = {
   id: "sc-rbp-crosser-sprint",
   speedMps: 2.1,
   triggerDistM: 18,
+  // NOT inherited: the below-floor release radius is
+  // max(DART_CREEP_RELEASE_M 8, floor × eta), and the walker's 3.6 against this
+  // shorter horizon gives a 6.0 m product that the backstop clamps up to 8.0 —
+  // still inside the 9.30 m pocket the drill credits. 6.0 × 6.0 s = 10.0 m.
+  minTriggerSpeedKmh: 6.0,
   triggerEtaSec: 6.0,
 };
 

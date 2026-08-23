@@ -397,3 +397,344 @@ describe("§4 the discs, the demos and the graded duty are untouched", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// §5 THE COPY AND THE ARM ARE READ FROM ONE SOURCE
+// ---------------------------------------------------------------------------
+
+/**
+ * THE FRAME THIS SECTION EXISTS FOR.
+ * `.audit-frames/wave-c/frames/sc-rx-guarded__pc-right/04-t076s.png` — a
+ * red-and-white boom lies HORIZONTALLY ACROSS the carriageway at bonnet height,
+ * and six seconds later the same drive is billed −10 «Влизане на прелез при
+ * спусната бариера» (`04-t082s`) and −10 «Спиране върху железопътните релси»
+ * (`04-t088s`): 20 наказателни точки · НЕИЗДЪРЖАН · 2 опасни грешки on the
+ * CORRECT leg. The boom and the card agree. What did not agree was the WORDS.
+ *
+ * WHY THE WORDS COULD NOT AGREE, from the committed data rather than from the
+ * frame. `worldRuntime` bars the span when `tSec % cycleSec` lands in
+ * [downFromSec, downToSec), and `railBarrierDownAt` draws the arm off the same
+ * sample — so the arm is right by construction and the only thing that can be
+ * wrong is a sentence that names a phase. rx-guarded-v1 is down 40 s of every
+ * 90, inside a 95 s par time; rx-drop-v1 is down [20, 60) of every 90 inside
+ * 110 s. Two things follow, and both are asserted below rather than asserted
+ * about:
+ *   (a) THE ARM RE-CLOSES INSIDE ONE ATTEMPT — so a ladder that narrates one
+ *       lift and falls silent has left the student to meet the second descent
+ *       with nothing. That is the −10 above.
+ *   (b) THE PHASE THE STUDENT FIRST SEES IS NOT AUTHORED — tSec runs through
+ *       arrival and the briefing (the run.log opens with the demo playhead at
+ *       0:23 on `01-arrival`, 0:40 on `04-t001s`), so «Бариерите са спуснати»
+ *       as an opening line is a coin toss.
+ *
+ * THE LAW, THEREFORE: a rail sentence may NAME the arm, may teach what each
+ * phase MEANS, and may condition the crossing on the lift — none of which a
+ * frame can refute — but it may not state which way the arm is pointing NOW.
+ *
+ * WHAT THIS SECTION DOES NOT CLAIM. It does not make the guarded finish disc
+ * refuse a barred entry: `tick.railBarred` IS on the tick and `stepReachZone`
+ * IS handed it, but the demand that would spend it lives in `lessons/
+ * objectives.ts` (see the note on `sc-rxg-finish`), which this lane does not
+ * own. This is the authoring half, and it is the half that speaks first.
+ */
+
+interface RailBarrier {
+  cycleSec: number;
+  downFromSec: number;
+  downToSec: number;
+}
+
+/** The committed timetable — the same file the runtime loads, never a copy. */
+function railBarrierOf(districtId: string): RailBarrier {
+  const raw = JSON.parse(
+    readFileSync(join(process.cwd(), "..", "content", "world", `${districtId}.json`), "utf8"),
+  ) as { meta: { scenario: { railCrossing: { barrier?: RailBarrier } } } };
+  const b = raw.meta.scenario.railCrossing.barrier;
+  if (!b) throw new Error(`${districtId} carries no barrier timetable`);
+  return b;
+}
+
+/** The two drills whose map HAS an arm (the unguarded one has none to lie about). */
+const GUARDED_DRILLS: readonly ScenarioSpec[] = [SC_RX_GUARDED, SC_RX_BARRIER_DROP];
+
+/**
+ * TWO SHAPES, BECAUSE THE TWO SHIPPED SENTENCES USED BOTH — and the first draft
+ * of this matcher caught only one, which is exactly what §5b exists to stop.
+ *
+ *   COPULA        «Бариерите СА спуснати: линията не е свободна»  ← guarded step 1
+ *   ARRIVAL       «Пристигаш пред жп прелез С ВДИГНАТА бариера»   ← drop objectiveBg
+ *
+ * Both name the phase of THIS crossing at THIS moment, and a frame settles both.
+ * Cyrillic, so substrings and explicit endings — JS `\b` is ASCII-only.
+ */
+// VERIFIER 2026-08-24 — THE ADJACENT FORM WAS ONE WORD WIDE. The shipped
+// matcher was `бариерата\s+е` / `бариерите\s+са` / `лостът\s+е`, i.e. subject
+// and copula touching. MEASURED against this file: putting «Бариерите ПРЕД ТЕБ
+// са спуснати.» into guarded step 1 left all 35 tests GREEN — the same class of
+// too-narrow instrument the §5b header says it exists to stop, one round later.
+// Up to two words may now stand between, which covers «пред теб», «вече»,
+// «сега», «в момента» and «отново». The subject/number pairing is deliberately
+// dropped: this is a BAN, so matching an ungrammatical «бариерите е» costs
+// nothing, while missing a grammatical assertion costs a frame.
+const ARM_STATE_COPULA = /(?:бариерата|бариерите|лостът)(?:\s+\p{L}+){0,2}\s+(?:е|са)\s+(?:спуснат|вдигнат)/iu;
+// `\w` is ASCII-only even under /u — the adjective ending «вдигнатА» has to be
+// spelled as a letter class or the matcher silently stops matching, which is the
+// instrument bug this programme has shipped four times.
+const ARM_STATE_ARRIVAL = /(?:^|[^\p{L}])с(?:ъс)?\s+(?:вдигнат|спуснат)\p{L}*\s+бариер/iu;
+
+/**
+ * WHERE EACH SHAPE IS BANNED, and the split is a real distinction rather than a
+ * convenience. `titleBg` / `objectiveBg` / `instructionsBg` / the success titles
+ * describe THIS ATTEMPT — they are printed on the catalogue card, the briefing
+ * and the banner while the arm is on screen, so a phase claim in them is a claim
+ * a frame can refute, in either shape.
+ *
+ * `teach.*` describes THE WORLD. Its whole job is to generalise, and
+ * sc-rx-barrier-drop's whenBg legitimately opens «На всеки охраняем жп прелез,
+ * КЪМ КОЙТО ПРИБЛИЖАВАШ С ВДИГНАТА БАРИЕРА — тя може да тръгне надолу всеки
+ * момент»: that is „whenever you meet one raised", not „this one is raised now".
+ * Banning the ARRIVAL shape there would delete a correct lesson, which is the
+ * failure this programme ranks worst. The COPULA shape stays banned everywhere —
+ * no teach card has any business asserting the state of the arm in front of you.
+ */
+const ATTEMPT_COPY_BANS: readonly RegExp[] = [ARM_STATE_COPULA, ARM_STATE_ARRIVAL];
+const TEACH_COPY_BANS: readonly RegExp[] = [ARM_STATE_COPULA];
+
+/** The EVENT the second descent needs named: the arm can go back down on you. */
+const RECLOSE_DUTY: readonly string[] = [
+  "пак надолу",
+  "отново надолу",
+  "пак се спуска",
+  "отново се спуска",
+];
+
+/**
+ * …AND THE ACT THAT MUST TRAVEL WITH IT — verifier 2026-08-24.
+ *
+ * `RECLOSE_DUTY` alone matches the EVENT, not the duty, and a marker is not a
+ * rule. MEASURED: replacing the new step with «Тръгне ли лостът ПАК НАДОЛУ,
+ * докато чакаш — МИНАВАЙ БЪРЗО, преди да е легнал.» left all 35 tests green —
+ * a gate named „the ladder states the duty" passing an instruction to race a
+ * descending boom, which is the fatal act both mistake demos on these two maps
+ * exist to convict. §2's `ENTRY_ORDER` does not catch it either: its
+ * alternation is «премини|преминавай|преминаваш|навлизай|навлез», and «минавай»
+ * / «мини» are not in it (REPORTED to §2's owner rather than widened here — that
+ * regex also sweeps the compiled objectives of five templates).
+ *
+ * So the step that raises the re-closure must also state the STOP. «чакаш» and
+ * «изчакай» are deliberately NOT on this list: the refuted sentence above
+ * contains «чакаш» incidentally, in a subordinate clause, while ordering the
+ * opposite.
+ */
+const RECLOSE_STOP: readonly string[] = [
+  "спираш",
+  "спри",
+  "спирай",
+  "не влизай",
+  "не навлизай",
+  "оставаш зад",
+];
+
+/** The sentences that speak about the drive in progress. */
+function attemptCopy(spec: ScenarioSpec): ReadonlyArray<{ where: string; text: string }> {
+  return [
+    { where: "titleBg", text: spec.titleBg },
+    { where: "objectiveBg", text: spec.objectiveBg },
+    ...spec.instructionsBg.map((s) => ({ where: `instruction ${s.n}`, text: s.textBg })),
+    ...spec.success.map((o) => ({ where: `success ${o.id}`, text: o.titleBg })),
+  ];
+}
+
+/** The sentences that speak about the world. */
+function teachCopy(spec: ScenarioSpec): ReadonlyArray<{ where: string; text: string }> {
+  return [
+    { where: "teach.whenBg", text: spec.teach.whenBg },
+    { where: "teach.whyBg", text: spec.teach.whyBg },
+    { where: "teach.examinerBg", text: spec.teach.examinerBg },
+  ];
+}
+
+describe("§5b the matchers have teeth", () => {
+  it("both shipped shapes are flagged, and neither string survives in the file", () => {
+    // sc-rx-guarded step 1 and sc-rx-barrier-drop's objectiveBg, verbatim as
+    // they shipped through the wave-c drive that produced the frames above.
+    const wasGuarded =
+      "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерите са спуснати: линията не е свободна.";
+    const wasDrop =
+      "Пристигаш пред жп прелез с вдигната бариера — но тя тръгва надолу пред теб. Спри зад стоп-линията и изчакай пълното ѝ вдигане; не се гмуркай под спускащата се бариера и никога не спирай върху релсите.";
+    expect(ARM_STATE_COPULA.test(wasGuarded)).toBe(true);
+    expect(ARM_STATE_ARRIVAL.test(wasDrop)).toBe(true);
+    // …and each shape is caught by the ban list its channel carries.
+    expect(ATTEMPT_COPY_BANS.some((re) => re.test(wasGuarded))).toBe(true);
+    expect(ATTEMPT_COPY_BANS.some((re) => re.test(wasDrop))).toBe(true);
+    // …and neither string is what the file holds today.
+    for (const spec of GUARDED_DRILLS) {
+      for (const row of [...attemptCopy(spec), ...teachCopy(spec)]) {
+        expect(row.text, `${spec.id} ${row.where}`).not.toBe(wasGuarded);
+        expect(row.text, `${spec.id} ${row.where}`).not.toBe(wasDrop);
+      }
+    }
+  });
+
+  it("the two mutations that walked THROUGH this section are flagged now", () => {
+    // Verifier 2026-08-24. Both were applied to the shipping file and left all
+    // 35 tests green; both are here so the holes cannot reopen silently.
+    const spacedCopula = "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерите пред теб са спуснати.";
+    expect(ARM_STATE_COPULA.test(spacedCopula)).toBe(true);
+    expect(ATTEMPT_COPY_BANS.some((re) => re.test(spacedCopula))).toBe(true);
+    expect(TEACH_COPY_BANS.some((re) => re.test(spacedCopula))).toBe(true);
+    for (const alsoSpaced of [
+      "Бариерата вече е спусната.",
+      "Лостът в момента е вдигнат.",
+      "Бариерите сега са вдигнати.",
+    ]) {
+      expect(ARM_STATE_COPULA.test(alsoSpaced), alsoSpaced).toBe(true);
+    }
+
+    const raceTheBoom = "Тръгне ли лостът пак надолу, докато чакаш — минавай бързо, преди да е легнал.";
+    expect(RECLOSE_DUTY.some((m) => raceTheBoom.toLowerCase().includes(m))).toBe(true); // event named…
+    expect(hasAny(raceTheBoom, RECLOSE_STOP)).toBe(false); // …duty absent → red
+    const shippedStep = "Тръгне ли лостът пак надолу, докато чакаш или приближаваш — спираш пак зад стоп-линията.";
+    expect(hasAny(shippedStep, RECLOSE_STOP)).toBe(true);
+  });
+
+  it("naming the phase as a CONDITION, a MEANING or a clause is not an assertion", () => {
+    for (const legitimate of [
+      "Едва след ПЪЛНОТО вдигане на бариерите се огледай и премини решително, без спиране върху коловоза.",
+      "Спуснати или СПУСКАЩИ СЕ бариери значат едно: влак в участъка.",
+      "На охраняем прелез лостът решава: докато е спуснат или се спуска, чакаш зад стоп-линията.",
+      "Тръгне ли лостът пак надолу, докато чакаш или приближаваш — спираш пак зад стоп-линията.",
+      "Изчакай търпеливо: лостът се вдига чак когато линията е чиста.",
+      "При вдигнати бариери преминаваш без спиране — но винаги с готовност.",
+    ]) {
+      expect(ATTEMPT_COPY_BANS.some((re) => re.test(legitimate)), legitimate).toBe(false);
+    }
+  });
+
+  it("the teach card may still generalise about a raised arm — and may not assert one", () => {
+    const generalisation =
+      "На всеки охраняем жп прелез, към който приближаваш с вдигната бариера — тя може да тръгне надолу всеки момент.";
+    expect(ARM_STATE_ARRIVAL.test(generalisation)).toBe(true); // the shape is there…
+    expect(TEACH_COPY_BANS.some((re) => re.test(generalisation))).toBe(false); // …and allowed here
+    expect(TEACH_COPY_BANS.some((re) => re.test("Бариерите са спуснати пред теб."))).toBe(true);
+  });
+
+  it("the re-close marker catches the new step and not the old ladder", () => {
+    expect(
+      RECLOSE_DUTY.some((m) =>
+        "Тръгне ли лостът пак надолу, докато чакаш или приближаваш — спираш пак зад стоп-линията."
+          .toLowerCase()
+          .includes(m),
+      ),
+    ).toBe(true);
+    // The ladder as it shipped: five steps, one lift, nothing after it.
+    const shippedLadder = [
+      "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерите са спуснати: линията не е свободна.",
+      "Намали отрано и спри зад стоп-линията — не плътно до бариерата и никога върху релсите.",
+      "Изчакай търпеливо: бариерата се вдига чак когато линията е чиста. Не се промъквай и не криволичи покрай нея — никога.",
+      "Едва след ПЪЛНОТО вдигане на бариерите се огледай и премини решително, без спиране върху коловоза.",
+      "Продължи спокойно до края на отсечката.",
+    ].join(" ");
+    expect(RECLOSE_DUTY.some((m) => shippedLadder.toLowerCase().includes(m))).toBe(false);
+  });
+});
+
+describe("§5 the arm re-closes inside one attempt, and the copy says so", () => {
+  for (const spec of GUARDED_DRILLS) {
+    it(`${spec.id}: the template's timetable is the district's, to the second`, () => {
+      const b = railBarrierOf(spec.map.districtId);
+      // The L7 mirror, and the guard on this file's own constants: zero the
+      // cycle or widen the window here and the copy law below stops describing
+      // the world, so it has to fail out loud rather than drift.
+      expect({
+        barrierCycleSec: spec.map.params.barrierCycleSec,
+        barrierDownFromSec: spec.map.params.barrierDownFromSec,
+        barrierDownToSec: spec.map.params.barrierDownToSec,
+      }).toEqual({
+        barrierCycleSec: b.cycleSec,
+        barrierDownFromSec: b.downFromSec,
+        barrierDownToSec: b.downToSec,
+      });
+      expect(b.downToSec, `${spec.map.districtId} is barred forever`).toBeLessThan(b.cycleSec);
+      expect(b.downToSec).toBeGreaterThan(b.downFromSec);
+    });
+
+    it(`${spec.id}: a whole down→up→down fits inside the drill's own par time`, () => {
+      const b = railBarrierOf(spec.map.districtId);
+      const par = spec.rubric?.parTimeSec;
+      expect(par, `${spec.id} authors no parTimeSec`).toBeDefined();
+      // THE PREMISE OF THE COPY LAW, measured rather than assumed. One full
+      // period inside par means no student — however he starts, whatever the
+      // session clock had already burnt on the briefing — can complete this
+      // drill without the arm changing state at least twice.
+      expect(
+        b.cycleSec,
+        `${spec.id}: cycle ${b.cycleSec}s vs par ${String(par)}s — if the arm was DELIBERATELY ` +
+          `made one-shot, relax this premise and the re-close duty below together, in one edit`,
+      ).toBeLessThanOrEqual(par!);
+    });
+
+    it(`${spec.id}: no sentence about THIS attempt states which way the arm points`, () => {
+      const offenders = attemptCopy(spec)
+        .filter((row) => ATTEMPT_COPY_BANS.some((re) => re.test(row.text)))
+        .map((row) => `${spec.id} ${row.where}: «${row.text}»`);
+      expect(offenders, offenders.join("\n")).toEqual([]);
+    });
+
+    it(`${spec.id}: no teach card asserts the arm's state either`, () => {
+      const offenders = teachCopy(spec)
+        .filter((row) => TEACH_COPY_BANS.some((re) => re.test(row.text)))
+        .map((row) => `${spec.id} ${row.where}: «${row.text}»`);
+      expect(offenders, offenders.join("\n")).toEqual([]);
+    });
+
+    it(`${spec.id}: the ladder states the duty for the arm coming back DOWN`, () => {
+      const stated = spec.instructionsBg.filter((s) =>
+        RECLOSE_DUTY.some((m) => s.textBg.toLowerCase().includes(m)),
+      );
+      expect(
+        stated.length,
+        `${spec.id} narrates one lift and stops — the arm returns every ` +
+          `${railBarrierOf(spec.map.districtId).cycleSec}s and the student is told nothing`,
+      ).toBeGreaterThan(0);
+      // …and at least one of those steps says what to DO, not merely that it
+      // happens (see RECLOSE_STOP — a marker-only gate passed «минавай бързо»).
+      const withDuty = stated.filter((s) => hasAny(s.textBg, RECLOSE_STOP));
+      expect(
+        withDuty.map((s) => s.n),
+        `${spec.id} names the second descent but never orders the stop:\n` +
+          stated.map((s) => `  step ${s.n}: «${s.textBg}»`).join("\n"),
+      ).not.toEqual([]);
+    });
+  }
+
+  it("the lesson CARD carries the condition too, not only the briefing", () => {
+    // `compile.ts` puts `objectiveBg` on `LessonSpec.descriptionBg` — the
+    // paragraph `LessonCard` prints in the catalogue, read before the briefing
+    // card exists. §2 swept `instructionsBg` alone, so this sentence kept the
+    // unconditional „stop, look, cross" the frames caught.
+    const was =
+      "Премини неохраняемия жп прелез по желязното правило: пълно спиране преди релсите, оглеждане наляво и надясно по линията и решително преминаване — без да спираш върху коловоза.";
+    expect(ENTRY_ORDER.test(was)).toBe(true);
+    expect(hasAny(was, CLEARANCE_CONDITION)).toBe(false);
+
+    const offenders = CROSSING_DRILLS.filter(
+      (spec) => ENTRY_ORDER.test(spec.objectiveBg) && !hasAny(spec.objectiveBg, CLEARANCE_CONDITION),
+    ).map((spec) => `${spec.id}: «${spec.objectiveBg}»`);
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("nothing was taken away: the wait duty still precedes the order on every ladder", () => {
+    for (const spec of CROSSING_DRILLS) {
+      const orderAt = spec.instructionsBg.findIndex((s) => ENTRY_ORDER.test(s.textBg));
+      const waitAt = spec.instructionsBg.findIndex((s) => hasAny(s.textBg, WAIT_DUTY));
+      expect(orderAt, spec.id).toBeGreaterThanOrEqual(0);
+      expect(waitAt, spec.id).toBeGreaterThanOrEqual(0);
+      expect(waitAt, spec.id).toBeLessThan(orderAt);
+      // …and the numbering the compiler validates is still contiguous.
+      expect(spec.instructionsBg.map((s) => s.n)).toEqual(
+        spec.instructionsBg.map((_, i) => i + 1),
+      );
+    }
+  });
+});

@@ -443,7 +443,11 @@ describe("DRIVEN: the crawler who stops in the pocket waits for a real person", 
     // the BEGINNER rung — the two ends of the pocket, both driven.
     const g = pocketGate(1);
     for (const stopAtY of [g.y - g.radiusM, g.y, g.y + g.radiusM]) {
-      it(`${s.id}: stopped at y = ${stopAtY.toFixed(1)} after a ${(WALKER.minTriggerSpeedKmh * 0.8).toFixed(1)} км/ч crawl`, () => {
+      // The label reads the spec UNDER TEST, not the walker: the two floors
+      // diverged when the sprinter stopped inheriting hers, and a title that
+      // names 2.9 км/ч while the body drives 4.8 is an instrument that lies in
+      // the reassuring direction.
+      it(`${s.id}: stopped at y = ${stopAtY.toFixed(1)} after a ${(s.minTriggerSpeedKmh * 0.8).toFixed(1)} км/ч crawl`, () => {
         const r = crawlToPocketAndWait(s, stopAtY, s.minTriggerSpeedKmh * 0.8);
         expect(r.released, "she never left the curb for a student under the speed floor").toBe(
           true,
@@ -486,4 +490,195 @@ describe("the L5 sprinter carries her own horizon, not the walker's", () => {
         `whose whole point is a SECOND person he did not see`,
     ).toBeLessThan(clearSec);
   });
+});
+
+// ---------------------------------------------------------------------------
+// 7. THE CREEP BAND — the drive a frightened beginner makes with NO THROTTLE
+// ---------------------------------------------------------------------------
+
+/**
+ * WHAT §2-§6 LEFT OPEN, and why it survived a whole round of this file.
+ *
+ * `triggerEtaSec` scales the release with the player's speed — but only ABOVE
+ * `minTriggerSpeedKmh`. Under the floor `dartFloorReleaseM` evaluates the same
+ * horizon at the FLOOR speed instead, so the release collapses back to a single
+ * fixed radius, `floor × eta` metres. At the shipped floor of 8 km/h that
+ * product was 22.2 m: a number nobody chose — one dial picked against the ring
+ * pace multiplied by another picked against the carriageway — and 22.2 m is far
+ * enough out that a student who crawls the exit spoke arrives after she has
+ * finished crossing and stepped up onto the pavement.
+ *
+ * Every existing probe of the slow band misses this, and the reason is
+ * structural rather than careless: both this file's §5 and the shared
+ * `encounter-battery.test.ts` crawl at `minTriggerSpeedKmh × 0.8`. That formula
+ * FOLLOWS THE FLOOR DOWN — it can never sit outside the range the floor itself
+ * covers, so it is a positive control for the mechanism and blind to its size.
+ *
+ * The band that is not blind is the product's own: `CREEP_CAP_FULL_KMH` (4) is
+ * where `vehicle/difficulty.ts` stops calling the drive a creep. Below it the
+ * beginner tier holds a throttle ceiling because the car is idling forward in
+ * D — which is to say, 0-4 км/ч is the speed a student reaches by taking his
+ * foot OFF everything, on the one approach whose briefing says «намали преди
+ * входа» and whose HUD prints «задачата иска ≤20» across the lane.
+ *
+ * Every assertion below is recomputed from the two authored dials, the compiled
+ * gate and the walker's own speed. Nothing here reads a literal from the spec.
+ */
+
+/** The top of the band `vehicle/difficulty.ts` treats as creep, км/ч. */
+const CREEP_CAP_FULL_KMH = 4;
+/**
+ * Crawl speeds driven through the real runner below. The top is the creep cap
+ * itself; the lower two are inside the band an idling automatic actually holds.
+ */
+const CREEP_PROBE_KMH = [2.6, 3.0, CREEP_CAP_FULL_KMH] as const;
+
+/**
+ * How far up the outbound lane the player is when a BELOW-FLOOR release fires:
+ * the release radius is a circle about the crossing, the taught line is
+ * x = X_ARM_LANE, so the two meet at this y. (Straight-line d differences
+ * understate the travel — the approach is not radial — which is why every
+ * claim below is measured on the lane the student actually drives.)
+ */
+function releaseYOnLane(s: PedestrianDartOutSpec): number {
+  const r = floorReleaseM(s);
+  return CROSSING.y - Math.sqrt(Math.max(0, r * r - X_ARM_LANE * X_ARM_LANE));
+}
+
+/**
+ * The SLOWEST creep at which a student who stops at the worst credited point of
+ * the pocket still finds her on the carriageway, км/ч — the drill's real floor.
+ *
+ * Worst = furthest up the lane, i.e. the zebra-side edge of the compiled disc:
+ * that is the credited stop with the longest run from the release radius, so it
+ * is the one she is most likely to have finished before he arrives. Compared
+ * against the time she needs to clear the roadway entirely, `roadToM / speed`.
+ */
+function coveredCreepFloorKmh(s: PedestrianDartOutSpec, level: ScenarioLevel): number {
+  const g = pocketGate(level);
+  const travelM = g.y + g.radiusM - releaseYOnLane(s);
+  const clearSec = s.roadToM / s.speedMps;
+  return (travelM / clearSec) * 3.6;
+}
+
+describe("the below-floor radius is SIZED to the gate, not inherited from the floor", () => {
+  /**
+   * The two-sided vice, and the whole repair in one assertion. §2 already
+   * demands the radius COVER every credited stop (or a student halted in the
+   * pocket waits for nobody). This adds the other wall: it may not exceed that
+   * by more than a metre, because every metre above the gate is a metre of head
+   * start she does not need and the student does not get to watch.
+   *
+   * Both dials are caught by it. Put the floor back to 8 km/h and the radius is
+   * 22.2 m; take the horizon to 12 s and it is 12.0 m; both fail here. Take
+   * either low enough to shrink the radius under the gate and §2 fails instead.
+   */
+  const SLACK_M = 1.0;
+  for (const s of [WALKER, SPRINTER]) {
+    it(`${s.id}: the radius sits within ${SLACK_M} m of the widest compiled pocket`, () => {
+      const need = Math.max(...LEVELS.map(pocketFarEdgeFromCrossingM));
+      expect(
+        floorReleaseM(s),
+        `${s.id}: the below-floor release radius is ${floorReleaseM(s).toFixed(2)} m against a ` +
+          `pocket whose furthest credited stop is ${need.toFixed(2)} m from the paint. ` +
+          `${(floorReleaseM(s) - need).toFixed(2)} m of that is pure head start: she steps off ` +
+          `that much earlier than the drill needs and finishes that much sooner, which is the ` +
+          `whole reason a crawling student arrives at a bare zebra. The radius is ` +
+          `minTriggerSpeedKmh × triggerEtaSec — size it, do not inherit it.`,
+      ).toBeLessThanOrEqual(need + SLACK_M);
+    });
+  }
+});
+
+describe("the walker covers the whole creep band, on every rung", () => {
+  for (const level of LEVELS) {
+    it(`sc-rbp-crosser @L${level}`, () => {
+      const floorKmh = coveredCreepFloorKmh(WALKER, level);
+      expect(
+        floorKmh,
+        `L${level}: a student who lets the car idle forward in D and stops at the zebra-side ` +
+          `edge of the pocket only meets her above ${floorKmh.toFixed(1)} км/ч, but the vehicle ` +
+          `module calls anything under ${CREEP_CAP_FULL_KMH} км/ч a creep — so the drive a ` +
+          `frightened beginner produces WITH NO THROTTLE AT ALL ends with him stopped in the ` +
+          `pocket, credited, three-starred, and looking at an empty crossing in a lesson called ` +
+          `«Пешеходец на изхода от кръговото».`,
+      ).toBeLessThan(CREEP_PROBE_KMH[0]);
+    });
+  }
+});
+
+describe("the L5 sprinter covers at least the top of the creep band", () => {
+  /**
+   * Honest scope, and it is narrower than the walker's on purpose. She is quick
+   * — clear of the carriageway in `roadToM / 2.1` = 8.5 s against the walker's
+   * 14.9 — so the same 10 m radius buys her a shallower band. Below it the L5
+   * student still meets the WALKER, who is staged at every rung and covered to
+   * the bottom of the creep band by the suite above: he never arrives at a bare
+   * zebra, he only loses the second-person twist. 9.30 m — the far edge of the
+   * L1 pocket, §2's wall — is what stops the radius shrinking to close the rest.
+   */
+  for (const level of LEVELS) {
+    it(`sc-rbp-crosser-sprint @L${level}`, () => {
+      const floorKmh = coveredCreepFloorKmh(SPRINTER, level);
+      expect(
+        floorKmh,
+        `L${level}: she is only met above ${floorKmh.toFixed(1)} км/ч — above the ` +
+          `${CREEP_CAP_FULL_KMH} км/ч the vehicle module calls the top of the creep band, so a ` +
+          `student idling up the exit spoke never sees the SECOND person this rung exists for`,
+      ).toBeLessThanOrEqual(CREEP_CAP_FULL_KMH);
+    });
+  }
+
+  it("…and the walker is staged alongside her at L5, so somebody is always there", () => {
+    const staged5 = (compileScenario(SC_RB_PED_EXIT, 5).stagedEvents ?? []).map((e) => e.id);
+    expect(staged5).toContain(WALKER.id);
+    expect(staged5).toContain(SPRINTER.id);
+  });
+});
+
+describe("DRIVEN: the throttle-free creep still meets a person on the carriageway", () => {
+  /**
+   * The arithmetic above is only worth what a drive says, so this runs the real
+   * `PedestrianDartOutRunner` against the real committed district — the same
+   * probe §5 uses, at the speeds §5 cannot reach because its crawl is defined
+   * as a fraction of the very floor under test.
+   *
+   * All three ends of the compiled L1 pocket, because which one is worst
+   * depends on the direction of the error: the zebra-side edge is the longest
+   * run from the release radius (she can finish first), the ring-side edge the
+   * shortest (she may not have stepped off yet).
+   */
+  const g = pocketGate(1);
+  const STOPS = [g.y - g.radiusM, g.y, g.y + g.radiusM] as const;
+
+  for (const crawlKmh of CREEP_PROBE_KMH) {
+    for (const stopAtY of STOPS) {
+      it(`sc-rbp-crosser: ${crawlKmh} км/ч, at rest at y = ${stopAtY.toFixed(1)}`, () => {
+        const r = crawlToPocketAndWait(WALKER, stopAtY, crawlKmh);
+        expect(r.released, "she never left the curb").toBe(true);
+        expect(
+          r.onRoadWhileStopped,
+          `he idled up the exit spoke at ${crawlKmh} км/ч — no throttle needed — stopped at ` +
+            `y = ${stopAtY.toFixed(1)}, inside the disc that credits «Спри в джоба между кръга и ` +
+            `пътеката», and she was NEVER on the carriageway while he stood there (walk ` +
+            `position at rest: ${r.walkAtRestM.toFixed(2)} m against a roadway of ` +
+            `[${WALKER.roadFromM}, ${WALKER.roadToM}]). Пропусни пешеходеца — кой?`,
+        ).toBe(true);
+      });
+    }
+  }
+
+  // The sprinter at the top of the band only — see the scope note above. Driven
+  // at the two stops her 8.5 s of road time actually covers.
+  for (const stopAtY of [g.y - g.radiusM, g.y] as const) {
+    it(`sc-rbp-crosser-sprint: ${CREEP_CAP_FULL_KMH} км/ч, at rest at y = ${stopAtY.toFixed(1)}`, () => {
+      const r = crawlToPocketAndWait(SPRINTER, stopAtY, CREEP_CAP_FULL_KMH);
+      expect(r.released, "she never left the curb").toBe(true);
+      expect(
+        r.onRoadWhileStopped,
+        `the L5 second person was never on the carriageway while he stood in the pocket ` +
+          `(walk position at rest: ${r.walkAtRestM.toFixed(2)} m)`,
+      ).toBe(true);
+    });
+  }
 });

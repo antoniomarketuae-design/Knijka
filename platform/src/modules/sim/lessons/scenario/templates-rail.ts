@@ -177,6 +177,46 @@ function railTrainPassEvent(id: string, holdOffsetM = 80): TrainPassSpec {
  * the clip rig re-enacts over the committed trace.
  */
 const RXU_TRAIN_HOLD_M = 32;
+/**
+ * THE BARRIER TIMETABLES, AND THE ONE FACT ABOUT THEM THE COPY USED TO DENY.
+ *
+ * `worldRuntime` bars the span exactly when `tSec % cycleSec` lands inside
+ * [downFromSec, downToSec) — PERIODIC, and the renderer's arm reads the same
+ * sample, so what the student SEES and what `tick.railBarred` grades can never
+ * disagree (`worldRuntime.railBarrierDownAt`, „the renderer never runs a second
+ * clock"). Two consequences the authored copy has to live with:
+ *
+ *   (1) THE ARM COMES BACK DOWN INSIDE ONE ATTEMPT. A 90 s cycle is SHORTER
+ *       than either drill's own par time (95 s / 110 s), so every student meets
+ *       at least one complete down→up→down, whenever he starts.
+ *   (2) THE PHASE AT THE FIRST TURN OF THE WHEELS IS NOT AUTHORED. tSec is the
+ *       session clock, and it is already running through arrival, the briefing
+ *       card and the «Разбрах» tap. MEASURED on the shipped build:
+ *       `.audit-frames/REBASE/frames/sc-rx-guarded__pc-right/run.log` opens
+ *       (CITATION CORRECTED, verifier 2026-08-24 — this said `wave-c`, and the
+ *       wave-c directory holds only frames, no run.log; the two lines quoted
+ *       below are in the STEERED re-drive's log, at `rebase`) with the demo
+ *       playhead at 0:23 on `01-arrival` and 0:40 on `04-t001s`,
+ *       i.e. ~39 s of session clock burnt before the drive — which is why the
+ *       boom in `04-t076s.png` lies ACROSS the carriageway (tSec ≈ 115,
+ *       cyclePos ≈ 25, inside [0, 40)) while step 1 was still telling the
+ *       student the barriers were down at the START, and why the −10 «Влизане
+ *       на прелез при спусната бариера» at `04-t082s` is the rule engine
+ *       reading the same arm correctly.
+ *
+ * SO NO SENTENCE THIS FILE PUBLISHES MAY ASSERT THE ARM'S CURRENT STATE. It may
+ * name the arm, teach what each phase MEANS, and condition the crossing on the
+ * lift — none of those can be contradicted by a frame. A flat «Бариерите са
+ * спуснати» can, and was. `rail-cross-when-clear.test.ts` §5 pins both halves
+ * (the law, and the re-closure duty the ladder now states) against the numbers
+ * below AS COMMITTED IN THE DISTRICT FILE, so the copy and the barrier are read
+ * from one source.
+ *
+ * THE NUMBERS THEMSELVES ARE UNTOUCHED — a lane that owns `content/world/` and
+ * the recorded traces may want to revisit (2), but shortening the down window
+ * here would silently unpick three committed recordings and is not this file's
+ * to do alone.
+ */
 /** rx-guarded-v1: the deterministic barrier timetable (down [0, 40) of 90 s). */
 const RXG_BARRIER_CYCLE_SEC = 90;
 const RXG_BARRIER_DOWN_FROM_SEC = 0;
@@ -200,8 +240,16 @@ export const SC_RX_UNGUARDED: ScenarioSpec = {
   family: "rail",
   tagsBg: ["жп прелез", "неохраняем прелез", "СТОП", "оглеждане"],
   titleBg: "Неохраняем жп прелез",
+  // WAS «…оглеждане наляво и надясно по линията и решително преминаване…» — the
+  // ladder learned the wait duty (instructions 4–5, see below) and this sentence
+  // did not, so the lesson CARD still sold the drill as stop → look → go. This
+  // is not a second copy of the briefing: `compile.ts` puts `objectiveBg` on
+  // `LessonSpec.descriptionBg`, which is the paragraph `LessonCard` prints in
+  // the catalogue and the line the sandbox HUD carries — it is read BEFORE the
+  // briefing and, on the catalogue, instead of it. The decision the looking is
+  // FOR now travels with it (doc 64 THEO-4).
   objectiveBg:
-    "Премини неохраняемия жп прелез по желязното правило: пълно спиране преди релсите, оглеждане наляво и надясно по линията и решително преминаване — без да спираш върху коловоза.",
+    "Премини неохраняемия жп прелез по желязното правило: пълно спиране преди релсите, оглеждане в двете посоки, изчакване, докато идващ влак отмине ИЗЦЯЛО, и чак след това решително преминаване — без спиране върху коловоза.",
   archetypeIds: ["RX-02"],
   conceptIds: ["c-railway-crossing", "c-give-way-stop-behavior", "c-warning-signs"],
   map: {
@@ -357,8 +405,13 @@ export const SC_RX_GUARDED: ScenarioSpec = {
   family: "rail",
   tagsBg: ["жп прелез", "бариера", "охраняем прелез", "търпение"],
   titleBg: "Охраняем прелез с бариера",
+  // WAS «Пристигаш пред жп прелез СЪС СПУСНАТИ БАРИЕРИ: …» — an assertion about
+  // the arm at a moment this sentence cannot see (see the timetable block
+  // above: the phase at the student's arrival is not authored, and the arm
+  // cycles). The duty is identical and its condition is still attached; what is
+  // gone is the claim about NOW.
   objectiveBg:
-    "Пристигаш пред жп прелез със спуснати бариери: изчакай търпеливо зад стоп-линията, докато се вдигнат напълно, и премини едва тогава — решително, без да спираш върху релсите.",
+    "На охраняем прелез лостът решава: докато е спуснат или се спуска, чакаш зад стоп-линията — преминаваш едва след пълното му вдигане, решително и без да спираш върху релсите.",
   archetypeIds: ["RX-01"],
   conceptIds: ["c-railway-crossing", "c-warning-signs", "c-general-care-duty"],
   map: {
@@ -382,11 +435,30 @@ export const SC_RX_GUARDED: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерите са спуснати: линията не е свободна." },
+    // STEP 1 USED TO END «…Бариерите са спуснати: линията не е свободна.» — a
+    // statement of fact about the arm, and the frame refutes it twice over:
+    // `04-t001s` of the pc-right drive starts with the session clock already at
+    // ~40 s (the arm UP, cyclePos 40 of 90) and `04-t076s` shows it back DOWN
+    // across the carriageway. The scenery is described here; the PHASE is read
+    // off the arm, which is the only thing that can be right every second.
+    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (знак А34) с бариери." },
     { n: 2, textBg: "Намали отрано и спри зад стоп-линията — не плътно до бариерата и никога върху релсите." },
-    { n: 3, textBg: "Изчакай търпеливо: бариерата се вдига чак когато линията е чиста. Не се промъквай и не криволичи покрай нея — никога." },
+    // VERIFIER 2026-08-24: the «— никога» came back. Nothing about the arm's
+    // PHASE lived in that word — it is this family's taught absolute (the
+    // mistake copy, the teach card and the file's own chapeau all end чл. 51–52
+    // with it), and the round that removed the phase claims took it along by
+    // accident. A softened prohibition is a taking-away, not a repair.
+    { n: 3, textBg: "Изчакай търпеливо: лостът се вдига чак когато линията е чиста. Не се промъквай и не криволичи покрай него — никога." },
     { n: 4, textBg: "Едва след ПЪЛНОТО вдигане на бариерите се огледай и премини решително, без спиране върху коловоза." },
-    { n: 5, textBg: "Продължи спокойно до края на отсечката." },
+    // STEP 5 IS NEW, AND IT IS THE HALF THE −10 CAME FROM. The arm is on a 90 s
+    // cycle inside a 95 s par time, so it WILL come back down on a patient
+    // student — and the ladder used to describe one lift and stop talking. The
+    // steered re-drive banks «✓ Изчакай зад стоп-линията пред бариерата» and is
+    // billed «Влизане на прелез при спусната бариера» six seconds later; the
+    // duty that closes that gap had never been stated anywhere the student
+    // reads. Requirement zero (doc 64 THEO-4): the rule, before the verdict.
+    { n: 5, textBg: "Тръгне ли лостът пак надолу, докато чакаш или приближаваш — спираш пак зад стоп-линията." },
+    { n: 6, textBg: "Продължи спокойно до края на отсечката." },
   ],
   success: [
     {
@@ -518,8 +590,14 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
   family: "rail",
   tagsBg: ["жп прелез", "спускаща се бариера", "охраняем прелез", "търпение"],
   titleBg: "Бариерата тръгва надолу",
+  // WAS «Пристигаш пред жп прелез С ВДИГНАТА БАРИЕРА — но тя тръгва надолу пред
+  // теб.» — the same assertion as sc-rx-guarded's, mirrored. This map's arm is
+  // down [20, 60) of every 90 s of SESSION clock, and the session clock is tens
+  // of seconds old before the wheels turn (see the timetable block), so „you
+  // arrive to a raised barrier" is a coin toss the sentence cannot see. The
+  // drill's subject — the arm moving DOWN in front of you — is unchanged.
   objectiveBg:
-    "Пристигаш пред жп прелез с вдигната бариера — но тя тръгва надолу пред теб. Спри зад стоп-линията и изчакай пълното ѝ вдигане; не се гмуркай под спускащата се бариера и никога не спирай върху релсите.",
+    "На този прелез лостът тръгва надолу точно пред теб: щом се спуска или е спуснат, спираш зад стоп-линията и чакаш пълното му вдигане — не се гмуркай под него и никога не спирай върху релсите.",
   archetypeIds: ["RX-01"],
   conceptIds: ["c-railway-crossing", "c-warning-signs", "c-general-care-duty"],
   map: {
@@ -544,11 +622,28 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
     vehicleStart: "ready",
   },
   instructionsBg: [
-    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (знак А34). Бариерата е вдигната, но всеки момент може да тръгне надолу." },
-    { n: 2, textBg: "Намали отрано. Щом бариерата започне да се спуска, спри зад стоп-линията — не се гмуркай под нея, за да „успееш“." },
-    { n: 3, textBg: "Изчакай търпеливо: спускащата се бариера значи влак в участъка. Не се промъквай и не влизай, докато не се вдигне напълно — никога." },
+    // STEP 1 USED TO SAY «Бариерата е вдигната, но…» — see the objectiveBg note
+    // and the timetable block: the arm's phase when the student first looks at
+    // it is not authored, so the scenery is named here and the phase is left to
+    // the arm.
+    { n: 1, textBg: "Потегли по улицата — напред има охраняем жп прелез (знак А34): лостът може да тръгне надолу всеки момент." },
+    { n: 2, textBg: "Намали отрано. Щом лостът тръгне надолу, спри зад стоп-линията — не се гмуркай под него, за да „успееш“." },
+    // VERIFIER 2026-08-24: «Не се промъквай и» and «— никога» came back. This
+    // step lost BOTH in the phase-claim round, and neither was a phase claim:
+    // «промъкване» is the act this drill's sibling demonstrates by name
+    // („Промъкване покрай бариерата"), the act `sc-rxd-wait`'s ≤ 1 км/ч cap
+    // exists to refuse, and the act this drill's OWN examinerBg still tells the
+    // student the examiner is watching for («изчакване без промъкване») — so
+    // the ladder had stopped naming a duty the rest of the drill still grades
+    // and still judges. Doc 64 THEO-4 runs both ways: the rule before the
+    // verdict, and no verdict whose rule was quietly dropped.
+    { n: 3, textBg: "Изчакай търпеливо: спускащият се лост значи влак в участъка. Не се промъквай и не влизай, докато не се вдигне напълно — никога." },
     { n: 4, textBg: "Едва след ПЪЛНОТО вдигане на бариерата се огледай и премини решително, без спиране върху коловоза." },
-    { n: 5, textBg: "Продължи спокойно до края на отсечката." },
+    // STEP 5 IS NEW — same reason as sc-rx-guarded's: down [20, 60) of every
+    // 90 s inside a 110 s par time, so the arm returns on a patient student and
+    // the ladder used to describe a single descent and a single lift.
+    { n: 5, textBg: "Тръгне ли лостът пак надолу, докато чакаш или приближаваш — спираш пак зад стоп-линията." },
+    { n: 6, textBg: "Продължи спокойно до края на отсечката." },
   ],
   success: [
     {

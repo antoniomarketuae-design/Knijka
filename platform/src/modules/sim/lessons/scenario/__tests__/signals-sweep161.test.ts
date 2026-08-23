@@ -100,13 +100,26 @@
  * is documented there as deliberate („renumbering would make the body claim to
  * be a different list"). §5 asserts that this file's own data is contiguous
  * from 1, so the routing cannot drift back here.
+ *
+ *   §6  sc-signal-hesitation, THE OTHER HALF — not §3's finding and said so out
+ *       loud. §3 is the wrongConvicted=NO acquittal, whose cause is severity
+ *       policy this file cannot reach. §6 guards the rightCredited half the
+ *       FOUNDER filed (doc 87 B40 „who ? who is sleeping on green"): briefing
+ *       step 3 makes six falsifiable geometric claims about the staged sleeper,
+ *       and four of the six were unpinned anywhere in the repo (see §6's own
+ *       docblock for the two that were, and how loosely).
  */
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import type { PriorityFromRightSpec, TrafficControllerSpec } from "../../../contracts";
+import type {
+  BrakingLeadCarSpec,
+  PriorityFromRightSpec,
+  TrafficControllerSpec,
+} from "../../../contracts";
+import { createScenarioDirector } from "../../../orchestrator";
 import { createTrafficSystem, DEFAULT_TRAFFIC_CONFIG } from "../../../traffic";
 import type { TrafficDistrict } from "../../../traffic/types";
 import { recordScriptedDrive, type DriveScript } from "../../../traces/recorder";
@@ -120,6 +133,7 @@ import {
   SC_SIGNAL_FLASHING,
   SC_SIGNAL_FLASHING_CONFLICT,
   SC_SIGNAL_HESITATION,
+  SC_SIGNAL_HESITATION_SLEEPER,
   SCENARIO_TEMPLATES_SIGNALS,
 } from "../templates-signals";
 import type { ScenarioSpec } from "../types";
@@ -134,7 +148,10 @@ const SPAWN_Y = -105;
 
 interface SxDistrict extends TrafficDistrict {
   meta: {
-    scenario: { params: Record<string, number | string> };
+    scenario: {
+      params: Record<string, number | string>;
+      derived?: { stopLineFromNodeM?: number };
+    };
   } & TrafficDistrict["meta"];
   buildings: ReadonlyArray<{ id: string; footprint: ReadonlyArray<readonly [number, number]> }>;
   spawnPoints: ReadonlyArray<{ id: string; x: number; y: number }>;
@@ -582,5 +599,306 @@ describe("§5 the «list starts at 2.» findings are not this file's data", () =
     expect(brief.length).toBeGreaterThan(1);
     expect(brief.map((s) => s.n)).toEqual(brief.map((_, i) => i + 1));
     expect(brief[0]!.n).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §6 — sc-signal-hesitation: the car instruction 3 points at is where
+//      instruction 3 says it is (doc 87 B40 — „who ? who is sleeping on green")
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS SECTION EXISTS, and it is not the finding above it.
+ *
+ * `sc-signal-hesitation:3c0ff44f` is the wrongConvicted=NO half, and §3 shows —
+ * with the two lists side by side — that its cause is severity-class policy
+ * shared by all 167 drills, not this file. What §3 does NOT cover is the OTHER
+ * half of the same drill, the rightCredited one the founder filed himself:
+ *
+ *   „it says sleeping on green but who ? who is sleeping on green yes Ok I stop
+ *    on the green cyrcle but is that it ? … just that there is no traffic car."
+ *
+ * The repair for that was `SC_SIGNAL_HESITATION_SLEEPER` plus briefing step 3,
+ * and step 3 is not scenery copy — it is six FALSIFIABLE GEOMETRIC CLAIMS made
+ * to a seventeen-year-old who is about to look for a 26-px shape at 62 m:
+ *
+ *   «гледай ОТВЪД КРЪСТОВИЩЕТО, ВЛЯВО от твоята линия — в НАСРЕЩНАТА ЛЕНТА, на
+ *    ДРУГАТА СТОП-ЛИНИЯ. Колата там е с ЛИЦЕ към теб … Брой наум до три:
+ *    зеленото ѝ свети, а ТЯ НЕ ПОМРЪДВА.»
+ *
+ * WHAT WAS ALREADY PINNED, AND WHAT WAS NOT — corrected by the verifier,
+ * 2026-08-24, because this docblock shipped saying „nothing in the repo pinned
+ * one of them" and that is not true of two of the six.
+ * `traffic/__tests__/staged-actor-label.test.ts` §1 already asserts
+ * «отвъд кръстовището» (as the very loose `pose.y > 0`), «с ЛИЦЕ към теб»
+ * (`dirY === -1`) and the ~62 m range. It does so by RE-DERIVING the hold arc
+ * with its own arithmetic over the district's raw node list — so it also does
+ * not exercise the production stager, and its beyond-the-junction pin would
+ * credit a car parked in the middle of the box. Genuinely unpinned before this
+ * section, and the reason it earns its place: the LANE-SIDE claims («ВЛЯВО от
+ * твоята линия», «в насрещната лента» — no x coordinate is measured anywhere
+ * else), the stop-line TIGHTNESS («на другата стоп-линия», within one car
+ * length rather than merely north of the node), and «тя не помръдва», which
+ * needs the actor driven and had no test at all.
+ *
+ * `hold.offsetM`, the path node order,
+ * `armDistM` and the map’s own lane pitch are four independent knobs, three of
+ * them already re-tuned once in this family’s history (the T7 27.7 m sweep, the
+ * −95/−90 mis-landing 180 lines away), and a drift in any of them turns the
+ * most specific sentence in the drill into a lie the student cannot detect: he
+ * looks where he was told, sees nothing, and learns that the instructor’s
+ * directions are not to be trusted. That is B40 returning with nobody to
+ * notice, because the copy would still read perfectly.
+ *
+ * MEASURED HERE, through the production `TrafficSystem.stage()` and the
+ * production `ScenarioDirector` — never the spec read back to itself:
+ *
+ *   pose            x = −4.0625, y = +29.0, dir = (0, −1), speed 0
+ *   its own line    sxh-v1 derived stopLineFromNodeM = 27.73 → 1.27 m back of it
+ *   the player      spawn lane x = +4.0625 → 8.125 m, one full lane pitch, LEFT
+ *   release         35 км/ч: first moves at player y = −19.77, after 8.75 s of
+ *                   standstill;  18 км/ч: y = −20.08 after 16.97 s. Both are
+ *                   ~8 m PAST his own paint at y = −27.725, so it is still
+ *                   asleep at y = −33.5, the pose the copy was written from, and
+ *                   still asleep at the moment he is graded. (The template's own
+ *                   note records 8.9 s / 17.1 s off a different approach
+ *                   profile; the agreement is the point — nothing has drifted.)
+ *
+ * MUTATION RECORD — every one applied to `templates-signals.ts` itself, run, and
+ * reverted; the file is byte-identical to its baseline afterwards:
+ *   hold −29 → −20 (into the box):       «на другата стоп-линия» red (pose.y 20)
+ *                                        AND «тя не помръдва» red (release at
+ *                                        player y = −28.8, behind his own paint).
+ *   pathNodes reversed (s → c → n):      four red — the car now stands in HIS
+ *                                        lane (x +4.06) facing away (dirY +1).
+ *   armDistM 50 → 200 (release at once): «тя не помръдва» red — moving already
+ *                                        at y = −33.5, the pose the copy names.
+ *   step 3 „ВЛЯВО" → „вляво":            the copy tripwire red.
+ *
+ * ADDED BY THE VERIFIER, 2026-08-24, same protocol (applied, run, reverted;
+ * `templates-signals.ts` md5 c70940bf… before and after):
+ *   hold −29 → −35 (a street back):      «на другата стоп-линия» red — 7.27 m
+ *                                        back of the paint against a 4.3 m cap,
+ *                                        so the tightness half has teeth too and
+ *                                        not just the „north of the node" half.
+ *   `staged` AND `actorLabels` removed:  ALL 31 GREEN — the gap the new wiring
+ *                                        test below now closes. (Caught outside
+ *                                        this file by `traffic/__tests__/
+ *                                        staged-actor-label.test.ts`, 3 red.)
+ *
+ * AND THE FIRST TEST IS A TRIPWIRE, NOT A CLAIM. A substring check catches a
+ * deletion and never a neutralisation, so it is not evidence that step 3 says
+ * anything true — the five geometry tests below are. It is here for the
+ * opposite failure: a rewrite of step 3 that leaves the pins measuring a
+ * sentence nobody reads any more, which is how a guard outlives its subject and
+ * goes on passing.
+ */
+/**
+ * The far stop line — READ OUT OF THE DISTRICT, never copied out of it.
+ *
+ * (Verifier repair, 2026-08-24.) This shipped as the literal `27.73`, and a
+ * literal is exactly the wrong shape for it: the sleeper is held at
+ * `node − 29 m`, so if sxh-v1's carriageway were ever widened the derived
+ * `stopLineFromNodeM` would move OUT past 29 and the car would stand INSIDE
+ * the junction box — the mis-staging «на другата стоп-линия» exists to forbid —
+ * while this section went on comparing it to the old paint and passing. The
+ * sibling battery `signals-barge-conviction.test.ts` reads the same field for
+ * the same reason. Same number today (27.73), so no assertion moves.
+ */
+const SLEEPER_STOP_LINE_M = ((): number => {
+  const v = district(SC_SIGNAL_HESITATION.map.districtId).meta.scenario.derived
+    ?.stopLineFromNodeM;
+  if (typeof v !== "number") {
+    throw new Error(
+      `${SC_SIGNAL_HESITATION.map.districtId}: meta.scenario.derived.stopLineFromNodeM is missing`,
+    );
+  }
+  return v;
+})();
+/** The pose the copy was written from — the template’s own note names it. */
+const SLEEPER_COPY_POSE_Y = -33.5;
+
+/**
+ * Drive a scripted northbound player up the south stem through the PRODUCTION
+ * director and report what the sleeper does. Ambient traffic off, so the only
+ * thing on the road is the actor under test.
+ */
+function sleeperRun(
+  sleeper: BrakingLeadCarSpec,
+  cruiseKmh: number,
+): {
+  pose: { x: number; y: number; dirX: number; dirY: number };
+  motionlessSec: number;
+  releasePlayerY: number | null;
+  standingAtCopyPose: boolean;
+} {
+  const traffic = createTrafficSystem(district(SC_SIGNAL_HESITATION.map.districtId), {
+    ...DEFAULT_TRAFFIC_CONFIG,
+    vehicleCount: 0,
+    pedestrianCount: 0,
+  });
+  const director = createScenarioDirector([sleeper], traffic, { seed: 7 });
+  const first = traffic.staged(sleeper.id);
+  if (!first) throw new Error("sleeper failed to stage");
+  const pose = { x: first.x, y: first.y, dirX: first.dirX, dirY: first.dirY };
+  const dt = 1 / 60;
+  let y = SPAWN_Y;
+  let t = 0;
+  let releasePlayerY: number | null = null;
+  let motionlessSec = 0;
+  let standingAtCopyPose = false;
+  let sawCopyPose = false;
+  for (let i = 0; i < 60 * 120 && y < 0; i++) {
+    y += (cruiseKmh / 3.6) * dt;
+    t += dt;
+    traffic.update(dt, {
+      // GREEN FOR THE SLEEPER TOO, and that is the point rather than a
+      // convenience. `signalPlan: greenFresh` puts the student on a live green,
+      // and step 3 says «ЗЕЛЕНОТО Ѝ СВЕТИ, а тя не помръдва» — the whole lesson
+      // is that this car is standing while it is ALLOWED to go. Feeding red
+      // here would let a light hold the car and the section would pass while
+      // proving nothing: a queue at a red teaches the opposite of JU-09.
+      signalPhase: () => "green",
+      playerPos: { x: LANE, y },
+      playerSpeedKmh: cruiseKmh,
+      playerHeadingDeg: 0,
+    });
+    director.step({
+      tSec: t,
+      dtSec: dt,
+      x: LANE,
+      y,
+      speedKmh: cruiseKmh,
+      headingDeg: 0,
+      brakePedal: 0,
+      tickEvents: [],
+    });
+    const now = traffic.staged(sleeper.id);
+    if (!now) continue;
+    const moving = Math.abs(now.speedMps) > 0.1;
+    if (releasePlayerY === null) {
+      if (moving) releasePlayerY = y;
+      else motionlessSec += dt;
+    }
+    if (!sawCopyPose && y >= SLEEPER_COPY_POSE_Y) {
+      sawCopyPose = true;
+      standingAtCopyPose = !moving;
+    }
+  }
+  return { pose, motionlessSec, releasePlayerY, standingAtCopyPose };
+}
+
+describe("§6 sc-signal-hesitation — briefing step 3 points at a car that is there", () => {
+  const step3 = SC_SIGNAL_HESITATION.instructionsBg.find((s) => s.n === 3);
+
+  it("the copy still makes the six claims this section measures", () => {
+    // The pins below are worthless if the sentence they guard has been
+    // rewritten — a geometry check that outlives its copy is a check on
+    // nothing. Each fragment is the load-bearing half of one claim.
+    expect(step3?.textBg).toContain("отвъд кръстовището");
+    expect(step3?.textBg).toContain("ВЛЯВО");
+    expect(step3?.textBg).toContain("насрещната лента");
+    expect(step3?.textBg).toContain("стоп-линия");
+    expect(step3?.textBg).toContain("ЛИЦЕ");
+    expect(step3?.textBg).toContain("не помръдва");
+  });
+
+  /**
+   * VERIFIER REPAIR, 2026-08-24 — the one claim §6 shipped without.
+   *
+   * Every other test below stages `SC_SIGNAL_HESITATION_SLEEPER` ITSELF, via
+   * `createScenarioDirector([sleeper], …)`. That proves the SPEC is right and
+   * says nothing about whether the shipped DRILL still contains it — which is
+   * the whole of B40 („just that there is no traffic car"). Measured: comment
+   * out `staged` AND `actorLabels` on SC_SIGNAL_HESITATION and all 31 tests in
+   * this file stay green, i.e. §6 would have watched the founder's own defect
+   * return under a section titled „points at a car that is there". (The
+   * regression is caught today by `traffic/__tests__/staged-actor-label.test.ts`
+   * — in another module, guarding the caption, not the geometry. A section that
+   * measures the sleeper should not need a different module to notice it is
+   * gone.)
+   */
+  it("…and the DRILL still contains it — not just the exported spec", () => {
+    expect((SC_SIGNAL_HESITATION.staged ?? []).map((s) => s.id)).toContain(
+      SC_SIGNAL_HESITATION_SLEEPER.id,
+    );
+    expect((SC_SIGNAL_HESITATION.actorLabels ?? []).map((l) => l.actorId)).toContain(
+      SC_SIGNAL_HESITATION_SLEEPER.id,
+    );
+    // …and it survives onto the rung the student is actually handed.
+    const staged = compileScenario(SC_SIGNAL_HESITATION, 1).stagedEvents ?? [];
+    expect(staged.map((s) => s.id)).toContain(SC_SIGNAL_HESITATION_SLEEPER.id);
+  });
+
+  it("«отвъд кръстовището, на другата стоп-линия» — it stands back of its own paint, never in the box", () => {
+    const { pose } = sleeperRun(SC_SIGNAL_HESITATION_SLEEPER, 35);
+    // Beyond the junction: north of the node, and OUTSIDE the open box.
+    expect(pose.y).toBeGreaterThan(SLEEPER_STOP_LINE_M);
+    // …and AT that line rather than parked a street away: within one car
+    // length of the paint, which is what «на другата стоп-линия» promises.
+    expect(pose.y - SLEEPER_STOP_LINE_M).toBeLessThanOrEqual(4.3);
+  });
+
+  it("«ВЛЯВО от твоята линия — в насрещната лента» — one full lane pitch to the player's left", () => {
+    const { pose } = sleeperRun(SC_SIGNAL_HESITATION_SLEEPER, 35);
+    // The mirrored lane centre, not „somewhere left".
+    expect(pose.x).toBeCloseTo(-LANE, 2);
+    // Stated as the student experiences it: the gap between his own lane and
+    // the car, which is the whole 8.125 m pitch. A sleeper nudged into his own
+    // lane would also disable HESITATION_AT_GREEN (leadGapM ≤ 12 m is a lawful
+    // reason to sit still) — the template’s own note says so at length, and this
+    // is the assertion that makes that note enforceable.
+    expect(LANE - pose.x).toBeCloseTo(2 * LANE, 2);
+  });
+
+  it("«с ЛИЦЕ към теб» — it faces the northbound student, so it reads as waiting and not parked", () => {
+    const { pose } = sleeperRun(SC_SIGNAL_HESITATION_SLEEPER, 35);
+    expect(pose.dirY).toBeLessThan(-0.99); // southbound, nose-on to a northbound car
+    expect(Math.abs(pose.dirX)).toBeLessThan(0.05);
+  });
+
+  it("«Брой наум до три … тя не помръдва» — still standing at the pose the copy was written from", () => {
+    // At the drill’s own graded approach pace (its objective caps 35 км/ч) and at
+    // half of it — the encounter battery’s invariant, because a drill that only
+    // works at one speed works for nobody.
+    for (const kmh of [35, 18]) {
+      const run = sleeperRun(SC_SIGNAL_HESITATION_SLEEPER, kmh);
+      expect(run.standingAtCopyPose, `standing at y=${SLEEPER_COPY_POSE_Y} @ ${kmh} км/ч`).toBe(true);
+      // Three seconds is the copy’s own promise, and it is the FLOOR, not the
+      // measurement: the shipped numbers are 8.9 s at 35 and 17.1 s at 18.
+      expect(run.motionlessSec, `motionless seconds @ ${kmh} км/ч`).toBeGreaterThanOrEqual(3);
+      // …and it wakes PAST the student’s own paint, so the decision he is graded
+      // on is made against a car that is still asleep.
+      expect(run.releasePlayerY, `release player y @ ${kmh} км/ч`).not.toBeNull();
+      expect(run.releasePlayerY as number).toBeGreaterThan(-SLEEPER_STOP_LINE_M);
+    }
+  });
+
+  it("the checks are not a formality — a sleeper moved into the box, or into his lane, is caught", () => {
+    // THE DIRECTION TEST. Without it every assertion above could be satisfied
+    // by a check loose enough to credit any pose at all.
+    const inTheBox = sleeperRun(
+      {
+        ...SC_SIGNAL_HESITATION_SLEEPER,
+        actor: { ...SC_SIGNAL_HESITATION_SLEEPER.actor, hold: { nodeIndex: 1, offsetM: -20 } },
+      },
+      35,
+    );
+    expect(inTheBox.pose.y).toBeLessThan(SLEEPER_STOP_LINE_M); // parked in the mouth
+    const hisOwnLane = sleeperRun(
+      {
+        ...SC_SIGNAL_HESITATION_SLEEPER,
+        actor: {
+          ...SC_SIGNAL_HESITATION_SLEEPER.actor,
+          pathNodes: ["sx-n-s", "sx-n-c", "sx-n-n"],
+          hold: { nodeIndex: 1, offsetM: -29 },
+        },
+      },
+      35,
+    );
+    // Reversed: it now stands on the student’s OWN side, nose away from him —
+    // «в насрещната лента» and «с ЛИЦЕ към теб» both false.
+    expect(hisOwnLane.pose.x).toBeCloseTo(LANE, 2);
+    expect(hisOwnLane.pose.dirY).toBeGreaterThan(0.99);
   });
 });

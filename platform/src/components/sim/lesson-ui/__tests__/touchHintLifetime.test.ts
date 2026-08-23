@@ -387,6 +387,11 @@ function fakeNode(style: FakeStyle, rects: FakeRect[] = [{ width: 180, height: 1
     },
     parentElement: null as unknown,
     ownerDocument: {
+      // The page state the harness never has to think about, because a harness
+      // is never backgrounded. Default `"visible"`: every row written before the
+      // hidden-document guard existed describes a phone the student is holding,
+      // and each one must keep meaning that.
+      visibilityState: "visible" as string | undefined,
       defaultView: {
         getComputedStyle: (n: { __style: FakeStyle }) => n.__style,
       },
@@ -395,6 +400,13 @@ function fakeNode(style: FakeStyle, rects: FakeRect[] = [{ width: 180, height: 1
     getClientRects: () => rects,
   };
   return node;
+}
+
+/** The same fully-painted card, on a page the student has switched away from. */
+function backgroundedCard() {
+  const card = fakeNode({});
+  card.ownerDocument.visibilityState = "hidden";
+  return chain(card);
 }
 
 /** Chain them child-first: `chain(card, parent, grandparent)`. */
@@ -470,6 +482,72 @@ describe("on the glass — the same predicate the audit judges the frame with", 
       { width: 180, height: 44 },
     ]);
     expect(touchHintOnGlass(chain(card))).toBe(true);
+  });
+
+  it("A HIDDEN DOCUMENT is off the glass — a phone in a pocket is not a reader", () => {
+    // THE ONE PLACE THIS PREDICATE LEAVES THE HARNESS ON PURPOSE, and the row
+    // that says so. `painted()` in `tools/mobile/lesson-audit.mjs` never asks,
+    // because a Playwright page is always foregrounded. A phone is not: a call
+    // arrives, the student switches app, the screen locks. Through all of it the
+    // computed styles are untouched and `getBoundingClientRect()` still returns
+    // the card's real 180 × 141 box — so every question the harness DOES ask
+    // answers YES, and without this the ceiling's clock would count a screen
+    // nobody is holding as time in front of a reader.
+    expect(touchHintOnGlass(backgroundedCard())).toBe(false);
+  });
+
+  it("…and a VISIBLE one is untouched — the guard may not become a mute button", () => {
+    // The opposite direction, and the reason the row above cannot be satisfied
+    // by making `touchHintOnGlass` stricter in general: a card on a page the
+    // student is looking at is still on the glass, and the ceiling must still be
+    // reachable. A guard that answered `false` everywhere would pass the row
+    // above and silently delete the second exit.
+    const visible = fakeNode({});
+    expect(visible.ownerDocument.visibilityState).toBe("visible");
+    expect(touchHintOnGlass(chain(visible))).toBe(true);
+  });
+
+  it("an engine that cannot answer falls through to the paint questions", () => {
+    // `visibilityState` absent — an old engine, a non-DOM document object, a
+    // node handed in by something that is not a browser. „I cannot tell whether
+    // the tab is hidden" is not evidence that it is, and it is not evidence that
+    // it is not: the paint questions still decide, exactly as they did before
+    // this guard existed. Only the literal string refuses.
+    const unknown = fakeNode({});
+    unknown.ownerDocument.visibilityState = undefined;
+    expect(touchHintOnGlass(chain(unknown))).toBe(true);
+    const unknownAndHidden = fakeNode({ display: "none" });
+    unknownAndHidden.ownerDocument.visibilityState = undefined;
+    expect(touchHintOnGlass(chain(unknownAndHidden))).toBe(false);
+  });
+
+  it("A WHOLE CEILING SPENT IN THE BACKGROUND BANKS NOTHING — and one in the foreground still fires", () => {
+    // The pair that makes this a lifetime claim rather than a predicate claim,
+    // driven through the real accumulator instead of asserted about it.
+    //
+    // The header used to answer the backgrounded tab with timer throttling —
+    // „a tenth of the rate" — which is a statement about the browser, not about
+    // the student. A tenth of the rate still reaches TOUCH_HINT_MAX_SHOWN_MS:
+    // 1 200 ticks at 1 Hz is twenty minutes in a pocket, after which the card
+    // carrying the ONLY written statement of the reverse gesture is gone and the
+    // student never saw one frame of it. Zero is the only rate that is a
+    // guarantee.
+    const away = backgroundedCard();
+    let hidden = 0;
+    const ticks = TOUCH_HINT_MAX_SHOWN_MS / TOUCH_HINT_POLL_MS;
+    for (let i = 0; i < ticks * 2; i += 1) hidden = touchHintAccrue(hidden, touchHintOnGlass(away));
+    expect(hidden).toBe(0);
+    expect(touchHintOutstayed(hidden)).toBe(false);
+    // …and the same loop on a page the student is looking at reaches the ceiling
+    // on the tick the derivation says it should. Without this half, „the clock
+    // never runs" would pass the half above.
+    const held = chain(fakeNode({}));
+    let shown = 0;
+    for (let i = 0; i < ticks - 1; i += 1) shown = touchHintAccrue(shown, touchHintOnGlass(held));
+    expect(touchHintOutstayed(shown)).toBe(false);
+    shown = touchHintAccrue(shown, touchHintOnGlass(held));
+    expect(shown).toBe(TOUCH_HINT_MAX_SHOWN_MS);
+    expect(touchHintOutstayed(shown)).toBe(true);
   });
 
   it("the instrument still asks it the same way — this may go red for a GOOD reason", () => {
