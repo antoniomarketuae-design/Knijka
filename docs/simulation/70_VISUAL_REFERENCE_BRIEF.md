@@ -1,11 +1,29 @@
 # Visual Reference Brief — founder-supplied targets (2026-07-10)
 
-> **CLIMATE CORRECTION (2026-07-26).** This brief was written from a Gulf/waterfront reference image
-> and originally specified **palms**. Sofia has a humid continental climate with snowy winters — palms
-> do not grow there, and a palm on a Sofia boulevard instantly reads as fake to the exact 17-year-old
-> audience this product is for. A palm species was actually shipped, and was only caught by looking at
-> a rendered frame. Use the street trees Sofia actually has: **липа (linden), кестен (horse chestnut),
-> топола (poplar), явор (maple)**. The species set is now enforced by tests in the world builders.
+> **SOFIA LOCALISATION (2026-07-26).** REF 1 below is a **Gulf/waterfront photograph**. It is a good
+> reference for *material quality, facade variety and set-dressing density* — and a bad one for
+> *place*. **The rule: replicate REF 1's craft, never its geography.** Anything in it that Sofia does
+> not have must be substituted before it is built, because the credibility this whole visual program
+> is buying is spent the instant a Bulgarian 17-year-old sees something their own city does not
+> contain. Four substitutions are forced; each is marked **[SOFIA]** at the line it applies to.
+>
+> 1. **Greenery — palms → липа (linden), кестен (horse chestnut), топола (poplar), явор (maple).**
+>    Sofia is humid-continental with snowy winters; palms do not grow there. This one was not
+>    hypothetical: a palm species actually shipped, and was caught only by looking at a rendered
+>    frame (`platform/public/clips/sc-junction-stop__m0.k2.webp`). The species set is now enforced by
+>    tests — see `TreeKind` in `platform/src/modules/sim/world/types.ts`.
+> 2. **No waterfront.** Sofia is landlocked under Vitosha and has no canal, embankment or waterside
+>    promenade. Take REF 1's *street-furniture rhythm* — railing runs, lamps every ~20 m, benches,
+>    trees in ground grates, two-tone paver bands — and put it on a wide boulevard sidewalk or a park
+>    edge instead.
+> 3. **The horizon is Vitosha, not a supertall spire.** A Burj-like silhouette is the single most
+>    out-of-place thing this brief could ask for. Sofia's background element is the **Vitosha ridge**,
+>    which is what doc 82 §3 (V3) actually ships.
+> 4. **Sofia's skyline is low.** REF 1's 25–80-floor towers do not exist there; Sofia's tallest
+>    completed buildings are roughly 25–30 floors. Build the facade *variety* at Sofia heights.
+>
+> **REF 3** (the Eastern-European driving-sim frame) is the closer reference for Sofia's ordinary
+> streets — panel blocks, lawns, curbside parking — and needs no substitution.
 
 The founder supplied 4 reference images. Agents cannot see them; this document is the
 authoritative transcription of every observable detail, written by the session that viewed
@@ -22,7 +40,10 @@ with sun reflections.
 
 **Foreground / promenade:** dark calm water (canal) → concrete embankment wall → wide paved
 promenade (large rectangular pavers, two tone bands) → continuous **black metal railing**
-along the water. Sparse individual pedestrians (business/casual). Modern **street lamps**
+along the water. **[SOFIA]** the water, the embankment and the promenade DO NOT get built — keep
+the paver bands, the railing runs, the lamp rhythm and the tree grates, and stand them on a
+boulevard sidewalk or park edge (localisation 2).
+Sparse individual pedestrians (business/casual). Modern **street lamps**
 (dark pole, single lantern head) every ~20 m. **Linden/chestnut street trees** in ground grates + low planters;
 benches; small utility boxes.
 
@@ -31,13 +52,15 @@ rows, ~15–25 parked cars (sedans/SUVs, varied dark/light), low yellow-black ba
 entrances, thin curb islands with linden/chestnut street trees. One/two **low retail pavilions** (1–2 floors, dark
 stone + bronze glass, thin roof slab). Wide boulevard beyond with sparse traffic.
 
-**Towers (the building kit target — VARIETY is the point, 25–80 floors):**
+**Towers (the building kit target — VARIETY is the point; 25–80 floors in the photo):**
+**[SOFIA]** build the same variety at Sofia's ~25–30 floors (localisation 4).
 1. **Concrete-grid towers** (left, tallest pair): beige/grey exposed-concrete punched-window
    grid — deep square window recesses in a strict grid, slightly rounded corner notches,
    dark reflective glass inside each recess, interior lights visible. Massive, monolithic.
 2. **Cream vertical-strip tower** (center): beige/cream precast with continuous vertical
    window strips, gently curved side profile, thin parapet crown.
-3. **Distant supertall spire** on the horizon (Burj-like silhouette) — background flavor only.
+3. ~~**Distant supertall spire** on the horizon (Burj-like silhouette)~~ — **[SOFIA] DO NOT BUILD.**
+   Sofia's horizon element is the **Vitosha ridge** (doc 82 §3 V3), localisation 3.
 4. **Twin dark-glass towers** (center-right): bronze/brown curtain wall, tight mullion grid,
    many lit interiors, identical pair, flat tops.
 5. **Horizontal-strip building** (right, very wide): alternating white concrete bands and
@@ -115,7 +138,8 @@ wet asphalt — strong reflections (our env-map handles this).
 
 1. **Cockpit camera** per REF 2/3 contract above (40–50% interior visible).
 2. **Environment kit v3** per REF 1 (4+ facade systems, podiums, retail bands, parking lots
-   with stalls + parked cars, promenade/railing/street-tree dressing) — replaces the uniform glass kit.
+   with stalls + parked cars, boulevard-sidewalk/railing/street-tree dressing) — replaces the
+   uniform glass kit. **[SOFIA]** at Sofia heights, with no waterside promenade and no spire.
 3. **Traffic fleet v2** — MANY more distinct models (sedan, hatch, wagon, crossover, boxy SUV,
    pickup, delivery van, YELLOW MINIBUS, taxi variant, luxury sedan), all self-authored in
    Blender, better silhouettes than v1 (~1–3k tris each is acceptable).

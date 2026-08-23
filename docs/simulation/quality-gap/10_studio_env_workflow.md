@@ -260,13 +260,14 @@ quads with polygonOffset, ~zero cost, top realism-per-byte.
 
 **Pass 4 — Set dressing & clutter (2–3 days).**
 Burgess's law: vary the clutter, not the architecture. Instanced generic sets in *clusters*:
-palms in grates + planters, benches, street lamps (~20 m rhythm), utility boxes, black metal
+street trees in grates + planters (липа/кестен — doc 70 SOFIA localisation 1, never palms),
+benches, street lamps (~20 m rhythm), utility boxes, black metal
 railing runs, bollards (yellow-black at lot entrances), billboards/poles, blue direction
 signs, bus stop. **Parked cars are set dressing**, not traffic: fill parking stalls + curbs
 with 15–25 statically instanced fleet cars, varied dark/light paint (REF 1 midground).
 Ground floors: retail glazing band + interior mapping or emissive interior cards + occasional
-red signage strip. Hero props (one each): a fountain, a landmark sculpture, the distant
-supertall spire silhouette — anchors, used ONCE (§4.3).
+red signage strip. Hero props (one each): a fountain, a landmark sculpture, the **Vitosha ridge**
+on the horizon — anchors, used ONCE (§4.3). (Not a supertall spire: doc 70 SOFIA localisation 3.)
 
 **Pass 5 — Traffic & life material fix (1–2 days).**
 REF 5's toy-car problem is material, not geometry: give the shared car shader clearcoat-ish

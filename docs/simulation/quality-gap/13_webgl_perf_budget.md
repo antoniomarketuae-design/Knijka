@@ -58,7 +58,7 @@ Concrete allocation that fits the laptop 150-call target:
 | Content | Strategy | Draw calls |
 |---|---|---|
 | 248 buildings (kit v3, 4+ facade systems) | 1 InstancedMesh per kit piece; trim-sheet atlas so each piece has **≤ 2 material groups** (opaque facade atlas + emissive/glass atlas). ~12–16 kit pieces | **≤ 32** |
-| 1758 trees/palms | 2–3 species × 2 materials (trunk, canopy cutout) via InstancedMesh; per-instance frustum culling mandatory | **4–6** |
+| 1758 trees | 2–3 species × 2 materials (trunk, canopy cutout) via InstancedMesh; per-instance frustum culling mandatory | **4–6** |
 | ~50 traffic cars, 10 models | 1 InstancedMesh per model; shared 3-material scheme (body-atlas / glass / wheels-trim) → 30 calls, or vertex-color body variation on one atlas → ~20 | **20–30** |
 | Hero car (exterior + cockpit) | it's the star; unique materials fine | **30–50** |
 | Roads/ground/markings | merged static meshes, ≤ 4 materials (asphalt, pavers, markings decal, lawn) | **4–8** |
@@ -96,7 +96,7 @@ Per-asset budgets (author-time, in Blender generators):
   sided at LOD0.
 - Hero car + cockpit: **50–100 k tris** total (hero-object class; it's always on screen, keep
   the cockpit half well-optimized since it covers ~45 % of pixels).
-- Tree/palm: ≤ 1.5 k tris LOD0 using cutout cards for fronds; **never alpha-blend foliage —
+- Tree: ≤ 1.5 k tris LOD0 using cutout cards for foliage; **never alpha-blend foliage —
   use `alphaTest`/alpha-hash cutout** so depth-write stays on and mobile overdraw
   (tile-based GPUs are fill-rate bound) stays sane.
 

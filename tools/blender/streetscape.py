@@ -1,10 +1,20 @@
 """
-Modern waterfront ROADS + STREETSCAPE kit generator (headless Blender).
+ROADS + STREETSCAPE kit generator (headless Blender).
 
-Authors the street-furniture layer for the Книжка.AI driving simulator to match
-the founder reference: a clean modern waterfront financial district — wide asphalt
-boulevards with crisp painted lane markings, a palm-lined promenade, black steel
-railings, decorative street lamps, organized order. Everything fictional/generic.
+Authors the street-furniture layer for the Книжка.AI driving simulator, taking its
+craft cues from the founder reference (doc 70 REF 1): wide asphalt boulevards with
+crisp painted lane markings, black steel railings, decorative street lamps,
+organized order. Everything fictional/generic.
+
+SOFIA LOCALISATION (doc 70). REF 1 is a Gulf/waterfront photograph: its *craft* is
+the target, never its *place*. This kit shipped a `palm_tree` prop until 2026-07-26,
+when a rendered frame (platform/public/clips/sc-junction-stop__m0.k2.webp) showed
+palms planted along a Sofia boulevard. Sofia is humid-continental with snowy winters
+— a palm reads as fake to the Bulgarian 17-year-old this product is for, and spends
+the credibility the whole visual program is buying. The prop and its GLB are deleted.
+Street trees here are Sofia species (липа / кестен / топола / явор); do not re-add a
+tropical one, the world builder's TreeKind contract has no such member and tests
+assert it (platform/src/modules/sim/world/types.ts).
 
 Two deliverables come out of one run:
 
@@ -13,7 +23,7 @@ Two deliverables come out of one run:
      glass_city_kit.py / sofia_buildings.py so the sim's instanced prop pipeline
      can drop them straight in):
         street_lamp · railing_segment · bollard · bench · trash_bin ·
-        planter · curb_segment · palm_tree · ornamental_tree
+        planter · curb_segment · ornamental_tree
 
   2. A crisp road-marking DECAL ATLAS (1024², transparent PNG) authored pixel-exact
      with numpy (2× supersampled for clean edges): dashed centre line, solid lane
@@ -106,8 +116,6 @@ def M():
         "soil":         mat("soil", (0.11, 0.08, 0.06), rough=1.0),
         "leaf":         mat("leaf", (0.19, 0.40, 0.17), rough=0.8),
         "leaf_hi":      mat("leaf_hi", (0.30, 0.52, 0.24), rough=0.75),
-        "palm_frond":   mat("palm_frond", (0.22, 0.42, 0.16), rough=0.7),
-        "palm_trunk":   mat("palm_trunk", (0.46, 0.36, 0.24), rough=0.9),
         "bark":         mat("bark", (0.30, 0.24, 0.18), rough=0.9),
         "asphalt":      mat("asphalt", (0.055, 0.056, 0.06), rough=0.92),
     }
@@ -329,51 +337,8 @@ def prop_curb_segment(mtl):
     return b.finalize("curb_segment")
 
 
-def prop_palm_tree(mtl):
-    b = Builder()
-    trunk = mtl["palm_trunk"]
-    frond = mtl["palm_frond"]
-    frond_hi = mtl["leaf_hi"]
-
-    def blade(start, az, elev, length, width, thick, m):
-        """One flat leaf blade: local +Z aligned to (az,elev). Returns its tip."""
-        R = rotz(az) @ roty(90 - elev)
-        dirv = R.to_3x3() @ mathutils.Vector((0, 0, 1))
-        s = mathutils.Vector(start)
-        c = s + dirv * (length / 2)
-        b.obox(c.x, c.y, c.z, width, thick, length, m, rot=R)
-        return s + dirv * length
-
-    # segmented, slightly leaning trunk
-    segs, seg_h, lean = 6, 0.60, 0.16
-    z, cx = 0.0, 0.0
-    for i in range(segs):
-        t = i / (segs - 1)
-        rr = 0.16 * (1 - 0.40 * t)
-        cx = lean * (t ** 1.5)
-        b.cyl(cx, 0, z + seg_h / 2, rr + 0.015, rr, seg_h, trunk, seg=9)
-        b.cyl(cx, 0, z + seg_h, rr + 0.02, rr + 0.02, 0.05, trunk, seg=9, caps=False)
-        z += seg_h
-    crown = (cx, 0.0, z + 0.05)
-    b.ico(crown[0], crown[1], crown[2], 0.14, trunk, subdiv=1)
-
-    # full drooping crown — each frond is a 2-segment arc (up then droop down)
-    nf = 14
-    for i in range(nf):
-        az = (360.0 / nf) * i + (7 if i % 2 else 0)
-        m = frond_hi if i % 4 == 0 else frond
-        e1 = blade(crown, az, 15, 0.95, 0.22, 0.03, m)   # inner: near-horizontal, slight lift
-        blade(e1, az, -44, 1.20, 0.13, 0.028, m)         # outer: droops down
-    # short upright central spears
-    for j in range(4):
-        blade(crown, 90 * j + 22, 66, 0.75, 0.10, 0.03, frond)
-    # green boss cluster fills the join
-    for j in range(3):
-        R = rotz(120 * j) @ roty(85)
-        d = R.to_3x3() @ mathutils.Vector((0, 0, 1))
-        p = mathutils.Vector(crown) + d * 0.18
-        b.ico(p.x, p.y, p.z - 0.05, 0.11, frond, subdiv=1, scale=(1, 1, 0.7))
-    return b.finalize("palm_tree")
+# NOTE: prop_palm_tree() lived here until 2026-07-26 — see SOFIA LOCALISATION in
+# the module docstring. Deleted with its GLB; do not restore it.
 
 
 def prop_ornamental_tree(mtl):
@@ -663,7 +628,7 @@ KIT = [
     ("trash_bin",       prop_trash_bin,       (GX[4], ROW0)),
     ("planter",         prop_planter,         (GX[0], ROW1)),
     ("curb_segment",    prop_curb_segment,    (GX[1], ROW1)),
-    ("palm_tree",       prop_palm_tree,       (GX[2], ROW1)),
+    # GX[2],ROW1 is free — it held palm_tree until the Sofia localisation delete.
     ("ornamental_tree", prop_ornamental_tree, (GX[3], ROW1)),
     # GX[4],ROW1 is where the marking demo tile goes (built in setup_and_render)
 ]
