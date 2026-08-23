@@ -39,6 +39,31 @@ const ROW = VIOLATIONS.COLLISION;
 
 type ContactWith = "vehicle" | "pedestrian" | "cyclist" | "staticObject";
 
+/**
+ * The string this row's corrective was until 2026-08-23, kept as the negative
+ * control for the topic probe below. It is not decoration: a probe that has
+ * stopped discriminating would report a corrective that answers all four cards
+ * whatever it is fed, and this is the sentence photographed under the footway
+ * crash — the one that must come out answering exactly ONE of them.
+ */
+const LEAD_CAR_ONLY_CORRECTIVE =
+  "Карай така, че винаги да имаш къде да спреш: гледай далеч напред, дръж 2 секунди зад " +
+  "предния и намалявай ПРЕДИ конфликтните точки (кръстовища, пътеки, паркирани коли).";
+
+/**
+ * „Does this text answer the card for body X?" — the vocabulary each body's own
+ * answer cannot be written without. Deliberately about the ACTION, not about
+ * the noun alone: a corrective that merely listed the four words would still
+ * fail the negative control, which requires the lead-car string to hit exactly
+ * one of them.
+ */
+const BODY_TOPIC: Record<ContactWith, RegExp> = {
+  vehicle: /дистанц|2 секунди|две секунди/i,
+  pedestrian: /пешеходец|пешеходц|човек/i,
+  cyclist: /велосипед|колоездач/i,
+  staticObject: /платно|бордюр|стълб|дърво|ограда/i,
+};
+
 function collisions(events: RuleEvent[]): ViolationEvent[] {
   return events.filter(
     (e): e is ViolationEvent => e.kind === "violation" && e.code === "COLLISION",
@@ -122,6 +147,25 @@ describe("the split may not become a looser card that fits every crash", () => {
       expect(body.explanationBg).not.toBe(ROW.explanationBg);
       expect(body.titleBg).not.toBe(ROW.titleBg);
     }
+  });
+
+  it("THE CORRECTIVE MUST ANSWER ALL FOUR CARDS — was 1 of 4, now 4 of 4", () => {
+    // `hud/SessionEndScreen.tsx correctiveFor(m.code)` looks this up BY CODE —
+    // there is no per-event channel for it — and `FaultCard` prints it under
+    // «✔ Правилното действие», directly beneath the per-body explanation the
+    // split above supplies. So the student told (correctly) that he left the
+    // carriageway and struck a building was then told to keep two seconds
+    // behind the car in front. THEO-4: a WRONG answer to „какво трябваше да
+    // направя" is worse than none.
+    const answered = (s: string): ContactWith[] => KINDS.filter((k) => BODY_TOPIC[k].test(s));
+    // NEGATIVE CONTROL on the probe itself: the photographed string answers the
+    // lead-car card and only that one. If this ever reports four, the probe has
+    // gone blind and the assertion under it means nothing.
+    expect(answered(LEAD_CAR_ONLY_CORRECTIVE)).toEqual(["vehicle"]);
+    expect(answered(ROW.correctiveBg).sort()).toEqual([...KINDS].sort());
+    // …and the branch that was already right is still there — this fix adds
+    // three answers, it does not trade one for another.
+    expect(ROW.correctiveBg).toMatch(BODY_TOPIC.vehicle);
   });
 
   it("an UNRECOGNISED body falls back to the pooled row, never to silence", () => {

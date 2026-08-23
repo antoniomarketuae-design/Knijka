@@ -262,9 +262,116 @@ export function manoeuvreGradeReasonBg(result: LessonResult): string | null {
       `по изпитния лист. Третата се дава само на каране без нито една наказателна точка.`
     );
   }
-  // Nothing capped it: the breakdown rows below ARE the explanation — every
-  // measured line carries its own 0–2 and its own sentence.
+  // Nothing capped it. The breakdown rows below are then the explanation —
+  // WHEN THERE ARE ANY. `unmeasuredStarsNoteBg` answers the case where there
+  // are not; read the two together, they cover the card between them.
   return null;
+}
+
+/**
+ * ★★★ WITH NOTHING BEHIND IT — the half of the star row nobody was accounting
+ * for.
+ *
+ * MEASURED · `.audit-frames/proof/frames/sc-sp-harsh-brake__mobile-right`
+ * (steered, 2026-08-22) · `_audit-debrief.json`, the „Оценка на маневрата"
+ * card in full:
+ *
+ *   „Оценка на маневрата · оценка на симулатора — не е закон · ★★★ · Точки за
+ *    изпълнение — оценка на симулатора за качеството на маневрата, по 0–2 за
+ *    всеки показател … · Ориентировъчно време — 185 с при ориентир 75 с"
+ *
+ * That is the whole card. Three filled stars under a heading that promises an
+ * opinion ON THE EXECUTION, a note promising „0–2 за всеки показател", and then
+ * not one показател — the single row present is par time, which `scoreRubric`
+ * marks informational and the star fold ignores by construction (doc 76 §6).
+ * `sc-follow-distance__mobile-right` is byte-for-byte the same shape. THIS IS
+ * THE BARE VERDICT doc 64 THEO-4 forbids, on the one card whose entire subject
+ * is how well the manoeuvre was driven.
+ *
+ * WHY IT IS THE COMMON CASE AND NOT AN EDGE. A balanced-brace scan of
+ * `lessons/scenario/templates-*.ts` finds 162 authored rubrics (the lane first
+ * reported 196; recounted by the verifier — 128 is the figure that matters and
+ * it is the same one doc 86 D7 reached), of which 128
+ * name NO quality component at all — most are literally `rubric: { parTimeSec:
+ * n }` (sc-sp-harsh-brake: 75). On every one of them `scoreRubric`'s
+ * `measuredCount` is 0 and the stars fall out of `completedAll` and `score ===
+ * 0`, i.e. THE ИЗПИТЕН ЛИСТ SAID A SECOND TIME under the manoeuvre's label.
+ *
+ * WHY THE SENTENCE HAD NOWHERE TO LIVE UNTIL NOW. `rubric.ts` already authored
+ * it (`NO_QUALITY_MEASURED_BG`) and hangs it on rows that abstained — but a
+ * rubric with no quality component authors no such row, so on those 128 the
+ * sentence is attached to nothing and never renders. That file's own comment
+ * says so and parks the half it cannot reach: a new row needs a new member in
+ * `RubricBreakdownLine["id"]` (`lessons/scenario/types.ts`), and the par-time
+ * row cannot carry it either — `b15-lawful-wait.test.ts` („without a wait the
+ * line is byte-identical to what shipped") pins that string with an exact
+ * `toBe`. NONE OF THAT IS NEEDED HERE. The sentence is not a row — it is the
+ * card's account of its own star row, and the card is this file's.
+ *
+ * THE NUMBER IS NOT TOUCHED, AND NOTHING IS TAKEN AWAY. „Full stars from
+ * cleanliness" is a stated contract (rubric.ts counts ~141 assertions behind
+ * it); changing what the star scale MEANS is an ADR, not a render edit. The
+ * student keeps the three stars, keeps the pass, keeps the XP. What he gains is
+ * the one fact that makes them readable: they say „не наруши нищо", not
+ * „изкара маневрата отлично".
+ *
+ * NOT WALLPAPER — it speaks only into the silence. When anything capped the
+ * grade `manoeuvreGradeReasonBg` has already accounted for the number in that
+ * exact slot, and a second paragraph on every failed run is noise; when a
+ * quality component DID score, the rows carry their own 0–2 and their own
+ * sentence. So: no cap sentence AND no scoring row.
+ *
+ * WHY `points !== null` AND NOT `measured`. They are not the same question and
+ * the par-time row is the counter-example that matters: it reports
+ * `measured: true` with `points: null`, because it WAS measured and still feeds
+ * no star. `measured` would count it and silence this note on precisely the 128
+ * rubrics it exists for. Every `points: 0 | 1 | 2` push in `scoreRubric` is
+ * preceded by `measuredCount += 1` and no other push is, so „some line carries
+ * points" is `measuredCount > 0` exactly.
+ */
+export function unmeasuredStarsNoteBg(
+  result: LessonResult,
+  rubric: RubricScore,
+): string | null {
+  if (manoeuvreGradeReasonBg(result) !== null) return null;
+  if (rubric.breakdownBg.some((line) => line.points !== null)) return null;
+  // VERIFIER, ROUND 5 — THE SENTENCE WAS FALSE ON 12 TEMPLATES, AND IT WAS THE
+  // SECOND SENTENCE ON THE CARD, NOT THE FIRST.
+  //
+  // The two guards above ask „did anything SCORE?". The sentence below answers
+  // a narrower question: „does this lesson AUTHOR a показател at all?" — and on
+  // an `observation`-only rubric those come apart. `templates-merging.ts:166`
+  // (sc-merge-accel-lane) authors two glance moments and no placement/economy;
+  // `parkingObservationFromTrace` (scenario/observation.ts) returns null unless
+  // the drive contains a reverse phase, and a motorway merge has none, so the
+  // observation row abstains on EVERY drive of it: `points: null`,
+  // `measured: false`. Guard 2 therefore passes and, unguarded, the card told a
+  // student „този урок няма показатели … наблюдение" two lines above a row
+  // headed „Наблюдение" naming „Ляво огледало…" and „Мъртва зона през рамо…".
+  // Rendered and counted, not reasoned: that shape came out at TWO accounts of
+  // one star row, the second of them untrue.
+  //
+  // And nothing was missing there to begin with. `scoreRubric` appends
+  // `NO_QUALITY_MEASURED_BG` to every unmeasured row when `measuredCount` is 0,
+  // and it renders — `line.detailBg` is printed by the breakdown `<li>` below.
+  // A quality component that abstains ALWAYS pushes such a row (every
+  // `measured: true` push in that file carries numeric points; the only
+  // `measured: true` / `points: null` line in the product is par time), so a
+  // rubric with any quality component already carries exactly one account.
+  // This note exists for the 128 rubrics that carry NO row to hang it on.
+  //
+  // Census of the shipped catalogue (balanced-brace scan of
+  // `lessons/scenario/templates-*.ts`): 162 authored rubrics — 128 with no
+  // quality component (this note's constituency), 12 observation-only (the
+  // false case above), 22 with placement/economy.
+  if (rubric.breakdownBg.some((line) => line.id !== "parTime")) return null;
+  return (
+    `Този урок няма показатели за качество на изпълнението (точност на ` +
+    `позицията, икономичност на маневрата, наблюдение), затова нито един не бе ` +
+    `измерен. Звездите идват изцяло от изпитния лист — маршрут, изминат ` +
+    `докрай, без нито една наказателна точка — и казват „не наруши нищо“, а не ` +
+    `„изкара маневрата отлично“.`
+  );
 }
 
 /* ---------------------------------------------------------------------------
@@ -806,6 +913,15 @@ export function SessionEndScreen({
     score.opasniPoints,
   );
   const manoeuvreReasonBg = manoeuvreGradeReasonBg(result);
+  // …and the other half of the same slot: the card's account of its star row
+  // when NOTHING about the manoeuvre was measured (see unmeasuredStarsNoteBg).
+  // The two are mutually exclusive by construction. The THIRD account of the
+  // same star row lives one file over — `scoreRubric` appends
+  // `NO_QUALITY_MEASURED_BG` to an abstaining row when nothing was measured —
+  // and `unmeasuredStarsNoteBg`'s last guard stands out of its way, so the card
+  // carries exactly one sentence about its stars: never none, never two.
+  const unmeasuredStarsBg =
+    rubric !== null ? unmeasuredStarsNoteBg(result, rubric) : null;
 
   // The badge, and the number's tone read off the number rather than off the
   // badge — see SESSION_VERDICT_LABEL_BG and pointsToneClass.
@@ -1103,6 +1219,16 @@ export function SessionEndScreen({
           {manoeuvreReasonBg !== null ? (
             <p className="text-xs font-semibold leading-relaxed text-warning">
               {manoeuvreReasonBg}
+            </p>
+          ) : null}
+          {/* …and when nothing capped it AND nothing was measured, the same
+              slot says where the stars actually came from. Muted and not
+              `--warning`: nothing is wrong on such a run — the student passed
+              — the reading of the number is simply not what the heading above
+              it advertises. See unmeasuredStarsNoteBg. */}
+          {unmeasuredStarsBg !== null ? (
+            <p className="text-xs font-semibold leading-relaxed text-muted">
+              {unmeasuredStarsBg}
             </p>
           ) : null}
           {/* THE FOURTH SCALE, AND THE ONE A FIND-AND-REPLACE WOULD HAVE GOT

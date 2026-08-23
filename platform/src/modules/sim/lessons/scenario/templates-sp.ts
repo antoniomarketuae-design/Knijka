@@ -32,10 +32,15 @@
  *
  * Ambient traffic is ZERO in every drive (seed 7). sc-speed-creep and
  * sc-speed-rain carry no actor at all — the only gradable fault is the
- * driver's own speed. sc-speed-dangerous stages TWO learn-only flow actors
- * (a runaway pace car + an overtaking passer, both structurally unable to
- * emit events — the FTG_LEAD / rearTailgater precedents), so its only
- * gradable fault is STILL the driver's own speed. The shadow drives
+ * driver's own speed. sc-speed-dangerous stages TWO flow actors (a runaway
+ * pace car + an overtaking passer — the FTG_LEAD / rearTailgater precedents)
+ * and sc-mw-discipline one, and NONE OF THEM EMITS AN EVENT, so the only
+ * gradable fault in either drill is STILL the driver's own speed and lane.
+ * „Emits no event" is NOT „cannot be hit", and the difference cost this file a
+ * critical: a `brakingLeadCar` publishes a `contactCast` billed to the player,
+ * and on a road short enough to lap it comes back BEHIND him. Both pace cars
+ * therefore ride one lane pitch off the student's line — see THE LAP at
+ * `SPD_FLOW_LEAD` and THE FLOW at `MWD_FLOW_LEAD`. The shadow drives
  * disciplined and clean and earns the family positive CLEAN_DRIVING.
  *
  * Family: "speed" — the catalog chip added for the SP family (doc 72 §8);
@@ -72,6 +77,9 @@ const LANE_X = 4.06;
 /** ov-keepright-v1 (2+2 boulevard): right (cruise) / left (pass) centers. */
 const KRD_RIGHT = 12.19;
 const KRD_LEFT = 4.06;
+/** One drawn lane of ov-keepright-v1, m — the staged actors' `extraRightOffsetM`
+ *  step (negative = the lane to the LEFT of the student's own). */
+const KRD_LANE_PITCH = KRD_RIGHT - KRD_LEFT; // 8.13
 
 // ---------------------------------------------------------------------------
 // 1. sc-speed-creep — „Пълзящо превишаване" (SP-01 + SP-03) on sp-creep2-v1:
@@ -215,8 +223,10 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
 //   - the PASSER behind (rearTailgater — learn-only, emits ZERO events by its
 //     runner contract) glues briefly, then overtakes on the left at the same
 //     illegal pace: the push.
-// Neither actor can grade anything; the ONLY gradable fault stays the
-// player's own speed. The two mistakes now demonstrate the BAND ITSELF:
+// The PASSER can grade nothing (empty `contactCast` by its runner's own
+// policy). The PACE CAR is a solid body billed to the player, so its LANE is
+// load-bearing — see THE LAP, below. The two mistakes demonstrate the BAND
+// ITSELF:
 // pacing the flow at ~58 grades второстепенна SPEEDING_OVER_LIMIT; chasing it
 // at ~66 grades опасна SPEEDING_DANGEROUS — same road, same flow, 8 km/h
 // apart, an exam continued vs an exam terminated. That contrast IS the +10
@@ -227,12 +237,81 @@ export const SC_SPEED_CREEP: ScenarioSpec = {
 /**
  * The RUNAWAY PACE CAR — „потокът" ahead. followGapM 400 on a 360 m road can
  * never be satisfied, so the matchPlayer controller pins the actor at its
- * maxMatchSpeedMps constantly (the FTG_LEAD documented precedent): a car in
- * the player's own lane pulling away at ~61 km/h. Slam tier authored out of
- * reach (slamAt past the road end + minSlamSpeedKmh 250) — deterministic
- * moving traffic, never a braking drill. It starts ~55 m ahead and only
- * GAINS distance on a lawful player, so FOLLOWING_TOO_CLOSE structurally
- * cannot arm even against the 66 km/h chase demo (gap stays ≥ ~50 m).
+ * maxMatchSpeedMps constantly (the FTG_LEAD documented precedent): a car
+ * pulling away at ~61 km/h. Slam tier authored out of reach (slamAt past the
+ * road end + minSlamSpeedKmh 250) — deterministic moving traffic, never a
+ * braking drill. It starts ~55 m ahead and only GAINS distance on a lawful
+ * player, so FOLLOWING_TOO_CLOSE structurally cannot arm even against the
+ * 66 km/h chase demo (gap stays ≥ ~50 m).
+ *
+ * ---------------------------------------------------------------------------
+ * THE LAP — why this car rides the LEFT lane and not the student's own
+ * (finding sc-speed-dangerous:e8414c56, critical; frames
+ * .audit-frames/wave-c/frames/sc-speed-dangerous__pc-right/08-debrief.png and
+ * .audit-frames/proof/frames/sc-speed-dangerous__{pc,mobile}-right/).
+ * ---------------------------------------------------------------------------
+ *
+ * WHAT THE FRAMES SHOW. A drive that held a cautious pace under the 50 while
+ * the flow went by returns НЕИЗДЪРЖАН, 10 наказателни точки, ★☆☆ and exactly
+ * one опасна грешка — «Удар в друго превозно средство» — on BOTH platforms,
+ * with both route objectives ticked. The card blames the student for a
+ * collision, and the debrief's own advice («дръж 2 секунди зад предния») is
+ * advice about a car in FRONT of him. He was hit from BEHIND.
+ *
+ * THE MECHANISM, MEASURED through the production stack (runtime → traffic →
+ * director → rules, __tests__/sp-flow-lead-lane.test.ts):
+ *
+ *  1. this actor is pinned at 17 m/s from the first second, so it covers the
+ *     290 m from its hold to the end of a 360 m road in ~21 s and `finished`
+ *     latches — long before a lesson whose drive budget is minutes;
+ *  2. FR-B5-RETURN (traffic/staged.ts) then does the right thing for the wrong
+ *     lane: rather than stand at the horizon it drives 70 m clear and RE-ENTERS
+ *     at its own hold pose — which is BEHIND a student who has driven on —
+ *     „under the command it left with". That command is `matchPlayer` with a
+ *     station of 400 m, and the rubber band `player + 0.55 × (400 − gap)` is
+ *     SIGN-BLIND: it commands maximum closing speed whether the actor is ahead
+ *     of him or behind him. The trick that makes this car a carrot in front
+ *     makes it a homing missile behind;
+ *  3. the staged-traffic player guard cannot save him. It opens at
+ *     GUARD_AHEAD_M 16 m, aims to stop GUARD_STOP_SHORT_M 6 m short and brakes
+ *     at HOLD_DECEL_MPS2 8 m/s² — 10 m of working room, i.e. it can arrest
+ *     √(2 × 8 × 10) ≈ 12.6 m/s. This car arrives at 17;
+ *  4. `BrakingLeadCarRunner` publishes a `contactCast` billed to the player
+ *     («closing: "player"»), so the touch is booked against HIM. Measured on
+ *     the sweep's own stop-go control law: first contact t = 84.3 s, player at
+ *     y = 155.4 doing 2.1 км/ч, actorId `sc-dng-flow-lead`, 44 overlap frames.
+ *     The лепка behind him is innocent by construction (RearTailgaterRunner
+ *     declares an EMPTY cast — „a rear-end by a car glued to your bumper is not
+ *     the student's fault; billing it here would convict the victim"). This car
+ *     did the same thing and was billed, because nothing had thought about what
+ *     it becomes on its second lap.
+ *
+ * THE FIX IS ONE LANE, and it is the lane discipline the rest of the catalogue
+ * already has: staged.ts states as measured fact that „every same-road actor in
+ * the catalogue rides ONE LANE PITCH off the student's line by authored
+ * construction (`extraRightOffsetM` ±8.125 / ±8.13)". These two flow actors
+ * were the exception. With the pace car one pitch LEFT its separation from a
+ * student who holds the right lane — the lane this drill's own objective pins,
+ * radius 6 < the 8.13 m pitch — is 8.13 m on every frame of every run, scripted
+ * or returning, so it cannot be the striker at any speed. Measured across
+ * steady 20…47 км/ч and the stop-go law: contacts 44 → 0.
+ *
+ * AND IT COSTS THE DRILL NOTHING. The carrot is still ~55 m ahead, still
+ * pulling away at ~61, still in the windscreen; instruction 2 still reads
+ * «Колата пред теб … се отдалечава с над 60 — остави я», with the lane named so
+ * the sentence matches the world (the sp-world-claims gate). It is also the
+ * truer picture: a car doing 61 on a 50 boulevard belongs in the overtaking
+ * lane, and putting it there makes the right-lane discipline this lesson grades
+ * legible instead of incidental.
+ *
+ * NOT FIXED HERE, AND ROUTED: the passer re-enters the same way, in the
+ * student's OWN lane (`rewindTo` zeroes the lateral channel, so the lane it
+ * passed into is forgotten) at its 17 m/s pass cruise, and drives THROUGH him —
+ * measured closest approach 0.004 m of centres. Nothing is billed (empty cast)
+ * and nothing can be: it is the лепка's own contract. But a car passing through
+ * the student is a defect of its own, and its lever is not in this file — a
+ * returning actor needs either the lane it left with or a pace the guard can
+ * arrest (traffic/staged.ts, FR-B5-RETURN's `rewindTo` / `reentryArc`).
  */
 const SPD_FLOW_LEAD: BrakingLeadCarSpec = {
   id: "sc-dng-flow-lead",
@@ -241,12 +320,16 @@ const SPD_FLOW_LEAD: BrakingLeadCarSpec = {
     pathNodes: ["ov-kr-n-start", "ov-kr-n-end"],
     hold: { nodeIndex: 0, offsetM: 70 }, // dormant ~55 m ahead of the spawn
     cruiseSpeedMps: 17,
-    extraRightOffsetM: 0, // the player's own (right) lane, x ≈ 12.19
+    // THE LEFT (overtaking) lane, x ≈ 4.06 — see THE LAP above. This is the
+    // whole of finding sc-speed-dangerous:e8414c56's repair; the guard for it
+    // is __tests__/sp-flow-lead-lane.test.ts, which drives the production
+    // stack and fails the moment this returns to 0.
+    extraRightOffsetM: -KRD_LANE_PITCH,
     colorIndex: 2,
   },
   followGapM: 400, // ABOVE any possible gap → constant maxMatchSpeedMps cruise
   maxMatchSpeedMps: 17, // ~61 km/h — the flow's illegal pace
-  slamAt: { x: KRD_RIGHT, y: 900 }, // far past the 360 m road — never reached
+  slamAt: { x: KRD_LEFT, y: 900 }, // far past the 360 m road — never reached
   slamRadiusM: 2,
   slamDecelMps2: 6,
   minSlamSpeedKmh: 250, // the slam tier is authored out of reach…
@@ -292,7 +375,7 @@ export const SC_SPEED_DANGEROUS: ScenarioSpec = {
   tagsBg: ["скорост", "ограничение на скоростта", "скорост на потока", "опасна грешка", "изпит"],
   titleBg: "Превишаване над +10 км/ч",
   objectiveBg:
-    "Потокът по булеварда лети с над 60 км/ч — една кола ти се отдалечава отпред, друга те притиска и изпреварва. Задачата е да НЕ тръгнеш с тях: дръж 46–48 км/ч в дясната лента. 51–60 е второстепенна грешка; над 60 (+10) е опасна и на изпита значи директно отпадане.",
+    "Потокът по булеварда лети с над 60 км/ч — една кола пред теб в лявата лента се отдалечава, друга те притиска отзад и после те изпреварва отляво. Задачата е да НЕ тръгнеш с тях: дръж 46–48 км/ч в дясната лента. 51–60 е второстепенна грешка; над 60 (+10) е опасна и на изпита значи директно отпадане.",
   archetypeIds: ["SP-02", "SP-13"],
   conceptIds: ["c-speed-limits", "c-speed-adaptation", "c-general-care-duty"],
   map: {
@@ -308,7 +391,16 @@ export const SC_SPEED_DANGEROUS: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Потегли по булеварда в дясната лента — ограничението е 50 км/ч, а потокът около теб няма да го спазва." },
-    { n: 2, textBg: "Колата пред теб се отдалечава с над 60 — остави я. Скоростта се чете от знака и скоростомера, не от гърба на предния." },
+    // THE LANE IS NAMED BECAUSE THE CAR IS IN IT (finding sc-speed-dangerous:
+    // e8414c56 — see THE LAP at SPD_FLOW_LEAD). The pace car now rides the
+    // LEFT lane, so the sentence says so: a briefing that points at a car in
+    // „твоята лента" while the world puts it one lane over is the same crime
+    // this file already struck twice (the school on sp-trans-v1, the мантинела
+    // on mw-v1). Everything the line taught is intact — it is still «Колата
+    // пред теб», it still «се отдалечава с над 60», and the moral is still
+    // that the needle is read off the plate and the speedometer rather than
+    // off the back of the car in front.
+    { n: 2, textBg: "Колата пред теб в ЛЯВАТА лента се отдалечава с над 60 — остави я. Скоростта се чете от знака и скоростомера, не от гърба на предния." },
     { n: 3, textBg: "В огледалото се появява кола, която те притиска и после те изпреварва отляво. Нейната грешка е нейна — не я прави своя." },
     { n: 4, textBg: "Помни границата: 55–60 е второстепенна грешка, а НАД 60 км/ч (+10) е опасна — на изпита това е директно отпадане." },
     { n: 5, textBg: "Задръж 46–48 км/ч до края на отсечката — да те изпреварват е нормално; да отпаднеш от изпита не е." },
@@ -811,6 +903,36 @@ export const SC_SPEED_TRANSITION: ScenarioSpec = {
     // a student to lift off for a building that is not out the windscreen is
     // the exact judgement this drill claims to teach.
     //
+    // …AND THE SENTENCE WAS ONE MISSING FIELD FROM BEING TRUE (measured
+    // 2026-08-23, and routed rather than done here because the file is not this
+    // lane's). content/world/sp-trans-v1.json carries SEVEN buildings and the
+    // FIRST OF THEM IS ALREADY CALLED `sp-tr-b-school`. It has no `kind`. The
+    // map's author put a school on this street and the one field that turns a
+    // footprint into a school — `kind: "school"`, which world/builders/
+    // schools.ts reads to derive the УЧИЛИЩЕ board, the yard railing and the
+    // А19 „Деца" posts — was never set, so the builder skips it and the student
+    // sees another anonymous block. That is why the copy promised a school it
+    // could not show: the promise was written against the intent, and the
+    // intent never reached the world.
+    //
+    // THE FIX IS ONE KEY, in tools/maps/gen_sp_transition.mjs and the committed
+    // district it writes, and NOTHING here has to change to accept it: the
+    // claim gate asks the district (`buildings.some(b => b.kind === "school")`,
+    // __tests__/sp-world-claims.test.ts), so the day that field is authored the
+    // school sentence becomes legal on this map by itself — and §3 of that file
+    // already proves the same sentence is ACCEPTED on sp-zone30-v1, which is
+    // the same predicate answering yes.
+    //
+    // Until then the copy stays as it is, and the remaining half of finding
+    // sc-speed-transition:f9e554fb — „no pedestrians … no residential cue" — is
+    // the streetscape complaint routed at sc-sp-curve below (both edges here
+    // ARE class `residential`; the dressing is what does not say so). Staged
+    // walkers would answer the „no pedestrians" half from THIS file, on the
+    // SCHOOL_YARD_CHILDREN pattern above, and that is the next change this
+    // lesson wants — it is left undone rather than done unverified, because
+    // this template's three committed recordings would have to be re-verified
+    // against the new cast in the same change.
+    //
     // What is left is what the map really is, and it is enough: the В26 disc at
     // y = 160 and a `residential` street behind it. The zone-transition IS the
     // lesson (see the header above) — the school was never carrying it.
@@ -1058,11 +1180,26 @@ export const SC_SP_CURVE: ScenarioSpec = {
     // edge CLASS, and gen_rural_curve.mjs authors this rural road as
     // `unclassified`, which world/builders/props.ts treats as residential-ish
     // (lamps, parapets, the tree pass at props.ts's `cls !== "residential" &&
-    // cls !== "unclassified"` gate), cityBuildings.ts fills with blocks and
-    // TrafficLayer parks its procedural row along. Fix belongs in
-    // tools/maps/gen_rural_curve.mjs + world/builders/{props,cityBuildings}.ts;
-    // there is no scenario-side lever (the spec carries no streetscape field,
-    // and sp-curve-v1's only other spawn is PAST the curve).
+    // cls !== "unclassified" && cls !== "living_street"` gate, props.ts:1615),
+    // and TrafficLayer parks its procedural row along it.
+    //
+    // RE-MEASURED 2026-08-23 against the committed district, because one clause
+    // of the routing above was wrong and would have sent the receiving lane to
+    // the wrong file: content/world/sp-curve-v1.json holds ONE edge
+    // (`spc-e-road`, class `unclassified`, maxspeed 90, 687 m), ONE building
+    // (`spc-b-barn`, no `kind`) and one `curveAdvisory` zone. So the five-storey
+    // blocks in the frame are NOT cityBuildings.ts — that builder places the kit
+    // onto REAL footprints and this district has one, a barn. Whatever
+    // synthesises the roadside blocks for a district with no footprints is the
+    // thing to find; the frame
+    // (.audit-frames/proof/frames/sc-sp-curve__pc-right/01-arrival.png) shows
+    // blocks, lamps, a left-verge parapet and a full rank of parked cars beside
+    // a correctly posted 90 disc.
+    //
+    // There is still no scenario-side lever: the spec carries no streetscape
+    // field, and sp-curve-v1's only other spawn (`spc-spawn-exit`, x = 355,
+    // y = 385.94) is PAST the curve, so it cannot be used to skip the dressed
+    // approach without deleting the 220 m the drill brakes over.
     { n: 1, textBg: "Потегли по извънградския път — тук ограничението е 90 км/ч и правата е свободна." },
     { n: 2, textBg: "Напред следва знак А1 „Опасен завой надясно“ с табела „50“ — препоръчителната скорост за завоя." },
     { n: 3, textBg: "Свали скоростта ПРЕДИ завоя: вдигни газта отрано и спри намаляването около 45–50 км/ч още на правата." },
@@ -1151,6 +1288,155 @@ export const SC_SP_CURVE: ScenarioSpec = {
 
 /** mw-v1 northbound cruise-lane center (meta.scenario — the L7 copy truth). */
 const MW_X_CRUISE = 0;
+/** …and its OVERTAKING lane centre (meta.scenario.laneLeftX). The flow rides
+ *  here; see THE FLOW below for why the lane is the whole of the design. */
+const MW_X_LEFT = -8.12;
+/**
+ * …and the lane a staged actor lands in on this edge with NO offset
+ * (meta.scenario.laneEmergencyX).
+ *
+ * MEASURED, because guessing it put the flow car in the student's own lane and
+ * billed the shadow drive FOLLOWING_TOO_CLOSE. `resolveStagedVehiclePath`
+ * (traffic/system.ts) places an actor in the RIGHTMOST lane of its edge and
+ * then applies `extraRightOffsetM`; `mw-e-nb` is authored `lanes: 3` — the two
+ * travel lanes PLUS the emergency lane — so the rightmost lane is the
+ * EMERGENCY one, not the cruise lane the student drives. The player's own
+ * grading uses the `emergencyLaneRight` seam to make laneId 1 the rightmost
+ * REQUIRED lane; the staged path resolver does not, and nothing reconciles
+ * them. So an actor's offset on THIS map is measured from +8.13, not from 0.
+ *
+ * Watched: `extraRightOffsetM: MW_X_LEFT − MW_X_CRUISE` (= −8.12) put the car
+ * at x = +0.01, i.e. exactly on the student's line, and the shadow's leadGap
+ * fell to 17.7 m at 125 км/ч — the trace gate's zero-violation assertion went
+ * red with FOLLOWING_TOO_CLOSE. That is what a lane guessed rather than
+ * measured costs, and it is the same defect class as the one being repaired.
+ */
+const MW_X_STAGED_DEFAULT = 8.13;
+
+/**
+ * The flow's pace, m/s — 36.0, i.e. ~129.6 км/ч.
+ *
+ * IT IS A CEILING, NOT A TASTE. `sim/collision/__tests__/index.test.ts` walks
+ * every authored `cruiseSpeedMps` in the catalogue and budgets the CONTACT
+ * SWEEP against the fastest of them: the worst frame the physics clock can
+ * produce is (PLAYER_TERMINAL_MPS 46.78 + fastest) × the 0.5 s rapier clamp,
+ * plus the rotation term, against `SWEEP_FRAME_TRAVEL_M` = 60 m — past which
+ * `ContactProbe` stops treating an interval as motion at all and the geometry
+ * BLANKS. The catalogue's fastest car is 36.0 (sc-merge-motorway-exit's rear
+ * tailgater) and the budget is measured from it: 41.39 m of translation,
+ * 55.33 m of ceiling, 8.4 % of headroom on the binding row.
+ *
+ * Authored at 38 (the first cut of this actor, ~137 км/ч) that becomes 42.39 /
+ * 56.33 and the headroom falls to 6.5 % — a real safety margin spent on 7 км/ч
+ * of scenery. So the flow rides at the ceiling the catalogue already carries.
+ *
+ * IT IS STILL THE FLOW, and it is arguably the better teaching object at 130
+ * than at 137: instruction 2 asks him to settle at «120–130 км/ч — със
+ * скоростта на потока», so a car doing 130 is the flow EXACTLY. Drive 120 and
+ * it pulls away from you; drive 130 and you hold station with it. What it may
+ * never be is SLOWER than any leg this lesson ships, because the whole safety
+ * argument for a solid body here is that the gap only ever opens — and it is
+ * not: the left-lane hog demo, the fastest of the three, drives 130 км/ч =
+ * 36.11 m/s and starts 135 m astern, so it closes at 0.11 m/s and would need
+ * 20 minutes to arrive on a 26 s route. Guarded in
+ * __tests__/sp-mw-flow-visible.test.ts §2.
+ */
+const MW_FLOW_MPS = 36;
+
+/**
+ * THE FLOW — one car in the OVERTAKING lane, doing the speed the briefing
+ * names (finding sc-mw-discipline:3bec2af1, major; frame
+ * .audit-frames/sweep161/sc-mw-discipline/pc-right/04-t103s.png and every
+ * frame of all four legs: not one other vehicle anywhere).
+ *
+ * THE COMPLAINT. Instruction 2 is «установи се около 120–130 км/ч — на
+ * магистрала се кара със скоростта на потока» and instruction 4 grades crawling
+ * far below that flow. Both are judgements about traffic the student cannot
+ * see. A drill that asks a seventeen-year-old to match a flow, and then grades
+ * him against it on an empty road, is teaching him to read a number off the
+ * HUD — which is the opposite of the habit («скоростта се чете от пътя, не от
+ * километража») this family exists to build.
+ *
+ * WHY A LEAD IN THE LEFT LANE AND NOT A PASSER BEHIND. The passer is the more
+ * vivid picture and it is the shape sc-speed-dangerous uses, but this template
+ * is different in one decisive way: its OWN mistake demo puts the student in
+ * the LEFT lane for a kilometre («Висене в лявата лента при 130»), and its
+ * other one crawls him along the CRUISE lane at 40. A `rearTailgater` closing
+ * from astern therefore ends up inside one of the two shipped recordings
+ * whichever lane it is given — it stages `playerGuard: false` by design (its
+ * sub-6 m лепка pose needs that) and its `passSpeedMps` is above what any
+ * guard could arrest anyway. It would not GRADE anything (its `contactCast` is
+ * empty by policy), which is exactly what makes it dangerous here: it would
+ * simply drive THROUGH the student in a demo the product renders as a clip.
+ *
+ * A lead that is always FASTER than the student cannot do that. This one holds
+ * 285 m up the overtaking lane, arms when he is within 200 m and then cruises
+ * its own arc at ~137 км/ч under `scheduledCruise` — faster than the 125 the
+ * shadow drives, faster than the 130 the hog drives, and immeasurably faster
+ * than the 40 the crawl drives. Every leg the gap OPENS, so the one solid body
+ * in this lesson can never be reached from behind, in any lane, on any rung.
+ *
+ * AND THE LANE IS LOAD-BEARING FOR A SECOND REASON — the one this file learned
+ * on sc-speed-dangerous (see THE LAP): a `brakingLeadCar` publishes a
+ * `contactCast` billed to the player, and FR-B5-RETURN re-enters a retired
+ * actor at its hold pose, behind him, under the command it left with. In the
+ * student's own lane that is a rear-end billed to the victim. One lane pitch
+ * over it is a car going past, which is what it always should have been.
+ *
+ * WHY NOT AMBIENT TRAFFIC, still. `spec.traffic.vehicleCount` would break the
+ * determinism law (ambient 0, seed 7) AND buy a false pass: the crawl detector
+ * exempts a car that is merely stuck behind someone, so an ambient car that
+ * happened to be in the CRUISE lane ahead could turn a real 40 км/ч crawl into
+ * a clean sheet. A staged actor in the OVERTAKING lane is not a lead in his
+ * lane and cannot be mistaken for a queue — which the trace gate now proves
+ * rather than assumes: «Пълзене с 40» still grades exactly
+ * DRIVING_TOO_SLOW_FOR_MOTORWAY with the flow car staged.
+ *
+ * SLAM TIER AUTHORED OUT OF REACH (slamAt past the 2600 m road end,
+ * minSlamSpeedKmh 250, proximityFallbackM 0.3 unreachable): deterministic
+ * moving traffic, never a braking drill.
+ */
+const MWD_FLOW_LEAD: BrakingLeadCarSpec = {
+  id: "sc-mwd-flow-lead",
+  kind: "brakingLeadCar",
+  actor: {
+    pathNodes: ["mw-n-nb-start", "mw-n-nb-end"],
+    // ~135 m up the road from the spawn: ~4 s of headway at the taught 125 —
+    // near enough to READ as a car rather than a dot on a 2600 m straight —
+    // and it is the buffer the „only ever opens" argument spends, because at
+    // MW_FLOW_MPS the fastest leg (the 130 км/ч hog) closes at 0.11 m/s.
+    hold: { nodeIndex: 0, offsetM: 150 },
+    cruiseSpeedMps: MW_FLOW_MPS,
+    // The OVERTAKING lane, x ≈ −8.12 — measured from the EMERGENCY lane this
+    // edge's rightmost lane actually is (see MW_X_STAGED_DEFAULT), not from
+    // the cruise lane the student drives.
+    extraRightOffsetM: MW_X_LEFT - MW_X_STAGED_DEFAULT,
+    colorIndex: 5,
+  },
+  // Under `scheduledCruise` this is only the release distance's fallback — the
+  // authored `armDistM` below is what actually releases it. It is kept at a
+  // motorway-plausible station so a future switch back to the band would not
+  // silently pin the actor at max speed (the sc-speed-dangerous trap).
+  followGapM: 90,
+  maxMatchSpeedMps: MW_FLOW_MPS,
+  paceMode: "scheduledCruise",
+  paceSpeedMps: MW_FLOW_MPS,
+  // > the 135 m it holds ahead of the spawn, so it is ROLLING FROM THE FRAME HE
+  // IS. Authored, not defaulted, and the reason is a picture: `scheduledCruise`
+  // waits at its hold until this distance, and any smaller number leaves a car
+  // STANDING STILL in the overtaking lane of a motorway while he closes on it
+  // at 125 км/ч. A stopped car in the fast lane is an emergency, not потокът —
+  // measured at a 285 m hold and armDistM 200 it stood there for the first ~9 s
+  // and the student then closed to 22 m of it. Released with him, it only pulls away.
+  armDistM: 320,
+  slamAt: { x: MW_X_LEFT, y: 4000 }, // far past the 2600 m road — never reached
+  slamRadiusM: 2,
+  slamDecelMps2: 6,
+  minSlamSpeedKmh: 250, // …the slam tier is authored out of reach…
+  proximityFallbackM: 0.3, // …and the proximity fallback cannot occur
+  triggersHazard: false,
+  resumeAfterSec: 3,
+};
 
 /**
  * SP-10 — скорост на потока + дръж вдясно на автомагистрала (ЗДвП чл. 15,
@@ -1163,23 +1449,18 @@ const MW_X_CRUISE = 0;
  *
  * THE MISSING „ПОТОК" (sweep161 — sc-mw-discipline/pc-right/04-t103s.png and
  * every frame of all four legs: not one other vehicle anywhere). The concept
- * this lesson names is the speed of the flow, and there is no flow to read.
- * The finding is REAL and is NOT closed. Two ways it could be closed, and why
- * neither belongs in this file alone:
- *   · STAGED flow actors — the right shape, and sc-speed-dangerous above is the
- *     working precedent (a learn-only lead + passer that cannot grade). But
- *     traces/scMwDiscipline.ts feeds `SC_MW_DISCIPLINE.staged` straight into
- *     `recordScriptedDrive`, so adding one here changes all three committed
- *     recordings and reds traces/__tests__/sc-mw-discipline-traces.test.ts,
- *     whose §3 asserts the files are byte-for-byte these scripts. It needs the
- *     actor AND a re-record (RECORD_TRACES=1) in the same change.
- *   · AMBIENT traffic (`spec.traffic.vehicleCount`) — REFUSED, and this is the
- *     trap worth writing down: the crawl detector exempts a car that is merely
- *     stuck behind someone (`leadGapM > cfg.motorwaySlowQueueGapM`,
- *     rules/engine.ts). An ambient car that happens to be ahead would turn a
- *     real 40 км/ч crawl into a clean pass — a FALSE PASS bought to fix a
- *     staging complaint. The determinism law (ambient 0, seed 7) already
- *     forbids it; this is the second reason.
+ * this lesson names is the speed of the flow, and there was no flow to read.
+ * CLOSED by `MWD_FLOW_LEAD` above — one staged car in the OVERTAKING lane at
+ * ~137 км/ч, which is the flow, seen from the lane the drill asks him to hold.
+ * The design note there explains why it is a lead in the LEFT lane and not the
+ * passer sc-speed-dangerous uses (this template's own mistake demos put the
+ * student in BOTH lanes, so an actor that closes from astern ends up inside a
+ * shipped recording), and why AMBIENT traffic stays refused — it would break
+ * the determinism law AND could buy a false pass, because the crawl detector
+ * exempts a car merely stuck behind someone (`leadGapM >
+ * cfg.motorwaySlowQueueGapM`, rules/engine.ts). The trace gate now measures
+ * that rather than assuming it: with the flow staged, «Пълзене с 40» still
+ * grades exactly DRIVING_TOO_SLOW_FOR_MOTORWAY, once.
  * The wrong-drive column of that same sweep leg is NOT evidence of a hole here:
  * pc-wrong held the throttle, ran 136 км/ч in the cruise lane and passed with
  * 0 errors — which is the correct verdict, because on a 140 motorway that IS a
@@ -1228,7 +1509,12 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     // any SP briefing names a мантинела again, until a builder exists to draw
     // one (routed: world/builders/props.ts + a district-schema feature).
     { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, а двете посоки вървят по отделни платна, разделени с ивица по средата." },
-    { n: 2, textBg: "Ускорявай уверено и се установи около 120–130 км/ч — на магистрала се кара със скоростта на потока." },
+    // THE FLOW IS NOW OUT THE WINDSCREEN (finding sc-mw-discipline:3bec2af1 —
+    // see THE FLOW at MWD_FLOW_LEAD). The line used to ask the student to match
+    // „потока" on a road with not one other vehicle on it; it now points at the
+    // car that IS the flow, so the number he is asked to hold has something to
+    // be read against. The claim gate: __tests__/sp-world-claims.test.ts.
+    { n: 2, textBg: "Погледни колата в лявата лента напред — тя се движи с потока, около 130 км/ч. Ускорявай уверено и се установи около 120–130 км/ч: на магистрала се кара със скоростта на потока — караш ли 120, тя бавно ти се отдалечава." },
     { n: 3, textBg: "Дръж ДЯСНАТА лента за движение: лявата е само за изпреварване, а аварийната вдясно не е лента за движение изобщо." },
     { n: 4, textBg: "Не пълзи: трайно движение далеч под потока (под 50 км/ч без причина) прави от колата ти подвижно препятствие." },
     { n: 5, textBg: "Задръж скоростта и лентата до края на участъка." },
@@ -1286,6 +1572,12 @@ export const SC_MW_DISCIPLINE: ScenarioSpec = {
     // the delta AND the instructor's line that explains it, authored together.
     l5Wet(),
   ],
+  // THE FLOW (finding sc-mw-discipline:3bec2af1). In `staged`, not `stagedAdd`:
+  // the concept the lesson grades — «скоростта на потока» — is not a level-5
+  // complication, it is the lesson, and a student on any rung has to be able to
+  // SEE it. All three committed recordings were re-verified against this cast
+  // (traces/__tests__/sc-mw-discipline-traces.test.ts §5/§9).
+  staged: [MWD_FLOW_LEAD],
   conditions: { weather: "dry" },
   localeBg: "bg-BG",
 };

@@ -10,7 +10,8 @@
 
 import { describe, expect, it } from "vitest";
 import { makeCommendation, makeViolation } from "../catalog";
-import { accumulateScore, isPassing, ledgerCloseTime } from "../scoring";
+import { accumulateScore, isPassing, ledgerBilling, ledgerCloseTime } from "../scoring";
+import type { ViolationEvent } from "../types";
 
 const collision = (t: number) => makeViolation("COLLISION", t); // опасна + terminateSession
 const redLight = (t: number) => makeViolation("RED_LIGHT_CROSSED", t); // опасна, NOT terminating
@@ -442,5 +443,172 @@ describe("the junction family, and the legs the first wave did not reach", () =>
     expect(s.unscoredAfterClose).toBe(1);
     // …and the same fault BEFORE the crash still costs its точка.
     expect(accumulateScore(streamOf([GAP, PTP])).totalPoints).toBe(11);
+  });
+});
+
+/**
+ * THE GUARD THAT KEEPS THE CLOSURE FROM MANUFACTURING A PASS (2026-08-23).
+ *
+ * `scoring.ts` closes the ledger only on a violation that is BOTH
+ * `terminateSession` and `opasna`, and its header spends a paragraph on why the
+ * second half is there: dropping points is the one shape of change that can
+ * turn a failure into a false pass, and a terminating fault of a lighter class
+ * would close the sheet at a total still inside приложение № 5, т. 11's caps.
+ *
+ * MEASURED: that clause was unguarded. Deleting `severityClass === "opasna"`
+ * from the closing predicate — in either of the two places that used to hold a
+ * copy of it — left all 810 tests of `src/modules/sim/rules` GREEN, on the very
+ * fold that turns «280 наказателни точки» into 81 and «640» into 10. The three
+ * cases below fail on that deletion.
+ *
+ * The event is hand-built rather than taken from the catalogue because no
+ * catalogue row is like this today, and that is the point: `ViolationEvent`
+ * lets any producer set `terminateSession` on any code, `makeViolation` copies
+ * whatever the spec carries, and the day a second termination ground is added
+ * (чл. 48, ал. 3 names two — ПТП and повторна намеса на комисията) this is the
+ * shape it can arrive in.
+ */
+const terminatingOsnovna = (t: number): ViolationEvent => ({
+  ...makeViolation("SEATBELT_OFF_WHILE_MOVING", t), // основна, 3 т.
+  terminateSession: true,
+});
+
+describe("the guard that keeps the closure from manufacturing a pass", () => {
+  it("a terminating fault that is NOT опасна does not close the ledger", () => {
+    const events = [terminatingOsnovna(10), belt(40)];
+    expect(ledgerCloseTime(events)).toBeNull();
+    const s = accumulateScore(events);
+    expect(s.totalPoints).toBe(6); // both rows billed — nothing was closed
+    expect(s.ledgerClosedAtSec).toBeNull();
+    expect(s.unscoredAfterClose).toBe(0);
+    expect(ledgerBilling(events)).toEqual([true, true]);
+  });
+
+  it("…and a second copy of that fault is billed too, not swallowed as a duplicate closer", () => {
+    // The one-termination-one-bill rule may only fire for a fault that actually
+    // terminated. Applied to a lighter class it becomes a silent amnesty for
+    // every repeat of it.
+    const s = accumulateScore([terminatingOsnovna(10), terminatingOsnovna(40), belt(60)]);
+    expect(s.totalPoints).toBe(9);
+    expect(s.osnovniCount).toBe(3);
+    expect(s.unscoredAfterClose).toBe(0);
+  });
+
+  it("…and this is the ИЗДЪРЖАН it stops: 10 наказателни точки, not 3", () => {
+    // Without the `opasna` half, this stream closes at 5 s, drops three of its
+    // four rows and lands at 3 наказателни точки / 3 от основни — inside both
+    // caps of приложение № 5, т. 11, i.e. a PASS handed to a drive that failed
+    // on the total and on the основни cap at once. There is no `hasDangerous`
+    // here to catch it, because nothing опасно happened.
+    const events = [terminatingOsnovna(5), belt(20), belt(40), speeding(60)];
+    const s = accumulateScore(events);
+    expect(s.ledgerClosedAtSec).toBeNull();
+    expect(s.totalPoints).toBe(10); // > 9
+    expect(s.osnovniPoints).toBe(9); // > 6
+    expect(s.hasDangerous).toBe(false);
+    expect(isPassing(s)).toBe(false);
+  });
+});
+
+/**
+ * THE THREE OPEN FINDINGS ON THIS FILE THAT HAD NO PIN, PINNED FROM THE FRAMES
+ * THAT RE-DRIVE THEM (2026-08-23).
+ *
+ * The blocks above re-score sweep-161 streams — the drives that FILED the
+ * findings. The first two here are the other side: the streams the product
+ * produced after the closure shipped, read off the steered re-drive under
+ * `.audit-frames/rebase` and the Wave-C re-drive under `.audit-frames/wave-c`.
+ * THE THIRD IS NOT A RE-DRIVE and this header used to say it was (corrected by
+ * the verifier, 2026-08-23): its stream is sweep-161's, the filing drive, and
+ * the re-drives of those two legs do not reproduce the split at all — see its
+ * own comment. It is kept because the arithmetic it pins is what the finding
+ * asked about, not because a re-drive confirmed the numbers.
+ * They exist so a future change cannot quietly walk any of the three back.
+ */
+describe("the re-drives, pinned", () => {
+  it("sc-merge-lane-end/pc-right: the grader DOES look at the drive — 13, and the sheet adds up", () => {
+    // `sc-merge-lane-end:0a1eff42` said the grader „never looked at the drive at
+    // all": all four sweep legs printed 0/0/0 because the drive emitted no
+    // violations (its own `run.log` reads «MISTAKES (0)»), so nothing ever
+    // reached this fold. Driven with steering
+    // (`.audit-frames/rebase/frames/sc-merge-lane-end__pc-right`, «MISTAKES (3)»)
+    // the same lesson produces three rows and this fold prices them exactly as
+    // `08-debrief-p2.png` prints them: «Опасни грешки 1 · 10 | Основни грешки
+    // 1 · 3 | Второстепенни грешки 0 · 0 | Общо (допустими 9) 2 · 13».
+    //
+    // `streamOf` as everywhere above: the CODES and their ORDER are the leg's,
+    // spaced one second apart from t = 10. The leg's own log prints no per-row
+    // timestamps, so no second here is a measurement and none is asserted as
+    // one — only the order matters, because only the order decides the closure.
+    const events = streamOf([
+      "LANE_CHANGE_WITHOUT_MIRROR_CHECK", // основна, 3 т.
+      PTP, // опасна — closes it («Удар в друго превозно средство»)
+      "POOR_LANE_KEEPING", // второстепенна, after the crash
+    ]);
+    const s = accumulateScore(events);
+    expect(s.totalPoints).toBe(13);
+    expect(s.opasniCount).toBe(1);
+    expect(s.osnovniCount).toBe(1);
+    expect(s.vtorostepenniCount).toBe(0); // «Второстепенни грешки 0 · 0» on the frame
+    expect(s.ledgerClosedAtSec).toBe(11); // streamOf: t = 10 + index
+    expect(s.unscoredAfterClose).toBe(1);
+    // …and the row-level flags agree with the total, so the list can print
+    // «без допълнителни изпитни точки» beside exactly the row that got none.
+    expect(ledgerBilling(events)).toEqual([true, true, false]);
+  });
+
+  it("sc-merge-roadworks-shift: right and wrong are no longer the same card", () => {
+    // `sc-merge-roadworks-shift:d43e7238`, critical — „pc-right, pc-wrong,
+    // mobile-right and mobile-wrong all produce 20 points, 2 dangerous errors,
+    // НЕИЗДЪРЖАН. Nothing the student does changes the verdict." The 20 was two
+    // reports of one crash and is pinned at 10 above. What separates the legs is
+    // asserted here: the steered correct drive
+    // (`.audit-frames/rebase/frames/…__pc-right/run.log`, «VERDICT: ИЗДЪРЖАН ·
+    // SCORE: 3 наказателни точки») carries one основна and passes; the wrong
+    // drive (`.audit-frames/wave-c/frames/…__pc-wrong/08-debrief.png`, «10
+    // наказателни точки … Опасни грешки 1 · 10») carries the crash and fails.
+    const right = accumulateScore(streamOf(["LANE_CHANGE_WITHOUT_MIRROR_CHECK"]));
+    const wrong = accumulateScore(streamOf([PTP]));
+    expect(right.totalPoints).toBe(3);
+    expect(isPassing(right)).toBe(true);
+    expect(wrong.totalPoints).toBe(10);
+    expect(isPassing(wrong)).toBe(false);
+    expect(right.totalPoints).toBeLessThan(wrong.totalPoints);
+  });
+
+  it("sc-merge-from-property: «10 on PC, 30 on mobile» is three faults, not a re-billed crash", () => {
+    // `sc-merge-from-property:5030a28b` read the split as the scorer grading by
+    // device. It is not: this fold is a pure function of the event stream, and
+    // the two legs handed it different streams. Both streams are SWEEP-161's —
+    // `.audit-frames/sweep161/sc-merge-from-property/{pc,mobile}-right/run.log`,
+    // the drives that filed the finding, NOT a re-drive (the corpus was left
+    // unnamed here until the verifier pinned it, 2026-08-23). pc-right is
+    // «MISTAKES (1)» / «SCORE: 10» — one ПТП. mobile-right is «MISTAKES (3)» /
+    // «SCORE: 30» — «Непропускане на пешеходец», «Неспиране на знак Б2 „Спри!“»
+    // and THEN «Пътнотранспортно произшествие»: three different faults, 10 + 10
+    // + 10, none of them a repeat of another. So the 30 must STAY 30;
+    // collapsing it is the amnesty the header forbids, and it would drop a
+    // pedestrian the student really did drive through.
+    //
+    // WHAT THE RE-DRIVES SAY, WHICH IS NOT THIS, AND WHY IT DOES NOT MOVE THE
+    // ASSERTION. Both legs were driven again and neither reproduces the split:
+    // steered (`.audit-frames/rebase/frames/sc-merge-from-property__*`) pc-right
+    // is «MISTAKES (2)» / 20 and mobile-right is «MISTAKES (1)» / 10 — the
+    // device with the higher score has swapped — and Wave-C
+    // (`wave-c-results.jsonl`) has pc-right 10 against mobile-right 20. On both
+    // re-drives the pedestrian and the Б2 come back as COMMENDATIONS («★ ✓
+    // Правилно пропускане на пешеходец», «★ ✓ Правилно спиране на знак Б2»),
+    // i.e. the same two acts scored the other way on a different drive. That is
+    // a statement about which faults the ENGINE detected on which run, not
+    // about this fold, which was handed three опасни and priced three опасни.
+    // The 30 stands as the correct price of the stream sweep-161 recorded.
+    const pc = accumulateScore(streamOf([PTP]));
+    expect(pc.totalPoints).toBe(10);
+
+    const mobile = accumulateScore(streamOf(["PEDESTRIAN_NOT_YIELDED", B2, PTP]));
+    expect(mobile.totalPoints).toBe(30);
+    expect(mobile.opasniCount).toBe(3);
+    expect(mobile.ledgerClosedAtSec).toBe(12); // the crash is last: nothing to drop
+    expect(mobile.unscoredAfterClose).toBe(0);
   });
 });

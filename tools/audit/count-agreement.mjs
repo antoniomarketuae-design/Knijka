@@ -316,7 +316,45 @@ export const RECIPES = {
   },
 };
 
+/**
+ * A fingerprint of the corpus and the closures, so a DISAGREEMENT can be told
+ * apart from a MOVING TARGET.
+ *
+ * This check is not atomic: it recomputes the census, then shells out to seven
+ * tools in turn. If a finding is filed or retired in between, every tool run
+ * after that moment reports a different — and correct — number, and the check
+ * calls it a disagreement. That happened twice in one session while repair
+ * agents were appending new findings, and each time a verifier spent real effort
+ * chasing a red that reproduced green the moment the corpus stopped moving.
+ *
+ * A check that cries wolf gets switched off, so it must say which of the two it
+ * is looking at.
+ */
+function corpusFingerprint() {
+  const parts = [];
+  const base = path.join(REPO, ".audit-frames");
+  for (const dir of [path.join(base, "findings"), path.join(base, "wave-c")]) {
+    let names = [];
+    try {
+      names = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).sort();
+    } catch {
+      continue;
+    }
+    for (const f of names) {
+      try {
+        const st = fs.statSync(path.join(dir, f));
+        parts.push(f + ":" + st.size + ":" + Math.round(st.mtimeMs));
+      } catch {
+        /* a file that vanished mid-check is itself movement */
+        parts.push(f + ":gone");
+      }
+    }
+  }
+  return parts.join("|");
+}
+
 export function check({ verbose = false } = {}) {
+  const fingerprintBefore = corpusFingerprint();
   const n = recompute();
   const expected = stampFrom(n);
   const expectedWorked = workedFrom(n);
@@ -452,7 +490,22 @@ export function check({ verbose = false } = {}) {
     );
   }
 
-  return { expected, expectedWorked, results, problems, ok: problems.length === 0 };
+  // A disagreement found while the corpus was being written is a MOVING TARGET,
+  // not a wrong number. Say so instead of accusing a tool: this check is not
+  // atomic, and twice in one session a verifier chased a red that reproduced
+  // green the moment the repair agents stopped filing findings.
+  const moved = corpusFingerprint() !== fingerprintBefore;
+  if (moved && problems.length) {
+    const note = [
+      "THE CORPUS MOVED WHILE THIS CHECK RAN — " + problems.length + " apparent disagreement(s)",
+      "      are reported as INCONCLUSIVE, not as failures. This check recomputes the census",
+      "      and then runs seven tools in turn, so a finding filed or retired in between makes",
+      "      every later tool correctly report a different number. Re-run on a still corpus.",
+      ...problems.map((p) => "      would have said: " + String(p).split("\n")[0]),
+    ].join("\n");
+    return { expected, expectedWorked, results, problems: [], moved, note, ok: true };
+  }
+  return { expected, expectedWorked, results, problems, moved, ok: problems.length === 0 };
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;

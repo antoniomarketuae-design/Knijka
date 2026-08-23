@@ -474,7 +474,12 @@ export const CLIP_PLAN: readonly ClipPlanEntry[] = [
     "mistakeIndex": 0,
     "tracePath": "content/traces/sc-mw-discipline/mistake-left-hog.trace.json",
     "faultTimeSec": 12.62,
-    "requiredActors": [],
+    "requiredActors": [
+      {
+        "kind": "vehicle",
+        "label": "Автомобил отпред в лентата (води)"
+      }
+    ],
     "governingControl": {
       "kind": "none",
       "label": "Няма"

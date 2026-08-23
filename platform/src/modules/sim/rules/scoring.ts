@@ -72,6 +72,16 @@
  * `__tests__/scoring-ledger-close.test.ts` („closing the ledger can never turn
  * a fail into a pass").
  *
+ * THE `opasna` REQUIREMENT ITSELF WAS UNGUARDED UNTIL 2026-08-23, which is the
+ * shape this whole paragraph was written to prevent: the sentence above is an
+ * argument, and an argument is not a test. Deleting `severityClass === "opasna"`
+ * from the closing predicate left all 810 tests of `src/modules/sim/rules`
+ * GREEN. It is now ONE predicate (`closesTheLedger`, which `ledgerCloseTime`
+ * calls rather than restating) and the block „the guard that keeps the closure
+ * from manufacturing a pass" fails on its deletion — including the case that
+ * `hasDangerous` cannot catch, a terminating fault of a LIGHTER class, where
+ * nothing опасно happened and the closure would drop a 10-point sheet to 3.
+ *
  * IT IS TIME-BASED, NOT POSITION-BASED. The closing moment is found first and
  * the fold then skips violations with `t` STRICTLY AFTER it, so an event array
  * that is not sorted by time (nothing in the contract promises it is —
@@ -210,29 +220,42 @@ export function applyViolation(score: ScoreBreakdown, v: ViolationEvent): ScoreB
 }
 
 /**
- * The moment the practical exam ended, or null if it never did — the EARLIEST
- * опасна carrying the catalogue's `terminateSession` flag (Наредба № 38,
- * чл. 48, ал. 3; today COLLISION alone).
+ * Does this event carry the ground that ends the exam? The catalogue's
+ * `terminateSession` flag (Наредба № 38, чл. 48, ал. 3; today COLLISION alone)
+ * AND `opasna`.
  *
- * The `opasna` requirement is the no-false-pass guard, not decoration: see the
+ * THE `opasna` HALF IS THE NO-FALSE-PASS GUARD, NOT DECORATION — see the
  * header. A terminating fault of any lighter class would close the ledger at a
  * total that could still be under 9, and dropping the rest would manufacture an
- * ИЗДЪРЖАН. Exported so a surface can name the second the drive stopped
- * counting without re-deriving the rule.
+ * ИЗДЪРЖАН out of a drive that was failing.
+ *
+ * IT IS ONE PREDICATE BECAUSE IT USED TO BE TWO, AND NOTHING NOTICED (measured
+ * 2026-08-23). `ledgerCloseTime` inlined the same three conditions and this
+ * function restated them, with a comment claiming they were „the same test".
+ * Mutating EITHER copy to drop `severityClass === "opasna"` left all 810 tests
+ * of `src/modules/sim/rules` GREEN — the clause the header spends a paragraph
+ * defending was, in both copies, unguarded and free to drift. The tests below
+ * (`the guard that keeps the closure from manufacturing a pass`) now fail on
+ * that mutation; sharing the predicate is what makes ONE such test enough.
+ */
+function closesTheLedger(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.terminateSession === true && e.severityClass === "opasna";
+}
+
+/**
+ * The moment the practical exam ended, or null if it never did — the EARLIEST
+ * violation that `closesTheLedger`.
+ *
+ * Exported so a surface can name the second the drive stopped counting without
+ * re-deriving the rule.
  */
 export function ledgerCloseTime(events: ReadonlyArray<ScorableEvent>): number | null {
   let closeAt: number | null = null;
   for (const e of events) {
-    if (e.kind !== "violation") continue;
-    if (e.terminateSession !== true || e.severityClass !== "opasna") continue;
+    if (!closesTheLedger(e)) continue;
     if (closeAt === null || e.t < closeAt) closeAt = e.t;
   }
   return closeAt;
-}
-
-/** Does this event carry the ground that ends the exam? (Same test as `ledgerCloseTime`.) */
-function closesTheLedger(e: ScorableEvent): boolean {
-  return e.kind === "violation" && e.terminateSession === true && e.severityClass === "opasna";
 }
 
 /**

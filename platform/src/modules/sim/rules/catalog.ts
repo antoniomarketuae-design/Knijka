@@ -402,8 +402,39 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     severityClass: "vtorostepenna",
     points: SEVERITY_POINTS.vtorostepenna,
     titleBg: "Движение в дъжд без светлини",
+    // THE FIFTH TELLTALE ROW, AND IT SAID TWO FALSE THINGS (2026-08-23).
+    // TELLTALE_TENSE_NOTE below used to enumerate FOUR codes that
+    // `hud/telltaleWarnings.ts` can print on an ARMED warning — i.e. before
+    // anything has been done — and this row was not among them. It is now,
+    // and nothing about this row changed to put it there: the DASHBOARD did.
+    // `hud/dashboardStatus.ts writeDashboardStatus` began publishing
+    // `dash.conditions` (a REQUIRED parameter since the O35 repair) and
+    // `armedTelltaleWarnings` defaults its second argument to that field, so
+    // the lights row now runs `headlightDutyCode(conditions)` instead of the
+    // legacy single bit — and that function maps BOTH the rain arm and the
+    // SNOWFALL arm onto this code (rules/engine.ts `lowBeamDuty`: чл. 70, ал. 1
+    // is one duty, so snow reuses this row's code with SNOW_LIGHTS_COPY).
+    //
+    // MEASURED through the real modules, parked car, engine on, 0 км/ч, lights
+    // off (`__tests__/telltale-warning-tense.test.ts`, which now derives over
+    // the conditions branch too):
+    //   snow → lights=HEADLIGHTS_OFF_IN_RAIN      rain → lights=HEADLIGHTS_OFF_IN_RAIN
+    //   conditions absent (legacy branch) → HEADLIGHTS_OFF_AT_NIGHT only
+    // The old string opened „Валеше, а караше без къси светлини" and
+    // `LessonPlayShell.tsx` prints it verbatim on that card. So it told a
+    // student who had never left P that he HAD been driving — the exact
+    // `sc-rx-tram-left` defect, one row further on — and during a snowfall it
+    // also told him it was RAINING, because the telltale card has no per-event
+    // override channel and never sees SNOW_LIGHTS_COPY.
+    //
+    // WHAT WAS NOT DONE: the row was not emptied and „дъжд" was not deleted
+    // from the card. It stays in `titleBg`, which the FAULT card prints and the
+    // telltale card does not, and the duty this row teaches is чл. 70, ал. 1's
+    // намалена видимост — which is what the sentence now leads with, exactly as
+    // the night and fog rows were repaired. It must stay true of every context
+    // that prints it: rain or snowfall, moving or standing.
     explanationBg:
-      "Валеше, а караше без къси светлини. При намалена видимост (дъжд, мъгла, сняг) включи късите светлини — не толкова за да виждаш, колкото за да те виждат другите.",
+      "При намалена видимост — дъжд, снеговалеж или мъгла — късите светлини трябва да са включени, преди колата да тръгне, и да останат включени, докато условията траят. Те не са толкова за да виждаш ти, колкото за да те виждат другите: зад пелената от пръски или снежинки сивата кола се появява пред очите на насрещния секунди по-късно, отколкото ти се струва.",
     correctiveBg:
       "Просто правило: тръгнат ли чистачките, светват и късите светлини — двете вървят винаги заедно.",
     lawRef: "ЗДвП чл. 70, ал. 1",
@@ -587,8 +618,27 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // control-neutral row that code reads with no event in hand.
     explanationBg:
       "Настъпи сблъсък. Това е ЕДНА опасна грешка и цялата десетка е цената на самото деяние — не сбор от натрупани дребни пропуски. В симулатора продължаваме, за да се учиш, но сесията се оценява като прекратена.",
+    // THE CORRECTIVE HAD TO WALK ALL FOUR BODIES TOO (2026-08-23). The split
+    // below gave each struck body its own title and explanation, and this slot
+    // was left as it was with a note calling that „the honest limit of a
+    // code-keyed slot". It is not a limit, it is the same defect one line down:
+    // `hud/SessionEndScreen.tsx correctiveFor(m.code)` looks this up BY CODE and
+    // hands it to `FaultCard`, which prints it under «✔ Правилното действие» —
+    // so the student who was just told, correctly, that he left the carriageway
+    // and hit a building was then told, as the answer to „какво трябваше да
+    // направя", to keep two seconds behind the car in front
+    // (`sc-junction-gap/mobile-wrong/04-t100s.png` — the footway crash;
+    // `sc-pk-ban-stop/pc-wrong/08-debrief.png` — two crashes, one corrective).
+    // Under doc 64 THEO-4 a WRONG corrective is worse than a bare one.
+    // Nothing was taken away: the two-second rule is still here, as the branch
+    // that owns it. Same construction as RAIL_CROSSING_VIOLATION's corrective,
+    // which already walks its three acts, and the reason both must: this slot
+    // has no per-event channel — `makeViolation` stamps title/explanation/lawRef
+    // onto the event and there is nowhere for a fourth string to ride. Giving it
+    // one is a change to `rules/types.ts` + the two display files and is filed,
+    // not smuggled in here.
     correctiveBg:
-      "Карай така, че винаги да имаш къде да спреш: гледай далеч напред, дръж 2 секунди зад предния и намалявай ПРЕДИ конфликтните точки (кръстовища, пътеки, паркирани коли).",
+      "Карай така, че винаги да имаш къде да спреш: гледай далеч напред и намалявай ПРЕДИ конфликтните точки — кръстовища, пътеки, паркирани коли — а не в тях. Зад друга кола това е дистанция от 2 секунди. Към пешеходец или велосипедист — сваляй скоростта, преди да си сигурен, че са те видели, и им остави странично разстояние. А тръгне ли колата извън платното към бордюр, стълб, дърво или ограда, произшествието вече е започнало: връщай поглед и волан към средата на лентата рано, не в последния метър.",
     // чл. 20, ал. 2 named: „…за да бъдат в състояние да спрат пред всяко
     // предвидимо препятствие. Когато възникне опасност за движението, водачите
     // са длъжни незабавно да намалят скоростта…"
@@ -1366,29 +1416,49 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
  * ---------------------------------------------------------------------------
  * TELLTALE_TENSE_NOTE — THE ROWS THAT ARE ALSO READ BEFORE THE FAULT EXISTS
  * ---------------------------------------------------------------------------
- * `hud/telltaleWarnings.ts` names four codes and carries no prose of its own,
- * on purpose: „the prose has exactly one home (rules/catalog.ts, ADR-002) and a
- * second copy here would be a second thing to keep true." `LessonPlayShell.tsx`
- * then prints `spec.explanationBg` + `spec.correctiveBg` on the armed-warning
- * card. So four rows in this file answer TWO questions with one string —
- * „какво направи" on the fault card, and „какво липсва" on a warning fired
- * BEFORE anything was done.
+ * `hud/telltaleWarnings.ts` names a CODE per row and carries no prose of its
+ * own, on purpose: „the prose has exactly one home (rules/catalog.ts, ADR-002)
+ * and a second copy here would be a second thing to keep true."
+ * `LessonPlayShell.tsx` then prints `spec.explanationBg` + `spec.correctiveBg`
+ * on the armed-warning card. So some rows in this file answer TWO questions
+ * with one string — „какво направи" on the fault card, and „какво липсва" on a
+ * warning fired BEFORE anything was done.
  *
  * THE INVARIANT, and it is mechanical rather than stylistic: a row may assert
  * that the car MOVED only if the telltale that prints it cannot arm at a
- * standstill. Three of the four arm on `moving || engineOn`:
+ * standstill. Four of the five arm on `moving || engineOn`:
  *
  *   belt   SEATBELT_OFF_WHILE_MOVING   arms parked  → may not assert movement
  *   lights HEADLIGHTS_OFF_AT_NIGHT     arms parked  → may not assert movement
+ *   lights HEADLIGHTS_OFF_IN_RAIN      arms parked  → may not assert movement
  *   fog    FOG_LIGHTS_OFF_IN_FOG       arms parked  → may not assert movement
  *   hand   HANDBRAKE_LEFT_ON           `moving && parkingBrakeOn` → may, and does
  *
+ * THE FIFTH ROW ARRIVED WITHOUT ANYBODY EDITING THIS FILE, which is the whole
+ * argument for deriving the list instead of remembering it. The lights row used
+ * to emit HEADLIGHTS_OFF_AT_NIGHT unconditionally off one flattened bit; since
+ * `hud/dashboardStatus.ts` began publishing `conditions` and
+ * `armedTelltaleWarnings` began defaulting to them, it emits whatever
+ * `headlightDutyCode` derives — and that is HEADLIGHTS_OFF_IN_RAIN for the rain
+ * arm AND for the SNOWFALL arm (чл. 70, ал. 1 is one duty; `engine.ts` bills
+ * snow through the same code with SNOW_LIGHTS_COPY). Between those two dates
+ * the row said „Валеше, а караше без къси светлини" on a card that fires with
+ * the car in P — and, in a snowfall, said it was raining, because the telltale
+ * card has no per-event channel and never sees the snow override.
+ *
+ * A SECOND CONSEQUENCE, and the row above is repaired for it too: a code that
+ * more than one WEATHER routes to may not assert which weather it is. That is
+ * the JUNCTION_SCAN_INCOMPLETE discipline (see its note) applied to a condition
+ * instead of to a control — the pooled string must be true of every context
+ * that prints it; the per-arm sharpness lives in the override.
+ *
  * The handbrake row is the CONTROL: it opens „Потегли с вдигната ръчна
  * спирачка" and that is correct, because its lamp cannot appear on a stopped
- * car. A check that scrubbed the past tense out of all four would be the same
- * defect pointed the other way. `__tests__/telltale-warning-tense.test.ts`
- * drives `armedTelltaleWarnings` at 0 км/ч to derive which codes are at stake
- * instead of listing them, and asserts both directions.
+ * car. A check that scrubbed the past tense out of all of them would be the
+ * same defect pointed the other way. `__tests__/telltale-warning-tense.test.ts`
+ * drives `armedTelltaleWarnings` at 0 км/ч — over BOTH branches and all sixteen
+ * weather combinations — to derive which codes are at stake instead of listing
+ * them, and asserts both directions.
  *
  * MEASURED · `sc-rx-tram-left/mobile-right/run.log`: „[01-arrival] 0 км/ч …
  * P" → „[02-briefing] 0 км/ч card=warning/peek · Коланът не е поставен ·
@@ -1489,10 +1559,14 @@ export const RAIL_CROSSING_ACT_COPY: Record<
  *
  * `correctiveBg` also stays pooled — same reason as the rail row: it is looked
  * up BY CODE at display time (SessionEndScreen, debrief, attemptReel) with no
- * event in hand. Its „гледай далеч напред, 2 секунди зад предния, намалявай
- * ПРЕДИ конфликтните точки" reads as lead-car advice next to a building corner,
- * and that is the honest limit of a code-keyed slot; the per-body EXPLANATION
- * is where the wall, the person and the bicycle each get their own sentence.
+ * event in hand. THAT IS A CONSTRAINT ON WHAT IT MAY SAY, NOT A LICENCE TO SAY
+ * ONE BODY'S ANSWER (corrected 2026-08-23 — this paragraph used to call the
+ * mismatch „the honest limit of a code-keyed slot", and a card that answers
+ * „какво трябваше да направя" with the wrong answer is not a limit, it is
+ * THEO-4's own failure mode). The row's corrective now walks all four bodies,
+ * the two-second lead-car rule among them, exactly as the rail corrective walks
+ * its three acts. The per-body EXPLANATION is still where the wall, the person
+ * and the bicycle each get their own paragraph.
  */
 export const COLLISION_CONTACT_COPY: Record<
   "vehicle" | "pedestrian" | "cyclist" | "staticObject",

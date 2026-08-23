@@ -146,6 +146,23 @@ export interface RuleEngineState {
    * not a usable derivative at render rates.
    */
   speedWindow: Array<{ t: number; speedKmh: number }>;
+  /**
+   * A SECOND, LONGER speed window — the one the motorway crawl's „is this a
+   * transition or a chicane" question is answered over. Trimmed to
+   * `motorwaySlowSteadyMeanWindowSec`.
+   *
+   * WHY IT CANNOT SHARE `speedWindow`. That window is sized by
+   * `accelWindowSec` (0.04 s), and that number is set by the HARSH-BRAKE
+   * conviction — a 7 m/s² signal held 0.4 s, where smoothing is lag and
+   * 0.15 s already silences two authored panic-brake demos (see the default's
+   * note in types.ts). The crawl's steadiness gate is the opposite kind of
+   * measurement: a 0.5 m/s² band, i.e. a SMALL-signal question asked of a
+   * derivative tuned for a large-signal one. types.ts's own arithmetic puts
+   * the residual noise of that derivative at ~0.42 m/s² at 120 fps — 84 % of
+   * the band — before any real pedal movement is added. One derivative cannot
+   * serve both, so the crawl gate gets its own averaging length.
+   */
+  crawlSpeedWindow: Array<{ t: number; speedKmh: number }>;
   /** Previous frame's lead gap (null = none reported) — cut-in recovery (A12). */
   prevLeadGapM: number | null;
   /**
@@ -842,6 +859,7 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     laneChange: { pending: [], lastBasisChangeAt: null },
     prevSpeedKmh: null,
     speedWindow: [],
+    crawlSpeedWindow: [],
     prevLeadGapM: null,
     lastLeadNearAt: null,
     overtakePullOutAt: null,
@@ -904,6 +922,7 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     // The samples themselves are never mutated in place (only pushed/shifted),
     // so a shallow array copy keeps the reducer's no-input-mutation contract.
     speedWindow: [...s.speedWindow],
+    crawlSpeedWindow: [...s.crawlSpeedWindow],
     lastIndicatorOnAt: { ...s.lastIndicatorOnAt },
     lastGlanceAt: { ...s.lastGlanceAt },
     scanStopCreditSec: { ...s.scanStopCreditSec },
@@ -1221,6 +1240,24 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     accelAnchor !== null && dt > 0 && t > accelAnchor.t
       ? (speed - accelAnchor.speedKmh) / 3.6 / (t - accelAnchor.t)
       : 0;
+  /**
+   * The same derivative taken over `motorwaySlowSteadyMeanWindowSec` — the
+   * MEAN acceleration across a second of road rather than across the last few
+   * render frames. Read by exactly one gate (the motorway crawl's steadiness
+   * test) and by nothing else; `null` until the window has actually spanned
+   * its length, so a car with no history is never judged steady on no data.
+   * See `crawlSpeedWindow`'s note for why it is a second window.
+   */
+  const crawlAnchor = stepSpeedWindow(
+    s.crawlSpeedWindow,
+    t,
+    speed,
+    cfg.motorwaySlowSteadyMeanWindowSec,
+  );
+  const crawlMeanAccelMps2 =
+    crawlAnchor !== null && t - crawlAnchor.t >= cfg.motorwaySlowSteadyMeanWindowSec
+      ? (speed - crawlAnchor.speedKmh) / 3.6 / (t - crawlAnchor.t)
+      : null;
   /** Gap to the lead vehicle, or null when the road ahead is clear/unknown. */
   const leadGapM =
     tick.leadGapM !== undefined && Number.isFinite(tick.leadGapM) ? tick.leadGapM : null;
@@ -2042,12 +2079,58 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // road, by construction rather than by authoring luck.
   const inEmergencyLane =
     tick.emergencyLaneRight === true && tick.laneId === 0 && tick.motorway === true;
+  // NOT A TRANSITION — MEASURED TWO WAYS, AND THE SECOND IS THE ONE A LEARNER
+  // CAN FAIL (2026-08-23).
+  //
+  // The gate below asks „is this car merging, or is it a mobile chicane", and
+  // until today it asked it of ONE number: the instantaneous derivative over
+  // `accelWindowSec` = 0.04 s. That number belongs to the harsh-brake
+  // conviction (7 m/s², held 0.4 s) and is deliberately short, because there
+  // smoothing is lag; types.ts's own note prices its residual at ~0.42 m/s² at
+  // 120 fps. The crawl band is 0.5. So on the glass the steadiness test was
+  // 84 % noise BEFORE the driver touched anything.
+  //
+  // And a beginner does not hold a pedal — he presses and releases it, which
+  // adds its own swing on top. Both make the same frame read „accelerating",
+  // and a frame that reads „accelerating" accrues nothing, so the detector
+  // that exists to say „не пълзи" can crawl for minutes without reaching one
+  // qualifying second.
+  //
+  // MEASURED, `sc-fo-motorway-gap / pc-right` (`.audit-frames/rebase`, HEAD
+  // 70bcd1ba): 258 s on a 140 км/ч motorway, top speed 15 км/ч, 27 full stops,
+  // 347 m of carriageway — «Опасни 0 · Основни 0 · Второстепенни 0», on the
+  // lesson whose briefing is «На 130 км/ч изминаваш 36 метра всяка секунда».
+  // The map arms everything (mw-v1 edges carry `motorway: true`, `maxspeed`
+  // 140) and the same drive's wrong leg scores 10, so the reducer was live and
+  // the crawl gate specifically was silent.
+  //
+  // WHAT THIS DOES NOT ESTABLISH, WRITTEN DOWN RATHER THAN GLOSSED. Nobody has
+  // yet read the live tick stream of that drive, so „the 0.04 s reading was out
+  // of band during the holds" is the best-supported explanation and not a
+  // measurement. What IS measured is the corpus's blindness to the question:
+  // the recorded traces are scripted and dead flat —
+  // `content/traces/sc-mw-min-speed/mistake-crawl-right.trace.json` holds 149
+  // distinct speeds across 813 band frames — so replays and unit fixtures
+  // exercised a smoothness the render loop never has to produce. The
+  // measurement that would settle it is one drive's `accelMps2` and
+  // `motorwayCrawlSec` published per frame; that is an instrument change and
+  // belongs in tools/, not here.
+  //
+  // THE SECOND MEASUREMENT IS ADDITIVE — it can only ADD qualifying frames,
+  // never remove one, so nothing that convicts today stops convicting. A merge
+  // is still exempt under BOTH readings (0 → 130 at ~2.5 m/s² averages 2.5 over
+  // any window), a brake toward a stop likewise; what changes is that a car
+  // whose speed is ragged around a low MEAN is no longer mistaken for one that
+  // is going somewhere.
+  const steadyForCrawl =
+    Math.abs(accelMps2) < cfg.motorwaySlowSteadyMps2 ||
+    (crawlMeanAccelMps2 !== null && Math.abs(crawlMeanAccelMps2) < cfg.motorwaySlowSteadyMps2);
   const motorwayCrawl =
     cfg.motorwayMinSpeedEnabled &&
     tick.motorway === true &&
     moving &&
     speed < cfg.motorwayMinFlowKmh &&
-    Math.abs(accelMps2) < cfg.motorwaySlowSteadyMps2 &&
+    steadyForCrawl &&
     (leadGapM === null || leadGapM > cfg.motorwaySlowQueueGapM) &&
     s.crossing === null &&
     (s.lastHazardEventAt === null || t - s.lastHazardEventAt > cfg.harshBrakeHazardCooldownSec) &&
@@ -2178,7 +2261,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // разрешен, and parking vs престой is indistinguishable with current
   // telemetry (the same A12 bar; PK-07 rides the zone later).
   //
-  // THE ONE INNOCENT REST THIS LIST CANNOT SEE, and it is not hypothetical:
+  // THE ONE INNOCENT REST THIS LIST COULD NOT SEE, and it is not hypothetical:
   // A PERSON STANDING IN THE LANE. Sweep 161, `sc-hz-accident-scene/pc-right`
   // (frame 04-t092s): a НАУЧИ card convicts «Спиране в забранена зона … под
   // знак В27» at the exact moment the car has stopped because a bystander is
@@ -2186,19 +2269,35 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // lesson whose whole subject is that people are standing there — the north
   // star inverted in one card.
   //
-  // EVERY OTHER TRAFFIC-SHAPED REST IS ACQUITTED ABOVE, so the omission is
+  // EVERY OTHER TRAFFIC-SHAPED REST WAS ACQUITTED ABOVE, so the omission was
   // structural rather than an oversight in the list: `banZoneQueue` reads
   // `leadGapM`, which is the VEHICLE ahead; `s.crossing` needs an armed
   // crossing zone, and hz-accident-v1 ships `crossings: []` precisely so no
-  // PEDESTRIAN_* code can fire on it. There is no third channel — `SimTick`
-  // carries no „person ahead" measurement of any kind, so this reducer
-  // literally cannot see the man it is convicting the student for stopping in
-  // front of. Naming that here rather than approximating it: the honest fix is
-  // a tick channel (the contact sentinel already resolves staged pedestrian
-  // poses every frame and could publish the nearest one's forward distance),
-  // and it lands in the runtime/orchestrator, not in this file. Until it
-  // exists, any acquittal written here would be a guess dressed as a rule.
+  // PEDESTRIAN_* code can fire on it. There was no third channel, so this
+  // reducer literally could not see the man it was convicting the student for
+  // stopping in front of.
+  //
+  // THE CHANNEL IS NOW DECLARED (`SimTick.vruAheadM`, 2026-08-23) and read
+  // here, on the same terms as every zone flag in this file: DATA, never a
+  // heuristic, and ABSENT means the reporter cannot answer rather than „nobody
+  // there" — so every existing drive, trace and fixture grades byte-
+  // identically until something publishes it. It is also one-directional: this
+  // number can only ACQUIT. Convicting on it would mean inferring „he should
+  // have stopped" from a bare distance, which needs the person's heading and
+  // speed and is the adjudication A12 refuses.
+  //
+  // WHAT IT STILL NEEDS, AND THIS FILE CANNOT DO IT: a publisher.
+  // `runtime/worldRuntime.ts` builds the tick, and the orchestrator's contact
+  // sentinel already resolves every staged pedestrian pose each frame — the
+  // nearest one's forward distance in the player's own path is the value. Until
+  // that lands, the acquittal below is armed and silent, exactly like
+  // `noStopZone` was before a map carried a В27 span.
   const banZoneQueue = leadGapM !== null && leadGapM <= cfg.banZoneStopQueueGapM;
+  /** A person in the path — the rest has a human cause (чл. 5, ал. 2). */
+  const banZoneVruAhead =
+    tick.vruAheadM !== undefined &&
+    Number.isFinite(tick.vruAheadM) &&
+    tick.vruAheadM <= cfg.banZoneVruAheadM;
   const banZoneControl =
     (tick.nextStopLineM !== undefined && tick.nextStopLineM <= cfg.banZoneStopLineClearM) ||
     (tick.nextStopLineControl === "trafficLight" &&
@@ -2210,6 +2309,7 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     speed <= cfg.fullStopMaxSpeedKmh &&
     forwardGear &&
     !banZoneQueue &&
+    !banZoneVruAhead &&
     !banZoneControl &&
     s.crossing === null;
   if (

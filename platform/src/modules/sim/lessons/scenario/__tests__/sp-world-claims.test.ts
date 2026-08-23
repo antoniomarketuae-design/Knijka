@@ -171,6 +171,27 @@ const WORLD_CLAIMS: readonly WorldClaim[] = [
     carriedBy: (_d, spec) => (spec.staged ?? []).some((e) => VEHICLE_ACTOR_KINDS.has(e.kind)),
     how: `staged vehicle actor (${[...VEHICLE_ACTOR_KINDS].join(" / ")})`,
   },
+  {
+    noun: "кола В ЛЯВАТА ЛЕНТА",
+    // THE LANE IS PART OF THE CLAIM (finding sc-speed-dangerous:e8414c56).
+    // The claim above asks „is there a car at all"; a briefing that tells the
+    // student WHICH LANE that car is in has said something more, and the
+    // repair that put sc-speed-dangerous's pace car one lane pitch left is
+    // exactly the kind of change that could later be reverted while the
+    // sentence naming the lane stayed behind. This asks the staged cast.
+    //
+    // NARROW ON PURPOSE — it matches a CAR placed in the left lane, never the
+    // doctrine about the student's own («лявата е само за изпреварване», which
+    // is true on an empty motorway and is what sc-mw-discipline says).
+    re: /кола[^.!?]{0,60}в\s+лявата\s+лента|в\s+лявата\s+лента[^.!?]{0,60}се отдалечава/iu,
+    carriedBy: (_d, spec) =>
+      (spec.staged ?? []).some(
+        (e) =>
+          VEHICLE_ACTOR_KINDS.has(e.kind) &&
+          ((e as { actor?: { extraRightOffsetM?: number } }).actor?.extraRightOffsetM ?? 0) <= -4,
+      ),
+    how: "staged vehicle actor with actor.extraRightOffsetM ≤ −4 (one lane pitch LEFT of the student's line)",
+  },
 ];
 
 /** Everything the student reads as a description of THIS drive. */
@@ -248,11 +269,53 @@ describe("§2 the claims this family HAS earned are still said, and still backed
     expect(SC_SPEED_DANGEROUS.staged ?? []).toHaveLength(2);
   });
 
+  it("sc-speed-dangerous names the pace car's lane, and stages the pace car in it", () => {
+    // The e8414c56 repair moved the pace car into the LEFT lane so it can
+    // never be the striker (templates-sp.ts „THE LAP"); the briefing was
+    // changed with it. Both halves are pinned, so neither can be undone alone:
+    // revert the actor and §1 refuses the sentence, revert the sentence and
+    // this fails.
+    expect(said(SC_SPEED_DANGEROUS, /в\s+лявата\s+лента/iu)).toBe(true);
+    const lead = (SC_SPEED_DANGEROUS.staged ?? []).find((e) => e.kind === "brakingLeadCar") as
+      | { actor: { extraRightOffsetM?: number } }
+      | undefined;
+    expect(lead?.actor.extraRightOffsetM).toBeCloseTo(-8.13, 2);
+    // …and the лепка that presses him is still in HIS lane — the pressure the
+    // drill is about is not paid for by the repair.
+    const passer = (SC_SPEED_DANGEROUS.staged ?? []).find((e) => e.kind === "rearTailgater") as
+      | { actor: { extraRightOffsetM?: number } }
+      | undefined;
+    expect(passer?.actor.extraRightOffsetM ?? 0).toBe(0);
+  });
+
   it("sc-speed-transition still names the зона-30 sign it really drives through", () => {
     // The school went; the lesson's actual subject must not go with it.
     expect(said(SC_SPEED_TRANSITION, /зона 30/iu)).toBe(true);
     const edges = DISTRICTS.get("sp-trans-v1")!.roads!.edges!;
     expect(edges.map((e) => e.maxspeed).sort((a, b) => (a ?? 0) - (b ?? 0))).toEqual([30, 50]);
+  });
+
+  it("sc-mw-discipline names the ПОТОК it grades him against, and now stages it", () => {
+    // sweep161 finding 3bec2af1: the lesson's central concept is «скоростта на
+    // потока» and all four legs photographed an empty motorway. Both halves of
+    // the repair are pinned together — the sentence that points at the flow,
+    // and the car that IS it, in the OVERTAKING lane where it can never be
+    // reached from behind (templates-sp.ts „THE FLOW").
+    expect(said(SC_MW_DISCIPLINE, /скоростта на потока/iu)).toBe(true);
+    expect(said(SC_MW_DISCIPLINE, /в\s+лявата\s+лента/iu)).toBe(true);
+    const flow = (SC_MW_DISCIPLINE.staged ?? []).find((e) => e.kind === "brakingLeadCar") as
+      | { actor: { extraRightOffsetM?: number }; paceSpeedMps?: number }
+      | undefined;
+    expect(flow).toBeDefined();
+    // Two lane pitches left of where an unoffset actor lands on mw-e-nb (whose
+    // rightmost lane is the EMERGENCY one) — i.e. the overtaking lane.
+    expect(flow!.actor.extraRightOffsetM).toBeCloseTo(-16.25, 2);
+    // …at a pace that is flow rather than an obstacle: at the top of the
+    // 120–130 км/ч band instruction 2 names, and under the posted 140. The
+    // ceiling is the contact-sweep budget, not taste — see
+    // `MW_FLOW_MPS` in templates-sp.ts and sp-mw-flow-visible.test.ts §1.
+    expect(flow!.paceSpeedMps! * 3.6).toBeGreaterThan(128);
+    expect(flow!.paceSpeedMps! * 3.6).toBeLessThan(140);
   });
 
   it("sc-mw-discipline still tells the student the carriageways are divided", () => {
@@ -293,6 +356,26 @@ describe("§3 the struck sentences are refused by this gate, and only where they
     expect(unbackedClaims(SC_SPEED_TRANSITION, DISTRICTS.get("sp-trans-v1")!)).toEqual([]);
   });
 
+  it("TRIPWIRE — sp-trans-v1's school is one missing field, not a missing building", () => {
+    // Measured 2026-08-23. The refusal above is correct TODAY and it is also
+    // one key away from being wrong: this district already carries a footprint
+    // called `sp-tr-b-school`, and `kind` is simply absent on it, so
+    // world/builders/schools.ts skips it and the street shows another
+    // anonymous block. The map's author meant to put a school here.
+    //
+    // RED IS THE GOAL. The day `kind: "school"` is authored (in
+    // tools/maps/gen_sp_transition.mjs and the district it writes) this test
+    // fails and names its own replacement: DELETE it, restore the struck
+    // «(училище/жилищна)» to sc-speed-transition instruction 2, and move the
+    // §3 refusal above to a district that genuinely has no school. Nothing
+    // else needs editing — §1's predicate asks the district and will start
+    // crediting it by itself.
+    const trans = DISTRICTS.get("sp-trans-v1")!;
+    const named = (trans.buildings ?? []).find((b) => b.id === "sp-tr-b-school");
+    expect(named, "sp-tr-b-school is gone — the routing note in templates-sp.ts is stale").toBeDefined();
+    expect(named!.kind, "kind is now authored — see this test's own instructions").toBeUndefined();
+  });
+
   it("the SAME sentence on sp-zone30-v1 → accepted (the school is authored there)", () => {
     // Same words, different map, opposite verdict: the gate is reading the
     // world, not the vocabulary. A predicate hard-wired to `false` dies here.
@@ -306,6 +389,25 @@ describe("§3 the struck sentences are refused by this gate, and only where they
     expect(misses).toHaveLength(1);
     expect(misses[0]).toContain("crashBarrier");
     expect(unbackedClaims(SC_MW_DISCIPLINE, DISTRICTS.get("mw-v1")!)).toEqual([]);
+  });
+
+  it("„кола в лявата лента" + " on a lesson that stages no vehicle → refused", () => {
+    // sc-speed-zone stages six CHILDREN and not one car, so the moment its
+    // briefing claims a car is in a lane the gate refuses it. That is what
+    // proves the new predicate reads the cast rather than the vocabulary.
+    const claimed = withInstruction(
+      SC_SPEED_ZONE,
+      1,
+      "Колата пред теб в лявата лента се отдалечава — остави я.",
+    );
+    const misses = unbackedClaims(claimed, DISTRICTS.get("sp-zone30-v1")!);
+    expect(misses.some((m) => m.includes("кола В ЛЯВАТА ЛЕНТА"))).toBe(true);
+    // …and the SHIPPED sc-speed-zone briefing, which claims no car, is clean.
+    expect(unbackedClaims(SC_SPEED_ZONE, DISTRICTS.get("sp-zone30-v1")!)).toEqual([]);
+  });
+
+  it("…and the SAME sentence on sc-speed-dangerous → accepted (the car is there)", () => {
+    expect(unbackedClaims(SC_SPEED_DANGEROUS, DISTRICTS.get("ov-keepright-v1")!)).toEqual([]);
   });
 
   it("and it stays refused on every district in the family — nothing builds one", () => {

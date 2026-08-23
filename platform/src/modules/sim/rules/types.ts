@@ -260,6 +260,30 @@ export interface SimTick {
   fogLightsOn?: boolean;
   /** Gap in meters to the nearest vehicle ahead in-lane (optional; absent/∞ = clear road). */
   leadGapM?: number;
+  /**
+   * Distance in metres to the nearest PERSON in the vehicle's own path ahead —
+   * a pedestrian or a cyclist standing in or crossing the carriageway the car
+   * is about to occupy. Absent = the reporter cannot answer (every hand-built
+   * tick, every recorded trace, every caller that has not been taught to
+   * publish it), NOT „nobody there".
+   *
+   * THE ONE INNOCENT REST THE REDUCER COULD NOT SEE. `leadGapM` is the VEHICLE
+   * ahead and `s.crossing` needs an authored crossing zone, so a car halted in
+   * front of a human being looked, to every existing channel, exactly like a
+   * car halted in front of nothing. Sweep 161, `sc-hz-accident-scene /
+   * pc-right`, frame `04-t092s.png`: a НАУЧИ card convicting «Спиране в
+   * забранена зона … под знак В27» at the moment a bystander is standing in
+   * the car's lane — stopping for a person taught as an offence, on the lesson
+   * whose entire subject is that people are standing there.
+   *
+   * POLARITY, deliberately one-directional: this channel can only ACQUIT. A
+   * value inside `banZoneVruAheadM` makes a rest lawful; absence leaves every
+   * detector exactly as it shipped, so no recorded drive changes shape. It is
+   * never read to convict — inferring „he should have stopped" from a distance
+   * is the adjudication A12 refuses, and it would need the person's own
+   * heading and speed, which this number does not carry.
+   */
+  vruAheadM?: number;
   /** True when driving against the flow of a one-way street (runtime-computed). */
   wrongWay?: boolean;
   // -- B1a Wave-1 world context (doc 72 capabilities 1 + N3). ALL optional and
@@ -577,13 +601,20 @@ export function isScorableEvent(e: { kind: string }): e is ScorableEvent {
 export interface RuleEngineConfig {
   /**
    * Window the signed acceleration is measured over, seconds (audit M-18).
-   * Every acceleration gate in the engine — braking response on a crossing
-   * approach, the harsh-brake onset, the motorway steady-crawl test, the
-   * emergency-lane pull-off exemption — reads this one derivative, and a
-   * derivative taken across a single RENDER frame is dominated by driveline
-   * noise (see the ACCEL WINDOW note in engine.ts). Must be long enough to
-   * average the jitter and short enough that a real brake application is not
-   * smeared away; at replay/trace rates (≥ 1 s frames) it changes nothing.
+   * The LARGE-SIGNAL acceleration gates read this one derivative — braking
+   * response on a crossing approach, the harsh-brake onset, the emergency-lane
+   * pull-off exemption — and a derivative taken across a single RENDER frame is
+   * dominated by driveline noise (see the ACCEL WINDOW note in engine.ts). Must
+   * be long enough to average the jitter and short enough that a real brake
+   * application is not smeared away; at replay/trace rates (≥ 1 s frames) it
+   * changes nothing.
+   *
+   * THE MOTORWAY STEADY-CRAWL TEST IS NO LONGER ONE OF THEM, and this sentence
+   * used to list it (corrected 2026-08-23). Its band is 0.5 m/s², which is
+   * SMALLER than this window's own residual as priced two paragraphs down in
+   * `DEFAULT_RULE_CONFIG` — so it was reading a large-signal instrument to ask
+   * a small-signal question. It now reads this derivative OR
+   * `motorwaySlowSteadyMeanWindowSec`'s, qualifying on either; see that field.
    */
   accelWindowSec: number;
   /**
@@ -1118,6 +1149,24 @@ export interface RuleEngineConfig {
    *  and never convicts (the standstill-lead context of the harsh-brake
    *  cause ledger, m). */
   banZoneStopQueueGapM: number;
+  /**
+   * A PERSON in the path this close ahead = the rest has a human cause and
+   * never convicts, m (`SimTick.vruAheadM`). The queue exemption above reads
+   * `leadGapM`, which is the vehicle ahead; this is the same exemption for the
+   * road user чл. 5, ал. 2 puts first, and it exists because the reducer
+   * convicted a student of «Спиране в забранена зона» while a bystander stood
+   * in front of his bumper (see engine.ts's ban-zone block).
+   *
+   * DELIBERATELY WIDER THAN THE QUEUE GAP. 8 m answers „is a car standing on
+   * top of me"; a person is not a car. He can step, he is not lit, he is not
+   * where the driver's eye is trained, and the whole duty is to leave him room
+   * — so the distance at which stopping for him is obviously right is the
+   * distance at which he is obviously the reason, not the one at which he is
+   * unavoidable. 20 m is inside the urban stopping distance from 50 км/ч and
+   * still short enough that a curb stop half a block from a pedestrian is
+   * judged on its own merits.
+   */
+  banZoneVruAheadM: number;
   /** A stop line ahead within this distance = a CONTROL stop (Б2/light
    *  queue), never convicts, m. Any FORBIDDING effective signal in the
    *  runtime's watch window is likewise innocent at any distance. */
@@ -1234,6 +1283,30 @@ export interface RuleEngineConfig {
    * stop, both carry |a| well above this — only a HELD crawl grades.
    */
   motorwaySlowSteadyMps2: number;
+  /**
+   * Seconds the crawl's steadiness test averages the acceleration over, when
+   * the instantaneous derivative says „transition" (see engine.ts's
+   * `crawlSpeedWindow` and `steadyForCrawl`).
+   *
+   * WHY A SECOND WINDOW EXISTS AT ALL. `accelWindowSec` is 0.04 s and is set
+   * by the harsh-brake conviction, where smoothing is lag — its own note says
+   * 0.15 s already silences two authored panic-brake demos. Its residual at
+   * 120 fps is ~0.42 m/s², which is 84 % of `motorwaySlowSteadyMps2`. A
+   * 0.5 m/s² question cannot be asked of a derivative whose noise is 0.42, and
+   * a beginner pumping the pedal at ~2 Hz adds ±1.7 m/s² on top of that.
+   *
+   * WHY THIS LENGTH. One second spans two full cycles of a ~2 Hz pedal, so the
+   * pumping averages to the drift it actually is, while a real merge
+   * (~2.5 m/s²) still reads 2.5 over the same second and stays exempt. It is
+   * also LONGER than every recorded frame period the corpus replays at
+   * (TRACE_SAMPLE_HZ = 20 → 0.05 s; the sweep fixtures → 0.25 s), which is the
+   * point: at those rates this reading is a genuine average rather than the
+   * previous frame restated, and it is the ONLY consumer of it.
+   *
+   * Shortening it toward `accelWindowSec` re-opens the defect; lengthening it
+   * past a few seconds starts smearing a real merge into a crawl.
+   */
+  motorwaySlowSteadyMeanWindowSec: number;
   /** A lead within this gap (m) means congestion — the crawl has a traffic
    *  cause and never convicts (the cause-ledger discipline). Sized for
    *  motorway headways: 60 m ≈ a 2 s gap at 110 km/h, so even a generous
@@ -1474,6 +1547,7 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   banZoneStopEnabled: true,
   banZoneStopRestSec: 4,
   banZoneStopQueueGapM: 8,
+  banZoneVruAheadM: 20, // a person, not a bumper — see the interface note
   banZoneStopLineClearM: 25,
   // OV-06: same 45 m lead corridor as the crossing overtake (one discipline).
   banOvertakeLeadGapM: 45,
@@ -1508,6 +1582,10 @@ export const DEFAULT_RULE_CONFIG: RuleEngineConfig = {
   // 0.5 m/s²: the recorder's own rates (accel 2.2 / brake ≥ 3.2) and any
   // honest live transition sit far above it; a held crawl reads ~0.
   motorwaySlowSteadyMps2: 0.5,
+  // The crawl gate's own averaging length — see the interface note. 1 s: two
+  // cycles of a beginner's ~2 Hz pedal, still short enough that a 2.5 m/s²
+  // merge reads 2.5 and stays exempt.
+  motorwaySlowSteadyMeanWindowSec: 1,
   motorwaySlowQueueGapM: 60,
   motorwaySlowSustainSec: 4,
   // 3 s: an accidental clip of the lane edge can never hold it; the shortest

@@ -26,7 +26,8 @@ import { fileURLToPath } from "node:url";
 import { analyzeNetwork } from "../../world/builders/network";
 import { analyzeRoundabouts } from "../../world/builders/roundabout";
 import { buildWorldGeometry } from "../../world/builders/buildWorldGeometry";
-import { SIDEWALK_WIDTH_M } from "../../world/builders/constants";
+import { PLAYER_HALF_WIDTH_M } from "../../collision/bodies";
+import { CURB_HEIGHT_M, SIDEWALK_WIDTH_M } from "../../world/builders/constants";
 import { assertDistrict, type District } from "../../world/types";
 import { LANE_WIDTH_M } from "../spatial";
 import {
@@ -38,6 +39,7 @@ import {
   SURFACE_PROBE_CAP_M,
   type DrivableSurface,
   type SurfaceFix,
+  type SurfaceUnderCar,
 } from "../surface";
 
 const WORLD = path.resolve(
@@ -208,6 +210,68 @@ describe("the three sweep161 frames read as off the carriageway", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The threshold a conviction owes the car's own body
+// ---------------------------------------------------------------------------
+
+describe("OFF_CARRIAGEWAY_BODY_ALLOWANCE_M is the car, not a dial", () => {
+  it("puts the whole flank past the kerb — and no further", () => {
+    // Round 1 of this programme shipped a 20 m threshold carrying four hundred
+    // words of justification, and setting it to zero left every test green.
+    // This constant decides every off-carriageway conviction the three frames
+    // above ask for, and until this case existed it had the SAME hole: set to
+    // 0 — which convicts a student whose tyre merely touches the kerb line —
+    // all 20 cases of this file and off-carriageway-consult.test.ts stayed
+    // green. (Verified by mutation, both directions, before this was written.)
+    //
+    // Measured on real asphalt rather than asserted as arithmetic: sxf-v1 is
+    // the district sc-signal-flashing was shot on. Put the car's CENTRE
+    // `centreOut` metres past the kerb and probe its INBOARD flank — the last
+    // part of the body still over the road, and the whole subject of the
+    // number.
+    const d = load("sxf-v1");
+    const eb = [...analyzeNetwork(d).edges]
+      .filter((e) => e.line && e.line.length >= 2)
+      .sort((a, b) => b.halfWidth - a.halfWidth)[0];
+    expect(eb, "sxf-v1 must still draw a ribbon").toBeDefined();
+    const c = midCross(eb.line as [number, number][]);
+    const flankAt = (centreOut: number): { under: SurfaceUnderCar; outsideKerbM: number } => {
+      const q = eb.halfWidth + centreOut - PLAYER_HALF_WIDTH_M;
+      const p = at("sxf-v1", c.x + c.nx * q, c.y + c.ny * q);
+      return { under: p.under, outsideKerbM: p.outsideKerbM };
+    };
+
+    // 1. AT the allowance even the inboard flank has left the asphalt — the
+    //    "whole flank off the road" the constant claims. Zero, or any value at
+    //    or under the chassis half-width, puts that flank back on the road.
+    const atThreshold = flankAt(OFF_CARRIAGEWAY_BODY_ALLOWANCE_M);
+    expect(atThreshold.under).not.toBe("carriageway");
+    expect(atThreshold.outsideKerbM).toBeGreaterThan(0);
+
+    // 2. …and only just off. The slack above the chassis is the kerb this
+    //    engine makes drivable, not a dial: an inflated threshold would let a
+    //    student drive a car's width onto the pavement before anything could
+    //    be said about it.
+    expect(atThreshold.outsideKerbM).toBeLessThanOrEqual(CURB_HEIGHT_M + 0.01);
+
+    // 3. The acquitting leg on the same asphalt: a centre a kerb's worth
+    //    INSIDE the threshold still has body over the road. Without this a
+    //    threshold could be raised freely and only the wording would notice.
+    expect(flankAt(OFF_CARRIAGEWAY_BODY_ALLOWANCE_M - CURB_HEIGHT_M - 0.05).under).toBe(
+      "carriageway",
+    );
+
+    // 4. And the number is DERIVED, not transcribed. The constant's own
+    //    comment says chassis half-width plus the drivable kerb; nothing
+    //    enforced it, so a chassis resize in vehicle/tuning (which is where
+    //    PLAYER_HALF_WIDTH_M comes from) would have drifted it in silence.
+    expect(OFF_CARRIAGEWAY_BODY_ALLOWANCE_M).toBeGreaterThan(PLAYER_HALF_WIDTH_M);
+    expect(OFF_CARRIAGEWAY_BODY_ALLOWANCE_M).toBeLessThanOrEqual(
+      PLAYER_HALF_WIDTH_M + CURB_HEIGHT_M,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
 // The other direction — nothing that is a road may read as anything else
 // ---------------------------------------------------------------------------
 
@@ -258,7 +322,16 @@ describe("no lane of any shipped district reads off the carriageway", () => {
     }
     expect(probes).toBeGreaterThan(80000);
     expect(offenders).toEqual([]);
-  });
+    // AN EXPLICIT BUDGET, because the default 5 s is not one (verifier,
+    // 2026-08-23). MEASURED on this box: 279 ms warm — but this is the FIRST
+    // case that opens all 105 district JSONs, and E: is a 7200 rpm HDD, so on
+    // a cold page cache the same case took 8,495 ms and vitest failed it with
+    // «Test timed out in 5000ms» while every assertion in it was true. A
+    // false-conviction sweep that can go red because a disk was cold is an
+    // instrument that lies, and this programme has already paid for two of
+    // those. Nothing here is loosened: the 86,907 probes and the empty
+    // `offenders` list are the assertion, and both still run in full.
+  }, 60_000);
 
   it("…and again through the FLOAT32 world geometry LessonScene actually runs", () => {
     // The sweep above indexes the builder's float64 views. The shipped scene
@@ -403,6 +476,37 @@ describe("resolve paths", () => {
       }
     }
   });
+
+  it("…and the same census on all 105 shipped districts, not the three above", () => {
+    // The case above samples POINT answers deeply on three maps. This one
+    // samples every map shallowly, because the failure it exists for is a
+    // whole builder pass `resolveDistrictDrivableSurface` forgets to mirror —
+    // and three districts that author no crossing furniture cannot see it.
+    // buildCrossingFurniture was exactly that: the kerbed pedestrian refuge
+    // island is 16 sidewalk triangles the live scene had and the headless
+    // index did not, on pe-bus-v1 / pe-cane-v1 / pe-slow-v1. Label-only by the
+    // layer rules — but a drift between the grader the student meets and the
+    // grader every trace is recorded against, and the next sidewalk writer
+    // added upstream would drift the same way unseen.
+    const ids = readdirSync(WORLD)
+      .filter((f) => f.endsWith(".json"))
+      .map((f) => f.replace(/\.json$/, ""));
+    expect(ids.length).toBeGreaterThanOrEqual(100);
+    const drift: string[] = [];
+    for (const id of ids) {
+      const dd = load(id);
+      const mesh = resolveDrivableSurface(buildWorldGeometry(dd)).counts;
+      const district = resolveDistrictDrivableSurface(dd).counts;
+      if (
+        mesh.carriageway !== district.carriageway ||
+        mesh.island !== district.island ||
+        mesh.footway !== district.footway
+      ) {
+        drift.push(`${id} mesh=${JSON.stringify(mesh)} district=${JSON.stringify(district)}`);
+      }
+    }
+    expect(drift).toEqual([]);
+  }, 120_000);
 
   it("empty meshes resolve to a surface that answers 'verge' and never throws", () => {
     // The tolerance discipline this file already runs for grip patches: a

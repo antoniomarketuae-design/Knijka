@@ -43,6 +43,7 @@
  * roadway, both direction banks (doc 72: the flooded dip, the icy bridge).
  */
 
+import { buildCrossingFurniture } from "../world/builders/markings";
 import { MeshAccumulator } from "../world/builders/mesh";
 import { analyzeNetwork } from "../world/builders/network";
 import { buildRoads } from "../world/builders/roads";
@@ -455,30 +456,49 @@ export function resolveDrivableSurface(meshes: DrivableSurfaceMeshes): DrivableS
  * The same index from a district document alone — for the HEADLESS graders
  * (trace recorder, the bot-completion suites) that never build a world.
  *
- * It is not a second derivation: it runs `buildWorldGeometry`'s own first
- * three calls, in its own order (network → rings → roads, then the roundabout
- * pass writing its island wall into the very sidewalk accumulator roads
- * returned), and indexes what they produce. Same painter, same asphalt.
+ * It is not a second derivation: it runs `buildWorldGeometry`'s own calls, in
+ * its own order (network → rings → roads, then the two passes that write kerbed
+ * furniture into the very sidewalk accumulator roads returned — the roundabout
+ * island wall and the pedestrian refuge island), and indexes what they produce.
+ * Same painter, same asphalt. The census-agreement case in
+ * drivable-surface.test.ts walks all 105 shipped districts, so a new upstream
+ * writer that this list does not mirror goes red rather than drifting.
  *
  * Takes the BUILDER's district type — `assertDistrict(raw)` — because that is
  * what the builder reads; the raw document every headless path already holds
  * satisfies it. Cache the result: it costs a road build, not a query.
  *
  * The price is that `runtime/index` now pulls `builders/roads` +
- * `builders/roundabout` into anything that imports the runtime barrel. Free on
- * the sim route (LessonScene already builds the world through both) and a
- * couple of pure-TS modules everywhere else; if that is ever measured to
- * matter, this ONE function moves to its own module and `resolveDrivableSurface`
- * — which imports nothing — stays here.
+ * `builders/roundabout` + `builders/markings` (for the refuge-island pass —
+ * all three are plain TS, no three/rapier) into anything that imports the
+ * runtime barrel. Free on the sim route (LessonScene already builds the world
+ * through all of them) and a couple of pure-TS modules everywhere else; if that
+ * is ever measured to matter, this ONE function moves to its own module and
+ * `resolveDrivableSurface` — which imports nothing — stays here.
  */
 export function resolveDistrictDrivableSurface(district: District): DrivableSurface {
   const network = analyzeNetwork(district);
   const rings = analyzeRoundabouts(district, network);
   const roads = buildRoads(network, rings);
+  // buildWorldGeometry's TWO sidewalk writers, in ITS order. Both raise kerbed
+  // furniture into the very accumulator `buildRoads` just returned, and paint
+  // into a markings accumulator nothing here reads:
+  //   · buildRoundabouts — the central island's kerb + rim;
+  //   · buildCrossingFurniture — the kerbed pedestrian refuge island / median
+  //     nose (doc 87 B50/B53/B54), which three shipped districts author
+  //     (pe-bus-v1, pe-cane-v1, pe-slow-v1) and which this path used to MISS.
+  // Missing it left the headless index 16 sidewalk triangles short of the one
+  // LessonScene runs on exactly those maps — label-only by the layer rules
+  // below, but a drift between the grader the student meets and the grader the
+  // traces are recorded against, and the next sidewalk writer added upstream
+  // would drift the same way. `resolve paths` in drivable-surface.test.ts now
+  // compares the census on ALL 105 districts rather than three of them.
+  const paint = new MeshAccumulator();
   const roundabouts = buildRoundabouts(rings, {
     sidewalks: roads.sidewalks,
-    markings: new MeshAccumulator(),
+    markings: paint,
   });
+  buildCrossingFurniture(district, network, { sidewalks: roads.sidewalks, markings: paint });
   const view = (acc: MeshAccumulator): SurfaceMesh => ({
     positions: acc.positionsView,
     indices: acc.indicesView,
