@@ -316,6 +316,31 @@ export const SC_PE_SCHOOL_PATROL: ScenarioSpec = {
  * conditions2.ts), where the drill IS the envelope; here it would be a second
  * detector firing on the same metre of road.
  *
+ * ⚠ THE UNBILLED HIGH-SPEED BAND, MEASURED AND DELIBERATELY LEFT (2026-08-23).
+ * The lane-10 `pass()` model, swept to 140 km/h across the ± 3 m jitter, says
+ * the чл. 119 duty stops being billable above 85 km/h (jitter −3; 94 at 0, 104
+ * at +3). The mechanism is arithmetic, not a bug in the numbers: she needs
+ * roadFromM / speedMps = 1.6 / 1.4 = 1.14 s to be ON the graded span, and the
+ * beam leash gives the car only 26.7–32.8 m of run-in, so past ~85 km/h the
+ * car crosses the paint while she is still on the kerb — no occupancy, no
+ * `crossingPassed` with `pedestrianOnCrossing`, nothing for the reducer.
+ * IT IS NOT T11's SHAPE: that driver is still convicted, and heavily — the
+ * street is tagged 50 and «Нормален ≤60», so 85+ books SPEEDING_DANGEROUS. He
+ * is billed, just not for the crossing.
+ * NOT RETUNED, and the reason is worth writing down rather than rediscovering:
+ *  - the only lever that would close it is a LARGER `triggerDistM` outer bound
+ *    with a `triggerEtaSec` horizon under it — and `triggerDistM` IS the beam
+ *    leash (30 m = what low beams show), the axis the whole template exists on
+ *    and the one `sc-pe-night-unlit-traces` pins against the day dart;
+ *  - `triggerEtaSec` alone cannot do it. Read its contract: the distance stays
+ *    an OUTER bound, so the ETA horizon only ever releases a walker LATER. It
+ *    was built for the opposite defect (careful driving suppressing a hazard);
+ *  - any release change re-times all three COMMITTED recordings under
+ *    content/traces/sc-pe-night-unlit/, which the trace battery compares
+ *    byte-for-byte, and re-recording them moves a frozen clip-plan input.
+ * So this is REPORTED with its numbers, for the owner of the traces + the clip
+ * pipeline to spend deliberately — not spent from inside a copy lane.
+ *
  * TWO HONEST GAPS, both render-only (neither touches grading):
  *  - „darker clothing colorway" (the backlog's L5 wish): PedestrianDartOutRunner
  *    hardcodes colorIndex 3 for every dart — the colourway is not an authored
@@ -399,9 +424,20 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
         "Нощ е и улицата е неосветена. Провери, че късите светлини са включени — без тях нямаш дори 40-те метра, които те показват.",
     },
     {
+      // PHANTOM PLATE (wave-c, the sc-pe-night-unlit row). This step read
+      // «Знакът разрешава 50» and there IS no знак: `buildWorldGeometry` on
+      // pe-dart-v1 posts {pedestrianCrossing 1, noOvertaking 1} and ZERO В26
+      // faces — the 50 here is чл. 21's built-up-area default, not a plate.
+      // Telling a student to read a plate that is not in his frame is the same
+      // defect as sc-pe-zone-living's «знакът важи» row, and it also taught the
+      // wrong law: in town the 50 comes from the settlement, which is exactly
+      // the fact the exam asks about. So the step now names where the number
+      // COMES FROM, and the чл. 20 ceiling — the whole point of PE-09 — is
+      // stated harder, not softer. Pinned by pe2-sweep161-copy-truth C5, which
+      // measures the district's built sign set rather than reading the words.
       n: 2,
       textBg:
-        "Знакът разрешава 50, но ти виждаш докъдето стигат фаровете. Ограничението е таван, не цел — карай със скорост, с която спираш в осветеното.",
+        "Тук няма табела с число — в населено място таванът е 50 по закон. Но ти виждаш само докъдето стигат фаровете: ограничението е таван, не цел. Карай със скорост, с която спираш в осветеното (чл. 20).",
     },
     {
       n: 3,
@@ -508,12 +544,54 @@ export const SC_PE_NIGHT_UNLIT: ScenarioSpec = {
  * The people walking the road are graded exactly as the law owes them, on a
  * street that looks exactly like the law describes.
  *
+ * ⚠ „NOTHING NARROWS" IS FALSE — DO NOT DELETE STEP 2's «стеснението».
+ * The wave-c note on 37bbb618 reads „Nothing anywhere narrows, so «стеснението
+ * между жилищните блокове» has no referent", and the committed district
+ * disagrees by 8 metres. `edgeHalfWidth` (the builders' own function) gives
+ * kerb-to-kerb 24.25 m on pz-e-approach → 16.25 m through pz-e-zone → 24.25 m
+ * on pz-e-out: `tertiary` carries the 4 m PARKING_LANE band per side and
+ * `residential` does not, so the kerbs really do step in at the Д15 boundary
+ * and out again at the Д16 one. Step 2 is describing a measured cross-section
+ * and this lane nearly deleted it on the strength of a screenshot.
+ * WHAT IS TRUE in that row is LEGIBILITY, not geometry: the narrowing is a
+ * parked band vanishing, and the flanking 12 m blocks render as grey office
+ * slabs, so a third of the road disappears without reading as a residential
+ * squeeze. That is a scene/generator row — reported, not answered by removing
+ * a fact. pe2-sweep161-copy-truth C6 pins the 8 m so the next repair has to go
+ * red before it can drop the clause.
+ *
+ * ⚠ THE UNMARKED CROSSING IS NOT UNMARKED IN THE BUILT WORLD (wave-c,
+ * mobile-right/04-t102s — a red-bordered А18 triangle on its own post inside
+ * the zone). The PAINT half held: `buildWorldGeometry` on pe-zone-v1 reports
+ * `zebraCrossings: 0`, the asphalt really is bare. The SIGN half did not:
+ * props.ts's „А18 in ADVANCE of an authored zebra" pass iterates
+ * `district.crossings` and never reads `crossing.kind`, so pz-x-1 earns ONE
+ * TRIANGLE PER DIRECTION — measured, 2 on this district. A warning plate
+ * announcing a пешеходна пътека is the one piece of furniture a жилищна зона
+ * must not carry, and it stood directly against briefing step 3.
+ * NOT FIXED HERE — props.ts is another lane's file, and the fix is one line of
+ * gating (skip the pass when `crossing.kind === "unmarked"`). REPORTED.
+ * What this file could honestly do, it did: step 3 no longer denies the
+ * feature, it states чл. 62, т. 1 instead (pe2-sweep161-copy-truth C4 pins
+ * both halves against the BUILT world, not against the sentence).
+ *
  * THREE HONEST GAPS, all reported, none faked:
  *  1. Д15/Д16 have no SignKind and no GLB (world/types.ts), so the zone has no
  *     plate — its visual anchors are the residential blocks, the В26-50
  *     boundary posts and the Б1 the ranks put on the exit (below). Render-only:
  *     grading reads `maxspeed` and the crossing, never a sign placement (the
  *     call gen_pe_school.mjs made for А19).
+ *     ⚠ CODES, because the wave-c note for this row asked for „the Д17 plate":
+ *     content/signs/signs.json is the law-cited catalogue and it says
+ *     Д15 = „Начало на жилищна зона", Д16 = „Край на жилищната зона",
+ *     Д17 = „ПЕШЕХОДНА ПЪТЕКА". Д17 is the crossing plate, not the zone plate —
+ *     writing it into this template's copy would put the wrong sign on the
+ *     exam sheet. The zone plates this scene lacks are Д15 and Д16, and every
+ *     Д-code in this file already matches signs.json.
+ *     MEASURED (buildWorldGeometry, seed 7): pe-zone-v1 posts
+ *     {giveWay 1, priorityRoad 2, limit50 6, limit20 2, limitEnd 1,
+ *     pedestrianCrossing 2} — a В26 «20» at y ≈ 126 (the plate the wave-c
+ *     04-t044s 6× crop reads) and NO zone plate of any kind.
  *  2. THE EXIT DUTY. чл. 25's „включване в движението — пропускаш всички"
  *     (content bank q-signs-049) has NO adjudicator. The closest shipped one is
  *     the right-hand-rule tracker, which grades the from-the-RIGHT subset — so
@@ -713,9 +791,25 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
         "На входа на зоната — стеснението между жилищните блокове — ограничението пада на 20 км/ч. Свали скоростта ПРЕДИ входа: 20 е пешеходно темпо, не „бавно шофиране“.",
     },
     {
+      // DENIED FEATURE (wave-c, mobile-right/04-t102s). This step read «Вътре
+      // няма пешеходни пътеки» while an А18 „Пешеходна пътека" triangle stood
+      // on its own post inside the zone, plainly in frame — and the measurement
+      // agrees: `buildWorldGeometry` posts TWO А18 on pe-zone-v1 (props.ts
+      // places one per direction for every authored crossing on a scenario map
+      // and never reads `crossing.kind`, so the deliberately `unmarked` pz-x-1
+      // earns them anyway). The PAINT half of the design held — zebraCrossings
+      // is 0, the asphalt is bare — so the world-side row is the sign, and it
+      // is reported, not fixed here: props.ts is another lane's file.
+      //
+      // The copy was over-claiming in its own right. чл. 62, т. 1 gives the
+      // pedestrian the WHOLE carriageway; it does not abolish crossings, and a
+      // real жилищна зона may contain one. Worse, the absolute invited the
+      // exact excuse the drill exists to kill — «той не беше на пътеката». The
+      // step now states the law and names that excuse, so it teaches MORE than
+      // the sentence it replaces. Pinned by pe2-sweep161-copy-truth C4.
       n: 3,
       textBg:
-        "Вътре няма пешеходни пътеки и никой не е длъжен да върви по тротоара — цялото платно е на хората. Хора върху платното тук не нарушават нищо: ти си гостът.",
+        "Вътре предимството на пешеходеца не е само върху пътека: по чл. 62 хората ползват платното по цялата му широчина и никой не е длъжен да върви по тротоара. Затова „не беше на пътеката“ не е оправдание — хора върху платното тук не нарушават нищо: ти си гостът.",
     },
     {
       n: 4,
@@ -893,6 +987,39 @@ export const SC_PE_ZONE_LIVING: ScenarioSpec = {
  * parked-car obstacles would need a bays layer + trace obstacles (the
  * sc-pe-zone-living honest gap); the row lives in the copy and the corner-shop
  * occluder pe-child-v1 already ships, exactly as child-ball treats it.
+ *
+ * THE „IT IS AN ADULT, ON THE FAR SIDE" ROW (wave-c) IS REFUTED — checked at
+ * the source AND on the frames, because the fix it asks for would have moved a
+ * correctly-staged actor:
+ *  - the CHILD RIG IS REAL and it is wired end to end. `variant: "child"`
+ *    below → runners.ts `stage()` spreads it onto the staged pedestrian →
+ *    traffic/staged.ts publishes it on TrafficPedestrianState → TrafficLayer
+ *    swaps the rig (PED_CHILD_HEIGHT 0.72 ≈ a 1.25 m figure, head ratio 0.86 /
+ *    0.72, PED_CHILD_TOP #e0562f over PED_CHILD_LEGS #37517d — a colourway no
+ *    adult in PED_COLORS/PED_LEG_COLORS can produce).
+ *  - sweep161/mobile-right/06-waited PHOTOGRAPHS it (crop 1440,430 200×150):
+ *    a short, big-headed figure in a bright orange top and blue trousers,
+ *    standing in a GAP of the parked row at the EAST kerb — the driver's own
+ *    side — with its head well below the roofline of the parked car beside it.
+ *    Not an adult, and not the far side of the road.
+ *  - the „far side of the road" reading comes from catching the walk late: the
+ *    child starts at ROW_CURB_EAST (+9.73, the driver's own kerb) and walks
+ *    WEST, so any frame taken after the wait finds her on the far half by
+ *    construction. Both wave-c 06-waited frames are exactly that moment.
+ *  - and the row's own gap is dressed, not faked: scenarioSceneryProps clears a
+ *    parked-car corridor along this dart, so the child really does come out of
+ *    a gap in the row rather than through a car.
+ * NOTHING MOVED HERE. What the row did leave standing is a WORLD row on
+ * another lane's file: pe-child-v1 tags 40 km/h on every edge and
+ * `buildWorldGeometry` posts ZERO В26 faces on it — no limit CHANGE, so the
+ * transition pass has nothing to sign, and the spawn-repeat pass bails on „no
+ * room before the mouth" because it wants SPAWN_CONTEXT_AHEAD_M 30 +
+ * ENTRY_POST_END_CLEAR_M 25 = 55 m of edge and pe-e-street-s2 is 32 m long.
+ * So the HUD's «40 · знакът важи» and the fast-row card's «зона 40 … чл. 21»
+ * both cite a plate the student cannot see — and 40 is BELOW the built-up-area
+ * default, so unlike the night street it genuinely needs one. Reported: the
+ * same shape as sc-pe-night-unlit's C5, which this lane COULD repair only
+ * because 50 in town needs no plate at all.
  *
  * TWO HONEST GAPS, both render/condition-only (neither touches grading):
  *  - „DUSK" (the L5 wish): ConditionAxis has no dusk value (dry/rain/fog/snow ×

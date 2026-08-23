@@ -20,26 +20,133 @@
  *                      both walkers still behind the railing on the far
  *                      footway; they stepped onto the tarmac at t105s.
  *
+ * TWO MORE OF THE SAME SPECIES landed in the wave-c re-drive, and both are
+ * settled by MEASURING THE BUILT WORLD rather than by reading the sentence:
+ *
+ *   C4  DENIED FEATURE sc-pe-zone-living/mobile-right/04-t102s (wave-c) —
+ *                      briefing step 3 read «Вътре няма пешеходни пътеки»
+ *                      while an А18 „Пешеходна пътека" triangle stood on its
+ *                      own post inside the zone, plainly in frame.
+ *                      `buildWorldGeometry` says pe-zone-v1 posts TWO of them
+ *                      (props.ts places А18 for every authored crossing on a
+ *                      scenario map and never consults `crossing.kind`, so the
+ *                      deliberately `unmarked` pz-x-1 gets a triangle anyway).
+ *                      The world half is props.ts — reported, not this lane's
+ *                      file. The copy half is: чл. 62 grants the pedestrian the
+ *                      WHOLE carriageway, it does not abolish crossings, so the
+ *                      absolute was never the law either.
+ *   C5  PHANTOM PLATE  sc-pe-night-unlit — briefing step 2 read «Знакът
+ *                      разрешава 50» on pe-dart-v1, a district whose built sign
+ *                      set is {pedestrianCrossing 1, noOvertaking 1}: ZERO speed
+ *                      plates. The 50 is the built-up-area default, not a plate,
+ *                      and the step told the student to read one that is not
+ *                      there — the sc-pe-zone-living/39d7ae90 complaint («the
+ *                      interface says the sign is in force») in briefing form.
+ *
+ * AND ONE RULE POINTS THE OTHER WAY, because measuring the world refuted a row
+ * instead of confirming it:
+ *
+ *   C6  TRUE CLAUSE    the same re-drive says «Nothing anywhere narrows, so
+ *                      „стеснението между жилищните блокове" has no referent».
+ *                      `edgeHalfWidth` says pe-zone-v1 goes 24.25 m → 16.25 m →
+ *                      24.25 m kerb-to-kerb across the two zone boundaries: the
+ *                      arterial parking band exists on `tertiary` and not on
+ *                      `residential`. The clause is a measurement, and this lane
+ *                      came within one edit of deleting it. C6 pins the 8 m so
+ *                      the next repair has to go red before it can drop it.
+ *
  * EVERY RULE HERE HAS TEETH IN BOTH DIRECTIONS, because a matcher that quietly
  * stops matching turns a census vacuously green (the lesson `stop-claim-gates`
  * paid for). Each matcher is asserted against the exact string it retired AND
  * against the string that replaced it, and each rule is asserted to SPARE a
- * shipped row that legitimately uses the same words.
+ * shipped row that legitimately uses the same words. C4 and C5 go further: the
+ * retired sentence is fed back through the SAME predicate against the SAME
+ * built district and must come out an offender, so neither census can be green
+ * because it stopped looking.
  *
  * SCOPE. `SCENARIO_TEMPLATES_PE2` only. `templates-vru2.ts` carries three more
  * «(ниво 5)» steps (sc-vu-blindspot-moto, sc-vu-door-zone, sc-vu-bikelane-turn)
  * and is another lane's file — reported, not touched, and deliberately outside
  * this census so this battery cannot turn that lane red.
+ *
+ * C4/C5 SCOPE IS `instructionsBg`, the live briefing — the array
+ * `LessonPlayShell` puts on the glass beside the drive, which is what every
+ * frame in the two rows photographs. `teach.whenBg` deliberately stays out:
+ * «Няма тротоар, няма пътеки, коли са паркирани от двете страни» there is
+ * reportage about Студентски град and „Дружба", introduced as such, not a claim
+ * about the street under the wheels.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { PedestrianDartOutSpec } from "../../../contracts";
+import { buildWorldGeometry } from "../../../world/builders/buildWorldGeometry";
+import { edgeHalfWidth } from "../../../world/builders/network";
+import { assertDistrict, type SignKind } from "../../../world/types";
 import { parseObjectiveParams } from "../../objectives";
 import { compileScenario } from "../compile";
 import { SC_PE_ZONE_LIVING, SCENARIO_TEMPLATES_PE2 } from "../templates-pe2";
-import type { ScenarioLevel } from "../types";
+import type { ScenarioLevel, ScenarioSpec } from "../types";
 
 const RUNGS: readonly ScenarioLevel[] = [1, 2, 3, 4, 5];
+
+// ---------------------------------------------------------------------------
+// The built world — the only witness that can settle a claim about signs
+// ---------------------------------------------------------------------------
+
+const REPO = path.resolve(process.cwd(), "..");
+
+/** Signs the shipped builders actually PUT IN THE SCENE for a district, by
+ *  kind. Built once per district — `buildWorldGeometry` is the same call
+ *  `LessonScene` makes, so this is what the student's frame contains. */
+const signCensusCache = new Map<string, Record<string, number>>();
+function signsBuiltFor(districtId: string): Record<string, number> {
+  const hit = signCensusCache.get(districtId);
+  if (hit) return hit;
+  const district = assertDistrict(
+    JSON.parse(readFileSync(path.join(REPO, "content", "world", `${districtId}.json`), "utf-8")),
+  );
+  const world = buildWorldGeometry(district, { seed: 7 });
+  const by: Record<string, number> = {};
+  for (const s of world.signs) by[s.kind] = (by[s.kind] ?? 0) + 1;
+  // `zebraCrossings` is markings.ts's own count of PAINTED crossings — the
+  // other half of "is there a пешеходна пътека here", and the half `kind:
+  // "unmarked"` actually governs.
+  by.__zebraPaint = world.stats.zebraCrossings;
+  signCensusCache.set(districtId, by);
+  return by;
+}
+
+/** Every В26 face the kit can post, i.e. "a plate stating a number". */
+function speedPlatesBuilt(districtId: string): number {
+  const by = signsBuiltFor(districtId);
+  return Object.entries(by)
+    .filter(([kind]) => /^limit\d+$/.test(kind))
+    .reduce((n, [, count]) => n + count, 0);
+}
+
+function crossingSignsBuilt(districtId: string): number {
+  const by = signsBuiltFor(districtId);
+  return (by["pedestrianCrossing" satisfies SignKind] ?? 0) + by.__zebraPaint;
+}
+
+/** The offenders a rule finds, given the steps it is applied to. Both C4 and
+ *  C5 call THIS, and both re-run it on the retired sentence — a predicate that
+ *  is only ever asked about the shipped copy cannot be shown to work. */
+function offendersOf(
+  specs: readonly ScenarioSpec[],
+  matches: (text: string) => boolean,
+  worldContradicts: (districtId: string) => boolean,
+  stepsOf: (spec: ScenarioSpec) => readonly { n: number; textBg: string }[] = (s) =>
+    s.instructionsBg,
+): string[] {
+  return specs.flatMap((spec) =>
+    stepsOf(spec)
+      .filter((s) => matches(s.textBg) && worldContradicts(spec.map.districtId))
+      .map((s) => `${spec.id} step ${s.n} — "${s.textBg}"`),
+  );
+}
 
 // ---------------------------------------------------------------------------
 // C1 — the rung number is the COMPILER's to say, never a step's
@@ -215,5 +322,200 @@ describe("C3 — the жилищна-зона halt chip is issued long before any
     if (haltP.kind !== "reachZone") throw new Error("shape");
     expect(/(?:^|[^\p{L}])[Сс]при(?![\p{L}])/u.test(halt.titleBg)).toBe(true);
     expect(haltP.maxSpeedKmh).toBeLessThanOrEqual(8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C4 — a briefing step may not DENY a road feature the district builds
+// ---------------------------------------------------------------------------
+
+/**
+ * A step asserting that a class of road feature is ABSENT from the street the
+ * student is on. The distinction that matters is «няма X» stated about HERE —
+ * a step that says what the law grants («предимството не е само върху пътека»)
+ * asserts nothing about the furniture and is deliberately outside it.
+ */
+const DENIES_CROSSING =
+  /(?:^|[^\p{L}])н[яе]ма\s+(?:никакви\s+)?(?:пешеходн[иа]\s+(?:пътек[иа]|пътека)|зебр[аи])(?![\p{L}])/iu;
+
+describe("C4 — the жилищна-зона briefing denied a crossing the world builds", () => {
+  const ZONE_DISTRICT = "pe-zone-v1";
+  const RETIRED_STEP3 =
+    "Вътре няма пешеходни пътеки и никой не е длъжен да върви по тротоара — цялото платно е на хората. " +
+    "Хора върху платното тук не нарушават нищо: ти си гостът.";
+
+  it("THE MEASUREMENT: pe-zone-v1 posts А18 „Пешеходна пътека“ inside the zone", () => {
+    const by = signsBuiltFor(ZONE_DISTRICT);
+    // The PAINT half of the design held, and this also settles the wave-c
+    // wording: that note says the zone „contains a marked zebra", and it does
+    // not — markings.ts lays nothing for `kind: "unmarked"`, the frame it cites
+    // (04-t102s) shows bare asphalt, and the count here is zero. What the frame
+    // really shows is the TRIANGLE, which is the half below.
+    expect(by.__zebraPaint, "painted zebras on pe-zone-v1").toBe(0);
+    // …and the sign half did not. props.ts iterates `district.crossings` and
+    // never reads `crossing.kind`, so the deliberately unmarked pz-x-1 earns a
+    // warning triangle per direction. THIS is the world-side row (reported —
+    // props.ts is not this lane's file). If it is ever fixed this expectation
+    // reds: that is the signal that the absolute may be stated again.
+    expect(
+      by.pedestrianCrossing ?? 0,
+      "А18 posts inside the жилищна зона — the plate step 3 used to deny",
+    ).toBeGreaterThan(0);
+  });
+
+  it("the matcher has teeth: it catches the retired step and spares the replacement", () => {
+    expect(DENIES_CROSSING.test(RETIRED_STEP3)).toBe(true);
+    expect(DENIES_CROSSING.test("Тук няма зебра — платното е на хората")).toBe(true);
+    const shipped = SC_PE_ZONE_LIVING.instructionsBg.find((s) => s.n === 3)!;
+    expect(DENIES_CROSSING.test(shipped.textBg)).toBe(false);
+    // …and it is not a ban on the WORDS: the replacement still teaches that the
+    // priority is not confined to a crossing, and must survive.
+    expect(/пътека/iu.test(shipped.textBg)).toBe(true);
+  });
+
+  it("NOT VACUOUS: the retired step, run through the same predicate, is an offender", () => {
+    const fixture: ScenarioSpec = {
+      ...SC_PE_ZONE_LIVING,
+      instructionsBg: [{ n: 3, textBg: RETIRED_STEP3 }],
+    };
+    expect(
+      offendersOf([fixture], (t) => DENIES_CROSSING.test(t), (d) => crossingSignsBuilt(d) > 0),
+    ).toHaveLength(1);
+  });
+
+  it("the census: no PE2 briefing step denies a crossing its own district builds", () => {
+    expect(
+      offendersOf(
+        SCENARIO_TEMPLATES_PE2,
+        (t) => DENIES_CROSSING.test(t),
+        (d) => crossingSignsBuilt(d) > 0,
+      ),
+    ).toEqual([]);
+  });
+
+  it("…and the duty was sharpened, not dropped: step 3 still hands the whole road to the pedestrian", () => {
+    // The failure mode of a "just delete the sentence" repair. чл. 62, т. 1 is
+    // the entire reason this drill exists; the step has to still say it, and it
+    // has to still say the student is the guest.
+    const shipped = SC_PE_ZONE_LIVING.instructionsBg.find((s) => s.n === 3)!.textBg;
+    expect(/цял[аоя]т?[ао]?\s+(?:му\s+)?(?:широчина|платно)/iu.test(shipped)).toBe(true);
+    expect(/гост/iu.test(shipped)).toBe(true);
+    expect(/чл\.\s*62/u.test(shipped)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C5 — a step may not attribute the posted limit to a plate the world lacks
+// ---------------------------------------------------------------------------
+
+/** The limit credited to a SIGN: «Знакът разрешава 50», «знакът позволява 30». */
+const SIGN_STATES_LIMIT = /знак\p{L}*\s+(?:разрешава|позволява|показва|дава|качва|сваля)\s+\d+/iu;
+
+describe("C5 — the night briefing read a speed plate pe-dart-v1 does not build", () => {
+  const NIGHT = SCENARIO_TEMPLATES_PE2.find((s) => s.id === "sc-pe-night-unlit")!;
+  const RETIRED_STEP2 =
+    "Знакът разрешава 50, но ти виждаш докъдето стигат фаровете. Ограничението е таван, не цел — " +
+    "карай със скорост, с която спираш в осветеното.";
+
+  it("THE MEASUREMENT: pe-dart-v1 builds ZERO В26 faces, pe-zone-v1 builds some", () => {
+    // The night street's 50 is чл. 21's built-up-area default — there is no
+    // plate to read, and the step told the student to read one.
+    expect(speedPlatesBuilt("pe-dart-v1"), "В26 faces built on pe-dart-v1").toBe(0);
+    // The SPARE side of the rule: where a plate really stands, naming it is
+    // correct signing and the rule must not forbid it. pe-zone-v1's mouth
+    // carries the В26 «20» the wave-c 04-t044s crop reads.
+    expect(speedPlatesBuilt("pe-zone-v1"), "В26 faces built on pe-zone-v1").toBeGreaterThan(0);
+  });
+
+  it("the matcher has teeth: it catches the retired step and spares the replacement", () => {
+    expect(SIGN_STATES_LIMIT.test(RETIRED_STEP2)).toBe(true);
+    expect(SIGN_STATES_LIMIT.test("знакът позволява 30 в зоната")).toBe(true);
+    const shipped = NIGHT.instructionsBg.find((s) => s.n === 2)!;
+    expect(SIGN_STATES_LIMIT.test(shipped.textBg)).toBe(false);
+    // …and it is not a ban on the word «знак»: sc-pe-zone-living step 6 points
+    // at the Б1 on the exit mouth, which `buildWorldGeometry` really posts.
+    const exitStep = SC_PE_ZONE_LIVING.instructionsBg.find((s) => /Б1/u.test(s.textBg))!;
+    expect(SIGN_STATES_LIMIT.test(exitStep.textBg)).toBe(false);
+    expect(signsBuiltFor("pe-zone-v1").giveWay ?? 0, "Б1 posts on pe-zone-v1").toBeGreaterThan(0);
+  });
+
+  it("NOT VACUOUS: the retired step, run through the same predicate, is an offender", () => {
+    const fixture: ScenarioSpec = { ...NIGHT, instructionsBg: [{ n: 2, textBg: RETIRED_STEP2 }] };
+    expect(
+      offendersOf([fixture], (t) => SIGN_STATES_LIMIT.test(t), (d) => speedPlatesBuilt(d) === 0),
+    ).toHaveLength(1);
+  });
+
+  it("the census: no PE2 briefing step credits the limit to a plate its district lacks", () => {
+    expect(
+      offendersOf(
+        SCENARIO_TEMPLATES_PE2,
+        (t) => SIGN_STATES_LIMIT.test(t),
+        (d) => speedPlatesBuilt(d) === 0,
+      ),
+    ).toEqual([]);
+  });
+
+  it("…and the чл. 20 lesson survived the repair: the step still says the limit is a ceiling", () => {
+    // The whole point of PE-09's step 2 — «карай със скорост, с която спираш в
+    // осветеното». A repair that only deleted the false clause would leave the
+    // student with the number and none of the reasoning; the number without the
+    // ceiling is the misconception the lesson exists to break.
+    const shipped = NIGHT.instructionsBg.find((s) => s.n === 2)!.textBg;
+    expect(/таван/iu.test(shipped)).toBe(true);
+    expect(/фаров|осветено/iu.test(shipped)).toBe(true);
+    expect(/50/u.test(shipped)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// C6 — «стеснението между жилищните блокове» is a MEASUREMENT, not a flourish
+// ---------------------------------------------------------------------------
+
+/**
+ * THE COUNTER-ROW, written down because this lane nearly deleted a true
+ * sentence. The wave-c note on sc-pe-zone-living/37bbb618 reads „Nothing
+ * anywhere narrows, so «стеснението между жилищните блокове» has no referent" —
+ * and the district disagrees, by 8 metres.
+ *
+ * `edgeHalfWidth` is the builders' OWN function: travel lanes plus a 4 m
+ * kerbside parking band on the arterial classes. pz-e-approach and pz-e-out are
+ * `tertiary` (band) and pz-e-zone is `residential` (no band), so the kerbs step
+ * IN by 4 m per side at the Д15 boundary and OUT again at the Д16 one:
+ * 24.25 m → 16.25 m → 24.25 m. Step 2 is describing a real cross-section.
+ *
+ * The founder-review reading is still worth something — it is about LEGIBILITY,
+ * not geometry: the narrowing is the parked band vanishing, and the flanking
+ * 12 m blocks render as grey office slabs, so a third of the road disappears
+ * without reading as a residential squeeze. That is a world/scene row and it is
+ * reported. What this file must not do is answer it by deleting a measured
+ * fact, so the number is pinned here: anyone who removes the clause has to make
+ * this test go red first, and read why.
+ */
+describe("C6 — the zone entry really is a narrowing (the clause a repair must not delete)", () => {
+  it("THE MEASUREMENT: pe-zone-v1 loses 8 m of kerb-to-kerb across the Д15 boundary", () => {
+    const district = JSON.parse(
+      readFileSync(path.join(REPO, "content", "world", "pe-zone-v1.json"), "utf-8"),
+    ) as { roads: { edges: { id: string; class: string; lanes: number; roundabout: boolean }[] } };
+    const width = (id: string) => {
+      const e = district.roads.edges.find((x) => x.id === id);
+      if (!e) throw new Error(`pe-zone-v1 has no edge ${id}`);
+      return 2 * edgeHalfWidth(e);
+    };
+    const approach = width("pz-e-approach");
+    const zone = width("pz-e-zone");
+    const out = width("pz-e-out");
+    expect(approach - zone, "kerb-to-kerb lost at the zone entry, m").toBeCloseTo(8, 3);
+    expect(out - zone, "kerb-to-kerb regained at the zone exit, m").toBeCloseTo(8, 3);
+    expect(zone).toBeLessThan(approach);
+  });
+
+  it("…and step 2 still says so — the copy is the reason the measurement matters", () => {
+    const step2 = SC_PE_ZONE_LIVING.instructionsBg.find((s) => s.n === 2)!.textBg;
+    expect(/стеснени/iu.test(step2)).toBe(true);
+    // The teaching the clause carries: slow down BEFORE the boundary, and 20 is
+    // a walking pace rather than "driving slowly".
+    expect(/ПРЕДИ/u.test(step2)).toBe(true);
+    expect(/20/u.test(step2)).toBe(true);
   });
 });

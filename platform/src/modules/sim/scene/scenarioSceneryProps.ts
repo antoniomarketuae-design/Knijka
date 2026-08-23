@@ -28,6 +28,11 @@
  *        (traces/scEdPoligonChain.ts) — this is the scene side of that pair,
  *        and „Удар в конус" is the drill's own graded mistake.
  *
+ *  3. DERIVED BUS-STOP SHELTERS (sweep 161 repair): the навес a district
+ *     authors as a STOP SPAN and nothing draws — see `busStopSheltersOf()`.
+ *     Derived from the same authored key rule 2b already reads, so there is no
+ *     third list to keep in sync.
+ *
  * Every coordinate is pinned BY VALUE from its single truth (the district
  * meta / the trace-harness rect), cited at each entry; the unit test
  * re-asserts the pins against the committed district JSON and the public
@@ -38,6 +43,7 @@ import { parseScenarioLessonId, scenarioById } from "@/modules/sim/lessons";
 import type {
   ScenarioObstacleSpec,
   ScenarioPropObstacle,
+  ScenarioWallObstacle,
 } from "./obstacleSpec";
 
 // ---------------------------------------------------------------------------
@@ -215,6 +221,68 @@ const HELD_SCENERY: Record<string, readonly ScenarioObstacleSpec[]> = {
   // curb-side of the driving line the ease-around bends past.
   "sc-hazard-obstacle": [
     { kind: "vehicle", x: 5.5, y: 130, headingDeg: 0, model: "dret_90", seed: 4, visual: true },
+  ],
+  // ── THE „ПРЕПЯТСТВИЕ" THAT WAS ONLY A PAINTED RING (sweep 161) ───────────
+  //
+  // «There is no physical obstacle at the stop mark. The task „Спри преди
+  // препятствието — с пълна спирачка, В своята лента" is represented only by a
+  // flat orange ring painted on the tarmac, a cyan light beam and a „Спри тук"
+  // floating label. Nothing occupies the lane, so the full-force stop is a stop
+  // before an abstraction.»  (.audit-frames/wave-c/frames/
+  // sc-hz-brake-dont-swerve__pc-right/04-t093s.png says the same thing on the
+  // current tree: empty lane, ring, beam, label.)
+  //
+  // The drill's own trace file had already filed it against itself:
+  // traces/scHzBrakeDontSwerve.ts — „Honest gap, flagged: there is no debris
+  // GLB and no «падащ товар» world zone — the object grades correctly, it does
+  // not yet render as itself." This is that body, and it is code geometry
+  // because a chunk of fallen load has no fleet model: a low block, not a
+  // vehicle. The teach copy names exactly this class of thing — „паднал товар
+  // от камион, отчупена гума, клон, дупка".
+  //
+  // PINNED, footprint-for-footprint, to hzBrakeDontSwerveObstacles()'s single
+  // rect (4.06, 190, halfWidthM 0.8, halfLengthM 1.2): a `wall` collider is
+  // [thicknessM/2, heightM/2, lengthM/2], so thicknessM 1.6 and lengthM 2.4
+  // ARE the rect's half-extents doubled — the painted body and the graded rect
+  // are the same rectangle (the L7 law). scenarioSceneryProps.test.ts asserts
+  // that equality against the trace export itself, not against a copy.
+  //
+  // HITTABLE, and this is the one place in this table where that choice is
+  // argued rather than inherited. The stalled/wreck bodies above are
+  // `visual: true` because their consequence is authored in the recorder
+  // channel; here the recorder channel says the same thing THE LIVE STUDENT
+  // must be told — mistake demo 2 is „Късно спиране в препятствието" with
+  // codeRefs ["COLLISION"] against this very rect, and a scene `wall` is
+  // untagged, so VehicleRig grades contact as "staticObject", which is the
+  // rect's own `withWhat`. Same code, same rectangle, same drill: not a new
+  // grading path, the authored one finally reaching the person driving. The
+  // file's own hittable rule points here too — „a visual-only body would show
+  // him an obstacle the world lets him drive through", which is precisely the
+  // lesson this drill cannot afford to teach.
+  //
+  // WHAT IT DOES NOT DISTURB, measured:
+  //   • the stop objective — `sc-hzbds-stop` is a 4 m zone at (4.06, 184); the
+  //     block spans y ∈ [188.8, 191.2] and the hero at rest on the mark reaches
+  //     y = 186.05 (CHASSIS half-length 2.05). 2.75 m of daylight;
+  //   • the escort — it rides x = −4.06 the whole approach, a full 8.125 m lane
+  //     pitch away, and `held-vs-staged.test.ts` re-measures that;
+  //   • the recorded traces — the recorder replays against ObstacleRect2D and
+  //     never mounts scene bodies, so all three committed drives are untouched;
+  //   • the reveal — the rect stays inert past 30 m out (trigger), and a solid
+  //     body cannot be reached from further than that anyway, so the „nothing
+  //     about the approach is a trap" promise survives;
+  //   • the curb pass — rule 3 below opens a 3.88 m circle here and the nearest
+  //     decoration body is 6.07 m away on the kerb, so hz-debris-v1 loses ZERO
+  //     bodies (measured on the shipped `computeParkedCars`; the test pins it).
+  //
+  // Height 0.8 m is deliberate and is NOT free: it is a load-bearing number, so
+  // the test moves it and expects red. Below ~0.5 m the block hides under the
+  // bonnet line from COCKPIT_EYE 1.20 m at the 30 m reveal and the student
+  // brakes for nothing he can see; at vehicle height it stops being „паднал
+  // товар" and becomes the stopped car of the sibling drill, whose lesson is a
+  // different one.
+  "sc-hz-brake-dont-swerve": [
+    { kind: "wall", x: 4.06, y: 190, headingDeg: 0, lengthM: 2.4, heightM: 0.8, thicknessM: 1.6 },
   ],
   // traces/scCrossingBusShadow.ts BUS_OBSTACLE: the stopped large occluder at
   // the near (east) curb, nose just south of the zebra — founder R3 #26 („NO
@@ -532,6 +600,134 @@ function authoredStopSpansOf(
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Source 3 for BODIES — the навес a district authors and nothing draws
+// ---------------------------------------------------------------------------
+//
+// SWEEP 161, sc-pk-busstop-ban (critical): «The world does not contain the
+// landmark the lesson is entirely about … The briefing's навес (shelter) is
+// absent … The zone exists only as a translucent teal/amber tint painted by
+// the HUD, so the student is trained to read a coaching overlay instead of the
+// street.» And sc-merge-bus-pullout (major): «The briefing says the right lane
+// is a bus lane … в нея е спирката» — with no spirka rendered anywhere on it.
+//
+// The shelter is not decoration on these two maps: the lesson IS the shelter.
+// sc-pk-busstop-ban's instruction 2 is «Зоната ѝ не започва ПРИ НАВЕСА —
+// започва там, където започва зигзагът», and its second mistake card explains
+// «Водачът спря ПРЕДИ НАВЕСА и реши, че е извън спирката». Both sentences name
+// a thing the student cannot see, so the drill's whole claim — the zone is
+// bigger than the shelter — has one of its two terms missing. A student who
+// never saw the навес learns nothing he can carry to a real street.
+//
+// WHY IT IS DERIVED AND NOT A THIRD LIST. `props.ts` builds a modelled shelter
+// from a `buildings[].kind === "busStop"` FRONTAGE, and the two districts whose
+// entire lesson is the stop author theirs as a SPAN in `meta.scenario` instead
+// (`busBayY` / `busStopPocketY` — measured: `buildings[].kind` is `null` on
+// both). That is the SAME blind spot rule 2b below was written for, so this
+// reads the same authored key through the same two helpers: a map that names a
+// stop gets one, the 90 that name none are byte-identical, and a map that
+// authors a real `busStop` frontage keeps the modelled one and gets no second.
+//
+// WHAT IT IS, HONESTLY: a stopgap, exactly like the procedural box truck that
+// stands in for a bus above. There is no shelter GLB reachable from this table
+// and `wall` is the only structural primitive the obstacle spec has, so this
+// draws the ONE face of a навес a driver actually reads from the carriageway —
+// its back panel, 4.5 m along the kerb and 2.5 m tall. It is a landmark, not a
+// model. The costed fix is in `world/builders/props.ts`: teach the bus-stop
+// pass to accept an authored SPAN as a candidate, and this derivation retires.
+//
+// WHERE IT STANDS, from the district's own numbers only:
+//   • along the street — the span's own midpoint (mg-busstop-v1 bay 130..176 →
+//     y = 153; pk-busstop-v1 pocket 180..210 → y = 195);
+//   • across it — `parkedKerbXOf` (the curb-decoration band, rebuilt from
+//     `laneCenterRightM`) plus one setback: mg 18.25 → 19.75, pk 10.12 → 11.62.
+//     Both clear the nearest building frontage by 2.5 m (mg `mgb-b-stop-block`
+//     face x = 22.25, pk `pkbs-b-stop-block` face x = 14.13) and neither
+//     reaches the DRIVEN carriageway edge (16.25 / 8.12). The sign of
+//     `laneCenterRightM` picks the side, so the opposite kerb is never touched.
+//
+// CORRECTED 2026-08-23 (adversarial verify) — „BEHIND the parked band, on the
+// pavement" WAS WRITTEN HERE AND IS NOT TRUE ON EITHER MAP. `parkedKerbXOf`
+// returns the DECORATION-BAND CENTRE, and that centre's distance from the real
+// kerb differs by the whole 4 m parking band depending on the edge's class
+// (`world/builders/network.edgeHalfWidth` = travel half + `PARKING_LANE_WIDTH_M`
+// on PARKING_LANE_CLASSES only), so ONE constant setback cannot land on the
+// pavement on both. Measured against the shipped cross-section:
+//
+//   mg-busstop-v1  edge class `tertiary` → the band IS drawn; the carriageway
+//     ribbon runs out to halfWidth 20.25 and the pavement is [20.25, 23.75].
+//     The panel is [19.653, 19.853] — ON THE PARKING-BAND ASPHALT, 0.40 m short
+//     of the kerb, i.e. a hittable wall standing inside the drivable ribbon.
+//   pk-busstop-v1  edge class `residential` → NO band; kerb = halfWidth = 8.125
+//     and the pavement is [8.125, 11.625]. The panel is [11.52, 11.72] — 0.105 m
+//     of it on the pavement and 0.095 m overhanging the outer lip above the
+//     0.35 m skirt, 3.40 m BACK from the kerb instead of at it.
+//
+// Left as measured rather than re-aimed, because the honest kerb (halfWidth +
+// ~1 m) collides with a second, budgeted defect: on the class with no band
+// `computeParkedCars` already seats its row ON the footway (FR-21,
+// traffic/__tests__/parked-on-footway.test.ts), so a навес put where a навес
+// belongs would stand among bodies that are themselves in the wrong place.
+// That is a placement decision with a second file in it, not a typo.
+//
+// AND IT TAKES NOTHING AWAY. Rule 3 opens a clear circle around every held
+// body, so a new body normally costs decoration pixels — here it costs none:
+// both spans are already empty kerb (mg because rule 2b cleared the bay, pk
+// because its pocket sits inside an authored `noStopping` zone), and the test
+// asserts `computeParkedCars` is body-for-body identical before and after.
+
+/** A навес's back panel, m — a Bulgarian shelter is ~4.5 m of kerb and stands
+ *  about 2.5 m to its roofline. Both are load-bearing and both are mutated in
+ *  the unit test against a bound with a reason: shorter than ONE CIVILIAN CAR
+ *  (4.1 m, the fleet „car" profile) it reads as a post rather than a structure,
+ *  and lower than a PARKED ROOFLINE (1.45 m, ScenarioObstacles rigTopY's
+ *  default) it vanishes the moment one car parks in front of it — which is the
+ *  defect it exists to end. */
+const SHELTER_LENGTH_M = 4.5;
+const SHELTER_HEIGHT_M = 2.5;
+const SHELTER_THICKNESS_M = 0.2;
+/** How far BEHIND the curb-decoration band centre the panel stands, m — enough
+ *  that a parked car never renders inside the shelter (worst-case parked
+ *  half-width 0.95 + the panel's own 0.1), and little enough that it is still
+ *  kerb furniture and not part of the building line. */
+const SHELTER_SETBACK_M = 1.5;
+
+/**
+ * The bus-stop shelters one district earns from its own authored stop spans.
+ * [] for the 90 districts that author none, and [] for a district that already
+ * carries a `kind: "busStop"` frontage (props.ts builds the modelled shelter
+ * there — two navesa in one place is the defect, not the fix).
+ *
+ * Straight-street only: the panel runs along the street at headingDeg 0, which
+ * is true exactly while the carriageway is the generator's north-south line.
+ * A curved map would need a heading this function cannot derive, so it does not
+ * pretend to — it returns [].
+ */
+export function busStopSheltersOf(districtRaw: unknown): ScenarioWallObstacle[] {
+  if (typeof districtRaw !== "object" || districtRaw === null) return [];
+  const doc = districtRaw as { meta?: { scenario?: unknown }; buildings?: unknown };
+  if (Array.isArray(doc.buildings)) {
+    for (const b of doc.buildings as Array<{ kind?: unknown }>) {
+      if (b && typeof b === "object" && b.kind === "busStop") return [];
+    }
+  }
+  const scenario = doc.meta?.scenario;
+  if (typeof scenario !== "object" || scenario === null) return [];
+  const s = scenario as Record<string, unknown>;
+  if (s.archetype !== "straight-street") return [];
+  const kerbX = parkedKerbXOf(s);
+  if (kerbX === null) return [];
+  return authoredStopSpansOf(s).map((span) => ({
+    kind: "wall" as const,
+    x: kerbX + Math.sign(kerbX) * SHELTER_SETBACK_M,
+    y: (span.fromY + span.toY) / 2,
+    headingDeg: 0,
+    lengthM: SHELTER_LENGTH_M,
+    heightM: SHELTER_HEIGHT_M,
+    thicknessM: SHELTER_THICKNESS_M,
+  }));
+}
+
 /** Circles covering the kerb line x = kerbX from fromY to toY, each wide
  *  enough that a decoration body CENTRED on that kerb inside the span is
  *  caught (the curb pass tests centres, not footprints). */
@@ -717,8 +913,14 @@ export function parkedClearZonesFor(
 
 /**
  * All held scenery for one scenario lesson: the template's dressing + the
- * district's authored cones. Pure data — the caller appends it to the
- * occupied-bay obstacle list and mounts ONE ScenarioObstacles.
+ * district's authored cones + the shelter its authored stop span earns. Pure
+ * data — the caller appends it to the occupied-bay obstacle list and mounts ONE
+ * ScenarioObstacles.
+ *
+ * The two derived sources are DISTRICT properties, not template ones: every
+ * lesson that loads the map sees the same street, which is the point — a
+ * spirka that appeared only on the drill about spirki would be one more thing
+ * the world says only when it is being graded.
  */
 export function heldSceneryFor(
   lessonId: string,
@@ -726,5 +928,5 @@ export function heldSceneryFor(
 ): ScenarioObstacleSpec[] {
   const parsed = parseScenarioLessonId(lessonId);
   const dressing = (parsed && HELD_SCENERY[parsed.templateId]) || [];
-  return [...dressing, ...scenarioConesOf(districtRaw)];
+  return [...dressing, ...scenarioConesOf(districtRaw), ...busStopSheltersOf(districtRaw)];
 }

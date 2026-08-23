@@ -47,6 +47,66 @@ const DEFAULT_LANE_SHIFT_RAMP_SEC = 1.5;
 const GUARD_AHEAD_M = 16;
 /** Player-guard lateral half-width, m (~car width + margin). */
 const GUARD_LATERAL_M = 3.0;
+/**
+ * FR-B5-CROSS: how far off its own path a RETURNING actor watches for a student
+ * who is coming onto it (step 2a). Step 2's `GUARD_LATERAL_M` is a LANE width,
+ * right for a car being followed and useless for one being crossed.
+ *
+ * IT IS AN ENGAGEMENT DISTANCE, AND THE BRAKE HAS TO BE ABLE TO FINISH. The
+ * along-path half of the window is `GUARD_AHEAD_M` 16 m, which at the give-way
+ * boulevard's 11.5 m/s is 1.4 s of warning, and stopping from that speed under
+ * `HOLD_DECEL_MPS2` takes 8.3 m — so an actor that first sees the student at
+ * ahead = 9 m cannot stop short of him and only succeeds in coming to rest ON
+ * his lane. Measured on a 16 км/ч crossing swept one metre at a time from 40 m
+ * out, worst case reported:
+ *
+ *   lateral window  3 m (step 2's)   → contact, y = 150.30 on jxg-giveway-v1
+ *   lateral window 16 m              → 1.18 m — the actor braked too late and
+ *                                      stopped 5.2 m from the lane centre,
+ *                                      which is the student driving into a
+ *                                      standing car, doc 87 item 4 again
+ *   lateral window 25 m              → 6.13 m at 16 км/ч …and 0.22 m at 5
+ *
+ * THAT LAST COLUMN IS WHY THIS NUMBER IS 60 AND NOT 25 (verifier, 2026-08-23).
+ * A window sized in metres OFF THE PATH is a window sized in SECONDS only for
+ * one crossing speed, and 25 m was fitted to the one speed the first sweep
+ * drove. A learner creeping out of a give-way line at 5–8 км/ч is still 25 m
+ * off the boulevard at the moment the actor's own 16 m arc window opens, so
+ * engagement is deferred until `ahead` has already fallen to ~7 m — and the
+ * actor then brakes to a dead stop at `ahead` = 0.22 m, which IS the crossing
+ * point, and holds there while the student crawls into it. Traced on the
+ * synthetic boulevard: actor at rest at x = 4.28 against a student lane centre
+ * of x = 4.0625, from t = 6.5 s, with the student still 23 m away. It is doc 87
+ * item 4 exactly — a body standing in the student's own lane in the junction
+ * mouth — produced by the guard written to prevent it.
+ *
+ * Reproduced on the real map, `jxg-giveway-v1` L1 through the production stack,
+ * driving the drill's own instructions and varying only the crossing pace:
+ *
+ *   25 m window, 8 км/ч, 25 s wait   → CONTACT with staged id 1000 at
+ *                                      y = 150.07, t = 77.6 s, 0.85 m
+ *   25 m window, stall in the box    → CONTACT with staged id 1000, 0.85 m
+ *   60 m window, both of the above   → 6.00 m and 6.06 m, clear
+ *
+ * Neither contact exists with FR-B5-RETURN alone (the actor never came back),
+ * so both were manufactured by this repair and are closed by this number.
+ *
+ * WHY 60. The window must not be the thing that delays engagement — the arc
+ * window already is, and 16 m is enough for the brake (8.3 + `GUARD_STOP_SHORT_M`
+ * = 14.3 m). So it has to exceed the longest APPROACH a student can be making
+ * when that arc window opens, which is his whole give-way leg: 36.06 m on
+ * `sc-jxgb-conflict` (the Б1 line to the boulevard) and 39.90 m on
+ * `sc-edpr-right`. 60 clears the longer of those with room for a longer leg,
+ * and it costs the cure nothing — measured on the drill's own drive, crossings
+ * and late metres are IDENTICAL at 25 and at 60 (6 crossings, 634.2 m), because
+ * a student who waits at the line is not `closing` and never engages the guard
+ * at any width.
+ *
+ * Wider cannot dawdle, for that same reason: `closing` is false for a
+ * STATIONARY student, so a car waiting at a give-way line never slows it at
+ * all, however close he is.
+ */
+const CROSS_WATCH_M = 60;
 /** Guard aims to stop this far short of the player, m. */
 const GUARD_STOP_SHORT_M = 6;
 /** matchPlayer proportional gain: m/s of speed delta per meter of gap error. */
@@ -124,20 +184,20 @@ const EXIT_MIN_SPEED_MPS = 4;
  * Same shape on `sc-merge-accel-lane`: `sc-mrg-mainline` at rest at y = 1030,
  * 70 m past the 960 m end of the motorway, from t ≈ 68 s.
  *
- * So an actor that has run its script and cleared the scene RETURNS TO ITS HOLD
- * POSE and drives its path again, the way a boulevard keeps producing cars. The
- * hold pose is the one place on these maps that is off-scene by construction —
- * the template authors put it there precisely so the actor is unseen before its
- * cue (`sc-lndc-target` „15 m behind the spawn", `sc-mrg-mainline` „dormant at
- * (0, 30) — deep behind the nose").
+ * So an actor that has run its script and cleared the scene RE-ENTERS AT THE
+ * START OF ITS OWN PATH and drives it again, the way a boulevard keeps
+ * producing cars — the far end of its road, which is where traffic comes from
+ * and the one place on any of these maps that is off-scene by construction.
  *
  * THREE THINGS IT MAY NOT BECOME, each one a guard below:
  *
  *  1. …a car that pops into the student's windscreen. Re-entry is allowed only
- *     once he is RETURN_CLEAR_M PAST the hold pose measured along the actor's
- *     own path — the same projection `matchPlayer` already takes, so the
- *     re-entry always happens behind him on the road he is driving, never in
- *     front of him.
+ *     once he is RETURN_CLEAR_M past the RE-ENTRY POSE measured along the
+ *     actor's own path — the same projection `matchPlayer` already takes, so
+ *     on a road he is driving the re-entry always happens behind him, never in
+ *     front of him — AND only while that pose is RETURN_CLEAR_M away from him
+ *     in a straight line, which is the same promise stated in metres for the
+ *     case where „along the path" is not a direction he is travelling in.
  *  2. …a second, unscripted run of a ONE-SHOT HAZARD. The discriminator is
  *     `railPath`: an actor riding an authored line OUTSIDE the road graph is
  *     the RX „жп прелез" train (the only `railPath` spec in the catalogue,
@@ -154,8 +214,9 @@ const EXIT_MIN_SPEED_MPS = 4;
  *     out-brakes the hero). Excluding on it would have retired precisely the
  *     two actors these findings are about (`sc-lndc-target`, `sc-mrg-mainline`
  *     are both rearTailgaters) and closed nothing.
- *  3. …a body materialising inside another one. The hold pose has to be clear of
- *     the ambient fleet by the same standoff `closesOnAmbient` enforces.
+ *  3. …a body materialising inside another one. The re-entry pose has to be
+ *     clear of the ambient fleet by the same standoff `closesOnAmbient`
+ *     enforces.
  *
  * And a RETURNING actor is guarded against the student even when its spec is
  * not (`playerGuarded` below). The лепка's flag buys one authored thing — a
@@ -172,6 +233,73 @@ const EXIT_MIN_SPEED_MPS = 4;
  * `phase === "resolved"`). The un-latch cannot come earlier than the full
  * retirement run — EXIT_CLEAR_M / exitSpeed, ≥ 4.7 s — so no runner is still
  * looking.
+ */
+/**
+ * FR-B5-CROSS (2026-08-23) — …AND FOR A CAR THAT CROSSES THE STUDENT'S ROAD
+ * RATHER THAN SHARING IT, „COME BACK" WAS NEVER REACHABLE.
+ *
+ * FR-B5-RETURN above measured two things from the AUTHORED HOLD: it re-entered
+ * there, and it asked whether the student was `RETURN_CLEAR_M` past it ALONG
+ * THE ACTOR'S OWN PATH. Both are right for an actor driving the student's road
+ * — every example in its own justification is one (`sc-lndc-target`,
+ * `sc-mrg-mainline`, the лепка). Both are wrong for an actor whose path CROSSES
+ * that road, and the two failures compound:
+ *
+ *  - „how far past me is he" becomes „how far ACROSS my carriageway is he",
+ *    which is bounded by the width of a street and cannot grow;
+ *  - the hold of a crossing actor is authored to be SEEN, not hidden — this
+ *    catalogue's own `sc-jxgb-conflict` carries forty lines explaining that its
+ *    −45 m hold „puts the car where the glance is aimed" — so re-entering there
+ *    is the windscreen pop guard 1 exists to forbid.
+ *
+ * MEASURED, level 1, production stack (`compileScenario` + `createTrafficSystem`
+ * + `createScenarioDirector`), driving each drill the way its own instructions
+ * read; `proj` is the student projected onto the actor's path:
+ *
+ *   sc-jx-giveway-b1 `sc-jxgb-conflict`   proj.s − holdS = 40.94 m  (bar: 70)
+ *   sc-ed-d2-priority-run `sc-edpr-right` proj.s − holdS = 69.71 m  (bar: 70)
+ *
+ * 40.94 is not a pose, it is a CEILING: the student's projection onto an
+ * east–west boulevard depends only on his x, so the figure is 40.94 at the Б1
+ * line (y = 118) and 40.94 at the exit gate (y = 178) and 40.94 everywhere else
+ * he can legally be. The second row is the same defect twenty-nine centimetres
+ * from the other side of the bar. Both cars therefore made ONE crossing and
+ * then stood still for the rest of the lesson:
+ *
+ *   sc-jxgb-conflict  at rest (−190.0, 154.1) from t = 60 s → 150 s of a 210 s
+ *                     lesson with the priority boulevard the drill is about
+ *                     empty, and the audited drive still on ЗАДАЧА 1/3 at
+ *                     t = 108 s (finding c335a08f, its own cited frame);
+ *   sc-edpr-right     at rest (−658, 41) from t ≈ 170 s (finding 76d2e929,
+ *                     „a priority lesson with ZERO moving traffic").
+ *
+ * THE REPAIR IS TO MEASURE FROM THE POSE THE ACTOR ACTUALLY RE-ENTERS AT, AND
+ * TO RE-ENTER AT THE START OF ITS PATH. `holdS` is 75 m into the give-way
+ * actor's 240 m path and 110 m into the d2 actor's 365 m one; subtracting it
+ * spent the whole clearance budget on road the student was never going to
+ * drive. From arc 0 the same two drives read `proj.s` = 115.9 m and 179.9 m,
+ * both clear of the bar, and the re-entry pose — the far end of the boulevard,
+ * (120.0, 154.1) — is 121.4 m from the student instead of 54.6 m.
+ *
+ * THE STRAIGHT-LINE FLOOR IS THE OTHER HALF, AND IT IS AN ADDITION. Guard 1
+ * used to be an along-the-path test ONLY, which says nothing about metres when
+ * the path bends back on itself or when the student is not travelling along it
+ * at all. It now must ALSO hold in plain distance, so „never within
+ * RETURN_CLEAR_M of the student" is true of every re-entry rather than only of
+ * the ones where the two happen to coincide. Nothing that used to be refused is
+ * now allowed on that axis; the pre-existing test case at 30 m stays refused,
+ * and it is refused by BOTH clauses now instead of one.
+ *
+ * WHAT THIS BUYS THE STUDENT, and it is the point of the lesson rather than a
+ * metric: a boulevard with priority traffic on it keeps having priority traffic
+ * on it. „Б1 не значи спри винаги" cannot be taught by a street where the one
+ * car went by at t = 50 s and nothing ever came again — a student who waits, as
+ * that drill's own instruction 4 tells him to, then learns that waiting is free
+ * and that the road is always clear. It is not, and the returning car is
+ * graded by the runtime's own give-way adjudication exactly as the first one
+ * was, so pulling out in front of it is convicted and yielding to it is
+ * commended — with the actor `playerGuarded` (below) on every run after the
+ * first, so the car that comes back can never be the one that hits him.
  */
 const RETURN_CLEAR_M = EXIT_CLEAR_M;
 /** Numeric ids for published staged states (ambient ids are 0..count-1). */
@@ -350,13 +478,15 @@ export interface StagedVehicleAgent {
   /** Speed of the retirement run, m/s (0 = not retiring; set once, at the
    *  frame the actor runs out of path, so the run is a constant coast). */
   exitSpeed: number;
-  /** FR-B5-RETURN: the published pose at `holdS`, cached at stage() time so the
-   *  re-entry checks cost no sampling and no allocation per frame. */
-  holdX: number;
-  holdY: number;
   /** How many times this actor has come back round (0 for every actor that
    *  never retires — the counter a test can read without a stopwatch). */
   returns: number;
+  /** FR-B5-CROSS: the player's distance to this actor's PATH on the previous
+   *  frame, so „he is moving onto my road" can be told from „he is driving
+   *  along beside it". Infinity until the first frame that measures it, and
+   *  measured only for an actor that has come back round — every actor with
+   *  `returns === 0` keeps it at Infinity and does no work at all. */
+  playerPathDist: number;
 }
 
 export interface StagedPedestrianAgent {
@@ -492,45 +622,122 @@ function closesOnPlayer(agent: StagedVehicleAgent, env: StagedEnv, step: number)
 }
 
 /**
- * FR-B5-RETURN — may this retired actor go back to its hold pose and drive the
- * path again? The three guards named in the RETURN_CLEAR_M block, in order of
- * how cheap they are to answer.
+ * Is `arc` a pose this actor may materialise at right now? Guards (1) and (3)
+ * of the RETURN_CLEAR_M block, asked about one arc.
  */
-function canReturnToHold(agent: StagedVehicleAgent, env: StagedEnv): boolean {
-  // (2) A one-shot hazard on its own rail crosses the road once, as written.
-  if (agent.spec.railPath !== undefined) return false;
-  // (3) Never materialise inside a body: the hold pose has to be clear of the
-  //     ambient fleet by the standoff `closesOnAmbient` enforces.
+function reentryClearAt(
+  agent: StagedVehicleAgent,
+  env: StagedEnv,
+  arc: number,
+  projS: number,
+): boolean {
+  // The pose at `arc`. `lat` and `exitM` are both zeroed by the rewind, so the
+  // sampled point IS that pose — one sample, no allocation.
+  sampleLane(agent.path, arc, 0, samp);
+  const ex = samp.x;
+  const ey = samp.y;
+  // (3) Never materialise inside a body: the re-entry pose has to be clear of
+  //     the ambient fleet by the standoff `closesOnAmbient` enforces.
   for (let i = 0; i < env.ambient.length; i++) {
     const a = env.ambient[i];
     if (a === agent.state) continue;
     const sep = vehicleHalfLengthM(agent.spec.profile) + vehicleHalfLengthM(a.profile) + 0.5;
-    if (Math.hypot(a.x - agent.holdX, a.y - agent.holdY) < sep) return false;
+    if (Math.hypot(a.x - ex, a.y - ey) < sep) return false;
   }
   if (!env.hasPlayer) return true;
   // (1) …and never in his windscreen. Measured ALONG THE ACTOR'S OWN PATH (the
   //     projection `matchPlayer` already takes), so „behind him" means behind on
-  //     the road, not merely far away in a straight line: he must be past the
-  //     hold arc by the same clearance the retirement run drives.
-  const proj = projectOntoPolyline(
-    agent.path.px,
-    agent.path.py,
-    agent.path.cum,
-    env.playerX,
-    env.playerY,
-  );
-  return proj.s - agent.holdS >= RETURN_CLEAR_M;
+  //     the road, not merely far away in a straight line…
+  if (projS - arc < RETURN_CLEAR_M) return false;
+  // …AND the same clearance in plain metres. That second half is new
+  // (FR-B5-CROSS) and it is an ADDITION: the along-path test says nothing about
+  // how many metres away the pose actually is when the path bends back on
+  // itself, or when the student is not travelling along it at all.
+  return Math.hypot(ex - env.playerX, ey - env.playerY) >= RETURN_CLEAR_M;
 }
 
 /**
- * The BODY half of `reset` — pose, lateral channel and retirement state back to
- * the authored hold. Factored so the orchestrator's re-arm and FR-B5-RETURN's
- * own re-entry cannot drift apart; `reset` additionally forces the command to
- * „hold", which is the one thing a return must NOT do (it is re-entering the
- * flow under the command it left with).
+ * How far off this actor's path the student can be and still count as DRIVING
+ * IT rather than crossing it (FR-B5-CROSS). Both bounds are measured, not
+ * chosen:
+ *
+ *  - every same-road actor in the catalogue rides exactly ONE LANE PITCH off
+ *    the student's line by authored construction — `extraRightOffsetM` is
+ *    ±8.125 / ±8.13 on `sc-lndc-target`, `sc-mrg-mainline`, `sc-mle-through-car`
+ *    — so 8.13 m is the widest „he is on my road" this catalogue produces;
+ *  - the narrowest „he is crossing my road" measured on the two drills this
+ *    exists for is 36.06 m (`sc-jxgb-conflict`, the student at the Б1 line) and
+ *    39.90 m (`sc-edpr-right`).
+ *
+ * Two lane pitches is double the first and less than half the second, which is
+ * as much daylight as a single number can have. It decides ONE thing — whether
+ * an actor may fall back to the far end of its road when its authored hold is
+ * unusable — and getting it wrong in the loose direction would let an oncoming
+ * STREAM take that fallback, where every car of it re-enters at the same arc
+ * and the authored column (`OncomingStreamRunner.stage` spaces them by
+ * `gapsM`) collapses into one clump of overlapping bodies.
  */
-function rewindToHold(agent: StagedVehicleAgent): void {
-  agent.s = agent.holdS;
+const ON_ACTORS_ROAD_M = 16.25;
+
+/**
+ * FR-B5-RETURN / FR-B5-CROSS — may this retired actor come back round, and at
+ * which arc? Returns the arc to re-enter at, or −1 for „not yet".
+ *
+ * TWO CANDIDATES, IN THE AUTHOR'S ORDER OF PREFERENCE.
+ *
+ *  1. THE AUTHORED HOLD, always tried first, because whatever the template
+ *     encoded in it survives the return — a stream's stagger, the лепка's tuck
+ *     behind the spawn. Every actor that returned before FR-B5-CROSS still
+ *     returns here, at the same arc, and this is the only candidate an actor on
+ *     the student's own road is ever offered.
+ *  2. THE FAR END OF ITS OWN ROAD (arc 0), offered ONLY to an actor whose road
+ *     the student is CROSSING rather than driving. For those the hold is no
+ *     use: `sc-jxgb-conflict`'s is authored to sit where the student's right
+ *     glance is aimed, 54.6 m from him, and the clearance from it tops out at
+ *     40.94 m against a 70 m bar — see the FR-B5-CROSS block. Arc 0 is where
+ *     that boulevard enters the scene, 121.4 m away, and it is the one pose
+ *     every path has.
+ *
+ * `holdS > 0` on the second candidate only skips asking the identical question
+ * twice: an actor authored to hold AT its path origin has already been offered
+ * that arc as candidate 1.
+ */
+function reentryArc(agent: StagedVehicleAgent, env: StagedEnv): number {
+  // (2) A one-shot hazard on its own rail crosses the road once, as written.
+  if (agent.spec.railPath !== undefined) return -1;
+  const proj = env.hasPlayer
+    ? projectOntoPolyline(
+        agent.path.px,
+        agent.path.py,
+        agent.path.cum,
+        env.playerX,
+        env.playerY,
+      )
+    : { s: Infinity, dist: Infinity };
+  if (reentryClearAt(agent, env, agent.holdS, proj.s)) return agent.holdS;
+  if (proj.dist > ON_ACTORS_ROAD_M && agent.holdS > 0 && reentryClearAt(agent, env, 0, proj.s)) {
+    return 0;
+  }
+  return -1;
+}
+
+/**
+ * The BODY half of `reset` and of FR-B5-RETURN's re-entry — pose, lateral
+ * channel and retirement state back to one arc on the path. Factored so the
+ * orchestrator's re-arm and the re-entry cannot drift apart in anything but
+ * the arc itself; `reset` additionally forces the command to „hold", which is
+ * the one thing a return must NOT do (it is re-entering the flow under the
+ * command it left with).
+ *
+ * The two arcs differ ON PURPOSE (FR-B5-CROSS). `reset` is the ORCHESTRATOR
+ * re-arming an actor for a scripted encounter it is about to time, so it goes
+ * to the pose the template authored for that. A RETURN is unscripted flow, so
+ * it goes to the far end of the actor's own road, which is where traffic comes
+ * from and the only pose that is off-scene for every actor rather than only
+ * for the ones whose author happened to hide it.
+ */
+function rewindTo(agent: StagedVehicleAgent, arc: number): void {
+  agent.s = arc;
   agent.speed = 0;
   agent.segHint = 0;
   agent.finished = false;
@@ -595,15 +802,10 @@ export function createStagedVehicle(
     indicator: "off",
     exitM: 0,
     exitSpeed: 0,
-    holdX: 0,
-    holdY: 0,
     returns: 0,
+    playerPathDist: Infinity,
   };
   publishVehicle(agent);
-  // FR-B5-RETURN: `s` is `holdS` and both offset terms (`lat`, `exitM`) are 0
-  // on this first publish, so the pose just written IS the hold pose.
-  agent.holdX = agent.state.x;
-  agent.holdY = agent.state.y;
   return agent;
 }
 
@@ -709,7 +911,7 @@ export function applyStagedCommand(
         break;
       case "reset":
         v.command.type = "hold";
-        rewindToHold(v);
+        rewindTo(v, v.holdS);
         v.indicator = "off";
         publishVehicle(v);
         break;
@@ -795,6 +997,79 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
     const lateral = Math.abs(relX * agent.state.dirY - relY * agent.state.dirX);
     if (along > 0 && along < GUARD_AHEAD_M && lateral < GUARD_LATERAL_M) {
       const guardTarget = Math.max(0, (along - GUARD_STOP_SHORT_M) * 0.8);
+      if (guardTarget < target) {
+        target = guardTarget;
+        brakeCap = HOLD_DECEL_MPS2;
+      }
+    }
+  }
+
+  // 2a) …AND THE STUDENT STANDING ACROSS THE ACTOR'S ROAD (FR-B5-CROSS).
+  //
+  //     Step 2 is a FOLLOWING guard: it measures the player in the actor's own
+  //     heading frame, so it sees him only inside a 3 m-wide corridor straight
+  //     ahead. A student CROSSING the actor's carriageway — which is the entire
+  //     event of every give-way and priority drill — is at ~90° to that frame
+  //     and is invisible to it until the two bodies are already touching.
+  //     Measured on jxg-giveway-v1 the moment FR-B5-CROSS put a second car on
+  //     the boulevard: the drill's own correct drive (stop at the Б1 line, wait
+  //     25 s, cross) took a 10-point contact at player y = 150.30, t = 70.4 s.
+  //     The player is not ahead of the actor; he is ACROSS it, so he has to be
+  //     measured the way the actor's road measures things — by arc.
+  //
+  //     GATED ON `returns > 0`, the same line `playerGuarded` already draws and
+  //     for the same reason. The FIRST run is the encounter the orchestrator
+  //     timed and the rule engine is grading: a priority car that brakes for a
+  //     student who barged out has taken the drill's teeth out. The second and
+  //     later runs are unscripted flow that nobody timed, and an unscripted car
+  //     may never be the one that hits him.
+  //
+  //     …AND GATED ON HIM MOVING ONTO THE ROAD, which is the difference between
+  //     a car crossing and a car driving along beside you, and is the whole
+  //     reason this is not simply step 2 with a wider window. Measured with the
+  //     wide window alone, on the three suites that carry same-road actors:
+  //
+  //       staged-return-run  `sc-lndc-target` covered 231 m of a 150 s window
+  //                          instead of 2,093 — the actor caught the crawling
+  //                          student, braked to 6 m behind him and FOLLOWED him
+  //                          for the rest of the lesson;
+  //       s7-ov-corridor     the oncoming choreography never completed;
+  //       vru-encounter      the rider could no longer get past.
+  //
+  //     Every same-road actor in the catalogue rides ONE LANE PITCH off the
+  //     student's line by authored construction (`extraRightOffsetM` ±8.125 /
+  //     ±8.13 on `sc-lndc-target`, `sc-mrg-mainline`, `sc-mle-through-car`), so
+  //     its distance to his path is a CONSTANT and „he is coming onto my road"
+  //     is false for it on every frame. For a student crossing a boulevard the
+  //     same quantity sweeps 36 m → 0, which is what braking is for. No heading
+  //     is available here (`StagedEnv` publishes a position and a speed), so the
+  //     trend is carried on the agent — one number, no allocation.
+  //
+  //     It BRAKES rather than freezing, and it aims to stop `GUARD_STOP_SHORT_M`
+  //     short of where he stands on the arc — never on top of it. A hard freeze
+  //     was tried first and is the doc 87 item-4 defect wearing a new hat: the
+  //     actor stops dead wherever it happens to be, which on this map is inside
+  //     the junction mouth, and the student then drives into a stationary body
+  //     exactly as the founder photographed.
+  if (agent.returns > 0 && env.hasPlayer) {
+    const proj = projectOntoPolyline(
+      agent.path.px,
+      agent.path.py,
+      agent.path.cum,
+      env.playerX,
+      env.playerY,
+    );
+    const closing = proj.dist < agent.playerPathDist;
+    agent.playerPathDist = proj.dist;
+    const ahead = proj.s - agent.s;
+    if (
+      cmd.type !== "brake" &&
+      closing &&
+      proj.dist < CROSS_WATCH_M &&
+      ahead > 0 &&
+      ahead < GUARD_AHEAD_M
+    ) {
+      const guardTarget = Math.max(0, (ahead - GUARD_STOP_SHORT_M) * 0.8);
       if (guardTarget < target) {
         target = guardTarget;
         brakeCap = HOLD_DECEL_MPS2;
@@ -898,16 +1173,19 @@ export function updateStagedVehicle(agent: StagedVehicleAgent, dt: number, env: 
         agent.exitM += step;
         agent.speed = agent.exitM >= EXIT_CLEAR_M ? 0 : agent.exitSpeed;
       }
-    } else if (canReturnToHold(agent, env)) {
+    } else {
       // FR-B5-RETURN (see RETURN_CLEAR_M): the run is over, the actor is out of
       // every observer's way, and there is nowhere further to drive on a 400 m
       // map the camera draws 420 m of. So it comes back round rather than
       // standing at the horizon in the lane the briefing is about — under the
       // command it left with, because staged actors never invent their own.
-      rewindToHold(agent);
-      agent.returns++;
-    } else {
-      agent.speed = 0;
+      const arc = reentryArc(agent, env);
+      if (arc >= 0) {
+        rewindTo(agent, arc);
+        agent.returns++;
+      } else {
+        agent.speed = 0;
+      }
     }
   }
 

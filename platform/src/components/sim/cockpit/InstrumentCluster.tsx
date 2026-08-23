@@ -16,9 +16,10 @@
  *   - a sweeping needle AND an exact mono readout on the same dial;
  *   - a big gear glyph — the thing three unreadable reels were teaching;
  *   - a telltale rail whose lit lamps throw a halo, so a red belt warning
- *     reads as a WARNING from across a 1280×720 frame — TRUE OF THE REEL
- *     MOUNT ONLY. In the cabin the steering wheel is in front of the rail and
- *     none of the eight lamps reaches the student. Measured in R3 below.
+ *     reads as a WARNING from across a 1280×720 frame. In the CABIN the
+ *     steering wheel sits in front of the authored rail, so that mount lays
+ *     the same eight lamps out in the one clear wedge of the face instead —
+ *     `wheelInFront` below and cabinTelltaleRail.ts. Measured in R3.
  *
  * It mounts two ways from one implementation, which is the point: portalled
  * onto the interior GLB's `screen_cluster` quad for the cockpit view, and
@@ -76,18 +77,23 @@ import {
   type LampTone,
   type Rgba,
 } from "@/modules/sim/cockpit";
+import { applyCabinTelltaleRail } from "./cabinTelltaleRail";
 
 // ---------------------------------------------------------------------------
-// R3 — THE CABIN MOUNT'S TELLTALE RAIL IS BEHIND THE STEERING WHEEL
+// R3 — THE CABIN MOUNT'S TELLTALE RAIL WAS BEHIND THE STEERING WHEEL
 // ---------------------------------------------------------------------------
 //
-// OPEN DEFECT, MEASURED 2026-08-18, NOT FIXED HERE — the constants that decide
-// it are clusterLayout's, and this note exists so the next reader does not
-// trust the header bullet above and stop looking. Three catalogue rows
-// (sc-vp-telltale, sc-vp-handbrake, sc-vp-telltale-red — all critical) report
-// „no lamp of any colour renders in any frame". They are right about the frame
-// and wrong about the cause: the state IS fed and this file DOES paint it. The
-// lamps are simply occluded.
+// FIXED ON THE PHONE 2026-08-23 by `wheelInFront` + cabinTelltaleRail.ts; the
+// measurement that named the defect is kept below because it is also the
+// acceptance test. PARTIAL ON THE DESKTOP — the PC camera foreshortens this
+// face much less, the rim crosses the relocated wedge ~26 design units higher
+// there, and the lower row's `oil` and `battery` are still behind it on all
+// three sc-vp-telltale PC frames. Measured and drawn on by the adversarial
+// pass; the table and the reason it is a re-solve are in cabinTelltaleRail.ts.
+// Three catalogue rows (sc-vp-telltale:103674db, sc-vp-handbrake:0aa6e3a6,
+// sc-vp-telltale-red:622bf269 — all critical) reported „no lamp of any colour
+// renders in any frame". They were right about the frame and wrong about the
+// cause: the state IS fed and this file DOES paint it. The lamps were occluded.
 //
 // MEASURED OFF THE SHIPPED FRAMES, not argued from the layout table
 // (.audit-frames/sweep161/sc-vp-readiness/mobile-right/04-t102s.png, 2556×1179,
@@ -100,21 +106,35 @@ import {
 //     x −220 → −45   x −115 → −16   x −9 → +41 (the wheel boss)
 //     x +107 → −48   x +233 → −119 (the plate's own bottom edge is −128)
 //
-// The rail sits at LAMP_CY −98 and a halo is LAMP_HALO/2 = 28 units tall, so it
-// occupies y −70…−126 at all eight slots (lampSlotX: −196 … +196). Sampling the
-// plate tone at each slot's pixel column through that band returns steering
-// wheel at every one of the eight — zero lamp glyph centres visible. The PC
-// frame (sc-vp-telltale/pc-right/04-t063s.png) is the same picture with one
-// crumb: a ~8 px slit between rim and column shroud lets the top of ONE lit
+// The authored rail sits at LAMP_CY −98 and a halo is LAMP_HALO/2 = 28 units
+// tall, so it occupies y −70…−126 at all eight slots (lampSlotX: −196 … +196).
+// Sampling the plate tone at each slot's pixel column through that band returns
+// steering wheel at every one of the eight — zero lamp glyph centres visible.
+// The PC frame (sc-vp-telltale/pc-right/04-t063s.png) is the same picture with
+// one crumb: a ~8 px slit between rim and column shroud lets the top of ONE lit
 // halo through at the belt slot, which is how the rail was shown to be lit at
-// all. RULE_Y (−70) and the „В И Т О К" wordmark (MARK_CY −44) are gone too.
+// all. RULE_Y (−70) and the „В И Т О К" wordmark (MARK_CY −44) are gone too;
+// both are marque and hairline rather than state, so both stay where they are.
 //
-// WHY IT IS NOT A ONE-LINE LIFT. The clear band above the wheel is ~110 design
-// units tall and the dial (r 90 at DIAL_CY 30), the three digit cells and the
-// gear letter already fill it; eight slots at LAMP_PITCH 56 are 392 units wide
-// and there is nowhere above the rim to put them at that pitch. It is a layout
-// pass in clusterLayout.ts + buildClusterFaceMesh, not a mount override like
-// `dialNumerals` below.
+// WHY IT WAS NOT A ONE-LINE LIFT, and what was done instead. The clear band
+// above the wheel is ~110 design units tall and the dial (r 90 at DIAL_CY 30),
+// the three digit cells and the gear letter already fill it; eight slots at
+// LAMP_PITCH 56 are 392 units wide and there is nowhere above the rim to put
+// them at that pitch. So the CABIN mount — and only the cabin mount — relays
+// the same eight lamps as a 4 × 2 block at 0.7 scale in the one clear wedge
+// the wheel leaves, right of the boss and below the readouts. That is a mount
+// decision of exactly the kind `dialNumerals` already is (the geometry is the
+// same in both mounts; what differs is what is in FRONT of it), so it lives
+// here rather than in the layout table the reel is authored against.
+//
+// WHAT IT STILL DOES NOT BUY, so nobody stops here: 28 design units on a face
+// that is ~158 CSS px wide in the cockpit is ~9 CSS px. Presence and COLOUR
+// read at that size — which is the whole of sc-vp-telltale-red's red-versus-
+// amber triage and of sc-vp-handbrake's lit-or-not check — and the GLYPH does
+// not, by the same arithmetic that removed the dial numerals. The other half of
+// the fix is `TelltaleEdgePings`, which LessonScene stands down in cockpit view
+// („the real cluster IS in frame and lights its own telltales") on the premise
+// these three frames refute. That file belongs to another lane.
 //
 // ── and a second, independent defect the same frames show ──────────────────
 // The palette reaches the GPU in the wrong colour space. `hexRgba` (clusterGeometry)
@@ -187,6 +207,20 @@ export interface InstrumentClusterProps {
    * `dialNumeralsLegibleAt()` carries the threshold.
    */
   dialNumerals?: boolean;
+  /**
+   * Is a steering wheel between this cluster and the eye?
+   *
+   * DEFAULTS OFF `overlay`, and that is a definition rather than a coincidence:
+   * an overlay cluster is camera-pinned chrome with nothing between it and the
+   * lens, and a non-overlay one is an object mounted in the cabin, behind the
+   * wheel. The prop exists so a third mount can say otherwise without having to
+   * lie about its depth test.
+   *
+   * When true the telltale rail is relaid into the clear wedge the wheel leaves
+   * (R3 above; cabinTelltaleRail.ts carries the measurement). Nothing else on
+   * the face moves, and nothing is dropped — all eight lamps travel together.
+   */
+  wheelInFront?: boolean;
 }
 
 export function InstrumentCluster({
@@ -196,6 +230,7 @@ export function InstrumentCluster({
   layer,
   renderOrder = 0,
   dialNumerals = true,
+  wheelInFront = !overlay,
 }: InstrumentClusterProps) {
   const groupRef = useRef<Group>(null);
   const needleRef = useRef<Object3D>(null);
@@ -224,6 +259,11 @@ export function InstrumentCluster({
   // --- Geometry: built once from the pure builders --------------------------
   const built = useMemo(() => {
     const face = buildClusterFaceMesh({ dialNumerals });
+    // Before a single byte reaches a BufferAttribute: in the cabin the wheel is
+    // in front of the authored rail, so the eight lamps are relaid where the
+    // driver can see them. Positions only — the atlas cells, the tones and the
+    // pulse are the same law in both mounts (R3 above).
+    if (wheelInFront) applyCabinTelltaleRail(face);
     const housing = buildClusterHousingMesh();
     const needle = buildClusterNeedleMesh();
 
@@ -251,9 +291,9 @@ export function InstrumentCluster({
     needleGeometry.setIndex(new BufferAttribute(needle.indices, 1));
 
     return { face, faceGeometry, housingGeometry, needleGeometry, faceColors, faceUvs };
-    // `dialNumerals` is a MOUNT-time decision (a constant per call site), so
-    // this rebuilds once per mount and never in a frame loop.
-  }, [dialNumerals]);
+    // `dialNumerals` and `wheelInFront` are MOUNT-time decisions (constants per
+    // call site), so this rebuilds once per mount and never in a frame loop.
+  }, [dialNumerals, wheelInFront]);
 
   useEffect(() => {
     const { faceGeometry, housingGeometry, needleGeometry } = built;

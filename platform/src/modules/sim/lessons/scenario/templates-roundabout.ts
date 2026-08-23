@@ -86,6 +86,53 @@
  * `roundabout-title-truth.test.ts` now holds it for this shelf, with the
  * measurement recorded at each site. No gate params moved.
  *
+ * ── 2026-08-23, THE RE-DRIVE: TWO CORRECTIONS TO THE PARAGRAPH ABOVE ───────
+ *
+ * The harness was taught KeyA/KeyD and this shelf was driven again
+ * (`.audit-frames/rebase/frames/sc-rb-*__{pc,mobile}-right/`). The steering
+ * excuse above is HALF right and it was used to close too much:
+ *
+ *  1. THE COLLISIONS SURVIVE STEERING. Three of the seven re-drives are rated
+ *     TRACKED by the harness's own loop (sc-rb-busy-gap on both platforms,
+ *     sc-rb-lane-choice on mobile — ribbon seen on 89–100 % of moving samples,
+ *     median error 2.6–5.8°) and all three still end on «Удар в неподвижно
+ *     препятствие», parked on the island grass, with every ring objective
+ *     open. So „no steering" does not finish the account.
+ *  2. AND THE RIBBON THEY WERE FOLLOWING GOES ROUND AND ROUND. Derived from
+ *     the shipped specs through `scene/guidanceRoute.ts` (measured, all four
+ *     drills): a `completeManeuver: roundabout` goal is a POINT at the island
+ *     centre, `snapToRoad` puts (0, 0) on the nearest carriageway — which on a
+ *     ring is the SOUTH MOUTH the student came in through — and the shortest
+ *     path there is another lap. sc-rb-exit-signal's first objective derives a
+ *     188 m ribbon on a 112.8 m ring; sc-rb-busy-gap's east gate, 30 m away,
+ *     derives 121 m; sc-rb-lane-choice's, 192 m. Every one of them ends back at
+ *     the entry mouth instead of on the exit arm. That is not this file's to
+ *     fix — the island centre is what `RoundaboutParams` means by (x, y) — and
+ *     it is filed against `scene/guidanceRoute.ts`.
+ *
+ * WHAT THIS FILE DID FIX IN THAT ROUND: the exit ARM. Every drill's maneuver
+ * row was titled with the exit it wanted and the evaluator behind it cannot see
+ * one — a south-entry / FIRST-exit drive collected «Излез на СЕВЕРНИЯ изход с
+ * включен десен мигач» with 3★ and zero violations. Three of the four now carry
+ * an `-exit-approach` gate that stands on the ring at their own exit and that
+ * such a drive never reaches; the fourth (sc-rb-lane-choice) cannot, for the
+ * arithmetic reason spelled out at EXIT_APPROACH_LEAD_DEG. See that block and
+ * the (c) section of `roundabout-title-truth.test.ts`, which holds the drive.
+ *
+ * WHAT IT DID NOT FIX, AND COULD NOT FROM HERE (measured the same day, through
+ * compileScenario → createLessonSession → applyTick → scoreRubric): on
+ * sc-rb-circulate-priority a drive that STOPS DEAD FOR 12 s INSIDE THE RING to
+ * wave the west car in — the one act instruction 4 and the whole teach card
+ * forbid — completes every objective, grades zero violations, passes, and
+ * scores 3★. A needless 10 s halt at the mouth of the EMPTY ring does the same,
+ * and its ten seconds are then SUBTRACTED from the par time as «чакане на
+ * предимство… изчакването е част от задачата». No objective kind in
+ * `lessons/types.ts` can express „did not stop" (a reachZone cap is a ceiling
+ * and a car at rest clears it best of all) and no detector fires inside a ring
+ * — HARSH_BRAKING_NO_CAUSE is structurally armored out, as this file's own
+ * panic-brake card already concedes. The drill therefore still cannot grade its
+ * own subject, and that is an engine gap, filed rather than papered over.
+ *
  * WHAT IS REPORTED RATHER THAN TOUCHED (both outside this file's ownership):
  *  · sc-rb-lane-choice starts at `rb2-spawn-south-inner`, i.e. IN the answer,
  *    so its lane gate `sc-rb2-inner-lane` was collected by all four sweep legs
@@ -121,6 +168,150 @@ const RING_R = 18;
 /** Arm right-lane center (rb-mini-v1 meta.scenario.laneCenterRightM) — the
  *  northbound lane of the south arm the player approaches and yields in. */
 const X_ARM_LANE = 4.06;
+
+/**
+ * A point on a ring centerline at circulation angle φ — degrees from the SOUTH
+ * node, CCW through EAST (φ 90 = east, 180 = north, 270 = west). The same
+ * convention every trace script on this shelf uses, so a coordinate here can be
+ * read straight against `scRb*.ts`.
+ */
+function ringPoint(phiDeg: number, radius: number): { x: number; y: number } {
+  const a = (phiDeg * Math.PI) / 180;
+  return {
+    x: Math.round(radius * Math.sin(a) * 100) / 100,
+    y: Math.round(-radius * Math.cos(a) * 100) / 100,
+  };
+}
+
+/**
+ * HOW FAR SHORT OF ITS OWN MOUTH AN EXIT-APPROACH GATE STANDS, degrees of ring.
+ *
+ * ── WHY THIS ROW EXISTS AT ALL ─────────────────────────────────────────────
+ *
+ * Every drill on this shelf ends on `completeManeuver: roundabout`, and every
+ * one of those rows used to be TITLED with the exit it wanted: «Излез на
+ * третия изход…», «…на северния изход…», «…на втория изход…». The evaluator
+ * behind that title (`stepRoundabout`, objectives.ts) measures exactly three
+ * things — distance to the island centre, |net arc| swept inside
+ * `enterRadiusM`, and whether the right stalk was lit in the exit window. It
+ * has no idea WHICH ARM the car left by, and it cannot: the params it is
+ * handed are one centre and two radii, and a circle names no compass point.
+ *
+ * MEASURED THROUGH THE PRODUCTION STACK, not argued (the drive is committed as
+ * the first case of `roundabout-title-truth.test.ts`): on
+ * sc-rb-circulate-priority @L3 a car that enters the south mouth, rides 90° of
+ * ring and leaves at the FIRST (east) exit with its right indicator on
+ * collects «Излез на СЕВЕРНИЯ изход с включен десен мигач», zero violations,
+ * ИЗДЪРЖАН, 3★, in 23 seconds. The 45° traversal floor
+ * (ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG) is cleared twice over by that drive, so
+ * none of the hardening the objective already carries touches it — the arm is
+ * simply not a thing the row can see.
+ *
+ * So the arm comes off the maneuver's title (which now states the passage and
+ * the stalk, both of which it really does grade) and is put where a gate CAN
+ * see it: a disc ON THE RING, one short arc before the drill's own exit. The
+ * engine steps objectives STRICTLY IN ORDER (engine.ts advances one index at a
+ * time), so completing the shelf's existing mouth gate and then this one is a
+ * statement about a PATH — east mouth first, then the approach to the exit —
+ * which is what «подмини чуждите изходи и излез на твоя» actually means. A
+ * driver who bails out at the first exit never reaches this disc and is told
+ * so, by name, on the route list.
+ *
+ * ── WHY 20° AND NOT „AT THE MOUTH" ─────────────────────────────────────────
+ *
+ * The mouth node itself is unusable on two of the four drills: their authored
+ * shadows peel off the ring onto the exit arm BEFORE the node (measured, on
+ * `scRbCirculatePriority.ts`'s own committed line: closest approach to the
+ * north node (0, 18) is 6.79 m, i.e. 0.79 m outside a radius-6 disc drawn
+ * there). Refusing a correct drive is the failure the founder ranks worst, so
+ * the gate stands where every shipped shadow demonstrably passes: 20° of ring
+ * before the exit, which is 6.3 m of arc on rb-mini and 9.1 m on rb-2lane.
+ *
+ * ── AND WHY THE DISC MUST FIT INSIDE `enterRadiusM` ────────────────────────
+ *
+ * This is a hard constraint, not a taste: the maneuver row is stepped only
+ * AFTER this gate completes, and `stepRoundabout` latches `entered` from
+ * `d <= enterRadiusM`. A gate a car could satisfy from OUTSIDE that circle
+ * would hand the maneuver a car already on its way out of the ring — `entered`
+ * would never latch, the exit branch would never run, and the drill would be
+ * uncompletable without driving back in and going round again.
+ *
+ * IT IS THE COMPILED RADIUS THAT HAS TO FIT, not the authored one, and that is
+ * what set the number. `scenario/params.ts widenRadius` multiplies a waypoint
+ * by `toleranceScale` at the aided rungs — measured 1.5× at L1 — so an
+ * authored 5 compiles to 7.5 and the disc reached 25.5 m on rb-mini against an
+ * enterRadiusM of 24, and 33.50 against 33 on rb-2lane. Four of the four rungs
+ * were over. At 4 the widening is capped at +2 (the ladder's own arithmetic:
+ * 4 × 1.5 − 4), the disc reaches 17.998 + 6 = 23.998 on rb-mini, and the
+ * ceiling holds on every authored level. `roundabout-title-truth.test.ts`
+ * walks the COMPILED objectives of every rung rather than the spec, because
+ * the spec-level version of that assertion was green while all four rungs were
+ * broken.
+ *
+ * ── THE ONE DRILL THAT DOES NOT GET ONE, AND THE HONEST REASON WHY ────────
+ *   (sc-rb-lane-choice — corrected 2026-08-23 by the verification pass, which
+ *    re-measured the paragraph that used to stand here and found it wrong)
+ *
+ * The claim used to be „impossible". It is not, and the arithmetic that said
+ * so had an assumption buried in it: that the disc must be CENTRED on the
+ * outer ring lane (r = 30.06), which leaves (33 − 30.06) / 1.5 = 1.96 m of
+ * authored radius. A disc does not have to be centred on the line it catches.
+ * Measured against the three committed traces of sc-rb-lane-choice, with the
+ * same containment rule (centre + 1.5 × radius ≤ enterRadiusM 33 ⇒ centre
+ * radius ≤ 27 at radius 4):
+ *
+ *   lead 20° (φ = 250), centre r = 27 → the shadow passes 3.96 m away. Inside
+ *     a radius-4 disc by FOUR CENTIMETRES. Nobody ships that.
+ *   lead 30–45° (φ = 240 … 225), centre r = 27 → 3.06 m, 3.03 m, 2.72 m,
+ *     2.05 m. Comfortably collected, containment satisfied on every rung.
+ *
+ * So a gate is available at a longer lead, and the reason not to author one
+ * is a judgement rather than a wall: at φ = 225 a car still in the INNER lane
+ * (r = 21.94) is 5.06 m from that centre and would be refused — and a student
+ * who leaves his lane change late is still leaving by the third exit, which
+ * is the thing the row is supposed to be about. Such a gate would grade WHEN
+ * the lane change happened as well as WHICH ARM was taken, and refusing a
+ * lawful drive is the failure the founder ranks worst. It is therefore left
+ * out ON PURPOSE, not because the ring has no room.
+ *
+ * `roundabout-title-truth.test.ts` pins the exception with a coarser
+ * centre-on-the-exit-lane formula. It works as a tripwire — a roomier
+ * `enterRadiusM` flips it and the exception has to be re-argued — but its
+ * comment still states the „impossible" reading, and that is what should be
+ * re-read, not this measurement.
+ */
+export const EXIT_APPROACH_LEAD_DEG = 20;
+/** Acceptance radius of an exit-approach gate, m — see the block above for the
+ *  ceiling it lives under (ring radius + 1.5 × this ≤ enterRadiusM). */
+export const EXIT_APPROACH_RADIUS_M = 4;
+
+/**
+ * ── WHY THIS ROW CARRIES NO maxSpeedKmh (2026-08-23, verification pass) ────
+ *
+ * The first version of these three gates copied the sibling mouth zone's cap
+ * (20 on rb-mini's ring, 30 on the exit-signal drill). Measured on the shipped
+ * catalogue, that cost more than it bought and bought nothing this row needs:
+ *
+ *  · IT CAN REFUSE A LAWFUL DRIVE. The ring is posted 30. `stepReachZone`
+ *    wants the cap honoured inside the disc or on the approach to it, so a
+ *    student circulating at a legal 25 km/h could be refused a gate whose
+ *    whole subject is WHICH ARM he left by. The pace is already asked for by
+ *    the mouth zone one exit earlier and by the posted limit the rule engine
+ *    grades against; this row asking again only adds a way to fail it.
+ *  · AND IT MOVED FOUR CENSUS RATCHETS. A capped reachZone is a counted
+ *    thing: `everyCappedCard()` went 953 → 967 (three rows × their rungs,
+ *    5 + 4 + 5) and broke the pinned totals in advisor-authored-cap.test.ts,
+ *    advisor-sweep161.test.ts and taskCapThread.test.ts, while the
+ *    world-referent gate's T8raw went 195 → 198 and reported a REGRESSION.
+ *    Five of the fourteen — sc-rb-exit-signal's, whose briefing quotes no
+ *    km/h anywhere — landed in the „no number on any surface" class this
+ *    programme has been draining. A gate that does not grade a speed should
+ *    not be counted as one.
+ *
+ * With no cap `hasArrivalDemand` is false, `capMet` opens true and `reached`
+ * is still the authored disc, swept — so the row is exactly the statement
+ * about a PATH that the block above says it is, and nothing else.
+ */
 
 // ---------------------------------------------------------------------------
 // sc-rb-exit-signal — „Изход от кръгово с десен мигач“ (RB-02 exit without the
@@ -257,8 +448,32 @@ export const SC_RB_EXIT_SIGNAL: ScenarioSpec = {
       params: { kind: "reachZone", x: 0, y: RING_R, radiusM: 6, maxSpeedKmh: 30 },
     },
     {
+      id: "sc-rbx-exit-approach",
+      // The arm the drill is named after, on the only side of the module that
+      // can see one. φ = 250° is 20° short of the WEST node (φ = 270), on the
+      // rb-mini ring centerline: (−16.91, 6.16), r = 17.998 from the island, so
+      // the disc lies inside enterRadiusM 24 even after the L1 ladder widens it
+      // to 6 (23.998 ≤ 24 — see EXIT_APPROACH_LEAD_DEG for why that ceiling is
+      // load-bearing and how it set the radius).
+      // The committed shadow passes 1.57 m from the centre at its ring(245)
+      // sample; a driver who leaves at the first (east) or second (north)
+      // mouth is 26–30 m away and never collects it.
+      titleBg: "Стигни по кръга до третия изход (запад)",
+      params: {
+        kind: "reachZone",
+        ...ringPoint(270 - EXIT_APPROACH_LEAD_DEG, RING_R),
+        radiusM: EXIT_APPROACH_RADIUS_M,
+        // NO SPEED CAP — see WHY THIS ROW CARRIES NO maxSpeedKmh above.
+      },
+    },
+    {
       id: "sc-rbx-exit",
-      titleBg: "Излез на третия изход с включен десен мигач",
+      // WAS «Излез на третия изход с включен десен мигач» — a certificate for
+      // an arm this evaluator cannot see (EXIT_APPROACH_LEAD_DEG carries the
+      // measured counter-drive). What it DOES grade is the passage and the
+      // stalk, and that is now all it says; the third exit is named by the
+      // gate above, by `objectiveBg`, and by instructions 3–5.
+      titleBg: "Премини през кръга и го напусни с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal and the
       // student must go round again.
@@ -487,8 +702,31 @@ export const SC_RB_CIRCULATE_PRIORITY: ScenarioSpec = {
       params: { kind: "reachZone", x: RING_R, y: 0, radiusM: 6, maxSpeedKmh: 20 },
     },
     {
+      id: "sc-rbc-exit-approach",
+      // φ = 160° — 20° short of the NORTH node (φ = 180) on the rb-mini ring
+      // centerline: (6.16, 16.91), r = 17.998, so the disc sits inside
+      // enterRadiusM 24 on every rung. THE NODE ITSELF WOULD HAVE REFUSED THE
+      // SHIPPED SHADOW: `scRbCirculatePriority.ts` peels off the ring at
+      // φ = 150 and blends onto the north arm, and its closest approach to
+      // (0, 18) is 6.79 m — outside the radius-6 disc its siblings use. At
+      // φ = 160 the same line passes 3.13 m (ring(150)) and 2.48 m
+      // (EXIT_NORTH[0]) from the centre.
+      titleBg: "Стигни по кръга до северния изход",
+      params: {
+        kind: "reachZone",
+        ...ringPoint(180 - EXIT_APPROACH_LEAD_DEG, RING_R),
+        radiusM: EXIT_APPROACH_RADIUS_M,
+        // NO SPEED CAP — see WHY THIS ROW CARRIES NO maxSpeedKmh above.
+      },
+    },
+    {
       id: "sc-rbc-exit",
-      titleBg: "Излез на северния изход с включен десен мигач",
+      // WAS «Излез на северния изход с включен десен мигач». The drive that
+      // retired that sentence is committed in `roundabout-title-truth.test.ts`:
+      // enter at south, leave at the FIRST (east) exit under a right stalk,
+      // and the row ticks — 3★, ИЗДЪРЖАН, 23 s. The compass point is now the
+      // gate above's; this row states the passage and the stalk it grades.
+      titleBg: "Премини през кръга и го напусни с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal.
       // enterRadiusM 24 (was 21) — R3 #6 family-wide geometry fix: the
@@ -779,8 +1017,25 @@ export const SC_RB_BUSY_GAP: ScenarioSpec = {
       params: { kind: "reachZone", x: RING_R, y: 0, radiusM: 6, maxSpeedKmh: 20 },
     },
     {
+      id: "sc-rbg-exit-approach",
+      // The same φ = 160° disc as sc-rb-circulate-priority — this drill takes
+      // the same (north) exit and its shadow reuses the same EXIT_NORTH blend,
+      // so the geometry that keeps that shadow credited keeps this one too.
+      titleBg: "Стигни по кръга до втория изход (север)",
+      params: {
+        kind: "reachZone",
+        ...ringPoint(180 - EXIT_APPROACH_LEAD_DEG, RING_R),
+        radiusM: EXIT_APPROACH_RADIUS_M,
+        // NO SPEED CAP — see WHY THIS ROW CARRIES NO maxSpeedKmh above.
+      },
+    },
+    {
       id: "sc-rbg-exit",
-      titleBg: "Излез на втория изход с включен десен мигач",
+      // WAS «Излез на втория изход с включен десен мигач» — see
+      // EXIT_APPROACH_LEAD_DEG: the evaluator cannot tell the second exit from
+      // the first. The ordinal moved to the gate above; instruction 5 and
+      // `objectiveBg` still say it in the student's own words.
+      titleBg: "Премини през кръга и го напусни с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator — an unsignalled exit voids the traversal.
       // enterRadiusM 24 (was 21) — R3 #6 family-wide geometry fix: the
@@ -1067,7 +1322,21 @@ export const SC_RB_LANE_CHOICE: ScenarioSpec = {
     },
     {
       id: "sc-rb2-exit",
-      titleBg: "Излез на третия изход с включен десен мигач",
+      // WAS «Излез на третия изход с включен десен мигач» — the arm is not in
+      // this evaluator's params (EXIT_APPROACH_LEAD_DEG), so the sentence was a
+      // certificate for something no tick carries. It is now said by
+      // `objectiveBg` and by instructions 1 and 5.
+      //
+      // THIS IS THE ONE DRILL ON THE SHELF WITH NO ARM GATE BEHIND THOSE WORDS.
+      // Not because the ring has no room — EXIT_APPROACH_LEAD_DEG's last block
+      // carries the re-measurement: a radius-4 disc centred at r = 27, 30–45°
+      // short of the west node, catches the committed shadow by 2.0–3.1 m and
+      // satisfies containment on every rung. It is left out because it would
+      // also grade WHEN the lane change happened — a car still in the inner
+      // lane at φ = 225 is 5.06 m off it, and he is still leaving by the third
+      // exit. `roundabout-title-truth.test.ts` carries the exception by a
+      // coarser formula, which holds as a tripwire; its prose does not.
+      titleBg: "Премини през кръга и го напусни с включен десен мигач",
       // The L3 roundabout contract (A10): enter the ring, exit ONLY under a
       // right indicator. enterRadiusM 33 admits the whole two-lane band (the
       // outer lane rides 30.06); exitRadiusM 46 sits clear of it.

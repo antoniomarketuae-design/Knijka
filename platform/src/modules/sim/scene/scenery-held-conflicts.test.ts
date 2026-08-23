@@ -198,18 +198,31 @@ describe("rule 3 — the curb pass keeps off the held dressing", () => {
     }
     expect(tooClose).toEqual([]);
     expect(sharingGround).toEqual([]);
-    // 417 bodies survive over these templates — the census in
-    // scenarioSceneryProps.ts. A change that deleted the rows wholesale would
-    // trip this floor.
+    // The census over these templates — the count in scenarioSceneryProps.ts.
+    // A change that deleted the rows wholesale would trip this floor.
     //
-    // It read 458 (470 before rule 3) until sweep 161 removed
-    // sc-follow-standstill's held column, which took that template out of
-    // TEMPLATES_WITH_DRESSING and its map's 41 curb bodies out of the census
-    // with it. None of the 41 moved or vanished — fo-follow-v1 still seats
-    // exactly the row it always did; it is simply no longer a drill this file
-    // has cause to walk. (Rule 3 never removed any of them: the row stands at
-    // |x| = 10.13 and the two held circles reached 4.69 m from x = 4.0625.)
-    expect(bodies).toBe(417);
+    // IT IS A POPULATION, NOT A BUDGET, and it moves when the SET of drills
+    // with dressing moves — so it is written as the arithmetic rather than as a
+    // total, and every term names the map it walks. A bare number re-typed each
+    // time a template joins is a floor that proves nothing.
+    //
+    // It read 470, then 458 once rule 3 removed the twelve strangers, then 417
+    // when sweep 161 removed sc-follow-standstill's held column — that took the
+    // template out of TEMPLATES_WITH_DRESSING and its map's 41 curb bodies out
+    // of the census with it. None of the 41 moved or vanished; fo-follow-v1
+    // still seats exactly the row it always did.
+    //
+    // The three terms below JOINED for the same structural reason, in the
+    // sweep-161 repair that bodied the debris and derived the bus-stop
+    // shelters: each map's whole curb row entered the walk with its template,
+    // and rule 3 removed NONE of it (the nearest decoration body is 6.07 m from
+    // the debris block against its 3.88 m circle, and both stop kerbs are
+    // already empty across the spans the shelters stand on). So the 417 term is
+    // still the same 417 bodies, in the same places.
+    const HZ_DEBRIS = 34; // sc-hz-brake-dont-swerve  (hz-debris-v1)
+    const MG_BUSSTOP = 38; // sc-merge-bus-pullout    (mg-busstop-v1, post rule 2b)
+    const PK_BUSSTOP = 30; // sc-pk-busstop-ban       (pk-busstop-v1, post rule 2b)
+    expect(bodies).toBe(417 + HZ_DEBRIS + MG_BUSSTOP + PK_BUSSTOP);
   }, 120_000);
 
   it("is what removed them — without rule 3 the same drills seat 12 strangers", () => {

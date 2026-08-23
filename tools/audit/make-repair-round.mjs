@@ -55,6 +55,13 @@ const REPAIRED = new Set([
   "platform/src/modules/sim/lessons/scenario/rubric.ts",
   "platform/src/modules/sim/lessons/scenario/templates-lanes.ts",
   "platform/src/modules/sim/lessons/scenario/templates-following.ts",
+  // round 3
+  "platform/src/modules/sim/world/builders/buildWorldGeometry.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-lanes2.ts",
+  "platform/src/modules/sim/environment/weather.ts",
+  "platform/src/modules/sim/collision/index.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-conditions.ts",
+  "platform/src/modules/sim/scenarios/coach.ts",
 ]);
 
 const open = loadOpenFindings();

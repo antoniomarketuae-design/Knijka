@@ -7,6 +7,8 @@
  * Coordinates are local meters: x = east, y = north, around meta.center.
  */
 
+import { TERRAIN_MARGIN_M } from "../world/builders/constants";
+
 export interface DistrictNode {
   id: string;
   x: number;
@@ -339,6 +341,134 @@ export interface District {
 
 /** BG urban default when an edge is unknown / vehicle is off-road (ЗДвП чл. 21). */
 export const BG_URBAN_DEFAULT_KMH = 50;
+
+// ---------------------------------------------------------------------------
+// THE DISTRICT'S EDGE — where the authored world stops existing.
+//
+// A district-v1 document declares `meta.boundsLocalMeters` and nothing else
+// about its own extent, and every consumer that needs "how big is this world"
+// re-derives it privately from those four numbers:
+//
+//   world/builders/terrain.ts   ground quad     = bounds ± TERRAIN_MARGIN_M
+//   world/builders/props.ts     prop keep-in    = bounds ± TERRAIN_MARGIN_M ∓ inset
+//   runtime/spatial.ts          uniform grid    = bounds − CELL_M, cols from the span
+//   runtime/minimap.ts          the drawn frame = bounds verbatim
+//
+// So the COLLIDABLE, DRAWN world is exactly `bounds ± TERRAIN_MARGIN_M` and not
+// one metre more. (`environment/groundBackdropShader.ts` continues it VISUALLY
+// with a 480 m camera-following disc — one draw call, no colliders, no props,
+// no road. That disc is the "featureless grey/green plane" in the audit
+// frames: it is the horizon, not the world.)
+//
+// NOTHING MARKS THAT LINE, and nothing can, because until this block existed no
+// module could name it. MEASURED over all 105 committed district-v1 documents
+// in content/world, taking the closest any drivable centreline comes to it:
+//
+//   64 districts   60.000 m   — the declared box IS the network's bounding box,
+//                               so the margin is the whole of the world past
+//                               the last road (every t-junction, x-junction,
+//                               car-park and полигон map is in this bucket)
+//   41 districts   66.000 – 78.125 m
+//   worst case     78.125 m   (pe-clear-v1)
+//
+// A learner therefore reaches the end of the authored world 60–78 m past the
+// last road on EVERY map in the product. `tj-rhr-v1` (sc-junction-rhr) and
+// `tj-stop-v1` (sc-junction-stop, sc-junction-scan) are the cheapest example:
+// their T-junction node `tj-n-c` sits at (0, 0) and the box's `maxY` IS 0, so
+// the graded junction is 60 m from the rim, in the direction a student who does
+// not turn drives.
+//
+// THAT NUMBER IS MEASURED FROM THE COMMITTED DOCUMENTS AND STANDS ON ITS OWN,
+// which is as well, because no drive in the tree can carry it. The void frames
+// these findings were filed from —
+// `.audit-frames/proof/frames/sc-junction-rhr__pc-right/04-t070s.png`, the car
+// at 6 км/ч on a featureless plane with the junction only in the mirror, and
+// 04-t202s.png, the same void 132 s later at 0 км/ч with «Завий наляво и излез
+// от кръстовището на запад» still on the glass and the task chip still reading
+// ЗАДАЧА 2/2 — come from a drive its OWN run.log marks BLIND: the guidance
+// ribbon was visible on 63 of 137 moving samples (46%, against a 50% floor),
+// and the log says it in terms — «THIS DRIVE WAS NOT STEERED … Treat it as an
+// unsteered drive.» BOTH pc-right drives of this lesson (proof/, rebase/) carry
+// that banner, and the only tracked drive on this map,
+// proof/frames/sc-junction-rhr__mobile-right (ribbon 23/23, straightness
+// 0.967), travelled 96.5 m from a spawn 105 m south of the junction — it never
+// reached the rim, so it cannot photograph the void either way. Nor can
+// `sc-junction-gap:75918e40` (~80 s at 58–65 км/ч for 216 наказателни точки):
+// that drive predates the steering work and its log carries no TRACKING line at
+// all.
+//
+// So the geometry above is this block's evidence, and a STEERED drive that
+// photographs the rim is still owed. What a steered drive cannot change is the
+// document: `maxY` IS 0 and the graded node IS at (0, 0) on all three maps.
+//
+// WHAT THIS BLOCK IS AND IS NOT. It is the MEASURE — the one place that answers
+// "how much authored world is left in front of this car", so the drawn barrier,
+// the instructor's warning and the ending gate all read the same number instead
+// of each re-deriving it. It draws nothing and it ends nothing: those consumers
+// live in files this lane does not own (see the routing note in the fix report).
+// ---------------------------------------------------------------------------
+
+/**
+ * The rectangle past which the district has no ground, no props and no road.
+ *
+ * The declared box padded by `TERRAIN_MARGIN_M` — the SAME constant the ground
+ * quad is built from, imported rather than mirrored so the two cannot drift
+ * (`world/builders/terrain.ts` `buildTerrain`, which is where this rectangle
+ * physically comes from).
+ *
+ * NORMALISED, and deliberately. `parseDistrict` accepts an INVERTED box on a
+ * measurement — the spatial index shares one `cellOf` between insert and query,
+ * so a negative column count is self-consistent and locates 323/323. Padding an
+ * inverted box literally would produce a rectangle with negative span, on which
+ * every pose in the world reads as outside — a false alarm on a document the
+ * parser has already ruled harmless. So min/max are ordered first.
+ */
+export function districtWorldEdge(district: District): DistrictBounds {
+  const b = district.meta.boundsLocalMeters;
+  return {
+    minX: Math.min(b.minX, b.maxX) - TERRAIN_MARGIN_M,
+    minY: Math.min(b.minY, b.maxY) - TERRAIN_MARGIN_M,
+    maxX: Math.max(b.minX, b.maxX) + TERRAIN_MARGIN_M,
+    maxY: Math.max(b.minY, b.maxY) + TERRAIN_MARGIN_M,
+  };
+}
+
+/**
+ * Signed clearance of a pose against `districtWorldEdge`, meters.
+ *
+ *   > 0  INSIDE  — metres of authored world left before the nearest rim
+ *   = 0           — on the rim
+ *   < 0  OUTSIDE — metres already past it (Euclidean, so a corner overshoot is
+ *                  not under-reported the way a per-axis test would)
+ *
+ * ONE SIGNED NUMBER RATHER THAN AN `isOutside` PREDICATE, because the three
+ * things this defect needs are three different thresholds on the same measure
+ * and a boolean can only serve the last of them: a fence/treeline is drawn at a
+ * fixed inset from the rim, a virtual instructor has to speak BEFORE the rim is
+ * crossed (THEO-4 — a student who is told only after he is in the void is told
+ * a verdict, not a reason), and an ending fires some distance past it. Two of
+ * those three are positive-side questions that no "am I out?" flag can answer.
+ *
+ * It is NOT the off-network test. `SimTick.edgeId === null` (locator.ts,
+ * OFF_ROAD_DISTANCE_M = 30 m) says "no centreline within 30 m" — a car on the
+ * verge of its own street, which is a driving fault. This says "there is no
+ * more world", which is not a driving fault at all and must never be graded as
+ * one. A car can be off-network with 200 m of clearance (the полигон), and — on
+ * a wide arterial's kerbside parking band, where the measured headroom is
+ * 0.645 m — on-network with clearance to spare. The two channels answer
+ * different questions and neither substitutes for the other.
+ */
+export function worldEdgeClearanceM(district: District, x: number, y: number): number {
+  const e = districtWorldEdge(district);
+  const dx = Math.max(e.minX - x, x - e.maxX);
+  const dy = Math.max(e.minY - y, y - e.maxY);
+  // Inside on both axes: the clearance is the distance to the NEAREST side.
+  // `+ 0` normalises the exactly-on-the-rim case, where negating a zero yields
+  // -0: a consumer comparing with Object.is / JSON-round-tripping the number
+  // would otherwise see a rim reading that is neither inside nor outside.
+  if (dx <= 0 && dy <= 0) return -Math.max(dx, dy) + 0;
+  return -Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
+}
 
 /**
  * Structural validation of a parsed district JSON. Cheap by design — the build

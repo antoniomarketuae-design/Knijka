@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { PERCEPTUAL_ROAD_SCALE } from "@/modules/sim/contracts";
 import { computeParkedCars, type TrafficDistrict } from "@/modules/sim/traffic";
-import { parkedClearZonesFor } from "../scenarioSceneryProps";
+import { busStopSheltersOf, parkedClearZonesFor } from "../scenarioSceneryProps";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "../../../../../..");
@@ -102,11 +102,30 @@ describe("RULE 2b — the authored bus-stop span clears its kerb", () => {
       expect(kerbXs.length, `${id}: one-sided row expected`).toBe(1);
       const zones = parkedClearZonesFor(`${templateId}@L1`, raw);
       expect(zones.length, `${id}: no zones emitted`).toBeGreaterThan(0);
-      for (const z of zones) {
+      // RULE 3's circles are NOT rule 2b's and never were on the kerb: they are
+      // centred on the drill's own held bodies. Since the sweep-161 repair each
+      // of these two maps holds one — the derived навес, which by construction
+      // stands BEHIND the parked band — so it is separated out by identity (its
+      // exact centre) rather than by a loosened tolerance, and then asserted
+      // ON, so this test still convicts a rule-2b zone that drifts off the kerb
+      // AND convicts a shelter that wanders onto it.
+      const shelters = busStopSheltersOf(raw);
+      expect(shelters.length, `${id}: the навес the stop earns`).toBe(1);
+      const kerbZones = zones.filter(
+        (z) => !shelters.some((s) => s.x === z.x && s.y === z.y),
+      );
+      expect(kerbZones.length, `${id}: rule 2b emitted nothing`).toBe(zones.length - 1);
+      for (const z of kerbZones) {
         expect(Math.abs(z.x - kerbXs[0]), `${id}: zone x ${z.x} vs kerb ${kerbXs[0]}`).toBeLessThan(
           0.05,
         );
       }
+      // The shelter is off the kerb line on purpose, and off it OUTWARD — a
+      // panel drawn on the band would be a structure standing among the parked
+      // cars instead of behind them.
+      expect(Math.abs(shelters[0].x), `${id}: shelter is not on the band`).toBeGreaterThan(
+        Math.abs(kerbXs[0]) + 0.05,
+      );
     }
   });
 

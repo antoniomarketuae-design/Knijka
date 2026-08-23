@@ -38,15 +38,57 @@
  * templates' own end-to-end proofs (s-w1/s-w2/s-w3/s-w4-bot-completion) are
  * what say the drills grade; this file only removes three certificates they
  * were handing out for free.
+ *
+ * ===========================================================================
+ * (c) THE ARM — 2026-08-23, THE PROMISE THIS FILE ITSELF WALKED PAST.
+ * ===========================================================================
+ *
+ * The two laws above iterate `scenario.success` and open with
+ * `if (objective.params.kind !== "reachZone") continue;`. The row every drill
+ * on this shelf ENDS on is a `completeManeuver`, so it was never examined — and
+ * it was carrying the loudest claim of the four: «Излез на ТРЕТИЯ изход…»,
+ * «…на СЕВЕРНИЯ изход…», «…на ВТОРИЯ изход…».
+ *
+ * `stepRoundabout` (objectives.ts) is handed one centre and two radii. It
+ * measures distance to that centre, |net arc| swept inside `enterRadiusM`, and
+ * whether the right stalk was lit in the exit window. A circle names no compass
+ * point, so WHICH ARM the car left by is not a fact this row can hold.
+ *
+ * DRIVEN, THROUGH THE PRODUCTION STACK — the first block at the bottom of this
+ * file. A car that enters the south mouth of sc-rb-circulate-priority, rides
+ * 90° of ring and leaves at the FIRST (east) exit with its right indicator on
+ * collected «Излез на СЕВЕРНИЯ изход с включен десен мигач», zero violations,
+ * ИЗДЪРЖАН, 3★, in 23 seconds. It clears ROUNDABOUT_MIN_TRAVERSAL_ARC_DEG (45)
+ * twice over, so none of the hardening that row already carries — the reverse
+ * guard, the arc floor, the void-on-unsignalled-exit — reaches it.
+ *
+ * THE REMEDY IS NOT ANOTHER DELETION. The arm moved to a gate that can see one:
+ * a disc ON THE RING, `EXIT_APPROACH_LEAD_DEG` before each drill's own exit,
+ * inserted BEFORE the maneuver row. The engine steps objectives strictly in
+ * order (engine.ts advances one index per completion), so collecting the
+ * shelf's existing mouth gate and then this one is a statement about a PATH.
+ * The east-exit drive above now leaves that task open and is told which one.
+ * The maneuver row keeps grading exactly what it always graded — the passage
+ * and the stalk — and now says only that.
+ *
+ * THREE OF THE FOUR. sc-rb-lane-choice's ring has no room for such a disc and
+ * that is arithmetic, not an omission — `NO_ARM_GATE_POSSIBLE` below carries
+ * the derivation and re-computes it from the shipped params on every run, so
+ * a map with room in it fails this file rather than being forgotten.
  */
 
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { makeTick } from "../../__tests__/fixtures";
-import { applyTick, createLessonSession } from "../../engine";
+import { applyTick, buildLessonResult, createLessonSession } from "../../engine";
 import { REACH_ZONE_HALT_CAP_KMH } from "../../objectives";
-import type { LessonSpec } from "../../../contracts";
+import type { LessonSpec, StagedEventSpec } from "../../../contracts";
+import { recordScriptedDrive, type DriveScript } from "../../../traces/recorder";
 import { compileScenario } from "../compile";
-import { SCENARIO_TEMPLATES_ROUNDABOUT } from "../templates-roundabout";
+import { scoreRubric } from "../rubric";
+import { EXIT_APPROACH_RADIUS_M, SCENARIO_TEMPLATES_ROUNDABOUT } from "../templates-roundabout";
 import type { ScenarioSpec } from "../types";
 
 const GROUP: readonly ScenarioSpec[] = SCENARIO_TEMPLATES_ROUNDABOUT;
@@ -293,4 +335,250 @@ describe("the give-way halt is real in both directions", () => {
 
     expect(statusOf(s, "sc-rbg-yield-line")).toBe("done");
   });
+});
+
+// ---------------------------------------------------------------------------
+// (c) THE ARM — the law, the drive that made it necessary, and the gate's teeth
+// ---------------------------------------------------------------------------
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(HERE, "../../../../../../..");
+function loadDistrict(id: string): unknown {
+  return JSON.parse(readFileSync(path.join(REPO_ROOT, "content", "world", `${id}.json`), "utf-8")) as unknown;
+}
+
+/**
+ * A claim about WHICH exit was taken — an ordinal («третия изход») or a compass
+ * arm («северния изход»). Both forms are in the shipped-before strings and both
+ * are facts about an ARM, which is what `stepRoundabout` has no parameter for.
+ *
+ * Attributive endings are matched with a stem + `\p{L}*` rather than a fixed
+ * suffix: Bulgarian inflects («трети/третия/третият»), and a matcher that only
+ * caught one form is exactly the instrument bug this programme has shipped
+ * before. Pinned against the four exact strings that shipped, below.
+ */
+const NAMED_EXIT_CLAIM =
+  /(?:първ|втор|трет|четвърт)\p{L}*\s+изход|(?:северн|южн|източн|западн)\p{L}*\s+изход/iu;
+
+describe("the exit matcher reads the shipped-before titles as claims and the replacement as none", () => {
+  it("the ordinals and the compass arms", () => {
+    expect(NAMED_EXIT_CLAIM.test("Излез на третия изход с включен десен мигач")).toBe(true);
+    expect(NAMED_EXIT_CLAIM.test("Излез на северния изход с включен десен мигач")).toBe(true);
+    expect(NAMED_EXIT_CLAIM.test("Излез на втория изход с включен десен мигач")).toBe(true);
+    // The replacement, and the reachZone titles that legitimately DO name a
+    // mouth — they are discs at a place, and a place is what a disc sees. The
+    // law below is scoped to `completeManeuver` rows for exactly that reason.
+    expect(NAMED_EXIT_CLAIM.test("Премини през кръга и го напусни с включен десен мигач")).toBe(false);
+    expect(NAMED_EXIT_CLAIM.test("Стигни по кръга до третия изход (запад)")).toBe(true);
+  });
+});
+
+describe("a roundabout MANEUVER title may not name which exit was taken", () => {
+  for (const scenario of GROUP) {
+    for (const objective of scenario.success) {
+      if (objective.params.kind !== "completeManeuver") continue;
+      if (objective.params.maneuver !== "roundabout") continue;
+      it(`${scenario.id} / ${objective.id}`, () => {
+        if (objective.params.kind !== "completeManeuver") return;
+        if (objective.params.maneuver !== "roundabout") return;
+        const p = objective.params;
+        expect(
+          NAMED_EXIT_CLAIM.test(objective.titleBg),
+          `${objective.id}: „${objective.titleBg}" certifies WHICH exit was taken, but ` +
+            `stepRoundabout is handed one centre (${p.x}, ${p.y}) and two radii ` +
+            `(enter ${p.enterRadiusM} / exit ${p.exitRadiusM}) — it measures distance, net ` +
+            `arc and the stalk, and a circle names no arm. The east-exit drive below collects ` +
+            `this row in full. Name the arm on a gate that stands on it.`,
+        ).toBe(false);
+      });
+    }
+  }
+});
+
+/** The east-exit bail-out: south mouth in, 90° of ring, out the FIRST exit with
+ *  the right stalk lit — a lawful little drive, and not this drill. */
+function eastExitDrive(): DriveScript {
+  const X = 4.06;
+  const R = 18;
+  const ring = (phi: number): [number, number] => {
+    const a = (phi * Math.PI) / 180;
+    return [R * Math.sin(a), -R * Math.cos(a)];
+  };
+  const run: Array<[number, number]> = [];
+  for (let p = 60; p <= 80; p += 10) run.push(ring(p));
+  return {
+    steps: [
+      { kind: "glance", mirror: "rear" },
+      { kind: "drive", points: [[X, -93], [X, -60]], targetKmh: 40, stopAtEnd: false },
+      { kind: "drive", points: [[X, -60], [X, -40], [X, -27.5]], targetKmh: 18, stopAtEnd: false },
+      { kind: "glance", mirror: "left" },
+      {
+        kind: "drive",
+        points: [[X, -27.5], [6.0, -23.0], [8.5, -18.5], [11.0, -15.0], ring(48), ring(55)],
+        targetKmh: 17,
+        stopAtEnd: false,
+      },
+      { kind: "drive", points: run, targetKmh: 12, stopAtEnd: false },
+      { kind: "indicator", setting: "right" },
+      { kind: "glance", mirror: "right" },
+      {
+        kind: "drive",
+        points: [ring(85), [17.5, -2.5], [20.0, -4.06], [26.0, -4.06], [40.0, -4.06], [58.0, -4.06]],
+        targetKmh: 12,
+      },
+      { kind: "indicator", setting: "off" },
+      { kind: "pause", sec: 1.5, brake: true },
+    ],
+  };
+}
+
+describe("THE DRIVE THAT RETIRED THE OLD TITLE — leaving at the FIRST exit", () => {
+  const spec = GROUP.find((s) => s.id === "sc-rb-circulate-priority")!;
+  const lesson = compileScenario(spec, 3);
+  let session = createLessonSession(lesson);
+  recordScriptedDrive(loadDistrict("rb-mini-v1"), eastExitDrive(), {
+    scenarioId: spec.id,
+    kind: "shadow",
+    seed: 7,
+    stagedEvents: [...(spec.staged ?? [])] as StagedEventSpec[],
+    onTick: (tick) => {
+      session = applyTick(session, tick).state;
+    },
+  });
+  const result = buildLessonResult(session);
+  const done = (id: string) => result.objectives.find((o) => o.id === id)?.done;
+
+  it("it is a clean, lawful drive — the drill is refused on the ROUTE, not on a fault", () => {
+    // The point of the whole block: nothing here is naughty. No violation, no
+    // collision. The student simply took the wrong exit, which is the one thing
+    // this drill exists to grade, so it has to be the route list that says so.
+    expect(session.events.filter((e) => e.kind === "violation").map((e) => e.code)).toEqual([]);
+  });
+
+  it("it still clears the ring gate it genuinely reached", () => {
+    expect(done("sc-rbc-past-east")).toBe(true);
+  });
+
+  it("…and is NOT credited with the northern exit (this went red before the gate existed)", () => {
+    // BEFORE: objectives were [past-east, exit] and this drive returned
+    // completedAll=true, passed=true, score=0, 3★ at 23 s — a full pass for a
+    // drive that never went near the north arm.
+    expect(done("sc-rbc-exit-approach")).toBe(false);
+    expect(result.completedAll).toBe(false);
+    expect(scoreRubric(result, spec.rubric!).stars).toBeLessThan(3);
+  });
+
+  it("the reason it is refused is the ARM and nothing else — the maneuver row is exit-blind still", () => {
+    // Stated as a measurement so a future change upstream cannot make this
+    // block pass for a different reason than the one it was written for: the
+    // exit-blindness is still there, it is simply no longer the last word.
+    // (The maneuver row never activates on this drive — the sequential engine
+    // stops at the open gate — which is why it reads as not done here.)
+    expect(done("sc-rbc-exit")).toBe(false);
+    const maneuver = spec.success.find((o) => o.id === "sc-rbc-exit")!;
+    expect(maneuver.params.kind).toBe("completeManeuver");
+    if (maneuver.params.kind !== "completeManeuver") return;
+    if (maneuver.params.maneuver !== "roundabout") return;
+    expect(maneuver.params.x).toBe(0);
+    expect(maneuver.params.y).toBe(0);
+  });
+});
+
+/**
+ * THE ONE DRILL THE REMEDY DOES NOT REACH, named rather than skipped.
+ *
+ * sc-rb-lane-choice rides rb-2lane, whose exit is a lane change onto the OUTER
+ * ring lane at r = 30.06 against an `enterRadiusM` of 33. The containment rule
+ * below leaves (33 − 30.06) / 1.5 = 1.96 m of authored radius for a disc that
+ * would have to sit ON that line — smaller than a car — and any disc drawn far
+ * enough inward to satisfy containment is ≥ 3 m off the committed shadow's
+ * exit line, which never comes inside r = 30.06. It needs a map with room in
+ * it, which no template can author. Listed here so „three of the four" cannot
+ * quietly become the standard.
+ */
+const NO_ARM_GATE_POSSIBLE = ["sc-rb-lane-choice"];
+
+describe("every drill on this shelf names its exit on a gate that stands on the ring", () => {
+  it("the exception list is exactly the drills whose ring has no room for one", () => {
+    // The arithmetic, not the preference — re-derived from the shipped params
+    // so a map or an enterRadiusM with room in it flips this and the exception
+    // has to be removed.
+    const cramped: string[] = [];
+    for (const scenario of GROUP) {
+      const maneuver = scenario.success.find(
+        (o) => o.params.kind === "completeManeuver" && o.params.maneuver === "roundabout",
+      )!;
+      if (maneuver.params.kind !== "completeManeuver") continue;
+      if (maneuver.params.maneuver !== "roundabout") continue;
+      // The radius the drill's own exit line would need a disc to sit on: the
+      // outermost ring lane it is driven on. rb-mini is single-lane (18);
+      // rb-2lane's exit lane is the outer one (30.06).
+      const exitLaneR = scenario.map.districtId === "rb-2lane-v1" ? 30.06 : 18;
+      const authorable = (maneuver.params.enterRadiusM - exitLaneR) / 1.5;
+      if (authorable < EXIT_APPROACH_RADIUS_M) cramped.push(scenario.id);
+    }
+    expect(cramped).toEqual(NO_ARM_GATE_POSSIBLE);
+  });
+
+  for (const scenario of GROUP) {
+    if (NO_ARM_GATE_POSSIBLE.includes(scenario.id)) continue;
+    const ids = scenario.success.map((o) => o.id);
+    const maneuverIdx = scenario.success.findIndex(
+      (o) => o.params.kind === "completeManeuver" && o.params.maneuver === "roundabout",
+    );
+
+    it(`${scenario.id} carries an exit-approach gate, and it stands BEFORE the maneuver`, () => {
+      expect(maneuverIdx, `${scenario.id}: ${ids.join(", ")}`).toBeGreaterThan(0);
+      const approach = scenario.success[maneuverIdx - 1];
+      expect(approach.id, `${scenario.id}: ${ids.join(", ")}`).toMatch(/-exit-approach$/);
+      expect(NAMED_EXIT_CLAIM.test(approach.titleBg), approach.titleBg).toBe(true);
+    });
+
+    /**
+     * THE CEILING THE GATE LIVES UNDER, and it is the reason the radius is 5
+     * and not a rounder number. `stepRoundabout` latches `entered` from
+     * `d <= enterRadiusM`, and the maneuver row is stepped only AFTER this gate
+     * completes. A disc a car could satisfy from OUTSIDE that circle hands the
+     * maneuver a car already leaving: `entered` never latches, the exit branch
+     * never runs, and the drill becomes uncompletable without driving back in.
+     * Raise EXIT_APPROACH_RADIUS_M past the slack, or move the gate outward,
+     * and this goes red.
+     */
+    it(`${scenario.id}: the whole acceptance disc lies inside enterRadiusM, on EVERY rung`, () => {
+      // ON EVERY RUNG, and that is the half an authored-spec check would have
+      // missed: `scenario/params.ts widenRadius` stretches a waypoint by up to
+      // REACH_ZONE_GRACE_M at L1/L2, so the ceiling has to hold against the
+      // COMPILED number, not the one written above.
+      expect(
+        (scenario.success[maneuverIdx - 1].params as { radiusM: number }).radiusM,
+      ).toBe(EXIT_APPROACH_RADIUS_M);
+      for (const rung of scenario.levels) {
+        const lesson = compileScenario(scenario, rung.level);
+        const approach = lesson.objectives[maneuverIdx - 1];
+        const maneuver = lesson.objectives[maneuverIdx];
+        const a = approach.params as { x: number; y: number; radiusM: number };
+        const m = maneuver.params as { x: number; y: number; enterRadiusM: number };
+        const reach = Math.hypot(a.x - m.x, a.y - m.y) + a.radiusM;
+        expect(
+          reach,
+          `${approach.id}@L${rung.level}: the disc reaches ${reach.toFixed(2)} m from the island ` +
+            `against an enterRadiusM of ${m.enterRadiusM} — a car that satisfied it out there ` +
+            `would hand the maneuver a ring it never entered, and the drill could not be ` +
+            `finished without driving back in`,
+        ).toBeLessThanOrEqual(m.enterRadiusM);
+      }
+    });
+  }
+});
+
+describe("the duty the maneuver title gave up is still said in the student's own words", () => {
+  // A fix that removes a sentence and puts nothing back is the failure mode
+  // this whole programme is trying to stop. Every drill must still TELL the
+  // student which exit is his, in the briefing he reads before he drives.
+  for (const scenario of GROUP) {
+    it(`${scenario.id}`, () => {
+      const spoken = [scenario.objectiveBg, ...scenario.instructionsBg.map((i) => i.textBg)].join(" ");
+      expect(NAMED_EXIT_CLAIM.test(spoken), `${scenario.id} no longer names its exit anywhere`).toBe(true);
+    });
+  }
 });

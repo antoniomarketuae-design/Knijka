@@ -15,7 +15,20 @@ import {
   PARK_DEPTH_WALL,
   pkVanObstacle,
 } from "@/modules/sim/traces";
+// Deep import, on purpose: `hzBrakeDontSwerveObstacles` is not on the traces
+// barrel (barrel-bundle-weight.test.ts ratchets that surface), and a literal
+// re-pin of its numbers here would be a copy that keeps passing after the
+// original moves. The lane11-data-truth battery deep-imports traces the same way.
+import { hzBrakeDontSwerveObstacles } from "@/modules/sim/traces/scHzBrakeDontSwerve";
 import {
+  CHASSIS_HALF_EXTENTS,
+  COCKPIT_EYE,
+  SUSPENSION_REST_LENGTH,
+  WHEEL_POSITIONS,
+  WHEEL_RADIUS,
+} from "@/modules/sim/vehicle/tuning";
+import {
+  busStopSheltersOf,
   heldSceneryFor,
   parkedClearZonesFor,
   scenarioConesOf,
@@ -346,5 +359,250 @@ describe("parkedClearZonesFor — the curb-decoration clear zones (doc 66 R5, v1
           .toBeGreaterThan(CAR_HALF_LEN + HERO_HALF_W);
       }
     }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SWEEP 161 REPAIRS — the two objects a briefing named and the world withheld
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe("sc-hz-brake-dont-swerve — the препятствие is a body, not a painted ring", () => {
+  /**
+   * «There is no physical obstacle at the stop mark … represented only by a
+   * flat orange ring painted on the tarmac, a cyan light beam and a „Спри тук"
+   * floating label. Nothing occupies the lane, so the full-force stop is a stop
+   * before an abstraction.»
+   *   .audit-frames/wave-c/frames/sc-hz-brake-dont-swerve__pc-right/04-t093s.png
+   *
+   * The rect is deep-imported, not re-typed: a literal copy of (4.06, 190, 0.8,
+   * 1.2) in this file would keep passing after the trace moved the debris.
+   */
+  const [DEBRIS] = hzBrakeDontSwerveObstacles();
+  const held = heldSceneryFor("sc-hz-brake-dont-swerve@L1", loadDistrict("hz-debris-v1"));
+
+  it("stands ON the graded rect, footprint for footprint", () => {
+    expect(held).toHaveLength(1);
+    const block = held[0];
+    expect(block.kind).toBe("wall");
+    if (block.kind !== "wall") return;
+    expect([block.x, block.y, block.headingDeg]).toEqual([DEBRIS.x, DEBRIS.y, DEBRIS.headingDeg]);
+    // The L7 painted-rect-equals-graded-rect law. `wall` colliders are
+    // [thicknessM/2, heightM/2, lengthM/2] with length along the heading, so
+    // these two equalities ARE „the body the student sees is the rectangle the
+    // drill grades" — a nudge to either number breaks them.
+    expect(block.lengthM / 2).toBe(DEBRIS.halfLengthM);
+    expect((block.thicknessM ?? 0.3) / 2).toBe(DEBRIS.halfWidthM);
+  });
+
+  it("is hittable, and grades on the code its own rect already names", () => {
+    const block = held[0];
+    // `ScenarioWallObstacle` has no `visual` escape hatch — a wall always
+    // mounts its cuboid. Asserted so a future `visual` field cannot be switched
+    // on here without this test noticing.
+    expect(block.kind).toBe("wall");
+    expect("visual" in block).toBe(false);
+    // ScenarioObstacles mounts wall colliders UNTAGGED, so VehicleRig grades
+    // contact as "staticObject" — which is this rect's own `withWhat`. Same
+    // code, same rectangle: the authored consequence, reaching the live driver.
+    expect(DEBRIS.withWhat).toBe("staticObject");
+  });
+
+  it("its height is a load-bearing number, bounded at both ends by the car", () => {
+    const block = held[0];
+    if (block.kind !== "wall") return;
+    const height = block.heightM ?? 1.2;
+    // FLOOR — the chassis collider's fully-extended ground clearance. A block
+    // lower than this passes UNDER the body box: the wheels would scrub it and
+    // the car would straddle „препятствието" it was told to stop for.
+    // The chassis origin rides one wheel radius + one fully-extended spring +
+    // the attachment drop above the road; the body box hangs half its height
+    // below that origin.
+    const chassisOriginAboveRoadM =
+      WHEEL_RADIUS + SUSPENSION_REST_LENGTH + Math.abs(WHEEL_POSITIONS[0].y);
+    const bodyClearanceM = chassisOriginAboveRoadM - CHASSIS_HALF_EXTENTS.y;
+    expect(bodyClearanceM).toBeCloseTo(0.37, 6);
+    expect(height).toBeGreaterThan(bodyClearanceM);
+    // CEILING — the driver's own eye above the road (COCKPIT_EYE is chassis
+    // local). The student must SEE the whole object and the road past it: above
+    // his eyeline the silhouette stops being fallen load and becomes the
+    // stopped VEHICLE of the sibling drill (sc-hazard-obstacle), whose lesson
+    // is „ease around", not „stop dead".
+    const eyeAboveRoadM = chassisOriginAboveRoadM + COCKPIT_EYE.y;
+    expect(height).toBeLessThan(eyeAboveRoadM);
+  });
+
+  it("clears the stop objective it must not block, and costs zero decoration", () => {
+    const block = held[0];
+    if (block.kind !== "wall") return;
+    // sc-hzbds-stop is a 4 m zone at (4.06, 184); the hero's nose reaches
+    // 184 + CHASSIS_HALF_EXTENTS.z when it rests on the mark.
+    const heroNoseY = 184 + CHASSIS_HALF_EXTENTS.z;
+    const blockNearY = block.y - block.lengthM / 2;
+    expect(blockNearY - heroNoseY).toBeGreaterThan(2);
+    // Rule 3 opens a circle here; hz-debris-v1 must lose no kerb for it.
+    const raw = loadDistrict("hz-debris-v1") as TrafficDistrict;
+    const W = 3.25 * PERCEPTUAL_ROAD_SCALE;
+    const zones = parkedClearZonesFor("sc-hz-brake-dont-swerve@L1", raw);
+    expect(zones.length).toBeGreaterThan(0); // the rule DID fire
+    const before = computeParkedCars(raw, W, []);
+    const after = computeParkedCars(raw, W, zones);
+    expect(after.map((c) => `${c.x},${c.y}`)).toEqual(before.map((c) => `${c.x},${c.y}`));
+  });
+});
+
+describe("busStopSheltersOf — the навес a district authors and nothing drew", () => {
+  /**
+   * sc-pk-busstop-ban (critical): «The world does not contain the landmark the
+   * lesson is entirely about … The briefing's навес (shelter) is absent».
+   * Its instruction 2 is «Зоната ѝ не започва ПРИ НАВЕСА» and its second
+   * mistake card is «Водачът спря ПРЕДИ НАВЕСА» — two sentences about a thing
+   * that was not in the world.
+   */
+  const W = 3.25 * PERCEPTUAL_ROAD_SCALE;
+  /** Worst-case parked-decoration half-width (the kit's widest body), m. */
+  const PARKED_HALF_W = 0.95;
+
+  const CASES = [
+    // district, template, span fromY, span toY, kerb band x, building face x
+    ["mg-busstop-v1", "sc-merge-bus-pullout", 130, 176, 18.25, 22.25],
+    ["pk-busstop-v1", "sc-pk-busstop-ban", 180, 210, 10.125, 14.13],
+  ] as const;
+
+  it.each(CASES)(
+    "%s: one panel, at the midpoint of the district's OWN authored span",
+    (districtId, templateId, fromY, toY) => {
+      const raw = loadDistrict(districtId);
+      const scenario = (
+        raw as {
+          meta: {
+            scenario: {
+              busBayY?: { fromY: number; toY: number };
+              busStopPocketY?: { fromY: number; toY: number };
+            };
+          };
+        }
+      ).meta.scenario;
+      const authored = scenario.busBayY ?? scenario.busStopPocketY;
+      // The span is the district's data, not a number this test invents.
+      expect(authored).toEqual({ fromY, toY });
+
+      const shelters = busStopSheltersOf(raw);
+      expect(shelters).toHaveLength(1);
+      const s = shelters[0];
+      expect(s.kind).toBe("wall");
+      expect(s.y).toBe((fromY + toY) / 2);
+      expect(s.headingDeg).toBe(0); // along the straight street
+      // …and it reaches the scene through the ONE composition LessonScene
+      // mounts, not only through its own helper.
+      expect(heldSceneryFor(`${templateId}@L1`, raw)).toContainEqual(s);
+    },
+  );
+
+  it.each(CASES)(
+    "%s: the panel stands BEHIND the parked band and IN FRONT of the building",
+    (districtId, _templateId, _fromY, _toY, kerbX, buildingFaceX) => {
+      const [s] = busStopSheltersOf(loadDistrict(districtId));
+      const near = s.x - (s.thicknessM ?? 0.3) / 2;
+      const far = s.x + (s.thicknessM ?? 0.3) / 2;
+      // NEAR side: clear of the outer flank of any car parked on the band, so
+      // no decoration body is ever drawn inside the shelter. A setback of 0
+      // fails here — the panel would land inside the parked bodies.
+      expect(near).toBeGreaterThan(kerbX + PARKED_HALF_W);
+      // FAR side: still kerb furniture, not part of the building line. A
+      // runaway setback fails here.
+      expect(far).toBeLessThan(buildingFaceX);
+      // It never reaches the carriageway: the driven edge is the kerb band
+      // centre minus PARK_BAND_CENTER_M (2.0).
+      expect(near).toBeGreaterThan(kerbX - 2.0);
+    },
+  );
+
+  it("is tall enough to be seen over the parked band and long enough to read as a навес", () => {
+    const [s] = busStopSheltersOf(loadDistrict("pk-busstop-v1"));
+    // A parked fleet roofline is 1.45 m (ScenarioObstacles rigTopY's default —
+    // the number the sc-follow-standstill removal was argued from). A panel
+    // shorter than that is invisible from the road the moment one car parks in
+    // front of it, which is the exact defect this shelter exists to end.
+    expect(s.heightM ?? 1.2).toBeGreaterThan(1.45);
+    // A structure shorter than one civilian car is a POST, not a shelter (the
+    // fleet „car" profile is 4.1 m long — HELD_CAR_HALF_DIAG_M's own 2.05).
+    expect(s.lengthM).toBeGreaterThanOrEqual(2.05 * 2);
+    // …and it still fits inside the span it was derived from.
+    expect(s.lengthM).toBeLessThan(210 - 180);
+  });
+
+  it("takes NOTHING away: both stop kerbs keep every decoration body they had", () => {
+    for (const [districtId, templateId] of CASES) {
+      const raw = loadDistrict(districtId) as TrafficDistrict;
+      const zones = parkedClearZonesFor(`${templateId}@L1`, raw);
+      const shelters = busStopSheltersOf(raw);
+      // The same zone list WITHOUT the rule-3 circles the shelter opened.
+      const withoutShelter = zones.filter(
+        (z) => !shelters.some((s) => s.x === z.x && s.y === z.y),
+      );
+      expect(withoutShelter.length).toBeLessThan(zones.length); // it DID open some
+      const before = computeParkedCars(raw, W, withoutShelter);
+      const after = computeParkedCars(raw, W, zones);
+      expect(after.map((c) => `${c.x},${c.y}`), districtId).toEqual(
+        before.map((c) => `${c.x},${c.y}`),
+      );
+    }
+  });
+
+  it("fires ONLY where a span is authored, and never twice at one stop", () => {
+    // sp-creep-v1 authors a real `kind: "busStop"` frontage and props.ts builds
+    // the modelled навес there — this derivation must stand down, or that map
+    // gets two shelters in one place.
+    const creep = loadDistrict("sp-creep-v1");
+    expect(
+      (creep as { buildings: Array<{ kind?: string }> }).buildings.some(
+        (b) => b.kind === "busStop",
+      ),
+    ).toBe(true);
+    expect(busStopSheltersOf(creep)).toEqual([]);
+    // …AND THE sp-creep-v1 LINE ABOVE CANNOT CONVICT THE GUARD IT NAMES, which
+    // is why the synthetic below exists (adversarial verify 2026-08-23): that
+    // map authors no `busBayY`/`busStopPocketY` at all, so deleting the
+    // `kind === "busStop"` early return leaves it [] anyway — measured, the
+    // mutation stays GREEN on the whole battery. Only a district with BOTH a
+    // frontage and a span can tell the guard from the empty span, and no
+    // shipped map has both. Hand-built, therefore, and it is the only case in
+    // this file that is: it is the one assertion that would otherwise pass
+    // while `props.ts`'s modelled навес and this one stood in the same place.
+    expect(
+      busStopSheltersOf({
+        buildings: [{ kind: "busStop", footprint: [[9, 190], [13, 190], [13, 200], [9, 200]] }],
+        meta: {
+          scenario: {
+            archetype: "straight-street",
+            lanesPerDirection: 1,
+            laneCenterRightM: 4.06,
+            busStopPocketY: { fromY: 180, toY: 210 },
+          },
+        },
+      }),
+    ).toEqual([]);
+    // The districts that name no stop are byte-identical.
+    expect(busStopSheltersOf(loadDistrict("hz-obstacle-v1"))).toEqual([]);
+    expect(busStopSheltersOf(loadDistrict("pe-child-v1"))).toEqual([]);
+    expect(busStopSheltersOf(loadDistrict("poligon-v1"))).toEqual([]);
+    // Defensive, like scenarioConesOf: junk in, [] out — never a throw.
+    expect(busStopSheltersOf(null)).toEqual([]);
+    expect(busStopSheltersOf({})).toEqual([]);
+    // No archetype and no laneCenterRightM → no guessed heading, no guessed kerb.
+    expect(busStopSheltersOf({ meta: { scenario: { busBayY: { fromY: 1, toY: 2 } } } })).toEqual([]);
+    // Straight-street only: a curve needs a heading this function cannot derive.
+    expect(
+      busStopSheltersOf({
+        meta: {
+          scenario: {
+            archetype: "roundabout",
+            lanesPerDirection: 1,
+            laneCenterRightM: 4.06,
+            busBayY: { fromY: 1, toY: 2 },
+          },
+        },
+      }),
+    ).toEqual([]);
   });
 });
