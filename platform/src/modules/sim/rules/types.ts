@@ -221,6 +221,27 @@ export interface SimTick {
    */
   edgeId?: string | null;
   /**
+   * Metres of authored world left in front of the car — the distance to the
+   * rectangle past which there is no ground, no props and no road
+   * (`runtime/district.worldEdgeClearanceM`; negative outside it).
+   *
+   * WHY A TICK FIELD AND NOT A LOOKUP. The measure was shipped, gated by its
+   * own test, and then read by NOTHING: on 2026-08-24 `districtWorldEdge` and
+   * `worldEdgeClearanceM` had zero non-test consumers anywhere in the tree, and
+   * its own docblock said so — «it draws nothing and it ends nothing». Meanwhile
+   * the census inside that block records the defect it exists to answer: a
+   * learner reaches the end of the authored world 60–78 m past the last road on
+   * EVERY map in the product. A number nobody can read is not a repair, so it
+   * travels with the tick, beside laneOffsetM, where the surfaces that must act
+   * on it already look.
+   *
+   * OPTIONAL, and nothing grades on it. No rule reads this field; the HUD does.
+   * A tick from a source with no district (replays, fixtures, the dev rigs)
+   * simply omits it, and every consumer must treat absent as "unknown", never
+   * as "outside".
+   */
+  worldEdgeClearanceM?: number;
+  /**
    * Mandatory direction glyph painted in the vehicle's OWN lane (М10 lane-
    * intent arrows — audit M-17). Authored world data (`meta.scenario
    * .laneArrows`, resolved by worldRuntime from the committed lane fix), never

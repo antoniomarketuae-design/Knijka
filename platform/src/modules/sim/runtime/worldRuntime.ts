@@ -28,7 +28,12 @@ import type {
   WorldRuntime,
 } from "../contracts";
 import type { SimTick, SimTickEvent } from "../rules/types";
-import { BG_URBAN_DEFAULT_KMH, parseDistrict, type District } from "./district";
+import {
+  BG_URBAN_DEFAULT_KMH,
+  parseDistrict,
+  worldEdgeClearanceM,
+  type District,
+} from "./district";
 import { Locator } from "./locator";
 import { DistrictIndex, makeEdgeHit, OFF_ROAD_DISTANCE_M } from "./spatial";
 import { bearingDeg, signedDeltaDeg } from "./geometry";
@@ -1964,6 +1969,11 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         position: { x: v.position.x, y: v.position.y },
         headingDeg: v.headingDeg,
         laneOffsetM: fix.laneOffsetM,
+        // The rim, measured every tick beside the lane fix — see the field's
+        // note in rules/types.ts for why it travels rather than being looked
+        // up. Four max() and one hypot() on numbers already in hand; the
+        // district is captured once at construction.
+        worldEdgeClearanceM: worldEdgeClearanceM(district, v.position.x, v.position.y),
         laneId: fix.laneId,
         laneCount: edgeRt ? edgeRt.lanesPerDir : 1,
         // C1: the segment laneId is numbered against — the reducer only

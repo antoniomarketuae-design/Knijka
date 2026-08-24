@@ -142,6 +142,7 @@ import {
   type ReverseStuckDirection,
   type StuckStartReason,
 } from "@/modules/sim/engine";
+import { worldEdgeWarning } from "@/modules/sim/runtime";
 import type {
   DrivelineRejection,
   DrivelineSnapshot,
@@ -2464,6 +2465,23 @@ export function LessonPlayShell({
   const sessionRef = useRef<LessonSessionState>(initialSession);
   const finalizedRef = useRef(false);
   const lastTickRef = useRef<SimTick | null>(null);
+  /**
+   * THE RIM — the latch and the card it raises.
+   *
+   * A learner reaches the end of the authored world 60–78 m past the last road
+   * on EVERY map in the product (the census in runtime/district.ts, measured
+   * over all 105 committed districts). Until 2026-08-24 nothing said so: the
+   * measure existed, was gated by its own test, and had no consumer anywhere —
+   * so a student who drove straight on simply arrived in a featureless void,
+   * with the lesson still asking for a turn that was now behind them.
+   *
+   * The latch starts ARMED and the trigger is edge-based with hysteresis
+   * (`worldEdgeWarning`): one card on the way out, and no second card until the
+   * student has demonstrably come back. A warning that repeats is a warning
+   * that gets ignored.
+   */
+  const worldEdgeArmedRef = useRef(true);
+  const [worldEdgeNear, setWorldEdgeNear] = useState(false);
   // A1: latest driveline snapshot from the scene (a few Hz) — ref-resident,
   // folded into the HUD snapshot by the regular poll below.
   const drivelineRef = useRef<DrivelineSnapshot | null>(null);
@@ -3233,6 +3251,15 @@ export function LessonPlayShell({
       // Dev drive rig: read-only, undefined everywhere but /dev/drive-rig.
       onDevTelemetry?.(tick, step);
 
+      // THE RIM. Absent on a tick from a source with no district (replays,
+      // fixtures, the dev rigs) — and absent means UNKNOWN, never "outside",
+      // so a tick that cannot say leaves the latch exactly where it was.
+      if (tick.worldEdgeClearanceM !== undefined) {
+        const rim = worldEdgeWarning(tick.worldEdgeClearanceM, worldEdgeArmedRef.current);
+        worldEdgeArmedRef.current = rim.armed;
+        if (rim.speak) setWorldEdgeNear(true);
+      }
+
       // THEO-3: the targeted wrong action fired — pause into the consequence
       // overlay (one-shot; the functional update keeps an already-open card).
       if (mistakeMoment !== undefined) {
@@ -3951,6 +3978,39 @@ export function LessonPlayShell({
               blocking: true,
               ackLabelBg: "Покажи",
               onAck: () => setConsequence({ moment: null }),
+            }
+          : null,
+
+        // 4b-rim. THE END OF THE AUTHORED WORLD, announced before it arrives.
+        //
+        // Measured over all 105 committed districts (runtime/district.ts): the
+        // learner reaches the rim 60–78 m past the last road on EVERY map, and
+        // nothing marked that line because until this card no module read the
+        // measure. tj-rhr-v1 is the cheapest case — its graded T-junction sits
+        // at (0, 0) and the box's maxY IS 0, so the junction is 60 m from the
+        // rim IN THE DIRECTION A STUDENT WHO DOES NOT TURN DRIVES.
+        //
+        // NOT BLOCKING, and that is the whole care of it. This fires while the
+        // car is moving; freezing the drive to say "you are near the edge"
+        // would be a worse thing than the edge. It is a line with a WHY behind
+        // one tap — THEO-4 — and the student dismisses it and drives on.
+        //
+        // It cannot fire on the taught route: WORLD_EDGE_WARN_M is 35 m against
+        // a 60 m minimum margin, so the car is at least 25 m beyond the last
+        // road on the tightest map in the product before this speaks.
+        worldEdgeNear && !ended
+          ? {
+              id: "world-edge",
+              kind: "hint" as const,
+              tone: "warn" as const,
+              lineBg: "Наближаваш края на учебната зона",
+              detailBg:
+                "Оттук нататък няма нито път, нито сграда — теренът просто свършва. " +
+                "Това не е част от упражнението и нищо отвъд ръба не се оценява. " +
+                "Върни се към синята линия и продължи по маршрута на урока.",
+              blocking: false,
+              ackLabelBg: "Разбрах",
+              onAck: () => setWorldEdgeNear(false),
             }
           : null,
 

@@ -471,6 +471,49 @@ export function worldEdgeClearanceM(district: District, x: number, y: number): n
 }
 
 /**
+ * HOW CLOSE TO THE RIM IS CLOSE ENOUGH TO SAY SOMETHING — and the two numbers
+ * are chosen from the census in the block above, not from taste.
+ *
+ * That census measured all 105 committed districts: 64 declare a box that IS
+ * the road network's bounding box, so the whole margin is TERRAIN_MARGIN_M
+ * (60.000 m) of authored-but-roadless ground; the other 41 run 66.000–78.125 m.
+ * A clearance of 35 m therefore means the car is at least 25 m BEYOND the last
+ * road on the tightest map in the product, and further on every other one. It
+ * cannot fire on a student who is still on the taught route, which matters more
+ * than firing early: this programme's standing crime is the false alarm.
+ *
+ * RE-ARM IS HIGHER THAN WARN, deliberately. A single threshold on a car
+ * wandering along the rim re-fires every time the number crosses it, and a
+ * warning that repeats is a warning that gets ignored. 50 m is far enough back
+ * that the student has demonstrably returned toward the world, not merely
+ * jittered.
+ */
+export const WORLD_EDGE_WARN_M = 35;
+export const WORLD_EDGE_REARM_M = 50;
+
+/**
+ * Edge-triggered: has the car just entered the rim band?
+ *
+ * `armed` is the caller's latch — true when a warning is available to fire.
+ * Returns the NEXT latch state and whether to speak now, so the caller keeps no
+ * rule of its own and two consumers cannot drift apart.
+ *
+ * NaN IS NEVER A WARNING, the same ruling the touch-hint and controls-legend
+ * lifetimes carry: a clearance that cannot be read is not evidence the student
+ * has left the world, and an unreadable number must not be able to put a card
+ * on the glass. It leaves the latch exactly as it found it.
+ */
+export function worldEdgeWarning(
+  clearanceM: number,
+  armed: boolean,
+): { armed: boolean; speak: boolean } {
+  if (!Number.isFinite(clearanceM)) return { armed, speak: false };
+  if (armed && clearanceM <= WORLD_EDGE_WARN_M) return { armed: false, speak: true };
+  if (!armed && clearanceM >= WORLD_EDGE_REARM_M) return { armed: true, speak: false };
+  return { armed, speak: false };
+}
+
+/**
  * Structural validation of a parsed district JSON. Cheap by design — the build
  * pipeline (tools/osm/build.mjs) already self-validates deeply; this guards
  * against loading the wrong file, not against a corrupt build.

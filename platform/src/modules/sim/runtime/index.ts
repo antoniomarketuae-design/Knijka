@@ -50,6 +50,16 @@ export {
 export {
   parseDistrict,
   BG_URBAN_DEFAULT_KMH,
+  // THE RIM, and it is exported here because it was NOT before. On 2026-08-24
+  // these three had no consumer anywhere in the tree except their own test —
+  // shipped, gated, and unreachable, which is how a measured repair reaches no
+  // student. The barrel is the door; a module boundary this product enforces
+  // (docs/architecture/05) makes an unexported symbol invisible by design.
+  districtWorldEdge,
+  worldEdgeClearanceM,
+  worldEdgeWarning,
+  WORLD_EDGE_WARN_M,
+  WORLD_EDGE_REARM_M,
   type District,
   type DistrictBounds,
   type DistrictCrossing,
