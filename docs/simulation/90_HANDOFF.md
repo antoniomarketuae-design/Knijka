@@ -447,3 +447,82 @@ value read only by its own test), and the **16 findings (12 critical) blaming
   quiz beat.
 - **Still not done, flagged three times: rotate the Poyo API key and the `id_ed25519_flokinet` SSH
   key.** Both were exposed in chat.
+
+---
+
+## 10. 2026-08-25 — THE REPAIR WAVE, AND WHY NONE OF IT IS COMMITTED YET
+
+### 10.1 State
+
+```
+open list : 523        criticals : 168        (from 563 / 182 at the start of round 10)
+```
+
+Forty findings retired in round 10, every one having survived an adversarial verifier. Five more
+are offered by the poster and are **deliberately not applied**: all five come from lanes whose
+verifiers died when the account hit its monthly spend limit, so not one has been attacked.
+
+### 10.2 Twelve repair patches are held in `.audit-frames/patches/`, NOT integrated
+
+| lane | files | verified? |
+|---|---|---|
+| hud-briefing-numbering | 5 | yes |
+| lesson-play-shell-w10 | 8 | yes |
+| mirror-lane-corridor | 3 | yes |
+| round10-mixed | 7 | yes |
+| w11-conditions-traces | 42 | yes |
+| wf_…-9 / -10 / -11 | 17 / 12 / 3 | yes |
+| wf_…-2 / -6 | 11 / 19 | **NO — verifier died on the spend limit** |
+
+**Nothing was integrated, and the reason is the verifiers, not the limit.** They overturned a
+large share of the FIXED claims, and two of the overturns are the pattern this programme keeps
+paying for:
+
+- `sc-hz-accident-scene:b8ca9ed6` — the lane authored three commendation explanations. **A
+  commendation's `explanationBg` has no renderer anywhere in the product**: `lessons/engine.ts`
+  `toHudEvents` drops it, `HudToasts`, `SessionEndScreen` and `debrief` print the title only. The
+  sentences reach nobody. FIXED → PARTIAL.
+- lane r1 — `itemEchoesLine` has **zero non-test call sites**; all six references in
+  `LessonPlayShell.tsx` are comments and it is not in the `hud/index.ts` barrel. It cannot regress
+  because it guards nothing shipped.
+- lane r1, the verifier's own mutation — deleting `relative isolate` from the controls-help panel
+  leaves **24 passed, nothing red**, while the shade then paints an 80%-alpha band down the whole
+  left rail. The case the lane was proudest of guards a token that changes nothing.
+
+### 10.3 The one patch that looked ready, and why it is not
+
+`mirror-lane-corridor` earned the only unqualified endorsement in the wave — *"no row verdict
+overturned … its numbers reproduced everywhere I re-derived them, which is not the norm in this
+corpus"*, three files, no grading path, clean line endings. Its verifier still found two blockers:
+
+1. **The ceiling clause is UNGATED.** Reverting only the `topCss` argument inside the `max-height`
+   call — while leaving the `top:` line — keeps **all 1,165 tests green** and puts the card
+   **65.2 px into the thumb control band** on the founder's own handset. The scan reads `top:`
+   declarations only. One assertion on the argument list closes it.
+2. **It introduces a NEW defect.** Nothing clipped on any profile before the patch (caps
+   160.99 / 146.80 / 138.20 against a 124.5 px card); after it, 0 / 4.3 / **20.9 px** are clipped —
+   and the gate PINS that (`toBeLessThan(21)`) instead of forbidding it. What is lost on 780×340 is
+   the tail of «Спряла кола: пусни палеца и натисни пак надолу — минава на заден ход.» — the
+   reverse-gear sentence this very file records as having been rewritten *because the old wording
+   made students select R wrongly*.
+
+**A repair that trades a layout overlap for deleted teaching text is not a repair.** Fix (1) and
+(2) before this lands.
+
+### 10.4 Two audit-tool defects fixed today
+
+- **PARTIAL was in the judges' brief before it was in the tools** (`151bd19` → corrected). 184
+  well-formed verdicts were rejected as malformed and counted as UNJUDGED — "nobody looked".
+- **A verifier's correction could be resurrected by a re-run judge** (`d4fd66a`). The poster
+  decided by file order; a resumed workflow re-ran judges whose fresh lines landed AFTER that
+  round's verifier corrections, reviving 6 closures the verifiers had killed. Precedence is now
+  *later round wins; within a round, verify wins.*
+
+### 10.5 What to do next, in order
+
+1. **Raise the spend limit** — every agent lane is blocked on it.
+2. Re-run verifiers for lanes `wf_…-2` and `wf_…-6`; nothing from them may be integrated first.
+3. Fix `mirror-lane-corridor` V1 and V2, then integrate it — it is the closest to ready.
+4. Integrate the rest per-row, honouring each verifier's overturns. **The FIXED column in a lane
+   report is a claim; the VERIFIER section is the record.**
+5. Only then re-run `wave-c-post.mjs --apply`, and only after the verify phase has finished.
