@@ -155,11 +155,16 @@ const evidenced = (r) => Boolean(resolveFrame(r.evidenceFrame) && r.evidenceQuot
 const verdictOf = (r) => {
   let v = String(r.verdict || "").toUpperCase();
   if ((v === "CLOSED" || v === "REFUTED") && !evidenced(r)) v = "UNJUDGED";
-  if (!["CLOSED", "STILL", "REFUTED", "UNJUDGED"].includes(v)) v = "UNJUDGED";
+  // PARTIAL — some clauses of a multi-clause finding are demonstrably gone and
+  // some are not. It is RECOGNISED so it is not silently rebadged UNJUDGED (the
+  // bug this line had on 2026-08-24, when the verdict reached the judges brief a
+  // round before it reached the tools), and it RETIRES NOTHING: only CLOSED and
+  // REFUTED are collected below, and both still need a frame and a quote.
+  if (!["CLOSED", "STILL", "PARTIAL", "REFUTED", "UNJUDGED"].includes(v)) v = "UNJUDGED";
   return v;
 };
 
-const tally = { CLOSED: 0, STILL: 0, REFUTED: 0, UNJUDGED: 0 };
+const tally = { CLOSED: 0, STILL: 0, PARTIAL: 0, REFUTED: 0, UNJUDGED: 0 };
 const retire = [];
 const stillOpen = [];
 for (const j of broken) {
@@ -239,6 +244,7 @@ console.log(
 console.log("");
 console.log("  CLOSED   : " + tally.CLOSED);
 console.log("  REFUTED  : " + tally.REFUTED);
+console.log("  PARTIAL  : " + tally.PARTIAL + "   (some clauses gone, some not — retires nothing)");
 console.log("  STILL    : " + tally.STILL);
 console.log("  UNJUDGED : " + tally.UNJUDGED);
 if (downgraded.length) {
@@ -356,6 +362,7 @@ if (fs.existsSync(LEDGER)) {
     "|---|---|",
     "| CLOSED (symptom gone, frame cited) | " + tally.CLOSED + " |",
     "| REFUTED (finding was never true) | " + tally.REFUTED + " |",
+    "| PARTIAL (some clauses gone, some not) | " + tally.PARTIAL + " |",
     "| STILL (symptom reproduces) | " + tally.STILL + " |",
     "| UNJUDGED (re-drive did not exercise it) | " + tally.UNJUDGED + " |",
     "",

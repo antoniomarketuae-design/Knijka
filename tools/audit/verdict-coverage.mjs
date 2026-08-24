@@ -77,7 +77,22 @@ if (fs.existsSync(VERDICTS)) {
   });
 }
 
-const VALID = ["CLOSED", "STILL", "REFUTED", "UNJUDGED"];
+/**
+ * PARTIAL joined the vocabulary on 2026-08-24, and it was added to the JUDGES
+ * BRIEF a round before it was added HERE — so 171 well-formed verdicts were
+ * rejected as malformed and the findings they described counted as UNJUDGED,
+ * i.e. as though nobody had looked. A verdict the judges are asked for and the
+ * tools do not know is worse than no verdict: it fails in the reassuring
+ * direction, which is the direction every instrument bug in this audit has
+ * failed in.
+ *
+ * It exists because forcing a multi-clause finding into CLOSED-or-STILL
+ * produced seven wrong "fixed" stamps in a sister round — in six of them the
+ * disqualifying caveat was written in the judge own notes field while the
+ * verdict field said closed. PARTIAL retires NOTHING, exactly like STILL. It
+ * is here so real movement can be seen without being counted as a closure.
+ */
+const VALID = ["CLOSED", "STILL", "PARTIAL", "REFUTED", "UNJUDGED"];
 const seen = new Map();
 const problems = [];
 
