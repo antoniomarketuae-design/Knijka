@@ -205,6 +205,19 @@ function tickSpread(halfWidthPx: number, halfGapPct: number | null): string {
 export interface TraceTimelineProps {
   trace: ScenarioTrace;
   clockRef: React.RefObject<TraceClock>;
+  /**
+   * The student is driving, so the demonstration has stood down and MUST NOT
+   * caption. Pausing its clock is not enough on its own: `activeAnnotationIndex`
+   * only clears a caption as the playhead moves past it, so a clock stopped
+   * inside that window pins its last sentence on the glass for the rest of the
+   * lesson. That is the sc-hz-breakdown-pulloff 0:26/0:26 frame — «Спряхме
+   * плътно вдясно…» over a car doing 6 км/ч in the running lane.
+   *
+   * The transport itself stays exactly where it is: the student may still scrub
+   * and replay the demonstration deliberately. What stops is the deck TALKING
+   * over their drive unasked.
+   */
+  standDown?: boolean;
   /** Deck label, e.g. „Демонстрация — сянка" (default per trace kind). */
   titleBg?: string;
   /** Compact deck (~40 % smaller controls) — founder ruling 2026-07-17: the
@@ -259,6 +272,7 @@ export function TraceTimeline({
   compact = false,
   touch = false,
   leading = null,
+  standDown = false,
 }: TraceTimelineProps) {
   const duration = Math.max(trace.meta.durationSec, 0.001);
   // Size grammar: one place per control class, so compact stays consistent.
@@ -299,7 +313,11 @@ export function TraceTimeline({
   }, [clockRef]);
 
   const activeIdx = activeAnnotationIndex(annotations, snap.t);
-  const active = activeIdx >= 0 ? annotations[activeIdx] : null;
+  // `standDown` wins over the window: see the prop's note. A paused playhead
+  // inside `windowSec` never clears on its own, so this is the only thing
+  // between the student and a first-person sentence about somebody else's
+  // drive printed over their own.
+  const active = !standDown && activeIdx >= 0 ? annotations[activeIdx] : null;
 
   const seek = (tSec: number) => {
     const clock = clockRef.current;

@@ -86,7 +86,18 @@ describe("§1 · the ⚙ sheet and the demonstration deck are one surface", () =
     expect(SCENE_CODE).toContain("clock.playing = false");
     // The CAPTURED clock, not `clockRef.current` re-read at teardown: the clock
     // this effect paused is the one it must un-pause.
-    expect(SCENE_CODE).toContain("if (wasPlaying) clock.playing = true");
+    //
+    // AND IT MAY NOT RESURRECT A DEMONSTRATION THAT HAS STOOD DOWN — 2026-08-24.
+    // The deck now stops itself the moment the student starts driving
+    // (`demoDeckLifetime.demoDeckStandsDown`, the third use of the pattern
+    // `touchHintStandsDown` and `controlsLegendStandsDown` already share). With
+    // `wasPlaying` alone, a student who opened the ⚙ sheet, pulled away, and
+    // closed it again would have the replay restarted BEHIND THEIR MOVING CAR:
+    // `wasPlaying` was captured true before they set off. So the give-back is
+    // guarded on the latch as well, and this pin says so.
+    expect(SCENE_CODE).toContain(
+      "if (wasPlaying && !stoodDownRef.current) clock.playing = true",
+    );
   });
 
   it("does not close the deck — the way back must be the same frame", () => {

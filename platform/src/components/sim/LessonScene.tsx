@@ -215,6 +215,7 @@ import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings
 // The mouse's pedals (founder 2026-07-30) — see the mount below.
 import { MousePedals } from "./lesson-ui/MousePedals";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
+import { DEMO_DECK_POLL_MS, demoDeckStandsDown } from "./lesson-ui/demoDeckLifetime";
 import { worldNameBg } from "@/modules/sim/scene/worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
 
@@ -2252,12 +2253,18 @@ export function ReadyScene({
           trace={ghostDemo.trace}
           clockRef={ghostClockRef}
           suppressed={touchSheetOpen}
+          sampleRef={sampleRef}
         />
       ) : null}
 
       {/* S1 L1 aid: the same playback deck for the scenario's shadow demo. */}
       {shadowTrace && aids?.shadowCar ? (
-        <DemoDeck trace={shadowTrace} clockRef={aidClockRef} suppressed={touchSheetOpen} />
+        <DemoDeck
+          trace={shadowTrace}
+          clockRef={aidClockRef}
+          suppressed={touchSheetOpen}
+          sampleRef={sampleRef}
+        />
       ) : null}
 
       {/* S1 followHints chip — „you are off the demonstrated line".
@@ -2793,9 +2800,17 @@ function DemoDeck({
   trace,
   clockRef,
   suppressed = false,
+  sampleRef,
 }: {
   trace: ScenarioTrace;
   clockRef: React.RefObject<TraceClock>;
+  /**
+   * The live car, read to decide when this demonstration stands down. Optional
+   * so the dev clip routes can mount a deck with no vehicle behind it; absent,
+   * the deck keeps its pre-2026-08-24 behaviour of narrating forever, which is
+   * the failure that costs a caption rather than a lesson.
+   */
+  sampleRef?: React.RefObject<VehicleSample>;
   /**
    * The ⚙ driveline sheet is open, so `PlayAreaStyles` has this deck
    * `display: none` (the two stand on the same floor — see `touchSheetOpen` in
@@ -2815,6 +2830,13 @@ function DemoDeck({
       !(window.innerHeight <= 560 || window.innerWidth <= 640),
   );
   const compact = useCompactStage();
+  /**
+   * Declared before the two effects that both read it: the stand-down latch is
+   * the senior fact about this deck, and the suppression effect below has to be
+   * able to ask whether the demonstration is finished with.
+   */
+  const stoodDownRef = useRef(false);
+  const [stoodDown, setStoodDown] = useState(false);
   // A DEMONSTRATION MAY NOT ADVANCE WHILE IT IS OFF SCREEN. `display: none`
   // hides a panel; it does not stop a replay. The pause is a ref write, not
   // state: nothing re-renders, and the transport picks it up on its own next
@@ -2836,10 +2858,40 @@ function DemoDeck({
     clock.playing = false;
     return () => {
       // Only give back what was taken: a demonstration the student had already
-      // paused stays paused.
-      if (wasPlaying) clock.playing = true;
+      // paused stays paused — AND one that stood down while the sheet was open
+      // stays down. Without the second half, a student who opens the ⚙ sheet,
+      // pulls away, and closes it again restarts a replay behind their own
+      // moving car: `wasPlaying` was captured true before they set off.
+      if (wasPlaying && !stoodDownRef.current) clock.playing = true;
     };
   }, [suppressed, clockRef]);
+  /**
+   * THE DEMONSTRATION STANDS DOWN WHEN THE STUDENT STARTS DRIVING.
+   *
+   * A ONE-WAY LATCH, for the reason spelled out at the controls legend: written
+   * as a condition ("the car is moving") it would come back every time the
+   * student stopped at a junction, and a demonstration that resumes narrating
+   * mid-lesson is worse than one that never stopped. Once this trips, the poll
+   * is gone for this lesson and the transport is the only authority left — the
+   * student can still replay the demonstration deliberately.
+   *
+   * It is a ref, not state, so latching costs no render; the paired `useState`
+   * exists only because the CAPTION has to disappear, and that is a render.
+   */
+  useEffect(() => {
+    if (!sampleRef || stoodDownRef.current) return;
+    const id = window.setInterval(() => {
+      if (!demoDeckStandsDown(sampleRef.current.speedKmh)) return;
+      stoodDownRef.current = true;
+      setStoodDown(true);
+      // Stop the replay as well as its voice. The caption is what the corpus
+      // photographed, but a demonstration still running behind a silent deck
+      // would put the shadow car through a junction the student is negotiating.
+      const clock = clockRef.current;
+      if (clock) clock.playing = false;
+    }, DEMO_DECK_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [sampleRef, clockRef]);
   /**
    * DOC 91 · C2 — THE BUTTON THAT OPENS AND CLOSES THE DEMONSTRATION.
    *
@@ -2920,6 +2972,7 @@ function DemoDeck({
           compact
           touch={compact}
           leading={compact ? toggle : null}
+          standDown={stoodDown}
         />
       ) : null}
     </div>

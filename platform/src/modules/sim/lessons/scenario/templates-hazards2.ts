@@ -1050,7 +1050,27 @@ export const SC_HZ_BREAKDOWN_PULLOFF: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Магистрала, две ленти за движение и аварийна лента вдясно. Потегли и се установи в дясната лента за движение — около 90–95 км/ч." },
-    { n: 2, textBg: "По време на движение на таблото светва червената лампа за налягане на маслото — двигателят отказва. Не бързай да реагираш рязко: имаш време за план." },
+    // sc-hz-breakdown-pulloff:f71c775a — CRITICAL. THE LESSON'S OWN CAUSE AND
+    // ITS SYMPTOM DID NOT MATCH. This step promised the red OIL PRESSURE lamp
+    // and «двигателят отказва»; what the student actually sees is
+    // «Контролна лампа: температура! Спри спокойно вдясно» (LessonScene.tsx:2292).
+    //
+    // FIXED IN THIS DIRECTION ON PURPOSE. The other direction — stage the oil
+    // lamp instead — is not one line: `TelltaleStimulusSpec.lamp` is the
+    // single-value union "temperature" (contracts.ts:1203), `director.telltaleLit`
+    // is a BOOLEAN, and `cabinTelltaleRail.ts` maps that one boolean into
+    // `tempWarnOn`. Widening it to a lamp id runs through contracts, the runner,
+    // LessonScene, the cabin rail and the dev capture scene — five files on the
+    // render path — for one lesson. THE CLUSTER CAN ALREADY DRAW IT
+    // (`LAMP_KEYS` in cockpit/clusterLayout.ts:303 lists "oil"), so that fix is
+    // cheap in pixels and expensive in plumbing; it is recorded, not skipped.
+    //
+    // The duty is unchanged either way, which is why the copy may move: doc 72
+    // §3 VP-06 and the ЗДвП чл. 20 doctrine quoted at the spec are «red = спри
+    // безопасно сега», not «oil specifically». What was NOT defensible was
+    // naming a lamp the student will never see, on the one lesson whose whole
+    // subject is reacting to the lamp.
+    { n: 2, textBg: "По време на движение на таблото светва червената контролна лампа за температура на двигателя. Червено значи: спри безопасно сега. Не бързай да реагираш рязко — имаш време за план." },
     { n: 3, textBg: "Провери огледалото, пусни десен мигач и започни плавно да намаляваш още в лентата за движение — предвидимо за движещите се зад теб." },
     { n: 4, textBg: "Прекоси плавно в аварийната лента в едно движение и спри максимално вдясно. Аварийната лента е само за принудително спиране — по нея не се кара до изхода." },
     { n: 5, textBg: "Спри плътно вдясно и угаси двигателя. Оттук нататък протоколът е пеша: аварийни светлини, жилетка ПРЕДИ да слезеш, триъгълник на 100 м зад колата, изчакване зад мантинелата и обаждане на 112." },
