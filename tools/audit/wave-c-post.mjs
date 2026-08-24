@@ -99,12 +99,54 @@ if (fs.existsSync(VERDICTS)) {
   }
 }
 
-// A verifier's correction supersedes the judge's original for the same id. Order
-// matters: originals first, corrections second, so a correction always wins even
-// if it was appended before another judge's original for a different finding.
+// WHICH LINE IS THE FINAL WORD ON A FINDING — and this was WRONG until 2026-08-25.
+//
+// It used to be two passes: uncorrected first, corrected second, last-write-wins.
+// That reads as "a verifier overrules the judge", which is the intent — but every
+// round tags BOTH its judges and its verifiers through  ("round10" and
+// "verify"), so they landed in the SAME pass and plain file order decided.
+//
+// MEASURED THE DAY IT BIT: a workflow was resumed after one lane died, some judges
+// re-ran, and their fresh lines were appended AFTER that round's verifier
+// corrections. 27 corrections were overwritten and several went the wrong way —
+//     sc-crossing-dart:0c2c6736   verify=PARTIAL  -> round10=CLOSED
+//     sc-park-night:74b62574      verify=UNJUDGED -> round10=CLOSED
+// i.e. closures a verifier had already killed came back to life and would have been
+// retired. That is the reassuring direction, which is where every instrument bug in
+// this audit has failed.
+//
+// THE ORDER THAT IS ACTUALLY MEANT, and it needs both halves:
+//   1. a LATER ROUND outranks an earlier one — round 10 looked at fresh frames, so
+//      it must be able to overturn a verifier from round 9;
+//   2. WITHIN one round, a verify line outranks the judge — the verifier is the
+//      appeal court, and it does not matter which line was appended last.
+//
+// The verify tag carries no round of its own (one tag, 331 lines, every round
+// since the first), so a line's round is the round whose block it falls in:
+// rounds are recognised by where each non-verify tag FIRST appears, in file order.
+const roundStart = [];
+rows.forEach((r, i) => {
+  const tag = r.correctedBy || "";
+  if (!tag || tag === "verify") return;
+  if (!roundStart.some((x) => x.tag === tag)) roundStart.push({ tag, at: i });
+});
+const roundOf = (i) => {
+  let n = 0;
+  for (let k = 0; k < roundStart.length; k += 1) if (i >= roundStart[k].at) n = k + 1;
+  return n;
+};
+const rank = (r, i) => roundOf(i) * 2 + (r.correctedBy === "verify" ? 1 : 0);
 const final = new Map();
-for (const r of rows) if (r.findingId && !r.correctedBy) final.set(r.findingId, r);
-for (const r of rows) if (r.findingId && r.correctedBy) final.set(r.findingId, r);
+const finalRank = new Map();
+rows.forEach((r, i) => {
+  if (!r.findingId) return;
+  const s = rank(r, i);
+  // >= keeps last-wins for genuine ties (a second verifier line on one finding).
+  if (!final.has(r.findingId) || s >= finalRank.get(r.findingId)) {
+    final.set(r.findingId, r);
+    finalRank.set(r.findingId, s);
+  }
+});
 
 const noId = rows.filter((r) => !r.findingId).length;
 const unknown = [...final.keys()].filter((k) => !byId.has(k));
