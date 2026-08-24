@@ -334,3 +334,116 @@ Two smaller things from the same hour, both cheap and both worth knowing:
   dirty tree. When an uncommitted doc blocks a certifying run, **park the file
   outside the repo** — do not commit it, or the drives attest a different build
   than the ones they must merge with.
+
+---
+
+## 9. 2026-08-24 — THE DAY THE HYPOTHESIS DIED, AND WHAT REPLACED IT
+
+### 9.1 The morning: 376 drives nearly wasted on a dead database
+
+Four drivers returned twelve drives with `verdict=(none — no verdict surface in the DOM)`. Nothing
+was wrong with the product. Every frame was **byte-identical at 275,851 bytes**, and `01-arrival.png`
+was not a cockpit — it was the error boundary, then the **paywall**.
+
+Four faults, stacked, none in the product:
+
+1. The `prisma dev` `knijka` server was dead (killed with the dev server by the memory pressure of a
+   13-worktree agent wave on a 16 GB box). `/simulator` → 500, `/api/health` → `db.ok:false`.
+2. Restarting it **moves the port** (51214 → 51218). `platform/.env` is gitignored, so repointing it
+   moves no worktree hash and does not break certification.
+3. The dev DB's schema was **21 days behind**: `User.sessionEpoch` and the whole `LoginLockout` table
+   missing → every `db.user.findUnique()` threw → `next-auth error=Configuration`. Doc 91 prescribed
+   `prisma db push` on 2026-08-14 and nobody ran it.
+4. The founder password no longer matched. `seed-founder.mjs` sets a password **only on create**, so
+   the seed can never repair a drifted store.
+
+**What hid it:** `tools/mobile/lib/auth.mjs` caches a session and validates **identity** but not
+**authority**. Admin is what bypasses the simulator entitlement, so a cookie minted while the DB was
+broken sailed past sign-in onto the 21,99 EUR page and the harness photographed marketing copy for
+210 s per drive at `exit=0`.
+
+> **RULE.** A no-verdict rate above a few percent is an INFRASTRUCTURE alarm, not a finding. Open
+> `01-arrival.png` and confirm it is a cockpit before judging one row. `exit=0` means the harness
+> finished; it does not mean the car existed.
+
+The restart checklist is in `~/.claude/projects/E--AI-driver/memory/audit-drive-infra-checklist.md`.
+
+### 9.2 The hypothesis, and why it failed
+
+The morning's claim was that the open list was mostly repaired already and merely awaited a re-drive
+— 525 of 563 findings had evidence older than the last commit touching the file they blame.
+
+**That statistic was a bad proxy and the claim was wrong.** "The file has been edited since the
+frame" was never the same as "this finding was fixed", and the first version of the measurement even
+dated findings by their SWEEP DIRECTORY mtime — which `wave-c-merge.mjs` resets, because it MOVES
+frame directories.
+
+A deterministic stratified sample of **153 of 563 findings (27%, all 118 files)** was read against
+source by seven agents, then attacked from BOTH directions:
+
+| | sample | ≈ of 563 |
+|---|---|---|
+| already repaired (survived attack) | 17 · 11% | ~63 |
+| **genuinely still broken (survived challenge)** | **61 · 40%** | **~224** |
+| never was a defect / instrument artifact | 21 · 14% | ~77 |
+| only a frame can settle it | 54 · 35% | ~199 |
+
+**Why both passes were needed.** The first verifier was told to doubt the good news and moved 27
+verdicts — **every one downward, none up**. A number from a test that can only move one way is not a
+measurement, so a second pass was run with the stance inverted. It refuted 21 of 87.
+
+### 9.3 The real blocker: repairs that ship a measurement and wire it to nothing
+
+Verified by hand — each exported, gated by its own test, and with **zero non-test consumers**
+(a mention inside a comment is not a use):
+
+- `runtime/district.ts` **`districtWorldEdge`** / **`worldEdgeClearanceM`** — the measure proving a
+  learner reaches the end of the authored world **60–78 m past the last road on EVERY map**. Its own
+  block said «it draws nothing and it ends nothing».
+- `lesson-ui/touchHintLifetime.ts` **`touchHintShouldHide`**.
+- `hud/overlayQueue.ts` **`whyIsReachable`** — named twice in `notifyColumn.ts`, both times in prose.
+  Several open truncation findings are measured by it and acted on by nothing.
+
+Same shape as round 7 (mutation-proved a change in a module nothing imports), round 8 (changed a
+value read only by its own test), and the **16 findings (12 critical) blaming
+`devrig/driveScript.ts`, which 404s in production** (`src/app/dev/drive-rig/page.tsx:31`).
+
+> **A repair is not finished when it is measured and gated. It is finished when a path from
+> `/simulator` reaches it.** The ADDRESS RULE applies to the repair, not only to the routing.
+
+### 9.4 What landed
+
+- `ae4a499` — eight demo captions that spoiled the hazard, reworded at source, 36 traces re-recorded.
+- `aeef1b3` — the demonstration stands down when the student drives (it was narrating «Спряхме
+  плътно вдясно…» at 6 км/ч in the running lane); and a lesson stops promising an oil-pressure lamp
+  when the product shows temperature.
+- `9b2ffe1` — the world edge is announced before the student drives into it, and the measure that
+  knew finally has a reader. Its gate checks **that the measure is still wired** and took three
+  mutation-caught iterations to become honest.
+
+**376 drives**, all `exit=0`, **zero tree movement**, 272 ended naturally, 2 no-verdict (0.5%).
+
+### 9.5 Traps that cost hours, so they are written down
+
+- **The worktree checks out CRLF; the main tree is LF.** A worktree patch carries whole-file ending
+  churn, and this repo has SOURCE-PINNED tests comparing LF snippets — they go red and **the failures
+  read as logic errors**. Normalise after every `git apply`.
+- **`\b` inside a template literal is the BACKSPACE escape.** A dead-code gate written that way
+  matched nothing and reported five live consumers as none.
+- **A no-verdict drive is not automatically a defect.** `sc-follow-tailgater/mobile-right` logged
+  «the session did not end on its own» and «no control on this screen ends the session»; the frame
+  4.6 s later shows «Сесията завърши — първо се самооцени» with a РЕЗУЛТАТ chip. The ladder gave up
+  just before the end line rendered. **The frame outranks the log.**
+
+### 9.6 Open for the founder
+
+- **`sc-vp-stall`** teaches clutch technique to a car with no clutch: `transmissionModeFor` returns
+  `"manual"` only for `"advanced"`, and `DEFAULT_DIFFICULTY` is `"normal"`. Build a lesson-level
+  transmission channel (multi-file, graded path) or rewrite the briefing for an automatic and lose a
+  Category B subject. **4 findings, 3 critical, one lesson. His call.**
+- **The ending gate on the world edge.** It would close the "session cannot end" family, but it
+  grades, and `terminalDepartureZone` was disarmed today for producing a false refusal.
+- Two content-signature rows need his signature: `ptp-i-parva-pomosht` supply, `l-accidents-first-aid`
+  quiz beat.
+- **Still not done, flagged three times: rotate the Poyo API key and the `id_ed25519_flokinet` SSH
+  key.** Both were exposed in chat.
