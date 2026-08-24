@@ -24,7 +24,7 @@
  * i.e. the ladder was non-monotonic — the rung ABOVE the shut one was open, off
  * the very rows that were said to leave it shut — and `ScenarioCatalog.tsx:226`
  * paints that shut rung „Отключва се с ≥ 2★ на предишното ниво" over a 3★ pass.
- * Worse than the copy: `actions.ts:154` runs `isScenarioLevelUnlocked` as the
+ * Worse than the copy: `actions.ts:272` runs `isScenarioLevelUnlocked` as the
  * SAVE gate, so re-driving that rung answers `LEVEL_LOCKED` and the finished
  * drive is discarded.
  *
@@ -104,7 +104,7 @@ describe("a rung the student has driven is never reported shut", () => {
   });
 
   it("the SAVE gate agrees, so a re-drive is no longer refused LEVEL_LOCKED", () => {
-    // actions.ts:154 → isScenarioLevelUnlocked → `{ ok: false, code:
+    // actions.ts:272 → isScenarioLevelUnlocked → `{ ok: false, code:
     // "LEVEL_LOCKED" }`, i.e. a completed drive thrown away on save.
     expect(isScenarioLevelUnlocked(SC_PARK_PERP_REV, 4, [row(4, 3)])).toBe(true);
     // …and an attempt with no stars at all is still the student's own drive.

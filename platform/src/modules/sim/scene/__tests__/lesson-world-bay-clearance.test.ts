@@ -36,6 +36,70 @@
  * The offender is not merely tight; it is twenty times closer than anything
  * else in the catalogue. That is what makes a floor defensible rather than
  * invented: it separates one lesson from a population that is nowhere near it.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * §2 — THE GROUND UNDER THE BAY, added 2026-08-24 because §1 CLOSED NOTHING.
+ *
+ * §1 shipped a distance and a quarantine and the finding stayed OPEN, which is
+ * the correct outcome for a measurement that measures the wrong property.
+ * „A wall is 1.5 m away" is a fact about the scenery. It does not say whether
+ * the student can carry out the order he is given, and that is the question the
+ * frame is asking: `04-t045s.png` is the windscreen of a car that never once
+ * left gear D on any lane of any platform, on a drill whose entire subject is
+ * reverse.
+ *
+ * SO THIS SECTION MEASURES THE ORDER INSTEAD: is the rect a student is told to
+ * park inside made of ground a car can be driven onto? It is built through the
+ * SHIPPED recipe — `buildLessonWorldCore` — and read off the meshes that recipe
+ * produces, not off the JSON, so it answers about the world the student is in.
+ *
+ * THE RESULT, over every scenario lesson with a graded bay (17), sampling each
+ * bay rect on a 5 × 3 lattice — 15 stations, corners included:
+ *
+ *     16 of 17 .............. 15/15 stations on the driven carriageway
+ *     sc-pk-driveway .......   9/15 on the carriageway, 6/15 on the RAISED
+ *                              SIDEWALK — the 12 cm kerb that `WorldColliders`
+ *                              mounts as a trimesh the wheels must climb
+ *
+ * The split is not marginal and it is not a sampling artefact: `PK_DRIVE_TARGET
+ * _BAY` is (8, 45) 2.7 × 5 at heading 90°, so its long axis runs EAST and its
+ * stations stand at x = 5.5 / 6.75 / 8 / 9.25 / 10.5. The carriageway's own
+ * built edge — `roadSurface`'s outermost vertex — is x = 8.125. The outer
+ * 2.375 m of a 5 m bay, 47.5% of the cell, is painted on the pavement.
+ *
+ * WHAT THAT DOES TO THE STUDENT, WHICH IS WHY IT IS THE ROOT AND §1 IS NOT.
+ * `sc-pkd-park` is a `parkInBay` with `centerTolM: 0.5`, so the car's centre
+ * must come to rest within 0.5 m of x = 8 — and a car is ~4.4 m long lying
+ * along that same east axis. At the most favourable pose inside tolerance the
+ * body still reaches x ≈ 10.2, i.e. roughly two metres of car, including an
+ * axle, has to be up over a kerb before the objective can tick. The manoeuvre
+ * the drill exists to teach is not merely hard on this map; it is graded
+ * against a rectangle that is half kerb, with a 15–25 m facade 1.5 m past its
+ * head (§1). „Задача 2" going unticked on all four lanes, and the windscreen
+ * being facade, are the same defect seen from two ends.
+ *
+ * THE PAINT IS THE OTHER HALF OF IT AND IT IS THIS MODULE'S OWN OUTPUT.
+ * `buildLessonWorldCore` pushes `lesson.parkingBay` into `paintBays` and
+ * `buildWorldGeometry` draws the white U into `markings`, which is co-planar
+ * with the ROAD surface. MEASURED on the built meshes: the U's vertices in the
+ * bay's y-band reach x = 10.63 at height 0.032 m, while the ground they stand
+ * over from x = 8.125 outward is the sidewalk, top at ROAD_Y + CURB_HEIGHT_M =
+ * 0.14 m. The outer 2.375 m of the graded cell is therefore painted about
+ * 0.11 m BELOW the pavement covering it: the cell the student can SEE is the
+ * 60% on asphalt, the cell he is MEASURED against is the whole rect. The L7
+ * „painted rect equals graded rect" law holds in the data and fails on the
+ * glass. Both numbers are asserted in the quarantine below, not just written
+ * here.
+ *
+ * NOT FIXABLE HERE, AND THE OWNERS ARE NAMED RATHER THAN IMPLIED. Moving the
+ * bay is `lessons/scenario/templates-pk.ts` (`PK_DRIVE_TARGET_BAY`, pinned
+ * value-for-value against `traces/scPkDriveway.ts PK_DRIVE_TARGET_BAY`, so both
+ * move together or neither does); moving the garage or opening a dropped kerb
+ * across the driveway mouth is `tools/maps/gen_pk_driveway.mjs` +
+ * `public/world/pk-drive-v1.json`. This section's job is to make either repair
+ * VERIFIABLE and to make the defect impossible to inherit silently: the
+ * quarantine below pins 9 and 6 by value and fails the day either number moves.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import fs from "node:fs";
@@ -43,6 +107,8 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { compileScenario, SCENARIO_TEMPLATES } from "../../lessons/scenario";
 import type { ScenarioLevel } from "../../lessons/scenario";
+import { buildLessonWorldCore } from "../lessonWorldRecipe";
+import type { MeshData } from "../../world";
 
 /**
  * Floor for the gap between a graded bay and any building footprint. Chosen
@@ -188,5 +254,268 @@ describe("graded parking bay vs authored buildings", () => {
     expect(row.buildingId).toBe("pkd-b-garage");
     expect(row.clearanceM).toBeCloseTo(QUARANTINE.clearanceM, 2);
     expect(row.clearanceM).toBeLessThan(BAY_BUILDING_CLEARANCE_FLOOR_M);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// §2 — THE GROUND UNDER THE BAY (see the header block).
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Stations across the bay rect, as fractions of its own length and width.
+ * Five × three = 15, corners included, so the lattice reaches the rect's
+ * extremes rather than sampling a comfortable interior — a centre-only probe
+ * would have called `sc-pk-driveway` clean.
+ */
+const LENGTH_STATIONS = [-0.5, -0.25, 0, 0.25, 0.5] as const;
+const WIDTH_STATIONS = [-0.5, 0, 0.5] as const;
+const BAY_STATIONS = LENGTH_STATIONS.length * WIDTH_STATIONS.length;
+
+/** Station poses of a bay rect, district space. Heading 0 = +y, and the length
+ *  axis is [sin h, cos h] — `markings`' own axes, so a 45° bay is sampled
+ *  along its diagonal exactly as it is painted. */
+function bayStations(b: Bay): Array<[number, number]> {
+  const h = (b.headingDeg * Math.PI) / 180;
+  const dx = Math.sin(h);
+  const dy = Math.cos(h);
+  const out: Array<[number, number]> = [];
+  for (const sl of LENGTH_STATIONS) {
+    for (const sw of WIDTH_STATIONS) {
+      out.push([
+        b.x + sl * b.lengthM * dx + sw * b.widthM * dy,
+        b.y + sl * b.lengthM * dy - sw * b.widthM * dx,
+      ]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Is the district-space point (px, py) covered by this built mesh?
+ *
+ * The meshes are WORLD space and the sim's world axes are (x, height, z) with
+ * district y = −z — the same convention `LessonScene` uses when it feeds the
+ * shadow trace and anchors traffic (`y: -anchorPose.z`, `armSignalPlan`s own
+ * comment: „district y = −world z"). Getting that sign wrong is the
+ * one way this whole section could be quietly nonsense, which is why the
+ * control test below drives the district's OWN spawn points through it: a
+ * flipped sign puts every spawn off the road and goes red immediately.
+ */
+function overMesh(mesh: MeshData, px: number, py: number): boolean {
+  const p = mesh.positions;
+  const ix = mesh.indices;
+  for (let t = 0; t + 2 < ix.length; t += 3) {
+    const a = ix[t] * 3;
+    const b = ix[t + 1] * 3;
+    const c = ix[t + 2] * 3;
+    const ax = p[a];
+    const ay = -p[a + 2];
+    const bx = p[b];
+    const by = -p[b + 2];
+    const cx = p[c];
+    const cy = -p[c + 2];
+    // Cheap triangle-bbox reject before the three half-plane tests.
+    if (px < Math.min(ax, bx, cx) || px > Math.max(ax, bx, cx)) continue;
+    if (py < Math.min(ay, by, cy) || py > Math.max(ay, by, cy)) continue;
+    const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by);
+    const d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy);
+    const d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+    const neg = d1 < 0 || d2 < 0 || d3 < 0;
+    const pos = d1 > 0 || d2 > 0 || d3 > 0;
+    if (!(neg && pos)) return true;
+  }
+  return false;
+}
+
+interface GroundRow {
+  templateId: string;
+  districtId: string;
+  /** Stations standing on the DRIVEN carriageway (road ribbon or junction fill). */
+  onCarriageway: number;
+  /** Stations standing on the raised sidewalk — the 12 cm kerb trimesh. */
+  onSidewalk: number;
+  /** Stations on neither: bare ground. */
+  elsewhere: number;
+  /** Outermost carriageway vertex of this district, m — the built kerb line. */
+  carriagewayEdgeM: number;
+  /** Farthest bay station from the road centre line, m. */
+  bayReachM: number;
+  /** Farthest PAINT vertex from the centre line inside the bay's own y-band,
+   *  m — how far out the white U is actually drawn. */
+  paintReachM: number;
+  /** Height that paint is drawn at, m (markings is co-planar with the road). */
+  paintTopM: number;
+  /** Every spawn point the district authors, and whether it is on asphalt. */
+  spawnsOnCarriageway: number;
+  spawnCount: number;
+  /** A point 1 km beyond the district bounds — must read OFF the carriageway. */
+  offMapReadsOn: boolean;
+}
+
+const GROUND: GroundRow[] = (() => {
+  const out: GroundRow[] = [];
+  for (const spec of SCENARIO_TEMPLATES) {
+    let lesson;
+    try {
+      lesson = compileScenario(spec, spec.levels[0].level as ScenarioLevel);
+    } catch {
+      continue;
+    }
+    const bay = lesson.parkingBay as Bay | undefined;
+    if (!bay) continue;
+    const districtId = lesson.world!.districtId;
+    const file = path.resolve(__dirname, `../../../../../public/world/${districtId}.json`);
+    if (!fs.existsSync(file)) continue;
+    const raw: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
+    // THROUGH THE SHIPPED RECIPE, not a re-listing of it: this is the same
+    // call `LessonScene` makes in its district-load effect, so the ground measured
+    // here is the ground rendered and collided in the drill.
+    const core = buildLessonWorldCore(lesson, raw);
+    const { roadSurface, junctionSurface, sidewalks } = core.geometry;
+    const onRoad = (x: number, y: number) =>
+      overMesh(roadSurface, x, y) || overMesh(junctionSurface, x, y);
+
+    let carriageway = 0;
+    let walk = 0;
+    let elsewhere = 0;
+    for (const [x, y] of bayStations(bay)) {
+      if (onRoad(x, y)) carriageway++;
+      else if (overMesh(sidewalks, x, y)) walk++;
+      else elsewhere++;
+    }
+
+    let edge = 0;
+    for (let i = 0; i < roadSurface.positions.length; i += 3) {
+      edge = Math.max(edge, Math.abs(roadSurface.positions[i]));
+    }
+    let reach = 0;
+    for (const [x] of bayStations(bay)) reach = Math.max(reach, Math.abs(x));
+
+    // How far out the WHITE U is actually drawn, read off the markings mesh
+    // inside the bay's own y-band, and at what height. `markings` is co-planar
+    // with the road, so paint standing past the kerb line is paint drawn under
+    // a pavement — a cell the student is graded on and cannot see.
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const [, y] of bayStations(bay)) {
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+    let paintReach = 0;
+    let paintTop = 0;
+    const mp = core.geometry.markings.positions;
+    for (let i = 0; i < mp.length; i += 3) {
+      const y = -mp[i + 2];
+      if (y < minY || y > maxY) continue;
+      if (Math.abs(mp[i]) > paintReach) paintReach = Math.abs(mp[i]);
+      paintTop = Math.max(paintTop, mp[i + 1]);
+    }
+
+    const b = (raw as { meta: { boundsLocalMeters: { maxX: number; maxY: number } } }).meta
+      .boundsLocalMeters;
+    out.push({
+      templateId: spec.id,
+      districtId,
+      onCarriageway: carriageway,
+      onSidewalk: walk,
+      elsewhere,
+      carriagewayEdgeM: edge,
+      bayReachM: reach,
+      paintReachM: paintReach,
+      paintTopM: paintTop,
+      spawnsOnCarriageway: core.spawnPoints.filter((s) => onRoad(s.x, s.y)).length,
+      spawnCount: core.spawnPoints.length,
+      offMapReadsOn: onRoad(b.maxX + 1000, b.maxY + 1000),
+    });
+  }
+  return out;
+})();
+
+/**
+ * THE ONE OFFENDER, quarantined by NAME and by VALUE, exactly as §1's is.
+ * 9 stations on the carriageway and 6 on the kerb, from a bay whose outer edge
+ * stands 2.375 m past the built carriageway edge. Whoever moves
+ * `PK_DRIVE_TARGET_BAY` (templates-pk.ts) or the street's cross-section
+ * (gen_pk_driveway.mjs) breaks this and deletes it — a repair that leaves this
+ * green did not reach the ground the student parks on.
+ */
+const GROUND_QUARANTINE = {
+  templateId: "sc-pk-driveway",
+  onCarriageway: 9,
+  onSidewalk: 6,
+  pastTheKerbM: 2.375,
+};
+
+describe("the graded bay stands on ground a car can be driven onto", () => {
+  it("the census is real, and the ground test discriminates", () => {
+    // THREE separate ways this section could be a tautology, all closed here,
+    // because every "0 defects" report in this project so far was an
+    // instrument bug rather than a clean product.
+    //
+    //  (a) an empty population passes every assertion below;
+    //  (b) an `overMesh` that always returns TRUE passes „15/15 on the
+    //      carriageway" for the whole catalogue — the off-map probe kills it;
+    //  (c) an `overMesh` that always returns FALSE (or a flipped z sign) would
+    //      make the healthy population read 0/15 — the spawn-point control
+    //      kills it, since every scenario spawn is authored on a carriageway
+    //      and validated as such by the generators' own post-checks.
+    expect(GROUND.length, "no scenario lesson has a graded bay").toBeGreaterThanOrEqual(15);
+    expect(GROUND.some((r) => r.templateId === GROUND_QUARANTINE.templateId)).toBe(true);
+
+    const offMap = GROUND.filter((r) => r.offMapReadsOn);
+    expect(offMap.map((r) => r.districtId), "a point 1 km off the map read as road").toEqual([]);
+
+    const strandedSpawns = GROUND.filter((r) => r.spawnsOnCarriageway !== r.spawnCount);
+    expect(
+      strandedSpawns.map((r) => `${r.districtId}: ${r.spawnsOnCarriageway}/${r.spawnCount}`),
+      "a district spawn point did not read as carriageway",
+    ).toEqual([]);
+  });
+
+  it("every lesson but the known offender is graded on asphalt end to end", () => {
+    const offenders = GROUND.filter(
+      (r) => r.templateId !== GROUND_QUARANTINE.templateId && r.onCarriageway !== BAY_STATIONS,
+    );
+    expect(
+      offenders.map(
+        (r) =>
+          `${r.templateId} (${r.districtId}): ${r.onCarriageway}/${BAY_STATIONS} road, ` +
+          `${r.onSidewalk} kerb, ${r.elsewhere} bare`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("sc-pk-driveway is STILL graded half on the pavement — quarantine tripwire", () => {
+    // `.audit-frames/sweep161/sc-pk-driveway/pc-right/04-t045s.png`, and the
+    // sibling row that says gear D never moved on any lane.
+    const row = GROUND.find((r) => r.templateId === GROUND_QUARANTINE.templateId)!;
+    expect(row.onCarriageway).toBe(GROUND_QUARANTINE.onCarriageway);
+    expect(row.onSidewalk).toBe(GROUND_QUARANTINE.onSidewalk);
+    expect(row.elsewhere, "the off stations are kerb, not bare ground").toBe(0);
+    // …and the same defect in metres, DERIVED from the built world rather than
+    // typed in: the outermost carriageway vertex against the bay's own reach.
+    expect(row.bayReachM - row.carriagewayEdgeM).toBeCloseTo(
+      GROUND_QUARANTINE.pastTheKerbM,
+      3,
+    );
+    // AND THE HALF OF IT THE STUDENT CANNOT SEE. The white U really is drawn
+    // out past the kerb line — `markings` reaches x = 10.63 here — and it is
+    // drawn at road level (0.032 m) while the ground under that span is the
+    // pavement top, ROAD_Y + CURB_HEIGHT_M = 0.14 m. So the outer 2.375 m of
+    // the graded cell is painted roughly 0.11 m BELOW the sidewalk covering
+    // it. Pinned because the header claims it; a claim in a comment with no
+    // assertion under it is how this repo shipped a false central claim with
+    // all eight of its tests green.
+    expect(row.paintReachM).toBeGreaterThan(row.carriagewayEdgeM);
+    expect(row.paintTopM).toBeLessThan(0.12);
+  });
+
+  it("the healthy population is not merely inside the kerb, it is clear of it", () => {
+    // What makes „15/15" a measurement rather than a lucky lattice: on every
+    // healthy lesson the bay's farthest station is INSIDE the carriageway
+    // edge, so the whole rect is asphalt however finely it is sampled.
+    const healthy = GROUND.filter((r) => r.templateId !== GROUND_QUARANTINE.templateId);
+    const worst = Math.max(...healthy.map((r) => r.bayReachM - r.carriagewayEdgeM));
+    expect(worst, `closest healthy bay to its kerb: ${worst.toFixed(2)} m`).toBeLessThan(0);
   });
 });

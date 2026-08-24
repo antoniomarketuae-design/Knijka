@@ -76,6 +76,13 @@ const REPAIRED = new Set([
   "platform/src/modules/sim/rules/scoring.ts",
   "platform/src/modules/sim/lessons/scenario/templates-sp.ts",
   "platform/src/modules/sim/rules",
+  // round 7
+  "platform/src/components/sim/lesson-ui/touchHintLifetime.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-merging.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-signals.ts",
+  "platform/src/modules/sim/traffic/TrafficLayer.tsx",
+  "platform/src/modules/sim/lessons/scenario/templates-roundabout2.ts",
+  "platform/src/modules/sim/lessons/scenario/templates-rail.ts",
 ]);
 
 const open = loadOpenFindings();

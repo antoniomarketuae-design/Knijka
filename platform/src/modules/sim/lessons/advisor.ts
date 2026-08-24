@@ -162,13 +162,48 @@ const ADVISOR_HALT_CAP_KMH = 8;
  * fail the task), which is why the caller takes a `Math.min` rather than a
  * substitution. All ten titles in the census read „под N км/ч" — a ceiling —
  * and the strictest match is taken, so a range like „26–28 км/ч" reads as 28.
+ *
+ * ── THE SPELLING IT COULD NOT READ (sweep161 part A, sc-speed-transition) ──
+ *
+ * A Bulgarian speed limit is not always written „N км/ч". The В26 zone plate
+ * is read and spoken as «зона 30», and one authored title says exactly that:
+ *
+ *   sc-speed-transition / sc-trn-in-zone
+ *   «Влез в зона 30 вече под ограничението»  →  card «… — дръж под 33 км/ч»
+ *
+ * The author HAD put the number in the title. The scanner above wanted the
+ * „км/ч" that the idiom omits, missed it, fell through to source 4, and the
+ * card licensed 33 inside a thirty zone — beside a briefing that says «влез в
+ * зоната вече под 30 км/ч» и «Задръж под 30 км/ч до края на зоната», and
+ * beside the В26 disc in the world. That is the filed defect
+ * («37 in a 30 is the goal») with a smaller number, not a different one.
+ *
+ * MEASURED over every compiled rung of every template: 953 capped cards, of
+ * which **5 (one objective × its five rungs) carry «зона N» in the title, and
+ * all 5 licensed more than the zone**. No other title in the catalogue matches,
+ * so this reads one idiom and touches nothing else.
+ *
+ * THE BAND IS THE GUARD. «зона» prefixes things that are not speeds (a „зона
+ * 2" parking sector, a lesson's own numbering), so only a value that could be a
+ * posted Bulgarian limit is taken. The floor is the halt band + 2: below it a
+ * „zone" figure is not a speed limit anybody signs, and a mis-read there would
+ * be the dangerous direction — a card demanding a crawl the gate never asked
+ * for.
  */
+const ZONE_CAP_MIN_KMH = ADVISOR_HALT_CAP_KMH + 2;
+const ZONE_CAP_MAX_KMH = 130;
+
 function titleCapKmh(titleBg: string): number | undefined {
   let strictest: number | undefined;
-  for (const m of titleBg.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)) {
-    const n = Number(m[1].replace(",", "."));
-    if (!Number.isFinite(n) || n <= 0) continue;
+  const take = (raw: string) => {
+    const n = Number(raw.replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return;
     if (strictest === undefined || n < strictest) strictest = n;
+  };
+  for (const m of titleBg.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)) take(m[1]);
+  for (const m of titleBg.matchAll(/зона\s*(\d+)/gi)) {
+    const n = Number(m[1]);
+    if (n >= ZONE_CAP_MIN_KMH && n <= ZONE_CAP_MAX_KMH) take(m[1]);
   }
   return strictest;
 }
@@ -350,7 +385,101 @@ function spokenCapKmh(
  * three.
  */
 function titleNamesController(titleBg: string): boolean {
-  return /регулировчик/i.test(titleBg);
+  return CONTROLLER_RX.test(titleBg);
+}
+
+/** One spelling of the officer, in one place, so the three readers below and
+ *  the objective branch above can never drift into disagreeing about him. */
+const CONTROLLER_RX = /регулировчик/i;
+
+/**
+ * DOES THIS LESSON STAGE AN OFFICER AT ALL? — and it is a property of the
+ * LESSON, not of whichever objective happens to be active.
+ *
+ * `titleNamesController` was the first cut and it is under-scoped, which the
+ * test that pinned it said out loud: *„`titleNamesController` is a substring
+ * test, so the displacement is only ever as strong as the banner."* Measured
+ * over the compiled catalogue, three templates put a регулировчик at their
+ * junction — sc-signal-controller, sc-sig-controller-live,
+ * sc-sig-controller-postures — and TWO of them carry an objective whose title
+ * does not name him:
+ *
+ *   sc-sig-controller-live   sc-sctl-exit  «Излез от кръстовището на север»
+ *   sc-sig-controller-postures sc-sctp-cross «Премини кръстовището, когато
+ *                                            позата разреши посоката ти»
+ *
+ * The second is the CROSSING objective of the officer's own drill. On both, a
+ * red-light hold put the generic lamp card back on the glass at the junction
+ * where the lamp decides nothing — the exact sentence that convicted the
+ * correct drive on sc-sig-controller-live/mobile-right (run.log 167/196/358),
+ * one objective further along the same route.
+ *
+ * Three authored surfaces are read, and all three are copy the student has
+ * already been shown, so this stays inside the rule this file opens with
+ * (ADR-002: authored copy, never free recall): the lesson's own title, every
+ * step of the compiled briefing (`briefingBg` — the „Инструкции" card), and
+ * every objective title on the route. sc-sig-controller-live's briefing step 2
+ * is the plainest of them: «Има ли регулировчик, важи само неговият сигнал.»
+ *
+ * A lesson with no officer anywhere reads false on all three and keeps every
+ * card it had.
+ */
+function lessonStagesController(lesson: LessonSpec, objectives: readonly LessonObjective[]): boolean {
+  if (CONTROLLER_RX.test(lesson.titleBg)) return true;
+  if (lesson.briefingBg?.some((step) => CONTROLLER_RX.test(step.textBg)) === true) return true;
+  return objectives.some((o) => CONTROLLER_RX.test(o.titleBg));
+}
+
+/**
+ * WHAT THE INSTRUCTOR SAYS WHILE THE STUDENT IS STOPPED AT THE OFFICER'S
+ * JUNCTION — the card that replaces the lamp's.
+ *
+ * IT MUST NOT SAY «Чакаш правилно». The generic red-light card opens with
+ * exactly that, and on sc-sig-controller-live it was false: the officer was
+ * standing SIDE-ON, which releases this direction, so the wait itself was the
+ * fault the drive was billed for. Nothing in `SimTick`, `YieldWaitState` or
+ * `PassSignalParams` carries the officer's posture (see the report), so this
+ * module cannot know whether this particular wait is right — and a module that
+ * cannot measure a thing may not praise it. That is the same withdrawal the
+ * pedestrian copy already made about a stop it could not see the position of.
+ *
+ * IT MUST NOT SAY «Тръгвай» EITHER, for the mirror reason: chest-on stops this
+ * direction and telling him to go would be the same defect pointing the other
+ * way.
+ *
+ * So it says the one thing that is true on every frame of every officer's
+ * junction and is what the student is there to learn — WHERE TO LOOK, and what
+ * each posture means. Both halves are retrieved: the postures are the
+ * lesson's own authored briefing (sc-sig-controller-live steps 3 and 4), and
+ * the hierarchy claim is the rule catalog's citation for the fault that grades
+ * this very duty, so the sentence spoken while he waits cites byte-identically
+ * what the toast would cite if he obeyed the lamp and got billed for it.
+ *
+ * NOTHING IS TAKEN AWAY BY IT. The first cut of this fix fell through to
+ * `advisorPromptForObjective`, which on `sc-sctl-exit` would have answered a
+ * live wait with «Излез от кръстовището на север» — a waypoint, not an answer
+ * to „am I right to be standing here". The wait keeps a voice; only the lamp
+ * loses its authority.
+ *
+ * 148 CHARACTERS, AND THE BUDGET IS NOT DECORATION. Every other card on this
+ * surface is held under 150 by `yield-voice.test.ts` („fits the 240 px
+ * column"), and a card that clips is a card whose second posture — the one that
+ * says GO — never reaches the student. The first draft ran to 249 and would
+ * have shipped the officer's rule with its ending cut off. All three postures
+ * ППЗДвП чл. 65 names are here: chest or back (stop), side-on (go), arm up
+ * (the phase is changing — wait for it), and the arm is kept precisely because
+ * dropping it would leave a student who is side-on going through a raised arm.
+ */
+const CONTROLLER_WAIT_CARD_BG =
+  "Тук решава регулировчикът, не лампата. Гледай позата му: гърди/гръб към теб — стоиш; " +
+  "страничен профил — минаваш, дори на червено; ръка горе — чакаш.";
+
+/** The live-wait card at a junction an officer is directing. */
+export function controllerWaitAdvisorPrompt(): AdvisorPrompt {
+  // No key chips, exactly as `yieldWaitAdvisorPrompt`: the next action depends
+  // on a posture this module cannot read, and the honesty rule of this file is
+  // that a chip may only name a control that PERFORMS the step.
+  return { textBg: CONTROLLER_WAIT_CARD_BG, keys: [] };
 }
 
 /**
@@ -459,9 +588,14 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     // Nothing left to advise — but a live yield is still worth a card, because
     // standing still lawfully is an answer to „what now" even on the run-out.
     const trailing = s.yieldWait;
-    return trailing !== undefined && trailing.holding && trailing.reason !== null
-      ? yieldWaitAdvisorPrompt(trailing.reason)
-      : null;
+    if (trailing === undefined || !trailing.holding || trailing.reason === null) return null;
+    // The officer outranks the lamp on the run-out too — the route ends north
+    // of sc-sig-controller-live's junction, so a hold there is the same
+    // junction with the objectives spent.
+    return trailing.reason === "redLight" &&
+      lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))
+      ? controllerWaitAdvisorPrompt()
+      : yieldWaitAdvisorPrompt(trailing.reason);
   }
   const active = s.objectives[s.currentObjectiveIndex];
 
@@ -482,16 +616,22 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
   // decides nothing (ЗДвП чл. 6, т. 2 — the officer's orders bind „НЕЗАВИСИМО
   // от светлинните сигнали" — and чл. 7, ал. 1 the hierarchy).
   //
-  // Same test, same doctrine as the objective branch above: where the AUTHOR
-  // put the officer in the title, the authored sentence is the instruction and
-  // the generic lamp copy stands down. Only `redLight` is displaced — a
-  // pedestrian, a Б2 or a roundabout at a regulated junction is still exactly
-  // what its own card says it is.
+  // Same doctrine as the objective branch above, one scope wider: the officer
+  // belongs to the LESSON, not to whichever objective is active
+  // (`lessonStagesController` — the first cut read only the active banner and
+  // handed the lamp back its authority on two of the three officer drills,
+  // including the crossing objective of one of them). Only `redLight` is
+  // displaced — a pedestrian, a Б2 or a roundabout at a regulated junction is
+  // still exactly what its own card says it is — and what replaces it is a
+  // WAIT card, not the waypoint: the student standing still is owed an answer
+  // to „am I right to be here", and `controllerWaitAdvisorPrompt` gives him the
+  // one this module can honestly give.
   const waiting = s.yieldWait;
   if (waiting !== undefined && waiting.holding && waiting.reason !== null) {
-    const lampOutranked =
-      waiting.reason === "redLight" && titleNamesController(active.spec.titleBg);
-    if (!lampOutranked) return yieldWaitAdvisorPrompt(waiting.reason);
+    if (waiting.reason === "redLight" && lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
+      return controllerWaitAdvisorPrompt();
+    }
+    return yieldWaitAdvisorPrompt(waiting.reason);
   }
 
   // The author's own cap comes off the RAW compiled objective, not off
@@ -785,8 +925,31 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
     // The one settled title that stays bare: `signal-stop-line-window.test.ts`
     // pins this exact string in the emitted titles of a red-light wait.
     settledTitleBg: "Чакането Е маневрата",
+    // THE ONE STAGE THAT STILL TAUGHT THE LAMP, and it is the stage that was
+    // photographed on the drive this whole thread comes from
+    // (sc-sig-controller-live/mobile-right/run.log line 196, t = 70 s: «Чакането
+    // Е маневрата · 13 секунди на червено са просто цикълът на светофара»).
+    // `cardBg`, `namedBg` and `verdictBg` were all amended in the sweep161 wave
+    // to carry ЗДвП чл. 6, т. 2's single exception; this one was not, so the
+    // middle line of the lecture went on telling a student at an OFFICER'S
+    // junction that his seconds were the light's cycle — 34 s before he was
+    // billed −10 for exactly that reading.
+    //
+    // The card above is displaced wholesale at an officer's junction
+    // (`controllerWaitAdvisorPrompt`). This channel cannot be: `stepYieldVoice`
+    // is handed a reason and a speed and never the lesson, so it cannot tell
+    // the two junctions apart. Until it can (see the report — the officer has
+    // no flag on `SimTick`, `YieldWaitState` or the `YieldReason` union), the
+    // generic lecture must carry the exception in every stage rather than in
+    // three of four.
+    //
+    // THE EXCEPTION GOES SECOND, NOT LAST, and the frame is why: on
+    // sc-turn-left-oncoming/pc-right/04-t043s.png this card is already painted
+    // with its final line running under the pedal bar. A clause appended to the
+    // end of a card that clips is a clause nobody reads — and this one is the
+    // difference between waiting and −10.
     settledBg: (sec) =>
-      `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Използвай ги: виж кой стои насреща, кой ще завива и къде са пешеходците, за да тръгнеш на зелено с готова картина вместо да я събираш в движение.`,
+      `${sec} секунди на червено са просто цикълът на светофара, не грешка — тези секунди се изваждат от ориентировъчното време на урока. Но първо провери едно: ако на кръстовището има регулировчик, чакаш него, а не лампата — неговият сигнал важи независимо от светофара и може да пуска твоята посока точно сега. Няма ли регулировчик, използвай секундите: виж кой стои насреща, кой ще завива и къде са пешеходците, за да тръгнеш с готова картина вместо да я събираш в движение.`,
     verdictTitleBg: "Изчака сигнала и тръгна чисто",
     verdictBg: (sec) =>
       `Изчака ${sec} с и премина — без отчетено нарушение на сигнала. Разрешаващият сигнал е разрешение да минеш, не задължение да тръгнеш веднага: проверката, която току-що направи — свободно ли е кръстовището отсреща — е тази, която пази от засядане в средата му. И помни кой го дава: има ли регулировчик, разрешението е неговото, а не на лампата.`,

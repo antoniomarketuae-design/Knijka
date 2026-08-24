@@ -342,7 +342,41 @@ export const SC_JUNCTION_STOP: ScenarioSpec = {
   success: [
     {
       id: "sc-jstop-approach",
-      titleBg: "Приближи знака Б2 с контролирана скорост",
+      // ONE ROUTE UNDER THREE NAMES (findings `sc-junction-stop:dab712b8`,
+      // `sc-junction-scan:282e3c33`, `sc-junction-gap:73564f66`; frames
+      // `.audit-frames/sweep161/sc-junction-{stop,scan,gap}/pc-right/04-t20*s.png`,
+      // all three quoting «Завий надясно и излез от кръстовището на изток»).
+      //
+      // THE CENSUS BEHIND IT, over all 167 shipped templates: «Приближи знака
+      // Б2 с контролирана скорост» was the task-1 chip of FOUR drills
+      // (sc-junction-stop / -scan / -gap / -left) and «Завий надясно и излез от
+      // кръстовището на изток» the task-3 chip of three. sc-junction-stop and
+      // sc-junction-scan share tj-stop-v1, the same spawn and the same three
+      // gate coordinates, so the chips were the only place left where the
+      // student could have been told which drill he is in — and they said the
+      // same thing.
+      //
+      // WHY THE FIX IS COPY. The gates cannot move: `content/traces/
+      // sc-junction-{stop,scan}/*.trace.json` replay through the production
+      // stack in the sc-tj-traces battery, and `signal-stop-line-window.test.ts`
+      // pins this very zone's far edge at 25.46 m from the paint. So the params
+      // stay byte-identical and the SENTENCE carries the difference — which is
+      // also what the findings measure („near-identical objective wording").
+      //
+      // THIS drill's subject is the full stop itself, so its approach chip says
+      // what the sign ahead will demand — the drill's own sentence, and a
+      // reason rather than a bare order (THEO-4). It stops short of two things
+      // on purpose:
+      //   · the imperative «Спри …» and the phrase «пълно спиране» —
+      //     `junctions-title-truth.test.ts` reads either in a reachZone banner
+      //     as a HALT demand, and this gate is a 30 km/h cap, not a halt;
+      //   · a printed «N км/ч» — the cap is real and naming it was tempting,
+      //     but `__tests__/advisor-authored-cap.test.ts` censuses every card
+      //     whose briefing speaks a km/h figure (that number is one of the four
+      //     sources the advisor coaches from), and that file belongs to the
+      //     advisor lane. Adding a figure here is legitimate; it just obliges
+      //     whoever adds it to re-measure that census in the same change.
+      titleBg: "Приближи знака Б2 бавно — тук се спира докрай, не почти",
       params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 30 },
     },
     {
@@ -354,7 +388,15 @@ export const SC_JUNCTION_STOP: ScenarioSpec = {
     },
     {
       id: "sc-jstop-exit",
-      titleBg: "Завий надясно и излез от кръстовището на изток",
+      // Re-worded, NOT re-aimed (see sc-jstop-approach for the three-drills
+      // census). It read «Завий надясно и излез от кръстовището на изток» — the
+      // same string sc-junction-gap still puts on ITS exit chip, on a different
+      // map, in a lane this one does not own. The act is genuinely the same act
+      // (a completed right turn onto the east arm), so the sentence says the
+      // same thing in its own words rather than inventing a difference that is
+      // not there: no clause was added, none removed, and «надясно» + «на
+      // изток» — the two things the disc really proves — are both still here.
+      titleBg: "Излез от кръстовището надясно и продължи на изток",
       // TITLE-TRUTH WAVE (see sc-jrhr-cross for the full argument). It read
       // «Завий надясно и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО»: the manoeuvre half
       // was measured, but «пътя с предимство» is the one phrase in the title a
@@ -640,9 +682,19 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
   tagsBg: ["ляв завой", "насрещно движение", "предимство", "интервал"],
   titleBg: "Ляв завой срещу насрещно",
   objectiveBg:
-    "Завий наляво през кръстовището, като пропуснеш насрещно движещите се: изчакай плътния интервал (4 и повече секунди) и завий решително, без да режеш пътя на никого.",
+    "Кръстовището е СВЕТОФАРНО: на червено чакаш пред стоп-линията, а зеленото само отваря кръстовището — то не ти дава предимство пред насрещните. Завий наляво чак в плътния интервал (4 и повече секунди), без да режеш пътя на никого.",
   archetypeIds: ["JU-10"],
-  conceptIds: ["c-left-turn-oncoming", "c-turning-left-junction", "c-priority-concept"],
+  conceptIds: [
+    "c-left-turn-oncoming",
+    "c-turning-left-junction",
+    "c-priority-concept",
+    // ADDED with the briefing rewrite below: this drill's junction IS
+    // signalized and the briefing now says so, so the concept card set has to
+    // carry the light as well. Without it the „защо" surface could cite
+    // everything about the left turn and nothing about the lamp the student is
+    // actually looking at while he waits.
+    "c-light-junction",
+  ],
   map: {
     archetype: "x-junction",
     params: {
@@ -661,21 +713,71 @@ export const SC_TURN_LEFT_ONCOMING: ScenarioSpec = {
     spawnPointId: "sx-spawn-east",
     vehicleStart: "ready",
   },
+  // BRIEFING-vs-WORLD (finding `sc-turn-left-oncoming:017da1c4`, critical,
+  // frame `.audit-frames/sweep161/sc-turn-left-oncoming/pc-right/04-t043s.png`).
+  //
+  // WHAT THE FRAME SHOWS. A red lamp burning at the mouth; the coach card
+  // «Чакаш правилно на червено. Тръгваш на зелено — след като видиш, че
+  // кръстовището е свободно.»; the teach card «Чакането Е маневрата — 10
+  // секунди на червено са просто цикълът на светофара»; and, in the same
+  // screenshot, all five briefing steps describing an UNSIGNALISED left turn
+  // whose only decision is a gap counted in seconds. Three surfaces, two
+  // different junctions.
+  //
+  // WHICH HALF WAS WRONG, and it is not the world. `sx-v1` is the shipped
+  // signalized X (meta.scenario.expectedControl "trafficLight",
+  // tools/maps/gen_signal_x.mjs); the site was chosen ON PURPOSE — see the
+  // SC_LTAP_TIGHT_EVENT note above: on a signalized node no RHR tracker and no
+  // stop-sign give-way check can double-grade the encounter. The runtime agrees:
+  // `sc-ltap-approach` is one of the four gates `__tests__/
+  // signal-stop-line-window.test.ts` measures against sx-v1's derived
+  // светофар line, and the lawful-wait narration the coach card comes from is
+  // the traffic-light arc. The MAP is right and the coach is right; the
+  // briefing was the one surface that had never been told there is a light.
+  //
+  // WHY THAT IS A SAFETY DEFECT AND NOT A COPY NIT. Both EW directions run on
+  // the same phase (signals.ts: two-phase cycle, green 20 / yellow 3 / red 26),
+  // so the oncoming car this drill stages has GREEN at the same moment the
+  // student does. That is the permissive-green left turn — ЗДвП чл. 37 — and
+  // the single most-taught trap in it is exactly the sentence the briefing did
+  // not contain: green opens the junction, it does not hand you priority. A
+  // student who reads „Насрещните имат предимство" with no light in the text,
+  // then meets a red, has been handed two ways to be wrong: creep out hunting a
+  // gap on a red, or read the green as his turn to go. Step 3 and step 4 below
+  // close both, in that order.
+  //
+  // NOTHING IS REMOVED. All five original steps survive: 1 and 2 verbatim, the
+  // old 3 becomes 5 (same 4-second norm, act-first), the old 4 and 5 are 6 and
+  // 7 unchanged. «Насрещните имат предимство» is not deleted — it is promoted
+  // into step 4, where it now says WHY it still holds under a green lamp, which
+  // is the harder and more useful form of the same law.
   instructionsBg: [
     { n: 1, textBg: "Тръгни на запад по пресечната улица — на кръстовището ще завиваш наляво, на юг." },
     { n: 2, textBg: "Пусни ляв мигач отрано и намали — завоят наляво се готви, не се импровизира." },
+    { n: 3, textBg: "Гледай светофара: на червено спри пред стоп-линията и изчакай зеленото." },
+    { n: 4, textBg: "Помни, че зеленото само отваря кръстовището — предимството остава на насрещните." },
     {
-      n: 3,
+      n: 5,
       textBg:
-        "Насрещните имат предимство. Прецени интервала в СЕКУНДИ: кола на по-малко от 4 секунди означава чакане, не спринт.",
+        "Прецени интервала в СЕКУНДИ: насрещен на по-малко от 4 секунди означава чакане, не спринт.",
     },
-    { n: 4, textBg: "Изчакай близкия насрещен автомобил да премине изцяло — спокойно, пред устието, без да навлизаш." },
-    { n: 5, textBg: "В плътния интервал завий решително наляво и продължи на юг." },
+    { n: 6, textBg: "Изчакай близкия насрещен автомобил да премине изцяло — спокойно, пред устието, без да навлизаш." },
+    { n: 7, textBg: "В плътния интервал завий решително наляво и продължи на юг." },
   ],
   success: [
     {
       id: "sc-ltap-approach",
-      titleBg: "Приближи кръстовището с ляв мигач и премерена скорост",
+      // WAS «Приближи КРЪСТОВИЩЕТО с ляв мигач и премерена скорост» — the same
+      // string, word for word, that `sc-rx-tram-left` (templates-rail.ts) puts
+      // on ITS approach gate, on this same sx-v1 map. Two drills, one chip.
+      //
+      // One word changes, and it is the word the critical finding is about: the
+      // thing being approached is a светофар, and this is the first surface the
+      // student reads while the lamp is already in his windscreen. The chip now
+      // agrees with the briefing, with the coach card and with the map.
+      // `params` are byte-identical, so `done` is bit-identical and no
+      // committed drive changes verdict.
+      titleBg: "Приближи светофара с ляв мигач и премерена скорост",
       // East-arm westbound lane center.
       params: { kind: "reachZone", x: 45, y: 4.06, radiusM: 8, maxSpeedKmh: 40 },
     },
@@ -856,7 +958,15 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
   success: [
     {
       id: "sc-jscan-approach",
-      titleBg: "Приближи знака Б2 с контролирана скорост",
+      // Same census, same map, same three coordinates as `sc-jstop-approach` —
+      // and that is precisely why the chip may not repeat its words. THIS
+      // drill's subject is the ляво-дясно-ляво scan, so its approach banner
+      // gives the reason THIS drill wants the slow approach: a scan costs
+      // seconds, and seconds are what arriving slowly buys. It is addressed to
+      // the student (THEO-4: never a bare demand) and it certifies nothing —
+      // the scan itself is graded next door by the config-gated
+      // JUNCTION_SCAN_INCOMPLETE detector this template opts in to.
+      titleBg: "Приближи знака Б2 бавно — за да ти стигне време да огледаш",
       params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 30 },
     },
     {
@@ -866,7 +976,13 @@ export const SC_JUNCTION_SCAN: ScenarioSpec = {
     },
     {
       id: "sc-jscan-exit",
-      titleBg: "Завий надясно и излез от кръстовището на изток",
+      // Re-worded for the three-drills census (see sc-jstop-approach). Both
+      // things the disc proves are still named — the завой is «десния» and the
+      // arm is «на изток». What is NOT here, deliberately, is the car this
+      // drill stages from the left: «след като колата отляво премине» would be
+      // a yield certificate on a plain disc, which is the exact crime the
+      // title-truth wave below removed.
+      titleBg: "Завърши десния завой и продължи на изток",
       // TITLE-TRUTH WAVE (see sc-jrhr-cross). Same rewrite as sc-jstop-exit,
       // same map: it read «…и ПРОДЪЛЖИ ПО ПЪТЯ С ПРЕДИМСТВО», and a reachZone
       // tick can prove neither priority nor the ляво-дясно-ляво scan this

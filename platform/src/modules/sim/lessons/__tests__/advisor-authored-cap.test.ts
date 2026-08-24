@@ -66,6 +66,18 @@ const HALT_CAP_KMH = 8;
 const KMH = (s: string) =>
   [...s.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)].map((m) => Number(m[1].replace(",", ".")));
 
+/**
+ * THE SECOND SPELLING OF AN AUTHORED CEILING — the В26 zone plate, which is
+ * read and written «зона 30», not «30 км/ч». It is the same source as `KMH`
+ * above (the author's own title), in the idiom Bulgarian actually uses, and it
+ * is admitted here for the same reason: a number the author wrote where the
+ * student can read it is not an orphan. `advisor.ts titleCapKmh` reads it, and
+ * `sc-speed-transition/sc-trn-in-zone` — «Влез в зона 30 вече под
+ * ограничението», gate 38 — is the one objective in the catalogue that has it.
+ */
+const ZONE_PLATE = (s: string) =>
+  [...s.matchAll(/зона\s*(\d+)/gi)].map((m) => Number(m[1])).filter((n) => n >= 10 && n <= 130);
+
 interface Card {
   lessonId: string;
   objectiveId: string;
@@ -241,7 +253,7 @@ describe("no capped objective grades against a number the card does not state", 
   it("and the number spoken belongs to somebody — sign, title, halt band or the author's own cap", () => {
     const orphan: string[] = [];
     for (const c of everyCappedCard()) {
-      const titleNums = KMH(c.titleBg);
+      const titleNums = [...KMH(c.titleBg), ...ZONE_PLATE(c.titleBg)];
       const isHalt = c.cap <= HALT_CAP_KMH && c.spoken === c.cap;
       const isSign = c.posted !== undefined && c.posted < c.cap && c.spoken === c.posted;
       const isTitle = c.spoken !== undefined && titleNums.includes(c.spoken);

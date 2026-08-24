@@ -15,6 +15,131 @@
  *
  * Pure client-side TS (no React) — callers own fetching the district JSON
  * and everything after the core build (traffic anchoring, directors, aids).
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE FOUR „THE WORLD IS NOT THE LESSON" ROWS PARKED ON THIS FILE — MEASURED,
+ * AND ONLY ONE OF THEM IS ANSWERABLE FROM HERE (2026-08-24).
+ *
+ * The rows, verbatim: „the car ends up INSIDE building geometry" (sc-pk-
+ * driveway, critical); „the briefing's whole premise is «сграда на ъгъла
+ * закрива гледката надясно» … the corner is open field" and „dense city on the
+ * approach street and bare terrain 100 m later" (sc-junction-blind); „beyond
+ * the priority road the world stops" (sc-junction-left); „finishes parked on a
+ * grey slab in the middle of an empty green field" (sc-ov-lane-keeping).
+ *
+ * They were routed here on a true premise — this function is the ONE place a
+ * LESSON and a DISTRICT are held at the same time, so if anything in the
+ * product is supposed to notice that the world does not contain what the
+ * briefing describes, it is this. Nothing did. What follows is what each row
+ * turned out to BE, built through this recipe rather than argued from the
+ * source, so the next reader does not re-derive it. Every number below was
+ * produced by `buildLessonWorldCore` on the committed districts.
+ *
+ * 1. sc-pk-driveway, „inside building geometry". TWO defects behind one frame,
+ *    and neither is the „no solid body" the row's second clause guesses at —
+ *    `colliders.buildings` on pk-drive-v1 carries all five masses (80 vertices
+ *    = 5 × 16), and the sweep's own t050s frame is the ПТП card firing.
+ *      (a) THE GRADED CELL IS HALF KERB. Sampled on a 5 × 3 lattice, 16 of the
+ *          17 catalogue bays stand 15/15 on the driven carriageway;
+ *          `PK_DRIVE_TARGET_BAY` (8, 45) 2.7 × 5 @ 90° stands 9/15, with 6
+ *          stations on the raised sidewalk: its outer edge reaches x = 10.5
+ *          against a built kerb line at x = 8.125, so 2.375 m of a 5 m cell —
+ *          47.5% of it — is pavement, and the white U is painted there 0.11 m
+ *          BELOW the pavement drawn over it. That is measured, pinned
+ *          and mutation-tested in `__tests__/lesson-world-bay-clearance.test.ts`
+ *          §2. OWNER: `lessons/scenario/templates-pk.ts` (the bay, pinned
+ *          value-for-value against `traces/scPkDriveway.ts`) and/or
+ *          `tools/maps/gen_pk_driveway.mjs` (the cross-section / a dropped kerb
+ *          across the driveway mouth). Not this file's to move, and §2 fails
+ *          the day either moves, so the repair is verifiable rather than
+ *          claimed.
+ *      (b) THE GARAGE IS AUTHORED 4 m AND BUILT 18.27 m, AND IT STANDS WHERE
+ *          THE LESSON PARKS THE CAR. `pkd-b-garage` (x ∈ [12, 18],
+ *          y ∈ [37, 53]) authors `height: 4` beside `heightSource: "default"`,
+ *          and `cityBuildings.resolveBuildingHeightM` reads "default" as NO
+ *          DATA and substitutes its 15–25 m jitter — measured on the shipped
+ *          function, `resolveBuildingHeightM("pkd-b-garage") = 18.27`. Both the
+ *          wall mesh and the collider take that height (`buildings.buildOne`
+ *          calls it once, line 114), so a four-metre garage is built as a
+ *          six-storey block whose west face is 1.5 m from the graded bay's east
+ *          edge (§1) — and `PK_DRIVE_TARGET_BAY.headingDeg` is 90°, so the car
+ *          that finishes the drill is pointed straight into it at ~4 m. An
+ *          18 m wall 4 m from the eye fills the whole windscreen: that IS the
+ *          row's „facade at arm's length … the view is inside the structure".
+ *          NOT A ONE-MAP SLIP: 222 buildings on the committed scenario maps,
+ *          written by ~30 `tools/maps/gen_*.mjs`, author a deliberate height
+ *          beside `heightSource: "default"` — including all 14 lot kiosks at
+ *          3.5 m. OWNER: the generators, or the „default" contract in
+ *          `world/builders/cityBuildings.ts` (DEFAULT_HEIGHT_MIN_M /
+ *          DEFAULT_HEIGHT_MAX_M). It is a data/renderer contract mismatch, not
+ *          a placement bug, and it is the first thing to fix on this row.
+ *      (c) A SECOND MASS IS REACHABLE AND THIS IS A HYPOTHESIS, NOT A
+ *          MEASUREMENT — the chassis pose was never logged, and the previous
+ *          routing lane asked for exactly that before anyone touches a file
+ *          (`.audit-frames/routing-collision.json`, sc-ov-being-overtaken:
+ *          „verify which of the two it is by logging the chassis translation
+ *          against both footprints on a re-drive"). `terminusClosures` puts two
+ *          masses (18.27 m and 13.15 m) at y ∈ [108, 128] on a street whose
+ *          asphalt ends at y = 90, so a lane that keeps driving forward reaches
+ *          them across `terrainPaved`. WHAT ARGUES AGAINST IT FOR THE ROW'S OWN
+ *          FRAME: `pc-right/04-t045s.png` is DEMONSTRATION playback („ДЕМОНСТРА-
+ *          ЦИЯ — СЛЕДВАЙ СЯНКАТА, 0:17 / 0:21"), and the shadow script in
+ *          `traces/scPkDriveway.ts` never leaves y ∈ [16, 51.3] — at 0:17 of 21 s
+ *          it is reversing into the bay, i.e. beside the garage, not 60 m north
+ *          of the road's end. Read (b) first for that frame; (c) is live for the
+ *          free-driving mobile lanes only, and only a logged pose decides it.
+ *          Either way `buildings.buildOne` gives every mass a collider that is
+ *          an open tube of wall quads with no floor and no cap, so a chassis
+ *          that does arrive ends up inside rather than stopped — ALREADY routed
+ *          with proof to `world/builders/buildings.ts` and `lessons/finish.ts`
+ *          in `.audit-frames/routing-collision.json` (sc-ln-turn-lane-arrows).
+ *          Nothing here authors a collider.
+ *
+ * 2. sc-junction-blind, „the corner is open field". THE MAP'S ONLY BUILDING
+ *    STOPS OCCLUDING BEFORE THE STUDENT REACHES THE GIVE-WAY LINE, AND THERE
+ *    IS NOTHING ON THE OTHER THREE CORNERS. `tj-b-occluder` stands
+ *    x ∈ [20, 46], y ∈ [-46, -20] and it is the district's ONLY building
+ *    (`meta.stats.buildings` = 1) on a 140 m + 130 m junction, so three corners
+ *    of the drill's own junction are bare ground — which is what the frame is
+ *    photographing. The sight line, derived from the shipped numbers rather
+ *    than estimated: `SC_JUNCTION_BLIND_CONFLICT.lineDistM` = 18 puts the
+ *    give-way pose at (4.06, -18); the actor runs east→west, so it sits in the
+ *    westbound lane at y ≈ +4.06, released `armDistM` = 70 out. That ray
+ *    crosses the building's west face x = 20 at y = -12.7 — 7.3 m NORTH of its
+ *    nearest face — and crosses further north still as the car closes. Occlusion
+ *    exists only further back: from the `sc-jblind-approach` disc at (4.06, -30)
+ *    the same ray crosses x = 20 at y = -21.8, i.e. 1.8 m inside the footprint.
+ *    So the mass hides the car on the approach and has released it by the line,
+ *    which is precisely backwards for instruction 3 („изпълзи внимателно,
+ *    докато очите наистина видят зад сградата" — there is nothing left to creep
+ *    past). Both the setback and the three empty corners are map data. OWNER:
+ *    the tj-occluded-v1 generator under `tools/maps/`.
+ *
+ * 3/4. sc-junction-left and sc-ov-lane-keeping, „the world stops" / „a grey
+ *    slab in an empty green field". The slab is `terrainPaved`, and it is not
+ *    the lesson's ground at all: on tj-emerge-v1 it spans x ∈ [-216, 216]
+ *    against roads that reach x = 160, because `terrain.ts` zones paved ground
+ *    by proximity to a BUILDING and pads each terminus mass by 20 m. So a car
+ *    that leaves the carriageway drives onto a 400 m concrete apron and then
+ *    onto grass. This is the same defect `buildWorldGeometry.ts` already fixed
+ *    for `mapKind: "scenario-lot"` (its `lotApronFootprint` / `lotEnclosure`
+ *    block) and did not fix for `scenario-street` / `scenario-junction` — those
+ *    are the mapKind strings the two gates actually test (`buildWorldGeometry.ts`
+ *    lines 199 and 319, `mapKind !== "scenario-lot"`); „t-junction" is the
+ *    scenario ARCHETYPE and matches nothing there. OWNER:
+ *    `world/builders/buildWorldGeometry.ts` + `world/builders/terrain.ts`.
+ *
+ * WHAT WAS TRIED HERE AND REFUTED, so it is not tried again. (i) „the parked
+ * decoration stands in the graded cell" — measured with the shipped
+ * `computeParkedCars` over all 17 scenario bays and all 11 curriculum/полигон/
+ * exam bays: ZERO overlaps, so a `parkedClearZones` rule for the graded bay
+ * would remove nothing and was not written. (ii) „a lesson objective is
+ * anchored off the carriageway" — 393 objective anchors, 1 genuine off-road
+ * (sc-merge-motorway-exit, another lane's) and 6 roundabout-centre artefacts;
+ * no population defect. (iii) „the bay paint the recipe emits strays outside
+ * the district" — `lessonParkingBaysFor` is district-scoped, `stats.parkingBays`
+ * is 1/0/0/0 on the four maps, no stray rect.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 import {

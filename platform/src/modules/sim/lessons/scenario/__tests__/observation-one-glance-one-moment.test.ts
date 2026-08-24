@@ -26,17 +26,49 @@
  * checked the van.
  *
  * THE FIX is to consume glances: no glance may be counted twice, so n moments
- * require n distinct glances. The assignment runs LAST MOMENT FIRST, each taking
- * the LATEST unspent glance in its window — because WHICH moment gets a
- * contested glance is what the debrief prints. Assigning forward instead gives
- * the same count and the wrong name: it ticks „Оглед по време на движението
- * назад" and refuses „Последна проверка преди спиране" to a student who made
- * exactly the final check.
+ * require n distinct glances. And WHICH moment gets a contested glance is what
+ * the debrief prints, so the assignment runs in a FIXED ORDER rather than
+ * per-moment — the pre-stop check claims the final window before the middle
+ * moment can. Let the middle moment have it and the debrief ticks „Оглед по
+ * време на движението назад" and refuses „Последна проверка преди спиране" to a
+ * student who made exactly the final check.
  *
  * BOTH DIRECTIONS ARE PROVED BELOW, and the second one matters as much as the
  * first: a student who really does look three times must still score 3/3. A
  * refusal that cannot be lifted by doing the thing right is the founder's own
  * complaint, and §3 is there so tightening this channel can never become that.
+ *
+ * ==========================================================================
+ * §4 AND §5 — THE SAME DEFECT AT THE MIDDLE WINDOW'S OTHER EDGE, 2026-08-24.
+ * ==========================================================================
+ *
+ * The during-reverse window swallows BOTH of its neighbours' overlaps. §1 took
+ * back the top one — the final five seconds — and left the bottom one: the
+ * `BEGIN_GRACE_SEC` tail, the three quarters of a second in which the head
+ * follows the hand into reverse. A lone glance there was still taken by the
+ * middle moment.
+ *
+ * MEASURED on the shipped mapper, reverse over [10, 20]:
+ *
+ *   glances [10.5] → ["obs-during-reverse"]   ← INSIDE the grace window
+ *   glances [10.8] → ["obs-during-reverse"]   ← outside it
+ *
+ * The student read the same debrief either side of a line the code draws, which
+ * is what an unguarded constant looks like from the surface it is supposed to
+ * move: `BEGIN_GRACE_SEC = 0` left 2 296 tests in 107 files GREEN.
+ *
+ * WHY IT OUTWEIGHS THE COUNT, which does not change. The learner selects R and
+ * looks — hand first, head a beat later. The debrief told him „Оглед по време на
+ * движението назад ✓" and refused „Оглед ПРЕДИ включване на задна". Both are
+ * false, and the ✓ is the half that gets a seventeen-year-old hurt: it certifies
+ * that he kept watching while the car was travelling backwards, which is the one
+ * thing he did not do.
+ *
+ * §4 pins every window edge in both directions. §5 answers the question §4
+ * raises — every naming rule risks costing a credit somewhere else — by brute-
+ * forcing the maximum matching over a 696-input sweep, so this mapper can never
+ * buy a better name with a lost star. Its first row is the negative control for
+ * the reference itself.
  */
 
 import { describe, expect, it } from "vitest";
@@ -181,5 +213,141 @@ describe("§3 a student who really looks three times still scores 3/3", () => {
     ];
     expect(observed([19], two)).toEqual(["obs-before-moveoff"]);
     expect(observed([5, 19], two)).toEqual(["obs-before-reverse", "obs-before-moveoff"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §4 — EVERY WINDOW EDGE, IN BOTH DIRECTIONS
+//
+// Guarding one constant is worth nothing while its neighbours are free, so each
+// row below is a PAIR: the last value the window still credits and the first one
+// it refuses. Shrinking OR growing any of the three numbers turns this red.
+// ---------------------------------------------------------------------------
+
+describe("§4 the grace window belongs to the BEFORE-check", () => {
+  it("a lone look half a second after R engages is the BEFORE-check, not a during-look", () => {
+    // reverseStart = 10, so [10, 10.75] is the grace tail — and it sits inside
+    // the middle moment's [10, 20] as well. This shipped as
+    // ["obs-during-reverse"]. MUTATION: `BEGIN_GRACE_SEC = 0` puts 10.5 outside
+    // the before-window and the middle moment takes it straight back.
+    expect(observed([10.5])).toEqual(["obs-before-reverse"]);
+  });
+
+  it("…and the grace has an EDGE: a look past it is honestly a during-look", () => {
+    // The fix must not become „the before-check takes anything near the start".
+    // 10.75 is the last instant it may claim; 10.8 belongs to the middle moment.
+    expect(observed([10.75])).toEqual(["obs-before-reverse"]);
+    expect(observed([10.8])).toEqual(["obs-during-reverse"]);
+  });
+
+  it("the late before-check still combines with the other two", () => {
+    expect(observed([10.5, 14, 19])).toEqual([
+      "obs-before-reverse",
+      "obs-during-reverse",
+      "obs-final-check",
+    ]);
+    // …and on its own alongside a pre-stop check it names BOTH correctly. This
+    // shipped as ["obs-during-reverse", "obs-final-check"].
+    expect(observed([10.5, 19])).toEqual(["obs-before-reverse", "obs-final-check"]);
+  });
+
+  it("BEFORE_WINDOW_SEC and FINAL_WINDOW_SEC keep their own edges too", () => {
+    expect(observed([0])).toEqual(["obs-before-reverse"]); // exactly 10 s before
+    expect(observed([-0.5])).toEqual([]); // 10.5 s before — too long ago to count
+    expect(observed([15])).toEqual(["obs-final-check"]); // exactly reverseEnd − 5
+    expect(observed([14.5])).toEqual(["obs-during-reverse"]); // 5.5 s before the stop
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5 — THE NAMING IS NEVER PAID FOR IN STARS
+//
+// §1 and §4 both decide WHICH moment gets a contested glance, and every such
+// rule is one wrong step from costing a credit: hand a glance to the moment
+// whose NAME fits and the moment that could have used it may find nothing left.
+// This programme's standing rule is to ask what a fix TAKES AWAY, so this
+// section answers it by brute force rather than by argument — on every input the
+// number of moments credited must equal the true maximum matching between
+// glances and windows.
+//
+// The reference is deliberately dumb: try every assignment of glances to moments
+// and keep the biggest legal one. It shares no code, no ordering and no
+// preference with the mapper, so it cannot share a bug with it either.
+// ---------------------------------------------------------------------------
+
+describe("§5 the credited COUNT is always the maximum a matcher could achieve", () => {
+  /** The authored window for moment `i`, on the fixture's reverse phase [10, 20]. */
+  function windowFor(i: number, n: number): [number, number] {
+    if (i === 0) return [0, 10.75];
+    if (i === n - 1 && n >= 2) return [15, Number.POSITIVE_INFINITY];
+    return [10, 20];
+  }
+
+  /** Maximum bipartite matching, by exhaustive search over glance→moment maps. */
+  function maxMatching(glanceTimes: number[], n: number): number {
+    let best = 0;
+    const used = new Array<boolean>(n).fill(false);
+    const walk = (g: number, taken: number): void => {
+      if (taken + (glanceTimes.length - g) <= best) return; // cannot beat `best`
+      if (g === glanceTimes.length) {
+        best = Math.max(best, taken);
+        return;
+      }
+      walk(g + 1, taken); // this glance credits nothing
+      for (let i = 0; i < n; i++) {
+        if (used[i]) continue;
+        const [from, to] = windowFor(i, n);
+        if (glanceTimes[g] < from || glanceTimes[g] > to) continue;
+        used[i] = true;
+        walk(g + 1, taken + 1);
+        used[i] = false;
+      }
+    };
+    walk(0, 0);
+    return best;
+  }
+
+  it("the reference disagrees with a mapper that hands the grace tail away", () => {
+    // The negative control for the reference itself. [5, 10.5] admits a matching
+    // of size 2 (5 → before, 10.5 → during). A before-check taking its LATEST
+    // glance instead of its earliest would eat 10.5, leave 5 outside every other
+    // window, and score 1 — the trap the "earliest" preference exists to avoid.
+    expect(maxMatching([5, 10.5], 3)).toBe(2);
+    expect(observed([5, 10.5])).toEqual(["obs-before-reverse", "obs-during-reverse"]);
+  });
+
+  it("agrees with the reference on every input in a 3-moment sweep", () => {
+    const grid = [-1, 0, 2, 5, 9.9, 10, 10.5, 10.75, 10.8, 12, 15, 17, 19, 20, 21, 26];
+    let checked = 0;
+    for (let a = 0; a < grid.length; a++) {
+      expect(observed([grid[a]]).length, `[${grid[a]}]`).toBe(maxMatching([grid[a]], 3));
+      checked++;
+      for (let b = a + 1; b < grid.length; b++) {
+        const pair = [grid[a], grid[b]];
+        expect(observed(pair).length, JSON.stringify(pair)).toBe(maxMatching(pair, 3));
+        checked++;
+        for (let c = b + 1; c < grid.length; c++) {
+          const trio = [grid[a], grid[b], grid[c]];
+          expect(observed(trio).length, JSON.stringify(trio)).toBe(maxMatching(trio, 3));
+          checked++;
+        }
+      }
+    }
+    // The sweep is real: every 1-, 2- and 3-glance drive over 16 times = 696.
+    expect(checked).toBe(696);
+  });
+
+  it("…and on the two-moment templates as well", () => {
+    const two: Moments = [
+      { id: "obs-before-reverse", titleBg: "Оглед преди задната" },
+      { id: "obs-before-moveoff", titleBg: "Оглед преди потегляне" },
+    ];
+    const grid = [-1, 0, 5, 10, 10.5, 10.8, 14, 15, 19, 22];
+    for (let a = 0; a < grid.length; a++) {
+      for (let b = a; b < grid.length; b++) {
+        const pair = a === b ? [grid[a]] : [grid[a], grid[b]];
+        expect(observed(pair, two).length, JSON.stringify(pair)).toBe(maxMatching(pair, 2));
+      }
+    }
   });
 });

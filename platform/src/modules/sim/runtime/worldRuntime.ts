@@ -100,19 +100,106 @@ const JUNCTION_CONTEXT_RADIUS_M = 80;
 //
 // WHAT CHANGES HERE. `runtime/surface.ts` (its own slice) reads the asphalt the
 // world builder actually laid, triangle for triangle. sample() now consults it
-// every frame and does exactly two things with the answer:
+// every frame and does exactly three things with the answer:
 //   1. when the car's whole flank is past the kerb it publishes
 //      centreLinePainted/laneLinesPainted = FALSE — the doc-86 T1 contract's
 //      own polarity ("the world builder painted NOTHING here"), applied to the
 //      one place where the answer is beyond argument;
-//   2. it exposes the measurement through `surfaceUnderCar` so the layer that
+//   2. it publishes `edgeId: null` — see the block below, which is the half
+//      that reaches the student;
+//   3. it exposes the measurement through `surfaceUnderCar` so the layer that
 //      OWNS convictions can grade it.
 //
-// WHAT DELIBERATELY DOES NOT CHANGE. `maxSpeedKmh`, `wrongWay`, the zone flags
-// and every опасна channel stay exactly as shipped off the asphalt. Silencing
-// them would trade a wrong charge for NO charge, and the replacement — an
-// off-carriageway violation code, and the lesson's off-route stop — lives in
-// files this slice does not own (see the report accompanying this change).
+// ---------------------------------------------------------------------------
+// (2) THE ROAD-MEMBERSHIP CHANNEL IS ANSWERED BY THE ASPHALT — 2026-08-24
+// ---------------------------------------------------------------------------
+//
+// WHY THE TWO FRAMES STAYED OPEN AFTER (1) AND (3) SHIPPED. The paint nulling
+// closed the −1 «Неустойчиво движение в лентата» billed at t129s while the ego
+// was INSIDE a roadside building — a wrongful conviction retired, and worth it.
+// `surfaceUnderCar` closed nothing, because it is an imperative getter and,
+// measured across the whole platform, its callers are: this file's own test.
+// Neither touches what both findings actually say — «no off-route stop, no
+// reset, no penalty», and «ended naturally with 0 of 3 objectives done» after
+// a hundred-odd seconds on bare ground. The measurement was being made every
+// frame and thrown away.
+//
+// THERE WAS ALREADY AN ENDING WAITING FOR IT, and it was waiting on the wrong
+// witness. `lessons/finish.ts` `stepOffNetwork` + `offNetworkEndingCopy` close a
+// drive that is off the network for OFF_NETWORK_STUCK_S = 75 s, and
+// `lessons/engine.ts` folds them (armed 7404468). Its evidence is
+// `SimTick.edgeId === null`, and until this change the ONLY thing that produced
+// that null was `locator.ts`: further than OFF_ROAD_DISTANCE_M = 30 m from
+// every road CENTRELINE. That is a lock-ACQUISITION radius. Measured on the two
+// findings' own maps, on a 2 m grid over each district's bbox + 60 m:
+//
+//   ov-oncoming-v1  14,659 poses get an edge handed back; 8,796 of them (60.0%)
+//                   have NO asphalt under them. Cross-section at y = 400: the
+//                   carriageway ends at x = 12.125 m, footway to ≈ 14 m, verge
+//                   beyond — and the locator answers `ovg-e-road`, lane 0,
+//                   maxspeed 90 for every metre of it out to x = 30.
+//   ln-arrows-v1    8,517 locked, 3,588 of them (42.1%) off the asphalt.
+//
+// So a car in the verge, on the footway, on a roundabout island or inside a
+// roadside building is „on the network" for as long as it stays inside that
+// skirt, the 75 s clock never starts, and the drive runs until the harness (or
+// the student) gives up. That is finding B's whole shape: `sc-ln-turn-lane-
+// arrows / pc-right` is painted road at t032s, bare ground at t064s, and still
+// running at t172s against a wall with 0 of 3 objectives done.
+//
+// SO `edgeId` NOW MEANS WHAT ITS CONTRACT SAYS. `SimTick.edgeId` is documented
+// „`null` means off-road/unknown", and `rules/engine.ts`'s act latch spells the
+// same reading out — „`null` IS A SEGMENT ANSWER … i.e. „this car is nowhere"".
+// The claim is unchanged; only the witness is better. `fix.edgeId` still governs
+// everything the LANE FIX is for (see below) — this is one channel, and it is
+// the one three consumers read as „is the car in the authored world".
+//
+// NOT THE SAME THING AS MAKING THE LOCATOR GO NULL, and the difference is the
+// whole reason this is one line rather than a threshold change. `locator.ts`'s
+// own header lists what goes quiet when the FIX goes null: `laneCount` → 1,
+// `maxSpeedKmh` → the district default, `wrongWay` → false, no М10 arrow and no
+// authored ban / paint / rail / curve span consulted at all. Off the asphalt
+// that would be an amnesty — exactly the „fix that takes something away" this
+// programme has already shipped once. The lane fix is left standing; only the
+// membership answer is re-witnessed.
+//
+// THE FALSE-REFUSAL EXPOSURE IS SMALLER THAN THE ONE IT REPLACES, and that is
+// the half that had to be measured before arming anything, because an ending
+// that closes a correct drive is the founder's own complaint manufactured by an
+// instrument. Swept on all 105 shipped districts:
+//   · 57,000 travel-lane centres AND kerbside parking-band centres — worst
+//     `outsideKerbM` 0.000 m. Not „under the bar": zero.
+//   · all 248 authored spawn points — 0.000 m.
+//   · all 117 authored parking BAY centres in every lot/pk/vu district
+//     (the deepest is lot-par-v1's parallel slot at 6.28 m off the aisle
+//     centreline) — 0.000 m, `under: "carriageway"`. A student who parks
+//     perfectly and sits in the bay is on drawn asphalt, so the clock never
+//     starts. This was the one way this change could have been catastrophic.
+//   · 78,132 tightest-legal kerb-hug poses (body just inside the ribbon edge) —
+//     3 read off-carriageway, all on ONE 4 m stretch of d2-v1 `e1056871739.1`,
+//     worst 2.73 m. Isolated poses cannot make 75 CONTINUOUS seconds.
+// Against that, the incumbent 30 m rule leaves 0.645 m of headroom along the
+// entire kerb band of district-v1's five-lane boulevard
+// (`__tests__/off-network-headroom.test.ts` measures it). The asphalt referent
+// is strictly the safer of the two in the acquitting direction as well as the
+// convicting one.
+//
+// WHAT THIS COSTS, NAMED RATHER THAN HIDDEN. `rules/engine.ts` suppresses a
+// pedestrian-crossing pass when the crossing's `hostEdgeId` and `tick.edgeId`
+// are two different STRINGS; a null is „unknown", so a car fully off the
+// asphalt sweeping past a SIDE street's zebra is graded where it used to be
+// acquitted. Narrow (the zebra on the car's own road matched already, so its
+// behaviour is unchanged) and pointing at a conviction worth defending — a car
+// on the pavement beside an occupied zebra. Named here because a fix that only
+// counts what it adds is how round 1 deleted a commendation.
+//
+// WHAT DELIBERATELY DOES NOT CHANGE. `maxSpeedKmh`, `wrongWay`, `laneId`, the
+// zone flags and every опасна channel stay exactly as shipped off the asphalt.
+// Silencing them would trade a wrong charge for NO charge — the 97 км/ч in
+// finding A's own frame must still be a conviction, not a shrug. The remaining
+// replacement, an OFF_CARRIAGEWAY violation code that says so at the KERB
+// instead of 75 s later, needs `rules/types.ts` + `rules/engine.ts` + the
+// violation catalogue and is routed in the report accompanying this change.
 //
 // COST, measured on this box:
 //   resolve  105 shipped districts in 320 ms total — median 0.4 ms, every
@@ -1881,7 +1968,17 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
         laneCount: edgeRt ? edgeRt.lanesPerDir : 1,
         // C1: the segment laneId is numbered against — the reducer only
         // grades laneId deltas within one segment (renumbering ≠ maneuver).
-        edgeId: fix.edgeId,
+        //
+        // …AND THE ASPHALT OVERRULES THE LOCK RING (surface-consult block (2)).
+        // `fix.edgeId` is the nearest CENTRELINE within 30 m, and on the two
+        // findings' own districts 60.0% / 42.1% of the ground it hands an edge
+        // back for has no asphalt on it at all. Off the carriageway this
+        // channel now says what its contract says it means — „this car is
+        // nowhere" — so `lessons/finish.ts`'s off-network ending
+        // can start its clock at the KERB instead of one lock-radius past it.
+        // Everything else on this tick still rides `fix`: the lane fix stays a
+        // lane fix, and only the road-MEMBERSHIP question is re-answered.
+        edgeId: offCarriageway ? null : fix.edgeId,
         indicator: v.indicator,
         headlights: v.headlights,
         seatbeltOn: v.seatbeltOn,

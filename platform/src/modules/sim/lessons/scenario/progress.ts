@@ -56,7 +56,7 @@
  * one was open off the very rows said to leave it shut, and `passed && !
  * unlocked` was a state this fold could emit. `ScenarioCatalog.tsx:226` paints
  * that rung 🔒 „Отключва се с ≥ 2★ на предишното ниво" over a 3★ pass, and the
- * copy is the smaller half: `actions.ts:154` runs `isScenarioLevelUnlocked` as
+ * copy is the smaller half: `actions.ts:272` runs `isScenarioLevelUnlocked` as
  * the SAVE gate, so re-driving it answers `LEVEL_LOCKED` and the finished drive
  * is discarded — the false failure, in the one place it costs a whole session.
  *
@@ -72,6 +72,53 @@
  * exists only because the save action already accepted the rung as open when it
  * was written. Nothing credits a rung nobody drove — the second half of the
  * test above is that direction, and fails the moment it stops holding.
+ *
+ * ---------------------------------------------------------------------------
+ * 2026-08-24 — THE LOCK THAT EXPLAINED ITSELF WITH THE RULE B9 DELETED.
+ *
+ * B9 changed what opens a rung and this fold has told nobody since. It reports
+ * `unlockedBy` for an OPEN rung and, for a SHUT one, `null` and nothing else —
+ * so the picker had no requirement to print and wrote its own. What it wrote
+ * is the PRE-B9 rule, and it is still on the screen today:
+ *
+ *   ScenarioCatalog.tsx:113  „Ниво 1 е винаги отворено; следващото ниво се
+ *                             отключва с ≥ 2★."
+ *   ScenarioCatalog.tsx:226  „Отключва се с ≥ 2★ на предишното ниво"
+ *
+ * Both sentences are false against this file. `unlockedBy: "attempt"` opens the
+ * next rung off ANY persisted attempt — 1★, 0★, an aborted session — which is
+ * the founder ruling B9 exists to serve («Users should always have the option
+ * to continue to the next lesson immediately and return later»). Measured on
+ * SC_PARK_PERP_REV with the single row `sc-park-perp-rev@L1` at 1★ — one star
+ * BELOW the bar the copy names: `isScenarioLevelUnlocked(spec, 2, rows) === true`
+ * and the save action accepts the drive, while the same picker sheet captions
+ * L3–L5 „Отключва се с ≥ 2★ на предишното ниво" — a star rule that will not be
+ * what opens those either.
+ *
+ * The cost is the wall FR-06 and FR-23 were filed about, rebuilt in copy after
+ * the engine stopped enforcing it: a student who takes 1★ is told he needs two
+ * stars to go on, and the two stars are not what he needs. A student staring at
+ * a genuinely shut rung is pointed at a star target that opens nothing — he has
+ * to DRIVE the rung below, once, and no surface says so. Doc 64 THEO-4:
+ * a decision the product takes about the student is explained or it is a defect,
+ * and an explanation that is not the reason is the worse half of that.
+ *
+ * So the fold now states the requirement itself, in the student's own language,
+ * out of the SAME branch that decides `unlocked` (`scenarioLockRequirementBg`
+ * below) — the sentence and the gate are computed together and cannot drift
+ * apart again the way the picker's hand-written copy did. It names the rung the
+ * student must drive, taken from the PREVIOUS AUTHORED ENTRY and never from
+ * `level - 1` arithmetic (the trap progression.ts:52 documents: a gapped ladder
+ * makes arithmetic point at a rung that does not exist).
+ *
+ * NOT YET ON THE SCREEN, and this is the honest half of the note: `page.tsx:122`
+ * projects the fold into `ScenarioCatalogEntry` (components/sim/lesson-ui/
+ * types.ts:71) as four fields — level, unlocked, attempts, bestStars — so
+ * `passed`, `unlockedBy` and now `lockedByBg` die at that seam, and B9's own
+ * promise („Nothing is hidden — `passed`, `bestStars` and `unlockedBy` all ride
+ * out of this fold") has never been true past this module's edge. Carrying the
+ * field through is one line in each of those two files plus the subtitle at
+ * ScenarioCatalog.tsx:226; none of the three is this lane's to edit.
  */
 
 import { parseScenarioLessonId } from "./resolve";
@@ -82,8 +129,37 @@ import type { ScenarioLevel, ScenarioSpec } from "./types";
  * Since B9 this is a QUALITY bar, not a lock: it decides `passed`, drives the
  * „върни се към…" prompts and the next-step recommendation, and no longer
  * decides `unlocked`. See `ScenarioLevelProgress.unlockedBy`.
+ *
+ * THE NAME STILL SAYS „UNLOCK" AND IT NO LONGER DOES ONE — read the docstring,
+ * not the identifier, and do not build a gate out of this number. Two callers
+ * read the name: `ScenarioCatalog.tsx:113`/`:226` interpolate it into the two
+ * on-screen sentences the 2026-08-24 header note takes apart, and
+ * `nextStep.ts:162` withholds the „Следващо ниво" button below it — which is a
+ * legitimate QUALITY choice there («one rung harder is earned», nextStep.ts
+ * header) but is justified in that file's prose by the retired unlock rule. Use
+ * `scenarioLockRequirementBg` for anything a student reads about a shut rung.
  */
 export const SCENARIO_UNLOCK_MIN_STARS = 2;
+
+/**
+ * The requirement a SHUT rung is waiting on, as the student needs to read it.
+ *
+ * ONE sentence, generated in one place, because the picker's hand-written
+ * version drifted off the rule (header, 2026-08-24) and nothing could tell:
+ * copy that restates a gate is only as true as the day it was typed. This is
+ * called from the same branch that returns `unlockedBy: null`, so a change to
+ * the gate is a change to the sentence.
+ *
+ * It says DRIVE, not PASS, and it says the grade does not matter, because that
+ * is exactly what B9 made true and exactly what the student is not being told:
+ * an attempt row is an attempt row whether it ended ИЗДЪРЖАН, НЕИЗДЪРЖАН or
+ * «Урокът беше прекъснат преди края». Stars are not in this sentence and must
+ * never come back into it — they mark a rung PASSED (`passed`), they open
+ * nothing.
+ */
+export function scenarioLockRequirementBg(previousLevel: ScenarioLevel): string {
+  return `Карай Ниво ${previousLevel} веднъж — отваря се независимо от оценката.`;
+}
 
 /**
  * Explicit gate override, passed by callers that resolved it SERVER-SIDE
@@ -133,6 +209,13 @@ export interface ScenarioLevelProgress {
   passed: boolean;
   /** Why `unlocked` is true; null when the rung is still shut. */
   unlockedBy: ScenarioUnlockReason | null;
+  /**
+   * What a SHUT rung is waiting on, in the student's own language — present
+   * exactly when `unlocked` is false, null otherwise. The picker prints this
+   * instead of restating the gate in its own words; see the 2026-08-24 note in
+   * the header for what its own words had become.
+   */
+  lockedByBg: string | null;
 }
 
 /** Per-authored-level progression of one template from the session history. */
@@ -158,6 +241,12 @@ export function scenarioLevelProgress(
   const ordered = [...spec.levels].sort((a, b) => a.level - b.level);
   let prevBest: number | null = null;
   let prevAttempts = 0;
+  // The rung the student must drive to open the next one — the PREVIOUS
+  // AUTHORED ENTRY, never `rung.level - 1`. Arithmetic on a gapped ladder
+  // names a rung that does not exist (progression.ts:52 measured that exact
+  // failure on the fractional полигон orders), and the requirement sentence
+  // has to point at something the picker can actually offer.
+  let prevLevel: ScenarioLevel | null = null;
   let first = true;
   return ordered.map((rung) => {
     const acc = byLevel.get(rung.level);
@@ -177,9 +266,18 @@ export function scenarioLevelProgress(
             : unlockAll
               ? "admin"
               : null;
+    // Computed HERE, off the same `unlockedBy` the verdict is taken from, so
+    // the sentence a student reads cannot say one thing while the gate does
+    // another — which is precisely what happened while this was the picker's
+    // own hand-written string.
+    const lockedByBg =
+      unlockedBy === null && prevLevel !== null
+        ? scenarioLockRequirementBg(prevLevel)
+        : null;
     first = false;
     prevBest = acc?.best ?? null;
     prevAttempts = acc?.attempts ?? 0;
+    prevLevel = rung.level;
     const best = acc?.best ?? null;
     return {
       level: rung.level,
@@ -188,6 +286,7 @@ export function scenarioLevelProgress(
       bestStars: best,
       passed: best !== null && best >= SCENARIO_UNLOCK_MIN_STARS,
       unlockedBy,
+      lockedByBg,
     };
   });
 }

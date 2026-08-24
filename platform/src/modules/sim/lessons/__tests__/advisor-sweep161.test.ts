@@ -57,6 +57,7 @@ import {
   YIELD_VOICE_SETTLE_S,
   advisorPromptForObjective,
   advisorPromptForSession,
+  controllerWaitAdvisorPrompt,
   createYieldVoice,
   stepYieldVoice,
   yieldWaitAdvisorPrompt,
@@ -288,31 +289,103 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
   // that frame — a MINIMUM-speed drill coached with a ceiling — is a template
   // copy row (templates-merging2), not a number this module may invent or
   // suppress.
-  const cases: [string, string, number, number][] = [
-    // scenario, objective, photographed gate, the author's own cap
-    ["sc-speed-transition", "sc-trn-approach", 57, 52],
-    ["sc-speed-transition", "sc-trn-in-zone", 38, 33],
-    ["sc-sp-curve", "sc-spcv-curve", 60, 55],
-    ["sc-sp-eco-coast", "sc-ecoc-coast", 41, 36],
-    ["sc-vu-cyclist-hook", "sc-vu-approach", 40, 35],
-    ["sc-mw-min-speed", "sc-mwms-join", 140, 140],
+  // `spoken` is the fourth column and it is the author's cap on five of the
+  // six. sc-trn-in-zone is the exception and the reason it exists: its title
+  // says «зона 30», which is a В26 plate written the way Bulgarian writes one,
+  // and until 2026-08-24 `titleCapKmh` could not read a ceiling without the
+  // literal „км/ч" beside it. The author's own pre-grace figure there is 33 —
+  // itself three above the zone he authored — so the card licensed 33 inside a
+  // thirty, one panel away from a briefing that says «влез в зоната вече под 30
+  // км/ч». The title now wins, as source 2 always said it should.
+  const cases: [string, string, number, number, number][] = [
+    // scenario, objective, photographed gate, the author's own cap, spoken
+    ["sc-speed-transition", "sc-trn-approach", 57, 52, 52],
+    ["sc-speed-transition", "sc-trn-in-zone", 38, 33, 30],
+    ["sc-sp-curve", "sc-spcv-curve", 60, 55, 55],
+    ["sc-sp-eco-coast", "sc-ecoc-coast", 41, 36, 36],
+    ["sc-vu-cyclist-hook", "sc-vu-approach", 40, 35, 35],
+    ["sc-mw-min-speed", "sc-mwms-join", 140, 140, 140],
   ];
-  for (const [scenarioId, objectiveId, photographed, authored] of cases) {
-    it(`${scenarioId}/${objectiveId}: the card says the author's ${authored}, never the ladder's ${photographed}`, () => {
+  for (const [scenarioId, objectiveId, photographed, authored, spoken] of cases) {
+    it(`${scenarioId}/${objectiveId}: the card says ${spoken}, never the ladder's ${photographed}`, () => {
       const { objective, prompt, authoredCapKmh } = cardFor(scenarioId, objectiveId);
       // The GATE is untouched — this is a copy fix, not a re-authored objective.
       expect((objective.params as { maxSpeedKmh?: number }).maxSpeedKmh).toBe(photographed);
       expect(authoredCapKmh).toBe(authored);
-      expect(prompt.textBg).toBe(`${objective.titleBg} — дръж под ${authored} км/ч`);
+      expect(prompt.textBg).toBe(`${objective.titleBg} — дръж под ${spoken} км/ч`);
       // The photographed figure is gone wherever it was ever the ladder's.
       if (photographed !== authored) {
         expect(prompt.textBg).not.toContain(String(photographed));
       }
       // And the number it does say can never fail the student who obeys it.
+      expect(spoken).toBeLessThanOrEqual(authored);
       expect(authored).toBeLessThanOrEqual(photographed);
+      expect(Number.isInteger(spoken)).toBe(true);
       expect(Number.isInteger(authored)).toBe(true);
     });
   }
+
+  // ── THE ZONE PLATE, BOTH DIRECTIONS ────────────────────────────────────
+  //
+  // sweep161's own words on this lesson: „ЗАДАЧА 2/3 says дръж под 38 км/ч
+  // inside a posted 30 zone while instruction 3 says около 26–28 км/ч. A
+  // student reading the chip is told … 37 in a 30 is the goal."
+  // (`.audit-frames/sweep161/sc-speed-transition/pc-right/01-arrival.png`.)
+  describe("«зона N» is a ceiling the author wrote, and the card reads it", () => {
+    it("the зона figure binds on every rung, not just the one the ladder happens to reach", () => {
+      // L1 grades at 38, L3–L5 at 33. The card is 30 on all five, so the
+      // sentence stops moving with the difficulty ladder — which is the whole
+      // complaint: the ladder's grace was being read out as the instruction.
+      for (const level of [1, 2, 3, 4, 5] as ScenarioLevel[]) {
+        const { prompt } = cardFor("sc-speed-transition", "sc-trn-in-zone", level);
+        expect(prompt.textBg, `L${level}`).toBe(
+          "Влез в зона 30 вече под ограничението — дръж под 30 км/ч",
+        );
+      }
+    });
+
+    it("and the briefing on the same screen now agrees with it", () => {
+      // The frame's other half. Both figures come off the compiled lesson, so
+      // a re-authored briefing that moved the zone would fail here rather than
+      // silently re-open the contradiction.
+      const lesson = compileScenario(template("sc-speed-transition"), 1);
+      const zoneSteps = (lesson.briefingBg ?? []).filter((b) => /зона/i.test(b.textBg));
+      expect(zoneSteps.length).toBeGreaterThan(0);
+      const briefed = zoneSteps.flatMap((b) =>
+        [...b.textBg.matchAll(/под (\d+) км\/ч/g)].map((m) => Number(m[1])),
+      );
+      expect(briefed).toContain(30);
+      const { prompt } = cardFor("sc-speed-transition", "sc-trn-in-zone");
+      expect(KMH_NUMBERS(prompt.textBg).at(-1)).toBe(Math.min(...briefed));
+    });
+
+    it("«зона» followed by something that is not a speed is NOT read as one", () => {
+      // The guard band. „зона 2" is a sector, not a limit, and a card demanding
+      // 2 км/ч would be the dangerous direction of this same bug.
+      const p = advisorPromptForObjective(
+        "Спри в зона 2 на паркинга",
+        { kind: "reachZone", x: 0, y: 0, radiusM: 10, maxSpeedKmh: 40 },
+        undefined,
+        undefined,
+        35,
+      );
+      expect(p.textBg).toBe("Спри в зона 2 на паркинга — дръж под 35 км/ч");
+    });
+
+    it("a зона figure LOOSER than the gate never licenses more than the gate", () => {
+      // The Math.min half, in the new source. An authored «зона 50» over a gate
+      // of 30 must still say 30 — a card may never invite the student to fail
+      // the task it is coaching.
+      const p = advisorPromptForObjective(
+        "Мини зона 50 спокойно",
+        { kind: "reachZone", x: 0, y: 0, radiusM: 10, maxSpeedKmh: 30 },
+        undefined,
+        undefined,
+        30,
+      );
+      expect(p.textBg).toBe("Мини зона 50 спокойно — дръж под 30 км/ч");
+    });
+  });
 
   it("no compiled card anywhere speaks a number that is neither the sign's, the author's, nor a halt", () => {
     const bad: string[] = [];
@@ -322,7 +395,14 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
       const authored = KMH_NUMBERS(c.titleBg);
       const isHalt = c.cap <= 8;
       const isSign = c.posted !== undefined && c.posted < c.cap && spoken === c.posted;
-      const isAuthored = spoken !== undefined && authored.includes(spoken);
+      // Source 2 has two spellings. «зона 30» is a В26 plate and is as much the
+      // author's own ceiling as «под 30 км/ч» is — see `titleCapKmh`'s zone
+      // clause and the block above.
+      const zonePlate = [...c.titleBg.matchAll(/зона\s*(\d+)/gi)]
+        .map((m) => Number(m[1]))
+        .filter((n) => n >= 10 && n <= 130);
+      const isAuthored =
+        spoken !== undefined && (authored.includes(spoken) || zonePlate.includes(spoken));
       // SOURCE 4 (2026-08-19): the template's own `maxSpeedKmh` before the rung's
       // grace. Admitted as a source, NOT as an escape hatch — it counts only when
       // the compiled objective actually carries the key and the spoken figure IS
@@ -627,35 +707,125 @@ function waitingSession(
 }
 
 describe("sweep161 — the live wait card stops telling the officer's junction to watch the lamp", () => {
-  it("sc-sig-controller-live: the card is the officer's instruction, not «Тръгваш на зелено»", () => {
+  // 2026-08-24 — THE DISPLACEMENT WAS SCOPED TO ONE BANNER AND THE OFFICER IS
+  // NOT A PROPERTY OF ONE BANNER.
+  //
+  // The first cut asked `titleNamesController(active.spec.titleBg)` and fell
+  // through to the OBJECTIVE card, and the test below said out loud what was
+  // wrong with that: „`titleNamesController` is a substring test, so the
+  // displacement is only ever as strong as the banner." Measured over the
+  // compiled catalogue, two of the three officer drills carry an objective that
+  // does not name him — `sc-sctl-exit` and, worse, `sc-sctp-cross`, the
+  // CROSSING objective of sc-sig-controller-postures — and on both the generic
+  // «Чакаш правилно на червено … Тръгваш на зелено» came straight back at the
+  // junction where the lamp decides nothing.
+  //
+  // Two things changed. The officer is now read off the LESSON (its title, its
+  // briefing, any of its objective titles — all authored copy the student has
+  // been shown), and what replaces the lamp card is a WAIT card rather than the
+  // waypoint: falling through to the objective would have answered a student
+  // standing still at `sc-sctl-exit` with «Излез от кръстовището на север».
+  const OFFICER_CARD = controllerWaitAdvisorPrompt().textBg;
+
+  it("sc-sig-controller-live: the wait card is the officer's, not «Тръгваш на зелено»", () => {
     const s = waitingSession("sc-sig-controller-live", "sc-sctl-cross", "redLight");
     const p = advisorPromptForSession(s);
     expect(p?.textBg).not.toContain("Тръгваш на зелено");
-    expect(p?.textBg).toBe(
-      "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
-    );
+    expect(p?.textBg).toBe(OFFICER_CARD);
   });
 
-  it("…and on its approach objective too — the objective's own words, not the lamp's", () => {
-    // The banner was «Приближи бавно и прочети регулировчика, не лампата» until
-    // 2026-08-19 (doc 88 O21): nothing in the cockpit contract can witness a
-    // look at a world actor, so the gate certified a read it never measured and
-    // the claim moved to `sc-sctl-cross`, which grades it. The OFFICER stayed in
-    // the words, and this test is why — the first cut of that retitle read
-    // «Приближи бавно до стоп-линията» and this assertion went red with the
-    // generic lamp card back in place, «…Тръгваш на зелено», on the junction
-    // where the lamp decides nothing. `titleNamesController` is a substring
-    // test, so the displacement is only ever as strong as the banner.
+  it("…and on its approach objective too", () => {
     const s = waitingSession("sc-sig-controller-live", "sc-sctl-read", "redLight");
     const p = advisorPromptForSession(s);
     expect(p?.textBg).not.toContain("Тръгваш на зелено");
-    // The cap clause is the authored-cap wave below: this zone grades at 20
-    // km/h and the template's own figure IS 20, so the card names it. The
-    // officer's sentence is untouched, which is what this test is about — and
-    // the number appearing here is the same lane's guarantee that no capped
-    // objective grades in silence, this one included.
+    expect(p?.textBg).toBe(OFFICER_CARD);
+  });
+
+  it("the OBJECTIVE card on the approach still keeps the officer in its own words", () => {
+    // KEPT FROM THE FIRST CUT, which pinned this and is still right: the banner
+    // was «Приближи бавно и прочети регулировчика, не лампата» until 2026-08-19
+    // (doc 88 O21) — nothing in the cockpit contract can witness a look at a
+    // world actor, so the gate certified a read it never measured and the claim
+    // moved to `sc-sctl-cross`. The OFFICER stayed in the words, and this test
+    // is why: the first cut of that retitle read «Приближи бавно до
+    // стоп-линията», and `advisorPromptForObjective`'s own officer branch
+    // (`titleNamesController`) is still a substring test on THIS banner. The cap
+    // clause is the authored-cap wave: the zone grades at 20 and the template's
+    // own figure IS 20, so the card names it rather than grading in silence.
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-read", "redLight");
+    const notWaiting = { ...s, yieldWait: freeWait() };
+    const p = advisorPromptForSession(notWaiting);
     expect(p?.textBg).toBe("Приближи бавно до регулировчика — дръж под 20 км/ч");
     expect(p?.textBg).toContain("регулировчика");
+  });
+
+  it("…and the CROSSING objective's card is still the authored officer sentence", () => {
+    // The `requireRedMet` branch of `advisorPromptForObjective`, which the
+    // generic «Спри на стоп-линията на светофара и изчакай зелено» used to
+    // answer — the sentence sweep161 filed as defect 3.
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-cross", "redLight");
+    const notWaiting = { ...s, yieldWait: freeWait() };
+    const p = advisorPromptForSession(notWaiting);
+    expect(p?.textBg).toBe(
+      "Премини стоп-линията по разрешение на регулировчика — въпреки червената лампа",
+    );
+    expect(p?.textBg).not.toContain("изчакай зелено");
+    expect(p?.keys).toEqual(["S"]);
+  });
+
+  it("…and on the objective that does NOT name him — the hole the first cut left", () => {
+    // `sc-sctl-exit` is «Излез от кръстовището на север». Before 2026-08-24 a
+    // red hold here read «Чакаш правилно на червено … Тръгваш на зелено», on
+    // the drill whose −10 was for doing exactly that.
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-exit", "redLight");
+    const p = advisorPromptForSession(s);
+    expect(p?.textBg).not.toContain("Тръгваш на зелено");
+    expect(p?.textBg).toBe(OFFICER_CARD);
+  });
+
+  it("…and on sc-sig-controller-postures' CROSSING objective, which never named him either", () => {
+    const s = waitingSession("sc-sig-controller-postures", "sc-sctp-cross", "redLight");
+    const p = advisorPromptForSession(s);
+    expect(p?.textBg).not.toContain("Тръгваш на зелено");
+    expect(p?.textBg).toBe(OFFICER_CARD);
+  });
+
+  it("…and after the last objective, where the route runs out past the same junction", () => {
+    const s = waitingSession("sc-sig-controller-live", "sc-sctl-exit", "redLight");
+    const done = { ...s, currentObjectiveIndex: s.objectives.length };
+    expect(advisorPromptForSession(done)?.textBg).toBe(OFFICER_CARD);
+  });
+
+  it("the officer's card praises nothing it cannot see, and orders nothing either", () => {
+    // THE HALF THAT MATTERS MOST. On the convicting drive the officer was
+    // SIDE-ON — the wait itself was the fault — so «Чакаш правилно» was false.
+    // Nothing this module is handed carries his posture, so it may neither
+    // approve the wait nor tell the student to go; it says where to look and
+    // what each posture means, which is true on every frame of every officer's
+    // junction.
+    expect(OFFICER_CARD).not.toContain("Чакаш правилно");
+    expect(OFFICER_CARD).not.toMatch(/Тръгвай|Потегли|Мини сега/);
+    expect(OFFICER_CARD).toContain("регулировчик");
+    // The teaching content: where to look, and both postures, so the student
+    // can act on it rather than be told a verdict (THEO-4 requirement zero).
+    expect(OFFICER_CARD).toContain("позата");
+    expect(OFFICER_CARD).toContain("страничен профил");
+    expect(OFFICER_CARD).toContain("гърди");
+    // The raised arm is the third posture ППЗДвП чл. 65 names and the only one
+    // that overrides a side-on release. A card that listed the other two alone
+    // would send a student who is side-on straight through a phase change.
+    expect(OFFICER_CARD).toContain("ръка горе");
+    // …and no key chip, because the next action depends on a posture this
+    // module cannot read (the advisor's own honesty rule).
+    expect(controllerWaitAdvisorPrompt().keys).toEqual([]);
+  });
+
+  it("…and it fits the same 240 px column every other wait card is held to", () => {
+    // `yield-voice.test.ts` holds all five reason cards to 40–150 characters.
+    // This one is painted in the same slot, so it is held to the same band —
+    // the first draft was 249 and would have clipped the clause that says GO.
+    expect(OFFICER_CARD.length).toBeGreaterThan(40);
+    expect(OFFICER_CARD.length).toBeLessThan(150);
   });
 
   // --- the opposite direction --------------------------------------------
@@ -683,5 +853,90 @@ describe("sweep161 — the live wait card stops telling the officer's junction t
     );
     // …and with no wait, an exhausted chain still advises nothing.
     expect(advisorPromptForSession({ ...done, yieldWait: freeWait() })).toBeNull();
+  });
+
+  it("the lesson scope is EVIDENCE, not a blanket — no officer anywhere means no displacement", () => {
+    // The census this widening was measured against: three templates stage a
+    // регулировчик and every other lesson in the catalogue keeps every card it
+    // had. Driven over the whole catalogue so a future template that mentions
+    // him in passing shows up here rather than on a student's glass.
+    const displaced: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES) {
+      const lesson = compileScenario(spec, 1);
+      const idx = lesson.objectives.length > 0 ? 0 : -1;
+      if (idx < 0) continue;
+      const s: LessonSessionState = {
+        ...createLessonSession(lesson),
+        phase: "driving",
+        currentObjectiveIndex: idx,
+        yieldWait: heldWait("redLight", 1),
+      };
+      if (advisorPromptForSession(s)?.textBg === OFFICER_CARD) displaced.push(spec.id);
+    }
+    expect(displaced.sort()).toEqual([
+      "sc-sig-controller-live",
+      "sc-sig-controller-postures",
+      "sc-signal-controller",
+    ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. THE MIDDLE LINE OF THE RED-LIGHT LECTURE — the other channel on the same
+//    convicting drive.
+//
+// run.log line 196, t = 70 s: «Чакането Е маневрата · 13 секунди на червено са
+// просто цикълът на светофара, не грешка …», 34 s before line 358 billed −10
+// «Неизпълнение на сигнала на регулировчика». The card is displaced at an
+// officer's junction; this channel cannot be — `stepYieldVoice` is handed a
+// reason and a speed and never the lesson — so the generic lecture has to carry
+// ЗДвП чл. 6, т. 2's single exception in EVERY stage, not in three of four.
+// ---------------------------------------------------------------------------
+
+describe("sweep161 — every stage of the red-light lecture names the one exception", () => {
+  const stages = () => {
+    const said: HudEvent[] = [];
+    let v: YieldVoiceState = createYieldVoice();
+    for (let t = 0; t <= YIELD_VOICE_SETTLE_S + 2; t += 0.5) {
+      const step = stepYieldVoice(v, {
+        t,
+        speedKmh: 0,
+        wait: heldWait("redLight", 0),
+        violations: [],
+      });
+      v = step.state;
+      said.push(...step.notices);
+    }
+    return said;
+  };
+
+  it("the card, the naming line AND the settled line all say the officer outranks the lamp", () => {
+    const spoken = [
+      yieldWaitAdvisorPrompt("redLight").textBg,
+      ...stages().map((e) => (e.kind === "lesson" ? `${e.titleBg} ${e.explanationBg}` : "")),
+    ].filter((s) => s.length > 0);
+    // Both staged lines actually fired — otherwise this test proves nothing.
+    expect(spoken.length).toBe(3);
+    for (const line of spoken) expect(line, line.slice(0, 40)).toMatch(/регулировчик/i);
+  });
+
+  it("the settled line still says the seconds are not a fault — nothing was traded away for it", () => {
+    const settled = stages().find(
+      (e) => e.kind === "lesson" && e.titleBg === "Чакането Е маневрата",
+    );
+    expect(settled).toBeDefined();
+    const body = settled!.kind === "lesson" ? settled!.explanationBg : "";
+    expect(body).toContain("не грешка");
+    expect(body).toContain("изваждат от ориентировъчното време");
+    expect(body).toMatch(/^\d+ секунди/);
+  });
+
+  it("and the exception is not smuggled into the other four reasons", () => {
+    // A Б1 line that started lecturing about регулировчици would be the
+    // opposite defect: copy that is true somewhere else, on a card that is
+    // about a give-way sign.
+    for (const reason of ["giveWayLine", "stopSign", "pedestrian", "roundaboutEntry"] as const) {
+      expect(yieldWaitAdvisorPrompt(reason).textBg, reason).not.toMatch(/регулировчик/i);
+    }
   });
 });
