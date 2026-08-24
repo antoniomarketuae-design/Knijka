@@ -71,7 +71,8 @@ export function scPeParkedRowScanShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай детето да освободи цялото платно — не потегляй под носа му." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътеката е свободна — премини спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно едва когато пътеката е свободна." },
       { kind: "drive", points: [[X_LEFT, Y_ZEBRA - 7], [X_LEFT, 106], [X_LEFT, 120]], targetKmh: 24 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "Готово: караше бавно и наляво покрай редицата, с покрита спирачка, и спря за изскочилото дете." },

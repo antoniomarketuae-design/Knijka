@@ -107,7 +107,8 @@ export function scSigFlashAmberPedShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай я да освободи платното напълно — не се разминавай „на косъм“." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътеката е чиста — продължи." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Продължи едва когато пътеката е чиста." },
       { kind: "drive", points: [[X_LANE, Y_CROSSING - 6], [X_LANE, 55], [X_LANE, 72]], targetKmh: 25 },
       { kind: "pause", sec: 1.5, brake: true },
       {

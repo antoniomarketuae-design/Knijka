@@ -123,7 +123,8 @@ export function scPeZoneLivingShadowScript(): DriveScript {
       },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Платното е чисто — продължи със същите 20 до края на зоната." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Едва когато платното е чисто — продължи със същите 20 до края на зоната." },
       // Shed to the crawl at Y_CRAWL, not at the mouth itself: at 4.6 m/s² the
       // 18 → 8 shed eats ~3.5 m, so starting it 17 m out is what puts the car
       // at crawl speed THROUGHOUT the sc-pzl-exit gate (y 272..282), instead of

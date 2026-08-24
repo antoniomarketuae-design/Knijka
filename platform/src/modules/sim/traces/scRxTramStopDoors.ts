@@ -68,7 +68,8 @@ function scRxTramStopShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Платното е на пътника, докато не се прибере — не потегляй под носа му." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Лентата е чиста — премини спокойно покрай спрелия трамвай." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно покрай спрелия трамвай едва когато лентата е чиста." },
       {
         kind: "drive",
         points: [[X_LANE, Y_ZEBRA - 6], [X_LANE, 120], [X_LANE, 134]],

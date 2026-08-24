@@ -187,7 +187,8 @@ export function scParkBayExitRevShadowScript(): DriveScript {
       // finish with margin, and a stopped car can never trip the contact check.
       { kind: "pause", sec: 7.0, brake: true },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Алеята е чиста — продължи спокойно към изхода." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Продължи спокойно към изхода едва когато алеята е чиста." },
       {
         kind: "drive",
         points: [

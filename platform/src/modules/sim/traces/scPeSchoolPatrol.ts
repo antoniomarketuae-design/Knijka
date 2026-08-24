@@ -97,7 +97,8 @@ export function scPeSchoolPatrolShadowScript(): DriveScript {
       },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Палката е свалена, пътеката е чиста — потегли плавно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Потегли плавно едва когато палката е свалена и пътеката е чиста." },
       { kind: "drive", points: [[X_LANE, Y_HALT], [X_LANE, 275], [X_LANE, Y_FINISH]], targetKmh: 25 },
       { kind: "pause", sec: 1.5, brake: true },
       {

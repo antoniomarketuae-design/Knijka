@@ -62,7 +62,8 @@ export function scCrossingWhiteCaneShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Търпение — той не те вижда и има нужда от много време; не настъпвай." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Слезе напълно от платното — премини спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно едва когато пешеходецът слезе напълно от платното." },
       {
         kind: "drive",
         points: [[X_LANE, Y_ZEBRA - 6.5], [X_LANE, 122], [X_LANE, 136]],

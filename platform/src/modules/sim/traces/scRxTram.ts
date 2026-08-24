@@ -258,7 +258,8 @@ function scRxTramIslandShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай го да стигне острова — не потегляй под носа му." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Платното е свободно — премини внимателно покрай острова." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини внимателно покрай острова едва когато платното е свободно." },
       {
         kind: "drive",
         points: [[X_LANE, Y_ZEBRA - 6], [X_LANE, 120], [X_LANE, 134]],

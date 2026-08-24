@@ -58,7 +58,8 @@ export function scCrossingLetPassShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай да освободи ЦЯЛАТА пътека — не се провирай зад гърба ѝ." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътеката е свободна — премини спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно едва когато пътеката е свободна." },
       {
         kind: "drive",
         points: [[X_LANE, Y_ZEBRA - 6.5], [X_LANE, 120], [X_LANE, 135]],

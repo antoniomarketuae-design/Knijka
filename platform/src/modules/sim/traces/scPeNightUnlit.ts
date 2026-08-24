@@ -101,7 +101,8 @@ export function scPeNightUnlitShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай я да освободи цялото платно — в тъмното не се разминаваш „на косъм“." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътеката е свободна — премини спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно едва когато пътеката е свободна." },
       {
         kind: "drive",
         points: [[X_LANE, Y_HALT], [X_LANE, 110], [X_LANE, 128]],

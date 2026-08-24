@@ -71,7 +71,8 @@ export function scCrossingRainSprintShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Изчакай го да слезе напълно от платното — при дъжд той бърза и вижда трудно." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
-      { kind: "annotation", textBg: "Пътеката е свободна — премини спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Премини спокойно едва когато пътеката е свободна." },
       {
         kind: "drive",
         points: [[X_LANE, Y_ZEBRA - 6.5], [X_LANE, 125], [X_LANE, 138]],

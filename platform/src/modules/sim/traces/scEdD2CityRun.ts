@@ -270,7 +270,8 @@ export function scEdD2CityRunShadowScript(route: ReadonlyArray<Pt>): DriveScript
       { kind: "annotation", textBg: "Спри и я изчакай да освободи платното напълно (чл. 119)." },
       { kind: "pause", sec: 7.0, brake: true },
       { kind: "glance", mirror: "left" },
-      { kind: "annotation", textBg: "Пътеката е чиста — довърши сегмента спокойно." },
+      // No-spoiler voice (sc-zebra-approach:8dda834f class): condition before command.
+      { kind: "annotation", textBg: "Довърши сегмента спокойно едва когато пътеката е чиста." },
       { kind: "drive", points: sliceRoute(route, S_ZEBRA_STOP, S_END), targetKmh: KMH_CROSSING },
       { kind: "pause", sec: 1.5, brake: true },
       {
