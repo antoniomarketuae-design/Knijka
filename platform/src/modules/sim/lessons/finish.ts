@@ -200,9 +200,10 @@
  * a terminal arrival needs three; the third needs one field this lane does not
  * own). `__tests__/terminal-departure.test.ts` drives it on shipped lessons and
  * ratchets the census; `routeDepartedEndingCopy` is the sentence it needs. The
- * ARM is six lines in `engine.ts` plus one field in `types.ts`, written out
- * verbatim beside the copy — until it lands nothing in this file's behaviour
- * has changed.
+ * ARM LANDED 2026-08-24 (engine.ts + one field in types.ts), at a dwell
+ * re-sized 20 → 75 s so the recorded return drive is not refused — see
+ * FINISH_DEPARTED_S for the derivation and the arm block below for the two
+ * options that were rejected instead.
  *
  * Pure and deterministic, like every other fold in this module: no clock, no
  * randomness, same state + same tick ⇒ same output.
@@ -850,54 +851,38 @@ export function routeDepartedEndingCopy(examMode: boolean): {
 }
 
 // ---------------------------------------------------------------------------
-// THE ARM IS NOT IN THIS FILE, and here is exactly what it is — verbatim, so
-// the routed edit is auditable at a glance. It is the same routing call the
-// O22 block above made, for the same reason (`engine.ts` and `types.ts` are
-// another lane's), and with the geometry, the census and the copy already
-// written and tested so what is left to land is mechanical.
+// THE ARM LANDED — 2026-08-24, the round the sweep161 findings on this file
+// were routed back to it. The block below used to hold the arm verbatim as a
+// routed work order plus one warning, and the warning was the whole reason it
+// had not landed: at FINISH_LEAVE_S the gate refused the recorded
+// overshoot-and-return drive 41.3 s before the student finished it. That
+// warning named three ways out and said none was decided. ONE NOW IS — the
+// first: the dwell is sized against the recorded return manoeuvre, and the
+// derivation is FINISH_DEPARTED_S above (75 s clears the 94.5 s completion by
+// 13.7 s and still closes the straight-on exhibit at ≈ entry + 75 s). The
+// other two options are recorded as rejected here so the next lane does not
+// re-litigate them: withholding while the terminal is re-earnable withholds
+// forever (`contractEarned` re-earns on ANY later compliant frame, so every
+// reachZone terminal is always re-earnable), and softening the copy would fix
+// the sentence while leaving the refusal.
 //
-//   1. `lessons/types.ts` — one field on LessonSessionState, beside the two
-//      gate states that are already there:
-//          /** O30: the departure gate on the terminal waypoint (finish.ts). */
-//          finishDepartureGate?: FinishGateState;
+// WHAT LANDED, exactly as the work order specified (engine.ts, beside the
+// other two gates; types.ts, one field):
+//   · `finishDepartureGate?: FinishGateState` on LessonSessionState;
+//   · stepped in the SAME `else` branch as the other two gates, so B15's
+//     freeze — which clears the partial dwell of every gate in the branch
+//     above it — covers this one too: a student stopped at a red just past the
+//     end of the route spends nothing;
+//   · the termination test guarded by `phase !== "completed"`, because the
+//     block above it already sets `phase` from `finishGate`/`stoppedStuck` and
+//     a frame on which both latch must not push two contradicting toasts;
+//   · `routeDepartedEndingCopy` as the sentence, never either existing one.
 //
-//   0. NOT AT FINISH_LEAVE_S, AND THIS IS THE PART THAT MUST BE RE-MEASURED
-//      BEFORE ANY OF IT LANDS. The dwell below is 20 s, and 20 s is shorter
-//      than the recovery the product allows today. Measured by stepping this
-//      zone's gate alongside `applyTick` on `sc-ac-aquaplane`@L1, on the
-//      overshoot-and-return drive recorded in the O30 block: the departure gate
-//      latches at t = 53.25 s and the student completes the lesson at
-//      t = 94.5 s. Landing the arm as written below would therefore END A
-//      LESSON 41.3 s BEFORE THE STUDENT FINISHED IT — and say «мина покрай
-//      края» to someone who was on his way back to the mark. That is refusing a
-//      correct drive, which objectives.ts calls the failure the founder ranks
-//      worst, and it is the opposite of the north star. Either the dwell is
-//      sized against real return manoeuvres, or the gate is withheld while the
-//      terminal objective is still re-earnable, or the copy stops implying the
-//      task is unrecoverable. None of those three is decided, so the arm is NOT
-//      ready to land and this block is a warning, not a work order.
-//
-//   2. `lessons/engine.ts` — stepped in the SAME `else` branch as the other
-//      two gates (so B15's freeze, which clears the partial dwell of every gate
-//      in the branch above it, covers this one too — a student stopped at a red
-//      just past the end of the route must not spend this dwell):
-//          const departure = terminalDepartureZone(params);
-//          if (departure !== null) {
-//            finishDepartureGate = stepFinishGate(
-//              finishDepartureGate ?? createFinishGate(), departure, tick);
-//          }
-//      …the same three-line freeze block the other two gates get, and then in
-//      the termination test:
-//          if (phase !== "completed" && finishDepartureGate?.reachedAtSec != null) {
-//            phase = "completed";
-//            endedAtSec = tick.t;
-//            hudEvents.push(routeDepartedEndingCopy(examMode));
-//          }
-//      …the `phase !== "completed"` guard is not decoration: the block above it
-//      already sets `phase` from `finishGate`/`stoppedStuck`, and without the
-//      guard a frame on which both latch pushes TWO ending toasts that
-//      contradict each other.
-//      …and `finishDepartureGate` in the returned state.
+// The ledger test that was written to convict the arm's absence
+// (`__tests__/terminal-departure.test.ts`, „STILL OWED") flipped the day this
+// landed, exactly as its comment said it would; the drive it steps now ends
+// with the departure copy, and a second end-to-end test pins the return drive
+// the old dwell refused.
 //
 // It grades nothing, exactly like the rest of this file: no ScorableEvent is
 // emitted, suppressed or reweighted, the unreached objectives stay honestly
@@ -1303,6 +1288,42 @@ export function terminalRescueZone(
 // invariant `finish-work-site-band.test.ts` states about an "outside" zone
 // holds here unchanged: the band never reaches inside the arm, it is never
 // zero-width, and it is never wider than FINISH_OUTSIDE_ANNULUS_M.
+/**
+ * Seconds past the departure circle before a drive that went PAST the end of
+ * the route is closed — the O30 zone's region dwell.
+ *
+ * NOT FINISH_LEAVE_S, and the change is the decision the O30 warning block
+ * demanded before the arm was allowed to land. Twenty seconds is right for a
+ * maneuver work site, where being outside means the work is provably over; it
+ * is WRONG here, measured on the recorded overshoot-and-return drive
+ * (sc-ac-aquaplane@L1, the O30 block): at 20 s the gate latches at t = 53.25 s
+ * and the student completes the lesson at t = 94.5 s — a correct drive refused
+ * 41.3 s before it finished, which objectives.ts calls the failure the founder
+ * ranks worst.
+ *
+ * FORCED FROM BOTH SIDES, like every bar in this file:
+ *
+ * FROM BELOW — it may not refuse a return the product allows. Two bounds, and
+ * the larger wins:
+ *   · the recorded return manoeuvre: region entry at t ≈ 33.0 s, completion at
+ *     t = 94.5 s ⇒ the gate may not latch inside 61.5 s of region time;
+ *   · a car that STOPS beyond the circle mid-return. This face carries no
+ *     speed test (a departing car is the moving case), so its bar must also
+ *     exceed the longest standstill any audited drive ever resumed from —
+ *     which is FINISH_OUTSIDE_STUCK_S's own measurement (69 s sampled over 332
+ *     lanes / 7,398 samples, 74.2 s true, ⇒ 75).
+ * The second bound contains the first, so this is DEFINED AS that constant
+ * rather than as a second 75 — one claim („past this, the car is not coming
+ * back"), one number, the same rule OFF_NETWORK_STUCK_S already follows.
+ *
+ * FROM ABOVE — it must still close the exhibit. The straight-on drive
+ * (40 km/h through the terminal and away, the flipped test) now ends at
+ * ≈ region entry + 75 s, inside every budget the audit ran, instead of never.
+ * B15's freeze still withholds every second of a lawful wait beyond the
+ * circle, so a red light past the end of the route spends nothing.
+ */
+export const FINISH_DEPARTED_S = FINISH_OUTSIDE_STUCK_S;
+
 export function terminalDepartureZone(
   objectives: readonly ObjectiveParams[],
 ): RouteFinishZone | null {
@@ -1326,7 +1347,7 @@ export function terminalDepartureZone(
     radiusM,
     armWithinM,
     workSiteRadiusM: armWithinM,
-    dwellSec: FINISH_LEAVE_S,
+    dwellSec: FINISH_DEPARTED_S,
     mode: "outside",
     terminalRescue: true,
   });

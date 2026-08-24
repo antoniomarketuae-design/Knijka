@@ -111,8 +111,34 @@ export const THROTTLE_RELEASE_S = 0.25;
 export const BRAKE_ATTACK_S = 0.25;
 /** Seconds after key release for brake to fall 1 → 0. */
 export const BRAKE_RELEASE_S = 0.2;
-/** Wall-clock clamp per read (s): a stalled tab must not slam a pedal. */
-export const MAX_RAMP_DT_S = 0.1;
+/**
+ * Wall-clock clamp per read (s) — and it is the PHYSICS ceiling, not a number
+ * of this file's own (2026-08-24, sweep161: sc-ov-oncoming-gap,
+ * sc-sig-controller-live).
+ *
+ * It was 0.1 („a stalled tab must not slam a pedal") while rapier's own frame
+ * clamp is 0.5 (PHYSICS_MAX_FRAME_DT, lesson-ui/sessionClock.ts — read out of
+ * the shipped bundle, not chosen). read() writes `lastReadMs` on every call,
+ * so the FIRST read of a frame takes the whole elapsed wall time and the rest
+ * of that frame's reads take ~0 — which means one slow frame used to buy 0.1 s
+ * of PEDAL against up to 0.5 s of WORLD. Above 10 fps the two clamps agree and
+ * nothing differs; at the 2 fps the mobile sweep leg actually runs at, a held
+ * brake key needed 2.5 frames (1.25 s of world) to arrive while the released
+ * throttle kept pushing for the same span. That is the sweep's own log line —
+ * „the brake is held and the car went 7 -> 10 км/ч — the sim never got the
+ * key" — fired 218× across sweep161, 73 of 195 mobile legs against 1 of 189 PC
+ * legs. The touch pads are not ramped at all (TouchControls writes position
+ * straight through), so the defect could only reach the keyboard channel.
+ *
+ * Equal clamps make pedal time and world time advance 1:1 at every frame rate:
+ * a key held through a stalled frame now delivers exactly the pedal the world
+ * moved under. The stalled-tab worry inverts rather than survives — the world
+ * steps 0.5 s on that resumed frame regardless, so the 0.1 cap did not stop
+ * the slam, it deleted 80 % of the driver's braking during it. The equality is
+ * asserted against lesson-ui/sessionClock.ts in __tests__/input.test.ts, so a
+ * rapier upgrade that moves the ceiling moves this with it or fails loudly.
+ */
+export const MAX_RAMP_DT_S = 0.5;
 
 /**
  * Advance one pedal value toward its key-held target along a linear ramp.

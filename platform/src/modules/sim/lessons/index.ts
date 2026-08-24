@@ -286,10 +286,12 @@ export {
   parseFinishLessonWire,
   rebuildRuleEvents,
   reconcileObjectiveOutcomes,
+  serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
   type FinishLessonWire,
   type GradedFinishWire,
+  type WireCoachedMistake,
   type WireMicroQuiz,
   type WireNearMiss,
   type WireObjectiveOutcome,
@@ -298,6 +300,7 @@ export {
 
 // Shared types
 export type {
+  CoachedMistake,
   EventPosition,
   ExamTermination,
   ExamTerminationReason,

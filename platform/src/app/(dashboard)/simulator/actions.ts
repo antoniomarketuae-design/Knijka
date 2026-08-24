@@ -316,6 +316,15 @@ export async function finishLessonAction(
     microQuiz: wire.microQuiz,
     priorBestScore,
     conceptTitles,
+    // The shown-but-not-charged violations (teach / learn-only arms), rebuilt
+    // by gradeFinishWire from wire codes + our own catalog titles. This is the
+    // debrief the student actually reads, and until this line the channel had
+    // NO producer — `DebriefContext.coachedMistakes` was documented, filtered
+    // and tested while every live debrief was built without it, so «чисто
+    // каране без нито едно нарушение» shipped over drives whose HUD had raised
+    // «Превишена скорост» twice (findings ef1eb9cf · a448e5f0 · 0fde4ec0 ·
+    // faae7057; frames: sweep161/sc-signal-flashing/mobile-wrong/04-t012s.png).
+    coachedMistakes: result.coachedMistakes,
   });
 
   const payload: SimSessionEventsJson = {

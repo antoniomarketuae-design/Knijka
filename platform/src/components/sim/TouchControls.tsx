@@ -2437,11 +2437,11 @@ export function TouchControls({
    * It is the FOURTH CLOCK, and it is a sibling of the three
    * `lesson-ui/sessionClock.ts` was written to reconcile („three clocks that
    * only agreed above 10 fps"). `engine/input.ts` ramps the KEYBOARD pedals
-   * against wall time and clamps each `read()` to `MAX_RAMP_DT_S = 0.1`, while
+   * against wall time and clamped each `read()` to `MAX_RAMP_DT_S = 0.1`, while
    * the world advances on rapier's own `PHYSICS_MAX_FRAME_DT = 0.5` — and
    * `read()` writes `lastReadMs` on every call, so the FIRST read of a frame
    * takes the whole elapsed and the rest of that frame's reads take nothing.
-   * One frame therefore buys 0.1 s of PEDAL and 0.5 s of WORLD:
+   * One frame therefore bought 0.1 s of PEDAL and 0.5 s of WORLD:
    *
    *   ≥10 fps   0.1 : 0.1   the clamp never binds — this is the PC leg
    *    2 fps    0.1 : 0.5   BRAKE_ATTACK_S 0.25 → 2.5 frames → 1.25 s of world
@@ -2462,15 +2462,19 @@ export function TouchControls({
    * Both are far below the 10 fps at which this clamp starts to bind, and the
    * guard's platform split is dated after the flag landed.
    *
-   * So on the mobile leg a held brake key genuinely does take ~1.25 s of WORLD
-   * time to arrive while the car keeps its throttle for the same span — which
+   * So on the mobile leg a held brake key genuinely did take ~1.25 s of WORLD
+   * time to arrive while the car kept its throttle for the same span — which
    * is „7 -> 10 км/ч, brake held", exactly. IT IS A KEYBOARD PATH. The pads on
    * this screen are not ramped at all (`driveApply` writes the position
    * straight through and `mergeInto` REPLACES), so the one input this defect
-   * cannot reach is the one a phone student actually uses — and the one it hits
+   * cannot reach is the one a phone student actually uses — and the one it hit
    * hardest is a student on a weak laptop, which is the device the product is
-   * aimed at. The fix is not here; it is `MAX_RAMP_DT_S`, and it belongs beside
-   * `PHYSICS_MAX_FRAME_DT` rather than five times under it.
+   * aimed at. The fix was never here; it was `MAX_RAMP_DT_S`, which belongs
+   * beside `PHYSICS_MAX_FRAME_DT` rather than five times under it — AND LANDED
+   * THERE 2026-08-24 (sweep161 ea19f/327f9): the two clamps are now the same
+   * 0.5 and `engine/__tests__/input.test.ts` asserts the equality across the
+   * module boundary, so one slow frame hands the pedal exactly the world time
+   * it hands the physics at every frame rate.
    *
    * What the takeover fix DID do is make this overlay live on a phone for the
    * whole drive for the first time. Until 2026-08-17 a stray drive key was

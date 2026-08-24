@@ -109,6 +109,21 @@ export interface WireMicroQuiz {
   correct: number;
 }
 
+/**
+ * One violation the drive SHOWED and deliberately did not score (the teach /
+ * learn-only arms — lessons/types.ts CoachedMistake). CODE AND TIME ONLY, no
+ * title: the server re-derives the Bulgarian copy from its own catalog, so a
+ * client cannot author a sentence into the debrief it will be handed back
+ * (ADR-002 — the same reason WireRuleEvent carries no copy). Display/debrief
+ * metadata, never the score: the worst a tampered list can do is add an
+ * „Учебни моменти" row to the student's own debrief, and OMITTING it merely
+ * reproduces the old behaviour — the direction this channel exists to end.
+ */
+export interface WireCoachedMistake {
+  code: string;
+  t: number;
+}
+
 export interface FinishLessonWire {
   lessonId: string;
   startedAtMs: number;
@@ -120,6 +135,13 @@ export interface FinishLessonWire {
   microQuiz?: WireMicroQuiz;
   /** A15: near-miss encounters (validated stat; absent on older clients). */
   nearMisses?: WireNearMiss[];
+  /**
+   * The shown-but-not-charged violations (WireCoachedMistake above) — feeds
+   * the SERVER debrief's coached channel, which is the text the student
+   * actually reads (`LessonPlayShell.tsx` renders `saveResult.debriefText`).
+   * Absent on older clients → the debrief scopes its claims to the sheet.
+   */
+  coachedMistakes?: WireCoachedMistake[];
   /**
    * S1 (scenario sessions): ids of the template's rubric observation moments
    * the student's recorded glances covered (lessons/scenario/observation.ts
@@ -152,6 +174,9 @@ const MAX_ABS_COORD_M = 100_000;
 /** S1 caps: observation-moment id list (templates author ≤ a handful). */
 const MAX_OBSERVED_MOMENTS = 32;
 const MAX_MOMENT_ID_LEN = 64;
+/** Coached-mistake list cap — mirrors engine.ts MAX_COACHED_MISTAKES. */
+const MAX_COACHED_MISTAKES_WIRE = 100;
+const MAX_CODE_LEN = 64;
 
 // ---------------------------------------------------------------------------
 // Client side: serialize
@@ -210,6 +235,19 @@ export function serializeNearMisses(
     }
     return wire;
   });
+}
+
+/**
+ * The shown-but-not-charged record → wire. Titles are dropped here on purpose
+ * (see WireCoachedMistake); the cap matches the engine's, so a capped state
+ * serializes whole.
+ */
+export function serializeCoachedMistakes(
+  coached: ReadonlyArray<{ code: string; t: number }>,
+): WireCoachedMistake[] {
+  return coached
+    .slice(0, MAX_COACHED_MISTAKES_WIRE)
+    .map((c) => ({ code: c.code, t: c.t }));
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +317,9 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   const nearMisses = parseNearMisses(o.nearMisses);
   if (nearMisses === "invalid") return null;
 
+  const coachedMistakes = parseCoachedMistakes(o.coachedMistakes);
+  if (coachedMistakes === "invalid") return null;
+
   const observedMomentIds = parseObservedMomentIds(o.observedMomentIds);
   if (observedMomentIds === "invalid") return null;
 
@@ -292,6 +333,7 @@ export function parseFinishLessonWire(value: unknown): FinishLessonWire | null {
   };
   if (microQuiz !== null) wire.microQuiz = microQuiz;
   if (nearMisses !== null) wire.nearMisses = nearMisses;
+  if (coachedMistakes !== null) wire.coachedMistakes = coachedMistakes;
   if (observedMomentIds !== null) wire.observedMomentIds = observedMomentIds;
 
   const attemptTrace = parseAttemptTrace(o.attemptTrace, o.lessonId);
@@ -437,6 +479,27 @@ function isPlausibleCoord(v: unknown): v is number {
  * bounded (clearance 0–50 m, relative speed 0–200 m/s) — generous physical
  * envelopes, not grading thresholds; nothing here ever scores.
  */
+/**
+ * Coached-mistake list — same tri-state contract as parseNearMisses. A code
+ * the catalog does not know DROPS SILENTLY rather than rejecting: the list is
+ * debrief metadata from possibly-newer clients, and losing one row costs a
+ * teach line while rejecting costs the whole session its save. Shape errors
+ * still reject — a malformed list is not our payload.
+ */
+function parseCoachedMistakes(value: unknown): WireCoachedMistake[] | null | "invalid" {
+  if (value === undefined || value === null) return null;
+  if (!Array.isArray(value) || value.length > MAX_COACHED_MISTAKES_WIRE) return "invalid";
+  const out: WireCoachedMistake[] = [];
+  for (const item of value) {
+    if (typeof item !== "object" || item === null) return "invalid";
+    const c = item as Record<string, unknown>;
+    if (typeof c.code !== "string" || c.code.length > MAX_CODE_LEN) return "invalid";
+    if (!isFiniteNum(c.t) || c.t < 0 || c.t > MAX_SESSION_SEC) return "invalid";
+    out.push({ code: c.code, t: c.t });
+  }
+  return out;
+}
+
 function parseNearMisses(value: unknown): WireNearMiss[] | null | "invalid" {
   if (value === undefined || value === null) return null;
   if (!Array.isArray(value) || value.length > MAX_NEAR_MISSES) return "invalid";
@@ -624,6 +687,23 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
   const examTermination =
     lesson.examMode === true ? examTerminationFor(events) : null;
 
+  /**
+   * The shown-but-not-charged record, TITLED BY OUR OWN CATALOG. The wire
+   * carries code+t only (WireCoachedMistake — ADR-002: a client must not be
+   * able to author debrief copy); an uncatalogued code drops here for the
+   * parse helper's reason. This is the producer for the SERVER debrief's
+   * `DebriefContext.coachedMistakes` — the channel that was documented,
+   * filtered and tested while NO live call site fed it, which is how
+   * «чисто каране без нито едно нарушение» shipped over a drive whose HUD
+   * had raised «Превишена скорост» twice (findings ef1eb9cf · a448e5f0 ·
+   * 0fde4ec0 · faae7057).
+   */
+  const coachedMistakes = (wire.coachedMistakes ?? []).flatMap((c) =>
+    c.code in VIOLATIONS
+      ? [{ code: c.code, titleBg: VIOLATIONS[c.code as ViolationCode].titleBg, t: c.t }]
+      : [],
+  );
+
   const result: LessonResult = {
     lessonId: lesson.id,
     summary,
@@ -636,6 +716,7 @@ export function gradeFinishWire(input: unknown): GradedFinishWire {
     escalations: escalated,
     durationSec: (wire.finishedAtMs - wire.startedAtMs) / 1000,
     ...(examTermination !== null ? { examTermination } : {}),
+    ...(coachedMistakes.length > 0 ? { coachedMistakes } : {}),
   };
 
   return { status: "ok", lesson, wire, events, result };

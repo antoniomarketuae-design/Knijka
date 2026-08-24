@@ -341,3 +341,48 @@ describe("the star row carries its grade in glyphs, not only in colour", () => {
     expect(markup).toContain('aria-label="1 от 3 звезди"');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 4 · The tally table is a FLOOR after a ledger close — and now says so
+// ---------------------------------------------------------------------------
+
+describe("the table carries the floor note when the ledger closed over rows (finding ed5a5b84)", () => {
+  // THE MEASURED DRIVE, EVENT FOR EVENT — wave-c/frames/sc-mw-min-speed__
+  // pc-right: crash at t=87 (04-t087s) closes the ledger, then the HUD books
+  // «−1» at t103 (04-t103s, ВТОРОСТЕПЕННА · Твърде бавно движение), «−3» at
+  // t178 (Смяна на лента без проверка) and «−10» twice at t183/t189
+  // (Движение по аварийната лента) — and the 08-debrief table read «Опасни
+  // 1/10 · Основни 0/0 · Второстепенни 0/0 · Общо 1/10» with nothing on the
+  // screen reconciling four priced cards against a one-row tally. The scorer
+  // is right (чл. 48, ал. 3); the table now says which kind of number it is.
+  const mwMinSpeed = resultOf(
+    [
+      makeViolation(COLLISION, 87),
+      makeViolation("DRIVING_TOO_SLOW_FOR_MOTORWAY", 103),
+      makeViolation("LANE_CHANGE_WITHOUT_MIRROR_CHECK", 178),
+      makeViolation("EMERGENCY_LANE_DRIVING", 183),
+      makeViolation("EMERGENCY_LANE_DRIVING", 189),
+    ],
+    { completedAll: false, aborted: true },
+  );
+
+  it("proves the fixture is the measured one: 1/10 billed, 4 closed over", () => {
+    expect(mwMinSpeed.summary.score.opasniCount).toBe(1);
+    expect(mwMinSpeed.summary.score.totalPoints).toBe(10);
+    expect(mwMinSpeed.summary.score.unscoredAfterClose).toBe(4);
+  });
+
+  it("prints the floor note, with the count and the closing article", () => {
+    const text = screenText(mwMinSpeed);
+    expect(text).toContain("долна граница");
+    expect(text).toContain("4 нарушения не добавят наказателни точки");
+    expect(text).toContain("чл. 48, ал. 3");
+  });
+
+  it("THE OTHER DIRECTION: a drive with nothing closed over stays note-free", () => {
+    // A sentence printed on every run is wallpaper (this file's own header).
+    const open = resultOf([makeViolation("RED_LIGHT_CROSSED", 12)], { completedAll: false });
+    expect(open.summary.score.unscoredAfterClose).toBe(0);
+    expect(screenText(open)).not.toContain("долна граница");
+  });
+});

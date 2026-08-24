@@ -7,6 +7,10 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+// Cross-module import IN A TEST, with precedent (collision/__tests__/index.
+// test.ts does the same): the assertion is that two clamps in two lanes are
+// ONE number, and only a test may look across the module boundary to say so.
+import { PHYSICS_MAX_FRAME_DT } from "@/components/sim/lesson-ui/sessionClock";
 import {
   BRAKE_ATTACK_S,
   BRAKE_RELEASE_S,
@@ -148,12 +152,52 @@ describe("SimInput keyboard pedal ramps", () => {
     h.input.dispose();
   });
 
-  it("clamps a stalled-tab gap so one read cannot slam the pedal", () => {
+  it("clamps a stalled-tab gap to the physics frame ceiling, not below it", () => {
+    // The clamp used to be 0.1 s — HALF A SECOND UNDER the world's own frame
+    // clamp — which is the sweep161 lost-brake-key defect (see the constant).
+    // A 5 s gap is still clamped, but to the same ceiling the physics uses,
+    // so the pedal lands exactly where one maximal world frame puts it.
     const h = harness();
     h.press("KeyW");
     const out = h.jump(5000); // 5 s gap, single read
-    expect(out.throttle).toBeCloseTo(MAX_RAMP_DT_S / THROTTLE_ATTACK_S, 5);
+    expect(out.throttle).toBeCloseTo(Math.min(1, MAX_RAMP_DT_S / THROTTLE_ATTACK_S), 5);
     h.input.dispose();
+  });
+
+  // -------------------------------------------------------------------------
+  // THE FOURTH CLOCK (sweep161: sc-ov-oncoming-gap ea19fa97, sc-sig-controller-
+  // live 327f9262). read()'s first call per frame takes the whole elapsed wall
+  // time; the physics frame takes up to PHYSICS_MAX_FRAME_DT of the same span.
+  // While this file's clamp sat at 0.1 s a 2 fps frame (the mobile sweep leg)
+  // bought 0.1 s of pedal against 0.5 s of world — „the brake is held and the
+  // car went 7 -> 10 км/ч — the sim never got the key", 73/195 mobile legs
+  // against 1/189 PC. Each test below FAILS at the old 0.1 clamp (mutation-
+  // checked by setting MAX_RAMP_DT_S back): the brake read 0.4, the throttle
+  // read 0.6, the constants differed.
+  // -------------------------------------------------------------------------
+  it("a 0.5 s frame delivers the FULL brake the held key asked for (lost-key mechanism)", () => {
+    const h = harness();
+    h.press("KeyS");
+    const out = h.jump(PHYSICS_MAX_FRAME_DT * 1000); // one slow frame, one read
+    expect(out.brake).toBe(1);
+    h.input.dispose();
+  });
+
+  it("…and a released throttle is fully gone within that same slow frame", () => {
+    const h = harness();
+    h.press("KeyW");
+    h.advance(1000); // saturate
+    h.release("KeyW");
+    const out = h.jump(PHYSICS_MAX_FRAME_DT * 1000);
+    expect(out.throttle).toBe(0);
+    h.input.dispose();
+  });
+
+  it("the pedal clock IS the physics clock — the two clamps are one number", () => {
+    // sessionClock.ts re-reads rapier's shipped clamp on every run; riding on
+    // that equality means a rapier upgrade that moves the ceiling fails HERE
+    // rather than silently reopening the 5× pedal/world split.
+    expect(MAX_RAMP_DT_S).toBe(PHYSICS_MAX_FRAME_DT);
   });
 
   it("keeps steering binary (ramps apply to pedals only)", () => {

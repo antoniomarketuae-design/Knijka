@@ -2945,6 +2945,42 @@ function handleTickEvent(
         if (z !== null) s.crossing = null;
         break;
       }
+      // THE VERDICT MUST NOT DEPEND ON THE DEVICE (sc-zebra-approach:34ecd82d).
+      // The in-zone sustain check below (§5) runs AFTER this handler, and this
+      // handler closes the zone — so the sustain could only ever be satisfied
+      // by a tick that LANDED inside the zone at least a sustain after onset.
+      // That is a requirement on sampling cadence, not on driving, and cadence
+      // is a property of the DEVICE (the same lesson the collision case's
+      // reporters taught): the identical scripted 59 км/ч approach booked
+      // «Твърде бързо приближаване…» on PC (pc-wrong/04-t006s, 250-odd samples
+      // across the ~2.1 s transit) and NOT on the sub-10-fps mobile harness
+      // (mobile-wrong, entry and pass with nothing between) — 20 т. against
+      // 10 т. for one drive. So the still-open episode is adjudicated HERE, at
+      // the pass, in wall clock: onset a full sustain before the paint AND
+      // still over the approach max AT the paint is the same offence §5
+      // convicts, no longer billed per tick count. Both directions hold:
+      // `tooFastEmitted` keeps the fine cadence at one bill, `tooFastSince`
+      // stays null through a braking response or a late-stepping pedestrian
+      // (the reaction-time grace), and a car genuinely braking from a legal
+      // entry cannot reach the paint above the max — pinned both ways in
+      // crossing-pass-cadence.test.ts.
+      //
+      // STRICTLY greater, unlike §5's `>=`, and the boundary is the point: a
+      // sustain that completes EXACTLY at the pass has no in-zone tick left
+      // for §5 to convict on at any cadence (the pass tick closes the zone
+      // first), so `>=` here would add a conviction no fine-cadence drive
+      // ever received — crossing-host-edge.test.ts pins that drive innocent.
+      // This clause repairs the sampling, it does not move the law.
+      if (
+        z !== null &&
+        !z.tooFastEmitted &&
+        z.tooFastSince !== null &&
+        tick.speedKmh > cfg.crossingApproachMaxKmh &&
+        t - z.tooFastSince > cfg.crossingTooFastSustainSec
+      ) {
+        z.tooFastEmitted = true;
+        out.push(makeViolation("PEDESTRIAN_CROSSING_TOO_FAST", t));
+      }
       if (e.pedestrianOnCrossing) {
         out.push(makeViolation("PEDESTRIAN_NOT_YIELDED", t));
       } else if (

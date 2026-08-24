@@ -450,9 +450,27 @@ export function unfinishedVerdictNoteBg(result: LessonResult): string | null {
     result.score === 0
       ? "Изпитният лист остана чист"
       : `${pointsWordsBg("exam", result.score)} — в допустимото по изпитния лист`;
+  /**
+   * „НЯМА НАРУШЕНИЕ" WAS A CLAIM ABOUT THE DRIVE, ON THE EVIDENCE OF THE
+   * SHEET. MEASURED · wave-c · `sc-signal-hesitation` · mobile · wrong
+   * (04-t012s.png; finding a448e5f0): the HUD raised «Превишена скорост (+1)»
+   * over a cluster reading 59 км/ч against a 50 sign — an unscored teach
+   * toast, shown twice — and this sentence then told the same student «няма
+   * нарушение, което да го отсъди». A 17-year-old reading both screens learns
+   * that 59 in a 50 is not a violation. So the claim is scoped to the sheet
+   * (which is all this function ever read), and when the result carries the
+   * shown-but-not-charged record, the sentence says where those cards went
+   * instead of denying them.
+   */
+  const coachedCount = result.coachedMistakes?.length ?? 0;
+  const noConviction =
+    coachedCount > 0
+      ? "няма нарушение в листа, което да го отсъди — показаните по време на карането " +
+        "забележки са учебни моменти и не влизат в наказателните точки (виж разбора)"
+      : "няма нарушение в изпитния лист, което да го отсъди";
   return (
-    `${sheetBg}, затова тук не пише „Неиздържан“: няма нарушение, което да го ` +
-    `отсъди. Не пише и „Издържан“ — зачита се само урок, изкаран докрай. ` +
+    `${sheetBg}, затова тук не пише „Неиздържан“: ${noConviction}. ` +
+    `Не пише и „Издържан“ — зачита се само урок, изкаран докрай. ` +
     `Карай го отново и стигни до края, за да получиш оценка.`
   );
 }
@@ -1182,6 +1200,28 @@ export function SessionEndScreen({
             </tr>
           </tbody>
         </table>
+        {/* THE TABLE IS A FLOOR, AND UNTIL THIS LINE NOTHING ON IT SAID SO.
+            MEASURED · wave-c · sc-mw-min-speed · pc · right (08-debrief.png;
+            finding ed5a5b84): after the t=87 crash closed the ledger the HUD
+            booked four more priced cards — «−1», «−3», «−10» twice — and this
+            table then read «Опасни 1/10 · Основни 0/0 · Второстепенни 0/0 ·
+            Общо 1/10» with nothing reconciling the two. The scorer is right
+            (Наредба № 38, чл. 48, ал. 3 withholds the rows after the close);
+            the PRODUCT never explained itself, so a student — and every audit
+            reading the tally — read a floor as a count. The debrief prose
+            carries the same reconciliation („долна граница“); the two surfaces
+            must not diverge. Agreement forked on the count for the „1
+            движения“ reason. */}
+        {score.unscoredAfterClose > 0 ? (
+          <p className="mt-1 text-xs font-semibold text-muted">
+            Таблицата е долна граница, не пълен брой: изпитът се прекратява при
+            произшествието (Наредба № 38, чл. 48, ал. 3), затова{" "}
+            {score.unscoredAfterClose === 1
+              ? "показаното след прекратяването нарушение не добавя наказателни точки тук"
+              : `показаните след прекратяването ${score.unscoredAfterClose} нарушения не добавят наказателни точки тук`}{" "}
+            — всяко от тях е в списъка с грешките по-долу.
+          </p>
+        ) : null}
       </section>
 
       {/* S1: scenario rubric — the maneuver-quality layer (doc 76 §6).

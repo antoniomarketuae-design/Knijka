@@ -90,6 +90,7 @@ import {
   scenarioById,
   scoreRubric,
   serializeAdvisorSetting,
+  serializeCoachedMistakes,
   serializeNearMisses,
   serializeRuleEvents,
   type AdvisorPrompt,
@@ -3206,6 +3207,13 @@ export function LessonPlayShell({
         })),
         microQuiz: { ...quizStatsRef.current },
         nearMisses: serializeNearMisses(state.nearMisses ?? []),
+        // The shown-but-not-charged violations (teach / learn-only arms), so
+        // the SERVER debrief — the text the student actually reads — can stop
+        // calling such a drive «чисто каране». Codes + times only; the server
+        // re-titles from its own catalog (ADR-002).
+        ...(r.coachedMistakes !== undefined && r.coachedMistakes.length > 0
+          ? { coachedMistakes: serializeCoachedMistakes(r.coachedMistakes) }
+          : {}),
         ...(observedMomentIds !== undefined ? { observedMomentIds } : {}),
         ...(storedTrace !== null ? { attemptTrace: storedTrace } : {}),
       }).then(setSaveResult, () => setSaveResult({ ok: false, code: "SAVE_FAILED" }));
@@ -3480,7 +3488,11 @@ export function LessonPlayShell({
   const debriefText = ended
     ? saveResult?.ok
       ? saveResult.debriefText
-      : buildDebrief(lesson, result).text
+      : // The coached channel rides the RESULT (deterministic, no ref read in
+        // render): without it this fallback still printed «чисто каране без
+        // нито едно нарушение» on drives whose HUD had shown teach cards —
+        // the same hole the server path had (findings ef1eb9cf · a448e5f0).
+        buildDebrief(lesson, result, { coachedMistakes: result.coachedMistakes }).text
     : null;
 
   // I1 „Позна ли се?" (doc 82 §5.3) — the self-assessment calibration gate.

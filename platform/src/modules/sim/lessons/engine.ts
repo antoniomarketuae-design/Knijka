@@ -59,6 +59,7 @@ import {
   FINISH_STANDSTILL_KMH,
   ROUTE_RUNOUT_MAX_S,
   createFinishGate,
+  routeDepartedEndingCopy,
   routeEndMark,
   routeFinishZone,
   offNetworkEndingCopy,
@@ -66,9 +67,11 @@ import {
   stepOffNetwork,
   stepFinishGate,
   stepYieldWait,
+  terminalDepartureZone,
   terminalRescueZone,
 } from "./finish";
 import type {
+  CoachedMistake,
   EventPosition,
   LessonPhase,
   LessonResult,
@@ -124,6 +127,7 @@ export function createLessonSession(
     scenarioEncounters: {},
     penaltyEscalations: [],
     lastTeachMomentAtSec: null,
+    coachedMistakes: [],
     lastT: 0,
     endedAtSec: null,
   };
@@ -163,6 +167,15 @@ export interface LessonStepResult {
  * driving time.
  */
 export const TEACH_PAUSE_MIN_GAP_S = 15;
+
+/**
+ * Cap on the shown-but-not-charged record (CoachedMistake) — the same
+ * discipline as every additive channel (wire.ts MAX_NEAR_MISSES): a continuing
+ * offence re-raised every few seconds for an hour must not grow the state or
+ * the finish payload without bound. 100 distinct display moments is far past
+ * anything a real drive produces (the deepest queue measured was eight).
+ */
+export const MAX_COACHED_MISTAKES = 100;
 
 /**
  * Frame-zero pose guard (doc 87 B3/B10/B11 — see
@@ -450,6 +463,30 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   const hudEvents: HudEvent[] = [];
   const scoredEvents: ScorableEvent[] = [];
   const teachMoments: TeachMoment[] = [];
+  /**
+   * SHOWN-BUT-NOT-CHARGED, RECORDED WHERE THE DECISION IS MADE. Every unscored
+   * arm below still DISPLAYS the violation — the teach pause, its rate-limited
+   * toast downgrade, the THEO-3 consequence moment and the learn-only ambient
+   * toast — and until this record existed, nothing downstream could tell such
+   * a drive from a clean one: `DebriefContext.coachedMistakes` had NO live
+   * producer, so the debrief wrote «чисто каране без нито едно нарушение»
+   * over drives whose own HUD had said «Превишена скорост» twice (sweep161
+   * `sc-signal-flashing`/mobile-wrong 04-t012s: 59 км/ч, 50 badge, «(+1)»;
+   * findings ef1eb9cf · a448e5f0 · 0fde4ec0 · faae7057). The UI teachQueue
+   * cannot substitute: it sees only the pause arm. Capped like every additive
+   * channel — a stuck-throttle drive re-raising one code every few seconds
+   * must not grow the state without bound; the debrief dedups by title anyway.
+   */
+  const coachedNew: CoachedMistake[] = [];
+  // `?? []`: the field is required on the type, but vitest transpiles without
+  // typechecking and older hand-built state fixtures predate it.
+  const coachedPrev = prev.coachedMistakes ?? [];
+  let coachedCount = coachedPrev.length;
+  const recordCoached = (e: { code: string; titleBg: string; t: number }): void => {
+    if (coachedCount >= MAX_COACHED_MISTAKES) return;
+    coachedNew.push({ code: e.code, titleBg: e.titleBg, t: e.t });
+    coachedCount += 1;
+  };
   for (const e of ruleEvents) {
     if (e.kind === "commendation") {
       hudEvents.push({ kind: "commendation", titleBg: e.titleBg });
@@ -525,6 +562,9 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         escalations = [...escalations, rec];
       }
     } else if (step.decision.mode === "teach") {
+      // Both arms display and neither charges → both are coached (the record
+      // the debrief's honesty rests on — see recordCoached above).
+      recordCoached(e);
       // First teachable encounter → pause + card, rate-limited: same-tick
       // moments all emit (the shell merges them into ONE pause with queued
       // cards); a moment inside the min-gap window after the previous pause
@@ -554,6 +594,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         });
       }
     } else {
+      // Unscored and shown (consequence overlay or ambient toast) → coached.
+      recordCoached(e);
       // THEO-3: the targeted wrong action just happened — latch the one-shot
       // consequence moment (the shell pauses on it) and swallow the ambient
       // toast: the consequence overlay presents the same catalog copy.
@@ -853,6 +895,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
 
   let finishGate = prev.finishGate;
   let finishRescueGate = prev.finishRescueGate;
+  let finishDepartureGate = prev.finishDepartureGate;
   let stoppedStuck = false;
   if (
     prev.phase === "driving" &&
@@ -905,6 +948,22 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
           strandedDwellSec: 0,
         };
       }
+      // O30's gate is in this branch for the same reason the other two are:
+      // a student stopped at a red just past the end of the route is doing the
+      // lesson, and neither the departure dwell nor its stranded face may
+      // spend one second of that wait.
+      if (
+        finishDepartureGate?.insideSinceSec != null ||
+        finishDepartureGate?.regionDwellSec ||
+        finishDepartureGate?.strandedDwellSec
+      ) {
+        finishDepartureGate = {
+          ...finishDepartureGate,
+          insideSinceSec: null,
+          regionDwellSec: 0,
+          strandedDwellSec: 0,
+        };
+      }
     } else {
       // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
       // presence-based and generous, and it must stay off the terminal
@@ -926,6 +985,46 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       const rescue = terminalRescueZone(params);
       if (rescue !== null) {
         finishRescueGate = stepFinishGate(finishRescueGate ?? createFinishGate(), rescue, tick);
+      }
+      // Gate 3 — O30, the departure (2026-08-24; finish.ts owns the zone, the
+      // dwell derivation and the copy). A car that drove THROUGH the end of
+      // the route and kept going satisfies neither gate above: gate 1 is
+      // withheld on the terminal objective and gate 2 needs a standstill AT
+      // the mark. This one is armed by having BEEN at the end of the route
+      // (the acceptance ring floored to one lane) and latches after
+      // FINISH_DEPARTED_S beyond it — sized so the recorded
+      // overshoot-and-return drive completes 13.7 s before it could fire.
+      // Stepped on every frame like gate 2: the stalled-chain case (a car past
+      // the end with EARLIER tasks open) is usually gate 1's in 0.5 s, but a
+      // route whose gate-1 zone is clamped away has only this ending.
+      // ── ARM DISARMED 2026-08-24, BEFORE IT EVER SHIPPED ────────────────────
+      //
+      // Its own verifier proved a FALSE REFUSAL with a probe drive. The bar is
+      // FINISH_DEPARTED_S of dwell inside the departure region, and that dwell
+      // accumulates WHILE THE CAR IS DRIVING BACK. A student who pauses and then
+      // takes a long return — pause + travel > 75 s — completed before this arm
+      // and is refused after it. A false refusal is the crime this programme
+      // exists to end, and it does not ship to buy a session-end.
+      //
+      // Gating the dwell on speed does NOT fix it: a car driving steadily AWAY
+      // must still accumulate, or the never-ends defect this arm was built for
+      // returns. The honest fix is to accumulate only while the car is NOT
+      // CLOSING ON THE MARK — and the finish state carries no previous distance
+      // to compare against (types.ts has dwellFace / regionDwellSec /
+      // strandedDwellSec and no range). That is a new field on a per-frame path
+      // and it must be proved by driving the overshoot-and-return case, which
+      // this box could not do at the moment the patch landed.
+      //
+      // So the arm is DISARMED rather than half-fixed, and every other repair
+      // the round earned is kept. Re-enable only together with a test that
+      // drives the return and proves the dwell does not accrue while closing.
+      const departure: ReturnType<typeof terminalDepartureZone> = null;
+      if (departure !== null) {
+        finishDepartureGate = stepFinishGate(
+          finishDepartureGate ?? createFinishGate(),
+          departure,
+          tick,
+        );
       }
     }
 
@@ -953,6 +1052,17 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
             ? "Спря в края на маршрута, но задачата тук не се отчете — затова урокът приключва, вместо да те държи на място. Разборът показва какво точно остана неизпълнено и как да го направиш следващия път."
             : "Стигна края на маршрута, затова урокът приключва тук. Част от задачите останаха неизпълнени — разборът показва всяка от тях и всяка грешка, вместо да те връща да караш маршрута отново.",
       });
+    }
+    // O30's own termination, with its own sentence — never either of the two
+    // above, both of which claim an arrival that did not happen (THEO-4 counts
+    // a wrong reason as a bare verdict in a costume). The `phase !==
+    // "completed"` guard is not decoration: the block above already sets
+    // `phase` from `finishGate`/`stoppedStuck`, and a frame on which both
+    // latch must not push two ending toasts that contradict each other.
+    if (phase !== "completed" && finishDepartureGate?.reachedAtSec != null) {
+      phase = "completed";
+      endedAtSec = tick.t;
+      hudEvents.push(routeDepartedEndingCopy(examMode));
     }
   }
 
@@ -1084,12 +1194,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       scenarioEncounters: encounters,
       penaltyEscalations: escalations,
       lastTeachMomentAtSec: lastTeachAt,
+      coachedMistakes: coachedNew.length > 0 ? [...coachedPrev, ...coachedNew] : coachedPrev,
       lastT: Math.max(prev.lastT, tick.t),
       ...(posedAtSec !== undefined ? { posedAtSec } : {}),
       ...(eventPositions !== undefined ? { eventPositions } : {}),
       ...(examTermination !== undefined ? { examTermination } : {}),
       ...(finishGate !== undefined ? { finishGate } : {}),
       ...(finishRescueGate !== undefined ? { finishRescueGate } : {}),
+      ...(finishDepartureGate !== undefined ? { finishDepartureGate } : {}),
       ...(yieldWait !== undefined ? { yieldWait } : {}),
       ...(yieldWaitSec !== undefined ? { yieldWaitSec } : {}),
       ...(yieldVoice !== undefined ? { yieldVoice } : {}),
@@ -1241,5 +1353,11 @@ export function buildLessonResult(state: LessonSessionState): LessonResult {
     ...(state.nearMisses !== undefined ? { nearMisses: state.nearMisses } : {}),
     // A13: the exam-termination record (examMode sessions only).
     ...(state.examTermination !== undefined ? { examTermination: state.examTermination } : {}),
+    // The shown-but-not-charged record — the debrief's coached channel finally
+    // has a producer (see LessonSessionState.coachedMistakes). `?? []` for the
+    // same fixture reason recordCoached states.
+    ...((state.coachedMistakes ?? []).length > 0
+      ? { coachedMistakes: state.coachedMistakes }
+      : {}),
   };
 }

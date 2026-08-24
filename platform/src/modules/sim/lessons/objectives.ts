@@ -140,6 +140,22 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       } else if (deriveControllerDemand(objective.titleBg) && !hasAtMarkDemand(out)) {
         out.requireControllerProceed = true;
       }
+      // THE WAITED-FOR PERSON, same law: authored wins, the title fills in.
+      // No conflict guard is needed — this demand never touches the `capMet`
+      // latch (see `ReachZoneWitnessDemands`), so it can share a zone with any
+      // of the other four demands without the single-frame conjunction problem
+      // `parseControllerDemand` exists to refuse.
+      if (p.requireVruUntouched !== undefined) {
+        if (p.requireVruUntouched !== true) {
+          throw new ObjectiveSpecError(
+            objective.id,
+            "reachZone requireVruUntouched must be true",
+          );
+        }
+        out.requireVruUntouched = true;
+      } else if (deriveVruWaitDemand(objective.titleBg)) {
+        out.requireVruUntouched = true;
+      }
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
       // acceptance disc — a cut deeper than the radius leaves nowhere legal to
@@ -745,6 +761,48 @@ export interface ReachZoneWitnessDemands {
    * refuses.
    */
   requireControllerProceed?: boolean;
+  /**
+   * THE PERSON THE BANNER SAYS WAS WAITED FOR WAS NOT RUN OVER — the fourth
+   * demand, and like the officer's permission it is a claim about the JOURNEY,
+   * not a state at the mark (2026-08-24, sc-hz-emergency-stop:5b697845).
+   *
+   * WHAT WAS BROKEN, on the proof2 frame (mobile-right, TRACKED 98%):
+   * «✓ Спри преди детето — с пълна спирачка, в лентата 1:40», «Удар в пешеходец
+   * −10 изпитни т. ОПАСНА ГРЕШКА … в 1:48», «✓ Изчакай детето и продължи до
+   * края на отсечката 2:14» — one protocol that congratulates the wait and
+   * convicts the strike, eight seconds apart. `sc-hzes-finish` is a bare disc
+   * at (LANE_X, 220), so arrival was the whole certificate.
+   *
+   * THE CHANNEL WAS ALREADY ONE PARAMETER AWAY. `stop-claim-gates.test.ts`
+   * ruled this row unwitnessable — „stepReachZone receives no ObjectiveContext,
+   * so no value of any param can make one of these true" — which repeated the
+   * lamp entry's mistake of reasoning from a silence instead of the tree:
+   * the child IS a staged encounter (`SC_HZ_EMERGENCY_STOP_DART`), her runner
+   * resolves `detail: "collision"` on contact (orchestrator/runners.ts), the
+   * shell folds it (`LessonPlayShell.tsx` → `applyStagedOutcome`) and the
+   * engine hands the outcomes to `stepObjective` on every frame. Only the
+   * forwarding into `stepReachZone` was missing.
+   *
+   * WHAT IT REFUSES AND WHAT IT DOES NOT — both directions, measured in
+   * `reach-zone-vru-untouched.test.ts`:
+   *  · REFUSED: the tick while the run's latest resolved dart encounter reads
+   *    `detail: "collision"` — the drive whose own record says the person the
+   *    banner names was struck. Permanent for the run unless a LATER encounter
+   *    resolves clean (self-correction is the one thing a drill must never
+   *    punish — the re-latch law above).
+   *  · UNTOUCHED: no outcome yet (the dart never released — a crawl below
+   *    `minTriggerSpeedKmh` keeps its tick exactly as shipped, and the staged
+   *    channel's own «тази ситуация не се случи» debrief line keeps owning
+   *    that case), any non-collision resolution, and every gate whose banner
+   *    makes no wait-for-a-person claim (the census in `deriveVruWaitDemand`).
+   *
+   * It does NOT ride the `capMet` latch: outcomes are session-monotone, so the
+   * refusal needs no eval-state memory — it is a pure per-frame read of the
+   * same `ObjectiveContext` that `requireRedMet` and `emergencyStop` already
+   * consume. What it still cannot witness is the POSITIVE half („waited out"),
+   * so the row keeps its retitle debt in `ACTOR_CLAIM_KNOWN_OPEN`.
+   */
+  requireVruUntouched?: boolean;
 }
 
 export type WitnessedReachZoneParams = ReachZoneParams & ReachZoneWitnessDemands;
@@ -837,6 +895,41 @@ const CONTROLLER_TITLE_PERMISSION =
 /** True when the banner says the officer released this crossing. */
 export function deriveControllerDemand(titleBg: string): boolean {
   return CONTROLLER_TITLE_PERMISSION.test(titleBg);
+}
+
+/**
+ * «ИЗЧАКАЙ + a person on foot» — the banner claims the driver WAITED FOR a
+ * human being, which is a claim about that human's fate the disc cannot make
+ * alone. CENSUSED over every `titleBg` in the catalogue (2026-08-24) rather
+ * than guessed, like the officer matcher above and for the same reason — a false
+ * refusal from an over-wide matcher is the failure the founder ranks worst.
+ * Eleven shipped titles carry the imperative «изчакай»; exactly ONE pairs it
+ * with a person on foot:
+ *
+ *   ✓ «Изчакай детето и продължи до края на отсечката»      sc-hzes-finish
+ *   ✗ «Изчакай червения сигнал…» / «Изчакай червеното…»      — a signal
+ *   ✗ «Спри и изчакай на разширението (под 6 км/ч)»          — a place
+ *   ✗ «Изчакай зад стоп-линията пред бариерата» (×2)         — a place
+ *   ✗ «Изчакай пътеката да се освободи»                      — the crossing
+ *   ✗ «Изчакай зад бавната кола…» / «…зад камиона…» /
+ *     «Изчакай колата…» / «Изчакай моториста…»               — road users the
+ *       dart channel cannot witness (no `pedestrianDartOut` outcome exists for
+ *       them), so binding them would author a demand nothing can ever spend —
+ *       they stay `ACTOR_CLAIM_KNOWN_OPEN` retitle debts, deliberately.
+ *
+ * «Спри преди детето…» does NOT match (no wait imperative) — its certificate
+ * was true when issued on the very frame this fix was cut from: the car DID
+ * stop before her; the strike came on the move-off, which is objective 3's
+ * claim. Both halves of the matcher are pinned by the teeth test in
+ * `reach-zone-vru-untouched.test.ts`, so a matcher that quietly stopped
+ * matching fails the build instead of silently emptying the census.
+ */
+const VRU_WAIT_TITLE =
+  /(?<![\p{L}])изчакай(?![\p{L}])[^.;!?]{0,40}?(?<![\p{L}])(?:дете(?:то)?|децата|пешеходец(?:а|ът)?|пешеходц(?:и|ите))(?![\p{L}])/iu;
+
+/** True when the banner claims a person on foot was waited for. */
+export function deriveVruWaitDemand(titleBg: string): boolean {
+  return VRU_WAIT_TITLE.test(titleBg);
 }
 
 function parseLampDemand(objective: LessonObjective, v: unknown): ReachZoneLampDemand {
@@ -938,12 +1031,36 @@ function controllerVerdictHere(tick: SimTick): "proceed" | "halt" | null {
 
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
+  // `requireVruUntouched` is deliberately absent: it never rides the `capMet`
+  // latch (outcomes are session-monotone, so it needs no eval-state memory),
+  // and folding it in would flip `capMet`'s initial value on a demand the
+  // latch arithmetic cannot spend or re-earn.
   return (
     params.maxSpeedKmh !== undefined ||
     params.requireLamps !== undefined ||
     params.requireGear !== undefined ||
     params.requireControllerProceed === true
   );
+}
+
+/**
+ * Was the wait the banner promised honoured, as far as the dart channel can
+ * see? Reads the LATEST resolved `pedestrianDartOut` encounter and refuses
+ * only `detail: "collision"` — the one resolution that makes «изчакай + a
+ * person» a false certificate on the drive's own record. Latest, not any:
+ * a later re-released encounter that resolved clean redeems the run, because
+ * self-correction is the one thing a drill must never punish. No outcome at
+ * all leaves the demand met — an encounter that never happened is unmeasured,
+ * and unmeasured must not become a refusal (the `notEncountered` debrief line
+ * owns saying «тази ситуация не се случи»).
+ */
+function vruWaitHonoured(ctx: ObjectiveContext): boolean {
+  for (let i = ctx.stagedOutcomes.length - 1; i >= 0; i--) {
+    const o = ctx.stagedOutcomes[i];
+    if (o.kind !== "pedestrianDartOut") continue;
+    return o.detail !== "collision";
+  }
+  return true;
 }
 
 /**
@@ -1243,7 +1360,7 @@ export function stepObjective(
 ): ObjectiveStepResult {
   switch (params.kind) {
     case "reachZone":
-      return stepReachZone(params, prev, tick);
+      return stepReachZone(params, prev, tick, ctx);
 
     case "passSignal":
       return stepPassSignal(params, prev, tick, ctx);
@@ -1324,6 +1441,7 @@ function stepReachZone(
   params: WitnessedReachZoneParams,
   prev: ObjectiveEvalState,
   tick: SimTick,
+  ctx: ObjectiveContext,
 ): ObjectiveStepResult {
   const st: Extract<ObjectiveEvalState, { type: "reachZone" }> =
     prev.type === "reachZone"
@@ -1600,7 +1718,14 @@ function stepReachZone(
   const capMet = !hasArrivalDemand(params)
     ? true
     : (st.capMet && !(capSpent || lampSpent || gearSpent || controllerSpent)) || contractEarned;
-  const done = reached && capMet;
+  // ── THE WAITED-FOR PERSON (see `ReachZoneWitnessDemands`) ─────────────────
+  // A pure per-frame read of the session's staged-outcome record, OUTSIDE the
+  // latch: outcomes only ever append, so „the latest dart resolution is a
+  // collision" needs no memory of its own and cannot flicker. On the frame the
+  // strike is folded in, `done` goes unreachable and stays so until a later
+  // encounter resolves clean; every zone without the demand is bit-identical.
+  const vruOk = params.requireVruUntouched !== true || vruWaitHonoured(ctx);
+  const done = reached && capMet && vruOk;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   const overCapNoted =

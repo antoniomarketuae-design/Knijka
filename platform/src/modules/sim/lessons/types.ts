@@ -837,6 +837,38 @@ export interface TeachMoment {
   t: number;
 }
 
+/**
+ * ONE VIOLATION THE STUDENT WAS SHOWN AND THE SCORE DELIBERATELY DID NOT
+ * CHARGE — the teach-first-then-grade half of the drive, recorded so the
+ * surfaces that describe the whole drive stop describing only the ledger.
+ *
+ * WHY A STATE CHANNEL AND NOT THE UI QUEUE. `DebriefContext.coachedMistakes`
+ * existed, was documented, was filtered, was tested — and NO live caller fed
+ * it: neither `actions.ts:315` (the debrief the student actually reads) nor
+ * `LessonPlayShell.tsx:3483` (the fallback) passed the field, so the whole
+ * repair was dead code and the debrief still wrote «чисто каране без нито
+ * едно нарушение» on drives whose HUD had raised «Превишена скорост» twice
+ * (measured: sweep161 `sc-signal-flashing`/mobile-wrong 04-t012s, 59 км/ч
+ * under a 50 badge, «(+1)»; wave-c `sc-signal-hesitation`/mobile-wrong the
+ * same shape — findings ef1eb9cf, a448e5f0, 0fde4ec0, faae7057). The UI's
+ * `teachQueue` could not close this: it sees only the PAUSE arm, while the
+ * rate-limited toast downgrade and the ambient learn-only toast never reach
+ * it. So the ENGINE records every unscored display arm here, the result
+ * carries it, and both debrief call sites read it off the result.
+ *
+ * Titles are catalog copy stamped at emission (ADR-002); the wire drops them
+ * and the server re-derives from the catalog by code, so a client cannot
+ * author a sentence into its own debrief.
+ */
+export interface CoachedMistake {
+  /** Rule-catalog violation code (plain string — future codes pass through). */
+  code: string;
+  /** Catalog title at emission — display only; the server re-derives it. */
+  titleBg: string;
+  /** Session time of the mistake, seconds. */
+  t: number;
+}
+
 // ---------------------------------------------------------------------------
 // A15 — mistake-map measurement channels (both ADDITIVE)
 // ---------------------------------------------------------------------------
@@ -940,6 +972,15 @@ export interface LessonSessionState {
    * the rate limit that keeps a mistake cluster from chaining pauses.
    */
   lastTeachMomentAtSec: number | null;
+  /**
+   * Every violation shown to the student that the score deliberately did not
+   * charge (see CoachedMistake): the teach-pause card, its rate-limited toast
+   * downgrade, the learn-only ambient toast and the THEO-3 consequence moment
+   * all record here at emission. The `events` comment above says „shown live
+   * but NOT added here" — this is where it IS added, so the debrief and the
+   * verdict copy can stop mistaking the ledger for the drive.
+   */
+  coachedMistakes: CoachedMistake[];
   /** Session time of the last processed tick, seconds. */
   lastT: number;
   /**
@@ -1039,9 +1080,21 @@ export interface LessonSessionState {
    */
   finishRescueGate?: FinishGateState;
   /**
-   * B15 (additive) — the lawful-wait hold that FREEZES both gates above. See
-   * YieldWaitState and finish.ts `stepYieldWait`. Absent until the first tick
-   * that consults it.
+   * O30 (additive, armed 2026-08-24) — the DEPARTURE gate on a terminal
+   * arrival waypoint (finish.ts `terminalDepartureZone`). The third zone the
+   * two above cannot express: a car that drove THROUGH the end of the route
+   * and kept going satisfies neither presence at the mark nor a standstill at
+   * it, and nothing else in the module is anchored anywhere it still is. Its
+   * dwell is FINISH_DEPARTED_S (75 s, sized so the recorded
+   * overshoot-and-return drive is NOT refused), frozen by the lawful wait like
+   * both gates above. Absent until the first tick that consults it, so no
+   * recorded session can reach it.
+   */
+  finishDepartureGate?: FinishGateState;
+  /**
+   * B15 (additive) — the lawful-wait hold that FREEZES the three gates above.
+   * See YieldWaitState and finish.ts `stepYieldWait`. Absent until the first
+   * tick that consults it.
    */
   yieldWait?: YieldWaitState;
   /**
@@ -1213,4 +1266,13 @@ export interface LessonResult {
    * catalog events (wire.ts) — never trusted from the client.
    */
   examTermination?: ExamTermination;
+  /**
+   * The violations the drive SHOWED and the score deliberately did NOT charge
+   * (additive; see CoachedMistake). Client results copy the engine state's
+   * record; server-rebuilt results re-derive titles from the catalog over the
+   * wire's code+t list. Absent = none recorded (older sessions, clean drives).
+   * Both debrief call sites feed `DebriefContext.coachedMistakes` from THIS
+   * field — the context channel had no live producer before it.
+   */
+  coachedMistakes?: CoachedMistake[];
 }

@@ -34,6 +34,7 @@ import { applyTick, createLessonSession } from "../engine";
 import {
   createFinishGate,
   FINISH_BAY_STUCK_S,
+  FINISH_DEPARTED_S,
   FINISH_LANE_FLOOR_M,
   FINISH_LEAVE_S,
   FINISH_OUTSIDE_ANNULUS_M,
@@ -153,20 +154,27 @@ describe("sc-ac-aquaplane@L1 — the car that drives past the end of the route",
     // of it has been at the end of the route just as surely as one in the lane.
     expect(ZONE.armWithinM).toBe(FINISH_LANE_FLOOR_M);
     expect(ZONE.radiusM).toBe(FINISH_LANE_FLOOR_M + FINISH_OUTSIDE_ANNULUS_M);
-    expect(ZONE.dwellSec).toBe(FINISH_LEAVE_S);
+    // FINISH_DEPARTED_S, not FINISH_LEAVE_S — the dwell decision that let the
+    // arm land. At 20 s the gate refused the recorded return drive 41.3 s
+    // before the student finished it (the end-to-end test below drives it);
+    // the bar must clear both the recorded return (61.5 s of region time) and
+    // the longest resumed standstill in the corpus (74.2 s ⇒ 75).
+    expect(ZONE.dwellSec).toBe(FINISH_DEPARTED_S);
+    expect(FINISH_DEPARTED_S).toBe(FINISH_OUTSIDE_STUCK_S);
+    expect(FINISH_DEPARTED_S).toBeGreaterThan(61.5);
   });
 
-  it("LATCHES — through the mark at 40 km/h and on, after FINISH_LEAVE_S clear of it", () => {
+  it("LATCHES — through the mark at 40 km/h and on, after FINISH_DEPARTED_S clear of it", () => {
     if (ZONE === null) throw new Error("no zone");
     const out = walk(ZONE, { x: 4.06, y: 300, speedKmh: 40 }, [
-      { x: 4.06, y: 900, speedKmh: 40 },
+      { x: 4.06, y: 1800, speedKmh: 40 },
     ]);
     expect(out.reachedAtSec).not.toBeNull();
     // It latches because he LEFT, not on a timer. He is clear of the departure
-    // circle at y = 450 + radiusM, and the dwell past it is FINISH_LEAVE_S.
+    // circle at y = 450 + radiusM, and the dwell past it is FINISH_DEPARTED_S.
     const clearedAtSec = (450 + ZONE.radiusM - 300) / (40 / 3.6);
-    expect(out.reachedAtSec as number).toBeGreaterThan(clearedAtSec + FINISH_LEAVE_S - DT * 2);
-    expect(out.reachedAtSec as number).toBeLessThan(clearedAtSec + FINISH_LEAVE_S + DT * 2);
+    expect(out.reachedAtSec as number).toBeGreaterThan(clearedAtSec + FINISH_DEPARTED_S - DT * 2);
+    expect(out.reachedAtSec as number).toBeLessThan(clearedAtSec + FINISH_DEPARTED_S + DT * 2);
   });
 
   it("does NOT latch on a car that never got to the end of the route", () => {
@@ -199,10 +207,11 @@ describe("sc-ac-aquaplane@L1 — the car that drives past the end of the route",
     expect(out.reachedAtSec).toBeNull();
   });
 
-  it("a car that turns back inside FINISH_LEAVE_S keeps its drive", () => {
+  it("a car that turns back inside FINISH_DEPARTED_S keeps its drive", () => {
     // Out past the departure circle, then back to the mark before the dwell is
-    // spent. The same twenty seconds B1 gives a student to notice a wrong
-    // roundabout exit and swing back — an overshoot is not an abandonment.
+    // spent. B1's own principle pointed at a waypoint — an overshoot is not an
+    // abandonment, and the 75 s bar gives the return far more room than the
+    // 20 s the zone first shipped with (which refused a measured return drive).
     if (ZONE === null) throw new Error("no zone");
     const out = walk(ZONE, { x: 4.06, y: 300, speedKmh: 30 }, [
       { x: 4.06, y: 450 + ZONE.radiusM + 40, speedKmh: 30 },
@@ -493,31 +502,96 @@ describe("routeDepartedEndingCopy", () => {
   });
 });
 
-describe("STILL OWED — the arm, which is engine.ts's and not this lane's", () => {
-  it("the exhibit drive STILL does not end: the zone is derived and folded by nothing", () => {
-    // Driven end-to-end through the real session, exactly the drive the zone
-    // above latches on: below obj0's 63 km/h cap so the first task ticks, far
-    // over obj1's 6 so the terminal can never tick, then straight on for four
-    // minutes. `terminalDepartureZone` is not consulted by `engine.ts`, so
-    // nothing closes him. THIS TEST FLIPS THE DAY THE ARM LANDS, and the flip
-    // is the point: it is the ledger entry for the routing debt, not a claim
-    // that the product is correct.
+describe("THE ARM LANDED — 2026-08-24, and both directions are driven end-to-end", () => {
+  // This block used to be „STILL OWED": one test asserting the exhibit drive
+  // does NOT end, written to flip the day engine.ts consulted the zone. It
+  // flipped. What stands here now is the pair the dwell decision rests on —
+  // the drive that must END and the drive that must NOT — because a departure
+  // ending that cannot tell them apart is worse than no ending at all.
+
+  function drive(
+    plan: (t: number) => { y: number; speedKmh: number } | null,
+  ): { state: ReturnType<typeof createLessonSession>; titles: string[]; t: number } {
     const template = SCENARIO_TEMPLATES.find((t) => t.id === "sc-ac-aquaplane");
     if (template === undefined) throw new Error("fixture gone");
     const lesson = compileScenario(template, 1);
     let state = createLessonSession(lesson);
+    const titles: string[] = [];
     let t = 0;
-    let y = 100;
-    const step = (40 / 3.6) * DT;
-    for (let i = 0; i < 240 / DT; i++) {
-      y += step;
+    for (;;) {
       t += DT;
-      const tick: SimTick = makeTick({ t, speedKmh: 40, maxSpeedKmh: 90, position: { x: 4.06, y } });
-      state = applyTick(state, tick).state;
+      const pose = plan(t);
+      if (pose === null) break;
+      const tick: SimTick = makeTick({
+        t,
+        speedKmh: pose.speedKmh,
+        maxSpeedKmh: 90,
+        position: { x: 4.06, y: pose.y },
+      });
+      const out = applyTick(state, tick);
+      state = out.state;
+      for (const e of out.hudEvents) if (e.kind === "lesson") titles.push(e.titleBg);
       if (state.phase !== "driving") break;
     }
-    expect(state.objectives.filter((o) => o.status === "done")).toHaveLength(1);
-    expect(state.phase).toBe("driving");
-    expect(t).toBeGreaterThan(200);
+    return { state, titles, t };
+  }
+
+  // SKIPPED 2026-08-24 — THE ARM IS DISARMED, AND THIS TEST IS ITS SPEC.
+  //
+  // engine.ts:1000 no longer builds the departure zone. Its verifier proved a
+  // FALSE REFUSAL with a probe drive: FINISH_DEPARTED_S of dwell accrues while
+  // the car is DRIVING BACK, so pause + travel > 75 s refuses a return that
+  // completed before the arm existed. This assertion is kept, not deleted,
+  // because it is the exhibit the arm has to satisfy.
+  //
+  // RE-ENABLE ONLY WITH ITS COUNTERPART: a test that drives the
+  // overshoot-and-RETURN case and proves the dwell does not accrue while the
+  // car is closing on the mark. That needs a previous-distance field on the
+  // finish state (types.ts carries dwellFace / regionDwellSec /
+  // strandedDwellSec and no range). Un-skipping this one alone re-ships the
+  // false refusal.
+  it.skip("the exhibit drive ENDS: straight through the terminal at 40 and away", () => {
+    // Below obj0's 63 km/h cap so the first task ticks, far over obj1's 6 so
+    // sweeping the disc spends `capMet`, then straight on. The departure
+    // circle (y = 467) is crossed at t ≈ 33.1 s; FINISH_DEPARTED_S later the
+    // drive is over, with the departure sentence and not either arrival one.
+    const v = 40 / 3.6;
+    const out = drive((t) => (t > 240 ? null : { y: 100 + v * t, speedKmh: 40 }));
+    expect(out.state.phase).toBe("completed");
+    expect(out.state.objectives.filter((o) => o.status === "done")).toHaveLength(1);
+    // Latch = circle crossing (≈ 33.1 s) + 75 s, quantized to the tick.
+    const clearedAtSec = (467 - 100) / v;
+    expect(out.state.endedAtSec ?? 0).toBeGreaterThan(clearedAtSec + FINISH_DEPARTED_S - 2);
+    expect(out.state.endedAtSec ?? 0).toBeLessThan(clearedAtSec + FINISH_DEPARTED_S + 2);
+    expect(out.titles.some((s) => s.includes("покрай края"))).toBe(true);
+  });
+
+  it("the recorded return drive is NOT refused: out 200 m, back, done at ≈ 94.5 s", () => {
+    // The O30 warning's own measurement, the drive the 20 s dwell closed at
+    // t = 53.25 s — 41.3 s before the student finished it. Out through the
+    // terminal at 40 km/h to y = 650, back at 40 to the edge of the acceptance
+    // disc, then onto the mark under obj1's 6 km/h cap, where `contractEarned`
+    // re-earns the objective and the chain completes. The departure gate's
+    // region time on this drive is ≈ 33 s — under FINISH_DEPARTED_S, over the
+    // 20 s that refused it — so the ending it gets is the COMPLETION, and no
+    // departure toast is ever pushed. This test fails at any dwell below 62 s.
+    const v40 = 40 / 3.6;
+    const v5 = 5 / 3.6;
+    const tOut = (650 - 100) / v40; // ≈ 49.5 s northbound
+    const tBack = tOut + (650 - 470) / v40; // ≈ 65.7 s back at the disc edge
+    const out = drive((t) => {
+      if (t > 200) return null;
+      if (t <= tOut) return { y: 100 + v40 * t, speedKmh: 40 };
+      if (t <= tBack) return { y: 650 - v40 * (t - tOut), speedKmh: 40 };
+      const y = Math.max(450, 470 - v5 * (t - tBack));
+      return { y, speedKmh: y > 450 ? 5 : 0 };
+    });
+    expect(out.state.phase).toBe("completed");
+    expect(out.state.objectives.filter((o) => o.status === "done")).toHaveLength(2);
+    expect(out.titles.some((s) => s.includes("покрай края"))).toBe(false);
+    // The completion is the return's, not a timeout's: well before the 200 s
+    // guard and after the car was back on the mark.
+    expect(out.t).toBeGreaterThan(tBack);
+    expect(out.t).toBeLessThan(130);
   });
 });

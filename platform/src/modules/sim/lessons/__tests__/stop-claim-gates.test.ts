@@ -38,8 +38,10 @@
  * rule's, on templates the narrow scope never looked at. Measured over all 167
  * shipped specs, EIGHT reachZone rows certify that another road user was let
  * through or waited for — a fact no field of SimTick carries into
- * `stepReachZone`, which is handed (params, prev, tick) and no ObjectiveContext
- * at all. Six of the eight are named in the sweep by their own frame:
+ * `stepReachZone`. (Since 2026-08-24 the evaluator IS handed ObjectiveContext,
+ * so the STAGED subset of the class became witnessable — see the sc-hzes-finish
+ * entry below; the ambient-actor rows remain outside the tick.) Six of the
+ * eight are named in the sweep by their own frame:
  *
  *   sc-lndc-wait       «Изчакай колата в съседната лента…» ✓ 2:12 with NO car
  *                      in that lane in any captured frame (mobile-right)
@@ -230,11 +232,16 @@ const TOUCHED = new Set([
 
 /**
  * Claims about ANOTHER road user — a yield, a gap, a clear crossing. No field
- * of SimTick carries another actor's priority or the outcome of a yield, and
- * `stepReachZone` receives no ObjectiveContext, so no value of any param can
- * make one of these true. They belong to the rule engine's trackers
- * (FAILED_TO_YIELD, PEDESTRIAN_NOT_YIELDED), which every one of these
- * templates already cites in its own mistakes[].
+ * of SimTick carries another actor's priority or the outcome of a yield, so
+ * for AMBIENT actors no value of any param can make one of these true. They
+ * belong to the rule engine's trackers (FAILED_TO_YIELD,
+ * PEDESTRIAN_NOT_YIELDED), which every one of these templates already cites in
+ * its own mistakes[]. The STAGED subset is different since 2026-08-24:
+ * `stepReachZone` now receives ObjectiveContext, and a banner that claims a
+ * person on foot was WAITED FOR binds `requireVruUntouched` — the gate refuses
+ * its tick while the run's own dart record reads `detail: "collision"`
+ * (`reach-zone-vru-untouched.test.ts`, both directions). That witnesses the
+ * NEGATIVE half only; the positive «waited out» stays a retitle debt.
  *
  * THE VOCABULARY IS THE VERB, NOT THE NOUN, and that distinction is the whole
  * precision of this rule. A title may NAME an actor as scenery — «Приближи
@@ -268,7 +275,7 @@ const ACTOR_CLAIM_KNOWN_OPEN: ReadonlyArray<{ specId: string; objectiveId: strin
     {
       specId: "sc-hz-emergency-stop",
       objectiveId: "sc-hzes-finish",
-      why: "sweep161 pc-right/08-debrief: «Изчакай детето…» ticked in the same protocol that convicts a collision, on a section the audit found no child in. templates-hazards2.ts; the stimulus is the staged encounter's, not the disc's.",
+      why: "HALF-CLOSED 2026-08-24 (sc-hz-emergency-stop:5b697845): the congratulate-and-convict contradiction — proof2 mobile-right ticked «Изчакай детето…» at 2:14 with «Удар в пешеходец» booked at 1:48 — is witnessed now: the title binds requireVruUntouched and the gate refuses while the run's dart record reads collision (reach-zone-vru-untouched.test.ts). STILL OPEN: the positive «waited out» half is not witnessable by any channel, so the retitle debt stays with templates-hazards2.ts.",
     },
     {
       specId: "sc-jx-giveway-b1",
