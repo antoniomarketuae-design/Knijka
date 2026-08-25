@@ -53,7 +53,24 @@ const X_LANE = 4.06;
 export function scSpWetLimitPlateShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Основно ограничение 50, но табелата „при мокра настилка — 40“ важи: вали. Таванът ни е 40 км/ч." },
+      // sc-sp-wet-limit-plate:65c7eaac, residual (a) — THE CAPTION TOLD HIM THE
+      // WEATHER, WHICH IS THE ONE THING THIS DRILL EXISTS TO MAKE HIM READ.
+      // `templates-speed2.ts` re-authored every instruction step to be true on a
+      // dry rung and a wet one («На сухо табелата спи», «първо погледни
+      // настилката, не текста»), and said in its own comment why: the L1 rung
+      // the harness drives is DRY, and a briefing that asserts rain teaches a
+      // student to misread a sleeping plate. These captions were not re-authored
+      // with it, and they are painted on the glass: w10-3 pc-right/04-t038s.png
+      // carries «важи: вали. Таванът ни е 40 км/ч» on the SAME screenshot as the
+      // instruction line saying 50 is fully lawful today, over 59 drive frames
+      // of dry asphalt, clear sky and parked wipers.
+      //
+      // THE RECORDING ITSELF IS A RAIN DRIVE and stays one (`rain: true` below,
+      // and the whole envelope argument in this file's header depends on it), so
+      // the caption is not made false — it is made to say WHOSE weather it is,
+      // and then hands the student the check. Same repair as the fog lesson's
+      // «Сянката кара с фарове за мъгла…».
+      { kind: "annotation", textBg: "Мокра ли е настилката — както в този запис — табелата „при мокра настилка — 40“ важи и таванът е 40 км/ч. Суха ли е, тя мълчи и важи основното 50." },
       // Low beams ON, set explicitly: the recorder's DAY default is "off",
       // which would itself grade HEADLIGHTS_OFF_IN_RAIN.
       { kind: "headlights", setting: "low" },
@@ -61,7 +78,7 @@ export function scSpWetLimitPlateShadowScript(): DriveScript {
       // ~38 km/h — under the 42.5 km/h rain envelope for the whole street, a
       // touch under the 40 plate ceiling.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 120]], targetKmh: 38, stopAtEnd: false },
-      { kind: "annotation", textBg: "Подминаваме табелата вече на 38 — не чакаме изпитващият да ни каже, че вали." },
+      { kind: "annotation", textBg: "Подминаваме табелата вече на 38 — таванът се чете от настилката, не се чака някой да го каже." },
       { kind: "drive", points: [[X_LANE, 120], [X_LANE, 240]], targetKmh: 38, stopAtEnd: false },
       { kind: "annotation", textBg: "На мокър път спирачният път е около 1,4 пъти по-дълъг — 40 връща и разстоянието, и времето за реакция." },
       { kind: "drive", points: [[X_LANE, 240], [X_LANE, 345]], targetKmh: 38 },

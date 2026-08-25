@@ -67,9 +67,23 @@ export function scHzBreakdownPulloffShadowScript(): DriveScript {
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[X_CRUISE, 15], [X_CRUISE, 150], [X_CRUISE, 280]], targetKmh: 95, stopAtEnd: false },
       {
+        // sc-hz-breakdown-pulloff:f71c775a — CRITICAL, second surface. The
+        // BRIEFING was moved off the oil lamp in an earlier round (step 2 of
+        // templates-hazards2.ts now names температура, with the reason written
+        // there), because `TelltaleStimulusSpec.lamp` is the single-value union
+        // "temperature" and the only thing the sim can fire is
+        // «Контролна лампа: температура! Спри спокойно вдясно»
+        // (LessonScene.tsx). THE CAPTION WAS NOT MOVED WITH IT, and it is the
+        // bigger of the two surfaces: `.audit-frames/w10-1/frames/
+        // sc-hz-breakdown-pulloff__pc-wrong/run.log` lines 378, 514, 649 carry
+        // this sentence over the windscreen while the red banner in the same
+        // frame says температура — twelve appearances of the oil lamp against
+        // forty of the temperature warning, in one drive. The lesson's whole
+        // subject is reacting to THAT lamp, so naming the other one is the
+        // defect wearing a different hat.
         kind: "annotation",
         textBg:
-          "Червената лампа за налягане на маслото светна — двигателят отказва. Без паника: огледало, десен мигач и плавно излизане вдясно.",
+          "Червената лампа за температура на двигателя светна — червено значи спри безопасно сега. Без паника: огледало, десен мигач и плавно излизане вдясно.",
       },
       { kind: "glance", mirror: "rear" },
       { kind: "indicator", setting: "right" },

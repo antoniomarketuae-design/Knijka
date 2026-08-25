@@ -154,6 +154,8 @@ import {
   isContact,
   PEDESTRIAN_BODY_RADIUS_M,
   playerObb,
+  PLAYER_HALF_LENGTH_M,
+  PLAYER_HALF_WIDTH_M,
 } from "../collision";
 import type { SimTickEvent } from "../rules";
 import type { VehicleProfile } from "../traffic/types";
@@ -306,4 +308,79 @@ export class ContactSentinel {
     }
     return this.hitOwners;
   }
+}
+
+/**
+ * THE PUBLISHER FOR `SimTick.vruAheadM` — how far ahead, in the car's own path,
+ * the nearest STAGED PERSON is standing. `Infinity` = nobody is.
+ *
+ * WHY THIS EXISTS AND WHY IT IS THE WHOLE FIX. `rules/engine.ts`'s ban-zone
+ * block already reads `tick.vruAheadM` and already acquits on it: a car at rest
+ * under a В27 with a person inside `banZoneVruAheadM` is not billed
+ * ILLEGAL_STOP_IN_BAN_ZONE. That acquittal has been ARMED AND SILENT since
+ * 2026-08-23, because nothing in the product ever wrote the field — the block's
+ * own closing paragraph says so in as many words: „WHAT IT STILL NEEDS, AND
+ * THIS FILE CANNOT DO IT: a publisher." So the finding it was written for kept
+ * reproducing: `.audit-frames/w10-1/frames/sc-hz-accident-scene__mobile-right/
+ * 04-t119s.png` and 04-t124s.png — «ⓘ Спиране в забранена зона» twice, cluster
+ * at 0 км/ч, a bystander against the bonnet, on the lesson whose whole subject
+ * is that people are standing in the road. A student is convicted for stopping
+ * for a human being.
+ *
+ * WHY THE MEASUREMENT LIVES HERE. This module already resolves every staged
+ * body's live pose off the traffic port each frame and already computes the
+ * „is it ahead of me" projection for `frontalOnly`. Re-deriving either in
+ * `LessonScene` would put grading geometry in a component (doc 05) and give one
+ * question two answers — the exact failure `directorContactCast` exists to
+ * prevent for the contact ids.
+ *
+ * THE CORRIDOR IS THE NARROWEST HONEST READING, deliberately. The engine's own
+ * contract calls this „a PERSON in the path", and a rule that acquitted for
+ * anyone merely NEARBY would hand the В27 code back its opposite defect: a
+ * deliberate curb stop beside a busy pavement would stop being billed, which is
+ * „loosening a check until it credits everybody". So a person counts only while
+ * his disc overlaps the band the car's own body sweeps — `PLAYER_HALF_WIDTH_M +
+ * PEDESTRIAN_BODY_RADIUS_M` either side of the centreline — and the distance
+ * returned is BUMPER TO BODY, not centre to centre, so it means the same thing
+ * `leadGapM` means one exemption up.
+ *
+ * PEDESTRIANS ONLY (`body === "disc"`), and the omission is named rather than
+ * implied: a cyclist is staged as a narrow BOX with a real heading, so „is he in
+ * my path" is an oriented-box question and not a disc one. Answering it with the
+ * pedestrian radius would be a guess in the direction that acquits, which is the
+ * direction this function may never guess in. Until a cyclist is measured with
+ * his own geometry, a stop for one is judged as it is today.
+ *
+ * ONE-DIRECTIONAL, like the field it feeds: this number can only ACQUIT.
+ * Nothing convicts on it, and nothing may — see the engine block.
+ */
+export function vruAheadMeters(
+  cast: readonly ContactCastMember[],
+  traffic: StagedTrafficPort,
+  x: number,
+  y: number,
+  headingDeg: number,
+): number {
+  if (cast.length === 0) return Number.POSITIVE_INFINITY;
+  const rad = (headingDeg * Math.PI) / 180;
+  const fx = Math.sin(rad);
+  const fy = Math.cos(rad);
+  const HALF_CORRIDOR_M = PLAYER_HALF_WIDTH_M + PEDESTRIAN_BODY_RADIUS_M;
+  let nearest = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < cast.length; i++) {
+    const m = cast[i];
+    if (m.body !== "disc") continue;
+    const actor = traffic.staged(m.actorId);
+    if (actor === null) continue;
+    const dx = actor.x - x;
+    const dy = actor.y - y;
+    // Forward is (sin, cos) — the same projection `frontalOnly` uses above;
+    // right is its perpendicular (cos, −sin).
+    const ahead = dx * fx + dy * fy;
+    if (ahead <= 0) continue;
+    if (Math.abs(dx * fy - dy * fx) > HALF_CORRIDOR_M) continue;
+    const gap = Math.max(0, ahead - PLAYER_HALF_LENGTH_M - PEDESTRIAN_BODY_RADIUS_M);
+    if (gap < nearest) nearest = gap;
+  }
+  return nearest;
 }

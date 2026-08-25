@@ -55,7 +55,20 @@ export function scAcFogShadowScript(): DriveScript {
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 120]], targetKmh: 25, stopAtEnd: false },
       { kind: "annotation", textBg: "Караш толкова бързо, колкото виждаш — тук около 25 км/ч, не 50." },
       { kind: "drive", points: [[X_LANE, 120], [X_LANE, 240]], targetKmh: 25, stopAtEnd: false },
-      { kind: "annotation", textBg: "Фаровете за мъгла светят ниско под пелената — и те правят видим за другите." },
+      // sc-ac-fog:e7333e17 — the coach narrated equipment that was OFF. This
+      // line asserted «Фаровете за мъгла светят ниско под пелената», in the
+      // second person, over a cockpit whose МЪГЛА telltale is unlit and a road
+      // with no fog beam on it: `.audit-frames/w10-2/frames/
+      // sc-ac-fog__pc-right/04-t101s.png` — МЪГЛА renders in the same inert
+      // white as СВЕТЛИНИ and ЧИСТАЧКИ while КОЛАН beside it is lit red, so the
+      // row does light when something is on. The mobile leg of that same drive
+      // is BILLED «Мъгла без фарове за мъгла». The shadow really does have them
+      // on (the `fogLights` step above); the student does not, and the sentence
+      // did not say whose lamps it meant. So it names the subject and turns the
+      // claim into the check the student can make on his own dashboard — which
+      // is what the caption should have been doing on a lesson whose graded act
+      // IS that switch (THEO-4: explain the decision, never assert it).
+      { kind: "annotation", textBg: "Сянката кара с фарове за мъгла — светят ниско под пелената и я правят видима. Виж своето табло: лампата МЪГЛА трябва да свети (чл. 74)." },
       { kind: "drive", points: [[X_LANE, 240], [X_LANE, 345]], targetKmh: 25 },
       { kind: "pause", sec: 1.5, brake: true },
       { kind: "annotation", textBg: "Готово: цялата отсечка със смъкната скорост и включени фарове за мъгла." },

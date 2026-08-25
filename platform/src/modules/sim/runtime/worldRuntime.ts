@@ -1366,6 +1366,7 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       leadGapM = Infinity,
       fog = false,
       snow = false,
+      vruAheadM = Infinity,
     ): SimTick {
       lastSampleTSec = tSec; // the barrier prop reads THIS clock (see getter)
       const events: SimTickEvent[] = [];
@@ -2006,6 +2007,15 @@ export function createWorldRuntime(districtJson: District | unknown): DistrictWo
       // (doc 72 AC-08 winter grip) is the same seam again.
       if (fog) tick.fog = true;
       if (snow) tick.snow = true;
+      // THE PERSON IN THE PATH (`SimTick.vruAheadM`) — additive, and published
+      // ONLY when a body was actually measured, so every drive, trace and
+      // fixture that has no staged pedestrian grades byte-identically to
+      // before. `Infinity` is not „nobody at 0 m", it is „this reporter cannot
+      // answer", and the rule engine reads an absent field and an infinite one
+      // the same way: it convicts. The channel only ever ACQUITS, and it had no
+      // writer at all until this line — see `orchestrator/contact.ts
+      // vruAheadMeters` for the frames.
+      if (Number.isFinite(vruAheadM)) tick.vruAheadM = vruAheadM;
       if (v.fogLightsOn !== undefined) tick.fogLightsOn = v.fogLightsOn;
       // B1a additive world context (doc 72 capabilities 1 + N3): flows onto
       // the tick exactly the way maxSpeedKmh does — from the resolved edge.

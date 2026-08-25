@@ -86,6 +86,7 @@ import {
   createScenarioDirector,
   directorContactCast,
   lessonSeed,
+  vruAheadMeters,
   type ScenarioDirector,
 } from "@/modules/sim/orchestrator";
 // Exact body geometry for naming a live contact — the SAME module the
@@ -2993,6 +2994,32 @@ function DemoDeck({
    *
    * It is a ref, not state, so latching costs no render; the paired `useState`
    * exists only because the CAPTION has to disappear, and that is a render.
+   *
+   * …AND THE PANEL GOES WITH THE VOICE — sc-follow-distance:407a976c and
+   * sc-follow-brake:62b67c75, 2026-08-24.
+   *
+   * The latch above silenced the caption and stopped the clock and left the
+   * TRANSPORT standing, on the reasoning that „the transport is the only
+   * authority left". That leaves ~420 × 105 px of scrub track, four buttons and
+   * three speed chips parked in the lower-left of the play area for the whole
+   * lesson: measured by the judge at x ≈ 278–890, y ≈ 540–645 of a 1440 × 900
+   * shot, and visible on every drive frame of
+   * `.audit-frames/w10-3/frames/sc-follow-distance__pc-right/` from 01-arrival
+   * to 04-t179s. On the cockpit view that band is the top of the dashboard and
+   * the near carriageway — the two things a following-distance drill is about.
+   *
+   * SO IT COLLAPSES TO ITS OWN BUTTON, which is not a new idea: the controls
+   * legend two components down does exactly this on exactly this trigger
+   * (`autoCollapsedRef` / `controlsLegendStandsDown`), and the corpus already
+   * accepted the result — the keys panel's row was closed on the frames where
+   * it had shrunk to a «Клавиши · за напреднали ▸» button. The deck's own
+   * «🎬 Демонстрация ▾» button stays exactly where it was, so nothing is taken
+   * away: a student who wants the demonstration back reopens it, deliberately,
+   * which is the same sentence the paragraph above already ends on.
+   *
+   * ONE-WAY, like everything else here, and only ONCE — `setOpen(false)` runs
+   * inside the same latch, so a student who reopens the deck at a junction
+   * keeps it open for the rest of the lesson.
    */
   useEffect(() => {
     if (!sampleRef || stoodDownRef.current) return;
@@ -3000,6 +3027,7 @@ function DemoDeck({
       if (!demoDeckStandsDown(sampleRef.current.speedKmh)) return;
       stoodDownRef.current = true;
       setStoodDown(true);
+      setOpen(false);
       // Stop the replay as well as its voice. The caption is what the corpus
       // photographed, but a demonstration still running behind a silent deck
       // would put the shadow car through a junction the student is negotiating.
@@ -3590,6 +3618,23 @@ function RuntimeDriver({
     // `conditions` memo). That is the point of the memo: the grader and the
     // display cannot disagree about whether it is snowing, which is the one
     // thing they have already disagreed about twice (O28, O35).
+    // THE PERSON IN THE PATH, on the same frame the law is applied to.
+    // `leadGap` above answers „is a CAR standing on top of me"; this answers the
+    // same question for the road user чл. 5, ал. 2 puts first, and the rule
+    // engine's В27 block has been waiting for it since 2026-08-23 with the
+    // acquittal wired and nothing writing the field. Measured in the module
+    // (`orchestrator/contact.ts`), off the director's own cast and the same
+    // traffic port `handleCollision` names bodies through — one question, one
+    // answer. A lesson with no director, or with no staged people, yields the
+    // empty cast and therefore Infinity — which is what every caller that
+    // cannot answer says, and leaves its tick byte-identical to before.
+    const vruAhead = vruAheadMeters(
+      directorContactCast(director),
+      traffic,
+      sample.position.x,
+      sample.position.y,
+      sample.headingDeg,
+    );
     const tick = runtime.sample(
       sample,
       tRef.current,
@@ -3598,6 +3643,7 @@ function RuntimeDriver({
       leadGap,
       conditions.fog,
       conditions.snow,
+      vruAhead,
     );
 
     // A8: the scenario director steps AFTER traffic.update + runtime.sample —

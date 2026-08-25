@@ -696,6 +696,47 @@ function authoredCapOf(spec: LessonObjective): number | undefined {
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined;
 }
 
+/**
+ * THE NUMBER THIS OBJECTIVE ALREADY PUT ON THE GLASS — for the OTHER surfaces
+ * that have to name the same cap, so they cannot name a different one.
+ *
+ * MEASURED, sc-ac-crosswind pc-right/04-t084s.png (w10-1): instruction 3 says
+ * «тук около 34 км/ч, таванът е 40», the objective toast under it says «дръж
+ * под 40 км/ч», the cockpit strip says «задачата иска ≤40» — and the НАУЧИ card
+ * in the same 200 px band says «не повече от 45 км/ч». Same task, same instant,
+ * two numbers, and the one the student was told to obey is the one that is not
+ * the grader's. The 45 is `params.maxSpeedKmh`: the author's 40 with the L1
+ * rung's 5 km/h of grace folded in (`scenario/params.ts widenSpeedCap`). Three
+ * of the four surfaces were already reconciled — they all read the advisor's
+ * sentence, directly or by parsing it back out (LessonPlayShell
+ * `taskCapKmhFromPrompt`) — and `lessons/engine.ts objectiveNotice` was the one
+ * left holding the raw compiled figure. The sibling row is sc-ac-snow, authored
+ * 25 / compiled 30, on the same arithmetic.
+ *
+ * So the coach card asks the same question the card above it asked, through the
+ * same `spokenCapKmh`: whose number is it. THE FALLBACK IS NOT A GUESS — a
+ * lesson compiled outside `scenario/compile.ts` never had a rung applied, so
+ * `maxSpeedKmh` there IS the author's own figure and returning it changes
+ * nothing (route-finish.test.ts's hand-built `t-route-capped` is that case).
+ *
+ * WHAT THIS MAY NOT DO IS MOVE A GATE, and it cannot: `spokenCapKmh` ends on a
+ * `Math.min` with the compiled cap, so the spoken figure is always AT OR BELOW
+ * the number that grades. A student who obeys what the card says passes the
+ * gate — the direction this product is allowed to be wrong in. The grace stays
+ * exactly what its own comment calls it, «forgiveness for a beginner's
+ * speedometer», and stops being a second instruction.
+ */
+export function shownObjectiveCapKmh(
+  spec: LessonObjective,
+  compiledCapKmh: number,
+  postedLimitKmh?: number,
+): number {
+  return (
+    spokenCapKmh(compiledCapKmh, spec.titleBg, postedLimitKmh, authoredCapOf(spec)) ??
+    compiledCapKmh
+  );
+}
+
 // ---------------------------------------------------------------------------
 // THE VOICE FOR THE WAITING — B15-VOICE (2026-08-05), requirement zero.
 //

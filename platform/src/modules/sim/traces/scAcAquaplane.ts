@@ -108,7 +108,19 @@ export function aquaVanObstacle(): ObstacleRect2D[] {
 export function scAcAquaplaneShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Пороен дъжд на извънградски път — и стояща вода в ниското напред. Решенията се взимат ПРЕДИ водата." },
+      // sc-ac-aquaplane:32b6d084 — the LOCALE claim, and the second place it
+      // lived. templates-conditions.ts struck „извънградският път" from the
+      // briefing and replaced it with the thing the student CAN check (the
+      // posted 90, built at y = 45 and y = 506); this caption kept it, and the
+      // caption is the line painted across the windscreen —
+      // `.audit-frames/w10-3/frames/sc-ac-aquaplane__pc-right/run.log` lines
+      // 242, 431 and the teaching card at 04-t101s, over six-storey lit blocks,
+      // a lamp column every ~32 m and a kerbside row of parked cars.
+      // „В НИСКОТО" GOES WITH IT, for the reason the truth gate's ban records:
+      // no district in the corpus has low ground — `roads.edges[].geometry` is
+      // `[x, y]` pairs and the carriageway is laid at the flat constant
+      // ROAD_Y — so a dip is a body NO map can hold.
+      { kind: "annotation", textBg: "Пороен дъжд по път с разрешени 90 — и стояща вода напред. Решенията се взимат ПРЕДИ водата." },
       // Low beams ON, set explicitly: the recorder's DAY default is "off",
       // which would itself grade HEADLIGHTS_OFF_IN_RAIN.
       { kind: "headlights", setting: "low" },

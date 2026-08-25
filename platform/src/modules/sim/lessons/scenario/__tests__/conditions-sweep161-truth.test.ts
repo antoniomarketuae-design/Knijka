@@ -34,37 +34,40 @@
  * can be vacuous: a rule is proved to have teeth by feeding it the exact copy
  * or the exact number the audit photographed and watching it be caught.
  *
- * WHAT THIS GATE CANNOT SEE, WRITTEN DOWN RATHER THAN IMPLIED — and it is the
- * half the frames were actually shot of. Every rule here sweeps the
- * `ScenarioSpec`: objective, numbered steps, gate titles, mistake debriefs.
- * The DEMO CAPTION is not in the spec. It is a `kind: "annotation"` step in
- * `sim/traces/scAc<Lesson>.ts`, baked into the committed
- * `content/traces/<lesson>/<name>.trace.json`, and it
- * renders as the big line over the windscreen under «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ
- * СЯНКАТА» — which is where sweep161 photographed most of these findings. The
- * briefings were cleaned; those captions were not, and they still carry the
- * struck claims:
+ * WHAT THIS GATE COULD NOT SEE, AND WHAT IT COST — CLOSED 2026-08-24.
  *
- *   traces/scAcCrosswind.ts:68,71,94,106,123 — „Напред е открит участък —
- *     МОСТЪТ, където страничният вятър духа силно отдясно" and four more
- *     „открития участък" lines, on fo-follow-v1. Live on
- *     `.audit-frames/proof/frames/sc-ac-crosswind__pc-right/04-t011s.png`
- *     (2026-08-22), over six-storey blocks and parked cars on both verges.
- *   traces/scAcIce.ts:104,132,143 — „знак А15 … ПРЕДИ МОСТА. Мостът замръзва
- *     пръв", „мостът е заледен"; and :113 „Напред е закъсал автомобил", live on
- *     `.audit-frames/proof/frames/sc-ac-ice__pc-right/01-arrival.png`.
- *   traces/scAcAquaplane.ts:111 — „Пороен дъжд на ИЗВЪНГРАДСКИ ПЪТ", the same
- *     locale claim RULE 3 just struck from the briefing.
- *   traces/scAcFog.ts:58 — „Фаровете за мъгла светят ниско под пелената",
- *     narrated while both cockpit telltales are dark
- *     (`.audit-frames/sweep161/sc-ac-fog/pc-right/04-t101s.png`).
+ * Every rule here swept the `ScenarioSpec`: objective, numbered steps, gate
+ * titles, mistake debriefs. The DEMO CAPTION is not in the spec. It is a
+ * `kind: "annotation"` step in `sim/traces/scAc<Lesson>.ts`, baked into the
+ * committed `content/traces/<lesson>/<name>.trace.json`, and it renders as the
+ * big line over the windscreen under «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА» — which
+ * is where sweep161 photographed most of these findings in the first place.
+ * The briefings were cleaned; those captions were not, so every struck claim
+ * simply changed surface and went on being taught:
  *
- * Extending `driverCopy` over the trace annotations is the right shape and is
- * NOT done here on purpose: those four files belong to another lane, the fix is
- * a re-record (RECORD_TRACES=1) and not a string edit, and a gate that lands
- * red is a gate the next lane deletes. Whoever owns that re-record should add
- * the annotations to `driverCopy` in the same change — all three rules above
- * then apply to them for free.
+ *   traces/scAcCrosswind.ts — „Напред е открит участък — МОСТЪТ…" and four more
+ *     „открития участък" lines, on fo-follow-v1, which has no `zones` array.
+ *     Re-photographed at w10-1 pc-right 04-t003s / t111s / t148s / t186s.
+ *   traces/scAcIce.ts — „знак А15 … ПРЕДИ МОСТА. Мостът замръзва пръв",
+ *     „мостът е заледен", and „Напред е закъсал автомобил" — the stalled car
+ *     being a recorder rect with no scenery prop. w10-1 pc-right 04-t086s.
+ *   traces/scAcAquaplane.ts — „Пороен дъжд на ИЗВЪНГРАДСКИ ПЪТ", plus „в
+ *     ниското", the dip no district in the corpus can hold. w10-3 run.log
+ *     242, 431.
+ *   traces/scAcFog.ts — „Фаровете за мъгла светят ниско под пелената", narrated
+ *     while the МЪГЛА telltale is unlit. w10-2 run.log 323, 593.
+ *
+ * The paragraph that used to stand here said extending `driverCopy` over the
+ * annotations was „the right shape" and was „NOT done here on purpose", and
+ * handed the job to whoever owned the re-record. Three repair rounds later
+ * nobody had, and all four lines were still on the glass. A rule that stops at
+ * the panel is a rule the copy walks around.
+ *
+ * So `driverCopy` now includes `captionCopy` — read from the COMMITTED trace,
+ * because that is what the browser plays — and all three rules above apply to
+ * the captions for free. The re-record it needed (RECORD_TRACES=1) came with
+ * the same change. See `captionCopy` below for the reader and the
+ * non-vacuity check that stops it going silently blind.
  */
 
 import { readFileSync } from "node:fs";
@@ -130,12 +133,93 @@ function briefingCopy(spec: ScenarioSpec): string[] {
   ];
 }
 
-/** …and everything the driver reads at any point in the drill, briefing plus
- *  debriefs. Used by the rules that must hold across the whole lesson. */
+/**
+ * THE DEMO CAPTION — the surface this gate could not see, and the one the
+ * frames were actually shot of.
+ *
+ * Every `kind: "annotation"` step of a lesson's authored drives is baked into
+ * the committed `content/traces/<lesson>/<name>.trace.json` as a
+ * `{ tSec, kind: "annotation", textBg }` event, and renders as the big line
+ * over the windscreen under «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА». It is read from
+ * the COMMITTED FILE rather than from `traces/scAc*.ts`, deliberately: the file
+ * is what ships to the browser, and a script whose recording was never re-made
+ * would otherwise pass a gate on copy nobody sees.
+ *
+ * WHY IT IS HERE NOW. The header of this file used to end with a paragraph
+ * headed „WHAT THIS GATE CANNOT SEE", listing the exact lines that had migrated
+ * out of the briefings into these captions and saying the extension was „NOT
+ * done here on purpose" because the files belonged to another lane. Three
+ * repair rounds later every one of those lines was still on the glass and the
+ * audit re-photographed all of them — sc-ac-crosswind's «мостът» at
+ * w10-1/…/04-t003s, t111s, t148s and t186s; sc-ac-ice's bridge thermodynamics
+ * at w10-1/…/04-t086s; sc-ac-aquaplane's «извънградски път» at w10-3/…/run.log
+ * 242 and 431; sc-ac-fog's fog lamps at w10-2/…/run.log 323 and 593. A rule
+ * that stops at the panel is a rule the copy walks around: the briefings were
+ * cleaned and the promise simply changed surface. So the annotations are
+ * driver-facing copy and are swept as such, and all three rules above now
+ * apply to them for free.
+ */
+const REPO_ROOT_FOR_TRACES = path.join(process.cwd(), "..");
+
+/** READ ONCE, EAGERLY, AT MODULE SCOPE — and the reason is a red gate rather
+ *  than tidiness. `driverCopy` is called from most rules in this file and each
+ *  call re-opened and re-parsed every trace of every template; the twin reader
+ *  in `lane-world-claims.test.ts` was measured at 243 reads of 81 distinct
+ *  traces in a single run of three `it`s.
+ *
+ *  A LAZY MEMO IS NOT ENOUGH, measured 2026-08-25: it removes the repeats and
+ *  leaves the whole COLD pass inside whichever `it` runs first, and in that
+ *  state the twin still died with `Test timed out in 5000ms` (10.7 s elapsed)
+ *  with five lanes sharing this 7200 rpm spindle — ~8 MB of JSON across ~81
+ *  files is seek-bound, not parse-bound. Module scope is evaluated at
+ *  COLLECTION, which `testTimeout` does not govern, so the read is paid once
+ *  there and every rule below is a pure lookup. The integrator's full-gate run
+ *  is exactly the contended condition that made the lazy form fail, and it is
+ *  the most likely cause of the one-off flake this file showed on the round it
+ *  was written. Traces are static under a suite, so one pass is the whole
+ *  truth. */
+const tracePathsOf = (spec: ScenarioSpec): readonly string[] => [
+  ...(spec.shadow ? [spec.shadow.path] : []),
+  ...(spec.mistakes ?? []).flatMap((m) => (m.traceRef ? [m.traceRef.path] : [])),
+];
+
+function readAnnotations(tracePath: string): readonly string[] {
+  const raw = JSON.parse(
+    readFileSync(path.join(REPO_ROOT_FOR_TRACES, tracePath), "utf-8"),
+  ) as { events?: Array<{ kind?: string; textBg?: string }> };
+  return (raw.events ?? [])
+    .filter((e) => e.kind === "annotation" && typeof e.textBg === "string")
+    .map((e) => e.textBg as string);
+}
+
+const ANNOTATIONS = new Map<string, readonly string[]>(
+  [...new Set(SCENARIO_TEMPLATES_CONDITIONS.flatMap((s) => tracePathsOf(s)))].map((rel) => [
+    rel,
+    readAnnotations(rel),
+  ]),
+);
+
+/** The fallback reads rather than returning nothing: a trace outside the
+ *  conditions family must not be reported as „no captions", which is the
+ *  vacuous pass §the caption sweep's own instrument check exists to refuse. */
+function annotationsOf(tracePath: string): readonly string[] {
+  return ANNOTATIONS.get(tracePath) ?? readAnnotations(tracePath);
+}
+
+/** Every demo caption the lesson can put over the windscreen — shadow first,
+ *  then each mistake demo the debrief replays. */
+function captionCopy(spec: ScenarioSpec): string[] {
+  return tracePathsOf(spec).flatMap((rel) => [...annotationsOf(rel)]);
+}
+
+/** …and everything the driver reads or is shown at any point in the drill:
+ *  briefing, debriefs, and the demonstration captions. Used by the rules that
+ *  must hold across the whole lesson. */
 function driverCopy(spec: ScenarioSpec): string[] {
   return [
     ...briefingCopy(spec),
     ...(spec.mistakes ?? []).flatMap((m) => [m.titleBg, m.whatWentWrongBg]),
+    ...captionCopy(spec),
   ];
 }
 
@@ -402,6 +486,21 @@ describe("sweep161 · the conditions drills narrate the world they are staged on
     expect(claims).toEqual([]);
   });
 
+  it("the sweep actually reaches the captions — an empty reader would pass everything", () => {
+    // THE INSTRUMENT BEFORE THE MEASUREMENT. `captionCopy` reads a committed
+    // JSON off disk by a path that comes out of the spec; a typo, a moved
+    // repo root or a renamed event kind would return [] and the extension
+    // above would go silently vacuous — green, and guarding nothing. That is
+    // the exact failure mode this audit has already paid for twice.
+    const captions = SCENARIO_TEMPLATES_CONDITIONS.flatMap(captionCopy);
+    expect(captions.length).toBeGreaterThan(40);
+    expect(new Set(SCENARIO_TEMPLATES_CONDITIONS.filter((s) => captionCopy(s).length > 0).map((s) => s.id)).size)
+      .toBeGreaterThanOrEqual(8);
+    // …and they are genuinely inside driverCopy, not merely readable.
+    const ice = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-ice")!;
+    expect(driverCopy(ice)).toEqual(expect.arrayContaining(captionCopy(ice)));
+  });
+
   it("the world rule has teeth — every line the audit photographed is caught", () => {
     // The exact strings in `.audit-frames/sweep161/sc-ac-crosswind/pc-right/
     // 01-arrival.png` and `.../sc-ac-ice/pc-right/04-t098s.png`.
@@ -415,6 +514,16 @@ describe("sweep161 · the conditions drills narrate the world they are staged on
       "Знай: мостът няма топла земя отдолу и е заледен, макар улицата да е суха.",
       "Виж закъсалия автомобил на моста — подхлъзнал се е преди теб.",
       "Лед по моста",
+      // …and the DEMO CAPTIONS the same claims had migrated into, verbatim off
+      // the committed traces at 151bd19 — the surface this gate could not see
+      // until the `captionCopy` extension above. Each is quoted in the w10
+      // frames named in that block.
+      "Напред е открит участък — мостът, където страничният вятър духа силно отдясно. Двете ръце здраво на волана.",
+      "Преди открития участък смъкваме към 34 км/ч — колкото по-бавно, толкова по-малко те мести поривът.",
+      "Грешката: 50 км/ч през открития участък, с отпусната ръка на волана.",
+      "Ясна студена сутрин след влажна нощ — и знак А15 „Опасност от хлъзгане“ преди моста. Мостът замръзва пръв: няма топла земя под платното.",
+      "Грешката: улицата е суха, колата носи 50 — а мостът е заледен и никой не намали преди него.",
+      "Пороен дъжд на извънградски път — и стояща вода в ниското напред. Решенията се взимат ПРЕДИ водата.",
     ];
     for (const line of SHIPPED) {
       expect(

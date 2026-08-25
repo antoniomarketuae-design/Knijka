@@ -78,7 +78,14 @@ export interface WorldRuntime {
   /** Produce the authoritative SimTick for the rule engine from a vehicle sample.
    *  `fog` (additive, default false) is the FOG condition flag — it reaches the
    *  tick exactly like `rain` does (the doc 72 AC-03 seam); `snow` (additive,
-   *  default false) is the SNOW condition flag, the same seam again (AC-08). */
+   *  default false) is the SNOW condition flag, the same seam again (AC-08).
+   *  `vruAheadM` (additive, default Infinity) is the bumper-to-body distance to
+   *  the nearest STAGED PERSON standing in the car's own path — `leadGapM` for
+   *  the road user чл. 5, ал. 2 puts first. It reaches the tick the same way
+   *  `leadGapM` does and it can only ever ACQUIT (`rules/engine.ts`, the
+   *  ban-zone block); `Infinity` means „nobody there or nobody could answer",
+   *  which is what every caller that omits it says. Measured by
+   *  `orchestrator/contact.ts vruAheadMeters`. */
   sample(
     v: VehicleSample,
     tSec: number,
@@ -87,6 +94,7 @@ export interface WorldRuntime {
     leadGapM?: number,
     fog?: boolean,
     snow?: boolean,
+    vruAheadM?: number,
   ): SimTick;
   /** Current phase for a signal node (grading/traffic read model; ignores
    *  cluster MODES — a dark cluster still reports its underlying cycle). */

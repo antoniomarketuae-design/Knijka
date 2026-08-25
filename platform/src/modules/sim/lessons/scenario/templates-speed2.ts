@@ -309,8 +309,34 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
   },
   instructionsBg: [
     { n: 1, textBg: "Потегли по магистралата — ограничението е 140 км/ч, а двете посоки са на отделни платна с разделителна ивица." },
+    // sc-mw-min-speed:f3c26187 — THE SAME MOTORWAY WAS TAUGHT TWO RHYTHMS AND
+    // TWO FLOORS, and the floor is this lesson's entire subject. mw-v1 is the
+    // ONE motorway in the catalogue and both drills run on it back to back:
+    // [HELD 2026-08-25 — THE REWRITE BELOW IS NOT SHIPPED, AND THE REASON IS
+    //  THAT IT WAS HALF DONE. Changing this step to 120–130 leaves the two task
+    //  chips still printing «около 110 км/ч», so the chip quotes a number the
+    //  lesson no longer sources — which is the exact contradiction
+    //  task-title-agrees-with-briefing.test.ts and one-junction-three-names
+    //  §3 were written to catch, and both go red on it. It also puts
+    //  sc-mw-min-speed into tier-feasibility bandTopShort beside
+    //  sc-mw-discipline. The diagnosis is right and sc-mw-min-speed:f3c26187
+    //  stays OPEN: fixing it means moving the briefing AND the two chips AND
+    //  the objective caps together, in one round, with those three gates green.]
+    // sc-mw-discipline briefs «установи около 120–130 км/ч» and «под 50 км/ч без
+    // причина», this one briefed 110 and 40. Neither number here was backed by
+    // anything on the road — the 110 against a staged flow authored at
+    // cruiseSpeedMps 33 (≈ 119 км/ч) rising to 36 (130), which is exactly the
+    // band the sibling names and `sp-mw-flow-visible.test.ts` §1 pins.
     { n: 2, textBg: "Ускорявай уверено и се установи около 110 км/ч в ДЯСНАТА лента за движение: това е ритъмът на потока тук." },
     { n: 3, textBg: "Погледни в огледалото за задно виждане. Колата зад теб се движи с магистрална скорост — дръж своя ритъм и я остави спокойно да те изпревари отляво." },
+    // …AND THE FLOOR IS THE NUMBER THAT GRADES. `DEFAULT_RULE_CONFIG
+    // .motorwayMinFlowKmh` is 50 (rules/types.ts:1602 — „authored detection
+    // floor, NOT a legal limit"), and DRIVING_TOO_SLOW_FOR_MOTORWAY bills a
+    // sustained causeless crawl BELOW it. The old line named 40, ten km/h under
+    // the number the engine actually uses, on the drill titled „не пълзи" — so a
+    // student holding 45 obeyed his briefing and was billed. The sibling
+    // sc-mw-discipline already says 50. The mistake demos below still crawl at
+    // 40, which is what being under the floor looks like.
     { n: 4, textBg: "Не сваляй скоростта без причина. Продължително пълзене далеч под потока (тук около 40 км/ч) превръща колата ти в подвижно препятствие, което всички трябва да заобикалят." },
     { n: 5, textBg: "Лявата лента е само за изпреварване, а аварийната вдясно не е лента за движение изобщо — дръж дясната до края на участъка." },
   ],
@@ -518,7 +544,16 @@ export const SC_SP_WET_LIMIT_PLATE: ScenarioSpec = {
     },
     {
       id: "sc-swp-finish",
-      titleBg: "Стигни края на отсечката, задържал мокрия таван",
+      // sc-sp-wet-limit-plate:65c7eaac, residual (b). The instruction list above
+      // was made weather-neutral by the wave that wrote this block; this GATE
+      // TITLE was not, and it is a driver-facing surface twice over — the HUD
+      // task chip during the drive and the ✓ line in the debrief. On the L1 dry
+      // rung the sweep books «✓ Стигни края на отсечката, задържал мокрия таван
+      // 0:49» over 59 drive frames of dry asphalt, clear sky, wipers off
+      // (w10-3, pc-wrong/08-debrief-p4.png) — the lesson certifying a wet
+      // ceiling nobody was ever under. It says the same thing the steps say
+      // now: hold whatever ceiling the SURFACE gave you.
+      titleBg: "Стигни края на отсечката, задържал тавана от настилката",
       params: { kind: "reachZone", x: LANE_X, y: 330, radiusM: 12 },
     },
   ],

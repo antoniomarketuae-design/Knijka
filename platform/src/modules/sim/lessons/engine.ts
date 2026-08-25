@@ -23,6 +23,7 @@
 
 import type {
   HudEvent,
+  LessonObjective,
   LessonSpec,
   NearMissEvent,
   StagedEventOutcome,
@@ -52,7 +53,7 @@ import {
   stepObjective,
   type ObjectiveContext,
 } from "./objectives";
-import { stepYieldVoice } from "./advisor";
+import { shownObjectiveCapKmh, stepYieldVoice } from "./advisor";
 import { foldTrainingScore, type PenaltyEscalation } from "./escalation";
 import { examTerminationFor } from "./exam";
 import {
@@ -350,10 +351,12 @@ function withSpeedMeasurement(e: ViolationEvent, tick: SimTick, explanationBg: s
  * things that are taught and not billed.
  */
 function objectiveNotice(
+  spec: LessonObjective,
   params: ObjectiveParams,
   before: ObjectiveEvalState,
   after: ObjectiveEvalState,
   tick: SimTick,
+  postedLimitKmh: number | undefined,
 ): HudEvent | null {
   if (
     params.kind === "reachZone" &&
@@ -362,6 +365,15 @@ function objectiveNotice(
     after.overCapNoted &&
     params.maxSpeedKmh !== undefined
   ) {
+    // THE NUMBER THE STUDENT WAS SHOWN, not the one the ladder compiled. This
+    // card used to print `params.maxSpeedKmh` raw, and on a rung with grace
+    // that is a SECOND figure for one task: sc-ac-crosswind pc-right/04-t084s
+    // carries the toast «дръж под 40 км/ч» and this card's «не повече от 45
+    // км/ч» in the same 200 px band. `shownObjectiveCapKmh` is the advisor's
+    // own `spokenCapKmh`, so the two surfaces cannot diverge again, and its
+    // closing `Math.min` keeps the spoken figure at or under the gate — the
+    // card can only ever be stricter than the grader, never looser.
+    const shownCapKmh = shownObjectiveCapKmh(spec, params.maxSpeedKmh, postedLimitKmh);
     return {
       kind: "lesson",
       titleBg: "Стигна точката, но твърде бързо",
@@ -370,7 +382,7 @@ function objectiveNotice(
       // REACH_ZONE_GRACE_M — the grace reaches back toward the driver, never
       // forward past the mark, because on a stop drill the overshoot is the
       // graded failure). Telling him otherwise would be its own falsehood.
-      explanationBg: `Задачата иска да си тук с не повече от ${params.maxSpeedKmh} км/ч, а в момента караш ${Math.round(Math.abs(tick.speedKmh))} км/ч — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
+      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, а в момента караш ${Math.round(Math.abs(tick.speedKmh))} км/ч — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
     };
   }
   if (
@@ -811,7 +823,14 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       const before = evalStates[currentIndex];
       const step = stepObjective(current.params, before, tick, ctx);
       evalStates[currentIndex] = step.evalState;
-      const notice = objectiveNotice(current.params, before, step.evalState, tick);
+      const notice = objectiveNotice(
+        current.spec,
+        current.params,
+        before,
+        step.evalState,
+        tick,
+        prev.lesson.postedLimitKmh,
+      );
       if (notice !== null) hudEvents.push(notice);
 
       if (!step.done) {

@@ -120,7 +120,16 @@ export interface ControllerGesture {
 export const CONTROLLER_GESTURES: readonly ControllerGesture[] = [
   {
     posture: "sideProfile",
-    poseBg: "Страничен профил към теб, ръцете отпуснати надолу",
+    // „ръцете отпуснати надолу" struck — the same repair the rendered bubble
+    // took (`traffic/controllerGestures.ts`), applied to the bank it is derived
+    // from so the two cannot drift apart again. `officerArmTarget` holds both
+    // arms OUT in every posture but „внимание", and the arms are not the
+    // discriminator in any case: the law puts it on the shoulder. NOTE FOR THE
+    // NEXT READER, so this is not mistaken for a shipped fix — grep finds no
+    // non-test consumer of `CONTROLLER_GESTURES` today; it is the authored bank
+    // the debrief is meant to render, and this line is corrected as content
+    // hygiene, not as a change the student can see.
+    poseBg: "Страничен профил към теб — ти си срещу рамото му",
     goBg: "Минаваш ТИ и всички по твоята посока — направо, надясно и наляво.",
     stopBg: "Спира напречното направление, което гледа гърдите или гърба му.",
     priorityBg:
@@ -1053,9 +1062,26 @@ export const SC_SIGNAL_CONTROLLER: ScenarioSpec = {
         "Ако вдигне ръка нагоре, това НЕ е „тръгвай“: вдигнатата ръка спира всички посоки, за да смени фазите. Който вече е в кръстовището, го освобождава; който чака — продължава да чака.",
     },
     {
+      // sc-signal-controller:2b255403 — „и отпусне ръце" STRUCK, for the reason
+      // already written out in full at `traffic/controllerGestures.ts`'s
+      // sideProfile bubble: `TrafficLayer.officerArmTarget` holds BOTH arms
+      // straight out (`lat = ±OFC_ARM_OUT_RAD`) in every posture that is not
+      // „внимание", and FR-OFC-ARMS added the forward lean precisely so they
+      // have a silhouette in PROFILE. The officer never lowers them, so a
+      // student told to wait for that is waiting for something the renderer
+      // cannot do — 04-t046s at 600% zoom, the arm straight out across the
+      // view. The BUBBLE was repaired then and this step was not, so the
+      // lesson's two surfaces disagreed with each other as well as with the
+      // mesh.
+      //
+      // AND THE ARMS ARE NOT THE CUE ANYWAY, which is why this does not simply
+      // say „ръцете настрани": the same officer with the same arms out is
+      // „минавай" at his shoulders and „спри" at his chest. The law puts it on
+      // the shoulder — „за водачите, които се намират срещу лявото или дясното
+      // рамо" — and so does the bubble the student reads two seconds later.
       n: 5,
       textBg:
-        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб и отпусне ръце, минаваш ти и всички по твоята посока, а напречното спира. Тогава преминаваш правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен (ППЗДвП — сигналите на регулировчика; ЗДвП чл. 7).",
+        "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб — ти си срещу рамото му — минаваш ти и всички по твоята посока, а напречното спира. Тогава преминаваш правó напред — дори светофарът междувременно да е станал червен: неговият сигнал е по-силен (ППЗДвП — сигналите на регулировчика; ЗДвП чл. 7).",
     },
   ],
   success: [

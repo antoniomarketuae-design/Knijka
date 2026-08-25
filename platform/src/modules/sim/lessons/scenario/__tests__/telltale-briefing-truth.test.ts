@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES } from "../templates";
 import type { TelltaleStimulusSpec } from "../../../contracts";
@@ -99,5 +101,104 @@ describe("a staged warning lamp and the briefing that describes it", () => {
       }
     }
     expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // …AND NOT IN THE DEMO CAPTION EITHER — the surface the briefing rule above
+  // pushed the defect onto instead of closing it.
+  // -------------------------------------------------------------------------
+
+  /**
+   * THE ROW CAME BACK ON THE OTHER SCREEN. This gate landed with the briefing
+   * repair for `sc-hz-breakdown-pulloff:f71c775a`, and step 2 has said
+   * «температура» ever since. The row was still STILL on the 2026-08-24 sweep,
+   * and the reason is in the run log rather than in the spec:
+   * `.audit-frames/w10-1/frames/sc-hz-breakdown-pulloff__pc-wrong/run.log`
+   * lines 378, 514 and 649 carry «Червената лампа за НАЛЯГАНЕ НА МАСЛОТО
+   * светна — двигателят отказва» across the windscreen, twelve times in one
+   * drive, while the red banner in the same frames fires температура forty
+   * times. The claim had simply moved from the panel into the demonstration
+   * caption, which is a `kind: "annotation"` step baked into the committed
+   * `content/traces/<lesson>/*.trace.json`.
+   *
+   * It is read from the COMMITTED FILE, not from `traces/scHz*.ts`, because the
+   * file is what the browser plays: a script edited without a re-record would
+   * otherwise pass a gate on copy nobody sees. Same reader, same reasoning, as
+   * the `captionCopy` extension in `conditions-sweep161-truth.test.ts` — where
+   * four more lessons had done the identical thing.
+   */
+  const REPO_ROOT = path.join(process.cwd(), "..");
+
+  // READ ONCE, EAGERLY, IN THE DESCRIBE BODY — the same shape as its twin in
+  // `lane-world-claims.test.ts`, and for the same measured reason. A lazy memo
+  // removes the repeat reads and leaves the COLD pass inside the first `it`,
+  // which on 2026-08-25 was still enough to trip `Test timed out in 5000ms` on
+  // that twin (10.7 s elapsed, five lanes sharing a 7200 rpm spindle). A
+  // describe callback runs at COLLECTION, where `testTimeout` does not reach,
+  // so the read is paid once there and every `it` below is a pure lookup.
+  // Traces are static for the lifetime of a suite.
+  const tracePathsOf = (s: ScenarioSpec): readonly string[] => [
+    ...(s.shadow ? [s.shadow.path] : []),
+    ...(s.mistakes ?? []).flatMap((m) => (m.traceRef ? [m.traceRef.path] : [])),
+  ];
+  const readCaptions = (rel: string): readonly string[] => {
+    const raw = JSON.parse(readFileSync(path.join(REPO_ROOT, rel), "utf-8")) as {
+      events?: Array<{ kind?: string; textBg?: string }>;
+    };
+    return (raw.events ?? [])
+      .filter((e) => e.kind === "annotation" && typeof e.textBg === "string")
+      .map((e) => e.textBg as string);
+  };
+  const CAPTIONS = new Map<string, readonly string[]>(
+    [...new Set(withTelltale.flatMap((s) => tracePathsOf(s)))].map((rel) => [
+      rel,
+      readCaptions(rel),
+    ]),
+  );
+
+  function captionsOf(s: ScenarioSpec): string[] {
+    // The fallback reads rather than returning nothing: a spec outside
+    // `withTelltale` must not be reported as „no captions", which is the
+    // vacuous-pass the first `it` below is here to refuse.
+    return tracePathsOf(s).flatMap((rel) => [...(CAPTIONS.get(rel) ?? readCaptions(rel))]);
+  }
+
+  it("the caption sweep reaches real captions — an empty reader would pass everything", () => {
+    const captions = withTelltale.flatMap(captionsOf);
+    expect(captions.length).toBeGreaterThan(0);
+    // The instrument, checked against its own subject: the lesson this rule was
+    // written for must be in the sweep and must be speaking.
+    const bp = withTelltale.find((s) => s.id === "sc-hz-breakdown-pulloff");
+    expect(bp, "sc-hz-breakdown-pulloff no longer stages a telltale").toBeDefined();
+    expect(captionsOf(bp!).length).toBeGreaterThan(0);
+  });
+
+  it("no demonstration caption names a lamp the product cannot light", () => {
+    const offenders: string[] = [];
+    for (const s of withTelltale) {
+      for (const caption of captionsOf(s)) {
+        for (const u of UNSTAGEABLE) {
+          if (u.re.test(caption)) {
+            offenders.push(`${s.id} caption promises ${u.what}: «${caption.slice(0, 80)}…»`);
+          }
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("the caption rule has teeth — the line that shipped is caught", () => {
+    // Verbatim off `content/traces/sc-hz-breakdown-pulloff/shadow-correct
+    // .trace.json` at 151bd19, and off the run log named above.
+    const SHIPPED =
+      "Червената лампа за налягане на маслото светна — двигателят отказва. Без паника: огледало, десен мигач и плавно излизане вдясно.";
+    expect(UNSTAGEABLE.some((u) => u.re.test(SHIPPED))).toBe(true);
+    // …and it is not in any caption the product ships any more.
+    expect(withTelltale.flatMap(captionsOf)).not.toContain(SHIPPED);
+    // Nor is the rule a ban on the word „лампа": the replacement passes.
+    const FIXED =
+      "Червената лампа за температура на двигателя светна — червено значи спри безопасно сега. Без паника: огледало, десен мигач и плавно излизане вдясно.";
+    expect(UNSTAGEABLE.some((u) => u.re.test(FIXED))).toBe(false);
+    expect(withTelltale.flatMap(captionsOf)).toContain(FIXED);
   });
 });

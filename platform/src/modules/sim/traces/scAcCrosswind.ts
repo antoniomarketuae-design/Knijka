@@ -23,11 +23,11 @@
  *     teaching. The ghost tells the same story the live wind writes.
  *
  * The trace gate replays exactly these through the production stack, day dry:
- *   - shadow: slows to ~34 km/h for the exposed segment, meets the gusts with
+ *   - shadow: slows to ~34 km/h for the gust run, meets the gusts with
  *     a SMALL steady correction (drift to x ≈ 3.3, ~0.8 m — far inside the
  *     3.25 m lane-keep band), releases it smoothly as the gust breathes →
  *     ZERO violations + CLEAN_DRIVING;
- *   - „Полет през открития участък“: carries 50 km/h in, leaves the wheel
+ *   - „Полет срещу поривите“: carries 50 km/h in, leaves the wheel
  *     loose — the gust walks the car to x ≈ 0.55 and it RIDES the center
  *     line ~4.9 s toward oncoming → EXACTLY CENTER_LINE_TOUCHED;
  *   - „Свръхкорекцията“ (the doc-72 second-swerve killer): near-limit speed,
@@ -40,9 +40,13 @@
  * (DEFAULT_RULE_CONFIG.laneKeepMaxOffsetM = 3.25): the offset passes 3.25 m
  * toward the center at x < 0.8125 (CENTER_LINE_TOUCHED side, 3.5 s sustain)
  * and away from it at x > 7.3125 (POOR_LANE_KEEPING side, 3 s sustain).
- * The exposed segment of the story spans y ≈ 150–265 (copy-only — the wind
- * in the LIVE session blows over the whole map; a per-zone exposure model
- * is doc-65 Phase-4 work, stated, not faked).
+ * The gust run of the story spans y ≈ 150–265 — a POLYLINE shape and nothing
+ * else. The captions no longer call it an „открит участък": the wind in the
+ * LIVE session blows over the whole map, fo-follow-v1 has no `zones` array, and
+ * naming a span the student cannot see out of the windscreen is what
+ * sc-ac-crosswind:e0b9507e was filed for (the note at the shadow's first
+ * annotation carries the frames). A per-zone exposure model is doc-65 Phase-4
+ * work, stated, not faked.
  */
 
 import { SC_AC_CROSSWIND } from "../lessons/scenario/templates-conditions";
@@ -65,10 +69,23 @@ const LANE_X = 4.06;
 export function scAcCrosswindShadowScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Напред е открит участък — мостът, където страничният вятър духа силно отдясно. Двете ръце здраво на волана." },
+      // sc-ac-crosswind:e0b9507e — CRITICAL, and this line is where it survived
+      // three repair rounds. The BRIEFING was cleaned of «мост / открит участък
+      // / камион» in an earlier wave; the caption was not, because
+      // `conditions-sweep161-truth.test.ts` sweeps the ScenarioSpec and an
+      // annotation is not in it — the gate's own header says so and names this
+      // line. So the promise simply moved from the panel to the big line over
+      // the windscreen, which is where the audit photographed it every time:
+      // w10-1/frames/sc-ac-crosswind__pc-right/04-t003s, t111s, t148s, t186s —
+      // «мостът» over the corner of an office block and a pale pavement.
+      // fo-follow-v1 carries no `zones` array at all; there is no span and no
+      // bridge on it, and the wind in the live session blows over the WHOLE map
+      // (see the dual-channel note at the top of this file). The captions now
+      // say that, which is both true and what the repaired briefing says.
+      { kind: "annotation", textBg: "Напред духа силен страничен вятър отдясно — по цялата отсечка. Двете ръце здраво на волана." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[LANE_X, 15], [LANE_X, 90], [LANE_X, 140]], targetKmh: 40, stopAtEnd: false },
-      { kind: "annotation", textBg: "Преди открития участък смъкваме към 34 км/ч — колкото по-бавно, толкова по-малко те мести поривът." },
+      { kind: "annotation", textBg: "Преди поривите смъкваме към 34 км/ч — колкото по-бавно, толкова по-малко те мести вятърът." },
       // The gust story, AUTHORED into the polyline: the wind shoves LEFT
       // (west, toward the осева), the correct driver meets it with a small
       // STEADY correction — drift to x ≈ 3.3 (≈ 0.8 m, far inside the
@@ -91,19 +108,19 @@ export function scAcCrosswindShadowScript(): DriveScript {
       { kind: "annotation", textBg: "Вятърът диша: отслабне ли поривът, отпускаш корекцията плавно — никога с втори замах." },
       { kind: "drive", points: [[LANE_X, 265], [LANE_X, 345]], targetKmh: 40 },
       { kind: "pause", sec: 1, brake: true },
-      { kind: "annotation", textBg: "Минахме открития участък в лентата: по-ниска скорост, здрав волан, меки корекции — и готовност за порив при всяко следващо открито място." },
+      { kind: "annotation", textBg: "Минахме отсечката в лентата: по-ниска скорост, здрав волан, меки корекции — и готовност за всеки следващ порив." },
     ],
   };
 }
 
 // ---------------------------------------------------------------------------
-// Mistake demo 1 — „Полет през открития участък" (CENTER_LINE_TOUCHED)
+// Mistake demo 1 — „Полет срещу поривите" (CENTER_LINE_TOUCHED)
 // ---------------------------------------------------------------------------
 
 export function scAcCrosswindMistakeFullSpeedScript(): DriveScript {
   return {
     steps: [
-      { kind: "annotation", textBg: "Грешката: 50 км/ч през открития участък, с отпусната ръка на волана." },
+      { kind: "annotation", textBg: "Грешката: 50 км/ч срещу поривите, с отпусната ръка на волана." },
       { kind: "glance", mirror: "rear" },
       { kind: "drive", points: [[LANE_X, 15], [LANE_X, 80], [LANE_X, 150]], targetKmh: 50, stopAtEnd: false },
       { kind: "annotation", textBg: "Поривът удря — и при 50 км/ч без корекция колата тръгва наляво, към осевата линия." },
@@ -120,7 +137,7 @@ export function scAcCrosswindMistakeFullSpeedScript(): DriveScript {
       { kind: "annotation", textBg: "Колата язди осевата линия в насрещното — вятърът я държи там, докато водачът не се събуди." },
       { kind: "drive", points: [[0.55, 250], [LANE_X, 285], [LANE_X, 345]], targetKmh: 50 },
       { kind: "pause", sec: 1, brake: true },
-      { kind: "annotation", textBg: "На открит участък скоростта се смъква ПРЕДИ порива — при 50 км/ч вятърът те мести с метри, преди да реагираш." },
+      { kind: "annotation", textBg: "Срещу страничен вятър скоростта се смъква ПРЕДИ порива — при 50 км/ч вятърът те мести с метри, преди да реагираш." },
     ],
   };
 }

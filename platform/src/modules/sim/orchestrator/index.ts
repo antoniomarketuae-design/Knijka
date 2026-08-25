@@ -19,6 +19,16 @@
  */
 
 export { createScenarioDirector, directorContactCast, hashSeed, lessonSeed } from "./director";
+// The publisher for `SimTick.vruAheadM` — see contact.ts. It ships through the
+// barrel because its ONE consumer is `components/sim/LessonScene`, and doc 05
+// says a component reaches a module only through its public API.
+export { vruAheadMeters } from "./contact";
+// …and the cast shape it is handed. Exported 2026-08-25 because a lane added a
+// test importing it from this barrel while the barrel did not publish it: the
+// suite went green (vitest does not typecheck) and tsc was red with TS2305.
+// Doc 05 says a consumer reaches a module only through its public API — so the
+// answer is to publish the type, not to reach past the door.
+export type { ContactCastMember } from "./contact";
 export { BRAKE_ONSET_THRESHOLD } from "./runners";
 export type {
   DirectorInput,

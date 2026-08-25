@@ -36,11 +36,15 @@ import { describe, expect, it } from "vitest";
 import { createWorldRuntime } from "../../../runtime";
 import { createTrafficSystem } from "../../../traffic/system";
 import type { TrafficDistrict } from "../../../traffic/types";
-import { createRuleEngine } from "../../../rules";
+import { createRuleEngine, DEFAULT_RULE_CONFIG } from "../../../rules";
 import { createScenarioDirector } from "../../../orchestrator/director";
 import { DT, stepFrame, type Stack } from "../../../orchestrator/__tests__/helpers";
 import type { StagedEventSpec } from "../../../contracts";
 import { SC_MW_DISCIPLINE } from "../templates-sp";
+// §4's second subject — the OTHER drill on the same motorway. A test may cross
+// a file boundary the shipped code may not; the point of the section is that
+// these two specs are read side by side.
+import { SC_MW_MIN_SPEED } from "../templates-speed2";
 
 const REPO_ROOT = join(process.cwd(), "..");
 const RAW = JSON.parse(
@@ -255,5 +259,119 @@ describe("§3 it changes no grade — the flow is scenery to the rule engine", (
 
   it("and the left-lane hog is still convicted of hogging, not of anything new", () => {
     expect(HOG().violationCodes).toEqual(["NOT_KEEPING_RIGHT"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §4 — ONE MOTORWAY, ONE FLOOR, ONE RHYTHM (sc-mw-min-speed:f3c26187)
+// ---------------------------------------------------------------------------
+//
+// mw-v1 is the ONLY motorway in the catalogue and TWO drills run on it back to
+// back. At the judged commit they briefed different worlds:
+//
+//   sc-mw-discipline   «установи около 120–130 км/ч» · «под 50 км/ч без причина»
+//   sc-mw-min-speed    «установи около 110 км/ч»     · «тук около 40 км/ч»
+//
+// Same rendered road, same posted 140 on both HUDs, two crawl floors ten km/h
+// apart — on the pair whose subject IS the floor. And the floor is not a matter
+// of taste: `DEFAULT_RULE_CONFIG.motorwayMinFlowKmh` is the number
+// DRIVING_TOO_SLOW_FOR_MOTORWAY bills below, so the lesson that said 40 told a
+// student 45 was fine and then billed him for it — a gate graded on a number
+// nobody said, pointing the other way.
+//
+// This gate reads the FLOOR off the rule config rather than repeating it, so the
+// day somebody retunes the detector the briefings are what goes red.
+/**
+ * §4 IS SKIPPED, AND THE ROW IT BELONGS TO STAYS OPEN — 2026-08-25.
+ *
+ * It asserts that sc-mw-discipline and sc-mw-min-speed teach the SAME floor,
+ * which is the right requirement: sc-mw-min-speed:f3c26187 files exactly that
+ * («the same motorway is taught two different floors, and the floor is this
+ * lesson entire subject»).
+ *
+ * The lane that wrote this changed sc-mw-min-speed briefing step 2 from «около
+ * 110 км/ч» to «около 120–130 км/ч» and stopped there. Both task chips still
+ * print «около 110 км/ч», so the chip quotes a number the lesson no longer
+ * sources — and task-title-agrees-with-briefing and one-junction-three-names §3
+ * both go red on it, plus the lesson joins tier-feasibility bandTopShort.
+ * The briefing change is therefore NOT shipped, and this block cannot pass.
+ *
+ * UN-SKIP IT TOGETHER WITH THE WHOLE MOVE: the briefing, BOTH task chips, and
+ * the objective caps, in one round, with those three gates green. Skipping it
+ * rather than deleting it keeps the requirement on the record — this block is
+ * the specification f3c26187 has to satisfy.
+ */
+describe.skip("§4 both motorway drills teach the floor the engine actually grades", () => {
+  const FLOOR = DEFAULT_RULE_CONFIG.motorwayMinFlowKmh;
+  const MOTORWAY_SPECS = [SC_MW_DISCIPLINE, SC_MW_MIN_SPEED];
+
+  it("the instrument: both drills are on the same district, and it is the motorway", () => {
+    // An empty or mismatched pair would make everything below vacuous.
+    expect(new Set(MOTORWAY_SPECS.map((s) => s.map.districtId)).size).toBe(1);
+    expect(MOTORWAY_SPECS[0].map.districtId).toBe("mw-v1");
+    expect(FLOOR).toBeGreaterThan(0);
+  });
+
+  it("every crawl floor a briefing names is the floor the detector uses", () => {
+    // Only sentences about CRAWLING are read, and only the «под N км/ч» shape:
+    // the posted ceiling and the flow band are other numbers in the same steps
+    // and must not be mistaken for a floor.
+    const offenders: string[] = [];
+    for (const spec of MOTORWAY_SPECS) {
+      for (const step of spec.instructionsBg) {
+        if (!/пълзен|пълзи|бавно движение/iu.test(step.textBg)) continue;
+        for (const m of step.textBg.matchAll(/под\s+(\d+)\s*км\/ч/giu)) {
+          if (Number(m[1]) !== FLOOR) {
+            offenders.push(`${spec.id} step ${step.n} names ${m[1]}, the engine grades ${FLOOR}`);
+          }
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("THE MUTATION — the line that shipped is gone, and the replacement states the floor", () => {
+    // Verbatim `templates-speed2.ts` step 4 at 151bd19. Note what its 40 was
+    // wearing: «далеч под потока (тук около 40 км/ч)» — a floor written so that
+    // the reader above cannot see it, which is exactly why the assertion that
+    // carries this section is the POSITIVE one below rather than the negative
+    // one. A rule that only forbids the wrong spelling is a rule the next
+    // author walks around.
+    const SHIPPED =
+      "Не сваляй скоростта без причина. Продължително пълзене далеч под потока (тук около 40 км/ч) превръща колата ти в подвижно препятствие, което всички трябва да заобикалят.";
+    expect(SHIPPED).toMatch(/40\s*км\/ч/u);
+    expect(
+      MOTORWAY_SPECS.flatMap((s) => s.instructionsBg.map((i) => i.textBg)),
+    ).not.toContain(SHIPPED);
+    const crawlStep = SC_MW_MIN_SPEED.instructionsBg.find((i) => /пълзен/iu.test(i.textBg));
+    expect(crawlStep, "sc-mw-min-speed no longer has a crawl step").toBeDefined();
+    expect(
+      [...crawlStep!.textBg.matchAll(/под\s+(\d+)\s*км\/ч/giu)].map((m) => Number(m[1])),
+      "the crawl step must state the graded floor, in the shape the rule can read",
+    ).toEqual([FLOOR]);
+    // …and no other number is smuggled into the same sentence.
+    expect(crawlStep!.textBg).not.toMatch(/40\s*км\/ч/u);
+  });
+
+  it("…and both drills name the same flow rhythm for the same road", () => {
+    // The other half of the row. Neither number is graded, so this is not about
+    // a gate — it is about a student driving the two lessons back to back on one
+    // rendered motorway and being told two different speeds for the same
+    // traffic. The band is the staged flow's own (cruiseSpeedMps 33 → 36, i.e.
+    // 119 → 130 км/ч), which §1 above already measures out the windscreen.
+    // The SETTLE clause only — «се установи около N км/ч». The steps also quote
+    // the staged car's own 130 and, on the sibling, a worked example at 120;
+    // those are illustrations, not the instruction, and reading them as one is
+    // how a comparison like this turns into noise.
+    const settleBand = (spec: typeof SC_MW_DISCIPLINE): string | null => {
+      for (const i of spec.instructionsBg) {
+        const m = /установи[^.]*?(\d+(?:\s*–\s*\d+)?)\s*км\/ч/u.exec(i.textBg);
+        if (m) return m[1].replace(/\s+/gu, "");
+      }
+      return null;
+    };
+    expect(settleBand(SC_MW_MIN_SPEED), "sc-mw-min-speed names no settle band").not.toBeNull();
+    expect(settleBand(SC_MW_DISCIPLINE), "sc-mw-discipline names no settle band").not.toBeNull();
+    expect(settleBand(SC_MW_MIN_SPEED)).toBe(settleBand(SC_MW_DISCIPLINE));
   });
 });

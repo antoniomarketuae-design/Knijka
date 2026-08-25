@@ -24,6 +24,8 @@
  * inside that window pins its sentence forever — that is precisely the
  * 0:26/0:26 frame above. So `standDown` gates the RENDER, not just the clock.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createRef } from "react";
 import { describe, expect, it } from "vitest";
@@ -102,6 +104,68 @@ describe("the demonstration's caption stands down when the student drives", () =
     // The student may still replay the demonstration deliberately — what stops
     // is the deck talking over their drive unasked, not the deck itself.
     expect(html).toContain('data-hud="deck-caption"');
+  });
+});
+
+/**
+ * =============================================================================
+ * …AND THE PANEL GOES WITH THE VOICE — sc-follow-distance:407a976c,
+ * sc-follow-brake:62b67c75 (2026-08-24)
+ * =============================================================================
+ *
+ * THE HALF THE STAND-DOWN LEFT. Silencing the caption and stopping the clock
+ * still leaves the TRANSPORT — scrub track, four buttons, three speed chips —
+ * parked in the lower-left of the play area for the rest of the lesson. On the
+ * cockpit view that band is the top of the dashboard and the near carriageway.
+ * Judged at x ≈ 278–890, y ≈ 540–645 of a 1440 × 900 shot and visible on every
+ * drive frame of `.audit-frames/w10-3/frames/sc-follow-distance__pc-right/`,
+ * 01-arrival through 04-t179s, on the drill whose whole subject is the gap to
+ * the car in front.
+ *
+ * The repair is `setOpen(false)` inside the same one-way latch, so the deck
+ * collapses to its own «🎬 Демонстрация ▾» button exactly the way the controls
+ * legend collapses to «Клавиши · за напреднали ▸» on the same trigger.
+ *
+ * WHY THIS IS A SOURCE WALK AND NOT A RENDER. `DemoDeck` lives inside
+ * `components/sim/LessonScene.tsx`, whose import closure reaches
+ * `@react-three/drei`; every test that touches it fails to LOAD in this
+ * environment. A walk cannot prove the collapse looks right — but it can prove
+ * the latch and the collapse are the same event, which is the thing that was
+ * missing, and it goes red the moment somebody moves one without the other.
+ */
+describe("the deck collapses to its button when it stands down", () => {
+  const SCENE = readFileSync(
+    path.join(process.cwd(), "src", "components", "sim", "LessonScene.tsx"),
+    "utf-8",
+  );
+
+  it("the walk is looking at the real latch", () => {
+    // The self-check: a moved component or a renamed latch would make the
+    // assertion below vacuous rather than false.
+    expect(SCENE).toContain("demoDeckStandsDown(sampleRef.current.speedKmh)");
+    expect(SCENE).toContain("stoodDownRef.current = true;");
+  });
+
+  it("the collapse is inside the latch, not somewhere near it", () => {
+    // The latch body: from the poll's guard to the interval's period. Anything
+    // outside it is a different event and would come back on the next stop at a
+    // junction, which is the failure the one-way rule exists to prevent.
+    const from = SCENE.indexOf("if (!demoDeckStandsDown(sampleRef.current.speedKmh)) return;");
+    const to = SCENE.indexOf("DEMO_DECK_POLL_MS", from);
+    expect(from).toBeGreaterThan(0);
+    expect(to).toBeGreaterThan(from);
+    const body = SCENE.slice(from, to);
+    expect(body).toContain("setStoodDown(true)");
+    expect(body).toContain("setOpen(false)");
+    expect(body).toContain("clock.playing = false");
+  });
+
+  it("the deck still OPENS by default — standing down is not never showing it", () => {
+    // The guard rail, and the same one the caption test above carries: a deck
+    // that started collapsed would answer the finding by deleting the feature.
+    // `open` is seeded true on any viewport that is not a small phone.
+    expect(SCENE).toContain("const [open, setOpen] = useState(");
+    expect(SCENE).toContain("window.innerHeight <= 560 || window.innerWidth <= 640");
   });
 });
 

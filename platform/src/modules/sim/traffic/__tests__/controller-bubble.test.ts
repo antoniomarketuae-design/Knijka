@@ -19,6 +19,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { CONTROLLER_GESTURES } from "@/modules/sim/lessons/scenario/templates-signals";
+import { SCENARIO_TEMPLATES } from "@/modules/sim/lessons/scenario/templates";
 import {
   BUBBLE_ARM_RAISED,
   BUBBLE_CHEST_OR_BACK,
@@ -155,7 +156,17 @@ describe("controller bubble copy (B42)", () => {
 // is allowed both ways („ръцете отпуснати" / „отпуснати ръце") with a 12-char
 // leash so the two halves have to be in the same clause.
 const ARMS = "ръ(?:ка|ката|це|цете)";
-const DOWN = "(?:надолу|долу|отпуснат|спуснат|свален)";
+// THE VERB WAS MISSING, AND IT IS WHY THE ROW CAME BACK. This alternation
+// listed only PARTICIPLES — „отпуснат/спуснат/свален" — so it caught
+// «ръцете отпуснати надолу» and slid straight past «и ОТПУСНЕ ръце», which is
+// the form `templates-signals.ts` step 5 actually used and the form
+// 02-briefing.png photographed. Measured 2026-08-24 by running this pattern
+// over every controller lesson's copy: the shipped step scored NO MATCH. The
+// stems below cover the participle and the finite verb together
+// (отпусне/отпусна/отпуснат/отпуснати, свали/свалена, спусне/спуснат), which is
+// what „a rule with one enforced instance is a convention" looks like when the
+// instance is a suffix.
+const DOWN = "(?:надолу|долу|отпусн[а-я]*|спусн[а-я]*|свал[а-я]*)";
 const OUT = "(?:настрани|встрани|хоризонтално)";
 /** Copy that claims the arms are DOWN. */
 const SAYS_ARMS_DOWN = new RegExp(`${ARMS}[^.]{0,12}?${DOWN}|${DOWN}[^.]{0,12}?${ARMS}`);
@@ -212,6 +223,63 @@ describe("the pose caption matches the arms the renderer holds", () => {
     }
     // The внимание pose has lat = 0 — nothing is out sideways there.
     expect(CONTROLLER_BUBBLES[BUBBLE_ARM_RAISED].poseBg).not.toMatch(SAYS_ARMS_OUT);
+  });
+
+  // -------------------------------------------------------------------------
+  // …AND NOT IN THE BRIEFING EITHER — sc-signal-controller:2b255403, 2026-08-24
+  // -------------------------------------------------------------------------
+  //
+  // THE BUBBLE WAS REPAIRED AND THE ROW STAYED OPEN, because a rule with one
+  // enforced instance is a convention and the frames found the next instance
+  // immediately. `.audit-frames/w10-2/frames/sc-signal-controller__mobile-right/
+  // 02-briefing.png` point 5, at the judged commit: «Щом се обърне със
+  // СТРАНИЧЕН ПРОФИЛ към теб и ОТПУСНЕ РЪЦЕ, минаваш ти…» — the exact claim
+  // this describe block struck from `poseBg`, on the panel the student reads
+  // first, over the officer at 04-t046s holding an arm straight out.
+  //
+  // So the question is put to every driver-facing line of every lesson that
+  // stages an officer, not to the three bubbles. The lesson set is found the
+  // way `advisor.ts lessonStagesController` finds it — the word itself — so a
+  // new controller drill is swept the day it is written rather than the day
+  // somebody remembers to add it here.
+  it("no briefing of an officer lesson describes an arm state the mesh is not in", () => {
+    const controllerSpecs = SCENARIO_TEMPLATES.filter(
+      (s) =>
+        /регулировчик/i.test(s.titleBg) ||
+        s.instructionsBg.some((i) => /регулировчик/i.test(i.textBg)) ||
+        s.success.some((o) => /регулировчик/i.test(o.titleBg)),
+    );
+    // The instrument first: an empty sweep here would pass everything, and this
+    // audit has already had a probe report zero defects because its subject set
+    // was empty.
+    expect(controllerSpecs.length).toBeGreaterThanOrEqual(2);
+
+    const offenders: string[] = [];
+    for (const s of controllerSpecs) {
+      const lines = [
+        s.objectiveBg,
+        ...s.instructionsBg.map((i) => i.textBg),
+        ...s.success.map((o) => o.titleBg),
+        ...(s.mistakes ?? []).flatMap((m) => [m.titleBg, m.whatWentWrongBg]),
+      ];
+      for (const line of lines) {
+        const wrong = armsOut(false) ? SAYS_ARMS_DOWN : SAYS_ARMS_OUT;
+        if (wrong.test(line)) offenders.push(`${s.id}: «${line.slice(0, 70)}…»`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("the briefing rule has teeth — the step that shipped is caught", () => {
+    // Verbatim from `templates-signals.ts` at 151bd19, the line 02-briefing.png
+    // photographed.
+    const SHIPPED =
+      "Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб и отпусне ръце, минаваш ти и всички по твоята посока, а напречното спира.";
+    expect(SHIPPED).toMatch(SAYS_ARMS_DOWN);
+    // …and the replacement teaches the cue the law actually gives.
+    expect("Щом се обърне със СТРАНИЧЕН ПРОФИЛ към теб — ти си срещу рамото му — минаваш ти").not.toMatch(
+      SAYS_ARMS_DOWN,
+    );
   });
 
   it("the arms are NOT offered as the thing that tells the two apart", () => {

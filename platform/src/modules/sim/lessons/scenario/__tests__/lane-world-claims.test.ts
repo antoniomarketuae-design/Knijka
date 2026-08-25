@@ -600,6 +600,110 @@ describe("§4 no briefing asserts weather the rung it ships to does not have", (
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // …AND THE SAME QUESTION PUT TO THE DEMONSTRATION CAPTION
+  // ---------------------------------------------------------------------------
+  //
+  // THE RULE ABOVE WAS OBEYED AND THE ROW STAYED OPEN. `sc-sp-wet-limit-plate`'s
+  // instructions were re-authored weather-neutral by the wave that wrote this
+  // section, and the 2026-08-24 sweep still photographed the assertion — it had
+  // moved into the demonstration caption, which is baked into
+  // `content/traces/<lesson>/*.trace.json` and painted across the windscreen
+  // under «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА». w10-3 pc-right/04-t038s.png carries
+  // «важи: вали. Таванът ни е 40 км/ч» on the SAME screenshot as instruction 2
+  // saying 50 is lawful today, over a dry street.
+  //
+  // A caption is compiled to every rung exactly the way an instruction is, so
+  // it takes exactly the same rule and the same detector — including the
+  // conditional escape, which is the shape the repaired copy uses. Read from the
+  // COMMITTED FILE because that is what the browser plays; a script edited
+  // without a re-record would otherwise pass on copy nobody sees.
+  //
+  // READ ONCE, EAGERLY, IN THE DESCRIBE BODY — and that is not tidiness, it is
+  // the difference between a green gate and a red one.
+  //
+  // MEASURED TWICE. Written as a plain re-read this reader took 243 file reads
+  // over 26 templates in one run of the three `it`s below — 81 distinct traces,
+  // opened and `JSON.parse`d three times each, because every `it` (and both
+  // filters inside the offenders loop) starts from the spec again. A LAZY
+  // per-path memo removes the ×3 and nothing else, and that was not enough: the
+  // first `it` still pays the whole COLD pass, and on 2026-08-25, on this
+  // 7200 rpm HDD with five other lanes on the same spindle, the lazily-memoised
+  // version still died — `Test timed out in 5000ms` at the sweep below, 10.7 s
+  // elapsed. The corpus is ~81 files × ~100 KB ≈ 8 MB of JSON; that is a
+  // seek-bound read, not a parse.
+  //
+  // So the read moves OUT of the `it` entirely. A describe callback runs at
+  // COLLECTION, which `testTimeout` does not govern — the same place this file
+  // already builds `DISTRICTS` and `SIGN_CENSUS` — so the cost is paid once,
+  // outside the 5 s budget, and every `it` below is a pure lookup. The
+  // integrator's full-gate run is exactly the contended condition that made the
+  // lazy version fail, which is why this may not be left as a memo.
+  //
+  // Traces are static under a suite, so one pass is the whole truth.
+  const tracePathsOf = (spec: ScenarioSpec): readonly string[] => [
+    ...(spec.shadow ? [spec.shadow.path] : []),
+    ...(spec.mistakes ?? []).flatMap((m) => (m.traceRef ? [m.traceRef.path] : [])),
+  ];
+  const readCaptions = (rel: string): readonly string[] => {
+    const raw = JSON.parse(readFileSync(path.join(REPO_ROOT, rel), "utf-8")) as {
+      events?: Array<{ kind?: string; textBg?: string }>;
+    };
+    return (raw.events ?? [])
+      .filter((e) => e.kind === "annotation" && typeof e.textBg === "string")
+      .map((e) => e.textBg as string);
+  };
+  const CAPTIONS = new Map<string, readonly string[]>(
+    [...new Set(LANE_TEMPLATES.flatMap((s) => tracePathsOf(s)))].map((rel) => [
+      rel,
+      readCaptions(rel),
+    ]),
+  );
+  // The fallback is unreachable for every caller below (all of them pass a
+  // LANE_TEMPLATES member) and is kept so a spec added to a future `it` reads
+  // rather than silently reporting no captions — an empty reader is the one
+  // failure this section's first `it` exists to catch.
+  const captionsOf = (spec: ScenarioSpec): string[] =>
+    tracePathsOf(spec).flatMap((rel) => [...(CAPTIONS.get(rel) ?? readCaptions(rel))]);
+
+  it("the caption sweep reaches real captions — an empty reader would pass everything", () => {
+    const all = LANE_TEMPLATES.flatMap(captionsOf);
+    expect(all.length).toBeGreaterThan(50);
+    expect(captionsOf(specById("sc-sp-wet-limit-plate")).length).toBeGreaterThan(5);
+  });
+
+  it("no demonstration caption asserts weather the rung it plays on does not have", () => {
+    const offenders: string[] = [];
+    for (const spec of LANE_TEMPLATES) {
+      const wet = captionsOf(spec).filter((c) => assertingSentences(c, ASSERTS_WET).length > 0);
+      const night = captionsOf(spec).filter((c) => assertingSentences(c, ASSERTS_NIGHT).length > 0);
+      for (const rung of spec.levels) {
+        if (wet.length > 0 && !["rain", "snow"].includes(rungWeather(spec, rung.level))) {
+          offenders.push(`${spec.id} L${rung.level} is «${rungWeather(spec, rung.level)}»: «${wet[0].slice(0, 70)}…»`);
+        }
+        if (night.length > 0 && !rungNight(spec, rung.level)) {
+          offenders.push(`${spec.id} L${rung.level} is daylight: «${night[0].slice(0, 70)}…»`);
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("THE CAPTION MUTATION — the struck narration fails on its own L1", () => {
+    // Verbatim off `content/traces/sc-sp-wet-limit-plate/shadow-correct
+    // .trace.json` at 151bd19, and off w10-3 run.log line 271.
+    const SHIPPED =
+      "Основно ограничение 50, но табелата „при мокра настилка — 40“ важи: вали. Таванът ни е 40 км/ч.";
+    expect(assertingSentences(SHIPPED, ASSERTS_WET).length).toBeGreaterThan(0);
+    // …and the replacement is a QUESTION to the student, true on both halves of
+    // the alternating ladder — the same escape the instruction copy uses.
+    const FIXED =
+      "Мокра ли е настилката — както в този запис — табелата „при мокра настилка — 40“ важи и таванът е 40 км/ч. Суха ли е, тя мълчи и важи основното 50.";
+    expect(assertingSentences(FIXED, ASSERTS_WET)).toEqual([]);
+    expect(captionsOf(specById("sc-sp-wet-limit-plate"))).toContain(FIXED);
+    expect(captionsOf(specById("sc-sp-wet-limit-plate"))).not.toContain(SHIPPED);
+  });
+
   it("THE MUTATION — the struck wet-plate line fails on its own L1", () => {
     // The exact sentence sweep161 photographed against a dry street. Put it
     // back and this section goes red, which is what makes the section above a
@@ -645,6 +749,79 @@ describe("§4 no briefing asserts weather the rung it ships to does not have", (
     // rung, not about the vocabulary.
     const spray = specById("sc-ac-truck-spray");
     expect(spray.levels.every((l) => rungWeather(spray, l.level) === "rain")).toBe(true);
+  });
+
+  // ---------------------------------------------------------------------------
+  // …AND THE THIRD SURFACE, WHICH IS WHY THIS ROW KEPT COMING BACK
+  // ---------------------------------------------------------------------------
+  //
+  // `sc-sp-wet-limit-plate:65c7eaac` has now been repaired three times on three
+  // different pieces of glass. The INSTRUCTION steps were made weather-neutral
+  // by an earlier wave; the DEMONSTRATION CAPTIONS by the block above; and the
+  // finding was STILL live on a surface neither rule could see — the success
+  // gate's own `titleBg`, which is the HUD task chip during the drive and the ✓
+  // line in the debrief. On the L1 dry rung the sweep books
+  // «✓ Стигни края на отсечката, задържал мокрия таван 0:49» over 59 drive
+  // frames of dry asphalt, clear sky and parked wipers (w10-3,
+  // pc-wrong/08-debrief-p4.png).
+  //
+  // The title was repaired in the same patch as the steps and NOTHING GATED IT.
+  // That is the pattern, not the incident: each wave fixes the surface it is
+  // looking at and the claim walks to the next one. So the rule takes the
+  // surface.
+  //
+  // WHY THE DETECTOR IS ONE PHRASE, said plainly rather than left to look
+  // timid. A chip has no room for «настилката е мокра»; the shape a TITLE uses
+  // is «мокрия таван» — a claim about which ceiling is in force right now. The
+  // wider `мокр\p{L}*\s+настилк` I tried first ACCUSED THE PLATE'S OWN NAME —
+  // `sc-sp-wet-limit-plate`'s other gate is «Подмини табелата „при мокра
+  // настилка“», where the words are the sign's, in quotes, and true on a dry
+  // day. That false positive is pinned below so a later widening has to face
+  // it.
+  const ASSERTS_WET_CEILING = new RegExp("мокр\\p{L}*\\s+таван", "iu");
+  const successTitles = (spec: ScenarioSpec): string[] =>
+    (spec.success ?? []).map((g) => g.titleBg);
+
+  it("the title sweep reaches real gate titles — an empty reader would pass everything", () => {
+    const all = LANE_TEMPLATES.flatMap(successTitles);
+    expect(all.length).toBeGreaterThan(20);
+    // The subject of the row must be in the sweep and must be speaking.
+    expect(successTitles(specById("sc-sp-wet-limit-plate")).length).toBeGreaterThan(1);
+  });
+
+  it("no success-gate title asserts weather the rung it ships to does not have", () => {
+    const offenders: string[] = [];
+    for (const spec of LANE_TEMPLATES) {
+      const wet = successTitles(spec).filter(
+        (t) =>
+          !IS_CONDITIONAL.test(t) && (ASSERTS_WET_CEILING.test(t) || ASSERTS_WET.test(t)),
+      );
+      if (wet.length === 0) continue;
+      for (const rung of spec.levels) {
+        if (!["rain", "snow"].includes(rungWeather(spec, rung.level))) {
+          offenders.push(
+            `${spec.id} L${rung.level} is «${rungWeather(spec, rung.level)}» but a gate title asserts wet: «${wet[0]}»`,
+          );
+        }
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
+  });
+
+  it("THE TITLE MUTATION — the ✓ line booked over dry asphalt is caught, the plate's name is not", () => {
+    // Verbatim `templates-speed2.ts` at 151bd19.
+    const SHIPPED = "Стигни края на отсечката, задържал мокрия таван";
+    expect(ASSERTS_WET_CEILING.test(SHIPPED)).toBe(true);
+    expect(LANE_TEMPLATES.flatMap(successTitles)).not.toContain(SHIPPED);
+    // …and the replacement says the same thing without asserting today's sky:
+    // the ceiling is read off the SURFACE, which is the whole drill.
+    expect(successTitles(specById("sc-sp-wet-limit-plate"))).toContain(
+      "Стигни края на отсечката, задържал тавана от настилката",
+    );
+    // The self-check that keeps this narrow rule from being widened blindly:
+    // the plate's own name quotes the sign and is true on a dry day.
+    expect(ASSERTS_WET_CEILING.test("Подмини табелата „при мокра настилка“")).toBe(false);
+    expect(ASSERTS_WET.test("Подмини табелата „при мокра настилка“")).toBe(false);
   });
 });
 
