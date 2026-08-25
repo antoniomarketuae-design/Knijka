@@ -611,8 +611,63 @@ export interface BriefingStepBg {
  * sentence nobody can skip" — the line is the row that is always painted first
  * and cannot be scrolled away from. Changing which step lands here breaks that
  * delivery, so it is written down in both files.
+ *
+ * ── …AND IT CARRIES ITS NUMBER, WHICH IT DID NOT — sweep w10, 2026-08-24 ────
+ *
+ * SIX ROWS, SIX LESSONS, ONE SENTENCE BETWEEN THEM: „Mobile briefing loses
+ * step 1 — the opening sentence is a heading and the list starts at «2.»."
+ * Filed on sc-ln-turn-lane-arrows, sc-ov-crest-curve, sc-ov-abort,
+ * sc-ov-return-gap, sc-ov-being-overtaken and sc-ov-oncoming-gap; all six were
+ * routed at `LessonPlayShell.tsx` and none of them is owned there.
+ *
+ * OPEN `w10-3/frames/sc-ln-turn-lane-arrows__mobile-right/02-briefing.png`.
+ * The ИНСТРУКЦИИ sheet reads, top to bottom:
+ *
+ *   Потегли по булеварда. Стрелките на платното разпределят посоките: …
+ *   2. Маршрутът ти е НАЛЯВО. Ти си в дясната лента — нейната стрелка не води…
+ *   3. Прочети стрелките отдалеч и започни престрояването рано: …
+ *
+ * `SimOverlay`'s sheet paints `lineBg` in an <h2> and `detailBg` under it, so a
+ * six-step procedure arrives as a heading plus «2.»…«6.». The desktop
+ * `BriefingCard` prints `{s.n}.` on every row and reads 1–6 correctly, which is
+ * why every one of the six rows says „the same scenario on PC renders 1–5
+ * correctly" — the mismatch is the surface, not the content.
+ *
+ * WHY THE NUMBER RATHER THAN THE OTHER TWO REPAIRS. Renumbering the body from
+ * 1 would make the body claim to be a different list (the paragraph below says
+ * so, and it is right). Deleting the numbers everywhere would throw away the
+ * only thing that tells a student the briefing is a SEQUENCE — «започни
+ * престрояването рано» is worth nothing if he cannot tell it comes before
+ * «заеми лявата лента». So the line joins the numbering it was always the head
+ * of: `${n}. ` from the step's OWN `n`, never a hardcoded 1, for the same
+ * reason the body is not renumbered.
+ *
+ * IT CANNOT RE-CREATE THE ECHO, AND THE REASON IS NOT THE ONE THIS BLOCK FIRST
+ * CLAIMED. The first draft said the numbered line was made safe by teaching
+ * `itemEchoesLine` to strip an ordinal from both sides. Counted afterwards:
+ * `itemEchoesLine` has ZERO non-test call sites — its six mentions in
+ * `LessonPlayShell.tsx` (1547, 1605, 1722, 1826, 3693, 3727) are all inside
+ * comment blocks and it is not re-exported from `hud/index.ts`, so nothing the
+ * student ever sees passes through it. What actually keeps the sentence from
+ * being printed twice is `briefingBodyBg` starting the body at step 2, which
+ * this change does not touch. The predicate was therefore left exactly as it
+ * was: a repair to something no live path reaches is the shape this programme
+ * keeps paying for, and one dressed as a safety argument for another repair is
+ * worse than a useless one. `briefing-no-echo.test.ts` drives all 167 templates
+ * × 4 rungs through `briefingLineBg` + `briefingBodyBg` and holds the rest.
  */
 export function briefingLineBg(steps: readonly BriefingStepBg[]): string {
+  // THE ORDINAL DOES NOT LIVE HERE, and one repair lane put it here twice.
+  //
+  // Prefixing it into the line spends three characters of the peek fold budget.
+  // Measured by a lane verifier over 663 rungs: 29 move to a worse band, 12 fall
+  // to ZERO body, 1,190 body characters lost — and what those twelve stop showing
+  // is the GRADED step, including the child-safety line on sc-crossing-child-ball.
+  // No gate could see it: those scenarios sit outside the five files
+  // briefing-card-budget.test.ts owns, so the full suite went green over it.
+  //
+  // The number travels as DATA instead — briefingLineOrdinal + SimOverlayItem
+  // .lineOrdinal, landed c61868b — so the line stays exactly as long as it was.
   return steps.length > 0 ? steps[0]!.textBg : "";
 }
 
@@ -621,7 +676,10 @@ export function briefingLineBg(steps: readonly BriefingStepBg[]): string {
  *
  * The numbers are kept (2., 3., …) rather than renumbered from 1: the list is a
  * sequence whose first item is the bold sentence directly above it, and
- * renumbering would make the body claim to be a different list.
+ * renumbering would make the body claim to be a different list. Since
+ * 2026-08-24 that sentence carries «1. » of its own, so the two halves finally
+ * read as one 1…N procedure instead of a heading followed by a list that
+ * starts at 2 — the six w10 rows quoted on `briefingLineBg`.
  *
  * `null` for a single-step briefing — there is then no second surface to offer,
  * and `SimOverlay` correctly renders no «ПРОЧЕТИ». No shipped template is in
@@ -705,6 +763,15 @@ export function briefingLineOrdinal(steps: readonly BriefingStepBg[]): number | 
  * on the code that was written to serve it: a test that passes equally before
  * and after guards nothing. The boundary is asserted in both directions in
  * `overlay-queue-moment.test.ts`.
+ *
+ * ⚠ AND IT IS REACHED BY NOTHING THE STUDENT SEES — counted 2026-08-24, when a
+ * sweep tried to edit it. Six mentions in `LessonPlayShell.tsx` (1547, 1605,
+ * 1722, 1826, 3693, 3727), every one inside a comment block; no re-export from
+ * `hud/index.ts`; the only callers are `overlay-queue-moment.test.ts` and
+ * `queueTaskEcho.test.ts`. It is a GATE PREDICATE, and the invariant it holds
+ * is real — `queueTaskEcho` runs live shell rows through it — but it guards no
+ * running code path, so a change to it fixes no frame. Written down here
+ * because the w10 sweep spent a hunk on it believing the opposite.
  */
 export function itemEchoesLine(item: Pick<SimOverlayItem, "lineBg" | "detailBg">): boolean {
   const line = item.lineBg.trim().toLocaleLowerCase("bg");

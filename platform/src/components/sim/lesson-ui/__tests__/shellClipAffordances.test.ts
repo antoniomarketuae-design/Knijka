@@ -254,7 +254,6 @@ describe("scrollRemainingPx · the surface credit is read off announces its own 
     expect(block).toContain("scrollbar-width:thin");
     // …and the pill exists only while something is genuinely below.
     expect(block).toContain("{endHasMore ? (");
-    expect(block).toContain("sticky bottom-0");
 
     // AND THE FLAG IS DERIVED FROM THE MEASUREMENT, WHICH THE LINE ABOVE DOES
     // NOT CHECK. The mutation run walked through the first version of this case
@@ -268,6 +267,67 @@ describe("scrollRemainingPx · the surface credit is read off announces its own 
     // It may never eat a tap meant for the CTA it floats over.
     const pill = block.slice(block.indexOf("{endHasMore ? ("));
     expect(pill.slice(0, pill.indexOf("</p>"))).toContain("pointer-events-none");
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     …AND IT USED TO SIT ON THE SENTENCE IT WAS ANNOUNCING — sweep w10.
+
+     `sc-vu-pass-clearance/pc-right/08-debrief-p3.png`, 1440 × 900. One line
+     of «Разбор от инструктора» with the pill drawn through it:
+
+       Какво се получи д[↓ РАЗБОРЪТ ПРОДЪЛЖАВА — ПРЕВЪРТИ ЗА ОЦЕНКАТА ПО
+       ЗАДАЧИ]дение не влезе в точките.
+
+     Four more instances in the same sweep, every one of them this surface.
+     The affordance was right; `sticky bottom-0` INSIDE the scroller was not.
+     A sticky box pins to the bottom edge of the SCROLLPORT, so every line
+     that scrolls past that edge passes under it — an opaque plate blanking
+     whichever words happen to be there. Under THEO-4 the debrief IS the
+     explanation, and a scroll hint may not be paid for with it.
+
+     The three cases below are the three halves of the structural answer, and
+     none of them can be satisfied by the shape that was photographed.
+     ──────────────────────────────────────────────────────────────────── */
+  it("THE FOLD LINE IS OUTSIDE THE SCROLL BOX, not floating inside it", () => {
+    const scroller = CODE.indexOf('data-hud="end-screen"');
+    const fold = CODE.indexOf('data-hud="end-fold"');
+    expect(scroller).toBeGreaterThan(-1);
+    expect(fold).toBeGreaterThan(scroller);
+
+    // THE STRUCTURAL READING, and it is a count rather than a string because a
+    // string cannot tell „next to" from „inside". Between the scroller's own
+    // attributes and the line, a SIBLING leaves exactly one unmatched `</div>`
+    // — the scroller's. Put the line back where it was photographed and the
+    // inner content column's unmatched `<div` lands in the same slice and the
+    // delta goes to −1. Both numbers were computed off the real file before
+    // this case was written; the mutation is not hypothetical.
+    const between = CODE.slice(scroller, fold);
+    const opens = (between.match(/<div/g) ?? []).length;
+    const closes = (between.match(/<\/div>/g) ?? []).length;
+    expect(closes - opens).toBe(1);
+  });
+
+  it("…and the box that scrolls is the one that YIELDS the line's height", () => {
+    // `min-h-0` is what lets a flex item shrink below its content at all, and
+    // `flex-1` is what makes it take the rest. Without the pair the scroller
+    // keeps its full height and pushes the line off the bottom of the overlay
+    // — the same sentence lost by a different route, which is why this is
+    // asserted and not left to the wrapper alone.
+    const tag = CODE.slice(CODE.indexOf('data-hud="end-screen"'));
+    expect(tag.slice(0, tag.indexOf(">"))).toContain("min-h-0 flex-1");
+    const scrim = CODE.slice(CODE.indexOf('data-hud="end-scrim"'));
+    expect(scrim.slice(0, scrim.indexOf(">"))).toContain("flex flex-col");
+  });
+
+  it("MUTATION — no `sticky` and no `absolute` anywhere on the line itself", () => {
+    // The one-character revert this whole case exists to catch. Asserted on
+    // the line's own element, not on the block, so the scroller's own
+    // positioning cannot mask it.
+    const pill = CODE.slice(CODE.indexOf('data-hud="end-fold"'));
+    const element = pill.slice(0, pill.indexOf("</p>"));
+    expect(element).not.toContain("sticky");
+    expect(element).not.toContain("absolute");
+    expect(element).toContain("shrink-0");
   });
 
   it("THE OBSERVER WATCHES THE CONTENT, NOT ONLY THE BOX", () => {

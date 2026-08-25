@@ -34,7 +34,13 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { advisorEchoTrim, listRowsInScrollCoords, rowsBelowFold } from "./LessonPlayShell";
+import {
+  advisorEchoTrim,
+  BRIEFING_FADE_MASK_CSS,
+  BRIEFING_FADE_PX,
+  listRowsInScrollCoords,
+  rowsBelowFold,
+} from "./LessonPlayShell";
 
 const SHELL = readFileSync(resolve(__dirname, "./LessonPlayShell.tsx"), "utf8");
 
@@ -420,6 +426,78 @@ describe("the briefing list yields instead of being guillotined", () => {
     expect(COLUMN).toContain("<ObjectiveBanner");
     const banner = COLUMN.slice(COLUMN.indexOf("<ObjectiveBanner"));
     expect(banner.slice(0, banner.indexOf("/>"))).not.toMatch(/shrink|min-h-0/);
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     …AND THE LINE AT THE CUT IS FADED RATHER THAN SLICED — sweep w10.
+
+     `sc-ov-crest-curve/pc-right/01-arrival.png`, 1440 × 900, opened. The
+     counter this file's sibling case added IS on the frame — «↓ ОЩЕ 5
+     СТЪПКИ» — so „the panel scrolled in silence" is genuinely closed. The
+     clause still standing is the one `sc-jx-blocked-exit/pc-right/
+     05-stopped.png` spells out: „the glyph bottoms of that last line are
+     themselves clipped by the panel edge."
+
+     WHY THAT IS NOT COSMETIC. `SimOverlay` measured the same cut on the
+     phone — «6.» with its ascenders sliced flat, 61 % of the line box inside
+     the band — and recorded what it costs: a horizontally guillotined line
+     reads as a RENDERING FAULT, not as „there is more". The student does not
+     reach for the wheel, and the counter above is arguing with the picture.
+
+     THE PAIR IS THE ASSERTION. A mask with no padding greys the last step of
+     every briefing that FITS; padding with no mask is the slice again. Both,
+     at the same number, or neither.
+     ──────────────────────────────────────────────────────────────────── */
+  it("the list fades its cut instead of slicing a glyph — and the pair matches", () => {
+    const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
+    expect(list).toContain("BRIEFING_FADE_MASK_CSS");
+    // Both spellings, or WebKit — the engine the founder reads this on — gets
+    // no mask and the frame is unchanged.
+    expect(list).toContain("WebkitMaskImage");
+    expect(list).toContain("maskImage");
+
+    // …and the padding that keeps a briefing which FITS from being dimmed.
+    // `pb-2.5` is 0.625rem = 10px; `BRIEFING_FADE_PX` is 10. Asserted as an
+    // equality against the constant rather than as two literals, so a fade
+    // that is retuned cannot silently stop matching its own padding.
+    expect(BRIEFING_FADE_PX).toBe(10);
+    expect(list).toContain("pb-2.5");
+    expect(BRIEFING_FADE_MASK_CSS).toContain(`calc(100% - ${BRIEFING_FADE_PX}px)`);
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     …AND THE FADE OBEYS THE SAME RULE AS THE COUNTER UNDER IT.
+
+     The affordance below this list already states the rule in its own comment:
+     „It exists only while something is genuinely below the fold, so a briefing
+     that fits carries no chrome." A mask that is always on breaks it twice —
+     over a list that FITS (where it relies on `pb-2.5` joining the scrollable
+     overflow to be invisible) and, worse, at the END of a scroll, where the
+     last step is fully reachable and dimming it is the only reading under
+     which this change could be called a regression on
+     `sc-sp-wet-limit-plate:fa722389` („the last step cannot be read").
+
+     `below` is the counter's own number, recomputed by `measure` on scroll and
+     on resize. Binding both to it is what makes the fade a statement about the
+     content rather than a decoration on the box.
+     ──────────────────────────────────────────────────────────────────── */
+  it("the fade is on only while something IS below the fold — the counter's predicate", () => {
+    const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
+    // The style prop is a conditional on `below`, not a bare object. Code
+    // only: `CARD` is comment-stripped, and the paragraph at the element
+    // quotes this predicate deliberately.
+    const styleAt = list.indexOf("style=");
+    expect(styleAt, "the list's style prop moved — re-anchor").toBeGreaterThan(-1);
+    const styleProp = list.slice(styleAt, list.indexOf("maskImage"));
+    expect(
+      styleProp,
+      "the briefing fade is unconditional again — it now dims the last step of " +
+        "a list that fits, and of one scrolled to its end",
+    ).toContain("below > 0");
+    // …and it is the same number the counter prints (that row is a sibling
+    // AFTER `</ol>`, so it is asserted against the whole card), which is what
+    // stops the two from disagreeing about whether anything is under the cut.
+    expect(CARD.slice(CARD.indexOf("</ol>"))).toContain("below > 0 ? (");
   });
 
   it("the «още» row is outside the scroll area, so it covers nothing", () => {

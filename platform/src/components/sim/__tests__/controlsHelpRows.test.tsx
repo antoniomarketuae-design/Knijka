@@ -194,6 +194,55 @@ describe("what the sheet actually renders", () => {
     expect(render({ defaultOpen: true })).toContain(`(+${rows.length - essentials.length})`);
   });
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE GROUND, ASSERTED AS OUTPUT — sweep w10, 2026-08-24.
+
+     `sc-junction-blind/pc-right/01-arrival.png`: the open key list drawn onto
+     the sky, the power lines and the road. The panel's class list has said
+     `bg-background/80 backdrop-blur` the whole time; `[data-hud="controls-
+     help"]` is on `GHOST_SURFACES`, and the UNPANEL sweep hands every un-inked
+     child of a ghost `background-color: transparent !important` AND
+     `backdrop-filter: none !important`. So both declarations have been dead
+     since the sweep landed — a component that believes it has a ground and
+     does not.
+
+     WHY HERE AND NOT ONLY IN `unpanelInkExemption.test.ts`. That file reads
+     this component's SOURCE, and an adversarial pass on the first version of
+     the fix showed exactly what a source read misses: deleting `relative
+     isolate` from the panel left 24 assertions green while the shipped result
+     would have been an 80 %-alpha band down the entire left rail. This file
+     is the only runnable test that renders `ControlsHelp`, so it is the only
+     place the shade can be checked as OUTPUT rather than as text — and it was
+     unrunnable for a whole round because `@babel` was missing from
+     `node_modules`, which is why the hole survived.
+     ──────────────────────────────────────────────────────────────────────── */
+  it("the open sheet renders its ground, inked and inside a container of its own", () => {
+    const markup = render({ defaultOpen: true });
+    // The shade exists, and carries the sweep's own opt-out. Without the
+    // attribute this element is handed `background-image: none !important`
+    // and the whole fix is a diff that changes no pixel.
+    expect(markup).toContain('data-hud="controls-help-scrim"');
+    const shadeAt = markup.indexOf('data-hud="controls-help-scrim"');
+    expect(markup.slice(shadeAt - 200, shadeAt + 200)).toContain("data-hud-ink");
+    // …it is the published gradient and not a hand-typed near-copy…
+    expect(markup.slice(shadeAt, shadeAt + 600)).toContain("rgba(6, 11, 20, 0.8)");
+    // …and it is `z-index:-1`, which is the whole reason the host below has to
+    // open a stacking context.
+    expect(markup.slice(shadeAt, shadeAt + 600)).toMatch(/z-index:\s*-1/);
+
+    // THE GEOMETRY, WHICH IS THE PART A SOURCE READ CANNOT SEE AT ALL: the
+    // element the shade is declared in must be the containing block for
+    // `inset: 0`. Rendered, that is a `class` on the div immediately before
+    // the shade — `relative` for the containing block, `isolate` for the
+    // stacking context (`position: relative` at `z-index: auto` opens none).
+    // Lose either and the shade sizes to `[data-hud="controls-help"]`, the
+    // full-height left rail, or paints behind the stage.
+    const hostClassAt = markup.lastIndexOf('class="', shadeAt);
+    const hostClass = markup.slice(hostClassAt, markup.indexOf('"', hostClassAt + 7) + 1);
+    expect(hostClass, "the legend shade's host lost `relative`").toContain("relative");
+    expect(hostClass, "the legend shade's host lost `isolate`").toContain("isolate");
+  });
+
   it("`defaultOpen={false}` renders the pill and NOT the rows", () => {
     // The contract behind `defaultOpen={!touchOnly && !driveLockedAtMount}`:
     // a phone (whose input is the touch dock) and a lesson that opens inside

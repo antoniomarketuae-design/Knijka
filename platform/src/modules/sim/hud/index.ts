@@ -28,6 +28,43 @@ export {
 // queue — the replacement for a task card, a teach card and a belt warning all
 // deciding independently that they owned the top of the screen.
 export { SimOverlay } from "./SimOverlay";
+/**
+ * THE SHADE, PUBLISHED — sweep w10, 2026-08-24.
+ *
+ * `SimOverlay` grew this recipe to close three criticals that all said the same
+ * sentence: „the ИНСТРУКЦИИ card has NO panel background at all … the text is
+ * painted straight onto the street." It stayed module-private, so the next
+ * surface with the same defect could not have it, and the sweep found that
+ * surface immediately — `[data-hud="touch-hint"]`, two lanes over, filed twice
+ * (`sc-ac-wet-braking`, `sc-ac-crosswind`): «Ляв палец — волан…» in white
+ * 11 px type over a lit tower-block facade, an orange window showing through
+ * the middle of a word.
+ *
+ * IT IS PUBLISHED RATHER THAN COPIED for the reason this module keeps
+ * re-learning (the census block in `overlayQueue.ts`, the weather vocabulary in
+ * `dashboardStatus.ts`): a hand-kept near-copy of a gradient is two numbers
+ * that must agree with nothing making them. `sim-overlay-scrim.test.ts` reads
+ * the palette out of `globals.css` and the ghost pins out of `PlayAreaStyles`
+ * to judge THIS function, and a second consumer inherits that judgement whole.
+ *
+ * ── BOTH HALVES TRAVEL, and the first draft of this export shipped only one.
+ *    An adversarial pass on that draft named it: the recipe is
+ *    `peekScrimBackgroundCss` (the horizontal ramps) AND `peekScrimMaskCss`
+ *    (the vertical ones), and `SimOverlay` says why in writing at the second
+ *    function — „two background layers do not intersect … which puts a hard
+ *    edge back on the two sides this is here to remove." A consumer that takes
+ *    only the background gets a rectangle with a hard 80 %-alpha horizontal
+ *    edge, i.e. a plate edge by another name, which is exactly the register
+ *    the 2026-08-03 ruling removed. Publishing one without the other is
+ *    publishing a trap.
+ */
+export {
+  PEEK_SCRIM_ALPHA,
+  PEEK_SCRIM_FEATHER_PX,
+  PEEK_SCRIM_RGB,
+  peekScrimBackgroundCss,
+  peekScrimMaskCss,
+} from "./SimOverlay";
 export {
   briefingBodyBg,
   briefingLineBg,

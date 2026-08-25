@@ -132,6 +132,13 @@ describe("the briefing card never prints the same sentence twice", () => {
   });
 
   /* ─────────────────────────────────────────────────────────────────────────
+     [MERGE NOTE, 2026-08-25. A sibling repair lane asserted the OTHER shape here —
+     that briefingLineBg itself returns "N. text" — with a mutation case proving
+     the old plain line fails it. Both were dropped, and the code with them: that
+     shape spends three characters of the peek fold budget, and a verifier measured
+     the cost over 663 rungs as 12 rungs falling to ZERO body and 1,190 body
+     characters lost, the graded step among them. The ordinal travels as data.]
+
      …AND THE NUMBERING IT KEEPS HAS TO START SOMEWHERE VISIBLE.
 
      Round 10, 2026-08-24 — twenty-one BROKEN rows on one attested commit, all

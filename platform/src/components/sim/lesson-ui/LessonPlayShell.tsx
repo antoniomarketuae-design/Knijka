@@ -1898,6 +1898,19 @@ export function lessonQueueBinding(s: LessonQueueState): LessonQueueBinding {
  * founder named it by name («the instructions too»). `max-w-md` is gone: the
  * card is `w-full` of the column, which is where its width now comes from.
  */
+/**
+ * The briefing list's bottom fade, px, and the gradient built from it.
+ *
+ * 10 px is `SimOverlay`'s `TEXT_FADE_PX`, taken rather than chosen: it is the
+ * number measured against an 11 px `leading-tight` line box on the phone, and
+ * this list is the same 11 px at the same leading. Exported so
+ * `briefingOverflow.test.tsx` can assert the pair (mask + padding) without
+ * restating the value — a fade whose padding drifts is a permanently greyed
+ * last step, which is a worse defect than the slice it replaced.
+ */
+export const BRIEFING_FADE_PX = 10;
+export const BRIEFING_FADE_MASK_CSS = `linear-gradient(to bottom, #000 calc(100% - ${BRIEFING_FADE_PX}px), transparent)`;
+
 export function BriefingCard({
   steps,
   onClose,
@@ -2058,10 +2071,86 @@ export function BriefingCard({
           with ~100 px of column unused below it). ec1f56f removed the cap and
           added the counter. This is the third piece, and the one none of the
           five findings would have been satisfied without. ──────────────────*/}
+      {/* ── …AND THE CUT LINE IS FADED, NOT GUILLOTINED — sweep w10 ──────────
+          `sc-ov-crest-curve/pc-right/01-arrival.png`, 1440 × 900, cropped at
+          x893 / y0-648 and opened. The counter added by the previous round IS
+          on the frame — «↓ ОЩЕ 5 СТЪПКИ» — so the „scrolled in silence" half
+          of that row is genuinely closed. What is still there is the row's
+          other clause, and `sc-jx-blocked-exit/pc-right/05-stopped.png` states
+          it in words: „the glyph bottoms of that last line are themselves
+          clipped by the panel edge."
+
+          A scroll container ends where it ends and its own bottom edge cuts
+          the next line through the glyphs. `SimOverlay` measured what that
+          does on the phone — «6.» with its ascenders sliced flat, „61 % of the
+          line inside the fade" — and recorded the reason it matters: a
+          horizontally sliced line reads as a RENDERING FAULT, not as „there is
+          more", so the student does not scroll and the counter above is
+          arguing with the picture.
+
+          THE SAME TWO DECLARATIONS, AND THEY ARE A PAIR. The mask dims the
+          last 10 px; the `pb-2.5` under it is what keeps a list that FITS from
+          being dimmed at all — padding joins the scrollable overflow in every
+          engine this ships on, so at the end of the scroll the last step's box
+          bottom sits on the fade's opaque edge. One without the other is
+          either a permanently greyed final step or no fade at all.
+
+          NOT THE LINE-GRID SNAP. `SimOverlay.foldMaskCss` has a second branch
+          that moves the cut onto a line boundary so no glyph is ever partly
+          painted; it needs a live measurement of the row edges against the
+          scrollport, which this card already takes for `rowsBelowFold` but does
+          not keep. That is the stronger repair and it is NOT done here —
+          faded-through is better than sliced-through and is not the same as
+          uncut. Routed with the measurement it needs: `listRowsInScrollCoords`
+          already returns the edges; what is missing is a `snappedBottomPx`
+          beside `rowsBelowFold` and a `maskImage` fed from it.
+
+          AND IT CLOSES NEITHER ROW IT WAS FILED UNDER, which is worth writing
+          down beside the change rather than in a report. `sc-ov-crest-curve`
+          asks for items 5 and 6, „which carry the whole decision rule" — a
+          fade does not show them, and the counter that answers the other half
+          of that row landed in an earlier round, not this one.
+          `sc-sp-wet-limit-plate` says the last step „cannot be read … is
+          unreachable"; read literally, dimming the fragment makes it less
+          legible, not more. What this change actually buys is the SIGNAL: a
+          horizontally guillotined line reads as a rendering fault and a faded
+          one reads as „there is more", so the counter above stops arguing with
+          the picture and the student has a reason to scroll. Both rows stay
+          open on the snap. ────────────────────────────────────────────────*/}
       <ol
         ref={listRef}
         onScroll={measure}
-        className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
+        className="mt-1 flex min-h-0 flex-col gap-0.5 overflow-y-auto pb-2.5 [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
+        style={
+          // ── THE FADE IS BOUND TO THE COUNTER'S OWN PREDICATE, `below > 0`,
+          //    and that is the row directly under this list stating the rule:
+          //    „It exists only while something is genuinely below the fold, so
+          //    a briefing that fits carries no chrome."
+          //
+          //    An unconditional mask relies on `pb-2.5` joining the scrollable
+          //    overflow to keep a list that FITS from being permanently
+          //    greyed — true in every engine this ships on, and still a fade
+          //    painted over a list with nothing below it. Worse, it stayed on
+          //    at the END of a scroll, where the last step is fully reachable
+          //    and dimming it is the one thing an adversarial read of
+          //    `sc-sp-wet-limit-plate:fa722389` („the last step cannot be
+          //    read") is entitled to call a regression.
+          //
+          //    `below` is recomputed by `measure` on every scroll and on every
+          //    resize, so the fade appears exactly while there is something
+          //    under the cut and vanishes the moment the student reaches it.
+          //    The padding stays either way: it is what puts the last step's
+          //    box bottom on the fade's opaque edge instead of inside it.
+          below > 0
+            ? {
+                // Both spellings: unprefixed in current WebKit, prefixed in the
+                // engine the founder reads this on. Same pair `SimOverlay`'s two
+                // text windows carry, and the same 10 px.
+                WebkitMaskImage: BRIEFING_FADE_MASK_CSS,
+                maskImage: BRIEFING_FADE_MASK_CSS,
+              }
+            : undefined
+        }
       >
         {steps.map((s) => (
           <li
@@ -5655,6 +5744,43 @@ export function LessonPlayShell({
           // product — protocol, verdict, mistake map, correctives, CTAs — and
           // the drive HUD's ghost register would make it unreadable. See the
           // micro-quiz above.
+          /* ── THE FOLD LINE STOPPED BEING A PLATE OVER THE SENTENCE ────────
+              sweep w10, sc-vu-pass-clearance/pc-right/08-debrief-p3.png.
+
+              THE FRAME, character for character, one line of the instructor's
+              debrief with the pill drawn through the middle of it:
+
+                Какво се получи д[↓ РАЗБОРЪТ ПРОДЪЛЖАВА — ПРЕВЪРТИ ЗА
+                ОЦЕНКАТА ПО ЗАДАЧИ]дение не влезе в точките.
+
+              The affordance is right and the row it announces (the per-
+              objective breakdown — the only honest statement of what WAS and
+              was NOT credited) is worth announcing. What was wrong is that it
+              was `sticky bottom-0` INSIDE the scroller: a sticky box pins to
+              the bottom edge of the scrollport and everything that scrolls past
+              that edge passes UNDER it, so an opaque pill blanks whatever line
+              happens to be there — four more instances in the same sweep, all
+              of them this surface. Under THEO-4 the debrief IS the explanation;
+              paying for a scroll hint with the words of the explanation it is
+              hinting at is the one price this product may not pay.
+
+              THE ANSWER IS THE ONE `BriefingCard` ALREADY WROTE DOWN, sixty
+              lines up in this file: „the affordance … is OUTSIDE the scroll
+              area on purpose … This row occupies its own 12 px of the card and
+              hides nothing." Same arrangement here: this wrapper is the flex
+              column, the scrim is its one shrinkable child (`min-h-0 flex-1`),
+              and the line is a `shrink-0` row beneath it. The scrollport is
+              SHORTER by the height of the line, which is the only way content
+              can stop passing under it — padding on the scroller cannot do it,
+              because padding moves where the content ENDS and not where the
+              viewport does.
+
+              `bg-background` moves up here with the box that now owns the full
+              rectangle: the scrim constant still paints the scroller, and this
+              paints the strip the line sits in, so §I20's „opaque, no
+              backdrop-filter" holds over the whole overlay and not just the
+              part that scrolls. ────────────────────────────────────────── */
+          <div data-hud="end-scrim" className="absolute inset-0 z-40 flex flex-col bg-background">
           <div
             // A2: the handle PlayAreaStyles' hit-area rule needs. The skip
             // control and the „не показвай автоматично" pill live inside
@@ -5673,7 +5799,14 @@ export function LessonPlayShell({
             // Chromium's 15 px classic bar is 2 % of this box and WebKit paints
             // none at rest. Same two declarations the product's other two HUD
             // scrollers carry.
-            className={`absolute inset-0 z-40 ${OVERLAY_SCRIM_CLASS} [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]`}
+            //
+            // `min-h-0 flex-1` REPLACED `absolute inset-0 z-40`, and it is the
+            // half of the fold-line fix that this element carries: it is now a
+            // flex item, and `min-h-0` is what lets a flex item shrink below
+            // its content at all — without it this box refuses to give up the
+            // line's height and the line is pushed off the bottom of the
+            // overlay, which is the same sentence lost by a different route.
+            className={`min-h-0 flex-1 ${OVERLAY_SCRIM_CLASS} [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]`}
           >
             <div className="flex w-full max-w-2xl flex-col gap-3">
               {/* A2: the compact close control USED to be here, unconditional,
@@ -5808,32 +5941,46 @@ export function LessonPlayShell({
                 autoOpen={endAutoOpen}
                 onAutoOpenChange={!resultHeld ? setEndAutoOpenPersisted : null}
               />
-              {/* ── «ПРОДЪЛЖАВА ПО-ДОЛУ» ─────────────────────────
-                  The sentence `scrollRemainingPx` measures. `sticky bottom-0`
-                  keeps it on the last visible row of the scroller as the
-                  student reads down, and it disappears the moment there is
-                  nothing left — an affordance that is always on is chrome, and
-                  this same sweep filed the phone's «↓ ОЩЕ N РЕДА» badge twice
-                  for sitting on the sentence it was counting.
-
-                  It says WHAT is below, not just that something is: on both
-                  filed frames the hidden part is the per-objective breakdown —
-                  the only place the student can see which skills were credited
-                  and which were not — so naming it is the difference between a
-                  scroll hint and a reason to scroll.
-
-                  `pointer-events-none` so it can never take a tap meant for the
-                  CTA it is floating over; the scroll it asks for works on the
-                  scrim regardless. */}
-              {endHasMore ? (
-                <p
-                  aria-live="polite"
-                  className="pointer-events-none sticky bottom-0 z-10 self-center rounded-full border border-border bg-background/95 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-muted"
-                >
-                  ↓ Разборът продължава — превърти за оценката по задачи
-                </p>
-              ) : null}
             </div>
+          </div>
+          {/* ══ END OF THE SCROLL BOX — EVERYTHING BELOW THIS LINE IS OUTSIDE
+                 IT. The landmark `shellClipAffordances.test.ts` measures the
+                 fold line's position against: a line that goes back inside the
+                 scroller lands ABOVE this comment, and the case goes red. ══ */}
+          {/* ── «ПРОДЪЛЖАВА ПО-ДОЛУ» ─────────────────────────
+              The sentence `scrollRemainingPx` measures. It disappears the
+              moment there is nothing left — an affordance that is always on is
+              chrome, and this same sweep filed the phone's «↓ ОЩЕ N РЕДА»
+              badge twice for sitting on the sentence it was counting.
+
+              It says WHAT is below, not just that something is: on both
+              filed frames the hidden part is the per-objective breakdown —
+              the only place the student can see which skills were credited
+              and which were not — so naming it is the difference between a
+              scroll hint and a reason to scroll.
+
+              IT SAT ON THE SENTENCE TOO, WHICH IS WHY IT MOVED. It was
+              `sticky bottom-0` inside the scroller and was photographed
+              blanking «…получи д[pill]дение не влезе в точките» — see the
+              measurement on the wrapper above. It is now its own row of the
+              overlay's column, `shrink-0`, below the box that scrolls, so
+              there is no longer any content it CAN cover.
+
+              `pointer-events-none` is kept although the row no longer floats
+              over a CTA: the pill is narrower than its row, and a transparent
+              strip beside it that swallows taps aimed at the scrim is a
+              control that does nothing and says nothing about why. */}
+          {endHasMore ? (
+            <p
+              data-hud="end-fold"
+              aria-live="polite"
+              className="pointer-events-none flex shrink-0 justify-center px-4 pb-2 text-[10px] font-black uppercase tracking-wider text-muted"
+            >
+              <span className="rounded-full border border-border bg-background px-3 py-1">
+                ↓ Разборът продължава — превърти за оценката по задачи
+              </span>
+            </p>
+          ) : null}
           </div>
         ) : null}
 

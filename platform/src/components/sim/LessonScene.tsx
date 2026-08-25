@@ -111,6 +111,9 @@ import {
 import type { SimTick } from "@/modules/sim/rules";
 import {
   createDashboardStatus,
+  PEEK_SCRIM_FEATHER_PX,
+  peekScrimBackgroundCss,
+  peekScrimMaskCss,
   RearProximityCue,
   TelltaleEdgePings,
   useTapActivation,
@@ -2511,11 +2514,124 @@ export function ReadyScene({
           // — and a corner that is not the road, so the degradation when the
           // cascade rule does not match is a misplaced card and never a
           // paragraph over the vanishing point.
-          className="pointer-events-none absolute right-3 top-3 z-30 flex min-h-0 max-w-full flex-col items-end gap-1.5 overflow-hidden text-right"
+          // `isolate` is new, and the honest account of it is smaller than the
+          // one first written here. A `z-index: -1` child needs a stacking
+          // context on this element or it paints behind the stage and the whole
+          // shade is invisible — but `absolute` + `z-30` ALREADY establishes
+          // one, so the token is not what makes the shade appear today. It is
+          // here so that removing `z-30` (a plausible layout edit, since
+          // PlayAreaStyles owns this card's position) cannot silently delete
+          // the ground. The load-bearing pair on THIS card is `absolute z-30`;
+          // on the keyboard legend below it is `relative isolate`, where the
+          // element genuinely has neither without them — and the case in
+          // `unpanelInkExemption.test.ts` now asserts each surface's own.
+          className="pointer-events-none absolute right-3 top-3 z-30 isolate flex min-h-0 max-w-full flex-col items-end gap-1.5 overflow-hidden text-right"
           role="note"
           aria-label="Съвети за игра на телефон"
           style={{ textShadow: "0 1px 4px rgba(0,0,0,0.96), 0 0 14px rgba(0,0,0,0.8)" }}
         >
+          {/* ── THE GROUND THIS CARD NEVER HAD — sweep w10, 2026-08-24 ────────
+              `sc-ac-wet-braking/mobile-right/03-ready.png`, iPhone 16 sideways,
+              cropped and looked at: «Ляв палец — волан. Десен палец — нагоре
+              газ, надолу спирачка.» is white 11 px type over a tower-block
+              facade with a lit orange window showing through the middle of the
+              second «палец», and the cyan reverse sentence below it — the one
+              that teaches how to select R — is over the same facade with
+              nothing behind it at all. Filed twice in the same sweep
+              (`sc-ac-crosswind/mobile-right/03-ready.png` is the same card over
+              sky and the minimap).
+
+              THE DARK RECTANGLE BEHIND THE FIRST TWO LINES IS NOT THIS CARD'S
+              PANEL. It is the interior rear-view mirror this corner sits over
+              — the identical misreading `PlayAreaStyles` records for the three
+              ИНСТРУКЦИИ criticals, whose frames looked plated and were not.
+              Below the mirror's bottom edge the type continues onto the street.
+
+              `textShadow` on the root was the whole of the compensation, and a
+              halo is a defence against a BUSY ground, not against a BRIGHT
+              one: it darkens the pixels immediately around a glyph and does
+              nothing to the 60 % grey concrete two glyph-widths away.
+
+              WHY A SHADE AND NOT A PANEL. `[data-hud="touch-hint"]` is on
+              `GHOST_SURFACES` because the 2026-08-03 review named this corner's
+              furniture by name („it reads as a cookie banner"), and that ruling
+              stands — no fill on the chips, no card edge, no radius, no blur.
+              The shade is the answer `SimOverlay` already found for exactly
+              this conflict: ground for the PROSE, nothing for the instrument.
+              Same function, same numbers, imported rather than re-typed.
+
+              `data-hud-ink` IS THE FIX and not decoration: the UNPANEL sweep's
+              second selector hands `background-image: none !important` to every
+              child of a ghost that lacks it, so without the attribute this
+              element paints nothing and the diff changes no pixel — which is
+              how the tier picker's fill survived a whole unpanel pass.
+
+              INSET AND NOT BLED. SimOverlay hangs its shade outside the card by
+              `PEEK_SCRIM_FEATHER_PX`; this root is `overflow-hidden` (the
+              scroll-window fix above depends on it), so an overhang would be
+              clipped to nothing and the geometry is `inset: 0` instead. The
+              published feather is still what is handed to the gradient, so the
+              ramps are the same 26 px on the road side and 12 px on the stage
+              side — they simply run INSIDE the box. The cost is that the flat
+              core is 38 px narrower than the card rather than 38 px wider, and
+              the two sentences are `text-right` in a right-aligned column, so
+              the side that loses ground is the empty one.
+
+              ── AND THE VERTICAL FEATHER TRAVELS WITH IT, which the first draft
+                 of this element dropped. `SimOverlay` paints its shade with
+                 TWO functions and says why at the second: „two background
+                 layers do not intersect … which puts a hard edge back on the
+                 two sides this is here to remove." Background alone here is a
+                 rectangle with a hard 80 %-alpha edge along its bottom, across
+                 the middle of the windscreen, on a ghost that has no border and
+                 no radius to end it — a plate edge by another name, i.e. the
+                 2026-08-03 register through the back door.
+
+                 THE MASK RAMPS INSIDE THE BOX rather than in an overhang there
+                 is no room for, and that is only acceptable because of WHAT is
+                 in the bottom 16 px: the «Разбрах» ack, `min-h-11` with its own
+                 `data-hud-ink` tint and a 55 % hairline, i.e. a control that
+                 paints its own box and does not depend on this ground. No
+                 prose is inside the ramp — the two sentences are in the
+                 `min-h-0 shrink` window above the button. That is the same
+                 judgement `PEEK_SCRIM_FEATHER_PX` records for its own bottom
+                 („right and bottom face the stage's own edge and the instrument
+                 band, where a shorter ramp is invisible anyway"), and it is why
+                 the ramp may be here and may NOT be under the key list two
+                 components down, where the bottom 16 px is a row of teaching.
+
+                 THE TOP EDGE STAYS HARD, on purpose and not by omission:
+                 `PEEK_SCRIM_FEATHER_PX.top` is 0 because above this card is the
+                 interior mirror's lane, and the published constant is taken
+                 rather than re-decided. Its ends dissolve over the 26 px and
+                 12 px horizontal ramps, so what remains is a stroke with no
+                 corners — SimOverlay's own reading of the identical edge.
+                 ────────────────────────────────────────────────────────────*/}
+          <div
+            data-hud="touch-hint-scrim"
+            data-hud-ink=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: -1,
+              pointerEvents: "none",
+              backgroundImage: peekScrimBackgroundCss({
+                left: PEEK_SCRIM_FEATHER_PX.left,
+                right: PEEK_SCRIM_FEATHER_PX.right,
+              }),
+              // Both spellings — WebKit is the engine these two frames were
+              // photographed on, and an unprefixed-only mask there is no mask.
+              WebkitMaskImage: peekScrimMaskCss({
+                top: PEEK_SCRIM_FEATHER_PX.top,
+                bottom: PEEK_SCRIM_FEATHER_PX.bottom,
+              }),
+              maskImage: peekScrimMaskCss({
+                top: PEEK_SCRIM_FEATHER_PX.top,
+                bottom: PEEK_SCRIM_FEATHER_PX.bottom,
+              }),
+            }}
+          />
           {/* ── THE WORDS SCROLL, THE BUTTON DOES NOT. ────────────────────────
               The corridor's ceiling is the hazard band's (notifyColumn.ts), and
               measured on the deployed build with everything else in place the
@@ -3886,7 +4002,88 @@ export function ControlsHelp({
         Клавиши · за напреднали {open ? "▾" : "▸"}
       </button>
       {open ? (
-        <div className="pointer-events-auto mt-1 flex min-h-0 w-full flex-col rounded-xl border border-border bg-background/80 backdrop-blur">
+        // ⚠ `relative isolate` IS THE LOAD-BEARING TOKEN ON THIS SURFACE, and
+        //   it was measured by deleting it. This <div> had NO `position` at
+        //   all, so the shade's `inset: 0` resolved against the nearest
+        //   positioned ancestor — `[data-hud="controls-help"]`, which is
+        //   `absolute left-3 top-3 … bottom: CONTROLS_HELP_BOTTOM_INSET`, i.e.
+        //   the FULL-HEIGHT LEFT RAIL. Deleted, the shade paints an 80 %-alpha
+        //   band down the whole left side of the windscreen; run that way, the
+        //   ink-exemption and legend-lifetime suites reported `24 passed` and
+        //   nothing red. `isolate` is the second half: `position: relative`
+        //   with `z-index: auto` does NOT open a stacking context, so a
+        //   `z-index: -1` child would still search upwards for one and paint
+        //   behind the stage. The geometry case in `unpanelInkExemption`
+        //   asserts both tokens off the class STRING (not the comment).
+        <div className="pointer-events-auto relative isolate mt-1 flex min-h-0 w-full flex-col rounded-xl border border-border bg-background/80 backdrop-blur">
+          {/* ── THE GROUND THIS PANEL ASKS FOR AND NEVER GETS ─────────────────
+              sweep w10, `sc-junction-blind/pc-right/01-arrival.png`, 1440×900,
+              cropped at x240-1000 / y80-640 and looked at: the open key list is
+              drawn straight onto the sky, the overhead power lines and the road
+              — «всичко в кабината се прави с мишката», «кормуване (или
+              стрелки)», «двигател: старт / стоп» all legible only where a dark
+              building happens to be behind them.
+
+              THE CLASS LIST ABOVE ALREADY ASKS FOR A PLATE — `bg-background/80
+              backdrop-blur`, written here in good faith — AND THE STYLESHEET
+              TAKES IT AWAY. `[data-hud="controls-help"]` is its own entry on
+              `GHOST_SURFACES` („⌨ Клавиши — 7.8 % of the frame, measured"), and
+              the UNPANEL sweep hands every child of a ghost that lacks
+              `data-hud-ink` both `background-color: transparent !important` and
+              `backdrop-filter: none !important`. So this panel has been asking
+              for a ground and painting none since the sweep landed — the same
+              „a diff that changes no pixel" the tier picker's fill produced,
+              running in the other direction.
+
+              The remedy is the register's own opt-out and not a cancellation
+              rule: a shade child, `data-hud-ink`, the SAME published gradient
+              the peek card and the touch hint use. The panel keeps its
+              hairline and its radius; what comes back is ground under prose,
+              which is the line `BriefingCard` drew for the whole product („a
+              numbered briefing is prose, not an instrument").
+
+              NO VERTICAL MASK HERE, AND THAT IS A DECISION. The touch hint two
+              components up takes `peekScrimMaskCss` as well as the background,
+              because it is a ghost with no border and a bare 80 %-alpha bottom
+              edge across the windscreen is a plate edge by another name. This
+              panel has `rounded-xl border border-border`: the hairline IS the
+              edge, so there is nothing for a ramp to soften — and a 16 px ramp
+              would run under the LAST ROW OF KEYS, prose on a partial ground,
+              which `PEEK_SCRIM_FEATHER_PX` calls „the defect this shade exists
+              to close, not a milder version of it".
+
+              WHAT THIS DOES NOT CLOSE, said plainly because an adversarial
+              pass raised it: `sc-junction-blind:d2587f64` has three limbs —
+              expanded by default, no ground, up for the whole drive. The
+              auto-collapse latch above closed the third; this closes the
+              second; THE FIRST IS UNTOUCHED and lives at `defaultOpen = true`
+              on this component's signature. The shade does not enlarge the
+              obstruction — this <div> is a content-height flex item and the
+              shade is `inset: 0` OF IT, so what is now opaque is exactly the
+              box `bg-background/80` has been asking for since the panel was
+              written — but a legible panel over the top-left of the windscreen
+              is still a panel over the top-left of the windscreen, and that row
+              stays open until the default is decided on a real frame. ──────*/}
+          <div
+            data-hud="controls-help-scrim"
+            data-hud-ink=""
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              zIndex: -1,
+              pointerEvents: "none",
+              borderRadius: "inherit",
+              backgroundImage: peekScrimBackgroundCss({
+                // Mirrored: this panel is at the LEFT rail, so the long ramp
+                // belongs on its RIGHT edge — the side that faces the road.
+                // `peekScrimBackgroundCss` ramps `to left`, so the two numbers
+                // swap rather than the function growing a direction argument.
+                left: PEEK_SCRIM_FEATHER_PX.right,
+                right: PEEK_SCRIM_FEATHER_PX.left,
+              }),
+            }}
+          />
           {/* Only the ROW LIST scrolls; the expander below stays pinned, so
               the way back to the short list is never scrolled out of reach.
               `scrollbar-width: thin` matters: on a short scene box a classic
