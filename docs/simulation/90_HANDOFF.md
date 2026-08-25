@@ -397,6 +397,16 @@ measurement, so a second pass was run with the stance inverted. It refuted 21 of
 Verified by hand — each exported, gated by its own test, and with **zero non-test consumers**
 (a mention inside a comment is not a use):
 
+> **CORRECTED 2026-08-25 — the first two were WIRED and are no longer dead.**
+> Commit `9b2ffe1` put `worldEdgeClearanceM` on the SimTick (`worldRuntime.ts:1977`) and
+> `LessonPlayShell.tsx:3347-3350` reads it to raise the rim card. A wave-2 lane deferred a
+> critical on the strength of the stale sentence below, so it is corrected here rather than left
+> to mislead the next reader. `touchHintShouldHide` and `whyIsReachable` are still dead.
+>
+> The residual on the rim is NOT a consumer hunt: `applyTick` runs at `LessonPlayShell:3337`,
+> BEFORE the rim block, so grading continues off-map BY POLICY. That is a one-line decision at
+> `:3350`, and it belongs with the founder alongside the ending gate.
+
 - `runtime/district.ts` **`districtWorldEdge`** / **`worldEdgeClearanceM`** — the measure proving a
   learner reaches the end of the authored world **60–78 m past the last road on EVERY map**. Its own
   block said «it draws nothing and it ends nothing».
@@ -575,7 +585,7 @@ violation code is in neither `REFERENT_RULES` nor `NO_WORLD_REFERENT`.
 
 **A test that cannot go red is worse than no test, because it reports safety.**
 Four predicates this week shipped, were gated by their own tests, and were read by
-nothing: `districtWorldEdge`, `worldEdgeClearanceM`, `touchHintShouldHide`,
+nothing when found:  and  (both WIRED 2026-08-25 by 9b2ffe1), ,
 `whyIsReachable` — and now `explanationBg` and `itemEchoesLine`.
 
 ### What was deliberately left unfinished
