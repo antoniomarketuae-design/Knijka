@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { briefingBodyBg, briefingLineBg } from "../overlayQueue";
+import { briefingBodyBg, briefingLineBg, briefingLineOrdinal } from "../overlayQueue";
 import { SCENARIO_TEMPLATES } from "../../lessons/scenario/templates";
 import { compileScenario } from "../../lessons/scenario/compile";
 import type { ScenarioLevel } from "../../lessons/scenario/types";
@@ -131,6 +131,63 @@ describe("the briefing card never prints the same sentence twice", () => {
     }
   });
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     …AND THE NUMBERING IT KEEPS HAS TO START SOMEWHERE VISIBLE.
+
+     Round 10, 2026-08-24 — twenty-one BROKEN rows on one attested commit, all
+     of them the same sentence, all of them a mobile `02-briefing.png`:
+     sc-pe-school-patrol, sc-park-zebra, sc-park-left, sc-park-wall,
+     sc-crossing-child-ball, sc-rb-busy-gap, sc-signal-dead, sc-speed-creep,
+     sc-ov-solid-return … „a blocking modal on mobile whose numbered list starts
+     at «2.» (step 1 is promoted to an unnumbered lead) and a side panel on pc
+     that numbers 1–5."
+
+     The test directly above is the reason the body opens at two, and it is the
+     RIGHT rule — renumbering would make the body claim to be a different list.
+     What nothing asserted is that the number it counts from is on the glass at
+     all. `briefingLineOrdinal` is that number; these two rows are the sequence
+     having no hole in it, and the negative control is the state the twenty-one
+     frames photographed.
+     ────────────────────────────────────────────────────────────────────────── */
+
+  it("the visible sequence has no hole: the line's ordinal, then the body's first", () => {
+    const holes: string[] = [];
+    for (const rung of RUNGS) {
+      if (rung.steps.length < 2) continue;
+      const ordinal = briefingLineOrdinal(rung.steps);
+      if (ordinal === null) {
+        holes.push(`${rung.id}: the line carries no number at all`);
+        continue;
+      }
+      // The body's own first number is read off the body STRING, not off
+      // `steps[1].n` — the sheet paints the string, and a rule checked against
+      // the array would pass through any future change to how the body is
+      // built. This is the same instrument discipline as `rowsBelowFold`.
+      const first = briefingBodyBg(rung.steps)!.split(".")[0];
+      if (first !== String(ordinal + 1)) {
+        holes.push(`${rung.id}: line is ${ordinal}. and the body opens at ${first}.`);
+      }
+    }
+    expect(holes, holes.join("\n")).toEqual([]);
+  });
+
+  it("…and WITHOUT the ordinal every shipped rung opens its list at 2 (the frames)", () => {
+    // MUTATION, written down rather than described: `briefingLineOrdinal`
+    // returning `null` — „there is no number, the bold sentence speaks for
+    // itself" — is exactly the build the twenty-one frames were taken on. If
+    // this stops being the whole corpus, the row above has gone vacuous.
+    const opensAtTwo = RUNGS.filter((r) => {
+      if (r.steps.length < 2) return false;
+      return briefingBodyBg(r.steps)!.startsWith("2. ");
+    });
+    expect(opensAtTwo.length).toBe(RUNGS.filter((r) => r.steps.length >= 2).length);
+    // …and every one of them names 1 as the missing item, which is what makes
+    // the hole closable at all: no shipped template starts its briefing at 0
+    // or skips straight to 2 in the authored data.
+    expect(RUNGS.every((r) => briefingLineOrdinal(r.steps) === 1)).toBe(true);
+    expect(briefingLineOrdinal([])).toBeNull();
+  });
+
   it("offers no «ПРОЧЕТИ» for a one-step briefing (a sheet onto nothing)", () => {
     expect(briefingBodyBg([{ n: 1, textBg: "Само това." }])).toBeNull();
     expect(briefingBodyBg([])).toBeNull();
@@ -162,6 +219,19 @@ describe("the briefing card never prints the same sentence twice", () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 const OVERLAY_SRC = readFileSync(join(__dirname, "..", "SimOverlay.tsx"), "utf8");
 
+/**
+ * The same helper `hud-card-fit.test.ts:110` uses, and for the same reason: a
+ * source scan that can be satisfied by a COMMENT is not a gate. Block comments
+ * are blanked rather than deleted so line numbers survive; line comments go.
+ */
+function stripComments(source: string): string {
+  const blanked = source.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
+  return blanked
+    .split("\n")
+    .map((l) => l.replace(/\/\/.*$/, ""))
+    .join("\n");
+}
+
 describe("SimOverlay's card cannot go back to clipping its own text", () => {
   it("has a scroll window that owns the shortfall", () => {
     expect(OVERLAY_SRC).toContain('data-sim-overlay-text=""');
@@ -187,6 +257,64 @@ describe("SimOverlay's card cannot go back to clipping its own text", () => {
     expect(OVERLAY_SRC).toMatch(/mt-0\.5 flex shrink-0 items-center justify-end/);
   });
 
+  /**
+   * THE SHEET PAINTS THE ORDINAL — and this pins the surface it is on, not a
+   * ban on the other one.
+   *
+   * WHAT THE ROW IS. All twenty-one round-10 frames are `02-briefing.png`, and
+   * `tools/mobile/lesson-audit.mjs:1049-1055` clicks «ПРОЧЕТИ» and waits
+   * 2 500 ms BEFORE that beat — so every one of them is the opened SHEET, the
+   * element below `data-sim-overlay-sheet-text`, and it is the only surface
+   * that shows the whole list. That is the reason the span lives there.
+   *
+   * WHAT THIS DELIBERATELY NO LONGER FORBIDS, and the measurement that took it
+   * out — round 10 verification, 2026-08-25. This assertion used to have a
+   * second half: the source above the sheet must NOT mention `shown.lineOrdinal`,
+   * i.e. the peek may never number its lead. The stated ground was a sweep over
+   * `briefing-card-budget.test.ts`'s FOLD_TABLE — „+3 authored characters moves
+   * 29 of 663 rungs into a worse band and takes 12 to no body at all". The
+   * frames contradict the model that sweep runs on: FOLD_TABLE's header
+   * measures the peek's text window at 180 × 127 px and budgets a ≤ 42-character
+   * line 110 visible body characters, while `sc-crossing-white-cane__mobile-
+   * right/01-arrival.png` shows a ~44-character line with ZERO body and
+   * «↓ ОЩЕ 17 РЕДА» — a real window of roughly 51 CSS px. The peek's body is at
+   * zero with or without three characters, so the cost was never demonstrated.
+   *
+   * The sweep is still a good argument against prefixing „1. " onto the STRING
+   * — `briefingLineBg` is the derivation both this file's corpus rows and
+   * `briefing-card-budget` read, and a prefix there would make the numbering
+   * rows assert against copy no author wrote. It was never an argument against
+   * markup, which costs zero authored characters and which FOLD_TABLE cannot
+   * see (it reads `spec.instructionsBg[].textBg`).
+   *
+   * So the peek's lead stays unnumbered on evidence rather than by gate: on
+   * both peek frames opened this round the body is entirely below the fold
+   * («↓ ОЩЕ 35 РЕДА», «↓ ОЩЕ 17 РЕДА»), so the peek displays no numbers at all
+   * and there is no visible hole in a sequence for a student to hunt in — a
+   * lone «1.» over nothing numbers a list of one. A later lane that re-derives
+   * FOLD_TABLE against the shipped window may number it, and should argue with
+   * a measurement, not with this test.
+   *
+   * Split on the sheet scroller's own hook, which the row below already treats
+   * as this file's landmark. No literal newline is matched anywhere here: this
+   * worktree checks out CRLF and the main tree is LF.
+   */
+  it("the sheet — the surface all twenty-one frames photographed — paints the ordinal", () => {
+    // Comments stripped FIRST, and the anchor found in the stripped text: the
+    // block above this element names the field, and a gate a comment can
+    // satisfy is `queueTaskEcho`'s symbol-name match over again — it counted a
+    // property read as a function call. (Stripping shifts offsets, so an index
+    // taken from the raw source would point at the wrong byte here.)
+    const SHEET_ANCHOR = "data-sim-overlay-sheet-text";
+    const src = stripComments(OVERLAY_SRC);
+    const at = src.indexOf(SHEET_ANCHOR);
+    expect(at, "the sheet's scroller lost its hook").toBeGreaterThan(0);
+    const sheet = src.slice(at);
+    expect(sheet, "the sheet stopped painting the number the body counts from").toContain(
+      "shown.lineOrdinal",
+    );
+  });
+
   it("the read sheet's own title is no longer a fragment", () => {
     // It used to be `<h2 class="… truncate …">{lineBg}</h2>` and ate 146 of 219
     // characters of the instruction it was heading — on the surface a student
@@ -195,5 +323,69 @@ describe("SimOverlay's card cannot go back to clipping its own text", () => {
     // …and the sheet keeps the authored line breaks of a numbered briefing,
     // which it never did: the five steps arrived as one run-on paragraph.
     expect(OVERLAY_SRC).toMatch(/whitespace-pre-line[^\n]*\n?[^\n]*\{shown\.detailBg\}/);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE WIRE BETWEEN THE TWO, WHICH AN ADVERSARIAL VERIFIER CUT WITHOUT
+   TURNING ANYTHING RED.
+
+   Round 10, 2026-08-25. Two mutations were run when the ordinal landed and
+   both went red as claimed: `briefingLineOrdinal` → `return null` (2 rows in
+   this file), and deleting the sheet's `<span className="tabular-nums">` (1
+   row). The verifier ran a third that nobody had. It deleted ONLY
+
+       lineOrdinal: briefingLineOrdinal(briefing),
+
+   from `LessonPlayShell.tsx` § 4c — the one line that carries the number from
+   the module to the glass — and re-ran the same scope
+   (`briefing-no-echo` + `sim-overlay-fold` + `overlay-queue`):
+   **56 passed / 56, all green.** With that line gone the product renders no
+   ordinal on any phone in any lesson, and `grep -rn lineOrdinal src` returns
+   three hits of which not one is a consumer — a type field and two assertions
+   that still pass, because the `<span>` is still there reading a property
+   nobody sets.
+
+   The two earlier mutations guard the two ENDS of the wire: a pure function
+   that still returns 1, and markup that still reads a field. Neither guards
+   the wire, and „shipped, gated, read by nobody" is this programme's most
+   expensive recurring bill — `districtWorldEdge`, `worldEdgeClearanceM`,
+   `touchHintShouldHide`, and round 8's value read only by its own test.
+
+   Source-pinned because the briefing item is an object literal inside a
+   5 000-line component: nothing importable, and nothing renderable without the
+   whole 3-D stage. `hud-card-fit.test.ts:220` reads this same file the same
+   way. Comments are stripped first, offsets are taken from the STRIPPED text,
+   and the match is scoped to the briefing item itself — a hit anywhere else in
+   5 000 lines would be some other card's field, not the sentence this number
+   counts from.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SHELL_SRC = stripComments(
+  readFileSync(
+    join(__dirname, "..", "..", "..", "..", "components", "sim", "lesson-ui", "LessonPlayShell.tsx"),
+    "utf8",
+  ),
+);
+
+describe("the ordinal reaches the glass: § 4c wires it beside the line it numbers", () => {
+  it("the briefing overlay item carries `lineOrdinal`, not only `lineBg`", () => {
+    const at = SHELL_SRC.indexOf('id: "briefing",');
+    expect(at, "§ 4c's briefing item lost its id — re-anchor this test").toBeGreaterThan(0);
+    const end = SHELL_SRC.indexOf('openLabelBg: "Прочети"', at);
+    expect(end, "the briefing item's «ПРОЧЕТИ» control moved — re-anchor this test").toBeGreaterThan(
+      at,
+    );
+    const item = SHELL_SRC.slice(at, end);
+    // Both halves of the split, from the module and not from an expression
+    // written in the component — the reason `briefingLineBg`/`briefingBodyBg`
+    // were extracted in the first place, and the reason the corpus rows at the
+    // top of this file assert against the SAME code the card renders.
+    expect(item, "the line stopped coming from the module").toContain(
+      "lineBg: briefingLineBg(briefing)",
+    );
+    expect(
+      item,
+      "the wire is cut: the sheet would read a field nobody sets, and every gate would stay green",
+    ).toContain("lineOrdinal: briefingLineOrdinal(briefing)");
   });
 });

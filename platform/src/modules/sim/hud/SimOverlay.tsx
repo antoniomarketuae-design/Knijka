@@ -1921,8 +1921,40 @@ export function SimOverlay({
                 overscrollBehavior: "contain",
               }}
             >
-              {/* The sentence the peek could not finish, in full and first. */}
+              {/* The sentence the peek could not finish, in full and first.
+
+                  ── AND WITH ITS NUMBER, WHEN IT HAS ONE — round 10, 2026-08-24.
+                     Twenty-one BROKEN rows, twenty-one mobile `02-briefing.png`
+                     frames, and every one of them is THIS element: an
+                     unnumbered lead in the headline face over a `detailBg` that
+                     opens at «2.» — while the pc leg of the same lesson numbers
+                     the same list 1–5 in full. The body is right to keep the
+                     authored numbering (`briefingBodyBg`); what was missing is
+                     the item the numbering counts FROM.
+
+                     IT GOES ON THIS SURFACE BECAUSE THIS IS WHERE THE FRAMES
+                     WERE TAKEN, and that is the whole of the reason. The
+                     harness clicks «ПРОЧЕТИ» and waits 2 500 ms before the
+                     `02-briefing` beat (`tools/mobile/lesson-audit.mjs:1049`),
+                     so every one of the twenty-one is this opened sheet — and
+                     the sheet is the only surface that shows the whole list.
+                     The peek's lead stays unnumbered because on the same
+                     round's peek frames its body is entirely below the fold
+                     («↓ ОЩЕ 35 РЕДА», «↓ ОЩЕ 17 РЕДА»): no numbers are visible
+                     there at all, so there is no sequence with a hole in it. A
+                     character-cost argument was also filed for this seam and
+                     was WITHDRAWN under verification — the arithmetic and the
+                     frame that contradicts it are at
+                     `SimOverlayItem.lineOrdinal`. Do not cite it.
+
+                     A separate `<span>` rather than a template literal so the
+                     ordinal cannot be mistaken for authored Bulgarian by the
+                     copy gates that read `lineBg`. `tabular-nums` keeps «10.»
+                     from shifting the sentence's first glyph against «1.». */}
               <h2 className="break-words text-sm font-extrabold leading-snug text-foreground">
+                {typeof shown.lineOrdinal === "number" ? (
+                  <span className="tabular-nums">{shown.lineOrdinal}. </span>
+                ) : null}
                 {shown.lineBg}
               </h2>
               {/* ── `whitespace-pre-line`, AND IT WAS MISSING HERE FOR THE WHOLE

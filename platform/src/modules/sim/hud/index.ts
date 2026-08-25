@@ -31,6 +31,7 @@ export { SimOverlay } from "./SimOverlay";
 export {
   briefingBodyBg,
   briefingLineBg,
+  briefingLineOrdinal,
   hasWhy,
   isAmbientOverlay,
   overlayCentreBand,

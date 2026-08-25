@@ -19,6 +19,7 @@ import {
   armedTelltaleWarnings,
   briefingBodyBg,
   briefingLineBg,
+  briefingLineOrdinal,
   capBg,
   clutchHeldObjBg,
   clutchObjBg,
@@ -4077,6 +4078,26 @@ export function LessonPlayShell({
               // the card renders. A rule that lives only in a component is a
               // rule six waves of measurement can walk past — this one did.
               lineBg: briefingLineBg(briefing),
+              // …AND THE NUMBER THAT SAYS THE LINE IS ITEM 1. The paragraph
+              // above ends „the numbering is preserved (2., 3., …) so the list
+              // still reads as a sequence whose first item is the bold sentence
+              // above it" — which was true of the DATA and never of the glass.
+              // Twenty-one round-10 mobile `02-briefing.png` frames show the
+              // sheet painting an unnumbered lead over a list that opens at
+              // «2.», against a pc panel numbering the same steps 1–5. The
+              // ordinal travels as DATA, so the surface decides whether to
+              // paint it and the authored string stays byte-identical for the
+              // corpus gates that read it (the field's own declaration carries
+              // the frames, and the cost argument that was withdrawn).
+              //
+              // THIS LINE IS THE WHOLE WIRE, and it was ungated for one round:
+              // a verifier deleted it alone and `briefing-no-echo` +
+              // `sim-overlay-fold` + `overlay-queue` stayed 56/56 green while
+              // every phone lost the number. The two mutations that WERE run
+              // guarded the ends — a function that still returns 1, a `<span>`
+              // that still reads a field. `briefing-no-echo.test.ts`'s last
+              // describe now source-pins this property inside this item.
+              lineOrdinal: briefingLineOrdinal(briefing),
               detailBg: briefingBodyBg(briefing),
               // …and the control that reaches them says what it opens. «ЗАЩО» is
               // the right word over a graded fault — „why was that wrong" — and

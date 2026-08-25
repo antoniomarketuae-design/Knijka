@@ -199,6 +199,66 @@ export interface SimOverlayItem {
    * bare verdict, never a naked score.
    */
   lineBg: string;
+  /**
+   * ── THE LINE'S OWN NUMBER, WHEN THE BODY UNDER IT IS A NUMBERED LIST ───────
+   *   round 10, 2026-08-24 · twenty-one BROKEN rows, one sentence between them.
+   *
+   * THE FRAMES, and there are twenty-one of them on the same commit — every
+   * one a mobile `02-briefing.png`, i.e. the SHEET at the bottom of
+   * `SimOverlay.tsx`, not the peek:
+   *
+   *   sc-pe-school-patrol/mobile-right  «Потегли и се движи спокойно в своята
+   *     лента — улицата пред теб минава край училище.» in the headline face,
+   *     with NO number, and then «2.» «3.» «4.» «5.» «6.» «7.» under it.
+   *   sc-park-zebra, sc-park-left, sc-park-wall  the same, running to «8.»
+   *   …and the pc leg of each prints the identical list numbered 1–5 in full,
+   *     which is the half that makes it a divergence rather than a style.
+   *
+   * WHY IT IS NOT COSMETIC. `briefingLineBg`/`briefingBodyBg` deliberately do
+   * NOT renumber the body from 1 — „the list is a sequence whose first item is
+   * the bold sentence directly above it". That is a correct contract and it is
+   * the reason the split exists at all. What was never delivered is the other
+   * half of it: nothing on the glass ever SAID the bold sentence is item 1, so
+   * the student is handed a seven-step procedure whose visible numbering opens
+   * at two. A learner counting the steps of a manoeuvre concludes one is
+   * missing and goes looking for it — on the surface whose whole job is to be
+   * the one place all the steps are readable.
+   *
+   * IT IS A NUMBER BESIDE `lineBg` AND NOT A PREFIX INSIDE IT. Two reasons,
+   * and the weaker of them was withdrawn under verification on 2026-08-25 —
+   * written down here rather than quietly dropped, because a repair whose
+   * stated reason is wrong is the next reader's trap:
+   *
+   *   · IT STANDS — `briefingLineBg` is the derivation the corpus gates read
+   *     (`briefing-no-echo.test.ts` sweeps all 663 compiled rungs through it,
+   *     and `briefing-card-budget.test.ts` budgets against `textBg`). „1. " in
+   *     that string is chrome inside a field the whole product treats as
+   *     AUTHORED BULGARIAN: the echo row, the numbering row and the fold table
+   *     would all be asserting against copy no author wrote. Markup on the
+   *     surface costs the string nothing.
+   *   · IT DOES NOT — the original filing said three characters cost 29 of 663
+   *     rungs a worse fold band and 12 of them their body outright, swept over
+   *     FOLD_TABLE. That table's header measures the peek's text window at
+   *     180 × 127 px and budgets a ≤ 42-character line 110 visible body
+   *     characters; the round-10 frames show a ~44-character line with ZERO
+   *     body and «↓ ОЩЕ 17 РЕДА» (`sc-crossing-white-cane__mobile-right/
+   *     01-arrival.png`), i.e. a real window of about 51 CSS px. The peek's
+   *     body is already at zero with or without the three characters, so that
+   *     cost is not demonstrated on this sweep's own evidence.
+   *
+   * WHICH SURFACE PAINTS IT, then, is settled by the frames and not by the
+   * table: all twenty-one are the opened SHEET (the harness clicks «ПРОЧЕТИ»
+   * and waits 2 500 ms before the beat, `tools/mobile/lesson-audit.mjs:1049`),
+   * and the sheet is the one surface that shows the whole list. The peek's lead
+   * stays unnumbered because on those frames the peek shows no numbers at all —
+   * its body is entirely below the fold — so there is no visible sequence for a
+   * missing «1.» to be missing FROM. That is a measurement, not a prohibition:
+   * see the note on the test that used to forbid it.
+   *
+   * `null`/absent for every item that is not one step of an authored list — a
+   * fault card, a commendation, a task line. Do not invent one.
+   */
+  lineOrdinal?: number | null;
   /** Leading chip: „ЗАДАЧА 2/3", „−2 т.", „Изпит". */
   chipBg?: string | null;
   /**
@@ -575,6 +635,28 @@ export function briefingBodyBg(steps: readonly BriefingStepBg[]): string | null 
     .slice(1)
     .map((s) => `${s.n}. ${s.textBg}`)
     .join("\n");
+}
+
+/**
+ * THE LINE'S NUMBER — the half of the split that was never delivered.
+ *
+ * `briefingBodyBg` keeps the authored numbering and therefore opens at „2.",
+ * on the stated ground that item 1 is the bold sentence above it. Twenty-one
+ * round-10 frames say the glass never told anybody that: the mobile sheet
+ * paints an unnumbered lead and a list starting at two, while the pc panel
+ * beside it numbers the same five steps 1–5. This returns the number the lead
+ * IS, so the surface that shows the whole list can close the sequence.
+ *
+ * `null` for an empty briefing — the same guard `briefingLineBg` uses, and for
+ * the same reason: there is no step 1 to name.
+ *
+ * It is `steps[0].n` and NOT the literal 1 deliberately. `compile.ts` owns
+ * which step lands on the line; a hard-coded 1 would keep claiming „first"
+ * through a change that made it something else, which is the failure mode the
+ * contract note above `briefingLineBg` exists to prevent.
+ */
+export function briefingLineOrdinal(steps: readonly BriefingStepBg[]): number | null {
+  return steps.length > 0 ? steps[0]!.n : null;
 }
 
 /**
