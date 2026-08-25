@@ -272,6 +272,10 @@ describe("§3 it changes no grade — the flow is scenery to the rule engine", (
 //   sc-mw-discipline   «установи около 120–130 км/ч» · «под 50 км/ч без причина»
 //   sc-mw-min-speed    «установи около 110 км/ч»     · «тук около 40 км/ч»
 //
+// (Both lines of sc-mw-min-speed moved on 2026-08-25; they are quoted here as
+// they were judged, because a gate that quotes the repaired text has nothing
+// left to compare against.)
+//
 // Same rendered road, same posted 140 on both HUDs, two crawl floors ten km/h
 // apart — on the pair whose subject IS the floor. And the floor is not a matter
 // of taste: `DEFAULT_RULE_CONFIG.motorwayMinFlowKmh` is the number
@@ -282,26 +286,33 @@ describe("§3 it changes no grade — the flow is scenery to the rule engine", (
 // This gate reads the FLOOR off the rule config rather than repeating it, so the
 // day somebody retunes the detector the briefings are what goes red.
 /**
- * §4 IS SKIPPED, AND THE ROW IT BELONGS TO STAYS OPEN — 2026-08-25.
+ * §4 RUNS AGAIN — 2026-08-25, and the block below is unchanged from the day it
+ * was written. It was skipped with an instruction rather than deleted:
  *
- * It asserts that sc-mw-discipline and sc-mw-min-speed teach the SAME floor,
- * which is the right requirement: sc-mw-min-speed:f3c26187 files exactly that
- * («the same motorway is taught two different floors, and the floor is this
- * lesson entire subject»).
+ *   „UN-SKIP IT TOGETHER WITH THE WHOLE MOVE: the briefing, BOTH task chips,
+ *    and the objective caps, in one round, with those three gates green.
+ *    Skipping it rather than deleting it keeps the requirement on the record —
+ *    this block is the specification f3c26187 has to satisfy."
  *
- * The lane that wrote this changed sc-mw-min-speed briefing step 2 from «около
- * 110 км/ч» to «около 120–130 км/ч» and stopped there. Both task chips still
- * print «около 110 км/ч», so the chip quotes a number the lesson no longer
- * sources — and task-title-agrees-with-briefing and one-junction-three-names §3
- * both go red on it, plus the lesson joins tier-feasibility bandTopShort.
- * The briefing change is therefore NOT shipped, and this block cannot pass.
+ * That is what landed. `templates-speed2.ts` moves briefing step 2 to «около
+ * 120–130 км/ч», step 4 to the graded floor, and BOTH task chips with them;
+ * the objective caps stay at the posted 140 because the ceiling never was the
+ * disputed number. The three named gates were run scoped and are green, and
+ * `tier-feasibility`'s band-top census now names two templates — which is the
+ * repair, since the two drills finally declare the same band on the same road.
  *
- * UN-SKIP IT TOGETHER WITH THE WHOLE MOVE: the briefing, BOTH task chips, and
- * the objective caps, in one round, with those three gates green. Skipping it
- * rather than deleting it keeps the requirement on the record — this block is
- * the specification f3c26187 has to satisfy.
+ * ONE SURFACE OF THIS ROW IS STILL OPEN, recorded here rather than in a report
+ * because this is where the next reader will be standing. The shadow recording
+ * (`traces/scMwMinSpeed.ts`, `FLOW_KMH = 110`) still drives 110 and its caption
+ * still says «Установени 110 км/ч — далеч под тавана и точно в ритъма», so the
+ * DEMONSTRATION contradicts the briefing it demonstrates. Moving it is not a
+ * copy edit: the drive is a committed byte-gated recording, re-recording it at
+ * ~125 changes what the staged flow car does relative to the ego, and this
+ * file's §3 asserts `tick.leadGapM` stays non-finite for the whole shadow —
+ * i.e. the ego never closes on the flow. That has to be re-measured, not
+ * assumed, which is a different round's work.
  */
-describe.skip("§4 both motorway drills teach the floor the engine actually grades", () => {
+describe("§4 both motorway drills teach the floor the engine actually grades", () => {
   const FLOOR = DEFAULT_RULE_CONFIG.motorwayMinFlowKmh;
   const MOTORWAY_SPECS = [SC_MW_DISCIPLINE, SC_MW_MIN_SPEED];
 

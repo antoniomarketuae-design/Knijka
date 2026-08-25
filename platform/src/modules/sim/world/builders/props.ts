@@ -45,6 +45,7 @@ import {
   BUS_STOP_MIN_SEPARATION_M,
   BUS_STOP_SHELTER_DEPTH_M,
   CLASS_RANK,
+  isMotorwayCarriageway,
   LINDEN_BOULEVARD_COUNT,
   PARK_TREE_GRID_M,
   RAILING_CROSSING_CLEAR_M,
@@ -91,6 +92,7 @@ import {
 import { toWorld, yawFromFacing } from "./mesh";
 import {
   isBareVergeSide,
+  isMotorwayEdge,
   junctionPriorityControls,
   onewayNoEntryArms,
   onewayTerminalNoEntryEdges,
@@ -1303,10 +1305,62 @@ export function buildProps(
   //
   // WHICH edges lives in network.onewayTerminalNoEntryEdges (see its header for
   // the three exclusions). WHERE: at the downstream terminal, on the right of
-  // the flow, FACING BACK along it — so a legal driver reads the back of the
-  // plate on his way out and only a driver pointed the wrong way ever sees the
-  // face. Same 0.8 m curb offset as every other post, and it runs through
-  // pushSignAt so the minimum post separation still holds.
+  // the flow, its FACE looking ON along that flow — so a legal driver reads the
+  // grey back of the plate on his way out and only a driver pointed the wrong
+  // way ever sees the red disc. Same 0.8 m curb offset as every other post, and
+  // it runs through pushSignAt so the minimum post separation still holds.
+  //
+  // THE FACE POINTED THE WRONG WAY UNTIL 2026-08-25, and a frame is what proved
+  // it. `yawFromFacing` aims the plate ALONG the vector it is handed — see
+  // `approachPropPose`, „Face the incoming driver: normal points away from the
+  // junction", i.e. the addressed driver's own travel direction negated — and
+  // this pass handed it `-tangent`. The disc therefore looked back down its own
+  // one-way street straight at the LEGAL driver, and the wrong-way entrant it
+  // was posted for was the one reader who only ever saw grey. Photographed on
+  // sc-merge-accel-lane: .audit-frames/w10-4/frames/sc-merge-accel-lane__
+  // mobile-right/04-t072s.png shows the ramp-terminal В2 — full red disc, white
+  // bar — on a pole beside the slip road the briefing has just ordered the
+  // student up, while that drive's debrief teaches him «В2 „Влизането
+  // забранено" значи не влизаш». The red face is ONE backface-culled quad on
+  // the GLB's front (tools/blender/signs.py `build_sign` → `face_quad`), so the
+  // yaw is the whole of what a student sees: with the flow he now reads grey.
+  //
+  // THE SIDE STAYS on the right of the FLOW — the entrant's left — and that is
+  // measured, not asserted: the sign of `perpRight` here was flipped, mw-entry-v1
+  // rebuilt, and the three noEntry plates printed. `mwe-e-ramp`'s terminal post
+  // moves from (13.18, 259.71) to (3.70, 257.56). MWE_X_CRUISE = 0 on an
+  // LANE_WIDTH_M = 8.125 pitch (templates-merging.ts:59-60) ⇒ the mainline
+  // CRUISE lane spans −4.06…+4.06, so the mirrored post stands in the middle of
+  // it — and that lane is the one objective 2 `sc-mrg-merge` orders him into
+  // (`reachZone x: MWE_X_CRUISE, y: 440, r: 4`, templates-merging.ts:158).
+  // Mirroring plants a pole in the carriageway the lesson sends the student
+  // down, i.e. a collision this product would then convict him of. Shipped, the
+  // post sits at 13.18 — clear of the acceleration lane's 4.06…12.19 as well.
+  // A В2 read on the left is still a В2 read; a post in the lane is a false
+  // refusal, and those never ship.
+  //
+  // The earlier form of this note said „x ≈ 5.96 m … inside the ACCELERATION
+  // lane". Neither figure reproduced when the mirror was actually built; the
+  // conclusion did, and worse. A number written under the word „measured" that
+  // nobody re-ran is the artefact this programme has twice paid for, so the
+  // arithmetic above is the printout, not a derivation.
+  //
+  // WHAT THIS COSTS, said out loud, because the yaw is only half the row. On
+  // that same sc-merge-accel-lane sweep the drive that FOLLOWS the briefing is
+  // itself convicted — `_audit-debrief.json` for the mobile-right leg: verdict
+  // НЕИЗДЪРЖАН, 20 наказателни точки, «Движение в обратна посока по еднопосочна
+  // улица −10 изпитни т. ОПАСНА ГРЕШКА» on the route the lesson ordered. Until
+  // now that student at least had a red В2 on his glass wrongly corroborating
+  // the charge; with the plate turned away he reads grey and is still billed,
+  // with nothing in the world to point at — a bare verdict, which is what doc 64
+  // THEO-4 forbids. Turning the plate is still right: it stops the world telling
+  // the legal driver he is illegal. But the conviction is a DIFFERENT channel
+  // and is NOT closed here — `runtime/worldRuntime.ts:1961` computes `wrongWay`
+  // from heading vs nearest-edge tangent and `rules/engine.ts` bills it, and
+  // that file's `WRONG_WAY_REARM_SEC` docblock already concedes the rest: „the
+  // sweep found no one-way sign or arrow in ANY frame of the three lessons where
+  // this fires, so the flag itself is wrong on those roads … reported, not
+  // patched here". The row stays open on that clause.
   //
   // Same lesson-scale gate and the same reasoning as the junction pass: an OSM
   // district's real signage was never recorded, so posting there would trade a
@@ -1330,9 +1384,10 @@ export function buildProps(
       // it forbids rather than out in the terminal's apron.
       const sPost = Math.max(0, total - NO_ENTRY_ALONG_M);
       const { point, tangent } = pointAlong(g, sPost);
-      // `tangent` runs WITH the one-way flow (geometry from → to).
+      // `tangent` runs WITH the one-way flow (geometry from → to), and the face
+      // goes WITH it: the reader this plate addresses is driving `-tangent`.
       const p = add(point, mul(perpRight(tangent), eb.halfWidth + NO_ENTRY_LATERAL_M));
-      pushSignAt(p, yawFromFacing(mul(tangent, -1)), "noEntry");
+      pushSignAt(p, yawFromFacing(tangent), "noEntry");
     }
   }
 
@@ -1410,6 +1465,26 @@ export function buildProps(
   // merely the safe one.
   const litClasses = lessonScale !== undefined ? SCENARIO_LIT_CLASSES : ARTERIAL_CLASSES;
 
+  // …UNLESS IT IS A МАГИСТРАЛА. `constants.isMotorwayCarriageway` carries the
+  // frame and the measurement; the short version is that the founder-ratified
+  // „no street trees, streetlights or sidewalks on a motorway" rule was
+  // enforced by the class STRING, and mw-exit-v1 tags its carriageway
+  // `class: "primary"` with `motorway: true` beside it. So the one lesson about
+  // leaving a магистрала was dressed as a Sofia side street — parapet, cypress
+  // row, lamp columns and overhead catenary, all in the arrival frame.
+  //
+  // Every B65 dressing pass below asks THIS instead of the raw set, so the
+  // exception has one definition and a new pass cannot forget it. The two
+  // ARTERIAL_CLASSES reads that are NOT dressing (`pitch`, and the tree pass's
+  // own species question) keep the raw set — a motorway never reaches them.
+  // [MERGE 2026-08-25] A second lane fixed this same defect by repeating an
+  // isMotorwayEdge() guard at each dressing site. Same diagnosis, and the
+  // helper below is the version that survives a new pass being added — which
+  // is the failure that put a cypress row and lamp columns on the one lesson
+  // about leaving a магистрала. One definition, asked by every pass.
+  const dressesAsStreet = (edge: { class: string; motorway?: boolean }): boolean =>
+    litClasses.has(edge.class) && !isMotorwayCarriageway(edge);
+
   // Bucketed footprint lookup, hoisted above the dressing passes so poles and
   // parapets can ask the same question the tree passes ask. Bucketed, not
   // scanned — see terrain.ts and AabbGrid's header: doc 82 V7's street wall
@@ -1421,7 +1496,7 @@ export function buildProps(
   const insideBuilding = (p: Vec2, pad: number) => buildingGrid.hits(p, pad);
 
   for (const eb of network.edges) {
-    if (!eb.line || !litClasses.has(eb.edge.class)) continue;
+    if (!eb.line || !dressesAsStreet(eb.edge)) continue;
     // Lamp columns stand on the verge — so a BARE verge (network.ts
     // BareVergeSide) never gets one. On a divided street that verge is the
     // median, whose columns belong to the OTHER carriageway's row; a column
@@ -1471,7 +1546,7 @@ export function buildProps(
   // of one per gap. Same scenario gate as the lamp row above.
   if (lessonScale !== undefined) {
     for (const eb of network.edges) {
-      if (!eb.line || eb.edge.roundabout || !SCENARIO_LIT_CLASSES.has(eb.edge.class)) continue;
+      if (!eb.line || eb.edge.roundabout || !dressesAsStreet(eb.edge)) continue;
       if (eb.bareVerge === "both") continue; // nowhere to stand a column
       const total = polylineLength(eb.line);
       if (total < UTILITY_POLE_SPACING_M) continue; // no room for a span
@@ -1511,7 +1586,7 @@ export function buildProps(
   // also the kerb collider. Nothing here is graded and nothing is an obstacle.
   if (lessonScale !== undefined) {
     for (const eb of network.edges) {
-      if (!eb.line || eb.edge.roundabout || !SCENARIO_LIT_CLASSES.has(eb.edge.class)) continue;
+      if (!eb.line || eb.edge.roundabout || !dressesAsStreet(eb.edge)) continue;
       const total = polylineLength(eb.line);
       if (total < RAILING_MIN_RUN_M) continue;
       // WHICH KERB. `perpRight` is the RIGHT of the geometry direction, and
@@ -1577,7 +1652,18 @@ export function buildProps(
   // dominant leafy species so a street reads as one planted row, not confetti.
   if (placeTrees)
     for (const eb of network.edges) {
-    if (!eb.line || eb.edge.roundabout || !ARTERIAL_CLASSES.has(eb.edge.class)) continue;
+    // ARTERIAL_CLASSES and NOT `dressesAsStreet` here, on purpose: this pass
+    // runs on city maps too, where `litClasses` is the arterial set, but on a
+    // scenario map `litClasses` is the WIDER scenario set — asking it here
+    // would plant boulevard tree rows down every residential micro-map in the
+    // catalogue. Only the motorway exception is added.
+    if (
+      !eb.line ||
+      eb.edge.roundabout ||
+      !ARTERIAL_CLASSES.has(eb.edge.class) ||
+      isMotorwayCarriageway(eb.edge)
+    )
+      continue;
     const lindenBoulevard = lindenBoulevardEdges.has(eb.edge.id);
     const dominant: TreeKind = hashString(eb.edge.id) % 2 === 0 ? "leafyA" : "leafyB";
     const other: TreeKind = dominant === "leafyA" ? "leafyB" : "leafyA";
@@ -1613,6 +1699,7 @@ export function buildProps(
     if (!eb.line) continue;
     const cls = eb.edge.class;
     if (cls !== "residential" && cls !== "unclassified" && cls !== "living_street") continue;
+    if (isMotorwayEdge(eb.edge)) continue; // see the lamp row above
     const total = polylineLength(eb.line);
     for (let s = STREET_TREE_SPACING_M / 2; s < total; s += STREET_TREE_SPACING_M) {
       if (rng() > 0.75 * options.treeDensity) continue;
@@ -1749,6 +1836,7 @@ export function buildProps(
   const BILLBOARD_STATION_M = 40;
   for (const eb of network.edges) {
     if (!eb.line || eb.edge.roundabout || eb.edge.class !== "primary") continue;
+    if (isMotorwayEdge(eb.edge)) continue; // see the lamp row above
     const total = polylineLength(eb.line);
     for (
       let s = Math.min(BILLBOARD_END_INSET_M, total / 2);
@@ -1873,6 +1961,7 @@ export function buildProps(
     if (!eb.line || eb.edge.roundabout) continue;
     const cls = eb.edge.class;
     if (cls !== "primary" && cls !== "secondary") continue;
+    if (isMotorwayEdge(eb.edge)) continue; // see the lamp row above
     // The shelter is parked at the back of the RIGHT-of-travel sidewalk — a
     // bare right verge has no sidewalk to park it on.
     if (isBareVergeSide(eb.bareVerge, 1)) continue;

@@ -74,9 +74,20 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES_CONDITIONS } from "../templates-conditions";
+import { SCENARIO_TEMPLATES } from "../templates";
 import { REACH_ZONE_HALT_CAP_KMH } from "../../objectives";
 import { assertDistrict, buildWorldGeometry } from "../../../world";
-import type { ScenarioSpec } from "../types";
+// RULE 4's two banks: the authored scenario copy and the fault-card copy.
+import { COMMENDATIONS, VIOLATIONS } from "../../../rules";
+import { briefingOrdersLampsOn } from "../../../scene/cabin";
+// RULE 4 sweeps the field the shell RENDERS, not only the field the bank
+// authors: `compileScenario` composes the rung's complication line itself, and
+// a generated line naming a key is invisible to a sweep of `instructionsBg`.
+import { compileScenario } from "../compile";
+// …and the desktop half of the same rule: the console hotspot is where a
+// keyboard reader is shown „V" now that the sentence no longer names it.
+import { COCKPIT_HOTSPOTS } from "../../../scene/vitok/hotspots";
+import type { ScenarioLevel, ScenarioSpec } from "../types";
 
 // ---------------------------------------------------------------------------
 // Shared readers
@@ -789,5 +800,206 @@ describe("sweep161 · a conditions claim is answered by the district it is stage
       const steps = spec.instructionsBg.map((s) => s.textBg);
       expect(steps.some((t) => /А15/u.test(t)), id).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RULE 4 — THE CONTROL. „The briefing tells a phone to press a keyboard key."
+//
+// `.audit-frames/w10-2/frames/sc-ac-fog__mobile-right/02-briefing.png`: step 1
+// of Мъгла reads «Включи късите светлини и фаровете за мъгла (клавиш V) преди
+// да потеглиш.» on a touch device. 04-t033s.png of the same leg is the surface
+// the student would have to press it on — МЕНЮ / ИЗГЛЕД / ПАУЗА / ⚙ КОЛА /
+// КЛАКС / МИГАЧ ×2 / Л·З·Д огледало — and there is no keyboard on it.
+//
+// This is rules 1–3's shape one field over: those three are about a sentence
+// that does not match the WORLD, this one about a sentence that does not match
+// the READER'S HANDS. The reason it is a bank-wide ban and not a Мъгла fix is
+// that a `ScenarioSpec` is authored ONCE and `compile.ts` spreads it verbatim
+// to both inputs, and a template literal in a bank file cannot reach the
+// product's input-aware channel, `hud/controlPhrases.ts` («натисни „ДВИГ“» vs
+// «щракни стартера на конзолата (клавиш I)»). So the BANK may name a CONTROL
+// and never a KEY.
+//
+// ⚠ AND NOT ONE WORD MORE THAN THAT. The first draft of this header said „there
+// is no branch in which an authored briefing could name the right control for a
+// phone and for a desktop", and that is false. The branch exists at the RENDER
+// site: `LessonPlayShell.tsx` holds `hintInputFor(hasTouchScreen())`, reads
+// `lesson.briefingBg`, and already imports `withSheetLocatorBg` for its own
+// hints. „Authored once" and „rendered input-blind" are different claims. The
+// rule this section enforces survives the correction — the bank still cannot
+// reach the input — but the FIX for the residue is one hop downstream, and a
+// header that declares it impossible is how the next lane does not build it.
+//
+// The sweep is the word «клавиш» and nothing cleverer. The other key-cap idiom
+// — a bare Latin letter in brackets — is deliberately NOT swept here: P, R, N
+// and D are printed on the cluster and on the gear cells, so «(P)» is a face
+// as often as it is a key, and a rule that cannot tell them apart would fail in
+// the reassuring direction the first time somebody widened it.
+// ---------------------------------------------------------------------------
+
+/** The one pattern, stated once. */
+const NAMES_A_KEY_RE = /клавиш/iu;
+
+/**
+ * Every authored Bulgarian string on a spec, found by the codebase's own naming
+ * rule rather than by a hand-kept field list: a user-facing string is a key
+ * ending in `Bg`. A hand-kept list is how `templates-lanes2`'s teach copy would
+ * be missed the day it grew a field — the same failure `collision/index.ts`'s
+ * header spends two paragraphs on.
+ */
+function authoredBgStrings(node: unknown, at: string, out: Array<[string, string]>): void {
+  if (typeof node === "string") {
+    out.push([at, node]);
+    return;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((v, i) => authoredBgStrings(v, `${at}[${i}]`, out));
+    return;
+  }
+  if (node !== null && typeof node === "object") {
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      if (k.endsWith("Bg") || typeof v === "object") authoredBgStrings(v, `${at}.${k}`, out);
+    }
+  }
+}
+
+describe("no authored copy names a key the reader may not have", () => {
+  it("the Мъгла step the sweep photographed on a phone names the lamp, not V", () => {
+    const fog = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-fog")!;
+    const step1 = fog.instructionsBg[0].textBg;
+    // The exact string that shipped, so this assertion cannot be vacuous.
+    expect(step1).toBe("Включи късите светлини и фаровете за мъгла („МЪГЛА“) преди да потеглиш.");
+    expect(step1).not.toMatch(NAMES_A_KEY_RE);
+  });
+
+  it("…and it is still an unconditional lamp ORDER, so the drill partition holds", () => {
+    // `scene/cabin.ts briefingOrdersLampsOn` reads this very sentence to decide
+    // whether the car spawns lit (doc-86 L10). Rewriting the step is exactly
+    // the edit that could drop sc-ac-fog out of the headlight-drill class
+    // without anything going red in this family, so it is asserted here beside
+    // the rewrite rather than only in `spawnHeadlights.test.ts`.
+    const fog = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-fog")!;
+    expect(briefingOrdersLampsOn(fog.instructionsBg.map((s) => s.textBg))).toBe(true);
+  });
+
+  it("THE GENERAL FORM: no spec in the whole bank names a key", () => {
+    const offenders: string[] = [];
+    for (const spec of SCENARIO_TEMPLATES) {
+      const strings: Array<[string, string]> = [];
+      authoredBgStrings(spec, spec.id, strings);
+      for (const [at, s] of strings) {
+        if (NAMES_A_KEY_RE.test(s)) offenders.push(`${at}: ${s}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("…nor does the COMPILED briefing, which is the string the shell prints", () => {
+    // The sweep above reads what the bank AUTHORS. `LessonPlayShell` renders
+    // `lesson.briefingBg`, and `compile.ts` does not merely copy the authored
+    // steps into it — it composes the rung's complication line and puts it at
+    // `briefingBg[0]`, the one row that is always painted and cannot be
+    // scrolled away from. That line is generated, so an authored-spec sweep
+    // cannot see it, and it is the row a student is MOST likely to read.
+    //
+    // This is the coverage half of the verifier's note on this section: the
+    // rule's title says „no authored copy names a key the reader may not have",
+    // and the surface the reader actually has is the compiled one.
+    const offenders: string[] = [];
+    let rungs = 0;
+    for (const spec of SCENARIO_TEMPLATES) {
+      for (const rung of spec.levels) {
+        const lesson = compileScenario(spec, rung.level as ScenarioLevel);
+        rungs += 1;
+        for (const [i, step] of (lesson.briefingBg ?? []).entries()) {
+          if (NAMES_A_KEY_RE.test(step.textBg)) {
+            offenders.push(`${lesson.id} briefingBg[${i}]: ${step.textBg}`);
+          }
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+    // A compile that starts returning nothing must not read as clean.
+    expect(rungs).toBeGreaterThan(400);
+  });
+
+  it("…nor does any rule-catalog card, which is read at a worse moment", () => {
+    // A fault card fires while the student is already being billed. sc-ac-fog's
+    // own code — FOG_LIGHTS_OFF_IN_FOG — carried «(клавиш V)» in its
+    // `correctiveBg` as well, which is the same defect one surface along, and
+    // it is the surface that names the way OUT of the fault.
+    const offenders: string[] = [];
+    for (const [code, spec] of [...Object.entries(VIOLATIONS), ...Object.entries(COMMENDATIONS)]) {
+      const strings: Array<[string, string]> = [];
+      authoredBgStrings(spec, code, strings);
+      for (const [at, s] of strings) {
+        if (NAMES_A_KEY_RE.test(s)) offenders.push(`${at}: ${s}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("the sweep has teeth: the string that shipped is caught by it", () => {
+    // Both repaired sentences, verbatim as the frames photographed them.
+    expect(
+      "Включи късите светлини и фаровете за мъгла (клавиш V) преди да потеглиш.",
+    ).toMatch(NAMES_A_KEY_RE);
+    expect(
+      "Щом видимостта падне значително, включи предните фарове за мъгла (клавиш V) заедно с късите светлини — и ги изгаси, щом мъглата се вдигне.",
+    ).toMatch(NAMES_A_KEY_RE);
+    // …and it does not fire on the repaired copy, which is what makes the two
+    // sweeps above a measurement rather than an empty walk.
+    expect(VIOLATIONS.FOG_LIGHTS_OFF_IN_FOG.correctiveBg).not.toMatch(NAMES_A_KEY_RE);
+    expect(VIOLATIONS.FOG_LIGHTS_OFF_IN_FOG.correctiveBg).toContain("„МЪГЛА“");
+  });
+
+  it("«МЪГЛА» is a face BOTH readers have on screen, not a name for one of them", () => {
+    // The same contract `controlPhrases.test.ts` holds for «ДВИГ»/«СЪЕД»: the
+    // copy may only name a face that is shipped, so a rename arrives here as a
+    // red rather than as a sentence pointing at a control that no longer exists.
+    const touchSrc = readFileSync(
+      path.join(process.cwd(), "src/components/sim/TouchControls.tsx"),
+      "utf8",
+    );
+    expect(touchSrc).toContain('textBg="МЪГЛА"');
+
+    const dashSrc = readFileSync(
+      path.join(process.cwd(), "src/modules/sim/hud/StatusDashboard.tsx"),
+      "utf8",
+    );
+    // Desktop authors it in title case and the caption class uppercases it, so
+    // BOTH halves have to hold for the six letters to be on the glass.
+    expect(dashSrc).toContain('labelBg="Мъгла"');
+    const caption = /const CAPTION =([\s\S]{0,240}?);/u.exec(dashSrc);
+    expect(caption, "StatusDashboard.tsx no longer declares a CAPTION class").not.toBeNull();
+    expect(caption![1]).toContain("uppercase");
+  });
+
+  it("THE PRICE OF DROPPING «V»: the desktop reader is still shown it, on the switch", () => {
+    // What the rewrite COSTS, gated rather than argued. The briefing used to
+    // name V — the desktop fog switch — and now names the lamp and its face. A
+    // keyboard student is not stranded by that only because the sentence's own
+    // noun matches the console hotspot verbatim, and that hotspot carries the
+    // key hint. Both halves are load-bearing, so both are pinned here:
+    //
+    //   · if the hotspot's `labelBg` is renamed, the sentence stops pointing at
+    //     anything a desktop student can find;
+    //   · if its `keyHint` is dropped, the key genuinely leaves the product for
+    //     this control and the sentence's omission stops being free.
+    //
+    // This is a `StatusDashboard` telltale's opposite number and the difference
+    // matters: the telltale caption is a READ-OUT (a `<div>` with `title` /
+    // `aria-label`, on a `pointer-events-none` bar); THIS is the switch.
+    const fog = COCKPIT_HOTSPOTS.find((h) => h.name === "hotspot_fog");
+    expect(fog, "scene/vitok/hotspots.ts no longer ships hotspot_fog").toBeDefined();
+    expect(fog!.labelBg).toBe("Фарове за мъгла");
+    expect(fog!.keyHint).toBe("V");
+    expect(fog!.action).toEqual({ type: "fogToggle" });
+    // …and the sentence that gave up the key still names that label's noun, so
+    // the two are findable from one another by a student and by a grep.
+    const step1 = SCENARIO_TEMPLATES_CONDITIONS.find((s) => s.id === "sc-ac-fog")!
+      .instructionsBg[0].textBg;
+    expect(step1).toContain("фаровете за мъгла");
   });
 });

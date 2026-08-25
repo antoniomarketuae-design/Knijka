@@ -312,22 +312,31 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
     // sc-mw-min-speed:f3c26187 — THE SAME MOTORWAY WAS TAUGHT TWO RHYTHMS AND
     // TWO FLOORS, and the floor is this lesson's entire subject. mw-v1 is the
     // ONE motorway in the catalogue and both drills run on it back to back:
-    // [HELD 2026-08-25 — THE REWRITE BELOW IS NOT SHIPPED, AND THE REASON IS
-    //  THAT IT WAS HALF DONE. Changing this step to 120–130 leaves the two task
-    //  chips still printing «около 110 км/ч», so the chip quotes a number the
-    //  lesson no longer sources — which is the exact contradiction
-    //  task-title-agrees-with-briefing.test.ts and one-junction-three-names
-    //  §3 were written to catch, and both go red on it. It also puts
-    //  sc-mw-min-speed into tier-feasibility bandTopShort beside
-    //  sc-mw-discipline. The diagnosis is right and sc-mw-min-speed:f3c26187
-    //  stays OPEN: fixing it means moving the briefing AND the two chips AND
-    //  the objective caps together, in one round, with those three gates green.]
     // sc-mw-discipline briefs «установи около 120–130 км/ч» and «под 50 км/ч без
     // причина», this one briefed 110 and 40. Neither number here was backed by
     // anything on the road — the 110 against a staged flow authored at
     // cruiseSpeedMps 33 (≈ 119 км/ч) rising to 36 (130), which is exactly the
-    // band the sibling names and `sp-mw-flow-visible.test.ts` §1 pins.
-    { n: 2, textBg: "Ускорявай уверено и се установи около 110 км/ч в ДЯСНАТА лента за движение: това е ритъмът на потока тук." },
+    // band the sibling names and `sp-mw-flow-visible.test.ts` §1 pins. So the
+    // WORLD decided this, not a preference between two authored numbers.
+    //
+    // THE PREVIOUS ROUND HELD THIS EXACT REWRITE, and its note is why it ships
+    // now instead of being attempted a third time: „changing this step to
+    // 120–130 leaves the two task chips still printing «около 110 км/ч», so the
+    // chip quotes a number the lesson no longer sources … fixing it means
+    // moving the briefing AND the two chips AND the objective caps together, in
+    // one round, with those three gates green." All three surfaces move in this
+    // patch — this step, `sc-mwms-join` and `sc-mwms-hold` below — and the
+    // gates it named were run scoped and are green: task-title-agrees-with-
+    // briefing, one-junction-three-names, tier-feasibility, briefing-card-
+    // budget, sp-mw-flow-visible.
+    //
+    // THE OBJECTIVE CAPS DO NOT MOVE, and that is not the omission the hold
+    // warned about. Both gates carry `maxSpeedKmh: 140` — the POSTED ceiling,
+    // which nothing in this repair touches — while the rhythm is a target.
+    // `advisor.ts titleCapKmh` reads «под N» as a ceiling and «около N» as a
+    // target, which is exactly what lets the chip name this band without
+    // quietly becoming a second limit.
+    { n: 2, textBg: "Ускорявай уверено и се установи около 120–130 км/ч в ДЯСНАТА лента за движение: това е ритъмът на потока тук." },
     { n: 3, textBg: "Погледни в огледалото за задно виждане. Колата зад теб се движи с магистрална скорост — дръж своя ритъм и я остави спокойно да те изпревари отляво." },
     // …AND THE FLOOR IS THE NUMBER THAT GRADES. `DEFAULT_RULE_CONFIG
     // .motorwayMinFlowKmh` is 50 (rules/types.ts:1602 — „authored detection
@@ -337,7 +346,16 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
     // student holding 45 obeyed his briefing and was billed. The sibling
     // sc-mw-discipline already says 50. The mistake demos below still crawl at
     // 40, which is what being under the floor looks like.
-    { n: 4, textBg: "Не сваляй скоростта без причина. Продължително пълзене далеч под потока (тук около 40 км/ч) превръща колата ти в подвижно препятствие, което всички трябва да заобикалят." },
+    //
+    // AND THE PHANTOM MINIMUM IS STILL REFUSED, which is what kept the number
+    // wrong rather than merely unstated. This template's header forbids „законът
+    // ти забранява под 50" outright — the content bank marks that claim WRONG —
+    // so the sentence keeps «Общ задължителен минимум няма» in front of the
+    // figure. The 50 is named as the speed at which THIS road's flow starts
+    // having to go around you, which is both the truth and the threshold the
+    // engine bills at; naming it is what stops the product convicting at a
+    // number its own briefing never showed the student.
+    { n: 4, textBg: "Не сваляй скоростта без причина. Общ задължителен минимум няма, но продължително пълзене далеч под потока — тук под 50 км/ч без причина — превръща колата ти в подвижно препятствие, което всички трябва да заобикалят." },
     { n: 5, textBg: "Лявата лента е само за изпреварване, а аварийната вдясно не е лента за движение изобщо — дръж дясната до края на участъка." },
   ],
   success: [
@@ -360,7 +378,12 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
       // difference in the same change: a figure marked as a ceiling («под N»)
       // is read as one and a target («около N») is not, so this number does not
       // become a cap and the card's own suffix still says the gate's 140.
-      titleBg: "Влез в ритъма на потока (около 110 км/ч) в дясната лента за движение",
+      //
+      // …AND THE NUMBER MOVED WITH THE BRIEFING, 2026-08-25. The chip that
+      // states the rhythm may not state a different rhythm from the step that
+      // sources it (sc-mw-min-speed:f3c26187): step 2 now names the band the
+      // staged flow actually drives, so this does too, in the same words.
+      titleBg: "Влез в ритъма на потока (около 120–130 км/ч) в дясната лента за движение",
       // Radius 6 pins the CRUISE lane (lane centers sit 8.12–8.13 m apart):
       // the left-lane crawler misses it, the right-lane crawler makes it — that
       // asymmetry IS the two demos' difference, made visible on the end screen.
@@ -371,7 +394,7 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
       // Same repair, the next instance — «ритъма» named and never numbered. A
       // rule with one enforced instance is a convention, and the second task of
       // the same route is where the frames would have found the next one.
-      titleBg: "Задръж лентата и ритъма (около 110 км/ч) през средата на участъка",
+      titleBg: "Задръж лентата и ритъма (около 120–130 км/ч) през средата на участъка",
       params: { kind: "reachZone", x: MWM_X_CRUISE, y: 640, radiusM: 6, maxSpeedKmh: 140 },
     },
     {
@@ -388,6 +411,20 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
   // RECORDED: committed deterministic recordings of the authored scripts in
   // traces/scMwMinSpeed.ts; gates in traces/__tests__/sc-mw-min-speed-traces
   // .test.ts (re-record with RECORD_TRACES=1).
+  //
+  // THE ONE SURFACE OF sc-mw-min-speed:f3c26187 THAT DID NOT MOVE, named here
+  // so the claim cannot walk to it unnoticed the way it walked across three
+  // surfaces of sc-sp-wet-limit-plate. `traces/scMwMinSpeed.ts` holds
+  // `FLOW_KMH = 110` and captions the shadow «Установени 110 км/ч — далеч под
+  // тавана и точно в ритъма», so the DEMONSTRATION now names a rhythm the
+  // briefing above no longer teaches.
+  //
+  // It is not a copy edit and that is why it is not in this patch: the drive is
+  // a committed byte-gated recording, and re-recording it at ~125 changes where
+  // the ego sits relative to the staged flow car — `sp-mw-flow-visible.test.ts`
+  // §3 asserts `tick.leadGapM` stays non-finite for the whole shadow (the drill
+  // corridor is congestion-free, which is what makes the crawl convictions
+  // honest). That has to be re-measured, not assumed.
   shadow: { path: "content/traces/sc-mw-min-speed/shadow-correct.trace.json" },
   staged: [MWM_FLOW_CAR],
   mistakes: [

@@ -47,14 +47,54 @@
  * WHAT IS ACTUALLY WRONG IS THE MATERIAL, and it is in
  * `world/components/StaticWorld.tsx` — the `geometries.waterDecals` mesh:
  * `color 0x0d141b`, `opacity 0.4`, `roughness 0.12`, `metalness 0.55`,
- * `envMapIntensity={ROAD_ENV_INTENSITY}`. Every one of those numbers is a DRY
- * -asphalt tuning, and standing water is only ever shown on a soaked road: a
- * few lines above it in the same component the rain response darkens the
- * asphalt albedo to 0.6× and drops its roughness 1.0 → 0.5. A dark translucent
- * gloss laid over an already dark, already glossy surface has almost no
- * contrast left to spend, which is what the frames show — over 40 sampled
- * `pc-right` frames the largest luminance step anywhere on the carriageway is
- * a fixed-screen-row fog gradient, and no band tracks the world.
+ * `envMapIntensity={ROAD_ENV_INTENSITY}`. Standing water is only ever shown on
+ * a soaked road: a few lines above it in the same component the rain response
+ * darkens the asphalt albedo to 0.6× and drops its roughness 1.0 → 0.5. A dark
+ * translucent gloss laid over an already dark, already glossy surface has
+ * almost no contrast left to spend, which is what the frames show — over 40
+ * sampled `pc-right` frames the largest luminance step anywhere on the
+ * carriageway is a fixed-screen-row fog gradient, and no band tracks the world.
+ *
+ * ── ONE SENTENCE OF THAT ROUTING NOTE WAS WRONG, AND IT POINTED AT THE WRONG
+ *    NUMBER — corrected 2026-08-25, w10-3 `sc-ac-aquaplane__pc-right/
+ *    04-t155s.png` (the beat where the lesson's own card says «Във водата» over
+ *    dry grey asphalt), by reading the component rather than the note.
+ *
+ * It said „EVERY ONE of those numbers is a DRY-asphalt tuning". `envMapIntensity`
+ * is not: `StaticWorld.tsx` declares its own `ROAD_ENV_INTENSITY` INSIDE the
+ * component as `1.5 + (0.55 - 1.5) * wetness`, so the sheet already gets the
+ * road's wetness-lerped sky response (1.5 dry → 0.55 soaked) — the same number
+ * the asphalt beside it uses. Sending the next reader to retune a value that is
+ * already correct is how a routing note costs a round, so it is struck here
+ * rather than left standing.
+ *
+ * WHAT SURVIVES THE CORRECTION, AND IT IS THE ONE NUMBER THAT CANNOT BE RIGHT:
+ * `metalness 0.55`. Water is a DIELECTRIC — its gloss is Fresnel, not metallic
+ * reflectance — and there is no physical material at 0.55 at all. In three.js
+ * that half-metal costs the sheet BOTH halves of the contrast it was authored
+ * to have: 55 % of the diffuse `0x0d141b` is removed (metals have no diffuse),
+ * so the near-black albedo that was supposed to darken the carriageway is
+ * spending less than half its budget, and what replaces it is an environment
+ * reflection TINTED BY THAT SAME NEAR-BLACK — i.e. neither dark nor bright,
+ * over a rain-darkened road that is already both.
+ *
+ * AND „NOTHING IS DRAWN" IS FALSE ON THE SHIPPED DISTRICT, which is worth one
+ * line here because it is the sentence that would otherwise send the next
+ * reader back into this builder: `content/world/ac-aqua-v1.json` really carries
+ * the zone — `{"id":"ac-aqua-z-water","kind":"waterPatch","edgeId":
+ * "ac-aqua-e-street","fromM":240,"toM":280,"patchGripFactor":0.15,
+ * "aquaplaneAboveKmh":65}` — and `StaticWorld.tsx:554` renders the mesh
+ * whenever the position count is > 0. (`water-decals.test.ts` proves the
+ * BUILDER on a synthetic `fixtureDistrict([waterZone()])`, not the shipped map,
+ * so do not cite it for this.) A sheet IS emitted and IS under the driving
+ * line. What the frames show is a sheet nobody can SEE — a shading fault, not a
+ * missing geometry.
+ *
+ * IT IS NAMED AND NOT CHANGED HERE, deliberately. A material edit is only
+ * finished when somebody LOOKS at the frame it is meant to fix, and this lane
+ * cannot render one; a shading change measured by nothing but a source scan is
+ * the failure this programme has paid for repeatedly. Whoever takes it should
+ * shoot `sc-ac-aquaplane__pc-right/04-t155s.png` before and after.
  *
  * The geometry cannot fix that; only the shading can. Routed there.
  * ---------------------------------------------------------------------------

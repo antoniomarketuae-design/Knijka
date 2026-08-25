@@ -446,12 +446,76 @@ describe("per-frame writers", () => {
     for (let i = 0; i < 8; i++) expect(uvs[i]).toBe(0);
   });
 
-  it("hexRgba parses the palette hexes", () => {
+  /**
+   * THE PALETTE REACHES THE GPU IN THE RIGHT COLOUR SPACE
+   * (sc-vp-telltale-red:622bf269, critical — 2026-08-25).
+   *
+   * This test used to assert `warn.g ≈ 0x6a / 255`, i.e. the RAW sRGB
+   * fraction, and it passed on the build the corpus photographed. Three never
+   * converts a raw BufferAttribute, so that fraction went out as LINEAR and
+   * came back through the renderer's linear→sRGB output encode: measured on
+   * `.audit-frames/sweep161/sc-vp-readiness/mobile-right/04-t102s.png`, ground
+   * #05070c rendered (38,46,61) and INK_FORE #e8eef8 rendered (245,247,252) —
+   * both exactly what encoding the fraction a second time predicts. warn
+   * #ff6a58 arrived pale salmon and caution #ffc24b pale cream, which is the
+   * red-versus-yellow triage sc-vp-telltale-red's whole briefing is built on.
+   *
+   * So the assertion is the ROUND TRIP rather than the parse. `encode` below
+   * is the renderer's own transfer function written out independently of the
+   * decoder under test, so dropping the conversion in `hexRgba` cannot make
+   * both sides move together and pass.
+   */
+  it("hexRgba survives the renderer's own encode, byte for byte", () => {
+    // Three's linear→sRGB output encode (the inverse of what hexRgba applies).
+    const encode = (c: number) =>
+      c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+    const byte = (c: number) => Math.round(encode(c) * 255);
+
+    for (const [hex, rgb] of [
+      ["#ff6a58", [0xff, 0x6a, 0x58]], // warn — the STOP NOW lamp
+      ["#ffc24b", [0xff, 0xc2, 0x4b]], // caution — the carry-on-to-a-garage lamp
+      ["#05070c", [0x05, 0x07, 0x0c]], // the housing ground that arrived mid slate
+      ["#e8eef8", [0xe8, 0xee, 0xf8]], // INK_FORE, the second exact match
+    ] as const) {
+      const c = hexRgba(hex);
+      expect({ hex, rgb: [byte(c.r), byte(c.g), byte(c.b)] }).toEqual({ hex, rgb: [...rgb] });
+    }
+  });
+
+  it("black and white are fixed points, and alpha is not a colour", () => {
+    // The two the shipped test already pinned: 0 and 1 are fixed points of the
+    // transfer function, so this half is unchanged by the repair above.
     expect(hexRgba("#ffffff")).toEqual({ r: 1, g: 1, b: 1, a: 1 });
     expect(hexRgba("#000000", 0)).toEqual({ r: 0, g: 0, b: 0, a: 0 });
-    const warn = hexRgba("#ff6a58");
-    expect(warn.r).toBeCloseTo(1, 5);
-    expect(warn.g).toBeCloseTo(0x6a / 255, 5);
+    // Opacity is coverage, not light: converting it would fade every halo.
+    expect(hexRgba("#ff6a58", 0.42).a).toBe(0.42);
+  });
+
+  it("the conversion moves the two lamp tones APART, not together", () => {
+    // WHAT THIS DOES AND DOES NOT SAY. An earlier version asserted
+    // `caution.g - warn.g > 0.35` under the title „far enough apart to be
+    // TRIAGED", and a verifier was right to refuse the title: 0.35 is a gap in
+    // LINEAR light, and linear is further from perceptual uniformity than sRGB
+    // is, so a linear threshold is not evidence that a student can tell red
+    // from amber. It was a mutation detector wearing a legibility claim.
+    //
+    // So it says the thing it can prove. Green is the channel red and amber
+    // separate in. The authored hexes are 0x6a and 0xc2 apart — a fixed
+    // distance in the space they were CHOSEN in — and the question the repair
+    // turns on is which way the missing decode moved that pair. It moved them
+    // together: without the conversion the raw fractions go to the GPU and come
+    // back through the renderer's encode washed out, which is the pale salmon
+    // and pale cream measured on the frame. With it, the separation is wider
+    // than the authored one. Strictly greater, so dropping the decode (both
+    // sides collapse to the raw gap, exactly equal) fails here.
+    //
+    // Legibility at the size the cabin mount renders a lamp — 28 design units,
+    // ≈ 9 CSS px — is a DIFFERENT question and is still open; it is recorded on
+    // `InstrumentCluster.tsx` with the glyph half of the same finding.
+    const AUTHORED_GREEN_GAP = (0xc2 - 0x6a) / 255;
+    const warn = hexRgba(CLUSTER_PALETTE.warn);
+    const caution = hexRgba(CLUSTER_PALETTE.caution);
+    expect(caution.g - warn.g).toBeGreaterThan(AUTHORED_GREEN_GAP);
   });
 });
 

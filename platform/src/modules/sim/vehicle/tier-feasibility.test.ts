@@ -365,7 +365,25 @@ describe("tier feasibility — no lesson requires a speed its own tier forbids",
 
   it("band tops: every residual shortfall is the governor, never the engine", () => {
     const shortTemplates = [...new Set(result.bandTopShort.map((r) => r.templateId))].sort();
-    expect(shortTemplates).toEqual(["sc-mw-discipline"]);
+    // TWO SINCE 2026-08-25, AND THAT IS THE REPAIR, NOT A REGRESSION.
+    // `sc-mw-min-speed:f3c26187`: mw-v1 is the one motorway in the catalogue
+    // and its two drills taught two different rhythms on it — 110 here against
+    // sc-mw-discipline's «120–130», the band the staged flow is actually
+    // authored at. Making them agree necessarily puts this template into the
+    // same band-top census as its sibling, for the same reason and by the same
+    // margin. What still has to hold is what the loop below asserts and this
+    // list does not: the shortfall is the GOVERNOR's, it is bounded, and no
+    // uncapped tier falls short at all.
+    //
+    // AND THE COST IS NAMED RATHER THAN LEFT IN THE CENSUS. No gate bills the
+    // student for it — a band top is a target, not a cap (`advisor.ts`
+    // `titleCapKmh` reads «около N» as one) — so nothing is refused that was
+    // credited before. But on the ONE lesson whose subject IS the speed floor,
+    // a capped beginner is now pointed at a rhythm his own car cannot quite
+    // make. That belongs to whatever wave owns the ladder: either the tier's
+    // governor clears the one motorway's flow, or the drill is not offered
+    // below the tier that can drive it.
+    expect(shortTemplates).toEqual(["sc-mw-discipline", "sc-mw-min-speed"]);
     for (const row of result.bandTopShort) {
       // A capped tier may fall short of a band TOP — that is the ladder. It may
       // not fall short by a lot, and the uncapped tier may not fall short at all.

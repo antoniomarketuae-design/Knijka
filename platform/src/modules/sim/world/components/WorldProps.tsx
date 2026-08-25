@@ -703,6 +703,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     const body = bakeVertexColored(gltf.scene, {
       include: (n) => !n.startsWith("face_"),
       rotateY: Math.PI,
+      normalize: true, // the post is in this bake — the base-to-y=0 drop is a no-op
     });
     const face = bakeSignFace(gltf.scene, Math.PI);
     return {
@@ -786,16 +787,51 @@ async function buildPropAssets(): Promise<PropAssets> {
   const signalHousing = bakeVertexColored(signal.scene, {
     include: (n) => !n.startsWith("lamp_"),
     rotateY: Math.PI,
+    normalize: true, // the mast is in this bake, so the base-to-y=0 drop is a no-op
   });
   const pedSignalHousing = buildPedSignalHousing();
 
+  /**
+   * THE NIGHT LAMPS WERE LIT ALL ALONG — ON THE PAVEMENT, 5.883 m UNDER THE
+   * HEAD THAT WAS SUPPOSED TO CARRY THEM (sc-ov-night-gap:5085441f, 2026-08-25).
+   *
+   * The finding read „every street lamp along the section renders as dark",
+   * and `Streetlights` below plainly asks for the opposite —
+   * `emissiveIntensity: night ? 2.6 : 0` on an `0xffe6c2` lens. Both are true.
+   * The glow is a PARTIAL bake of an ELEVATED primitive, and `bakeVertexColored`
+   * normalises by default: `dy = bb.min.y`, base to y = 0. Measured off
+   * `public/sim/streetscape/street_lamp.glb` by walking the node transforms and
+   * the accessor bounds, per material:
+   *
+   *   steel_dark   y 0.000 … 0.180   the foot
+   *   steel_black  y 0.180 … 6.303   the column + the arm
+   *   lamp_head    y 5.892 … 6.068   the housing the lens sits in
+   *   lamp_lit     y 5.883 … 5.967   THE LENS
+   *
+   * So the housing bake (everything but `lamp_lit`) has bb.min.y = 0 and its
+   * normalisation moves nothing — which is why the posts stand correctly. The
+   * lens bake, alone, has bb.min.y = 5.883 and was translated that far DOWN: it
+   * has been burning at ankle height at the foot of every mast, behind the very
+   * column that hides it, on every night lesson in the product. Confirmed on
+   * `.audit-frames/w10-2/frames/sc-ov-night-gap__mobile-right/04-t055s.png` —
+   * four lamp posts down the left verge and one on the right, every head dark,
+   * on the drill whose whole subject is judging distance by lights.
+   *
+   * This is the third partial bake to need the flag and the reason the option
+   * exists at all (the rail-barrier arm and the ad face both say so above and
+   * below). `__tests__/prop-bake-normalisation.test.ts` now re-measures the GLB
+   * and holds the general rule instead of this one instance: a bake that names
+   * an `include` filter must SAY which frame it lands in.
+   */
   const streetlightHousing = bakeVertexColored(lamp.scene, {
     include: (n) => n !== "lamp_lit",
     rotateY: -Math.PI / 2,
+    normalize: true, // the column is in this bake (bb.min.y = 0) — a no-op drop
   });
   const streetlightGlow = bakeVertexColored(lamp.scene, {
     include: (n) => n === "lamp_lit",
     rotateY: -Math.PI / 2,
+    normalize: false, // the lens must stay at 5.883 m, in the housing's frame
   });
 
   // Ad-carrying v2 props: vertex-coloured body + the "ad_face" primitive as a
@@ -806,6 +842,7 @@ async function buildPropAssets(): Promise<PropAssets> {
     body: bakeVertexColored(gltf.scene, {
       include: (n) => n !== "ad_face",
       rotateY: Math.PI,
+      normalize: true, // the support is in this bake — the drop is a no-op
     }),
     face: bakeVertexColored(gltf.scene, {
       include: (n) => n === "ad_face",

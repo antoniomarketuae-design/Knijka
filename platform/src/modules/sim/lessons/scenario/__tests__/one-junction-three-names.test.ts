@@ -42,17 +42,22 @@
  *   §4  a drill sited on a map whose committed world file declares
  *       expectedControl "trafficLight" must SAY there is a light;
  *   §5  the matchers have teeth: each is run against the exact string this
- *       lane replaced and against a neighbour it must not convict.
+ *       lane replaced and against a neighbour it must not convict;
+ *   §6  a `passSignal` chip may not certify an interval it cannot witness —
+ *       added 2026-08-25 with the last Б2 pair (see the block there).
  *
- * SCOPE, stated so the silences are deliberate. `sc-junction-gap` lives in
- * templates-junctions2.ts and `sc-junction-left` in templates-junctions3.ts —
- * both files carry OPEN critical findings of their own (`sc-junction-blind:
- * dea35510`, and junctions3's row), so they belong to other lanes and are not
- * edited here. They still share two chips with each other; §2's ratchet keeps
- * that pair visible without this lane rewriting another lane's file. The same
- * goes for `sc-rx-tram-left` (templates-rail.ts, two open criticals), the one
- * remaining drill that stands on a signalized map and never says so — §4 names
- * it as the routed row it is.
+ * SCOPE, stated so the silences are deliberate. `sc-junction-gap` and
+ * `sc-junction-left` BOTH live in templates-junctions2.ts (SC_JUNCTION_GAP at
+ * its head, SC_JUNCTION_LEFT ~309 lines below) — this paragraph used to file
+ * the second one in templates-junctions3.ts and the correction is worth
+ * recording rather than quietly fixing, because that mistake is precisely what
+ * let the pair sit on §2's ratchet as „another lane's file" for a wave. That
+ * file carries an OPEN critical of its own (`sc-junction-blind:dea35510`),
+ * which is still not this lane's; the two chips the pair shared were closed on
+ * 2026-08-25 in the file itself and the row is named in §2. The same
+ * other-lane logic still applies to `sc-rx-tram-left` (templates-rail.ts, two
+ * open criticals), the one remaining drill that stands on a signalized map and
+ * never says so — §4 names it as the routed row it is.
  * =============================================================================
  */
 
@@ -151,12 +156,20 @@ function duplicateChipPairs(): string[] {
  *
  * Three rows LEFT this list with the repair, and they are named in §1:
  *   sc-junction-stop ~ sc-junction-scan · ~ sc-junction-gap · scan ~ gap
+ *
+ * A FOURTH LEFT IT ON 2026-08-25 (w10-2, sc-junction-gap:73564f66): the
+ * `sc-junction-gap ~ sc-junction-left` row above was the „another lane's to
+ * fix" one, and that lane came. `templates-junctions2.ts` gave the gap drill
+ * its own two chips — it is the drill about COUNTING THE INTERVAL, and
+ * sc-junction-left is the one about turning across the priority road. The row
+ * is DELETED rather than left standing at zero, on this list's own discipline:
+ * a stale entry cannot quietly stop being true, and a deleted one makes the
+ * pair's return a failure instead of a shrug.
  */
 const KNOWN_DUPLICATE_PAIRS: readonly string[] = [
   "sc-crossing-let-pass ~ sc-crossing-dart", //            templates-pe.ts
   "sc-crossing-let-pass ~ sc-crossing-slow-crosser", //    templates-pe.ts
   "sc-crossing-slow-crosser ~ sc-crossing-dart", //        templates-pe.ts
-  "sc-junction-gap ~ sc-junction-left", //   junctions2.ts ~ junctions3.ts
   "sc-junction-rhr ~ sc-vu-emergency-junction", // junctions.ts ~ vru.ts
   "sc-rx-guarded ~ sc-rx-barrier-drop", //                 templates-rail.ts
   "sc-vp-stall ~ sc-vp-handbrake", //                      templates-cockpit.ts
@@ -186,6 +199,10 @@ describe("§2 the duplicate-chip class is a ratchet", () => {
       "sc-junction-stop ~ sc-junction-scan",
       "sc-junction-stop ~ sc-junction-gap",
       "sc-junction-scan ~ sc-junction-gap",
+      // 2026-08-25 — the last Б2 pair, closed in templates-junctions2.ts. Named
+      // here rather than only removed from the list above, so restoring either
+      // chip fails with the pair's name instead of with a count.
+      "sc-junction-gap ~ sc-junction-left",
     ]) {
       expect(now, `${pair} is back`).not.toContain(pair);
     }
@@ -283,7 +300,28 @@ const CAP_TOLERANCE = 1.1;
  */
 const CEILING_FIGURE =
   /(?:под|до|не повече от|максимум|препоръчителните|препоръчителна|препоръчителни)\s+(\d+)\s*км\/ч/u;
-const TARGET_FIGURE = /(?:около|поне|не под|минимум)\s+(\d+)\s*км\/ч/u;
+/**
+ * …AND A TARGET MAY BE A BAND, WHICH THIS DID NOT READ (2026-08-25,
+ * `sc-mw-min-speed:f3c26187`). The two motorway drills run on the same rendered
+ * road and taught two different rhythms — 110 here against the sibling's
+ * 120–130 — and the sibling's form is the one the staged flow actually drives
+ * (`sp-mw-flow-visible` §1: cruiseSpeedMps 33 → 36, i.e. 119 → 130 км/ч). So the
+ * chip now prints the band.
+ *
+ * WITHOUT THE OPTIONAL LOW END BELOW, «около 120–130 км/ч» matched neither
+ * `TARGET_FIGURE` nor `CEILING_FIGURE`, and `speedBanners` fell through to the
+ * bare `KMH_IN_TITLE` — which reads 130 and, having no construction to go on,
+ * classifies it as a CEILING. Both rows would have left the target census
+ * silently (measured: the named set below went to `[]`) and been judged by the
+ * ±10 % ceiling band instead. A guard that stops seeing the two rows it was
+ * written to bound is the „green by absence" this repo keeps finding.
+ *
+ * THE TOP OF THE BAND IS THE FIGURE, deliberately: `badSpeedBanner`'s first
+ * clause is `cap < said` — the false-refusal edge, kept for both kinds — so
+ * taking the top is the direction that CONVICTS a band whose upper end climbs
+ * past its own gate, and taking the low end would hide exactly that.
+ */
+const TARGET_FIGURE = /(?:около|поне|не под|минимум)\s+(?:\d+\s*[–-]\s*)?(\d+)\s*км\/ч/u;
 
 interface SpeedBanner {
   scenarioId: string;
@@ -370,10 +408,36 @@ describe("§3 a banner that prints a speed is standing on the gate that enforces
     const targets = speedBanners()
       .filter((b) => b.claim === "target")
       .map((b) => `${b.scenarioId}/${b.objectiveId} says ${b.said} км/ч under a gate of ${b.cap}`);
+    // 2026-08-25: the two rows are the same two; the FIGURE moved, from 110 to
+    // the top of the «около 120–130 км/ч» band the sibling drill and the staged
+    // flow both name (sc-mw-min-speed:f3c26187). The set is still two.
     expect(targets, targets.join("\n")).toEqual([
-      "sc-mw-min-speed/sc-mwms-join says 110 км/ч under a gate of 140",
-      "sc-mw-min-speed/sc-mwms-hold says 110 км/ч under a gate of 140",
+      "sc-mw-min-speed/sc-mwms-join says 130 км/ч under a gate of 140",
+      "sc-mw-min-speed/sc-mwms-hold says 130 км/ч under a gate of 140",
     ]);
+  });
+
+  it("…and a band still has to be IN the briefing, both ends of it", () => {
+    // The target branch's real guard is „the same figure appears in the
+    // lesson's own authored briefing", and a band widens the surface that has
+    // to agree. Both ends are checked here, on the compiled chips rather than
+    // on the constant, so an author who moves the briefing and leaves the chip
+    // (or the reverse — the exact half-fix the previous round HELD this repair
+    // over) fails on whichever half stayed behind.
+    const spec = ALL.find((s) => s.id === "sc-mw-min-speed");
+    expect(spec, "sc-mw-min-speed left the registry").toBeDefined();
+    const briefing = spec!.instructionsBg.map((s) => s.textBg).join(" | ");
+    for (const objective of spec!.success) {
+      const band = /около\s+(\d+)\s*[–-]\s*(\d+)\s*км\/ч/u.exec(objective.titleBg);
+      if (!band) continue;
+      expect(briefing, `${objective.id}: the band's low end is not in the briefing`).toContain(
+        `${band[1]}–${band[2]} км/ч`,
+      );
+    }
+    // …and the sweep is not vacuous: this drill really does print a band.
+    expect(spec!.success.some((o) => /около\s+\d+\s*[–-]\s*\d+\s*км\/ч/u.test(o.titleBg))).toBe(
+      true,
+    );
   });
 
   it("sc-spcv-curve sits ON the ±10 % edge, and the margin is 0,001 км/ч", () => {
@@ -623,5 +687,91 @@ describe("§5 every matcher above convicts what this lane replaced", () => {
       s.success.some((o) => o.titleBg === "Завий надясно и излез от кръстовището на изток"),
     ).map((s) => s.id);
     expect(stillQuoting).toEqual(["sc-junction-gap"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §6 — a passSignal chip may not certify the interval it cannot witness
+//      (added 2026-08-25 with the last Б2 pair — sc-junction-gap:73564f66)
+// ---------------------------------------------------------------------------
+
+/**
+ * WHY THIS IS A LAW AND NOT TWO EDITS. Both Б2 drills on `tj-emerge-v1` shipped
+ * the chip «Премини стоп-линията след пълно спиране И ПРОПУСНАТ ИНТЕРВАЛ» over
+ * a `passSignal` / `control: "stopSign"` gate. `stepPassSignal` (objectives.ts)
+ * witnesses two things — the full stop at the line and the crossing — and
+ * `SimTick` carries no other actor's priority and no yield outcome, so the
+ * second half of that sentence is a certificate no evaluator on the drive can
+ * sign. The gap misjudgment is graded where it is really measured: the give-way
+ * check at the line, FAILED_TO_YIELD, which is what both drills' mistake demos
+ * bill.
+ *
+ * The 2026-08-25 wave rewrote the gap drill's chip and the verifier found the
+ * identical claim still standing on its twin, 309 lines down the SAME file.
+ * Two rows edited by hand is how a class comes back; a rule over every
+ * `passSignal` title in the catalogue is how it stops being authorable.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT CONVICT, said out loud so the silence is not
+ * mistaken for an oversight: `sc-junction-scan`'s «…след пълно спиране и
+ * оглеждане». Scanning is not in the same position as the interval — the rule
+ * engine grades it under its own code (JUNCTION_SCAN_INCOMPLETE, with per-
+ * control copy in rules/engine.ts), so whether that chip is a false certificate
+ * or a chip whose channel is merely not wired into `stepPassSignal` is a
+ * MEASUREMENT nobody has taken. Convicting it here on the strength of an
+ * analogy would trade one defect for another. It is named as an open row.
+ */
+const INTERVAL_CERTIFICATE =
+  /(?:пропуснат|пропуснал|изчакан|осигурен)\s+(?:безопасен\s+)?интервал/iu;
+
+const passSignalChips = (): Array<{ scenarioId: string; objectiveId: string; titleBg: string }> =>
+  ALL.flatMap((s) =>
+    s.success
+      .filter((o) => (o.params as { kind?: string }).kind === "passSignal")
+      .map((o) => ({ scenarioId: s.id, objectiveId: o.id, titleBg: o.titleBg })),
+  );
+
+describe("§6 a passSignal chip claims only what its gate can witness", () => {
+  it("the sweep sees every passSignal chip in the catalogue", () => {
+    // Non-vacuity first, on this file's own §5 discipline: a sweep that found
+    // nothing would satisfy the prohibition below forever.
+    const chips = passSignalChips();
+    expect(chips.length).toBeGreaterThanOrEqual(11);
+    expect(chips.map((c) => c.objectiveId)).toContain("sc-jgap-line");
+    expect(chips.map((c) => c.objectiveId)).toContain("sc-jleft-line");
+  });
+
+  it("not one of them certifies a passed interval", () => {
+    const claiming = passSignalChips()
+      .filter((c) => INTERVAL_CERTIFICATE.test(c.titleBg))
+      .map((c) => `${c.scenarioId} ${c.objectiveId}: ${c.titleBg}`);
+    expect(
+      claiming,
+      `a passSignal gate witnesses the stop and the crossing, nothing about the ` +
+        `gap the student took — grade that at the give-way check and let the chip ` +
+        `point at the drill instead of certifying it.`,
+    ).toEqual([]);
+  });
+
+  it("and the matcher has teeth in both directions", () => {
+    // The exact string this wave replaced, on both twins …
+    expect(
+      INTERVAL_CERTIFICATE.test("Премини стоп-линията след пълно спиране и пропуснат интервал"),
+    ).toBe(true);
+    // … and the two that replaced it, one of which still says «интервал»
+    // because POINTING at the drill is not CERTIFYING it.
+    expect(
+      INTERVAL_CERTIFICATE.test(
+        "Премини стоп-линията след пълно спиране — оттук нататък решава интервалът",
+      ),
+    ).toBe(false);
+    expect(
+      INTERVAL_CERTIFICATE.test(
+        "Премини стоп-линията след пълно спиране — левият завой започва оттук",
+      ),
+    ).toBe(false);
+    // The neighbour it must not convict, per the block above.
+    expect(INTERVAL_CERTIFICATE.test("Премини стоп-линията след пълно спиране и оглеждане")).toBe(
+      false,
+    );
   });
 });

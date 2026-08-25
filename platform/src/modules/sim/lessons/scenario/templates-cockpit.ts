@@ -337,7 +337,7 @@ export const SC_VP_STALL: ScenarioSpec = {
   tagsBg: ["кокпит", "потегляне", "загасване", "съединител", "изпитни упражнения"],
   titleBg: "Загасване при потегляне",
   objectiveBg:
-    "Изисква ниво „Напреднал“ — само там колата е с ръчни скорости и съединител. Потегли от място, без двигателят да загасне: съединител докрай, лек газ и плавно отпускане до точката на зацепване — загасването е класическата грешка от изпитни нерви и всяко се брои.",
+    "Урокът върви на ниво „Напреднал“ — колата тук е с ръчни скорости и съединител. Потегли от място, без двигателят да загасне: съединител докрай, лек газ и плавно отпускане до точката на зацепване — загасването е класическата грешка от изпитни нерви и всяко се брои.",
   archetypeIds: ["VP-04"],
   conceptIds: ["c-vehicle-controls", "c-pre-drive-check"],
   map: {
@@ -350,6 +350,17 @@ export const SC_VP_STALL: ScenarioSpec = {
   start: {
     spawnPointId: "vp-spawn-approach",
     vehicleStart: "ready",
+    // ROUND 11, 2026-08-25 — THE TIER IS THE LESSON'S, NOT THE STUDENT'S.
+    // Round 10 (below) turned the tier into instruction 1's act and measured
+    // the result on the next sweep: gear D on all 80 sampled frames of
+    // pc-right, pc-wrong and mobile-right, i.e. the clutch drill ran its whole
+    // life on an automatic. The line was not weak — the ASK was wrong. The
+    // tier is not this lesson's subject; the bite point is. So the lesson now
+    // states which car it hands over, the way `vehicleStart` above already
+    // does, and instruction 1 goes back to being one act (the belt) plus the
+    // fact the student needs to read the cockpit («ръчни скорости и
+    // съединител»). `openingTier` seeds the picker — it does not pin it.
+    openingTier: "advanced",
   },
   // Step 1 is the belt and the tier: without the tier, steps 2–4 name controls
   // the car does not have (see the header); without the belt, the pull-away
@@ -384,8 +395,33 @@ export const SC_VP_STALL: ScenarioSpec = {
   // LessonScene alone, and a ScenarioSpec has no field to demand a tier. That
   // is the lesson-level transmission channel the header already routes to
   // contracts.ts + compile.ts + LessonScene.tsx + vehicle/driveline.ts.
+  //
+  // ROUND 11, 2026-08-25 — THAT CHANNEL EXISTS NOW, AND IT IS THE HAND-OVER
+  // RATHER THAN A REFUSAL. `start.openingTier` above → `LessonSpec.openingTier`
+  // (contracts.ts, written by compile.ts) → the tier `useState` seed in
+  // LessonScene, which is what `VehicleRig` reads every frame through
+  // `transmissionModeFor`. The car arrives manual, so the clutch steps 2–4
+  // command exist and `ENGINE_STALLED` is reachable on the student's own drive
+  // for the first time.
+  //
+  // WHY NOT THE REFUSAL THE PARAGRAPH ABOVE ASKED FOR. A gate that failed the
+  // drill on the automatic tier would convict a student for a simulator
+  // setting rather than for driving — the one thing this product must never
+  // do. Handing over the right car makes the wrong tier unreachable at t = 0
+  // instead of punishable at the debrief, and the pill still lets a student
+  // leave deliberately, which is a choice and not a mistake.
+  //
+  // STILL OPEN, and named so nobody stops here: a student who clicks
+  // „Нормален" MID-drive gets the automatic back with no word about what the
+  // remaining steps now mean. That is `onTransmissionChanged`'s voice
+  // (LessonScene → LessonPlayShell), which today announces the moved selector
+  // and not the lost clutch. Different file, different lane.
   instructionsBg: [
-    { n: 1, textBg: "Закопчай колана и превключи на „Напреднал“ — на „Нормален“ колата е автоматик." },
+    // …AND ROUND 11 TOOK THE SWITCH BACK OUT (`start.openingTier` above). The
+    // step is one act again — the belt — followed by the fact the student has
+    // to read the cockpit with. 74 characters, two shorter than the round-10
+    // line, so the fold budget step 2 has to live in did not narrow.
+    { n: 1, textBg: "Закопчай колана — тази кола е с ръчни скорости и съединител („Напреднал“)." },
     { n: 2, textBg: "Съединител докрай („СЪЕД“ / Z), включи първа предавка (]) и дай лек газ." },
     { n: 3, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване и задръж, докато колата тръгне." },
     { n: 4, textBg: "Загасне ли двигателят: съединител докрай, запали отново и повтори спокойно." },

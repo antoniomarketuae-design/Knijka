@@ -11,15 +11,38 @@
 //   - ambient city bed: very quiet murmur + slow distant-traffic swell (LFO),
 //   - NPC hum: one shared voice, gain follows the nearest traffic car,
 //   - rain patter + rhythmic wiper swish (flags in the update payload),
-//   - two-tone emergency siren, gain by distance to the active actor (VU-09),
+//   - two-tone emergency siren, gain by distance to the active actor (VU-09)
+//     — ⚠ built here, and on the w10 sweep it never fires: `sirenM` comes from
+//     a scan for a `profile === "emergency"` actor (LessonScene 3608-3615) and
+//     no lesson in that sweep put one on the road (sc-vu-emergency:180ed5bc),
 //   - indicator relay tick-tock, collision thump, seatbelt click.
 //
 // Autoplay policy: nothing is created until unlock() is called from a real
-// user gesture (LessonScene wires pointerdown/keydown). Volume + mute are
-// persisted to localStorage. Every layer goes silent while paused.
+// user gesture (LessonScene wires pointerdown/keydown). Mute is persisted (by
+// the store below); volume is READ from localStorage at construction and no
+// longer written by any live path — see `persist()`. Every layer goes silent
+// while paused.
+//
+// MUTE IS NO LONGER A FIELD ON THIS CLASS — sweep w10, nine rows, 2026-08-25.
+// It lives in `simAudioMuteStore.ts`, which owns the bit and the storage key
+// this file used to write. The reason is the whole of that file's header: the
+// only route to mute was `CABIN_KEYS.muteAudio`, a KEYBOARD KEY, so on a phone
+// the mix was uncontrollable and six `07b-menu.png` frames show a ⚙ sheet with
+// no sound row in it. The ⚙ row that fixes that is a DOM sibling of the shell
+// and cannot reach this instance; a store can, and mirroring the bit into one
+// would leave two places that must agree with nothing making them.
+//
+// Volume is untouched and still lives here: nothing outside this file sets it,
+// so it has no second owner to drift against. When a volume CONTROL ships it
+// should move the same way, for the same reason.
+
+import {
+  getSimAudioMuted,
+  setSimAudioMuted,
+  subscribeSimAudioMuted,
+} from "./simAudioMuteStore";
 
 const VOLUME_KEY = "knijka.sim.volume";
-const MUTED_KEY = "knijka.sim.muted";
 
 /** Cosmetic gear speed bands (km/h) — mirrors tuning.GEAR_UPSHIFT_KMH. */
 const GEAR_BANDS: ReadonlyArray<readonly [number, number]> = [
@@ -295,16 +318,22 @@ export class SimAudio {
   private env: SceneAudioEnv = {};
 
   private volumeValue = 0.5;
-  private mutedValue = false;
+  /** Unsubscribe from the mute store, dropped in `dispose()`. */
+  private unsubscribeMute: (() => void) | null = null;
 
   constructor() {
     try {
       const v = window.localStorage.getItem(VOLUME_KEY);
       if (v !== null) this.volumeValue = Math.min(1, Math.max(0, Number(v) || 0));
-      this.mutedValue = window.localStorage.getItem(MUTED_KEY) === "1";
     } catch {
       // Storage blocked (private mode) — session-only settings.
     }
+    // The ⚙ sheet's «Звук» row writes the store, not this object, and the
+    // student expects the mix to go quiet under his thumb rather than at the
+    // next thing that happens to recompute the gain. `applyMaster` is a no-op
+    // until `unlock()` builds the graph, so a mute chosen before the first
+    // gesture costs nothing and is simply read when the graph arrives.
+    this.unsubscribeMute = subscribeSimAudioMuted(() => this.applyMaster());
   }
 
   get unlocked(): boolean {
@@ -315,8 +344,9 @@ export class SimAudio {
     return this.volumeValue;
   }
 
+  /** Delegated: the store owns this bit. See the note at the top of the file. */
   get muted(): boolean {
-    return this.mutedValue;
+    return getSimAudioMuted();
   }
 
   /** Build the audio graph. MUST be called from a user-gesture handler. */
@@ -543,10 +573,15 @@ export class SimAudio {
     this.persist();
   }
 
+  /**
+   * The M key's route (`cabin.ts` → `onToggleMute`). It writes the STORE, so
+   * the key and the ⚙ sheet's «Звук» row are the same act: the row's word
+   * updates when the key is pressed, and the mix goes quiet when the row is
+   * tapped. `applyMaster` and the persist both happen on the store's
+   * notification — doing them here as well would write the key twice.
+   */
   toggleMute(): void {
-    this.mutedValue = !this.mutedValue;
-    this.applyMaster();
-    this.persist();
+    setSimAudioMuted(!getSimAudioMuted());
   }
 
   /**
@@ -741,6 +776,11 @@ export class SimAudio {
   }
 
   dispose(): void {
+    // Before the context: a listener that outlives the graph would call
+    // `applyMaster` on a disposed instance every time the next lesson's student
+    // touches the «Звук» row, once per lesson ever mounted.
+    this.unsubscribeMute?.();
+    this.unsubscribeMute = null;
     if (this.ctx) void this.ctx.close();
     this.ctx = null;
     this.nodes = null;
@@ -824,7 +864,7 @@ export class SimAudio {
   }
 
   private effectiveVolume(): number {
-    return this.mutedValue ? 0 : this.volumeValue;
+    return getSimAudioMuted() ? 0 : this.volumeValue;
   }
 
   private applyMaster(): void {
@@ -833,10 +873,32 @@ export class SimAudio {
     }
   }
 
+  /**
+   * ⚠ THIS METHOD IS NOW COLD IN PRODUCTION, AND THAT IS THIS PATCH'S DOING —
+   * named here rather than left to be discovered.
+   *
+   * The mute key is NOT written here any more: `simAudioMuteStore` writes it on
+   * every change, and a second writer holding a stale copy is exactly how the
+   * two would drift apart, which is the thing giving the bit one owner was
+   * meant to prevent. But the mute path was `persist()`'s only LIVE caller. The
+   * remaining one is `setVolume`, and `setVolume` has no caller outside this
+   * file — volume has never been user-settable — so `knijka.sim.volume` used to
+   * be written on every M press and is now written by nothing.
+   *
+   * Consequences, both small and both real: a fresh browser never creates that
+   * key (an existing one is still read at construction, so nobody's setting
+   * changes), and `app/(legal)/cookies/page.tsx:130` lists it as stored, which
+   * is now an over-disclosure rather than a wrong one. The next round decides
+   * one of two things — a volume CONTROL ships (the store's header says it
+   * should move the same way and for the same reason), or this, `setVolume` and
+   * VOLUME_KEY go, and the cookies page loses a line. Do NOT gate this symbol
+   * as if it were reached; `simAudioMuteStore.test.ts` holds the condition that
+   * still has teeth — that the class writes exactly one key, and not the mute
+   * one.
+   */
   private persist(): void {
     try {
       window.localStorage.setItem(VOLUME_KEY, String(this.volumeValue));
-      window.localStorage.setItem(MUTED_KEY, this.mutedValue ? "1" : "0");
     } catch {
       // non-fatal
     }

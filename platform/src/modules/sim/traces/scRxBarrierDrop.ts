@@ -55,7 +55,33 @@ export function scRxBarrierDropShadowScript(): DriveScript {
       // Wait out the WHOLE down-window [20, 60): a 44 s hold from ~t 20 resumes
       // deep in the open window [60, 90).
       { kind: "pause", sec: 44, brake: true },
-      { kind: "annotation", textBg: "Бариерата е вдигната напълно. Бърз оглед и премини решително — без спиране върху релсите." },
+      // THE SIBLING OF sc-rx-guarded:e0c40055 — and it has a frame of its own.
+      // (Corrected: the repair round that widened the gate wrote „found by the
+      // gate rather than by a second frame". That was wrong, and a wrong frame
+      // citation is worse than none — it tells the next reader not to look.
+      // `.audit-frames/w10-1/frames/sc-rx-barrier-drop__pc-right/` holds 43
+      // frames; `run.log:215` carries this caption on the deck verbatim and
+      // `04-t027s.png`, opened, shows it at 9 км/ч with the А34 triangle ahead
+      // on the right kerb and the scrubber at 1:06/1:24.)
+      //
+      // The caption WAS «Бариерата е вдигната напълно. Бърз оглед и премини
+      // решително…» — character-for-character the sentence photographed over a
+      // LOWERED boom on `w10-3/frames/sc-rx-guarded__pc-right/04-t074s.png`,
+      // and it sits on the same kind of surface: a fixed offset into the replay
+      // clock, over a barrier whose phase is world data on a 90 s cycle
+      // ([20, 60) here). Same repair, same reason — the condition, never the
+      // state — and the new sentence is now the lesson's own instruction 4
+      // («Едва след ПЪЛНОТО вдигане на бариерата се огледай и премини
+      // решително»), which is on the glass in that same frame.
+      //
+      // WHAT THIS DOES NOT REPAIR, and the frame is explicit about it: that leg
+      // ends НЕИЗДЪРЖАН, score 20, «Влизане на прелез при спусната бариера −10»
+      // + «Спиране върху железопътните релси −10», with BOTH route objectives
+      // ticked. Identical to sc-rx-guarded's standing half. A caption is not an
+      // input to a steered drive; the owner is a demand in lessons/objectives.ts
+      // reading `tick.railBarred` (shape: `requireControllerProceed`), and both
+      // rows stay OPEN on that clause.
+      { kind: "annotation", textBg: "Премини решително едва когато лостът се вдигне ДОКРАЙ — бърз оглед наляво и надясно, без спиране върху релсите." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
       { kind: "drive", points: [[X_LANE, 146], [X_LANE, 190]], targetKmh: 25, stopAtEnd: false },

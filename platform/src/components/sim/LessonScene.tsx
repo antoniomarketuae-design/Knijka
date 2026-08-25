@@ -168,6 +168,7 @@ import {
 import {
   CabinControls,
   initialHeadlightsFor,
+  initialParkingBrakeOnFor,
   type MirrorGlanceKind,
 } from "@/modules/sim/scene/cabin";
 import { lessonRequiredSpeedKmh } from "@/modules/sim/scene/lessonSpeedContract";
@@ -219,7 +220,11 @@ import { GlanceEdgePings, type GlancePingTap } from "./lesson-ui/GlanceEdgePings
 // The mouse's pedals (founder 2026-07-30) — see the mount below.
 import { MousePedals } from "./lesson-ui/MousePedals";
 import { TraceTimeline } from "./lesson-ui/TraceTimeline";
-import { DEMO_DECK_POLL_MS, demoDeckStandsDown } from "./lesson-ui/demoDeckLifetime";
+import {
+  DEMO_DECK_POLL_MS,
+  demoDeckAtRest,
+  demoDeckStandsDown,
+} from "./lesson-ui/demoDeckLifetime";
 import { worldNameBg } from "@/modules/sim/scene/worldNames";
 import type { QualityPreset } from "./lesson-ui/types";
 
@@ -1250,7 +1255,11 @@ export function ReadyScene({
   // inert, byte-identical behavior.
   const aids = lesson.aids;
   const shadowTrace = built.shadowTrace;
-  const aidClockRef = useRef<TraceClock>(createTraceClock());
+  // PARKED AT 0:00, NOT PLAYING — `demoDeckAtRest` carries the two arrival
+  // frames and the reasoning. `createTraceClock()` keeps its own `playing: true`
+  // default for the dev clip routes that drive it deliberately; what changes is
+  // the ONE clock a student's lesson mounts.
+  const aidClockRef = useRef<TraceClock>(demoDeckAtRest(createTraceClock()));
   // followHints: sustained deviation from the shadow path → one hint chip.
   const [followHintOn, setFollowHintOn] = useState(false);
 
@@ -1297,7 +1306,19 @@ export function ReadyScene({
   // drive, not a setting that follows you around; the picker still switches it
   // mid-scene, and storeDifficulty still records the click for anything that
   // wants to know the preference.
-  const [difficulty, setDifficultyState] = useState<DifficultyMode>(DEFAULT_DIFFICULTY);
+  //
+  // …AND A LESSON MAY NAME THE TIER IT OPENS ON — sc-vp-stall:e4dfb43f
+  // (critical), 2026-08-25. The clutch drill commands «Съединител докрай», a
+  // first gear and a bite point in four of its five steps, and
+  // `transmissionModeFor` gives a clutch only on „Напреднал". Round 10 asked
+  // the STUDENT to switch first; the next sweep read gear D on all 80 sampled
+  // frames of all three legs, so the drill never once ran on a car it could be
+  // performed in. `openingTier` (contracts.ts) is the same kind of statement as
+  // `vehicleStart` — which car is handed over — and it SEEDS this state rather
+  // than pinning it, so the picker below still switches tiers mid-drive.
+  const [difficulty, setDifficultyState] = useState<DifficultyMode>(
+    lesson.openingTier ?? DEFAULT_DIFFICULTY,
+  );
   const difficultyRef = useRef<DifficultyMode>(difficulty);
   useEffect(() => {
     difficultyRef.current = difficulty;
@@ -1645,6 +1666,17 @@ export function ReadyScene({
         night: isNight,
         rain,
         fog: fogWeather,
+        preDrive: lesson.preDrive,
+        lessonId: lesson.id,
+      }),
+      // The same invariant on the other red lamp (cabin.ts's spawn block, and
+      // .audit-frames/w10-3/frames/sc-vp-handbrake__pc-wrong/01-arrival.png:
+      // 0 км/ч, no input yet, the `brake` telltale dark on the lesson whose
+      // premise is that the handbrake is UP). A lesson whose briefing ORDERS
+      // «Свали ръчната» must hand the car over with it pulled, or the order is
+      // pre-performed and the lamp it tells the student to watch never lights.
+      initialParkingBrakeOnFor({
+        vehicleStart,
         preDrive: lesson.preDrive,
         lessonId: lesson.id,
       }),
@@ -2187,7 +2219,7 @@ export function ReadyScene({
             ribbon) plays the recorded trace kinematically — no physics. */}
         {ghostDemo ? (
           <Suspense fallback={null}>
-            <ShadowCar trace={ghostDemo.trace} clockRef={ghostClockRef} />
+            <ShadowCar trace={ghostDemo.trace} clockRef={ghostClockRef} district={district} />
           </Suspense>
         ) : null}
         {/* S1 aids (doc 76 §7): L1 shadowCar = ghost + ribbon + timeline;
@@ -2198,6 +2230,12 @@ export function ReadyScene({
               trace={shadowTrace}
               clockRef={aidClockRef}
               showGhost={aids?.shadowCar === true}
+              // The blue demonstration ribbon goes quiet over the painted
+              // crossings and the junction paint, exactly as RouteGuidance's
+              // does — sc-crossing-dart:f0bf371d, `06-waited.png`, where it ran
+              // unbroken across the zebra the lesson exists to teach. The
+              // district is the same object that layer is handed.
+              district={district}
             />
           </Suspense>
         ) : null}
@@ -3812,7 +3850,13 @@ export function controlsHelpRows({
       what: "всичко в кабината се прави с мишката",
       essential: true,
     },
-    { id: "steer", keys: "W A S D", what: "кормуване (или стрелки)", essential: true },
+    // …AND THE SAME U+00A0 AS THE GEAR ROW BELOW, for the same reason and off
+    // the same two frames: at 11 px in a ~152 px column this row breaks as
+    // «кормуване (или» / «стрелки)», leaving the closing half of a parenthesis
+    // alone on a line. The sans face this column now uses (see the <p> at the
+    // row's render) buys most of it back; binding the parenthetical is what
+    // makes the row unable to break there at any width.
+    { id: "steer", keys: "W A S D", what: "кормуване (или\u00a0стрелки)", essential: true },
     { id: "ignition", keys: "I", what: "двигател: старт / стоп", essential: true },
     // NON-BREAKING SPACES BEFORE THE TWO GEAR LETTERS. This column is
     // `w-[min(15rem,45%)]` minus a 3.75 rem key cap, and the sweep photographed
@@ -3843,7 +3887,10 @@ export function controlsHelpRows({
       : {
           id: "reverse",
           keys: "[ ]",
-          what: "на изпит заден ход се избира само с лоста (D → N → R)",
+          // …and the SEQUENCE is one token, bound the same way. The general
+          // form of the gear row rule found this the moment it was written:
+          // «R)» alone on a line, on every exam rung.
+          what: "на изпит заден ход се избира само с лоста (D\u00a0→\u00a0N\u00a0→\u00a0R)",
         },
     { id: "handbrake", keys: "Space", what: "ръчна спирачка", essential: true },
     { id: "clutch", keys: "Z", what: "съединител — задръж („Напреднал“)" },
@@ -4158,7 +4205,49 @@ export function ControlsHelp({
                 <kbd className="min-w-[3.75rem] shrink-0 rounded bg-surface px-1.5 py-0.5 text-center font-mono text-[10px] font-bold text-accent">
                   {row.keys}
                 </kbd>
-                <span className="text-muted">{row.what}</span>
+                {/* ── A `<p>`, AND THE ELEMENT IS THE WHOLE FIX — sc-ac-night-
+                    lights:6cc71728, w10-2.
+                    THE FRAME: `sc-ac-night-lights/pc-right/01-arrival.png` and
+                    `sc-ed-d2-priority-run/pc-right/01-arrival.png`, side by
+                    side with the ИНСТРУКЦИИ panel on the same picture. This
+                    column is set in a FIXED-WIDTH face — «всичко в кабината се
+                    / прави с мишката», every glyph the same advance — while
+                    the numbered briefing 900 px to its right is the rounded
+                    sans. Same screen, two reading faces, and the mono one is
+                    the fifteen Bulgarian SENTENCES.
+                    IT IS NOT AUTHORED HERE AND IT IS NOT A BUG IN THE REGISTER.
+                    `[data-hud="controls-help"]` is on `GHOST_SURFACES`, and the
+                    2026-08-03 register sets `font-family: var(--font-mono)` on
+                    every ghost — the founder's own „low-contrast monospace text
+                    anchored to the edge". That ruling stands. What it also
+                    carries is the carve-out, and the carve-out's own sentence
+                    is the bug report: „every instrument value in this HUD is a
+                    span/div/kbd and every authored sentence is a <p>." This one
+                    was a <span>, so a sentence was read as a value.
+                    AND IT PAID TWICE. The register measured the cost of mono on
+                    prose at „about 24 characters per line against about 35 in
+                    the body face". This column is ~152 px wide, so the same
+                    arithmetic turns three of the four essential rows into two
+                    lines with an orphan on the second — «кормуване (или /
+                    стрелки)» is on both frames, and it is the row's third
+                    clause. One element, both clauses, no new CSS: the split
+                    „falls out of the existing markup" exactly as written.
+                    The key cap stays a <kbd> in mono, because a key cap IS an
+                    instrument value and the register is right about it.
+                    AND THE ROW IS NOT CLOSED BY THIS, which is the half a
+                    repair report is likeliest to swallow. 6cc71728 has FOUR
+                    clauses. Clause 2 (the orphaned gear letter «D») closed at
+                    `ec1f56f`; clauses 1 and 3 are the two above. Clause 4 —
+                    „the world's overhead power cables are drawn straight across
+                    the panel text" — is untouched here and is still on the very
+                    frame this block cites: four white catenary lines run
+                    diagonally through «двигател: старт / стоп» and «скорости:
+                    към P / към D». That is a world-geometry-versus-HUD
+                    occlusion, the same class as `sc-turn-left-oncoming:2a784463`
+                    and `sc-ov-keep-right:6751402d`, and it belongs to
+                    `hud/overheadHint.ts` with a projected-bounds probe — not to
+                    an element name. The row stays OPEN on it. */}
+                <p className="text-muted">{row.what}</p>
               </div>
             ))}
           </div>

@@ -41,6 +41,9 @@ import {
   listRowsInScrollCoords,
   rowsBelowFold,
 } from "./LessonPlayShell";
+// The snap's arithmetic, from the module that owns it — see the publishing note
+// beside the export in `modules/sim/hud/index.ts`.
+import { foldMaskCss, foldWindowPx } from "@/modules/sim/hud";
 
 const SHELL = readFileSync(resolve(__dirname, "./LessonPlayShell.tsx"), "utf8");
 
@@ -238,8 +241,22 @@ describe("listRowsInScrollCoords · the rows arrive in the list's own frame", ()
     // shipped line was `top: (li as HTMLElement).offsetTop`.
     expect(CARD).toContain("listRowsInScrollCoords");
     expect(CARD).toContain("getBoundingClientRect");
-    expect(CARD).not.toContain("offsetTop");
-    expect(CARD).not.toContain("offsetHeight");
+    // ── THE BAN IS ON THE MEMBER READ, NOT ON THE NINE CHARACTERS — round 11.
+    //
+    // These two were bare `toContain` checks until the line-grid snap landed,
+    // and the snap made them wrong in the reassuring direction's opposite: it
+    // hands `foldWindowPx` rows whose FIELD is called `offsetTop` (that is
+    // `SimOverlay.FoldRow`'s published shape, and those numbers come from
+    // `getBoundingClientRect` like everything else here), so a correct card
+    // failed a gate whose defect it does not have.
+    //
+    // What the row is actually about is reading the property OFF AN ELEMENT —
+    // the shipped line was `top: (li as HTMLElement).offsetTop`, and the whole
+    // derivation of why that number is wrong is at `listRowsInScrollCoords`.
+    // So the ban is on the member access, which is what the mutation that
+    // proves this case restores.
+    expect(CARD).not.toMatch(/\.offsetTop\b/);
+    expect(CARD).not.toMatch(/\.offsetHeight\b/);
   });
 });
 
@@ -498,6 +515,143 @@ describe("the briefing list yields instead of being guillotined", () => {
     // AFTER `</ol>`, so it is asserted against the whole card), which is what
     // stops the two from disagreeing about whether anything is under the cut.
     expect(CARD.slice(CARD.indexOf("</ol>"))).toContain("below > 0 ? (");
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     …AND THE CUT IS ON THE LINE GRID, WHICH THE FADE COULD NEVER BE.
+     `sc-pe-night-unlit:918c80b4` · `sc-pe-zone-living:85e5547d` · w10, round 11.
+
+     THE FRAMES, both pc, both re-judged STILL after the fade landed:
+       sc-pe-night-unlit/pc-right/01-arrival.png  — step 3's last line cut
+         horizontally by the card's bottom edge, half-height letterforms
+         directly above the counter
+       sc-pe-zone-living/pc-right/04-t017s.png    — the same on every pc frame
+         of both lanes; „what changed is only WHICH step gets guillotined"
+
+     The previous round wrote the diagnosis into the shell itself and declined
+     the repair by name: „NOT THE LINE-GRID SNAP … That is the stronger repair
+     and it is NOT done here … Both rows stay open on the snap." This is the
+     snap. The arithmetic is `SimOverlay.foldWindowPx`, published rather than
+     copied, and the cases below drive it on THIS panel's own geometry.
+     ──────────────────────────────────────────────────────────────────── */
+  it("a 10 px band cannot help cutting a line; the snap lands between them", () => {
+    // The bridge-ice rows with their leading, which is the one thing the
+    // counter never needed: 11 px `leading-tight` two-line steps, 28 px tall,
+    // so each carries ONE interior line edge at +14.
+    const rows = BRIDGE_ICE_ROWS.map((r) => ({
+      offsetTop: r.top,
+      heightPx: r.height,
+      lineHeightPx: 14,
+    }));
+    // The frame: the fold falls at 250, inside step 9's box (240 → 268).
+    const win = foldWindowPx(rows, { scrollTop: 0, clientHeight: 250 });
+    expect(win.hardEdge).toBe(true);
+    // 240 is step 9's own TOP — the nearest grid edge at or under the fold.
+    // The old band went opaque at 240 and transparent at 250, i.e. it painted
+    // 10 px of a 14 px line box: glyph tops at declining alpha, which is the
+    // picture on both frames.
+    expect(win.bottomPx).toBe(240);
+    expect(win.topPx).toBe(0);
+    // And the mask says so — two coincident stops, no gradient anywhere.
+    const css = foldMaskCss(win, BRIEFING_FADE_PX);
+    expect(css).toContain("#000 240px");
+    expect(css).toContain("transparent 240px");
+    expect(css).not.toContain("calc(");
+  });
+
+  it("a briefing that FITS is handed back whole — the false-refusal twin", () => {
+    // The snap may never hide a line the student can already read. 298 is the
+    // content's own bottom, and the sibling case above pins the counter at 0
+    // for the same geometry.
+    const rows = BRIDGE_ICE_ROWS.map((r) => ({
+      offsetTop: r.top,
+      heightPx: r.height,
+      lineHeightPx: 14,
+    }));
+    const win = foldWindowPx(rows, { scrollTop: 0, clientHeight: 298 });
+    expect(win).toEqual({ topPx: 0, bottomPx: 298, hardEdge: false });
+    // …and with no hard edge the card emits the 2026-08-14 band, character for
+    // character. The fade is still the floor.
+    expect(foldMaskCss(win, BRIEFING_FADE_PX)).toBe(BRIEFING_FADE_MASK_CSS);
+  });
+
+  it("scrolled into the middle, BOTH ends land on the grid", () => {
+    // Row 16 of the sweep is „clipped at BOTH ends on this viewport" — the
+    // desktop panel scrolls, so the top edge is a real cut too.
+    const rows = BRIDGE_ICE_ROWS.map((r) => ({
+      offsetTop: r.top,
+      heightPx: r.height,
+      lineHeightPx: 14,
+    }));
+    // Scrolled to 50 — four pixels into step 2's second line box, so the top
+    // border of the box really does fall inside letters.
+    const win = foldWindowPx(rows, { scrollTop: 50, clientHeight: 224 });
+    expect(win.hardEdge).toBe(true);
+    // Offsets are from the top of the VISIBLE box, which is what a mask
+    // gradient is measured in — so both are the grid edge minus scrollTop.
+    // 58 is step 2's own bottom; 270 is step 10's top.
+    expect(win.topPx + 50).toBe(58);
+    expect(win.bottomPx + 50).toBe(270);
+  });
+
+  it("THE WIRING: the card builds the window and paints the mask from it", () => {
+    // jsdom has no layout, so the component's own reading cannot be asserted by
+    // rendering it — this file's own technique. Three separate things have to
+    // be true, and the shipped fade satisfied none of them.
+    expect(CARD).toContain("foldWindowPx(");
+    // The rows handed to it carry a LEADING. Without it every step is one
+    // indivisible block, the interior line edges vanish, and a two-line step
+    // gets hidden whole to tidy an edge — the snap's own documented refusal
+    // firing on the common case.
+    expect(CARD).toContain("lineHeightPx");
+    expect(CARD).toContain("getComputedStyle");
+    // …and the mask that reaches the element is built from that window, not
+    // from the constant. Both spellings, because WebKit is the engine the
+    // frames were photographed on.
+    const list = CARD.slice(CARD.indexOf("<ol"), CARD.indexOf("</ol>"));
+    expect(list).toMatch(/WebkitMaskImage:[\s\S]{0,160}foldMaskCss\(/);
+    expect(list).toMatch(/[^t]maskImage:[\s\S]{0,160}foldMaskCss\(/);
+    // The floor is still the floor: when the snap refuses, the band ships.
+    expect(list).toContain("BRIEFING_FADE_MASK_CSS");
+  });
+
+  /* ───────────────────────────────────────────────────────────────────────
+     …AND WHICH NUMBER GOES INTO EACH FIELD — added by the lane-r6 VERIFIER,
+     2026-08-25, because the case above passed two mutations that put the
+     defect back.
+
+     `foldWindowPx` is well gated and the three cases before this one drive it
+     on real numbers. What NOTHING held was the COMPOSITION: the ten lines in
+     `measure` that turn DOM rects into `FoldRow`s. Both of these survived the
+     whole 62-test scoped run with every assertion green:
+
+       lineHeightPx: …getComputedStyle(el).fontSize   (11 instead of 13.75, so
+         every interior edge `foldWindowPx` offers lands INSIDE a line box —
+         precisely the defect 918c80b4 / 85e5547d are filed for)
+       offsetTop: rects[i]!.top                       (raw viewport top instead
+         of the list's own scroll frame — the exact confusion
+         `listRowsInScrollCoords` was written to end, see its header)
+
+     jsdom has no layout and this file runs in `node`, so the composition
+     cannot be asserted by rendering. It CAN be pinned by name, and a pin that
+     names the property is worth more than one that names the call: the two
+     mutations differ from the shipped line by one identifier each.
+     ──────────────────────────────────────────────────────────────────── */
+  it("the snap's rows carry the LEADING and the list's OWN coordinates", () => {
+    // `\b` built rather than written: in a template literal `\b` is U+0008 and
+    // matches nothing — the trap that once reported five live consumers as
+    // none. These are real regex literals, so it is a word boundary.
+    const measure = CARD.slice(CARD.indexOf("const foldRows"), CARD.indexOf("foldWindowPx("));
+    expect(measure).not.toBe("");
+    // The leading is the line box's height, not the glyph size. `heightPx /
+    // leading` is how the interior edges are counted, so a font metric here
+    // puts every edge inside a line and the snap cuts letters it was added to
+    // stop cutting.
+    expect(measure).toMatch(/lineHeightPx:[\s\S]{0,80}getComputedStyle\([^)]*\)\.lineHeight\b/);
+    // …and the offsets are the rows in SCROLL coordinates — `r`, the output of
+    // `listRowsInScrollCoords` — not the raw `rects` the DOM handed back.
+    expect(measure).toMatch(/offsetTop:\s*r\.top\b/);
+    expect(measure).toMatch(/heightPx:\s*r\.height\b/);
   });
 
   it("the «още» row is outside the scroll area, so it covers nothing", () => {

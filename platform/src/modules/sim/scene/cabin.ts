@@ -225,6 +225,180 @@ export function initialHeadlightsFor(ctx: SpawnHeadlightContext): HeadlightSetti
   return ctx.night || ctx.rain || ctx.fog ? "low" : "off";
 }
 
+// ---------------------------------------------------------------------------
+// SPAWN PARKING-BRAKE STATE — the same invariant, on the other red lamp.
+// ---------------------------------------------------------------------------
+//
+// MEASURED, `.audit-frames/w10-3/frames/sc-vp-handbrake__pc-wrong/`. The
+// lesson is „Потегляне с вдигната ръчна" and briefing step 2 reads «Свали
+// ръчната докрай и погледни таблото: червената лампа за ръчна спирачка ТРЯБВА
+// да угасне. Свети ли още — ръчната не е долу.» On 01-arrival.png the cluster
+// is at 0 км/ч in D with the student's hands still off the controls, and the
+// cabin telltale block shows exactly ONE lit lamp — the belt. Slot 3 of the
+// rail (`brake`, LAMP_KEYS order) is dark, and it is dark on 04-t011s.png too,
+// at 59 км/ч, in the lane whose entire premise is that the handbrake was never
+// lowered. The same is true of the РЪЧНА glyph in the PC control strip.
+//
+// TWO CRITICAL ROWS BLAMED THE INSTRUMENT AND THE INSTRUMENT IS INNOCENT.
+// `clusterReadout.lampBank` already does `set(out.brake, input.parkingBrakeOn
+// ? "warn" : "off")`, VitokCockpit's sampler already feeds
+// `driveline.parkingBrakeOn`, TouchControls' РЪЧНА pill already takes
+// `active={snap.parkingBrakeOn}` and StatusDashboard already paints it
+// `var(--danger)`. FOUR shipped surfaces render the state. The state is false:
+// `start.vehicleStart: "ready"` → `DrivelineState("ready")` →
+// `parkingBrakeOn = false` (vehicle/driveline.ts). The lesson about setting off
+// with the handbrake up hands the student a car whose handbrake is already
+// down, so the lamp the briefing calls the sole verification instrument has
+// nothing to verify, and step 2's order arrives pre-performed.
+//
+// That is doc 86 L10's defect exactly — «THE HAND-OVER STATE MUST NOT FALSIFY
+// THE LESSON'S OWN LAMP SENTENCE» — pointing at the other lamp, so it is
+// answered the same way: DERIVED from the template's own authored briefing,
+// never a hand-typed list of ids. The headlight list failed OPEN and cost
+// `sc-park-night` seven quiet rounds; a handbrake list would fail open the
+// same way, on the same catalogue, for the same reason.
+//
+// WHY THIS IS SAFE TO HAND OVER. A parking brake at spawn is not a new state
+// for the product: 31 templates and 130 exam rungs already spawn `cold`, which
+// is engine off, selector P AND parking brake on. `stuckStart.ts` watches the
+// functional throttle and names the first blocker in fix order — engine →
+// selector → parking brake — so a student who presses the pedal is told «свали
+// ръчната» rather than left guessing, and `PARKING_BRAKE_FORCE_N` is untouched.
+// Nothing new can be refused either: HANDBRAKE_LEFT_ON needs `moving &&
+// parkingBrakeOn` (rules/catalog.ts), and a student who obeys step 2 before
+// moving is clean by construction. Cold spawns keep their own brake-on state —
+// this rule only ever moves a `ready` hand-over, and only ever toward ON.
+//
+// ---------------------------------------------------------------------------
+// AND THE OTHER DIRECTION, WHICH THE FIRST WRITE-UP OF THIS BLOCK DID NOT COST.
+// ---------------------------------------------------------------------------
+// „No false refusal is possible" is true and is only half the question. The
+// half it skipped: `PARKING_BRAKE_FORCE_N` does not make the car drag, it
+// makes the car STOP. Measured on the drive rig and recorded on
+// `engine/stuckStart.ts`'s standstill constant — eight seconds of full
+// throttle against the lever reached a maximum of 0.32 км/ч — while
+// HANDBRAKE_LEFT_ON needs `speed > cfg.movingSpeedKmh` = 5 км/ч, sustained
+// `handbrakeSustainSec` = 1.5 s (rules/types.ts:1406-1408). The car reaches
+// under a fifteenth of that threshold and stays there. So on the lesson TITLED
+// „Потегляне с вдигната ръчна" the fault it is named after cannot be booked
+// from a standstill, and the catalogue's own «Колата се влачи, спирачките
+// прегряват» describes a drag the force model does not produce.
+//
+// THAT PATH WAS ALREADY CLOSED AT HEAD, and it is closed by the force model
+// rather than by this rule: before this change the lever was DOWN at hand-over,
+// so on `sc-vp-handbrake` there was nothing to leave up in the first place —
+// which is exactly what `sc-vp-handbrake:1f2f7463` («потеглянето с вдигната
+// ръчна не струва нищо на ученика») photographed at 59 км/ч with the РЪЧНА pill
+// grey. This rule neither opens that path nor shuts it. It STAYS OPEN, and it
+// is a conviction question — whether a lever a student never releases should
+// cost points at all when the car does not move — not a hand-over question.
+// HANDBRAKE_LEFT_ON does remain reachable the other way round, by pulling the
+// lever while already above 5 км/ч; it is not globally dead.
+//
+// WHAT DOES CHANGE IS WHAT THE STUDENT IS TOLD. With the lever pulled, a
+// floored throttle at a standstill resolves through `stuckStartReason` to
+// `parkingBrake`, and `LessonPlayShell.handleStuckStart` prints «Ръчната
+// спирачка е вдигната — колата е задържана … свалянето на ръчната е последната
+// стъпка преди потегляне». Doc 64 THEO-4 is what makes that the condition of
+// shipping this at all: a car that refuses to move in silence is a bare
+// verdict, so an immobilising hand-over may only ship with that channel armed.
+// `components/sim/__tests__/spawnParkingBrakeSeam.test.tsx` pins it on the
+// driveline this rule actually produces, beside the mount that produces it.
+//
+// TWO KNOCK-ON EFFECTS ON THE CORPUS, named so the next sweep is not surprised:
+// the wrong-lane audit drive of this lesson will no longer reach 59 км/ч and
+// will fail on route incompleteness instead, and `sc-vp-readiness`'s authored
+// mistake card `mistake-handbrake.trace.json` («влачи се») is a recorded demo
+// of a drag the live car cannot reproduce from rest. Neither is a reason to
+// hand a student a lesson whose first order is already carried out.
+// ---------------------------------------------------------------------------
+
+/** The control's noun. «ръчна» alone is the way every briefing in the
+ *  catalogue says it; «спирачка» on its own is the FOOT brake and must not
+ *  arm this (sc-hz-brake-fade's «натисни спирачката» is a pedal sentence). */
+const PARKING_BRAKE_NOUN_RE = /(?:^|[^\p{L}])ръчна(?:та)?(?![\p{L}])/iu;
+/** The imperative to let it off. Imperatives ONLY: the participle «свалена»
+ *  («Продължи с поставен колан и свалена ръчна…») describes the state the
+ *  student is already in and orders nothing, so it must not arm the spawn.
+ *  Unicode boundaries only — `\b` is ASCII and never matches a Cyrillic edge,
+ *  which is the trap the lamp predicate above records paying for. */
+const RELEASE_RE = /(?:^|[^\p{L}])(свали|освободи|отпусни|пусни)(?![\p{L}])/iu;
+
+/** Clauses that mention the parking brake at all (the lamp rule's split, and
+ *  the same reason: a hedge or an explanation binds to its own clause). */
+function parkingBrakeClauses(text: string): string[] {
+  return text
+    .split(/[.!?:;]\s+|\s[—–-]\s/u)
+    .filter((c) => PARKING_BRAKE_NOUN_RE.test(c));
+}
+
+/**
+ * Does this lesson's own authored briefing ORDER the student to release the
+ * parking brake, unconditionally? Pure over the authored step texts — no
+ * catalogue, no DOM — so it is unit-testable by mutation on the sentences
+ * themselves, exactly like `briefingOrdersLampsOn`.
+ */
+export function briefingOrdersParkingBrakeOff(instructionTexts: readonly string[]): boolean {
+  for (const text of instructionTexts) {
+    for (const clause of parkingBrakeClauses(text)) {
+      if (RELEASE_RE.test(clause) && !CONDITIONAL_RE.test(clause)) return true;
+    }
+  }
+  return false;
+}
+
+/** Memoised per template, like the lamp drill — the catalogue scan runs once. */
+const brakeDrillCache = new Map<string, boolean>();
+
+/**
+ * True when RELEASING the parking brake is an act THIS lesson asks for, read
+ * off the template's hand-authored `instructionsBg`. Unknown ids (curriculum
+ * lessons, tests) are not drills and keep the pre-existing hand-over.
+ */
+export function isParkingBrakeDrillLesson(lessonId: string): boolean {
+  const templateId = templateIdOfLessonId(lessonId);
+  const hit = brakeDrillCache.get(templateId);
+  if (hit !== undefined) return hit;
+  const spec = scenarioById(templateId);
+  const drill =
+    spec !== undefined && briefingOrdersParkingBrakeOff(spec.instructionsBg.map((s) => s.textBg));
+  brakeDrillCache.set(templateId, drill);
+  return drill;
+}
+
+/** Derived, not typed — the partition the gate beside this file pins by name. */
+export function parkingBrakeDrillTemplateIds(): ReadonlySet<string> {
+  return new Set(SCENARIO_TEMPLATES.filter((s) => isParkingBrakeDrillLesson(s.id)).map((s) => s.id));
+}
+
+/** The inputs the spawn parking-brake decision reads — primitives, so the rule
+ *  is unit-tested without a DOM or a compiled lesson. */
+export interface SpawnParkingBrakeContext {
+  /** LessonSpec.vehicleStart as resolved by the caller ("cold" | "ready"). */
+  vehicleStart: VehicleStartState;
+  /** True when this lesson runs the 13-step pre-drive procedure — the release
+   *  is a coached/graded step there and the cold car already supplies it. */
+  preDrive: boolean;
+  /** Compiled lesson id, e.g. `sc-vp-handbrake@L2`, or the raw template id. */
+  lessonId: string;
+  /** Override for "is the lever itself the lesson?". Omitted in production —
+   *  derived from `lessonId` via the authored briefing. */
+  brakeDrill?: boolean;
+}
+
+/**
+ * Is the parking brake ON when this lesson hands the car over?
+ * `true` only when the lesson's own briefing ORDERS the release and the car
+ * would otherwise arrive with it already down. A cold start is already brake-on
+ * and says so through `vehicleStart`, so this returns false there and lets
+ * `DrivelineState` keep owning that case — one truth, not two.
+ */
+export function initialParkingBrakeOnFor(ctx: SpawnParkingBrakeContext): boolean {
+  if (ctx.vehicleStart !== "ready") return false; // DrivelineState("cold") already pulls it
+  if (ctx.preDrive) return false; // `parking-brake-off` is a graded step there
+  return ctx.brakeDrill ?? isParkingBrakeDrillLesson(ctx.lessonId);
+}
+
 /**
  * Pure hold-to-glance state machine (extracted so it is unit-testable in
  * Node — CabinControls binds window listeners and cannot be constructed
@@ -400,9 +574,19 @@ export class CabinControls {
      *  `initialHeadlightsFor()`. Default "off" = the pre-doc-86 behaviour, so
      *  every headless/legacy construction is byte-identical. */
     initialHeadlights: HeadlightSetting = "off",
+    /** Parking brake at hand-over — resolve it with `initialParkingBrakeOnFor()`.
+     *  Default false = the pre-existing behaviour, so every headless/legacy
+     *  construction is byte-identical; a `cold` start pulls it in the driveline
+     *  constructor regardless and this can only ever ADD the brake, never
+     *  release one the spawn policy asked for. */
+    initialParkingBrakeOn = false,
   ) {
     this.headlights = initialHeadlights;
     this.driveline = new DrivelineState(vehicleStart);
+    // Written straight onto the field rather than through `toggleParkingBrake`:
+    // the toggle emits `parkingBrakeChanged`, which the A2 procedure observer
+    // reads as a performed step, and nobody performed anything at t = 0.
+    if (initialParkingBrakeOn) this.driveline.parkingBrakeOn = true;
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
     window.addEventListener("blur", this.onBlur);

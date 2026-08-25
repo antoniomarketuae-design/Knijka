@@ -93,6 +93,9 @@ import {
   type RefObject,
 } from "react";
 import {
+  overlayCarriesMoment,
+  overlayMomentBg,
+  OVERLAY_MOMENT_TICK_MS,
   OVERLAY_PEEK_HEIGHT_PX,
   type SimOverlayItem,
   type SimOverlayTone,
@@ -809,6 +812,40 @@ function DismissGlyph() {
   );
 }
 
+/**
+ * THE MOMENT'S CLOCK, LIFTED OUT OF THE EFFECT SO A GATE CAN DRIVE IT.
+ *
+ * WHY IT IS NOT INLINE, and this is a measurement rather than a preference:
+ * the first version of this row was guarded by a source pin —
+ * `expect(overlay).toMatch(/setInterval\(\(\) => setNowMs\(Date\.now\(\)\), …/)`
+ * over the raw file text — and an adversarial pass COMMENTED THE INTERVAL OUT,
+ * leaving the literal alive only as text, and all 43 tests stayed green while
+ * the card printed a frozen «преди 2 с» for its whole 8 s life. A rendered-once
+ * number is a timestamp, not an age. There is no DOM environment configured for
+ * this suite (`vitest.config.ts` → `environment: "node"`, and the coverage note
+ * beside it says why), so a mounted component cannot be advanced through time
+ * here at all; what CAN be driven is a clock that is an ordinary function. This
+ * is that function, and `overlay-queue-moment.test.ts` runs it under
+ * `vi.useFakeTimers()`: three ticks in three seconds, none after the disposer.
+ *
+ * The disposer is not decoration either — `SimOverlay` unmounts every time the
+ * queue goes quiet, and an interval that outlives it calls `setNowMs` on a dead
+ * card once a second for the rest of the drive.
+ *
+ * `Date.now()` at every tick and never a counter, for `HudToasts`' own reason:
+ * WebKit throttles a backgrounded tab's timers hard on a phone, so a counter
+ * comes back with the number of ticks it was AWAKE for instead of the true age.
+ *
+ * BARE `setInterval` and not this file's usual `window.setInterval`, which is a
+ * deviation with a reason: `window` does not exist in the node environment the
+ * suite runs in, so the `window.` form is a clock no gate can drive. In a
+ * browser the two are the same binding.
+ */
+export function startMomentClock(onTick: () => void): () => void {
+  const timer = setInterval(onTick, OVERLAY_MOMENT_TICK_MS);
+  return () => clearInterval(timer);
+}
+
 export function SimOverlay({
   item,
   queued,
@@ -1081,9 +1118,59 @@ export function SimOverlay({
   // expected to read all the way to the end.
   const sheetFold = useFoldLines(`sheet ${open ? "open" : "shut"} ${foldKey}`);
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     WHICH MOMENT THE VERDICT IS ABOUT — §2.6 O33's SECOND HALF, 2026-08-25.
+
+     THE FRAME (`w10-4/sc-sp-curve__mobile-wrong/04-t193s.png`, iPhone 16
+     landscape): «⚠ −1 ИЗПИТНА Т. · Превишена скорост · Движеше се над
+     разрешената…» stands in the column while the cluster under it reads
+     **11 км/ч**, the disc beside it reads **90** and the strip says «РЕЖИМ
+     Нормален ≤100». The card is telling the truth about a moment that has gone
+     and nothing on the glass said which. Round 10's frame of the same shape
+     (04-t030s, cluster 18) is why `SimOverlayItem.raisedAtMs` exists at all.
+
+     BOTH OTHER LINKS OF THE CHAIN WERE ALREADY LANDED AND THIS ONE WAS NOT.
+     `HudToasts` stamps every card and prints the age on the roomy leg;
+     `overlayQueue.overlayMomentBg` turns the stamp into «сега» / «преди 6 с» in
+     the toast's exact vocabulary; `LessonPlayShell`'s `...(!ended` re-map feeds
+     `raisedAtMs: t.raisedAtMs` on both kinds that carry one. The field was FED
+     AND UNREAD for a round — its own ⚠ says so, and `hud-toast-moment.test.tsx`
+     held an `expect(overlay).not.toContain("overlayMomentBg")` naming this row
+     as the edit that inverts it. This is that row.
+
+     THE CLOCK IS `HudToasts`' CLOCK, deliberately duplicated rather than
+     shared: importing that column here would pull `../rules` — the grading
+     barrel — into the overlay for one integer. `Date.now()` and not a counter,
+     for the reason it gives: WebKit throttles a backgrounded tab's timers hard
+     on a phone, and a counter comes back with the number of ticks it was awake
+     for instead of the true age. The interval runs only while a dated card is
+     up, so a task line, a «Браво» and an empty screen cost nothing.
+
+     AND THE INTERVAL ITSELF LIVES IN `startMomentClock` ABOVE, not here — a
+     verifier commented this line out and forty-three tests stayed green, because
+     the only thing guarding it was a regex over the file's own text and a
+     comment satisfies one of those. The block at `startMomentClock` carries that
+     measurement and the gate that now fails for it.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const momentTicking =
+    shown !== null && overlayCarriesMoment(shown.kind) && shown.raisedAtMs !== undefined;
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!momentTicking) return;
+    setNowMs(Date.now());
+    return startMomentClock(() => setNowMs(Date.now()));
+  }, [momentTicking]);
+
   if (shown === null) return null;
 
   const color = TONE_COLOR[shown.tone];
+  // «сега» / «преди 6 с», or null — `overlayCarriesMoment` is the authority on
+  // WHICH kinds may be dated (a «Браво» and a task line state no verdict about
+  // a past moment) and `overlayMomentBg` is the authority on the words, so the
+  // phone and `HudToasts` cannot describe one fault with two strings. An
+  // unstamped card gets `null` and prints nothing: inventing «сега» for a fault
+  // that may be a minute old is 04-t193s wearing the costume of its own fix.
+  const momentBg = overlayCarriesMoment(shown.kind) ? overlayMomentBg(shown, nowMs) : null;
   const hasDetail =
     (typeof shown.detailBg === "string" && shown.detailBg.trim().length > 0) ||
     shown.hasRichDetail === true;
@@ -1451,14 +1538,66 @@ export function SimOverlay({
              0.9 of it over the shade below reads 3.97 : 1 — under AA, on the
              label that tells a student there is more of the reason he was
              marked down. Full strength it is 4.57 : 1, the same as the chip. */}
-      {peekFold.lines > 0 ? (
-        <span
-          data-sim-overlay-fold=""
-          aria-hidden
-          className="mt-0.5 shrink-0 self-end text-[10px] font-black uppercase leading-none tracking-wider"
-        >
-          ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
-        </span>
+      {/* ── AND THE MOMENT RIDES IN THE SAME ROW, 2026-08-25 — see the block at
+             `momentTicking` for the frame. It is the card's LAST row, which is
+             where `HudToasts.ToastFooter` prints the identical string on the
+             roomy leg, and it is folded into the fold's row rather than given
+             one of its own because a new 10 px band would come out of the text
+             window: the peek's whole budget at 852 × 393 is 95.8 px and this
+             file has already spent two rounds refusing to pay for chrome with
+             authored Bulgarian.
+             `justify-between` and not `self-end`: the age reads left, against
+             the words it dates, and the fold keeps the right edge it has had
+             since 2026-08-16. The row exists when EITHER is present.
+             NOT `aria-hidden`, unlike the fold beside it — the fold describes a
+             scroll position assistive technology does not have, but the moment
+             is a fact about the verdict that is nowhere else in the DOM.
+             `flex-wrap`, and NO `truncate` on either child — `briefing-no-echo`
+             forbids a clip on anything in this file that is not an uppercase
+             chip, and it is right to: a clipped «преди 12 с» would be a dated
+             verdict whose date is unreadable. Both children are
+             `whitespace-nowrap shrink-0`, so on the narrowest column the FOLD
+             drops to a second 10 px row instead of either string losing a
+             character.
+
+             WHAT IT COSTS, STATED RATHER THAN DECLARED AWAY. The first write-up
+             of this row said it cost no vertical budget and a verifier was right
+             to strike that: every `violation` and `hint` is stamped, so on such
+             a card WITH NO FOLD this row is ~12 px (`mt-0.5` + a 10 px
+             `leading-none` band) that did not exist before, and on a card at its
+             `notifyColumnMaxHeightCss` cap the only shrinkable thing on the card
+             is the text window. The trade is bounded at ONE LINE and it is
+             SELF-ANNOUNCING, which is the whole reason it is acceptable under
+             THEO-4: the line does not vanish, it goes below the fold of a window
+             that scrolls, `useFoldLines` counts it, and the count appears in
+             this very row as «↓ още 1 ред». Nothing authored is deleted and
+             nothing is hidden silently — which is the trade this file refused in
+             2026-08-14 when `line-clamp-6` was hiding 215 px behind „…" and
+             saying nothing. On a card with ≥12 px of slack the cost is zero.
+             STILL OWED: the 852 × 393 before/after of `sc-sp-curve__mobile-wrong
+             /04-t193s`, which settles it by looking. */}
+      {momentBg !== null || peekFold.lines > 0 ? (
+        <div className="mt-0.5 flex shrink-0 flex-wrap items-center justify-between gap-x-2">
+          {momentBg !== null ? (
+            <span
+              data-sim-overlay-moment=""
+              className="shrink-0 whitespace-nowrap text-[10px] font-semibold tabular-nums leading-none"
+            >
+              {momentBg}
+            </span>
+          ) : (
+            <span aria-hidden />
+          )}
+          {peekFold.lines > 0 ? (
+            <span
+              data-sim-overlay-fold=""
+              aria-hidden
+              className="shrink-0 text-[10px] font-black uppercase leading-none tracking-wider"
+            >
+              ↓ още {peekFold.lines} {peekFold.lines === 1 ? "ред" : "реда"}
+            </span>
+          ) : null}
+        </div>
       ) : null}
 
       {/* Row 3 — the controls, right-aligned under the words. Absent only on the

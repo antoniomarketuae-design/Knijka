@@ -51,6 +51,8 @@ import {
   stampToasts,
   type HudToast,
 } from "../HudToasts";
+import { SimOverlay } from "../SimOverlay";
+import type { SimOverlayItem } from "../overlayQueue";
 
 /** Markup with tags stripped — what a reader actually reads. */
 function textOf(node: React.ReactElement): string {
@@ -86,6 +88,30 @@ function columnText(toasts: HudToast[], quiet = false): string {
 
 function raisedAgo(event: HudEvent, ageMs: number, id = 1): HudToast {
   return { id, event, raisedAtMs: Date.now() - ageMs };
+}
+
+/**
+ * THE PHONE'S CARD, as the shell re-maps a toast into it — the surface the
+ * frames in this file's header were shot on. Same argument as `columnText`
+ * above: the real component, reading its own clock, with no `nowMs` seam that
+ * would let a card which had stopped reading any clock pass.
+ */
+function peekText(item: SimOverlayItem, queued = 0): string {
+  return textOf(<SimOverlay item={item} queued={queued} />);
+}
+
+/** The `...(!ended` re-map's own output shape for a graded fault. */
+function peekViolation(ageMs: number | null): SimOverlayItem {
+  return {
+    id: "toast:7",
+    kind: "violation",
+    tone: "warn",
+    chipBg: "−1 изпитна т.",
+    lineBg: "Превишена скорост",
+    detailBg: "Движеше се над разрешената скорост. Ограничението е таван, не цел.",
+    lawRef: "ЗДвП чл. 21, ал. 1",
+    ...(ageMs === null ? {} : { raisedAtMs: Date.now() - ageMs }),
+  };
 }
 
 describe("toastAgeBg — the vocabulary, each assertion paired with what breaks it", () => {
@@ -212,6 +238,79 @@ describe("the mounted column, not the helper", () => {
   });
 });
 
+describe("THE PHONE'S CARD, MOUNTED — the leg the frames were shot on", () => {
+  /**
+   * `w10-4/sc-sp-curve__mobile-wrong/04-t193s.png`, iPhone 16 landscape: the
+   * peek reads «⚠ −1 ИЗПИТНА Т. · Превишена скорост · Движеше се над
+   * разрешената…» while the cluster under it reads **11 км/ч**, the disc beside
+   * it reads **90** and the grading strip says «РЕЖИМ Нормален ≤100». Round 10
+   * filed the same shape at 18 км/ч (04-t030s). Nothing on the glass said the
+   * card was about a moment that had gone, so the only reading available to a
+   * seventeen-year-old was that the grader is broken.
+   *
+   * `SimOverlay` is the component the shell mounts on a compact viewport —
+   * `HudToasts` is not rendered there at all — so a green `overlayMomentBg`
+   * beside an unwired card is exactly the failure this directory has signed its
+   * name to before. These render the real one.
+   */
+  it("a fault raised six seconds ago is DATED on the phone, not just on the desktop", () => {
+    const out = peekText(peekViolation(6000));
+    expect(out).toContain("Превишена скорост");
+    expect(out).toContain("преди 6 с");
+  });
+
+  it("the printed age tracks the real age — a hard-coded string fails this pair", () => {
+    expect(peekText(peekViolation(5000))).toContain("преди 5 с");
+    expect(peekText(peekViolation(9000))).toContain("преди 9 с");
+  });
+
+  it("inside the band it reads «сега», in the toast's own vocabulary", () => {
+    const out = peekText(peekViolation(0));
+    expect(out).toContain("сега");
+    expect(out).not.toMatch(/преди \d+ с/);
+  });
+
+  it("an UNSTAMPED card prints no age — the direction that costs a student", () => {
+    // `app/dev/popup-rig` and every non-toast item build these by hand. «сега»
+    // on a fault that may be a minute old is 04-t193s wearing the costume of
+    // its own fix, so the blank is asserted as hard as the age.
+    const out = peekText(peekViolation(null));
+    expect(out).toContain("Превишена скорост");
+    expect(out).not.toContain("сега");
+    expect(out).not.toMatch(/преди \d+ с/);
+    // …and nothing else on the card was displaced to make room for the blank.
+    expect(out).toContain("Ограничението е таван");
+  });
+
+  it("praise is NOT dated on this leg either — one authority, both surfaces", () => {
+    // `overlayCarriesMoment` is that authority. A commendation stamped by some
+    // future caller must still print nothing: it states no verdict about a past
+    // moment, so an age on it is furniture that costs a line of the 95.8 px
+    // this card has at 852 × 393.
+    const praise: SimOverlayItem = {
+      id: "toast:9",
+      kind: "praise",
+      tone: "good",
+      chipBg: "Браво",
+      lineBg: "Правилно отстъпено предимство",
+      raisedAtMs: Date.now() - 3000,
+    };
+    const out = peekText(praise);
+    expect(out).toContain("Правилно отстъпено предимство");
+    expect(out).not.toMatch(/преди \d+ с/);
+    expect(out).not.toContain("сега");
+  });
+
+  it("the two legs describe ONE fault with ONE string — that is the requirement", () => {
+    // The drift this whole pair of files exists to keep out: the phone saying
+    // «преди 8 с» and the desktop «преди 7 с» about one event on one drive.
+    // Same age, both surfaces, same words.
+    const ageMs = 8000;
+    expect(peekText(peekViolation(ageMs))).toContain("преди 8 с");
+    expect(columnText([raisedAgo(SPEEDING, ageMs)])).toContain("преди 8 с");
+  });
+});
+
 describe("THE OTHER DIRECTION — an unstamped card may not invent a moment", () => {
   it("prints no age at all rather than «сега»", () => {
     // `app/dev/popup-rig` builds `HudToast` literals by hand and carries no
@@ -271,7 +370,7 @@ describe("THE SURFACE THAT MOUNTS IT — the half this directory has got wrong b
     expect(MOUNT.test(regressed)).toBe(false);
   });
 
-  it("THE PHONE IS HALF COVERED, and WHICH half is recorded rather than implied", () => {
+  it("THE PHONE IS COVERED ON BOTH HALVES, and each half is named rather than implied", () => {
     // `compact ? null : <HudToasts …>` — the roomy leg only. On a phone the
     // shell re-maps every toast into a `SimOverlayItem` for `SimOverlay`, and
     // that shape used to carry no moment, so the stamp was dropped at this
@@ -283,12 +382,18 @@ describe("THE SURFACE THAT MOUNTS IT — the half this directory has got wrong b
     // this block's `not.toContain` went red on that edit, exactly as the field's
     // own ⚠ promised, and it is inverted here rather than deleted.
     //
-    // ⚠ THE GLASS HAS NOT MOVED YET, and saying so is the whole point of this
-    // block. The second half is `hud/SimOverlay.tsx`'s last row —
-    // `overlayMomentBg(item, now)` — which nothing calls today, so a phone card
-    // still prints no age. The field is FED and UNREAD, which is a half-state
-    // and is recorded as one: the frames above are NOT closed, and whoever
-    // renders that row closes them and inverts the second assertion below.
+    // ── AND INVERTED AGAIN, 2026-08-25 (O33's second half) ───────────────
+    // The glass has moved. `hud/SimOverlay.tsx`'s last row now calls
+    // `overlayMomentBg(shown, nowMs)` behind the `overlayCarriesMoment` guard,
+    // so the phone card prints the age the desktop has printed since the toast
+    // lane landed — proved by RENDER in „THE PHONE'S CARD, MOUNTED" above, and
+    // pinned to the source here so a re-map that quietly drops `raisedAtMs`
+    // again cannot leave that render passing on a hand-built item.
+    //
+    // BOTH ASSERTIONS BELOW STILL FAIL FOR A REGRESSION, which is the only
+    // reason to keep a source pin at all: the producer count goes to 1 if
+    // either kind loses its stamp, and the consumer check goes red if the call
+    // is deleted.
     const shell = readFileSync(
       resolve(__dirname, "../../../../components/sim/lesson-ui/LessonPlayShell.tsx"),
       "utf8",
@@ -298,10 +403,10 @@ describe("THE SURFACE THAT MOUNTS IT — the half this directory has got wrong b
     expect(mapped).toContain('kind: "violation"');
     // The producer side: both kinds that carry a moment are stamped.
     expect(mapped.match(/raisedAtMs: t\.raisedAtMs,/g) ?? []).toHaveLength(2);
-    // …and the consumer side is still absent. ← this is the line that inverts
-    // when the phone card finally prints the age.
+    // …and the consumer side is present, with its kind guard.
     const overlay = readFileSync(resolve(__dirname, "../SimOverlay.tsx"), "utf8");
-    expect(overlay).not.toContain("overlayMomentBg");
+    expect(overlay).toContain("overlayMomentBg(shown, nowMs)");
+    expect(overlay).toContain("overlayCarriesMoment(shown.kind)");
   });
 });
 

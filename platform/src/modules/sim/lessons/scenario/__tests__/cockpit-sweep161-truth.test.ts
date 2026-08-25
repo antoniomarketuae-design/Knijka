@@ -65,6 +65,7 @@ import {
   SC_PK_MOVE_OFF,
   SC_VP_STALL,
 } from "../templates-cockpit";
+import { compileScenario } from "../compile";
 import type { ScenarioSpec } from "../types";
 
 const REPO_ROOT = path.join(process.cwd(), "..");
@@ -504,6 +505,37 @@ describe("§5 the rewritten steps stay inside the compact card's band", () => {
  * line drives an unfailable rung of a lesson about stalling and completes it.
  * That gate needs a transmission channel no `ScenarioSpec` has (see the block
  * above `SC_VP_STALL.instructionsBg`).
+ *
+ * =============================================================================
+ * ROUND 11, 2026-08-25 — THE RULE ABOVE IS REPLACED, NOT DELETED.
+ * =============================================================================
+ *
+ * The next sweep judged sc-vp-stall:e4dfb43f STILL: gear D on all 80 sampled
+ * frames of pc-right, pc-wrong and mobile-right. The ordered switch is a better
+ * SENTENCE than the preference it replaced and it bought nothing, because the
+ * problem was never the sentence's grammar — it was that a lesson which cannot
+ * exist until the student changes a simulator setting is a lesson nobody
+ * performs. Round 10's own note ends by routing the channel that fixes it
+ * («contracts.ts + compile.ts + LessonScene.tsx»); that channel is now
+ * `start.openingTier`, and the car arrives manual.
+ *
+ * So the bar moves from ORDER THE SWITCH to HAND OVER THE CAR — and the old
+ * assertion inverts, because doc 86 L10's rule now applies to it: a hand-over
+ * that already performed the act must not carry a briefing ordering it, or the
+ * order is pre-performed exactly the way `sc-park-night`'s headlights were.
+ * `SWITCH_TO_TIER_RE` and `TIER_AS_PREFERENCE_RE` are kept and both are still
+ * asserted — a drill may now say neither — so §6b still has teeth in both
+ * directions and the round-10 shape cannot come back unnoticed.
+ *
+ * `objectiveBg` STILL NAMES THE TIER, and that half of round 10 is untouched:
+ * the lesson tile is the only surface a student who never opens the briefing
+ * reads, and „Напреднал" there is what tells them why this cockpit has a third
+ * pedal when no other lesson's does.
+ *
+ * WHAT IS STILL NOT DONE, so the row does not read as fully retired: a student
+ * who clicks „Нормален" mid-drive gets the automatic back and nothing says what
+ * the remaining steps now mean. `onTransmissionChanged` (LessonScene →
+ * LessonPlayShell) announces the moved selector and not the lost clutch.
  */
 
 /** The tier asked for as an act: the imperative, then the tier's own label. */
@@ -534,8 +566,12 @@ describe("§6 a drill that needs the manual tier ORDERS the switch and says so e
   });
 
   for (const spec of manualDrills()) {
-    it(`${spec.id} — the switch is an instruction, not a preference`, () => {
-      expect(spec.instructionsBg.some((s) => SWITCH_TO_TIER_RE.test(s.textBg))).toBe(true);
+    it(`${spec.id} — the manual tier is HANDED OVER, not asked for`, () => {
+      // The car arrives with the gearbox the steps command…
+      expect(spec.start.openingTier).toBe("advanced");
+      // …so the briefing must neither ORDER the switch (an act already
+      // performed — doc 86 L10) nor state it as a wish (round 10's finding).
+      expect(spec.instructionsBg.filter((s) => SWITCH_TO_TIER_RE.test(s.textBg))).toEqual([]);
       expect(spec.instructionsBg.filter((s) => TIER_AS_PREFERENCE_RE.test(s.textBg))).toEqual([]);
     });
 
@@ -547,15 +583,54 @@ describe("§6 a drill that needs the manual tier ORDERS the switch and says so e
     });
   }
 
-  it("§6b TEETH — the shipped-before sentence fails both halves, the new one passes", () => {
-    // Both directions, or the predicates guard nothing: the exact text that was
-    // on the glass in w10-3 is refused, and the text that replaced it is not.
-    const before = "Закопчай колана. Урокът иска ниво „Напреднал“ — с ръчни скорости и съединител.";
-    expect(SWITCH_TO_TIER_RE.test(before)).toBe(false);
-    expect(TIER_AS_PREFERENCE_RE.test(before)).toBe(true);
+  it("§6b TEETH — both shipped-before sentences are refused, the new one is not", () => {
+    // Both predicates in both directions, or they guard nothing. These are the
+    // two sentences that were actually on the glass, in order.
+    const shippedR9 = "Закопчай колана. Урокът иска ниво „Напреднал“ — с ръчни скорости и съединител.";
+    expect(TIER_AS_PREFERENCE_RE.test(shippedR9)).toBe(true); // the wish
+    const shippedR10 = "Закопчай колана и превключи на „Напреднал“ — на „Нормален“ колата е автоматик.";
+    expect(SWITCH_TO_TIER_RE.test(shippedR10)).toBe(true); // the order
 
+    // …and round 11's line is neither, because the tier is no longer the
+    // student's to set. It still carries the FACT — this cockpit has a clutch.
     const after = SC_VP_STALL.instructionsBg[0].textBg;
-    expect(SWITCH_TO_TIER_RE.test(after)).toBe(true);
+    expect(SWITCH_TO_TIER_RE.test(after)).toBe(false);
     expect(TIER_AS_PREFERENCE_RE.test(after)).toBe(false);
+    expect(after).toContain("съединител");
+  });
+
+  it("§6c — the drill without the field compiles to a car with NO CLUTCH", () => {
+    // THE FIRST CUT OF THIS TEST WAS VACUOUS and a verifier said so:
+    //
+    //     const withoutTier = { ...SC_VP_STALL, start: { …, openingTier: undefined } };
+    //     expect(withoutTier.start.openingTier).not.toBe("advanced");
+    //
+    // — true by construction. It restated the literal one line above it and
+    // asserted nothing about the production rule, which is the same failure as
+    // a gate that greps for its own comment.
+    //
+    // So the teeth are put where the rule actually runs: through
+    // `compileScenario` and out the other side as the GEARBOX. The negative
+    // case is the whole finding restated in one line — a manual drill that is
+    // not handed the tier lands the student in an automatic, which is what the
+    // sweep photographed as gear D on all 80 sampled frames.
+    const withoutTier: ScenarioSpec = {
+      ...SC_VP_STALL,
+      start: { ...SC_VP_STALL.start, openingTier: undefined },
+    };
+    const forgotten = compileScenario(withoutTier, 1);
+    expect(forgotten.openingTier).toBeUndefined();
+    expect(transmissionModeFor(forgotten.openingTier ?? DEFAULT_DIFFICULTY)).toBe("automatic");
+
+    // …and the shipped spec, through the same pipeline, hands over the car the
+    // four middle steps command.
+    const shipped = compileScenario(SC_VP_STALL, 1);
+    expect(shipped.openingTier).toBe("advanced");
+    expect(transmissionModeFor(shipped.openingTier ?? DEFAULT_DIFFICULTY)).toBe("manual");
+
+    // The control: MANUAL_ONLY_RE really does classify this spec as a drill
+    // that commands a manual-only control, so the rule is being applied to
+    // something rather than vacuously skipped.
+    expect(SC_VP_STALL.instructionsBg.some((s) => MANUAL_ONLY_RE.test(s.textBg))).toBe(true);
   });
 });

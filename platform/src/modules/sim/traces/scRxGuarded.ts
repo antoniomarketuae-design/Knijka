@@ -53,7 +53,40 @@ export function scRxGuardedShadowScript(): DriveScript {
       // Wait past the lift (26 s from ~t 20 → resume ~t 46 > 40, deep in the
       // open window [40, 90)).
       { kind: "pause", sec: 26, brake: true },
-      { kind: "annotation", textBg: "Бариерите са вдигнати напълно. Бърз оглед и премини решително — без спиране върху релсите." },
+      // WAS «Бариерите са вдигнати напълно. Бърз оглед и премини решително…» —
+      // an ORDER hung on a claim about the arm, and the arm is world data on a
+      // 90 s cycle while this caption fires at a fixed offset into the REPLAY.
+      // `.audit-frames/w10-3/frames/sc-rx-guarded__pc-right/04-t074s.png`: that
+      // exact sentence is on the deck-caption box with the red-and-white boom
+      // lying flat across the carriageway underneath it, the player at 19 км/ч
+      // and the scrubber at 0:46/1:06 — six seconds before the −10 «Влизане на
+      // прелез при спусната бариера» at 04-t082s. The drive's own clock reads
+      // ~114 s (04-t001s already starts at cyclePos ≈ 40), so cyclePos ≈ 24 and
+      // the arm is barred [0, 40) — the product ordered the crossing and then
+      // convicted the student of it. Two −10s and НЕИЗДЪРЖАН on the CORRECT
+      // leg: a false refusal, bought with our own instruction.
+      //
+      // The repair is the one templates-rail.ts already made to objectiveBg and
+      // instruction 1 — „the scenery is described here; the PHASE is read off
+      // the arm, which is the only thing that can be right every second." The
+      // caption now names the CONDITION and never the state, so it is true at
+      // every phase of the cycle and at every offset of the replay clock; and
+      // it is the ratified voice of ae4a499 («Премини спокойно едва когато
+      // пътеката е свободна»), which no-spoiler-captions.test.ts now enforces
+      // for booms as well as for zebras.
+      //
+      // THE ROW IS NOT CLOSED BY THIS, and saying so here is the point of
+      // writing it here. e0c40055 also bills `rightCredited=NO` and
+      // `wrongConvicted=NO`, and this edit touches no barrier phase, no shadow
+      // timing (the `pause` above is untouched), no objective demand and no
+      // grading rule. Re-drive the correct leg and it is convicted again, by the
+      // same rule, at the same second — a caption is not an input to a steered
+      // drive. The routed owner is templates-rail.ts's own note at the
+      // `sc-rxg-finish` disc: a `requireRailClear` demand in lessons/objectives.ts
+      // reading `tick.railBarred`, shaped like `requireControllerProceed`
+      // (2026-08-19). Same clause stands open on sc-rx-barrier-drop, which has
+      // its own frame — `.audit-frames/w10-1/frames/sc-rx-barrier-drop__pc-right/`.
+      { kind: "annotation", textBg: "Премини решително едва когато лостът се вдигне ДОКРАЙ — бърз оглед наляво и надясно, без спиране върху релсите." },
       { kind: "glance", mirror: "left" },
       { kind: "glance", mirror: "right" },
       { kind: "drive", points: [[X_LANE, 146], [X_LANE, 190]], targetKmh: 25, stopAtEnd: false },

@@ -604,6 +604,23 @@ export function advisorPromptForObjective(
 }
 
 /**
+ * Seconds this hold has been standing, off the session's own clock.
+ *
+ * `lastT` is the tick the session was last folded on and `sinceSec` is the tick
+ * the hold began — the same pair `stepYieldVoice` measures its stages against,
+ * so the card and the voice can never disagree about how long the wait has
+ * been. Nothing here is graded; the worst a wrong number can do is change a
+ * coaching card one tick early or late. Undefined when the hold carries no
+ * start (a hand-built session in a test, an older client), which
+ * `yieldWaitAdvisorPrompt` reads as „keep the opening card".
+ */
+function heldWaitSec(s: LessonSessionState, wait: YieldWaitState): number | undefined {
+  if (wait.sinceSec === null) return undefined;
+  const held = s.lastT - wait.sinceSec;
+  return Number.isFinite(held) && held >= 0 ? held : undefined;
+}
+
+/**
  * The advisor's single entry point: the NEXT expected action for a live
  * session, or null when there is nothing to advise (exam mode, ended
  * session, free drive / all objectives done).
@@ -633,7 +650,7 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     return trailing.reason === "redLight" &&
       lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))
       ? controllerWaitAdvisorPrompt()
-      : yieldWaitAdvisorPrompt(trailing.reason);
+      : yieldWaitAdvisorPrompt(trailing.reason, heldWaitSec(s, trailing));
   }
   const active = s.objectives[s.currentObjectiveIndex];
 
@@ -669,7 +686,7 @@ export function advisorPromptForSession(s: LessonSessionState): AdvisorPrompt | 
     if (waiting.reason === "redLight" && lessonStagesController(s.lesson, s.objectives.map((o) => o.spec))) {
       return controllerWaitAdvisorPrompt();
     }
-    return yieldWaitAdvisorPrompt(waiting.reason);
+    return yieldWaitAdvisorPrompt(waiting.reason, heldWaitSec(s, waiting));
   }
 
   // The author's own cap comes off the RAW compiled objective, not off
@@ -853,6 +870,41 @@ export const YIELD_VOICE_DEPART_GRACE_S = 10;
 export const YIELD_VOICE_EPISODE_GAP_S = 12;
 
 /**
+ * Continuous seconds of lawful standstill after which the CARD stops saying
+ * «Чакаш правилно» and starts saying how the wait ends.
+ *
+ * WHY THERE IS A SECOND CARD AT ALL — sc-rb-ped-exit:c1e5b6df, and rule 1 above
+ * is why there is exactly one more and not a counter. The card was constant for
+ * the whole hold, and the hold's own ceiling is YIELD_WAIT_MAX_S = 180 s. So a
+ * student who has stopped at a mouth that has since emptied reads
+ * «Чакаш правилно — в кръга имат предимство» for three minutes, and the
+ * settled line under it says «Стоиш вече N секунди и това е правилно». Measured
+ * on the steered re-drive of the roundabout drill
+ * (.audit-frames/w10-1/frames/sc-rb-ped-exit__pc-right/run.log): LAWFUL WAIT
+ * declared at t = 24 s and again at t = 75 s, «Чакаш правилно» unchanged both
+ * times and for 45 s after the ring had cleared — 90 s of a 210 s lesson spent
+ * being told that standing still was the manoeuvre. Doc 64 THEO-4 asks this
+ * product to explain every decision it announces; a decision that has stopped
+ * being true is the one case where repeating the explanation is the defect.
+ *
+ * THIRTY SECONDS, AND EVERY SHIPPED CYCLE IS UNDER IT. The longest signalized
+ * red on the shipped maps is 26 s of a 50 s cycle (see YIELD_VOICE_SETTLE_S,
+ * which reads the same three numbers for the opposite end of the wait), and the
+ * roundabout drill's circulator laps in ~39 s — so by 30 s the student has seen
+ * the ring's whole near side go by at least once and the reassurance at 10 s
+ * has had twenty seconds to be believed. It is also far inside the 180 s
+ * ceiling, so the card changes while the hold is still live rather than after
+ * the gates have already resumed underneath it.
+ *
+ * IT CHANGES ONCE, WHICH IS WHY IT MAY CHANGE AT ALL. The shell keys its
+ * announce/dismiss on the card's TEXT (LessonPlayShell `advisorDismissed` /
+ * `useFreshKey`), so a card that counted seconds would re-announce every frame
+ * — rule 1's nag in a different hat. One transition per hold is one
+ * re-announcement, at the moment there is something new to say.
+ */
+export const YIELD_CARD_LONG_WAIT_S = 30;
+
+/**
  * Graded codes that MUTE the gap verdict for the wait they land on. Every one
  * of them means the departure was judged and judged badly, by the channel that
  * is allowed to judge — the verdict would either contradict it or, worse,
@@ -924,6 +976,26 @@ const LAW_RED_LIGHT = `${VIOLATIONS.RED_LIGHT_CROSSED.lawRef}; ЗДвП чл. 50
 interface YieldVoiceCopy {
   /** The advisor card, CONSTANT for the whole wait (see rule 1 above). */
   cardBg: string;
+  /**
+   * THE SECOND — AND LAST — CARD OF A WAIT THAT HAS OUTLASTED ITS OWN REASON
+   * (sc-rb-ped-exit:c1e5b6df, 2026-08-25). Present only on the three duties a
+   * driver DISCHARGES BY LOOKING; see `YIELD_CARD_LONG_WAIT_S` for the number
+   * and `longCardBg`'s absence on `redLight`/`pedestrian` for the safety line.
+   *
+   * AND IT MAY NOT BE TALLER THAN THE CARD IT REPLACES. The first draft of
+   * these three was 165/189/170 characters against an opening-card corpus whose
+   * worst case had ever been 132 — +2, +4 and +4 whole lines in the 117 px
+   * phone content box, into a column that is height-capped and folds what it
+   * cannot fit (`notifyColumn.ts`, and the sweep filed «↓ ОЩЕ 6 РЕДА» on the
+   * card BELOW this one in the same run). That is a layout defect traded for a
+   * copy defect: the student is handed the sentence that finally tells him how
+   * the wait ends, and it pushes the card under it off the glass. The copy was
+   * cut to 130/122/113 and the transition now costs the column nothing —
+   * measured, per reason, in `advisor-yield-long-wait.test.ts` §4 with the same
+   * greedy wrapper and the same 35-chars-per-216 px ratio `advisorFace.test.tsx`
+   * measures the face with.
+   */
+  longCardBg?: string;
   namedTitleBg: string;
   namedBg: string;
   settledTitleBg: string;
@@ -944,6 +1016,15 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   roundaboutEntry: {
     cardBg:
       "Чакаш правилно — в кръга имат предимство. Гледай НАЛЯВО и тръгвай, когато можеш да влезеш, без някой в кръга да намалява заради теб.",
+    // The ring is the one duty whose end the driver reads for himself: there is
+    // no lamp and nobody waves him in. So the „go" is never unconditional — it
+    // is the back half of a sentence whose front half is the look, which is the
+    // sentence an instructor in the right-hand seat says at half a minute. The
+    // closing clause survives the length cut because „чакам си реда" is the
+    // misconception this drill was written against; `settledBg` teaches it at
+    // length and this is its five-word form.
+    longCardBg:
+      "Чакането стана дълго. Погледни пак НАЛЯВО: празен ли е кръгът, интервалът е твой — влизай сега. Ред по пристигане на кръгово няма.",
     namedTitleBg: "Защо чакаш: в кръга имат предимство",
     namedBg:
       "Спрял си правилно. На входа на кръгово кръстовище не може да стои знак „Път с предимство“ — там винаги е Б1 или Б2, тоест ти си на пътя без предимство и пропускаш движещите се в кръга. Гледай НАЛЯВО. Интервалът, който чакаш, е такъв, че да влезеш и да набереш скоростта на кръга, без движещият се в него да намалява заради теб.",
@@ -966,6 +1047,15 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   giveWayLine: {
     cardBg:
       "Чакаш правилно — знак Б1: пропускаш движещите се по пътя с предимство. Огледай ляво–дясно–ляво и тръгвай в реален интервал.",
+    // Б1 does not demand a full stop at all, so half a minute at the line is
+    // already far past what the sign asks. The poor-visibility answer — edge
+    // out slowly until you see, then stop again — is NOT repeated here: this
+    // reason's `settledBg` closes on exactly that sentence and the voice speaks
+    // it at YIELD_VOICE_SETTLE_S = 10 s, twenty seconds before this card can
+    // appear. Restating it cost the phone column four lines it does not have
+    // (see `longCardBg`'s own note above).
+    longCardBg:
+      "Чакането стана дълго. Б1 иска да пропуснеш, не да стоиш: огледай пак ляво–дясно–ляво и щом главният е чист — тръгвай сега.",
     namedTitleBg: "Защо чакаш: знак Б1 „Пропусни движението“",
     namedBg:
       "Спрял си правилно. Знакът Б1 те поставя на пътя БЕЗ предимство: на кръстовище, на което единият път е сигнализиран като път с предимство, водачите от другите пътища са длъжни да пропуснат движещите се по него. Пълно спиране Б1 не изисква — задължението е да пропуснеш. Огледай ляво–дясно–ляво и чакай интервал, в който пресичаш, без някой по главния път да намалява заради теб.",
@@ -980,6 +1070,11 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   stopSign: {
     cardBg:
       "Знак Б2: пълното спиране е задължително — и е направено. Сега пропусни движещите се по пътя с предимство.",
+    // The first half of the Б2 duty is DONE by the time this card can appear —
+    // the wheels have been still for half a minute. What is left is the second
+    // half, and it ends when the road is clear, not when a clock says so.
+    longCardBg:
+      "Чакането стана дълго. Спирането по Б2 е направено — остава да пропуснеш: огледай пак и ако е чисто, тръгвай сега.",
     namedTitleBg: "Защо чакаш: знак Б2 „Спри! Пропусни движението!“",
     namedBg:
       "Спрял си правилно, и точно тук пълното спиране е задължително — на Б2 се спира докрай ВИНАГИ, дори пътят да изглежда празен. Колелата неподвижни, брой наум до три, огледай ляво–дясно–ляво. Спирането обаче е само първата половина: знакът иска и да ПРОПУСНЕШ движещите се по пътя с предимство, така че тръгваш чак когато никой не приближава.",
@@ -1064,12 +1159,49 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
   },
 };
 
-/** The card line for a live wait — constant per reason, by design (rule 1). */
-export function yieldWaitAdvisorPrompt(reason: YieldReason): AdvisorPrompt {
-  // No key chips: the correct action is to keep the car still, and the honesty
-  // rule of this file is that a chip must name a control that PERFORMS the
-  // step. There is no key for „carry on doing nothing".
-  return { textBg: YIELD_VOICE_COPY[reason].cardBg, keys: [] };
+/**
+ * The card line for a live wait — constant per reason, by design (rule 1), with
+ * the ONE documented transition at YIELD_CARD_LONG_WAIT_S.
+ *
+ * `heldSec` is the seconds the car has been standing THIS hold; omitting it
+ * (every existing caller, and every test double that has no clock) keeps the
+ * opening card, which is the behaviour this function has always had.
+ *
+ * TWO REASONS DELIBERATELY HAVE NO SECOND CARD, and the omission is the whole
+ * safety argument rather than an oversight. `redLight` and `pedestrian` are the
+ * duties whose end is declared by something OUTSIDE the car — a lamp turning
+ * green, a person reaching the kerb. There is no length of wait at which
+ * „огледай пак и тръгвай" becomes true of either, and a card that hinted at it
+ * would be this product telling a seventeen-year-old to move off against a red
+ * or across a live crossing. They keep their constant card for as long as the
+ * hold lasts. `yieldCardCopyCoversLongWait` (below) is what stops a future
+ * author closing that gap for tidiness.
+ */
+export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): AdvisorPrompt {
+  const copy = YIELD_VOICE_COPY[reason];
+  const longCard = copy.longCardBg;
+  // An unreadable clock is NOT a long wait — the same direction the demo deck
+  // and the touch hint take with an unreadable speed: a number nobody can read
+  // must never be able to change what the student is being told.
+  const held = heldSec !== undefined && Number.isFinite(heldSec) ? heldSec : -1;
+  // No key chips on EITHER card: the honesty rule of this file is that a chip
+  // must name a control that PERFORMS the step, and neither „carry on doing
+  // nothing" nor „look left again" is a key.
+  const textBg =
+    longCard !== undefined && held >= YIELD_CARD_LONG_WAIT_S ? longCard : copy.cardBg;
+  return { textBg, keys: [] };
+}
+
+/**
+ * Which duties carry a second card — read by the gate, not by the shell.
+ *
+ * Exported so `advisor-yield-long-wait.test.ts` can assert the SPLIT rather
+ * than the five strings: the property that matters is that exactly the
+ * look-and-go duties have one, and adding a sixth `YieldReason` must make
+ * somebody decide which side it falls on.
+ */
+export function yieldCardCopyCoversLongWait(reason: YieldReason): boolean {
+  return YIELD_VOICE_COPY[reason].longCardBg !== undefined;
 }
 
 /** Fresh voice: nothing said, nothing pending. */

@@ -604,8 +604,15 @@ export const REACH_ZONE_HALT_CAP_KMH = 8;
  *
  * THE CODE NOW SAYS WHAT THE HUD ALREADY PROMISED. lessons/engine.ts renders
  * this exact sentence off `overCapNoted`: «Задачата иска да си тук с не повече
- * от N км/ч, а в момента караш M км/ч … Ако я подминеш с тази скорост,
- * задачата остава неизпълнена.» Passing it at that speed did NOT leave the
+ * от N км/ч, а стигна дотук с M км/ч … Ако я подминеш с тази скорост,
+ * задачата остава неизпълнена.» (It said «а в момента караш M км/ч» until
+ * 2026-08-25 — a present tense over a frozen sample, which the card's own
+ * «Намали СЕГА» falsified; see the block at that string. The middle clause has
+ * a second form, «а върху точката вдигна скоростта до M км/ч», for the frame
+ * this latch fires on a car that ARRIVED legally and lost the speed after —
+ * which is what the 29 gates carrying a `requireLamps`/`requireGear` demand
+ * beside their cap do on their mistake lane.) Passing it at that
+ * speed did NOT leave the
  * task unfulfilled whenever the latch had already been banked — the card was
  * describing behaviour the evaluator did not have.
  *

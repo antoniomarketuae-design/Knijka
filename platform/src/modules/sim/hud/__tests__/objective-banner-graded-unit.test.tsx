@@ -105,9 +105,15 @@ describe("the graded speed leaves this component in one piece", () => {
   });
 
   it("…and on the completion-flash branch, which is the narrower box", () => {
-    // `px-3` a side against the steady branch's `px-1`, plus a 20 px tick and
-    // an 8 px gap: the tick card has 40 px less room for the same sentence, so
+    // `px-3` a side against the steady branch's `px-2`, plus a 20 px tick and
+    // an 8 px gap: the tick card has 36 px less room for the same sentence, so
     // it is the branch a wrap is MORE likely on.
+    //
+    // IT WAS 40 UNTIL 2026-08-25, when the steady branch went `px-1` → `px-2`
+    // to buy its shade's ramps a place to live that is not on top of the
+    // sentence (`ObjectiveBanner`'s `OBJECTIVE_SCRIM_FEATHER_PX`). The gap
+    // between the two branches narrowed by exactly that 2 × 4 px; which branch
+    // is the tighter one did not change.
     expect(nowrapRuns(flashing(CAPPED))).toEqual(["110 км/ч"]);
   });
 

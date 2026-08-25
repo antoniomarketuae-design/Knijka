@@ -48,7 +48,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { VehicleSample } from "@/modules/sim/contracts";
-import type { LessonSpec } from "@/modules/sim/lessons";
+import { shownObjectiveCapKmh, type LessonSpec } from "@/modules/sim/lessons";
 import {
   LOOKAHEAD_MAX_LEGS,
   ROUTE_MAX_SAMPLES,
@@ -69,6 +69,8 @@ import {
   MARKER_SIGN_POST_BASE_Y,
   MARKER_SIGN_POST_RADIUS_M,
   CROSSING_MUTE_MAX_SPANS,
+  MUTE_EDGE_M,
+  MUTE_UNUSED_S,
   type DerivedRoute,
   type GuidanceGoal,
   type GuidancePointGoal,
@@ -474,17 +476,10 @@ const RIBBON_VERT = /* glsl */ `
   }
 `;
 
-/** Ramp length at each end of a crossing gap, m. */
-const MUTE_EDGE_M = 1.2;
-/**
- * Sentinel for an unused mute slot — far past any route this product derives
- * (LOOKAHEAD_MAX_M is 170 m and the longest single leg is EMERGENCY_AHEAD_M at
- * 150), and deliberately NOT 1e9: the shader evaluates
- * `smoothstep(s − MUTE_EDGE_M, s, vS)` on every slot, and at 1e9 a float32
- * cannot represent the 1.2 m offset, so edge0 == edge1 and the smoothstep
- * divides by zero. 1e6 keeps the two edges distinct with six digits to spare.
- */
-const MUTE_UNUSED_S = 1e6;
+// `MUTE_EDGE_M` and `MUTE_UNUSED_S` were declared here while this was the only
+// ribbon that muted. They live in `scene/guidanceRoute.ts` beside
+// `CROSSING_MUTE_MAX_SPANS` now, because `ShadowCar.tsx` draws the second one
+// and reads the same spans — see that file's own block.
 
 const RIBBON_FRAG = /* glsl */ `
   uniform vec3 uColor;
@@ -713,17 +708,56 @@ export function postedLimitAt(
   return best;
 }
 
-/** Second line of the chip: the objective's hidden speed contract, spelled
- *  out. A gate that silently demands ≤5 km/h is the whole of doc 86 T8.
- *  `postedKmh` is the street's own limit at the marker — see postedLimitAt. */
-export function capLineBg(goal: GuidancePointGoal, postedKmh?: number): string {
+/**
+ * Second line of the chip: the objective's hidden speed contract, spelled
+ * out. A gate that silently demands ≤5 km/h is the whole of doc 86 T8.
+ * `postedKmh` is the street's own limit at the marker — see postedLimitAt.
+ *
+ * ── THE THIRD NUMBER, AND WHY IT IS THE ONE THE PLAQUE MUST PRINT ──────────
+ * w10-3, `sc-follow-tailgater/pc-right/04-t087s.png`, ALL THREE ON ONE
+ * PHOTOGRAPH: this plaque at the waypoint reads «Карай дотук · не по-бързо от
+ * 41 км/ч», the task chip immediately right of it «дръж под 36 км/ч», and the
+ * cockpit strip under both «задачата иска ≤36». One objective, «Успокой
+ * темпото», authored `reachZone(maxSpeedKmh: 36)`; the 41 is the L1 rung's
+ * 5 км/ч of grace folded in by `scenario/params.ts widenSpeedCap`.
+ *
+ * B58 already taught this chip not to print above the SIGN. It was still
+ * printing above the SENTENCE. The card, the toast and the strip were
+ * reconciled on O51 — all three read the advisor's spoken figure, directly or
+ * parsed back out of it (`LessonPlayShell.taskCapKmhFromPrompt`) — and this
+ * plaque, the only one of the four that lives in the world rather than on the
+ * HUD, was left holding the raw compiled gate. `advisor.ts` measured the class
+ * at 212 of 953 capped cards where the gate stands above the spoken number.
+ *
+ * THE CLAMP CANNOT REFUSE A CORRECT DRIVE, and that asymmetry is the whole
+ * licence for it: nothing here touches the gate, which still accepts 41. The
+ * plaque only ever comes DOWN to what the student was already told, so a
+ * student who obeys the world drives inside the number that grades him. The
+ * mirror of B58's own rule, one surface further in: the label may be stricter
+ * than the gate, never more permissive than the law — and never louder than
+ * the lesson.
+ *
+ * `shownKmh` absent ⇒ bit-identical to the shipped label, which is what keeps
+ * every hand-built goal and every uncompiled lesson unchanged.
+ */
+export function capLineBg(
+  goal: GuidancePointGoal,
+  postedKmh?: number,
+  shownKmh?: number,
+): string {
   if (goal.maxSpeedKmh === undefined) return "";
   // A HALT demand is never clamped: «спри — под 5 км/ч» is already far below
   // any posted limit, and min() there would silently turn a stop into a limit.
+  // The spoken figure is excluded for the same reason — `spokenCapKmh` speaks
+  // in км/ч and «спри» is not a speed.
   const shown =
-    goal.affordance === "halt" || postedKmh === undefined
+    goal.affordance === "halt"
       ? goal.maxSpeedKmh
-      : Math.min(goal.maxSpeedKmh, postedKmh);
+      : Math.min(
+          goal.maxSpeedKmh,
+          postedKmh ?? Number.POSITIVE_INFINITY,
+          shownKmh ?? Number.POSITIVE_INFINITY,
+        );
   return goal.affordance === "halt"
     ? `спри — под ${Math.round(shown)} км/ч`
     : `не по-бързо от ${Math.round(shown)} км/ч`;
@@ -741,6 +775,10 @@ export function makeLabelTexture(
   /** `false` builds the TITLE-ONLY plate — the one the sign wears outside
    *  MIN_LEGIBLE_CAP_CSS_PX. See the LABEL_CAP_PX block. */
   withCap = true,
+  /** The figure the advisor is already speaking for this objective — see
+   *  `capLineBg`. Last, and after `withCap`, so the two plates stay the same
+   *  call with ONE argument different. */
+  shownKmh?: number,
 ): THREE.CanvasTexture | null {
   if (!goal || !goal.marker || typeof document === "undefined") return null;
   const canvas = document.createElement("canvas");
@@ -748,7 +786,7 @@ export function makeLabelTexture(
   canvas.height = LABEL_PX_H;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  const cap = withCap ? capLineBg(goal, postedKmh) : "";
+  const cap = withCap ? capLineBg(goal, postedKmh, shownKmh) : "";
   ctx.clearRect(0, 0, LABEL_PX_W, LABEL_PX_H);
   // Near-opaque, not 0.72. The panel's job is to be the GROUND its own text
   // stands on; at 0.72 the world's value came through it and the glyphs were
@@ -900,9 +938,30 @@ export function RouteGuidance({
     () => (pointGoal ? postedLimitAt(district, pointGoal.x, pointGoal.y) : undefined),
     [district, pointGoal],
   );
+  /**
+   * O51/B58 — THE FIGURE THE STUDENT WAS ALREADY TOLD, for the one surface
+   * that was still printing the raw gate. See `capLineBg`'s own block for the
+   * photograph (41 on this plaque, 36 on the chip, ≤36 on the strip).
+   *
+   * `shownObjectiveCapKmh` is the advisor's resolution, exported from
+   * `@/modules/sim/lessons` — not re-derived here, because a second copy of
+   * that arithmetic is how the four surfaces disagreed in the first place. It
+   * needs the objective as COMPILED (`lesson.objectives[i]`), because the
+   * author's pre-grace number rides on a key `parseObjectiveParams` drops.
+   *
+   * `undefined` for an objective that is not the active one, has no cap, or
+   * belongs to a lesson compiled outside `scenario/compile.ts` — and absent it
+   * `capLineBg` is bit-identical to what shipped.
+   */
+  const shownAtGoal = useMemo(() => {
+    if (!pointGoal || pointGoal.maxSpeedKmh === undefined) return undefined;
+    const spec = lesson.objectives[activeObjectiveIndex];
+    if (!spec) return undefined;
+    return shownObjectiveCapKmh(spec, pointGoal.maxSpeedKmh, lesson.postedLimitKmh);
+  }, [pointGoal, lesson, activeObjectiveIndex]);
   const labelTexture = useMemo(
-    () => makeLabelTexture(pointGoal, postedAtGoal),
-    [pointGoal, postedAtGoal],
+    () => makeLabelTexture(pointGoal, postedAtGoal, true, shownAtGoal),
+    [pointGoal, postedAtGoal, shownAtGoal],
   );
   useEffect(() => () => labelTexture?.dispose(), [labelTexture]);
   /**
@@ -917,10 +976,10 @@ export function RouteGuidance({
    */
   const labelTextureNoCap = useMemo(
     () =>
-      pointGoal && pointGoal.marker && capLineBg(pointGoal, postedAtGoal) !== ""
-        ? makeLabelTexture(pointGoal, postedAtGoal, false)
+      pointGoal && pointGoal.marker && capLineBg(pointGoal, postedAtGoal, shownAtGoal) !== ""
+        ? makeLabelTexture(pointGoal, postedAtGoal, false, shownAtGoal)
         : null,
-    [pointGoal, postedAtGoal],
+    [pointGoal, postedAtGoal, shownAtGoal],
   );
   useEffect(() => () => labelTextureNoCap?.dispose(), [labelTextureNoCap]);
 

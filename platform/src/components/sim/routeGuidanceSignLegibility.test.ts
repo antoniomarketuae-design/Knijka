@@ -410,8 +410,13 @@ describe("the graded number is legible where it is printed, or it is not printed
     // The title-only plate is built from the same function with the cap
     // suppressed, so „drawn without the number" cannot silently become „not
     // drawn": `withCap` is the ONLY thing that changes.
-    expect(src2).toContain("const cap = withCap ? capLineBg(goal, postedKmh) : \"\";");
-    expect(src2).toContain("makeLabelTexture(pointGoal, postedAtGoal, false)");
+    // O51: `shownKmh` was threaded in after this pin was written, so both
+    // plates now take four arguments. The property the pin exists for is
+    // unchanged and is now literally visible — argument 3 is the ONLY one that
+    // differs between the two calls.
+    expect(src2).toContain("const cap = withCap ? capLineBg(goal, postedKmh, shownKmh) : \"\";");
+    expect(src2).toContain("makeLabelTexture(pointGoal, postedAtGoal, true, shownAtGoal)");
+    expect(src2).toContain("makeLabelTexture(pointGoal, postedAtGoal, false, shownAtGoal)");
   });
 
   it("the gate reads the LIVE window, not a device profile", () => {

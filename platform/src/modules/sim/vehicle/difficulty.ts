@@ -29,7 +29,11 @@
 import type { VehicleInput } from "./VehicleSim";
 import { AERO_DRAG, CHASSIS_LINEAR_DAMPING, CHASSIS_MASS, engineForceAt } from "./tuning";
 
-export type DifficultyMode = "beginner" | "normal" | "advanced";
+// The union itself lives in difficultyMode.ts — a leaf with no imports — so a
+// module can name a tier without pulling VehicleSim and rapier in behind it.
+// See that file for the closure this broke and the gate that caught it.
+export type { DifficultyMode } from "./difficultyMode";
+import type { DifficultyMode } from "./difficultyMode";
 
 export interface DifficultyPreset {
   labelBg: string;

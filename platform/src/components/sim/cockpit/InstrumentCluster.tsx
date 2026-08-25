@@ -150,6 +150,16 @@ import { applyCabinTelltaleRail } from "./cabinTelltaleRail";
 // The fix is the one line in `hexRgba`, so that both this file's runtime tones
 // and the builder's static ones move together; converting only the tones below
 // would invert TICK_DARK against the plate and make it worse.
+//
+// LANDED 2026-08-25 (sc-vp-telltale-red:622bf269). `hexRgba` now applies the
+// sRGB EOTF, so every tone on this face — the builder's ground/ink/edges and
+// the TONE table below alike — reaches the GPU linear and comes back out of the
+// renderer's encode as the authored hex. The gate is the ROUND TRIP rather than
+// the parse (clusterGeometry.test.ts: «hexRgba survives the renderer's own
+// encode, byte for byte»), because the shipped parse assertion was green on the
+// build that produced the frame above. What this does NOT buy is the other half
+// of the same row — a 28-design-unit lamp is ~9 CSS px in the cockpit, so the
+// colour now reads and the GLYPH still does not.
 
 /** Telltale pulse rate. Slow enough to read as an instrument warning, fast
  *  enough that a 3-second reel beat contains a full cycle. */

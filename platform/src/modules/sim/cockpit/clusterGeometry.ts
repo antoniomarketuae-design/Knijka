@@ -95,14 +95,56 @@ export interface Rgba {
   a: number;
 }
 
-/** "#rrggbb" → unit floats. Kept here (not in a shared util) because the
- *  cluster is the only consumer and the palette is a fixed table. */
+/**
+ * One channel of an sRGB hex → the LINEAR value a vertex-colour attribute has
+ * to carry.
+ *
+ * THE MEASUREMENT, AND WHY IT COSTS A LESSON (sc-vp-telltale-red:622bf269,
+ * critical; the block at InstrumentCluster.tsx's palette comment, which
+ * diagnosed this and could not reach it from there).
+ *
+ * `hexRgba` used to divide the byte by 255 and stop. Three's ColorManagement
+ * converts `Color.setHex`; it never converts a raw `BufferAttribute`, so the
+ * number went to the GPU as LINEAR and came back through the renderer's
+ * linear→sRGB output encode. Two exact matches read off the shipped frame
+ * (`.audit-frames/sweep161/sc-vp-readiness/mobile-right/04-t102s.png`): the
+ * housing ground #05070c (5,7,12) arrived as (38,46,61) and INK_FORE #e8eef8
+ * (232,238,248) as (245,247,252) — both to the digit predicted by encoding the
+ * raw fraction a second time.
+ *
+ * What that costs, in the order it matters: it turns warn #ff6a58 into pale
+ * salmon and caution #ffc24b into pale cream, and the whole of
+ * sc-vp-telltale-red is «цветът на лампата решава какво правиш» — yellow means
+ * carry on to a garage, red means stop NOW. Two washed pastels a few percent
+ * apart are not a triage a seventeen-year-old can make at 9 CSS px. It also
+ * lifts the deep ground to mid slate and flattens TICK_DARK against TICK_LIT,
+ * so the dial's arc stops reading as a rate.
+ *
+ * THE CONVERSION LIVES HERE, not at the call sites, for the reason the
+ * diagnosis already gave: every tone on this face comes through this function —
+ * the builder's static ground, ink and edges AND the frame loop's lamp and tick
+ * colours — so converting a subset would invert TICK_DARK against its own plate
+ * and make the dial worse than it is now. The atlas is untouched: it is a
+ * canvas painted in CSS colours with `colorSpace = SRGBColorSpace`, which three
+ * decodes correctly on its own, and the vertex colour multiplies it.
+ *
+ * Pure black and pure white are fixed points of the transfer function, which is
+ * why they are the two the shipped test already pinned and why it still passes.
+ */
+function srgbChannelToLinear(c: number): number {
+  // The sRGB EOTF, exactly as three's ColorManagement applies it to a Color.
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/** "#rrggbb" → unit floats in LINEAR space (see above). Kept here (not in a
+ *  shared util) because the cluster is the only consumer and the palette is a
+ *  fixed table. `alpha` is NOT converted — opacity is not a colour. */
 export function hexRgba(hex: string, alpha = 1): Rgba {
   const n = parseInt(hex.slice(1), 16);
   return {
-    r: ((n >> 16) & 255) / 255,
-    g: ((n >> 8) & 255) / 255,
-    b: (n & 255) / 255,
+    r: srgbChannelToLinear(((n >> 16) & 255) / 255),
+    g: srgbChannelToLinear(((n >> 8) & 255) / 255),
+    b: srgbChannelToLinear((n & 255) / 255),
     a: alpha,
   };
 }

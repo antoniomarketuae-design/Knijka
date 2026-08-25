@@ -18,6 +18,7 @@ import type {
   StagedEventSpec,
 } from "../../contracts";
 import type { RuleEngineConfig } from "../../rules";
+import type { DifficultyMode } from "../../vehicle";
 import type { ObjectiveParams } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -173,6 +174,28 @@ export interface ScenarioStart {
    * the full A1 start (L4 exam-protocol levels typically override to cold).
    */
   vehicleStart?: "cold" | "ready";
+  /**
+   * The DIFFICULTY TIER this lesson opens on — and, because the tier is what
+   * decides it, WHICH GEARBOX the student is handed
+   * (`transmissionModeFor`: "advanced" → manual + clutch, everything else →
+   * automatic). Absent = `DEFAULT_DIFFICULTY`, which is every lesson but one.
+   *
+   * WHY A LESSON MAY DEMAND A TIER AT ALL — sc-vp-stall:e4dfb43f (critical).
+   * „Загасване при потегляне" enumerates clutch technique in four of its five
+   * steps and the round-10 repair asked the STUDENT to switch tiers first
+   * («превключи на „Напреднал“»). Measured on the next sweep: the gear reads D
+   * on all 80 sampled frames of all three legs, so the drill ran its whole
+   * life on a car with no clutch to press and no stall to make. The tier is
+   * not this lesson's SUBJECT — the clutch is — so asking for it in the
+   * briefing puts a simulator setting between the student and the lesson, and
+   * a lesson that must be configured before it exists is a lesson nobody
+   * performs. It is the same kind of fact as `vehicleStart`: which car is
+   * handed over. So it is declared here and honoured at mount.
+   *
+   * The tier PILL is untouched: this seeds the opening state, it does not pin
+   * it, and a student may still switch mid-drive exactly as before.
+   */
+  openingTier?: DifficultyMode;
 }
 
 /** One graded objective of the scenario (compiles to a LessonObjective). */

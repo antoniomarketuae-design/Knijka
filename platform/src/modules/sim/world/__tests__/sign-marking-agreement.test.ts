@@ -194,11 +194,19 @@ describe("ov-oneway-v1: the one-way street is SIGNED, not just painted", () => {
     expect(posts).toHaveLength(1);
     expect(terminal).toHaveLength(1);
     // The terminal plate stands at the east end of the east one-way arm and
-    // faces BACK along the flow, i.e. WEST — so the legal driver leaving the
-    // map reads its back and only a wrong-way entrant reads its face.
+    // its FACE looks EAST — ON with the flow — so the legal driver leaving the
+    // map reads the plate's grey back and only a wrong-way entrant, who is
+    // driving west into the arm, ever reads the red disc.
+    //
+    // THIS LINE ASSERTED THE OPPOSITE until 2026-08-25 (`tFace[0] < -0.8`),
+    // under the comment above it that already described the behaviour asserted
+    // now — a green test reporting safety for a plate aimed at the wrong
+    // reader. `StaticTransform.yaw` states the convention it got backwards:
+    // „+Z is the facing side", and `yawFromFacing` turns +Z onto the vector it
+    // is handed. See props.ts „THE FACE POINTED THE WRONG WAY" for the frame.
     const t = terminal[0]!;
     const tFace: [number, number] = [Math.sin(t.yaw), -Math.cos(t.yaw)];
-    expect(tFace[0]).toBeLessThan(-0.8);
+    expect(tFace[0]).toBeGreaterThan(0.8);
   });
 
   it("posts exactly one В1 on the west arm, whose flow points back at the junction", () => {
@@ -295,6 +303,116 @@ describe("ov-oneway-v1: the one-way street is SIGNED, not just painted", () => {
     // the rb maps are scenario micro-maps too, so only the ring guard saves them.
     for (const id of ["rb-2lane-v1", "rb-mini-v1", "rb-ped-v1"]) {
       expect(loadWorld(id).stats.signs.noEntry, `${id} posted a В1 on a ring`).toBe(0);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 2b. EVERY terminal В1 in the catalogue, not just ov-oneway's
+// ---------------------------------------------------------------------------
+// The general form of the one assertion above, and the reason it is general:
+// the single-instance version was pinned BACKWARDS and stayed green, so the
+// same inversion shipped on every other map the pass touches. A steered drive
+// photographed it — .audit-frames/w10-4/frames/sc-merge-accel-lane__mobile-
+// right/04-t072s.png: a full red В2 disc on a pole beside the acceleration lane
+// the briefing had just ordered the student up, on a lesson whose debrief then
+// teaches him «В2 „Влизането забранено" значи не влизаш».
+//
+// DERIVED, NEVER LISTED: every document in content/world is re-run through the
+// same rule `network.onewayTerminalNoEntryEdges` applies, and every district
+// that has such an edge is built. 9 of the 105 committed maps qualify today
+// (the two motorway carriageways and their ramps, the lane-drop merge, the
+// roadworks shift, the gantry street, the cane crossing, ov-oneway's far arm),
+// carrying 15 plates between them. A tenth map joins this gate on the day it
+// lands, with nothing to edit here.
+// ---------------------------------------------------------------------------
+
+/** The directory `loadRaw` resolves against, for the whole-catalogue pass. */
+function worldDir(): string {
+  const candidates = [
+    path.join(process.cwd(), "content", "world"),
+    path.resolve(process.cwd(), "..", "content", "world"),
+  ];
+  const dir = candidates.find((d) => fs.existsSync(d));
+  if (!dir) throw new Error(`content/world not found in: ${candidates.join(", ")}`);
+  return dir;
+}
+
+type DistrictEdgeDoc = District["roads"]["edges"][number];
+
+/** `network.onewayTerminalNoEntryEdges`, re-derived from the raw document — so
+ *  the gate cannot be satisfied by the builder agreeing with itself. */
+function terminalOneWayEdges(d: District): DistrictEdgeDoc[] {
+  const degree = new Map<string, number>();
+  for (const e of d.roads.edges) {
+    for (const id of [e.from, e.to]) degree.set(id, (degree.get(id) ?? 0) + 1);
+  }
+  const flowLeaves = new Set(
+    d.roads.edges.filter((e) => e.oneway && !e.roundabout).map((e) => e.from),
+  );
+  return d.roads.edges.filter(
+    (e) => e.oneway && !e.roundabout && (degree.get(e.to) ?? 0) < 3 && !flowLeaves.has(e.to),
+  );
+}
+
+describe("every terminal В1 in the catalogue addresses the wrong-way entrant", () => {
+  const signed = fs
+    .readdirSync(worldDir())
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => f.slice(0, -5))
+    .sort()
+    .map((id) => {
+      const district = loadDistrict(id);
+      return {
+        id,
+        terminals: terminalOneWayEdges(district),
+        // The SAME key `zoneSigns.scenarioSignScale` gates the pass on, read
+        // rather than re-guessed: an OSM city district's real signage was never
+        // recorded, so props.ts posts nothing there and this gate must not ask
+        // it to. d2-v1 and district-v1 have terminal one-way edges and are
+        // correctly bare.
+        micro: String(district.meta.mapKind ?? "").startsWith("scenario"),
+      };
+    })
+    .filter((d) => d.terminals.length > 0);
+
+  it("still finds the shape this pass exists for, on more than one map", () => {
+    // A FLOOR, not an equality: a new micro-map must JOIN the gate below, never
+    // renumber it. 9 scenario districts / 15 plates when this was written.
+    expect(signed.filter((s) => s.micro).length).toBeGreaterThanOrEqual(9);
+    expect(signed.map((s) => s.id)).toContain("mw-entry-v1");
+  });
+
+  it.each(signed.map((s) => s.id))("%s: no В1 looks back down its own one-way", (id) => {
+    const entry = signed.find((s) => s.id === id)!;
+    const terminals = entry.terminals;
+    const plates = loadWorld(id).signs.filter((s) => s.kind === "noEntry");
+    for (const e of terminals) {
+      const g = e.geometry;
+      const end = g[g.length - 1]!;
+      const prev = g[g.length - 2]!;
+      const len = Math.hypot(end[0] - prev[0], end[1] - prev[1]);
+      const tangent = [(end[0] - prev[0]) / len, (end[1] - prev[1]) / len] as const;
+      // Posted 1.4 m back along the flow and (halfWidth + 0.8) off the kerb —
+      // ~5.8 m from the terminal node on the widest (3-lane) map here, so 20 m
+      // catches the plate without reaching a neighbouring mouth: a node of
+      // degree < 3 has none.
+      const atMouth = plates.filter(
+        (p) => Math.hypot(p.position[0] - end[0], -p.position[2] - end[1]) < 20,
+      );
+      if (entry.micro) {
+        expect(atMouth.length, `${id}/${e.id}: the terminal mouth is unsigned`).toBeGreaterThan(0);
+      }
+      for (const p of atMouth) {
+        // yaw θ turns model +Z (StaticTransform: „+Z is the facing side") onto
+        // world (sinθ, cosθ); world +Z is district −y.
+        const face = [Math.sin(p.yaw), -Math.cos(p.yaw)] as const;
+        const withFlow = face[0] * tangent[0] + face[1] * tangent[1];
+        expect(
+          withFlow,
+          `${id}/${e.id}: the В1 face looks back at the LEGAL driver (face·flow ${withFlow.toFixed(3)})`,
+        ).toBeGreaterThan(0.8);
+      }
     }
   });
 });

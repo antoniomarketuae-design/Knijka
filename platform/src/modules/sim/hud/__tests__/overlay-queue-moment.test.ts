@@ -1,10 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+// The clock the phone's card runs, imported rather than read as text — see THE
+// GATE THAT A COMMENT SATISFIED below for why a source pin was not enough.
+import { startMomentClock } from "../SimOverlay";
 import {
   overlayCarriesMoment,
   overlayMomentBg,
   OVERLAY_MOMENT_NOW_MAX_MS,
+  OVERLAY_MOMENT_TICK_MS,
   whyIsReachable,
   WHY_REACHABLE_MIN_VISIBLE_FRACTION,
   hasWhy,
@@ -258,18 +262,150 @@ describe("the no-echo rule is now a predicate over any card, not a briefing conv
   });
 });
 
-describe("the field is declared here and NOT yet spent, which is asserted rather than hoped", () => {
-  it("`SimOverlayItem` carries `raisedAtMs` and the phone card still does not print it", () => {
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE GATE THAT A COMMENT SATISFIED — measured 2026-08-25, on this file.
+
+   The block below used to read `SimOverlay.tsx` raw and assert
+   `toMatch(/setInterval\(\(\) => setNowMs\(Date\.now\(\)\), …\)/)`. An
+   adversarial pass commented that one line out — the literal surviving only as
+   text — and ALL 43 TESTS IN THE TWO SUITES STAYED GREEN while the card
+   rendered a frozen timestamp: «преди 2 с» for the whole 8 s life of a card
+   whose entire purpose is to say how old the verdict is. The pin guarded the
+   presence of a STRING, not the presence of a CLOCK.
+
+   Both halves are closed here, because either alone still passes a mutation the
+   other catches:
+     · `overlayCode()` — the source pin now reads the file with every comment
+       STRIPPED, so commenting the call out is the same as deleting it. Mutate
+       this one by COMMENTING, not by deleting: commenting is the mutation that
+       used to survive.
+     · `startMomentClock` — the interval is an ordinary exported function, so it
+       can be driven under `vi.useFakeTimers()` and asserted to actually FIRE.
+       There is no DOM environment in this suite (`vitest.config.ts` →
+       `environment: "node"`), so a mounted component cannot be advanced through
+       time at all; a function can.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Source with every comment removed — line comments, block comments, and the
+ * JSX wrapper form, which is an ordinary block comment inside braces and so is
+ * covered by the same rule.
+ *
+ * Deliberately NOT a parser: the point is to be obviously right about the one
+ * thing it is for — the same idiom `tap-activation.test.ts:515` already uses on
+ * `TraceTimeline.tsx`, widened by one branch so a comment appended AFTER code on
+ * the same line goes too. It is asserted against a fixture below, because a
+ * stripper that quietly stopped stripping would hand back exactly the gate this
+ * file just lost.
+ */
+function stripComments(src: string): string {
+  return src
+    .replace(/\r\n/g, "\n")
+    // Block comments, which is also what a JSX `{/* … */}` wrapper is.
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    // Line comments — only on lines carrying no quote or backtick before the
+    // `//`, so a URL or a regex inside a string literal is left alone. A
+    // disabled line of code never has one.
+    .replace(/^[^\n"'`]*\/\/.*$/gm, "");
+}
+
+function overlayCode(): string {
+  return stripComments(
+    fs.readFileSync(
+      path.join(process.cwd(), "src", "modules", "sim", "hud", "SimOverlay.tsx"),
+      "utf8",
+    ),
+  );
+}
+
+describe("the source pin reads CODE, not text — the stripper is the instrument", () => {
+  it("a commented-out call is not a call, in all three shapes a mutation takes", () => {
+    // The instrument before the measurement, against a fixture rather than
+    // against the file: a stripper checked only on the real source passes the
+    // moment the source happens not to contain the shape it is meant to remove,
+    // and hands back exactly the gate this block exists because we lost.
+    const fixture = [
+      "  // return startMomentClock(() => setNowMs(Date.now()));",
+      "  /* return startMomentClock(() => setNowMs(Date.now())); */",
+      "  {/* return startMomentClock(() => setNowMs(Date.now())); */}",
+      "  return startMomentClock(() => setNowMs(Date.now()));",
+    ].join("\n");
+    const live = stripComments(fixture).match(/startMomentClock/g) ?? [];
+    expect(live, "three disabled copies, one live one").toHaveLength(1);
+    // …and it does not simply delete everything, which would pass the line
+    // above and turn every pin in this file green forever.
+    expect(stripComments(fixture)).toContain("return startMomentClock(() => setNowMs(Date.now()));");
+    // The real file still parses to code, i.e. the stripper did not eat it.
+    expect(overlayCode()).toContain("export function startMomentClock");
+  });
+});
+
+describe("THE CLOCK, DRIVEN — an age that does not advance is a timestamp", () => {
+  /**
+   * `startMomentClock` is the interval `SimOverlay`'s effect returns. The three
+   * assertions are the three ways the frozen card comes back: it never fires, it
+   * fires on the wrong cadence (the phone drifting a second from the desktop —
+   * see `OVERLAY_MOMENT_TICK_MS`), or it fires forever on a card that is gone.
+   */
+  it("fires once per OVERLAY_MOMENT_TICK_MS, and not before", () => {
+    vi.useFakeTimers();
+    try {
+      let ticks = 0;
+      const stop = startMomentClock(() => {
+        ticks += 1;
+      });
+      vi.advanceTimersByTime(OVERLAY_MOMENT_TICK_MS - 1);
+      expect(ticks, "nothing fires before the tick is due").toBe(0);
+      vi.advanceTimersByTime(1);
+      expect(ticks, "…and exactly one tick when it is").toBe(1);
+      vi.advanceTimersByTime(OVERLAY_MOMENT_TICK_MS * 2);
+      expect(ticks, "three seconds of a card's life is three refreshes").toBe(3);
+      stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("STOPS when the card goes — an interval outliving its card is a leak", () => {
+    // `SimOverlay` unmounts every time the queue goes quiet. Without the
+    // disposer this keeps calling `setNowMs` on a dead card once a second for
+    // the rest of the drive.
+    vi.useFakeTimers();
+    try {
+      let ticks = 0;
+      const stop = startMomentClock(() => {
+        ticks += 1;
+      });
+      vi.advanceTimersByTime(OVERLAY_MOMENT_TICK_MS);
+      expect(ticks).toBe(1);
+      stop();
+      vi.advanceTimersByTime(OVERLAY_MOMENT_TICK_MS * 10);
+      expect(ticks, "no tick survives the card").toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("the field is declared here and IS NOW SPENT, which is asserted rather than hoped", () => {
+  it("`SimOverlayItem` carries `raisedAtMs` and the phone card prints it", () => {
     /**
      * O33 asked for exactly this field, in these words: „so that whoever adds
      * the field to `SimOverlayItem` is told this file wants it."
      *
-     * The two edits that SPEND it are both outside this lane and both are named
-     * so neither can be lost — the shell's re-map (`LessonPlayShell.tsx`) and
-     * the phone card's last row (`SimOverlay.tsx`). This block asserts the
-     * CURRENT state of both, so it goes red the moment either lands and whoever
-     * lands it inverts it in the same commit. A row parked in prose is a row
-     * nobody finds again; this one fails.
+     * The two edits that SPEND it were both outside this lane and both were
+     * named so neither could be lost — the shell's re-map
+     * (`LessonPlayShell.tsx`, landed round 11) and the phone card's last row
+     * (`SimOverlay.tsx`). This block asserted the CURRENT state of both so it
+     * would go red the moment either landed, and it did, twice.
+     *
+     * ── INVERTED, 2026-08-25, ON THE FRAME THAT REPRODUCED ────────────────
+     * `w10-4/sc-sp-curve__mobile-wrong/04-t193s.png`: «−1 ИЗПИТНА Т. ·
+     * Превишена скорост» in the column, **11 км/ч** on the cluster, a 90 disc
+     * beside it. The card now dates itself, so it is inverted rather than
+     * deleted — the direction it guards is still live, in the other sense: a
+     * regression that stops calling `overlayMomentBg` puts the undated card
+     * back and this goes red for it.
      */
     const src = fs
       .readFileSync(
@@ -279,13 +415,34 @@ describe("the field is declared here and NOT yet spent, which is asserted rather
       .replace(/\r\n/g, "\n");
     expect(src).toMatch(/^\s*raisedAtMs\?: number;$/m);
 
-    const overlay = fs
+    const overlay = overlayCode();
+    // The consumer side, and BOTH halves of it: the string function, and the
+    // kind guard without which a «Браво» would carry a date.
+    expect(overlay).toContain("overlayMomentBg(shown, nowMs)");
+    expect(overlay).toContain("overlayCarriesMoment(shown.kind)");
+    // …and the clock that makes an age an age. A rendered-once number is a
+    // timestamp, not an age: it would read «преди 2 с» for the card's whole
+    // 8 s life. The interval is the half a string assertion cannot see —
+    // and READ THROUGH `overlayCode()`, which is the half a source pin cannot
+    // see. See the block above it: this exact assertion, written against the
+    // raw text, was satisfied by the line COMMENTED OUT.
+    expect(overlay).toContain("OVERLAY_MOMENT_TICK_MS");
+    expect(overlay).toMatch(/return startMomentClock\(\(\) => setNowMs\(Date\.now\(\)\)\);/);
+  });
+
+  it("the TICK is pinned against `HudToasts.tsx` too — one clock, two legs", () => {
+    // Same argument as the band above: a phone refreshing at 2 s while the
+    // desktop refreshes at 1 s prints «преди 6 с» for a second longer than the
+    // drive it describes, which is the drift `Math.round` exists to keep out
+    // arriving through the clock instead of through the arithmetic.
+    const toasts = fs
       .readFileSync(
-        path.join(process.cwd(), "src", "modules", "sim", "hud", "SimOverlay.tsx"),
+        path.join(process.cwd(), "src", "modules", "sim", "hud", "HudToasts.tsx"),
         "utf8",
       )
       .replace(/\r\n/g, "\n");
-    // ← inverts when the phone card starts printing the age.
-    expect(overlay).not.toContain("overlayMomentBg");
+    const tick = toasts.match(/TOAST_AGE_TICK_MS\s*=\s*(\d+)/);
+    expect(tick).not.toBeNull();
+    expect(Number(tick?.[1])).toBe(OVERLAY_MOMENT_TICK_MS);
   });
 });

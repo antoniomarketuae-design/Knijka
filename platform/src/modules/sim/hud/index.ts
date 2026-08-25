@@ -65,6 +65,39 @@ export {
   peekScrimBackgroundCss,
   peekScrimMaskCss,
 } from "./SimOverlay";
+/**
+ * THE LINE-GRID SNAP, PUBLISHED — sweep w10 round 11, and it was ROUTED here
+ * in writing before it was asked for.
+ *
+ * `LessonPlayShell`'s desktop ИНСТРУКЦИИ list carries this note at its own fade:
+ *
+ *   „NOT THE LINE-GRID SNAP. `SimOverlay.foldMaskCss` has a second branch that
+ *    moves the cut onto a line boundary so no glyph is ever partly painted …
+ *    That is the stronger repair and it is NOT done here — faded-through is
+ *    better than sliced-through and is not the same as uncut."
+ *
+ * The sweep kept filing the difference. `sc-pe-night-unlit/pc-right/01-arrival`
+ * and `sc-pe-zone-living/pc-right/04-t017s` are both „a numbered step sliced
+ * horizontally through its letterforms by the card's bottom edge", on the
+ * DESKTOP panel, where a 10 px fade over an 11 px `leading-tight` line box
+ * cannot land anywhere but inside a line.
+ *
+ * Same reasoning as the shade above it: published rather than copied, because a
+ * hand-kept near-copy of this arithmetic is two grids that must agree with
+ * nothing making them — and `sim-overlay-fold.test.ts` already holds this one
+ * against real numbers, so a second consumer inherits that judgement whole.
+ *
+ * THREE NAMES, NOT FIVE, and the two that are missing were in the first draft
+ * of this block. `FOLD_SLACK_PX` and `FOLD_FALLBACK_LEADING_PX` went on the
+ * barrel beside these because they are part of the same table — and then had
+ * ZERO importers: `foldWindowPx` already takes the slack as a defaulted
+ * parameter, the fallback leading is internal to it, and this module's own
+ * tests reach past the barrel to `../SimOverlay` for both. A public name with
+ * no caller is the same defect as a repair with no reader, one layer out: it
+ * widens the module boundary doc 05 draws and buys nothing. They are still
+ * exported from `SimOverlay.tsx`, where the four files that use them read them.
+ */
+export { foldMaskCss, foldWindowPx, type FoldRow } from "./SimOverlay";
 export {
   briefingBodyBg,
   briefingLineBg,

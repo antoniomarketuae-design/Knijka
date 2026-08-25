@@ -41,6 +41,13 @@ import {
   type TraceClock,
 } from "@/modules/sim/traces";
 import { createRibbonBuffers, writeRibbonStrip } from "@/modules/sim/scene/ribbonStrip";
+import {
+  CROSSING_MUTE_MAX_SPANS,
+  MUTE_EDGE_M,
+  MUTE_UNUSED_S,
+  crossingMuteSpans,
+  type RouteDistrictLike,
+} from "@/modules/sim/scene/guidanceRoute";
 
 /** Same assets as HeroCarBody (kept in sync — public asset paths). */
 const HERO_URL = "/sim/vehicles/hero_car.glb";
@@ -220,18 +227,61 @@ const TRACE_RIBBON_VERT = /* glsl */ `
   }
 `;
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE DEMONSTRATION PATH DOES NOT PAINT OVER A ZEBRA EITHER — sc-crossing-dart
+ * :f0bf371d, w10-3.
+ *
+ * THE FRAME. `.audit-frames/w10-3/frames/sc-crossing-dart__mobile-right/
+ * 06-waited.png`: the student is stopped at the marked crossing on pe-dart-v1,
+ * the advisor card beside him explains the wait — and a glowing BLUE dashed
+ * ribbon runs continuously up the carriageway and straight over the zebra bars,
+ * unbroken, to the shadow car beyond.
+ *
+ * IT IS THIS FILE'S RIBBON AND NOT THE GUIDANCE ONE, which is why the mute the
+ * repo already carries did not stop it. Two ribbons are on that asphalt:
+ *   · `RouteGuidance` — `--accent-2`, „зелена" in the lesson's own legend copy,
+ *     and MEASURED to mute correctly here: driven on the shipped pe-dart-v1
+ *     with the real look-ahead it returns a quiet span at [65.9, 73.9] m for
+ *     the crossing at (0, 80). It is not the ribbon in the photograph.
+ *   · THIS one — `KIND_TINT.shadow` = #3f8cff, blue, ending at the shadow car,
+ *     which is exactly what the row describes. `TRACE_RIBBON_FRAG` had no mute
+ *     term at all, and `crossingMuteSpans` could not have been asked for one:
+ *     its parameter said `DerivedRoute` while this path is a
+ *     `tracePathForRibbon` polyline. Widened to `ArcSampledPath` (guidanceRoute
+ *     .ts) so the arithmetic reads what it always only read.
+ *
+ * SAME MECHANISM, SAME REASON. The bars are painted at MARKING_Y = 0.032 and
+ * this ribbon blends ADDITIVELY at RIBBON_Y = 0.05, so where they meet the
+ * white bars wash blue and their edges stop reading — on a lesson whose whole
+ * subject is seeing the пътека. The spans, the ramp and the sentinel are the
+ * published ones; nothing here is a second opinion about where a zebra is.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 const TRACE_RIBBON_FRAG = /* glsl */ `
   uniform vec3 uColor;
   uniform float uTime;
   uniform float uFlowSpeed;
   uniform float uOpacity;
+  // Arclength spans this path must not paint over — the painted crossings and
+  // the junction paint under it. Unused slots are parked at MUTE_UNUSED_S.
+  uniform vec2 uMute[${CROSSING_MUTE_MAX_SPANS}];
   varying float vS;
   varying float vSide;
   void main() {
     float edge = 1.0 - smoothstep(0.45, 1.0, abs(vSide));
     float band = fract(vS / 6.0 + abs(vSide) * 0.22 - uTime * uFlowSpeed / 6.0);
     float dash = smoothstep(0.05, 0.22, band) * (1.0 - smoothstep(0.5, 0.68, band));
-    float a = uOpacity * edge * (0.4 + 0.6 * dash);
+    // Ramped over ${MUTE_EDGE_M.toFixed(1)} m at each end rather than cut
+    // square: a hard edge across the ribbon reads as a second painted bar,
+    // which is the last thing a zebra needs beside it.
+    float mute = 1.0;
+    for (int i = 0; i < ${CROSSING_MUTE_MAX_SPANS}; i++) {
+      float inSpan = smoothstep(uMute[i].x - ${MUTE_EDGE_M.toFixed(1)}, uMute[i].x, vS)
+                   * (1.0 - smoothstep(uMute[i].y, uMute[i].y + ${MUTE_EDGE_M.toFixed(1)}, vS));
+      mute = min(mute, 1.0 - inSpan);
+    }
+    float a = uOpacity * edge * mute * (0.4 + 0.6 * dash);
     if (a < 0.003) discard;
     gl_FragColor = vec4(uColor, a);
   }
@@ -284,6 +334,15 @@ export interface ShadowCarProps {
    */
   showGhost?: boolean;
   /**
+   * The district this trace was recorded on, when the caller has it — the
+   * painted crossings and junction paint the ribbon must go quiet over (see
+   * TRACE_RIBBON_FRAG's block). OPTIONAL, and absent it the ribbon draws
+   * exactly as it always did: the Scenario Studio and the clip rig replay
+   * traces with no district in hand, and a demo path that fails to draw is a
+   * worse answer than one that draws over paint.
+   */
+  district?: RouteDistrictLike | null;
+  /**
    * Render the roof ❌ badge on mistake demos (default true). The clip rig
    * passes false on lot maps, where the badge's 2.9 m float parallax-projects
    * onto near backgrounds ("X on the grass", pilot v2) — a ground-anchored
@@ -298,6 +357,7 @@ export function ShadowCar({
   showRibbon = true,
   showGhost = true,
   showBadge = true,
+  district = null,
 }: ShadowCarProps) {
   const { scene } = useGLTF(HERO_URL, DRACO_PATH);
   const kind = trace.meta.kind;
@@ -397,6 +457,19 @@ export function ShadowCar({
     () => tracePathForRibbon(trace, 1.25, RIBBON_MAX_SAMPLES),
     [trace],
   );
+  /**
+   * The quiet spans on THIS path — the published arithmetic, asked about a
+   * `tracePathForRibbon` polyline instead of a derived route. `totalLen` is the
+   * last cumulative arclength the sampler wrote; `count === 0` (an empty trace)
+   * yields no spans, which is what the mute already returns for a null path.
+   */
+  const muteSpans = useMemo(() => {
+    if (ribbonPath.count === 0) return [];
+    return crossingMuteSpans(
+      { ...ribbonPath, totalLen: ribbonPath.arc[ribbonPath.count - 1] },
+      district,
+    );
+  }, [ribbonPath, district]);
   const ribbonMatArgs = useMemo<[THREE.ShaderMaterialParameters]>(
     () => [
       {
@@ -407,6 +480,15 @@ export function ShadowCar({
           uTime: { value: 0 },
           uFlowSpeed: { value: reducedMotion ? 0 : 4.0 },
           uOpacity: { value: 0.4 },
+          // Allocated ONCE and mutated in place by the layout effect below —
+          // the same „no allocation after mount" contract RouteGuidance's own
+          // ribbon keeps, for the same reason.
+          uMute: {
+            value: Array.from(
+              { length: CROSSING_MUTE_MAX_SPANS },
+              () => new THREE.Vector2(MUTE_UNUSED_S, MUTE_UNUSED_S),
+            ),
+          },
         },
         transparent: true,
         depthWrite: false,
@@ -433,7 +515,18 @@ export function ShadowCar({
   useLayoutEffect(() => {
     const geo = ribbonGeoRef.current;
     if (geo) writeRibbonStrip(geo, ribbonPath, RIBBON_Y, RIBBON_HALF_W);
-  }, [ribbonPath]);
+    // …and the same effect writes the quiet spans, so the geometry and the
+    // spans measured on it can never be one rebuild apart.
+    const mat = ribbonMatRef.current;
+    if (mat) {
+      const slots = mat.uniforms.uMute.value as THREE.Vector2[];
+      for (let i = 0; i < slots.length; i++) {
+        const span = muteSpans[i];
+        if (span) slots[i]!.set(span[0], span[1]);
+        else slots[i]!.set(MUTE_UNUSED_S, MUTE_UNUSED_S);
+      }
+    }
+  }, [ribbonPath, muteSpans]);
 
   /** The ❌ sprite exists only on mistake demos — and only when the caller
    *  wants it, which is what the fade list has to be rebuilt for. */

@@ -171,6 +171,57 @@ export function edgeParkingBand(edge: object): boolean | null {
   return v === true || v === false ? v : null;
 }
 
+/**
+ * IS THIS AN АВТОМАГИСТРАЛА? — the typed flag, not the class name
+ * (w10-2, sc-merge-motorway-exit:22f793e2, 2026-08-25).
+ *
+ * `constants.ts` has said the rule since gen_motorway.mjs shipped, verbatim:
+ * „a motorway carries no arterial parking band, street trees, streetlights or
+ * sidewalks (founder R-media #7/#8)". It enforced it by keeping the string
+ * `"motorway"` out of ARTERIAL_CLASSES / SIDEWALK_CLASSES / PARKING_LANE_
+ * CLASSES — which works exactly as long as every motorway says `class:
+ * "motorway"`, and one of the three does not:
+ *
+ *     mw-v1        mw-e-nb / mw-e-sb            class "motorway"   140
+ *     mw-entry-v1  mwe-e-nb-approach …          class "motorway"   140
+ *     mw-exit-v1   mwx-e-nb-approach/-decel/    class "PRIMARY"    140
+ *                  -main/-sb                    (motorway: true)
+ *
+ * `primary` is in every one of those sets, so the exit district — and only the
+ * exit district — is dressed as a city boulevard. The frame is
+ * `.audit-frames/w10-2/frames/sc-merge-motorway-exit__mobile-right/
+ * 05-stopped.png`: a timber utility pole with overhead catenary filling the
+ * centre of the windscreen, a lamp column row, a pedestrian parapet, cypresses
+ * down both verges, and a continuous rank of PARKED CARS at the kerb of a
+ * carriageway the same frame's chip posts at «140 · РЕЖИМ Нормален ≤150».
+ * Stopping or parking there is ЗДвП чл. 58, т. 2–3; the world was drawing the
+ * offence the product bills.
+ *
+ * SO THE PREDICATE ASKS THE FLAG THE RUNTIME ALREADY GRADES ON.
+ * `world/types.ts DistrictEdge.motorway` is authored district data, it is what
+ * `runtime/worldRuntime` publishes as `SimTick.motorway`, and it is what
+ * `rules/engine` arms DRIVING_TOO_SLOW_FOR_MOTORWAY and the emergency-lane
+ * article from. One district mis-typing its class can no longer un-motorway a
+ * motorway for the dressing passes, which is the difference between fixing
+ * mw-exit-v1 and making the class of defect unauthorable.
+ *
+ * ABSENT ⇒ FALSE, so every district that never carried the flag builds
+ * byte-identically — the same polarity `edgeBareVerge` and `edgeParkingBand`
+ * above use, and for the same reason.
+ *
+ * WHAT THIS DOES NOT TOUCH, deliberately, and it is the other half of the same
+ * frame: the SIDEWALK and the 4 m parking BAND are carriageway geometry
+ * (`edgeParkingWidthM` feeds `edgeHalfWidth`, which moves the kerb, the
+ * frontage and every prop anchored off them). Withdrawing them here would move
+ * mw-exit-v1's kerbs inside one lane's change, with four committed recordings
+ * riding on that district. The furniture and the parked row are pure
+ * instancing — nothing anchored to the carriageway moves — so those go now and
+ * the geometry half is REPORTED, not smuggled in beside it.
+ */
+export function isMotorwayEdge(edge: object): boolean {
+  return (edge as { motorway?: unknown }).motorway === true;
+}
+
 /** Parking band width per side of an edge (0 for non-arterial/roundabout).
  *  An explicit `parkingBand` OVERRIDES the class in both directions — a
  *  collector with no kerbside parking is as real as a residential street with
@@ -352,10 +403,20 @@ export function onewayNoEntryArms(approaches: readonly OneWayApproachLike[]): Se
  * so a student was failed for entering a street the world never forbade.
  *
  * The mouth is the edge's DOWNSTREAM terminal: the point a driver would enter
- * from if he came at it against the flow. The plate stands there facing BACK
- * along the flow, which is how a Bulgarian one-way street is actually signed —
- * a legal driver sees the back of the post as he leaves, and only a driver
- * pointed the wrong way ever reads the face.
+ * from if he came at it against the flow. The plate stands there with its FACE
+ * looking ON along the flow, which is how a Bulgarian one-way street is
+ * actually signed — a legal driver sees the grey back of the post as he leaves,
+ * and only a driver pointed the wrong way ever reads the red disc.
+ *
+ * That sentence used to open „facing BACK along the flow" and then close with
+ * the truth, and the pass downstream (props.ts, „В1 at the TERMINAL mouth")
+ * implemented the opening half: `yawFromFacing(mul(tangent, -1))`, so the disc
+ * addressed the LEGAL driver on 15 plates across 9 maps until 2026-08-25. The
+ * gate that should have caught it was pinned backwards under a comment that
+ * described the correct behaviour. This function only decides WHICH edges get a
+ * plate and never touches yaw, but it is the header a reader arrives at first,
+ * so the wording is corrected here too: leaving the seed in place is how the
+ * inversion grows back.
  *
  * Excluded, and each for a reason the sign kit would otherwise falsify:
  *  - ROUNDABOUT rings. Every ring arm is one-way by construction and its

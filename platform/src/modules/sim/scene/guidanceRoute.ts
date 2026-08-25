@@ -328,13 +328,30 @@ export interface RouteTurn {
   dirY: number;
 }
 
-export interface DerivedRoute {
+/**
+ * A POLYLINE WITH ARCLENGTH — the whole of what the arclength arithmetic in
+ * this file actually reads.
+ *
+ * Extracted from `DerivedRoute` (which still IS one, and every existing caller
+ * is unaffected) because a DERIVED ROUTE is not the only ribbon this product
+ * lays over a zebra. `traces/sample.ts tracePathForRibbon` builds the same
+ * shape for the SHADOW CAR's demonstration path, `ShadowCar.tsx` draws it
+ * through the same `ribbonStrip` builder — and it was drawing it straight
+ * across the crossing stripes on `sc-crossing-dart/mobile-right/06-waited.png`
+ * while the guidance ribbon beside it went quiet correctly. The mute arithmetic
+ * had no opinion about that path only because its parameter type said
+ * „objectives", not „polyline". Now it says polyline.
+ */
+export interface ArcSampledPath {
   /** Flat [x0, y0, x1, y1, …] district-coord samples (2.5 m spacing). */
   pts: Float32Array;
   /** Cumulative arclength per sample, meters. */
   arc: Float32Array;
   count: number;
   totalLen: number;
+}
+
+export interface DerivedRoute extends ArcSampledPath {
   turns: RouteTurn[];
   /**
    * Arclength at which the ACTIVE objective's marker sits. Equals `totalLen`
@@ -1837,7 +1854,7 @@ export function deriveGuidanceRoute(
 
 /** Arclength of the route sample nearest to (x, y) — the "head" the ribbon
  * fades around. Full scan over ≤1024 samples: trivial, zero allocation. */
-export function nearestArcOnRoute(route: DerivedRoute, x: number, y: number): number {
+export function nearestArcOnRoute(route: ArcSampledPath, x: number, y: number): number {
   const { pts, count } = route;
   let best = 0;
   let bestD2 = Infinity;
@@ -2010,15 +2027,54 @@ const MUTE_DIR_WINDOW_M = DENSIFY_STEP_M;
 
 /** Most spans the shader carries. Four markings on one derived route is more
  *  than any district in the catalogue puts on a single objective's leg; past
- *  that the nearest ones win, because they are the ones on the glass. */
+ *  that the nearest ones win, because they are the ones on the glass.
+ *
+ *  ── AND „NEAREST" MEANS SOMETHING ELSE TO THE SECOND CALLER. Raised by the
+ *  round-11 verifier and recorded here rather than in a report, because the
+ *  sentence above is the thing that stops being true. It rests on s = 0 being
+ *  the CAR, which holds for a `deriveGuidanceRoute` route: the route is rebuilt
+ *  from the car's pose, so the four kept spans are the four ahead of him. On
+ *  `ShadowCar`'s `tracePathForRibbon` polyline s = 0 is the TRACE'S START and
+ *  never moves, so the four kept spans are the first four ALONG THE DEMO PATH,
+ *  which are the four nearest the beginning of the demonstration and not the
+ *  four in view.
+ *
+ *  MEASURED, not assumed: the map that row was filed on — `content/world/
+ *  pe-dart-v1.json` — carries exactly one crossing (`pe-x-1` at (0, 80)) and no
+ *  controlled nodes, so it yields one span and the cap is never reached. It is
+ *  not a regression either way; before this round that ribbon muted over
+ *  nothing at all. But on any district that paints more than four crossings and
+ *  stop lines under one demo trace, the later ones stay unpainted-over
+ *  permanently, and whoever raises this number or reaches for a „nearest the
+ *  ghost" variant should know the fix is partial in that general case. */
 export const CROSSING_MUTE_MAX_SPANS = 4;
+
+/**
+ * ── THE SHADER'S HALF OF THE SPAN CONTRACT, AND WHY IT LIVES HERE ──────────
+ * These two were module-private in `components/sim/RouteGuidance.tsx` while
+ * that was the only ribbon that muted. `ShadowCar.tsx` now reads the same spans
+ * for the demonstration path, and a second copy of a number is how the dial
+ * numerals shipped at a third of their reviewed size — so the table is one
+ * table. Nothing about either value changed in the move.
+ */
+/** Ramp length at each end of a quiet span, m. */
+export const MUTE_EDGE_M = 1.2;
+/**
+ * Sentinel for an unused mute slot — far past any path this product draws
+ * (LOOKAHEAD_MAX_M is 170 m and the longest single leg is EMERGENCY_AHEAD_M at
+ * 150), and deliberately NOT 1e9: the shader evaluates
+ * `smoothstep(s − MUTE_EDGE_M, s, vS)` on every slot, and at 1e9 a float32
+ * cannot represent the 1.2 m offset, so edge0 == edge1 and the smoothstep
+ * divides by zero. 1e6 keeps the two edges distinct with six digits to spare.
+ */
+export const MUTE_UNUSED_S = 1e6;
 
 /** The ribbon's own travel direction at arclength `s`, unit — two clamped
  *  `routePointAt` reads into points the caller owns. Unlike everything under
  *  „per-frame helpers" above, this one runs on OBJECTIVE CHANGE only (it has a
  *  single caller), so the returned pair is allocated rather than written out. */
 function routeDirAtArc(
-  route: DerivedRoute,
+  route: ArcSampledPath,
   s: number,
   a: { x: number; y: number },
   b: { x: number; y: number },
@@ -2049,7 +2105,7 @@ function routeDirAtArc(
  * glass while the route is fresh.
  */
 export function crossingMuteSpans(
-  route: DerivedRoute | null,
+  route: ArcSampledPath | null,
   district: RouteDistrictLike | null | undefined,
 ): Array<[number, number]> {
   if (!route || !district) return [];
@@ -2096,7 +2152,7 @@ export function crossingMuteSpans(
 
 /** Point at arclength `s` (clamped), written into `out` — zero allocation. */
 export function routePointAt(
-  route: DerivedRoute,
+  route: ArcSampledPath,
   s: number,
   out: { x: number; y: number },
 ): void {

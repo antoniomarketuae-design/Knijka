@@ -38,14 +38,19 @@
  *
  * OUTPUT
  *   <out>/wave-c-results.jsonl — one row per drive: lesson, leg, exit, verdict,
- *   score, stars, frames, lost, endedNaturally, forcedBy, attested commit.
+ *   score, stars, frames, lost, endedNaturally, forcedBy, attested commit, and
+ *   the two INPUT guards — lostKeys, refusedReversePress — that say whether the
+ *   drive's own pedals arrived (lib/summary.mjs; sc-speed-creep:84ba5dbf).
  *   Append-only, so an interrupted run resumes without losing what it measured.
+ *   <out>/frames/<lesson>__<leg>/run.log — the whole transcript, kept.
  */
 
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { parseSummary } from "./lib/summary.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
@@ -144,24 +149,14 @@ console.log(
 console.log(`[wave-c] target ${BASE}, attesting commit ${HEAD.slice(0, 12)}`);
 
 // --- drive ------------------------------------------------------------------
-/** Pull the machine summary the harness prints, which is the judgeable surface. */
-function parseSummary(stdout) {
-  const grab = (re) => {
-    const m = re.exec(stdout);
-    return m ? m[1].trim() : null;
-  };
-  return {
-    verdict: grab(/VERDICT:\s*(.+?)\s*·/),
-    score: grab(/SCORE:\s*(\d+)\s*наказателни/),
-    stars: grab(/(\d+)\s*от\s*3\s*звезди/),
-    frames: grab(/frames:\s*(\d+)\s*captured/),
-    lost: grab(/captured\s*·\s*(\d+)\s*LOST/),
-    endedNaturally: /endedNaturally:\s*true/.test(stdout),
-    forcedBy: grab(/forcedBy:\s*(.+?)\s*$/m),
-    treeMoved: /THE SOURCE TREE MOVED DURING THIS DRIVE/.test(stdout),
-    attested: grab(/serving\s+([0-9a-f]{12})/),
-  };
-}
+//
+// `parseSummary` LIVES IN lib/summary.mjs AND NOT HERE, and the move is the
+// whole reason the two new counters below can be gated at all. This file has
+// top-level side effects — it reads argv, refuses a dirty tree and then drives
+// 376 lessons — so a test that imported it to check the parser would start a
+// wave. Nothing could exercise the reader, which is how it went fifteen rounds
+// lifting nine fields and dropping two. `__tests__/wave-c-summary.test.mjs`
+// now drives it against real transcripts out of the corpus.
 
 let ran = 0;
 let refused = 0;

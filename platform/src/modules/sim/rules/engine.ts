@@ -40,7 +40,7 @@
  *    drives must NEVER produce a violation.
  */
 
-import { makeCommendation, makeViolation } from "./catalog";
+import { makeCommendation, makeViolation, WRONG_WAY_ROAD_MOTORWAY } from "./catalog";
 import { encodeSpeedMeasurement } from "./consequences";
 import {
   DEFAULT_RULE_CONFIG,
@@ -725,6 +725,65 @@ const ACT_REVERSE_REOPEN_M = ACT_REOPEN_TRAVEL_M;
  * own, and it is the difference between one false conviction and five.
  */
 const WRONG_WAY_REARM_SEC = 4;
+
+/**
+ * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
+ * (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25).
+ *
+ * THE FRAME. `.audit-frames/w10-4/frames/sc-merge-accel-lane__mobile-wrong/
+ * 08-debrief-p6.png` and its `_audit-debrief.json`: six identical cards reading
+ * «Движение в обратна посока по еднопосочна улица … Движеше се срещу платното
+ * на еднопосочна улица … Влизай в еднопосочна само по посока на движението»,
+ * in the lesson «Включване в магистрала през лентата за ускоряване», on a drive
+ * the same sheet also bills «Движение по аварийната лента». There is no street
+ * in this district and no В2 anywhere in it — the card describes a place the
+ * student was never in, on the gravest row he collected.
+ *
+ * THE CLAUSE IS RIGHT AND THE TITLE IS WRONG, which is why this is copy and not
+ * a code. Наредба № 38, прил. № 5, т. 10, б. „в" — quoted verbatim in `n38.ts`
+ * — reads „когато изпитваният навлезе срещу движението на ПЪТЕН ВЪЗЕЛ или път с
+ * еднопосочно движение": the article names the interchange FIRST and the
+ * one-way street second, and a motorway carriageway is both one-way and a
+ * пътен възел. So the mark, the severity and the citation stand exactly as
+ * billed; only the sentence the student reads was written for the other half
+ * of the clause. Same channel and same argument as `JUNCTION_SCAN_COPY` below
+ * (Б1 vs Б2) — `makeViolation`'s `titleBg`/`explanationBg` override, no new
+ * code, no severity or points change.
+ *
+ * AND THE CORRECTIVE COULD HAVE KILLED HIM. `correctiveBg` has no per-event
+ * channel (read from the catalogue BY CODE at display time — see the note on
+ * JUNCTION_SCAN_COPY), and the catalogue's said „спри веднага, включи
+ * аварийните и излез внимателно на заден ход". On a motorway that is ЗДвП
+ * чл. 58, т. 1 („забранено е … движение на заден ход") given as advice, at
+ * 140 км/ч closing speeds. The catalogue's corrective was therefore rewritten
+ * to be true of BOTH roads rather than split here — the same repair the
+ * снеговалеж entry describes two blocks down.
+ *
+ * THE COPY ITSELF IS NOT HERE, and that is the correction this repair took on
+ * its verifier pass. It first rode `makeViolation`'s `titleBg`/`explanationBg`
+ * override, the way `JUNCTION_SCAN_COPY` below does — and neither field
+ * crosses `wire.ts`. `serializeRuleEvents` carries `kind`, `code`, `t`,
+ * `detail`, `penaltyMultiplier`, `x/y`, so `rebuildRuleEvents` rebuilt the
+ * pooled street row on the server and the end screen printed «…по
+ * автомагистрала» in «Грешки» beside «…по еднопосочна улица» in «Разбор». So
+ * the road travels as `detail`, which DOES cross, and the copy lives in
+ * `catalog.ts WRONG_WAY_ROAD_COPY` where `actCopy` reaches it from both sides.
+ * JUNCTION_SCAN_COPY gets away with the override because its events are billed
+ * inside a pre-drive/junction path that is retitled again on rebuild; this one
+ * is not, and „both surfaces happen to agree today" is what this codebase has
+ * already been burned by twice (wire.ts's `situation` note; FaultCard's).
+ *
+ * WHAT IS ROUTED, NOT PATCHED. `realWorldBg` has no per-event channel either
+ * and still prices the street case (чл. 183, ал. 4 — 100 лв.); the motorway
+ * case is чл. 178ж, ал. 1 (три месеца + 1000 лв.), which `consequences.ts`
+ * already carries at the аварийна лента row. Splitting that string needs a
+ * per-event road-price channel through `SessionEndScreen`'s FaultCard, which
+ * is not this seam. Reported.
+ *
+ * NOT the whole row either, and said out loud: the SIX bills are the flicker
+ * half, and `WRONG_WAY_REARM_SEC` above owns it. This changes what one bill
+ * SAYS, not how many there are.
+ */
 
 /**
  * JU-23 per-CONTROL copy for JUNCTION_SCAN_INCOMPLETE (doc 87, item 5 of the
@@ -1997,7 +2056,19 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
       0,
     )
   ) {
-    events.push(makeViolation("WRONG_WAY", t));
+    // The road the student is actually on picks the sentence, and it travels as
+    // `detail` so the server's rebuild picks the same one (see the
+    // WRONG_WAY_ROAD_COPY block above). `tick.motorway` is authored district
+    // data and ABSENT means „unknown", never „no" — an unknown road keeps the
+    // shipped street copy AND stamps no detail at all, so every recorded drive
+    // off a non-motorway map is byte-identical on the wire as well as on glass.
+    events.push(
+      makeViolation(
+        "WRONG_WAY",
+        t,
+        tick.motorway === true ? { detail: WRONG_WAY_ROAD_MOTORWAY } : undefined,
+      ),
+    );
   }
 
   // Keep right: prolonged driving in a non-rightmost lane on a multi-lane road.

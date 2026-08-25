@@ -565,6 +565,43 @@ export const ARTERIAL_CLASSES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * A MOTORWAY CARRIAGEWAY, HOWEVER ITS `class` HAPPENS TO BE TAGGED.
+ *
+ * The rule three docstrings up is founder-ratified and older than this
+ * function: „a motorway carries no arterial parking band, street trees,
+ * streetlights or sidewalks (gen_motorway.mjs mw-v1; founder R-media #7/#8)".
+ * It was enforced ENTIRELY by the class string, and the class string is not the
+ * only place the world records what a road is.
+ *
+ * `.audit-frames/w10-2/frames/sc-merge-motorway-exit__mobile-right/01-arrival.png`
+ * is what that costs. The briefing reads «Тръгваш в ЛЯВАТА лента на
+ * магистралата», the HUD chip reads 140, and out of the windscreen there is an
+ * iron pedestrian parapet along the left kerb, a row of cypresses, street-lamp
+ * columns and four overhead catenary spans crossing the sky. MEASURED on the
+ * committed districts: mw-entry-v1 and mw-v1 tag their carriageways
+ * `class: "motorway"` and are dressed correctly by the class rule alone;
+ * mw-exit-v1 tags the identical carriageway `class: "primary"` and carries
+ * `motorway: true` beside it — so ARTERIAL_CLASSES matched, SCENARIO_LIT_CLASSES
+ * matched, and the one map in the catalogue whose entire subject is leaving a
+ * магистрала got the Sofia side-street dressing kit.
+ *
+ * The `motorway` flag is not new and not invented here: `world/types.ts` has
+ * carried it since the MOTORWAY-SEGMENT slice, and `world/referents.ts` already
+ * spells this exact test inline when it refuses to name a motorway as a street.
+ * The furniture passes simply never asked.
+ *
+ * ONLY THE DRESSING PASSES CONSULT IT (props.ts). Sidewalks, the parking band
+ * and the paint still go by class, deliberately: those move `edgeHalfWidth` and
+ * therefore the drivable geometry every lane-keeping rule is graded against,
+ * and re-tagging a graded carriageway is a re-drive, not a patch. Scenery can
+ * only ever be REMOVED by this predicate, so no drive it credits today can be
+ * refused tomorrow.
+ */
+export function isMotorwayCarriageway(edge: { class: string; motorway?: boolean }): boolean {
+  return edge.motorway === true || edge.class === "motorway" || edge.class === "motorway_link";
+}
+
+/**
  * Classes whose carriageway gets the SOLID EDGE LINE (М1 „очертаваща края на
  * платното за движение").
  *

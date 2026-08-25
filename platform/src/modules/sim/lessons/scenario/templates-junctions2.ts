@@ -119,12 +119,36 @@ export const SC_JUNCTION_GAP: ScenarioSpec = {
   success: [
     {
       id: "sc-jgap-approach",
-      titleBg: "Приближи знака Б2 с контролирана скорост",
+      // ONE JUNCTION UNDER TWO NAMES, the last pair (w10-2,
+      // sc-junction-gap:73564f66, 2026-08-25). `one-junction-three-names
+      // .test.ts` closed sc-junction-stop and sc-junction-scan against each
+      // other and against this drill, and left ONE row on its §2 ratchet:
+      // «sc-junction-gap ~ sc-junction-left» — junctions2 ~ junctions3, sharing
+      // these two chips word for word. Both are Б2 approaches, so the route
+      // cannot separate them and the chips are the only surface that can tell a
+      // student which drill he is in. This one is about READING THE INTERVAL
+      // (its own objectiveBg: „кола на по-малко от три-четири секунди означава
+      // изчакване"); sc-junction-left is about the left turn across the
+      // priority road. The chips now say so.
+      //
+      // NO NUMBER, deliberately — §3 of that file: a banner that names N км/ч
+      // must sit on a gate that really caps at N, and the interval is counted
+      // in SECONDS, which no chip here measures.
+      titleBg: "Приближи знака Б2 бавно — интервалът се чете отдалеч",
       params: { kind: "reachZone", x: 4.06, y: -45, radiusM: 8, maxSpeedKmh: 30 },
     },
     {
       id: "sc-jgap-line",
-      titleBg: "Премини стоп-линията след пълно спиране и пропуснат интервал",
+      // …AND IT NO LONGER CERTIFIES THE GAP. The old chip read «…след пълно
+      // спиране И ПРОПУСНАТ ИНТЕРВАЛ», which is the very claim the note on
+      // `sc-jgap-exit` below spends a paragraph refusing: a `passSignal` gate
+      // witnesses the full stop and the crossing, and nothing at all about the
+      // interval the student took (SimTick carries no other actor's priority,
+      // no yield outcome). The gap misjudgment is graded where it is really
+      // measured — the give-way check at the line → FAILED_TO_YIELD, on both
+      // mistake demos. What follows the dash is a pointer to the drill, not a
+      // certificate about it.
+      titleBg: "Премини стоп-линията след пълно спиране — оттук нататък решава интервалът",
       // Founder R3 #14 (doc 62 — „stop marker wrong"): the guidance pillar
       // stands at THIS point (guidanceGoalFor renders passSignal x/y), so it
       // is pinned to the Б2 stop line in the player's lane (lane center
@@ -450,7 +474,29 @@ export const SC_JUNCTION_LEFT: ScenarioSpec = {
     },
     {
       id: "sc-jleft-line",
-      titleBg: "Премини стоп-линията след пълно спиране и пропуснат интервал",
+      // THE SAME UNWITNESSABLE CERTIFICATE, ON THE TWIN — verifier pass on
+      // sc-junction-gap:73564f66, 2026-08-25. The gap drill's chip stopped
+      // claiming «и пропуснат интервал» twenty lines up; this one, 309 lines
+      // below it in the SAME file, on the same map (tj-emerge-v1), through the
+      // same `passSignal`/`stopSign` gate, went on claiming it. Retiring a
+      // false certificate on one drill and leaving it standing on the drill it
+      // was being separated FROM is not a repair, it is a relabelling.
+      //
+      // What this gate really witnesses is written out at `stepPassSignal`
+      // (objectives.ts, „Б2 Е СТОП, НЕ Е МЯСТО, КРАЙ КОЕТО СЕ МИНАВА"): the
+      // full stop at the line, and the crossing. It has no channel for another
+      // vehicle's priority and none for the seconds the student let pass —
+      // that judgement is graded where it is really measured, at the give-way
+      // check (FAILED_TO_YIELD, which is what BOTH mistake demos below bill).
+      // So the chip names the act it can certify and then points at the drill.
+      //
+      // AND IT STILL SEPARATES THE TWO DRILLS, which is the row this file was
+      // opened for: the gap drill's chip ends «оттук нататък решава интервалът»
+      // (counting the gap), this one ends «левият завой започва оттук»
+      // (turning across the priority road). Nothing the student is taught is
+      // lost — инструкция 4 still says the 3–4 seconds in full, and `teach.
+      // whyBg` below calls the underestimated interval the commonest mistake.
+      titleBg: "Премини стоп-линията след пълно спиране — левият завой започва оттук",
       params: { kind: "passSignal", nodeId: "tj-n-c", x: 0, y: 0, radiusM: 45, control: "stopSign" },
     },
     {

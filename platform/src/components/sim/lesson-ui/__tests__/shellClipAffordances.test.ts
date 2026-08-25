@@ -46,13 +46,15 @@
  * the case it is written out beside it.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROOMY_HUD_FLOOR_PX } from "../immersive";
 import {
   LEGEND_ANNOUNCE_MS,
   notifyColumnCapPx,
+  rowsBelowFold,
+  rowsFullyBelowFold,
   notifyColumnCutPx,
   SCROLL_REMAINING_SLACK_PX,
   scrollRemainingPx,
@@ -549,8 +551,62 @@ describe("notifyColumnCutPx · what the column takes out of the graded fault", (
     // really being something below the fold.
     const after = scroller.slice(scroller.indexOf("</div>"));
     expect(after).toContain("toastsBelowFold > 0");
-    expect(after).toContain("↓ още {toastsBelowFold}");
+    expect(after).toContain("toastsUnseenBelowFold");
     expect(after).toContain("shrink-0");
+  });
+
+  describe("…and the sentence it says is true in BOTH shapes of fold", () => {
+    /** One 240 px card in a 120 px scrollport: half of it is under the cut and
+     *  there is no second card at all. Before the shrink-weight repair this
+     *  state produced NO row (the scroller never overflowed, so the count was
+     *  0); it is now the common one, which is why the wording had to move. */
+    const oneTallCard = [{ top: 0, height: 240 }];
+    /** Two cards, the first read whole, the second entirely under the cut. */
+    const twoCards = [
+      { top: 0, height: 100 },
+      { top: 106, height: 100 },
+    ];
+
+    it("a single guillotined card has NOTHING entirely below it", () => {
+      // Both counts, in both directions, so neither can drift into the other.
+      expect(rowsBelowFold(oneTallCard, 0, 120)).toBe(1); // …something is cut…
+      expect(rowsFullyBelowFold(oneTallCard, 0, 120)).toBe(0); // …but nothing is unseen
+      // MUTATION: `r.top > fold - 1` → `r.top + r.height > fold + 1` (i.e. the
+      // other counter's rule) makes this 1 and the shell promises a second
+      // notification over a column that holds one card.
+    });
+
+    it("…and a second card that starts under the fold IS counted", () => {
+      expect(rowsFullyBelowFold(twoCards, 0, 105)).toBe(1);
+      // The bias: a row starting within 1 px ABOVE the fold still counts, because
+      // announcing „the explanation continues" over an unmentioned second graded
+      // fault is the one direction this may never round in.
+      expect(rowsFullyBelowFold([{ top: 105.5, height: 100 }], 0, 106)).toBe(1);
+    });
+
+    it("scrolling to the end clears both, and an unlaid-out list claims nothing", () => {
+      expect(rowsBelowFold(twoCards, 101, 105)).toBe(0);
+      expect(rowsFullyBelowFold(twoCards, 101, 105)).toBe(0);
+      // `clientHeight <= 0` is „not laid out yet", not „everything is hidden" —
+      // the same guard `rowsBelowFold` carries, and for the same reason: a flash
+      // of «още 2» on every mount is permanent chrome by another name.
+      expect(rowsFullyBelowFold(twoCards, 0, 0)).toBe(0);
+    });
+
+    it("THE WIRING: the two counts pick two different sentences", () => {
+      const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
+      const after = scroller.slice(scroller.indexOf("</div>"));
+      const row = after.slice(0, after.indexOf("</p>"));
+      // The count branch names notifications…
+      expect(row).toContain("toastsUnseenBelowFold > 0");
+      expect(row).toContain("известие");
+      expect(row).toContain("известия");
+      // …and the other branch names what is actually under the cut. Same
+      // vocabulary as the two overlays that already answer this exact question.
+      expect(row).toContain("обяснението продължава");
+      // And the whole row still exists only while something really is cut.
+      expect(after).toContain("toastsBelowFold > 0");
+    });
   });
 
   it("…and the YIELD ORDER the briefing card argued for still holds", () => {
@@ -558,24 +614,135 @@ describe("notifyColumnCutPx · what the column takes out of the graded fault", (
     // to a briefing the student has already read." Giving the toast stack
     // `min-h-0` at the default shrink factor would have broken exactly that —
     // flexbox distributes a deficit in proportion to (base × factor), so a
-    // 490 px stack at 1 would absorb 68 % of the FIRST pixel of pressure while
-    // the briefing was still full height.
+    // 490 px stack at 1 against a 230 px briefing at 1 would absorb 68 % of the
+    // FIRST pixel of pressure while the briefing was still full height.
+    //
+    // ══ WHAT THIS CASE USED TO ASSERT, AND WHY IT WAS THE WRONG HALF ═══════
+    // It read `expect(w).toBeLessThan(1)` — „1 would put it ahead of the
+    // briefing" — and the shipped weight was 0.05. The ratio was right; the
+    // NUMBER was a cap. CSS Flexbox § 9.7 step 4b: „If the sum of the unfrozen
+    // flex items' flex factors is less than one, multiply the initial free
+    // space by this sum." Once the briefing has frozen at zero the scroller is
+    // the only unfrozen item, that sum IS its own weight, and at 0.05 the box
+    // absorbed a twentieth of the deficit and let the rest overflow the
+    // `overflow-hidden` column. The scroller therefore never overflowed
+    // ITSELF, `rowsBelowFold` returned 0, and the counter the case below
+    // guards never mounted — the guillotine arrived together with the silence.
+    // Frame, in the path shape w10 actually uses (`<wave>/frames/<lesson>__
+    // <variant>/`, not sweep161's): `.audit-frames/w10-1/frames/
+    // sc-ac-highbeam-lead__pc-wrong/04-t018s.png` — «нищо.» sliced through its
+    // x-height at the column edge with nothing under the cut.
+    //
+    // So the order now lives on the side that may carry a big number.
     const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
     const decls = scroller.slice(0, scroller.indexOf("<HudToasts"));
     const factor = /\[flex-shrink:([\d.]+)\]/.exec(decls);
     expect(factor, "the shrink weight is written, not defaulted").not.toBeNull();
     const w = Number(factor![1]);
-    expect(w).toBeGreaterThan(0); // 0 would mean it never yields, so never scrolls
-    expect(w).toBeLessThan(1); // …and 1 would put it ahead of the briefing
+    // THE § 9.7 FLOOR. Below 1 the weight stops being a priority and becomes a
+    // ceiling on how much of the deficit this box may take, which is the defect.
+    expect(w).toBeGreaterThanOrEqual(1);
+    // …and the briefing's weight is written too, on its own root.
+    const briefingRoot = CODE.slice(CODE.indexOf('aria-label="Инструкции за упражнението"'));
+    const briefingDecls = briefingRoot.slice(0, briefingRoot.indexOf("</div>"));
+    const bFactor = /\[flex-shrink:([\d.]+)\]/.exec(briefingDecls);
+    expect(bFactor, "the briefing carries the yield order now").not.toBeNull();
+    const b = Number(bFactor![1]);
     // The arithmetic, at the shipped sizes: the briefing takes ≥90 % of the
     // deficit the two of them share, i.e. nine pixels of briefing for every one
     // of fault, until the briefing freezes at zero and the rest comes here.
-    const briefingShare = 230 * 1;
+    const briefingShare = 230 * b;
     const stackShare = 490 * w;
     expect(briefingShare / (briefingShare + stackShare)).toBeGreaterThan(0.9);
     // And the briefing is still the child that CAN empty: its `min-h-0` is the
     // one the yield order is built on.
     expect(CODE).toContain("flex w-full min-h-0 min-w-0 flex-col");
+  });
+
+  it("THE GENERAL FORM: no sub-1 shrink weight anywhere under the sim trees", () => {
+    // One enforced instance is a convention, and this wave's frames found the
+    // next instance immediately. A `flex-shrink` under 1 NEVER expresses „yields
+    // last" — § 9.7 step 4b turns it into „may only ever absorb this fraction of
+    // the deficit", and the remainder is handed to whatever `overflow` the
+    // ancestor happens to have. Where a box must yield last, raise its SIBLING.
+    //
+    // ══ WHAT THE FIRST VERSION OF THIS WALKER COULD NOT SEE ═══════════════
+    // It decided „prose or class list?" by asking whether the PHYSICAL LINE
+    // holding the match also held `className=`. An adversarial reader dropped
+    //
+    //     className={[
+    //       "flex min-h-0 flex-col",
+    //       "[flex-shrink:0.05]",
+    //     ].join(" ")}
+    //
+    // into `components/sim` and this file stayed at 36 passed: the weight is on
+    // one line, the `className=` on another. That shape is not hypothetical —
+    // `components/sim` + `modules/sim` already open a composed `className={`,
+    // `className={[` or `className={cn(` in nine places, so the next instance
+    // would have landed precisely where the gate could not look. A gate with a
+    // blind spot the size of the idiom it polices is decoration.
+    //
+    // The question was never „is `className=` on this line". It is „is this
+    // text CODE, or the paragraph explaining why the value was retired" — and
+    // this file already answers that, for the shell, with `stripComments`. Same
+    // answer here, and it needs no window at all: the prose goes, whatever
+    // survives is a class list that ships. It closes the other half too — a
+    // weight that has been COMMENTED OUT is not on anyone's screen and must not
+    // be reported as an offender. A trailing `// [flex-shrink:0.5]` after code
+    // on the same line survives stripping and would be reported; that is the
+    // safe direction for a gate to be wrong in.
+    const roots = [
+      resolve(__dirname, "../../../../components/sim"),
+      resolve(__dirname, "../../../../modules/sim"),
+    ];
+    const offenders: string[] = [];
+    const seen: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = resolve(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(entry.name)) continue;
+        const src = stripComments(readFileSync(full, "utf8"));
+        for (const m of src.matchAll(/\[flex-shrink:([\d.]+)\]/g)) {
+          seen.push(`${full}: ${m[0]}`);
+          if (Number(m[1]) < 1) offenders.push(`${full}: ${m[0]}`);
+        }
+      }
+    };
+    for (const r of roots) walk(r);
+    expect(offenders).toEqual([]);
+    // POSITIVE CONTROL, because a walker that visits nothing reports safety and
+    // an empty `offenders` proves only that the loop ran zero times. These are
+    // the two weights this repair wrote; if the walk stops finding them it has
+    // stopped walking — or `stripComments` has started eating code — and the
+    // assertion above means nothing.
+    const inShell = (w: string) =>
+      seen.some((s) => s.includes("LessonPlayShell.tsx") && s.endsWith(w));
+    expect(inShell("[flex-shrink:20]"), "the briefing's weight is still walked").toBe(true);
+    expect(inShell("[flex-shrink:1]"), "the toast scroller's weight is still walked").toBe(true);
+  });
+
+  it("…and the cut line is FADED, on the same predicate as the counter", () => {
+    // Four PC rows in wave w10 do not say „I could not scroll" — they say the
+    // card is „truncated mid-sentence … with no ellipsis, no scrollbar and no
+    // expand control" (sc-ac-aquaplane:0ae00f29). The mask is the signal half:
+    // a horizontally guillotined line reads as a rendering fault, a faded one
+    // reads as „there is more". Same constant, same 10 px and same predicate
+    // the briefing list one card up already carries.
+    const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));
+    const decls = scroller.slice(0, scroller.indexOf("<HudToasts"));
+    expect(decls).toContain("BRIEFING_FADE_MASK_CSS");
+    // Both spellings — unprefixed in current WebKit, prefixed in the engine the
+    // founder reads this on.
+    expect(decls).toContain("WebkitMaskImage");
+    expect(decls).toContain("maskImage");
+    // CONDITIONAL, not permanent chrome: a stack that fits, and a stack scrolled
+    // to its end, are not dimmed. `toastsBelowFold` is recomputed on every
+    // scroll and every resize, which is what makes the two states different.
+    expect(decls).toContain("toastsBelowFold > 0");
   });
 
   it("the counter is measured off what HudToasts paints, not off a guessed shape", () => {

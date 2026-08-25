@@ -18,7 +18,6 @@ import {
   type SimSessionDetailRow,
   type SimSessionListRow,
 } from "@/modules/sim/lessons/store";
-import { VIOLATIONS, type ViolationCode } from "@/modules/sim/rules";
 import type {
   LessonEntryView,
   ScenarioCatalogEntry,
@@ -27,12 +26,10 @@ import { FeatureOffline } from "@/components/ui/FeatureOffline";
 import { isFeatureDisabled } from "@/lib/features";
 import { canDriveSimulator } from "./access";
 import { SimulatorPaywall } from "./paywall";
+import { historyMistakeGroups } from "./historyMistakes";
 import { resolveScenarioDeepLink } from "./scenarioDeepLink";
 import { SimulatorClient } from "./simulator-client";
-import type {
-  SessionHistoryEntry,
-  SessionHistoryMistake,
-} from "./session-history";
+import type { SessionHistoryEntry } from "./session-history";
 
 export const metadata: Metadata = {
   title: "Симулатор · Книжка.AI",
@@ -199,19 +196,16 @@ export default async function SimulatorPage({ searchParams }: SimulatorPageProps
 // A15 history fold (server-side)
 // ---------------------------------------------------------------------------
 
-const SEVERITY_RANK: Record<SessionHistoryMistake["severityClass"], number> = {
-  opasna: 2,
-  osnovna: 1,
-  vtorostepenna: 0,
-};
-
 /**
  * Stored SimSession rows → plain history entries. The stored `ruleEvents` are
- * kept opaque by the store's defensive parse, so the ONLY thing read from a
- * stored event is its (kind, code) — severity, points, titles, law refs and
+ * kept opaque by the store's defensive parse, so the only things read from a
+ * stored event are its (kind, code) and — since 2026-08-25 — the per-act
+ * `detail` the wire already carries: severity, points, titles, law refs and
  * the A15 corrective always come rebuilt from the violation catalog, exactly
- * like the wire path: a tampered/stale payload can list events, never
- * re-price or re-title them. Unknown codes are skipped, not trusted.
+ * like the wire path, and a tampered/stale payload can list events, never
+ * re-price or re-title them. Unknown codes are skipped, not trusted. The fold
+ * that does it lives in `historyMistakes.ts` (with its own gate) because a
+ * server component cannot be unit-tested.
  */
 function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[] {
   const titleByLessonId = new Map(
@@ -230,34 +224,7 @@ function buildHistoryEntries(rows: SimSessionDetailRow[]): SessionHistoryEntry[]
 
   return rows.map((r) => {
     const ev = r.events;
-
-    const groups = new Map<string, SessionHistoryMistake>();
-    if (ev !== null) {
-      for (const raw of ev.ruleEvents) {
-        if (typeof raw !== "object" || raw === null) continue;
-        const e = raw as { kind?: unknown; code?: unknown };
-        if (e.kind !== "violation" || typeof e.code !== "string") continue;
-        if (!(e.code in VIOLATIONS)) continue;
-        const spec = VIOLATIONS[e.code as ViolationCode];
-        const g = groups.get(e.code);
-        if (g) {
-          g.count += 1;
-        } else {
-          groups.set(e.code, {
-            titleBg: spec.titleBg,
-            lawRef: spec.lawRef,
-            severityClass: spec.severityClass,
-            points: spec.points,
-            count: 1,
-            correctiveBg: spec.correctiveBg,
-          });
-        }
-      }
-    }
-    const mistakes = [...groups.values()].sort((a, b) => {
-      const rank = SEVERITY_RANK[b.severityClass] - SEVERITY_RANK[a.severityClass];
-      return rank !== 0 ? rank : b.points * b.count - a.points * a.count;
-    });
+    const mistakes = historyMistakeGroups(ev?.ruleEvents);
 
     return {
       id: r.id,

@@ -1018,6 +1018,29 @@ const TJ_OCCLUDED = "tj-occluded-v1"; // sc-junction-blind (равнозначн
 const JX_EQUAL = "jx-equal-v1"; // sc-jx-equal-left  (равнозначно ×)
 const SX = "sx-v1"; // sc-jx-blocked-exit (signalized ×)
 const JXG = "jxg-giveway-v1"; // the Б1 map — the only give-way paint shipped
+const LN_ARROWS = "ln-arrows-v1"; // sc-ln-turn-lane-arrows (6-lane × residential, signalized)
+
+/** Every committed district id, sorted — the same walk the census below takes. */
+function corpusIds(): string[] {
+  if (!WORLD_DIR) throw new Error("content/world not found from " + process.cwd());
+  return fs
+    .readdirSync(WORLD_DIR)
+    .filter((f) => f.endsWith(".json"))
+    .map((f) => f.slice(0, -".json".length))
+    .sort();
+}
+
+/**
+ * „This map authors lane-intent arrows" — the same field `markings.ts`'s
+ * `readLaneArrows` reads, asked of the district rather than of the painter, so
+ * „authored" and „painted" stay two separate questions. That separation IS the
+ * assertion: a district that authors and does not paint is the defect
+ * `sc-ln-turn-lane-arrows` alleges.
+ */
+function hasAuthoredLaneArrows(district: District): boolean {
+  const sc = district.meta.scenario as { laneArrows?: unknown } | undefined;
+  return Boolean(sc?.laneArrows && typeof sc.laneArrows === "object");
+}
 
 // ---------------------------------------------------------------------------
 // 1. The markings the audit reported missing
@@ -1210,6 +1233,118 @@ describe("the marking each lesson names is on the road", () => {
     // the only SIGNALIZED one. Four arms, four lines.
     const built = build(SX);
     expect(built.markings.stopLines).toBe(4);
+  });
+
+  // -------------------------------------------------------------------------
+  // …AND THE SEVENTH, filed a year of rounds later against the wrong file.
+  //
+  // `sc-ln-turn-lane-arrows:2b49c687`, CRITICAL: «the entire lesson is about
+  // carriageway arrows splitting the directions, but the junction approach is a
+  // featureless grey slab: at the stop line there is not a single directional
+  // arrow, no lane divisions and no stop line painted. The student is told to
+  // read markings that are not there.» Routed at `runtime/laneArrows.ts`, which
+  // is the GRADING resolver and paints nothing at all.
+  //
+  // The round-10 judge already refuted the headline off the arrival frame —
+  // «two large white DIRECTIONAL ARROWS … a left-bending arrow in the left lane
+  // and a right-bending arrow in the right lane, with dashed white lane-divider
+  // lines running between them» — and a refutation that lives only in a report
+  // is worth nothing the next time somebody squints at a screenshot. That is
+  // this file's own opening argument, so the refutation is a test.
+  //
+  // WHAT THE JUDGE COULD NOT SETTLE FROM A FRAME, and this can: he kept the
+  // stop-line half STANDING on `pc-right/04-t060s.png` and `mobile-right/
+  // 04-t072s.png` — «an unbroken grey expanse with no stop line, no lane
+  // channelisation and no arrows anywhere in front of the ego» — with the
+  // caveat that both legs were flagged BLIND. Built here, the paint IS laid:
+  // four М7 bars, one per incoming arm, and three stations of glyphs. What
+  // those two frames photograph is the JUNCTION ITSELF, and the second case
+  // below measures how much of it there is, because that is the real defect
+  // and it is not in any painter.
+  // -------------------------------------------------------------------------
+
+  it(`${LN_ARROWS}: the lane-intent arrows and the four М7 bars ARE on the road — sc-ln-turn-lane-arrows's headline, refuted`, () => {
+    const built = build(LN_ARROWS);
+
+    // Three glyph stations × three lanes. `ln-arrows-v1`'s `meta.scenario
+    // .laneArrows` authors laneId 0/1/2 as right / through / left, which is the
+    // split the briefing describes («дясна лента — само надясно, средна — само
+    // направо, лява — само наляво»), and the through glyph is two quads to the
+    // turning pair's three: 3 × (2 + 3 + 3) = 24.
+    expect(built.markings.laneArrowQuads).toBe(24);
+
+    // …and the signalized × carries one bar per incoming arm, exactly like
+    // `sx-v1` above. Both counts, because „no arrows" and „no stop line" are
+    // two clauses of one row and closing either alone is how this row survived.
+    expect(built.markings.stopLines).toBe(4);
+    const incoming = [...built.net.nodes.values()]
+      .filter((n) => n.degree >= 3 && n.signalized)
+      .reduce((n, node) => n + node.approaches.filter((a) => a.incoming).length, 0);
+    expect(incoming).toBe(4);
+  });
+
+  it("every district that authors lane arrows gets them painted — the general form", () => {
+    // A rule with one enforced instance is a convention. Three districts author
+    // `meta.scenario.laneArrows` today (`runtime/laneArrows.ts`'s own census:
+    // ln-arrows-v1, ov-oneway-v1 and rb-2lane-v1's four arms), and the failure
+    // this catches is the one the row alleges — authored data that the painter
+    // silently declines, leaving a lesson to grade a marking the world does not
+    // have. Measured 2026-08-25: 24 / 6 / 28 quads.
+    const authored = corpusIds().filter((id) => hasAuthoredLaneArrows(load(id)));
+    expect(authored.length).toBeGreaterThanOrEqual(3);
+    for (const id of authored) {
+      expect(build(id).markings.laneArrowQuads, id).toBeGreaterThan(0);
+    }
+  });
+
+  it(`${LN_ARROWS}: the bare expanse the frames show is 43.375 m of JUNCTION, not missing paint`, () => {
+    // THE MEASUREMENT THIS ROW ACTUALLY NEEDED, and the reason it is recorded
+    // here rather than repaired here.
+    //
+    // `network.ts`'s `nodeOpenRadiusM` opens a junction by the WIDEST edge that
+    // touches it plus a corner radius — ONE radius for the node, applied to
+    // every arm. At `ln-n-c` the widest is the boulevard itself: 6 lanes at
+    // LANE_WIDTH_M plus a 4 m parking band each side, so the boulevard's own
+    // arms are cut back by the boulevard's own half-width. The cross street
+    // they have to clear is 2 lanes wide.
+    //
+    //     ln-e-s trimTo   43.375 m        (and ln-e-w, ln-e-n, ln-e-e alike)
+    //     the М7 bar at   106.025 m of a 150 m arm  = 44 m short of the centre
+    //     last arrow at    93.75 m       (station 4 at 123.75 m is skipped —
+    //                                     its glyph falls inside the trim)
+    //
+    // So the junction is an 86.75 m square of unmarked asphalt, and a driver
+    // photographed anywhere inside it is looking at exactly what the finding
+    // describes: no stop line, no channelisation, no arrows. The paint is not
+    // missing; the junction is five times the width of the street it crosses.
+    //
+    // NOT FIXED HERE, deliberately. A per-APPROACH radius is the correct model
+    // and it moves `analyzeNetwork` for all 105 districts at once — every cut
+    // cross-section, every junction patch, every stop line's GRADED arclength
+    // (`runtime/stoplines.ts` reads the same cut) and every spawn point that
+    // was placed against one. That is its own wave with its own frames. The
+    // numbers are pinned so it has a before, and so nobody re-files this as
+    // „the painter skipped an arrow".
+    const built = build(LN_ARROWS);
+    const arm = built.net.edgeById.get("ln-e-s")!;
+    const armLen = polylineLength(arm.edge.geometry as Vec2[]);
+    expect(armLen).toBeCloseTo(150, 9);
+    expect(arm.trimTo).toBeCloseTo(43.375, 9);
+
+    // The cross street is the one the boulevard has to get past, and it is a
+    // quarter of the opening it gets. This is the comparison, stated as the
+    // ratio rather than as two loose numbers.
+    const cross = built.net.edgeById.get("ln-e-w")!;
+    expect(arm.trimTo / cross.halfWidth).toBeGreaterThan(4);
+
+    // …and the bar really is at the mouth of that opening, on the arclength
+    // `runtime/stoplines.ts` grades at — paint and grading coincide or a driver
+    // who stops on the paint is failed for not stopping.
+    const bars = quadsOnEdge(built, "ln-e-s").filter(
+      (q) => Math.abs(q.across - STOP_LINE_WIDTH_M) < 1e-6 && q.along > 1,
+    );
+    expect(bars.length).toBe(1);
+    expect(bars[0]!.s).toBeCloseTo(armLen - arm.trimTo - STOP_LINE_BEYOND_CUT_M, 3);
   });
 
   it(`${TJ_OCCLUDED} / ${JX_EQUAL}: равнозначни junctions carry NO transverse line`, () => {

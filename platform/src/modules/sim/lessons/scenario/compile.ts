@@ -1294,6 +1294,11 @@ export function compileScenario(
     // Maneuver drills start at the skill; the curriculum owns the ritual.
     preDrive: false,
     vehicleStart: rung.vehicleStart ?? spec.start.vehicleStart ?? "ready",
+    // …and WHICH CAR, on the one drill whose four middle steps command a
+    // clutch. Spread rather than written flat so every other compiled lesson
+    // is byte-identical and the scene's own `DEFAULT_DIFFICULTY` stays the
+    // authority for them (ScenarioStartSpec.openingTier carries the frames).
+    ...(spec.start.openingTier ? { openingTier: spec.start.openingTier } : {}),
     objectives,
     // S1 (doc 76 §0 low-speed fidelity): scenario micro-lessons grade ANY
     // contact — a 2 km/h bumper touch on a parked car IS the mistake being

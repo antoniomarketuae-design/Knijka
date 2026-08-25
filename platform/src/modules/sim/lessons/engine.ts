@@ -374,6 +374,48 @@ function objectiveNotice(
     // closing `Math.min` keeps the spoken figure at or under the gate — the
     // card can only ever be stricter than the grader, never looser.
     const shownCapKmh = shownObjectiveCapKmh(spec, params.maxSpeedKmh, postedLimitKmh);
+    const measuredKmh = Math.round(Math.abs(tick.speedKmh));
+    // ── WHICH FRAME IS THIS? — the half the tense fix cannot skip ───────────
+    //
+    // `overCapNoted` latches on the first frame that is `!done && inAcceptance
+    // && speedKmh > cap` (objectives.ts), and THAT IS NOT ALWAYS THE ARRIVAL.
+    // On a zone whose contract also demands a cockpit STATE at the mark, a
+    // student can enter UNDER the cap with the state unmet — no latch, because
+    // `done` is false on the unmet demand and the speed is legal — and then go
+    // over the cap while still inside the disc. The latch fires there, and an
+    // unconditional «стигна дотук с M км/ч» would then be a claim about an
+    // arrival that happened at a different speed. The aorist would have stopped
+    // rotting and started lying, which is the worse of the two.
+    //
+    // NOT A HYPOTHETICAL, AND NOT LATENT — MEASURED ON THIS TREE, 2026-08-25.
+    // A sweep of all 167 templates × rungs finds 953 capped `reachZone` gates,
+    // and 29 of them ALREADY carry an at-mark demand alongside the cap:
+    //   sc-ac-night-lights/sc-acn-lit   ×5  lamps=lit   (cap 50)
+    //   sc-ac-rain-lights/sc-acr-lit    ×4  lamps=lit   (cap 47→42)
+    //   sc-ac-highbeam-lead/sc-ahl-follow ×5 lamps=low  (cap 50→45)
+    //   sc-ac-fog/sc-acf-adapted        ×5  lamps=fog   (cap 35→30)
+    //   sc-ac-snow/sc-acs-approach      ×5  lamps=low   (cap 30→25)
+    //   sc-park-bay-exit-rev/sc-pbe-out ×5  gear=reverse (cap 8)
+    // A grep for an AUTHORED `requireLamps:` finds none and reads clean — the
+    // demand is DERIVED FROM THE BANNER (`objectives.ts deriveLampDemand` /
+    // `deriveGearDemand`, „the gate measures what the banner promises"), so it
+    // arrives without anybody authoring a key. And the branch is not a corner
+    // of those 29: it is their MISTAKE LANE. «Мини контролната зона осветен»
+    // fires this card exactly when the student drives it unlit, which is the
+    // drive the lesson exists to teach.
+    //
+    // THE DISCRIMINATOR IS FREE. `inAcceptance ⟹ sweptAcceptance ⟹ reached`
+    // on one frame, so on the latch frame `after.reached` is always true and
+    // `before.reached` is false EXACTLY on the frame the car first arrived.
+    // No new state, no new field in `ObjectiveEvalState` (which this lane may
+    // not extend anyway — see `ReachZoneWitnessDemands`).
+    const arrivedOnThisFrame = before.type !== "reachZone" || !before.reached;
+    // Both forms are aorist, both print the MEASURED number (THEO-4: what was
+    // observed, what is wanted, what to do — never a bare verdict), and both
+    // leave «тази скорост» two clauses down resolving to it.
+    const measuredBg = arrivedOnThisFrame
+      ? `а стигна дотук с ${measuredKmh} км/ч`
+      : `а върху точката вдигна скоростта до ${measuredKmh} км/ч`;
     return {
       kind: "lesson",
       titleBg: "Стигна точката, но твърде бързо",
@@ -382,7 +424,46 @@ function objectiveNotice(
       // REACH_ZONE_GRACE_M — the grace reaches back toward the driver, never
       // forward past the mark, because on a stop drill the overshoot is the
       // graded failure). Telling him otherwise would be its own falsehood.
-      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, а в момента караш ${Math.round(Math.abs(tick.speedKmh))} км/ч — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
+      //
+      // ── AND THE SPEED IS REPORTED IN THE TENSE IT WAS MEASURED IN ────────
+      //
+      // This sentence used to read «а в момента караш M км/ч» — the present
+      // tense, about a number sampled ONCE, on the rising edge of
+      // `overCapNoted`, and then frozen for as long as the card lives (a
+      // `lesson` toast, up to the 8 s teaching TTL).
+      //
+      // The card's own next clause is «Намали СЕГА». So the instruction and
+      // the claim were pointed at each other: a student who obeyed the card
+      // made the card false, and the faster he obeyed the more false it got.
+      // TWO FRAMES, ONE MECHANISM, and the second is the re-drive of the
+      // first, so this is not a one-off sample:
+      //   · `.audit-frames/w10-1/frames/sc-merge-from-property/mobile-right/
+      //     05-stopped.png` — card «…а в момента караш 16 км/ч», cluster
+      //     directly below it «0 км/ч D»;
+      //   · `.audit-frames/w10-3/frames/sc-merge-from-property/pc-right/
+      //     05-stopped.png` — the same lesson re-driven, «…караш 8 км/ч» over
+      //     the same «0 км/ч D» (cropped 4× from x660-920 / y545-655).
+      // The number moved between the two drives; the contradiction did not.
+      //
+      // NOT FIXED BY RE-SAMPLING. A live figure would need this composed
+      // string to be recomputed per tick, and it is not — `objectiveNotice`
+      // returns one HudEvent at one instant and the toast column owns it from
+      // there. `hud/HudToasts.tsx` already took the half that IS the column's
+      // (it prints the card's age, so the claim is dated on the glass) and
+      // named this file as the owner of the other half. This is that half:
+      // the aorist cannot rot, because the arrival already happened. It also
+      // agrees with the card's own title, which was ALREADY past tense —
+      // «Стигна точката, но твърде бързо» — so the two halves of one card
+      // stop disagreeing about when they are.
+      //
+      // WHICH aorist is decided one screen up: an unconditional „стигна дотук"
+      // is false on the 29 gates whose latch frame is not the arrival frame,
+      // and trading a stale claim for a wrong one is not a repair.
+      //
+      // «тази скорост» two clauses down still resolves in both forms: it is
+      // the speed the card just printed, which is the speed that would carry
+      // him past the mark if he keeps it.
+      explanationBg: `Задачата иска да си тук с не повече от ${shownCapKmh} км/ч, ${measuredBg} — затова още не се отчита. Намали СЕГА, докато си върху точката. Ако я подминеш с тази скорост, задачата остава неизпълнена, но урокът продължава и разборът я показва накрая.`,
     };
   }
   if (
@@ -1266,14 +1347,133 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     const crashed = scoredEvents.some(
       (e) => e.kind === "violation" && e.terminateSession === true,
     );
+    // ── P2: THE STANDSTILL TEST WAS UNSIGNED, ALONE IN THIS GATE ─────────────
+    // Filed against `finish.ts` CRASH_PIN_STUCK_S on 2026-08-17 and left open
+    // as „another lane's file"; this is that lane. The test read
+    // `tick.speedKmh > FINISH_STANDSTILL_KMH`, and REVERSE READS NEGATIVE — so
+    // a student backing out of what he hit at −20 км/ч scored −20 > 1 = false
+    // and was counted as STANDING STILL, banking dwell toward having his lesson
+    // closed under him. He was saved only once he cleared CRASH_PIN_RADIUS_M,
+    // so the exposure was the first 6 m of the one manoeuvre this gate's own
+    // comment promises never to punish („drove away — not stuck, and never
+    // closed down"). Every other speed test on the finish side of the wall
+    // already compares the MAGNITUDE (`stepYieldWait` finish.ts:1787,
+    // `stepFinishGate` finish.ts:1998, both carrying the reason in as many
+    // words). This one now does too.
+    //
+    // ── P3 WAS WRITTEN HERE, MEASURED, AND IS NOT LANDED ─────────────────────
+    // `finish.ts:532-545` has asked since 2026-08-16 for the lawful-wait freeze
+    // below to be exempted for a pinned car („The fix is one condition in
+    // `engine.ts`"), and the obvious spelling of that condition is „the car is
+    // off the carriageway", keyed on
+    //     Math.abs(tick.laneOffsetM) > prev.rules.config.laneKeepMaxOffsetM
+    // It was written, gated and watched RED. IT IS REFUTED IN BOTH DIRECTIONS,
+    // and the measurements are here so the next lane does not re-derive them:
+    //
+    //  1. THE PREDICATE IS NOT CARRIAGEWAY MEMBERSHIP — it is the straddle
+    //     test, and its truthy region includes THE MIDDLE OF THE ROAD.
+    //     `runtime/locator.ts` CLAMPS the lateral distance before computing the
+    //     offset (`d = Math.max(0, Math.min(lanesPerDir * W, d))`, both branches
+    //     at locator.ts:278 and :297), so with LANE_WIDTH_M = 3.25 ×
+    //     PERCEPTUAL_ROAD_SCALE = 8.125 the largest magnitude the locator can
+    //     EMIT is W/2 = 4.0625. Against a bar of 1.3 × 2.5 = 3.25 the whole
+    //     truthy band is 0.8125 m wide, and on a two-way street with one lane
+    //     per direction it is true BOTH past the outer edge (d > 7.3125) AND for
+    //     d < 0.8125 — a car sitting on the осева reads laneOffsetM 4.0625, the
+    //     same number as a car pressed into a building. `rules/engine.ts:1748`
+    //     names the identical expression `offCentre` and grades
+    //     POOR_LANE_KEEPING off it: lane-keeping, not membership.
+    //     `scenario/templates-parking.ts:626-632` already wrote this down —
+    //     `lot-spawn-approach` reads laneOffsetM 4.06 and „Thirty-one shipped
+    //     scenarios do that". Landing the exemption would have closed the drive,
+    //     at ten seconds, of every one of those students who took a shunt and
+    //     then waited out a give-way line within 26 m. It costs the case it
+    //     claims to keep.
+    //
+    //  2. IT CANNOT FIRE ON THE DRIVES IT WAS DERIVED FROM. The frames are real
+    //     — `.audit-frames/w10-4/frames/sc-signal-dead__mobile-right/` books the
+    //     collision at 04-t106s.png and photographs «0 км/ч · D» against a wall
+    //     at 04-t144s.png and at the last frame (4ef8baf7, ~70 s), and
+    //     `w10-2/…/sc-park-gap-short__mobile-right/` is the same shape
+    //     (3b981a51) — but their own run.logs show the car MOVING AWAY after the
+    //     impact (7 км/ч at 04-t117s, 10 км/ч at t109s) between two zero beats.
+    //     CRASH_PIN_RADIUS_M is 6 m; 3 m/s clears it several times over, so
+    //     `awayM > CRASH_PIN_RADIUS_M` had already dropped the pin and there was
+    //     no pin for a freeze to postpone. Off the network both of the freeze's
+    //     inputs go to zero at once anyway: `locator.applyFix(null)` sets
+    //     laneOffsetM = 0 (locator.ts:214) and `worldRuntime.ts:1442` gates the
+    //     stop-line scan on `fix.edgeIdx >= 0`, so `yieldReasonAt` returns null.
+    //     Meanwhile `w10-3/…/sc-park-gap-long__pc-right/` books the same impact,
+    //     does NOT move (0 км/ч at 04-t065s and 04-t071s) and ends ~10 s later:
+    //     THE PIN FIRES TODAY, UNFROZEN. Nothing in this sweep photographs the
+    //     freeze suppressing it. The 52 s of standstill on the cited frames is
+    //     the „simply stuck, not at the end of the route" case — which is
+    //     `stepOffNetwork`'s 75 s bar below plus the missing IN-FLIGHT „you have
+    //     left the road" state (`offNetworkEndingCopy` exists only as an ENDING,
+    //     so for 75 s the student is told nothing). That is where 4ef8baf7 lives,
+    //     and it stays OPEN.
+    //
+    //  3. BOTH CITED DRIVES CARRY THE HARNESS'S OWN «NO LANE-POSITION FINDING
+    //     MAY BE DRAWN FROM THIS DRIVE» stamp (57 % and 53 % closed-loop,
+    //     TRACKING: INTERMITTENT), and laneOffsetM is a lane-position quantity.
+    //
+    // So the freeze stays UNCONDITIONAL. If the exemption is ever wanted, key it
+    // on the impact (`withWhat === "staticObject"` — a car pinned against a
+    // building hit a static body, a car rear-ending a queue hit a vehicle) or on
+    // `tick.edgeId === null`, and MEASURE it on a drive that shows it first.
+    // The two tests below pin both halves of that: the freeze must survive, and
+    // it must survive for a car on the centreline.
+    const dwellUnspendable =
+      yieldWait?.holding === true || Math.abs(tick.speedKmh) > FINISH_STANDSTILL_KMH;
     if (crashed) {
       // Re-arm on every impact: the pose that matters is the LAST one.
-      crashPin = { atSec: tick.t, x: tick.position.x, y: tick.position.y, stillSinceSec: null };
+      //
+      // ── P1: THE RE-ARM USED TO WIPE THE CLOCK WITH THE POSE ────────────────
+      // They measure different things. The pose is what „did not leave the
+      // spot" is measured FROM; `stillSinceSec` is what „has not moved" is
+      // measured WITH, and a fresh REPORT of a car that has not moved is not
+      // evidence of movement — movement has its own test, one branch down, and
+      // `awayM > CRASH_PIN_RADIUS_M` still drops the pin outright for anyone
+      // who genuinely drove off. The exhibit is a stationary pinned car struck
+      // by a SECOND body: `rules/engine.ts` keys its contact episodes per body,
+      // so that bill is a new violation on frame N, the re-arm reset the ten
+      // seconds, and the rescue slid another ten seconds down the road for a
+      // car that had already been motionless for nine. (The original filing —
+      // 65 re-reports in one 177 s drive — is narrower now than when it was
+      // written: the dedupe wave made a reopen need daylight plus 2 m of
+      // travel, so a grind no longer re-bills. The wipe was wrong either way.)
+      //
+      // The same `dwellUnspendable` predicate governs both branches, so a car
+      // that IS moving on the frame it re-hits drops the dwell here exactly as
+      // it would one branch down. One rule, one spelling.
+      //
+      // AND THE SAME RADIUS. Inheriting a dwell is only honest while the car is
+      // still where it banked it, and speed alone cannot say so across a long
+      // frame: the harness measured a worst tick of 3562 ms on the very drive
+      // this pin is filed from, and a car can cross metres inside one while both
+      // sampled endpoints read 0 км/ч. The non-crash branch below drops the pin
+      // outright past CRASH_PIN_RADIUS_M; the re-arm cannot do that (it has a
+      // fresh graded impact in hand) so it drops the CLOCK instead — the same
+      // evidence, spent the only way this branch can spend it. Conservative by
+      // construction: dropping a dwell can only keep a drive running.
+      const rearmMovedM =
+        crashPin === undefined
+          ? 0
+          : Math.hypot(tick.position.x - crashPin.x, tick.position.y - crashPin.y);
+      crashPin = {
+        atSec: tick.t,
+        x: tick.position.x,
+        y: tick.position.y,
+        stillSinceSec:
+          dwellUnspendable || rearmMovedM > CRASH_PIN_RADIUS_M
+            ? null
+            : (crashPin?.stillSinceSec ?? null),
+      };
     } else if (crashPin !== undefined) {
       const awayM = Math.hypot(tick.position.x - crashPin.x, tick.position.y - crashPin.y);
       if (awayM > CRASH_PIN_RADIUS_M) {
         crashPin = undefined; // drove away — not stuck, and never closed down
-      } else if (yieldWait?.holding === true || tick.speedKmh > FINISH_STANDSTILL_KMH) {
+      } else if (dwellUnspendable) {
         // Moving, or lawfully waiting (B15's freeze applies here for the same
         // reason it applies to the other two gates: that second is evidence of
         // nothing). Drop the partial dwell rather than bank it.

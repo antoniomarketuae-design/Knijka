@@ -41,6 +41,15 @@ export {
    * act's row. See catalog.ts's doc for the drive that proved it.
    */
   actCopy,
+  /**
+   * WRONG_WAY's two roads, and the `detail` key that selects the motorway one.
+   * Exported so the surfaces that group faults can be gated against the same
+   * table the engine and `rebuildRuleEvents` build from, instead of against a
+   * copy of the sentence — see catalog.ts for the frame (six «еднопосочна
+   * улица» cards on a motorway merge).
+   */
+  WRONG_WAY_ROAD_COPY,
+  WRONG_WAY_ROAD_MOTORWAY,
   makeCommendation,
   makeViolation,
   type CommendationSpec,

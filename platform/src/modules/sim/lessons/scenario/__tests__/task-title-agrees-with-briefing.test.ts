@@ -229,14 +229,28 @@ describe("a task that invokes the recommended speed says which number that is", 
     // the grade moved and no correct drive can be refused by this repair.
     const spec = SCENARIO_TEMPLATES.find((s) => s.id === "sc-mw-min-speed");
     expect(spec, "sc-mw-min-speed left the registry").toBeDefined();
+    //
+    // 2026-08-25, `sc-mw-min-speed:f3c26187`: the FIGURE moved and this pin
+    // moved with it, which is the pin doing its job. mw-v1 is the one motorway
+    // in the catalogue and both drills run on it back to back; the sibling
+    // sc-mw-discipline briefs «около 120–130 км/ч» and the staged flow here is
+    // authored at cruiseSpeedMps 33 → 36 (119 → 130 км/ч), so 110 was the one
+    // number on this road that nothing backed. The gate is still 140 and the
+    // suffix is still the gate's, so this repair still cannot refuse a drive.
     const briefing = (compileScenario(spec!, 1).briefingBg ?? []).map((s) => s.textBg).join(" | ");
-    expect(briefing, "briefing step 2 is where the 110 comes from").toContain("около 110 км/ч");
+    expect(briefing, "briefing step 2 is where the rhythm comes from").toContain(
+      "около 120–130 км/ч",
+    );
+    // …and the old number is gone from the briefing, so „the chip quotes a
+    // figure the lesson no longer sources" cannot come back on either side.
+    expect(briefing, "the retired figure must not survive anywhere").not.toContain("110 км/ч");
     for (const objectiveId of ["sc-mwms-join", "sc-mwms-hold"]) {
       for (const level of rungsOf(spec!)) {
         const text = cardFor(spec!, level, objectiveId);
-        expect(text, `${objectiveId}@L${level}`).toContain("около 110 км/ч");
+        expect(text, `${objectiveId}@L${level}`).toContain("около 120–130 км/ч");
         expect(text, `${objectiveId}@L${level}`).toContain("дръж под 140 км/ч");
-        expect(text, `${objectiveId}@L${level}`).not.toContain("дръж под 110");
+        expect(text, `${objectiveId}@L${level}`).not.toContain("дръж под 130");
+        expect(text, `${objectiveId}@L${level}`).not.toContain("110");
       }
     }
   });
@@ -271,7 +285,7 @@ describe("a task that invokes the recommended speed says which number that is", 
      * BOTH DIRECTIONS in one test, because they are the same repair: the CURVE
      * proves a ceiling narrowed to the табела's 50, the MOTORWAY proves a target
      * did NOT become a ceiling (the card must still publish the gate's 140 while
-     * carrying the taught 110). The session is built the way
+     * carrying the taught band). The session is built the way
      * `advisor-authored-cap.test.ts` builds its live check — driving phase, the
      * objective index pointed at the row under test — because
      * `advisorPromptForSession` digs the authored cap out of the RAW compiled
@@ -283,7 +297,7 @@ describe("a task that invokes the recommended speed says which number that is", 
       [
         "sc-mw-min-speed",
         "sc-mwms-join",
-        "Влез в ритъма на потока (около 110 км/ч) в дясната лента за движение — дръж под 140 км/ч",
+        "Влез в ритъма на потока (около 120–130 км/ч) в дясната лента за движение — дръж под 140 км/ч",
       ],
     ] as const) {
       const spec = SCENARIO_TEMPLATES.find((s) => s.id === scenarioId)!;

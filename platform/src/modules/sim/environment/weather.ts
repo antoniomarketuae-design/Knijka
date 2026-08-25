@@ -292,6 +292,23 @@
 //      „гумите му вдигат пелена от пръски, в която не се вижда нищо"; the
 //      student sees straight through it to the horizon. Nothing in this store
 //      changed that and nothing in this store can.
+//
+//      AND THE ONE PIECE OF EVIDENCE THAT SAID OTHERWISE IS THE ROUTE MARKER —
+//      2026-08-25. The w10-4 re-judge downgraded this row to PARTIAL on the
+//      reading that „from about t150 a translucent pale-cyan column is drawn
+//      attached to the truck and rising from its roof … absent at 04-t001s and
+//      04-t059s". Opened: `.audit-frames/w10-4/frames/sc-ac-truck-spray__pc-
+//      right/04-t188s.png` carries TWO such columns, at x ≈ 1105 and x ≈ 1310
+//      of a 1440-wide shot, and the truck is at x ≈ 848. They are on the
+//      VERGE, not on the vehicle — and the frame prints their name in its own
+//      top-left legend: «стрелка и стълб светлина — завоят и целта по
+//      маршрута». They are the route/target beacons (the same pale-cyan column
+//      stands over «Карай дотук» on the night lessons), they appear at t150
+//      because that is when the ego gets within draw range of the route end,
+//      and they have nothing to do with rain. The air behind the truck is still
+//      perfectly clear on that frame: no plume, no curtain, no visibility loss,
+//      with ИНСТРУКЦИИ step 3 «гумите му вдигат пелена от пръски, в която не се
+//      вижда нищо» legible beside it. The row stands whole and stays routed.
 
 import { useSyncExternalStore } from "react";
 

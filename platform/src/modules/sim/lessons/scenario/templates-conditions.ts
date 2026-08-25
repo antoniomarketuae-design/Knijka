@@ -725,8 +725,56 @@ export const SC_AC_FOG: ScenarioSpec = {
     // 25 км/ч“ AT INDEX 2 on purpose — tier-feasibility's imperative sweep labels
     // a speed order by its instruction number, and 25 km/h is feasible on every
     // tier, so the row must stay recognisably the same row.
-    // 72 ch
-    { n: 1, textBg: "Включи късите светлини и фаровете за мъгла (клавиш V) преди да потеглиш." },
+    // 71 ch — and the four characters that left are the ones a phone cannot
+    // press. It read «(клавиш V)» until 2026-08-25:
+    // `.audit-frames/w10-2/frames/sc-ac-fog__mobile-right/02-briefing.png`
+    // photographs that sentence on a touch device, and 04-t033s.png of the
+    // same leg photographs the drive surface it would have to be pressed on —
+    // МЕНЮ / ИЗГЛЕД / ПАУЗА / ⚙ КОЛА / КЛАКС / МИГАЧ ×2 / three mirrors, and
+    // no keyboard anywhere in the building. A briefing is authored ONCE and
+    // read by both inputs (`compile.ts` spreads `instructionsBg` verbatim), so
+    // it is the one surface that may not name a key: the input-aware channel
+    // for that is `hud/controlPhrases.ts`, which this string cannot reach.
+    //
+    // ⚠ WHAT THIS DOES **NOT** SAY, because the first draft of this comment did
+    // and it was false. „There is no branch in which an authored briefing could
+    // name the right control for a phone AND a desktop" is wrong: the branch
+    // exists at the RENDER site. `LessonPlayShell.tsx` holds the input
+    // (`hintInputFor(hasTouchScreen())`), reads `lesson.briefingBg` and already
+    // imports `withSheetLocatorBg` from `hud/controlPhrases.ts` for its own
+    // hints. „Authored once" and „rendered input-blind" are two different
+    // claims and the first draft merged them. What is true is the narrower
+    // thing: THIS STRING cannot reach the input, so the BANK's rule is „name a
+    // control, never a key" — and the two-form treatment belongs one hop
+    // downstream, at the render site, not in a third rewrite of this literal.
+    //
+    // THE COST OF STOPPING HERE, stated so it is not rediscovered as a finding:
+    // the desktop reader loses „V" from this sentence. He is not stranded — the
+    // sentence's own noun «фаровете за мъгла» matches the console hotspot
+    // verbatim (`scene/vitok/hotspots.ts hotspot_fog`, `labelBg: "Фарове за
+    // мъгла"`), and that hotspot carries `keyHint: "V"`, so the key is on the
+    // control he is looking at. `conditions-sweep161-truth.test.ts` pins both
+    // halves, so the day the hotspot drops its key hint this omission stops
+    // being free and says so. The touch reader gains the cell face but not the
+    // ⚙-sheet locator every other touch sentence in the product appends
+    // (`TOUCH_SHEET_LOCATOR_BG`) — that half needs the render site and is open.
+    //
+    // «МЪГЛА» IS THE FACE BOTH READERS SEE, which is why it can replace the
+    // key rather than merely delete it: on touch it is the ⚙-strip cell
+    // (`components/sim/TouchControls.tsx` `textBg="МЪГЛА"`), on desktop it is
+    // the telltale caption under the fog lamp (`hud/StatusDashboard.tsx`
+    // `labelBg="Мъгла"`, rendered through the `uppercase` CAPTION class). The
+    // desktop caption is a READ-OUT, not the switch — that is the console
+    // hotspot («Фарове за мъгла», scene/vitok/hotspots.ts) or V — but it names
+    // the same lamp in the same six letters, which is what the sentence needs
+    // it for. `conditions-sweep161-truth.test.ts` reads both files and fails if
+    // either face is renamed, the same contract `controlPhrases.test.ts` holds.
+    //
+    // The step stays an unconditional lamp ORDER for `scene/cabin.ts`
+    // `briefingOrdersLampsOn` — one clause, «Включи» + a lamp noun, no hedge —
+    // so sc-ac-fog does not fall out of the headlight-drill partition that
+    // `spawnHeadlights.test.ts` pins by name.
+    { n: 1, textBg: "Включи късите светлини и фаровете за мъгла („МЪГЛА“) преди да потеглиш." },
     // 71 ch — sc-acf-adapted grades 30 (= the 0.6 × 50 fog envelope). „25"
     // stays inside the „стабилизирай" clause, so it remains the ONE speed
     // order tier-feasibility sees here, at instruction 2, exactly as the note

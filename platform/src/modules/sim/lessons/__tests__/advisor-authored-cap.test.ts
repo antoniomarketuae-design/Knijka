@@ -452,7 +452,72 @@ describe("the exhibits", () => {
     expect(953 - oldSpoken).toBe(494);
     // The two classes inside that 499.
     expect(noneStated).toBe(169);
-    expect(statedAboveGate).toBe(116);
+    //
+    // RE-MEASURED 2026-08-25 (w10-4, sc-hazard-obstacle:b103ec20): 116 → 122,
+    // and the cause is a GATE that moved rather than a briefing that did, so it
+    // is worth saying exactly what joined before anyone reads a bigger number
+    // as a bigger defect.
+    //
+    // `scenario/params.ts widenSpeedCap` stopped letting the difficulty ladder
+    // widen an aided gate ALL THE WAY UP TO the posted sign (B58 had only
+    // stopped it going above). Six compiled gates were standing exactly on the
+    // sign and came down off it: sc-ac-highbeam-lead L1 (50 → 47),
+    // sc-hazard-obstacle L1 (50 → 48), sc-vu-blindspot-moto L1 (50 → 47),
+    // sc-ln-decisive-change L1 and L2 (50 → 49), sc-sign-warning L1 (50 → 47).
+    // While a gate sat ON the sign, `Math.min(surfaces) > cap` was false by a
+    // hair; a gate under the sign makes it true. Those six are the whole delta,
+    // and on every one of them the UNAIDED rungs of the same objective (L3/L4/
+    // L5, graded at the author's own 45/46/48) were ALREADY inside this count —
+    // so the class did not gain a drill, it gained the aided rungs of drills
+    // that were in it all along.
+    //
+    // AND THIS IS THE CLASS AS THE OLD THREE SOURCES SAW IT, which is what
+    // makes the growth benign rather than a regression: the strictest number
+    // above those gates is the STREET SIGN, which is where a teaching gate is
+    // supposed to sit. Source 4 — the card that now names the author's own cap
+    // — speaks 45 / 46 / 48 on those six, at or under the gate every time
+    // („no spoken number is above its own gate", §2), and `RouteGuidance.
+    // capLineBg` paints 47 / 48 / 49, also at or under it (censused in
+    // `gate-keeps-half-its-headroom.test.ts`). Nobody is graded against a
+    // threshold nobody stated on any of the six.
+    //
+    // Restated, not relaxed: it is still an exact figure, still measured the
+    // old way, and it still goes red the moment a briefing or a title gains or
+    // loses a «N км/ч».
+    expect(statedAboveGate).toBe(122);
+  });
+
+  it("and the six the 2026-08-25 clamp added are named, with what the student is shown", () => {
+    // THE RESTATEMENT ABOVE, AUDITABLE. A census that moves by six inside an
+    // aggregate is a number anyone can push; the six rows by name, each with
+    // the figure the CARD speaks and the figure the LANE BAR paints, is a claim
+    // that fails if a seventh joins or if any of them stops being harmless.
+    const cards = everyCappedCard();
+    const at = (lessonId: string, objectiveId: string) =>
+      cards.find((c) => c.lessonId === lessonId && c.objectiveId === objectiveId);
+    const moved: [string, string, number, number][] = [
+      // lesson@rung, objective, the gate now, the number the card speaks
+      ["sc-ac-highbeam-lead@L1", "sc-ahl-follow", 47, 45],
+      ["sc-hazard-obstacle@L1", "sc-obs-approach", 48, 46],
+      ["sc-vu-blindspot-moto@L1", "sc-vubs-let-pass", 47, 45],
+      ["sc-ln-decisive-change@L1", "sc-lndc-wait", 49, 48],
+      ["sc-ln-decisive-change@L2", "sc-lndc-wait", 49, 48],
+      ["sc-sign-warning@L1", "reach-end", 47, 45],
+    ];
+    for (const [lessonId, objectiveId, cap, spoken] of moved) {
+      const c = at(lessonId, objectiveId);
+      expect(c, `${lessonId} ${objectiveId} is not in the sweep`).toBeDefined();
+      expect(c!.cap, `${lessonId} gate`).toBe(cap);
+      // Under the sign, which is the whole point of the clamp …
+      expect(c!.posted).toBe(50);
+      expect(c!.cap).toBeLessThan(50);
+      // … the card speaks the author's own number, at or under the gate …
+      expect(c!.spoken, `${lessonId} card`).toBe(spoken);
+      expect(c!.spoken!).toBeLessThanOrEqual(c!.cap);
+      // … and the bar painted across the lane is the gate itself, to the
+      // whole km/h `capLineBg` rounds to, so obeying the paint cannot fail.
+      expect(Math.round(Math.min(c!.cap, c!.posted!))).toBeLessThanOrEqual(c!.cap);
+    }
   });
 });
 

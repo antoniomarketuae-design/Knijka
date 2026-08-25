@@ -197,3 +197,217 @@ describe("FR-B5-JAM — a car pinned against what it hit is not left there", () 
     expect(s.crashPin?.stillSinceSec ?? null).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// THE DEFECTS THE PIN'S OWN SPEC HAD FILED AGAINST ITS FOLD — AND THE ONE
+// PRESCRIPTION THAT MUST NOT BE FILLED
+// ---------------------------------------------------------------------------
+//
+// `finish.ts` specifies the pin's evidence model and `lessons/engine.ts` folds
+// it, and on 2026-08-16/17 the spec side wrote three defects in the fold into
+// its own comment block and closed none of them, each time because the fold is
+// „another lane's file". This is that lane. Two of the three are repaired here
+// (P1, P2) and each gate below was watched RED against the shipped fold before
+// the fix — the exact mutation is named in the block above it.
+//
+// THE THIRD IS REFUTED, NOT REPAIRED, and the last two tests exist to keep it
+// refuted. `finish.ts:532-545` asks for the lawful-wait freeze to be lifted for
+// a pinned car; the obvious spelling — exempt a car whose
+// `|laneOffsetM| > laneKeepMaxOffsetM` — closes the drive of a car sitting on
+// the ОСЕВА, because `runtime/locator.ts` clamps the lateral distance before
+// computing the offset (locator.ts:278, :297) so the largest magnitude it can
+// emit is LANE_WIDTH_M / 2 = 4.0625 against a bar of 3.25. That is the straddle
+// test, not carriageway membership, and `templates-parking.ts:626-632` records
+// that `lot-spawn-approach` reads laneOffsetM 4.06 with „Thirty-one shipped
+// scenarios" starting there. The engine.ts block carries the full derivation.
+//
+// The frames that made the round worth spending, all the same picture: a car
+// pressed into a building with the clock running and nothing said.
+// `.audit-frames/w10-4/frames/sc-signal-dead__mobile-right/` — collision card
+// at 04-t106s.png, «0 км/ч · D» against a wall at 04-t144s.png and at the last
+// frame: ~70 s (sc-signal-dead:4ef8baf7). `.audit-frames/w10-2/frames/
+// sc-park-gap-short__mobile-right/` — the same from 04-t130s.png through
+// 04-t177s.png (3b981a51). NEITHER IS THIS GATE: both run.logs record the car
+// moving away after the impact (7 км/ч at 04-t117s, 10 км/ч at t109s) past
+// CRASH_PIN_RADIUS_M = 6 m, so the pin was already dropped and no freeze was
+// postponing anything. Those rows stay OPEN against `stepOffNetwork`'s 75 s bar
+// and the missing in-flight „you have left the road" state.
+
+/**
+ * A car on the centreline of a two-way street reads exactly this — it is
+ * `LANE_WIDTH_M / 2 = 3.25 × PERCEPTUAL_ROAD_SCALE / 2`, the largest magnitude
+ * `runtime/locator.ts` can emit, and the pose 31 shipped scenarios spawn at
+ * (`lot-spawn-approach`, templates-parking.ts:626-632). It is ALSO what a car
+ * shoved into a building reads, which is the whole point of the last test.
+ */
+const CENTRELINE_OFFSET_M = 4.0625;
+
+/**
+ * A frame with a controlled line inside YIELD_STOP_LINE_REACH_M ahead — which
+ * is all `yieldReasonAt` needs to publish `giveWayLine` and latch B15's freeze.
+ * `laneOffsetM` is the only thing that varies between the two freeze tests.
+ */
+function atLine(
+  t: number,
+  y: number,
+  speedKmh: number,
+  laneOffsetM: number,
+  events: SimTick["events"] = [],
+): SimTick {
+  return makeTick({
+    t,
+    speedKmh,
+    position: { x: 0, y },
+    laneOffsetM,
+    nextStopLineM: 10,
+    nextStopLineControl: "giveWay",
+    events,
+  });
+}
+
+describe("the crash pin's fold — the defects its own spec had filed", () => {
+  it("P2 — a student REVERSING out of what he hit never banks the rescue's clock", () => {
+    // MUTATION: put `tick.speedKmh > FINISH_STANDSTILL_KMH` back in place of
+    // the magnitude test and this goes red at the second-to-last assertion —
+    // −20 > 1 is false, the reverse frame reads as a STANDSTILL, the dwell
+    // banked at t+0.5 is never dropped and the drive is closed at t+10.5 on a
+    // student who was in the middle of the one manoeuvre this gate promises
+    // never to punish.
+    const { state: s0, t } = underWay();
+    let s = collide(s0, t, 40);
+    let tt = t + 0.5;
+    for (; tt <= t + 9; tt += 0.5) s = applyTick(s, frame(tt, 40, 0)).state;
+    expect(s.phase, "nine seconds is one short of the bar").toBe("driving");
+    expect(s.crashPin?.stillSinceSec ?? null, "…and the clock is running").not.toBeNull();
+
+    // He backs off half a metre at 20 км/ч. Reverse reads NEGATIVE.
+    s = applyTick(s, frame(tt, 39.5, -20)).state;
+    tt += 0.5;
+    expect(s.crashPin, "half a metre is the radius' business, not the clock's").toBeDefined();
+    expect(
+      s.crashPin?.stillSinceSec ?? null,
+      "a reverse frame is MOVEMENT — the dwell restarts from here",
+    ).toBeNull();
+
+    // Settling again restarts the ten seconds, so nothing may end inside the
+    // window the unsigned test would have closed him in.
+    for (; tt <= t + 19; tt += 0.5) s = applyTick(s, frame(tt, 39.5, 0)).state;
+    expect(s.phase, "the drive is still his").toBe("driving");
+  });
+
+  it("P1 — a SECOND body striking the pinned car re-arms the pose, not the clock", () => {
+    // MUTATION: put `stillSinceSec: null` back into the re-arm and this goes
+    // red at the last assertion — the nine seconds already served are thrown
+    // away and the rescue slides another ten seconds down the road for a car
+    // that has not moved at all. `rules/engine.ts` keys contact episodes per
+    // body, so a different `withWhat` always bills: that is the instrument in
+    // the middle of this test, and it is asserted rather than assumed.
+    const { state: s0, t } = underWay();
+    let s = collide(s0, t, 40); // vehicle
+    let tt = t + 0.5;
+    for (; tt <= t + 9; tt += 0.5) s = applyTick(s, frame(tt, 40, 0)).state;
+    expect(s.phase).toBe("driving");
+
+    s = applyTick(s, frame(tt, 40, 0, [{ kind: "collision", withWhat: "staticObject" }])).state;
+    tt += 0.5;
+    expect(
+      s.events.filter((e) => e.kind === "violation" && e.code === "COLLISION").length,
+      "the instrument: a body never touched before always bills",
+    ).toBe(2);
+
+    for (; tt <= t + 12; tt += 0.5) {
+      s = applyTick(s, frame(tt, 40, 0)).state;
+      if (s.phase !== "driving") break;
+    }
+    expect(s.phase, "eleven motionless seconds is eleven motionless seconds").toBe("completed");
+  });
+
+  it("P1 — …but a re-arm more than CRASH_PIN_RADIUS_M away spends the clock it inherited", () => {
+    // The hole the inheritance opens, closed with the branch below's own bar.
+    // Frames are 2 Hz here; the harness measured a WORST TICK OF 3562 ms on the
+    // drive this pin is filed from, and inside one of those a car crosses metres
+    // while both sampled endpoints read 0 км/ч. Without this the nine seconds
+    // banked against a bumper would be spent against a wall 8 m away.
+    // MUTATION: drop `|| rearmMovedM > CRASH_PIN_RADIUS_M` from the re-arm and
+    // this goes red — «the dwell was banked somewhere else — it cannot be spent
+    // here: expected 3.5 to be null» — the inherited clock survives the jump and
+    // the drive is closed one second after an impact it never sat at.
+    const { state: s0, t } = underWay();
+    let s = collide(s0, t, 40);
+    let tt = t + 0.5;
+    for (; tt <= t + 9; tt += 0.5) s = applyTick(s, frame(tt, 40, 0)).state;
+    expect(s.crashPin?.stillSinceSec ?? null, "nine seconds banked at the bumper").not.toBeNull();
+
+    // One long frame later he is 8 m up the road and hits something else. Both
+    // endpoints read 0 км/ч, so speed says nothing; the pose says everything.
+    const far = 40 + CRASH_PIN_RADIUS_M + 2;
+    s = applyTick(s, frame(tt, far, 0, [{ kind: "collision", withWhat: "staticObject" }])).state;
+    tt += 0.5;
+    expect(s.crashPin?.y, "the pin re-arms at the NEW pose").toBe(far);
+    expect(
+      s.crashPin?.stillSinceSec ?? null,
+      "the dwell was banked somewhere else — it cannot be spent here",
+    ).toBeNull();
+
+    for (; tt <= t + 14; tt += 0.5) {
+      s = applyTick(s, frame(tt, far, 0)).state;
+      if (s.phase !== "driving") break;
+    }
+    expect(s.phase, "the ten seconds start again at the new wall").toBe("driving");
+  });
+
+  it("the lawful-wait freeze stays UNCONDITIONAL — a shunt at the line keeps driving", () => {
+    // A rear-ender into the back of a queue at a red is a car that CAN move the
+    // moment the queue does; closing that drive at ten seconds takes away the
+    // very thing the collision card promises — «В симулатора продължаваме, за да
+    // се учиш» (rules/catalog.ts COLLISION). `finish.ts:532-545` prescribes
+    // exempting the pin from this freeze; this is the bill that prescription
+    // pays, and it is why the exemption is not landed.
+    // MUTATION: this is the BLANKET removal, i.e. delete
+    // `yieldWait?.holding === true ||` from `dwellUnspendable` — the drive is
+    // then closed at t+10.5 on a student doing the right thing.
+    const { state: s0, t } = underWay();
+    let s = applyTick(s0, atLine(t, 40, 18, 0, [{ kind: "collision", withWhat: "vehicle" }])).state;
+    expect(s.crashPin, "the impact must arm the pin").toBeDefined();
+    let tt = t + 0.5;
+    for (; tt <= t + CRASH_PIN_STUCK_S * 2; tt += 0.5) {
+      s = applyTick(s, atLine(tt, 40, 0, 0)).state;
+    }
+    // The instrument: the freeze really is latched, so this test measures the
+    // freeze and not a hold that never happened.
+    expect(s.yieldWait?.holding, "he is lawfully stopped at the line").toBe(true);
+    expect(s.yieldWait?.reason, "…and the freeze's own reason is live").toBe("giveWayLine");
+    expect(s.phase, "twice the bar, and the drive is still his").toBe("driving");
+  });
+
+  it("…and it keeps it for a car ON THE CENTRELINE, which reads the same offset as a wall", () => {
+    // THE GUARD AGAINST THE PRESCRIPTION. `runtime/locator.ts` CLAMPS the
+    // lateral distance (locator.ts:278, :297), so the largest magnitude it can
+    // emit is LANE_WIDTH_M / 2 = 4.0625 — which is what a car pressed into a
+    // building reads AND what a car sitting on the осева reads. Against
+    // `laneKeepMaxOffsetM` = 1.3 × 2.5 = 3.25 the truthy band is 0.8125 m wide
+    // and it contains the middle of the road; `rules/engine.ts:1748` calls the
+    // identical expression `offCentre` and grades POOR_LANE_KEEPING off it.
+    // `templates-parking.ts:626-632`: `lot-spawn-approach` reads 4.06 there and
+    // „Thirty-one shipped scenarios do that".
+    // MUTATION: add `&& Math.abs(tick.laneOffsetM) <= prev.rules.config
+    // .laneKeepMaxOffsetM` to the freeze — the prescription's own spelling — and
+    // this goes red: the drive is closed at t+10.5 on a student who is lawfully
+    // stopped at a give-way line, on 31 shipped spawns' worth of geometry.
+    const { state: s0, t } = underWay();
+    let s = applyTick(
+      s0,
+      atLine(t, 40, 18, CENTRELINE_OFFSET_M, [{ kind: "collision", withWhat: "vehicle" }]),
+    ).state;
+    expect(s.crashPin, "the impact must arm the pin").toBeDefined();
+    let tt = t + 0.5;
+    for (; tt <= t + CRASH_PIN_STUCK_S * 2; tt += 0.5) {
+      s = applyTick(s, atLine(tt, 40, 0, CENTRELINE_OFFSET_M)).state;
+    }
+    expect(s.yieldWait?.holding, "he is lawfully stopped at the line").toBe(true);
+    expect(
+      s.phase,
+      "a lane-keeping number may not decide whether a drive is closed under him",
+    ).toBe("driving");
+  });
+});

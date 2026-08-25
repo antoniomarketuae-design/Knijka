@@ -193,6 +193,12 @@ export function validateScenarioSpec(
   if (spec.start?.vehicleStart !== undefined && !["cold", "ready"].includes(spec.start.vehicleStart)) {
     errors.push(`start.vehicleStart must be "cold" | "ready"`);
   }
+  if (
+    spec.start?.openingTier !== undefined &&
+    !["beginner", "normal", "advanced"].includes(spec.start.openingTier)
+  ) {
+    errors.push(`start.openingTier must be "beginner" | "normal" | "advanced"`);
+  }
 
   // -- Instructions: contiguous 1..n, Bulgarian.
   if (!Array.isArray(spec.instructionsBg) || spec.instructionsBg.length === 0) {

@@ -52,7 +52,27 @@ export function scFollowDistanceShadowScript(): DriveScript {
       // ~26 km/h behind a lead that drives its OWN steady 25.9 km/h from 25 m of
       // centres (20.9 m of bumpers) — the gap holds itself and reads ~2.9 s.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 110]], targetKmh: 26, stopAtEnd: false },
-      { kind: "annotation", textBg: "На 26 км/ч тези двайсетина метра са близо 3 секунди — има време за реакция." },
+      // WHOSE 26 IT IS, AND WHY THAT WORD IS NOT DECORATION — w10-3,
+      // `sc-follow-distance__pc-right/04-t179s.png`: this caption on the glass
+      // with the student's own cluster reading 11 км/ч D. Filed against
+      // `AdvisorCard.tsx` («the advisor bubble quotes a speed the car is not
+      // doing»); it is not the advisor, it is this sentence, and an earlier
+      // round moved the caption card down onto the «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ
+      // СЯНКАТА» panel so the speaker is ADJACENT. The row reproduced anyway,
+      // one digit different (0 км/ч then, 11 now), because adjacency is not
+      // attribution: the sentence still had no subject.
+      //
+      // 26 IS TRUE OF THE RECORDING AND IS NOW SAID TO BE. Measured on the
+      // committed trace at this annotation's own beat (t = 14.85 s): 25.9 км/ч.
+      // The figure does not move — only the subject arrives — so nothing that
+      // quotes it downstream has to move with it.
+      //
+      // THIS IS THE LESSON WHOSE WHOLE SUBJECT IS THAT THE SAME TWENTY METRES
+      // IS A DIFFERENT AMOUNT OF TIME AT A DIFFERENT SPEED. A seventeen-year-old
+      // reading „на 26 км/ч … близо 3 секунди" as a statement about the car he
+      // is sitting in at 11 км/ч has been taught that twenty metres IS three
+      // seconds — the exact misconception the drill exists to remove.
+      { kind: "annotation", textBg: "Сянката кара с 26 км/ч: при тази скорост двайсетина метра са близо 3 секунди — има време за реакция." },
       { kind: "drive", points: [[X_LANE, 110], [X_LANE, 230]], targetKmh: 26, stopAtEnd: false },
       { kind: "annotation", textBg: "Дистанцията се държи в секунди, не в метри на око — брой „едно-и-две“." },
       { kind: "drive", points: [[X_LANE, 230], [X_LANE, 345]], targetKmh: 26 },
@@ -74,7 +94,16 @@ export function scFollowDistanceMistakeTailgateScript(): DriveScript {
       // Ease up behind the closer lead (a smooth close from ~5 m to ~2.2 m of
       // bumpers — never overshooting into it), then GLUE on at 48 km/h.
       { kind: "drive", points: [[X_LANE, 15], [X_LANE, 70]], targetKmh: 30, stopAtEnd: false },
-      { kind: "annotation", textBg: "На 48 км/ч половин дължина кола е под две десети от секундата — няма никакво време за реакция." },
+      // THE SIBLING OF THE SHADOW'S CAPTION, AND ITS FIGURE IS WORSE PLACED.
+      // Measured on the committed trace at this beat (t = 8.52 s): the recorded
+      // car is at 29.8 км/ч — the 48 belongs to the leg BELOW, which has not
+      // started. The physics is right at 48 (half a car ≈ 2.2 m ÷ 13.3 m/s =
+      // 0.17 s, „под две десети") and WRONG at 29.8 (0.27 s), so a caption read
+      // as „right now" teaches an untrue number. Attributing it to the instant
+      // would therefore be a second false claim, not a fix: it is stated as the
+      // conditional it always was, about the tailgate that is about to happen.
+      // The 48 is the recording's own peak (47.9), so no figure is invented.
+      { kind: "annotation", textBg: "Сянката ще залепи на 48 км/ч: при тази скорост половин дължина кола е под две десети от секундата — няма никакво време за реакция." },
       // The sustained tailgate: ~2.2 m bumper gap (~0.17 s) held for ~16 s.
       { kind: "drive", points: [[X_LANE, 70], [X_LANE, 300]], targetKmh: 48, stopAtEnd: false },
       { kind: "drive", points: [[X_LANE, 300], [X_LANE, 330]], targetKmh: 48 },

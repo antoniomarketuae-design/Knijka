@@ -291,7 +291,7 @@ describe("reachZone", () => {
 
     it("THE CARD THE REMOVAL DELETED: the refusal latches for the engine to explain", () => {
       // `overCapNoted` is what lessons/engine.ts turns into «Задачата иска да
-      // си тук с не повече от 55 км/ч, а в момента караш 59 км/ч…» — THEO-4's
+      // си тук с не повече от 55 км/ч, а стигна дотук с 59 км/ч…» — THEO-4's
       // own shape (what was observed, what is wanted, what to do about it), and
       // the sweep read it off staging at t = 17 s. With the cap gone this state
       // is unreachable and the row says nothing at all, on any drive.

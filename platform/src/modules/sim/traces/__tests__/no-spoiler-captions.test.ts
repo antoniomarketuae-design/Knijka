@@ -46,8 +46,42 @@ const ROOTS = [
 // Cyrillic-safe boundaries: JS \b is ASCII-only, so Cyrillic words need
 // explicit lookarounds on the Cyrillic block.
 const CYR = "\\u0400-\\u04FF";
-/** «… е свободна/чист(а/о) …» as a bare assertion, or «слезе напълно …». */
-const ASSERTION = new RegExp(`(?<![${CYR}])е\\s+(свободн|чист)|(?<![${CYR}])слезе\\s+напълно`, "iu");
+/**
+ * «… е свободна/чист(а/о) …» as a bare assertion, or «слезе напълно …», or
+ * «… са/е вдигнат(и/а) …».
+ *
+ * THE THIRD ALTERNATIVE IS THE GENERAL FORM, AND IT COST A FALSE REFUSAL.
+ * `.audit-frames/w10-3/frames/sc-rx-guarded__pc-right/04-t074s.png` carries
+ * «Бариерите са вдигнати напълно. Бърз оглед и премини решително — без спиране
+ * върху релсите.» on the deck-caption box, with the red-and-white boom lying
+ * flat across the carriageway in the same frame and the −10 «Влизане на прелез
+ * при спусната бариера» six seconds later. This gate's first two alternatives
+ * are the ZEBRA's vocabulary; a raised-arm claim is the identical shape (assert
+ * the hazard is clear, then command motion) in the rail family's vocabulary,
+ * and it was not caught. A rule with one enforced instance is a convention:
+ * widening it flagged sc-rx-barrier-drop's shadow caption too — the same
+ * sentence, character for character, on a barrier with its own 90 s timetable.
+ * (Corrected: the round that widened this predicate recorded that sibling as
+ * „a lesson no frame in this sweep had reached". It is not.
+ * `.audit-frames/w10-1/frames/sc-rx-barrier-drop__pc-right/` holds 43 frames,
+ * `run.log:215` carries the caption on the deck, and `04-t027s.png` shows it at
+ * 9 км/ч. Believing there was no frame is why nobody looked — and the frame
+ * also bills «Влизане на прелез при спусната бариера −10» on that CORRECT leg,
+ * which no caption can repair. See scRxBarrierDrop.ts for the routed owner.)
+ *
+ * MEASURED over the whole corpus (503 content recordings, 1,870 captions):
+ * before the re-record the widened predicate flags EXACTLY those two captions
+ * and nothing else. The nearby raised-arm sentences stay silent because they
+ * command nothing — «Бариерата е вдигната, но колоната още стои» (queue-clear),
+ * «Бариерата е вдигната и прелезът е охраняем — не сме длъжни да спираме»
+ * (pk-rail-ban), «Палката е вдигната, групата е стъпила» (school-patrol) — which
+ * is the discipline this gate has had since it shipped: the offence is the
+ * COMMAND resting on the claim, not the claim.
+ */
+const ASSERTION = new RegExp(
+  `(?<![${CYR}])е\\s+(свободн|чист)|(?<![${CYR}])слезе\\s+напълно|(?<![${CYR}])(са|е)\\s+вдигнат`,
+  "iu",
+);
 /** Second-person motion imperatives — the "go" half of the spoiler shape. */
 const IMPERATIVE = new RegExp(
   `(?<![${CYR}])(премини|продължи|потегли|довърши|тръгни)(?![${CYR}])`,
@@ -87,6 +121,34 @@ describe("no-spoiler captions (sc-zebra-approach:8dda834f class)", () => {
     expect(isSpoilerCaption("Пътеката е свободна — премини спокойно.")).toBe(true);
     expect(isSpoilerCaption("Слезе напълно от платното — премини спокойно.")).toBe(true);
     expect(isSpoilerCaption("Палката е свалена, пътеката е чиста — потегли плавно.")).toBe(true);
+    // The rail family's vocabulary — the sc-rx-guarded:e0c40055 frame, verbatim,
+    // and the sibling the widening found in sc-rx-barrier-drop.
+    expect(
+      isSpoilerCaption(
+        "Бариерите са вдигнати напълно. Бърз оглед и премини решително — без спиране върху релсите.",
+      ),
+    ).toBe(true);
+    expect(
+      isSpoilerCaption(
+        "Бариерата е вдигната напълно. Бърз оглед и премини решително — без спиране върху релсите.",
+      ),
+    ).toBe(true);
+    // …and its repair: the condition, never the state, so the sentence is true
+    // at every phase of a 90 s barrier cycle and every offset of the replay clock.
+    expect(
+      isSpoilerCaption(
+        "Премини решително едва когато лостът се вдигне ДОКРАЙ — бърз оглед наляво и надясно, без спиране върху релсите.",
+      ),
+    ).toBe(false);
+    // A raised arm that commands NOTHING is not this gate's business — the three
+    // live corpus sentences that sit closest to the new alternative.
+    expect(isSpoilerCaption("Бариерата е вдигната, но колоната още стои — вдигната бариера не значи „влез“.")).toBe(
+      false,
+    );
+    expect(
+      isSpoilerCaption("Бариерата е вдигната и прелезът е охраняем — не сме длъжни да спираме. Не спираме и „за всеки случай“."),
+    ).toBe(false);
+    expect(isSpoilerCaption("Палката е вдигната, групата е стъпила — а колата продължава…")).toBe(false);
     // The repaired voice — condition before/around the command — must pass.
     expect(isSpoilerCaption("Премини спокойно едва когато пътеката е свободна.")).toBe(false);
     expect(

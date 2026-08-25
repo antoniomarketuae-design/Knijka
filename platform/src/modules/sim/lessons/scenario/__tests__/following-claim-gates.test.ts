@@ -29,7 +29,7 @@
  * replaced by a false refusal.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -1054,5 +1054,208 @@ describe("EXPOSURE (not a fix): a pace cap credits the car that stopped inside i
       bargesThenStops(SC_FOLLOW_CUTIN, "sc-fc-rebuild", cap),
       "pc-wrong/04-t017s.png: ✓ «Продължи спокойно след вклиняването» at 0 км/ч, 3 s after the collision",
     ).toBe(true);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   4 · A DEMONSTRATION CAPTION MAY NOT QUOTE A SPEED WITH NO SPEAKER
+   ═══════════════════════════════════════════════════════════════════════════
+
+   THE FRAME, w10-3 · `sc-follow-distance__pc-right/04-t179s.png`: the caption
+   «На 26 км/ч тези двайсетина метра са близо 3 секунди — има време за реакция»
+   on the glass, and the student's own instrument cluster under it reading
+   **11 км/ч D**. The row was filed against `components/sim/lesson-ui/
+   AdvisorCard.tsx` — „the advisor bubble quotes a speed the car is not doing" —
+   and it is not the advisor: it is a `kind: "annotation"` step of the committed
+   recording, painted by `TraceTimeline`'s caption box.
+
+   AN EARLIER ROUND ALREADY REPAIRED THE ADJACENCY (`TraceTimeline`'s `mt-auto`,
+   which drops the card onto the «ДЕМОНСТРАЦИЯ — СЛЕДВАЙ СЯНКАТА» panel that
+   names the speaker) AND THE ROW REPRODUCED ANYWAY, one digit different: 0 км/ч
+   on the old frame, 11 км/ч on the new one. Proximity is not attribution. What
+   was left is the sentence's own grammar — a bare prepositional speed with no
+   subject reads as a statement about the reader's car, and on THIS drill that
+   is the exact misconception it exists to remove (the same twenty metres is a
+   different amount of time at a different speed).
+
+   THE CENSUS, over all 503 committed traces at the time of writing: 1 870
+   annotations, 101 of which quote a км/ч figure, and exactly TWO opened with a
+   bare speed — both in this family, both repaired in the same change. One
+   enforced instance is a convention, so the shape is SWEPT rather than asserted
+   twice: the other 99 already name their actor («Грешката: 72 км/ч», «колата
+   задържа 38 км/ч») or state a conditional («при 50 км/ч …»), which is why this
+   gate can be catalogue-wide without becoming an alarm nobody reads.
+
+   IT READS THE COMMITTED TRACE AND NOT THE `.ts` SCRIPT, because the committed
+   file is what the browser plays: a script edited without a re-record would
+   otherwise pass a gate on copy nobody sees.                                */
+
+/** Every committed recording in the repo, as `<lesson>/<name>`. */
+function everyCommittedTrace(): Array<{ id: string; textsBg: string[] }> {
+  const root = path.join(REPO_ROOT, "content", "traces");
+  const out: Array<{ id: string; textsBg: string[] }> = [];
+  for (const dir of readdirSync(root)) {
+    const lessonDir = path.join(root, dir);
+    if (!statSync(lessonDir).isDirectory()) continue;
+    for (const file of readdirSync(lessonDir)) {
+      if (!file.endsWith(".trace.json")) continue;
+      const doc = JSON.parse(readFileSync(path.join(lessonDir, file), "utf-8")) as {
+        events?: Array<{ kind?: string; textBg?: string }>;
+      };
+      const textsBg = (doc.events ?? [])
+        .filter((e) => e.kind === "annotation" && typeof e.textBg === "string")
+        .map((e) => e.textBg as string);
+      out.push({ id: `${dir}/${file.replace(/\.trace\.json$/, "")}`, textsBg });
+    }
+  }
+  return out;
+}
+
+/**
+ * A caption that OPENS with a speed CLAUSE and names nobody: «На 26 км/ч …».
+ *
+ * Anchored at the start on purpose, and that anchor is the false-refusal half.
+ * Mid-sentence figures are how the other 99 captions in the bank correctly say
+ * «Грешката: 72 км/ч …» and «при 50 км/ч е около 14 метра»; a predicate that
+ * flagged those would be switched off inside a round and this row would come
+ * straight back. What is banned is the ONE shape that has no subject at all.
+ *
+ * ── WIDENED 2026-08-25, AND ONE PROPOSED BRANCH WAS MEASURED AND REJECTED ──
+ * An adversarial pass probed the first version and found it narrower than this
+ * block's own title: it missed «Сега на 26 км/ч …» (an adverb in front of the
+ * identical clause) and «На около 30 км/ч …» (a qualifier in front of the
+ * identical figure). Both carry the defect whole, so the leading adverb and the
+ * qualifier are now optional parts of the shape, and the preposition is matched
+ * in either case because after an adverb it is lower-case.
+ *
+ * THE BRANCH THAT WAS REJECTED, and it is rejected on a MEASUREMENT rather than
+ * on taste: the same pass proposed banning a caption that opens with a bare
+ * figure and no preposition at all («26 км/ч и …»). Swept over the catalogue,
+ * that branch refuses SIX live captions, every one of them correct — «130 км/ч
+ * не оправдава лентата: без изпреварване мястото ти е вдясно.»
+ * (`sc-mw-discipline/mistake-left-hog`), «48 км/ч в зона 30 е над +10 км/ч —
+ * опасна грешка, отпадане на изпита.» (`sc-speed-transition/mistake-carry-
+ * speed`) and four siblings. A bare figure that is the sentence's TOPIC («48
+ * км/ч в зона 30 е …» — this speed, in this zone, is this fault) attributes
+ * nothing to anybody; the defect is the ADVERBIAL clause («на 48 км/ч …» — at
+ * this speed, [the thing you are watching] …), which is the one a reader
+ * silently completes with his own car. Six false refusals is how a gate becomes
+ * an alarm nobody reads, and this file has said so since it was written.
+ * «При 26 км/ч …» stays permitted for the same reason: it is explicitly a
+ * conditional and reads as one.
+ */
+const BARE_SPEED_OPENING =
+  /^\s*(?:(?:Сега|Тук|Там|Вече|Ето)\s+)?(?:[Нн]а|[Сс]ъс|[Сс])\s+(?:около\s+|близо\s+|над\s+|под\s+)?\d{1,3}\s*км\/ч/;
+
+describe("no demonstration caption states a speed the student may read as his own", () => {
+  const traces = everyCommittedTrace();
+  const captions = traces.flatMap((t) => t.textsBg);
+
+  it("has a corpus at all — a sweep over nothing proves nothing", () => {
+    // Non-vacuity in BOTH dimensions: a reader that found no files, or found
+    // files and no annotations inside them, would pass the rule below while
+    // measuring nothing. These are the numbers measured on 2026-08-25 and they
+    // are FLOORS, so adding lessons cannot turn the gate off.
+    expect(traces.length, "committed trace files").toBeGreaterThanOrEqual(500);
+    expect(captions.length, "annotations in the bank").toBeGreaterThanOrEqual(1800);
+    expect(
+      captions.filter((c) => c.includes("км/ч")).length,
+      "captions that quote a speed at all — the population this rule is about",
+    ).toBeGreaterThanOrEqual(95);
+  });
+
+  it("the predicate catches the shipped sentence and clears the 99 that are fine", () => {
+    // The instrument before the measurement, as a MUTATION pair: a regex that
+    // matched nothing and one that matched every км/ч figure each fail exactly
+    // one of these lines, so neither can be mistaken for this one.
+    expect(
+      BARE_SPEED_OPENING.test("На 26 км/ч тези двайсетина метра са близо 3 секунди."),
+      "the sentence photographed at 04-t179s",
+    ).toBe(true);
+    // The two shapes the first version of this predicate missed — same clause,
+    // one adverb / one qualifier in front of it.
+    expect(
+      BARE_SPEED_OPENING.test("Сега на 26 км/ч тези двайсетина метра са близо 3 секунди."),
+      "an adverb in front does not change whose speed the reader hears",
+    ).toBe(true);
+    expect(BARE_SPEED_OPENING.test("На около 30 км/ч спирачният път е двойно по-дълъг.")).toBe(true);
+    expect(BARE_SPEED_OPENING.test("Грешката: 72 км/ч — уж съобразено с дъжда…")).toBe(false);
+    expect(BARE_SPEED_OPENING.test("Един поглед встрани при 50 км/ч е около 14 метра.")).toBe(false);
+    expect(
+      BARE_SPEED_OPENING.test("Следвай спокойно на около 40 км/ч и дръж поне 2 секунди дистанция."),
+    ).toBe(false);
+    // …and the false-refusal half of the WIDENING, quoted from the live bank:
+    // a bare figure that is the sentence's topic states a fact about a speed and
+    // attributes it to nobody. Six such captions ship today; a predicate that
+    // flagged them would be switched off inside a round.
+    expect(
+      BARE_SPEED_OPENING.test("130 км/ч не оправдава лентата: без изпреварване мястото ти е вдясно."),
+      "sc-mw-discipline/mistake-left-hog, live and correct",
+    ).toBe(false);
+    expect(
+      BARE_SPEED_OPENING.test("48 км/ч в зона 30 е над +10 км/ч — опасна грешка, отпадане на изпита."),
+      "sc-speed-transition/mistake-carry-speed, live and correct",
+    ).toBe(false);
+    // The conditional form this drill deliberately permits.
+    expect(BARE_SPEED_OPENING.test("При 26 км/ч двайсет метра са близо 3 секунди.")).toBe(false);
+    // …and both repaired captions, which must be clear or the repair is circular.
+    expect(
+      BARE_SPEED_OPENING.test(
+        "Сянката кара с 26 км/ч: при тази скорост двайсетина метра са близо 3 секунди — има време за реакция.",
+      ),
+    ).toBe(false);
+  });
+
+  it("NO committed caption in the catalogue opens with a bare speed", () => {
+    const offenders = traces.flatMap((t) =>
+      t.textsBg.filter((c) => BARE_SPEED_OPENING.test(c)).map((c) => `${t.id} :: ${c}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("…and this drill's two captions name the shadow, with the figures unmoved", () => {
+    // The figures do NOT move — 26 and 48 are the recording's own — so nothing
+    // downstream that quotes them has to move with them. Only the subject
+    // arrives. Asserted verbatim so a re-record that drops the attribution is a
+    // red line rather than a silent regression.
+    const shadow = traces.find((t) => t.id === "sc-follow-distance/shadow-correct");
+    const tailgate = traces.find((t) => t.id === "sc-follow-distance/mistake-tailgate");
+    expect(shadow, "the committed shadow recording").toBeDefined();
+    expect(tailgate, "the committed tailgate recording").toBeDefined();
+    expect(shadow!.textsBg).toContain(
+      "Сянката кара с 26 км/ч: при тази скорост двайсетина метра са близо 3 секунди — има време за реакция.",
+    );
+    expect(tailgate!.textsBg).toContain(
+      "Сянката ще залепи на 48 км/ч: при тази скорост половин дължина кола е под две десети от секундата — няма никакво време за реакция.",
+    );
+  });
+
+  it("every speed either caption quotes is one its OWN recording reaches", () => {
+    // The half a grammar rule cannot see: naming the shadow is worthless if the
+    // number is not the shadow's. Measured against the samples rather than the
+    // script — `mistake-tailgate` says 48 and the recorded car is at 29,8 км/ч
+    // when that caption fires, which is why that one is phrased as a conditional
+    // about the leg it announces instead of as a claim about the instant.
+    // THE FIGURE IS PARSED OUT OF THE COMMITTED CAPTION, not repeated here.
+    // A list of expected numbers in this file would be a second copy of the
+    // bank: a re-record that moved 26 to 60 would satisfy it and this gate
+    // would be checking its own memory instead of the product.
+    for (const id of [
+      "sc-follow-distance/shadow-correct",
+      "sc-follow-distance/mistake-tailgate",
+    ] as const) {
+      const [scenarioId, name] = id.split("/") as [string, string];
+      const top = Math.max(...samplesOf(scenarioId, name).map((s) => s.speedKmh));
+      const quoted = (traces.find((t) => t.id === id)?.textsBg ?? [])
+        .flatMap((c) => Array.from(c.matchAll(/(\d{1,3})\s*км\/ч/g)))
+        .map((m) => Number(m[1]));
+      expect(quoted.length, `${id} quotes a speed at all`).toBeGreaterThan(0);
+      for (const kmh of quoted) {
+        expect(
+          Math.abs(top - kmh),
+          `${id} tops ${top.toFixed(1)} км/ч but its caption quotes ${kmh}`,
+        ).toBeLessThanOrEqual(1.5);
+      }
+    }
   });
 });

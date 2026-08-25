@@ -25,6 +25,8 @@ import {
   clutchObjBg,
   createDashboardStatus,
   endLineDemandsAnswer,
+  foldMaskCss,
+  foldWindowPx,
   gearDownWithBg,
   gearUpActBg,
   gearUpWithBg,
@@ -62,6 +64,7 @@ import {
   type HintInput,
   type MinimapFrame,
   type ObjectiveFlash,
+  type FoldRow,
   type SimOverlayItem,
   type TelltaleWarning,
 } from "@/modules/sim/hud";
@@ -167,6 +170,12 @@ import {
   qualityValueBg,
   type QualitySelection,
 } from "./qualityChoice";
+import { soundAriaLabelBg, soundHintBg, soundValueBg } from "./soundChoice";
+// The ⚙ sheet's «Звук» row writes this and `SimAudio` reads it — the store is
+// the one owner of the bit (scene/simAudioMuteStore.ts has the nine w10 frames
+// and the reason it is not a prop). Deep import for CalibrationGate's reason:
+// the scene barrel would pull the R3F half into this client bundle.
+import { toggleSimAudioMuted, useSimAudioMuted } from "@/modules/sim/scene/simAudioMuteStore";
 import { useQualitySelection } from "./QualityPresetSelector";
 import { CalibrationGate, CalibrationPendingCard } from "./CalibrationGate";
 import { HudCloseButton } from "./HudCloseButton";
@@ -1216,6 +1225,38 @@ export function rowsBelowFold(
 }
 
 /**
+ * …AND HOW MANY OF THEM THE STUDENT HAS NOT SEEN A PIXEL OF — the other
+ * question, and the one that decides which SENTENCE the fold row says.
+ *
+ * WHY IT EXISTS. `rowsBelowFold` counts a row the moment its bottom crosses the
+ * fold, which for the briefing's STEPS is exactly right: a step you cannot read
+ * to the end is a step you have not read. Said about the toast column it turns
+ * into a different claim. „↓ още 1 известие" over a single graded fault whose
+ * body is cut in half reads as „there is a SECOND notification below" — and
+ * there is not; what is below is the rest of the sentence on the glass. Before
+ * the shrink-weight repair at `data-hud-toast-scroller` that case produced no
+ * row at all, so the wording never had to answer for it; the repair makes it
+ * the COMMON case, and a counter that arrives lying is worse than the silence
+ * it replaced.
+ *
+ * THE BIAS IS DELIBERATE AND IT IS TOWARD COUNTING. A row that starts within
+ * 1 px above the fold is called fully hidden. Getting it wrong that way costs
+ * „още 1 известие" where „обяснението продължава" would have been kinder;
+ * getting it wrong the other way would announce a continuation while a WHOLE
+ * second graded fault sits under the cut unmentioned, which is the one direction
+ * a fault column may never round in.
+ */
+export function rowsFullyBelowFold(
+  rows: ReadonlyArray<{ top: number; height: number }>,
+  scrollTop: number,
+  clientHeight: number,
+): number {
+  if (clientHeight <= 0) return 0;
+  const fold = scrollTop + clientHeight;
+  return rows.filter((r) => r.top > fold - 1).length;
+}
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * …AND THE ROWS HAVE TO BE IN THE LIST'S COORDINATES — 2026-08-18.
  *
@@ -1934,6 +1975,34 @@ export function BriefingCard({
   // estimate does.
   const listRef = useRef<HTMLOListElement | null>(null);
   const [below, setBelow] = useState(0);
+  /**
+   * ── THE CUT IS ON THE LINE GRID NOW, WHICH IS THE ROUTED HALF ─────────────
+   * The paragraph at the `<ol>` ends „Both rows stay open on the snap", and
+   * the sweep re-filed the difference twice more on the DESKTOP panel:
+   *
+   *   sc-pe-night-unlit/pc-right/01-arrival.png   step 3's last line cut
+   *     horizontally by the card's bottom edge, half-height letterforms
+   *   sc-pe-zone-living/pc-right/04-t017s.png     the same, one step further
+   *     down — „sliced through the x-height", on every pc frame of both lanes
+   *
+   * A 10 px band under an 11 px `leading-tight` (13.75 px) line box cannot end
+   * anywhere but inside a line: `SimOverlay`'s own block has the arithmetic and
+   * the conclusion — „any band that ends inside a line box ends inside its
+   * letters. The only cut that is not through a letter is a cut BETWEEN LINE
+   * BOXES." That snap is `foldWindowPx`, it is published now, and this is the
+   * consumer its routing note named. Nothing about the counter's rule moves;
+   * what moves is which pixel the mask goes transparent at.
+   *
+   * `null` until the first measurement, and `hardEdge: false` whenever nothing
+   * is overflowing — both resolve to `BRIEFING_FADE_MASK_CSS` character for
+   * character, so a server render, an engine with no ResizeObserver and a
+   * briefing that fits are all exactly what they were.
+   */
+  const [foldWin, setFoldWin] = useState<{
+    topPx: number;
+    bottomPx: number;
+    hardEdge: boolean;
+  } | null>(null);
   const measure = useCallback(() => {
     const ol = listRef.current;
     if (ol === null) return;
@@ -1943,20 +2012,46 @@ export function BriefingCard({
     // makes it one in both engines). The full derivation and what the wrong
     // number actually said is at `listRowsInScrollCoords`.
     const listTop = ol.getBoundingClientRect().top;
-    setBelow(
-      rowsBelowFold(
-        listRowsInScrollCoords(
-          listTop,
-          ol.scrollTop,
-          Array.from(ol.children).map((li) => {
-            const r = (li as HTMLElement).getBoundingClientRect();
-            return { top: r.top, height: r.height };
-          }),
-        ),
-        ol.scrollTop,
-        ol.clientHeight,
-      ),
-    );
+    const rects = Array.from(ol.children).map((li) => {
+      const el = li as HTMLElement;
+      const r = el.getBoundingClientRect();
+      return { top: r.top, height: r.height, el };
+    });
+    const rows = listRowsInScrollCoords(listTop, ol.scrollTop, rects);
+    // The snap needs one thing the counter never did: each row's own leading,
+    // because a step that wraps to three lines offers two interior edges the
+    // cut may land on. `NaN` (jsdom, `line-height: normal`) makes that row a
+    // single indivisible block — `foldWindowPx`'s documented behaviour, not a
+    // silent degradation.
+    //
+    // AND IT IS ONE STYLE RESOLUTION, NOT ONE PER ROW — raised by the round-11
+    // verifier, because this is `onScroll` on the one surface a student drags
+    // and the R3F loop is running behind it. The rect loop above already forced
+    // layout, nothing between the two loops writes to the DOM, so style is
+    // clean when the first `getComputedStyle` read arrives and the remaining
+    // ~9 are served from it. Per row rather than hoisted off the first `<li>`
+    // deliberately: every step carries `leading-tight` today, and a row that
+    // one day does not must snap to its OWN grid rather than to its sibling's.
+    const foldRows: FoldRow[] = rows.map((r, i) => ({
+      offsetTop: r.top,
+      heightPx: r.height,
+      lineHeightPx: Number.parseFloat(getComputedStyle(rects[i]!.el).lineHeight),
+    }));
+    const win = foldWindowPx(foldRows, {
+      scrollTop: ol.scrollTop,
+      clientHeight: ol.clientHeight,
+    });
+    setFoldWin(win);
+    // THE COUNTER STILL READS THE BOX, AND THAT IS A PROOF, NOT AN OVERSIGHT.
+    // `SimOverlay`'s own counter is recounted against the cut, because it
+    // counts LINES and the snap moves the cut inside a line. This one counts
+    // STEPS, and `rowsBelowFold` already counts a step whose bottom is past
+    // the fold — i.e. a half-visible step is counted. The snapped edge is the
+    // LARGEST row/line edge at or under `clientHeight + slack`, and every row
+    // bottom is one of those edges, so no step's bottom can lie between the
+    // snap and the box: the two arguments cannot give different numbers here.
+    // Threading `win.bottomPx` would look like a guard and guard nothing.
+    setBelow(rowsBelowFold(rows, ol.scrollTop, ol.clientHeight));
   }, []);
   useEffect(() => {
     const ol = listRef.current;
@@ -1998,7 +2093,15 @@ export function BriefingCard({
       // <ol> below. Without `min-h-0` this card is a flex item with the default
       // `min-height: auto`, which means it REFUSES to shrink, and the column's
       // `overflow-hidden` then cuts it wherever it happens to end.
-      className="pointer-events-auto flex w-full min-h-0 min-w-0 flex-col rounded-2xl border border-border bg-background/85 px-3 py-1.5 backdrop-blur"
+      //
+      // `[flex-shrink:20]` is where the yield order now LIVES. It used to live
+      // on the toast scroller as a sub-1 weight, which CSS Flexbox § 9.7 turns
+      // into a cap on how much that box may absorb at all (the derivation, and
+      // the frame it guillotined, are at `data-hud-toast-scroller` below). The
+      // ratio is the same one that comment always claimed — 230 × 20 against
+      // 490 × 1 is nine pixels of briefing for every one of graded fault — it
+      // is simply written on the side that is allowed to carry a big number.
+      className="pointer-events-auto flex w-full min-h-0 min-w-0 flex-col [flex-shrink:20] rounded-2xl border border-border bg-background/85 px-3 py-1.5 backdrop-blur"
     >
       <div className="flex shrink-0 items-center gap-2">
         <p className="text-[10px] font-black uppercase tracking-wider text-accent">Инструкции</p>
@@ -2141,13 +2244,29 @@ export function BriefingCard({
           //    under the cut and vanishes the moment the student reaches it.
           //    The padding stays either way: it is what puts the last step's
           //    box bottom on the fade's opaque edge instead of inside it.
-          below > 0
+          //
+          //    ── AND WHICH MASK, of the two. `foldWin.hardEdge` is the snap's
+          //    own answer to „is a line being cut in half, and can the cut be
+          //    moved onto the grid". When it can, the window is opaque between
+          //    two line-box edges and transparent outside them, so no glyph is
+          //    ever partly painted — the routed repair. When it cannot (the
+          //    snap's two documented refusals: nothing overflowing, or a cut
+          //    that would swallow more than one line box), the 2026-08-14 band
+          //    is emitted exactly as before. Faded-through remains the floor;
+          //    it is no longer the ceiling.
+          below > 0 || foldWin?.hardEdge === true
             ? {
                 // Both spellings: unprefixed in current WebKit, prefixed in the
                 // engine the founder reads this on. Same pair `SimOverlay`'s two
                 // text windows carry, and the same 10 px.
-                WebkitMaskImage: BRIEFING_FADE_MASK_CSS,
-                maskImage: BRIEFING_FADE_MASK_CSS,
+                WebkitMaskImage:
+                  foldWin !== null && foldWin.hardEdge
+                    ? foldMaskCss(foldWin, BRIEFING_FADE_PX)
+                    : BRIEFING_FADE_MASK_CSS,
+                maskImage:
+                  foldWin !== null && foldWin.hardEdge
+                    ? foldMaskCss(foldWin, BRIEFING_FADE_PX)
+                    : BRIEFING_FADE_MASK_CSS,
               }
             : undefined
         }
@@ -2205,12 +2324,14 @@ type PlayMenuItem = {
   /**
    * THE TRADE, under the label — doc 91 §I26(c) / THEO-4.
    *
-   * Only the quality row carries one, and it is the reason that row is not just
-   * a switch: a setting that changes the experience without saying what it
-   * costs is the bare verdict requirement zero forbids, one layer out from the
-   * theory module. Kept to two lines of 10 px type at 208 px (see
+   * The quality row and the «Звук» row carry one, and it is the reason neither
+   * is just a switch: a setting that changes the experience without saying what
+   * it costs is the bare verdict requirement zero forbids, one layer out from
+   * the theory module. Kept to two lines of 10 px type at 208 px (see
    * `qualityChoice.ts` for the measurement) — a third line costs menu height
-   * the sheet does not have on the tightest profile in the ladder.
+   * the sheet does not have on the tightest profile in the ladder. Both files
+   * pin the same 70-character ceiling and both are held to it by their own
+   * test; a third row that wants a hint inherits the same budget.
    */
   hintBg?: string | null;
   /** Full accessible name when label+value+hint would otherwise read as three
@@ -2444,6 +2565,44 @@ function PlayMenu({
           //    ago, and the trigger button still carries `title={titleBg}` for
           //    a pointer. It stays on a roomy stage, where the sheet is not
           //    competing with the road for height.
+          //
+          // ── AND AGAIN FOR THE «ЗВУК» ROW (sweep w10) ────────────────────────
+          //
+          // The block above is why adding a row here is not free, so the row
+          // added below it is priced against the same ladder. ⚠ THIS IS
+          // ARITHMETIC ON THE MEASUREMENT ABOVE, NOT A FRESH PHOTOGRAPH — a
+          // browser re-measure of portrait is what the next round owes this
+          // block, and the number below is what it should expect to find.
+          //
+          //   portrait   `grid-cols-1`, no two-column relief. The row carries a
+          //              hint, so it costs 56.5 px, not 43.5 (the arithmetic is
+          //              on PlayMenuRow). 370 → ~426.5, so the sheet's foot goes
+          //              from y 428 to ~y 484 and the 3 px of clearance over
+          //              «Мигач надясно» is spent: the sheet now lands ON that
+          //              station rather than above it.
+          //   landscape  two columns, row-major. On the 8-row set the six
+          //              `07b-menu.png` frames photograph, «Звук» and «Качество»
+          //              share one grid row and their hints share its height —
+          //              the sheet does not grow at all. On the 10-row set
+          //              (pre-drive + fullscreen both live) they fall in
+          //              different rows and it grows by one 12.5 px hint line,
+          //              still far under the 294 px that forced two columns.
+          //
+          // WHY THAT IS A PRICE AND NOT A REGRESSION — two mechanisms, both on
+          // this element, and neither of them was invented for this row:
+          //
+          //  · COVERING A THUMB STATION IS NO LONGER A DEAD CONTROL. §W3: this
+          //    sheet PAUSES the scene (`onOpenChange` → `playMenuOpen` → the
+          //    scene's `paused`), every TouchControls button is inert while it
+          //    is up, and that seam is gated in `shellViewportContract.test.ts`.
+          //    It is the whole reason the eighth row was affordable in the first
+          //    place.
+          //  · A ROW CANNOT FALL BELOW THE FOLD, because the wrapper caps at
+          //    `maxHeight: calc(100% - 1rem)` and this element is `min-h-0
+          //    overflow-y-auto`: past the cap the sheet SCROLLS instead of
+          //    growing off the stage. That pair was ungated — a verifier noted
+          //    that 724 tests pass with it deleted — and `soundChoice.test.ts`
+          //    now pins both, because it is what makes the ninth row safe too.
           className={`pointer-events-auto flex min-h-0 flex-col overflow-y-auto rounded-2xl border border-border bg-background/95 p-1.5 backdrop-blur ${
             compact ? "w-60 max-w-[70vw] [@media(orientation:landscape)]:w-[23rem]" : "w-60 max-w-[70vw]"
           }`}
@@ -3012,6 +3171,17 @@ export function LessonPlayShell({
       return next;
     });
   }, []);
+
+  // -- Sound: the ⚙ sheet's «Звук» row (sweep w10, nine rows) -----------------
+  //
+  // Read-only here. The bit is owned by `scene/simAudioMuteStore`, because the
+  // thing that has to obey it is a `SimAudio` built inside `LessonScene`'s
+  // mount effect and there is no prop path from this sheet to it. Note what
+  // this row is NOT: it is not a new feature. The mix has always been there and
+  // has always been mutable — from the M key, and from nothing else, which on a
+  // phone is nowhere at all. Six mobile `07b-menu.png` frames photograph this
+  // exact sheet with no sound row in it.
+  const soundMuted = useSimAudioMuted();
 
   // X toggles fullscreen (F is taken by the rear-mirror glance), P toggles the
   // minimap. Both are listed in the controls legend (LessonScene ControlsHelp).
@@ -4341,29 +4511,30 @@ export function LessonPlayShell({
   // scroller is not one.
   const toastScrollRef = useRef<HTMLDivElement | null>(null);
   const [toastsBelowFold, setToastsBelowFold] = useState(0);
+  // …and how many of those the student has seen NOTHING of — the number that
+  // picks the sentence. See `rowsFullyBelowFold` for why one count cannot do
+  // both jobs on a column of faults.
+  const [toastsUnseenBelowFold, setToastsUnseenBelowFold] = useState(0);
   const measureToastFold = useCallback(() => {
     const el = toastScrollRef.current;
     if (el === null) return;
     const stack = el.querySelector('[data-hud="toasts"]');
     if (stack === null) {
       setToastsBelowFold(0);
+      setToastsUnseenBelowFold(0);
       return;
     }
     const listTop = el.getBoundingClientRect().top;
-    setToastsBelowFold(
-      rowsBelowFold(
-        listRowsInScrollCoords(
-          listTop,
-          el.scrollTop,
-          Array.from(stack.children).map((card) => {
-            const r = (card as HTMLElement).getBoundingClientRect();
-            return { top: r.top, height: r.height };
-          }),
-        ),
-        el.scrollTop,
-        el.clientHeight,
-      ),
+    const rows = listRowsInScrollCoords(
+      listTop,
+      el.scrollTop,
+      Array.from(stack.children).map((card) => {
+        const r = (card as HTMLElement).getBoundingClientRect();
+        return { top: r.top, height: r.height };
+      }),
     );
+    setToastsBelowFold(rowsBelowFold(rows, el.scrollTop, el.clientHeight));
+    setToastsUnseenBelowFold(rowsFullyBelowFold(rows, el.scrollTop, el.clientHeight));
   }, []);
   useEffect(() => {
     const el = toastScrollRef.current;
@@ -4466,6 +4637,47 @@ export function LessonPlayShell({
           labelBg: "Карта",
           valueBg: minimapOn ? "вкл." : "изкл.",
           onSelect: toggleMinimap,
+          keepOpen: true,
+        },
+        // ── «ЗВУК» · THE MIX THE PRODUCT ALWAYS HAD AND COULD NOT BE TOLD ABOUT
+        //
+        // Nine w10 rows over seven lessons: „no evidence of audio anywhere, and
+        // no way to control it". Six of them photograph THIS sheet — «Съветник ·
+        // Въпроси · Задача · Карта · Качество · Прекрати · ← Всички уроци» and
+        // nothing else. The rows conclude the product has no audio; it has a
+        // full procedural mix, live on every lesson (built at LessonScene 1589,
+        // fed per frame by VehicleRig 620). What it had no route to was this
+        // row: mute was reachable ONLY from the M key, so on a phone the sound
+        // was not merely uncontrolled but uncontrollABLE.
+        //
+        // AND IT CLOSES ONE NOUN OF THREE. Every one of those rows says „no
+        // volume control, no mute, no audio indicator"; this is mute. The rows
+        // stay OPEN, and `soundChoice.ts` says which clause each one keeps —
+        // including the чл. 91 siren, whose oscillators exist and whose cue
+        // never fires because no emergency actor is ever on the road (still-open
+        // critical sc-vu-emergency:180ed5bc; the trace is in the store header).
+        //
+        // BESIDE «Карта» AND «Качество», with the other controls that change
+        // what the session PRESENTS rather than what the car does.
+        //
+        // IN THE EXAM TOO, for «Качество»'s reason and one of its own. It is not
+        // coaching, so it is no advantage — and it is the one row here a student
+        // may need in the opposite direction: an exam whose stimulus is a siren
+        // (чл. 91) is unpassable to a student who muted the sim three lessons
+        // ago and has no way to find out, let alone undo it.
+        //
+        // `keepOpen` and a `hintBg` for the same reason the quality row has
+        // both: the student watches the word change under his thumb, and under
+        // THEO-4 a setting that changes what he LEARNS may not announce itself
+        // as a bare state word. Silence teaches a systematically faster car
+        // (doc 82 §4.4) — `soundChoice.ts` carries the sentence and its budget.
+        {
+          key: "sound",
+          labelBg: "Звук",
+          valueBg: soundValueBg(soundMuted),
+          hintBg: soundHintBg(soundMuted),
+          ariaLabelBg: soundAriaLabelBg(soundMuted),
+          onSelect: toggleSimAudioMuted,
           keepOpen: true,
         },
         // ── §I26(c) · THE QUALITY CONTROL, WHERE AN FPS COMPLAINT CAN REACH IT
@@ -5228,16 +5440,59 @@ export function LessonPlayShell({
                   CUT — `notifyColumnCutPx` carries the seven findings and the
                   222 px it measured on the sweep's own stage.
 
-                  `min-h-0` is what lets this box shrink at all; `[flex-shrink:0.05]`
-                  is what keeps the YIELD ORDER the briefing card argues for.
-                  Flexbox distributes a deficit in proportion to (base size ×
-                  shrink factor), so with the briefing at the default 1 on ~230 px
-                  and this stack at 0.05 on ~490 px the briefing absorbs 90 % of the
-                  first pixel of pressure — nine pixels of briefing for every one of
-                  fault — and only once the briefing has frozen at zero does the
-                  remainder come here. A graded fault still never yields to a
-                  briefing; it simply stops being guillotined once there is nothing
-                  else left to give.
+                  `min-h-0` is what lets this box shrink at all; the shrink
+                  WEIGHTS are what keep the YIELD ORDER the briefing card argues
+                  for. Flexbox distributes a deficit in proportion to (base size
+                  × shrink factor), so with the briefing at 20 on ~230 px and
+                  this stack at 1 on ~490 px the briefing absorbs 90 % of the
+                  first pixel of pressure — nine pixels of briefing for every one
+                  of fault — and only once the briefing has frozen at zero does
+                  the remainder come here. A graded fault still never yields to a
+                  briefing; it simply stops being guillotined once there is
+                  nothing else left to give.
+
+                  ══ AND THE WEIGHT MUST NOT BE UNDER 1, WHICH IS WHAT SHIPPED ══
+
+                  This box carried `[flex-shrink:0.05]`, chosen for the ratio
+                  above and gated by a test that asserted `w < 1`. The ratio was
+                  right and the number was a CAP, because CSS Flexbox § 9.7
+                  step 4b has a clause the ratio argument does not:
+
+                    „If the sum of the unfrozen flex items' flex factors is less
+                     than one, multiply the initial free space by this sum. If
+                     the magnitude of this value is less than the magnitude of
+                     the remaining free space, use this as the remaining free
+                     space."
+
+                  On the pass where the briefing has already frozen at zero this
+                  scroller is the ONLY unfrozen item, so that sum is 0.05, and
+                  the box absorbed five per cent of the deficit and then stopped.
+                  The rest overflowed the column — which is `overflow-hidden` —
+                  and was cut. And because the scroller itself never overflowed,
+                  `measureToastFold` read `scrollHeight === clientHeight`,
+                  `rowsBelowFold` returned 0, and the «↓ още N» row never
+                  mounted: the guillotine came WITH the silence, not despite it.
+
+                  THE FRAME, and the path is the one that RESOLVES — w10 stores
+                  frames as `<wave>/frames/<lesson>__<variant>/`, not in the
+                  `sweep161` shape the first draft of this comment cited:
+                  `.audit-frames/w10-1/frames/sc-ac-highbeam-lead__pc-wrong/04-t018s.png`,
+                  cropped x1180–1440 / y370–650 at 3×: the ОПАСНА ГРЕШКА card's
+                  last line — «нищо.» — is sliced through its x-height at the
+                  column's bottom edge, and under the cut there is world, the
+                  round mirror button, and no counter. Nine more rows in this
+                  wave say the same sentence about the same column, on both
+                  platforms (highbeam-lead, junction-rhr, ac-aquaplane,
+                  follow-distance on PC; ov-abort, ov-return-gap, ov-oncoming-gap,
+                  roundabout-entry, hz-emergency-stop, ov-night-gap on the phone,
+                  where `SimOverlay`'s peek owns the same cut).
+
+                  So the ratio is now written the way it survives § 9.7: this
+                  stack at 1 — the floor at which the clause stops biting — and
+                  the briefing at 20, which is what holds 230 × 20 ≥ 9 × 490 × 1.
+                  `shellClipAffordances.test.ts` gates BOTH halves, and the
+                  general form: no `[flex-shrink:<1]` anywhere under the sim
+                  trees, because a sub-1 weight is never a priority, it is a cap.
 
                   AND THE ARBITRARY PROPERTY WAS VERIFIED TO COMPILE, not assumed
                   to: a Tailwind class that the scanner declines to emit would
@@ -5245,7 +5500,9 @@ export function LessonPlayShell({
                   this project's signature failure. Compiled with the repo's own
                   tailwindcss v4.3.3 against a fixture holding this exact class
                   and the output carries `.\[flex-shrink\:0\.05\] { flex-shrink:
-                  0.05 }`. (The fixture was scratch and is not in the tree.)
+                  0.05 }`. (The fixture was scratch and is not in the tree.) The
+                  form is unchanged — an arbitrary PROPERTY is emitted verbatim,
+                  so only the value moved.
 
                   `pointer-events-none` does not make the scroller unreachable: it
                   suppresses hit-testing on THIS box, while the cards inside are
@@ -5257,7 +5514,26 @@ export function LessonPlayShell({
                 ref={toastScrollRef}
                 onScroll={measureToastFold}
                 data-hud-toast-scroller=""
-                className="pointer-events-none flex min-h-0 flex-col overflow-y-auto [flex-shrink:0.05] [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
+                className="pointer-events-none flex min-h-0 flex-col overflow-y-auto [flex-shrink:1] [scrollbar-color:var(--border-strong)_transparent] [scrollbar-width:thin]"
+                style={
+                  // ── …AND THE CUT LINE IS FADED, NOT GUILLOTINED ──────────
+                  // The same mask, the same 10 px and the same predicate the
+                  // briefing list carries one card up, for the same reason and
+                  // now on the surface that needs it most. Four of this wave's
+                  // PC rows do not say „I could not scroll", they say the card
+                  // is „truncated mid-sentence … with no ellipsis, no scrollbar
+                  // and no expand control" (sc-ac-aquaplane) — a horizontally
+                  // guillotined line reads as a rendering fault, a faded one
+                  // reads as „there is more". Bound to `toastsBelowFold > 0`
+                  // and not left unconditional, so a stack that fits, and a
+                  // stack scrolled to its end, carry no chrome at all.
+                  toastsBelowFold > 0
+                    ? {
+                        WebkitMaskImage: BRIEFING_FADE_MASK_CSS,
+                        maskImage: BRIEFING_FADE_MASK_CSS,
+                      }
+                    : undefined
+                }
               >
                 <HudToasts
                   toasts={toasts}
@@ -5279,8 +5555,22 @@ export function LessonPlayShell({
                   aria-live="polite"
                   className="shrink-0 text-right text-[9px] font-black uppercase tracking-wider text-warning"
                 >
-                  ↓ още {toastsBelowFold}{" "}
-                  {toastsBelowFold === 1 ? "известие" : "известия"}
+                  {/* TWO SENTENCES, because the fold answers two different
+                      questions and only one of them is a count. When something
+                      is entirely under the cut, „още N известия" is the true
+                      statement and N is the number of graded faults the student
+                      has not seen a pixel of. When NOTHING is entirely under it
+                      — one tall card, cut through its own explanation, which is
+                      what every PC row in wave w10 photographs — the honest
+                      sentence names what continues, in the vocabulary
+                      `TeachMomentOverlay` and `MistakeConsequenceOverlay`
+                      already use for the same cut. Saying „още 1 известие" there
+                      would promise a second notification that does not exist. */}
+                  {toastsUnseenBelowFold > 0
+                    ? `↓ още ${toastsUnseenBelowFold} ${
+                        toastsUnseenBelowFold === 1 ? "известие" : "известия"
+                      }`
+                    : "↓ обяснението продължава — превърти"}
                 </p>
               ) : null}
             </>

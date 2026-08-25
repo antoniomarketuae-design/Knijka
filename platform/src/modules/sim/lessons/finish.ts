@@ -168,6 +168,20 @@
  * the map still cannot be ended on; nothing in this file's behaviour has
  * changed.
  *
+ * THE ARM LANDED FIVE DAYS AFTER THAT PARAGRAPH WAS WRITTEN, AND IT NEVER SAID
+ * SO — 7404468, 2026-08-19, „the car that drove off the world can be told so".
+ * `engine.ts:1302` folds `stepOffNetwork` on every driving frame and pushes
+ * `offNetworkEndingCopy` at the bar; `types.ts` carries `offNetworkSinceSec`.
+ * The two paragraphs above are kept verbatim because they are the derivation of
+ * OFF_NETWORK_STUCK_S and of the copy, and both are still load-bearing — but
+ * „the ARM still does not [exist]" is now false, and a routing note that has
+ * gone stale is worse than none: it sends the next reader to build a thing that
+ * is already running. Found 2026-08-25 while adjudicating
+ * sc-ov-oncoming-gap:83420a40 („the car can leave the road network entirely and
+ * keep driving"), whose OWN answer is the mirror of this one and is recorded at
+ * the O22 block below: on that lane the arm was armed and correctly silent — the
+ * car never left the network. See there before re-filing this class.
+ *
  * The false-refusal case the row said to measure FIRST has been measured, and
  * the margin is far thinner than „the authored targets are safe" suggested. That
  * sentence („the deepest parking bay in the lot districts sits 6.3 m from the
@@ -785,7 +799,29 @@ export function offNetworkEndingCopy(examMode: boolean): {
 }
 
 // ---------------------------------------------------------------------------
-// THE ARM IS NOT IN THIS FILE, and here is exactly what it is.
+// THE ARM IS NOT IN THIS FILE — AND IT LANDED ON 2026-08-19 (7404468), EXACTLY
+// AS THE WORK ORDER BELOW SPECIFIES IT. `engine.ts:1302` folds this fold before
+// the finish gates and pushes `offNetworkEndingCopy` at the bar;
+// `types.ts` carries `offNetworkSinceSec`. The order is kept below because it
+// is the audit trail of what was asked for and what shipped, not because
+// anything is owed.
+//
+// WHAT THE ARM DOES **NOT** COVER, MEASURED 2026-08-25 ON THE ROW THAT LOOKS
+// LIKE ITS EXHIBIT. sc-ov-oncoming-gap:83420a40 photographs
+// `.audit-frames/w10-1/frames/sc-ov-oncoming-gap__mobile-wrong/04-t060s.png`:
+// 104 км/ч, the whole windscreen one featureless grey plane, «Следвай синята
+// линия» over no blue line and no road — and files it as „the car can leave the
+// road network entirely and keep driving … no off-route stop, no boundary".
+// The arm was armed on that drive and was RIGHT to stay silent. Its own
+// run.log: «ended: true · endedNaturally: true · forcedBy: -», «Задачите от
+// маршрута са изпълнени», НЕИЗДЪРЖАН on the exam sheet and not on the route.
+// The car completed every objective, so it was never off the network at all —
+// `tick.edgeId` was non-null throughout and this fold correctly never armed.
+// What the frame shows is a car ON a centreline the world DREW NOTHING AROUND.
+// That is a render-extent row and it belongs to the world/scene layer, not to
+// any gate in this file: no ending, however sensitive, may fire on a drive that
+// is completing its route, and one that did would be the false refusal this
+// module's every constant is sized to avoid.
 //
 // `lessons/engine.ts` is where every gate in this module is folded and where
 // the session's `phase` is set; it is owned by another lane, so this was routed

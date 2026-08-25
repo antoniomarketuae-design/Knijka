@@ -375,6 +375,21 @@ export function overlayCarriesMoment(kind: SimOverlayKind): boolean {
 export const OVERLAY_MOMENT_NOW_MAX_MS = 2000;
 
 /**
+ * How often the printed age is refreshed while a dated card is up, ms —
+ * `HudToasts.TOAST_AGE_TICK_MS`, copied by value for the reason the band above
+ * is: importing the `.tsx` column into this pure leaf would drag React in, and
+ * `overlay-queue-moment.test.ts` re-reads that file's own literal on every run
+ * so the copy cannot drift.
+ *
+ * IT IS THE SAME NUMBER ON BOTH LEGS OR THE AGE IS NOT AN AGE. A phone
+ * refreshing at 2 s while the desktop refreshes at 1 s would print «преди 6 с»
+ * for a second longer than the drive it describes — the same one-second drift
+ * `overlayMomentBg`'s ROUND-not-floor case exists to keep out, arriving through
+ * the clock instead of through the arithmetic.
+ */
+export const OVERLAY_MOMENT_TICK_MS = 1000;
+
+/**
  * THE MOMENT, IN THE CARD'S OWN WORDS — the phone's half of the toast stamp.
  *
  * Deliberately here and not in `SimOverlay.tsx`: it is a pure string function

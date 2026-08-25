@@ -101,6 +101,50 @@ function widenRadius(radiusM: number, toleranceScale: number, maxRadiusWidenM: n
  * simply stops being inflated further. `postedLimitKmh` absent ⇒ behaviour is
  * bit-identical to before, which is what keeps the 446 gates on maps that
  * declare no limit unchanged.
+ *
+ * ── …AND „UP TO THE SIGN" IS STILL FAR ENOUGH TO EMPTY THE GATE — w10-4,
+ *    2026-08-25 (sc-hazard-obstacle:b103ec20, sc-ac-highbeam-lead:5b87547e) ──
+ *
+ * B58 stopped the ladder printing a number ABOVE the sign. It left it free to
+ * walk a gate all the way UP TO the sign, and a gate standing on the posted
+ * limit demands exactly what the law already demands — which is to say
+ * nothing. Six compiled gates were in that state, measured through
+ * `compileScenario` over all 167 templates × every rung:
+ *
+ *   sc-ac-highbeam-lead  L1 sc-ahl-follow    authored 45 · posted 50 · gate 50
+ *   sc-hazard-obstacle   L1 sc-obs-approach  authored 46 · posted 50 · gate 50
+ *   sc-vu-blindspot-moto L1 sc-vubs-let-pass authored 45 · posted 50 · gate 50
+ *   sc-ln-decisive-change L1+L2 sc-lndc-wait authored 48 · posted 50 · gate 50
+ *   sc-sign-warning      L1 reach-end        authored 45 · posted 50 · gate 50
+ *
+ * `.audit-frames/w10-4/frames/sc-hazard-obstacle__pc-wrong/08-debrief-p3.png`
+ * is what that looks like from the student's seat: «✓ Приближи обекта с
+ * контролирана скорост 0:32 · ✓ Задмини обекта и продължи напред 0:39 · ✓
+ * Стигни края на отсечката 0:42», ★★★, on a run whose own `run.log` reads
+ * „14 · 56 · 59 км/ч" past a stalled car in a street posted 50. On the
+ * BEGINNER rung — the one rung where the gate is the only thing telling him
+ * what „контролирана" means — «контролирана скорост» had been compiled into
+ * „the legal maximum".
+ *
+ * THE BOUND: THE GRACE MAY SPEND AT MOST HALF THE HEADROOM THE AUTHOR LEFT.
+ * Whatever distance a template put between its own cap and the sign, the aided
+ * rung keeps at least half of it, so a gate can never be widened into the law
+ * itself. Where the author left plenty (58 under a 90 sign; 130 under 140) the
+ * half is bigger than the grace and NOTHING changes — which is why this moves
+ * six rows and not nine hundred and fifty-three.
+ *
+ * IT CANNOT REFUSE A DRIVE THE AUTHOR WOULD HAVE PASSED, and that is the whole
+ * safety argument: the clamp is bounded below by `maxSpeedKmh` itself, so every
+ * aided rung stays at or above the cap the template authored and grades at L3.
+ * A drive that earns the tick on the author's own gate earns it on every rung
+ * below — narrowing forgiveness is not tightening the gate.
+ * `gate-keeps-half-its-headroom.test.ts` sweeps that direction over all 953
+ * capped gates rather than restating it here.
+ *
+ * A template that WANTS its aided rung at the sign says so by authoring the
+ * sign: authored ≥ posted keeps the old arithmetic exactly (the headroom is
+ * zero or negative and the WIDEN-ONLY floor takes over), which is what leaves
+ * sc-speed-dangerous's 52-on-a-50 and the motorway's 140-on-a-140 untouched.
  */
 function widenSpeedCap(
   maxSpeedKmh: number,
@@ -112,7 +156,26 @@ function widenSpeedCap(
   if (grace <= 0) return maxSpeedKmh;
   const widened = r1(maxSpeedKmh + grace);
   if (postedLimitKmh === undefined || !Number.isFinite(postedLimitKmh)) return widened;
-  return Math.min(widened, Math.max(maxSpeedKmh, postedLimitKmh));
+  // Half the author's own headroom under the sign — and never below what he
+  // authored, so the aided rung is never stricter than the rung that grades
+  // his number. `Math.max(0, …)` keeps an authored cap at or above the sign on
+  // the pre-existing branch: the ceiling collapses to `maxSpeedKmh` and the
+  // WIDEN-ONLY floor returns it unchanged.
+  //
+  // …AND THE HALF IS FLOORED TO A WHOLE KM/H, BECAUSE THE CHIP IS. Verifier
+  // pass on this repair, 2026-08-25: the first cut of this clamp landed
+  // sc-ac-highbeam-lead / sc-sign-warning / sc-vu-blindspot-moto L1 on 47.5
+  // while `RouteGuidance.capLineBg` prints `Math.round(min(cap, posted))` —
+  // «не по-бързо от 48 км/ч» across the lane over a gate that grades 47.5,
+  // and `objectives.ts` compares `speedKmh <= cap` with no slack on
+  // `contractEarned`. That is B58's own defect turned one decimal place
+  // inward: the student obeys the number the world paints him and fails.
+  // Flooring the half keeps every compiled cap a whole km/h wherever the
+  // author wrote one, so `Math.round` on the glass is the identity and the
+  // painted number IS the graded number. It also only ever moves the ceiling
+  // DOWN, so the safety argument above is unchanged.
+  const halfHeadroom = Math.floor(Math.max(0, postedLimitKmh - maxSpeedKmh) / 2);
+  return Math.max(maxSpeedKmh, Math.min(widened, r1(maxSpeedKmh + halfHeadroom)));
 }
 
 /**

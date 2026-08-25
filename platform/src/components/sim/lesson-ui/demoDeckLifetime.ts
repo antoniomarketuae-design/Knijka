@@ -76,3 +76,53 @@ export function demoDeckStandsDown(speedKmh: number): boolean {
   if (!Number.isFinite(speedKmh)) return false;
   return Math.abs(speedKmh) > DEMO_DECK_MOVING_KMH;
 }
+
+/**
+ * …AND THE OTHER END OF THE SAME LIFETIME: WHEN IT STARTS.
+ *
+ * The stand-down above closed the half of the defect that happens at speed. It
+ * cannot touch the half that happens at ZERO, and the corpus photographed that
+ * one too:
+ *
+ *   sc-ed-poligon-chain  pc-right 01-arrival — the cluster reads 0 км/ч in D,
+ *                        no control has been touched, and the deck already
+ *                        reads 0:22 / 2:44 with «Центрирано в мястото. Излез
+ *                        напред и продължи по правата към втората станция.» on
+ *                        the glass. (sc-ed-poligon-chain:746682ab, critical)
+ *   sc-merge-lane-end    pc-right 01-arrival — 0 км/ч, task 1 «Влей се в
+ *                        оставащата лента…» unstarted, and the caption reads
+ *                        «Вписахме се в пролуката с едно движение — никой в
+ *                        лявата лента не спря…». (sc-merge-lane-end:16d2fa64)
+ *
+ * THE MECHANISM IS `createTraceClock()`'s `playing: true`. The replay starts on
+ * the Canvas's first frame and runs on wall time while the student reads the
+ * six-step ИНСТРУКЦИИ panel beside it, so twenty-odd seconds of demonstration
+ * are spent before the lesson has begun and the student looks up at whatever
+ * sentence the playhead happens to be standing on. On both frames above that
+ * sentence is in the first-person COMPLETED voice — the same 42 captions the
+ * stand-down block counted — so the product's first words to a student who has
+ * driven nothing are congratulations for a manoeuvre that never happened. Doc
+ * 64 THEO-4: this product explains every decision it announces, and there is no
+ * decision here to explain, because nothing was done.
+ *
+ * SO THE DEMONSTRATION WAITS FOR ITS AUDIENCE. The deck opens parked at 0:00
+ * and the student presses ▶ — the transport that was always there, and the same
+ * gesture the stand-down block already ends on («a student who wants the
+ * demonstration back reopens it, deliberately»). Nothing is taken away and no
+ * caption is edited: the bank is untouched, the ghost still drives the recorded
+ * line, and the aid is still `DEFAULT_LEVEL_AIDS[1].shadowCar`.
+ *
+ * IT IS ALSO THE ONLY READING THAT LEAVES THE TWO HALVES COHERENT. Since the
+ * stand-down landed, a demonstration cannot be followed WHILE driving — it goes
+ * quiet above 5 км/ч. A replay that can only be watched from a standstill and
+ * yet starts itself before the student is ready to watch is a demonstration
+ * arranged so that it is missed.
+ *
+ * Structurally typed rather than importing `TraceClock`, so this file stays the
+ * dependency-free pure module its two siblings are.
+ */
+export function demoDeckAtRest<T extends { tSec: number; playing: boolean }>(clock: T): T {
+  clock.playing = false;
+  clock.tSec = 0;
+  return clock;
+}

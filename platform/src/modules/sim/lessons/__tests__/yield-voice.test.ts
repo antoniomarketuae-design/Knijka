@@ -166,19 +166,36 @@ describe("B15-VOICE — a line every two seconds would be worse than silence", (
     expect(said.length).toBe(2);
   });
 
-  it("the advisor CARD text is constant for the whole wait", () => {
+  it("two minutes of continuous waiting produce exactly two CARDS", () => {
     // The card's text is the key the shell announces and dismisses on
     // (LessonPlayShell `advisorDismissed` / `useFreshKey`), so a card that
     // counted seconds would re-announce itself on every frame — the nag
     // wearing a different hat.
+    //
+    // THIS ROW USED TO SAY „constant for the whole wait", AND ONE WAS TOO FEW
+    // (sc-rb-ped-exit:c1e5b6df, 2026-08-25). A card that never changes is a
+    // card that goes on saying «Чакаш правилно» after the ring it names has
+    // emptied — measured at 45 s and again at 70 s on the drill's own frames,
+    // and it cost that leg 90 s of a 210 s budget. So the invariant is not
+    // „one text" but „one TRANSITION": the anti-nag property is that a
+    // two-minute hold produces a countable handful of announcements, and two
+    // is the number, exactly as the line count directly above it is two.
     const start = atTheLine();
-    const early = hold(start.state, start.t, 3, []);
-    const late = hold(early.state, early.t, 40, []);
-    const a = advisorPromptForSession(early.state);
-    const b = advisorPromptForSession(late.state);
-    expect(a).not.toBeNull();
-    expect(a?.textBg).toBe(b?.textBg);
-    expect(a?.keys).toEqual([]); // there is no key for „carry on doing nothing"
+    const seen: string[] = [];
+    let cur = start;
+    for (let i = 0; i < 120; i++) {
+      cur = hold(cur.state, cur.t, 1, []);
+      const p = advisorPromptForSession(cur.state);
+      expect(p).not.toBeNull();
+      expect(p?.keys).toEqual([]); // there is no key for „carry on doing nothing"
+      if (seen[seen.length - 1] !== p?.textBg) seen.push(p!.textBg);
+    }
+    expect(seen.length).toBe(2);
+    // …and the transition is one-way, so the two are not the same text
+    // alternating: `seen` collapses runs, so a flicker would count far past 2.
+    expect(seen[0]).not.toBe(seen[1]);
+    expect(seen[0]).toContain("Чакаш правилно");
+    expect(seen[1]).toContain("Чакането стана дълго");
   });
 
   it("creeping one car length up a queue does not re-open the lecture", () => {

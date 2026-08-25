@@ -13,6 +13,9 @@
 
 import type { RuleEngineConfig, SimTick } from "./rules/types";
 import type { PreDriveMode } from "./procedures/types";
+// The tier a lesson may open on. Type-only, and `vehicle/` imports nothing
+// from here, so this cannot close a cycle.
+import type { DifficultyMode } from "./vehicle/difficultyMode";
 
 /**
  * PERCEPTUAL ROAD SCALE — the single dial for how exaggerated the road
@@ -236,6 +239,15 @@ export interface LessonSpec {
    * reserved for acclimatization free-drive (L0).
    */
   vehicleStart?: "cold" | "ready";
+  /**
+   * The difficulty tier the scene OPENS on. Absent = `DEFAULT_DIFFICULTY`,
+   * which is every lesson but the clutch drill — and the tier is what decides
+   * the GEARBOX (`transmissionModeFor`: "advanced" → manual + clutch). See
+   * `ScenarioStartSpec.openingTier` for the measurement (sc-vp-stall:e4dfb43f)
+   * and for why a lesson may state which car it hands over. Seeds the picker's
+   * opening state only; the tier pill still switches it mid-drive.
+   */
+  openingTier?: DifficultyMode;
   /** Ordered objectives; each completes via a predicate over runtime state. */
   objectives: LessonObjective[];
   /** Optional time-of-day/weather override. `fog` = dense FOG (doc 72 AC-03):

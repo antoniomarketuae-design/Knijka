@@ -306,6 +306,88 @@ describe("what the sheet actually renders", () => {
     expect(hidden(withTop)).toBe(hidden(withoutTop) + 2);
   });
 
+  /* ─────────────────────────────────────────────────────────────────────────
+     THE SENTENCES ARE PROSE, SO THEY ARE `<p>` — sc-ac-night-lights:6cc71728,
+     w10-2, round 11.
+
+     THE FRAMES, opened side by side because that is what makes the row
+     undeniable: `sc-ac-night-lights/pc-right/01-arrival.png` and
+     `sc-ed-d2-priority-run/pc-right/01-arrival.png`. On both, this panel's
+     text is a FIXED-WIDTH face — «всичко в кабината се / прави с мишката»,
+     every glyph the same advance — while the ИНСТРУКЦИИ card 900 px to its
+     right, on the same photograph, is the rounded sans. The row's words: „set
+     in a monospace face unlike every other panel in the app".
+
+     THE CAUSE IS THE REGISTER'S OWN CARVE-OUT, MISSED BY ONE ELEMENT NAME.
+     `[data-hud="controls-help"]` is on `GHOST_SURFACES`; the 2026-08-03 ruling
+     puts every ghost in `var(--font-mono)` („low-contrast monospace text
+     anchored to the edge") and then exempts prose with
+
+         [data-sim-stage] GHOST :is(p, h1, h2, h3, blockquote) { --font-sans }
+
+     whose own comment states the assumption this panel broke: „every
+     instrument value in this HUD is a span/div/kbd and every authored sentence
+     is a <p>." Fifteen Bulgarian sentences were `<span>`s.
+
+     AND THE SECOND CLAUSE IS THE SAME CAUSE. The register measured mono at
+     „about 24 characters per line against about 35 in the body face"; this
+     column is ~152 px, so the rows break early and the tail lands alone —
+     «кормуване (или» / «стрелки)» is on both frames.
+
+     THE KEY CAP IS NOT TOUCHED. It is an instrument value, it is a `<kbd>`,
+     and the register is right about it — which is exactly why this test
+     asserts BOTH halves rather than „the panel is sans now".
+     ──────────────────────────────────────────────────────────────────────── */
+  it("the description is a <p> — prose face — and the key cap is still a <kbd>", () => {
+    const markup = render({ defaultOpen: true });
+    // Every essential row: the sentence is in a paragraph, so the register's
+    // published carve-out reaches it without one line of new CSS.
+    for (const row of controlsHelpRows({
+      topdownAllowed: true,
+      reverseAssistEnabled: true,
+      reverseViewOn: false,
+    })) {
+      if (!row.essential) continue;
+      const at = markup.indexOf(row.what);
+      expect(at, `row «${row.id}» is not rendered at all`).toBeGreaterThan(-1);
+      // The element immediately wrapping the sentence, read backwards from it.
+      const openTag = markup.lastIndexOf("<", at);
+      expect(
+        markup.slice(openTag, at),
+        `row «${row.id}»'s sentence is not in a <p> — the ghost register will ` +
+          `set it in JetBrains Mono, which is the whole of 6cc71728`,
+      ).toMatch(/^<p[\s>]/);
+    }
+    // …and the keys stay in the telemetry face. A test that only checked for
+    // <p> would go green on a panel that had lost its key caps too.
+    expect(markup).toMatch(/<kbd[^>]*font-mono/);
+  });
+
+  it("the row whose tail is a parenthetical cannot break before it", () => {
+    // «кормуване (или / стрелки)» on both w10-2 frames. Same U+00A0 technique
+    // as the gear row, which this file already guards two cases above — a
+    // convention with one enforced instance is not a convention.
+    const rows = controlsHelpRows({
+      topdownAllowed: true,
+      reverseAssistEnabled: true,
+      reverseViewOn: false,
+    });
+    expect(rows.find((r) => r.id === "steer")!.what).toBe(`кормуване (или${NBSP}стрелки)`);
+    // THE GENERAL FORM: no authored row may end in a breakable short tail —
+    // a closing parenthetical or a single letter — because that is the shape
+    // the sweep photographed twice, on two different rows.
+    for (const combination of COMBINATIONS) {
+      for (const row of controlsHelpRows(combination)) {
+        const tail = row.what.split(" ").at(-1) ?? "";
+        expect(
+          tail.length,
+          `row «${row.id}» ends on the breakable fragment «${tail}» — bind it ` +
+            `to the word before it with ${"\\u00a0"}, as «steer» and «gears» are`,
+        ).toBeGreaterThan(2);
+      }
+    }
+  });
+
   it("the K row prints the live setting, not a fixed guess", () => {
     // The row's own reason for existing: „the legend never lies about which way
     // the view will turn". Both states, because a row hard-wired to either one

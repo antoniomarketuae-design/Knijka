@@ -451,8 +451,17 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     // `moving || engineOn`, so this string is printed at a standstill too.
     explanationBg:
       "В гъста мъгла предните фарове за мъгла трябва да светят. Те светят ниско и широко под пелената — осветяват маркировката пред теб и те правят видим за другите там, където късите светлини се отразяват в капките.",
+    // THE SECOND INSTANCE OF THE SAME DEFECT, found by looking for it. The
+    // sc-ac-fog briefing named «(клавиш V)» to a phone; so did this corrective,
+    // and a corrective is read at a WORSE moment — the student is already being
+    // billed a второстепенна грешка when it appears. `VIOLATIONS` copy is
+    // authored once and rendered to both inputs (the fault card, the debrief
+    // and the telltale ping all read this record), so the key had to go the
+    // same way it went there: «МЪГЛА» is the touch cell face in
+    // `components/sim/TouchControls.tsx` and the telltale caption in
+    // `hud/StatusDashboard.tsx`, i.e. six letters both readers have on screen.
     correctiveBg:
-      "Щом видимостта падне значително, включи предните фарове за мъгла (клавиш V) заедно с късите светлини — и ги изгаси, щом мъглата се вдигне.",
+      "Щом видимостта падне значително, включи предните фарове за мъгла („МЪГЛА“) заедно с късите светлини — и ги изгаси, щом мъглата се вдигне.",
     // HONEST ABOUT WHAT THE ACT SAYS, 2026-08-09. чл. 74, ал. 1 is a PERMISSION
     // with a limit, not a duty: „Допълнителни светлини за мъгла може да се
     // използват само при значително намалена видимост… Тези светлини не може да
@@ -486,8 +495,19 @@ export const VIOLATIONS: Record<ViolationCode, ViolationSpec> = {
     titleBg: "Движение в обратна посока по еднопосочна улица",
     explanationBg:
       "Движеше се срещу платното на еднопосочна улица. Това е една от най-опасните грешки — насрещните нямат как да те очакват. Влизай в еднопосочна само по посока на движението.",
+    // TRUE OF BOTH ROADS THE CLAUSE NAMES, and the old text was not
+    // (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25). Наредба № 38,
+    // прил. № 5, т. 10, б. „в" covers „пътен възел ИЛИ път с еднопосочно
+    // движение", and six cards of this row were photographed on a motorway
+    // merge — where „излез внимателно на заден ход" is ЗДвП чл. 58, т. 1
+    // („забранено е … движение на заден ход") handed to the student as advice,
+    // at 140 км/ч closing speeds. `correctiveBg` has no per-event override
+    // channel (it is read from this catalogue BY CODE at display time — see
+    // JUNCTION_SCAN_COPY in engine.ts), so the one string has to say both,
+    // exactly as the снеговалеж reuse two entries down does. The title and
+    // explanation DO split per road: `WRONG_WAY_ROAD_COPY` below.
     correctiveBg:
-      "Оглеждай знаците на входа на всяка улица — В2 „Влизането забранено“ значи не влизаш. Влязъл ли си вече — спри веднага, включи аварийните и излез внимателно на заден ход.",
+      "На входа на всяка улица чети знаците — В2 „Влизането забранено“ значи не влизаш. Влязъл ли си вече в еднопосочна улица — спри веднага, включи аварийните и излез на заден ход бавно, с поглед назад. На магистрала е точно обратното: заден ход и обръщане са забранени (чл. 58, т. 1 и 2) — отбий максимално вдясно, аварийни светлини, жилетка, изчакай зад мантинелата и се обади на 112.",
     lawRef: "ЗДвП чл. 6, т. 1",
     realWorldBg:
       "Извън изпита: глоба 100 лв. по ЗДвП чл. 183, ал. 4 — водач, който „навлиза след знак, забраняващ влизането на съответното пътно превозно средство, или се движи в забранената посока на еднопосочен път“. Създаде ли това непосредствена опасност, чл. 179, ал. 1, т. 5 вдига наказанието на глоба в размер 200 лв.",
@@ -1701,6 +1721,60 @@ export const COLLISION_CONTACT_COPY: Record<
 };
 
 /**
+ * WRONG_WAY's two roads — w10-4, `sc-merge-accel-lane:93685d58`, 2026-08-25.
+ *
+ * THE FRAME. `.audit-frames/w10-4/frames/sc-merge-accel-lane__mobile-wrong/
+ * 08-debrief-p6.png` + its `_audit-debrief.json`: six identical cards reading
+ * «Движение в обратна посока по еднопосочна улица … Движеше се срещу платното
+ * на еднопосочна улица … Влизай в еднопосочна само по посока на движението»,
+ * in the lesson «Включване в магистрала през лентата за ускоряване», on a sheet
+ * that also bills «Движение по аварийната лента». There is no street in
+ * `mw-entry-v1` and no В2 anywhere in it: the gravest row the student collected
+ * described a place he was never in.
+ *
+ * THE CLAUSE IS RIGHT AND ONLY THE SENTENCE IS WRONG, which is why this is copy
+ * and not a code. Наредба № 38, прил. № 5, т. 10, б. „в" — quoted verbatim in
+ * `n38.ts` — reads „когато изпитваният навлезе срещу движението на ПЪТЕН ВЪЗЕЛ
+ * или път с еднопосочно движение": the article names the interchange first and
+ * the one-way street second, and a motorway carriageway is both one-way and a
+ * пътен възел. The mark, the severity and the citation stand exactly as billed.
+ *
+ * AND IT RIDES `detail`, NOT AN OVERRIDE, BECAUSE THE OVERRIDE DIES AT THE WIRE.
+ * The first cut of this repair passed `{ titleBg, explanationBg }` straight to
+ * `makeViolation` in `engine.ts`, the way `JUNCTION_SCAN_COPY` does. The
+ * verifier ran it: `serializeRuleEvents` (wire.ts) carries `kind`, `code`, `t`,
+ * `detail`, `penaltyMultiplier`, `x/y` — and NOTHING else — so the server's
+ * `rebuildRuleEvents` reconstructed the pooled street row and the end screen
+ * printed «…по автомагистрала» in «Грешки» (client events) beside «…по
+ * еднопосочна улица» in «Разбор» (server rebuild), a few centimetres apart.
+ * That is the exact defect `wire.ts` records at its own `situation` channel and
+ * `FaultCard.tsx` records at its: „two surfaces on one screen that agree by
+ * accident stop agreeing the first time either is edited." `detail` crosses,
+ * `rebuildRuleEvents` re-applies it through `actCopy`, and both halves of the
+ * sheet are then built from the same table — the same channel
+ * `RAIL_CROSSING_VIOLATION` and `COLLISION` already use.
+ *
+ * `lawRef` DOES NOT SPLIT, and unlike the rail row that is not an omission:
+ * ЗДвП чл. 6, т. 1 („длъжен е да се движи по посоката") is the rule broken on a
+ * street and on a carriageway alike. What genuinely differs is the PRICE —
+ * чл. 183, ал. 4 (100 лв.) on a street versus чл. 178ж, ал. 1 on a motorway —
+ * and `realWorldBg` has no per-event channel at all, so that half is reported
+ * rather than smuggled in here.
+ */
+export const WRONG_WAY_ROAD_MOTORWAY = "motorway";
+
+export const WRONG_WAY_ROAD_COPY: Record<
+  string,
+  { titleBg: string; explanationBg: string }
+> = {
+  [WRONG_WAY_ROAD_MOTORWAY]: {
+    titleBg: "Движение в обратна посока по автомагистрала",
+    explanationBg:
+      "Движеше се срещу посоката на платното на автомагистрала. Това е най-опасното нещо, което може да се случи на магистрала — насрещните пътуват със 140 км/ч и нямат никакво време да реагират. Платното на магистралата е еднопосочно: влиза се само през входната рампа и само по посоката на движението.",
+  },
+};
+
+/**
  * The per-act tables, keyed by the code that owns each. A registry rather than a
  * chain of `if (code === …)`: the next code that grades more than one act adds a
  * row here and `makeViolation` picks it up for every producer at once.
@@ -1710,6 +1784,7 @@ const PER_ACT_COPY: Partial<
 > = {
   RAIL_CROSSING_VIOLATION: RAIL_CROSSING_ACT_COPY,
   COLLISION: COLLISION_CONTACT_COPY,
+  WRONG_WAY: WRONG_WAY_ROAD_COPY,
 };
 
 /**

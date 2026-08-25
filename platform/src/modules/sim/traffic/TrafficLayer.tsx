@@ -83,7 +83,7 @@ import {
   type HazardStimulusSpec,
   type SignalPhase,
 } from "../contracts";
-import { edgeTravelHalfWidth, nodeOpenRadiusM } from "../world/builders/network";
+import { edgeTravelHalfWidth, isMotorwayEdge, nodeOpenRadiusM } from "../world/builders/network";
 // B40(a) — the EXTRACTED world-label channel (doc 87 B35). This layer keeps its
 // own painter for the B42 officer bubble on purpose (that row is closed and
 // photographed; moving it would put it back at risk for nothing the founder can
@@ -858,6 +858,20 @@ export function computeParkedCars(
     const edge = edges[e];
     if (edge.roundabout) continue;
     if (!PARK_CLASSES.has(edge.class)) continue;
+    // ── NOBODY PARKS ON A МАГИСТРАЛА, and it is the law this product bills
+    //    from: ЗДвП чл. 58, т. 2–3 forbids stopping and parking on a motorway
+    //    outside the emergency lane in a breakdown, and `catalog.ts`'s own
+    //    аварийна-лента row prices it at three months and 1000 лв.
+    //
+    //    mw-exit-v1 types its four 140 км/ч carriageways `primary` while
+    //    carrying `motorway: true`, and `primary` is in PARK_CLASSES — so this
+    //    pass laid a continuous kerbside rank of parked cars along a live
+    //    motorway. `.audit-frames/w10-2/frames/sc-merge-motorway-exit__
+    //    mobile-right/05-stopped.png` shows the row beside a chip reading
+    //    «140 · РЕЖИМ Нормален ≤150». `isMotorwayEdge` (world/builders/network)
+    //    carries the three-district table and why the flag is asked instead of
+    //    the class. No body on any non-motorway district moves.
+    if (isMotorwayEdge(edge)) continue;
     if (parkingOptedOut(edge)) continue; // FR-21: this street parks nobody
     const geo = edge.geometry;
     if (!geo || geo.length < 2) continue;

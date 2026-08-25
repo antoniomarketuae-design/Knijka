@@ -132,6 +132,12 @@ export {
   parseStoredAdvisorSetting,
   resetGlancePings,
   serializeAdvisorSetting,
+  // O51 — the figure this objective already put on the glass. On the barrel
+  // because the WORLD plaque (`components/sim/RouteGuidance.capLineBg`) is the
+  // fourth surface that has to name the same cap, and it sits outside this
+  // module: without an exported resolver it re-derived the number and printed
+  // the raw gate (41 against the card's 36 on sc-follow-tailgater@L1).
+  shownObjectiveCapKmh,
   type AdvisorPrompt,
   type GlancePingPhase,
   type GlancePingsState,
