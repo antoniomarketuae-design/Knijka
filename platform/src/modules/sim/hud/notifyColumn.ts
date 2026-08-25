@@ -346,9 +346,32 @@ export function rectClearsMirrorBand(
    the column's `max-height` argument), pinned from two directions by
    `sim-overlay-mirror-lane.test.ts` — which asserts BOTH that the new constant
    is present and that `top: NOTIFY_COLUMN_TOP_CSS_COMPACT` is absent, so a
-   revert cannot be quiet — and by `hud-off-the-road.test.ts`. The remaining
-   `NOTIFY_COLUMN_TOP_CSS_COMPACT` readers are the ones this block says should
-   keep it: `TouchControls.TOP_RAIL_TOP_CSS` and the demonstration deck.
+   revert cannot be quiet — and by `hud-off-the-road.test.ts`.
+
+   ❌ …AND THE SENTENCE THAT USED TO END THIS PARAGRAPH WAS WRONG BY TWO.
+   It read „the remaining `NOTIFY_COLUMN_TOP_CSS_COMPACT` readers are the ones
+   this block says should keep it: `TouchControls.TOP_RAIL_TOP_CSS` and the
+   demonstration deck." Re-read against the tree on 2026-08-24 — this file's own
+   rule, three paragraphs down, that „a comment that describes a shipped state
+   must be re-read against the tree, not inherited" — there were two more, and
+   both were RIGHT-corridor surfaces standing in the mirror's corner:
+
+     `[data-hud="touch-hint"]`     the first-run thumb card, filed TWENTY-FOUR
+                                   times in one steered sweep as „painted with
+                                   no panel straight onto the rear-view mirror
+                                   and the sky". Its ink measures y 11.0 → 132.3
+                                   on an 852 × 393 stage against a mirror
+                                   painted 0 → 70.
+     `[data-hud="audio-prompt"]`   same corner, same instrument — and its own
+                                   ROOMY rule already carried the lane, so only
+                                   the compact arm was ever wrong.
+
+   Both now read the COLUMN constant. The reason a wrong sentence could stand
+   here for five days is that ONE enforced instance is a convention, so the rule
+   is now a scan rather than a claim: `mirror-lane-corridor.test.ts` enumerates
+   every compact `top:` in `PlayAreaStyles` that names a `data-hud` surface and
+   requires each to be either a stated corner-datum tenant or written from
+   `NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN`.
 
    ⚠ AND THE PRICE IT PAID IS NOW PHOTOGRAPHED, which the paragraph below
    predicted in the abstract and nobody had measured against the catalogue. The
@@ -399,11 +422,37 @@ export function rectClearsMirrorBand(
  * `notifyColumnFloorCss()`); `topCss` is where the column starts. Both are
  * subtracted from the sky budget too, because a `max-height` is measured from
  * the box's own top edge and the column's top is not the stage's.
+ *
+ * ── `stageFraction` IS AN ARGUMENT NOW, AND ONE SURFACE PASSES A DIFFERENT
+ *    ONE — 2026-08-24, the mirror-lane round.
+ *
+ * The default is and stays the peek's 0.43, so every existing call site is
+ * byte-identical. The parameter exists because the corridor acquired a second
+ * tenant whose LIFETIME is not the peek's: `[data-hud="touch-hint"]` is on the
+ * glass only until the car first reaches `TOUCH_HINT_MOVING_KMH`
+ * (`components/sim/lesson-ui/touchHintLifetime.ts`, whose own census reads it
+ * painted at 03-ready in 174 of 174 runs and at no 04- frame in any of them),
+ * and it CLIPS what it cannot hold — it sets `overflow: hidden` inside a
+ * `pointer-events-none` parent, so its scroller cannot be scrolled by a thumb.
+ * The peek does neither: it is up while the student drives, and it paints past
+ * this ceiling rather than losing its «ПРОЧЕТИ» row.
+ *
+ * 0.43 is 0.53 („where a 2.2 m sign at 30 m and a pedestrian at 15 m land",
+ * derived at the 50 km/h limit) less a tenth of the frame of clearance. That
+ * margin is bought for a card that shares the glass with a moving car; charging
+ * it to a card that cannot be on the glass above 5 km/h costs authored
+ * Bulgarian that no gesture can recover. So the hint is bounded by
+ * `HAZARD_BAND_TOP_FRACTION` itself — it may not enter the band, and it does
+ * not pay the driving margin on top.
  */
-export function notifyColumnMaxHeightCss(floorCss: string, topCss: string): string {
+export function notifyColumnMaxHeightCss(
+  floorCss: string,
+  topCss: string,
+  stageFraction: number = NOTIFY_COLUMN_MAX_STAGE_FRACTION,
+): string {
   return `min(
           calc(100% - ${floorCss} - ${topCss}),
-          calc(${NOTIFY_COLUMN_MAX_STAGE_FRACTION * 100}% - ${topCss})
+          calc(${stageFraction * 100}% - ${topCss})
         )`;
 }
 
@@ -412,11 +461,12 @@ export function notifyColumnMaxHeightPx(
   stageHeightPx: number,
   bandFloorPx: number,
   topPx: number,
+  stageFraction: number = NOTIFY_COLUMN_MAX_STAGE_FRACTION,
 ): number {
   if (!Number.isFinite(stageHeightPx) || stageHeightPx <= 0) return 0;
   return Math.min(
     stageHeightPx - bandFloorPx - topPx,
-    stageHeightPx * NOTIFY_COLUMN_MAX_STAGE_FRACTION - topPx,
+    stageHeightPx * stageFraction - topPx,
   );
 }
 

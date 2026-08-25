@@ -37,7 +37,12 @@ import {
 // Deep import, and for the reason LessonScene's own two deep imports state: the
 // barrel belongs to the HUD lane, this wave does not own it, and a rule that
 // needs one new length is not worth a cross-lane edit to a re-export list.
-import { FLANK_LANE_VAR, notifyColumnMaxHeightCss } from "@/modules/sim/hud/notifyColumn";
+import {
+  FLANK_LANE_VAR,
+  HAZARD_BAND_TOP_FRACTION,
+  NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
+  notifyColumnMaxHeightCss,
+} from "@/modules/sim/hud/notifyColumn";
 
 /**
  * One CSS rule, mounted by the play shell: while a LETTERBOXED session is on
@@ -883,8 +888,28 @@ ${TOUCH_BAND_CSS_VARS}
         transform: none;
         translate: none;
       }
+      /* …AND SIDEWAYS IT PAYS THE MIRROR'S LANE, WHICH THIS RULE DID NOT AND
+         THE ROOMY ONE ABOVE ALREADY DOES — 2026-08-24.
+
+         The roomy declaration two lines up reads NOTIFY_COLUMN_TOP_CSS_ROOMY,
+         which carries the interior mirror's lane in its own max(). This one
+         read the phone layout's CORNER DATUM instead, and the datum is 8 px —
+         i.e. this card was authored into the top-right corner of a compact
+         stage, which is the corner the cockpit's interior mirror is projected
+         into (notifyColumn.ts, „THE MIRROR IS AN INSTRUMENT"; the mirror is
+         painted [524, 0 → 707, 70] on an iPhone 16 sideways and this column
+         runs 541 → 721, i.e. inside its x band with the glass sticking out on
+         both sides). SimOverlay swapped the peek to the COLUMN constant on
+         2026-08-19; this card is the same corridor, the same phone and the same
+         instrument, and it was simply not on that list.
+
+         It costs nothing to move: unlike the peek and the first-run hint this
+         rule writes no max-height, so the card keeps every line it had — only
+         its top edge steps from 8 px to 73.24 (852 × 393), 67.76 (780 × 360),
+         64.44 (780 × 340), which is the lane plus its 8 px gutter and nothing
+         else. */
       [data-sim-compact="on"] [data-hud="audio-prompt"] {
-        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT};
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};
         width: ${NOTIFY_COLUMN_WIDTH_CSS_COMPACT};
       }
       /* …and its inner card stops being a one-line strip: in a 240 px column
@@ -1504,13 +1529,87 @@ ${TOUCH_BAND_CSS_VARS}
          read. Landscape 3.75 rem, upright 0 — the orientation split lives in
          TOUCH_BAND_CSS_VARS and nowhere else. Re-measured: [541, 8, 180 × …],
          right edge 721, twenty pixels clear of the band. */
+      /* ── …AND IT WAS STANDING ON THE INTERIOR MIRROR THE WHOLE TIME.
+         2026-08-24, twenty-four filings of one sentence.
+
+         WHAT THE FRAMES SHOW. Every one of them is 03-ready on a sideways
+         phone, and every one says the same thing — e.g.
+         .audit-frames/w10-3/frames/sc-rb-busy-gap__mobile-right/03-ready.png:
+         „«Ляв палец — волан…» and «Спряла кола: пусни палеца…» painted straight
+         onto the rear-view mirror and the sky, and the mirror is unreadable
+         through them". Measured off that frame (2556 × 1179 at dpr 3, i.e. the
+         852 × 393 stage this whole catalogue was shot at), the hint's own ink:
+
+           white line 1   y  11.0 → 18.3      teal line 1   y 44.7 → 52.0
+           white line 2   y  27.0 → 33.3      teal line 2   y 58.0 → 68.0
+                                              teal line 3   y 74.3 → 82.0
+           «РАЗБРАХ» pill y  88.7 → 132.3  (43.6 px, i.e. its min-h-11)
+
+         — a box of 8 → 132.5 against a mirror painted 0 → 70. Sixty-two pixels
+         of first-run teaching copy on the one instrument the same lesson grades
+         a glance at.
+
+         THE LANE IS NOT NEW AND NEITHER IS THE RULING. „An instrument you
+         cannot see is not an instrument, so the HUD moves, not the mirror"
+         (rows B74/B76, further up this file). SimOverlay moved the peek onto
+         NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN on 2026-08-19 and
+         notifyColumn.ts then recorded that „the remaining
+         NOTIFY_COLUMN_TOP_CSS_COMPACT readers are TOP_RAIL_TOP_CSS and the
+         demonstration deck". Re-read against the tree, that sentence was wrong
+         by two: this rule and the audio card were both still on the datum, and
+         both are right-corridor surfaces. mirror-lane-corridor.test.ts now
+         holds the GENERAL form, so the next surface added to this corridor
+         cannot quietly inherit the corner again.
+
+         AND THE CEILING HAD TO MOVE WITH THE TOP — the half of the 2026-08-17
+         swap that was left half-landed once already. A max-height is measured
+         from the box's own top edge, so moving only the top would drop this
+         card's floor from 0.43 of the stage to 0.596, through the hazard band,
+         and it would have been reported as „the mirror is fixed".
+
+         WHY THE HINT'S CEILING IS THE BAND ITSELF AND NOT THE PEEK'S 0.43. Fed
+         the peek's fraction from the new top, this card's budget on the
+         founder's own handset is 95.8 px against the 124.5 px it measures on
+         the frame above — and this card CLIPS what it cannot hold (overflow:
+         hidden on the bare rule; its words live in an overflow-y-auto
+         scroller inside a pointer-events-none parent, so no thumb can scroll
+         them back). That is not a fold, it is a deletion of two lines of the
+         founder's own reverse-gear sentence. The peek pays the tenth-of-a-frame
+         margin because it is on the glass WHILE THE STUDENT DRIVES; this card
+         cannot be — touchHintLifetime.ts stands it down the first time the
+         car reaches 5 км/ч and its census reads it painted at 03-ready in 174
+         of 174 runs and at no 04- frame in any of them. So it is bounded by
+         HAZARD_BAND_TOP_FRACTION — it may not ENTER the band — and does not
+         also pay the driving margin.
+
+         RESOLVED, AND THE TWO SMALLER PROFILES STILL PAY. The min() has a
+         SECOND term — what the driving controls leave (notifyColumnFloorCss) —
+         and on every sideways phone in the ladder it is that term, not the
+         band, that binds. Printed from the module's own resolvers rather than
+         read off the arithmetic above:
+
+           stage      top     floor   ceiling  card    was (0.43)  clipped now
+           852 × 393  73.24   193     126.76   124.5   95.75       0.0 px
+           780 × 360  67.76   172     120.24   124.5   87.04       4.3 px
+           780 × 340  64.44   172     103.56   124.5   81.76      20.9 px
+
+         So on the handset this whole catalogue was photographed on the card
+         keeps every line it had AND leaves the mirror; the peek's own fraction
+         would have deleted 28.7 px of it. On a 340 px stage there are only
+         103.56 px between the mirror's lane and the thumb pads and the card
+         wants 124.5, so something must give: this rule gives the tail of the
+         reverse-gear sentence rather than the instrument, and says so instead
+         of picking the quiet half. The copy is five lines at 180 px and only
+         the founder may cut it — that, not another length here, is what closes
+         the last 20.9 px. */
       [data-sim-compact="on"] [data-hud="touch-hint"] {
-        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT};
+        top: ${NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN};
         right: calc(${NOTIFY_COLUMN_RIGHT_CSS} + ${FLANK_LANE_VAR});
         width: calc(${NOTIFY_COLUMN_WIDTH_CSS_COMPACT} - ${FLANK_LANE_VAR});
         max-height: ${notifyColumnMaxHeightCss(
           notifyColumnFloorCss(),
-          NOTIFY_COLUMN_TOP_CSS_COMPACT,
+          NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
+          HAZARD_BAND_TOP_FRACTION,
         )};
       }
       /* …AND IT STANDS DOWN FOR THE ⚙ SHEET — measured 2026-08-12, kept in
