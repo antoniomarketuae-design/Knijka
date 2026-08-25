@@ -3283,7 +3283,18 @@ function handleTickEvent(
         if (placeAct === null) out.push(bill);
         else billAct(s, tick, out, placeAct, bill);
       } else if (e.yielded) {
-        const praise = makeCommendation("YIELDED_TO_PRIORITY", t);
+        // …AND THE PRAISE NAMES THE ACT TOO (round 10, 2026-08-24). The bill
+        // above has picked one of five codes by `e.situation` since VU-09; the
+        // praise pushed one pooled sentence for all nine situations that reach
+        // here, and that sentence ends «…безопасността на кръстовище» — false
+        // on `emergency`, `vulnerable-pass` and `narrow-meeting`, none of which
+        // needs a junction to happen. `sc-hz-accident-scene` is the frame: a
+        // straight street past a crash, zero intersections in the district, and
+        // a green «✓ Правилно отстъпено предимство» for making way for the
+        // ambulance. The situation now travels with the praise and
+        // `YIELD_PRAISE_SITUATION_COPY` (catalog.ts) answers for those three;
+        // the five junction situations fall through to the pooled row unchanged.
+        const praise = makeCommendation("YIELDED_TO_PRIORITY", t, e.situation);
         if (placeAct === null) out.push(praise);
         else billAct(s, tick, out, placeAct, praise);
       }

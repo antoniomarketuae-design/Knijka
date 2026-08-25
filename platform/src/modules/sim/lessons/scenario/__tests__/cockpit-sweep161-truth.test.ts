@@ -469,3 +469,93 @@ describe("§5 the rewritten steps stay inside the compact card's band", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// §6 — NAMING THE TIER IS NOT ASKING FOR IT (round 10, 2026-08-24/25)
+// ---------------------------------------------------------------------------
+
+/**
+ * §2 asks whether the briefing NAMES the tier. `w10-3/frames/sc-vp-stall/
+ * pc-right/01-arrival.png` is what happens when that is the whole bar: the tier
+ * strip IS on the glass at the top right («Начинаещ · НОРМАЛЕН · Напреднал»,
+ * Нормален underlined), step 1 was on the glass beside it — and the drive ran
+ * the whole lesson in D. Gear reads D on every sampled frame of all three legs.
+ *
+ * The shipped sentence was «Закопчай колана. Урокът иска ниво „Напреднал“ — с
+ * ръчни скорости и съединител.» It stated A PREFERENCE OF THE LESSON'S, in a
+ * list of four other sentences that are all commands, next to a control the
+ * reader has no reason to connect it to. §2 was satisfied and the student was
+ * not instructed. So the demand is now the ACT — превключи — and the lesson
+ * card states it before he enters, which is the only surface that reaches a
+ * student who never opens the briefing.
+ *
+ * IT IS GATED HERE BECAUSE IT WAS NOT GATED AT ALL: the adversarial pass on
+ * this repair found that nothing in the tree referenced either new string, so a
+ * revert of it would have been silent.
+ *
+ * THE SET IS DERIVED, NOT LISTED: every cockpit briefing that commands a
+ * manual-only control has to ask for the tier this way. Today that is exactly
+ * one spec, and §6a asserts that count so the day a second drill commands the
+ * clutch it is held to the same bar instead of quietly inheriting §2's weaker
+ * one.
+ *
+ * WHAT THIS STILL DOES NOT DO — the row stays open, and it is the bigger half:
+ * nothing REFUSES the drill on the automatic tier. A student who ignores the
+ * line drives an unfailable rung of a lesson about stalling and completes it.
+ * That gate needs a transmission channel no `ScenarioSpec` has (see the block
+ * above `SC_VP_STALL.instructionsBg`).
+ */
+
+/** The tier asked for as an act: the imperative, then the tier's own label. */
+const SWITCH_TO_TIER_RE = new RegExp(
+  `(?<![\\p{L}])превключи(?![\\p{L}])[^.;!?]{0,40}${MANUAL_TIER_LABEL_BG}`,
+  "u",
+);
+
+/** The tier stated as something the LESSON wants — the shipped-before shape.
+ *  `\p{L}*` and not `\w*` for the inflection: JS `\w` is ASCII-only, so «Урокът
+ *  иска» slipped straight through the first draft of this line (the same trap
+ *  AT_THE_KERB_RE's note documents two hundred lines up). */
+const TIER_AS_PREFERENCE_RE = /(?:урок|упражнени|занятие)\p{L}*\s+иска/iu;
+
+/** Cockpit drills whose steps command a control only the manual tier has. */
+function manualDrills(): ScenarioSpec[] {
+  return SCENARIO_TEMPLATES_COCKPIT.filter((s) =>
+    s.instructionsBg.some((step) => MANUAL_ONLY_RE.test(step.textBg)),
+  );
+}
+
+describe("§6 a drill that needs the manual tier ORDERS the switch and says so early", () => {
+  it("§6a — the derived set is the one spec this rule was measured on", () => {
+    // Not a lock on the number for its own sake: if a second drill starts
+    // commanding the clutch, this line goes red first and the body below is
+    // re-argued for it rather than applied blind.
+    expect(manualDrills().map((s) => s.id)).toEqual(["sc-vp-stall"]);
+  });
+
+  for (const spec of manualDrills()) {
+    it(`${spec.id} — the switch is an instruction, not a preference`, () => {
+      expect(spec.instructionsBg.some((s) => SWITCH_TO_TIER_RE.test(s.textBg))).toBe(true);
+      expect(spec.instructionsBg.filter((s) => TIER_AS_PREFERENCE_RE.test(s.textBg))).toEqual([]);
+    });
+
+    it(`${spec.id} — and the lesson card names the tier before he enters`, () => {
+      // The briefing is behind a card he can dismiss; `objectiveBg` is on the
+      // lesson tile itself, which is the surface a student who never opens the
+      // briefing still reads.
+      expect(spec.objectiveBg).toContain(MANUAL_TIER_LABEL_BG);
+    });
+  }
+
+  it("§6b TEETH — the shipped-before sentence fails both halves, the new one passes", () => {
+    // Both directions, or the predicates guard nothing: the exact text that was
+    // on the glass in w10-3 is refused, and the text that replaced it is not.
+    const before = "Закопчай колана. Урокът иска ниво „Напреднал“ — с ръчни скорости и съединител.";
+    expect(SWITCH_TO_TIER_RE.test(before)).toBe(false);
+    expect(TIER_AS_PREFERENCE_RE.test(before)).toBe(true);
+
+    const after = SC_VP_STALL.instructionsBg[0].textBg;
+    expect(SWITCH_TO_TIER_RE.test(after)).toBe(true);
+    expect(TIER_AS_PREFERENCE_RE.test(after)).toBe(false);
+  });
+});

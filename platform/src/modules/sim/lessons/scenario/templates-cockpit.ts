@@ -337,7 +337,7 @@ export const SC_VP_STALL: ScenarioSpec = {
   tagsBg: ["кокпит", "потегляне", "загасване", "съединител", "изпитни упражнения"],
   titleBg: "Загасване при потегляне",
   objectiveBg:
-    "Потегли от място, без двигателят да загасне: съединител докрай, лек газ и плавно отпускане до точката на зацепване — загасването е класическата грешка от изпитни нерви и всяко се брои.",
+    "Изисква ниво „Напреднал“ — само там колата е с ръчни скорости и съединител. Потегли от място, без двигателят да загасне: съединител докрай, лек газ и плавно отпускане до точката на зацепване — загасването е класическата грешка от изпитни нерви и всяко се брои.",
   archetypeIds: ["VP-04"],
   conceptIds: ["c-vehicle-controls", "c-pre-drive-check"],
   map: {
@@ -358,8 +358,34 @@ export const SC_VP_STALL: ScenarioSpec = {
   // (the sc-vp-readiness precedent — its instruction 1 has always said so).
   // The five steps stay five and stay inside the 95-character band
   // (briefing-card-budget.test.ts) — the old step 4 was 98.
+  //
+  // ROUND 10, 2026-08-24 — «УРОКЪТ ИСКА» IS NOT AN INSTRUCTION.
+  // `w10-3/frames/sc-vp-stall/pc-right/01-arrival.png`, read at the pixels:
+  // the tier strip IS on the glass at the top right («Начинаещ · НОРМАЛЕН ·
+  // Напреднал», Нормален underlined) and step 1 was on the glass beside it —
+  // and the drive still ran the whole lesson in D. Gear reads D on every
+  // sampled frame of all three legs.
+  //
+  // The sentence stated a PREFERENCE OF THE LESSON'S („урокът иска") next to a
+  // control the reader has no reason to connect it to, in a list of four other
+  // sentences that are all commands. Every step around it opens with a verb
+  // aimed at him (`ACT_FIRST`, briefing-card-budget.test.ts); this one asked
+  // him to infer an action from a statement of intent. So it is now the act —
+  // switch — followed by what he is holding if he does not: an automatic, with
+  // no съединител for steps 2–4 to command and no загасване for the drill to
+  // grade. 93 characters, inside the band.
+  //
+  // WHAT THIS STILL DOES NOT DO, and it is the half that matters: nothing
+  // REFUSES the drill on the automatic tier. A student who ignores the line
+  // drives an unfailable rung of a lesson about stalling and completes it. The
+  // gate would have to read the transmission, and no channel carries it —
+  // `stepObjective` is handed a `SimTick` (lessons/rules) whose `gear` is a
+  // number, `transmissionModeFor` lives in vehicle/difficulty.ts and is read by
+  // LessonScene alone, and a ScenarioSpec has no field to demand a tier. That
+  // is the lesson-level transmission channel the header already routes to
+  // contracts.ts + compile.ts + LessonScene.tsx + vehicle/driveline.ts.
   instructionsBg: [
-    { n: 1, textBg: "Закопчай колана. Урокът иска ниво „Напреднал“ — с ръчни скорости и съединител." },
+    { n: 1, textBg: "Закопчай колана и превключи на „Напреднал“ — на „Нормален“ колата е автоматик." },
     { n: 2, textBg: "Съединител докрай („СЪЕД“ / Z), включи първа предавка (]) и дай лек газ." },
     { n: 3, textBg: "Отпускай съединителя ПЛАВНО до точката на зацепване и задръж, докато колата тръгне." },
     { n: 4, textBg: "Загасне ли двигателят: съединител докрай, запали отново и повтори спокойно." },

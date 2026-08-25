@@ -47,6 +47,7 @@ import {
 import {
   createEvalState,
   parseObjectiveParams,
+  personContactVoidsObjective,
   stepObjective,
   type ObjectiveContext,
 } from "./objectives";
@@ -307,6 +308,26 @@ function countRedsMet(evalStates: ReadonlyArray<ObjectiveEvalState>): number {
     if (s.type === "passSignal" && s.redMet) n += 1;
   }
   return n;
+}
+
+/**
+ * Did this scored event record contact with a HUMAN BODY? (round 10,
+ * 2026-08-24 — `objectives.ts vruWaitHonoured` holds the frame.)
+ *
+ * `detail` is the struck body kind the contact episode already stamps on every
+ * bill (`rules/engine.ts`, `COLLISION_CONTACT_COPY`'s four keys), so this reads
+ * the discriminator rather than inventing one. A cyclist counts: чл. 42's
+ * clearance duty and чл. 119's yield duty protect the same unarmoured body, and
+ * a banner that says «изчакай» about either is falsified by hitting them.
+ * Vehicles and static objects do NOT count — those are the rule engine's to
+ * grade and say nothing about whether a person was let through.
+ */
+function isPersonContact(e: ScorableEvent): boolean {
+  return (
+    e.kind === "violation" &&
+    e.code === "COLLISION" &&
+    (e.detail === "pedestrian" || e.detail === "cyclist")
+  );
 }
 
 /** Map rule-engine output onto the HUD event contract (toasts). */
@@ -628,6 +649,21 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     }
   }
 
+  // A STRUCK PERSON, READ OFF THE LEDGER THIS FRAME ALREADY WROTE
+  // (round 10, 2026-08-24 — `objectives.ts vruWaitHonoured` carries the frame
+  // and the derivation). `prev.events` is the run's scored ledger and
+  // `scoredEvents` is what THIS tick just added — both are needed: a car that
+  // reaches the child on the frame it also completes the waypoint must not be
+  // certified by a ledger one frame stale. Session-monotone, so it is computed
+  // once, here, rather than per objective.
+  //
+  // FOLDED ABOVE BOTH READERS, and the second one is why (2026-08-25). It feeds
+  // the objective context below AND the finish gate further down, because a
+  // demand that can no longer be met changes two questions at once: whether the
+  // certificate is issued, and whether the drive can still end by itself.
+  const struckAPersonInRun =
+    prev.events.some(isPersonContact) || scoredEvents.some(isPersonContact);
+
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
   let currentIndex = prev.currentObjectiveIndex;
@@ -671,6 +707,7 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       const ctx: ObjectiveContext = {
         stagedOutcomes: prev.stagedOutcomes ?? [],
         redsMetInRun: countRedsMet(evalStates),
+        ...(struckAPersonInRun ? { struckAPersonInRun: true } : {}),
       };
       const before = evalStates[currentIndex];
       const step = stepObjective(current.params, before, tick, ctx);
@@ -965,10 +1002,39 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         };
       }
     } else {
-      // Gate 1 — the stalled chain. Unchanged in its arming condition: it is
-      // presence-based and generous, and it must stay off the terminal
-      // objective, where every correct final approach would satisfy it.
-      if (!onTerminal) {
+      // Gate 1 — the stalled chain. Presence-based and generous, and it stays
+      // off the terminal objective, where every correct final approach would
+      // satisfy it.
+      //
+      // ── …UNLESS THERE IS NO CORRECT FINAL APPROACH LEFT (2026-08-25) ───────
+      //
+      // The person-contact refusal above (`objectives.ts vruWaitHonoured`) is
+      // session-monotone: once a pedestrian or a cyclist has been struck, a
+      // `requireVruUntouched` gate can never complete again. When that gate is
+      // the LAST objective, the chain stops advancing, `currentIndex` never
+      // reaches `objectives.length`, the run-out is never armed — and the drive
+      // no longer ends by itself. Measured through `applyTick` on the same tick
+      // stream with one `{kind:"collision", withWhat:"pedestrian"}` as the only
+      // difference: CLEAN → `phase: completed`; STRUCK → still `driving` sixty
+      // ticks later. The other exits do not cover it — `stepOffNetwork` needs
+      // the car off the carriageway, the crash pin needs CRASH_PIN_STUCK_S of
+      // standstill against what he hit, gate 2 needs a full standstill AT the
+      // mark, and the exam termination needs `examMode`. So a student who ran
+      // the child over could reach the protocol that convicts him — the −10
+      // «Удар в пешеходец» card and its чл. 48, ал. 3 corrective, which is the
+      // entire teaching payload of that lesson — only by quitting, and quitting
+      // costs the attempt its XP and its calibration (`aborted`).
+      //
+      // A REFUSAL MUST NOT DOUBLE AS A TRAP. The reason gate 1 is withheld here
+      // is that a correct approach would satisfy it; when the demand is already
+      // unsatisfiable that reason has evaporated, and this is the exact case
+      // gate 1 was built for — a chain that has stalled with the car at the end
+      // of the route. Nothing is graded by it: the objective keeps its honest
+      // `active` status and `buildLessonResult` reports finished-and-failed, so
+      // the certificate is still refused. Only the strand goes.
+      const terminalUnearnable =
+        onTerminal && personContactVoidsObjective(params[currentIndex], struckAPersonInRun);
+      if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {
           finishGate = stepFinishGate(finishGate ?? createFinishGate(), zone, tick);

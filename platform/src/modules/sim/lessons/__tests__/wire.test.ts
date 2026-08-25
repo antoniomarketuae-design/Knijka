@@ -40,6 +40,58 @@ describe("rule-event wire round-trip", () => {
     expect(rebuildRuleEvents([{ kind: "violation", code: "MADE_UP", t: 1 }])).toBeNull();
     expect(rebuildRuleEvents([{ kind: "commendation", code: "COLLISION", t: 1 }])).toBeNull();
   });
+
+  /**
+   * ONE ACT, ONE NAME, ON BOTH HALVES OF THE END SCREEN (round 10, 2026-08-25).
+   *
+   * `YIELD_PRAISE_SITUATION_COPY` retitles three of the nine situations that
+   * push the pooled `YIELDED_TO_PRIORITY`, so the title stopped being derivable
+   * from `code` alone — and this screen is built TWICE: «Похвали» from the
+   * client's own events (`LessonPlayShell` → `buildLessonResult(state)`),
+   * «Разбор» from the server's rebuild of this wire log. Without the situation
+   * on the wire the two printed «Правилно пропуснат автомобил със специален
+   * режим» and «Правилно отстъпено предимство» a few centimetres apart, and the
+   * persisted `conceptId` — the one the learner model reads — took the server's.
+   *
+   * The whole loop is exercised, `parseFinishLessonWire` included, because the
+   * validator is what actually stands between the two: a rebuild that agreed
+   * only when handed a payload the parser would have stripped would agree in a
+   * test and diverge in production.
+   */
+  it("a retitled praise survives the round-trip — the client and the server agree", () => {
+    const client = makeCommendation("YIELDED_TO_PRIORITY", 33, "emergency");
+    expect(client.titleBg).toBe("Правилно пропуснат автомобил със специален режим");
+    expect(client.conceptId).toBe("c-emergency-priority");
+
+    const wire = serializeRuleEvents([client]);
+    expect(wire).toEqual([
+      { kind: "commendation", code: "YIELDED_TO_PRIORITY", t: 33, detail: "emergency" },
+    ]);
+
+    const parsed = parseFinishLessonWire({
+      lessonId: "l0-free-drive",
+      startedAtMs: 1000,
+      finishedAtMs: 61000,
+      aborted: false,
+      ruleEvents: wire,
+      objectives: [],
+    });
+    const server = rebuildRuleEvents(parsed!.ruleEvents)!;
+    expect(server[0].titleBg).toBe(client.titleBg);
+    expect(server[0].conceptId).toBe(client.conceptId);
+  });
+
+  it("…and a junction yield still crosses with no situation at all", () => {
+    // The five junction situations keep the pooled row, so nothing new goes on
+    // the wire for them — if this ever grows a `detail`, the „nothing about
+    // those drives changes by a byte" claim in catalog.ts has stopped being true.
+    const pooled = makeCommendation("YIELDED_TO_PRIORITY", 12, "right-hand-rule");
+    expect(pooled.titleBg).toBe("Правилно отстъпено предимство");
+    expect(serializeRuleEvents([pooled])).toEqual([
+      { kind: "commendation", code: "YIELDED_TO_PRIORITY", t: 12 },
+    ]);
+    expect(rebuildRuleEvents(serializeRuleEvents([pooled]))).toEqual([pooled]);
+  });
 });
 
 describe("parseFinishLessonWire", () => {

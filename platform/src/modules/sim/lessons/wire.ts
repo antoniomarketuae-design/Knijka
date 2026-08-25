@@ -208,6 +208,21 @@ export function serializeRuleEvents(
       if (e.detail !== undefined) wire.detail = e.detail;
       const multiplier = takeMultiplier(e.code, e.t);
       if (multiplier > 1) wire.penaltyMultiplier = multiplier;
+    } else if (e.situation !== undefined) {
+      // THE PRAISE'S OWN DISCRIMINATOR (round 10, 2026-08-25). Set only when
+      // `YIELD_PRAISE_SITUATION_COPY` retitled the pooled `YIELDED_TO_PRIORITY`
+      // — three of its nine situations — so nothing new crosses for any
+      // commendation that shipped before it existed. Without this the server's
+      // `rebuildRuleEvents` recomputes the POOLED title and the end screen
+      // prints two names for one act: «Похвали» from the client's own events,
+      // «Разбор» from the server's rebuild, a few centimetres apart.
+      //
+      // Same channel, same 64-char cap and the same trust as a violation's
+      // `detail`: a forged value can only select another row of that table (an
+      // unknown one falls back to the pooled title), so it moves a sentence of
+      // praise and a positive concept tag. It cannot reach a point, a verdict
+      // or a penalty — those are rebuilt from `code` alone, as they always were.
+      wire.detail = e.situation;
     }
     const pos = pendingPos.get(`${e.kind}:${e.code}@${e.t}`)?.shift();
     if (pos !== undefined) {
@@ -561,7 +576,12 @@ export function rebuildRuleEvents(wire: ReadonlyArray<WireRuleEvent>): ScorableE
       out.push(makeViolation(code, e.t, overrides));
     } else {
       if (!(e.code in COMMENDATIONS)) return null;
-      out.push(makeCommendation(e.code as CommendationCode, e.t));
+      // `detail` is the praise's situation on this side too (serializeRuleEvents
+      // above) — the one input that decides which of the retitled acts this is.
+      // Rebuilt through the SAME catalog function the client used, so an
+      // unknown or absent value lands on the pooled row on both sides rather
+      // than on two different rows.
+      out.push(makeCommendation(e.code as CommendationCode, e.t, e.detail));
     }
   }
   return out;

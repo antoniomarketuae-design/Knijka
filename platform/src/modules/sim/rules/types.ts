@@ -604,6 +604,19 @@ export interface CommendationEvent {
   titleBg: string;
   explanationBg: string;
   conceptId?: string;
+  /**
+   * WHICH ACT THIS PRAISE IS ABOUT, when the pooled code cannot say (round 10,
+   * 2026-08-25). `YIELDED_TO_PRIORITY` is pushed for nine different situations
+   * and `YIELD_PRAISE_SITUATION_COPY` (catalog.ts) retitles three of them, so
+   * the title is no longer derivable from `code` alone — and the debrief is
+   * built twice, once on the client and once from the server's rebuild of the
+   * wire log. Present ONLY when it actually selected different copy; absent is
+   * the pooled row, i.e. every commendation shipped before this field existed.
+   *
+   * It is the commendation's half of the `detail` channel `ViolationEvent`
+   * already has, and it rides that same wire key (`lessons/wire.ts`).
+   */
+  situation?: string;
 }
 
 export type RuleEvent = ViolationEvent | CommendationEvent;

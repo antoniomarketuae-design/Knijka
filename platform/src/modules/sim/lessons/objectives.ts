@@ -412,6 +412,16 @@ export interface ObjectiveContext {
    * earlier junction satisfies a later requireRedMet gate).
    */
   redsMetInRun: number;
+  /**
+   * Has this drive struck a person on foot or on a bicycle, anywhere, at any
+   * point? Session-monotone (a contact never un-happens), so it needs no
+   * eval-state memory of its own — the same property `stagedOutcomes` has.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped. See `vruWaitHonoured` for the frame that made it necessary.
+   */
+  struckAPersonInRun?: boolean;
 }
 
 const EMPTY_CONTEXT: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 0 };
@@ -1053,14 +1063,83 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
  * all leaves the demand met — an encounter that never happened is unmeasured,
  * and unmeasured must not become a refusal (the `notEncountered` debrief line
  * owns saying «тази ситуация не се случи»).
+ *
+ * ── …AND A STRUCK PERSON IS NOT „UNMEASURED" (round 10, 2026-08-24) ────────
+ *
+ * `w10-1/frames/sc-hz-emergency-stop/pc-right/08-debrief-p4.png` and its
+ * `_audit-debrief.json`, read together: «✓ Изчакай детето и продължи до края на
+ * отсечката 2:24» in a protocol whose ONE fault is «Удар в пешеходец −10
+ * изпитни т. ОПАСНА ГРЕШКА», with the card's own citation beside it — „Тази
+ * грешка спира самия изпит … при допускане на ПТП" (Наредба № 38, чл. 48,
+ * ал. 3). The title is the one this whole demand was written for
+ * (`VRU_WAIT_TITLE`'s census names it as the single match in the catalogue),
+ * the wiring is live (`LessonPlayShell.tsx:3327` → `applyStagedOutcome` →
+ * `ObjectiveContext`), and the certificate was issued anyway.
+ *
+ * IT IS THE „NO OUTCOME" ARM THAT ISSUED IT. The dart is released only when
+ * the player is ~30 m out AND doing at least `minTriggerSpeedKmh` (25 for
+ * `SC_HZ_EMERGENCY_STOP_DART`); a drive that never reaches that speed never
+ * arms the encounter, so the runner never resolves, `stagedOutcomes` stays
+ * empty on this kind, and the loop above falls through to `true` — while the
+ * child is standing on the kerb where the car then reaches her. „The encounter
+ * did not happen" and „the person was hit before it could" are the same state
+ * as far as this loop can see, and they are opposite answers to the question
+ * the banner asks.
+ *
+ * So the CONTACT is consulted as well, and it is a different channel from a
+ * different grader: `tick.events` carries `{kind:"collision", withWhat}` on
+ * every impact, `rules/engine.ts` bills it per struck body, and the engine
+ * folds „did this drive ever strike a person or a cyclist" into the context.
+ * Nothing here reads a verdict, a score or a star — only whether a human body
+ * was hit, which is a fact about the drive and not an opinion about it.
+ *
+ * IT CANNOT REFUSE A CORRECT DRIVE, which is the bar every arm in this file is
+ * held to: a drive that hits nobody is bit-identical to shipped, and the only
+ * drive it refuses is one the same debrief already convicts of the gravest
+ * fault the catalogue has. Absent (`undefined`) is „unknown" and keeps the old
+ * answer, so every fixture, rig and replay is untouched.
  */
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
+  // A struck person outranks the encounter record in both directions: it
+  // refuses a run the dart never armed for, and it refuses one whose LAST dart
+  // resolved clean after an earlier body was already hit.
+  if (ctx.struckAPersonInRun === true) return false;
   for (let i = ctx.stagedOutcomes.length - 1; i >= 0; i--) {
     const o = ctx.stagedOutcomes[i];
     if (o.kind !== "pedestrianDartOut") continue;
     return o.detail !== "collision";
   }
   return true;
+}
+
+/**
+ * IS THIS OBJECTIVE UNEARNABLE FOR THE REST OF THE RUN? (2026-08-25.)
+ *
+ * The one refusal in this file that can never be taken back. Every other arm is
+ * a per-frame read that a later frame can answer differently — a cap is met on
+ * arrival, a lamp is switched on, a dart re-latches clean — but a struck person
+ * is session-monotone by construction, so a `requireVruUntouched` gate that has
+ * seen one is closed for good.
+ *
+ * `lessons/engine.ts` asks, because that permanence is the difference between
+ * REFUSING a certificate and STRANDING a drive: when the unearnable gate is the
+ * last one in the chain, nothing advances `currentIndex` and the session loses
+ * its ordinary ending. The engine's own comment at the finish gate carries the
+ * measurement and what it does about it. Nothing here decides an ending — this
+ * answers one question about one objective and the caller does the rest.
+ *
+ * The cast is this suite's own idiom (`reach-zone-witness.test.ts`,
+ * `reach-zone-vru-untouched.test.ts`): `parseObjectiveParams` BUILDS a
+ * `WitnessedReachZoneParams` and returns it under the narrower union type, so
+ * the demands are present at runtime on every parsed reachZone and absent from
+ * the compile-time union. Reading it back is what the parse promised.
+ */
+export function personContactVoidsObjective(
+  params: ObjectiveParams,
+  struckAPersonInRun: boolean,
+): boolean {
+  if (!struckAPersonInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireVruUntouched === true;
 }
 
 /**

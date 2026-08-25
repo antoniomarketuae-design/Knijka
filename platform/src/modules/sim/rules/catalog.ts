@@ -1412,6 +1412,112 @@ export const COMMENDATIONS: Record<CommendationCode, CommendationSpec> = {
   },
 };
 
+/**
+ * THE PRAISE SIDE HAD ONE TITLE FOR NINE DIFFERENT ACTS — round 10, 2026-08-24,
+ * corrected 2026-08-25 after the adversarial pass.
+ *
+ * `w10-1/frames/sc-hz-accident-scene/mobile-right/08-debrief-p7.png`, read at
+ * the pixels: «Похвали ✓ Правилно отстъпено предимство 0:33» on a lesson that
+ * is a straight urban street past a crash scene — no junction, no crossing, no
+ * priority sign, and `hz-accident-v1.json` holds zero intersections.
+ *
+ * ⚠ WHAT THE FRAME SHOWS IS THE TITLE, AND ONLY THE TITLE. The first draft of
+ * this note said the card „then explained itself with «…безопасността на
+ * кръстовище»", as if read off the same picture. It was read off line 1401 of
+ * this file. Measured against the captured artefact:
+ *
+ *   grep -c "безопасността на кръстовище" _audit-debrief.json  →  0
+ *   grep -c "безопасността на кръстовище" run.log              →  0
+ *   section[aria-label="Похвали"] → «Правилно отстъпено предимство 0:33»
+ *
+ * It could not have held it: A COMMENDATION'S `explanationBg` HAS NO RENDERER
+ * ANYWHERE IN THE PRODUCT. The census, run over every consumer of the type —
+ * `lessons/engine.ts toHudEvents` maps a commendation to `{kind, titleBg}` and
+ * drops the rest before the HUD sees it · `hud/HudToasts.tsx`'s commendation
+ * branch prints `titleBg` · `hud/hudPreferences.ts` says so in its own words ·
+ * `hud/SessionEndScreen.tsx` «Похвали» prints `titleBg` + clock ·
+ * `lessons/debrief.ts commendationLines` builds `• ${title}` · `hud/FaultCard`
+ * is typed `ViolationEvent` and never takes one. All SIX `CommendationCode`s
+ * carry explanation prose no student has ever read (counted off the union in
+ * types.ts, not off the adversarial pass's „eleven", which was the wrong
+ * number), and the pooled junction sentence above is one of them. THAT IS AN
+ * OPEN ROW, not a thing this table may pretend to fix:
+ * authoring three more unread sentences here would have been prose with no
+ * reader. So this table carries the TITLE and the CONCEPT — the two columns
+ * with a proven live path — and nothing else.
+ *
+ * WHAT HE ACTUALLY DID is in the template: `SC_HZ_ACCIDENT_SCENE.staged` ends
+ * with `SC_HZ_ACCIDENT_EMERGENCY`, and `EmergencyVehicleRunner` resolves with
+ * `{ situation: "emergency", yielded: true }` (orchestrator/runners.ts) — he
+ * made way for a special-regime vehicle at a crash site, which is чл. 104,
+ * ал. 1, not a junction rule at all. `templates-vru.ts` records the same praise
+ * on `sc-vu-emergency-junction` at 0:06 and 0:37.
+ *
+ * THE ASYMMETRY IS THE DEFECT, and it is visible in `engine.ts`'s own
+ * `prioritySituation` case: the VIOLATED branch already picks one of five codes
+ * by `e.situation` (EMERGENCY_NOT_YIELDED, OVERTAKE_INSUFFICIENT_GAP,
+ * OVERTAKE_RETURN_TOO_EARLY, VULNERABLE_PASS_TOO_CLOSE, FAILED_TO_YIELD) while
+ * the YIELDED branch has always pushed the single pooled
+ * `YIELDED_TO_PRIORITY`. Nine situations reach that branch —
+ *
+ *   left-turn-oncoming · right-hand-rule · roundabout ×2   worldRuntime
+ *   vulnerable-pass                                        worldRuntime
+ *   give-way · cyclist-right-hook · narrow-meeting ·
+ *   emergency                                              runners
+ *
+ * — and the pooled TITLE is right for the five that happen at a junction and
+ * wrong for at least one that does not: «Правилно отстъпено предимство» told a
+ * student who had passed a cyclist with real clearance that he had yielded
+ * priority. THEO-4 forbids a card that announces a decision without explaining
+ * it; a card that names the wrong act is that failure one step earlier.
+ *
+ * WHERE THE TITLE IS READ (the live path this table exists for, all three
+ * measured in the tree rather than assumed):
+ *   /simulator → `rules/engine.ts` → `lessons/engine.ts toHudEvents` →
+ *     `LessonPlayShell.tsx` praise toast `lineBg` — on the glass mid-drive;
+ *   → `summary.commendations` → `hud/SessionEndScreen.tsx` «Похвали»;
+ *   → server rebuild → `lessons/debrief.ts commendationLines` «• …».
+ *
+ * NO NEW CODE, and that is deliberate rather than lazy: `world/referents.ts`
+ * enumerates `COMMENDATIONS` as part of „every code the catalog can emit" and
+ * binds each to a world referent, so four new codes would be four new rows in
+ * another lane's census for a defect that is entirely about COPY. The
+ * mechanism reused instead is this file's own `COLLISION_CONTACT_COPY`: one
+ * code, a table keyed by the `detail` string the reducer already has in hand.
+ *
+ * …WHICH IS WHY THE SITUATION HAS TO CROSS THE WIRE, and that half was missing
+ * from the first cut of this repair. The debrief the student reads is built
+ * TWICE — the end screen's «Похвали» from the client's own events, the «Разбор»
+ * text from the server's rebuild of the same log — and `rebuildRuleEvents`
+ * calls `makeCommendation(code, t)` with no situation. Measured through the
+ * real serializer: CLIENT «Правилно пропуснат автомобил със специален режим»,
+ * SERVER «Правилно отстъпено предимство», both on one screen a few centimetres
+ * apart. `lessons/wire.ts` carries it on the `detail` channel now, for exactly
+ * the reason its own header gives: „a divergence here is not a second opinion —
+ * it is the opinion".
+ *
+ * THE FIVE JUNCTION SITUATIONS ARE ABSENT ON PURPOSE — they keep the pooled
+ * row, whose title is exactly right for them, so nothing about those drives
+ * changes by a byte, and nothing new crosses the wire for them either.
+ */
+export const YIELD_PRAISE_SITUATION_COPY: Record<
+  string,
+  { titleBg: string; conceptId?: string }
+> = {
+  emergency: {
+    titleBg: "Правилно пропуснат автомобил със специален режим",
+    conceptId: "c-emergency-priority",
+  },
+  "vulnerable-pass": {
+    titleBg: "Правилно разминаване с велосипедист",
+    conceptId: "c-cyclists",
+  },
+  "narrow-meeting": {
+    titleBg: "Правилно разминаване в стеснението",
+    conceptId: "c-priority-concept",
+  },
+};
+
 /*
  * ---------------------------------------------------------------------------
  * TELLTALE_TENSE_NOTE — THE ROWS THAT ARE ALSO READ BEFORE THE FAULT EXISTS
@@ -1657,15 +1763,40 @@ export function makeViolation(
   return event;
 }
 
-export function makeCommendation(code: CommendationCode, t: number): CommendationEvent {
+/**
+ * `situation` is the reducer's `prioritySituation.situation` string, and it is
+ * OPTIONAL so every existing caller compiles and behaves byte-identically. It
+ * is honoured only for `YIELDED_TO_PRIORITY`, the one pooled row that had to
+ * speak for nine acts; an unknown situation falls back to the pooled title,
+ * which is what a junction yield wants anyway. See
+ * `YIELD_PRAISE_SITUATION_COPY`.
+ *
+ * IT IS STAMPED BACK ONTO THE EVENT ONLY WHEN IT CHANGED THE COPY. That is the
+ * whole reason the field exists: `wire.ts` has to be able to hand the server
+ * the same discriminator the client used, or the two halves of one debrief
+ * print two names for one act. Stamping it unconditionally would put a new
+ * string on the wire for the five junction situations that do not use it — new
+ * bytes, a new thing to validate, and nothing downstream would read them.
+ */
+export function makeCommendation(
+  code: CommendationCode,
+  t: number,
+  situation?: string,
+): CommendationEvent {
   const spec = COMMENDATIONS[code];
+  const perSituation =
+    code === "YIELDED_TO_PRIORITY" && situation !== undefined
+      ? YIELD_PRAISE_SITUATION_COPY[situation]
+      : undefined;
   const event: CommendationEvent = {
     kind: "commendation",
     code,
     t,
-    titleBg: spec.titleBg,
+    titleBg: perSituation?.titleBg ?? spec.titleBg,
     explanationBg: spec.explanationBg,
   };
-  if (spec.conceptId !== undefined) event.conceptId = spec.conceptId;
+  if (perSituation !== undefined && situation !== undefined) event.situation = situation;
+  const conceptId = perSituation?.conceptId ?? spec.conceptId;
+  if (conceptId !== undefined) event.conceptId = conceptId;
   return event;
 }
