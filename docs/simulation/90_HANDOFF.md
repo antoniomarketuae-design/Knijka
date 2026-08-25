@@ -526,3 +526,67 @@ corpus"*, three files, no grading path, clean line endings. Its verifier still f
 4. Integrate the rest per-row, honouring each verifier's overturns. **The FIXED column in a lane
    report is a claim; the VERIFIER section is the record.**
 5. Only then re-run `wave-c-post.mjs --apply`, and only after the verify phase has finished.
+
+---
+
+## 11. 2026-08-25 — THE REPAIR WAVE, INTEGRATED
+
+Six lanes landed, one superseded, two held out. Every one gated with `tsc` and
+the full suite, and landed only after its verifier's objections were ANSWERED —
+not accepted wholesale and not waved through.
+
+| commit | lane | what |
+|---|---|---|
+| `d8c1b80` | mirror-lane-corridor | the touch hint clears the mirror and instruments; the ungated ceiling closed |
+| `c61868b` | hud-briefing-numbering | the briefing's step 1 gets its number back, as DATA |
+| `bc5a279` | lesson-play-shell-w10 | four HUD surfaces get their ground back; `relative isolate` gated |
+| `6a1e4ff` | round10-mixed | the yield praise names the act, on a surface that renders |
+| `d81dfbc` | wf_…-10 | advisor caps, the B58 gate, task/briefing agreement |
+| `fcdec17` | wf_…-12 | motorway traffic, conditions traces, 18 re-recorded JSONs |
+
+**Superseded:** `w11-conditions-traces` — the same 42 files as `wf_…-12`, same
+deletions, 63 fewer code lines. Its only unique content is a memoisation cache in
+a test helper and extra commentary. Two integration agents worked one repair; the
+richer landed.
+
+**Held out:** `wf_…-2` and `wf_…-6` never got a verifier (their agents died when
+the account hit its spend limit). `wf_…-2` is additionally proved RED: two
+world-referent gates fail with it applied and pass at HEAD, because its new
+violation code is in neither `REFERENT_RULES` nor `NO_WORLD_REFERENT`.
+
+### What the verifiers actually bought
+
+1. **The numbering regression, filed by THREE lanes.** Two prefixed the ordinal
+   into `briefingLineBg`; by majority that wins. Measured over 663 rungs: 29 to a
+   worse fold band, **12 to ZERO body, 1,190 body characters lost** — the graded
+   step among them, including «…тук играят деца». **No gate could see it**: those
+   scenarios sit outside the five files `briefing-card-budget` owns.
+2. **`relative isolate`** — deleting it left **139 tests green** while the shade
+   escaped behind the stage. Now caught by a source case AND a rendered one.
+3. **Commendation `explanationBg` has no renderer anywhere.** `toHudEvents` drops
+   it; all five downstream surfaces print the title only; the string appears zero
+   times in eight captured debrief DOMs. The fourth dead predicate this week.
+4. **A mutation case that was red when the code was RIGHT** — it asserted the
+   plain line FAILS. Landing it would have locked the regression in permanently.
+5. **Two `tsc` reds a green suite cannot see** (TS2739 on a fabricated row, TS2305
+   on an unpublished barrel type). **Vitest does not typecheck.**
+
+### The rule this wave earned
+
+**A test that cannot go red is worse than no test, because it reports safety.**
+Four predicates this week shipped, were gated by their own tests, and were read by
+nothing: `districtWorldEdge`, `worldEdgeClearanceM`, `touchHintShouldHide`,
+`whyIsReachable` — and now `explanationBg` and `itemEchoesLine`.
+
+### What was deliberately left unfinished
+
+`sc-mw-min-speed:f3c26187` — two lanes moved the briefing and neither moved the
+task chips, so the chip quotes a number the lesson no longer sources. The briefing
+change is reverted; the lane's reasoning is kept at the site as an unshipped
+proposal; and `sp-mw-flow-visible §4` — which is the row's own specification — is
+`describe.skip` with the re-enable condition written above it: **briefing, BOTH
+chips and the objective caps move together, in one round, with
+task-title-agrees-with-briefing, one-junction-three-names §3 and tier-feasibility
+green.** Deleting that block would have made the tree green and the row invisible.
+
+**tsc 0 · vitest 15,709 passing · open list 523 / 168 critical.**
