@@ -193,6 +193,44 @@ const ADVISOR_HALT_CAP_KMH = 8;
 const ZONE_CAP_MIN_KMH = ADVISOR_HALT_CAP_KMH + 2;
 const ZONE_CAP_MAX_KMH = 130;
 
+/**
+ * ── AND A NUMBER IN A TITLE IS NOT AUTOMATICALLY A CEILING (w10-4, 2026-08-24,
+ *    finding sc-mw-min-speed:2545554a) ──
+ *
+ * This scanner took EVERY „N км/ч" in a title as a ceiling and `Math.min`ned it
+ * against the gate. Censused over the whole catalogue that was harmless and
+ * accidentally so: all eleven objective titles that carry a figure write it as
+ * „…под N км/ч", the one construction where the reading is right. Nothing had
+ * ever been authored any other way, and this is why.
+ *
+ * A TARGET IS NOT A CEILING AND A FLOOR IS ITS OPPOSITE. `sc-mw-min-speed` is
+ * the drill whose whole subject is NOT crawling — «общ задължителен минимум
+ * няма, но кола, която пълзи с 40 в поток от 130, е подвижно препятствие» — and
+ * on `.audit-frames/w10-1/frames/sc-mw-min-speed__pc-right/01-arrival.png` the
+ * only number on the glass is «дръж под 140 км/ч» while briefing step 2 asks
+ * for «около 110 км/ч». The obvious repair — put the rhythm in the task title —
+ * was UNAVAILABLE while this function existed: „около 110 км/ч" would have been
+ * read as a ceiling and the card would have printed «дръж под 110 км/ч» on a
+ * motorway, i.e. the sentence that tells a student to slow down, printed by the
+ * lesson that exists to tell him not to. A floor («поне 90») would have been
+ * worse still: the strictest figure wins, so the drill would have coached a
+ * 90 km/h CAP off its own minimum.
+ *
+ * So the scanner now reads the construction and not just the digits. Taken:
+ * „под N" · „до N" · „не повече от N" · „максимум N" — and „препоръчителните N"
+ * (an А1 табела IS the ceiling for the arc; `SPEED_TOO_FAST_FOR_CURVE` grades
+ * exactly that duty). Left alone: „около N" (a target) and „поне / не под /
+ * минимум N" (a floor), which now mean on the chip what they mean in Bulgarian.
+ *
+ * MEASURED before the change and after it, over every compiled rung of every
+ * template: NOT ONE of the 953 capped cards changes the number it speaks. The
+ * eleven „под" titles all carry the marker, and the twelfth — sc-spcv-curve's
+ * «с препоръчителните 50 км/ч» — is the advisory form named above. This widens
+ * what an author may write; it moves nothing that was already written.
+ */
+const TITLE_CEILING_RX =
+  /(?:под|до|не повече от|максимум|препоръчителните|препоръчителна|препоръчителни)\s+(\d+(?:[.,]\d+)?)\s*км\/ч/giu;
+
 function titleCapKmh(titleBg: string): number | undefined {
   let strictest: number | undefined;
   const take = (raw: string) => {
@@ -200,7 +238,7 @@ function titleCapKmh(titleBg: string): number | undefined {
     if (!Number.isFinite(n) || n <= 0) return;
     if (strictest === undefined || n < strictest) strictest = n;
   };
-  for (const m of titleBg.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)) take(m[1]);
+  for (const m of titleBg.matchAll(TITLE_CEILING_RX)) take(m[1]!);
   for (const m of titleBg.matchAll(/зона\s*(\d+)/gi)) {
     const n = Number(m[1]);
     if (n >= ZONE_CAP_MIN_KMH && n <= ZONE_CAP_MAX_KMH) take(m[1]);

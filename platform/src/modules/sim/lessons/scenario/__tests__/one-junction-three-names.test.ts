@@ -228,6 +228,63 @@ describe("§2 the duplicate-chip class is a ratchet", () => {
 const KMH_IN_TITLE = /(\d+)\s*км\/ч/;
 const CAP_TOLERANCE = 1.1;
 
+/**
+ * ⚠ EXTENDED 2026-08-24 (w10-4, finding sc-mw-min-speed:2545554a) — A CEILING
+ * AND A TARGET ARE NOT THE SAME CLAIM, AND THE LAW ABOVE ONLY EVER JUDGED ONE.
+ *
+ * Every one of the ten banners the block above measured writes its figure as a
+ * CEILING — „…под N км/ч" — so „the gate's own cap, ±10 %" was the whole of the
+ * rule and nothing tested the premise. `sc-mw-min-speed` is the lesson where the
+ * premise fails: its subject is NOT CRAWLING on a motorway
+ * («общ задължителен минимум няма, но кола, която пълзи с 40 в поток от 130, е
+ * подвижно препятствие»), its gate is the posted 140, and the number the
+ * student needs is the RHYTHM the briefing teaches — «около 110 км/ч». On
+ * `.audit-frames/w10-1/frames/sc-mw-min-speed__pc-right/01-arrival.png` the only
+ * figure on the glass was «дръж под 140 км/ч»: a maximum, on the drill about
+ * minimums.
+ *
+ * THE LAW'S OWN TWO EDGES DECIDE THIS, they were just never asked about a
+ * target:
+ *   · the FALSE-REFUSAL edge applies unchanged and is kept — a printed figure
+ *     above the gate would refuse the student who drove exactly what he read.
+ *   · the „a demand the gate never makes" edge is precisely what the Bulgarian
+ *     construction answers. «под N» IS a demand and stays inside the ±10 % band.
+ *     «около N» is not one, and reading it as one is the misread that produced
+ *     the mutation this repair was proved against: with `advisor.ts titleCapKmh`
+ *     still taking every figure as a ceiling, the card printed «дръж под 110
+ *     км/ч» on a motorway — the lesson coaching the fault it exists to teach
+ *     against.
+ *
+ * SO A TARGET IS HELD TO A DIFFERENT TEST — STRICTER ON ONE AXIS AND, SAY IT
+ * PLAINLY, LOOSER ON THE OTHER. An adversarial read of the first draft of this
+ * block (verifier, lane r10) caught the summary claiming the ±10 % band was
+ * „kept verbatim". IT IS NOT KEPT FOR TARGETS, and it cannot be: the band asks
+ * `cap > said * 1.1`, and 140 > 121 — the gate stands 27,3 % above the printed
+ * 110 (the rhythm sits 21,4 % below the gate, the same gap read from the other
+ * end). So the ceiling band would fail the one banner this extension exists to
+ * allow. `badSpeedBanner` returns on the target branch BEFORE the band is ever
+ * evaluated. What a target must satisfy is:
+ *   · at or under the gate — the false-refusal edge, kept for BOTH kinds;
+ *   · the SAME figure must appear in the lesson's own authored briefing. No
+ *     ceiling is asked that, and it is what stops „target" becoming the loophole
+ *     through which an invented number reaches a chip: 110 is on the glass
+ *     because briefing step 2 says «установи се около 110 км/ч в ДЯСНАТА лента»,
+ *     and if that sentence ever loses the number the banner fails with it;
+ *   · and the target must be one the corpus census below already names. The
+ *     distance from the gate is unbounded by construction — a taught rhythm is
+ *     not the gate's own figure and no arithmetic relates them — so what is
+ *     bounded instead is the SET. A third target cannot appear silently; it
+ *     turns the census red and has to be argued in the change that adds it.
+ *     That is the whole of the guard: reviewed, not measured.
+ *
+ * THE CEILING CENSUS IS UNCHANGED — 6/6, 30/30, 45/45, 75/75, 110/110, 50/52,
+ * 30/33, 40/43, plus sc-spcv-curve's 50/55 (9,1 %, inside the band) added in the
+ * same wave. Two banners are targets and both are sc-mw-min-speed's.
+ */
+const CEILING_FIGURE =
+  /(?:под|до|не повече от|максимум|препоръчителните|препоръчителна|препоръчителни)\s+(\d+)\s*км\/ч/u;
+const TARGET_FIGURE = /(?:около|поне|не под|минимум)\s+(\d+)\s*км\/ч/u;
+
 interface SpeedBanner {
   scenarioId: string;
   objectiveId: string;
@@ -235,30 +292,50 @@ interface SpeedBanner {
   said: number;
   cap: number | undefined;
   kind: string;
+  /** „ceiling" — a demand; „target" — the taught figure. See the block above. */
+  claim: "ceiling" | "target";
+  /** Every «N км/ч» the lesson's own authored briefing states. */
+  briefingFigures: number[];
 }
 
 function speedBanners(): SpeedBanner[] {
   const out: SpeedBanner[] = [];
   for (const spec of ALL) {
+    const briefingFigures = [
+      ...spec.instructionsBg
+        .map((s) => s.textBg)
+        .join(" | ")
+        .matchAll(/(\d+)\s*км\/ч/gu),
+    ].map((m) => Number(m[1]));
     for (const objective of spec.success) {
       const m = KMH_IN_TITLE.exec(objective.titleBg);
       if (!m) continue;
       const p = objective.params as { kind: string; maxSpeedKmh?: number };
+      const target = TARGET_FIGURE.exec(objective.titleBg);
+      const ceiling = CEILING_FIGURE.exec(objective.titleBg);
       out.push({
         scenarioId: spec.id,
         objectiveId: objective.id,
         titleBg: objective.titleBg,
-        said: Number(m[1]),
+        said: Number((target ?? ceiling ?? m)[1]),
         cap: p.maxSpeedKmh,
         kind: p.kind,
+        // A bare figure with no construction around it is judged as a ceiling,
+        // which is the conservative reading: it keeps the ±10 % band on
+        // anything an author writes without saying what kind of number it is.
+        claim: target !== null && ceiling === null ? "target" : "ceiling",
+        briefingFigures,
       });
     }
   }
   return out;
 }
 
-const badSpeedBanner = (b: SpeedBanner): boolean =>
-  b.cap === undefined || b.cap < b.said || b.cap > b.said * CAP_TOLERANCE + 0.001;
+const badSpeedBanner = (b: SpeedBanner): boolean => {
+  if (b.cap === undefined || b.cap < b.said) return true;
+  if (b.claim === "target") return !b.briefingFigures.includes(b.said);
+  return b.cap > b.said * CAP_TOLERANCE + 0.001;
+};
 
 describe("§3 a banner that prints a speed is standing on the gate that enforces it", () => {
   it("the corpus is populated (a law over an empty set proves nothing)", () => {
@@ -279,6 +356,63 @@ describe("§3 a banner that prints a speed is standing on the gate that enforces
           `${b.cap ?? "nothing at all"} — «${b.titleBg}»`,
       );
     expect(liars, liars.join("\n")).toEqual([]);
+  });
+
+  it("the target branch is a NAMED set of two, not an open door", () => {
+    // WHY THIS EXISTS (2026-08-24, verifier r10). The clause above stops
+    // judging a target the moment it reads `claim === "target"`, so the ±10 %
+    // band never runs on one and a target may sit arbitrarily far below its
+    // gate. That is deliberate — see the block above — but „deliberate" is not
+    // „bounded". This is the bound: the corpus is allowed exactly these two
+    // targets, both on the one drill whose subject is a minimum. Anything else
+    // that reaches the loose branch is listed here by name in the failure and
+    // has to be argued, with a re-measurement, in the change that authors it.
+    const targets = speedBanners()
+      .filter((b) => b.claim === "target")
+      .map((b) => `${b.scenarioId}/${b.objectiveId} says ${b.said} км/ч under a gate of ${b.cap}`);
+    expect(targets, targets.join("\n")).toEqual([
+      "sc-mw-min-speed/sc-mwms-join says 110 км/ч under a gate of 140",
+      "sc-mw-min-speed/sc-mwms-hold says 110 км/ч under a gate of 140",
+    ]);
+  });
+
+  it("sc-spcv-curve sits ON the ±10 % edge, and the margin is 0,001 км/ч", () => {
+    /*
+     * RAISED BY THE VERIFIER (r10 §10), AND ITS ARITHMETIC CORRECTED HERE — the
+     * fragility is real, the stated mechanism was not, and both belong on the
+     * record because the wrong one would send the next reader after the wrong
+     * line.
+     *
+     * THE CLAIM: „`50 * 1.1` is 55.00000000000001, so without the `+ 0.001`
+     * this row would be RED today." MEASURED: `50 * 1.1` is
+     * 55.000000000000007105 — the product rounds UP, i.e. in the PASSING
+     * direction, so `55 > 50 * 1.1` is already false and deleting the epsilon
+     * changes nothing. I ran that mutation: 19/19 still green. The epsilon is
+     * insurance against the rounding going the other way, not the thing
+     * carrying this row.
+     *
+     * WHAT IS TRUE, AND IS WHY THIS TEST EXISTS: sc-spcv-curve prints 50 under a
+     * gate of 55, which is 10,000 % — not „inside the band" but exactly ON it.
+     * Total margin 0,001 км/ч, all of it the epsilon. MEASURED at CAP_TOLERANCE
+     * 1.09, three rows convict, not one — this curve plus the two 30/33 pairs
+     * (`sc-speed-creep/sc-crp-zone`, `sc-speed-zone/sc-zn-under-limit`) that
+     * predate this wave and sit on the same edge. So the band is already
+     * saturated: it has no headroom to give and this wave took none. A tightening
+     * would read as three unrelated copy bugs; the assertion below makes it read
+     * as what it is.
+     */
+    const curve = speedBanners().find((b) => b.objectiveId === "sc-spcv-curve");
+    expect(curve, "sc-spcv-curve no longer prints a figure — re-derive this row").toBeDefined();
+    expect([curve!.said, curve!.cap]).toEqual([50, 55]);
+    expect(badSpeedBanner(curve!), "sc-spcv-curve fell out of the ±10 % band").toBe(false);
+
+    const marginKmh = curve!.said * CAP_TOLERANCE + 0.001 - curve!.cap!;
+    expect(
+      marginKmh > 0 && marginKmh < 0.01,
+      `sc-spcv-curve's headroom under the band is now ${marginKmh.toFixed(6)} км/ч, not ~0,001. ` +
+        `CAP_TOLERANCE moved (${CAP_TOLERANCE}) or the curve's 50/55 pair did. Either is allowed — ` +
+        `restate this margin and the ceiling census in the block above, in the SAME change.`,
+    ).toBe(true);
   });
 
   it("the three repaired chips print no figure — the advisor census depends on it", () => {
@@ -464,6 +598,12 @@ describe("§5 every matcher above convicts what this lane replaced", () => {
       said,
       cap,
       kind: "reachZone",
+      // SpeedBanner gained these two when the briefing-figures rule landed. A
+      // fabricated row must still be a WHOLE SpeedBanner, or the compiler stops
+      // describing what badSpeedBanner is handed — and vitest does not typecheck,
+      // so this file passed 6/6 while tsc was red.
+      claim: "ceiling",
+      briefingFigures: [],
     });
     expect(badSpeedBanner(row(30, 30))).toBe(false); // exact — the shipped shape
     expect(badSpeedBanner(row(30, 33))).toBe(false); // the corpus's widest

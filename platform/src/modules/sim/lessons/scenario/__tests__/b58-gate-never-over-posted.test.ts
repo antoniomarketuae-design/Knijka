@@ -329,8 +329,16 @@ describe("B58 — the advisor card never says a number the sign forbids", () => 
     expect(unreadableCards(cards)).toEqual([]);
     const withNumber = cards.filter((c) => c.reading.kind === "number");
     const silent = cards.filter((c) => c.reading.kind === "silent");
-    expect(withNumber.length).toBe(278);
-    expect(silent.length).toBe(224);
+    // RE-MEASURED 2026-08-24 (w10-4, finding sc-sp-curve:289575d7): 278 → 283
+    // with-number, 224 → 219 silent. The five are the five rungs of
+    // sc-sp-curve/sc-spcv-curve. Its title used to defer to a number by name
+    // («…с препоръчителната скорост») and this survey withholds the authored
+    // cap on purpose, so with nothing to read the card fell silent here; the
+    // title now names the табела's own 50 and source 2 reads it. Nothing moved
+    // between the two populations except that one objective, and the total is
+    // unchanged, which is what makes this a restatement and not a relaxation.
+    expect(withNumber.length).toBe(283);
+    expect(silent.length).toBe(219);
     // Both populations must stay non-trivial for the file to mean anything: a
     // catalog of only-silent cards proves nothing about numbers, and one with
     // no silent cards would mean the source test stopped biting.

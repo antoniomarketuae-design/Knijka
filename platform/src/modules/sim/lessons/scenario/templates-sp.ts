@@ -1071,7 +1071,25 @@ export const SC_SP_HARSH_BRAKE: ScenarioSpec = {
   success: [
     {
       id: "sc-shb-stop",
-      titleBg: "Мини контролната зона с планирано, плавно спиране",
+      // THE CHIP TOLD HIM TO DRIVE THROUGH IT AND THE BRIEFING TOLD HIM TO STOP
+      // IN IT — w10-4/w10-3, finding sc-sp-harsh-brake:543539f6. One
+      // photograph, `.audit-frames/w10-3/frames/sc-sp-harsh-brake__pc-right/
+      // 01-arrival.png`, carries both: «ЗАДАЧА 1/2 · Мини контролната зона с
+      // планирано, плавно спиране · дръж под 50 км/ч» in the right column and,
+      // an inch away in the ИНСТРУКЦИИ card, step 3 — «…спирай постепенно и
+      // равномерно ДО ПЪЛЕН ПОКОЙ В ЗОНАТА». „Мини" is минавам: pass through.
+      // The two sentences ask for opposite things about the same twelve metres.
+      //
+      // THE GATE IS NOT WHAT MOVED, and deliberately. This is a `reachZone` with
+      // a 52 ceiling: reaching the zone at rest satisfies it, so the student who
+      // obeyed the BRIEFING was never refused and no drive changes verdict here.
+      // What was wrong is the sentence, and a sentence is what the student
+      // obeys. The title now claims exactly what the gate measures — arrive in
+      // the zone, already slowed — and the full stop stays where the lesson
+      // teaches it, in step 3. Claiming the stop in the title instead would be
+      // the parking3 defect in reverse (a chip promising a duty nothing
+      // measures); that file's header records the five titles retired for it.
+      titleBg: "Стигни контролната зона с планирано, плавно спиране",
       params: { kind: "reachZone", x: LANE_X, y: 180, radiusM: 12, maxSpeedKmh: 52 },
     },
     {
@@ -1215,7 +1233,37 @@ export const SC_SP_CURVE: ScenarioSpec = {
     },
     {
       id: "sc-spcv-curve",
-      titleBg: "Мини средата на завоя с препоръчителната скорост",
+      // THE TITLE DEFERRED TO A NUMBER AND THE CARD ANSWERED WITH A DIFFERENT
+      // ONE — w10-4, finding sc-sp-curve:289575d7. On
+      // `.audit-frames/w10-4/frames/sc-sp-curve__mobile-right/04-t113s.png` the
+      // chip reads «ЗАДАЧА 2/3 · Мини средата на завоя с препоръчителната
+      // скорост» and the cockpit strip under it «задачата иска ≤55», while
+      // instruction 3 of the same briefing says «спри намаляването около 45–50
+      // км/ч», instruction 2 names the табела „50", and the А1 plate in the
+      // world posts 50. The task deferred to „the recommended speed" and the
+      // only figure the student was held to was 55 — five above the one thing
+      // in this lesson that recommends anything.
+      //
+      // READ THE FRAME CAREFULLY, THOUGH — the disc visible on 04-t113s.png is
+      // the В26 regulatory limit and it reads 90. The 50 is the А1 ADVISORY,
+      // and the two are different scales and different articles (чл. 21 vs
+      // чл. 20, ал. 2), which is exactly why this repair is worth making
+      // carefully. The 50 is verifiable in this file rather than on that photo:
+      // the map recipe below is `maxspeedKmh: 90, advisoryKmh: 50`, and the new
+      // gate binds this title's figure to `map.params.advisoryKmh`, not to
+      // whatever number happens to be painted on a disc in shot.
+      //
+      // WHY THE TITLE AND NOT THE GATE. 55 is authored: „the adapted 48 passes,
+      // the 70 hold does not", and the curve fault itself
+      // (SPEED_TOO_FAST_FOR_CURVE) grades off the advisory + grace independently
+      // of this waypoint. Tightening 55 to 50 would refuse drives this rung
+      // currently credits — the one direction a repair may never move — so the
+      // gate is untouched and the SENTENCE is corrected. `advisor.ts
+      // titleCapKmh` takes the strictest figure the author put in the title and
+      // `Math.min`s it against the gate, so the card now says 50 and a student
+      // who obeys 50 still clears 55 with room. Two numbers became one, and it
+      // is the one the табела posts.
+      titleBg: "Мини средата на завоя с препоръчителните 50 км/ч",
       // Mid-arc control zone (meta.scenario.laneCurveMid), cap just above the
       // advisory + grace: the adapted 48 passes, the 70 hold does not.
       params: { kind: "reachZone", x: CURVE_MID.x, y: CURVE_MID.y, radiusM: 12, maxSpeedKmh: 55 },

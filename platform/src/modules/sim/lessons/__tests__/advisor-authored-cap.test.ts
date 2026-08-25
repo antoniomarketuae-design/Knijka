@@ -67,6 +67,32 @@ const KMH = (s: string) =>
   [...s.matchAll(/(\d+(?:[.,]\d+)?)\s*км\/ч/g)].map((m) => Number(m[1].replace(",", ".")));
 
 /**
+ * …AND THE SAME SCAN NARROWED TO WHAT A TITLE STATES AS A CEILING — added
+ * 2026-08-24 (w10-4, finding sc-mw-min-speed:2545554a).
+ *
+ * `KMH` above is the right instrument for a BRIEFING, which is prose and where
+ * any figure counts as „a number the student was shown". It is the wrong one
+ * for a TITLE the card turns into a cap, and the two census assertions further
+ * down were modelling `titleCapKmh` with it: „the strictest km/h in the title
+ * is the ceiling". That stopped being the rule when `advisor.ts` learnt to read
+ * the construction — «под N» is a ceiling, «около N» is a target and «поне N»
+ * is a floor — which is what let `sc-mw-min-speed` finally put its taught
+ * rhythm («около 110 км/ч») on a chip whose gate is 140 without the card
+ * printing «дръж под 110» on a motorway.
+ *
+ * The model is mirrored rather than imported ON PURPOSE, exactly like
+ * `everyCappedCard` is not shared with `advisor-sweep161.test.ts`: two censuses
+ * that cross-check each other must not fail together because one helper was
+ * wrong. If this drifts from `TITLE_CEILING_RX` the assertions below say so.
+ */
+const KMH_CEILING = (s: string) =>
+  [
+    ...s.matchAll(
+      /(?:под|до|не повече от|максимум|препоръчителните|препоръчителна|препоръчителни)\s+(\d+(?:[.,]\d+)?)\s*км\/ч/giu,
+    ),
+  ].map((m) => Number(m[1]!.replace(",", ".")));
+
+/**
  * THE SECOND SPELLING OF AN AUTHORED CEILING — the В26 zone plate, which is
  * read and written «зона 30», not «30 км/ч». It is the same source as `KMH`
  * above (the author's own title), in the idiom Bulgarian actually uses, and it
@@ -401,7 +427,7 @@ describe("the exhibits", () => {
     let statedAboveGate = 0;
     let oldSpoken = 0;
     for (const c of everyCappedCard()) {
-      const titleNums = KMH(c.titleBg);
+      const titleNums = KMH_CEILING(c.titleBg);
       const sources = [
         ...(titleNums.length > 0 ? [Math.min(...titleNums)] : []),
         ...(c.posted !== undefined && c.posted > 0 && c.posted < c.cap ? [c.posted] : []),
@@ -414,8 +440,16 @@ describe("the exhibits", () => {
     }
     // What the card said before source 4 — and what advisor.ts's own comment
     // got wrong by five in each direction.
-    expect(oldSpoken).toBe(454);
-    expect(953 - oldSpoken).toBe(499);
+    //
+    // RE-MEASURED 2026-08-24 (w10-4, finding sc-sp-curve:289575d7): 454 → 459,
+    // and the block above says what to do when a briefing or a title gains a
+    // «N км/ч» — restate it, never relax it. The five are the five rungs of
+    // sc-sp-curve/sc-spcv-curve, whose title stopped deferring to «the
+    // recommended speed» and started naming the табела's own 50, which puts it
+    // inside the reach of the OLD rule (title + posted-below-gate) as well.
+    // The 953 still reconciles, and nothing moved from spoken to silent.
+    expect(oldSpoken).toBe(459);
+    expect(953 - oldSpoken).toBe(494);
     // The two classes inside that 499.
     expect(noneStated).toBe(169);
     expect(statedAboveGate).toBe(116);
@@ -437,7 +471,7 @@ describe("source 4 only ever fills a hole", () => {
         if (c.spoken !== c.cap) moved.push(`${c.lessonId} ${c.objectiveId}: halt card said ${c.spoken}, cap ${c.cap}`);
         continue;
       }
-      const titleNums = KMH(c.titleBg);
+      const titleNums = KMH_CEILING(c.titleBg);
       const sources = [
         ...(titleNums.length > 0 ? [Math.min(...titleNums)] : []),
         ...(c.posted !== undefined && c.posted > 0 && c.posted < c.cap ? [c.posted] : []),

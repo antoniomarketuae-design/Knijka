@@ -297,11 +297,22 @@ describe("sweep161 part D — the card stops publishing the grader's tolerance a
   // itself three above the zone he authored — so the card licensed 33 inside a
   // thirty, one panel away from a briefing that says «влез в зоната вече под 30
   // км/ч». The title now wins, as source 2 always said it should.
+  //
+  // sc-spcv-curve JOINED IT ON 2026-08-24 (w10-4, finding sc-sp-curve:289575d7),
+  // and by the same route: source 2 can only read a ceiling the author WROTE,
+  // and this title deferred to one by name — «с препоръчителната скорост» —
+  // while the табела in the world, briefing step 2 and briefing step 3 all say
+  // 50. `04-t113s.png` caught what that costs: the chip beside a cockpit strip
+  // reading «задачата иска ≤55». The title now names the plate's own figure, so
+  // `spoken` moves 55 → 50 while `authored` and the photographed gate stand
+  // exactly where they were — a copy fix, and the invariants at the bottom of
+  // this loop (spoken ≤ authored ≤ gate) prove it cannot have cost a student
+  // anything.
   const cases: [string, string, number, number, number][] = [
     // scenario, objective, photographed gate, the author's own cap, spoken
     ["sc-speed-transition", "sc-trn-approach", 57, 52, 52],
     ["sc-speed-transition", "sc-trn-in-zone", 38, 33, 30],
-    ["sc-sp-curve", "sc-spcv-curve", 60, 55, 55],
+    ["sc-sp-curve", "sc-spcv-curve", 60, 55, 50],
     ["sc-sp-eco-coast", "sc-ecoc-coast", 41, 36, 36],
     ["sc-vu-cyclist-hook", "sc-vu-approach", 40, 35, 35],
     ["sc-mw-min-speed", "sc-mwms-join", 140, 140, 140],

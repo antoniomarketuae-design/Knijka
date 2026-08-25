@@ -31,6 +31,7 @@ import {
   buildSessionSummary,
   createRuleEngine,
   isScorableEvent,
+  parseSpeedMeasurement,
   reduceTick,
   type RuleEngineConfig,
   type RuleEvent,
@@ -231,6 +232,100 @@ function withFollowingGapDetail(
   );
   const gapTxt = gapSec.toFixed(1).replace(".", ",");
   return `${e.explanationBg} Дистанция в момента: ${gapTxt} с (${Math.round(gapM)} м) — дръж поне ${targetSec} с.`;
+}
+
+/** „78,4" — one decimal, Bulgarian comma, the way the cluster prints a speed. */
+function kmhTxt(v: number): string {
+  return (Math.round(v * 10) / 10).toString().replace(".", ",");
+}
+
+/**
+ * THE SPEED THE CARD CONVICTED ON, SAID FIRST — w10-4, 2026-08-24.
+ *
+ * THE FRAME. `.audit-frames/w10-4/frames/sc-sp-curve__mobile-wrong/
+ * 04-t193s.png`, 2556 × 1179, opened: the notification column carries
+ * «⚠ −1 ИЗПИТНА Т. · Превишена скорост · Движеше се над разрешената», the
+ * posted-limit badge on the instrument strip reads 90, and the cluster in the
+ * same photograph reads **11 км/ч**. Five seconds earlier (04-t188s) the same
+ * cluster read 97. The card is telling the truth about a moment that has
+ * passed, and there is nothing on the glass that says so — no measurement, no
+ * limit, no tense marker of any kind. What a seventeen-year-old sees is an
+ * accusation of speeding laid over a speedometer showing eleven.
+ *
+ * `sc-speed-transition/mobile-wrong/04-t018s.png` is the same card one band up:
+ * «⚠ −10 ИЗПИТНИ Т. +2 · Превишаване с повече от 10 км/ч», cluster 59, disc 30,
+ * and not one word of the catalogue's explanation on screen — «↓ ОЩЕ 5 РЕДА»
+ * takes all of it.
+ *
+ * WHY THE NUMBERS EXIST ALREADY AND NOBODY SHOWED THEM. `rules/engine.ts` holds
+ * the speed AND `tick.maxSpeedKmh` at the instant it convicts and encodes the
+ * pair onto `ViolationEvent.detail` (`consequences.ts encodeSpeedMeasurement`,
+ * „v97/l90"). The DEBRIEF decodes it — `debrief.ts worstSpeedDetail` prices the
+ * ЗДвП чл. 182 ladder off exactly this — and the live card never did. So the
+ * one surface the student reads WHILE he can still correct the fault was the
+ * one surface without the measurement.
+ *
+ * IT LEADS, IT DOES NOT TRAIL, and that is the half the frames decide. The
+ * FOLLOWING family's readout above is APPENDED, which is right for a card that
+ * gets to finish printing; these two do not. On both frames above the peek is
+ * the post-mirror-lane 95.8 px column (`notifyColumn.ts`
+ * NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN) and the fold swallowed the entire body
+ * — an appended sentence would land at line 6 of 5 hidden ones, i.e. nowhere.
+ * The first line is the only line the compact card guarantees, so the
+ * measurement takes it and the catalogue's teaching follows behind, whole.
+ *
+ * THE CURVE CODE HAS THE SAME TWO NUMBERS AND CARRIES NEITHER. `reduceTick`
+ * raises SPEED_TOO_FAST_FOR_CURVE with no `detail` at all, from a branch where
+ * `speed` and `tick.curveAdvisoryKmh` are both in scope. It is read off the
+ * TICK here rather than stamped onto the event on purpose: `detail` is a wire,
+ * database and trace field, `debrief.ts` prices `encodeSpeedMeasurement`
+ * details through the чл. 182 fine ladder, and an А1 табела is NOT a posted
+ * limit — exceeding it is чл. 20, ал. 2, not чл. 182. Stamping the same codec
+ * on it would have printed a speeding fine for a curve-advisory fault. Same
+ * reason the sentence says «препоръчителни … от табелата» and never
+ * «разрешени»: the two scales are different laws and this product may not
+ * blur them.
+ *
+ * DISPLAY ONLY, exactly like the gap readout it sits beside: the scored
+ * `ScorableEvent`, the wire serialization and the server-rebuilt grade keep the
+ * catalogue's fixed copy byte-identically (ADR-002 — authored text plus
+ * measured numbers, never free text).
+ *
+ * ⚠ TWO OF THREE. The finding this answers (`sc-sp-curve:02e43576`) names three
+ * absences — no measurement, no tense marker, NO TIMESTAMP — and an adversarial
+ * verifier was right that this closes only the first two. The row stays OPEN on
+ * the third and it is not this function's to close, for a reason worth stating
+ * so nobody solves it here: `explanationBg` is computed ONCE, at the tick that
+ * raises the card, so an age written into this string would freeze at «преди
+ * 0 с» and stay there while the card aged on the glass — the very defect the
+ * frame documents, wearing the costume of the fix.
+ *
+ * The moment is a RENDER-time property and it is already built, whole, one
+ * module out: `hud/HudToasts.tsx toastAgeBg` («сега» / «преди 8 с»),
+ * `toastCarriesAge` (which already returns true for `violation`), and
+ * `hud/overlayQueue.ts overlayMomentBg` + `SimOverlayItem.raisedAtMs`. On the
+ * roomy leg it prints. On a PHONE — which is where both frames were shot — the
+ * shell re-maps toasts into `SimOverlayItem` and drops the stamp at that
+ * boundary. The two edits that spend it are named in `overlayQueue.ts`'s own
+ * block (the shell re-map in `LessonPlayShell.tsx`, the last row in
+ * `SimOverlay.tsx`) and `hud-toast-moment.test.tsx` holds an interlock that
+ * goes red the moment the first of them lands. That is the owner; the third
+ * clause is filed against it, not against this line.
+ */
+function withSpeedMeasurement(e: ViolationEvent, tick: SimTick, explanationBg: string): string {
+  if (e.code === "SPEEDING_OVER_LIMIT" || e.code === "SPEEDING_DANGEROUS") {
+    const m = parseSpeedMeasurement(e.detail);
+    if (m === null) return explanationBg;
+    return `Отчетена скорост ${kmhTxt(m.measuredKmh)} км/ч при разрешени ${Math.round(m.limitKmh)} км/ч. ${explanationBg}`;
+  }
+  if (e.code === "SPEED_TOO_FAST_FOR_CURVE") {
+    const advisory = tick.curveAdvisoryKmh;
+    const measured = tick.speedKmh;
+    if (advisory === undefined || !Number.isFinite(advisory) || advisory <= 0) return explanationBg;
+    if (!Number.isFinite(measured) || measured <= 0) return explanationBg;
+    return `Отчетена скорост ${kmhTxt(measured)} км/ч при препоръчителни ${Math.round(advisory)} км/ч от табелата. ${explanationBg}`;
+  }
+  return explanationBg;
 }
 
 /**
@@ -517,7 +612,11 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
     // SPD #39/#48: DISPLAY text only — the FOLLOWING family carries the
     // measured time-gap readout; every other code passes through unchanged.
     // The scored event (scoredEvents/state.events/wire) keeps catalog copy.
-    const explanationBg = withFollowingGapDetail(e, tick, prev.rules.config);
+    const explanationBg = withSpeedMeasurement(
+      e,
+      tick,
+      withFollowingGapDetail(e, tick, prev.rules.config),
+    );
     const step = coachStep(
       encounters,
       {

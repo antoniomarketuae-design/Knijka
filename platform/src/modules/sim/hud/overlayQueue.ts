@@ -612,6 +612,16 @@ export interface BriefingStepBg {
  * and cannot be scrolled away from. Changing which step lands here breaks that
  * delivery, so it is written down in both files.
  *
+ * [MERGE NOTE, 2026-08-25 — THE THIRD LANE TO PROPOSE THE STRING PREFIX.]
+ * A third independent repair lane arrived here wanting briefingLineBg to return
+ * "N. text". Its frame evidence is right and its diagnosis is right; only the
+ * PLACEMENT is wrong. A verifier measured that shape over 663 rungs: 29 move to
+ * a worse fold band, 12 fall to ZERO body, 1,190 body characters lost — the
+ * GRADED step among them, including the child-safety line on
+ * sc-crossing-child-ball. Three characters of a 180 px window are not free.
+ * The ordinal travels as data instead (briefingLineOrdinal, c61868b), so every
+ * lane that files this defect gets its fix without the peek paying for it.
+ *
  * ── …AND IT CARRIES ITS NUMBER, WHICH IT DID NOT — sweep w10, 2026-08-24 ────
  *
  * SIX ROWS, SIX LESSONS, ONE SENTENCE BETWEEN THEM: „Mobile briefing loses
@@ -657,7 +667,7 @@ export interface BriefingStepBg {
  * × 4 rungs through `briefingLineBg` + `briefingBodyBg` and holds the rest.
  */
 export function briefingLineBg(steps: readonly BriefingStepBg[]): string {
-  // THE ORDINAL DOES NOT LIVE HERE, and one repair lane put it here twice.
+  // THE ORDINAL DOES NOT LIVE HERE, and THREE repair lanes put it here.
   //
   // Prefixing it into the line spends three characters of the peek fold budget.
   // Measured by a lane verifier over 663 rungs: 29 move to a worse band, 12 fall

@@ -317,7 +317,24 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
   success: [
     {
       id: "sc-mwms-join",
-      titleBg: "Влез в ритъма на потока в дясната лента за движение",
+      // THE ONLY NUMBER ON THE GLASS WAS THE CEILING — w10-1, finding
+      // sc-mw-min-speed:2545554a. On `.audit-frames/w10-1/frames/
+      // sc-mw-min-speed__pc-right/01-arrival.png` the task chip reads «Влез в
+      // ритъма на потока в дясната лента за движение · дръж под 140 км/ч» —
+      // a MAXIMUM, on the one drill in the catalogue whose subject is not
+      // crawling. Briefing step 2 names «около 110 км/ч» and step 4 names the
+      // 40 that makes the car an obstacle, and neither number ever reached the
+      // HUD. The chip is the sentence a student re-reads mid-drive.
+      //
+      // «ОКОЛО», NOT «ПОД», AND NOT A MINIMUM EITHER. There is no general
+      // Bulgarian motorway minimum — this template's own header says so twice
+      // and refuses the phantom «не под 50» — so the chip may not invent one.
+      // What it can state is the RHYTHM the lesson teaches, in the same words
+      // briefing step 2 uses. `advisor.ts titleCapKmh` was taught the
+      // difference in the same change: a figure marked as a ceiling («под N»)
+      // is read as one and a target («около N») is not, so this number does not
+      // become a cap and the card's own suffix still says the gate's 140.
+      titleBg: "Влез в ритъма на потока (около 110 км/ч) в дясната лента за движение",
       // Radius 6 pins the CRUISE lane (lane centers sit 8.12–8.13 m apart):
       // the left-lane crawler misses it, the right-lane crawler makes it — that
       // asymmetry IS the two demos' difference, made visible on the end screen.
@@ -325,7 +342,10 @@ export const SC_MW_MIN_SPEED: ScenarioSpec = {
     },
     {
       id: "sc-mwms-hold",
-      titleBg: "Задръж лентата и ритъма през средата на участъка",
+      // Same repair, the next instance — «ритъма» named and never numbered. A
+      // rule with one enforced instance is a convention, and the second task of
+      // the same route is where the frames would have found the next one.
+      titleBg: "Задръж лентата и ритъма (около 110 км/ч) през средата на участъка",
       params: { kind: "reachZone", x: MWM_X_CRUISE, y: 640, radiusM: 6, maxSpeedKmh: 140 },
     },
     {
