@@ -718,3 +718,81 @@ invisible; opening the boxes banked 250 already-fixed problems and left 680
 honest atomic ones; **1,462 ever filed · 782 closed with evidence · 53% done**.
 Progress from here is monotonic: every fix retires its own row. Give him the
 53% number and the retired-per-day rate, not the open count alone.
+
+### §12a — THE FOUNDER'S STANDING ORDER (verbatim, given repeatedly — this is not optional)
+
+> *"I dont want to repeat my self, auto queue fix after fix after fix after fix
+> after fix untill all open questions are fixed."* · *"continue and repair do
+> not stop auto queue dont come back for checkpoints"* · *"we have to fix all
+> open files in one go with auto queue with everything… no stops no checkpoints
+> I want those 53% finished already."* (2026-08-26)
+
+**What this means operationally:** launch the repair campaign against ALL 476
+STILL rows and chain it wave → integrate → gate → commit+push → apply
+retirements → snapshot ledger → confirm-sweep → NEXT WAVE, automatically,
+without asking permission between waves. Do not stop to report unless something
+needs a founder DECISION (the 200-UNJUDGED question, founder-only items, a
+destructive/irreversible step) or a gate is red and the fix needs judgement.
+Status updates are fine; checkpoints that WAIT are not. He has had to give this
+instruction five separate times — do not make him give it a sixth.
+
+The only legitimate stops: founder-only items (§12 list), the UNJUDGED
+decision, and anything that would falsify evidence or sign content (only the
+founder signs content — never flip a `status` field to make a gate green).
+
+### §12b — THE ELEVEN INVARIANTS (every pass, no exceptions — each was bought with a failure)
+
+1. **The server must attest the CURRENT commit** or the harness refuses
+   (`EXIT_TARGET_UNVERIFIED`). Every commit ⇒ dev-server restart before the
+   next sweep (~10 min).
+2. **`/api/health` must read `db.ok:true` AND the matching commit, and ONE
+   canary drive must return a real verdict, before dispatching any sweep.**
+   Caught a dead database twice; without it the harness photographs the
+   PAYWALL at exit=0, byte-identical frames. Infra details (prisma dev moves
+   its port on restart, schema drift, session cache) are in the auto-memory
+   note `audit-drive-infra-checklist`.
+3. **Never `--apply` before the verify phase has finished.** Done once: 78
+   retired, 41 overturned by verifiers, reverted by hand.
+4. **A verdict that has not been attacked is not a verdict.**
+5. **Normalise LF after every `git apply`** — worktrees check out CRLF, the
+   tree is LF; the mismatch breaks source-pinned tests in a way that reads as
+   logic errors.
+6. **`tsc` before every commit.** Vitest does not typecheck; five tsc reds
+   have passed a green suite so far (latest: a /s regex flag on ES2017).
+7. **Gate the STACK, not each patch.** The rapier-in-collision breach passed
+   every patch individually.
+8. **Mutate every gate you keep.** A test that cannot go red reports safety.
+9. **Nothing is recorded as closing a row its verifier did not close.**
+10. **A driver that stops printing is NOT a driver that is working** — 11 h
+    lost to silence. Every sweep runs with the in-tool timeout
+    (`lib/limits.mjs`, 900 s vs 510 s longest real drive) and something armed
+    to notify on completion. Never launch a sweep nothing is watching.
+11. **The ADDRESS RULE: prove a non-test import chain to /simulator BEFORE
+    editing.** Grep the export → find a non-test importer → walk it to a
+    rendered component. A chain ending in a test/story/script is dead. Round 7
+    mutation-proved a fix eleven ways in a module nothing imports.
+
+### §12c — held out WITH CAUSE (do not resurrect without meeting the condition)
+
+- `wf_…-2` patch — proved RED (fault code in neither referent rules nor the
+  catalogue) and ineffective. Binned.
+- `wf_…-6` patch — never verified (its agent died on a spend limit). Re-verify
+  from scratch or bin.
+- `w11-conditions-traces` — duplicate of a landed lane. Binned.
+- `overlayHoldsDrive` wire into LessonPlayShell `paused` — verifier-proved
+  false refusal without `blocking:false` at LPS:4240; land ONLY with a driven
+  proof that compact THEO-3 completes past 60 s (§12 queue item 4).
+- The disarmed terminal-departure arm (`engine.ts:1265`) — re-enable ONLY with
+  a test that drives overshoot-and-return and proves dwell does not accrue
+  while closing on the mark.
+- The 4 remaining PARTIAL rows — re-split or judge per-clause in the next
+  adjudication; do NOT leave them to rot as compounds again.
+
+### §12d — the sweep supervisor
+
+`tools/mobile/drive-supervisor.sh` (committed with this section) wraps a
+wave-c shard: kills+resumes on stall, reaps ONLY its own descendant browsers
+(v1 reaped globally and executed its siblings' browsers — two drives died in
+the same millisecond), threshold 1200 s > the in-tool 900 s timeout. Resume is
+exit-code-aware (`lib/resume.mjs`), so a restart costs one drive, never a
+shard, and a crashed drive is re-driven instead of counted.
