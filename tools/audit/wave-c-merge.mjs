@@ -202,10 +202,50 @@ const merged = [...seen.values()];
 // is the whole reason the merge cannot be a `cat`.
 for (const r of merged) r.out = path.join(DEST, "frames", r.lesson + "__" + r.leg);
 
-fs.writeFileSync(
-  path.join(DEST, "wave-c-results.jsonl"),
-  merged.map((r) => JSON.stringify(r)).join("\n") + "\n",
-);
+/**
+ * MERGE WITH WHAT THE DESTINATION ALREADY HOLDS — 2026-08-26.
+ *
+ * This was a bare write of `merged`, i.e. only the halves named on THIS command
+ * line. The frame directories are moved/copied in additively, so a second merge
+ * into the same destination left it holding every frame and a results file
+ * describing only the last batch.
+ *
+ * MEASURED: a 215-drive sweep merged into `w11`, then an 8-lesson gap sweep
+ * merged into the same `w11`. Frames went to 231. The results file went to 16.
+ * Nothing errored, and the summary printed "merged 16 drive(s)" — which is true
+ * and reads like success. Every downstream tool reads the results file, so 215
+ * certifiable drives would have been invisible to adjudication while their
+ * frames sat on disk.
+ *
+ * Splitting a sweep across runs is normal — a gap sweep, a re-drive of a stalled
+ * shard — so the destination is merged into, keyed by lesson+leg, and a drop in
+ * row count is shouted about rather than written quietly.
+ */
+const destResults = path.join(DEST, "wave-c-results.jsonl");
+const carried = new Map();
+if (fs.existsSync(destResults)) {
+  for (const line of fs.readFileSync(destResults, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      const j = JSON.parse(line);
+      carried.set(String(j.lesson) + "__" + String(j.leg), j);
+    } catch {
+      /* a torn tail line is not a reason to drop every good row beside it */
+    }
+  }
+}
+const carriedBefore = carried.size;
+for (const r of merged) carried.set(String(r.lesson) + "__" + String(r.leg), r);
+const union = [...carried.values()];
+fs.writeFileSync(destResults, union.map((r) => JSON.stringify(r)).join("\n") + "\n");
+if (carriedBefore) {
+  console.log(
+    "results file: " + carriedBefore + " already there + " + merged.length + " from this run = " + union.length + " row(s)",
+  );
+}
+if (union.length < carriedBefore) {
+  console.log("  REFUSING TO BE QUIET: the results file SHRANK. That should be impossible — investigate.");
+}
 
 const bad = merged.filter((r) => r.exit !== 0);
 const moved = merged.filter((r) => r.treeMoved);

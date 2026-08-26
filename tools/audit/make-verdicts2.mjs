@@ -66,6 +66,23 @@ if (!fs.existsSync(resultsPath)) {
   console.error("[verdicts] " + resultsPath + " not found — phase 1 has not been merged yet.");
   process.exit(2);
 }
+
+/**
+ * THE DRIVE ROOT IS WHEREVER THE RESULTS FILE LIVES — never assume `wave-c`.
+ *
+ * The judge brief used to name `…\.audit-frames\wave-c\frames\…` in fixed text
+ * while the results it reads came from `WAVEC_RESULTS`. The moment a sweep
+ * merges anywhere else, every judge is sent to pictures from a superseded build
+ * while reading a results file from the right one — and a judge who opens a
+ * stale frame and writes STILL has made an error no later tool can detect.
+ *
+ * A sweep DOES have to merge elsewhere: on 2026-08-26, 219 of the 788 banked
+ * retirements cited `(lesson, leg)` directories under `wave-c/frames/` that the
+ * new sweep re-drives, so `wave-c-merge` correctly refuses that destination and
+ * the drives land in their own directory.
+ */
+const DRIVE_ROOT = path.dirname(resultsPath);
+const win = (p) => String(p).split("/").join(String.fromCharCode(92));
 const driven = new Map();
 for (const line of fs.readFileSync(resultsPath, "utf8").split("\n")) {
   if (!line.trim()) continue;
@@ -204,13 +221,34 @@ const HOW = [
   "",
   "THE OLD frames are the paths the reader prints (under .audit-frames/sweep161/).",
   "THE NEW frames from the re-drive are under",
-  "    E:\\AI driver\\.audit-frames\\wave-c\\frames\\<lesson>__<platform>-<mode>\\*.png",
+  "    " + win(DRIVE_ROOT) + "\\frames\\<lesson>__<platform>-<mode>\\*.png",
   "and the machine summary of each new drive is a JSON line in",
-  "    E:\\AI driver\\.audit-frames\\wave-c\\wave-c-results.jsonl",
+  "    " + win(resultsPath),
   "",
   "OPEN BOTH. A verdict written without looking at the new frame is a guess, and this",
   "programme has had three findings survive only until somebody replayed the trace",
   "instead of reading its title.",
+  "",
+  "-- THE CAR MAY NOT HAVE BEEN STEERED, AND THAT DECIDES YOUR VERDICT --",
+  "MEASURED on the 2026-08-26 sweep: 77 of 82 `-right` legs STEERED (22-110 wheel",
+  "commands each). 0 of 43 `-wrong` legs did. The drive path runs the steering loop",
+  "only in its `roll` phase, and every MODE=wrong lane holds the throttle flat and",
+  "never reaches it. Each leg's run.log says which it was, in capitals:",
+  "    STEERING: 22 command(s) ...                    <- steered, judge normally",
+  "    !! THIS DRIVE WAS NOT STEERED AND NOT MEASURED  <- read the next paragraph",
+  "",
+  "ON AN UNSTEERED LEG, any finding that turns on steering, lane position, parking,",
+  "reversing, route progress or OBJECTIVE CREDITING is UNJUDGED — never STILL.",
+  "«The objective did not tick» on a car that never turned the wheel is not a product",
+  "defect; it is a description of the harness. Recording it as STILL retires nothing",
+  "and puts a false row in the ledger. The run.log names the affected objectives.",
+  "",
+  "Copy, layout and paint defects ARE judgeable on an unsteered leg — the text on the",
+  "glass does not depend on the wheel. Judge those normally.",
+  "",
+  "«guidance loop BLIND» is NOT «NOT-RUN». BLIND means the loop ran and could not see",
+  "the guidance — that may itself be a defect worth filing. NOT-RUN on a",
+  "vehicle-preparation lesson (sc-vp-*) is expected: the car is not meant to move.",
   "",
   "-- WHAT THE BRACKET AFTER A LEG MEANS --",
   "`mobile-right (ИЗДЪРЖАН)` reached a verdict card and a pill was read off it.",
