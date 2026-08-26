@@ -600,3 +600,121 @@ task-title-agrees-with-briefing, one-junction-three-names §3 and tier-feasibili
 green.** Deleting that block would have made the tree green and the row invisible.
 
 **tsc 0 · vitest 15,709 passing · open list 523 / 168 critical.**
+
+---
+
+## §12 — 2026-08-26: the day the count was made honest (ACCOUNT-SWITCH HANDOFF)
+
+> **If you are the next session, on either account: read this section, then
+> `docs/simulation/QUEUE` below, then act. Everything is pushed to BOTH remotes.
+> The founder was told the numbers in the exact words of the "boxes" explanation
+> at the end of this section — use the same framing, do not re-explain it
+> differently.**
+
+### State at handoff
+
+- **HEAD `23322f2`** on `scenario-engine`, clean, pushed to origin AND vps.
+- **Open list: `filed=1462 retired=782 open=680 critical=218`** — verify with
+  `node tools/audit/verdict-coverage.mjs | head -1`. Every counter AGREES
+  (`node tools/audit/count-agreement.mjs`), corpus gates 14/14 from the repo
+  root and from `platform/` — the count no longer depends on cwd.
+- **Of the 680: 476 STILL (atomic, individually fixable) · 200 UNJUDGED
+  (cannot be settled by one drive at 13% determinism) · 4 PARTIAL.**
+- The audit corpus is gitignored ON PURPOSE (drives certify against the
+  worktree hash) and is now BACKED UP on the **`ledger/audit`** branch on both
+  remotes. After every wave that touches the corpus, run
+  `bash tools/audit/snapshot-ledger.sh "note"` — it commits through a temp
+  index, moves nothing in the working tree, and drives keep certifying.
+- Gates: tsc 0 · vitest 15,960 pass / 2 fail / 171 skip (the 2 are
+  `t-accidents` + `l-accidents-first-aid` content, red at HEAD for weeks,
+  BLOCKED ON FOUNDER CONTENT) · tools 495/496 (`deck-captions` standing).
+
+### What happened on 2026-08-26, in order
+
+1. **The 204-leg fill sweep completed** — every (lesson,leg) pair a comparison
+   row needed, all at commit `2706813`, all exit=0 with frames. It had hung
+   ELEVEN HOURS overnight: three drivers blocked on dead Playwright browsers,
+   `spawnSync` had no timeout. Fixed at the source (`lib/limits.mjs`, measured
+   bound: longest real drive 510 s, timeout 900 s) plus `lib/resume.mjs` — the
+   resume predicate used to ignore the exit code, so a CRASHED drive was
+   recorded as measured FOR EVER and a sweep could report 204/204 over holes.
+   Both mutation-proved. Commit `220d476`.
+2. **Fill adjudication** — 8 judges + 8 adversarial verifiers, 64 rows.
+   Open 523 → 511. Commit `220d476` (same).
+3. **The dead-predicate wave** (`9be440d`) — the class where a "repair" ships a
+   measurement and wires it to NO consumer. 75 candidates, verified verdicts:
+   21 WIRED to real consumers · 30 DELETED (answered questions the product
+   never asks) · 20 PREMISE-FALSE (live after all — verify everything) ·
+   7 findings REOPENED. Integration survived a DO-NOT-COMMIT review with 4
+   blockers, all fixed. THE LESSON: splitting patches per-file let HALF of a
+   verifier-rejected item ship (its test was a new file = "uncontested").
+4. **The reopens actually applied** (`a302a1d` area) — REOPEN.jsonl had recorded
+   an INTENTION; 5 rows were still counted retired. Moved out of closures with
+   history kept in `reopened.jsonl`. Open 511 → 516. Up is honest here.
+5. **THE PARTIAL SPLIT** (`16cbc85`) — the main event. 230 of the open rows
+   were COMPOUND (avg 2.8 complaints each) and PARTIAL retires nothing, so
+   finished work was invisible — THIS is why the count never moved. Six lanes
+   split them into 647 atomic children; six adversarial verifiers overturned
+   28 GONE claims and ZERO in the closing direction. **250 already-repaired
+   clauses retired on frame evidence** (0 missing frames, 0 without quotes).
+   Open 516 → 685 → 680. `chunk-split.jsonl` is ADDITIVE in finding-reader —
+   NEVER remove that declaration, supersession eats the file otherwise.
+6. **Three tools taught that a SPLIT parent is history, not an invented id**
+   (`verdict-coverage`, `count-agreement` WORKED_RE hyphen fix, `wave-c-post`
+   — the last one refused ALL retirements until fixed). Commit `23322f2`.
+
+### The queue — what the next session does, in order
+
+1. **Repair waves against the 476 STILL**, batched by suspectFile. Top of the
+   list (run `node tools/audit/finding-reader.mjs --count` for the live table):
+   LessonPlayShell.tsx · rules/engine.ts · SimOverlay.tsx · objectives.ts ·
+   LessonScene.tsx. Use the wave pattern of 2706813/9be440d: isolated
+   worktrees while drives run, adversarial verifier per lane, ADDRESS RULE
+   (prove a non-test import chain to /simulator BEFORE editing), integrate →
+   full gate → commit. After each wave: confirm-sweep the touched lessons
+   (~1 h), NOT a full sweep (~5 h). Full sweep every ~5th round.
+2. **After every corpus change**: `verdict-coverage` → `count-agreement` →
+   `wave-c-post --apply` → `snapshot-ledger.sh`.
+3. **FOUNDER DECISION PENDING — the 200 UNJUDGED**: 99 need a rate-mode
+   harness (drive N times, judge the RATE — does not exist yet), 37 were never
+   exercised, the rest lane-position/no-frame. Recommendation given to the
+   founder: accept as known-unmeasurable and ship; build rate mode only if he
+   says so. DO NOT judge them from single drives — 13% determinism, measured.
+4. **Deferred with cause, needs a DRIVE to land**: the `overlayHoldsDrive`
+   wire into LessonPlayShell `paused` — verifier proved it makes compact
+   THEO-3 undrivable at 60 s without `blocking:false` at LPS:4240. Wire+flag+
+   drive-proof together, never the wire alone. Details in §11 area and
+   `.audit-frames/patches/INTEGRATION-REVIEW.md`.
+5. **Founder-only items, batch into ONE sitting**: sc-vp-stall transmission
+   channel · world-edge ENDING rule · ptp-i-parva-pomosht supply ·
+   l-accidents-first-aid quiz beat (unblocks the 2 red vitest files) ·
+   **rotate the two exposed keys (flagged 5+ times: Poyo API key, and the SSH
+   key at C:\Users\Ljh\.ssh\id_ed25519_flokinet whose contents were surfaced
+   in a session)**.
+
+### Traps that cost hours today — do not relearn them
+
+- `vps` remote needs `GIT_SSH_COMMAND="ssh -i ~/.ssh/id_ed25519_flokinet -o
+  IdentitiesOnly=yes"`. Never export it globally — origin breaks and verifiers
+  cry MISSING.
+- Node resolves `/tmp` and `/c/...` as `E:\tmp` / broken. Windows-form paths in
+  Node, POSIX in bash.
+- Repo-wide grep walks 78 worktrees under `.claude/worktrees` and times out —
+  scope every search to `platform/src` or `tools/`.
+- A supervisor threshold BELOW the longest real drive (510 s) kills healthy
+  work and manufactures defects. Bounds live in `tools/mobile/lib/limits.mjs`
+  with the corpus query that justifies them.
+- The dev server port is NOT 3000 (that is nexflow — another product). Find it
+  with the health probe; today it was 3460, commit-attested.
+
+### The founder conversation to carry forward
+
+He asked twice why the count never fell and said plainly: **"what I want is to
+finally finish those 500 questions so we can move on with the platform."** When
+the split made 516 → 680 he was (rightly) frustrated. The explanation he
+accepted the numbers under: the 516 were BOXES; 230 boxes held 2–5 problems
+each; a box only closed when everything inside was fixed, so finished work was
+invisible; opening the boxes banked 250 already-fixed problems and left 680
+honest atomic ones; **1,462 ever filed · 782 closed with evidence · 53% done**.
+Progress from here is monotonic: every fix retires its own row. Give him the
+53% number and the retired-per-day rate, not the open count alone.
