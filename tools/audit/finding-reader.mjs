@@ -115,7 +115,7 @@ const BASE_SOURCE = /^chunk-\d+\.jsonl$/;
  * that forgetting to add a name here costs a printed warning instead of four
  * critical findings.
  */
-export const ADDITIVE = new Set(["chunk-wavec-new.jsonl"]);
+export const ADDITIVE = new Set(["chunk-wavec-new.jsonl", "chunk-split.jsonl"]);
 
 /**
  * WHAT SUPERSESSION IS THROWING AWAY, PER FILE — 2026-08-21.
@@ -341,6 +341,25 @@ const realFiles = (rows) =>
  * them critical — that a wave had already retired with a frame and a quote, and
  * was told the number it computed was authoritative.
  */
+/**
+ * Findings REPLACED BY A FINER SPLIT — bucket "SPLIT".
+ *
+ * A compound row that named three complaints could never retire until all
+ * three were fixed, so 230 of them were split into 647 atomic children on
+ * 2026-08-26. The parent is not closed (it was not fixed) and not refuted (it
+ * was not wrong) — it is superseded, so it leaves the open list without a
+ * closure, which would have needed a frame it does not have.
+ *
+ * They are exposed because their 2,722 verdict lines still name them, and a
+ * reader that calls those lines "unknown findingId" reports 828 false alarms
+ * — which is how a real gap hides in noise.
+ */
+export function splitParents() {
+  return loadAllRows()
+    .filter((j) => j.bucket === "SPLIT")
+    .map((j) => ({ ...j, findingId: findingId(j) }));
+}
+
 export function corpusCounts() {
   const filed = loadStandingBroken();
   const retired = loadClosures();

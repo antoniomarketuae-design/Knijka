@@ -34,7 +34,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+import { corpusCounts, openListLine, splitParents, workedLine } from "./finding-reader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -62,6 +62,9 @@ const counts = corpusCounts();
 // report's output. Only what is OWED changes with the scope.
 const byId = new Map(counts.filed.map((j) => [j.findingId, j]));
 const owed = FILED ? counts.filed : counts.open;
+
+const splitIds = new Set(splitParents().map((j) => j.findingId));
+let splitLines = 0;
 
 const rows = [];
 const malformed = [];
@@ -117,6 +120,14 @@ for (const r of rows) {
     continue;
   }
   if (!byId.has(r.findingId)) {
+    // A line naming a finding a SPLIT replaced is history, exactly as a line
+    // naming a retired one is — see the note on byId above. Counting it as an
+    // invented id printed 828 false alarms the first time, and a report that
+    // cries wolf 828 times is a report nobody reads the 829th line of.
+    if (splitIds.has(r.findingId)) {
+      splitLines += 1;
+      continue;
+    }
     problems.push("unknown findingId " + r.findingId);
     continue;
   }

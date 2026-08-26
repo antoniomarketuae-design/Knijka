@@ -189,7 +189,12 @@ export const STAMP_RE = /OPEN-LIST(?:\s+[a-z]+=\d+)+/g;
  * builds it by counting the array the tool is holding, which no amount of
  * importing can fake.
  */
-export const WORKED_RE = /WORKED\s+scope=[a-z]+(?:\s+[a-z]+=\d+)+/g;
+// scope allows hyphens: a tool whose scope is not the whole open list needs a
+// name that says so ("split-parents", "split-open-children"). With [a-z]+ the
+// regex matched "scope=split" and then failed on "-parents", so a tool that DID
+// print a correct WORKED line was reported as printing none — the check accused
+// it of the one thing it had not done, which is worse than not checking.
+export const WORKED_RE = /WORKED\s+scope=[a-z][a-z-]*(?:\s+[a-z]+=\d+)+/g;
 
 const distinct = (text, re) =>
   [...new Set((String(text || "").match(re) || []).map((s) => s.trim().replace(/\s+/g, " ")))];
@@ -288,6 +293,10 @@ export const RECIPES = {
   "verdict-coverage.mjs": (t) => ({ args: [] }),
   "never-edited.mjs": (t) => ({ args: ["--all"] }),
   "wave-c-post.mjs": (t) => ({ args: [] }),
+  // Both split tools are REPORT-ONLY without --apply, so the agreement check
+  // runs them exactly as a reader would and they touch nothing.
+  "apply-splits.mjs": (t) => ({ args: [] }),
+  "emit-split-verdicts.mjs": (t) => ({ args: [] }),
   "make-verdicts2.mjs": (t) => ({ args: [path.join(t, "verdicts-out")] }),
   // Emits a repair-round workflow, so it is handed to a temp path and never to
   // the real batches directory. Registered the day it was written, because this
