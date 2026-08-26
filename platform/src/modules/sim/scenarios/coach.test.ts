@@ -1,8 +1,32 @@
 import { describe, expect, it } from "vitest";
 import { COLLISION_CONTACT_COPY, VIOLATIONS, actCopy } from "../rules";
+import { recordEncounter } from "./policy";
 import type { ViolationSeverity } from "./policy";
-import { coachSession, coachStep, type CoachInput } from "./coach";
+import { coachStep, type CoachDecision, type CoachInput } from "./coach";
 import { repeatFamilyForCode, scenarioForCode } from "./mapping";
+
+/**
+ * THE SESSION FOLD, WHICH LIVES HERE BECAUSE ONLY THIS FILE EVER WANTED IT.
+ *
+ * It was `coachSession` in `coach.ts`, exported through `scenarios/index.ts`,
+ * with zero non-test callers for its whole life. The production fold is
+ * `lessons/engine.ts:713` and it cannot be this one — it does real work between
+ * the steps (explanation text, HUD event, pause decision, scoring), which a
+ * fold returning only decisions has nowhere to carry.
+ *
+ * Kept byte-for-byte so every case below still reads the same, and kept in TEST
+ * SCOPE so nobody greps it years from now and takes it for a shipped API.
+ */
+function coachSession(violations: readonly CoachInput[]): CoachDecision[] {
+  let encounters: Record<string, number> = {};
+  const out: CoachDecision[] = [];
+  for (const v of violations) {
+    const r = coachStep(encounters, v);
+    encounters = r.encounters;
+    out.push(r.decision);
+  }
+  return out;
+}
 
 /** One coach input at the code's OWN catalogue severity — no invented numbers. */
 function asDriven(code: string, detail?: string): CoachInput {
@@ -509,5 +533,60 @@ describe("A13 exam mode — coach OFF, always-grade", () => {
   it("without the flag the coach is untouched (teach-first survives)", () => {
     const first = coachStep({}, { code: "SPEEDING_OVER_LIMIT", severityClass: "vtorostepenna" });
     expect(first.decision.mode).toBe("teach");
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE COUNTER IS THE MODULE'S, NOT THIS FILE'S — 2026-08-26.
+
+   `policy.recordEncounter` is the one place that says what „one more encounter"
+   means, and policy.ts's header says so in as many words: „the caller owns the
+   per-driver encounter counts … this module just decides teach-vs-grade". It
+   had NO caller anywhere in the tree. `coachStep` spelled the same spread out by
+   hand in three places, and every row above stayed green regardless — they read
+   DECISIONS, not the shape of the record.
+
+   WHAT THESE ROWS ACTUALLY GUARD — measured at integration, not asserted.
+   They do NOT bind the call site, and the first draft of this paragraph claimed
+   they did. Inlining both spreads back into `coachStep` leaves all 31 rows in
+   this file green, because the two spellings produce identical counts today.
+   What they DO catch is the change that would hurt: a key moved by something
+   other than one, or the input record mutated instead of copied — counting
+   `teachKey` twice turns this block red. Keep them for that, and do not read
+   them as a pin on `recordEncounter` being the caller.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("coachStep counts through policy.recordEncounter", () => {
+  it("every key the step touches moved by exactly one, and nothing else moved", () => {
+    const before: Record<string, number> = { "teach:ev-speed-limit": 4, noise: 9 };
+    const frozen = { ...before };
+    const step = coachStep(before, asDriven("SPEEDING_OVER_LIMIT"));
+
+    // IMMUTABLE — the whole point of the helper's signature. A reducer that
+    // mutated its input would replay a session differently on the second run.
+    expect(before, "the input record may not be touched").toEqual(frozen);
+
+    for (const [key, value] of Object.entries(step.encounters)) {
+      if (key === "noise") continue;
+      expect(value, `${key}: a step may only ever add one`).toBe(recordEncounter(before, key)[key]);
+    }
+    // …and the untouched key came through unchanged rather than being dropped.
+    expect(step.encounters.noise).toBe(9);
+  });
+
+  it("the graded key is the third increment, and only when a grading happened", () => {
+    // Teach first: no `graded:` key exists at all, so the ladder needs no
+    // offset. This is the row that goes red if the third call site is inlined
+    // back and drifts to „+1 always".
+    const taught = coachStep({}, asDriven("SPEEDING_OVER_LIMIT"));
+    expect(taught.decision.mode).toBe("teach");
+    expect(Object.keys(taught.encounters).filter((k) => k.startsWith("graded:"))).toEqual([]);
+
+    const graded = coachStep(taught.encounters, asDriven("SPEEDING_OVER_LIMIT"));
+    expect(graded.decision.mode).toBe("grade");
+    const key = Object.keys(graded.encounters).find((k) => k.startsWith("graded:"));
+    expect(key).toBeDefined();
+    expect(graded.encounters[key as string]).toBe(
+      recordEncounter(taught.encounters, key as string)[key as string],
+    );
   });
 });

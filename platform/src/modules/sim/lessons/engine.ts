@@ -1283,6 +1283,22 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // So the arm is DISARMED rather than half-fixed, and every other repair
       // the round earned is kept. Re-enable only together with a test that
       // drives the return and proves the dwell does not accrue while closing.
+      //
+      // ── AND THE ROW IT WAS CREDITED WITH IS REOPENED — 2026-08-26 ─────────
+      //
+      // Disarming was the right call and it is not revisited here. What was
+      // NOT right is that a repair round counted `sc-park-night:e4e1436a` as
+      // closed on this work. With `departure` pinned to null the branch below
+      // is unreachable on every frame of every lesson, so `finishDepartureGate`
+      // is never written, `routeDepartedEndingCopy` is never pushed, and no
+      // student has ever seen the sentence the closure rested on. The
+      // dead-predicate census wrote the row back into
+      // `.audit-frames/patches/REOPEN.jsonl`.
+      //
+      // The code stays. It is not dead-by-accident, it is parked with a stated
+      // re-enable condition one line above, and deleting it would only make the
+      // next lane re-derive the zone and re-discover the false refusal. What
+      // changes is the bookkeeping: this closes nothing until the null goes.
       const departure: ReturnType<typeof terminalDepartureZone> = null;
       if (departure !== null) {
         finishDepartureGate = stepFinishGate(

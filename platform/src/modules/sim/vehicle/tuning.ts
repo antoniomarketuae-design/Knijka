@@ -45,11 +45,20 @@
  * rendering between steps — that is what kills 144 Hz micro-stutter).
  */
 export const FIXED_DT = 1 / 60;
-/**
- * Cap on frame delta (s) so a background tab doesn't explode the sim.
- * Used by the headless harness; @react-three/rapier clamps internally (0.5 s).
- */
-export const MAX_FRAME_DT = 0.1;
+/* `MAX_FRAME_DT = 0.1` stood here until 2026-08-26 with the docstring „Cap on
+   frame delta (s) so a background tab doesn't explode the sim. Used by the
+   headless harness". It was used by nothing — no harness, no test, no product
+   file — and the sentence was worse than idle: the cap that IS applied is 0.5,
+   and it is applied from two other places under two other names.
+     · `PHYSICS_MAX_FRAME_DT` (components/sim/lesson-ui/sessionClock.ts) — what
+       @react-three/rapier clamps to, and what `sessionClockAdvance` mirrors so
+       the session clock and the world advance by the same amount.
+     · `MAX_FRAME_DT_SEC` (modules/sim/traffic/system.ts) — the same 0.5, kept
+       deliberately equal, with `substep.test.ts` asserting the two agree.
+   A third, unread, disagreeing number named as if it were the authority is how
+   somebody eventually clamps to 0.1 and re-tunes every dt-sensitive constant in
+   this file by accident. Deleted rather than corrected: the two live ones are
+   already tested against each other. */
 /** Gravity (m/s², Y-up). */
 export const GRAVITY = -9.81;
 
@@ -88,8 +97,14 @@ export const CHASSIS_RESTITUTION = 0.05;
 // ---------------------------------------------------------------------------
 // Wheels — geometry. Order: FL, FR, RL, RR. (+X is the LEFT side of the car.)
 // ---------------------------------------------------------------------------
-export const WHEEL_RADIUS = 0.32; // m — ~195/65 R15
-export const WHEEL_WIDTH = 0.24; // m — visual only
+export const WHEEL_RADIUS = 0.32; // m — ~195/65 R15 (read by VehicleSim,
+// HeroCarBody, ShadowCar and the marketing hero scene)
+/* `WHEEL_WIDTH = 0.24 // m — visual only` was published beside it and read by
+   nothing on this side of the repo: no mesh, no collider, no test. The only
+   `T.WHEEL_WIDTH` in the tree is `spike/vehicle-feel`, which has its own
+   `tuning.ts` and is never imported (CLAUDE.md: „throwaway prototypes, never
+   imported"). Every wheel the product paints is built from WHEEL_RADIUS alone.
+   Deleted 2026-08-26 — „visual only" describes a visual nothing consults. */
 /** Suspension attachment points in chassis-local space (m). Wheelbase 2.56 m, track 1.52 m. */
 export const WHEEL_POSITIONS = [
   { x: 0.76, y: -0.1, z: 1.28 }, // FL
@@ -505,14 +520,22 @@ export const CHASE_STIFFNESS = 5.0; // 1/s exponential follow rate
 //   15.6" 16:9 laptop → screen height ≈ 19.4 cm, viewed at ≈ 45 cm
 //   → vertical DFOV = 2·atan(9.7/45) ≈ 24.5°; a 24" desktop monitor at
 //   ≈ 60 cm gives ≈ 28°. Calibrated vertical GFOV ≈ 1.22 × 24.5–28 ≈ 30–34°.
-/** Research-optimum GFOV:DFOV ratio (R2 §3.3). */
-export const GFOV_DISPLAY_RATIO = 1.22;
-/** Vertical DFOV (deg) of the assumed 15.6" laptop viewed at ~45 cm. */
-export const ASSUMED_DISPLAY_VFOV_DEG = 24.5;
-/** Fully calibrated vertical GFOV (deg) for the assumed display — ≈30. */
-export const CALIBRATED_GFOV_DEG = Math.round(
-  ASSUMED_DISPLAY_VFOV_DEG * GFOV_DISPLAY_RATIO,
-);
+//
+// ── AND THE THREE CONSTANTS THAT SAID SO ARE GONE, 2026-08-26 ───────────────
+//
+// `GFOV_DISPLAY_RATIO` (1.22), `ASSUMED_DISPLAY_VFOV_DEG` (24.5) and the
+// `CALIBRATED_GFOV_DEG = round(24.5 × 1.22) = 30` derived from them were
+// exported and read by NOTHING — not by `CameraRig`, not by a test, not by a
+// tool. The camera has been on `COCKPIT_FOV = 47` since lane 12 revised the
+// cockpit contract, `cockpitVFovForAspect` widens it per aspect and clamps at
+// `COCKPIT_FOV_MAX = 56`, and `cockpit-camera-contract.test.ts` pins all of it.
+//
+// So the tree carried a published „fully calibrated" 30° beside a shipped 47°,
+// with nothing to say which was in force — and the arithmetic above is exactly
+// the sort a later reader adopts on the strength of the word „calibrated". The
+// DERIVATION is worth keeping and is kept, as this comment; the numbers are not
+// worth publishing as constants until the founder session actually re-tunes the
+// camera, at which point they belong next to `COCKPIT_FOV` and not here.
 
 /** Chase vertical FOV. Was 60 (uncalibrated). 44 = the cockpit's 40 + 4°:
  *  the third-person frame needs the car plus margins in view, and it is not

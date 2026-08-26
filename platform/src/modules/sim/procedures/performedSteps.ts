@@ -84,24 +84,24 @@ export function isCockpitHotspotName(name: string): name is CockpitHotspotName {
   return HOTSPOT_NAME_SET.has(name);
 }
 
-/** Minimal structural node — matches three.js Object3D without importing it. */
-export interface NamedNode {
-  name: string;
-  parent: NamedNode | null;
-}
+/* ─────────────────────────────────────────────────────────────────────────────
+   `NamedNode` + `resolveHotspotName` STOOD HERE — removed 2026-08-26.
 
-/**
- * Doc-69 resolution rule: walk `object.name` up the parent chain until a
- * `hotspot_*` contract name matches; anything else in the cockpit is inert.
- * (The procedural cockpit binds handlers per mesh, so this mostly guards the
- * A3 authored-interior future where hotspot proxies may carry child meshes.)
- */
-export function resolveHotspotName(node: NamedNode | null): CockpitHotspotName | null {
-  for (let n = node; n !== null; n = n.parent) {
-    if (isCockpitHotspotName(n.name)) return n.name;
-  }
-  return null;
-}
+   The rule was: walk `object.name` up the parent chain until a `hotspot_*`
+   contract name matches. Its own doc string said what it was for — „this mostly
+   guards the A3 authored-interior future where hotspot proxies may carry child
+   meshes" — and the future has not arrived. `VitokCockpit.tsx` binds
+   `onPointerDown` / `onClick` / `onContextMenu` PER HOTSPOT MESH, over a `spec`
+   captured in the closure, so no pick ever needs a name resolved: the handler
+   already knows which control it is. There is no ray hit whose object might be
+   a child of a hotspot, because there are no children.
+
+   It was on the `procedures` barrel, which made it look like part of the
+   cockpit contract rather than a spare part for a cockpit nobody has built.
+   `isCockpitHotspotName` and `COCKPIT_HOTSPOT_NAMES` above are untouched and
+   are the doc-69 contract itself; when the authored interior lands, whoever
+   binds it writes the walk against the tree they actually have.
+   ───────────────────────────────────────────────────────────────────────────── */
 
 // ---------------------------------------------------------------------------
 // Step classification + control metadata

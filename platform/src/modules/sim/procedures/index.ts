@@ -26,9 +26,10 @@ export {
   preDriveStepKind,
   preDriveTapActionBg,
   readyToMoveOff,
-  resolveHotspotName,
+  // No `resolveHotspotName` / `NamedNode`: the cockpit binds a handler per
+  // hotspot mesh, so nothing ever resolves a picked object's name. Removed
+  // 2026-08-26 — see the block in `performedSteps.ts` where they stood.
   type CockpitHotspotName,
-  type NamedNode,
   type PreDriveControlSignal,
   type PreDrivePointer,
   type PreDrivePrimaryInput,

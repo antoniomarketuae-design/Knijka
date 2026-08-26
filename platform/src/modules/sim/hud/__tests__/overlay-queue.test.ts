@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   hasWhy,
@@ -7,8 +9,6 @@ import {
   overlayPriority,
   overlayQueueMaySpeak,
   overlaySilencesQueue,
-  peekWithinBudget,
-  rectClearsCentreBand,
   rectViewportFraction,
   requiresWhy,
   selectOverlay,
@@ -32,6 +32,46 @@ import {
  */
 
 const IPHONE16_PORTRAIT = { w: 393, h: 852 };
+
+/**
+ * THE TWO BUDGET PREDICATES NOW LIVE HERE — dead-predicate census, 2026-08-26.
+ *
+ * `rectClearsCentreBand` and `peekWithinBudget` used to be exported from
+ * `overlayQueue.ts`, and NOTHING on the /simulator path ever called them: the
+ * declarations, two barrel lines and this file were the whole census, and the
+ * WebKit probe the module's header says imports them does not. They were
+ * therefore predicates that shipped in the bundle so that this file could ask
+ * them questions — a closed loop.
+ *
+ * The MEASUREMENTS below are not a closed loop and are kept verbatim: they are
+ * the founder's own device geometry, and they are what decided that the peek
+ * shares the top rail instead of taking a second row. They are re-expressed
+ * against the two things the module still publishes — `overlayCentreBand` and
+ * `rectViewportFraction` — so every number and every verdict is unchanged and
+ * the shipped bundle is two functions lighter.
+ *
+ * WHAT THIS FILE THEREFORE DOES NOT CLAIM: that any painted rect on the real
+ * page obeys them. Nothing measures that yet. See the block at the deletion.
+ */
+function rectClearsCentreBand(
+  rect: { x: number; y: number; width: number; height: number },
+  w: number,
+  h: number,
+): boolean {
+  const band = overlayCentreBand(w, h);
+  const overlapX = Math.min(rect.x + rect.width, band.right) - Math.max(rect.x, band.left);
+  const overlapY = Math.min(rect.y + rect.height, band.bottom) - Math.max(rect.y, band.top);
+  return overlapX <= 0 || overlapY <= 0;
+}
+
+function peekWithinBudget(
+  rect: { x: number; y: number; width: number; height: number },
+  w: number,
+  h: number,
+): boolean {
+  return rectViewportFraction(rect, w, h) <= OVERLAY_PEEK_MAX_FRACTION;
+}
+
 const IPHONE16_LANDSCAPE = { w: 852, h: 393 };
 
 function item(kind: SimOverlayKind, over: Partial<SimOverlayItem> = {}): SimOverlayItem {
@@ -61,6 +101,31 @@ describe("selectOverlay — one overlay, never three", () => {
     expect(selection.waiting).toHaveLength(2);
     // …and the one that speaks is the one that froze the car.
     expect(selection.active?.kind).toBe("teach");
+  });
+
+  /**
+   * …AND THE RANKING TEST BELOW IS ABOUT THE CODE THE SHELL RUNS.
+   *
+   * Until 2026-08-26 it was not. `selectOverlay` sorted on the private
+   * `PRIORITY` table and counted on the private `AMBIENT` set, while
+   * `overlayPriority` / `isAmbientOverlay` — the two functions this file
+   * asserts about and the two the barrel exports — were called by nothing but
+   * this file. The next test could have stayed green through any change to the
+   * sort, because it was never reading the sort.
+   *
+   * `selectOverlay` now calls both. This is the guard that it keeps doing so:
+   * a source scan, because a behavioural test cannot tell one identical table
+   * from another. Delete either call and this turns red.
+   */
+  it("selectOverlay goes THROUGH overlayPriority and isAmbientOverlay", () => {
+    const src = readFileSync(resolve(__dirname, "../overlayQueue.ts"), "utf8");
+    const body = src.slice(src.indexOf("export function selectOverlay("));
+    expect(body).toContain("overlayPriority(b.item.kind)");
+    expect(body).toContain("overlayPriority(a.item.kind)");
+    expect(body).toContain("isAmbientOverlay(i.kind)");
+    // …and does not reach past them into the raw tables.
+    expect(body).not.toContain("PRIORITY[");
+    expect(body).not.toContain("AMBIENT.has(");
   });
 
   it("ranks safety and blocking pauses above ambient guidance", () => {

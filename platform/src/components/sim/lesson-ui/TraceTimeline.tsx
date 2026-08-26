@@ -50,36 +50,22 @@ const STEP_EPSILON_SEC = 0.05;
 /** Painted width of one tick's hit slot, px — `w-5` compact, `w-6` roomy. */
 const TICK_WIDTH_PX = { compact: 20, roomy: 24 } as const;
 
-/**
- * THE ROOMY CAPTION CARD'S OWN BOX, px — the two numbers its classes resolve
- * to, named so the dead-air arithmetic below is checkable rather than asserted.
- *
- * `px-3.5 py-2` + a 1 px border on both edges = 18 px of chrome; `text-sm` is
- * Tailwind's 14 px on a 20 px line box. Nothing here is a preference: change a
- * class above and these change with it, which is why they sit next to it.
- */
-const ROOMY_CAPTION_CARD_CHROME_PX = 18;
-const ROOMY_CAPTION_LINE_PX = 20;
+/* THE DEAD-AIR ARITHMETIC — `captionDeadAirPx`, and the two constants its card
+   resolves to — moved to `__tests__/deckCaptionVoice.test.tsx` on 2026-08-26.
 
-/**
- * How much EMPTY BOX stands between an `lines`-line caption and the deck panel
- * that owns it, on a roomy stage — i.e. how far the sentence floats free of the
- * only thing on the stage that says who is speaking it.
- *
- * `sc-follow-distance/pc-right/04-t180s.png` is 80 px of this at two lines, and
- * that gap is why a sweep judge filed the demonstration's narration as „the
- * advisor bubble" and routed it at `AdvisorCard.tsx`. The card is bottom-
- * aligned now, so this is 0 at every length the bank contains — but the
- * function stays because the box is FIXED, so the question „how much of it is
- * nothing?" is the one that has to keep being answerable.
- */
-export function captionDeadAirPx(
-  lines: number,
-  boxPx: number = DECK_ROOMY_CAPTION_HEIGHT_PX,
-): number {
-  const card = ROOMY_CAPTION_CARD_CHROME_PX + Math.max(0, lines) * ROOMY_CAPTION_LINE_PX;
-  return Math.max(0, boxPx - card);
-}
+   THE FIX FOR THE 80 px IS `mt-auto` ON THE CARD, and it is further down this
+   file where it always was. That is what closed `sc-follow-distance/pc-right/
+   04-t180s.png` — a two-line caption floating 93 px clear of the panel that
+   said whose driving it described, filed as „the advisor bubble" and routed at
+   `AdvisorCard.tsx` because nothing in the frame could have told the judge
+   otherwise. An auto margin absorbs the slack in CSS; nothing at runtime needs
+   the number.
+
+   The function was the MEASUREMENT of the defect, not the repair, and its own
+   docstring conceded it („this is 0 at every length the bank contains — but the
+   function stays…"). A component that exports an unread measurement makes it
+   look like a rule the component applies, and the row was booked against it. It
+   is kept in full, with every assertion, beside its only reader. */
 
 /**
  * WHO IS SPEAKING THE CAPTION — the deck's own title, reused rather than
@@ -708,8 +694,9 @@ export function TraceTimeline({
         // and there is nothing in the frame that could have told them
         // otherwise, because the card was standing alone on the carriageway.
         //
-        // WHY IT STOOD ALONE, AS ARITHMETIC (`captionDeadAirPx` below, and the
-        // constants are the shipped ones). The box is a FIXED
+        // WHY IT STOOD ALONE, AS ARITHMETIC (`captionDeadAirPx`, now in
+        // `__tests__/deckCaptionVoice.test.tsx` — see the note at the top of
+        // this file — and the constants are the shipped ones). The box is a FIXED
         // DECK_ROOMY_CAPTION_HEIGHT_PX = 138 and its content was start-aligned,
         // so a two-line caption — ROOMY_CAPTION_CARD_CHROME_PX 18 of chrome
         // plus 2 × ROOMY_CAPTION_LINE_PX 20 = 58 — left EIGHTY pixels of

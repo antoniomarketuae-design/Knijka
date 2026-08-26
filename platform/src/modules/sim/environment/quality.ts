@@ -2,7 +2,7 @@
 //
 // Pure data & math (no DOM, no three.js) — unit-tested in Node. The client
 // store (qualityStore.ts) persists the user's choice and runs the FPS probe
-// that feeds `recommendQuality`.
+// that feeds `ledgerFromSample`.
 
 export type QualityLevel = "low" | "med" | "high";
 /** What the user picks in settings; "auto" defers to the probe recommendation. */
@@ -592,9 +592,13 @@ function clampBelowFailure(level: QualityLevel, failedAt: QualityLevel | null): 
  * Promotion is therefore paid for exactly once, at the one moment in the
  * session where changing tiers costs nothing.
  *
- * Bands mirror `recommendQuality`, with two differences that matter on a phone:
- * promotion needs the fuller sample window, and `ceiling` is applied on the way
- * out so a handset can never be promoted into `high`'s dpr-1.5 buffer.
+ * Bands are this module's own `PROMOTE_FPS` / `HOLD_FPS` / `STRUGGLE_FPS`, with
+ * two differences that matter on a phone: promotion needs the fuller sample
+ * window, and `ceiling` is applied on the way out so a handset can never be
+ * promoted into `high`'s dpr-1.5 buffer. (This line used to read „bands mirror
+ * `recommendQuality`" — that function held the same three numbers as literals
+ * and had no caller, so the mirror was two hand-kept copies. It is gone; see
+ * the block where it stood.)
  *
  * Note what the 57 fps promotion bar means at tier `low` on the reference
  * device: doc 82 §2.2 sets the phone target at *"30 flat (floor 24) — do not
@@ -645,37 +649,26 @@ export function levelFromLedger(
   return clampBelowFailure(minLevel(ledger.earned, ceiling), ledger.failedAt);
 }
 
-/**
- * The "auto" heuristic.
+/*
+ * ── `recommendQuality` USED TO SIT HERE, AND IT WAS THE OLD «AUTO» HEURISTIC ─
+ *   removed 2026-08-26 by the dead-predicate wave.
  *
- * - No fps evidence (`fpsMedian` null):
- *   - with a `currentLevel` (probe ran but collected too few frames — hidden
- *     tab etc.): keep the current level, change nothing;
- *   - without one (cold start): defer to `seedQualityFromSignals`. Pass
- *     `signals` to give it the pointer/memory/core evidence; with only a `dpr`
- *     the seed reduces to the shipped rule (med, or low at dpr ≥ 3), which is
- *     why every existing caller keeps its answer.
- * - With an fps median measured *at* `currentLevel`:
- *   - ≥ 57 fps: headroom → step up one level (never more than one per probe);
- *   - ≥ 48 fps: holding target → stay;
- *   - ≥ 34 fps: struggling → step down one level;
- *   - below:    step straight to "low".
+ * It answered the same question the pair above answers — „which tier should
+ * this device run" — with the same three bands, written as the literals 57 /
+ * 48 / 34 instead of `PROMOTE_FPS` / `HOLD_FPS` / `STRUGGLE_FPS`, and with the
+ * same cold-start deferral to `seedQualityFromSignals`. It had no non-test
+ * caller. The live probe (`qualityStore.ts:409 useAutoQualityProbe`, reached
+ * from `useQuality` at :308) writes through `writeQualityLedger` →
+ * `ledgerFromSample`, and the tier is applied at the next cold start by
+ * `levelFromLedger` — the deliberate design doc 82 §8 records, because a live
+ * tier change at `low`→`med` starts a 5.2 MB texture fetch under the student's
+ * wheels.
+ *
+ * SO IT WAS NOT AN UNWIRED IMPROVEMENT, IT WAS A SECOND OPINION NOBODY ASKED —
+ * and the shape that makes it worth a paragraph rather than a silent delete:
+ * its bands were hand-copied numbers, so an edit to `PROMOTE_FPS` moved the
+ * shipped ledger and left this function answering the old question, with a
+ * green test suite either way. `ledgerFromSample`'s own docstring said „Bands
+ * mirror `recommendQuality`" — a mirror is exactly what a duplicated constant
+ * is not.
  */
-export function recommendQuality(input: {
-  dpr: number;
-  fpsMedian: number | null;
-  currentLevel?: QualityLevel;
-  /** Cold-start device evidence (doc 82 §2.3). Omit → dpr-only, as shipped. */
-  signals?: DeviceSignals;
-}): QualityLevel {
-  const { dpr, fpsMedian, currentLevel, signals } = input;
-  if (fpsMedian === null) {
-    if (currentLevel) return currentLevel;
-    return seedQualityFromSignals(signals ?? unknownDeviceSignals(dpr));
-  }
-  const current = currentLevel ?? "med";
-  if (fpsMedian >= 57) return stepUp(current);
-  if (fpsMedian >= 48) return current;
-  if (fpsMedian >= 34) return stepDown(current);
-  return "low";
-}

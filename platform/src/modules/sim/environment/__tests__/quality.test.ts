@@ -12,7 +12,6 @@ import {
   TOUCH_MAX_DPR,
   TOUCH_MED_MAX_DPR,
   TOUCH_HIGH_MAX_DPR,
-  recommendQuality,
   seedQualityFromSignals,
   unknownDeviceSignals,
   type DeviceSignals,
@@ -278,69 +277,6 @@ describe("seedQualityFromSignals", () => {
   it("never seeds high — a cold start has no evidence of headroom", () => {
     const beefy = laptop({ deviceMemoryGb: 8, hardwareConcurrency: 32, dpr: 1 });
     expect(seedQualityFromSignals(beefy)).toBe("med");
-  });
-});
-
-describe("recommendQuality", () => {
-  it("keeps the current level when the probe produced no evidence", () => {
-    for (const level of ["low", "med", "high"] as const) {
-      expect(recommendQuality({ dpr: 1.5, fpsMedian: null, currentLevel: level })).toBe(level);
-    }
-  });
-
-  it("cold-start guess is med when the device says nothing about itself", () => {
-    // dpr no longer decides anything on its own, at any value: without pointer
-    // evidence there is no phone claim to make.
-    expect(recommendQuality({ dpr: 1, fpsMedian: null })).toBe("med");
-    expect(recommendQuality({ dpr: 2, fpsMedian: null })).toBe("med");
-    expect(recommendQuality({ dpr: 3, fpsMedian: null })).toBe("med");
-  });
-
-  it("defers the cold start to the device seed when signals are supplied", () => {
-    // A dpr-2 panel that is ALSO touch-only is a phone, and now reads as one —
-    // the case the dpr-only rule above got wrong.
-    expect(
-      recommendQuality({ dpr: 2, fpsMedian: null, signals: phone({ dpr: 2 }) }),
-    ).toBe("low");
-    // With an fps median the signals are irrelevant: measurement beats guess.
-    expect(
-      recommendQuality({
-        dpr: 2,
-        fpsMedian: 60,
-        currentLevel: "low",
-        signals: phone({ dpr: 2 }),
-      }),
-    ).toBe("med");
-  });
-
-  it("steps up exactly one level with clear headroom", () => {
-    expect(recommendQuality({ dpr: 1, fpsMedian: 60, currentLevel: "low" })).toBe("med");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 60, currentLevel: "med" })).toBe("high");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 60, currentLevel: "high" })).toBe("high");
-  });
-
-  it("holds steady in the target band", () => {
-    expect(recommendQuality({ dpr: 1, fpsMedian: 50, currentLevel: "med" })).toBe("med");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 48, currentLevel: "high" })).toBe("high");
-  });
-
-  it("steps down one level when struggling", () => {
-    expect(recommendQuality({ dpr: 1, fpsMedian: 40, currentLevel: "high" })).toBe("med");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 40, currentLevel: "med" })).toBe("low");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 34, currentLevel: "low" })).toBe("low");
-  });
-
-  it("collapses straight to low when far below target", () => {
-    expect(recommendQuality({ dpr: 1, fpsMedian: 25, currentLevel: "high" })).toBe("low");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 10, currentLevel: "med" })).toBe("low");
-  });
-
-  it("respects the documented band edges", () => {
-    expect(recommendQuality({ dpr: 1, fpsMedian: 57, currentLevel: "med" })).toBe("high");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 56.9, currentLevel: "med" })).toBe("med");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 48, currentLevel: "med" })).toBe("med");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 47.9, currentLevel: "med" })).toBe("low");
-    expect(recommendQuality({ dpr: 1, fpsMedian: 33.9, currentLevel: "high" })).toBe("low");
   });
 });
 

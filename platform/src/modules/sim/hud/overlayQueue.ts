@@ -118,23 +118,52 @@ export function overlayCentreBand(
   };
 }
 
-/**
- * Does this painted rect stay out of the road? Touching an edge is allowed
- * (a pill whose bottom is exactly the band's top line has not entered it);
- * one pixel inside is not.
- */
-export function rectClearsCentreBand(
-  rect: OverlayRect,
-  viewportWidthPx: number,
-  viewportHeightPx: number,
-): boolean {
-  const band = overlayCentreBand(viewportWidthPx, viewportHeightPx);
-  const overlapX = Math.min(rect.x + rect.width, band.right) - Math.max(rect.x, band.left);
-  const overlapY = Math.min(rect.y + rect.height, band.bottom) - Math.max(rect.y, band.top);
-  return overlapX <= 0 || overlapY <= 0;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   `rectClearsCentreBand` AND `peekWithinBudget` ARE GONE — dead-predicate
+   census, 2026-08-26, and what they leave behind is a fact worth reading.
 
-/** Fraction of the viewport a painted rect costs. */
+   Both took a MEASURED rect and answered a yes/no about rules 2 and 3 of the
+   budget at the top of this file. Neither was ever called. `grep -rn` across
+   `platform/src` returned the declarations, the two barrel lines in
+   `hud/index.ts`, and `__tests__/overlay-queue.test.ts` — nothing else. So the
+   tests that read them fed HAND-WRITTEN rects to a function no screen calls
+   and checked its arithmetic — a closed loop that could not fail on any change
+   to the shipped HUD. Deleting them is not a loss of coverage; it is the
+   deletion of coverage that was never there.
+
+   ── AND THE ENFORCER DOES EXIST. THE FIRST DRAFT OF THIS BLOCK SAID IT DID
+      NOT, AND WAS WRONG — corrected on the same day it was written, by the
+      verifier that re-ran the census. ──────────────────────────────────────
+
+   Rules 2 (`OVERLAY_PEEK_MAX_FRACTION`) and 3 (`overlayCentreBand`) ARE
+   enforced against real painted rects, by `tools/mobile/overlay-probe.mjs`:
+   a WebKit probe that reads `getBoundingClientRect()` off the shipped page and
+   computes exactly these two verdicts (`withinPeekBudget` at :348,
+   `clearsCentreBand` at :350, both raised as problems at :535-536).
+
+   It MIRRORS rather than imports — `.mjs` cannot import `.ts`, so it carries
+   the fractions as literals at :48-49 — and the mirror is pinned:
+   `__tests__/overlay-queue.test.ts`'s „states the numbers the WebKit probe
+   asserts against" holds `OVERLAY_PEEK_MAX_FRACTION` and
+   `OVERLAY_CENTRE_BAND` to the probe's copy, so the screen and its measurement
+   cannot drift apart. The module header's claim is therefore true in substance
+   and imprecise only in mechanism.
+
+   HOW THE FIRST DRAFT MISSED IT, because the mistake is reusable: it grepped
+   `tools/` for the two FUNCTION names, which are a `platform/src` concern and
+   were never going to be there. The header's sentence is about the CONSTANTS.
+   `grep -rn OVERLAY_PEEK_MAX_FRACTION tools/` hits line 48 immediately.
+
+   What is true is narrower and still worth writing down: these two rules have
+   no enforcer INSIDE the app — nothing in `platform/src` measures a painted
+   rect — and the two deleted predicates were not one either, because nothing
+   called them. Rules 1 and 4 are enforced in-process (`selectOverlay` and
+   `overlayQueueMaySpeak`, both called by `LessonPlayShell`); 2 and 3 are
+   enforced out of process, by the probe, on a real device ladder.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Fraction of the viewport a painted rect costs — the arithmetic behind
+ *  rule 2, kept in the module the constant lives in. */
 export function rectViewportFraction(
   rect: OverlayRect,
   viewportWidthPx: number,
@@ -145,15 +174,6 @@ export function rectViewportFraction(
   const w = Math.max(0, Math.min(rect.x + rect.width, viewportWidthPx) - Math.max(rect.x, 0));
   const h = Math.max(0, Math.min(rect.y + rect.height, viewportHeightPx) - Math.max(rect.y, 0));
   return (w * h) / area;
-}
-
-/** Is the default state within budget? */
-export function peekWithinBudget(
-  rect: OverlayRect,
-  viewportWidthPx: number,
-  viewportHeightPx: number,
-): boolean {
-  return rectViewportFraction(rect, viewportWidthPx, viewportHeightPx) <= OVERLAY_PEEK_MAX_FRACTION;
 }
 
 // ---------------------------------------------------------------------------
@@ -789,14 +809,18 @@ export function briefingLineOrdinal(steps: readonly BriefingStepBg[]): number | 
  * and after guards nothing. The boundary is asserted in both directions in
  * `overlay-queue-moment.test.ts`.
  *
- * ⚠ AND IT IS REACHED BY NOTHING THE STUDENT SEES — counted 2026-08-24, when a
- * sweep tried to edit it. Six mentions in `LessonPlayShell.tsx` (1547, 1605,
- * 1722, 1826, 3693, 3727), every one inside a comment block; no re-export from
- * `hud/index.ts`; the only callers are `overlay-queue-moment.test.ts` and
- * `queueTaskEcho.test.ts`. It is a GATE PREDICATE, and the invariant it holds
- * is real — `queueTaskEcho` runs live shell rows through it — but it guards no
- * running code path, so a change to it fixes no frame. Written down here
- * because the w10 sweep spent a hunk on it believing the opposite.
+ * ⚠ IT WAS REACHED BY NOTHING THE STUDENT SEES — counted 2026-08-24, when a
+ * sweep tried to edit it, and the count was right: six mentions in
+ * `LessonPlayShell.tsx`, every one inside a comment block, and two test files.
+ * A gate predicate that guards no running code path fixes no frame, and this
+ * one had held that shape for three commits while three separate blocks of
+ * prose described it as the thing keeping a sentence from being printed twice.
+ *
+ * ✅ SINCE THIS COMMIT IT IS SPENT AT THE ONE CHOKEPOINT EVERY ITEM PASSES —
+ * `selectOverlay` at the bottom of this file, which `LessonPlayShell.tsx:4429`
+ * calls on every compact frame and whose `active` is what `SimOverlay` paints.
+ * See `stripLineEcho` below it for what the queue now does with a TRUE answer,
+ * and why the answer is a trim rather than a deletion.
  */
 export function itemEchoesLine(item: Pick<SimOverlayItem, "lineBg" | "detailBg">): boolean {
   const line = item.lineBg.trim().toLocaleLowerCase("bg");
@@ -1018,11 +1042,87 @@ export interface SelectOverlayOptions {
  * still answered honestly, because the car must stay frozen for a blocking
  * item whether or not the menu on top of it lets that item be painted.
  */
+/**
+ * WHAT THE QUEUE DOES WITH A TRUE `itemEchoesLine` — AND WHY IT IS A TRIM.
+ *
+ * The obvious act on „this detail repeats its own line" is to drop the detail.
+ * That is the wrong one, and the frame the predicate was filed on says why:
+ *
+ *   line   «Мини контролната зона с готов кокпит»
+ *   detail «Мини контролната зона с готов кокпит — дръж под 50 км/ч»
+ *
+ * The echo is the head; «дръж под 50 км/ч» is the only new instruction on the
+ * card, and deleting the detail to remove a duplicate would have deleted it.
+ * That is this repo's one forbidden direction — a fix for noise that costs a
+ * lesson — so the head comes off and the remainder stays.
+ *
+ * A PURE DUPLICATE IS LEFT ALONE, deliberately. When nothing survives the trim
+ * the detail was the line and nothing else, and emptying it would flip
+ * `hasWhy(item)` to false — i.e. turn a card that `requiresWhy` into a bare
+ * verdict, which doc 64 THEO-4 forbids outright. Printing one sentence twice is
+ * a cosmetic cost; a graded card with no explanation under it is not. So the
+ * queue takes the cheap win and refuses the expensive one.
+ *
+ * ── THE SEPARATOR, AND THE REFUSAL THAT COMES WITH IT ─────────────────────
+ *
+ * The separator between the two halves goes with the echo, and the set is
+ * `ECHO_SEPARATOR` below — deliberately the SAME set `advisorEchoTrim`
+ * (`LessonPlayShell.tsx`) strips on the roomy stage, including `!` and `?`.
+ *
+ * The first draft of this function stripped a NARROWER set than that, and
+ * asserted in this very docstring that the two agreed. They did not. Measured
+ * on real `selectOverlay` calls, the narrow set left the student reading
+ * «! Ти си на пешеходна пътека» and «? Провери огледалото» — the echo removed
+ * and its punctuation stranded as the first character of the card. The claim
+ * of parity was written before the parity was.
+ *
+ * AND A SEPARATOR SET CANNOT BE THE WHOLE ANSWER, because `itemEchoesLine`
+ * accepts ANY non-alphanumeric as the boundary (the `\p{L}\p{N}` test above) —
+ * «…», «(», «»», «/» all make it true, and none of them is a separator this
+ * trim knows how to remove. So the exit condition is not „did I strip a
+ * separator" but the mirror of the entry condition: WHAT IS LEFT MUST OPEN ON
+ * A WORD. If it does not, the trim is REFUSED and the detail is returned
+ * verbatim, because a sentence beginning «(внимателно) преди линията» is a
+ * fragment in the instructor's voice, and a fragment is the register the
+ * 2026-08-03 ruling removed. One sentence printed twice is the cheaper error —
+ * the same trade the pure-duplicate case above makes, for the same reason.
+ *
+ * ONE TRIM CALLED FROM BOTH SURFACES would be better than two that agree by
+ * inspection, and it is not done here: `advisorEchoTrim` is module-private to
+ * `LessonPlayShell.tsx` and answers a different question (it may return null,
+ * meaning „render no card at all", which a queue item cannot do). The
+ * agreement is hand-kept, this paragraph is the record of it, and
+ * `overlay-queue-moment.test.ts` holds both halves against real
+ * `selectOverlay` calls.
+ */
+const ECHO_SEPARATOR_RUN = /^[\s—–·,:;.!?-]+/u;
+
+function stripLineEcho(item: SimOverlayItem): SimOverlayItem {
+  if (!itemEchoesLine(item)) return item;
+  const detail = (item.detailBg ?? "").trim();
+  // Re-derive the head on the ORIGINAL casing: `itemEchoesLine` folds case to
+  // decide, but the string the student reads must keep the author's.
+  const head = detail.replace(/^\d+\.\s*/, "");
+  const tail = head.slice(item.lineBg.trim().length);
+  // Nothing after the echo → a PURE duplicate. Left alone on purpose; see above.
+  if (tail.trim() === "") return item;
+  const rest = tail.replace(ECHO_SEPARATOR_RUN, "").trim();
+  // …and what survives must open on a word, or this was a boundary the trim
+  // cannot clean and the card keeps its sentence whole.
+  if (rest === "" || !/^[\p{L}\p{N}]/u.test(rest)) return item;
+  return { ...item, detailBg: rest };
+}
+
 export function selectOverlay(
   candidates: ReadonlyArray<SimOverlayItem | null | undefined>,
   options: SelectOverlayOptions = {},
 ): OverlaySelection {
-  const items = candidates.filter((c): c is SimOverlayItem => c != null);
+  const items = candidates
+    .filter((c): c is SimOverlayItem => c != null)
+    // THE ECHO COMES OFF BEFORE ANYTHING RANKS — every item, not only the one
+    // that wins, because `waiting` is what the „+N" badge counts and what the
+    // sheet lists, and a duplicate sentence is a duplicate on both surfaces.
+    .map(stripLineEcho);
   // Over ALL candidates, and before the gate below — see `OverlaySelection.held`.
   const held = items.some((i) => i.blocking === true);
 
@@ -1031,17 +1131,27 @@ export function selectOverlay(
   }
   if (items.length === 0) return { active: null, queued: 0, waiting: [], held };
 
+  // THROUGH THE PUBLISHED PREDICATES, NOT PAST THEM — dead-predicate census,
+  // 2026-08-26. This sort read `PRIORITY` and this count read `AMBIENT`
+  // directly, while `overlayPriority` and `isAmbientOverlay` — the two
+  // functions the barrel exports and the two the queue's tests assert about —
+  // were called by nothing but those tests. The tables and the accessors could
+  // not drift (they are three lines apart), but the ASSERTIONS were about a
+  // path the shell never executed: `overlay-queue.test.ts` pinned the ordering
+  // of a function that was not the one doing the ordering. One call each fixes
+  // that, and costs a property lookup per item on a list that is never longer
+  // than the overlay kinds themselves.
   const ordered = items
     .map((item, index) => ({ item, index }))
     .sort((a, b) =>
-      PRIORITY[b.item.kind] - PRIORITY[a.item.kind] || a.index - b.index,
+      overlayPriority(b.item.kind) - overlayPriority(a.item.kind) || a.index - b.index,
     )
     .map((e) => e.item);
 
   const [active, ...waiting] = ordered;
   return {
     active,
-    queued: waiting.filter((i) => !AMBIENT.has(i.kind)).length,
+    queued: waiting.filter((i) => !isAmbientOverlay(i.kind)).length,
     waiting,
     held,
   };

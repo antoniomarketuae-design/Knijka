@@ -29,6 +29,8 @@
  *      Without this the whole thing is a function nothing renders.
  */
 
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 import {
   YIELD_CARD_LONG_WAIT_S,
@@ -153,6 +155,62 @@ describe("a wait ended by something outside the car never gets a second card", (
     );
     expect(covered.sort()).toEqual([...LOOK_AND_GO_REASONS].sort());
     for (const reason of DECLARED_ELSEWHERE) expect(yieldCardCopyCoversLongWait(reason)).toBe(false);
+  });
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     …AND THE GATE ASKS THIS PREDICATE RATHER THAN ITS OWN COPY OF IT.
+
+     Written 2026-08-26, and it is the row the two above could not supply. Both
+     of them call `yieldCardCopyCoversLongWait` and `yieldWaitAdvisorPrompt`
+     SEPARATELY and assert each is right on its own; neither would notice the two
+     drifting apart, because until this commit the gate did not read the
+     predicate — it re-derived the same test inline. The predicate answered a
+     question nothing in the product asked.
+
+     This row asserts the IDENTITY: for every reason, at a wait past the
+     threshold, the card changes if and only if the predicate says that reason
+     has a second card. It fails the moment somebody gives `redLight` or
+     `pedestrian` a `longCardBg` without deciding that the predicate agrees — the
+     „tidiness" edit the predicate's own docstring names as the thing it exists
+     to stop.
+
+     WHAT IT DOES NOT CATCH, and the row below exists because of it: the
+     predicate IS `YIELD_VOICE_COPY[reason].longCardBg !== undefined`, so a
+     gate that went back to asking `copy.longCardBg` directly would behave
+     IDENTICALLY and every assertion here would stay green. Measured, not
+     argued — the wire was reverted and 15/15 passed.
+     ═══════════════════════════════════════════════════════════════════════ */
+  it("the card moves at the threshold EXACTLY where the predicate says it may", () => {
+    for (const reason of [...LOOK_AND_GO_REASONS, ...DECLARED_ELSEWHERE]) {
+      const opening = yieldWaitAdvisorPrompt(reason).textBg;
+      const atThreshold = yieldWaitAdvisorPrompt(reason, YIELD_CARD_LONG_WAIT_S).textBg;
+      const moved = atThreshold !== opening;
+      expect(moved, `${reason}: the gate and the predicate must not disagree`).toBe(
+        yieldCardCopyCoversLongWait(reason),
+      );
+      // …and one second under the threshold nobody moves, whatever the split
+      // says — the transition is the predicate's to allow and the clock's to
+      // trigger, and neither may do the other's job.
+      expect(
+        yieldWaitAdvisorPrompt(reason, YIELD_CARD_LONG_WAIT_S - 1).textBg,
+        `${reason}: below the bar`,
+      ).toBe(opening);
+    }
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE SOURCE PIN — because the identity above is a tautology.
+
+     Written 2026-08-26, after a verifier caught this file claiming a guard it
+     did not provide. A behavioural test cannot tell the two spellings apart,
+     because they compute the same boolean. Only reading the gate can.
+     ═══════════════════════════════════════════════════════════════════════ */
+  it("the gate in advisor.ts CALLS the predicate, not its own copy of it", () => {
+    const src = readFileSync(new URL("../advisor.ts", import.meta.url), "utf8");
+    const at = src.indexOf("const textBg =");
+    expect(at, "the long-wait gate moved — re-point this pin").toBeGreaterThan(-1);
+    const gate = src.slice(at, at + 240);
+    expect(gate).toContain("yieldCardCopyCoversLongWait(reason)");
   });
 });
 

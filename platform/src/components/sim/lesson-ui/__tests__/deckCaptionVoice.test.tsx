@@ -88,7 +88,37 @@ import {
   DECK_TOUCH_CAPTION_HEIGHT_PX,
 } from "@/modules/sim/hud";
 import type { ScenarioTrace, TraceClock } from "@/modules/sim/traces";
-import { captionDeadAirPx, captionSpeakerBg, TraceTimeline } from "../TraceTimeline";
+import { captionSpeakerBg, TraceTimeline } from "../TraceTimeline";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE DEAD-AIR ARITHMETIC LIVES HERE NOW — moved out of `TraceTimeline.tsx`
+   on 2026-08-26, unchanged in every number.
+
+   The REPAIR for the 80 px is `mt-auto` on the caption card, in the component,
+   where it always was. This was the MEASUREMENT of the defect, and the
+   component exported it while nothing rendered by it — which reads as a rule
+   the component applies and got the row booked as fixed. Its own docstring
+   conceded the position: „the card is bottom-aligned now, so this is 0 at every
+   length the bank contains — but the function stays".
+
+   It is worth keeping, and this is the honest place for it: the box is a FIXED
+   138 px, so „how much of it is nothing?" is the question that has to keep
+   being answerable when somebody proposes putting a visible label inside it.
+   Asking it in the test costs the same and claims nothing.
+
+   The two card constants come with it, because they ARE the arithmetic: 18 px
+   of chrome is `px-3.5 py-2` plus a 1 px border on both edges, and 20 px is
+   Tailwind's `text-sm` line box. `DECK_ROOMY_CAPTION_HEIGHT_PX` is still
+   imported from the module above — it is a shipped length, and it is what the
+   caption box actually is.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ROOMY_CAPTION_CARD_CHROME_PX = 18;
+const ROOMY_CAPTION_LINE_PX = 20;
+
+function captionDeadAirPx(lines: number, boxPx: number = DECK_ROOMY_CAPTION_HEIGHT_PX): number {
+  const card = ROOMY_CAPTION_CARD_CHROME_PX + Math.max(0, lines) * ROOMY_CAPTION_LINE_PX;
+  return Math.max(0, boxPx - card);
+}
 
 /* ─────────────────────────────────────────────────────────────────────────────
    1 · THE DEAD AIR, AS A NUMBER

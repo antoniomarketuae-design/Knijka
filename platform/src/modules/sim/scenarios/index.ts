@@ -38,7 +38,6 @@ export {
 export { scenarioForCode } from "./mapping";
 export {
   coachStep,
-  coachSession,
   type CoachInput,
   type CoachDecision,
   type CoachOptions,

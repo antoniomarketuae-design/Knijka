@@ -104,8 +104,11 @@ import {
   drawWorldLabel,
   WORLD_LABEL_GAP_M,
   WORLD_LABEL_H_M,
-  WORLD_LABEL_MAX_SCALE,
-  WORLD_LABEL_REF_DIST_M,
+  // The sizing rule AND the glance floor, in one call — see the block at the
+  // frame loop. `WORLD_LABEL_MAX_SCALE` / `WORLD_LABEL_REF_DIST_M` are no
+  // longer read here: this file used to re-derive the clamp inline, which is
+  // how the renderer and the instrument came to disagree in the first place.
+  worldLabelScaleFor,
   WORLD_LABEL_TEX_H,
   WORLD_LABEL_TEX_W,
   WORLD_LABEL_W_M,
@@ -1412,10 +1415,24 @@ function TrafficLights({
         // Constant apparent size past the reference distance — the caption has
         // to be readable at the 45 m where the drill's own card says «намали
         // отрано», not only at the line where the decision is already made.
-        const s = Math.min(
-          WORLD_LABEL_MAX_SCALE,
-          Math.max(1, labelDist / WORLD_LABEL_REF_DIST_M),
-        );
+        //
+        // …AND CONSTANT APPARENT SIZE IS NOT THE SAME AS READABLE, which is the
+        // half that was measured and never wired. `worldLabelScaleFor` draws the
+        // sizing rule above (`WORLD_LABEL_MAX_SCALE` and all) and then consults
+        // `worldLabelLineIsLegible` against THIS STAGE: 0.0198 × the stage
+        // height puts the headline at ~16 px on a desktop and ~7.8 px on the
+        // founder's phone in landscape, and only one of those clears the
+        // 20-arcminute glance floor. A card that already clears it is drawn
+        // exactly as before — see that function for why growing a readable
+        // plaque would be the same crime pointing the other way.
+        //
+        // The two readings are the frame's own: `size.height` is the stage in
+        // CSS px (not device px — the floor is derived in CSS px) and `fov` is
+        // the vertical field of view in degrees. An orthographic camera has no
+        // `fov`; `worldLabelScaleFor` reads the resulting NaN as „unmeasurable"
+        // and hands back the base scale rather than inventing growth.
+        const vFovRad = ((frame.camera as { fov?: number }).fov ?? Number.NaN) * (Math.PI / 180);
+        const s = worldLabelScaleFor(labelDist, frame.size.height, vFovRad);
         // THE HEAD'S OWN SCALE, and it is not a detail: every signal placement
         // in the product is emitted at `scale 1.5` (sx-v1 and pe-jay-v1 both
         // measured through `buildWorldGeometry`), so the housing crown stands

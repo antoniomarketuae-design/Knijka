@@ -134,17 +134,29 @@ export function parseDifficultyMode(v: unknown): DifficultyMode | null {
   return v === "beginner" || v === "normal" || v === "advanced" ? v : null;
 }
 
-/** Stored explicit choice if any, else DEFAULT_DIFFICULTY (client only). */
-export function loadDifficulty(): DifficultyMode {
-  try {
-    return (
-      parseDifficultyMode(window.localStorage.getItem(DIFFICULTY_STORAGE_KEY)) ??
-      DEFAULT_DIFFICULTY
-    );
-  } catch {
-    return DEFAULT_DIFFICULTY; // private mode / SSR — session default applies
-  }
-}
+/* `loadDifficulty` WAS HERE, AND THE PRODUCT RULED AGAINST THE QUESTION IT
+   ANSWERED — dead-predicate census, 2026-08-26.
+
+   It returned the stored explicit choice, else DEFAULT_DIFFICULTY, and the
+   only thing that ever called it was `difficulty.test.ts`. That is not an
+   oversight; it is a decision, written out in `LessonScene.tsx` at the state
+   this used to seed:
+
+     „It used to restore the last persisted click, which meant one press of
+      «Напреднал» silently pinned every subsequent scenario to the manual tier
+      — the founder hit that reviewing the 150 and could not tell why every
+      scene behaved differently from the one before. A tier is a choice about
+      THIS drive, not a setting that follows you around."
+
+   A scene now opens at `lesson.openingTier ?? DEFAULT_DIFFICULTY`. Keeping the
+   reader around invited exactly one future edit — „restore the preference" —
+   which is the defect the founder already paid to have removed.
+
+   `storeDifficulty` below is deliberately KEPT and is deliberately write-only:
+   the click is still recorded (the scene calls it), and the key contract above
+   is what a future surface that legitimately wants the preference — a settings
+   page, not a drive — would read. It is one `getItem` away and does not need a
+   reader parked in the bundle to stay possible. */
 
 /** Persist an explicit selector click (and ONLY that — see the key contract). */
 export function storeDifficulty(mode: DifficultyMode): void {

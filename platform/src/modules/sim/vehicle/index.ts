@@ -88,7 +88,6 @@ export {
   DEFAULT_DIFFICULTY,
   DIFFICULTY_STORAGE_KEY,
   parseDifficultyMode,
-  loadDifficulty,
   storeDifficulty,
   // Domain-scaled governor (founder review R3 #37 — the motorway drill).
   governorCapKmh,

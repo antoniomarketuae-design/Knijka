@@ -75,7 +75,6 @@ export {
   l5BusyStreet,
   l5Fog,
   l5Night,
-  l5TightManeuver,
   l5Wet,
   l5WetGrip,
 } from "./complications";

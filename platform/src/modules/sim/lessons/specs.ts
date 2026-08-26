@@ -1031,8 +1031,18 @@ export function lessonById(id: string): LessonSpec | undefined {
   return ALL_LESSONS.find((l) => l.id === id);
 }
 
-/** Curriculum lessons sorted by order (the exam entry is NOT in here — it
- *  has its own gated card on /simulator, not a select-grid slot). */
-export function lessonsInOrder(): LessonSpec[] {
-  return [...LESSONS].sort((a, b) => a.order - b.order);
-}
+/* `lessonsInOrder` WAS HERE — dead-predicate census, 2026-08-26. It returned
+   `[...LESSONS].sort((a, b) => a.order - b.order)` and nothing outside
+   `__tests__/route-finish.test.ts` ever called it, because the ordering
+   question is already answered TWICE on the live path and neither answer could
+   have used this one:
+
+     · `progression.computeProgression` sorts its own argument — `const ordered
+       = [...lessons].sort((a, b) => a.order - b.order)` — before it walks the
+       unlock chain, so handing it a pre-sorted array changes nothing;
+     · `/simulator/page.tsx` then sorts the MERGED list (curriculum + полигон,
+       orders 0.5 / 1.5 slotting the площадка cards between the lessons), which
+       is a list this function cannot express.
+
+   Wiring it into either would have been a call that changed no behaviour —
+   the kind of repair this census exists to stop. */

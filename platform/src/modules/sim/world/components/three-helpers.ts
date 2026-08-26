@@ -200,28 +200,25 @@ export function chunkTransforms<T extends { position: readonly [number, number, 
   return [...cells.values()];
 }
 
-/**
- * `createInstancedMesh`, chunked: one cullable InstancedMesh per occupied
- * grid cell. Names are suffixed `-c<N>` so a frame counter can still attribute
- * them to the family.
- */
-export function createChunkedInstancedMeshes(
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  transforms: readonly StaticTransform[],
-  options: { castShadow?: boolean; receiveShadow?: boolean; name?: string; chunkM?: number } = {},
-): THREE.InstancedMesh[] {
-  const groups = chunkTransforms(transforms, options.chunkM ?? PROP_CHUNK_M);
-  if (groups.length <= 1) {
-    return [createInstancedMesh(geometry, material, transforms, options)];
-  }
-  return groups.map((g, i) =>
-    createInstancedMesh(geometry, material, g, {
-      ...options,
-      name: options.name ? `${options.name}-c${i}` : undefined,
-    }),
-  );
-}
+/* `createChunkedInstancedMeshes` WAS HERE — dead-predicate census, 2026-08-26.
+   It was `createInstancedMesh` wrapped in `chunkTransforms`: one cullable
+   InstancedMesh per occupied grid cell, names suffixed `-c<N>`. It landed in
+   1d6b42c and no world builder ever called it — declaration only, zero tests.
+
+   THE OPTIMISATION IS NOT DEAD; ONLY THIS GENERIC WAS. `chunkTransforms` above
+   IS live: `WorldProps.tsx` imports it and calls it, and its private
+   `createTreeInstancedMeshes` is this same shape written against
+   `createTreeInstancedMesh` (per-instance yaw AND non-uniform scale, which
+   `createInstancedMesh` does not do — which is exactly why the generic could
+   not be reused there and why nobody reused it). `PROP_CHUNK_MIN_INSTANCES` is
+   live too, as `chunkTransforms`'s default `minInstances`.
+
+   So the grid is measured, argued and running on the props that need it, and
+   what shipped beside it was a second door into the same room that nothing
+   walked through. Adopting it for a family that is currently ONE mesh would
+   have been a performance change — more draw calls for fewer triangles — made
+   to satisfy a census, on a box that cannot run the frame-cost drive that
+   decided the 600 m cell in the first place. */
 
 /**
  * Instanced mesh where each instance is offset from a base transform —

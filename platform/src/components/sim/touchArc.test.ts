@@ -143,7 +143,7 @@ function overlap(a: StageRect, b: StageRect): number {
  * SIDEWAYS IT GIVES THE BAND ITS LANE BACK — 2026-08-14, „FIX · FLANKS", and
  * this is the arithmetic PlayAreaStyles ships: `right` grows by FLANK_LANE_PX
  * and `width` loses the same 60 px, so the box's LEFT edge does not move and
- * `notifyColumnLeftFraction`'s 0.60 contract reads exactly what it read before.
+ * the column's 0.60 left-edge contract reads exactly what it read before.
  * Upright the column keeps its full 141 px — 141 − 60 is not a card — and the
  * separation is bought with height instead (`notifyColumnFloorPx`).
  */

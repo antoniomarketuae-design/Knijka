@@ -2,16 +2,50 @@ import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  hudCardFitsViewport,
   hudCardMaxWidthPx,
-  hudCardRenderedWidthPx,
-  FOUNDER_VIEWPORT_PX,
   HUD_CARD_MAX_WIDTH_CLASS,
   HUD_CARD_SIDE_GUTTER_PX,
-  NARROWEST_VIEWPORT_PX,
   TOAST_CARD_WIDTH_CLASS,
   TOAST_CARD_WIDTH_PX,
 } from "../hudPreferences";
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   THE GATE'S OWN FOUR, MOVED HERE FROM `hudPreferences.ts` ON 2026-08-26.
+
+   They shipped in the module for a week and were imported by this file and
+   nothing else — not by a component, not by the barrel, not by the app. A
+   device ladder and a „does this declaration fit" predicate are questions a
+   GATE asks; the HUD's own answer is the CSS clamp (`HUD_CARD_MAX_WIDTH_CLASS`)
+   that every card carries, and nothing in the running product ever computes a
+   fit, because nothing in it knows the viewport width in TypeScript. Keeping
+   them in the module made a test instrument look like a shipped measurement,
+   which is the exact confusion this wave was opened to clear. Not one
+   assertion below changed.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Narrowest viewport the product supports, px — iPhone SE / small Android in
+ * portrait. Every HUD card must fit HERE, not merely on the founder's phone.
+ */
+const NARROWEST_VIEWPORT_PX = 320;
+
+/** The founder's own device width, px — the frame the photo was taken on. */
+const FOUNDER_VIEWPORT_PX = 393;
+
+/**
+ * Does a card that DECLARES `declaredWidthPx` still fit? The clamp means the
+ * rendered width is `min(declared, max)`, so this asks the only question worth
+ * asking: is the declaration itself honest, or is it relying on the clamp to
+ * rescue it (which silently shrinks a card designed to be readable)?
+ */
+function hudCardFitsViewport(declaredWidthPx: number, viewportWidthPx: number): boolean {
+  return declaredWidthPx <= hudCardMaxWidthPx(viewportWidthPx);
+}
+
+/** What the card actually renders at, once the clamp is applied. */
+function hudCardRenderedWidthPx(declaredWidthPx: number, viewportWidthPx: number): number {
+  return Math.min(declaredWidthPx, hudCardMaxWidthPx(viewportWidthPx));
+}
 
 /**
  * =============================================================================

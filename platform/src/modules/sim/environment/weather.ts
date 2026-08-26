@@ -598,14 +598,20 @@ export function useRainIntensity(): number {
   );
 }
 
-/** Fog intensity 0..1, quantized to 0.01 (occasional React consumers). */
-export function useFogIntensity(): number {
-  return useSyncExternalStore(
-    subscribe,
-    () => quantize(fogIntensity),
-    () => 0,
-  );
-}
+// `useFogIntensity` STOOD HERE AND NOTHING MOUNTED IT — removed 2026-08-26.
+//
+// Its three siblings all have live React consumers: `useWetness` and
+// `useSnowIntensity` in `StaticWorld.tsx`, `useRainIntensity` in
+// `WindshieldDroplets.tsx`. Fog has none, and it is not an oversight — fog is
+// the one channel of the four that no React tree ever needs, because it is
+// consumed per FRAME inside `SkyDome.tsx` (`getFogIntensity()` at the imperative
+// getter, in the render loop, deliberately outside React so a 0.01 step does not
+// re-render the scene graph). The hook's own doc string said „occasional React
+// consumers" and there were none, in this tree or in any prior commit.
+//
+// It also had ZERO tests, so this deletion removes nothing that was ever
+// proved. `getFogIntensity` — the getter that actually paints the fog — is
+// untouched above and stays under `weather.test.ts`.
 
 /** Snow intensity 0..1, quantized to 0.01 (occasional React consumers). */
 export function useSnowIntensity(): number {

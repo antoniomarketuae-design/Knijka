@@ -4,9 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   deckCompactOpenWidthPx,
   deckTouchRowMinWidthPx,
-  notifyColumnLeftFraction,
   notifyColumnWidthPx,
-  rectIsInNotifyColumn,
   DECK_COMPACT_COLUMN_RESERVE_PX,
   DECK_ROOMY_CAPTION_HEIGHT_PX,
   DECK_ROOMY_OPEN_HEIGHT_PX,
@@ -45,6 +43,29 @@ import {
 /** The devices this product is judged on (tools/mobile/lib/devices.mjs) plus a
  *  laptop and the desktop the harness renders at. */
 const LADDER = [320, 360, 375, 390, 393, 430, 448, 640, 852, 1024, 1280, 1920];
+
+/**
+ * WHERE THE COLUMN'S LEFT EDGE LANDS, as a fraction of the viewport width.
+ *
+ * This used to be `notifyColumnLeftFraction`, EXPORTED from `notifyColumn.ts`,
+ * and the dead-predicate census of 2026-08-26 found that the declaration, one
+ * barrel line and this file were its entire existence — nothing on the
+ * /simulator path ever called it. So it shipped in the bundle to answer a
+ * question only a test asked.
+ *
+ * It is derived here instead, from the two things the SHIPPED column really is
+ * made of: `notifyColumnWidthPx` (which `TouchControls.tsx` calls at its own
+ * compact-stage measurement) and `NOTIFY_COLUMN_GUTTER_PX`. That is the
+ * important half — the sweep below still fails the moment either of those
+ * changes in a way that walks the column back onto the road, which is the only
+ * reason the number was ever computed.
+ */
+function notifyColumnLeftFraction(viewportWidthPx: number, compact: boolean): number {
+  if (!Number.isFinite(viewportWidthPx) || viewportWidthPx <= 0) return 1;
+  const left =
+    viewportWidthPx - NOTIFY_COLUMN_GUTTER_PX - notifyColumnWidthPx(viewportWidthPx, compact);
+  return left / viewportWidthPx;
+}
 
 describe("the column is at the right edge on every device in the ladder", () => {
   it("never lets its left edge come left of 60 % of the width", () => {
@@ -86,28 +107,26 @@ describe("the column is at the right edge on every device in the ladder", () => 
   });
 });
 
-describe("the acceptance predicate has teeth", () => {
-  // THE MEASUREMENT THE RENDERED FRAME IS JUDGED BY. Both examples are real:
-  // the first is the objective stack as it shipped this morning (measured at
-  // 1280×800: x = 353.1, w = 573.7), the second is where it lands after.
-  it("rejects the centred banner that was on the road, accepts the moved one", () => {
-    expect(rectIsInNotifyColumn({ x: 353.1, width: 573.7 }, 1280)).toBe(false);
-    expect(rectIsInNotifyColumn({ x: 948, width: 320 }, 1280)).toBe(true);
-  });
+/* ─────────────────────────────────────────────────────────────────────────────
+   „THE ACCEPTANCE PREDICATE HAS TEETH" STOOD HERE — retired 2026-08-26 with
+   `rectIsInNotifyColumn` itself, and the frames it held are kept because they
+   are the only part of it that was ever evidence:
 
-  it("rejects a card that is at the right edge but reaches back past the middle", () => {
-    // A full-width strip anchored right is the top-rail shape being replaced.
-    expect(rectIsInNotifyColumn({ x: 58, width: 323 }, 393)).toBe(false);
-  });
+     1280 × 800, the objective stack as it shipped that morning: x = 353.1,
+     w = 573.7 — centred, on the road. After the move: x = 948, w = 320.
+     393 CSS px portrait, the compact column: x = 239.5, w = 141.5.
+     The top-rail shape being replaced: x = 58, w = 323 at 393 — anchored
+     right and still reaching back past the middle.
 
-  it("rejects a card that is narrow but floating, not at the edge", () => {
-    expect(rectIsInNotifyColumn({ x: 800, width: 200 }, 1280)).toBe(false);
-  });
-
-  it("accepts the compact column on the founder's portrait phone", () => {
-    expect(rectIsInNotifyColumn({ x: 239.5, width: 141.5 }, 393)).toBe(true);
-  });
-});
+   Five green rows, and not one of them could fail on anything the product does:
+   the predicate judged a MEASURED rect and nothing in the running app has one.
+   The column is DECLARED (`NOTIFY_COLUMN_RIGHT_CSS`, `…WIDTH_CSS_COMPACT`,
+   handed to `SimOverlay` as inline lengths), and the only party that ever holds
+   a rect is the drive harness, which is `.mjs` under `tools/` and cannot import
+   this module. What actually keeps a card in the column is the block below —
+   the shipped CSS, generated from these same constants — and `hud-off-the-road`,
+   which pins the harness's own copy of the arithmetic to them.
+   ───────────────────────────────────────────────────────────────────────────── */
 
 describe("the shipped CSS is generated from the same constants", () => {
   it("expresses both widths as a self-limiting min()", () => {

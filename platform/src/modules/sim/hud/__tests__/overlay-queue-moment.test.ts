@@ -14,6 +14,7 @@ import {
   hasWhy,
   itemEchoesLine,
   requiresWhy,
+  selectOverlay,
   type SimOverlayItem,
   type SimOverlayKind,
 } from "../overlayQueue";
@@ -259,6 +260,126 @@ describe("the no-echo rule is now a predicate over any card, not a briefing conv
     // being a single short word.
     expect(itemEchoesLine({ lineBg: "Мини зоната", detailBg: "Мини зоната бавно" })).toBe(true);
     expect(itemEchoesLine({ lineBg: "Мини зона", detailBg: "Мини зоната бавно" })).toBe(false);
+  });
+
+  /**
+   * ── AND THE ONLY ROW THAT PROVES ANY OF THE ABOVE REACHES A STUDENT ────────
+   *
+   * Every case in this describe called the predicate directly, and every one of
+   * them was green for three commits during which `itemEchoesLine` had ZERO
+   * non-test callers — a rule that was correct, proved, and ran on no drive.
+   * From inside a suite the two are indistinguishable: a function called only
+   * by its own test looks exactly like a function called on every frame.
+   *
+   * So this row does not call the predicate at all. It calls `selectOverlay` —
+   * the queue's single chokepoint, which `LessonPlayShell.tsx:4429` invokes on
+   * every compact frame and whose `active` is what `SimOverlay` paints — and
+   * asserts what comes OUT. Unwire the predicate from the selector and this
+   * goes red while all fourteen isolation rows above stay green.
+   */
+  const echoItem = (over: Partial<SimOverlayItem> = {}): SimOverlayItem => ({
+    id: "task",
+    kind: "task",
+    tone: "neutral",
+    lineBg: "Мини контролната зона с готов кокпит",
+    detailBg: "Мини контролната зона с готов кокпит — дръж под 50 км/ч",
+    ...over,
+  });
+
+  it("CONSUMER — selectOverlay takes the echo off the item the student reads", () => {
+    const sel = selectOverlay([echoItem()]);
+    expect(sel.active).not.toBeNull();
+    // The head is gone…
+    expect(sel.active?.detailBg).toBe("дръж под 50 км/ч");
+    // …and the line itself is untouched — the trim is on the detail only.
+    expect(sel.active?.lineBg).toBe("Мини контролната зона с готов кокпит");
+  });
+
+  it("CONSUMER — a numbered body's echo comes off with its ordinal", () => {
+    const sel = selectOverlay([
+      echoItem({ lineBg: "Потегли по улицата", detailBg: "1. Потегли по улицата: дръж вдясно" }),
+    ]);
+    expect(sel.active?.detailBg).toBe("дръж вдясно");
+  });
+
+  it("CONSUMER — a genuine elaboration is carried through UNCHANGED", () => {
+    // The false-refusal direction, at the consumer rather than at the predicate:
+    // «Спринтирай» merely begins with «Спри» and must survive the queue intact.
+    const detailBg = "Спринтирай към целта";
+    const sel = selectOverlay([echoItem({ lineBg: "Спри", detailBg })]);
+    expect(sel.active?.detailBg).toBe(detailBg);
+    // …and so must an ordinary explanation that shares no head at all.
+    const why = "Ограничението е таван, не цел.";
+    const sel2 = selectOverlay([echoItem({ lineBg: "Превишена скорост", detailBg: why })]);
+    expect(sel2.active?.detailBg).toBe(why);
+  });
+
+  it("CONSUMER — a PURE duplicate keeps its detail, because emptying it deletes the WHY", () => {
+    // doc 64 THEO-4: no bare verdicts. A card that `requiresWhy` and whose
+    // detail is exactly its line would lose `hasWhy` if the queue deleted the
+    // duplicate, turning a graded card into a verdict with no explanation. One
+    // sentence printed twice is the cheaper error and this is the row that
+    // holds the queue to it.
+    const dup = { lineBg: "Мини зоната", detailBg: "Мини зоната" };
+    expect(itemEchoesLine(dup)).toBe(true);
+    const sel = selectOverlay([echoItem(dup)]);
+    expect(sel.active?.detailBg).toBe("Мини зоната");
+    expect(hasWhy(sel.active!)).toBe(true);
+  });
+
+  it("CONSUMER — the trim reaches the WAITING rows too, not only the winner", () => {
+    // `waiting` is what the sheet lists and what the „+N" badge counts, so an
+    // echo that survives there is on the glass just the same.
+    const sel = selectOverlay([
+      echoItem({ id: "teach", kind: "teach", lineBg: "Спри преди стоп-линията", detailBg: "чл. 47" }),
+      echoItem(),
+    ]);
+    expect(sel.active?.id).toBe("teach");
+    expect(sel.waiting.map((w) => w.detailBg)).toEqual(["дръж под 50 км/ч"]);
+  });
+
+  /**
+   * ── THE PUNCTUATION THE ECHO LEAVES BEHIND, AND THE ROWS THAT MEASURE IT ──
+   *
+   * The first version of `stripLineEcho` removed a NARROWER set of separators
+   * than `itemEchoesLine` accepts as a boundary, and its own docstring claimed
+   * the two agreed. Driven through the real `selectOverlay`, the student read:
+   *
+   *     lineBg «Спри»  detailBg «Спри! Ти си на пешеходна пътека»
+   *       →  «! Ти си на пешеходна пътека»
+   *
+   * — the duplicate removed and its exclamation mark left standing as the first
+   * character of the card. Two rows, because there are two halves to hold: the
+   * separators the trim now DOES take, and the boundaries it must REFUSE
+   * rather than strand. Both call `selectOverlay`, not the predicate.
+   */
+  it("CONSUMER — «!» and «?» leave with the echo instead of opening the card", () => {
+    const bang = selectOverlay([
+      echoItem({ lineBg: "Спри", detailBg: "Спри! Ти си на пешеходна пътека" }),
+    ]);
+    expect(bang.active?.detailBg).toBe("Ти си на пешеходна пътека");
+    const query = selectOverlay([
+      echoItem({ lineBg: "Спри", detailBg: "Спри? Провери огледалото" }),
+    ]);
+    expect(query.active?.detailBg).toBe("Провери огледалото");
+  });
+
+  it("CONSUMER — a boundary the trim cannot clean is REFUSED, not stranded", () => {
+    // `itemEchoesLine` calls ANY non-alphanumeric a boundary, which is wider
+    // than the separator run the trim can remove. Where the two disagree the
+    // card keeps its sentence whole: one sentence printed twice is cheaper than
+    // one that opens on «(» or «…», which reads as a fragment in the
+    // instructor's voice.
+    for (const detailBg of [
+      "Спри… после тръгни",
+      "Спри (внимателно) преди линията",
+      "Спри»  преди знака",
+      "Спри /  провери",
+    ]) {
+      expect(itemEchoesLine({ lineBg: "Спри", detailBg }), detailBg).toBe(true);
+      const sel = selectOverlay([echoItem({ lineBg: "Спри", detailBg })]);
+      expect(sel.active?.detailBg, detailBg).toBe(detailBg);
+    }
   });
 });
 

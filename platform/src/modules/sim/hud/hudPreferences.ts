@@ -161,40 +161,32 @@ export const HUD_CARD_SIDE_GUTTER_PX = 12;
  */
 export const HUD_CARD_MAX_WIDTH_CLASS = "max-w-[calc(100vw-1.5rem)]";
 
-/**
- * Narrowest viewport the product supports, px — iPhone SE / small Android in
- * portrait. Every HUD card must fit HERE, not merely on the founder's phone.
- */
-export const NARROWEST_VIEWPORT_PX = 320;
-
-/** The founder's own device width, px — the frame the photo was taken on. */
-export const FOUNDER_VIEWPORT_PX = 393;
-
-/** Widest a HUD card may be on a `viewportWidthPx`-wide screen. */
+/** Widest a HUD card may be on a `viewportWidthPx`-wide screen — the px form of
+ *  the class above, so the gate and the cards read one number. */
 export function hudCardMaxWidthPx(viewportWidthPx: number): number {
   return Math.max(0, viewportWidthPx - HUD_CARD_SIDE_GUTTER_PX * 2);
 }
 
-/**
- * Does a card that DECLARES `declaredWidthPx` still fit? The clamp means the
- * rendered width is `min(declared, max)`, so this asks the only question worth
- * asking: is the declaration itself honest, or is it relying on the clamp to
- * rescue it (which silently shrinks a card designed to be readable)?
- */
-export function hudCardFitsViewport(
-  declaredWidthPx: number,
-  viewportWidthPx: number,
-): boolean {
-  return declaredWidthPx <= hudCardMaxWidthPx(viewportWidthPx);
-}
+/* ─────────────────────────────────────────────────────────────────────────────
+   FOUR SYMBOLS MOVED OUT OF THIS FILE — 2026-08-26, and where they went says
+   what they were: `NARROWEST_VIEWPORT_PX`, `FOUNDER_VIEWPORT_PX`,
+   `hudCardFitsViewport` and `hudCardRenderedWidthPx` now live at the top of
+   `__tests__/hud-card-fit.test.ts`.
 
-/** What the card actually renders at, once the clamp is applied. */
-export function hudCardRenderedWidthPx(
-  declaredWidthPx: number,
-  viewportWidthPx: number,
-): number {
-  return Math.min(declaredWidthPx, hudCardMaxWidthPx(viewportWidthPx));
-}
+   They were never re-exported from `hud/index.ts`, so by doc 05 nothing outside
+   this file could call them even in principle — and inside it, nothing did.
+   Their one importer was the gate that scans every HUD `.tsx` for an over-wide
+   declaration, which is a real and valuable gate and is untouched: a device
+   ladder and a „does this declaration fit" predicate are the QUESTIONS A GATE
+   ASKS, not values the running HUD reads. The HUD's own answer is a CSS clamp
+   (`HUD_CARD_MAX_WIDTH_CLASS`) applied by the cards themselves; nothing in the
+   product ever computes a fit at runtime, because nothing in the product knows
+   the viewport width in TypeScript.
+
+   Left here on purpose: `hudCardMaxWidthPx`, because it is the px reading of
+   the shipped clamp and TWO test files (this gate and `notify-column`) hold the
+   column against it, so it is the one shared number of the five.
+   ───────────────────────────────────────────────────────────────────────────── */
 
 /**
  * Tailwind classes that must stay in step with `TOAST_CARD_WIDTH_PX`.

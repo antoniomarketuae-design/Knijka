@@ -386,3 +386,67 @@ describe("readSpeedContract — which of the three numbers is being graded", () 
     expect(stricter).toBeGreaterThan(0);
   });
 });
+
+/**
+ * ===========================================================================
+ * THE REPORT HAS A READER — 2026-08-26.
+ *
+ * `lessonSpeedConflict`'s own docstring promises the contradiction is
+ * „reported rather than absorbed", and until this commit the only thing it was
+ * reported TO was the suite above. The bound half is live: `LessonScene`
+ * imports `lessonRequiredSpeedKmh` and hands the clamped number to the world as
+ * `lessonRequiredKmh`, so a district asking for 140 on a 50 map has its
+ * declaration silently reduced — the glass stays lawful and the lesson quietly
+ * becomes undriveable-as-authored with nothing anywhere naming the two numbers
+ * that fought. Detected, proved to five cases, and never said out loud.
+ *
+ * The warning now sits at the one place the bound is applied, which is also the
+ * one place a district is loaded. This block is the ADDRESS: it fails if
+ * `LessonScene` stops asking, so the visibility half cannot go back to being an
+ * assertion about itself.
+ * ===========================================================================
+ */
+describe("the contradiction reaches the surface that loads the district", () => {
+  const SCENE = readFileSync(
+    path.resolve(HERE, "../../../../components/sim/LessonScene.tsx"),
+    "utf8",
+  );
+
+  it("LessonScene asks for the conflict, on the same district it bounds", () => {
+    expect(SCENE).toContain("lessonSpeedConflict,");
+    expect(SCENE).toContain("const speedConflict = lessonSpeedConflict(district);");
+    // Bound and report are one act: both read the SAME `district` object, in
+    // the same build block, so a scene that clamps without asking is refused.
+    const build = SCENE.slice(
+      SCENE.indexOf("lessonRequiredKmh: lessonRequiredSpeedKmh(district)"),
+      SCENE.indexOf("} catch (err) {"),
+    );
+    expect(build.length).toBeGreaterThan(0);
+    expect(build).toContain("lessonSpeedConflict(district)");
+  });
+
+  it("…and it prints BOTH numbers, not merely that something was wrong", () => {
+    // A warning that says „speed bound" and no figures is the same silence with
+    // extra steps: the whole content of this report is which two numbers fought
+    // and which of them the map published.
+    const at = SCENE.indexOf("if (speedConflict !== null) {");
+    expect(at).toBeGreaterThan(-1);
+    const warn = SCENE.slice(at, at + 900);
+    expect(warn).toContain("speedConflict.declaredKmh");
+    expect(warn).toContain("speedConflict.maxLegalKmh");
+    expect(warn).toContain("speedConflict.source");
+  });
+
+  it("the shape it prints is the shape the function returns", () => {
+    // Pinned against a real conflict rather than against the type, so renaming
+    // a field breaks this row and not only the compiler.
+    const doc = fakeDistrict({ limits: [50, 40], scenario: { requiredSpeedKmh: 140 } });
+    const conflict = lessonSpeedConflict(doc);
+    expect(conflict).not.toBeNull();
+    expect(Object.keys(conflict!).sort()).toEqual(["declaredKmh", "maxLegalKmh", "source"]);
+    expect(conflict!.declaredKmh).toBe(140);
+    expect(conflict!.maxLegalKmh).toBe(50);
+    // …and the bound really did fire, so the warning is about a clamp that happened.
+    expect(lessonRequiredSpeedKmh(doc)).toBe(50);
+  });
+});

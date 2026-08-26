@@ -189,7 +189,35 @@ export function seedQualityLevel(): QualityLevel {
  */
 export function refreshSeededQuality(): QualityLevel {
   seededLevel = null;
-  return seedQualityLevel();
+  const level = seedQualityLevel();
+  // …AND IT LANDS IN THE STORE, 2026-08-26. Dropping the memo re-reads the
+  // ledger; it does NOT move `state.recommendation`, which is written exactly
+  // once — by `loadStored()` at module init — and is what `effectiveQuality()`
+  // returns for every student on `auto`. Without this line the half above was
+  // the same „applied at the next cold start" that the memo drop exists to end,
+  // one layer down:
+  //
+  //   probe measures 7 fps and writes the ledger → the student comes back to
+  //   this screen → the memo is dropped, `seedQualityLevel()` recomputes `low`
+  //   and the value is DISCARDED → the next lesson's `useQuality()` still
+  //   answers `med`, because nothing ever wrote it.
+  //
+  // It is worse than a stale tier, and this is the half that made it worth a
+  // line rather than a note: `useAutoQualityProbe` files its next sample under
+  // `effectiveQuality(getQualityState())` — the tier this store believes — while
+  // `<SceneSlot quality>` renders the tier the OTHER store (QualityPresetSelector,
+  // which `refreshQualityPreset()` does notify) resolved. A frame time paid at
+  // `low` recorded against `med` is a false ledger entry, and it then decides the
+  // cold start of every later session. That is precisely the disease the manual
+  // path's `setQualitySetting` mirror was added to cure; the auto path had it
+  // still open because `setQualityRecommendation` — the setter written for this
+  // exact call — had no caller anywhere in the tree.
+  //
+  // SAFE HERE AND NOWHERE ELSE, for the reason this whole function is: the
+  // canvas is unmounted, no drive is in progress, and the next lesson's texture
+  // budget has not been chosen. `setState` no-ops when the level is unchanged.
+  setQualityRecommendation(level);
+  return level;
 }
 
 /**

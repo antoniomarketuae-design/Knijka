@@ -5,7 +5,6 @@ import {
   notifyColumnMaxHeightPx,
   notifyColumnMirrorLanePx,
   notifyColumnTopPx,
-  rectClearsMirrorBand,
   MIRROR_BAND_BOTTOM_FRACTION_COMPACT_LANDSCAPE,
   MIRROR_BAND_BOTTOM_FRACTION_COMPACT_PORTRAIT,
   MIRROR_BAND_BOTTOM_FRACTION_ROOMY,
@@ -15,6 +14,9 @@ import {
   NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
   NOTIFY_COLUMN_TOP_CSS_ROOMY,
 } from "../notifyColumn";
+// The judgement, not the layout — see `mirrorBand.ts`'s header for why it is
+// here and not in the module the lengths ship from.
+import { rectClearsMirrorBand } from "./mirrorBand";
 import { OVERLAY_PEEK_HEIGHT_PX } from "../overlayQueue";
 import { hotspotScreenRect } from "../../scene/vitok/cabinLook";
 import { notifyColumnFloorPx } from "../../../../components/sim/TouchControls";

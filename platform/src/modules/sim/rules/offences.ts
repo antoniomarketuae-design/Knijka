@@ -93,9 +93,11 @@ import type { ViolationCode, ViolationEvent } from "./types";
  * — a lesson literally called „Пълзящо превишаване на скоростта", whose whole
  * subject is ONE speed that creeps — closed with `MISTAKES (4)` holding both
  * „Превишаване с повече от 10 км/ч" (опасна) and „Превишена скорост"
- * (второстепенна). Seven drives in that sweep carry both titles. `ladderIdentityFor`
- * is what lets the census see them; why the pair is REPORTED and not merged is
- * written at `LADDER_SHARED_LADDERS`.
+ * (второстепенна). Seven drives in that sweep carry both titles. The census that
+ * SEES them is `ladderIdentityFor` in `__tests__/offences.test.ts` (it lived in
+ * this file until 2026-08-26 — see the note beside `LADDER_SHARED_LADDERS`);
+ * why the pair is REPORTED and not merged is written at `LADDER_SHARED_LADDERS`,
+ * and the card that prints two prices for one act is still doing it.
  */
 export interface OffenceCharge {
   /** „ЗДвП чл. 183, ал. 4, т. 7“ — the penalty provision, as retrieved. */
@@ -362,24 +364,32 @@ export const GATED_SHARED_PROVISIONS: readonly GatedSharedProvision[] = [
  * as the data itself labels it, and the rung count — so two ladders cannot be
  * called one on prose alone.
  */
-export interface LadderIdentity {
-  /** The деяние the ladder prices, as retrieved. */
-  offenceBg: string;
-  /** Which alinea's ladder, in the retrieved row's own words. */
-  scopeBg: string;
-  /** Rung count — the structural half of the identity. */
-  tierCount: number;
-}
+/* `LadderIdentity` / `ladderIdentityFor` were declared here and moved to
+   `__tests__/offences.test.ts` on 2026-08-26. The census below is unchanged and
+   still measured on every run; what changed is where the reader of it lives, and
+   what this module claims by publishing it.
 
-export function ladderIdentityFor(code: ViolationCode): LadderIdentity | null {
-  const road = roadConsequenceFor(code);
-  if (road.kind !== "ladder") return null;
-  return {
-    offenceBg: road.offenceBg,
-    scopeBg: road.scopeBg,
-    tierCount: road.tiers.length,
-  };
-}
+   THE DEFECT IS STILL OPEN AND MUST BE SEEN TO BE. `FaultCard`'s `DerivedRung`
+   prints „Твоят случай" — the arithmetic, the money verdict and the контролни
+   точки of the rung the measured speed lands on — and on
+   `.audit-frames/sweep161/sc-speed-creep/pc-wrong` it printed TWO of them for one
+   creeping overspeed, „Превишаване с повече от 10 км/ч" (опасна) beside
+   „Превишена скорост" (второстепенна). Seven drives in that sweep carry both
+   titles.
+
+   This function made that pair VISIBLE TO A CENSUS. It did not stop the card
+   printing twice, and the block under `LADDER_SHARED_LADDERS` says why nothing
+   here can: collapsing the pair keeps the CHEAP rung (`billRoadConsequences`
+   picks the earliest member by time, and a creeping overspeed enters the
+   второстепенна band first), which is the same crime pointing the other way.
+   Closing it needs a ladder-aware `sharedChargeFor`, a primary chosen by
+   DECLARED order, and a founder ruling on whether one stretch that climbed from
+   +8 to +25 is one нарушение at the top band or two.
+
+   Two review rows were closed against this symbol — sc-roundabout-entry:217f9fc8
+   and sc-zebra-approach:1dff2165 — and both are reopened in
+   `.audit-frames/patches/REOPEN.jsonl`. A test-only census is worth keeping and
+   it is kept; it is not a repair of the card. */
 
 export interface LadderSharedSpec {
   offenceBg: string;

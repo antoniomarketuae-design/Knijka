@@ -151,6 +151,15 @@ describe("…AND THE SHEET ACTUALLY RENDERS IT", () => {
    * it. A copy module with a green unit test and no consumer is that shape
    * exactly, and the four cases above would all pass with the row deleted.
    *
+   * STATUS 2026-08-26, so this list is not read as still-true: a sweep for
+   * exactly this class found 75 candidates across the tree and wired 21 of
+   * them, `worldEdgeClearanceM`, `touchHintShouldHide` and `whyIsReachable`
+   * among them. They are read now. The paragraph above is kept in the past
+   * tense it belongs in, because the SHAPE is what this block guards against
+   * and the shape did not go away with those three — 30 more predicates in
+   * the same sweep answered questions the product never asks and were
+   * deleted instead.
+   *
    * MUTATION RUN: the whole `key: "sound"` item was commented out of the
    * PlayMenu array. This case went red; all four above stayed green. That gap
    * is the entire reason this block is here.

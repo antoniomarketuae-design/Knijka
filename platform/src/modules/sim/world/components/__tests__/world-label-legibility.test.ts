@@ -26,10 +26,14 @@
  * where lines DO clear the floor, so a future fix can be seen to work.
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
   WORLD_LABEL_GLANCE_FLOOR_CSS_PX,
+  WORLD_LABEL_LEGIBILITY_MAX_SCALE,
+  worldLabelScaleFor,
   WORLD_LABEL_H_M,
   WORLD_LABEL_LINE_PX,
   WORLD_LABEL_MAX_SCALE,
@@ -161,5 +165,103 @@ describe("the predicate discriminates — it does not condemn everybody", () => 
       expect(worldLabelApparentCssPx(WORLD_LABEL_LINE_PX.lawRef, 18, bad, PHONE_VFOV)).toBe(0);
       expect(worldLabelApparentCssPx(WORLD_LABEL_LINE_PX.lawRef, 18, PHONE_H, bad)).toBe(0);
     }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   …AND THE CONSUMER, WHICH FOR A WEEK DID NOT EXIST — 2026-08-26.
+
+   Everything above this line was true on 2026-08-19 and changed nothing a
+   student sees. `worldLabelLineIsLegible` had ONE importer in the whole tree —
+   this file — so no plaque was ever resized or refused for failing the glance
+   floor at runtime, and the next label to fall under it would have been caught
+   by nobody. The three rows the lane closed (sc-jx-equal-left, sc-junction-blind,
+   sc-jx-blocked-exit) rest on the `WORLD_LABEL_MAX_SCALE` clamp, which really
+   did ship — and which is a CEILING, so it can only ever make a card SMALLER
+   than the sizing rule asks for. It cannot answer a card that is too small.
+
+   `worldLabelScaleFor` is the missing half: the sizing rule, then the floor,
+   then a bounded amount of growth. `WorldProps` calls it once per frame for the
+   B35 signal-head caption — the shared channel this file's header says
+   everything is to migrate onto.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe("worldLabelScaleFor — the floor, applied where the card is drawn", () => {
+  it("leaves a card that ALREADY clears the floor exactly as the rule drew it", () => {
+    // The false-refusal direction, and on this channel it is expensive: the
+    // plaque hangs over the junction the student is trying to read, so a card
+    // that grew where it was already legible is furniture on the one part of
+    // the frame that matters. The PC play area clears the floor at the
+    // reference distance (proved three blocks up), so nothing moves.
+    for (const d of [4, WORLD_LABEL_REF_DIST_M, 30, 45, 61]) {
+      expect(worldLabelScaleFor(d, PC_H, PC_VFOV), `${d} m`).toBe(worldLabelScaleAt(d));
+    }
+  });
+
+  it("grows the card on the handset — by the ratio it is short by, and no more", () => {
+    // 7.8 px against a 10.5 px floor at the reference distance: short by about
+    // 1.35, and that is exactly what it grows by. Not a round number and not a
+    // preference — the floor divided by the measurement.
+    const d = WORLD_LABEL_REF_DIST_M;
+    const apparent = worldLabelApparentCssPx(WORLD_LABEL_LINE_PX.headline, d, PHONE_H, PHONE_VFOV);
+    expect(apparent).toBeLessThan(WORLD_LABEL_GLANCE_FLOOR_CSS_PX);
+    const s = worldLabelScaleFor(d, PHONE_H, PHONE_VFOV);
+    expect(s).toBeCloseTo(worldLabelScaleAt(d) * (WORLD_LABEL_GLANCE_FLOOR_CSS_PX / apparent), 9);
+    // …and the card it produces really is legible, which is the only test that
+    // matters: the grown plane's headline stands ON the floor, not under it.
+    expect(apparent * (s / worldLabelScaleAt(d))).toBeCloseTo(
+      WORLD_LABEL_GLANCE_FLOOR_CSS_PX,
+      9,
+    );
+  });
+
+  it("never shrinks a card, and never grows past its own ceiling", () => {
+    for (const d of [1, 4, 18, 45, 61, 200]) {
+      const s = worldLabelScaleFor(d, PHONE_H, PHONE_VFOV);
+      expect(s, `${d} m`).toBeGreaterThanOrEqual(worldLabelScaleAt(d));
+      expect(s, `${d} m`).toBeLessThanOrEqual(WORLD_LABEL_LEGIBILITY_MAX_SCALE);
+    }
+    // A stage one pixel tall would ask for a plaque the size of the district;
+    // the ceiling is what stops the fix from becoming the next finding.
+    expect(worldLabelScaleFor(45, 1, PHONE_VFOV)).toBe(WORLD_LABEL_LEGIBILITY_MAX_SCALE);
+  });
+
+  it("an UNMEASURABLE stage changes nothing — it does not invent growth", () => {
+    // A canvas of zero height mid-resize, an orthographic camera with no `fov`
+    // (the top-down aid), a NaN out of a torn read. „I could not measure" is
+    // not evidence that the card is too small, and the direction that costs the
+    // student here is a 12 m plaque over the junction on a missing number.
+    for (const bad of [0, -1, Number.NaN]) {
+      expect(worldLabelScaleFor(45, bad, PHONE_VFOV), `height ${bad}`).toBe(worldLabelScaleAt(45));
+      expect(worldLabelScaleFor(45, PHONE_H, bad), `fov ${bad}`).toBe(worldLabelScaleAt(45));
+    }
+  });
+});
+
+describe("WorldProps draws the caption at the scale the floor asks for", () => {
+  // `WorldProps.tsx` is R3F and cannot be mounted here, so the binding is read
+  // as source — with the comments removed FIRST, because these files are
+  // thousands of lines of prose about exactly these constants and a scan that
+  // counted them would be satisfied by the paragraph explaining the fix rather
+  // than by the fix.
+  const SRC = readFileSync(join(__dirname, "../WorldProps.tsx"), "utf8");
+  const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join("\n");
+
+  it("the comment remover really removes comments", () => {
+    const inProse = "the card rendered INSIDE the housing";
+    expect(SRC).toContain(inProse);
+    expect(CODE).not.toContain(inProse);
+  });
+
+  it("the frame loop asks for the scale instead of re-deriving the clamp", () => {
+    expect(CODE).toContain("worldLabelScaleFor(labelDist, frame.size.height, vFovRad)");
+    // …and the inline clamp is GONE. While it stood beside the call the
+    // renderer and the instrument could disagree again without anything saying
+    // so, which is the condition that produced this whole family.
+    expect(CODE).not.toContain("WORLD_LABEL_MAX_SCALE");
+    expect(CODE).not.toContain("WORLD_LABEL_REF_DIST_M");
   });
 });

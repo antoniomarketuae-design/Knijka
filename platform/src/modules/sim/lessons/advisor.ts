@@ -1179,7 +1179,6 @@ const YIELD_VOICE_COPY: Record<YieldReason, YieldVoiceCopy> = {
  */
 export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): AdvisorPrompt {
   const copy = YIELD_VOICE_COPY[reason];
-  const longCard = copy.longCardBg;
   // An unreadable clock is NOT a long wait — the same direction the demo deck
   // and the touch hint take with an unreadable speed: a number nobody can read
   // must never be able to change what the student is being told.
@@ -1187,15 +1186,33 @@ export function yieldWaitAdvisorPrompt(reason: YieldReason, heldSec?: number): A
   // No key chips on EITHER card: the honesty rule of this file is that a chip
   // must name a control that PERFORMS the step, and neither „carry on doing
   // nothing" nor „look left again" is a key.
+  //
+  // THE SPLIT IS ASKED FOR, NOT RE-DERIVED (2026-08-26). This line read
+  // `longCard !== undefined`, which is the same question `yieldCardCopyCoversLongWait`
+  // answers — so the predicate that was written to hold the redLight/pedestrian
+  // refusal had no reader on the /simulator path, and the gate it was supposed
+  // to guard asked its own private version instead. Two spellings of one rule is
+  // how a later author closes that gap „for tidiness" in one of them and nothing
+  // fails: the predicate keeps saying no while the card starts saying go.
   const textBg =
-    longCard !== undefined && held >= YIELD_CARD_LONG_WAIT_S ? longCard : copy.cardBg;
+    yieldCardCopyCoversLongWait(reason) && held >= YIELD_CARD_LONG_WAIT_S
+      ? (copy.longCardBg ?? copy.cardBg)
+      : copy.cardBg;
   return { textBg, keys: [] };
 }
 
 /**
  * Which duties carry a second card — read by the gate, not by the shell.
  *
- * Exported so `advisor-yield-long-wait.test.ts` can assert the SPLIT rather
+ * „Read by the gate" became true on 2026-08-26 and was not before:
+ * `yieldWaitAdvisorPrompt` above now asks THIS function whether a reason has a
+ * long-wait card, instead of asking `copy.longCardBg !== undefined` itself. The
+ * two are the same question, and the whole value of the predicate is that the
+ * redLight/pedestrian refusal is stated in ONE place — a second spelling inside
+ * the gate is how somebody later gives those two a long card „for tidiness"
+ * while this function, and the test that reads it, keep saying they have none.
+ *
+ * Also exported so `advisor-yield-long-wait.test.ts` can assert the SPLIT rather
  * than the five strings: the property that matters is that exactly the
  * look-and-go duties have one, and adding a sixth `YieldReason` must make
  * somebody decide which side it falls on.

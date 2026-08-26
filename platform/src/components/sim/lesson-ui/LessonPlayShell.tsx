@@ -1383,14 +1383,25 @@ export function notifyColumnCapPx(stageHeightPx: number, columnTopPx: number): n
  * @param gapsPx          the column's own `gap-1.5` between the children present
  * ═══════════════════════════════════════════════════════════════════════════
  */
-export function notifyColumnCutPx(
-  capPx: number,
-  unshrinkablePx: number,
-  toastStackPx: number,
-  gapsPx: number,
-): number {
-  return Math.max(0, unshrinkablePx + toastStackPx + gapsPx - capPx);
-}
+// …AND THE ARITHMETIC ITSELF IS GONE — 2026-08-26.
+//
+// `notifyColumnCutPx(capPx, unshrinkablePx, toastStackPx, gapsPx)` returned the
+// overflow in pixels, and it was never called by anything: declaration, two
+// mentions in comments, one describe block in `shellClipAffordances.test.ts`.
+// Everything above this line is worth keeping and none of it needs the
+// function, because THE FIX IS NOT A MEASUREMENT — it is the CSS four hundred
+// lines down: `min-h-0` on the toast scroller plus a shrink weight of 1, which
+// makes the stack the column's last-resort yielder so the deficit is absorbed
+// by SCROLLING instead of by `overflow-hidden` guillotining the last card. That
+// shipped, it is live on every lesson, and it is what the seven findings above
+// were closed against.
+//
+// A runtime consumer would also have been the wrong shape. The deficit this
+// computed is exactly what flexbox already resolves during layout, so a React
+// re-implementation of it could only ever be a second opinion about a number
+// the engine had already acted on — and the affordance the student needs
+// («↓ още N») is counted in CARDS off the painted DOM by `measureToastFold`,
+// not in pixels off an arithmetic model of it.
 
 /**
  * Sub-pixel slack for `scrollRemainingPx`, px. Fractional line boxes stack, so

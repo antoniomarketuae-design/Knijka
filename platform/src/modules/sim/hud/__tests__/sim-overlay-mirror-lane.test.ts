@@ -55,12 +55,13 @@ import {
   notifyColumnMaxHeightPx,
   notifyColumnMirrorLanePx,
   notifyColumnTopPx,
-  rectClearsMirrorBand,
   HAZARD_BAND_TOP_FRACTION,
   NOTIFY_COLUMN_MAX_STAGE_FRACTION,
   NOTIFY_COLUMN_TOP_CSS_COMPACT,
   NOTIFY_COLUMN_TOP_CSS_COMPACT_COLUMN,
 } from "../notifyColumn";
+// The judgement, not the layout — see `mirrorBand.ts`'s header.
+import { rectClearsMirrorBand } from "./mirrorBand";
 import { OVERLAY_PEEK_HEIGHT_PX } from "../overlayQueue";
 import { PEEK_SCRIM_FEATHER_PX, SIM_OVERLAY_COLUMN_FLOOR_CSS } from "../SimOverlay";
 import {

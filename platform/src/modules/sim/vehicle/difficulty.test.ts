@@ -11,7 +11,6 @@ import {
   governorCapKmh,
   GOVERNOR_BAND_KMH,
   governorIsEasing,
-  loadDifficulty,
   parseDifficultyMode,
   REQUIRED_SPEED_HEADROOM_KMH,
   storeDifficulty,
@@ -359,11 +358,21 @@ describe("default difficulty (founder ruling 2026-07-19)", () => {
     expect(parseDifficultyMode(2)).toBeNull();
   });
 
-  it("loadDifficulty: no storage at all (node env) → the default", () => {
-    expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
-  });
-
-  it("explicit stored choice is authoritative; absent/garbage → default", () => {
+  /**
+   * THE READER IS GONE; THE WRITER'S CONTRACT IS WHAT MATTERED.
+   *
+   * `loadDifficulty` was deleted on 2026-08-26 (dead-predicate census): this
+   * file was its only caller, and `LessonScene.tsx` states in as many words
+   * why nothing else may have one — a tier is a choice about THIS drive, and
+   * restoring it silently pinned every later scenario to the manual tier.
+   *
+   * What is still LIVE is `storeDifficulty`: the tier picker calls it on every
+   * click (LessonScene `setDifficulty`). Its whole contract is that the key is
+   * written ONLY on an explicit click, never eagerly with the default — that
+   * is what let the 2026-07-19 default flip reach users who never touched the
+   * selector — so that is what is asserted here.
+   */
+  it("storeDifficulty writes the explicit click, and only that", () => {
     const store = new Map<string, string>();
     vi.stubGlobal("window", {
       localStorage: {
@@ -372,19 +381,25 @@ describe("default difficulty (founder ruling 2026-07-19)", () => {
       },
     });
     try {
-      // Nothing stored (fresh user OR an existing user who never clicked the
-      // selector — the key is only ever written on an explicit click, so both
-      // look identical here): the new default applies.
-      expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
-      // Explicit click persists and stays authoritative over the default.
+      // Nothing is written before a click — a fresh user and an existing user
+      // who never touched the selector must look identical, so both follow
+      // whatever DEFAULT_DIFFICULTY currently says.
+      expect(store.has(DIFFICULTY_STORAGE_KEY)).toBe(false);
       storeDifficulty("beginner");
       expect(store.get(DIFFICULTY_STORAGE_KEY)).toBe("beginner");
-      expect(loadDifficulty()).toBe("beginner");
-      // Corrupted value degrades to the default, never throws.
+      storeDifficulty("advanced");
+      expect(store.get(DIFFICULTY_STORAGE_KEY)).toBe("advanced");
+      // …and whatever comes back out of that key is still parsed, never
+      // trusted: this is the guard for a hand-edited or stale value.
+      expect(parseDifficultyMode(store.get(DIFFICULTY_STORAGE_KEY))).toBe("advanced");
       store.set(DIFFICULTY_STORAGE_KEY, "turbo");
-      expect(loadDifficulty()).toBe(DEFAULT_DIFFICULTY);
+      expect(parseDifficultyMode(store.get(DIFFICULTY_STORAGE_KEY))).toBeNull();
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it("never throws where there is no storage at all (node env / private mode)", () => {
+    expect(() => storeDifficulty("normal")).not.toThrow();
   });
 });

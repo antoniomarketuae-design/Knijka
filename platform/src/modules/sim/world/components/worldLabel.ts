@@ -203,6 +203,74 @@ export function worldLabelLineIsLegible(
   );
 }
 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * …AND THE SCALE THAT ANSWERS IT — the consumer the predicate above never had.
+ *
+ * `worldLabelLineIsLegible` landed on 2026-08-19 as the answer to „the world
+ * plaque renders at ~6 px, unreadable". It was correct, it was tested, and it
+ * was imported by exactly one file: its own test. The clamp that DID ship
+ * (`WORLD_LABEL_MAX_SCALE`, applied in `WorldProps`) is a CEILING on growth, so
+ * it can only ever make the card smaller than the sizing rule asks for — it
+ * cannot answer a card that is too small. Nothing on the frame path consulted
+ * the floor, so nothing refused or resized a plaque for failing it.
+ *
+ * THE ARITHMETIC, so the number is not a preference. Past
+ * `WORLD_LABEL_REF_DIST_M` the caller grows the plane with distance, which
+ * holds APPARENT size constant — and a constant apparent size is a property of
+ * the VIEWPORT, not of the distance. At the reference distance with a 50° vFOV
+ * the 100 px headline stands at
+ *
+ *     viewportHeightCssPx × (100/470 × 1.5605 m) ÷ (2 × 18 m × tan 25°)
+ *
+ * ≈ 0.0198 × viewportHeightCssPx: about 16 px on a 800 px desktop stage and
+ * about 7.8 px on the founder's phone in landscape (393 CSS px tall). The
+ * desktop clears the 20-arcminute floor and the phone does not, by a factor of
+ * 1.35 — which is the whole of the complaint, and it is why a fix expressed in
+ * metres or in a fixed scale could not have worked: the same card is legible
+ * on one stage and not on the other.
+ *
+ * SO THE GROWTH IS GATED BY THE PREDICATE AND BOUNDED BY ITS OWN CEILING. A
+ * card that already clears the floor is left EXACTLY as the sizing rule drew it
+ * — a plaque that grew on a stage where it was already readable would be
+ * furniture over the junction the student is trying to see, which is the same
+ * cost the first-run touch hint was charged for. A card under the floor grows
+ * by the ratio it is short by, and never past
+ * `WORLD_LABEL_LEGIBILITY_MAX_SCALE`.
+ *
+ * UNKNOWN INPUTS CHANGE NOTHING. A viewport or a field of view this function
+ * cannot read (a stage of zero height mid-resize, an orthographic camera with
+ * no `fov`) returns the base scale: „I could not measure" is not evidence that
+ * the card is too small, and inventing growth from it would put a 12 m plaque
+ * over a junction on the strength of a missing number.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export const WORLD_LABEL_LEGIBILITY_MAX_SCALE = 2 * WORLD_LABEL_MAX_SCALE;
+
+/**
+ * The scale the caller should draw the card at: the sizing rule's own answer,
+ * raised only as far as the glance floor requires on THIS stage.
+ *
+ * `linePx` is the line that must be readable — the HEADLINE, because it is what
+ * the object IS and the rest is elaboration. Demanding the 38 px law line clear
+ * the floor would ask for a card four times the size of the junction, which is
+ * a refusal to teach dressed as a legibility fix.
+ */
+export function worldLabelScaleFor(
+  distM: number,
+  viewportHeightCssPx: number,
+  vFovRad: number,
+  linePx: number = WORLD_LABEL_LINE_PX.headline,
+): number {
+  const base = worldLabelScaleAt(distM);
+  if (!(viewportHeightCssPx > 0) || !(vFovRad > 0) || !(distM > 0)) return base;
+  if (worldLabelLineIsLegible(linePx, distM, viewportHeightCssPx, vFovRad)) return base;
+  const apparent = worldLabelApparentCssPx(linePx, distM, viewportHeightCssPx, vFovRad);
+  if (!(apparent > 0)) return base;
+  const needed = base * (WORLD_LABEL_GLANCE_FLOOR_CSS_PX / apparent);
+  return Math.min(WORLD_LABEL_LEGIBILITY_MAX_SCALE, Math.max(base, needed));
+}
+
 /** Paint one centred line, shrunk to fit inside the card. */
 function labelLine(
   g: CanvasRenderingContext2D,

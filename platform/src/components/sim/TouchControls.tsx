@@ -68,7 +68,9 @@
  *    would interrupt the first drive, tilt misbehaves under a landscape
  *    orientation lock and on a flat-propped tablet, and it is not deterministic
  *    for the rule engine — same three reasons the previous author rejected it,
- *    still true. TOUCH_STEER_MODE_STORAGE_KEY keeps the A/B seam open;
+ *    still true. (This line used to end „TOUCH_STEER_MODE_STORAGE_KEY keeps the
+ *    A/B seam open"; it did not — nothing ever read that key. See the block
+ *    where the seam stood.)
  *  - the old slider's travel was a FRACTION OF THE ZONE, so the same thumb
  *    movement steered differently on different phones. Full lock is now a fixed
  *    TOUCH_STEER_RANGE_PX (engine/touch.ts), which is the only version of this
@@ -143,24 +145,20 @@ import type { CabinControls, HeadlightSetting, IndicatorSetting } from "@/module
 import type { CameraMode, TopdownAidHandle } from "./CameraRig";
 
 // ---------------------------------------------------------------------------
-// Steer-mode setting seam (A/B: slider vs tilt). Only the thumb pad is
-// implemented; "tilt" intentionally falls back to it until a tilt source lands
-// (see the header rationale) — the flag exists so an A/B test can flip cohorts
-// without a schema change.
+// THE STEER-MODE A/B SEAM STOOD HERE AND IT WAS NOT A SEAM — removed 2026-08-26.
+//
+// `TouchSteerMode`, `TOUCH_STEER_MODE_STORAGE_KEY` and `readTouchSteerMode()`
+// shipped as „the flag exists so an A/B test can flip cohorts without a schema
+// change". Counted: ZERO readers. Not one line of this component, of any other
+// component, of any module, or of any TEST ever called the reader or named the
+// key — so writing `"tilt"` into `sim.touchSteerMode` on a real device flips
+// nothing and never could, because the tilt branch does not exist either.
+//
+// A flag nothing reads is not an open seam, it is a claim that a decision has
+// been prepared for. The three reasons tilt was rejected are in the header and
+// they stand on their own; when a tilt source actually lands, the setting comes
+// back with the branch that consumes it, in the same commit.
 // ---------------------------------------------------------------------------
-
-export type TouchSteerMode = "slider" | "tilt";
-export const TOUCH_STEER_MODE_STORAGE_KEY = "sim.touchSteerMode";
-
-export function readTouchSteerMode(): TouchSteerMode {
-  try {
-    return window.localStorage.getItem(TOUCH_STEER_MODE_STORAGE_KEY) === "tilt"
-      ? "tilt"
-      : "slider";
-  } catch {
-    return "slider";
-  }
-}
 
 /** setPointerCapture that survives an already-released pointer (races on
  *  fast taps; some webviews) — losing capture only degrades edge-tracking,
@@ -773,8 +771,17 @@ export function arcStationCount(side: "left" | "right"): number {
   return side === "left" ? ARC_STATIONS_LEFT : ARC_STATIONS_RIGHT;
 }
 
-/** The busier flank — what the band arithmetic and the sweeps have to clear. */
-export const ARC_STATIONS = Math.max(ARC_STATIONS_LEFT, ARC_STATIONS_RIGHT);
+/*
+ * `ARC_STATIONS = Math.max(ARC_STATIONS_LEFT, ARC_STATIONS_RIGHT)` used to sit
+ * here, described as „the busier flank — what the band arithmetic and the
+ * sweeps have to clear". Removed 2026-08-26: nothing read it, in this file or
+ * anywhere else, tests included. The band arithmetic 300 lines down does NOT go
+ * through a max — it hangs the left band off `STEER_PAD_H` and the right off
+ * `DRIVE_PAD_H` with `ARC_STATIONS_RIGHT` (`:1103`), which is the honest shape,
+ * because the two flanks have different pad heights and a single max cannot
+ * describe both. The paragraph above still says „`ARC_STATIONS` is a max"; the
+ * sentence survives as history of the argument, not as a live reference.
+ */
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * THE RUN IS GONE — 2026-08-14, „FIX · FLANKS". IT IS WHY HE CALLED THEM DEBRIS.
@@ -1147,7 +1154,7 @@ export const TOUCH_BAND_CSS_VARS = `
  *     right offset of `FLANK_LANE_PX` and takes the same width off it, so its
  *     box ends 8 px before the band starts and its LEFT edge does not move at
  *     all (852 − 59 − 12 − 240 = 541 before; 852 − 59 − 72 − 180 = 541 after —
- *     `notifyColumnLeftFraction` is unchanged and so is its 0.60 contract).
+ *     the column's left fraction is unchanged and so is its 0.60 contract).
  *     Having stopped sharing the lane, the column no longer has to clear the
  *     band's HEIGHT either — it only has to clear the drivetrain pad. That
  *     takes the compact cap from 128 px to 192 px on the founder's phone:

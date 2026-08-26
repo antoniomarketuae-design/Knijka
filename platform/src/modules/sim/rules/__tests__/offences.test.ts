@@ -30,7 +30,6 @@ import {
   OFFENCE_GROUPS,
   SEPARATE_ACTS,
   billRoadConsequences,
-  ladderIdentityFor,
   offenceCoversNoteBg,
   offenceGroupFor,
   sharedChargeFor,
@@ -39,6 +38,42 @@ import {
 import type { ViolationCode, ViolationEvent } from "../types";
 
 const ALL_CODES = Object.keys(VIOLATIONS) as ViolationCode[];
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE LADDER CENSUS'S READER LIVES HERE — moved out of `offences.ts` 2026-08-26.
+
+   `ladderIdentityFor` was exported from the rules module and imported by this
+   file and nothing else. Its own docstring said what it is for: it „lets the
+   CENSUS see" two ladder rows priced for one act — and the census is this test.
+   That is a legitimate thing to own, and it is owned here.
+
+   WHAT IT IS NOT is a repair of the defect it was written beside: `FaultCard`
+   still prints two „Твоят случай" rungs for one measured speed on
+   `sc-speed-creep/pc-wrong`, and `offences.ts` records why nothing in that
+   module can close it alone (collapsing the pair would keep the CHEAP rung, and
+   deciding otherwise needs a founder ruling). While the symbol sat in the
+   shipped module it read as the fix, and two criticals were closed against it —
+   sc-roundabout-entry:217f9fc8 and sc-zebra-approach:1dff2165, both reopened.
+
+   Read off the retrieved consequence and never inferred: the `offenceBg` the
+   ladder prices, the `scopeBg` naming which alinea's ladder it is in the data's
+   own words, and the rung count — so two ladders cannot be called one on prose.
+   ═══════════════════════════════════════════════════════════════════════════ */
+interface LadderIdentity {
+  offenceBg: string;
+  scopeBg: string;
+  tierCount: number;
+}
+
+function ladderIdentityFor(code: ViolationCode): LadderIdentity | null {
+  const road = roadConsequenceFor(code);
+  if (road.kind !== "ladder") return null;
+  return {
+    offenceBg: road.offenceBg,
+    scopeBg: road.scopeBg,
+    tierCount: road.tiers.length,
+  };
+}
 
 function at(code: ViolationCode, t: number): ViolationEvent {
   return makeViolation(code, t);

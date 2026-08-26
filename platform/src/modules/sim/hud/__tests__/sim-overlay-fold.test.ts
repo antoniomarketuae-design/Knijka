@@ -263,8 +263,13 @@ function rbExitSignalWindow() {
   const TITLE = 13.75;
   const BODY = 15.125;
   const rows = [
-    { top: 0, height: 2 * TITLE, lineHeight: TITLE },
-    { top: 2 * TITLE + 2, height: 11 * BODY, lineHeight: BODY },
+    { top: 0, height: 2 * TITLE, lineHeight: TITLE, body: false },
+    // …and the SECOND row is the explanation, which the window's `measure` now
+    // picks out by attribute for `whyIsReachable`. The stand-in carries the
+    // attribute because the real `<p>` does: a fake that answered `null` here
+    // would model a card with no WHY at all, which reads as REACHABLE — the
+    // reassuring direction, in the fixture rather than in the code.
+    { top: 2 * TITLE + 2, height: 11 * BODY, lineHeight: BODY, body: true },
   ];
   const el = {
     scrollTop: 0,
@@ -273,6 +278,8 @@ function rbExitSignalWindow() {
     getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 96 }),
     children: rows.map((r) => ({
       getBoundingClientRect: () => ({ top: r.top, left: 0, width: 180, height: r.height }),
+      getAttribute: (name: string) =>
+        name === "data-sim-overlay-body" && r.body ? "" : null,
       __lineHeight: r.lineHeight,
     })),
     __paddingBottom: 10,
@@ -399,6 +406,7 @@ describe("§RUN the mounted card measures its own window", () => {
     el.children = [
       {
         getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 150 }),
+        getAttribute: () => null,
         __lineHeight: 15,
       },
     ];
@@ -430,6 +438,7 @@ describe("§RUN the mounted card measures its own window", () => {
     el.children = [
       {
         getBoundingClientRect: () => ({ top: 0, left: 0, width: 180, height: 60 }),
+        getAttribute: () => null,
         __lineHeight: 15.125,
       },
     ];

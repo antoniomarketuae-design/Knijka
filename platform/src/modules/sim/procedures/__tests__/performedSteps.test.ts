@@ -10,8 +10,6 @@ import {
   PRE_DRIVE_STEP_CONTROLS,
   preDriveStepKind,
   readyToMoveOff,
-  resolveHotspotName,
-  type NamedNode,
   type PreDriveControlSignal,
 } from "../performedSteps";
 import { PRE_DRIVE_STEP_ORDER } from "../steps";
@@ -168,15 +166,14 @@ describe("step classification + control metadata", () => {
   });
 });
 
-describe("hotspot name resolution (doc 69 walk-up rule)", () => {
-  it("walks parents until a hotspot_* name matches", () => {
-    const root: NamedNode = { name: "hotspot_engine_start", parent: null };
-    const child: NamedNode = { name: "starter_bezel", parent: root };
-    const grandchild: NamedNode = { name: "", parent: child };
-    expect(resolveHotspotName(grandchild)).toBe("hotspot_engine_start");
-    expect(resolveHotspotName({ name: "dash_bake", parent: null })).toBeNull();
-    expect(resolveHotspotName(null)).toBeNull();
-  });
+describe("the doc-69 hotspot vocabulary", () => {
+  /* THE WALK-UP ROW STOOD HERE and went out with `resolveHotspotName` on
+     2026-08-26. It proved that a click on `hotspot_engine_start > starter_bezel
+     > <unnamed>` resolves to the hotspot — a correct rule for a cockpit nobody
+     has built. `VitokCockpit.tsx` binds `onPointerDown`/`onClick` per hotspot
+     MESH over a `spec` in the closure, so no pick is ever resolved by name and
+     no hotspot has children. The vocabulary itself is the contract and is
+     asserted below, unchanged. */
 
   it("isCockpitHotspotName accepts exactly the contract vocabulary", () => {
     for (const name of COCKPIT_HOTSPOT_NAMES) expect(isCockpitHotspotName(name)).toBe(true);

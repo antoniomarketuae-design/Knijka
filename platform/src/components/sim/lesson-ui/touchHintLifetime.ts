@@ -252,11 +252,15 @@
  * rather than early. Late costs a card on a stationary picture. Early costs a
  * lesson.
  *
- * ⚠ THE CEILING IS NOT WIRED YET, AND THIS PARAGRAPH IS HERE SO NOBODY READS THE
- *   ONE ABOVE AS A DESCRIPTION OF WHAT SHIPS. As of this commit `LessonScene`
- *   still calls `touchHintStandsDown(sampleRef.current.speedKmh)` — the speed
- *   exit alone. The rule, its bounds and its proof live here; the change that
- *   spends them lives in a file this lane does not own:
+ * ✔ WIRED 2026-08-26 — AND THE PARAGRAPH THIS REPLACES IS THE REASON THE WHOLE
+ *   DEAD-PREDICATE WAVE EXISTS. It read „⚠ THE CEILING IS NOT WIRED YET" and
+ *   sat here for four commits while `LessonScene` called
+ *   `touchHintStandsDown(sampleRef.current.speedKmh)` — the speed exit alone —
+ *   so the ceiling, its bounds, its 224-run derivation and its whole test file
+ *   graded exactly nothing that a student could see. A rule with a proof and no
+ *   caller is not half-shipped; it is unshipped with paperwork.
+ *
+ *   `LessonScene.tsx` now runs both exits, in these exact lines:
  *
  *     const hintRef = useRef<HTMLDivElement | null>(null);   // + on the card
  *     …
@@ -279,10 +283,13 @@
  *   the second argument. `__tests__/touchHintLifetime.test.ts` reads
  *   `LessonScene.tsx` as source and FAILS on a scene that reaches for the
  *   ceiling without the on-glass accumulator, so the half-wired version cannot
- *   land quietly. That block also asserts the CURRENT call, so it goes red the
- *   moment the edit lands — deliberately. Whoever makes it updates that
- *   assertion to `touchHintShouldHide(sampleRef.current.speedKmh, shownMs)` in
- *   the same commit, and the ceiling is live.
+ *   land quietly. Two rows there changed with this wiring: the one that pinned
+ *   the OLD call now pins `touchHintShouldHide(sampleRef.current.speedKmh,
+ *   shownMs)` and refuses a scene that still names `touchHintStandsDown(`
+ *   directly, and the on-glass guard — which used to be an `if` that was green
+ *   BECAUSE the symbol was dead — is now asserted flat. A third row pins
+ *   `ref={hintRef}` to the element carrying `data-hud="touch-hint"`, so the
+ *   clock cannot be quietly re-fed from the `showTouchHint` flag.
  *
  * ── THE HALF THAT IS EASY TO GET WRONG: AN AUTO-EXIT MUST NOT DELETE THE
  *    TEACHING ──────────────────────────────────────────────────────────────

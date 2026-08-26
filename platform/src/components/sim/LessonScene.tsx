@@ -171,7 +171,10 @@ import {
   initialParkingBrakeOnFor,
   type MirrorGlanceKind,
 } from "@/modules/sim/scene/cabin";
-import { lessonRequiredSpeedKmh } from "@/modules/sim/scene/lessonSpeedContract";
+import {
+  lessonRequiredSpeedKmh,
+  lessonSpeedConflict,
+} from "@/modules/sim/scene/lessonSpeedContract";
 import { TouchControls } from "./TouchControls";
 // The lesson clock's ceiling. Imported from `lesson-ui/` rather than declared
 // here because it has to be unit-testable in Node: this file drags in R3F,
@@ -183,7 +186,9 @@ import { sessionClockAdvance } from "./lesson-ui/sessionClock";
 // whole 3 min 39 s lesson. See that file's header for the four frames.
 import {
   TOUCH_HINT_POLL_MS,
-  touchHintStandsDown,
+  touchHintAccrue,
+  touchHintOnGlass,
+  touchHintShouldHide,
 } from "./lesson-ui/touchHintLifetime";
 // …and the SAME missing lifetime on the desktop twin of that card: the «⌨
 // Клавиши» legend opened itself on every mouse lesson and then printed key caps
@@ -205,6 +210,7 @@ import { buildMinimapPolylines } from "@/modules/sim/scene/lessonMinimap";
 import {
   applySignalModes,
   buildLessonWorldCore,
+  districtUrlFor,
   wireTrafficQueries,
   type LessonWorldCore,
 } from "@/modules/sim/scene/lessonWorldRecipe";
@@ -561,7 +567,14 @@ export default function LessonScene(props: LessonSceneProps) {
         // THE multi-map seam (doc 74 §5.2): the lesson spec names its world;
         // everything below is parameterized by the parsed document.
         const districtId = lessonDistrictId(props.lesson);
-        const res = await fetch(`/world/${districtId}.json`);
+        // THE URL IS THE RECIPE'S, NOT A SECOND COPY OF IT. `districtUrlFor`
+        // has existed beside `lessonDistrictId` since 46947ce and this line
+        // spelled the same template out again — so the address of a committed
+        // district lived in two places, one of which nothing read. The audit
+        // census that found it is the reason it is called here: a helper the
+        // scene re-derives inline is a helper that will drift the first time
+        // the world route moves.
+        const res = await fetch(districtUrlFor(props.lesson));
         if (!res.ok) throw new Error(`district ${districtId} ${res.status}`);
         const raw: unknown = await res.json();
         // THE drill's world recipe — extracted verbatim to lessonWorldRecipe
@@ -675,6 +688,31 @@ export default function LessonScene(props: LessonSceneProps) {
             // B7: и скоростта, която самият урок ИЗИСКВА (зелената вълна).
             lessonRequiredKmh: lessonRequiredSpeedKmh(district),
           });
+          // …AND THE BOUND SAYS SO WHEN IT BITES — wired 2026-08-26.
+          //
+          // `lessonRequiredSpeedKmh` silently clamps a district that asks the
+          // governor for a speed its own streets forbid. That clamp is right:
+          // it is what stops «РЕЖИМ Начинаещ ≤146» standing six pixels from a
+          // 50 disc. But a silent clamp turns a MIS-AUTHORED MAP into a lesson
+          // that merely feels wrong to drive — the declared speed is gone and
+          // nothing anywhere names the two numbers that fought.
+          //
+          // `lessonSpeedConflict` is that report, and until now it had no
+          // reader outside its own test: the contradiction was detected, proved
+          // to five cases, and never once said out loud on the surface where a
+          // district is actually loaded. One line, at the one place the bound
+          // is applied, so the next mis-authored district announces itself on
+          // the first drive instead of on the next audit sweep.
+          const speedConflict = lessonSpeedConflict(district);
+          if (speedConflict !== null) {
+            console.warn(
+              `LessonScene: ${lessonDistrictId(props.lesson)} declares` +
+                ` ${speedConflict.declaredKmh} km/h (${speedConflict.source}) but its own roads` +
+                ` allow at most ${speedConflict.maxLegalKmh} km/h — the lesson speed was bound` +
+                ` DOWN to the legal maximum. This lesson cannot be driven both as authored and` +
+                ` lawfully; the map or the declaration is wrong, not the student.`,
+            );
+          }
         }
       } catch (err) {
         console.error("LessonScene: failed to build world", err);
@@ -1354,6 +1392,11 @@ export function ReadyScene({
   const [perfLog] = useState(() => shouldLogPerf());
   const [touchSource] = useState(() => new TouchInputSource());
   const [showTouchHint, setShowTouchHint] = useState(shouldShowTouchHint);
+  /** The touch hint card's own element, read by the ceiling's painted clock.
+   *  `touchHintOnGlass` needs the NODE, not the flag: `showTouchHint` is true
+   *  for the whole ~18 s the briefing covers the card, and that is precisely
+   *  the stretch that must not be charged to the student's attention. */
+  const hintRef = useRef<HTMLDivElement | null>(null);
   /** Was this lesson opened INSIDE the pre-drive procedure? Captured once, at
    *  mount, because it decides a DEFAULT (the collapsed key legend) and a
    *  default must not flip halfway through a session. */
@@ -1425,10 +1468,37 @@ export function ReadyScene({
   // The poll runs only while the hint is up (a few seconds, once per device) and
   // reads one number off the sample the frame loop already writes — the frame
   // loop that grades gains no line for a piece of disappearing type.
+  //
+  // ── AND THE SECOND EXIT, wired 2026-08-26 ─────────────────────────────────
+  //
+  // The speed exit fires in 213 of the 224 measured mobile runs. The residue is
+  // the 11 where the car never once read above the moving floor — a lesson that
+  // is graded standing still, or a student who never pressed anything — and for
+  // those the card had no lifetime at all: bare white type across ~70 % of the
+  // interior rear-view mirror until the drive ended. `touchHintShouldHide` ORs
+  // the two, so the ceiling only ever ends a card the speed exit did not.
+  //
+  // THE CLOCK MUST BE A PAINTED CLOCK. Adding the poll interval to `shownMs`
+  // unconditionally is the wrong inlining, and it is wrong in the direction
+  // that costs a lesson (the test next door refuses that literal outright):
+  // this interval is born with the scene, and the card spends the first 17.1–21.8 s
+  // of every mobile lesson mounted and `display: none` behind the briefing. That
+  // would spend ~18 s of the ceiling before the card's first painted frame and
+  // then delete the words early, on a student who never saw them. So the tick
+  // goes through `touchHintAccrue(shownMs, touchHintOnGlass(hintRef.current))`,
+  // which advances only on a tick it can prove was painted — and a tick it
+  // cannot judge (null ref, detached node, backgrounded tab) advances nothing,
+  // pushing the ceiling LATER rather than earlier.
+  //
+  // Like the speed exit, this one calls the setter directly and never touches
+  // `sim.touchHintSeen`: an automatic exit may get the words out of the way, but
+  // only «РАЗБРАХ» may decide on the student's behalf that they were read.
   useEffect(() => {
     if (!showTouchHint) return;
+    let shownMs = 0;
     const id = window.setInterval(() => {
-      if (touchHintStandsDown(sampleRef.current.speedKmh)) setShowTouchHint(false);
+      shownMs = touchHintAccrue(shownMs, touchHintOnGlass(hintRef.current));
+      if (touchHintShouldHide(sampleRef.current.speedKmh, shownMs)) setShowTouchHint(false);
     }, TOUCH_HINT_POLL_MS);
     return () => window.clearInterval(id);
   }, [showTouchHint]);
@@ -2546,6 +2616,7 @@ export function ReadyScene({
           corridor's 161 px hazard-band ceiling. */}
       {showTouchHint ? (
         <div
+          ref={hintRef}
           data-hud="touch-hint"
           // Position and width come from PlayAreaStyles (one definition of the
           // corridor, from notifyColumn.ts). What is authored here is the SHAPE

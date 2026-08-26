@@ -55,7 +55,6 @@ import {
   notifyColumnCapPx,
   rowsBelowFold,
   rowsFullyBelowFold,
-  notifyColumnCutPx,
   SCROLL_REMAINING_SLACK_PX,
   scrollRemainingPx,
   TASK_ANNOUNCE_MS,
@@ -499,41 +498,32 @@ describe("the ИНСТРУКЦИИ list can be seen to be scrollable", () => {
    sc-ln-obstacle-meeting.
    ────────────────────────────────────────────────────────────────────────── */
 
-describe("notifyColumnCutPx · what the column takes out of the graded fault", () => {
+describe("the column takes nothing out of the graded fault", () => {
   /** The sweep's own roomy stage: 1165 × 650, column top 164 (the number
    *  notifyColumn.ts records from both engines) ⇒ cap 322. */
   const CAP = notifyColumnCapPx(650, 164);
-  /** ObjectiveBanner, measured on the shipped desktop layout. */
-  const BANNER_PX = 52;
-  /** One fault card. Doc 86 L14's own number, and `visibleToasts` shows TWO. */
-  const CARD_PX = 240;
-  /** The column's `gap-1.5`. */
-  const GAP_PX = 6;
 
-  it("THE FRAME, AS ARITHMETIC: 222 px of the second fault card, on the ordinary state", () => {
+  it("the cap is the sweep's own 322, which is what the deficit was against", () => {
     expect(CAP).toBe(322);
-    // Banner + two cards + two gaps, against the cap. Not an edge case: two
-    // cards is what the queue shows when two things went wrong.
-    const cut = notifyColumnCutPx(CAP, BANNER_PX, 2 * CARD_PX, 2 * GAP_PX);
-    expect(cut).toBe(222);
-    // 222 of the second card's 240 — 92 % of it — so eighteen pixels survive:
-    // its «ОПАСНА ГРЕШКА / −10 изпитни т.» header row and nothing under it. That
-    // is exactly the shape every one of the seven findings describes, and it is
-    // the worst possible shape: a verdict with its reason cut off is the bare
-    // verdict doc 64 THEO-4 forbids, delivered by a layout.
-    expect(cut / CARD_PX).toBeGreaterThan(0.9);
-    expect(CARD_PX - cut).toBe(18);
   });
 
-  it("…and it is not a cap that cuts a column with room — the other direction", () => {
-    // ONE card, the same stage: nothing is taken. A function that reported a cut
-    // here would make the affordance permanent chrome, which is the defect the
-    // briefing's own counter was reworked to avoid.
-    expect(notifyColumnCutPx(CAP, BANNER_PX, CARD_PX, GAP_PX)).toBe(0);
-    // …and a stage with no room at all does not report a negative cut.
-    expect(notifyColumnCutPx(0, BANNER_PX, CARD_PX, GAP_PX)).toBeGreaterThan(0);
-    expect(notifyColumnCutPx(1000, BANNER_PX, 2 * CARD_PX, 2 * GAP_PX)).toBe(0);
-  });
+  /* ── TWO ARITHMETIC ROWS STOOD HERE AND ARE GONE WITH `notifyColumnCutPx`
+        — 2026-08-26. Their numbers are the frame and are kept:
+
+          objective banner 52 + two 240 px fault cards + 2 × 6 px of `gap-1.5`
+          = 544 against a 322 px cap ⇒ **222 px cut**, i.e. 92 % of the second
+          card. Eighteen pixels survive: its «ОПАСНА ГРЕШКА / −10 изпитни т.»
+          header row and nothing under it — a verdict with its reason cut off,
+          which is the bare verdict THEO-4 forbids, delivered by a layout.
+          Two cards is not an edge case; it is what the queue shows when two
+          things went wrong.
+
+        What those two rows could NOT do is fail on anything the product does.
+        They exercised a pure function with four numbers typed into the test,
+        and the function had no caller anywhere in `platform/src` — so the
+        deficit it modelled could return in full and both rows would stay
+        green. The row below is the one that holds the fix, and it reads the
+        shipped source: the deficit is absorbed by a SCROLLER, not computed. ── */
 
   it("THE WIRING: the toast stack scrolls instead, with a bar and a counted row", () => {
     const scroller = CODE.slice(CODE.indexOf("data-hud-toast-scroller"));

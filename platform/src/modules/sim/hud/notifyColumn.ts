@@ -20,7 +20,12 @@
  * for them MOVED. So the acceptance test here is not a coverage percentage —
  * it is a POSITION, and a position can be asserted:
  *
- *     notifyColumnLeftFraction(w, compact) >= NOTIFY_COLUMN_MIN_LEFT_FRACTION
+ *     (w − NOTIFY_COLUMN_GUTTER_PX − notifyColumnWidthPx(w, compact)) / w
+ *         >= NOTIFY_COLUMN_MIN_LEFT_FRACTION
+ *
+ * — swept across the whole device ladder by `__tests__/notify-column.test.ts`,
+ * which owns that division (it used to be an exported `notifyColumnLeftFraction`
+ * here; see the block where it stood),
  *
  * i.e. on every device in the ladder the column's left edge is at or past 60 %
  * of the width, so the centre of the frame — the road, the vanishing point, the
@@ -124,12 +129,12 @@ export const NOTIFY_COLUMN_MIN_LEFT_FRACTION = 0.6;
    one pixel moves.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * The cockpit horizon, as a fraction of the canvas — `cabinLook.test.ts`'s own
- * assertion (`at([0.24, 0.71, 1e6]).y ≈ 0.58`), quoted here so the arithmetic
- * above can be re-run rather than trusted.
- */
-export const COCKPIT_HORIZON_FRACTION = 0.58;
+/* The cockpit horizon (0.58 of the canvas, `cabinLook.test.ts`'s own assertion)
+   was published from here as `COCKPIT_HORIZON_FRACTION` until 2026-08-26. It is
+   a datum for the derivation above, not a length this module applies — nothing
+   read it but `__tests__/hud-off-the-road.test.ts`, it was never in the barrel,
+   and no CSS string was ever derived from it. It now lives beside the assertion
+   that uses it, so this file publishes only numbers it spends. */
 
 /**
  * The top of the band a hazard is projected into, as a fraction of the stage.
@@ -294,24 +299,18 @@ export function notifyColumnMirrorLanePx(
   return stage.height * fraction + NOTIFY_COLUMN_MIRROR_GUTTER_PX;
 }
 
-/**
- * THE RULE, as a predicate a measured rect can be judged by — the mirror's
- * twin of `rectIsInNotifyColumn`.
- *
- * It asks about BOTH axes on purpose. A box in the LEFT corridor never touches
- * this mirror however high it is, and a rule that forgot to say so would drag
- * the top rail and the open deck down with the column (see the block below for
- * what that costs, measured).
- */
-export function rectClearsMirrorBand(
-  rect: { x: number; y: number; width: number },
-  stage: { width: number; height: number },
-  compact: boolean,
-): boolean {
-  if (!Number.isFinite(stage.width) || stage.width <= 0) return false;
-  if (rect.x + rect.width <= stage.width * MIRROR_BAND_LEFT_FRACTION) return true;
-  return rect.y >= notifyColumnMirrorLanePx(stage, compact);
-}
+/* THE RULE AS A PREDICATE — `rectClearsMirrorBand` — used to stand here, and it
+   moved to `__tests__/mirrorBand.ts` on 2026-08-26.
+
+   What this module OWES the mirror is a length, and it still ships it: the two
+   `NOTIFY_COLUMN_TOP_CSS_*` strings below are derived from the fractions above
+   and `PlayAreaStyles.tsx` writes both. The predicate is a different thing —
+   „here is a rect somebody MEASURED, is it legal?" — and nothing that paints
+   asks it, because the layout is a static length in a stylesheet and the only
+   party holding a measured box is a probe. Exported from here it read as a rule
+   the HUD applies, and a review row was closed on that reading. Its two inputs
+   are still imported from this file, so a fraction changed here still changes
+   the judgement there. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    WHY THE COMPACT DATUM BELOW DOES NOT CARRY THIS LANE, AND WHAT IT WOULD COST
@@ -482,27 +481,46 @@ export function notifyColumnWidthPx(viewportWidthPx: number, compact: boolean): 
   return Math.min(cap, viewportWidthPx * fraction);
 }
 
-/** Where the column's left edge lands, as a fraction of the viewport width. */
-export function notifyColumnLeftFraction(viewportWidthPx: number, compact: boolean): number {
-  if (!Number.isFinite(viewportWidthPx) || viewportWidthPx <= 0) return 1;
-  const left =
-    viewportWidthPx - NOTIFY_COLUMN_GUTTER_PX - notifyColumnWidthPx(viewportWidthPx, compact);
-  return left / viewportWidthPx;
-}
+/* `notifyColumnLeftFraction` WAS HERE — dead-predicate census, 2026-08-26.
+   It divided (viewportWidth − NOTIFY_COLUMN_GUTTER_PX − notifyColumnWidthPx)
+   by the width, and the only thing that ever called it was
+   `__tests__/notify-column.test.ts`: the declaration and one barrel line were
+   the entire non-test census. It shipped in every bundle so that one test file
+   could ask it a question.
 
-/** Is a measured rect inside the column — at the right edge, past the middle? */
-export function rectIsInNotifyColumn(
-  rect: { x: number; width: number },
-  viewportWidthPx: number,
-  /** Slack for sub-pixel layout and a card's own shadow, px. */
-  tolerancePx = 2,
-): boolean {
-  if (!Number.isFinite(viewportWidthPx) || viewportWidthPx <= 0) return false;
-  const leftOk = rect.x >= viewportWidthPx * NOTIFY_COLUMN_MIN_LEFT_FRACTION - tolerancePx;
-  const rightGap = viewportWidthPx - (rect.x + rect.width);
-  const rightOk = rightGap <= NOTIFY_COLUMN_GUTTER_PX * 2 + tolerancePx;
-  return leftOk && rightOk;
-}
+   THE RULE IT EXPRESSED IS NOT DELETED. It is the acceptance criterion at the
+   top of this file — the column's left edge at or past
+   NOTIFY_COLUMN_MIN_LEFT_FRACTION on every device in the ladder — and it is
+   still swept across the whole ladder, now derived in the test from the LIVE
+   `notifyColumnWidthPx` (which `TouchControls.tsx` really does call) and the
+   live gutter. Same arithmetic, same numbers, same verdict; one fewer function
+   in the shipped HUD. */
+
+// `rectIsInNotifyColumn` STOOD HERE AND NOTHING ASKED IT — removed 2026-08-26.
+//
+// It was a predicate for judging a MEASURED rect: „is this box in the column?"
+// Nothing in the running product ever has one. The column's position is not
+// discovered at runtime, it is DECLARED — `NOTIFY_COLUMN_RIGHT_CSS` and
+// `NOTIFY_COLUMN_WIDTH_CSS_COMPACT` are handed to `SimOverlay` as inline
+// lengths — so the only party that could ever hold a rect to compare against it
+// is an instrument outside the app: the mobile drive harness, which is `.mjs`
+// under `tools/` and cannot import this file at all.
+//
+// It was on the `hud` barrel, which made it look like a shipped rule. It was
+// read by one test.
+//
+// CORRECTED 2026-08-26 AT INTEGRATION. This paragraph used to end „Its twin
+// `rectClearsMirrorBand` below stays, and the difference is not sentiment:
+// that one is called by this module's own live code path." Both halves are
+// false now: the twin moved to `__tests__/mirrorBand.ts` in the same pass,
+// and it had no non-test caller either. The sentence was true of ONE lane's
+// tree and survived into a tree where the other lane had already moved the
+// twin — which is what an integration defect looks like when it is made of
+// prose instead of code, and why the comment above it says the opposite.
+// The fractions the deleted predicate read
+// (`NOTIFY_COLUMN_MIN_LEFT_FRACTION`, `NOTIFY_COLUMN_GUTTER_PX`) are unchanged
+// and still declared above, so the harness's own copy of this arithmetic can go
+// on being pinned to them by `hud-off-the-road.test.ts`.
 
 /** px → a rem literal, so the CSS below is generated from the constants above. */
 function rem(px: number): string {
@@ -657,7 +675,7 @@ export function notifyColumnTopPx(
  * The width given up here is bought back in height — the column's cap is no
  * longer the whole control band's floor, because the lanes are disjoint. Net at
  * 852 × 393: 240 × 128 = 30 720 px² → 180 × 192 = 34 560, and the LEFT edge does
- * not move, so `notifyColumnLeftFraction`'s 0.60 rule reads what it read before.
+ * not move, so the 0.60 left-edge rule reads what it read before.
  *
  * ── AND THE SWEEP RE-FILED THE DEFECT THIS LANE ALREADY CLOSED. REFUTED ON
  *    ITS OWN FRAME, 2026-08-19 ─────────────────────────────────────────────
@@ -894,18 +912,22 @@ export const CONTROLS_HELP_TOP_INSET_PX = 12;
  */
 export const RIBBON_LEGEND_LANE_PX = 39 + 8;
 
-/**
- * COMPACT: how far up the deck may float.
- *
- * `TOUCH_CONTROLS_FLOOR` is tuned on a PORTRAIT phone, where the pads stack;
- * applied to a 393 px-tall LANDSCAPE stage the same number lifts the deck to
- * y = 30, i.e. straight into the overlay peek at the top of this column
- * (measured 2026-08-03: deck at y 30.5, peek at y 8). Capping it at 45 % of the
- * stage keeps the portrait floor untouched — 45 % of 836 is larger than the
- * floor, so `min()` picks the floor — and drops the deck into the lower half of
- * the column in landscape, which is where a transport belongs.
- */
-export const NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT = "45%";
+/* `NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT` WAS HERE, AND IT DESCRIBED A RULE THE
+   PRODUCT HAD ALREADY THROWN AWAY — dead-predicate census, 2026-08-26.
+
+   It was the string "45%", and its own docstring explained why the compact
+   deck is capped at 45 % of the stage. `PlayAreaStyles.tsx` says the opposite,
+   in the imperative: „THE 45 % CAP IS GONE — 2026-08-10, row C1, and this is
+   the largest single overlap the row was opened on." The cap stopped the deck
+   being lifted into this column and did it by dropping the deck onto the thumb
+   controls instead — 1 861 px² of the horn button on an iPhone 16 landscape,
+   1 936 px² on the 780 × 360 Android. The shipped rule is now
+   `bottom: TOUCH_CONTROLS_FLOOR` and nothing else.
+
+   The constant survived the removal, exported from here and from the barrel,
+   read by nobody — a documented justification, in production code, for
+   behaviour the product deliberately does not have. That is worse than dead:
+   the next lane to read it would have believed it. */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    THE DECK WHEN IT IS OPEN, ON A PHONE — 2026-08-10.

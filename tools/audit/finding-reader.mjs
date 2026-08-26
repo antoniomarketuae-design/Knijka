@@ -256,9 +256,21 @@ export function loadClosures() {
     out.rejected = rejected;
     return out;
   }
+  // The repo root, so a REPO-RELATIVE evidenceFrame resolves from any cwd.
+  //
+  // MEASURED 2026-08-26: closures.jsonl held 534 rows — 528 absolute and 6
+  // repo-relative. `fs.existsSync` resolves a relative path against the
+  // PROCESS cwd, so those 6 resolved from the repo root and vanished from
+  // `platform/`. The open count was 511 or 517 depending on which directory
+  // you happened to be standing in, and `count-agreement.test.mjs` went red
+  // only under `cd platform && node scripts/tools-tests.mjs`. The docstring
+  // above this function says the failure mode it guards against is „a number
+  // that moves with no visible reason". It was moving with the shell's cwd.
+  const REPO = path.dirname(path.dirname(DIR));
   const resolves = (f) => {
     if (!f) return false;
-    for (const t of [f, String(f).split("\\").join("/")]) {
+    const slashed = String(f).split("\\").join("/");
+    for (const t of [f, slashed, path.resolve(REPO, String(f)), path.resolve(REPO, slashed)]) {
       try {
         if (fs.existsSync(t)) return true;
       } catch {

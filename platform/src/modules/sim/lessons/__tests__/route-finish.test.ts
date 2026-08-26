@@ -47,7 +47,7 @@ import {
   FINISH_STUCK_S,
 } from "../finish";
 import { parseObjectiveParams } from "../objectives";
-import { EXAM_LESSON, L7_PARKING_BAY, lessonById, lessonsInOrder } from "../specs";
+import { EXAM_LESSON, L7_PARKING_BAY, lessonById, LESSONS } from "../specs";
 import type { LessonSessionState, ObjectiveParams } from "../types";
 import { makeTick } from "./fixtures";
 
@@ -956,7 +956,7 @@ describe("routeFinishZone", () => {
 
 describe("every shipped lesson keeps a workable finish", () => {
   const shipped: LessonSpec[] = [
-    ...lessonsInOrder(),
+    ...LESSONS,
     EXAM_LESSON,
     ...["l8-poligon-basics"].flatMap((id) => {
       const l = lessonById(id);

@@ -5,13 +5,26 @@ import {
   notifyColumnMaxHeightCss,
   notifyColumnMaxHeightPx,
   notifyColumnWidthPx,
-  COCKPIT_HORIZON_FRACTION,
   HAZARD_BAND_TOP_FRACTION,
   NOTIFY_COLUMN_GUTTER_PX,
   NOTIFY_COLUMN_MAX_STAGE_FRACTION,
   NOTIFY_COLUMN_MIN_LEFT_FRACTION,
 } from "../notifyColumn";
 import { notifyColumnFloorPx } from "../../../../components/sim/TouchControls";
+
+/**
+ * The cockpit horizon, as a fraction of the canvas — `cabinLook.test.ts`'s own
+ * assertion (`at([0.24, 0.71, 1e6]).y ≈ 0.58`), quoted so the derivation of
+ * `HAZARD_BAND_TOP_FRACTION` can be re-run here rather than trusted.
+ *
+ * It lived in `notifyColumn.ts` as an `export const` until 2026-08-26 and this
+ * file was its only reader — not in the barrel, not read by any layout, and no
+ * CSS length derived from it. A number a shipped module publishes reads as a
+ * number that module USES; this one is a sanity datum for the row below, so it
+ * sits with the row. (Deleting it instead would have cost the one assertion that
+ * notices if the hazard band is ever raised into the sky.)
+ */
+const COCKPIT_HORIZON_FRACTION = 0.58;
 
 /**
  * =============================================================================

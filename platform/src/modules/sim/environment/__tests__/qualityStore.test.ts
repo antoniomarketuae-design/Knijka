@@ -117,6 +117,65 @@ describe("seedQualityLevel / refreshSeededQuality", () => {
     storage.set(LEDGER_KEY, JSON.stringify({ earned: "high", failedAt: null }));
     expect(refreshSeededQuality()).toBe("med");
   });
+
+  /* ═════════════════════════════════════════════════════════════════════════
+     …AND THE SEAM HAS TO REACH THE STORE, NOT ONLY ITS CALLER — 2026-08-26.
+
+     Every row above reads `refreshSeededQuality()`'s RETURN VALUE, and all four
+     stayed green while the store itself never moved: `state.recommendation` is
+     written exactly once, by `loadStored()` at module init, and it is what
+     `effectiveQuality()` answers for a student on `auto`. `LessonSelectScreen`
+     calls this function and discards the return value, so the measurement
+     reached `seedQualityLevel()` and stopped there.
+
+     The rows below assert the OTHER end of the wire — the one the canvas
+     actually reads (`SimEnvironment.tsx:146`, `WindshieldDroplets.tsx:190`, both
+     through `useQuality()` → `effectiveQuality(getQualityState())`). They fail
+     if `setQualityRecommendation` loses its only caller, which is the state this
+     module was in for the whole of the repair round that wrote it.
+     ═══════════════════════════════════════════════════════════════════════ */
+  it("the refreshed tier LANDS IN THE STORE the canvas reads", async () => {
+    const storage = installBrowser(PHONE);
+    const { refreshSeededQuality, effectiveQuality, getQualityState } = await freshStore();
+    expect(effectiveQuality(getQualityState())).toBe("low");
+    storage.set(LEDGER_KEY, JSON.stringify({ earned: "med", failedAt: null }));
+    refreshSeededQuality();
+    // NOT `refreshSeededQuality()`'s answer — the store's. This is the read
+    // `useQuality()` performs, and before the wire it still said "low".
+    expect(getQualityState().recommendation).toBe("med");
+    expect(effectiveQuality(getQualityState())).toBe("med");
+  });
+
+  it("…and it notifies subscribers, so a mounted canvas is not left stale", async () => {
+    const storage = installBrowser(PHONE);
+    const { refreshSeededQuality, subscribeQuality } = await freshStore();
+    let notified = 0;
+    const stop = subscribeQuality(() => {
+      notified += 1;
+    });
+    storage.set(LEDGER_KEY, JSON.stringify({ earned: "med", failedAt: null }));
+    refreshSeededQuality();
+    expect(notified).toBe(1);
+    // An unchanged tier is a no-op — `useSyncExternalStore` must not be woken
+    // for a value that did not move, on the one screen where a re-render costs
+    // the whole R3F tree.
+    refreshSeededQuality();
+    expect(notified).toBe(1);
+    stop();
+  });
+
+  it("…and a student's own choice still outranks the measurement", async () => {
+    // The direction that must NOT regress: `setting` is the student's, and a
+    // recommendation is only ever consulted while `setting === "auto"`.
+    const storage = installBrowser(PHONE);
+    const { refreshSeededQuality, setQualitySetting, effectiveQuality, getQualityState } =
+      await freshStore();
+    setQualitySetting("low");
+    storage.set(LEDGER_KEY, JSON.stringify({ earned: "med", failedAt: null }));
+    refreshSeededQuality();
+    expect(getQualityState().recommendation).toBe("med");
+    expect(effectiveQuality(getQualityState())).toBe("low");
+  });
 });
 
 describe("canvasMaxDpr", () => {

@@ -30,7 +30,6 @@ export {
   POLIGON_LESSONS,
   lessonById,
   lessonParkingBaysFor,
-  lessonsInOrder,
 } from "./specs";
 
 // A13 exam mode — official-limit termination fold (client + server shared)

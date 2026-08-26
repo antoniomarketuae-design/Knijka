@@ -10,7 +10,12 @@
  *   weather channel     — wetness / rain intensity the world & vehicle read
  *
  * Pure data/math (also consumed by tests):
- *   ENVIRONMENT_PRESETS, sunDirection, QUALITY_PRESETS, recommendQuality
+ *   ENVIRONMENT_PRESETS, sunDirection, QUALITY_PRESETS
+ *
+ * `ledgerFromSample` was listed here until 2026-08-26 and never exported. It
+ * is live — `qualityStore.ts` calls it — but its consumer is INSIDE this
+ * module, so it is not part of the public surface and a caller reaching for
+ * it through the barrel would have found nothing.
  */
 
 export { SimEnvironment, type SimEnvironmentProps } from "./SimEnvironment";
@@ -62,7 +67,6 @@ export type {
 
 export {
   QUALITY_PRESETS,
-  recommendQuality,
   seedQualityFromSignals,
   unknownDeviceSignals,
   medianFpsFromDeltas,
@@ -131,7 +135,9 @@ export type { ContextLossEvent } from "./contextLoss";
 export {
   useWetness,
   useRainIntensity,
-  useFogIntensity,
+  // No `useFogIntensity`: fog is read per frame by `SkyDome` through
+  // `getFogIntensity` below, deliberately outside React. The hook was removed
+  // 2026-08-26 — see the block in `weather.ts` where it stood.
   useSnowIntensity,
   getWetness,
   getRainIntensity,

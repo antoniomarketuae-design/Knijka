@@ -97,6 +97,7 @@ import {
   overlayMomentBg,
   OVERLAY_MOMENT_TICK_MS,
   OVERLAY_PEEK_HEIGHT_PX,
+  whyIsReachable,
   type SimOverlayItem,
   type SimOverlayTone,
 } from "./overlayQueue";
@@ -242,6 +243,60 @@ export function foldLinesBelow(
   const step =
     Number.isFinite(lineHeightPx) && lineHeightPx > 0 ? lineHeightPx : FOLD_FALLBACK_LEADING_PX;
   return Math.max(1, Math.round(hidden / step));
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * THE OTHER HALF OF THE FOLD, AND THE ONE THAT WAS MEASURED AND THROWN AWAY.
+ *
+ * `overlayQueue.whyIsReachable` asks „is this item's explanation reachable on
+ * the glass?" and takes two numbers it refuses to guess at: how many lines of
+ * the WHY the peek can print, and how many the item has. Its own header names
+ * this file as the owner of the measured half — „`SimOverlay.foldLinesBelow`
+ * already owns the measured half" — and for two rounds that was where the chain
+ * stopped: the predicate shipped with one importer, its test.
+ *
+ * This is the missing arithmetic. It is separate from `foldLinesBelow` because
+ * the two answer different questions about the same box: that one counts whole
+ * lines of ANYTHING still below the reader (the peek's «↓ още N реда» row, which
+ * is about scrolling), this one counts lines OF THE EXPLANATION inside and
+ * outside the cut window (which is about whether the reasoning arrived at all).
+ * A card whose line wraps to four rows and whose body is one row is not folded
+ * in the same sense as a card with a sentence on top of a document.
+ *
+ * COORDINATES. `row` is in SCROLL coordinates — `offsetTop` measured from the
+ * window's content top, the way `measure()` builds its rows — and `view` is the
+ * CUT window: `scrollTop` plus `foldWindowPx().bottomPx`, i.e. the snapped edge
+ * the fade stops at, never the raw `clientHeight`. Counting against the box
+ * would credit the student with the half-line the snap exists to stop showing.
+ *
+ * BOTH DIRECTIONS, and they are not symmetric. `visibleLines` FLOORS: crediting
+ * a line that is two thirds painted is the reassuring direction, and this
+ * project's every „0 defects" report came from an instrument that erred that
+ * way. `FOLD_SLACK_PX` is added first for the opposite reason — fractional line
+ * boxes make a row that fits exactly measure 44.99 px against a 15 px grain, and
+ * without the slack a whole visible body would report two lines of three.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+export function detailLinesInWindow(
+  row: { offsetTop: number; heightPx: number; lineHeightPx: number } | null,
+  view: { scrollTop: number; bottomPx: number },
+  slackPx: number = FOLD_SLACK_PX,
+): { visibleLines: number; detailLines: number } {
+  if (row === null || !(row.heightPx > 0)) return { visibleLines: 0, detailLines: 0 };
+  const step =
+    Number.isFinite(row.lineHeightPx) && row.lineHeightPx > 0
+      ? row.lineHeightPx
+      : FOLD_FALLBACK_LEADING_PX;
+  const detailLines = Math.max(1, Math.round(row.heightPx / step));
+  const top = row.offsetTop;
+  const bottom = row.offsetTop + row.heightPx;
+  const viewTop = view.scrollTop;
+  const viewBottom = view.scrollTop + view.bottomPx;
+  const overlap = Math.min(bottom, viewBottom) - Math.max(top, viewTop);
+  if (!(overlap > 0)) return { visibleLines: 0, detailLines };
+  const visibleLines = Math.min(detailLines, Math.max(0, Math.floor((overlap + slackPx) / step)));
+  return { visibleLines, detailLines };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -672,11 +727,22 @@ export function peekScrimMaskCss(
 function useFoldLines(key: string): {
   ref: RefObject<HTMLDivElement | null>;
   lines: number;
+  /** The explanation's own two numbers, for `whyIsReachable`. */
+  why: { visibleLines: number; detailLines: number };
   maskCss: string;
   onScroll: () => void;
 } {
   const ref = useRef<HTMLDivElement | null>(null);
   const [lines, setLines] = useState(0);
+  // Starts at 0/0, which `whyIsReachable` reads as „nothing authored to fold" —
+  // i.e. REACHABLE. That is the right start and it is the reason the server
+  // render raises no alarm: an unmeasured surface has not shown that the
+  // explanation was cut, and the direction that costs a student is the one that
+  // invents a verdict about a card nobody has laid out yet.
+  const [why, setWhy] = useState<{ visibleLines: number; detailLines: number }>({
+    visibleLines: 0,
+    detailLines: 0,
+  });
   // The mask starts as the plain 2026-08-14 gradient, which is also what an
   // engine with no `ResizeObserver` and the server render keep: the snap can
   // only ever improve on it, never be a prerequisite for the card working.
@@ -691,14 +757,21 @@ function useFoldLines(key: string): {
     // at `text-[11px] leading-snug`). Rounding twice, five rows down, walks the
     // cut a whole pixel back into the letters it exists to stay out of.
     const box = el.getBoundingClientRect();
-    const rows: FoldRow[] = Array.from(el.children).map((child) => {
+    // The explanation's own row, picked out by the attribute the body already
+    // carries. NOT „the last child": the body is absent on a card with no WHY
+    // and the fold row is outside this window, so an index would be a guess
+    // that silently becomes wrong the next time a row is added.
+    let detailIdx = -1;
+    const rows: FoldRow[] = Array.from(el.children).map((child, i) => {
       const rect = child.getBoundingClientRect();
+      if (child.getAttribute("data-sim-overlay-body") !== null) detailIdx = i;
       return {
         offsetTop: rect.top - box.top + el.scrollTop,
         heightPx: rect.height,
         lineHeightPx: Number.parseFloat(getComputedStyle(child).lineHeight),
       };
     });
+    const detailRow = detailIdx >= 0 ? rows[detailIdx] : null;
     // The fade's twin: both windows pad their own bottom by `TEXT_FADE_PX` so
     // that a text which FITS is not faded, and that padding joins the
     // scrollable overflow. Counting it would announce a line that is not there.
@@ -731,6 +804,19 @@ function useFoldLines(key: string): {
       ),
     );
     setMaskCss(foldMaskCss(win));
+    // …and the WHY's own two numbers, measured against the SAME cut window the
+    // mask stops at. `setWhy` with equal members still allocates a new object,
+    // so it is compared here rather than handed to React six times a second —
+    // this hook is remeasured by a ResizeObserver over a live WebGL canvas.
+    const nextWhy = detailLinesInWindow(detailRow, {
+      scrollTop: el.scrollTop,
+      bottomPx: win.bottomPx,
+    });
+    setWhy((prev) =>
+      prev.visibleLines === nextWhy.visibleLines && prev.detailLines === nextWhy.detailLines
+        ? prev
+        : nextWhy,
+    );
   }, []);
   useEffect(() => {
     const el = ref.current;
@@ -742,7 +828,7 @@ function useFoldLines(key: string): {
     for (const child of Array.from(el.children)) ro.observe(child);
     return () => ro.disconnect();
   }, [key, measure]);
-  return { ref, lines, maskCss, onScroll: measure };
+  return { ref, lines, why, maskCss, onScroll: measure };
 }
 
 /** Tone → the one colour token the pill is tinted with. */
@@ -1184,6 +1270,35 @@ export function SimOverlay({
   // used instead. This is deliberately a property of the ITEM and not a new
   // rule about kinds: the owner declares „this one has no way back", which is
   // the only party that knows.
+  /* ══════════════════════════════════════════════════════════════════════════
+     DID THE EXPLANATION ACTUALLY ARRIVE? — the consumer `whyIsReachable` never
+     had, wired 2026-08-26.
+
+     The predicate has been in `overlayQueue.ts` since the referent-gate round
+     and its own header names the frames it was derived from: 3, 8, 15, 15 and
+     39 lines of authored Bulgarian hidden behind a peek showing between one and
+     three. It shipped with a test and no caller, which means every one of those
+     frames could recur and the card would say nothing — the peek's «↓ още N
+     реда» counts lines, and a line count is not a judgement about whether the
+     reasoning got through.
+
+     THIS IS A THEO-4 QUESTION AND NOT A LAYOUT ONE. A −10 ОПАСНА ГРЕШКА whose
+     WHY is 39 lines behind a 2.5-line window is a bare verdict wearing the
+     costume of an explanation, and requirement zero forbids exactly that.
+
+     WHAT IT CHANGES, deliberately kept to the chrome that is already on the
+     card: the control that opens the sheet stops being a quiet «Защо» and
+     carries the size of what it is holding («Защо ↓39»), and the card is
+     marked so a drive can photograph the state rather than infer it. NOT a new
+     row and NOT a bigger card — the peek's whole budget at 852 × 393 is 95.8 px
+     and this file has spent two rounds refusing to pay for chrome with authored
+     Bulgarian. The remedy the predicate's header actually prescribes — a peek
+     that prints a summary it can finish — is an AUTHORING change; until the
+     copy that needs it is rewritten, the student is at least told that the
+     sentence continues and by how much.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const whyReachable = whyIsReachable(shown, peekFold.why);
+  const whyFoldedLines = Math.max(0, peekFold.why.detailLines - peekFold.why.visibleLines);
   const closable = !blocking && shown.noDismiss !== true;
   // …and when a card holds no OTHER control, the card itself is the button —
   // the `HudToasts` grammar, so the phone and the desktop dismiss the same way.
@@ -1622,7 +1737,16 @@ export function SimOverlay({
                 borderColor: `color-mix(in srgb, ${color} 45%, transparent)`,
               }}
             >
-              {open ? "▾" : (shown.openLabelBg ?? "Защо")}
+              {/* …and it names the SIZE of what it holds when the peek cannot
+                  hold it — see the `whyReachable` block. `↓N` and not a word:
+                  the chip is 44 px of thumb on a 180 px lane, and the two
+                  characters are the difference between „there is more" and „the
+                  explanation is not on this card". */}
+              {open
+                ? "▾"
+                : whyReachable
+                  ? (shown.openLabelBg ?? "Защо")
+                  : `${shown.openLabelBg ?? "Защо"} ↓${whyFoldedLines}`}
             </button>
           ) : null}
           {blocking || hasAck ? (
@@ -1845,6 +1969,15 @@ export function SimOverlay({
         ) : (
           <div
             data-sim-overlay-card="panel"
+            // THE STATE, AS A FACT A DRIVE CAN PHOTOGRAPH. Only this branch can
+            // ever carry it: `whyIsReachable` is false only for an item that
+            // owes a WHY and has one, and such a card always has `hasDetail`,
+            // which is precisely what makes it a panel rather than the
+            // dismiss-button shape above. The attribute is absent when the
+            // explanation fits — an absent attribute is the honest rendering of
+            // „nothing to report", and it is also what the server render emits,
+            // because an unmeasured window has not proved anything was cut.
+            data-sim-overlay-why-folded={whyReachable ? undefined : whyFoldedLines}
             className={CARD_CLASS}
             style={{ minHeight: `${minHeight}px`, color }}
             role={blocking ? "alertdialog" : "status"}

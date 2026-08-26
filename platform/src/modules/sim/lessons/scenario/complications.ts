@@ -233,24 +233,24 @@ export function l5BusyStreet(vehicleCount?: number, level: ScenarioLevel = 5): L
  * Real-world justification, and it is not a technicality: a parallel park that
  * takes five shunts holds up a lane of traffic behind you, and Наредба № 38
  * counts repeated correction as a fault. Fewer, better movements IS the skill.
+ *
+ * ⚠ THE ARGUMENT ABOVE IS KEPT; THE BUILDER IT INTRODUCED IS NOT. See below.
  */
-export function l5TightManeuver(
-  objectiveId: string,
-  level: ScenarioLevel = 5,
-  rubric?: Omit<RubricSpec, "economy">,
-): LevelSpec {
-  return {
-    level,
-    rubric: {
-      ...(rubric ?? {}),
-      economy: { objectiveId, attemptsFor3Stars: 1, attemptsFor2Stars: 2 },
-    },
-    complication: {
-      adds: ["rubric"],
-      titleBg: "Като на изпит — от първия път",
-      coachBg:
-        "Мястото, очертанията и допуските са същите; мярката е по-строга — три звезди се дават само за маневра, влязла от първия път, две за най-много два опита. Затова не бързай в началото: подмини по-широко, спри на точката, от която завоят излиза сам, и погледни през рамо, преди да тръгнеш назад. Всяко излизане и връщане е загубено време за теб и задръстена лента за колите зад теб — икономичната маневра е и по-безопасната.",
-      lawRef: "Наредба № 38",
-    },
-  };
-}
+/* `l5TightManeuver` WAS HERE — dead-predicate census, 2026-08-26.
+
+   It built a LevelSpec whose complication was an `economy` rubric (three
+   stars only for a maneuver entered first time) plus its coaching sentence.
+   A Node import-graph walk found ZERO bindings outside this file and zero
+   tests, and nothing inside this file dispatched it either — checked because
+   a string-keyed dispatch table would have hidden the call, and there is none.
+
+   IT WAS A CONVENIENCE NOBODY REACHED FOR, not a missing wire: the templates
+   author `economy` rubrics inline, 54 of them (rubric.ts counts them), in
+   templates-maneuver.ts and templates-exam.ts. Calling this builder from one
+   of those would have re-authored an existing rubric to make a census look
+   green, which is the move this wave exists to refuse.
+
+   FOUND IN PASSING, same shape, not touched because they were not in this
+   lane's brief: `l5Fog`, `l5BusyStreet` and `l5WetGrip` are also exported,
+   also barrelled, and also called by no template — only `l5Wet` and
+   `l5Night` are dispatched (templates-cockpit / -cockpit2 / -conditions). */

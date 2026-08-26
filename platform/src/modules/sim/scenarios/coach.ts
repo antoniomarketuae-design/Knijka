@@ -25,7 +25,7 @@
  * THIS FILE EMITS NO TEXT, AND EIGHT AUDIT FINDINGS SAY OTHERWISE — 2026-08-23.
  *
  * The note is here because the corpus points a fixer HERE, so this is where the
- * next one lands. `coachStep`/`coachSession` return {mode, scored, showLesson,
+ * next one lands. `coachStep` returns {mode, scored, showLesson,
  * penaltyMultiplier} and nothing else; measured on the comment-stripped source,
  * the file holds ZERO Cyrillic characters and its only string literals are
  * module specifiers, mode names and counter-key prefixes. It cannot be the
@@ -67,7 +67,7 @@ import { actCopy } from "../rules";
 import type { ViolationCode } from "../rules";
 import { getScenarioEvent } from "./events";
 import { repeatFamilyForCode, scenarioForCode } from "./mapping";
-import { policyForViolation, resolveEncounter } from "./policy";
+import { policyForViolation, recordEncounter, resolveEncounter } from "./policy";
 import type { EncounterMode, ViolationSeverity } from "./policy";
 
 type Severity = ViolationSeverity;
@@ -235,7 +235,13 @@ export function coachStep(
   const prior = encounters[teachKey] ?? 0;
   const seen = encounters[seenKey] ?? 0;
   const priorGraded = encounters[gradedKey] ?? 0;
-  const nextEncounters = { ...encounters, [teachKey]: prior + 1, [seenKey]: seen + 1 };
+  // …and the three increments go through `policy.recordEncounter`, which is the
+  // module that OWNS the shape of this record („the caller owns the per-driver
+  // encounter counts" — policy.ts's header). It was written for exactly this
+  // and had no caller: this file spelled the spread out by hand in three
+  // places, which is three chances for one of them to drift from „+1 on this
+  // key" into something else, silently, with every existing suite green.
+  const nextEncounters = recordEncounter(recordEncounter(encounters, teachKey), seenKey);
 
   // A13 exam mode — unconditional always-grade at official base points. Even
   // learn-only-mapped codes grade: if the rule engine emitted a violation, an
@@ -291,20 +297,25 @@ export function coachStep(
     },
     // The ladder counts GRADINGS, so this increments only when one happened.
     encounters:
-      outcome.mode === "grade"
-        ? { ...nextEncounters, [gradedKey]: priorGraded + 1 }
-        : nextEncounters,
+      outcome.mode === "grade" ? recordEncounter(nextEncounters, gradedKey) : nextEncounters,
   };
 }
 
-/** Fold the coach over an ordered violation stream (fresh session). */
-export function coachSession(violations: readonly CoachInput[]): CoachDecision[] {
-  let encounters: Record<string, number> = {};
-  const out: CoachDecision[] = [];
-  for (const v of violations) {
-    const r = coachStep(encounters, v);
-    encounters = r.encounters;
-    out.push(r.decision);
-  }
-  return out;
-}
+/*
+ * `coachSession(violations)` — a fold of `coachStep` over an ordered stream —
+ * used to be exported here and from `scenarios/index.ts`. Removed 2026-08-26:
+ * it had no non-test caller and could not acquire one.
+ *
+ * THE PRODUCTION FOLD IS `lessons/engine.ts:713` AND IT CANNOT CALL THIS ONE.
+ * That loop threads `encounters` through `coachStep` exactly as this did, but
+ * it does real work between the steps — it builds the explanation string, it
+ * pushes a HUD event, it decides whether the moment may pause the drive, it
+ * bills the score. A fold that returns only the decisions has nowhere to put
+ * any of that, so „make the engine call it" was never on the table.
+ *
+ * What it actually was is a convenience for `coach.test.ts`, which drives it
+ * seventeen times. That is a fine thing to want and the wrong place to keep it:
+ * a helper only the suite uses, exported through the module's public barrel,
+ * reads to every later grep exactly like a shipped API. It now lives in the
+ * test that wanted it, where its scope tells the truth.
+ */

@@ -574,16 +574,65 @@ describe("on the glass — the same predicate the audit judges the frame with", 
 describe("LessonScene binds both exits, and they are not the same exit", () => {
   const SCENE = readFileSync(join(__dirname, "../../LessonScene.tsx"), "utf8");
 
-  it("the automatic exit is wired to the vehicle sample's speed", () => {
-    // NOTE FOR WHOEVER WIRES THE CEILING. This asserts the CURRENT call, which
-    // is the speed exit alone; `touchHintShouldHide` exists and is proved but
-    // nothing calls it yet (see the ⚠ block in `touchHintLifetime.ts`). That is
-    // on purpose — this row goes red the moment the scene changes, so the
-    // ceiling cannot land half-wired and unnoticed. Replace the expected string
-    // with `touchHintShouldHide(sampleRef.current.speedKmh, shownMs)` in the
-    // same commit that adds the accumulator.
-    expect(SCENE).toContain("touchHintStandsDown(sampleRef.current.speedKmh)");
+  it("the automatic exit is wired to the vehicle sample's speed AND to the ceiling", () => {
+    // WIRED 2026-08-26. This row used to assert `touchHintStandsDown(…)` — the
+    // speed exit alone — with a note telling whoever wired the ceiling to swap
+    // the string in the same commit. That commit is this one, and the swap is
+    // the point: `touchHintShouldHide` is no longer a predicate the tests prove
+    // and the product ignores. Both exits now run in `LessonScene`, so BOTH
+    // strings are asserted here and this file goes red if either is unwired.
+    expect(SCENE).toContain("touchHintShouldHide(sampleRef.current.speedKmh, shownMs)");
     expect(SCENE).toContain("TOUCH_HINT_POLL_MS");
+    // …and the speed exit did not survive as a second, competing call: it is
+    // reached THROUGH `touchHintShouldHide`, so a scene that still names it
+    // directly is a scene running two exits with two different persistences.
+    expect(SCENE).not.toContain("touchHintStandsDown(");
+  });
+
+  it("the ceiling's clock is fed by the CARD'S OWN element, not by the flag", () => {
+    // THE ROW THAT MAKES THE PREDICATE STAY READ. `touchHintOnGlass` answers a
+    // question only the DOM node can answer, and the whole content of the fix
+    // is that its argument is the card's ref rather than `showTouchHint`: the
+    // flag is true for the entire 17.1–21.8 s the briefing covers the card, and
+    // charging that to the student's attention fires the ceiling ~18 s early on
+    // every mobile lesson in the catalogue.
+    //
+    // So: the ref must exist, it must be attached to the card the JSX renders,
+    // and it must be what the accumulator reads.
+    // ── AND THE NEEDLE IS LOOKED FOR IN THE CODE, NOT IN THE PROSE ──────────
+    //
+    // This row shipped as a bare `expect(SCENE).toContain(…)` over the WHOLE
+    // file and it guarded nothing: the doc comment above the effect in
+    // `LessonScene.tsx` quotes the call verbatim, so the needle was satisfied
+    // by the paragraph explaining the call whatever the call itself said.
+    // Measured at integration, 2026-08-26 — rewriting the effect line to
+    // `touchHintAccrue(shownMs, showTouchHint)`, i.e. the exact ~18 s-early
+    // ceiling this row exists to refuse, left the file 43/43 GREEN.
+    //
+    // So the window is opened at the effect's own first statement and the
+    // comment block, which sits entirely above it, is out of reach. The
+    // whole-file assertion is kept underneath as the weaker half: it is the
+    // one that survives a reformat of the effect.
+    const effectAt = SCENE.indexOf("if (!showTouchHint) return;");
+    expect(effectAt, "the touch-hint poll effect must still exist").toBeGreaterThan(-1);
+    const effect = SCENE.slice(effectAt, effectAt + 400);
+    expect(effect, "the painted clock must be in the CODE, not only in the comment").toContain(
+      "touchHintAccrue(shownMs, touchHintOnGlass(hintRef.current))",
+    );
+    expect(SCENE).toContain("touchHintAccrue(shownMs, touchHintOnGlass(hintRef.current))");
+    expect(SCENE).toMatch(/const hintRef = useRef<HTMLDivElement \| null>\(null\)/);
+    // The ref reaches the DOM: `ref={hintRef}` sits on the element that also
+    // carries `data-hud="touch-hint"`, which is the card the harness photographs.
+    // Sliced FORWARD from the render branch, not back from the data-hud string —
+    // that attribute is quoted in this file's own frame notes hundreds of lines
+    // earlier, and an `indexOf`-to-`indexOf` window over it silently yielded the
+    // empty string, which `toContain` then… also failed on, but for the wrong
+    // reason. A window that can be empty is not a window.
+    const open = SCENE.indexOf("{showTouchHint ? (");
+    expect(open, "the touch-hint render branch must still exist").toBeGreaterThan(-1);
+    const card = SCENE.slice(open, open + 400);
+    expect(card).toContain('data-hud="touch-hint"');
+    expect(card, "the ceiling's ref must be on the card itself").toContain("ref={hintRef}");
   });
 
   it("the ceiling CANNOT land without the on-glass accumulator", () => {
@@ -593,19 +642,23 @@ describe("LessonScene binds both exits, and they are not the same exit", () => {
     // ~18 s of a 120 s ceiling on arrival and the briefing — before the card's
     // first painted frame — on every mobile lesson in the catalogue.
     //
-    // Green today because the scene reaches for none of it. It goes red the day
-    // somebody wires the ceiling the way this file used to describe, which is
-    // the only way that mistake can be caught: it produces no type error, no
-    // failing render, and a card that vanishes looks exactly like a card that
-    // worked.
-    const reachesForTheCeiling =
+    // THIS ROW USED TO BE AN `if`, AND THAT WAS THE DEFECT. It read
+    // `if (SCENE.includes("touchHintShouldHide") || …) { expect(…) }` and was
+    // green precisely BECAUSE the scene reached for none of it — a guard whose
+    // green light was the symptom it was supposed to catch. Now that the
+    // ceiling is wired the antecedent is permanently true, so the `if` is gone
+    // and the two requirements are asserted flat. A scene that keeps the
+    // ceiling and drops the painted clock fails here, which is the only way
+    // that mistake can be caught: it produces no type error, no failing render,
+    // and a card that vanishes looks exactly like a card that worked.
+    expect(
       SCENE.includes("touchHintShouldHide") ||
-      SCENE.includes("touchHintOutstayed") ||
-      SCENE.includes("TOUCH_HINT_MAX_SHOWN_MS");
-    if (reachesForTheCeiling) {
-      expect(SCENE, "the ceiling needs a PAINTED clock").toContain("touchHintAccrue(");
-      expect(SCENE, "…fed by the card's own element").toContain("touchHintOnGlass(");
-    }
+        SCENE.includes("touchHintOutstayed") ||
+        SCENE.includes("TOUCH_HINT_MAX_SHOWN_MS"),
+      "the ceiling must still be wired — it was, at 2026-08-26",
+    ).toBe(true);
+    expect(SCENE, "the ceiling needs a PAINTED clock").toContain("touchHintAccrue(");
+    expect(SCENE, "…fed by the card's own element").toContain("touchHintOnGlass(");
     // …and the inlined increment is refused whether or not the rest is present.
     expect(SCENE).not.toContain("+= TOUCH_HINT_POLL_MS");
     expect(SCENE).not.toContain("+ TOUCH_HINT_POLL_MS");

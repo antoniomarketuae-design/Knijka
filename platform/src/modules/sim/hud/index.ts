@@ -5,7 +5,16 @@
 
 // 2026 lesson HUD
 export { HudStyles } from "./HudStyles";
-export { SpeedCard } from "./SpeedCard";
+// `SpeedCard` WAS EXPORTED HERE AND RENDERED NOWHERE — removed 2026-08-26.
+// `StatusDashboard` below replaced it in full ("Replaces the old bottom-left
+// SpeedCard + GearIndicatorCard pair", its own header), and the component's own
+// header had been carrying the epitaph since 2026-08-19: „there is no
+// `<SpeedCard` in the tree. It survives only as a named export". A public API
+// with no consumer is not a spare part, it is a second surface that can print a
+// limit disagreeing with the disc the student is billed against — the file said
+// that too, under DO NOT RE-MOUNT IT WITHOUT READING THAT FRAME FIRST. The
+// frame, the В26-disc collision and the resolution all live in
+// `StatusDashboard.tsx`'s `GovernorCapMark`, which is where they belong.
 export { GearIndicatorCard } from "./GearIndicatorCard";
 export { StatusDashboard } from "./StatusDashboard";
 export {
@@ -113,8 +122,6 @@ export {
   overlayPriority,
   overlayQueueMaySpeak,
   overlaySilencesQueue,
-  peekWithinBudget,
-  rectClearsCentreBand,
   rectViewportFraction,
   requiresWhy,
   selectOverlay,
@@ -160,9 +167,7 @@ export {
   // Declared by components/sim/TouchControls (TOUCH_BAND_CSS_VARS); pinned to
   // that declaration by touchArc.test.ts.
   FLANK_LANE_VAR,
-  notifyColumnLeftFraction,
   notifyColumnWidthPx,
-  rectIsInNotifyColumn,
   // …and the demonstration transport, which shares this corridor on a phone —
   // and, when it is OPEN, leaves it for the left one on a desktop too.
   deckCompactOpenWidthPx,
@@ -188,7 +193,6 @@ export {
   DECK_TOUCH_ROW_CONTROLS,
   DECK_TOUCH_SCRUB_MIN_PX,
   DECK_TOUCH_TARGET_PX,
-  NOTIFY_COLUMN_DECK_MAX_LIFT_COMPACT,
   NOTIFY_COLUMN_DECK_RESERVE_PX,
   NOTIFY_COLUMN_GUTTER_PX,
   NOTIFY_COLUMN_MAX_WIDTH_COMPACT_PX,
