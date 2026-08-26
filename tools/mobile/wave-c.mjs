@@ -51,6 +51,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseSummary } from "./lib/summary.mjs";
+import { measuredLegs } from "./lib/resume.mjs";
+import { DRIVE_TIMEOUT_MS } from "./lib/limits.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..");
@@ -116,19 +118,15 @@ if (LIMIT) rows = rows.slice(0, LIMIT);
 mkdirSync(OUT, { recursive: true });
 const resultsPath = path.join(OUT, "wave-c-results.jsonl");
 
-/** Rows already measured at THIS commit — so an interrupted run resumes. */
-const done = new Set();
-if (existsSync(resultsPath)) {
-  for (const line of readFileSync(resultsPath, "utf8").split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      const j = JSON.parse(line);
-      if (j.head === HEAD) done.add(`${j.lesson}/${j.leg}`);
-    } catch {
-      /* a torn tail line is not a reason to re-drive everything */
-    }
-  }
-}
+/**
+ * Rows already measured at THIS commit — so an interrupted run resumes.
+ *
+ * The predicate lives in lib/resume.mjs and consults the EXIT CODE, which
+ * this block did not: a drive that crashed before it ever reached the lesson
+ * was filed as measured for ever, so a sweep could report 204/204 over holes.
+ * Three did exactly that on 2026-08-26.
+ */
+const done = existsSync(resultsPath) ? measuredLegs(readFileSync(resultsPath, "utf8"), HEAD) : new Set();
 
 const planned = [];
 for (const r of rows) {
@@ -172,9 +170,16 @@ for (const p of planned) {
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env, KNIJKA_BASE: BASE, KNIJKA_EXPECT_COMMIT: HEAD },
+      // WITHOUT THIS, A DEAD BROWSER IS INDISTINGUISHABLE FROM A SLOW DRIVE.
+      // Three shards blocked here for eleven hours on 2026-08-25 while the
+      // server stayed healthy. The bound is measured, not guessed — see
+      // lib/limits.mjs. A killed drive records exit null, which resume.mjs
+      // correctly refuses to count as measured, so it is re-driven.
+      timeout: DRIVE_TIMEOUT_MS,
     },
   );
   const stdout = (res.stdout || "") + (res.stderr || "");
+  const timedOut = Boolean(res.error && res.error.code === "ETIMEDOUT");
 
   // KEEP THE TRANSCRIPT. This used to parse the harness output and throw it
   // away, so Wave C produced 0 run logs where sweep161 produced 520 — and a
@@ -203,6 +208,7 @@ for (const p of planned) {
       total: p.total,
       // The harness's own code, not a wrapper's and not a pipe's.
       exit: res.status,
+      timedOut,
       ...s,
       ms: Date.now() - started,
       out: outDir,
@@ -213,7 +219,8 @@ for (const p of planned) {
     `[${String(ran).padStart(3)}/${planned.length}] ${p.lesson} ${p.leg} ` +
       `exit=${res.status} verdict=${s.verdict ?? "-"} score=${s.score ?? "-"} ` +
       `frames=${s.frames ?? "-"}${s.lost && s.lost !== "0" ? ` LOST=${s.lost}` : ""}` +
-      (s.treeMoved ? "  !! TREE MOVED — certifies nothing" : ""),
+      (s.treeMoved ? "  !! TREE MOVED — certifies nothing" : "") +
+      (timedOut ? "  !! KILLED at the drive timeout — re-drive it" : ""),
   );
 }
 
