@@ -49,7 +49,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
+import { splitParents, corpusCounts, openListLine, workedLine } from "./finding-reader.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 function findRepo() {
@@ -85,6 +85,13 @@ const broken = counts.open;
 // treats an unknown id as evidence that a judge mangled one — a false alarm
 // there blocks a legitimate posting run.
 const byId = new Map(counts.filed.map((j) => [j.findingId, j]));
+// ...and the same is true of a finding a SPLIT replaced. On 2026-08-26, 230
+// compound rows were split into 647 atomic children and left the filed corpus
+// with bucket "SPLIT". Their 2,722 verdict lines still name them, so without
+// this every posting run refused with "230 verdict line(s) cite a findingId
+// that is not in the corpus" — accusing the judges of mangling ids they had
+// written correctly, and blocking every legitimate retirement behind it.
+for (const j of splitParents()) if (!byId.has(j.findingId)) byId.set(j.findingId, j);
 
 // --- the verdicts --------------------------------------------------------------
 const rows = [];
