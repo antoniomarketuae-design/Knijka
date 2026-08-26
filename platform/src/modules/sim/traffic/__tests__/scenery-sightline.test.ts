@@ -292,7 +292,18 @@ const JUNCTION_DISTRICTS = [
 ] as const;
 
 describe("T6 — no parked body stands inside a junction (ЗДвП чл. 98)", () => {
-  it("is clean on all 90 committed districts", () => {
+  // TIME BUDGET, NOT A WIDENED GATE — 2026-08-27.
+  //
+  // This loads and scans all 90 committed districts. In isolation that is 1.28 s
+  // of test time. It went red at the default 5 s inside a full-suite run that
+  // took 592 s wall-clock on --maxWorkers=2 — starved, not slow: the same test
+  // on the same tree measured 1.28 s alone, byte-identical to the pre-change
+  // baseline, so nothing here got more expensive.
+  //
+  // The ASSERTION is untouched: every district is still scanned and a single
+  // parked body inside a junction still fails this. Only the clock moved, and it
+  // moved because a false red under load teaches the next reader to ignore it.
+  it("is clean on all 90 committed districts", { timeout: 60_000 }, () => {
     const offenders: string[] = [];
     let bodies = 0;
     for (const id of DISTRICT_IDS) {

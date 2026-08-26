@@ -20,8 +20,11 @@
  */
 
 import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
+import { getSnowIntensity } from "@/modules/sim/environment";
 import type { SignalLampState } from "../../contracts";
 import { buildWorldGeometry } from "../builders/buildWorldGeometry";
+import { setSnowCover } from "../textures/snowCover";
 import type { BuildWorldOptions, District, WorldGeometry, WorldQuality } from "../types";
 import { QUALITY_PRESETS } from "./quality";
 import { StaticWorld } from "./StaticWorld";
@@ -73,6 +76,30 @@ export function DistrictWorld({
     [district, buildOptions, prebuilt],
   );
   const preset = QUALITY_PRESETS[quality];
+
+  // THE ONE WRITER of the prop snow-cover uniform (textures/snowCover.ts).
+  //
+  // It lives HERE rather than inside WorldProps because this component is the
+  // single mount point both halves of the world share, so „how much snow is
+  // lying" is set once per frame for every hooked material at once — a single
+  // float store, no re-render, no allocation, and no second writer that could
+  // ever disagree with the first.
+  //
+  // Per FRAME rather than off `useSnowIntensity()`, and the reason is stated
+  // exactly rather than dramatically: the React hook quantizes to 0.01, so it
+  // would re-render this component ~85 times across the snow channel's 6 s
+  // ramp. The instanced prop meshes are `useMemo`d on `world`/`assets`/`preset`
+  // and would NOT be rebuilt by that — the cost is 85 reconciliations of the
+  // whole world subtree, not 85 rebuilds. It is still the wrong shape: a
+  // uniform wants a value, not a render.
+  //
+  // The value read is the same `getSnowIntensity()` that SkyDome, SnowFlakes
+  // and StaticWorld's road mapping already read, so the accumulation on the
+  // props, the flakes in the air, the haze and the brightened carriageway all
+  // ramp on one channel and can never drift apart.
+  useFrame(() => {
+    setSnowCover(getSnowIntensity());
+  });
 
   return (
     <group name="district-world">

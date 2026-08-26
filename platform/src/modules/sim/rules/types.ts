@@ -598,12 +598,18 @@ export interface ViolationEvent {
   /**
    * THIS EVENT IS THE RE-GRADE OF A BREACH ALREADY REPORTED, not a new act.
    *
-   * Set only by the standing-duty arms of `reduceTick` (belt, handbrake, the
-   * four lamp arms — see `STANDING_DUTY_REGRADE_SEC`). Those duties bill twice
-   * per episode because the FIRST bill is spent by the founder-approved
-   * teach-first free mini-lesson, and without a second one an entire lesson
-   * driven unbelted or unlit reached its debrief as «чисто каране». The second
-   * bill exists ONLY to reach the charge the teach consumed.
+   * Set by the CONTINUING-BREACH arms of `reduceTick`, and only by those:
+   *  · the six one-switch duties — belt, handbrake, the four lamp arms (see
+   *    `STANDING_DUTY_REGRADE_SEC`);
+   *  · the two второстепенни speed codes — SPEEDING_OVER_LIMIT and
+   *    SPEED_TOO_FAST_FOR_CONDITIONS (see `SPEED_REGRADE_SEC`).
+   * Each of them adds exactly ONE such bill per episode, because the FIRST bill
+   * is spent by the founder-approved teach-first free mini-lesson, and without
+   * it an entire lesson driven unbelted, unlit, or 59 км/ч through a posted 50
+   * reached its debrief as «чисто каране» / «Второстепенни 0 0». (The duties
+   * then stop at two bills; SPEEDING_OVER_LIMIT keeps its own 20 s repeat
+   * cadence on top, and those repeats are NOT marked.) The marked bill exists
+   * ONLY to reach the charge the teach consumed.
    *
    * So it must not be charged when the first bill ALREADY was — in exam mode
    * (no teach pass at all), on a repeat offence (the topic was taught in the

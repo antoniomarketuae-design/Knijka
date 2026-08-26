@@ -649,6 +649,37 @@ ${TOUCH_BAND_CSS_VARS}
          corridor of 275…593 on an iPhone 16) and 61 px above the dash dock.
          ══════════════════════════════════════════════════════════════════ */
 
+      /* ── THE SECOND CHIP IN THAT LANE, AND IT TAKES THE FLOOR WHEN IT CAN.
+         „[data-hud=follow-gap]" («Дистанция · 34 м · 1,2 с») is the front
+         twin of the badge the block above is about, added for
+         sc-fo-motorway-gap. Two centred chips cannot share one row, so the
+         component parks it at 9.5rem — one row up, clear of «Кола отзад».
+
+         But the row above is the row the block above spends four hundred words
+         explaining is scarce: on the 852 × 393 landscape phone this catalogue
+         is shot at, 108 px is the pad corridor and the cockpit horizon is
+         165 px off the floor. A chip at 9.5rem tops out at ~180 px, i.e. on the
+         road — which is the founder's standing sentence, written three times,
+         that THE CENTRE OF THE SCREEN IS ROAD.
+
+         It does not have to be up there most of the time. The rear badge is a
+         PROXIMITY WARNING and exists only while a real vehicle is inside ~15 m
+         behind (the honesty contract in rearProximity.ts); the following gap is a
+         continuous instrument and is up whenever anybody is being followed. So
+         the front chip claims the accepted 6.75 rem floor whenever the stage
+         has no rear chip to stack on, and yields the row only for the seconds
+         both are raised. Measured against the two components' own gates rather
+         than guessed: nothing else in this file writes „bottom" for either
+         name, so this rule and the Tailwind class are the only two authorities
+         and they cannot drift into a third.
+
+         :has() and not a component prop, for this file's standing reason — the
+         two chips are separate components in a different lane and „data-hud"
+         is the only vocabulary the two trees share. */
+      [data-sim-stage]:not(:has([data-hud="rear-proximity"])) [data-hud="follow-gap"] {
+        bottom: 6.75rem;
+      }
+
       /* …and the column stops short of the deck rather than being painted over
          it. The reserve is the deck's own MEASURED open height plus a gutter
          (notifyColumn.ts). :has() so a screen with no demonstration — which is

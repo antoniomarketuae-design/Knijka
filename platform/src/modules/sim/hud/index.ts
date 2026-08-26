@@ -275,6 +275,18 @@ export {
 export { RearProximityCue } from "./RearProximityCue";
 export type { RearCuePose, RearGapSource } from "./RearProximityCue";
 export { rearCueLabelBg, stepRearCue, type RearCue, type RearCueLevel } from "./rearProximity";
+// …and its FRONT twin — the following-gap readout the lessons that teach the
+// two-second rule were grading against and never showing (sc-fo-motorway-gap).
+export { FollowGapBadge, FollowGapCue } from "./FollowGapCue";
+export type { FollowCuePose, LeadGapSource } from "./FollowGapCue";
+export {
+  followCueLabelBg,
+  followGapTarget,
+  stepFollowCue,
+  type FollowCue,
+  type FollowCueLevel,
+  type FollowGapTarget,
+} from "./followGap";
 export { PreDriveChecklist } from "./PreDriveChecklist";
 export { SessionEndScreen, type SessionEndConcept } from "./SessionEndScreen";
 export {

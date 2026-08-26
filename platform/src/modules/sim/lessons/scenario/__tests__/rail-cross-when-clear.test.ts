@@ -362,12 +362,34 @@ describe("§3 no rail success title commands the crossing", () => {
 // §4 NOTHING WAS TAKEN AWAY
 // ---------------------------------------------------------------------------
 
-/** The finish disc of each crossing drill, as it shipped — the retitle must be
- *  copy and only copy, so `done` stays bit-identical on every recorded drive. */
-const FINISH_DISCS: ReadonlyArray<{ spec: ScenarioSpec; id: string }> = [
-  { spec: SC_RX_UNGUARDED, id: "sc-rxu-finish" },
-  { spec: SC_RX_GUARDED, id: "sc-rxg-finish" },
-  { spec: SC_RX_BARRIER_DROP, id: "sc-rxd-finish" },
+/**
+ * The finish disc of each crossing drill.
+ *
+ * ── WHAT THIS ROW USED TO SAY, AND WHY IT NO LONGER CAN (wave 2) ────────────
+ *
+ * It read „as it shipped — the retitle must be copy and only copy, so `done`
+ * stays bit-identical on every recorded drive", and asserted all three discs
+ * `toEqual({kind, x: 4.06, y: 285, radiusM: 6})`. That was the correct
+ * assertion for a lane that could only change WORDS, and §5 of this file says
+ * so in its own words: *„it does not make the guarded finish disc refuse a
+ * barred entry … the demand that would spend it lives in `lessons/
+ * objectives.ts`, which this lane does not own."*
+ *
+ * That demand now exists (`ReachZoneParams.requireRailClear`), and on the two
+ * GUARDED discs `done` is deliberately no longer bit-identical: a drive billed
+ * `RAIL_CROSSING_VIOLATION` "entered-barred" no longer collects «стигни края на
+ * отсечката ОТВЪД ПРЕЛЕЗА». `lessons/__tests__/rail-clear-gate.test.ts` drives
+ * all six recordings through `applyTick` and holds both directions.
+ *
+ * SO THE GEOMETRY IS STILL PINNED — a moved mark or a widened radius still
+ * fails here, which is what this case was really protecting — and the DEMAND is
+ * pinned per drill, by name, in both directions. The unguarded disc keeps the
+ * exact assertion it always had, because rx-unguarded-v1 has no arm to read.
+ */
+const FINISH_DISCS: ReadonlyArray<{ spec: ScenarioSpec; id: string; railGate: boolean }> = [
+  { spec: SC_RX_UNGUARDED, id: "sc-rxu-finish", railGate: false },
+  { spec: SC_RX_GUARDED, id: "sc-rxg-finish", railGate: true },
+  { spec: SC_RX_BARRIER_DROP, id: "sc-rxd-finish", railGate: true },
 ];
 
 describe("§4 the discs, the demos and the graded duty are untouched", () => {
@@ -375,7 +397,15 @@ describe("§4 the discs, the demos and the graded duty are untouched", () => {
     for (const row of FINISH_DISCS) {
       const authored = row.spec.success.find((o) => o.id === row.id);
       expect(authored, `${row.spec.id} lost ${row.id}`).toBeDefined();
-      expect(authored!.params).toEqual({ kind: "reachZone", x: 4.06, y: 285, radiusM: 6 });
+      const { requireRailClear, ...geometry } = authored!.params as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(geometry, row.id).toEqual({ kind: "reachZone", x: 4.06, y: 285, radiusM: 6 });
+      // The demand, per drill, by name — both directions, so a lane that adds
+      // it to the unguarded disc (where nothing can ever spend it) or drops it
+      // from a guarded one fails here rather than in a sweep.
+      expect(requireRailClear, `${row.id} rail gate`).toBe(row.railGate ? true : undefined);
     }
   });
 

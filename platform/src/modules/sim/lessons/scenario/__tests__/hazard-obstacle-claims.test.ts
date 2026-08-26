@@ -23,6 +23,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { SCENARIO_TEMPLATES_HAZARDS } from "../templates-hazards";
+import type { ScenarioObjectiveSpec } from "../types";
 
 /**
  * Copy that promises the student was, or was not, in CONTACT with something.
@@ -33,18 +34,37 @@ import { SCENARIO_TEMPLATES_HAZARDS } from "../templates-hazards";
 const CLAIMS_CONTACT =
   /(закач|удар|бутн|докосн|блъсн|застърж|остърж)[а-я]*/i;
 
-/** Objective kinds whose params can actually decide a contact question. */
-const KINDS_THAT_CAN_TEST_CONTACT: ReadonlySet<string> = new Set<string>([
-  // Deliberately EMPTY. `ObjectiveParams` (lessons/types.ts) is reachZone /
-  // passSignal / driveDistance / completeManeuver, and not one of them carries
-  // a contact term — the parking and three-point-turn maneuvers lean on the
-  // rule engine's obstacle rects, which is a DETECTOR, not an objective gate.
-  // The day such a term exists, add its kind here and the rule relaxes itself.
-]);
+/**
+ * CAN THESE PARAMS ACTUALLY DECIDE A CONTACT QUESTION?
+ *
+ * This used to be a set of KINDS and the set was deliberately empty, with the
+ * note „the day such a term exists, add its kind here and the rule relaxes
+ * itself". The term now exists — `ReachZoneParams.requireNoContact`
+ * (lessons/types.ts), read by `objectives.ts stepReachZone` off
+ * `ObjectiveContext.struckABodyInRun` — but relaxing BY KIND would have been
+ * the wrong relaxation, and a wide one: every bare `reachZone` in the family
+ * would have been free to promise a contact test again, which is the exact
+ * defect this file was written for.
+ *
+ * So the question is asked per OBJECTIVE, of the params themselves. A title may
+ * claim contact when its own gate carries the key and never otherwise, and the
+ * rule bites HARDER than the version it replaces rather than less: adding a
+ * contact promise to any other objective in the family still fails the build,
+ * and so does removing the key from the one objective that earns its promise.
+ */
+function canTestContact(params: ScenarioObjectiveSpec["params"]): boolean {
+  return params.kind === "reachZone" && params.requireNoContact === true;
+}
 
 const allObjectives = () =>
   SCENARIO_TEMPLATES_HAZARDS.flatMap((spec) =>
-    spec.success.map((o) => ({ lesson: spec.id, id: o.id, titleBg: o.titleBg, kind: o.params.kind })),
+    spec.success.map((o) => ({
+      lesson: spec.id,
+      id: o.id,
+      titleBg: o.titleBg,
+      kind: o.params.kind,
+      canTestContact: canTestContact(o.params),
+    })),
   );
 
 describe("hazards objectives claim only what they measure", () => {
@@ -68,12 +88,27 @@ describe("hazards objectives claim only what they measure", () => {
 
   it("no objective title promises a contact test its params cannot run", () => {
     const offenders = allObjectives().filter(
-      (o) => CLAIMS_CONTACT.test(o.titleBg) && !KINDS_THAT_CAN_TEST_CONTACT.has(o.kind),
+      (o) => CLAIMS_CONTACT.test(o.titleBg) && !o.canTestContact,
     );
     expect(
       offenders.map((o) => `${o.lesson}/${o.id} (${o.kind}): "${o.titleBg}"`),
       "a green tick would certify a skill nothing measured",
     ).toEqual([]);
+  });
+
+  it("THE RELAXATION IS NOT A HOLE — the key, not the kind, is what licenses the claim", () => {
+    // Both directions of the per-objective rule, so the round that widened it
+    // to „kind" (which would have re-opened the family) fails here instead.
+    expect(canTestContact({ kind: "reachZone", x: 0, y: 0, radiusM: 12 })).toBe(false);
+    expect(
+      canTestContact({ kind: "reachZone", x: 0, y: 0, radiusM: 12, requireNoContact: true }),
+    ).toBe(true);
+    // …and the one objective that makes the promise really does carry the gate,
+    // so „the title came back" and „the gate came back" cannot drift apart.
+    const cleared = allObjectives().find((o) => o.id === "sc-obs-cleared");
+    expect(cleared, "sc-obs-cleared is gone — this file no longer guards anything").toBeDefined();
+    expect(cleared!.titleBg).toMatch(CLAIMS_CONTACT);
+    expect(cleared!.canTestContact, "the promise is back without the gate").toBe(true);
   });
 
   it("the contact LESSON is still taught — it just lives where it is enforced", () => {

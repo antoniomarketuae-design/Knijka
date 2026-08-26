@@ -930,21 +930,38 @@ describe("wave-2 bot completion — sc-sp-limit-end at L3", () => {
   it("counter-proof: accelerating 200 m early TEACHES SPEEDING_OVER_LIMIT, and misses the junction gate", () => {
     let s = createLessonSession(compileScenario(SC_SP_LIMIT_END, 3));
     const taught: string[] = [];
+    let taughtAtSec = Number.NaN;
     recordScSpLimitEndDrive(loadDistrict("sp-signs-v1"), "mistake-early-accel", {
       onTick: (tick) => {
         const step = applyTick(s, tick);
         s = step.state;
-        for (const m of step.teachMoments ?? []) taught.push(m.code);
+        for (const m of step.teachMoments ?? []) {
+          taught.push(m.code);
+          if (Number.isNaN(taughtAtSec)) taughtAtSec = m.t;
+        }
       },
     });
     const r = buildLessonResult(s);
     // SPEEDING_OVER_LIMIT is a teachable второстепенна fault, so its FIRST
     // encounter lands on the A9 teach-moment channel (pause + card), not on
-    // session.events — the student is taught the scope rule, not merely docked.
+    // session.events — the student is taught the scope rule before he is docked.
     // The §9 code assert lives on the trace gate, where the recorder's own
     // engine grades every encounter: traces/__tests__/sc-sp-limit-end-traces.
     expect(taught).toEqual(["SPEEDING_OVER_LIMIT"]);
-    expect(s.events.filter((e) => e.kind === "violation")).toEqual([]);
+    // …AND THEN HE IS DOCKED, because he is still over the limit ten driving
+    // seconds after the card (w11 · SPEED_REGRADE_SEC). This assertion used to
+    // read `toEqual([])` — taught once, charged nothing, for the whole overspeed
+    // — which is the very shape the sweep filed as «Второстепенни 0 0 · ИЗДЪРЖАН»
+    // across seven lessons. ONE bill, marked `regrade`: it is the charge the free
+    // lesson consumed, not a second act, and `lessons/engine.ts` drops it
+    // wherever the code was already charged.
+    const billed = s.events.filter((e) => e.kind === "violation");
+    expect(billed.map((e) => [e.code, e.severityClass, e.points, e.regrade === true])).toEqual([
+      ["SPEEDING_OVER_LIMIT", "vtorostepenna", 1, true],
+    ]);
+    // The teach still comes FIRST and the charge lands a full SPEED_REGRADE_SEC
+    // (6 s) later — the discipline is teach-then-grade, not grade-on-sight.
+    expect(billed[0]!.t).toBeGreaterThan(taughtAtSec + 5.9);
     // …and the drill's own gate bites independently of the detector: it was
     // doing ~48 at y = 310, so it was never „still in the zone at 40" there.
     expect(r.objectives.find((o) => o.id === "sc-sple-hold-to-junction")!.done).toBe(false);

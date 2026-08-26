@@ -38,7 +38,9 @@ import { LANE_WIDTH_M } from "../world/builders/constants";
 import { buildLaneGraph, type LaneGraph } from "./graph";
 import {
   buildPedRoute,
+  buildPedSidewalkRoute,
   createPedestrianAgent,
+  SIDEWALK_MIN_EDGE_M,
   updatePedestrian,
   type PedestrianAgent,
   type PedestrianEnv,
@@ -72,6 +74,7 @@ import {
   PLAYER_HALF_LENGTH_M,
   vehicleHalfLengthM,
   type CyclistApproach,
+  type DistrictEdge,
   type OncomingApproach,
   type StagedActorSpec,
   type StagedActorView,
@@ -426,6 +429,62 @@ class TrafficSystemImpl implements TrafficSystem {
         this.pedestrianAgents.push(agent);
         this.pedestrians.push(agent.state);
         pedId++;
+      }
+    }
+
+    // --- Ambient PAVEMENT walkers: the population the crossing loop above
+    // cannot reach, because 84 of the 105 committed districts declare no
+    // crossing at all. Same agent, same update, same lateral geometry — a
+    // route with no `cross` segment, so `crossingCounts` (and through it every
+    // rule-engine crossing duty) is untouched. The reasoning in full is the
+    // „SIDEWALK-ONLY WALKERS" block in pedestrians.ts.
+    //
+    // The ids CONTINUE `pedId` rather than restarting: `TrafficPedestrianState
+    // .id` is what `NpcColliders` reports a near-miss under and what
+    // `worldLabel` bubbles hang off, and two agents sharing one id is a defect
+    // that only shows up as a mislabelled person.
+    if (cfg.sidewalkPedestrianCount > 0) {
+      const footwayless = new Set(cfg.footwaylessRoadClasses);
+      const walkable = district.roads.edges.filter(
+        (e) => !footwayless.has(e.class) && e.geometry.length >= 2 && e.length >= SIDEWALK_MIN_EDGE_M,
+      );
+      if (cfg.anchor) {
+        // Nearest edge midpoint first — people where the driver is, the same
+        // rule the crossing loop and `buildRoutes` already follow.
+        const ax = cfg.anchor.x;
+        const ay = cfg.anchor.y;
+        const midDist = (e: DistrictEdge): number => {
+          const g = e.geometry[Math.floor(e.geometry.length / 2)];
+          return Math.hypot(g[0] - ax, g[1] - ay);
+        };
+        walkable.sort((a, b) => midDist(a) - midDist(b));
+      } else {
+        walkable.sort((a, b) => (a.id < b.id ? -1 : 1));
+      }
+      // Two passes so a one-edge map (ln-v1, vu-door-v1, every ov-* street)
+      // still gets both of its pavements populated instead of one walker.
+      let placed = 0;
+      for (let pass = 0; pass < 4 && placed < cfg.sidewalkPedestrianCount; pass++) {
+        for (const edge of walkable) {
+          if (placed >= cfg.sidewalkPedestrianCount) break;
+          // Alternate sides so the two pavements fill evenly, and spread the
+          // beats along the edge rather than stacking them on one spot.
+          const side: 1 | -1 = placed % 2 === 0 ? 1 : -1;
+          const anchorS = edge.length * ((pass + 0.5) / 4 + rngRange(rng, -0.12, 0.12));
+          const route = buildPedSidewalkRoute(edge, cfg.laneWidthM, side, anchorS, rng);
+          if (!route) continue;
+          const agent = createPedestrianAgent(
+            pedId,
+            route,
+            mulberry32(cfg.seed ^ (0x7f4a7c15 + pedId * 0xc2b2ae35)),
+            Math.floor(rng() * PED_COLOR_VARIANTS),
+            cfg,
+          );
+          this.pedestrianAgents.push(agent);
+          this.pedestrians.push(agent.state);
+          pedId++;
+          placed++;
+        }
       }
     }
 

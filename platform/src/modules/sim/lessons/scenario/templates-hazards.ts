@@ -101,10 +101,42 @@ export const SC_HAZARD_OBSTACLE: ScenarioSpec = {
        * `__tests__/hazard-obstacle-claims.test.ts` now forbids ANY objective in
        * this family from claiming a contact property, so the sentence cannot
        * come back without the gate arriving with it.
+       *
+       * ── THE GATE ARRIVED (sc-hazard-obstacle:0f31ccfb, wave 2) ─────────────
+       *
+       * THE ROW CAME BACK ANYWAY, and its re-drive is sharper than the filing:
+       * «✓ Задмини обекта и продължи напред 0:43», seven seconds after task 1
+       * at 0:36, on a leg whose own steering block reads „0 trace commands —
+       * THIS DRIVE DID NOT STEER", wheel never touched, throttle flat at 57–59
+       * км/ч. A car that never turned the wheel cannot have gone round
+       * anything. The retitle was honest about the SENTENCE and changed nothing
+       * about the TICK: the credit was still bare arrival.
+       *
+       * So `ReachZoneParams.requireNoContact` was built where the note routed
+       * it (`lessons/types.ts` carries the design, `objectives.ts
+       * stepReachZone` the arm, `engine.ts struckABodyInRun` the channel), and
+       * this waypoint is its first and only author. The title goes back to
+       * promising the thing the gate now measures, and the claims test relaxes
+       * per-OBJECTIVE — a title may claim contact exactly when its own params
+       * carry the key, so a bare `reachZone` making the promise still fails the
+       * build.
+       *
+       * WHAT IS STILL NOT MEASURED, stated so the next round does not read this
+       * as more than it is: the gate refuses a tick to a drive that STRUCK
+       * something. It does not certify that the car went ROUND the obstacle —
+       * the un-steered leg above, which passes through the disc at 59 км/ч
+       * having hit nothing because the obstacle sits curb-side of a 8.125 m
+       * lane, still ticks. Witnessing the avoidance itself needs a lateral term
+       * (a signed `laneOffsetM` excursion, or the obstacle's own footprint
+       * cleared by a margin) that no objective param expresses today. Routed,
+       * and NOT claimed closed here.
        */
-      titleBg: "Задмини обекта и продължи напред",
-      // Past the obstacle (y = 130), back in the lane center.
-      params: { kind: "reachZone", x: LANE_X, y: 178, radiusM: 12 },
+      titleBg: "Задмини обекта, без да го закачиш, и продължи напред",
+      // Past the obstacle (y = 130), back in the lane center. `requireNoContact`
+      // is the term the block above routed here: a drive whose protocol already
+      // books a COLLISION may not collect a certificate that says it got past
+      // without touching anything.
+      params: { kind: "reachZone", x: LANE_X, y: 178, radiusM: 12, requireNoContact: true },
     },
     {
       id: "sc-obs-finish",

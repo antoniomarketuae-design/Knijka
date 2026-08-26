@@ -170,6 +170,68 @@ describe("a standing duty held in breach is CHARGED once, however long it runs",
 });
 
 // ---------------------------------------------------------------------------
+// …and the same guard on a continuing OVERSPEED (w11 · SPEED_REGRADE_SEC)
+// ---------------------------------------------------------------------------
+
+/** A continuous 56 км/ч in a 50 zone, one tick per second, [t0, t1] inclusive. */
+function overspeedCruise(t0: number, t1: number) {
+  const out = [];
+  for (let t = t0; t <= t1; t += 1) out.push(makeTick({ t, speedKmh: 56 }));
+  return out;
+}
+
+const speedCharges = (s: LessonSessionState) =>
+  s.events.filter((e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT");
+
+describe("a continuing OVERSPEED is charged once, and is no longer charged nothing", () => {
+  // WHY THIS EXISTS, and it is the lamps' argument on the code the audit
+  // photographed most. `SPEEDING_OVER_LIMIT` re-bills on `speedingRepeatSec`
+  // (20 s) — longer than the drive on most of the catalogue's lessons — so the
+  // single bill a short leg produced was the FIRST encounter of its topic and
+  // the teach-first free mini-lesson spent it. `.audit-frames/w11` has seven
+  // legs of it: 57–59 км/ч under a posted 50 for the whole section, «Опасни 0 0
+  // · Основни 1 3 · Второстепенни 0 0», ИЗДЪРЖАН, +100 XP, and the single
+  // основна is the harness's own unbuckled belt. `SPEED_REGRADE_SEC` reaches
+  // the charge the teach consumed; `regrade` keeps it from ever being a second
+  // charge.
+
+  it("EXAM: 15 s at 56 in a 50 = ONE charge, not two", () => {
+    const r = run(createLessonSession(examLesson), overspeedCruise(0, 15));
+    expect(speedCharges(r.state)).toHaveLength(1);
+    expect(r.taught).toHaveLength(0); // no teach pass in the exam
+    expect(r.hud.filter((e) => e.kind === "violation")).toHaveLength(1);
+  });
+
+  it("TRAINING: the same drive TEACHES once and then CHARGES once — it used to charge nothing", () => {
+    const c = run(createLessonSession(trainingLesson), overspeedCruise(0, 15));
+    // Requirement-zero holds: the card comes before the mark.
+    expect(c.taught.map((m) => m.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    // …and this is the repair. Before it, `speedCharges` was EMPTY here — a
+    // whole section held over the limit reached the debrief with «Второстепенни
+    // 0 0» and a pass.
+    expect(speedCharges(c.state)).toHaveLength(1);
+    expect(buildLessonResult(c.state).score).toBe(1);
+    // The teach is first and the charge is SPEED_REGRADE_SEC of driving later —
+    // not grade-on-sight.
+    expect(speedCharges(c.state)[0]!.t).toBeGreaterThan(c.taught[0]!.t + 5.9);
+  });
+
+  it("a genuine correction, then a SECOND stint, costs two charges — not four", () => {
+    // Same shape as the lamps' counterpart: two episodes × two bills, and both
+    // re-grades of an already-charged code are dropped.
+    const stream = [
+      ...overspeedCruise(0, 15),
+      ...Array.from({ length: 10 }, (_, i) => makeTick({ t: 16 + i, speedKmh: 40 })),
+      ...overspeedCruise(26, 41),
+    ];
+    expect(speedCharges(run(createLessonSession(examLesson), stream).state)).toHaveLength(2);
+    const training = run(createLessonSession(trainingLesson), stream);
+    expect(training.taught).toHaveLength(1);
+    expect(speedCharges(training.state)).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Termination fold (pure)
 // ---------------------------------------------------------------------------
 

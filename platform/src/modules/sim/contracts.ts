@@ -220,7 +220,23 @@ export interface LessonSpec {
    * fields fall back to DEFAULT_LESSON_TRAFFIC (the city values). The полигон
    * runs ~2 vehicles / 2 pedestrians — an учебна площадка is not a highway.
    */
-  traffic?: { vehicleCount?: number; pedestrianCount?: number; anchorRadiusM?: number };
+  traffic?: {
+    vehicleCount?: number;
+    pedestrianCount?: number;
+    anchorRadiusM?: number;
+    /**
+     * Ambient PAVEMENT walkers — people on the footway who never step onto the
+     * carriageway, so they arm no crossing duty and change no grading (the
+     * „SIDEWALK-ONLY WALKERS" block in `traffic/pedestrians.ts` carries the
+     * proof). Absent ⇒ the live scene sizes them from the DISTRICT'S OWN
+     * walkable kerb length (`ambientSidewalkBudget`), which is why this is an
+     * override and not a required number: an empty pavement is a property of
+     * the street, and every scenario map inherited one by default.
+     *
+     * Set it to 0 to author a genuinely deserted road on purpose.
+     */
+    sidewalkPedestrianCount?: number;
+  };
   /** Spawn point id from the lesson's district JSON, or explicit pose. */
   spawn: { pointId?: string; position?: { x: number; y: number }; headingDeg?: number };
   /** Whether the 13-step pre-drive procedure runs before driving. */

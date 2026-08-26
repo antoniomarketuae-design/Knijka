@@ -91,6 +91,82 @@ export interface ReachZoneParams {
    * This decides only whether the TASK is ticked off.
    */
   acceptBeforeMarkM?: number;
+  /**
+   * THE GATE FINALLY HAS THE CONTACT TERM ITS OWN TEMPLATE ROUTED HERE —
+   * sc-hazard-obstacle:0f31ccfb, wave 2.
+   *
+   * `templates-hazards.ts sc-obs-cleared` carries the routing note verbatim:
+   * *„A real gate — «no contact event since this objective armed» — needs a new
+   * term on `ReachZoneParams` plus the evaluator that reads it … Routed."* This
+   * is that term. Until it existed the objective was retitled DOWN — from
+   * «Задмини обекта, без да го закачиш» to «Задмини обекта и продължи напред» —
+   * because an honest title was the only thing the lane could ship, and
+   * `__tests__/hazard-obstacle-claims.test.ts` was left standing so the promise
+   * could not come back without the gate arriving with it. It has now arrived.
+   *
+   * WHAT IT MEANS. `true` = this waypoint may not be ticked on a drive whose
+   * own protocol already books a `COLLISION` — a struck body, of any kind,
+   * anywhere in the run. It is a claim about the JOURNEY, exactly like
+   * `requireVruUntouched` (objectives.ts `ReachZoneWitnessDemands`) and read the
+   * same way: a per-frame consultation of the run's SCORED ledger, no
+   * eval-state memory, and never part of the `capMet` latch.
+   *
+   * WHY THE WHOLE-RUN LEDGER AND NOT „the obstacle". `stepReachZone` is handed
+   * (params, prev, tick, ctx) and has no notion of WHICH body a template meant;
+   * `ObjectiveContext` carries facts about the drive, not a cast list. On the
+   * one drill that authors it there is exactly one thing on the carriageway to
+   * strike, so the two readings coincide — and where they would not, the
+   * broader reading is the SAFE direction for a certificate: it can only ever
+   * withhold a tick from a drive the same debrief already convicts of the
+   * gravest fault in the catalogue (Наредба № 38 чл. 48, ал. 3).
+   *
+   * IT CANNOT REFUSE A CLEAN DRIVE. The channel is the rule engine's BILLED
+   * collision, not the raw contact stream: a touch under the closing-speed
+   * floor never becomes a `ScorableEvent`, so it never reaches this gate (see
+   * orchestrator/contact.ts — „a 2 km/h bumper kiss is not a crash"). A drive
+   * that hits nothing is bit-identical to shipped, and so is every waypoint
+   * that does not author the key.
+   */
+  requireNoContact?: true;
+  /**
+   * THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS — sc-rx-guarded:deb92207,
+   * wave 2, and the second term this file's own templates routed here.
+   *
+   * `templates-rail.ts sc-rxg-finish` names the owner in so many words: *„this
+   * disc CAN be taught to refuse while the arm is down — and until it is, this
+   * drill's own two ❌ demos still complete it at 33.4 s and 46.9 s on drives
+   * convicted of entering barred. OWNER: `lessons/objectives.ts` (a
+   * `requireRailClear` demand reading `tick.railBarred`)."* `traces/
+   * scRxGuarded.ts` and `rail-cross-when-clear.test.ts` §5 route the same
+   * clause to the same address. This is it.
+   *
+   * WHAT IT MEANS. `true` = this waypoint is earned by BEING ON the authored
+   * track band (`tick.railCrossing === "on"`) while the guarded arm is NOT down
+   * (`tick.railBarred !== true`), and thrown away by being on that band while
+   * it IS. Like `requireControllerProceed` it is a claim about a moment on the
+   * JOURNEY rather than a state at the mark — the finish disc sits 130 m past
+   * the crossing — so it rides the same `capMet` latch and shares that demand's
+   * single-frame rule: it may not sit on a zone that also carries a cap, a lamp
+   * or a gear demand, because one latch cannot hold two independently-earned
+   * halves (see `parseControllerDemand`).
+   *
+   * WHY NOT „the arm is up AT the mark". Because the arm is on a 90 s cycle
+   * inside a 95 s par time: it comes back down while a perfectly correct
+   * student is still driving the last 130 m, and refusing him then would be a
+   * lie about a crossing he has already made properly. What is graded is the
+   * crossing, at the crossing.
+   *
+   * IT CANNOT TRAP ANYONE, and that is the half checked before the half that
+   * refuses. The latch is not one-shot: a student who creeps across barred and
+   * comes round to cross again after the lift earns it back, the same escape
+   * `requireControllerProceed` documents. And an unmeasurable channel never
+   * refuses — absent `railCrossing` means the tick's author cannot answer, so
+   * a zone that authors this key on a map with no rail span would never
+   * complete, which is why the key is authored only on the two drills whose
+   * district ships the timetable and why `rail-cross-when-clear.test.ts` pins
+   * the census.
+   */
+  requireRailClear?: true;
 }
 
 /**

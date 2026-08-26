@@ -140,6 +140,17 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
       } else if (deriveControllerDemand(objective.titleBg) && !hasAtMarkDemand(out)) {
         out.requireControllerProceed = true;
       }
+      // THE RAISED ARM (ReachZoneParams.requireRailClear — lessons/types.ts
+      // carries the finding and the three files that routed it here). AUTHORED
+      // ONLY, and for a blunter reason than the contact term's: a rail claim
+      // derived from a banner would be a demand nothing can spend on the 1,718
+      // catalogue gates whose district has no track band at all, and a demand
+      // nothing can spend is a lesson nobody can finish. It is written on the
+      // two discs whose map ships a timetable, and `rail-cross-when-clear
+      // .test.ts` pins that census in both directions.
+      if (p.requireRailClear !== undefined) {
+        out.requireRailClear = parseRailClearDemand(objective, p.requireRailClear);
+      }
       // THE WAITED-FOR PERSON, same law: authored wins, the title fills in.
       // No conflict guard is needed — this demand never touches the `capMet`
       // latch (see `ReachZoneWitnessDemands`), so it can share a zone with any
@@ -155,6 +166,25 @@ export function parseObjectiveParams(objective: LessonObjective): ObjectiveParam
         out.requireVruUntouched = true;
       } else if (deriveVruWaitDemand(objective.titleBg)) {
         out.requireVruUntouched = true;
+      }
+      // THE CONTACT TERM (ReachZoneParams.requireNoContact — lessons/types.ts
+      // carries the finding and the routing note it answers). AUTHORED ONLY,
+      // and deliberately so: the four demands above may be filled in from the
+      // banner because their populations were CENSUSED over all 395 catalogue
+      // objectives, and a census is what stops a matcher from inventing a
+      // demand nobody can spend. The contact census (2026-08-26, every
+      // `titleBg:` in `templates-*.ts` against /закач|удар|засегн|блъсн|допр/)
+      // returns exactly ONE reachZone-adjacent title, and it is a parkInBay
+      // («паркирай на заден ход, без да опираш буса»). One member is not a
+      // population; a matcher built on it would be a guess wearing a census's
+      // clothes. So the key is written where it is meant, and
+      // `hazard-obstacle-claims.test.ts` holds the other direction — a title
+      // that CLAIMS contact without this key fails the build.
+      if (p.requireNoContact !== undefined) {
+        if (p.requireNoContact !== true) {
+          throw new ObjectiveSpecError(objective.id, "reachZone requireNoContact must be true");
+        }
+        out.requireNoContact = true;
       }
       // SIGNED (FR-24): + = the mark sits past the paint, − = the paint is
       // ahead of the mark. The only rejected value is one that would empty the
@@ -422,6 +452,42 @@ export interface ObjectiveContext {
    * shipped. See `vruWaitHonoured` for the frame that made it necessary.
    */
   struckAPersonInRun?: boolean;
+  /**
+   * Has this drive struck ANY body — a vehicle, a person, a cyclist or an
+   * authored static obstacle — anywhere, at any point? The same session-monotone
+   * fact as `struckAPersonInRun` one category wider, read off the same scored
+   * ledger, and the only thing `ReachZoneParams.requireNoContact` consults.
+   *
+   * A SUPERSET, NOT A REPLACEMENT. `struckAPersonInRun` stays its own field
+   * because it answers a different question — «беше ли прегазен човекът, за
+   * когото пишеш, че си изчакал» — and because the two gates must be able to
+   * disagree: a drill may forbid touching the stalled car it routes you round
+   * without making any claim about a pedestrian, and vice versa.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+   * (the rigs, the fixtures, `EMPTY_CONTEXT`) omits it and behaves exactly as
+   * shipped.
+   */
+  struckABodyInRun?: boolean;
+  /**
+   * Has this drive been billed for going onto a level crossing with the arm
+   * down — `RAIL_CROSSING_VIOLATION` detail `"entered-barred"`, the 10-point
+   * terminating опасна of ЗДвП чл. 52? The one fact
+   * `ReachZoneParams.requireRailClear` consults.
+   *
+   * READ OFF THE VERDICT, WHICH IS UNUSUAL HERE AND IS ARGUED IN
+   * `railClearHonoured`. Every other field on this context is a fact about the
+   * drive (an outcome resolved, a body struck); this one is a fact about the
+   * drive's PROTOCOL. The reason is that the entry is a TRANSITION — the
+   * approach→on edge — and the reducer that owns that edge has already
+   * adjudicated it once, with the approach guard and the reverse exemption that
+   * make it honest. A second adjudicator reading raw `railBarred` frames is how
+   * the first cut of this demand acquitted the creep that crossed under the
+   * boom and was still on the rails when it lifted.
+   *
+   * OPTIONAL, and absent means „unknown", never „yes".
+   */
+  enteredRailBarredInRun?: boolean;
 }
 
 const EMPTY_CONTEXT: ObjectiveContext = { stagedOutcomes: [], redsMetInRun: 0 };
@@ -820,6 +886,32 @@ export interface ReachZoneWitnessDemands {
    * so the row keeps its retitle debt in `ACTOR_CLAIM_KNOWN_OPEN`.
    */
   requireVruUntouched?: boolean;
+  /**
+   * NOTHING WAS STRUCK ON THE WAY HERE — the fifth demand, declared on
+   * `ReachZoneParams` itself (lessons/types.ts, which carries the finding, the
+   * routing note it answers and the reason the ledger is read whole) and
+   * restated here so the five demands read as one set.
+   *
+   * It is listed with its siblings and behaves like the fourth: a claim about
+   * the JOURNEY, read per frame off `ObjectiveContext.struckABodyInRun`,
+   * outside the `capMet` latch, and absent on every zone that does not author
+   * it. See `noContactHonoured` for the read and `contactVoidsObjective` for
+   * the permanence the finish gate has to know about.
+   */
+  requireNoContact?: true;
+  /**
+   * THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS — the sixth demand,
+   * declared on `ReachZoneParams` itself (lessons/types.ts, which carries the
+   * finding and the three files that routed it here) and restated here so the
+   * set reads as one.
+   *
+   * A claim about the JOURNEY, like the fourth and the fifth: a per-frame read
+   * of `ObjectiveContext.enteredRailBarredInRun`, outside the `capMet` latch,
+   * absent on every zone that does not author it. See `railClearHonoured` for
+   * the read — and, more usefully, for the per-frame design this replaced and
+   * the recorded drive that killed it.
+   */
+  requireRailClear?: true;
 }
 
 export type WitnessedReachZoneParams = ReachZoneParams & ReachZoneWitnessDemands;
@@ -1006,6 +1098,22 @@ function parseControllerDemand(
 }
 
 /**
+ * THE RAISED ARM. No conflict guard is needed and that is a fact about the
+ * final design rather than an omission: like `requireVruUntouched` and
+ * `requireNoContact`, this demand never touches the `capMet` latch (see
+ * `railClearHonoured`), so it can share a zone with any at-mark demand without
+ * the single-frame conjunction problem `parseControllerDemand` exists to
+ * refuse. What is still refused is a malformed value — a `false` here would
+ * read as „no demand" and silently un-gate a crossing.
+ */
+function parseRailClearDemand(objective: LessonObjective, v: unknown): true {
+  if (v !== true) {
+    throw new ObjectiveSpecError(objective.id, "reachZone requireRailClear must be true");
+  }
+  return true;
+}
+
+/**
  * Is the lamp demand honoured on THIS frame? „fog" is the чл. 74 pairing — the
  * fog lamps are an ADDITION to the dipped beams, never a substitute for them,
  * so it asks for both. `fogLightsOn` is optional on the contract and absent
@@ -1046,12 +1154,68 @@ function controllerVerdictHere(tick: SimTick): "proceed" | "halt" | null {
   return verdict;
 }
 
+/**
+ * DID THIS DRIVE GO ONTO THE RAILS WITH THE ARM DOWN?
+ *
+ * ── THE FIRST DESIGN AND WHY THE MEASUREMENT KILLED IT (wave 2) ─────────────
+ *
+ * This started as `requireControllerProceed`'s twin: a per-frame read of
+ * `tick.railCrossing === "on" && tick.railBarred !== true`, earned on the band,
+ * spent on the band, carried by `capMet`. It type-checked, it refused the
+ * blast-through demo, and it was WRONG — and it was wrong in the direction that
+ * matters, which is why it was driven before it was believed.
+ *
+ * `mistake-creep-barred` — the drive whose own copy is «Водачът спря учтиво
+ * пред прелеза, но не изчака: пропълзя напред и се промъкна през коловоза при
+ * още спуснати бариери» — went onto the band inside the barred window [0, 40)
+ * and was STILL ON IT when the arm lifted at cyclePos 40, because that is what
+ * creeping means. The lift re-earned the latch under a car that was already
+ * between the rails. Replayed through `applyTick`, it collected the certificate
+ * exactly as it had before the demand existed: the gate refused the driver who
+ * raced the boom and acquitted the one who crept under it, which is the
+ * distinction the drill exists to teach and the one the copy calls „учтивото
+ * спиране не оправдава нищо".
+ *
+ * ── WHAT IT READS INSTEAD ──────────────────────────────────────────────────
+ *
+ * The ENTRY, adjudicated once, by the grader that already owns it.
+ * `rules/engine.ts` bills `RAIL_CROSSING_VIOLATION` detail `"entered-barred"`
+ * on the approach→on transition and nowhere else — „convicts regardless of any
+ * stop made first (weaving past the barrier after a polite stop is the kill)" —
+ * so the fact this demand needs is a fact the protocol has already printed.
+ * Nothing here re-adjudicates a law; it reads one line of the drive's own
+ * ledger, the way `requireVruUntouched` reads the struck-person line.
+ *
+ * SESSION-MONOTONE, AND THAT PERMANENCE IS DELIBERATE. This is the second
+ * refusal in this file that cannot be taken back, and it is in the first one's
+ * company for a reason: entering a barred crossing is a terminating опасна
+ * (Наредба № 38 чл. 48, ал. 3 — «само тази грешка спира и самия изпит»),
+ * because on the other side of the boom is a train that can neither stop nor
+ * swerve. The re-latch law this file applies everywhere else — „self-correction
+ * is the one thing a drill must never punish" — is about acts a student can
+ * perform again properly. Driving under a lowered boom is not one of them, and
+ * a certificate reading «стигни края на отсечката ОТВЪД ПРЕЛЕЗА» may not be
+ * issued for a crossing the same protocol convicts.
+ *
+ * A REFUSAL MAY NOT DOUBLE AS A TRAP: `sc-rxg-finish` and `sc-rxd-finish` are
+ * both TERMINAL, so `railBarredVoidsObjective` below tells `lessons/engine.ts`
+ * to release the stalled-chain gate — the certificate stays refused and only
+ * the strand goes, exactly as for the struck person.
+ *
+ * OPTIONAL, and absent means „unknown", never „yes": every hand-built caller
+ * omits it and behaves exactly as shipped.
+ */
+function railClearHonoured(ctx: ObjectiveContext): boolean {
+  return ctx.enteredRailBarredInRun !== true;
+}
+
 /** True when the demands a reachZone makes are met by the whole zone contract. */
 function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
-  // `requireVruUntouched` is deliberately absent: it never rides the `capMet`
-  // latch (outcomes are session-monotone, so it needs no eval-state memory),
-  // and folding it in would flip `capMet`'s initial value on a demand the
-  // latch arithmetic cannot spend or re-earn.
+  // `requireVruUntouched`, `requireNoContact` and `requireRailClear` are
+  // deliberately absent: none of them rides the `capMet` latch (all three facts
+  // are session-monotone, so none needs eval-state memory), and folding any of
+  // them in would flip `capMet`'s initial value on a demand the latch
+  // arithmetic cannot spend or re-earn.
   return (
     params.maxSpeedKmh !== undefined ||
     params.requireLamps !== undefined ||
@@ -1106,6 +1270,13 @@ function hasArrivalDemand(params: WitnessedReachZoneParams): boolean {
  * fault the catalogue has. Absent (`undefined`) is „unknown" and keeps the old
  * answer, so every fixture, rig and replay is untouched.
  */
+function noContactHonoured(ctx: ObjectiveContext): boolean {
+  // `true` is the only refusing value: `undefined` is „the caller cannot
+  // answer" (every fixture, rig and replay), and unknown must never become a
+  // refusal — the same polarity `struckAPersonInRun` ships with.
+  return ctx.struckABodyInRun !== true;
+}
+
 function vruWaitHonoured(ctx: ObjectiveContext): boolean {
   // A struck person outranks the encounter record in both directions: it
   // refuses a run the dart never armed for, and it refuses one whose LAST dart
@@ -1147,6 +1318,50 @@ export function personContactVoidsObjective(
 ): boolean {
   if (!struckAPersonInRun || params.kind !== "reachZone") return false;
   return (params as WitnessedReachZoneParams).requireVruUntouched === true;
+}
+
+/**
+ * THE SAME QUESTION FOR THE CONTACT TERM, and it is asked for the same reason:
+ * a `requireNoContact` gate that has seen a billed collision is closed for the
+ * rest of the run, so when it is the LAST objective in the chain nothing
+ * advances `currentIndex` and the drive loses its ordinary ending.
+ *
+ * ONE REFUSAL, NEVER A TRAP — the law the block above states and the reason
+ * `lessons/engine.ts` folds both of these into one `terminalUnearnable`. The
+ * certificate is still withheld (`buildLessonResult` reports
+ * finished-and-failed on an objective left `active`); only the strand goes, so
+ * a student who struck the obstacle can still reach the debrief that explains
+ * the fault instead of having to quit and forfeit the attempt.
+ *
+ * Kept separate from `personContactVoidsObjective` rather than merged into one
+ * three-argument predicate: the two demands read two different facts and a
+ * caller that knows only one of them must be able to ask only that one.
+ */
+export function contactVoidsObjective(
+  params: ObjectiveParams,
+  struckABodyInRun: boolean,
+): boolean {
+  if (!struckABodyInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireNoContact === true;
+}
+
+/**
+ * …AND THE SAME QUESTION FOR THE RAISED ARM, which is the one where it is not
+ * optional: `sc-rxg-finish` and `sc-rxd-finish` are both the LAST objective of
+ * their drill, so without this the student who drove under the boom would reach
+ * the protocol that teaches him чл. 52 only by quitting — forfeiting the
+ * attempt's XP and its calibration for having been shown the fault the lesson
+ * exists to show him.
+ *
+ * The certificate is still refused (the objective stays `active` and
+ * `buildLessonResult` reports finished-and-failed). Only the strand goes.
+ */
+export function railBarredVoidsObjective(
+  params: ObjectiveParams,
+  enteredRailBarredInRun: boolean,
+): boolean {
+  if (!enteredRailBarredInRun || params.kind !== "reachZone") return false;
+  return (params as WitnessedReachZoneParams).requireRailClear === true;
 }
 
 /**
@@ -1952,7 +2167,26 @@ function stepReachZone(
   // strike is folded in, `done` goes unreachable and stays so until a later
   // encounter resolves clean; every zone without the demand is bit-identical.
   const vruOk = params.requireVruUntouched !== true || vruWaitHonoured(ctx);
-  const done = reached && capMet && vruOk;
+  // ── NOTHING WAS STRUCK ON THE WAY HERE (ReachZoneParams.requireNoContact) ──
+  // Same shape and same reasoning as the arm above it: a per-frame read of a
+  // session-monotone fact, outside the `capMet` latch, so no eval-state field
+  // is needed and nothing can flicker. A zone without the key never consults
+  // it and is bit-identical to shipped.
+  //
+  // THE FINDING THIS CLOSES, in its own words: *„«✓ Задмини обекта и продължи
+  // напред 0:43» … the credit is still a bare reachZone arrival with no contact
+  // or avoidance term."* `COLLISION` is `terminateSession`, and terminating
+  // ends the SHEET rather than the drive — so the car that clipped the stalled
+  // vehicle kept rolling the remaining 48 m and collected the tick under a
+  // sentence about having got past it. It no longer does.
+  const contactOk = params.requireNoContact !== true || noContactHonoured(ctx);
+  // ── THE ARM WAS UP WHEN THE CAR WENT OVER THE RAILS (requireRailClear) ─────
+  // Third arm of the same shape, and see `railClearHonoured` for the per-frame
+  // design this replaced and the drive that killed it. Outside the `capMet`
+  // latch because the fact is session-monotone: the entry was adjudicated once,
+  // by the grader that owns it, and a later frame cannot un-adjudicate it.
+  const railOk = params.requireRailClear !== true || railClearHonoured(ctx);
+  const done = reached && capMet && vruOk && contactOk && railOk;
   // „You are ON the mark and still too fast" — the one state the student
   // reads as „nothing happened". Latched so it is said once, not every frame.
   const overCapNoted =

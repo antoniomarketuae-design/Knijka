@@ -4769,12 +4769,77 @@ export function LessonPlayShell({
         // The price of a task line that retires after seven seconds is that it
         // must come back in one tap. This is that tap — and it is why making the
         // banner transient is a redesign rather than a deletion.
+        //
+        // ── «2/2» IS NOT A SCORE, AND THIS ROW USED TO LET IT LOOK LIKE ONE ───
+        // (sc-sp-harsh-brake:2b71d0c7, wave 2.)
+        //
+        // THE FINDING'S FIRST FORM WAS REFUTED AND ITS HARM SURVIVED THE
+        // REFUTATION. It said „the in-drive menu reports «Задача 2/2» … while
+        // only one of the two objectives is actually done", and the ORDINAL
+        // argument is correct for the BANNER — run.log carries «Задача 1/2Стигни
+        // контролната зона…» and «Задача 2/2Стигни края на отсечката», i.e.
+        // N-of-M *plus that objective's title*, and 01-arrival prints 1/2 at
+        // 0 км/ч before anything can be done. But the MENU is a different
+        // widget: `w11/…/sc-sp-harsh-brake__mobile-right/07b-menu.png` shows
+        // «Задача    2/2» as a bare value in a settings list beside Съветник /
+        // Звук / Карта / Качество, with no title and no context to mark it an
+        // ordinal — and it is the ONLY task readout a mobile student gets,
+        // because the banner is ✗ NOT ON THE GLASS on 43 of 43 drive beats of
+        // that leg (it retires after its TTL, which is this row's whole reason
+        // for existing). One number, «2/2», at a moment when one of two tasks is
+        // done, with nothing on screen to stop it reading as a completion count.
+        //
+        // TWO CHANGES, BOTH ON THE READOUT AND NEITHER ON THE COUNTER:
+        //  · «2 от 2» instead of «2/2». A solidus is the product's own score
+        //    grammar — it is what «Изпит 6/9» and «Подготовка 4/13» use one row
+        //    away — while «N от M» is the ordinal form, and Bulgarian marks the
+        //    difference the same way English does between „2/2" and „2 of 2".
+        //  · THE TASK'S OWN SENTENCE UNDER IT, in `hintBg` — the slot doc 91
+        //    §I26(c) added for exactly this, „a setting that changes the
+        //    experience without saying what it costs is the bare verdict
+        //    requirement zero forbids". Here the bare verdict IS the fraction.
+        //    `taskLineBg` is `snap.objectiveTitle` outside mistake mode, i.e.
+        //    the same sentence the banner would be carrying if it were still up,
+        //    so the row now says WHICH task rather than only how many.
+        //
+        // THE HEIGHT IS PAID, not ignored: a hinted row costs 56.5 px against
+        // 43.5 (the arithmetic is on `PlayMenuRow`), which in portrait is the
+        // same 13 px the «Звук» row spent. The two mechanisms that made that
+        // affordable are unchanged and both gated — this sheet PAUSES the scene
+        // (`onOpenChange`, `shellViewportContract.test.ts`) so a covered thumb
+        // station is not a dead control, and the wrapper's `maxHeight` +
+        // `overflow-y-auto` pair (pinned by `soundChoice.test.ts`) makes the
+        // sheet SCROLL past the cap instead of growing off the stage. In
+        // landscape the row is one cell of a two-column grid and usually shares
+        // its grid row's height with a hint that is already there.
+        //
+        // AND THE HINT IS NOT TRUNCATED, which is a decision and not an
+        // oversight. The «Звук» / «Качество» rows hold a 70-character copy
+        // budget because their hint is a TRADE the author writes and can
+        // shorten; this one is the student's task, and the longest objective
+        // title in the catalogue is 76 characters («Премини стоп-линията по
+        // разрешение на регулировчика — въпреки червената лампа», censused over
+        // every `titleBg:` in `templates-*.ts`). At ~35 characters to a 10 px
+        // line in 208 px that is three lines in the worst case — one line and
+        // ~12.5 px more than the budgeted two, absorbed by the same cap-and-
+        // scroll pair. Cutting it instead would put half a sentence in the ONLY
+        // task readout a mobile student gets, which is the harm this row is
+        // being repaired for, one layer down.
         ...(compact && taskLineBg !== null && taskLineBg !== ""
           ? [
               {
                 key: "task",
                 labelBg: "Задача",
-                valueBg: mistakeMode ? null : `${snap.objectiveIndex}/${snap.objectiveTotal}`,
+                valueBg: mistakeMode
+                  ? null
+                  : `${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))} от ${snap.objectiveTotal}`,
+                // Mistake mode has no ordinal to disambiguate and its line is
+                // the lesson description rather than an objective title, so it
+                // keeps the shape it shipped with: label only, no second line.
+                hintBg: mistakeMode ? null : taskLineBg,
+                ariaLabelBg: mistakeMode
+                  ? "Задача"
+                  : `Задача ${Math.min(snap.objectiveIndex, Math.max(1, snap.objectiveTotal))} от ${snap.objectiveTotal}: ${taskLineBg}`,
                 onSelect: () => setTaskPing((n) => n + 1),
               },
             ]

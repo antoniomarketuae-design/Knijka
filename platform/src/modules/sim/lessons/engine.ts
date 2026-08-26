@@ -47,9 +47,11 @@ import {
   type PreDriveStepId,
 } from "../procedures";
 import {
+  contactVoidsObjective,
   createEvalState,
   parseObjectiveParams,
   personContactVoidsObjective,
+  railBarredVoidsObjective,
   stepObjective,
   type ObjectiveContext,
 } from "./objectives";
@@ -540,6 +542,44 @@ function isPersonContact(e: ScorableEvent): boolean {
   );
 }
 
+/**
+ * ANY struck body — the wider read `ReachZoneParams.requireNoContact` consults
+ * (lessons/types.ts carries the finding). Same ledger, same event code, no
+ * `detail` filter: a vehicle, a person, a cyclist and an authored static
+ * obstacle are all bodies a drill may forbid touching.
+ *
+ * THE BILLED EVENT, NOT THE RAW CONTACT STREAM, and that is what makes the
+ * demand safe to author. `orchestrator/contact.ts` only opens an encounter once
+ * the closing speed clears the drill's own floor — „a 2 km/h bumper kiss is not
+ * a crash" — and `rules/engine.ts` collapses the per-frame stream into one bill
+ * per body. So what reaches this predicate is an accident the protocol already
+ * prints, never a graze the student cannot see.
+ */
+function isBodyContact(e: ScorableEvent): boolean {
+  return e.kind === "violation" && e.code === "COLLISION";
+}
+
+/**
+ * Went onto the rails with the arm down — the ONE line of the ledger
+ * `ReachZoneParams.requireRailClear` consults (objectives.ts
+ * `railClearHonoured` carries the finding and the argument for reading a
+ * verdict here rather than raw frames).
+ *
+ * The `detail` narrowing is the whole point: `RAIL_CROSSING_VIOLATION` also
+ * carries "no-stop" (an UNGUARDED crossing entered without the mandatory full
+ * stop) and "stopped-on-track" (came to rest between the rails). Both are real
+ * faults with their own graders and their own copy, and neither is a claim
+ * about the barrier — folding them in would refuse the guarded drill's
+ * certificate for an offence its banner never spoke about.
+ */
+function isBarredRailEntry(e: ScorableEvent): boolean {
+  return (
+    e.kind === "violation" &&
+    e.code === "RAIL_CROSSING_VIOLATION" &&
+    e.detail === "entered-barred"
+  );
+}
+
 /** Map rule-engine output onto the HUD event contract (toasts). */
 function toHudEvents(events: ReadonlyArray<RuleEvent>): HudEvent[] {
   return events.map((e) =>
@@ -913,6 +953,21 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
   // certificate is issued, and whether the drive can still end by itself.
   const struckAPersonInRun =
     prev.events.some(isPersonContact) || scoredEvents.some(isPersonContact);
+  // …AND THE SAME LEDGER READ ONE CATEGORY WIDER, for the contact term
+  // (`ReachZoneParams.requireNoContact`). Both halves for the same reason as
+  // above: a car that strikes the obstacle on the frame it also crosses the
+  // waypoint must not be certified by a ledger one frame stale.
+  const struckABodyInRun =
+    struckAPersonInRun ||
+    prev.events.some(isBodyContact) ||
+    scoredEvents.some(isBodyContact);
+  // …AND THE BARRED RAIL ENTRY, on the same two halves of the same ledger, for
+  // `ReachZoneParams.requireRailClear`. The entry and the finish disc are 130 m
+  // apart, so the one-frame-stale case cannot arise here — both halves are read
+  // anyway, because a channel that is correct only because of a distance is a
+  // channel that breaks when a template moves a mark.
+  const enteredRailBarredInRun =
+    prev.events.some(isBarredRailEntry) || scoredEvents.some(isBarredRailEntry);
 
   let objectives = prev.objectives;
   let evalStates = prev.evalStates;
@@ -958,6 +1013,8 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
         stagedOutcomes: prev.stagedOutcomes ?? [],
         redsMetInRun: countRedsMet(evalStates),
         ...(struckAPersonInRun ? { struckAPersonInRun: true } : {}),
+        ...(struckABodyInRun ? { struckABodyInRun: true } : {}),
+        ...(enteredRailBarredInRun ? { enteredRailBarredInRun: true } : {}),
       };
       const before = evalStates[currentIndex];
       const step = stepObjective(current.params, before, tick, ctx);
@@ -1290,7 +1347,19 @@ export function applyTick(prev: LessonSessionState, tick: SimTick): LessonStepRe
       // `active` status and `buildLessonResult` reports finished-and-failed, so
       // the certificate is still refused. Only the strand goes.
       const terminalUnearnable =
-        onTerminal && personContactVoidsObjective(params[currentIndex], struckAPersonInRun);
+        onTerminal &&
+        (personContactVoidsObjective(params[currentIndex], struckAPersonInRun) ||
+          // The contact term is monotone for exactly the same reason and
+          // strands the chain in exactly the same way (`objectives.ts
+          // contactVoidsObjective`). Nothing is graded by this: the objective
+          // keeps its honest `active` status and the certificate is still
+          // refused — only the trap goes.
+          contactVoidsObjective(params[currentIndex], struckABodyInRun) ||
+          // The barred rail entry is the case where this is not optional: BOTH
+          // guarded drills put the gated disc last, so without it the student
+          // who drove under the boom could reach the чл. 52 protocol only by
+          // quitting (`railBarredVoidsObjective`).
+          railBarredVoidsObjective(params[currentIndex], enteredRailBarredInRun));
       if (!onTerminal || terminalUnearnable) {
         const zone = routeFinishZone(params);
         if (zone !== null) {

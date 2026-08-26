@@ -89,9 +89,55 @@ interface Presence {
   vehicleCount: number;
 }
 
+/**
+ * WHERE THE STUDENT STANDS — and this used to be „a spawnPointId or nothing".
+ *
+ * `ScenarioStart` has TWO forms (`scenario/types.ts`: „a spawn point id … or an
+ * explicit pose (exactly one of the two must be set)"), and this probe only
+ * ever read the first. A template that authors its own pose returned null from
+ * `measure`, and `measure` returning null makes the `it` block RETURN — so the
+ * row went green without measuring anything. A skip that reads as a pass is the
+ * failure mode this whole file is written against, one level up.
+ *
+ * HOW IT WAS FOUND, and the finding it hid — w11, working
+ * sc-ed-d2-priority-run:76d2e929 („a priority lesson with ZERO moving traffic
+ * … the right drive burned 90 s of «lawful waits» standing still for a car
+ * that never comes"). Adding `exam-drills` to
+ * `SCENARIO_FAMILY_TRAFFIC_BASELINE` brought all five exam templates into
+ * `SUBJECTS`, and every one of them authors `start.position` — each with its
+ * own comment saying why („d2's five spawnPoints all sit on quiet streets far
+ * from this arterial"). The suite reported 27 passing tests and had measured
+ * exactly none of them.
+ *
+ * WHAT THE REAL MEASUREMENT THEN SAID, kept here because it is the answer the
+ * next lane would otherwise spend itself re-deriving, and because it is a
+ * NEGATIVE result — the family baseline was reverted on the strength of it:
+ *
+ *   template                    4 cars              12 cars
+ *   sc-ed-d2-city-run           ALIVE (both floors) ALIVE
+ *   sc-ed-d2-priority-run       100% empty, 0 pass  100% empty, 0 pass
+ *   sc-ed-d2-stop-address       0 passages          0 passages
+ *
+ * Tripling the density moves the two dead ones by nothing at all, so whatever
+ * is wrong at those two poses is NOT a count: either `buildRoutes` seeds no
+ * loop through those junctions on the real Лозенец topology, or the probe's own
+ * premise fails there (it stands at the intersection nearest the SPAWN, and
+ * `sc-ed-d2-priority-run` spawns on a one-way slip road whose nearest node has
+ * no crossing arm, while the junction the drill actually grades is the Б2 line
+ * at n2945503673, further along). Those are different repairs and this probe
+ * cannot tell them apart; a drive that stands at the GRADED node rather than
+ * the nearest one would.
+ */
+function startPose(spec: ScenarioSpec, d: RawDistrict): { x: number; y: number } | null {
+  if (spec.start.spawnPointId !== undefined) {
+    return d.spawnPoints?.find((s) => s.id === spec.start.spawnPointId) ?? null;
+  }
+  return spec.start.position ?? null;
+}
+
 function measure(spec: ScenarioSpec, level: number): Presence | null {
   const d = district(spec.map.districtId);
-  const sp = d.spawnPoints?.find((s) => s.id === spec.start.spawnPointId);
+  const sp = startPose(spec, d);
   if (!sp || d.intersections.length === 0) return null;
   let node = d.intersections[0];
   let best = Infinity;
@@ -199,6 +245,19 @@ const GRIDLOCK_ALLOWLIST = new Map<string, string>([
 describe("ambient presence — the lesson's subject exists where the lesson grades", () => {
   it("the census really finds the yielding families (guard against a vacuous suite)", () => {
     expect(SUBJECTS.length).toBeGreaterThanOrEqual(15);
+  });
+
+  it("…and every one of them can actually be POSED — a skip reads as a pass", () => {
+    // The counting guard above cannot see this: a subject with no resolvable
+    // start pose is still counted, still gets its own green `it`, and is never
+    // measured. `startPose` above records how that hid five templates for a
+    // whole wave. Named here rather than left to `measure`'s null bail, so the
+    // suite fails LOUDLY the next time a template's pose stops resolving.
+    for (const spec of SUBJECTS) {
+      const d = district(spec.map.districtId);
+      expect(startPose(spec, d), `${spec.id}: no resolvable start pose`).not.toBeNull();
+      expect(d.intersections.length, `${spec.id} (${spec.map.districtId})`).toBeGreaterThan(0);
+    }
   });
 
   for (const spec of SUBJECTS) {

@@ -109,9 +109,11 @@ import {
   type PreDriveSignalTracker,
   type PreDriveStepId,
 } from "@/modules/sim/procedures";
-import type { SimTick } from "@/modules/sim/rules";
+import { DEFAULT_RULE_CONFIG, type SimTick } from "@/modules/sim/rules";
 import {
   createDashboardStatus,
+  FollowGapCue,
+  followGapTarget,
   PEEK_SCRIM_FEATHER_PX,
   peekScrimBackgroundCss,
   peekScrimMaskCss,
@@ -150,7 +152,9 @@ import {
 } from "@/modules/sim/world";
 import { createWorldRuntime, type SurfaceGripPatch } from "@/modules/sim/runtime";
 import {
+  ambientSidewalkBudget,
   createTrafficSystem,
+  DEFAULT_TRAFFIC_CONFIG,
   TrafficLayer,
   type TrafficDistrict,
   type VehicleProfile,
@@ -640,6 +644,34 @@ export default function LessonScene(props: LessonSceneProps) {
             vehicleCount: trafficSpec?.vehicleCount ?? DEFAULT_LESSON_TRAFFIC.vehicleCount,
             pedestrianCount:
               trafficSpec?.pedestrianCount ?? DEFAULT_LESSON_TRAFFIC.pedestrianCount,
+            // …AND THE PEOPLE ON THE PAVEMENT, which no lesson had.
+            //
+            // Four major w11 rows say one sentence — sc-sp-limit-end,
+            // sc-vu-emergency, sc-sp-eco-coast, sc-vu-cyclist-hook: a city
+            // street, tower blocks, parked cars, railings, and „not one
+            // pedestrian on either pavement in any frame of either drive on
+            // either platform". The last of those is a lesson built ENTIRELY
+            // around vulnerable road users.
+            //
+            // Raising `pedestrianCount` does not fix it and that is the real
+            // finding: every walker this project has ever built is anchored on
+            // a `DistrictCrossing`, and 84 of the 105 committed districts —
+            // including all four of those maps — declare none. So the traffic
+            // module grew a pavement walker that needs no crossing, arms no
+            // crossing duty and is sized HERE from the district's own walkable
+            // kerb length, because an empty pavement is a property of the
+            // street rather than a lesson-design decision. A lesson that wants
+            // a genuinely deserted road authors `sidewalkPedestrianCount: 0`.
+            //
+            // Live sessions only: `DEFAULT_TRAFFIC_CONFIG` keeps this at 0, so
+            // the recorded traces, the clip feeds and every unit fixture that
+            // builds a traffic system are byte-identical to before.
+            sidewalkPedestrianCount:
+              trafficSpec?.sidewalkPedestrianCount ??
+              ambientSidewalkBudget(
+                raw as Parameters<typeof createTrafficSystem>[0],
+                DEFAULT_TRAFFIC_CONFIG.footwaylessRoadClasses,
+              ),
           },
         );
         // Telemetry queries (pedestrian/junction/oncoming/right/circulating/
@@ -1310,6 +1342,15 @@ export function ReadyScene({
   // same seam as fog; the snow-grip PHYSICS rides lesson.physics, never this.
   const snowWeather = lesson.environment?.snow ?? false;
   const isNight = timeOfDay === "night";
+  // The FOLLOWING-GAP badge's thresholds, taken from the LESSON'S OWN rule
+  // config so the gauge and the grader can never print different numbers —
+  // `hud/followGap.ts` spends a paragraph on why that is the one rule this
+  // instrument has. `lesson.ruleConfig` is the same Partial the runtime merges
+  // over `DEFAULT_RULE_CONFIG` before `rules/engine.ts` reads it.
+  const followTarget = useMemo(
+    () => followGapTarget({ ...DEFAULT_RULE_CONFIG, ...(lesson.ruleConfig ?? {}) }, rain),
+    [lesson.ruleConfig, rain],
+  );
   const level = toLevel(quality);
   const spawn = useMemo(() => spawnPose(lesson, spawnPoints), [lesson, spawnPoints]);
   // A7: district-space spawn pose — the start of the FIRST guidance route
@@ -2349,6 +2390,24 @@ export function ReadyScene({
           frame-loop wiring, no grading read/write). hidden while any pause/
           quiz/teach/end overlay is up (physicsPaused ∪ shell paused). */}
       <RearProximityCue traffic={traffic} sampleRef={sampleRef} hidden={physicsPaused} />
+
+      {/* …AND THE SAME INSTRUMENT POINTING FORWARD — «Дистанция · 34 м · 1,2 с»
+          (sc-fo-motorway-gap, CRITICAL: „the two-second following distance the
+          lesson exists to teach is never measured — no frame reports a gap in
+          metres or seconds", across all 74 frames of two fresh legs). The
+          number was already in the product: `traffic.leadGapMeters` feeds
+          `SimTick.leadGapM` and `rules/engine.ts` grades three faults off it.
+          What was missing was showing the student the quantity he is billed
+          against. Same isolated-additive shape as the rear cue above: polls
+          `leadGapMeters` off `sampleRef` at ~5 Hz internally, no frame-loop
+          wiring, no grading read or write. `followTarget` carries the LESSON'S
+          own thresholds so the badge cannot disagree with the engine. */}
+      <FollowGapCue
+        traffic={traffic}
+        sampleRef={sampleRef}
+        target={followTarget}
+        hidden={physicsPaused}
+      />
 
       {/* „Звукът е част от урока" (doc 82 §4.4, isolated additive block).
           A muted session teaches a systematically FASTER car than the student

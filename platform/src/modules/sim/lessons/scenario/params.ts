@@ -215,6 +215,34 @@ export function serializeObjectiveParams(
       // paint. An aided rung forgives a student who stops early; no rung
       // forgives one who stops past the line.
       if (p.acceptBeforeMarkM !== undefined) params.acceptBeforeMarkM = p.acceptBeforeMarkM;
+      // ── THE WITNESS DEMANDS SURVIVE THE LADDER, AND THIS LINE IS WHY THEY
+      //    ARE NOT DEAD CODE (wave 2) ────────────────────────────────────────
+      //
+      // THIS FUNCTION IS A WHITELIST. Everything the switch above does not name
+      // is dropped, silently, on the way from the authored template to the
+      // compiled `LessonSpec` — and EVERY scenario lesson a student plays goes
+      // through here (`compileScenario` → `LessonSpec.objectives` →
+      // `createLessonSession` → `parseObjectiveParams`). So a term added to
+      // `ReachZoneParams` and read by `stepReachZone` is still a term the
+      // product never sees until its name appears on this line.
+      //
+      // MEASURED, not reasoned: `requireRailClear` was authored on
+      // `sc-rxg-finish`, parsed correctly by `parseObjectiveParams`, read
+      // correctly by the evaluator, gated by its own test at template level —
+      // and `rail-clear-gate.test.ts`, which drives `applyTick` on the compiled
+      // rung, showed the barred creep still collecting its certificate. The key
+      // never reached the session. That is the dead-predicate class exactly: a
+      // measurement wired to no consumer, green in every test that does not
+      // cross this boundary.
+      //
+      // NOT LADDERED, either of them, and unlike the radius that is not an
+      // omission. The aid ladder forgives PRECISION — a wider disc, a softer
+      // cap — because a beginner's hands are less exact. Neither of these is a
+      // precision: „did you strike something" and „was the boom down when you
+      // went over the rails" have the same answer at L1 and at L5, and a rung
+      // that forgave them would teach the opposite of the lesson it belongs to.
+      if (p.requireNoContact === true) params.requireNoContact = true;
+      if (p.requireRailClear === true) params.requireRailClear = true;
       return { kind: "reachZone", params };
     }
     case "passSignal": {

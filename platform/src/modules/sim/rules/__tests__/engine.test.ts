@@ -59,10 +59,25 @@ describe("speeding detector", () => {
   });
 
   it("fires once per repeat window while continuously over (M-16)", () => {
-    // 30 s at 58 in a 50: billed at t=2 and again a speedingRepeatSec later.
+    // 30 s at 58 in a 50: billed at t=2, RE-GRADED at t=8 (SPEED_REGRADE_SEC —
+    // the charge the teach-first free lesson consumed), and billed again a
+    // speedingRepeatSec after the FIRST bill. The M-16 cadence itself is
+    // untouched: the 2 and the 22 are where they always were.
     const { events } = drive(cruise(0, 30, { speedKmh: 58 }));
-    expect(codes(events)).toEqual(["SPEEDING_OVER_LIMIT", "SPEEDING_OVER_LIMIT"]);
-    expect(events.map((e) => e.t)).toEqual([2, 22]);
+    expect(codes(events)).toEqual([
+      "SPEEDING_OVER_LIMIT",
+      "SPEEDING_OVER_LIMIT",
+      "SPEEDING_OVER_LIMIT",
+    ]);
+    expect(events.map((e) => e.t)).toEqual([2, 8, 22]);
+    // Only the middle one is the re-grade, and it says so — `lessons/engine.ts`
+    // drops exactly this event whenever the code has already been charged, so
+    // an exam candidate's ledger is unchanged.
+    expect(events.map((e) => e.kind === "violation" && e.regrade === true)).toEqual([
+      false,
+      true,
+      false,
+    ]);
   });
 
   it("re-arms only after the limit is HELD for the cooldown (M-16)", () => {

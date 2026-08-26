@@ -117,6 +117,51 @@ describe("speed-for-conditions detector — SNOW", () => {
     );
     expect(codes(drive(ticks).events)).not.toContain("FOG_LIGHTS_OFF_IN_FOG");
   });
+
+  it("a breach still running after the card is RE-GRADED, once (SPEED_REGRADE_SEC)", () => {
+    /**
+     * THE FRAME THIS EXISTS FOR — `.audit-frames/w11/frames/
+     * sc-ac-truck-spray__pc-wrong/04-t034s.png`: disc 140, «РЕЖИМ Нормален ≤150
+     * · знакът важи · задачата иска ≤80», cluster 128 км/ч, heavy rain. Its
+     * debrief books four наказателни точки — колан 3 and «дъжд без светлини» 1
+     * — and files the driving itself under «Учебни моменти (не влизат в
+     * точките): • Несъобразена с условията скорост», i.e. at zero. The CORRECT
+     * leg of the same lesson, top 17 км/ч, gets the byte-identical card.
+     *
+     * WHY: this detector rode plain `stepEpisode`, which bills ONCE per episode
+     * and never asks again — and that single bill is the first encounter of its
+     * topic, so the teach-first free mini-lesson spends it. Unlike
+     * SPEEDING_OVER_LIMIT it had no repeat cadence at all, so the breach was
+     * free at ANY length.
+     *
+     * limit 50 · rain 0.85 → envelope 42.5 · sustain 3 s, so 48 км/ч in rain
+     * bills at t = 3 (the teach) and is re-graded at t = 9. Never a third time:
+     * Наредба № 38 prices the fault once, not per minute.
+     */
+    const ticks = cruise(0, 40, { speedKmh: 48, maxSpeedKmh: 50, rain: true, headlights: "low" });
+    const bills = drive(ticks)
+      .events.filter((e) => e.kind === "violation" && e.code === "SPEED_TOO_FAST_FOR_CONDITIONS")
+      .map((e) => [Number(e.t.toFixed(1)), e.kind === "violation" && e.regrade === true] as const);
+    expect(bills).toEqual([
+      [3, false],
+      [9, true],
+    ]);
+  });
+
+  it("…and a genuine correction re-arms it, so a second stint bills on its own", () => {
+    // The other direction: slowing INTO the envelope ends the episode, so the
+    // student who corrects and later speeds up again has committed a second
+    // act — and its own first bill is not a re-grade of the first act.
+    const ticks = [
+      ...cruise(0, 12, { speedKmh: 48, maxSpeedKmh: 50, rain: true, headlights: "low" }),
+      ...cruise(13, 20, { speedKmh: 40, maxSpeedKmh: 50, rain: true, headlights: "low" }),
+      ...cruise(21, 40, { speedKmh: 48, maxSpeedKmh: 50, rain: true, headlights: "low" }),
+    ];
+    const bills = drive(ticks)
+      .events.filter((e) => e.kind === "violation" && e.code === "SPEED_TOO_FAST_FOR_CONDITIONS")
+      .map((e) => e.kind === "violation" && e.regrade === true);
+    expect(bills).toEqual([false, true, false, true]);
+  });
 });
 
 // snowfall + no low beam · sustain = rainLightsSustainSec 3 s (O28, чл. 70 ал. 1).

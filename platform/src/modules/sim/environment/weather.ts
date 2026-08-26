@@ -166,6 +166,26 @@
 //    sub-pixel quads reach the frame, countable by eye on the same
 //    `03-ready`), and the HAZE is still fog's — see 1. Neither is this file.
 //
+// 2a. THE ROAD WAS THE ONLY SURFACE SNOW COULD LAND ON, AND THAT IS NOW FIXED
+//    ELSEWHERE — 2026-08-26, routed OUT of this file so the next reader does
+//    not re-derive it. The w11 re-judge of `sc-ac-snow:cfb2d46d` narrowed the
+//    row to „snow accumulates on the ground plane only; canopies, railings and
+//    building faces take none", and the cause was one sentence long: the two
+//    call sites in §2 above were the ONLY consumers of the snow channel that
+//    changed a surface, so the whole world outside the carriageway rendered
+//    July. The general term now lives in
+//    `world/textures/snowCover.ts` — a per-fragment `mix` toward this file's
+//    own DAY `snowWeather` colour, weighted by the world normal's Y, attached
+//    to the five shared prop materials in `WorldProps.makeSharedMaterials()`
+//    and driven once per frame by `DistrictWorld` off `getSnowIntensity()`.
+//    It had to be per-fragment and not a `roadSurfaceToParams` sibling: that
+//    mapping is right for a road BECAUSE a road is flat, and a whole-material
+//    tint on a tree lights its underside as brightly as its top and stops it
+//    reading as a tree. Nothing in this store changed and nothing needed to.
+//    Still open there and stated honestly at that file: no R0 look has been
+//    done on the result, and vehicles (TrafficLayer's parked row, the most
+//    visible bare up-facing surface left in `01-arrival`) are not covered.
+//
 // 2b. ICE STILL HAS NO CHANNEL, AND MUST NOT GET A ROAD-MATERIAL ONE.
 //    sc-ac-ice and sc-ac-bridge-ice author `weather: "dry"` (the vocabulary is
 //    {dry|rain|fog|snow}, there is no cold state to author) and render high

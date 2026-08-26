@@ -515,8 +515,35 @@ export const SC_RX_GUARDED: ScenarioSpec = {
       // convicted of entering barred. OWNER: `lessons/objectives.ts` (a
       // `requireRailClear` demand reading `tick.railBarred`), not this file,
       // which may only stop the banner from ORDERING what it cannot see.
+      //
+      // ── THE DEBT IS PAID (sc-rx-guarded:deb92207, wave 2) ─────────────────
+      //
+      // `ReachZoneParams.requireRailClear` was built at the address this note
+      // named (lessons/types.ts carries the design, `objectives.ts
+      // stepReachZone` the arm, `railVerdictHere` the read), shaped exactly
+      // like `requireControllerProceed`: earned on a frame the car is ON the
+      // authored band with `tick.railBarred` false, spent on a frame it is on
+      // the band with the arm down, carried by the `capMet` latch in between.
+      //
+      // MEASURED THROUGH `applyTick` ON THIS DRILL'S OWN THREE RECORDINGS
+      // (`__tests__/rail-clear-gate.test.ts`): the shadow — which waits out the
+      // 40 s barred window and crosses after the lift — still completes; the
+      // two ❌ demos this note named, both billed «Влизане на прелез при
+      // спусната бариера», no longer do. That is the whole of what changed.
+      //
+      // WHAT IS NOT CLOSED BY THIS, and it is the larger half of the row: the
+      // −10 on the steered CORRECT leg is a correct conviction of a harness
+      // that crept onto the band at cyclePos ≈ 25. This demand stops the drill
+      // certifying a barred crossing; it does not make a barred crossing pass,
+      // and nothing here touches the rule engine's arm.
+      //
+      // AND THE TITLE STAYS AS IT IS. It says «стигни края … отвъд прелеза» —
+      // arrival past the crossing — which is exactly what the disc plus the
+      // demand now prove together. Promoting it back to «след вдигането» would
+      // re-issue a claim about the ARM's history that a single earned frame
+      // does not carry, and this family has retired that sentence three times.
       titleBg: "Стигни края на отсечката отвъд прелеза",
-      params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
+      params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6, requireRailClear: true },
     },
   ],
   rubric: { parTimeSec: 95 },
@@ -694,8 +721,15 @@ export const SC_RX_BARRIER_DROP: ScenarioSpec = {
       // rx-drop-v1 is a GUARDED span, so `tick.railBarred` is live here too and
       // the same unpaid half applies — see sc-rxg-finish for the demand this
       // gate is owed and who owns it.
+      //
+      // PAID HERE TOO (wave 2), and measured on this drill's own recordings
+      // rather than inherited from its sibling: `mistake-dive-barrier` — the
+      // drive that races the descending arm, billed RAIL_CROSSING_VIOLATION
+      // "entered-barred" — completed this disc at t = 42.1 s with the barrier
+      // still down and never lifted. It no longer does, and the shadow still
+      // does. See `__tests__/rail-clear-gate.test.ts`.
       titleBg: "Стигни края на отсечката отвъд прелеза",
-      params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6 },
+      params: { kind: "reachZone", x: RX_LANE, y: 285, radiusM: 6, requireRailClear: true },
     },
   ],
   rubric: { parTimeSec: 110 },

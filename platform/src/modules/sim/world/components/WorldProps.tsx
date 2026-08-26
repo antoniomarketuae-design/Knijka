@@ -100,6 +100,7 @@ import {
   LENS_GLASS_HEX,
   LENS_R_M,
 } from "./signalLensLook";
+import { snowCoverOnBeforeCompile, snowCoverProgramCacheKey } from "../textures/snowCover";
 import {
   drawWorldLabel,
   WORLD_LABEL_GAP_M,
@@ -619,9 +620,40 @@ function composeParkingKit(pieces: {
   return composeCluster(parts);
 }
 
+/**
+ * SNOW LIES ON PROPS TOO — and until 2026-08-26 nothing in this file could see
+ * it. `sc-ac-snow` brightened its carriageway (StaticWorld's
+ * `roadSurfaceToParams`) and left the tree canopies full summer green, the
+ * parapet railing bare and every bollard, bench, lamp column and signal visor
+ * exactly as it renders in July: the audit's own words for the w11 re-drive
+ * were „the green full-leaf tree carries nothing … the dark railing run beside
+ * the pavement carries nothing — beside a verge and pavement that are now
+ * white". One missing term across five materials, not five defects.
+ *
+ * The hook is per-FRAGMENT against the world normal, because a prop is not a
+ * road: a whole-material tint would wash the underside of a canopy as brightly
+ * as its top and stop it reading as a tree. See `textures/snowCover.ts` for the
+ * full reasoning and for the identity property that makes this free everywhere
+ * else — at snowIntensity 0 the injected `mix` is `x * 1.0 + y * 0.0`, so every
+ * dry, rain, fog and night lesson renders the bytes it rendered before.
+ *
+ * SIGN FACES AND SIGNAL LENSES ARE NOT IN THIS SET, deliberately: `bakeSign`
+ * hands each numeral its own `faceMaterial` and the lamps run their own
+ * `MeshBasicMaterial`, so the surfaces the rule engine grades the student on
+ * stay exactly as legible under snow as they are dry.
+ */
 function makeSharedMaterials(): PropAssets["materials"] {
-  const std = (metalness: number, roughness: number, envMapIntensity: number) =>
-    new THREE.MeshStandardMaterial({ vertexColors: true, metalness, roughness, envMapIntensity });
+  const std = (metalness: number, roughness: number, envMapIntensity: number) => {
+    const m = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      metalness,
+      roughness,
+      envMapIntensity,
+    });
+    m.onBeforeCompile = snowCoverOnBeforeCompile;
+    m.customProgramCacheKey = snowCoverProgramCacheKey;
+    return m;
+  };
   return {
     signBody: std(0.5, 0.5, 1.4), // galvanised poles/brackets catch the sky
     signalHousing: std(0.3, 0.55, 1.3),

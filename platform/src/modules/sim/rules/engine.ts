@@ -37,6 +37,14 @@
  *    charged ONCE: the re-bill carries `regrade`, and `lessons/engine.ts` drops
  *    it when the code has already been charged (exam mode, a repeat offence, a
  *    grade-on-sight policy), so one continuous breach can never cost twice.
+ *  - THE SAME RE-GRADE NOW COVERS THE TWO SECOND-DEGREE SPEED CODES
+ *    (SPEED_REGRADE_SEC, six seconds — the derivation is at the constant): an
+ *    overspeed still running after the card, and a speed still too fast for the
+ *    rain/fog/snow/night envelope after the card, are billed once more. Without it a
+ *    59-in-a-50 drive shorter than the 20 s `speedingRepeatSec` cadence — which
+ *    is most of the catalogue's lessons — reached its debrief on «Второстепенни
+ *    0 0 · ИЗДЪРЖАН · +100 XP», and the conditions code, which has no cadence at
+ *    all, was free at any length. Same `regrade` discipline, same drop.
  *  - Both pedestrian-crossing violations can fire on one crossing (approach
  *    too fast, then still failing to yield) — they are distinct mistakes and
  *    each deserves immediate feedback. Any опасна already fails the session.
@@ -238,12 +246,24 @@ export interface RuleEngineState {
     lastQualifyingStopAt: number | null;
   };
   speedingMinor: EpisodeState;
+  /**
+   * The POST-TEACH RE-GRADE clock for `speedingMinor` — a second, longer
+   * sustain on the SAME condition and the SAME reset, so the continuing
+   * overspeed is billed once more `SPEED_REGRADE_SEC` of driving after the
+   * first bill. Separate state rather than a parameter on the episode above
+   * because the two answer different questions and must not share a clock: the
+   * first bill is „he is speeding", this one is „he is STILL speeding, after we
+   * told him". See `SPEED_REGRADE_SEC` for the frames.
+   */
+  speedingMinorRegrade: EpisodeState;
   speedingDangerous: EpisodeState;
   seatbelt: EpisodeState;
   handbrake: EpisodeState;
   headlights: EpisodeState;
   laneKeeping: EpisodeState;
   conditionsSpeed: EpisodeState;
+  /** The post-teach re-grade clock for `conditionsSpeed` — see `speedingMinorRegrade`. */
+  conditionsSpeedRegrade: EpisodeState;
   rainLights: EpisodeState;
   /** Driving in FOG without front fog lamps (AC-03, чл. 74). */
   fogLights: EpisodeState;
@@ -832,6 +852,107 @@ const STANDING_DUTY_REGRADE_SEC = 10;
 const STANDING_DUTY_MAX_BILLS = 2;
 
 /**
+ * THE SAME RE-GRADE, FOR THE TWO SECOND-DEGREE **SPEED** CODES — seconds of
+ * driving after the first bill (w11 · lane „grade-blind-to-speed", 2026-08-26).
+ *
+ * ── WHAT WAS PHOTOGRAPHED ────────────────────────────────────────────────────
+ * `sc-hazard-obstacle__pc-wrong/04-t012s.png` and its four siblings
+ * (`sc-vu-pass-clearance`, `sc-follow-tailgater`, `sc-sp-wet-limit-plate`,
+ * `sc-signal-response`, all `.audit-frames/w11/frames/…/04-t012s.png`): В26 disc
+ * **50**, «РЕЖИМ Нормален ≤60 · знакът важи», cluster **59 км/ч**, held from the
+ * first drive beat to the debrief — and the debrief reads «Опасни 0 0 · Основни
+ * 1 3 · Второстепенни 0 0 · ИЗДЪРЖАН · +100 XP», where the single основна is the
+ * harness's own unbuckled belt and nothing at all is booked for the speed.
+ * `sc-ac-truck-spray__pc-wrong/04-t034s.png` is the same silence one code over:
+ * disc **140**, «РЕЖИМ Нормален ≤150 · знакът важи · задачата иска ≤80», cluster
+ * **128 км/ч**, heavy rain — and the driving is filed under «Учебни моменти (не
+ * влизат в точките): • Несъобразена с условията скорост», i.e. at zero, so the
+ * 130 км/ч leg and the 17 км/ч leg of that lesson get byte-identical cards.
+ *
+ * ── WHY, AND IT IS NOT THE BANDS ─────────────────────────────────────────────
+ * Driven through this reducer, a flat 59 in a 50 held for 47 s bills
+ * SPEEDING_OVER_LIMIT three times (t=6.6 / 26.6 / 46.6). The bands are right.
+ * What is wrong is that the drives above are SHORTER than the cadence:
+ *  · SPEEDING_OVER_LIMIT re-bills on `speedingRepeatSec` = **20 s**, and those
+ *    five legs run 17–18 s from their first moving beat to the debrief (their
+ *    own `run.log`: 04-t001s … 04-t017s, then 07-end), so the SECOND bill lands
+ *    after the student has already been told he passed;
+ *  · SPEED_TOO_FAST_FOR_CONDITIONS is on plain `stepEpisode` — ONE bill per
+ *    episode, ever, however long the breach runs, so it is free at any length.
+ * Either way the drive produces exactly ONE event, and the founder-approved
+ * teach-first free mini-lesson (`scenarios/policy.ts`) spends it. Both codes are
+ * второстепенни, i.e. precisely the constituency A12's warn-once floor covers,
+ * so for a CONTINUING breach „one warning, then grade" reduces to „never
+ * grade". The debrief then prints the engine's own promise — «Първата среща не
+ * се наказва … При повторение вече влиза в изпитния лист» — over a drive that
+ * never got a повторение because the reducer never asked a second time.
+ *
+ * That is verbatim the defect `STANDING_DUTY_REGRADE_SEC` above was written to
+ * close, and that block already knew the speed cadence was too slow: „the
+ * engine's existing 20 s repeat cadence (`speedingRepeatSec`) would have
+ * expired AFTER the drive and moved nothing." The six one-switch duties were
+ * repaired; the speed codes were left on the old model. This is the same repair
+ * on the same argument.
+ *
+ * ── WHY SIX AND NOT THE DUTIES' TEN ──────────────────────────────────────────
+ * Both halves of the number are this engine's own declared units, one of each:
+ *  · `speedingRearmSec` = 4 — „a correction that counts" (the M-16 hysteresis,
+ *    and the same figure `WRONG_WAY_REARM_SEC` borrows for the same idea);
+ *  · `speedingMinorSustainSec` = 2 — „this is a fault and not a blip", the
+ *    window that billed him the first time.
+ * Six seconds is therefore „he was given the time this engine calls a
+ * correction, did not take it, and then held the fault for as long as it took
+ * to bill him in the first place". It is deliberately SHORTER than the duties'
+ * ten because the corrective act is different in kind: the belt and the lamps
+ * need a hand on a control that may be wanted for the manoeuvre, and ten
+ * seconds was argued as generous for exactly that; the whole of the correction
+ * here is lifting off the accelerator, which is the first line of the card the
+ * student has just dismissed, and every metre in between is the offence still
+ * being committed.
+ * And — the same clause `STANDING_DUTY_REGRADE_SEC` argues for itself — it has
+ * to reach the drives the audit photographed. Those five legs are over the
+ * graced limit from their second drive beat to the end, i.e. for roughly 12–15 s
+ * of driving (`run.log`: 04-t001s at 14 км/ч, 04-t006s at 56–57, then 04-t012s
+ * and 04-t017s at 59, then 07-end), so a bill at first + 10 s would land at or
+ * past the debrief and move nothing, while first + 6 s lands with a margin. That
+ * is spending the margin in the direction that costs a real overspeed a point
+ * rather than the direction that lets it go free — which is the right way round
+ * for a RE-GRADE of a fault this engine has already billed, and would not be for
+ * a fresh accusation.
+ *
+ * ── TWO BILLS ARE STILL NOT TWO CHARGES ──────────────────────────────────────
+ * The re-grade carries `regrade: true`, so `lessons/engine.ts` DROPS it whenever
+ * the code has already been charged — exam mode, a repeat offence, a
+ * grade-on-sight policy. In exam mode the ledger is therefore byte-identical to
+ * today. It exists only to reach the charge the free lesson consumed.
+ *
+ * ── WHAT THIS DELIBERATELY DOES NOT TOUCH ────────────────────────────────────
+ *  · SPEEDING_DANGEROUS — опасна, so `policyForViolation` returns
+ *    „always-grade" and its FIRST bill is the charge. A re-grade there is dead
+ *    by construction (`alreadyCharged` drops it on the same tick it is built),
+ *    and its `repeatSec` is 0 on an argued safety ruling. Nothing to add.
+ *  · SPEED_TOO_FAST_FOR_CURVE — основна (3 т.) and currently the subject of an
+ *    OPEN false-positive row (`sc-sp-curve:45e7e4fb`: the card fires on a car
+ *    that has left the carriageway entirely). Doubling a bill that is under
+ *    suspicion of convicting the innocent is the wrong direction to move first;
+ *    it is left alone until that row is settled.
+ *  · THE TASK CAP, and this is the half of „grade-blind-to-speed" that is NOT
+ *    closed here. `sc-ac-truck-spray`'s own strip paints «задачата иска ≤80»
+ *    beside a 140 disc while the car does 128, and NOTHING in this file can see
+ *    that 80: `readSpeedContract` (`scene/lessonSpeedContract.ts`) resolves
+ *    posted-vs-task-vs-mode and names the BINDING number, `hud/StatusDashboard
+ *    .tsx` paints it, and the reducer grades `tick.maxSpeedKmh` — the road's
+ *    posted limit — and nothing else. The objective's own cap reaches the glass
+ *    and the objective gate (`lessons/objectives.ts` `capMet`) and never the
+ *    изпитен лист. Feeding it here would mean grading a DRILL INSTRUCTION as a
+ *    Наредба № 38 fault across ~950 capped objectives, i.e. a founder decision
+ *    with a lawRef and a severity, not a bug fix — the same line
+ *    `lessons/advisor.ts` draws at its own 32 above-the-street gates. Filed,
+ *    not patched.
+ */
+const SPEED_REGRADE_SEC = 6;
+
+/**
  * WRONG_WAY on an АВТОМАГИСТРАЛА — the card names the road the student is on
  * (w10-4, sc-merge-accel-lane:93685d58, 2026-08-25).
  *
@@ -1033,12 +1154,14 @@ export function createRuleEngine(config?: Partial<RuleEngineConfig>): RuleEngine
     scanStopCreditSec: { left: 0, right: 0 },
     stop: { stoppedSince: null, lastQualifyingStopAt: null },
     speedingMinor: { ...IDLE_EPISODE },
+    speedingMinorRegrade: { ...IDLE_EPISODE },
     speedingDangerous: { ...IDLE_EPISODE },
     seatbelt: { ...IDLE_EPISODE },
     handbrake: { ...IDLE_EPISODE },
     headlights: { ...IDLE_EPISODE },
     laneKeeping: { ...IDLE_EPISODE },
     conditionsSpeed: { ...IDLE_EPISODE },
+    conditionsSpeedRegrade: { ...IDLE_EPISODE },
     rainLights: { ...IDLE_EPISODE },
     fogLights: { ...IDLE_EPISODE },
     snowLights: { ...IDLE_EPISODE },
@@ -1092,12 +1215,14 @@ function cloneState(s: RuleEngineState): RuleEngineState {
     scanStopCreditSec: { ...s.scanStopCreditSec },
     stop: { ...s.stop },
     speedingMinor: { ...s.speedingMinor },
+    speedingMinorRegrade: { ...s.speedingMinorRegrade },
     speedingDangerous: { ...s.speedingDangerous },
     seatbelt: { ...s.seatbelt },
     handbrake: { ...s.handbrake },
     headlights: { ...s.headlights },
     laneKeeping: { ...s.laneKeeping },
     conditionsSpeed: { ...s.conditionsSpeed },
+    conditionsSpeedRegrade: { ...s.conditionsSpeedRegrade },
     rainLights: { ...s.rainLights },
     fogLights: { ...s.fogLights },
     snowLights: { ...s.snowLights },
@@ -1797,10 +1922,11 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   // Carried as `detail` (see consequences.ts encodeSpeedMeasurement) so
   // `deriveSpeedingBand` can name the student's own rung.
   const speedDetail = encodeSpeedMeasurement(speed, limit);
+  const speedingMinorCond = speed > bands.gradedAbove && speed <= bands.dangerousAbove;
   if (
     stepSustainedEpisode(
       s.speedingMinor,
-      speed > bands.gradedAbove && speed <= bands.dangerousAbove,
+      speedingMinorCond,
       speedReset,
       t,
       cfg.speedingMinorSustainSec,
@@ -1809,6 +1935,35 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
     )
   ) {
     events.push(makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }));
+  }
+  // THE RE-GRADE THE FREE LESSON CONSUMED (SPEED_REGRADE_SEC — the frames and
+  // the whole argument are there). The SAME condition and the SAME reset as the
+  // bill above, on a sustain that is `SPEED_REGRADE_SEC` longer — so it can
+  // only ever fire AFTER that bill has already fired, never instead of it, and
+  // it fires exactly once per continuous overspeed.
+  //
+  // It is additive on purpose: `stepSustainedEpisode`'s own cadence is left
+  // byte-identical, so every bill this reducer produces today it still produces
+  // at the same instant, and the 20 s ladder — which the M-16 note says must
+  // keep making sustained speeding cost monotonically more than corrected
+  // speeding — is untouched. What is added is ONE bill, marked `regrade`, which
+  // `lessons/engine.ts` drops the moment the code has already been charged. So
+  // in exam mode, on a repeat offence and under a grade-on-sight policy the
+  // ledger does not move at all; it moves only where the single bill was spent
+  // on the teach and the student was charged nothing.
+  if (
+    stepEpisode(
+      s.speedingMinorRegrade,
+      speedingMinorCond,
+      speedReset,
+      t,
+      cfg.speedingMinorSustainSec + SPEED_REGRADE_SEC,
+    )
+  ) {
+    events.push({
+      ...makeViolation("SPEEDING_OVER_LIMIT", t, { detail: speedDetail }),
+      regrade: true,
+    });
   }
   // THE REPEAT CADENCE STOPS AT THE ОПАСНА LINE (2026-08-18, the redrive).
   //
@@ -2065,16 +2220,38 @@ export function reduceTick(prev: RuleEngineState, tick: SimTick): ReduceResult {
   const conditionLimit = limit * conditionFactor;
   const tooFastForConditions =
     conditionsReduced && moving && speed > conditionLimit && speed <= bands.gradedAbove;
+  const conditionsSpeedReset = !conditionsReduced || speed <= conditionLimit;
   if (
     stepEpisode(
       s.conditionsSpeed,
       tooFastForConditions,
-      !conditionsReduced || speed <= conditionLimit,
+      conditionsSpeedReset,
       t,
       cfg.conditionsSpeedSustainSec,
     )
   ) {
     events.push(makeViolation("SPEED_TOO_FAST_FOR_CONDITIONS", t));
+  }
+  // …AND THE RE-GRADE, because the bill above is the only one this episode will
+  // EVER produce (`stepEpisode` sets `emitted` once and never re-arms without a
+  // correction), so the teach-first free lesson is the whole consequence of
+  // driving an entire wet/foggy/snowy/night section too fast for it. Measured
+  // on `sc-ac-truck-spray/pc-wrong`: 128 км/ч in rain against a conditions
+  // envelope of 119 (140 × 0.85), filed under «Учебни моменти (не влизат в
+  // точките)» and priced at zero, while the 17 км/ч leg of the same lesson got
+  // the identical card. Same condition, same reset, a sustain longer by
+  // SPEED_REGRADE_SEC, and `regrade: true` so it is dropped wherever the code
+  // was already charged — see SPEED_REGRADE_SEC.
+  if (
+    stepEpisode(
+      s.conditionsSpeedRegrade,
+      tooFastForConditions,
+      conditionsSpeedReset,
+      t,
+      cfg.conditionsSpeedSustainSec + SPEED_REGRADE_SEC,
+    )
+  ) {
+    events.push({ ...makeViolation("SPEED_TOO_FAST_FOR_CONDITIONS", t), regrade: true });
   }
 
   // Curve-advisory overspeed (SP-05 „скорост в завой" — the CURVE-ENVELOPE

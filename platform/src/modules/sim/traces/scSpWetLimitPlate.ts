@@ -70,7 +70,38 @@ export function scSpWetLimitPlateShadowScript(): DriveScript {
       // the caption is not made false — it is made to say WHOSE weather it is,
       // and then hands the student the check. Same repair as the fog lesson's
       // «Сянката кара с фарове за мъгла…».
-      { kind: "annotation", textBg: "Мокра ли е настилката — както в този запис — табелата „при мокра настилка — 40“ важи и таванът е 40 км/ч. Суха ли е, тя мълчи и важи основното 50." },
+      //
+      // ── AND THAT REPAIR WAS OVERTURNED BY ITS OWN QUOTE (wave 2) ──────────
+      //
+      // It shipped «Мокра ли е настилката — КАКТО В ТОЗИ ЗАПИС — табелата …
+      // важи и таванът е 40 км/ч. Суха ли е, тя мълчи и важи основното 50.» and
+      // was closed as „conditional in both directions … says nothing about
+      // today". Читателят на закритието го опроверга с неговия собствен цитат:
+      // «както в този запис» is neither conditional nor about nothing. It is a
+      // flat assertion that the recording the student is about to press play on
+      // is WET — and `.audit-frames/w11/frames/sc-sp-wet-limit-plate__pc-right/
+      // 01-arrival.png` is that sentence painted on the glass over a dry,
+      // sunlit street, clear sky, wipers parked.
+      //
+      // WHY THE ASSERTION IS FALSE ON SCREEN EVEN THOUGH THE RECORDING IS WET.
+      // The demo is a SHADOW CAR replayed inside the LIVE scene, and the
+      // playback carries no weather of its own: `modules/sim/environment/
+      // weather.ts` §3b makes `lesson.environment.{rain,fog,snow}` the ONE
+      // authored field feeding both the picture (SimEnvironment →
+      // setWeatherTarget) and the graded tick. `templates-speed2.ts` ships this
+      // template `conditions: { weather: "dry" }` with rain first appearing at
+      // L3, and the harness drives «Ниво 1 — Пълна помощ». So on the rung the
+      // student is standing on, „this recording" IS his own dry road. The
+      // `rain: true` two lines down is the RECORDER's envelope — it makes the
+      // ghost's 38 км/ч honest against the rain band — and it is not, and
+      // cannot be, a render instruction.
+      //
+      // SO THE CAPTION STOPS POINTING AT THE PICTURE ALTOGETHER. It states the
+      // plate's rule in both directions and hands the student the check, which
+      // is true at every rung of the alternating ladder and at every offset of
+      // the replay clock — the same escape instruction 3 already uses. Nothing
+      // about the recording, the ghost or the weather is claimed by it.
+      { kind: "annotation", textBg: "Табелата „при мокра настилка — 40“ важи само при мокра настилка: тогава таванът е 40 км/ч. Суха ли е — тя мълчи и важи основното 50. Първо гледай настилката, после текста." },
       // Low beams ON, set explicitly: the recorder's DAY default is "off",
       // which would itself grade HEADLIGHTS_OFF_IN_RAIN.
       { kind: "headlights", setting: "low" },

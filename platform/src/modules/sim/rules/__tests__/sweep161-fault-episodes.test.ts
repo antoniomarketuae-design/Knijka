@@ -369,7 +369,22 @@ describe("speeding — the repeat cadence stops at the опасна line", () =>
     // 200 s at 57 in a 50 is ten второстепенни, ten наказателни точки, a fail
     // against the allowance of nine. One bill would be a PASS, and that is the
     // one direction a scorer may never move (rules/scoring.ts's header).
-    expect(billsOf("SPEEDING_OVER_LIMIT", overspeed(57, 200))).toBe(10);
+    //
+    // ELEVEN SINCE w11, and the eleventh is the RE-GRADE, not a cadence change:
+    // the ten cadence bills are still at 2, 22, 42 … 182 and the extra one is at
+    // 8 (SPEED_REGRADE_SEC), carrying `regrade: true`. It exists to reach the
+    // charge the teach-first free lesson spends on the FIRST bill, and
+    // `lessons/engine.ts` drops it wherever that bill was already charged — so
+    // in exam mode this count is still ten. The cadence itself is what this row
+    // guards, and it is asserted below rather than left implied in a total.
+    const bills = drive(overspeed(57, 200))
+      .events.filter((e) => e.kind === "violation" && e.code === "SPEEDING_OVER_LIMIT")
+      .map((e) => [Number(e.t.toFixed(1)), e.kind === "violation" && e.regrade === true] as const);
+    expect(bills.filter(([, isRegrade]) => !isRegrade).map(([t]) => t)).toEqual([
+      2, 22, 42, 62, 82, 102, 122, 142, 162, 182,
+    ]);
+    expect(bills.filter(([, isRegrade]) => isRegrade).map(([t]) => t)).toEqual([8]);
+    expect(billsOf("SPEEDING_OVER_LIMIT", overspeed(57, 200))).toBe(11);
   });
 
   it("sustained dangerous speeding is still never cheaper than oscillating (M-16)", () => {

@@ -370,9 +370,32 @@ export interface TrafficConfig {
   seed: number;
   vehicleCount: number;
   pedestrianCount: number;
+  /**
+   * Ambient PAVEMENT walkers — people on the footway who never step onto the
+   * carriageway. See the „SIDEWALK-ONLY WALKERS" block in `pedestrians.ts` for
+   * the four rows this closes and, more importantly, for why raising
+   * `pedestrianCount` instead would have spawned nobody: 84 of the 105
+   * committed districts declare zero crossings, and every crossing walker is
+   * anchored on one.
+   *
+   * DEFAULT 0, DELIBERATELY, and it is the one thing about this field that
+   * must not change casually. Every recorded trace, every clip-capture feed
+   * and ~50 unit fixtures build their traffic system through this same config;
+   * a non-zero default would put people into all of them at once and break the
+   * recorded-trace byte-identity contract. The LIVE lesson path
+   * (`components/sim/LessonScene`) is the only caller that passes a number.
+   */
+  sidewalkPedestrianCount: number;
   laneWidthM: number;
   /** Road classes vehicle routes never use (parking aisles look wrong). */
   excludedRoadClasses: string[];
+  /**
+   * Road classes that carry no footway, so no ambient pavement walker is ever
+   * seeded on them. A motorway with people on the verge is a worse lie than a
+   * motorway with nobody on it — `sc-mw-emergency-lane` and
+   * `sc-fo-motorway-gap` both drive `mw-v1`, which is `motorway` end to end.
+   */
+  footwaylessRoadClasses: string[];
   /** Concentrate traffic near this district point (usually the player spawn)
    *  so agents are visible where the driver actually is. Omit to scatter
    *  routes across the whole district (legacy behaviour). */
@@ -418,10 +441,13 @@ export const DEFAULT_TRAFFIC_CONFIG: TrafficConfig = {
   seed: 1,
   vehicleCount: 10,
   pedestrianCount: 8,
+  // 0 — see the field's own comment. The live scene opts in; nothing else does.
+  sidewalkPedestrianCount: 0,
   // MUST match the world/runtime lane width (3.25 m × perceptual road scale)
   // or NPC lane centers drift off the painted lanes.
   laneWidthM: 3.25 * PERCEPTUAL_ROAD_SCALE,
   excludedRoadClasses: ["service"],
+  footwaylessRoadClasses: ["motorway", "motorway_link", "trunk", "trunk_link", "service"],
 
   accelMps2: 1.8,
   comfortDecelMps2: 2.2,

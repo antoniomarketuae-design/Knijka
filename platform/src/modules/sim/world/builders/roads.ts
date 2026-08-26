@@ -45,6 +45,7 @@ import {
 } from "./math2d";
 import { MeshAccumulator, toWorld, UP } from "./mesh";
 import { isBareVergeSide, type NodeInfo, type RoadNetwork } from "./network";
+import type { District } from "../types";
 import {
   clipIntoRingBoundary,
   clipOutOfIslands,
@@ -481,13 +482,103 @@ function buildCornerAprons(acc: MeshAccumulator, node: NodeInfo, patch: Junction
 }
 
 // ---------------------------------------------------------------------------
+// The kerb a CAR PARK still has to have
+// ---------------------------------------------------------------------------
+
+/**
+ * THE LOT AISLE — the one carriageway in the product that is driven on every
+ * lesson it appears in and was dressed by nothing.
+ *
+ * MEASURED, on the shipped builder, before it was called a defect. Every one
+ * of the 14 committed `scenario-lot` maps is one `residential` APPROACH
+ * (y ∈ [-120, -30]) plus one `service` AISLE (y ∈ [-30, +40]), and all fourteen
+ * parking drills happen on the aisle. `buildWorldGeometry(lot-gap-long-v1, {})`
+ * on 2026-08-26 returned `stats.sidewalkStrips = 2` and a sidewalk mesh
+ * spanning district y ∈ [-118.80, -33.23]: the kerb stops 3.2 m short of the
+ * gate node and never enters the lot, while `roadSurface` runs the full
+ * y ∈ [-120, +40]. So the asphalt the student parks on has no edge of any kind.
+ *
+ * WHY IT HAPPENS. `SIDEWALK_CLASSES` does not contain `service`, and it is
+ * right not to: the two OSM city districts author 58 and 68 `service` edges
+ * apiece — every driveway, alley and delivery lane in Studentski grad — and a
+ * 3.5 m raised pavement down each of those is a different world, not a repair.
+ * The gate is the CLASS; the thing that is wrong is the MAP KIND.
+ *
+ * WHY IT MATTERS MORE THAN „the lot looks bare". sc-park-gap-long task 2 reads
+ * «влез НАПРЕД в мястото и спри УСПОРЕДНО НА БОРДЮРА» (ЗДвП чл. 94) and
+ * sc-park-gap-short's briefing says the same. The бордюр the task names is the
+ * referent the student is asked to judge his car against, and it was not in the
+ * world: w11 `sc-park-gap-long__pc-right/04-t076s.png` is that task chip over a
+ * windscreen with no kerb anywhere in it. A drill cannot grade — or even pose —
+ * a manoeuvre whose subject the world does not draw.
+ *
+ * THE GEOMETRY, checked on all 14 maps before a single triangle was emitted
+ * (`__tests__/lot-aisle-has-a-kerb.test.ts` re-checks it on every run): the
+ * aisle's built half width is 8.125 m and the OUTERMOST corner of any painted
+ * bay on any lot map is 7.53 m from the aisle centreline. The kerb face
+ * therefore lands 0.595 m outside the last bay corner on every map — outside
+ * the paint, never through it, which is the guard that this cannot quietly
+ * regrade a bay by fencing part of it off.
+ *
+ * WHAT IT CANNOT DO, because the question was asked before the change and not
+ * after: it cannot book a fault. The kerb top is `CURB_HEIGHT_M` = 0.12 m; the
+ * chassis collider's underside sits ~0.3 m above the road (`vehicle/tuning`:
+ * wheel anchor -0.1, suspension rest 0.3, wheel radius 0.32, half-extent y
+ * 0.35), so a 12 cm kerb cannot reach it and `VehicleRig.onCollisionEnter`
+ * cannot fire on one — which matters because every compiled scenario lesson
+ * runs at `collisionMinKmh: 0`. And the sidewalk mesh's only other consumer,
+ * the drivable-surface index, feeds `surfaceUnderCar`, which on 2026-08-26 had
+ * no non-test reader anywhere in the tree. Additive in the world, silent in the
+ * grader.
+ *
+ * FOUR GATES, all of them the ones `buildWorldGeometry`'s own lot passes use:
+ * a district must be given at all, `meta.mapKind` must be exactly
+ * `"scenario-lot"` (14 of 105 committed maps), and only its `service` edges are
+ * named. Every city / exam / полигон / street district builds byte-identically,
+ * including `pe-dart-v1`'s service alley and `mg-property-v1`'s service drive,
+ * which are streets' furniture and not a car park's.
+ */
+export function lotAisleKerbEdgeIds(district: District | undefined): ReadonlySet<string> {
+  if (!district) return EMPTY_EDGE_IDS;
+  // DistrictMeta is an open record, so the kind arrives typed `unknown`; the
+  // typeof is what lets the literal comparison through (the zoneSigns.ts /
+  // lotApronFootprint pattern).
+  const mapKind = district.meta.mapKind;
+  if (typeof mapKind !== "string" || mapKind !== "scenario-lot") return EMPTY_EDGE_IDS;
+  const ids = new Set<string>();
+  for (const edge of district.roads.edges) {
+    if (edge.class === LOT_AISLE_CLASS) ids.add(edge.id);
+  }
+  return ids.size > 0 ? ids : EMPTY_EDGE_IDS;
+}
+
+/** A car-park aisle's own road class — the same string `MARKED_CLASSES` keeps
+ *  out of the lane-line pass with the same reading („a car-park aisle, a
+ *  driveway and a delivery lane"). Bay paint, not lane lines — but a kerb. */
+const LOT_AISLE_CLASS = "service";
+
+const EMPTY_EDGE_IDS: ReadonlySet<string> = new Set<string>();
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * `district` is optional and carries exactly one decision: whether an edge that
+ * no class set kerbs is nonetheless a CAR PARK's roadway (`lotAisleKerbEdgeIds`
+ * above). Omitting it reproduces the pre-2026-08-27 build byte for byte, which
+ * is what keeps a caller that has no district honest rather than silently
+ * different. The two shipped callers — `buildWorldGeometry` and
+ * `runtime/surface.resolveDistrictDrivableSurface` — both pass it, and
+ * `drivable-surface.test.ts`'s 105-district census agreement is what fails if
+ * one of them ever stops.
+ */
 export function buildRoads(
   network: RoadNetwork,
   rings: readonly RoundaboutRing[] = [],
+  district?: District,
 ): RoadBuildResult {
+  const kerbedEdgeIds = lotAisleKerbEdgeIds(district);
   // Registered ring edge → its roundabout, so the outer kerb below is built
   // against the ring it actually belongs to (a district may hold several).
   const ringByEdgeId = new Map<string, RoundaboutRing>();
@@ -563,7 +654,10 @@ export function buildRoads(
           sidewalkStripCount++;
         }
       }
-    } else if (SIDEWALK_CLASSES.has(eb.edge.class) && !eb.edge.roundabout) {
+    } else if (
+      (SIDEWALK_CLASSES.has(eb.edge.class) || kerbedEdgeIds.has(eb.edge.id)) &&
+      !eb.edge.roundabout
+    ) {
       // Pull sidewalk ends back a little so junction corners stay open.
       const lineLen = polylineLength(eb.line);
       if (lineLen > 6) {

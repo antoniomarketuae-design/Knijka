@@ -277,6 +277,148 @@ export function buildPedRoute(
   return { segments };
 }
 
+// ---------------------------------------------------------------------------
+// SIDEWALK-ONLY WALKERS — the empty-pavement class, and why a crossing could
+// never have populated these streets.
+//
+// FOUR MAJOR ROWS, ONE SENTENCE, w11: sc-sp-limit-end „a city street lined
+// with parked cars on the right kerb and railings on the left, and not one
+// pedestrian on either pavement in 207 s of frames on either platform";
+// sc-vu-emergency „a four-lane city boulevard with tower blocks both sides …
+// and not a single pedestrian on either pavement in any frame of either drive
+// on either platform"; sc-sp-eco-coast the same of a signalled boulevard;
+// sc-vu-cyclist-hook the same of a junction in a lesson built ENTIRELY around
+// vulnerable road users — „the only human the world contains is the single
+// scripted cyclist".
+//
+// THE OBVIOUS FIX IS A NO-OP, AND THAT IS THE FINDING UNDER THE FINDING.
+// `SCENARIO_DEFAULT_TRAFFIC.pedestrianCount` is 0 (lessons/scenario/compile.ts),
+// so the first move anyone makes is to raise it. Measured over the 105
+// committed districts in `platform/public/world`: **84 of them declare ZERO
+// crossings.** Every pedestrian this file has ever built is anchored on a
+// `DistrictCrossing` (`buildPedRoute` takes one and returns null without it),
+// so on `sp-signs-v1`, `sx-v1`, `ln-v1` and `vu-cyclist-v1` — the four maps
+// those four rows were photographed on, 0 crossings between them — raising the
+// count would have spawned NOBODY and the ledger would have banked a repair
+// that changes not one pixel. That is the dead-predicate class this audit
+// keeps measuring, and it would have been earned here by reading a constant
+// instead of the data under it.
+//
+// SO THE WALK IS ANCHORED ON THE EDGE, and it deliberately has no `cross`
+// segment. That is not a simplification, it is the whole safety argument:
+//
+//   · `crossingCounts` is incremented ONLY from `setOnRoad`, which is called
+//     ONLY for a segment of kind "cross". A route made of walk segments can
+//     never touch it, so `TrafficSystem.pedestrianOnCrossing` — and through
+//     `runtime.setPedestrianQuery`, the rule engine's crossing duties — cannot
+//     see these agents at all. compile.ts's own reason for keeping ambient
+//     pedestrians at zero is „ambient pedestrians on a junction drill would arm
+//     crossing duties the copy never mentions", and that reason survives this
+//     change intact: nothing here arms anything.
+//   · The lateral line is `pedSidewalkOffsetM`, unchanged and shared — the
+//     same B14/FR-21 geometry the crossing walkers use, so a pavement walker
+//     cannot end up inside a parked body or out on the carriageway by a route
+//     the audited one already proved safe.
+//   · The only other live reader of `traffic.pedestrians` is
+//     `components/sim/NpcColliders`, whose near-miss tracker opens a window at
+//     0.75 m of body clearance and is documented there as a NON-GRADED stat. A
+//     walker stands `PED_STAND_BACK_M` past the kerb, i.e. metres outside the
+//     travel lane, so it cannot open one from the carriageway — and if the
+//     student mounts the pavement, a near-miss with a person there is the
+//     honest reading.
+// ---------------------------------------------------------------------------
+
+/** Shortest edge worth walking, m — below this the out-and-back is a pirouette. */
+export const SIDEWALK_MIN_EDGE_M = 60;
+/** Half-length band of one walker's out-and-back beat, m. */
+const SIDEWALK_BEAT_MIN_M = 55;
+const SIDEWALK_BEAT_MAX_M = 130;
+
+/**
+ * Build a PAVEMENT loop along `edge`: out along one side and back, no
+ * carriageway span anywhere in it. `side` is +1 for the right of the edge
+ * direction and −1 for the left (the same convention `buildPedRoute` uses for
+ * its two sidewalks). `anchorS` is the arc length the beat is centred on, so
+ * the caller can put walkers where the driver actually is.
+ *
+ * Returns null when the edge is too short or too degenerate to host a walk —
+ * the same contract `buildPedRoute` has, so the caller's loop is unchanged.
+ */
+export function buildPedSidewalkRoute(
+  edge: DistrictEdge,
+  laneWidthM: number,
+  side: 1 | -1,
+  anchorS: number,
+  rng: Rng,
+): PedRoute | null {
+  if (edge.geometry.length < 2) return null;
+  const center = offsetPolyline(edge.geometry, 0);
+  if (center.length < SIDEWALK_MIN_EDGE_M) return null;
+
+  const sC = Math.min(Math.max(anchorS, 0), center.length);
+  const half = rngRange(rng, SIDEWALK_BEAT_MIN_M, SIDEWALK_BEAT_MAX_M);
+  const s0 = Math.max(0, sC - Math.min(half, sC));
+  const s1 = Math.min(center.length, sC + Math.min(half, center.length - sC));
+  if (s1 - s0 < SIDEWALK_MIN_EDGE_M * 0.5) return null;
+
+  const sideOff = pedSidewalkOffsetM(edge, laneWidthM);
+  const pts = subPolyline(center.px, center.py, center.cum, s0, s1);
+  const walk = offsetPolyline(pts, side * sideOff);
+  if (!(walk.length > SIDEWALK_MIN_EDGE_M * 0.5)) return null;
+
+  const out: number[][] = [];
+  for (let i = 0; i < walk.px.length; i++) out.push([walk.px[i], walk.py[i]]);
+  const back = [...out].reverse();
+
+  const segments: PedSegment[] = [
+    makeSegment("walk", null, out, 0, 0, 0, 0),
+    makeSegment("walk", null, back, 0, 0, 0, 0),
+  ];
+  for (const seg of segments) if (!(seg.length > 0.2)) return null;
+  return { segments };
+}
+
+/**
+ * How many pavement walkers a district can carry, from the district's own
+ * walkable kerb length. The caller may override it (a lesson's `traffic
+ * .sidewalkPedestrianCount`); this is what the live scene asks for when nobody
+ * has said otherwise.
+ *
+ * DERIVED AND NOT CHOSEN, in both directions:
+ *
+ *   · one walker per 90 m of walkable EDGE — measured against the maps the
+ *     four rows were filed on, that is 4 on `ln-v1` (a 400 m two-lane street),
+ *     3 on `vu-cyclist-v1`, 8 on `sp-signs-v1` and 4 on `sx-v1`. Both
+ *     pavements of a 400 m street with four people on them is a quiet
+ *     residential street, which is what those maps depict; it is not a crowd
+ *     and it is not the empty film set the frames show today.
+ *   · the ceiling is `DEFAULT_LESSON_TRAFFIC.pedestrianCount` (20, the city
+ *     value the full `district-v1` has run at since doc 74 §5.5) minus room
+ *     for the crossing walkers that map also seeds, so no district ever
+ *     carries more people than the one the renderer was tuned on.
+ *   · a district whose walkable edges are all shorter than
+ *     `SIDEWALK_MIN_EDGE_M` gets ZERO rather than a rounded-up one: the
+ *     parking lots are exactly that shape, and one person pacing a 30 m aisle
+ *     reads as a bug, not as a street.
+ */
+export const SIDEWALK_METRES_PER_WALKER = 90;
+export const SIDEWALK_BUDGET_MAX = 12;
+
+export function ambientSidewalkBudget(
+  district: { roads: { edges: readonly DistrictEdge[] } },
+  footwaylessRoadClasses: readonly string[],
+): number {
+  const footwayless = new Set(footwaylessRoadClasses);
+  let walkableM = 0;
+  for (const e of district.roads.edges) {
+    if (footwayless.has(e.class)) continue;
+    if (e.geometry.length < 2 || e.length < SIDEWALK_MIN_EDGE_M) continue;
+    walkableM += e.length;
+  }
+  if (walkableM <= 0) return 0;
+  return Math.min(SIDEWALK_BUDGET_MAX, Math.round(walkableM / SIDEWALK_METRES_PER_WALKER));
+}
+
 export function createPedestrianAgent(
   id: number,
   route: PedRoute,

@@ -434,7 +434,11 @@ export function buildWorldGeometry(
   // „not a proper round-about … a Round a bout is a Cyrcle" defect (doc 87
   // FR-22). Empty on every district that registers none.
   const rings = analyzeRoundabouts(district, network);
-  const roads = buildRoads(network, rings);
+  // `district` is passed for ONE decision the network cannot carry: a
+  // `scenario-lot` map's `service` aisle is a car park's roadway and gets the
+  // kerb the drill's own task names («спри успоредно на бордюра»). See
+  // `roads.lotAisleKerbEdgeIds` for the measurement and the four gates.
+  const roads = buildRoads(network, rings, district);
   // Standing-water sheets over waterPatch zone spans (aquaplane visibility
   // slice) — one merged mesh, zero quads on every map without live spans.
   const water = buildWaterDecals(district, network);

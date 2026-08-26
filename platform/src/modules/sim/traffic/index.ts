@@ -110,6 +110,17 @@ export type {
   TrafficLayerProps,
 } from "./TrafficLayer";
 export { DEFAULT_TRAFFIC_CONFIG } from "./types";
+// AMBIENT PAVEMENT POPULATION — how many walkers a district's own kerb length
+// supports. Published because the LIVE scene is the only caller that may ask
+// for them (`TrafficConfig.sidewalkPedestrianCount` defaults to 0 so recorded
+// traces and clip feeds stay byte-identical); the four empty-pavement rows and
+// the crossing-anchoring measurement behind it are in `pedestrians.ts`.
+export {
+  ambientSidewalkBudget,
+  SIDEWALK_BUDGET_MAX,
+  SIDEWALK_METRES_PER_WALKER,
+  SIDEWALK_MIN_EDGE_M,
+} from "./pedestrians";
 // A11 hittable traffic — pure proximity/near-miss helpers for the physics
 // shell pool (components/sim/NpcColliders binds them to rapier).
 export {

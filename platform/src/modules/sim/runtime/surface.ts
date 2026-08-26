@@ -479,7 +479,13 @@ export function resolveDrivableSurface(meshes: DrivableSurfaceMeshes): DrivableS
 export function resolveDistrictDrivableSurface(district: District): DrivableSurface {
   const network = analyzeNetwork(district);
   const rings = analyzeRoundabouts(district, network);
-  const roads = buildRoads(network, rings);
+  // `district` third, exactly as `buildWorldGeometry` calls it: it is what
+  // tells `buildRoads` that a `scenario-lot` map's `service` aisle is a car
+  // park's roadway and carries a kerb. Dropping it here would leave the
+  // headless index 32 sidewalk vertices short of the one LessonScene runs on,
+  // on all 14 lot maps — the same drift the paragraph above records for the
+  // refuge island, and the same census that catches it.
+  const roads = buildRoads(network, rings, district);
   // buildWorldGeometry's TWO sidewalk writers, in ITS order. Both raise kerbed
   // furniture into the very accumulator `buildRoads` just returned, and paint
   // into a markings accumulator nothing here reads:

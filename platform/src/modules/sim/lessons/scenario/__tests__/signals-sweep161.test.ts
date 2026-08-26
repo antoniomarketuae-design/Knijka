@@ -363,9 +363,16 @@ describe("§2 every committed shadow ribbon clears every building on its own map
 
 interface DriveOutcome {
   /** Codes the recorder's own rule engine saw, with the second they fired. */
-  engineCodes: Array<{ code: string; tSec: number }>;
+  engineCodes: Array<{ code: string; tSec: number; regrade: boolean }>;
   /** Codes the LESSON SESSION billed — what the debrief and the score read. */
   sessionCodes: string[];
+  /**
+   * The second the SESSION stopped grading. The recorder's own engine keeps
+   * reducing every tick the script produces, so the two lists above can and do
+   * diverge past this instant — see §3's re-grade assertion, which is entirely
+   * about that gap.
+   */
+  endedAtSec: number | null;
   score: number;
   passed: boolean;
   objectivesDone: boolean[];
@@ -402,10 +409,11 @@ function drive(
   return {
     engineCodes: rec.ruleEvents
       .filter((e) => e.kind === "violation")
-      .map((e) => ({ code: e.code, tSec: e.t })),
+      .map((e) => ({ code: e.code, tSec: e.t, regrade: e.regrade === true })),
     sessionCodes: session.events
       .filter((e) => e.kind === "violation")
       .map((e) => (e as { code: string }).code),
+    endedAtSec: session.endedAtSec ?? null,
     score: result.score,
     passed: result.passed,
     objectivesDone: result.objectives.map((o) => o.done),
@@ -478,9 +486,10 @@ describe("§3 sc-signal-hesitation — the acquittal is the coach's, not the les
     // sxh-v1's boulevard is posted 50 and speedingBands puts второстепенна at
     // 55 and опасна at 60, so a held 59 is squarely a graded overspeed. It
     // fires; the session simply does not carry it.
-    expect(out.engineCodes.map((e) => e.code)).toEqual(["SPEEDING_OVER_LIMIT"]);
+    expect(out.engineCodes[0].code).toBe("SPEEDING_OVER_LIMIT");
     expect(out.engineCodes[0].tSec).toBeGreaterThan(6);
     expect(out.engineCodes[0].tSec).toBeLessThan(12);
+    expect(out.engineCodes[0].regrade).toBe(false);
   });
 
   it("THE CAUSE, and it is not in this file: второстепенна warns once before it grades", () => {
@@ -493,8 +502,41 @@ describe("§3 sc-signal-hesitation — the acquittal is the coach's, not the les
     // THE PIN THAT MATTERS: the gap between the two lists. The day the coach,
     // the policy or the debrief changes, this goes red and is re-read rather
     // than staying quietly true.
-    expect(out.engineCodes.length).toBe(1);
     expect(out.sessionCodes.length).toBe(0);
+  });
+
+  it("…and the w11 re-grade is emitted but arrives AFTER this lesson has ended", () => {
+    /**
+     * `rules/engine.ts SPEED_REGRADE_SEC` bills a continuing overspeed a second
+     * time six driving seconds after the first — the bill the teach-first free
+     * lesson consumed — and `lessons/engine.ts` charges it whenever the code
+     * was not already charged. That is what should move the five audit legs
+     * this lane was filed on (`sc-vu-pass-clearance`, `sc-follow-tailgater`,
+     * `sc-sp-wet-limit-plate`, `sc-jx-priority-confidence`,
+     * `sc-hazard-obstacle`): each of their debriefs carries a seatbelt re-grade
+     * stamped 0:38–0:44 — ten driving seconds after the belt's first bill — and
+     * each drive runs on past it (`sc-hazard-obstacle`'s route objectives are
+     * ticked at 0:36 / 0:43 / 0:46), so there is a window for a six-second speed
+     * re-grade where there was none for the twenty-second cadence. That is an
+     * inference off timestamps, not an attestation; the drive settles it.
+     *
+     * THIS DRIVE IS THE COUNTER-CASE, and it is recorded rather than papered
+     * over: the reducer emits the re-grade at ≈14.9 s, and this session has
+     * already ENDED at ≈12.6 s — the route ran out — so nothing reaches the
+     * sheet and `sessionCodes` above is still empty. A drive whose whole
+     * gradeable window after the card is under six seconds is still free.
+     *
+     * DO NOT ANSWER THIS BY SHORTENING SPEED_REGRADE_SEC: at ~3 s the re-grade
+     * stops being „he was told and kept doing it" and becomes grade-on-sight,
+     * which is the founder-ratified teach-first ruling, not a bug. The honest
+     * owner is the LESSON END — an episode still open when the route runs out
+     * was never corrected, and `lessons/engine.ts buildLessonResult` is where
+     * that can be seen. Filed, not patched here.
+     */
+    const speeding = out.engineCodes.filter((e) => e.code === "SPEEDING_OVER_LIMIT");
+    expect(speeding.map((e) => e.regrade)).toEqual([false, true]);
+    expect(out.endedAtSec).not.toBeNull();
+    expect(speeding[1].tSec).toBeGreaterThan(out.endedAtSec!);
   });
 
   it("…and the drill's own code cannot cover for it: hesitation needs a standstill", () => {

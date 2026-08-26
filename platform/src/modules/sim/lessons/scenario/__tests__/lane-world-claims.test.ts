@@ -695,13 +695,73 @@ describe("§4 no briefing asserts weather the rung it ships to does not have", (
     const SHIPPED =
       "Основно ограничение 50, но табелата „при мокра настилка — 40“ важи: вали. Таванът ни е 40 км/ч.";
     expect(assertingSentences(SHIPPED, ASSERTS_WET).length).toBeGreaterThan(0);
-    // …and the replacement is a QUESTION to the student, true on both halves of
-    // the alternating ladder — the same escape the instruction copy uses.
+    // …and the replacement states the plate's rule in both directions and
+    // points at nothing — true on both halves of the alternating ladder, the
+    // same escape the instruction copy uses.
     const FIXED =
-      "Мокра ли е настилката — както в този запис — табелата „при мокра настилка — 40“ важи и таванът е 40 км/ч. Суха ли е, тя мълчи и важи основното 50.";
+      "Табелата „при мокра настилка — 40“ важи само при мокра настилка: тогава таванът е 40 км/ч. Суха ли е — тя мълчи и важи основното 50. Първо гледай настилката, после текста.";
     expect(assertingSentences(FIXED, ASSERTS_WET)).toEqual([]);
     expect(captionsOf(specById("sc-sp-wet-limit-plate"))).toContain(FIXED);
     expect(captionsOf(specById("sc-sp-wet-limit-plate"))).not.toContain(SHIPPED);
+  });
+
+  /**
+   * ── THE FORM `ASSERTS_WET` CANNOT SEE, AND THE ROUND IT COST ──────────────
+   *
+   * The version of the case above that shipped between these two asserted
+   * «Мокра ли е настилката — КАКТО В ТОЗИ ЗАПИС — …» and called it „conditional
+   * in both directions … says nothing about today". It was overturned by its
+   * own quote: «както в този запис» is neither conditional nor about nothing.
+   * And nothing in this file could have caught it, for two compounding reasons
+   * worth writing down rather than re-discovering:
+   *
+   *  1. `IS_CONDITIONAL` exempts a whole SENTENCE if any clause of it is a
+   *     question, and bare «ли» is one of its tokens — so a sentence that opens
+   *     «Мокра ли е настилката» carries anything it likes after the dash.
+   *  2. `ASSERTS_WET` looks for «вали» / «настилката е мокра» / «пътят е мокър».
+   *     «както в този запис» contains none of them. Widening (1) would not have
+   *     helped: the clause has no wet token in it at all. The claim is DEICTIC —
+   *     it points at the picture — and a token matcher cannot see a pointer.
+   *
+   * SO THE POINTER ITSELF IS WHAT IS FORBIDDEN, and it is forbidden absolutely
+   * rather than conditionally: a demonstration caption may not describe the
+   * recording it belongs to. `TraceTimeline` replays the ghost inside the LIVE
+   * scene, whose weather is `lesson.environment` (environment/weather.ts §3b),
+   * so „as in this recording" is a claim about a picture the caption does not
+   * control and cannot be right about at more than one rung of an alternating
+   * ladder. Teach the rule; let the student read the road.
+   *
+   * BOTH DIRECTIONS PINNED, because a matcher that quietly stopped matching is
+   * the instrument bug this programme has shipped four times.
+   */
+  const POINTS_AT_THE_RECORDING = /(?<![\p{L}])(?:в|на) (?:този|тази|това) (?:запис|записа|демонстрация|демонстрацията|кадър|кадъра|видео|видеото)(?![\p{L}])/iu;
+
+  it("THE DEICTIC RULE — no caption describes the recording it plays inside", () => {
+    // Teeth first: the struck clause and two shapes of it must fire…
+    expect(POINTS_AT_THE_RECORDING.test("Мокра ли е настилката — както в този запис — табелата важи."))
+      .toBe(true);
+    expect(POINTS_AT_THE_RECORDING.test("В този запис вали и настилката е мокра.")).toBe(true);
+    expect(POINTS_AT_THE_RECORDING.test("Както в тази демонстрация, таванът е 40.")).toBe(true);
+    // …and the copy the lane legitimately ships must not. These are verbatim
+    // captions from this same trace and its siblings.
+    for (const innocent of [
+      "Табелата „при мокра настилка — 40“ важи само при мокра настилка: тогава таванът е 40 км/ч. Суха ли е — тя мълчи и важи основното 50. Първо гледай настилката, после текста.",
+      "Подминаваме табелата вече на 38 — таванът се чете от настилката, не се чака някой да го каже.",
+      "На мокър път спирачният път е около 1,4 пъти по-дълъг — 40 връща и разстоянието, и времето за реакция.",
+      "Премини решително едва когато лостът се вдигне ДОКРАЙ — бърз оглед наляво и надясно, без спиране върху релсите.",
+    ]) {
+      expect(POINTS_AT_THE_RECORDING.test(innocent), innocent).toBe(false);
+    }
+  });
+
+  it("…and no shipped caption in this lane's corpus breaks it", () => {
+    const offenders: string[] = [];
+    for (const spec of LANE_TEMPLATES) {
+      for (const c of captionsOf(spec)) {
+        if (POINTS_AT_THE_RECORDING.test(c)) offenders.push(`${spec.id}: «${c.slice(0, 90)}…»`);
+      }
+    }
+    expect(offenders, offenders.join("\n")).toEqual([]);
   });
 
   it("THE MUTATION — the struck wet-plate line fails on its own L1", () => {
